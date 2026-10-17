@@ -10,18 +10,31 @@ local render = addon:GetModule('Render')
 local drawable = addon:GetModule('Drawable')
 
 -- Scrollbox is a drawable that scrolls one child: a WowScrollBox with a MinimalScrollBar.
--- It hands the child the width left of the bar (or nothing, for a natural width), sizes the
--- scroll child to the height the child took, and reports the viewport it occupies: the
+-- It hands the child the width left of the bar's room (or nothing, for a natural width), sizes
+-- the scroll child to the height the child took, and reports the viewport it occupies: the
 -- child's height capped at MaxHeight when the window sizes to its content, or the fixed
--- Height of a window the player sized. The bar shows and hides itself
--- (SetHideIfUnscrollable): it is updated from the scroll box's own size, which the window
--- sets after this render. Each window owns one scroll box for its lifetime.
+-- Height of a window the player sized. A child's FitWidth goes up and a LayoutWidth comes down
+-- with the room added or taken off; FitHeight goes up as the child's height, the viewport that
+-- shows all of it. The bar shows and hides itself (SetHideIfUnscrollable): it
+-- is updated from the scroll box's own size, which the window sets after this render. A bag's
+-- box keeps the bar's room on both sides and shows the bar only while it is used
+-- (ScrollboxOptions). Each window owns one scroll box for its lifetime.
 ---@class Scrollbox: AceModule
 local scrollbox = addon:NewModule('Scrollbox')
 
 -- The width kept free for the scroll bar, whether or not it shows, so the content does not
 -- move when the bar appears.
 local BAR_WIDTH = 14
+
+-- The auto-hiding bar: how long it takes to fade in and out, and how long it stays after the
+-- last wheel scroll or after the pointer leaves its room.
+local FADE_IN = 0.15
+local FADE_OUT = 0.3
+local LINGER = 1
+
+---@class (exact) ScrollboxOptions
+---@field Symmetric? boolean Keep the bar's room on both sides, so the child is centered.
+---@field AutoHideBar? boolean Show the bar only while the wheel scrolls or the pointer is over its room.
 
 ---@class (exact) ScrollboxDrawable: Drawable
 ---@field frame Frame
@@ -31,6 +44,9 @@ local BAR_WIDTH = 14
 ---@field scrollView table
 ---@field child? Drawable
 ---@field plan? RenderPlan
+---@field symmetric boolean
+---@field barDriver? Frame Updates the auto-hiding bar each frame while the bar is shown.
+---@field barIdle number Seconds since the wheel last scrolled or the pointer left the bar's room.
 local scrollboxProto = drawable:Extend({}, 'ScrollboxFrame')
 
 -- SetChild makes child the drawable this box scrolls. The child it replaces is hidden and
@@ -48,7 +64,8 @@ function scrollboxProto:SetChild(child)
   child.renderParent = self
   child:SetParent(self.scrollChild)
   child:ClearAllPoints()
-  child:SetPoint({ Point = "TOPLEFT", RelativeTo = self.scrollChild, RelativePoint = "TOPLEFT" })
+  child:SetPoint({ Point = "TOPLEFT", RelativeTo = self.scrollChild, RelativePoint = "TOPLEFT",
+    XOffset = self.symmetric and BAR_WIDTH or 0 })
   child:Hide()
   self.plan = {
     Plan = {
@@ -69,6 +86,13 @@ function scrollboxProto:GetBarWidth()
   return BAR_WIDTH
 end
 
+-- GetGutterWidth returns the width the box keeps free beside its child: the bar's room, on the
+-- right, or on both sides for a symmetric box.
+---@return number
+function scrollboxProto:GetGutterWidth()
+  return self.symmetric and BAR_WIDTH * 2 or BAR_WIDTH
+end
+
 ---@return RenderPlan
 function scrollboxProto:GetRenderPlan()
   if self.plan == nil then
@@ -81,8 +105,10 @@ end
 ---@return RenderResult
 function scrollboxProto:PreRender(parentResult)
   local width = parentResult and parentResult.Width
+  local layoutWidth = parentResult and parentResult.LayoutWidth
   return {
-    Width = width and math.max(0, width - BAR_WIDTH) or nil,
+    Width = width and math.max(0, width - self:GetGutterWidth()) or nil,
+    LayoutWidth = layoutWidth and math.max(0, layoutWidth - self:GetGutterWidth()) or nil,
   }
 end
 
@@ -110,17 +136,51 @@ function scrollboxProto:Render(parentResult, _, results)
   self.scrollBar:SetAttribute("nodeignore", not scrollable)
   self.scrollBox:FullUpdate(true)
 
-  local width = parentResult and parentResult.Width or (childWidth + BAR_WIDTH)
-  return { Width = width, Height = viewport, Scrollable = scrollable }
+  local width = parentResult and parentResult.Width or (childWidth + self:GetGutterWidth())
+  local fit = childResult.FitWidth and childResult.FitWidth + self:GetGutterWidth() or nil
+  return { Width = width, Height = viewport, Scrollable = scrollable, FitWidth = fit, FitHeight = childHeight }
+end
+
+-- updateBar fades the auto-hiding bar in while the pointer is over its room on the right or the
+-- wheel scrolled less than LINGER seconds ago, and out otherwise. It runs every frame the bar is
+-- shown (Blizzard shows it only when the child does not fit).
+---@private
+---@param elapsed number
+function scrollboxProto:updateBar(elapsed)
+  local frame = self.frame
+  if frame:IsMouseOver(0, 0, frame:GetWidth() - BAR_WIDTH, 0) then
+    self.barIdle = 0
+  else
+    self.barIdle = self.barIdle + elapsed
+  end
+  local bar = self.scrollBar
+  local alpha = bar:GetAlpha()
+  if self.barIdle < LINGER then
+    alpha = math.min(1, alpha + elapsed / FADE_IN)
+  else
+    alpha = math.max(0, alpha - elapsed / FADE_OUT)
+  end
+  if alpha ~= bar:GetAlpha() then
+    bar:SetAlpha(alpha)
+  end
+end
+
+-- hideBar makes the auto-hiding bar invisible until the wheel or the pointer shows it.
+---@private
+function scrollboxProto:hideBar()
+  self.barIdle = LINGER
+  self.scrollBar:SetAlpha(0)
 end
 
 -- Create builds a scroll box parented to parent. The caller anchors sb.frame.
 ---@param parent Frame
 ---@param name? string
+---@param opts? ScrollboxOptions
 ---@return ScrollboxDrawable
-function scrollbox:Create(parent, name)
+function scrollbox:Create(parent, name, opts)
   ---@type ScrollboxDrawable
   local sb = drawable:Create(scrollboxProto)
+  sb.symmetric = opts ~= nil and opts.Symmetric == true
   local frame = CreateFrame("Frame", name, parent)
   local box = CreateFrame("Frame", name and (name .. "Box") or nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetAllPoints(frame)
@@ -146,5 +206,22 @@ function scrollbox:Create(parent, name)
   sb.scrollBar = bar
   sb.scrollChild = child
   sb.scrollView = view
+
+  if opts ~= nil and opts.AutoHideBar then
+    -- A child of the bar updates only while the bar is shown; it starts hidden each time the bar
+    -- reappears. Wheel scrolls reach the box's own OnMouseWheel, which scrolls it.
+    local driver = CreateFrame("Frame", nil, bar)
+    driver:SetScript("OnUpdate", function(_, elapsed)
+      sb:updateBar(elapsed)
+    end)
+    driver:SetScript("OnShow", function()
+      sb:hideBar()
+    end)
+    box:HookScript("OnMouseWheel", function()
+      sb.barIdle = 0
+    end)
+    sb.barDriver = driver
+    sb:hideBar()
+  end
   return sb
 end

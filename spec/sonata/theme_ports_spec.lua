@@ -43,6 +43,17 @@ local context = addon:GetModule("Context")
 
 local THEME_FILES = { "base", "default", "simpledark", "moonlight", "elvui", "gw2" }
 
+local FLAVORS = {
+  Retail = { isRetail = true },
+  Forever = { isRetail = true, isForever = true },
+  Era = { isClassic = true },
+  Anniversary = { isAnniversary = true },
+  TBC = { isBCC = true },
+  Mists = { isMists = true },
+  Cata = { isCata = true },
+}
+local FLAVOR_FLAGS = { "isRetail", "isForever", "isClassic", "isAnniversary", "isBCC", "isMists", "isCata" }
+
 describe("BetterBags' other themes", function()
   local originalSend, originalThemes
 
@@ -64,6 +75,32 @@ describe("BetterBags' other themes", function()
     events.SendMessage = originalSend
     sonata.themes = originalThemes
     db.GetTheme, db.SetTheme = originalGetTheme, originalSetTheme
+  end)
+
+  -- The bag's items have the same padding on both sides on every theme (window.md, centering):
+  -- each theme's bag insets, and the footer that lines up with them, are the same left and right,
+  -- on every client. A theme whose art is uneven would compensate here, with its measurements.
+  it("pads every theme's bag the same on both sides, on every client", function()
+    local saved = {}
+    for _, flag in ipairs(FLAVOR_FLAGS) do saved[flag] = addon[flag] end
+    local uneven = {}
+    for flavor, flags in pairs(FLAVORS) do
+      for _, flag in ipairs(FLAVOR_FLAGS) do addon[flag] = flags[flag] == true end
+      for key in pairs(sonata.themes) do
+        local bag = sonata:Resolve(key).Windows.Bag or {}
+        local insets = bag.Insets or {}
+        if (insets.Left or 0) ~= (insets.Right or 0) then
+          table.insert(uneven, string.format("%s on %s: insets %s/%s", key, flavor, tostring(insets.Left), tostring(insets.Right)))
+        end
+        local footer = bag.Layout and bag.Layout.Footer
+        if type(footer) == "table" and (footer.Left or 0) ~= (footer.Right or 0) then
+          table.insert(uneven, string.format("%s on %s: footer %s/%s", key, flavor, tostring(footer.Left), tostring(footer.Right)))
+        end
+      end
+    end
+    for _, flag in ipairs(FLAVOR_FLAGS) do addon[flag] = saved[flag] end
+    table.sort(uneven)
+    assert.are.same({}, uneven)
   end)
 
   local count = 0
@@ -163,7 +200,9 @@ describe("BetterBags' other themes", function()
           assert.are.equal(Enum.UITextureSliceMode[art[2]], bg._sliceMode, key)
           assert.is_nil(w.decoration:GetTemplateFrame(), key)
         end
-        assert.are.same({ Left = 18, Right = 24, Top = art[3], Bottom = 12 }, bag.decoration:GetInsets(), key)
+        -- The art's border is the same on both sides (dark-frame.png and parchment.png are opaque
+        -- the same distance in from the left and the right), so the padding is too.
+        assert.are.same({ Left = 18, Right = 18, Top = art[3], Bottom = 12 }, bag.decoration:GetInsets(), key)
       end
     end)
 
@@ -178,10 +217,10 @@ describe("BetterBags' other themes", function()
       assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 50, -15 }, { bag.decoration:GetTitleText():GetPoint(1) })
       assert.are.same({
         { Point = "TOPLEFT", X = 18, Y = -48 },
-        { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -24, Y = -68 },
+        { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -18, Y = -68 },
       }, layout.Search.Points)
       assert.are.equal(24, layout.Search.Reserve)
-      assert.are.same({ Left = 18, Right = 24, Bottom = 12, Height = 20, Reserve = 26 }, layout.Footer)
+      assert.are.same({ Left = 18, Right = 18, Bottom = 12, Height = 20, Reserve = 26 }, layout.Footer)
       -- Only Dark: Parchment and Slate keep Moonlight's.
       apply("Slate")
       assert.are.same({ { Point = "TOPLEFT", X = 8, Y = -6 } }, bag.decoration:GetLayout().MenuButton.Points)
@@ -207,7 +246,7 @@ describe("BetterBags' other themes", function()
         assert.is_nil(bg._sliceMargins, kind)
         assert.are.equal(0.6, bg:GetAlpha(), kind)
       end
-      assert.are.same({ Left = 18, Right = 24, Top = 40, Bottom = 12 }, windows.Bag.decoration:GetInsets())
+      assert.are.same({ Left = 18, Right = 18, Top = 40, Bottom = 12 }, windows.Bag.decoration:GetInsets())
       assert.are.equal("X", windows.Bag.decoration:GetCloseButton():GetText())
     end)
 

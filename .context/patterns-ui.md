@@ -182,3 +182,23 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 ## A Button's Font String Keeps Its Width When Its Font Changes
 **Problem**: a button's own font string (`button:SetFontString(fs)`, one anchor, no width) keeps the width it was sized to when its font object changes, and two fonts that look identical can measure differently: a shadow offset of 1 makes a string about 0.8 wider than a glow at offset 0. A settings navigation entry sized while hovered or selected (glow) wrapped onto a clipped second line in its normal role (shadow): "Import/" for "Import/Export" (render recording on WoW: Forever: width 110.0, string 110.8). Blizzard's reset, width 0 then the same text (`QuestLogTitleButton_Resize`), refreshed `GetStringWidth()` but not the width.
 **Solution**: after every font change (and when the entry is made), set the width to 0, set the button's text again, then set the width explicitly from `GetStringWidth()`, rounded up with a pixel to spare, as Blizzard sizes a tab after changing its font (`CRFRaidMarkersMixin:SetTab`). Sonata calls back a text's watcher after each font change (`sonata:WatchTextFont(fs, fn)`: role switches, themes, client rescales); `forms/layouts/stacked.lua` `fitNavText` uses it. To see such a bug, record rendering: every Sonata font change is a `text` entry with its width, string width and lines. See `.claude/rules/sonata.md` §3c.
+
+## SetPoint Takes Both Offsets or Neither
+**Problem**: `frame:SetPoint(point, relativeTo, relativePoint, x)` with a nil y offset: the client drops the x offset (a render recording showed a scroll box child anchored 14 in sitting at 0). Both offsets are required (`SimpleScriptRegionResizingAPIDocumentation`), Blizzard's UI never passes one alone, and the spec frame mock used to accept it.
+**Solution**: pass both, 0 for the one you do not need. `drawableProto:SetPoint` does it for drawables, and the frame mock now errors on one offset without the other, so a call site that breaks the contract fails its specs. See `.claude/rules/render-pipeline.md` §4a.
+
+## Measure Then Arrange
+**Problem**: a layout that positions frames while it measures cannot answer "how wide would this be?", so callers re-derive geometry with formulas that drift from what the layout does (snapped bag windows ended 5 to 111 px wider than their content).
+**Solution**: compute the layout as data first (`Flow:Pack`, `grid:Measure`, `section:Measure`, `view:Measure`, `canvas:Plan`), choose, then apply it (`Arrange`); one function places every cell (`gridProto:PlaceCell`), which is where an animation between two layouts would hook in. See `.claude/rules/render-pipeline.md` §4b.
+
+## Sizes Read From the Client Carry Float Error at a UI Scale
+**Problem**: at a UI scale (0.65 in the capture) `frame:GetWidth()` can return a hair under the size that was set (a window set to 466 read back just under it once it was anchored by its center). Code that compares such a value with whole-number layouts makes the wrong choice at exactly the fitting width: the bag rejected the layout it had just snapped to.
+**Solution**: round sizes read from the client before comparing them exactly. The window rounds the size it hands its content to a hundredth of a unit (`withoutFloatError`, `window/window.lua`), far below a pixel. See `.claude/rules/window.md` §3b.
+
+## Animate Layout Changes by Placing Parents Before Children
+**Problem**: animating a reshuffle (rows, sections, items) needs each frame's old place in the coordinate space of its new parent. Placing children before their parents meant an item moving into a section that had just appeared found that section unanchored, and could only jump.
+**Solution**: every placement goes through one function (`Motion:Place`, `render/motion.lua`) that anchors offsets from the parent, so each level animates on its own and they compose. Place parents first (containers, then sections, then items): when a child is placed its parent is already anchored where it visually starts (its old spot if moving, its final spot if new). Work out old positions from your own anchors (TOPLEFT to TOPLEFT, plus explicit links where Blizzard positions a frame), not from screen rectangles. See `.claude/rules/render-pipeline.md` §4c.
+
+## Keep the Frame Mock's Anchors Faithful
+**Problem**: the spec frame mock's `SetAllPoints` set no points and `SetPoint` appended a second point of the same name, unlike the client. Code that walks anchors (`GetPoint(1)`) behaved differently in specs than in game.
+**Solution**: `SetAllPoints` sets TOPLEFT and BOTTOMRIGHT, and `SetPoint` replaces a point already set (warcraft.wiki.gg). When a test relied on the old mock, fix the test, not the mock.

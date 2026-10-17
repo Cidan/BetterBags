@@ -40,6 +40,25 @@ local window = addon:NewModule('Window')
 -- How much of the screen's height a window sized to its content may take.
 local SCREEN_FRACTION = 0.9
 
+-- Snapping to the content after a resize: how long it takes, the share of it spent reaching the
+-- bounce, and how far past the content's width the bounce goes (a share of the distance, at
+-- most SNAP_OVERSHOOT). The bounce stays inside the room a bag's scroll box keeps on each side.
+local SNAP_DURATION = 0.35
+local SNAP_TURN = 0.65
+local SNAP_OVERSHOOT = 10
+local SNAP_OVERSHOOT_SHARE = 0.1
+
+-- At a UI scale the client reads a frame's size back with float error (a window set to 466 reads
+-- a hair under it), and content compares the size it is given with layouts that are whole
+-- numbers wide. Sizes handed to content are rounded to this fraction of a unit, far below a pixel.
+local SIZE_PRECISION = 100
+
+---@param value number
+---@return number
+local function withoutFloatError(value)
+  return math.floor(value * SIZE_PRECISION + 0.5) / SIZE_PRECISION
+end
+
 -- The resize grip without a theme's: Blizzard's chat size grabber, shown while hovered.
 local DEFAULT_GRIP = {
   Size = 16,
@@ -71,7 +90,8 @@ local DEFAULT_GRIP = {
 ---@field SizeMode? fun(): WindowSizeMode
 ---@field Size? fun(): number?, number? The size the player left it at, for the window mode.
 ---@field Resizable? boolean false: in the window mode it keeps its size and has no grip.
----@field OnResized? fun(ctx: Context, width: number, height: number) Called after the player resized it.
+---@field OnResized? fun(ctx: Context, width: number, height: number) Called after the player resized it (once a snap ends).
+---@field SnapToContent? fun(): boolean true: when the player lets go of the grip, the window shrinks to its content's width, and to its height when there is room below it.
 ---@field MinWidth? number|false|fun(): number The window's minimum width.
 ---@field MinHeight? number|false|fun(): number The window's minimum height.
 ---@field MinContentWidth? number|fun(): number The content box's minimum width.
@@ -107,8 +127,35 @@ local DEFAULT_GRIP = {
 ---@field gripHover boolean
 ---@field moving boolean
 ---@field sizing? boolean The player is sizing it (between the grip's mouse down and up).
+---@field fitWidth? number The narrowest width its content lays out the same in, from the last render.
+---@field fitHeight? number The height that shows all of its content without scrolling, from the last render.
+---@field snap? {from: number, to: number, overshoot: number, fromHeight: number, toHeight: number, overshootHeight: number, elapsed: number, contentWidth: number} The snap running.
+---@field snapDriver? Frame Steps a snap each frame.
 ---@field opts WindowOptions
 local windowProto = drawable:Extend({}, 'WindowFrame')
+
+-- SnapSizeAt returns a width or height of a snap from from to to at progress p (0 to 1): it eases
+-- out to overshoot past to by SNAP_TURN of the way, then settles back on to.
+---@param from number
+---@param to number
+---@param overshoot number
+---@param p number
+---@return number
+function window.SnapSizeAt(from, to, overshoot, p)
+  if p <= 0 then
+    return from
+  end
+  if p >= 1 then
+    return to
+  end
+  local low = to - overshoot
+  if p <= SNAP_TURN then
+    local q = p / SNAP_TURN
+    return from + (low - from) * (1 - (1 - q) ^ 3)
+  end
+  local q = (p - SNAP_TURN) / (1 - SNAP_TURN)
+  return low + overshoot * q * q * (3 - 2 * q)
+end
 
 ---@param value number|false|nil|fun(): number
 ---@return number?
@@ -277,6 +324,7 @@ function windowProto:WatchDrag()
     if self.opts.CanMove ~= nil and not self.opts.CanMove(ctx) then
       return
     end
+    self:FinishSnap()
     if self.opts.OnMoveStart ~= nil then
       self.opts.OnMoveStart(ctx)
     end
@@ -609,6 +657,7 @@ end
 function windowProto:Hide(ctx, callback)
   local _ = ctx
   local frame = self.frame
+  self:FinishSnap()
   if self.showAnimation ~= nil then
     self.showAnimation:Stop()
   end
@@ -790,6 +839,7 @@ function windowProto:styleResizeGrip()
       if button ~= "LeftButton" then
         return
       end
+      self:FinishSnap()
       trace(self, "resize start")
       self.sizing = true
       -- From where the player pressed (alwaysStartFromMouse, as Blizzard's PanelResizeButtonMixin
@@ -806,14 +856,9 @@ function windowProto:styleResizeGrip()
       self.frame:StopMovingOrSizing()
       self.sizing = false
       trace(self, "resize stopped")
-      self:KeepOnScreen()
-      trace(self, "on screen")
-      self:SavePosition()
-      trace(self, "position saved")
-      if self.opts.OnResized ~= nil then
-        self.opts.OnResized(ctx, self.frame:GetWidth(), self.frame:GetHeight())
+      if not self:startSnap(ctx) then
+        self:finishResize(ctx)
       end
-      self:Invalidate()
     end)
     addon.SetScript(grip, "OnEnter", function()
       self.gripHover = true
@@ -847,6 +892,111 @@ function windowProto:styleResizeGrip()
   self:updateGripAlpha()
 end
 
+-- finishResize ends a resize: the window is pulled back on the screen, its position and size
+-- are saved, and it lays out again.
+---@private
+---@param ctx Context
+function windowProto:finishResize(ctx)
+  self:KeepOnScreen()
+  trace(self, "on screen")
+  self:SavePosition()
+  trace(self, "position saved")
+  if self.opts.OnResized ~= nil then
+    self.opts.OnResized(ctx, self.frame:GetWidth(), self.frame:GetHeight())
+  end
+  self:Invalidate()
+end
+
+-- startSnap starts shrinking the window to its content's width after a resize, when its owner
+-- snaps it (SnapToContent) and the content leaves room to the sides. It lays the content out at
+-- the player's width first, which gives the content's narrowest width (fitWidth); the window
+-- never gets narrower than its minimum. The top left is pinned, so the edge the player dragged
+-- moves. It returns whether a snap started.
+---@private
+---@param ctx Context
+---@return boolean
+function windowProto:startSnap(ctx)
+  if self.opts.SnapToContent == nil or not self.opts.SnapToContent() then
+    return false
+  end
+  render:RenderNow(self, { ctx = ctx })
+  local frame = self.frame
+  local from, fromHeight = frame:GetWidth(), frame:GetHeight()
+  local minWidth, minHeight = self:minimumSize()
+  local to = self.fitWidth and math.max(minWidth, self.fitWidth) or from
+  local toHeight = self.fitHeight and math.max(minHeight, self.fitHeight) or fromHeight
+  -- A snap only shrinks: a side whose target is not at least half a pixel smaller keeps its size.
+  if from - to < 0.5 then
+    to = from
+  end
+  if fromHeight - toHeight < 0.5 then
+    toHeight = fromHeight
+  end
+  if to == from and toHeight == fromHeight then
+    return false
+  end
+  local left, top = frame:GetLeft(), frame:GetTop()
+  if left ~= nil and top ~= nil then
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+  end
+  local insets = self:GetContentInsets()
+  self.snap = {
+    from = from,
+    to = to,
+    overshoot = math.max(0, math.min(SNAP_OVERSHOOT, (from - to) * SNAP_OVERSHOOT_SHARE, to - minWidth)),
+    fromHeight = fromHeight,
+    toHeight = toHeight,
+    overshootHeight = math.max(0, math.min(SNAP_OVERSHOOT, (fromHeight - toHeight) * SNAP_OVERSHOOT_SHARE, toHeight - minHeight)),
+    elapsed = 0,
+    contentWidth = to - insets.Left - insets.Right,
+  }
+  if self.snapDriver == nil then
+    -- A child of the window: it hides with the window (Escape included), which ends the snap.
+    self.snapDriver = CreateFrame("Frame", nil, frame)
+    self.snapDriver:SetScript("OnHide", function()
+      self:FinishSnap()
+    end)
+  end
+  self.snapDriver:SetScript("OnUpdate", function(_, elapsed)
+    self:stepSnap(elapsed)
+  end)
+  trace(self, "snap start")
+  return true
+end
+
+-- stepSnap moves a running snap one frame along its bounce.
+---@private
+---@param elapsed number
+function windowProto:stepSnap(elapsed)
+  local snap = self.snap
+  if snap == nil then
+    return
+  end
+  snap.elapsed = snap.elapsed + elapsed
+  local p = math.min(1, snap.elapsed / SNAP_DURATION)
+  self.frame:SetSize(window.SnapSizeAt(snap.from, snap.to, snap.overshoot, p),
+    window.SnapSizeAt(snap.fromHeight, snap.toHeight, snap.overshootHeight, p))
+  self:Invalidate()
+  if p >= 1 then
+    self:FinishSnap()
+  end
+end
+
+-- FinishSnap ends a running snap at its size and saves the resize. It does nothing when no
+-- snap runs. The player grabbing the grip, moving the window or hiding it ends a snap.
+function windowProto:FinishSnap()
+  local snap = self.snap
+  if snap == nil then
+    return
+  end
+  self.snap = nil
+  self.snapDriver:SetScript("OnUpdate", nil)
+  self.frame:SetSize(snap.to, snap.toHeight)
+  trace(self, "snapped")
+  self:finishResize(context:New('WindowSnapped'))
+end
+
 ---@return RenderPlan
 function windowProto:GetRenderPlan()
   return self.plan
@@ -858,8 +1008,9 @@ function windowProto:PreRender()
   local vertical = insets.Top + insets.Bottom
   if self:GetSizeMode() == "window" then
     return {
-      Width = math.max(0, self.frame:GetWidth() - insets.Left - insets.Right),
-      Height = math.max(0, self.frame:GetHeight() - vertical),
+      Width = math.max(0, withoutFloatError(self.frame:GetWidth()) - insets.Left - insets.Right),
+      Height = math.max(0, withoutFloatError(self.frame:GetHeight()) - vertical),
+      LayoutWidth = self.snap and self.snap.contentWidth or nil,
     }
   end
   local _, screen = self:screenSize()
@@ -879,8 +1030,10 @@ function windowProto:Render(_, options, results)
     if result == nil then
       error("a window's content returned no render result")
     end
+    local insets = self:GetContentInsets()
+    self.fitWidth = result.FitWidth and result.FitWidth + insets.Left + insets.Right or nil
+    self.fitHeight = result.FitHeight and result.FitHeight + insets.Top + insets.Bottom or nil
     if self:GetSizeMode() == "content" then
-      local insets = self:GetContentInsets()
       local minWidth, minHeight = self:minimumSize()
       local width = math.max(minWidth, (result.Width or 0) + insets.Left + insets.Right)
       local height = math.max(minHeight, (result.Height or 0) + insets.Top + insets.Bottom)

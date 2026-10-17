@@ -90,6 +90,7 @@ const.DATABASE_DEFAULTS = {
     firstTimeMenu = true,
     enabled = true,
     enableBagFading = false,
+    animateItemMovement = false,
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
@@ -226,6 +227,14 @@ describe("Database", function()
     it("GetShowBankTabs / SetShowBankTabs", function()
       DB:SetShowBankTabs(true)
       assert.is_true(DB:GetShowBankTabs())
+    end)
+
+    it("GetAnimateItemMovement / SetAnimateItemMovement, off until turned on", function()
+      assert.is_false(DB:GetAnimateItemMovement())
+      DB:SetAnimateItemMovement(true)
+      assert.is_true(DB:GetAnimateItemMovement())
+      DB:SetAnimateItemMovement(false)
+      assert.is_false(DB:GetAnimateItemMovement())
     end)
 
     it("GetEnableBagFading / SetEnableBagFading", function()
@@ -382,6 +391,21 @@ describe("Database", function()
       assert.are.equal("content", DB:GetBagSizeMode(const.BAG_KIND.BACKPACK))
       DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
       assert.are.equal("window", DB:GetBagSizeMode(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("snaps every bag window to its content unless turned off, per view", function()
+      DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
+      assert.is_true(DB:GetBagSnapToContent(const.BAG_KIND.BACKPACK))
+      assert.is_true(DB:GetBagSnapToContent(const.BAG_KIND.BANK))
+      DB:SetBagSnapToContent(const.BAG_KIND.BACKPACK, false)
+      assert.is_false(DB:GetBagSnapToContent(const.BAG_KIND.BACKPACK))
+      assert.is_true(DB:GetBagSnapToContent(const.BAG_KIND.BANK))
+      DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_ALL_BAGS)
+      assert.is_true(DB:GetBagSnapToContent(const.BAG_KIND.BACKPACK))
+      DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
+      assert.is_false(DB:GetBagSnapToContent(const.BAG_KIND.BACKPACK))
+      DB:SetBagSnapToContent(const.BAG_KIND.BACKPACK, true)
+      assert.is_true(DB:GetBagSnapToContent(const.BAG_KIND.BACKPACK))
     end)
 
     it("rejects a size mode it does not know", function()

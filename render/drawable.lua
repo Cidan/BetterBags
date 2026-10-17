@@ -104,8 +104,15 @@ function drawableProto:ClearAllPoints()
 end
 
 ---@param point Point
+-- SetPoint anchors the frame. The client takes both offsets or neither
+-- (SimpleScriptRegionResizingAPIDocumentation): an x offset given with a nil y offset was dropped,
+-- so a missing offset is 0 when the other is given.
 function drawableProto:SetPoint(point)
-  self.frame:SetPoint(point.Point, point.RelativeTo, point.RelativePoint, point.XOffset, point.YOffset)
+  local x, y = point.XOffset, point.YOffset
+  if x ~= nil or y ~= nil then
+    x, y = x or 0, y or 0
+  end
+  self.frame:SetPoint(point.Point, point.RelativeTo, point.RelativePoint, x, y)
 end
 
 function drawableProto:Hide()

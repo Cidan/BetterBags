@@ -132,7 +132,8 @@ describe("RenderRecorder", function()
         headerContainer = frameIn(canvasFrame, 0, 0, 386, 50),
         tabContainer = frameIn(canvasFrame, 0, -50, 386, 400),
         footerContainer = frameIn(canvasFrame, 0, -450, 386, 50),
-        GetLayout = function(_, width) return { itemsPerRow = width and 4 or 5, columns = 2 } end,
+        plan = { itemsPerRow = 4, columns = 2, width = 372 },
+        plannedFor = 385.99997,
       },
       globalSections = { ["Recent Items"] = section("Recent Items", 8, { "0_1" }) },
       currentView = { sections = { Armor = section("Armor", 4, { "0_2", "0_3" }) } },
@@ -170,18 +171,139 @@ describe("RenderRecorder", function()
     assert.are.same({ recording }, BetterBagsPerfDB.renderRecordings)
   end)
 
+  -- A frame Motion is moving shows where it started and where it goes, as offsets from the frame it
+  -- hangs from (render/motion.lua): a snapshot is taken as the window renders, when its moves start,
+  -- so its positions are the starts.
+  it("says which sections, items and containers are moving, from where to where", function()
+    local w = newWindow({ 640, 480 })
+    local bag = fakeBag(w)
+    local motion = addon:GetModule("Motion")
+    motion:Init()
+    local armor = bag.currentView.sections.Armor
+    local moved, still = armor.content.cells[2].frame, armor.content.cells[1].frame
+    local tab, canvasFrame = bag.canvas.tabContainer, bag.canvas.frame
+    local k = {}
+    motion:BeginPass(k)
+    motion:Place(moved, armor.frame, 47, -20)
+    motion:Place(still, armor.frame, 6, -20)
+    motion:Place(armor.frame, w.frame, 10, -60)
+    motion:Place(tab, canvasFrame, 0, -50)
+    motion:EndPass()
+    motion:BeginPass(k)
+    motion:Place(moved, armor.frame, 6, -61)
+    motion:Place(still, armor.frame, 6, -20)
+    motion:Place(armor.frame, w.frame, 200, -60)
+    motion:Place(tab, canvasFrame, 0, -80)
+    motion:EndPass()
+    local lines = recorder:Snapshot(w)
+    motion:Init()
+    local function lineWith(start)
+      for _, line in ipairs(lines) do
+        if line:find(start, 1, true) then return line end
+      end
+      return ""
+    end
+    local text = table.concat(lines, "\n")
+    assert.is_truthy(lineWith("  item 0_3 "):find(" moving from 47.0,-20.0 to 6.0,-61.0", 1, true), text)
+    assert.is_truthy(lineWith("view section Armor "):find(" moving from 10.0,-60.0 to 200.0,-60.0", 1, true), text)
+    assert.is_truthy(lineWith("canvas "):find(" | tab moving from 0.0,-50.0 to 0.0,-80.0", 1, true), text)
+    assert.is_nil(lineWith("  item 0_2 "):find("moving", 1, true), text)
+    assert.is_nil(lineWith("canvas "):find("footer moving", 1, true), text)
+  end)
+
+  -- The width a layout was chosen for, exactly: a layout exactly as wide as its window is rejected
+  -- when the window reads back a hair narrower (a retail recording at scale 0.65), which one
+  -- decimal cannot show.
+  it("gives the exact width the canvas planned for, or that it was sized to its content", function()
+    local w = newWindow({ 640, 480 })
+    local bag = fakeBag(w)
+    local text = table.concat(recorder:Snapshot(w), "\n")
+    assert.is_truthy(text:find(" for=385.999970 ", 1, true), text)
+    bag.canvas.plannedFor = nil
+    text = table.concat(recorder:Snapshot(w), "\n")
+    assert.is_truthy(text:find(" for=content ", 1, true), text)
+  end)
+
   it("describes a bag down to its item buttons: scroll, canvas layout, sections, items", function()
     local w = newWindow({ 640, 480 })
     fakeBag(w)
     local lines = recorder:Snapshot(w)
     local text = table.concat(lines, "\n")
     assert.is_truthy(text:find("scroll @6.0,42.0 400.0x300.0 child 500.0 bar=false", 1, true), text)
-    assert.is_truthy(text:find("canvas @6.0,42.0 386.0x500.0 layout ipr=4 columns=2 header=50.0 tab=400.0 footer=50.0", 1, true), text)
+    assert.is_truthy(text:find("canvas @6.0,42.0 386.0x500.0 layout ipr=4 columns=2 width=372.0 for=385.999970 header=50.0 tab=400.0 footer=50.0", 1, true), text)
     assert.is_truthy(text:find("global section Recent Items ipr=8 cells=2 shown=true @10.0,60.0 180.0x90.0", 1, true), text)
     assert.is_truthy(text:find("view section Armor ipr=4 cells=3", 1, true), text)
     assert.is_truthy(text:find("  item 0_2 @16.0,80.0 37.0x37.0", 1, true), text)
     assert.is_truthy(text:find("  item 0_3 @57.0,80.0 37.0x37.0", 1, true), text)
     assert.is_truthy(text:find("  gap", 1, true), text)
+  end)
+
+  -- How far the bag's items (and its sections, titles included) are from each side of the
+  -- window, and how far in the theme's border art ends: a template's NineSlice edges, or a
+  -- backdrop's edge. Left and right should match on every theme (window.md, centering).
+  describe("padding", function()
+    local function paddingLine(w)
+      for _, line in ipairs(recorder:Snapshot(w)) do
+        if line:find("^padding ") then return line end
+      end
+    end
+
+    it("measures the items and sections from each side of the window", function()
+      local w = newWindow({ 640, 480 })
+      fakeBag(w)
+      local line = paddingLine(w)
+      assert.is_truthy(line:find("padding items left=16.0 right=546.0 | sections left=10.0 right=450.0", 1, true), line)
+      assert.is_truthy(line:find("| border unknown", 1, true), line)
+    end)
+
+    -- A NineSlice edge piece is wider than the metal drawn in it (Default's are 75 pixels, 8 outside
+    -- the frame on the left and 4 on the right, a render recording on retail), so the recorder
+    -- gives where the pieces lie and claims nothing about the art inside them.
+    it("gives where a template's NineSlice edge pieces lie, and no visible padding", function()
+      local w = newWindow({ 640, 480 })
+      fakeBag(w)
+      local template = CreateFrame("Frame", nil, w.frame)
+      template.NineSlice = CreateFrame("Frame", nil, template)
+      template.NineSlice.LeftEdge = template.NineSlice:CreateTexture()
+      template.NineSlice.LeftEdge:SetSize(75, 400)
+      template.NineSlice.LeftEdge._rect = { left = 92, bottom = 220 }
+      template.NineSlice.RightEdge = template.NineSlice:CreateTexture()
+      template.NineSlice.RightEdge:SetSize(75, 400)
+      template.NineSlice.RightEdge._rect = { left = 669, bottom = 220 }
+      w.decoration.template = template
+      local line = paddingLine(w)
+      assert.is_truthy(line:find("| border NineSlice pieces left=-8.0..67.0 right=-4.0..71.0", 1, true), line)
+      assert.is_nil(line:find("visible", 1, true), line)
+    end)
+
+    it("measures a backdrop's border from its edge size", function()
+      local w = newWindow({ 640, 480 })
+      fakeBag(w)
+      w.frame:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 3 })
+      local line = paddingLine(w)
+      assert.is_truthy(line:find("| border backdrop left=3.0 right=3.0 | visible left=13.0 right=543.0", 1, true), line)
+    end)
+
+    -- The global sections are measured before the view's: the rightmost item there must still
+    -- set the right padding when a view item further left comes after it.
+    it("measures from the outermost items wherever they are", function()
+      local w = newWindow({ 640, 480 })
+      local bag = fakeBag(w)
+      local recent = bag.globalSections["Recent Items"]
+      local far = CreateFrame("Frame", nil, recent.frame)
+      far:SetSize(37, 37)
+      far._rect = { left = w.frame:GetLeft() + 500, bottom = recent.frame:GetBottom() }
+      table.insert(recent.content.cells, { slotkey = "0_9", frame = far })
+      local line = paddingLine(w)
+      assert.is_truthy(line:find("padding items left=16.0 right=103.0", 1, true), line)
+    end)
+
+    it("says when the bag shows no items", function()
+      local w = newWindow({ 640, 480 })
+      local bag = fakeBag(w)
+      bag.globalSections, bag.currentView = {}, nil
+      assert.is_truthy(paddingLine(w):find("padding items none | sections none", 1, true))
+    end)
   end)
 
   -- What each item button shows, beyond where it is: how it was last drawn (an item, a free slot

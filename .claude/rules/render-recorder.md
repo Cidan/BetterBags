@@ -37,15 +37,33 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   scale, clamp, cursor (window.md 3a).
 - `content insets L,R,T,B @...`: the content box.
 - For a bag (found through `addon.Bags`): `scroll @... child <height> bar=<shown>`;
-  `canvas @... layout ipr=<items per row> columns=<n> header=<h> tab=<h> footer=<h>` (the layout
-  `BagCanvas:GetLayout` computes for the canvas width in window mode, the settings otherwise);
+  `canvas @... layout ipr=<items per row> columns=<n> width=<w> for=<exact> header=<h> tab=<h>
+  footer=<h>` (the plan the canvas arranged in its last render, render-pipeline.md §4b; `width` is
+  the plan's own width, the one a snap goes to; `for` is the width the plan had to fit, to six
+  decimals, or `content` when sized to its content: a layout exactly as wide as its window was
+  rejected at a width printed as 426.0, window.md §3b, which one decimal could not show);
   `global section` / `view section <title> ipr=<n> cells=<n> shown=<bool> @...`, sorted by
-  title; under each, `  item <slotkey> @...` per item button and `  gap` per gap cell. An item
+  title; under each, `  item <slotkey> @...` per item button and `  gap` per gap cell. A section
+  or item Motion is moving ends with `moving from <x0>,<y0> to <x1>,<y1>` (offsets from the frame
+  it hangs from: where the move started and where it goes), and the canvas line with
+  `| tab moving ...` / `| footer moving ...` for its containers (render-pipeline.md §4c). The
+  snapshot is taken as the render that starts the moves ends, so the `@` positions (and the padding
+  line) are the moves' starts. An item
   button's line adds what it shows: how it was last drawn (`item`, `free count=<n> name=<bag>`,
   `empty`), `border=<r,g,b>` or `off` (the decoration's `IconBorder`), `padlock=<bool>` (Blizzard's
   "extended" slot frame, `UpdateExtended`, on the button or the decoration), `mouse=<bool>` (the
   interaction button's `IsMouseEnabled`) and `glyph=<atlas>` or `none` (the empty slot glyph).
   Added for free slots on WoW: Forever that showed a padlock and a quality border.
+- For a bag, `padding items left=<px> right=<px> | sections left=<px> right=<px> | <border>`: how
+  far the outermost shown item buttons and sections (titles included) are from each side of the
+  window, then the theme's border. A backdrop: `border backdrop left=<edge> right=<edge> | visible
+  left=<px> right=<px>` (the items' distance from the border). A template:
+  `border NineSlice pieces left=<from>..<to> right=<from>..<to>`, where the edge pieces lie,
+  measured inward from each edge of the window (negative is outside it); a piece is wider than the
+  metal drawn in it (Default's are 75 pixels, 8 outside the frame on the left and 4 on the right,
+  a retail recording), so no visible padding is claimed. `border unknown` for art painted in a
+  texture (Moonlight's frames: measured from the image files instead). Left and right should
+  match on every theme (window.md §3b). Added for centering the bag's content.
 
 ## 3. Storage
 

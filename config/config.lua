@@ -135,6 +135,17 @@ function config:CreateConfig()
     end
   })
 
+  f:AddCheckbox({
+    title = 'Animate Item Movement',
+    description = 'If enabled, items, sections and rows glide to their new places when the bags rearrange (sorting, looting, resizing).',
+    getValue = function(_)
+      return db:GetAnimateItemMovement()
+    end,
+    setValue = function(_, value)
+      db:SetAnimateItemMovement(value)
+    end
+  })
+
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
@@ -548,6 +559,18 @@ function config:CreateConfig()
       setValue = function(ctx, value)
         db:SetBagSizeMode(bagType.kind, value and "window" or "content")
         events:SendMessage(ctx, 'bags/Redraw')
+      end
+    })
+
+    f:AddCheckbox({
+      title = 'Snap to Content',
+      description = 'With Resizable Window on, when you let go after resizing the ' .. string.lower(bagType.name)
+        .. ', it shrinks to fit its items, so there is no empty space at the sides or below them.',
+      getValue = function(_)
+        return db:GetBagSnapToContent(bagType.kind)
+      end,
+      setValue = function(_, value)
+        db:SetBagSnapToContent(bagType.kind, value)
       end
     })
 

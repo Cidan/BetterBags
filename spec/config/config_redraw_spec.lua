@@ -252,6 +252,56 @@ describe("Config settings refreshes", function()
     end
   end)
 
+  -- Snap to Content is read when the player lets go of the resize grip (window.md, snapping):
+  -- nothing to redraw when it changes. It sits right below Resizable Window.
+  it("turns Snap to Content on and off for each bag, next to Resizable Window, with no refresh", function()
+    local snaps = {}
+    saved[#saved + 1] = { db, "GetBagSnapToContent", db.GetBagSnapToContent }
+    saved[#saved + 1] = { db, "SetBagSnapToContent", db.SetBagSnapToContent }
+    db.GetBagSnapToContent = function(_, kind) return snaps[kind] ~= false end
+    db.SetBagSnapToContent = function(_, kind, value) snaps[kind] = value end
+    local found = settings("Snap to Content")
+    assert.are.equal(2, #found)
+    for _, opts in ipairs(found) do
+      sent, snaps = {}, {}
+      assert.is_true(opts.getValue(context:New("Test")))
+      opts.setValue(context:New("Test"), false)
+      local kind = next(snaps)
+      assert.is_false(snaps[kind])
+      assert.is_false(opts.getValue(context:New("Test")))
+      assert.are.same({}, messages())
+    end
+    for i, entry in ipairs(entries) do
+      if entry.opts.title == "Snap to Content" then
+        assert.are.equal("Resizable Window", entries[i - 1].opts.title)
+      end
+    end
+  end)
+
+  -- The bag's canvas reads it on every render (render-pipeline.md §4c): nothing to redraw when it
+  -- changes. One setting for both bags, right below Enable Bag Fading.
+  it("turns Animate Item Movement on and off, below Enable Bag Fading, with no refresh", function()
+    local on = false
+    saved[#saved + 1] = { db, "GetAnimateItemMovement", db.GetAnimateItemMovement }
+    saved[#saved + 1] = { db, "SetAnimateItemMovement", db.SetAnimateItemMovement }
+    db.GetAnimateItemMovement = function() return on end
+    db.SetAnimateItemMovement = function(_, value) on = value end
+    local found = settings("Animate Item Movement")
+    assert.are.equal(1, #found)
+    local opts = found[1]
+    sent = {}
+    assert.is_false(opts.getValue(context:New("Test")))
+    opts.setValue(context:New("Test"), true)
+    assert.is_true(on)
+    assert.is_true(opts.getValue(context:New("Test")))
+    assert.are.same({}, messages())
+    for i, entry in ipairs(entries) do
+      if entry.opts.title == "Animate Item Movement" then
+        assert.are.equal("Enable Bag Fading", entries[i - 1].opts.title)
+      end
+    end
+  end)
+
   describe("opacity and scale", function()
     local windows, savedValues, opacityUpdates
 

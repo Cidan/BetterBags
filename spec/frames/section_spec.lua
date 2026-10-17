@@ -78,6 +78,21 @@ local mockGridProto = {
   Draw = function()
     return 100, 50
   end,
+  -- Measure packs the cells 37 wide in rows of maxWidthPerRow (one 50-tall row for these specs'
+  -- single cell) and records what it was asked; Arrange records what it applied.
+  Measure = function(self, options)
+    self.measured = (self.measured or 0) + 1
+    self.lastLimit = options.maxWidthPerRow
+    local width = 100
+    if options.maxWidthPerRow == math.huge then
+      width = 41 * #options.cells - 4
+    end
+    return { width = width, height = 50, positions = {}, columnOf = {}, cells = options.cells }
+  end,
+  Arrange = function(self, measured)
+    self.arranged = measured
+    return measured.width, measured.height
+  end,
   GetContainer = function(self)
     if not self._container then
       self._container = CreateFrame("Frame")
@@ -92,7 +107,9 @@ local grid = StubBetterBagsModule("Grid")
 grid.Create = function()
   local g = setmetatable({
     cells = {},
-    idToCell = {}
+    idToCell = {},
+    -- The frame the real grid's cells hang from (frames/grid.lua).
+    inner = CreateFrame("Frame"),
   }, { __index = mockGridProto })
   return g
 end
@@ -119,6 +136,23 @@ describe("Section Frame", function()
     ResetModuleStub("Groups", "data/groups.lua")
     ResetModuleStub("Localization", "core/localization.lua")
     ResetModuleStub("Grid", "frames/grid.lua")
+  end)
+
+  -- Motion works out where an item that changes section was from the anchors up to a frame both
+  -- sections hang from; the frame a section's cells hang from is placed by Blizzard's scroll box,
+  -- so the section links it to its own frame at the offset its cells start (render/motion.lua).
+  -- A render recording shows every item 6 pixels in and a title's height down from its section.
+  describe("where its cells start", function()
+    it("links the frame its cells hang from to its own frame, past its title", function()
+      local motion = addon:GetModule("Motion")
+      local s = sectionFrame:Create(context:New("test"))
+      local link = motion.links[s.content.inner]
+      assert.are.equal(s.frame, link.to)
+      assert.are.same({ 6, -s.title:GetHeight() }, { link.offset() })
+      assert.are.same({ 6, -s.title:GetHeight() }, { s:GetCellOrigin() })
+      s:RemoveHeader()
+      assert.are.same({ 6, 0 }, { link.offset() })
+    end)
   end)
 
   describe("Creation and Pooling", function()
@@ -266,6 +300,66 @@ describe("Section Frame", function()
       assert.are.equal(w, 112)
       assert.are.equal(h, 50) -- 50 instead of 74 (title height 18 and offset 6 are skipped)
       assert.is_true(s.removeHeader)
+    end)
+
+    -- Measure works the size out and moves nothing; Arrange applies it (render-pipeline.md, the
+    -- layout engine). Draw is the two in a row.
+    it("measures its size at an items per row without moving anything", function()
+      local s = sectionFrame:Create(context:New("TestMeasure"))
+      s:AddCell("cell1", {})
+      s.frame:SetSize(1, 1)
+      local measured = s:Measure(const.BAG_KIND.BACKPACK, 9)
+      assert.are.same({ 112, 74, 9 }, { measured.width, measured.height, measured.itemsPerRow })
+      assert.are.equal((37 + 4) * 9 + 16, s.content.lastLimit)
+      assert.is_nil(s.content.arranged)
+      assert.are.same({ 1, 1 }, { s.frame:GetWidth(), s.frame:GetHeight() })
+    end)
+
+    it("arranges a measure: its cells, its size and the items per row it was measured at", function()
+      local s = sectionFrame:Create(context:New("TestArrange"))
+      s:AddCell("cell1", {})
+      local measured = s:Measure(const.BAG_KIND.BANK, 4)
+      assert.are.same({ 112, 74 }, { s:Arrange(const.BAG_KIND.BANK, measured) })
+      assert.are.equal(measured.content, s.content.arranged)
+      assert.are.same({ 112, 74 }, { s.frame:GetWidth(), s.frame:GetHeight() })
+      assert.are.equal(4, s:GetMaxCellWidth())
+      assert.are.equal(const.BAG_KIND.BANK, s:GetKind())
+      assert.is_true(s.frame:IsShown())
+    end)
+
+    it("draws by measuring at its items per row and arranging", function()
+      local s = sectionFrame:Create(context:New("TestDrawMeasure"))
+      s:AddCell("cell1", {})
+      s:SetMaxCellWidth(6)
+      s:Draw(const.BAG_KIND.BACKPACK, nil, false)
+      assert.are.equal(1, s.content.measured)
+      assert.are.equal((37 + 4) * 6 + 16, s.content.lastLimit)
+      assert.are.equal(6, s.content.arranged.itemsPerRow or s:GetMaxCellWidth())
+    end)
+
+    -- A full section name widens a section to its title, rounded up to a whole pixel.
+    it("widens to its title's text, in whole pixels, when full names show", function()
+      local s = sectionFrame:Create(context:New("TestTitleWidth"))
+      s:AddCell("cell1", {})
+      s:SetTitle("A long category name here")
+      s.title.GetTextWidth = function() return 150.3 end
+      database.GetShowFullSectionNames = function() return true end
+      local measured = s:Measure(const.BAG_KIND.BACKPACK, 3)
+      database.GetShowFullSectionNames = function() return false end
+      assert.are.equal(151 + 12, measured.width)
+    end)
+
+    -- Past this many items per row the section's cells all fit one row: measuring at more
+    -- changes nothing (frames/bagcanvas.lua tries no more).
+    it("says the items per row past which it no longer changes", function()
+      local s = sectionFrame:Create(context:New("TestCap"))
+      for i = 1, 7 do s:AddCell("cell" .. i, {}) end
+      assert.are.equal(7, s:GetItemsPerRowCap())
+      local one = sectionFrame:Create(context:New("TestCapOne"))
+      one:AddCell("cell1", {})
+      assert.are.equal(1, one:GetItemsPerRowCap())
+      local none = sectionFrame:Create(context:New("TestCapNone"))
+      assert.are.equal(1, none:GetItemsPerRowCap())
     end)
 
     it("resets headerless state upon wipe or release", function()

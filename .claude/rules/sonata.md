@@ -277,6 +277,19 @@ Details:
 
 ## 3b. BetterBags' themes (`sonata/themes/*.lua`)
 
+**Bag padding is the same on both sides.** BetterBags centers the bag's items in its content box
+(window.md §3b), so a theme's `Windows.Bag.Insets` (and the `Layout.Footer` that lines up with
+them) must leave the same room inside the visible border on the left and the right. Art whose
+border is uneven compensates in its insets, with the measurements written next to them.
+`spec/sonata/theme_ports_spec.lua` ("pads every theme's bag the same on both sides") checks
+every built-in theme on every client. Measured: Moonlight's two frame images (their opaque
+edge and border line sit at the same pixels from both sides). Default's `DefaultPanelTemplate`
+border (`ButtonFrameTemplateNoPortrait`): a retail recording shows its edge pieces are 75 pixels
+wide, 8 outside the frame on the left and 4 outside on the right, as the layout places them; the
+metal drawn inside them cannot be read from frames, so whether its visible border is uneven
+(4 pixels more on the right if the left and right pieces are mirror images) is not measured yet.
+ElvUI, GW2 and Simple Dark are backdrops, whose edge the recorder reads (render-recorder.md).
+
 Each theme is a data file that calls `sonata:RegisterTheme`, listed in every TOC right after
 `window\window.lua`, Base first.
 Window kinds: **Bag** (the backpack and bank), **Panel** (forms: the settings and profiler
@@ -319,14 +332,16 @@ overlay search panel).
   A third, Dark Round, was removed; Dark took its darker fill): Moonlight's art, shipped in
   `textures\moonlight\`, nine-sliced with 24px margins as every window's `Background` (`$Frame`,
   `$SliceMode`: Dark's tiled square frame `dark-frame.png`, Moonlight's default, or Parchment's
-  stretched paper), content insets 18, 24, 40, 12,
+  stretched paper), content insets 18, 18, 40, 12 (they were 18, 24, 40, 12, ported from
+  Moonlight: the images are opaque the same distance in from the left and the right, measured
+  from the files, so the padding is the same on both sides, window.md §3b),
   `GameFontHighlight` titles in the text palette (`$TextColor`, `$TextShadow`: white with a black
   shadow on the dark themes) at TOPLEFT 44, -15 (20, -15 on dialogs), and a 32px close button
-  lettered "X" (`CloseButton.Font`, §3). The bag's search box sits at 18, -40 to -24, -60
-  (reserve 24), its footer at 18, 24, bottom 12 (the money and currencies sit on it), and a
+  lettered "X" (`CloseButton.Font`, §3). The bag's search box sits at 18, -40 to -18, -60
+  (reserve 24), its footer at 18, 18, bottom 12 (the money and currencies sit on it), and a
   32px menu button (art 32 x 40) at 8, -6. **Dark** brings its menu button inside its frame's
   heavy border (which ends about 16 in): the button at 14, -12, the title at 50, -15, the
-  search box at 18, -48 to -24, -68, and the bag's content box 48 from the top (8 lower).
+  search box at 18, -48 to -18, -68, and the bag's content box 48 from the top (8 lower).
   Parchment and Slate keep the set's positions.
   Parchment hangs its 281 x 84 ribbon over the bag (BOTTOM 40 below the window's TOP) and
   centers the bag's title on it.

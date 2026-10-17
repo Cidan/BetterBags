@@ -19,7 +19,10 @@ local BACKGROUND = {
   SliceMargins = { Left = 24, Right = 24, Top = 24, Bottom = 24 },
 }
 
-local INSETS = { Left = 18, Right = 24, Top = 40, Bottom = 12 }
+-- The frame's border is the same width on both sides (dark-frame.png and parchment.png are
+-- opaque the same distance in from the left and the right), so the padding is too: the bag's
+-- items have the same room on both sides (window.md, centering).
+local INSETS = { Left = 18, Right = 18, Top = 40, Bottom = 12 }
 
 -- The title sits right of the menu button, in the theme's text color.
 local TITLE = {
@@ -42,11 +45,11 @@ bag.Layout = {
   Search = {
     Points = {
       { Point = "TOPLEFT", X = 18, Y = -40 },
-      { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -24, Y = -60 },
+      { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -18, Y = -60 },
     },
     Reserve = 24,
   },
-  Footer = { Left = 18, Right = 24, Bottom = 12, Height = 20, Reserve = 26 },
+  Footer = { Left = 18, Right = 18, Bottom = 12, Height = 20, Reserve = 26 },
   MenuButton = { Points = { { Point = "TOPLEFT", X = 8, Y = -6 } } },
 }
 
@@ -113,7 +116,7 @@ sonata:RegisterTheme({
     Flat = framed(),
     Dialog = dialog,
     Slots = { Background = BACKGROUND, Insets = { Left = 14, Right = 14, Top = 14, Bottom = 14 } },
-    Search = { Background = BACKGROUND, Insets = { Left = 18, Right = 24, Top = 12, Bottom = 12 } },
+    Search = { Background = BACKGROUND, Insets = { Left = 18, Right = 18, Top = 12, Bottom = 12 } },
   },
   Elements = {
     -- A smaller menu button that fits inside the frame.
@@ -136,7 +139,7 @@ sonata:RegisterTheme({
         Search = {
           Points = {
             { Point = "TOPLEFT", X = 18, Y = -48 },
-            { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -24, Y = -68 },
+            { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -18, Y = -68 },
           },
         },
         MenuButton = { Points = { { Point = "TOPLEFT", X = 14, Y = -12 } } },

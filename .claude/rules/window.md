@@ -55,8 +55,9 @@ The window is a render root (its plan: PRE, DEP content, SELF).
   window's own scale (`UIParent` height x its effective scale / the frame's), minus the vertical
   insets, and no width (natural). SELF sizes the frame to the content's result plus the insets,
   at least the minimums.
-- **Window mode**: PRE gives the content the inner box (`Width`, `Height`); SELF keeps the frame
-  size. `UpdateSizeMode()` makes the frame resizable with bounds = the minimums, takes `Size()`
+- **Window mode**: PRE gives the content the inner box (`Width`, `Height`), from the frame's size
+  rounded to a hundredth of a unit (`SIZE_PRECISION`, §3b: the client reads sizes back with float
+  error at a UI scale); SELF keeps the frame size. `UpdateSizeMode()` makes the frame resizable with bounds = the minimums, takes `Size()`
   clamped to them (or keeps the current size when nothing was saved, at least the minimums),
   shows the grip, and lays out again; content mode hides the grip and lays out again. In window
   mode `OnSizeChanged` invalidates, so dragging the grip reflows the content.
@@ -70,8 +71,9 @@ theme's `Resize` (`Size` number or `{Width, Height}`, `Points` (default BOTTOMRI
 `Highlight`, `Pushed`, `ShowOnHover`) or the default (Blizzard's chat size grabber, shown only
 while hovered). Left button only: down starts sizing from BOTTOMRIGHT from where the player
 pressed (`StartSizing("BOTTOMRIGHT", true)`: `alwaysStartFromMouse`, documented on every client
-branch, the way Blizzard's `PanelResizeButtonMixin` starts its resizes), up stops it, puts the
-window back on the screen, saves the position and calls `OnResized`. Without
+branch, the way Blizzard's `PanelResizeButtonMixin` starts its resizes), up stops it (and snaps
+the window to its content when the owner asks, §3b), puts the window back on the screen, saves
+the position and calls `OnResized`. Without
 `alwaysStartFromMouse` the client resized the window inside `StartSizing`, before the cursor
 moved, from a point an earlier move or resize had left: a render recording (render-recorder.md)
 of a bank after the player moved it and resized it back and forth shows every click on the grip
@@ -109,6 +111,115 @@ touch the clamp.
 
 Coverage: `spec/window/window_spec.lua` ("kept on the screen"), `spec/frames/bag_draw_ownership_spec.lua`
 ("leaves keeping the window on the screen to the window").
+
+### 3b. Centering, the scroll bar, and snapping to the content
+
+**Asked:** the bag's padding is the same on both sides of its longest row, on every theme, at
+all times, resizable windows included, and nothing on screen moves when a scroll bar appears.
+**Measured before:** in render recordings (retail, content mode) every bag had 12 px on the left
+and 26 on the right of its items; resizable bank windows had 12 on the left and 85 to 117 on the
+right. The causes, from the code: the scroll box kept its bar's 14 px on the right only, and the
+canvas pinned the content to its left edge whatever width it was given.
+
+- **The content is centered** (`frames/bagcanvas.lua`): the header (Recent Items), the tab view
+  and the footer (Free Space) share one left edge, and the widest of them is centered in the
+  canvas width: the header container is anchored at `(width - contentWidth) / 2` from both
+  edges and the other two hang from it. Exact, not rounded, so the two sides are equal.
+  Sections pad their icons 6 px on both sides, so the icons are centered too.
+- **The bar's room on both sides, always** (`render/scrollbox.lua`, `Symmetric`): the bag's
+  scroll box insets its child by 14 px and hands it the width less 28, whether or not the bar
+  shows, so the content never moves for it ("visual stability above all"; reserving the room
+  only while the bar shows was rejected because the content would jump when it appeared). The
+  bag's minimum content width counts both (`GetGutterWidth`).
+- **The bar hides itself** (`AutoHideBar`): invisible (alpha 0) until the mouse wheel scrolls
+  the box or the pointer is in the bar's room on the right; it fades in over 0.15 s, stays a
+  second after the last wheel or after the pointer leaves, and fades out over 0.3 s. A child of
+  the bar runs it each frame, so it costs nothing while Blizzard hides the bar (nothing scrolls),
+  and it starts hidden each time the bar reappears. Wheel scrolls are seen with a hook on the
+  box's own `OnMouseWheel`. The hover check is `IsMouseOver` with the left edge moved to the
+  bar's room (`IsMouseOver(0, 0, width - 14, 0)`; Blizzard enlarges hit rects the same way,
+  `FloatingChatFrame.lua`).
+- **Failure mode (fixed, measured): the left room never applied.** A render recording on retail
+  (Default, resizing the bank) showed every render with the items 28 px further from the right
+  than the left (12 vs 40, 39.4 vs 67.4) and the canvas at the scroll area's left edge: the scroll
+  box anchored its child with an x offset and a nil y offset, which the client drops (both are
+  required, `SimpleScriptRegionResizingAPIDocumentation`). `drawableProto:SetPoint` passes 0 for
+  a missing one, and the frame mock rejects one offset without the other (render-pipeline.md).
+- **Failure mode (fixed, measured): a snapped bag lost a step of its layout once it settled.** A
+  retail render recording at scale 0.65 shows it four times: a bag snapped to 466 (a layout 426
+  wide) and, 10 ms later, after the snap re-anchored the window by its center to save its
+  position, the same window width chose the next narrower layout (344 wide), with 61 px on each
+  side instead of 20, until a click on the grip snapped again (to 384); the same at 302, which
+  fell to 300. The layout is whole numbers wide, and it can only be rejected at a canvas width
+  printed as 426.0 when that width is a hair under 426: the client handed the window's width
+  back with float error. During the snap the window hands its content the exact target
+  (`LayoutWidth`), which is why the snap itself looked right. The window now rounds the size it
+  hands its content to a hundredth of a unit (`withoutFloatError`), and the recorder prints the
+  exact width each layout was chosen for (`for=`, render-recorder.md) so a capture shows it.
+  Only the window's content size needed it: the other sizes the client hands back (the capped
+  theme textures, the screen clamp) make no exact comparison.
+- **A layout is a function of items per row and columns alone** (render-pipeline.md, the layout
+  engine). A resizable window takes the densest layout no wider than its width: the canvas tries
+  every items per row from the one past which nothing changes down to one. **Failure mode (fixed,
+  measured):** the snap used to guess the narrowest width with a formula, and the same recording
+  shows a snap (1036.8 to 1006) leaving 24 px of extra width, centered, while another left none:
+  the steps the player saw. An offline probe with the real grid showed 5 to 111 px left over.
+- **Snap to Content** (`SnapToContent` option, the bag's per-view setting, on by default): when
+  the player lets go of the grip, `startSnap` lays the content out at the player's width and
+  reads `FitWidth`, the chosen layout's own width; the window shrinks to it plus the scroll room
+  and the insets, at least its minimum. The candidates are the same for every width, so the
+  densest layout that fits the player's width is also the densest that fits its own width: the
+  snapped window shows the same layout, item for item, with no space left over (a randomized test
+  checks this over 300 bags). The top left is pinned (re-anchored `TOPLEFT` to `UIParent`), so the
+  edge the player dragged moves. The width eases out (cubic) to 10 % of the distance past the
+  target (at most 10 px, never below the minimum) in 65 % of 0.35 s, then settles back
+  (smoothstep): the bounce. While it runs the window hands the content a `LayoutWidth` (the
+  target) with its real `Width`, so the layout never changes mid-bounce and the content stays
+  centered in the moving width; the bounce stays inside the 14 px room. Each step lays the window
+  out (`Invalidate`). At the end it saves the position and size (`OnResized`). Grabbing the grip,
+  moving the window or hiding it (`Hide`, or Escape: the snap's driver is a child of the window
+  and ends it from its `OnHide`) ends the snap at its target at once. A snap only shrinks: a side
+  whose target is not at least half a pixel smaller keeps its size, and nothing snaps when neither
+  side moves or the setting is off. Steps trace as `snap start` and `snapped` (§3a diagnostics).
+- **The height snaps too** (asked: when the player leaves dead space below the content, the
+  bottom should hug the content the way the top does). The content reports `FitHeight`, the
+  height that shows all of it without scrolling (the scroll box passes up its child's height);
+  the window adds its top and bottom insets, and the same release shrinks the height to that, at
+  least the minimum height. The top stays pinned, so the bottom edge moves; on Default the
+  footer then sits right under the last row as the search box sits over the first (the insets
+  are the title bar plus the search box's reserve, and the theme's edge plus the footer's
+  reserve). Content taller than the window keeps the player's height and scrolls. Either side
+  can snap alone. The height uses the width's bounce (`SnapSizeAt`, asked for by name): past its
+  target by 10 % of the distance (at most 10 px, never below the minimum) and back, on the same
+  frames (700x500 to 412x345: both are furthest past at 224 ms, 402 and 335, and both settle at
+  352 ms). Below the content there is no room like the scroll room beside it, so at the bottom of
+  the bounce the last row slides under the bottom edge by that much; the auto-hiding bar stays
+  hidden. A side that does not snap never moves, even when a minimum (they can be functions) rose
+  above it before the release: each overshoot is floored at zero.
+- **The reported height is the height of what is drawn.** An empty canvas container is kept 1
+  pixel tall, and the containers used to hang from the bottom of the one above, so with no Recent
+  Items the view and Free Space sat a pixel lower than the canvas's reported height. A content-
+  sized recording shows the result: the scroll area ended at 396 and Free Space at 397, the bottom
+  row of the free-slot buttons cut by a pixel. A height snap would have cut it the same way. The
+  view and footer now hang from the header's top at the plan's offsets (`hangFromHeader`,
+  `frames/bagcanvas.lua`), so the content ends exactly at the reported height.
+- **What is still not equal:** a window the player sized without snapping can be an odd or
+  fractional number of units wider than its layout, so each side gets half (exact, not rounded),
+  and the client may round each edge to a physical pixel. Theme art whose border is drawn
+  unevenly around the frame (Default's NineSlice edge pieces sit 8 px outside the frame on the
+  left and 4 on the right) is the theme's to compensate (sonata.md 3b).
+
+Coverage: `spec/frames/bagcanvas_spec.lua` (plans, the snap property, densest, centering,
+measures kept across renders), `spec/render/scrollbox_spec.lua` ("for a bag (Symmetric,
+AutoHideBar)"), `spec/render/render_spec.lua` ("anchors with both offsets when only one is
+given"), `spec/window/window_spec.lua` ("snapping to its content" with "its height", "hands its
+content its size without the client's float error"), `spec/render/scrollbox_spec.lua` ("passes up
+the height that shows its whole child"), `spec/frames/bagcanvas_spec.lua` ("places each container
+where the plan puts it"),
+`spec/sonata/theme_ports_spec.lua` ("pads every theme's bag the same on both sides"),
+`spec/config/config_redraw_spec.lua` ("Snap to Content"). Every guard was
+mutation-tested. To check a theme in game, record rendering (render-recorder.md): each bag
+snapshot has a `padding` line with both sides.
 
 ## 4. Showing and hiding
 
@@ -172,13 +283,15 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   strata and level, the saved position (`database:GetBagPosition`), and options read from the
   bag's settings for the view it shows: `Opacity` and `Scale` from `GetBagSizeInfo`, `SizeMode`
   from `database:GetBagSizeMode` (per view, default `"content"`), `Size`/`OnResized` from
-  `Get/SetBagViewFrameSize`, `Fade` from `GetEnableBagFading`. `CanMove` is false while an
+  `Get/SetBagViewFrameSize`, `SnapToContent` from `GetBagSnapToContent` (per view, on unless
+  turned off, §3b), `Fade` from `GetEnableBagFading`. `CanMove` is false while an
   item is on the cursor (pressing on the window is a drop then). `OnClose` is `bag:Hide`.
-  `OnRendered` runs `bag:OnResize`. Its content is a `Scrollbox` whose child is the bag's
-  canvas (`frames/bagcanvas.lua`, layout-rendering.md §3); `bag.scrollBox`, `headerContainer`,
+  `OnRendered` runs `bag:OnResize`. Its content is a `Scrollbox` (with the bar's room on both
+  sides and a bar that hides itself, §3b) whose child is the bag's canvas
+  (`frames/bagcanvas.lua`, layout-rendering.md §3); `bag.scrollBox`, `headerContainer`,
   `tabContainer` and `footerContainer` point into them.
-- **Minimums**: content at least 260 wide (or the tabs' width) plus the scroll bar, and 100
-  high; the window at least as wide as the slots panel while it shows.
+- **Minimums**: content at least 260 wide (or the tabs' width) plus the scroll bar's room on
+  both sides, and 100 high; the window at least as wide as the slots panel while it shows.
 - **BuildParts** creates the in-bag search box (`searchBox:CreateBox`, kept as
   `bag.searchBox`; `searchBox:GetSearchText` and QuickFind read it there), the menu button
   (`BagMenuButton`, bag-menu-button.md), the action buttons a theme may give the window

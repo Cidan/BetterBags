@@ -194,6 +194,18 @@ end
 ---@param label string
 ---@param sections table<any, Section>
 ---@param origin Frame
+-- moving says where a frame Motion is moving started and where it goes, as offsets from the frame
+-- it hangs from, or nothing when it is still (render/motion.lua).
+---@param frame Frame
+---@return string
+local function moving(frame)
+  local x0, y0, x1, y1 = addon:GetModule('Motion'):GetMove(frame)
+  if x0 == nil then
+    return ""
+  end
+  return string.format(" moving from %s,%s to %s,%s", num(x0), num(y0), num(x1), num(y1))
+end
+
 local function describeSections(lines, label, sections, origin)
   local sorted = {}
   for _, section in pairs(sections or {}) do
@@ -203,8 +215,8 @@ local function describeSections(lines, label, sections, origin)
   for _, section in ipairs(sorted) do
     local frame = section.frame
     local cells = section.content and section.content.cells or {}
-    table.insert(lines, string.format("%s section %s ipr=%s cells=%d shown=%s %s", label, titleOf(section),
-      tostring(section.maxItemsPerRow), #cells, tostring(frame:IsShown()), rectIn(frame, origin)))
+    table.insert(lines, string.format("%s section %s ipr=%s cells=%d shown=%s %s%s", label, titleOf(section),
+      tostring(section.maxItemsPerRow), #cells, tostring(frame:IsShown()), rectIn(frame, origin), moving(frame)))
     for _, cell in ipairs(cells) do
       if cell.isGap then
         table.insert(lines, "  gap")
@@ -213,10 +225,87 @@ local function describeSections(lines, label, sections, origin)
         if cell.drawnAs ~= nil then
           line = line .. " " .. buttonState(cell)
         end
-        table.insert(lines, line)
+        table.insert(lines, line .. moving(cell.frame))
       end
     end
   end
+end
+
+-- bounds returns how far the shown frames are from the window's left and right edges, or nil
+-- when none is shown.
+---@param frames Frame[]
+---@param window Frame
+---@return number? left, number? right
+local function bounds(frames, window)
+  local left, right
+  for _, f in ipairs(frames) do
+    if f:IsShown() and f:GetLeft() ~= nil then
+      local l, r = f:GetLeft() - window:GetLeft(), window:GetRight() - f:GetRight()
+      left = left == nil and l or math.min(left, l)
+      right = right == nil and r or math.min(right, r)
+    end
+  end
+  return left, right
+end
+
+-- describeBorder describes the theme's border, and returns how far in from the window's left
+-- and right edges its art ends when that can be read: a backdrop's edge size. A template's
+-- NineSlice edge pieces are given as where they lie (from the window's edge, inward; negative is
+-- outside it): a piece is wider than the art drawn in it (Default's are 75 pixels), so the visible
+-- border cannot be read from them. Other art (a texture with its border painted in) neither.
+---@param window BetterBagsWindow
+---@return string text, number? left, number? right
+local function describeBorder(window)
+  local frame = window.frame
+  local template = window.decoration and window.decoration.template
+  local nine = template and template.NineSlice
+  if nine ~= nil and nine.LeftEdge ~= nil and nine.RightEdge ~= nil and nine.LeftEdge:GetRight() ~= nil then
+    local left, right = frame:GetLeft(), frame:GetRight()
+    return string.format("border NineSlice pieces left=%s..%s right=%s..%s",
+      num(nine.LeftEdge:GetLeft() - left), num(nine.LeftEdge:GetRight() - left),
+      num(right - nine.RightEdge:GetRight()), num(right - nine.RightEdge:GetLeft()))
+  end
+  local backdrop = frame.GetBackdrop ~= nil and frame:GetBackdrop() or nil
+  if backdrop ~= nil and backdrop.edgeFile ~= nil and backdrop.edgeFile ~= "" then
+    local edge = backdrop.edgeSize or 0
+    return string.format("border backdrop left=%s right=%s", num(edge), num(edge)), edge, edge
+  end
+  return "border unknown"
+end
+
+-- describePadding measures how far the bag's items, and its sections (titles included), are
+-- from each side of the window, where the theme's border ends, and so how far the items are
+-- from the border: the left and right figures should match (window.md, centering).
+---@param window BetterBagsWindow
+---@param bag Bag
+---@return string
+local function describePadding(window, bag)
+  local sections, items = {}, {}
+  local function collect(list)
+    for _, section in pairs(list or {}) do
+      table.insert(sections, section.frame)
+      for _, cell in ipairs(section.content and section.content.cells or {}) do
+        if not cell.isGap and cell.frame ~= nil then
+          table.insert(items, cell.frame)
+        end
+      end
+    end
+  end
+  collect(bag.globalSections)
+  collect(bag.currentView and bag.currentView.sections)
+  local frame = window.frame
+  local itemLeft, itemRight = bounds(items, frame)
+  local sectionLeft, sectionRight = bounds(sections, frame)
+  local parts = {
+    itemLeft and string.format("padding items left=%s right=%s", num(itemLeft), num(itemRight)) or "padding items none",
+    sectionLeft and string.format("sections left=%s right=%s", num(sectionLeft), num(sectionRight)) or "sections none",
+  }
+  local border, borderLeft, borderRight = describeBorder(window)
+  table.insert(parts, border)
+  if borderLeft ~= nil and itemLeft ~= nil then
+    table.insert(parts, string.format("visible left=%s right=%s", num(itemLeft - borderLeft), num(itemRight - borderRight)))
+  end
+  return table.concat(parts, " | ")
 end
 
 -- Snapshot describes what a window shows, one line per part: the window (Geometry), its
@@ -244,12 +333,20 @@ function recorder:Snapshot(window)
   end
   local canvas = bag.canvas
   if canvas ~= nil then
-    local width = window:GetSizeMode() == "window" and canvas.frame:GetWidth() or nil
-    local layout = canvas:GetLayout(width)
-    table.insert(lines, string.format("canvas %s layout ipr=%s columns=%s header=%s tab=%s footer=%s",
-      rectIn(canvas.frame, frame), tostring(layout.itemsPerRow), tostring(layout.columns),
-      num(canvas.headerContainer:GetHeight()), num(canvas.tabContainer:GetHeight()), num(canvas.footerContainer:GetHeight())))
+    local plan = canvas.plan or {}
+    local plannedFor = canvas.plannedFor and string.format("%.6f", canvas.plannedFor) or "content"
+    local line = string.format("canvas %s layout ipr=%s columns=%s width=%s for=%s header=%s tab=%s footer=%s",
+      rectIn(canvas.frame, frame), tostring(plan.itemsPerRow), tostring(plan.columns), num(plan.width or 0), plannedFor,
+      num(canvas.headerContainer:GetHeight()), num(canvas.tabContainer:GetHeight()), num(canvas.footerContainer:GetHeight()))
+    for _, part in ipairs({ { "tab", canvas.tabContainer }, { "footer", canvas.footerContainer } }) do
+      local move = moving(part[2])
+      if move ~= "" then
+        line = line .. " | " .. part[1] .. move
+      end
+    end
+    table.insert(lines, line)
   end
+  table.insert(lines, describePadding(window, bag))
   describeSections(lines, "global", bag.globalSections, frame)
   if bag.currentView ~= nil then
     describeSections(lines, "view", bag.currentView.sections, frame)

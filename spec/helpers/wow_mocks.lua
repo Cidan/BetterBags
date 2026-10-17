@@ -288,27 +288,64 @@ local function CreateMockWidget(widgetType, name, parent)
     if self._rect == nil then return nil end
     return self._rect.left + self:GetWidth() / 2, self._rect.bottom + self:GetHeight() / 2
   end
+  -- ScriptRegion:IsMouseOver(offsetTop, offsetBottom, offsetLeft, offsetRight)
+  -- (SimpleScriptRegionAPIDocumentation): whether the cursor (GetCursorPosition, in the region's
+  -- scale) is inside the region's rect moved out by the offsets; Blizzard enlarges it with
+  -- IsMouseOver(10, -10, 0, 10) (FloatingChatFrame.lua). False for a region with no rect.
+  function widget:IsMouseOver(offsetTop, offsetBottom, offsetLeft, offsetRight)
+    local left, right, top, bottom = self:GetLeft(), self:GetRight(), self:GetTop(), self:GetBottom()
+    if left == nil then return false end
+    local scale = self:GetEffectiveScale()
+    local x, y = GetCursorPosition()
+    x, y = x / scale, y / scale
+    return x >= left + (offsetLeft or 0) and x <= right + (offsetRight or 0)
+      and y >= bottom + (offsetBottom or 0) and y <= top + (offsetTop or 0)
+  end
   function widget:SetAlpha(alpha)
     self._alpha = alpha
   end
   function widget:GetAlpha()
     return self._alpha or 1
   end
+  -- ScriptRegionResizing:SetAllPoints([relativeTo, doResize]): only the TOPLEFT and BOTTOMRIGHT
+  -- points are set, after clearing the others (warcraft.wiki.gg); relativeTo defaults to the
+  -- parent.
   function widget:SetAllPoints(other)
+    local relativeTo = other or self:GetParent()
+    self._points = {
+      { point = "TOPLEFT", relativeTo = relativeTo, relativePoint = "TOPLEFT", x = 0, y = 0 },
+      { point = "BOTTOMRIGHT", relativeTo = relativeTo, relativePoint = "BOTTOMRIGHT", x = 0, y = 0 },
+    }
     self._allPoints = other or true
   end
   function widget:ClearAllPoints()
     self._points = {}
     self._allPoints = nil
   end
+  -- ScriptRegion:SetPoint(point, relativeTo, relativePoint, offsetX, offsetY)
+  -- (SimpleScriptRegionResizingAPIDocumentation): both offsets are required together. In game an
+  -- x offset given with a nil y offset was dropped (a render recording: a scroll box's child
+  -- anchored 14 in sat at 0), so the mock rejects one offset without the other.
   function widget:SetPoint(point, relativeTo, relativePoint, x, y)
-    table.insert(self._points, {
+    if type(relativePoint) == "string" and (x == nil) ~= (y == nil) then
+      error("SetPoint: offsetX and offsetY must be given together, got " .. tostring(x) .. ", " .. tostring(y), 2)
+    end
+    -- A region has one anchor per point: setting a point again replaces it (warcraft.wiki.gg's
+    -- SetPoint example sets the same point several times "with the same result").
+    local anchor = {
       point = point,
       relativeTo = relativeTo,
       relativePoint = relativePoint,
       x = x,
       y = y
-    })
+    }
+    for i, existing in ipairs(self._points) do
+      if existing.point == point then
+        self._points[i] = anchor
+        return
+      end
+    end
+    table.insert(self._points, anchor)
   end
   -- ScriptRegion:GetNumPoints() -> numPoints.
   function widget:GetNumPoints()

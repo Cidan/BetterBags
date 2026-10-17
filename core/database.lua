@@ -171,6 +171,18 @@ function DB:GetEnableBagFading()
   return DB.data.profile.enableBagFading
 end
 
+-- GetAnimateItemMovement returns whether items, sections and rows travel to their new places when
+-- the bags rearrange (render-pipeline.md §4c). Off unless turned on.
+---@return boolean
+function DB:GetAnimateItemMovement()
+  return DB.data.profile.animateItemMovement
+end
+
+---@param enabled boolean
+function DB:SetAnimateItemMovement(enabled)
+  DB.data.profile.animateItemMovement = enabled
+end
+
 ---@param kind BagKind
 ---@return boolean
 function DB:GetGroupsEnabled(kind)
@@ -251,6 +263,21 @@ function DB:SetBagSizeMode(kind, mode)
     error("unknown bag size mode: " .. tostring(mode))
   end
   DB.data.profile.size[DB:GetBagView(kind)][kind].sizeMode = mode
+end
+
+-- GetBagSnapToContent returns whether the bag's window, in the view it shows, shrinks to its
+-- content's width, and its height when there is room below it, when the player finishes
+-- resizing it. On unless turned off.
+---@param kind BagKind
+---@return boolean
+function DB:GetBagSnapToContent(kind)
+  return DB.data.profile.size[DB:GetBagView(kind)][kind].snapToContent ~= false
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetBagSnapToContent(kind, value)
+  DB.data.profile.size[DB:GetBagView(kind)][kind].snapToContent = value
 end
 
 function DB:GetItemLevelOptions(kind)

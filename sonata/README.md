@@ -109,7 +109,7 @@ A window style:
 
 | Key | What it does |
 |---|---|
-| `Insets` | `{ Left, Right, Top, Bottom }`: the content box inside the window; BetterBags lays out the window's contents there and sizes the window around it |
+| `Insets` | `{ Left, Right, Top, Bottom }`: the content box inside the window; BetterBags lays out the window's contents there and sizes the window around it. On a `Bag`, BetterBags centers the items in this box, so leave the same room inside your border on the left and the right (if your border art is wider on one side, make that inset wider by the difference); the bag's `Layout.Footer` should match |
 | `Template` | a Blizzard frame template drawn behind the window: `Name`, `Level` (offset from the window, default -1), `Levels` (offsets for the template's child frames, e.g. `{ NineSlice = 500 }` to draw a border above the content), `TitleFont`, `Title = false`, `HideTitleWhenEmpty`, `Opacity` (the key of the template region that fades with the player's opacity setting, e.g. `"Bg"`), `Hide` (keys of template parts to hide), `BackdropColor`, `BackdropBorderColor` |
 | `Backdrop` | a backdrop on the window: `BgFile`, `EdgeFile`, `EdgeSize`, `Tile`, `TileEdge`, `TileSize`, `Insets`, `Color`, `BorderColor`, `Opacity` (`false`: the fill ignores the opacity setting), `BorderOpacity = true` (the border fades too), `Outlines` (extra edge-only borders: `{ Offset, EdgeSize, EdgeFile, Color }`, offset outside when positive, inside when negative) |
 | `Background` | a texture filling the window (or `Inset`/`Points`); fades with the opacity setting unless `Opacity = false` |
