@@ -29,6 +29,18 @@ reasoning about it can suggest a cause; it does not establish one.
   switch showed 12.6-15 ms of unmeasured time inside `Bank.SwitchToGroup`, the same with zero
   or 529 buttons reacting to the context change, which only one of these two calls could
   explain.
+- **The cooldown refresh** (event-buckets.md §3): `Item.UpdateCooldown` returns what it did:
+  `"unchanged"` when it skipped Blizzard's update, else the first input that changed
+  (`"start"`, `"duration"`, `"enable"`, `"icon"`, `"slot"`, `"decoration"`, `"generation"`,
+  `"first"`, `"full"` for a full draw, `"row"`, `"no read"`), or `"empty"`/`"no bag"`.
+  `Bag.OnCooldown` returns how many buttons it checked and how many it applied Blizzard's
+  update to. Added for the Dream Breath stutter in raids and Mythic+, to show in a capture with
+  the bags open how much each refresh does.
+- **Circumstances and whole-client time** (perf-profiler.md §3, §10a): captures record the
+  addon restrictions and the instance at their start and end, every restriction change, and
+  Blizzard's per-frame time for all addons and the whole client. Added when captures of that
+  stutter showed slow frames with BetterBags idle, and could say neither where the player was
+  nor where the time went.
 - **New-item flags and Recent Items timers** (recent-items.md §1): `items:ClientNewItemFlag(bag,
   slot)` returns what the client reports for a slot, and `items:SeedNewItemTimer(kind, item)`
   returns what it did: `"started"`, `"running"` (the GUID already has a timer), `"not new"` (the

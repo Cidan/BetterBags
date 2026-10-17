@@ -554,6 +554,25 @@ describe("Bag Draw: shared item button ownership across global sections and view
   -- passes is never hidden or unparented in between, so Blizzard's OnHide/OnShow
   -- handlers on the item button template do not run on every redraw.
   describe("claim, then sweep", function()
+    -- Blizzard's item buttons react to being visible (the enchant event, the item context
+    -- callback). Only the buttons a draw placed are visible: a slot made earlier and never
+    -- drawn stays hidden, and closing the bag hides the drawn ones with it.
+    it("leaves visible only the buttons it drew, and none once the bag closes", function()
+      local bag = newBag()
+      local untouched = itemFrame:GetButton(context:New("boot"), "0_7")
+      bag:Draw(context:New("draw"), slotInfoWith(
+        { itemAt(0, 1, "Weapons"), itemAt(0, 2, "Recent Items") }, {}), function() end)
+      local drawn = { itemFrame.buttonsBySlotkey["0_1"], itemFrame.buttonsBySlotkey["0_2"] }
+      for _, item in ipairs(drawn) do
+        assert.is_true(item.button:IsVisible(), item.slotkey)
+      end
+      assert.is_false(untouched.button:IsVisible())
+      bag.frame:Hide()
+      for _, item in ipairs(drawn) do
+        assert.is_false(item.button:IsVisible(), item.slotkey)
+      end
+    end)
+
     local log
 
     local function watch(button)
@@ -1015,6 +1034,20 @@ describe("Bag Draw: shared item button ownership across global sections and view
 
       assert.are.equal(1, calls["0_1"])
       assert.are.equal(1, calls["0_2"], "Recent Items buttons live outside the tab view and must refresh too")
+    end)
+
+    -- The call trace records return values (data-driven.md): each refresh says how many
+    -- buttons it checked and how many it applied Blizzard's update to.
+    it("returns how many buttons it checked and how many it updated", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw"), slotInfoWith(
+        { itemAt(0, 1, "Weapons"), itemAt(0, 2, "Recent Items"), itemAt(0, 3, "Weapons") }, {}), function() end)
+      spyCooldowns({ "0_1", "0_2", "0_3" })
+      startCooldowns({ "0_1", "0_2" })
+      assert.are.same({ 3, 2 }, { bag:OnCooldown(context:New("cooldown")) })
+      assert.are.same({ 3, 0 }, { bag:OnCooldown(context:New("cooldown")) })
+      bag.frame:Hide()
+      assert.are.same({ 0, 0 }, { bag:OnCooldown(context:New("cooldown")) })
     end)
 
     it("skips buttons whose cooldown is unchanged since it was applied", function()

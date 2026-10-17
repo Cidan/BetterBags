@@ -621,6 +621,55 @@ describe("PerfPane", function()
     end)
   end)
 
+  -- What a capture of the Dream Breath investigation needs to say: what was simulated, where
+  -- the player was, which addon restrictions were active, and whose a slow frame was.
+  describe("summary of where and under which restrictions", function()
+    local function session()
+      return {
+        id = 7,
+        meta = {
+          reason = "simulate",
+          simulation = { event = "BAG_UPDATE_COOLDOWN", rate = 22, duration = 30, payload = "", openBags = true },
+          instanceStart = { name = "Ara-Kara", instanceType = "party", difficultyID = 23, difficultyName = "Mythic" },
+          instanceStop = { name = "Ara-Kara", instanceType = "party", difficultyID = 23, difficultyName = "Mythic" },
+          restrictionsStart = { Combat = "Active", Map = "Active", Encounter = "Inactive" },
+          restrictionsStop = { Combat = "Inactive", Map = "Active", Encounter = "Inactive" },
+          topAddonsStop = { { name = "BetterBags", ms = 56.7 }, { name = "Other", ms = 3 } },
+        },
+        stats = { durationMs = 1000, frames = 3, activeFrames = 3, instrumentedMs = 1 },
+        timeline = {
+          ours = "100,20000,300",
+          blizzard = "50,30000,100",
+          series = { app = "16000,180000,17000", all = "1000,31000,2000" },
+        },
+      }
+    end
+
+    it("says what was simulated, where, and under which restrictions", function()
+      local text = pane:BuildSummary(session())
+      assert.is_truthy(text:find("Simulated BAG_UPDATE_COOLDOWN at 22/s for 30 s, with the bags opened.", 1, true))
+      assert.is_truthy(text:find("Where: Ara-Kara (Mythic, party) at the start and at the end.", 1, true))
+      assert.is_truthy(text:find("Addon restrictions active at the start: Combat, Map; at the end: Map.", 1, true))
+    end)
+
+    it("says how slow the slowest frame was for the whole client and all addons, and BetterBags' share", function()
+      local text = pane:BuildSummary(session())
+      assert.is_truthy(text:find("Slowest frame for the whole client (Blizzard): 180 ms, frame 2. In it, all addons took 31.0 ms and BetterBags 20.0 ms (measured) / 30.0 ms (Blizzard).", 1, true))
+      assert.is_truthy(text:find("Slowest single tick since the client started (Blizzard): BetterBags 56.7 ms, Other 3.00 ms.", 1, true))
+    end)
+
+    it("leaves these lines out of sessions without the data", function()
+      local plain = session()
+      plain.meta = { reason = "manual" }
+      plain.timeline = { ours = "100" }
+      local text = pane:BuildSummary(plain)
+      assert.is_falsy(text:find("Simulated", 1, true))
+      assert.is_falsy(text:find("Where:", 1, true))
+      assert.is_falsy(text:find("Addon restrictions", 1, true))
+      assert.is_falsy(text:find("whole client", 1, true))
+    end)
+  end)
+
   describe("settings", function()
     local function entry(title)
       for _, e in ipairs(createdForm.entries) do

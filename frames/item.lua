@@ -374,20 +374,22 @@ end
 -- with the same bag and slot Blizzard's update would, and skips the update when the
 -- cooldown, the icon, the decoration and the theme generation all match the record. A
 -- full draw always applies. ResetVisuals and SetFreeSlots, which clear the cooldown,
--- invalidate the record. Item rows never skip.
+-- invalidate the record. Item rows never skip. It returns what it did, for the profiler's
+-- call trace: "unchanged" when it skipped, else why it applied Blizzard's update.
 ---@param ctx Context
 ---@param data ItemData
 ---@param onlyIfChanged? boolean
+---@return string
 function itemFrame.itemProto:UpdateCooldown(ctx, data, onlyIfChanged)
 	self.blank = false
 	assert(data, "data must be provided")
 	if data.isItemEmpty then
-		return
+		return "empty"
 	end
 	local decoration = self:GetDecoration(ctx)
 	local retail = decoration.UpdateCooldown ~= nil
 	if not retail and data.bagid == nil then
-		return
+		return "no bag"
 	end
 	local readCooldown = C_Container and C_Container.GetContainerItemCooldown
 	local bag, slot, start, duration, enable
@@ -401,11 +403,31 @@ function itemFrame.itemProto:UpdateCooldown(ctx, data, onlyIfChanged)
 	end
 	local icon = data.itemInfo.itemIcon
 	local s = self.cooldownState
-	if onlyIfChanged and readCooldown and not self.staticData and s and s.valid
-		and s.decoration == decoration and s.decorationGeneration == sonata:GetGeneration()
-		and s.bag == bag and s.slot == slot and s.icon == icon
-		and s.start == start and s.duration == duration and s.enable == enable then
-		return
+	local reason
+	if not onlyIfChanged then
+		reason = "full"
+	elseif not readCooldown then
+		reason = "no read"
+	elseif self.staticData then
+		reason = "row"
+	elseif not s or not s.valid then
+		reason = "first"
+	elseif s.decoration ~= decoration then
+		reason = "decoration"
+	elseif s.decorationGeneration ~= sonata:GetGeneration() then
+		reason = "generation"
+	elseif s.bag ~= bag or s.slot ~= slot then
+		reason = "slot"
+	elseif s.icon ~= icon then
+		reason = "icon"
+	elseif s.start ~= start then
+		reason = "start"
+	elseif s.duration ~= duration then
+		reason = "duration"
+	elseif s.enable ~= enable then
+		reason = "enable"
+	else
+		return "unchanged"
 	end
 	if retail then
 		decoration:UpdateCooldown(icon)
@@ -419,6 +441,7 @@ function itemFrame.itemProto:UpdateCooldown(ctx, data, onlyIfChanged)
 	s.bag, s.slot, s.icon = bag, slot, icon
 	s.start, s.duration, s.enable = start, duration, enable
 	s.valid = readCooldown ~= nil
+	return reason
 end
 
 ---@param ctx Context
@@ -1143,7 +1166,6 @@ function itemFrame:OnEnable()
 	for _ = 1, 50 do
 		local vItem = self:_DoCreate(ctx, -3)
 		vItem.isVirtual = true
-		vItem.frame:Hide()
 		tinsert(self.virtualPool, vItem)
 	end
 
@@ -1193,7 +1215,12 @@ function itemFrame:_DoCreate(_, bagID)
 	local name = format("BetterBagsItemButton%d", buttonCount)
 	buttonCount = buttonCount + 1
 
+	-- Hidden until a draw shows it inside a bag window, before the Blizzard buttons exist: they
+	-- react to being visible (the enchant event and the item context callback), so a slot that
+	-- is never drawn must never be visible, with the bags open or closed. Blizzard's Initialize
+	-- shows the buttons themselves; this holder keeps them from being visible.
 	local parent = CreateFrame("Frame", name .. "parent")
+	parent:Hide()
 	parent:SetID(bagID)
 	parent.IsCombinedBagContainer = function() return false end
 

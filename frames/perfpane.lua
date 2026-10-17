@@ -1282,6 +1282,75 @@ end
 
 ---@param session table
 ---@return string
+-- activeRestrictions lists the restriction types a state table says are active.
+---@param states? table<string, string>
+---@return string
+local function activeRestrictions(states)
+  local active = {}
+  for name, state in pairs(states or {}) do
+    if state == 'Active' or state == 'Activating' then
+      table.insert(active, name)
+    end
+  end
+  table.sort(active)
+  return #active > 0 and table.concat(active, ', ') or 'none'
+end
+
+---@param where table
+---@return string
+local function placeText(where)
+  local detail = {}
+  if where.difficultyName and where.difficultyName ~= '' then table.insert(detail, where.difficultyName) end
+  if where.instanceType and where.instanceType ~= '' then table.insert(detail, where.instanceType) end
+  if #detail == 0 then return where.name or '?' end
+  return string.format('%s (%s)', where.name or '?', table.concat(detail, ', '))
+end
+
+-- AddContextLines adds what a capture recorded about its circumstances: the simulation it ran,
+-- where the player was, the addon restrictions in effect, and whose its slowest frame was.
+---@param add fun(fmt: string, ...)
+---@param session table
+function paneProto:AddContextLines(add, session)
+  local meta = session.meta or {}
+  local sim = meta.simulation
+  if sim then
+    add('Simulated %s at %d/s for %d s%s%s.', sim.event or '?', sim.rate or 0, sim.duration or 0,
+      (sim.payload and sim.payload ~= '') and (', payload "' .. sim.payload .. '"') or '',
+      sim.openBags and ', with the bags opened' or '')
+  end
+  if meta.instanceStart and meta.instanceStop then
+    local first, last = placeText(meta.instanceStart), placeText(meta.instanceStop)
+    if first == last then
+      add('Where: %s at the start and at the end.', first)
+    else
+      add('Where: %s at the start; %s at the end.', first, last)
+    end
+  end
+  if meta.restrictionsStart and meta.restrictionsStop then
+    add('Addon restrictions active at the start: %s; at the end: %s.',
+      activeRestrictions(meta.restrictionsStart), activeRestrictions(meta.restrictionsStop))
+  end
+  local timeline = perfFormat:DecodeTimeline(session)
+  local app = timeline.series and timeline.series.app
+  if app and #app > 0 then
+    local worst = 1
+    for i, v in ipairs(app) do
+      if v > app[worst] then worst = i end
+    end
+    local all = timeline.series.all
+    add('Slowest frame for the whole client (Blizzard): %s, frame %d. In it, all addons took %s and BetterBags %s (measured) / %s (Blizzard).',
+      perfFormat:Ms(app[worst]), worst, perfFormat:Ms(all and all[worst] or 0),
+      perfFormat:Ms(timeline.ours[worst] or 0), perfFormat:Ms(timeline.blizzard and timeline.blizzard[worst] or 0))
+  end
+  if meta.topAddonsStop and #meta.topAddonsStop > 0 then
+    local parts = {}
+    for _, entry in ipairs(meta.topAddonsStop) do
+      table.insert(parts, string.format('%s %s', entry.name or '?', perfFormat:Ms(entry.ms or 0)))
+    end
+    add('Slowest single tick since the client started (Blizzard): %s.', table.concat(parts, ', '))
+  end
+end
+
 function paneProto:BuildSummary(session)
   local meta, stats = session.meta or {}, session.stats or {}
   local lines = {}
@@ -1294,6 +1363,7 @@ function paneProto:BuildSummary(session)
   add('Character: %s - %s.  Client: %s %s (%s).  BetterBags %s.', meta.character or '?', meta.realm or '?',
     meta.flavor or '?', meta.gameVersion or '?', meta.gameBuild or '?', meta.addonVersion or '?')
   add('What was measured: %s.', (perfSessions.PRESETS[meta.preset or 'full'] or perfSessions.PRESETS.full).label)
+  self:AddContextLines(add, session)
   add('')
   local duration = stats.durationMs or 0
   local measured = stats.instrumentedMs or 0

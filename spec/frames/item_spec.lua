@@ -131,6 +131,7 @@ debug.Log = function() end
 -- A fresh frames/item.lua: a copy an earlier spec file loaded holds that file's Sonata stubs,
 -- not the ones above. Removed again in the teardown.
 local itemFrame = LoadFreshBetterBagsModule("ItemFrame", "frames/item.lua")
+local realCreateDecoration = itemFrame.CreateDecoration
 itemFrame.CreateDecoration = function(_, item) return newDecoration(item) end
 
 describe("ItemFrame Static Buttons and Parent Removal Tests", function()
@@ -172,6 +173,23 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       for k, v in pairs(fields or {}) do data[k] = v end
       return data
     end
+
+    it("is visible once drawn into an open bag, not while the bag is closed, and not after release", function()
+      local item = itemFrame:GetButton(btnCtx, "0_9")
+      local bag = CreateFrame("Frame", nil, UIParent)
+      item:SetItemFromData(btnCtx, potion())
+      -- What the section grid's layout does with a drawn button (frames/grid.lua).
+      item.frame:SetParent(bag)
+      assert.is_true(item.frame:IsShown())
+      assert.is_true(item.button:IsVisible())
+      bag:Hide()
+      assert.is_false(item.button:IsVisible())
+      bag:Show()
+      item:Wipe(btnCtx)
+      assert.is_false(item.frame:IsShown())
+      assert.is_nil(item.frame:GetParent())
+      assert.is_false(item.button:IsVisible())
+    end)
 
     it("is made once, styled by Sonata as an ItemButton, and announced", function()
       local item = itemFrame:GetButton(btnCtx, "0_9")
@@ -302,6 +320,41 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       itemFrame:GetButton(btnCtx, "12_98")
       itemFrame._DoCreate = origDoCreate
       assert.equal(0, created, "no bank tab slot is created after boot")
+    end)
+
+    -- Blizzard's item buttons react to being shown: EnchantingItemButtonAnimMixin:OnShow
+    -- subscribes to ENCHANT_SPELL_COMPLETED and ItemButtonMixin:PostOnShow to the item context
+    -- callback (Blizzard_ItemButton). A slot made at boot and never drawn must not be visible,
+    -- or every possible slot reacts with the bags closed (the Dream Breath stutter in raids and
+    -- Mythic+).
+    it("leaves every slot hidden and unparented until it is drawn", function()
+      addon.isRetail = true
+      const.BANK_ONLY_BAGS = { [6] = 6 }
+      const.ACCOUNT_BANK_BAGS = { [12] = 12 }
+      itemFrame:Init()
+      itemFrame:OnEnable()
+      local count = 0
+      for slotkey, item in pairs(itemFrame.buttonsBySlotkey) do
+        count = count + 1
+        assert.is_false(item.frame:IsShown(), slotkey)
+        assert.is_nil(item.frame:GetParent(), slotkey)
+        -- Blizzard's Initialize shows the button itself; its hidden holder keeps it from being visible.
+        assert.is_true(item.button:IsShown(), slotkey)
+        assert.is_false(item.button:IsVisible(), slotkey)
+      end
+      assert.is_true(count > 0)
+      for _, vItem in ipairs(itemFrame.virtualPool) do
+        assert.is_false(vItem.frame:IsVisible())
+      end
+    end)
+
+    it("makes the drawing button inside the hidden holder, so it is not visible either", function()
+      itemFrame:Init()
+      local item = itemFrame:Create(ctx:New("boot"), 0)
+      local decoration = realCreateDecoration(itemFrame, item)
+      assert.are.equal(item.frame, decoration:GetParent())
+      assert.is_true(decoration:IsShown())
+      assert.is_false(decoration:IsVisible())
     end)
 
     it("keeps 40 slots per bank bag on Classic", function()
@@ -625,6 +678,26 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       after_each(function()
         _G._containerCooldowns = {}
         sonata.generation = 0
+      end)
+
+      -- The call trace records return values (data-driven.md): each refresh says whether it
+      -- skipped Blizzard's update or which input made it apply it.
+      it("returns why it applied Blizzard's update, or that it skipped it", function()
+        assert.equal("unchanged", item:UpdateCooldown(btnCtx, potion(), true))
+        _G._containerCooldowns["0_6"] = { 100, 60, 1 }
+        assert.equal("start", item:UpdateCooldown(btnCtx, potion(), true))
+        assert.equal("unchanged", item:UpdateCooldown(btnCtx, potion(), true))
+        _G._containerCooldowns["0_6"] = { 100, 90, 1 }
+        assert.equal("duration", item:UpdateCooldown(btnCtx, potion(), true))
+        _G._containerCooldowns["0_6"] = { 100, 90, 0 }
+        assert.equal("enable", item:UpdateCooldown(btnCtx, potion(), true))
+        local other = potion()
+        other.itemInfo.itemIcon = 1
+        assert.equal("icon", item:UpdateCooldown(btnCtx, other, true))
+        sonata.generation = 1
+        assert.equal("generation", item:UpdateCooldown(btnCtx, other, true))
+        -- A full draw always applies.
+        assert.equal("full", item:UpdateCooldown(btnCtx, other))
       end)
 
       it("skips a refresh when the cooldown is unchanged since it was applied", function()

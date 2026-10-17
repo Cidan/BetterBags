@@ -24,6 +24,9 @@ local itemBrowser = addon:GetModule('ItemBrowser')
 ---@class PerfPane: AceModule
 local perfPane = addon:GetModule('PerfPane')
 
+---@class SimulatePane: AceModule
+local simulatePane = addon:GetModule('SimulatePane')
+
 ---@class WindowModule: AceModule
 local window = addon:GetModule('Window')
 
@@ -124,11 +127,12 @@ function debugWindow:Create(ctx)
     return false
   end)
 
-  -- Add default "Debug Log", "Items", "Dump", and "Performance" tabs
+  -- Add default "Debug Log", "Items", "Dump", "Performance" and "Simulate" tabs
   self.tabFrame:AddTab(ctx, "Debug Log")
   self.tabFrame:AddTab(ctx, "Items")
   self.tabFrame:AddTab(ctx, "Dump")
   self.tabFrame:AddTab(ctx, "Performance")
+  self.tabFrame:AddTab(ctx, "Simulate")
   self.tabFrame:SetTabByIndex(ctx, 1)
 
   -- Create content frames for each tab
@@ -137,6 +141,7 @@ function debugWindow:Create(ctx)
   self.contentFrames[2] = self:CreateItemsFrame()
   self.contentFrames[3] = self:CreateDumpFrame()
   self.contentFrames[4] = self:CreatePerformanceFrame()
+  self.contentFrames[5] = self:CreateSimulateFrame()
 
   events:GroupBucketEvent({}, {'debug/LogAdded'}, function()
     self.contentFrames[1]:InsertTable(self.cells)
@@ -284,13 +289,24 @@ function debugWindow:CreatePerformanceFrame()
   return pane
 end
 
+---CreateSimulateFrame creates the event simulator's Simulate tab.
+---@return SimulatePaneFrame
+function debugWindow:CreateSimulateFrame()
+  local box = self.window.content
+  local pane = simulatePane:Create(box)
+  pane.frame:SetPoint("TOPLEFT", box, "TOPLEFT", 0, 0)
+  pane.frame:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
+  pane:Hide()
+  return pane
+end
+
 ---SwitchTab switches to the specified tab.
 ---@param tabId number
 function debugWindow:SwitchTab(tabId)
   for id, frame in pairs(self.contentFrames) do
     if id == tabId then
       frame:Show()
-      if id == 2 or id == 3 or id == 4 then
+      if id >= 2 then
         frame:Update()
       end
     else

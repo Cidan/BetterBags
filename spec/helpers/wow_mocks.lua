@@ -944,10 +944,21 @@ local function CreateMockWidget(widgetType, name, parent)
       widget.GetBagID = function(self)
         return self.bagID or (self:GetParent() and self:GetParent():GetID() or nil)
       end
+      -- ContainerFrameItemButtonMixin:Initialize (Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua,
+      -- 12.1.5): bag and slot, the extended-slot state, the combined-bags background, then Show.
       widget.Initialize = function(self, bag, slot)
         self:SetBagID(bag)
         self:SetID(slot)
-        self:GetParent():IsCombinedBagContainer()
+        self:UpdateExtended()
+        local isCombined = self:GetParent():IsCombinedBagContainer()
+        if isCombined and not self.ItemSlotBackground then
+          self.ItemSlotBackground = self:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
+          self.ItemSlotBackground:SetAllPoints(self)
+        end
+        if self.ItemSlotBackground then
+          self.ItemSlotBackground:SetShown(isCombined)
+        end
+        self:Show()
       end
       widget.GetSlotAndBagID = function(self)
         return self:GetID(), self:GetBagID()

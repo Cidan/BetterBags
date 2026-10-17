@@ -312,6 +312,92 @@ describe("PerfSessions", function()
       assert.are.same({ 25 }, addon:GetModule("PerfFormat"):DecodeTimeline(session).blizzard)
     end)
 
+    -- Raids and dungeons switch on addon restrictions (C_RestrictedActions, 12.x); a capture
+    -- records which were active, and where the player was.
+    it("records the addon restrictions and the instance when it starts and stops", function()
+      local savedEnum = { _G.Enum.AddOnRestrictionType, _G.Enum.AddOnRestrictionState }
+      local savedApi, savedInstance = _G.C_RestrictedActions, _G.GetInstanceInfo
+      _G.Enum.AddOnRestrictionType = { Combat = 0, Encounter = 1, ChallengeMode = 2, PvPMatch = 3, Map = 4, Chat = 5 }
+      _G.Enum.AddOnRestrictionState = { Inactive = 0, Activating = 1, Active = 2 }
+      local states = { [0] = 2, [4] = 2 }
+      _G.C_RestrictedActions = { GetAddOnRestrictionState = function(t) return states[t] or 0 end }
+      local where = { "Tichondrius Halls", "party", 8, "Mythic Keystone", 5 }
+      _G.GetInstanceInfo = function() return unpack(where) end
+      perfSessions:StartCapture("manual")
+      states[1] = 2
+      where = { "Dornogal", "none", 0, "", 5 }
+      local session = perfSessions:StopCapture()
+      _G.Enum.AddOnRestrictionType, _G.Enum.AddOnRestrictionState = savedEnum[1], savedEnum[2]
+      _G.C_RestrictedActions, _G.GetInstanceInfo = savedApi, savedInstance
+      assert.are.same({ Combat = "Active", Encounter = "Inactive", ChallengeMode = "Inactive", PvPMatch = "Inactive",
+        Map = "Active", Chat = "Inactive" }, session.meta.restrictionsStart)
+      assert.are.equal("Active", session.meta.restrictionsStop.Encounter)
+      assert.are.same({ name = "Tichondrius Halls", instanceType = "party", difficultyID = 8,
+        difficultyName = "Mythic Keystone" }, session.meta.instanceStart)
+      assert.are.equal("none", session.meta.instanceStop.instanceType)
+    end)
+
+    it("leaves the restrictions out on clients without them", function()
+      local savedApi = _G.C_RestrictedActions
+      _G.C_RestrictedActions = nil
+      perfSessions:StartCapture("manual")
+      local session = perfSessions:StopCapture()
+      _G.C_RestrictedActions = savedApi
+      assert.is_nil(session.meta.restrictionsStart)
+      assert.is_nil(session.meta.restrictionsStop)
+    end)
+
+    it("records Blizzard's per-frame time for all addons and the whole client, and the slowest addons", function()
+      _G.C_AddOnProfiler = {
+        IsEnabled = function() return true end,
+        GetAddOnMetric = function() return 1 end,
+        GetOverallMetric = function(metric)
+          return metric == _G.Enum.AddOnProfilerMetric.LastTime and 4 or 0
+        end,
+        GetApplicationMetric = function(metric)
+          return metric == _G.Enum.AddOnProfilerMetric.LastTime and 160 or 0
+        end,
+        GetTopKAddOnsForMetric = function(metric, k)
+          assert.are.equal(_G.Enum.AddOnProfilerMetric.PeakTime, metric)
+          assert.are.equal(10, k)
+          return { { addOnName = "BetterBags", metricValue = 56.7 }, { addOnName = "Other", metricValue = 3 } }
+        end,
+      }
+      perfSessions:StartCapture("manual")
+      perf:_OnFrame()
+      local session = perfSessions:StopCapture()
+      local timeline = addon:GetModule("PerfFormat"):DecodeTimeline(session)
+      assert.are.same({ 4 }, timeline.series.all)
+      assert.are.same({ 160 }, timeline.series.app)
+      assert.are.same({ { name = "BetterBags", ms = 56.7 }, { name = "Other", ms = 3 } }, session.meta.topAddonsStop)
+      assert.are.same(session.meta.topAddonsStop, session.meta.topAddonsStart)
+    end)
+
+    it("traces addon restriction changes on clients that have them", function()
+      local savedUtils = _G.C_EventUtils
+      _G.C_EventUtils = { IsEventValid = function(name) return name == "ADDON_RESTRICTION_STATE_CHANGED" end }
+      perfSessions._eventsHooked = nil
+      registered = {}
+      perfSessions:Init()
+      assert.is_function(registered.ADDON_RESTRICTION_STATE_CHANGED)
+      _G.C_EventUtils = { IsEventValid = function() return false end }
+      perfSessions._eventsHooked = nil
+      registered = {}
+      perfSessions:Init()
+      _G.C_EventUtils = savedUtils
+      assert.is_nil(registered.ADDON_RESTRICTION_STATE_CHANGED)
+    end)
+
+    it("keeps metadata the starter adds, such as the simulation it runs", function()
+      perfSessions:StartCapture("simulate", { simulation = { event = "BAG_UPDATE_COOLDOWN", rate = 12 } })
+      local session = perfSessions:StopCapture()
+      assert.are.equal("simulate", session.meta.reason)
+      assert.are.same({ event = "BAG_UPDATE_COOLDOWN", rate = 12 }, session.meta.simulation)
+      local format = addon:GetModule("PerfFormat")
+      assert.are.equal("simulate", format:ReasonLabel("simulate"))
+      assert.are.equal("by the event simulator", format:ReasonPhrase("simulate"))
+    end)
+
     it("leaves Blizzard metrics out on clients without the addon profiler", function()
       perfSessions:StartCapture("manual")
       local session = perfSessions:StopCapture()

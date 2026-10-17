@@ -850,34 +850,49 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
 	self.behavior:SwitchToBankAndWipe(ctx)
 end
 
+-- refreshCooldown refreshes one button's cooldown; it returns whether it checked the button
+-- and whether Blizzard's update ran.
 ---@param ctx Context
 ---@param item Item
+---@return boolean checked, boolean applied
 local function refreshCooldown(ctx, item)
 	-- A button reused as a free slot still carries the data of the item it last drew.
 	if item.isFreeSlot then
-		return
+		return false, false
 	end
 	local data = item:GetItemData()
-	if data then
-		item:UpdateCooldown(ctx, data, true)
+	if not data then
+		return false, false
 	end
+	local reason = item:UpdateCooldown(ctx, data, true)
+	return true, reason ~= "unchanged" and reason ~= "empty"
 end
 
 -- OnCooldown refreshes the cooldown of every visible item button: the active tab
--- view's buttons and the global Recent Items section's, which lives outside the view.
+-- view's buttons and the global Recent Items section's, which lives outside the view. It
+-- returns how many buttons it checked and how many it applied Blizzard's update to, for the
+-- profiler's call trace.
 ---@param ctx Context
+---@return number checked, number applied
 function bagFrame.bagProto:OnCooldown(ctx)
 	if not self:IsShown() then
-		return
+		return 0, 0
+	end
+	local checked, applied = 0, 0
+	local function refresh(item)
+		local c, a = refreshCooldown(ctx, item)
+		if c then checked = checked + 1 end
+		if a then applied = applied + 1 end
 	end
 	if self.currentView then
 		for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-			refreshCooldown(ctx, item)
+			refresh(item)
 		end
 	end
 	for _, item in ipairs(self.itemFrames or {}) do
-		refreshCooldown(ctx, item)
+		refresh(item)
 	end
+	return checked, applied
 end
 
 ---@param ctx Context
