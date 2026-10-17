@@ -591,6 +591,19 @@ describe("Drawable", function()
     assert.are.equal(d.frame, d:GetFrame())
   end)
 
+  -- Both offsets are required together (SimpleScriptRegionResizingAPIDocumentation); the client
+  -- dropped an x offset given without a y offset, so a missing one is passed as 0.
+  it("anchors with both offsets when only one is given", function()
+    local d = drawable:Create({})
+    d.frame = CreateFrame("Frame")
+    local parent = CreateFrame("Frame")
+    d:SetPoint({ Point = "TOPLEFT", RelativeTo = parent, RelativePoint = "TOPLEFT", XOffset = 14 })
+    assert.are.same({ "TOPLEFT", parent, "TOPLEFT", 14, 0 }, { d.frame:GetPoint(1) })
+    d:ClearAllPoints()
+    d:SetPoint({ Point = "TOPLEFT", RelativeTo = parent, RelativePoint = "TOPLEFT", YOffset = -3 })
+    assert.are.same({ "TOPLEFT", parent, "TOPLEFT", 0, -3 }, { d.frame:GetPoint(1) })
+  end)
+
   it("forwards the rest of the frame calls", function()
     local d = drawable:Create({})
     d.frame = CreateFrame("Frame")

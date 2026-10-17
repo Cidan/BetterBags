@@ -314,7 +314,14 @@ local function CreateMockWidget(widgetType, name, parent)
     self._points = {}
     self._allPoints = nil
   end
+  -- ScriptRegion:SetPoint(point, relativeTo, relativePoint, offsetX, offsetY)
+  -- (SimpleScriptRegionResizingAPIDocumentation): both offsets are required together. In game an
+  -- x offset given with a nil y offset was dropped (a render recording: a scroll box's child
+  -- anchored 14 in sat at 0), so the mock rejects one offset without the other.
   function widget:SetPoint(point, relativeTo, relativePoint, x, y)
+    if type(relativePoint) == "string" and (x == nil) ~= (y == nil) then
+      error("SetPoint: offsetX and offsetY must be given together, got " .. tostring(x) .. ", " .. tostring(y), 2)
+    end
     table.insert(self._points, {
       point = point,
       relativeTo = relativeTo,
