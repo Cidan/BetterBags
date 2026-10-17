@@ -123,6 +123,13 @@ Specs (`sonata/apply.lua`):
   own texture coordinates, tiling and nine-slice data (`SimpleTextureBaseAPIDocumentation.lua`),
   which a reset after it would undo. `apply:ResetTexture` blanks a texture for reuse, size
   included.
+- **Tiling loads the art with the `REPEAT` wrap mode.** `HorizTile`/`VertTile` pass `"REPEAT"`
+  as the horizontal/vertical wrap mode to `SetTexture` (or `SetAtlas`) before setting the tile
+  flags, as Blizzard's `SetTextureWithAddressModeOptions` does (`TextureUtil.lua`). With the
+  default `CLAMP`, a texture tiled past its own size repeats its edge pixels: Slate's marble
+  (256 x 256) drew as vertical streaks below its first 256 pixels. Coverage:
+  `spec/sonata/apply_spec.lua` ("loads a tiled file with the REPEAT wrap mode", "loads a tiled
+  atlas with the REPEAT wrap mode too") and the Slate tests in `spec/sonata/theme_ports_spec.lua`.
 - Button states (`apply:ButtonStates`): a state given a file, atlas or color draws it, reset to
   fill the button, untinted, at full alpha; a state with only `VertexColor`, `TexCoords`,
   `BlendMode`, `Inset` or `Alpha` changes the art the button already has (the

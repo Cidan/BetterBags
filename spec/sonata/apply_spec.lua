@@ -133,6 +133,32 @@ describe("SonataApply", function()
       assert.are.equal(Enum.UITextureSliceMode.Tiled, t._sliceMode)
     end)
 
+    -- Tiling from Lua needs the REPEAT wrap mode on the file or atlas, as Blizzard's
+    -- SetTextureWithAddressModeOptions does (Blizzard_SharedXMLBase/TextureUtil.lua): with the
+    -- default CLAMP, a texture tiled past its size repeats its edge pixels in streaks.
+    it("loads a tiled file with the REPEAT wrap mode in each tiled direction", function()
+      local t = used()
+      apply:Texture(t, { Texture = "marble.png", HorizTile = true, VertTile = true })
+      assert.are.equal("REPEAT", t._wrapH)
+      assert.are.equal("REPEAT", t._wrapV)
+      assert.is_true(t._horizTile)
+      assert.is_true(t._vertTile)
+      apply:Texture(t, { Texture = "marble.png", HorizTile = true })
+      assert.are.equal("REPEAT", t._wrapH)
+      assert.is_nil(t._wrapV)
+      apply:Texture(t, { Texture = "plain.png" })
+      assert.is_nil(t._wrapH)
+      assert.is_nil(t._wrapV)
+    end)
+
+    it("loads a tiled atlas with the REPEAT wrap mode too", function()
+      local t = used()
+      apply:Texture(t, { Atlas = "bags-icon", VertTile = true })
+      assert.is_nil(t._wrapH)
+      assert.are.equal("REPEAT", t._wrapV)
+      assert.is_true(t._vertTile)
+    end)
+
     it("draws a solid color", function()
       local t = used()
       apply:Texture(t, { Color = { 0, 0, 0, 0.5 } })

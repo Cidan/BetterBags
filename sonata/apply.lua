@@ -126,12 +126,16 @@ function apply:Texture(texture, spec)
   texture:SetDesaturated(false)
   texture:SetAlpha(1)
 
+  -- Tiling needs the REPEAT wrap mode on the file or atlas: with the default CLAMP, a texture
+  -- tiled past its size repeats its edge pixels in streaks.
+  local wrapH = spec.HorizTile and "REPEAT" or nil
+  local wrapV = spec.VertTile and "REPEAT" or nil
   if spec.Atlas ~= nil then
-    texture:SetAtlas(spec.Atlas, spec.UseAtlasSize == true)
+    texture:SetAtlas(spec.Atlas, spec.UseAtlasSize == true, nil, nil, wrapH, wrapV)
   elseif spec.Color ~= nil then
     texture:SetColorTexture(self:Color(spec.Color))
   else
-    texture:SetTexture(spec.Texture)
+    texture:SetTexture(spec.Texture, wrapH, wrapV)
   end
 
   if spec.SliceMargins ~= nil then

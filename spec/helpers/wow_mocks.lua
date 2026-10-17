@@ -606,8 +606,10 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   -- TextureBase:SetTexture(textureAsset) replaces whatever the texture drew (an atlas or a
   -- color texture); nil clears it.
-  function widget:SetTexture(path)
+  -- TextureBase:SetTexture(asset, wrapModeHorizontal?, wrapModeVertical?, filterMode?).
+  function widget:SetTexture(path, wrapH, wrapV, filterMode)
     self._texturePath = path
+    self._wrapH, self._wrapV, self._filterMode = wrapH, wrapV, filterMode
     self._atlas = nil
     self._colorTexture = nil
   end
@@ -627,9 +629,12 @@ local function CreateMockWidget(widgetType, name, parent)
   -- TextureBase:SetAtlas(atlas, useAtlasSize) draws the atlas with its own texture
   -- coordinates, tiling and nine-slice data (SimpleTextureBaseAPIDocumentation.lua; the
   -- mock leaves those unset, so a later SetTexCoord, tiling or slicing call shows).
-  function widget:SetAtlas(atlas, useAtlasSize)
+  -- TextureBase:SetAtlas(atlas, useAtlasSize?, filterMode?, resetTexCoords?, wrapModeHorizontal?,
+  -- wrapModeVertical?).
+  function widget:SetAtlas(atlas, useAtlasSize, filterMode, _, wrapH, wrapV)
     self._atlas = atlas
     self._useAtlasSize = useAtlasSize
+    self._wrapH, self._wrapV, self._filterMode = wrapH, wrapV, filterMode
     self._texturePath = nil
     self._colorTexture = nil
     self._texCoords = nil
@@ -641,6 +646,7 @@ local function CreateMockWidget(widgetType, name, parent)
   -- TextureBase:SetColorTexture(r, g, b, a?) replaces a texture or atlas with a solid color.
   function widget:SetColorTexture(r, g, b, a)
     self._colorTexture = {r = r, g = g, b = b, a = a or 1}
+    self._wrapH, self._wrapV = nil, nil
     self._atlas = nil
     self._texturePath = nil
   end

@@ -169,7 +169,8 @@ take a texture spec or a color: `Background = { Color = { 0, 0, 0, 0.8 } }`,
 - **Textures**: one of `Texture` (a file), `Atlas` (`UseAtlasSize`) or `Color`, plus `Layer`,
   `SubLevel`, `SliceMode` (`"Stretched"` or `"Tiled"`) with `SliceMargins = { Left, Right,
   Top, Bottom }` for nine-sliced art, `TexCoords`, `VertexColor`, `BlendMode`, `Desaturated`,
-  `HorizTile`, `VertTile`, `Alpha`.
+  `HorizTile`, `VertTile` (tile the art; Sonata loads it with the `REPEAT` wrap mode the tiling
+  needs), `Alpha`.
 - **Points**: a list of `{ Point, RelativeTo, RelativePoint, X, Y }`; `RelativeTo` defaults to
   the window (or the element) and may name a texture or `Title` where noted.
 
