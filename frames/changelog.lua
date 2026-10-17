@@ -52,10 +52,12 @@ local changelogWindow = addon:NewModule('ChangelogWindow')
 local WIDTH, HEIGHT = 560, 540
 -- The room under the list for the checkbox and the button.
 local BOTTOM_ROW = 34
--- The room right of the list: its scroll bar then sits 16 in from the content box's edge, as the
--- settings window's does (forms/form.lua), clear of a frame drawn up to the content box (the
--- Panel kind has no right inset in Default).
-local RIGHT_GAP = 4
+-- The room right of the list. The scroll box puts its 8-wide bar 12 in from its right edge, and
+-- the bar's 17-wide buttons are centered on it (MinimalScrollBar.xml), so they reach 0.5 past it.
+-- The Panel kind has no right inset in Default, whose border covers about 6 pixels of the content
+-- box (Blizzard's own Inset frames start 6 in): 10 leaves the buttons 9.5 in, clear of it. At 0,
+-- and at 4, the border covered the bar's buttons in game.
+local RIGHT_GAP = 10
 -- The list's padding: left and right of every part, above the first.
 local PAD = 10
 local TOP = 8

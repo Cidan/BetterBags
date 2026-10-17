@@ -267,9 +267,9 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   (Escape closes it), strata DIALOG, 560 x 540 in the window mode with `Resizable = false`, no
   fade, the backpack's opacity. Its content is a body drawable (plan PRE, DEP scroll box, SELF)
   that hands the scroll box the content box minus a 34-pixel bottom row holding a checkbox and
-  an "Okay!" button, and minus 4 pixels on the right so its bar sits 16 in from the content box's
-  edge like the settings window's; the scroll box scrolls a canvas laying the releases out at its
-  width.
+  an "Okay!" button, and minus 10 pixels on the right so the bar's 17-wide buttons end clear of
+  the border Default draws over the content box's right edge (changelog.md); the scroll box
+  scrolls a canvas laying the releases out at its width.
   `OnHide` marks the notes seen. Details: changelog.md. Coverage: `spec/frames/changelog_spec.lua`.
 - **The search category editor** (`frames/searchcategory.lua`): a Dialog window named
   `BetterBagsSearchCategoryConfig`, strata DIALOG, 430 x 450 in the window mode with

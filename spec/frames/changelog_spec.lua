@@ -189,9 +189,10 @@ describe("ChangelogWindow", function()
   it("lays the releases out top to bottom across the scroll area, and scrolls them", function()
     open()
     local insets = cw.window:GetContentInsets()
-    -- The scroll area stops 4 short of the content box's right edge: its bar then sits 16 in
-    -- from it, as the settings window's does, clear of a frame drawn up to the content box.
-    local canvasWidth = 560 - insets.Left - insets.Right - 4 - cw.scroll:GetBarWidth()
+    -- The scroll area stops 10 short of the content box's right edge, so the bar's 17-wide
+    -- buttons (centered on the 8-wide bar) end 9.5 in from it, clear of a frame border drawn
+    -- over the content box's edge.
+    local canvasWidth = 560 - insets.Left - insets.Right - 10 - cw.scroll:GetBarWidth()
     assert.are.equal(canvasWidth, cw.canvas.frame:GetWidth())
     local last = 1
     local function below(frame)
@@ -241,10 +242,10 @@ describe("ChangelogWindow", function()
     assert.are.equal("Don't show me this again", cw.checkboxLabel:GetText())
     assert.are.same({ "BOTTOMRIGHT", body, "BOTTOMRIGHT", -6, 6 }, { cw.okay:GetPoint(1) })
     assert.are.equal("Okay!", cw.okay:GetText())
-    assert.are.same({ "BOTTOMRIGHT", body, "BOTTOMRIGHT", -4, 34 }, { cw.scroll.frame:GetPoint(2) })
-    -- The list scrolls in the scroll area: the content box less the bottom row and the 4 pixels
+    assert.are.same({ "BOTTOMRIGHT", body, "BOTTOMRIGHT", -10, 34 }, { cw.scroll.frame:GetPoint(2) })
+    -- The list scrolls in the scroll area: the content box less the bottom row and the 10 pixels
     -- on the right.
-    assert.are.same({ Width = 496, Height = 466 }, cw.body:PreRender({ Width = 500, Height = 500 }))
+    assert.are.same({ Width = 490, Height = 466 }, cw.body:PreRender({ Width = 500, Height = 500 }))
     assert.are.equal("Button", registered[cw.okay])
   end)
 

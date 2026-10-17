@@ -38,10 +38,12 @@ Dialog windows have none), named `BetterBagsChangelog` (closes with Escape), tit
 in BetterBags", 560 x 540, not resizable, in the `DIALOG` strata, with the backpack's opacity, no
 fade. Built the first time it opens.
 - Content: a `ChangelogBody` drawable (plan PRE, DEP scroll, SELF) whose PRE hands the scroll box
-  the content box minus the 34-pixel bottom row and 4 pixels on the right. The scroll area stops
-  those 4 pixels short (`RIGHT_GAP`), so its bar sits 16 in from the content box's right edge, as
-  the settings window's does (`forms/form.lua`): the Panel kind has no right inset in Default, and
-  at the edge the bar drew over the frame's border. The scroll box (`render/scrollbox.lua`)
+  the content box minus the 34-pixel bottom row and 10 pixels on the right. The scroll area stops
+  those 10 pixels short (`RIGHT_GAP`): the scroll box puts its 8-wide bar 12 in from its right
+  edge, and the bar's 17-wide up and down buttons are centered on it (`MinimalScrollBar.xml`), so
+  they end 9.5 in from the content box's edge. The Panel kind has no right inset in Default, whose
+  border covers about 6 pixels of the content box (Blizzard's own `Inset` frames start 6 in); at
+  gaps of 0 and 4 the border covered the bar's buttons in game (WoW: Forever). The scroll box (`render/scrollbox.lua`)
   scrolls a `ChangelogCanvas` drawable laid out at the scroll area's width: per release a header
   (version in `Heading`, date in `MutedSmall` with " - Alpha" for an alpha, a `New` badge in
   `Positive` while unseen, the headline in `Description`, wrapped), then a row per entry: the
