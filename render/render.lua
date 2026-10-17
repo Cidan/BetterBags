@@ -39,6 +39,9 @@ local MAX_DEPTH = 1000
 ---@field MaxHeight? number Down: the most height a child may take before it scrolls.
 ---@field FullWidth? number Down: the full width, for children that span every column.
 ---@field Scrollable? boolean Up: the content is taller than the viewport it was given.
+---@field LayoutWidth? number Down: the width to lay out for, when it differs from the width shown (a window animating to its snapped width).
+---@field FitWidth? number Up: the width its layout takes; a window snapped to it shows the same layout.
+---@field FitHeight? number Up: the height that shows all of it without scrolling.
 
 ---@class RenderResults
 ---@field Results table<Drawable, RenderResult>

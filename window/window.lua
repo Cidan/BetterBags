@@ -91,7 +91,7 @@ local DEFAULT_GRIP = {
 ---@field Size? fun(): number?, number? The size the player left it at, for the window mode.
 ---@field Resizable? boolean false: in the window mode it keeps its size and has no grip.
 ---@field OnResized? fun(ctx: Context, width: number, height: number) Called after the player resized it (once a snap ends).
----@field SnapToContent? fun(): boolean true: when the player lets go of the grip, the window shrinks to its content's width.
+---@field SnapToContent? fun(): boolean true: when the player lets go of the grip, the window shrinks to its content's width, and to its height when there is room below it.
 ---@field MinWidth? number|false|fun(): number The window's minimum width.
 ---@field MinHeight? number|false|fun(): number The window's minimum height.
 ---@field MinContentWidth? number|fun(): number The content box's minimum width.
@@ -128,19 +128,20 @@ local DEFAULT_GRIP = {
 ---@field moving boolean
 ---@field sizing? boolean The player is sizing it (between the grip's mouse down and up).
 ---@field fitWidth? number The narrowest width its content lays out the same in, from the last render.
----@field snap? {from: number, to: number, overshoot: number, elapsed: number, contentWidth: number} The snap running.
+---@field fitHeight? number The height that shows all of its content without scrolling, from the last render.
+---@field snap? {from: number, to: number, overshoot: number, fromHeight: number, toHeight: number, rebound: number, elapsed: number, contentWidth: number} The snap running.
 ---@field snapDriver? Frame Steps a snap each frame.
 ---@field opts WindowOptions
 local windowProto = drawable:Extend({}, 'WindowFrame')
 
--- SnapWidthAt returns the width of a snap from from to to at progress p (0 to 1): it eases out
--- to overshoot past to by SNAP_TURN of the way, then settles back on to.
+-- SnapSizeAt returns a width or height of a snap from from to to at progress p (0 to 1): it eases
+-- out to overshoot past to by SNAP_TURN of the way, then settles back on to.
 ---@param from number
 ---@param to number
 ---@param overshoot number
 ---@param p number
 ---@return number
-function window.SnapWidthAt(from, to, overshoot, p)
+function window.SnapSizeAt(from, to, overshoot, p)
   if p <= 0 then
     return from
   end
@@ -154,6 +155,18 @@ function window.SnapWidthAt(from, to, overshoot, p)
   end
   local q = (p - SNAP_TURN) / (1 - SNAP_TURN)
   return low + overshoot * q * q * (3 - 2 * q)
+end
+
+-- SnapReboundAt is SnapSizeAt folded at to: where SnapSizeAt passes to, this comes back off it
+-- by as much, so it reaches to, rebounds by up to overshoot at the same moment SnapSizeAt is
+-- furthest past it, and settles on to. It never goes past to.
+---@param from number
+---@param to number
+---@param overshoot number
+---@param p number
+---@return number
+function window.SnapReboundAt(from, to, overshoot, p)
+  return to + math.abs(window.SnapSizeAt(from, to, overshoot, p) - to)
 end
 
 ---@param value number|false|nil|fun(): number
@@ -919,14 +932,19 @@ function windowProto:startSnap(ctx)
     return false
   end
   render:RenderNow(self, { ctx = ctx })
-  if self.fitWidth == nil then
-    return false
-  end
   local frame = self.frame
-  local from = frame:GetWidth()
-  local minWidth = self:minimumSize()
-  local to = math.max(minWidth, math.min(from, self.fitWidth))
+  local from, fromHeight = frame:GetWidth(), frame:GetHeight()
+  local minWidth, minHeight = self:minimumSize()
+  local to = self.fitWidth and math.max(minWidth, self.fitWidth) or from
+  local toHeight = self.fitHeight and math.max(minHeight, self.fitHeight) or fromHeight
+  -- A snap only shrinks: a side whose target is not at least half a pixel smaller keeps its size.
   if from - to < 0.5 then
+    to = from
+  end
+  if fromHeight - toHeight < 0.5 then
+    toHeight = fromHeight
+  end
+  if to == from and toHeight == fromHeight then
     return false
   end
   local left, top = frame:GetLeft(), frame:GetTop()
@@ -935,10 +953,15 @@ function windowProto:startSnap(ctx)
     frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
   end
   local insets = self:GetContentInsets()
+  -- The height rebounds off its target instead of passing it: there is no room below the
+  -- content, as there is beside it, so passing it would cut the content's bottom row.
   self.snap = {
     from = from,
     to = to,
     overshoot = math.max(0, math.min(SNAP_OVERSHOOT, (from - to) * SNAP_OVERSHOOT_SHARE, to - minWidth)),
+    fromHeight = fromHeight,
+    toHeight = toHeight,
+    rebound = math.min(SNAP_OVERSHOOT, (fromHeight - toHeight) * SNAP_OVERSHOOT_SHARE),
     elapsed = 0,
     contentWidth = to - insets.Left - insets.Right,
   }
@@ -966,14 +989,15 @@ function windowProto:stepSnap(elapsed)
   end
   snap.elapsed = snap.elapsed + elapsed
   local p = math.min(1, snap.elapsed / SNAP_DURATION)
-  self.frame:SetWidth(window.SnapWidthAt(snap.from, snap.to, snap.overshoot, p))
+  self.frame:SetSize(window.SnapSizeAt(snap.from, snap.to, snap.overshoot, p),
+    window.SnapReboundAt(snap.fromHeight, snap.toHeight, snap.rebound, p))
   self:Invalidate()
   if p >= 1 then
     self:FinishSnap()
   end
 end
 
--- FinishSnap ends a running snap at its width and saves the resize. It does nothing when no
+-- FinishSnap ends a running snap at its size and saves the resize. It does nothing when no
 -- snap runs. The player grabbing the grip, moving the window or hiding it ends a snap.
 function windowProto:FinishSnap()
   local snap = self.snap
@@ -982,7 +1006,7 @@ function windowProto:FinishSnap()
   end
   self.snap = nil
   self.snapDriver:SetScript("OnUpdate", nil)
-  self.frame:SetWidth(snap.to)
+  self.frame:SetSize(snap.to, snap.toHeight)
   trace(self, "snapped")
   self:finishResize(context:New('WindowSnapped'))
 end
@@ -1022,6 +1046,7 @@ function windowProto:Render(_, options, results)
     end
     local insets = self:GetContentInsets()
     self.fitWidth = result.FitWidth and result.FitWidth + insets.Left + insets.Right or nil
+    self.fitHeight = result.FitHeight and result.FitHeight + insets.Top + insets.Bottom or nil
     if self:GetSizeMode() == "content" then
       local minWidth, minHeight = self:minimumSize()
       local width = math.max(minWidth, (result.Width or 0) + insets.Left + insets.Right)

@@ -254,7 +254,8 @@ function DB:SetBagSizeMode(kind, mode)
 end
 
 -- GetBagSnapToContent returns whether the bag's window, in the view it shows, shrinks to its
--- content's width when the player finishes resizing it. On unless turned off.
+-- content's width, and its height when there is room below it, when the player finishes
+-- resizing it. On unless turned off.
 ---@param kind BagKind
 ---@return boolean
 function DB:GetBagSnapToContent(kind)

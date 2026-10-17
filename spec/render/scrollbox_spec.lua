@@ -248,6 +248,17 @@ describe("Scrollbox", function()
       assert.is_nil(seen.LayoutWidth)
     end)
 
+    -- A window snapping its height: the height that shows the whole child without scrolling,
+    -- whatever height the box was given.
+    it("passes up the height that shows its whole child (FitHeight)", function()
+      local sb = bagScroll()
+      sb:SetChild(child(300, 230))
+      assert.are.equal(230, render:NewRenderChain(root(sb, { Width = 640, Height = 480 }), {}).FitHeight)
+      sb:SetChild(child(300, 900))
+      assert.are.equal(900, render:NewRenderChain(root(sb, { Width = 640, Height = 480 }), {}).FitHeight)
+      assert.are.equal(900, render:NewRenderChain(root(sb, { MaxHeight = 500 }), {}).FitHeight)
+    end)
+
     it("keeps the child where it is whether or not it scrolls", function()
       local sb = bagScroll()
       local tall, short = child(300, 900), child(300, 100)

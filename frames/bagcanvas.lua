@@ -68,14 +68,17 @@ function bagCanvas:Create(bag, parent)
   header:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
   header:SetHeight(1)
 
+  -- The view and the footer hang from the header's top at the offsets the plan gives them (Render),
+  -- not from the bottom of the container above: an empty container is kept 1 pixel tall, which
+  -- would push everything below it down a pixel past the height the canvas reports.
   local tab = CreateFrame("Frame", nil, frame)
-  tab:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, 0)
-  tab:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", 0, 0)
+  tab:SetPoint("TOPLEFT", header, "TOPLEFT", 0, 0)
+  tab:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, 0)
   tab:SetHeight(1)
 
   local footer = CreateFrame("Frame", nil, frame)
-  footer:SetPoint("TOPLEFT", tab, "BOTTOMLEFT", 0, 0)
-  footer:SetPoint("TOPRIGHT", tab, "BOTTOMRIGHT", 0, 0)
+  footer:SetPoint("TOPLEFT", header, "TOPLEFT", 0, 0)
+  footer:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, 0)
   footer:SetHeight(1)
 
   canvas.headerContainer = header
@@ -218,6 +221,16 @@ function canvasProto:ForgetMeasures()
   self.measured = nil
 end
 
+-- hangFromHeader anchors a container below the header's top: it shares the header's left and
+-- right edges (centered with it) and starts y below its top.
+---@param container Frame
+---@param y number
+function canvasProto:hangFromHeader(container, y)
+  container:ClearAllPoints()
+  container:SetPoint("TOPLEFT", self.headerContainer, "TOPLEFT", 0, -y)
+  container:SetPoint("TOPRIGHT", self.headerContainer, "TOPRIGHT", 0, -y)
+end
+
 ---@return RenderPlan
 function canvasProto:GetRenderPlan()
   return { Plan = { { step = render.SELF } } }
@@ -235,13 +248,15 @@ function canvasProto:Render(parentResult)
   self.plan = plan
   self.plannedFor = plannedFor
   local bag = self.bag
-  bag:ArrangeGlobalSections(plan.global)
+  local _, headerH = bag:ArrangeGlobalSections(plan.global)
   local tabH = 0
   if bag.currentView ~= nil and plan.view ~= nil then
     local _, h = bag.currentView:Arrange(plan.view)
     tabH = h
   end
   self.tabContainer:SetHeight(math.max(1, tabH))
+  self:hangFromHeader(self.tabContainer, headerH)
+  self:hangFromHeader(self.footerContainer, headerH + tabH)
 
   local totalW = width or plan.width
   local offset = (totalW - plan.width) / 2

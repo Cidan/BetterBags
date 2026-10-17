@@ -554,7 +554,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Snap to Content',
       description = 'With Resizable Window on, when you let go after resizing the ' .. string.lower(bagType.name)
-        .. ', it shrinks to fit its items, so there is no empty space at the sides.',
+        .. ', it shrinks to fit its items, so there is no empty space at the sides or below them.',
       getValue = function(_)
         return db:GetBagSnapToContent(bagType.kind)
       end,

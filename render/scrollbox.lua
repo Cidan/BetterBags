@@ -14,7 +14,8 @@ local drawable = addon:GetModule('Drawable')
 -- the scroll child to the height the child took, and reports the viewport it occupies: the
 -- child's height capped at MaxHeight when the window sizes to its content, or the fixed
 -- Height of a window the player sized. A child's FitWidth goes up and a LayoutWidth comes down
--- with the room added or taken off. The bar shows and hides itself (SetHideIfUnscrollable): it
+-- with the room added or taken off; FitHeight goes up as the child's height, the viewport that
+-- shows all of it. The bar shows and hides itself (SetHideIfUnscrollable): it
 -- is updated from the scroll box's own size, which the window sets after this render. A bag's
 -- box keeps the bar's room on both sides and shows the bar only while it is used
 -- (ScrollboxOptions). Each window owns one scroll box for its lifetime.
@@ -137,7 +138,7 @@ function scrollboxProto:Render(parentResult, _, results)
 
   local width = parentResult and parentResult.Width or (childWidth + self:GetGutterWidth())
   local fit = childResult.FitWidth and childResult.FitWidth + self:GetGutterWidth() or nil
-  return { Width = width, Height = viewport, Scrollable = scrollable, FitWidth = fit }
+  return { Width = width, Height = viewport, Scrollable = scrollable, FitWidth = fit, FitHeight = childHeight }
 end
 
 -- updateBar fades the auto-hiding bar in while the pointer is over its room on the right or the

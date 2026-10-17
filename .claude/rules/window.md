@@ -178,9 +178,31 @@ canvas pinned the content to its left edge whatever width it was given.
   centered in the moving width; the bounce stays inside the 14 px room. Each step lays the window
   out (`Invalidate`). At the end it saves the position and size (`OnResized`). Grabbing the grip,
   moving the window or hiding it (`Hide`, or Escape: the snap's driver is a child of the window
-  and ends it from its `OnHide`) ends the snap at its target at once. Nothing snaps when the
-  window already fits (within half a pixel) or the setting is off. Steps trace as `snap start`
-  and `snapped` (§3a diagnostics).
+  and ends it from its `OnHide`) ends the snap at its target at once. A snap only shrinks: a side
+  whose target is not at least half a pixel smaller keeps its size, and nothing snaps when neither
+  side moves or the setting is off. Steps trace as `snap start` and `snapped` (§3a diagnostics).
+- **The height snaps too** (asked: when the player leaves dead space below the content, the
+  bottom should hug the content the way the top does). The content reports `FitHeight`, the
+  height that shows all of it without scrolling (the scroll box passes up its child's height);
+  the window adds its top and bottom insets, and the same release shrinks the height to that, at
+  least the minimum height. The top stays pinned, so the bottom edge moves; on Default the
+  footer then sits right under the last row as the search box sits over the first (the insets
+  are the title bar plus the search box's reserve, and the theme's edge plus the footer's
+  reserve). Content taller than the window keeps the player's height and scrolls. Either side
+  can snap alone. The height bounces too, but off the content rather than past it: below the
+  content there is no room like the scroll room beside it, so passing the content's height would
+  cut its bottom row for a moment. `SnapReboundAt` is the width's curve (`SnapSizeAt`) folded at
+  the target: the bottom edge comes up to the content, rebounds by up to 10 % of the distance (at
+  most 10 px), and settles back on it. The rebound peaks at the moment the width is furthest past
+  its target, so the two move together (700x500 to 412x345: the bottom meets the content at about
+  144 ms, both peak at 224 ms, both settle at 352 ms).
+- **The reported height is the height of what is drawn.** An empty canvas container is kept 1
+  pixel tall, and the containers used to hang from the bottom of the one above, so with no Recent
+  Items the view and Free Space sat a pixel lower than the canvas's reported height. A content-
+  sized recording shows the result: the scroll area ended at 396 and Free Space at 397, the bottom
+  row of the free-slot buttons cut by a pixel. A height snap would have cut it the same way. The
+  view and footer now hang from the header's top at the plan's offsets (`hangFromHeader`,
+  `frames/bagcanvas.lua`), so the content ends exactly at the reported height.
 - **What is still not equal:** a window the player sized without snapping can be an odd or
   fractional number of units wider than its layout, so each side gets half (exact, not rounded),
   and the client may round each edge to a physical pixel. Theme art whose border is drawn
@@ -190,8 +212,10 @@ canvas pinned the content to its left edge whatever width it was given.
 Coverage: `spec/frames/bagcanvas_spec.lua` (plans, the snap property, densest, centering,
 measures kept across renders), `spec/render/scrollbox_spec.lua` ("for a bag (Symmetric,
 AutoHideBar)"), `spec/render/render_spec.lua` ("anchors with both offsets when only one is
-given"), `spec/window/window_spec.lua` ("snapping to its content", "hands its content its size
-without the client's float error"),
+given"), `spec/window/window_spec.lua` ("snapping to its content" with "its height", "hands its
+content its size without the client's float error"), `spec/render/scrollbox_spec.lua` ("passes up
+the height that shows its whole child"), `spec/frames/bagcanvas_spec.lua` ("places each container
+where the plan puts it"),
 `spec/sonata/theme_ports_spec.lua` ("pads every theme's bag the same on both sides"),
 `spec/config/config_redraw_spec.lua` ("Snap to Content"). Every guard was
 mutation-tested. To check a theme in game, record rendering (render-recorder.md): each bag

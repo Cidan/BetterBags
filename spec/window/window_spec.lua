@@ -577,13 +577,14 @@ describe("Window", function()
     describe("snapping to its content", function()
       local snap
 
-      -- fitting builds content whose narrowest width is fit, recording what it was given.
-      local function fitting(fit)
+      -- fitting builds content whose narrowest width is fit and, when given, whose height without
+      -- scrolling is fitHeight, recording what it was given.
+      local function fitting(fit, fitHeight)
         local c = content(300, 200)
         function c:Render(parentResult)
           table.insert(self.given, parentResult)
           return { Width = parentResult and parentResult.Width or 300, Height = parentResult and parentResult.Height or 200,
-            FitWidth = fit }
+            FitWidth = fit, FitHeight = fitHeight }
         end
         return c
       end
@@ -696,6 +697,17 @@ describe("Window", function()
         assert.is_true(fits.snapDriver == nil or fits.snapDriver:GetScript("OnUpdate") == nil)
       end)
 
+      it("never grows wider than the player left it, nor snaps by less than half a pixel", function()
+        local wider = snapping(fitting(750))
+        resizeTo(wider, 700, 500)
+        assert.are.same({ 700, 500 }, saveSize)
+        assert.is_true(wider.snapDriver == nil or wider.snapDriver:GetScript("OnUpdate") == nil)
+        local close = snapping(fitting(687.7))
+        resizeTo(close, 700, 500)
+        assert.are.same({ 700, 500 }, saveSize)
+        assert.is_true(close.snapDriver == nil or close.snapDriver:GetScript("OnUpdate") == nil)
+      end)
+
       it("never snaps or bounces narrower than its minimum", function()
         local w = snapping(fitting(100))
         resizeTo(w, 700, 500)
@@ -726,15 +738,128 @@ describe("Window", function()
       end)
 
       it("follows a bounce curve: from the start, past the end, back to the end", function()
-        assert.are.equal(700, window.SnapWidthAt(700, 412, 10, 0))
-        assert.are.equal(412, window.SnapWidthAt(700, 412, 10, 1))
-        assert.are.equal(402, window.SnapWidthAt(700, 412, 10, 0.65))
+        assert.are.equal(700, window.SnapSizeAt(700, 412, 10, 0))
+        assert.are.equal(412, window.SnapSizeAt(700, 412, 10, 1))
+        assert.are.equal(402, window.SnapSizeAt(700, 412, 10, 0.65))
         local previous = 700
         for i = 1, 100 do
-          local width = window.SnapWidthAt(700, 412, 10, i / 100)
+          local width = window.SnapSizeAt(700, 412, 10, i / 100)
           assert.is_true(math.abs(width - previous) < 40, "no jumps")
           previous = width
         end
+      end)
+
+      -- The same snap for the height: dead space below the content goes, so the content's bottom
+      -- meets the bottom of the content box as its top meets the top (the theme's insets around
+      -- both). The top stays where it is, so the bottom edge moves.
+      describe("its height", function()
+        -- run, but returning each height it took.
+        local function heights(w)
+          local list = {}
+          for _ = 1, 200 do
+            local update = w.snapDriver:GetScript("OnUpdate")
+            if update == nil then break end
+            update(w.snapDriver, 0.016)
+            table.insert(list, w.frame:GetHeight())
+            advance()
+          end
+          return list
+        end
+
+        it("shrinks to its content's height when the player leaves room below it, then saves it", function()
+          local w = snapping(fitting(400, 300))
+          resizeTo(w, 700, 500)
+          local list = heights(w)
+          assert.are.equal(345, list[#list])
+          assert.are.same({ 412, 345 }, saveSize)
+          assert.are.same({ "TOPLEFT", UIParent, "BOTTOMLEFT", 100, 700 }, { w.frame:GetPoint(1) })
+        end)
+
+        it("snaps only its height when its width already fits, and only its width when its height does", function()
+          local w = snapping(fitting(688, 300))
+          resizeTo(w, 700, 500)
+          heights(w)
+          assert.are.same({ 700, 345 }, saveSize)
+          local wide = snapping(fitting(400, 455))
+          resizeTo(wide, 700, 500)
+          run(wide)
+          assert.are.same({ 412, 500 }, saveSize)
+        end)
+
+        it("keeps the player's height when its content is taller: the content scrolls", function()
+          local w = snapping(fitting(400, 800))
+          resizeTo(w, 700, 500)
+          heights(w)
+          assert.are.same({ 412, 500 }, saveSize)
+        end)
+
+        it("keeps its height when it already fits within half a pixel", function()
+          local w = snapping(fitting(688, 454.7))
+          resizeTo(w, 700, 500)
+          assert.are.same({ 700, 500 }, saveSize)
+          assert.is_true(w.snapDriver == nil or w.snapDriver:GetScript("OnUpdate") == nil)
+        end)
+
+        it("snaps when only its height leaves room", function()
+          local w = snapping(fitting(688, 300))
+          resizeTo(w, 700, 500)
+          assert.is_not_nil(w.snapDriver:GetScript("OnUpdate"))
+        end)
+
+        it("never snaps shorter than its minimum", function()
+          local w = snapping(fitting(400, 20))
+          resizeTo(w, 700, 500)
+          local list = heights(w)
+          for _, height in ipairs(list) do assert.is_true(height >= 100, tostring(height)) end
+          assert.are.same({ 412, 100 }, saveSize)
+        end)
+
+        -- A bounce past the content's height would cut its bottom row for a moment (there is no room
+        -- below the content like the scroll room beside it), so the bottom edge bounces off the
+        -- content instead: it comes up to it, rebounds, and settles back on it.
+        it("bounces off its content without passing it, in the time the width takes", function()
+          local w = snapping(fitting(400, 300))
+          resizeTo(w, 700, 500)
+          local list = heights(w)
+          for _, height in ipairs(list) do assert.is_true(height >= 345, tostring(height)) end
+          -- The low point where it meets the content (a frame can step over the contact itself), then
+          -- the rebound above it.
+          local low
+          for i = 2, #list - 1 do
+            if list[i] < list[i - 1] and list[i] <= list[i + 1] then low = i break end
+          end
+          assert.is_not_nil(low, "comes down to its content, then rebounds")
+          assert.is_true(list[low] - 345 < 6, tostring(list[low]))
+          local rebound = 0
+          for i = low, #list do rebound = math.max(rebound, list[i] - 345) end
+          assert.is_true(rebound > 3 and rebound <= 10, tostring(rebound))
+          assert.are.equal(345, list[#list])
+          assert.is_true(#list >= 15 and #list <= 30, tostring(#list))
+        end)
+
+        it("rebounds in step with the width's bounce, never below where it ends", function()
+          assert.are.equal(500, window.SnapReboundAt(500, 345, 10, 0))
+          assert.are.equal(345, window.SnapReboundAt(500, 345, 10, 1))
+          assert.are.equal(355, window.SnapReboundAt(500, 345, 10, 0.65))
+          assert.are.equal(402, window.SnapSizeAt(700, 412, 10, 0.65))
+          local previous = 500
+          for i = 1, 100 do
+            local height = window.SnapReboundAt(500, 345, 10, i / 100)
+            assert.is_true(height >= 345, tostring(height))
+            assert.is_true(math.abs(height - previous) < 40, "no jumps")
+            previous = height
+          end
+          assert.are.equal(345, window.SnapReboundAt(345, 345, 0, 0.65), "a side that does not snap stays")
+        end)
+
+        it("ends the snap at its height when the player grabs the grip", function()
+          local w = snapping(fitting(400, 300))
+          resizeTo(w, 700, 500)
+          w.snapDriver:GetScript("OnUpdate")(w.snapDriver, 0.05)
+          w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
+          assert.are.same({ 412, 345 }, { w.frame:GetWidth(), w.frame:GetHeight() })
+          assert.are.same({ 412, 345 }, saveSize)
+        end)
       end)
     end)
 

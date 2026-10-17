@@ -120,11 +120,37 @@ describe("BagCanvas", function()
     ResetModuleStub("BagCanvas", "frames/bagcanvas.lua")
   end)
 
-  it("stacks the header, view and footer containers", function()
+  it("stacks the header, view and footer containers from its top", function()
     local canvas = bagCanvas:Create(bag(), CreateFrame("Frame"))
     assert.are.same({ "TOPLEFT", canvas.frame, "TOPLEFT", 0, 0 }, { canvas.headerContainer:GetPoint(1) })
-    assert.are.same({ "TOPLEFT", canvas.headerContainer, "BOTTOMLEFT", 0, 0 }, { canvas.tabContainer:GetPoint(1) })
-    assert.are.same({ "TOPLEFT", canvas.tabContainer, "BOTTOMLEFT", 0, 0 }, { canvas.footerContainer:GetPoint(1) })
+    assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, 0 }, { canvas.tabContainer:GetPoint(1) })
+    assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, 0 }, { canvas.footerContainer:GetPoint(1) })
+  end)
+
+  -- An empty container is kept 1 pixel tall, but it never pushes the next one down: a recording
+  -- of a bag with no Recent Items had its Free Space 1 pixel past the bottom of the canvas, cut by
+  -- the scroll box. Each container sits where the plan puts it, and the content ends exactly at
+  -- the height the canvas reports.
+  it("places each container where the plan puts it, so the content ends at its height", function()
+    local b = bag({ section(9), section(3) }, nil, section(4, "free"))
+    local canvas = bagCanvas:Create(b, CreateFrame("Frame"))
+    local result = draw(canvas)
+    local tabH = b.currentView.arranged.height
+    local footerH = b.arrangedGlobal.footer.height
+    assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, 0 }, { canvas.tabContainer:GetPoint(1) })
+    assert.are.same({ "TOPRIGHT", canvas.headerContainer, "TOPRIGHT", 0, 0 }, { canvas.tabContainer:GetPoint(2) })
+    assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, -tabH }, { canvas.footerContainer:GetPoint(1) })
+    assert.are.same({ "TOPRIGHT", canvas.headerContainer, "TOPRIGHT", 0, -tabH }, { canvas.footerContainer:GetPoint(2) })
+    assert.are.equal(tabH + footerH, result.Height)
+
+    local withRecent = bag({ section(9) }, section(2, "recent"), section(4, "free"))
+    canvas = bagCanvas:Create(withRecent, CreateFrame("Frame"))
+    result = draw(canvas)
+    local headerH = withRecent.arrangedGlobal.header.height
+    tabH = withRecent.currentView.arranged.height
+    assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, -headerH }, { canvas.tabContainer:GetPoint(1) })
+    assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, -(headerH + tabH) }, { canvas.footerContainer:GetPoint(1) })
+    assert.are.equal(headerH + tabH + withRecent.arrangedGlobal.footer.height, result.Height)
   end)
 
   it("lays out with the bag's settings when sized to its content, and arranges what it measured", function()
