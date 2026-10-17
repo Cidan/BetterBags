@@ -716,6 +716,42 @@ describe("Sonata engine", function()
       assert.are.equal("Off", savedTheme)
     end)
 
+    -- The theme pane previews a theme (applied, not saved) and puts the saved one back when the
+    -- player leaves it.
+    it("names the theme the saved setting puts in effect: the saved theme, else Default", function()
+      savedTheme = "Other"
+      assert.are.equal("Other", sonata:GetSavedThemeKey())
+      for _, key in ipairs({ "Missing", "Off", "Base" }) do
+        savedTheme = key
+        assert.are.equal("Default", sonata:GetSavedThemeKey(), key)
+      end
+    end)
+
+    it("puts the saved theme back after a preview, without saving anything", function()
+      savedTheme = "Other"
+      sonata:OnEnable()
+      sonata:ApplyTheme(context:New("spec"), "Default", false)
+      local applied = 0
+      local originalApply = sonata.ApplyTheme
+      sonata.ApplyTheme = function(...) applied = applied + 1; return originalApply(...) end
+      sonata:RestoreSavedTheme(context:New("spec"))
+      assert.are.equal("Other", sonata:GetCurrentThemeKey())
+      assert.are.equal(1, applied)
+      sonata:RestoreSavedTheme(context:New("spec"))
+      assert.are.equal(1, applied)
+      savedTheme = "Off"
+      sonata:RestoreSavedTheme(context:New("spec"))
+      sonata.ApplyTheme = originalApply
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+      assert.are.equal("Off", savedTheme)
+    end)
+
+    it("restores nothing before Sonata applied a theme", function()
+      savedTheme = "Other"
+      sonata:RestoreSavedTheme(context:New("spec"))
+      assert.is_nil(sonata:GetCurrentThemeKey())
+    end)
+
     it("falls back to Default for a saved theme that is hidden", function()
       savedTheme = "Base"
       sonata:OnEnable()

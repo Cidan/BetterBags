@@ -74,6 +74,19 @@ Resolution never changes the registered tables.
   `ADDON_LOADED`) is applied at once, unsaved, when it is the saved choice, not already applied,
   and selectable. (The old theme module reset a missing saved theme to Default at login, so a
   third-party theme never survived a reload.)
+- **Previews.** `GetSavedThemeKey()` names the theme the saved setting puts in effect (the
+  saved theme, or Default while it is missing, hidden or unavailable), and
+  `RestoreSavedTheme(ctx)` applies it, unsaved, when another theme is applied (nothing before
+  the first apply, nothing when it is already applied). The settings window's Theme pane
+  (`config/themepane.lua`) previews: picking a selectable theme applies it unsaved
+  (`ApplyTheme(ctx, key, false)`; picking the saved one or an unavailable one shows the saved
+  one), its status reads "Previewing", and only **Apply Theme** saves it. The pane's frame hides
+  when the player opens another settings page or closes the settings window (`OnHide` also
+  fires when an ancestor hides); `EndPreview` then restores the saved theme and forgets the pick.
+  The list's check mark and "Currently Active" follow the saved theme, not the one previewed.
+  Coverage: `spec/sonata/engine_spec.lua` ("names the theme the saved setting puts in effect",
+  "puts the saved theme back after a preview", "restores nothing before Sonata applied a theme")
+  and `spec/config/themepane_spec.lua` ("previewing").
 - `GetThemes()` lists every theme that is not hidden, available or not (the theme pane shows
   unavailable ones as such); `GetAllThemes()` lists only those a player can pick now.
 - `GetCurrentTheme()` is the resolved active theme (before any apply: the saved one, or

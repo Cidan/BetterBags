@@ -616,6 +616,30 @@ function sonata:GetCurrentThemeKey()
   return self.current
 end
 
+-- GetSavedThemeKey returns the theme the saved setting puts in effect: the saved theme, or
+-- Default while it is missing, hidden or unavailable.
+---@return string
+function sonata:GetSavedThemeKey()
+  local key = db():GetTheme()
+  if self:IsSelectable(key) then
+    return key
+  end
+  return 'Default'
+end
+
+-- RestoreSavedTheme applies the theme the saved setting puts in effect, without saving, when
+-- another one is applied (a preview from the theme pane).
+---@param ctx Context
+function sonata:RestoreSavedTheme(ctx)
+  if not self.applied then
+    return
+  end
+  local key = self:GetSavedThemeKey()
+  if self.current ~= key then
+    self:ApplyTheme(ctx, key, false)
+  end
+end
+
 -- GetCurrentTheme returns the resolved active theme. Before a theme was applied it is the
 -- saved one, or Default when that is missing or unavailable.
 ---@return SonataTheme

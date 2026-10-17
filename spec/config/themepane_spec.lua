@@ -102,7 +102,7 @@ describe("ThemePane", function()
     -- The status is drawn with a text role, so a theme can color it.
     for key, expected in pairs({
       Default = { "Currently Active", false, "Active", "Positive" },
-      SimpleDark = { "Available", true, "Apply Theme", "Description" },
+      SimpleDark = { "Previewing", true, "Apply Theme", "Description" },
       elvui = { "Unavailable", false, "Unavailable", "Negative" },
     }) do
       pane:SelectTheme(key)
@@ -128,6 +128,69 @@ describe("ThemePane", function()
     for _, entry in ipairs(pane.listFrame.items) do
       assert.are.equal(entry.key == "SimpleDark", entry.active, entry.key)
     end
+  end)
+
+  -- Picking a theme previews it: applied at once, saved only by Apply. Leaving the pane (another
+  -- settings page, or closing the settings window, both hide it) puts the saved theme back.
+  describe("previewing", function()
+    local function hide(pane)
+      pane.frame:GetScript("OnHide")(pane.frame)
+    end
+
+    it("applies a picked theme without saving it, the saved one keeping its check mark", function()
+      local pane = newPane()
+      pane:RefreshList()
+      pane:SelectTheme("SimpleDark")
+      assert.are.equal("SimpleDark", sonata:GetCurrentThemeKey())
+      assert.are.equal("Default", savedTheme)
+      assert.are.equal("Previewing", pane.themeDetail.statusLabel:GetText())
+      for _, entry in ipairs(themePane:Entries()) do
+        assert.are.equal(entry.key == "Default", entry.active, entry.key)
+      end
+    end)
+
+    it("saves the previewed theme when Apply is pressed, and keeps it after leaving", function()
+      local pane = newPane()
+      pane:SelectTheme("SimpleDark")
+      pane.themeDetail.applyButton:GetScript("OnClick")(pane.themeDetail.applyButton, "LeftButton")
+      assert.are.equal("SimpleDark", savedTheme)
+      hide(pane)
+      assert.are.equal("SimpleDark", sonata:GetCurrentThemeKey())
+    end)
+
+    it("puts the saved theme back when the pane hides, and forgets the pick", function()
+      local pane = newPane()
+      pane.frame:GetScript("OnShow")(pane.frame)
+      pane:RefreshList()
+      pane:SelectTheme("SimpleDark")
+      hide(pane)
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+      assert.are.equal("Default", savedTheme)
+      assert.is_nil(pane.selectedTheme)
+      assert.is_true(pane.emptyDetail:IsShown())
+    end)
+
+    it("shows the saved theme while an unavailable theme or the saved one is picked", function()
+      local pane = newPane()
+      pane:SelectTheme("SimpleDark")
+      pane:SelectTheme("elvui")
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+      pane:SelectTheme("SimpleDark")
+      pane:SelectTheme("Default")
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+    end)
+
+    it("applies nothing when the pane hides without a preview, or a picked theme twice", function()
+      local pane = newPane()
+      local applied = 0
+      local originalApply = sonata.ApplyTheme
+      sonata.ApplyTheme = function(...) applied = applied + 1; return originalApply(...) end
+      hide(pane)
+      pane:SelectTheme("SimpleDark")
+      pane:SelectTheme("SimpleDark")
+      sonata.ApplyTheme = originalApply
+      assert.are.equal(1, applied)
+    end)
   end)
 
   it("marks the theme applied, not a saved theme that is not loaded", function()
