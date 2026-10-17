@@ -1234,7 +1234,6 @@ describe("Bag Draw: shared item button ownership across global sections and view
       local bag = newBag()
       bag.kind = kind or const.BAG_KIND.BACKPACK
       bag.bankTab = bankTab
-      bag.KeepBagInBounds = function() end
       bag.frame.GetBottom = function() return 100 end
       bag.frame:SetMovable(true)
       bag:WatchMouse()
@@ -1430,6 +1429,19 @@ describe("Bag Draw: shared item button ownership across global sections and view
         assert.is_not_nil(placesTabs)
         assert.is_true(placesTabs > made)
       end)
+    end)
+
+    -- The window keeps every window on the screen (window.md); the bag no longer loosens the
+    -- clamp to let all but 50 pixels of itself go off it.
+    it("leaves keeping the window on the screen to the window, with nothing allowed off it", function()
+      local bag = newBag()
+      assert.is_nil(bag.KeepBagInBounds)
+      for _, m in ipairs({ "window", "content" }) do
+        sizeMode = m
+        bag.frame:SetClampRectInsets(0, 0, 0, 0)
+        bag:OnResize()
+        assert.are.same({ 0, 0, 0, 0 }, bag.frame._clampRectInsets, m)
+      end
     end)
 
     it("is a Bag window named for its bag, laying out the bag's canvas in a scroll box", function()
