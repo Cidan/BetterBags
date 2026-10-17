@@ -130,28 +130,73 @@ describe("ThemePane", function()
     end
   end)
 
-  -- Picking a theme previews it: applied at once, saved only by Apply. Leaving the pane (another
-  -- settings page, or closing the settings window, both hide it) puts the saved theme back.
+  -- Picking a theme previews it on the next frame (applying restyles and resizes the settings
+  -- window, which must not happen inside the click on the list); only Apply saves it. Leaving
+  -- the pane (another settings page, or closing the settings window, both hide it) puts the
+  -- saved theme back.
   describe("previewing", function()
+    local queued
+
+    before_each(function()
+      queued = {}
+      override(_G.C_Timer, "After", function(_, fn) table.insert(queued, fn) end)
+    end)
+
+    -- nextFrame runs what was waiting for the next frame; what that schedules waits for the one after.
+    local function nextFrame()
+      local due = queued
+      queued = {}
+      for _, fn in ipairs(due) do fn() end
+    end
+
     local function hide(pane)
       pane.frame:GetScript("OnHide")(pane.frame)
     end
 
-    it("applies a picked theme without saving it, the saved one keeping its check mark", function()
+    local function countApplies()
+      local count = { n = 0 }
+      local originalApply = sonata.ApplyTheme
+      override(sonata, "ApplyTheme", function(...)
+        count.n = count.n + 1
+        return originalApply(...)
+      end)
+      return count
+    end
+
+    it("applies a picked theme on the next frame, not in the click, without saving it", function()
       local pane = newPane()
       pane:RefreshList()
       pane:SelectTheme("SimpleDark")
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+      assert.are.equal("Previewing", pane.themeDetail.statusLabel:GetText())
+      nextFrame()
       assert.are.equal("SimpleDark", sonata:GetCurrentThemeKey())
       assert.are.equal("Default", savedTheme)
-      assert.are.equal("Previewing", pane.themeDetail.statusLabel:GetText())
       for _, entry in ipairs(themePane:Entries()) do
         assert.are.equal(entry.key == "Default", entry.active, entry.key)
       end
     end)
 
+    it("previews only the last theme picked before the frame passes, once", function()
+      local pane = newPane()
+      local applies = countApplies()
+      pane:SelectTheme("SimpleDark")
+      pane:SelectTheme("Default")
+      assert.are.equal(1, #queued)
+      nextFrame()
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+      assert.are.equal(0, applies.n)
+      pane:SelectTheme("Default")
+      pane:SelectTheme("SimpleDark")
+      nextFrame()
+      assert.are.equal("SimpleDark", sonata:GetCurrentThemeKey())
+      assert.are.equal(1, applies.n)
+    end)
+
     it("saves the previewed theme when Apply is pressed, and keeps it after leaving", function()
       local pane = newPane()
       pane:SelectTheme("SimpleDark")
+      nextFrame()
       pane.themeDetail.applyButton:GetScript("OnClick")(pane.themeDetail.applyButton, "LeftButton")
       assert.are.equal("SimpleDark", savedTheme)
       hide(pane)
@@ -161,8 +206,9 @@ describe("ThemePane", function()
     it("puts the saved theme back when the pane hides, and forgets the pick", function()
       local pane = newPane()
       pane.frame:GetScript("OnShow")(pane.frame)
-      pane:RefreshList()
+      nextFrame()
       pane:SelectTheme("SimpleDark")
+      nextFrame()
       hide(pane)
       assert.are.equal("Default", sonata:GetCurrentThemeKey())
       assert.are.equal("Default", savedTheme)
@@ -170,26 +216,39 @@ describe("ThemePane", function()
       assert.is_true(pane.emptyDetail:IsShown())
     end)
 
+    it("previews nothing when the pane hides before the frame passes", function()
+      local pane = newPane()
+      local applies = countApplies()
+      pane:SelectTheme("SimpleDark")
+      hide(pane)
+      nextFrame()
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+      assert.are.equal(0, applies.n)
+    end)
+
     it("shows the saved theme while an unavailable theme or the saved one is picked", function()
       local pane = newPane()
       pane:SelectTheme("SimpleDark")
+      nextFrame()
       pane:SelectTheme("elvui")
+      nextFrame()
       assert.are.equal("Default", sonata:GetCurrentThemeKey())
       pane:SelectTheme("SimpleDark")
+      nextFrame()
       pane:SelectTheme("Default")
+      nextFrame()
       assert.are.equal("Default", sonata:GetCurrentThemeKey())
     end)
 
     it("applies nothing when the pane hides without a preview, or a picked theme twice", function()
       local pane = newPane()
-      local applied = 0
-      local originalApply = sonata.ApplyTheme
-      sonata.ApplyTheme = function(...) applied = applied + 1; return originalApply(...) end
+      local applies = countApplies()
       hide(pane)
       pane:SelectTheme("SimpleDark")
+      nextFrame()
       pane:SelectTheme("SimpleDark")
-      sonata.ApplyTheme = originalApply
-      assert.are.equal(1, applied)
+      nextFrame()
+      assert.are.equal(1, applies.n)
     end)
   end)
 

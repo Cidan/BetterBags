@@ -134,7 +134,7 @@ function themePaneProto:SelectTheme(themeKey)
   end
 
   self.selectedTheme = themeKey
-  self:Preview(themeKey)
+  self:QueuePreview(themeKey)
   self:UpdateDetailPanel()
 
   -- Refresh the list to update selection highlight
@@ -144,6 +144,26 @@ function themePaneProto:SelectTheme(themeKey)
     if elementData and elementData.key == themeKey then
       button:SetBackdropColor(1, 0.82, 0, 0.3)
       self.selectedButton = button
+    end
+  end)
+end
+
+-- QueuePreview previews a picked theme on the next frame: applying a theme restyles and resizes
+-- the settings window, which must not happen inside the click on the theme list. A later pick
+-- before then replaces it.
+---@param themeKey string
+function themePaneProto:QueuePreview(themeKey)
+  self.pendingPreview = themeKey
+  if self.previewQueued then
+    return
+  end
+  self.previewQueued = true
+  C_Timer.After(0, function()
+    self.previewQueued = false
+    local key = self.pendingPreview
+    self.pendingPreview = nil
+    if key ~= nil then
+      self:Preview(key)
     end
   end)
 end
@@ -166,6 +186,7 @@ end
 -- settings page, or the settings window closing).
 ---@param ctx Context
 function themePaneProto:EndPreview(ctx)
+  self.pendingPreview = nil
   sonata:RestoreSavedTheme(ctx)
   self.selectedTheme = nil
   self.selectedButton = nil

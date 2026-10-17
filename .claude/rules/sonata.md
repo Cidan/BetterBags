@@ -80,7 +80,11 @@ Resolution never changes the registered tables.
   the first apply, nothing when it is already applied). The settings window's Theme pane
   (`config/themepane.lua`) previews: picking a selectable theme applies it unsaved
   (`ApplyTheme(ctx, key, false)`; picking the saved one or an unavailable one shows the saved
-  one), its status reads "Previewing", and only **Apply Theme** saves it. The pane's frame hides
+  one), its status reads "Previewing", and only **Apply Theme** saves it. The preview applies
+  on the **next frame** (`QueuePreview`, one `C_Timer.After(0)`; the last pick before then
+  wins), never inside the click on the list: applying restyles and resizes the settings window
+  around the list, and applying inside the click sometimes left the list blank until it was
+  scrolled (reported in game). A pane that hides before then previews nothing. The pane's frame hides
   when the player opens another settings page or closes the settings window (`OnHide` also
   fires when an ancestor hides); `EndPreview` then restores the saved theme and forgets the pick.
   The list's check mark and "Currently Active" follow the saved theme, not the one previewed.
