@@ -251,46 +251,84 @@ function sectionProto:DislocateAllCellsWithID(slotkey)
   self.content:DislocateAllCellsWithID(slotkey)
 end
 
--- Grid will render the section as a grid of icons.
+-- The widest row a section of N items per row may lay out: N 37-pixel cells 4 apart, with room
+-- to spare below the next cell (render/flow.lua checks a row without the gap before its last cell).
+---@param itemsPerRow number
+---@return number
+local function rowLimit(itemsPerRow)
+  return ((37 + 4) * itemsPerRow) + 16
+end
+
+---@class (exact) SectionMeasure
+---@field itemsPerRow number
+---@field content GridMeasure Where the section's cells go.
+---@field width number The section's width: its cells (or its title) and 6 pixels on each side, in whole pixels.
+---@field height number
+---@field hidden? boolean It has nothing to show.
+
+-- Measure works out the section's size with itemsPerRow cells in a row, moving nothing
+-- (render-pipeline.md, the layout engine): 6 pixels of padding on each side of its cells, as wide
+-- as its title's text (rounded up to a whole pixel) when full names show, and its title's height
+-- above them unless the header is removed.
+---@param kind BagKind
+---@param itemsPerRow number
+---@return SectionMeasure
+function sectionProto:Measure(kind, itemsPerRow)
+  local content = self.content:Measure({ cells = self.content.cells, maxWidthPerRow = rowLimit(itemsPerRow) })
+  local w, h = content.width, content.height
+  if w == 0 then
+    return { itemsPerRow = itemsPerRow, content = content, width = 0, height = 0, hidden = true }
+  end
+  if self.fillWidth or database:GetShowFullSectionNames(kind) then
+    w = math.max(w, math.ceil(self.title:GetTextWidth()))
+  end
+  local height = self.removeHeader and h or (h + self.title:GetHeight() + 6)
+  return { itemsPerRow = itemsPerRow, content = content, width = w + 12, height = height }
+end
+
+-- Arrange applies a measure: the cells where it put them, the title, and the section's size.
+---@param kind BagKind
+---@param measured SectionMeasure
+---@return number width
+---@return number height
+function sectionProto:Arrange(kind, measured)
+  self.kind = kind
+  self.maxItemsPerRow = measured.itemsPerRow
+  if measured.hidden then
+    self.frame:Hide()
+    return 0, 0
+  end
+  self.content:Arrange(measured.content)
+  if self.removeHeader then
+    self.title:Hide()
+    self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 6, 0)
+  else
+    self.title:Show()
+    self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
+  end
+  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
+  self.content:Show()
+  self.frame:SetSize(measured.width, measured.height)
+  self.frame:Show()
+  return measured.width, measured.height
+end
+
+-- GetItemsPerRowCap returns the items per row from which all the section's cells fit one row:
+-- measuring it with more changes nothing.
+---@return number
+function sectionProto:GetItemsPerRowCap()
+  local oneRow = self.content:Measure({ cells = self.content.cells, maxWidthPerRow = math.huge }).width
+  return math.max(1, math.ceil((oneRow - 16) / (37 + 4)))
+end
+
+-- Grid will render the section as a grid of icons, at its items per row.
 ---@param kind BagKind
 ---@param _view BagView
 ---@param _freeSpaceShown boolean
 ---@return number width
 ---@return number height
 function sectionProto:Grid(kind, _view, _freeSpaceShown)
-  self.kind = kind
-
-  local w, h = self.content:Draw({
-    cells = self.content.cells,
-    maxWidthPerRow = ((37 + 4) * self.maxItemsPerRow) + 16,
-  })
-
-  if w == 0 then
-    self.frame:Hide()
-    return 0, 0
-  end
-
-  if self.fillWidth or database:GetShowFullSectionNames(kind) then
-    w = math.max(w, self.title:GetTextWidth())
-  end
-
-  local fullWidth = w + 12
-  local fullHeight
-  if self.removeHeader then
-    self.title:Hide()
-    fullHeight = h
-    self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 6, 0)
-  else
-    self.title:Show()
-    fullHeight = h + self.title:GetHeight() + 6
-    self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
-  end
-  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
-
-  self.content:Show()
-  self.frame:SetSize(fullWidth, fullHeight)
-  self.frame:Show()
-  return fullWidth, fullHeight
+  return self:Arrange(kind, self:Measure(kind, self.maxItemsPerRow))
 end
 
 -------

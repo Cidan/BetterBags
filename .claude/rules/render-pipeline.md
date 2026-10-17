@@ -28,7 +28,9 @@ up (`RenderResult`):
 | `Height` | the height a child must fill; nil: its natural height | the height it took |
 | `MaxHeight` | the most a child may take before it scrolls | |
 | `FullWidth` | the full width, for children spanning every column | |
+| `LayoutWidth` | the width to lay out for, when it differs from the width shown (a window animating to its snapped width) | |
 | `Scrollable` | | the content is taller than its viewport |
+| `FitWidth` | | the width its layout takes: a window snapped to it shows the same layout (window.md 3b) |
 
 `RenderChainOptions` (`OnlyRedraw`, `Invalidated`, `ctx`) is passed to every step. (It is not
 `RenderOptions`, which is `frames/grid.lua`'s grid layout options.)
@@ -106,9 +108,79 @@ one for its lifetime (no pool).
   Show/Hide on it (Blizzard's bar overrides those whenever it updates). It sets the bar's
   `nodeignore` attribute (ConsolePort's cursor skips such nodes) to `not Scrollable`.
 
+## 4a. Anchoring: both offsets or neither
+
+`SetPoint(point, relativeTo, relativePoint, offsetX, offsetY)` takes both offsets
+(`SimpleScriptRegionResizingAPIDocumentation`: neither is nilable). An x offset passed with a nil
+y offset is dropped by the client: a render recording showed the bag's scroll box child, anchored
+14 in, at 0. `drawableProto:SetPoint` passes 0 for a missing offset when the other is given, and
+the frame mock (`spec/helpers/wow_mocks.lua`) errors when one is given without the other, so any
+call site that breaks the contract fails its specs. Coverage: `spec/render/render_spec.lua`
+("anchors with both offsets when only one is given").
+
+## 4b. The layout engine: measure, then arrange
+
+**Why.** The bag's horizontal geometry was described four times: the canvas's formulas from a
+width to items per row, the view's row limit, what the grid actually did (rows that run 4 past
+their limit, columns at their own widths), and the snap's formula guessing the grid from the
+canvas's formula. Each disagreement showed up as padding: a render recording and an offline probe
+with the real grid showed snapped windows 5 to 111 px wider than their content, depending on
+where the drag stopped. And nothing could ask "how wide is this layout?" without moving frames.
+Now one engine computes layouts as data, and everything else asks it.
+
+- **Flow** (`render/flow.lua`, pure): `Flow:Pack(sizes, { rowLimit, columns?, spacing? })`
+  places boxes in rows (a row wraps when the next box would pass the limit, checked without the
+  gap before its last box, so a row can run one spacing past it) within columns (rows split by
+  height: each column takes rows until it passes its share of the total plus 20, at least the
+  tallest box; more columns than asked grow the share and retry, at most five times), and returns
+  `{ positions, columnOf, width, height }`. An empty layout is one spacing (4) wide. It is the
+  grid's old algorithm, line for line: 3,000 random layouts through both gave 0 mismatches before
+  the grid switched to it. Loaded for every spec by `spec/setup.lua`.
+- **Grid** (`frames/grid.lua`): `Measure(options)` packs the cells' sizes (rounded, or
+  `options.sizeOf(cell)` for a cell not arranged yet) and moves nothing; `Arrange(measured)`
+  places every cell through `PlaceCell(cell, x, y)`, the one function that moves a cell (the hook
+  for animating a reshuffle between two layouts: a plan holds every cell's target), and sizes the
+  grid; `Draw(options)` is the two in a row (the currency icons and the slots panels use it).
+- **Section** (`frames/section.lua`): `Measure(kind, itemsPerRow)` returns
+  `{ itemsPerRow, content, width, height, hidden? }`: its cells packed in rows of
+  41 × itemsPerRow + 16, 6 pixels of padding on each side, as wide as its title rounded up to a
+  whole pixel when full names show, its title's height above unless the header is removed.
+  `Arrange(kind, measured)` applies it. `GetItemsPerRowCap()` is the items per row from which its
+  cells fit one row (more changes nothing). `Draw`/`Grid` arrange a measure at its items per row.
+- **View** (`views/views.lua`): `Measure(itemsPerRow, columns, measureSection?)` measures every
+  section (through `measureSection` when given) and packs them at their measured sizes in rows of
+  41 × itemsPerRow + 16 within columns; `Arrange(measured)` arranges every section, then the
+  sections. `Layout(ctx, layout)` is the two.
+- **Bag global sections** (`frames/bag.lua`): `GetGlobalLayoutSections()` lists Recent Items
+  (spanning the columns) and Free Space (spanning them when it shows every slot);
+  `MeasureGlobalSections(itemsPerRow, columns, measureSection?)` and `ArrangeGlobalSections`.
+- **Canvas** (`frames/bagcanvas.lua`): `Measure(itemsPerRow, columns)` is a plan
+  (`{ itemsPerRow, columns, global, view, width, height }`). `Plan(width?)`: without a width the
+  bag's items per row; with one the densest plan no wider than it, out of every items per row from
+  a cap down to one (one when nothing fits). The cap is where nothing changes any more: every
+  section's cells fit one row and every section fits one row of sections. The candidates do not
+  depend on the width, which is why the plan chosen at a width is chosen again at its own width
+  (the snap). Candidates whose row limit less the widest section reaches the width are skipped:
+  the view's first row is wider than that, and such an items per row is past every section's cap.
+  Section measures are cached per items per row (capped where the section stops changing) and kept
+  across renders until the bag binds new data (`ForgetMeasures`, from `bag:Draw`): a resize
+  re-plans every render. `Render` arranges the plan and centers it; its result's `FitWidth` is the
+  plan's width.
+- **Cost (measured offline, PUC Lua 5.1, a bank of 591 items in 60 sections):** planning took
+  17-25 ms per render before the skip and 1-3.4 ms after it (worst about 5.5 ms when a width needs
+  items per row not measured yet); laying one layout out costs about 0.25 ms. Arranging frames in
+  the client costs more than either. Capture a resize with the profiler to see it in game.
+
+Coverage: `spec/render/flow_spec.lua`, `spec/frames/grid_spec.lua`, `spec/frames/section_spec.lua`
+("measures its size…", "arranges a measure…", "says the items per row past which…"),
+`spec/views/gridview_spec.lua` ("measures a layout without moving anything…"),
+`spec/frames/bag_draw_ownership_spec.lua` ("global sections in a layout", "has its canvas forget
+its section measures…"), `spec/frames/bagcanvas_spec.lua` (the snap property over 300 random
+bags, densest, measures kept and forgotten, centering). Every guard was mutation-tested.
+
 ## 5. Load order and init
 
-All five TOCs list `render\render.lua`, `render\drawable.lua`, `render\scrollbox.lua` after
+All five TOCs list `render\render.lua`, `render\drawable.lua`, `render\scrollbox.lua`, `render\flow.lua` after
 `core\fonts.lua` (the profiler engine and Context load earlier) and before anything that draws,
 followed by `sonata\engine.lua`, `sonata\apply.lua`, `sonata\decoration.lua`,
 `sonata\elements.lua` and `window\window.lua`.

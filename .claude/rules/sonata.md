@@ -283,10 +283,12 @@ them) must leave the same room inside the visible border on the left and the rig
 border is uneven compensates in its insets, with the measurements written next to them.
 `spec/sonata/theme_ports_spec.lua` ("pads every theme's bag the same on both sides") checks
 every built-in theme on every client. Measured: Moonlight's two frame images (their opaque
-edge and border line sit at the same pixels from both sides). Not measured yet: Default's
-`DefaultPanelTemplate` border (a NineSlice whose corners sit 8 outside the frame on the left and
-4 on the right), ElvUI, GW2 and Simple Dark; the render recorder's `padding` line measures a
-NineSlice or backdrop border in game (render-recorder.md).
+edge and border line sit at the same pixels from both sides). Default's `DefaultPanelTemplate`
+border (`ButtonFrameTemplateNoPortrait`): a retail recording shows its edge pieces are 75 pixels
+wide, 8 outside the frame on the left and 4 outside on the right, as the layout places them; the
+metal drawn inside them cannot be read from frames, so whether its visible border is uneven
+(4 pixels more on the right if the left and right pieces are mirror images) is not measured yet.
+ElvUI, GW2 and Simple Dark are backdrops, whose edge the recorder reads (render-recorder.md).
 
 Each theme is a data file that calls `sonata:RegisterTheme`, listed in every TOC right after
 `window\window.lua`, Base first.

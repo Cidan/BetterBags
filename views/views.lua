@@ -55,7 +55,16 @@ end
 ---@class (exact) ViewLayout
 ---@field itemsPerRow number How many items a section puts in a row.
 ---@field columns number How many columns of sections the view lays out.
----@field rowWidth? number How wide a row of sections may be (frames/bagcanvas.lua); 41 * itemsPerRow + 16 without one.
+
+---@class (exact) ViewMeasure
+---@field itemsPerRow number
+---@field columns number
+---@field sections table<Section, SectionMeasure>
+---@field content GridMeasure Where the sections go.
+---@field width number
+---@field height number
+
+---@alias SectionMeasurer fun(section: Section, itemsPerRow: number): SectionMeasure
 
 -- Bind puts the tab's data into the view: a section per category in the data's order, and a
 -- cell per item, gap and free slot, each item button drawn from its data. It ends the render
@@ -112,29 +121,67 @@ function views.viewProto:Bind(ctx, bag, slotInfo)
   self:FinishRender(ctx)
 end
 
--- Layout lays the bound sections out: each section puts layout.itemsPerRow items in a row,
--- and the view arranges the sections in layout.columns columns, packing rows up to
--- layout.rowWidth. It returns the size it took and the width of its widest column.
----@param ctx Context
----@param layout ViewLayout
----@return number width, number height, number widestColumn
-function views.viewProto:Layout(ctx, layout)
-  local _ = ctx
+-- Measure works out the layout of the bound sections, moving nothing (render-pipeline.md, the
+-- layout engine): each section measured with itemsPerRow items in a row (by measureSection when
+-- given: the canvas caches measures across the layouts it tries), and the sections packed in rows
+-- of 41 * itemsPerRow + 16 within columns at their measured sizes.
+---@param itemsPerRow number
+---@param columns number
+---@param measureSection? SectionMeasurer
+---@return ViewMeasure
+function views.viewProto:Measure(itemsPerRow, columns, measureSection)
+  local sections = {}
   for _, section in pairs(self.sections) do
-    section:SetMaxCellWidth(layout.itemsPerRow)
-    section:Draw(self.kind, self.bagview, false, true)
+    if measureSection ~= nil then
+      sections[section] = measureSection(section, itemsPerRow)
+    else
+      sections[section] = section:Measure(self.kind, itemsPerRow)
+    end
   end
-  self.content.maxCellWidth = layout.columns
-  self.content:Draw({
+  local content = self.content:Measure({
     cells = self.content.cells,
-    maxWidthPerRow = layout.rowWidth or ((37 + 4) * layout.itemsPerRow) + 16,
-    columns = layout.columns,
+    maxWidthPerRow = ((37 + 4) * itemsPerRow) + 16,
+    columns = columns,
+    sizeOf = function(cell)
+      local measured = sections[cell]
+      if measured ~= nil then
+        return measured.width, measured.height
+      end
+    end,
   })
+  return {
+    itemsPerRow = itemsPerRow,
+    columns = columns,
+    sections = sections,
+    content = content,
+    width = content.width,
+    height = content.height,
+  }
+end
+
+-- Arrange applies a measure: every section's cells and size, then the sections where it put them.
+-- It returns the size it took.
+---@param measured ViewMeasure
+---@return number width, number height
+function views.viewProto:Arrange(measured)
+  for section, sectionMeasure in pairs(measured.sections) do
+    section:Arrange(self.kind, sectionMeasure)
+  end
+  self.content.maxCellWidth = measured.columns
+  self.content:Arrange(measured.content)
   for _, section in pairs(self.sections) do
     debug:WalkAndFixAnchorGraph(section.frame)
   end
-  local width = self.content.contentWidth or 0
-  return width, self.content.contentHeight or 0, self.content.maxColumnWidth or width
+  return measured.width, measured.height
+end
+
+-- Layout measures the bound sections with layout's items per row and columns and arranges them.
+---@param ctx Context
+---@param layout ViewLayout
+---@return number width, number height
+function views.viewProto:Layout(ctx, layout)
+  local _ = ctx
+  return self:Arrange(self:Measure(layout.itemsPerRow, layout.columns))
 end
 
 ---@param oldSlotKey string

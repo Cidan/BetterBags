@@ -422,7 +422,7 @@ end
 
 -- BindGlobalSections puts this pass's Recent Items and Free Space data into the global
 -- sections (the header and footer of the bag, outside the tab views) and ends their part of
--- the pass. LayoutGlobalSections lays them out.
+-- the pass. The canvas measures and arranges them (MeasureGlobalSections, ArrangeGlobalSections).
 ---@param ctx Context
 ---@param slotInfo SlotInfo
 function bagFrame.bagProto:BindGlobalSections(ctx, slotInfo)
@@ -507,30 +507,59 @@ function bagFrame.bagProto:BindGlobalSections(ctx, slotInfo)
 	self:FinishGlobalSections(ctx)
 end
 
--- LayoutGlobalSections lays the global sections out with the bag's layout: Recent Items and
--- "show all" free space span every column; aggregated free space takes one section's row.
----@param layout ViewLayout
----@return number headerW, number headerH, number footerW, number footerH
-function bagFrame.bagProto:LayoutGlobalSections(layout)
-	local currentView = database:GetBagView(self.kind)
-	local headerW, headerH = 0, 0
+---@class (exact) GlobalLayoutSection
+---@field section Section
+---@field spansColumns boolean It takes the items per row of every column.
+---@field place "header"|"footer"
+
+-- GetGlobalLayoutSections lists the global sections the draw bound: Recent Items above the view,
+-- spanning every column, and Free Space below it, one section wide, or spanning every column when
+-- it shows every free slot.
+---@return GlobalLayoutSection[]
+function bagFrame.bagProto:GetGlobalLayoutSections()
+	local listed = {}
 	if self.recentSection then
-		self.recentSection:SetMaxCellWidth(layout.itemsPerRow * layout.columns)
-		headerW, headerH = self.recentSection:Draw(self.kind, currentView, false)
+		table.insert(listed, { section = self.recentSection, spansColumns = true, place = "header" })
+	end
+	if self.freeSpaceSection then
+		table.insert(listed, { section = self.freeSpaceSection, spansColumns = self.freeSpaceShowAll == true, place = "footer" })
+	end
+	return listed
+end
+
+-- MeasureGlobalSections measures the global sections for a layout of itemsPerRow in columns,
+-- moving nothing (by measureSection when given: the canvas caches measures across layouts).
+---@param itemsPerRow number
+---@param columns number
+---@param measureSection? SectionMeasurer
+---@return {header?: SectionMeasure, footer?: SectionMeasure}
+function bagFrame.bagProto:MeasureGlobalSections(itemsPerRow, columns, measureSection)
+	local measured = {}
+	for _, global in ipairs(self:GetGlobalLayoutSections()) do
+		local perRow = global.spansColumns and itemsPerRow * columns or itemsPerRow
+		if measureSection ~= nil then
+			measured[global.place] = measureSection(global.section, perRow)
+		else
+			measured[global.place] = global.section:Measure(self.kind, perRow)
+		end
+	end
+	return measured
+end
+
+-- ArrangeGlobalSections applies a measure of the global sections and sizes the header and footer
+-- containers to them.
+---@param measured {header?: SectionMeasure, footer?: SectionMeasure}
+---@return number headerW, number headerH, number footerW, number footerH
+function bagFrame.bagProto:ArrangeGlobalSections(measured)
+	local headerW, headerH, footerW, footerH = 0, 0, 0, 0
+	if self.recentSection and measured.header then
+		headerW, headerH = self.recentSection:Arrange(self.kind, measured.header)
 	end
 	if self.headerContainer then
 		self.headerContainer:SetHeight(math.max(1, headerH))
 	end
-
-	local footerW, footerH = 0, 0
-	if self.freeSpaceSection then
-		if self.freeSpaceShowAll then
-			self.freeSpaceSection:SetMaxCellWidth(layout.itemsPerRow * layout.columns)
-			footerW, footerH = self.freeSpaceSection:Draw(self.kind, currentView, true, true)
-		else
-			self.freeSpaceSection:SetMaxCellWidth(layout.itemsPerRow)
-			footerW, footerH = self.freeSpaceSection:Draw(self.kind, currentView, false)
-		end
+	if self.freeSpaceSection and measured.footer then
+		footerW, footerH = self.freeSpaceSection:Arrange(self.kind, measured.footer)
 	end
 	if self.footerContainer then
 		self.footerContainer:SetHeight(math.max(1, footerH))
@@ -618,7 +647,9 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 	self:ApplySizeSettings()
 
 	-- The window lays the bound sections out (the canvas, frames/bagcanvas.lua) and sizes
-	-- itself, now, so the draw is complete when Draw returns.
+	-- itself, now, so the draw is complete when Draw returns. The sections hold new data: the
+	-- canvas measures them again.
+	self.canvas:ForgetMeasures()
 	render:RenderNow(self.window, { ctx = ctx })
 
 	if

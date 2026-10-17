@@ -79,6 +79,10 @@ local sectionProto = {
   GetCellCount = function() return 1 end,
   SetMaxCellWidth = function() end,
   Draw = function() end,
+  -- 50 x 50 at any items per row.
+  Measure = function(_, _, itemsPerRow) return { itemsPerRow = itemsPerRow, width = 50, height = 50, content = {} } end,
+  Arrange = function(self, kind, measured) self.arranged = measured return measured.width, measured.height end,
+  GetItemsPerRowCap = function() return 1 end,
   SetTitle = function() end,
   GetAllCells = function() return {} end,
   AddCell = function() end,
@@ -120,6 +124,17 @@ local mockGridProto = {
   Draw = function(self, options)
     self.lastMask = options and options.mask
     return 100, 50
+  end,
+  -- Measure lays every cell out 100 x 50 and records what it was asked; Arrange records what it
+  -- applied.
+  Measure = function(self, options)
+    self.lastOptions = options
+    return { width = 100, height = 50, positions = {}, columnOf = {}, cells = options.cells }
+  end,
+  Arrange = function(self, measured)
+    self.arranged = measured
+    self.contentWidth, self.contentHeight = measured.width, measured.height
+    return measured.width, measured.height
   end,
   GetContainer = function(self)
     if not self._container then
@@ -264,21 +279,17 @@ describe("Phase 6 View Placement and Rendering Tests", function()
       }
     }
 
-    local drawSpy = spy.on(view.content, "Draw")
-
     local rendered = false
     render(view, context:New("test"), bag, mockSlotInfo, function()
       rendered = true
     end)
 
     assert.is_true(rendered)
-    assert.spy(drawSpy).was.called()
-
-    -- Assert on drawing parameters (Phase 8 contracts)
-    local drawCall = drawSpy.calls[1]
-    local drawOptions = drawCall.vals[2]
-    assert.are.equal(221, drawOptions.maxWidthPerRow) -- ((37 + 4) * 5) + 16
-    assert.are.equal(4, drawOptions.columns) -- sizeInfo.columnCount
+    -- Assert on the layout's parameters (Phase 8 contracts)
+    local options = view.content.lastOptions
+    assert.are.equal(221, options.maxWidthPerRow) -- ((37 + 4) * 5) + 16
+    assert.are.equal(4, options.columns) -- sizeInfo.columnCount
+    assert.is_not_nil(view.content.arranged)
   end)
 
   it("lays out again with new limits without binding again", function()
@@ -300,37 +311,78 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     local section = view:GetSection("Things")
     local added, widths = 0, {}
     section.AddCell = function() added = added + 1 end
-    section.SetMaxCellWidth = function(_, width) table.insert(widths, width) end
-    local drawSpy = spy.on(view.content, "Draw")
+    local measure = section.Measure
+    section.Measure = function(s, kind, itemsPerRow)
+      table.insert(widths, itemsPerRow)
+      return measure(s, kind, itemsPerRow)
+    end
 
     view:Layout(context:New("test"), { itemsPerRow = 3, columns = 1 })
     view:Layout(context:New("test"), { itemsPerRow = 9, columns = 2 })
 
     assert.are.equal(0, added)
     assert.are.same({ 3, 9 }, widths)
-    local last = drawSpy.calls[#drawSpy.calls].vals[2]
+    local last = view.content.lastOptions
     assert.are.equal((37 + 4) * 9 + 16, last.maxWidthPerRow)
     assert.are.equal(2, last.columns)
   end)
 
-  -- A window the player sized gives each column its width (frames/bagcanvas.lua): rows pack up
-  -- to the limit the layout gives instead of the one items per row implies.
-  it("packs rows up to the layout's row width when it gives one, and reports its widest column", function()
+  -- Measure works the layout out from the sections' measures and moves nothing; Arrange applies
+  -- it (render-pipeline.md, the layout engine). The canvas measures several layouts and arranges
+  -- one (frames/bagcanvas.lua).
+  it("measures a layout without moving anything, then arranges the measure it is given", function()
     local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK)
-    view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, { tabs = { [1] = { items = {}, categories = {} } } })
-    local drawSpy = spy.on(view.content, "Draw")
-    view.content.maxColumnWidth = 321
-    local _, _, widest = view:Layout(context:New("test"), { itemsPerRow = 9, columns = 2, rowWidth = 376 })
-    assert.are.equal(376, drawSpy.calls[1].vals[2].maxWidthPerRow)
-    assert.are.equal(321, widest)
+    local item1 = {
+      bagid = 0, slotid = 1, slotkey = "0_1", itemHash = "hash1", isItemEmpty = false,
+      itemInfo = { itemID = 1234, currentItemCount = 10, itemStackCount = 20, itemQuality = 1, itemIcon = 136,
+        isBound = false, category = "Things" },
+      questInfo = { isQuestItem = false },
+    }
+    view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, {
+      tabs = { [1] = { items = { item1 }, categories = { { name = "Things" } } } },
+      stacks = { GetStackInfo = function() return nil end },
+    })
+    local section = view:GetSection("Things")
+    view.content.arranged, section.arranged = nil, nil
+    local measured = view:Measure(7, 2)
+    assert.is_nil(view.content.arranged)
+    assert.is_nil(section.arranged)
+    assert.are.same({ 7, 2, 100, 50 }, { measured.itemsPerRow, measured.columns, measured.width, measured.height })
+    -- The grid lays each section out at its measured size, not its frame's.
+    assert.are.same({ 50, 50 }, { view.content.lastOptions.sizeOf(section) })
+    assert.are.same({ 100, 50 }, { view:Arrange(measured) })
+    assert.are.equal(measured.sections[section], section.arranged)
+    assert.are.equal(measured.content, view.content.arranged)
+  end)
+
+  -- A measure function from the canvas replaces the sections' own (it caches them across layouts).
+  it("measures its sections with the function it is given", function()
+    local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK)
+    local item1 = {
+      bagid = 0, slotid = 1, slotkey = "0_1", itemHash = "hash1", isItemEmpty = false,
+      itemInfo = { itemID = 1, currentItemCount = 1, itemStackCount = 1, itemQuality = 1, itemIcon = 1, isBound = false,
+        category = "Things" },
+      questInfo = { isQuestItem = false },
+    }
+    view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, {
+      tabs = { [1] = { items = { item1 }, categories = { { name = "Things" } } } },
+      stacks = { GetStackInfo = function() return nil end },
+    })
+    local asked = {}
+    local measured = view:Measure(4, 1, function(section, itemsPerRow)
+      table.insert(asked, { section, itemsPerRow })
+      return { itemsPerRow = itemsPerRow, width = 77, height = 33, content = {} }
+    end)
+    assert.are.same({ { view:GetSection("Things"), 4 } }, asked)
+    assert.are.same({ 77, 33 }, { view.content.lastOptions.sizeOf(view:GetSection("Things")) })
+    local _ = measured
   end)
 
   it("returns the size it laid out to", function()
     local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK)
     view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, { tabs = { [1] = { items = {}, categories = {} } } })
-    view.content.Draw = function(self)
-      self.contentWidth, self.contentHeight = 123, 45
-      return 123, 45
+    view.content.Measure = function(_, options)
+      return { width = 123, height = 45, positions = {}, columnOf = {}, cells = options.cells }
     end
     local w, h = view:Layout(context:New("test"), { itemsPerRow = 5, columns = 1 })
     assert.are.same({ 123, 45 }, { w, h })
@@ -666,6 +718,9 @@ describe("Phase 6 View Placement and Rendering Tests", function()
             SetMaxCellWidth = function() end,
             RemoveHeader = function() end,
             Draw = function() return 50, 50 end,
+            Measure = function(_, _, n) return { itemsPerRow = n, width = 50, height = 50, content = {} } end,
+            Arrange = function() return 50, 50 end,
+            GetItemsPerRowCap = function() return 1 end,
             GetAllCells = function() return {} end,
             AddCell = function(_, id, cell)
               table.insert(addedCells, { id = id, cell = cell })

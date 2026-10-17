@@ -132,7 +132,7 @@ describe("RenderRecorder", function()
         headerContainer = frameIn(canvasFrame, 0, 0, 386, 50),
         tabContainer = frameIn(canvasFrame, 0, -50, 386, 400),
         footerContainer = frameIn(canvasFrame, 0, -450, 386, 50),
-        GetLayout = function(_, width) return { itemsPerRow = width and 4 or 5, columns = 2 } end,
+        plan = { itemsPerRow = 4, columns = 2, width = 372 },
       },
       globalSections = { ["Recent Items"] = section("Recent Items", 8, { "0_1" }) },
       currentView = { sections = { Armor = section("Armor", 4, { "0_2", "0_3" }) } },
@@ -176,7 +176,7 @@ describe("RenderRecorder", function()
     local lines = recorder:Snapshot(w)
     local text = table.concat(lines, "\n")
     assert.is_truthy(text:find("scroll @6.0,42.0 400.0x300.0 child 500.0 bar=false", 1, true), text)
-    assert.is_truthy(text:find("canvas @6.0,42.0 386.0x500.0 layout ipr=4 columns=2 header=50.0 tab=400.0 footer=50.0", 1, true), text)
+    assert.is_truthy(text:find("canvas @6.0,42.0 386.0x500.0 layout ipr=4 columns=2 width=372.0 header=50.0 tab=400.0 footer=50.0", 1, true), text)
     assert.is_truthy(text:find("global section Recent Items ipr=8 cells=2 shown=true @10.0,60.0 180.0x90.0", 1, true), text)
     assert.is_truthy(text:find("view section Armor ipr=4 cells=3", 1, true), text)
     assert.is_truthy(text:find("  item 0_2 @16.0,80.0 37.0x37.0", 1, true), text)
@@ -202,20 +202,24 @@ describe("RenderRecorder", function()
       assert.is_truthy(line:find("| border unknown", 1, true), line)
     end)
 
-    it("measures a template's border from its NineSlice edges", function()
+    -- A NineSlice edge piece is wider than the metal drawn in it (Default's are 75 pixels, 8 outside
+    -- the frame on the left and 4 on the right, a render recording on retail), so the recorder
+    -- gives where the pieces lie and claims nothing about the art inside them.
+    it("gives where a template's NineSlice edge pieces lie, and no visible padding", function()
       local w = newWindow({ 640, 480 })
       fakeBag(w)
       local template = CreateFrame("Frame", nil, w.frame)
       template.NineSlice = CreateFrame("Frame", nil, template)
       template.NineSlice.LeftEdge = template.NineSlice:CreateTexture()
-      template.NineSlice.LeftEdge:SetSize(16, 400)
+      template.NineSlice.LeftEdge:SetSize(75, 400)
       template.NineSlice.LeftEdge._rect = { left = 92, bottom = 220 }
       template.NineSlice.RightEdge = template.NineSlice:CreateTexture()
-      template.NineSlice.RightEdge:SetSize(16, 400)
-      template.NineSlice.RightEdge._rect = { left = 728, bottom = 220 }
+      template.NineSlice.RightEdge:SetSize(75, 400)
+      template.NineSlice.RightEdge._rect = { left = 669, bottom = 220 }
       w.decoration.template = template
       local line = paddingLine(w)
-      assert.is_truthy(line:find("| border left=8.0 right=12.0 NineSlice | visible left=8.0 right=534.0", 1, true), line)
+      assert.is_truthy(line:find("| border NineSlice pieces left=-8.0..67.0 right=-4.0..71.0", 1, true), line)
+      assert.is_nil(line:find("visible", 1, true), line)
     end)
 
     it("measures a backdrop's border from its edge size", function()
@@ -223,7 +227,7 @@ describe("RenderRecorder", function()
       fakeBag(w)
       w.frame:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 3 })
       local line = paddingLine(w)
-      assert.is_truthy(line:find("| border left=3.0 right=3.0 backdrop | visible left=13.0 right=543.0", 1, true), line)
+      assert.is_truthy(line:find("| border backdrop left=3.0 right=3.0 | visible left=13.0 right=543.0", 1, true), line)
     end)
 
     -- The global sections are measured before the view's: the rightmost item there must still

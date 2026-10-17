@@ -236,24 +236,29 @@ local function bounds(frames, window)
   return left, right
 end
 
--- borderOf returns how far in from the window's left and right edges the theme's border art
--- ends, and where that was read: a template's NineSlice edge pieces, or the backdrop's edge
--- size. Other art (a texture with its border painted in) cannot be measured from frames.
+-- describeBorder describes the theme's border, and returns how far in from the window's left
+-- and right edges its art ends when that can be read: a backdrop's edge size. A template's
+-- NineSlice edge pieces are given as where they lie (from the window's edge, inward; negative is
+-- outside it): a piece is wider than the art drawn in it (Default's are 75 pixels), so the visible
+-- border cannot be read from them. Other art (a texture with its border painted in) neither.
 ---@param window BetterBagsWindow
----@return number? left, number? right, string? source
-local function borderOf(window)
+---@return string text, number? left, number? right
+local function describeBorder(window)
   local frame = window.frame
   local template = window.decoration and window.decoration.template
   local nine = template and template.NineSlice
   if nine ~= nil and nine.LeftEdge ~= nil and nine.RightEdge ~= nil and nine.LeftEdge:GetRight() ~= nil then
-    return nine.LeftEdge:GetRight() - frame:GetLeft(), frame:GetRight() - nine.RightEdge:GetLeft(), "NineSlice"
+    local left, right = frame:GetLeft(), frame:GetRight()
+    return string.format("border NineSlice pieces left=%s..%s right=%s..%s",
+      num(nine.LeftEdge:GetLeft() - left), num(nine.LeftEdge:GetRight() - left),
+      num(right - nine.RightEdge:GetRight()), num(right - nine.RightEdge:GetLeft()))
   end
   local backdrop = frame.GetBackdrop ~= nil and frame:GetBackdrop() or nil
   if backdrop ~= nil and backdrop.edgeFile ~= nil and backdrop.edgeFile ~= "" then
     local edge = backdrop.edgeSize or 0
-    return edge, edge, "backdrop"
+    return string.format("border backdrop left=%s right=%s", num(edge), num(edge)), edge, edge
   end
-  return nil
+  return "border unknown"
 end
 
 -- describePadding measures how far the bag's items, and its sections (titles included), are
@@ -283,14 +288,10 @@ local function describePadding(window, bag)
     itemLeft and string.format("padding items left=%s right=%s", num(itemLeft), num(itemRight)) or "padding items none",
     sectionLeft and string.format("sections left=%s right=%s", num(sectionLeft), num(sectionRight)) or "sections none",
   }
-  local borderLeft, borderRight, source = borderOf(window)
-  if borderLeft == nil then
-    table.insert(parts, "border unknown")
-  else
-    table.insert(parts, string.format("border left=%s right=%s %s", num(borderLeft), num(borderRight), source))
-    if itemLeft ~= nil then
-      table.insert(parts, string.format("visible left=%s right=%s", num(itemLeft - borderLeft), num(itemRight - borderRight)))
-    end
+  local border, borderLeft, borderRight = describeBorder(window)
+  table.insert(parts, border)
+  if borderLeft ~= nil and itemLeft ~= nil then
+    table.insert(parts, string.format("visible left=%s right=%s", num(itemLeft - borderLeft), num(itemRight - borderRight)))
   end
   return table.concat(parts, " | ")
 end
@@ -320,10 +321,9 @@ function recorder:Snapshot(window)
   end
   local canvas = bag.canvas
   if canvas ~= nil then
-    local width = window:GetSizeMode() == "window" and canvas.frame:GetWidth() or nil
-    local layout = canvas:GetLayout(width)
-    table.insert(lines, string.format("canvas %s layout ipr=%s columns=%s header=%s tab=%s footer=%s",
-      rectIn(canvas.frame, frame), tostring(layout.itemsPerRow), tostring(layout.columns),
+    local plan = canvas.plan or {}
+    table.insert(lines, string.format("canvas %s layout ipr=%s columns=%s width=%s header=%s tab=%s footer=%s",
+      rectIn(canvas.frame, frame), tostring(plan.itemsPerRow), tostring(plan.columns), num(plan.width or 0),
       num(canvas.headerContainer:GetHeight()), num(canvas.tabContainer:GetHeight()), num(canvas.footerContainer:GetHeight())))
   end
   table.insert(lines, describePadding(window, bag))

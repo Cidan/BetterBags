@@ -95,6 +95,10 @@ local sectionProto = {
   GetAllCells = function() return {} end,
   AddCell = function() end,
   RemoveCell = function() end,
+  -- 50 x 50 at any items per row (frames/section.lua Measure, Arrange).
+  Measure = function(_, _, itemsPerRow) return { itemsPerRow = itemsPerRow, width = 50, height = 50, content = {} } end,
+  Arrange = function(_, _, measured) return measured.width, measured.height end,
+  GetItemsPerRowCap = function() return 1 end,
 }
 sectionFrame.Create = function()
   local s = setmetatable({}, { __index = sectionProto })
@@ -111,6 +115,11 @@ local mockGridProto = {
   Sort = function() end,
   SortVertical = function() end,
   Draw = function(self, options) return 100, 50 end,
+  -- Every layout is 100 x 50 (frames/grid.lua Measure, Arrange).
+  Measure = function(_, options)
+    return { width = 100, height = 50, positions = {}, columnOf = {}, cells = options.cells }
+  end,
+  Arrange = function(_, measured) return measured.width, measured.height end,
   GetContainer = function(self)
     if not self._container then self._container = CreateFrame("Frame") end
     return self._container
@@ -964,7 +973,11 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
     local view = bag:GetViewForTab(context:New("test"), 1)
     view.Bind = function() end
-    view.Layout = function() return 400, 200 end
+    local size = { 400, 200 }
+    view.Measure = function(_, itemsPerRow, columns)
+      return { itemsPerRow = itemsPerRow, columns = columns, sections = {}, content = {}, width = size[1], height = size[2] }
+    end
+    view.Arrange = function(_, measured) return measured.width, measured.height end
     local slotInfo = { tabs = { [1] = { items = {}, categories = {} } }, sortedItems = {}, stacks = { GetStackInfo = function() end } }
 
     bag:Draw(context:New("test"), slotInfo, function() end)
@@ -972,7 +985,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.are.equal(400 + 2 * bag.scroll:GetBarWidth(), bag.frame:GetWidth())
     assert.are.equal(200, bag.frame:GetHeight())
 
-    view.Layout = function() return 10, 10 end
+    size = { 10, 10 }
     bag:Draw(context:New("test"), slotInfo, function() end)
     assert.are.equal(260 + 2 * bag.scroll:GetBarWidth(), bag.frame:GetWidth())
     assert.are.equal(100, bag.frame:GetHeight())

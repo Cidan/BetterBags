@@ -200,18 +200,6 @@ describe("Grid layout under measurement noise", function()
     return out
   end
 
-  -- The widest column decides how narrow a snapped window can be (frames/bagcanvas.lua).
-  it("records the width of its widest column", function()
-    local g = grid:Create(CreateFrame("Frame"), false)
-    g:AddCell("a", sectionCell(131, 200))
-    g:AddCell("b", sectionCell(213, 200))
-    g:AddCell("c", sectionCell(90, 200))
-    g:Draw({ cells = g.cells, maxWidthPerRow = 220, columns = 3 })
-    assert.are.equal(213, g.maxColumnWidth)
-    g:Draw({ cells = {}, maxWidthPerRow = 220, columns = 1 })
-    assert.are.equal(0, g.maxColumnWidth)
-  end)
-
   it("keeps two sections that exactly fill a row on that row, whatever noise their widths carry", function()
     for _, noise in ipairs({ 0, 0.00001, -0.00001, 0.004 }) do
       local g = grid:Create(CreateFrame("Frame"), false)

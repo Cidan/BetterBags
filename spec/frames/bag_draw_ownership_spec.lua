@@ -70,6 +70,23 @@ local mockGridProto = {
     self.contentWidth, self.contentHeight = 41 * count, 41
     return self.contentWidth, self.contentHeight
   end,
+  -- Measure sizes the cells like Draw, moving nothing; Arrange shows them like Draw.
+  Measure = function(self, options)
+    local cells = options and options.cells or self.cells
+    local count = #cells
+    local width, height = 41 * count, count > 0 and 41 or 0
+    return { width = width, height = height, positions = {}, columnOf = {}, cells = cells }
+  end,
+  Arrange = function(self, measured)
+    for _, cell in ipairs(measured.cells) do
+      if not cell.isGap and cell.frame then
+        cell.frame:SetParent(self.inner)
+        cell.frame:Show()
+      end
+    end
+    self.contentWidth, self.contentHeight = measured.width, measured.height
+    return measured.width, measured.height
+  end,
   GetContainer = function(self)
     return self.frame
   end,
@@ -519,6 +536,53 @@ describe("Bag Draw: shared item button ownership across global sections and view
   -- The data phase leaves freeSpace out of a tab with no free slots (data/items.lua
   -- Phase10_PartitionIntoTabs); the draw follows the data. An empty Free Space section
   -- showed its header squeezed into two dots: an empty grid reports its spacing as width.
+  -- Recent Items spans every column; Free Space is one section wide, or spans every column when it
+  -- shows every free slot. The canvas measures them with each layout it tries and arranges the
+  -- chosen one (frames/bagcanvas.lua).
+  describe("global sections in a layout", function()
+    local function drawWith(showAll)
+      local bag = newBag()
+      local info = slotInfoWith({ itemAt(0, 1, "Recent Items"), itemAt(0, 3, "Weapons") }, { freeSpaceButton(0, 2, 1) })
+      info.tabs[1].freeSpace.showAll = showAll
+      bag:Draw(context:New("draw"), info, function() end)
+      return bag
+    end
+
+    it("lists Recent Items as spanning the columns, and Free Space only when it shows every slot", function()
+      local bag = drawWith(false)
+      local listed = bag:GetGlobalLayoutSections()
+      assert.are.same({ { bag.recentSection, true, "header" }, { bag.freeSpaceSection, false, "footer" } },
+        { { listed[1].section, listed[1].spansColumns, listed[1].place }, { listed[2].section, listed[2].spansColumns, listed[2].place } })
+      assert.is_true(drawWith(true):GetGlobalLayoutSections()[2].spansColumns)
+    end)
+
+    it("measures them without moving anything, with the items per row each takes", function()
+      local bag = drawWith(false)
+      bag.recentSection.frame:SetSize(1, 1)
+      local asked = {}
+      local measured = bag:MeasureGlobalSections(5, 3, function(section, itemsPerRow)
+        asked[section] = itemsPerRow
+        return section:Measure(bag.kind, itemsPerRow)
+      end)
+      assert.are.equal(15, asked[bag.recentSection])
+      assert.are.equal(5, asked[bag.freeSpaceSection])
+      assert.are.same({ 15, 5 }, { measured.header.itemsPerRow, measured.footer.itemsPerRow })
+      assert.are.same({ 1, 1 }, { bag.recentSection.frame:GetWidth(), bag.recentSection.frame:GetHeight() })
+      assert.are.equal(15, bag:MeasureGlobalSections(5, 3).header.itemsPerRow)
+    end)
+
+    it("arranges a measure and sizes the header and footer containers to it", function()
+      local bag = drawWith(false)
+      local measured = bag:MeasureGlobalSections(4, 2)
+      local headerW, headerH, footerW, footerH = bag:ArrangeGlobalSections(measured)
+      assert.are.same({ measured.header.width, measured.header.height }, { headerW, headerH })
+      assert.are.same({ measured.footer.width, measured.footer.height }, { footerW, footerH })
+      assert.are.equal(headerH, bag.headerContainer:GetHeight())
+      assert.are.equal(footerH, bag.footerContainer:GetHeight())
+      assert.are.equal(8, bag.recentSection:GetMaxCellWidth())
+    end)
+  end)
+
   describe("Free Space only when the data carries it", function()
     it("draws no Free Space section when the tab's data carries no freeSpace", function()
       local bag = newBag()
@@ -1523,6 +1587,17 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.are.equal(0, bag.window.opts.MinWidth())
       shown = true
       assert.are.equal(500, bag.window.opts.MinWidth())
+    end)
+
+    -- New data in the sections: the canvas measures them again (frames/bagcanvas.lua).
+    it("has its canvas forget its section measures on every draw, before laying out", function()
+      local bag = newBag()
+      local order = {}
+      override(bag.canvas, "ForgetMeasures", function() table.insert(order, "forget") end)
+      local render = addon:GetModule("Render")
+      override(render, "RenderNow", function() table.insert(order, "render") end)
+      bag:Draw(context:New("spec"), slotInfoWith({}, {}), function() end)
+      assert.are.same({ "forget", "render" }, order)
     end)
 
     it("asks its bag to close when its close button is clicked", function()

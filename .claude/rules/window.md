@@ -138,35 +138,47 @@ canvas pinned the content to its left edge whatever width it was given.
   box's own `OnMouseWheel`. The hover check is `IsMouseOver` with the left edge moved to the
   bar's room (`IsMouseOver(0, 0, width - 14, 0)`; Blizzard enlarges hit rects the same way,
   `FloatingChatFrame.lua`).
-- **Resizable layouts use the width they are given**: items per row come from a real section's
-  width (41 × N + 8 for N items) and rows of sections pack up to the column's width, 4 less
-  (the grid lets a row run 4 past its limit), instead of a worst-case budget of 41 × N + 20 per
-  column. A dragged window can show one more item per row at some widths, and the layout at a
-  snapped width is exactly the same (below). The canvas spec lays real grids out at 1,800 widths
-  to check nothing is ever wider than its window.
+- **Failure mode (fixed, measured): the left room never applied.** A render recording on retail
+  (Default, resizing the bank) showed every render with the items 28 px further from the right
+  than the left (12 vs 40, 39.4 vs 67.4) and the canvas at the scroll area's left edge: the scroll
+  box anchored its child with an x offset and a nil y offset, which the client drops (both are
+  required, `SimpleScriptRegionResizingAPIDocumentation`). `drawableProto:SetPoint` passes 0 for
+  a missing one, and the frame mock rejects one offset without the other (render-pipeline.md).
+- **A layout is a function of items per row and columns alone** (render-pipeline.md, the layout
+  engine). A resizable window takes the densest layout no wider than its width: the canvas tries
+  every items per row from the one past which nothing changes down to one. **Failure mode (fixed,
+  measured):** the snap used to guess the narrowest width with a formula, and the same recording
+  shows a snap (1036.8 to 1006) leaving 24 px of extra width, centered, while another left none:
+  the steps the player saw. An offline probe with the real grid showed 5 to 111 px left over.
 - **Snap to Content** (`SnapToContent` option, the bag's per-view setting, on by default): when
-  the player lets go of the grip, `startSnap` lays the content out at the player's width, reads
-  the content's narrowest width that lays out the same (`FitWidth`, the canvas: every column as
-  wide as the widest one, and the header and footer, or the narrowest width that keeps the
-  items per row when no section filled a row), and shrinks the window to it plus the insets, at
-  least its minimum. The top left is pinned (re-anchored `TOPLEFT` to `UIParent`), so the edge
-  the player dragged moves. The width eases out (cubic) to 10 % of the distance past the target
-  (at most 10 px, never below the minimum) in 65 % of 0.35 s, then settles back (smoothstep):
-  the bounce. While it runs the window hands the content a `LayoutWidth` (the target) with its
-  real `Width`, so the layout never changes mid-bounce and the content stays centered in the
-  moving width; the bounce stays inside the 14 px room. Each step lays the window out
-  (`Invalidate`). At the end it saves the position and size (`OnResized`). Grabbing the grip,
+  the player lets go of the grip, `startSnap` lays the content out at the player's width and
+  reads `FitWidth`, the chosen layout's own width; the window shrinks to it plus the scroll room
+  and the insets, at least its minimum. The candidates are the same for every width, so the
+  densest layout that fits the player's width is also the densest that fits its own width: the
+  snapped window shows the same layout, item for item, with no space left over (a randomized test
+  checks this over 300 bags). The top left is pinned (re-anchored `TOPLEFT` to `UIParent`), so the
+  edge the player dragged moves. The width eases out (cubic) to 10 % of the distance past the
+  target (at most 10 px, never below the minimum) in 65 % of 0.35 s, then settles back
+  (smoothstep): the bounce. While it runs the window hands the content a `LayoutWidth` (the
+  target) with its real `Width`, so the layout never changes mid-bounce and the content stays
+  centered in the moving width; the bounce stays inside the 14 px room. Each step lays the window
+  out (`Invalidate`). At the end it saves the position and size (`OnResized`). Grabbing the grip,
   moving the window or hiding it (`Hide`, or Escape: the snap's driver is a child of the window
   and ends it from its `OnHide`) ends the snap at its target at once. Nothing snaps when the
   window already fits (within half a pixel) or the setting is off. Steps trace as `snap start`
   and `snapped` (§3a diagnostics).
+- **What is still not equal:** a window the player sized without snapping can be an odd or
+  fractional number of units wider than its layout, so each side gets half (exact, not rounded),
+  and the client may round each edge to a physical pixel. Theme art whose border is drawn
+  unevenly around the frame (Default's NineSlice edge pieces sit 8 px outside the frame on the
+  left and 4 on the right) is the theme's to compensate (sonata.md 3b).
 
-Coverage: `spec/frames/bagcanvas_spec.lua` ("centering", "fit width", the layout tests),
-`spec/render/scrollbox_spec.lua` ("for a bag (Symmetric, AutoHideBar)"),
-`spec/window/window_spec.lua` ("snapping to its content"), `spec/frames/grid_spec.lua` ("records
-the width of its widest column"), `spec/views/gridview_spec.lua` ("packs rows up to the layout's
-row width"), `spec/sonata/theme_ports_spec.lua` ("pads every theme's bag the same on both
-sides"), `spec/config/config_redraw_spec.lua` ("Snap to Content"). Every guard was
+Coverage: `spec/frames/bagcanvas_spec.lua` (plans, the snap property, densest, centering,
+measures kept across renders), `spec/render/scrollbox_spec.lua` ("for a bag (Symmetric,
+AutoHideBar)"), `spec/render/render_spec.lua` ("anchors with both offsets when only one is
+given"), `spec/window/window_spec.lua` ("snapping to its content"),
+`spec/sonata/theme_ports_spec.lua` ("pads every theme's bag the same on both sides"),
+`spec/config/config_redraw_spec.lua` ("Snap to Content"). Every guard was
 mutation-tested. To check a theme in game, record rendering (render-recorder.md): each bag
 snapshot has a `padding` line with both sides.
 

@@ -9,8 +9,8 @@ local const = addon:GetModule('Constants')
 ---@class GridFrame: AceModule
 local grid = addon:NewModule('Grid')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+---@class Flow: AceModule
+local flow = addon:GetModule('Flow')
 
 ---@class Cell
 ---@field frame Frame
@@ -41,13 +41,12 @@ addon:GetModule('Perf'):RegisterPrototype(gridProto, 'GridFrame')
 
 ---@class (exact) RenderOptions
 ---@field cells Cell[] The cells to render in this grid.
----@field maxWidthPerRow number The maximum width of a row before it wraps.
+---@field maxWidthPerRow number The maximum width of a row before it wraps (render/flow.lua).
 ---@field columns? number The number of columns to render. If not set, columns is 1.
----@field header? Cell A Cell to render above all other items, ignoring columns.
----@field footer? Cell A Cell to render below all other items, ignoring columns.
----@field mask? Cell[] A list of cells to hide and not render at all.
----@field dynamic? boolean If true, the grid will calculate the number of columns such that the height of the grid does not exceed the percentage of the screen height.
----@field dynamicHeight? number The percentage of the screen height to use when calculating the number of columns.
+---@field sizeOf? fun(cell: Cell): number?, number? The size to lay a cell out at, when it is not its frame's yet (a section measured but not arranged); nil falls back to the frame's.
+
+---@class (exact) GridMeasure: FlowResult
+---@field cells Cell[] The cells, in the order of the positions.
 
 function gridProto:Show()
   self.frame:Show()
@@ -263,33 +262,6 @@ function gridProto:DislocateAllCellsWithID(id)
   targetCell.frame:ClearAllPoints()
 end
 
----@return number, number
-function gridProto:stageSimple()
-  return 1,1
-end
-
----@param options RenderOptions
----@return Cell[]
-function gridProto:calculateCellMask(options)
-  if not options.mask then return options.cells end
-
-  ---@type Cell[]
-  local result = {}
-  for _, cell in ipairs(options.cells) do
-    local found = false
-    for _, maskCell in ipairs(options.mask) do
-      if cell == maskCell then
-        found = true
-        break
-      end
-    end
-    if not found then
-      table.insert(result, cell)
-    end
-  end
-  return result
-end
-
 -- cellSize returns a cell's size rounded to whole pixels, the size the grid lays it out at. A
 -- frame reports its size back with float noise (scale conversions), and a size a hair over its
 -- whole value at a row or column limit (two 131-wide sections against a 262-wide row) moved cells
@@ -305,238 +277,66 @@ local function cellSize(cell)
   return math.floor(cell.frame:GetWidth() + 0.5), math.floor(cell.frame:GetHeight() + 0.5)
 end
 
--- calculateColumns takes a list of cells and a column count. It will then
--- return a list of list of cells, where each list of cells is a column.
--- The columns are divided evenly by the height of all the cell frames
--- in a given column.
+-- Measure works out where every cell would go, from the cells' sizes alone, with the packing
+-- every grid shares (render/flow.lua). It moves nothing: a view measures its sections for a
+-- width before deciding which layout to arrange (frames/bagcanvas.lua).
 ---@param options RenderOptions
----@return Cell[][]
-function gridProto:calculateColumns(options)
-  local maskedCells = self:calculateCellMask(options)
-  if not options.columns or options.columns == 1 then
-    return {[1] = maskedCells}
+---@return GridMeasure
+function gridProto:Measure(options)
+  local sizes = {}
+  local sizeOf = options.sizeOf
+  for i, cell in ipairs(options.cells) do
+    local w, h
+    if sizeOf ~= nil then
+      w, h = sizeOf(cell)
+    end
+    if w == nil then
+      w, h = cellSize(cell)
+    end
+    sizes[i] = { w, h }
   end
-  local rowWidth = 0
-  local totalHeight = 0
-  local maxCellHeight = 0
-  ---@type Cell[][]
-  for i, cell in ipairs(maskedCells) do
-    local cellWidth, cellHeight = cellSize(cell)
-
-    if i ~= 1 then
-      if rowWidth + cellWidth > options.maxWidthPerRow then
-        totalHeight = totalHeight + cellHeight + self.spacing
-        rowWidth = cellWidth
-      else
-        rowWidth = rowWidth + cellWidth + self.spacing
-      end
-    else
-      totalHeight = cellHeight
-      rowWidth = cellWidth
-    end
-
-    if cellHeight > maxCellHeight then
-      maxCellHeight = math.ceil(cellHeight)
-    end
-  end
-
-  -- Consider the largest cell for calculating splitAt. Don't split before reaching that height, to avoid unnecessary columns
-  local splitAt = math.ceil(math.max((totalHeight / options.columns) + 20, maxCellHeight))
-  local algorithmAttempt = 0
-
-  while true do
-    local currentHeight = 0
-    local currentColumn = 1
-    rowWidth = 0
-    local overshoot = 0
-    local columns = {}
-    algorithmAttempt = algorithmAttempt + 1
-
-    for i, cell in ipairs(maskedCells) do
-      local cellWidth, cellHeight = cellSize(cell)
-
-      if i ~= 1 then
-        if rowWidth + cellWidth > options.maxWidthPerRow then
-          if currentHeight + cellHeight > splitAt then
-            currentColumn = currentColumn + 1
-            currentHeight = cellHeight
-          else
-            currentHeight = currentHeight + cellHeight + self.spacing
-          end
-          rowWidth = cellWidth
-        else
-          rowWidth = rowWidth + cellWidth + self.spacing
-        end
-      else
-        currentHeight = cellHeight
-        rowWidth = cellWidth
-      end
-
-      if not columns[currentColumn] then
-        columns[currentColumn] = {}
-      end
-      table.insert(columns[currentColumn], cell)
-
-      if currentColumn > options.columns then
-        overshoot = overshoot + cellHeight
-      end
-    end
-
-    if currentColumn > options.columns then
-      if algorithmAttempt > 5 then
-        -- The algorithm should be pretty fast and we should get to a valid distribution in a 1-3 attempts, but let's cut it off after 5 attempts to be safe
-        debug:Log("calculateColumns", "Couldn't fit cells in", options.columns, "columns after 5 attempts. Using current solution.")
-        return columns
-      end
-
-      -- Need to increase splitAt to reduce number of columns, try evenly increasing by the overshot height/2 and try again
-      splitAt = splitAt + math.ceil(overshoot / (2 * options.columns))
-    else
-      return columns
-    end
-  end
+  local measured = flow:Pack(sizes, { rowLimit = options.maxWidthPerRow, columns = options.columns, spacing = self.spacing })
+  ---@cast measured GridMeasure
+  measured.cells = options.cells
+  return measured
 end
 
----@param cells Cell[]
----@param options RenderOptions
----@param currentOffset number
----@param topOffset number
----@return number, number
-function gridProto:layoutSingleColumn(cells, options, currentOffset, topOffset)
-  local w = 0
-  local rowWidth = 0
-  local h = 0
-  local currentX, currentY
-  local rowHeight = 0
-
-  for i, cell in ipairs(cells) do
-    local cellWidth, cellHeight = cellSize(cell)
-
-    if i ~= 1 then
-      if rowWidth + cellWidth > options.maxWidthPerRow then
-        -- Wrap to new row
-        h = h + rowHeight + self.spacing
-        currentY = topOffset - h
-        currentX = currentOffset
-        rowWidth = cellWidth
-        rowHeight = cellHeight
-        w = math.max(w, rowWidth)
-      else
-        -- Same row, next cell
-        currentX = currentOffset + rowWidth + self.spacing
-        rowWidth = rowWidth + cellWidth + self.spacing
-        rowHeight = math.max(rowHeight, cellHeight)
-        w = math.max(w, rowWidth)
-      end
-    else
-      -- First cell in column
-      h = 0
-      currentY = topOffset
-      currentX = currentOffset
-      rowWidth = cellWidth
-      rowHeight = cellHeight
-      w = rowWidth
-    end
-
+-- Arrange puts the cells where a measure placed them and sizes the grid to it.
+---@param measured GridMeasure
+---@return number width, number height
+function gridProto:Arrange(measured)
+  for i, cell in ipairs(measured.cells) do
     if not cell.isGap then
-      if cell.frame:GetParent() ~= self.inner then
-        cell.frame:SetParent(self.inner)
-      end
-      cell.frame:ClearAllPoints()
-      cell.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", currentX, currentY)
-      cell.frame:Show()
+      local position = measured.positions[i]
+      self:PlaceCell(cell, position.x, position.y)
     end
   end
-
-  -- Add the last row's height to the total column height
-  if #cells > 0 then
-    h = h + rowHeight
-  end
-
-  return w, h
+  self.inner:SetSize(measured.width, measured.height)
+  self.contentWidth = measured.width
+  self.contentHeight = measured.height
+  return measured.width, measured.height
 end
 
----@param options RenderOptions
----@return number, number
-function gridProto:stage(options)
-  if not options then return 0, 0 end
-
-  -- Explicitly hide masked cells so they don't remain visible at old positions
-  if options.mask then
-    for _, maskCell in ipairs(options.mask) do
-      if maskCell.frame then
-        maskCell.frame:Hide()
-      end
-    end
+-- PlaceCell puts one cell at x, y from the grid's top left. Every cell of every grid is placed
+-- here: the one place an animation between two layouts would take over.
+---@param cell Cell
+---@param x number
+---@param y number
+function gridProto:PlaceCell(cell, x, y)
+  if cell.frame:GetParent() ~= self.inner then
+    cell.frame:SetParent(self.inner)
   end
-
-  local w = 0
-  local h = 0
-  local columns = self:calculateColumns(options)
-  local currentOffset = 0
-  local topOffset = 0
-  local headerWidth = 0
-  local headerHeight = 0
-  local footerWidth = 0
-  local footerHeight = 0
-  local bottomColumnPosition = 0
-  local widestColumn = 0
-  if options.header then
-    ---@type RenderOptions
-    local headerOptions = {
-      cells = {options.header},
-      maxWidthPerRow = options.maxWidthPerRow * 2,
-    }
-    headerWidth, headerHeight = self:layoutSingleColumn({options.header}, headerOptions, 0, 0)
-    topOffset = -headerHeight
-  end
-
-  for _, column in ipairs(columns) do
-    local columnWidth, columnHeight = self:layoutSingleColumn(column, options, currentOffset, topOffset)
-    widestColumn = math.max(widestColumn, columnWidth)
-    w = w + columnWidth
-    h = math.max(h, columnHeight)
-    currentOffset = currentOffset + columnWidth
-    bottomColumnPosition = math.max(bottomColumnPosition, columnHeight)
-  end
-
-  if options.footer then
-    ---@type RenderOptions
-    local footerOptions = {
-      cells = {options.footer},
-      maxWidthPerRow = options.maxWidthPerRow * 2,
-    }
-    footerWidth, footerHeight = self:layoutSingleColumn({options.footer}, footerOptions, 0, -bottomColumnPosition + topOffset)
-    --topOffset = -headerHeight
-  end
-
-  h = h + headerHeight + footerHeight
-
-  if w == 0  or w < headerWidth then
-    w = headerWidth
-  end
-
-  if w == 0  or w < footerWidth then
-    w = footerWidth
-  end
-  w = w + self.spacing
-  -- Remove the last 4 pixels of padding.
-  if w > 4 then
-    w = w - 4 ---@type number
-  end
-  self.inner:SetSize(w, h)
-  self.contentWidth = w
-  self.contentHeight = h
-  self.maxColumnWidth = widestColumn
-  return w, h
+  cell.frame:ClearAllPoints()
+  cell.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", x, y)
+  cell.frame:Show()
 end
 
--- Draw will draw the grid.
+-- Draw measures the grid and arranges it.
 ---@param options RenderOptions
 ---@return number width
 ---@return number height
 function gridProto:Draw(options)
-  return self:stage(options)
+  return self:Arrange(self:Measure(options))
 end
 
 -- Clear will remove and release all columns from the grid,
