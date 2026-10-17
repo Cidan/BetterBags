@@ -150,9 +150,15 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   `Reserve` rows above the content while in-bag search is on), `Footer` (`Left`, `Right`,
   `Bottom`, `Height`, `Reserve` rows below the content; the money sits 4 in from its right end
   and the backpack's currencies 4 in from its left end, both anchored to the footer bar, so the
-  theme places them), `MenuButton` (`Points`; `false` hides it), `Actions` (below). It
+  theme places them), `MenuButton` (`Points`; `false` hides it), `Actions` (below), `Tabs`
+  (`Offset = { X, Y }`: where the tab bar's top left sits from the bag's bottom left, default
+  0, 2; `PlaceTabs`, also run by `bagFrame:Create` once the behavior made the bar, since a window
+  registered after the first theme is decorated before its tabs exist). The tab bar is a frame
+  level below the bag, so art a theme draws below the window (BetterBags - Themes' race borders
+  reach 13 to 56 below it) would cover the tabs unless the theme hangs them below it. It
   reserves those rows with `SetExtraInsets`, then redraws a shown slots panel (tabs measure
-  themselves again on `sonata/ThemeChanged`, sonata.md).
+  themselves again on `sonata/ThemeChanged`, sonata.md). Coverage for the tab bar:
+  `spec/frames/bag_draw_ownership_spec.lua` ("the tab bar (PlaceTabs)").
   **Failure mode (fixed):** the currencies were pinned to the window at fixed offsets
   (`const.OFFSETS.BAG_LEFT_INSET + 4`, `BAG_BOTTOM_INSET + 3`: 10 and 6), so on a theme with an
   inset footer (the Moonlight set's 18, 12) they sat on Dark's border while the money sat on the
