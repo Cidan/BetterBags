@@ -148,9 +148,18 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
 - **PlaceParts** (the window's `OnDecorated`, after every theme) places those parts from the
   theme's bag window `Layout` (sonata.md): `Search` (`Points` relative to the window,
   `Reserve` rows above the content while in-bag search is on), `Footer` (`Left`, `Right`,
-  `Bottom`, `Height`, `Reserve` rows below the content), `MenuButton` (`Points`; `false`
-  hides it), `Actions` (below). It reserves those rows with `SetExtraInsets`, then redraws a
-  shown slots panel (tabs measure themselves again on `sonata/ThemeChanged`, sonata.md).
+  `Bottom`, `Height`, `Reserve` rows below the content; the money sits 4 in from its right end
+  and the backpack's currencies 4 in from its left end, both anchored to the footer bar, so the
+  theme places them), `MenuButton` (`Points`; `false` hides it), `Actions` (below). It
+  reserves those rows with `SetExtraInsets`, then redraws a shown slots panel (tabs measure
+  themselves again on `sonata/ThemeChanged`, sonata.md).
+  **Failure mode (fixed):** the currencies were pinned to the window at fixed offsets
+  (`const.OFFSETS.BAG_LEFT_INSET + 4`, `BAG_BOTTOM_INSET + 3`: 10 and 6), so on a theme with an
+  inset footer (the Moonlight set's 18, 12) they sat on Dark's border while the money sat on the
+  footer. `Currency:CreateIconGrid(parent, footer)` now anchors them to the footer bar the
+  backpack passes (retail and Classic); with Base's footer (6, 6) they are exactly where they
+  were. Coverage: `spec/frames/currency_spec.lua` ("sits 4 in from the left end of the footer
+  bar"), `spec/bags/backpack_spec.lua` ("hands the currency grid its bag's footer bar").
 - **Action buttons** (`frames/bagactions.lua`, `BagActions`): a theme's `Layout.Actions` =
   `{ Points, Size (32), Spacing (5), Buttons = { { Action, Normal, Highlight, Pushed }, ... } }`
   places one square button per entry, the first at `Points` (relative to the window frame) and

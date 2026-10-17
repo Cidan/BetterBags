@@ -23,6 +23,7 @@ fonts.UnitFrame12White = fonts.UnitFrame12White or CreateFont("BetterBagsThemePa
 local list = stubModule("List")
 
 LoadBetterBagsModule("sonata/engine.lua")
+LoadBetterBagsModule("sonata/apply.lua")
 local sonata = addon:GetModule("Sonata")
 
 ResetModuleStub("ThemePane", "config/themepane.lua")
@@ -42,7 +43,8 @@ describe("ThemePane", function()
     originalThemes = sonata.themes
     sonata.themes = {}
     sonata:Init()
-    sonata:RegisterTheme({ Name = "Base", Hidden = true })
+    -- The real Base: the pane draws its text with Base's text roles.
+    assert(loadfile("sonata/themes/base.lua"))("BetterBags")
     sonata:RegisterTheme({ Name = "Default", DisplayName = "Default", Description = "The default theme." })
     sonata:RegisterTheme({ Name = "SimpleDark", DisplayName = "Simple Dark", Description = "A simple dark theme." })
     sonata:RegisterTheme({ Name = "elvui", DisplayName = "ElvUI", Available = function() return false end })
@@ -97,16 +99,19 @@ describe("ThemePane", function()
 
   it("shows whether a theme is applied, available or not", function()
     local pane = newPane()
+    -- The status is drawn with a text role, so a theme can color it.
     for key, expected in pairs({
-      Default = { "Currently Active", false, "Active" },
-      SimpleDark = { "Available", true, "Apply Theme" },
-      elvui = { "Unavailable", false, "Unavailable" },
+      Default = { "Currently Active", false, "Active", "Positive" },
+      SimpleDark = { "Available", true, "Apply Theme", "Description" },
+      elvui = { "Unavailable", false, "Unavailable", "Negative" },
     }) do
       pane:SelectTheme(key)
       local detail = pane.themeDetail
       assert.are.equal(expected[1], detail.statusLabel:GetText(), key)
       assert.are.equal(expected[2], detail.applyButton:IsEnabled(), key)
       assert.are.equal(expected[3], detail.applyButton:GetText(), key)
+      assert.are.equal(sonata:GetTextFont(expected[4]), detail.statusLabel:GetFontObject(), key)
+      assert.is_nil(detail.statusLabel._textColor, key)
     end
     pane:SelectTheme("SimpleDark")
     assert.are.equal("Simple Dark", pane.themeDetail.nameLabel:GetText())

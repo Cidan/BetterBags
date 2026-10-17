@@ -19,8 +19,9 @@ const.OFFSETS = const.OFFSETS or { BAG_LEFT_INSET = 0, BAG_BOTTOM_INSET = 0 }
 local grid = StubBetterBagsModule("Grid")
 grid.Create = function()
   local container = {
-    ClearAllPoints = function() end,
-    SetPoint = function() end,
+    points = {},
+    ClearAllPoints = function(self) self.points = {} end,
+    SetPoint = function(self, ...) table.insert(self.points, { ... }) end,
     SetWidth = function() end,
     SetSize = function() end,
   }
@@ -35,10 +36,30 @@ grid.Create = function()
 end
 
 ResetModuleStub("Currency", "frames/currency.lua")
+-- The counts are drawn with Sonata's text roles, styled from the saved theme.
+local db, createdDatabase = StubBetterBagsModule("Database")
+local originalGetTheme = db.GetTheme
+db.GetTheme = function() return "Default" end
+UseSonataTextRoles()
+
 LoadBetterBagsModule("frames/currency.lua")
 local currency = addon:GetModule("Currency")
 
 describe("Currency icon grid", function()
+  before_each(function()
+    UseSonataTextRoles()
+  end)
+
+  -- The currencies sit on the theme's footer (Layout.Footer), 4 in from its left end, as the
+  -- money sits 4 in from its right end: they used to be pinned to the window at fixed
+  -- offsets, outside the footer of themes whose border is thicker (Dark).
+  it("sits 4 in from the left end of the footer bar it is given", function()
+    local parent = CreateFrame("Frame")
+    local footer = CreateFrame("Frame", nil, parent)
+    local g = currency:CreateIconGrid(parent, footer)
+    assert.are.same({ { "BOTTOMLEFT", footer, "BOTTOMLEFT", 4, 0 } }, g.iconGrid:GetContainer().points)
+  end)
+
   describe("Classic legacy currency globals (no C_CurrencyInfo namespace)", function()
     local savedNamespace
     local expandCalls
@@ -113,4 +134,9 @@ describe("Currency icon grid", function()
       assert.equal(true, expandCalls[1].expand)
     end)
   end)
+end)
+
+teardown(function()
+  db.GetTheme = originalGetTheme
+  if createdDatabase then ResetModuleStub("Database") end
 end)

@@ -8,8 +8,8 @@ local sonata = addon:GetModule('Sonata')
 
 -- The Moonlight set, from BetterBags' sister addon Moonlight: every window drawn in one
 -- nine-sliced frame of art (textures/moonlight), titled in white at the top left, with a
--- lettered close button. The hidden Moonlight theme holds the geometry; Dark, Dark Round and
--- Parchment choose the art ($Frame, $SliceMode), and Parchment hangs a ribbon over the bag.
+-- lettered close button. The hidden Moonlight theme holds the geometry and Dark's frame;
+-- Parchment chooses its own art ($Frame, $SliceMode) and hangs a ribbon over the bag.
 -- Slate is Moonlight's own default: Blizzard's marble, tiled, with no frame art.
 local ART = "Interface\\AddOns\\BetterBags\\textures\\moonlight\\"
 
@@ -21,9 +21,9 @@ local BACKGROUND = {
 
 local INSETS = { Left = 18, Right = 24, Top = 40, Bottom = 12 }
 
--- The title sits right of the menu button.
+-- The title sits right of the menu button, in the theme's text color.
 local TITLE = {
-  Font = { Object = "GameFontHighlight" },
+  Font = { Object = "GameFontHighlight", Color = "$TextColor", Shadow = "$TextShadow" },
   Points = { { Point = "TOPLEFT", X = 44, Y = -15 } },
   Height = 24,
   Justify = "LEFT",
@@ -77,6 +77,9 @@ local function tab(inset, style)
   return t
 end
 
+-- The close button's letter in black on the paper.
+local PARCHMENT_CLOSE = { Font = { Object = "GameFontBlack" } }
+
 local GRAY_TEXT = { Object = "GameFontHighlightSmall", Color = { 0.7, 0.7, 0.7, 1 } }
 local NO_SHADOW = { X = 0, Y = 0, Color = { 0, 0, 0, 0 } }
 -- The plain middle of parchment.png, away from its burnt edges.
@@ -123,34 +126,29 @@ sonata:RegisterTheme({
   DisplayName = "Dark",
   Description = "A dark frame, from Moonlight.",
   Parent = "Moonlight",
+  Windows = {
+    -- The frame's heavy border ends about 16 in: the menu button sits inside it, the title
+    -- right of it, and the search box and content below it.
+    Bag = {
+      Insets = { Top = 48 },
+      Title = { Points = { { Point = "TOPLEFT", X = 50, Y = -15 } } },
+      Layout = {
+        Search = {
+          Points = {
+            { Point = "TOPLEFT", X = 18, Y = -48 },
+            { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -24, Y = -68 },
+          },
+        },
+        MenuButton = { Points = { { Point = "TOPLEFT", X = 14, Y = -12 } } },
+      },
+    },
+  },
   Elements = {
-    -- The frame's translucent black inside its heavy black edge; the selected tab lighter.
+    -- Translucent black inside the frame's heavy black edge; the selected tab lighter.
     Tab = tab(2, {
       Background = { Color = { 0, 0, 0, 0.55 } },
       Border = { Color = { 0.01, 0.01, 0.01, 1 }, EdgeSize = 3 },
       Selected = { Background = { Color = { 1, 1, 1, 0.1 } } },
-      Font = GRAY_TEXT,
-      HighlightFont = WHITE_TEXT,
-      SelectedFont = WHITE_TEXT,
-    }),
-  },
-})
-
-sonata:RegisterTheme({
-  Name = "DarkRound",
-  DisplayName = "Dark Round",
-  Description = "A dark frame with round corners, from Moonlight.",
-  Parent = "Moonlight",
-  Variables = { Frame = ART .. "dark-round.png" },
-  Elements = {
-    -- The frame's dark fill inside its #3c3b3c rim; the selected tab's rim brighter.
-    Tab = tab(2, {
-      Background = { Color = { 0, 0, 0, 0.75 } },
-      Border = { Color = { 0.235, 0.231, 0.235, 1 }, EdgeSize = 2 },
-      Selected = {
-        Background = { Color = { 1, 1, 1, 0.06 } },
-        Border = { Color = { 0.55, 0.55, 0.55, 1 } },
-      },
       Font = GRAY_TEXT,
       HighlightFont = WHITE_TEXT,
       SelectedFont = WHITE_TEXT,
@@ -166,6 +164,21 @@ sonata:RegisterTheme({
   Variables = {
     Frame = ART .. "parchment.png",
     SliceMode = "Stretched",
+    -- Dark text on the paper, in Blizzard's parchment text colors (GlobalColor): body text
+    -- PARCHMENT_MATERIAL_TEXT_COLOR, titles PARCHMENT_MATERIAL_TITLETEXT_COLOR, the hovered
+    -- entry PARCHMENTLARGE_MATERIAL_TITLETEXT_COLOR, good and bad states
+    -- PARCHMENT_ACCESSIBILITY_GREEN and _RED. Secondary and muted text take the browns of the
+    -- tabs' text and of the paper's burnt edge. No shadow; a faint gold glow marks the open
+    -- settings entry.
+    TextColor = { 46 / 255, 31 / 255, 15 / 255, 1 },
+    TextSoftColor = { 0.36, 0.22, 0.1, 1 },
+    TextMutedColor = { 0.455, 0.286, 0.176, 1 },
+    TextAccentColor = { 0, 0, 0, 1 },
+    TextAccentHoverColor = { 53 / 255, 0, 0, 1 },
+    TextPositiveColor = { 19 / 255, 68 / 255, 4 / 255, 1 },
+    TextNegativeColor = { 172 / 255, 3 / 255, 3 / 255, 1 },
+    TextShadow = { Color = { 0, 0, 0, 0 }, X = 0, Y = 0 },
+    TextGlow = { Color = { 1, 0.82, 0, 0.35 }, X = 0, Y = 0 },
   },
   Windows = {
     Bag = {
@@ -179,9 +192,13 @@ sonata:RegisterTheme({
         },
       },
       Title = { Points = { { Point = "BOTTOM", RelativeTo = "Ribbon", RelativePoint = "BOTTOM", Y = 25 } }, Justify = "CENTER" },
+      CloseButton = PARCHMENT_CLOSE,
     },
+    Panel = { CloseButton = PARCHMENT_CLOSE },
+    Flat = { CloseButton = PARCHMENT_CLOSE },
   },
   Elements = {
+    SectionHeader = { Font = { Object = "GameFontNormal", Color = "$TextAccentColor", Shadow = "$TextShadow" } },
     -- A strip of the paper, dimmed until the tab is selected, in the burnt edge's brown, with
     -- dark brown text and no shadow.
     Tab = tab(2, {

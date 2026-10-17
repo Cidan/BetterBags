@@ -27,14 +27,23 @@ describe("UI Unification Classic/Era Fallbacks", function()
   end)
 
   describe("Money Frame Classic Fallback", function()
+    local db, createdDatabase, originalGetTheme
+
     setup(function()
       addon.isRetail = false
+      -- The money is drawn with Sonata's text roles, styled from the saved theme.
+      db, createdDatabase = StubBetterBagsModule("Database")
+      originalGetTheme = db.GetTheme
+      db.GetTheme = function() return "Default" end
+      UseSonataTextRoles()
       ResetModuleStub("MoneyFrame", "frames/money.lua")
       LoadBetterBagsModule("frames/money.lua")
     end)
 
     teardown(function()
       addon.isRetail = true
+      db.GetTheme = originalGetTheme
+      if createdDatabase then ResetModuleStub("Database") end
     end)
 
     it("should use textures instead of Atlases in Classic Era for money buttons", function()

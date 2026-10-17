@@ -21,8 +21,9 @@ db.GetTheme = db.GetTheme or function() return "Default" end
 db.SetTheme = db.SetTheme or function() end
 
 local fonts = trackStub("Fonts")
-fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or { name = "UnitFrame12Yellow" }
-fonts.UnitFrame12White = fonts.UnitFrame12White or { name = "UnitFrame12White" }
+-- Real font objects, as core/fonts.lua makes them (CreateFont).
+fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsUnitFrame12Yellow")
+fonts.UnitFrame12White = fonts.UnitFrame12White or CreateFont("BetterBagsUnitFrame12White")
 
 LoadBetterBagsModule("sonata/engine.lua")
 LoadBetterBagsModule("sonata/apply.lua")

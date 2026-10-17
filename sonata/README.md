@@ -8,7 +8,7 @@ theme cleanly when the player switches.
 
 The themes BetterBags ships are in this folder's `themes/` directory and are the best
 examples: `base.lua` (what every theme inherits), `default.lua` (Blizzard's look),
-`simpledark.lua`, `moonlight.lua` (Dark, Dark Round, Parchment and Slate, sharing one hidden
+`simpledark.lua`, `moonlight.lua` (Dark, Parchment and Slate, sharing one hidden
 parent), `elvui.lua` and `gw2.lua`
 (themes that depend on another addon and read its settings through variables).
 
@@ -53,6 +53,7 @@ draws Default until your addon registers it, then switches to it in the same ses
 | `Variables` | named values, or functions returning them, used anywhere as `"$Name"` |
 | `Windows` | window styles by window kind |
 | `Elements` | element styles by element kind |
+| `Text` | text roles: the fonts of BetterBags' own text (settings, dialogs, the bag footer); see [Text](#text) |
 | `Clients` | partial themes applied only on some game clients |
 
 ### Inheritance, and how themes merge
@@ -134,7 +135,7 @@ A `Bag` style's `Layout` places the parts the bag owns, relative to the window:
 | Key | What it places |
 |---|---|
 | `Search` | the in-bag search box: `Points`, and `Reserve` (the rows above the content it takes while shown) |
-| `Footer` | the money and currency bar: `Left`, `Right`, `Bottom`, `Height`, `Reserve` |
+| `Footer` | the money and currency bar: `Left`, `Right`, `Bottom`, `Height`, `Reserve`; the money sits 4 in from its right end, the currencies 4 in from its left end |
 | `MenuButton` | the round bag menu button: `Points`; `false` hides it |
 | `Actions` | buttons running BetterBags actions (GW2's side panel): `Points` (the first button), `Size`, `Spacing`, `Buttons = { { Action, Normal, Highlight, Pushed }, ... }`, where `Action` is `ShowBags`, `Sort`, `Settings` or `Menu`; buttons stack downwards |
 
@@ -158,6 +159,39 @@ switching themes never leaves part of the last theme behind. Fills and borders o
 take a texture spec or a color: `Background = { Color = { 0, 0, 0, 0.8 } }`,
 `Border = { Color = { 0.3, 0.3, 0.3, 1 }, EdgeSize = 1, Inset = -1 }`.
 
+## Text
+
+BetterBags' own text, in the settings window, dialogs, the search category editor, the search
+panel, the debug window and the bag footer, is drawn with **text roles**: fonts named by what the
+text is. Every theme inherits Base's roles, which take their colors from these variables, so a
+light theme only needs to set the variables:
+
+| Variable | Base | Used for |
+|---|---|---|
+| `TextColor` | white | headings, body text, values, the settings navigation, money and counts |
+| `TextSoftColor` | light gray | option titles and descriptions, secondary information |
+| `TextMutedColor` | gray | notes, hints, empty lists |
+| `TextAccentColor` | gold | names and field labels, the open settings entry |
+| `TextAccentHoverColor` | warm gold | the hovered settings entry |
+| `TextPositiveColor`, `TextNegativeColor` | green, red | a good or bad state |
+| `TextShadow` | black, offset 1, -1 | every role's shadow |
+| `TextGlow` | gold glow | the hovered and open settings entries |
+
+```lua
+Variables = {
+  TextColor = { 0.18, 0.12, 0.06, 1 },
+  TextAccentColor = { 0, 0, 0, 1 },
+  TextShadow = { Color = { 0, 0, 0, 0 }, X = 0, Y = 0 },
+},
+```
+
+To change one role rather than a color, set it under `Text` (it merges with Base's):
+`Text = { Field = { Color = { 0.4, 0.8, 1, 1 } } }`. The roles are `Heading`, `Label`,
+`Description`, `Title`, `Field`, `FieldSmall`, `Body`, `BodySmall`, `BodyLarge`, `Muted`,
+`MutedSmall`, `Empty`, `Positive`, `Negative`, `Nav`, `NavHover`, `NavActive`, `NavSub`,
+`NavSubHover`, `NavSubActive`, `Search`, `Count` and `Money`. Window titles and section titles
+are styled by their window and element styles (`Title.Font`, `SectionHeader.Font`).
+
 ## Specs
 
 - **Colors**: `{ r, g, b, a }` (alpha optional) or `{ r = , g = , b = , a = }`.
@@ -169,7 +203,8 @@ take a texture spec or a color: `Background = { Color = { 0, 0, 0, 0.8 } }`,
 - **Textures**: one of `Texture` (a file), `Atlas` (`UseAtlasSize`) or `Color`, plus `Layer`,
   `SubLevel`, `SliceMode` (`"Stretched"` or `"Tiled"`) with `SliceMargins = { Left, Right,
   Top, Bottom }` for nine-sliced art, `TexCoords`, `VertexColor`, `BlendMode`, `Desaturated`,
-  `HorizTile`, `VertTile`, `Alpha`.
+  `HorizTile`, `VertTile` (tile the art; Sonata loads it with the `REPEAT` wrap mode the tiling
+  needs), `Alpha`.
 - **Points**: a list of `{ Point, RelativeTo, RelativePoint, X, Y }`; `RelativeTo` defaults to
   the window (or the element) and may name a texture or `Title` where noted.
 

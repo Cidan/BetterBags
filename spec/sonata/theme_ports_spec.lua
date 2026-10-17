@@ -139,10 +139,13 @@ describe("BetterBags' other themes", function()
   describe("the Moonlight set", function()
     local ART = "Interface\\AddOns\\BetterBags\\textures\\moonlight\\"
 
-    it("lists Dark, Dark Round and Parchment, built on a hidden Moonlight base", function()
+    -- Dark Round was folded into Dark: Dark kept its square frame and tabs and took Dark Round's
+    -- darker fill (black at 0.75, baked into dark-frame.png).
+    it("lists Dark and Parchment, built on a hidden Moonlight base, and no Dark Round", function()
       local all = sonata:GetAllThemes()
       assert.is_nil(all.Moonlight)
-      for key, name in pairs({ Dark = "Dark", DarkRound = "Dark Round", Parchment = "Parchment" }) do
+      assert.is_nil(sonata:GetTheme("DarkRound"))
+      for key, name in pairs({ Dark = "Dark", Parchment = "Parchment" }) do
         assert.is_not_nil(all[key], key)
         assert.are.equal(name, sonata:GetTheme(key).DisplayName)
         assert.are.equal("Moonlight", sonata:GetTheme(key).Parent)
@@ -150,8 +153,7 @@ describe("BetterBags' other themes", function()
     end)
 
     it("frames every window in its art, nine-sliced, with Moonlight's content box", function()
-      for key, art in pairs({ Dark = { "dark-frame.png", "Tiled" },
-        DarkRound = { "dark-round.png", "Tiled" }, Parchment = { "parchment.png", "Stretched" } }) do
+      for key, art in pairs({ Dark = { "dark-frame.png", "Tiled", 48 }, Parchment = { "parchment.png", "Stretched", 40 } }) do
         local bag, panel = newWindow("Bag"), newWindow("Panel")
         apply(key)
         for _, w in ipairs({ bag, panel }) do
@@ -161,8 +163,29 @@ describe("BetterBags' other themes", function()
           assert.are.equal(Enum.UITextureSliceMode[art[2]], bg._sliceMode, key)
           assert.is_nil(w.decoration:GetTemplateFrame(), key)
         end
-        assert.are.same({ Left = 18, Right = 24, Top = 40, Bottom = 12 }, bag.decoration:GetInsets(), key)
+        assert.are.same({ Left = 18, Right = 24, Top = art[3], Bottom = 12 }, bag.decoration:GetInsets(), key)
       end
+    end)
+
+    -- Dark's frame has a heavy border whose inside starts about 16 in (dark-frame.png): its menu
+    -- button sits inside it, the title and search box move to make room, and the money and
+    -- currencies sit on its footer, inside the border too.
+    it("keeps Dark's menu button inside its frame's border, with the title and search box clear of it", function()
+      local bag = newWindow("Bag")
+      apply("Dark")
+      local layout = bag.decoration:GetLayout()
+      assert.are.same({ { Point = "TOPLEFT", X = 14, Y = -12 } }, layout.MenuButton.Points)
+      assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 50, -15 }, { bag.decoration:GetTitleText():GetPoint(1) })
+      assert.are.same({
+        { Point = "TOPLEFT", X = 18, Y = -48 },
+        { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -24, Y = -68 },
+      }, layout.Search.Points)
+      assert.are.equal(24, layout.Search.Reserve)
+      assert.are.same({ Left = 18, Right = 24, Bottom = 12, Height = 20, Reserve = 26 }, layout.Footer)
+      -- Only Dark: Parchment and Slate keep Moonlight's.
+      apply("Slate")
+      assert.are.same({ { Point = "TOPLEFT", X = 8, Y = -6 } }, bag.decoration:GetLayout().MenuButton.Points)
+      assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 44, -15 }, { bag.decoration:GetTitleText():GetPoint(1) })
     end)
 
     -- Slate is Moonlight's own default theme: Blizzard's marble, tiled the way Blizzard tiles it
@@ -180,6 +203,7 @@ describe("BetterBags' other themes", function()
         assert.are.equal("Interface\\FrameGeneral\\UI-Background-Marble", bg:GetTexture(), kind)
         assert.is_true(bg:GetHorizTile(), kind)
         assert.is_true(bg:GetVertTile(), kind)
+        assert.are.same({ "REPEAT", "REPEAT" }, { bg._wrapH, bg._wrapV }, kind)
         assert.is_nil(bg._sliceMargins, kind)
         assert.are.equal(0.6, bg:GetAlpha(), kind)
       end
@@ -187,17 +211,19 @@ describe("BetterBags' other themes", function()
       assert.are.equal("X", windows.Bag.decoration:GetCloseButton():GetText())
     end)
 
+    -- The set's own geometry, which Slate keeps (Dark moves its button, title and search box in).
     it("titles at the top left in white, with a lettered close button and the corner grip", function()
       local bag = newWindow("Bag")
-      apply("Dark")
+      apply("Slate")
       local title = bag.decoration:GetTitleText()
       assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 44, -15 }, { title:GetPoint(1) })
       assert.are.same({ 1, 1, 1, 1 }, { title:GetTextColor() })
       local close = bag.decoration:GetCloseButton()
       assert.are.equal("X", close:GetText())
       assert.are.same({ 32, 32 }, { close:GetWidth(), close:GetHeight() })
-      local layout = sonata:Resolve("Dark").Windows.Bag.Layout
+      local layout = sonata:Resolve("Slate").Windows.Bag.Layout
       assert.are.same({ { Point = "TOPLEFT", X = 8, Y = -6 } }, layout.MenuButton.Points)
+      assert.are.equal(32, sonata:Resolve("Slate").Elements.BagButton.Size)
       assert.are.equal(32, sonata:Resolve("Dark").Elements.BagButton.Size)
     end)
 
@@ -212,12 +238,13 @@ describe("BetterBags' other themes", function()
       assert.are.same({ "BOTTOM", ribbon, "BOTTOM", 0, 25 }, { title:GetPoint(1) })
     end)
 
-    it("ships its art with BetterBags", function()
-      for _, file in ipairs({ "dark-frame.png", "dark-round.png", "parchment.png", "parchment-ribbon.png" }) do
+    it("ships the art it uses with BetterBags, and not Dark Round's frame", function()
+      for _, file in ipairs({ "dark-frame.png", "parchment.png", "parchment-ribbon.png" }) do
         local f = io.open("textures/moonlight/" .. file, "rb")
         assert.is_not_nil(f, file)
         f:close()
       end
+      assert.is_nil(io.open("textures/moonlight/dark-round.png", "rb"))
     end)
   end)
 
@@ -508,6 +535,73 @@ describe("BetterBags' other themes", function()
     end)
   end)
 
+  -- Parchment's light paper needs dark text: its text roles take Blizzard's parchment text
+  -- colors (GlobalColor: PARCHMENT_MATERIAL_TEXT_COLOR, PARCHMENT_MATERIAL_TITLETEXT_COLOR,
+  -- PARCHMENTLARGE_MATERIAL_TITLETEXT_COLOR, PARCHMENT_ACCESSIBILITY_GREEN/RED) and drop the
+  -- black shadow; the dark themes keep Base's white text.
+  describe("text", function()
+    local function roleColor(role)
+      local r, g, b, a = sonata:GetTextFont(role):GetTextColor()
+      return { r, g, b, a }
+    end
+    local function roleShadow(role)
+      local font = sonata:GetTextFont(role)
+      local r, g, b, a = font:GetShadowColor()
+      local x, y = font:GetShadowOffset()
+      return { r, g, b, a, x, y }
+    end
+
+    it("draws Parchment's text in Blizzard's parchment colors, without a shadow", function()
+      apply("Parchment")
+      local BODY, TITLE = { 46 / 255, 31 / 255, 15 / 255, 1 }, { 0, 0, 0, 1 }
+      for _, role in ipairs({ "Heading", "Body", "BodySmall", "BodyLarge", "Nav", "NavSub", "Search", "Count", "Money" }) do
+        assert.are.same(BODY, roleColor(role), role)
+      end
+      for _, role in ipairs({ "Title", "Field", "FieldSmall", "NavActive", "NavSubActive" }) do
+        assert.are.same(TITLE, roleColor(role), role)
+      end
+      assert.are.same({ 0.36, 0.22, 0.1, 1 }, roleColor("Label"))
+      assert.are.same({ 0.36, 0.22, 0.1, 1 }, roleColor("Description"))
+      assert.are.same({ 0.455, 0.286, 0.176, 1 }, roleColor("Muted"))
+      assert.are.same({ 0.455, 0.286, 0.176, 1 }, roleColor("Empty"))
+      assert.are.same({ 53 / 255, 0, 0, 1 }, roleColor("NavHover"))
+      assert.are.same({ 19 / 255, 68 / 255, 4 / 255, 1 }, roleColor("Positive"))
+      assert.are.same({ 172 / 255, 3 / 255, 3 / 255, 1 }, roleColor("Negative"))
+      assert.are.same({ 0, 0, 0, 0, 0, 0 }, roleShadow("Body"))
+      assert.are.same({ 1, 0.82, 0, 0.35, 0, 0 }, roleShadow("NavActive"))
+    end)
+
+    it("titles Parchment's windows in its text color without a shadow, and letters its close button in black", function()
+      local panel, bag = newWindow("Panel"), newWindow("Bag")
+      apply("Parchment")
+      for _, w in ipairs({ panel, bag }) do
+        local title = w.decoration:GetTitleText()
+        assert.are.same({ 46 / 255, 31 / 255, 15 / 255, 1 }, { title:GetTextColor() })
+        assert.are.same({ 0, 0, 0, 0 }, { title:GetShadowColor() })
+        assert.are.equal(GameFontBlack, w.decoration:GetCloseButton():GetNormalFontObject())
+      end
+      local section = sonata:Resolve("Parchment").Elements.SectionHeader.Font
+      assert.are.same({ Object = "GameFontNormal", Color = { 0, 0, 0, 1 }, Shadow = { Color = { 0, 0, 0, 0 }, X = 0, Y = 0 } },
+        section)
+    end)
+
+    it("keeps Base's white text on the dark themes", function()
+      for _, key in ipairs({ "Dark", "Slate", "SimpleDark" }) do
+        apply(key)
+        assert.are.same({ 1, 1, 1, 1 }, roleColor("Body"), key)
+        assert.are.same({ 1, 0.82, 0, 1 }, roleColor("Title"), key)
+        assert.are.same({ 0, 0, 0, 1, 1, -1 }, roleShadow("Body"), key)
+        if key ~= "SimpleDark" then
+          local w = newWindow("Panel")
+          apply(key)
+          assert.are.same({ 1, 1, 1, 1 }, { w.decoration:GetTitleText():GetTextColor() }, key)
+          assert.are.same({ 0, 0, 0, 1 }, { w.decoration:GetTitleText():GetShadowColor() }, key)
+          assert.are.equal(GameFontNormal, w.decoration:GetCloseButton():GetNormalFontObject(), key)
+        end
+      end
+    end)
+  end)
+
   -- Every built-in theme but Default (Blizzard's tabs) and ElvUI (ElvUI's flat tabs, covered
   -- above) draws its own flat tabs, styled here on a real tab through the real styler.
   describe("tabs", function()
@@ -540,7 +634,7 @@ describe("BetterBags' other themes", function()
     end
 
     it("hides Blizzard's tab art on every theme with its own tabs, and sizes them alike", function()
-      for _, key in ipairs({ "SimpleDark", "Dark", "DarkRound", "Parchment", "GW2", "Slate" }) do
+      for _, key in ipairs({ "SimpleDark", "Dark", "Parchment", "GW2", "Slate" }) do
         local tab = tabFor(key)
         assert.are.equal(0, tab.Left:GetAlpha(), key)
         assert.are.equal(0, tab.LeftActive:GetAlpha(), key)
@@ -574,18 +668,6 @@ describe("BetterBags' other themes", function()
       elements:SetTabState(tab, "selected")
       assert.are.same({ 1, 1, 1, 0.1 }, rgba(skin.selectedFill._colorTexture))
       assert.are.same({ 1, 1, 1, 1 }, textColor(tab))
-    end)
-
-    it("draws Dark Round's tabs in the frame's dark fill and rim, the selected rim brighter", function()
-      local tab = tabFor("DarkRound")
-      local skin = tab.sonataSkin
-      assert.are.same({ 0, 0, 0, 0.75 }, rgba(skin.fill._colorTexture))
-      assert.are.same({ 0.235, 0.231, 0.235, 1 }, rgba(skin.edges[1]._colorTexture))
-      assert.are.equal(2, skin.edges[1]:GetHeight())
-      elements:SetTabState(tab, "selected")
-      assert.are.same({ 0.55, 0.55, 0.55, 1 }, rgba(skin.edges[1]._colorTexture))
-      elements:SetTabState(tab, "normal")
-      assert.are.same({ 0.235, 0.231, 0.235, 1 }, rgba(skin.edges[1]._colorTexture))
     end)
 
     it("cuts Parchment's tabs from its paper, dimmed until selected, in a burnt edge and brown text", function()
@@ -627,6 +709,7 @@ describe("BetterBags' other themes", function()
       assert.are.equal("Interface\\FrameGeneral\\UI-Background-Marble", skin.fill:GetTexture())
       assert.is_true(skin.fill:GetHorizTile())
       assert.is_true(skin.fill:GetVertTile())
+      assert.are.same({ "REPEAT", "REPEAT" }, { skin.fill._wrapH, skin.fill._wrapV })
       assert.are.same({ 0.18, 0.18, 0.18, 1 }, rgba(skin.edges[1]._colorTexture))
       elements:SetTabState(tab, "selected")
       assert.are.same({ 0.54, 0.56, 0.6, 1 }, rgba(skin.bar._colorTexture))

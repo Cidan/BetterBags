@@ -123,6 +123,13 @@ Specs (`sonata/apply.lua`):
   own texture coordinates, tiling and nine-slice data (`SimpleTextureBaseAPIDocumentation.lua`),
   which a reset after it would undo. `apply:ResetTexture` blanks a texture for reuse, size
   included.
+- **Tiling loads the art with the `REPEAT` wrap mode.** `HorizTile`/`VertTile` pass `"REPEAT"`
+  as the horizontal/vertical wrap mode to `SetTexture` (or `SetAtlas`) before setting the tile
+  flags, as Blizzard's `SetTextureWithAddressModeOptions` does (`TextureUtil.lua`). With the
+  default `CLAMP`, a texture tiled past its own size repeats its edge pixels: Slate's marble
+  (256 x 256) drew as vertical streaks below its first 256 pixels. Coverage:
+  `spec/sonata/apply_spec.lua` ("loads a tiled file with the REPEAT wrap mode", "loads a tiled
+  atlas with the REPEAT wrap mode too") and the Slate tests in `spec/sonata/theme_ports_spec.lua`.
 - Button states (`apply:ButtonStates`): a state given a file, atlas or color draws it, reset to
   fill the button, untinted, at full alpha; a state with only `VertexColor`, `TexCoords`,
   `BlendMode`, `Inset` or `Alpha` changes the art the button already has (the
@@ -290,16 +297,37 @@ overlay search panel).
   backdrop. The bag's search box sits at 20, -40 to -10, -60 and the menu button at 4, -6 with
   its art at 85% (`BagButton` portrait and highlight 40.8 x 51); section titles
   `UnitFrame12White`.
-- **The Moonlight set** (`Dark`, `DarkRound`, `Parchment`, shown as Dark, Dark Round and
-  Parchment, children of the hidden `Moonlight`; first released as `MoonlightDark`,
-  `MoonlightDarkRound`, `MoonlightParchment`, which `DB:Migrate` moves to the new keys): Moonlight's art, shipped in `textures\moonlight\`, nine-sliced with
-  24px margins as every window's `Background` (`$Frame`, `$SliceMode`: tiled dark frame, tiled
-  round dark frame, stretched parchment), content insets 18, 24, 40, 12, white
-  `GameFontHighlight` titles at TOPLEFT 44, -15 (20, -15 on dialogs), and a 32px close button
+- **The Moonlight set** (`Dark` and `Parchment`, children of the hidden `Moonlight`; first
+  released as `MoonlightDark` and `MoonlightParchment`, which `DB:Migrate` moves to the new keys.
+  A third, Dark Round, was removed; Dark took its darker fill): Moonlight's art, shipped in
+  `textures\moonlight\`, nine-sliced with 24px margins as every window's `Background` (`$Frame`,
+  `$SliceMode`: Dark's tiled square frame `dark-frame.png`, Moonlight's default, or Parchment's
+  stretched paper), content insets 18, 24, 40, 12,
+  `GameFontHighlight` titles in the text palette (`$TextColor`, `$TextShadow`: white with a black
+  shadow on the dark themes) at TOPLEFT 44, -15 (20, -15 on dialogs), and a 32px close button
   lettered "X" (`CloseButton.Font`, §3). The bag's search box sits at 18, -40 to -24, -60
-  (reserve 24), its footer at 18, 24, bottom 12, and a 32px menu button (art 32 x 40) at 8, -6.
+  (reserve 24), its footer at 18, 24, bottom 12 (the money and currencies sit on it), and a
+  32px menu button (art 32 x 40) at 8, -6. **Dark** brings its menu button inside its frame's
+  heavy border (which ends about 16 in): the button at 14, -12, the title at 50, -15, the
+  search box at 18, -48 to -24, -68, and the bag's content box 48 from the top (8 lower).
+  Parchment and Slate keep the set's positions.
   Parchment hangs its 281 x 84 ribbon over the bag (BOTTOM 40 below the window's TOP) and
   centers the bag's title on it.
+  **Dark's fill** is Dark Round's: black at 0.75 (`0,0,0,192`) inside the frame's border, where
+  Moonlight's frame had black at 0.30. It is baked into `dark-frame.png`: every pixel inside the
+  border's solid black band (found by filling from the center up to the band) had its alpha
+  remapped so the band's inner fade (pixels 10-15 from each edge) runs from 255 down to the new
+  192 instead of to 77, and the fill itself became pure black at 192. The border, its band and
+  the soft shadow outside it are unchanged, pixel for pixel. Dark Round's art, `dark-round.png`
+  (a round #3c3b3c rim around the same fill), is no longer shipped.
+  **Parchment's text** (§3c) is dark, in Blizzard's parchment text colors from the game's color
+  table (`GlobalColor`): body `#2e1f0f` (`PARCHMENT_MATERIAL_TEXT_COLOR`), titles and accents
+  black (`PARCHMENT_MATERIAL_TITLETEXT_COLOR`), the hovered settings entry `#350000`
+  (`PARCHMENTLARGE_MATERIAL_TITLETEXT_COLOR`), good and bad `PARCHMENT_ACCESSIBILITY_GREEN` and
+  `_RED`, secondary and muted text the browns of its tabs' text and the paper's burnt edge, no
+  shadow, and a faint gold glow (35%) on the open settings entry. Its window titles follow the
+  palette; its section titles are black `GameFontNormal` without a shadow
+  (`Elements.SectionHeader`), and its close buttons are lettered in `GameFontBlack`.
 - **Slate** (`Slate`, a child of `Moonlight`): Moonlight's own default theme. Every window's
   background is Blizzard's marble (`Interface\FrameGeneral\UI-Background-Marble`, present on
   every client), tiled the way Blizzard tiles it (`HorizTile`, `VertTile`,
@@ -351,10 +379,8 @@ into the tab (the tab bar hangs 2 pixels into the window, `frames/tabs.lua`), te
 below the middle, a light hover:
 - Simple Dark: black, the window's 1px gray (0.5) edge, the selected tab 0.12 gray; text 0.7
   gray, white when selected or hovered (`GameFontHighlightSmall`).
-- Dark: the frame art's translucent black (0.55) in a 3px near-black edge, the selected tab
-  lighter (white at 0.1); gray and white text.
-- Dark Round: the frame art's black at 0.75 in its 2px #3c3b3c rim, which turns 0.55 gray on
-  the selected tab (`Selected.Border`).
+- Dark: translucent black (0.55) in a 3px near-black edge, the selected tab lighter (white at
+  0.1); gray and white text.
 - Parchment: a strip of `parchment.png`'s plain middle (TexCoords 0.25-0.75, 0.3-0.5), dimmed
   (0.8, 0.76, 0.7) until selected, in a 2px burnt-brown edge (#74492d); dark brown
   `GameFontNormalSmall` text without a shadow, darker when selected.
@@ -363,7 +389,7 @@ below the middle, a light hover:
   GW2's wine-red accent (`GW.Colors.Accent`) along the bottom of the selected tab.
 - Slate: the tiled marble in a 1px dark edge, a cool gray bar along the bottom of the selected
   tab.
-The colors of Dark, Dark Round and Parchment were read from the art's pixels. While a tab is
+The colors of Dark and Parchment were read from the art's pixels. While a tab is
 dragged, the reorder marker is as tall as the tabs (`tabs:UpdateDropPlaceholder`).
 
 Coverage: `spec/sonata/themes_spec.lua` (Base hidden, its geometry and fades per kind; Default's
@@ -376,6 +402,81 @@ button, Masque, item buttons, tabs, search box and buttons, bag layout; Guild Wa
 the bag's header, panel, footer and background, its title and close button, the side buttons,
 the other windows, the search box). Every file in
 `sonata/themes/` is listed in every TOC after Base (`spec/render/toc_spec.lua`).
+
+## 3c. Text roles (`Sonata:GetTextFont`, `CreateText`, `SetTextRole`, `SetButtonTextRole`)
+
+BetterBags' own text (the settings window and its panes, dialogs, the search category editor,
+the overlay search panel, the debug window's tabs, the bag footer's money and currency counts,
+the empty-group hint) is drawn with **text roles**: named fonts in the theme's `Text` table,
+each a font spec (§3). Before roles every such text hard-coded a client font and white, gold or
+gray, so no theme could change it, and on Parchment's light paper it was white on parchment.
+
+- **A font object is made once and never changed.** `Sonata:GetTextFont(role)` makes the
+  current theme's font object for a role the first time it is asked for (`CreateFont`, named
+  `BetterBagsText<Role><n>`, unique), styles it right away, and never touches it again.
+  `Sonata:CreateText(parent, role, layer?)` makes a font string drawn with a role,
+  `Sonata:SetTextRole(text, role)` switches a font string or edit box to a role, and
+  `Sonata:SetButtonTextRole(button, role)` sets a button's normal font object; all three record
+  the role (weak tables `texts`, `buttonTexts`). An unknown role errors.
+- **A theme makes new font objects and moves the text.** `ApplyTheme` (before windows and
+  elements) and every rescale of the client's fonts call `newTextFonts`: it starts an empty set
+  of role font objects and points every recorded text and button at its role's new one. Text
+  whose role the theme does not define keeps its font object. Old font objects stay as they
+  were (font objects cannot be destroyed; a theme switch leaves at most one unused object per
+  role behind). **Failure mode (fixed):** role font objects used to be restyled in place on
+  every theme switch, relying on a font object passing its changes to the text set to it. The
+  settings window is built before Sonata applies the saved theme, so its font objects were
+  changed while its text used them, and a text that then switched font objects (hovering a
+  settings entry: `Nav`, `NavHover`, back to `Nav`) came back out of step: the entry changed
+  size until a theme switch restyled everything together. Restyling only at a different moment
+  (re-copying on the client's rescale) did not fix it in game. The rule now: never change a font
+  object after it is made; make a new one. `Sonata:Init` starts empty registries.
+- **A role font is a copy of its client font.** `styleTextFont` copies the role's client font
+  with `Font:CopyFontObject`, then applies the role's color, shadow, file and justification;
+  never `Font:SetFontObject`, which makes a font inherit from another (Blizzard makes its own
+  runtime font objects by copying, `FontableFrameMixin.lua`). The client rescales its fonts with
+  `SetFontHeight` for the Text Size setting after `VARIABLES_LOADED` and whenever the setting
+  changes (`TextSizeManager.lua`), then sends `EventRegistry` `TextSizeManager.OnTextScaleUpdated`;
+  `Sonata:Init` registers for it (one callback, Sonata as the owner, so a new `Init` replaces it)
+  and makes new role fonts, so copies follow the client's sizes.
+- **Text drawn with a role must not set its own color or shadow** (`SetTextColor`,
+  `SetShadowColor`, `SetShadowOffset`): that overrides its font object. States switch roles
+  instead: the settings navigation is `Nav`, `NavHover`, `NavActive` (`NavSub*` for entries), a
+  theme's status `Positive`, `Description` or `Negative`, a profiler row `BodySmall` or
+  `MutedSmall`.
+- **Roles in Base** (`sonata/themes/base.lua`), each the client font its text used and its old
+  color: `Heading`, `Label`, `Description` (settings sections, option titles and descriptions);
+  `Title`, `Field`, `FieldSmall` (pane names and field labels, small headers); `Body`,
+  `BodySmall`, `BodyLarge`; `Muted`, `MutedSmall`, `Empty` (notes, captions, empty-pane
+  messages); `Positive`, `Negative`; the six `Nav` roles; `Search` (the overlay's typed text,
+  `GameFontNormalHuge`); `Count` and `Money` (the bag footer, `Number12Font`; money is
+  `NumberFontNormalRight` on Classic, a `Clients.Classic` override, as before). Near-identical
+  grays were merged (0.7 and 0.9 into the 0.75 and white roles, 0.5 into 0.6), and the theme
+  pane's "Unavailable" uses Blizzard's red text (`RED_FONT_COLOR`) instead of a dim red.
+- **The palette.** Roles take their colors from variables, so a theme recolors all its text by
+  setting them: `TextColor`, `TextSoftColor`, `TextMutedColor`, `TextAccentColor`,
+  `TextAccentHoverColor`, `TextPositiveColor`, `TextNegativeColor`, `TextShadow`, `TextGlow`
+  (a shadow with no offset). A theme can also restyle one role under `Text`.
+- **What keeps its own font:** input fields (their own field art), the in-bag search box (the
+  `SearchBox` element), item text on item buttons, item rows (quality colors), the bag-anchor
+  and section-drag frames (their own backdrops), and the flame graph and timeline canvases.
+- **Guard:** `spec/sonata/text_usage_spec.lua` fails when a file that draws this text sets a
+  color or shadow, makes text with a client font, or uses a fixed BetterBags or number font.
+  Specs whose code draws role text call `UseSonataTextRoles()` (`spec/helpers/addon_loader.lua`)
+  and give their `Database` a `GetTheme`.
+
+Coverage: `spec/sonata/text_spec.lua` (one named font per role, every role's Base look, a
+theme's palette reaching roles and the text set to them, switching roles, one role restyled,
+Classic money, new font objects per theme with text and buttons moved to them and the old ones
+unchanged, no font object changed after it is made (through theme switches and rescales), text
+on a role the new theme lacks, new role fonts at the client's sizes after a rescale, copies rather
+than inheriting fonts, one text-size callback across `Init`s, unknown roles),
+`spec/forms/stacked_text_spec.lua` (including a hovered settings entry after a theme application
+ending on the same font object as the entries never hovered),
+`spec/config/themepane_spec.lua`, `spec/frames/perfpane_spec.lua`, `spec/frames/money_spec.lua`,
+`spec/frames/debug_window_spec.lua`, `spec/frames/search_overlay_spec.lua`,
+`spec/frames/simulatepane_spec.lua`, and the Parchment and dark-theme tests in
+`spec/sonata/theme_ports_spec.lua`.
 
 ## 4. Load order
 

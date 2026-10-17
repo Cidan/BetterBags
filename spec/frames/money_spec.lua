@@ -11,12 +11,19 @@ events:Init()
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
 
+-- The money is drawn with Sonata's text roles, styled from the saved theme.
+local db, createdDatabase = StubBetterBagsModule("Database")
+local originalGetTheme = db.GetTheme
+db.GetTheme = function() return "Default" end
+local sonata = UseSonataTextRoles()
+
 ResetModuleStub("MoneyFrame", "frames/money.lua")
 LoadBetterBagsModule("frames/money.lua")
 local money = addon:GetModule("MoneyFrame")
 
 describe("Money Frame", function()
   before_each(function()
+    UseSonataTextRoles()
     _G._playerMoney = 1234567 -- 123 gold, 45 silver, 67 copper
     _G._depositedMoney = 9876543 -- 987 gold, 65 silver, 43 copper
     _G._lastPopupShown = nil
@@ -34,6 +41,15 @@ describe("Money Frame", function()
       assert.are.equal(m.copperButton:GetText(), "67")
       assert.are.equal(m.silverButton:GetText(), "45")
       assert.are.equal(m.goldButton:GetText(), "123")
+    end)
+
+    -- A theme colors the money through the Money text role (the bag footer sits on the
+    -- window's own background).
+    it("draws the amounts with the Money text role", function()
+      local m = money:Create(false)
+      for _, button in ipairs({ m.goldButton, m.silverButton, m.copperButton }) do
+        assert.are.equal(sonata:GetTextFont("Money"), button:GetNormalFontObject())
+      end
     end)
 
     it("creates warbank money frame correctly", function()
@@ -161,4 +177,9 @@ describe("Money Frame", function()
       assert.is_false(_G.GameTooltip._shown)
     end)
   end)
+end)
+
+teardown(function()
+  db.GetTheme = originalGetTheme
+  if createdDatabase then ResetModuleStub("Database") end
 end)

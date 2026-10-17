@@ -44,7 +44,7 @@ function backpack.proto:OnCreate(ctx)
 	self.bag.slots = slots
 
 	-- Currency icon grid (bottom of backpack)
-	self.bag.currencyIconGrid = currency:CreateIconGrid(self.bag.frame)
+	self.bag.currencyIconGrid = currency:CreateIconGrid(self.bag.frame, self.bag.bottomBar)
 
 
 	-- Group tabs

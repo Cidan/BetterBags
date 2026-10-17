@@ -15,6 +15,12 @@ LoadBetterBagsModule("core/context.lua")
 local animations = StubBetterBagsModule("Animations")
 animations.AttachFadeGroup = animations.AttachFadeGroup or function() return {}, {} end
 
+-- The layout draws its text with Sonata's text roles, styled from the saved theme.
+local db, createdDatabase = StubBetterBagsModule("Database")
+local originalGetTheme = db.GetTheme
+db.GetTheme = function() return "Default" end
+UseSonataTextRoles()
+
 LoadBetterBagsModule("forms/layouts/layout.lua")
 LoadBetterBagsModule("forms/layouts/stacked.lua")
 
@@ -51,6 +57,7 @@ end
 describe("stacked layout slider", function()
   local savedIsRetail
   before_each(function()
+    UseSonataTextRoles()
     savedIsRetail = addon.isRetail
     addon.isRetail = true
   end)
@@ -146,4 +153,9 @@ describe("stacked layout slider", function()
       assert.same({ 15 }, saved)
     end)
   end)
+end)
+
+teardown(function()
+  db.GetTheme = originalGetTheme
+  if createdDatabase then ResetModuleStub("Database") end
 end)

@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -68,13 +71,13 @@ function itemColorPane:Create(parent)
   local yOffset = 0
 
   -- Title
-  local title = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  local title = sonata:CreateText(content, "Title")
   title:SetPoint("TOPLEFT", 0, yOffset)
   title:SetText("Dynamic Item Level Colors")
   yOffset = yOffset - 30
 
   -- Description
-  local desc = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  local desc = sonata:CreateText(content, "Body")
   desc:SetPoint("TOPLEFT", 0, yOffset)
   desc:SetPoint("RIGHT", content, "RIGHT", 0, 0)
   desc:SetJustifyH("LEFT")
@@ -83,21 +86,21 @@ function itemColorPane:Create(parent)
   yOffset = yOffset - 50
 
   -- Current breakpoints info
-  pane.breakpointsLabel = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  pane.breakpointsLabel = sonata:CreateText(content, "Field")
   pane.breakpointsLabel:SetPoint("TOPLEFT", 0, yOffset)
   pane.breakpointsLabel:SetPoint("RIGHT", content, "RIGHT", 0, 0)
   pane.breakpointsLabel:SetJustifyH("LEFT")
   yOffset = yOffset - 150
 
   -- Color pickers section
-  local colorsTitle = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  local colorsTitle = sonata:CreateText(content, "Title")
   colorsTitle:SetPoint("TOPLEFT", 0, yOffset)
   colorsTitle:SetText("Color Configuration")
   yOffset = yOffset - 30
 
   -- Helper function to create color picker
   local function CreateColorPicker(colorKey, yPos)
-    local label = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local label = sonata:CreateText(content, "Field")
     label:SetPoint("TOPLEFT", 20, yPos)
     pane.colorPickerLabels[colorKey] = label
 
