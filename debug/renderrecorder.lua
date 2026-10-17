@@ -272,6 +272,33 @@ function recorder:WindowRendered(window)
   self:add({ kind = "render", window = tostring(window.frame:GetName()), lines = lines })
 end
 
+-- describeText describes a font string as drawn: its text, its font object, file and size, its
+-- width against its string's, its lines, and its parent's width.
+---@param text FontString
+---@return string
+local function describeText(text)
+  local path, size, flags = text:GetFont()
+  local fontObject = text:GetFontObject()
+  local parent = text:GetParent()
+  return string.format("%q font=%s %s %s %s | w=%s h=%s string=%s lines=%s truncated=%s wrap=%s | parent w=%s",
+    tostring(text:GetText()), fontObject and tostring(fontObject:GetName()) or "nil", tostring(path), num(size),
+    tostring(flags), num(text:GetWidth()), num(text:GetHeight()), num(text:GetStringWidth()),
+    tostring(text:GetNumLines()), tostring(text:IsTruncated()), tostring(text:CanWordWrap()),
+    parent and parent.GetWidth and num(parent:GetWidth()) or "?")
+end
+
+-- TextChanged adds a Sonata text whose font changed ("font") or that its watcher refit after it
+-- ("refit"), with its role.
+---@param text FontString|EditBox
+---@param role? string
+---@param step string
+function recorder:TextChanged(text, role, step)
+  if not self.recording or text.GetStringWidth == nil then
+    return
+  end
+  self:add({ kind = "text", step = step, role = tostring(role), line = describeText(text) })
+end
+
 -- WindowStep adds a step of a resize or a move, with the window's geometry.
 ---@param window BetterBagsWindow
 ---@param step string

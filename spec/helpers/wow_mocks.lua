@@ -807,6 +807,23 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetStringWidth()
     return #self._text * 6
   end
+  -- FontString:GetNumLines() -> numLines, IsTruncated() -> isTruncated, CanWordWrap() -> wrap
+  -- (SimpleFontStringAPIDocumentation). Lines as GetStringHeight counts them; never truncated.
+  function widget:GetNumLines()
+    local text = self._text or ""
+    if text == "" then return 0 end
+    local width = self:GetWidth()
+    if width > 0 then
+      return math.max(1, math.ceil(self:GetStringWidth() / width))
+    end
+    return 1
+  end
+  function widget:IsTruncated()
+    return false
+  end
+  function widget:CanWordWrap()
+    return self._wordWrap ~= false
+  end
   -- FontString:GetStringHeight() -> the height of the text as drawn: no text is 0; otherwise
   -- one line per GetWidth() worth of characters (6 pixels each, as GetStringWidth), times the
   -- line height. A stand-in for the client's text layout.

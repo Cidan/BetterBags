@@ -19,6 +19,13 @@ clicked.
   `resizing`, `rendered while resizing`, `resize stop`, `resize stopped`, `on screen`,
   `position saved`, `move start`, `move stopped`; window.md 3a) adds a `step` entry with the
   window's `Geometry`.
+- **Text font changes**: every change of a Sonata text's font object (`sonata:fontChanged`:
+  `SetTextRole`, a theme's or a client rescale's new font objects) adds a `text` entry with
+  step `font`; a text with a watcher (`WatchTextFont`, sonata.md 3c) adds `refit` after its
+  watcher ran, and `next frame` one frame later (a `SetWidth` is applied on the next update tick,
+  `QuestLogTitleButton_Resize`). Each holds the role and a line
+  `"<text>" font=<font object> <file> <size> <flags> | w= h= string= lines= truncated= wrap= |
+  parent w=`. Added when settings entries kept wrapping after their refit on WoW: Forever.
 - Costs nothing while stopped: the window checks `recorder.recording` (a field) and does nothing
   more. The profiler never wraps it (`ALWAYS_EXCLUDED` in `debug/perf/engine.lua`), so a capture
   running at the same time does not measure it.
@@ -44,8 +51,8 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
 
 `BetterBagsPerfDB.renderRecordings`: the newest last, at most `MAX_RECORDINGS` (5). A recording is
 `{ id, startedAt, stoppedAt, character, realm, gameVersion, gameBuild, full?, entries }`; an entry
-is `{ t = "<ms since start>", kind = "render", window, lines = { ... } }` or
-`{ t, kind = "step", window, step, geometry }`. A recording takes at most `MAX_ENTRIES` (20000)
+is `{ t = "<ms since start>", kind = "render", window, lines = { ... } }`,
+`{ t, kind = "step", window, step, geometry }` or `{ t, kind = "text", step, role, line }`. A recording takes at most `MAX_ENTRIES` (20000)
 entries and then sets `full`. `BetterBagsPerfDB` is separate from the AceDB profile, like the
 profiler's sessions; the recorder's `Init` runs right after `PerfSessions:Init` (initialization.md).
 Read offline from `WTF/Account/<ACCOUNT>/SavedVariables/BetterBags.lua`.

@@ -767,12 +767,27 @@ function sonata:WatchTextFont(text, fn)
   self.textWatchers[text] = fn
 end
 
+-- fontChanged runs the text's watcher, telling a running render recorder about the change, the
+-- refit, and the refit text a frame later: a SetWidth is applied on the next update tick
+-- (render-recorder.md).
 ---@private
 ---@param text FontString|EditBox
 function sonata:fontChanged(text)
+  local recorder = addon:GetModule('RenderRecorder', true)
+  local recording = recorder ~= nil and recorder.recording
+  if recording then
+    recorder:TextChanged(text, self.texts[text], "font")
+  end
   local watcher = self.textWatchers[text]
   if watcher ~= nil then
     watcher(text)
+    if recording then
+      local role = self.texts[text]
+      recorder:TextChanged(text, role, "refit")
+      C_Timer.After(0, function()
+        recorder:TextChanged(text, role, "next frame")
+      end)
+    end
   end
 end
 

@@ -222,6 +222,58 @@ describe("RenderRecorder", function()
     assert.is_truthy(text:find("  item 0_1 @92.0,100.0 37.0x37.0 item border=off padlock=false mouse=true glyph=none", 1, true), text)
   end)
 
+  -- Every change of a Sonata text's font while recording, and the refit its watcher made after
+  -- it (sonata.md 3c): the text, its font object, file and size, its width against the width of
+  -- its string, its lines, and its parent's width.
+  it("records each font change of a Sonata text, and its refit", function()
+    UseSonataTextRoles()
+    local button = CreateFrame("Button", nil, UIParent)
+    button:SetSize(100, 24)
+    local fs = sonata:CreateText(button, "Body")
+    fs:SetText("  Import/Export")
+    local watched = sonata:CreateText(button, "Body")
+    watched:SetText("Profiles")
+    sonata:WatchTextFont(watched, function(t) t:SetWidth(0) end)
+    sonata:SetTextRole(fs, "Heading")
+    assert.are.equal(0, recorder:GetEntryCount())
+    recorder:Start()
+    sonata:SetTextRole(fs, "Body")
+    sonata:SetTextRole(watched, "Heading")
+    local recording = recorder:Stop()
+    local steps = {}
+    for _, e in ipairs(recording.entries) do
+      assert.are.equal("text", e.kind)
+      table.insert(steps, e.role .. " " .. e.step)
+    end
+    assert.are.same({ "Body font", "Heading font", "Heading refit" }, steps)
+    local line = recording.entries[1].line
+    local fontName = sonata:GetTextFont("Body"):GetName()
+    for _, want in ipairs({ '"  Import/Export"', "font=" .. fontName, "w=", "string=90.0", "lines=", "truncated=false",
+      "wrap=", "parent w=100.0" }) do
+      assert.is_truthy(line:find(want, 1, true), want .. " in " .. line)
+    end
+  end)
+
+  -- A SetWidth is not applied until the next update tick (QuestLogTitleButton_Resize), so a refit
+  -- text is recorded again a frame later.
+  it("records a refit text again on the next frame", function()
+    UseSonataTextRoles()
+    local pending = {}
+    local originalAfter = _G.C_Timer.After
+    _G.C_Timer.After = function(_, fn) table.insert(pending, fn) end
+    local fs = sonata:CreateText(CreateFrame("Button", nil, UIParent), "Body")
+    fs:SetText("Import/Export")
+    sonata:WatchTextFont(fs, function(t) t:SetWidth(0) end)
+    recorder:Start()
+    sonata:SetTextRole(fs, "Heading")
+    for _, fn in ipairs(pending) do fn() end
+    _G.C_Timer.After = originalAfter
+    local recording = recorder:Stop()
+    local steps = {}
+    for _, e in ipairs(recording.entries) do table.insert(steps, e.step) end
+    assert.are.same({ "font", "refit", "next frame" }, steps)
+  end)
+
   it("records each step of a resize and a move with the window's geometry", function()
     local w = newWindow({ 640, 480 })
     w:Show(context:New("spec"))
