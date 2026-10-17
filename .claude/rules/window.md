@@ -189,13 +189,13 @@ canvas pinned the content to its left edge whatever width it was given.
   footer then sits right under the last row as the search box sits over the first (the insets
   are the title bar plus the search box's reserve, and the theme's edge plus the footer's
   reserve). Content taller than the window keeps the player's height and scrolls. Either side
-  can snap alone. The height bounces too, but off the content rather than past it: below the
-  content there is no room like the scroll room beside it, so passing the content's height would
-  cut its bottom row for a moment. `SnapReboundAt` is the width's curve (`SnapSizeAt`) folded at
-  the target: the bottom edge comes up to the content, rebounds by up to 10 % of the distance (at
-  most 10 px), and settles back on it. The rebound peaks at the moment the width is furthest past
-  its target, so the two move together (700x500 to 412x345: the bottom meets the content at about
-  144 ms, both peak at 224 ms, both settle at 352 ms).
+  can snap alone. The height uses the width's bounce (`SnapSizeAt`, asked for by name): past its
+  target by 10 % of the distance (at most 10 px, never below the minimum) and back, on the same
+  frames (700x500 to 412x345: both are furthest past at 224 ms, 402 and 335, and both settle at
+  352 ms). Below the content there is no room like the scroll room beside it, so at the bottom of
+  the bounce the last row slides under the bottom edge by that much; the auto-hiding bar stays
+  hidden. A side that does not snap never moves, even when a minimum (they can be functions) rose
+  above it before the release: each overshoot is floored at zero.
 - **The reported height is the height of what is drawn.** An empty canvas container is kept 1
   pixel tall, and the containers used to hang from the bottom of the one above, so with no Recent
   Items the view and Free Space sat a pixel lower than the canvas's reported height. A content-

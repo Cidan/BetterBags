@@ -806,50 +806,83 @@ describe("Window", function()
           assert.is_not_nil(w.snapDriver:GetScript("OnUpdate"))
         end)
 
-        it("never snaps shorter than its minimum", function()
+        it("never snaps or bounces shorter than its minimum", function()
           local w = snapping(fitting(400, 20))
           resizeTo(w, 700, 500)
           local list = heights(w)
           for _, height in ipairs(list) do assert.is_true(height >= 100, tostring(height)) end
           assert.are.same({ 412, 100 }, saveSize)
+          local near = snapping(fitting(400, 57))
+          resizeTo(near, 700, 500)
+          list = heights(near)
+          for _, height in ipairs(list) do assert.is_true(height >= 100, tostring(height)) end
+          assert.are.same({ 412, 102 }, saveSize)
         end)
 
-        -- A bounce past the content's height would cut its bottom row for a moment (there is no room
-        -- below the content like the scroll room beside it), so the bottom edge bounces off the
-        -- content instead: it comes up to it, rebounds, and settles back on it.
-        it("bounces off its content without passing it, in the time the width takes", function()
+        -- The width's bounce: past its target by 10 % of the distance (at most 10 px) and back, on
+        -- the same frames as the width. There is no room below the content like the scroll room
+        -- beside it, so at the bottom of the bounce the last row slides under the bottom edge.
+        it("bounces like its width: past its content and back, in step with it", function()
           local w = snapping(fitting(400, 300))
           resizeTo(w, 700, 500)
-          local list = heights(w)
-          for _, height in ipairs(list) do assert.is_true(height >= 345, tostring(height)) end
-          -- The low point where it meets the content (a frame can step over the contact itself), then
-          -- the rebound above it.
-          local low
-          for i = 2, #list - 1 do
-            if list[i] < list[i - 1] and list[i] <= list[i + 1] then low = i break end
+          local sizes = {}
+          for _ = 1, 200 do
+            local update = w.snapDriver:GetScript("OnUpdate")
+            if update == nil then break end
+            update(w.snapDriver, 0.016)
+            table.insert(sizes, { w.frame:GetWidth(), w.frame:GetHeight() })
+            advance()
           end
-          assert.is_not_nil(low, "comes down to its content, then rebounds")
-          assert.is_true(list[low] - 345 < 6, tostring(list[low]))
-          local rebound = 0
-          for i = low, #list do rebound = math.max(rebound, list[i] - 345) end
-          assert.is_true(rebound > 3 and rebound <= 10, tostring(rebound))
-          assert.are.equal(345, list[#list])
-          assert.is_true(#list >= 15 and #list <= 30, tostring(#list))
+          local low, lowAt, narrow, narrowAt = math.huge, 0, math.huge, 0
+          for i, step in ipairs(sizes) do
+            if step[2] < low then low, lowAt = step[2], i end
+            if step[1] < narrow then narrow, narrowAt = step[1], i end
+          end
+          assert.is_true(low < 345 and low >= 345 - 10, tostring(low))
+          assert.is_true(345 - low > 9, "the full 10 px for this distance: " .. tostring(low))
+          for i = 2, lowAt do assert.is_true(sizes[i][2] <= sizes[i - 1][2], "shrinks to the bounce") end
+          for i = lowAt + 1, #sizes do assert.is_true(sizes[i][2] >= sizes[i - 1][2], "settles from the bounce") end
+          assert.are.equal(narrowAt, lowAt, "in step with the width")
+          assert.are.equal(345, sizes[#sizes][2])
+          assert.is_true(#sizes >= 15 and #sizes <= 30, tostring(#sizes))
         end)
 
-        it("rebounds in step with the width's bounce, never below where it ends", function()
-          assert.are.equal(500, window.SnapReboundAt(500, 345, 10, 0))
-          assert.are.equal(345, window.SnapReboundAt(500, 345, 10, 1))
-          assert.are.equal(355, window.SnapReboundAt(500, 345, 10, 0.65))
-          assert.are.equal(402, window.SnapSizeAt(700, 412, 10, 0.65))
-          local previous = 500
-          for i = 1, 100 do
-            local height = window.SnapReboundAt(500, 345, 10, i / 100)
-            assert.is_true(height >= 345, tostring(height))
-            assert.is_true(math.abs(height - previous) < 40, "no jumps")
-            previous = height
+        -- Minimums can be functions: one can rise above the window's size before the release. The
+        -- side under its minimum does not snap, and it must not bounce with the side that does.
+        it("keeps a side under a minimum that rose still while the other side snaps", function()
+          local minWidth, minHeight = 260, 100
+          local function release(w, width, height)
+            w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
+            w.frame:SetSize(width, height)
+            w.frame:GetScript("OnSizeChanged")(w.frame, width, height)
           end
-          assert.are.equal(345, window.SnapReboundAt(345, 345, 0, 0.65), "a side that does not snap stays")
+          local function sizesOf(w)
+            local list = {}
+            for _ = 1, 200 do
+              local update = w.snapDriver:GetScript("OnUpdate")
+              if update == nil then break end
+              update(w.snapDriver, 0.016)
+              table.insert(list, { w.frame:GetWidth(), w.frame:GetHeight() })
+              advance()
+            end
+            return list
+          end
+          local opts = { MinWidth = function() return minWidth end, MinHeight = function() return minHeight end }
+
+          local tall = snapping(fitting(400, 800), opts)
+          release(tall, 700, 500)
+          minHeight = 600
+          tall.resizeGrip:GetScript("OnMouseUp")(tall.resizeGrip, "LeftButton")
+          for _, step in ipairs(sizesOf(tall)) do assert.are.equal(500, step[2]) end
+          assert.are.same({ 412, 500 }, saveSize)
+
+          minWidth, minHeight = 260, 100
+          local wide = snapping(fitting(900, 300), opts)
+          release(wide, 700, 500)
+          minWidth = 800
+          wide.resizeGrip:GetScript("OnMouseUp")(wide.resizeGrip, "LeftButton")
+          for _, step in ipairs(sizesOf(wide)) do assert.are.equal(700, step[1]) end
+          assert.are.same({ 700, 345 }, saveSize)
         end)
 
         it("ends the snap at its height when the player grabs the grip", function()

@@ -129,7 +129,7 @@ local DEFAULT_GRIP = {
 ---@field sizing? boolean The player is sizing it (between the grip's mouse down and up).
 ---@field fitWidth? number The narrowest width its content lays out the same in, from the last render.
 ---@field fitHeight? number The height that shows all of its content without scrolling, from the last render.
----@field snap? {from: number, to: number, overshoot: number, fromHeight: number, toHeight: number, rebound: number, elapsed: number, contentWidth: number} The snap running.
+---@field snap? {from: number, to: number, overshoot: number, fromHeight: number, toHeight: number, overshootHeight: number, elapsed: number, contentWidth: number} The snap running.
 ---@field snapDriver? Frame Steps a snap each frame.
 ---@field opts WindowOptions
 local windowProto = drawable:Extend({}, 'WindowFrame')
@@ -155,18 +155,6 @@ function window.SnapSizeAt(from, to, overshoot, p)
   end
   local q = (p - SNAP_TURN) / (1 - SNAP_TURN)
   return low + overshoot * q * q * (3 - 2 * q)
-end
-
--- SnapReboundAt is SnapSizeAt folded at to: where SnapSizeAt passes to, this comes back off it
--- by as much, so it reaches to, rebounds by up to overshoot at the same moment SnapSizeAt is
--- furthest past it, and settles on to. It never goes past to.
----@param from number
----@param to number
----@param overshoot number
----@param p number
----@return number
-function window.SnapReboundAt(from, to, overshoot, p)
-  return to + math.abs(window.SnapSizeAt(from, to, overshoot, p) - to)
 end
 
 ---@param value number|false|nil|fun(): number
@@ -953,15 +941,13 @@ function windowProto:startSnap(ctx)
     frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
   end
   local insets = self:GetContentInsets()
-  -- The height rebounds off its target instead of passing it: there is no room below the
-  -- content, as there is beside it, so passing it would cut the content's bottom row.
   self.snap = {
     from = from,
     to = to,
     overshoot = math.max(0, math.min(SNAP_OVERSHOOT, (from - to) * SNAP_OVERSHOOT_SHARE, to - minWidth)),
     fromHeight = fromHeight,
     toHeight = toHeight,
-    rebound = math.min(SNAP_OVERSHOOT, (fromHeight - toHeight) * SNAP_OVERSHOOT_SHARE),
+    overshootHeight = math.max(0, math.min(SNAP_OVERSHOOT, (fromHeight - toHeight) * SNAP_OVERSHOOT_SHARE, toHeight - minHeight)),
     elapsed = 0,
     contentWidth = to - insets.Left - insets.Right,
   }
@@ -990,7 +976,7 @@ function windowProto:stepSnap(elapsed)
   snap.elapsed = snap.elapsed + elapsed
   local p = math.min(1, snap.elapsed / SNAP_DURATION)
   self.frame:SetSize(window.SnapSizeAt(snap.from, snap.to, snap.overshoot, p),
-    window.SnapReboundAt(snap.fromHeight, snap.toHeight, snap.rebound, p))
+    window.SnapSizeAt(snap.fromHeight, snap.toHeight, snap.overshootHeight, p))
   self:Invalidate()
   if p >= 1 then
     self:FinishSnap()
