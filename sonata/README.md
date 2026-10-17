@@ -8,7 +8,7 @@ theme cleanly when the player switches.
 
 The themes BetterBags ships are in this folder's `themes/` directory and are the best
 examples: `base.lua` (what every theme inherits), `default.lua` (Blizzard's look),
-`simpledark.lua`, `moonlight.lua` (Dark, Dark Round, Parchment and Slate, sharing one hidden
+`simpledark.lua`, `moonlight.lua` (Dark, Parchment and Slate, sharing one hidden
 parent), `elvui.lua` and `gw2.lua`
 (themes that depend on another addon and read its settings through variables).
 

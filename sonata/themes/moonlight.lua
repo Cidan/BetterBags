@@ -8,8 +8,8 @@ local sonata = addon:GetModule('Sonata')
 
 -- The Moonlight set, from BetterBags' sister addon Moonlight: every window drawn in one
 -- nine-sliced frame of art (textures/moonlight), titled in white at the top left, with a
--- lettered close button. The hidden Moonlight theme holds the geometry; Dark, Dark Round and
--- Parchment choose the art ($Frame, $SliceMode), and Parchment hangs a ribbon over the bag.
+-- lettered close button. The hidden Moonlight theme holds the geometry and Dark's frame;
+-- Parchment chooses its own art ($Frame, $SliceMode) and hangs a ribbon over the bag.
 -- Slate is Moonlight's own default: Blizzard's marble, tiled, with no frame art.
 local ART = "Interface\\AddOns\\BetterBags\\textures\\moonlight\\"
 
@@ -127,33 +127,11 @@ sonata:RegisterTheme({
   Description = "A dark frame, from Moonlight.",
   Parent = "Moonlight",
   Elements = {
-    -- The frame's translucent black inside its heavy black edge; the selected tab lighter.
+    -- Translucent black inside the frame's heavy black edge; the selected tab lighter.
     Tab = tab(2, {
       Background = { Color = { 0, 0, 0, 0.55 } },
       Border = { Color = { 0.01, 0.01, 0.01, 1 }, EdgeSize = 3 },
       Selected = { Background = { Color = { 1, 1, 1, 0.1 } } },
-      Font = GRAY_TEXT,
-      HighlightFont = WHITE_TEXT,
-      SelectedFont = WHITE_TEXT,
-    }),
-  },
-})
-
-sonata:RegisterTheme({
-  Name = "DarkRound",
-  DisplayName = "Dark Round",
-  Description = "A dark frame with round corners, from Moonlight.",
-  Parent = "Moonlight",
-  Variables = { Frame = ART .. "dark-round.png" },
-  Elements = {
-    -- The frame's dark fill inside its #3c3b3c rim; the selected tab's rim brighter.
-    Tab = tab(2, {
-      Background = { Color = { 0, 0, 0, 0.75 } },
-      Border = { Color = { 0.235, 0.231, 0.235, 1 }, EdgeSize = 2 },
-      Selected = {
-        Background = { Color = { 1, 1, 1, 0.06 } },
-        Border = { Color = { 0.55, 0.55, 0.55, 1 } },
-      },
       Font = GRAY_TEXT,
       HighlightFont = WHITE_TEXT,
       SelectedFont = WHITE_TEXT,

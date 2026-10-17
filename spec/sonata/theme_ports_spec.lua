@@ -139,10 +139,13 @@ describe("BetterBags' other themes", function()
   describe("the Moonlight set", function()
     local ART = "Interface\\AddOns\\BetterBags\\textures\\moonlight\\"
 
-    it("lists Dark, Dark Round and Parchment, built on a hidden Moonlight base", function()
+    -- Dark Round was folded into Dark: Dark kept its square frame and tabs and took Dark Round's
+    -- darker fill (black at 0.75, baked into dark-frame.png).
+    it("lists Dark and Parchment, built on a hidden Moonlight base, and no Dark Round", function()
       local all = sonata:GetAllThemes()
       assert.is_nil(all.Moonlight)
-      for key, name in pairs({ Dark = "Dark", DarkRound = "Dark Round", Parchment = "Parchment" }) do
+      assert.is_nil(sonata:GetTheme("DarkRound"))
+      for key, name in pairs({ Dark = "Dark", Parchment = "Parchment" }) do
         assert.is_not_nil(all[key], key)
         assert.are.equal(name, sonata:GetTheme(key).DisplayName)
         assert.are.equal("Moonlight", sonata:GetTheme(key).Parent)
@@ -150,8 +153,7 @@ describe("BetterBags' other themes", function()
     end)
 
     it("frames every window in its art, nine-sliced, with Moonlight's content box", function()
-      for key, art in pairs({ Dark = { "dark-frame.png", "Tiled" },
-        DarkRound = { "dark-round.png", "Tiled" }, Parchment = { "parchment.png", "Stretched" } }) do
+      for key, art in pairs({ Dark = { "dark-frame.png", "Tiled" }, Parchment = { "parchment.png", "Stretched" } }) do
         local bag, panel = newWindow("Bag"), newWindow("Panel")
         apply(key)
         for _, w in ipairs({ bag, panel }) do
@@ -213,12 +215,13 @@ describe("BetterBags' other themes", function()
       assert.are.same({ "BOTTOM", ribbon, "BOTTOM", 0, 25 }, { title:GetPoint(1) })
     end)
 
-    it("ships its art with BetterBags", function()
-      for _, file in ipairs({ "dark-frame.png", "dark-round.png", "parchment.png", "parchment-ribbon.png" }) do
+    it("ships the art it uses with BetterBags, and not Dark Round's frame", function()
+      for _, file in ipairs({ "dark-frame.png", "parchment.png", "parchment-ribbon.png" }) do
         local f = io.open("textures/moonlight/" .. file, "rb")
         assert.is_not_nil(f, file)
         f:close()
       end
+      assert.is_nil(io.open("textures/moonlight/dark-round.png", "rb"))
     end)
   end)
 
@@ -560,7 +563,7 @@ describe("BetterBags' other themes", function()
     end)
 
     it("keeps Base's white text on the dark themes", function()
-      for _, key in ipairs({ "Dark", "DarkRound", "Slate", "SimpleDark" }) do
+      for _, key in ipairs({ "Dark", "Slate", "SimpleDark" }) do
         apply(key)
         assert.are.same({ 1, 1, 1, 1 }, roleColor("Body"), key)
         assert.are.same({ 1, 0.82, 0, 1 }, roleColor("Title"), key)
@@ -608,7 +611,7 @@ describe("BetterBags' other themes", function()
     end
 
     it("hides Blizzard's tab art on every theme with its own tabs, and sizes them alike", function()
-      for _, key in ipairs({ "SimpleDark", "Dark", "DarkRound", "Parchment", "GW2", "Slate" }) do
+      for _, key in ipairs({ "SimpleDark", "Dark", "Parchment", "GW2", "Slate" }) do
         local tab = tabFor(key)
         assert.are.equal(0, tab.Left:GetAlpha(), key)
         assert.are.equal(0, tab.LeftActive:GetAlpha(), key)
@@ -642,18 +645,6 @@ describe("BetterBags' other themes", function()
       elements:SetTabState(tab, "selected")
       assert.are.same({ 1, 1, 1, 0.1 }, rgba(skin.selectedFill._colorTexture))
       assert.are.same({ 1, 1, 1, 1 }, textColor(tab))
-    end)
-
-    it("draws Dark Round's tabs in the frame's dark fill and rim, the selected rim brighter", function()
-      local tab = tabFor("DarkRound")
-      local skin = tab.sonataSkin
-      assert.are.same({ 0, 0, 0, 0.75 }, rgba(skin.fill._colorTexture))
-      assert.are.same({ 0.235, 0.231, 0.235, 1 }, rgba(skin.edges[1]._colorTexture))
-      assert.are.equal(2, skin.edges[1]:GetHeight())
-      elements:SetTabState(tab, "selected")
-      assert.are.same({ 0.55, 0.55, 0.55, 1 }, rgba(skin.edges[1]._colorTexture))
-      elements:SetTabState(tab, "normal")
-      assert.are.same({ 0.235, 0.231, 0.235, 1 }, rgba(skin.edges[1]._colorTexture))
     end)
 
     it("cuts Parchment's tabs from its paper, dimmed until selected, in a burnt edge and brown text", function()

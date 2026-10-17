@@ -227,11 +227,11 @@ describe("Database Migration", function()
     end)
   end)
 
-  -- The Moonlight themes were first released as MoonlightDark, MoonlightDarkRound and
-  -- MoonlightParchment; a profile that chose one keeps it under its new key.
+  -- The Moonlight themes were first released as MoonlightDark and MoonlightParchment; a
+  -- profile that chose one keeps it under its new key.
   describe("renamed Moonlight theme keys", function()
     it("moves a saved Moonlight theme to its new key", function()
-      for old, new in pairs({ MoonlightDark = "Dark", MoonlightDarkRound = "DarkRound", MoonlightParchment = "Parchment" }) do
+      for old, new in pairs({ MoonlightDark = "Dark", MoonlightParchment = "Parchment" }) do
         DB.data.profile.theme = old
         DB:Migrate()
         assert.are.equal(new, DB.data.profile.theme, old)

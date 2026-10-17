@@ -297,17 +297,25 @@ overlay search panel).
   backdrop. The bag's search box sits at 20, -40 to -10, -60 and the menu button at 4, -6 with
   its art at 85% (`BagButton` portrait and highlight 40.8 x 51); section titles
   `UnitFrame12White`.
-- **The Moonlight set** (`Dark`, `DarkRound`, `Parchment`, shown as Dark, Dark Round and
-  Parchment, children of the hidden `Moonlight`; first released as `MoonlightDark`,
-  `MoonlightDarkRound`, `MoonlightParchment`, which `DB:Migrate` moves to the new keys): Moonlight's art, shipped in `textures\moonlight\`, nine-sliced with
-  24px margins as every window's `Background` (`$Frame`, `$SliceMode`: tiled dark frame, tiled
-  round dark frame, stretched parchment), content insets 18, 24, 40, 12,
+- **The Moonlight set** (`Dark` and `Parchment`, children of the hidden `Moonlight`; first
+  released as `MoonlightDark` and `MoonlightParchment`, which `DB:Migrate` moves to the new keys.
+  A third, Dark Round, was removed; Dark took its darker fill): Moonlight's art, shipped in
+  `textures\moonlight\`, nine-sliced with 24px margins as every window's `Background` (`$Frame`,
+  `$SliceMode`: Dark's tiled square frame `dark-frame.png`, Moonlight's default, or Parchment's
+  stretched paper), content insets 18, 24, 40, 12,
   `GameFontHighlight` titles in the text palette (`$TextColor`, `$TextShadow`: white with a black
   shadow on the dark themes) at TOPLEFT 44, -15 (20, -15 on dialogs), and a 32px close button
   lettered "X" (`CloseButton.Font`, §3). The bag's search box sits at 18, -40 to -24, -60
   (reserve 24), its footer at 18, 24, bottom 12, and a 32px menu button (art 32 x 40) at 8, -6.
   Parchment hangs its 281 x 84 ribbon over the bag (BOTTOM 40 below the window's TOP) and
   centers the bag's title on it.
+  **Dark's fill** is Dark Round's: black at 0.75 (`0,0,0,192`) inside the frame's border, where
+  Moonlight's frame had black at 0.30. It is baked into `dark-frame.png`: every pixel inside the
+  border's solid black band (found by filling from the center up to the band) had its alpha
+  remapped so the band's inner fade (pixels 10-15 from each edge) runs from 255 down to the new
+  192 instead of to 77, and the fill itself became pure black at 192. The border, its band and
+  the soft shadow outside it are unchanged, pixel for pixel. Dark Round's art, `dark-round.png`
+  (a round #3c3b3c rim around the same fill), is no longer shipped.
   **Parchment's text** (§3c) is dark, in Blizzard's parchment text colors from the game's color
   table (`GlobalColor`): body `#2e1f0f` (`PARCHMENT_MATERIAL_TEXT_COLOR`), titles and accents
   black (`PARCHMENT_MATERIAL_TITLETEXT_COLOR`), the hovered settings entry `#350000`
@@ -367,10 +375,8 @@ into the tab (the tab bar hangs 2 pixels into the window, `frames/tabs.lua`), te
 below the middle, a light hover:
 - Simple Dark: black, the window's 1px gray (0.5) edge, the selected tab 0.12 gray; text 0.7
   gray, white when selected or hovered (`GameFontHighlightSmall`).
-- Dark: the frame art's translucent black (0.55) in a 3px near-black edge, the selected tab
-  lighter (white at 0.1); gray and white text.
-- Dark Round: the frame art's black at 0.75 in its 2px #3c3b3c rim, which turns 0.55 gray on
-  the selected tab (`Selected.Border`).
+- Dark: translucent black (0.55) in a 3px near-black edge, the selected tab lighter (white at
+  0.1); gray and white text.
 - Parchment: a strip of `parchment.png`'s plain middle (TexCoords 0.25-0.75, 0.3-0.5), dimmed
   (0.8, 0.76, 0.7) until selected, in a 2px burnt-brown edge (#74492d); dark brown
   `GameFontNormalSmall` text without a shadow, darker when selected.
@@ -379,7 +385,7 @@ below the middle, a light hover:
   GW2's wine-red accent (`GW.Colors.Accent`) along the bottom of the selected tab.
 - Slate: the tiled marble in a 1px dark edge, a cool gray bar along the bottom of the selected
   tab.
-The colors of Dark, Dark Round and Parchment were read from the art's pixels. While a tab is
+The colors of Dark and Parchment were read from the art's pixels. While a tab is
 dragged, the reorder marker is as tall as the tabs (`tabs:UpdateDropPlaceholder`).
 
 Coverage: `spec/sonata/themes_spec.lua` (Base hidden, its geometry and fades per kind; Default's
