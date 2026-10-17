@@ -137,6 +137,14 @@ describe("Constants Module Offsets", function()
     assert.is_true(count >= 4)
   end)
 
+  -- Items, sections and rows only glide to their new places when the player turns it on
+  -- (render-pipeline.md §4c).
+  it("leaves animating item movement off by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    assert.is_false(const.DATABASE_DEFAULTS.profile.animateItemMovement)
+  end)
+
   it("should have SCROLLBAR_WIDTH defined in the era constants offsets", function()
     loadfile("core/constants.lua")("BetterBags")
     loadfile("core/era/constants.lua")("BetterBags")

@@ -28,9 +28,10 @@ local motion = addon:GetModule('Motion')
 -- at a width is also the one chosen at that layout's own width (FitWidth), which is what a window
 -- snaps to (window.md 3b).
 --
--- Each render while the canvas is shown is a Motion pass (render/motion.lua): every section, item
--- and container whose place changed travels there, the rest stay put. A hidden canvas places
--- everything at once, and hiding ends its moves and forgets them, so a bag never opens mid-move.
+-- With Animate Item Movement on, each render while the canvas is shown is a Motion pass
+-- (render/motion.lua): every section, item and container whose place changed travels there, the
+-- rest stay put. Otherwise, and while hidden, it places everything at once; hiding ends its moves
+-- and forgets them, so a bag never opens mid-move.
 ---@class BagCanvas: AceModule
 local bagCanvas = addon:NewModule('BagCanvas')
 
@@ -256,8 +257,8 @@ function canvasProto:Render(parentResult)
   local plan = self:Plan(plannedFor)
   self.plan = plan
   self.plannedFor = plannedFor
-  local shown = self.frame:IsVisible()
-  if shown then
+  local animated = self.frame:IsVisible() and database:GetAnimateItemMovement()
+  if animated then
     motion:BeginPass(self)
   else
     motion:Forget(self)
@@ -275,7 +276,7 @@ function canvasProto:Render(parentResult)
   if view ~= nil then
     bag.currentView:Arrange(view)
   end
-  if shown then
+  if animated then
     motion:EndPass()
   end
 

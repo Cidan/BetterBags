@@ -183,7 +183,14 @@ bags, densest, measures kept and forgotten, centering). Every guard was mutation
 
 **Asked:** rows, sections and item buttons move to their new places instead of jumping, and only
 what changed place moves: a section alone, an item alone, or any mix. The motion eases slow, fast,
-slow.
+slow. It is an option, off by default (asked).
+
+- **The setting.** "Animate Item Movement" (`config/config.lua`, right below Enable Bag Fading),
+  one profile flag for both bags: `animateItemMovement`, `false` in `const.DATABASE_DEFAULTS`,
+  `DB:GetAnimateItemMovement()` / `SetAnimateItemMovement`. The canvas reads it on every render, so
+  changing it needs no refresh: off, the next render forgets the canvas (moves end at their
+  targets) and places at once; on, the first render after places at once and the ones after move.
+  Specs that render a canvas with a stubbed database stub it off.
 
 - **One function places the bag's frames.** `Motion:Place(frame, relativeTo, x, y)` anchors a
   frame's TOPLEFT to `relativeTo`'s TOPLEFT at an offset. Every grid cell goes through it
@@ -216,8 +223,8 @@ slow.
   new parent is already anchored where it visually starts: its old spot when it is moving, its final
   spot when it just appeared. So an item also travels into a section that appeared in the same draw.
   Before the reorder, sections were placed after their items.
-- **Visibility.** The canvas runs a pass only while its frame `IsVisible()`; a hidden canvas
-  `Forget`s itself and places at once. Its own `OnHide` (every way a bag closes, a fade included)
+- **Visibility.** The canvas runs a pass only while its frame `IsVisible()` and the setting is
+  on; otherwise it `Forget`s itself and places at once. Its own `OnHide` (every way a bag closes, a fade included)
   calls `Forget`, which ends its moves at their targets, so a bag never opens mid-move and the first
   render after it opens places everything at once. The header container (centering) is never
   animated: it follows the window as it is resized.
@@ -243,9 +250,12 @@ stays, an item carried to another section and into a section that just appeared,
 it was), `spec/frames/grid_spec.lua` ("Grid cells in motion"), `spec/frames/section_spec.lua`
 ("where its cells start"), `spec/views/gridview_spec.lua` ("places its sections before their
 items"), `spec/frames/bagcanvas_spec.lua` ("in motion": containers slide when Recent Items appears,
-only while shown, forgotten on hide, the pass closed, containers before contents, the header never
+only while shown and turned on, forgotten on hide, the pass closed, containers before contents, the header never
 moves), `spec/debug/render_recorder_spec.lua` ("says which sections, items and containers are
-moving"). Every guard was mutation-tested (30 mutations; each that first survived led to a test or
+moving"), `spec/core/constants_spec.lua` ("leaves animating item movement off by default"),
+`spec/database_spec.lua` ("GetAnimateItemMovement / SetAnimateItemMovement"),
+`spec/config/config_redraw_spec.lua` ("turns Animate Item Movement on and off"). Every guard was
+mutation-tested (30 mutations; each that first survived led to a test or
 to removing dead code).
 
 The frame mock was made faithful for this (spec/helpers/wow_mocks.lua): `SetAllPoints` sets

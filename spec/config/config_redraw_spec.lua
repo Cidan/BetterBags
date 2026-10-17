@@ -278,6 +278,30 @@ describe("Config settings refreshes", function()
     end
   end)
 
+  -- The bag's canvas reads it on every render (render-pipeline.md §4c): nothing to redraw when it
+  -- changes. One setting for both bags, right below Enable Bag Fading.
+  it("turns Animate Item Movement on and off, below Enable Bag Fading, with no refresh", function()
+    local on = false
+    saved[#saved + 1] = { db, "GetAnimateItemMovement", db.GetAnimateItemMovement }
+    saved[#saved + 1] = { db, "SetAnimateItemMovement", db.SetAnimateItemMovement }
+    db.GetAnimateItemMovement = function() return on end
+    db.SetAnimateItemMovement = function(_, value) on = value end
+    local found = settings("Animate Item Movement")
+    assert.are.equal(1, #found)
+    local opts = found[1]
+    sent = {}
+    assert.is_false(opts.getValue(context:New("Test")))
+    opts.setValue(context:New("Test"), true)
+    assert.is_true(on)
+    assert.is_true(opts.getValue(context:New("Test")))
+    assert.are.same({}, messages())
+    for i, entry in ipairs(entries) do
+      if entry.opts.title == "Animate Item Movement" then
+        assert.are.equal("Enable Bag Fading", entries[i - 1].opts.title)
+      end
+    end
+  end)
+
   describe("opacity and scale", function()
     local windows, savedValues, opacityUpdates
 

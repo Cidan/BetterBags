@@ -90,6 +90,7 @@ const.DATABASE_DEFAULTS = {
     firstTimeMenu = true,
     enabled = true,
     enableBagFading = false,
+    animateItemMovement = false,
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
@@ -226,6 +227,14 @@ describe("Database", function()
     it("GetShowBankTabs / SetShowBankTabs", function()
       DB:SetShowBankTabs(true)
       assert.is_true(DB:GetShowBankTabs())
+    end)
+
+    it("GetAnimateItemMovement / SetAnimateItemMovement, off until turned on", function()
+      assert.is_false(DB:GetAnimateItemMovement())
+      DB:SetAnimateItemMovement(true)
+      assert.is_true(DB:GetAnimateItemMovement())
+      DB:SetAnimateItemMovement(false)
+      assert.is_false(DB:GetAnimateItemMovement())
     end)
 
     it("GetEnableBagFading / SetEnableBagFading", function()

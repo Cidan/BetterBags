@@ -171,6 +171,18 @@ function DB:GetEnableBagFading()
   return DB.data.profile.enableBagFading
 end
 
+-- GetAnimateItemMovement returns whether items, sections and rows travel to their new places when
+-- the bags rearrange (render-pipeline.md §4c). Off unless turned on.
+---@return boolean
+function DB:GetAnimateItemMovement()
+  return DB.data.profile.animateItemMovement
+end
+
+---@param enabled boolean
+function DB:SetAnimateItemMovement(enabled)
+  DB.data.profile.animateItemMovement = enabled
+end
+
 ---@param kind BagKind
 ---@return boolean
 function DB:GetGroupsEnabled(kind)

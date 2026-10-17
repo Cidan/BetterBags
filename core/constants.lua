@@ -680,6 +680,7 @@ const.DATABASE_DEFAULTS = {
     firstTimeMenu = true,
     enabled = true,
     enableBagFading = false,
+    animateItemMovement = false,
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,

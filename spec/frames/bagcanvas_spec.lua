@@ -25,6 +25,8 @@ const.BAG_VIEW = const.BAG_VIEW or { SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 local db = trackStub("Database")
 local sizeInfo = { itemsPerRow = 7, columnCount = 2 }
 local originalGetBagSizeInfo, originalGetBagView = db.GetBagSizeInfo, db.GetBagView
+local originalAnimate = db.GetAnimateItemMovement
+local animate = true
 
 LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
@@ -109,6 +111,8 @@ describe("BagCanvas", function()
     render:Init()
     motion:Init()
     db.GetBagSizeInfo = function() return sizeInfo end
+    animate = true
+    db.GetAnimateItemMovement = function() return animate end
     db.GetBagView = function() return const.BAG_VIEW.SECTION_GRID end
     sizeInfo = { itemsPerRow = 7, columnCount = 2 }
   end)
@@ -116,6 +120,7 @@ describe("BagCanvas", function()
   after_each(function()
     db.GetBagSizeInfo = originalGetBagSizeInfo
     db.GetBagView = originalGetBagView
+    db.GetAnimateItemMovement = originalAnimate
   end)
 
   teardown(function()
@@ -267,6 +272,19 @@ describe("BagCanvas", function()
       assert.are.same({ 0, 0, 0, -headerH }, { motion:GetMove(canvas.tabContainer) })
       assert.are.same({ 0, -tabH, 0, -(headerH + tabH) }, { motion:GetMove(canvas.footerContainer) })
       assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, 0 }, { canvas.tabContainer:GetPoint(1) })
+    end)
+
+    -- Animate Item Movement (off by default) turns it on.
+    it("places everything at once while animating item movement is off, and forgets what it placed", function()
+      animate = false
+      local canvas, b = recentAppears(CreateFrame("Frame"))
+      assert.is_nil(motion:GetMove(canvas.tabContainer))
+      assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, -b.arrangedGlobal.header.height },
+        { canvas.tabContainer:GetPoint(1) })
+      animate = true
+      b.recent = nil
+      draw(canvas)
+      assert.is_nil(motion:GetMove(canvas.tabContainer), "its first pass once turned on places at once")
     end)
 
     it("places everything at once while hidden, and forgets what it placed", function()

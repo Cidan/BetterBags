@@ -135,6 +135,17 @@ function config:CreateConfig()
     end
   })
 
+  f:AddCheckbox({
+    title = 'Animate Item Movement',
+    description = 'If enabled, items, sections and rows glide to their new places when the bags rearrange (sorting, looting, resizing).',
+    getValue = function(_)
+      return db:GetAnimateItemMovement()
+    end,
+    setValue = function(_, value)
+      db:SetAnimateItemMovement(value)
+    end
+  })
+
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
