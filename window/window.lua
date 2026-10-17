@@ -138,13 +138,27 @@ function window:Init()
   end
 end
 
--- trace describes the window to a running profiler capture, at a step of a resize or a move:
--- the call trace records Geometry's return value.
+-- recording returns the render recorder (debug/renderrecorder.lua) while it records.
+---@return RenderRecorder?
+local function recording()
+  local recorder = addon:GetModule('RenderRecorder', true)
+  if recorder ~= nil and recorder.recording then
+    return recorder
+  end
+  return nil
+end
+
+-- trace describes the window at a step of a resize or a move, to a running profiler capture
+-- (the call trace records Geometry's return value) and to the render recorder.
 ---@param w BetterBagsWindow
 ---@param step string
 local function trace(w, step)
   if perf.active then
     w:Geometry(step)
+  end
+  local recorder = recording()
+  if recorder ~= nil then
+    recorder:WindowStep(w, step)
   end
 end
 
@@ -875,6 +889,10 @@ function windowProto:Render(_, options, results)
     trace(self, "rendered while resizing")
   else
     self:KeepOnScreen()
+  end
+  local recorder = recording()
+  if recorder ~= nil then
+    recorder:WindowRendered(self)
   end
   return { Width = width, Height = height }
 end

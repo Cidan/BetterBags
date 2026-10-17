@@ -47,3 +47,10 @@ reasoning about it can suggest a cause; it does not establish one.
   client does not flag the item) or `"no guid"`. Both were local functions. Added when a vendor
   purchase onto a partial stack did not enter Recent Items and no capture could show whether the
   client flagged the slot.
+- **Window geometry and the render recorder** (window.md 3a, render-recorder.md):
+  `windowProto:Geometry(step)` returns a window's anchors, rect, scale, clamp and the cursor, and
+  is called at every step of a resize or a move while a profiler capture runs; the render recorder
+  (Performance tab, **Record Rendering**) keeps a snapshot of a window down to its item buttons
+  after each render that changed it, and every resize and move step. Added for a bank window that
+  grew past the screen when its resize grip was clicked, which no capture could explain: the
+  profiler shows neither where the window was anchored nor where each section and button went.
