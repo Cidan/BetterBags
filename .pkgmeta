@@ -1,5 +1,12 @@
 package-as: BetterBags
 
+# The changelog CurseForge, Wago, WoWInterface and the GitHub release show: the build's notes, as
+# Markdown, written in CI by tools/changelog (.claude/rules/changelog.md). Without the file (a
+# failed run) the packager writes its own from the commits.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 externals:
   libs/LibStub: https://repos.wowace.com/wow/libstub/tags/1.0
   libs/CallbackHandler-1.0: https://repos.wowace.com/wow/callbackhandler/trunk/CallbackHandler-1.0

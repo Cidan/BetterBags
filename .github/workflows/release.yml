@@ -36,7 +36,8 @@ jobs:
         with:
           fetch-depth: 0  # gets git history for changelogs
 
-      # once cloned, write the in-game changelog (data/changelogdata.lua) before packaging: Gemini
+      # once cloned, write the in-game changelog (data/changelogdata.lua) and the sites' changelog
+      # (CHANGELOG.md, the packager's manual changelog) before packaging: Gemini
       # summarizes every commit since the previous tag, and the notes are kept on the changelog branch
       # (tools/changelog, .claude/rules/changelog.md). A failure ships an empty changelog, never the
       # repository's copy, and never stops the release.
@@ -53,9 +54,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          go run ./tools/changelog -channel release -tag "${{ github.ref_name }}" -store "$RUNNER_TEMP/changelog-store" -out data/changelogdata.lua || {
-            echo "::warning::The changelog could not be written; this build ships an empty one."
+          go run ./tools/changelog -channel release -tag "${{ github.ref_name }}" -store "$RUNNER_TEMP/changelog-store" -out data/changelogdata.lua -markdown CHANGELOG.md || {
+            echo "::warning::The changelog could not be written; this build ships an empty one, and the sites get the packager's changelog of commits."
             cp tools/changelog/testdata/changelogdata.empty.lua data/changelogdata.lua
+            rm -f CHANGELOG.md
           }
 
       - name: Save the stored changelogs

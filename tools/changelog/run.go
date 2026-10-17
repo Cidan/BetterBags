@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
 	"strings"
 	"time"
 )
@@ -21,7 +24,10 @@ type Config struct {
 	StoreDir string
 	// Out is the data file to write (data/changelogdata.lua).
 	Out string
-	Now func() time.Time
+	// Markdown is where the build's own notes go as Markdown (the packager's manual changelog,
+	// CHANGELOG.md); empty writes none.
+	Markdown string
+	Now      func() time.Time
 }
 
 // Deps are what a run reads from.
@@ -135,10 +141,11 @@ func (r runner) notes(ctx context.Context, channel string, rng Range) (Summary, 
 	return s, false, nil
 }
 
-// Run writes the changelog data for a build. It first empties the data file, so a run that
-// fails ships no notes rather than the ones in the repository; then it writes the build's notes
-// (or reuses the stored ones), stores them, writes again any bundled notes that were listed from
-// commits, and writes the data with the releases the build carries.
+// Run writes the changelog data for a build. It first empties the data file and removes the
+// Markdown, so a run that fails ships no notes rather than the ones in the repository, and the
+// packager falls back to its changelog of commits; then it writes the build's notes (or reuses the
+// stored ones), stores them, writes again any bundled notes that were listed from commits, writes
+// the data with the releases the build carries, and the build's own notes as Markdown.
 func Run(ctx context.Context, cfg Config, deps Deps) error {
 	logOut := deps.Log
 	if logOut == nil {
@@ -149,6 +156,11 @@ func Run(ctx context.Context, cfg Config, deps Deps) error {
 	}}
 	if err := writeData(cfg.Out, nil); err != nil {
 		return err
+	}
+	if cfg.Markdown != "" {
+		if err := os.Remove(cfg.Markdown); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
 	}
 	if cfg.StoreDir == "" {
 		return fmt.Errorf("no store directory")
@@ -219,7 +231,14 @@ func Run(ctx context.Context, cfg Config, deps Deps) error {
 
 	bundle := Bundle(stored, cfg.Channel, current)
 	r.log("writing %d releases to %s", len(bundle), cfg.Out)
-	return writeData(cfg.Out, bundle)
+	if err := writeData(cfg.Out, bundle); err != nil {
+		return err
+	}
+	if cfg.Markdown == "" {
+		return nil
+	}
+	r.log("writing the notes of %s to %s", current.Version, cfg.Markdown)
+	return writeMarkdown(cfg.Markdown, current)
 }
 
 func inBundle(bundle []Release, version string) bool {

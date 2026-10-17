@@ -6,6 +6,9 @@
 //	go run ./tools/changelog -channel alpha -from <before> -to <sha> -store <changelog branch checkout>
 //	go run ./tools/changelog -channel release -tag v0.5.17 -store <changelog branch checkout>
 //
+// With -markdown, the build's own notes are also written as Markdown: the packager's manual
+// changelog (.pkgmeta), shown on CurseForge, Wago, WoWInterface and the GitHub release.
+//
 // GEMINI_API_KEY (a Google AI Studio key) lets Gemini write the notes; without it they list the
 // commits. GITHUB_TOKEN and GITHUB_REPOSITORY let an alpha read its pull requests' commits.
 package main
@@ -27,6 +30,7 @@ func main() {
 	flag.StringVar(&cfg.To, "to", "HEAD", "the build's commit (an alpha)")
 	flag.StringVar(&cfg.StoreDir, "store", "", "a checkout of the changelog branch")
 	flag.StringVar(&cfg.Out, "out", "data/changelogdata.lua", "the data file to write")
+	flag.StringVar(&cfg.Markdown, "markdown", "", "where to write the build's notes as Markdown (the packager's manual changelog)")
 	repo := flag.String("repo", os.Getenv("GITHUB_REPOSITORY"), "owner/name, to read pull requests")
 	model := flag.String("model", DefaultGeminiModel, "the Gemini model")
 	flag.Parse()

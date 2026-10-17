@@ -11,3 +11,5 @@ cpp-ghost-text-preview-widget-anysphere://**
 /luacov.report.out
 /luacov.stats.out
 .claude/worktrees/
+# Written in CI by tools/changelog (the packager's manual changelog).
+/CHANGELOG.md

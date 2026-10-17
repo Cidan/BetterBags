@@ -74,10 +74,16 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          go run ./tools/changelog -channel alpha -from "${{ github.event.pull_request.base.sha }}" -to "${{ github.event.pull_request.head.sha }}" -store "$RUNNER_TEMP/changelog-store" -out "$RUNNER_TEMP/changelogdata.lua"
+          go run ./tools/changelog -channel alpha -from "${{ github.event.pull_request.base.sha }}" -to "${{ github.event.pull_request.head.sha }}" -store "$RUNNER_TEMP/changelog-store" -out "$RUNNER_TEMP/changelogdata.lua" -markdown "$RUNNER_TEMP/CHANGELOG.md"
           {
             echo "### The changelog this pull request would ship"
+            echo
+            cat "$RUNNER_TEMP/CHANGELOG.md"
+            echo
+            echo "<details><summary>In game (data/changelogdata.lua)</summary>"
+            echo
             echo '```lua'
             sed -n '/^changelogData.releases/,$p' "$RUNNER_TEMP/changelogdata.lua"
             echo '```'
+            echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
