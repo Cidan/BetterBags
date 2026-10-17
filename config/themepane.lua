@@ -9,6 +9,9 @@ local list = addon:GetModule('List')
 ---@class Sonata: AceModule
 local sonata = addon:GetModule('Sonata')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class ThemePane: AceModule
 local themePane = addon:NewModule('ThemePane')
 
@@ -23,7 +26,7 @@ local themePane = addon:NewModule('ThemePane')
 ---@field name string Its display name.
 ---@field description string
 ---@field available boolean Its addon is loaded (it can be applied).
----@field active boolean It is the applied theme.
+---@field active boolean It is the saved theme (the one in effect outside a preview).
 
 ---@class ThemePaneFrame
 ---@field frame Frame
@@ -131,6 +134,7 @@ function themePaneProto:SelectTheme(themeKey)
   end
 
   self.selectedTheme = themeKey
+  self:QueuePreview(themeKey)
   self:UpdateDetailPanel()
 
   -- Refresh the list to update selection highlight
@@ -142,6 +146,54 @@ function themePaneProto:SelectTheme(themeKey)
       self.selectedButton = button
     end
   end)
+end
+
+-- QueuePreview previews a picked theme on the next frame: applying a theme restyles and resizes
+-- the settings window, which must not happen inside the click on the theme list. A later pick
+-- before then replaces it.
+---@param themeKey string
+function themePaneProto:QueuePreview(themeKey)
+  self.pendingPreview = themeKey
+  if self.previewQueued then
+    return
+  end
+  self.previewQueued = true
+  C_Timer.After(0, function()
+    self.previewQueued = false
+    local key = self.pendingPreview
+    self.pendingPreview = nil
+    if key ~= nil then
+      self:Preview(key)
+    end
+  end)
+end
+
+-- Preview applies a picked theme without saving it; Apply saves it. Picking the saved theme or
+-- one that cannot be applied shows the saved theme.
+---@param themeKey string
+function themePaneProto:Preview(themeKey)
+  local ctx = context:New('ThemePane_Preview')
+  if sonata:IsSelectable(themeKey) then
+    if sonata:GetCurrentThemeKey() ~= themeKey then
+      sonata:ApplyTheme(ctx, themeKey, false)
+    end
+  else
+    sonata:RestoreSavedTheme(ctx)
+  end
+end
+
+-- EndPreview puts the saved theme back and forgets the pick, when the pane hides (another
+-- settings page, or the settings window closing).
+---@param ctx Context
+function themePaneProto:EndPreview(ctx)
+  self.pendingPreview = nil
+  sonata:RestoreSavedTheme(ctx)
+  self.selectedTheme = nil
+  self.selectedButton = nil
+  if self.initialized then
+    self:RefreshList()
+    self:UpdateDetailPanel()
+  end
 end
 
 function themePaneProto:UpdateDetailPanel()
@@ -197,7 +249,7 @@ function themePaneProto:ShowThemeDetail(entry)
     self.themeDetail.applyButton:SetEnabled(false)
     self.themeDetail.applyButton:SetText("Active")
   elseif entry.available then
-    self.themeDetail.statusLabel:SetText("Available")
+    self.themeDetail.statusLabel:SetText("Previewing")
     sonata:SetTextRole(self.themeDetail.statusLabel, "Description")
     self.themeDetail.applyButton:SetEnabled(true)
     self.themeDetail.applyButton:SetText("Apply Theme")
@@ -301,7 +353,7 @@ function themePane:Entry(key)
     name = theme.DisplayName or theme.Name,
     description = theme.Description or "No description available.",
     available = sonata:IsAvailable(key),
-    active = key == sonata:GetCurrentThemeKey(),
+    active = key == sonata:GetSavedThemeKey(),
   }
 end
 
@@ -371,6 +423,10 @@ function themePane:New(parent)
         pane:UpdateDetailPanel()
       end)
     end
+  end)
+
+  addon.SetScript(pane.frame, "OnHide", function(ctx)
+    pane:EndPreview(ctx)
   end)
 
   -- Handle size changes to ensure the list updates when pane dimensions are set.

@@ -35,6 +35,9 @@ local drawable = addon:GetModule('Drawable')
 ---@class WindowModule: AceModule
 local window = addon:GetModule('Window')
 
+---@class SonataApply: AceModule
+local apply = addon:GetModule('SonataApply')
+
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
@@ -227,9 +230,15 @@ end
 ---@param callback? fun()
 function BankSlots.bankSlotsPanelProto:Show(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
-  local offset = self.window:GetLayout().Offset or {}
-  self.frame:ClearAllPoints()
-  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", offset.X or 0, offset.Y or 0)
+  -- Where the theme says: Layout.Points relative to the bag, else Layout.Offset below it.
+  local layout = self.window:GetLayout()
+  if layout.Points ~= nil then
+    apply:Points(self.frame, layout.Points, self.bagFrame)
+  else
+    local offset = layout.Offset or {}
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", offset.X or 0, offset.Y or 0)
+  end
   -- Completely hide the group tabs and remember whether they were visible so
   -- they can be restored correctly when the bank slots panel is closed.
   local bankBag = addon.Bags and addon.Bags.Bank

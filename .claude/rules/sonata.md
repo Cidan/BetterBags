@@ -74,6 +74,23 @@ Resolution never changes the registered tables.
   `ADDON_LOADED`) is applied at once, unsaved, when it is the saved choice, not already applied,
   and selectable. (The old theme module reset a missing saved theme to Default at login, so a
   third-party theme never survived a reload.)
+- **Previews.** `GetSavedThemeKey()` names the theme the saved setting puts in effect (the
+  saved theme, or Default while it is missing, hidden or unavailable), and
+  `RestoreSavedTheme(ctx)` applies it, unsaved, when another theme is applied (nothing before
+  the first apply, nothing when it is already applied). The settings window's Theme pane
+  (`config/themepane.lua`) previews: picking a selectable theme applies it unsaved
+  (`ApplyTheme(ctx, key, false)`; picking the saved one or an unavailable one shows the saved
+  one), its status reads "Previewing", and only **Apply Theme** saves it. The preview applies
+  on the **next frame** (`QueuePreview`, one `C_Timer.After(0)`; the last pick before then
+  wins), never inside the click on the list: applying restyles and resizes the settings window
+  around the list, and applying inside the click sometimes left the list blank until it was
+  scrolled (reported in game). A pane that hides before then previews nothing. The pane's frame hides
+  when the player opens another settings page or closes the settings window (`OnHide` also
+  fires when an ancestor hides); `EndPreview` then restores the saved theme and forgets the pick.
+  The list's check mark and "Currently Active" follow the saved theme, not the one previewed.
+  Coverage: `spec/sonata/engine_spec.lua` ("names the theme the saved setting puts in effect",
+  "puts the saved theme back after a preview", "restores nothing before Sonata applied a theme")
+  and `spec/config/themepane_spec.lua` ("previewing").
 - `GetThemes()` lists every theme that is not hidden, available or not (the theme pane shows
   unavailable ones as such); `GetAllThemes()` lists only those a player can pick now.
 - `GetCurrentTheme()` is the resolved active theme (before any apply: the saved one, or
@@ -199,7 +216,7 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 | `Tab` | a bottom tab | `Art = "Flat"` (template art hidden; `Background`, `Border`, `Hover` (HIGHLIGHT layer), `Selected = { Background, Bar, Border }`: `Bar` is a texture spec with `Height` and `Points` (default along the top), `Border = { Color }` recolors the tab's border while it is selected or a drop target), `Height` (default 32), `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | a section title font string | `Font` (default `GameFontNormal`) |
 | `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
-| `BagButton` | the bag menu (portrait) button | `Size` (40), `Portrait`, `Highlight` (texture spec + `Width`, `Height`, `X`, `Y`; OVERLAY 7) |
+| `BagButton` | the bag menu (portrait) button | `Size` (40; `Width`/`Height` per axis), `Portrait`, `Highlight` (texture spec + `Width`, `Height`, `X`, `Y`; OVERLAY 7; `false` hides it, the next style shows it again), `States` (`Normal`, `Highlight`, `Pushed`, `Disabled` through `apply:ButtonStates`, the button's own state art; every state a style leaves out is cleared, so a flat button never outlives its theme). Added for plugin themes whose menu button is flat art (macOS, Aero Glass in BetterBags - Themes); coverage `spec/sonata/elements_spec.lua` ("the bag menu button") |
 | `Button` | `UIPanelButtonTemplate` buttons | `Strip`, `Background`, `Border`, `HoverBorderColor` (the border's color while the mouse is over the button; hooked once), `Highlight` (`false` hides the button's highlight by alpha, given back by a later style), `Font`, `HighlightFont`, `DisabledFont` (the button's own fonts are recorded and put back) |
 | `EditBox` | `InputBoxTemplate` edit boxes | `Strip`, `Background`, `Border`, `Font` (the box's own font is put back) |
 

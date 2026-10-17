@@ -815,10 +815,27 @@ function bagFrame.bagProto:PlaceParts(ctx, decoration)
 
 	menuButton:Place(self.menuButton, layout.MenuButton, self.frame, overlay)
 	bagActions:Place(self.actions, layout.Actions, self.frame, overlay)
+	self:PlaceTabs()
 	self:UpdateSearchShown()
 	if self.slots and self.slots:IsShown() then
 		self.slots:Draw(ctx)
 	end
+end
+
+-- PlaceTabs hangs the tab bar below the bag where the theme's layout says (Layout.Tabs.Offset:
+-- where the bar's top left sits from the bag's bottom left), 2 into the window without one.
+-- Themes whose art reaches far below the window hang it below that art.
+function bagFrame.bagProto:PlaceTabs()
+	if self.tabs == nil then
+		return
+	end
+	local tabsLayout = self.window:GetLayout().Tabs
+	local offset = type(tabsLayout) == "table" and tabsLayout.Offset or {}
+	local x, y = offset.X or 0, offset.Y or 2
+	local bar = self.tabs.frame
+	bar:ClearAllPoints()
+	bar:SetPoint("TOPLEFT", self.frame, "BOTTOMLEFT", x, y)
+	bar:SetPoint("TOPRIGHT", self.frame, "BOTTOMRIGHT", x, y)
 end
 
 -- UpdateSearchShown shows the in-bag search box when in-bag search is on, and reserves the
@@ -1002,6 +1019,7 @@ function bagFrame:Create(ctx, kind)
 
 	-- Call behavior-specific creation (slots, currency, tabs, etc.)
 	b.behavior:OnCreate(ctx)
+	b:PlaceTabs()
 
 	b:WatchMouse()
 

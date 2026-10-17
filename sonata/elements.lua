@@ -657,19 +657,39 @@ local function bagArt(texture, spec, owner)
   texture:SetPoint("CENTER", owner, "CENTER", spec.X or 0, spec.Y or 0)
 end
 
+-- StyleBagButton sizes the bag menu button (Size, or Width and Height), draws its portrait
+-- and hover art (false hides either), and gives the button its own state art (States: Normal,
+-- Highlight, Pushed, Disabled; a state left out is cleared).
 ---@param button Button
 ---@param style table
 function elements:StyleBagButton(button, style)
   local size = style.Size or 40
-  button:SetSize(size, size)
+  button:SetSize(style.Width or size, style.Height or size)
   if button.portrait ~= nil then
-    bagArt(button.portrait, withDefaults(style.Portrait, BAG_PORTRAIT), button)
+    if style.Portrait == false then
+      button.portrait:Hide()
+    else
+      bagArt(button.portrait, withDefaults(style.Portrait, BAG_PORTRAIT), button)
+      button.portrait:Show()
+    end
   end
   if button.highlightTex ~= nil then
-    local alpha = button.highlightTex:GetAlpha()
-    bagArt(button.highlightTex, withDefaults(style.Highlight, BAG_HIGHLIGHT), button)
-    button.highlightTex:SetAlpha(alpha)
+    if style.Highlight == false then
+      button.highlightTex:Hide()
+    else
+      local alpha = button.highlightTex:GetAlpha()
+      bagArt(button.highlightTex, withDefaults(style.Highlight, BAG_HIGHLIGHT), button)
+      button.highlightTex:SetAlpha(alpha)
+      button.highlightTex:Show()
+    end
   end
+  local states = type(style.States) == "table" and style.States or {}
+  apply:ButtonStates(button, {
+    Normal = states.Normal or false,
+    Highlight = states.Highlight or false,
+    Pushed = states.Pushed or false,
+    Disabled = states.Disabled or false,
+  })
 end
 
 -- captureFonts records a button's or edit box's own fonts the first time a style changes them.

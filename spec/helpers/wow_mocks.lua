@@ -429,10 +429,12 @@ local function CreateMockWidget(widgetType, name, parent)
   -- SimpleButtonAPIDocumentation.lua: SetHighlightTexture(asset, blendMode?) sets the
   -- button's highlight region; Set{Pushed,Disabled}Texture(asset) and the Set*Atlas
   -- variants likewise set their state region.
+  -- Button:SetHighlightTexture(asset, blendMode?): the blend mode defaults to ADD
+  -- (wowprogramming, Button:SetHighlightTexture).
   function widget:SetHighlightTexture(texture, blendMode)
     self._highlightTexture = texture
     setStateTexture(self, "GetHighlightTexture", "HighlightTexture", texture, "SetHighlightTexture")
-    if blendMode then self:GetHighlightTexture():SetBlendMode(blendMode) end
+    self:GetHighlightTexture():SetBlendMode(blendMode or "ADD")
   end
   function widget:SetPushedTexture(texture)
     setStateTexture(self, "GetPushedTexture", "PushedTexture", texture, "SetPushedTexture")

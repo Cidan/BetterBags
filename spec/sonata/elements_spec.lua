@@ -603,6 +603,49 @@ describe("SonataElements", function()
       local point, _, _, x = b.highlightTex:GetPoint(1)
       assert.are.same({ "CENTER", 2 }, { point, x })
     end)
+
+    it("sizes the button by Width and Height, each defaulting to Size", function()
+      local b = bagButton()
+      elements:StyleBagButton(b, { Width = 30, Height = 21 })
+      assert.are.same({ 30, 21 }, { b:GetWidth(), b:GetHeight() })
+      elements:StyleBagButton(b, { Size = 32, Height = 12 })
+      assert.are.same({ 32, 12 }, { b:GetWidth(), b:GetHeight() })
+      elements:StyleBagButton(b, {})
+      assert.are.same({ 40, 40 }, { b:GetWidth(), b:GetHeight() })
+    end)
+
+    -- A flat menu button (a theme's own art in the button's states, as macOS and Aero Glass
+    -- draw it) hides the portrait and its hover art; the next theme gets them back.
+    it("hides the portrait and its hover art when a style turns them off, and shows them for the next", function()
+      local b = bagButton()
+      elements:StyleBagButton(b, { Portrait = false, Highlight = false })
+      assert.is_false(b.portrait:IsShown())
+      assert.is_false(b.highlightTex:IsShown())
+      elements:StyleBagButton(b, {})
+      assert.is_true(b.portrait:IsShown())
+      assert.is_true(b.highlightTex:IsShown())
+      assert.are.equal("Interface\\Containerframe\\Bagslots2x", b.portrait:GetTexture())
+    end)
+
+    it("draws the button's own normal, hover and pressed art from States, and clears it for a style without", function()
+      local b = bagButton()
+      elements:StyleBagButton(b, { States = {
+        Normal = { Texture = "menu.png" },
+        Highlight = { Texture = "menu-hover.png" },
+        Pushed = { Texture = "menu-push.png" },
+      } })
+      assert.are.equal("menu.png", b:GetNormalTexture():GetTexture())
+      assert.are.equal("menu-hover.png", b:GetHighlightTexture():GetTexture())
+      assert.are.equal("ADD", b:GetHighlightTexture():GetBlendMode())
+      assert.are.equal("menu-push.png", b:GetPushedTexture():GetTexture())
+      elements:StyleBagButton(b, { States = { Highlight = { Texture = "menu.png", BlendMode = "BLEND" } } })
+      assert.are.equal("BLEND", b:GetHighlightTexture():GetBlendMode())
+      assert.is_nil(b:GetNormalTexture():GetTexture())
+      elements:StyleBagButton(b, {})
+      assert.is_nil(b:GetNormalTexture():GetTexture())
+      assert.is_nil(b:GetHighlightTexture():GetTexture())
+      assert.is_nil(b:GetPushedTexture():GetTexture())
+    end)
   end)
 
   describe("dialog buttons and edit boxes", function()

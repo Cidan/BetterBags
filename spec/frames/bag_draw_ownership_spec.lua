@@ -1387,6 +1387,51 @@ describe("Bag Draw: shared item button ownership across global sections and view
       return bag
     end
 
+    -- Themes whose art reaches far below the window hang the tab bar below it
+    -- (Layout.Tabs.Offset: where the bar's top left sits from the bag's bottom left).
+    describe("the tab bar (PlaceTabs)", function()
+      local function bagWithTabs(layout)
+        local sonata = addon:GetModule("Sonata")
+        override(sonata, "themes", {})
+        sonata:RegisterTheme({ Name = "Base", Hidden = true })
+        sonata:RegisterTheme({ Name = "Default", Windows = { Bag = { Layout = layout } } })
+        local bag = newBag()
+        bag:BuildParts()
+        bag.tabs = { frame = CreateFrame("Frame", nil, bag.frame) }
+        sonata:ApplyTheme(context:New("spec"), "Default")
+        return bag
+      end
+
+      it("hangs it where the theme's Layout.Tabs says", function()
+        local bag = bagWithTabs({ Tabs = { Offset = { X = 14, Y = -30 } } })
+        local bar = bag.tabs.frame
+        assert.are.equal(2, bar:GetNumPoints())
+        assert.are.same({ "TOPLEFT", bag.frame, "BOTTOMLEFT", 14, -30 }, { bar:GetPoint(1) })
+        assert.are.same({ "TOPRIGHT", bag.frame, "BOTTOMRIGHT", 14, -30 }, { bar:GetPoint(2) })
+      end)
+
+      it("hangs it 2 into the window when the theme says nothing", function()
+        local bag = bagWithTabs({})
+        assert.are.same({ "TOPLEFT", bag.frame, "BOTTOMLEFT", 0, 2 }, { bag.tabs.frame:GetPoint(1) })
+        assert.are.same({ "TOPRIGHT", bag.frame, "BOTTOMRIGHT", 0, 2 }, { bag.tabs.frame:GetPoint(2) })
+      end)
+
+      it("does nothing for a bag without tabs", function()
+        local bag = newBag()
+        bag:BuildParts()
+        assert.has_no.errors(function() bag:PlaceTabs() end)
+      end)
+
+      it("bagFrame:Create places the tab bar once the bag's behavior made it", function()
+        local source = assert(io.open("frames/bag.lua", "r")):read("*a")
+        local create = source:match("function bagFrame:Create%(ctx, kind%)(.-)\nend\n")
+        local made = create:find("b.behavior:OnCreate(ctx)", 1, true)
+        local placesTabs = create:find("b:PlaceTabs()", 1, true)
+        assert.is_not_nil(placesTabs)
+        assert.is_true(placesTabs > made)
+      end)
+    end)
+
     it("is a Bag window named for its bag, laying out the bag's canvas in a scroll box", function()
       local bag = newBag()
       assert.are.equal("Bag", bag.window.kind)

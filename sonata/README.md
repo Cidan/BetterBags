@@ -137,10 +137,13 @@ A `Bag` style's `Layout` places the parts the bag owns, relative to the window:
 | `Search` | the in-bag search box: `Points`, and `Reserve` (the rows above the content it takes while shown) |
 | `Footer` | the money and currency bar: `Left`, `Right`, `Bottom`, `Height`, `Reserve`; the money sits 4 in from its right end, the currencies 4 in from its left end |
 | `MenuButton` | the round bag menu button: `Points`; `false` hides it |
+| `Tabs` | the tab bar below the bag: `Offset = { X, Y }`, where the bar's top left sits from the bag's bottom left (default `0, 2`: 2 into the window). The bar is drawn below the window, so a theme whose art reaches below the window hangs it below that art |
 | `Actions` | buttons running BetterBags actions (GW2's side panel): `Points` (the first button), `Size`, `Spacing`, `Buttons = { { Action, Normal, Highlight, Pushed }, ... }`, where `Action` is `ShowBags`, `Sort`, `Settings` or `Menu`; buttons stack downwards |
 
 A `Slots` style's `Layout.Offset = { X, Y }` is where the panel's top left sits from its bag's
-bottom left.
+bottom left. To place it anywhere else around its bag, give `Layout.Points` instead (relative to
+the bag): `Points = { { Point = "BOTTOMLEFT", RelativePoint = "TOPLEFT" } }` sits it above the
+bag.
 
 ## Elements
 
@@ -150,7 +153,7 @@ bottom left.
 | `Tab` | the tabs below a bag | `Art = "Flat"` (hide Blizzard's tab art) with `Background`, `Border`, `Hover`, `Selected = { Background, Bar, Border }` (`Bar` with `Height` and `Points`; `Border = { Color }` while selected); `Height`, `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | section titles | `Font` |
 | `SearchBox` | the in-bag search box | `Strip` (hide its art), `HideCaps`, `Middle` (texture spec, `Points`, `Height`), `SearchIcon` (texture spec and `Points`, `Width`, `Height`; `false` hides it), `ClearButton = { Icon }`, `Background`, `Border`, `Font`, `Instructions`, `InstructionsPoints`, `TextInsets` |
-| `BagButton` | the bag menu button | `Size`, `Portrait`, `Highlight` (texture spec and `Width`, `Height`, `X`, `Y`) |
+| `BagButton` | the bag menu button | `Size` (or `Width` and `Height`), `Portrait`, `Highlight` (texture spec and `Width`, `Height`, `X`, `Y`; `false` hides either), `States = { Normal, Highlight, Pushed, Disabled }` (the button's own state art, as on `CloseButton`: a flat button drawn with `Portrait = false, Highlight = false`) |
 | `Button` | buttons in dialogs and settings | `Strip`, `Background`, `Border`, `HoverBorderColor`, `Highlight` (`false` hides it), `Font`, `HighlightFont`, `DisabledFont` |
 | `EditBox` | edit boxes in dialogs | `Strip`, `Background`, `Border`, `Font` |
 
@@ -275,7 +278,7 @@ sonata:RegisterTheme({
 | `themes.SetupBagButton` | `Layout.MenuButton`, `Elements.BagButton` |
 | `ItemButton(item)` | `Elements.ItemButton` (BetterBags owns the decoration; do not create one) |
 | `Tab(tab)` | `Elements.Tab` |
-| `PositionBagSlots` | `Windows.Slots.Layout.Offset` |
+| `PositionBagSlots` | `Windows.Slots.Layout.Offset`, or `Layout.Points` relative to the bag |
 | `DisableMasque = true` | `Masque = false` |
 | `Reset()` | nothing: BetterBags releases a theme's look itself |
 
