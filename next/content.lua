@@ -80,6 +80,7 @@ local STEP = style.ICON + style.GAP
 ---@field dragSlotY? number Where the last render put the dragged section's gap.
 ---@field leaving table<string, number> Sections moved away, left out until this time (GetTime).
 ---@field headerHandler? NextHeaderHandler
+---@field cellHeight number How tall a row of buttons is, without the gap (the vendor's are taller).
 local canvasProto = drawable:Extend({}, 'NextCanvas')
 
 ---@param parent Frame
@@ -96,6 +97,7 @@ function nextContent:Create(parent)
   canvas.buttons = {}
   canvas.freeTotal = 0
   canvas.leaving = {}
+  canvas.cellHeight = style.ICON
   addon.SetScript(canvas.frame, "OnHide", function()
     canvas:Settle()
   end)
@@ -270,6 +272,59 @@ function canvasProto:addItem(ctx, section, data, claims)
   end
 end
 
+-- beginBind sets last pass's sections aside for reuse and starts an empty pass.
+---@private
+function canvasProto:beginBind()
+  for name, section in pairs(self.byName) do
+    self.stale[name] = section
+  end
+  self.byName = {}
+  self.order = {}
+  self.buttons = {}
+  self.freeTotal = 0
+end
+
+-- finishBind hides and pools last pass's sections that were not drawn again.
+---@private
+function canvasProto:finishBind()
+  for name, section in pairs(self.stale) do
+    self.stale[name] = nil
+    self.leaving[name] = nil
+    self:release(section)
+  end
+end
+
+-- SetCellHeight sets how tall a row of buttons is, without the gap.
+---@param height number
+function canvasProto:SetCellHeight(height)
+  self.cellHeight = height
+  self:Invalidate()
+end
+
+---@class (exact) NextCanvasSection
+---@field name string
+---@field buttons {key: string, frame: Frame}[] Drawn already, in order.
+---@field count? string What its header counts, the number of buttons by default.
+
+-- BindSections puts sections of buttons the caller drew (the vendor's) into the canvas, in their
+-- order. The buttons are the caller's to release.
+---@param sections NextCanvasSection[]
+function canvasProto:BindSections(sections)
+  self:beginBind()
+  for _, s in ipairs(sections) do
+    local section = self:section(s.name, "category")
+    for _, button in ipairs(s.buttons) do
+      if button.frame:GetParent() ~= section.cells then
+        button.frame:SetParent(section.cells)
+      end
+      table.insert(section.entries, { item = button })
+      self.buttons[button.key] = button
+    end
+    section.count:SetText(s.count or tostring(#s.buttons))
+  end
+  self:finishBind()
+end
+
 -- Bind puts a tab's data into sections and draws their buttons, claiming each in claims. Last
 -- pass's sections not drawn again are hidden and pooled; their buttons are left to the bag's
 -- sweep.
@@ -278,13 +333,7 @@ end
 ---@param tabID number
 ---@param claims table<Item, boolean>
 function canvasProto:Bind(ctx, slotInfo, tabID, claims)
-  for name, section in pairs(self.byName) do
-    self.stale[name] = section
-  end
-  self.byName = {}
-  self.order = {}
-  self.buttons = {}
-  self.freeTotal = 0
+  self:beginBind()
 
   local recentName = L:G("Recent Items")
   local recent = {}
@@ -357,11 +406,7 @@ function canvasProto:Bind(ctx, slotInfo, tabID, claims)
     end
   end
 
-  for name, section in pairs(self.stale) do
-    self.stale[name] = nil
-    self.leaving[name] = nil
-    self:release(section)
-  end
+  self:finishBind()
 end
 
 -- Render lays the sections out in one column, in rows of as many icons as fit the width it is
@@ -389,17 +434,18 @@ function canvasProto:Render(parentResult)
     y = y + drag.height
     placed = placed + 1
   end
+  local rowStep = self.cellHeight + style.GAP
   for _, section in ipairs(self.order) do
     local rows = math.max(1, math.ceil(#section.entries / perRow))
-    local height = style.SECTION_HEADER + rows * STEP - style.GAP
+    local height = style.SECTION_HEADER + rows * rowStep - style.GAP
     section.height = height
     section.frame:SetSize(width, height)
     section.inner:SetSize(width, height)
-    section.cells:SetSize(width, rows * STEP)
+    section.cells:SetSize(width, rows * rowStep)
     for j, entry in ipairs(section.entries) do
       if entry.item ~= nil then
         local column, row = (j - 1) % perRow, math.floor((j - 1) / perRow)
-        motion:Place(entry.item.frame, section.cells, column * STEP, -row * STEP)
+        motion:Place(entry.item.frame, section.cells, column * STEP, -row * rowStep)
         entry.item.frame:Show()
       end
     end

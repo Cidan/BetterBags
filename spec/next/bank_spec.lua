@@ -301,6 +301,7 @@ describe("NextBank", function()
       assert.are.same({ "TOPLEFT", UIParent, "TOPLEFT", 0, 0 }, { bank.frame:GetPoint(1) })
       assert.are.same({ "BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0 }, { bank.frame:GetPoint(2) })
       assert.are.equal(style.WIDTH, bank.frame:GetWidth())
+      assert.are.equal("HIGH", bank.frame:GetFrameStrata())
     end)
 
     it("feathers its right edge out to nothing and takes no clicks there", function()

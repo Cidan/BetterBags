@@ -79,3 +79,13 @@ Use `C_Timer.After(0, ...)` to clear the Retail guard after event processing com
 **Solution**: call `C_Container.PickupContainerItem(bag, emptySlot)` directly. It is not protected (no restriction tag on warcraft.wiki.gg, none in `ContainerDocumentation.lua`; BetterBags already calls it from the WoW: Forever bank sockets), it is exactly what dropping on that slot does, and it writes nothing Blizzard's code reads. Read the free slot from the client at that moment (`C_Container.GetContainerFreeSlots`): picking up onto an occupied slot swaps, putting the other item on the cursor. Leave anything that needs a Blizzard confirmation (a refundable item going into the Warbank) to Blizzard's own buttons.
 
 **Related Files**: `util/cursorplacement.lua`, `frames/bag.lua` (`WatchMouse`), `.claude/rules/bag-drop-zone.md`
+
+## Keep a Blizzard Frame Shown but Unseen: Hook Its Hide, Act a Frame Later
+
+**Problem**: BetterBags Next's vendor replaces Blizzard's merchant frame, but Blizzard's bag code sells on a right click only while `MerchantFrame:IsShown()` (and on its first tab). Hiding the frame breaks selling; leaving it visible shows two vendors. Parented to a hidden frame it stays "shown" (its own flag) and is never visible, but then its `OnHide` never runs either, and that is what ended the visit (`MerchantFrame_OnHide` → `CloseMerchant`), so a hide by the panel manager or Escape leaves the vendor open with nothing on screen.
+
+**Solution**: reparent it at load (as the bank frame), write none of its fields or its tab, and `hooksecurefunc(MerchantFrame, "Hide", ...)` (a secure field write). The hook ends the visit with `C_Timer.After(0, ...)` so `CloseMerchant` runs outside Blizzard's code, guarded so every close path ends the visit once. Code that asked whether a vendor is open with `IsVisible()` must ask `IsShown()`, as Blizzard's bag code does.
+
+**Purchases**: buy through Blizzard's own confirmation functions (`MerchantFrame_ConfirmExtendedItemCost`, `MerchantFrame_ConfirmHighCostItem`), called the way its item button calls them, never instead of them. They run from our click, so they write `MerchantFrame.itemIndex`/`count`/`price` and show the popup tainted (see the section above); their accept calls `BuyMerchantItem`, which is not protected. Not verified in game; CompactVendor ships the same calls.
+
+**Related Files**: `next/vendor.lua` (`TakeOver`, `EndVisitLater`), `next/merchant.lua` (`Purchase`), `util/movementflow.lua`, `.claude/rules/next.md` §10

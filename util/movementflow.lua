@@ -21,10 +21,13 @@ function movementFlow:AtTradeWindow()
   return frame ~= nil and frame:IsVisible()
 end
 
+-- AtNPCShopWindow is whether a vendor is open, as Blizzard's bag code decides to sell
+-- (ContainerFrameItemButton_OnClick): MerchantFrame:IsShown(). BetterBags Next's vendor keeps that
+-- frame shown under a hidden parent (next.md §10), where it is never visible.
 ---@return boolean
 function movementFlow:AtNPCShopWindow()
   local frame = _G["MerchantFrame"] --[[@as Frame]]
-  return frame ~= nil and frame:IsVisible()
+  return frame ~= nil and frame:IsShown()
 end
 
 ---@return MovementFlowType

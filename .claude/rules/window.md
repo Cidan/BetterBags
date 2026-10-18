@@ -393,7 +393,8 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   edit boxes and buttons are Sonata elements. Coverage: `spec/frames/searchcategory_spec.lua`.
 - **The debug window** (`frames/debug.lua`, `/bbdb`): a Flat window named
   `BetterBagsDebugWindow`, 800 x 600 in the window mode with `Resizable = false`, movable, no
-  fade. Its four tabs' contents fill the content box. Its close button takes left and right
+  fade, in the `DIALOG` strata (above BetterBags Next's `HIGH` panels, next.md §3, which it is
+  used beside while profiling). Its four tabs' contents fill the content box. Its close button takes left and right
   clicks (`CloseClicks`): left turns debug mode off, right clears the log (`OnClose`). It shows
   and hides with `config/DebugMode`. Coverage: `spec/frames/debug_window_spec.lua`.
 - **The slots panels** (`frames/bagslots.lua`: Show Bags for the backpack and the Classic/Era

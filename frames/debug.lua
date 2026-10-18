@@ -101,6 +101,8 @@ function debugWindow:Create(ctx)
   self.window = window:Create({
     Kind = "Flat",
     Name = "BetterBagsDebugWindow",
+    -- Above BetterBags Next's panels (HIGH), which it is used beside while profiling.
+    Strata = "DIALOG",
     Title = "BetterBags Debug Window",
     SizeMode = function() return "window" end,
     Resizable = false,

@@ -46,7 +46,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag", "NextBank"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor"
     }
 
     for _, name in ipairs(modules) do
@@ -56,6 +56,11 @@ describe("Core Init and Enable flow", function()
     end
     local perfSessions = addon:GetModule("PerfSessions")
     perfSessions.StartIfArmed = perfSessions.StartIfArmed or spy.new(function() return false end)
+    local nextVendor = addon:GetModule("NextVendor")
+    nextVendor.Create = nextVendor.Create or function()
+      return { frame = CreateFrame("Frame"), GetName = function() return "BetterBagsNextVendor" end }
+    end
+    nextVendor.TakeOver = nextVendor.TakeOver or function() end
 
     -- Provide specific mock implementations needed by init
     local L = addon:GetModule("Localization")
@@ -221,6 +226,54 @@ describe("Core Init and Enable flow", function()
     local special = {}
     for _, name in ipairs(UISpecialFrames) do special[name] = true end
     assert.is_true(special["BetterBagsNextBank"], "Escape closes it")
+  end)
+
+  -- BetterBags Next's vendor (next.md §10): with it on, the vendor is made, takes Blizzard's merchant
+  -- frame under the hidden frame Blizzard's bags go under, and closes with Escape; with it off,
+  -- nothing is made and the merchant frame is Blizzard's.
+  describe("the vendor", function()
+    local function panel(name)
+      return { frame = CreateFrame("Frame"), GetName = function() return name end, SetTitle = function() end }
+    end
+
+    local function initialize(nextOn)
+      local db = addon:GetModule("Database")
+      local nextBag = addon:GetModule("NextBag")
+      local nextBankMod = addon:GetModule("NextBank")
+      local nextVendor = addon:GetModule("NextVendor")
+      local saved = { db.GetNextEnabled, nextBag.Create, nextBankMod.Create, nextVendor.Create, nextVendor.TakeOver }
+      local vendor = panel("BetterBagsNextVendor")
+      local took
+      db.GetNextEnabled = function() return nextOn end
+      nextBag.Create = function() return panel("BetterBagsNextBackpack") end
+      nextBankMod.Create = function() return panel("BetterBagsNextBank") end
+      nextVendor.Create = spy.new(function() return vendor end)
+      nextVendor.TakeOver = function(_, hidden) took = hidden end
+      addon.Vendor = nil
+      local ok, err = pcall(function() addon:OnInitialize() end)
+      local made = nextVendor.Create
+      db.GetNextEnabled, nextBag.Create, nextBankMod.Create, nextVendor.Create, nextVendor.TakeOver = unpack(saved)
+      assert.is_true(ok, err)
+      return vendor, made, took
+    end
+
+    it("is made with BetterBags Next, under the hidden frame, closing with Escape", function()
+      local vendor, made, took = initialize(true)
+      assert.spy(made).was.called(1)
+      assert.are.equal(vendor, addon.Vendor)
+      assert.are.equal(_G.BetterBagsSneakyFrame, took)
+      assert.is_false(took:IsShown())
+      local special = {}
+      for _, name in ipairs(UISpecialFrames) do special[name] = true end
+      assert.is_true(special["BetterBagsNextVendor"])
+    end)
+
+    it("is not made without it, leaving Blizzard's merchant frame alone", function()
+      local _, made, took = initialize(false)
+      assert.spy(made).was_not.called()
+      assert.is_nil(addon.Vendor)
+      assert.is_nil(took)
+    end)
   end)
 
   it("should create UI frames during OnInitialize and NOT during OnEnable", function()

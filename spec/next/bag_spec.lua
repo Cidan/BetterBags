@@ -195,6 +195,15 @@ describe("NextBag", function()
       assert.are.equal(style.WIDTH, bag.frame:GetWidth())
     end)
 
+    -- Above every other part of the UI (MEDIUM panels, LOW bars, addon frames up to HIGH), below
+    -- what must cover it: Blizzard's popups and game menu (DIALOG), menus (FULLSCREEN_DIALOG),
+    -- tooltips, and the toplevel HIGH boxes that raise themselves when shown (the stack split).
+    it("sits in the HIGH strata, raising itself when shown or clicked", function()
+      local bag = nextBag:Create(ctx())
+      assert.are.equal("HIGH", bag.frame:GetFrameStrata())
+      assert.is_true(bag.frame:IsToplevel())
+    end)
+
     it("feathers its left edge out to nothing and takes no clicks there", function()
       local bag = nextBag:Create(ctx())
       local g = bag.feather._gradient

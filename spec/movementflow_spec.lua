@@ -80,9 +80,17 @@ describe("MovementFlow", function()
       assert.is_false(movementFlow:AtNPCShopWindow())
     end)
 
-    it("returns true when MerchantFrame is visible", function()
-      _G["MerchantFrame"] = { IsVisible = function() return true end }
+    -- As Blizzard's bag code decides to sell (ContainerFrameItemButton_OnClick: MerchantFrame:IsShown()).
+    it("returns true while MerchantFrame is shown, even under a hidden parent (BetterBags Next's vendor)", function()
+      local hidden = CreateFrame("Frame")
+      hidden:Hide()
+      local frame = CreateFrame("Frame", nil, hidden)
+      frame:Show()
+      _G["MerchantFrame"] = frame
+      assert.is_false(frame:IsVisible())
       assert.is_true(movementFlow:AtNPCShopWindow())
+      frame:Hide()
+      assert.is_false(movementFlow:AtNPCShopWindow())
     end)
   end)
 
@@ -110,7 +118,7 @@ describe("MovementFlow", function()
     end)
 
     it("returns NPCSHOP when at a merchant", function()
-      _G["MerchantFrame"] = { IsVisible = function() return true end }
+      _G["MerchantFrame"] = { IsShown = function() return true end }
       assert.are.equal(const.MOVEMENT_FLOW.NPCSHOP, movementFlow:GetMovementFlow())
     end)
 
