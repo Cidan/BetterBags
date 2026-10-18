@@ -118,13 +118,43 @@ section dragged out of a panel returns to the panel's strata (§7).
   opaque; no border art) and the 458-pixel body (a solid deep indigo, with a faint lavender wash at
   the top). The body reaches 40 pixels past the right edge so the opening overshoot never shows the
   world behind it. The feather takes no clicks (`SetHitRectInsets`).
-- **Header:** the title, "Backpack", 26-pixel white with a soft shadow; a light **ribbon** running
-  left from the title across the feather and out of the window (a thin gold line and a soft glow,
-  both fading out to the left) with a spark that sweeps along it every few seconds; sort and
+- **Header:** the title, "Backpack", 26-pixel white with a soft shadow, in a **cloud**; a light
+  **ribbon** running left from the cloud across the feather and out of the window (a thin gold line
+  and a soft glow, both fading out to the left) with a spark that glides in along it every few
+  seconds (the title's cloud, below); sort and
   settings buttons at the top right (`bags-button-autosort-up`, `uitools-icon-settings`). Both
   atlases are in the client's atlas table (`UiTextureAtlasMember`, wago.tools) on retail 12.1.5,
   WoW: Forever 1.60.1, Classic Era 1.15.9, Mists 5.5.4 and Anniversary 2.5.6. The settings button
   first used `GM-icon-settings`, which Classic Era and Mists do not have: the button was blank there.
+- **The title's cloud** (asked: the ribbon "ending at the text is meh", "flow into a bubble behind
+  and around the word backpack, with the sparkles and glow ... don't drown the text", "seamless and
+  not abrupt", then "more like a cloud, no hard lines around it"). A first version, a capsule with a
+  thin rim, was replaced by this one.
+  - Twelve puffs of one soft glow (`textures/next/glow.png`, white, brightest at its centre and
+    fading to nothing at its edge; made by `tools/textures/next_glow.py`), additive, tinted from the
+    palette: gold where the ribbon enters, lavender across, a few smaller ones above and below for
+    billows. Their places, sizes, colors and alphas are data (`NextStyle.Cloud`): each sits a share
+    of the way across the cloud, which reaches 16 pixels past the title on each side, so the cloud
+    spreads across any title (`LayoutCloud`, on every `SetTitle`: the bank's group and tab names,
+    the vendor's merchant). The puffs are at most 0.24 alpha, below the title (ARTWORK; the title is
+    OVERLAY), so it stays crisp. No texture of the cloud has an edge.
+  - The ribbon runs into the cloud's edge (`TitleJoin`) and goes on inside it as a 24-pixel tail
+    that fades out from the ribbon's brightness; a warm puff sits where it enters, over both.
+  - The cloud breathes: each puff's alpha (by 15%) and height (by 1.5 pixels), at its own pace and
+    from its own point (`applyCloud`, from a driver that is a child of the panel, so it runs only
+    while the panel shows).
+  - The shimmer glides in along the ribbon from its far end (in and out eased), comes to rest
+    6 pixels inside the cloud, before the title, and settles there: it grows and fades while the
+    cloud swells (puffs by up to 60%, the entering puff more) and eases back, quickly at first and
+    then gently (`style.Time.Absorb`, 0.7 s). Nothing jumps and nothing crosses the title.
+  - A third sparkle emitter (§4) is born in the cloud above and below the title, never over it.
+  - Mirrored on the bank (and every left-side panel): the ribbon enters on the right.
+  - Coverage: `spec/next/bag_spec.lua` ("the title's cloud": the puffs, their layer and texture,
+    the ribbon and its tail, spreading across a new title, breathing out of step, the shimmer's
+    glide, rest, settling and swell with no step anywhere, the sparkles above and below the title)
+    and `spec/next/bank_spec.lua` (mirrored). Every guard was mutation-tested (27 mutations; the
+    six that first survived led to tests of the drift, the swell reaching the puffs and the
+    settling's shape, and to removing a size reset the next shimmer redoes).
 - **Search** under the title: the backpack's in-bag search box (`searchBox:CreateBox`), taken out of
   Sonata's hands and drawn flat. It follows the in-bag search setting like the classic bag's.
 - **Content:** a scroll box (`render/scrollbox.lua`, its bar hidden until used) holding the canvas.
@@ -144,7 +174,9 @@ section dragged out of a panel returns to the panel's strata (§7).
 ## 4. Sparkles (`next/sparkles.lua`)
 
 A small particle emitter: star sprites (`Interface\Cooldown\star4`, additive) spawned around the
-title's ribbon and, more rarely, along the feathered edge, drifting out of the window (left from the
+title's ribbon, out of the title's cloud (above and below the title, most near where the ribbon
+enters, about 3 a second, at most 10) and, more rarely, along the feathered edge, drifting out of
+the window (left from the
 backpack, right from the bank: the emitter's `Direction`) while they twinkle, spin and fade, in
 starlight gold, white and moon lavender. At most 28 alive, about
 8 a second; textures are pooled. It runs only while the panel is shown, and spawns nothing in
