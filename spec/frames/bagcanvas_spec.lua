@@ -274,6 +274,15 @@ describe("BagCanvas", function()
       assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, 0 }, { canvas.tabContainer:GetPoint(1) })
     end)
 
+    -- The classic bags keep Motion's own time; only BetterBags Next moves in 0.24 s (next.md §5).
+    it("moves in Motion's 0.3 seconds", function()
+      local canvas = recentAppears(CreateFrame("Frame"))
+      motion:Step(0.29)
+      assert.is_not_nil(motion:GetMove(canvas.tabContainer))
+      motion:Step(0.01)
+      assert.is_nil(motion:GetMove(canvas.tabContainer))
+    end)
+
     -- Animate Item Movement (off by default) turns it on.
     it("places everything at once while animating item movement is off, and forgets what it placed", function()
       animate = false

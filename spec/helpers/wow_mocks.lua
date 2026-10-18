@@ -987,8 +987,16 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetFrameStrata(strata)
     self._frameStrata = strata
   end
+  -- A frame shares its parent's strata unless it sets its own (warcraft.wiki.gg "Frame Strata").
   function widget:GetFrameStrata()
-    return self._frameStrata or "MEDIUM"
+    if self._frameStrata ~= nil then
+      return self._frameStrata
+    end
+    local owner = self._parent
+    if owner ~= nil and owner.GetFrameStrata ~= nil then
+      return owner:GetFrameStrata()
+    end
+    return "MEDIUM"
   end
   -- warcraft.wiki.gg "Frame Strata": when a frame's level changes, every descendant shifts by
   -- the same amount, and a descendant that would go below 0 is set to 10000.

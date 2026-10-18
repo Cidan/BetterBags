@@ -65,20 +65,29 @@ style.Color = {
 }
 
 -- Timings, in seconds, and the cascade's rise in pixels.
+-- How long everything that moves in answer to the player takes: items and sections gliding to their
+-- new places (sorting, looting, switching tabs, making room for a dragged section), a dropped
+-- section landing or flying into its target, and the tab bar gliding. Not the panel's own slides
+-- in and out (Open, Close), which are tuned on their own.
+local INTERACTION = 0.24
+
 style.Time = {
+  Interaction = INTERACTION,
   Open = 0.45,
   Close = 0.24,
   Cascade = 0.32,
   Stagger = 0.045,
   OpenCascadeDelay = 0.12,
-  Glide = 0.22,
+  Glide = INTERACTION,
+  -- The wash at the top of the panel fading to another color.
+  Wash = 0.44,
   Hover = 0.15,
   Shimmer = 1.4,
   ShimmerEvery = 3.4,
   -- Moving sections (next.md §7).
   Lift = 0.12,
-  Land = 0.22,
-  FlyAway = 0.3,
+  Land = INTERACTION,
+  FlyAway = INTERACTION,
   Pulse = 0.6,
 }
 style.RISE = 12

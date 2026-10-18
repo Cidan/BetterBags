@@ -52,6 +52,15 @@ describe("Motion", function()
     for _ = 1, 100 do tick(0.016) end
   end
 
+  -- hermite is the curve: from x0 at speed v0 to x1 at rest over d seconds, e seconds in.
+  local function hermite(x0, v0, x1, d, e)
+    local u = e / d
+    local u2, u3 = u * u, u * u * u
+    local x = (2 * u3 - 3 * u2 + 1) * x0 + (u3 - 2 * u2 + u) * d * v0 + (3 * u2 - 2 * u3) * x1
+    local v = ((6 * u2 - 6 * u) * x0 + (3 * u2 - 4 * u + 1) * d * v0 + (6 * u - 6 * u2) * x1) / d
+    return x, v
+  end
+
   it("places a frame at once outside a pass", function()
     local f = shown()
     motion:Place(f, root, 10, -20)
@@ -122,6 +131,75 @@ describe("Motion", function()
     for i = peakAt + 1, #steps do assert.is_true(steps[i] <= steps[i - 1] + 1e-9, "slows down") end
     assert.is_true(steps[1] < peak * 0.25 and steps[#steps] < peak * 0.25, "starts and ends slow")
     assert.are.equal(300, xs[#xs])
+  end)
+
+  -- A pass may give its moves their own duration: BetterBags Next's sections making room for a
+  -- dragged section move faster (next.md §7).
+  it("moves in a pass's own time, with the same slow, fast, slow curve", function()
+    local f = shown()
+    pass(key, function() motion:Place(f, root, 0, 0) end)
+    motion:BeginPass(key, 0.2)
+    motion:Place(f, root, 300, 0)
+    motion:EndPass()
+    tick(0.05)
+    local quarter = select(4, f:GetPoint(1))
+    assert.is_true(math.abs(quarter - 300 * (3 * 0.25 ^ 2 - 2 * 0.25 ^ 3)) < 1e-6, tostring(quarter))
+    tick(0.05)
+    assert.is_true(math.abs(select(4, f:GetPoint(1)) - 150) < 1e-6, "halfway at half its time")
+    tick(0.1)
+    assert.are.same({ "TOPLEFT", root, "TOPLEFT", 300, 0 }, anchorOf(f))
+    assert.is_nil(motion:GetMove(f))
+  end)
+
+  it("keeps the usual time for a pass that gives none", function()
+    local f = shown()
+    pass(key, function() motion:Place(f, root, 0, 0) end)
+    motion:BeginPass(key, 0.2)
+    motion:Place(f, root, 0, 0)
+    motion:EndPass()
+    pass(key, function() motion:Place(f, root, 300, 0) end)
+    tick(0.2)
+    assert.is_not_nil(motion:GetMove(f), "still moving after 0.2 s")
+    tick(DURATION - 0.2)
+    assert.is_nil(motion:GetMove(f))
+  end)
+
+  it("keeps its speed turning toward a new place in a pass with its own time", function()
+    local f = shown()
+    pass(key, function() motion:Place(f, root, 0, 0) end)
+    motion:BeginPass(key, 0.2)
+    motion:Place(f, root, 300, 0)
+    motion:EndPass()
+    tick(0.11)
+    local at, speed = hermite(0, 0, 300, 0.2, 0.11)
+    assert.is_true(math.abs(select(4, f:GetPoint(1)) - at) < 1e-6)
+    motion:BeginPass(key, 0.2)
+    motion:Place(f, root, 600, 0)
+    motion:EndPass()
+    tick(0.01)
+    local expected = hermite(at, speed, 600, 0.2, 0.01)
+    assert.is_true(math.abs(select(4, f:GetPoint(1)) - expected) < 1e-6,
+      string.format("%.4f, expected %.4f", select(4, f:GetPoint(1)), expected))
+    tick(0.2)
+    assert.are.same({ "TOPLEFT", root, "TOPLEFT", 600, 0 }, anchorOf(f))
+  end)
+
+  -- A drag ends mid-slide: a quick move turns into one of the usual time.
+  it("carries its speed into a move of another duration", function()
+    local f = shown()
+    pass(key, function() motion:Place(f, root, 0, 0) end)
+    motion:BeginPass(key, 0.2)
+    motion:Place(f, root, 300, 0)
+    motion:EndPass()
+    tick(0.11)
+    local at, speed = hermite(0, 0, 300, 0.2, 0.11)
+    pass(key, function() motion:Place(f, root, 600, 0) end)
+    tick(0.01)
+    local expected = hermite(at, speed, 600, DURATION, 0.01)
+    assert.is_true(math.abs(select(4, f:GetPoint(1)) - expected) < 1e-6,
+      string.format("%.4f, expected %.4f", select(4, f:GetPoint(1)), expected))
+    tick(DURATION)
+    assert.are.same({ "TOPLEFT", root, "TOPLEFT", 600, 0 }, anchorOf(f))
   end)
 
   it("leaves a frame that stays where it is alone", function()

@@ -76,9 +76,16 @@ local CANVAS_TOP = 1090
 describe("NextDrag", function()
   local buttons, sent, pins, db, backpackGroups, bankGroups, slots, calls, backpack, bank
 
+  -- An item button: a holder frame and, inside it, the button the player clicks. Like Blizzard's
+  -- (ContainerFrameItemButtonMixin:OnReceiveDrag calls OnDragStart, which is a left click), a drag
+  -- released over that button picks its item up.
   local function fakeButton(slotkey)
     local b = { slotkey = slotkey, frame = CreateFrame("Frame") }
     b.frame:SetSize(37, 37)
+    b.button = CreateFrame("Button", nil, b.frame)
+    b.button:SetScript("OnReceiveDrag", function()
+      table.insert(calls.pickedUp, slotkey)
+    end)
     function b:SetItemFromData(_, data) self.data = data self.isFreeSlot = false end
     function b:SetFreeSlots(_, data) self.data = data self.isFreeSlot = true end
     function b:SetSize(_, w, h) self.frame:SetSize(w, h) end
@@ -224,7 +231,7 @@ describe("NextDrag", function()
       [12] = { id = 12, name = "Vault", bankType = CHAR },
     }
     slots = { [BACKPACK] = backpackData(), [BANK] = bankData() }
-    calls = { moved = {}, assigned = {}, scrolled = {}, titleDrops = {} }
+    calls = { moved = {}, assigned = {}, scrolled = {}, titleDrops = {}, pickedUp = {} }
 
     override(addon, "isRetail", true)
     override(addon, "isForever", false)
@@ -652,6 +659,132 @@ describe("NextDrag", function()
       assert.is_nil(bank.tabs.dropTarget)
       drop(herbs)
       assert.are.same({}, calls.moved)
+    end)
+  end)
+
+  -- The client starts a drag only once the cursor has moved a little, so by then it can be over the
+  -- section's first item rather than its header. The release goes to the mouse-enabled frame under
+  -- the cursor (warcraft.wiki.gg UIHANDLER_OnReceiveDrag: also when dragging widgets), and over an
+  -- item button that is a click that picks the item up.
+  describe("the release", function()
+    local STRATA = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5, FULLSCREEN = 6,
+      FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
+
+    -- topmost is the frame the client gives the release to, of those under the cursor: the
+    -- highest visible, mouse-enabled one, by strata, then level.
+    local function topmost(frames)
+      local best
+      for _, f in ipairs(frames) do
+        if f:IsVisible() and f:IsMouseEnabled() then
+          local a, b = STRATA[f:GetFrameStrata()], best and STRATA[best:GetFrameStrata()]
+          if best == nil or a > b or (a == b and f:GetFrameLevel() > best:GetFrameLevel()) then
+            best = f
+          end
+        end
+      end
+      return best
+    end
+
+    -- underCursor lists what is under the cursor while a section is dragged by a point of its own:
+    -- that point's item button, and the cover over the section when it reaches the point.
+    local function underCursor(s, itemButton)
+      local frames = { itemButton }
+      local cover = nextDrag.cover
+      if cover ~= nil and cover:IsShown() then
+        local state = nextDrag.current
+        local p1, p2 = { cover:GetPoint(1) }, { cover:GetPoint(2) }
+        assert.are.same({ "TOPLEFT", s.frame, "TOPLEFT" }, { p1[1], p1[2], p1[3] })
+        assert.are.same({ "BOTTOMRIGHT", s.frame, "BOTTOMRIGHT" }, { p2[1], p2[2], p2[3] })
+        local left, top, right, bottom = -p1[4], p1[5], s.frame:GetWidth() + p2[4], s.frame:GetHeight() - p2[5]
+        if state.grabX >= -left and state.grabX <= right and state.grabY >= -top and state.grabY <= bottom then
+          table.insert(frames, cover)
+        end
+      end
+      return frames
+    end
+
+    local function release(s, itemButton)
+      local focus = topmost(underCursor(s, itemButton))
+      local onReceive = focus and focus:GetScript("OnReceiveDrag")
+      if onReceive then
+        onReceive(focus)
+      end
+      drop(s)
+    end
+
+    it("never picks up the item the cursor was over when the drag started", function()
+      local herbs = pickUp(backpack, "Herbs", 20, style.SECTION_HEADER + 10)
+      local armor = section(backpack, "Armor")
+      moveTo(herbs.frame:GetLeft() + 20, armor.frame:GetTop() - 5)
+      release(herbs, buttons["0_3"].button)
+      finishTweens()
+      assert.are.same({}, calls.pickedUp)
+      assert.are.same({ Herbs = 0 }, pins[BACKPACK], "the reorder still happens")
+    end)
+
+    it("never picks up an item dropping the section on the other bag", function()
+      local herbs = pickUp(backpack, "Herbs", 20, style.SECTION_HEADER + 10)
+      moveTo(300, 600)
+      release(herbs, buttons["0_3"].button)
+      assert.are.same({}, calls.pickedUp)
+      assert.are.same({ { { "0_3", "0_4" } } }, calls.moved, "the move still happens")
+    end)
+
+    it("covers the section, and a margin past its edges, above everything in it", function()
+      local herbs = pickUp(backpack, "Herbs")
+      local cover = nextDrag.cover
+      assert.is_true(cover:IsShown())
+      assert.is_true(cover:IsMouseEnabled())
+      assert.are.equal("TOOLTIP", cover:GetFrameStrata())
+      local p1, p2 = { cover:GetPoint(1) }, { cover:GetPoint(2) }
+      assert.is_true(p1[4] < 0 and p1[5] > 0, "past the top left")
+      assert.is_true(p2[4] > 0 and p2[5] < 0, "past the bottom right")
+      local function check(f)
+        assert.is_true(cover:GetFrameLevel() > f:GetFrameLevel())
+        for _, child in ipairs({ f:GetChildren() }) do check(child) end
+      end
+      check(herbs.frame)
+    end)
+
+    it("goes above a frame far above the section, as a skin or a template's level can put one", function()
+      local herbs = section(backpack, "Herbs")
+      local high = buttons["0_3"].button
+      high:SetFrameLevel(herbs.frame:GetFrameLevel() + 300)
+      pickUp(backpack, "Herbs")
+      assert.is_true(nextDrag.cover:GetFrameLevel() > high:GetFrameLevel())
+    end)
+
+    -- Lowering a frame's level lowers every frame in it, and one that would go below 0 jumps to the
+    -- top level, 10000 (warcraft.wiki.gg "Frame Strata"), where the cover cannot be above it.
+    it("never sends a frame of the section to the top level, picked up or put back", function()
+      local herbs = section(backpack, "Herbs")
+      local before = {}
+      local function levels(f, out)
+        out[f] = f:GetFrameLevel()
+        for _, child in ipairs({ f:GetChildren() }) do levels(child, out) end
+        return out
+      end
+      levels(herbs.frame, before)
+      pickUp(backpack, "Herbs")
+      for f in pairs(levels(herbs.frame, {})) do
+        assert.is_true(f:GetFrameLevel() < 10000)
+      end
+      nextDrag:Cancel()
+      for f, level in pairs(levels(herbs.frame, {})) do
+        assert.are.equal(before[f], level)
+      end
+    end)
+
+    it("takes the cover away when the section is back in its bag", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(900, 600)
+      drop(herbs)
+      assert.is_true(nextDrag.cover:IsShown(), "while it lands")
+      finishTweens()
+      assert.is_false(nextDrag.cover:IsShown())
+      pickUp(backpack, "Cloth")
+      nextDrag:Cancel()
+      assert.is_false(nextDrag.cover:IsShown())
     end)
   end)
 

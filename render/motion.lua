@@ -15,8 +15,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 -- that stays, and both can move at once. A frame that changes parent starts where it was: its old
 -- and new places are worked out from the anchors (and links) up to the frame both hang from.
 --
--- A move eases slow, fast, slow: a cubic that starts and ends at rest, over MOVE_DURATION. Turned
--- toward a new place mid-move, a frame keeps its speed rather than stopping first.
+-- A move eases slow, fast, slow: a cubic that starts and ends at rest, over MOVE_DURATION, or the
+-- duration the pass that started it gives. Turned toward a new place mid-move, a frame keeps its
+-- speed rather than stopping first.
 ---@class Motion: AceModule
 local motion = addon:NewModule('Motion')
 
@@ -40,6 +41,7 @@ local EXACT = 0.01
 ---@field x1 number Where it goes.
 ---@field y1 number
 ---@field elapsed number
+---@field duration number How long it takes, in seconds.
 ---@field x number Where it was put last.
 ---@field y number
 
@@ -52,6 +54,7 @@ local EXACT = 0.01
 ---@field id number
 ---@field previous? number The id of the root's previous pass.
 ---@field started number
+---@field duration? number How long the moves it starts take, when not MOVE_DURATION.
 
 -- reset empties every table; the driver stops.
 local function reset()
@@ -83,7 +86,7 @@ local function at(move, u)
   local u3 = u2 * u
   local h00, h10, h01 = 2 * u3 - 3 * u2 + 1, u3 - 2 * u2 + u, 3 * u2 - 2 * u3
   local d00, d10, d01 = 6 * u2 - 6 * u, 3 * u2 - 4 * u + 1, 6 * u - 6 * u2
-  local t = MOVE_DURATION
+  local t = move.duration
   local x = h00 * move.x0 + h10 * t * move.vx + h01 * move.x1
   local y = h00 * move.y0 + h10 * t * move.vy + h01 * move.y1
   local vx = (d00 * move.x0 + d10 * t * move.vx + d01 * move.x1) / t
@@ -166,16 +169,18 @@ function motion:Link(frame, to, offset)
 end
 
 -- BeginPass starts placing root's frames: frames root's previous pass placed move to their new
--- places, the rest are placed at once.
+-- places, the rest are placed at once. duration is how long the moves it starts take (default
+-- MOVE_DURATION).
 ---@param root any
-function motion:BeginPass(root)
+---@param duration? number
+function motion:BeginPass(root, duration)
   self.nextPass = self.nextPass + 1
   local state = self.roots[root]
   if state == nil then
     state = {}
     self.roots[root] = state
   end
-  self.pass = { root = root, id = self.nextPass, previous = state.current, started = 0 }
+  self.pass = { root = root, id = self.nextPass, previous = state.current, started = 0, duration = duration }
   state.current = self.nextPass
 end
 
@@ -216,7 +221,7 @@ function motion:Place(frame, relativeTo, x, y)
   local cx, cy = whereIn(frame, relativeTo)
   local vx, vy = 0, 0
   if move ~= nil then
-    local _, _, mvx, mvy = at(move, math.min(1, move.elapsed / MOVE_DURATION))
+    local _, _, mvx, mvy = at(move, math.min(1, move.elapsed / move.duration))
     vx, vy = mvx, mvy
   end
   self.moves[frame] = nil
@@ -226,7 +231,7 @@ function motion:Place(frame, relativeTo, x, y)
   end
   self.moves[frame] = {
     root = pass.root, relativeTo = relativeTo, x0 = cx, y0 = cy, vx = vx, vy = vy, x1 = x, y1 = y,
-    elapsed = 0, x = cx, y = cy,
+    elapsed = 0, duration = pass.duration or MOVE_DURATION, x = cx, y = cy,
   }
   anchor(frame, relativeTo, cx, cy)
   pass.started = pass.started + 1
@@ -292,11 +297,11 @@ function motion:Step(elapsed)
     else
       move.elapsed = move.elapsed + elapsed
       local x, y
-      if move.elapsed >= MOVE_DURATION then
+      if move.elapsed >= move.duration then
         x, y = move.x1, move.y1
         self.moves[frame] = nil
       else
-        x, y = at(move, move.elapsed / MOVE_DURATION)
+        x, y = at(move, move.elapsed / move.duration)
       end
       anchor(frame, move.relativeTo, x, y)
       move.x, move.y = x, y

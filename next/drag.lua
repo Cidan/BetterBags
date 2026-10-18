@@ -46,6 +46,14 @@ local SCROLL_EDGE = 40
 local SCROLL_SPEED = 700
 -- How long a section moved away stays out of its column while its items are still there.
 local LEAVING_SECONDS = 3
+-- How far past a dragged section's edges its cover reaches: the client starts a drag only once
+-- the cursor has moved a little, so the point grabbed can be just outside the section.
+local COVER_MARGIN = 20
+-- How far above the highest frame in a dragged section its cover sits, for buttons drawn into it
+-- while it is dragged.
+local COVER_ABOVE = 100
+-- The highest frame level there is (warcraft.wiki.gg "Frame Strata").
+local MAX_LEVEL = 10000
 
 ---@alias NextDropKind "reorder"|"tab"|"bagtab"|"bag"
 
@@ -115,9 +123,29 @@ function nextDrag:buildLayer()
   local hint = layer:CreateFontString(nil, "OVERLAY")
   hint:SetFontObject(style:Font("TabSelected"))
   hint:Hide()
+  -- The cover lies over a dragged section and takes the mouse, so the release lands on it and
+  -- not on one of the section's item buttons: their OnReceiveDrag is a left click
+  -- (ContainerFrameItemButtonMixin), which picks the item up. It does nothing with it. The drop
+  -- is the header's OnDragStop, which the client sends to the frame being dragged wherever the
+  -- cursor is, and targets are found by position, so neither depends on what is under the cursor.
+  local cover = CreateFrame("Frame", nil, layer)
+  cover:EnableMouse(true)
+  cover:Hide()
   self.layer = layer
   self.shadow = shadow
   self.hint = hint
+  self.cover = cover
+end
+
+-- maxLevel returns the highest frame level in frame and every frame below it.
+---@param frame Frame
+---@return number
+local function maxLevel(frame)
+  local level = frame:GetFrameLevel()
+  for _, child in ipairs({ frame:GetChildren() }) do
+    level = math.max(level, maxLevel(child))
+  end
+  return level
 end
 
 -- place puts the dragged section so that the point grabbed is at x, y, at its scale.
@@ -164,13 +192,21 @@ function nextDrag:Begin(panel, section)
   GameTooltip:Hide()
   frame:SetParent(self.layer)
   frame:SetFrameStrata("TOOLTIP")
-  frame:SetFrameLevel(self.layer:GetFrameLevel() + 2)
+  -- Never lower it: every frame in it moves with it, and one that would go below 0 jumps to the top
+  -- level (warcraft.wiki.gg "Frame Strata"), where the cover cannot be above it.
+  frame:SetFrameLevel(math.max(frame:GetFrameLevel(), self.layer:GetFrameLevel() + 2))
   self:place(x, y)
   self.shadow:ClearAllPoints()
   self.shadow:SetPoint("TOPLEFT", frame, "TOPLEFT", -10, 10)
   self.shadow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 10, -10)
   self.shadow:SetAlpha(0)
   self.shadow:Show()
+  local cover = self.cover
+  cover:ClearAllPoints()
+  cover:SetPoint("TOPLEFT", frame, "TOPLEFT", -COVER_MARGIN, COVER_MARGIN)
+  cover:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", COVER_MARGIN, -COVER_MARGIN)
+  cover:SetFrameLevel(math.min(MAX_LEVEL, maxLevel(frame) + COVER_ABOVE))
+  cover:Show()
   local state = self.current
   tween:Play(self, {
     duration = style.Time.Lift,
@@ -446,6 +482,7 @@ function nextDrag:reattach(hidden)
   end
   self.shadow:Hide()
   self.hint:Hide()
+  self.cover:Hide()
 end
 
 -- finish ends the drag: the target unlit, the driver stopped.

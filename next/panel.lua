@@ -416,7 +416,7 @@ function panelProto:SetWash(name)
   local from = self.washColor
   local to = style.Color[name]
   tween:Play(self.wash, {
-    duration = style.Time.Glide * 2,
+    duration = style.Time.Wash,
     from = 0,
     to = 1,
     ease = "inOutSine",
