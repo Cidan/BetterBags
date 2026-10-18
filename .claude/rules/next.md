@@ -31,6 +31,13 @@ Item Movement), or `/bb next`, turns it on or off and asks for a reload (`askToR
   keybinding (`BetterBags_ToggleSearch`, `frames/search.lua`) asks the backpack to `ToggleSearch`
   when it can: Next opens and puts the cursor in its own box, or lets go of it on a second press.
   There is no overlay search panel with Next (the classic backpack's behavior made it).
+- **Nothing changes for a player with Next off.** `nextEnabled` defaults to `false`, so the classic
+  backpack is created as before; the search keybinding keeps the overlay (the classic bag has no
+  `ToggleSearch`); the two guards are no-ops for a bag with an anchor and a window. The six
+  `next\*.lua` files load for everyone and only register modules and prototypes: no frame or font
+  is made until `NextBag:Create`. Every TOC loads each module a file looks up at load before that
+  file, checked by `spec/render/toc_spec.lua` ("loads every module a file looks up at load before
+  that file, in every TOC"), which would otherwise be an error for every player.
 - Every other caller uses members Next has (checked against the whole addon): `IsShown`, `frame`,
   `Show`, `Hide`, `Draw`, `Search`, `ResetSearch`, `searchBox`, `loaded`, `SetTitle`, `GetName`,
   `kind`, `drawOnClose`, `PlaceCursorItem`, `behavior.SwitchToGroup`. Quick Find's `bag.tabs`
@@ -148,4 +155,5 @@ strings no template has; they now use the templates' font (`GameFontHighlightSma
 - No Show Bags panel, currencies, bag anchor or bag menu; the size and opacity settings do not
   apply (the panel has one size).
 - Item buttons keep the active theme's style.
-- Not yet seen in game.
+- No dragging category headers onto tabs.
+- Seen in game once, which found the section title font error (§6); not seen since that fix.

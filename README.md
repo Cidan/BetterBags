@@ -569,6 +569,17 @@ Import and Export strings only contain category information. Set your own style 
 	</tr>
 </table>
 
+## BetterBags Next (experimental)
+An early look at a new backpack design. Turn it on with **BetterBags Next (experimental)** in the settings, or type `/bb next`; BetterBags asks to reload the UI for it to take effect, and the same setting or command turns it off again.
+
+- Your backpack becomes a full-height panel that slides in from the right edge of the screen, with soft, feathered edges instead of a border.
+- Your backpack groups become tabs down the left side of the panel: click one to switch, right-click one to rename or delete it, and click **+** to make a new group.
+- Your categories are listed in one column, each its own row of large icons, with Recent Items first and Free Space last. The list scrolls.
+- Sections fade in as the panel opens, items glide to their new places when you sort or loot, and sparkles drift out of the window from the title.
+- Searching, sorting, the settings button, dropping items onto the panel, cooldowns and tooltips work as they do in the regular bag. The bank keeps its regular window.
+
+Not there yet: the Show Bags panel, currencies, the bag anchor, the bag menu, dragging categories onto tabs, and the size and opacity settings (the panel has one size). It is an experiment and may change or go away; please report what you think.
+
 ## Reporting Performance Problems
 If BetterBags makes your game stutter, you can record exactly what it was doing and send that along with your report.
 

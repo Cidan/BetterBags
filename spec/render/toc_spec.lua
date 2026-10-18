@@ -72,6 +72,42 @@ describe("render pipeline and Sonata load order", function()
     assert.are.equal(5, count)
   end)
 
+  -- Every TOC loads for every player, whatever they turned on: a file that looks up a module (at
+  -- load, "local x = addon:GetModule('X')") before the file that makes it would error for all of
+  -- them. Each lookup must name a module an earlier file of the same TOC made, or the file itself.
+  it("loads every module a file looks up at load before that file, in every TOC", function()
+    local pipe = io.popen("ls *.toc")
+    local count = 0
+    for path in pipe:lines() do
+      local defined, unresolved, lookups = {}, {}, 0
+      for _, entry in ipairs(readToc(path)) do
+        local file = entry:gsub("\\", "/")
+        local f = file:match("%.lua$") and not file:match("^libs/") and io.open(file, "r")
+        if f then
+          local source = f:read("*a")
+          f:close()
+          local here = {}
+          for name in source:gmatch("NewModule%(%s*['\"]([^'\"]+)['\"]") do here[name] = true end
+          for line in (source .. "\n"):gmatch("([^\n]*)\n") do
+            local name = line:match("^local%s+[%w_]+%s*=%s*addon:GetModule%(%s*['\"]([^'\"]+)['\"]%s*%)")
+            if name then
+              lookups = lookups + 1
+              if not defined[name] and not here[name] then
+                table.insert(unresolved, file .. " looks up " .. name)
+              end
+            end
+          end
+          for name in pairs(here) do defined[name] = true end
+        end
+      end
+      assert.are.same({}, unresolved, path)
+      assert.is_true(lookups > 400, path .. " checked " .. lookups .. " lookups")
+      count = count + 1
+    end
+    pipe:close()
+    assert.are.equal(5, count)
+  end)
+
   -- BetterBagsNext (next.md): its files load after what they use (the bag frame, the search
   -- box, the money frame, the backpack behavior) and before core/init.lua, in dependency order.
   it("lists BetterBags Next's files in every TOC, in order, after the bag frames and before init", function()

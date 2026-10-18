@@ -78,6 +78,9 @@ the session. See `.claude/rules/perf-profiler.md`.
 ### 4. Shifting Heavy UI Frame Creation to ADDON_LOADED
 To completely avoid script timeout errors (up to 200ms) during the enter-world sequences (`PLAYER_LOGIN`) on World of Warcraft (especially in Hardcore environments), the heavy structural UI creation is shifted entirely to the `ADDON_LOADED` phase inside `addon:OnInitialize()`.
 - **Phase Split:** Building physical bag and bank containers (`BagFrame:Create`), decorating every window with the saved theme (enabling Sonata, which applies it; windows made later are decorated as they register, sonata.md §2), setting up backpack titles, and registering frames to `UISpecialFrames` are performed under `addon:OnInitialize()`. This phase is immune to the engine's standard script execution timers.
+- **Which backpack:** `addon.Bags.Backpack` is the classic `BagFrame:Create(ctx, BACKPACK)`, or,
+  when BetterBags Next is on (`database:GetNextEnabled()`, read here, so it takes effect after a
+  reload), `NextBag:Create(ctx)` (next.md §1). The classic backpack is then not created at all.
 - **Data Decoupling:** Absolutely no data-api queries, `C_Container` scans, search engine indexing, or items harvesting are permitted during this phase. The UI frames must remain empty structural shells.
 - **No Sweep in OnEnable:** `OnEnable()` (PLAYER_LOGIN) still reads no bags. The client has not delivered them yet at that point (a captured login read a backpack of 20 empty slots there), so `refresh:OnEnable()` only holds the refresh queue for the startup read, which runs once after the loading screen, when the bags have stopped changing and their item data has loaded (refresh-scheduler.md §8).
 
