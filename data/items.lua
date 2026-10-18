@@ -1051,7 +1051,9 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
       totalItems = totalItems + 1
     end
 
-    currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
+    -- The item's own category, without search categories: the search index holds it while Phase 8
+    -- matches search categories (data-loader.md §8).
+    currentItem.itemInfo.category = self:GetCategory(ctx, currentItem, true)
     currentItem.isUpgrade = self:ResolveUpgrade(currentItem)
     currentItem.itemContextMatchResult = self:ResolveItemContextMatchResult(currentItem)
     currentItem.drawGeneration = self._drawGeneration[kind]
@@ -1228,9 +1230,11 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
 
   self:RefreshSearchCache(kind, itemData)
 
-  -- Phase 6 resolved categories against the previous sweep's search cache. Resolve
-  -- again now that the cache reflects this sweep, so search categories compete with
-  -- custom categories, gear sets and recent items by the priority rules in GetCategory.
+  -- Phase 6 gave each item its own category, without search categories, and the index was
+  -- brought up to date with it, so the search categories above matched each item by its own
+  -- properties. Resolve again now that the cache reflects this sweep, so search categories compete
+  -- with custom categories, gear sets and recent items by the priority rules in GetCategory; the
+  -- index then holds the category each item is shown in, for the search box.
   for _, currentItem in pairs(itemData) do
     if not currentItem.isItemEmpty then
       local oldCategory = currentItem.itemInfo.category
@@ -2882,7 +2886,13 @@ function items:AttachBasicItemInfo(itemID, data)
   data.forceClear = false
 end
 
-function items:GetCategory(ctx, data)
+-- GetCategory returns the category data is shown in. With own, it leaves search categories out:
+-- the item's own category, which search categories are matched against (Phase6_EnrichData).
+---@param ctx Context
+---@param data ItemData
+---@param own? boolean
+---@return string
+function items:GetCategory(ctx, data, own)
   if not data or data.isItemEmpty then
     return L:G("Empty Slot")
   end
@@ -2909,8 +2919,11 @@ function items:GetCategory(ctx, data)
   -- Unified priority-based category selection
   -- Check both search cache (from search categories) and item list categories,
   -- returning the one with higher priority
-  local searchCategory = self.searchCache[data.kind] and self.searchCache[data.kind][data.slotkey]
-  local searchPriority = self.categoryPriorityCache[data.kind] and self.categoryPriorityCache[data.kind][data.slotkey]
+  local searchCategory, searchPriority
+  if not own then
+    searchCategory = self.searchCache[data.kind] and self.searchCache[data.kind][data.slotkey]
+    searchPriority = self.categoryPriorityCache[data.kind] and self.categoryPriorityCache[data.kind][data.slotkey]
+  end
   local customCategory, customPriority = categories:GetCustomCategory(ctx, data.kind, data)
 
   -- If both exist, compare priorities

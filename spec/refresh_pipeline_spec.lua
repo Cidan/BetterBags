@@ -1563,6 +1563,87 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.equal("Searchy", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
   end)
 
+  -- Search categories are matched against each item's own category (the one it has without any
+  -- search category), never against a search category it was given (data-loader.md §8).
+  -- Reported: a search category "Lucky Items" with the query "lucky" held Arcanoweave, which says
+  -- "lucky" nowhere: categories were first given from the previous sweep's search results, kept by
+  -- bag slot, and a bare word matches the category field, so an item that landed in a lucky item's
+  -- slot (a sort) took "Lucky Items" and then matched "lucky" through that name for good.
+  describe("search categories match each item's own category", function()
+    local function searchCategories(list)
+      override(categories, "GetCustomCategory", function() return nil, nil end)
+      override(categories, "GetSortedSearchCategories", function()
+        local out = {}
+        for _, c in ipairs(list) do
+          table.insert(out, { name = c[1], priority = c[3] or 10,
+            enabled = { [const.BAG_KIND.BACKPACK] = true, [const.BAG_KIND.BANK] = true },
+            searchCategory = { query = c[2], groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } })
+        end
+        return out
+      end)
+    end
+
+    local function categoryOf(slotInfo, slotkey)
+      return slotInfo.itemsBySlotKey[slotkey].itemInfo.category
+    end
+
+    it("never gives an item the search category of the item that was in its slot before", function()
+      searchCategories({ { "Alpha Items", "alpha" } })
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      local own = categoryOf(slotInfo, "0_2")
+      assert.equal("Alpha Items", categoryOf(slotInfo, "0_1"))
+      assert.are_not.equal("Alpha Items", own)
+      -- A sort swaps them: each keeps its GUID, in the other slot.
+      mockContainer[0] = { { itemID = 202, guid = "guid-202", count = 1 }, { itemID = 101, guid = "guid-101", count = 1 } }
+      slotInfo = refreshBackpack()
+      assert.equal(own, categoryOf(slotInfo, "0_1"), "Beta Shield took its slot's old search category")
+      assert.equal("Alpha Items", categoryOf(slotInfo, "0_2"))
+      slotInfo = refreshBackpack()
+      assert.equal(own, categoryOf(slotInfo, "0_1"), "and on the next read")
+    end)
+
+    it("lets an item go once it no longer matches, even when the category's name holds the query", function()
+      searchCategories({ { "Alpha Items", "alpha" } })
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      assert.equal("Alpha Items", categoryOf(refreshBackpack(), "0_1"))
+      -- Its own name, type, subtype and tooltip hold no "items"; the category's name does.
+      searchCategories({ { "Alpha Items", "items" } })
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.are_not.equal("Alpha Items", categoryOf(slotInfo, "0_1"))
+    end)
+
+    it("matches the category field against the item's own category, never a search category's name", function()
+      searchCategories({ { "Alpha Items", "alpha" }, { "Meta", 'category = "alpha items"', 1 } })
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      refreshBackpack()
+      local slotInfo = refreshBackpack()
+      assert.equal("Alpha Items", categoryOf(slotInfo, "0_1"))
+      -- The item's own category still works (README: `and not category = "gear:"`).
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        if data.itemInfo.itemID == 101 then return "Custom", 10 end
+        return nil, nil
+      end)
+      local list = { { "By Custom", "category = custom" } }
+      override(categories, "GetSortedSearchCategories", function()
+        return { { name = list[1][1], priority = 10, enabled = { [const.BAG_KIND.BACKPACK] = true },
+          searchCategory = { query = list[1][2], groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } } }
+      end)
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("By Custom", categoryOf(slotInfo, "0_1"))
+    end)
+
+    it("still lets the search box find items by the search category they are in", function()
+      searchCategories({ { "Alpha Items", "alpha" } })
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      searchText = "alpha items"
+      local slotInfo = refreshBackpack()
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isSearchResult, "found by the category it is in")
+      assert.is_false(slotInfo.itemsBySlotKey["0_2"].isSearchResult)
+      assert.is_true(search:Search("alpha items")["0_1"], "between sweeps too")
+    end)
+  end)
+
   it("evaluates the active search box text against the freshly indexed items", function()
     mockContainer[0] = {
       { itemID = 101, guid = "guid-101", count = 1 },
@@ -1657,6 +1738,24 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       if wipe then ctx:Set("wipe", true) end
       items:RefreshBank(ctx)
     end
+
+    it("equals a clean rebuild after sweeps with a search category in play", function()
+      override(categories, "GetCustomCategory", function() return nil, nil end)
+      override(categories, "GetSortedSearchCategories", function()
+        return { { name = "Alpha Items", priority = 10, enabled = { [const.BAG_KIND.BACKPACK] = true, [const.BAG_KIND.BANK] = true },
+          searchCategory = { query = "alpha", groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } } }
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      mockContainer[6] = { { itemID = 303, guid = "guid-303", count = 1 } }
+      refreshBank()
+      refreshBackpack({ wipe = true })
+      assert.are.same(cleanState(), indexState(), "after a wipe")
+      mockContainer[0] = { { itemID = 202, guid = "guid-202", count = 1 }, { itemID = 101, guid = "guid-101", count = 1 } }
+      refreshBackpack()
+      assert.are.same(cleanState(), indexState(), "after a swap")
+      refreshBackpack({ derive = true })
+      assert.are.same(cleanState(), indexState(), "after a recalculation")
+    end)
 
     it("re-indexes only the slot that changed on a targeted sweep", function()
       mockContainer[0] = {
