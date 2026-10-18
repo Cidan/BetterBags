@@ -157,6 +157,13 @@ frames\menubutton.lua
 frames\bagactions.lua
 frames\bag.lua
 
+next\style.lua
+next\tween.lua
+next\sparkles.lua
+next\tabs.lua
+next\content.lua
+next\bag.lua
+
 
 config\categorypane.lua
 config\themepane.lua

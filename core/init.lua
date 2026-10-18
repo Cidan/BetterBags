@@ -210,7 +210,12 @@ function addon:OnInitialize()
   applyCompat()
   self:HideBlizzardBags()
   local rootctx = context:New('addon_initialize')
-  addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
+  -- BetterBags Next (next.md) replaces the backpack's frame and draw; the bank is the same.
+  if database:GetNextEnabled() then
+    addon.Bags.Backpack = addon:GetModule('NextBag'):Create(rootctx)
+  else
+    addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
+  end
 
   -- Establish the bag-button bindings and the highlight-button list before any
   -- of the fallible frame/theme/bank creation below. AceAddon runs

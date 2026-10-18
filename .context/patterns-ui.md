@@ -202,3 +202,7 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 ## Keep the Frame Mock's Anchors Faithful
 **Problem**: the spec frame mock's `SetAllPoints` set no points and `SetPoint` appended a second point of the same name, unlike the client. Code that walks anchors (`GetPoint(1)`) behaved differently in specs than in game.
 **Solution**: `SetAllPoints` sets TOPLEFT and BOTTOMRIGHT, and `SetPoint` replaces a point already set (warcraft.wiki.gg). When a test relied on the old mock, fix the test, not the mock.
+
+## Set a Font String's Font Before Its Text
+**Problem**: `FontString:SetText()` on a font string created without a template and with no font yet raises `FontString:SetText(): Font not set` in the client. A BetterBags Next section title set its text, then its font, and errored on the first open in game while every spec passed.
+**Solution**: give a font string its font (`SetFontObject`, `SetFont`, or a template in `CreateFontString`) before any `SetText`. The spec frame mock raises the client's error, so tests catch the order; spec fixtures that stand in for XML templates must give their font strings the template's font.

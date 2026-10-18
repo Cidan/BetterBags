@@ -183,6 +183,18 @@ function DB:SetAnimateItemMovement(enabled)
   DB.data.profile.animateItemMovement = enabled
 end
 
+-- GetNextEnabled returns whether the backpack is BetterBags Next's panel (next.md); it takes
+-- effect after a reload. Off unless turned on.
+---@return boolean
+function DB:GetNextEnabled()
+  return DB.data.profile.nextEnabled
+end
+
+---@param enabled boolean
+function DB:SetNextEnabled(enabled)
+  DB.data.profile.nextEnabled = enabled
+end
+
 ---@param kind BagKind
 ---@return boolean
 function DB:GetGroupsEnabled(kind)

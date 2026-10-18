@@ -665,6 +665,14 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetTexCoord(...)
     self._texCoords = {...}
   end
+  -- TextureBase:SetRotation(radians, normalizedRotationPoint?) and GetRotation() -> radians
+  -- (SimpleTextureBaseAPIDocumentation, every client).
+  function widget:SetRotation(radians)
+    self._rotation = radians
+  end
+  function widget:GetRotation()
+    return self._rotation or 0
+  end
   -- TextureBase:SetGradient(orientation, minColor, maxColor) with two ColorMixins.
   function widget:SetGradient(orientation, minColor, maxColor)
     self._gradient = { orientation = orientation, min = minColor, max = maxColor }
@@ -745,7 +753,13 @@ local function CreateMockWidget(widgetType, name, parent)
   -- Text and Fonts. A button's text is its font string's (Blizzard sizes buttons from
   -- button:GetFontString():GetStringWidth() after setting their text, InspectPaperDollFrame.lua,
   -- Blizzard_CompactRaidFrameManager.lua).
+  -- FontString:SetText(text): the font must be set before showing text (warcraft.wiki.gg
+  -- API_FontString_SetText); the client raises "FontString:SetText(): Font not set" for a font
+  -- string with no font (none set, no inherited template).
   function widget:SetText(text)
+    if self._type == "FontString" and self._font == nil and self._fontObject == nil and self._inherits == nil then
+      error("FontString:SetText(): Font not set", 2)
+    end
     self._text = tostring(text or "")
     if self._fontString ~= nil then
       self._fontString._text = self._text
@@ -1670,6 +1684,8 @@ _G.BreakUpLargeNumbers = function(val)
   return left:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "") .. (right or "")
 end
 
+-- StaticPopupDialogs: Blizzard's table of popup definitions (StaticPopup.lua), filled by addons.
+_G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
 _G._lastPopupShown = nil
 _G.StaticPopup_Show = function(name, ...)
   _G._lastPopupShown = { name = name, args = {...} }

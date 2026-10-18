@@ -92,8 +92,9 @@ describe("SimulatePane", function()
     local names = {}
     for _, entry in ipairs(pane.eventList.items) do table.insert(names, entry.event) end
     assert.are.same({ "BAG_UPDATE_COOLDOWN", "SPELLS_CHANGED" }, names)
+    -- BetterBagsPlainTextListButton has no text of its own (templates/container.xml): the pane
+    -- makes it.
     local button = CreateFrame("Button")
-    button.Text = button:CreateFontString()
     pane.eventList.init(button, pane.eventList.items[2])
     click(button)
     assert.are.equal("SPELLS_CHANGED", pane.selected)

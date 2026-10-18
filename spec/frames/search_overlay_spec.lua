@@ -127,6 +127,22 @@ describe("the overlay search panel", function()
     assert.are.equal("BetterBagsSearchHelpText", sf.helpText:GetName())
   end)
 
+  -- A BetterBagsNext backpack has no overlay panel: the keybinding asks it to search
+  -- (next.md §1).
+  it("leaves the search keybinding to a backpack that searches itself", function()
+    local toggled = 0
+    addon.Bags.Backpack.ToggleSearch = function() toggled = toggled + 1 end
+    BetterBags_ToggleSearch()
+    assert.are.equal(1, toggled)
+  end)
+
+  it("toggles the overlay from the search keybinding for the classic backpack", function()
+    local sf = create()
+    BetterBags_ToggleSearch()
+    assert.are.equal(1, bagShows)
+    assert.is_true(sf.frame:IsShown())
+  end)
+
   it("opens the backpack and fades in, focusing the box once shown", function()
     local sf = create()
     sf:Toggle(context:New("spec"))

@@ -145,6 +145,13 @@ describe("Constants Module Offsets", function()
     assert.is_false(const.DATABASE_DEFAULTS.profile.animateItemMovement)
   end)
 
+  -- BetterBagsNext is an experiment the player turns on (next.md).
+  it("leaves BetterBags Next off by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    assert.is_false(const.DATABASE_DEFAULTS.profile.nextEnabled)
+  end)
+
   it("should have SCROLLBAR_WIDTH defined in the era constants offsets", function()
     loadfile("core/constants.lua")("BetterBags")
     loadfile("core/era/constants.lua")("BetterBags")
