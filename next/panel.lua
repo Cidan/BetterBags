@@ -69,10 +69,28 @@ local nextPanel = addon:NewModule('NextPanel')
 
 -- The ribbon running from the title out of the window.
 local RIBBON_LENGTH = 300
+-- The spark gliding in along it, and how much it grows as it settles into the title's cloud.
+local SPARK_SIZE = 26
+local SPARK_GROWTH = 18
 -- The ribbon's glow: thin lines above and below it, fainter the further out.
 local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 0.15 }, { 6, 0.06 }, { -6, 0.06 } }
 
 ---@alias NextSide "RIGHT"|"LEFT"
+
+-- A puff of the title's cloud and where it rests: x along and y above the title's middle, from the
+-- title's point the ribbon joins (TitleJoin), its size and alpha before it breathes.
+---@class (exact) NextCloudPuff
+---@field texture Texture
+---@field base {x: number, y: number, w: number, h: number, a: number}
+---@field period number Seconds per breath.
+---@field phase number Where in its breath it starts.
+
+---@class (exact) NextCloud
+---@field puffs NextCloudPuff[]
+---@field join Texture The puff on the ribbon's end.
+---@field driver Frame Runs the breathing while the panel shows.
+---@field time number Seconds the cloud has breathed.
+---@field swell number How brightly it swells with the shimmer, 0 to 1.
 
 ---@class (exact) NextPanelOptions
 ---@field kind BagKind
@@ -106,7 +124,8 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field washColor number[] The wash's color now.
 ---@field title FontString
 ---@field ribbon Texture The ribbon's brightest line.
----@field spark Texture What sweeps along the ribbon.
+---@field spark Texture What glides in along the ribbon and settles into the cloud.
+---@field cloud NextCloud Round the title, the ribbon flowing into it.
 ---@field headerButtons Button[] In order from the screen edge.
 ---@field searchBox SearchFrame
 ---@field scroll ScrollboxDrawable
@@ -482,13 +501,79 @@ function panelProto:GetHeaderButtons()
   return {}
 end
 
--- BuildHeader makes the title on the body's inner side, the ribbon running from it out of the
--- window (a thin gold line with a soft glow, fading out toward its end) and the spark that sweeps
--- along it, and the kind's buttons along the top from the screen edge.
+-- TitleJoin says where the ribbon ends and the title's cloud begins: the window's hard edge, where
+-- the body (and its wash) starts, as the title's point it is measured from, how far from that
+-- point, and which way is in, across the cloud (1 right, -1 left). Nothing of the ribbon goes on
+-- into the window (asked: it should "stop flush with the hard edge of the window").
+---@return string point, number x, number inward
+function panelProto:TitleJoin()
+  local edge = style.PAD + 4
+  if self.side == "LEFT" then
+    return "RIGHT", edge, -1
+  end
+  return "LEFT", -edge, 1
+end
+
+-- CloudSpan is how far the title's cloud reaches across, from the ribbon's end to Pad past the
+-- title's far side, for the title as it is now.
+---@return number
+function panelProto:CloudSpan()
+  return self.title:GetStringWidth() + style.PAD + 4 + style.Cloud.Pad
+end
+
+-- LayoutCloud spreads the cloud's puffs across the title as it is now (a share of the way across
+-- from the join, the widest as wide as the cloud) and draws them.
+function panelProto:LayoutCloud()
+  local C = style.Cloud
+  local _, joinX, inward = self:TitleJoin()
+  local span = self:CloudSpan()
+  for i, puff in ipairs(self.cloud.puffs) do
+    local spec = C.Puffs[i]
+    puff.base = {
+      x = joinX + inward * spec.F * span,
+      y = spec.Y,
+      w = spec.W or span * spec.Wide,
+      h = spec.H,
+      a = spec.A,
+    }
+    puff.texture:SetSize(puff.base.w, puff.base.h)
+  end
+  self:applyCloud()
+end
+
+-- applyCloud draws the cloud as it is now: each puff where it rests, risen and brightened by its
+-- breath, the whole cloud and the join's puff brightened by the shimmer's swell.
+---@private
+function panelProto:applyCloud()
+  local C, cloud = style.Cloud, self.cloud
+  local point = self:TitleJoin()
+  local lift = 1 + C.Swell * cloud.swell
+  for _, puff in ipairs(cloud.puffs) do
+    local breath = 2 * math.pi * cloud.time / puff.period + puff.phase
+    local base = puff.base
+    puff.texture:SetPoint("CENTER", self.title, point, base.x, base.y + C.Drift * math.sin(breath))
+    puff.texture:SetAlpha(base.a * (1 + C.Depth * math.sin(breath * 0.77 + 1)) * lift)
+  end
+  cloud.join:SetAlpha(C.Join.A + C.JoinSwell * cloud.swell)
+end
+
+-- SetCloudSwell brightens the cloud with the shimmer, 0 to 1.
+---@param swell number
+function panelProto:SetCloudSwell(swell)
+  self.cloud.swell = swell
+  self:applyCloud()
+end
+
+-- BuildHeader makes the title on the body's inner side, the cloud round it (soft puffs of glow,
+-- warm where the ribbon ends, no line anywhere, breathing slowly), the ribbon running from the
+-- window's hard edge out of the window (a thin gold line with a soft glow, fading out toward its
+-- end), the spark that glides in along it, and the kind's buttons along the top from the screen
+-- edge.
 ---@param text string
 function panelProto:BuildHeader(text)
   local frame, body = self.frame, self.body
   local left = self.side == "LEFT"
+  local C = style.Cloud
   local title = frame:CreateFontString(nil, "OVERLAY")
   title:SetFontObject(style:Font("Title"))
   if left then
@@ -500,15 +585,33 @@ function panelProto:BuildHeader(text)
   title:SetText(text)
   self.title = title
 
+  local point, joinX = self:TitleJoin()
+  local function puffOf(sublevel, color)
+    local t = frame:CreateTexture(nil, "ARTWORK", nil, sublevel)
+    t:SetTexture(style.CLOUD_GLOW)
+    t:SetBlendMode("ADD")
+    local c = style.Color[color]
+    t:SetVertexColor(c[1], c[2], c[3])
+    return t
+  end
+  local cloud = { puffs = {}, time = 0, swell = 0 }
+  for i, spec in ipairs(C.Puffs) do
+    -- Out of step: each breathes at its own pace, from its own point in the breath.
+    table.insert(cloud.puffs, { texture = puffOf(-2, spec.Color), period = 4 + (i % 4) * 0.9, phase = i * 1.7 })
+  end
+  cloud.join = puffOf(1, C.Join.Color)
+  cloud.join:SetSize(C.Join.Size, C.Join.Size)
+  cloud.join:SetPoint("CENTER", title, point, joinX, 0)
+
   for _, glow in ipairs(RIBBON_GLOW) do
-    local line = frame:CreateTexture(nil, "ARTWORK")
+    local line = frame:CreateTexture(nil, "ARTWORK", nil, 0)
     line:SetSize(RIBBON_LENGTH, 2)
     line:SetColorTexture(1, 1, 1, 1)
     if left then
-      line:SetPoint("LEFT", title, "RIGHT", 10, glow[1])
+      line:SetPoint("LEFT", title, point, joinX, glow[1])
       line:SetGradient("HORIZONTAL", style:CreateColor("Gold", glow[2]), style:CreateColor("Gold", 0))
     else
-      line:SetPoint("RIGHT", title, "LEFT", -10, glow[1])
+      line:SetPoint("RIGHT", title, point, joinX, glow[1])
       line:SetGradient("HORIZONTAL", style:CreateColor("Gold", 0), style:CreateColor("Gold", glow[2]))
     end
     line:SetBlendMode("ADD")
@@ -517,14 +620,24 @@ function panelProto:BuildHeader(text)
     end
   end
 
+  cloud.driver = CreateFrame("Frame", nil, frame)
+  -- A child of the panel: it runs only while the panel shows.
+  cloud.driver:SetScript("OnUpdate", function(_, elapsed)
+    cloud.time = cloud.time + elapsed
+    self:applyCloud()
+  end)
+  self.cloud = cloud
+
   local spark = frame:CreateTexture(nil, "OVERLAY")
   spark:SetTexture(style.SPARKLE_TEXTURE)
   spark:SetBlendMode("ADD")
   spark:SetVertexColor(unpack(style.Color.Gold))
-  spark:SetSize(26, 26)
+  spark:SetSize(SPARK_SIZE, SPARK_SIZE)
   spark:SetPoint("CENTER", self.ribbon, left and "LEFT" or "RIGHT", 0, 0)
   spark:SetAlpha(0)
   self.spark = spark
+
+  self:LayoutCloud()
 
   self.headerButtons = {}
   for _, spec in ipairs(self:GetHeaderButtons()) do
@@ -664,7 +777,8 @@ function panelProto:BuildFooter()
   end
 end
 
--- BuildSparkles makes the two emitters: one around the title's ribbon, one along the feathered
+-- BuildSparkles makes the three emitters: one out of the title's cloud, one around the title's
+-- ribbon, one along the feathered
 -- edge, both drifting out of the window.
 function panelProto:BuildSparkles()
   local fx = CreateFrame("Frame", nil, self.frame)
@@ -672,16 +786,33 @@ function panelProto:BuildSparkles()
   fx:SetFrameLevel(self.frame:GetFrameLevel() + 50)
   local out = self:Outward()
   -- Where the ribbon starts, from the panel's top left: 10 pixels outside the title.
-  local ribbonStart
+  local _, joinX, inward = self:TitleJoin()
+  -- The title's side the join is measured from: its left edge on the backpack, its right on the
+  -- bank, from the panel's top left.
+  local titleEdge
   local edge
   if self.side == "LEFT" then
-    ribbonStart = style.BODY_WIDTH - (style.PAD + 4) + 10
+    titleEdge = style.BODY_WIDTH - (style.PAD + 4)
     edge = style.BODY_WIDTH
   else
-    ribbonStart = style.FEATHER + style.PAD + 4 - 10
+    titleEdge = style.FEATHER + style.PAD + 4
     edge = style.FEATHER
   end
+  local ribbonStart = titleEdge + joinX
   local titleMiddle = -(style.TITLE_TOP + 13)
+  -- Born in the cloud above or below the title, never over it, most of them near the join.
+  self.cloudSparkles = sparkles:Create(fx, {
+    Rate = 3, Max = 10, Life = { 1.4, 2.6 }, Size = { 4, 9 }, Speed = { 3, 12 }, Rise = { -3, 5 },
+    Wobble = 2, Spin = 1.2, Alpha = 0.7, Direction = out,
+    Spawn = function()
+      local span = self:CloudSpan()
+      local y = 14 + math.random() * 14
+      if math.random() < 0.5 then
+        y = -y
+      end
+      return titleEdge + joinX + inward * span * math.random() ^ 1.7, titleMiddle + y
+    end,
+  })
   self.sparkles = sparkles:Create(fx, {
     Rate = 8, Max = 28, Life = { 2.0, 3.6 }, Size = { 6, 15 }, Speed = { 22, 64 }, Rise = { -8, 10 },
     Wobble = 4, Spin = 1.5, Direction = out,
@@ -773,26 +904,47 @@ end
 function panelProto:WatchKind()
 end
 
+-- playShimmer glides the spark in along the ribbon from its far end, easing to rest where the
+-- ribbon ends at the window's edge, then lets it grow and fade there while the cloud swells and
+-- settles, every ShimmerEvery seconds. Everything eases in and out: nothing jumps.
 ---@private
 function panelProto:playShimmer()
   local spark = self.spark
   local out = self:Outward()
-  local from = self.side == "LEFT" and "LEFT" or "RIGHT"
+  local inner = self.side == "LEFT" and "LEFT" or "RIGHT"
+  local size = SPARK_SIZE
   tween:Play(spark, {
     duration = style.Time.Shimmer,
-    delay = style.Time.ShimmerEvery - style.Time.Shimmer,
+    delay = math.max(0, style.Time.ShimmerEvery - style.Time.Shimmer - style.Time.Absorb),
     from = 0,
     to = 1,
-    ease = "inOutSine",
+    ease = "linear",
     onUpdate = function(t)
+      local p = tween.Ease.inOutSine(t)
       spark:ClearAllPoints()
-      spark:SetPoint("CENTER", self.ribbon, from, out * t * RIBBON_LENGTH, 0)
-      spark:SetAlpha(math.sin(math.pi * t))
+      spark:SetPoint("CENTER", self.ribbon, inner, out * (1 - p) * RIBBON_LENGTH, 0)
+      spark:SetSize(size, size)
+      spark:SetAlpha(math.sin(math.pi * t / 2))
+      self:SetCloudSwell(t > 0.6 and ((t - 0.6) / 0.4) ^ 2 or 0)
     end,
     onDone = function()
-      if self.frame:IsShown() and not self.closing then
-        self:playShimmer()
-      end
+      tween:Play(spark, {
+        duration = style.Time.Absorb,
+        from = 0,
+        to = 1,
+        ease = "linear",
+        onUpdate = function(t)
+          local grown = size + SPARK_GROWTH * (1 - (1 - t) ^ 2)
+          spark:SetSize(grown, grown)
+          spark:SetAlpha((1 - t) ^ 1.5)
+          self:SetCloudSwell((1 - t) ^ 2)
+        end,
+        onDone = function()
+          if self.frame:IsShown() and not self.closing then
+            self:playShimmer()
+          end
+        end,
+      })
     end,
   })
 end
@@ -842,6 +994,7 @@ function panelProto:Show(ctx, slotInfo)
   self.content:Cascade(true, style.Time.OpenCascadeDelay)
   self.sparkles:Start()
   self.edgeSparkles:Start()
+  self.cloudSparkles:Start()
   self:playShimmer()
   addon.TriggerItemContextChanged()
   return drew
@@ -907,6 +1060,7 @@ end
 ---@param text string
 function panelProto:SetTitle(text)
   self.title:SetText(text)
+  self:LayoutCloud()
 end
 
 -- OnHidden runs on every way the panel hides (the slide's end, Escape hiding it at once): the
@@ -918,8 +1072,11 @@ function panelProto:OnHidden(ctx)
   tween:Stop(self)
   tween:Stop(self.spark)
   self.spark:SetAlpha(0)
+  self.spark:SetSize(SPARK_SIZE, SPARK_SIZE)
+  self:SetCloudSwell(0)
   self.sparkles:Stop()
   self.edgeSparkles:Stop()
+  self.cloudSparkles:Stop()
   self:OnClosed(ctx)
 end
 

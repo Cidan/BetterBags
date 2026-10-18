@@ -86,6 +86,8 @@ style.Time = {
   Hover = 0.15,
   Shimmer = 1.4,
   ShimmerEvery = 3.4,
+  -- How long the shimmer takes to settle into the title's cloud once it arrives.
+  Absorb = 0.7,
   -- Moving sections (next.md §7).
   Lift = 0.12,
   Land = INTERACTION,
@@ -96,6 +98,34 @@ style.RISE = 12
 
 -- The sparkle sprite: the cooldown "bling" star, on every client.
 style.SPARKLE_TEXTURE = "Interface\\Cooldown\\star4"
+-- The cloud round the title the ribbon flows into (next.md §3): puffs of a soft glow that fades to
+-- nothing at its edge (tools/textures/next_glow.py), so there is no line anywhere. The cloud
+-- reaches from the window's hard edge, where the ribbon ends, to Pad past the title's far side. A
+-- puff sits a share F of the way across it from the ribbon's end, Y above the title's middle, W x H
+-- pixels (W false: as wide as the cloud times Wide), in a color of the palette at alpha A. The
+-- Join puff sits on the ribbon's end. Each puff breathes, out of step
+-- with the others: its alpha by Depth and its height by Drift pixels, over a few seconds. When the
+-- shimmer arrives the cloud brightens by Swell and the Join puff by JoinSwell.
+style.Cloud = {
+  Pad = 16, Swell = 0.6, JoinSwell = 0.45, Depth = 0.15, Drift = 1.5,
+  Join = { Size = 34, Color = "Gold", A = 0.35 },
+  Puffs = {
+    { F = 0.45, Y = 0, W = false, Wide = 1.15, H = 60, Color = "Lavender", A = 0.09 },
+    { F = 0.10, Y = 5, W = 54, H = 50, Color = "Gold", A = 0.24 },
+    { F = 0.21, Y = -8, W = 50, H = 46, Color = "Gold", A = 0.2 },
+    { F = 0.34, Y = 9, W = 60, H = 54, Color = "Lavender", A = 0.17 },
+    { F = 0.48, Y = -7, W = 66, H = 56, Color = "Lavender", A = 0.16 },
+    { F = 0.62, Y = 8, W = 58, H = 52, Color = "Lavender", A = 0.15 },
+    { F = 0.77, Y = -6, W = 52, H = 46, Color = "Lavender", A = 0.12 },
+    { F = 0.91, Y = 3, W = 42, H = 40, Color = "Lavender", A = 0.1 },
+    { F = 0.16, Y = 17, W = 30, H = 26, Color = "Gold", A = 0.12 },
+    { F = 0.28, Y = -19, W = 34, H = 30, Color = "Lavender", A = 0.11 },
+    { F = 0.55, Y = 19, W = 38, H = 32, Color = "Lavender", A = 0.11 },
+    { F = 0.70, Y = -18, W = 32, H = 28, Color = "Lavender", A = 0.09 },
+  },
+}
+-- White, the shape in the alpha: a soft round glow.
+style.CLOUD_GLOW = "Interface\\AddOns\\BetterBags\\textures\\next\\glow.png"
 -- The spark that sweeps along the title's ribbon.
 style.SPARK_TEXTURE = "Interface\\COMMON\\StreamSpark"
 

@@ -429,9 +429,11 @@ local function CreateMockWidget(widgetType, name, parent)
   end
 
   -- Textures and FontStrings
-  function widget:CreateTexture(textureName, drawLayer, inherits)
+  -- Frame:CreateTexture(name, drawLayer, templateName, subLevel) (SimpleFrameAPIDocumentation).
+  function widget:CreateTexture(textureName, drawLayer, inherits, subLevel)
     local tex = CreateMockWidget("Texture", textureName, self)
     tex._drawLayer = drawLayer
+    tex._sublevel = subLevel
     tex._inherits = inherits
     table.insert(self._textures, tex)
     return tex
