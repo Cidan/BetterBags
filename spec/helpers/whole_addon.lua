@@ -15,13 +15,24 @@
 -- the addon they expect: the AceAddon registry, LibStub's libraries, the Enum tables, the globals it
 -- set, and the events and hooks the loaded addon registered.
 --
--- The client set up here is live retail: Enum.BagIndex, Enum.PlayerInteractionType and
--- Enum.ItemQuality are Blizzard's (Blizzard_APIDocumentationGenerated, BagIndexConstants,
--- PlayerInteractionType, ItemQuality), the other values are the ones spec/core/constants_spec.lua
--- uses. The mocks have no layout engine, so every frame the loaded addon makes is resolved at the
+-- The client set up here is live retail or WoW: Forever: Enum.BagIndex, Enum.PlayerInteractionType
+-- and Enum.ItemQuality are Blizzard's (Blizzard_APIDocumentationGenerated on the live and forever
+-- branches: BagIndexConstants, PlayerInteractionType, ItemQuality; the last two are the same on
+-- both), the other values are the ones spec/core/constants_spec.lua uses. The mocks have no layout engine, so every frame the loaded addon makes is resolved at the
 -- screen's origin, as if laid out, and the cursor is far off screen, so no frame is under it.
 
 local WholeAddon = {}
+
+-- WoW: Forever 1.60.1 (the forever branch's BagIndexConstantsDocumentation.lua): retail-shaped,
+-- 9 character and 9 account bank tabs.
+local FOREVER_BAG_INDEX = {
+  Accountbanktab = -3, Characterbanktab = -2, Keyring = -1, Backpack = 0, Bag_1 = 1, Bag_2 = 2,
+  Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
+}
+for i = 1, 9 do
+  FOREVER_BAG_INDEX["CharacterBankTab_" .. i] = 5 + i
+  FOREVER_BAG_INDEX["AccountBankTab_" .. i] = 14 + i
+end
 
 local RETAIL_BAG_INDEX = {
   Accountbanktab = -3, Characterbanktab = -2, Keyring = -1, Backpack = 0, Bag_1 = 1, Bag_2 = 2,
@@ -65,8 +76,9 @@ local EXPANSIONS = {
 local QUALITY_NAMES = { "Poor", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Artifact", "Heirloom",
   "WoWToken" }
 
--- The bag-bar buttons of live retail (Blizzard_MainMenuBarBagButtons/Mainline): each has a
--- SlotHighlightTexture (BaseBagSlotButtonTemplate). Live retail has no KeyRingButton.
+-- The bag-bar buttons (Blizzard_MainMenuBarBagButtons): each has a SlotHighlightTexture
+-- (BaseBagSlotButtonTemplate). Live retail has no KeyRingButton; WoW: Forever has one
+-- (Camelot/MainMenuBarBagButtons.xml, ShapedBagSlotButtonTemplate).
 local BAG_BAR_BUTTONS = { "MainMenuBarBackpackButton", "CharacterBag0Slot", "CharacterBag1Slot",
   "CharacterBag2Slot", "CharacterBag3Slot", "CharacterReagentBag0Slot" }
 
@@ -76,9 +88,10 @@ local LIBRARIES = { "libs/LibWindow-1.1/LibWindow-1.1.lua", "libs/WagoAnalytics/
 
 -- The files spec/setup.lua already loaded, with their modules, into the addon set aside; the fresh
 -- addon gets its own copy of each.
-local function tocFiles()
+---@param toc string
+local function tocFiles(toc)
   local files = {}
-  for line in io.lines("BetterBags.toc") do
+  for line in io.lines(toc) do
     line = line:gsub("\r", "")
     if line ~= "" and not line:match("^#") and not line:match("^libs") and line:match("%.lua$") then
       table.insert(files, (line:gsub("\\", "/")))
@@ -100,7 +113,12 @@ end
 ---@field addon table The fresh BetterBags addon.
 ---@field errors string[] Every error that reached the error handler, in order.
 
----@param opts? { next?: boolean }
+-- opts.client is "retail" (live, BetterBags.toc; the default) or "forever" (WoW: Forever,
+-- BetterBags_Camelot.toc). opts.next starts with BetterBags Next on; opts.sizeMode ("content" or
+-- "window") sizes every bag in every view that way (the bags' "Drag to Resize"); opts.theme is the
+-- saved theme; opts.profile(defaults, const) changes any other default the profile starts with;
+-- opts.globals sets globals other addons would (a theme's addon), restored afterwards.
+---@param opts? { client?: "retail"|"forever", next?: boolean, sizeMode?: WindowSizeMode, theme?: string, profile?: fun(defaults: table, const: table), globals?: table<string, any> }
 ---@return WholeAddonHandle
 function WholeAddon.Load(opts)
   opts = opts or {}
@@ -159,12 +177,15 @@ function WholeAddon.Load(opts)
     for name, lib in pairs(libs) do LibStub.libs[name], LibStub.minors[name] = lib, minors[name] end
   end)
 
-  -- The retail client, with no saved variables yet.
+  -- The client, with no saved variables yet. WoW: Forever is the camelot project
+  -- (Blizzard_ProjectConstants/Camelot/ProjectConstants.lua: WOW_PROJECT_CAMELOT = 18).
+  local forever = opts.client == "forever"
   setGlobal("BetterBagsDB", nil)
   setGlobal("BetterBagsPerfDB", nil)
   setGlobal("WOW_PROJECT_MAINLINE", 1)
-  setGlobal("WOW_PROJECT_ID", 1)
-  setField(Enum, "BagIndex", RETAIL_BAG_INDEX)
+  setGlobal("WOW_PROJECT_CAMELOT", forever and 18 or nil)
+  setGlobal("WOW_PROJECT_ID", forever and 18 or 1)
+  setField(Enum, "BagIndex", forever and FOREVER_BAG_INDEX or RETAIL_BAG_INDEX)
   setField(Enum, "PlayerInteractionType", PLAYER_INTERACTION_TYPE)
   setField(Enum, "ItemQuality", ITEM_QUALITY)
   setField(Enum, "InventoryType", INVENTORY_TYPE)
@@ -180,7 +201,9 @@ function WholeAddon.Load(opts)
     setGlobal(name, CreateFrame("Frame", name))
   end
   for i = 1, 13 do setGlobal("ContainerFrame" .. i, CreateFrame("Frame", "ContainerFrame" .. i)) end
-  for _, name in ipairs(BAG_BAR_BUTTONS) do
+  local bagBar = { unpack(BAG_BAR_BUTTONS) }
+  if forever then table.insert(bagBar, "KeyRingButton") end
+  for _, name in ipairs(bagBar) do
     local button = CreateFrame("Button", name)
     button.SlotHighlightTexture = button:CreateTexture(nil, "OVERLAY")
     setGlobal(name, button)
@@ -233,6 +256,8 @@ function WholeAddon.Load(opts)
   setGlobal("_cursorX", -10000)
   setGlobal("_cursorY", -10000)
 
+  for name, value in pairs(opts.globals or {}) do setGlobal(name, value) end
+
   ---@type WholeAddonHandle
   local handle = { errors = {} }
   setGlobal("geterrorhandler", function()
@@ -249,12 +274,25 @@ function WholeAddon.Load(opts)
     function dropdown:HideDropDownMenu() end
   end
 
-  for _, path in ipairs(tocFiles()) do
+  for _, path in ipairs(tocFiles(forever and "BetterBags_Camelot.toc" or "BetterBags.toc")) do
     assert(loadfile(path))("BetterBags", {})
   end
   handle.addon = aceAddon:GetAddon("BetterBags")
+  local const = handle.addon:GetModule("Constants")
+  local defaults = const.DATABASE_DEFAULTS.profile
   if opts.next then
-    handle.addon:GetModule("Constants").DATABASE_DEFAULTS.profile.nextEnabled = true
+    defaults.nextEnabled = true
+  end
+  if opts.sizeMode then
+    for _, kinds in pairs(defaults.size) do
+      for _, info in pairs(kinds) do info.sizeMode = opts.sizeMode end
+    end
+  end
+  if opts.theme then
+    defaults.theme = opts.theme
+  end
+  if opts.profile then
+    opts.profile(defaults, const)
   end
 
   table.insert(restorers, 1, function()

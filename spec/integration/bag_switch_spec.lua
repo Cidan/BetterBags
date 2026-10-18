@@ -71,6 +71,96 @@ describe("switching bag designs on the whole addon", function()
     switch(addon, "next")
   end)
 
+  -- A resizable window sets its size limits as it is styled, which reads the bag's minimum
+  -- width: before the bag has made what it reads (reported in game for a resizable bank).
+  it("switches both ways with bags the player sizes (Drag to Resize)", function()
+    local addon = start({ next = true, sizeMode = "window" })
+    switch(addon, "classic")
+    assert.are.equal("window", addon.Bags.Bank.window:GetSizeMode())
+    switch(addon, "next")
+    switch(addon, "classic")
+    handle:Restore()
+    addon = start({ sizeMode = "window" })
+    switch(addon, "next")
+    switch(addon, "classic")
+  end)
+
+  -- What changes the code that runs while a window is styled or a bag is made: the theme (each
+  -- lays out different parts; Guild Wars 2 has action buttons and no menu button), the size mode
+  -- (here the backpack sized to its content and the bank by the player, at once), the client, and
+  -- the settings a bag reads as it is made.
+  describe("on every theme, on WoW: Forever, and with other settings", function()
+    local function mixedSizes(defaults, const)
+      for _, kinds in pairs(defaults.size) do
+        kinds[const.BAG_KIND.BACKPACK].sizeMode = "content"
+        kinds[const.BAG_KIND.BANK].sizeMode = "window"
+      end
+    end
+
+    -- The addons the ElvUI and Guild Wars 2 themes need, as spec/sonata/theme_ports_spec.lua
+    -- stands in for them (the media, textures and pixel settings ElvUI's theme reads; GW2_UI's
+    -- font settings).
+    local function elvui()
+      local E = {
+        media = { blankTex = "Interface\\ElvUIBlank", glossTex = "Interface\\ElvUINorm",
+          bordercolor = { 0.1, 0.1, 0.1 }, backdropcolor = { 0.2, 0.2, 0.2 },
+          backdropfadecolor = { 0.06, 0.06, 0.06, 0.8 }, rgbvaluecolor = { 0.1, 0.6, 0.9 } },
+        Media = { Textures = { Close = "Interface\\ElvUIClose", BagQuestIcon = "Interface\\ElvUIQuest",
+          BagUpgradeIcon = "Interface\\ElvUIUpgrade" } },
+        PixelMode = true, twoPixelsPlease = false, Modern = true, Border = 1,
+        TexCoords = { 0.08, 0.92, 0.08, 0.92 },
+      }
+      function E:Scale(n) return n end
+      return { ElvUI = { E } }
+    end
+    local THEME_ADDONS = {
+      elvui = elvui,
+      GW2 = function()
+        return { GW2_ADDON = { settings = { fonts = { size = { bigHeader = 20, normal = 13, small = 11 },
+          outline = "NONE" } } } }
+      end,
+    }
+
+    for _, theme in ipairs({ "Default", "SimpleDark", "Dark", "Parchment", "Slate", "elvui", "GW2" }) do
+      it("makes the classic bags after the " .. theme .. " theme was applied, and switches back and forth", function()
+        local addons = THEME_ADDONS[theme]
+        local addon = start({ next = true, theme = theme, profile = mixedSizes, globals = addons and addons() })
+        assert.are.equal(theme, addon:GetModule("Sonata"):GetCurrentThemeKey())
+        switch(addon, "classic")
+        assert.is_not_nil(addon.Bags.Bank.searchBox.frame:GetPoint(1))
+        switch(addon, "next")
+        switch(addon, "classic")
+      end)
+    end
+
+    for _, first in ipairs({ "next", "classic" }) do
+      it("switches both ways on WoW: Forever, starting with " .. first, function()
+        local addon = start({ client = "forever", next = first == "next", profile = mixedSizes })
+        assert.is_true(addon.isForever)
+        local other = first == "next" and "classic" or "next"
+        switch(addon, other)
+        switch(addon, first)
+        switch(addon, other)
+      end)
+    end
+
+    it("switches both ways with in-bag search and groups off, in the Show Bags view", function()
+      local function others(defaults, const)
+        mixedSizes(defaults, const)
+        defaults.inBagSearch = false
+        for kind in pairs(defaults.groupsEnabled) do defaults.groupsEnabled[kind] = false end
+        for kind in pairs(defaults.views) do defaults.views[kind] = const.BAG_VIEW.SECTION_ALL_BAGS end
+      end
+      local addon = start({ next = true, profile = others })
+      switch(addon, "classic")
+      switch(addon, "next")
+      handle:Restore()
+      addon = start({ profile = others })
+      switch(addon, "next")
+      switch(addon, "classic")
+    end)
+  end)
+
   it("switches with the backpack open, the other design opening in its place", function()
     local addon = start()
     addon.Bags.Backpack:Show(ctx(addon))

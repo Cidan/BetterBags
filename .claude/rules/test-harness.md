@@ -81,8 +81,12 @@ only shows when the real modules meet in an order startup never produces: a swit
 designs made the classic bags after the theme was applied, and crashed in game while every spec
 passed (next.md §11f). The whole-addon helper loads and starts all of BetterBags:
 - **Use:** `local WholeAddon = dofile("spec/helpers/whole_addon.lua")`; `local handle =
-  WholeAddon.Load({ next = true? })`; `handle:Start()`; `handle.addon` is the addon,
-  `handle.errors` every error that reached the error handler; `handle:Restore()` in `after_each`.
+  WholeAddon.Load(opts)`; `handle:Start()`; `handle.addon` is the addon, `handle.errors` every
+  error that reached the error handler; `handle:Restore()` in `after_each`. Options: `client`
+  (`"retail"`, the default, or `"forever"`: `BetterBags_Camelot.toc`, `WOW_PROJECT_CAMELOT`, Forever's
+  9 + 9 bank tabs, a `KeyRingButton`), `next` (BetterBags Next on), `sizeMode` (every bag in every
+  view), `theme` (the saved theme), `profile(defaults, const)` (any other default), `globals`
+  (what another addon would set, such as the ElvUI and GW2_UI stand-ins a theme needs).
 - **A fresh addon:** the one `spec/helpers/addon_loader.lua` made is set aside in AceAddon's
   registry (with its queued entries), and every Lua file of `BetterBags.toc` is loaded in order
   into a new one. Libraries the specs do not load are loaded (LibWindow-1.1, the WagoAnalytics
@@ -107,6 +111,9 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   AceAddon registry and queues, LibStub's libraries, the `Enum` tables, each global it set, and
   the loaded addon's events, messages and hooks. A full suite run with the whole-addon spec in it
   passes unchanged, which shows nothing leaks.
-- **Cost:** about 1.1 s per load and start (measured: 8 in 8.9 s); keep whole-addon specs few and pointed.
+- **Cost:** about 1.1 s per load and start, 0.8 s of it the real `ItemFrame:OnEnable` making every
+  item button of every slot at login; `spec/integration/bag_switch_spec.lua` takes about 21 s.
+  Keep whole-addon specs few and pointed: a test needs its own load only when it needs a fresh
+  start (what it checks happens the first time something is made).
 - Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e).
 

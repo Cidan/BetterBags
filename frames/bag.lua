@@ -72,6 +72,10 @@ local cursorPlacement = addon:GetModule("CursorPlacement")
 
 -- The smallest content a bag window shows: the old fixed minimum of the bag's content box.
 local MIN_CONTENT_WIDTH = 260
+
+-- The bag's scroll box keeps the bar's room on both sides, so the content stays centered and still
+-- when the bar shows, and its bar shows only while it is used (window.md, centering).
+local SCROLL_OPTIONS = { Symmetric = true, AutoHideBar = true }
 local MIN_CONTENT_HEIGHT = 100
 
 -------
@@ -802,9 +806,11 @@ function bagFrame.bagProto:BuildWindow(name)
 			end
 			return 0
 		end,
+		-- Read as the window is styled, which for a bag made after a theme was applied is before its
+		-- scroll box and tabs exist (next.md §11f).
 		MinContentWidth = function()
 			local tabsWidth = self.tabs and self.tabs.width or 0
-			return math.max(MIN_CONTENT_WIDTH, tabsWidth) + self.scroll:GetGutterWidth()
+			return math.max(MIN_CONTENT_WIDTH, tabsWidth) + scrollbox:GutterWidthFor(SCROLL_OPTIONS)
 		end,
 		MinContentHeight = MIN_CONTENT_HEIGHT,
 		Fade = function()
@@ -823,9 +829,7 @@ function bagFrame.bagProto:BuildWindow(name)
 	self.frame = self.window.frame
 	self.frame:SetSize(200, 200)
 
-	-- The bar's room on both sides keeps the content centered and still when the bar shows; the
-	-- bar shows only while it is used (window.md, centering).
-	self.scroll = scrollbox:Create(self.frame, "BetterBagsBagScroll" .. name, { Symmetric = true, AutoHideBar = true })
+	self.scroll = scrollbox:Create(self.frame, "BetterBagsBagScroll" .. name, SCROLL_OPTIONS)
 	self.canvas = bagCanvas:Create(self, self.scroll.scrollChild)
 	self.scroll:SetChild(self.canvas)
 	self.window:SetContent(self.scroll)

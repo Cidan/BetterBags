@@ -291,7 +291,10 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   (`frames/bagcanvas.lua`, layout-rendering.md §3); `bag.scrollBox`, `headerContainer`,
   `tabContainer` and `footerContainer` point into them.
 - **Minimums**: content at least 260 wide (or the tabs' width) plus the scroll bar's room on
-  both sides, and 100 high; the window at least as wide as the slots panel while it shows.
+  both sides, and 100 high; the window at least as wide as the slots panel while it shows. The
+  bar's room comes from the options the scroll box is made with (`scrollbox:GutterWidthFor`), not
+  the box: a bag made after a theme was applied reads its minimums as its window is styled, inside
+  `window:Create`, before the box exists (next.md §11f).
 - **BuildParts** creates the in-bag search box (`searchBox:CreateBox`, kept as
   `bag.searchBox`; `searchBox:GetSearchText` and QuickFind read it there), the menu button
   (`BagMenuButton`, bag-menu-button.md), the action buttons a theme may give the window

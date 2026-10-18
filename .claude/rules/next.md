@@ -751,7 +751,11 @@ both ways, with the backpack open and closed, with no error; the classic bags ma
 (their parts placed); and the strongest check of the unhooking: after any switch, including back
 to a design made earlier, BetterBags listens to exactly the events and messages, with as many
 callbacks each, as a fresh start in that design. 12 mutations, one survivor leading to the
-switch-back check.
+switch-back check. Then, for what changes what runs while a window is styled: every theme
+(Default, Simple Dark, Dark, Parchment, Slate, and ElvUI and Guild Wars 2 with stand-ins for their
+addons), each making the classic bags late; the backpack sized to its content and the bank by the
+player at once; WoW: Forever both ways; and in-bag search off, groups off and the Show Bags view.
+With the minimum width reading the scroll box, 10 of the 17 fail with the reported error.
 
 ### 11f. Failure mode (fixed): the classic bags made by a switch
 
@@ -764,6 +768,20 @@ was applied, and Sonata styles a window the moment it registers (patterns-ui.md,
 Elements Made on First Use"): inside `BuildWindow`, before `BuildParts`. `PlaceParts` now does
 nothing until the parts exist, and `bagFrame:Create` places them once made
 (`PlacePartsIfDecorated`, window.md §7). Next's panels register no windows, so making Next by a
-switch had no such problem. The specs had missed it because `spec/bagsystem_spec.lua` uses stand-in
+switch had no such problem.
+
+The next report was the same order in another place: `frames/bag.lua: attempt to index field
+'scroll' (a nil value)`, once, for a bank in the window size mode (Drag to Resize). Styling a window
+in that mode sets its resize bounds from the owner's minimums (`window:UpdateSizeMode`), and the
+bag's `MinContentWidth` added `self.scroll:GetGutterWidth()`, made after `window:Create`. The bar's
+room is fixed by the scroll box's options, so the minimum now reads it from them
+(`scrollbox:GutterWidthFor(SCROLL_OPTIONS)`, the options the bag's box is made with) and needs
+nothing built later. Every other callback of the windows a switch makes (the bags, both slots
+panels, the overlay search) reads only settings or guards what it reads; checked by reading each.
+
+**The rule for windows made after a theme was applied:** everything the window calls while it is
+styled (`OnDecorated`, `SizeMode`, `Size`, the minimums, `Opacity`, `Scale`) runs inside
+`window:Create`, so it may read only what exists before the owner builds anything else, or must
+do nothing until it does. The specs had missed it because `spec/bagsystem_spec.lua` uses stand-in
 bags and no spec ran the real `bagFrame:Create` after a theme was applied; the whole-addon spec
 reproduces the error exactly without the fix.
