@@ -218,3 +218,7 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 ## A Drop Is the Release's Hardware Event
 **Problem**: moving items (`C_Container.UseContainerItem`) needs a hardware event; a drop detected in `OnUpdate` is not one, and the client can miss a release when another window takes the mouse.
 **Solution**: drop in the dragged frame's `OnDragStop`; also check `IsMouseButtonDown` each frame (as Blizzard's chat frame drag does) and, without the release, finish the drag without moving items.
+
+## Never Give an Edit Box a Font Object Read Back From It
+**Problem**: `EditBox:GetFontObject()` on an `InputBoxTemplate` box returns an unnamed font object of the box's own (its XML `<FontString inherits="ChatFontNormal"/>`), not the font it was given; `box:SetFontObject(thatObject)` makes the font inherit from itself and crashes the client with STACK_OVERFLOW (issue #1152, the ElvUI theme at login).
+**Solution**: to restore an edit box, record its look by value (`GetFont`, `GetTextColor`, `GetShadowColor`, `GetShadowOffset`, `GetJustifyH`) and set it back with `SetFont` and the setters, and only touch a box a style changed. Font strings are safe to round-trip (Blizzard does it in `MenuTemplates.lua`); edit boxes are not (Blizzard never does). See sonata.md §3a.

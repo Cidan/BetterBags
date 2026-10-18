@@ -785,20 +785,55 @@ function elements:StyleButton(button, style)
   end
 end
 
+-- captureEditBoxLook records how an edit box's text looks, by value, before a style first changes
+-- its font. Never by font object: an edit box from InputBoxTemplate reports a font object of its
+-- own, and handing it back makes that font inherit from itself, which overflowed the client's
+-- stack (issue #1152).
+---@param box EditBox
+local function captureEditBoxLook(box)
+  if box.sonataLook ~= nil then
+    return
+  end
+  local file, height, flags = box:GetFont()
+  box.sonataLook = {
+    file = file, height = height, flags = flags,
+    color = { box:GetTextColor() },
+    shadowColor = { box:GetShadowColor() },
+    shadowOffset = { box:GetShadowOffset() },
+    justify = box:GetJustifyH(),
+  }
+end
+
+-- restoreEditBoxLook gives an edit box back the look captureEditBoxLook recorded.
+---@param box EditBox
+local function restoreEditBoxLook(box)
+  local look = box.sonataLook
+  box.sonataLook = nil
+  if look.file ~= nil then
+    box:SetFont(look.file, look.height, look.flags or "")
+  end
+  box:SetTextColor(unpack(look.color))
+  box:SetShadowColor(unpack(look.shadowColor))
+  box:SetShadowOffset(unpack(look.shadowOffset))
+  if look.justify ~= nil then
+    box:SetJustifyH(look.justify)
+  end
+end
+
 ---@param box EditBox
 ---@param style table
 function elements:StyleEditBox(box, style)
-  if next(style) == nil and box.sonataSkin == nil and box.sonataStripped == nil and box.sonataFonts == nil then
+  if next(style) == nil and box.sonataSkin == nil and box.sonataStripped == nil and box.sonataLook == nil then
     return
   end
   strip(box, INPUT_ART, style.Strip == true)
   fill(box, style.Background, "fill", "BACKGROUND", -8)
   edges(box, style.Border)
-  captureFonts(box)
   if style.Font ~= nil then
+    captureEditBoxLook(box)
     apply:Font(box, style.Font)
-  elseif box.sonataFonts.font ~= nil then
-    apply:Font(box, { Object = box.sonataFonts.font })
+  elseif box.sonataLook ~= nil then
+    restoreEditBoxLook(box)
   end
 end
 
