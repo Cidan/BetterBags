@@ -433,6 +433,133 @@ describe("NextBag", function()
     end)
   end)
 
+  -- Asked: opening, the panel overshoots its place and bounces back, showing what is under the bag
+  -- at the screen edge; a gold glow, near but not entirely opaque and animated, covers that edge
+  -- instead, "pulling" the bag back (next.md §3).
+  describe("the glow on the screen edge as it opens", function()
+    local G = style.EdgeGlow
+
+    -- watch opens the panel and runs the slide and the glow in 10 ms steps.
+    local function watch(bag, steps)
+      local seen = {}
+      bag:Show(ctx())
+      for _ = 1, steps do
+        local update = tween.driver:GetScript("OnUpdate")
+        if update then update(tween.driver, 0.01) end
+        local frame = bag.edgeGlow.frame
+        -- As the panel moves, before the glow's own update: the glow keeps up in the same frame.
+        local moved = { overshoot = math.max(0, -bag.offset), shown = frame:IsShown(), alpha = frame:GetAlpha() }
+        local glowUpdate = frame:GetScript("OnUpdate")
+        if frame:IsShown() and glowUpdate then glowUpdate(frame, 0.01) end
+        local puff = bag.edgeGlow.flow[1]
+        table.insert(seen, { overshoot = moved.overshoot, shown = frame:IsShown(), alpha = frame:GetAlpha(),
+          movedAlpha = moved.alpha, movedShown = moved.shown, puffY = puff and select(5, puff:GetPoint(1)) })
+      end
+      return seen
+    end
+
+    it("lies on the screen edge, a gold veil near opaque at the edge, fading in, under a bloom and a line", function()
+      local bag = nextBag:Create(ctx())
+      local glow = bag.edgeGlow
+      assert.is_false(glow.frame:IsShown())
+      assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, 0 }, { glow.frame:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 0 }, { glow.frame:GetPoint(2) })
+      assert.is_true(glow.frame:GetFrameLevel() > bag.frame:GetFrameLevel() + 50, "above the panel's content")
+      local outer, inner = glow.veil[1], glow.veil[2]
+      assert.are.equal("BLEND", outer:GetBlendMode(), "it covers what is under it")
+      assert.are.same({ "TOPRIGHT", glow.frame, "TOPRIGHT", 0, 0 }, { outer:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", outer, "TOPLEFT", 0, 0 }, { inner:GetPoint(1) })
+      assert.are.equal(G.Outer + G.Inner, glow.frame:GetWidth())
+      local o, i = outer._gradient, inner._gradient
+      assert.are.equal(G.Edge, o.max.a, "at the screen edge")
+      assert.is_true(G.Edge >= 0.8 and G.Edge < 1, "near, but not entirely, opaque")
+      assert.are.equal(o.min.a, i.max.a, "no step between the two")
+      assert.are.equal(0, i.min.a, "faded out inward")
+      local gold = style.Color.Gold
+      assert.are.same({ gold[1], gold[2], gold[3] }, { o.max.r, o.max.g, o.max.b })
+      assert.are.equal(G.Outer + G.Inner, outer:GetWidth() + inner:GetWidth())
+      -- The slide overshoots by 10% of its run (outBack); past the fill's reach, that is the gap.
+      local widest = (style.WIDTH + style.OVERREACH) * 0.1 - style.OVERREACH
+      assert.is_true(G.Outer > widest, "its near-opaque part is wider than the widest gap: " .. widest)
+      assert.are.equal(style.CLOUD_GLOW, glow.bloom:GetTexture())
+      assert.are.equal("ADD", glow.bloom:GetBlendMode())
+      assert.are.equal("ADD", glow.line:GetBlendMode())
+      assert.are.equal(G.Flow.Count, #glow.flow)
+    end)
+
+    it("covers the edge fully whenever the bag is far enough past its place to show the edge", function()
+      local bag = nextBag:Create(ctx())
+      local gapped = 0
+      for _, s in ipairs(watch(bag, 60)) do
+        if s.overshoot > style.OVERREACH then
+          gapped = gapped + 1
+          assert.is_true(s.movedShown and s.movedAlpha == 1, "the gap is covered the moment it opens: " .. s.overshoot)
+          assert.is_true(s.shown and s.alpha == 1)
+        end
+      end
+      assert.is_true(gapped > 5, "the slide does open a gap: " .. gapped)
+    end)
+
+    it("rises as the bag swings past its place and fades after it settles back, without a step", function()
+      local bag = nextBag:Create(ctx())
+      local seen = watch(bag, 120)
+      local first, peak, last
+      for i, s in ipairs(seen) do
+        if s.shown and not first then first = i end
+        if s.alpha == 1 and not peak then peak = i end
+        if s.shown then last = i end
+      end
+      assert.is_true(first ~= nil and peak ~= nil and last ~= nil)
+      assert.is_true(seen[first].overshoot > 0, "not before the bag swings past its place")
+      assert.is_false(seen[#seen].shown, "gone once it has faded")
+      for i = 2, #seen do
+        local drop = seen[i - 1].alpha - seen[i].alpha
+        assert.is_true(drop <= 0.01 / G.Release + 1e-9, "fades without a step: " .. drop)
+      end
+      local settled
+      for i, s in ipairs(seen) do
+        if i > peak and s.overshoot == 0 and not settled then settled = i end
+      end
+      assert.is_true(last - settled >= 20, "lingers a moment as the bag settles: " .. (last - settled))
+    end)
+
+    it("is animated: its lights flow along the edge", function()
+      local bag = nextBag:Create(ctx())
+      local ys = {}
+      for _, s in ipairs(watch(bag, 60)) do
+        if s.shown then ys[s.puffY] = true end
+      end
+      local distinct = 0
+      for _ in pairs(ys) do distinct = distinct + 1 end
+      assert.is_true(distinct > 10, "the lights move: " .. distinct)
+    end)
+
+    it("pulls sparkles into the edge while it glows", function()
+      local bag = nextBag:Create(ctx())
+      watch(bag, 30)
+      local e = bag.edgeGlow.sparkles
+      assert.are.equal(1, e.options.Direction, "toward the screen edge")
+      for _ = 1, 50 do
+        local x = e.options.Spawn()
+        assert.is_true(x >= 0 and x <= G.Outer + G.Inner, "born in the glow")
+      end
+      local update = e.frame:GetScript("OnUpdate")
+      assert.is_not_nil(update, "running while it glows")
+      update(e.frame, 0.1)
+      assert.is_true(#e.alive > 0)
+    end)
+
+    it("goes when the panel hides", function()
+      local bag = nextBag:Create(ctx())
+      watch(bag, 25)
+      assert.is_true(bag.edgeGlow.frame:IsShown())
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.is_false(bag.edgeGlow.frame:IsShown())
+      assert.are.equal(0, bag.edgeGlow.intensity)
+    end)
+  end)
+
   describe("opening and closing", function()
     it("keeps a draw for when it opens, and draws it as it opens", function()
       local bag = nextBag:Create(ctx())

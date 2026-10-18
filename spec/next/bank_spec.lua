@@ -371,6 +371,28 @@ describe("NextBank", function()
       assert.are.equal(0, xs[#xs], "at rest at the window's edge")
     end)
 
+    -- The edge glow mirrored (next.md §3): the bank opens from the left edge.
+    it("covers the left screen edge while it opens past its place, pulling sparkles into it", function()
+      local G = style.EdgeGlow
+      local bank = nextBank:Create(ctx())
+      local glow = bank.edgeGlow
+      assert.are.same({ "TOPLEFT", UIParent, "TOPLEFT", 0, 0 }, { glow.frame:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", glow.frame, "TOPLEFT", 0, 0 }, { glow.veil[1]:GetPoint(1) })
+      assert.are.equal(G.Edge, glow.veil[1]._gradient.min.a, "near opaque at the screen edge, on the left")
+      assert.are.equal(-1, glow.sparkles.options.Direction)
+      bank:Show(ctx())
+      local gapped = 0
+      for _ = 1, 60 do
+        tween.driver:GetScript("OnUpdate")(tween.driver, 0.01)
+        if glow.frame:IsShown() then glow.frame:GetScript("OnUpdate")(glow.frame, 0.01) end
+        if bank.offset > style.OVERREACH then
+          gapped = gapped + 1
+          assert.are.equal(1, glow.frame:GetAlpha())
+        end
+      end
+      assert.is_true(gapped > 5)
+    end)
+
     it("hangs its tabs from its right side and drifts its sparkles right", function()
       local bank = nextBank:Create(ctx())
       assert.are.equal("LEFT", bank.tabs.side)

@@ -124,6 +124,18 @@ style.Cloud = {
     { F = 0.70, Y = -18, W = 32, H = 28, Color = "Lavender", A = 0.09 },
   },
 }
+-- The glow on the screen edge as a panel opens (next.md §3): the slide overshoots its place and
+-- bounces back, and past the fill's reach (OVERREACH) the screen edge would show what is under the
+-- panel. A gold veil covers it, near opaque at the edge (Edge) easing to Mid over the Outer pixels
+-- and out to nothing over the Inner ones, under a soft Bloom and a bright Line on the edge and Flow
+-- lights moving along it. It rises as the panel swings past its place, full once the swing reaches
+-- OVERREACH, and fades at a rate that takes Release seconds from full once it swings back.
+style.EdgeGlow = {
+  Outer = 24, Inner = 32, Edge = 0.88, Mid = 0.62, Release = 0.45,
+  Bloom = { Width = 90, A = 0.22 },
+  Line = { Width = 2, A = 0.45 },
+  Flow = { Count = 3, W = 70, H = 140, A = 0.2, Speed = { 260, 420 } },
+}
 -- White, the shape in the alpha: a soft round glow.
 style.CLOUD_GLOW = "Interface\\AddOns\\BetterBags\\textures\\next\\glow.png"
 -- The spark that sweeps along the title's ribbon.

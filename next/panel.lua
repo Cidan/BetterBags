@@ -233,6 +233,139 @@ function panelProto:HiddenOffset()
   return -self:Outward() * (style.WIDTH + style.OVERREACH)
 end
 
+-- BuildEdgeGlow makes the glow that covers the screen edge while the panel opens past its place
+-- (NextStyle.EdgeGlow): on the screen edge, not on the panel, above the panel's content, hidden
+-- until the panel swings past its place; its lights flow along the edge and it pulls sparkles in.
+function panelProto:BuildEdgeGlow()
+  local G = style.EdgeGlow
+  local left = self.side == "LEFT"
+  local edge = left and "LEFT" or "RIGHT"
+  local away = left and "RIGHT" or "LEFT"
+  local frame = CreateFrame("Frame", nil, self.frame)
+  frame:SetFrameLevel(self.frame:GetFrameLevel() + 60)
+  frame:SetPoint("TOP" .. edge, UIParent, "TOP" .. edge, 0, 0)
+  frame:SetPoint("BOTTOM" .. edge, UIParent, "BOTTOM" .. edge, 0, 0)
+  frame:SetWidth(G.Outer + G.Inner)
+  frame:SetAlpha(0)
+  frame:Hide()
+  local function gold(a)
+    return style:CreateColor("Gold", a)
+  end
+  -- The veil: Edge at the screen edge to Mid over Outer pixels, Mid to nothing over Inner.
+  local outer = frame:CreateTexture(nil, "ARTWORK", nil, 0)
+  outer:SetColorTexture(1, 1, 1, 1)
+  outer:SetWidth(G.Outer)
+  outer:SetPoint("TOP" .. edge, frame, "TOP" .. edge, 0, 0)
+  outer:SetPoint("BOTTOM" .. edge, frame, "BOTTOM" .. edge, 0, 0)
+  local inner = frame:CreateTexture(nil, "ARTWORK", nil, 0)
+  inner:SetColorTexture(1, 1, 1, 1)
+  inner:SetWidth(G.Inner)
+  inner:SetPoint("TOP" .. edge, outer, "TOP" .. away, 0, 0)
+  inner:SetPoint("BOTTOM" .. edge, outer, "BOTTOM" .. away, 0, 0)
+  if left then
+    outer:SetGradient("HORIZONTAL", gold(G.Edge), gold(G.Mid))
+    inner:SetGradient("HORIZONTAL", gold(G.Mid), gold(0))
+  else
+    outer:SetGradient("HORIZONTAL", gold(G.Mid), gold(G.Edge))
+    inner:SetGradient("HORIZONTAL", gold(0), gold(G.Mid))
+  end
+  local function glowTexture(sublevel, a)
+    local t = frame:CreateTexture(nil, "ARTWORK", nil, sublevel)
+    t:SetTexture(style.CLOUD_GLOW)
+    t:SetBlendMode("ADD")
+    local c = style.Color.Gold
+    t:SetVertexColor(c[1], c[2], c[3])
+    t:SetAlpha(a)
+    return t
+  end
+  -- The bloom: a soft glow centred on the screen edge.
+  local bloom = glowTexture(1, G.Bloom.A)
+  bloom:SetWidth(G.Bloom.Width)
+  bloom:SetPoint("TOP", frame, "TOP" .. edge, 0, 0)
+  bloom:SetPoint("BOTTOM", frame, "BOTTOM" .. edge, 0, 0)
+  local line = frame:CreateTexture(nil, "ARTWORK", nil, 2)
+  local c = style.Color.Gold
+  line:SetColorTexture(c[1], c[2], c[3], G.Line.A)
+  line:SetBlendMode("ADD")
+  line:SetWidth(G.Line.Width)
+  line:SetPoint("TOP" .. edge, frame, "TOP" .. edge, 0, 0)
+  line:SetPoint("BOTTOM" .. edge, frame, "BOTTOM" .. edge, 0, 0)
+  local flow = {}
+  for _ = 1, G.Flow.Count do
+    local puff = glowTexture(1, G.Flow.A)
+    puff:SetSize(G.Flow.W, G.Flow.H)
+    table.insert(flow, puff)
+  end
+  local glow = {
+    frame = frame, veil = { outer, inner }, bloom = bloom, line = line, flow = flow, edge = edge,
+    intensity = 0, target = 0, time = 0,
+  }
+  -- Sparkles born in the veil and pulled into the screen edge.
+  glow.sparkles = sparkles:Create(frame, {
+    Rate = 45, Max = 30, Life = { 0.35, 0.7 }, Size = { 4, 10 }, Speed = { 40, 110 }, Rise = { -10, 10 },
+    Wobble = 2, Spin = 2, Alpha = 0.9, Direction = left and -1 or 1,
+    Colors = { style.Color.Gold, style.Color.White },
+    Spawn = function()
+      return math.random() * (G.Outer + G.Inner), -math.random() * UIParent:GetHeight()
+    end,
+  })
+  -- A child of the panel: it runs only while the glow shows.
+  frame:SetScript("OnUpdate", function(_, elapsed)
+    glow.time = glow.time + elapsed
+    glow.intensity = math.max(glow.target, glow.intensity - elapsed / G.Release)
+    if glow.intensity <= 0 then
+      self:hideEdgeGlow()
+      return
+    end
+    self:applyEdgeGlow()
+  end)
+  self.edgeGlow = glow
+end
+
+-- applyEdgeGlow draws the edge glow at its intensity, its lights where the time puts them: each
+-- runs along the edge at its own speed, every other one the other way.
+---@private
+function panelProto:applyEdgeGlow()
+  local G, glow = style.EdgeGlow, self.edgeGlow
+  glow.frame:SetAlpha(glow.intensity)
+  local height = UIParent:GetHeight()
+  local inward = glow.edge == "LEFT" and 1 or -1
+  local count = #glow.flow
+  for i, puff in ipairs(glow.flow) do
+    local speed = G.Flow.Speed[1] + (G.Flow.Speed[2] - G.Flow.Speed[1]) * (i - 1) / math.max(1, count - 1)
+    local way = i % 2 == 0 and -1 or 1
+    local run = height + G.Flow.H
+    local at = (run * (i - 1) / count + way * speed * glow.time) % run
+    puff:SetPoint("CENTER", glow.frame, "TOP" .. glow.edge, inward * G.Flow.W / 2, -(at - G.Flow.H / 2))
+  end
+end
+
+---@private
+function panelProto:hideEdgeGlow()
+  local glow = self.edgeGlow
+  glow.intensity, glow.target = 0, 0
+  glow.frame:Hide()
+  glow.sparkles:Stop()
+end
+
+-- followEdge lights the edge glow as far as the panel is past its place (full once it is
+-- OVERREACH past, where the screen edge would show), at once: the glow fades on its own.
+---@private
+function panelProto:followEdge()
+  local glow = self.edgeGlow
+  local over = math.max(0, self:Outward() * self.offset)
+  local share = math.min(1, over / style.OVERREACH)
+  glow.target = share * share * (3 - 2 * share)
+  if glow.target > glow.intensity then
+    glow.intensity = glow.target
+    if not glow.frame:IsShown() then
+      glow.frame:Show()
+      glow.sparkles:Start()
+    end
+    self:applyEdgeGlow()
+  end
+end
+
 ---@private
 ---@param x number
 function panelProto:setOffset(x)
@@ -246,6 +379,7 @@ function panelProto:setOffset(x)
     frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, 0)
     frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", x, 0)
   end
+  self:followEdge()
 end
 
 -- BuildPanel makes the panel: full height on its edge of the screen, its body a deep indigo with
@@ -269,6 +403,7 @@ function panelProto:BuildPanel(name)
   end
   frame:Hide()
   self.frame = frame
+  self:BuildEdgeGlow()
   self:setOffset(0)
 
   local body = CreateFrame("Frame", nil, frame)
@@ -1074,6 +1209,7 @@ function panelProto:OnHidden(ctx)
   self.spark:SetAlpha(0)
   self.spark:SetSize(SPARK_SIZE, SPARK_SIZE)
   self:SetCloudSwell(0)
+  self:hideEdgeGlow()
   self.sparkles:Stop()
   self.edgeSparkles:Stop()
   self.cloudSparkles:Stop()
