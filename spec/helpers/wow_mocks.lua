@@ -584,6 +584,11 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   -- FontInstance: SetFontObject(font) / GetFontObject(), SetShadowOffset(offsetX, offsetY).
   function widget:SetFontObject(font)
+    if self._ownFont ~= nil and font == self._ownFont then
+      -- What the client does (issue #1152, see InputBoxTemplate below): the font would inherit
+      -- from itself, and the call recurses until the process's stack overflows.
+      error("stack overflow: an edit box was given its own font object", 2)
+    end
     self._fontObject = font
   end
   function widget:SetShadowOffset(x, y)
@@ -912,8 +917,16 @@ local function CreateMockWidget(widgetType, name, parent)
     self._fontSize = size
     self._fontFlags = flags
   end
-  -- GetFont() -> fontFile, height, flags (SimpleFontAPIDocumentation.lua).
+  -- GetFont() -> fontFile, height, flags (SimpleFontAPIDocumentation.lua): set with SetFont, else
+  -- the font object's it inherits (warcraft.wiki.gg UIOBJECT_FontInstance).
   function widget:GetFont()
+    if self._font == nil then
+      local fo = self:GetFontObject()
+      if fo.GetFont ~= nil then
+        local file, height, flags = fo:GetFont()
+        return file, height, flags or ""
+      end
+    end
     return self._font, self._fontSize, self._fontFlags or ""
   end
   function widget:SetTextColor(r, g, b, a)
@@ -930,7 +943,13 @@ local function CreateMockWidget(widgetType, name, parent)
   -- FontInstance:GetFontObject() -> the font object set with SetFontObject, else the one the
   -- font string inherits (CreateFontString's template).
   function widget:GetFontObject()
+    if self._ownFont ~= nil then
+      return self._ownFont
+    end
     local fo = self._fontObject or (self._inherits and _G[self._inherits])
+    if type(fo) == "string" then
+      fo = _G[fo]
+    end
     if fo ~= nil then
       return fo
     end
@@ -1434,6 +1453,39 @@ end
 _G.__mockTemplates.UIPanelCloseButtonDefaultAnchors = function(frame)
   _G.__mockTemplates.UIPanelCloseButton(frame)
   frame:SetPoint("TOPRIGHT", frame:GetParent(), "TOPRIGHT", 1, 0)
+end
+
+-- InputBoxTemplate = InputBoxScriptTemplate + InputBoxVisualTemplate (Blizzard_SharedXML/Shared/
+-- InputBox/InputBoxTemplates.xml): the Left, Right and Middle border textures, and the box's font
+-- declared in XML with <FontString inherits="ChatFontNormal"/>. What the 12.1.5 client does with
+-- that font is from a crash report (issue #1152): after SetFontObject("GameFontHighlight"), the
+-- box's GetFontObject() returned an unnamed font object, not GameFontHighlight, and
+-- SetFontObject() with that object overflowed the client's stack inside the call. The mock's box
+-- reports an unnamed font of its own (with the look of the font it was given) and raises a stack
+-- overflow when it is handed back. Blizzard's code never hands an edit box its own font object.
+_G.__mockTemplates.InputBoxTemplate = function(frame)
+  frame.Left = frame:CreateTexture(nil, "BACKGROUND")
+  frame.Left:SetAtlas("common-search-border-left")
+  frame.Right = frame:CreateTexture(nil, "BACKGROUND")
+  frame.Right:SetAtlas("common-search-border-right")
+  frame.Middle = frame:CreateTexture(nil, "BACKGROUND")
+  frame.Middle:SetAtlas("common-search-border-middle")
+  frame._fontObject = _G.ChatFontNormal
+  local function parent()
+    local fo = frame._fontObject
+    if type(fo) == "string" then
+      fo = _G[fo]
+    end
+    return fo
+  end
+  frame._ownFont = {
+    GetName = function() return nil end,
+    GetFont = function() return parent():GetFont() end,
+    GetTextColor = function() return parent():GetTextColor() end,
+    GetShadowColor = function() return parent():GetShadowColor() end,
+    GetShadowOffset = function() return parent():GetShadowOffset() end,
+    GetJustifyH = function() return parent():GetJustifyH() end,
+  }
 end
 
 _G.CreateFrame = function(frameType, name, parent, template)

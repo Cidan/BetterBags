@@ -218,7 +218,7 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 | `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
 | `BagButton` | the bag menu (portrait) button | `Size` (40; `Width`/`Height` per axis), `Portrait`, `Highlight` (texture spec + `Width`, `Height`, `X`, `Y`; OVERLAY 7; `false` hides it, the next style shows it again), `States` (`Normal`, `Highlight`, `Pushed`, `Disabled` through `apply:ButtonStates`, the button's own state art; every state a style leaves out is cleared, so a flat button never outlives its theme). Added for plugin themes whose menu button is flat art (macOS, Aero Glass in BetterBags - Themes); coverage `spec/sonata/elements_spec.lua` ("the bag menu button") |
 | `Button` | `UIPanelButtonTemplate` buttons | `Strip`, `Background`, `Border`, `HoverBorderColor` (the border's color while the mouse is over the button; hooked once), `Highlight` (`false` hides the button's highlight by alpha, given back by a later style), `Font`, `HighlightFont`, `DisabledFont` (the button's own fonts are recorded and put back) |
-| `EditBox` | `InputBoxTemplate` edit boxes | `Strip`, `Background`, `Border`, `Font` (the box's own font is put back) |
+| `EditBox` | `InputBoxTemplate` edit boxes | `Strip`, `Background`, `Border`, `Font` (the box's look before the first style that set one is put back by value; a box no style gave a font is never touched) |
 
 Details:
 - `DrawItemQuality(decoration, color, quality)` draws quality on the backdrop edge and returns
@@ -270,6 +270,25 @@ Details:
   (`RemoveButton` gives it its own look back), and it adds nothing while that theme is active;
   the next draw under a theme that uses Masque adds the buttons again
   (`spec/integrations/masque_spec.lua`).
+- **Never hand an edit box a font object read back from it (issue #1152).** An
+  `InputBoxTemplate` box declares its font in XML (`<FontString inherits="ChatFontNormal"/>`,
+  InputBoxTemplates.xml), and on the 12.1.5 client its `GetFontObject()` returned an unnamed font
+  object of its own even after `SetFontObject("GameFontHighlight")`; `SetFontObject()` with that
+  object made the font inherit from itself and crashed the game with STACK_OVERFLOW (the crash
+  report's Lua stack: `apply:Font` → `SetFontObject(nameBox, Font)`, from the search category
+  editor's name box, at login with the ElvUI theme, the only theme with an `EditBox` style; it
+  sets no font, so the styler put back what it had read). `StyleEditBox` now records the box's
+  look by value (`GetFont`, text color, shadow, justification) only when a style first sets a
+  font, and puts it back with `SetFont` and the setters, once. Blizzard round-trips font strings'
+  font objects in shipping code (`MenuTemplates.lua`, `Blizzard_Shared_StoreUISecure.lua`), never
+  edit boxes', so the template title's restore (`sonata/decoration.lua`, a font string) and
+  button fonts (`GetNormalFontObject`, named objects from the template's `NormalFont`) keep theirs.
+  The spec mock's `InputBoxTemplate` follows the report: its box reports a font of its own, and
+  handing it back raises a stack overflow. Coverage: `spec/sonata/elements_spec.lua` ("leaves an
+  edit box's font alone when no style sets one", "gives an edit box back the look it had, never
+  its own font object", "keeps the look it first had across several themes that set a font") and
+  `spec/sonata/theme_ports_spec.lua` ("styles InputBoxTemplate edit boxes without touching their
+  font"); each guard was mutation-tested.
 - **Item decorations** are made once per button (`item:GetDecoration`, item-drawing.md §7a)
   and registered as `ItemButton` elements; a theme never builds its own.
 - Edge sizes and insets are in UI units. Pixel-perfect edges at any scale are not yet

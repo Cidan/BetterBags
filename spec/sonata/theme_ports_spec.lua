@@ -422,6 +422,25 @@ describe("BetterBags' other themes", function()
       assert.is_true(sonata:GetElementStyle("EditBox").Strip)
     end)
 
+    -- Issue #1152: logging in with the ElvUI theme crashed the game (STACK_OVERFLOW) styling the
+    -- search category editor's name box, an InputBoxTemplate edit box.
+    it("styles InputBoxTemplate edit boxes without touching their font", function()
+      elvui()
+      local box = CreateFrame("EditBox", "SpecSearchCategoryNameBox", UIParent, "InputBoxTemplate")
+      box:SetFontObject("GameFontHighlight")
+      sonata:RegisterElement("EditBox", box)
+      local reported = {}
+      local savedHandler = _G.geterrorhandler
+      _G.geterrorhandler = function() return function(err) table.insert(reported, err) end end
+      apply("elvui")
+      apply("Default")
+      apply("elvui")
+      _G.geterrorhandler = savedHandler
+      assert.are.same({}, reported)
+      assert.are.equal("GameFontHighlight", box._fontObject)
+      assert.are.equal(0, box.Middle:GetAlpha(), "flattened")
+    end)
+
     it("puts the search box and menu button where its bag drew them", function()
       elvui()
       local layout = sonata:Resolve("elvui").Windows.Bag.Layout

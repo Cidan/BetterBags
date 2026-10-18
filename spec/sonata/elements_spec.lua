@@ -712,11 +712,53 @@ describe("SonataElements", function()
       assert.is_nil(b:GetHighlightTexture():GetTexture())
     end)
 
-    it("gives an edit box back its template font", function()
-      local box = panelButton()
-      elements:StyleEditBox(box, { Font = { Object = "UnitFrame12White" } })
+    -- An edit box from InputBoxTemplate reports a font object of its own, and handing it back
+    -- overflowed the client's stack (issue #1152: the ElvUI theme crashed the game at login).
+    local function inputBox()
+      local box = CreateFrame("EditBox", nil, UIParent, "InputBoxTemplate")
+      box:SetFontObject("GameFontHighlight")
+      return box
+    end
+
+    it("leaves an edit box's font alone when no style sets one (issue #1152)", function()
+      local box = inputBox()
+      assert.has_no.errors(function()
+        elements:StyleEditBox(box, { Strip = true, Background = { Color = { 0, 0, 0, 1 } },
+          Border = { Color = { 0, 0, 0, 1 }, EdgeSize = 1 } })
+        elements:StyleEditBox(box, {})
+      end)
+      assert.are.equal("GameFontHighlight", box._fontObject)
+      assert.is_nil(box._font, "no font set directly")
+    end)
+
+    it("gives an edit box back the look it had, never its own font object", function()
+      local box = inputBox()
+      box:SetJustifyH("LEFT")
+      elements:StyleEditBox(box, { Font = { Object = "UnitFrame12White", Color = { 1, 0, 0, 1 }, Justify = "RIGHT" } })
+      assert.has_no.errors(function()
+        elements:StyleEditBox(box, {})
+      end)
+      assert.are.same({ "Fonts\\FRIZQT__.TTF", 12, "" }, { box:GetFont() })
+      assert.are.same({ 1, 1, 1, 1 }, { box:GetTextColor() })
+      assert.are.same({ 0, 0, 0, 1 }, { box:GetShadowColor() })
+      assert.are.same({ 1, -1 }, { box:GetShadowOffset() })
+      assert.are.equal("LEFT", box:GetJustifyH())
+      local set = 0
+      local setFont = box.SetFont
+      box.SetFont = function(...)
+        set = set + 1
+        return setFont(...)
+      end
       elements:StyleEditBox(box, {})
-      assert.are.equal(_G.ChatFontNormal, box._fontObject)
+      assert.are.equal(0, set, "given back once, not on every theme after")
+    end)
+
+    it("keeps the look it first had across several themes that set a font", function()
+      local box = inputBox()
+      elements:StyleEditBox(box, { Font = { Object = "UnitFrame12White", Color = { 1, 0, 0, 1 } } })
+      elements:StyleEditBox(box, { Font = { Object = "UnitFrame12White", Color = { 0, 1, 0, 1 } } })
+      elements:StyleEditBox(box, {})
+      assert.are.same({ 1, 1, 1, 1 }, { box:GetTextColor() })
     end)
 
     it("flattens an edit box the same way", function()
