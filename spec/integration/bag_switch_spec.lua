@@ -50,6 +50,24 @@ describe("switching bag designs on the whole addon", function()
     return found
   end
 
+  -- A load and start take about 940 MB of mock frames: anything the loaded addon leaves reachable
+  -- after Restore keeps all of it, and a CI runner ran out of memory over a run of these specs.
+  it("lets the loaded addon be collected once restored", function()
+    local held = setmetatable({}, { __mode = "v" })
+    local function loadAndSwitch()
+      local addon = start({ next = true })
+      switch(addon, "classic")
+      held.addon, held.frame, held.items = addon, addon.Bags.Backpack.frame, addon:GetModule("Items")
+      handle:Restore()
+      handle = nil
+    end
+    loadAndSwitch()
+    collectgarbage("collect")
+    assert.is_nil(held.addon, "the addon")
+    assert.is_nil(held.frame, "its frames")
+    assert.is_nil(held.items, "its modules")
+  end)
+
   it("starts with the classic bags and switches to BetterBags Next and back", function()
     local addon = start()
     assert.are.equal("classic", addon:GetModule("BagSystem"):ActiveDesign())

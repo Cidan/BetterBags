@@ -85,6 +85,7 @@ local BAG_BAR_BUTTONS = { "MainMenuBarBackpackButton", "CharacterBag0Slot", "Cha
 -- Libraries the TOC loads that spec/setup.lua does not. Two start with a UTF-8 byte order mark,
 -- which the client skips and Lua 5.1's loadfile rejects.
 local LIBRARIES = { "libs/LibWindow-1.1/LibWindow-1.1.lua", "libs/WagoAnalytics/Shim.lua" }
+local LIBRARY_NAMES = { "LibWindow-1.1", "WagoAnalytics", "LibUIDropDownMenu-4.0" }
 
 -- The files spec/setup.lua already loaded, with their modules, into the addon set aside; the fresh
 -- addon gets its own copy of each.
@@ -123,6 +124,18 @@ end
 function WholeAddon.Load(opts)
   opts = opts or {}
   local restorers = {}
+  -- Every global as it was: the loaded addon makes named frames and functions (keybindings,
+  -- slash commands), and any of them left behind keeps the whole addon in memory.
+  local globalsBefore = {}
+  for name, value in pairs(_G) do globalsBefore[name] = value end
+  table.insert(restorers, function()
+    for name in pairs(_G) do
+      if globalsBefore[name] == nil then rawset(_G, name, nil) end
+    end
+    for name, value in pairs(globalsBefore) do
+      if rawget(_G, name) ~= value then rawset(_G, name, value) end
+    end
+  end)
   local function setGlobal(name, value)
     local old = rawget(_G, name)
     table.insert(restorers, function() rawset(_G, name, old) end)
@@ -132,6 +145,40 @@ function WholeAddon.Load(opts)
     local old = rawget(tbl, key)
     table.insert(restorers, function() rawset(tbl, key, old) end)
     rawset(tbl, key, value)
+  end
+
+  -- Tables shared with the rest of the specs that the loaded addon adds to in place: each is put
+  -- back as it was.
+  local function keepAsIs(tbl)
+    if tbl == nil then return end
+    local before = {}
+    for key, value in pairs(tbl) do before[key] = value end
+    table.insert(restorers, function()
+      for key in pairs(tbl) do
+        if before[key] == nil then tbl[key] = nil end
+      end
+      for key, value in pairs(before) do tbl[key] = value end
+    end)
+  end
+  keepAsIs(_G.SlashCmdList)
+  -- The libraries' own registries: what they were embedded in (AceHook's embeded, keyed by the
+  -- addon), AceDB's databases, AceConsole's commands, and the like.
+  for _, lib in pairs(LibStub.libs) do
+    if type(lib) == "table" then
+      for _, field in pairs(lib) do
+        if type(field) == "table" then keepAsIs(field) end
+      end
+    end
+  end
+  -- A mock frame lists the frames parented to it (_children, for GetChildren): the loaded addon
+  -- parents thousands to UIParent and other frames made before it.
+  local seenFrames = {}
+  for _, value in pairs(globalsBefore) do
+    if type(value) == "table" and type(rawget(value, "_children")) == "table" and not seenFrames[value] then
+      seenFrames[value] = true
+      local children = { unpack(value._children) }
+      table.insert(restorers, function() value._children = children end)
+    end
   end
 
   -- The addon set aside: AceAddon's registry, statuses and queues.
@@ -264,6 +311,12 @@ function WholeAddon.Load(opts)
     return function(e) table.insert(handle.errors, tostring(e)) end
   end)
 
+  -- Each library loads fresh: a copy another spec registered (a stand-in, or the same library)
+  -- would be upgraded in place by NewLibrary, keeping what the loaded addon put in it. The
+  -- copy is put back with the rest of LibStub.
+  for _, name in ipairs(LIBRARY_NAMES) do
+    LibStub.libs[name], LibStub.minors[name] = nil, nil
+  end
   for _, path in ipairs(LIBRARIES) do loadWithoutBOM(path) end
   -- LibUIDropDownMenu needs much of Blizzard's frame code; the context menu's calls are stood in for.
   local dropdown = LibStub:NewLibrary("LibUIDropDownMenu-4.0", 1)
@@ -295,13 +348,17 @@ function WholeAddon.Load(opts)
     opts.profile(defaults, const)
   end
 
-  table.insert(restorers, 1, function()
+  -- Runs first (restorers run last to first): unhooking reads the libraries' registries, which
+  -- are put back afterwards.
+  table.insert(restorers, function()
     local events = handle.addon:GetModule("Events")
     if events._eventHandler and events._eventHandler.UnregisterAllEvents then
       events._eventHandler:UnregisterAllEvents()
       events._eventHandler:UnregisterAllMessages()
     end
     handle.addon:UnhookAll()
+    -- Sonata follows the client's text size (sonata.md §3c).
+    EventRegistry:UnregisterCallback("TextSizeManager.OnTextScaleUpdated", handle.addon:GetModule("Sonata"))
   end)
 
   -- Start runs what the client runs as BetterBags loads and the player logs in: AceAddon's own
@@ -314,9 +371,13 @@ function WholeAddon.Load(opts)
     onEvent(aceAddon.frame, "PLAYER_LOGIN")
   end
 
+  -- Restore frees the loaded addon too (a load and start take about 940 MB of mock frames): a full
+  -- collection, so no more than one load is ever in memory.
   function handle:Restore()
     for i = #restorers, 1, -1 do restorers[i]() end
     restorers = {}
+    self.addon = nil
+    collectgarbage("collect")
   end
 
   return handle

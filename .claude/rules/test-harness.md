@@ -92,6 +92,7 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   into a new one. Libraries the specs do not load are loaded (LibWindow-1.1, the WagoAnalytics
   shim; byte order marks stripped, which the client skips and Lua 5.1 rejects) or stood in for
   (LibUIDropDownMenu: the four calls the context menu makes).
+- **Libraries loaded fresh:** see Memory below.
 - **Started as the client starts it:** through AceAddon's own handler, `ADDON_LOADED` (not logged
   in) initializes the addon while its modules are still queued, so the modules it enables are only
   marked; `PLAYER_LOGIN` enables the addon and every marked module. Calling `OnInitialize` and
@@ -107,13 +108,29 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   `CreateDataProvider`.
 - **No layout engine:** every frame the loaded addon makes is resolved at the screen's origin, as
   if laid out, and the cursor is far off screen.
-- **Restore** puts back everything changed in place (insulation restores only globals): the
-  AceAddon registry and queues, LibStub's libraries, the `Enum` tables, each global it set, and
-  the loaded addon's events, messages and hooks. A full suite run with the whole-addon spec in it
-  passes unchanged, which shows nothing leaks.
+- **Restore** puts back everything changed in place (insulation restores only globals): first
+  the loaded addon's events, messages and hooks and Sonata's text-size callback (unhooking reads
+  the libraries' registries, put back next), then the table fields of every library (AceHook's
+  `embeded` and `registry` are keyed by the addon; AceDB's databases; AceConsole's commands),
+  `SlashCmdList`, the children lists of frames made before the load, the AceAddon registry and
+  queues, LibStub's libraries, the `Enum` tables, and every global as it was. Then it collects.
+- **Memory (the failure mode):** a load and start take about 940 MB, because the frame mock makes
+  its 178 methods as fresh closures for every frame and the addon makes about 2,700 item buttons
+  at login. Anything left reachable after `Restore` keeps all of it: before these restores, each
+  load stayed in memory, the integration spec alone peaked at 24.8 GB, and GitHub's runner was
+  shut down mid-run twice (no test failed; it ran out of memory). Each holder was found with a
+  reference search from the globals, the registry and the stacks (Lua 5.1 rules: a weak-keyed
+  table's values are strong). `spec/integration/bag_switch_spec.lua` ("lets the loaded addon be
+  collected once restored") fails if a load is kept, run alone or in the full suite. The libraries
+  the harness loads are loaded fresh, with any copy another spec registered set aside: LibStub
+  upgrades an existing copy in place, and LibWindow's `windowData` (keyed by the bags' frames)
+  then outlived the load, which only the full suite showed. Measured now: 3 MB kept after each
+  load; the integration spec peaks at 2.2 GB alone, the full suite at 5.2 GB (5.0 GB without it).
 - **Cost:** about 1.1 s per load and start, 0.8 s of it the real `ItemFrame:OnEnable` making every
-  item button of every slot at login; `spec/integration/bag_switch_spec.lua` takes about 21 s.
-  Keep whole-addon specs few and pointed: a test needs its own load only when it needs a fresh
-  start (what it checks happens the first time something is made).
+  item button of every slot at login, plus the collection in `Restore`, which walks the whole heap
+  (the other specs' too): the integration spec takes about 26 s alone and adds about 32 s to the
+  full suite (16 s without it, 48 s with it). Keep whole-addon specs few and pointed: a test needs its own load only when it needs
+  a fresh start (what it checks happens the first time something is made). Making the frame mock
+  share its methods (one set behind a metatable) would cut both, for every spec.
 - Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e).
 
