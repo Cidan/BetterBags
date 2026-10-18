@@ -1,0 +1,23 @@
+{
+  "id": 1792341485,
+  "version": "v0.5.18-1-g1bcfee6",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "5c23f35a449e1c26d228bfb8599d77a5609f0bd9",
+  "to": "1bcfee66dd844295d445afb506a493d7d4a4e4e9",
+  "headline": "This update speeds up interaction animations in BetterBags Next and prevents accidentally picking up items when dragging sections.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Moving a section no longer picks up an item",
+      "details": "Releasing a dragged section in BetterBags Next will no longer accidentally pick up the item under the cursor or display item tooltips while dragging.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Faster interaction animations in BetterBags Next",
+      "details": "Animations in BetterBags Next now share a unified, snappier duration of 0.24 seconds when sorting, looting, switching tabs, and rearranging sections.",
+      "clients": []
+    }
+  ]
+}
