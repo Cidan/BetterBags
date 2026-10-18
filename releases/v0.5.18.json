@@ -1,0 +1,31 @@
+{
+  "id": 1792334148,
+  "version": "v0.5.18",
+  "channel": "release",
+  "date": "2026-10-18",
+  "from": "v0.5.17",
+  "to": "v0.5.18",
+  "headline": "Introduces the experimental BetterBags Next slide-in interface and fixes a crash with the ElvUI theme.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Experimental BetterBags Next interface",
+      "details": "An optional new design for your backpack and bank that slides in from the screen edges as full-height panels. It features side tabs for groups, larger item icons, smooth motion animations, and support for dragging section headers to reorder categories, assign them to tabs, or transfer items between bags. It can be enabled in settings or by typing /bb next.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Crash at login with ElvUI theme",
+      "details": "Fixed a game crash that occurred during the loading screen when using the ElvUI theme.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Blank settings button on Classic",
+      "details": "The settings button on the backpack header is no longer blank on Classic Era and Mists of Pandaria.",
+      "clients": [
+        "Classic"
+      ]
+    }
+  ]
+}
