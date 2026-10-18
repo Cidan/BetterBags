@@ -118,6 +118,7 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field closeSound number
 ---@field frame Frame The panel.
 ---@field body Frame The opaque part, inside the feathered edge.
+---@field fill Texture The body's color, reaching OVERREACH past the screen edge.
 ---@field feather Texture
 ---@field wash Texture The faint color at the top of the body.
 ---@field dropGlow Texture Lit while a section from the other bag would drop here (next.md §7).
@@ -307,6 +308,7 @@ function panelProto:BuildPanel(name)
     wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", style.OVERREACH, 0)
   end
   fill:SetColorTexture(unpack(style.Color.Body))
+  self.fill = fill
   self.feather = feather
 
   wash:SetHeight(260)

@@ -553,6 +553,23 @@ describe("NextBag", function()
       end)
     end)
 
+    -- Asked: the bounce showed what is under the bag at the screen edge (next.md §3). The fill
+    -- reaches far enough past the panel that the screen edge stays covered through the bounce.
+    it("keeps its fill over the screen edge through the whole bounce", function()
+      local bag = nextBag:Create(ctx())
+      local point, to, relative, reach = bag.fill:GetPoint(2)
+      assert.are.same({ "BOTTOMRIGHT", bag.frame, "BOTTOMRIGHT" }, { point, to, relative })
+      bag:Show(ctx())
+      local deepest = 0
+      for _ = 1, 250 do
+        tween:Step(0.002)
+        deepest = math.max(deepest, -offset(bag))
+        assert.is_true(offset(bag) + reach >= 0, "the fill reaches the screen edge: " .. offset(bag) .. " + " .. reach)
+      end
+      assert.is_true(deepest > 0.09 * (style.WIDTH + style.OVERREACH), "it still bounces: " .. deepest)
+      assert.are.equal(0, offset(bag))
+    end)
+
     it("fades its sections in one after the other as it opens", function()
       local bag = nextBag:Create(ctx())
       bag:Draw(ctx(), slotInfo, function() end)
