@@ -24,6 +24,11 @@ bag slots. A section title with Shift adds the item to that category; without Sh
 passes the drop to its window (`sectionFrame:OnTitleClickOrDrop`, through
 `addon:GetBagFromKind(section:GetKind())`).
 
+BetterBags Next's sections have a header button over their title row (next.md §7). It takes the
+item drops the classic section title takes: an item dropped or left-clicked onto it goes to its
+panel (`PlaceCursorItem`), or with Shift into its category, through the same
+`sectionFrame:OnTitleClickOrDrop`.
+
 ## 2. What happens to the item (`util/cursorplacement.lua`)
 
 `CursorPlacement:PlaceCursorItem(kind, bankTab)` returns what it did, so a profiler trace shows

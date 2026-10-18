@@ -18,6 +18,7 @@ next/
 ├── sparkles.lua  # NextSparkles: a pooled particle emitter of star sprites
 ├── tabs.lua      # NextTabs: the tab rail down a panel's inner edge
 ├── content.lua   # NextContent: the canvas: sections in one column, laid out through Motion
+├── drag.lua      # NextDrag: moving sections by their headers: reorder, to a tab, to the other bag
 ├── panel.lua     # NextPanel: the panel both bags are made of, for either side of the screen
 ├── bag.lua       # NextBag: the backpack's panel, on the right (addon.Bags.Backpack)
 └── bank.lua      # NextBank: the bank's panel, on the left (addon.Bags.Bank)
@@ -54,6 +55,16 @@ pass drew and this one did not. `NextContent:Bind` builds the sections (Recent I
 tab's categories in their order, Free Space) and draws the static per-slot item buttons, sized to
 44 pixels; `NextContent:Render` lays them out in one column inside the panel's scroll box, through
 Motion so what changed place glides there. A draw while the panel is hidden waits for it to open.
+
+## Moving sections
+
+Every section has a header button. Dragging a category's header picks the section up: its frame,
+with its real item buttons, moves to `NextDrag`'s layer and follows the cursor, while the canvas
+keeps a gap (`NextContent:BeginDrag`, `SetDragIndex`, `DragIndexAt`) that the other sections slide
+around. Dropping reorders it (`NextDrag:SaveOrder` pins the new order in `customSectionSort`),
+assigns its category to a tab's group, or moves its items to the other bag with
+`SectionFrame:MoveItems`. Targets are found by position every frame. Panels register with
+`NextDrag:Register` and answer `ShownBankType`, `InTabMode` and, for the bank, `BankTypeOfTab`.
 
 ## The bank
 

@@ -186,6 +186,22 @@ local function bankTypeOfTab(bagIndex)
   return Enum.BankType.Character
 end
 
+-- ShownBankType is the bank type the bank shows (retail), what drops and moves go by.
+---@return BankType?
+function bankProto:ShownBankType()
+  if not addon.isRetail then
+    return nil
+  end
+  return bankTypeOfTab(self.bankTab)
+end
+
+-- BankTypeOfTab is a Blizzard bank tab's bank type.
+---@param bagIndex number
+---@return BankType
+function bankProto:BankTypeOfTab(bagIndex)
+  return bankTypeOfTab(bagIndex)
+end
+
 -- PurchasedTabs returns the purchased bank tabs of a bank type, in tab order.
 ---@param bankType BankType
 ---@return BankTabData[]

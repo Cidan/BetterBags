@@ -244,6 +244,62 @@ describe("NextTabs", function()
     end)
   end)
 
+  -- A section dragged over a tab (next.md §7).
+  describe("as a drop target", function()
+    it("finds the tab under the cursor, by position", function()
+      rail:SetTabs(groups)
+      UIParent:_SetRect(0, 0, 1920, 1200)
+      for i, t in ipairs(rail.tabs) do t.button:_SetRect(100, 1000 - i * 40, 80, 30) end
+      _G._cursorX, _G._cursorY = 120, 925
+      assert.are.equal(rail.tabs[2], rail:TabAt())
+      _G._cursorX = 20
+      assert.is_nil(rail:TabAt())
+      rail.frame:Hide()
+      _G._cursorX = 120
+      assert.is_nil(rail:TabAt(), "nothing while the rail is hidden")
+      _G._cursorX, _G._cursorY = nil, nil
+    end)
+
+    it("lights the tab a section would drop on, slid out, and puts it back after", function()
+      rail:SetTabs(groups)
+      rail:Select(1)
+      rail:SetDropTarget(2)
+      finishTweens()
+      local tab = rail.tabs[2]
+      assert.are.equal(style:Font("TabSelected"), tab.text:GetFontObject())
+      assert.is_true(tab.glow:IsShown())
+      local _, _, _, x = tab.button:GetPoint(1)
+      assert.are.equal(-style.TAB_HOVER, x)
+      rail:SetDropTarget(nil)
+      finishTweens()
+      assert.are.equal(style:Font("Tab"), tab.text:GetFontObject())
+      assert.is_false(tab.glow:IsShown())
+      _, _, _, x = tab.button:GetPoint(1)
+      assert.are.equal(0, x)
+      assert.are.equal(style:Font("TabSelected"), rail.tabs[1].text:GetFontObject(), "the selected tab stays bright")
+    end)
+
+    it("keeps the lit tab slid out when the pointer leaves it mid-drag", function()
+      rail:SetTabs(groups)
+      rail:SetDropTarget(2)
+      local button = rail.tabs[2].button
+      button:GetScript("OnLeave")(button)
+      finishTweens()
+      local _, _, _, x = button:GetPoint(1)
+      assert.are.equal(-style.TAB_HOVER, x)
+    end)
+
+    it("pulses a tab that received a section, then fades the glow out", function()
+      rail:SetTabs(groups)
+      rail:Pulse(2)
+      local glow = rail.tabs[2].glow
+      assert.is_true(glow:IsShown())
+      assert.is_true(glow:GetAlpha() > 0.5)
+      finishTweens()
+      assert.is_false(glow:IsShown())
+    end)
+  end)
+
   it("reuses its tabs when the groups change, hiding the ones it no longer needs", function()
     rail:SetTabs(groups)
     local first = rail.tabs[1].button

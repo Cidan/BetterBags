@@ -161,6 +161,7 @@ globals = {
 	"ITEM_QUALITY7_DESC",
 	"ITEM_QUALITY8_DESC",
 	"IsShiftKeyDown",
+	"IsMouseButtonDown",
 	"IsModifiedClick",
 	"Item",
 	"ItemLocation",

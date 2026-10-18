@@ -75,6 +75,11 @@ style.Time = {
   Hover = 0.15,
   Shimmer = 1.4,
   ShimmerEvery = 3.4,
+  -- Moving sections (next.md §7).
+  Lift = 0.12,
+  Land = 0.22,
+  FlyAway = 0.3,
+  Pulse = 0.6,
 }
 style.RISE = 12
 

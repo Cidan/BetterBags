@@ -1,0 +1,731 @@
+-- drag_spec.lua -- NextDrag (next/drag.lua): moving sections by their headers (next.md §7). A section
+-- is picked up with its real item buttons and follows the cursor; the other sections slide out of
+-- its way; dropping it reorders it (saving its place), moves it to a tab, or moves its items to the
+-- other bag, on the real backpack and bank panels.
+local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
+
+LoadBetterBagsModule("core/context.lua")
+
+local createdStubs = {}
+local function trackStub(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
+end
+
+local const = trackStub("Constants")
+const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0, BANK = 1 }
+local BACKPACK, BANK = const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK
+
+local stubs = {
+  L = trackStub("Localization"),
+  itemFrame = trackStub("ItemFrame"),
+  items = trackStub("Items"),
+  database = trackStub("Database"),
+  groups = trackStub("Groups"),
+  events = trackStub("Events"),
+  searchBox = trackStub("SearchBox"),
+  sonata = trackStub("Sonata"),
+  money = trackStub("MoneyFrame"),
+  cursorPlacement = trackStub("CursorPlacement"),
+  backpackBehavior = trackStub("BackpackBehavior"),
+  bankBehavior = trackStub("BankBehavior"),
+  bankSlots = trackStub("BankSlots"),
+  menuButton = trackStub("BagMenuButton"),
+  sectionFrame = trackStub("SectionFrame"),
+}
+
+local replaced = {}
+local function override(tbl, key, value)
+  table.insert(replaced, { tbl, key, rawget(tbl, key) })
+  tbl[key] = value
+end
+local function restore()
+  for i = #replaced, 1, -1 do
+    replaced[i][1][replaced[i][2]] = replaced[i][3]
+  end
+  replaced = {}
+end
+
+LoadBetterBagsModule("render/render.lua")
+LoadBetterBagsModule("render/drawable.lua")
+LoadBetterBagsModule("render/scrollbox.lua")
+local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
+  { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
+  { "NextDrag", "next/drag.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
+  { "NextBank", "next/bank.lua" } }
+for _, m in ipairs(modules) do
+  ResetModuleStub(m[1], m[2])
+  LoadBetterBagsModule(m[2])
+end
+
+local nextBag = addon:GetModule("NextBag")
+local nextBank = addon:GetModule("NextBank")
+local nextDrag = addon:GetModule("NextDrag")
+local style = addon:GetModule("NextStyle")
+local tween = addon:GetModule("NextTween")
+local render = addon:GetModule("Render")
+local motion = addon:GetModule("Motion")
+local context = addon:GetModule("Context")
+
+local CHAR, ACCOUNT = 1, 2
+local SECTION_GRID, SECTION_ALL_BAGS = 2, 4
+-- The canvas's top on screen, below each panel's header.
+local CANVAS_TOP = 1090
+
+describe("NextDrag", function()
+  local buttons, sent, pins, db, backpackGroups, bankGroups, slots, calls, backpack, bank
+
+  local function fakeButton(slotkey)
+    local b = { slotkey = slotkey, frame = CreateFrame("Frame") }
+    b.frame:SetSize(37, 37)
+    function b:SetItemFromData(_, data) self.data = data self.isFreeSlot = false end
+    function b:SetFreeSlots(_, data) self.data = data self.isFreeSlot = true end
+    function b:SetSize(_, w, h) self.frame:SetSize(w, h) end
+    function b:GetItemData() return self.data end
+    function b:UpdateSearch() end
+    function b:UpdateCooldown() return "unchanged" end
+    function b:Release() end
+    return b
+  end
+
+  local function item(slotkey, category)
+    return { slotkey = slotkey, itemInfo = { category = category } }
+  end
+
+  local function tab(names, items)
+    local categories = {}
+    for _, n in ipairs(names) do table.insert(categories, { name = n }) end
+    return { categories = categories, items = items }
+  end
+
+  local function backpackData()
+    return {
+      sortedItems = { item("0_9", "Recent Items") },
+      tabs = {
+        [1] = tab({ "Armor", "Cloth", "Herbs", "Ore" }, {
+          item("0_1", "Armor"), item("0_2", "Cloth"), item("0_3", "Herbs"), item("0_4", "Herbs"), item("0_5", "Ore"),
+        }),
+        [2] = tab({ "Gems" }, { item("0_6", "Gems") }),
+      },
+    }
+  end
+
+  local function bankData()
+    return {
+      sortedItems = {},
+      tabs = {
+        [10] = tab({ "Leather", "Mail" }, { item("6_1", "Leather"), item("6_2", "Mail") }),
+        [11] = tab({ "Potions" }, { item("12_1", "Potions") }),
+        [12] = tab({ "Gold" }, { item("6_3", "Gold") }),
+      },
+    }
+  end
+
+  local function ctx() return context:New("spec") end
+
+  local function finishTweens()
+    for _ = 1, 400 do
+      local update = tween.driver and tween.driver:GetScript("OnUpdate")
+      if update == nil then return end
+      update(tween.driver, 0.05)
+    end
+  end
+
+  local function cursor(x, y)
+    _G._cursorX, _G._cursorY = x, y
+  end
+
+  -- layout puts a panel's frames where the client would: the canvas below the header, each
+  -- section where the canvas laid it out, the tabs down the rail, the scroll area.
+  local function layout(panel)
+    local left = panel.side == "LEFT" and 0 or (1920 - style.WIDTH)
+    local bodyLeft = panel.side == "LEFT" and left or (left + style.FEATHER)
+    panel.body:_SetRect(bodyLeft, 0, style.BODY_WIDTH, 1200)
+    panel.scroll.frame:_SetRect(bodyLeft + style.PAD, style.FOOTER, style.BODY_WIDTH - 2 * style.PAD,
+      1200 - style.CONTENT_TOP - style.FOOTER)
+    local canvas = panel.content.frame
+    local height = canvas:GetHeight()
+    canvas:_SetRect(bodyLeft + style.PAD + 14, CANVAS_TOP - height, style.GRID_WIDTH, height)
+    for _, section in ipairs(panel.content.order) do
+      if section.frame:GetParent() == canvas then
+        section.frame:_SetRect(bodyLeft + style.PAD + 14, CANVAS_TOP - section.y - section.height,
+          style.GRID_WIDTH, section.height)
+      end
+    end
+    local tabLeft = panel.side == "LEFT" and (bodyLeft + style.BODY_WIDTH) or (bodyLeft - 100)
+    for i, t in ipairs(panel.tabs.tabs) do
+      t.button:_SetRect(tabLeft, CANVAS_TOP - i * (style.TAB_HEIGHT + style.TAB_SPACING), 100, style.TAB_HEIGHT)
+    end
+  end
+
+  local function flush()
+    render:Flush()
+    motion:Step(1)
+    layout(backpack)
+    if bank then layout(bank) end
+  end
+
+  local function section(panel, name)
+    return panel.content.byName[name]
+  end
+
+  local function sectionNames(panel)
+    local out = {}
+    for _, s in ipairs(panel.content.order) do table.insert(out, s.name) end
+    return out
+  end
+
+  local function sentNamed(name)
+    local out = {}
+    for _, m in ipairs(sent) do
+      if m[1] == name then table.insert(out, m[2]) end
+    end
+    return out
+  end
+
+  -- pickUp presses on a section's header at a point inside it and drags.
+  local function pickUp(panel, name, dx, dy)
+    local s = section(panel, name)
+    cursor(s.frame:GetLeft() + (dx or 20), s.frame:GetTop() - (dy or 10))
+    _G._mouseButtonsDown = { LeftButton = true }
+    s.header:GetScript("OnDragStart")(s.header)
+    return s
+  end
+
+  local function moveTo(x, y)
+    cursor(x, y)
+    nextDrag:Update(0.016)
+  end
+
+  local function drop(s)
+    _G._mouseButtonsDown = nil
+    s.header:GetScript("OnDragStop")(s.header)
+  end
+
+  local function centerOf(frame)
+    local x, y = frame:GetCenter()
+    return x, y
+  end
+
+  before_each(function()
+    render:Init()
+    tween:Init()
+    motion:Init()
+    nextDrag:Init()
+    buttons, sent = {}, {}
+    pins = {}
+    db = { view = { [BACKPACK] = SECTION_GRID, [BANK] = SECTION_GRID }, active = { [BACKPACK] = 1, [BANK] = 10 },
+      showBankTabs = false }
+    backpackGroups = { [1] = { id = 1, name = "Backpack" }, [2] = { id = 2, name = "Gems" } }
+    bankGroups = {
+      [10] = { id = 10, name = "Bank", bankType = CHAR, isDefault = true },
+      [11] = { id = 11, name = "Warbank", bankType = ACCOUNT, isDefault = true },
+      [12] = { id = 12, name = "Vault", bankType = CHAR },
+    }
+    slots = { [BACKPACK] = backpackData(), [BANK] = bankData() }
+    calls = { moved = {}, assigned = {}, scrolled = {}, titleDrops = {} }
+
+    override(addon, "isRetail", true)
+    override(addon, "isForever", false)
+    override(addon, "hasWarbank", true)
+    override(addon, "atBank", true)
+    override(const, "BANK_TAB", { BANK = -2, ACCOUNT_BANK_1 = 12 })
+    override(const, "BAG_VIEW", { SECTION_GRID = SECTION_GRID, SECTION_ALL_BAGS = SECTION_ALL_BAGS })
+    override(const, "ACCOUNT_BANK_BAGS", { [12] = 12, [13] = 13 })
+    override(Enum.BagIndex, "Characterbanktab", -2)
+    override(Enum.BagIndex, "CharacterBankTab_1", 6)
+    override(Enum.BagIndex, "AccountBankTab_1", 12)
+    UIParent:_SetRect(0, 0, 1920, 1200)
+
+    override(stubs.L, "G", function(_, key) return key end)
+    override(stubs.itemFrame, "GetButton", function(_, _, slotkey)
+      buttons[slotkey] = buttons[slotkey] or fakeButton(slotkey)
+      return buttons[slotkey]
+    end)
+    override(stubs.items, "GetAllSlotInfo", function() return slots end)
+    override(stubs.items, "ExpireRecentItems", function() return false end)
+    override(stubs.items, "ClearBankCache", function() end)
+    override(stubs.database, "GetGroupsEnabled", function() return true end)
+    override(stubs.database, "GetActiveGroup", function(_, kind) return db.active[kind] end)
+    override(stubs.database, "SetActiveGroup", function(_, kind, id) db.active[kind] = id end)
+    override(stubs.database, "GetInBagSearch", function() return true end)
+    override(stubs.database, "GetShowBankTabs", function() return db.showBankTabs end)
+    override(stubs.database, "SetShowBankTabs", function(_, on) db.showBankTabs = on end)
+    override(stubs.database, "GetBagView", function(_, kind) return db.view[kind] end)
+    override(stubs.database, "SetBagView", function(_, kind, view) db.view[kind] = view end)
+    override(stubs.database, "GetPreviousView", function() return SECTION_GRID end)
+    override(stubs.database, "SetPreviousView", function() end)
+    override(stubs.database, "GetCustomSectionSort", function(_, kind)
+      pins[kind] = pins[kind] or {}
+      return pins[kind]
+    end)
+    override(stubs.database, "SetCustomSectionSort", function(_, kind, name, index)
+      pins[kind] = pins[kind] or {}
+      pins[kind][name] = index
+    end)
+    override(stubs.groups, "GetAllGroups", function(_, kind) return kind == BANK and bankGroups or backpackGroups end)
+    override(stubs.groups, "GetGroup", function(_, kind, id) return (kind == BANK and bankGroups or backpackGroups)[id] end)
+    override(stubs.groups, "IsDefaultGroup", function(_, kind, id)
+      local g = (kind == BANK and bankGroups or backpackGroups)[id]
+      return g ~= nil and (g.isDefault == true or (kind == BACKPACK and id == 1))
+    end)
+    override(stubs.groups, "GetDefaultBankGroup", function() return bankGroups[10] end)
+    override(stubs.groups, "AssignCategoryToGroup", function(_, c, kind, name, id, bankType)
+      assert.is_not_nil(c)
+      table.insert(calls.assigned, { kind, name, id, bankType })
+    end)
+    override(stubs.events, "SendMessage", function(_, _, name, opts) table.insert(sent, { name, opts }) end)
+    override(stubs.events, "RegisterMessage", function() end)
+    override(stubs.events, "RegisterEvent", function() end)
+    override(stubs.events, "BucketEvent", function() end)
+    override(stubs.searchBox, "CreateBox", function(_, kind, parent)
+      local box = { kind = kind, frame = CreateFrame("Frame", nil, parent) }
+      box.textBox = CreateFrame("EditBox", nil, box.frame)
+      return box
+    end)
+    override(stubs.sonata, "UnregisterElement", function() end)
+    override(stubs.money, "Create", function()
+      return { frame = CreateFrame("Frame"), Update = function() end }
+    end)
+    override(stubs.cursorPlacement, "PlaceCursorItem", function() return "placed" end)
+    override(stubs.backpackBehavior, "Create", function() return {} end)
+    override(stubs.bankBehavior, "SuppressBlizzardBankPanel", function() end)
+    override(stubs.bankBehavior, "proto", { UpdatePurchaseBankButton = function() end })
+    override(stubs.bankSlots, "GetBagSocketIndex", function() return nil end)
+    override(stubs.sectionFrame, "MoveItems", function(_, list, bankType)
+      local keys = {}
+      for _, data in ipairs(list) do table.insert(keys, data.slotkey) end
+      table.insert(calls.moved, { keys, bankType })
+    end)
+    override(stubs.sectionFrame, "OnTitleClickOrDrop", function(_, c, adapter)
+      assert.is_not_nil(c)
+      table.insert(calls.titleDrops, { adapter:GetKind(), adapter:GetTitle() })
+    end)
+    override(C_Bank, "FetchPurchasedBankTabData", function(bankType)
+      if bankType == CHAR then return { { ID = 6, name = "Base", icon = 1 } } end
+      return { { ID = 12, name = "Shared", icon = 2 } }
+    end)
+    override(C_Bank, "FetchNextPurchasableBankTabData", function() return nil end)
+    override(C_Bank, "CloseBankFrame", function() end)
+    override(C_Container, "SortBankBags", function() end)
+    override(addon, "SetBlizzardBankType", function() end)
+    override(addon, "TriggerItemContextChanged", function() end)
+    override(addon, "ForceHideBlizzardBags", function() end)
+    override(_G, "PlaySound", function() end)
+    override(_G, "InCombatLockdown", function() return false end)
+    _G._cursorHasItem = false
+
+    backpack = nextBag:Create(ctx())
+    bank = nextBank:Create(ctx())
+    for _, panel in ipairs({ backpack, bank }) do
+      panel:Show(ctx())
+      panel:Draw(ctx(), slots[panel.kind], function() end)
+    end
+    finishTweens()
+    flush()
+    -- Every other test starts with the scroll area unscrolled.
+    for _, panel in ipairs({ backpack, bank }) do
+      local box = panel.scroll.scrollBox
+      box._scrollRange, box._scrollPercentage = 500, 0
+    end
+  end)
+
+  after_each(function()
+    nextDrag:Cancel()
+    restore()
+    _G._cursorX, _G._cursorY = 0, 0
+    _G._cursorHasItem = false
+    _G._mouseButtonsDown = nil
+  end)
+
+  teardown(function()
+    for i = #modules, 1, -1 do ResetModuleStub(modules[i][1]) end
+    for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
+  end)
+
+  describe("picking up", function()
+    it("lifts the real section, with its item buttons, into the drag layer where it was", function()
+      local herbs = section(backpack, "Herbs")
+      local left, top = herbs.frame:GetLeft(), herbs.frame:GetTop()
+      pickUp(backpack, "Herbs")
+      assert.are.equal(nextDrag.layer, herbs.frame:GetParent())
+      assert.are.equal("TOOLTIP", herbs.frame:GetFrameStrata())
+      assert.are.equal(herbs.cells, buttons["0_3"].frame:GetParent(), "its buttons come with it")
+      assert.are.same({ "TOPLEFT", UIParent, "BOTTOMLEFT", left, top }, { herbs.frame:GetPoint(1) })
+      assert.is_true(nextDrag.shadow:IsShown())
+    end)
+
+    it("shrinks a little around the point that was grabbed, which stays under the cursor", function()
+      local herbs = pickUp(backpack, "Herbs", 30, 12)
+      local cx, cy = _G._cursorX, _G._cursorY
+      finishTweens()
+      local s = herbs.frame:GetScale()
+      assert.are.equal(0.94, s)
+      local _, _, _, ox, oy = herbs.frame:GetPoint(1)
+      assert.is_true(math.abs((ox * s + 30 * s) - cx) < 1e-6, "the grabbed point's x")
+      assert.is_true(math.abs((oy * s - 12 * s) - cy) < 1e-6, "the grabbed point's y")
+    end)
+
+    it("keeps a gap where it was, so nothing moves until the cursor does", function()
+      local ore = section(backpack, "Ore")
+      pickUp(backpack, "Herbs")
+      render:Flush()
+      assert.is_nil(motion:GetMove(ore.frame))
+    end)
+
+    it("picks up only categories, never in the Show Bags view, and one section at a time", function()
+      pickUp(backpack, "Recent Items")
+      assert.is_false(nextDrag:IsActive())
+      db.view[BACKPACK] = SECTION_ALL_BAGS
+      pickUp(backpack, "Herbs")
+      assert.is_false(nextDrag:IsActive())
+      db.view[BACKPACK] = SECTION_GRID
+      pickUp(backpack, "Herbs")
+      assert.is_true(nextDrag:IsActive())
+      local cloth = section(backpack, "Cloth")
+      cloth.header:GetScript("OnDragStart")(cloth.header)
+      assert.are.equal(backpack.content.frame, cloth.frame:GetParent())
+    end)
+
+    it("follows the cursor", function()
+      local herbs = pickUp(backpack, "Herbs", 20, 10)
+      finishTweens()
+      moveTo(1300, 600)
+      local s = herbs.frame:GetScale()
+      local _, _, _, ox, oy = herbs.frame:GetPoint(1)
+      assert.is_true(math.abs(ox * s - (1300 - 20 * s)) < 1e-6)
+      assert.is_true(math.abs(oy * s - (600 + 10 * s)) < 1e-6)
+    end)
+  end)
+
+  describe("making room", function()
+    it("moves the gap under the cursor, the other sections sliding out of its way", function()
+      local armor = section(backpack, "Armor")
+      local herbs = pickUp(backpack, "Herbs")
+      -- A frame passes between the pickup and the cursor moving.
+      render:Flush()
+      local x = herbs.frame:GetLeft() + 20
+      -- Above Armor's middle: the gap goes first among the categories (Recent Items stays first).
+      moveTo(x, armor.frame:GetTop() - 5)
+      assert.are.equal(2, backpack.content.drag.index)
+      render:Flush()
+      local _, y0, _, y1 = motion:GetMove(armor.frame)
+      assert.is_true(y1 < y0, "Armor slides down")
+    end)
+
+    it("scrolls toward the edge it is held near, faster the closer", function()
+      local herbs = pickUp(backpack, "Herbs")
+      local box = backpack.scroll.scrollBox
+      local x = herbs.frame:GetLeft() + 20
+      moveTo(x, style.FOOTER + 30)
+      local slow = box:GetDerivedScrollOffset()
+      assert.is_true(slow > 0, "scrolls down near the bottom")
+      moveTo(x, style.FOOTER + 2)
+      assert.is_true(box:GetDerivedScrollOffset() - slow > slow, "faster closer to the edge")
+      local before = box:GetDerivedScrollOffset()
+      moveTo(x, CANVAS_TOP - 30)
+      local up = before - box:GetDerivedScrollOffset()
+      assert.is_true(up > 0, "up near the top")
+      before = box:GetDerivedScrollOffset()
+      moveTo(x, CANVAS_TOP - 3)
+      assert.is_true(before - box:GetDerivedScrollOffset() > up, "faster closer to the top")
+      before = box:GetDerivedScrollOffset()
+      moveTo(x, 600)
+      assert.are.equal(before, box:GetDerivedScrollOffset(), "not in the middle")
+    end)
+  end)
+
+  describe("reordering", function()
+    it("drops the section into its gap, saves its place and recalculates the bag", function()
+      local armor = section(backpack, "Armor")
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(herbs.frame:GetLeft() + 20, armor.frame:GetTop() - 5)
+      flush()
+      drop(herbs)
+      assert.are.same({ Herbs = 0 }, pins[BACKPACK])
+      assert.is_true(nextDrag:IsActive(), "still landing")
+      finishTweens()
+      assert.is_false(nextDrag:IsActive())
+      assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
+      assert.are.equal(1, herbs.frame:GetScale())
+      assert.are.equal("MEDIUM", herbs.frame:GetFrameStrata())
+      assert.is_false(nextDrag.shadow:IsShown())
+      assert.are.same({ "Recent Items", "Herbs", "Armor", "Cloth", "Ore" }, sectionNames(backpack))
+      assert.are.same({ { backpack = true, bank = false } }, sentNamed("bags/Rederive"))
+      render:Flush()
+      assert.is_nil(motion:GetMove(herbs.frame), "lands exactly where the canvas puts it")
+    end)
+
+    it("starts landing from exactly where it was dropped", function()
+      local herbs = pickUp(backpack, "Herbs", 20, 10)
+      finishTweens()
+      moveTo(1600, 700)
+      drop(herbs)
+      tween:Step(0.0001)
+      local s = herbs.frame:GetScale()
+      local _, _, _, ox, oy = herbs.frame:GetPoint(1)
+      assert.is_true(math.abs(ox * s - (1600 - 20 * 0.94)) < 2)
+      assert.is_true(math.abs(oy * s - (700 + 10 * 0.94)) < 2)
+    end)
+
+    it("lands back in its old place when dropped outside after its gap moved", function()
+      local armor = section(backpack, "Armor")
+      local herbs = pickUp(backpack, "Herbs")
+      local oldY = herbs.y
+      moveTo(herbs.frame:GetLeft() + 20, armor.frame:GetTop() - 5)
+      flush()
+      moveTo(900, 600)
+      drop(herbs)
+      flush()
+      finishTweens()
+      local _, rel, _, _, y = herbs.frame:GetPoint(1)
+      assert.are.equal(backpack.content.frame, rel)
+      assert.are.equal(-oldY, y)
+    end)
+
+    it("lands back where it was when dropped outside any panel, saving nothing", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(900, 600)
+      drop(herbs)
+      finishTweens()
+      assert.are.same({}, pins[BACKPACK] or {})
+      assert.are.same({}, sentNamed("bags/Rederive"))
+      assert.are.same({ "Recent Items", "Armor", "Cloth", "Herbs", "Ore" }, sectionNames(backpack))
+      assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
+    end)
+
+    describe("saving the order", function()
+      it("pins what comes up to the dropped section, after the pinned list's other entries", function()
+        pins[BACKPACK] = { Gems = 0 }
+        nextDrag:SaveOrder(BACKPACK, { "Armor", "Herbs", "Cloth", "Ore" }, 2)
+        assert.are.same({ Gems = 0, Armor = 1, Herbs = 2 }, pins[BACKPACK])
+      end)
+
+      it("keeps the tab's block where its first pinned category was, and other tabs' order", function()
+        pins[BACKPACK] = { Gems = 0, Armor = 1, Leather = 2, Cloth = 3 }
+        nextDrag:SaveOrder(BACKPACK, { "Herbs", "Armor", "Cloth", "Ore" }, 1)
+        assert.are.same({ Gems = 0, Herbs = 1, Armor = 2, Cloth = 3, Leather = 4 }, pins[BACKPACK])
+      end)
+
+      it("moves a pinned category down among unpinned ones, leaving the rest to the sort", function()
+        pins[BACKPACK] = { Armor = 0, Cloth = 1 }
+        nextDrag:SaveOrder(BACKPACK, { "Cloth", "Herbs", "Armor", "Ore" }, 3)
+        assert.are.same({ Cloth = 0, Herbs = 1, Armor = 2 }, pins[BACKPACK])
+      end)
+    end)
+  end)
+
+  describe("dropping on a tab of its own bag", function()
+    it("lights the tab and names the move, then assigns the category to its group", function()
+      local gems = backpack.tabs:Tab(2)
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(gems.button))
+      assert.are.equal(2, backpack.tabs.dropTarget)
+      assert.are.equal("Move to Gems", nextDrag.hint:GetText())
+      assert.is_true(nextDrag.hint:IsShown())
+      drop(herbs)
+      assert.are.same({ { BACKPACK, "Herbs", 2 } }, calls.assigned)
+      assert.is_nil(backpack.tabs.dropTarget)
+    end)
+
+    it("flies into the tab, then leaves the column until it is gone, and the tab pulses", function()
+      local gems = backpack.tabs:Tab(2)
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(gems.button))
+      drop(herbs)
+      tween:Step(style.Time.FlyAway / 2)
+      assert.is_true(herbs.frame:GetScale() < 0.94)
+      assert.is_true(herbs.frame:GetAlpha() < 1)
+      finishTweens()
+      assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
+      assert.is_false(herbs.frame:IsShown())
+      assert.are.equal(1, herbs.frame:GetScale(), "full size when it comes back")
+      assert.is_not_nil(backpack.content.leaving.Herbs)
+      assert.are.same({ { backpack = true, bank = false, resetLayout = true } }, sentNamed("bags/Rederive"))
+    end)
+
+    it("pulses the tab it flew into", function()
+      local gems = backpack.tabs:Tab(2)
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(gems.button))
+      drop(herbs)
+      tween:Step(style.Time.FlyAway + 0.001)
+      assert.is_true(gems.glow:IsShown())
+      assert.is_true(gems.glow:GetAlpha() > 0.5)
+    end)
+
+    it("is no target on the tab shown or the tab that makes a group", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(backpack.tabs:Tab(1).button))
+      assert.is_nil(backpack.tabs.dropTarget)
+      moveTo(centerOf(backpack.tabs:Tab(0).button))
+      assert.is_nil(backpack.tabs.dropTarget)
+      assert.is_false(nextDrag.hint:IsShown())
+      drop(herbs)
+      finishTweens()
+      assert.are.same({}, calls.assigned)
+    end)
+
+    it("takes a bank category only to a group of the same bank type", function()
+      local leather = pickUp(bank, "Leather")
+      moveTo(centerOf(bank.tabs:Tab(11).button))
+      assert.is_nil(bank.tabs.dropTarget, "the Warbank's group")
+      moveTo(centerOf(bank.tabs:Tab(12).button))
+      assert.are.equal(12, bank.tabs.dropTarget)
+      drop(leather)
+      assert.are.same({ { BANK, "Leather", 12 } }, calls.assigned)
+    end)
+  end)
+
+  describe("dropping on the other bag", function()
+    it("moves the section's items to the bank, the bank glowing and the move named", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      assert.is_true(bank.dropGlow:IsShown())
+      assert.are.equal("Move to the Bank", nextDrag.hint:GetText())
+      drop(herbs)
+      assert.are.same({ { { "0_3", "0_4" } } }, calls.moved)
+      assert.are.same({}, calls.assigned)
+      finishTweens()
+      assert.is_false(bank.dropGlow:IsShown())
+      assert.is_not_nil(backpack.content.leaving.Herbs)
+      assert.is_false(herbs.frame:IsShown())
+    end)
+
+    it("names the Warbank while the bank shows it", function()
+      bank:SwitchToGroup(ctx(), 11)
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      assert.are.equal("Move to the Warbank", nextDrag.hint:GetText())
+      drop(herbs)
+    end)
+
+    it("moves into a bank group's bank type and assigns the category to it there", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(bank.tabs:Tab(11).button))
+      assert.are.equal(11, bank.tabs.dropTarget)
+      assert.are.equal("Move to Warbank", nextDrag.hint:GetText())
+      drop(herbs)
+      assert.are.same({ { { "0_3", "0_4" }, ACCOUNT } }, calls.moved)
+      assert.are.same({ { BANK, "Herbs", 11, ACCOUNT } }, calls.assigned)
+      finishTweens()
+      assert.are.same({ { resetLayout = true } }, sentNamed("bags/Rederive"))
+    end)
+
+    it("moves bank items to the backpack and assigns the category to a backpack group", function()
+      local leather = pickUp(bank, "Leather")
+      moveTo(centerOf(backpack.tabs:Tab(2).button))
+      drop(leather)
+      assert.are.same({ { { "6_1" } } }, calls.moved)
+      assert.are.same({ { BACKPACK, "Leather", 2 } }, calls.assigned)
+    end)
+
+    it("is no target on a purchase tab", function()
+      override(C_Bank, "FetchNextPurchasableBankTabData", function() return { tabCost = 1 } end)
+      bank:ToggleBankTabs(ctx())
+      flush()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(bank.tabs:Tab(-1).button))
+      assert.is_nil(bank.tabs.dropTarget)
+      drop(herbs)
+      assert.are.same({}, calls.moved)
+    end)
+
+    it("moves into a Blizzard bank tab's bank type in the bank's Bank Tabs mode", function()
+      bank:ToggleBankTabs(ctx())
+      bank:Draw(ctx(), slots[BANK], function() end)
+      flush()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(bank.tabs:Tab(12).button))
+      drop(herbs)
+      assert.are.same({ { { "0_3", "0_4" }, ACCOUNT } }, calls.moved)
+      assert.are.same({}, calls.assigned)
+    end)
+
+    it("is no target away from the bank", function()
+      override(addon, "atBank", false)
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      assert.is_false(bank.dropGlow:IsShown())
+      moveTo(centerOf(bank.tabs:Tab(11).button))
+      assert.is_nil(bank.tabs.dropTarget)
+      drop(herbs)
+      assert.are.same({}, calls.moved)
+    end)
+  end)
+
+  describe("cancelling", function()
+    it("puts the section straight back when its panel closes mid-drag", function()
+      local herbs = pickUp(backpack, "Herbs")
+      backpack.frame:Hide()
+      backpack.frame:GetScript("OnHide")(backpack.frame)
+      assert.is_false(nextDrag:IsActive())
+      assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
+      drop(herbs)
+      assert.are.same({}, calls.moved)
+    end)
+
+    -- The client may miss the release (another window took the mouse); Blizzard's own drags
+    -- check the button too (FloatingChatFrame.lua). Without the release's hardware event no item
+    -- can be moved.
+    it("drops when the button is up without a release, never moving items then", function()
+      local armor = section(backpack, "Armor")
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(herbs.frame:GetLeft() + 20, armor.frame:GetTop() - 5)
+      _G._mouseButtonsDown = nil
+      nextDrag:Update(0.016)
+      assert.is_nil(pins[BACKPACK] and pins[BACKPACK].Herbs, "the release's OnDragStop gets a frame first")
+      nextDrag:Update(0.016)
+      assert.are.same({ Herbs = 0 }, pins[BACKPACK], "a reorder still saves")
+      finishTweens()
+      assert.is_false(nextDrag:IsActive())
+      local cloth = pickUp(backpack, "Cloth")
+      moveTo(300, 600)
+      _G._mouseButtonsDown = nil
+      nextDrag:Update(0.016)
+      nextDrag:Update(0.016)
+      finishTweens()
+      assert.are.same({}, calls.moved)
+      assert.are.equal(backpack.content.frame, cloth.frame:GetParent())
+      assert.is_true(cloth.frame:IsShown(), "it lands back")
+    end)
+
+    it("ends the drag when the section leaves the data", function()
+      pickUp(backpack, "Herbs")
+      slots[BACKPACK].tabs[1] = tab({ "Armor" }, { item("0_1", "Armor") })
+      backpack:Draw(ctx(), slots[BACKPACK], function() end)
+      assert.is_false(nextDrag:IsActive())
+    end)
+  end)
+
+  describe("the header", function()
+    it("passes an item clicked or dropped on it to its panel, and moves the section on a right click", function()
+      local herbs = section(backpack, "Herbs")
+      _G._cursorHasItem = true
+      herbs.header:GetScript("OnClick")(herbs.header, "LeftButton")
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({ { BACKPACK, "Herbs" }, { BACKPACK, "Herbs" } }, calls.titleDrops)
+      _G._cursorHasItem = false
+      herbs.header:GetScript("OnClick")(herbs.header, "RightButton")
+      assert.are.same({ { { "0_3", "0_4" } } }, calls.moved)
+    end)
+
+    it("moves nothing on a right click of Free Space", function()
+      slots[BACKPACK].tabs[1].freeSpace = { showAll = false, buttons = { { slotkey = "1_5", count = 4 } } }
+      backpack:Draw(ctx(), slots[BACKPACK], function() end)
+      local free = section(backpack, "Free Space")
+      free.header:GetScript("OnClick")(free.header, "RightButton")
+      assert.are.same({}, calls.moved)
+    end)
+
+    it("moves only items on a right click, never a free slot", function()
+      slots[BACKPACK].tabs[1] = tab({ "Herbs" }, { item("0_3", "Herbs"), { slotkey = "0_7", isFreeSlot = true,
+        itemInfo = { category = "Herbs" } } })
+      backpack:Draw(ctx(), slots[BACKPACK], function() end)
+      local herbs = section(backpack, "Herbs")
+      herbs.header:GetScript("OnClick")(herbs.header, "RightButton")
+      assert.are.same({ { { "0_3" } } }, calls.moved)
+    end)
+  end)
+end)

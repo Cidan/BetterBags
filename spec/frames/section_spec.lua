@@ -15,7 +15,8 @@ categories.GetGroupForCategory = function() return nil end
 local const = StubBetterBagsModule("Constants")
 const.BAG_VIEW = { SECTION_GRID = 1 }
 const.BAG_KIND = { BACKPACK = 1, BANK = 2 }
-const.MOVEMENT_FLOW = { UNDEFINED = 0, NPCSHOP = 1, SENDMAIL = 2 }
+-- The real values (core/constants.lua).
+const.MOVEMENT_FLOW = { UNDEFINED = -1, BANK = 0, REAGENT = 1, WARBANK = 2, SENDMAIL = 3, TRADE = 4, NPCSHOP = 5 }
 
 local sort = StubBetterBagsModule("Sort")
 sort.GetItemSortBySlot = function() end
@@ -278,6 +279,81 @@ describe("Section Frame", function()
       end)
       -- The real item is still moved; the gap is simply skipped.
       assert.are.equal(1, #used)
+    end)
+
+    -- BetterBags Next drops a whole section on the other bag or one of its tabs (next.md §7):
+    -- the same move as the right click, for a list of items, into a given bank type.
+    describe("MoveItems", function()
+      local used, saved
+
+      before_each(function()
+        used, saved = {}, {}
+        for _, k in ipairs({ "GetMovementFlow" }) do saved[#saved + 1] = { movementFlow, k, movementFlow[k] } end
+        saved[#saved + 1] = { items, "GetAllSlotInfo", items.GetAllSlotInfo }
+        saved[#saved + 1] = { items, "GetItemDataFromSlotKey", items.GetItemDataFromSlotKey }
+        saved[#saved + 1] = { addon, "GetBagFromBagID", addon.GetBagFromBagID }
+        saved[#saved + 1] = { addon, "atBank", addon.atBank }
+        saved[#saved + 1] = { database, "GetCategorySell", database.GetCategorySell }
+        _G.C_Container.UseContainerItem = function(bagid, slotid, unit, bankType, reagent)
+          table.insert(used, { bagid, slotid, unit, bankType, reagent or nil })
+        end
+        addon.GetBagFromBagID = function() return { kind = const.BAG_KIND.BACKPACK } end
+        items.GetAllSlotInfo = function()
+          return { [const.BAG_KIND.BACKPACK] = { stacks = { GetStackInfo = function(_, hash)
+            if hash == "stacked" then return { slotkeys = { ["0_9"] = true } } end
+            return nil
+          end } } }
+        end
+        items.GetItemDataFromSlotKey = function(_, key)
+          if key == "0_9" then return { bagid = 0, slotid = 9, itemHash = "stacked" } end
+        end
+      end)
+
+      after_each(function()
+        for i = #saved, 1, -1 do saved[i][1][saved[i][2]] = saved[i][3] end
+      end)
+
+      local function item(slot, hash)
+        return { bagid = 0, slotid = slot, itemHash = hash or ("h" .. slot) }
+      end
+
+      it("moves every item and every pile of its virtual stack to the window the flow names", function()
+        movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.BANK end
+        sectionFrame:MoveItems({ item(1), item(2, "stacked"), { isItemEmpty = true, bagid = 0, slotid = 3 } })
+        assert.are.same({ { 0, 1 }, { 0, 2 }, { 0, 9 } }, used)
+      end)
+
+      it("moves into the Warbank when the flow says so", function()
+        movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.WARBANK end
+        sectionFrame:MoveItems({ item(1) })
+        assert.are.same({ { 0, 1, nil, Enum.BankType.Account } }, used)
+      end)
+
+      it("moves into the bank type it is given while the bank is open, whatever the flow", function()
+        movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.BANK end
+        addon.atBank = true
+        sectionFrame:MoveItems({ item(1) }, Enum.BankType.Account)
+        sectionFrame:MoveItems({ item(2) }, Enum.BankType.Character)
+        assert.are.same({ { 0, 1, nil, Enum.BankType.Account }, { 0, 2 } }, used)
+        addon.atBank = false
+        sectionFrame:MoveItems({ item(3) }, Enum.BankType.Account)
+        assert.are.equal(2, #used, "not while the bank is closed")
+      end)
+
+      it("moves nothing without an open window, and sells only with the setting, ten at most", function()
+        movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.UNDEFINED end
+        sectionFrame:MoveItems({ item(1) })
+        assert.are.equal(0, #used)
+        movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.NPCSHOP end
+        database.GetCategorySell = function() return false end
+        sectionFrame:MoveItems({ item(1) })
+        assert.are.equal(0, #used)
+        database.GetCategorySell = function() return true end
+        local list = {}
+        for i = 1, 12 do list[i] = item(i) end
+        sectionFrame:MoveItems(list)
+        assert.are.equal(10, #used)
+      end)
     end)
   end)
 

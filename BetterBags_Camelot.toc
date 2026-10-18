@@ -162,6 +162,7 @@ next\tween.lua
 next\sparkles.lua
 next\tabs.lua
 next\content.lua
+next\drag.lua
 next\panel.lua
 next\bag.lua
 next\bank.lua

@@ -47,9 +47,26 @@ local STEP = style.ICON + style.GAP
 ---@field count FontString
 ---@field line Texture
 ---@field cells Frame The item buttons hang from it.
+---@field header Button Across the title row: dragging it moves the section (next.md §7).
 ---@field entries NextSectionEntry[]
 ---@field isNew boolean It was not drawn in the previous pass.
 ---@field rise number How far below its place it is, in pixels.
+---@field y number Where the last render put it, from the canvas's top.
+---@field height number Its height in the last render.
+
+---@class (exact) NextCanvasDrag
+---@field section NextSection The section picked up.
+---@field index number Where its gap is among the other sections, from 1.
+---@field height number Its height in the last render.
+---@field onLost? fun() Called when it leaves the data or the canvas is torn down mid-drag.
+
+---@class NextHeaderHandler
+---@field OnHeaderDragStart? fun(self: any, section: NextSection)
+---@field OnHeaderDragStop? fun(self: any, section: NextSection)
+---@field OnHeaderClick? fun(self: any, ctx: Context, section: NextSection, button: string)
+---@field OnHeaderReceiveDrag? fun(self: any, ctx: Context, section: NextSection)
+---@field OnHeaderEnter? fun(self: any, section: NextSection)
+---@field OnHeaderLeave? fun(self: any, section: NextSection)
 
 ---@class (exact) NextCanvas: Drawable
 ---@field frame Frame
@@ -59,6 +76,10 @@ local STEP = style.ICON + style.GAP
 ---@field pool NextSection[] Sections not in use, hidden.
 ---@field buttons table<string, Item> This pass's buttons by slot key.
 ---@field freeTotal number This pass's free slots, in every bag of the tab.
+---@field drag? NextCanvasDrag The section being dragged.
+---@field dragSlotY? number Where the last render put the dragged section's gap.
+---@field leaving table<string, number> Sections moved away, left out until this time (GetTime).
+---@field headerHandler? NextHeaderHandler
 local canvasProto = drawable:Extend({}, 'NextCanvas')
 
 ---@param parent Frame
@@ -74,6 +95,7 @@ function nextContent:Create(parent)
   canvas.pool = {}
   canvas.buttons = {}
   canvas.freeTotal = 0
+  canvas.leaving = {}
   addon.SetScript(canvas.frame, "OnHide", function()
     canvas:Settle()
   end)
@@ -105,10 +127,49 @@ function canvasProto:newSection()
   local cells = CreateFrame("Frame", nil, inner)
   cells:SetPoint("TOPLEFT", inner, "TOPLEFT", 0, -style.SECTION_HEADER)
   ---@type NextSection
-  return {
+  local section = {
     name = "", kind = "category", frame = frame, inner = inner, title = title, count = count,
-    line = line, cells = cells, entries = {}, isNew = true, rise = 0,
+    line = line, cells = cells, entries = {}, isNew = true, rise = 0, y = 0, height = 0,
   }
+  section.header = self:newHeader(section)
+  return section
+end
+
+-- newHeader makes a section's header: a button across its title row that passes drags, clicks
+-- and drops to the canvas's header handler (the panel).
+---@private
+---@param section NextSection
+---@return Button
+function canvasProto:newHeader(section)
+  local header = CreateFrame("Button", nil, section.inner)
+  header:SetPoint("TOPLEFT", section.inner, "TOPLEFT", 0, 0)
+  header:SetPoint("TOPRIGHT", section.inner, "TOPRIGHT", 0, 0)
+  header:SetHeight(style.SECTION_HEADER)
+  header:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  header:RegisterForDrag("LeftButton")
+  local highlight = header:CreateTexture(nil, "HIGHLIGHT")
+  highlight:SetAllPoints()
+  highlight:SetColorTexture(1, 1, 1, 1)
+  highlight:SetGradient("HORIZONTAL", style:CreateColor("Lavender", 0.12), style:CreateColor("Lavender", 0))
+  local function call(name, ...)
+    local handler = self.headerHandler
+    if handler and handler[name] then
+      handler[name](handler, ...)
+    end
+  end
+  header:SetScript("OnDragStart", function() call("OnHeaderDragStart", section) end)
+  header:SetScript("OnDragStop", function() call("OnHeaderDragStop", section) end)
+  header:SetScript("OnEnter", function() call("OnHeaderEnter", section) end)
+  header:SetScript("OnLeave", function() call("OnHeaderLeave", section) end)
+  addon.SetScript(header, "OnClick", function(ctx, _, button) call("OnHeaderClick", ctx, section, button) end)
+  addon.SetScript(header, "OnReceiveDrag", function(ctx) call("OnHeaderReceiveDrag", ctx, section) end)
+  return header
+end
+
+-- SetHeaderHandler names what the sections' headers report their drags, clicks and drops to.
+---@param handler NextHeaderHandler
+function canvasProto:SetHeaderHandler(handler)
+  self.headerHandler = handler
 end
 
 ---@private
@@ -153,6 +214,13 @@ end
 ---@private
 ---@param section NextSection
 function canvasProto:release(section)
+  local drag = self.drag
+  if drag ~= nil and drag.section == section then
+    self.drag = nil
+    if drag.onLost then
+      drag.onLost()
+    end
+  end
   tween:Stop(section)
   section.frame:SetAlpha(1)
   setRise(section, 0)
@@ -291,6 +359,7 @@ function canvasProto:Bind(ctx, slotInfo, tabID, claims)
 
   for name, section in pairs(self.stale) do
     self.stale[name] = nil
+    self.leaving[name] = nil
     self:release(section)
   end
 end
@@ -308,14 +377,22 @@ function canvasProto:Render(parentResult)
   else
     motion:Forget(self)
   end
-  local y = 0
-  for i, section in ipairs(self.order) do
-    if i > 1 then
+  local drag = self.drag
+  local y, placed, others = 0, 0, 0
+  self.dragSlotY = nil
+  -- gap keeps the dragged section's room in the column.
+  local function gap()
+    if placed > 0 then
       y = y + style.SECTION_SPACING
     end
+    self.dragSlotY = y
+    y = y + drag.height
+    placed = placed + 1
+  end
+  for _, section in ipairs(self.order) do
     local rows = math.max(1, math.ceil(#section.entries / perRow))
     local height = style.SECTION_HEADER + rows * STEP - style.GAP
-    motion:Place(section.frame, self.frame, 0, -y)
+    section.height = height
     section.frame:SetSize(width, height)
     section.inner:SetSize(width, height)
     section.cells:SetSize(width, rows * STEP)
@@ -326,7 +403,27 @@ function canvasProto:Render(parentResult)
         entry.item.frame:Show()
       end
     end
-    y = y + height
+    if drag ~= nil and section == drag.section then
+      drag.height = height
+    elseif self:IsLeaving(section) then
+      section.frame:Hide()
+    else
+      others = others + 1
+      if drag ~= nil and others == drag.index then
+        gap()
+      end
+      if placed > 0 then
+        y = y + style.SECTION_SPACING
+      end
+      section.y = y
+      motion:Place(section.frame, self.frame, 0, -y)
+      section.frame:Show()
+      y = y + height
+      placed = placed + 1
+    end
+  end
+  if drag ~= nil and drag.index > others then
+    gap()
   end
   if animated then
     motion:EndPass()
@@ -343,7 +440,8 @@ end
 function canvasProto:Cascade(all, delay)
   local i = 0
   for _, section in ipairs(self.order) do
-    if all or section.isNew then
+    local dragged = self.drag ~= nil and self.drag.section == section
+    if (all or section.isNew) and not dragged then
       tween:Play(section, {
         duration = style.Time.Cascade,
         delay = (delay or 0) + i * style.Time.Stagger,
@@ -360,6 +458,166 @@ function canvasProto:Cascade(all, delay)
   end
 end
 
+-- others returns the sections the column lays out around a dragged section, in order.
+---@private
+---@return NextSection[]
+function canvasProto:others()
+  local out = {}
+  for _, section in ipairs(self.order) do
+    if (self.drag == nil or section ~= self.drag.section) and not self:IsLeaving(section) then
+      table.insert(out, section)
+    end
+  end
+  return out
+end
+
+-- dragRange is where a dragged section's gap may go among the others: after Recent Items, before
+-- Free Space.
+---@private
+---@return number first, number last
+function canvasProto:dragRange()
+  local others = self:others()
+  local first, last = 1, #others + 1
+  for i, section in ipairs(others) do
+    if section.kind == "recent" then
+      first = i + 1
+    elseif section.kind == "free" and last == #others + 1 then
+      last = i
+    end
+  end
+  return first, last
+end
+
+-- BeginDrag starts a section's drag: the column keeps a gap its size where it was. onLost is
+-- called if the section leaves the data, or the canvas is torn down, before the drag ends.
+---@param section NextSection
+---@param onLost? fun()
+function canvasProto:BeginDrag(section, onLost)
+  local index = 1
+  for _, other in ipairs(self.order) do
+    if other == section then
+      break
+    end
+    if not self:IsLeaving(other) then
+      index = index + 1
+    end
+  end
+  self.drag = { section = section, index = index, height = section.height, onLost = onLost }
+  tween:Stop(section, true)
+end
+
+-- SetDragIndex moves the dragged section's gap to index among the others (kept among the
+-- categories), laying the column out again when it moved.
+---@param index number
+function canvasProto:SetDragIndex(index)
+  local drag = self.drag
+  if drag == nil then
+    return
+  end
+  local first, last = self:dragRange()
+  index = math.max(first, math.min(last, index))
+  if index ~= drag.index then
+    drag.index = index
+    self:Invalidate()
+  end
+end
+
+-- DragIndexAt returns the insertion point among the others for a height from the canvas's top:
+-- before the first other section whose middle is below it, laid out without the gap.
+---@param localY number
+---@return number
+function canvasProto:DragIndexAt(localY)
+  local y = 0
+  for i, section in ipairs(self:others()) do
+    if i > 1 then
+      y = y + style.SECTION_SPACING
+    end
+    if localY < y + section.height / 2 then
+      return i
+    end
+    y = y + section.height
+  end
+  return #self:others() + 1
+end
+
+-- GetDragSlotY returns where the last render put the dragged section's gap, from the canvas's top.
+---@return number?
+function canvasProto:GetDragSlotY()
+  return self.dragSlotY
+end
+
+-- EndDrag ends a drag. With commit the section takes its gap's place in the order; otherwise it
+-- keeps the place it had.
+---@param commit boolean
+function canvasProto:EndDrag(commit)
+  local drag = self.drag
+  if drag == nil then
+    return
+  end
+  self.drag = nil
+  if commit then
+    local others = self:othersExcept(drag.section)
+    table.insert(others, math.min(drag.index, #others + 1), drag.section)
+    -- Leaving sections keep their places; every other place takes the next of the new order.
+    local order, o = {}, 1
+    for _, section in ipairs(self.order) do
+      if section ~= drag.section and self:IsLeaving(section) then
+        table.insert(order, section)
+      else
+        table.insert(order, others[o])
+        o = o + 1
+      end
+    end
+    self.order = order
+  end
+  self:Invalidate()
+end
+
+-- othersExcept returns the sections the column lays out, but except, in order.
+---@param except NextSection
+---@return NextSection[]
+function canvasProto:othersExcept(except)
+  local out = {}
+  for _, section in ipairs(self.order) do
+    if section ~= except and not self:IsLeaving(section) then
+      table.insert(out, section)
+    end
+  end
+  return out
+end
+
+-- MarkLeaving leaves a section that was moved away out of the column for seconds: it stays out
+-- until its category is gone from the data, while it has nothing but gaps, or until the time is
+-- up with its items still there (a move the game refused).
+---@param name string
+---@param seconds number
+function canvasProto:MarkLeaving(name, seconds)
+  self.leaving[name] = GetTime() + seconds
+  self:Invalidate()
+end
+
+-- IsLeaving says whether a section is left out of the column as moved away.
+---@param section NextSection
+---@return boolean
+function canvasProto:IsLeaving(section)
+  local untilTime = self.leaving[section.name]
+  if untilTime == nil then
+    return false
+  end
+  local hasItems = false
+  for _, entry in ipairs(section.entries) do
+    if entry.item ~= nil then
+      hasItems = true
+      break
+    end
+  end
+  if hasItems and GetTime() >= untilTime then
+    self.leaving[section.name] = nil
+    return false
+  end
+  return true
+end
+
 -- Settle ends every move and cascade at its end: the canvas hid.
 function canvasProto:Settle()
   motion:Forget(self)
@@ -370,6 +628,7 @@ end
 
 -- Release hides and pools every section: the bag is torn down. Buttons are the bag's to release.
 function canvasProto:Release()
+  self.leaving = {}
   for _, section in ipairs(self.order) do
     self:release(section)
   end
