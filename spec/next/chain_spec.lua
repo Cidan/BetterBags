@@ -157,6 +157,12 @@ describe("NextChain", function()
     return SCREEN - 2 * (style.WIDTH - style.FEATHER) - gap()
   end
 
+  -- Whether any of a panel's frame is on the screen.
+  local function onScreen(panel)
+    local left = panel.side == "LEFT" and offset(panel) or (SCREEN + offset(panel) - style.WIDTH)
+    return left + style.WIDTH > 0 and left < SCREEN
+  end
+
   -- Where each body's inner edge is on screen.
   local function bankBodyEdge() return offset(bank) + style.WIDTH - style.FEATHER end
   local function backpackBodyEdge() return SCREEN + offset(backpack) - style.WIDTH + style.FEATHER end
@@ -456,16 +462,141 @@ describe("NextChain", function()
       assert.are.equal(-distance(), offset(backpack), "in its place once the entrance ends")
     end)
 
-    it("can fly it in from its own edge instead (style.Chain.Enter)", function()
-      override(style.Chain, "Enter", "edge")
+    -- Asked: restoring a chain as the pair opens, "stagger them appearing from the border they are
+    -- chained to? the window closest to the border first, then the chained one a few ms after, and
+    -- have them fall in place". At a bank or vendor the companion opens first and the backpack a
+    -- frame later (the interaction sends bags/OpenClose later).
+    it("brings a chained pair in from the anchor's edge, the anchor first, the chained bag a moment after", function()
+      layout = "left"
+      open(bank)
+      step(1 / 60)
+      open(backpack)
+      local held = offset(backpack)
+      assert.is_true(held <= -SCREEN, "waiting beyond the anchor's edge: " .. held)
+      assert.is_false(onScreen(backpack))
+      assert.is_true(backpack.frame:GetFrameLevel() < bank.frame:GetFrameLevel(), "beneath the anchor")
+      step(style.Chain.Stagger * 0.8)
+      assert.are.equal(held, offset(backpack), "a moment after the anchor")
+      assert.is_true(onScreen(bank), "the anchor is coming in")
+      step(style.Chain.Stagger * 0.4)
+      assert.is_true(offset(backpack) > held, "then it comes")
+      settle()
+      assert.are.equal(-distance(), offset(backpack))
+      assert.are.equal(0, offset(bank))
+      assert.are.equal(500, backpack.frame:GetFrameLevel(), "back at its own level once in place")
+    end)
+
+    -- As in game: what the backpack shows was drawn while it was hidden, and is drawn as it opens.
+    it("cascades its sections in only as it starts coming in", function()
+      layout = "left"
+      open(bank)
+      step(1 / 60)
+      backpack:Draw(ctx(), slots[BACKPACK], function() end)
+      backpack:Show(ctx())
+      step(style.Chain.Stagger + style.Time.OpenCascadeDelay - 0.03)
+      assert.are.equal(0, backpack.content.order[1].frame:GetAlpha(), "not yet")
+      settle()
+      assert.are.equal(1, backpack.content.order[1].frame:GetAlpha())
+    end)
+
+    it("does not hold a companion for a backpack that is already open", function()
+      layout = "right"
+      open(backpack)
+      settle()
+      assert.is_false(chain:WaitsForAnchor(bank))
+      escape(backpack)
+      assert.is_true(chain:WaitsForAnchor(bank))
+    end)
+
+    it("falls into place: fast out from behind the anchor, settling just past its place and back", function()
       layout = "left"
       open(bank)
       settle()
       open(backpack)
+      local from, to = offset(backpack), -distance()
+      local furthest, first = to, nil
+      for _ = 1, math.ceil(style.Time.Enter * 60) + 2 do
+        step(1 / 60)
+        first = first or offset(backpack)
+        furthest = math.max(furthest, offset(backpack))
+      end
+      assert.is_true((first - from) / (to - from) > 0.05, "quick off the mark")
+      local past = furthest - to
+      assert.is_true(past > 0, "it settles past its place")
+      assert.is_true(past < 0.04 * (to - from), "only just: " .. past)
+      assert.are.equal(to, offset(backpack))
+    end)
+
+    -- Chained right, the backpack is the anchor, but the bank or vendor opens first: it waits out
+    -- of sight beyond the backpack's edge, and comes in after the backpack.
+    it("holds a companion chained to the backpack out of sight until the backpack opens, then brings it in after", function()
+      layout = "right"
+      open(bank)
+      assert.is_false(onScreen(bank), "out of sight")
+      assert.is_true(offset(bank) >= SCREEN, "beyond the backpack's edge: " .. offset(bank))
       step(1 / 60)
-      assert.is_true(offset(backpack) > -style.WIDTH * 0.5, "from its own edge: " .. offset(backpack))
+      assert.is_false(onScreen(bank), "waiting")
+      open(backpack)
+      local held = offset(bank)
+      step(style.Chain.Stagger * 0.8)
+      assert.are.equal(held, offset(bank), "after the backpack")
+      assert.is_true(onScreen(backpack), "the backpack is coming in")
       settle()
-      assert.are.equal(-distance(), offset(backpack))
+      assert.are.equal(distance(), offset(bank))
+      assert.are.equal(0, offset(backpack))
+      assert.is_not_nil(chain.coupling)
+    end)
+
+    it("says the waiting companion has finished showing only once it is in place", function()
+      layout = "right"
+      local shown = 0
+      open(bank, function() shown = shown + 1 end)
+      step(1 / 60)
+      open(backpack)
+      step(style.Chain.Stagger + style.Time.Enter * 0.5)
+      assert.are.equal(0, shown, "still coming in")
+      settle()
+      assert.are.equal(1, shown)
+    end)
+
+    it("brings a waiting companion in from its own edge when the backpack does not open", function()
+      layout = "right"
+      local shown = 0
+      open(bank, function() shown = shown + 1 end)
+      step(style.Chain.AnchorWait * 0.9)
+      assert.is_false(onScreen(bank), "still waiting")
+      step(style.Chain.AnchorWait * 0.1 + 2 / 60)
+      assert.is_true(offset(bank) <= 0 and onScreen(bank), "from its own edge: " .. offset(bank))
+      settle()
+      assert.are.equal(0, offset(bank))
+      assert.is_true(bank.docked)
+      assert.are.equal(1, shown)
+    end)
+
+    it("closes a waiting companion without crossing the screen", function()
+      layout = "right"
+      open(bank)
+      step(1 / 60)
+      close(bank)
+      for _ = 1, 60 do
+        step(1 / 60)
+        assert.is_false(onScreen(bank), "never on the screen: " .. offset(bank))
+      end
+      assert.is_false(bank:IsShown())
+    end)
+
+    it("sends a chained bag home from its own edge when its anchor closes before it came in", function()
+      layout = "left"
+      open(bank)
+      step(1 / 60)
+      open(backpack)
+      close(bank)
+      for _ = 1, 60 do
+        step(1 / 60)
+        assert.is_true(offset(backpack) >= -0.5, "never crossing the screen: " .. offset(backpack))
+      end
+      assert.are.equal(0, offset(backpack))
+      assert.is_true(backpack.docked)
     end)
 
     it("brings the bank in beside the backpack when chained right", function()
@@ -604,6 +735,68 @@ describe("NextChain", function()
       end
       assert.is_true(backpack.braid.knot:IsShown(), "the knot in the middle, drawn by the chained bag")
       assert.is_false(bank.braid.knot:IsShown())
+    end)
+
+    -- The client reads a frame's size back with float error at a UI scale (window.md §3b,
+    -- layout-rendering.md §4). Reported: the tangle "only appears sometimes", never at the bank,
+    -- and at a vendor only after clicking the vendor again (which lists its tabs again).
+    it("couples when the client reads the tabs' widths back with float error", function()
+      open(bank)
+      open(backpack)
+      settle()
+      local reads = 0
+      for _, panel in ipairs({ bank, backpack }) do
+        for _, t in ipairs(panel.tabs.tabs) do
+          local get = t.button.GetWidth
+          t.button.GetWidth = function(b)
+            reads = reads + 1
+            return get(b) + (reads % 2 == 0 and 1e-4 or -1e-4)
+          end
+        end
+      end
+      click(backpack)
+      settle()
+      assert.is_not_nil(chain.coupling)
+      assert.are.equal(1, chain.coupling.amount)
+    end)
+
+    it("couples a bag resting within half a pixel of its place", function()
+      click(backpack)
+      settle()
+      escape(bank)
+      settle()
+      open(bank)
+      backpack:PlaceAt(-distance() + 0.3)
+      settle()
+      assert.is_not_nil(chain.coupling)
+      assert.are.equal(1, chain.coupling.amount)
+    end)
+
+    it("takes a place within half a pixel for its place: no flight, still coupled", function()
+      click(backpack)
+      settle()
+      backpack:PlaceAt(-distance() + 0.3)
+      chain:Update(ctx())
+      assert.is_false(tween:IsPlaying(backpack), "no flight for under half a pixel")
+      assert.are.equal(1, chain.coupling.amount)
+      assert.are.equal(1, chain.coupling.target, "not letting go")
+    end)
+
+    -- One companion closes and another opens in the same moment (a bank closed by Escape as a
+    -- vendor opens): the backpack stays where it is, and the new pair couples once the old one
+    -- has let go.
+    it("couples a new pair once the coupling of the pair before has let go", function()
+      -- Letting go outlasting the new anchor's slide: nothing else is left to couple them after.
+      override(style.Time, "Uncouple", style.Time.Open * 2)
+      local other = nextBank:Create(ctx())
+      click(backpack)
+      settle()
+      escape(bank)
+      open(other)
+      settle()
+      assert.is_not_nil(chain.coupling)
+      assert.are.equal(other, chain.coupling.anchor)
+      assert.are.equal(1, chain.coupling.amount)
     end)
 
     it("braids from each body edge to the middle of the gap, the halves meeting, the strands crossing", function()

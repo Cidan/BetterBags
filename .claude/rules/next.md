@@ -877,12 +877,26 @@ The anchor is the bag at the screen edge; the chained bag faces it, so their rib
 - **Alone, a bag sits at its own edge.** A chained bag sits beside its anchor only while the anchor
   is open (`chain:Pair`, `chain:RestOffset`): when the anchor opens it flies over; when the anchor
   closes (or Escape hides it) it flies home.
-- **A chained bag opening beside its open anchor** comes in from behind the anchor
-  (`style.Chain.Enter = "behind"`: it starts past the anchor's edge, lowered 100 levels beneath it,
-  and slides out from under it), or flies in across the screen from its own edge (`"edge"`), for the
-  player to try both. At a banker the bank opens first and the backpack a frame later
-  (`bags/OpenClose` is sent later), so a chained-left backpack always enters this way. Closing, a bag
-  leaves through its own edge as before.
+- **A chained bag opening beside its open anchor comes in from the anchor's edge** (`panel:Enter`):
+  from out of sight beyond that edge (`chain:EntranceOffset`), lowered 100 levels beneath the anchor
+  so it slides out from under it, and back at its own level once in place. While the anchor is still
+  coming in itself it starts `style.Chain.Stagger` (0.08 s) after (`chain:EntranceDelay`). Asked,
+  after the first version flew a restored chain across the screen as the bags opened: "stagger them
+  appearing from the border they are chained to? the window closest to the border first, then the
+  chained one a few ms after, and have them fall in place". An option to fly it in across the
+  screen from its own edge (`style.Chain.Enter = "edge"`) was dropped with it.
+- **At a bank or a vendor the companion opens first** and the backpack a frame later
+  (`addon.OpenInteractionWindow` sends `bags/OpenClose` later). Chained left, the backpack then comes
+  in after its anchor as above. Chained right, the companion is the chained bag and its anchor is not
+  open yet: it waits out of sight beyond the backpack's edge (`chain:WaitsForAnchor`,
+  `panel:WaitForAnchor`, `panel.waiting`) and comes in after the backpack once the backpack opens
+  (`chain:Update`). If the backpack has not opened within `style.Chain.AnchorWait` (0.25 s) it opens
+  alone from its own edge. The backpack opens after its companion, so it never waits. A bank waiting
+  still loads only once it has come in (refresh-scheduler.md §11): wait, stagger and entrance stay
+  under the bank's 1 s show timeout.
+- **Out of sight beyond the far edge** (waiting, or held through its stagger: `BeyondFarEdge`), a bag
+  that flies home (its anchor closed) or closes leaves through its own edge, never crossing the
+  screen. Closing, a bag leaves through its own edge as before.
 - **Screen changes** (`UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED`, registered in BetterBags Next's
   event scope) place the bags at once; a screen too narrow keeps them apart without changing the
   saved layout.
@@ -912,15 +926,33 @@ The anchor is the bag at the screen edge; the chained bag faces it, so their rib
   its panel has come to rest (refresh-scheduler.md §11).
 - Moving both across, the two flights start together with the same duration and ease, so the gap
   between them stays exactly the same all the way.
-- A chained bag's entrance takes `style.Time.Enter` (0.4 s) and eases out; an ordinary opening is
-  the 0.45 s slide with its bounce. Coupling takes 0.35 s, letting go 0.25 s.
+- A chained bag's entrance takes `style.Time.Enter` (0.5 s) with `outBackSoft`: quick off the mark,
+  settling about a fiftieth of the way past its place and back ("fall in place"; `outBack`'s tenth
+  would be over a hundred pixels on a move across the screen). Its sections cascade in as it starts
+  coming in (`moveIn`), not while it waits. An ordinary opening is the 0.45 s slide with its bounce.
+  Coupling takes 0.35 s, letting go 0.25 s.
 
 ### 12d. The coupling
 
 Once the chained bag has come to rest beside its anchor (`chain:Arrived`), the pair couples
 (`chain.coupling`, `amount` 0 to 1 over `style.Time.Couple`, 0.35 s); it uncouples (back to 0 over
 `style.Time.Uncouple`, then ends) as soon as they are no longer chained or one closes. Moving both
-across keeps the coupling and swaps the roles.
+across keeps the coupling and swaps the roles. `chain:UpdateCoupling` (and `Arrived`) returns what
+it did for profiler traces: `"coupled"`, `"kept"`, `"on its way"`, `"letting go"`, `"apart"`.
+
+- **A place is the same within half a pixel** (`PLACED`), and the rails' widths are the ones they
+  set (`tab.width`), never read back with `GetWidth`. **Failure mode (fixed):** reported, the tangle
+  "only appears sometimes", never at the bank, and at a vendor only after clicking the vendor again.
+  The pair coupled only when the chained bag's target equalled its rest place, recomputed, exactly,
+  and that place came from the tabs' `GetWidth`, which the client hands back with float error at a
+  UI scale (window.md §3b, layout-rendering.md §4). Off by a hair, the pair never coupled, until
+  something listed the tabs again (clicking the vendor again does), which flew the bag the hair and
+  coupled it. The specs' frames return exact sizes, so nothing reproduced it until a test read the
+  widths back with a 0.0001-pixel error. Either fix alone covers that test; both are kept. Not
+  confirmed with a capture: the client's float error is measured in other recordings, its role here
+  is concluded from the symptoms and that test.
+- **A pair formed while another let go** (one companion closing as another opens, the backpack in
+  place) couples as soon as the old coupling ends: the end of letting go checks the pair again.
 
 - **The braid.** Each bag draws its half (`panel.braid`, `BuildBraid`, `SetCoupling`, `applyBraid`):
   two strands of 16 additive gold `Line`s (`Frame:CreateLine`, on every client's API documentation)
@@ -949,17 +981,25 @@ across keeps the coupling and swaps the roles.
 `spec/next/chain_spec.lua` (the layouts and each role; the gap from the tabs and the feathers;
 each click: flying either way, putting back, moving across together with the gap held, alone, no
 room, a tab renamed, the screen's size or the UI scale changing (placed at once), a screen too
-narrow; opening alone at its edge, flying to a companion that opens,
-coming in from behind or from its edge, the bank beside the backpack, flying home when the anchor
-closes or is hidden, `onShown` across a flight; the far edge both ways; coupling after the flight,
+narrow; opening alone at its edge, flying to a companion that opens, coming in from behind its
+anchor, staggered after an anchor coming in, falling into place, its sections cascading in only then,
+a companion waiting for the backpack and coming in after it, saying it has shown only once in place,
+coming in alone when the backpack does not open, closing while waiting, flying home from its own
+edge when its anchor closes before it came in, not waiting for an open backpack, the bank beside the
+backpack, flying home when the anchor closes or is hidden, `onShown` across a flight; the far edge
+both ways; coupling with tabs read back with float error, within half a pixel, a new pair after the
+old let go, coupling after the flight,
 the braid's geometry, its turn and lights, staying coupled while moving across, untwisting and
 stretching as they part, letting go on a close, the knot's burst, sparkles kept apart; the title's
 tooltip and glow), `spec/next/vendor_spec.lua` ("chaining": the vendor is a companion, its name goes
-to the chain), `spec/next/sparkles_spec.lua` (`Burst`), `spec/database_spec.lua` and
+to the chain), `spec/next/sparkles_spec.lua` (`Burst`), `spec/next/tabs_spec.lua` (`Width` from the
+widths set), `spec/next/tween_spec.lua` (`outBackSoft`), `spec/database_spec.lua` and
 `spec/core/constants_spec.lua` (the setting). The frame mock gained `CreateLine` from Blizzard's API
 documentation. 47 mutations; the five that first survived led to tests of the screen events, the
 entrance's own target and timing, the braid running on through the knot and the burst's sparkles,
-and to removing a per-move redraw the driver already does.
+and to removing a per-move redraw the driver already does. The coupling and entrance fixes: 21
+mutations; the five that first survived led to tests of the rail's width, a bag at rest within half
+a pixel, the companion not waiting for an open backpack and the delayed cascade, and to removing a
+check the half-pixel rule already makes.
 
-Not seen in game yet: the motion, the braid and the spacing need a look, and `style.Chain.Enter`
-both ways.
+Not seen in game yet: the staggered entrance and the coupling fix.

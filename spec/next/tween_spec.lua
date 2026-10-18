@@ -41,6 +41,16 @@ describe("NextTween", function()
     local speed = (cubic(0.5 + 1e-5) - cubic(0.5 - 1e-5)) / 2e-5
     assert.is_true(math.abs(speed - 3) < 1e-3, "three times as fast in the middle: " .. speed)
     assert.is_true(cubic(0.1) < tween.Ease.inOutSine(0.1), "softer off the mark than sine")
+    -- outBackSoft settles just past its end and back: about a fiftieth (a chained bag falling into
+    -- place across the screen, next.md §12), where outBack goes a tenth past.
+    local soft, furthest, backFurthest = tween.Ease.outBackSoft, 0, 0
+    for i = 1, 999 do
+      furthest = math.max(furthest, soft(i / 1000))
+      backFurthest = math.max(backFurthest, tween.Ease.outBack(i / 1000))
+    end
+    assert.is_true(furthest > 1.015 and furthest < 1.025, "a fiftieth past: " .. furthest)
+    assert.is_true(backFurthest > 1.09, "outBack a tenth: " .. backFurthest)
+    assert.is_true(soft(1 / 30) > 0.1, "quick off the mark")
     local overshoots = false
     for i = 1, 99 do
       if tween.Ease.outBack(i / 100) > 1 then overshoots = true end

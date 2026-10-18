@@ -100,7 +100,9 @@ style.Time = {
   -- bag coming in beside its open partner; the ribbons twisting together, and coming apart. The
   -- first ones felt "too slow and... linear almost" at 0.7 s with an in-out sine.
   Fly = 0.45,
-  Enter = 0.4,
+  -- The chained bag coming in from its anchor's edge, falling into place (outBackSoft). Asked:
+  -- "stagger them appearing from the border they are chained to ... and have them fall in place".
+  Enter = 0.5,
   Couple = 0.35,
   Uncouple = 0.25,
 }
@@ -112,8 +114,10 @@ style.SPARKLE_TEXTURE = "Interface\\Cooldown\\star4"
 style.RIBBON_LENGTH = 300
 
 -- Chaining the backpack and its companion (next.md §12).
--- Enter: how a chained bag comes in beside its open partner: "behind" slides it out from beneath
--- the partner, "edge" flies it in from its own edge across the screen.
+-- A chained bag comes in from its anchor's edge, out from beneath the anchor: Stagger seconds after
+-- an anchor still coming in. A companion chained to the backpack that opens first (at a bank or a
+-- vendor the backpack opens a frame later) waits out of sight up to AnchorWait seconds for it, and
+-- comes in alone from its own edge if it does not open.
 -- TabMargin: the room between the two bags' tab rails, which hang into the gap between the bodies.
 -- The braid the two ribbons twist into: Segments lines per strand on each bag's half of the gap,
 -- Amplitude pixels either side of the ribbon at the middle of the gap (none at the bodies),
@@ -121,7 +125,8 @@ style.RIBBON_LENGTH = 300
 -- in front (Depth less behind); Beads lights running along it from each cloud to the knot in
 -- BeadTime seconds; the knot KnotSize pixels, KnotAlpha bright, swelling by KnotSwell as they couple.
 style.Chain = {
-  Enter = "behind",
+  Stagger = 0.08,
+  AnchorWait = 0.25,
   TabMargin = 24,
   Segments = 16, Amplitude = 7, Wavelength = 64, Turn = 0.9, Thickness = 2, Alpha = 0.85, Depth = 0.5,
   Beads = 3, BeadTime = 1.6, BeadSize = 12,

@@ -48,6 +48,9 @@ local chain = addon:NewModule('NextChain')
 -- Which of the pair is the anchor, at its edge, in a chained layout.
 local ANCHOR_ROLE = { left = "companion", right = "backpack" }
 
+-- Two places closer than this are the same place (UpdateCoupling).
+local PLACED = 0.5
+
 function chain:Init()
   self.backpack = nil
   self.companions = {}
@@ -169,16 +172,38 @@ function chain:RestOffset(panel)
   return 0
 end
 
--- EntranceOffset is where a chained bag starts coming in beside its open anchor: "behind" past the
--- anchor's edge, so it slides out from beneath the anchor; "edge" off its own edge, so it flies in
--- across the screen (style.Chain.Enter).
+-- EntranceOffset is where a chained bag comes in from: out of sight beyond its anchor's edge, so it
+-- slides out from beneath the anchor (asked: "appearing from the border they are chained to").
 ---@param panel NextPanelFrame
 ---@return number
 function chain:EntranceOffset(panel)
-  if style.Chain.Enter == "edge" then
-    return panel:HiddenOffset()
-  end
   return panel:Outward() * (UIParent:GetWidth() + style.FEATHER)
+end
+
+-- EntranceDelay is how long a chained bag waits before coming in: Stagger while its anchor is
+-- still coming in itself (asked: "the window closest to the border first, then the chained one a
+-- few ms after"), none when the anchor is in place.
+---@param panel NextPanelFrame
+---@return number
+function chain:EntranceDelay(panel)
+  local anchor = self:AnchorOf(panel)
+  if anchor ~= nil and tween:IsPlaying(anchor) then
+    return style.Chain.Stagger
+  end
+  return 0
+end
+
+-- WaitsForAnchor says whether panel, opening, waits for its anchor out of sight: a companion
+-- chained to the backpack (layout "right") while the backpack is closed. A companion opens only at
+-- a bank or a vendor, whose interaction opens the backpack a frame later (addon.OpenInteractionWindow
+-- sends bags/OpenClose later), so it would otherwise open alone at its own edge and then fly across
+-- the screen. The backpack opens after its companion, so it never waits.
+---@param panel NextPanelFrame
+---@return boolean
+function chain:WaitsForAnchor(panel)
+  local backpack = self.backpack
+  return panel.chainRole == "companion" and ANCHOR_ROLE[self:Layout()] == "backpack" and backpack ~= nil
+    and not isOpen(backpack) and self:Distance(backpack, panel) >= 0
 end
 
 -- Anchor returns the open anchor of panel when panel is the chained bag of the layout.
@@ -238,9 +263,14 @@ function chain:Update(ctx, snap)
   for _, panel in ipairs(panels) do
     if isOpen(panel) then
       local to = self:RestOffset(panel)
-      if snap then
+      if panel.waiting then
+        -- Its anchor has opened: it comes in after it.
+        if self:AnchorOf(panel) ~= nil then
+          panel:Enter(to, self:EntranceDelay(panel))
+        end
+      elseif snap then
         panel:PlaceAt(to)
-      elseif panel.target ~= to then
+      elseif math.abs((panel.target or 0) - to) >= PLACED then
         panel:FlyTo(to)
       end
     end
@@ -249,41 +279,58 @@ function chain:Update(ctx, snap)
 end
 
 -- Arrived runs when a bag has come to rest after a slide or a flight: a chained bag beside its
--- anchor couples.
+-- anchor couples. It returns what UpdateCoupling did, for profiler traces.
 ---@param panel NextPanelFrame
+---@return string
 function chain:Arrived(panel)
   local _ = panel
-  self:UpdateCoupling()
+  return self:UpdateCoupling()
 end
 
 -- UpdateCoupling couples the pair once the chained bag has reached its place beside the anchor,
 -- keeps a pair coupled while it moves across together (the roles swap: the other bag is at the edge
--- after), and uncouples as soon as the bags are no longer chained or one of them closes.
+-- after), and lets go as soon as the bags are no longer chained or one of them closes. A place is
+-- the same within half a pixel: it is computed from sizes, and the client hands sizes back with
+-- float error at a UI scale, so an exact match could fail for good (reported: the tangle "only
+-- appears sometimes"). It returns what it did, for profiler traces: "coupled", "kept", "on its
+-- way" (the chained bag has not reached its place), "letting go" (another pair's coupling, or the
+-- pair parted), "apart".
+---@return string
 function chain:UpdateCoupling()
   local anchor, chained = self:Pair()
   local c = self.coupling
-  local placed = chained ~= nil and chained.target == self:RestOffset(chained)
-  if placed then
-    if c ~= nil and ((c.anchor == anchor and c.chained == chained) or (c.anchor == chained and c.chained == anchor)) then
-      c.anchor, c.chained = anchor, chained
-      if c.target ~= 1 then
-        self:tweenCoupling(1)
+  if chained ~= nil then
+    local rest = self:RestOffset(chained)
+    if math.abs((chained.target or 0) - rest) < PLACED then
+      local same = c ~= nil and ((c.anchor == anchor and c.chained == chained) or (c.anchor == chained and c.chained == anchor))
+      if same then
+        c.anchor, c.chained = anchor, chained
+        if c.target ~= 1 then
+          self:tweenCoupling(1)
+        end
+        self:applyCoupling()
+        return "kept"
       end
-      self:applyCoupling()
-      return
+      if c == nil then
+        if math.abs(chained.offset - rest) >= PLACED then
+          return "on its way"
+        end
+        self.coupling = { anchor = anchor, chained = chained, amount = 0, target = 0, phase = 0, time = 0 }
+        self.driver:SetScript("OnUpdate", function(_, elapsed)
+          self:Turn(elapsed)
+        end)
+        self:tweenCoupling(1)
+        return "coupled"
+      end
     end
-    if c == nil and math.abs(chained.offset - chained.target) < 0.5 then
-      self.coupling = { anchor = anchor, chained = chained, amount = 0, target = 0, phase = 0, time = 0 }
-      self.driver:SetScript("OnUpdate", function(_, elapsed)
-        self:Turn(elapsed)
-      end)
-      self:tweenCoupling(1)
+  end
+  if c ~= nil then
+    if c.target ~= 0 then
+      self:tweenCoupling(0)
     end
-    return
+    return "letting go"
   end
-  if c ~= nil and c.target ~= 0 then
-    self:tweenCoupling(0)
-  end
+  return "apart"
 end
 
 -- Turn turns the braid elapsed seconds on and runs its lights along it.
@@ -325,6 +372,9 @@ function chain:tweenCoupling(to)
       end
       c.anchor:SetCoupling(0, 0, false, 0, 0)
       c.chained:SetCoupling(0, 0, false, 0, 0)
+      -- A pair that formed while this one let go (a companion closed as another opened, the
+      -- backpack in place already) couples now: nothing else would.
+      self:UpdateCoupling()
     end,
   })
 end

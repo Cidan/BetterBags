@@ -10,10 +10,14 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class NextTween: AceModule
 local tween = addon:NewModule('NextTween')
 
----@alias NextEase "linear"|"outCubic"|"inCubic"|"inOutSine"|"inOutCubic"|"outBack"
+---@alias NextEase "linear"|"outCubic"|"inCubic"|"inOutSine"|"inOutCubic"|"outBack"|"outBackSoft"
 
--- The overshoot of outBack: about a tenth past the end at its furthest.
+-- The overshoot of outBack: about a tenth past the end at its furthest. For an overshoot s, the
+-- furthest past the end is 4 s^3 / (27 (s + 1)^2).
 local BACK = 1.70158
+-- outBackSoft's: about a fiftieth (2%) past the end, for long moves (a chained bag falling into
+-- place) where outBack's tenth would be a hundred pixels or more.
+local BACK_SOFT = 0.75
 
 -- Ease maps a time from 0 to 1 to progress from 0 to 1.
 ---@type table<NextEase, fun(t: number): number>
@@ -33,6 +37,10 @@ tween.Ease = {
   outBack = function(t)
     local u = t - 1
     return 1 + (BACK + 1) * u * u * u + BACK * u * u
+  end,
+  outBackSoft = function(t)
+    local u = t - 1
+    return 1 + (BACK_SOFT + 1) * u * u * u + BACK_SOFT * u * u
   end,
 }
 

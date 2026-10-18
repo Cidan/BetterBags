@@ -75,6 +75,9 @@ local nextPanel = addon:NewModule('NextPanel')
 local RIBBON_LENGTH = style.RIBBON_LENGTH
 -- Sparkles a second along a feathered edge.
 local EDGE_SPARKLE_RATE = 2.5
+-- The panel's frame level in the HIGH strata; a chained bag coming in from beneath its anchor is
+-- lowered below it for the way, and put back here once in place.
+local PANEL_LEVEL = 500
 -- The spark gliding in along it, and how much it grows as it settles into the title's cloud.
 local SPARK_SIZE = 26
 local SPARK_GROWTH = 18
@@ -142,6 +145,7 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field fill Texture The body's color, reaching OVERREACH past the screen edge while docked.
 ---@field outerFeather Texture The body's far edge feathered out, while it is not at its screen edge.
 ---@field docked boolean It is at its screen edge (not beside its anchor, nor flying).
+---@field waiting boolean Out of sight beyond its anchor's edge, waiting for the anchor to open.
 ---@field chainRole "backpack"|"companion"
 ---@field target? number The offset it is headed to (or rests at).
 ---@field ribbonLines Texture[] The ribbon and its glow lines.
@@ -326,19 +330,27 @@ end
 -- the panel has finished showing.
 ---@param to number
 function panelProto:FlyTo(to)
+  local from = self.offset
+  if self:BeyondFarEdge() then
+    -- Out of sight beyond its anchor's edge (waiting, or before its entrance): it comes from its
+    -- own edge instead of crossing the screen.
+    from = self:HiddenOffset()
+  end
+  self.waiting = false
   self.target = to
   if to ~= 0 then
     self:SetDocked(false)
   end
   tween:Play(self, {
     duration = style.Time.Fly,
-    from = self.offset,
+    from = from,
     to = to,
     ease = "inOutCubic",
     onUpdate = function(x)
       self:setOffset(x)
     end,
     onDone = function()
+      self.frame:SetFrameLevel(PANEL_LEVEL)
       if to == 0 then
         self:SetDocked(true)
       end
@@ -352,10 +364,88 @@ end
 ---@param to number
 function panelProto:PlaceAt(to)
   tween:Stop(self)
+  self.frame:SetFrameLevel(PANEL_LEVEL)
   self.target = to
   self:setOffset(to)
   self:SetDocked(to == 0)
   self:finishShowing()
+end
+
+-- BeyondFarEdge says the panel is out of sight beyond the far edge of the screen (its near side
+-- past it): where a chained bag waits for its anchor and comes in from (next.md §12).
+---@return boolean
+function panelProto:BeyondFarEdge()
+  return self.offset * self:Outward() >= UIParent:GetWidth()
+end
+
+-- moveIn brings the panel in from an offset to one, after delay seconds, its sections cascading
+-- in as it comes; once in place it is at its own level again, says it has finished showing, and
+-- the chain couples it.
+---@private
+---@param from number
+---@param to number
+---@param duration number
+---@param ease NextEase
+---@param delay number
+function panelProto:moveIn(from, to, duration, ease, delay)
+  self:setOffset(from)
+  tween:Play(self, {
+    duration = duration,
+    delay = delay,
+    from = from,
+    to = to,
+    ease = ease,
+    onUpdate = function(x)
+      self:setOffset(x)
+    end,
+    onDone = function()
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+  self.content:Cascade(true, delay + style.Time.OpenCascadeDelay)
+end
+
+-- Enter brings a chained bag in beside its anchor (next.md §12): from out of sight beyond the
+-- anchor's edge, beneath the anchor, after delay (EntranceDelay), falling into place.
+---@param to number
+---@param delay number
+function panelProto:Enter(to, delay)
+  self.waiting = false
+  self.target = to
+  self:SetDocked(false)
+  local anchor = chain:AnchorOf(self)
+  if anchor ~= nil then
+    self.frame:SetFrameLevel(math.max(1, anchor.frame:GetFrameLevel() - 100))
+  end
+  self:moveIn(chain:EntranceOffset(self), to, style.Time.Enter, "outBackSoft", delay)
+end
+
+-- WaitForAnchor holds a chained bag out of sight beyond its anchor's edge while the anchor is
+-- about to open (chain:WaitsForAnchor); the chain brings it in once the anchor opens. If the anchor
+-- has not opened within AnchorWait, it opens alone, from its own edge.
+function panelProto:WaitForAnchor()
+  self.waiting = true
+  local at = chain:EntranceOffset(self)
+  self.target = at
+  self:SetDocked(false)
+  self:setOffset(at)
+  tween:Play(self, {
+    duration = style.Chain.AnchorWait,
+    from = at,
+    to = at,
+    ease = "linear",
+    onUpdate = function(x)
+      self:setOffset(x)
+    end,
+    onDone = function()
+      self.waiting = false
+      self.target = 0
+      self:SetDocked(true)
+      self:moveIn(self:HiddenOffset(), 0, style.Time.Open, "outBack", 0)
+    end,
+  })
 end
 
 -- BuildPanel makes the panel: full height on its edge of the screen, its body a deep indigo with
@@ -368,7 +458,7 @@ function panelProto:BuildPanel(name)
   local left = self.side == "LEFT"
   local frame = CreateFrame("Frame", name, UIParent)
   frame:SetFrameStrata("HIGH")
-  frame:SetFrameLevel(500)
+  frame:SetFrameLevel(PANEL_LEVEL)
   frame:SetToplevel(true)
   frame:SetWidth(style.WIDTH)
   frame:EnableMouse(true)
@@ -1337,25 +1427,10 @@ function panelProto:Show(ctx, slotInfo, onShown)
   self.onShown = { onShown }
   local sliding = self.frame:IsShown()
   self.closing = false
+  self.waiting = false
   PlaySound(self.openSound)
   self:OnShowing(ctx)
   self.frame:Show()
-  -- Where it rests: at its edge, or beside its open anchor, coming in from behind the anchor or
-  -- from its own edge (next.md §12).
-  local to = self:RestOffset()
-  local anchor = chain:AnchorOf(self)
-  local from = self:HiddenOffset()
-  if sliding then
-    from = self.offset
-  elseif anchor ~= nil then
-    from = chain:EntranceOffset(self)
-    if style.Chain.Enter ~= "edge" then
-      self.frame:SetFrameLevel(math.max(1, anchor.frame:GetFrameLevel() - 100))
-    end
-  end
-  self.target = to
-  self:setOffset(from)
-  self:SetDocked(to == 0)
   local drew = false
   if self.drawPendingOnShow then
     self.drawPendingOnShow = false
@@ -1367,21 +1442,27 @@ function panelProto:Show(ctx, slotInfo, onShown)
       drew = true
     end
   end
-  local entering = to ~= 0
-  tween:Play(self, {
-    duration = entering and style.Time.Enter or style.Time.Open,
-    from = from,
-    to = to,
-    ease = entering and "outCubic" or "outBack",
-    onUpdate = function(x)
-      self:setOffset(x)
-    end,
-    onDone = function()
-      self:finishShowing()
-      chain:Arrived(self)
-    end,
-  })
-  self.content:Cascade(true, style.Time.OpenCascadeDelay)
+  -- Where it comes in from and rests (next.md §12): opened again as it slid out, from where it is;
+  -- beside its open anchor, after the anchor, from beyond the anchor's edge; chained to a backpack
+  -- about to open, out of sight until it does; else at its own edge, from its edge.
+  local to = self:RestOffset()
+  if sliding then
+    self.target = to
+    self:SetDocked(to == 0)
+    if to == 0 then
+      self:moveIn(self.offset, 0, style.Time.Open, "outBack", 0)
+    else
+      self:moveIn(self.offset, to, style.Time.Enter, "outBackSoft", 0)
+    end
+  elseif chain:AnchorOf(self) ~= nil then
+    self:Enter(to, chain:EntranceDelay(self))
+  elseif chain:WaitsForAnchor(self) then
+    self:WaitForAnchor()
+  else
+    self.target = 0
+    self:SetDocked(true)
+    self:moveIn(self:HiddenOffset(), 0, style.Time.Open, "outBack", 0)
+  end
   self.sparkles:Start()
   self.edgeSparkles:Start()
   self.cloudSparkles:Start()
@@ -1407,10 +1488,16 @@ function panelProto:Hide(ctx)
   PlaySound(self.closeSound)
   self.closing = true
   self.target = self:HiddenOffset()
+  -- Out of sight beyond its anchor's edge, it leaves through its own edge without crossing the screen.
+  local from = self.offset
+  if self:BeyondFarEdge() then
+    from = self:HiddenOffset()
+  end
+  self.waiting = false
   chain:Update(ctx)
   tween:Play(self, {
     duration = style.Time.Close,
-    from = self.offset,
+    from = from,
     to = self:HiddenOffset(),
     ease = "inCubic",
     onUpdate = function(x)
@@ -1471,6 +1558,8 @@ function panelProto:OnHidden(ctx)
   self.edgeSparkles:Stop()
   self.cloudSparkles:Stop()
   self.knotSparkles:Stop()
+  self.waiting = false
+  self.frame:SetFrameLevel(PANEL_LEVEL)
   chain:Update(ctx)
   self:OnClosed(ctx)
 end

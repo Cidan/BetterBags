@@ -39,6 +39,8 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field bg Texture
 ---@field glow Texture Lit while the tab is a drop target, and when it pulses.
 ---@field slide number How far it is slid out, in pixels.
+---@field width number The width it was given (never read back from the client, which returns it with
+--- float error at a UI scale).
 ---@field y number How far below the rail's top it is.
 ---@field secure boolean It is a purchase tab.
 ---@field accent? number[]
@@ -302,7 +304,8 @@ function railProto:SetTabs(entries)
     else
       tab.icon:Hide()
     end
-    tab.button:SetWidth(math.min(style.TAB_MAX_WIDTH, math.max(style.TAB_MIN_WIDTH, width)))
+    tab.width = math.min(style.TAB_MAX_WIDTH, math.max(style.TAB_MIN_WIDTH, width))
+    tab.button:SetWidth(tab.width)
     self:place(tab)
     tab.button:Show()
   end
@@ -314,12 +317,14 @@ function railProto:SetTabs(entries)
 end
 
 -- Width is how far the rail's tabs stick out from the body: its widest tab, without the hover
--- slide; 0 with no tabs.
+-- slide; 0 with no tabs. From the widths the rail gave its tabs: the client hands a frame's size
+-- back with float error at a UI scale (window.md §3b), and a chained bag's place, computed from
+-- this, must come out the same every time (next.md §12).
 ---@return number
 function railProto:Width()
   local widest = 0
   for _, tab in ipairs(self.tabs) do
-    widest = math.max(widest, tab.button:GetWidth())
+    widest = math.max(widest, tab.width)
   end
   return widest
 end
