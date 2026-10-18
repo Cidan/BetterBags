@@ -576,10 +576,11 @@ An early look at a new design for your bags. Turn it on with **BetterBags Next (
 - Your groups become tabs down the inner side of each panel: click one to switch, right-click one to rename or delete it, and click **+** to make a new group.
 - Your categories are listed in one column, each its own row of large icons, with Recent Items first and Free Space last. The list scrolls.
 - Sections fade in as a panel opens, items glide to their new places when you sort or loot, and sparkles drift out of the window from the title.
+- Drag a category by its header to move it: the whole section comes with your cursor and the others slide out of its way. Drop it where you want it and it stays there. Drop it on a tab to move the category to that group, or (at the bank) on the other bag, or one of its tabs, to move everything in it there. Right-click a header to move the section to whatever window is open, as in the regular bags.
 - Searching, sorting, the settings button, dropping items onto the panel, cooldowns and tooltips work as they do in the regular bags.
 - In the bank, your Warbank groups are listed after your bank groups, in teal, and the top of the panel turns teal while one shows. The buttons at the top close the bank, deposit your Warbound items, sort the bank (or the Warbank, while it shows) and switch between your groups and the bank's own tabs, where you can see each tab on its own, buy tabs, and right-click a tab to change its name, icon and deposit settings. In WoW: Forever, drop a bag on a bank tab to use it.
 
-Not there yet: the backpack's Show Bags panel, currencies, the bag anchor, the bag menu, dragging categories onto tabs, and the size and opacity settings (the panels have one size). It is an experiment and may change or go away; please report what you think.
+Not there yet: the backpack's Show Bags panel, currencies, the bag anchor, the bag menu, and the size and opacity settings (the panels have one size). It is an experiment and may change or go away; please report what you think.
 
 ## Reporting Performance Problems
 If BetterBags makes your game stutter, you can record exactly what it was doing and send that along with your report.

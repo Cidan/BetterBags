@@ -206,3 +206,15 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 ## Set a Font String's Font Before Its Text
 **Problem**: `FontString:SetText()` on a font string created without a template and with no font yet raises `FontString:SetText(): Font not set` in the client. A BetterBags Next section title set its text, then its font, and errored on the first open in game while every spec passed.
 **Solution**: give a font string its font (`SetFontObject`, `SetFont`, or a template in `CreateFontString`) before any `SetText`. The spec frame mock raises the client's error, so tests catch the order; spec fixtures that stand in for XML templates must give their font strings the template's font.
+
+## Dragging a Real Frame Across Clipping Parents
+**Problem**: a section inside a scroll box is clipped by it and draws in its panel's strata, so it can neither leave its window nor show above the other bag while dragged; and the frame under the cursor hides what is below it from `OnEnter`.
+**Solution**: reparent the dragged frame to a full-screen, mouse-disabled layer in the `TOOLTIP` strata (its children follow its strata and keep their levels relative to it), and find drop targets by position every frame with `IsMouseOver`, which is geometric. Put it back with the parent's strata and level. BetterBags Next (next/drag.lua, next.md §7).
+
+## Measure a Scaled Frame From Your Own State
+**Problem**: the client reports a frame's edges (`GetLeft`, `GetTop`) in the frame's own scale. A dragged section shrunk to 94% reads back about 6% off, so an animation starting from its read-back position starts from the wrong place.
+**Solution**: keep the position you gave it (the cursor and the grabbed point) and work from that; read edges only from frames at scale 1 under `UIParent` (the canvas, tabs, scroll area).
+
+## A Drop Is the Release's Hardware Event
+**Problem**: moving items (`C_Container.UseContainerItem`) needs a hardware event; a drop detected in `OnUpdate` is not one, and the client can miss a release when another window takes the mouse.
+**Solution**: drop in the dragged frame's `OnDragStop`; also check `IsMouseButtonDown` each frame (as Blizzard's chat frame drag does) and, without the release, finish the drag without moving items.

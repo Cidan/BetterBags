@@ -31,6 +31,7 @@ local stubs = {
   bankBehavior = trackStub("BankBehavior"),
   bankSlots = trackStub("BankSlots"),
   menuButton = trackStub("BagMenuButton"),
+  sectionFrame = trackStub("SectionFrame"),
 }
 
 -- Every value this spec replaces, put back after each test.
@@ -51,7 +52,7 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextPanel", "next/panel.lua" }, { "NextBank", "next/bank.lua" } }) do
+  { "NextDrag", "next/drag.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBank", "next/bank.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -238,7 +239,7 @@ describe("NextBank", function()
   end)
 
   teardown(function()
-    for _, m in ipairs({ "NextBank", "NextPanel", "NextContent", "NextTabs", "NextSparkles", "NextTween", "NextStyle" }) do
+    for _, m in ipairs({ "NextBank", "NextPanel", "NextDrag", "NextContent", "NextTabs", "NextSparkles", "NextTween", "NextStyle" }) do
       ResetModuleStub(m)
     end
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end

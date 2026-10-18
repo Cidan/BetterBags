@@ -38,7 +38,7 @@ Item Movement), or `/bb next`, turns it on or off and asks for a reload (`askToR
 - **Nothing changes for a player with Next off.** `nextEnabled` defaults to `false`, so the classic
   backpack is created as before; the search keybinding keeps the overlay (the classic bag has no
   `ToggleSearch`); the guards are no-ops for the classic bags (they have an anchor, a window and
-  `SetTabByID`). The eight `next\*.lua` files load for everyone and only register modules and
+  `SetTabByID`). The nine `next\*.lua` files load for everyone and only register modules and
   prototypes: no frame or font is made until `NextBag:Create` or `NextBank:Create`. Every TOC loads each module a file looks up at load before that
   file, checked by `spec/render/toc_spec.lua` ("loads every module a file looks up at load before
   that file, in every TOC"), which would otherwise be an error for every player.
@@ -206,7 +206,103 @@ reusing their code wherever it is not drawing.
   `BankSlots:GetBagSocketIndex(bankType, bagIndex)` and `BankSlots:PickupBag(bankType, bagIndex)`
   (the panel's buttons now call them).
 
-## 7. Coverage
+## 7. Moving sections (`next/drag.lua`)
+
+Asked: "sections draggable and reorderable, with their position being saved where we reorder ...
+we drag a header and *all* item buttons and the section header go into my cursor, and when i drag
+up and down the bag window, other sections slide up or down to make room. when i drop, it animates
+into position", then dragging a section to the other bag ("move this to the bank/backpack" for a
+whole section) and between tabs, in the same bag and across the backpack and the bank.
+
+**Picking up.** Every section has a header button over its title row. Dragging it (left button,
+the client's drag threshold: `RegisterForDrag`, `OnDragStart`) picks up a category section; Recent
+Items and Free Space stay put, and nothing is picked up in the Show Bags view (`SECTION_ALL_BAGS`,
+which includes the bank's Bank Tabs mode: its sections are bags, in bag order) or while another
+section is being dragged or landing.
+
+- The section's own frame, with its title and its real item buttons, leaves the canvas for the drag
+  layer (`NextDrag.layer`, a full-screen frame on `UIParent` in the `TOOLTIP` strata that takes no
+  mouse) at exactly the place it was on screen, so nothing jumps. Its children follow its strata
+  (frames take their parent's strata unless one sets its own; no item button does) and keep their
+  levels relative to it.
+- It lifts: it shrinks to 94% around the point that was grabbed, with a soft shadow, over 0.12 s.
+  From then on it follows the cursor, the grabbed point staying under it.
+- The canvas keeps a gap the section's height where it was (`NextContent:BeginDrag`), so the other
+  sections do not move until the cursor does.
+
+**Making room.** While the cursor is over its own panel's body, the gap goes to the insertion point
+under the cursor (`NextContent:DragIndexAt`, by the midpoints of the other sections), and the other
+sections slide out of its way: the canvas lays them out around the gap through Motion
+(render-pipeline.md §4c), as for any change of place. Near the top or bottom of the scroll area
+(40 pixels) the content scrolls toward the edge, faster the closer the cursor
+(`ScrollToOffset`/`GetDerivedScrollOffset`, Blizzard's scroll box on every client).
+
+**Drop targets**, found from the cursor's position every frame (`IsMouseOver`, geometric, so the
+section under the cursor never hides what is below it). Each shows what dropping does: the target
+tab lights up (`NextTabs:SetDropTarget`), or the other panel's body glows; a line under the section
+names the action ("Move to Herbs", "Move to the Warbank"...).
+
+| Over | Drop |
+|---|---|
+| its own panel's body | **Reorder**: the section moves to the gap; its new place is saved (below) |
+| a tab of its own panel | **Move to that tab**: the category is assigned to the tab's group (`Groups:AssignCategoryToGroup`, which removes the assignment for a default group) |
+| the other panel's body | **Move to the other bag**: every item of the section is moved there, as the classic header's right click does (`SectionFrame:MoveItems`, the movement flow: the bank type the bank shows) |
+| a group tab of the other panel | **Move to the other bag, into that tab**: the items move (into the group's bank type when the target is the bank) and the category is assigned to that group in the other bag |
+| a Blizzard tab of the other panel (Bank Tabs mode) | **Move to the other bag**: the items move into that tab's bank type; where they land is up to the game (`C_Container.UseContainerItem` names a bank type, not a tab) |
+
+Not targets (the section lands back where it was): the tab already shown, "+", purchase tabs, a
+bank group of the other bank type than the section's (Character Bank categories cannot go to
+Warbank groups and back, as with the classic drag: `UseContainerItem` cannot move items between
+the two), the other bag while not at the bank, anything else.
+
+**Dropping.**
+- Reorder, or no target: the section flies from the cursor into its gap and back to full size over
+  0.22 s, aiming at the gap's place every frame (the content may still be scrolling), then returns
+  to the canvas at exactly that place; the canvas places it at once there (Motion places a frame the
+  previous pass did not), so nothing jumps.
+- Any move: the section flies into the target (the tab's center, or the middle of the other panel's
+  content), shrinking to 15% and fading out over 0.3 s; a target tab pulses. It returns to the canvas
+  hidden and **leaving** (`NextContent:MarkLeaving`): the canvas leaves it out (the others close the
+  gap) until its category is gone from the tab, or it has nothing but gaps left, or 3 seconds pass
+  with its items still there (a move the game refused), when it shows again.
+- Then the bags are recalculated (`bags/Rederive`, refresh-scheduler.md §10): the bag whose order or
+  tabs changed, with a fresh layout for tab moves.
+
+**Saving the order** (`NextDrag:SaveOrder(kind, names, index)`). A section's place is its
+category's entry in `customSectionSort[kind]` (the settings' "Pinned" order, util/sort.lua): pinned
+categories come first, by their number, then the rest by the section sort setting. After a drop the
+tab's categories, in their new order, are `L`, with the dropped one at `k`. Everything in `L` up to
+and including `k` is pinned, and so is everything after `k` that was pinned already; together they
+form one block, in `L`'s order, put into the global pinned list where the first of them was (or at
+its end), and the list is numbered again from 0. Categories after `k` that were not pinned stay
+unpinned and keep following the sort setting; other tabs' categories keep their relative order. The
+next recalculation therefore sorts the tab exactly as it was dropped.
+
+**Cancelling.** The panel closing (`OnHidden`), the section disappearing from the data mid-drag, or
+the canvas being torn down puts the section straight back in its canvas with no action. The drop
+itself is the header's `OnDragStop`: a mouse release, the hardware event `UseContainerItem` needs
+(it is how the classic header's right click moves a category). If the client misses the release
+(another window took the mouse; Blizzard's own drags check for it, `FloatingChatFrame.lua`), the
+drag drops once it finds the left button up two frames in a row (`IsMouseButtonDown`; the first
+frame leaves the release's own `OnDragStop` its chance), but without moving items: an `OnUpdate`
+is no hardware event, so a drop on the other bag or its tabs lands back.
+
+**Positions** are in `UIParent`'s coordinates: the cursor (`GetCursorPosition` over `UIParent`'s
+effective scale), the canvas, tabs and scroll area (all at scale 1 under `UIParent`). The client
+reports a scaled frame's edges in its own scale, so the dragged section's position is always worked
+out from the cursor and the grabbed point, never read back from it.
+
+**The header also** passes an item dropped or clicked onto it to its panel (bag-drop-zone.md: Shift
+adds the item to the category, as the classic title does, `SectionFrame:OnTitleClickOrDrop`), and a
+right click moves the whole section to the open window (the classic header's Move Categories,
+`SectionFrame:MoveItems`).
+
+`SectionFrame:MoveItems(list, bankType?)` is the classic right click's move, taken out of
+`OnTitleRightClick` so both use it: the movement flow (or, with `bankType`, that bank while it is
+open), every pile of each item's virtual stack, the vendor's limit of 10 and the category-sell
+setting, then `C_Container.UseContainerItem` for each item.
+
+## 8. Coverage
 
 `spec/next/tween_spec.lua` (eases, start value at once, delay, replacing, side by side, stopping
 and finishing, a callback starting the next tween, a tween stopped by another in the same frame),
@@ -239,9 +335,26 @@ module), `spec/core/init_spec.lua` ("makes the backpack a BetterBags Next panel 
 checkbox, `/bb next`, `/bbanchor` without anchors, the Scale slider without a window),
 `spec/frames/search_overlay_spec.lua` (the keybinding), `spec/quickfind_spec.lua` (a bank whose
 tabs have no visual switch), `spec/core/constants_spec.lua`, `spec/database_spec.lua`,
-`spec/render/toc_spec.lua` (load order). Every guard was mutation-tested: 72 mutations for the
+`spec/render/toc_spec.lua` (load order). Moving sections: `spec/next/drag_spec.lua` (on the real
+backpack and bank panels: picking up into the drag layer where it was, the lift around the grabbed
+point, the gap, categories only, never in Show Bags, one at a time, following; the gap under the
+cursor with the others sliding, auto-scroll and its speed at both edges; reordering: the drop, the
+saved order, the landing from where it was dropped into the gap, cancelling back to the old place;
+saving the order's three cases; tabs of its own bag: lighting and naming, assigning, flying in,
+leaving, the pulse, the tab shown and "+", bank types; the other bag: moving, the glow, Bank or
+Warbank, into a group's bank type with the assignment, from the bank to a backpack group, a
+Blizzard tab, purchase tabs, away from the bank; cancelling on close and when the section leaves
+the data; a missed release; the header's item drops and right click, Free Space, free slots),
+`spec/next/content_spec.lua` ("dragging a section": the gap and its range, the insertion point, the
+end, committing, leaving sections, losing the section, no cascade; "section headers"),
+`spec/next/tabs_spec.lua` ("as a drop target": the tab under the cursor, lighting, the pulse, a lit
+tab staying out), `spec/frames/section_spec.lua` ("MoveItems"). Every guard was mutation-tested: 72 mutations for the
 backpack (the nine that first survived each led to a stronger test), then 94 for the bank, the
-mirrored panel, the tab rail and the wiring (the six that first survived each led to a test).
+mirrored panel, the tab rail and the wiring (the six that first survived each led to a test), then
+73 for moving sections (eleven of the twelve that first survived each led to a test; the twelfth
+showed a redundant check, removed). The mocks gained the scroll box's offset API
+(`GetDerivedScrollRange`, `GetDerivedScrollOffset`, `ScrollToOffset`, ScrollBox.lua) and
+`IsMouseButtonDown`.
 
 The mocks gained texture rotation (`SetRotation`/`GetRotation`) and Blizzard's
 `StaticPopupDialogs` table. **A font string's font comes before its text:** a section title set
@@ -253,11 +366,13 @@ it. It also showed the profiler and Simulate panes' specs building rows with fon
 strings no template has; they now use the templates' font (`GameFontHighlightSmall`,
 `templates/debug.xml`) or let the pane make its own (`BetterBagsPlainTextListButton` has none).
 
-## 8. Known limits of the prototype
+## 9. Known limits of the prototype
 
 - No Show Bags panel for the backpack (the bank's Bank Tabs mode is there), currencies, bag anchor
   or bag menu; the size and opacity settings do not apply (the panels have one size).
 - Item buttons keep the active theme's style.
-- No dragging category headers onto tabs.
-- The backpack was seen in game once, which found the section title font error (§7); not seen
-  since that fix. The bank has not been seen in game.
+- Dropping on a Blizzard bank tab moves items into that tab's bank type; the game decides which tab
+  they land in.
+- Moving a section between the Character Bank and the Warbank (within the bank) is not offered.
+- The backpack was seen in game once, which found the section title font error (§8); not seen
+  since that fix. The bank and moving sections have not been seen in game.

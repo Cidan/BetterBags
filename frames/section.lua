@@ -480,32 +480,36 @@ function sectionFrame:OnTitleClickOrDrop(ctx, section)
   events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
----@param section Section
-function sectionFrame:OnTitleRightClick(section)
+-- MoveItems moves items, with every other pile of their virtual stacks, to the window the
+-- movement flow names (Move Categories): the bank (the bank type it shows), the mailbox, the trade
+-- window, or a vendor (with the category-sell setting, ten items at most, so they can be bought
+-- back). With bankType the items go into that bank, while the bank is open.
+---@param list ItemData[]
+---@param bankType? number
+function sectionFrame:MoveItems(list, bankType)
   local flow = movementFlow:GetMovementFlow()
+  if bankType ~= nil then
+    if not addon.atBank then return end
+    flow = (Enum.BankType and bankType == Enum.BankType.Account) and const.MOVEMENT_FLOW.WARBANK
+      or const.MOVEMENT_FLOW.BANK
+  end
   if flow == const.MOVEMENT_FLOW.UNDEFINED then return end
   if flow == const.MOVEMENT_FLOW.NPCSHOP and not db:GetCategorySell() then return end
 
   -- This list contains all items to move.
   ---@type ItemData[]
-  local list = {}
+  local all = {}
 
-  for _, cell in pairs(section:GetAllCells()) do
-    -- Gap cells are plain math tables ({ isGap = true, ... }) with no frame and
-    -- no GetItemData method; they persist in a section after items leave it
-    -- (e.g. mailing away Recent Items) and must be skipped or this errors.
-    if not cell.isGap then
-      local data = cell:GetItemData()
-      if not data.isItemEmpty then
-        table.insert(list, data)
+  for _, data in ipairs(list) do
+    if not data.isItemEmpty then
+      table.insert(all, data)
 
-        -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
-        local stack = items:GetAllSlotInfo()[addon:GetBagFromBagID(data.bagid).kind].stacks:GetStackInfo(data.itemHash)
-        if stack ~= nil then
-          for subSlotKey in pairs(stack.slotkeys) do
-            local subData = items:GetItemDataFromSlotKey(subSlotKey)
-            table.insert(list, subData)
-          end
+      -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
+      local stack = items:GetAllSlotInfo()[addon:GetBagFromBagID(data.bagid).kind].stacks:GetStackInfo(data.itemHash)
+      if stack ~= nil then
+        for subSlotKey in pairs(stack.slotkeys) do
+          local subData = items:GetItemDataFromSlotKey(subSlotKey)
+          table.insert(all, subData)
         end
       end
     end
@@ -515,11 +519,11 @@ function sectionFrame:OnTitleRightClick(section)
   if flow == const.MOVEMENT_FLOW.NPCSHOP then
     local newlist = {}
     for i=1, 10 do
-      if list[i] then
-        table.insert(newlist, list[i])
+      if all[i] then
+        table.insert(newlist, all[i])
       end
     end
-    list = newlist
+    all = newlist
   end
 
   -- Only DF since warbank has Enum.BankType
@@ -528,9 +532,24 @@ function sectionFrame:OnTitleRightClick(section)
     containerType = Enum.BankType.Account
   end
 
-  for _, item in pairs(list) do
+  for _, item in ipairs(all) do
     C_Container.UseContainerItem(item.bagid, item.slotid, nil, containerType, flow == const.MOVEMENT_FLOW.REAGENT)
   end
+end
+
+---@param section Section
+function sectionFrame:OnTitleRightClick(section)
+  ---@type ItemData[]
+  local list = {}
+  for _, cell in pairs(section:GetAllCells()) do
+    -- Gap cells are plain math tables ({ isGap = true, ... }) with no frame and
+    -- no GetItemData method; they persist in a section after items leave it
+    -- (e.g. mailing away Recent Items) and must be skipped or this errors.
+    if not cell.isGap then
+      table.insert(list, cell:GetItemData())
+    end
+  end
+  self:MoveItems(list)
 end
 
 function sectionProto:onTitleMouseEnter()

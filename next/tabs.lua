@@ -34,6 +34,7 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field text FontString
 ---@field icon Texture
 ---@field bg Texture
+---@field glow Texture Lit while the tab is a drop target, and when it pulses.
 ---@field slide number How far it is slid out, in pixels.
 ---@field y number How far below the rail's top it is.
 ---@field secure boolean It is a purchase tab.
@@ -50,6 +51,7 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field pool NextTab[] Ordinary tabs not in use, hidden.
 ---@field securePool NextTab[] Purchase tabs not in use, hidden.
 ---@field selected? number
+---@field dropTarget? number The tab a dragged section would drop on (next.md §7).
 ---@field onClick? fun(ctx: Context, id: number, button: string)
 ---@field onDrag? fun(ctx: Context, id: number)
 local railProto = {}
@@ -123,6 +125,12 @@ function railProto:newTab(secure)
   local bg = button:CreateTexture(nil, "BACKGROUND")
   bg:SetAllPoints()
   bg:SetColorTexture(1, 1, 1, 1)
+  local glow = button:CreateTexture(nil, "ARTWORK")
+  glow:SetAllPoints()
+  glow:SetColorTexture(1, 1, 1, 1)
+  glow:SetVertexColor(unpack(style.Color.Lavender))
+  glow:SetBlendMode("ADD")
+  glow:Hide()
   local text = button:CreateFontString(nil, "OVERLAY")
   text:SetFontObject(style:Font("Tab"))
   local icon = button:CreateTexture(nil, "ARTWORK")
@@ -138,7 +146,7 @@ function railProto:newTab(secure)
     icon:SetPoint("RIGHT", text, "LEFT", -style.TAB_ICON_GAP, 0)
   end
   ---@type NextTab
-  local tab = { id = 0, button = button, text = text, icon = icon, bg = bg, slide = 0, y = 0, secure = secure }
+  local tab = { id = 0, button = button, text = text, icon = icon, bg = bg, glow = glow, slide = 0, y = 0, secure = secure }
   if not secure then
     addon.SetScript(button, "OnClick", function(ctx, _, mouseButton)
       if self.onClick then
@@ -172,7 +180,9 @@ function railProto:newTab(secure)
     end
   end)
   button:SetScript("OnLeave", function()
-    self:slideTo(tab, 0)
+    if tab.id ~= self.dropTarget then
+      self:slideTo(tab, 0)
+    end
     if tab.tooltip then
       GameTooltip:Hide()
     end
@@ -206,6 +216,8 @@ end
 ---@param tab NextTab
 function railProto:release(tab)
   tween:Stop(tab)
+  tween:Stop(tab.glow)
+  tab.glow:Hide()
   tab.slide = 0
   tab.button:Hide()
   table.insert(tab.secure and self.securePool or self.pool, tab)
@@ -291,7 +303,7 @@ end
 ---@private
 ---@param tab NextTab
 function railProto:paint(tab)
-  local selected = tab.id == self.selected
+  local selected = tab.id == self.selected or tab.id == self.dropTarget
   local color = selected and style.Color.TabSelected or style.Color.Tab
   local faint = CreateColor(color[1], color[2], color[3], color[4] * 0.35)
   local solid = CreateColor(color[1], color[2], color[3], color[4])
@@ -309,6 +321,81 @@ function railProto:moveIndicator(y)
   self.indicatorY = y
   self.indicator:ClearAllPoints()
   self.indicator:SetPoint(self:edge(), self.frame, self:edge(), 0, y)
+end
+
+-- tab returns the tab of an id.
+---@param id? number
+---@return NextTab?
+function railProto:Tab(id)
+  for _, tab in ipairs(self.tabs) do
+    if tab.id == id then
+      return tab
+    end
+  end
+  return nil
+end
+
+-- TabAt returns the tab under the cursor, by position (IsMouseOver), whatever lies above it: a
+-- dragged section follows the cursor.
+---@return NextTab?
+function railProto:TabAt()
+  if not self.frame:IsShown() then
+    return nil
+  end
+  for _, tab in ipairs(self.tabs) do
+    if tab.button:IsShown() and tab.button:IsMouseOver() then
+      return tab
+    end
+  end
+  return nil
+end
+
+-- SetDropTarget lights id's tab, slid out, as the tab a dragged section would drop on, or no tab.
+---@param id? number
+function railProto:SetDropTarget(id)
+  if id == self.dropTarget then
+    return
+  end
+  local old = self:Tab(self.dropTarget)
+  self.dropTarget = id
+  if old then
+    tween:Stop(old.glow)
+    old.glow:Hide()
+    self:slideTo(old, 0)
+    self:paint(old)
+  end
+  local new = self:Tab(id)
+  if new then
+    tween:Stop(new.glow)
+    new.glow:SetAlpha(0.3)
+    new.glow:Show()
+    self:slideTo(new, style.TAB_HOVER)
+    self:paint(new)
+  end
+end
+
+-- Pulse flashes id's tab: it received a section.
+---@param id number
+function railProto:Pulse(id)
+  local tab = self:Tab(id)
+  if tab == nil then
+    return
+  end
+  local glow = tab.glow
+  glow:Show()
+  tween:Play(glow, {
+    duration = style.Time.Pulse,
+    from = 0.8,
+    to = 0,
+    onUpdate = function(v)
+      glow:SetAlpha(v)
+    end,
+    onDone = function()
+      if tab.id ~= self.dropTarget then
+        glow:Hide()
+      end
+    end,
+  })
 end
 
 -- Select makes id's tab the selected one; with animate the bar glides to it.

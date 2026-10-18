@@ -15,6 +15,9 @@ local database = addon:GetModule('Database')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule('SearchBox')
 
@@ -47,6 +50,12 @@ local nextTabs = addon:GetModule('NextTabs')
 
 ---@class NextContent: AceModule
 local nextContent = addon:GetModule('NextContent')
+
+---@class NextDrag: AceModule
+local nextDrag = addon:GetModule('NextDrag')
+
+---@class SectionFrame: AceModule
+local sectionFrame = addon:GetModule('SectionFrame')
 
 -- NextPanel is the panel BetterBagsNext's bags are made of (next.md §3): a full-height panel on a
 -- side of the screen that slides in from that edge, its inner edge feathered out to nothing, with
@@ -90,6 +99,7 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field body Frame The opaque part, inside the feathered edge.
 ---@field feather Texture
 ---@field wash Texture The faint color at the top of the body.
+---@field dropGlow Texture Lit while a section from the other bag would drop here (next.md §7).
 ---@field washColor number[] The wash's color now.
 ---@field title FontString
 ---@field ribbon Texture The ribbon's brightest line.
@@ -181,6 +191,8 @@ function nextPanel:Create(proto, opts)
   p:BuildSparkles()
   p:BuildTabs()
   p:Watch()
+  p.content:SetHeaderHandler(p)
+  nextDrag:Register(p)
   return p
 end
 
@@ -273,6 +285,122 @@ function panelProto:BuildPanel(name)
   wash:SetBlendMode("ADD")
   self.wash = wash
   self:paintWash(style.Color.Wash)
+
+  local glow = frame:CreateTexture(nil, "BORDER")
+  glow:SetAllPoints(body)
+  glow:SetColorTexture(1, 1, 1, 1)
+  glow:SetVertexColor(unpack(style.Color.Lavender))
+  glow:SetBlendMode("ADD")
+  glow:SetAlpha(0)
+  glow:Hide()
+  self.dropGlow = glow
+end
+
+-- SetDropGlow lights the body while a section from the other bag would drop on it.
+---@param on boolean
+function panelProto:SetDropGlow(on)
+  local glow = self.dropGlow
+  if on then
+    glow:Show()
+  end
+  tween:Play(glow, {
+    duration = style.Time.Hover,
+    from = glow:GetAlpha(),
+    to = on and 0.12 or 0,
+    onUpdate = function(v)
+      glow:SetAlpha(v)
+    end,
+    onDone = function()
+      if not on then
+        glow:Hide()
+      end
+    end,
+  })
+end
+
+-- ShownBankType is the bank type the panel shows: none for the backpack.
+---@return number?
+function panelProto:ShownBankType()
+  return nil
+end
+
+-- InTabMode is whether the panel's tabs are Blizzard's bank tabs: never for the backpack.
+---@return boolean
+function panelProto:InTabMode()
+  return false
+end
+
+-- titleAdapter is what the classic title's item drop needs of a section (SectionFrame
+-- OnTitleClickOrDrop): its bag kind and title.
+---@private
+---@param section NextSection
+---@return table
+function panelProto:titleAdapter(section)
+  local kind = self.kind
+  return {
+    GetKind = function() return kind end,
+    GetTitle = function() return section.name end,
+  }
+end
+
+-- OnHeaderDragStart picks a section up by its header (next.md §7).
+---@param section NextSection
+function panelProto:OnHeaderDragStart(section)
+  nextDrag:Begin(self, section)
+end
+
+-- OnHeaderDragStop drops the section being dragged.
+---@param section NextSection
+function panelProto:OnHeaderDragStop(section)
+  local _ = section
+  nextDrag:Drop(context:New('NextSectionDrop'))
+end
+
+-- OnHeaderClick passes an item clicked onto a header to the panel (Shift: to the category), and
+-- moves a section to the open window on a right click (Move Categories).
+---@param ctx Context
+---@param section NextSection
+---@param button string
+function panelProto:OnHeaderClick(ctx, section, button)
+  if CursorHasItem() then
+    sectionFrame:OnTitleClickOrDrop(ctx, self:titleAdapter(section))
+    return
+  end
+  if button == "RightButton" and section.kind ~= "free" then
+    sectionFrame:MoveItems(nextDrag:SectionItems(section))
+  end
+end
+
+-- OnHeaderReceiveDrag passes an item dropped on a header to the panel (Shift: to the category).
+---@param ctx Context
+---@param section NextSection
+function panelProto:OnHeaderReceiveDrag(ctx, section)
+  if CursorHasItem() then
+    sectionFrame:OnTitleClickOrDrop(ctx, self:titleAdapter(section))
+  end
+end
+
+-- OnHeaderEnter tells what a header does.
+---@param section NextSection
+function panelProto:OnHeaderEnter(section)
+  if nextDrag:IsActive() then
+    return
+  end
+  GameTooltip:SetOwner(section.header, self.side == "LEFT" and "ANCHOR_RIGHT" or "ANCHOR_LEFT")
+  GameTooltip:SetText(section.name, 1, 1, 1, 1, true)
+  if section.kind == "category" then
+    GameTooltip:AddLine(L:G("Drag to reorder, or onto a tab or the other bag."), 0.8, 0.8, 0.8, true)
+  end
+  if section.kind ~= "free" then
+    GameTooltip:AddLine(L:G("Right-click to move it to the open window."), 0.8, 0.8, 0.8, true)
+  end
+  GameTooltip:Show()
+end
+
+---@param section NextSection
+function panelProto:OnHeaderLeave(section)
+  local _ = section
+  GameTooltip:Hide()
 end
 
 ---@private
@@ -744,6 +872,7 @@ end
 -- slide, the sparkles and the spark stop, and OnClosed runs.
 ---@param ctx Context
 function panelProto:OnHidden(ctx)
+  nextDrag:PanelHidden(self)
   self.closing = false
   tween:Stop(self)
   tween:Stop(self.spark)

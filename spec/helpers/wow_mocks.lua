@@ -1150,6 +1150,18 @@ _G.__mockTemplates.WowScrollBox = function(frame)
     self:SetView(view)
     self._scrolledToBegin = true
   end
+  -- ScrollBoxBaseMixin:GetDerivedScrollRange() (the content's extent less the visible extent;
+  -- specs set _scrollRange), GetDerivedScrollOffset() (range * scroll percentage), and
+  -- ScrollToOffset(offset, noInterpolation): nothing without a range, else the percentage
+  -- offset / range, kept between 0 and 1 (ScrollControllerMixin.SetScrollPercentage saturates).
+  function frame:GetDerivedScrollRange() return self._scrollRange or 0 end
+  function frame:GetDerivedScrollOffset() return self:GetDerivedScrollRange() * (self._scrollPercentage or 0) end
+  function frame:ScrollToOffset(offset)
+    local range = self:GetDerivedScrollRange()
+    if range > 0 then
+      self._scrollPercentage = math.max(0, math.min(1, offset / range))
+    end
+  end
   function frame:FullUpdate(immediately)
     self._fullUpdates = (self._fullUpdates or 0) + 1
     self._lastFullUpdateImmediate = immediately
@@ -1911,6 +1923,15 @@ _G._cursorY = 0
 
 _G.CursorHasItem = function() return _G._cursorHasItem or false end
 _G.IsShiftKeyDown = function() return _G._isShiftKeyDown or false end
+-- IsMouseButtonDown([button]) -> down (InputDocumentation.lua): any button without one. Specs set
+-- _G._mouseButtonsDown = { LeftButton = true }.
+_G.IsMouseButtonDown = function(button)
+  local down = _G._mouseButtonsDown or {}
+  if button == nil then
+    return next(down) ~= nil
+  end
+  return down[button] == true
+end
 _G.IsControlKeyDown = function() return _G._isControlKeyDown or false end
 _G.IsAltKeyDown = function() return _G._isAltKeyDown or false end
 _G.GetCursorInfo = function() return _G._cursorType, _G._cursorItemID, _G._cursorItemLink end

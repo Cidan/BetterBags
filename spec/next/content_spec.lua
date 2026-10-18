@@ -75,6 +75,17 @@ describe("NextContent", function()
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
   end)
 
+  local replaced = {}
+  local function override(tbl, key, value)
+    table.insert(replaced, { tbl, key, rawget(tbl, key) })
+    tbl[key] = value
+  end
+
+  after_each(function()
+    for i = #replaced, 1, -1 do replaced[i][1][replaced[i][2]] = replaced[i][3] end
+    replaced = {}
+  end)
+
   local function item(slotkey, category)
     return { slotkey = slotkey, itemInfo = { category = category } }
   end
@@ -274,6 +285,186 @@ describe("NextContent", function()
     draw()
     assert.is_nil(motion:GetMove(buttons["0_2"].frame))
     assert.are.same({ canvas.order[1].cells, STEP, 0 }, { at(buttons["0_2"].frame) })
+  end)
+
+  -- A section dragged by its header (next.md §7).
+  describe("dragging a section", function()
+    local function threeSections(opts)
+      opts = opts or {}
+      bind(data({
+        recent = opts.recent and { item("0_9", "Recent Items") } or nil,
+        categories = { { name = "A" }, { name = "B" }, { name = "C" } },
+        items = { item("0_1", "A"), item("0_2", "B"), item("0_3", "C") },
+        free = opts.free and { showAll = false, buttons = { { slotkey = "1_5", count = 3 } } } or nil,
+      }))
+      draw()
+      return canvas.byName
+    end
+
+    local ONE = style.SECTION_HEADER + style.ICON + style.SECTION_SPACING
+
+    local function y(section)
+      local _, _, _, _, oy = section.frame:GetPoint(1)
+      return -oy
+    end
+
+    it("keeps a gap where a section was picked up, the others staying put", function()
+      local s = threeSections()
+      canvas:BeginDrag(s.B)
+      draw()
+      assert.are.equal(0, y(s.A))
+      assert.are.equal(2 * ONE, y(s.C))
+      assert.is_nil(motion:GetMove(s.C.frame))
+      assert.are.equal(ONE, canvas:GetDragSlotY())
+    end)
+
+    it("moves the gap where it is asked, the others sliding out of its way", function()
+      local s = threeSections()
+      canvas:BeginDrag(s.B)
+      draw()
+      canvas:SetDragIndex(1)
+      draw()
+      assert.are.equal(0, canvas:GetDragSlotY())
+      assert.are.same({ 0, 0, 0, -ONE }, { motion:GetMove(s.A.frame) })
+      assert.are.equal(2 * ONE, y(s.C))
+    end)
+
+    it("keeps a gap after the last section", function()
+      local s = threeSections()
+      canvas:BeginDrag(s.A)
+      canvas:SetDragIndex(3)
+      draw()
+      assert.are.equal(2 * ONE, canvas:GetDragSlotY())
+    end)
+
+    it("keeps the gap among the categories, after Recent Items and before Free Space", function()
+      local s = threeSections({ recent = true, free = true })
+      canvas:BeginDrag(s.B)
+      canvas:SetDragIndex(1)
+      assert.are.equal(2, canvas.drag.index)
+      canvas:SetDragIndex(99)
+      assert.are.equal(4, canvas.drag.index, "before Free Space")
+    end)
+
+    it("finds the insertion point under a height by the others' midpoints", function()
+      local s = threeSections()
+      canvas:BeginDrag(s.B)
+      draw()
+      assert.are.equal(1, canvas:DragIndexAt(5))
+      assert.are.equal(2, canvas:DragIndexAt(ONE - 5))
+      assert.are.equal(2, canvas:DragIndexAt(ONE + 5))
+      assert.are.equal(3, canvas:DragIndexAt(ONE + ONE / 2 + 5))
+      assert.are.equal(3, canvas:DragIndexAt(500))
+      assert.are.equal(1, canvas:DragIndexAt(-50))
+    end)
+
+    it("puts a dropped section at its new place, and leaves it where it was otherwise", function()
+      local s = threeSections()
+      canvas:BeginDrag(s.B)
+      canvas:SetDragIndex(3)
+      canvas:EndDrag(true)
+      assert.are.same({ "A", "C", "B" }, names())
+      draw()
+      motion:Step(1)
+      assert.are.equal(2 * ONE, y(s.B))
+      canvas:BeginDrag(s.A)
+      canvas:SetDragIndex(3)
+      canvas:EndDrag(false)
+      assert.are.same({ "A", "C", "B" }, names())
+      assert.is_nil(canvas.drag)
+    end)
+
+    it("keeps a leaving section's place when another is dropped", function()
+      local s = threeSections()
+      override(_G, "GetTime", function() return 100 end)
+      canvas:MarkLeaving("A", 3)
+      canvas:BeginDrag(s.C)
+      canvas:SetDragIndex(1)
+      canvas:EndDrag(true)
+      local out = {}
+      for _, section in ipairs(canvas.order) do table.insert(out, section.name) end
+      assert.are.same({ "A", "C", "B" }, out)
+    end)
+
+    it("leaves out a leaving section until its time is up with its items still there", function()
+      local s = threeSections()
+      local now = 100
+      override(_G, "GetTime", function() return now end)
+      canvas:MarkLeaving("B", 3)
+      draw()
+      motion:Step(1)
+      assert.is_false(s.B.frame:IsShown())
+      assert.are.equal(ONE, y(s.C))
+      now = 104
+      draw()
+      motion:Step(1)
+      assert.is_true(s.B.frame:IsShown())
+      assert.are.equal(2 * ONE, y(s.C))
+    end)
+
+    it("keeps hiding a leaving section with nothing but gaps, and forgets it once it is gone", function()
+      local now = 100
+      override(_G, "GetTime", function() return now end)
+      threeSections()
+      canvas:MarkLeaving("B", 3)
+      bind(data({ categories = { { name = "A" }, { name = "B" }, { name = "C" } },
+        items = { item("0_1", "A"), gap("0_2", "B"), item("0_3", "C") } }))
+      now = 104
+      draw()
+      assert.is_false(canvas.byName.B.frame:IsShown())
+      bind(data({ categories = { { name = "A" }, { name = "C" } }, items = { item("0_1", "A"), item("0_3", "C") } }))
+      assert.is_nil(canvas.leaving.B)
+    end)
+
+    it("tells the drag when the section it picked up leaves the data or is torn down", function()
+      local s = threeSections()
+      local lost = 0
+      canvas:BeginDrag(s.B, function() lost = lost + 1 end)
+      bind(data({ categories = { { name = "A" }, { name = "C" } }, items = { item("0_1", "A"), item("0_3", "C") } }))
+      assert.are.equal(1, lost)
+      assert.is_nil(canvas.drag)
+      s = threeSections()
+      canvas:BeginDrag(s.A, function() lost = lost + 1 end)
+      canvas:Release()
+      assert.are.equal(2, lost)
+    end)
+
+    it("does not fade in a section being dragged", function()
+      local s = threeSections()
+      canvas:BeginDrag(s.B)
+      canvas:Cascade(true)
+      assert.are.equal(1, s.B.frame:GetAlpha())
+      assert.are.equal(0, s.A.frame:GetAlpha())
+    end)
+  end)
+
+  describe("section headers", function()
+    it("gives each section a header across its title row that passes drags and clicks to its handler", function()
+      local seen = {}
+      canvas:SetHeaderHandler({
+        OnHeaderDragStart = function(_, section) table.insert(seen, { "start", section.name }) end,
+        OnHeaderDragStop = function(_, section) table.insert(seen, { "stop", section.name }) end,
+        OnHeaderClick = function(_, ctx, section, button)
+          assert.is_not_nil(ctx)
+          table.insert(seen, { "click", section.name, button })
+        end,
+        OnHeaderReceiveDrag = function(_, ctx, section)
+          assert.is_not_nil(ctx)
+          table.insert(seen, { "drop", section.name })
+        end,
+      })
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+      draw()
+      local header = canvas.order[1].header
+      assert.are.same({ "TOPLEFT", canvas.order[1].inner, "TOPLEFT", 0, 0 }, { header:GetPoint(1) })
+      assert.are.equal(style.SECTION_HEADER, header:GetHeight())
+      assert.are.same({ "LeftButton" }, header._registeredDrags)
+      header:GetScript("OnDragStart")(header)
+      header:GetScript("OnDragStop")(header)
+      header:GetScript("OnClick")(header, "RightButton")
+      header:GetScript("OnReceiveDrag")(header)
+      assert.are.same({ { "start", "A" }, { "stop", "A" }, { "click", "A", "RightButton" }, { "drop", "A" } }, seen)
+    end)
   end)
 
   it("ends its moves and cascades when it hides", function()
