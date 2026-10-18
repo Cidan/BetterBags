@@ -356,6 +356,15 @@ describe("NextBag", function()
 
   -- Switching between the classic design and BetterBags Next without a reload (next.md §11).
   describe("switching designs (Deactivate, Activate)", function()
+    it("says it is closing while it slides out", function()
+      local bag = opened()
+      assert.is_false(bag:IsClosing())
+      bag:Hide(ctx())
+      assert.is_true(bag:IsClosing())
+      finishTweens()
+      assert.is_false(bag:IsClosing())
+    end)
+
     it("hides at once and lets go of every button it drew", function()
       local bag = opened()
       bag:Deactivate(ctx())

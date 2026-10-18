@@ -64,6 +64,7 @@ describe("BagSystem", function()
     b.searchBox = { textBox = CreateFrame("EditBox") }
     function b:GetName() return name end
     function b:IsShown() return self.frame:IsShown() end
+    function b:IsClosing() return self.closingNow == true end
     function b:Show(_) table.insert(self.log, "show") self.frame:Show() return true end
     function b:Draw(_, data, callback)
       table.insert(self.log, { "draw", data })
@@ -220,6 +221,15 @@ describe("BagSystem", function()
       assert.are.same({ { "draw", slotInfo[BACKPACK] }, "deactivate", "activate", { "draw", slotInfo[BACKPACK] },
         "show" }, addon.Bags.Backpack.log)
       assert.is_true(calls.highlight > 0)
+    end)
+
+    -- A backpack sliding or fading out was closed: the new one stays closed.
+    it("does not open the new backpack when the old one was closing", function()
+      start()
+      addon.Bags.Backpack.frame:Show()
+      addon.Bags.Backpack.closingNow = true
+      bagSystem:Switch(ctx(), "next")
+      assert.are.same({ { "draw", slotInfo[BACKPACK] } }, addon.Bags.Backpack.log)
     end)
 
     it("switches back without making anything again, the old design's registrations hooked again", function()

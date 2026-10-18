@@ -700,7 +700,10 @@ off; with Next off it does nothing, §10a).
 4. **Taking over**: `addon.Bags.Backpack`, `addon.Bags.Bank` and `addon.Vendor` become the new
    design's, the setting is saved (`database:SetNextEnabled`), the backpack's `loaded` flag (and
    the bank's) carries over, and the backpack draws the data last read
-   (`items:GetAllSlotInfo()[BACKPACK]`; no bag is read again) and opens if the old one was open.
+   (`items:GetAllSlotInfo()[BACKPACK]`; no bag is read again) and opens if the old one was open:
+   shown and not closing (`IsClosing`: the classic window fading out, Next's panel sliding out; a
+   bag closed a moment before the switch still shows while it does, and used to open the other
+   design).
    The in-bag search text of the backpack and the bank carries over, set even when empty so a
    design switched back on never shows a stale search. The bag-bar highlight is updated and
    `bags/DesignChanged` (design) is sent.
@@ -741,3 +744,26 @@ and `spec/bags/bank_spec.lua` (`Resync`), `spec/next/bag_spec.lua`, `spec/next/b
 `spec/frames/contextmenu_spec.lua`, `spec/config/config_redraw_spec.lua`, `spec/core/init_spec.lua`,
 `spec/core/backpack_button_spec.lua`. 71 mutations: two survivors led to tests, one showed a guard a
 second `Disable` makes unnecessary (removed), one was a malformed mutation.
+
+On the whole addon (`spec/integration/bag_switch_spec.lua`, through `spec/helpers/whole_addon.lua`,
+test-harness.md §5): every file of the TOC loaded and started as the client does, then switched
+both ways, with the backpack open and closed, with no error; the classic bags made after the theme
+(their parts placed); and the strongest check of the unhooking: after any switch, including back
+to a design made earlier, BetterBags listens to exactly the events and messages, with as many
+callbacks each, as a fresh start in that design. 12 mutations, one survivor leading to the
+switch-back check.
+
+### 11f. Failure mode (fixed): the classic bags made by a switch
+
+Reported in game, switching from Next to the classic bags the first time:
+`frames/bag.lua: attempt to index field 'searchBox' (a nil value)`, twice (backpack and bank), from
+`Sonata:RegisterWindow` → `decorate` → the window's `OnDecorated` → `bagProto:PlaceParts`. At
+login the bags are made before Sonata applies the theme (at `PLAYER_LOGIN`), so their windows are
+decorated after everything exists. A design made by a switch registers its windows after the theme
+was applied, and Sonata styles a window the moment it registers (patterns-ui.md, "Windows and
+Elements Made on First Use"): inside `BuildWindow`, before `BuildParts`. `PlaceParts` now does
+nothing until the parts exist, and `bagFrame:Create` places them once made
+(`PlacePartsIfDecorated`, window.md §7). Next's panels register no windows, so making Next by a
+switch had no such problem. The specs had missed it because `spec/bagsystem_spec.lua` uses stand-in
+bags and no spec ran the real `bagFrame:Create` after a theme was applied; the whole-addon spec
+reproduces the error exactly without the fix.

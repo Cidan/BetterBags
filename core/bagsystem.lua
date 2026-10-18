@@ -179,7 +179,7 @@ function bagSystem:Switch(ctx, design)
   end
 
   local old = self.sets[self.active]
-  local wasOpen = old.backpack:IsShown()
+  local wasOpen = old.backpack:IsShown() and not old.backpack:IsClosing()
   local backpackSearch, bankSearch = searchText(old.backpack), searchText(old.bank)
   for _, bag in ipairs({ old.backpack, old.bank or false, old.vendor or false }) do
     if bag then

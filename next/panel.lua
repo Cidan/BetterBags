@@ -893,6 +893,12 @@ function panelProto:IsShown()
   return self.frame:IsShown()
 end
 
+-- IsClosing says the panel is sliding out: closed, though its frame still shows.
+---@return boolean
+function panelProto:IsClosing()
+  return self.closing
+end
+
 ---@return string
 function panelProto:GetName()
   return self.frame:GetName()

@@ -303,8 +303,12 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   and the backpack's currencies 4 in from its left end, both anchored to the footer bar, so the
   theme places them), `MenuButton` (`Points`; `false` hides it), `Actions` (below), `Tabs`
   (`Offset = { X, Y }`: where the tab bar's top left sits from the bag's bottom left, default
-  0, 2; `PlaceTabs`, also run by `bagFrame:Create` once the behavior made the bar, since a window
-  registered after the first theme is decorated before its tabs exist). The tab bar is a frame
+  0, 2; `PlaceTabs`). A bag made after a theme was applied (the classic bags made the first time
+  the bags switch from BetterBags Next, next.md §11f) is decorated as its window registers, inside
+  `BuildWindow`, before `BuildParts` made anything: `PlaceParts` then does nothing, and
+  `bagFrame:Create` places every part once the behavior made the last of them
+  (`PlacePartsIfDecorated`; only the tab bar for a window not decorated yet, whose first theme
+  places the rest). The tab bar is a frame
   level below the bag, so art a theme draws below the window (BetterBags - Themes' race borders
   reach 13 to 56 below it) would cover the tabs unless the theme hangs them below it. It
   reserves those rows with `SetExtraInsets`, then redraws a shown slots panel (tabs measure

@@ -253,6 +253,12 @@ function bagFrame.bagProto:IsShown()
 	return self.frame:IsShown()
 end
 
+-- IsClosing says the bag is fading out: closed, though its frame still shows.
+---@return boolean
+function bagFrame.bagProto:IsClosing()
+	return self.window:IsClosing()
+end
+
 ---@return number x
 ---@return number y
 function bagFrame.bagProto:GetPosition()
@@ -847,6 +853,11 @@ end
 ---@param ctx Context
 ---@param decoration SonataWindowDecoration
 function bagFrame.bagProto:PlaceParts(ctx, decoration)
+	-- A window registered after a theme was applied is styled as it registers, before BuildParts
+	-- (the classic bags made by a switch, next.md §11); PlacePartsIfDecorated places them once made.
+	if self.searchBox == nil then
+		return
+	end
 	local layout = decoration:GetLayout()
 	local overlay = decoration:GetOverlayFrame()
 
@@ -879,6 +890,18 @@ function bagFrame.bagProto:PlaceParts(ctx, decoration)
 	self:UpdateSearchShown()
 	if self.slots and self.slots:IsShown() then
 		self.slots:Draw(ctx)
+	end
+end
+
+-- PlacePartsIfDecorated places the bag's parts once they are made: all of them when the window
+-- was styled before they existed (a bag made after a theme was applied, next.md §11), else the tab
+-- bar, which the behavior made after the parts.
+---@param ctx Context
+function bagFrame.bagProto:PlacePartsIfDecorated(ctx)
+	if self.window.decoration then
+		self:PlaceParts(ctx, self.window.decoration)
+	else
+		self:PlaceTabs()
 	end
 end
 
@@ -1079,7 +1102,7 @@ function bagFrame:Create(ctx, kind)
 
 	-- Call behavior-specific creation (slots, currency, tabs, etc.)
 	b.behavior:OnCreate(ctx)
-	b:PlaceTabs()
+	b:PlacePartsIfDecorated(ctx)
 
 	b:WatchMouse()
 

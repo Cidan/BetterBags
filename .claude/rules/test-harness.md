@@ -74,3 +74,39 @@ Once C-level APIs are mocked, triggering `items:ProcessRefresh(ctx, const.BAG_KI
 - **Phase 4 (Search Indexing):** Builds ngrams and full-text indexes over all items in the dataset.
 - **Phase 4.5 (Category & Data Enrichment):** Assigns final priority-based categories to each slot.
 - **Verification Rule:** Assert that specific items (including qualities, binding, counts, and custom classifications) resolve and group perfectly under their corresponding categories in the final generated `slotInfo.itemsBySlotKey`.
+
+### 5. The Whole Addon (`spec/helpers/whole_addon.lua`)
+Most specs load the modules they test next to stubs of the rest. That cannot catch an error that
+only shows when the real modules meet in an order startup never produces: a switch between bag
+designs made the classic bags after the theme was applied, and crashed in game while every spec
+passed (next.md §11f). The whole-addon helper loads and starts all of BetterBags:
+- **Use:** `local WholeAddon = dofile("spec/helpers/whole_addon.lua")`; `local handle =
+  WholeAddon.Load({ next = true? })`; `handle:Start()`; `handle.addon` is the addon,
+  `handle.errors` every error that reached the error handler; `handle:Restore()` in `after_each`.
+- **A fresh addon:** the one `spec/helpers/addon_loader.lua` made is set aside in AceAddon's
+  registry (with its queued entries), and every Lua file of `BetterBags.toc` is loaded in order
+  into a new one. Libraries the specs do not load are loaded (LibWindow-1.1, the WagoAnalytics
+  shim; byte order marks stripped, which the client skips and Lua 5.1 rejects) or stood in for
+  (LibUIDropDownMenu: the four calls the context menu makes).
+- **Started as the client starts it:** through AceAddon's own handler, `ADDON_LOADED` (not logged
+  in) initializes the addon while its modules are still queued, so the modules it enables are only
+  marked; `PLAYER_LOGIN` enables the addon and every marked module. Calling `OnInitialize` and
+  `OnEnable` directly is not the same: Sonata would never apply a theme. Saved variables start
+  empty on every load (an earlier load's saved setting would otherwise decide the design).
+- **The retail client:** Blizzard's `Enum.BagIndex`, `Enum.PlayerInteractionType`,
+  `Enum.ItemQuality` from the API documentation of the live branch, the other values as
+  `spec/core/constants_spec.lua` sets them, Blizzard's bag frames and bag-bar buttons (with their
+  `SlotHighlightTexture`), `NUM_TOTAL_BAG_FRAMES` 5. Mocks that other specs never needed were added
+  to `spec/helpers/wow_mocks.lua` from Blizzard's source: `issecurevariable`, `GetRect`, the edit
+  box's multi-line methods, `SearchBoxTemplate`/`BagSearchBoxTemplate`, `WowScrollBoxList`,
+  `CreateScrollBoxListLinearView`, the list's `ScrollUtil` functions and drag behavior, and
+  `CreateDataProvider`.
+- **No layout engine:** every frame the loaded addon makes is resolved at the screen's origin, as
+  if laid out, and the cursor is far off screen.
+- **Restore** puts back everything changed in place (insulation restores only globals): the
+  AceAddon registry and queues, LibStub's libraries, the `Enum` tables, each global it set, and
+  the loaded addon's events, messages and hooks. A full suite run with the whole-addon spec in it
+  passes unchanged, which shows nothing leaks.
+- **Cost:** about 1.1 s per load and start (measured: 8 in 8.9 s); keep whole-addon specs few and pointed.
+- Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e).
+
