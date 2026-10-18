@@ -57,6 +57,19 @@ describe("NextTabs", function()
     assert.are.equal(style.TAB_MIN_WIDTH, rail.tabs[3].button:GetWidth(), "never narrower than the minimum")
   end)
 
+  -- A chained bag's place is computed from the rails' widths (next.md §12): they must come out the
+  -- same every time, and the client reads a frame's size back with float error at a UI scale.
+  it("says how wide it is from the widths it gave its tabs, not from what the client reads back", function()
+    rail:SetTabs({ { id = 1, name = "Backpack" }, { id = 2, name = string.rep("W", 40) } })
+    assert.are.equal(style.TAB_MAX_WIDTH, rail:Width())
+    for _, t in ipairs(rail.tabs) do
+      t.button.GetWidth = function() return style.TAB_MAX_WIDTH + 1e-4 end
+    end
+    assert.are.equal(style.TAB_MAX_WIDTH, rail:Width())
+    rail:SetTabs({})
+    assert.are.equal(0, rail:Width())
+  end)
+
   it("caps a long name's tab at the widest a tab may be", function()
     rail:SetTabs({ { id = 1, name = string.rep("x", 60) } })
     assert.are.equal(style.TAB_MAX_WIDTH, rail.tabs[1].button:GetWidth())

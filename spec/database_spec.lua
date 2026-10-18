@@ -92,6 +92,7 @@ const.DATABASE_DEFAULTS = {
     enableBagFading = false,
     animateItemMovement = false,
     nextEnabled = false,
+    nextChain = "apart",
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
@@ -236,6 +237,17 @@ describe("Database", function()
       assert.is_true(DB:GetNextEnabled())
       DB:SetNextEnabled(false)
       assert.is_false(DB:GetNextEnabled())
+    end)
+
+    -- How BetterBags Next's bags sit (next.md §12): apart on opposite edges, or chained on one.
+    it("GetNextChain / SetNextChain, apart until chained, and nothing but a layout", function()
+      assert.are.equal("apart", DB:GetNextChain())
+      for _, layout in ipairs({ "left", "right", "apart" }) do
+        DB:SetNextChain(layout)
+        assert.are.equal(layout, DB:GetNextChain())
+      end
+      assert.has_error(function() DB:SetNextChain("middle") end)
+      assert.are.equal("apart", DB:GetNextChain())
     end)
 
     it("GetAnimateItemMovement / SetAnimateItemMovement, off until turned on", function()

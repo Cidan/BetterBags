@@ -57,6 +57,7 @@ function nextBag:Create(ctx)
     title = L:G("Backpack"),
     openSound = SOUNDKIT.IG_BACKPACK_OPEN,
     closeSound = SOUNDKIT.IG_BACKPACK_CLOSE,
+    chainRole = "backpack",
   })
   b.helper = backpackBehavior:Create(b)
   b.behavior = {

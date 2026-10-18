@@ -91,6 +91,24 @@ function emitterProto:Start()
   end)
 end
 
+-- Burst spawns up to n sparkles at once (never past Max, none in combat), and runs the driver so
+-- they live out their lives.
+---@param n number
+function emitterProto:Burst(n)
+  if InCombatLockdown() then
+    return
+  end
+  for _ = 1, n do
+    if #self.alive >= self.options.Max then
+      break
+    end
+    self:spawn()
+  end
+  if self.frame:GetScript("OnUpdate") == nil then
+    self:Start()
+  end
+end
+
 -- Stop clears every sparkle and stops the driver.
 function emitterProto:Stop()
   self.frame:SetScript("OnUpdate", nil)

@@ -9,6 +9,9 @@ local style = addon:GetModule('NextStyle')
 ---@class NextTween: AceModule
 local tween = addon:GetModule('NextTween')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 -- NextTabs is BetterBagsNext's tab rail (next.md §3): a tab per entry, stacked down the body's
 -- inner edge and sticking out over the feathered edge like bookmarks: to the left of the
 -- backpack's panel (the right side of the screen), to the right of the bank's (the left side).
@@ -36,6 +39,8 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field bg Texture
 ---@field glow Texture Lit while the tab is a drop target, and when it pulses.
 ---@field slide number How far it is slid out, in pixels.
+---@field width number The width it was given (never read back from the client, which returns it with
+--- float error at a UI scale).
 ---@field y number How far below the rail's top it is.
 ---@field secure boolean It is a purchase tab.
 ---@field accent? number[]
@@ -54,6 +59,7 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field dropTarget? number The tab a dragged section would drop on (next.md §7).
 ---@field onClick? fun(ctx: Context, id: number, button: string)
 ---@field onDrag? fun(ctx: Context, id: number)
+---@field onResize? fun(ctx: Context) Runs after the tabs are set, which can change the rail's width.
 local railProto = {}
 addon:GetModule('Perf'):RegisterPrototype(railProto, 'NextTabRail')
 
@@ -94,6 +100,12 @@ end
 ---@param fn fun(ctx: Context, id: number)
 function railProto:SetDragHandler(fn)
   self.onDrag = fn
+end
+
+-- SetResizeHandler sets what runs after the tabs are set (their widths can have changed).
+---@param fn fun(ctx: Context)
+function railProto:SetResizeHandler(fn)
+  self.onResize = fn
 end
 
 -- edge is the point a tab and the bar hang from: the body's side of the rail.
@@ -292,12 +304,29 @@ function railProto:SetTabs(entries)
     else
       tab.icon:Hide()
     end
-    tab.button:SetWidth(math.min(style.TAB_MAX_WIDTH, math.max(style.TAB_MIN_WIDTH, width)))
+    tab.width = math.min(style.TAB_MAX_WIDTH, math.max(style.TAB_MIN_WIDTH, width))
+    tab.button:SetWidth(tab.width)
     self:place(tab)
     tab.button:Show()
   end
   self.frame:SetHeight(#entries > 0 and (y + STEP) or 1)
   self:Select(self.selected)
+  if self.onResize then
+    self.onResize(context:New("NextTabs_Resize"))
+  end
+end
+
+-- Width is how far the rail's tabs stick out from the body: its widest tab, without the hover
+-- slide; 0 with no tabs. From the widths the rail gave its tabs: the client hands a frame's size
+-- back with float error at a UI scale (window.md §3b), and a chained bag's place, computed from
+-- this, must come out the same every time (next.md §12).
+---@return number
+function railProto:Width()
+  local widest = 0
+  for _, tab in ipairs(self.tabs) do
+    widest = math.max(widest, tab.width)
+  end
+  return widest
 end
 
 ---@private

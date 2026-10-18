@@ -195,6 +195,23 @@ function DB:SetNextEnabled(enabled)
   DB.data.profile.nextEnabled = enabled
 end
 
+---@alias NextChainLayout "apart"|"left"|"right"
+
+-- GetNextChain returns how BetterBags Next's backpack and its companion (the bank or a vendor) sit:
+-- apart on opposite edges, or chained on the left or the right (next.md §12).
+---@return NextChainLayout
+function DB:GetNextChain()
+  return DB.data.profile.nextChain
+end
+
+---@param layout NextChainLayout
+function DB:SetNextChain(layout)
+  if layout ~= "apart" and layout ~= "left" and layout ~= "right" then
+    error("unknown BetterBags Next chain layout: " .. tostring(layout))
+  end
+  DB.data.profile.nextChain = layout
+end
+
 ---@param kind BagKind
 ---@return boolean
 function DB:GetGroupsEnabled(kind)

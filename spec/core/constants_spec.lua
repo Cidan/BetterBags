@@ -139,6 +139,13 @@ describe("Constants Module Offsets", function()
 
   -- Items, sections and rows only glide to their new places when the player turns it on
   -- (render-pipeline.md §4c).
+  -- BetterBags Next's bags start on opposite edges of the screen, not chained (next.md §12).
+  it("keeps BetterBags Next's bags apart by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    assert.are.equal("apart", const.DATABASE_DEFAULTS.profile.nextChain)
+  end)
+
   it("leaves animating item movement off by default", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")

@@ -51,7 +51,7 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDrag", "next/drag.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
+  { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -118,12 +118,14 @@ describe("NextBag", function()
     override(stubs.database, "GetGroupsEnabled", function() return groupsEnabled end)
     override(stubs.database, "GetActiveGroup", function() return activeGroup end)
     override(stubs.database, "SetActiveGroup", function(_, _, id) activeGroup = id end)
+    override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetInBagSearch", function() return inBagSearch end)
     override(stubs.groups, "GetAllGroups", function() return allGroups end)
     override(stubs.groups, "GetGroup", function(_, _, id) return allGroups[id] end)
     override(stubs.events, "SendMessage", function(_, _, name, opts) table.insert(sent, { name, opts }) end)
     override(stubs.events, "RegisterMessage", function(_, name, fn) messages[name] = fn end)
     override(stubs.events, "BucketEvent", function(_, name, fn, filter) buckets[name] = { fn, filter } end)
+    override(stubs.events, "RegisterEvent", function() end)
     override(stubs.searchBox, "CreateBox", function(_, kind, parent)
       box = { kind = kind, frame = CreateFrame("Frame", nil, parent) }
       box.textBox = CreateFrame("EditBox", nil, box.frame)

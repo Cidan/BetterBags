@@ -438,6 +438,38 @@ local function CreateMockWidget(widgetType, name, parent)
     table.insert(self._textures, tex)
     return tex
   end
+  -- Frame:CreateLine(name, drawLayer, templateName, subLevel) (SimpleFrameAPIDocumentation) makes a
+  -- Line: a texture drawn from a start point to an end point (SimpleLineAPIDocumentation, on the
+  -- live, forever, classic, classic_era and classic_anniversary branches). SetStartPoint and
+  -- SetEndPoint take (relativePoint, relativeTo, offsetX = 0, offsetY = 0).
+  function widget:CreateLine(lineName, drawLayer, inherits, subLevel)
+    local line = CreateMockWidget("Line", lineName, self)
+    line._drawLayer = drawLayer
+    line._sublevel = subLevel
+    line._inherits = inherits
+    line._thickness = 1
+    line._hitRectThickness = 0
+    line.SetStartPoint = function(l, relativePoint, relativeTo, offsetX, offsetY)
+      l._startPoint = { relativePoint, relativeTo, offsetX or 0, offsetY or 0 }
+    end
+    line.SetEndPoint = function(l, relativePoint, relativeTo, offsetX, offsetY)
+      l._endPoint = { relativePoint, relativeTo, offsetX or 0, offsetY or 0 }
+    end
+    line.GetStartPoint = function(l)
+      local p = l._startPoint or {}
+      return p[1], p[2], p[3], p[4]
+    end
+    line.GetEndPoint = function(l)
+      local p = l._endPoint or {}
+      return p[1], p[2], p[3], p[4]
+    end
+    line.SetThickness = function(l, thickness) l._thickness = thickness end
+    line.GetThickness = function(l) return l._thickness end
+    line.SetHitRectThickness = function(l, thickness) l._hitRectThickness = thickness end
+    line.GetHitRectThickness = function(l) return l._hitRectThickness end
+    table.insert(self._textures, line)
+    return line
+  end
   function widget:CreateFontString(fontStringName, drawLayer, inherits)
     local fs = CreateMockWidget("FontString", fontStringName, self)
     fs._drawLayer = drawLayer

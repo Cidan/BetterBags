@@ -682,6 +682,10 @@ const.DATABASE_DEFAULTS = {
     enableBagFading = false,
     animateItemMovement = false,
     nextEnabled = false,
+    -- How BetterBags Next's backpack and its companion (the bank or a vendor) sit: "apart" on
+    -- opposite edges, chained "left" (the companion at the left edge, the backpack beside it) or
+    -- "right" (the backpack at the right edge, the companion beside it). next.md §12.
+    nextChain = "apart",
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
