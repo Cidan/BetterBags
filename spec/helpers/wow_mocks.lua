@@ -665,6 +665,14 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetTexCoord(...)
     self._texCoords = {...}
   end
+  -- TextureBase:SetRotation(radians, normalizedRotationPoint?) and GetRotation() -> radians
+  -- (SimpleTextureBaseAPIDocumentation, every client).
+  function widget:SetRotation(radians)
+    self._rotation = radians
+  end
+  function widget:GetRotation()
+    return self._rotation or 0
+  end
   -- TextureBase:SetGradient(orientation, minColor, maxColor) with two ColorMixins.
   function widget:SetGradient(orientation, minColor, maxColor)
     self._gradient = { orientation = orientation, min = minColor, max = maxColor }
@@ -1670,6 +1678,8 @@ _G.BreakUpLargeNumbers = function(val)
   return left:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "") .. (right or "")
 end
 
+-- StaticPopupDialogs: Blizzard's table of popup definitions (StaticPopup.lua), filled by addons.
+_G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
 _G._lastPopupShown = nil
 _G.StaticPopup_Show = function(name, ...)
   _G._lastPopupShown = { name = name, args = {...} }

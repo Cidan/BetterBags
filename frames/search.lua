@@ -54,6 +54,12 @@ addon:GetModule('Perf'):RegisterPrototype(searchBox.searchProto, 'SearchBoxFrame
 -- search key bind.
 function BetterBags_ToggleSearch()
   local ctx = context:New('BetterBags_ToggleSearch')
+  -- A BetterBags Next backpack searches in its own panel and has no overlay (next.md).
+  local backpack = addon.Bags and addon.Bags.Backpack
+  if backpack and backpack.ToggleSearch then
+    backpack:ToggleSearch(ctx)
+    return
+  end
   searchBox.searchFrame:Toggle(ctx)
 end
 

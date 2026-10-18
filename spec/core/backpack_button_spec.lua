@@ -55,7 +55,7 @@ describe("Bag-bar backpack button click", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag"
     }
     for _, name in ipairs(modules) do
       local stub = StubBetterBagsModule(name)
@@ -73,6 +73,7 @@ describe("Bag-bar backpack button click", function()
 
     local db = addon:GetModule("Database")
     db.GetEnableBankBag = db.GetEnableBankBag or function() return true end
+    db.GetNextEnabled = db.GetNextEnabled or function() return false end
     db.GetShowBagButton = db.GetShowBagButton or function() return true end
 
     local eventsMod = addon:GetModule("Events")

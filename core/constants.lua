@@ -681,6 +681,7 @@ const.DATABASE_DEFAULTS = {
     enabled = true,
     enableBagFading = false,
     animateItemMovement = false,
+    nextEnabled = false,
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,

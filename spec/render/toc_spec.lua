@@ -72,6 +72,27 @@ describe("render pipeline and Sonata load order", function()
     assert.are.equal(5, count)
   end)
 
+  -- BetterBagsNext (next.md): its files load after what they use (the bag frame, the search
+  -- box, the money frame, the backpack behavior) and before core/init.lua, in dependency order.
+  it("lists BetterBags Next's files in every TOC, in order, after the bag frames and before init", function()
+    local files = { "next\\style.lua", "next\\tween.lua", "next\\sparkles.lua", "next\\tabs.lua",
+      "next\\content.lua", "next\\bag.lua" }
+    local pipe = io.popen("ls *.toc")
+    for path in pipe:lines() do
+      local lines = readToc(path)
+      local previous = indexOf(lines, "frames\\bag.lua")
+      assert.is_not_nil(previous, path)
+      for _, file in ipairs(files) do
+        local at = indexOf(lines, file)
+        assert.is_not_nil(at, path .. " lists " .. file)
+        assert.is_true(previous < at, path .. " " .. file)
+        previous = at
+      end
+      assert.is_true(previous < indexOf(lines, "core\\init.lua"), path)
+    end
+    pipe:close()
+  end)
+
   it("lists every Sonata theme file in every TOC, after Base and before the frames", function()
     local themes = {}
     local list = io.popen("ls sonata/themes/*.lua")

@@ -154,6 +154,33 @@ describe("Config settings refreshes", function()
       assert.are.same({}, sent)
     end)
 
+    -- BetterBagsNext (next.md): /bb next turns it on or off and asks to reload.
+    it("turns BetterBags Next on and off on /bb next, asking to reload", function()
+      local on = false
+      local savedGet, savedSet = db.GetNextEnabled, db.SetNextEnabled
+      db.GetNextEnabled = function() return on end
+      db.SetNextEnabled = function(_, value) on = value end
+      _G._lastPopupShown = nil
+      handlers.bb(" Next ")
+      assert.is_true(on)
+      assert.are.equal("BETTERBAGS_RELOAD_UI", _G._lastPopupShown.name)
+      handlers.bb("next")
+      assert.is_false(on)
+      assert.are.equal(0, opened)
+      db.GetNextEnabled, db.SetNextEnabled = savedGet, savedSet
+    end)
+
+    -- A BetterBagsNext backpack has no anchor (next.md §1).
+    it("shows the bags' anchors on /bbanchor, skipping a backpack without one", function()
+      local savedBags = addon.Bags
+      local shown = 0
+      local anchor = { Activate = function() end, Show = function() shown = shown + 1 end }
+      addon.Bags = { Backpack = {}, Bank = { anchor = anchor } }
+      handlers.bbanchor()
+      assert.are.equal(1, shown)
+      addon.Bags = savedBags
+    end)
+
     it("opens the changelog on /bb changelog, in any case and spacing", function()
       handlers.bb("changelog")
       handlers.bb("  ChangeLog ")
@@ -302,6 +329,30 @@ describe("Config settings refreshes", function()
     end
   end)
 
+  -- BetterBagsNext (next.md): an experiment that replaces the backpack's draw; it takes effect
+  -- after a reload, so turning it on or off asks for one. It sits right below Animate Item Movement.
+  it("turns BetterBags Next on and off, below Animate Item Movement, asking to reload", function()
+    local on = false
+    saved[#saved + 1] = { db, "GetNextEnabled", db.GetNextEnabled }
+    saved[#saved + 1] = { db, "SetNextEnabled", db.SetNextEnabled }
+    db.GetNextEnabled = function() return on end
+    db.SetNextEnabled = function(_, value) on = value end
+    local found = settings("BetterBags Next (experimental)")
+    assert.are.equal(1, #found)
+    sent = {}
+    _G._lastPopupShown = nil
+    assert.is_false(found[1].getValue(context:New("Test")))
+    found[1].setValue(context:New("Test"), true)
+    assert.is_true(on)
+    assert.are.equal("BETTERBAGS_RELOAD_UI", _G._lastPopupShown.name)
+    assert.are.same({}, messages())
+    for i, entry in ipairs(entries) do
+      if entry.opts.title == "BetterBags Next (experimental)" then
+        assert.are.equal("Animate Item Movement", entries[i - 1].opts.title)
+      end
+    end
+  end)
+
   describe("opacity and scale", function()
     local windows, savedValues, opacityUpdates
 
@@ -346,6 +397,17 @@ describe("Config settings refreshes", function()
         local w = windows[savedValues[1][2]]
         assert.are.equal(1, w.scale)
         assert.are.same({ false }, w.quiet)
+      end
+    end)
+
+    -- A BetterBagsNext backpack has no window to rescale (next.md §1).
+    it("saves the scale of a bag without a window", function()
+      saved[#saved + 1] = { addon, "GetBagFromKind", addon.GetBagFromKind }
+      addon.GetBagFromKind = function() return {} end
+      for _, opts in ipairs(settings("Scale")) do
+        savedValues = {}
+        opts.setValue(context:New("Test"), 90)
+        assert.are.equal(90, savedValues[1][3])
       end
     end)
   end)

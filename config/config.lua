@@ -40,6 +40,23 @@ local itemColorPane = addon:GetModule('ItemColorPane')
 ---@field configFrame FormFrame
 local config = addon:NewModule('Config')
 
+-- askToReload asks the player to reload the UI, for a setting that takes effect only then.
+local function askToReload()
+  StaticPopupDialogs["BETTERBAGS_RELOAD_UI"] = {
+    text = "BetterBags needs to reload the UI for this change to take effect. Reload now?",
+    button1 = "Yes",
+    button2 = "No",
+    OnAccept = function()
+      ReloadUI()
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+  }
+  StaticPopup_Show("BETTERBAGS_RELOAD_UI")
+end
+
 function config:CreateConfig()
   local f = form:Create({
     title = 'BetterBags Settings',
@@ -107,20 +124,7 @@ function config:CreateConfig()
     end,
     setValue = function(_, value)
       db:SetEnableBankBag(value)
-      -- Prompt user to reload UI
-      StaticPopupDialogs["BETTERBAGS_RELOAD_UI"] = {
-        text = "BetterBags needs to reload the UI for this change to take effect. Reload now?",
-        button1 = "Yes",
-        button2 = "No",
-        OnAccept = function()
-          ReloadUI()
-        end,
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = true,
-        preferredIndex = 3,
-      }
-      StaticPopup_Show("BETTERBAGS_RELOAD_UI")
+      askToReload()
     end
   })
 
@@ -143,6 +147,19 @@ function config:CreateConfig()
     end,
     setValue = function(_, value)
       db:SetAnimateItemMovement(value)
+    end
+  })
+
+  f:AddCheckbox({
+    title = 'BetterBags Next (experimental)',
+    description = 'An experimental new backpack: a panel that slides in from the right edge of the screen, '
+      .. 'with tabs down its side and your categories in one column. Requires a UI reload to take effect.',
+    getValue = function(_)
+      return db:GetNextEnabled()
+    end,
+    setValue = function(_, value)
+      db:SetNextEnabled(value)
+      askToReload()
     end
   })
 
@@ -635,7 +652,8 @@ function config:CreateConfig()
       setValue = function(_, value)
         db:SetBagViewSizeScale(bagType.kind, db:GetBagView(bagType.kind), value)
         local bag = addon:GetBagFromKind(bagType.kind)
-        if bag then
+        -- A BetterBags Next backpack has no window: it has one size.
+        if bag and bag.window then
           bag.window:UpdateScale()
         end
       end,
@@ -1144,18 +1162,28 @@ function config:Open()
 end
 
 function config:RegisterSettings()
-  -- /bb opens the settings; /bb changelog opens the changelog (frames/changelog.lua).
+  -- /bb opens the settings; /bb changelog opens the changelog (frames/changelog.lua); /bb next
+  -- turns BetterBags Next on or off (next.md).
   LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function(input)
-    if strtrim(input or ""):lower() == "changelog" then
+    local command = strtrim(input or ""):lower()
+    if command == "changelog" then
       events:SendMessage(context:New('SlashChangelog'), 'changelog/Open')
+      return
+    end
+    if command == "next" then
+      db:SetNextEnabled(not db:GetNextEnabled())
+      askToReload()
       return
     end
     self:Open()
   end)
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbanchor", function()
-    addon.Bags.Backpack.anchor:Activate()
-    addon.Bags.Backpack.anchor:Show()
+    -- A BetterBags Next backpack has no anchor.
+    if addon.Bags.Backpack.anchor then
+      addon.Bags.Backpack.anchor:Activate()
+      addon.Bags.Backpack.anchor:Show()
+    end
     if addon.Bags.Bank then
       addon.Bags.Bank.anchor:Activate()
       addon.Bags.Bank.anchor:Show()

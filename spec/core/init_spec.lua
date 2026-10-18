@@ -46,7 +46,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag"
     }
 
     for _, name in ipairs(modules) do
@@ -66,6 +66,7 @@ describe("Core Init and Enable flow", function()
 
     local db = addon:GetModule("Database")
     db.GetEnableBankBag = db.GetEnableBankBag or function() return true end
+    db.GetNextEnabled = db.GetNextEnabled or function() return false end
     db.GetShowBagButton = db.GetShowBagButton or function() return true end
 
     local eventsMod = addon:GetModule("Events")
@@ -173,6 +174,25 @@ describe("Core Init and Enable flow", function()
     addon:OnInitialize()
     addon:OnEnable()
     assert.spy(changelogWindow.Enable).was.called(1)
+  end)
+
+  -- BetterBagsNext (next.md §1): with it on, the backpack is a NextBag and the classic frame is
+  -- made for the bank only.
+  it("makes the backpack a BetterBags Next panel when it is on", function()
+    local bagFrame = addon:GetModule("BagFrame")
+    local nextBag = addon:GetModule("NextBag")
+    local db = addon:GetModule("Database")
+    local savedGet, savedCreate = db.GetNextEnabled, nextBag.Create
+    local panel = { frame = CreateFrame("Frame"), GetName = function() return "BetterBagsNextBackpack" end,
+      SetTitle = function() end }
+    db.GetNextEnabled = function() return true end
+    nextBag.Create = spy.new(function() return panel end)
+    local ok, err = pcall(function() addon:OnInitialize() end)
+    db.GetNextEnabled, nextBag.Create = savedGet, savedCreate
+    assert.is_true(ok, err)
+    assert.are.equal(panel, addon.Bags.Backpack)
+    assert.spy(bagFrame.Create).was.called(1)
+    assert.spy(bagFrame.Create).was.called_with(match._, match._, addon:GetModule("Constants").BAG_KIND.BANK)
   end)
 
   it("should create UI frames during OnInitialize and NOT during OnEnable", function()
