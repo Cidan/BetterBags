@@ -97,11 +97,12 @@ style.Time = {
   FlyAway = INTERACTION,
   Pulse = 0.6,
   -- Chaining (next.md §12): a bag flying to its partner, or home, or both moving across; a chained
-  -- bag coming in beside its open partner; the ribbons twisting together, and coming apart.
-  Fly = 0.7,
-  Enter = 0.55,
-  Couple = 0.5,
-  Uncouple = 0.3,
+  -- bag coming in beside its open partner; the ribbons twisting together, and coming apart. The
+  -- first ones felt "too slow and... linear almost" at 0.7 s with an in-out sine.
+  Fly = 0.45,
+  Enter = 0.4,
+  Couple = 0.35,
+  Uncouple = 0.25,
 }
 style.RISE = 12
 

@@ -903,19 +903,22 @@ The anchor is the bag at the screen edge; the chained bag faces it, so their rib
 
 ### 12c. Motion
 
-- `panel:FlyTo(to)` flies a bag (`style.Time.Fly`, 0.7 s, in-out); `PlaceAt` places it at once.
+- `panel:FlyTo(to)` flies a bag (`style.Time.Fly`, 0.45 s, in-out cubic: slow off the mark and
+  into place, three times its average speed in the middle); `PlaceAt` places it at once. The first
+  flights, 0.7 s with an in-out sine (only about 1.6 times its average speed at its fastest), felt
+  "too slow and... linear almost".
   `panel.target` is where it is headed, `RestOffset` where it rests. A flight that takes over an
   opening slide still runs the slide's `onShown` (`finishShowing`), so a bank open still loads once
   its panel has come to rest (refresh-scheduler.md §11).
 - Moving both across, the two flights start together with the same duration and ease, so the gap
   between them stays exactly the same all the way.
-- A chained bag's entrance takes `style.Time.Enter` (0.55 s) and eases out; an ordinary opening is
-  the 0.45 s slide with its bounce.
+- A chained bag's entrance takes `style.Time.Enter` (0.4 s) and eases out; an ordinary opening is
+  the 0.45 s slide with its bounce. Coupling takes 0.35 s, letting go 0.25 s.
 
 ### 12d. The coupling
 
 Once the chained bag has come to rest beside its anchor (`chain:Arrived`), the pair couples
-(`chain.coupling`, `amount` 0 to 1 over `style.Time.Couple`); it uncouples (back to 0 over
+(`chain.coupling`, `amount` 0 to 1 over `style.Time.Couple`, 0.35 s); it uncouples (back to 0 over
 `style.Time.Uncouple`, then ends) as soon as they are no longer chained or one closes. Moving both
 across keeps the coupling and swaps the roles.
 

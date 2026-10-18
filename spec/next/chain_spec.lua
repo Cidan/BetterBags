@@ -316,6 +316,24 @@ describe("NextChain", function()
       assert.are.equal(gap(), backpackBodyEdge() - bankBodyEdge())
     end)
 
+    -- Asked: the flight "feels too slow and... linear almost": quick, slow off the mark and into
+    -- place, fast in the middle (in-out cubic).
+    it("flies quickly, slow off the mark and into place, fast in the middle", function()
+      assert.is_true(style.Time.Fly <= 0.45, "quick: " .. style.Time.Fly)
+      click(backpack)
+      local progress = {}
+      for _ = 1, 3 do
+        step(style.Time.Fly * 0.25)
+        table.insert(progress, -offset(backpack) / distance())
+      end
+      local cubic = tween.Ease.inOutCubic
+      for i, share in ipairs({ 0.25, 0.5, 0.75 }) do
+        assert.is_true(math.abs(progress[i] - cubic(share)) < 0.06, share .. ": " .. progress[i])
+      end
+      step(style.Time.Fly * 0.25 + 2 / 60)
+      assert.are.equal(-distance(), offset(backpack), "there on time")
+    end)
+
     -- "if a bag is chained, clicking on it's name puts it back"
     it("puts a chained bag back on its own edge", function()
       click(backpack)

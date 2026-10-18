@@ -10,7 +10,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class NextTween: AceModule
 local tween = addon:NewModule('NextTween')
 
----@alias NextEase "linear"|"outCubic"|"inCubic"|"inOutSine"|"outBack"
+---@alias NextEase "linear"|"outCubic"|"inCubic"|"inOutSine"|"inOutCubic"|"outBack"
 
 -- The overshoot of outBack: about a tenth past the end at its furthest.
 local BACK = 1.70158
@@ -22,6 +22,14 @@ tween.Ease = {
   outCubic = function(t) return 1 - (1 - t) ^ 3 end,
   inCubic = function(t) return t * t * t end,
   inOutSine = function(t) return 0.5 - math.cos(math.pi * t) / 2 end,
+  -- Slow off the mark and into place, three times its average speed in the middle.
+  inOutCubic = function(t)
+    if t < 0.5 then
+      return 4 * t * t * t
+    end
+    local u = 2 - 2 * t
+    return 1 - u * u * u / 2
+  end,
   outBack = function(t)
     local u = t - 1
     return 1 + (BACK + 1) * u * u * u + BACK * u * u

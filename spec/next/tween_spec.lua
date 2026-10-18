@@ -29,6 +29,18 @@ describe("NextTween", function()
     assert.is_true(tween.Ease.outCubic(0.5) > 0.5, "out starts fast")
     assert.is_true(tween.Ease.inCubic(0.5) < 0.5, "in starts slow")
     near(0.5, tween.Ease.inOutSine(0.5))
+    -- In-out cubic: slow off the mark, three times its average speed in the middle, slow into
+    -- place, and symmetric (chaining's flights, next.md §12).
+    local cubic = tween.Ease.inOutCubic
+    near(0.5, cubic(0.5))
+    near(4 * 0.25 ^ 3, cubic(0.25))
+    for i = 1, 49 do
+      near(1 - cubic(1 - i / 100), cubic(i / 100), "symmetric")
+    end
+    -- (A numeric speed: the acceleration flips at the middle, so allow for the step.)
+    local speed = (cubic(0.5 + 1e-5) - cubic(0.5 - 1e-5)) / 2e-5
+    assert.is_true(math.abs(speed - 3) < 1e-3, "three times as fast in the middle: " .. speed)
+    assert.is_true(cubic(0.1) < tween.Ease.inOutSine(0.1), "softer off the mark than sine")
     local overshoots = false
     for i = 1, 99 do
       if tween.Ease.outBack(i / 100) > 1 then overshoots = true end

@@ -334,7 +334,7 @@ function panelProto:FlyTo(to)
     duration = style.Time.Fly,
     from = self.offset,
     to = to,
-    ease = "inOutSine",
+    ease = "inOutCubic",
     onUpdate = function(x)
       self:setOffset(x)
     end,
