@@ -1,11 +1,11 @@
 # BetterBags Next (experimental)
 
-An experiment in a new backpack design: a full-height panel that slides in from the right edge of
-the screen, the backpack's groups as tabs down its left side, the categories in one column of big
-icons, and a title with a ribbon of light and sparkles drifting out of the window. It replaces
-only how the backpack is drawn: the item data, the item buttons and the settings that feed the data
-are the classic bag's. Off unless the player turns it on (**BetterBags Next (experimental)** in the
-settings, or `/bb next`), which takes effect after a reload. The bank keeps the classic window.
+An experiment in a new bag design: full-height panels that slide in from the edges of the screen,
+the backpack from the right and the bank from the left, each with its tabs down its inner side,
+the categories in one column of big icons, and a title with a ribbon of light and sparkles drifting
+out of the window. It replaces only how the bags are drawn: the item data, the item buttons and the
+settings that feed the data are the classic bags'. Off unless the player turns it on (**BetterBags
+Next (experimental)** in the settings, or `/bb next`), which takes effect after a reload.
 
 The design, the rules it follows and its coverage are in `.claude/rules/next.md`.
 
@@ -16,31 +16,51 @@ next/
 ├── style.lua     # NextStyle: sizes, palette, timings and fonts, in one place
 ├── tween.lua     # NextTween: one tween per key on a single OnUpdate (slide, fades, glides)
 ├── sparkles.lua  # NextSparkles: a pooled particle emitter of star sprites
-├── tabs.lua      # NextTabs: the tab rail down the panel's left edge
+├── tabs.lua      # NextTabs: the tab rail down a panel's inner edge
 ├── content.lua   # NextContent: the canvas: sections in one column, laid out through Motion
-└── bag.lua       # NextBag: the panel, standing in for the backpack (addon.Bags.Backpack)
+├── panel.lua     # NextPanel: the panel both bags are made of, for either side of the screen
+├── bag.lua       # NextBag: the backpack's panel, on the right (addon.Bags.Backpack)
+└── bank.lua      # NextBank: the bank's panel, on the left (addon.Bags.Bank)
 ```
 
 Files load in that order in every TOC, after `frames\bag.lua` (they use the search box, the money
-frame, the backpack behavior and the render pipeline) and before `core\init.lua`.
+frame, the bag behaviors, the menu button and the render pipeline) and before `core\init.lua`.
+
+## One panel, two sides
+
+`NextPanel:Create(proto, opts)` builds a panel for `opts.side` (`"RIGHT"` or `"LEFT"`), and
+everything mirrors with it: the edge it is anchored to and slides from, the feathered edge, the
+tabs, the title and its ribbon, the sparkles, the header buttons and the footer. A kind makes its
+prototype with `NextPanel:Extend(proto, name)` and overrides what differs: `GetHeaderButtons`,
+`CreateMoney`, `RefreshTabs`, `OnTabClicked`, `OnTabDragged`, `GetCurrentTabID`, `OnShowing`,
+`OnSlidOut`, `WatchKind`, `Refresh` and `Sort` (and `watchesCooldowns`).
 
 ## How it takes over
 
 `core/init.lua` makes `addon.Bags.Backpack` with `NextBag:Create(ctx)` instead of
-`BagFrame:Create(ctx, BACKPACK)` when `database:GetNextEnabled()`. The classic backpack is then not
-created at all, so the two never draw the same item buttons. Everything else in the addon talks to
-whichever object is there; NextBag provides the members they use (`Show`, `Hide`, `Toggle`,
-`IsShown`, `Draw`, `Search`, `ResetSearch`, `OnCooldown`, `Refresh`, `Sort`, `Wipe`, `GetName`,
-`SetTitle`, `ToggleSearch`, `PlaceCursorItem`, `frame`, `kind`, `searchBox`, `loaded`,
-`drawOnClose`, `behavior.SwitchToGroup`).
+`BagFrame:Create(ctx, BACKPACK)` when `database:GetNextEnabled()`, and `addon.Bags.Bank` with
+`NextBank:Create(ctx)` when the bank bag is enabled too. The classic bags are then not created at
+all, so they never draw the same item buttons. Everything else in the addon talks to whichever
+object is there; the panels provide the members they use (`Show`, `Hide`, `Toggle`, `IsShown`,
+`Draw`, `Search`, `ResetSearch`, `OnCooldown`, `Refresh`, `Sort`, `Wipe`, `GetName`, `SetTitle`,
+`ToggleSearch`, `PlaceCursorItem`, `frame`, `kind`, `searchBox`, `loaded`, `drawOnClose`,
+`behavior.SwitchToGroup`; the bank also `SwitchToBankAndWipe`, `bankTab`, `blizzardBankTab` and
+`behavior.SwitchToBlizzardTab`).
 
 ## Drawing
 
-`NextBag:Draw` is the classic draw pass: claim the buttons drawn, then release the ones the last
+`NextPanel:Draw` is the classic draw pass: claim the buttons drawn, then release the ones the last
 pass drew and this one did not. `NextContent:Bind` builds the sections (Recent Items, the active
 tab's categories in their order, Free Space) and draws the static per-slot item buttons, sized to
 44 pixels; `NextContent:Render` lays them out in one column inside the panel's scroll box, through
 Motion so what changed place glides there. A draw while the panel is hidden waits for it to open.
+
+## The bank
+
+The bank reuses the classic bank's code wherever it is not drawing: `BankBehavior`'s group dialogs
+and purchase rule (`bank.proto`, with the Next bank as its `bag`), `BankBehavior:SuppressBlizzardBankPanel`,
+`BagMenuButton:Sort`, and `BankSlots:OpenTabConfig`, `GetBagSocketIndex` and `PickupBag` (retail
+TOCs only). It never touches Blizzard's bank panel or ends the bank interaction from `OnHide`.
 
 ## Writing Next code
 
@@ -49,4 +69,6 @@ Motion so what changed place glides there. A draw while the panel is hidden wait
 - Anything that animates goes through NextTween (a key per thing animated) or Motion (frame
   placement); there is one OnUpdate for each, and neither runs while idle.
 - Look and timings live in NextStyle; nothing else hard-codes a size or a color.
+- An atlas must be in the atlas table of every client that shows it (wago.tools
+  `UiTextureAtlasMember`, per build): `GM-icon-settings` is missing on Classic Era and Mists.
 - Specs are in `spec/next/`.

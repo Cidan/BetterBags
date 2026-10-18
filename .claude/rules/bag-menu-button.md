@@ -36,7 +36,8 @@ Right Click → Deposit Warbank Items** (on Forever the deposit line is omitted)
 sync whenever the click branches change.
 
 The right click is `BagMenuButton:Sort(ctx, bag)`, which a theme's Sort action button
-(window.md, "Action buttons") calls too, so both always do the same thing.
+(window.md, "Action buttons") and BetterBags Next's bank sort button (next.md §6, retail) call
+too, so all of them always do the same thing.
 
 Coverage: `spec/frames/menubutton_spec.lua` (every click branch, the shared Sort, the drop, the
 first-time highlight, both tooltips with and without a Warbank, the cursor-item line,

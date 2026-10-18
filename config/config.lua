@@ -1179,12 +1179,12 @@ function config:RegisterSettings()
   end)
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbanchor", function()
-    -- A BetterBags Next backpack has no anchor.
+    -- A BetterBags Next bag has no anchor.
     if addon.Bags.Backpack.anchor then
       addon.Bags.Backpack.anchor:Activate()
       addon.Bags.Backpack.anchor:Show()
     end
-    if addon.Bags.Bank then
+    if addon.Bags.Bank and addon.Bags.Bank.anchor then
       addon.Bags.Bank.anchor:Activate()
       addon.Bags.Bank.anchor:Show()
     end

@@ -49,7 +49,7 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextBag", "next/bag.lua" } }) do
+  { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -146,7 +146,7 @@ describe("NextBag", function()
   end)
 
   teardown(function()
-    for _, m in ipairs({ "NextBag", "NextContent", "NextTabs", "NextSparkles", "NextTween", "NextStyle" }) do
+    for _, m in ipairs({ "NextBag", "NextPanel", "NextContent", "NextTabs", "NextSparkles", "NextTween", "NextStyle" }) do
       ResetModuleStub(m)
     end
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
@@ -466,6 +466,17 @@ describe("NextBag", function()
   end)
 
   describe("buttons and search", function()
+    -- Both atlases are in the atlas table of retail, WoW: Forever, Classic Era, Mists and
+    -- Anniversary; GM-icon-settings, the first settings icon, is missing on Classic Era and Mists.
+    it("draws its header icons with atlases every client has, settings at the screen edge", function()
+      local bag = opened()
+      assert.are.equal("uitools-icon-settings", bag.settingsButton.icon:GetAtlas())
+      assert.are.equal("bags-button-autosort-up", bag.sortButton.icon:GetAtlas())
+      assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3) },
+        { bag.settingsButton:GetPoint(1) })
+      assert.are.same({ "RIGHT", bag.settingsButton, "LEFT", -8, 0 }, { bag.sortButton:GetPoint(1) })
+    end)
+
     it("sorts the backpack and opens the settings from its header", function()
       local bag = opened()
       bag.sortButton:GetScript("OnClick")(bag.sortButton, "LeftButton")

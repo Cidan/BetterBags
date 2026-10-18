@@ -46,7 +46,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag", "NextBank"
     }
 
     for _, name in ipairs(modules) do
@@ -176,23 +176,51 @@ describe("Core Init and Enable flow", function()
     assert.spy(changelogWindow.Enable).was.called(1)
   end)
 
-  -- BetterBagsNext (next.md §1): with it on, the backpack is a NextBag and the classic frame is
-  -- made for the bank only.
+  -- BetterBagsNext (next.md §1): with it on, the backpack is a NextBag; with the bank off, the
+  -- classic frame is made for neither bag.
   it("makes the backpack a BetterBags Next panel when it is on", function()
     local bagFrame = addon:GetModule("BagFrame")
     local nextBag = addon:GetModule("NextBag")
     local db = addon:GetModule("Database")
-    local savedGet, savedCreate = db.GetNextEnabled, nextBag.Create
+    local savedGet, savedCreate, savedBank = db.GetNextEnabled, nextBag.Create, db.GetEnableBankBag
     local panel = { frame = CreateFrame("Frame"), GetName = function() return "BetterBagsNextBackpack" end,
       SetTitle = function() end }
     db.GetNextEnabled = function() return true end
+    db.GetEnableBankBag = function() return false end
     nextBag.Create = spy.new(function() return panel end)
     local ok, err = pcall(function() addon:OnInitialize() end)
-    db.GetNextEnabled, nextBag.Create = savedGet, savedCreate
+    db.GetNextEnabled, nextBag.Create, db.GetEnableBankBag = savedGet, savedCreate, savedBank
     assert.is_true(ok, err)
     assert.are.equal(panel, addon.Bags.Backpack)
-    assert.spy(bagFrame.Create).was.called(1)
-    assert.spy(bagFrame.Create).was.called_with(match._, match._, addon:GetModule("Constants").BAG_KIND.BANK)
+    assert.is_nil(addon.Bags.Bank)
+    assert.spy(bagFrame.Create).was_not.called()
+  end)
+
+  -- BetterBags Next covers the bank too (next.md §6): with it on, the bank is a NextBank and the
+  -- classic frame is made for neither bag.
+  it("makes the bank a BetterBags Next panel when it is on", function()
+    local bagFrame = addon:GetModule("BagFrame")
+    local nextBag = addon:GetModule("NextBag")
+    local nextBankMod = addon:GetModule("NextBank")
+    local db = addon:GetModule("Database")
+    local savedGet, savedBag, savedBank = db.GetNextEnabled, nextBag.Create, nextBankMod.Create
+    local function panel(name)
+      return { frame = CreateFrame("Frame"), GetName = function() return name end, SetTitle = function() end }
+    end
+    local backpack, bank = panel("BetterBagsNextBackpack"), panel("BetterBagsNextBank")
+    db.GetNextEnabled = function() return true end
+    nextBag.Create = function() return backpack end
+    nextBankMod.Create = spy.new(function() return bank end)
+    local ok, err = pcall(function() addon:OnInitialize() end)
+    local made = nextBankMod.Create
+    db.GetNextEnabled, nextBag.Create, nextBankMod.Create = savedGet, savedBag, savedBank
+    assert.is_true(ok, err)
+    assert.are.equal(bank, addon.Bags.Bank)
+    assert.spy(made).was.called(1)
+    assert.spy(bagFrame.Create).was_not.called()
+    local special = {}
+    for _, name in ipairs(UISpecialFrames) do special[name] = true end
+    assert.is_true(special["BetterBagsNextBank"], "Escape closes it")
   end)
 
   it("should create UI frames during OnInitialize and NOT during OnEnable", function()

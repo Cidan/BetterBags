@@ -69,26 +69,30 @@ local bankSlotButtonProto = {}
 addon:GetModule('Perf'):RegisterPrototype(bankSlotButtonProto, 'BankSlotButton')
 
 -- GetBagSocketIndex returns the Enum.BagIndex.Characterbanktab slot of the bag socket
--- behind this tab, or nil when the tab has none. On WoW: Forever every character bank
+-- behind a bank tab, or nil when the tab has none. On WoW: Forever every character bank
 -- tab after the first is a bag socket: it only has slots once a bag is placed in it. The
 -- first tab is the fixed, bagless base bank (Camelot/BankFrame.lua starts its bag
 -- buttons at socket 2).
+---@param bankType BankType
+---@param bagIndex number
 ---@return number?
-function bankSlotButtonProto:GetBagSocketIndex()
-  if not addon.isForever or self.bankType ~= Enum.BankType.Character then
+function BankSlots:GetBagSocketIndex(bankType, bagIndex)
+  if not addon.isForever or bankType ~= Enum.BankType.Character then
     return nil
   end
-  local socketIndex = self.bagIndex - Enum.BagIndex.CharacterBankTab_1 + 1
+  local socketIndex = bagIndex - Enum.BagIndex.CharacterBankTab_1 + 1
   if socketIndex < 2 then
     return nil
   end
   return socketIndex
 end
 
--- PickupBag picks up the bag in this tab's socket, places the cursor bag into it, or
+-- PickupBag picks up the bag in a bank tab's socket, places the cursor bag into it, or
 -- swaps the two, exactly like Blizzard's own bank bag button.
-function bankSlotButtonProto:PickupBag()
-  local socketIndex = self:GetBagSocketIndex()
+---@param bankType BankType
+---@param bagIndex number
+function BankSlots:PickupBag(bankType, bagIndex)
+  local socketIndex = self:GetBagSocketIndex(bankType, bagIndex)
   if not socketIndex then
     return
   end
@@ -97,6 +101,15 @@ function bankSlotButtonProto:PickupBag()
     return
   end
   C_Container.PickupContainerItem(Enum.BagIndex.Characterbanktab, socketIndex)
+end
+
+---@return number?
+function bankSlotButtonProto:GetBagSocketIndex()
+  return BankSlots:GetBagSocketIndex(self.bankType, self.bagIndex)
+end
+
+function bankSlotButtonProto:PickupBag()
+  BankSlots:PickupBag(self.bankType, self.bagIndex)
 end
 
 -- Update refreshes the button's visual state based on current tab data.
@@ -334,11 +347,16 @@ function BankSlots.bankSlotsPanelProto:OnClose(ctx)
   self.tabsWereShown = false
 end
 
--- OpenTabConfig opens the Blizzard tab configuration dialog for the given
--- bank tab. Uses BankPanel.TabSettingsMenu for character bank tabs and
--- AccountBankPanel.TabSettingsMenu for account/warbank tabs.
 ---@param bagIndex number
 function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
+  BankSlots:OpenTabConfig(bagIndex)
+end
+
+-- OpenTabConfig opens the Blizzard tab configuration dialog for the given
+-- bank tab, beside the bank. Uses BankPanel.TabSettingsMenu for character bank tabs and
+-- AccountBankPanel.TabSettingsMenu for account/warbank tabs.
+---@param bagIndex number
+function BankSlots:OpenTabConfig(bagIndex)
   local bagFrame = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.frame
 
   -- Determine bank type: account bank tabs start at AccountBankTab_1

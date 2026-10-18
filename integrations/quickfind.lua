@@ -156,8 +156,8 @@ function quickfind:ShowInBag(id)
           bag.behavior:SwitchToAccountBank(ctx, tabID)
         end
       else
-        -- Fallback: unknown tab type, use visual-only
-        if bag.tabs then
+        -- Fallback: unknown tab type, use visual-only (a BetterBags Next bank's tabs have none)
+        if bag.tabs and bag.tabs.SetTabByID then
           bag.tabs:SetTabByID(ctx, tabID)
         end
       end
