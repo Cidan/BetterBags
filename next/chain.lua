@@ -193,6 +193,55 @@ function chain:EntranceDelay(panel)
   return 0
 end
 
+-- ShownAnchorOf returns the bag panel is chained to in the layout while that bag still shows, open
+-- or sliding out: the backpack for a companion chained right, the shown companion for the backpack
+-- chained left.
+---@param panel NextPanelFrame
+---@return NextPanelFrame?
+function chain:ShownAnchorOf(panel)
+  local role = ANCHOR_ROLE[self:Layout()]
+  if role == nil or panel.chainRole == role then
+    return nil
+  end
+  if role == "backpack" then
+    local backpack = self.backpack
+    if backpack ~= nil and backpack.frame:IsShown() then
+      return backpack
+    end
+    return nil
+  end
+  for _, companion in ipairs(self.companions) do
+    if companion.frame:IsShown() then
+      return companion
+    end
+  end
+  return nil
+end
+
+-- Holds says panel stays where it is: it is away from its own edge (beside its anchor) and its
+-- anchor is sliding out. Leaving a bank or a vendor, the companion closes a frame before the
+-- backpack (addon.CloseInteractionWindow sends bags/OpenClose later): held, a backpack chained left
+-- then leaves after its anchor through the anchor's edge, instead of first flying home across the
+-- screen. One that stays open goes home once the anchor has gone (its OnHidden updates the chain).
+---@param panel NextPanelFrame
+---@return boolean
+function chain:Holds(panel)
+  local anchor = self:ShownAnchorOf(panel)
+  return anchor ~= nil and anchor.closing and not panel.docked
+end
+
+-- ExitOffset is where panel goes as it closes: out beyond its anchor's edge while it is beside an
+-- anchor that still shows (asked: "if the bag is chained, it should also exit in the direction of
+-- the anchor"), else off its own edge.
+---@param panel NextPanelFrame
+---@return number
+function chain:ExitOffset(panel)
+  if not panel.docked and self:ShownAnchorOf(panel) ~= nil then
+    return self:EntranceOffset(panel)
+  end
+  return panel:HiddenOffset()
+end
+
 -- WaitsForAnchor says whether panel, opening, waits for its anchor out of sight: a companion
 -- chained to the backpack (layout "right") while the backpack is closed. A companion opens only at
 -- a bank or a vendor, whose interaction opens the backpack a frame later (addon.OpenInteractionWindow
@@ -268,6 +317,8 @@ function chain:Update(ctx, snap)
         if self:AnchorOf(panel) ~= nil then
           panel:Enter(to, self:EntranceDelay(panel))
         end
+      elseif self:Holds(panel) then
+        panel:Hold()
       elseif snap then
         panel:PlaceAt(to)
       elseif math.abs((panel.target or 0) - to) >= PLACED then
@@ -370,8 +421,8 @@ function chain:tweenCoupling(to)
         self.coupling = nil
         self.driver:SetScript("OnUpdate", nil)
       end
-      c.anchor:SetCoupling(0, 0, false, 0, 0)
-      c.chained:SetCoupling(0, 0, false, 0, 0)
+      c.anchor:SetCoupling(0, 0, false, 0, 0, style.FEATHER)
+      c.chained:SetCoupling(0, 0, false, 0, 0, style.FEATHER)
       -- A pair that formed while this one let go (a companion closed as another opened, the
       -- backpack in place already) couples now: nothing else would.
       self:UpdateCoupling()
@@ -391,8 +442,12 @@ function chain:applyCoupling()
   local gap = UIParent:GetWidth() - 2 * (style.WIDTH - style.FEATHER) - math.abs(c.anchor.offset)
     - math.abs(c.chained.offset)
   local half = math.max(0, gap / 2)
-  c.anchor:SetCoupling(c.amount, half, false, c.phase, c.time)
-  c.chained:SetCoupling(c.amount, half, true, c.phase, c.time)
+  -- The inner feathers grow to a share of the gap the pair rests at (not of the gap as they part,
+  -- which can be the whole screen): style.Chain.CoupledFeather.
+  local rest = math.min(math.max(0, gap), self:Gap(c.anchor, c.chained))
+  local feather = math.max(style.FEATHER, style.Chain.CoupledFeather * rest)
+  c.anchor:SetCoupling(c.amount, half, false, c.phase, c.time, feather)
+  c.chained:SetCoupling(c.amount, half, true, c.phase, c.time, feather)
 end
 
 -- Tooltip says what a click on panel's name does.

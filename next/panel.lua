@@ -73,8 +73,6 @@ local nextPanel = addon:NewModule('NextPanel')
 
 -- The ribbon running from the title out of the window.
 local RIBBON_LENGTH = style.RIBBON_LENGTH
--- Sparkles a second along a feathered edge.
-local EDGE_SPARKLE_RATE = 2.5
 -- The panel's frame level in the HIGH strata; a chained bag coming in from beneath its anchor is
 -- lowered below it for the way, and put back here once in place.
 local PANEL_LEVEL = 500
@@ -90,6 +88,7 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 -- lines from its body edge to the middle of the gap, lights running along them, and the knot in the
 -- middle (shown by the chained bag).
 ---@class (exact) NextBraid
+---@field layer Frame Above the panel, where the braid is drawn.
 ---@field strands Line[][]
 ---@field beads Texture[]
 ---@field knot Texture
@@ -156,7 +155,6 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field braid NextBraid This bag's half of the braid while coupled.
 ---@field knotSparkles NextSparkleEmitter Bursts from the knot as the pair couples.
 ---@field sparkSpread number How far out from the body the ribbon's sparkles are born.
----@field edgeOuter boolean The edge sparkles are on the far (outer) edge.
 ---@field feather Texture
 ---@field wash Texture The faint color at the top of the body.
 ---@field dropGlow Texture Lit while a section from the other bag would drop here (next.md §7).
@@ -312,7 +310,6 @@ function panelProto:SetDocked(docked)
     self.wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", reach, 0)
   end
   self.outerFeather:SetShown(not docked)
-  self:updateEdgeSparkles()
 end
 
 -- finishShowing calls what waited for the panel to finish showing (Show's onShown), once.
@@ -358,6 +355,12 @@ function panelProto:FlyTo(to)
       chain:Arrived(self)
     end,
   })
+end
+
+-- Hold stops the panel where it is (chain:Holds: its anchor is sliding out).
+function panelProto:Hold()
+  tween:Stop(self)
+  self.target = self.offset
 end
 
 -- PlaceAt puts the panel at an offset at once (the screen changed).
@@ -510,7 +513,7 @@ function panelProto:BuildPanel(name)
 
   -- The far edge feathered out toward the middle of the screen, while not at its edge (SetDocked).
   local outerFeather = frame:CreateTexture(nil, "BACKGROUND")
-  outerFeather:SetWidth(style.FEATHER)
+  outerFeather:SetWidth(style.Chain.OuterFeather)
   outerFeather:SetColorTexture(1, 1, 1, 1)
   if left then
     outerFeather:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 0)
@@ -925,10 +928,15 @@ end
 -- BuildBraid makes this bag's half of the braid (next.md §12), hidden until it couples: two strands
 -- of additive gold lines, the lights that run along them, and the knot in the middle of the gap.
 function panelProto:BuildBraid()
-  local frame, C = self.frame, style.Chain
+  local C = style.Chain
   local gold = style.Color.Gold
+  -- Its own layer above the panel: a coupled bag's grown feather reaches into the other bag's half
+  -- of the gap, and would cover that half if the braid were drawn with the panel's own regions.
+  local frame = CreateFrame("Frame", nil, self.frame)
+  frame:SetAllPoints(self.frame)
+  frame:SetFrameLevel(self.frame:GetFrameLevel() + 40)
   local braid = { strands = { {}, {} }, beads = {}, amount = 0, half = 0, chained = false, phase = 0, time = 0,
-    swell = 0 }
+    swell = 0, layer = frame }
   for s = 1, 2 do
     for _ = 1, C.Segments do
       local line = frame:CreateLine(nil, "ARTWORK", nil, 1)
@@ -961,16 +969,18 @@ end
 
 -- SetCoupling draws this bag's half of the braid: amount from 0 (straight ribbon, no braid) to 1,
 -- half the gap's width, whether it is the chained bag (which shows the knot), and how far the braid
--- has turned. Its ribbon reaches the middle of the gap as it couples, and its sparkles stay on its
--- side.
+-- has turned. Its ribbon reaches the middle of the gap as it couples, its ribbon sparkles stay on its
+-- side, and its inner feather grows toward feather wide (into the gap, past its frame).
 ---@param amount number
 ---@param half number
 ---@param chained boolean
 ---@param phase number
 ---@param time number
-function panelProto:SetCoupling(amount, half, chained, phase, time)
+---@param feather number The inner feather's width when fully coupled.
+function panelProto:SetCoupling(amount, half, chained, phase, time, feather)
   local braid = self.braid
   braid.amount, braid.half, braid.chained, braid.phase, braid.time = amount, half, chained, phase, time
+  self:growFeather((feather - style.FEATHER) * amount)
   self.ribbonLength = RIBBON_LENGTH + (math.min(half, RIBBON_LENGTH) - RIBBON_LENGTH) * amount
   for _, line in ipairs(self.ribbonLines) do
     line:SetWidth(self.ribbonLength)
@@ -986,8 +996,23 @@ function panelProto:SetCoupling(amount, half, chained, phase, time)
     o.Life = { 2.0, 3.6 }
     o.Speed = { 22, 64 }
   end
-  self:updateEdgeSparkles()
   self:applyBraid()
+end
+
+-- growFeather widens the inner feather by grow pixels past the frame's inner edge, into the gap; it
+-- still starts at the body edge.
+---@private
+---@param grow number
+function panelProto:growFeather(grow)
+  local feather, frame = self.feather, self.frame
+  if self.side == "LEFT" then
+    feather:SetPoint("TOPRIGHT", frame, "TOPRIGHT", grow, 0)
+    feather:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", grow, 0)
+  else
+    feather:SetPoint("TOPLEFT", frame, "TOPLEFT", -grow, 0)
+    feather:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -grow, 0)
+  end
+  feather:SetWidth(style.FEATHER + grow)
 end
 
 -- applyBraid lays this bag's half of the braid out. A strand's height above the ribbon at d pixels
@@ -1238,17 +1263,13 @@ function panelProto:BuildSparkles()
       return ribbonStart + out * math.random() * self.sparkSpread, titleMiddle + (math.random() * 2 - 1) * 8
     end,
   })
-  -- Along the feathered edge facing the world: the inner one at its screen edge, the far one when
-  -- it is not (updateEdgeSparkles).
-  local outerEdge = self.side == "LEFT" and 0 or style.WIDTH
-  self.edgeOuter = false
+  -- Along the inner feathered edge, chained or not (asked, of an earlier version that stopped them
+  -- while coupled: "let's not do that"). Coupled, they drift into the gap and die before the other
+  -- bag: they travel at most 36 * 4.2 + 24 pixels, the gap is at least 192.
   self.edgeSparkles = sparkles:Create(fx, {
-    Rate = EDGE_SPARKLE_RATE, Max = 12, Life = { 2.4, 4.2 }, Size = { 4, 9 }, Speed = { 14, 36 }, Rise = { -6, 6 },
+    Rate = 2.5, Max = 12, Life = { 2.4, 4.2 }, Size = { 4, 9 }, Speed = { 14, 36 }, Rise = { -6, 6 },
     Wobble = 3, Spin = 1, Alpha = 0.6, Direction = out,
     Spawn = function()
-      if self.edgeOuter then
-        return outerEdge - out * math.random() * 24, -math.random() * fx:GetHeight()
-      end
       return edge + out * math.random() * 24, -math.random() * fx:GetHeight()
     end,
   })
@@ -1260,18 +1281,6 @@ function panelProto:BuildSparkles()
       return ribbonStart + out * self.braid.half, titleMiddle
     end,
   })
-end
-
--- updateEdgeSparkles puts the edge sparkles on the feathered edge that faces the world: the inner
--- one at the screen edge, the far one beside an anchor or flying (drifting toward the middle of the
--- screen). An anchor's inner edge faces the bag chained to it, so a coupled anchor has none.
----@private
-function panelProto:updateEdgeSparkles()
-  local o = self.edgeSparkles.options
-  local out = self:Outward()
-  self.edgeOuter = not self.docked
-  o.Direction = self.edgeOuter and -out or out
-  o.Rate = (self.braid.amount > 0 and not self.braid.chained) and 0 or EDGE_SPARKLE_RATE
 end
 
 -- BuildTabs makes the tab rail down the body's inner edge and lists the kind's tabs.
@@ -1487,18 +1496,25 @@ function panelProto:Hide(ctx)
   addon.ForceHideBlizzardBags()
   PlaySound(self.closeSound)
   self.closing = true
-  self.target = self:HiddenOffset()
-  -- Out of sight beyond its anchor's edge, it leaves through its own edge without crossing the screen.
+  -- Beside its anchor, it leaves through the anchor's edge, beneath the anchor (next.md §12); else
+  -- through its own. Out of sight beyond the far edge, it leaves through its own without crossing
+  -- the screen.
+  local to = chain:ExitOffset(self)
+  local anchor = chain:ShownAnchorOf(self)
+  if to ~= self:HiddenOffset() and anchor ~= nil then
+    self.frame:SetFrameLevel(math.max(1, anchor.frame:GetFrameLevel() - 100))
+  end
+  self.target = to
   local from = self.offset
-  if self:BeyondFarEdge() then
-    from = self:HiddenOffset()
+  if self:BeyondFarEdge() and to == self:HiddenOffset() then
+    from = to
   end
   self.waiting = false
   chain:Update(ctx)
   tween:Play(self, {
     duration = style.Time.Close,
     from = from,
-    to = self:HiddenOffset(),
+    to = to,
     ease = "inCubic",
     onUpdate = function(x)
       self:setOffset(x)
@@ -1506,6 +1522,10 @@ function panelProto:Hide(ctx)
     onDone = function()
       self.closing = false
       self.frame:Hide()
+      -- What OnHidden does too, for a hide whose OnHide does not run: back at its own level, and the
+      -- bag the chain held for it (chain:Holds) placed again.
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      chain:Update(ctx)
       addon.TriggerItemContextChanged()
       self:OnSlidOut(ctx)
     end,

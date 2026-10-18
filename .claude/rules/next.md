@@ -896,7 +896,24 @@ The anchor is the bag at the screen edge; the chained bag faces it, so their rib
   under the bank's 1 s show timeout.
 - **Out of sight beyond the far edge** (waiting, or held through its stagger: `BeyondFarEdge`), a bag
   that flies home (its anchor closed) or closes leaves through its own edge, never crossing the
-  screen. Closing, a bag leaves through its own edge as before.
+  screen.
+- **Closing, a chained bag leaves through its anchor's edge** (`chain:ExitOffset`): while it is away
+  from its own edge and the bag it is chained to still shows (`chain:ShownAnchorOf`: open, or sliding
+  out), it slides out beyond the anchor's edge, beneath the anchor (lowered 100 levels, back at its
+  own level once hidden); else through its own edge, as before. Asked: "when closing a vendor or bank,
+  if the bag is chained, it should also exit in the direction of the anchor (right now it flies
+  across the screen to it's original side when we leave the vendor/bank/whatever)".
+- **Leaving a bank or a vendor the companion closes a frame before the backpack**
+  (`addon.CloseInteractionWindow` sends `bags/OpenClose` later). Chained right, the companion is the
+  chained bag and leaves through the backpack's edge, then the backpack through its own. Chained
+  left, the companion is the anchor: while it slides out, the backpack beside it is held where it is
+  (`chain:Holds`, `panel:Hold`), so it leaves after it through the bank's edge when it closes a frame
+  later, instead of first flying home across the screen. One that stays open goes home once the
+  anchor has gone: the end of a slide-out updates the chain (as `OnHidden` does; also for a hide
+  whose `OnHide` does not run, as in the specs' frames). A bag still at its own edge is never held.
+  The whole addon, through `BANKFRAME_CLOSED` and the banker interaction's hide: chained left the bank
+  goes 0 to -620 and the backpack -800 to -2016, chained right the backpack 0 to 620 and the bank 800
+  to 2016.
 - **Screen changes** (`UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED`, registered in BetterBags Next's
   event scope) place the bags at once; a screen too narrow keeps them apart without changing the
   saved layout.
@@ -911,9 +928,17 @@ The anchor is the bag at the screen edge; the chained bag faces it, so their rib
   (`chain:Distance`), so its body edge sits exactly the gap from the anchor's.
 - **The far edge.** Away from its screen edge (beside its anchor, or flying) a bag's far side faces
   the middle of the screen: `SetDocked(false)` stops the fill and the wash at the frame and shows
-  `outerFeather`, the body's color fading out over 96 pixels beyond it; back at its edge the fill and
-  wash reach `OVERREACH` past it again. The switch happens at offset 0, where both are off the
-  screen, so it never shows.
+  `outerFeather`, the body's color fading out over `style.Chain.OuterFeather` (48) pixels beyond it
+  (it was the full 96 of the inner feather; asked: "too heavy. tone it down a bit"); back at its edge
+  the fill and wash reach `OVERREACH` past it again. The switch happens at offset 0, where both are
+  off the screen, so it never shows.
+- **Coupled, the inner feathers grow into the gap** (`panel:growFeather`, from `SetCoupling`): each to
+  `style.Chain.CoupledFeather` (0.65) of the gap the pair rests at, never under 96, with the coupling's
+  amount, so it grows as they couple and shrinks as they part. Past the middle, the two fades overlap
+  and the bags look closer; under the whole gap, there is still a gap. The texture keeps its anchor on
+  the frame's inner edge, pushed past it by the growth and widened as much, so it still starts at the
+  body edge. Asked: "grow the feathering between two coupled bags a bit when things are coupled, so
+  they appear a bit more closely together (still a gap, just not as drastic)".
 
 ### 12c. Motion
 
@@ -960,8 +985,10 @@ it did for profiler traces: `"coupled"`, `"kept"`, `"on its way"`, `"letting go"
   the body is `±amplitude · sin(π d / 2h) · sin(k s + phase)`, with `s` the signed distance from the
   middle of the gap (`d - h` on the left bag, `h - d` on the right), so the halves meet at the middle,
   the strands swell from nothing at the bodies, the second mirrors the first and they cross; the
-  strand in front by the turn is brighter. Each bag's half is in its own frame, over its own
-  feather, so neither bag's raising above the other covers it. Lines are only ever re-pointed with
+  strand in front by the turn is brighter. Each bag's half is drawn on its own layer
+  (`braid.layer`, 40 levels above the panel): a coupled bag's grown feather reaches into the other
+  bag's half, and would cover that half if the braid were one of the panel's own regions. Lines are
+  only ever re-pointed with
   `SetStartPoint`/`SetEndPoint` (`Line:ClearAllPoints` is marked protected).
 - **Shared turn.** One driver (`chain.driver`) turns the braid (`style.Chain.Turn`) and lays both
   halves out in the same call, so they never fall out of step; it runs only while coupled, every
@@ -972,9 +999,11 @@ it did for profiler traces: `"coupled"`, `"kept"`, `"on its way"`, `"letting go"
 - **Lights and the knot.** Three lights run along each half from its cloud to the knot in the middle
   (`style.Chain.BeadTime`); the chained bag shows the knot, a soft gold puff that flashes as they
   couple (`BurstKnot`), with a burst of sparkles (`knotSparkles`, `NextSparkleEmitter:Burst`).
-- **Sparkles stay on their own side.** Coupled, ribbon sparkles are born and die within the first
-  half of the gap; the anchor's edge sparkles stop (its feathered edge faces the chained bag), and a
-  bag away from its edge has them on its far edge, drifting toward the middle of the screen.
+- **Sparkles.** Coupled, ribbon sparkles are born and die within the first half of the gap. Edge
+  sparkles keep drifting off both bags' inner feathered edges into the gap, chained or not, and die
+  before the other bag (at most 36 * 4.2 + 24 pixels out; the gap is at least 192). An earlier version
+  stopped the anchor's and moved the chained bag's to its far edge; asked: "the small sparkles along
+  the bags stop when they are coupled, let's not do that".
 
 ### 12e. Coverage
 
@@ -986,11 +1015,15 @@ anchor, staggered after an anchor coming in, falling into place, its sections ca
 a companion waiting for the backpack and coming in after it, saying it has shown only once in place,
 coming in alone when the backpack does not open, closing while waiting, flying home from its own
 edge when its anchor closes before it came in, not waiting for an open backpack, the bank beside the
-backpack, flying home when the anchor closes or is hidden, `onShown` across a flight; the far edge
-both ways; coupling with tabs read back with float error, within half a pixel, a new pair after the
-old let go, coupling after the flight,
+backpack, flying home when the anchor closes or is hidden, `onShown` across a flight; closing through
+the anchor's edge beneath it, held while the anchor leaves then leaving after it, going home once the
+anchor has gone, and through its own edge when alone at it, sliding in while the anchor leaves, on a
+screen too narrow, on its way home after the anchor was hidden (both layouts), and as the anchor of a
+pair moving across; the far edge both ways, toned down; coupling with tabs read back with float
+error, within half a pixel, a new pair after the old let go, the inner feathers growing and
+shrinking, the braid above both feathers, edge sparkles kept running, coupling after the flight,
 the braid's geometry, its turn and lights, staying coupled while moving across, untwisting and
-stretching as they part, letting go on a close, the knot's burst, sparkles kept apart; the title's
+stretching as they part, letting go on a close, the knot's burst; the title's
 tooltip and glow), `spec/next/vendor_spec.lua` ("chaining": the vendor is a companion, its name goes
 to the chain), `spec/next/sparkles_spec.lua` (`Burst`), `spec/next/tabs_spec.lua` (`Width` from the
 widths set), `spec/next/tween_spec.lua` (`outBackSoft`), `spec/database_spec.lua` and
@@ -1000,6 +1033,7 @@ entrance's own target and timing, the braid running on through the knot and the 
 and to removing a per-move redraw the driver already does. The coupling and entrance fixes: 21
 mutations; the five that first survived led to tests of the rail's width, a bag at rest within half
 a pixel, the companion not waiting for an open backpack and the delayed cascade, and to removing a
-check the half-pixel rule already makes.
+check the half-pixel rule already makes. The exit, feather and sparkle changes: 24 mutations; the five
+that first survived led to the edge-case closing tests above.
 
-Not seen in game yet: the staggered entrance and the coupling fix.
+Not seen in game yet: closing through the anchor's edge, the feathers, the sparkles.

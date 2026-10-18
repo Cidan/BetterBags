@@ -119,6 +119,11 @@ style.RIBBON_LENGTH = 300
 -- vendor the backpack opens a frame later) waits out of sight up to AnchorWait seconds for it, and
 -- comes in alone from its own edge if it does not open.
 -- TabMargin: the room between the two bags' tab rails, which hang into the gap between the bodies.
+-- OuterFeather: how far a bag away from its screen edge feathers out on its far side, toward the
+-- rest of the screen (asked, at the full FEATHER: "too heavy. tone it down a bit").
+-- CoupledFeather: how far into the gap each coupled bag's inner feather reaches, as a share of the
+-- gap (past the middle, so the two overlap and the bags look closer; under the whole gap, so there
+-- is still a gap). Asked: "grow the feathering between two coupled bags a bit".
 -- The braid the two ribbons twist into: Segments lines per strand on each bag's half of the gap,
 -- Amplitude pixels either side of the ribbon at the middle of the gap (none at the bodies),
 -- Wavelength pixels per turn, turning Turn radians a second, Thickness pixels thick, Alpha bright
@@ -128,6 +133,8 @@ style.Chain = {
   Stagger = 0.08,
   AnchorWait = 0.25,
   TabMargin = 24,
+  OuterFeather = 48,
+  CoupledFeather = 0.65,
   Segments = 16, Amplitude = 7, Wavelength = 64, Turn = 0.9, Thickness = 2, Alpha = 0.85, Depth = 0.5,
   Beads = 3, BeadTime = 1.6, BeadSize = 12,
   KnotSize = 30, KnotAlpha = 0.5, KnotSwell = 0.5,

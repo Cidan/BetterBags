@@ -585,6 +585,7 @@ describe("NextChain", function()
       assert.is_false(bank:IsShown())
     end)
 
+    -- Held out of sight beyond the bank's edge while the bank leaves, then home from its own edge.
     it("sends a chained bag home from its own edge when its anchor closes before it came in", function()
       layout = "left"
       open(bank)
@@ -593,7 +594,7 @@ describe("NextChain", function()
       close(bank)
       for _ = 1, 60 do
         step(1 / 60)
-        assert.is_true(offset(backpack) >= -0.5, "never crossing the screen: " .. offset(backpack))
+        assert.is_true(offset(backpack) >= -0.5 or not onScreen(backpack), "never crossing the screen: " .. offset(backpack))
       end
       assert.are.equal(0, offset(backpack))
       assert.is_true(backpack.docked)
@@ -628,6 +629,137 @@ describe("NextChain", function()
       assert.are.equal(0, offset(bank))
     end)
 
+    -- Asked: "when closing a vendor or bank, if the bag is chained, it should also exit in the
+    -- direction of the anchor (right now it flies across the screen to it's original side when we
+    -- leave the vendor/bank/whatever)". Leaving, the companion closes a frame before the backpack
+    -- (addon.CloseInteractionWindow sends bags/OpenClose later).
+    it("leaves through its anchor's edge, beneath the anchor, when it closes beside it", function()
+      layout = "right"
+      open(backpack)
+      open(bank)
+      settle()
+      close(bank)
+      assert.is_true(bank.frame:GetFrameLevel() < backpack.frame:GetFrameLevel(), "beneath the anchor")
+      local last = offset(bank)
+      for _ = 1, 40 do
+        step(1 / 60)
+        assert.is_true(offset(bank) >= last - 1e-6, "toward the anchor's edge: " .. offset(bank))
+        last = offset(bank)
+      end
+      assert.is_false(bank:IsShown())
+      assert.is_true(last >= SCREEN, "out beyond it")
+      assert.are.equal(500, bank.frame:GetFrameLevel(), "back at its own level once hidden")
+      close(backpack)
+      settle()
+      assert.are.equal(backpack:HiddenOffset(), offset(backpack), "the anchor through its own edge")
+    end)
+
+    it("holds a chained backpack while its anchor leaves, then lets it leave after it through the anchor's edge", function()
+      layout = "left"
+      open(bank)
+      open(backpack)
+      settle()
+      close(bank)
+      step(1 / 60)
+      assert.are.equal(-distance(), offset(backpack), "held where it is")
+      close(backpack)
+      local last = offset(backpack)
+      for _ = 1, 40 do
+        step(1 / 60)
+        assert.is_true(offset(backpack) <= last + 1e-6, "never toward its own edge: " .. offset(backpack))
+        last = offset(backpack)
+      end
+      assert.is_false(backpack:IsShown())
+      assert.is_true(last <= -SCREEN, "out beyond the anchor's edge")
+    end)
+
+    it("goes home once its anchor has gone when it stays open", function()
+      layout = "left"
+      open(bank)
+      open(backpack)
+      settle()
+      close(bank)
+      step(style.Time.Close * 0.6)
+      assert.are.equal(-distance(), offset(backpack), "until the anchor has gone")
+      settle()
+      assert.are.equal(0, offset(backpack))
+      assert.is_true(backpack.docked)
+    end)
+
+    -- leavesOwnEdge closes panel and checks it goes out through its own edge, never the other way.
+    local function leavesOwnEdge(panel)
+      close(panel)
+      local out, last = -panel:Outward(), offset(panel)
+      for _ = 1, 40 do
+        step(1 / 60)
+        assert.is_true((offset(panel) - last) * out >= -1e-6, "through its own edge: " .. offset(panel))
+        last = offset(panel)
+      end
+      assert.are.equal(panel:HiddenOffset(), last)
+    end
+
+    it("lets a bag slide in at its own edge while the anchor of its chain is still leaving", function()
+      layout = "left"
+      open(bank)
+      settle()
+      close(bank)
+      open(backpack)
+      step(style.Time.Open + 2 / 60)
+      assert.are.equal(0, offset(backpack), "slid all the way in, never held")
+      assert.is_true(backpack.docked)
+    end)
+
+    it("closes through its own edge when a screen too narrow to chain keeps it there", function()
+      UIParent:_SetRect(0, 0, 2 * (style.WIDTH - style.FEATHER) + gap() - 1, 1200)
+      layout = "left"
+      open(bank)
+      open(backpack)
+      settle()
+      leavesOwnEdge(backpack)
+    end)
+
+    it("closes through its own edge on its way home after its anchor was hidden", function()
+      layout = "left"
+      open(bank)
+      open(backpack)
+      settle()
+      escape(bank)
+      step(style.Time.Fly * 0.3)
+      leavesOwnEdge(backpack)
+      layout = "right"
+      open(backpack)
+      open(bank)
+      settle()
+      escape(backpack)
+      step(style.Time.Fly * 0.3)
+      leavesOwnEdge(bank)
+    end)
+
+    it("closes the anchor of a pair moving across through its own edge", function()
+      layout = "left"
+      open(bank)
+      open(backpack)
+      settle()
+      click(bank)
+      assert.are.equal("right", layout, "the backpack is the anchor now")
+      step(style.Time.Fly * 0.3)
+      leavesOwnEdge(backpack)
+    end)
+
+    it("still leaves through its own edge when it is alone at it", function()
+      layout = "left"
+      open(backpack)
+      settle()
+      close(backpack)
+      local last = offset(backpack)
+      for _ = 1, 30 do
+        step(1 / 60)
+        assert.is_true(offset(backpack) >= last - 1e-6)
+        last = offset(backpack)
+      end
+      assert.are.equal(backpack:HiddenOffset(), last)
+    end)
+
     -- The bank loads once it has finished showing (refresh-scheduler.md §11): a flight that
     -- replaces a panel's opening slide still says when it is done.
     it("says a panel has finished showing when a flight took over its opening slide", function()
@@ -660,7 +792,9 @@ describe("NextChain", function()
       local feather = backpack.outerFeather
       assert.is_true(feather:IsShown())
       assert.are.same({ "TOPLEFT", backpack.frame, "TOPRIGHT", 0, 0 }, { feather:GetPoint(1) })
-      assert.are.equal(style.FEATHER, feather:GetWidth())
+      -- Asked: the far edge's feathering "is too heavy. tone it down a bit".
+      assert.are.equal(style.Chain.OuterFeather, feather:GetWidth())
+      assert.is_true(style.Chain.OuterFeather < style.FEATHER, "lighter than the inner feather")
       local g = feather._gradient
       assert.are.equal(style.Color.Body[4], g.min.a, "the body's color at its edge")
       assert.are.equal(0, g.max.a, "nothing at the far end")
@@ -891,24 +1025,66 @@ describe("NextChain", function()
       assert.is_true(#burst.alive > 0, "as they couple")
     end)
 
-    -- Sparkles stay on their own bag's side: the anchor's feathered edge faces the chained bag, so
-    -- its edge sparkles stop; the chained bag's drift off its far edge, toward the middle of the
-    -- screen; ribbon sparkles die before the middle of the gap.
-    it("keeps each bag's sparkles off the other while coupled", function()
+    -- Asked: "the small sparkles along the bags stop when they are coupled, let's not do that".
+    -- They keep drifting off both inner edges into the gap, dying before the other bag; ribbon
+    -- sparkles die before the middle of the gap.
+    it("keeps both bags' edge sparkles going along their inner edges while coupled", function()
       click(backpack)
       settle()
-      assert.are.equal(0, bank.edgeSparkles.options.Rate)
-      assert.are.equal(1, backpack.edgeSparkles.options.Direction, "toward the middle of the screen")
-      local x = backpack.edgeSparkles.options.Spawn()
-      assert.is_true(x >= style.WIDTH, "born on its far edge: " .. x)
       for _, panel in ipairs({ bank, backpack }) do
-        local o = panel.sparkles.options
-        assert.is_true(o.Speed[2] * o.Life[2] <= half(), "dies before the middle")
+        local o = panel.edgeSparkles.options
+        assert.is_true(o.Rate > 0, panel:GetName())
+        assert.is_not_nil(panel.edgeSparkles.frame:GetScript("OnUpdate"), "running")
+        assert.are.equal(panel:Outward(), o.Direction, "into the gap")
+        local inner = panel.side == "LEFT" and style.BODY_WIDTH or style.FEATHER
+        for _ = 1, 20 do
+          local x = o.Spawn()
+          assert.is_true(math.abs(x - inner) <= 24, "born on its inner edge: " .. x)
+        end
+        assert.is_true(o.Speed[2] * o.Life[2] + 24 < gap(), "dies before the other bag")
+        local r = panel.sparkles.options
+        assert.is_true(r.Speed[2] * r.Life[2] <= half(), "ribbon sparkles die before the middle")
       end
+    end)
+
+    -- Asked: "let's grow the feathering between two coupled bags a bit when things are coupled, so
+    -- they appear a bit more closely together (still a gap, just not as drastic)".
+    it("grows both inner feathers into the gap while coupled, still leaving a gap, and back as they part", function()
       click(backpack)
       settle()
-      assert.is_true(bank.edgeSparkles.options.Rate > 0)
-      assert.are.equal(-1, backpack.edgeSparkles.options.Direction)
+      local grown = math.max(style.FEATHER, style.Chain.CoupledFeather * gap())
+      assert.is_true(grown > gap() / 2, "they overlap in the middle")
+      assert.is_true(grown < gap(), "neither reaches the other bag")
+      for _, panel in ipairs({ bank, backpack }) do
+        assert.is_true(math.abs(panel.feather:GetWidth() - grown) < 1e-6, panel:GetName() .. " grown")
+      end
+      -- Each still starts at its body edge: the grown part reaches past its frame into the gap.
+      assert.is_true(math.abs(select(4, bank.feather:GetPoint(1)) - (grown - style.FEATHER)) < 1e-6)
+      assert.is_true(math.abs(select(4, backpack.feather:GetPoint(1)) + (grown - style.FEATHER)) < 1e-6)
+      click(backpack)
+      step(style.Time.Uncouple / 2)
+      local partway = bank.feather:GetWidth()
+      assert.is_true(partway > style.FEATHER and partway < grown, "shrinking as they part: " .. partway)
+      settle()
+      for _, panel in ipairs({ bank, backpack }) do
+        assert.are.equal(style.FEATHER, panel.feather:GetWidth())
+        assert.are.equal(0, select(4, panel.feather:GetPoint(1)))
+      end
+    end)
+
+    -- Grown, a bag's feather reaches into the other bag's half of the gap: the braid is drawn on a
+    -- layer above both bags, so neither feather covers it.
+    it("draws the braid above both bags' feathers", function()
+      click(backpack)
+      settle()
+      for _, panel in ipairs({ bank, backpack }) do
+        local layer = panel.braid.layer
+        assert.are.equal(layer, panel.braid.strands[1][1]:GetParent())
+        assert.are.equal(layer, panel.braid.beads[1]:GetParent())
+        assert.are.equal(layer, panel.braid.knot:GetParent())
+        assert.is_true(layer:GetFrameLevel() > bank.frame:GetFrameLevel())
+        assert.is_true(layer:GetFrameLevel() > backpack.frame:GetFrameLevel())
+      end
     end)
   end)
 
