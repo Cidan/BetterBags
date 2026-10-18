@@ -1,0 +1,17 @@
+{
+  "id": 1792349361,
+  "version": "v0.5.18-3-ga24d127",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "bb908cad901c9e2e4c18974024b6b5bb4c8442bd",
+  "to": "a24d127109ae2e686c64a556595d24847d99d2c6",
+  "headline": "You can now switch between the classic bags and BetterBags Next instantly without reloading your interface.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Switch between classic bags and Next without reloading",
+      "details": "You can now switch between the classic bag view and BetterBags Next on the fly without needing to reload your UI. Switching is available in the settings, via the /bb next slash command, from the classic backpack menu, or using the switch button in the Next header. For safety, switching is disabled while in combat, at the bank, or visiting a vendor.",
+      "clients": []
+    }
+  ]
+}
