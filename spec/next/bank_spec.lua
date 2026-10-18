@@ -371,6 +371,22 @@ describe("NextBank", function()
       assert.are.equal(0, xs[#xs], "at rest at the window's edge")
     end)
 
+    -- The fill mirrored (next.md §3): the bank bounces open from the left edge.
+    it("keeps its fill over the left screen edge through the whole bounce", function()
+      local bank = nextBank:Create(ctx())
+      local point, to, relative, reach = bank.fill:GetPoint(1)
+      assert.are.same({ "TOPLEFT", bank.frame, "TOPLEFT" }, { point, to, relative })
+      bank:Show(ctx())
+      local deepest = 0
+      for _ = 1, 250 do
+        tween:Step(0.002)
+        deepest = math.max(deepest, offset(bank))
+        assert.is_true(offset(bank) + reach <= 0, "the fill reaches the screen edge: " .. offset(bank) .. " " .. reach)
+      end
+      assert.is_true(deepest > 0.09 * (style.WIDTH + style.OVERREACH), "it still bounces: " .. deepest)
+      assert.are.equal(0, offset(bank))
+    end)
+
     it("hangs its tabs from its right side and drifts its sparkles right", function()
       local bank = nextBank:Create(ctx())
       assert.are.equal("LEFT", bank.tabs.side)

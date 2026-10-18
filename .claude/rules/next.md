@@ -116,8 +116,8 @@ section dragged out of a panel returns to the panel's strata (§7).
 - A frame anchored to the top right and bottom right of `UIParent`: full height, 554 wide. From the
   left: a 96-pixel **feathered edge** (a horizontal gradient of the body color, transparent to
   opaque; no border art) and the 458-pixel body (a solid deep indigo, with a faint lavender wash at
-  the top). The body reaches 40 pixels past the right edge so the opening overshoot never shows the
-  world behind it. The feather takes no clicks (`SetHitRectInsets`).
+  the top). The body reaches `OVERREACH` (66 pixels) past the right edge so the opening bounce
+  never shows the world behind it (below). The feather takes no clicks (`SetHitRectInsets`).
 - **Header:** the title, "Backpack", 26-pixel white with a soft shadow, in a **cloud**; a light
   **ribbon** running left from the cloud across the feather and out of the window (a thin gold line
   and a soft glow, both fading out to the left) with a spark that glides in along it every few
@@ -168,9 +168,23 @@ section dragged out of a panel returns to the panel's strata (§7).
   for that tab), right click opens the group menu (rename, delete) and "+" creates a group, both
   through the classic backpack behavior's dialogs. Hidden when groups are off.
 - **Opening:** the panel slides in from the right (0.45 s, a small overshoot), the sparkles start
-  and the sections cascade in. **Closing:** it slides out to the right (0.24 s) and hides. Escape
-  hides it at once (`UISpecialFrames`). Every way it hides runs `OnClosed` (Recent Items expiry,
-  held gaps; recent-items.md §3) and stops the sparkles and moves.
+  and the sections cascade in.
+- **The bounce never shows the screen edge** (asked: "you can see what's under the bag briefly at
+  the edge as it overshoots"). The slide runs `WIDTH + OVERREACH` (`HiddenOffset`) with `outBack`,
+  which swings a tenth of its run past its place; with the body reaching 40 pixels past the panel,
+  a gap up to 19.4 pixels wide opened at the screen edge for about the middle third of the slide.
+  `NextStyle.OVERREACH` is now derived from the panel's width: the smallest reach that covers a
+  tenth of `WIDTH + OVERREACH` (`WIDTH / 9`, rounded up), plus 4 pixels, which is 66 for today's
+  554-pixel panel against a 62-pixel swing. The fill and the wash reach that far; the slide is
+  26 pixels longer (620 instead of 594). A gold glow over the gap was tried first and dropped ("looks weird ... make the
+  window bigger out the edge so it just covers it up, remove the glow").
+- **Closing:** it slides out to the right (0.24 s) and hides. Escape hides it at once
+  (`UISpecialFrames`). Every way it hides runs `OnClosed` (Recent Items expiry, held gaps;
+  recent-items.md §3) and stops the sparkles and moves.
+- Coverage of the reach: `spec/next/bag_spec.lua` ("keeps its fill over the screen edge through the
+  whole bounce": the real slide in 2 ms steps, the fill's outer edge never inside the screen, and
+  the bounce still at least 9% of the run) and `spec/next/bank_spec.lua` (mirrored on the left
+  edge). 5 mutations, all caught.
 - **The window is a drop target** (bag-drop-zone.md): an item dropped on the body goes into a free
   slot of the backpack.
 

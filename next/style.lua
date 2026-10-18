@@ -23,9 +23,12 @@ style.BODY_WIDTH = style.GRID_WIDTH + style.GUTTER + style.PAD * 2
 -- The feathered edge left of the body, transparent to opaque.
 style.FEATHER = 96
 style.WIDTH = style.FEATHER + style.BODY_WIDTH
--- How far the body reaches past the screen's right edge, so the opening overshoot never shows
--- what is behind the panel.
-style.OVERREACH = 40
+-- How far the body reaches past the screen edge, so the opening bounce never shows what is behind
+-- the panel (next.md §3). The panel slides in WIDTH + OVERREACH (HiddenOffset) with outBack
+-- (next/tween.lua), which swings a tenth of that past its place, so the reach must be at least
+-- WIDTH / 9; 4 pixels more spare it rounding.
+style.OPEN_OVERSHOOT = 0.1
+style.OVERREACH = math.ceil(style.WIDTH * style.OPEN_OVERSHOOT / (1 - style.OPEN_OVERSHOOT)) + 4
 
 -- The header, from the body's top: the title, then the search box; the content starts below.
 style.TITLE_TOP = 24
