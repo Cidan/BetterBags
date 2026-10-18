@@ -1,0 +1,17 @@
+{
+  "id": 1792333352,
+  "version": "v0.5.17-3-gc7ba13d",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "053a54710c30d69a6a435e21c795644cdd2c6b36",
+  "to": "c7ba13dd43ef9f415b18f7555985cd32ecc0cf94",
+  "headline": "Section dragging and reordering arrives in BetterBags Next.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Drag and drop section management in BetterBags Next",
+      "details": "In the experimental BetterBags Next mode, category sections can now be dragged by their headers to reorder them, with surrounding sections sliding smoothly out of the way. Dropping a section onto a tab assigns its category to that tab, while dragging it between your inventory and bank transfers all of its items.",
+      "clients": []
+    }
+  ]
+}
