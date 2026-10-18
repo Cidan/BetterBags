@@ -1,0 +1,17 @@
+{
+  "id": 1792355656,
+  "version": "v0.5.18-5-gad40a94",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "08025bdf5a79deb07a4025f621893c811c5c89d1",
+  "to": "ad40a94ac1314b3fdc8e6190d79eb09884443937",
+  "headline": "Fixed an issue in BetterBags Next where the background briefly showed behind the panel during its opening animation.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Panel opening bounce showing screen edge gap",
+      "details": "In BetterBags Next, bag and bank panels now extend further past the screen edge so the game world underneath is no longer briefly visible when the slide animation bounces open.",
+      "clients": []
+    }
+  ]
+}
