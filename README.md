@@ -388,7 +388,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `name` (name = "Tome of Unstable Power") The name of the item; the first line in the tooltip.
 - `type` (type = Armor) The type of the item. Some examples include Armor, Weapon, Consumable, and Reagent.
 - `subtype` (subtype = Miscellaneous) The subtype of the item. Some examples include Leather, Potion, Bag, and Bows. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding type and subtype.
-- `category` (category = "Gear: MW DPS") The category that the item is sorted into in BetterBags.
+- `category` (category = "Gear: MW DPS") The category that the item is sorted into in BetterBags. In a search category's query, it is the category the item has without any search category (a custom category, a gear set, or its type), so a search category is never matched through its own name or another search category's.
 - `equipmentLocation` or `slot` (slot = Trinket) The item slot that the gear is for. Examples include Head, Legs, Main-Hand, and Finger.
 - `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW, Mid.
 - `equipmentSet` (equipmentSet = "MW DPS") The equipment set(s) that a piece of gear is part of.
