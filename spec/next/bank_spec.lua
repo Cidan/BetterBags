@@ -341,22 +341,19 @@ describe("NextBank", function()
     it("runs its ribbon into the right of the title's cloud, warm where it enters", function()
       local C = style.Cloud
       local bank = nextBank:Create(ctx())
-      local span = bank.title:GetStringWidth() + 2 * C.Pad
-      assert.are.same({ "LEFT", bank.title, "RIGHT", C.Pad, 0 }, { bank.ribbon:GetPoint(1) })
-      assert.are.same({ "RIGHT", bank.title, "RIGHT", C.Pad, 0 }, { bank.cloud.tail:GetPoint(1) })
-      local g = bank.cloud.tail._gradient
-      assert.are.equal(0, g.min.a, "gone inside the cloud, on the left")
-      assert.are.equal(bank.ribbon._gradient.min.a, g.max.a, "as bright as the ribbon where it goes on")
-      assert.are.same({ "CENTER", bank.title, "RIGHT", C.Pad - C.Join.U, 0 }, { bank.cloud.join:GetPoint(1) })
+      local edge = style.PAD + 4
+      local span = bank.title:GetStringWidth() + edge + C.Pad
+      assert.are.same({ "LEFT", bank.title, "RIGHT", edge, 0 }, { bank.ribbon:GetPoint(1) })
+      assert.is_nil(bank.cloud.tail)
+      assert.are.same({ "CENTER", bank.title, "RIGHT", edge, 0 }, { bank.cloud.join:GetPoint(1) })
       for i, puff in ipairs(bank.cloud.puffs) do
-        assert.are.equal(C.Pad - C.Puffs[i].F * span, puff.base.x)
+        assert.are.equal(edge - C.Puffs[i].F * span, puff.base.x)
         local point, to, relative, x = puff.texture:GetPoint(1)
         assert.are.same({ "CENTER", bank.title, "RIGHT", puff.base.x }, { point, to, relative, x })
       end
     end)
 
-    it("glides its shimmer in from the right, to rest just inside the cloud", function()
-      local C = style.Cloud
+    it("glides its shimmer in from the right, to rest at the window's edge", function()
       local bank = opened()
       tween:Stop(bank.spark)
       bank:playShimmer()
@@ -371,7 +368,7 @@ describe("NextBank", function()
       end
       assert.is_true(xs[1] > 0.9 * 300, "from the far end, on the right")
       for i = 2, #xs do assert.is_true(xs[i] <= xs[i - 1], "in, toward the cloud") end
-      assert.are.equal(-C.Join.U, xs[#xs], "at rest just inside the cloud")
+      assert.are.equal(0, xs[#xs], "at rest at the window's edge")
     end)
 
     it("hangs its tabs from its right side and drifts its sparkles right", function()
@@ -381,7 +378,7 @@ describe("NextBank", function()
       assert.are.equal(1, bank.sparkles.options.Direction)
       assert.are.equal(1, bank.edgeSparkles.options.Direction)
       local C = style.Cloud
-      local join = style.BODY_WIDTH - style.PAD - 4 + C.Pad
+      local join = style.BODY_WIDTH
       local x = bank.sparkles.options.Spawn()
       assert.is_true(x >= join, "born at the ribbon's start or past it")
       assert.are.equal(1, bank.cloudSparkles.options.Direction)
@@ -390,7 +387,7 @@ describe("NextBank", function()
       for _ = 1, 200 do
         local cx = bank.cloudSparkles.options.Spawn()
         assert.is_true(cx <= join + 1e-9, "in the cloud, which ends at the join")
-        if cx > join - (bank.title:GetStringWidth() + 2 * C.Pad) / 2 then near = near + 1 end
+        if cx > join - (bank.title:GetStringWidth() + style.PAD + 4 + C.Pad) / 2 then near = near + 1 end
       end
       assert.is_true(near > 120, "most near the join: " .. near)
     end)

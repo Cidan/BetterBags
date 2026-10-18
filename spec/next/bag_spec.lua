@@ -247,8 +247,10 @@ describe("NextBag", function()
   -- abrupt", "more like a cloud, no hard lines around it"; next.md §3).
   describe("the title's cloud", function()
     local C = style.Cloud
+    -- The window's hard edge, from the title's left: where the body (and its wash) starts.
+    local edge = -(style.PAD + 4)
     local function width(bag) return bag.title:GetStringWidth() end
-    local function span(bag) return width(bag) + 2 * C.Pad end
+    local function span(bag) return width(bag) - edge + C.Pad end
 
     it("gathers soft puffs round the title, below it and additive, nothing but soft glow", function()
       local bag = nextBag:Create(ctx())
@@ -259,7 +261,7 @@ describe("NextBag", function()
         assert.are.equal(style.CLOUD_GLOW, t:GetTexture(), "the soft glow, no outline")
         assert.are.equal("ADD", t:GetBlendMode())
         assert.are.equal("ARTWORK", (t:GetDrawLayer()))
-        assert.are.equal(-C.Pad + spec.F * span(bag), base.x)
+        assert.are.equal(edge + spec.F * span(bag), base.x)
         assert.are.equal(spec.Y, base.y)
         assert.are.equal(spec.W or span(bag) * spec.Wide, base.w)
         assert.are.equal(spec.H, base.h)
@@ -275,32 +277,36 @@ describe("NextBag", function()
       end
       local join = bag.cloud.join
       assert.are.equal(style.CLOUD_GLOW, join:GetTexture())
-      assert.are.same({ "CENTER", bag.title, "LEFT", -C.Pad + C.Join.U, 0 }, { join:GetPoint(1) })
+      assert.are.same({ "CENTER", bag.title, "LEFT", edge, 0 }, { join:GetPoint(1) })
       assert.are.equal(C.Join.A, join:GetAlpha())
-      -- Back to front: the puffs, the ribbon and its tail, the join's puff.
+      -- Back to front: the puffs, the ribbon, the join's puff.
       local function sub(t) return select(2, t:GetDrawLayer()) end
       assert.is_true(sub(bag.cloud.puffs[1].texture) < sub(bag.ribbon))
-      assert.are.equal(sub(bag.ribbon), sub(bag.cloud.tail))
       assert.is_true(sub(bag.ribbon) < sub(join))
     end)
 
-    it("runs the ribbon into the cloud's edge, its end fading out inside the cloud", function()
+    -- Asked: the bar's glow went "a tad bit too far into the window, should stop flush with the
+    -- hard edge of the window".
+    it("ends the ribbon and its glow flush with the window's hard edge, where the cloud begins", function()
       local bag = nextBag:Create(ctx())
-      assert.are.same({ "RIGHT", bag.title, "LEFT", -C.Pad, 0 }, { bag.ribbon:GetPoint(1) })
-      local tail = bag.cloud.tail
-      assert.are.same({ "LEFT", bag.title, "LEFT", -C.Pad, 0 }, { tail:GetPoint(1) })
-      assert.are.same({ C.Tail, 2 }, { tail:GetWidth(), tail:GetHeight() })
-      assert.are.equal("ADD", tail:GetBlendMode())
-      local g = tail._gradient
-      assert.are.equal(bag.ribbon._gradient.max.a, g.min.a, "as bright as the ribbon where it goes on")
-      assert.are.equal(0, g.max.a, "gone inside the cloud")
+      local lines = 0
+      for _, t in ipairs(bag.frame._textures) do
+        if t._width == 300 and t._height == 2 then
+          lines = lines + 1
+          local point, to, relative, x = t:GetPoint(1)
+          assert.are.same({ "RIGHT", bag.title, "LEFT", edge }, { point, to, relative, x }, "every line of its glow")
+        end
+      end
+      assert.are.equal(7, lines)
+      assert.is_nil(bag.cloud.tail, "nothing of it goes on into the window")
+      assert.are.equal(edge, bag.cloud.puffs[1].base.x - C.Puffs[1].F * span(bag), "the cloud begins there")
     end)
 
     it("spreads the cloud across a new title", function()
       local bag = nextBag:Create(ctx())
       bag:SetTitle("A much longer title")
       for i, puff in ipairs(bag.cloud.puffs) do
-        assert.are.equal(-C.Pad + C.Puffs[i].F * span(bag), puff.base.x)
+        assert.are.equal(edge + C.Puffs[i].F * span(bag), puff.base.x)
         assert.are.equal(puff.base.x, select(4, puff.texture:GetPoint(1)))
       end
     end)
@@ -360,8 +366,7 @@ describe("NextBag", function()
       assert.is_true(#lit > 20)
       assert.is_true(lit[1].x < -0.9 * 300, "from the far end of the ribbon")
       local stop = lit[#lit].x
-      assert.are.equal(C.Join.U, stop, "at rest just inside the cloud")
-      assert.is_true(stop < C.Pad, "before the title")
+      assert.are.equal(0, stop, "at rest where the ribbon ends, at the window's edge")
       local peakJoin, peakSwell = 0, 0
       for i = 2, #samples do
         local s, p = samples[i], samples[i - 1]
@@ -413,7 +418,7 @@ describe("NextBag", function()
       for _ = 1, 300 do
         local x, y = e.options.Spawn()
         local tx, ty = x - (style.FEATHER + style.PAD + 4), y + (style.TITLE_TOP + 13)
-        assert.is_true(tx >= -C.Pad and tx <= width(bag) + C.Pad, "within the cloud")
+        assert.is_true(tx >= edge and tx <= width(bag) + C.Pad, "within the cloud")
         assert.is_true(math.abs(ty) >= 14 and math.abs(ty) <= 28, "above or below the title: " .. ty)
         if ty > 0 then above = above + 1 else below = below + 1 end
         if tx < width(bag) / 2 then nearHalf = nearHalf + 1 end

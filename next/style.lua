@@ -100,15 +100,15 @@ style.RISE = 12
 style.SPARKLE_TEXTURE = "Interface\\Cooldown\\star4"
 -- The cloud round the title the ribbon flows into (next.md §3): puffs of a soft glow that fades to
 -- nothing at its edge (tools/textures/next_glow.py), so there is no line anywhere. The cloud
--- reaches Pad past the title on each side. A puff sits a share F of the way across it from where
--- the ribbon joins it, Y above the title's middle, W x H pixels (W false: as wide as the cloud
--- times Wide), in a color of the palette at alpha A. The Join puff is where the ribbon enters, U
--- pixels in; the ribbon's last Tail pixels fade out inside it. Each puff breathes, out of step
+-- reaches from the window's hard edge, where the ribbon ends, to Pad past the title's far side. A
+-- puff sits a share F of the way across it from the ribbon's end, Y above the title's middle, W x H
+-- pixels (W false: as wide as the cloud times Wide), in a color of the palette at alpha A. The
+-- Join puff sits on the ribbon's end. Each puff breathes, out of step
 -- with the others: its alpha by Depth and its height by Drift pixels, over a few seconds. When the
 -- shimmer arrives the cloud brightens by Swell and the Join puff by JoinSwell.
 style.Cloud = {
-  Pad = 16, Tail = 24, Swell = 0.6, JoinSwell = 0.45, Depth = 0.15, Drift = 1.5,
-  Join = { U = 6, Size = 34, Color = "Gold", A = 0.35 },
+  Pad = 16, Swell = 0.6, JoinSwell = 0.45, Depth = 0.15, Drift = 1.5,
+  Join = { Size = 34, Color = "Gold", A = 0.35 },
   Puffs = {
     { F = 0.45, Y = 0, W = false, Wide = 1.15, H = 60, Color = "Lavender", A = 0.09 },
     { F = 0.10, Y = 5, W = 54, H = 50, Color = "Gold", A = 0.24 },

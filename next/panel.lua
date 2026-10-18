@@ -87,8 +87,7 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 
 ---@class (exact) NextCloud
 ---@field puffs NextCloudPuff[]
----@field join Texture The puff the ribbon enters.
----@field tail Texture The ribbon's end, fading out inside the cloud.
+---@field join Texture The puff on the ribbon's end.
 ---@field driver Frame Runs the breathing while the panel shows.
 ---@field time number Seconds the cloud has breathed.
 ---@field swell number How brightly it swells with the shimmer, 0 to 1.
@@ -502,15 +501,24 @@ function panelProto:GetHeaderButtons()
   return {}
 end
 
--- TitleJoin says where the ribbon joins the title's cloud: the title's point it is measured from,
--- how far from that point, and which way is in, across the cloud (1 right, -1 left).
+-- TitleJoin says where the ribbon ends and the title's cloud begins: the window's hard edge, where
+-- the body (and its wash) starts, as the title's point it is measured from, how far from that
+-- point, and which way is in, across the cloud (1 right, -1 left). Nothing of the ribbon goes on
+-- into the window (asked: it should "stop flush with the hard edge of the window").
 ---@return string point, number x, number inward
 function panelProto:TitleJoin()
-  local pad = style.Cloud.Pad
+  local edge = style.PAD + 4
   if self.side == "LEFT" then
-    return "RIGHT", pad, -1
+    return "RIGHT", edge, -1
   end
-  return "LEFT", -pad, 1
+  return "LEFT", -edge, 1
+end
+
+-- CloudSpan is how far the title's cloud reaches across, from the ribbon's end to Pad past the
+-- title's far side, for the title as it is now.
+---@return number
+function panelProto:CloudSpan()
+  return self.title:GetStringWidth() + style.PAD + 4 + style.Cloud.Pad
 end
 
 -- LayoutCloud spreads the cloud's puffs across the title as it is now (a share of the way across
@@ -518,7 +526,7 @@ end
 function panelProto:LayoutCloud()
   local C = style.Cloud
   local _, joinX, inward = self:TitleJoin()
-  local span = self.title:GetStringWidth() + 2 * C.Pad
+  local span = self:CloudSpan()
   for i, puff in ipairs(self.cloud.puffs) do
     local spec = C.Puffs[i]
     puff.base = {
@@ -557,10 +565,10 @@ function panelProto:SetCloudSwell(swell)
 end
 
 -- BuildHeader makes the title on the body's inner side, the cloud round it (soft puffs of glow,
--- warm where the ribbon enters, no line anywhere, breathing slowly), the ribbon running from the
--- cloud out of the window (a thin gold line with a soft glow, fading out toward its end, its other
--- end fading out inside the cloud), the spark that glides in along it, and the kind's buttons along
--- the top from the screen edge.
+-- warm where the ribbon ends, no line anywhere, breathing slowly), the ribbon running from the
+-- window's hard edge out of the window (a thin gold line with a soft glow, fading out toward its
+-- end), the spark that glides in along it, and the kind's buttons along the top from the screen
+-- edge.
 ---@param text string
 function panelProto:BuildHeader(text)
   local frame, body = self.frame, self.body
@@ -577,7 +585,7 @@ function panelProto:BuildHeader(text)
   title:SetText(text)
   self.title = title
 
-  local point, joinX, inward = self:TitleJoin()
+  local point, joinX = self:TitleJoin()
   local function puffOf(sublevel, color)
     local t = frame:CreateTexture(nil, "ARTWORK", nil, sublevel)
     t:SetTexture(style.CLOUD_GLOW)
@@ -593,7 +601,7 @@ function panelProto:BuildHeader(text)
   end
   cloud.join = puffOf(1, C.Join.Color)
   cloud.join:SetSize(C.Join.Size, C.Join.Size)
-  cloud.join:SetPoint("CENTER", title, point, joinX + inward * C.Join.U, 0)
+  cloud.join:SetPoint("CENTER", title, point, joinX, 0)
 
   for _, glow in ipairs(RIBBON_GLOW) do
     local line = frame:CreateTexture(nil, "ARTWORK", nil, 0)
@@ -612,20 +620,6 @@ function panelProto:BuildHeader(text)
     end
   end
 
-  -- The ribbon's end goes on into the cloud, fading out.
-  local tail = frame:CreateTexture(nil, "ARTWORK", nil, 0)
-  tail:SetSize(C.Tail, 2)
-  tail:SetColorTexture(1, 1, 1, 1)
-  tail:SetBlendMode("ADD")
-  local bright = RIBBON_GLOW[1][2]
-  if left then
-    tail:SetPoint("RIGHT", title, point, joinX, 0)
-    tail:SetGradient("HORIZONTAL", style:CreateColor("Gold", 0), style:CreateColor("Gold", bright))
-  else
-    tail:SetPoint("LEFT", title, point, joinX, 0)
-    tail:SetGradient("HORIZONTAL", style:CreateColor("Gold", bright), style:CreateColor("Gold", 0))
-  end
-  cloud.tail = tail
   cloud.driver = CreateFrame("Frame", nil, frame)
   -- A child of the panel: it runs only while the panel shows.
   cloud.driver:SetScript("OnUpdate", function(_, elapsed)
@@ -811,7 +805,7 @@ function panelProto:BuildSparkles()
     Rate = 3, Max = 10, Life = { 1.4, 2.6 }, Size = { 4, 9 }, Speed = { 3, 12 }, Rise = { -3, 5 },
     Wobble = 2, Spin = 1.2, Alpha = 0.7, Direction = out,
     Spawn = function()
-      local span = self.title:GetStringWidth() + 2 * style.Cloud.Pad
+      local span = self:CloudSpan()
       local y = 14 + math.random() * 14
       if math.random() < 0.5 then
         y = -y
@@ -910,12 +904,12 @@ end
 function panelProto:WatchKind()
 end
 
--- playShimmer glides the spark in along the ribbon from its far end, easing to rest just inside
--- the cloud, before the title, then lets it grow and fade there while the cloud swells and
+-- playShimmer glides the spark in along the ribbon from its far end, easing to rest where the
+-- ribbon ends at the window's edge, then lets it grow and fade there while the cloud swells and
 -- settles, every ShimmerEvery seconds. Everything eases in and out: nothing jumps.
 ---@private
 function panelProto:playShimmer()
-  local spark, C = self.spark, style.Cloud
+  local spark = self.spark
   local out = self:Outward()
   local inner = self.side == "LEFT" and "LEFT" or "RIGHT"
   local size = SPARK_SIZE
@@ -928,7 +922,7 @@ function panelProto:playShimmer()
     onUpdate = function(t)
       local p = tween.Ease.inOutSine(t)
       spark:ClearAllPoints()
-      spark:SetPoint("CENTER", self.ribbon, inner, out * (RIBBON_LENGTH - p * (RIBBON_LENGTH + C.Join.U)), 0)
+      spark:SetPoint("CENTER", self.ribbon, inner, out * (1 - p) * RIBBON_LENGTH, 0)
       spark:SetSize(size, size)
       spark:SetAlpha(math.sin(math.pi * t / 2))
       self:SetCloudSwell(t > 0.6 and ((t - 0.6) / 0.4) ^ 2 or 0)

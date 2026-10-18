@@ -134,17 +134,20 @@ section dragged out of a panel returns to the panel's strata (§7).
     fading to nothing at its edge; made by `tools/textures/next_glow.py`), additive, tinted from the
     palette: gold where the ribbon enters, lavender across, a few smaller ones above and below for
     billows. Their places, sizes, colors and alphas are data (`NextStyle.Cloud`): each sits a share
-    of the way across the cloud, which reaches 16 pixels past the title on each side, so the cloud
-    spreads across any title (`LayoutCloud`, on every `SetTitle`: the bank's group and tab names,
+    of the way across the cloud, which reaches from the window's hard edge to 16 pixels past the
+    title's far side (`CloudSpan`), so the cloud spreads across any title (`LayoutCloud`, on every `SetTitle`: the bank's group and tab names,
     the vendor's merchant). The puffs are at most 0.24 alpha, below the title (ARTWORK; the title is
     OVERLAY), so it stays crisp. No texture of the cloud has an edge.
-  - The ribbon runs into the cloud's edge (`TitleJoin`) and goes on inside it as a 24-pixel tail
-    that fades out from the ribbon's brightness; a warm puff sits where it enters, over both.
+  - The ribbon and every line of its glow end flush with the window's hard edge (`TitleJoin`: where
+    the body and its wash start, 22 pixels before the title), where the cloud begins; a warm puff
+    sits on its end. Asked: the bar's glow went "a tad bit too far into the window, should stop
+    flush with the hard edge of the window"; before, it ended 6 pixels inside the body and a
+    24-pixel tail went on fading inside, nearly to the first letter.
   - The cloud breathes: each puff's alpha (by 15%) and height (by 1.5 pixels), at its own pace and
     from its own point (`applyCloud`, from a driver that is a child of the panel, so it runs only
     while the panel shows).
-  - The shimmer glides in along the ribbon from its far end (in and out eased), comes to rest
-    6 pixels inside the cloud, before the title, and settles there: it grows and fades while the
+  - The shimmer glides in along the ribbon from its far end (in and out eased), comes to rest on
+    the ribbon's end at the window's edge, and settles there: it grows and fades while the
     cloud swells (puffs by up to 60%, the entering puff more) and eases back, quickly at first and
     then gently (`style.Time.Absorb`, 0.7 s). Nothing jumps and nothing crosses the title.
   - A third sparkle emitter (§4) is born in the cloud above and below the title, never over it.
