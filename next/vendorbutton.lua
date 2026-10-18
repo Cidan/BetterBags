@@ -15,6 +15,12 @@ local merchant = addon:GetModule('NextMerchant')
 ---@class Question: AceModule
 local question = addon:GetModule('Question')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
@@ -43,7 +49,9 @@ local SEARCH_DIM = 0.25
 
 ---@class NextVendorButtonFrame
 ---@field key string What the canvas knows it by.
----@field frame Button
+---@field frame Frame The holder the canvas places: the button and its price under it.
+---@field button Button The square button: it takes the clicks, and Masque skins it.
+---@field highlight Texture
 ---@field icon Texture
 ---@field border Texture
 ---@field quest Texture
@@ -97,53 +105,75 @@ function vendorButton:PriceText(price, costs)
 end
 
 ---@return NextVendorButtonFrame
+-- newButton makes a button: a holder the canvas places, as tall as the icon and its price, and in
+-- it the square button that takes the clicks and that Masque skins. Masque sizes a skin to the
+-- button it skins (Core.lua UpdateScale), and finds an item button's parts by these names
+-- (Masque 12.1.0 Skins/Regions.lua, Item): icon, IconBorder, Count.
+---@return NextVendorButtonFrame
 local function newButton()
-  local frame = CreateFrame("Button")
+  local frame = CreateFrame("Frame")
   frame:SetSize(style.ICON, style.ICON + style.VENDOR_PRICE)
-  frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  local icon = frame:CreateTexture(nil, "ARTWORK")
+  local button = CreateFrame("Button", nil, frame)
+  button:SetSize(style.ICON, style.ICON)
+  button:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+  button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local icon = button:CreateTexture(nil, "ARTWORK")
   icon:SetSize(style.ICON, style.ICON)
-  icon:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-  local border = frame:CreateTexture(nil, "OVERLAY")
+  icon:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
+  button.icon = icon
+  local border = button:CreateTexture(nil, "OVERLAY")
   border:SetTexture(QUALITY_BORDER)
   border:SetAllPoints(icon)
   border:Hide()
-  local quest = frame:CreateTexture(nil, "OVERLAY", nil, 2)
+  button.IconBorder = border
+  local quest = button:CreateTexture(nil, "OVERLAY", nil, 2)
   quest:SetTexture(QUEST_BANG)
   quest:SetAllPoints(icon)
   quest:Hide()
-  local highlight = frame:CreateTexture(nil, "HIGHLIGHT")
+  local highlight = button:CreateTexture(nil, "HIGHLIGHT")
   highlight:SetAllPoints(icon)
   highlight:SetColorTexture(1, 1, 1, 0.15)
-  local durability = frame:CreateTexture(nil, "OVERLAY", nil, 3)
+  local durability = button:CreateTexture(nil, "OVERLAY", nil, 3)
   durability:SetHeight(3)
   durability:SetPoint("BOTTOMLEFT", icon, "BOTTOMLEFT", 0, 0)
   durability:SetColorTexture(1, 1, 1, 1)
   durability:Hide()
-  local count = frame:CreateFontString(nil, "OVERLAY")
+  local count = button:CreateFontString(nil, "OVERLAY")
   count:SetFontObject(style:Font("Stack"))
   count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
-  local stock = frame:CreateFontString(nil, "OVERLAY")
+  button.Count = count
+  local stock = button:CreateFontString(nil, "OVERLAY")
   stock:SetFontObject(style:Font("Stack"))
   stock:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
   local price = frame:CreateFontString(nil, "OVERLAY")
   price:SetFontObject(style:Font("Price"))
-  price:SetPoint("TOP", icon, "BOTTOM", 0, -1)
+  price:SetPoint("TOP", button, "BOTTOM", 0, -1)
   ---@type NextVendorButtonFrame
   local b = setmetatable({
-    key = "", frame = frame, icon = icon, border = border, quest = quest, count = count, stock = stock,
-    price = price, durability = durability,
+    key = "", frame = frame, button = button, icon = icon, border = border, quest = quest, count = count,
+    stock = stock, price = price, durability = durability, highlight = highlight,
   }, { __index = buttonProto })
-  frame:SetScript("OnEnter", function() b:OnEnter() end)
-  frame:SetScript("OnLeave", function() b:OnLeave() end)
-  addon.SetScript(frame, "OnClick", function(_, _, mouse) b:OnClick(mouse) end)
+  button:SetScript("OnEnter", function() b:OnEnter() end)
+  button:SetScript("OnLeave", function() b:OnLeave() end)
+  addon.SetScript(button, "OnClick", function(_, _, mouse) b:OnClick(mouse) end)
   return b
 end
 
--- Acquire returns a released button, or a new one.
+-- MasqueRegions returns the parts Masque skins, by its region names (Skins/Regions.lua, Item).
+---@return table<string, Region>
+function buttonProto:MasqueRegions()
+  return { Icon = self.icon, IconBorder = self.border, Count = self.count, Highlight = self.highlight }
+end
+
+-- Acquire returns a released button, or a new one, announced once (vendor/NewButton: Masque adds
+-- it to its Vendor group).
 ---@return NextVendorButtonFrame
 function vendorButton:Acquire()
-  local b = table.remove(self.pool) or newButton()
+  local b = table.remove(self.pool)
+  if b == nil then
+    b = newButton()
+    events:SendMessage(context:New('NextVendorButton'), 'vendor/NewButton', b)
+  end
   b.frame:Show()
   return b
 end
@@ -266,7 +296,7 @@ end
 -- OnEnter shows Blizzard's tooltip for what the button shows, with its price and what clicking
 -- does, and the cursor Blizzard's merchant shows over it.
 function buttonProto:OnEnter()
-  GameTooltip:SetOwner(self.frame, "ANCHOR_RIGHT")
+  GameTooltip:SetOwner(self.button, "ANCHOR_RIGHT")
   if self.mode == "buy" then
     local item = self.item
     GameTooltip:SetMerchantItem(item.index)
@@ -316,7 +346,7 @@ function buttonProto:askQuantity()
       if n == nil or n < 1 then
         return
       end
-      merchant:Purchase(self.frame, item, math.min(math.floor(n), most))
+      merchant:Purchase(self.button, item, math.min(math.floor(n), most))
     end)
 end
 
@@ -337,7 +367,7 @@ function buttonProto:OnClick(mouse)
       return
     end
     if mouse == "RightButton" then
-      merchant:Purchase(self.frame, self.item)
+      merchant:Purchase(self.button, self.item)
     end
   elseif self.mode == "buyback" then
     merchant:Buyback(self.buyback.index)

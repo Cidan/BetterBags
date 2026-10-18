@@ -662,6 +662,119 @@ describe("NextDrag", function()
     end)
   end)
 
+  -- A panel that buys sections (BetterBags Next's vendor, next.md §10): a backpack section dropped
+  -- anywhere on it, its body or its tabs, is sold. The seller says what sells and sells it.
+  describe("dropping on a seller", function()
+    local seller
+
+    local function keys(list)
+      local out = {}
+      for _, data in ipairs(list) do table.insert(out, data.slotkey) end
+      return out
+    end
+
+    before_each(function()
+      override(addon, "atBank", false)
+      bank.frame:Hide()
+      seller = { kind = -1, closing = false, glows = {}, sales = {}, sells = nil, answer = "sold" }
+      seller.frame = CreateFrame("Frame")
+      seller.body = CreateFrame("Frame")
+      seller.body:_SetRect(0, 0, style.BODY_WIDTH, 1200)
+      seller.scroll = { frame = CreateFrame("Frame") }
+      seller.scroll.frame:_SetRect(style.PAD, style.FOOTER, 300, 900)
+      local tabButton = CreateFrame("Button")
+      tabButton:_SetRect(style.BODY_WIDTH, 900, 100, style.TAB_HEIGHT)
+      seller.tabs = { TabAt = function()
+        return tabButton:IsMouseOver() and { id = 2, button = tabButton } or nil
+      end }
+      seller.tabButton = tabButton
+      function seller:IsShown() return self.frame:IsShown() end
+      function seller:SetDropGlow(on) table.insert(self.glows, on) end
+      function seller:SaleOf(list) return self.sells or list end
+      function seller:Sell(c, sale)
+        assert.is_not_nil(c)
+        table.insert(self.sales, keys(sale))
+        return self.answer
+      end
+      nextDrag:RegisterSeller(seller)
+    end)
+
+    it("sells a backpack section dropped on it, lit and the sale named, flying into it", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      assert.are.same({ true }, seller.glows)
+      assert.are.equal("Sell 2 items", nextDrag.hint:GetText())
+      drop(herbs)
+      assert.are.same({ { "0_3", "0_4" } }, seller.sales)
+      assert.are.same({}, calls.moved)
+      finishTweens()
+      assert.are.same({ true, false }, seller.glows)
+      assert.is_not_nil(backpack.content.leaving.Herbs)
+      assert.is_false(herbs.frame:IsShown())
+    end)
+
+    it("takes it on its tabs too, and names a single item", function()
+      local armor = pickUp(backpack, "Armor")
+      moveTo(centerOf(seller.tabButton))
+      assert.are.equal("Sell 1 item", nextDrag.hint:GetText())
+      drop(armor)
+      assert.are.same({ { "0_1" } }, seller.sales)
+    end)
+
+    it("lands back when nothing in it sells, or when the seller asks first", function()
+      seller.sells = {}
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      assert.are.equal("Nothing in it sells", nextDrag.hint:GetText())
+      drop(herbs)
+      finishTweens()
+      assert.are.same({}, seller.sales)
+      assert.is_true(herbs.frame:IsShown())
+      assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
+      seller.sells, seller.answer = nil, "asked"
+      herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      drop(herbs)
+      finishTweens()
+      assert.are.same({ { "0_3", "0_4" } }, seller.sales)
+      assert.is_true(herbs.frame:IsShown(), "it lands back while the question is open")
+      assert.is_nil(backpack.content.leaving.Herbs)
+    end)
+
+    it("sells nothing without the release", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      _G._mouseButtonsDown = nil
+      nextDrag:Update(0.016)
+      nextDrag:Update(0.016)
+      finishTweens()
+      assert.are.same({}, seller.sales)
+      assert.is_true(herbs.frame:IsShown())
+    end)
+
+    it("is no target while hidden or closing, nor for a bank section", function()
+      seller.frame:Hide()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      assert.are.same({}, seller.glows)
+      drop(herbs)
+      finishTweens()
+      seller.frame:Show()
+      seller.closing = true
+      herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      drop(herbs)
+      finishTweens()
+      seller.closing = false
+      bank.frame:Show()
+      local leather = pickUp(bank, "Leather")
+      moveTo(300, 600)
+      assert.are.same({}, seller.glows)
+      drop(leather)
+      assert.are.same({}, seller.sales)
+    end)
+  end)
+
   -- The client starts a drag only once the cursor has moved a little, so by then it can be over the
   -- section's first item rather than its header. The release goes to the mouse-enabled frame under
   -- the cursor (warcraft.wiki.gg UIHANDLER_OnReceiveDrag: also when dragging widgets), and over an

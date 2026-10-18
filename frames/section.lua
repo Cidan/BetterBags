@@ -480,6 +480,27 @@ function sectionFrame:OnTitleClickOrDrop(ctx, section)
   events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
+-- WithStacks returns the items of list and every pile their virtual stacks hide (a stack shows one
+-- item for all of its piles), without empty slots.
+---@param list ItemData[]
+---@return ItemData[]
+function sectionFrame:WithStacks(list)
+  ---@type ItemData[]
+  local all = {}
+  for _, data in ipairs(list) do
+    if not data.isItemEmpty then
+      table.insert(all, data)
+      local stack = items:GetAllSlotInfo()[addon:GetBagFromBagID(data.bagid).kind].stacks:GetStackInfo(data.itemHash)
+      if stack ~= nil then
+        for subSlotKey in pairs(stack.slotkeys) do
+          table.insert(all, items:GetItemDataFromSlotKey(subSlotKey))
+        end
+      end
+    end
+  end
+  return all
+end
+
 -- MoveItems moves items, with every other pile of their virtual stacks, to the window the
 -- movement flow names (Move Categories): the bank (the bank type it shows), the mailbox, the trade
 -- window, or a vendor (with the category-sell setting, ten items at most, so they can be bought
@@ -497,23 +518,7 @@ function sectionFrame:MoveItems(list, bankType)
   if flow == const.MOVEMENT_FLOW.NPCSHOP and not db:GetCategorySell() then return end
 
   -- This list contains all items to move.
-  ---@type ItemData[]
-  local all = {}
-
-  for _, data in ipairs(list) do
-    if not data.isItemEmpty then
-      table.insert(all, data)
-
-      -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
-      local stack = items:GetAllSlotInfo()[addon:GetBagFromBagID(data.bagid).kind].stacks:GetStackInfo(data.itemHash)
-      if stack ~= nil then
-        for subSlotKey in pairs(stack.slotkeys) do
-          local subData = items:GetItemDataFromSlotKey(subSlotKey)
-          table.insert(all, subData)
-        end
-      end
-    end
-  end
+  local all = self:WithStacks(list)
 
   -- Limit the selling amount to be able to buy back
   if flow == const.MOVEMENT_FLOW.NPCSHOP then

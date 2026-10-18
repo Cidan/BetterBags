@@ -33,8 +33,8 @@ local tween = addon:GetModule('NextTween')
 -- NextDrag moves BetterBagsNext's sections by their headers (next.md §7). A section picked up
 -- leaves its canvas for the drag layer with its real item buttons and follows the cursor, the
 -- canvas keeping a gap where it would go; dropping it reorders it (saving its place), assigns its
--- category to a tab's group, or moves its items to the other bag (and that bag's tab). Drop
--- targets are found from the cursor's position every frame.
+-- category to a tab's group, moves its items to the other bag (and that bag's tab), or sells them
+-- to a seller (the vendor). Drop targets are found from the cursor's position every frame.
 ---@class NextDrag: AceModule
 local nextDrag = addon:NewModule('NextDrag')
 
@@ -55,7 +55,19 @@ local COVER_ABOVE = 100
 -- The highest frame level there is (warcraft.wiki.gg "Frame Strata").
 local MAX_LEVEL = 10000
 
----@alias NextDropKind "reorder"|"tab"|"bagtab"|"bag"
+---@alias NextDropKind "reorder"|"tab"|"bagtab"|"bag"|"sell"
+
+-- NextSeller is a panel that buys sections (BetterBags Next's vendor, next.md §10): never a source,
+-- a target for backpack sections anywhere on its body or tabs.
+---@class NextSeller
+---@field body Frame
+---@field tabs NextTabRail
+---@field scroll ScrollboxDrawable
+---@field closing boolean
+---@field IsShown fun(self): boolean
+---@field SetDropGlow fun(self, on: boolean)
+---@field SaleOf fun(self, list: ItemData[]): ItemData[] What of the section's items it would sell.
+---@field Sell fun(self, ctx: Context, sale: ItemData[]): string "sold", or "asked" when it asks first.
 
 ---@class (exact) NextDropTarget
 ---@field type NextDropKind
@@ -83,6 +95,7 @@ function nextDrag:Init()
   end
   self.current = nil
   self.panels = {} ---@type NextPanelFrame[]
+  self.sellers = {} ---@type NextSeller[]
 end
 
 nextDrag:Init()
@@ -91,6 +104,12 @@ nextDrag:Init()
 ---@param panel NextPanelFrame
 function nextDrag:Register(panel)
   table.insert(self.panels, panel)
+end
+
+-- RegisterSeller makes a panel a target that sells the backpack sections dropped on it.
+---@param seller NextSeller
+function nextDrag:RegisterSeller(seller)
+  table.insert(self.sellers, seller)
 end
 
 ---@return boolean
@@ -268,6 +287,14 @@ end
 ---@return NextDropTarget?
 function nextDrag:FindTarget()
   local src = self.current.panel
+  for _, seller in ipairs(self.sellers) do
+    if seller:IsShown() and not seller.closing and (seller.tabs:TabAt() ~= nil or seller.body:IsMouseOver()) then
+      if src.kind == const.BAG_KIND.BACKPACK then
+        return { type = "sell", panel = seller }
+      end
+      return nil
+    end
+  end
   for _, panel in ipairs(self.panels) do
     if panel:IsShown() and not panel.closing then
       local tab = panel.tabs:TabAt()
@@ -295,6 +322,16 @@ end
 ---@param target NextDropTarget
 ---@return string?
 local function describe(target)
+  if target.type == "sell" then
+    local n = #target.panel:SaleOf(nextDrag:SectionItems(nextDrag.current.section))
+    if n == 0 then
+      return L:G("Nothing in it sells")
+    end
+    if n == 1 then
+      return L:G("Sell 1 item")
+    end
+    return format(L:G("Sell %d items"), n)
+  end
   if target.type == "tab" or target.type == "bagtab" then
     return format(L:G("Move to %s"), target.tab.text:GetText())
   end
@@ -333,13 +370,13 @@ function nextDrag:showTarget(target)
   if old then
     if old.tab then
       old.panel.tabs:SetDropTarget(nil)
-    elseif old.type == "bag" then
+    elseif old.type == "bag" or old.type == "sell" then
       old.panel:SetDropGlow(false)
     end
   end
   if target and target.tab then
     target.panel.tabs:SetDropTarget(target.tab.id)
-  elseif target and target.type == "bag" then
+  elseif target and (target.type == "bag" or target.type == "sell") then
     target.panel:SetDropGlow(true)
   end
   local text = target and describe(target)
@@ -583,7 +620,7 @@ function nextDrag:Drop(ctx, noMoves)
     return
   end
   local target = self:FindTarget()
-  if noMoves and target and (target.type == "bag" or target.type == "bagtab") then
+  if noMoves and target and (target.type == "bag" or target.type == "bagtab" or target.type == "sell") then
     target = nil
   end
   state.landing = true
@@ -620,7 +657,15 @@ function nextDrag:Drop(ctx, noMoves)
 
   local list = self:SectionItems(state.section)
   local rederive
-  if target.type == "tab" then
+  if target.type == "sell" then
+    -- Back in its place when nothing sells, or while the seller asks first.
+    local sale = target.panel:SaleOf(list)
+    if #sale == 0 or target.panel:Sell(ctx, sale) ~= "sold" then
+      canvas:SetDragIndex(state.startIndex)
+      self:land(false)
+      return
+    end
+  elseif target.type == "tab" then
     groups:AssignCategoryToGroup(ctx, kind, name, target.tab.id)
     rederive = { backpack = kind == const.BAG_KIND.BACKPACK, bank = kind == const.BAG_KIND.BANK, resetLayout = true }
   elseif target.type == "bagtab" then
@@ -637,7 +682,7 @@ function nextDrag:Drop(ctx, noMoves)
       groups:AssignCategoryToGroup(ctx, panel.kind, name, id)
       rederive = { resetLayout = true }
     end
-  else
+  elseif target.type == "bag" then
     sectionFrame:MoveItems(list)
   end
 

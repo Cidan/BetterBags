@@ -16,6 +16,7 @@ end
 
 local const = trackStub("Constants")
 local stubs = {
+  events = trackStub("Events"),
   merchant = trackStub("NextMerchant"),
   question = trackStub("Question"),
   L = trackStub("Localization"),
@@ -54,16 +55,23 @@ describe("NextVendorButton", function()
   end
 
   local function click(b, mouse)
-    b.frame:GetScript("OnClick")(b.frame, mouse or "RightButton")
+    b.button:GetScript("OnClick")(b.button, mouse or "RightButton")
+  end
+
+  local function enter(b)
+    b.button:GetScript("OnEnter")(b.button)
   end
 
   before_each(function()
-    calls = { purchase = {}, buyback = {}, repair = {} }
+    calls = { purchase = {}, buyback = {}, repair = {}, messages = {} }
     asked = nil
     vendorButton:Init()
     override(const, "ITEM_QUALITY_COLOR", { [1] = { 1, 1, 1, 1 }, [2] = { 0.12, 1, 0, 1 }, [4] = { 0.64, 0.21, 0.93, 1 } })
     override(const, "ITEM_QUALITY", { Poor = 0, Common = 1, Uncommon = 2 })
     override(stubs.L, "G", function(_, key) return key end)
+    override(stubs.events, "SendMessage", function(_, _, name, ...)
+      table.insert(calls.messages, { name = name, args = { ... } })
+    end)
     override(stubs.merchant, "Purchase", function(_, frame, i, quantity)
       table.insert(calls.purchase, { frame = frame, item = i, quantity = quantity })
     end)
@@ -94,11 +102,37 @@ describe("NextVendorButton", function()
     it("is a big icon with room for its price under it, and is reused once released", function()
       local b = vendorButton:Acquire()
       assert.are.same({ style.ICON, style.ICON + style.VENDOR_PRICE }, { b.frame:GetSize() })
-      assert.are.same({ style.ICON, style.ICON }, { b.icon:GetSize() })
+      assert.are.same({ style.ICON, style.ICON }, { b.button:GetSize() })
       b:Release()
       assert.is_false(b.frame:IsShown())
       assert.are.equal(b, vendorButton:Acquire())
       assert.are_not.equal(b, vendorButton:Acquire())
+    end)
+
+    -- Masque skins a button against its own size (Core.lua UpdateScale), so the button it skins is
+    -- the square icon, the price a label under it on the holder the canvas places.
+    it("holds a square button with Masque's parts, its price under it", function()
+      local b = vendorButton:Acquire()
+      assert.are.equal("Button", b.button:GetObjectType())
+      assert.are.equal(b.frame, b.button:GetParent())
+      assert.are.same({ "TOPLEFT", b.frame, "TOPLEFT", 0, 0 }, { b.button:GetPoint(1) })
+      assert.are.same({ style.ICON, style.ICON }, { b.icon:GetSize() })
+      -- Masque's names for an item button's parts (Masque 12.1.0 Skins/Regions.lua, Item).
+      assert.are.equal(b.icon, b.button.icon)
+      assert.are.equal(b.border, b.button.IconBorder)
+      assert.are.equal(b.count, b.button.Count)
+      assert.are.same({ Icon = b.icon, IconBorder = b.border, Count = b.count, Highlight = b.highlight },
+        b:MasqueRegions())
+      assert.are.equal("HIGHLIGHT", b.highlight:GetDrawLayer())
+      assert.are.same({ "TOP", b.button, "BOTTOM", 0, -1 }, { b.price:GetPoint(1) })
+    end)
+
+    it("announces each new button once, for Masque", function()
+      local b = vendorButton:Acquire()
+      b:Release()
+      vendorButton:Acquire()
+      assert.are.equal(1, #calls.messages)
+      assert.are.same({ "vendor/NewButton", b }, { calls.messages[1].name, calls.messages[1].args[1] })
     end)
 
     it("shows an item for sale: icon, stack size, stock and the quest mark", function()
@@ -177,32 +211,33 @@ describe("NextVendorButton", function()
     it("is Blizzard's merchant item tooltip with its price and what clicking does, and the buy cursor", function()
       local b = vendorButton:Acquire()
       b:SetBuy(item({ price = 1500, costs = { { texture = 77, value = 2, currencyName = "Valor" } } }))
-      b.frame:GetScript("OnEnter")(b.frame)
+      enter(b)
+      assert.are.equal(b.button, GameTooltip._owner)
       assert.are.equal(4, GameTooltip._merchantItem)
       local text = {}
       for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
       assert.are.same({ " ", "Price: 15s", "|T77:0|t 2 Valor", "Right-click to buy", "Shift-click to buy a quantity" }, text)
       assert.are.equal("BUY_CURSOR", _G._cursor)
-      b.frame:GetScript("OnLeave")(b.frame)
+      b.button:GetScript("OnLeave")(b.button)
       assert.is_nil(_G._cursor)
       b:SetBuy(item({ canAfford = false }))
-      b.frame:GetScript("OnEnter")(b.frame)
+      enter(b)
       assert.are.equal("BUY_ERROR_CURSOR", _G._cursor)
     end)
 
     it("shows a buyback's and a repair's", function()
       local b = vendorButton:Acquire()
       b:SetBuyback({ index = 2, name = "Sold", texture = 5, price = 90, quantity = 3, isUsable = true, quality = 2 })
-      b.frame:GetScript("OnEnter")(b.frame)
+      enter(b)
       assert.are.equal(2, GameTooltip._buybackItem)
       b:SetRepair({ slot = 5, texture = 6, durability = 25, maxDurability = 100, cost = 3000 })
-      b.frame:GetScript("OnEnter")(b.frame)
+      enter(b)
       assert.are.same({ unit = "player", slot = 5 }, GameTooltip._inventoryItem)
       local text = {}
       for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
       assert.are.same({ " ", "Durability: 25 / 100", "Repair: 30s", "Click to repair" }, text)
       b:SetRepair({ bag = 0, slot = 2, texture = 6, durability = 1, maxDurability = 2, cost = 5 })
-      b.frame:GetScript("OnEnter")(b.frame)
+      enter(b)
       assert.are.same({ bag = 0, slot = 2 }, GameTooltip._bagItem)
     end)
   end)
@@ -216,7 +251,7 @@ describe("NextVendorButton", function()
       assert.are.same({}, calls.purchase)
       click(b, "RightButton")
       assert.are.equal(1, #calls.purchase)
-      assert.are.equal(b.frame, calls.purchase[1].frame)
+      assert.are.equal(b.button, calls.purchase[1].frame)
       assert.are.equal(i, calls.purchase[1].item)
       assert.is_nil(calls.purchase[1].quantity)
     end)

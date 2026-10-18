@@ -30,11 +30,18 @@ local merchant = addon:GetModule('NextMerchant')
 ---@class NextVendorButton: AceModule
 local vendorButton = addon:GetModule('NextVendorButton')
 
+---@class NextDrag: AceModule
+local nextDrag = addon:GetModule('NextDrag')
+
+---@class SectionFrame: AceModule
+local sectionFrame = addon:GetModule('SectionFrame')
+
 -- NextVendor is BetterBags Next's vendor (next.md §10): a panel on the left, as the bank's, that
 -- stands in for Blizzard's merchant frame while BetterBags Next is on. It shows what the vendor
 -- sells in the backpack's categories (Buy), what was sold to it (Buyback) and, at a vendor that
 -- repairs, what needs repair (Repair); its header sells junk, repairs everything (from the guild
--- bank too) and filters by spec. An item dropped on it is sold. Blizzard's merchant frame stays
+-- bank too) and filters by spec. An item dropped on it is sold, and so is a backpack section dragged
+-- onto it (a NextDrag seller). Blizzard's merchant frame stays
 -- shown but is never seen (TakeOver): Blizzard's bag code sells on a right click while
 -- MerchantFrame:IsShown(), and its OnHide would end the visit.
 ---@class NextVendor: AceModule
@@ -46,6 +53,9 @@ local TAB_BUY, TAB_BUYBACK, TAB_REPAIR = 1, 2, 3
 -- sell; GW2_UI sells the same way).
 local SELL_ROUNDS = 3
 local SELL_DELAY = 0.2
+-- How many items sold buyback keeps (Blizzard's BUYBACK_ITEMS_PER_PAGE); a section sale of more
+-- asks first.
+local BUYBACK_KEEPS = 12
 local REPAIR_ICONS = "Interface\\MerchantFrame\\UI-Merchant-RepairIcons"
 -- Blizzard's merchant purchase prompts, closed when the vendor closes (MerchantFrame_OnHide).
 local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED", "CONFIRM_REFUND_TOKEN_ITEM",
@@ -90,6 +100,7 @@ function nextVendor:Create(ctx)
   v.closeRequested = false
   v.buttons = {}
   v.content:SetCellHeight(style.ICON + style.VENDOR_PRICE)
+  nextDrag:RegisterSeller(v)
   self.panel = v
   return v
 end
@@ -528,6 +539,51 @@ function vendorProto:OnHeaderEnter(section)
   GameTooltip:SetOwner(section.header, "ANCHOR_RIGHT")
   GameTooltip:SetText(section.name, 1, 1, 1, 1, true)
   GameTooltip:Show()
+end
+
+-- SaleOf returns what of a backpack section dropped on the vendor sells: every item and every pile
+-- its virtual stack hides (sectionFrame:WithStacks, what Move Categories sells), in the backpack's
+-- bags, once each, leaving out what the vendor does not buy (hasNoValue) and refundable purchases,
+-- which Blizzard asks about before refunding them (ContainerFrame_GetExtendedPriceString).
+---@param list ItemData[]
+---@return ItemData[]
+function vendorProto:SaleOf(list)
+  local sale, seen = {}, {}
+  for _, data in ipairs(sectionFrame:WithStacks(list)) do
+    local bag, slot = data.bagid, data.slotid
+    local key = bag .. "_" .. slot
+    if not seen[key] and const.BACKPACK_BAGS[bag] ~= nil then
+      seen[key] = true
+      local info = C_Container.GetContainerItemInfo(bag, slot)
+      if info and not info.hasNoValue and not C_Item.CanBeRefunded(ItemLocation:CreateFromBagAndSlot(bag, slot)) then
+        table.insert(sale, data)
+      end
+    end
+  end
+  return sale
+end
+
+-- Sell sells a section's sale while the vendor is open: at once when buyback can keep all of it,
+-- after asking past that. It returns "sold", or "asked" while the question is open.
+---@param ctx Context
+---@param sale ItemData[]
+---@return string
+function vendorProto:Sell(ctx, sale)
+  local _ = ctx
+  local slots = {}
+  for _, data in ipairs(sale) do
+    table.insert(slots, { bag = data.bagid, slot = data.slotid })
+  end
+  local function sell()
+    merchant:SellSlots(slots, function() return self.atMerchant end)
+  end
+  if #slots <= BUYBACK_KEEPS then
+    sell()
+    return "sold"
+  end
+  question:YesNo(L:G("Sell Items"),
+    format(L:G("Sell %d items? Only the last 12 items sold can be bought back."), #slots), sell, function() end)
+  return "asked"
 end
 
 -- SellJunk sells the junk in the bags: through Blizzard's own Sell All Junk where the client has

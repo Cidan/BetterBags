@@ -217,7 +217,7 @@ describe("NextVendor", function()
       assert.are.equal("HIGH", v.frame:GetFrameStrata())
     end)
 
-    it("is neither the source nor the target of a section drag", function()
+    it("is no source of section drags, nor a panel they reorder in (it buys them: a seller)", function()
       local v = open()
       for _, panel in ipairs(nextDrag.panels) do assert.are_not.equal(v, panel) end
       local s = v.content.order[1]
@@ -540,6 +540,94 @@ describe("NextVendor", function()
       local h = v.content.order[1].header
       h:GetScript("OnReceiveDrag")(h)
       assert.are.same({ 0 }, _G._merchantCalls.pickup)
+    end)
+  end)
+
+  -- A backpack section dragged onto the vendor is sold (NextDrag's seller, next.md §10).
+  describe("selling a section", function()
+    local infos
+
+    local function slotData(bag, slot)
+      return { bagid = bag, slotid = slot, slotkey = bag .. "_" .. slot }
+    end
+
+    local function slotsOf(list)
+      local out = {}
+      for _, d in ipairs(list) do table.insert(out, d.slotkey) end
+      return out
+    end
+
+    before_each(function()
+      infos = {}
+      _G._refundableLocations = {}
+      override(const, "BACKPACK_BAGS", { [0] = 0, [1] = 1 })
+      override(stubs.sectionFrame, "WithStacks", function(_, list)
+        local all = {}
+        for _, d in ipairs(list) do
+          table.insert(all, d)
+          if d.hides then
+            for _, h in ipairs(d.hides) do table.insert(all, h) end
+          end
+        end
+        return all
+      end)
+      override(C_Container, "GetContainerItemInfo", function(bag, slot)
+        return infos[bag .. "_" .. slot] or { hasNoValue = false }
+      end)
+    end)
+
+    after_each(function()
+      _G._refundableLocations = {}
+    end)
+
+    it("is a seller for section drags", function()
+      local v = nextVendor:Create(ctx())
+      assert.are.same({ v }, nextDrag.sellers)
+    end)
+
+    it("sells every item and hidden pile of the backpack's bags the vendor buys, refunds aside, once each", function()
+      local v = open()
+      local stacked = slotData(0, 2)
+      stacked.hides = { slotData(1, 7), slotData(0, 2) }
+      infos["0_3"] = { hasNoValue = true }
+      _G._refundableLocations["1:1"] = true
+      local sale = v:SaleOf({ slotData(0, 1), stacked, slotData(0, 3), slotData(1, 1), slotData(6, 1) })
+      assert.are.same({ "0_1", "0_2", "1_7" }, slotsOf(sale))
+    end)
+
+    it("sells up to 12 at once, while the vendor is open", function()
+      local v = open()
+      local sale = {}
+      for i = 1, 12 do table.insert(sale, slotData(0, i)) end
+      assert.are.equal("sold", v:Sell(ctx(), sale))
+      assert.is_nil(asked)
+      assert.are.equal(12, #calls.sellSlots[1].slots)
+      assert.are.same({ bag = 0, slot = 3 }, calls.sellSlots[1].slots[3])
+      assert.is_true(calls.sellSlots[1].open)
+    end)
+
+    it("asks first past 12, the last 12 sold being all buyback keeps", function()
+      local v = open()
+      local sale = {}
+      for i = 1, 13 do table.insert(sale, slotData(0, i)) end
+      assert.are.equal("asked", v:Sell(ctx(), sale))
+      assert.are.same({}, calls.sellSlots)
+      assert.are.equal("Sell Items", asked.title)
+      assert.are.equal("Sell 13 items? Only the last 12 items sold can be bought back.", asked.text)
+      asked.no()
+      assert.are.same({}, calls.sellSlots)
+      asked.yes()
+      assert.are.equal(13, #calls.sellSlots[1].slots)
+    end)
+
+    it("sells nothing once the vendor has closed", function()
+      local v = open()
+      local sale = {}
+      for i = 1, 13 do table.insert(sale, slotData(0, i)) end
+      v:Sell(ctx(), sale)
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      asked.yes()
+      assert.is_false(calls.sellSlots[1].open)
     end)
   end)
 

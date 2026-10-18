@@ -245,7 +245,11 @@ Asked: "sections draggable and reorderable, with their position being saved wher
 we drag a header and *all* item buttons and the section header go into my cursor, and when i drag
 up and down the bag window, other sections slide up or down to make room. when i drop, it animates
 into position", then dragging a section to the other bag ("move this to the bank/backpack" for a
-whole section) and between tabs, in the same bag and across the backpack and the bank.
+whole section) and between tabs, in the same bag and across the backpack and the bank. Then
+selling a backpack section by dragging it onto the vendor: a panel registered with
+`NextDrag:RegisterSeller` is a `sell` target for backpack sections anywhere on its body or tabs
+while it is shown, checked before the bags' panels; it says what sells (`SaleOf`) and sells it
+(`Sell`), and the section flies into it only when it sold (§10b).
 
 **Picking up.** Every section has a header button over its title row. Dragging it (left button,
 the client's drag threshold: `RegisterForDrag`, `OnDragStart`) picks up a category section; Recent
@@ -501,6 +505,31 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
 - **Selling:** an item dropped on the panel or on a section header, or let go over it, is sold as on
   Blizzard's frame (its `OnMouseUp`: Blizzard's refund question first,
   `ContainerFrame_GetExtendedPriceString(MerchantFrame.refundItem, ...)`, then `PickupMerchantItem(0)`).
+- **Selling a section** (asked: "drag a section anywhere into a vendor window from my backpack to
+  sell everything in that section"): the vendor is a `NextDrag` seller (`RegisterSeller`, §7), never
+  a source. While it is shown, a backpack section dragged over its body or its tabs lights it and
+  names the sale ("Sell 7 items", "Nothing in it sells"). `SaleOf` is what sells: every item and
+  every pile its virtual stack hides (`sectionFrame:WithStacks`, shared with Move Categories), in
+  the backpack's bags, each slot once, leaving out what the vendor does not buy (`hasNoValue`) and
+  refundable purchases (`C_Item.CanBeRefunded`: Blizzard asks before refunding one, and
+  `UseContainerItem` would refund it without asking). `Sell` sells it at once (`SellSlots`, while
+  the vendor is open) when buyback can keep all of it (12, Blizzard's `BUYBACK_ITEMS_PER_PAGE`),
+  else asks first ("Sell 13 items? Only the last 12 items sold can be bought back."). The section
+  flies into the vendor when it sold, and lands back in its place when nothing sells or while the
+  question is open. Selling needs the drop's release, as moves do: a drag ended without one sells
+  nothing. Unlike a right click on the header (Move Categories), it does not need Enable Category
+  Sell and Deposit and is not cut to 10 items: the drag is the deliberate act, and the question
+  covers what buyback cannot.
+- **Masque:** each button is a holder the canvas places (`frame`, as tall as the icon and its price)
+  holding the square button that takes the clicks (`button`), so Masque, which sizes a skin to the
+  button it skins (Masque 12.1.0 `Core.lua` `UpdateScale`), skins the icon alone. The button carries
+  Masque's names for an item button's parts (`icon`, `IconBorder`, `Count`; `Skins/Regions.lua`),
+  and `MasqueRegions` lists them with the highlight. A new button is announced once
+  (`vendor/NewButton`); the Masque integration adds it to its own `BetterBags/Vendor` group as an
+  `Item` button, takes it out under a theme with `Masque = false`, and adds it back when a theme
+  that uses Masque applies (vendor buttons are reused, not drawn again on a theme change). A draw
+  needs no re-skin: it sets the icon's file (Masque keeps its crop) and the border's color, and
+  Masque re-skins the border itself when its texture is set (its `IconBorder` hook).
 - **Keeping up:** `MERCHANT_UPDATE`, `MERCHANT_FILTER_ITEM_UPDATE`, `CURRENCY_DISPLAY_UPDATE` redraw;
   `UPDATE_INVENTORY_DURABILITY`, `PLAYER_MONEY`, `BAG_UPDATE_DELAYED` update the header and redraw;
   `GET_ITEM_INFO_RECEIVED` is bucketed, only while it is shown. A draw keeps the button of every key
@@ -601,8 +630,16 @@ three rounds, stopping on close; repairs and their tooltips; the filter; selling
 Blizzard's refund question; every way of closing ending the visit once; the takeover),
 `spec/next/content_spec.lua` ("sections of other buttons"), `spec/tooltip_spec.lua` ("merchants and
 repair"), `spec/movementflow_spec.lua` (a shown merchant frame under a hidden parent),
-`spec/core/init_spec.lua` ("the vendor"), `spec/render/toc_spec.lua`. Every guard was
-mutation-tested: 90 mutations, the fourteen that first survived each leading to a test. The mocks
+`spec/core/init_spec.lua` ("the vendor"), `spec/render/toc_spec.lua`. Selling a section and Masque:
+`spec/next/drag_spec.lua` ("dropping on a seller": lit and named, sold and flown in, its tabs, one
+item, nothing that sells, a question open, no release, hidden, closing, a bank section),
+`spec/next/vendor_spec.lua` ("selling a section": registered, what sells, at once up to 12, asking
+past it, nothing once closed), `spec/frames/section_spec.lua` (`WithStacks`),
+`spec/next/vendorbutton_spec.lua` (the holder and its square button, Masque's names, announced
+once, the tooltip's owner), `spec/integrations/masque_spec.lua` ("vendor buttons"). Every guard was
+mutation-tested: 90 mutations, the fourteen that first survived each leading to a test; then 37 for
+selling sections and Masque (one led to a test, one showed a guard Masque's `AddButton` already
+makes, removed). The mocks
 gained the merchant APIs from Blizzard's merchant code (`ResetMockMerchant`), modified-click
 bindings from `Bindings_*.xml`, a `hooksecurefunc` that hooks (it was a no-op), `MenuUtil`'s context
 menu, `C_GameRules`, coin strings and merchant tooltips.

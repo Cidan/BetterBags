@@ -61,6 +61,8 @@ function masque:OnEnable()
   self.groups["Backpack"]:RegisterCallback(self.OnSkinChange, self)
   self.groups["Bank"] = Masque:Group('BetterBags', 'Bank')
   self.groups["Bank"]:RegisterCallback(self.OnSkinChange, self)
+  self.groups["Vendor"] = Masque:Group('BetterBags', 'Vendor')
+  self.groups["Vendor"]:RegisterCallback(self.OnSkinChange, self)
 
   -- The group each item decoration was last added to. Item buttons are redrawn without
   -- being released (and so removed) in between, and Masque's AddButton does nothing for a
@@ -91,12 +93,38 @@ function masque:OnEnable()
     skin(item, decoration)
   end)
 
+  -- BetterBags Next's vendor buttons (next/vendorbutton.lua) are made once and reused, each
+  -- announced once. Their square button is skinned as an item button with its parts named;
+  -- nothing a draw does to them (icon, border color, count) needs a skin again. Adding a button
+  -- already in the group does nothing (Masque's AddButton returns for it).
+  self.vendorButtons = setmetatable({}, { __mode = 'k' })
+
+  ---@param b NextVendorButtonFrame
+  local function skinVendor(b)
+    if not sonata:UsesMasque() then return end
+    local group = self.groups["Vendor"]
+    group:AddButton(b.button, b:MasqueRegions(), "Item")
+    self.added[b.button] = group
+  end
+
+  events:RegisterMessage('vendor/NewButton', function(_, b)
+    self.vendorButtons[b] = true
+    skinVendor(b)
+  end)
+
   -- Item buttons keep one decoration across themes, which the theme restyles. A theme that
   -- does not use Masque takes the buttons Masque skinned out of their groups (RemoveButton
   -- gives a button its own look back), so Masque's skin does not stay under the theme's;
   -- the next draw under a theme that uses Masque adds them again.
+  -- Vendor buttons are not drawn again on a theme change, so a theme that uses Masque adds them back
+  -- itself.
   events:RegisterMessage('sonata/ThemeChanged', function()
-    if sonata:UsesMasque() then return end
+    if sonata:UsesMasque() then
+      for b in pairs(self.vendorButtons) do
+        skinVendor(b)
+      end
+      return
+    end
     for decoration, group in pairs(self.added) do
       group:RemoveButton(decoration)
       self.added[decoration] = nil

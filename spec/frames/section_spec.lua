@@ -317,6 +317,15 @@ describe("Section Frame", function()
         return { bagid = 0, slotid = slot, itemHash = hash or ("h" .. slot) }
       end
 
+      -- What a section stands for: each item shown and every pile its virtual stack hides (BetterBags
+      -- Next's vendor sells the same, next.md §10).
+      it("lists every item and every pile its virtual stack hides, without empty slots", function()
+        local all = sectionFrame:WithStacks({ item(1), item(2, "stacked"), { isItemEmpty = true, bagid = 0, slotid = 3 } })
+        local slots = {}
+        for _, data in ipairs(all) do table.insert(slots, { data.bagid, data.slotid }) end
+        assert.are.same({ { 0, 1 }, { 0, 2 }, { 0, 9 } }, slots)
+      end)
+
       it("moves every item and every pile of its virtual stack to the window the flow names", function()
         movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.BANK end
         sectionFrame:MoveItems({ item(1), item(2, "stacked"), { isItemEmpty = true, bagid = 0, slotid = 3 } })
