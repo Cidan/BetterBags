@@ -239,6 +239,68 @@ describe("Database", function()
       assert.is_false(DB:GetNextEnabled())
     end)
 
+    -- Asked: "if this is a net new install of the addon, i now want to default to the next
+    -- experience". A new install has no saved variables yet: AceDB creates BetterBagsDB only when it
+    -- is nil (AceDB-3.0 New), and nothing reads it before DB:Init. The setting's default stays off,
+    -- so a profile that never turned Next on (AceDB saves only what differs from the defaults) keeps
+    -- the classic bags (next.md §1).
+    describe("new installs", function()
+      local savedData, savedVariables
+      before_each(function()
+        savedData, savedVariables = DB.data, _G.BetterBagsDB
+      end)
+      after_each(function()
+        DB.data, _G.BetterBagsDB = savedData, savedVariables
+      end)
+
+      it("starts a new install with BetterBags Next, and saves it", function()
+        _G.BetterBagsDB = nil
+        DB:Init()
+        assert.is_true(DB:GetNextEnabled())
+        -- AceDB copies each default into the profile when it is made (copyDefaults) and removes the
+        -- values equal to their default at logout (removeDefaults): true differs, so it is saved.
+        assert.is_true(rawget(_G.BetterBagsDB.profiles.Default, "nextEnabled"), "saved, so the next load keeps it")
+      end)
+
+      it("is not new on its second load", function()
+        _G.BetterBagsDB = nil
+        DB:Init()
+        DB:Init()
+        assert.is_true(DB:GetNextEnabled())
+        DB:SetNextEnabled(false)
+        DB:Init()
+        assert.is_false(DB:GetNextEnabled(), "the player's choice from then on")
+      end)
+
+      it("keeps the classic bags on an install from before that never turned Next on", function()
+        _G.BetterBagsDB = { profileKeys = {}, profiles = { Default = { firstTimeMenu = false } } }
+        DB:Init()
+        assert.is_false(DB:GetNextEnabled())
+        assert.is_false(rawget(_G.BetterBagsDB.profiles.Default, "nextEnabled"), "only the default, removed at logout")
+      end)
+
+      it("keeps what an existing install chose", function()
+        _G.BetterBagsDB = { profiles = { Default = { nextEnabled = true } } }
+        DB:Init()
+        assert.is_true(DB:GetNextEnabled())
+        _G.BetterBagsDB = { profiles = { Default = { nextEnabled = false } } }
+        DB:Init()
+        assert.is_false(DB:GetNextEnabled())
+      end)
+
+      -- Every character shares the Default profile (AceDB:New with true), so a character new to an
+      -- existing install is no new install: it has the account's bags.
+      it("gives a character new to an existing install the account's bags", function()
+        _G.BetterBagsDB = { profileKeys = { ["Someone Else - Elsewhere"] = "Default" }, profiles = { Default = {} } }
+        DB:Init()
+        assert.is_false(DB:GetNextEnabled())
+        _G.BetterBagsDB = { profileKeys = { ["Someone Else - Elsewhere"] = "Default" },
+          profiles = { Default = { nextEnabled = true } } }
+        DB:Init()
+        assert.is_true(DB:GetNextEnabled())
+      end)
+    end)
+
     -- How BetterBags Next's bags sit (next.md §12): apart on opposite edges, or chained on one.
     it("GetNextChain / SetNextChain, apart until chained, and nothing but a layout", function()
       assert.are.equal("apart", DB:GetNextChain())

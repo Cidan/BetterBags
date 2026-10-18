@@ -14,6 +14,22 @@ button in Next's own header switch between the two designs at once, without a re
 ## 1. How it takes over
 
 - `database:GetNextEnabled()` (`nextEnabled` in the profile, `false` in `const.DATABASE_DEFAULTS`).
+- **A new install starts with Next.** Asked: "if this is a net new install of the addon, i now want
+  to default to the next experience". `DB:Init` checks the saved variables before AceDB makes them:
+  `BetterBagsDB` is nil only when the account has none (AceDB-3.0 `New` creates it only then;
+  nothing reads it before `DB:Init`), and then it sets `nextEnabled = true` in the profile, before
+  `core/init.lua` picks the design, so the first session is already Next. It is saved because it
+  differs from the default (AceDB copies the defaults into the profile and removes the values equal
+  to them at logout). The default stays `false`: AceDB saves only what differs from the defaults, so
+  a default of `true` would turn Next on for every existing player who never touched the setting.
+  A character new to an existing install keeps the account's bags (every character shares the
+  Default profile, `AceDB:New(..., true)`); so does a new or reset profile (the default). A player
+  whose saved variables were deleted counts as new.
+  - `firstTimeMenu` (the classic menu button's first-time bounce) was considered and is not a
+    new-install signal: it is cleared only by the first left-click on the classic menu button
+    (`frames/menubutton.lua`), so an existing player who never left-clicked it (opening settings
+    with `/bb`, sorting with a right-click) still reads as new; Next has no such button, so it would
+    stay set for every Next player and re-apply on every load; and it is per profile.
 - `core/init.lua` makes the design the setting names through `BagSystem` (§11), which creates
   `addon.Bags.Backpack` with `NextBag:Create(ctx)` instead of `BagFrame:Create(ctx, BACKPACK)`
   when it is on; the other design is made the first time the bags switch to it. Nothing else
@@ -1036,4 +1052,5 @@ a pixel, the companion not waiting for an open backpack and the delayed cascade,
 check the half-pixel rule already makes. The exit, feather and sparkle changes: 24 mutations; the five
 that first survived led to the edge-case closing tests above.
 
-Not seen in game yet: closing through the anchor's edge, the feathers, the sparkles.
+Seen in game (the player): the whole of §12, including closing through the anchor's edge, the
+feathers and the sparkles.

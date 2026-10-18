@@ -119,7 +119,10 @@ end
 -- "window") sizes every bag in every view that way (the bags' "Drag to Resize"); opts.theme is the
 -- saved theme; opts.profile(defaults, const) changes any other default the profile starts with;
 -- opts.globals sets globals other addons would (a theme's addon), restored afterwards.
----@param opts? { client?: "retail"|"forever", next?: boolean, sizeMode?: WindowSizeMode, theme?: string, profile?: fun(defaults: table, const: table), globals?: table<string, any> }
+-- opts.install is "existing" (the default: the saved variables of an install that never changed a
+-- setting) or "new" (no saved variables at all: a new install, which starts with BetterBags Next,
+-- next.md §1).
+---@param opts? { client?: "retail"|"forever", next?: boolean, sizeMode?: WindowSizeMode, theme?: string, profile?: fun(defaults: table, const: table), globals?: table<string, any>, install?: "existing"|"new" }
 ---@return WholeAddonHandle
 function WholeAddon.Load(opts)
   opts = opts or {}
@@ -224,10 +227,11 @@ function WholeAddon.Load(opts)
     for name, lib in pairs(libs) do LibStub.libs[name], LibStub.minors[name] = lib, minors[name] end
   end)
 
-  -- The client, with no saved variables yet. WoW: Forever is the camelot project
+  -- The client, with the saved variables of an install that never changed a setting, or none (a new
+  -- install). WoW: Forever is the camelot project
   -- (Blizzard_ProjectConstants/Camelot/ProjectConstants.lua: WOW_PROJECT_CAMELOT = 18).
   local forever = opts.client == "forever"
-  setGlobal("BetterBagsDB", nil)
+  setGlobal("BetterBagsDB", opts.install ~= "new" and {} or nil)
   setGlobal("BetterBagsPerfDB", nil)
   setGlobal("WOW_PROJECT_MAINLINE", 1)
   setGlobal("WOW_PROJECT_CAMELOT", forever and 18 or nil)

@@ -97,7 +97,11 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   in) initializes the addon while its modules are still queued, so the modules it enables are only
   marked; `PLAYER_LOGIN` enables the addon and every marked module. Calling `OnInitialize` and
   `OnEnable` directly is not the same: Sonata would never apply a theme. Saved variables start
-  empty on every load (an earlier load's saved setting would otherwise decide the design).
+  fresh on every load (an earlier load's saved setting would otherwise decide the design): by
+  default those of an install that never changed a setting (`BetterBagsDB = {}`), so the bags are
+  the classic ones unless `next` is set; `install = "new"` starts with none at all, a new install,
+  which starts with BetterBags Next (next.md §1). Before new installs started with Next, every load
+  had none; the existing install keeps every spec written then meaning what it did.
 - **The retail client:** Blizzard's `Enum.BagIndex`, `Enum.PlayerInteractionType`,
   `Enum.ItemQuality` from the API documentation of the live branch, the other values as
   `spec/core/constants_spec.lua` sets them, Blizzard's bag frames and bag-bar buttons (with their
@@ -148,6 +152,7 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   full suite (16 s without it, 48 s with it). Keep whole-addon specs few and pointed: a test needs its own load only when it needs
   a fresh start (what it checks happens the first time something is made). Making the frame mock
   share its methods (one set behind a metatable) would cut both, for every spec.
-- Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e),
+- Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e; and §1: a new
+  install starts with Next, an existing one keeps the classic bags),
   `spec/integration/bank_open_spec.lua` (refresh-scheduler.md §11).
 
