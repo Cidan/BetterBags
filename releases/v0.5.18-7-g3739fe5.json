@@ -1,0 +1,17 @@
+{
+  "id": 1792363058,
+  "version": "v0.5.18-7-g3739fe5",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "5714e9921da508aa8283d6d7c55f0bb5994943ed",
+  "to": "3739fe572187576cb8c1abc800449e5e5bfd20c7",
+  "headline": "Introduces bag chaining in BetterBags Next to dock the backpack and companion windows side by side on one edge of the screen.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Chain bags together on one side in BetterBags Next",
+      "details": "The backpack and companion windows like the bank or vendors can now be chained together on the left or right side of the screen instead of sitting on opposite edges. Clicking a bag's title docks it beside its partner, sends it back, or moves the coupled pair to the opposite edge with animated braided ribbons. Chained layouts are saved per profile and animate smoothly when opening or closing together.",
+      "clients": []
+    }
+  ]
+}
