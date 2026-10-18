@@ -43,12 +43,19 @@ style.TAB_MIN_WIDTH = 76
 style.TAB_MAX_WIDTH = 150
 style.TAB_PADDING = 14
 style.TAB_HOVER = 6
+style.TAB_ICON = 16
+style.TAB_ICON_GAP = 6
+-- The room between the bank's character tabs and its Warbank tabs.
+style.TAB_GROUP_GAP = 10
 
 -- Colors as { r, g, b, a }.
 style.Color = {
   Body = { 0.045, 0.04, 0.085, 0.94 },
   Wash = { 0.55, 0.45, 1.0, 0.16 },
   Gold = { 1.0, 0.84, 0.5, 1 },
+  -- The Warbank's accent, and the wash the panel takes while it shows a Warbank tab.
+  Warbank = { 0.35, 0.85, 0.95, 1 },
+  WarbankWash = { 0.3, 0.75, 1.0, 0.16 },
   White = { 1, 1, 1, 1 },
   Lavender = { 0.78, 0.72, 1.0, 1 },
   Text = { 0.96, 0.95, 1.0, 1 },

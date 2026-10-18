@@ -346,6 +346,12 @@ socket button, `BankItemButtonBagMixin` (`Blizzard_UIPanels_Game/Camelot/BankFra
   false (and hides the tooltip) for an empty socket (`TooltipDataHandler.lua`).
 - Refresh events: `PLAYERBANKSLOTS_CHANGED` and `BAG_CONTAINER_UPDATE`.
 
+BetterBags Next's bank (next.md §6) shows the same sockets in its Bank Tabs mode, through the
+module's `BankSlots:GetBagSocketIndex(bankType, bagIndex)` and `BankSlots:PickupBag(bankType,
+bagIndex)`, which the panel's buttons also call (`GetBagSocketIndex`/`PickupBag` on a button
+delegate to them): its tab is draggable and takes drops, and its icon is the socketed bag's (or an
+empty bag slot).
+
 Rather than add a second row of bag buttons, BetterBags makes the existing tab button in the
 bank "Show Bags" strip (`frames/bankslots.lua`) the socket too, because on Camelot each
 socket is exactly one tab:

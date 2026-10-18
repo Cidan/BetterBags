@@ -161,7 +161,9 @@ next\tween.lua
 next\sparkles.lua
 next\tabs.lua
 next\content.lua
+next\panel.lua
 next\bag.lua
+next\bank.lua
 
 
 config\categorypane.lua

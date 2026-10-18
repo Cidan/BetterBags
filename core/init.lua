@@ -210,7 +210,7 @@ function addon:OnInitialize()
   applyCompat()
   self:HideBlizzardBags()
   local rootctx = context:New('addon_initialize')
-  -- BetterBags Next (next.md) replaces the backpack's frame and draw; the bank is the same.
+  -- BetterBags Next (next.md) replaces the backpack's frame and draw.
   if database:GetNextEnabled() then
     addon.Bags.Backpack = addon:GetModule('NextBag'):Create(rootctx)
   else
@@ -271,9 +271,14 @@ function addon:OnInitialize()
     addon:UpdateButtonHighlight()
   end)
 
-  -- Only create the bank bag if the setting is enabled
+  -- Only create the bank bag if the setting is enabled. BetterBags Next (next.md §6) replaces its
+  -- frame and draw too.
   if database:GetEnableBankBag() then
-    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+    if database:GetNextEnabled() then
+      addon.Bags.Bank = addon:GetModule('NextBank'):Create(rootctx:Copy())
+    else
+      addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+    end
   end
 
   -- Sonata decorates every window registered so far with the saved theme (Default when it is

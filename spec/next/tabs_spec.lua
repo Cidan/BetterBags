@@ -116,6 +116,134 @@ describe("NextTabs", function()
     assert.are.equal(0, x)
   end)
 
+  it("draws the gold bar in the selected tab's accent, gold unless the tab has its own", function()
+    local teal = { 0.2, 0.8, 0.9, 1 }
+    rail:SetTabs({ { id = 1, name = "Bank" }, { id = 2, name = "Warbank", accent = teal } })
+    rail:Select(2)
+    assert.are.same(teal, { rail.indicator:GetVertexColor() })
+    rail:Select(1)
+    assert.are.same(style.Color.Gold, { rail.indicator:GetVertexColor() })
+  end)
+
+  it("leaves a gap above a tab that asks for one, moving every tab after it down", function()
+    rail:SetTabs({ { id = 1, name = "Bank" }, { id = 2, name = "Warbank", gap = 12 }, { id = 3, name = "More" } })
+    local step = style.TAB_HEIGHT + style.TAB_SPACING
+    assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(step + 12) }, { rail.tabs[2].button:GetPoint(1) })
+    assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(2 * step + 12) }, { rail.tabs[3].button:GetPoint(1) })
+    rail:Select(3)
+    assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(2 * step + 12) }, { rail.indicator:GetPoint(1) })
+    assert.are.equal(3 * step + 12, rail.frame:GetHeight())
+  end)
+
+  it("shows a tab's icon beside its name, from a file or an atlas, and makes room for it", function()
+    rail:SetTabs({ { id = 1, name = "Ore Deposits", icon = 12345 }, { id = 2, name = "Warbank", atlas = "warbands-icon" },
+      { id = 3, name = "Plain" } })
+    local ore, warbank, plain = rail.tabs[1], rail.tabs[2], rail.tabs[3]
+    assert.are.equal(12345, ore.icon:GetTexture())
+    assert.is_true(ore.icon:IsShown())
+    assert.are.equal("warbands-icon", warbank.icon:GetAtlas())
+    assert.is_false(plain.icon:IsShown())
+    assert.are.equal(#"Ore Deposits" * 6 + style.TAB_PADDING * 2 + style.TAB_ICON + style.TAB_ICON_GAP, ore.button:GetWidth())
+    rail:SetTabs({ { id = 1, name = "Ore" } })
+    assert.is_false(rail.tabs[1].icon:IsShown(), "a reused tab drops the icon it had")
+  end)
+
+  it("fills the tooltip itself when a tab's tooltip is a function", function()
+    local filled
+    rail:SetTabs({ { id = 1, name = "Tab", tooltip = function(owner)
+      filled = owner
+      GameTooltip:AddLine("custom")
+    end } })
+    local button = rail.tabs[1].button
+    button:GetScript("OnEnter")(button)
+    assert.are.equal(button, filled)
+    assert.are.equal("custom", GameTooltip.lines[1].text)
+  end)
+
+  -- Buying a bank tab is protected: the button must be Blizzard's purchase template, whose own
+  -- click opens the purchase dialog; it is never given an OnClick (next.md §6).
+  describe("purchase tabs", function()
+    it("makes a purchase tab from Blizzard's purchase template, for its bank type, with no click of ours", function()
+      rail:SetTabs({ { id = -1, name = "+", secure = 1 }, { id = -2, name = "+", secure = 2 } })
+      local char, account = rail.tabs[1].button, rail.tabs[2].button
+      assert.are.equal("BankPanelPurchaseButtonScriptTemplate", char._template)
+      assert.are.equal(1, char:GetAttribute("overrideBankType"))
+      assert.are.equal(2, account:GetAttribute("overrideBankType"))
+      assert.is_nil(char:GetScript("OnClick"))
+      local step = style.TAB_HEIGHT + style.TAB_SPACING
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -step }, { account:GetPoint(1) })
+    end)
+
+    it("keeps purchase tabs and ordinary tabs apart when it reuses them", function()
+      rail:SetTabs({ { id = 1, name = "Bank" }, { id = -1, name = "+", secure = 1 } })
+      local plain, purchase = rail.tabs[1].button, rail.tabs[2].button
+      rail:SetTabs({ { id = -2, name = "+", secure = 2 }, { id = 5, name = "Tab" } })
+      assert.are.equal(purchase, rail.tabs[1].button)
+      assert.are.equal(2, purchase:GetAttribute("overrideBankType"))
+      assert.are.equal(plain, rail.tabs[2].button)
+      assert.is_not_nil(plain:GetScript("OnClick"))
+    end)
+  end)
+
+  -- A WoW: Forever bank tab is a bag socket: dragging it or dropping a bag on it moves the bag.
+  it("tells its drag handler when a draggable tab is dragged or has something dropped on it", function()
+    local drags = {}
+    rail:SetDragHandler(function(ctx, id)
+      assert.is_not_nil(ctx)
+      table.insert(drags, id)
+    end)
+    rail:SetTabs({ { id = 7, name = "Socket", draggable = true }, { id = 8, name = "Plain" } })
+    local socket, plain = rail.tabs[1].button, rail.tabs[2].button
+    assert.are.same({ "LeftButton" }, socket._registeredDrags)
+    assert.is_nil(plain._registeredDrags)
+    socket:GetScript("OnDragStart")(socket)
+    socket:GetScript("OnReceiveDrag")(socket)
+    plain:GetScript("OnDragStart")(plain)
+    plain:GetScript("OnReceiveDrag")(plain)
+    assert.are.same({ 7, 7 }, drags)
+  end)
+
+  -- The bank's panel is on the left of the screen: its rail hangs from the body's right edge and
+  -- its tabs stick out to the right (next.md §3, "one panel, two sides").
+  describe("on the left side of the screen", function()
+    local left
+
+    before_each(function()
+      left = nextTabs:Create(body, "LEFT")
+      left:SetTabs(groups)
+    end)
+
+    it("hangs from the body's right edge, its tabs sticking out to the right", function()
+      assert.are.same({ "TOPLEFT", body, "TOPRIGHT", 0, -style.CONTENT_TOP }, { left.frame:GetPoint(1) })
+      local step = style.TAB_HEIGHT + style.TAB_SPACING
+      assert.are.same({ "TOPLEFT", left.frame, "TOPLEFT", 0, -step }, { left.tabs[2].button:GetPoint(1) })
+      assert.are.equal("LEFT", left.tabs[2].text:GetJustifyH())
+    end)
+
+    it("slides a hovered tab out to the right", function()
+      local button = left.tabs[2].button
+      button:GetScript("OnEnter")(button)
+      finishTweens()
+      local _, _, _, x = button:GetPoint(1)
+      assert.are.equal(style.TAB_HOVER, x)
+    end)
+
+    it("puts the gold bar on the body side of the selected tab", function()
+      left:Select(2)
+      local step = style.TAB_HEIGHT + style.TAB_SPACING
+      assert.are.same({ "TOPLEFT", left.frame, "TOPLEFT", 0, -step }, { left.indicator:GetPoint(1) })
+    end)
+
+    it("fades each tab out toward its outer end", function()
+      local g = left.tabs[1].bg._gradient
+      assert.is_true(g.min.a > g.max.a, "opaque at the body, fainter outside")
+      local right = rail
+      right:SetTabs(groups)
+      local rg = right.tabs[1].bg._gradient
+      assert.is_true(rg.max.a > rg.min.a)
+    end)
+  end)
+
   it("reuses its tabs when the groups change, hiding the ones it no longer needs", function()
     rail:SetTabs(groups)
     local first = rail.tabs[1].button

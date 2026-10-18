@@ -7,7 +7,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local style = addon:GetModule('NextStyle')
 
 -- NextSparkles is a small particle emitter (next.md §4): star sprites born where Spawn says,
--- drifting left while they twinkle, spin, shrink and fade. Sprites are pooled. An emitter runs
+-- drifting left (or right) while they twinkle, spin, shrink and fade. Sprites are pooled. An emitter runs
 -- only while started, and its driver is a child of the frame it draws on, so it also stops while
 -- that frame is hidden. It spawns nothing in combat; sparkles already out finish their lives.
 ---@class NextSparkles: AceModule
@@ -29,7 +29,8 @@ local WOBBLE_SPEED = 2.3
 ---@field Max number The most alive at once.
 ---@field Life number[] { shortest, longest } in seconds.
 ---@field Size number[] { smallest, largest } in pixels.
----@field Speed number[] { slowest, fastest } leftward drift, pixels a second.
+---@field Speed number[] { slowest, fastest } drift, pixels a second.
+---@field Direction? number The way they drift: -1 left (the default), 1 right.
 ---@field Rise number[] { lowest, highest } vertical drift, pixels a second (up is positive).
 ---@field Wobble number How far a sparkle bobs up and down, in pixels.
 ---@field Spin number How fast a sparkle spins, radians a second.
@@ -127,7 +128,7 @@ function emitterProto:spawn()
     texture = texture,
     x = x,
     y = y,
-    vx = -between(random, o.Speed),
+    vx = (o.Direction or -1) * between(random, o.Speed),
     vy = between(random, o.Rise),
     age = 0,
     life = between(random, o.Life),

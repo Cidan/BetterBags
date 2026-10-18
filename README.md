@@ -570,15 +570,16 @@ Import and Export strings only contain category information. Set your own style 
 </table>
 
 ## BetterBags Next (experimental)
-An early look at a new backpack design. Turn it on with **BetterBags Next (experimental)** in the settings, or type `/bb next`; BetterBags asks to reload the UI for it to take effect, and the same setting or command turns it off again.
+An early look at a new design for your bags. Turn it on with **BetterBags Next (experimental)** in the settings, or type `/bb next`; BetterBags asks to reload the UI for it to take effect, and the same setting or command turns it off again.
 
-- Your backpack becomes a full-height panel that slides in from the right edge of the screen, with soft, feathered edges instead of a border.
-- Your backpack groups become tabs down the left side of the panel: click one to switch, right-click one to rename or delete it, and click **+** to make a new group.
+- Your backpack becomes a full-height panel that slides in from the right edge of the screen, and your bank its mirror image on the left, both with soft, feathered edges instead of a border.
+- Your groups become tabs down the inner side of each panel: click one to switch, right-click one to rename or delete it, and click **+** to make a new group.
 - Your categories are listed in one column, each its own row of large icons, with Recent Items first and Free Space last. The list scrolls.
-- Sections fade in as the panel opens, items glide to their new places when you sort or loot, and sparkles drift out of the window from the title.
-- Searching, sorting, the settings button, dropping items onto the panel, cooldowns and tooltips work as they do in the regular bag. The bank keeps its regular window.
+- Sections fade in as a panel opens, items glide to their new places when you sort or loot, and sparkles drift out of the window from the title.
+- Searching, sorting, the settings button, dropping items onto the panel, cooldowns and tooltips work as they do in the regular bags.
+- In the bank, your Warbank groups are listed after your bank groups, in teal, and the top of the panel turns teal while one shows. The buttons at the top close the bank, deposit your Warbound items, sort the bank (or the Warbank, while it shows) and switch between your groups and the bank's own tabs, where you can see each tab on its own, buy tabs, and right-click a tab to change its name, icon and deposit settings. In WoW: Forever, drop a bag on a bank tab to use it.
 
-Not there yet: the Show Bags panel, currencies, the bag anchor, the bag menu, dragging categories onto tabs, and the size and opacity settings (the panel has one size). It is an experiment and may change or go away; please report what you think.
+Not there yet: the backpack's Show Bags panel, currencies, the bag anchor, the bag menu, dragging categories onto tabs, and the size and opacity settings (the panels have one size). It is an experiment and may change or go away; please report what you think.
 
 ## Reporting Performance Problems
 If BetterBags makes your game stutter, you can record exactly what it was doing and send that along with your report.

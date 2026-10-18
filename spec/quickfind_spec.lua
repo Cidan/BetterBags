@@ -76,4 +76,13 @@ describe("QuickFind bank tab classification", function()
     assert.is_nil(switched.character)
     assert.is_nil(switched.account)
   end)
+
+  -- A BetterBags Next bank's tab rail has no visual-only switch (next.md §6).
+  it("skips the visual tab switch for a bank whose tabs have none", function()
+    items.GetItemDataFromSlotKey = function()
+      return { bagid = -1, itemInfo = { itemName = "Test Item" } }
+    end
+    addon.Bags = { Bank = { Show = function() end, behavior = {}, tabs = { frame = {} } } }
+    assert.has_no.errors(function() quickfind:ShowInBag("bank:-1_1") end)
+  end)
 end)

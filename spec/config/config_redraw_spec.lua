@@ -178,6 +178,9 @@ describe("Config settings refreshes", function()
       addon.Bags = { Backpack = {}, Bank = { anchor = anchor } }
       handlers.bbanchor()
       assert.are.equal(1, shown)
+      addon.Bags = { Backpack = { anchor = anchor }, Bank = {} }
+      handlers.bbanchor()
+      assert.are.equal(2, shown, "a BetterBags Next bank has no anchor either")
       addon.Bags = savedBags
     end)
 

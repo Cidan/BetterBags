@@ -322,6 +322,21 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       assert.spy(mockMenu.Update).was.called()
       assert.is_not_nil(mockMenu.selectedTabData)
     end)
+
+    -- BetterBags Next's bank opens Blizzard's tab settings without a panel (next.md §6).
+    it("opens a tab's settings for any caller, from the module", function()
+      addon.isRetail = true
+      local mockMenu = CreateFrame("Frame")
+      mockMenu.SetSelectedTab = function(self, id)
+        self.selectedTabData = { ID = id, icon = 1234 }
+      end
+      mockMenu.Update = spy.new(function() end)
+      _G.BankFrame = { BankPanel = { TabSettingsMenu = mockMenu } }
+      addon:GetModule("BankSlots"):OpenTabConfig(7)
+      assert.spy(mockMenu.Update).was.called()
+      assert.are.equal(7, mockMenu.selectedTabData.ID)
+      assert.is_true(mockMenu:IsShown())
+    end)
   end)
 
   describe("5. Stuck Filter / blizzardBankTab Leak on Close", function()
@@ -656,6 +671,23 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       assert.are.equal(2, panel.buttons[2]:GetBagSocketIndex())
       assert.are.equal(3, panel.buttons[3]:GetBagSocketIndex())
       assert.are.equal(9, panel.buttons[9]:GetBagSocketIndex())
+    end)
+
+    -- BetterBags Next's bank shows the same tabs and moves bags through the same sockets
+    -- (next.md §6), so the socket logic is the module's, not only its buttons'.
+    it("maps a tab to its bag socket and moves bags through it for any caller", function()
+      local bankSlots = addon:GetModule("BankSlots")
+      assert.is_nil(bankSlots:GetBagSocketIndex(Enum.BankType.Character, 6))
+      assert.are.equal(2, bankSlots:GetBagSocketIndex(Enum.BankType.Character, 7))
+      assert.is_nil(bankSlots:GetBagSocketIndex(Enum.BankType.Account, 7))
+      bankSlots:PickupBag(Enum.BankType.Character, 8)
+      bankSlots:PickupBag(Enum.BankType.Character, 6)
+      assert.are.same({ { bag = -2, slot = 3 } }, C_Container._pickups)
+      _G.InCombatLockdown = function() return true end
+      bankSlots:PickupBag(Enum.BankType.Character, 8)
+      assert.are.equal(1, #C_Container._pickups)
+      addon.isForever = false
+      assert.is_nil(bankSlots:GetBagSocketIndex(Enum.BankType.Character, 7))
     end)
 
     it("has no bag sockets on live retail", function()

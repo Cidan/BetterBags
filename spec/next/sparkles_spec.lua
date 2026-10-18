@@ -77,6 +77,17 @@ describe("NextSparkles", function()
     assert.is_true(p.angle ~= angle0, "spins")
   end)
 
+  -- The bank's panel is on the left of the screen: its sparkles drift right, out of its window.
+  it("drifts its sparkles right when its direction says so", function()
+    local e = emitter({ Rate = 1, Direction = 1 })
+    e:Start()
+    step(e, 1)
+    local p = e.alive[1]
+    local x0 = xOf(p)
+    step(e, 0.5)
+    assert.is_true(math.abs((xOf(p) - x0) - 20) < 1e-6, "right, 40 a second for half a second")
+  end)
+
   it("fades a sparkle in, then out to nothing at the end of its life, and reuses its sprite", function()
     local e = emitter({ Rate = 1, Max = 1 })
     e:Start()
