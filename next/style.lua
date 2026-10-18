@@ -23,9 +23,12 @@ style.BODY_WIDTH = style.GRID_WIDTH + style.GUTTER + style.PAD * 2
 -- The feathered edge left of the body, transparent to opaque.
 style.FEATHER = 96
 style.WIDTH = style.FEATHER + style.BODY_WIDTH
--- How far the body reaches past the screen's right edge, so the opening overshoot never shows
--- what is behind the panel.
-style.OVERREACH = 40
+-- How far the body reaches past the screen edge, so the opening bounce never shows what is behind
+-- the panel (next.md §3). The panel slides in WIDTH + OVERREACH (HiddenOffset) with outBack
+-- (next/tween.lua), which swings a tenth of that past its place, so the reach must be at least
+-- WIDTH / 9; 4 pixels more spare it rounding.
+style.OPEN_OVERSHOOT = 0.1
+style.OVERREACH = math.ceil(style.WIDTH * style.OPEN_OVERSHOOT / (1 - style.OPEN_OVERSHOOT)) + 4
 
 -- The header, from the body's top: the title, then the search box; the content starts below.
 style.TITLE_TOP = 24
@@ -123,18 +126,6 @@ style.Cloud = {
     { F = 0.55, Y = 19, W = 38, H = 32, Color = "Lavender", A = 0.11 },
     { F = 0.70, Y = -18, W = 32, H = 28, Color = "Lavender", A = 0.09 },
   },
-}
--- The glow on the screen edge as a panel opens (next.md §3): the slide overshoots its place and
--- bounces back, and past the fill's reach (OVERREACH) the screen edge would show what is under the
--- panel. A gold veil covers it, near opaque at the edge (Edge) easing to Mid over the Outer pixels
--- and out to nothing over the Inner ones, under a soft Bloom and a bright Line on the edge and Flow
--- lights moving along it. It rises as the panel swings past its place, full once the swing reaches
--- OVERREACH, and fades at a rate that takes Release seconds from full once it swings back.
-style.EdgeGlow = {
-  Outer = 24, Inner = 32, Edge = 0.88, Mid = 0.62, Release = 0.45,
-  Bloom = { Width = 90, A = 0.22 },
-  Line = { Width = 2, A = 0.45 },
-  Flow = { Count = 3, W = 70, H = 140, A = 0.2, Speed = { 260, 420 } },
 }
 -- White, the shape in the alpha: a soft round glow.
 style.CLOUD_GLOW = "Interface\\AddOns\\BetterBags\\textures\\next\\glow.png"
