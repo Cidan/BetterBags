@@ -1,0 +1,17 @@
+{
+  "id": 1792364511,
+  "version": "v0.5.18-8-gceb61d7",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "3739fe572187576cb8c1abc800449e5e5bfd20c7",
+  "to": "ceb61d77ac8a1c5ddcf4895b8436b0f031ac5d4b",
+  "headline": "New installations of BetterBags now default to the BetterBags Next experience.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "BetterBags Next enabled by default for new installs",
+      "details": "Brand new installations of BetterBags now start with BetterBags Next enabled by default. Existing installations and settings are left unchanged.",
+      "clients": []
+    }
+  ]
+}
