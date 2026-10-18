@@ -1760,10 +1760,24 @@ _G.GetCurrentRegionName = function() return "US" end
 _G.geterrorhandler = function()
   return function(err) return err end
 end
+-- securecallfunction(func, ...) and securecall(func or name, ...): an error in the function is not
+-- passed to the caller; it goes to the default error handler and the call returns nothing,
+-- otherwise the call returns what the function returned (warcraft.wiki.gg API:securecall).
+-- CallbackHandler dispatches every AceEvent message and event through it.
 _G.securecallfunction = function(fn, ...)
-  return pcall(fn, ...)
+  local results = { pcall(fn, ...) }
+  if not results[1] then
+    geterrorhandler()(results[2])
+    return
+  end
+  return unpack(results, 2, table.maxn(results))
 end
-_G.securecall = _G.securecallfunction
+_G.securecall = function(fn, ...)
+  if type(fn) == "string" then
+    fn = _G[fn]
+  end
+  return _G.securecallfunction(fn, ...)
+end
 
 -- Table utilities
 _G.CopyTable = function(t)

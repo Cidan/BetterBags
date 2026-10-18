@@ -427,6 +427,26 @@ describe("Backpack Module Loading and Compatibility Tests", function()
   -- The on-close refresh belongs to the bag frame's OnHide (bagProto:OnClosed), which every
   -- close path fires; refreshing here as well would sweep twice on a normal close. Fading is
   -- the window's (window/window.lua), so the behavior hides the same way with or without it.
+  -- bagProto:Show hands every behavior what to call once its window has finished showing
+  -- (refresh-scheduler.md §11).
+  it("hands the window what to call once it has finished showing", function()
+    local loadBase = assert(loadfile("bags/backpack.lua"))
+    loadBase("BetterBags")
+    local backpack = addon:GetModule("BackpackBehavior")
+    local savedTrigger = addon.TriggerItemContextChanged
+    addon.TriggerItemContextChanged = function() end
+    finally(function() addon.TriggerItemContextChanged = savedTrigger end)
+    local given
+    local mockBag = {
+      frame = CreateFrame("Frame", "BetterBagsBackpackShowTest"),
+      tabsResizedAfterLoad = true,
+      window = { Show = function(_, _, onShown) given = onShown end },
+    }
+    local onShown = function() end
+    backpack:Create(mockBag):OnShow(addon:GetModule("Context"):New("TestShow"), onShown)
+    assert.are.equal(onShown, given)
+  end)
+
   it("hides through the bag's window and does not refresh from its own OnHide", function()
     local loadBase = assert(loadfile("bags/backpack.lua"))
     loadBase("BetterBags")

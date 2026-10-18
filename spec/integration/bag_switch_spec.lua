@@ -68,6 +68,19 @@ describe("switching bag designs on the whole addon", function()
     assert.is_nil(held.items, "its modules")
   end)
 
+  -- AceEvent dispatches through CallbackHandler, which calls each handler with
+  -- securecallfunction: an error in a handler goes to the error handler (warcraft.wiki.gg
+  -- API:securecall), so the harness sees it (test-harness.md §5).
+  it("collects an error thrown in a message or event handler", function()
+    local addon = start({})
+    local events = addon:GetModule("Events")
+    events:RegisterMessage("spec/Throws", function() error("thrown in a handler") end)
+    events:SendMessage(addon:GetModule("Context"):New("spec"), "spec/Throws")
+    assert.equal(1, #handle.errors)
+    assert.is_truthy(tostring(handle.errors[1]):find("thrown in a handler", 1, true))
+    handle.errors = {}
+  end)
+
   it("starts with the classic bags and switches to BetterBags Next and back", function()
     local addon = start()
     assert.are.equal("classic", addon:GetModule("BagSystem"):ActiveDesign())

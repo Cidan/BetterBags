@@ -3511,6 +3511,8 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       -- at 1.25 s with the bank's item data not loaded (478 of 491 items read cold), the banker
       -- interaction's recalculation at 2.08 s, then at 2.51 s the item data arriving with the
       -- tooltip resolution it sets off. The bank must be read once, warm, and not move after.
+      -- The window's show animation (0.1 s classic, 0.45 s Next) ends before the interaction;
+      -- nothing loads until it has (refresh-scheduler.md §11).
       it("reads the bank once, warm, through a bank open in the captured order", function()
         items:OnEnable()
         refresh:OnEnable()
@@ -3537,8 +3539,11 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         override(loader, "PrimeBank", function(_, cb) bankPrimed = cb end)
         override(database, "GetShowBankTabs", function() return false end)
         override(_G, "GameMenuFrame", { IsShown = function() return false end })
-        local shown = 0
-        override(addon, "Bags", { Bank = { bankTab = 6, Show = function() shown = shown + 1 end } })
+        local shown, bankShown = 0, nil
+        override(addon, "Bags", { Bank = { bankTab = 6, Show = function(_, _, _, onShown)
+          shown = shown + 1
+          bankShown = onShown
+        end } })
         override(addon, "atBank", false)
         override(addon, "atInteracting", false)
 
@@ -3569,6 +3574,10 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         fire("BANKFRAME_OPENED")
         drain()
         assert.equal(1, shown, "the bank shows at once")
+        assert.is_nil(bankPrimed, "nothing loads while its window shows")
+        bankShown()
+        drain()
+        assert.is_function(bankPrimed, "loading once it has shown")
         assert.equal(0, bankReads, "and is not read while its item data loads")
 
         -- What core/hooks.lua sends when the banker interaction opens the backpack

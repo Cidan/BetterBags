@@ -350,10 +350,24 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   `window:Hide`). The bank's open setup (`SuppressBlizzardBankPanel`, the active group, money,
   the slots panel) runs before the window shows, never in a fade callback: a stopped fade drops
   its callback (§4). Closing the Classic/Era bank calls `CloseBankFrame` in the hide callback.
+  `bag:Show(ctx, slotInfo, onShown)` runs `onShown` once the window has finished showing: it
+  passes it to `behavior:OnShow(ctx, onShown)`, which passes it to `window:Show`, or, for a bag
+  already open, to `window:Show` directly (which calls back at once, or when a fade still playing
+  ends). A bank open loads the bank then (refresh-scheduler.md §11).
+- **Loading...** (`bag.loadingText`, made in `BuildWindow`): a text in the `Empty` role, centered
+  on the scroll box 10 levels above it, shown while what the bag shows has never been read:
+  before its first draw, after `Wipe` (the bank tears its drawing down when it closes,
+  `SwitchToBankAndWipe`), and for a draw of data without `tabs` (`items:NewSlotInfo` has none
+  until a read commits). `UpdateLoadingText` hides it while the retail bank's Purchase Bank button,
+  in the same place, shows (`bank.proto:UpdatePurchaseBankButton` calls it; BetterBags Next's bank,
+  which uses that method with itself as the bag, has its own text). Asked: "can we add a loading
+  text on the classic bags maybe? just so it's not blank blank". With fading off the bank reads at
+  once, so it shows briefly, and for about a second on a session's first open (the item data).
 
 Coverage: `spec/frames/bag_draw_ownership_spec.lua` ("the bag's window": the window and canvas,
 settings, saved size, minimums, close, scale and opacity per draw, size mode only on change,
-search box placement and reserve, footer, menu button, `OnResize` in both modes),
+search box placement and reserve, footer, menu button, `OnResize` in both modes; "showing a bag
+(Show)": the callback; "the loading text"),
 `spec/frames/bagcanvas_spec.lua`, `spec/frames/menubutton_spec.lua`, `spec/sonata/themes_spec.lua`,
 `spec/config/config_redraw_spec.lua` ("opacity and scale"), `spec/database_spec.lua` (size mode),
 `spec/views/persistent_tabs_spec.lua` ("sizes the bag window around its canvas").

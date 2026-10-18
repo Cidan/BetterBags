@@ -54,3 +54,8 @@ reasoning about it can suggest a cause; it does not establish one.
   after each render that changed it, and every resize and move step. Added for a bank window that
   grew past the screen when its resize grip was clicked, which no capture could explain: the
   profiler shows neither where the window was anchored nor where each section and button went.
+- **When a bank open stopped waiting for its window** (refresh-scheduler.md §11):
+  `Refresh._BankShown(open, reason)` records why the wait ended ("finished", "timeout", "no window")
+  and returns what it did ("loading", "already", "ended"), so a capture of a bank open shows whether
+  the bank loaded after the show animation or on the timeout. Added with the change that loads the
+  bank once its window has shown, so the capture asked for before and after can show it.

@@ -262,19 +262,26 @@ describe("Refresh Module", function()
   -- data; it arrived 1.2 s later and set off another refresh. The bank now shows at once and
   -- is read once its item data has loaded (refresh-scheduler.md §11).
   describe("opening the bank", function()
-    local prime, shown, savedPrimeBank, savedGetShowBankTabs, savedGameMenu
+    local prime, primes, shown, onShown, savedPrimeBank, savedGetShowBankTabs, savedGameMenu
 
     before_each(function()
       events:Init()
       addon.isRetail = true
-      prime, shown = nil, 0
+      prime, primes, shown, onShown = nil, 0, 0, nil
       savedPrimeBank = loader.PrimeBank
-      loader.PrimeBank = function(_, cb) prime = cb end
+      loader.PrimeBank = function(_, cb)
+        primes = primes + 1
+        prime = cb
+      end
       savedGetShowBankTabs = db.GetShowBankTabs
       db.GetShowBankTabs = function() return false end
       savedGameMenu = _G.GameMenuFrame
       _G.GameMenuFrame = { IsShown = function() return false end }
-      addon.Bags = { Bank = { bankTab = 1, Show = function() shown = shown + 1 end } }
+      -- Show(ctx, slotInfo, onShown): onShown runs once the window has finished showing.
+      addon.Bags = { Bank = { bankTab = 1, Show = function(_, _, _, cb)
+        shown = shown + 1
+        onShown = cb
+      end } }
       refresh:OnEnable()
       spy.on(refresh, "RequestUpdate")
     end)
@@ -291,28 +298,48 @@ describe("Refresh Module", function()
       events._eventMap[event].fn(event)
     end
 
-    local function timeouts()
+    local function timers(delay)
       local out = {}
       for _, t in ipairs(delayed) do
-        if t.delay == refresh.BANK_PRIME_TIMEOUT then out[#out + 1] = t end
+        if t.delay == delay then out[#out + 1] = t end
       end
       return out
     end
 
-    it("shows the bank at once and reads it once its item data has loaded", function()
+    local function timeouts()
+      return timers(refresh.BANK_PRIME_TIMEOUT)
+    end
+
+    -- afterStartup runs the startup read OnEnable holds every sweep for (refresh-scheduler.md §8).
+    local function afterStartup()
+      refresh:_StartupRead("primed")
+    end
+
+    -- Asked: "finish our bank window show animation, before we start loading in bank info, just
+    -- to prevent hitching" (refresh-scheduler.md §11).
+    it("shows the bank at once, and loads it only once it has finished showing", function()
       fire("BANKFRAME_OPENED")
       assert.equal(1, shown)
       assert.is_true(addon.atBank)
+      assert.is_function(onShown, "asks to hear when the window has finished showing")
+      assert.equal(0, primes, "loads nothing while the window shows")
+      assert.equal(0, #timeouts())
+      assert.spy(refresh.RequestUpdate).was_not.called()
+      onShown()
+      assert.equal(1, primes)
       assert.spy(refresh.RequestUpdate).was_not.called()
       prime()
       assert.spy(refresh.RequestUpdate).was.called(1)
       assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true, resetLayout = true, bankOpen = "primed" })
       timeouts()[1].fn()
-      assert.spy(refresh.RequestUpdate).was.called(1, "the timeout does nothing once read")
+      timers(refresh.BANK_SHOW_TIMEOUT)[1].fn()
+      assert.spy(refresh.RequestUpdate).was.called(1, "the timeouts do nothing once read")
+      assert.equal(1, primes)
     end)
 
     it("reads it when the data has not loaded in time, and again when it arrives", function()
       fire("BANKFRAME_OPENED")
+      onShown()
       assert.equal(1, #timeouts())
       timeouts()[1].fn()
       assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true, resetLayout = true, bankOpen = "timeout" })
@@ -321,20 +348,98 @@ describe("Refresh Module", function()
       assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true })
     end)
 
-    it("does not read for an open that has ended", function()
+    it("does not load or read for an open that has ended", function()
       fire("BANKFRAME_OPENED")
+      local firstShown = onShown
+      fire("BANKFRAME_CLOSED")
+      firstShown()
+      timers(refresh.BANK_SHOW_TIMEOUT)[1].fn()
+      assert.equal(0, primes, "closed while it showed")
+
+      fire("BANKFRAME_OPENED")
+      onShown()
       local first = prime
       fire("BANKFRAME_CLOSED")
       first()
       assert.spy(refresh.RequestUpdate).was_not.called()
 
       fire("BANKFRAME_OPENED")
+      onShown()
       local second = prime
       first()
       timeouts()[1].fn()
       assert.spy(refresh.RequestUpdate).was_not.called()
       second()
       assert.spy(refresh.RequestUpdate).was.called(1)
+    end)
+
+    -- Escape can hide the window mid-animation (its callback is dropped) while the bank stays
+    -- open, and a theme's animation might never finish.
+    it("loads anyway when the window never says it finished showing", function()
+      fire("BANKFRAME_OPENED")
+      assert.equal(1, #timers(refresh.BANK_SHOW_TIMEOUT))
+      assert.is_true(refresh.BANK_SHOW_TIMEOUT >= 0.45 and refresh.BANK_SHOW_TIMEOUT < refresh.BANK_PRIME_TIMEOUT)
+      timers(refresh.BANK_SHOW_TIMEOUT)[1].fn()
+      assert.equal(1, primes)
+      onShown()
+      assert.equal(1, primes, "loads once")
+    end)
+
+    it("says why each open stopped waiting for its window, for profiler traces", function()
+      spy.on(refresh, "_BankShown")
+      fire("BANKFRAME_OPENED")
+      onShown()
+      timers(refresh.BANK_SHOW_TIMEOUT)[1].fn()
+      assert.spy(refresh._BankShown).was.returned_with("loading")
+      assert.spy(refresh._BankShown).was.called_with(match.is_ref(refresh), match._, "finished")
+      assert.spy(refresh._BankShown).was.returned_with("already")
+      fire("BANKFRAME_CLOSED")
+      fire("BANKFRAME_OPENED")
+      local stale = timers(refresh.BANK_SHOW_TIMEOUT)[1]
+      fire("BANKFRAME_CLOSED")
+      stale.fn()
+      assert.spy(refresh._BankShown).was.returned_with("ended")
+      refresh._BankShown:revert()
+    end)
+
+    it("loads at once without a bank window (Enable Bank Bags off)", function()
+      addon.Bags = {}
+      fire("BANKFRAME_OPENED")
+      assert.equal(1, primes)
+    end)
+
+    -- Nothing reads the bank while its window shows: the open's read reads every bank bag
+    -- after, so a bank sweep asked for meanwhile is covered. The backpack is not held.
+    it("sweeps no bank while its window shows, and the backpack as usual", function()
+      afterStartup()
+      spy.on(items, "RunRefresh")
+      fire("BANKFRAME_OPENED")
+      refresh:RequestUpdate({ backpack = true, bank = true, bags = { [6] = true } })
+      refresh:RequestUpdate({ wipe = true })
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
+      assert.spy(items.RunRefresh).was_not.called_with(items, match._, const.BAG_KIND.BANK)
+      onShown()
+      prime()
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
+      refresh:RequestUpdate({ bank = true, bags = { [6] = true } })
+      local bankSweeps = 0
+      for _, call in ipairs(items.RunRefresh.calls) do
+        if call.vals[3] == const.BAG_KIND.BANK then bankSweeps = bankSweeps + 1 end
+      end
+      assert.equal(2, bankSweeps, "the open's read, then sweeps as usual")
+      items.RunRefresh:revert()
+    end)
+
+    it("sweeps the bank again once the bank closes during the animation and reopens", function()
+      afterStartup()
+      spy.on(items, "RunRefresh")
+      fire("BANKFRAME_OPENED")
+      fire("BANKFRAME_CLOSED")
+      fire("BANKFRAME_OPENED")
+      onShown()
+      prime()
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
+      items.RunRefresh:revert()
     end)
   end)
 

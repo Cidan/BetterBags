@@ -168,7 +168,12 @@ section dragged out of a panel returns to the panel's strata (§7).
   for that tab), right click opens the group menu (rename, delete) and "+" creates a group, both
   through the classic backpack behavior's dialogs. Hidden when groups are off.
 - **Opening:** the panel slides in from the right (0.45 s, a small overshoot), the sparkles start
-  and the sections cascade in. **Closing:** it slides out to the right (0.24 s) and hides. Escape
+  and the sections cascade in. `Show(ctx, slotInfo, onShown)` runs `onShown` once the panel has
+  slid into place: at once when it is open, when a slide still playing ends (callbacks queued on
+  `panel.onShown`), never for a slide that `Hide` or Escape (`OnHidden`) cut short. The bank is
+  loaded then (refresh-scheduler.md §11): it slides in saying "Loading..." (its data has never
+  been read), and its sections cascade in when its read draws. Coverage: `spec/next/bag_spec.lua` ("telling the
+  caller it has finished showing"). **Closing:** it slides out to the right (0.24 s) and hides. Escape
   hides it at once (`UISpecialFrames`). Every way it hides runs `OnClosed` (Recent Items expiry,
   held gaps; recent-items.md §3) and stops the sparkles and moves.
 - **The window is a drop target** (bag-drop-zone.md): an item dropped on the body goes into a free

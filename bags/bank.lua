@@ -90,8 +90,10 @@ function bank:SuppressBlizzardBankPanel()
 	BankPanel:Show()
 end
 
+-- OnShow sets the bank up and shows its window; onShown runs once the window has finished showing.
 ---@param ctx Context
-function bank.proto:OnShow(ctx)
+---@param onShown? fun()
+function bank.proto:OnShow(ctx, onShown)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
 
 	-- Lazy resize tabs on first show to account for fonts loaded by other addons (e.g., GW2 UI)
@@ -133,7 +135,7 @@ function bank.proto:OnShow(ctx)
 	self:SwitchToGroup(ctx, activeGroup)
 
 	self.bag.moneyFrame:Update()
-	self.bag.window:Show(ctx)
+	self.bag.window:Show(ctx, onShown)
 	addon.TriggerItemContextChanged()
 
 	-- Restore the bank tab slots panel when the setting is enabled,
@@ -291,6 +293,11 @@ end
 
 function bank.proto:UpdatePurchaseBankButton()
 	self.bag.purchaseBankButton:SetShown(self:NeedsBankPurchase())
+	-- The classic bag's Loading... gives way to the button. BetterBags Next's bank, which uses these
+	-- methods with itself as the bag (next/bank.lua), draws its own.
+	if self.bag.UpdateLoadingText then
+		self.bag:UpdateLoadingText()
+	end
 end
 
 ---@return FrameStrata

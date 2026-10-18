@@ -148,9 +148,14 @@ describe("Bank Purchase Bank button", function()
       SetTitle = function() end,
       Draw = function() end,
       window = {
-        Show = function() frame:Show() end,
+        Show = function(_, _, onShown)
+          frame:Show()
+          bag.windowOnShown = onShown
+        end,
         Hide = function(_, _, callback) frame:Hide() if callback then callback() end end,
       },
+      loadingUpdates = 0,
+      UpdateLoadingText = function(self) self.loadingUpdates = self.loadingUpdates + 1 end,
     }
     behavior = bankBehavior:Create(bag)
     behavior:OnCreate(newContext())
@@ -211,6 +216,22 @@ describe("Bank Purchase Bank button", function()
   end)
 
   describe("when it shows", function()
+    -- The bank is loaded once its window has finished showing (refresh-scheduler.md §11).
+    it("hands the window what to call once it has finished showing", function()
+      oneCharacterTab()
+      local onShown = function() end
+      behavior:OnShow(newContext(), onShown)
+      assert.are.equal(onShown, bag.windowOnShown)
+    end)
+
+    -- The bag's Loading... text sits where the button does (frames/bag.lua).
+    it("lets the bag's loading text give way to the button, or come back", function()
+      noCharacterTab()
+      local before = bag.loadingUpdates
+      behavior:OnShow(newContext())
+      assert.is_true(bag.loadingUpdates > before)
+    end)
+
     it("shows when the bank opens and the character owns no character bank tab", function()
       noCharacterTab()
       behavior:OnShow(newContext())

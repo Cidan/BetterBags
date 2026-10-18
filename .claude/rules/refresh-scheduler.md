@@ -422,7 +422,7 @@ read"; "upgrade verdict cache": which events read and which recalculate),
 `spec/bags/bank_context_refresh_spec.lua`, `spec/bags/backpack_spec.lua`, `spec/items_spec.lua`
 (late Pawn registration).
 
-## 11. Opening the Bank: Show at Once, Read Once Primed
+## 11. Opening the Bank: Show at Once, Load Once Shown, Read Once Primed
 
 Bank containers have no slots until the bank opens, so the startup read's priming (§8,
 `PrimeAll`) cannot cover them, and `BANKFRAME_OPENED` used to request the bank read at once.
@@ -432,28 +432,69 @@ items was read cold, and their data arrived about 1.2 s later in one batch, whic
 second refresh of both bags (and, before recalculations re-read cold items, re-sorted them on
 screen).
 
+Then the open was primed, but with warm data (every open after a session's first) priming calls
+back in the same frame, so the bank's read started in the first frame of the window's show
+animation and its commit and draw landed in the frames after: inside BetterBags Next's 0.45 s
+slide, or the classic window's fade when Enable Fading is on (0.1 s in Base). Asked: "finish our
+bank window show animation, before we start loading in bank info, just to prevent hitching. bank
+loading is heavy with all the items it has." Earlier captures put bank work in the tens of
+milliseconds to over a hundred (a bank recalculation of 149 ms, §10; a redundant bank draw of
+19 ms, layout-rendering.md §3). No capture of the hitch itself was available; a capture of a warm
+bank open on retail with Next, before and after, is to confirm it (data-driven.md).
+
 Now `BANKFRAME_OPENED` (`data/refresh.lua`):
 1. sets `addon.atBank` and the bank tab as before;
-2. shows the bank window at once (`addon.Bags.Bank:Show`), with the bank's committed items,
-   which are none after a close (a loading screen will go here);
-3. `refresh:_PrimeBankAndRead()`: `itemLoader:PrimeBank` loads every bank slot's item data in
-   one `ContinuableContainer`, and the read (`{ bank = true, resetLayout = true, bankOpen =
-   "primed" }`) runs when it completes. The container calls back synchronously when the data is
-   already cached, so an open with warm data reads in the same frame as before.
-4. `BANK_PRIME_TIMEOUT` (2 s) bounds the wait: Blizzard drops the callbacks of an item whose
-   load fails (`ITEM_DATA_LOAD_RESULT` with `success == false`, `AsyncCallbackSystem.lua`), so
-   the container may never complete. Then the read runs with `bankOpen = "timeout"`, and when
-   the data does arrive the bank is read again (`{ bank = true }`), since that read found it cold.
-5. An open that has ended (`BANKFRAME_CLOSED`, or a new open) does nothing when its priming or
-   timeout completes.
+2. `refresh:_OpenBank(ctx)` shows the bank window at once (`addon.Bags.Bank:Show(ctx, nil,
+   onShown)`), with the bank's committed items, which are none after a close: the classic bag
+   says Loading... (window.md §7), Next's bank its own Loading... (next.md §3);
+3. waits for the window to finish showing. Both designs call `onShown` then: the classic bag
+   passes it to its behavior and on to `window:Show` (at once without a fade, when a fade still
+   playing ends, never for a fade cut short, window.md §4); Next's panel when its slide ends (at
+   once when open, never for a slide closing or Escape cut short, next.md §3). Classic bags do not
+   fade by default (`enableBagFading = false`), so there the window calls back at once and the
+   bank loads at once, as before;
+4. `BANK_SHOW_TIMEOUT` (1 s, past Next's 0.45 s slide) loads the bank anyway if the window never
+   says it finished: Escape can hide it mid-animation while the bank stays open, and a theme's
+   animation might never end;
+5. while the window shows, no sweep reads the bank: `_RunUnit` skips the bank part of any unit
+   while `refresh:BankShowing()`, and the backpack part runs as usual. Nothing is lost: the open's
+   read, which follows, reads every bank bag with a fresh layout, so a bank `BAG_UPDATE` batch, a
+   Classic `PLAYERBANKSLOTS_CHANGED`, a wipe or a bank sort's sweep asked for meanwhile is covered
+   (a sort's pending mark stays set and that read clears it);
+6. `refresh:_BankShown(open, reason)` ends the wait, once, and loads: `_PrimeBankAndRead(open)`.
+   `itemLoader:PrimeBank` loads every bank slot's item data in one `ContinuableContainer`, and the
+   read (`{ bank = true, resetLayout = true, bankOpen = "primed" }`) runs when it completes.
+   `_BankShown` is a method, so a capture's call trace shows when the wait ended and why
+   (`reason` "finished", "timeout" or "no window", with Enable Bank Bags off) and what it did (it
+   returns "loading", "already" or "ended");
+7. `BANK_PRIME_TIMEOUT` (2 s) bounds the wait for the data: Blizzard drops the callbacks of an
+   item whose load fails (`ITEM_DATA_LOAD_RESULT` with `success == false`,
+   `AsyncCallbackSystem.lua`), so the container may never complete. Then the read runs with
+   `bankOpen = "timeout"`, and when the data does arrive the bank is read again (`{ bank = true }`),
+   since that read found it cold;
+8. an open that has ended (`BANKFRAME_CLOSED`, or a new open) does nothing when its window says it
+   has shown, or its priming or a timeout completes. Closing also ends the hold.
 
 `items/RefreshBank/Done` (`core/init.lua`) then draws the shown bank. `bankOpen` marks the read
 in captures, so a capture shows whether the open waited for the data or timed out.
 
-Coverage: `spec/refresh_spec.lua` ("opening the bank": shown at once, read once primed and not
-again on the timeout; read on the timeout and again when the data arrives; nothing for an ended
-open), `spec/loader_spec.lua` ("primes every bank bag, and only bank bags, in one load"), and
-`spec/refresh_pipeline_spec.lua` ("reads the bank once, warm, through a bank open in the
-captured order": replays a captured open, cold item data, the banker interaction, then the data
-and the tooltip resolution arriving, through the real pipeline and queue; it fails with the old
-immediate read).
+**The cost:** the bank's contents appear once its window has shown: 0.45 s later on Next, 0.1 s
+on classic with fading on. Priming also starts after the animation (asked: nothing loads before
+it), so a session's first open, which waits about 1.2 s for the server, waits that much longer;
+priming at once and holding only the read would hide that wait behind the animation, at the cost
+of a loop over every bank slot in its first frame.
+
+Coverage: `spec/refresh_spec.lua` ("opening the bank": shown at once and loaded only once shown,
+read once primed and not again on the timeouts; read on the data timeout and again when the data
+arrives; nothing for an ended open, closed while it showed or after; loaded on the show timeout;
+`_BankShown`'s reasons and returns; loaded at once with no bank window; no bank sweep while it
+shows, the backpack as usual, then sweeps as usual; a reopen), `spec/loader_spec.lua` ("primes
+every bank bag, and only bank bags, in one load"), `spec/refresh_pipeline_spec.lua` ("reads the
+bank once, warm, through a bank open in the captured order": replays a captured open, the window
+finishing its show, cold item data, the banker interaction, then the data and the tooltip
+resolution arriving, through the real pipeline and queue), and
+`spec/integration/bank_open_spec.lua` (the whole addon: no bank read while Next's bank slides in or
+the classic bank fades in, then one read, and Loading... gone once drawn; at once with fading
+off). 29 mutations; the four that first survived led to a harness test (an error in a message
+handler reaches the harness, test-harness.md §5) and to removing two resets of Next's callback list
+that every new slide already does.
