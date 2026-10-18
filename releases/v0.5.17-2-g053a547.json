@@ -1,0 +1,25 @@
+{
+  "id": 1792306208,
+  "version": "v0.5.17-2-g053a547",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "6de2bc1f2f40f1e3ac983b395219bb3a07d7e900",
+  "to": "053a54710c30d69a6a435e21c795644cdd2c6b36",
+  "headline": "Adds bank support to the experimental BetterBags Next redesign and fixes a missing icon on Classic.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Bank panel for BetterBags Next",
+      "details": "Adds the bank panel to the experimental BetterBags Next redesign, opening mirrored on the left side of the screen. Includes support for character and Warbank groups, Bank Tabs mode, tab purchasing and configuration, warbound item deposits, and bag sockets.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "BetterBags Next settings button icon on Classic",
+      "details": "Fixed an issue where the settings button on the experimental Next panel appeared blank on Classic Era and Mists.",
+      "clients": [
+        "Classic"
+      ]
+    }
+  ]
+}
