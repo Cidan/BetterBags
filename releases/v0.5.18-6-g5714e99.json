@@ -1,0 +1,17 @@
+{
+  "id": 1792355960,
+  "version": "v0.5.18-6-g5714e99",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "ad40a94ac1314b3fdc8e6190d79eb09884443937",
+  "to": "5714e9921da508aa8283d6d7c55f0bb5994943ed",
+  "headline": "Opening the bank is now smoother with item loading deferred until window animations finish.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Smoother bank opening animation",
+      "details": "Opening the bank now waits until the window finishes sliding or fading into view before loading items, preventing animation hitching. Bags using the classic view also show a brief Loading message while item data is being retrieved.",
+      "clients": []
+    }
+  ]
+}
