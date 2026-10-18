@@ -1,0 +1,17 @@
+{
+  "id": 1792367906,
+  "version": "v0.6.1",
+  "channel": "release",
+  "date": "2026-10-18",
+  "from": "v0.6.0",
+  "to": "v0.6.1",
+  "headline": "Fixes an issue where items could mistakenly end up in search categories they do not match.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Items wrongly getting stuck in search categories",
+      "details": "Moving or sorting bags could cause an item to inherit the previous slot occupant's search category, leaving unrelated items stuck in that category. Search categories now properly evaluate each item's actual category.",
+      "clients": []
+    }
+  ]
+}
