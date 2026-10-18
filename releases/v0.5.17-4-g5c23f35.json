@@ -1,0 +1,17 @@
+{
+  "id": 1792334043,
+  "version": "v0.5.17-4-g5c23f35",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "c7ba13dd43ef9f415b18f7555985cd32ecc0cf94",
+  "to": "5c23f35a449e1c26d228bfb8599d77a5609f0bd9",
+  "headline": "This build fixes a game crash at login when using the ElvUI theme.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Crash at login with ElvUI theme",
+      "details": "Fixed a game crash occurring right after the loading screen when using the ElvUI theme.",
+      "clients": []
+    }
+  ]
+}
