@@ -1,0 +1,47 @@
+{
+  "id": 1792364699,
+  "version": "v0.6.0",
+  "channel": "release",
+  "date": "2026-10-18",
+  "from": "v0.5.18",
+  "to": "v0.6.0",
+  "headline": "BetterBags Next gains a custom vendor interface, side-by-side window docking, instant style switching, and becomes the default for new installations.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Integrated vendor panel in BetterBags Next",
+      "details": "When visiting a merchant, BetterBags Next now displays a custom vendor panel with categorized stock, Buy, Buyback, and Repair tabs. It includes item search, repair tools, and lets you quickly sell items or entire sections by dragging them onto the window.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Dock backpack and companion panels together",
+      "details": "You can now chain your backpack and companion window (such as the bank or a vendor) together on the same side of the screen in BetterBags Next. Click the title bar to link, unlink, or move the pair across the screen.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Switch bag designs without reloading",
+      "details": "You can now toggle between classic BetterBags and BetterBags Next on the fly without reloading your UI. Switch via addon settings, the /bb next chat command, or buttons in the bag menus.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "BetterBags Next enabled on new installations",
+      "details": "New installations of BetterBags now start with BetterBags Next active by default. Existing installations will keep their current bag settings.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Smoother bank opening and loading indicator",
+      "details": "The bank now waits for its opening animation to finish before reading and drawing items, eliminating animation stutter. Classic bags show a temporary loading message while items load for the first time.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Next animation and visual refinements",
+      "details": "Interaction animations are faster and more consistent, and dropping a section onto the bag will no longer pick up the item beneath it. Window bounce animations no longer reveal the screen edge, and title bars feature a new flowing cloud glow.",
+      "clients": []
+    }
+  ]
+}
