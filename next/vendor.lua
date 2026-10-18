@@ -95,6 +95,7 @@ function nextVendor:Create(ctx)
     openSound = SOUNDKIT.IG_CHARACTER_INFO_OPEN,
     closeSound = SOUNDKIT.IG_CHARACTER_INFO_CLOSE,
     noDrag = true,
+    chainRole = "companion",
   })
   v.tab = TAB_BUY
   v.atMerchant = false

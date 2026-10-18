@@ -49,7 +49,7 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDrag", "next/drag.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
+  { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
   { "NextVendor", "next/vendor.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -148,6 +148,7 @@ describe("NextVendor", function()
     MerchantFrame:Hide()
     override(stubs.L, "G", function(_, key) return key end)
     override(stubs.items, "ExpireRecentItems", function() return false end)
+    override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetInBagSearch", function() return true end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
     override(stubs.events, "SendMessage", function() end)
@@ -205,6 +206,20 @@ describe("NextVendor", function()
   teardown(function()
     for i = #modules, 1, -1 do ResetModuleStub(modules[i][1]) end
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
+  end)
+
+  -- Vendors, banks and the backpack chain alike (next.md §12): the vendor is the backpack's
+  -- companion, like the bank, and its name chains it.
+  describe("chaining", function()
+    it("is the backpack's companion, and its name goes to the chain", function()
+      local v = nextVendor:Create(ctx())
+      local chain = addon:GetModule("NextChain")
+      assert.are.equal("companion", v.chainRole)
+      local clicked
+      override(chain, "Click", function(_, _, panel) clicked = panel return "alone" end)
+      v.titleButton:GetScript("OnClick")(v.titleButton, "LeftButton")
+      assert.are.equal(v, clicked)
+    end)
   end)
 
   describe("the panel", function()

@@ -9,6 +9,9 @@ local style = addon:GetModule('NextStyle')
 ---@class NextTween: AceModule
 local tween = addon:GetModule('NextTween')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 -- NextTabs is BetterBagsNext's tab rail (next.md §3): a tab per entry, stacked down the body's
 -- inner edge and sticking out over the feathered edge like bookmarks: to the left of the
 -- backpack's panel (the right side of the screen), to the right of the bank's (the left side).
@@ -54,6 +57,7 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field dropTarget? number The tab a dragged section would drop on (next.md §7).
 ---@field onClick? fun(ctx: Context, id: number, button: string)
 ---@field onDrag? fun(ctx: Context, id: number)
+---@field onResize? fun(ctx: Context) Runs after the tabs are set, which can change the rail's width.
 local railProto = {}
 addon:GetModule('Perf'):RegisterPrototype(railProto, 'NextTabRail')
 
@@ -94,6 +98,12 @@ end
 ---@param fn fun(ctx: Context, id: number)
 function railProto:SetDragHandler(fn)
   self.onDrag = fn
+end
+
+-- SetResizeHandler sets what runs after the tabs are set (their widths can have changed).
+---@param fn fun(ctx: Context)
+function railProto:SetResizeHandler(fn)
+  self.onResize = fn
 end
 
 -- edge is the point a tab and the bar hang from: the body's side of the rail.
@@ -298,6 +308,20 @@ function railProto:SetTabs(entries)
   end
   self.frame:SetHeight(#entries > 0 and (y + STEP) or 1)
   self:Select(self.selected)
+  if self.onResize then
+    self.onResize(context:New("NextTabs_Resize"))
+  end
+end
+
+-- Width is how far the rail's tabs stick out from the body: its widest tab, without the hover
+-- slide; 0 with no tabs.
+---@return number
+function railProto:Width()
+  local widest = 0
+  for _, tab in ipairs(self.tabs) do
+    widest = math.max(widest, tab.button:GetWidth())
+  end
+  return widest
 end
 
 ---@private

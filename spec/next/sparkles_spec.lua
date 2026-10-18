@@ -117,6 +117,25 @@ describe("NextSparkles", function()
     assert.are.equal(0, #e.alive)
   end)
 
+  -- The knot's burst as two chained bags couple (next.md §12).
+  it("bursts sparkles out at once, never past Max, and lets them live out their lives", function()
+    local e = emitter({ Rate = 0, Max = 6 })
+    e:Burst(4)
+    assert.are.equal(4, #e.alive)
+    assert.is_not_nil(e.frame:GetScript("OnUpdate"), "running")
+    e:Burst(10)
+    assert.are.equal(6, #e.alive, "capped")
+    step(e, 2.5)
+    assert.are.equal(0, #e.alive)
+  end)
+
+  it("bursts nothing in combat", function()
+    local e = emitter({ Rate = 0 })
+    combat = true
+    e:Burst(4)
+    assert.are.equal(0, #e.alive)
+  end)
+
   it("clears every sparkle when it stops", function()
     local e = emitter()
     e:Start()

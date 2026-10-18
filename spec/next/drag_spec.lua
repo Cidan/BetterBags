@@ -52,7 +52,7 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDrag", "next/drag.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
+  { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
   { "NextBank", "next/bank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -256,6 +256,7 @@ describe("NextDrag", function()
     override(stubs.database, "GetGroupsEnabled", function() return true end)
     override(stubs.database, "GetActiveGroup", function(_, kind) return db.active[kind] end)
     override(stubs.database, "SetActiveGroup", function(_, kind, id) db.active[kind] = id end)
+    override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetInBagSearch", function() return true end)
     override(stubs.database, "GetShowBankTabs", function() return db.showBankTabs end)
     override(stubs.database, "SetShowBankTabs", function(_, on) db.showBankTabs = on end)

@@ -54,6 +54,9 @@ local nextContent = addon:GetModule('NextContent')
 ---@class NextDrag: AceModule
 local nextDrag = addon:GetModule('NextDrag')
 
+---@class NextChain: AceModule
+local chain = addon:GetModule('NextChain')
+
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
@@ -61,14 +64,17 @@ local sectionFrame = addon:GetModule('SectionFrame')
 -- side of the screen that slides in from that edge, its inner edge feathered out to nothing, with
 -- the title and its sparkles, a search box, the tabs down its inner side, the content in one
 -- column and a footer. Everything mirrors with the side: the backpack is on the right, the bank on
--- the left. A kind (next/bag.lua, next/bank.lua) makes its prototype with Extend and supplies its
+-- the left. Where a panel rests, at its edge or chained beside its partner, is NextChain's
+-- (next/chain.lua). A kind (next/bag.lua, next/bank.lua) makes its prototype with Extend and supplies its
 -- header buttons, its tabs and what they do, what opening and closing do, sorting and refreshing.
 ---@class NextPanel: AceModule
 ---@field proto NextPanelFrame The panel's prototype every kind's chains to.
 local nextPanel = addon:NewModule('NextPanel')
 
 -- The ribbon running from the title out of the window.
-local RIBBON_LENGTH = 300
+local RIBBON_LENGTH = style.RIBBON_LENGTH
+-- Sparkles a second along a feathered edge.
+local EDGE_SPARKLE_RATE = 2.5
 -- The spark gliding in along it, and how much it grows as it settles into the title's cloud.
 local SPARK_SIZE = 26
 local SPARK_GROWTH = 18
@@ -76,6 +82,20 @@ local SPARK_GROWTH = 18
 local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 0.15 }, { 6, 0.06 }, { -6, 0.06 } }
 
 ---@alias NextSide "RIGHT"|"LEFT"
+
+-- A bag's half of the braid two coupled bags' ribbons twist into (next.md §12): two strands of
+-- lines from its body edge to the middle of the gap, lights running along them, and the knot in the
+-- middle (shown by the chained bag).
+---@class (exact) NextBraid
+---@field strands Line[][]
+---@field beads Texture[]
+---@field knot Texture
+---@field amount number 0 (straight ribbon) to 1 (braided).
+---@field half number From the body edge to the middle of the gap.
+---@field chained boolean It is the chained bag (it shows the knot).
+---@field phase number
+---@field time number
+---@field swell number The knot's swell as the pair couples.
 
 -- A puff of the title's cloud and where it rests: x along and y above the title's middle, from the
 -- title's point the ribbon joins (TitleJoin), its size and alpha before it breathes.
@@ -101,6 +121,7 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field openSound number
 ---@field closeSound number
 ---@field noDrag? boolean Its sections are not dragged, and nothing is dropped on it (the vendor).
+---@field chainRole "backpack"|"companion" What it is in the chain (next.md §12).
 
 ---@class (exact) NextHeaderButton
 ---@field key string The field the button is kept in on the panel.
@@ -118,7 +139,20 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field closeSound number
 ---@field frame Frame The panel.
 ---@field body Frame The opaque part, inside the feathered edge.
----@field fill Texture The body's color, reaching OVERREACH past the screen edge.
+---@field fill Texture The body's color, reaching OVERREACH past the screen edge while docked.
+---@field outerFeather Texture The body's far edge feathered out, while it is not at its screen edge.
+---@field docked boolean It is at its screen edge (not beside its anchor, nor flying).
+---@field chainRole "backpack"|"companion"
+---@field target? number The offset it is headed to (or rests at).
+---@field ribbonLines Texture[] The ribbon and its glow lines.
+---@field ribbonLength number How far the ribbon reaches from the body: full length, or the middle of
+--- the gap while coupled.
+---@field titleButton Button Over the title: a click chains (next.md §12).
+---@field titleGlow Texture Behind the title, lit while the pointer is over it.
+---@field braid NextBraid This bag's half of the braid while coupled.
+---@field knotSparkles NextSparkleEmitter Bursts from the knot as the pair couples.
+---@field sparkSpread number How far out from the body the ribbon's sparkles are born.
+---@field edgeOuter boolean The edge sparkles are on the far (outer) edge.
 ---@field feather Texture
 ---@field wash Texture The faint color at the top of the body.
 ---@field dropGlow Texture Lit while a section from the other bag would drop here (next.md §7).
@@ -220,6 +254,7 @@ function nextPanel:Create(proto, opts)
   if not opts.noDrag then
     nextDrag:Register(p)
   end
+  chain:Register(p, opts.chainRole)
   return p
 end
 
@@ -249,6 +284,78 @@ function panelProto:setOffset(x)
     frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, 0)
     frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", x, 0)
   end
+end
+
+-- RestOffset is where the panel rests: at its edge, or beside its anchor (next.md §12).
+---@return number
+function panelProto:RestOffset()
+  return chain:RestOffset(self)
+end
+
+-- SetDocked shapes the body's far edge: at its screen edge the fill and the wash reach OVERREACH past
+-- it, so the opening bounce never shows what is behind; away from it (beside its anchor, or flying)
+-- they stop at the frame and the far edge feathers out toward the middle of the screen.
+---@param docked boolean
+function panelProto:SetDocked(docked)
+  self.docked = docked
+  local reach = docked and style.OVERREACH or 0
+  local frame = self.frame
+  if self.side == "LEFT" then
+    self.fill:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, 0)
+    self.wash:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, 0)
+  else
+    self.fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", reach, 0)
+    self.wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", reach, 0)
+  end
+  self.outerFeather:SetShown(not docked)
+  self:updateEdgeSparkles()
+end
+
+-- finishShowing calls what waited for the panel to finish showing (Show's onShown), once.
+---@private
+function panelProto:finishShowing()
+  local callbacks = self.onShown or {}
+  self.onShown = nil
+  for _, callback in ipairs(callbacks) do
+    callback()
+  end
+end
+
+-- FlyTo flies the panel to an offset (chaining, next.md §12): detached from its edge as it leaves,
+-- docked again if it comes to rest there. A flight that took over an opening slide still says when
+-- the panel has finished showing.
+---@param to number
+function panelProto:FlyTo(to)
+  self.target = to
+  if to ~= 0 then
+    self:SetDocked(false)
+  end
+  tween:Play(self, {
+    duration = style.Time.Fly,
+    from = self.offset,
+    to = to,
+    ease = "inOutSine",
+    onUpdate = function(x)
+      self:setOffset(x)
+    end,
+    onDone = function()
+      if to == 0 then
+        self:SetDocked(true)
+      end
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- PlaceAt puts the panel at an offset at once (the screen changed).
+---@param to number
+function panelProto:PlaceAt(to)
+  tween:Stop(self)
+  self.target = to
+  self:setOffset(to)
+  self:SetDocked(to == 0)
+  self:finishShowing()
 end
 
 -- BuildPanel makes the panel: full height on its edge of the screen, its body a deep indigo with
@@ -310,6 +417,23 @@ function panelProto:BuildPanel(name)
   fill:SetColorTexture(unpack(style.Color.Body))
   self.fill = fill
   self.feather = feather
+
+  -- The far edge feathered out toward the middle of the screen, while not at its edge (SetDocked).
+  local outerFeather = frame:CreateTexture(nil, "BACKGROUND")
+  outerFeather:SetWidth(style.FEATHER)
+  outerFeather:SetColorTexture(1, 1, 1, 1)
+  if left then
+    outerFeather:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 0)
+    outerFeather:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 0)
+    outerFeather:SetGradient("HORIZONTAL", style:CreateColor("Body", 0), style:CreateColor("Body"))
+  else
+    outerFeather:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, 0)
+    outerFeather:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 0, 0)
+    outerFeather:SetGradient("HORIZONTAL", style:CreateColor("Body"), style:CreateColor("Body", 0))
+  end
+  outerFeather:Hide()
+  self.outerFeather = outerFeather
+  self.docked = true
 
   wash:SetHeight(260)
   wash:SetColorTexture(1, 1, 1, 1)
@@ -607,8 +731,11 @@ function panelProto:BuildHeader(text)
   cloud.join:SetSize(C.Join.Size, C.Join.Size)
   cloud.join:SetPoint("CENTER", title, point, joinX, 0)
 
+  self.ribbonLines = {}
+  self.ribbonLength = RIBBON_LENGTH
   for _, glow in ipairs(RIBBON_GLOW) do
     local line = frame:CreateTexture(nil, "ARTWORK", nil, 0)
+    table.insert(self.ribbonLines, line)
     line:SetSize(RIBBON_LENGTH, 2)
     line:SetColorTexture(1, 1, 1, 1)
     if left then
@@ -642,6 +769,8 @@ function panelProto:BuildHeader(text)
   self.spark = spark
 
   self:LayoutCloud()
+  self:BuildBraid()
+  self:BuildTitleButton()
 
   self.headerButtons = {}
   for _, spec in ipairs(self:GetHeaderButtons()) do
@@ -650,6 +779,200 @@ function panelProto:BuildHeader(text)
     table.insert(self.headerButtons, button)
   end
   self:LayoutHeader()
+end
+
+-- BuildTitleButton makes the title a button (next.md §12): a click chains the bag to its partner,
+-- puts it back, or moves both across; the pointer over it lights a soft glow behind the title and
+-- says what a click does.
+function panelProto:BuildTitleButton()
+  local frame, title = self.frame, self.title
+  local glow = frame:CreateTexture(nil, "ARTWORK", nil, -3)
+  glow:SetTexture(style.CLOUD_GLOW)
+  glow:SetBlendMode("ADD")
+  local gold = style.Color.Gold
+  glow:SetVertexColor(gold[1], gold[2], gold[3])
+  glow:SetPoint("TOPLEFT", title, "TOPLEFT", -24, 14)
+  glow:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", 24, -14)
+  glow:SetAlpha(0)
+  self.titleGlow = glow
+
+  local button = CreateFrame("Button", nil, frame)
+  button:SetPoint("TOPLEFT", title, "TOPLEFT", -8, 6)
+  button:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", 8, -6)
+  button:SetFrameLevel(frame:GetFrameLevel() + 55)
+  button:RegisterForClicks("LeftButtonUp")
+  addon.SetScript(button, "OnClick", function(ctx)
+    chain:Click(ctx, self)
+  end)
+  addon.SetScript(button, "OnEnter", function()
+    self:lightTitle(true)
+    GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
+    GameTooltip:SetText(self.title:GetText())
+    GameTooltip:AddLine(chain:Tooltip(self), 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  addon.SetScript(button, "OnLeave", function()
+    self:lightTitle(false)
+    GameTooltip:Hide()
+  end)
+  self.titleButton = button
+end
+
+---@private
+---@param on boolean
+function panelProto:lightTitle(on)
+  local glow = self.titleGlow
+  tween:Play(glow, {
+    duration = style.Time.Hover,
+    from = glow:GetAlpha(),
+    to = on and 0.3 or 0,
+    onUpdate = function(v)
+      glow:SetAlpha(v)
+    end,
+  })
+end
+
+-- BuildBraid makes this bag's half of the braid (next.md §12), hidden until it couples: two strands
+-- of additive gold lines, the lights that run along them, and the knot in the middle of the gap.
+function panelProto:BuildBraid()
+  local frame, C = self.frame, style.Chain
+  local gold = style.Color.Gold
+  local braid = { strands = { {}, {} }, beads = {}, amount = 0, half = 0, chained = false, phase = 0, time = 0,
+    swell = 0 }
+  for s = 1, 2 do
+    for _ = 1, C.Segments do
+      local line = frame:CreateLine(nil, "ARTWORK", nil, 1)
+      line:SetColorTexture(1, 1, 1, 1)
+      line:SetVertexColor(gold[1], gold[2], gold[3])
+      line:SetBlendMode("ADD")
+      line:SetThickness(C.Thickness)
+      line:Hide()
+      table.insert(braid.strands[s], line)
+    end
+  end
+  for _ = 1, C.Beads do
+    local bead = frame:CreateTexture(nil, "ARTWORK", nil, 2)
+    bead:SetTexture(style.CLOUD_GLOW)
+    bead:SetBlendMode("ADD")
+    bead:SetVertexColor(1, 0.95, 0.8)
+    bead:SetSize(C.BeadSize, C.BeadSize)
+    bead:Hide()
+    table.insert(braid.beads, bead)
+  end
+  local knot = frame:CreateTexture(nil, "ARTWORK", nil, 3)
+  knot:SetTexture(style.CLOUD_GLOW)
+  knot:SetBlendMode("ADD")
+  knot:SetVertexColor(gold[1], gold[2], gold[3])
+  knot:SetSize(C.KnotSize, C.KnotSize)
+  knot:Hide()
+  braid.knot = knot
+  self.braid = braid
+end
+
+-- SetCoupling draws this bag's half of the braid: amount from 0 (straight ribbon, no braid) to 1,
+-- half the gap's width, whether it is the chained bag (which shows the knot), and how far the braid
+-- has turned. Its ribbon reaches the middle of the gap as it couples, and its sparkles stay on its
+-- side.
+---@param amount number
+---@param half number
+---@param chained boolean
+---@param phase number
+---@param time number
+function panelProto:SetCoupling(amount, half, chained, phase, time)
+  local braid = self.braid
+  braid.amount, braid.half, braid.chained, braid.phase, braid.time = amount, half, chained, phase, time
+  self.ribbonLength = RIBBON_LENGTH + (math.min(half, RIBBON_LENGTH) - RIBBON_LENGTH) * amount
+  for _, line in ipairs(self.ribbonLines) do
+    line:SetWidth(self.ribbonLength)
+  end
+  local o = self.sparkles.options
+  if amount > 0 then
+    -- Ribbon sparkles die before the middle of the gap, so none drifts over the other bag.
+    self.sparkSpread = half * 0.3
+    o.Life = { 1.0, 1.6 }
+    o.Speed = { 3, half * 0.5 / 1.6 }
+  else
+    self.sparkSpread = 70
+    o.Life = { 2.0, 3.6 }
+    o.Speed = { 22, 64 }
+  end
+  self:updateEdgeSparkles()
+  self:applyBraid()
+end
+
+-- applyBraid lays this bag's half of the braid out. A strand's height above the ribbon at d pixels
+-- from the body edge is the same function of the distance from the middle of the gap on both bags,
+-- so the halves meet: s = (d - half) on the left bag, (half - d) on the right one, turning with the
+-- braid; it swells from nothing at the body to the full amplitude in the middle, and the second
+-- strand mirrors the first, so they cross. The strand in front (by the turn) is brighter.
+---@private
+function panelProto:applyBraid()
+  local braid, C = self.braid, style.Chain
+  local shown = braid.amount > 0 and braid.half > 0
+  if not shown then
+    for _, strand in ipairs(braid.strands) do
+      for _, line in ipairs(strand) do
+        line:Hide()
+      end
+    end
+    for _, bead in ipairs(braid.beads) do
+      bead:Hide()
+    end
+    braid.knot:Hide()
+    return
+  end
+  local point, joinX = self:TitleJoin()
+  local out, h, n = self:Outward(), braid.half, C.Segments
+  local amp = C.Amplitude * braid.amount
+  local k = 2 * math.pi / C.Wavelength
+  local function at(d, sign)
+    local s = (d - h) * out
+    return sign * amp * math.sin(math.pi * d / (2 * h)) * math.sin(k * s + braid.phase), s
+  end
+  for strand = 1, 2 do
+    local sign = strand == 1 and 1 or -1
+    for i, line in ipairs(braid.strands[strand]) do
+      local d0, d1 = h * (i - 1) / n, h * i / n
+      local y0 = at(d0, sign)
+      local y1, s1 = at(d1, sign)
+      line:SetStartPoint(point, self.title, joinX + out * d0, y0)
+      line:SetEndPoint(point, self.title, joinX + out * d1, y1)
+      local front = sign * math.cos(k * s1 + braid.phase)
+      line:SetAlpha(C.Alpha * braid.amount * (1 - C.Depth * (1 - front) / 2))
+      line:Show()
+    end
+  end
+  for i, bead in ipairs(braid.beads) do
+    local u = (braid.time / C.BeadTime + (i - 1) / #braid.beads) % 1
+    local d = u * h
+    local y = at(d, i % 2 == 0 and -1 or 1)
+    bead:SetPoint("CENTER", self.title, point, joinX + out * d, y)
+    bead:SetAlpha(math.sin(math.pi * u) * braid.amount)
+    bead:Show()
+  end
+  local knot = braid.knot
+  if braid.chained then
+    knot:SetPoint("CENTER", self.title, point, joinX + out * h, at(h, 1))
+    knot:SetAlpha(C.KnotAlpha * braid.amount * (1 + C.KnotSwell * braid.swell))
+    knot:Show()
+  else
+    knot:Hide()
+  end
+end
+
+-- BurstKnot flashes the knot and bursts sparkles from it, as the pair couples.
+function panelProto:BurstKnot()
+  local braid = self.braid
+  tween:Play(braid.knot, {
+    duration = style.Time.Couple,
+    from = 1,
+    to = 0,
+    onUpdate = function(v)
+      braid.swell = v
+      self:applyBraid()
+    end,
+  })
+  self.knotSparkles:Burst(12)
 end
 
 -- LayoutHeader lines the shown header buttons up from the screen edge, so a hidden one leaves
@@ -817,20 +1140,48 @@ function panelProto:BuildSparkles()
       return titleEdge + joinX + inward * span * math.random() ^ 1.7, titleMiddle + y
     end,
   })
+  self.sparkSpread = 70
   self.sparkles = sparkles:Create(fx, {
     Rate = 8, Max = 28, Life = { 2.0, 3.6 }, Size = { 6, 15 }, Speed = { 22, 64 }, Rise = { -8, 10 },
     Wobble = 4, Spin = 1.5, Direction = out,
     Spawn = function()
-      return ribbonStart + out * math.random() * 70, titleMiddle + (math.random() * 2 - 1) * 8
+      return ribbonStart + out * math.random() * self.sparkSpread, titleMiddle + (math.random() * 2 - 1) * 8
     end,
   })
+  -- Along the feathered edge facing the world: the inner one at its screen edge, the far one when
+  -- it is not (updateEdgeSparkles).
+  local outerEdge = self.side == "LEFT" and 0 or style.WIDTH
+  self.edgeOuter = false
   self.edgeSparkles = sparkles:Create(fx, {
-    Rate = 2.5, Max = 12, Life = { 2.4, 4.2 }, Size = { 4, 9 }, Speed = { 14, 36 }, Rise = { -6, 6 },
+    Rate = EDGE_SPARKLE_RATE, Max = 12, Life = { 2.4, 4.2 }, Size = { 4, 9 }, Speed = { 14, 36 }, Rise = { -6, 6 },
     Wobble = 3, Spin = 1, Alpha = 0.6, Direction = out,
     Spawn = function()
+      if self.edgeOuter then
+        return outerEdge - out * math.random() * 24, -math.random() * fx:GetHeight()
+      end
       return edge + out * math.random() * 24, -math.random() * fx:GetHeight()
     end,
   })
+  -- From the knot in the middle of the gap, as the pair couples (BurstKnot).
+  self.knotSparkles = sparkles:Create(fx, {
+    Rate = 0, Max = 16, Life = { 0.5, 1.1 }, Size = { 4, 10 }, Speed = { 12, 40 }, Rise = { -16, 16 },
+    Wobble = 2, Spin = 2, Alpha = 0.9, Direction = out,
+    Spawn = function()
+      return ribbonStart + out * self.braid.half, titleMiddle
+    end,
+  })
+end
+
+-- updateEdgeSparkles puts the edge sparkles on the feathered edge that faces the world: the inner
+-- one at the screen edge, the far one beside an anchor or flying (drifting toward the middle of the
+-- screen). An anchor's inner edge faces the bag chained to it, so a coupled anchor has none.
+---@private
+function panelProto:updateEdgeSparkles()
+  local o = self.edgeSparkles.options
+  local out = self:Outward()
+  self.edgeOuter = not self.docked
+  o.Direction = self.edgeOuter and -out or out
+  o.Rate = (self.braid.amount > 0 and not self.braid.chained) and 0 or EDGE_SPARKLE_RATE
 end
 
 -- BuildTabs makes the tab rail down the body's inner edge and lists the kind's tabs.
@@ -841,6 +1192,10 @@ function panelProto:BuildTabs()
   end)
   self.tabs:SetDragHandler(function(ctx, id)
     self:OnTabDragged(ctx, id)
+  end)
+  -- Chained, the gap between the bags follows their tabs' widths (next.md §12).
+  self.tabs:SetResizeHandler(function(ctx)
+    chain:Update(ctx)
   end)
   self:RefreshTabs()
 end
@@ -926,7 +1281,7 @@ function panelProto:playShimmer()
     onUpdate = function(t)
       local p = tween.Ease.inOutSine(t)
       spark:ClearAllPoints()
-      spark:SetPoint("CENTER", self.ribbon, inner, out * (1 - p) * RIBBON_LENGTH, 0)
+      spark:SetPoint("CENTER", self.ribbon, inner, out * (1 - p) * self.ribbonLength, 0)
       spark:SetSize(size, size)
       spark:SetAlpha(math.sin(math.pi * t / 2))
       self:SetCloudSwell(t > 0.6 and ((t - 0.6) / 0.4) ^ 2 or 0)
@@ -984,9 +1339,23 @@ function panelProto:Show(ctx, slotInfo, onShown)
   self.closing = false
   PlaySound(self.openSound)
   self:OnShowing(ctx)
-  local from = sliding and self.offset or self:HiddenOffset()
-  self:setOffset(from)
   self.frame:Show()
+  -- Where it rests: at its edge, or beside its open anchor, coming in from behind the anchor or
+  -- from its own edge (next.md §12).
+  local to = self:RestOffset()
+  local anchor = chain:AnchorOf(self)
+  local from = self:HiddenOffset()
+  if sliding then
+    from = self.offset
+  elseif anchor ~= nil then
+    from = chain:EntranceOffset(self)
+    if style.Chain.Enter ~= "edge" then
+      self.frame:SetFrameLevel(math.max(1, anchor.frame:GetFrameLevel() - 100))
+    end
+  end
+  self.target = to
+  self:setOffset(from)
+  self:SetDocked(to == 0)
   local drew = false
   if self.drawPendingOnShow then
     self.drawPendingOnShow = false
@@ -998,20 +1367,18 @@ function panelProto:Show(ctx, slotInfo, onShown)
       drew = true
     end
   end
+  local entering = to ~= 0
   tween:Play(self, {
-    duration = style.Time.Open,
+    duration = entering and style.Time.Enter or style.Time.Open,
     from = from,
-    to = 0,
-    ease = "outBack",
+    to = to,
+    ease = entering and "outCubic" or "outBack",
     onUpdate = function(x)
       self:setOffset(x)
     end,
     onDone = function()
-      local callbacks = self.onShown or {}
-      self.onShown = nil
-      for _, callback in ipairs(callbacks) do
-        callback()
-      end
+      self:finishShowing()
+      chain:Arrived(self)
     end,
   })
   self.content:Cascade(true, style.Time.OpenCascadeDelay)
@@ -1020,6 +1387,7 @@ function panelProto:Show(ctx, slotInfo, onShown)
   self.cloudSparkles:Start()
   self:playShimmer()
   addon.TriggerItemContextChanged()
+  chain:Update(ctx)
   return drew
 end
 
@@ -1038,6 +1406,8 @@ function panelProto:Hide(ctx)
   addon.ForceHideBlizzardBags()
   PlaySound(self.closeSound)
   self.closing = true
+  self.target = self:HiddenOffset()
+  chain:Update(ctx)
   tween:Play(self, {
     duration = style.Time.Close,
     from = self.offset,
@@ -1100,6 +1470,8 @@ function panelProto:OnHidden(ctx)
   self.sparkles:Stop()
   self.edgeSparkles:Stop()
   self.cloudSparkles:Stop()
+  self.knotSparkles:Stop()
+  chain:Update(ctx)
   self:OnClosed(ctx)
 end
 

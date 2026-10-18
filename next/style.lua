@@ -96,11 +96,37 @@ style.Time = {
   Land = INTERACTION,
   FlyAway = INTERACTION,
   Pulse = 0.6,
+  -- Chaining (next.md §12): a bag flying to its partner, or home, or both moving across; a chained
+  -- bag coming in beside its open partner; the ribbons twisting together, and coming apart.
+  Fly = 0.7,
+  Enter = 0.55,
+  Couple = 0.5,
+  Uncouple = 0.3,
 }
 style.RISE = 12
 
 -- The sparkle sprite: the cooldown "bling" star, on every client.
 style.SPARKLE_TEXTURE = "Interface\\Cooldown\\star4"
+-- The ribbon running from the title out of the window, at full length.
+style.RIBBON_LENGTH = 300
+
+-- Chaining the backpack and its companion (next.md §12).
+-- Enter: how a chained bag comes in beside its open partner: "behind" slides it out from beneath
+-- the partner, "edge" flies it in from its own edge across the screen.
+-- TabMargin: the room between the two bags' tab rails, which hang into the gap between the bodies.
+-- The braid the two ribbons twist into: Segments lines per strand on each bag's half of the gap,
+-- Amplitude pixels either side of the ribbon at the middle of the gap (none at the bodies),
+-- Wavelength pixels per turn, turning Turn radians a second, Thickness pixels thick, Alpha bright
+-- in front (Depth less behind); Beads lights running along it from each cloud to the knot in
+-- BeadTime seconds; the knot KnotSize pixels, KnotAlpha bright, swelling by KnotSwell as they couple.
+style.Chain = {
+  Enter = "behind",
+  TabMargin = 24,
+  Segments = 16, Amplitude = 7, Wavelength = 64, Turn = 0.9, Thickness = 2, Alpha = 0.85, Depth = 0.5,
+  Beads = 3, BeadTime = 1.6, BeadSize = 12,
+  KnotSize = 30, KnotAlpha = 0.5, KnotSwell = 0.5,
+}
+
 -- The cloud round the title the ribbon flows into (next.md §3): puffs of a soft glow that fades to
 -- nothing at its edge (tools/textures/next_glow.py), so there is no line anywhere. The cloud
 -- reaches from the window's hard edge, where the ribbon ends, to Pad past the title's far side. A

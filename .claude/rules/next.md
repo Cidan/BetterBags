@@ -839,3 +839,124 @@ styled (`OnDecorated`, `SizeMode`, `Size`, the minimums, `Opacity`, `Scale`) run
 do nothing until it does. The specs had missed it because `spec/bagsystem_spec.lua` uses stand-in
 bags and no spec ran the real `bagFrame:Create` after a theme was applied; the whole-addon spec
 reproduces the error exactly without the fix.
+
+## 12. Chaining the backpack and its companion (`next/chain.lua`)
+
+Asked: "having the left and right bags sit on opposite ends works well for me, but it's not going
+to work well for everyone. so we need to have an option to chain bags to each other": an anchor bag
+on the left or the right; clicking a bag's name flies it to the other bag and "their glowy stick
+things that stick out, merge in an animation effect that shows them intertwined and coupled"; left
+flies right and right flies left; a chained bag's name puts it back; the anchor's name moves both to
+the other side; kept across sessions; vendors, banks and the backpack all alike. Decided with the
+player: each bag keeps its orientation ("fixed"), and the backpack alone opens at its own edge,
+joining its companion when it opens ("option a").
+
+### 12a. Three layouts
+
+The backpack faces left (its title, tabs and ribbon on its left), its companion (the bank or the
+vendor, whichever is open) faces right. That leaves three layouts, saved as the profile's
+`nextChain` (`DB:GetNextChain`/`SetNextChain`, default `"apart"`):
+
+| Layout | Left edge | Right edge |
+|---|---|---|
+| `apart` | the companion | the backpack |
+| `left` | the companion (the anchor), the backpack beside it facing it | |
+| `right` | | the backpack (the anchor), the companion beside it facing it |
+
+The anchor is the bag at the screen edge; the chained bag faces it, so their ribbons meet in the gap.
+
+- **Clicking a bag's name** (`panel.titleButton`, over the title; `chain:Click`, which returns what
+  it did for profiler traces): apart, the bag flies to its partner (`"chained"`: the backpack makes
+  `left`, the companion `right`); the chained bag goes back to its edge (`"unchained"`); the anchor
+  moves both across together (`"moved"`: `left` and `right` swap, the bags keep their order and fly
+  as one, so the other bag ends at the edge and is the anchor). With no partner open nothing happens
+  (`"alone"`); on a screen too narrow for the two side by side it refuses with an error message
+  (`"no room"`).
+- **The pointer over the title** lights a soft glow behind it and the tooltip says what a click
+  does.
+- **Alone, a bag sits at its own edge.** A chained bag sits beside its anchor only while the anchor
+  is open (`chain:Pair`, `chain:RestOffset`): when the anchor opens it flies over; when the anchor
+  closes (or Escape hides it) it flies home.
+- **A chained bag opening beside its open anchor** comes in from behind the anchor
+  (`style.Chain.Enter = "behind"`: it starts past the anchor's edge, lowered 100 levels beneath it,
+  and slides out from under it), or flies in across the screen from its own edge (`"edge"`), for the
+  player to try both. At a banker the bank opens first and the backpack a frame later
+  (`bags/OpenClose` is sent later), so a chained-left backpack always enters this way. Closing, a bag
+  leaves through its own edge as before.
+- **Screen changes** (`UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED`, registered in BetterBags Next's
+  event scope) place the bags at once; a screen too narrow keeps them apart without changing the
+  saved layout.
+
+### 12b. Spacing
+
+- **The gap** between the two bodies (`chain:Gap`) is both tab rails (each `NextTabRail:Width()`,
+  its widest tab, plus the hover slide) and `style.Chain.TabMargin`, never less than the two feathers
+  (192). A tab renamed or added re-lists the rail, whose resize handler (`SetResizeHandler`) runs
+  `chain:Update`, so the chained bag glides to the new gap.
+- **The chained bag's offset** from its own edge is the screen less both bodies and the gap
+  (`chain:Distance`), so its body edge sits exactly the gap from the anchor's.
+- **The far edge.** Away from its screen edge (beside its anchor, or flying) a bag's far side faces
+  the middle of the screen: `SetDocked(false)` stops the fill and the wash at the frame and shows
+  `outerFeather`, the body's color fading out over 96 pixels beyond it; back at its edge the fill and
+  wash reach `OVERREACH` past it again. The switch happens at offset 0, where both are off the
+  screen, so it never shows.
+
+### 12c. Motion
+
+- `panel:FlyTo(to)` flies a bag (`style.Time.Fly`, 0.7 s, in-out); `PlaceAt` places it at once.
+  `panel.target` is where it is headed, `RestOffset` where it rests. A flight that takes over an
+  opening slide still runs the slide's `onShown` (`finishShowing`), so a bank open still loads once
+  its panel has come to rest (refresh-scheduler.md §11).
+- Moving both across, the two flights start together with the same duration and ease, so the gap
+  between them stays exactly the same all the way.
+- A chained bag's entrance takes `style.Time.Enter` (0.55 s) and eases out; an ordinary opening is
+  the 0.45 s slide with its bounce.
+
+### 12d. The coupling
+
+Once the chained bag has come to rest beside its anchor (`chain:Arrived`), the pair couples
+(`chain.coupling`, `amount` 0 to 1 over `style.Time.Couple`); it uncouples (back to 0 over
+`style.Time.Uncouple`, then ends) as soon as they are no longer chained or one closes. Moving both
+across keeps the coupling and swaps the roles.
+
+- **The braid.** Each bag draws its half (`panel.braid`, `BuildBraid`, `SetCoupling`, `applyBraid`):
+  two strands of 16 additive gold `Line`s (`Frame:CreateLine`, on every client's API documentation)
+  from its body edge to the middle of the gap. A strand's height above the ribbon at `d` pixels from
+  the body is `±amplitude · sin(π d / 2h) · sin(k s + phase)`, with `s` the signed distance from the
+  middle of the gap (`d - h` on the left bag, `h - d` on the right), so the halves meet at the middle,
+  the strands swell from nothing at the bodies, the second mirrors the first and they cross; the
+  strand in front by the turn is brighter. Each bag's half is in its own frame, over its own
+  feather, so neither bag's raising above the other covers it. Lines are only ever re-pointed with
+  `SetStartPoint`/`SetEndPoint` (`Line:ClearAllPoints` is marked protected).
+- **Shared turn.** One driver (`chain.driver`) turns the braid (`style.Chain.Turn`) and lays both
+  halves out in the same call, so they never fall out of step; it runs only while coupled, every
+  frame, so the braid follows the bags as they move: half the gap is measured from where they are,
+  so the braid stretches and untwists as a chained bag flies home.
+- **The ribbons** reach the middle of the gap while coupled (`panel.ribbonLength`), back to 300 as
+  they let go, and the shimmer runs along that length.
+- **Lights and the knot.** Three lights run along each half from its cloud to the knot in the middle
+  (`style.Chain.BeadTime`); the chained bag shows the knot, a soft gold puff that flashes as they
+  couple (`BurstKnot`), with a burst of sparkles (`knotSparkles`, `NextSparkleEmitter:Burst`).
+- **Sparkles stay on their own side.** Coupled, ribbon sparkles are born and die within the first
+  half of the gap; the anchor's edge sparkles stop (its feathered edge faces the chained bag), and a
+  bag away from its edge has them on its far edge, drifting toward the middle of the screen.
+
+### 12e. Coverage
+
+`spec/next/chain_spec.lua` (the layouts and each role; the gap from the tabs and the feathers;
+each click: flying either way, putting back, moving across together with the gap held, alone, no
+room, a tab renamed, the screen's size or the UI scale changing (placed at once), a screen too
+narrow; opening alone at its edge, flying to a companion that opens,
+coming in from behind or from its edge, the bank beside the backpack, flying home when the anchor
+closes or is hidden, `onShown` across a flight; the far edge both ways; coupling after the flight,
+the braid's geometry, its turn and lights, staying coupled while moving across, untwisting and
+stretching as they part, letting go on a close, the knot's burst, sparkles kept apart; the title's
+tooltip and glow), `spec/next/vendor_spec.lua` ("chaining": the vendor is a companion, its name goes
+to the chain), `spec/next/sparkles_spec.lua` (`Burst`), `spec/database_spec.lua` and
+`spec/core/constants_spec.lua` (the setting). The frame mock gained `CreateLine` from Blizzard's API
+documentation. 47 mutations; the five that first survived led to tests of the screen events, the
+entrance's own target and timing, the braid running on through the knot and the burst's sparkles,
+and to removing a per-move redraw the driver already does.
+
+Not seen in game yet: the motion, the braid and the spacing need a look, and `style.Chain.Enter`
+both ways.
