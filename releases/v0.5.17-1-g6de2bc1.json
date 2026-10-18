@@ -1,0 +1,17 @@
+{
+  "id": 1792302432,
+  "version": "v0.5.17-1-g6de2bc1",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "8cdc00781dcb0914cfe76c8c266d6d5cd167bd27",
+  "to": "6de2bc1f2f40f1e3ac983b395219bb3a07d7e900",
+  "headline": "Adds an experimental new backpack panel featuring group tabs, larger icons, and smooth animations.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Experimental BetterBags Next backpack panel",
+      "details": "You can now test an experimental backpack view featuring a full-height panel that slides in from the right edge of your screen, group tabs down the side, larger icons, and smooth animations. It is disabled by default and can be toggled through the settings or by typing /bb next followed by a reload. The bank and your existing item rules remain unchanged.",
+      "clients": []
+    }
+  ]
+}
