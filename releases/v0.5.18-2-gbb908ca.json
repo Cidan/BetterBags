@@ -1,0 +1,23 @@
+{
+  "id": 1792341609,
+  "version": "v0.5.18-2-gbb908ca",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "1bcfee66dd844295d445afb506a493d7d4a4e4e9",
+  "to": "bb908cad901c9e2e4c18974024b6b5bb4c8442bd",
+  "headline": "Adds a category-based vendor panel and improved window layering to BetterBags Next.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Vendor replacement panel in BetterBags Next",
+      "details": "When BetterBags Next is enabled, visiting a merchant opens a panel organized into your backpack categories, featuring Buy, Buyback, and Repair tabs. It includes a dedicated search bar, quick repair and junk selling buttons, Masque skinning, and allows selling items individually or by dragging an entire category section directly onto the vendor.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Side panel layering in BetterBags Next",
+      "details": "Side panels now render above standard interface elements while remaining safely beneath confirmation popups, dropdown menus, and tooltips.",
+      "clients": []
+    }
+  ]
+}
