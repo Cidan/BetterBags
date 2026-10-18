@@ -1,0 +1,17 @@
+{
+  "id": 1792351670,
+  "version": "v0.5.18-4-g08025bd",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "a24d127109ae2e686c64a556595d24847d99d2c6",
+  "to": "08025bdf5a79deb07a4025f621893c811c5c89d1",
+  "headline": "BetterBags Next window titles now feature a soft, breathing cloud and updated ribbon animations.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "BetterBags Next title cloud and ribbon animations",
+      "details": "Window titles in BetterBags Next now rest on a soft, breathing cloud of gold and lavender glow. The decorative ribbon ends flush with the window edge where the cloud begins, while shimmer and sparkle animations settle gently around the title without obscuring the text.",
+      "clients": []
+    }
+  ]
+}
