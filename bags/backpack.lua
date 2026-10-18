@@ -191,6 +191,13 @@ function backpack.proto:RegisterEvents()
 	end)
 end
 
+-- Resync catches up on what RegisterEvents' handlers would have done while the classic design was
+-- switched off (next.md §11): the groups, listed as tabs.
+---@param ctx Context
+function backpack.proto:Resync(ctx)
+	self:GenerateGroupTabs(ctx)
+end
+
 ---@return boolean
 function backpack.proto:ShouldHandleSort()
 	return true

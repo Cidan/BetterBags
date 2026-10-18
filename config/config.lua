@@ -153,13 +153,16 @@ function config:CreateConfig()
   f:AddCheckbox({
     title = 'BetterBags Next (experimental)',
     description = 'An experimental new backpack: a panel that slides in from the right edge of the screen, '
-      .. 'with tabs down its side and your categories in one column. Requires a UI reload to take effect.',
+      .. 'with tabs down its side and your categories in one column. Switches at once, outside combat, '
+      .. 'the bank and vendors.',
     getValue = function(_)
       return db:GetNextEnabled()
     end,
-    setValue = function(_, value)
-      db:SetNextEnabled(value)
-      askToReload()
+    setValue = function(ctx, value)
+      -- A switch refused (combat, the bank, a vendor) leaves the setting as it was: show it again.
+      if not addon:GetModule('BagSystem'):Switch(ctx, value and "next" or "classic") then
+        self.configFrame:ReloadAllFormElements()
+      end
     end
   })
 
@@ -1163,7 +1166,7 @@ end
 
 function config:RegisterSettings()
   -- /bb opens the settings; /bb changelog opens the changelog (frames/changelog.lua); /bb next
-  -- turns BetterBags Next on or off (next.md).
+  -- switches the bags between the classic design and BetterBags Next (next.md §11).
   LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function(input)
     local command = strtrim(input or ""):lower()
     if command == "changelog" then
@@ -1171,8 +1174,7 @@ function config:RegisterSettings()
       return
     end
     if command == "next" then
-      db:SetNextEnabled(not db:GetNextEnabled())
-      askToReload()
+      addon:GetModule('BagSystem'):Switch(context:New('SlashNext'), db:GetNextEnabled() and "classic" or "next")
       return
     end
     self:Open()
@@ -1196,6 +1198,11 @@ function config:RegisterSettings()
 
   events:RegisterMessage('config/Open', function()
     self:Open()
+  end)
+
+  -- The bags switched design from a menu (next.md §11): the checkbox shows it.
+  events:RegisterMessage('bags/DesignChanged', function()
+    self.configFrame:ReloadAllFormElements()
   end)
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbdb", function()

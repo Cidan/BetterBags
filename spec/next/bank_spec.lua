@@ -292,6 +292,20 @@ describe("NextBank", function()
     button:GetScript("OnClick")(button, mouse or "LeftButton")
   end
 
+  -- Switching between the classic design and BetterBags Next without a reload (next.md §11).
+  describe("switching designs (Activate)", function()
+    it("catches up on its tabs, its money and its Purchase Bank button", function()
+      local bank = nextBank:Create(ctx())
+      local before = calls.purchaseUpdates
+      local updates = moneyMade[#moneyMade].updates
+      allGroups[13] = { id = 13, name = "Ore", bankType = CHAR }
+      bank:Activate(ctx())
+      assert.is_not_nil(bank.tabs:Tab(13))
+      assert.are.equal(updates + 1, moneyMade[#moneyMade].updates)
+      assert.are.equal(before + 1, calls.purchaseUpdates)
+    end)
+  end)
+
   describe("the panel", function()
     it("is a hidden, named, full-height panel on the left edge of the screen", function()
       local bank = nextBank:Create(ctx())

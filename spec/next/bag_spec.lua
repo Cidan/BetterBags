@@ -30,6 +30,7 @@ local stubs = {
   cursorPlacement = trackStub("CursorPlacement"),
   backpackBehavior = trackStub("BackpackBehavior"),
   sectionFrame = trackStub("SectionFrame"),
+  bagSystem = trackStub("BagSystem"),
 }
 
 -- Every function this spec replaces on a module, put back after each test and the file.
@@ -353,6 +354,32 @@ describe("NextBag", function()
     end)
   end)
 
+  -- Switching between the classic design and BetterBags Next without a reload (next.md §11).
+  describe("switching designs (Deactivate, Activate)", function()
+    it("hides at once and lets go of every button it drew", function()
+      local bag = opened()
+      bag:Deactivate(ctx())
+      assert.is_false(bag.frame:IsShown())
+      assert.is_false(bag.closing, "not through the slide")
+      for slotkey, b in pairs(buttons) do
+        assert.are.equal(1, b.released, slotkey)
+      end
+      assert.are.same({}, bag.drawnButtons)
+    end)
+
+    it("catches up on its search box, its tabs and its money", function()
+      local bag = nextBag:Create(ctx())
+      local updates = 0
+      bag.moneyFrame.Update = function() updates = updates + 1 end
+      inBagSearch = false
+      allGroups[3] = { id = 3, name = "Ore" }
+      bag:Activate(ctx())
+      assert.is_false(bag.searchBox.frame:IsShown())
+      assert.is_not_nil(bag.tabs:Tab(3), "Ore listed")
+      assert.are.equal(1, updates)
+    end)
+  end)
+
   describe("drawing", function()
     it("releases the buttons it drew last time and did not draw again", function()
       local bag = opened()
@@ -485,6 +512,29 @@ describe("NextBag", function()
       assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3) },
         { bag.settingsButton:GetPoint(1) })
       assert.are.same({ "RIGHT", bag.settingsButton, "LEFT", -8, 0 }, { bag.sortButton:GetPoint(1) })
+    end)
+
+    -- The way back from BetterBags Next without a reload (next.md §11): the backpack's own icon,
+    -- Blizzard's backpack button's art on each client (bag-main on retail and WoW: Forever,
+    -- MainMenuBarBagButtons.lua; Button-Backpack-Up on Classic, MainMenuBarBagButtons.xml).
+    it("switches the bags to the classic design from a backpack button in its header", function()
+      local switched = {}
+      override(stubs.bagSystem, "Switch", function(_, c, design)
+        assert.is_not_nil(c)
+        table.insert(switched, design)
+        return true
+      end)
+      override(addon, "isRetail", true)
+      local bag = opened()
+      assert.are.equal("bag-main", bag.classicButton.icon:GetAtlas())
+      assert.are.same({ "RIGHT", bag.sortButton, "LEFT", -8, 0 }, { bag.classicButton:GetPoint(1) })
+      bag.classicButton:GetScript("OnClick")(bag.classicButton, "LeftButton")
+      assert.are.same({ "classic" }, switched)
+      bag.classicButton:GetScript("OnEnter")(bag.classicButton)
+      assert.are.equal("Switch to Classic Bags", GameTooltip:GetText())
+      override(addon, "isRetail", false)
+      local classicClient = nextBag:Create(ctx())
+      assert.are.equal("Interface\\Buttons\\Button-Backpack-Up", classicClient.classicButton.icon:GetTexture())
     end)
 
     it("sorts the backpack and opens the settings from its header", function()

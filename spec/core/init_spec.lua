@@ -111,6 +111,15 @@ describe("Core Init and Enable flow", function()
     addon.HookScript = function() end
     addon.SecureHook = function() end
 
+    -- The bag designs are made through the real BagSystem (core/bagsystem.lua, next.md §11), in
+    -- scopes of the events module.
+    eventsMod.NewScope = eventsMod.NewScope or function(_, name)
+      return { name = name, Enable = function() end, Disable = function() end }
+    end
+    eventsMod.InScope = eventsMod.InScope or function(_, _, fn) fn() end
+    _G.ResetModuleStub("BagSystem", "core/bagsystem.lua")
+    assert(loadfile("core/bagsystem.lua"))("BetterBags")
+
     -- Reset core/init.lua load status
     _G.ResetModuleStub("BetterBags", "core/init.lua")
     local fn = assert(loadfile("core/init.lua"))

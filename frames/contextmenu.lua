@@ -336,6 +336,22 @@ function contextMenu:CreateContextMenu(bag)
 		end
 	end
 
+	-- Switching to BetterBags Next without a reload (next.md §11), from the backpack's menu: the
+	-- bank's is shown at the bank, where the bags cannot be switched.
+	if bag.kind == const.BAG_KIND.BACKPACK then
+		table.insert(menuList, {
+			text = L:G("Switch to Next"),
+			notCheckable = true,
+			tooltipTitle = L:G("Switch to Next"),
+			tooltipText = L:G("Use BetterBags Next, the experimental new bags. Switch back from its backpack."),
+			func = function()
+				local ctx = context:New("SwitchToNext")
+				contextMenu:Hide(ctx)
+				addon:GetModule('BagSystem'):Switch(ctx, "next")
+			end,
+		})
+	end
+
 	table.insert(menuList, {
 		text = L:G("What's New"),
 		notCheckable = true,

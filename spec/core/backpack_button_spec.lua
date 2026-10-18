@@ -55,7 +55,7 @@ describe("Bag-bar backpack button click", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag", "NextBank"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor"
     }
     for _, name in ipairs(modules) do
       local stub = StubBetterBagsModule(name)
@@ -128,6 +128,13 @@ describe("Bag-bar backpack button click", function()
     -- Reload ONLY core/init.lua so its upvalues bind to the stubs above.
     -- Crucially, do NOT stub addon.HookScript here: the production throw must
     -- reproduce.
+    -- The bag designs are made through the real BagSystem (core/bagsystem.lua, next.md §11).
+    eventsMod.NewScope = eventsMod.NewScope or function(_, name)
+      return { name = name, Enable = function() end, Disable = function() end }
+    end
+    eventsMod.InScope = eventsMod.InScope or function(_, _, fn) fn() end
+    _G.ResetModuleStub("BagSystem", "core/bagsystem.lua")
+    assert(loadfile("core/bagsystem.lua"))("BetterBags")
     _G.ResetModuleStub("BetterBags", "core/init.lua")
     local fn = assert(loadfile("core/init.lua"))
     fn("BetterBags")

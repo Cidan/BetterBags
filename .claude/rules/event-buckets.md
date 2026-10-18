@@ -13,8 +13,10 @@ windows:
   timer). When the timer fires, the window closes and the callback runs once. A continuous
   stream of fires therefore still flushes every 0.2s.
 - **Callbacks persist.** The callback runs for every window for the life of the session.
-  Calling `BucketEvent` again for the same event **replaces** its callback and filter; the
-  underlying event handler is registered only once.
+  **Each call makes a bucket of its own**, with its own window, filter and callback; the
+  underlying event handler is registered only once. (It used to replace the event's callback and
+  filter: the classic backpack and BetterBags Next's backpack both bucket `BAG_UPDATE_COOLDOWN`,
+  and with both designs made, next.md §11, one silently took the other's place.)
 - **Filter first.** The optional `filter(eventName, ...)` runs on every fire before anything
   else. Returning false drops the fire: nothing is recorded and no window opens. Use it to
   keep uninteresting fires down to a function call (e.g. only our tooltip instance ids,
@@ -95,3 +97,18 @@ backpack overrides do not replace `RegisterEvents`):
   whenever the bag opens").
 - `spec/frames/bag_draw_ownership_spec.lua` ("cooldown refresh (OnCooldown)"): Recent Items
   buttons refresh, Free Space buttons are skipped, nothing happens while hidden.
+
+## 5. Scopes (`events:NewScope`, `events:InScope`)
+
+A scope holds the registrations made while it is current: `events:InScope(scope, fn)` makes it
+current while `fn` runs (the previous one is current again afterwards, also when `fn` errors), and
+every `RegisterEvent`, `RegisterMessage`, `BucketEvent` (and what `CatchUntil` registers) records
+its callback in it. `scope:Disable()` unhooks them all: each callback leaves its event's or
+message's list (a new list replaces the old, so a dispatch already going over it finishes as it
+started), an event or message no callback is left for is unregistered from AceEvent, and its
+buckets' open windows are cancelled and forgotten. `scope:Enable()` hooks them all again,
+registering with AceEvent what needs it. A callback registered while its scope is off is hooked
+when the scope is switched on. BetterBags makes each bag design in a scope of its own and
+switches the one not in use off (next.md §11).
+
+Coverage: `spec/events_spec.lua` ("scopes"; "BucketEvent": one bucket per registration).

@@ -84,6 +84,13 @@ function bank.proto:RegisterEvents()
 	-- No bank-specific events in Era
 end
 
+-- Resync has nothing to catch up on when the classic design is switched back on (next.md §11):
+-- there are no bank events here.
+---@param ctx Context
+function bank.proto:Resync(ctx)
+	local _ = ctx
+end
+
 ---@param ctx Context
 function bank.proto:SwitchToBankAndWipe(ctx)
 	ctx:Set("wipe", true)

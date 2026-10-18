@@ -154,6 +154,40 @@ describe("Classic/Era Bank OnCreate Bag Slots Panel", function()
     assert.is_false(mockBag.slots.frame:IsShown(), flavor .. " bank slots panel must start hidden")
   end
 
+  -- Switching designs (next.md §11): a classic bank switched back on catches up on what its own
+  -- handlers would have done while they were off.
+  describe("catching up when the classic design is switched back on (Resync)", function()
+    local function behaviorFor(overridePath)
+      assert(loadfile("bags/bank.lua"))("BetterBags")
+      if overridePath then
+        assert(loadfile(overridePath))("BetterBags")
+      end
+      local b = addon:GetModule("BankBehavior"):Create({ frame = CreateFrame("Frame"), Hide = function() end })
+      local calls = {}
+      b.GenerateGroupTabs = function() table.insert(calls, "tabs") end
+      b.UpdatePurchaseBankButton = function() table.insert(calls, "purchase") end
+      return b, calls
+    end
+
+    it("lists its tabs and updates its purchase button on retail", function()
+      local b, calls = behaviorFor(nil)
+      b:Resync({})
+      assert.are.same({ "tabs", "purchase" }, calls)
+    end)
+
+    it("has nothing to catch up on Classic, which has no bank events", function()
+      local b, calls = behaviorFor("bags/classic/bank.lua")
+      b:Resync({})
+      assert.are.same({}, calls)
+    end)
+
+    it("has nothing to catch up on Era, which has no bank events", function()
+      local b, calls = behaviorFor("bags/era/bank.lua")
+      b:Resync({})
+      assert.are.same({}, calls)
+    end)
+  end)
+
   it("classic bank OnCreate creates a hidden BANK bag slots panel for 'Show Bags'", function()
     local mockBag, ctx = runBankOnCreate("bags/classic/bank.lua")
     assertBankSlotsPanel(mockBag, ctx, "classic")

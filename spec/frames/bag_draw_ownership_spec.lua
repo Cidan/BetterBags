@@ -1160,6 +1160,59 @@ describe("Bag Draw: shared item button ownership across global sections and view
 
   -- Recent Items only expire when the bag closes, and the refresh that applies the expiry
   -- (and collapses held gaps) runs while the bag is hidden, so nothing moves while it is open.
+  -- Switching between the classic design and BetterBags Next without a reload (next.md §11): the
+  -- design switched off hides at once and lets go of its buttons; switched back on, it catches up
+  -- on what its handlers would have done while they were off.
+  describe("switching designs (Deactivate, Activate)", function()
+    local calls
+
+    local function partsOn(bag)
+      calls = {}
+      bag.behavior.Resync = function(_, c) table.insert(calls, { "resync", c }) end
+      bag.moneyFrame = { Update = function() table.insert(calls, { "money" }) end }
+      bag.currencyIconGrid = { Update = function() table.insert(calls, { "currency" }) end }
+      bag.slots = { Draw = function(_, c) table.insert(calls, { "slots", c }) end }
+      bag.searchFrame = { Hide = function() table.insert(calls, { "overlay hidden" }) end }
+      local anchorFrame = CreateFrame("Frame")
+      anchorFrame:Show()
+      bag.anchor = { frame = anchorFrame, Load = function() table.insert(calls, { "anchor loaded" }) end,
+        Hide = function() error("hiding the anchor through Hide saves it hidden") end }
+      bag.UpdateSearchShown = function() table.insert(calls, { "search shown" }) end
+      return bag
+    end
+
+    it("hides at once and lets go of every button it drew, its overlay search and anchor hidden", function()
+      local bag = partsOn(newBag())
+      local released = {}
+      local button = { Release = function() table.insert(released, "button") end }
+      bag.drawnButtons = { [button] = true }
+      bag:Deactivate(context:New("switch"))
+      assert.is_false(bag.frame:IsShown())
+      assert.is_false(bag.window:IsClosing(), "not through the fade")
+      assert.are.same({ "button" }, released)
+      assert.are.same({}, bag.drawnButtons)
+      assert.are.same({ { "overlay hidden" } }, calls)
+      assert.is_false(bag.anchor.frame:IsShown())
+    end)
+
+    it("catches up on its search box, behavior, money, currencies, slots panel and anchor", function()
+      local bag = partsOn(newBag())
+      bag.frame:Hide()
+      local c = context:New("switch")
+      bag:Activate(c)
+      assert.are.same({ { "search shown" }, { "resync", c }, { "money" }, { "currency" }, { "slots", c },
+        { "anchor loaded" } }, calls)
+    end)
+
+    it("catches up without the parts it does not have", function()
+      local bag = newBag()
+      bag.behavior.Resync = function() end
+      bag.UpdateSearchShown = function() end
+      assert.has_no.errors(function() bag:Activate(context:New("switch")) end)
+      assert.has_no.errors(function() bag:Deactivate(context:New("switch")) end)
+    end)
+  end)
+
   describe("closing the bag (OnClosed)", function()
     local expireCalls, expireResult
 

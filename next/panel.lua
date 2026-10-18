@@ -932,6 +932,28 @@ function panelProto:OnClosed(ctx)
   end
 end
 
+-- Deactivate switches the panel off with BetterBags Next (next.md §11): it hides at once (its
+-- OnHide still runs its close work) and lets go of every button it drew.
+---@param ctx Context
+function panelProto:Deactivate(ctx)
+  if self.frame:IsShown() then
+    self.frame:Hide()
+  end
+  self:Wipe(ctx)
+end
+
+-- Activate catches the panel up when BetterBags Next is switched back on: what its handlers would
+-- have done while they were off (the search box's setting, the tabs, the money).
+---@param ctx Context
+function panelProto:Activate(ctx)
+  local _ = ctx
+  self:UpdateSearchShown()
+  self:RefreshTabs()
+  if self.moneyFrame then
+    self.moneyFrame:Update()
+  end
+end
+
 -- Refresh recalculates the kind's bag from what was last read.
 ---@param ctx Context
 function panelProto:Refresh(ctx)

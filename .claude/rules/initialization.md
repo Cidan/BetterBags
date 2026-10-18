@@ -70,10 +70,17 @@ the session. See `.claude/rules/perf-profiler.md`.
   contextMenu:Init()
   addon:GetModule('BagButton'):Init()
   addon:GetModule('ItemRowFrame'):Init()
+  bagSystem:Init()
 
   -- 5. Integrations
   consoleport:Init()
 ```
+
+The bags themselves are then made through `BagSystem` (core/bagsystem.lua), which makes the design
+the setting names, the classic bags or BetterBags Next, each in an event scope of its own so the
+bags can switch design without a reload (next.md §11): `CreateBackpack` first (the bag-bar setup
+of §5 follows it, with `addon:WatchBackpackFrame` for §6), then `CreateRest` and `Use`, then Sonata,
+then `Finish` (the backpack's title and `UISpecialFrames`).
 
 ### 4. Shifting Heavy UI Frame Creation to ADDON_LOADED
 To completely avoid script timeout errors (up to 200ms) during the enter-world sequences (`PLAYER_LOGIN`) on World of Warcraft (especially in Hardcore environments), the heavy structural UI creation is shifted entirely to the `ADDON_LOADED` phase inside `addon:OnInitialize()`.

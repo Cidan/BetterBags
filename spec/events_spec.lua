@@ -318,12 +318,13 @@ describe("Events", function()
       assert.is_false(timerCallbacks[1].cancelled)
     end)
 
-    it("clears the timer reference after firing but keeps the callback registered", function()
+    it("opens a new window with the next fire after a window flushed", function()
       events:BucketEvent("test/BucketClear", function() end)
-      events._eventMap["test/BucketClear"].fn("test/BucketClear", "test/BucketClear")
+      local fn = events._eventMap["test/BucketClear"].fn
+      fn("test/BucketClear", "test/BucketClear")
       fireTimers()
-      assert.is_nil(events._bucketTimers["test/BucketClear"])
-      assert.are.equal(1, #events._bucketCallbacks["test/BucketClear"])
+      fn("test/BucketClear", "test/BucketClear")
+      assert.are.equal(1, #timerCallbacks)
     end)
 
     it("runs the callback for every window, not only the first", function()
@@ -362,7 +363,6 @@ describe("Events", function()
       fn("test/BucketFilter", 1)
       fn("test/BucketFilter", 2)
       assert.are.equal(0, #timerCallbacks)
-      assert.are.equal(0, #events._eventArguments["test/BucketFilter"])
       fn("test/BucketFilter", 7)
       assert.are.equal(1, #timerCallbacks)
       fireTimers()
@@ -371,7 +371,8 @@ describe("Events", function()
     end)
 
     it("builds no context or argument record for payload-less fires", function()
-      events:BucketEvent("test/BucketNoAlloc", function() end)
+      local received
+      events:BucketEvent("test/BucketNoAlloc", function(_, evts) received = evts end)
       local fn = events._eventMap["test/BucketNoAlloc"].fn
       local originalNew = context.New
       local created = 0
@@ -381,18 +382,18 @@ describe("Events", function()
       end
       for _ = 1, 5 do fn("test/BucketNoAlloc") end
       local createdDuringFires = created
-      local recorded = #events._eventArguments["test/BucketNoAlloc"]
       fireTimers()
       context.New = originalNew
       assert.are.equal(0, createdDuringFires)
-      assert.are.equal(0, recorded)
+      assert.are.same({}, received)
       assert.are.equal(1, created)
     end)
 
-    it("registers the underlying event once when BucketEvent is called again", function()
+    it("registers the underlying event once, however many buckets listen to it", function()
       events:BucketEvent("test/BucketOnce", function() end)
+      local fn = events._eventMap["test/BucketOnce"].fn
       events:BucketEvent("test/BucketOnce", function() end)
-      assert.are.equal(1, #events._eventMap["test/BucketOnce"].cbs)
+      assert.are.equal(fn, events._eventMap["test/BucketOnce"].fn)
     end)
 
     it("opens a fresh window for fires raised during the flush", function()
@@ -412,20 +413,22 @@ describe("Events", function()
       assert.same({"first", "second"}, batches)
     end)
 
-    it("replaces the previous callback when called twice for the same event", function()
-      -- BucketEvent resets _bucketCallbacks[event] on each call, so the
-      -- most recent registration wins. This documents the current behavior.
-      local firstRan = false
-      local secondRan = false
-      events:BucketEvent("test/BucketMulti", function() firstRan = true end)
-      events:BucketEvent("test/BucketMulti", function() secondRan = true end)
-      local eventMap = events._eventMap
-      if eventMap["test/BucketMulti"] then
-        eventMap["test/BucketMulti"].fn("test/BucketMulti", "test/BucketMulti")
-      end
+    -- Both bag designs bucket BAG_UPDATE_COOLDOWN (next.md §11): one registration must not take
+    -- another's place.
+    it("gives each registration its own bucket: its own window, filter and callback", function()
+      local first, second = {}, {}
+      events:BucketEvent("test/BucketMulti", function(_, evts) table.insert(first, #evts) end)
+      events:BucketEvent("test/BucketMulti", function(_, evts) table.insert(second, #evts) end, function(_, id)
+        return id == 2
+      end)
+      local fn = events._eventMap["test/BucketMulti"].fn
+      fn("test/BucketMulti", 1)
+      assert.are.equal(1, #timerCallbacks, "only the first took it")
+      fn("test/BucketMulti", 2)
+      assert.are.equal(2, #timerCallbacks)
       fireTimers()
-      assert.is_false(firstRan)
-      assert.is_true(secondRan)
+      assert.are.same({ 2 }, first)
+      assert.are.same({ 1 }, second)
     end)
 
     it("calls the callback with a context", function()
@@ -454,6 +457,186 @@ describe("Events", function()
       assert.are.equal(2, #received)
       assert.are.equal(111, received[1].args[1])
       assert.are.equal(222, received[2].args[1])
+    end)
+  end)
+
+  -- ─── Scopes ─────────────────────────────────────────────────────────────────
+
+  -- A bag design's registrations are made in its scope, so switching the design off unhooks every
+  -- one of them and switching it on hooks them again (next.md §11).
+  describe("scopes", function()
+    local timers, originalNewTimer, aceFrame
+
+    before_each(function()
+      timers = {}
+      originalNewTimer = _G.C_Timer.NewTimer
+      _G.C_Timer.NewTimer = function(_, callback)
+        local entry = { callback = callback, cancelled = false }
+        table.insert(timers, entry)
+        return { Cancel = function() entry.cancelled = true end }
+      end
+      aceFrame = LibStub("AceEvent-3.0").frame
+    end)
+
+    after_each(function()
+      _G.C_Timer.NewTimer = originalNewTimer
+    end)
+
+    local function fire(event, ...)
+      local entry = events._eventMap[event]
+      if entry then entry.fn(event, ...) end
+    end
+
+    local function fireTimers()
+      local pending = timers
+      timers = {}
+      for _, t in ipairs(pending) do
+        if not t.cancelled then t.callback() end
+      end
+    end
+
+    it("switches off a scope's events, messages and buckets, and back on", function()
+      local scope = events:NewScope("design")
+      local got = {}
+      events:InScope(scope, function()
+        events:RegisterEvent("TEST_SCOPE_EVENT", function(_, _, n) table.insert(got, "event " .. n) end)
+        events:RegisterMessage("test/ScopeMessage", function(_, n) table.insert(got, "message " .. n) end)
+        events:BucketEvent("TEST_SCOPE_BUCKET", function(_, evts) table.insert(got, "bucket " .. #evts) end)
+      end)
+      fire("TEST_SCOPE_EVENT", 1)
+      events:SendMessage(context:New("t"), "test/ScopeMessage", 1)
+      fire("TEST_SCOPE_BUCKET", 1)
+      fireTimers()
+      assert.are.same({ "event 1", "message 1", "bucket 1" }, got)
+      scope:Disable()
+      assert.is_false(scope:IsEnabled())
+      got = {}
+      fire("TEST_SCOPE_EVENT", 2)
+      events:SendMessage(context:New("t"), "test/ScopeMessage", 2)
+      fire("TEST_SCOPE_BUCKET", 2)
+      fireTimers()
+      assert.are.same({}, got)
+      scope:Enable()
+      fire("TEST_SCOPE_EVENT", 3)
+      events:SendMessage(context:New("t"), "test/ScopeMessage", 3)
+      fire("TEST_SCOPE_BUCKET", 3)
+      fireTimers()
+      assert.are.same({ "event 3", "message 3", "bucket 1" }, got)
+    end)
+
+    it("leaves what was registered outside it alone", function()
+      local scope = events:NewScope("design")
+      local got = {}
+      events:RegisterEvent("TEST_SCOPE_SHARED", function() table.insert(got, "outside") end)
+      events:InScope(scope, function()
+        events:RegisterEvent("TEST_SCOPE_SHARED", function() table.insert(got, "inside") end)
+      end)
+      events:RegisterEvent("TEST_SCOPE_SHARED", function() table.insert(got, "after") end)
+      scope:Disable()
+      fire("TEST_SCOPE_SHARED")
+      assert.are.same({ "outside", "after" }, got)
+    end)
+
+    it("unregisters a WoW event no callback is left for, and registers it again", function()
+      local scope = events:NewScope("design")
+      events:InScope(scope, function()
+        events:RegisterEvent("TEST_SCOPE_ALONE", function() end)
+        events:BucketEvent("TEST_SCOPE_ALONE_BUCKET", function() end)
+      end)
+      assert.is_true(aceFrame._events["TEST_SCOPE_ALONE"])
+      scope:Disable()
+      assert.is_nil(aceFrame._events["TEST_SCOPE_ALONE"])
+      assert.is_nil(aceFrame._events["TEST_SCOPE_ALONE_BUCKET"])
+      assert.is_nil(events._eventMap["TEST_SCOPE_ALONE"])
+      scope:Enable()
+      assert.is_true(aceFrame._events["TEST_SCOPE_ALONE"])
+      assert.is_true(aceFrame._events["TEST_SCOPE_ALONE_BUCKET"])
+    end)
+
+    it("cancels a bucket's open window when switched off", function()
+      local scope = events:NewScope("design")
+      local ran = false
+      events:InScope(scope, function()
+        events:BucketEvent("TEST_SCOPE_WINDOW", function() ran = true end)
+      end)
+      fire("TEST_SCOPE_WINDOW", 1)
+      assert.are.equal(1, #timers)
+      scope:Disable()
+      assert.is_true(timers[1].cancelled)
+      fireTimers()
+      assert.is_false(ran)
+      scope:Enable()
+      fire("TEST_SCOPE_WINDOW", 2)
+      fireTimers()
+      assert.is_true(ran)
+    end)
+
+    it("switches on and off once, however often it is asked", function()
+      local scope = events:NewScope("design")
+      local calls = 0
+      events:InScope(scope, function()
+        events:RegisterEvent("TEST_SCOPE_TWICE", function() calls = calls + 1 end)
+      end)
+      scope:Enable()
+      fire("TEST_SCOPE_TWICE")
+      assert.are.equal(1, calls)
+      scope:Disable()
+      scope:Disable()
+      scope:Enable()
+      fire("TEST_SCOPE_TWICE")
+      assert.are.equal(2, calls)
+    end)
+
+    it("hooks nothing registered in it while it is off, until it is switched on", function()
+      local scope = events:NewScope("design")
+      local calls = 0
+      scope:Disable()
+      events:InScope(scope, function()
+        events:RegisterEvent("TEST_SCOPE_LATE", function() calls = calls + 1 end)
+      end)
+      fire("TEST_SCOPE_LATE")
+      assert.are.equal(0, calls)
+      scope:Enable()
+      fire("TEST_SCOPE_LATE")
+      assert.are.equal(1, calls)
+    end)
+
+    it("keeps a dispatch going when a callback switches a scope off", function()
+      local scope = events:NewScope("design")
+      local got = {}
+      events:RegisterEvent("TEST_SCOPE_DURING", function()
+        table.insert(got, "first")
+        scope:Disable()
+      end)
+      events:InScope(scope, function()
+        events:RegisterEvent("TEST_SCOPE_DURING", function() table.insert(got, "second") end)
+      end)
+      events:RegisterEvent("TEST_SCOPE_DURING", function() table.insert(got, "third") end)
+      fire("TEST_SCOPE_DURING")
+      fire("TEST_SCOPE_DURING")
+      assert.are.same({ "first", "second", "third", "first", "third" }, got)
+    end)
+
+    it("puts back the scope it was in, nested or after an error", function()
+      local outer, inner = events:NewScope("outer"), events:NewScope("inner")
+      local got = {}
+      events:InScope(outer, function()
+        events:InScope(inner, function()
+          events:RegisterEvent("TEST_SCOPE_NESTED", function() table.insert(got, "inner") end)
+        end)
+        events:RegisterEvent("TEST_SCOPE_NESTED", function() table.insert(got, "outer") end)
+      end)
+      assert.has_error(function()
+        events:InScope(inner, function() error("boom") end)
+      end)
+      events:RegisterEvent("TEST_SCOPE_NESTED", function() table.insert(got, "none") end)
+      inner:Disable()
+      fire("TEST_SCOPE_NESTED")
+      assert.are.same({ "outer", "none" }, got)
+      outer:Disable()
+      got = {}
+      fire("TEST_SCOPE_NESTED")
+      assert.are.same({ "none" }, got)
     end)
   end)
 
