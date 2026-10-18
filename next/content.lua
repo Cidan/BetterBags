@@ -142,9 +142,9 @@ function canvasProto:section(name, kind)
   section.name = name
   section.kind = kind
   section.entries = {}
-  section.title:SetText(name)
   local font = kind == "recent" and "SectionRecent" or kind == "free" and "SectionFree" or "Section"
   section.title:SetFontObject(style:Font(font))
+  section.title:SetText(name)
   self.byName[name] = section
   table.insert(self.order, section)
   return section

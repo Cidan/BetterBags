@@ -249,7 +249,7 @@ describe("PerfPane", function()
     it("selects a session from its row and draws its flame graph", function()
       local items = itemsOf(pane.sessionList)
       local button = CreateFrame("Button")
-      button.Text = button:CreateFontString()
+      button.Text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
       button.Selected = button:CreateTexture()
       pane.sessionList.init(button, items[2])
       button:GetScript("OnClick")(button)
@@ -325,7 +325,7 @@ describe("PerfPane", function()
     it("fills function rows column by column", function()
       local button = CreateFrame("Button")
       for _, key in ipairs({ "Name", "Calls", "Total", "Self", "Avg", "Max", "Alloc" }) do
-        button[key] = button:CreateFontString()
+        button[key] = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
       end
       pane.functionList.init(button, itemsOf(pane.functionList)[1])
       assert.are.equal("Items.Harvest", button.Name:GetText())
@@ -420,7 +420,7 @@ describe("PerfPane", function()
     local function renderRow(row)
       local button = CreateFrame("Button")
       for _, key in ipairs({ "Name", "Calls", "Total", "Self", "Avg", "Max", "Alloc" }) do
-        button[key] = button:CreateFontString()
+        button[key] = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
       end
       pane.functionList.init(button, row)
       return button
@@ -510,7 +510,7 @@ describe("PerfPane", function()
     local function renderCallRow(row)
       local button = CreateFrame("Button")
       for _, key in ipairs({ "Time", "Frame", "Duration", "Name", "Args" }) do
-        button[key] = button:CreateFontString()
+        button[key] = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
       end
       button.Selected = button:CreateTexture()
       pane.callList.init(button, row)

@@ -133,7 +133,14 @@ next`, `/bbanchor` without an anchor, the Scale slider without a window),
 mutation-tested (72 mutations; the nine that first survived each led to a stronger test).
 
 The mocks gained texture rotation (`SetRotation`/`GetRotation`) and Blizzard's
-`StaticPopupDialogs` table.
+`StaticPopupDialogs` table. **A font string's font comes before its text:** a section title set
+its text before its font, and the client raised `FontString:SetText(): Font not set` on opening
+the panel (BugSack, `content.lua:145`). The frame mock now raises the same error for `SetText` on
+a font string with no font (none set, no inherited template; warcraft.wiki.gg
+`API_FontString_SetText`: "the font must be set before showing text"), so every Next test checks
+it. It also showed the profiler and Simulate panes' specs building rows with fontless font
+strings no template has; they now use the templates' font (`GameFontHighlightSmall`,
+`templates/debug.xml`) or let the pane make its own (`BetterBagsPlainTextListButton` has none).
 
 ## 7. Known limits of the prototype
 

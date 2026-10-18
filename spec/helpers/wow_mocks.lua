@@ -753,7 +753,13 @@ local function CreateMockWidget(widgetType, name, parent)
   -- Text and Fonts. A button's text is its font string's (Blizzard sizes buttons from
   -- button:GetFontString():GetStringWidth() after setting their text, InspectPaperDollFrame.lua,
   -- Blizzard_CompactRaidFrameManager.lua).
+  -- FontString:SetText(text): the font must be set before showing text (warcraft.wiki.gg
+  -- API_FontString_SetText); the client raises "FontString:SetText(): Font not set" for a font
+  -- string with no font (none set, no inherited template).
   function widget:SetText(text)
+    if self._type == "FontString" and self._font == nil and self._fontObject == nil and self._inherits == nil then
+      error("FontString:SetText(): Font not set", 2)
+    end
     self._text = tostring(text or "")
     if self._fontString ~= nil then
       self._fontString._text = self._text
