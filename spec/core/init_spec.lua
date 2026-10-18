@@ -1,6 +1,7 @@
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 describe("Core Init and Enable flow", function()
+  local savedDatabase
   local oldOnInitialize, oldOnEnable
   local oldBags
   local originalUISpecialFrames
@@ -71,7 +72,13 @@ describe("Core Init and Enable flow", function()
 
     local db = addon:GetModule("Database")
     db.GetEnableBankBag = db.GetEnableBankBag or function() return true end
-    db.GetNextEnabled = db.GetNextEnabled or function() return false end
+    -- Replaced, not defaulted with "or": an earlier spec in the suite may have loaded the real
+    -- Database, whose Init would open AceDB on whatever BetterBagsDB it left (none is a new install,
+    -- which starts with BetterBags Next, next.md §1) and whose GetNextEnabled would read that
+    -- profile (.context/patterns-state.md, "Spec Files Must Pass Alone and Shuffled").
+    savedDatabase = { Init = rawget(db, "Init"), GetNextEnabled = rawget(db, "GetNextEnabled") }
+    db.Init = spy.new(function() end)
+    db.GetNextEnabled = function() return false end
     db.GetShowBagButton = db.GetShowBagButton or function() return true end
 
     local eventsMod = addon:GetModule("Events")
@@ -127,6 +134,8 @@ describe("Core Init and Enable flow", function()
   end)
 
   after_each(function()
+    local db = addon:GetModule("Database")
+    db.Init, db.GetNextEnabled = savedDatabase.Init, savedDatabase.GetNextEnabled
     addon.OnInitialize = oldOnInitialize
     addon.OnEnable = oldOnEnable
     addon.Bags = oldBags

@@ -20,8 +20,17 @@ local DB = addon:NewModule('Database')
 ---@field alpha number
 
 function DB:Init()
+  -- A new install has no saved variables yet: AceDB creates them only when the global is nil
+  -- (AceDB-3.0 New), and nothing reads them before this. A character new to an existing install is
+  -- no new install: every character shares the Default profile.
+  local newInstall = _G[addonName .. 'DB'] == nil
   -- Create the settings database.
   DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
+  if newInstall then
+    -- New installs start with BetterBags Next (next.md §1). Saved in the profile: the default stays
+    -- off, so a profile from before that never turned Next on keeps the classic bags.
+    DB.data.profile.nextEnabled = true
+  end
   DB:Migrate()
 end
 

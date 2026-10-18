@@ -81,6 +81,21 @@ describe("switching bag designs on the whole addon", function()
     handle.errors = {}
   end)
 
+  -- Asked: "if this is a net new install of the addon, i now want to default to the next
+  -- experience". A new install has no saved variables at all.
+  it("starts a new install with BetterBags Next", function()
+    local addon = start({ install = "new" })
+    assert.are.equal("next", addon:GetModule("BagSystem"):ActiveDesign())
+    assert.is_true(addon:GetModule("Database"):GetNextEnabled())
+    assert.is_not_nil(addon.Vendor)
+  end)
+
+  it("keeps the classic bags on an install that never turned BetterBags Next on", function()
+    local addon = start({ install = "existing" })
+    assert.are.equal("classic", addon:GetModule("BagSystem"):ActiveDesign())
+    assert.is_false(addon:GetModule("Database"):GetNextEnabled())
+  end)
+
   it("starts with the classic bags and switches to BetterBags Next and back", function()
     local addon = start()
     assert.are.equal("classic", addon:GetModule("BagSystem"):ActiveDesign())
