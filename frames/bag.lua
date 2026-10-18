@@ -10,6 +10,9 @@ local bagFrame = addon:NewModule("BagFrame")
 ---@class Localization: AceModule
 local L = addon:GetModule("Localization")
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule("Sonata")
+
 ---@class Constants: AceModule
 local const = addon:GetModule("Constants")
 
@@ -124,6 +127,8 @@ local MIN_CONTENT_HEIGHT = 100
 ---@field bankTab BankTab
 ---@field blizzardBankTab number? When set, the bank is filtered to show only items from this specific Blizzard bag index (set by the bank slots panel).
 ---@field purchaseBankButton Button? Retail bank: shown in the middle of the bank while the character owns no character bank tab.
+---@field loadingText FontString Loading..., in the middle of the bag while what it shows has never been read.
+---@field loading boolean What the bag shows has never been read.
 ---@field behavior BackpackBehaviorProto|BankBehaviorProto The bag-type-specific behavior
 bagFrame.bagProto = {}
 addon:GetModule('Perf'):RegisterPrototype(bagFrame.bagProto, 'Bag')
@@ -131,15 +136,21 @@ addon:GetModule('Perf'):RegisterPrototype(bagFrame.bagProto, 'Bag')
 -- Show shows the bag and draws a draw deferred while it was hidden, with slotInfo when
 -- given (the caller's current data; the deferred one can be an older object: the bank's is
 -- replaced when its cache is cleared). It returns whether it drew, so a caller about to draw
--- the same data does not draw it twice.
+-- the same data does not draw it twice. onShown runs once the window has finished showing (at
+-- once without a fade, when a fade still playing ends; never for a fade cut short), which is
+-- when a bank open loads the bank (refresh-scheduler.md §11).
 ---@param ctx Context
 ---@param slotInfo? SlotInfo
+---@param onShown? fun()
 ---@return boolean drew
-function bagFrame.bagProto:Show(ctx, slotInfo)
+function bagFrame.bagProto:Show(ctx, slotInfo, onShown)
 	if self.window:IsShown() and not self.window:IsClosing() then
+		if onShown ~= nil then
+			self.window:Show(ctx, onShown)
+		end
 		return false
 	end
-	self.behavior:OnShow(ctx)
+	self.behavior:OnShow(ctx, onShown)
 	if self.drawPendingOnShow then
 		self.drawPendingOnShow = false
 		local data = slotInfo or self.lastSlotInfo
@@ -303,6 +314,8 @@ function bagFrame.bagProto:Wipe(ctx)
 	end
 	self.drawnButtons = {}
 	self.claims = nil
+	self.loading = true
+	self:UpdateLoadingText()
 end
 
 ---@param ctx Context
@@ -692,6 +705,9 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 	self.currentView = view
 
 	self.lastSlotInfo = slotInfo
+	-- Data with no tabs has never been read (the bank's after it closed, until its open's read).
+	self.loading = slotInfo.tabs == nil
+	self:UpdateLoadingText()
 	self:ApplySizeSettings()
 
 	-- The window lays the bound sections out (the canvas, frames/bagcanvas.lua) and sizes
@@ -837,6 +853,26 @@ function bagFrame.bagProto:BuildWindow(name)
 	self.headerContainer = self.canvas.headerContainer
 	self.tabContainer = self.canvas.tabContainer
 	self.footerContainer = self.canvas.footerContainer
+
+	-- Loading... in the middle of the bag, above its content, while what it shows has never been
+	-- read (UpdateLoadingText): nothing is drawn yet.
+	local loading = CreateFrame("Frame", nil, self.frame)
+	loading:SetSize(1, 1)
+	loading:SetPoint("CENTER", self.scrollBox, "CENTER", 0, 0)
+	loading:SetFrameLevel(self.scrollBox:GetFrameLevel() + 10)
+	self.loadingText = sonata:CreateText(loading, "Empty", "OVERLAY")
+	self.loadingText:SetPoint("CENTER", loading, "CENTER", 0, 0)
+	self.loadingText:SetText(L:G("Loading..."))
+	self.loading = true
+	self:UpdateLoadingText()
+end
+
+-- UpdateLoadingText shows Loading... while what the bag shows has never been read (the bank waits
+-- for its window to finish showing before it is read, refresh-scheduler.md §11), unless the retail
+-- bank's Purchase Bank button, in the same place, shows.
+function bagFrame.bagProto:UpdateLoadingText()
+	local purchase = self.purchaseBankButton
+	self.loadingText:SetShown(self.loading and not (purchase ~= nil and purchase:IsShown()))
 end
 
 -- BuildParts creates the parts of the bag window the theme places: the in-bag search box, the

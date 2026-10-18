@@ -33,6 +33,10 @@ refresh.STARTUP_PRIME_TIMEOUT = 2
 -- Seconds a bank open waits for the bank's item data before reading it anyway (the captured
 -- opens received it 1.2 s after BANKFRAME_OPENED).
 refresh.BANK_PRIME_TIMEOUT = 2
+-- Seconds a bank open waits for the bank window to say it has finished showing before loading the
+-- bank anyway (Escape can hide it mid-animation while the bank stays open). The longest built-in
+-- show animation is BetterBags Next's 0.45 s slide.
+refresh.BANK_SHOW_TIMEOUT = 1
 -- How long after PLAYER_ENTERING_WORLD to stop waiting for the end of the loading screen:
 refresh.STARTUP_LOADING_TIMEOUT = 10
 
@@ -396,7 +400,9 @@ function refresh:_RunUnit(request)
     sorter()
   end
 
-  if request.bank and addon.atBank and addon.Bags.Bank then
+  -- While the bank window shows after an open, the bank is not swept: the open's read, which
+  -- follows, reads every bank bag (_OpenBank).
+  if request.bank and addon.atBank and addon.Bags.Bank and not self:BankShowing() then
     local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
     if addon.atWarbank and addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab < accountBankStart then
       addon.Bags.Bank.bankTab = accountBankStart
@@ -506,12 +512,7 @@ function refresh:OnEnable()
         addon.Bags.Bank.blizzardBankTab = firstButton.bagIndex
       end
     end
-    -- The window shows at once (with the bank's committed items: none after a close) and the
-    -- bank is read once its item data has loaded (refresh-scheduler.md §11).
-    if addon.Bags and addon.Bags.Bank then
-      addon.Bags.Bank:Show(context:New('BANKFRAME_OPENED'))
-    end
-    self:_PrimeBankAndRead()
+    self:_OpenBank(context:New('BANKFRAME_OPENED'))
   end)
 
   events:RegisterEvent('BANKFRAME_CLOSED', function()
@@ -615,13 +616,54 @@ function refresh:_OnStartupFrame()
   self:_StartupPrime()
 end
 
+-- _OpenBank shows the bank window at once (with the bank's committed items: none after a close)
+-- and loads the bank only once the window has finished showing, so the bank's read and draw never
+-- land in its show animation (asked: "finish our bank window show animation, before we start
+-- loading in bank info, just to prevent hitching"; refresh-scheduler.md §11). Until then no sweep
+-- reads the bank (_RunUnit): the open's read reads every bank bag after.
+---@param ctx Context
+function refresh:_OpenBank(ctx)
+  local open = { showing = true }
+  self._bankOpen = open
+  C_Timer.After(self.BANK_SHOW_TIMEOUT, function() self:_BankShown(open, 'timeout') end)
+  if addon.Bags and addon.Bags.Bank then
+    addon.Bags.Bank:Show(ctx, nil, function() self:_BankShown(open, 'finished') end)
+  else
+    self:_BankShown(open, 'no window')
+  end
+end
+
+-- _BankShown ends a bank open's wait for its window, once, and loads the bank. reason says what
+-- ended it ("finished", "timeout", "no window"). It returns what it did, for profiler traces:
+-- "loading", "already" (the wait had ended) or "ended" (the open has ended).
+---@param open table
+---@param reason string
+---@return string
+function refresh:_BankShown(open, reason)
+  local _ = reason
+  if self._bankOpen ~= open then
+    return 'ended'
+  end
+  if not open.showing then
+    return 'already'
+  end
+  open.showing = false
+  self:_PrimeBankAndRead(open)
+  return 'loading'
+end
+
+-- BankShowing says the bank window is still showing after a bank open: nothing reads the bank.
+---@return boolean
+function refresh:BankShowing()
+  return self._bankOpen ~= nil and self._bankOpen.showing == true
+end
+
 -- _PrimeBankAndRead loads the bank's item data, then reads the bank, from a clean, gapless
 -- layout (gaps held from a previous visit collapse). It reads after BANK_PRIME_TIMEOUT if the
 -- data has not all arrived, and reads again when it does, since that read found it cold.
 -- Neither happens for an open that has ended (the bank closed, or opened again).
-function refresh:_PrimeBankAndRead()
-  local open = {}
-  self._bankOpen = open
+---@param open table The open being loaded (refresh._bankOpen).
+function refresh:_PrimeBankAndRead(open)
   local read = false
   local function readBank(reason)
     if self._bankOpen ~= open then return end

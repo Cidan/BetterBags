@@ -188,6 +188,21 @@ describe("Classic/Era Bank OnCreate Bag Slots Panel", function()
     end)
   end)
 
+  -- The bank is loaded once its window has finished showing (refresh-scheduler.md §11).
+  for _, path in ipairs({ "bags/classic/bank.lua", "bags/era/bank.lua" }) do
+    it(path .. " hands the window what to call once it has finished showing", function()
+      local mockBag = runBankOnCreate(path)
+      local given
+      mockBag.window = { Show = function(_, _, onShown) given = onShown end }
+      local savedTrigger = addon.TriggerItemContextChanged
+      addon.TriggerItemContextChanged = function() end
+      finally(function() addon.TriggerItemContextChanged = savedTrigger end)
+      local onShown = function() end
+      addon:GetModule("BankBehavior"):Create(mockBag):OnShow({}, onShown)
+      assert.are.equal(onShown, given)
+    end)
+  end
+
   it("classic bank OnCreate creates a hidden BANK bag slots panel for 'Show Bags'", function()
     local mockBag, ctx = runBankOnCreate("bags/classic/bank.lua")
     assertBankSlotsPanel(mockBag, ctx, "classic")

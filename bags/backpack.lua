@@ -60,7 +60,10 @@ local contextMenu = addon:GetModule("ContextMenu")
 backpack.proto = {}
 addon:GetModule('Perf'):RegisterPrototype(backpack.proto, 'Backpack')
 
-function backpack.proto:OnShow(ctx)
+-- OnShow shows the backpack's window; onShown runs once the window has finished showing.
+---@param ctx Context
+---@param onShown? fun()
+function backpack.proto:OnShow(ctx, onShown)
 	PlaySound(SOUNDKIT.IG_BACKPACK_OPEN)
 
 	-- Lazy resize tabs on first show to account for fonts loaded by other addons (e.g., GW2 UI)
@@ -71,7 +74,7 @@ function backpack.proto:OnShow(ctx)
 		end
 	end
 
-	self.bag.window:Show(ctx)
+	self.bag.window:Show(ctx, onShown)
 	addon.TriggerItemContextChanged()
 end
 

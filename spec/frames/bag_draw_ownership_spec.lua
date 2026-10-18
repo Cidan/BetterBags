@@ -9,6 +9,9 @@
 -- These specs run the real ItemFrame, SectionFrame, Views and BagFrame modules so
 -- that button identity and section cell release behave exactly as in the client.
 
+-- Base's text roles, kept for the specs that swap in a test Base theme.
+local baseTextRoles = {}
+
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 LoadBetterBagsModule("core/context.lua")
@@ -291,8 +294,10 @@ local function loadRealModules()
   LoadBetterBagsModule("frames/bagcanvas.lua")
   addon:GetModule("Render"):Init()
   addon:GetModule("Sonata"):Init()
-  -- Base and Default: the views draw their hints with Base's text roles.
+  -- Base and Default: the views draw their hints, and a bag its Loading..., with Base's text roles.
   UseSonataTextRoles()
+  baseTextRoles.Text = addon:GetModule("Sonata").themes.Base.Text
+  baseTextRoles.Variables = addon:GetModule("Sonata").themes.Base.Variables
   ResetModuleStub("ItemFrame", "frames/item.lua")
   LoadBetterBagsModule("frames/item.lua")
   addon:GetModule("ItemFrame").CreateDecoration = function(_, item) return newDecoration(item) end
@@ -1350,6 +1355,94 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.is_false(bag:Show(context:New("show"), slotInfoWith({}, {})))
       assert.is_false(drew)
     end)
+
+    -- The bank is loaded once its window has finished showing (refresh-scheduler.md §11).
+    it("hands its behavior what to call once the window has finished showing", function()
+      local bag = newBag()
+      bag.frame:Hide()
+      local given
+      bag.behavior.OnShow = function(_, _, onShown) given = onShown end
+      local onShown = function() end
+      bag:Show(context:New("show"), nil, onShown)
+      assert.equal(onShown, given)
+    end)
+
+    it("calls back at once when it is already open, without showing again", function()
+      local bag = newBag()
+      local showings, called = 0, 0
+      bag.behavior.OnShow = function() showings = showings + 1 end
+      bag:Show(context:New("show"), nil, function() called = called + 1 end)
+      assert.equal(0, showings)
+      assert.equal(1, called)
+    end)
+
+    -- The window calls back at once when it is shown, or when a fade in still playing ends
+    -- (window.md §4, spec/window/window_spec.lua).
+    it("leaves an open bag's callback to its window, which knows whether it is still fading in", function()
+      local bag = newBag()
+      local given
+      bag.window.Show = function(_, _, onShown) given = onShown end
+      local onShown = function() end
+      bag:Show(context:New("show"), nil, onShown)
+      assert.equal(onShown, given)
+    end)
+  end)
+
+  -- Asked: the classic bank waits for its window to finish showing before it is read, "can we add
+  -- a loading text on the classic bags maybe? just so it's not blank blank" (refresh-scheduler.md
+  -- §11). A bag says Loading... while what it shows has never been read: data without tabs, or
+  -- nothing drawn (before its first draw, or once its drawing was torn down, as the bank's is when
+  -- it closes).
+  describe("the loading text", function()
+    -- What items:NewSlotInfo gives before a read (data/slots.lua): no tabs.
+    local neverRead = { itemsBySlotKey = {}, visibleItemsBySlotKey = {}, emptySlots = {}, totalItems = 0,
+      GetVisibleItems = function(self) return self.visibleItemsBySlotKey end }
+
+    it("says Loading... in the middle of the bag, above its content, before anything is drawn", function()
+      local bag = newBag()
+      local text = bag.loadingText
+      assert.equal("Loading...", text:GetText())
+      assert.is_true(text:IsShown())
+      local holder = text:GetParent()
+      assert.are.same({ "CENTER", bag.scrollBox, "CENTER", 0, 0 }, { holder:GetPoint(1) })
+      assert.is_true(holder:GetFrameLevel() > bag.scrollBox:GetFrameLevel())
+      assert.equal(addon:GetModule("Sonata"):GetTextFont("Empty"), text:GetFontObject())
+    end)
+
+    it("hides once a read is drawn, and says it again for data never read", function()
+      local bag = newBag()
+      bag:Draw(context:New("read"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+      assert.is_false(bag.loadingText:IsShown())
+      bag:Draw(context:New("never read"), neverRead, function() end)
+      assert.is_true(bag.loadingText:IsShown())
+    end)
+
+    it("says it again once its drawing is torn down (the bank closing)", function()
+      local bag = newBag()
+      bag:Draw(context:New("read"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+      bag:Wipe(context:New("wipe"))
+      assert.is_true(bag.loadingText:IsShown())
+    end)
+
+    it("leaves a draw deferred while hidden to the draw that shows it", function()
+      local bag = newBag()
+      bag.frame:Hide()
+      bag:Draw(context:New("hidden"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+      assert.is_true(bag.loadingText:IsShown(), "nothing drawn yet")
+    end)
+
+    -- The retail bank's Purchase Bank button sits in the same place (bags/bank.lua).
+    it("gives way to the Purchase Bank button", function()
+      local bag = newBag()
+      local button = CreateFrame("Button", nil, bag.frame)
+      bag.purchaseBankButton = button
+      button:Show()
+      bag:UpdateLoadingText()
+      assert.is_false(bag.loadingText:IsShown())
+      button:Hide()
+      bag:UpdateLoadingText()
+      assert.is_true(bag.loadingText:IsShown())
+    end)
   end)
 
   -- Issue #408: an item dropped anywhere on a bag window, or the window clicked while holding
@@ -1490,11 +1583,13 @@ describe("Bag Draw: shared item button ownership across global sections and view
     end)
 
     -- partsBag builds a bag with its window and parts, decorated with a theme whose bag
-    -- window has insets and a layout like the Base theme's.
+    -- window has insets and a layout like the Base theme's, and Base's text roles (a bag draws
+    -- its Loading... text in one).
     local function partsBag()
       local sonata = addon:GetModule("Sonata")
       override(sonata, "themes", {})
-      sonata:RegisterTheme({ Name = "Base", Hidden = true, Windows = { Bag = {
+      sonata:RegisterTheme({ Name = "Base", Hidden = true, Text = baseTextRoles.Text, Variables = baseTextRoles.Variables,
+        Windows = { Bag = {
         Insets = { Left = 6, Right = 6, Top = 42, Bottom = 3 },
         Layout = {
           Search = { Points = { { Point = "TOPLEFT", X = 20, Y = -30 },
@@ -1517,7 +1612,7 @@ describe("Bag Draw: shared item button ownership across global sections and view
       local function bagWithTabs(layout)
         local sonata = addon:GetModule("Sonata")
         override(sonata, "themes", {})
-        sonata:RegisterTheme({ Name = "Base", Hidden = true })
+        sonata:RegisterTheme({ Name = "Base", Hidden = true, Text = baseTextRoles.Text, Variables = baseTextRoles.Variables })
         sonata:RegisterTheme({ Name = "Default", Windows = { Bag = { Layout = layout } } })
         local bag = newBag()
         bag:BuildParts()
@@ -1740,7 +1835,8 @@ describe("Bag Draw: shared item button ownership across global sections and view
     it("places its parts once made when its window was styled before them", function()
       local sonata = addon:GetModule("Sonata")
       override(sonata, "themes", {})
-      sonata:RegisterTheme({ Name = "Base", Hidden = true, Windows = { Bag = {
+      sonata:RegisterTheme({ Name = "Base", Hidden = true, Text = baseTextRoles.Text, Variables = baseTextRoles.Variables,
+        Windows = { Bag = {
         Insets = { Left = 6, Right = 6, Top = 42, Bottom = 3 },
         Layout = {
           Search = { Points = { { Point = "TOPLEFT", X = 20, Y = -30 } }, Reserve = 20 },

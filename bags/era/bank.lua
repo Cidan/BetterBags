@@ -32,10 +32,12 @@ local bagSlots = addon:GetModule("BagSlots")
 --- (gated on bag.slots) disappears from the bank.
 -------
 
+-- OnShow shows the bank's window; onShown runs once the window has finished showing.
 ---@param ctx Context
-function bank.proto:OnShow(ctx)
+---@param onShown? fun()
+function bank.proto:OnShow(ctx, onShown)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-	self.bag.window:Show(ctx)
+	self.bag.window:Show(ctx, onShown)
 	addon.TriggerItemContextChanged()
 end
 

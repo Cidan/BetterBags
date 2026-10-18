@@ -140,6 +140,8 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field edgeSparkles NextSparkleEmitter Along the feathered edge.
 ---@field offset number How far the panel is from its place, outward being off the screen.
 ---@field closing boolean It is sliding out.
+---@field onShown? (fun())[] What to call once the slide in playing has ended. Every slide in starts
+--- a new list: a slide a close or Escape cut short never ends, so its list is never called.
 ---@field opening boolean It is drawing as it opens.
 ---@field tabChanged boolean The next draw shows another tab.
 ---@field drawOnClose boolean
@@ -958,14 +960,26 @@ function panelProto:OnShowing(ctx)
 end
 
 -- Show slides the panel in from its edge, drawing a draw it kept while hidden (with slotInfo when
--- given), fading its sections in and starting its sparkles. It returns whether it drew.
+-- given), fading its sections in and starting its sparkles. It returns whether it drew. onShown
+-- runs once the panel has slid into place: at once when it is open, when a slide still playing
+-- ends, never for a slide closing or Escape cut short. A bank open loads the bank then
+-- (refresh-scheduler.md §11).
 ---@param ctx Context
 ---@param slotInfo? SlotInfo
+---@param onShown? fun()
 ---@return boolean drew
-function panelProto:Show(ctx, slotInfo)
+function panelProto:Show(ctx, slotInfo, onShown)
   if self.frame:IsShown() and not self.closing then
+    if onShown ~= nil then
+      if self.onShown ~= nil then
+        table.insert(self.onShown, onShown)
+      else
+        onShown()
+      end
+    end
     return false
   end
+  self.onShown = { onShown }
   local sliding = self.frame:IsShown()
   self.closing = false
   PlaySound(self.openSound)
@@ -991,6 +1005,13 @@ function panelProto:Show(ctx, slotInfo)
     ease = "outBack",
     onUpdate = function(x)
       self:setOffset(x)
+    end,
+    onDone = function()
+      local callbacks = self.onShown or {}
+      self.onShown = nil
+      for _, callback in ipairs(callbacks) do
+        callback()
+      end
     end,
   })
   self.content:Cascade(true, style.Time.OpenCascadeDelay)

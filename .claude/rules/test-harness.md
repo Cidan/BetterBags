@@ -108,6 +108,22 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   `CreateDataProvider`.
 - **No layout engine:** every frame the loaded addon makes is resolved at the screen's origin, as
   if laid out, and the cursor is far off screen.
+- **No item button template:** the frame mock builds none of `ContainerFrameItemButtonTemplate`'s
+  regions or mixin methods (item specs build their own button fakes), so the whole addon cannot
+  draw an item button: a spec that runs a read and its draw keeps every bag empty
+  (`globals = { C_Container = ... }` with `GetContainerNumSlots` 0; the mock gives every bag 16
+  slots and every slot an item). Drawing items on the whole addon needs a template mock from
+  Blizzard's source first.
+- **Errors in message and event handlers reach `handle.errors`.** AceEvent dispatches through
+  CallbackHandler, which calls each handler with `securecallfunction`. The mock used to return
+  `pcall`'s results and drop the error, so a handler that threw (a bank draw missing a Blizzard
+  global) failed silently; it now does what the client does (warcraft.wiki.gg API:securecall):
+  the error goes to `geterrorhandler()` and the call returns nothing. The whole suite passed
+  unchanged with the fix. Coverage: `spec/integration/bag_switch_spec.lua` ("collects an error
+  thrown in a message or event handler").
+- **Driving time:** pass `globals = { C_Timer = ... }` with an `After`/`NewTimer` that keep their
+  timers for the spec to run (`spec/integration/bank_open_spec.lua`); the startup read runs once
+  the spec fires `LOADING_SCREEN_DISABLED` and runs one quiet frame on `refresh._startupFrame`.
 - **Restore** puts back everything changed in place (insulation restores only globals): first
   the loaded addon's events, messages and hooks and Sonata's text-size callback (unhooking reads
   the libraries' registries, put back next), then the table fields of every library (AceHook's
@@ -132,5 +148,6 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   full suite (16 s without it, 48 s with it). Keep whole-addon specs few and pointed: a test needs its own load only when it needs
   a fresh start (what it checks happens the first time something is made). Making the frame mock
   share its methods (one set behind a metatable) would cut both, for every spec.
-- Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e).
+- Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e),
+  `spec/integration/bank_open_spec.lua` (refresh-scheduler.md §11).
 
