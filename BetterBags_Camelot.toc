@@ -166,6 +166,9 @@ next\drag.lua
 next\panel.lua
 next\bag.lua
 next\bank.lua
+next\merchant.lua
+next\vendorbutton.lua
+next\vendor.lua
 
 
 config\categorypane.lua

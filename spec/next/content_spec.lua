@@ -302,6 +302,53 @@ describe("NextContent", function()
     assert.is_nil(motion:GetMove(frame))
   end)
 
+  -- BetterBags Next's vendor (next.md §10) binds sections of its own buttons, taller than an icon
+  -- (the price is under it).
+  describe("sections of other buttons", function()
+    local function vendorButton(key)
+      local f = CreateFrame("Button")
+      f:SetSize(style.ICON, style.ICON + 14)
+      return { key = key, frame = f }
+    end
+
+    it("lays out the sections it is given, in their order, with their own counts", function()
+      local a, b, c = vendorButton("v1"), vendorButton("v2"), vendorButton("v3")
+      canvas:BindSections({
+        { name = "Food", buttons = { a, b } },
+        { name = "Armor", buttons = { c }, count = "9" },
+      })
+      draw()
+      assert.are.same({ "Food", "Armor" }, { canvas.order[1].name, canvas.order[2].name })
+      assert.are.equal("2", canvas.order[1].count:GetText())
+      assert.are.equal("9", canvas.order[2].count:GetText())
+      assert.are.equal(canvas.order[1].cells, a.frame:GetParent())
+      assert.are.same({ canvas.order[1].cells, STEP, 0 }, { at(b.frame) })
+      assert.are.same({ v1 = a, v2 = b, v3 = c }, canvas.buttons)
+    end)
+
+    it("steps rows by its cell height", function()
+      canvas:SetCellHeight(style.ICON + 14)
+      local list = {}
+      for i = 1, 9 do list[i] = vendorButton("v" .. i) end
+      canvas:BindSections({ { name = "Food", buttons = list } })
+      draw()
+      local rowStep = style.ICON + 14 + style.GAP
+      assert.are.same({ canvas.order[1].cells, 0, -rowStep }, { at(list[9].frame) })
+      assert.are.equal(style.SECTION_HEADER + 2 * rowStep - style.GAP, canvas.order[1].height)
+    end)
+
+    it("reuses a section of the same name and releases the rest", function()
+      canvas:BindSections({ { name = "Food", buttons = { vendorButton("a") } }, { name = "Gone", buttons = {} } })
+      draw()
+      local food, gone = canvas.byName.Food, canvas.byName.Gone
+      canvas:BindSections({ { name = "Food", buttons = { vendorButton("b") } } })
+      draw()
+      assert.are.equal(food, canvas.byName.Food)
+      assert.is_false(food.isNew)
+      assert.is_false(gone.frame:IsShown())
+    end)
+  end)
+
   -- A section dragged by its header (next.md §7).
   describe("dragging a section", function()
     local function threeSections(opts)

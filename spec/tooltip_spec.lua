@@ -553,4 +553,75 @@ describe("TooltipScanner", function()
       assert.are.equal(0, tooltipScanner:GetCacheSize())
     end)
   end)
+
+  -- BetterBags Next's vendor (next/merchant.lua, next.md §10): a vendor item's tooltip text and
+  -- the repair cost of an item, retail through C_TooltipInfo, Classic through the scan tooltip.
+  describe("merchants and repair", function()
+    local saved
+
+    before_each(function()
+      saved = { isRetail = addon.isRetail, scan = tooltipScanner.scanTooltip, info = _G.C_TooltipInfo }
+    end)
+
+    after_each(function()
+      addon.isRetail = saved.isRetail
+      tooltipScanner.scanTooltip = saved.scan
+      _G.C_TooltipInfo = saved.info
+      _G["BetterBagsScanTooltipTextLeft1"] = nil
+      _G["BetterBagsScanTooltipTextRight1"] = nil
+      _G["BetterBagsScanTooltipTextLeft2"] = nil
+    end)
+
+    it("joins a vendor item's tooltip lines on retail, as for bag items", function()
+      addon.isRetail = true
+      _G.C_TooltipInfo = { GetMerchantItem = function(index)
+        assert.are.equal(4, index)
+        return { lines = { { leftText = "Potion", rightText = "" }, { leftText = "Use: heal", rightText = "5 sec" } } }
+      end }
+      assert.are.equal("Potion Use: heal 5 sec", tooltipScanner:GetMerchantItemText(4))
+      _G.C_TooltipInfo = { GetMerchantItem = function() return { lines = {} } end }
+      assert.is_nil(tooltipScanner:GetMerchantItemText(4))
+    end)
+
+    it("reads a vendor item's tooltip from the scan tooltip on Classic", function()
+      addon.isRetail = false
+      local set
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetMerchantItem = function(_, index) set = index end,
+        NumLines = function() return 2 end,
+      }
+      _G["BetterBagsScanTooltipTextLeft1"] = { GetText = function() return "Arrow" end }
+      _G["BetterBagsScanTooltipTextRight1"] = nil
+      _G["BetterBagsScanTooltipTextLeft2"] = { GetText = function() return "Projectile" end }
+      assert.are.equal("Arrow Projectile", tooltipScanner:GetMerchantItemText(3))
+      assert.are.equal(3, set)
+    end)
+
+    it("reads repair costs from C_TooltipInfo on retail", function()
+      addon.isRetail = true
+      _G.C_TooltipInfo = {
+        GetInventoryItem = function(unit, slot) assert.are.equal("player", unit) return { repairCost = slot * 10 } end,
+        GetBagItem = function(bag, slot) return { repairCost = bag * 100 + slot } end,
+      }
+      assert.are.equal(50, tooltipScanner:GetInventoryRepairCost(5))
+      assert.are.equal(203, tooltipScanner:GetBagRepairCost(2, 3))
+      _G.C_TooltipInfo = { GetInventoryItem = function() return nil end, GetBagItem = function() return {} end }
+      assert.are.equal(0, tooltipScanner:GetInventoryRepairCost(5))
+      assert.are.equal(0, tooltipScanner:GetBagRepairCost(2, 3))
+    end)
+
+    it("reads repair costs from the scan tooltip on Classic (what its setters return)", function()
+      addon.isRetail = false
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetInventoryItem = function(_, unit, slot) return true, false, slot + 1 end,
+        SetBagItem = function(_, bag, slot) return false, bag + slot end,
+      }
+      assert.are.equal(6, tooltipScanner:GetInventoryRepairCost(5))
+      assert.are.equal(5, tooltipScanner:GetBagRepairCost(2, 3))
+      tooltipScanner.scanTooltip = nil
+      assert.are.equal(0, tooltipScanner:GetInventoryRepairCost(5))
+    end)
+  end)
 end)

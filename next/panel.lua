@@ -82,12 +82,15 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field title string
 ---@field openSound number
 ---@field closeSound number
+---@field noDrag? boolean Its sections are not dragged, and nothing is dropped on it (the vendor).
 
 ---@class (exact) NextHeaderButton
 ---@field key string The field the button is kept in on the panel.
 ---@field atlas? string
 ---@field texture? string|number
+---@field texCoords? number[] Of the texture: left, right, top, bottom.
 ---@field tooltip string
+---@field tooltipFunc? fun(button: Button) Fills the tooltip instead of tooltip.
 ---@field onClick fun(ctx: Context)
 
 ---@class NextPanelFrame
@@ -192,7 +195,9 @@ function nextPanel:Create(proto, opts)
   p:BuildTabs()
   p:Watch()
   p.content:SetHeaderHandler(p)
-  nextDrag:Register(p)
+  if not opts.noDrag then
+    nextDrag:Register(p)
+  end
   return p
 end
 
@@ -225,12 +230,15 @@ function panelProto:setOffset(x)
 end
 
 -- BuildPanel makes the panel: full height on its edge of the screen, its body a deep indigo with
--- a faint wash of color at the top, its inner edge feathered out to nothing.
+-- a faint wash of color at the top, its inner edge feathered out to nothing. It sits in the HIGH
+-- strata, above the rest of the UI: what must cover it is higher (Blizzard's popups and game menu
+-- are DIALOG, menus FULLSCREEN_DIALOG, tooltips TOOLTIP), or HIGH and toplevel, raising itself
+-- above it when shown (the stack split, StackSplitFrame.xml).
 ---@param name string
 function panelProto:BuildPanel(name)
   local left = self.side == "LEFT"
   local frame = CreateFrame("Frame", name, UIParent)
-  frame:SetFrameStrata("MEDIUM")
+  frame:SetFrameStrata("HIGH")
   frame:SetFrameLevel(500)
   frame:SetToplevel(true)
   frame:SetWidth(style.WIDTH)
@@ -442,13 +450,20 @@ function panelProto:headerButton(spec)
     icon:SetAtlas(spec.atlas)
   else
     icon:SetTexture(spec.texture)
+    if spec.texCoords then
+      icon:SetTexCoord(unpack(spec.texCoords))
+    end
   end
   icon:SetVertexColor(0.85, 0.82, 1, 1)
   button.icon = icon
   button:SetScript("OnEnter", function()
     icon:SetVertexColor(1, 1, 1, 1)
     GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
-    GameTooltip:SetText(spec.tooltip, 1, 1, 1, 1, true)
+    if spec.tooltipFunc then
+      spec.tooltipFunc(button)
+    else
+      GameTooltip:SetText(spec.tooltip, 1, 1, 1, 1, true)
+    end
     GameTooltip:Show()
   end)
   button:SetScript("OnLeave", function()
@@ -512,23 +527,36 @@ function panelProto:BuildHeader(text)
   self.spark = spark
 
   self.headerButtons = {}
-  local previous
   for _, spec in ipairs(self:GetHeaderButtons()) do
     local button = self:headerButton(spec)
-    if previous == nil then
-      if left then
-        button:SetPoint("TOPLEFT", body, "TOPLEFT", style.PAD, -(style.TITLE_TOP + 3))
-      else
-        button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3))
-      end
-    elseif left then
-      button:SetPoint("LEFT", previous, "RIGHT", 8, 0)
-    else
-      button:SetPoint("RIGHT", previous, "LEFT", -8, 0)
-    end
     self[spec.key] = button
     table.insert(self.headerButtons, button)
-    previous = button
+  end
+  self:LayoutHeader()
+end
+
+-- LayoutHeader lines the shown header buttons up from the screen edge, so a hidden one leaves
+-- no gap.
+function panelProto:LayoutHeader()
+  local left = self.side == "LEFT"
+  local body = self.body
+  local previous
+  for _, button in ipairs(self.headerButtons) do
+    button:ClearAllPoints()
+    if button:IsShown() then
+      if previous == nil then
+        if left then
+          button:SetPoint("TOPLEFT", body, "TOPLEFT", style.PAD, -(style.TITLE_TOP + 3))
+        else
+          button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3))
+        end
+      elseif left then
+        button:SetPoint("LEFT", previous, "RIGHT", 8, 0)
+      else
+        button:SetPoint("RIGHT", previous, "LEFT", -8, 0)
+      end
+      previous = button
+    end
   end
 end
 
@@ -536,8 +564,7 @@ end
 -- searchBox:GetSearchText) out of the theme's hands and draws it flat: a soft pill and a fading
 -- underline instead of the template's border.
 function panelProto:BuildSearch()
-  local sf = searchBox:CreateBox(self.kind, self.frame)
-  sonata:UnregisterElement("SearchBox", sf.textBox)
+  local sf = self:CreateSearchBox()
   sf.frame:ClearAllPoints()
   sf.frame:SetPoint("TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.SEARCH_TOP)
   sf.frame:SetPoint("TOPRIGHT", self.body, "TOPRIGHT", -style.PAD, -style.SEARCH_TOP)
@@ -559,6 +586,14 @@ function panelProto:BuildSearch()
   underline:SetGradient("HORIZONTAL", style:CreateColor("Lavender", 0.5), style:CreateColor("Lavender", 0))
   self.searchBox = sf
   self:UpdateSearchShown()
+end
+
+-- CreateSearchBox makes the panel's search box: the kind's in-bag box, out of the theme's hands.
+---@return SearchFrame
+function panelProto:CreateSearchBox()
+  local sf = searchBox:CreateBox(self.kind, self.frame)
+  sonata:UnregisterElement("SearchBox", sf.textBox)
+  return sf
 end
 
 -- UpdateSearchShown shows the search box while in-bag search is on, as the classic bag does.

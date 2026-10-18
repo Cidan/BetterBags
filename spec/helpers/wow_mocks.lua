@@ -608,8 +608,13 @@ local function CreateMockWidget(widgetType, name, parent)
     self._sizing = point or "BOTTOMRIGHT"
     self._sizingFromMouse = alwaysStartFromMouse == true
   end
+  -- Frame:SetToplevel(topLevel) / IsToplevel(): a toplevel frame raises its level when clicked or
+  -- shown (warcraft.wiki.gg API:Frame_SetToplevel).
   function widget:SetToplevel(topLevel)
     self._toplevel = topLevel
+  end
+  function widget:IsToplevel()
+    return self._toplevel == true
   end
   function widget:SetClampedToScreen(clamped)
     self._clamped = clamped
@@ -1556,7 +1561,20 @@ _G.ScrollUtil.InitScrollBoxWithScrollBar = function(scrollBox, scrollBar, view)
   scrollBox:Init(view)
 end
 
-_G.hooksecurefunc = function() end
+-- hooksecurefunc([table,] name, hook): replaces the function with one that calls the original,
+-- then the hook with the same arguments, and returns what the original returned
+-- (warcraft.wiki.gg API_hooksecurefunc).
+_G.hooksecurefunc = function(tbl, name, hook)
+  if type(tbl) == "string" then
+    tbl, name, hook = _G, tbl, name
+  end
+  local original = tbl[name]
+  tbl[name] = function(...)
+    local results = { original(...) }
+    hook(...)
+    return unpack(results)
+  end
+end
 _G.UIParent = CreateMockWidget("Frame", "UIParent")
 _G.UIParent:SetSize(1920, 1200)
 function _G.UIParent:GetEffectiveScale()
@@ -1995,9 +2013,12 @@ end
 _G.IsControlKeyDown = function() return _G._isControlKeyDown or false end
 _G.IsAltKeyDown = function() return _G._isAltKeyDown or false end
 _G.GetCursorInfo = function() return _G._cursorType, _G._cursorItemID, _G._cursorItemLink end
--- IsModifiedClick(action?) -> isHeld. PICKUPITEM defaults to SHIFT (Bindings_*.xml).
+-- IsModifiedClick(action?) -> isHeld, with the default bindings (Bindings_*.xml ModifiedClick):
+-- PICKUPITEM, SPLITSTACK and CHATLINK on SHIFT, DRESSUP on CTRL; with no action, any modifier.
 _G.IsModifiedClick = function(action)
-  if action == "PICKUPITEM" then return _G.IsShiftKeyDown() end
+  if action == "PICKUPITEM" or action == "SPLITSTACK" or action == "CHATLINK" then return _G.IsShiftKeyDown() end
+  if action == "DRESSUP" then return _G.IsControlKeyDown() end
+  if action == nil then return _G.IsShiftKeyDown() or _G.IsControlKeyDown() or _G.IsAltKeyDown() end
   return false
 end
 _G.ClearCursor = function()
@@ -2315,3 +2336,229 @@ _G.ItemButtonUtil = {
   Event = { ItemContextChanged = 1 },
   TriggerEvent = function() end,
 }
+
+-- Merchants. The merchant functions are legacy globals with no generated documentation; their
+-- shapes are what Blizzard's own merchant code reads (Blizzard_UIPanels_Game/Mainline,
+-- Vanilla and TBC MerchantFrame.lua and .xml; MerchantFrameDocumentation.lua for C_MerchantFrame).
+-- Specs describe the open merchant in _G._merchant and read what was asked of it in
+-- _G._merchantCalls (reset both with ResetMockMerchant):
+--   items[i] = { link, itemID, name, texture, price, stackCount, numAvailable, isPurchasable,
+--     isUsable, hasExtendedCost, currencyID, spellID, isQuestStartItem, maxStack, canAfford,
+--     refundable, costs = { { texture, value, link, currencyName } } }
+--   buyback[i] = { name, texture, price, quantity, numAvailable, isUsable, isBound, link }
+--   canRepair, repairCost, canGuildRepair, guildWithdraw, guildMoney, junk, sellJunkEnabled,
+--   currencies, filter, open
+function _G.ResetMockMerchant()
+  _G._merchant = { items = {}, buyback = {}, canRepair = false, repairCost = 0, canGuildRepair = false,
+    guildWithdraw = 0, guildMoney = 0, junk = 0, sellJunkEnabled = true, currencies = {}, filter = 1,
+    open = true, repairMode = false }
+  _G._merchantCalls = { buy = {}, buyback = {}, repair = {}, pickup = {}, closed = 0, sellJunk = 0,
+    confirmExtended = {}, confirmHighCost = {}, sellJunkClicked = 0, inventoryPickups = {}, filters = {} }
+  _G._durability = {}
+  _G._bagDurability = {}
+  _G._repairCosts = {}
+end
+_G.ResetMockMerchant()
+
+local function merchantItem(index)
+  return _G._merchant.items[index]
+end
+
+-- GetMerchantNumItems() -> numItems.
+_G.GetMerchantNumItems = function() return #_G._merchant.items end
+-- C_MerchantFrame.GetItemInfo(index) -> MerchantItemInfo (retail and WoW: Forever; nilable).
+_G.C_MerchantFrame = _G.C_MerchantFrame or {}
+_G.C_MerchantFrame.GetItemInfo = function(index)
+  local item = merchantItem(index)
+  if item == nil then return nil end
+  return { name = item.name, texture = item.texture or 0, price = item.price or 0, stackCount = item.stackCount or 1,
+    numAvailable = item.numAvailable or -1, isPurchasable = item.isPurchasable ~= false,
+    isUsable = item.isUsable ~= false, hasExtendedCost = item.hasExtendedCost == true, currencyID = item.currencyID,
+    spellID = item.spellID, isQuestStartItem = item.isQuestStartItem == true }
+end
+-- GetMerchantItemInfo(index) -> name, texture, price, stackCount, numAvailable, isPurchasable,
+-- isUsable, extendedCost, currencyID (Classic: Vanilla/TBC MerchantFrame.lua).
+_G.GetMerchantItemInfo = function(index)
+  local item = merchantItem(index)
+  if item == nil then return nil end
+  return item.name, item.texture or 0, item.price or 0, item.stackCount or 1, item.numAvailable or -1,
+    item.isPurchasable ~= false, item.isUsable ~= false, item.hasExtendedCost == true, item.currencyID
+end
+_G.GetMerchantItemLink = function(index) local item = merchantItem(index) return item and item.link end
+_G.GetMerchantItemID = function(index) local item = merchantItem(index) return item and item.itemID end
+_G.GetMerchantItemMaxStack = function(index) local item = merchantItem(index) return item and item.maxStack or 1 end
+-- CanAffordMerchantItem(index) -> canAfford (nil when the client does not know).
+_G.CanAffordMerchantItem = function(index) local item = merchantItem(index) return item and item.canAfford ~= false end
+-- GetMerchantItemCostInfo(index) -> number of cost entries; GetMerchantItemCostItem(index, i) ->
+-- itemTexture, itemValue, itemLink, currencyName (MerchantFrame_UpdateAltCurrency).
+_G.GetMerchantItemCostInfo = function(index) local item = merchantItem(index) return item and #(item.costs or {}) or 0 end
+_G.GetMerchantItemCostItem = function(index, costIndex)
+  local item = merchantItem(index)
+  local cost = item and item.costs and item.costs[costIndex]
+  if cost == nil then return nil end
+  return cost.texture, cost.value, cost.link, cost.currencyName
+end
+_G.C_MerchantFrame.IsMerchantItemRefundable = function(index) local item = merchantItem(index) return item ~= nil and item.refundable ~= false end
+_G.C_MerchantFrame.GetNumJunkItems = function() return _G._merchant.junk end
+_G.C_MerchantFrame.IsSellAllJunkEnabled = function() return _G._merchant.sellJunkEnabled end
+_G.C_MerchantFrame.SellAllJunkItems = function() _G._merchantCalls.sellJunk = _G._merchantCalls.sellJunk + 1 end
+_G.C_MerchantFrame.GetMerchantCurrencies = function() return _G._merchant.currencies end
+-- BuyMerchantItem(index, quantity?), PickupMerchantItem(index) (0 sells the cursor item),
+-- CloseMerchant().
+_G.BuyMerchantItem = function(index, quantity) table.insert(_G._merchantCalls.buy, { index, quantity }) end
+_G.PickupMerchantItem = function(index) table.insert(_G._merchantCalls.pickup, index) end
+_G.CloseMerchant = function()
+  _G._merchantCalls.closed = _G._merchantCalls.closed + 1
+  _G._merchant.open = false
+end
+-- Buyback: GetNumBuybackItems(), GetBuybackItemInfo(i) -> name, texture, price, quantity,
+-- numAvailable, isUsable, isBound; GetBuybackItemLink(i); BuybackItem(i).
+_G.GetNumBuybackItems = function() return #_G._merchant.buyback end
+_G.GetBuybackItemInfo = function(index)
+  local item = _G._merchant.buyback[index]
+  if item == nil then return nil end
+  return item.name, item.texture or 0, item.price or 0, item.quantity or 1, item.numAvailable or -1,
+    item.isUsable ~= false, item.isBound == true
+end
+_G.GetBuybackItemLink = function(index) local item = _G._merchant.buyback[index] return item and item.link end
+_G.BuybackItem = function(index) table.insert(_G._merchantCalls.buyback, index) end
+-- Repair: CanMerchantRepair(), GetRepairAllCost() -> repairAllCost, canRepair, RepairAllItems
+-- (guildBankRepair?), CanGuildBankRepair(), GetGuildBankWithdrawMoney() (-1: no limit),
+-- GetGuildBankMoney(), ShowRepairCursor(), HideRepairCursor(), InRepairMode().
+_G.CanMerchantRepair = function() return _G._merchant.canRepair end
+_G.GetRepairAllCost = function() return _G._merchant.repairCost, _G._merchant.repairCost > 0 end
+_G.RepairAllItems = function(guild) table.insert(_G._merchantCalls.repair, guild == true) end
+_G.CanGuildBankRepair = function() return _G._merchant.canGuildRepair end
+_G.GetGuildBankWithdrawMoney = function() return _G._merchant.guildWithdraw end
+_G.GetGuildBankMoney = function() return _G._merchant.guildMoney end
+_G.ShowRepairCursor = function() _G._merchant.repairMode = true end
+_G.HideRepairCursor = function() _G._merchant.repairMode = false end
+_G.InRepairMode = function() return _G._merchant.repairMode end
+-- PickupInventoryItem(slot): in repair mode it repairs that slot (PaperDollItemSlotButton_OnClick).
+_G.PickupInventoryItem = function(slot)
+  table.insert(_G._merchantCalls.inventoryPickups, { slot = slot, repairing = _G._merchant.repairMode })
+end
+-- GetInventoryItemDurability(slot) -> current, maximum (EquipmentManager.lua);
+-- C_Container.GetContainerItemDurability(bag, slot) -> durability, maxDurability
+-- (ContainerDocumentation.lua). Specs set _G._durability[slot] and _G._bagDurability["bag:slot"].
+_G.GetInventoryItemDurability = function(slot)
+  local d = _G._durability[slot]
+  if d == nil then return nil end
+  return d[1], d[2]
+end
+_G.C_Container.GetContainerItemDurability = function(bag, slot)
+  local d = _G._bagDurability[bag .. ":" .. slot]
+  if d == nil then return nil end
+  return d[1], d[2]
+end
+-- The filter: SetMerchantFilter(filter), GetMerchantFilter(), and the LE_LOOT_FILTER_* values
+-- (retail MerchantFrame_OnLoad).
+_G.LE_LOOT_FILTER_ALL = 1
+_G.LE_LOOT_FILTER_CLASS = 2
+_G.LE_LOOT_FILTER_SPEC1 = 3
+_G.LE_LOOT_FILTER_BOE = 7
+_G.SetMerchantFilter = function(filter)
+  _G._merchant.filter = filter
+  table.insert(_G._merchantCalls.filters, filter)
+end
+_G.GetMerchantFilter = function() return _G._merchant.filter end
+-- Blizzard's confirmations (MerchantFrame.lua): MERCHANT_HIGH_PRICE_COST, and the functions an
+-- item button's right click goes through; they read the button's ID, price, link, count, name,
+-- texture and showNonrefundablePrompt. The Sell All Junk button's confirmation.
+_G.MERCHANT_HIGH_PRICE_COST = 1500000
+_G.MerchantFrame_ConfirmExtendedItemCost = function(button, quantity)
+  table.insert(_G._merchantCalls.confirmExtended, { id = button:GetID(), quantity = quantity, price = button.price,
+    link = button.link, count = button.count, name = button.name, texture = button.texture,
+    nonrefundable = button.showNonrefundablePrompt })
+end
+_G.MerchantFrame_ConfirmHighCostItem = function(button, quantity)
+  table.insert(_G._merchantCalls.confirmHighCost, { id = button:GetID(), quantity = quantity, price = button.price,
+    link = button.link })
+end
+_G.MerchantFrame_OnSellAllJunkButtonClicked = function()
+  _G._merchantCalls.sellJunkClicked = _G._merchantCalls.sellJunkClicked + 1
+end
+-- C_CurrencyInfo.GetCoinTextureString(amount) (CurrencyInfoDocumentation.lua): the amount in
+-- gold, silver and copper with their icons; the mock writes "1g 2s 3c", leaving out zeros.
+_G.C_CurrencyInfo = _G.C_CurrencyInfo or {}
+_G.C_CurrencyInfo.GetCoinTextureString = function(amount)
+  local gold, silver, copper = math.floor(amount / 10000), math.floor(amount / 100) % 100, amount % 100
+  local parts = {}
+  if gold > 0 then table.insert(parts, gold .. "g") end
+  if silver > 0 then table.insert(parts, silver .. "s") end
+  if copper > 0 or #parts == 0 then table.insert(parts, copper .. "c") end
+  return table.concat(parts, " ")
+end
+-- C_CurrencyInfo.GetCurrencyInfo(type) -> CurrencyInfo; specs set _G._currencies[id].
+_G._currencies = {}
+_G.C_CurrencyInfo.GetCurrencyInfo = function(id) return _G._currencies[id] end
+-- Tooltips for merchants: GameTooltip:SetMerchantItem(index), SetBuybackItem(index),
+-- SetInventoryItem(unit, slot) -> hasItem, hasCooldown, repairCost (ItemUtil.lua). C_TooltipInfo
+-- (retail; TooltipInfoDocumentation.lua) returns TooltipData, whose repairCost
+-- TooltipDataRules.lua reads. Specs set _G._repairCosts["inv:slot"] and ["bag:bag:slot"].
+function _G.GameTooltip:SetMerchantItem(index) self._merchantItem = index self:Show() end
+function _G.GameTooltip:SetBuybackItem(index) self._buybackItem = index self:Show() end
+function _G.GameTooltip:SetInventoryItem(unit, slot)
+  self._inventoryItem = { unit = unit, slot = slot }
+  self:Show()
+  return true, false, _G._repairCosts["inv:" .. slot]
+end
+_G.C_TooltipInfo = _G.C_TooltipInfo or {}
+_G.C_TooltipInfo.GetInventoryItem = function(unit, slot)
+  return { type = 0, lines = {}, repairCost = _G._repairCosts["inv:" .. slot] }
+end
+_G.C_TooltipInfo.GetBagItem = _G.C_TooltipInfo.GetBagItem or function(bag, slot)
+  return { type = 0, lines = {}, repairCost = _G._repairCosts["bag:" .. bag .. ":" .. slot] }
+end
+_G.C_TooltipInfo.GetMerchantItem = function(index)
+  local item = merchantItem(index)
+  return { type = 0, lines = item and item.tooltipLines or {} }
+end
+-- HandleModifiedItemClick(link) -> handled (a chat link, a dress-up: ItemButtonTemplate.lua);
+-- DressUpItemLink(link); SetCursor(cursor), ResetCursor().
+_G.HandleModifiedItemClick = function() return _G._modifiedClickHandled == true end
+_G.SetCursor = function(cursor) _G._cursor = cursor end
+_G.ResetCursor = function() _G._cursor = nil end
+
+-- The merchant frame's helpers. ResetSetMerchantFilter() (retail; MerchantFrame_OnShow calls it on
+-- every open) resets the filter to the client's default. ContainerFrame_GetExtendedPriceString(
+-- itemButton, isEquipped, quantity) shows Blizzard's refund confirmation and returns true when the
+-- item is refundable (ContainerFrame.lua); specs set _G._extendedPriceShown. StaticPopup_Hide(which).
+_G.ResetSetMerchantFilter = function()
+  _G._merchant.filter = _G.LE_LOOT_FILTER_CLASS
+  _G._merchantCalls.filterReset = (_G._merchantCalls.filterReset or 0) + 1
+end
+_G.ContainerFrame_GetExtendedPriceString = function(itemButton, isEquipped)
+  _G._extendedPriceAsked = { button = itemButton, isEquipped = isEquipped }
+  return _G._extendedPriceShown == true
+end
+_G._hiddenPopups = {}
+_G.StaticPopup_Hide = function(which) table.insert(_G._hiddenPopups, which) end
+-- C_GameRules.IsGameRuleActive(rule) (GameRulesDocumentation.lua); MerchantFrame.lua checks
+-- Enum.GameRule.MerchantFilterDisabled. Specs set _G._gameRules[rule].
+_G.Enum.GameRule = _G.Enum.GameRule or { MerchantFilterDisabled = 54 }
+_G._gameRules = {}
+_G.C_GameRules = _G.C_GameRules or {}
+_G.C_GameRules.IsGameRuleActive = function(rule) return _G._gameRules[rule] == true end
+-- GetNumSpecializations() and C_SpecializationInfo.GetSpecializationInfo(index, ...) -> id, name
+-- (MerchantFrame_OnLoad lists the specs as filters).
+_G.GetNumSpecializations = _G.GetNumSpecializations or function() return 2 end
+_G.C_SpecializationInfo = _G.C_SpecializationInfo or {}
+_G.C_SpecializationInfo.GetSpecializationInfo = _G.C_SpecializationInfo.GetSpecializationInfo
+  or function(index) return 100 + index, "Spec " .. index end
+-- MenuUtil.CreateContextMenu(ownerRegion, generator, ...) (Blizzard_Menu/MenuUtil.lua): calls
+-- generator(ownerRegion, rootDescription, ...). The mock's root description records what is made:
+-- SetTag, CreateRadio(text, isSelected, setSelected, data), CreateDivider. Specs read
+-- _G._lastContextMenu.
+_G.MenuUtil = _G.MenuUtil or {}
+_G.MenuUtil.CreateContextMenu = function(owner, generator, ...)
+  local root = { entries = {} }
+  function root:SetTag(tag) self.tag = tag end
+  function root:CreateRadio(text, isSelected, setSelected, data)
+    table.insert(self.entries, { kind = "radio", text = text, isSelected = isSelected, setSelected = setSelected, data = data })
+  end
+  function root:CreateDivider() table.insert(self.entries, { kind = "divider" }) end
+  generator(owner, root, ...)
+  _G._lastContextMenu = { owner = owner, root = root }
+  return root
+end

@@ -99,6 +99,9 @@ local perfSessions = addon:GetModule('PerfSessions')
 ---@field Bank Bag
 addon.Bags = {}
 
+---@type NextVendorPanel? BetterBags Next's vendor (next.md §10), made only while BetterBags Next is on.
+addon.Vendor = nil
+
 addon.atBank = false
 addon.atWarbank = false
 
@@ -281,6 +284,15 @@ function addon:OnInitialize()
     end
   end
 
+  -- BetterBags Next's vendor (next.md §10) stands in for Blizzard's merchant frame, which goes under
+  -- the hidden frame Blizzard's bags are under: still shown to Blizzard's bag code, which sells
+  -- on a right click while it is, but never seen. Kept apart from addon.Bags: it is no bag.
+  if database:GetNextEnabled() then
+    local nextVendor = addon:GetModule('NextVendor')
+    addon.Vendor = nextVendor:Create(rootctx:Copy())
+    nextVendor:TakeOver(_G.BetterBagsSneakyFrame)
+  end
+
   -- Sonata decorates every window registered so far with the saved theme (Default when it is
   -- missing or unavailable this session); windows made later are decorated as they register.
   addon:GetModule('Sonata'):Enable()
@@ -292,6 +304,9 @@ function addon:OnInitialize()
   -- Only add bank to UISpecialFrames if it was created
   if addon.Bags.Bank then
     table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+  end
+  if addon.Vendor then
+    table.insert(UISpecialFrames, addon.Vendor:GetName())
   end
 
   -- Disable the bag tutorial screens, as Better Bags does not match

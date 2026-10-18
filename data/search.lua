@@ -350,8 +350,8 @@ function search:UpdateCategoryIndex(item, oldCategory)
     oldCategory = snap.category
     snap.category = item.itemInfo.category
   end
-  search:removeStringFromIndex(self.indicies.category, oldCategory, item.slotkey)
-  search:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+  self:removeStringFromIndex(self.indicies.category, oldCategory, item.slotkey)
+  self:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
 end
 
 ---@private
@@ -847,17 +847,27 @@ function search:EvaluateQuery(ast)
   -- This is a special case where we want to return all items in the index that are not
   -- in the result set, as this is a negation of the entire index.
   if not ast.left and not ast.right and ast.operator == "!=" then
-    -- JIT load this module, as there is a circular dependency.
-    ---@class Items: AceModule
-    local items = addon:GetModule('Items')
-
-    for _, slotInfo in pairs(items:GetAllSlotInfo()) do
-      for k in pairs(slotInfo.itemsBySlotKey) do
-        if not negative[k] then
-          positive[k] = true
-        end
+    for k in pairs(self:Universe()) do
+      if not negative[k] then
+        positive[k] = true
       end
     end
   end
   return positive, negative
+end
+
+-- Universe returns every slot key a negated query covers: every item of both bags. A search
+-- index of other items (BetterBags Next's vendor, next/merchant.lua) returns its own.
+---@return table<string, any>
+function search:Universe()
+  -- JIT load this module, as there is a circular dependency.
+  ---@class Items: AceModule
+  local items = addon:GetModule('Items')
+  local all = {}
+  for _, slotInfo in pairs(items:GetAllSlotInfo()) do
+    for k in pairs(slotInfo.itemsBySlotKey) do
+      all[k] = true
+    end
+  end
+  return all
 end

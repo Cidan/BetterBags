@@ -10,6 +10,8 @@ local style = addon:NewModule('NextStyle')
 
 -- Item icons and the room between them.
 style.ICON = 44
+-- The room under a vendor button's icon for its price (next.md §10).
+style.VENDOR_PRICE = 14
 style.GAP = 6
 style.PER_ROW = 8
 -- The scroll box keeps its bar's room on both sides (render/scrollbox.lua, Symmetric).
@@ -112,13 +114,16 @@ local FONTS = {
   Tab = { size = 12, color = style.Color.Muted },
   TabSelected = { size = 12, color = style.Color.White, shadow = true },
   Footer = { size = 12, color = style.Color.Muted },
+  -- The vendor's buttons (next.md §10): the price under the icon, the stack size and stock on it.
+  Price = { size = 10, color = style.Color.White, shadow = true },
+  Stack = { size = 11, color = style.Color.White, shadow = true },
 }
 
 style.fonts = {} ---@type table<string, Font>
 
 -- Font returns Next's font object of a name, made the first time it is asked for in the
 -- client's own font file (the locale's), at Next's size and color.
----@param name string Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected or Footer.
+---@param name string Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Price or Stack.
 ---@return Font
 function style:Font(name)
   local font = self.fonts[name]

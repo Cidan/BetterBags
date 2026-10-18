@@ -201,6 +201,106 @@ function tooltipScanner:ExtractClassic(bagid, slotid)
   return table.concat(lines, " ")
 end
 
+-- joinRetailLines joins a C_TooltipInfo tooltip's left and right texts with spaces, as
+-- ExtractRetail does, or nil when it has none.
+---@param tooltipData? TooltipData
+---@return string?
+local function joinRetailLines(tooltipData)
+  if not tooltipData or not tooltipData.lines then
+    return nil
+  end
+  local lines = {}
+  for _, line in ipairs(tooltipData.lines) do
+    if line.leftText and line.leftText ~= "" then
+      table.insert(lines, line.leftText)
+    end
+    if line.rightText and line.rightText ~= "" then
+      table.insert(lines, line.rightText)
+    end
+  end
+  if #lines == 0 then
+    return nil
+  end
+  return table.concat(lines, " ")
+end
+
+-- joinScanLines joins the scan tooltip's left and right texts with spaces, as ExtractClassic does,
+-- or nil when it has none.
+---@param scanTooltip GameTooltip
+---@return string?
+local function joinScanLines(scanTooltip)
+  local lines = {}
+  for i = 1, math.min(scanTooltip:NumLines(), 30) do
+    for _, side in ipairs({ "Left", "Right" }) do
+      local fontString = _G["BetterBagsScanTooltipText" .. side .. i]
+      local text = fontString and fontString:GetText()
+      if text and text ~= "" then
+        table.insert(lines, text)
+      end
+    end
+  end
+  if #lines == 0 then
+    return nil
+  end
+  return table.concat(lines, " ")
+end
+
+-- GetMerchantItemText returns the tooltip text of the open merchant's item at index, for
+-- BetterBags Next's vendor search (next/merchant.lua): C_TooltipInfo.GetMerchantItem on retail,
+-- the scan tooltip's SetMerchantItem on Classic. Not cached: merchants change their items.
+---@param index number
+---@return string?
+function tooltipScanner:GetMerchantItemText(index)
+  if addon.isRetail then
+    if not C_TooltipInfo or not C_TooltipInfo.GetMerchantItem then
+      return nil
+    end
+    return joinRetailLines(C_TooltipInfo.GetMerchantItem(index))
+  end
+  if not self.scanTooltip then
+    return nil
+  end
+  self.scanTooltip:ClearLines()
+  self.scanTooltip:SetMerchantItem(index)
+  return joinScanLines(self.scanTooltip)
+end
+
+-- GetInventoryRepairCost returns what repairing an equipped item costs: the TooltipData's
+-- repairCost on retail (Blizzard's TooltipDataRules.lua reads it), the third return of the scan
+-- tooltip's SetInventoryItem on Classic (PaperDollFrame.lua). 0 when nothing says.
+---@param slot number
+---@return number
+function tooltipScanner:GetInventoryRepairCost(slot)
+  if addon.isRetail then
+    local data = C_TooltipInfo and C_TooltipInfo.GetInventoryItem and C_TooltipInfo.GetInventoryItem("player", slot)
+    return data and data.repairCost or 0
+  end
+  if not self.scanTooltip then
+    return 0
+  end
+  self.scanTooltip:ClearLines()
+  local _, _, repairCost = self.scanTooltip:SetInventoryItem("player", slot)
+  return repairCost or 0
+end
+
+-- GetBagRepairCost returns what repairing an item in a bag costs: the TooltipData's repairCost on
+-- retail, the second return of the scan tooltip's SetBagItem on Classic (ContainerFrame_Shared.lua).
+---@param bag number
+---@param slot number
+---@return number
+function tooltipScanner:GetBagRepairCost(bag, slot)
+  if addon.isRetail then
+    local data = C_TooltipInfo and C_TooltipInfo.GetBagItem and C_TooltipInfo.GetBagItem(bag, slot)
+    return data and data.repairCost or 0
+  end
+  if not self.scanTooltip then
+    return 0
+  end
+  self.scanTooltip:ClearLines()
+  local _, repairCost = self.scanTooltip:SetBagItem(bag, slot)
+  return repairCost or 0
+end
+
 --- Clear the entire tooltip cache
 --- Called when items are wiped or addon is reset
 function tooltipScanner:ClearCache()

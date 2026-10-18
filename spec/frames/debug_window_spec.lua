@@ -144,6 +144,11 @@ describe("DebugWindow", function()
     assert.is_true(w.frame._movable)
   end)
 
+  -- Above BetterBags Next's panels (HIGH, next.md §3), which it is used beside while profiling.
+  it("sits in the DIALOG strata, as the settings window does", function()
+    assert.are.equal("DIALOG", debugWindow.window.frame:GetFrameStrata())
+  end)
+
   it("puts every tab's content in the window's content box", function()
     local box = debugWindow.window.content
     for i = 1, 5 do
