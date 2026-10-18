@@ -211,8 +211,8 @@ slow. It is an option, off by default (asked).
   new move from where it is, keeping its speed (no stop before turning). A frame re-placed with the
   same target keeps its move. A move closer than half a pixel is placed at once.
 - **A pass's own duration.** `BeginPass(root, duration?)`: the moves a pass starts take its duration
-  (each move keeps its own), else 0.3 s. BetterBags Next's canvas passes a shorter one while a
-  section is dragged (next.md §7). A frame turning from a move of one duration into a move of
+  (each move keeps its own), else 0.3 s. BetterBags Next's canvas passes its interaction time,
+  0.24 s, to every pass (next.md §5); the classic bags' canvas passes none. A frame turning from a move of one duration into a move of
   another keeps its speed: the speed is worked out with the old move's duration, which a test pins
   (the mutation that uses the default instead only shows across two durations).
 - **Changing parent.** An item that changes section (or moves between the view and Recent Items)

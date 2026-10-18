@@ -373,7 +373,7 @@ function canvasProto:Render(parentResult)
   local perRow = math.max(1, math.floor((width + style.GAP) / STEP))
   local animated = self.frame:IsVisible()
   if animated then
-    motion:BeginPass(self, self.drag ~= nil and style.Time.MakeRoom or nil)
+    motion:BeginPass(self, style.Time.Interaction)
   else
     motion:Forget(self)
   end

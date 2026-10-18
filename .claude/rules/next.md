@@ -136,6 +136,21 @@ on a single `OnUpdate` that exists only while something tweens; playing a key ag
 tween, `Stop(key, finish)` stops it (at its end with `finish`). Eases: `linear`, `outCubic`,
 `inCubic`, `inOutSine`, `outBack`.
 
+**0.24 seconds for interactions** (asked: "that'll be our magic number for interactions").
+`NextStyle.Time.Interaction` is how long everything that moves in answer to the player takes:
+items and sections gliding to their new places through Motion (the canvas gives every Motion pass
+that duration: sorting, looting, switching tabs, making room for a dragged section), a dropped
+section landing (`Land`) or flying into its target (`FlyAway`), and the tab bar gliding (`Glide`).
+Kept at their own times: the panel's slides in and out (`Open` 0.45 s, `Close` 0.24 s; asked not to
+touch them, so `Close` is its own number, not the interaction time), the sections' fade-in cascade
+(`Cascade` 0.32 s), feedback (`Hover` 0.15 s, `Lift` 0.12 s), the tab pulse (`Pulse` 0.6 s), the
+wash's color fade (`Wash` 0.44 s, which was `Glide * 2` before), the shimmer and the sparkles. The
+classic bags keep Motion's 0.3 s (asked: not to touch them yet). Coverage: `spec/next/style_spec.lua`,
+`spec/next/content_spec.lua` ("glides an item to its new place in the interaction time", "moves
+sections in the interaction time once nothing is dragged too"), `spec/next/bank_spec.lua` ("fades
+the wash to the Warbank's over its own time"), `spec/frames/bagcanvas_spec.lua` ("moves in Motion's
+0.3 seconds").
+
 ## 6. The bank (`next/bank.lua`)
 
 The bank's panel is the backpack's mirror image (§3): anchored to the left edge of the screen, it
@@ -249,9 +264,9 @@ section is being dragged or landing.
 **Making room.** While the cursor is over its own panel's body, the gap goes to the insertion point
 under the cursor (`NextContent:DragIndexAt`, by the midpoints of the other sections), and the other
 sections slide out of its way: the canvas lays them out around the gap through Motion
-(render-pipeline.md §4c), as for any change of place, but over `NextStyle.Time.MakeRoom` (0.24 s;
-asked: "slightly faster, just a bit") rather than Motion's usual 0.3 s: while a section is dragged
-the canvas passes that duration to its Motion pass. The curve is the same ease-in-out. Near the top or bottom of the scroll area
+(render-pipeline.md §4c), as for any change of place, in the interaction time (0.24 s, §5; first
+asked for this slide alone, "slightly faster, just a bit", then for every Next move) rather than
+Motion's usual 0.3 s. The curve is the same ease-in-out. Near the top or bottom of the scroll area
 (40 pixels) the content scrolls toward the edge, faster the closer the cursor
 (`ScrollToOffset`/`GetDerivedScrollOffset`, Blizzard's scroll box on every client).
 

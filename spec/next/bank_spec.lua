@@ -469,6 +469,15 @@ describe("NextBank", function()
       assert.are.same(style.Color.WarbankWash, bank.washColor)
     end)
 
+    it("fades the wash to the Warbank's over its own time", function()
+      local bank = opened()
+      bank:SwitchToGroup(ctx(), 3)
+      tween:Step(style.Time.Wash - 0.01)
+      assert.are_not.same(style.Color.WarbankWash, bank.washColor)
+      tween:Step(0.02)
+      assert.are.same(style.Color.WarbankWash, bank.washColor)
+    end)
+
     it("says it is loading until the bank has been read", function()
       slotInfo = { sortedItems = {} }
       local bank = nextBank:Create(ctx())
