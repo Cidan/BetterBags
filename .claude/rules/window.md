@@ -291,7 +291,10 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   (`frames/bagcanvas.lua`, layout-rendering.md §3); `bag.scrollBox`, `headerContainer`,
   `tabContainer` and `footerContainer` point into them.
 - **Minimums**: content at least 260 wide (or the tabs' width) plus the scroll bar's room on
-  both sides, and 100 high; the window at least as wide as the slots panel while it shows.
+  both sides, and 100 high; the window at least as wide as the slots panel while it shows. The
+  bar's room comes from the options the scroll box is made with (`scrollbox:GutterWidthFor`), not
+  the box: a bag made after a theme was applied reads its minimums as its window is styled, inside
+  `window:Create`, before the box exists (next.md §11f).
 - **BuildParts** creates the in-bag search box (`searchBox:CreateBox`, kept as
   `bag.searchBox`; `searchBox:GetSearchText` and QuickFind read it there), the menu button
   (`BagMenuButton`, bag-menu-button.md), the action buttons a theme may give the window
@@ -303,8 +306,12 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   and the backpack's currencies 4 in from its left end, both anchored to the footer bar, so the
   theme places them), `MenuButton` (`Points`; `false` hides it), `Actions` (below), `Tabs`
   (`Offset = { X, Y }`: where the tab bar's top left sits from the bag's bottom left, default
-  0, 2; `PlaceTabs`, also run by `bagFrame:Create` once the behavior made the bar, since a window
-  registered after the first theme is decorated before its tabs exist). The tab bar is a frame
+  0, 2; `PlaceTabs`). A bag made after a theme was applied (the classic bags made the first time
+  the bags switch from BetterBags Next, next.md §11f) is decorated as its window registers, inside
+  `BuildWindow`, before `BuildParts` made anything: `PlaceParts` then does nothing, and
+  `bagFrame:Create` places every part once the behavior made the last of them
+  (`PlacePartsIfDecorated`; only the tab bar for a window not decorated yet, whose first theme
+  places the rest). The tab bar is a frame
   level below the bag, so art a theme draws below the window (BetterBags - Themes' race borders
   reach 13 to 56 below it) would cover the tabs unless the theme hangs them below it. It
   reserves those rows with `SetExtraInsets`, then redraws a shown slots panel (tabs measure

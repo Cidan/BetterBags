@@ -893,6 +893,12 @@ function panelProto:IsShown()
   return self.frame:IsShown()
 end
 
+-- IsClosing says the panel is sliding out: closed, though its frame still shows.
+---@return boolean
+function panelProto:IsClosing()
+  return self.closing
+end
+
 ---@return string
 function panelProto:GetName()
   return self.frame:GetName()
@@ -929,6 +935,28 @@ function panelProto:OnClosed(ctx)
   if expired or self.drawOnClose then
     self.drawOnClose = false
     self:Refresh(ctx)
+  end
+end
+
+-- Deactivate switches the panel off with BetterBags Next (next.md §11): it hides at once (its
+-- OnHide still runs its close work) and lets go of every button it drew.
+---@param ctx Context
+function panelProto:Deactivate(ctx)
+  if self.frame:IsShown() then
+    self.frame:Hide()
+  end
+  self:Wipe(ctx)
+end
+
+-- Activate catches the panel up when BetterBags Next is switched back on: what its handlers would
+-- have done while they were off (the search box's setting, the tabs, the money).
+---@param ctx Context
+function panelProto:Activate(ctx)
+  local _ = ctx
+  self:UpdateSearchShown()
+  self:RefreshTabs()
+  if self.moneyFrame then
+    self.moneyFrame:Update()
   end
 end
 

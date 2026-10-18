@@ -76,6 +76,7 @@ The toggles come first, then Bag Anchor, then the bank's sorts, then the common 
 | Show Bag Button | Bag Anchor ▸ |
 | Bag Anchor ▸ | Sort Bank |
 | | Clean Up Warbank (with a Warbank) |
+| Switch to Next | |
 | What's New | What's New |
 | Open Options Screen | Open Options Screen |
 | Close Menu | Close Menu |
@@ -83,7 +84,9 @@ The toggles come first, then Bag Anchor, then the bank's sorts, then the common 
 (asked: Drag to Resize at the top of both bags' menus, Bag Anchor below the toggles, Show Bag
 Button above Bag Anchor). The bank's Show Bags used to come after its sorts; it moved up so both
 menus start alike and the two sorts stay together. Show Bags is only listed when the bag has a
-slots panel.
+slots panel. **Switch to Next** (asked) switches the bags to BetterBags Next without a reload
+(next.md §11); only the backpack's menu has it, since the bank's is shown at the bank, where the
+bags cannot switch.
 
 - **Drag to Resize** is the Resizable Window option (`config/config.lua`) as a toggle: checked
   while `database:GetBagSizeMode(kind) == "window"`; a click sets "window" or "content" for the

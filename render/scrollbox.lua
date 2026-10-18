@@ -90,7 +90,15 @@ end
 -- right, or on both sides for a symmetric box.
 ---@return number
 function scrollboxProto:GetGutterWidth()
-  return self.symmetric and BAR_WIDTH * 2 or BAR_WIDTH
+  return scrollbox:GutterWidthFor({ Symmetric = self.symmetric })
+end
+
+-- GutterWidthFor returns the width a box made with opts keeps free beside its child, known before
+-- the box is made (a window can read its owner's minimums while the owner is still being built).
+---@param opts? ScrollboxOptions
+---@return number
+function scrollbox:GutterWidthFor(opts)
+  return opts ~= nil and opts.Symmetric == true and BAR_WIDTH * 2 or BAR_WIDTH
 end
 
 ---@return RenderPlan

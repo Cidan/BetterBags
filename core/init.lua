@@ -6,14 +6,11 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@cast addon +AceHook-3.0
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class BagFrame: AceModule
-local BagFrame = addon:GetModule('BagFrame')
+---@class BagSystem: AceModule
+local bagSystem = addon:GetModule('BagSystem')
 
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
@@ -206,6 +203,7 @@ function addon:OnInitialize()
   contextMenu:Init()
   addon:GetModule('BagButton'):Init()
   addon:GetModule('ItemRowFrame'):Init()
+  bagSystem:Init()
 
   -- 5. Integrations
   consoleport:Init()
@@ -213,12 +211,10 @@ function addon:OnInitialize()
   applyCompat()
   self:HideBlizzardBags()
   local rootctx = context:New('addon_initialize')
-  -- BetterBags Next (next.md) replaces the backpack's frame and draw.
-  if database:GetNextEnabled() then
-    addon.Bags.Backpack = addon:GetModule('NextBag'):Create(rootctx)
-  else
-    addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
-  end
+  -- The bags of the design the setting names, the classic bags or BetterBags Next (next.md §11),
+  -- each made in an event scope of its own so it can be switched without a reload.
+  local design = bagSystem:SavedDesign()
+  addon.Bags.Backpack = bagSystem:CreateBackpack(rootctx, design)
 
   -- Establish the bag-button bindings and the highlight-button list before any
   -- of the fallible frame/theme/bank creation below. AceAddon runs
@@ -261,53 +257,20 @@ function addon:OnInitialize()
     end
   end
 
-  -- Keep the Blizzard bag-bar highlight in sync with the backpack window on EVERY
-  -- show/hide path, not just addon:ToggleAllBags. The "X" close button
-  -- (frame.Owner:Hide) and ESC (UISpecialFrames hides the frame widget directly) both
-  -- bypass addon.OnUpdate, the only caller of UpdateButtonHighlight, so without these
-  -- hooks the bag-bar buttons stay lit after closing the bag by those paths. Hooking
-  -- our own insecure frame's OnShow/OnHide is taint-free and idempotent with OnUpdate.
-  addon.Bags.Backpack.frame:HookScript("OnShow", function()
-    addon:UpdateButtonHighlight()
-  end)
-  addon.Bags.Backpack.frame:HookScript("OnHide", function()
-    addon:UpdateButtonHighlight()
-  end)
+  addon:WatchBackpackFrame(addon.Bags.Backpack.frame)
 
-  -- Only create the bank bag if the setting is enabled. BetterBags Next (next.md §6) replaces its
-  -- frame and draw too.
-  if database:GetEnableBankBag() then
-    if database:GetNextEnabled() then
-      addon.Bags.Bank = addon:GetModule('NextBank'):Create(rootctx:Copy())
-    else
-      addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
-    end
-  end
-
-  -- BetterBags Next's vendor (next.md §10) stands in for Blizzard's merchant frame, which goes under
-  -- the hidden frame Blizzard's bags are under: still shown to Blizzard's bag code, which sells
-  -- on a right click while it is, but never seen. Kept apart from addon.Bags: it is no bag.
-  if database:GetNextEnabled() then
-    local nextVendor = addon:GetModule('NextVendor')
-    addon.Vendor = nextVendor:Create(rootctx:Copy())
-    nextVendor:TakeOver(_G.BetterBagsSneakyFrame)
-  end
+  -- The rest of the design: the bank with Enable Bank Bags, and BetterBags Next's vendor (next.md
+  -- §10), which takes Blizzard's merchant frame under the hidden frame Blizzard's bags are under
+  -- (kept apart from addon.Bags: it is no bag).
+  bagSystem:CreateRest(rootctx:Copy(), design)
+  bagSystem:Use(design)
 
   -- Sonata decorates every window registered so far with the saved theme (Default when it is
   -- missing or unavailable this session); windows made later are decorated as they register.
   addon:GetModule('Sonata'):Enable()
 
-  addon.Bags.Backpack:SetTitle(L:G("Backpack"))
-
-  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-
-  -- Only add bank to UISpecialFrames if it was created
-  if addon.Bags.Bank then
-    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
-  end
-  if addon.Vendor then
-    table.insert(UISpecialFrames, addon.Vendor:GetName())
-  end
+  -- The backpack's title, and Escape closes every window of the design.
+  bagSystem:Finish(design)
 
   -- Disable the bag tutorial screens, as Better Bags does not match
   -- the base UI/UX these screens refer to.
@@ -317,6 +280,22 @@ function addon:OnInitialize()
 	end
 end
 
+
+-- WatchBackpackFrame keeps the Blizzard bag-bar highlight in sync with a backpack's frame on EVERY
+-- show/hide path, not just addon:ToggleAllBags. The "X" close button (frame.Owner:Hide) and ESC
+-- (UISpecialFrames hides the frame widget directly) both bypass addon.OnUpdate, the only caller of
+-- UpdateButtonHighlight, so without these hooks the bag-bar buttons stay lit after closing the bag
+-- by those paths. Hooking our own insecure frame's OnShow/OnHide is taint-free and idempotent with
+-- OnUpdate. Each design's backpack is watched once it is made (core/bagsystem.lua).
+---@param frame Frame
+function addon:WatchBackpackFrame(frame)
+  frame:HookScript("OnShow", function()
+    addon:UpdateButtonHighlight()
+  end)
+  frame:HookScript("OnHide", function()
+    addon:UpdateButtonHighlight()
+  end)
+end
 
 ---@param bagid number
 ---@return Bag|nil

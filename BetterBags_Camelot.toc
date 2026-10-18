@@ -184,4 +184,5 @@ integrations\masque.lua
 integrations\simpleitemlevel.lua
 integrations\quickfind.lua
 
+core\bagsystem.lua
 core\init.lua

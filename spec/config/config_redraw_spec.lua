@@ -136,7 +136,7 @@ describe("Config settings refreshes", function()
       savedRegister = console.RegisterChatCommand
       console.RegisterChatCommand = function(_, command, fn) handlers[command] = fn end
       savedRegisterMessage = events.RegisterMessage
-      events.RegisterMessage = function() end
+      events.RegisterMessage = function(_, name, fn) handlers["message " .. name] = fn end
       savedOpen = config.Open
       config.Open = function() opened = opened + 1 end
       config:RegisterSettings()
@@ -154,20 +154,36 @@ describe("Config settings refreshes", function()
       assert.are.same({}, sent)
     end)
 
-    -- BetterBagsNext (next.md): /bb next turns it on or off and asks to reload.
-    it("turns BetterBags Next on and off on /bb next, asking to reload", function()
+    -- BetterBagsNext (next.md §11): /bb next switches the bags to the other design, no reload.
+    it("switches the bags to the other design on /bb next, without a reload", function()
       local on = false
-      local savedGet, savedSet = db.GetNextEnabled, db.SetNextEnabled
+      local bagSystem = stubModule("BagSystem")
+      local savedGet, savedSwitch = db.GetNextEnabled, bagSystem.Switch
       db.GetNextEnabled = function() return on end
-      db.SetNextEnabled = function(_, value) on = value end
+      local switched = {}
+      bagSystem.Switch = function(_, c, design)
+        assert.is_not_nil(c)
+        table.insert(switched, design)
+        on = design == "next"
+        return true
+      end
       _G._lastPopupShown = nil
       handlers.bb(" Next ")
-      assert.is_true(on)
-      assert.are.equal("BETTERBAGS_RELOAD_UI", _G._lastPopupShown.name)
       handlers.bb("next")
-      assert.is_false(on)
+      assert.are.same({ "next", "classic" }, switched)
+      assert.is_nil(_G._lastPopupShown)
       assert.are.equal(0, opened)
-      db.GetNextEnabled, db.SetNextEnabled = savedGet, savedSet
+      db.GetNextEnabled, bagSystem.Switch = savedGet, savedSwitch
+    end)
+
+    -- A switch from a bag's menu shows in the settings' checkbox (next.md §11).
+    it("shows the bags' design again in the settings when it changes", function()
+      local reloads = 0
+      local savedFrame = config.configFrame
+      config.configFrame = { ReloadAllFormElements = function() reloads = reloads + 1 end }
+      handlers["message bags/DesignChanged"](context:New("Test"), "next")
+      config.configFrame = savedFrame
+      assert.are.equal(1, reloads)
     end)
 
     -- A BetterBagsNext backpack has no anchor (next.md §1).
@@ -332,14 +348,24 @@ describe("Config settings refreshes", function()
     end
   end)
 
-  -- BetterBagsNext (next.md): an experiment that replaces the backpack's draw; it takes effect
-  -- after a reload, so turning it on or off asks for one. It sits right below Animate Item Movement.
-  it("turns BetterBags Next on and off, below Animate Item Movement, asking to reload", function()
+  -- BetterBagsNext (next.md §11): turning it on or off switches the bags at once, no reload; a
+  -- switch refused (combat, the bank, a vendor) leaves the checkbox as the setting is. It sits right
+  -- below Animate Item Movement.
+  it("switches the bags on its checkbox, below Animate Item Movement, without a reload", function()
     local on = false
+    local bagSystem = stubModule("BagSystem")
     saved[#saved + 1] = { db, "GetNextEnabled", db.GetNextEnabled }
-    saved[#saved + 1] = { db, "SetNextEnabled", db.SetNextEnabled }
+    saved[#saved + 1] = { bagSystem, "Switch", bagSystem.Switch }
     db.GetNextEnabled = function() return on end
-    db.SetNextEnabled = function(_, value) on = value end
+    local switched, allow = {}, true
+    bagSystem.Switch = function(_, c, design)
+      assert.is_not_nil(c)
+      table.insert(switched, design)
+      if allow then on = design == "next" end
+      return allow
+    end
+    local reloads = 0
+    config.configFrame = { ReloadAllFormElements = function() reloads = reloads + 1 end }
     local found = settings("BetterBags Next (experimental)")
     assert.are.equal(1, #found)
     sent = {}
@@ -347,7 +373,13 @@ describe("Config settings refreshes", function()
     assert.is_false(found[1].getValue(context:New("Test")))
     found[1].setValue(context:New("Test"), true)
     assert.is_true(on)
-    assert.are.equal("BETTERBAGS_RELOAD_UI", _G._lastPopupShown.name)
+    assert.are.equal(0, reloads)
+    allow = false
+    found[1].setValue(context:New("Test"), false)
+    assert.are.same({ "next", "classic" }, switched)
+    assert.is_true(on)
+    assert.are.equal(1, reloads, "the checkbox shows the setting again")
+    assert.is_nil(_G._lastPopupShown)
     assert.are.same({}, messages())
     for i, entry in ipairs(entries) do
       if entry.opts.title == "BetterBags Next (experimental)" then

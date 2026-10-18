@@ -288,6 +288,12 @@ local function CreateMockWidget(widgetType, name, parent)
     if self._rect == nil then return nil end
     return self._rect.left + self:GetWidth() / 2, self._rect.bottom + self:GetHeight() / 2
   end
+  -- ScriptRegion:GetRect() -> left, bottom, width, height ("MayReturnNothing": nothing while
+  -- the rect is not resolved, SimpleScriptRegionAPIDocumentation).
+  function widget:GetRect()
+    if self._rect == nil then return end
+    return self._rect.left, self._rect.bottom, self:GetWidth(), self:GetHeight()
+  end
   -- ScriptRegion:IsMouseOver(offsetTop, offsetBottom, offsetLeft, offsetRight)
   -- (SimpleScriptRegionAPIDocumentation): whether the cursor (GetCursorPosition, in the region's
   -- scale) is inside the region's rect moved out by the offsets; Blizzard enlarges it with
@@ -823,6 +829,17 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetNumeric(numeric)
     self._numeric = numeric
   end
+  -- EditBox:SetMultiLine(multiline) / IsMultiLine(), SetCountInvisibleLetters(count)
+  -- (SimpleEditBoxAPIDocumentation).
+  function widget:SetMultiLine(multiline)
+    self._multiLine = multiline
+  end
+  function widget:IsMultiLine()
+    return self._multiLine == true
+  end
+  function widget:SetCountInvisibleLetters(count)
+    self._countInvisibleLetters = count
+  end
   function widget:SetAutoFocus(autoFocus)
     self._autoFocus = autoFocus
   end
@@ -1201,6 +1218,114 @@ _G.__mockTemplates.WowScrollBox = function(frame)
   end
 end
 
+-- WowScrollBoxList (Blizzard_SharedXML/Shared/Scroll/ScrollTemplates.xml: ScrollBoxBaseTemplate
+-- with ScrollBoxListMixin): a scroll box whose view holds a data provider. Init(view) sets the
+-- view; SetDataProvider(provider) and GetDataProvider() go through the view (a view is required
+-- first); ScrollToEnd() sets the scroll percentage to 1 (ScrollBoxBaseMixin);
+-- SetInterpolateScroll comes from ScrollControllerMixin.
+_G.__mockTemplates.WowScrollBoxList = function(frame)
+  function frame:Init(view) self.view = view end
+  function frame:GetView() return self.view end
+  function frame:SetDataProvider(provider)
+    if not self.view then
+      error("A view is required before assigning the data provider.")
+    end
+    self.view.dataProvider = provider
+  end
+  function frame:GetDataProvider() return self.view.dataProvider end
+  function frame:ScrollToEnd() self._scrollPercentage = 1 end
+  function frame:SetInterpolateScroll(canInterpolate) self._interpolateScroll = canInterpolate end
+end
+
+-- CreateScrollBoxListLinearView() (Blizzard_SharedXML/Shared/Scroll/ScrollBoxListLinearView.lua):
+-- the setters BetterBags' list frame calls keep their values.
+_G.CreateScrollBoxListLinearView = function()
+  local view = {}
+  function view:SetElementInitializer(template, initializer) self.template, self.initializer = template, initializer end
+  function view:SetElementResetter(resetter) self.resetter = resetter end
+  function view:SetPadding(top, bottom, left, right, spacing) self.padding = { top, bottom, left, right, spacing } end
+  function view:SetExtent(extent) self.extent = extent end
+  return view
+end
+
+-- DataProviderMixin and CreateDataProvider(tbl) (Blizzard_SharedXML/DataProvider.lua): a list of
+-- element data with callbacks (CallbackRegistryMixin; its event names map to themselves,
+-- GenerateCallbackEvents). Inserting triggers OnInsert, then OnSizeChanged; removing OnRemove,
+-- then OnSizeChanged; Flush OnRemove for each element, then OnSizeChanged.
+_G.DataProviderMixin = { Event = { OnSizeChanged = "OnSizeChanged", OnInsert = "OnInsert",
+  OnRemove = "OnRemove", OnSort = "OnSort", OnMove = "OnMove" } }
+_G.CreateDataProvider = function(tbl)
+  local provider = { collection = {}, callbacks = {} }
+  function provider:RegisterCallback(event, func, owner)
+    self.callbacks[event] = self.callbacks[event] or {}
+    table.insert(self.callbacks[event], { func = func, owner = owner })
+  end
+  function provider:TriggerEvent(event, ...)
+    for _, cb in ipairs(self.callbacks[event] or {}) do
+      cb.func(cb.owner, ...)
+    end
+  end
+  function provider:Enumerate() return ipairs(self.collection) end
+  function provider:GetCollection() return self.collection end
+  function provider:GetSize() return #self.collection end
+  function provider:IsEmpty() return #self.collection == 0 end
+  function provider:InsertAtIndex(elementData, index)
+    if index == nil then
+      table.insert(self.collection, elementData)
+      index = #self.collection
+    else
+      table.insert(self.collection, index, elementData)
+    end
+    self:TriggerEvent("OnInsert", index, elementData, false)
+    self:TriggerEvent("OnSizeChanged", false)
+  end
+  function provider:Insert(...)
+    for i = 1, select("#", ...) do
+      local elementData = select(i, ...)
+      table.insert(self.collection, elementData)
+      self:TriggerEvent("OnInsert", #self.collection, elementData, false)
+    end
+    if select("#", ...) > 0 then self:TriggerEvent("OnSizeChanged", false) end
+  end
+  function provider:InsertTable(t)
+    for _, elementData in ipairs(t) do
+      table.insert(self.collection, elementData)
+      self:TriggerEvent("OnInsert", #self.collection, elementData, false)
+    end
+    if #t > 0 then self:TriggerEvent("OnSizeChanged", false) end
+  end
+  function provider:RemoveIndex(index)
+    local elementData = table.remove(self.collection, index)
+    if elementData ~= nil then
+      self:TriggerEvent("OnRemove", elementData, index)
+      self:TriggerEvent("OnSizeChanged", false)
+    end
+  end
+  function provider:Find(index) return self.collection[index] end
+  function provider:FindIndex(elementData)
+    for index, e in ipairs(self.collection) do
+      if e == elementData then return index, e end
+    end
+  end
+  function provider:FindByPredicate(predicate)
+    for index, e in ipairs(self.collection) do
+      if predicate(e) then return index, e end
+    end
+  end
+  function provider:ContainsByPredicate(predicate) return self:FindByPredicate(predicate) ~= nil end
+  function provider:ForEach(func)
+    for _, e in ipairs(self.collection) do func(e) end
+  end
+  function provider:Flush()
+    local old = self.collection
+    self.collection = {}
+    for index, elementData in ipairs(old) do self:TriggerEvent("OnRemove", elementData, index) end
+    self:TriggerEvent("OnSizeChanged", false)
+  end
+  if tbl then provider:InsertTable(tbl) end
+  return provider
+end
+
 -- MinimalScrollBar (Blizzard_SharedXML/Shared/Scroll/ScrollBar.lua, ScrollBarMixin):
 -- SetHideIfUnscrollable(hide), SetInterpolateScroll(canInterpolateScroll).
 _G.__mockTemplates.MinimalScrollBar = function(frame)
@@ -1561,6 +1686,24 @@ _G.ScrollUtil.InitScrollBoxWithScrollBar = function(scrollBox, scrollBar, view)
   scrollBox:Init(view)
 end
 
+-- ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view) binds the bar and
+-- initializes the box with the view, as InitScrollBoxWithScrollBar does (ScrollUtil.lua);
+-- ScrollUtil.InitDefaultLinearDragBehavior(scrollBox) returns the box's drag behavior
+-- (ScrollBoxDragBehavior), whose setters keep their values: SetReorderable, SetDragPredicate,
+-- SetDropPredicate, SetFinalizeDrop.
+_G.ScrollUtil.InitScrollBoxListWithScrollBar = function(scrollBox, scrollBar, view)
+  scrollBox._scrollBar = scrollBar
+  scrollBox:Init(view)
+end
+_G.ScrollUtil.InitDefaultLinearDragBehavior = function(scrollBox)
+  local behavior = { scrollBox = scrollBox, reorderable = false }
+  function behavior:SetReorderable(canReorder) self.reorderable = canReorder end
+  function behavior:SetDragPredicate(predicate) self.dragPredicate = predicate end
+  function behavior:SetDropPredicate(predicate) self.dropPredicate = predicate end
+  function behavior:SetFinalizeDrop(finalize) self.finalizeDrop = finalize end
+  return behavior
+end
+
 -- hooksecurefunc([table,] name, hook): replaces the function with one that calls the original,
 -- then the hook with the same arguments, and returns what the original returned
 -- (warcraft.wiki.gg API_hooksecurefunc).
@@ -1574,6 +1717,12 @@ _G.hooksecurefunc = function(tbl, name, hook)
     hook(...)
     return unpack(results)
   end
+end
+-- issecurevariable([tbl,] variable) -> isSecure, taint (warcraft.wiki.gg API_issecurevariable):
+-- true, nil for a key nothing has tainted, which is every key in specs (they model no taint).
+-- AceHook reads it to refuse raw hooks of secure functions.
+_G.issecurevariable = function()
+  return true, nil
 end
 _G.UIParent = CreateMockWidget("Frame", "UIParent")
 _G.UIParent:SetSize(1920, 1200)
@@ -1816,6 +1965,41 @@ _G.__mockTemplates.InputScrollFrameTemplate = function(frame)
   frame.EditBox:SetAutoFocus(false)
   frame.EditBox.Instructions = frame.EditBox:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
 end
+
+-- SearchBoxTemplate (Blizzard_SharedXML/Shared/InputBox/InputBoxTemplates.xml): an edit box
+-- inheriting InputBoxInstructionsTemplate, so InputBoxVisualTemplate's Left, Right and Middle art
+-- (BACKGROUND, the common-search-border atlases) and an Instructions font string (ARTWORK,
+-- GameFontDisableSmall, 16 in on the left and 20 on the right); its own searchIcon (OVERLAY,
+-- common-search-magnifyingglass, 10 x 10 at LEFT 1, -1), a hidden 17 x 17 clearButton at RIGHT
+-- -3 with an Icon (common-search-clearbutton at 0.5, 10 x 10 at TOPLEFT 3, -3), text insets 16,
+-- 20, 0, 0. BagSearchBoxTemplate (Blizzard_UIPanelTemplates/Mainline/UIPanelTemplates.xml)
+-- inherits it.
+_G.__mockTemplates.SearchBoxTemplate = function(box)
+  box.Left = box:CreateTexture(nil, "BACKGROUND")
+  box.Left:SetAtlas("common-search-border-left")
+  box.Right = box:CreateTexture(nil, "BACKGROUND")
+  box.Right:SetAtlas("common-search-border-right")
+  box.Middle = box:CreateTexture(nil, "BACKGROUND")
+  box.Middle:SetAtlas("common-search-border-middle")
+  box.Instructions = box:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+  box.Instructions:SetPoint("TOPLEFT", box, "TOPLEFT", 16, 0)
+  box.Instructions:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -20, 0)
+  box.searchIcon = box:CreateTexture(nil, "OVERLAY")
+  box.searchIcon:SetAtlas("common-search-magnifyingglass")
+  box.searchIcon:SetSize(10, 10)
+  box.searchIcon:SetPoint("LEFT", box, "LEFT", 1, -1)
+  box.clearButton = CreateFrame("Button", nil, box)
+  box.clearButton:SetSize(17, 17)
+  box.clearButton:SetPoint("RIGHT", box, "RIGHT", -3, 0)
+  box.clearButton:Hide()
+  box.clearButton.Icon = box.clearButton:CreateTexture(nil, "ARTWORK")
+  box.clearButton.Icon:SetAtlas("common-search-clearbutton")
+  box.clearButton.Icon:SetAlpha(0.5)
+  box.clearButton.Icon:SetSize(10, 10)
+  box.clearButton.Icon:SetPoint("TOPLEFT", box.clearButton, "TOPLEFT", 3, -3)
+  box:SetTextInsets(16, 20, 0, 0)
+end
+_G.__mockTemplates.BagSearchBoxTemplate = _G.__mockTemplates.SearchBoxTemplate
 
 -- SimplePanelTemplate (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml): 338 x 424, a
 -- rock Bg texture, an Inset frame and a NineSlice frame. BetterBags' BetterBagsSearchPanelTemplate

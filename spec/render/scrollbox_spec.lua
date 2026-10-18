@@ -216,6 +216,15 @@ describe("Scrollbox", function()
       return sb
     end
 
+    -- A window sizes itself from its owner's minimums as it is styled, which can be before the
+    -- owner made its scroll box (next.md §11f): the room is known from the options alone.
+    it("says the room a box made with given options keeps, before any box is made", function()
+      assert.are.equal(28, scrollbox:GutterWidthFor({ Symmetric = true, AutoHideBar = true }))
+      assert.are.equal(14, scrollbox:GutterWidthFor({ AutoHideBar = true }))
+      assert.are.equal(14, scrollbox:GutterWidthFor(nil))
+      assert.are.equal(bagScroll():GetGutterWidth(), scrollbox:GutterWidthFor({ Symmetric = true }))
+    end)
+
     it("keeps the bar's room on both sides: the child is inset by it and gets the width less both", function()
       local sb = bagScroll()
       local c = child(300, 200)

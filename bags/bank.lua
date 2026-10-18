@@ -356,6 +356,14 @@ function bank.proto:RegisterEvents()
 	end)
 end
 
+-- Resync catches up on what RegisterEvents' handlers would have done while the classic design was
+-- switched off (next.md §11): the tabs, and the Purchase Bank button.
+---@param ctx Context
+function bank.proto:Resync(ctx)
+	self:GenerateGroupTabs(ctx)
+	self:UpdatePurchaseBankButton()
+end
+
 ---@return boolean
 function bank.proto:ShouldHandleSort()
 	return false

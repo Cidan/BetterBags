@@ -46,6 +46,7 @@ local sectionFrame = addon:GetModule('SectionFrame')
 -- MerchantFrame:IsShown(), and its OnHide would end the visit.
 ---@class NextVendor: AceModule
 ---@field panel? NextVendorPanel
+---@field hooked? Frame The merchant frame whose Hide is hooked (once: a hook cannot be taken off).
 local nextVendor = addon:NewModule('NextVendor')
 
 local TAB_BUY, TAB_BUYBACK, TAB_REPAIR = 1, 2, 3
@@ -114,11 +115,26 @@ function nextVendor:TakeOver(hidden)
     return
   end
   MerchantFrame:SetParent(hidden)
+  if self.hooked == MerchantFrame then
+    return
+  end
+  self.hooked = MerchantFrame
   hooksecurefunc(MerchantFrame, "Hide", function()
     if self.panel then
       self.panel:EndVisitLater()
     end
   end)
+end
+
+-- GiveBack returns Blizzard's merchant frame to UIParent when BetterBags Next is switched off
+-- (next.md §11), only away from a vendor: a shown frame reparented to a visible parent would run
+-- Blizzard's OnShow from our code. The hook stays and does nothing: the panel never sees a vendor
+-- open while Next is off.
+function nextVendor:GiveBack()
+  if MerchantFrame == nil then
+    return
+  end
+  MerchantFrame:SetParent(UIParent)
 end
 
 ---@return NextHeaderButton[]
@@ -329,6 +345,13 @@ end
 function vendorProto:OnHidden(ctx)
   nextPanel.proto.OnHidden(self, ctx)
   self:EndVisitLater()
+end
+
+-- Activate has nothing to catch up on: BetterBags Next is switched only away from a vendor, and
+-- the next vendor that opens draws everything (OnShowing).
+---@param ctx Context
+function vendorProto:Activate(ctx)
+  local _ = ctx
 end
 
 -- OnClosed does nothing: the vendor has no Recent Items.

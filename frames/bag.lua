@@ -72,6 +72,10 @@ local cursorPlacement = addon:GetModule("CursorPlacement")
 
 -- The smallest content a bag window shows: the old fixed minimum of the bag's content box.
 local MIN_CONTENT_WIDTH = 260
+
+-- The bag's scroll box keeps the bar's room on both sides, so the content stays centered and still
+-- when the bar shows, and its bar shows only while it is used (window.md, centering).
+local SCROLL_OPTIONS = { Symmetric = true, AutoHideBar = true }
 local MIN_CONTENT_HEIGHT = 100
 
 -------
@@ -171,6 +175,44 @@ function bagFrame.bagProto:OnClosed(ctx)
 	end
 end
 
+-- Deactivate switches the bag off with the classic design (next.md §11): it hides at once (its
+-- OnHide still runs its close work), lets go of every button it drew, and hides its overlay search
+-- and its anchor's frame, keeping the anchor's saved state.
+---@param ctx Context
+function bagFrame.bagProto:Deactivate(ctx)
+	if self.frame:IsShown() then
+		self.frame:Hide()
+	end
+	self:Wipe(ctx)
+	if self.searchFrame then
+		self.searchFrame:Hide(ctx)
+	end
+	if self.anchor then
+		self.anchor.frame:Hide()
+	end
+end
+
+-- Activate catches the bag up when the classic design is switched back on: what its handlers would
+-- have done while they were off (the search box's setting, its behavior's tabs and buttons, the
+-- money, the currencies, the slots panel), and its anchor as saved.
+---@param ctx Context
+function bagFrame.bagProto:Activate(ctx)
+	self:UpdateSearchShown()
+	self.behavior:Resync(ctx)
+	if self.moneyFrame then
+		self.moneyFrame:Update()
+	end
+	if self.currencyIconGrid then
+		self.currencyIconGrid:Update()
+	end
+	if self.slots then
+		self.slots:Draw(ctx)
+	end
+	if self.anchor then
+		self.anchor:Load()
+	end
+end
+
 -- WatchForClose runs OnClosed from the frame's own OnHide, which every way of closing the
 -- bag fires: the toggle, the close button, ESC (UISpecialFrames hides the frame directly,
 -- skipping behavior:OnHide) and the end of the fade-out.
@@ -213,6 +255,12 @@ end
 
 function bagFrame.bagProto:IsShown()
 	return self.frame:IsShown()
+end
+
+-- IsClosing says the bag is fading out: closed, though its frame still shows.
+---@return boolean
+function bagFrame.bagProto:IsClosing()
+	return self.window:IsClosing()
 end
 
 ---@return number x
@@ -758,9 +806,11 @@ function bagFrame.bagProto:BuildWindow(name)
 			end
 			return 0
 		end,
+		-- Read as the window is styled, which for a bag made after a theme was applied is before its
+		-- scroll box and tabs exist (next.md §11f).
 		MinContentWidth = function()
 			local tabsWidth = self.tabs and self.tabs.width or 0
-			return math.max(MIN_CONTENT_WIDTH, tabsWidth) + self.scroll:GetGutterWidth()
+			return math.max(MIN_CONTENT_WIDTH, tabsWidth) + scrollbox:GutterWidthFor(SCROLL_OPTIONS)
 		end,
 		MinContentHeight = MIN_CONTENT_HEIGHT,
 		Fade = function()
@@ -779,9 +829,7 @@ function bagFrame.bagProto:BuildWindow(name)
 	self.frame = self.window.frame
 	self.frame:SetSize(200, 200)
 
-	-- The bar's room on both sides keeps the content centered and still when the bar shows; the
-	-- bar shows only while it is used (window.md, centering).
-	self.scroll = scrollbox:Create(self.frame, "BetterBagsBagScroll" .. name, { Symmetric = true, AutoHideBar = true })
+	self.scroll = scrollbox:Create(self.frame, "BetterBagsBagScroll" .. name, SCROLL_OPTIONS)
 	self.canvas = bagCanvas:Create(self, self.scroll.scrollChild)
 	self.scroll:SetChild(self.canvas)
 	self.window:SetContent(self.scroll)
@@ -809,6 +857,11 @@ end
 ---@param ctx Context
 ---@param decoration SonataWindowDecoration
 function bagFrame.bagProto:PlaceParts(ctx, decoration)
+	-- A window registered after a theme was applied is styled as it registers, before BuildParts
+	-- (the classic bags made by a switch, next.md §11); PlacePartsIfDecorated places them once made.
+	if self.searchBox == nil then
+		return
+	end
 	local layout = decoration:GetLayout()
 	local overlay = decoration:GetOverlayFrame()
 
@@ -841,6 +894,18 @@ function bagFrame.bagProto:PlaceParts(ctx, decoration)
 	self:UpdateSearchShown()
 	if self.slots and self.slots:IsShown() then
 		self.slots:Draw(ctx)
+	end
+end
+
+-- PlacePartsIfDecorated places the bag's parts once they are made: all of them when the window
+-- was styled before they existed (a bag made after a theme was applied, next.md §11), else the tab
+-- bar, which the behavior made after the parts.
+---@param ctx Context
+function bagFrame.bagProto:PlacePartsIfDecorated(ctx)
+	if self.window.decoration then
+		self:PlaceParts(ctx, self.window.decoration)
+	else
+		self:PlaceTabs()
 	end
 end
 
@@ -1041,7 +1106,7 @@ function bagFrame:Create(ctx, kind)
 
 	-- Call behavior-specific creation (slots, currency, tabs, etc.)
 	b.behavior:OnCreate(ctx)
-	b:PlaceTabs()
+	b:PlacePartsIfDecorated(ctx)
 
 	b:WatchMouse()
 

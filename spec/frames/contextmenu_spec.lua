@@ -323,8 +323,8 @@ describe("ContextMenu 'Show Bags' toggle", function()
     it("puts Drag to Resize first and Show Bag Button above Bag Anchor in the backpack's menu", function()
       local menuList = contextMenu:CreateContextMenu(newBag(const.BAG_KIND.BACKPACK, false))
       assert.is_true(menuList[1].isTitle)
-      assert.are.same({ "Drag to Resize", "Show Bags", "Show Bag Button", "Bag Anchor", "What's New",
-        "Open Options Screen", "Close Menu" }, texts(menuList))
+      assert.are.same({ "Drag to Resize", "Show Bags", "Show Bag Button", "Bag Anchor", "Switch to Next",
+        "What's New", "Open Options Screen", "Close Menu" }, texts(menuList))
     end)
 
     it("puts Drag to Resize first and Bag Anchor third in the bank's menu, its sorts together after it", function()
@@ -378,6 +378,27 @@ describe("ContextMenu 'Show Bags' toggle", function()
       assert.is_false(bag.slots:IsShown())
       assert.are.same({ true, false }, showBankTabsCalls)
       assert.are.same({ "bags/Rederive", "bags/Rederive" }, sentMessages)
+    end)
+
+    -- Switching to BetterBags Next without a reload (next.md §11), from the backpack's menu only:
+    -- the bank's is shown at the bank, where the bags cannot be switched.
+    it("switches the bags to BetterBags Next from the backpack's menu", function()
+      local bagSystem = stubModule("BagSystem")
+      local switched = {}
+      override(bagSystem, "Switch", function(_, c, design)
+        assert.is_not_nil(c)
+        table.insert(switched, design)
+        return true
+      end)
+      local hidden = 0
+      override(contextMenu, "Hide", function() hidden = hidden + 1 end)
+      local entry = findEntry(contextMenu:CreateContextMenu(newBag(const.BAG_KIND.BACKPACK, false)), "Switch to Next")
+      assert.is_true(entry.notCheckable)
+      assert.are.equal("Switch to Next", entry.tooltipTitle)
+      entry.func()
+      assert.are.same({ "next" }, switched)
+      assert.are.equal(1, hidden)
+      assert.is_nil(findEntry(contextMenu:CreateContextMenu(newBag(const.BAG_KIND.BANK, false)), "Switch to Next"))
     end)
 
     -- The changelog (frames/changelog.lua) opens from the menu, above the options entry.

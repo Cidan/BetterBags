@@ -202,6 +202,19 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     aceAddon.addons["BetterBags_BackpackBehavior"] = oldAddons["BackpackBehavior"]
   end)
 
+  -- Switching designs (next.md §11): a classic backpack switched back on lists its groups as tabs
+  -- again, what its groups/* handlers would have done while they were off.
+  it("catches up on its tabs when the classic design is switched back on (Resync)", function()
+    local loadBase = assert(loadfile("bags/backpack.lua"))
+    loadBase("BetterBags")
+    local behavior = addon:GetModule("BackpackBehavior"):Create({ frame = CreateFrame("Frame") })
+    local listed = {}
+    behavior.GenerateGroupTabs = function(_, c) table.insert(listed, c) end
+    local c = {}
+    behavior:Resync(c)
+    assert.are.same({ c }, listed)
+  end)
+
   it("should successfully run era backpack OnCreate without crashes", function()
     -- Load base backpack behavior using loadfile directly to bypass load-once logic
     local loadBase = assert(loadfile("bags/backpack.lua"))

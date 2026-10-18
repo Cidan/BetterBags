@@ -670,6 +670,16 @@ function bankProto:WatchKind()
   end)
 end
 
+-- Activate catches the bank up as every panel does, and its Purchase Bank button, which
+-- BANK_TABS_CHANGED updates on retail.
+---@param ctx Context
+function bankProto:Activate(ctx)
+  nextPanel.proto.Activate(self, ctx)
+  if addon.isRetail then
+    self:UpdatePurchaseBankButton()
+  end
+end
+
 -- Refresh recalculates the bank from what was last read; it does nothing while the bank is
 -- closed (refresh-scheduler.md §10).
 ---@param ctx Context

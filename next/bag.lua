@@ -74,6 +74,12 @@ function bagProto:GetHeaderButtons()
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
     { key = "sortButton", atlas = "bags-button-autosort-up", tooltip = L:G("Sort Bags"),
       onClick = function(ctx) self:Sort(ctx) end },
+    -- The way back to the classic bags, without a reload (next.md §11): Blizzard's backpack button's
+    -- art, bag-main on retail and WoW: Forever, Button-Backpack-Up on Classic.
+    { key = "classicButton", atlas = addon.isRetail and "bag-main" or nil,
+      texture = not addon.isRetail and "Interface\\Buttons\\Button-Backpack-Up" or nil,
+      tooltip = L:G("Switch to Classic Bags"),
+      onClick = function(ctx) addon:GetModule('BagSystem'):Switch(ctx, "classic") end },
   }
 end
 

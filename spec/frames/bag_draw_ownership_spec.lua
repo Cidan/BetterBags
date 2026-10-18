@@ -1160,6 +1160,66 @@ describe("Bag Draw: shared item button ownership across global sections and view
 
   -- Recent Items only expire when the bag closes, and the refresh that applies the expiry
   -- (and collapses held gaps) runs while the bag is hidden, so nothing moves while it is open.
+  -- Switching between the classic design and BetterBags Next without a reload (next.md §11): the
+  -- design switched off hides at once and lets go of its buttons; switched back on, it catches up
+  -- on what its handlers would have done while they were off.
+  describe("switching designs (Deactivate, Activate)", function()
+    local calls
+
+    local function partsOn(bag)
+      calls = {}
+      bag.behavior.Resync = function(_, c) table.insert(calls, { "resync", c }) end
+      bag.moneyFrame = { Update = function() table.insert(calls, { "money" }) end }
+      bag.currencyIconGrid = { Update = function() table.insert(calls, { "currency" }) end }
+      bag.slots = { Draw = function(_, c) table.insert(calls, { "slots", c }) end }
+      bag.searchFrame = { Hide = function() table.insert(calls, { "overlay hidden" }) end }
+      local anchorFrame = CreateFrame("Frame")
+      anchorFrame:Show()
+      bag.anchor = { frame = anchorFrame, Load = function() table.insert(calls, { "anchor loaded" }) end,
+        Hide = function() error("hiding the anchor through Hide saves it hidden") end }
+      bag.UpdateSearchShown = function() table.insert(calls, { "search shown" }) end
+      return bag
+    end
+
+    it("says it is closing while its window fades out", function()
+      local bag = newBag()
+      assert.is_false(bag:IsClosing())
+      bag.window.IsClosing = function() return true end
+      assert.is_true(bag:IsClosing())
+    end)
+
+    it("hides at once and lets go of every button it drew, its overlay search and anchor hidden", function()
+      local bag = partsOn(newBag())
+      local released = {}
+      local button = { Release = function() table.insert(released, "button") end }
+      bag.drawnButtons = { [button] = true }
+      bag:Deactivate(context:New("switch"))
+      assert.is_false(bag.frame:IsShown())
+      assert.is_false(bag.window:IsClosing(), "not through the fade")
+      assert.are.same({ "button" }, released)
+      assert.are.same({}, bag.drawnButtons)
+      assert.are.same({ { "overlay hidden" } }, calls)
+      assert.is_false(bag.anchor.frame:IsShown())
+    end)
+
+    it("catches up on its search box, behavior, money, currencies, slots panel and anchor", function()
+      local bag = partsOn(newBag())
+      bag.frame:Hide()
+      local c = context:New("switch")
+      bag:Activate(c)
+      assert.are.same({ { "search shown" }, { "resync", c }, { "money" }, { "currency" }, { "slots", c },
+        { "anchor loaded" } }, calls)
+    end)
+
+    it("catches up without the parts it does not have", function()
+      local bag = newBag()
+      bag.behavior.Resync = function() end
+      bag.UpdateSearchShown = function() end
+      assert.has_no.errors(function() bag:Activate(context:New("switch")) end)
+      assert.has_no.errors(function() bag:Deactivate(context:New("switch")) end)
+    end)
+  end)
+
   describe("closing the bag (OnClosed)", function()
     local expireCalls, expireResult
 
@@ -1486,13 +1546,14 @@ describe("Bag Draw: shared item button ownership across global sections and view
         assert.has_no.errors(function() bag:PlaceTabs() end)
       end)
 
-      it("bagFrame:Create places the tab bar once the bag's behavior made it", function()
-        local source = assert(io.open("frames/bag.lua", "r")):read("*a")
-        local create = source:match("function bagFrame:Create%(ctx, kind%)(.-)\nend\n")
-        local made = create:find("b.behavior:OnCreate(ctx)", 1, true)
-        local placesTabs = create:find("b:PlaceTabs()", 1, true)
-        assert.is_not_nil(placesTabs)
-        assert.is_true(placesTabs > made)
+      -- bagFrame:Create places them once the bag's behavior made them (PlacePartsIfDecorated,
+      -- checked below): before any theme, only the tab bar.
+      it("places the tab bar of a window not styled yet once its behavior made it", function()
+        local bag = bagWithTabs(nil)
+        bag.window.decoration = nil
+        bag.tabs.frame:ClearAllPoints()
+        bag:PlacePartsIfDecorated(context:New("spec"))
+        assert.are.same({ "TOPLEFT", bag.frame, "BOTTOMLEFT", 0, 2 }, { bag.tabs.frame:GetPoint(1) })
       end)
     end)
 
@@ -1671,6 +1732,45 @@ describe("Bag Draw: shared item button ownership across global sections and view
       bag:SetSearchShown(context:New("spec"))
       assert.is_true(bag.searchBox.frame:IsShown())
       assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
+    end)
+
+    -- A bag made after a theme was applied (the classic bags made the first time the bags switch
+    -- from BetterBags Next, next.md §11) has its window styled as the window registers, before its
+    -- parts are made: placing them must wait for them, then happen.
+    it("places its parts once made when its window was styled before them", function()
+      local sonata = addon:GetModule("Sonata")
+      override(sonata, "themes", {})
+      sonata:RegisterTheme({ Name = "Base", Hidden = true, Windows = { Bag = {
+        Insets = { Left = 6, Right = 6, Top = 42, Bottom = 3 },
+        Layout = {
+          Search = { Points = { { Point = "TOPLEFT", X = 20, Y = -30 } }, Reserve = 20 },
+          Footer = { Left = 6, Right = 6, Bottom = 6, Height = 20, Reserve = 26 },
+          MenuButton = { Points = { { Point = "TOPLEFT", X = -10, Y = 7 } } },
+        },
+      } } })
+      sonata:RegisterTheme({ Name = "Default" })
+      sonata:ApplyTheme(context:New("spec"), "Default")
+      local errors = {}
+      override(_G, "geterrorhandler", function() return function(e) table.insert(errors, e) end end)
+      inBagSearch = true
+      local bag = newBag()
+      assert.are.same({}, errors)
+      assert.is_not_nil(bag.window.decoration)
+      bag:BuildParts()
+      bag:PlacePartsIfDecorated(context:New("spec"))
+      assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 20, -30 }, { bag.searchBox.frame:GetPoint(1) })
+      assert.is_true(bag.searchBox.frame:IsShown())
+      assert.are.same({ "BOTTOMLEFT", bag.frame, "BOTTOMLEFT", 6, 6 }, { bag.bottomBar:GetPoint(1) })
+      assert.are.equal(bag.menuButton, placed[#placed - 1].button or placed[#placed].button)
+    end)
+
+    it("bagFrame:Create places its parts once made, for a window styled before them", function()
+      local source = assert(io.open("frames/bag.lua", "r")):read("*a")
+      local create = source:match("function bagFrame:Create%(ctx, kind%)(.-)\nend\n")
+      local made = create:find("b.behavior:OnCreate(ctx)", 1, true)
+      local places = create:find("b:PlacePartsIfDecorated(ctx)", 1, true)
+      assert.is_not_nil(places)
+      assert.is_true(places > made)
     end)
 
     it("puts the footer bar along the bottom and the menu button where the theme says", function()
