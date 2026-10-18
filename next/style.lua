@@ -75,7 +75,9 @@ style.Time = {
   Hover = 0.15,
   Shimmer = 1.4,
   ShimmerEvery = 3.4,
-  -- Moving sections (next.md §7).
+  -- Moving sections (next.md §7). MakeRoom is how long the other sections take to slide out of a
+  -- dragged section's way (Motion's other moves take 0.3).
+  MakeRoom = 0.24,
   Lift = 0.12,
   Land = 0.22,
   FlyAway = 0.3,

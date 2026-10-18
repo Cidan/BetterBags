@@ -224,7 +224,23 @@ section is being dragged or landing.
   layer (`NextDrag.layer`, a full-screen frame on `UIParent` in the `TOOLTIP` strata that takes no
   mouse) at exactly the place it was on screen, so nothing jumps. Its children follow its strata
   (frames take their parent's strata unless one sets its own; no item button does) and keep their
-  levels relative to it.
+  levels relative to it. Its level is raised to the layer's + 2 when below it, never lowered:
+  lowering a frame lowers every frame in it, and one that would go below 0 jumps to the top level,
+  10000 (warcraft.wiki.gg "Frame Strata"), where the cover could not be above it.
+- A **cover** lies over it: a mouse-enabled, invisible frame in the drag layer, anchored 20 pixels
+  past every edge of the section and 100 levels above the highest frame in it. The client starts a
+  drag only once the cursor has moved a little, so the point grabbed (which stays under the cursor)
+  can be one of the section's item buttons rather than its header. The release goes to the
+  mouse-enabled frame under the cursor (warcraft.wiki.gg `UIHANDLER_OnReceiveDrag`: also when
+  dragging widgets), and an item button's `OnReceiveDrag` is a left click
+  (`ContainerFrameItemButtonMixin:OnReceiveDrag` → `OnDragStart` → `OnClick("LeftButton")`), which
+  picked the item up (reported: dragging a section down and letting go left its item in the hand).
+  The release now lands on the cover, which does nothing with it. Nothing about the drop changes:
+  it is the header's `OnDragStop`, which the client sends to the frame being dragged wherever the
+  cursor is (`UIHANDLER_OnDragStop`), and targets are found by position. The cover also keeps the
+  section's item tooltips from opening under the cursor while it is dragged. It hides when the
+  section is back in its canvas (it stays while the section lands, so a click then picks up
+  nothing either).
 - It lifts: it shrinks to 94% around the point that was grabbed, with a soft shadow, over 0.12 s.
   From then on it follows the cursor, the grabbed point staying under it.
 - The canvas keeps a gap the section's height where it was (`NextContent:BeginDrag`), so the other
@@ -233,7 +249,9 @@ section is being dragged or landing.
 **Making room.** While the cursor is over its own panel's body, the gap goes to the insertion point
 under the cursor (`NextContent:DragIndexAt`, by the midpoints of the other sections), and the other
 sections slide out of its way: the canvas lays them out around the gap through Motion
-(render-pipeline.md §4c), as for any change of place. Near the top or bottom of the scroll area
+(render-pipeline.md §4c), as for any change of place, but over `NextStyle.Time.MakeRoom` (0.24 s;
+asked: "slightly faster, just a bit") rather than Motion's usual 0.3 s: while a section is dragged
+the canvas passes that duration to its Motion pass. The curve is the same ease-in-out. Near the top or bottom of the scroll area
 (40 pixels) the content scrolls toward the edge, faster the closer the cursor
 (`ScrollToOffset`/`GetDerivedScrollOffset`, Blizzard's scroll box on every client).
 
@@ -344,15 +362,22 @@ saving the order's three cases; tabs of its own bag: lighting and naming, assign
 leaving, the pulse, the tab shown and "+", bank types; the other bag: moving, the glow, Bank or
 Warbank, into a group's bank type with the assignment, from the bank to a backpack group, a
 Blizzard tab, purchase tabs, away from the bank; cancelling on close and when the section leaves
-the data; a missed release; the header's item drops and right click, Free Space, free slots),
+the data; a missed release; the header's item drops and right click, Free Space, free slots; the
+release: no item picked up when the drag started over one, reordering or moving to the other bag,
+the cover over the section and past its edges, above every frame in it and above one far above
+it, no frame of the section sent to the top level, the cover gone once the section is back),
 `spec/next/content_spec.lua` ("dragging a section": the gap and its range, the insertion point, the
-end, committing, leaving sections, losing the section, no cascade; "section headers"),
+end, committing, leaving sections, losing the section, no cascade, the faster slide and the usual
+speed once nothing is dragged; "section headers"), `spec/render/motion_spec.lua` (a pass's own
+duration with the same curve, the default for a pass without one, turning within one duration and
+across two),
 `spec/next/tabs_spec.lua` ("as a drop target": the tab under the cursor, lighting, the pulse, a lit
 tab staying out), `spec/frames/section_spec.lua` ("MoveItems"). Every guard was mutation-tested: 72 mutations for the
 backpack (the nine that first survived each led to a stronger test), then 94 for the bank, the
 mirrored panel, the tab rail and the wiring (the six that first survived each led to a test), then
 73 for moving sections (eleven of the twelve that first survived each led to a test; the twelfth
-showed a redundant check, removed). The mocks gained the scroll box's offset API
+showed a redundant check, removed), then 14 for the faster slide and the cover (the three that
+first survived each led to a test). The mocks gained the scroll box's offset API
 (`GetDerivedScrollRange`, `GetDerivedScrollOffset`, `ScrollToOffset`, ScrollBox.lua) and
 `IsMouseButtonDown`.
 
