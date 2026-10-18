@@ -1,0 +1,17 @@
+{
+  "id": 1792367721,
+  "version": "v0.6.0-1-g6b214bd",
+  "channel": "alpha",
+  "date": "2026-10-18",
+  "from": "ceb61d77ac8a1c5ddcf4895b8436b0f031ac5d4b",
+  "to": "6b214bd01adf8086e34bac81604a4a3f9896ce84",
+  "headline": "This build fixes an issue where search categories could trap unrelated items after sorting.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Unrelated items appearing in search categories",
+      "details": "Items moving into bag slots previously occupied by items matching a search category will no longer inherit that category. Search category filters now evaluate an item by its actual category rather than the name of the search category displaying it.",
+      "clients": []
+    }
+  ]
+}
