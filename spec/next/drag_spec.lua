@@ -297,7 +297,9 @@ describe("NextDrag", function()
     override(stubs.events, "BucketEvent", function() end)
     override(stubs.searchBox, "CreateBox", function(_, kind, parent)
       local box = { kind = kind, frame = CreateFrame("Frame", nil, parent) }
-      box.textBox = CreateFrame("EditBox", nil, box.frame)
+      -- As searchBox:CreateBox makes it (frames/search.lua): a BagSearchBoxTemplate edit box.
+      box.textBox = CreateFrame("EditBox", nil, box.frame, "BagSearchBoxTemplate")
+      box.helpText = box.textBox.Instructions
       return box
     end)
     override(stubs.sonata, "UnregisterElement", function() end)

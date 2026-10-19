@@ -178,7 +178,25 @@ section dragged out of a panel returns to the panel's strata (§7).
     six that first survived led to tests of the drift, the swell reaching the puffs and the
     settling's shape, and to removing a size reset the next shimmer redoes).
 - **Search** under the title: the backpack's in-bag search box (`searchBox:CreateBox`), taken out of
-  Sonata's hands and drawn flat. It follows the in-bag search setting like the classic bag's.
+  Sonata's hands and drawn in Next's look by `BuildSearch`, which every panel runs on its box (the
+  vendor's own too). It follows the in-bag search setting like the classic bag's.
+  - **Asked: it was "very difficult to see"; make it stand out without breaking the look.** It
+    showed the template's help text in 35% gray `GameFontDisableSmall` (about 2.5:1 against its
+    fill), a 10-pixel magnifier at 60% gray, a fill barely lighter than the body, and an underline
+    fading out halfway.
+  - Now: a fill lighter than the body (`style.Color.SearchFill`, `SearchFillFocus` while focused), a
+    1-pixel lavender edge all round (`style.SearchEdge`: 0.3 idle, 0.55 under the pointer or holding
+    a search, 1 focused, fading over `Time.Hover`), a 14-pixel lavender magnifier (white while
+    focused), and the help text in Next's `Search` font (muted lavender, 12; about 5.7:1) left after
+    it; typed text in `SearchText` (13, Next's text color), inset past the magnifier.
+  - Next's colors are set from hooks that run after the template's scripts
+    (`SearchBoxTemplate_OnEditFocusGained`/`Lost`/`OnTextChanged` set the magnifier to white or 0.6
+    gray). The `OnTextChanged` hook also shows the help text only while the box is empty: a box that
+    sets its own `OnTextChanged` replaces the template's (`InputBoxInstructions_OnTextChanged`), and
+    the vendor's box did, so "Search Vendor" stayed under what was typed.
+  - Coverage: `spec/next/bag_spec.lua` ("the search box's look"), `spec/next/vendor_spec.lua` ("hides
+    its help text while something is typed"); the spec mock's `SearchBoxTemplate` runs Blizzard's
+    template scripts, and `EditBox:GetText` is "" for an empty box, as in the client.
 - **Content:** a scroll box (`render/scrollbox.lua`, its bar hidden until used) holding the canvas.
 - **Footer:** free slots on the left, money on the right (`MoneyFrame`).
 - **Tabs** (`next/tabs.lua`): the backpack's groups as tabs stacked down the body's left edge,

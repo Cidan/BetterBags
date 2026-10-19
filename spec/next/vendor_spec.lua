@@ -242,6 +242,20 @@ describe("NextVendor", function()
       assert.is_false(nextDrag:IsActive())
     end)
 
+    -- Its box sets its own OnTextChanged, which replaces the template's, the one that hid the help text
+    -- (InputBoxInstructions_OnTextChanged), so "Search Vendor" stayed under what was typed.
+    it("hides its help text while something is typed, and shows it again once emptied", function()
+      local v = open()
+      local t = v.searchBox.textBox
+      assert.are.equal("Search Vendor", t.Instructions:GetText())
+      t:SetText("plate")
+      t:GetScript("OnTextChanged")(t, true)
+      assert.is_false(t.Instructions:IsShown())
+      t:SetText("")
+      t:GetScript("OnTextChanged")(t, true)
+      assert.is_true(t.Instructions:IsShown())
+    end)
+
     it("has a search box of its own, always shown, filtering the vendor's items", function()
       local v = open()
       assert.is_true(v.searchBox.frame:IsShown())

@@ -1124,32 +1124,131 @@ function panelProto:LayoutHeader()
   end
 end
 
--- BuildSearch takes the kind's in-bag search box (the data phase reads its query,
--- searchBox:GetSearchText) out of the theme's hands and draws it flat: a soft pill and a fading
--- underline instead of the template's border.
+-- BuildSearch takes the panel's search box (the kind's in-bag box, whose query the data phase reads,
+-- searchBox:GetSearchText; the vendor's own) out of the theme's hands and draws it in Next's look,
+-- so it stands out (asked: it was "very difficult to see"): a fill lighter than the panel, a lavender
+-- edge all round that brightens under the pointer and while focused, a lavender magnifier, and the
+-- help text in Next's muted lavender after it, instead of the template's border and 35% gray text.
 function panelProto:BuildSearch()
   local sf = self:CreateSearchBox()
   sf.frame:ClearAllPoints()
   sf.frame:SetPoint("TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.SEARCH_TOP)
   sf.frame:SetPoint("TOPRIGHT", self.body, "TOPRIGHT", -style.PAD, -style.SEARCH_TOP)
   sf.frame:SetHeight(style.SEARCH_HEIGHT)
+  local t = sf.textBox
   for _, key in ipairs({ "Left", "Middle", "Right" }) do
-    if sf.textBox[key] then
-      sf.textBox[key]:SetAlpha(0)
+    t[key]:SetAlpha(0)
+  end
+  local fill = sf.frame:CreateTexture(nil, "BACKGROUND")
+  fill:SetAllPoints()
+  fill:SetColorTexture(1, 1, 1, 1)
+  self.searchFill = fill
+  self.searchEdges = {}
+  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+    local edge = sf.frame:CreateTexture(nil, "BORDER")
+    edge:SetColorTexture(1, 1, 1, 1)
+    if side == "TOP" or side == "BOTTOM" then
+      edge:SetPoint(side .. "LEFT", sf.frame, side .. "LEFT", 0, 0)
+      edge:SetPoint(side .. "RIGHT", sf.frame, side .. "RIGHT", 0, 0)
+      edge:SetHeight(1)
+    else
+      edge:SetPoint("TOP" .. side, sf.frame, "TOP" .. side, 0, 0)
+      edge:SetPoint("BOTTOM" .. side, sf.frame, "BOTTOM" .. side, 0, 0)
+      edge:SetWidth(1)
+    end
+    table.insert(self.searchEdges, edge)
+  end
+  self.searchEdgeAlpha = style.SearchEdge.Idle
+
+  local icon = t.searchIcon
+  icon:ClearAllPoints()
+  icon:SetPoint("LEFT", t, "LEFT", style.SEARCH_GAP, 0)
+  icon:SetSize(style.SEARCH_ICON, style.SEARCH_ICON)
+  local help = t.Instructions
+  help:ClearAllPoints()
+  help:SetPoint("LEFT", icon, "RIGHT", style.SEARCH_GAP, 0)
+  help:SetPoint("RIGHT", t, "RIGHT", -24, 0)
+  help:SetJustifyH("LEFT")
+  help:SetFontObject(style:Font("Search"))
+  t:SetFontObject(style:Font("SearchText"))
+  t:SetTextColor(unpack(style.Color.Text))
+  t:SetTextInsets(style.SEARCH_GAP * 2 + style.SEARCH_ICON, 24, 0, 0)
+
+  -- Hooked after the template's scripts (and the box's own OnTextChanged, which replaced the
+  -- template's: InputBoxInstructions_OnTextChanged hid the help text), so Next's colors win.
+  addon.HookScript(t, "OnEnter", function()
+    self.searchHover = true
+    self:UpdateSearchLook()
+  end)
+  addon.HookScript(t, "OnLeave", function()
+    self.searchHover = false
+    self:UpdateSearchLook()
+  end)
+  addon.HookScript(t, "OnEditFocusGained", function() self:UpdateSearchLook() end)
+  addon.HookScript(t, "OnEditFocusLost", function() self:UpdateSearchLook() end)
+  addon.HookScript(t, "OnTextChanged", function()
+    help:SetShown(t:GetText() == "")
+    self:UpdateSearchLook()
+  end)
+  self.searchBox = sf
+  self:UpdateSearchLook(true)
+  self:UpdateSearchShown()
+end
+
+-- SearchState is how the search box looks now: "focus" while typed in, "hover" under the pointer,
+-- "active" while it holds a search, else "idle".
+---@return string
+function panelProto:SearchState()
+  local t = self.searchBox.textBox
+  if t:HasFocus() then
+    return "focus"
+  end
+  if self.searchHover then
+    return "hover"
+  end
+  if t:GetText() ~= "" then
+    return "active"
+  end
+  return "idle"
+end
+
+-- UpdateSearchLook draws the search box for its state: the fill and magnifier at once, the edge
+-- fading to its strength (at once with now).
+---@param now? boolean
+function panelProto:UpdateSearchLook(now)
+  local state = self:SearchState()
+  local focused = state == "focus"
+  local fill = style.Color[focused and "SearchFillFocus" or "SearchFill"]
+  self.searchFill:SetVertexColor(fill[1], fill[2], fill[3], fill[4])
+  local icon = self.searchBox.textBox.searchIcon
+  if focused then
+    icon:SetVertexColor(1, 1, 1, 1)
+  else
+    local c = style.Color.Lavender
+    icon:SetVertexColor(c[1], c[2], c[3], state == "idle" and style.SearchIcon.Idle or style.SearchIcon.Active)
+  end
+  local target = focused and style.SearchEdge.Focus
+    or (state == "idle" and style.SearchEdge.Idle or style.SearchEdge.Hover)
+  local function paint(alpha)
+    self.searchEdgeAlpha = alpha
+    local c = style.Color.Lavender
+    for _, edge in ipairs(self.searchEdges) do
+      edge:SetVertexColor(c[1], c[2], c[3], alpha)
     end
   end
-  local pill = sf.frame:CreateTexture(nil, "BACKGROUND")
-  pill:SetAllPoints()
-  pill:SetColorTexture(1, 1, 1, 1)
-  pill:SetGradient("HORIZONTAL", style:CreateColor("TabSelected", 0.55), style:CreateColor("Tab", 0.35))
-  local underline = sf.frame:CreateTexture(nil, "BORDER")
-  underline:SetPoint("BOTTOMLEFT", sf.frame, "BOTTOMLEFT", 0, 0)
-  underline:SetPoint("BOTTOMRIGHT", sf.frame, "BOTTOMRIGHT", 0, 0)
-  underline:SetHeight(1)
-  underline:SetColorTexture(1, 1, 1, 1)
-  underline:SetGradient("HORIZONTAL", style:CreateColor("Lavender", 0.5), style:CreateColor("Lavender", 0))
-  self.searchBox = sf
-  self:UpdateSearchShown()
+  if now then
+    tween:Stop(self.searchEdges)
+    paint(target)
+    return
+  end
+  local from = self.searchEdgeAlpha
+  tween:Play(self.searchEdges, {
+    duration = style.Time.Hover,
+    from = 0,
+    to = 1,
+    ease = "outCubic",
+    onUpdate = function(t) paint(t >= 1 and target or from + (target - from) * t) end,
+  })
 end
 
 -- CreateSearchBox makes the panel's search box: the kind's in-bag box, out of the theme's hands.

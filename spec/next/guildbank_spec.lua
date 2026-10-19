@@ -181,7 +181,9 @@ describe("NextGuildBank", function()
     override(stubs.searchBox, "CreateBox", function(_, kind, parent)
       table.insert(calls.created, kind)
       local frame = CreateFrame("Frame", nil, parent)
-      return { frame = frame, textBox = CreateFrame("EditBox", nil, frame), kind = kind }
+      -- As searchBox:CreateBox makes it (frames/search.lua): a BagSearchBoxTemplate edit box.
+      local textBox = CreateFrame("EditBox", nil, frame, "BagSearchBoxTemplate")
+      return { frame = frame, textBox = textBox, helpText = textBox.Instructions, kind = kind }
     end)
     override(stubs.sonata, "UnregisterElement", function() end)
     override(stubs.sonata, "RegisterElement", function() end)

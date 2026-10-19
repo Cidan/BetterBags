@@ -830,6 +830,11 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetTextInsets(left, right, top, bottom)
     self._textInsets = { left, right, top, bottom }
   end
+  -- GetTextInsets() -> left, right, top, bottom (none nilable; 0 until set).
+  function widget:GetTextInsets()
+    local insets = self._textInsets or { 0, 0, 0, 0 }
+    return insets[1] or 0, insets[2] or 0, insets[3] or 0, insets[4] or 0
+  end
   function widget:SetFontString(fontString)
     self._fontString = fontString
   end
@@ -965,9 +970,13 @@ local function CreateMockWidget(widgetType, name, parent)
     end
     return 0, 0
   end
+  -- EditBox:GetText() is "" for an empty box, never nil.
   function widget:GetText()
     if self._secretText ~= nil then
       return self._secretText
+    end
+    if self._type == "EditBox" and self._text == nil then
+      return ""
     end
     return self._text
   end
@@ -2148,6 +2157,33 @@ _G.__mockTemplates.SearchBoxTemplate = function(box)
   box.clearButton.Icon:SetSize(10, 10)
   box.clearButton.Icon:SetPoint("TOPLEFT", box.clearButton, "TOPLEFT", 3, -3)
   box:SetTextInsets(16, 20, 0, 0)
+  -- Its scripts (InputBoxTemplates.lua): SearchBoxTemplate_OnLoad dims the magnifier to 0.6 and sets
+  -- the instructions (SEARCH); focus gained brightens it and shows the clear button; focus lost dims
+  -- it and hides the button while the box is empty; text changed does both by focus and text, then
+  -- shows the instructions only while the box is empty (InputBoxInstructions_OnTextChanged). A
+  -- SetScript replaces one of them, as in the client.
+  box.searchIcon:SetVertexColor(0.6, 0.6, 0.6)
+  box.Instructions:SetText(_G.SEARCH or "Search")
+  box:SetScript("OnEditFocusGained", function(self)
+    self.searchIcon:SetVertexColor(1, 1, 1)
+    self.clearButton:Show()
+  end)
+  box:SetScript("OnEditFocusLost", function(self)
+    if self:GetText() == "" then
+      self.searchIcon:SetVertexColor(0.6, 0.6, 0.6)
+      self.clearButton:Hide()
+    end
+  end)
+  box:SetScript("OnTextChanged", function(self)
+    if not self:HasFocus() and self:GetText() == "" then
+      self.searchIcon:SetVertexColor(0.6, 0.6, 0.6)
+      self.clearButton:Hide()
+    else
+      self.searchIcon:SetVertexColor(1, 1, 1)
+      self.clearButton:Show()
+    end
+    self.Instructions:SetShown(self:GetText() == "")
+  end)
 end
 _G.__mockTemplates.BagSearchBoxTemplate = _G.__mockTemplates.SearchBoxTemplate
 
