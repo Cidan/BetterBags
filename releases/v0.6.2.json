@@ -1,0 +1,20 @@
+{
+  "id": 1792369017,
+  "version": "v0.6.2",
+  "channel": "alpha",
+  "date": "2026-10-19",
+  "from": "6b214bd01adf8086e34bac81604a4a3f9896ce84",
+  "to": "34538842a8bb6d0aed129f99cf4207ec92169461",
+  "headline": "Fixed a Lua error when opening the vendor window inside instances.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Fix error opening vendor in instances",
+      "details": "Opening the vendor window inside a dungeon or raid no longer triggers an error caused by restricted NPC names.",
+      "clients": [
+        "Retail",
+        "Forever"
+      ]
+    }
+  ]
+}
