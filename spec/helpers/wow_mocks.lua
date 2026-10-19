@@ -1199,6 +1199,7 @@ local function CreateMockWidget(widgetType, name, parent)
     widget.ItemContextOverlay = CreateMockWidget("Texture", nil, widget)
     widget.UpgradeIcon = CreateMockWidget("Texture", nil, widget)
     if widgetType == "ItemButton" then
+      _G.__mockItemButtonParts(widget, true)
       widget.SetHasItem = function() end
       widget.SetBagID = function(self, id)
         self.bagID = id
@@ -1250,10 +1251,44 @@ _G.ContainerFrame_GetContainerNumSlots = function(bagID)
   return bagID, numSlots
 end
 
+-- The parts of an item button (Blizzard_ItemButton ItemButtonTemplate.xml): the ItemButton
+-- intrinsic on retail and WoW: Forever (Shared, mixin ItemButtonMixin), ItemButtonTemplate on Classic
+-- (Classic, no mixin). Both: icon, Count (NumberFontNormal, hidden), searchOverlay and IconBorder
+-- (WhiteIconFrame), both hidden, and IconOverlay. The intrinsic adds ItemContextOverlay and
+-- ItemButtonMixin's SetMatchesSearch / GetMatchesSearch: a button that does not match shows its
+-- ItemContextOverlay (UpdateItemContextOverlay, the Standard mode: black at 0.8).
+function _G.__mockItemButtonParts(button, intrinsic)
+  button.icon = button:CreateTexture(nil, "BORDER")
+  button.Count = button:CreateFontString(nil, "ARTWORK", "NumberFontNormal")
+  button.Count:Hide()
+  button.searchOverlay = button:CreateTexture(nil, "OVERLAY")
+  button.searchOverlay:Hide()
+  button.IconBorder = button:CreateTexture(nil, "OVERLAY")
+  button.IconBorder:SetTexture("Interface\\Common\\WhiteIconFrame")
+  button.IconBorder:Hide()
+  button.IconOverlay = button:CreateTexture(nil, "OVERLAY")
+  button.IconOverlay:Hide()
+  if intrinsic then
+    button.ItemContextOverlay = button:CreateTexture(nil, "OVERLAY")
+    button.ItemContextOverlay:Hide()
+    function button:SetMatchesSearch(matchesSearch)
+      self.matchesSearch = matchesSearch
+      self.ItemContextOverlay:SetShown(matchesSearch == false)
+    end
+    function button:GetMatchesSearch()
+      return self.matchesSearch
+    end
+  end
+end
+
 -- Templates a mocked frame can inherit. CreateFrame applies each template named in its
 -- comma-separated template list, so a frame gets the regions and mixin methods its XML
 -- template gives it in the client. Each entry is built from Blizzard's own template.
 _G.__mockTemplates = _G.__mockTemplates or {}
+
+_G.__mockTemplates.ItemButtonTemplate = function(frame)
+  _G.__mockItemButtonParts(frame, false)
+end
 
 -- WowScrollBox (Blizzard_SharedXML/Shared/Scroll/ScrollBox.lua, ScrollBox.xml): a ScrollTarget
 -- child frame; Init(view) sets the view and scrolls to the beginning; SetView(view) binds the
@@ -1810,6 +1845,14 @@ _G.hooksecurefunc = function(tbl, name, hook)
     hook(...)
     return unpack(results)
   end
+end
+-- ShowUIPanel(frame, force) and HideUIPanel(frame) (UIParentPanelManager): the panel manager places
+-- the frame among the open panels and shows it, or hides it. Specs only see the show and the hide.
+_G.ShowUIPanel = function(frame)
+  if frame then frame:Show() end
+end
+_G.HideUIPanel = function(frame)
+  if frame then frame:Hide() end
 end
 -- issecurevariable([tbl,] variable) -> isSecure, taint (warcraft.wiki.gg API_issecurevariable):
 -- true, nil for a key nothing has tainted, which is every key in specs (they model no taint).
@@ -2845,7 +2888,8 @@ function _G.ResetMockGuildBank()
   _G._guildBank = { tabs = {}, delivered = {}, current = 1, money = 0, withdrawMoney = 0, canWithdrawMoney = false,
     isLeader = false, tabCost = nil, canEditTabs = false, guildName = "The Guild" }
   _G._guildBankCalls = { queries = {}, setCurrent = {}, pickup = {}, autoStore = {}, split = {}, deposits = {},
-    withdrawals = {}, closed = 0, bought = 0, tabInfo = {}, tooltips = {}, splitFrames = {}, cursorMoneyDropped = 0 }
+    withdrawals = {}, closed = 0, bought = 0, tabInfo = {}, tooltips = {}, splitFrames = {}, cursorMoneyDropped = 0,
+    splitHidden = 0 }
 end
 _G.ResetMockGuildBank()
 
@@ -2922,6 +2966,9 @@ end
 _G.StackSplitFrame = _G.StackSplitFrame or {}
 function _G.StackSplitFrame:OpenStackSplitFrame(maxStack, owner, anchor, anchorTo)
   table.insert(_G._guildBankCalls.splitFrames, { max = maxStack, owner = owner, anchor = anchor, anchorTo = anchorTo })
+end
+function _G.StackSplitFrame:Hide()
+  _G._guildBankCalls.splitHidden = _G._guildBankCalls.splitHidden + 1
 end
 _G.OpenStackSplitFrame = function(maxStack, owner, anchor, anchorTo)
   _G.StackSplitFrame:OpenStackSplitFrame(maxStack, owner, anchor, anchorTo)

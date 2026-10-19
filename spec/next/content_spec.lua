@@ -304,6 +304,35 @@ describe("NextContent", function()
 
   -- BetterBags Next's vendor (next.md §10) binds sections of its own buttons, taller than an icon
   -- (the price is under it).
+  -- The guild bank's slots are not bag slots: its canvas takes its buttons from the guild bank's own
+  -- buttons (NextGuildButton) instead of the item buttons (guild-bank.md §5).
+  describe("a source of buttons of its own", function()
+    it("draws every button, Free Space's too, from the source it is given, and claims them", function()
+      local made = {}
+      local source = {
+        GetButton = function(_, _, slotkey)
+          made[slotkey] = made[slotkey] or { slotkey = slotkey, frame = CreateFrame("Frame"), drawn = {},
+            SetItemFromData = function(self, _, d) table.insert(self.drawn, { "item", d }) end,
+            SetFreeSlots = function(self, _, d, count) table.insert(self.drawn, { "free", d, count }) end,
+            SetSize = function(self, _, w, h) self.frame:SetSize(w, h) end }
+          return made[slotkey]
+        end,
+      }
+      canvas:SetButtonSource(source)
+      bind(data({
+        categories = { { name = "Ore" } },
+        items = { item("1001_1", "Ore") },
+        free = { showAll = false, buttons = { { slotkey = "1001_2", bagid = 1001, slotid = 2, count = 96, key = "Gear" } } },
+      }))
+      assert.are.same({}, buttons, "no item button is taken")
+      assert.are.equal("item", made["1001_1"].drawn[1][1])
+      assert.are.same({ "free", 96 }, { made["1001_2"].drawn[1][1], made["1001_2"].drawn[1][3] })
+      assert.is_true(claims[made["1001_1"]])
+      assert.is_true(claims[made["1001_2"]])
+      assert.are.equal(made["1001_1"], canvas.buttons["1001_1"])
+    end)
+  end)
+
   describe("sections of other buttons", function()
     local function vendorButton(key)
       local f = CreateFrame("Button")

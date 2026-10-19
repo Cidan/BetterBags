@@ -30,6 +30,9 @@ local nextBank = addon:GetModule('NextBank')
 ---@class NextVendor: AceModule
 local nextVendor = addon:GetModule('NextVendor')
 
+---@class NextGuildBank: AceModule
+local nextGuildBank = addon:GetModule('NextGuildBank')
+
 ---@class ConsolePort: AceModule
 local consoleport = addon:GetModule('ConsolePort')
 
@@ -52,6 +55,7 @@ local bagSystem = addon:NewModule('BagSystem')
 ---@field backpack? table
 ---@field bank? table
 ---@field vendor? NextVendorPanel
+---@field guild? NextGuildBankPanel BetterBags Next's guild bank, on a client with a guild bank.
 
 function bagSystem:Init()
   self.sets = {}
@@ -99,7 +103,8 @@ function bagSystem:CreateBackpack(ctx, design)
 end
 
 -- CreateRest makes the rest of a design in its scope: its bank, with Enable Bank Bags, and for
--- BetterBags Next the vendor, which takes over Blizzard's merchant frame.
+-- BetterBags Next the vendor, which takes over Blizzard's merchant frame, and on a client with a guild
+-- bank the guild bank, which takes over Blizzard's guild bank frame (guild-bank.md §5).
 ---@param ctx Context
 ---@param design BagDesign
 function bagSystem:CreateRest(ctx, design)
@@ -114,11 +119,47 @@ function bagSystem:CreateRest(ctx, design)
     end
     if design == "next" then
       s.vendor = nextVendor:Create(ctx)
+      if addon.hasGuildBank then
+        s.guild = nextGuildBank:Create(ctx)
+      end
     end
   end)
   if design == "next" then
-    nextVendor:TakeOver(_G.BetterBagsSneakyFrame)
+    self:takeOver(s)
   end
+end
+
+-- takeOver has BetterBags Next's panels stand in for Blizzard's merchant and guild bank frames.
+---@private
+---@param s BagSystemSet
+function bagSystem:takeOver(s)
+  nextVendor:TakeOver(_G.BetterBagsSneakyFrame)
+  if s.guild then
+    nextGuildBank:TakeOver(_G.BetterBagsSneakyFrame)
+  end
+end
+
+-- giveBack gives Blizzard's merchant and guild bank frames back when BetterBags Next is switched off.
+---@private
+---@param s BagSystemSet
+function bagSystem:giveBack(s)
+  nextVendor:GiveBack()
+  if s.guild then
+    nextGuildBank:GiveBack()
+  end
+end
+
+-- others are a design's bags beside its backpack, in the order they are made.
+---@param s BagSystemSet
+---@return table[]
+local function others(s)
+  local list = {}
+  for _, bag in ipairs({ s.bank or false, s.vendor or false, s.guild or false }) do
+    if bag then
+      table.insert(list, bag)
+    end
+  end
+  return list
 end
 
 -- Use makes a design's bags the addon's.
@@ -128,6 +169,7 @@ function bagSystem:Use(design)
   self.active = design
   addon.Bags.Backpack = s.backpack
   addon.Bags.Bank = s.bank
+  addon.Bags.GuildBank = s.guild
   addon.Vendor = s.vendor
 end
 
@@ -136,10 +178,9 @@ end
 function bagSystem:Finish(design)
   local s = self.sets[design]
   s.backpack:SetTitle(L:G("Backpack"))
-  for _, bag in ipairs({ s.backpack, s.bank or false, s.vendor or false }) do
-    if bag then
-      table.insert(UISpecialFrames, bag:GetName())
-    end
+  table.insert(UISpecialFrames, s.backpack:GetName())
+  for _, bag in ipairs(others(s)) do
+    table.insert(UISpecialFrames, bag:GetName())
   end
 end
 
@@ -158,9 +199,9 @@ local function searchText(bag)
 end
 
 -- Switch puts a design's bags in place of the ones in use, and saves the choice. It refuses in
--- combat (making the classic bags makes secure tab buttons), at the bank and at a vendor (their
--- frames would have to change hands open: a shown merchant frame reparented to a visible parent
--- runs Blizzard's OnShow from our code). It returns whether the design is in use now.
+-- combat (making the classic bags makes secure tab buttons), at the bank, at a vendor and at the
+-- guild bank (their frames would have to change hands open: a shown merchant frame reparented to a
+-- visible parent runs Blizzard's OnShow from our code). It returns whether the design is in use now.
 ---@param ctx Context
 ---@param design BagDesign
 ---@return boolean
@@ -177,18 +218,20 @@ function bagSystem:Switch(ctx, design)
   if (MerchantFrame and MerchantFrame:IsShown()) or (addon.Vendor and addon.Vendor.atMerchant) then
     return refuse(L:G("Close the vendor to switch bags."))
   end
+  if addon.atGuildBank then
+    return refuse(L:G("Close the guild bank to switch bags."))
+  end
 
   local old = self.sets[self.active]
   local wasOpen = old.backpack:IsShown() and not old.backpack:IsClosing()
   local backpackSearch, bankSearch = searchText(old.backpack), searchText(old.bank)
-  for _, bag in ipairs({ old.backpack, old.bank or false, old.vendor or false }) do
-    if bag then
-      bag:Deactivate(ctx)
-    end
+  old.backpack:Deactivate(ctx)
+  for _, bag in ipairs(others(old)) do
+    bag:Deactivate(ctx)
   end
   old.scope:Disable()
   if old.design == "next" then
-    nextVendor:GiveBack()
+    self:giveBack(old)
   end
 
   local new = self.sets[design]
@@ -202,15 +245,17 @@ function bagSystem:Switch(ctx, design)
     if new.bank then
       consoleport:Add(new.bank.frame)
     end
+    if new.guild then
+      consoleport:Add(new.guild.frame)
+    end
   else
     new.scope:Enable()
     if design == "next" then
-      nextVendor:TakeOver(_G.BetterBagsSneakyFrame)
+      self:takeOver(new)
     end
-    for _, bag in ipairs({ new.backpack, new.bank or false, new.vendor or false }) do
-      if bag then
-        bag:Activate(ctx)
-      end
+    new.backpack:Activate(ctx)
+    for _, bag in ipairs(others(new)) do
+      bag:Activate(ctx)
     end
   end
 

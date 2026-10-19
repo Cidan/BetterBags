@@ -143,21 +143,13 @@ function searchBox.searchProto:UpdateSearch(ctx)
   end
 
   if self.kind ~= nil then
-    if self.kind == const.BAG_KIND.BACKPACK then
+    local bag = searchBox:BagOfKind(self.kind)
+    if bag then
       if text == "" then
-        addon.Bags.Backpack:ResetSearch(ctx)
+        bag:ResetSearch(ctx)
       else
         local results = search:Search(text)
-        addon.Bags.Backpack:Search(ctx, results)
-      end
-    else
-      if addon.Bags.Bank then
-        if text == "" then
-          addon.Bags.Bank:ResetSearch(ctx)
-        else
-          local results = search:Search(text)
-          addon.Bags.Bank:Search(ctx, results)
-        end
+        bag:Search(ctx, results)
       end
     end
   else
@@ -217,17 +209,24 @@ end
 ---@param kind BagKind
 ---@return SearchFrame?
 function searchBox:GetInBagBox(kind)
+  local bag = self:BagOfKind(kind)
+  return bag and bag.searchBox or nil
+end
+
+-- BagOfKind is the bag that shows a kind: the backpack, the bank, or BetterBags Next's guild bank.
+---@param kind BagKind
+---@return table?
+function searchBox:BagOfKind(kind)
   local bags = addon.Bags
   if bags == nil then
     return nil
   end
-  local bag
   if kind == const.BAG_KIND.BANK then
-    bag = bags.Bank
-  else
-    bag = bags.Backpack
+    return bags.Bank
+  elseif kind == const.BAG_KIND.GUILD then
+    return bags.GuildBank
   end
-  return bag and bag.searchBox or nil
+  return bags.Backpack
 end
 
 ---@param ctx Context
@@ -360,6 +359,8 @@ function searchBox:CreateBox(kind, parent)
   sf.textBox = textBox
   if kind == const.BAG_KIND.BACKPACK then
     sf.helpText:SetText("Search Backpack")
+  elseif kind == const.BAG_KIND.GUILD then
+    sf.helpText:SetText("Search Guild Bank")
   else
     sf.helpText:SetText("Search Bank")
   end

@@ -26,6 +26,7 @@ local stubs = {
   nextBag = trackStub("NextBag"),
   nextBank = trackStub("NextBank"),
   nextVendor = trackStub("NextVendor"),
+  nextGuildBank = trackStub("NextGuildBank"),
   consoleport = trackStub("ConsolePort"),
 }
 
@@ -102,12 +103,15 @@ describe("BagSystem", function()
   before_each(function()
     events:Init()
     bagSystem:Init()
-    made, fired, calls, sent = {}, {}, { takeOver = {}, giveBack = 0, consoleport = {}, watched = {} }, {}
+    made, fired, calls, sent = {}, {}, { takeOver = {}, giveBack = 0, consoleport = {}, watched = {},
+      guildTakeOver = {}, guildGiveBack = 0 }, {}
     nextOn, bankOn = false, true
     slotInfo = { [BACKPACK] = { "backpack data" }, [BANK] = { "bank data" } }
     override(addon, "Bags", {})
     override(addon, "Vendor", nil)
     override(addon, "atBank", false)
+    override(addon, "atGuildBank", false)
+    override(addon, "hasGuildBank", true)
     override(stubs.L, "G", function(_, key) return key end)
     override(stubs.database, "GetNextEnabled", function() return nextOn end)
     override(stubs.database, "SetNextEnabled", function(_, on) nextOn = on end)
@@ -121,6 +125,9 @@ describe("BagSystem", function()
       v.atMerchant = false
       return v
     end))
+    override(stubs.nextGuildBank, "Create", spy.new(function() return fakeBag("next", "guild") end))
+    override(stubs.nextGuildBank, "TakeOver", function(_, hidden) table.insert(calls.guildTakeOver, hidden) end)
+    override(stubs.nextGuildBank, "GiveBack", function() calls.guildGiveBack = calls.guildGiveBack + 1 end)
     override(stubs.nextVendor, "TakeOver", function(_, hidden) table.insert(calls.takeOver, hidden) end)
     override(stubs.nextVendor, "GiveBack", function() calls.giveBack = calls.giveBack + 1 end)
     override(stubs.consoleport, "Add", function(_, frame) table.insert(calls.consoleport, frame) end)
@@ -175,6 +182,29 @@ describe("BagSystem", function()
       assert.spy(stubs.bagFrame.Create).was_not.called()
     end)
 
+    -- BetterBags Next's guild bank (guild-bank.md §5) stands in for Blizzard's guild bank frame; the
+    -- classic bags leave Blizzard's frame to show the guild bank.
+    it("makes BetterBags Next's guild bank, which takes over Blizzard's guild bank frame", function()
+      nextOn = true
+      start()
+      assert.are.equal("guild", addon.Bags.GuildBank.kind)
+      assert.are.same({ _G.BetterBagsSneakyFrame }, calls.guildTakeOver)
+      assert.is_true(special()["BagSystemSpecnextguild"])
+    end)
+
+    it("makes no guild bank for the classic bags, nor on a client without one (Classic Era)", function()
+      start()
+      assert.is_nil(addon.Bags.GuildBank)
+      assert.spy(stubs.nextGuildBank.Create).was_not.called()
+      bagSystem:Init()
+      override(addon, "hasGuildBank", false)
+      nextOn = true
+      start()
+      assert.is_nil(addon.Bags.GuildBank)
+      assert.spy(stubs.nextGuildBank.Create).was_not.called()
+      assert.are.same({}, calls.guildTakeOver)
+    end)
+
     it("makes no bank without bank bags", function()
       bankOn = false
       start()
@@ -190,8 +220,8 @@ describe("BagSystem", function()
       assert.is_true(bagSystem:Switch(ctx(), "next"))
       assert.are.same({ "deactivate" }, old.log)
       assert.are.same({ "deactivate" }, made[2].log)
-      assert.are.same({ "next 0", "next 1", "next message 0", "next message 1", "next message vendor",
-        "next vendor" }, fire())
+      assert.are.same({ "next 0", "next 1", "next guild", "next message 0", "next message 1", "next message guild",
+        "next message vendor", "next vendor" }, fire())
     end)
 
     it("makes the other design once, uses it, saves the setting and says so", function()
@@ -208,7 +238,7 @@ describe("BagSystem", function()
       local names = special()
       assert.is_true(names["BagSystemSpecnext0"] and names["BagSystemSpecnext1"] and names["BagSystemSpecnextvendor"])
       assert.are.same({ addon.Bags.Backpack.frame }, calls.watched)
-      assert.are.same({ addon.Bags.Backpack.frame, addon.Bags.Bank.frame }, calls.consoleport)
+      assert.are.same({ addon.Bags.Backpack.frame, addon.Bags.Bank.frame, addon.Bags.GuildBank.frame }, calls.consoleport)
     end)
 
     it("draws the new backpack with what was read, and opens it only when the old one was open", function()
@@ -245,7 +275,7 @@ describe("BagSystem", function()
       assert.spy(stubs.nextBag.Create).was.called(1)
       assert.are.same({ "deactivate", "activate", { "draw", slotInfo[BACKPACK] } }, classic.log)
       assert.are.same({ "classic 0", "classic 1", "classic message 0", "classic message 1" }, fire())
-      assert.are.equal(2, #UISpecialFrames - 3, "the classic frames listed once")
+      assert.are.equal(2, #UISpecialFrames - 4, "the classic frames listed once")
       bagSystem:Switch(ctx(), "next")
       assert.are.same({ _G.BetterBagsSneakyFrame, _G.BetterBagsSneakyFrame }, calls.takeOver,
         "the merchant frame taken again")
@@ -292,6 +322,39 @@ describe("BagSystem", function()
       override(addon, "atBank", true)
       assert.is_false(bagSystem:Switch(ctx(), "next"))
       refused("Close the bank to switch bags.")
+    end)
+
+    it("refuses at the guild bank", function()
+      start()
+      override(addon, "atGuildBank", true)
+      assert.is_false(bagSystem:Switch(ctx(), "next"))
+      refused("Close the guild bank to switch bags.")
+    end)
+
+    it("switches the guild bank off with BetterBags Next, giving Blizzard's frame back, and on again", function()
+      nextOn = true
+      start()
+      local guild = addon.Bags.GuildBank
+      assert.is_true(bagSystem:Switch(ctx(), "classic"))
+      assert.are.same({ "deactivate" }, guild.log)
+      assert.are.equal(1, calls.guildGiveBack)
+      assert.is_nil(addon.Bags.GuildBank)
+      assert.is_true(bagSystem:Switch(ctx(), "next"))
+      assert.are.equal(guild, addon.Bags.GuildBank)
+      assert.are.same({ "deactivate", "activate" }, guild.log)
+      assert.are.equal(2, #calls.guildTakeOver)
+    end)
+
+    it("makes the guild bank the first time BetterBags Next is switched to, for the cursor too", function()
+      start()
+      assert.is_true(bagSystem:Switch(ctx(), "next"))
+      assert.are.equal("guild", addon.Bags.GuildBank.kind)
+      assert.are.same({ _G.BetterBagsSneakyFrame }, calls.guildTakeOver)
+      local added = false
+      for _, frame in ipairs(calls.consoleport) do
+        if frame == addon.Bags.GuildBank.frame then added = true end
+      end
+      assert.is_true(added)
     end)
 
     it("refuses at a vendor, Blizzard's or BetterBags Next's", function()

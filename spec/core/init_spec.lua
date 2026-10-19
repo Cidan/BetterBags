@@ -63,6 +63,11 @@ describe("Core Init and Enable flow", function()
       return { frame = CreateFrame("Frame"), GetName = function() return "BetterBagsNextVendor" end }
     end
     nextVendor.TakeOver = nextVendor.TakeOver or function() end
+    local nextGuildBank = addon:GetModule("NextGuildBank")
+    nextGuildBank.Create = nextGuildBank.Create or function()
+      return { frame = CreateFrame("Frame"), GetName = function() return "BetterBagsNextGuildBank" end }
+    end
+    nextGuildBank.TakeOver = nextGuildBank.TakeOver or function() end
 
     -- Provide specific mock implementations needed by init
     local L = addon:GetModule("Localization")

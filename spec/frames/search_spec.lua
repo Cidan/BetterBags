@@ -95,6 +95,60 @@ describe("SearchBox:GetSearchText", function()
     assert.equal("", searchBox:GetSearchText(const.BAG_KIND.BANK))
   end)
 
+  -- The guild bank's in-bag box is BetterBags Next's guild bank panel's (guild-bank.md §5).
+  describe("the guild bank", function()
+    local GUILD = 2
+    local saved, searched, reset
+
+    before_each(function()
+      saved = {
+        guild = rawget(const.BAG_KIND, "GUILD"),
+        attach = rawget(addon:GetModule("Animations"), "AttachFadeGroup"),
+        register = rawget(addon:GetModule("Sonata"), "RegisterElement"),
+        search = rawget(addon:GetModule("Search"), "Search"),
+      }
+      const.BAG_KIND.GUILD = GUILD
+      addon:GetModule("Animations").AttachFadeGroup = function()
+        local group = { Play = function() end }
+        return group, group
+      end
+      addon:GetModule("Sonata").RegisterElement = function() end
+      addon:GetModule("Search").Search = function(_, text) return { query = text } end
+      searched, reset = nil, 0
+      addon.Bags.GuildBank = {
+        frame = {},
+        Search = function(_, _, results) searched = results end,
+        ResetSearch = function() reset = reset + 1 end,
+      }
+      addon.Bags.Bank.Search = function() error("the bank is not searched") end
+    end)
+
+    after_each(function()
+      const.BAG_KIND.GUILD = saved.guild
+      addon:GetModule("Animations").AttachFadeGroup = saved.attach
+      addon:GetModule("Sonata").RegisterElement = saved.register
+      addon:GetModule("Search").Search = saved.search
+    end)
+
+    it("finds the guild bank's in-bag box, and its query", function()
+      addon.Bags.GuildBank.searchBox = makeBox("ore")
+      assert.are.equal(addon.Bags.GuildBank.searchBox, searchBox:GetInBagBox(GUILD))
+      assert.equal("ore", searchBox:GetSearchText(GUILD))
+    end)
+
+    it("names its box after the guild bank, and searches only the guild bank as it is typed in", function()
+      local box = searchBox:CreateBox(GUILD, CreateFrame("Frame"))
+      assert.are.equal("Search Guild Bank", box.helpText:GetText())
+      local ctx = addon:GetModule("Context"):New("test")
+      box.textBox:SetText("ore")
+      box:UpdateSearch(ctx)
+      assert.are.same({ query = "ore" }, searched)
+      box.textBox:SetText("")
+      box:UpdateSearch(ctx)
+      assert.are.equal(1, reset)
+    end)
+  end)
+
   it("returns empty string when no search box holds any text", function()
     searchBox.searchFrame = makeBox("")
     assert.equal("", searchBox:GetSearchText(const.BAG_KIND.BACKPACK))

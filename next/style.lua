@@ -61,6 +61,9 @@ style.Color = {
   -- The Warbank's accent, and the wash the panel takes while it shows a Warbank tab.
   Warbank = { 0.35, 0.85, 0.95, 1 },
   WarbankWash = { 0.3, 0.75, 1.0, 0.16 },
+  -- The guild bank's accent and wash: the guild's green (guild chat's color).
+  Guild = { 0.4, 1.0, 0.5, 1 },
+  GuildWash = { 0.3, 1.0, 0.45, 0.16 },
   White = { 1, 1, 1, 1 },
   Lavender = { 0.78, 0.72, 1.0, 1 },
   Text = { 0.96, 0.95, 1.0, 1 },

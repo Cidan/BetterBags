@@ -168,6 +168,8 @@ next\bank.lua
 next\merchant.lua
 next\vendorbutton.lua
 next\vendor.lua
+next\guildbutton.lua
+next\guildbank.lua
 
 
 config\categorypane.lua
