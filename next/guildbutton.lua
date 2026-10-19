@@ -182,11 +182,11 @@ end
 
 -- SetItemFromData draws a guild item: its icon, count (a virtual stack's total), quality (Blizzard's
 -- SetItemButtonQuality, then the theme's or BetterBags' glow by the guild bank's setting), lock,
--- item level and upgrade arrow, and the search's match.
+-- item level and upgrade arrow, and the search's match. It ends with guild/Updated: the quality
+-- border it rewrote is one Masque skins, so Masque skins it again, as item/Updated does for bag buttons.
 ---@param ctx Context
 ---@param data ItemData
 function buttonProto:SetItemFromData(ctx, data)
-  local _ = ctx
   self.data, self.free, self.isFreeSlot = data, nil, nil
   self.tab = data.guildTab or guildBank:TabOf(data.bagid)
   local info = data.itemInfo
@@ -209,6 +209,7 @@ function buttonProto:SetItemFromData(ctx, data)
     self:UpdateSearch(nil, not (data.containerInfo and data.containerInfo.isFiltered))
   end
   self.frame:Show()
+  events:SendMessage(ctx, 'guild/Updated', self)
 end
 
 -- drawItemLevel shows the item level of gear as a bag button does (itemProto:DrawItemLevel), by the
@@ -234,13 +235,13 @@ function buttonProto:drawItemLevel(info)
 end
 
 -- SetFreeSlots draws a Free Space entry: an empty slot of a tab shown by itself (nocount), or a tab's
--- free slots with their count in the combined view, in the bags' empty slot art.
+-- free slots with their count in the combined view, in the bags' empty slot art. It ends with
+-- guild/Updated, as an item draw does.
 ---@param ctx Context
 ---@param data table A Free Space entry (items:Phase10_PartitionIntoTabs).
 ---@param count number
 ---@param nocount? boolean
 function buttonProto:SetFreeSlots(ctx, data, count, nocount)
-  local _ = ctx
   self.data, self.free, self.isFreeSlot = nil, data, true
   self.tab = guildBank:TabOf(data.bagid)
   self:reset()
@@ -253,6 +254,7 @@ function buttonProto:SetFreeSlots(ctx, data, count, nocount)
   end
   SetItemButtonCount(self.button, nocount and 0 or count)
   self.frame:Show()
+  events:SendMessage(ctx, 'guild/Updated', self)
 end
 
 -- UpdateSearch dims the button when a search leaves it out: Blizzard's own (SetMatchesSearch) where

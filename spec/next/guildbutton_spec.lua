@@ -324,6 +324,41 @@ describe("NextGuildButton", function()
     end)
   end)
 
+  -- Every draw rewrites the quality border Masque skins (Blizzard's SetItemButtonQuality sets its
+  -- atlas or texture, BetterBags' glow its texture, coordinates and blend), so each draw is announced
+  -- (guild/Updated) for Masque to skin the button again, as item/Updated does for bag buttons.
+  describe("announcing its draws", function()
+    local function updates(b)
+      local n = 0
+      for _, m in ipairs(calls.messages) do
+        if m.name == "guild/Updated" then
+          assert.are.equal(b, m.args[1])
+          n = n + 1
+        end
+      end
+      return n
+    end
+
+    it("announces every item draw, after the quality border is drawn", function()
+      local b = guildButton:GetButton(ctx, "1002_7")
+      local before
+      override(stubs.itemFrame, "DrawQualityGlowFor", function()
+        assert.are.equal(before, updates(b), "the border is drawn before the announcement")
+      end)
+      before = 0
+      b:SetItemFromData(ctx, item({ quality = 3 }))
+      before = 1
+      b:SetItemFromData(ctx, item({ quality = 3 }))
+      assert.are.equal(2, updates(b))
+    end)
+
+    it("announces every free slot draw", function()
+      local b = guildButton:GetButton(ctx, "1002_9")
+      b:SetFreeSlots(ctx, free({ individual = true }), 1, true)
+      assert.are.equal(1, updates(b))
+    end)
+  end)
+
   -- GuildBankItemButtonMixin: OnClick, OnDragStart, OnReceiveDrag, OnEnter, OnHide; each on the
   -- item's own tab (GuildBank makes it current: Blizzard's buttons act on the current tab).
   describe("clicks", function()

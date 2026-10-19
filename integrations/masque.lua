@@ -116,18 +116,31 @@ function masque:OnEnable()
 
   -- BetterBags Next's guild bank buttons (next/guildbutton.lua) are Blizzard's own item buttons, made
   -- once and reused, each announced once; Masque finds an item button's parts itself, as for the
-  -- item decorations. Like vendor buttons they are not drawn again on a theme change.
+  -- item decorations. Every draw rewrites their quality border as an item draw does (Blizzard's
+  -- SetItemButtonQuality sets its atlas, past Masque's SetTexture hook, and BetterBags' glow its
+  -- coordinates and blend), so each draw (guild/Updated) skins them again, as item/Updated does. Like
+  -- vendor buttons they are not drawn again on a theme change.
   self.guildButtons = setmetatable({}, { __mode = 'k' })
 
   ---@param b NextGuildButtonFrame
   local function skinGuild(b)
     if not sonata:UsesMasque() then return end
     local group = self.groups["Guild Bank"]
-    group:AddButton(b.button)
-    self.added[b.button] = group
+    if self.added[b.button] == group then
+      group:ReSkin(b.button)
+    else
+      group:AddButton(b.button)
+      self.added[b.button] = group
+    end
+    self:ReapplyBlend(b.button)
   end
 
   events:RegisterMessage('guild/NewButton', function(_, b)
+    self.guildButtons[b] = true
+    skinGuild(b)
+  end)
+
+  events:RegisterMessage('guild/Updated', function(_, b)
     self.guildButtons[b] = true
     skinGuild(b)
   end)

@@ -221,9 +221,20 @@ element (its styler guards the parts a plain item button lacks).
 over and gives back Blizzard's frame with the design, lists it for Escape, and refuses to switch at
 the guild bank ("Close the guild bank to switch bags."). `addon.Bags.GuildBank`;
 `addon:GetBagFromKind(GUILD)` and `GetBagFromBagID(container)` find it (the latter no longer indexes
-the Warbank's table on Classic, which has none). ConsolePort's cursor reaches it. Masque skins its
-buttons in a Guild Bank group of their own, added once, taken out under a theme without Masque and
-added back under one with it.
+the Warbank's table on Classic, which has none). ConsolePort's cursor reaches it.
+
+**Masque.** Guild bank buttons are in a Guild Bank group of their own. Every draw rewrites the
+quality border Masque skins: Blizzard's `SetItemButtonQuality` sets its atlas or texture
+(`Mainline/ItemButtonTemplate.lua`; `SetAtlas` slips past Masque's `IconBorder` `SetTexture` hook,
+`Core/Regions/IconBorder.lua`), and BetterBags' glow sets its texture, coordinates and blend. So
+each draw ends with `guild/Updated`, and the integration skins the button again (`ReSkin`, or
+`AddButton` the first time) and gives its border a blend mode, exactly as `item/Updated` does for bag
+buttons. A theme applied also re-skins them: Sonata restyles them as `ItemButton` elements, and a
+theme change redraws only the backpack and the bank. A theme without Masque takes them out of the
+group. **Failure mode (fixed):** they were only added once, at creation, so after their first draw
+they showed Masque's frame with Blizzard's and BetterBags' quality border inside it, not the skin's.
+**Cost, not measured:** guild buttons have no draw record (item-drawing.md §7b), so every guild
+draw re-skins every button it draws, where bag buttons re-skin only the ones that changed.
 
 ## 6. Taint
 

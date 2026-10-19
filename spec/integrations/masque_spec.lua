@@ -196,7 +196,10 @@ describe("Masque integration", function()
       assert.is_nil(groups["Backpack"].Buttons[b.button])
     end)
 
-    it("leaves it out under a theme without Masque, and adds it when a theme with Masque applies", function()
+    -- A theme applied restyles guild buttons (Sonata's ItemButton elements) before
+    -- sonata/ThemeChanged, and redraws only the backpack and the bank (refresh:Redraw), so a theme
+    -- with Masque skins them again itself.
+    it("leaves it out under a theme without Masque, adds it when one with Masque applies, and skins it again", function()
       disableMasque = true
       local b = guildButton()
       announce(b)
@@ -205,7 +208,31 @@ describe("Masque integration", function()
       events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Default")
       assert.is_true(groups["Guild Bank"].Buttons[b.button])
       events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Default")
-      assert.are.same({ "skin" }, groups["Guild Bank"].log, "once")
+      assert.are.same({ "skin", "skin" }, groups["Guild Bank"].log, "added once, then skinned again")
+    end)
+
+    -- Each draw rewrites the quality border Masque skins (texture or atlas, coordinates, blend);
+    -- Masque's own SetTexture hook only puts the art back. So every draw re-skins, as bag buttons do.
+    it("skins it again on every draw, and gives its border a blend mode", function()
+      local b = guildButton()
+      announce(b)
+      b.button.IconBorder:SetBlendMode("DISABLE")
+      events:SendMessage(context:New("test"), "guild/Updated", b)
+      events:SendMessage(context:New("test"), "guild/Updated", b)
+      assert.are.same({ "skin", "skin", "skin" }, groups["Guild Bank"].log)
+      assert.are.equal("BLEND", b.button.IconBorder:GetBlendMode())
+    end)
+
+    it("adds it on a draw when it is not in the group yet, and not under a theme without Masque", function()
+      local b = guildButton()
+      disableMasque = true
+      announce(b)
+      events:SendMessage(context:New("test"), "guild/Updated", b)
+      assert.is_nil(groups["Guild Bank"].Buttons[b.button])
+      disableMasque = false
+      events:SendMessage(context:New("test"), "guild/Updated", b)
+      assert.is_true(groups["Guild Bank"].Buttons[b.button])
+      assert.are.same({ "skin" }, groups["Guild Bank"].log)
     end)
 
     it("takes it out when a theme turns Masque off, and back in when one turns it on", function()
