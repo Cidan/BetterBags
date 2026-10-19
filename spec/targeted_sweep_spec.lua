@@ -91,6 +91,10 @@ database.GetEnableBankBag = function() return false end
 database.GetMarkRecentItems = function() return false end
 database.GetShowAllFreeSpace = function() return true end
 database.GetBagView = function() return const.BAG_VIEW.SECTION_GRID end
+-- The upgrade provider as an untouched profile has it (const.DATABASE_DEFAULTS), so this file runs
+-- alone: it passed only after other spec files had stubbed these.
+database.GetUpgradeIconProvider = function() return "None" end
+database.GetUpgradeIconProviderUserSet = function() return false end
 
 addon.isRetail = true
 addon.isClassic = false

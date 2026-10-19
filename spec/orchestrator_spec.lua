@@ -20,9 +20,15 @@ end
 database.GetCategoryFilter = function() return false end
 database.GetEnableBankBag = function() return false end
 database.GetMarkRecentItems = function() return false end
+-- The rest of what a sweep reads, as an untouched profile has it (const.DATABASE_DEFAULTS), so this
+-- file runs alone: it passed only after other spec files had stubbed these.
+database.GetUpgradeIconProvider = function() return "None" end
+database.GetUpgradeIconProviderUserSet = function() return false end
+database.GetShowAllFreeSpace = function() return false end
 
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
+const.BAG_VIEW = { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 const.BANK_BAGS = { [6] = 6, [7] = 7 }
 const.BACKPACK_BAGS = { [0] = 0, [1] = 1 }
 const.BINDING_SCOPE = {
@@ -79,6 +85,8 @@ LoadBetterBagsModule("data/binding.lua")
 
 local categories = StubBetterBagsModule("Categories")
 categories.GetSortedSearchCategories = function() return {} end
+-- No item here is in a custom category (categories:GetCustomCategory returns nil for those).
+categories.GetCustomCategory = function() return nil end
 
 -- Load items, slots, and stacks
 ResetModuleStub("Items", "data/items.lua")

@@ -122,6 +122,27 @@ LoadBetterBagsModule("data/items.lua")
 LoadBetterBagsModule("data/slots.lua")
 local items = addon:GetModule("Items")
 
+-- Every test starts from the same state, whatever ran before it (busted --shuffle runs the tests of
+-- this file in any order): fresh Items and Search state (the search index is only made by Init), and,
+-- once it ends, the constants as this file sets them and the ItemLocation and ItemButtonUtil mocks
+-- (spec/helpers/wow_mocks.lua), which some tests replace.
+local constBaseline = {}
+for key, value in pairs(const) do constBaseline[key] = value end
+local savedItemLocation, savedItemButtonUtil = _G.ItemLocation, _G.ItemButtonUtil
+
+before_each(function()
+  items:Init()
+  addon:GetModule("Search"):Init()
+end)
+
+after_each(function()
+  for key in pairs(const) do
+    if constBaseline[key] == nil then const[key] = nil end
+  end
+  for key, value in pairs(constBaseline) do const[key] = value end
+  _G.ItemLocation, _G.ItemButtonUtil = savedItemLocation, savedItemButtonUtil
+end)
+
 describe("Items (New Data Farming Engine)", function()
   before_each(function()
     items:Init()
