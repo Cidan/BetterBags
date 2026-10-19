@@ -95,6 +95,7 @@ describe("Masque integration", function()
     end
     masque.added = setmetatable({}, { __mode = "k" })
     masque.vendorButtons = setmetatable({}, { __mode = "k" })
+    masque.guildButtons = setmetatable({}, { __mode = "k" })
   end)
 
   teardown(function()
@@ -172,6 +173,52 @@ describe("Masque integration", function()
     events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Default")
     send("item/Updated", backpackItem, backpackDecoration)
     assert.is_true(groups["Backpack"].Buttons[backpackDecoration])
+  end)
+
+  -- BetterBags Next's guild bank buttons (next/guildbutton.lua, guild-bank.md §5): Blizzard's own item
+  -- buttons, in a group of their own, made once and reused, so skinned when announced and when a theme
+  -- with Masque applies.
+  describe("guild bank buttons", function()
+    local function guildButton()
+      local button = CreateFrame("ItemButton")
+      return { button = button, frame = button }
+    end
+
+    local function announce(b)
+      events:SendMessage(context:New("test"), "guild/NewButton", b)
+    end
+
+    it("adds a new guild bank button to the Guild Bank group, its parts Masque's to find", function()
+      local b = guildButton()
+      announce(b)
+      assert.is_true(groups["Guild Bank"].Buttons[b.button])
+      assert.is_nil(groups["Guild Bank"].regions[b.button])
+      assert.is_nil(groups["Backpack"].Buttons[b.button])
+    end)
+
+    it("leaves it out under a theme without Masque, and adds it when a theme with Masque applies", function()
+      disableMasque = true
+      local b = guildButton()
+      announce(b)
+      assert.is_nil(groups["Guild Bank"].Buttons[b.button])
+      disableMasque = false
+      events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Default")
+      assert.is_true(groups["Guild Bank"].Buttons[b.button])
+      events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Default")
+      assert.are.same({ "skin" }, groups["Guild Bank"].log, "once")
+    end)
+
+    it("takes it out when a theme turns Masque off, and back in when one turns it on", function()
+      local b = guildButton()
+      announce(b)
+      disableMasque = true
+      events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Flat")
+      assert.is_nil(groups["Guild Bank"].Buttons[b.button])
+      disableMasque = false
+      events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Default")
+      assert.is_true(groups["Guild Bank"].Buttons[b.button])
+      assert.are.same({ "skin", "unskin", "skin" }, groups["Guild Bank"].log)
+    end)
   end)
 
   -- BetterBags Next's vendor buttons (next/vendorbutton.lua, next.md §10): its own group, the

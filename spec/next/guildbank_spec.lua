@@ -141,7 +141,8 @@ describe("NextGuildBank", function()
     guildButton:Init()
     ResetMockGuildBank()
     messages, handlers, timers = {}, {}, {}
-    calls = { load = {}, close = 0, buy = 0, deposit = 0, withdraw = 0, place = {}, cleared = 0, created = {} }
+    calls = { load = {}, close = 0, buy = 0, deposit = 0, withdraw = 0, place = {}, cleared = 0, created = {},
+      deposited = {}, withdrawn = {} }
     asked = nil
     data = {
       tabs = { tab(1, "Gear"), tab(2, "Mats", { remainingWithdrawals = -1 }), tab(3, "Officers", { viewable = false }),
@@ -208,6 +209,27 @@ describe("NextGuildBank", function()
     override(stubs.question, "AskForInput", function(_, title, text, onInput)
       asked = { title = title, text = text, onInput = onInput }
     end)
+    override(stubs.question, "YesNo", function(_, title, text, yes, no)
+      asked = { title = title, text = text, yes = yes, no = no }
+    end)
+    override(stubs.guildBank, "DepositSlots", function(_, slots, n)
+      table.insert(calls.deposited, { slots = slots, tab = n })
+      return #slots
+    end)
+    override(stubs.guildBank, "WithdrawItems", function(_, list)
+      table.insert(calls.withdrawn, list)
+      return #list
+    end)
+    -- Every pile a section's virtual stacks hide comes with it (SectionFrame:WithStacks).
+    override(stubs.sectionFrame, "WithStacks", function(_, list)
+      local all = {}
+      for _, d in ipairs(list) do
+        table.insert(all, d)
+        for _, pile in ipairs(d.piles or {}) do table.insert(all, pile) end
+      end
+      return all
+    end)
+    override(const, "BACKPACK_BAGS", { [0] = 0, [1] = 1 })
     override(C_Timer, "After", function(_, fn) table.insert(timers, fn) end)
     override(_G, "PlaySound", function() end)
     override(_G, "GetGuildInfo", function() return data.guildName, "Member", 3 end)
@@ -535,6 +557,89 @@ describe("NextGuildBank", function()
       local g = open()
       g:PlaceCursorItem()
       assert.are.same({ 2 }, calls.place)
+    end)
+  end)
+
+  -- Sections dragged in and out (next.md §7, guild-bank.md §5): the guild bank says what it takes and
+  -- moves it, as the vendor sells what is dragged onto it.
+  describe("sections moved in and out", function()
+    local function bagItem(bag, slot, opts)
+      opts = opts or {}
+      return { bagid = bag, slotid = slot, slotkey = bag .. "_" .. slot, piles = opts.piles,
+        itemInfo = { isBound = opts.bound or false } }
+    end
+
+    it("deposits into the tab shown by itself, else the guild bank's current tab, only where the player may", function()
+      local g = open()
+      assert.are.equal(2, g:DepositTab())
+      data.tabs[2].canDeposit = false
+      assert.is_nil(g:DepositTab())
+      data.showTabs = true
+      data.current = 1
+      g = open(g)
+      assert.are.equal(1, g:DepositTab())
+    end)
+
+    it("deposits a backpack section's items and their piles, leaving out bound items and other bags'", function()
+      local g = open()
+      local result = g:Deposit(ctx(), {
+        bagItem(0, 1, { piles = { bagItem(1, 4) } }),
+        bagItem(0, 2, { bound = true }),
+        bagItem(6, 3),
+      })
+      assert.are.equal("deposited", result)
+      assert.are.same({ { slots = { { bag = 0, slot = 1 }, { bag = 1, slot = 4 } }, tab = 2 } }, calls.deposited)
+    end)
+
+    it("deposits into the tab it was dropped on", function()
+      local g = open()
+      g:Deposit(ctx(), { bagItem(0, 1) }, 1001)
+      assert.are.equal(1, calls.deposited[1].tab)
+    end)
+
+    it("asks first when the player cannot take items back out of the tab", function()
+      local g = open()
+      assert.are.equal("asked", g:Deposit(ctx(), { bagItem(0, 1), bagItem(0, 2) }, 1004))
+      assert.are.same({}, calls.deposited)
+      assert.are.equal("You cannot take items back out of Donations. Deposit 2 items?", asked.text)
+      asked.yes()
+      assert.are.equal(4, calls.deposited[1].tab)
+    end)
+
+    it("deposits nothing when nothing in the section can go in, or no tab takes deposits", function()
+      local g = open()
+      assert.are.equal("nothing", g:Deposit(ctx(), { bagItem(0, 2, { bound = true }) }))
+      data.tabs[2].canDeposit = false
+      assert.are.equal("nothing", g:Deposit(ctx(), { bagItem(0, 1) }))
+      assert.are.same({}, calls.deposited)
+      assert.is_nil(asked)
+    end)
+
+    it("withdraws a section on a right click on its header, and says so", function()
+      local g = open()
+      g:Draw(ctx(), { sortedItems = {}, tabs = { [ALL] = { categories = { { name = "Ore" } }, items = {
+        { slotkey = "1002_4", bagid = 1002, slotid = 4, guildTab = 2, itemInfo = { category = "Ore", itemIcon = 5,
+          currentItemCount = 20, itemQuality = 1, classID = 7 } } } } } })
+      local section = g.content.byName.Ore
+      g:OnHeaderClick(ctx(), section, "RightButton")
+      assert.are.equal(1, #calls.withdrawn)
+      assert.are.equal("1002_4", calls.withdrawn[1][1].slotkey)
+      local lines = {}
+      local saved = { GameTooltip.SetText, GameTooltip.AddLine }
+      GameTooltip.SetText = function(_, text) table.insert(lines, text) end
+      GameTooltip.AddLine = function(_, text) table.insert(lines, text) end
+      g:OnHeaderEnter(section)
+      GameTooltip.SetText, GameTooltip.AddLine = saved[1], saved[2]
+      assert.are.same({ "Ore", "Drag to reorder, or onto the backpack to take it out.", "Right-click to take it out to your bags." }, lines)
+    end)
+
+    it("withdraws a guild section's items and their piles", function()
+      local g = open()
+      local a = { bagid = 1002, slotid = 4, guildTab = 2 }
+      local pile = { bagid = 1001, slotid = 9, guildTab = 1 }
+      a.piles = { pile }
+      g:Withdraw({ a })
+      assert.are.same({ { a, pile } }, calls.withdrawn)
     end)
   end)
 

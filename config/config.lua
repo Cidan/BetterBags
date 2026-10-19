@@ -240,6 +240,10 @@ function config:CreateConfig()
     {name = 'Backpack', kind = const.BAG_KIND.BACKPACK},
     {name = 'Bank', kind = const.BAG_KIND.BANK}
   }
+  -- The guild bank (BetterBags Next's, guild-bank.md §5) has its own, on a client with one.
+  if addon.hasGuildBank then
+    table.insert(bagTypes, {name = 'Guild Bank', kind = const.BAG_KIND.GUILD})
+  end
   for _, bagType in ipairs(bagTypes) do
 
     f:AddSection({

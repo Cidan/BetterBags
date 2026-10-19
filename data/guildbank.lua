@@ -394,6 +394,38 @@ function guildBank:Split(tab, slot, amount)
   SplitGuildBankItem(tab, slot, amount)
 end
 
+-- DepositSlots deposits bag slots into a tab, made current first: a bag item used at the guild bank
+-- goes into the current tab, as Blizzard's right click on a bag item does
+-- (ContainerFrameItemButton_OnClick: C_Container.UseContainerItem). It returns how many it deposited
+-- (none once the guild bank is closed).
+---@param slots {bag: number, slot: number}[]
+---@param tab number
+---@return number
+function guildBank:DepositSlots(slots, tab)
+  if not self.open then
+    return 0
+  end
+  self:MakeCurrent(tab)
+  for _, s in ipairs(slots) do
+    C_Container.UseContainerItem(s.bag, s.slot)
+  end
+  return #slots
+end
+
+-- WithdrawItems moves guild items into the bags, each from its own tab (Withdraw). It returns how
+-- many it withdrew (none once the guild bank is closed).
+---@param list ItemData[]
+---@return number
+function guildBank:WithdrawItems(list)
+  if not self.open then
+    return 0
+  end
+  for _, data in ipairs(list) do
+    self:Withdraw(data.guildTab or self:TabOf(data.bagid), data.slotid)
+  end
+  return #list
+end
+
 -- FreeSlot is a tab's first empty slot, read from the client now, or nil when it is full.
 ---@param tab number
 ---@return number?

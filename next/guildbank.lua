@@ -33,6 +33,12 @@ local nextPanel = addon:GetModule('NextPanel')
 ---@class NextGuildButton: AceModule
 local guildButton = addon:GetModule('NextGuildButton')
 
+---@class SectionFrame: AceModule
+local sectionFrame = addon:GetModule('SectionFrame')
+
+---@class NextDrag: AceModule
+local nextDrag = addon:GetModule('NextDrag')
+
 -- NextGuildBank is BetterBags Next's guild bank (guild-bank.md §5): a panel on the left, as the
 -- bank's, that stands in for Blizzard's guild bank frame while BetterBags Next is on. It shows every
 -- tab's items in the categories the bags use (All Tabs), or a tab by itself, its slots in order (the
@@ -523,6 +529,108 @@ end
 ---@param ctx Context
 function guildProto:Refresh(ctx)
   events:SendMessage(ctx, 'bags/Rederive', { guild = true })
+end
+
+-- DepositTab is the tab a section dropped on the guild bank goes into: the tab shown by itself, else
+-- the guild bank's current tab (where Blizzard's frame deposits), when the player may deposit there.
+---@return number?
+function guildProto:DepositTab()
+  local tab = self:ShownTab() or guildBank:CurrentTab()
+  local info = tab and guildBank:TabInfo(tab)
+  if info == nil or not info.viewable or not info.canDeposit then
+    return nil
+  end
+  return tab
+end
+
+-- CanDepositIn says whether a tab's container is a tab the player may deposit in.
+---@param container number
+---@return boolean
+function guildProto:CanDepositIn(container)
+  local tab = guildBank:TabOf(container)
+  local info = tab and guildBank:TabInfo(tab)
+  return info ~= nil and info.viewable and info.canDeposit
+end
+
+-- Deposit puts a backpack section into a tab (the one dropped on, else DepositTab): every item and
+-- every pile its virtual stack hides (SectionFrame:WithStacks), in the backpack's bags, leaving out
+-- bound items, which the guild bank does not take. Into a tab the player cannot withdraw from, it asks
+-- first: those items cannot be taken back. It returns "deposited", "asked", or "nothing".
+---@param ctx Context
+---@param list ItemData[]
+---@param container? number
+---@return string
+function guildProto:Deposit(ctx, list, container)
+  local _ = ctx
+  local tab
+  if container ~= nil then
+    tab = self:CanDepositIn(container) and guildBank:TabOf(container) or nil
+  else
+    tab = self:DepositTab()
+  end
+  if tab == nil then
+    return "nothing"
+  end
+  local slots, seen = {}, {}
+  for _, data in ipairs(sectionFrame:WithStacks(list)) do
+    local key = data.bagid .. "_" .. data.slotid
+    if not seen[key] and const.BACKPACK_BAGS[data.bagid] ~= nil and not (data.itemInfo and data.itemInfo.isBound) then
+      seen[key] = true
+      table.insert(slots, { bag = data.bagid, slot = data.slotid })
+    end
+  end
+  if #slots == 0 then
+    return "nothing"
+  end
+  local info = guildBank:TabInfo(tab)
+  if info.numWithdrawals == 0 then
+    question:YesNo(L:G("Deposit Items"),
+      format(L:G("You cannot take items back out of %s. Deposit %d items?"), info.name, #slots),
+      function() guildBank:DepositSlots(slots, tab) end, function() end)
+    return "asked"
+  end
+  guildBank:DepositSlots(slots, tab)
+  return "deposited"
+end
+
+-- Withdraw moves a guild section into the bags: every item and every pile its virtual stack hides.
+---@param list ItemData[]
+---@return number
+function guildProto:Withdraw(list)
+  return guildBank:WithdrawItems(sectionFrame:WithStacks(list))
+end
+
+-- OnHeaderClick passes an item clicked onto a header to the guild bank (Shift: to the category), and
+-- takes a section out to the bags on a right click (the bank's right click moves it to the open
+-- window; the guild bank's open window is the bags).
+---@param ctx Context
+---@param section NextSection
+---@param button string
+function guildProto:OnHeaderClick(ctx, section, button)
+  if CursorHasItem() or button ~= "RightButton" then
+    nextPanel.proto.OnHeaderClick(self, ctx, section, button)
+    return
+  end
+  if section.kind ~= "free" then
+    self:Withdraw(nextDrag:SectionItems(section))
+  end
+end
+
+-- OnHeaderEnter tells what a guild section's header does.
+---@param section NextSection
+function guildProto:OnHeaderEnter(section)
+  if nextDrag:IsActive() then
+    return
+  end
+  GameTooltip:SetOwner(section.header, "ANCHOR_RIGHT")
+  GameTooltip:SetText(section.name, 1, 1, 1, 1, true)
+  if section.kind == "category" then
+    GameTooltip:AddLine(L:G("Drag to reorder, or onto the backpack to take it out."), 0.8, 0.8, 0.8, true)
+  end
+  if section.kind ~= "free" then
+    GameTooltip:AddLine(L:G("Right-click to take it out to your bags."), 0.8, 0.8, 0.8, true)
+  end
+  GameTooltip:Show()
 end
 
 -- PlaceCursorItem puts the item held into the tab shown by itself, else the guild bank's current tab

@@ -281,6 +281,45 @@ describe("GuildBank (the guild bank as a data source)", function()
 
   -- Only into tabs it has loaded: a tab the client never received reads as empty, and a pickup on a
   -- slot that is not empty swaps the cursor's item with what is there.
+  -- Moving a whole section in or out (guild-bank.md §5): a bag item used at the guild bank is
+  -- deposited into the current tab (ContainerFrameItemButton_OnClick's right click, UseContainerItem),
+  -- and a guild item comes out with AutoStoreGuildBankItem, from its own tab.
+  describe("moving many items", function()
+    local used
+
+    before_each(function()
+      used = {}
+      openBank()
+      _G._guildBank.current = 1
+    end)
+
+    it("deposits bag slots into a tab, made current first", function()
+      local saved = C_Container.UseContainerItem
+      C_Container.UseContainerItem = function(bag, slot) table.insert(used, { bag, slot, _G._guildBank.current }) end
+      local n = guildBank:DepositSlots({ { bag = 0, slot = 1 }, { bag = 2, slot = 7 } }, 2)
+      C_Container.UseContainerItem = saved
+      assert.are.equal(2, n)
+      assert.are.same({ { 0, 1, 2 }, { 2, 7, 2 } }, used)
+    end)
+
+    it("withdraws guild items from their own tabs", function()
+      local n = guildBank:WithdrawItems({ { guildTab = 2, slotid = 4 }, { bagid = const.GUILD_BANK_TAB_CONTAINER[1], slotid = 9 } })
+      assert.are.equal(2, n)
+      assert.are.same({ { tab = 2, slot = 4, current = 2 }, { tab = 1, slot = 9, current = 1 } }, _G._guildBankCalls.autoStore)
+    end)
+
+    it("moves nothing once the guild bank is closed", function()
+      fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", GUILD_BANKER)
+      local saved = C_Container.UseContainerItem
+      C_Container.UseContainerItem = function(bag, slot) table.insert(used, { bag, slot }) end
+      assert.are.equal(0, guildBank:DepositSlots({ { bag = 0, slot = 1 } }, 2))
+      C_Container.UseContainerItem = saved
+      assert.are.equal(0, guildBank:WithdrawItems({ { guildTab = 2, slotid = 4 } }))
+      assert.are.same({}, used)
+      assert.are.same({}, _G._guildBankCalls.autoStore)
+    end)
+  end)
+
   describe("placing the cursor's item", function()
     before_each(function()
       openBank()

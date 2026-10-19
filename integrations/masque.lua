@@ -63,6 +63,8 @@ function masque:OnEnable()
   self.groups["Bank"]:RegisterCallback(self.OnSkinChange, self)
   self.groups["Vendor"] = Masque:Group('BetterBags', 'Vendor')
   self.groups["Vendor"]:RegisterCallback(self.OnSkinChange, self)
+  self.groups["Guild Bank"] = Masque:Group('BetterBags', 'Guild Bank')
+  self.groups["Guild Bank"]:RegisterCallback(self.OnSkinChange, self)
 
   -- The group each item decoration was last added to. Item buttons are redrawn without
   -- being released (and so removed) in between, and Masque's AddButton does nothing for a
@@ -112,6 +114,24 @@ function masque:OnEnable()
     skinVendor(b)
   end)
 
+  -- BetterBags Next's guild bank buttons (next/guildbutton.lua) are Blizzard's own item buttons, made
+  -- once and reused, each announced once; Masque finds an item button's parts itself, as for the
+  -- item decorations. Like vendor buttons they are not drawn again on a theme change.
+  self.guildButtons = setmetatable({}, { __mode = 'k' })
+
+  ---@param b NextGuildButtonFrame
+  local function skinGuild(b)
+    if not sonata:UsesMasque() then return end
+    local group = self.groups["Guild Bank"]
+    group:AddButton(b.button)
+    self.added[b.button] = group
+  end
+
+  events:RegisterMessage('guild/NewButton', function(_, b)
+    self.guildButtons[b] = true
+    skinGuild(b)
+  end)
+
   -- Item buttons keep one decoration across themes, which the theme restyles. A theme that
   -- does not use Masque takes the buttons Masque skinned out of their groups (RemoveButton
   -- gives a button its own look back), so Masque's skin does not stay under the theme's;
@@ -122,6 +142,9 @@ function masque:OnEnable()
     if sonata:UsesMasque() then
       for b in pairs(self.vendorButtons) do
         skinVendor(b)
+      end
+      for b in pairs(self.guildButtons) do
+        skinGuild(b)
       end
       return
     end
