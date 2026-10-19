@@ -311,17 +311,23 @@ function chain:Click(ctx, panel)
   return "chained"
 end
 
+-- Panels returns every registered panel: the backpack, then its companions.
+---@return NextPanelFrame[]
+function chain:Panels()
+  local panels = { self.backpack }
+  for _, companion in ipairs(self.companions) do
+    table.insert(panels, companion)
+  end
+  return panels
+end
+
 -- Update sends every open bag to where it rests now (flying, or at once with snap: the screen
 -- changed), then couples or uncouples the pair.
 ---@param ctx Context
 ---@param snap? boolean
 function chain:Update(ctx, snap)
   local _ = ctx
-  local panels = { self.backpack }
-  for _, companion in ipairs(self.companions) do
-    table.insert(panels, companion)
-  end
-  for _, panel in ipairs(panels) do
+  for _, panel in ipairs(self:Panels()) do
     if isOpen(panel) and isSmall(panel) then
       -- Where the player put it; the screen changed: still on it, its height the screen's share.
       if snap then
@@ -380,7 +386,9 @@ function chain:UpdateCoupling()
         return "kept"
       end
       if c == nil then
-        if math.abs(chained.offset - rest) >= PLACED then
+        -- Switching size, either may still be gliding to its place (Morph): its offset is already
+        -- the place.
+        if math.abs(chained.offset - rest) >= PLACED or anchor.morph ~= nil or chained.morph ~= nil then
           return "on its way"
         end
         self.coupling = { anchor = anchor, chained = chained, amount = 0, target = 0, phase = 0, time = 0 }
@@ -399,6 +407,20 @@ function chain:UpdateCoupling()
     return "letting go"
   end
   return "apart"
+end
+
+-- LetGo ends the coupling at once, both halves of the braid hidden: the bags are switching size
+-- (nextPanel:SetSize), and small panels are not chained yet (docs/next-small-mode.md).
+function chain:LetGo()
+  local c = self.coupling
+  if c == nil then
+    return
+  end
+  tween:Stop(c)
+  self.coupling = nil
+  self.driver:SetScript("OnUpdate", nil)
+  c.anchor:SetCoupling(0, 0, false, 0, 0, style.FEATHER)
+  c.chained:SetCoupling(0, 0, false, 0, 0, style.FEATHER)
 end
 
 -- Turn turns the braid elapsed seconds on and runs its lights along it.

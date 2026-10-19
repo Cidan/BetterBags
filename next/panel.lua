@@ -84,6 +84,19 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 
 ---@alias NextSide "RIGHT"|"LEFT"
 
+-- Where a panel's body is, part way between its sizes: its top left (in UIParent's units), its
+-- height, its beam's length, and how full it looks (1: the feather shown and no edge; 0: small).
+---@class (exact) NextMorphPoint
+---@field x number
+---@field y number
+---@field h number
+---@field ribbon number
+---@field full number
+
+-- A glide between sizes (panelProto:Morph): the tween's key, and where the body is now.
+---@class (exact) NextMorph
+---@field at NextMorphPoint
+
 -- A bag's half of the braid two coupled bags' ribbons twist into (next.md §12): two strands of
 -- lines from its body edge to the middle of the gap, lights running along them, and the knot in the
 -- middle (shown by the chained bag).
@@ -196,6 +209,8 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field placeX? number A small panel's place: its top left in UIParent's units.
 ---@field placeY? number
 ---@field moving? boolean The player is dragging the small panel.
+---@field morph? NextMorph Set while it glides to its new size (Morph).
+---@field morphFrom? NextMorphPoint Where its body was as it switched.
 local panelProto = {}
 nextPanel.proto = panelProto
 addon:GetModule('Perf'):RegisterPrototype(panelProto, 'NextPanelFrame')
@@ -272,6 +287,35 @@ function nextPanel:Create(proto, opts)
   return p
 end
 
+-- SetSize switches every BetterBags Next panel to a size (docs/next-small-mode.md), saved: a chained
+-- pair lets go of its braid at once, a panel not shown takes the size at once, and a shown one
+-- morphs to it once every panel has it (where a full panel rests depends on its partner's size). It
+-- returns what it did, for profiler traces: "switched", or "same" when it is the size already.
+---@param ctx Context
+---@param size NextSize
+---@return string
+function nextPanel:SetSize(ctx, size)
+  local _ = ctx
+  if database:GetNextSize() == size then
+    return "same"
+  end
+  database:SetNextSize(size)
+  chain:LetGo()
+  local morphing = {}
+  for _, panel in ipairs(chain:Panels()) do
+    if panel:PrepareResize(size) then
+      table.insert(morphing, panel)
+    end
+  end
+  for _, panel in ipairs(morphing) do
+    panel:Morph()
+  end
+  for _, panel in ipairs(chain:Panels()) do
+    panel:UpdateSizeButton()
+  end
+  return "switched"
+end
+
 -- outward is the direction from the panel toward the middle of the screen: left (-1) for the
 -- panel on the right, right (1) for the panel on the left.
 ---@return number
@@ -294,6 +338,8 @@ end
 ---@private
 ---@param x number
 function panelProto:setOffset(x)
+  -- Anything that places the panel while it glides to a new size ends the glide first.
+  self:endMorph()
   self.offset = x
   local frame = self.frame
   frame:ClearAllPoints()
@@ -670,6 +716,7 @@ function panelProto:ApplyGeometry()
   wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -bodyRight, 0)
   self.feather:SetShown(not small)
   if not small then
+    self.feather:ClearAllPoints()
     self:growFeather(0)
   end
   for _, edge in ipairs(self.edges) do
@@ -707,6 +754,139 @@ function panelProto:FitSmall()
   if changed then
     render:Invalidate(self.root)
   end
+end
+
+-- BodyRect is where the body is on screen for the panel's size and offset now: its top left (in
+-- UIParent's units) and its height. Its width is BODY_WIDTH at both sizes.
+---@return number x, number y, number height
+function panelProto:BodyRect()
+  if self:IsSmall() then
+    return self.placeX + self.offset, self.placeY, self:SmallHeight()
+  end
+  local left = self.offset
+  if self.side == "RIGHT" then
+    left = UIParent:GetWidth() - style.WIDTH + self.offset
+  end
+  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight()
+end
+
+-- PrepareResize switches the panel's size (nextPanel:SetSize). Not shown (a closing one finishes
+-- closing first), it takes the size at once and lays its content out for it. Shown, it finishes
+-- what it was doing, keeps where its body is now, and morphs once every panel has its size (Morph).
+-- It returns whether it morphs.
+---@param size NextSize
+---@return boolean
+function panelProto:PrepareResize(size)
+  if self.closing then
+    tween:Stop(self, true)
+  end
+  if not self.frame:IsShown() then
+    -- A glide still running (Escape closed it mid-glide) ends as ApplyGeometry places it (setOffset).
+    self.size = size
+    self.offset = self:HiddenOffset()
+    self:ApplyGeometry()
+    render:Invalidate(self.root)
+    return false
+  end
+  if self.morph ~= nil then
+    -- Switched back while it glides: it turns around from where it is.
+    self.morphFrom = self.morph.at
+    tween:Stop(self.morph)
+    self.morph = nil
+  else
+    -- An opening slide or a flight ends where it was going: its end says the panel has shown.
+    tween:Stop(self, true)
+    local x, y, h = self:BodyRect()
+    self.morphFrom = { x = x, y = y, h = h, ribbon = self.ribbonLength, full = self:IsSmall() and 0 or 1 }
+  end
+  self.size = size
+  return true
+end
+
+-- Morph glides the panel's body from where it was (PrepareResize) to where it rests at its new size:
+-- its top left and its height (its width is the same at both). Its parts are the new size's from the
+-- start (ApplyGeometry) and the frame is anchored by its top left and sized as it goes, so the body
+-- only moves and stretches. Nothing reaches past the screen edge on the way. The feather and the
+-- small panel's edge cross-fade (a small panel's feather fades out beside its inner side), the beam
+-- grows or shrinks, and the content is laid out once, at the end, for its new size.
+function panelProto:Morph()
+  local from = self.morphFrom --[[@as NextMorphPoint]]
+  self.morphFrom = nil
+  local small = self:IsSmall()
+  self.offset = small and 0 or chain:RestOffset(self)
+  self.target = self.offset
+  self:ApplyGeometry()
+  local tx, ty, th = self:BodyRect()
+  local toRibbon = self.ribbonLength
+  self:SetDocked(false)
+  local frame, feather, edges = self.frame, self.feather, self.edges
+  feather:Show()
+  if small then
+    feather:ClearAllPoints()
+    if self.side == "LEFT" then
+      feather:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, 0)
+      feather:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 0, 0)
+    else
+      feather:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 0)
+      feather:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 0)
+    end
+    feather:SetWidth(style.FEATHER)
+  end
+  for _, edge in ipairs(edges) do
+    edge:Show()
+  end
+  local bodyLeft, width = self:BodyLeft(), self:Width()
+  local toFull = small and 0 or 1
+  ---@type NextMorph
+  local morph = { at = { x = from.x, y = from.y, h = from.h, ribbon = from.ribbon, full = from.full } }
+  self.morph = morph
+  local at = morph.at
+  tween:Play(morph, {
+    duration = style.Time.Morph,
+    from = 0,
+    to = 1,
+    ease = "inOutCubic",
+    onUpdate = function(t)
+      at.x = from.x + (tx - from.x) * t
+      at.y = from.y + (ty - from.y) * t
+      at.h = from.h + (th - from.h) * t
+      at.ribbon = from.ribbon + (toRibbon - from.ribbon) * t
+      at.full = from.full + (toFull - from.full) * t
+      frame:ClearAllPoints()
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x - bodyLeft, at.y)
+      frame:SetSize(width, at.h)
+      feather:SetAlpha(at.full)
+      for _, edge in ipairs(edges) do
+        edge:SetAlpha(1 - at.full)
+      end
+      self.ribbonLength = at.ribbon
+      for _, line in ipairs(self.ribbonLines) do
+        line:SetWidth(at.ribbon)
+      end
+    end,
+    onDone = function()
+      self.morph = nil
+      feather:SetAlpha(1)
+      for _, edge in ipairs(edges) do
+        edge:SetAlpha(1)
+      end
+      self:ApplyGeometry()
+      render:Invalidate(self.root)
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- endMorph ends a glide to a new size where it was going (anything else that places the panel).
+---@private
+function panelProto:endMorph()
+  if self.morph ~= nil then
+    tween:Stop(self.morph, true)
+  end
+end
+
+-- UpdateSizeButton shows what the size button does now (the backpack has one).
+function panelProto:UpdateSizeButton()
 end
 
 -- BuildMover makes what moves a small panel (docs/next-small-mode.md): its title row, from the top
@@ -748,6 +928,7 @@ function panelProto:StartMove()
   if not self:IsSmall() or self.closing or self.moving or GetCursorInfo() ~= nil then
     return false
   end
+  self:endMorph()
   tween:Stop(self, true)
   self.frame:StartMoving()
   -- StartMoving flags the frame user-placed, and the client then restores a named frame's place

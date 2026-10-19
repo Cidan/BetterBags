@@ -125,9 +125,10 @@ through `style.ICON` and `style.GAP`), and resizing a small panel with a grip.
 
 ## Phases
 
-1. **Small panels:** the setting, the small geometry (no feather, a shorter beam, the height, the
-   edge), sparkles that follow the geometry, opening and closing in place, moving and saved places,
-   the toggle with the morph. Small panels are not chained yet.
+1. **Small panels** (done; `.claude/rules/next.md` §14): the setting, the small geometry (no
+   feather, a shorter beam, the height, the edge), sparkles that follow the geometry, opening and
+   closing in place, moving and saved places, the toggle with the morph. Small panels are not
+   chained yet.
 2. **Chaining by dragging:** the snap, moving a chained pair together, letting go, the braid and its
    sparkles between two free panels, a companion coming in beside its open anchor.
 3. **Tuning** with the player, in game.

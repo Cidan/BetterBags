@@ -124,6 +124,8 @@ style.Time = {
   Enter = 0.5,
   Couple = 0.35,
   Uncouple = 0.25,
+  -- An open panel switching between full and small (docs/next-small-mode.md).
+  Morph = 0.4,
 }
 style.RISE = 12
 

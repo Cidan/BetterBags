@@ -61,6 +61,7 @@ end
 
 local nextBag = addon:GetModule("NextBag")
 local nextBank = addon:GetModule("NextBank")
+local nextPanel = addon:GetModule("NextPanel")
 local nextDrag = addon:GetModule("NextDrag")
 local chain = addon:GetModule("NextChain")
 local style = addon:GetModule("NextStyle")
@@ -479,6 +480,283 @@ describe("BetterBags Next's small mode", function()
       assert.is_false(bag.frame:IsClampedToScreen())
       bag.titleButton:GetScript("OnDragStart")(bag.titleButton, "LeftButton")
       assert.is_nil(bag.frame._moving)
+    end)
+  end)
+
+  -- A button on the backpack switches every panel between full and small, animated
+  -- (docs/next-small-mode.md, "Switching sizes").
+  describe("switching sizes", function()
+    local function step(seconds)
+      tween.driver:GetScript("OnUpdate")(tween.driver, seconds)
+    end
+
+    local function opened(create)
+      local panel = create(ctx())
+      panel:Show(ctx())
+      finishTweens()
+      return panel
+    end
+
+    local function click(bag)
+      bag.sizeButton:GetScript("OnClick")(bag.sizeButton, "LeftButton")
+    end
+
+    -- The body's top left and height on screen while it morphs (the frame anchored by its top left).
+    local function body(panel)
+      local x, y = topLeft(panel)
+      return x + panel:BodyLeft(), y, panel.frame:GetHeight()
+    end
+
+    local function between(v, a, b, what)
+      local lo, hi = math.min(a, b), math.max(a, b)
+      assert.is_true(v > lo and v < hi, what .. ": " .. v .. " is not between " .. a .. " and " .. b)
+    end
+
+    it("has a button on the backpack with Blizzard's minimize art while full, maximize while small", function()
+      db.size = "full"
+      local bag = nextBag:Create(ctx())
+      assert.are.equal("RedButton-Condense", bag.sizeButton.icon:GetAtlas())
+      click(bag)
+      assert.are.equal("RedButton-Expand", bag.sizeButton.icon:GetAtlas())
+      click(bag)
+      assert.are.equal("RedButton-Condense", bag.sizeButton.icon:GetAtlas())
+    end)
+
+    it("sits after the button back to the classic bags, saying what it does", function()
+      db.size = "full"
+      local bag = nextBag:Create(ctx())
+      assert.are.same({ "RIGHT", bag.classicButton, "LEFT", -8, 0 }, { bag.sizeButton:GetPoint(1) })
+      bag.sizeButton:GetScript("OnEnter")(bag.sizeButton)
+      assert.are.equal("Small Bags", GameTooltip:GetText())
+      click(bag)
+      bag.sizeButton:GetScript("OnEnter")(bag.sizeButton)
+      assert.are.equal("Full Size Bags", GameTooltip:GetText())
+    end)
+
+    it("uses Classic's own smaller and bigger buttons on Classic", function()
+      override(addon, "isRetail", false)
+      db.size = "full"
+      local bag = nextBag:Create(ctx())
+      assert.are.equal("Interface\\Buttons\\UI-Panel-SmallerButton-Up", bag.sizeButton.icon:GetTexture())
+      click(bag)
+      assert.are.equal("Interface\\Buttons\\UI-Panel-BiggerButton-Up", bag.sizeButton.icon:GetTexture())
+    end)
+
+    it("saves the size, and does nothing when it is already the size", function()
+      db.size = "full"
+      local bag = nextBag:Create(ctx())
+      assert.are.equal("same", nextPanel:SetSize(ctx(), "full"))
+      assert.are.equal("switched", nextPanel:SetSize(ctx(), "small"))
+      assert.are.equal("small", db.size)
+      assert.are.equal("small", bag.size)
+    end)
+
+    it("switches a closed panel at once, its content laid out for its new height", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = nextBank:Create(ctx())
+      local renders = 0
+      override(render, "Invalidate", function(_, d) if d == bank.root then renders = renders + 1 end end)
+      click(bag)
+      assert.are.equal(1, renders)
+      assert.is_nil(bank.morph)
+      assert.are.equal("small", bank.size)
+      assert.are.equal(style.BODY_WIDTH, bank.frame:GetWidth())
+      assert.is_false(bank.feather:IsShown())
+      bank:Show(ctx())
+      finishTweens()
+      assert.are.same({ style.Small.Margin, (UIParent:GetHeight() + smallHeight()) / 2 }, { topLeft(bank) })
+    end)
+
+    it("glides an open panel's body from its edge to its small place, shrinking to its height", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+      click(bag)
+      step(style.Time.Morph / 2)
+      local x, y, height = body(bag)
+      between(x, w - style.BODY_WIDTH, w - style.BODY_WIDTH - style.Small.Margin, "left")
+      between(y, h, (h + smallHeight()) / 2, "top")
+      between(height, h, smallHeight(), "height")
+      finishTweens()
+      assert.are.same({ w - style.BODY_WIDTH - style.Small.Margin, (h + smallHeight()) / 2 }, { topLeft(bag) })
+      assert.are.same({ style.BODY_WIDTH, smallHeight() }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+      assert.are.equal(1, bag.frame:GetAlpha())
+    end)
+
+    it("fades the feather out and the edge in as it shrinks, its beam shortening", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.Morph / 2)
+      assert.is_true(bag.feather:IsShown())
+      between(bag.feather:GetAlpha(), 0, 1, "feather")
+      for _, edge in ipairs(bag.edges) do
+        assert.is_true(edge:IsShown())
+        between(edge:GetAlpha(), 0, 1, "edge")
+      end
+      between(bag.ribbonLength, style.RIBBON_LENGTH, style.Small.Ribbon, "beam")
+      finishTweens()
+      assert.is_false(bag.feather:IsShown())
+      assert.are.equal(1, bag.feather:GetAlpha())
+      for _, edge in ipairs(bag.edges) do assert.are.equal(1, edge:GetAlpha()) end
+      assert.are.equal(style.Small.Ribbon, bag.ribbonLength)
+    end)
+
+    it("grows back to its screen edge, the feather fading in and the edge out", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.Morph / 2)
+      between(bag.feather:GetAlpha(), 0, 1, "feather")
+      for _, edge in ipairs(bag.edges) do between(edge:GetAlpha(), 0, 1, "edge") end
+      local _, _, height = body(bag)
+      between(height, smallHeight(), UIParent:GetHeight(), "height")
+      finishTweens()
+      assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, 0 }, { bag.frame:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 0 }, { bag.frame:GetPoint(2) })
+      assert.are.equal(style.WIDTH, bag.frame:GetWidth())
+      assert.is_true(bag.feather:IsShown())
+      assert.are.equal(1, bag.feather:GetAlpha())
+      for _, edge in ipairs(bag.edges) do assert.is_false(edge:IsShown()) end
+      assert.is_true(bag.docked)
+      assert.are.equal(style.RIBBON_LENGTH, bag.ribbonLength)
+    end)
+
+    it("turns around from where it is when switched back mid-glide", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.Morph / 2)
+      local x, y, h = body(bag)
+      local feather = bag.feather:GetAlpha()
+      local ribbon = bag.ribbonLength
+      click(bag)
+      local x2, y2, h2 = body(bag)
+      assert.is_true(math.abs(x2 - x) < 1e-6 and math.abs(y2 - y) < 1e-6 and math.abs(h2 - h) < 1e-6,
+        "it starts back from where it was")
+      assert.is_true(math.abs(bag.feather:GetAlpha() - feather) < 1e-6)
+      assert.is_true(math.abs(bag.ribbonLength - ribbon) < 1e-6)
+      -- The first glide would have ended here: it was stopped, and does not end the second.
+      step(style.Time.Morph / 2 + 0.01)
+      assert.is_not_nil(bag.morph)
+      local _, _, h3 = body(bag)
+      between(h3, h, UIParent:GetHeight(), "height on the way back")
+      finishTweens()
+      assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, 0 }, { bag.frame:GetPoint(1) })
+      assert.are.equal(1, bag.feather:GetAlpha())
+    end)
+
+    it("drops its glide when it is switched after Escape closed it mid-glide", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.Morph / 2)
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      click(bag)
+      assert.is_nil(bag.morph)
+      assert.are.equal("full", bag.size)
+      assert.are.equal(style.WIDTH, bag.frame:GetWidth())
+    end)
+
+    it("keeps gliding when the open bag is shown again (a refresh)", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.Morph / 2)
+      bag:Show(ctx())
+      assert.is_not_nil(bag.morph)
+    end)
+
+    it("keeps its feather on its inner side after shrinking and growing back", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      finishTweens()
+      click(bag)
+      finishTweens()
+      assert.are.equal(2, bag.feather:GetNumPoints())
+      assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 0, 0 }, { bag.feather:GetPoint(1) })
+      assert.are.same({ "BOTTOMLEFT", bag.frame, "BOTTOMLEFT", 0, 0 }, { bag.feather:GetPoint(2) })
+    end)
+
+    it("does not reach past the screen edge while it morphs", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.Morph / 2)
+      assert.is_false(bag.docked)
+      local _, _, _, x = bag.fill:GetPoint(2)
+      assert.are.equal(0, x)
+    end)
+
+    it("lays its content out once, at the end", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local renders = 0
+      override(render, "Invalidate", function(_, d) if d == bag.root then renders = renders + 1 end end)
+      click(bag)
+      step(style.Time.Morph / 2)
+      assert.are.equal(0, renders)
+      finishTweens()
+      assert.are.equal(1, renders)
+    end)
+
+    it("finishes the morph first when it starts to close", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.Morph / 2)
+      bag:Hide(ctx())
+      assert.is_false(bag.feather:IsShown())
+      for _, edge in ipairs(bag.edges) do assert.are.equal(1, edge:GetAlpha()) end
+      finishTweens()
+      assert.is_false(bag:IsShown())
+      assert.are.equal(style.Small.Slide, bag.offset)
+    end)
+
+    it("finishes the morph first when it is moved", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.Morph / 2)
+      bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+      assert.is_nil(bag.morph)
+      assert.are.same({ UIParent:GetWidth() - style.BODY_WIDTH - style.Small.Margin,
+        (UIParent:GetHeight() + smallHeight()) / 2 }, { topLeft(bag) })
+    end)
+
+    it("finishes closing before it switches a closing panel", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:Hide(ctx())
+      click(bag)
+      assert.is_false(bag:IsShown())
+      assert.is_nil(bag.morph, "a closed bag does not glide")
+      assert.are.equal("small", bag.size)
+      assert.are.equal(style.BODY_WIDTH, bag.frame:GetWidth())
+    end)
+
+    -- A full pair chained on one edge braids its ribbons (next.md §12); small panels are not
+    -- chained yet, so it lets go at once, and braids again once both are full and in place.
+    it("lets go of a chained pair's braid at once, and braids again when they grow back", function()
+      db.size = "full"
+      override(stubs.database, "GetNextChain", function() return "right" end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      assert.is_not_nil(chain.coupling)
+      click(bag)
+      assert.is_nil(chain.coupling)
+      assert.are.equal(0, bank.braid.amount)
+      finishTweens()
+      assert.is_nil(chain.coupling)
+      click(bag)
+      step(style.Time.Morph / 2)
+      assert.are.equal("on its way", chain:UpdateCoupling(), "not while they still glide to their places")
+      assert.is_nil(chain.coupling)
+      finishTweens()
+      assert.is_not_nil(chain.coupling)
+      assert.are.equal(1, chain.coupling.amount)
+      assert.are.equal(chain:RestOffset(bank), bank.offset)
     end)
   end)
 end)
