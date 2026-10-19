@@ -25,7 +25,7 @@ The deterministic loading order is rigorously divided into 5 distinct phases:
 ADDON_LOADED (core/init.lua: OnInitialize)
   ├── 1. Core & Utilities (events, perf + perfSessions + StartIfArmed, simulator, debug, async, bucket)
   ├── 2. Database (DB - loaded before downstream queries)
-  ├── 3. Data Models & Scanners (tooltipScanner, itemLoader, categories, groups, equipmentSets, search, items, refresh)
+  ├── 3. Data Models & Scanners (tooltipScanner, itemLoader, guildBank, categories, groups, equipmentSets, search, items, refresh)
   ├── 4. Render, Themes & Presentation Frames (render, sonata, tabs, itemFrame, sectionFrame, contextMenu, bagButton, itemRowFrame)
   └── 5. Integrations (consoleport)
 ```
@@ -53,6 +53,7 @@ the session. See `.claude/rules/perf-profiler.md`.
   -- 3. Data Models and Scanners
   addon:GetModule('TooltipScanner'):Init()
   itemLoader:Init()
+  addon:GetModule('GuildBank'):Init()
   categories:Init()
   addon:GetModule('Groups'):Init()
   addon:GetModule('EquipmentSets'):Init()

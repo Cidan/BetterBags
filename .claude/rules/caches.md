@@ -44,6 +44,10 @@ by recalculations on every item still in its slot): new-item flag (`items:Client
 gear sets, quest state, tooltip text. Known staleness, the same as an unvisited bag: a refundable
 purchase's binding expiring, an appearance being collected (until the slot changes or a wipe).
 
+A guild bank slot (guild-bank.md §3) is kept the same way by `items:HarvestGuildBank`, compared on
+everything the guild bank reports of it (`GuildBank:ReadSlot`: link, count, lock, icon, filter,
+quality); it has no GUID or item location to compare. Never kept when read cold.
+
 ### 2. Upgrade verdicts (`items:ResolveUpgrade`, data-loader.md §15)
 Kept value: `data.upgradeVerdict`, only for providers registered `{ cacheable = true }`, which is
 only the built-in `BetterBags` provider. Pawn and SimpleItemLevel are asked on every sweep, as

@@ -823,9 +823,19 @@ end
 ---@param quality number
 function itemFrame.itemProto:DrawQualityGlow(decoration, quality)
 	self.blank = false
+	itemFrame:DrawQualityGlowFor(self.kind, decoration, quality)
+end
+
+-- DrawQualityGlowFor draws the quality glow on a button of a kind of bag, by that kind's glow
+-- intensity: the item buttons' glow (DrawQualityGlow), shared with buttons that are not a bag's
+-- item buttons (BetterBags Next's guild bank, guild-bank.md §5).
+---@param kind BagKind
+---@param decoration Frame
+---@param quality number
+function itemFrame:DrawQualityGlowFor(kind, decoration, quality)
 	local border = decoration.IconBorder
 	if not border then return end
-	local intensity = database:GetGlowIntensity(self.kind)
+	local intensity = database:GetGlowIntensity(kind)
 	if not (quality and quality > const.ITEM_QUALITY.Common) or not intensity or intensity <= 0 then
 		border:Hide()
 		return

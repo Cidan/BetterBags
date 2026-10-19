@@ -39,6 +39,12 @@ refresh.BANK_PRIME_TIMEOUT = 2
 refresh.BANK_SHOW_TIMEOUT = 1
 -- How long after PLAYER_ENTERING_WORLD to stop waiting for the end of the loading screen:
 refresh.STARTUP_LOADING_TIMEOUT = 10
+-- The guild bank (guild-bank.md §3). Seconds it waits for its window to say it has finished
+-- showing before loading its tabs anyway, as the bank does (BANK_SHOW_TIMEOUT):
+refresh.GUILD_SHOW_TIMEOUT = 1
+-- Seconds a guild bank tab waits for its items' data before it is read anyway (the late data is
+-- read again), as a bank open does (BANK_PRIME_TIMEOUT):
+refresh.GUILD_PRIME_TIMEOUT = 2
 
 -- The events the startup frame listens to. The bag events mean the client is still
 -- delivering the bags.
@@ -68,6 +74,8 @@ function refresh:Init()
   self._startup = nil
   -- The redraw asked for this frame (RequestRedraw), if any.
   self._redrawPending = nil
+  -- The guild bank visit under way (_OpenGuildBank), if any.
+  self._guildBankOpen = nil
 end
 
 -- RequestRedraw draws the bags again on the next frame (Redraw). Every request made in the
@@ -134,6 +142,8 @@ end
 ---@field merged? number How many requests this one carries (set by merging, for profiler traces)
 ---@field startup? string Why the startup read ran (set on the startup read, for profiler traces)
 ---@field bankOpen? string Why a bank open's read ran, "primed" or "timeout" (for profiler traces)
+---@field guild? boolean Update the guild bank's items (only while it is open)
+---@field guildLoad? string Why a guild bank read ran, "primed" or "timeout" (for profiler traces)
 
 ---@param request RefreshRequest
 ---@return boolean
@@ -166,6 +176,7 @@ local function canMerge(waiting, incoming)
     return waiting.bags == nil
       and (not incoming.backpack or waiting.backpack == true)
       and (not incoming.bank or waiting.bank == true)
+      and (not incoming.guild or waiting.guild == true)
   end
   return true
 end
@@ -177,6 +188,7 @@ end
 local function mergeInto(waiting, incoming)
   waiting.backpack = waiting.backpack or incoming.backpack
   waiting.bank = waiting.bank or incoming.bank
+  waiting.guild = waiting.guild or incoming.guild
   if waiting.wipe or not waiting.bags or not incoming.bags then
     waiting.bags = nil
   else
@@ -347,6 +359,7 @@ function refresh:_RunUnit(request)
     ctx:Set('wipe', true)
     request.backpack = true
     request.bank = true
+    request.guild = true
   end
 
   -- Sorting. Every sorted kind is marked "sort sweep pending": the next committed sweep of
@@ -411,6 +424,12 @@ function refresh:_RunUnit(request)
     items:RunRefresh(ctx:Copy(), const.BAG_KIND.BANK)
   end
 
+  -- While the guild bank window shows after an open, the guild bank is not swept: its tabs load
+  -- after, and each is read as it arrives (_GuildTabLoaded).
+  if request.guild and addon.atGuildBank and addon.Bags.GuildBank and not self:GuildBankShowing() then
+    items:RunRefresh(ctx:Copy(), const.BAG_KIND.GUILD)
+  end
+
   if request.backpack then
     items:RunRefresh(ctx, const.BAG_KIND.BACKPACK)
   end
@@ -452,16 +471,17 @@ function refresh:OnEnable()
   events:RegisterMessage('bags/Redraw', function(_, options)
     self:RequestRedraw(options ~= nil and options.buttons == true)
   end)
-  -- bags/Rederive (ctx, { backpack?, bank?, resetLayout?, buttons? }?) recalculates the bags
-  -- from the items already read (§10); naming neither kind recalculates both. buttons makes
+  -- bags/Rederive (ctx, { backpack?, bank?, guild?, resetLayout?, buttons? }?) recalculates the
+  -- bags from the items already read (§10); naming no kind recalculates every kind. buttons makes
   -- every button draw in full, for settings the buttons draw from.
   events:RegisterMessage('bags/Rederive', function(_, options)
     options = options or {}
-    local both = options.backpack == nil and options.bank == nil
+    local all = options.backpack == nil and options.bank == nil and options.guild == nil
     self:RequestUpdate({
       derive = true,
-      backpack = (both or options.backpack == true) or nil,
-      bank = (both or options.bank == true) or nil,
+      backpack = (all or options.backpack == true) or nil,
+      bank = (all or options.bank == true) or nil,
+      guild = (all or options.guild == true) or nil,
       resetLayout = options.resetLayout == true or nil,
       restyle = options.buttons == true or nil,
     })
@@ -532,7 +552,111 @@ function refresh:OnEnable()
     end)
   end
 
+  -- The guild bank (guild-bank.md §3), told by the guild bank's data source (data/guildbank.lua).
+  events:RegisterMessage('guildbank/Opened', function(ctx)
+    self:_OpenGuildBank(ctx)
+  end)
+  events:RegisterMessage('guildbank/TabLoaded', function(_, tab)
+    self:_GuildTabLoaded(tab)
+  end)
+  events:RegisterMessage('guildbank/Changed', function()
+    self:_GuildBankChanged()
+  end)
+  events:RegisterMessage('guildbank/TabsChanged', function()
+    self:RequestUpdate({ guild = true })
+  end)
+  events:RegisterMessage('guildbank/Closed', function(ctx)
+    self._guildBankOpen = nil
+    items:ClearGuildBankCache(ctx)
+  end)
+
   self:HoldForStartup()
+end
+
+-- _OpenGuildBank shows the guild bank's window at once and loads its tabs only once the window has
+-- finished showing, as a bank open does (_OpenBank). Without a window that shows the guild bank (the
+-- classic bags), Blizzard's own guild bank frame shows it and nothing is read.
+---@param ctx Context
+function refresh:_OpenGuildBank(ctx)
+  local bag = addon.Bags and addon.Bags.GuildBank
+  if bag == nil then
+    return
+  end
+  local open = { showing = true, read = false }
+  self._guildBankOpen = open
+  C_Timer.After(self.GUILD_SHOW_TIMEOUT, function() self:_GuildBankShown(open, 'timeout') end)
+  bag:Show(ctx, nil, function() self:_GuildBankShown(open, 'finished') end)
+end
+
+-- _GuildBankShown ends a guild bank open's wait for its window, once, and loads its tabs
+-- (GuildBank:Load). reason says what ended it. It returns what it did, for profiler traces:
+-- "loading", "already" (the wait had ended) or "ended" (the visit has ended).
+---@param open table
+---@param reason string
+---@return string
+function refresh:_GuildBankShown(open, reason)
+  local _ = reason
+  if self._guildBankOpen ~= open then
+    return 'ended'
+  end
+  if not open.showing then
+    return 'already'
+  end
+  open.showing = false
+  addon:GetModule('GuildBank'):Load()
+  return 'loading'
+end
+
+-- GuildBankShowing says the guild bank window is still showing after an open: nothing reads it.
+---@return boolean
+function refresh:GuildBankShowing()
+  return self._guildBankOpen ~= nil and self._guildBankOpen.showing == true
+end
+
+-- _PrimeGuildAndRead loads the item data of the guild bank tabs given, then reads the guild bank;
+-- the first read of a visit rebuilds the layout. It reads after GUILD_PRIME_TIMEOUT if the data has
+-- not all arrived, and again when it does. Nothing happens for a visit that has ended.
+---@param tabs number[]
+function refresh:_PrimeGuildAndRead(tabs)
+  local open = self._guildBankOpen
+  if open == nil or open.showing then
+    return
+  end
+  local read = false
+  local function readGuild(reason)
+    if self._guildBankOpen ~= open then return end
+    if read then
+      if reason == 'primed' then
+        self:RequestUpdate({ guild = true })
+      end
+      return
+    end
+    read = true
+    local first = not open.read
+    open.read = true
+    self:RequestUpdate({ guild = true, resetLayout = first or nil, guildLoad = reason })
+  end
+  C_Timer.After(self.GUILD_PRIME_TIMEOUT, function() readGuild('timeout') end)
+  addon:GetModule('ItemLoader'):PrimeGuildBank(tabs, function() readGuild('primed') end)
+end
+
+-- _GuildTabLoaded reads a guild bank tab the server has sent (GuildBank:Load), once its items' data
+-- has loaded.
+---@param tab number
+function refresh:_GuildTabLoaded(tab)
+  self:_PrimeGuildAndRead({ tab })
+end
+
+-- _GuildBankChanged reads the guild bank's loaded tabs again when something in them changed (an item
+-- moved, or locked while another player moves it), once their items' data has loaded.
+function refresh:_GuildBankChanged()
+  local guildBank = addon:GetModule('GuildBank')
+  local tabs = {}
+  for container in pairs(guildBank:LoadedContainers()) do
+    table.insert(tabs, guildBank:TabOf(container))
+  end
+  table.sort(tabs)
+  self:_PrimeGuildAndRead(tabs)
 end
 
 -- HoldForStartup holds every sweep until the client has delivered the bags, then reads

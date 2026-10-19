@@ -256,6 +256,25 @@ local function groupBankType(group)
   return nil
 end
 
+-- isGuild says whether a panel is BetterBags Next's guild bank (guild-bank.md §5).
+---@param panel NextPanelFrame
+---@return boolean
+local function isGuild(panel)
+  return const.BAG_KIND.GUILD ~= nil and panel.kind == const.BAG_KIND.GUILD
+end
+
+-- CanMoveBetween says whether a section can move from src to the other panel now: between the
+-- backpack and the bank at the bank, between the backpack and the guild bank at the guild bank.
+---@param src NextPanelFrame
+---@param panel NextPanelFrame
+---@return boolean
+function nextDrag:CanMoveBetween(src, panel)
+  if isGuild(src) or isGuild(panel) then
+    return addon.atGuildBank == true
+  end
+  return addon.atBank == true
+end
+
 -- CanDropOnTab says whether a section from src can be dropped on a panel's tab.
 ---@param panel NextPanelFrame
 ---@param tab NextTab
@@ -266,7 +285,8 @@ function nextDrag:CanDropOnTab(panel, tab, src)
     return false
   end
   if panel == src then
-    if panel:InTabMode() or tab.id == panel:GetCurrentTabID() then
+    -- The guild bank's tabs hold no groups to assign a category to.
+    if isGuild(panel) or panel:InTabMode() or tab.id == panel:GetCurrentTabID() then
       return false
     end
     local group = groups:GetGroup(panel.kind, tab.id)
@@ -277,10 +297,25 @@ function nextDrag:CanDropOnTab(panel, tab, src)
     local bankType = groupBankType(group)
     return shown == nil or bankType == nil or bankType == shown
   end
-  if not addon.atBank then
+  if not self:CanMoveBetween(src, panel) then
     return false
   end
+  if isGuild(panel) then
+    return panel:CanDepositIn(tab.id)
+  end
   return panel:InTabMode() or groups:GetGroup(panel.kind, tab.id) ~= nil
+end
+
+-- CanDropOnBody says whether a section from src can be dropped on the other panel's body: the guild
+-- bank only while it has a tab the player may deposit in (its DepositTab).
+---@param panel NextPanelFrame
+---@param src NextPanelFrame
+---@return boolean
+function nextDrag:CanDropOnBody(panel, src)
+  if not self:CanMoveBetween(src, panel) then
+    return false
+  end
+  return not isGuild(panel) or panel:DepositTab() ~= nil
 end
 
 -- FindTarget returns what dropping the dragged section where the cursor is would do, or nil.
@@ -308,7 +343,7 @@ function nextDrag:FindTarget()
         if panel == src then
           return { type = "reorder", panel = panel }
         end
-        if addon.atBank then
+        if self:CanDropOnBody(panel, src) then
           return { type = "bag", panel = panel }
         end
         return nil
@@ -338,6 +373,9 @@ local function describe(target)
   if target.type == "bag" then
     if target.panel.kind == const.BAG_KIND.BACKPACK then
       return L:G("Move to the Backpack")
+    end
+    if isGuild(target.panel) then
+      return L:G("Move to the Guild Bank")
     end
     if Enum.BankType and target.panel:ShownBankType() == Enum.BankType.Account then
       return L:G("Move to the Warbank")
@@ -657,7 +695,21 @@ function nextDrag:Drop(ctx, noMoves)
 
   local list = self:SectionItems(state.section)
   local rederive
-  if target.type == "sell" then
+  if (target.type == "bag" or target.type == "bagtab") and isGuild(target.panel) then
+    -- Deposited into the tab dropped on, else the guild bank's deposit tab; back in its place while
+    -- the guild bank asks first, or when nothing in it can go in.
+    if target.panel:Deposit(ctx, list, target.tab and target.tab.id or nil) ~= "deposited" then
+      canvas:SetDragIndex(state.startIndex)
+      self:land(false)
+      return
+    end
+  elseif (target.type == "bag" or target.type == "bagtab") and isGuild(src) then
+    src:Withdraw(list)
+    if target.type == "bagtab" then
+      groups:AssignCategoryToGroup(ctx, target.panel.kind, name, target.tab.id)
+      rederive = { resetLayout = true }
+    end
+  elseif target.type == "sell" then
     -- Back in its place when nothing sells, or while the seller asks first.
     local sale = target.panel:SaleOf(list)
     if #sale == 0 or target.panel:Sell(ctx, sale) ~= "sold" then

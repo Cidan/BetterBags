@@ -21,6 +21,9 @@ function consoleport:OnEnable()
   if addon.Bags.Bank then
     self:Add(addon.Bags.Bank.frame)
   end
+  if addon.Bags.GuildBank then
+    self:Add(addon.Bags.GuildBank.frame)
+  end
 
   -- Context menus are created on demand, so we need to listen for the context/show event to add them.
   events:RegisterMessage('context/show', function()

@@ -33,6 +33,10 @@ local stubs = {
   bankSlots = trackStub("BankSlots"),
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
+  guildBank = trackStub("GuildBank"),
+  question = trackStub("Question"),
+  color = trackStub("Color"),
+  elements = trackStub("SonataElements"),
 }
 
 local replaced = {}
@@ -53,7 +57,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
-  { "NextBank", "next/bank.lua" } }
+  { "NextBank", "next/bank.lua" }, { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -61,6 +65,7 @@ end
 
 local nextBag = addon:GetModule("NextBag")
 local nextBank = addon:GetModule("NextBank")
+local nextGuildBank = addon:GetModule("NextGuildBank")
 local nextDrag = addon:GetModule("NextDrag")
 local style = addon:GetModule("NextStyle")
 local tween = addon:GetModule("NextTween")
@@ -74,7 +79,7 @@ local SECTION_GRID, SECTION_ALL_BAGS = 2, 4
 local CANVAS_TOP = 1090
 
 describe("NextDrag", function()
-  local buttons, sent, pins, db, backpackGroups, bankGroups, slots, calls, backpack, bank
+  local buttons, sent, pins, db, backpackGroups, bankGroups, slots, calls, backpack, bank, guild
 
   -- An item button: a holder frame and, inside it, the button the player clicks. Like Blizzard's
   -- (ContainerFrameItemButtonMixin:OnReceiveDrag calls OnDragStart, which is a left click), a drag
@@ -97,7 +102,8 @@ describe("NextDrag", function()
   end
 
   local function item(slotkey, category)
-    return { slotkey = slotkey, itemInfo = { category = category } }
+    local bag, slot = slotkey:match("^(%-?%d+)_(%d+)$")
+    return { slotkey = slotkey, bagid = tonumber(bag), slotid = tonumber(slot), itemInfo = { category = category } }
   end
 
   local function tab(names, items)
@@ -171,6 +177,7 @@ describe("NextDrag", function()
     motion:Step(1)
     layout(backpack)
     if bank then layout(bank) end
+    if guild then layout(guild) end
   end
 
   local function section(panel, name)
@@ -231,7 +238,8 @@ describe("NextDrag", function()
       [12] = { id = 12, name = "Vault", bankType = CHAR },
     }
     slots = { [BACKPACK] = backpackData(), [BANK] = bankData() }
-    calls = { moved = {}, assigned = {}, scrolled = {}, titleDrops = {}, pickedUp = {} }
+    calls = { moved = {}, assigned = {}, scrolled = {}, titleDrops = {}, pickedUp = {}, deposited = {}, withdrawn = {} }
+    guild = nil
 
     override(addon, "isRetail", true)
     override(addon, "isForever", false)
@@ -660,6 +668,183 @@ describe("NextDrag", function()
       assert.is_nil(bank.tabs.dropTarget)
       drop(herbs)
       assert.are.same({}, calls.moved)
+    end)
+  end)
+
+  -- BetterBags Next's guild bank (guild-bank.md §5): at the guild bank, a backpack section dropped on
+  -- it is deposited, into the tab it is dropped on or its deposit tab; a guild section dropped on the
+  -- backpack is withdrawn. The guild bank's own sections are reordered as any panel's.
+  describe("the guild bank", function()
+    local GUILD, ALL = 2, 1
+    local asked, guildTabs
+
+    local function guildInfo(n, name, opts)
+      opts = opts or {}
+      return { tab = n, container = 1000 + n, name = name, icon = n, viewable = true,
+        canDeposit = opts.canDeposit ~= false, numWithdrawals = opts.numWithdrawals or 5, remainingWithdrawals = 5 }
+    end
+
+    local function guildData()
+      local ore, cloth = item("1002_4", "Ore"), item("1001_1", "Cloth")
+      ore.guildTab, cloth.guildTab = 2, 1
+      return { sortedItems = {}, tabs = { [ALL] = tab({ "Cloth", "Ore" }, { cloth, ore }) } }
+    end
+
+    before_each(function()
+      asked = nil
+      guildTabs = { guildInfo(1, "Gear"), guildInfo(2, "Mats"), guildInfo(3, "Locked", { canDeposit = false }),
+        guildInfo(4, "Donations", { numWithdrawals = 0 }) }
+      override(const, "BAG_KIND", { UNDEFINED = -1, BACKPACK = BACKPACK, BANK = BANK, GUILD = GUILD })
+      override(const, "GUILD_BANK_ALL_TAB", ALL)
+      override(const, "GUILD_BANK_BAGS", { [1001] = 1, [1002] = 2, [1003] = 3, [1004] = 4 })
+      override(const, "BACKPACK_BAGS", { [0] = 0 })
+      override(addon, "atBank", false)
+      override(addon, "atGuildBank", true)
+      db.view[GUILD] = SECTION_GRID
+      slots[GUILD] = guildData()
+      override(stubs.database, "GetShowGuildBankTabs", function() return false end)
+      override(stubs.database, "SetShowGuildBankTabs", function() end)
+      override(stubs.guildBank, "Tabs", function() return guildTabs end)
+      override(stubs.guildBank, "TabInfo", function(_, n) return guildTabs[n] end)
+      override(stubs.guildBank, "TabOf", function(_, container) return const.GUILD_BANK_BAGS[container] end)
+      override(stubs.guildBank, "ContainerOf", function(_, n) return 1000 + n end)
+      override(stubs.guildBank, "CurrentTab", function() return 2 end)
+      override(stubs.guildBank, "CanBuyTab", function() return true end)
+      override(stubs.guildBank, "Close", function() end)
+      override(stubs.guildBank, "DepositSlots", function(_, list, n)
+        local keys = {}
+        for _, slot in ipairs(list) do table.insert(keys, slot.bag .. "_" .. slot.slot) end
+        table.insert(calls.deposited, { keys, n })
+        return #list
+      end)
+      override(stubs.guildBank, "WithdrawItems", function(_, list)
+        local keys = {}
+        for _, data in ipairs(list) do table.insert(keys, data.slotkey) end
+        table.insert(calls.withdrawn, keys)
+        return #list
+      end)
+      override(stubs.sectionFrame, "WithStacks", function(_, list) return list end)
+      override(stubs.question, "YesNo", function(_, title, text, yes) asked = { title = title, text = text, yes = yes } end)
+      bank.frame:Hide()
+      bank = nil
+      guild = nextGuildBank:Create(ctx())
+      guild.content:SetButtonSource({
+        GetButton = function(_, _, slotkey)
+          buttons[slotkey] = buttons[slotkey] or fakeButton(slotkey)
+          return buttons[slotkey]
+        end,
+      })
+      guild:Show(ctx())
+      guild:Draw(ctx(), slots[GUILD], function() end)
+      finishTweens()
+      flush()
+      guild.scroll.scrollBox._scrollRange, guild.scroll.scrollBox._scrollPercentage = 500, 0
+    end)
+
+    it("deposits a backpack section into the guild bank's current tab, the guild bank glowing and the move named", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      assert.is_true(guild.dropGlow:IsShown())
+      assert.are.equal("Move to the Guild Bank", nextDrag.hint:GetText())
+      drop(herbs)
+      assert.are.same({ { { "0_3", "0_4" }, 2 } }, calls.deposited)
+      finishTweens()
+      assert.is_not_nil(backpack.content.leaving.Herbs)
+    end)
+
+    it("deposits into the guild tab it is dropped on, which pulses", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(guild.tabs:Tab(1001).button))
+      assert.are.equal(1001, guild.tabs.dropTarget)
+      assert.are.equal("Move to Gear", nextDrag.hint:GetText())
+      drop(herbs)
+      assert.are.same({ { { "0_3", "0_4" }, 1 } }, calls.deposited)
+      assert.are.same({}, calls.assigned)
+    end)
+
+    it("is no target on a tab the player may not deposit in, nor All Tabs, nor buying a tab", function()
+      local herbs = pickUp(backpack, "Herbs")
+      for _, id in ipairs({ 1003, ALL, 0 }) do
+        moveTo(centerOf(guild.tabs:Tab(id).button))
+        assert.is_nil(guild.tabs.dropTarget)
+      end
+      drop(herbs)
+      assert.are.same({}, calls.deposited)
+    end)
+
+    it("is no target when the player may deposit in no tab the guild bank would use", function()
+      guildTabs[2].canDeposit = false
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      assert.is_false(guild.dropGlow:IsShown())
+      drop(herbs)
+      assert.are.same({}, calls.deposited)
+    end)
+
+    it("asks first before depositing into a tab the player cannot take items back from, landing back meanwhile", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(guild.tabs:Tab(1004).button))
+      drop(herbs)
+      assert.are.same({}, calls.deposited)
+      assert.is_not_nil(asked)
+      finishTweens()
+      assert.is_nil(backpack.content.leaving.Herbs)
+      assert.is_true(herbs.frame:IsShown())
+      asked.yes()
+      assert.are.same({ { { "0_3", "0_4" }, 4 } }, calls.deposited)
+    end)
+
+    it("withdraws a guild section into the backpack", function()
+      local ore = pickUp(guild, "Ore")
+      moveTo(1700, 600)
+      assert.is_true(backpack.dropGlow:IsShown())
+      assert.are.equal("Move to the Backpack", nextDrag.hint:GetText())
+      drop(ore)
+      assert.are.same({ { "1002_4" } }, calls.withdrawn)
+      finishTweens()
+      assert.is_not_nil(guild.content.leaving.Ore)
+    end)
+
+    it("withdraws into a backpack group, assigning the category to it", function()
+      local ore = pickUp(guild, "Ore")
+      moveTo(centerOf(backpack.tabs:Tab(2).button))
+      drop(ore)
+      assert.are.same({ { "1002_4" } }, calls.withdrawn)
+      assert.are.same({ { BACKPACK, "Ore", 2 } }, calls.assigned)
+      finishTweens()
+      assert.are.same({ { resetLayout = true } }, sentNamed("bags/Rederive"))
+    end)
+
+    it("reorders the guild bank's own sections, saving their order for the guild bank", function()
+      local ore = pickUp(guild, "Ore")
+      moveTo(300, CANVAS_TOP - 5)
+      drop(ore)
+      finishTweens()
+      assert.are.same({ "Ore", "Cloth" }, sectionNames(guild))
+      assert.are.equal(0, pins[GUILD].Ore)
+    end)
+
+    it("does not drop a guild section on the guild bank's own tabs", function()
+      local ore = pickUp(guild, "Ore")
+      moveTo(centerOf(guild.tabs:Tab(1001).button))
+      assert.is_nil(guild.tabs.dropTarget)
+      drop(ore)
+      assert.are.same({}, calls.withdrawn)
+      assert.are.same({}, calls.assigned)
+    end)
+
+    it("is no target away from the guild bank", function()
+      override(addon, "atGuildBank", false)
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      assert.is_false(guild.dropGlow:IsShown())
+      drop(herbs)
+      local ore = pickUp(guild, "Ore")
+      moveTo(1700, 600)
+      assert.is_false(backpack.dropGlow:IsShown())
+      drop(ore)
+      assert.are.same({}, calls.deposited)
+      assert.are.same({}, calls.withdrawn)
     end)
   end)
 

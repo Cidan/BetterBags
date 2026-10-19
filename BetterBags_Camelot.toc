@@ -98,6 +98,7 @@ data\tooltip.lua
 data\equipmentsets.lua
 data\categories.lua
 data\groups.lua
+data\guildbank.lua
 data\items.lua
 data\stacks.lua
 data\slots.lua
@@ -170,6 +171,8 @@ next\bank.lua
 next\merchant.lua
 next\vendorbutton.lua
 next\vendor.lua
+next\guildbutton.lua
+next\guildbank.lua
 
 
 config\categorypane.lua

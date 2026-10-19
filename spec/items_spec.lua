@@ -122,6 +122,27 @@ LoadBetterBagsModule("data/items.lua")
 LoadBetterBagsModule("data/slots.lua")
 local items = addon:GetModule("Items")
 
+-- Every test starts from the same state, whatever ran before it (busted --shuffle runs the tests of
+-- this file in any order): fresh Items and Search state (the search index is only made by Init), and,
+-- once it ends, the constants as this file sets them and the ItemLocation and ItemButtonUtil mocks
+-- (spec/helpers/wow_mocks.lua), which some tests replace.
+local constBaseline = {}
+for key, value in pairs(const) do constBaseline[key] = value end
+local savedItemLocation, savedItemButtonUtil = _G.ItemLocation, _G.ItemButtonUtil
+
+before_each(function()
+  items:Init()
+  addon:GetModule("Search"):Init()
+end)
+
+after_each(function()
+  for key in pairs(const) do
+    if constBaseline[key] == nil then const[key] = nil end
+  end
+  for key, value in pairs(constBaseline) do const[key] = value end
+  _G.ItemLocation, _G.ItemButtonUtil = savedItemLocation, savedItemButtonUtil
+end)
+
 describe("Items (New Data Farming Engine)", function()
   before_each(function()
     items:Init()
@@ -1111,6 +1132,70 @@ describe("Items (New Data Farming Engine)", function()
       assert.are.equal("Mobile-Herbalism", info.emptySlotFamilyIcon)
       assert.are.equal("Reagent Bag", info.emptySlotName)
       assert.are.equal(2, empties[1].itemInfo.itemQuality)
+    end)
+  end)
+
+  -- The slot-order view (Show Bags, a bank or guild tab by itself) draws a bag's empty slots in
+  -- place. A Free Space entry's button is one of those slots (an aggregated entry takes the bag's
+  -- first free slot), and a slot has one button, so the section took it out of its place and left a
+  -- gap. That view carries no Free Space for the bags it draws in place.
+  describe("Free Space in the slot-order view", function()
+    local DB, saved
+
+    before_each(function()
+      DB = addon:GetModule("Database")
+      saved = {
+        groups = DB.GetGroupsEnabled, showAll = DB.GetShowAllFreeSpace, view = DB.GetBagView,
+        bagName = _G.C_Container.GetBagName, bags = const.BACKPACK_BAGS,
+      }
+      DB.GetGroupsEnabled = function() return false end
+      DB.GetBagView = function() return const.BAG_VIEW.SECTION_ALL_BAGS end
+      const.BACKPACK_BAGS = { [0] = 0, [1] = 1 }
+    end)
+
+    after_each(function()
+      DB.GetGroupsEnabled, DB.GetShowAllFreeSpace, DB.GetBagView = saved.groups, saved.showAll, saved.view
+      _G.C_Container.GetBagName = saved.bagName
+      const.BACKPACK_BAGS = saved.bags
+    end)
+
+    local empties = {
+      { bagid = 0, slotid = 2, slotkey = "0_2", itemInfo = { emptySlotName = "Bag" } },
+      { bagid = 1, slotid = 5, slotkey = "1_5", itemInfo = { emptySlotName = "Bag" } },
+    }
+    local byBag = { [0] = { name = "Bag", count = 1, family = 0 }, [1] = { name = "Bag", count = 1, family = 0 } }
+    local freeKeys = { [0] = "0_2", [1] = "1_5" }
+
+    local function partition()
+      local ctx = addon:GetModule("Context"):New("TestSlotOrderFreeSpace")
+      return items:Phase10_PartitionIntoTabs(ctx, const.BAG_KIND.BACKPACK, {}, empties, byBag, freeKeys, {})
+    end
+
+    it("carries no Free Space when every bag's empty slots are drawn in place, in both free space modes", function()
+      _G.C_Container.GetBagName = function() return "Bag" end
+      for _, showAll in ipairs({ true, false }) do
+        DB.GetShowAllFreeSpace = function() return showAll end
+        assert.is_nil(partition()[1].freeSpace, "showAll " .. tostring(showAll))
+      end
+    end)
+
+    it("keeps the free slots of a bag whose empty slots are not drawn in place", function()
+      _G.C_Container.GetBagName = function(bag) return bag == 0 and "Backpack" or nil end
+      DB.GetShowAllFreeSpace = function() return true end
+      local keys = {}
+      for _, button in ipairs(partition()[1].freeSpace.buttons) do table.insert(keys, button.slotkey) end
+      assert.are.same({ "1_5" }, keys)
+      DB.GetShowAllFreeSpace = function() return false end
+      local free = partition()[1].freeSpace
+      assert.are.equal(1, #free.buttons)
+      assert.are.same({ "1_5", 1 }, { free.buttons[1].slotkey, free.buttons[1].count })
+    end)
+
+    it("keeps Free Space in the category view", function()
+      DB.GetBagView = function() return const.BAG_VIEW.SECTION_GRID end
+      _G.C_Container.GetBagName = function() return "Bag" end
+      DB.GetShowAllFreeSpace = function() return false end
+      assert.are.equal(2, partition()[1].freeSpace.buttons[1].count)
     end)
   end)
 

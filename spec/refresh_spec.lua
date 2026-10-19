@@ -246,11 +246,11 @@ describe("Refresh Module", function()
     assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, bank = true, resetLayout = true })
   end)
 
-  it("routes bags/Rederive, recalculating both bags unless told which", function()
+  it("routes bags/Rederive, recalculating every kind of bag unless told which", function()
     refresh:OnEnable()
     spy.on(refresh, "RequestUpdate")
     events:SendMessage("bags/Rederive")
-    assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, bank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, bank = true, guild = true })
     local ctx = addon:GetModule("Context"):New("Test")
     events:SendMessage(ctx, "bags/Rederive", { backpack = true, resetLayout = true, buttons = true })
     assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, resetLayout = true, restyle = true })
@@ -538,6 +538,192 @@ describe("Refresh Module", function()
     refresh:RequestUpdate({ sort = true })
     assert.spy(_G.SortBags).was.called(1)
     addon.isRetail = true -- reset
+  end)
+
+  -- The guild bank opens as the bank does (guild-bank.md §3): its window shows at once, its tabs
+  -- load once the window has finished showing, and each tab is read once its items' data has loaded.
+  describe("the guild bank", function()
+    local GUILD = 2
+    local guildBank, shown, onShown, primes, savedBagKind, savedPrimeGuildBank, loads, loadedTabs
+
+    local function send(message, ...)
+      events:SendMessage(addon:GetModule("Context"):New("test"), message, ...)
+    end
+
+    local function timers(delay)
+      local out = {}
+      for _, t in ipairs(delayed) do
+        if t.delay == delay then out[#out + 1] = t end
+      end
+      return out
+    end
+
+    before_each(function()
+      events:Init()
+      savedBagKind = const.BAG_KIND
+      const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = GUILD }
+      guildBank = StubBetterBagsModule("GuildBank")
+      loads, loadedTabs = 0, {}
+      guildBank.Load = function() loads = loads + 1 return true end
+      guildBank.LoadedContainers = function()
+        local out = {}
+        for _, tab in ipairs(loadedTabs) do out[1000 + tab] = 1000 + tab end
+        return out
+      end
+      guildBank.TabOf = function(_, container) return container - 1000 end
+      shown, onShown, primes = 0, nil, {}
+      savedPrimeGuildBank = loader.PrimeGuildBank
+      loader.PrimeGuildBank = function(_, tabs, cb)
+        table.insert(primes, { tabs = tabs, cb = cb })
+      end
+      addon.Bags = { GuildBank = { Show = function(_, _, _, cb)
+        shown = shown + 1
+        onShown = cb
+      end } }
+      refresh:OnEnable()
+      refresh:_StartupRead("primed")
+      spy.on(refresh, "RequestUpdate")
+    end)
+
+    after_each(function()
+      refresh.RequestUpdate:revert()
+      loader.PrimeGuildBank = savedPrimeGuildBank
+      const.BAG_KIND = savedBagKind
+      addon.atGuildBank = nil
+    end)
+
+    local function open()
+      addon.atGuildBank = true
+      send("guildbank/Opened")
+    end
+
+    it("shows the guild bank at once, and loads its tabs only once it has finished showing", function()
+      open()
+      assert.equal(1, shown)
+      assert.equal(0, loads, "loads nothing while the window shows")
+      onShown()
+      assert.equal(1, loads)
+      timers(refresh.GUILD_SHOW_TIMEOUT)[1].fn()
+      assert.equal(1, loads, "the timeout does nothing once loading")
+    end)
+
+    it("loads anyway when the window never says it finished showing", function()
+      open()
+      timers(refresh.GUILD_SHOW_TIMEOUT)[1].fn()
+      assert.equal(1, loads)
+      onShown()
+      assert.equal(1, loads)
+    end)
+
+    it("does nothing without a guild bank window (the classic bags: Blizzard's frame shows it)", function()
+      addon.Bags = {}
+      open()
+      assert.equal(0, loads)
+      send("guildbank/TabLoaded", 1)
+      assert.equal(0, #primes)
+    end)
+
+    it("reads each tab once its items' data has loaded, the first read of a visit afresh", function()
+      open()
+      onShown()
+      send("guildbank/TabLoaded", 2)
+      assert.are.same({ 2 }, primes[1].tabs)
+      assert.spy(refresh.RequestUpdate).was_not.called()
+      primes[1].cb()
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, resetLayout = true, guildLoad = "primed" })
+      send("guildbank/TabLoaded", 1)
+      primes[2].cb()
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, guildLoad = "primed" })
+      assert.spy(refresh.RequestUpdate).was.called(2)
+    end)
+
+    it("reads a tab whose data has not loaded in time, and again when it arrives", function()
+      open()
+      onShown()
+      send("guildbank/TabLoaded", 2)
+      timers(refresh.GUILD_PRIME_TIMEOUT)[1].fn()
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, resetLayout = true, guildLoad = "timeout" })
+      primes[1].cb()
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true })
+      assert.spy(refresh.RequestUpdate).was.called(2)
+    end)
+
+    it("reads the loaded tabs when the guild bank changes, not while its window shows", function()
+      open()
+      send("guildbank/Changed")
+      assert.equal(0, #primes)
+      onShown()
+      loadedTabs = { 3, 1 }
+      send("guildbank/Changed")
+      assert.are.same({ 1, 3 }, primes[1].tabs)
+      primes[1].cb()
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, resetLayout = true, guildLoad = "primed" })
+      send("guildbank/Changed")
+      primes[2].cb()
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, guildLoad = "primed" })
+    end)
+
+    it("reads when its tabs change (names, permissions)", function()
+      open()
+      onShown()
+      send("guildbank/TabsChanged")
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true })
+    end)
+
+    it("does nothing for a visit that has ended", function()
+      open()
+      local stale = onShown
+      send("guildbank/Closed")
+      stale()
+      assert.equal(0, loads)
+      open()
+      onShown()
+      send("guildbank/TabLoaded", 1)
+      local first = primes[1].cb
+      send("guildbank/Closed")
+      first()
+      timers(refresh.GUILD_PRIME_TIMEOUT)[1].fn()
+      assert.spy(refresh.RequestUpdate).was_not.called()
+    end)
+
+    it("forgets the guild bank's items when it closes", function()
+      spy.on(items, "ClearGuildBankCache")
+      open()
+      send("guildbank/Closed")
+      assert.spy(items.ClearGuildBankCache).was.called(1)
+      items.ClearGuildBankCache:revert()
+    end)
+
+    it("sweeps the guild bank only while it is open and its window has shown, after the bank", function()
+      spy.on(items, "RunRefresh")
+      refresh:RequestUpdate({ guild = true })
+      assert.spy(items.RunRefresh).was_not.called_with(items, match._, GUILD)
+      open()
+      refresh:RequestUpdate({ guild = true })
+      assert.spy(items.RunRefresh).was_not.called_with(items, match._, GUILD)
+      onShown()
+      refresh:RequestUpdate({ guild = true, backpack = true })
+      assert.spy(items.RunRefresh).was.called_with(items, match._, GUILD)
+      local calls = items.RunRefresh.calls
+      assert.are.equal(GUILD, calls[#calls - 1].vals[3], "before the backpack")
+      items.RunRefresh:revert()
+    end)
+
+    it("reads the open guild bank on a wipe", function()
+      spy.on(items, "RunRefresh")
+      open()
+      onShown()
+      refresh:RequestUpdate({ wipe = true })
+      assert.spy(items.RunRefresh).was.called_with(items, match._, GUILD)
+      items.RunRefresh:revert()
+    end)
+
+    it("recalculates the guild bank when asked, and with every kind when none is named", function()
+      send("bags/Rederive", { guild = true })
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, guild = true })
+      send("bags/Rederive")
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, bank = true, guild = true })
+    end)
   end)
 
   describe("Sort Handling and Recent Items Clearing", function()

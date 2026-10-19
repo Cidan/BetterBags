@@ -81,6 +81,7 @@ local STEP = style.ICON + style.GAP
 ---@field leaving table<string, number> Sections moved away, left out until this time (GetTime).
 ---@field headerHandler? NextHeaderHandler
 ---@field cellHeight number How tall a row of buttons is, without the gap (the vendor's are taller).
+---@field buttonSource {GetButton: fun(self: any, ctx: Context, slotkey: string): Item} Where Bind takes its buttons: the item buttons, or the guild bank's (SetButtonSource).
 local canvasProto = drawable:Extend({}, 'NextCanvas')
 
 ---@param parent Frame
@@ -98,6 +99,7 @@ function nextContent:Create(parent)
   canvas.freeTotal = 0
   canvas.leaving = {}
   canvas.cellHeight = style.ICON
+  canvas.buttonSource = itemFrame
   addon.SetScript(canvas.frame, "OnHide", function()
     canvas:Settle()
   end)
@@ -241,7 +243,7 @@ end
 ---@param claims table<Item, boolean>
 ---@return Item
 function canvasProto:claim(ctx, section, slotkey, claims)
-  local button = itemFrame:GetButton(ctx, slotkey)
+  local button = self.buttonSource:GetButton(ctx, slotkey)
   claims[button] = true
   if math.abs(button.frame:GetWidth() - style.ICON) > 0.01 then
     button:SetSize(ctx, style.ICON, style.ICON)
@@ -266,7 +268,9 @@ function canvasProto:addItem(ctx, section, data, claims)
   end
   local button = self:claim(ctx, section, data.slotkey, claims)
   if data.isFreeSlot then
+    -- An empty slot drawn in place (a tab shown in slot order, which has no Free Space for it).
     button:SetFreeSlots(ctx, data, -1)
+    self.freeTotal = self.freeTotal + 1
   else
     button:SetItemFromData(ctx, data)
   end
@@ -292,6 +296,13 @@ function canvasProto:finishBind()
     self.leaving[name] = nil
     self:release(section)
   end
+end
+
+-- SetButtonSource makes Bind take its buttons from source (GetButton) instead of the item buttons:
+-- the guild bank's slots are not bag slots (guild-bank.md §5).
+---@param source {GetButton: fun(self: any, ctx: Context, slotkey: string): Item}
+function canvasProto:SetButtonSource(source)
+  self.buttonSource = source
 end
 
 -- SetCellHeight sets how tall a row of buttons is, without the gap.
@@ -393,7 +404,7 @@ function canvasProto:Bind(ctx, slotInfo, tabID, claims)
       end
     end
     section.count:SetText(tostring(total))
-    self.freeTotal = total
+    self.freeTotal = self.freeTotal + total
   end
 
   for _, section in ipairs(self.order) do

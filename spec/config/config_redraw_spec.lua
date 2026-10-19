@@ -109,6 +109,10 @@ describe("Config settings refreshes", function()
       saved[#saved + 1] = { db, key, db[key] }
       db[key] = fn
     end
+    -- A client without a guild bank, whatever an earlier spec left: the bags are the backpack and
+    -- the bank ("the guild bank's settings" below sets it).
+    saved[#saved + 1] = { addon, "hasGuildBank", addon.hasGuildBank }
+    addon.hasGuildBank = false
     config.configFrame = nil
     config:CreateConfig()
     entries = created.entries
@@ -277,6 +281,72 @@ describe("Config settings refreshes", function()
   -- Opacity and scale belong to the bag's window: it fades its background or rescales and
   -- lays itself out again, with no message to the bags at all.
   -- The size mode: sized to its items (content) or a window the player sizes (window).
+  -- The guild bank (BetterBags Next's, guild-bank.md §5) has the bags' settings of its own, on a
+  -- client with a guild bank.
+  describe("the guild bank's settings", function()
+    local savedKind, savedHas
+
+    -- rebuild makes the settings window again and returns what it was given.
+    local function rebuild()
+      local made
+      local create = form.Create
+      form.Create = function(...)
+        made = create(...)
+        return made
+      end
+      config.configFrame = nil
+      config:CreateConfig()
+      form.Create = create
+      return made.entries
+    end
+
+    local function sectionTitles(list)
+      local titles = {}
+      for _, entry in ipairs(list) do
+        if entry.kind == "AddSection" then table.insert(titles, entry.opts.title) end
+      end
+      return titles
+    end
+
+    before_each(function()
+      savedKind, savedHas = const.BAG_KIND, addon.hasGuildBank
+      const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = 2 }
+    end)
+
+    after_each(function()
+      const.BAG_KIND, addon.hasGuildBank = savedKind, savedHas
+    end)
+
+    it("has a Guild Bank section after the bank's, whose settings are the guild bank's", function()
+      addon.hasGuildBank = true
+      entries = rebuild()
+      local titles = sectionTitles(entries)
+      local bank, guild
+      for i, title in ipairs(titles) do
+        if title == "Bank" then bank = i end
+        if title == "Guild Bank" then guild = i end
+      end
+      assert.is_not_nil(guild)
+      assert.are.equal(bank + 1, guild)
+      local kinds = {}
+      local savedSet = db.SetGlowIntensity
+      db.SetGlowIntensity = function(_, kind) table.insert(kinds, kind) end
+      for _, setting in ipairs(settings("Quality Glow Intensity")) do
+        setting.setValue(context:New("test"), 50)
+      end
+      db.SetGlowIntensity = savedSet
+      assert.are.same({ 0, 1, 2 }, kinds)
+    end)
+
+    it("has none on a client without a guild bank (Classic Era)", function()
+      addon.hasGuildBank = false
+      entries = rebuild()
+      for _, title in ipairs(sectionTitles(entries)) do
+        assert.are_not.equal("Guild Bank", title)
+      end
+    end)
+  end)
+
   it("makes each bag a window the player sizes, or one sized to its items, and redraws it", function()
     local modes = {}
     saved[#saved + 1] = { db, "GetBagSizeMode", db.GetBagSizeMode }

@@ -90,6 +90,14 @@ Use `C_Timer.After(0, ...)` to clear the Retail guard after event processing com
 
 **Related Files**: `next/vendor.lua` (`TakeOver`, `EndVisitLater`), `next/merchant.lua` (`Purchase`), `util/movementflow.lua`, `.claude/rules/next.md` §10
 
+## Keep a Blizzard Frame Shown When Its Own Show Checks It Is Visible
+
+**Problem**: BetterBags Next's guild bank replaces Blizzard's guild bank frame, which is load on demand. Blizzard's `ShowGuildBankFrame` (retail and Forever; Classic's UIParent handler is the same) calls `ShowUIPanel(GuildBankFrame)` and then `CloseGuildBankFrame()` at once when `GuildBankFrame:IsVisible()` is false, and the frame's `OnHide` ends the visit too. Parenting it to a hidden frame (the vendor's way, above) ends every visit the moment it starts.
+
+**Solution**: `hooksecurefunc("ShowUIPanel", ...)` once; when it shows the frame, put it under a tiny shown frame (`SetScale(0.001)`: visible to Blizzard's check, never seen), take its `OnHide` off (`SetScript`, on a frame that is not protected), and a frame later put it under the hidden frame. Hook its `Hide` to end the visit a frame later, as its `OnHide` did. Give the `OnHide` back with the frame when the feature is switched off. Bagnon does the same (`core/features/uiOverrides.lua`).
+
+**Related Files**: `next/guildbank.lua` (`TakeOver`, `OnShowUIPanel`, `GiveBack`), `spec/integration/guild_bank_spec.lua`, `.claude/rules/guild-bank.md` §5
+
 ## Secret Values: Show Them, Never Measure Them
 
 **Problem**: from patch 12.0.0, APIs return secret values under addon restrictions (a dungeon, a raid, combat, an encounter). Addon code may store them, pass them to Lua functions and concatenate them, but arithmetic, comparisons, `#` and table keys error (warcraft.wiki.gg Secret Values). Secrecy spreads: a widget given a secret gets a secret aspect, and its other APIs then return secrets (a font string showing a secret name has a secret width, `SecretWhenAnchoringSecret`). BetterBags Next's vendor put the vendor's name (`UnitName("npc")`, `SecretWhenUnitNameIdentityRestricted`) in its title and measured the title to lay out the cloud: an error in every instance.

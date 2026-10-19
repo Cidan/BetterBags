@@ -239,6 +239,23 @@ describe("ItemFrame on Classic clients", function()
     assert.is_false(decoration.IconBorder:IsShown(), "intensity 0 must draw no border at all")
   end)
 
+  -- BetterBags Next's guild bank buttons are not item buttons of a bag (guild-bank.md §5); they glow
+  -- by the guild bank's own setting through the same drawing.
+  it("draws the glow of another kind's buttons by that kind's intensity", function()
+    local database = addon:GetModule("Database")
+    local asked
+    override(database, "GetGlowIntensity", function(_, kind)
+      asked = kind
+      return kind == 2 and 100 or 0
+    end)
+    local border = CreateFrame("Frame"):CreateTexture()
+    border:Hide()
+    itemFrame:DrawQualityGlowFor(2, { IconBorder = border }, const.ITEM_QUALITY.Rare)
+    assert.are.equal(2, asked)
+    assert.is_true(border:IsShown())
+    assert.equal("ADD", border._blendMode)
+  end)
+
   it("draws a solid colored border (no additive halo) at intensity 60", function()
     local database = addon:GetModule("Database")
     override(database, "GetGlowIntensity", function() return 60 end)

@@ -556,6 +556,68 @@ describe("TooltipScanner", function()
 
   -- BetterBags Next's vendor (next/merchant.lua, next.md §10): a vendor item's tooltip text and
   -- the repair cost of an item, retail through C_TooltipInfo, Classic through the scan tooltip.
+  -- A guild bank slot has no item GUID: its text is cached by the item's link (guild-bank.md §3).
+  describe("guild bank items", function()
+    local saved
+
+    before_each(function()
+      saved = { isRetail = addon.isRetail, scan = tooltipScanner.scanTooltip, info = _G.C_TooltipInfo,
+        atGuildBank = addon.atGuildBank }
+      for i = #sentMessages, 1, -1 do sentMessages[i] = nil end
+      for i = #sentOptions, 1, -1 do sentOptions[i] = nil end
+    end)
+
+    after_each(function()
+      addon.isRetail = saved.isRetail
+      tooltipScanner.scanTooltip = saved.scan
+      _G.C_TooltipInfo = saved.info
+      addon.atGuildBank = saved.atGuildBank
+      _G["BetterBagsScanTooltipTextLeft1"] = nil
+    end)
+
+    it("joins a guild bank item's tooltip lines on retail, once per link", function()
+      addon.isRetail = true
+      local scans = 0
+      _G.C_TooltipInfo = { GetGuildBankItem = function(tab, slot)
+        scans = scans + 1
+        assert.are.same({ 2, 7 }, { tab, slot })
+        return { lines = { { leftText = "Copper Ore", rightText = "" }, { leftText = "Crafting Reagent" } } }
+      end }
+      assert.are.equal("Copper Ore Crafting Reagent", tooltipScanner:GetGuildBankItemText(2, 7, "|Hitem:2770|h"))
+      assert.are.equal("Copper Ore Crafting Reagent", tooltipScanner:GetGuildBankItemText(2, 7, "|Hitem:2770|h"))
+      assert.are.equal(1, scans)
+    end)
+
+    it("reads a guild bank item's tooltip from the scan tooltip on Classic", function()
+      addon.isRetail = false
+      local set
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetGuildBankItem = function(_, tab, slot) set = { tab, slot } end,
+        NumLines = function() return 1 end,
+      }
+      _G["BetterBagsScanTooltipTextLeft1"] = { GetText = function() return "Linen Cloth" end }
+      assert.are.equal("Linen Cloth", tooltipScanner:GetGuildBankItemText(1, 3, "|Hitem:2589|h"))
+      assert.are.same({ 1, 3 }, set)
+    end)
+
+    it("scans again once the tooltip resolves, and recalculates the open guild bank", function()
+      addon.isRetail = true
+      addon.atGuildBank = true
+      _G.C_TooltipInfo = { GetGuildBankItem = function()
+        return { dataInstanceID = 777, lines = { { leftText = "Elixir" } } }
+      end }
+      tooltipScanner:GetGuildBankItemText(1, 1, "|Hitem:9|h")
+      capturedBucket(context:New("t"), { { eventName = "TOOLTIP_DATA_UPDATE", args = { 777 } } })
+      assert.are.same({ "bags/Rederive" }, sentMessages)
+      assert.are.same({ backpack = true, bank = false, guild = true }, sentOptions[1])
+      _G.C_TooltipInfo.GetGuildBankItem = function()
+        return { dataInstanceID = 777, lines = { { leftText = "Elixir" }, { leftText = "Use: Agility" } } }
+      end
+      assert.are.equal("Elixir Use: Agility", tooltipScanner:GetGuildBankItemText(1, 1, "|Hitem:9|h"))
+    end)
+  end)
+
   describe("merchants and repair", function()
     local saved
 

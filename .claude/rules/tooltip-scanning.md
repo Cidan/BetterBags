@@ -92,6 +92,14 @@ that are never starved, persistent callbacks, the filter, no per-fire allocation
 event-buckets.md. Coverage: `spec/events_spec.lua` ("passes the collected per-fire event
 arguments to the callback").
 
+## 3a. Guild bank items
+
+A guild bank slot has no item GUID: `TooltipScanner:GetGuildBankItemText(tab, slot, link)` caches by
+link under `"guild:" .. link` (`C_TooltipInfo.GetGuildBankItem` on retail, the scan tooltip's
+`SetGuildBankItem` on Classic). A sparse retail tooltip is recorded and resolves as a bag item's; a
+resolution recalculates the guild bank too while it is open (`bags/Rederive { guild }`).
+guild-bank.md §3.
+
 ## 4. Coverage
 
 `spec/tooltip_spec.lua` ("TOOLTIP_DATA_UPDATE resolution"): records the instance map,

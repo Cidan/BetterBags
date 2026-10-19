@@ -47,7 +47,8 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
+      "GuildBank", "NextGuildBank"
     }
 
     for _, name in ipairs(modules) do
@@ -62,6 +63,11 @@ describe("Core Init and Enable flow", function()
       return { frame = CreateFrame("Frame"), GetName = function() return "BetterBagsNextVendor" end }
     end
     nextVendor.TakeOver = nextVendor.TakeOver or function() end
+    local nextGuildBank = addon:GetModule("NextGuildBank")
+    nextGuildBank.Create = nextGuildBank.Create or function()
+      return { frame = CreateFrame("Frame"), GetName = function() return "BetterBagsNextGuildBank" end }
+    end
+    nextGuildBank.TakeOver = nextGuildBank.TakeOver or function() end
 
     -- Provide specific mock implementations needed by init
     local L = addon:GetModule("Localization")
@@ -197,6 +203,62 @@ describe("Core Init and Enable flow", function()
     addon:OnInitialize()
     addon:OnEnable()
     assert.spy(changelogWindow.Enable).was.called(1)
+  end)
+
+  -- The guild bank's data source (data/guildbank.lua) follows the guild banker interaction from its
+  -- OnEnable: initialized with the data models, enabled with the rest (guild-bank.md §2).
+  it("initializes the guild bank with the data models and enables it", function()
+    local guildBank = addon:GetModule("GuildBank")
+    guildBank.Init = spy.new(function() end)
+    guildBank.Enable = spy.new(function() end)
+    addon:OnInitialize()
+    assert.spy(guildBank.Init).was.called(1)
+    addon:OnEnable()
+    assert.spy(guildBank.Enable).was.called(1)
+  end)
+
+  it("finds the guild bank's panel by its kind and by a guild bank tab's container", function()
+    addon:OnInitialize()
+    local const = addon:GetModule("Constants")
+    local saved = {}
+    for _, key in ipairs({ "BAG_KIND", "GUILD_BANK_BAGS", "BACKPACK_BAGS", "BANK_BAGS", "ACCOUNT_BANK_BAGS" }) do
+      saved[key] = const[key]
+    end
+    const.BAG_KIND = { BACKPACK = 0, BANK = 1, GUILD = 2 }
+    const.GUILD_BANK_BAGS = { [1001] = 1 }
+    const.BACKPACK_BAGS, const.BANK_BAGS, const.ACCOUNT_BANK_BAGS = { [0] = 0 }, { [6] = 6 }, {}
+    local panel = {}
+    addon.Bags.GuildBank = panel
+    local byKind, byBag = addon:GetBagFromKind(2), addon:GetBagFromBagID(1001)
+    for key, value in pairs(saved) do
+      const[key] = value
+    end
+    assert.are.equal(panel, byKind)
+    assert.are.equal(panel, byBag)
+  end)
+
+  -- Classic has no Warbank, so no const.ACCOUNT_BANK_BAGS (core/constants.lua), yet it has a guild
+  -- bank (TBC Anniversary, Mists).
+  it("finds the guild bank's panel by a container on Classic, which has no Warbank", function()
+    addon:OnInitialize()
+    local const = addon:GetModule("Constants")
+    local saved = {}
+    for _, key in ipairs({ "GUILD_BANK_BAGS", "BACKPACK_BAGS", "BANK_BAGS", "ACCOUNT_BANK_BAGS" }) do
+      saved[key] = const[key]
+    end
+    const.GUILD_BANK_BAGS = { [1001] = 1 }
+    const.BACKPACK_BAGS, const.BANK_BAGS, const.ACCOUNT_BANK_BAGS = { [0] = 0 }, { [-1] = -1 }, nil
+    local panel = {}
+    addon.Bags.GuildBank = panel
+    local ok, byBag = pcall(function() return addon:GetBagFromBagID(1001) end)
+    local okUnknown, unknown = pcall(function() return addon:GetBagFromBagID(55) end)
+    for key, value in pairs(saved) do
+      const[key] = value
+    end
+    assert.is_true(ok, tostring(byBag))
+    assert.are.equal(panel, byBag)
+    assert.is_true(okUnknown, tostring(unknown))
+    assert.is_nil(unknown)
   end)
 
   -- BetterBagsNext (next.md §1): with it on, the backpack is a NextBag; with the bank off, the
@@ -409,6 +471,20 @@ describe("Core Init and Enable flow", function()
         Draw = function(_, _, _, cb) drawn = drawn + 1; if cb then cb() end end,
       }
     end
+
+    -- The guild bank's panel (BetterBags Next) is made with the design, maybe after OnEnable (a
+    -- switch), so the handler looks for it at each read (guild-bank.md §5).
+    it("draws the guild bank's panel after each guild bank read, when there is one", function()
+      local slotInfo = {}
+      handlers["items/RefreshGuildBank/Done"]({}, slotInfo)
+      assert.same({}, sent)
+      local drewWith
+      addon.Bags.GuildBank = { Draw = function(_, _, info, cb) drewWith = info; cb() end }
+      handlers["items/RefreshGuildBank/Done"]({}, slotInfo)
+      assert.are.equal(slotInfo, drewWith)
+      assert.same({ "bags/Draw/GuildBank/Done" }, sent)
+      addon.Bags.GuildBank = nil
+    end)
 
     it("draws the bank once when showing it drew it", function()
       addon.atBank = true

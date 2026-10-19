@@ -97,6 +97,40 @@ local async = addon:GetModule("Async")
 
 local items = addon:NewModule("Items")
 
+-- eachKind calls fn with every kind of bag the data engine reads.
+---@param fn fun(kind: BagKind)
+local function eachKind(fn)
+  for _, kind in pairs(const.BAG_KIND) do
+    if kind ~= const.BAG_KIND.UNDEFINED then
+      fn(kind)
+    end
+  end
+end
+
+-- guildTabOf is the guild bank tab a container is (const.GUILD_BANK_BAGS), nil for every container
+-- that is a bag.
+---@param bagid number
+---@return number?
+local function guildTabOf(bagid)
+  return const.GUILD_BANK_BAGS and const.GUILD_BANK_BAGS[bagid]
+end
+
+-- drawsEmptySlotsInPlace says whether the slot-order view (Show Bags, a bank or guild tab by itself)
+-- draws a bag's empty slots in place (Phase9_Sort): a bag with a name, a Warbank tab (retail reports
+-- no name for them) and a guild bank tab (not a bag).
+---@param bagid number
+---@return boolean
+local function drawsEmptySlotsInPlace(bagid)
+  return C_Container.GetBagName(bagid) ~= nil
+    or (addon.isRetail and const.ACCOUNT_BANK_BAGS ~= nil and const.ACCOUNT_BANK_BAGS[bagid] ~= nil)
+    or guildTabOf(bagid) ~= nil
+end
+
+---@return GuildBank
+local function guildBankSource()
+  return addon:GetModule("GuildBank")
+end
+
 -- A cacheable provider's verdicts are kept on each item until one of their inputs changes
 -- (see ResolveUpgrade); register a provider as cacheable only when every input of its
 -- verdict is covered by an invalidation in RegisterCacheEvents.
@@ -435,31 +469,16 @@ end
 -- BOOT STUBS & LEGACY PROTOTYPES
 function items:Init()
   self.slotInfo = {}
-  self.searchCache = {
-    [const.BAG_KIND.BACKPACK] = {},
-    [const.BAG_KIND.BANK] = {},
-  }
-  self.categoryPriorityCache = {
-    [const.BAG_KIND.BACKPACK] = {},
-    [const.BAG_KIND.BANK] = {},
-  }
-  self._newItemTimers = {
-    [const.BAG_KIND.BACKPACK] = {},
-    [const.BAG_KIND.BANK] = {},
-  }
+  self.searchCache = {}
+  self.categoryPriorityCache = {}
+  self._newItemTimers = {}
   self._preSort = false
   self._doingRefresh = false
-  self._firstLoad = {
-    [const.BAG_KIND.BACKPACK] = true,
-    [const.BAG_KIND.BANK] = true,
-  }
+  self._firstLoad = {}
   -- A sort clears recent items and asks for a fresh layout, but the sweep that shows the
   -- result comes later (the item moves' refresh, or Refresh's fallback when nothing moved).
   -- The flag stays set until a sweep of that kind has committed.
-  self._sortSweepPending = {
-    [const.BAG_KIND.BACKPACK] = false,
-    [const.BAG_KIND.BANK] = false,
-  }
+  self._sortSweepPending = {}
   -- The interaction state (addon.atInteracting) each kind's committed stacks were built
   -- under (see NeedsInteractionRecalculation).
   self._stackedInteracting = {}
@@ -467,10 +486,15 @@ function items:Init()
   -- every restyling recalculation (settings, bags/Rederive with buttons). Item buttons skip a
   -- redraw whose inputs are unchanged, so a new generation makes every button of the kind
   -- redraw.
-  self._drawGeneration = {
-    [const.BAG_KIND.BACKPACK] = 0,
-    [const.BAG_KIND.BANK] = 0,
-  }
+  self._drawGeneration = {}
+  eachKind(function(kind)
+    self.searchCache[kind] = {}
+    self.categoryPriorityCache[kind] = {}
+    self._newItemTimers[kind] = {}
+    self._firstLoad[kind] = true
+    self._sortSweepPending[kind] = false
+    self._drawGeneration[kind] = 0
+  end)
   -- Equipped gear by inventory slot, set by every backpack sweep (HarvestEquipment); nil
   -- until the first one, so an unread slot is never taken for an empty one.
   self.equipmentCache = nil
@@ -575,8 +599,9 @@ function items:WipeSlotInfo(kind)
 end
 
 function items:ResetSlotInfo()
-  self:WipeSlotInfo(const.BAG_KIND.BACKPACK)
-  self:WipeSlotInfo(const.BAG_KIND.BANK)
+  eachKind(function(kind)
+    self:WipeSlotInfo(kind)
+  end)
 end
 
 function items:RemoveNewItemFromAllItems()
@@ -589,14 +614,24 @@ end
 
 function items:ClearItemCache(ctx)
   self.previousItemGUID = {}
-  self:WipeSearchCache(const.BAG_KIND.BACKPACK)
-  self:WipeSearchCache(const.BAG_KIND.BANK)
+  eachKind(function(kind)
+    self:WipeSearchCache(kind)
+  end)
   self:ResetSlotInfo()
 end
 
 function items:ClearBankCache(ctx)
   self:WipeSearchCache(const.BAG_KIND.BANK)
   self:WipeSlotInfo(const.BAG_KIND.BANK)
+end
+
+-- ClearGuildBankCache forgets the guild bank's items when the guild bank closes: the next sweep of
+-- any kind drops them from the shared search index (Phase8_EnrichCategories), and the next visit
+-- reads the guild bank afresh.
+function items:ClearGuildBankCache(ctx)
+  self:WipeSearchCache(const.BAG_KIND.GUILD)
+  self:WipeSlotInfo(const.BAG_KIND.GUILD)
+  self._firstLoad[const.BAG_KIND.GUILD] = true
 end
 
 function items:WipeAndRefreshAll(ctx)
@@ -611,7 +646,10 @@ end
 ---@param ctx Context
 ---@param kind BagKind
 ---@return table emptySlots, table emptySlotsByBag
-function items:Phase5_UpdateFreeSlots(ctx, kind)
+function items:Phase5_UpdateFreeSlots(ctx, kind, itemData)
+  if kind == const.BAG_KIND.GUILD then
+    return self:guildFreeSlots(itemData)
+  end
   local baglist
   local tab = ctx:Get("bagid")
   if kind == const.BAG_KIND.BANK then
@@ -673,9 +711,39 @@ function items:Phase5_UpdateFreeSlots(ctx, kind)
   return emptySlots, emptySlotsByBag
 end
 
+-- guildFreeSlots counts a guild bank read's empty slots per tab, from the slots it read (a tab is
+-- not a container, so the client has no free slot count for it). Each tab is its own kind of free
+-- space, named after the tab; only tabs this player may deposit in count.
+---@private
+---@param itemData table<string, ItemData>
+---@return table<string, number> emptySlots, table<number, {name: string, count: number, family: number}> emptySlotsByBag
+function items:guildFreeSlots(itemData)
+  local emptySlots, emptySlotsByBag = {}, {}
+  local free = {}
+  for _, item in pairs(itemData or {}) do
+    if item.isItemEmpty then
+      free[item.bagid] = (free[item.bagid] or 0) + 1
+    end
+  end
+  for container in pairs(guildBankSource():LoadedContainers()) do
+    local info = guildBankSource():TabInfo(guildBankSource():TabOf(container))
+    if info and info.canDeposit then
+      local count = free[container] or 0
+      emptySlots[info.name] = (emptySlots[info.name] or 0) + count
+      emptySlotsByBag[container] = { name = info.name, count = count, family = 0 }
+    end
+  end
+  return emptySlots, emptySlotsByBag
+end
+
 ---@param bagid number
 ---@return string
 function items:GetBagName(bagid)
+  local guildTab = guildTabOf(bagid)
+  if guildTab then
+    local info = guildBankSource():TabInfo(guildTab)
+    return string.format("#%d: %s", guildTab, info and info.name or format(GUILDBANK_TAB_NUMBER, guildTab))
+  end
   local isBackpack = const.BACKPACK_BAGS[bagid] ~= nil
   if isBackpack then
     local isKeyring = Enum and Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring
@@ -726,6 +794,15 @@ end
 
 local function ItemBelongsToTab(kind, item, tabID, viewBagView)
   if not item then return false end
+  -- The guild bank shows every tab's items in categories (one view), or a tab by itself, its
+  -- slots in order (guild-bank.md §4).
+  if kind == const.BAG_KIND.GUILD then
+    if viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS then
+      return item.bagid == tabID
+    end
+    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+    return tabID == const.GUILD_BANK_ALL_TAB and category ~= L:G("Free Space") and category ~= L:G("Recent Items")
+  end
   if viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS then
     -- Retail's bank Show Bags view is one Blizzard bank tab at a time (tab ID == bag ID).
     -- Classic/Era has no bank tabs, so every bank container renders, like the backpack.
@@ -770,6 +847,12 @@ local function ItemBelongsToTab(kind, item, tabID, viewBagView)
 end
 
 local function IncludeBagInFreeSpace(kind, bagid, tabID)
+  if kind == const.BAG_KIND.GUILD then
+    if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+      return bagid == tabID
+    end
+    return tabID == const.GUILD_BANK_ALL_TAB and guildTabOf(bagid) ~= nil
+  end
   if kind == const.BAG_KIND.BACKPACK then
     -- The keyring (WoW: Forever) holds only keys: its slots are not free space.
     local isKeyring = Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring
@@ -807,6 +890,16 @@ end
 local function GetPossibleTabIDs(kind)
   local tabs = {}
   local groupsMod = addon:GetModule("Groups", true)
+  if kind == const.BAG_KIND.GUILD then
+    if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+      for container in pairs(guildBankSource():LoadedContainers()) do
+        tabs[container] = true
+      end
+    else
+      tabs[const.GUILD_BANK_ALL_TAB] = true
+    end
+    return tabs
+  end
   if kind == const.BAG_KIND.BACKPACK then
     if database.GetGroupsEnabled and database:GetGroupsEnabled(kind) and groupsMod and groupsMod.GetAllGroups then
       for _, group in pairs(groupsMod:GetAllGroups(kind)) do
@@ -848,6 +941,9 @@ function items:Phase1_DetermineBags(ctx, kind)
   local bagList = {}
   if kind == const.BAG_KIND.BACKPACK then
     bagList = const.BACKPACK_BAGS
+  elseif kind == const.BAG_KIND.GUILD then
+    -- The guild bank's tabs the client has received this visit (GuildBank:Load).
+    bagList = guildBankSource():LoadedContainers()
   elseif kind == const.BAG_KIND.BANK then
     if const.BANK_ONLY_BAGS then
       for _, bag in pairs(const.BANK_ONLY_BAGS) do
@@ -942,6 +1038,9 @@ end
 ---@param previousItems? table<string, ItemData> The committed items, whose unchanged slots are kept.
 ---@param rereadEquipment? boolean Read every equipped slot again (wipe sweeps).
 function items:Phase2_Harvest(kind, bagList, previousItems, rereadEquipment)
+  if kind == const.BAG_KIND.GUILD then
+    return self:HarvestGuildBank(bagList, previousItems), {}
+  end
   return self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK, previousItems, rereadEquipment)
 end
 
@@ -958,6 +1057,9 @@ end
 ---@return table<string, ItemData> itemData
 ---@return table<number, ItemData> equipmentData
 function items:Phase2_Rederive(kind, committedItems)
+  if kind == const.BAG_KIND.GUILD then
+    return self:RederiveGuildBank(committedItems), {}
+  end
   local itemData = {}
   local itemLoader = addon:GetModule("ItemLoader", true)
   for slotkey, item in pairs(committedItems) do
@@ -1002,6 +1104,13 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
       return details
     end
     local name, quality
+    local guildTab = guildTabOf(bagid)
+    if guildTab then
+      local info = guildBankSource():TabInfo(guildTab)
+      details = { name = info and info.name or format(GUILDBANK_TAB_NUMBER, guildTab), quality = const.BAG_SUBTYPE_TO_QUALITY[0] }
+      bagDetails[bagid] = details
+      return details
+    end
     local invid = C_Container.ContainerIDToInventoryID(bagid)
     local baglink = GetInventoryItemLink("player", invid)
     if Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
@@ -1222,10 +1331,13 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
     -- this sweep's items -- re-indexing only the items whose indexed values changed, or
     -- every item on a wipe -- and the other kind's with its last-committed items, so the
     -- index always equals a clean rebuild over both bags.
-    local otherKind = (kind == const.BAG_KIND.BANK) and const.BAG_KIND.BACKPACK or const.BAG_KIND.BANK
-    local otherSlotInfo = self.slotInfo and self.slotInfo[otherKind]
     search:SyncKind(kind, itemData, ctx:Get("wipe") == true)
-    search:SyncKind(otherKind, otherSlotInfo and otherSlotInfo.itemsBySlotKey or {})
+    eachKind(function(otherKind)
+      if otherKind ~= kind then
+        local otherSlotInfo = self.slotInfo and self.slotInfo[otherKind]
+        search:SyncKind(otherKind, otherSlotInfo and otherSlotInfo.itemsBySlotKey or {})
+      end
+    end)
   end
 
   self:RefreshSearchCache(kind, itemData)
@@ -1268,7 +1380,8 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
 
   local sectionLayouts = {}
   if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-    local shouldHideHeader = (kind == const.BAG_KIND.BANK)
+    -- A bank tab or a guild bank tab shown by itself is one section: its tab names it.
+    local shouldHideHeader = (kind == const.BAG_KIND.BANK or kind == const.BAG_KIND.GUILD)
     for _, currentItem in pairs(itemData) do
       if not currentItem.isItemEmpty then
         local category = self:GetBagName(currentItem.bagid)
@@ -1285,6 +1398,23 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
   return sectionLayouts
 end
 
+-- bagOfKind is the bag that shows a kind: the backpack, the bank, or the guild bank.
+---@private
+---@param kind BagKind
+---@return table?
+function items:bagOfKind(kind)
+  local bags = addon.Bags
+  if not bags then
+    return nil
+  end
+  if kind == const.BAG_KIND.BANK then
+    return bags.Bank
+  elseif kind == const.BAG_KIND.GUILD then
+    return bags.GuildBank
+  end
+  return bags.Backpack
+end
+
 -- IsBagOpen reports whether the bag window for `kind` is currently visible.
 -- Gaps only accrue while the user is looking at the bag; a sweep that runs while
 -- the bag is hidden (the on-close redraw, or consuming items with bags closed)
@@ -1292,7 +1422,7 @@ end
 ---@param kind BagKind
 ---@return boolean
 function items:IsBagOpen(kind)
-  local bag = addon.Bags and (kind == const.BAG_KIND.BANK and addon.Bags.Bank or addon.Bags.Backpack)
+  local bag = self:bagOfKind(kind)
   if not bag or not bag.frame or not bag.frame.IsShown then
     return false
   end
@@ -1303,7 +1433,7 @@ end
 -- because the frame is then hidden, rebuilds a gapless layout.
 ---@param kind BagKind
 function items:MarkDrawOnClose(kind)
-  local bag = addon.Bags and (kind == const.BAG_KIND.BANK and addon.Bags.Bank or addon.Bags.Backpack)
+  local bag = self:bagOfKind(kind)
   if bag then
     bag.drawOnClose = true
   end
@@ -1461,7 +1591,7 @@ function items:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
   if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
     for bagid, emptyBagData in pairs(emptySlotByBagAndSlot) do
       for slotid, data in pairs(emptyBagData) do
-        if C_Container.GetBagName(bagid) ~= nil or (addon.isRetail and const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid]) then
+        if drawsEmptySlotsInPlace(bagid) then
           local category = self:GetBagName(bagid)
           local dummy = {
             isFreeSlot = true,
@@ -1509,7 +1639,9 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
 
   -- Get active tab ID
   local activeTabID = 1
-  if kind == const.BAG_KIND.BACKPACK then
+  if kind == const.BAG_KIND.GUILD then
+    activeTabID = const.GUILD_BANK_ALL_TAB
+  elseif kind == const.BAG_KIND.BACKPACK then
     if database.GetGroupsEnabled and database:GetGroupsEnabled(kind) then
       activeTabID = database.GetActiveGroup and database:GetActiveGroup(kind) or 1
     end
@@ -1521,10 +1653,19 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
     end
   end
 
-  possibleTabs[activeTabID] = true
-  possibleTabs[1] = true -- fallback
+  if kind ~= const.BAG_KIND.GUILD or viewBagView ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+    possibleTabs[activeTabID] = true
+    possibleTabs[1] = true -- fallback
+  end
 
   local showAll = database:GetShowAllFreeSpace(kind)
+  -- The slot-order view draws a bag's empty slots in place, so Free Space leaves those bags out: an
+  -- entry's button is one of those slots, and a slot has one button, so the section took it out of
+  -- its place and left a gap.
+  local slotOrder = viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS
+  local function inFreeSpace(bagid, tabID)
+    return IncludeBagInFreeSpace(kind, bagid, tabID) and not (slotOrder and drawsEmptySlotsInPlace(bagid))
+  end
 
   for tabID in pairs(possibleTabs) do
     tabs[tabID] = {
@@ -1539,14 +1680,14 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
 
     -- Filter emptySlotsSorted and emptySlotsByBag for this tab
     for _, item in ipairs(emptySlotsSorted or {}) do
-      if IncludeBagInFreeSpace(kind, item.bagid, tabID) then
+      if inFreeSpace(item.bagid, tabID) then
         table.insert(tabs[tabID].emptySlotsSorted, item)
       end
     end
 
     if emptySlotsByBag then
       for bagid, info in pairs(emptySlotsByBag) do
-        if IncludeBagInFreeSpace(kind, bagid, tabID) then
+        if inFreeSpace(bagid, tabID) then
           tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count, family = info.family }
           tabs[tabID].emptySlots[info.name] = (tabs[tabID].emptySlots[info.name] or 0) + info.count
         end
@@ -1736,7 +1877,12 @@ function items:Phase11_CommitAndDispatch(ctx, kind, itemData, equipmentData, pre
   end
   realSlotInfo.sortedCategories = categoryOrder
 
-  local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
+  local ev = "items/RefreshBackpack/Done"
+  if kind == const.BAG_KIND.BANK then
+    ev = "items/RefreshBank/Done"
+  elseif kind == const.BAG_KIND.GUILD then
+    ev = "items/RefreshGuildBank/Done"
+  end
   events:SendMessage(ctx, ev, realSlotInfo)
 end
 
@@ -1804,6 +1950,12 @@ function items:RunRefresh(ectx, kind)
   -- next frame against the state committed by then.
   async:Yield()
 
+  -- A guild bank read whose visit ended while it waited commits nothing: the guild bank's items
+  -- were forgotten when it closed (ClearGuildBankCache).
+  if kind == const.BAG_KIND.GUILD and not addon.atGuildBank then
+    return
+  end
+
   if self._firstLoad[kind] == true then
     self._firstLoad[kind] = false
     ectx:Set("wipe", true)
@@ -1838,7 +1990,7 @@ function items:RunRefresh(ectx, kind)
   self:Phase4_ClearMovedItemGlows(ectx, previousItems, itemData)
   self:MarkAddedItemsRecent(ectx, kind, previousItems, itemData)
 
-  local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ectx, kind)
+  local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ectx, kind, itemData)
 
   local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData, emptySlotsByBag)
 
@@ -2466,6 +2618,8 @@ function items:GetBagKindFromBagID(bagid)
     return const.BAG_KIND.BACKPACK
   elseif const.BANK_BAGS[bid] or (const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bid]) then
     return const.BAG_KIND.BANK
+  elseif guildTabOf(bid) then
+    return const.BAG_KIND.GUILD
   end
   return const.BAG_KIND.BACKPACK
 end
@@ -2634,57 +2788,18 @@ function items:AttachItemInfo(data, kind, containerInfo)
     return data
   end
   data.isItemEmpty = false
-  local itemName, _, _, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expacID, setID, isCraftingReagent =
-    C_Item.GetItemInfo(itemID)
-  local harvestIncomplete = itemName == nil
+  local props = self:ReadItemProperties(itemID, itemLink)
+  local harvestIncomplete = props.incomplete
 
-  itemName = itemName or ""
-  itemLevel = itemLevel or 0
-  itemMinLevel = itemMinLevel or 0
-  itemType = itemType or ""
-  itemSubType = itemSubType or ""
-  itemStackCount = itemStackCount or 1
-  itemEquipLoc = itemEquipLoc or ""
-  itemTexture = itemTexture or 134400
-  sellPrice = sellPrice or 0
-  classID = classID or 0
-  subclassID = subclassID or 0
-  bindType = bindType or 0
-  expacID = expacID or 0
-  setID = setID or 0
-  isCraftingReagent = not not isCraftingReagent
-
-  -- The categorization-relevant fields (type, subtype, equip location, class, subclass)
-  -- are sourced from C_Item.GetItemInfoInstant, which never issues a server query and
-  -- always returns for a valid item -- unlike C_Item.GetItemInfo above, which returns nil
-  -- for these while the item cache is cold. On login with very full bags that cold read
-  -- coerced itemType/itemSubType to "" and dumped every affected item into "Everything"
-  -- until a /reload warmed the cache (issue #1090). Instant info keeps categorization
-  -- correct regardless of cache warmth; GetItemInfo still supplies name/level/price/bind/
-  -- expac, which have no instant equivalent and heal on the next warm sweep.
-  local _, instType, instSubType, instEquipLoc, _, instClassID, instSubclassID =
-    C_Item.GetItemInfoInstant(itemID)
-  itemType = instType or itemType
-  itemSubType = instSubType or itemSubType
-  itemEquipLoc = instEquipLoc or itemEquipLoc
-  classID = instClassID or classID
-  subclassID = instSubclassID or subclassID
-
-  bindType = self:GetBindTypeFromLink(itemLink) or bindType --link overrides itemID if set
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as ItemQuality]]
   itemQuality = itemQuality or const.ITEM_QUALITY.Common
-
-  local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
-  effectiveIlvl = effectiveIlvl or itemLevel or 0
-  isPreview = not not isPreview
-  baseIlvl = baseIlvl or itemLevel or 0
 
   local invType = itemMixin:GetInventoryType()
   data.containerInfo = containerInfo or C_Container.GetContainerItemInfo(bagid, slotid)
   if not data.containerInfo then
     harvestIncomplete = true
     data.containerInfo = {
-      iconFileID = itemTexture or 134400,
+      iconFileID = props.itemTexture or 134400,
       stackCount = 1,
       isLocked = false,
       quality = itemQuality,
@@ -2700,8 +2815,8 @@ function items:AttachItemInfo(data, kind, containerInfo)
   data.rawItemName = data.containerInfo.itemName
   data.rawIconFileID = data.containerInfo.iconFileID
   data.rawQuality = data.containerInfo.quality
-  data.containerInfo.itemName = data.containerInfo.itemName or itemName or ""
-  data.containerInfo.iconFileID = data.containerInfo.iconFileID or itemTexture or 134400
+  data.containerInfo.itemName = data.containerInfo.itemName or props.itemName or ""
+  data.containerInfo.iconFileID = data.containerInfo.iconFileID or props.itemTexture or 134400
   data.containerInfo.quality = data.containerInfo.quality or itemQuality
 
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
@@ -2712,25 +2827,10 @@ function items:AttachItemInfo(data, kind, containerInfo)
     }
   end
 
-  local itemAppearanceID, itemModifiedAppearanceID = 0, 0
-  if C_TransmogCollection and itemLink then
-    local appID, modAppID = C_TransmogCollection.GetItemInfo(itemLink)
-    itemAppearanceID = appID or 0
-    itemModifiedAppearanceID = modAppID or 0
-  end
-  data.transmogInfo = {
-    transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
-      appearanceID = 0,
-      secondaryAppearanceID = 0,
-      appliedAppearanceID = 0,
-      appliedSecondaryAppearanceID = 0,
-    },
-    itemAppearanceID = itemAppearanceID,
-    itemModifiedAppearanceID = itemModifiedAppearanceID,
-    hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID) or false,
-  }
+  data.transmogInfo = self:TransmogInfoOf(itemID, itemLink,
+    C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or nil)
 
-  data.bindingInfo = binding.GetItemBinding(itemLocation, bindType) or { binding = 0, bound = false }
+  data.bindingInfo = binding.GetItemBinding(itemLocation, props.bindType) or { binding = 0, bound = false }
 
   -- Extract tooltip text for search indexing
   ---@class TooltipScanner: AceModule
@@ -2742,40 +2842,157 @@ function items:AttachItemInfo(data, kind, containerInfo)
   data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType]
       and const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType]
     or { 0 }
-  data.itemInfo = {
-    itemID = itemID,
+  data.itemInfo = self:ItemInfoOf(props, {
     itemGUID = itemGUID,
-    itemName = data.containerInfo.itemName or itemName or "",
-    itemLink = itemLink,
+    itemName = data.containerInfo.itemName or props.itemName or "",
     itemQuality = itemQuality,
-    itemLevel = itemLevel,
-    itemMinLevel = itemMinLevel,
-    itemType = itemType,
-    itemSubType = itemSubType,
-    itemStackCount = itemStackCount,
-    itemEquipLoc = itemEquipLoc,
-    itemTexture = itemTexture,
-    sellPrice = sellPrice,
-    classID = classID,
-    subclassID = subclassID,
-    bindType = bindType,
-    expacID = expacID,
-    setID = setID or 0,
-    isCraftingReagent = isCraftingReagent,
-    effectiveIlvl = effectiveIlvl --[[@as number]],
-    isPreview = isPreview --[[@as boolean]],
-    baseIlvl = baseIlvl --[[@as number]],
-    itemIcon = data.containerInfo.iconFileID or itemTexture or 134400,
+    itemIcon = data.containerInfo.iconFileID or props.itemTexture or 134400,
     isBound = data.containerInfo.isBound or false,
     isLocked = data.containerInfo.isLocked or false,
     isNewItem = self:ClientNewItemFlag(bagid, slotid),
     isBattlePayItem = (_G.C_Container and _G.C_Container.IsBattlePayItem and _G.C_Container.IsBattlePayItem(bagid, slotid)) and true or false,
     currentItemCount = data.containerInfo.stackCount or 1,
-    category = "",
-    currentItemLevel = C_Item.GetCurrentItemLevel and C_Item.GetCurrentItemLevel(itemLocation) or effectiveIlvl or 0,
+    currentItemLevel = C_Item.GetCurrentItemLevel and C_Item.GetCurrentItemLevel(itemLocation) or props.effectiveIlvl or 0,
     equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
-    tooltipText = tooltipText or "",
+    tooltipText = tooltipText,
+  })
+  return self:FinishItemData(data, kind, harvestIncomplete, true)
+end
+
+-- ReadItemProperties reads what an item is, whatever slot holds it: C_Item.GetItemInfo, with every
+-- field it has no data for yet filled with a fallback (incomplete is then true), and the fields
+-- categories depend on from C_Item.GetItemInfoInstant, which never needs a server query.
+---@param itemID number
+---@param itemLink? string
+---@return table
+function items:ReadItemProperties(itemID, itemLink)
+  local itemName, _, quality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expacID, setID, isCraftingReagent =
+    C_Item.GetItemInfo(itemID)
+  local props = {
+    itemID = itemID,
+    itemLink = itemLink,
+    incomplete = itemName == nil,
+    itemName = itemName or "",
+    itemQuality = quality,
+    itemLevel = itemLevel or 0,
+    itemMinLevel = itemMinLevel or 0,
+    itemType = itemType or "",
+    itemSubType = itemSubType or "",
+    itemStackCount = itemStackCount or 1,
+    itemEquipLoc = itemEquipLoc or "",
+    itemTexture = itemTexture or 134400,
+    sellPrice = sellPrice or 0,
+    classID = classID or 0,
+    subclassID = subclassID or 0,
+    expacID = expacID or 0,
+    setID = setID or 0,
+    isCraftingReagent = not not isCraftingReagent,
   }
+
+  -- The categorization-relevant fields (type, subtype, equip location, class, subclass)
+  -- are sourced from C_Item.GetItemInfoInstant, which never issues a server query and
+  -- always returns for a valid item -- unlike C_Item.GetItemInfo above, which returns nil
+  -- for these while the item cache is cold. On login with very full bags that cold read
+  -- coerced itemType/itemSubType to "" and dumped every affected item into "Everything"
+  -- until a /reload warmed the cache (issue #1090). Instant info keeps categorization
+  -- correct regardless of cache warmth; GetItemInfo still supplies name/level/price/bind/
+  -- expac, which have no instant equivalent and heal on the next warm sweep.
+  local _, instType, instSubType, instEquipLoc, _, instClassID, instSubclassID =
+    C_Item.GetItemInfoInstant(itemID)
+  props.itemType = instType or props.itemType
+  props.itemSubType = instSubType or props.itemSubType
+  props.itemEquipLoc = instEquipLoc or props.itemEquipLoc
+  props.classID = instClassID or props.classID
+  props.subclassID = instSubclassID or props.subclassID
+
+  props.bindType = self:GetBindTypeFromLink(itemLink) or bindType or 0 --link overrides itemID if set
+
+  local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
+  props.effectiveIlvl = effectiveIlvl or props.itemLevel or 0
+  props.isPreview = not not isPreview
+  props.baseIlvl = baseIlvl or props.itemLevel or 0
+  return props
+end
+
+-- TransmogInfoOf is an item's appearance and whether the account has collected it. current is the
+-- slot's own transmog (C_Item.GetCurrentItemTransmogInfo), which only a slot with an item location
+-- has.
+---@param itemID number
+---@param itemLink? string
+---@param current? table
+---@return table
+function items:TransmogInfoOf(itemID, itemLink, current)
+  local itemAppearanceID, itemModifiedAppearanceID = 0, 0
+  if C_TransmogCollection and itemLink then
+    local appID, modAppID = C_TransmogCollection.GetItemInfo(itemLink)
+    itemAppearanceID = appID or 0
+    itemModifiedAppearanceID = modAppID or 0
+  end
+  return {
+    transmogInfoMixin = current or {
+      appearanceID = 0,
+      secondaryAppearanceID = 0,
+      appliedAppearanceID = 0,
+      appliedSecondaryAppearanceID = 0,
+    },
+    itemAppearanceID = itemAppearanceID,
+    itemModifiedAppearanceID = itemModifiedAppearanceID,
+    hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID) or false,
+  }
+end
+
+-- ItemInfoOf builds an item's itemInfo from what the item is (props, ReadItemProperties) and what
+-- its slot says of it (slot): the one place every kind of slot (a bag slot, a guild bank slot) fills
+-- it, so they never differ in what they hold.
+---@param props table
+---@param slot table
+---@return ItemInfo
+function items:ItemInfoOf(props, slot)
+  return {
+    itemID = props.itemID,
+    itemGUID = slot.itemGUID,
+    itemName = slot.itemName,
+    itemLink = props.itemLink,
+    itemQuality = slot.itemQuality,
+    itemLevel = props.itemLevel,
+    itemMinLevel = props.itemMinLevel,
+    itemType = props.itemType,
+    itemSubType = props.itemSubType,
+    itemStackCount = props.itemStackCount,
+    itemEquipLoc = props.itemEquipLoc,
+    itemTexture = props.itemTexture,
+    sellPrice = props.sellPrice,
+    classID = props.classID,
+    subclassID = props.subclassID,
+    bindType = props.bindType,
+    expacID = props.expacID,
+    setID = props.setID or 0,
+    isCraftingReagent = props.isCraftingReagent,
+    effectiveIlvl = props.effectiveIlvl --[[@as number]],
+    isPreview = props.isPreview --[[@as boolean]],
+    baseIlvl = props.baseIlvl --[[@as number]],
+    itemIcon = slot.itemIcon,
+    isBound = slot.isBound,
+    isLocked = slot.isLocked,
+    isNewItem = slot.isNewItem,
+    isBattlePayItem = slot.isBattlePayItem,
+    currentItemCount = slot.currentItemCount,
+    category = "",
+    currentItemLevel = slot.currentItemLevel,
+    equipmentSets = slot.equipmentSets,
+    tooltipText = slot.tooltipText or "",
+  } --[[@as ItemInfo]]
+end
+
+-- FinishItemData ends a read of an item, for every kind of slot: the highest item level seen (item
+-- level colors), the Recent Items timer for an item the client flags new (bag slots only: seed),
+-- the parsed link, the item hash, the stack fields and whether the read was cold.
+---@param data ItemData
+---@param kind BagKind
+---@param harvestIncomplete boolean
+---@param seed boolean
+---@return ItemData
+function items:FinishItemData(data, kind, harvestIncomplete, seed)
   -- Track max item level for dynamic coloring
   if data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
     local cID = data.itemInfo.classID
@@ -2790,15 +3007,149 @@ function items:AttachItemInfo(data, kind, containerInfo)
     end
   end
 
-  self:SeedNewItemTimer(kind, data)
+  if seed then
+    self:SeedNewItemTimer(kind, data)
+  end
 
-  data.itemLinkInfo = self:ParseItemLink(itemLink)
+  data.itemLinkInfo = self:ParseItemLink(data.itemInfo.itemLink)
   data.itemHash = self:GenerateItemHash(data)
   data.forceClear = false
   data.stacks = 0
   data.stackedCount = data.itemInfo.currentItemCount
   data.harvestIncomplete = harvestIncomplete
   return data
+end
+
+-- AttachGuildBankItemInfo fills a guild bank slot's ItemData, as AttachItemInfo fills a bag slot's:
+-- from what the guild bank says of the slot (read, GuildBank:ReadSlot; nil for an empty slot) and
+-- what the item is. A guild bank slot has no item location, so it has no GUID, quest data, new-item
+-- flag, current transmog or equipment set; its item is never bound (the guild bank takes no bound
+-- item), its binding comes from its bind type, and its current item level is its link's.
+---@param data ItemData With bagid (the tab's container) and slotid.
+---@param read? GuildBankSlotRead
+---@return ItemData
+function items:AttachGuildBankItemInfo(data, read)
+  local tab = guildBankSource():TabOf(data.bagid)
+  data.kind = const.BAG_KIND.GUILD
+  data.basic = false
+  data.guildTab = tab
+  data.slotkey = self:GetSlotKeyFromBagAndSlot(data.bagid, data.slotid)
+  data.guildRead = read
+  if read == nil then
+    data.isItemEmpty = true
+    data.bindingInfo = {} --[[@as table]]
+    data.itemInfo = {} --[[@as table]]
+    return data
+  end
+  data.isItemEmpty = false
+  local itemID = C_Item.GetItemInfoInstant(read.link)
+  local props = self:ReadItemProperties(itemID, read.link)
+  local itemQuality = read.quality or props.itemQuality or const.ITEM_QUALITY.Common
+  local icon = read.texture or props.itemTexture or 134400
+
+  data.containerInfo = {
+    iconFileID = icon,
+    stackCount = read.count,
+    isLocked = read.locked,
+    quality = itemQuality,
+    isReadable = false,
+    hasLoot = false,
+    hyperlink = read.link,
+    isFiltered = read.isFiltered,
+    hasNoValue = props.sellPrice == 0,
+    itemID = itemID,
+    isBound = false,
+    itemName = props.itemName,
+  }
+  data.questInfo = { isQuestItem = false, isActive = false }
+  data.transmogInfo = self:TransmogInfoOf(itemID, read.link, nil)
+  data.bindingInfo = binding.FromBindType(props.bindType)
+
+  ---@class TooltipScanner: AceModule
+  local tooltipScanner = addon:GetModule('TooltipScanner')
+  local invType = C_Item.GetItemInventoryTypeByID(read.link) or 0
+  data.inventoryType = invType
+  data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType] or { 0 }
+  local level = C_Item.GetDetailedItemLevelInfo(read.link)
+  data.itemInfo = self:ItemInfoOf(props, {
+    itemGUID = "",
+    itemName = props.itemName,
+    itemQuality = itemQuality,
+    itemIcon = icon,
+    isBound = false,
+    isLocked = read.locked,
+    isNewItem = false,
+    isBattlePayItem = false,
+    currentItemCount = read.count,
+    currentItemLevel = level or props.effectiveIlvl or 0,
+    tooltipText = tooltipScanner:GetGuildBankItemText(tab, data.slotid, read.link),
+  })
+  return self:FinishItemData(data, const.BAG_KIND.GUILD, props.incomplete, false)
+end
+
+-- sameGuildRead says whether a guild bank slot still holds what an item was read from: every field
+-- the guild bank reports of the slot. The lock is one: another player moving the item locks it.
+---@param a GuildBankSlotRead
+---@param b GuildBankSlotRead
+---@return boolean
+local function sameGuildRead(a, b)
+  return a.link == b.link and a.count == b.count and a.locked == b.locked and a.texture == b.texture
+    and a.isFiltered == b.isFiltered and a.quality == b.quality
+end
+
+-- HarvestGuildBank reads every slot of the guild bank tabs in bagList (their containers), as Harvest
+-- reads bags: a slot whose contents are unchanged keeps its committed item (previousItems), unless
+-- that item was read cold.
+---@param bagList table<number, number>
+---@param previousItems? table<string, ItemData>
+---@return table<string, ItemData>
+function items:HarvestGuildBank(bagList, previousItems)
+  local itemData = {}
+  for container in pairs(bagList) do
+    local tab = guildBankSource():TabOf(container)
+    if tab then
+      for slotid = 1, const.GUILD_BANK_SLOTS do
+        local slotkey = self:GetSlotKeyFromBagAndSlot(container, slotid)
+        local read = guildBankSource():ReadSlot(tab, slotid)
+        local previous = previousItems and previousItems[slotkey]
+        if read and previous and not previous.isItemEmpty and not previous.harvestIncomplete
+          and previous.guildRead and sameGuildRead(previous.guildRead, read) then
+          itemData[slotkey] = previous
+        else
+          local data = {}
+          ---@cast data +ItemData
+          data.bagid, data.slotid = container, slotid
+          itemData[slotkey] = self:AttachGuildBankItemInfo(data, read)
+        end
+      end
+    end
+  end
+  return itemData
+end
+
+-- RederiveGuildBank gives a recalculation of the guild bank (refresh-scheduler.md §10) the items it
+-- last read, reading no slot, the tooltip text refreshed (a cache hit, or a re-scan after a tooltip
+-- resolved). An item read cold is read again, as every read does with one.
+---@param committedItems table<string, ItemData>
+---@return table<string, ItemData>
+function items:RederiveGuildBank(committedItems)
+  local itemData = {}
+  ---@class TooltipScanner: AceModule
+  local tooltipScanner = addon:GetModule('TooltipScanner')
+  for slotkey, item in pairs(committedItems) do
+    if not item.isItemEmpty then
+      if item.harvestIncomplete then
+        local data = {}
+        ---@cast data +ItemData
+        data.bagid, data.slotid = item.bagid, item.slotid
+        item = self:AttachGuildBankItemInfo(data, guildBankSource():ReadSlot(item.guildTab, item.slotid))
+      else
+        item.itemInfo.tooltipText = tooltipScanner:GetGuildBankItemText(item.guildTab, item.slotid, item.itemInfo.itemLink) or ""
+      end
+    end
+    itemData[slotkey] = item
+  end
+  return itemData
 end
 
 ---@param itemID number
