@@ -84,20 +84,26 @@ From `next/panel.lua`, `next/chain.lua` and `next/style.lua`:
 
 ### Chaining by dragging them together
 
-- **Drop a bag next to its partner** (its inner side within `style.Small.Snap` of the partner's
-  facing side) and it snaps beside it, tops aligned, the tab rails clear of each other: they are
-  chained. Only the facing sides chain: the backpack faces left, a companion right, as their tabs,
-  titles and ribbons do today.
-- **Chained, they move together:** dragging either moves both. Dragging the chained one away past
-  `style.Small.Unsnap` lets it go.
-- **The sparkles between them:** chained, their ribbons twist into the braid across the gap, the
-  knot bursts, and the edge sparkles drift into the gap, as in full mode. The braid's geometry
-  becomes a gap between two rects instead of across the screen.
-- **What is saved:** whether a companion is chained to the backpack (`nextSmallChained`), so a
-  companion that opens while the backpack is open comes in beside it, as chained bags do today
-  (`Enter`): out from beneath the anchor, falling into place.
+- **Drop a bag next to its partner and it chains.** Only the facing sides chain: the backpack faces
+  left, a companion right, as their tabs, titles and ribbons do. A bag dropped with its inner side
+  within `style.Small.SnapReach` of where it would sit beside its partner, and its top within
+  `style.Small.SnapRise` of the partner's, glides into place beside it: tops aligned, the gap between
+  them wide enough for both tab rails (`chain:SmallGap`, at least `style.Small.MinGap`). A pair that
+  would not fit on the screen does not chain.
+- **The anchor is the bag it was dropped beside.** Saved as `nextSmallChain`: `"apart"`,
+  `"backpack"` (a companion was dropped beside the backpack) or `"companion"` (the backpack was
+  dropped beside a companion; it then sits beside whichever companion is open).
+- **Dragging the anchor moves both:** the other follows it, the braid with them. **Dragging the
+  other lets it go** (the braid comes apart); dropped back beside the anchor, it chains again.
+- **Opening:** places are saved, so a chained bag opens straight at its spot beside its anchor
+  (where the anchor is, or was left), sliding in and fading as any small panel does. No waiting for
+  the anchor as in full mode.
+- **The sparkles between them:** once both are open and in place, their ribbons twist into the
+  braid across the gap, the knot bursts, and the edge sparkles drift into the gap, as in full mode.
+  The braid's geometry is the gap between the two bodies instead of across the screen.
+- **When the gap changes** (a tab rail grows), the chained bag glides to its new spot.
 - The full mode's layouts (`nextChain`) are kept as they are and still used in full mode; the
-  title's click (chain, unchain, move across) belongs to full mode.
+  title's click (chain, unchain, move across) belongs to full mode. Each size keeps its own chain.
 
 ### Switching sizes (the morph)
 
@@ -129,8 +135,9 @@ through `style.ICON` and `style.GAP`), and resizing a small panel with a grip.
    feather, a shorter beam, the height, the edge), sparkles that follow the geometry, opening and
    closing in place, moving and saved places, the toggle with the morph. Small panels are not
    chained yet.
-2. **Chaining by dragging:** the snap, moving a chained pair together, letting go, the braid and its
-   sparkles between two free panels, a companion coming in beside its open anchor.
+2. **Chaining by dragging** (done; `.claude/rules/next.md` §14e): the snap, moving a chained pair
+   together, letting go, the braid and its sparkles between two free panels, a companion opening
+   beside its anchor.
 3. **Tuning** with the player, in game.
 
 Each phase is tested first (specs that fail before), documented in `.claude/rules/next.md`, and

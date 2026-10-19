@@ -729,6 +729,9 @@ const.DATABASE_DEFAULTS = {
     -- (docs/next-small-mode.md); and where each kind's small panel was left (its top left).
     nextSize = "full",
     nextSmallPlaces = {},
+    -- Which small panel anchors a chained pair: "apart", "backpack" or "companion" (the one the
+    -- other was dropped beside).
+    nextSmallChain = "apart",
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,

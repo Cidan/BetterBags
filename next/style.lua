@@ -143,6 +143,11 @@ style.Small = {
   Edge = 0.35,
   -- How far in from its screen edge a panel sits until it is first moved.
   Margin = 40,
+  -- Chaining by dropping a bag beside its partner: how close its inner side must be to where it
+  -- would sit, how far apart their tops may be, and the least room between them.
+  SnapReach = 80,
+  SnapRise = 160,
+  MinGap = 64,
 }
 
 -- The sparkle sprite: the cooldown "bling" star, on every client.

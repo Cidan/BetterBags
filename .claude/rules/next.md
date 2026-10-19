@@ -1154,8 +1154,8 @@ A second size for every Next panel: smaller, movable panels that keep Next's loo
 smaller screens. The plan, the reasoning and what was asked are in `docs/next-small-mode.md`
 (asked: "the biggest pain is two panels open for people with smaller screens ... a smaller panel,
 like ESO ... a panel we can move ... a button toggle to swap between small and full mode (animated
-of course)"). Phase 1 (this section) is small panels, moving them, and switching sizes; chaining
-small panels by dragging them together is phase 2.
+of course)"). Phase 1 is small panels, moving them and switching sizes (§14a-d); phase 2 is chaining
+small panels by dragging them together (§14e).
 
 ### 14a. The setting and the size
 
@@ -1210,9 +1210,10 @@ end of a switch. `BuildPanel` only makes the parts.
     works in combat (`StartMoving` is blocked only on protected frames).
 - **The screen changing** (`UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED`, `chain:Update` with snap)
   refits an open small panel and lays its content out again; a closed one refits when it opens.
-- **The chain** (§12) leaves small panels alone: never paired (`Pair`), never placed (`Update`),
-  never sent through a partner's edge (`ShownAnchorOf`); its title's click does nothing (`Click`
-  returns `"small"`) and its tooltip says to drag it.
+- **The full chain** (§12) leaves small panels alone: never paired (`Pair`), never placed by the full
+  layouts (`Update`), never sent through a partner's edge (`ShownAnchorOf`); a small panel's title's
+  click does nothing (`Click` returns `"small"`) and its tooltip says to drag it. Small panels chain
+  their own way (§14e).
 
 ### 14d. Switching sizes (`nextPanel:SetSize`, `PrepareResize`, `Morph`)
 
@@ -1242,9 +1243,45 @@ end of a switch. `BuildPanel` only makes the parts.
   flight and refit goes through it), and so does `StartMove` (it moves the frame itself). Showing an
   open panel again (a refresh) does not end it.
 
-### 14e. Coverage
+### 14e. Chaining small bags by dragging them together (`next/chain.lua`)
 
-`spec/next/small_spec.lua` (42): the geometry (size, place, no feather, the edge, the beam, sparkles
+Asked: "they can still chain to each other if dragged close by. still want the sparkles between
+them/coming out the side though!"
+- **The small chain** is its own setting, `nextSmallChain` (`DB:Get/SetNextSmallChain`): `"apart"`,
+  `"backpack"` (a companion was dropped beside the backpack: the backpack anchors) or `"companion"`
+  (the backpack was dropped beside a companion, and sits beside whichever is open). Full mode's
+  `nextChain` is untouched; each size keeps its own chain.
+- **Where a chained bag sits** (`ChainedPlace`): a companion left of the backpack, the backpack right
+  of a companion (only their facing sides chain), tops aligned, `SmallGap` between them (both tab
+  rails, each its widest tab plus the hover slide, and a margin; at least `Small.MinGap`).
+  `SmallPlace` of a chained bag is that spot beside its anchor where the anchor is now
+  (`LivePlace`: under the mouse while dragged, else its place, saved or default, so a companion opens
+  straight beside where the backpack was left, open or not). There is no waiting for the anchor.
+- **Dropping beside a partner chains** (`chain:Dropped`, from `StopMove`): an open small partner, the
+  dropped bag's spot beside it on the screen, and the drop within `Small.SnapReach` (80) across and
+  `Small.SnapRise` (160) up or down of it. The partner becomes the anchor, the dropped bag glides into
+  its spot (`GlideTo`, `Time.Glide`), its place saved there.
+- **Dragging the anchor moves both:** its partner (`chain:Follower`) is placed beside it every frame
+  of the drag (the mover's `OnUpdate`, cleared at the drop; a glide into its spot is finished first),
+  the braid with them; at the drop both places are saved.
+- **Dragging the other lets it go** (`chain:Detach`, from `StartMove`): the chain is `"apart"` and the
+  braid comes apart at once; dropped back beside the anchor, it chains again.
+- **The braid** (`UpdateCoupling` with `SmallPair`, `applyCoupling`): once both are open and still
+  (`SmallPlaced`: neither sliding, gliding or switching size), their ribbons twist into the braid
+  across the gap between their bodies where they are now (`SmallLeft`), the chained bag showing the
+  knot, which bursts. One of the pair closing lets go; it braids again when it opens.
+- **Sparkles between them, never over them:** the ribbon sparkles shorten as in full mode; a braided
+  small bag's edge sparkles live shorter and drift slower (`SetCoupling`), so they die before the
+  middle of a narrow gap (born up to 24 out, 24 + half the gap / 2 stays below the gap, which is at
+  least 64). Apart, they drift as before.
+- **When a chained bag's spot moves** (the gap changes: a tab rail grows), it glides there
+  (`chain:Settle`, from `Update` and `Arrived`), but never while it slides in or switches size: a
+  slide's end says the bag has shown (a bank open waits for it), so it settles once it arrives. A bag
+  chained to a closed backpack stays where it is.
+
+### 14f. Coverage
+
+`spec/next/small_spec.lua` (61): the geometry (size, place, no feather, the edge, the beam, sparkles
 on both sides, the root, a saved place kept on the screen), opening and closing (slide and fade,
 reopening mid-close, the screen at opening, never chained, closing with a chain layout saved),
 moving (by the title row and the title, saved per kind, the layout cache flag, kept on the screen,
@@ -1253,10 +1290,16 @@ panels never move), switching sizes (the button's art on retail and Classic, its
 saving, closed panels with their content laid out, the glide's path both ways, the cross-fade and the
 beam, nothing past the edge, one layout at the end, a close or a move mid-glide, a closing panel, a
 pair's braid let go and braided again only once both arrive, turning around mid-glide, Escape
-mid-glide, a refresh mid-glide, the feather's anchors after both ways). `spec/database_spec.lua` and
-`spec/core/constants_spec.lua` (the settings). The other Next specs run full size. Every guard was
-mutation-tested (39 mutations); the five redundant ones it found were removed, and each one it showed
-untested got a test.
+mid-glide, a refresh mid-glide, the feather's anchors after both ways), chaining (the gap, dropping
+beside either partner, too far, too high, facing away, a pair that would not fit, the braid's
+halves and knot, the edge sparkles in the gap and back, the anchor moving both, letting go and
+chaining again, opening beside an open anchor, beside where it was left, the backpack beside a
+companion, closing and reopening one of the pair, a spot that moves, one that moves while sliding in
+or switching size, a closed anchor, a partner gliding when the anchor is dragged, each size's chain).
+`spec/database_spec.lua` and `spec/core/constants_spec.lua` (the settings). The other Next specs run
+full size. Every guard was mutation-tested (80 mutations): the redundant ones it found were removed
+(nine), each one it showed untested got a test, and it found one bug before it shipped (a glide that
+would have cut a bag's slide in short, dropping what waited for it to show).
 
 Not verified in game yet: how the small panels look, the glide, moving them, and the button's art
 (a red Blizzard button among flat icons).

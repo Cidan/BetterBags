@@ -673,10 +673,15 @@ function panelProto:clampPlace(x, y)
   return x, y
 end
 
--- SmallPlace is where a small panel sits: where the player left it, else a margin in from its own
--- screen edge (the backpack's right, a companion's left), centered; on the screen either way.
+-- SmallPlace is where a small panel sits: chained (docs/next-small-mode.md), beside its anchor where
+-- the anchor is now (LivePlace); else where the player left it, else a margin in from its own screen
+-- edge (the backpack's right, a companion's left), centered; on the screen either way.
 ---@return number x, number y
 function panelProto:SmallPlace()
+  local anchor = chain:SmallAnchorOf(self)
+  if anchor ~= nil then
+    return self:clampPlace(chain:ChainedPlace(self, anchor, anchor:LivePlace()))
+  end
   local x, y = database:GetNextSmallPlace(self.kind)
   if x == nil then
     y = (UIParent:GetHeight() + self:SmallHeight()) / 2
@@ -687,6 +692,59 @@ function panelProto:SmallPlace()
     end
   end
   return self:clampPlace(x, y)
+end
+
+-- LivePlace is where a small panel's top left is now: under the mouse while the player drags it, else
+-- its place.
+---@return number x, number y
+function panelProto:LivePlace()
+  if self.moving then
+    local x, y = self.frame:GetLeft(), self.frame:GetTop()
+    if x ~= nil and y ~= nil then
+      return x, y
+    end
+  end
+  return self:SmallPlace()
+end
+
+-- SmallLeft is where a shown small panel's left edge is now: under the mouse while dragged, else its
+-- place plus its slide.
+---@return number
+function panelProto:SmallLeft()
+  if self.moving then
+    local x = self.frame:GetLeft()
+    if x ~= nil then
+      return x
+    end
+  end
+  return self.placeX + self.offset
+end
+
+-- GlideTo glides a shown small panel from where it is to a new place (chaining it beside its partner,
+-- or its spot beside its anchor moving), then the chain braids it if it is in place.
+---@param x number
+---@param y number
+function panelProto:GlideTo(x, y)
+  local fromX, fromY = self.placeX + self.offset, self.placeY
+  self.placeX, self.placeY = x, y
+  self.offset = 0
+  self.target = 0
+  local frame = self.frame
+  tween:Play(self, {
+    duration = style.Time.Glide,
+    from = 0,
+    to = 1,
+    ease = "outCubic",
+    onUpdate = function(t)
+      frame:ClearAllPoints()
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", fromX + (x - fromX) * t, fromY + (y - fromY) * t)
+      frame:SetAlpha(1)
+    end,
+    onDone = function()
+      self:setOffset(0)
+      chain:Arrived(self)
+    end,
+  })
 end
 
 -- ApplyGeometry shapes the panel for its size and puts it where it is for that size (its offset).
@@ -935,6 +993,18 @@ function panelProto:StartMove()
   -- from its layout cache at login (warcraft.wiki.gg Frame:StartMoving): the place is ours to keep.
   self.frame:SetUserPlaced(false)
   self.moving = true
+  -- Chained (docs/next-small-mode.md): dragging the other bag lets it go of its anchor; dragging the
+  -- anchor, its open partner follows it every frame.
+  chain:Detach(self)
+  local follower = chain:Follower(self)
+  if follower ~= nil then
+    -- A glide into its spot ends where it was going: from now on its spot follows the anchor.
+    tween:Stop(follower, true)
+    self.mover:SetScript("OnUpdate", function()
+      follower.placeX, follower.placeY = follower:SmallPlace()
+      follower:setOffset(0)
+    end)
+  end
   return true
 end
 
@@ -944,15 +1014,32 @@ function panelProto:StopMove()
   if not self.moving then
     return
   end
-  self.moving = false
+  self.mover:SetScript("OnUpdate", nil)
   local frame = self.frame
   frame:StopMovingOrSizing()
   local x, y = frame:GetLeft(), frame:GetTop()
+  self.moving = false
   if x ~= nil and y ~= nil then
-    self.placeX, self.placeY = self:clampPlace(x, y)
-    database:SetNextSmallPlace(self.kind, self.placeX, self.placeY)
+    x, y = self:clampPlace(x, y)
+    -- Dropped beside its partner, it chains to it and glides into its spot.
+    local sx, sy = chain:Dropped(self, x, y)
+    self.placeX, self.placeY = x, y
+    self.offset = 0
+    if sx ~= nil then
+      database:SetNextSmallPlace(self.kind, sx, sy)
+      self:GlideTo(sx, sy)
+      return
+    end
+    database:SetNextSmallPlace(self.kind, x, y)
   end
   self:setOffset(0)
+  -- An anchor let go: its partner settles beside where it was dropped, its place saved too.
+  local follower = chain:Follower(self)
+  if follower ~= nil then
+    follower.placeX, follower.placeY = follower:SmallPlace()
+    follower:setOffset(0)
+    database:SetNextSmallPlace(follower.kind, follower.placeX, follower.placeY)
+  end
 end
 
 -- SetDropGlow lights the body while a section from the other bag would drop on it.
@@ -1423,6 +1510,17 @@ function panelProto:SetCoupling(amount, half, chained, phase, time, feather)
     self.sparkSpread = self:SparkSpreadBase()
     o.Life = { 2.0, 3.6 }
     o.Speed = { 22, 64 }
+  end
+  local e = self.edgeSparkles.options
+  if amount > 0 and self:IsSmall() then
+    -- Two small bags braided (docs/next-small-mode.md): their gap can be narrow, so the edge
+    -- sparkles die before the middle of it, never over the other bag (born up to 24 out, half the
+    -- gap at least 32: 24 + half * 0.5 stays below the gap).
+    e.Life = { 1.0, 1.6 }
+    e.Speed = { 3, math.max(3, half * 0.5 / 1.6) }
+  else
+    e.Life = { 2.4, 4.2 }
+    e.Speed = { 14, 36 }
   end
   self:applyBraid()
 end

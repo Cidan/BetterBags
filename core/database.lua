@@ -269,6 +269,24 @@ function DB:SetNextSmallPlace(kind, x, y)
   DB.data.profile.nextSmallPlaces[kind] = { x = x, y = y }
 end
 
+---@alias NextSmallChain "apart"|"backpack"|"companion"
+
+-- GetNextSmallChain returns which small panel anchors a chained pair (docs/next-small-mode.md):
+-- "apart", "backpack" (a companion was dropped beside it) or "companion" (the backpack was dropped
+-- beside a companion, and sits beside whichever is open).
+---@return NextSmallChain
+function DB:GetNextSmallChain()
+  return DB.data.profile.nextSmallChain
+end
+
+---@param layout NextSmallChain
+function DB:SetNextSmallChain(layout)
+  if layout ~= "apart" and layout ~= "backpack" and layout ~= "companion" then
+    error("unknown BetterBags Next small chain: " .. tostring(layout))
+  end
+  DB.data.profile.nextSmallChain = layout
+end
+
 ---@param kind BagKind
 ---@return boolean
 function DB:GetGroupsEnabled(kind)

@@ -120,7 +120,7 @@ describe("BetterBags Next's small mode", function()
     nextDrag:Init()
     chain:Init()
     sent, buttons, placed = {}, {}, {}
-    db = { size = "small", places = {}, view = { [BACKPACK] = SECTION_GRID, [BANK] = SECTION_GRID },
+    db = { size = "small", places = {}, smallChain = "apart", view = { [BACKPACK] = SECTION_GRID, [BANK] = SECTION_GRID },
       active = { [BACKPACK] = 1, [BANK] = 10 } }
     slots = {
       [BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = { { name = "Herbs" } }, items = { item("0_1", "Herbs") } } } },
@@ -149,6 +149,8 @@ describe("BetterBags Next's small mode", function()
       if p then return p[1], p[2] end
     end)
     override(stubs.database, "SetNextSmallPlace", function(_, kind, x, y) db.places[kind] = { x, y } end)
+    override(stubs.database, "GetNextSmallChain", function() return db.smallChain end)
+    override(stubs.database, "SetNextSmallChain", function(_, layout) db.smallChain = layout end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
     override(stubs.database, "GetActiveGroup", function(_, kind) return db.active[kind] end)
@@ -757,6 +759,315 @@ describe("BetterBags Next's small mode", function()
       assert.is_not_nil(chain.coupling)
       assert.are.equal(1, chain.coupling.amount)
       assert.are.equal(chain:RestOffset(bank), bank.offset)
+    end)
+  end)
+
+  -- Dragged close to its partner, a small bag chains to it (docs/next-small-mode.md, "Chaining by
+  -- dragging them together"): the one dropped beside is the anchor; dragging the anchor moves both,
+  -- dragging the other lets it go; their ribbons braid across the gap.
+  describe("chaining small bags", function()
+    local function step(seconds)
+      tween.driver:GetScript("OnUpdate")(tween.driver, seconds)
+    end
+
+    local function opened(create)
+      local panel = create(ctx())
+      panel:Show(ctx())
+      finishTweens()
+      return panel
+    end
+
+    local function startDrag(panel)
+      panel.mover:GetScript("OnDragStart")(panel.mover, "LeftButton")
+    end
+
+    -- The client moves the frame with the mouse; each frame the panel follows (its mover's OnUpdate).
+    local function moveTo(panel, left, top)
+      panel.frame:_SetRect(left, top - panel.frame:GetHeight(), panel.frame:GetWidth(), panel.frame:GetHeight())
+      local update = panel.mover:GetScript("OnUpdate")
+      if update then update(panel.mover, 0.016) end
+    end
+
+    local function stopDrag(panel)
+      panel.mover:GetScript("OnDragStop")(panel.mover)
+    end
+
+    local function drag(panel, left, top)
+      startDrag(panel)
+      moveTo(panel, left, top)
+      stopDrag(panel)
+    end
+
+    -- Where a bank sits chained beside the backpack, and the backpack beside a bank.
+    local function besideBag(bag, bank)
+      return bag.placeX - chain:SmallGap(bag, bank) - style.BODY_WIDTH, bag.placeY
+    end
+
+    local function besideBank(bank, bag)
+      return bank.placeX + style.BODY_WIDTH + chain:SmallGap(bag, bank), bank.placeY
+    end
+
+    it("keeps chained bags apart by both tab rails, never closer than the minimum", function()
+      local bag = nextBag:Create(ctx())
+      local bank = nextBank:Create(ctx())
+      assert.are.equal(style.Small.MinGap, chain:SmallGap(bag, bank))
+      override(bag.tabs, "Width", function() return 120 end)
+      override(bank.tabs, "Width", function() return 90 end)
+      assert.are.equal(120 + 90 + 2 * style.TAB_HOVER + style.Chain.TabMargin, chain:SmallGap(bag, bank))
+    end)
+
+    it("chains a bag dropped beside its partner's facing side, gliding it into place, its tops aligned", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local x, y = besideBag(bag, bank)
+      drag(bank, x - style.Small.SnapReach + 1, y + style.Small.SnapRise - 1)
+      assert.are.equal("backpack", db.smallChain, "the backpack is the anchor")
+      finishTweens()
+      assert.are.same({ x, y }, { topLeft(bank) })
+      assert.are.same({ x, y }, db.places[BANK])
+      assert.is_not_nil(chain.coupling)
+      assert.are.equal(bag, chain.coupling.anchor)
+      assert.are.equal(bank, chain.coupling.chained)
+      assert.are.equal(1, chain.coupling.amount)
+    end)
+
+    it("chains the backpack dropped beside a companion, the companion the anchor", function()
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local x, y = besideBank(bank, bag)
+      drag(bag, x + 20, y - 30)
+      assert.are.equal("companion", db.smallChain)
+      finishTweens()
+      assert.are.same({ x, y }, { topLeft(bag) })
+      assert.are.equal(bank, chain.coupling.anchor)
+    end)
+
+    it("does not chain a bag dropped too far, too high, or facing away", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local x, y = besideBag(bag, bank)
+      drag(bank, x - style.Small.SnapReach - 1, y)
+      assert.are.equal("apart", db.smallChain)
+      drag(bank, x, y - style.Small.SnapRise - 1)
+      assert.are.equal("apart", db.smallChain)
+      -- On the backpack's right: the bank's inner side faces away from it.
+      drag(bank, bag.placeX + style.BODY_WIDTH + chain:SmallGap(bag, bank) - 400, y)
+      assert.are.equal("apart", db.smallChain)
+      finishTweens()
+      assert.is_nil(chain.coupling)
+    end)
+
+    it("does not chain a pair that would not fit on the screen", function()
+      -- The bank's spot is 30 off the screen's left edge: dropped at the edge, it is within reach.
+      UIParent:_SetRect(0, 0, 990, 1200)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local x, y = besideBag(bag, bank)
+      assert.are.equal(-30, x)
+      drag(bank, 0, y)
+      assert.are.equal("apart", db.smallChain)
+    end)
+
+    it("braids their ribbons across the gap between them, the chained bag showing the knot", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local x, y = besideBag(bag, bank)
+      drag(bank, x, y)
+      finishTweens()
+      local half = chain:SmallGap(bag, bank) / 2
+      assert.are.equal(half, bag.braid.half)
+      assert.are.equal(half, bank.braid.half)
+      assert.is_true(bank.braid.chained)
+      assert.is_false(bag.braid.chained)
+    end)
+
+    -- Asked: "still want the sparkles between them/coming out the side". Between them, never over the
+    -- other bag: a sparkle is born up to 24 out of its bag's inner side and drifts at most its speed
+    -- times its life.
+    it("keeps its edge sparkles in the gap while braided, and lets them drift as before once apart", function()
+      db.smallChain = "backpack"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local gap = chain:SmallGap(bag, bank)
+      for _, panel in ipairs({ bag, bank }) do
+        local o = panel.edgeSparkles.options
+        assert.is_true(24 + o.Speed[2] * o.Life[2] < gap, "within the gap: " .. o.Speed[2] * o.Life[2])
+      end
+      bank:Hide(ctx())
+      finishTweens()
+      assert.are.same({ 14, 36 }, bag.edgeSparkles.options.Speed)
+      assert.are.same({ 2.4, 4.2 }, bag.edgeSparkles.options.Life)
+    end)
+
+    it("moves both when the anchor is dragged, the braid kept, and saves both places", function()
+      db.smallChain = "backpack"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      assert.is_not_nil(chain.coupling)
+      startDrag(bag)
+      moveTo(bag, 1000, 1000)
+      local gap = chain:SmallGap(bag, bank)
+      assert.are.same({ 1000 - gap - style.BODY_WIDTH, 1000 }, { topLeft(bank) })
+      assert.is_not_nil(chain.coupling)
+      stopDrag(bag)
+      assert.are.same({ 1000, 1000 }, db.places[BACKPACK])
+      assert.are.same({ 1000 - gap - style.BODY_WIDTH, 1000 }, db.places[BANK])
+      assert.is_nil(bag.mover:GetScript("OnUpdate"), "it stops following once let go")
+      assert.are.equal("kept", chain:UpdateCoupling())
+    end)
+
+    it("lets the other bag go when it is dragged, and chains it again when dropped back beside", function()
+      db.smallChain = "backpack"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local x, y = besideBag(bag, bank)
+      startDrag(bank)
+      assert.are.equal("apart", db.smallChain)
+      assert.are.equal(0, chain.coupling.target, "the braid comes apart as soon as it is dragged")
+      moveTo(bank, 100, 900)
+      stopDrag(bank)
+      finishTweens()
+      assert.is_nil(chain.coupling)
+      assert.are.same({ 100, 900 }, db.places[BANK])
+      drag(bank, x + 10, y)
+      finishTweens()
+      assert.are.equal("backpack", db.smallChain)
+      assert.is_not_nil(chain.coupling)
+    end)
+
+    it("opens a companion beside its open anchor, and the pair braids", function()
+      db.smallChain = "backpack"
+      db.places[BACKPACK] = { 1200, 1000 }
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = nextBank:Create(ctx())
+      bank:Show(ctx())
+      finishTweens()
+      assert.are.same({ 1200 - chain:SmallGap(bag, bank) - style.BODY_WIDTH, 1000 }, { topLeft(bank) })
+      assert.is_not_nil(chain.coupling)
+    end)
+
+    it("opens a companion beside where its anchor was left, before the anchor opens", function()
+      db.smallChain = "backpack"
+      db.places[BACKPACK] = { 1200, 1000 }
+      local bag = nextBag:Create(ctx())
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      assert.are.same({ 1200 - chain:SmallGap(bag, bank) - style.BODY_WIDTH, 1000 }, { topLeft(bank) })
+      assert.is_nil(chain.coupling)
+      bag:Show(ctx())
+      assert.is_nil(chain.coupling, "not while the backpack still slides in")
+      finishTweens()
+      assert.is_not_nil(chain.coupling)
+    end)
+
+    it("opens the backpack beside the open companion it was chained to", function()
+      db.smallChain = "companion"
+      db.places[BANK] = { 100, 900 }
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.are.same({ 100 + style.BODY_WIDTH + chain:SmallGap(bag, bank), 900 }, { topLeft(bag) })
+      assert.is_not_nil(chain.coupling)
+    end)
+
+    it("lets go of the braid when one of the pair closes, and braids again when it opens", function()
+      db.smallChain = "backpack"
+      opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      bank:Hide(ctx())
+      finishTweens()
+      assert.is_nil(chain.coupling)
+      assert.are.equal("backpack", db.smallChain, "still chained")
+      bank:Show(ctx())
+      finishTweens()
+      assert.is_not_nil(chain.coupling)
+    end)
+
+    it("glides the chained bag to its new spot when the gap changes", function()
+      db.smallChain = "backpack"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      override(bag.tabs, "Width", function() return 140 end)
+      chain:Update(ctx())
+      step(0.05)
+      local x = topLeft(bank)
+      local wanted = besideBag(bag, bank)
+      assert.is_true(x ~= wanted, "it glides there")
+      finishTweens()
+      assert.are.same({ wanted, bag.placeY }, { topLeft(bank) })
+      assert.is_not_nil(chain.coupling)
+    end)
+
+    -- A slide or a switch is never cut short: the slide's end says the bag has shown (a bank open
+    -- waits for it to read the bank).
+    it("glides a chained bag to a spot that moved while it slid in only once it is in", function()
+      db.smallChain = "backpack"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = nextBank:Create(ctx())
+      local shown = 0
+      bank:Show(ctx(), nil, function() shown = shown + 1 end)
+      override(bag.tabs, "Width", function() return 140 end)
+      chain:Update(ctx())
+      assert.are.equal(0, shown)
+      finishTweens()
+      assert.are.equal(1, shown)
+      assert.are.same({ besideBag(bag, bank) }, { topLeft(bank) })
+      assert.is_not_nil(chain.coupling)
+    end)
+
+    it("glides a chained bag to a spot that moved while it switched size only once it has", function()
+      db.size = "full"
+      db.smallChain = "backpack"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      nextPanel:SetSize(ctx(), "small")
+      step(style.Time.Morph / 2)
+      override(bag.tabs, "Width", function() return 140 end)
+      chain:Update(ctx())
+      assert.is_not_nil(bank.morph)
+      assert.is_false(tween:IsPlaying(bank))
+      assert.is_nil(chain.coupling, "not while they switch size")
+      finishTweens()
+      assert.are.same({ besideBag(bag, bank) }, { topLeft(bank) })
+      assert.is_not_nil(chain.coupling)
+    end)
+
+    it("leaves a bag chained to a closed backpack where it is when its spot moves", function()
+      db.smallChain = "backpack"
+      local bag = nextBag:Create(ctx())
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local x, y = topLeft(bank)
+      override(bank.tabs, "Width", function() return 140 end)
+      chain:Update(ctx())
+      finishTweens()
+      assert.are.same({ x, y }, { topLeft(bank) })
+      local _ = bag
+    end)
+
+    it("takes a partner still gliding into place along when the anchor is dragged", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local x, y = besideBag(bag, bank)
+      drag(bank, x + 40, y)
+      step(style.Time.Glide / 3)
+      startDrag(bag)
+      moveTo(bag, 1000, 1000)
+      -- Its glide does not pull it back toward its old spot.
+      step(0.01)
+      assert.are.same({ 1000 - chain:SmallGap(bag, bank) - style.BODY_WIDTH, 1000 }, { topLeft(bank) })
+      stopDrag(bag)
+    end)
+
+    it("keeps each size's chain: switching to full and back braids the small pair again", function()
+      db.smallChain = "backpack"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      nextPanel:SetSize(ctx(), "full")
+      finishTweens()
+      assert.is_nil(chain.coupling, "full bags follow the full chain, which keeps them apart")
+      assert.are.equal("backpack", db.smallChain)
+      nextPanel:SetSize(ctx(), "small")
+      finishTweens()
+      assert.is_not_nil(chain.coupling)
+      assert.are.same({ besideBag(bag, bank) }, { topLeft(bank) })
     end)
   end)
 end)
