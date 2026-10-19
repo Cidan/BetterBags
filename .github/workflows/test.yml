@@ -37,8 +37,13 @@ jobs:
       - name: Install busted
         run: luarocks install busted
 
+      # Capped at 4 GB of memory, so a spec that keeps too much fails here with "not enough memory"
+      # instead of the runner being shut down mid-run (the whole suite peaks at about 1.25 GB;
+      # .claude/rules/test-harness.md, memory).
       - name: Run tests
-        run: busted
+        run: |
+          ulimit -v 4000000
+          busted
 
   # The changelog generator (tools/changelog) and the script that keeps its notes.
   changelog-generator:

@@ -34,6 +34,15 @@ style.OVERREACH = math.ceil(style.WIDTH * style.OPEN_OVERSHOOT / (1 - style.OPEN
 style.TITLE_TOP = 24
 style.SEARCH_TOP = 70
 style.SEARCH_HEIGHT = 26
+-- The search box's magnifier, and the room left of it and between it and the text.
+style.SEARCH_ICON = 14
+style.SEARCH_GAP = 8
+-- How strong the search box's lavender edge is: idle, under the pointer or holding a search, and
+-- focused. Asked: the box was "very difficult to see"; it stands out without leaving Next's look.
+style.SearchEdge = { Idle = 0.3, Hover = 0.55, Focus = 1 }
+-- How strong its lavender magnifier is: idle, and under the pointer or holding a search (it is
+-- white while focused).
+style.SearchIcon = { Idle = 0.85, Active = 1 }
 style.CONTENT_TOP = 110
 style.FOOTER = 40
 
@@ -70,6 +79,13 @@ style.Color = {
   Muted = { 0.62, 0.58, 0.78, 1 },
   Tab = { 0.09, 0.08, 0.16, 0.92 },
   TabSelected = { 0.18, 0.15, 0.32, 0.96 },
+  -- A move waiting to be confirmed (NextDrag's dock): its card, the scrim dimming the panel behind
+  -- it, and the amber of its glow and warning (Gold).
+  Card = { 0.1, 0.085, 0.19, 0.98 },
+  Scrim = { 0, 0, 0, 0.6 },
+  -- The search box's fill, idle and focused: lighter than the body, so it reads as a field.
+  SearchFill = { 0.133, 0.114, 0.239, 1 },
+  SearchFillFocus = { 0.165, 0.141, 0.314, 1 },
 }
 
 -- Timings, in seconds, and the cascade's rise in pixels.
@@ -194,6 +210,13 @@ local FONTS = {
   Tab = { size = 12, color = style.Color.Muted },
   TabSelected = { size = 12, color = style.Color.White, shadow = true },
   Footer = { size = 12, color = style.Color.Muted },
+  -- A move waiting to be confirmed (NextDrag's dock): what it does, its warning, and how to answer.
+  ConfirmTitle = { size = 18, color = style.Color.White, shadow = true },
+  ConfirmWarning = { size = 12, color = style.Color.Gold },
+  ConfirmHint = { size = 12, color = style.Color.Lavender },
+  -- The search box's help text ("Search Backpack"), and what is typed in it.
+  Search = { size = 12, color = style.Color.Muted },
+  SearchText = { size = 13, color = style.Color.Text },
   -- The vendor's buttons (next.md §10): the price under the icon, the stack size and stock on it.
   Price = { size = 10, color = style.Color.White, shadow = true },
   Stack = { size = 11, color = style.Color.White, shadow = true },
@@ -203,7 +226,7 @@ style.fonts = {} ---@type table<string, Font>
 
 -- Font returns Next's font object of a name, made the first time it is asked for in the
 -- client's own font file (the locale's), at Next's size and color.
----@param name string Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Price or Stack.
+---@param name string Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price or Stack.
 ---@return Font
 function style:Font(name)
   local font = self.fonts[name]

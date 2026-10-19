@@ -587,27 +587,29 @@ function vendorProto:SaleOf(list)
   return sale
 end
 
--- Sell sells a section's sale while the vendor is open: at once when buyback can keep all of it,
--- after asking past that. It returns "sold", or "asked" while the question is open.
+-- Sell sells a section's sale while the vendor is open: at once when buyback can keep all of it, or
+-- once confirmed. Unconfirmed past that it sells nothing and returns "confirm" with what to confirm
+-- with: NextDrag docks the section in the vendor with that text until a double click confirms it.
 ---@param ctx Context
 ---@param sale ItemData[]
----@return string
-function vendorProto:Sell(ctx, sale)
+---@param confirmed? boolean
+---@return string result "sold" or "confirm"
+---@return NextConfirmation? confirmation
+function vendorProto:Sell(ctx, sale, confirmed)
   local _ = ctx
   local slots = {}
   for _, data in ipairs(sale) do
     table.insert(slots, { bag = data.bagid, slot = data.slotid })
   end
-  local function sell()
-    merchant:SellSlots(slots, function() return self.atMerchant end)
+  if not confirmed and #slots > BUYBACK_KEEPS then
+    return "confirm", {
+      title = format(L:G("Sell %d items?"), #slots),
+      warning = format(L:G("Only the last %d items sold can be bought back."), BUYBACK_KEEPS),
+      hint = L:G("Double-click to sell · Right-click to cancel"),
+    }
   end
-  if #slots <= BUYBACK_KEEPS then
-    sell()
-    return "sold"
-  end
-  question:YesNo(L:G("Sell Items"),
-    format(L:G("Sell %d items? Only the last 12 items sold can be bought back."), #slots), sell, function() end)
-  return "asked"
+  merchant:SellSlots(slots, function() return self.atMerchant end)
+  return "sold"
 end
 
 -- SellJunk sells the junk in the bags: through Blizzard's own Sell All Junk where the client has

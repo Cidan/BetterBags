@@ -297,7 +297,9 @@ describe("NextDrag", function()
     override(stubs.events, "BucketEvent", function() end)
     override(stubs.searchBox, "CreateBox", function(_, kind, parent)
       local box = { kind = kind, frame = CreateFrame("Frame", nil, parent) }
-      box.textBox = CreateFrame("EditBox", nil, box.frame)
+      -- As searchBox:CreateBox makes it (frames/search.lua): a BagSearchBoxTemplate edit box.
+      box.textBox = CreateFrame("EditBox", nil, box.frame, "BagSearchBoxTemplate")
+      box.helpText = box.textBox.Instructions
       return box
     end)
     override(stubs.sonata, "UnregisterElement", function() end)
@@ -781,17 +783,25 @@ describe("NextDrag", function()
       assert.are.same({}, calls.deposited)
     end)
 
-    it("asks first before depositing into a tab the player cannot take items back from, landing back meanwhile", function()
+    it("docks a deposit into a tab the player cannot take items back from, and deposits on a double click", function()
       local herbs = pickUp(backpack, "Herbs")
       moveTo(centerOf(guild.tabs:Tab(1004).button))
       drop(herbs)
-      assert.are.same({}, calls.deposited)
-      assert.is_not_nil(asked)
       finishTweens()
-      assert.is_nil(backpack.content.leaving.Herbs)
-      assert.is_true(herbs.frame:IsShown())
-      asked.yes()
+      assert.are.same({}, calls.deposited)
+      assert.is_nil(asked, "no dialog")
+      local d = nextDrag.dock
+      assert.is_true(d.frame:IsShown())
+      assert.are.equal(guild.frame, d.frame:GetParent())
+      assert.are.equal("Deposit 2 items?", d.title:GetText())
+      assert.are.equal("You cannot take them back out of Donations.", d.warning:GetText())
+      assert.are.equal(d.card, herbs.frame:GetParent())
+      assert.are.equal(herbs, backpack.content.drag.section, "the backpack keeps its gap")
+      d.catcher:GetScript("OnDoubleClick")(d.catcher, "LeftButton")
       assert.are.same({ { { "0_3", "0_4" }, 4 } }, calls.deposited)
+      finishTweens()
+      assert.is_not_nil(backpack.content.leaving.Herbs)
+      assert.is_false(d.frame:IsShown())
     end)
 
     it("withdraws a guild section into the backpack", function()
@@ -862,7 +872,7 @@ describe("NextDrag", function()
     before_each(function()
       override(addon, "atBank", false)
       bank.frame:Hide()
-      seller = { kind = -1, closing = false, glows = {}, sales = {}, sells = nil, answer = "sold" }
+      seller = { kind = -1, closing = false, glows = {}, sales = {}, asked = {}, sells = nil, answer = "sold" }
       seller.frame = CreateFrame("Frame")
       seller.body = CreateFrame("Frame")
       seller.body:_SetRect(0, 0, style.BODY_WIDTH, 1200)
@@ -877,10 +887,16 @@ describe("NextDrag", function()
       function seller:IsShown() return self.frame:IsShown() end
       function seller:SetDropGlow(on) table.insert(self.glows, on) end
       function seller:SaleOf(list) return self.sells or list end
-      function seller:Sell(c, sale)
+      -- As the vendor's: "sold", or "confirm" and the text to confirm with while unconfirmed.
+      function seller:Sell(c, sale, confirmed)
         assert.is_not_nil(c)
+        if self.answer == "confirm" and not confirmed then
+          table.insert(self.asked, keys(sale))
+          return "confirm", { title = "Sell 2 items?", warning = "Only the last 12 items sold can be bought back.",
+            hint = "Double-click to sell · Right-click to cancel" }
+        end
         table.insert(self.sales, keys(sale))
-        return self.answer
+        return "sold"
       end
       nextDrag:RegisterSeller(seller)
     end)
@@ -907,7 +923,7 @@ describe("NextDrag", function()
       assert.are.same({ { "0_1" } }, seller.sales)
     end)
 
-    it("lands back when nothing in it sells, or when the seller asks first", function()
+    it("lands back when nothing in it sells", function()
       seller.sells = {}
       local herbs = pickUp(backpack, "Herbs")
       moveTo(300, 600)
@@ -917,14 +933,172 @@ describe("NextDrag", function()
       assert.are.same({}, seller.sales)
       assert.is_true(herbs.frame:IsShown())
       assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
-      seller.sells, seller.answer = nil, "asked"
-      herbs = pickUp(backpack, "Herbs")
-      moveTo(300, 600)
-      drop(herbs)
-      finishTweens()
-      assert.are.same({ { "0_3", "0_4" } }, seller.sales)
-      assert.is_true(herbs.frame:IsShown(), "it lands back while the question is open")
-      assert.is_nil(backpack.content.leaving.Herbs)
+    end)
+
+    -- Asked: a sale past what buyback keeps asked in a dialog that "blends right in", and the section
+    -- snapped back to the backpack meanwhile, drawing the eye away. Now the section stays in the
+    -- seller, glowing, until it is confirmed with a double click or cancelled.
+    describe("a sale it confirms first", function()
+      local herbs
+
+      local function dock()
+        return nextDrag.dock
+      end
+
+      before_each(function()
+        seller.answer = "confirm"
+        herbs = pickUp(backpack, "Herbs")
+        moveTo(300, 600)
+        drop(herbs)
+        finishTweens()
+      end)
+
+      local function doubleClick()
+        local catcher = dock().catcher
+        catcher:GetScript("OnDoubleClick")(catcher, "LeftButton")
+      end
+
+      local function click(mouse)
+        local catcher = dock().catcher
+        catcher:GetScript("OnClick")(catcher, mouse)
+      end
+
+      local function backInPlace()
+        assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
+        assert.is_true(herbs.frame:IsShown())
+        assert.is_false(dock().frame:IsShown())
+        assert.is_false(nextDrag:IsActive())
+        assert.is_nil(backpack.content.drag)
+        assert.is_nil(backpack.content.leaving.Herbs)
+      end
+
+      it("docks the section in the seller with what it asks, selling nothing and keeping the backpack's gap", function()
+        assert.are.same({ { "0_3", "0_4" } }, seller.asked)
+        assert.are.same({}, seller.sales)
+        local d = dock()
+        assert.is_true(d.frame:IsShown())
+        assert.are.equal(seller.frame, d.frame:GetParent())
+        assert.are.equal("Sell 2 items?", d.title:GetText())
+        assert.are.equal("Only the last 12 items sold can be bought back.", d.warning:GetText())
+        assert.are.equal("Double-click to sell · Right-click to cancel", d.hint:GetText())
+        assert.are.equal(d.card, herbs.frame:GetParent())
+        assert.is_true(herbs.frame:IsShown())
+        assert.is_true(d.scrim:IsShown(), "the seller's own items dim behind it")
+        assert.are.equal(herbs, backpack.content.drag.section, "the backpack keeps its gap")
+        assert.is_nil(backpack.content.leaving.Herbs)
+        assert.is_true(nextDrag:IsActive())
+        assert.are.same({ true, false }, seller.glows)
+        assert.is_false(nextDrag.hint:IsShown())
+        assert.is_false(nextDrag.cover:IsShown())
+      end)
+
+      it("keeps the section's item buttons from taking the clicks", function()
+        local d = dock()
+        local function maxLevel(f)
+          local level = f:GetFrameLevel()
+          for _, child in ipairs({ f:GetChildren() }) do level = math.max(level, maxLevel(child)) end
+          return level
+        end
+        assert.is_true(d.catcher:IsMouseEnabled())
+        assert.is_true(d.catcher:GetFrameLevel() > maxLevel(herbs.frame))
+      end)
+
+      it("sells on a double click, with the section's items as they are then, and flies it in", function()
+        slots[BACKPACK].tabs[1] = tab({ "Armor", "Cloth", "Herbs", "Ore" }, {
+          item("0_1", "Armor"), item("0_2", "Cloth"), item("0_3", "Herbs"), item("0_5", "Ore"),
+        })
+        backpack:Draw(ctx(), slots[BACKPACK], function() end)
+        flush()
+        doubleClick()
+        assert.are.same({ { "0_3" } }, seller.sales)
+        finishTweens()
+        assert.is_false(dock().frame:IsShown())
+        assert.is_false(herbs.frame:IsShown())
+        assert.is_not_nil(backpack.content.leaving.Herbs)
+        assert.is_false(nextDrag:IsActive())
+        assert.is_nil(backpack.content.drag)
+      end)
+
+      it("does nothing on a single click", function()
+        click("LeftButton")
+        finishTweens()
+        assert.are.same({}, seller.sales)
+        assert.is_true(dock().frame:IsShown())
+        assert.are.equal(dock().card, herbs.frame:GetParent())
+      end)
+
+      it("cancels on a right click: the section lands back in its gap, nothing sold", function()
+        click("RightButton")
+        finishTweens()
+        assert.are.same({}, seller.sales)
+        backInPlace()
+      end)
+
+      it("covers the seller's own items, so nothing behind it is bought, and cancels on a right click there too", function()
+        local d = dock()
+        assert.is_true(d.frame:IsMouseEnabled())
+        d.frame:GetScript("OnMouseUp")(d.frame, "LeftButton")
+        assert.is_true(d.frame:IsShown())
+        d.frame:GetScript("OnMouseUp")(d.frame, "RightButton")
+        finishTweens()
+        assert.are.same({}, seller.sales)
+        backInPlace()
+      end)
+
+      it("sells nothing on a double click once the seller is closing, and lands back", function()
+        seller.closing = true
+        doubleClick()
+        finishTweens()
+        assert.are.same({}, seller.sales)
+        backInPlace()
+      end)
+
+      it("lands back when nothing is left to sell at the double click", function()
+        seller.sells = {}
+        doubleClick()
+        finishTweens()
+        assert.are.same({}, seller.sales)
+        backInPlace()
+      end)
+
+      it("cancels when the seller closes", function()
+        seller.frame:Hide()
+        nextDrag:PanelHidden(seller)
+        assert.are.same({}, seller.sales)
+        backInPlace()
+      end)
+
+      it("puts the section back first when another one is picked up", function()
+        local armor = pickUp(backpack, "Armor")
+        assert.are.equal(armor, nextDrag.current.section)
+        assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
+        assert.is_false(dock().frame:IsShown())
+        drop(armor)
+      end)
+
+      it("goes away with the section when its category leaves the data", function()
+        slots[BACKPACK].tabs[1] = tab({ "Armor", "Cloth", "Ore" }, {
+          item("0_1", "Armor"), item("0_2", "Cloth"), item("0_5", "Ore"),
+        })
+        backpack:Draw(ctx(), slots[BACKPACK], function() end)
+        flush()
+        assert.is_false(dock().frame:IsShown())
+        assert.is_false(nextDrag:IsActive())
+        assert.are.same({}, seller.sales)
+      end)
+
+      it("pulses its glow", function()
+        local d = dock()
+        local update = d.frame:GetScript("OnUpdate")
+        local alphas = {}
+        for _ = 1, 6 do
+          update(d.frame, 0.2)
+          table.insert(alphas, d.glow[1]:GetAlpha())
+        end
+        local low, high = math.min(unpack(alphas)), math.max(unpack(alphas))
+        assert.is_true(high - low > 0.3, "it pulses: " .. table.concat(alphas, ", "))
+        for _, edge in ipairs(d.glow) do assert.are.equal(alphas[#alphas], edge:GetAlpha()) end
+      end)
     end)
 
     it("sells nothing without the release", function()

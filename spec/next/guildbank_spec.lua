@@ -181,7 +181,9 @@ describe("NextGuildBank", function()
     override(stubs.searchBox, "CreateBox", function(_, kind, parent)
       table.insert(calls.created, kind)
       local frame = CreateFrame("Frame", nil, parent)
-      return { frame = frame, textBox = CreateFrame("EditBox", nil, frame), kind = kind }
+      -- As searchBox:CreateBox makes it (frames/search.lua): a BagSearchBoxTemplate edit box.
+      local textBox = CreateFrame("EditBox", nil, frame, "BagSearchBoxTemplate")
+      return { frame = frame, textBox = textBox, helpText = textBox.Instructions, kind = kind }
     end)
     override(stubs.sonata, "UnregisterElement", function() end)
     override(stubs.sonata, "RegisterElement", function() end)
@@ -597,12 +599,17 @@ describe("NextGuildBank", function()
       assert.are.equal(1, calls.deposited[1].tab)
     end)
 
-    it("asks first when the player cannot take items back out of the tab", function()
+    -- Confirmed in the guild bank itself, as a big sale is in the vendor (NextDrag docks the section).
+    it("deposits into a tab the player cannot take items back out of only once confirmed, with no dialog", function()
       local g = open()
-      assert.are.equal("asked", g:Deposit(ctx(), { bagItem(0, 1), bagItem(0, 2) }, 1004))
+      local items = { bagItem(0, 1), bagItem(0, 2) }
+      local result, confirmation = g:Deposit(ctx(), items, 1004)
+      assert.are.equal("confirm", result)
+      assert.are.same({ title = "Deposit 2 items?", warning = "You cannot take them back out of Donations.",
+        hint = "Double-click to deposit · Right-click to cancel" }, confirmation)
       assert.are.same({}, calls.deposited)
-      assert.are.equal("You cannot take items back out of Donations. Deposit 2 items?", asked.text)
-      asked.yes()
+      assert.is_nil(asked)
+      assert.are.equal("deposited", g:Deposit(ctx(), items, 1004, true))
       assert.are.equal(4, calls.deposited[1].tab)
     end)
 

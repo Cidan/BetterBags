@@ -242,6 +242,20 @@ describe("NextVendor", function()
       assert.is_false(nextDrag:IsActive())
     end)
 
+    -- Its box sets its own OnTextChanged, which replaces the template's, the one that hid the help text
+    -- (InputBoxInstructions_OnTextChanged), so "Search Vendor" stayed under what was typed.
+    it("hides its help text while something is typed, and shows it again once emptied", function()
+      local v = open()
+      local t = v.searchBox.textBox
+      assert.are.equal("Search Vendor", t.Instructions:GetText())
+      t:SetText("plate")
+      t:GetScript("OnTextChanged")(t, true)
+      assert.is_false(t.Instructions:IsShown())
+      t:SetText("")
+      t:GetScript("OnTextChanged")(t, true)
+      assert.is_true(t.Instructions:IsShown())
+    end)
+
     it("has a search box of its own, always shown, filtering the vendor's items", function()
       local v = open()
       assert.is_true(v.searchBox.frame:IsShown())
@@ -664,17 +678,19 @@ describe("NextVendor", function()
       assert.is_true(calls.sellSlots[1].open)
     end)
 
-    it("asks first past 12, the last 12 sold being all buyback keeps", function()
+    -- Past 12 the sale is confirmed in the vendor itself (the section docks there with this text,
+    -- NextDrag): the dialog it asked with blended in, and the section snapped back to the backpack.
+    it("past 12, the last 12 sold being all buyback keeps, sells only once confirmed, with no dialog", function()
       local v = open()
       local sale = {}
       for i = 1, 13 do table.insert(sale, slotData(0, i)) end
-      assert.are.equal("asked", v:Sell(ctx(), sale))
+      local result, confirmation = v:Sell(ctx(), sale)
+      assert.are.equal("confirm", result)
+      assert.are.same({ title = "Sell 13 items?", warning = "Only the last 12 items sold can be bought back.",
+        hint = "Double-click to sell · Right-click to cancel" }, confirmation)
       assert.are.same({}, calls.sellSlots)
-      assert.are.equal("Sell Items", asked.title)
-      assert.are.equal("Sell 13 items? Only the last 12 items sold can be bought back.", asked.text)
-      asked.no()
-      assert.are.same({}, calls.sellSlots)
-      asked.yes()
+      assert.is_nil(asked)
+      assert.are.equal("sold", v:Sell(ctx(), sale, true))
       assert.are.equal(13, #calls.sellSlots[1].slots)
     end)
 
@@ -682,9 +698,8 @@ describe("NextVendor", function()
       local v = open()
       local sale = {}
       for i = 1, 13 do table.insert(sale, slotData(0, i)) end
-      v:Sell(ctx(), sale)
       eventsRegistered["MERCHANT_CLOSED"](ctx())
-      asked.yes()
+      v:Sell(ctx(), sale, true)
       assert.is_false(calls.sellSlots[1].open)
     end)
   end)

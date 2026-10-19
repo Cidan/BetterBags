@@ -554,13 +554,17 @@ end
 
 -- Deposit puts a backpack section into a tab (the one dropped on, else DepositTab): every item and
 -- every pile its virtual stack hides (SectionFrame:WithStacks), in the backpack's bags, leaving out
--- bound items, which the guild bank does not take. Into a tab the player cannot withdraw from, it asks
--- first: those items cannot be taken back. It returns "deposited", "asked", or "nothing".
+-- bound items, which the guild bank does not take. Into a tab the player cannot withdraw from (those
+-- items cannot be taken back) it deposits only once confirmed: unconfirmed it returns "confirm" with
+-- what to confirm with, and NextDrag docks the section in the guild bank until a double click. It
+-- returns "deposited", "confirm" or "nothing".
 ---@param ctx Context
 ---@param list ItemData[]
 ---@param container? number
----@return string
-function guildProto:Deposit(ctx, list, container)
+---@param confirmed? boolean
+---@return string result
+---@return NextConfirmation? confirmation
+function guildProto:Deposit(ctx, list, container, confirmed)
   local _ = ctx
   local tab
   if container ~= nil then
@@ -583,11 +587,12 @@ function guildProto:Deposit(ctx, list, container)
     return "nothing"
   end
   local info = guildBank:TabInfo(tab)
-  if info.numWithdrawals == 0 then
-    question:YesNo(L:G("Deposit Items"),
-      format(L:G("You cannot take items back out of %s. Deposit %d items?"), info.name, #slots),
-      function() guildBank:DepositSlots(slots, tab) end, function() end)
-    return "asked"
+  if info.numWithdrawals == 0 and not confirmed then
+    return "confirm", {
+      title = format(L:G("Deposit %d items?"), #slots),
+      warning = format(L:G("You cannot take them back out of %s."), info.name),
+      hint = L:G("Double-click to deposit · Right-click to cancel"),
+    }
   end
   guildBank:DepositSlots(slots, tab)
   return "deposited"

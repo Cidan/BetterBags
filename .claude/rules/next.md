@@ -178,7 +178,25 @@ section dragged out of a panel returns to the panel's strata (§7).
     six that first survived led to tests of the drift, the swell reaching the puffs and the
     settling's shape, and to removing a size reset the next shimmer redoes).
 - **Search** under the title: the backpack's in-bag search box (`searchBox:CreateBox`), taken out of
-  Sonata's hands and drawn flat. It follows the in-bag search setting like the classic bag's.
+  Sonata's hands and drawn in Next's look by `BuildSearch`, which every panel runs on its box (the
+  vendor's own too). It follows the in-bag search setting like the classic bag's.
+  - **Asked: it was "very difficult to see"; make it stand out without breaking the look.** It
+    showed the template's help text in 35% gray `GameFontDisableSmall` (about 2.5:1 against its
+    fill), a 10-pixel magnifier at 60% gray, a fill barely lighter than the body, and an underline
+    fading out halfway.
+  - Now: a fill lighter than the body (`style.Color.SearchFill`, `SearchFillFocus` while focused), a
+    1-pixel lavender edge all round (`style.SearchEdge`: 0.3 idle, 0.55 under the pointer or holding
+    a search, 1 focused, fading over `Time.Hover`), a 14-pixel lavender magnifier (white while
+    focused), and the help text in Next's `Search` font (muted lavender, 12; about 5.7:1) left after
+    it; typed text in `SearchText` (13, Next's text color), inset past the magnifier.
+  - Next's colors are set from hooks that run after the template's scripts
+    (`SearchBoxTemplate_OnEditFocusGained`/`Lost`/`OnTextChanged` set the magnifier to white or 0.6
+    gray). The `OnTextChanged` hook also shows the help text only while the box is empty: a box that
+    sets its own `OnTextChanged` replaces the template's (`InputBoxInstructions_OnTextChanged`), and
+    the vendor's box did, so "Search Vendor" stayed under what was typed.
+  - Coverage: `spec/next/bag_spec.lua` ("the search box's look"), `spec/next/vendor_spec.lua` ("hides
+    its help text while something is typed"); the spec mock's `SearchBoxTemplate` runs Blizzard's
+    template scripts, and `EditBox:GetText` is "" for an empty box, as in the client.
 - **Content:** a scroll box (`render/scrollbox.lua`, its bar hidden until used) holding the canvas.
 - **Footer:** free slots on the left, money on the right (`MoneyFrame`).
 - **Tabs** (`next/tabs.lua`): the backpack's groups as tabs stacked down the body's left edge,
@@ -421,6 +439,41 @@ drag drops once it finds the left button up two frames in a row (`IsMouseButtonD
 frame leaves the release's own `OnDragStop` its chance), but without moving items: an `OnUpdate`
 is no hardware event, so a drop on the other bag or its tabs lands back.
 
+**Confirming in the target** (`NextDrag:Pend`). A move the target confirms first (a sale past what
+buyback keeps, §10; a deposit into a guild tab the player cannot withdraw from, guild-bank.md §5)
+used to open the question dialog while the section landed back in its source. Asked: the dialog
+"blends right in", and the section snapping back drew the eye back to the backpack; "maybe ... the
+category itself sticks in the vendor with a 'double click to confirm sell' and a glowing pulse". Now
+the target's `Sell` or `Deposit` returns `"confirm"` and a `NextConfirmation` (title, warning,
+hint), and the drop docks the section in the target:
+- **The dock** (`buildDock`, one, reused): over the target's scroll area, a scrim (`Color.Scrim`)
+  that dims the target's own items and takes their clicks, so nothing behind is bought; a card
+  (`Color.Card`) edged in an amber glow (`Color.Gold`, a 2-pixel edge and a soft halo) that pulses
+  (`PULSE_PERIOD`, 1.2 s), with the title (`ConfirmTitle`, 18, white), the warning (`ConfirmWarning`,
+  gold) and the hint (`ConfirmHint`, lavender) around the section. The card is scaled down when it
+  is taller than the scroll area, and laid out again when the section's height changes.
+- **The section** flies from where it was dropped into the card (`Time.Land`) and sits there with
+  its real item buttons. A catcher lies over the card above them (as the drag's cover does), so a
+  click answers rather than picking an item up. The drag goes on (`state.pending`, `landing`), so
+  the source keeps its gap and nothing goes back to it meanwhile. Its level is only ever raised:
+  lowering it threw a descendant to the top level (warcraft.wiki.gg "Frame Strata"), above the
+  catcher.
+- **A double click confirms** (`ConfirmPending`): a mouse click, the hardware event selling and
+  moving need. The target acts on the section's items as they are then (`SectionItems`; the
+  vendor recomputes `SaleOf`), and the section flies into it as a move that did not ask does
+  (`moveDone`). Nothing moved (nothing left in it, or the target is closing): it lands back.
+- **Cancelled** by a right click (on the card or the scrim; it lands back in its gap, the one time
+  it does, because the player asked), the target or the source hiding (`PanelHidden`; Escape
+  closes the vendor as always, which cancels), the section leaving the data, or another section
+  being picked up (`Begin` puts it back at once). There is no timeout.
+- Coverage: `spec/next/drag_spec.lua` ("a sale it confirms first": docked with the text and the gap
+  kept, the catcher above the buttons, double click with the items as they are then, single click,
+  right click on the card and the scrim, nothing left, closing, the seller hiding, a new pickup, the
+  section leaving the data, the pulse; "the guild bank": a deposit docked and confirmed),
+  `spec/next/vendor_spec.lua` and `spec/next/guildbank_spec.lua` (`Sell` and `Deposit` confirm
+  rather than ask). Every guard was mutation-tested; one that survived was dead code (`Cancel`
+  hiding the dock, which `finish` does) and was removed.
+
 **Positions** are in `UIParent`'s coordinates: the cursor (`GetCursorPosition` over `UIParent`'s
 effective scale), the canvas, tabs and scroll area (all at scale 1 under `UIParent`). The client
 reports a scaled frame's edges in its own scale, so the dragged section's position is always worked
@@ -614,13 +667,15 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   the backpack's bags, each slot once, leaving out what the vendor does not buy (`hasNoValue`) and
   refundable purchases (`C_Item.CanBeRefunded`: Blizzard asks before refunding one, and
   `UseContainerItem` would refund it without asking). `Sell` sells it at once (`SellSlots`, while
-  the vendor is open) when buyback can keep all of it (12, Blizzard's `BUYBACK_ITEMS_PER_PAGE`),
-  else asks first ("Sell 13 items? Only the last 12 items sold can be bought back."). The section
-  flies into the vendor when it sold, and lands back in its place when nothing sells or while the
-  question is open. Selling needs the drop's release, as moves do: a drag ended without one sells
-  nothing. Unlike a right click on the header (Move Categories), it does not need Enable Category
-  Sell and Deposit and is not cut to 10 items: the drag is the deliberate act, and the question
-  covers what buyback cannot.
+  the vendor is open) when buyback can keep all of it (12, Blizzard's `BUYBACK_ITEMS_PER_PAGE`).
+  Past that, `Sell` sells nothing unless `confirmed` and returns `"confirm"` with the text to
+  confirm with ("Sell 13 items?", "Only the last 12 items sold can be bought back.", "Double-click
+  to sell · Right-click to cancel"): the section docks in the vendor until a double click confirms
+  it (§7, "Confirming in the target"). The section flies into the vendor when it sold, and lands
+  back in its place when nothing sells. Selling needs a mouse click, as moves do: the drop's release,
+  or the double click; a drag ended without a release sells nothing. Unlike a right click on the
+  header (Move Categories), it does not need Enable Category Sell and Deposit and is not cut to 10
+  items: the drag is the deliberate act, and the confirmation covers what buyback cannot.
 - **Masque:** each button is a holder the canvas places (`frame`, as tall as the icon and its price)
   holding the square button that takes the clicks (`button`), so Masque, which sizes a skin to the
   button it skins (Masque 12.1.0 `Core.lua` `UpdateScale`), skins the icon alone. The button carries

@@ -126,9 +126,16 @@ describe("NextBag", function()
     override(stubs.events, "RegisterMessage", function(_, name, fn) messages[name] = fn end)
     override(stubs.events, "BucketEvent", function(_, name, fn, filter) buckets[name] = { fn, filter } end)
     override(stubs.events, "RegisterEvent", function() end)
+    -- As searchBox:CreateBox makes it (frames/search.lua): a BagSearchBoxTemplate edit box in a
+    -- frame, its help text the template's Instructions, centered.
     override(stubs.searchBox, "CreateBox", function(_, kind, parent)
       box = { kind = kind, frame = CreateFrame("Frame", nil, parent) }
-      box.textBox = CreateFrame("EditBox", nil, box.frame)
+      box.textBox = CreateFrame("EditBox", nil, box.frame, "BagSearchBoxTemplate")
+      box.textBox:SetAllPoints()
+      box.helpText = box.textBox.Instructions
+      box.helpText:ClearAllPoints()
+      box.helpText:SetPoint("CENTER")
+      box.helpText:SetText("Search Backpack")
       return box
     end)
     override(stubs.sonata, "UnregisterElement", function(_, kind, element)
@@ -230,6 +237,100 @@ describe("NextBag", function()
       assert.are.equal(box, bag.searchBox)
       assert.are.same({ "unregistered", "SearchBox", box.textBox }, sent[1])
       assert.is_true(box.frame:IsShown())
+    end)
+
+    -- Asked: the search box was "very difficult to see" (35% gray help text on a fill barely lighter
+    -- than the panel); make it stand out without leaving Next's look.
+    describe("the search box's look", function()
+      local function color(texture)
+        local r, g, b, a = texture:GetVertexColor()
+        return { r, g, b, a }
+      end
+
+      local function near(expected, actual, what)
+        for i = 1, 4 do
+          assert.is_true(math.abs(expected[i] - actual[i]) < 0.001, what .. ": " .. table.concat(actual, ",")
+            .. " is not " .. table.concat(expected, ","))
+        end
+      end
+
+      local function edgeAlpha(bag)
+        local alphas = {}
+        for _, edge in ipairs(bag.searchEdges) do table.insert(alphas, color(edge)[4]) end
+        for i = 2, #alphas do assert.are.equal(alphas[1], alphas[i], "every edge alike") end
+        return alphas[1]
+      end
+
+      local function lavender(alpha)
+        local c = style.Color.Lavender
+        return { c[1], c[2], c[3], alpha }
+      end
+
+      it("draws a fill lighter than the panel, edged in lavender all round, over none of the template's art", function()
+        local bag = nextBag:Create(ctx())
+        local t = box.textBox
+        for _, key in ipairs({ "Left", "Middle", "Right" }) do
+          assert.are.equal(0, t[key]:GetAlpha(), key)
+        end
+        near(style.Color.SearchFill, color(bag.searchFill), "fill")
+        assert.are.equal(4, #bag.searchEdges)
+        assert.are.equal(style.SearchEdge.Idle, edgeAlpha(bag))
+      end)
+
+      it("shows its help text in Next's own font, left of the box after the magnifier", function()
+        nextBag:Create(ctx())
+        local t = box.textBox
+        assert.are.equal(style:Font("Search"), box.helpText:GetFontObject())
+        assert.are.equal("LEFT", box.helpText:GetJustifyH())
+        local point, rel, relPoint, x = box.helpText:GetPoint(1)
+        assert.are.same({ "LEFT", t.searchIcon, "RIGHT", style.SEARCH_GAP }, { point, rel, relPoint, x })
+        assert.are.same({ style.SEARCH_ICON, style.SEARCH_ICON }, { t.searchIcon:GetSize() })
+        point, rel, relPoint, x = t.searchIcon:GetPoint(1)
+        assert.are.same({ "LEFT", t, "LEFT", style.SEARCH_GAP }, { point, rel, relPoint, x })
+        near(lavender(style.SearchIcon.Idle), color(t.searchIcon), "magnifier")
+        assert.are.equal(style:Font("SearchText"), t:GetFontObject())
+        assert.are.same({ style.SEARCH_GAP * 2 + style.SEARCH_ICON, 24, 0, 0 }, { t:GetTextInsets() })
+      end)
+
+      it("brightens its edge while the pointer is over it, and settles back", function()
+        local bag = nextBag:Create(ctx())
+        local t = box.textBox
+        t:GetScript("OnEnter")(t)
+        finishTweens()
+        assert.are.equal(style.SearchEdge.Hover, edgeAlpha(bag))
+        t:GetScript("OnLeave")(t)
+        finishTweens()
+        assert.are.equal(style.SearchEdge.Idle, edgeAlpha(bag))
+      end)
+
+      it("lights up while focused, its magnifier white, and keeps its colors over the template's", function()
+        local bag = nextBag:Create(ctx())
+        local t = box.textBox
+        t:SetFocus()
+        t:GetScript("OnEditFocusGained")(t)
+        finishTweens()
+        assert.are.equal(style.SearchEdge.Focus, edgeAlpha(bag))
+        near(style.Color.SearchFillFocus, color(bag.searchFill), "fill")
+        near({ 1, 1, 1, 1 }, color(t.searchIcon), "magnifier")
+        -- Blizzard's focus lost dims the magnifier to 0.6 gray; Next's lavender wins.
+        t:ClearFocus()
+        t:GetScript("OnEditFocusLost")(t)
+        finishTweens()
+        assert.are.equal(style.SearchEdge.Idle, edgeAlpha(bag))
+        near(style.Color.SearchFill, color(bag.searchFill), "fill")
+        near(lavender(style.SearchIcon.Idle), color(t.searchIcon), "magnifier")
+      end)
+
+      it("stays lit while it holds a search, focused or not", function()
+        local bag = nextBag:Create(ctx())
+        local t = box.textBox
+        t:SetText("ore")
+        t:GetScript("OnTextChanged")(t, true)
+        t:GetScript("OnEditFocusLost")(t)
+        finishTweens()
+        assert.are.equal(style.SearchEdge.Hover, edgeAlpha(bag))
+        near(lavender(style.SearchIcon.Active), color(t.searchIcon), "magnifier")
+      end)
     end)
 
     it("hides the search box while in-bag search is off, and recalculates when it changes", function()

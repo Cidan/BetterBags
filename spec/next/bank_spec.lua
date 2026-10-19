@@ -187,7 +187,9 @@ describe("NextBank", function()
     override(stubs.events, "BucketEvent", function(_, name, fn, filter) buckets[name] = { fn, filter } end)
     override(stubs.searchBox, "CreateBox", function(_, kind, parent)
       local box = { kind = kind, frame = CreateFrame("Frame", nil, parent) }
-      box.textBox = CreateFrame("EditBox", nil, box.frame)
+      -- As searchBox:CreateBox makes it (frames/search.lua): a BagSearchBoxTemplate edit box.
+      box.textBox = CreateFrame("EditBox", nil, box.frame, "BagSearchBoxTemplate")
+      box.helpText = box.textBox.Instructions
       calls.box = box
       return box
     end)
