@@ -115,6 +115,17 @@ local function guildTabOf(bagid)
   return const.GUILD_BANK_BAGS and const.GUILD_BANK_BAGS[bagid]
 end
 
+-- drawsEmptySlotsInPlace says whether the slot-order view (Show Bags, a bank or guild tab by itself)
+-- draws a bag's empty slots in place (Phase9_Sort): a bag with a name, a Warbank tab (retail reports
+-- no name for them) and a guild bank tab (not a bag).
+---@param bagid number
+---@return boolean
+local function drawsEmptySlotsInPlace(bagid)
+  return C_Container.GetBagName(bagid) ~= nil
+    or (addon.isRetail and const.ACCOUNT_BANK_BAGS ~= nil and const.ACCOUNT_BANK_BAGS[bagid] ~= nil)
+    or guildTabOf(bagid) ~= nil
+end
+
 ---@return GuildBank
 local function guildBankSource()
   return addon:GetModule("GuildBank")
@@ -1580,9 +1591,7 @@ function items:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
   if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
     for bagid, emptyBagData in pairs(emptySlotByBagAndSlot) do
       for slotid, data in pairs(emptyBagData) do
-        -- A guild bank tab has no bag name (it is not a bag), and its slots show in place too.
-        if C_Container.GetBagName(bagid) ~= nil or (addon.isRetail and const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid])
-          or guildTabOf(bagid) then
+        if drawsEmptySlotsInPlace(bagid) then
           local category = self:GetBagName(bagid)
           local dummy = {
             isFreeSlot = true,
@@ -1650,6 +1659,13 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
   end
 
   local showAll = database:GetShowAllFreeSpace(kind)
+  -- The slot-order view draws a bag's empty slots in place, so Free Space leaves those bags out: an
+  -- entry's button is one of those slots, and a slot has one button, so the section took it out of
+  -- its place and left a gap.
+  local slotOrder = viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS
+  local function inFreeSpace(bagid, tabID)
+    return IncludeBagInFreeSpace(kind, bagid, tabID) and not (slotOrder and drawsEmptySlotsInPlace(bagid))
+  end
 
   for tabID in pairs(possibleTabs) do
     tabs[tabID] = {
@@ -1664,14 +1680,14 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
 
     -- Filter emptySlotsSorted and emptySlotsByBag for this tab
     for _, item in ipairs(emptySlotsSorted or {}) do
-      if IncludeBagInFreeSpace(kind, item.bagid, tabID) then
+      if inFreeSpace(item.bagid, tabID) then
         table.insert(tabs[tabID].emptySlotsSorted, item)
       end
     end
 
     if emptySlotsByBag then
       for bagid, info in pairs(emptySlotsByBag) do
-        if IncludeBagInFreeSpace(kind, bagid, tabID) then
+        if inFreeSpace(bagid, tabID) then
           tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count, family = info.family }
           tabs[tabID].emptySlots[info.name] = (tabs[tabID].emptySlots[info.name] or 0) + info.count
         end

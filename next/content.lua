@@ -268,7 +268,9 @@ function canvasProto:addItem(ctx, section, data, claims)
   end
   local button = self:claim(ctx, section, data.slotkey, claims)
   if data.isFreeSlot then
+    -- An empty slot drawn in place (a tab shown in slot order, which has no Free Space for it).
     button:SetFreeSlots(ctx, data, -1)
+    self.freeTotal = self.freeTotal + 1
   else
     button:SetItemFromData(ctx, data)
   end
@@ -402,7 +404,7 @@ function canvasProto:Bind(ctx, slotInfo, tabID, claims)
       end
     end
     section.count:SetText(tostring(total))
-    self.freeTotal = total
+    self.freeTotal = self.freeTotal + total
   end
 
   for _, section in ipairs(self.order) do

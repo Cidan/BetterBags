@@ -304,6 +304,35 @@ describe("NextContent", function()
 
   -- BetterBags Next's vendor (next.md §10) binds sections of its own buttons, taller than an icon
   -- (the price is under it).
+  -- A tab shown in slot order draws its empty slots in place and carries no Free Space (the data
+  -- phase leaves it out: the section took a slot's only button out of its place). The panel's
+  -- footer still says how many slots are free.
+  describe("free slots drawn in place", function()
+    local function emptySlot(slotkey, category)
+      return { slotkey = slotkey, isFreeSlot = true, itemInfo = { category = category } }
+    end
+
+    it("counts them in its free slots, drawn as free slots where they are", function()
+      bind(data({
+        categories = { { name = "#1: Bag" } },
+        items = { item("0_1", "#1: Bag"), emptySlot("0_2", "#1: Bag"), emptySlot("0_3", "#1: Bag") },
+      }))
+      assert.are.equal(2, canvas.freeTotal)
+      assert.is_nil(canvas.byName["Free Space"])
+      assert.are.same({ "free", -1 }, { buttons["0_2"].drawn[1][1], buttons["0_2"].drawn[1][3] })
+    end)
+
+    it("adds them to the free slots Free Space counts", function()
+      bind(data({
+        categories = { { name = "#1: Bag" } },
+        items = { emptySlot("0_2", "#1: Bag") },
+        free = { showAll = false, buttons = { { slotkey = "1_1", count = 5, key = "Bag" } } },
+      }))
+      assert.are.equal(6, canvas.freeTotal)
+      assert.are.equal("5", canvas.byName["Free Space"].count:GetText())
+    end)
+  end)
+
   -- The guild bank's slots are not bag slots: its canvas takes its buttons from the guild bank's own
   -- buttons (NextGuildButton) instead of the item buttons (guild-bank.md §5).
   describe("a source of buttons of its own", function()

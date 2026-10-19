@@ -481,6 +481,20 @@ describe("the guild bank through the data engine", function()
     assert.are.equal(96, free)
   end)
 
+  -- Its free slots are those empty slots: a Free Space entry would take one of them out of its place
+  -- (one button per slot) and leave a gap in the tab's grid.
+  it("has no Free Space when a tab is shown by itself, its free slots being in place", function()
+    saveGlobal(_G.C_Container, "GetBagName")
+    _G.C_Container.GetBagName = function(bagid) return bagid < BASE and "Bag" or nil end
+    viewMode = SECTION_ALL_BAGS
+    loadTabs()
+    local slotInfo = read()
+    assert.is_nil(slotInfo.tabs[BASE + 2].freeSpace)
+    viewMode = SECTION_GRID
+    slotInfo = read()
+    assert.is_not_nil(slotInfo.tabs[const.GUILD_BANK_ALL_TAB].freeSpace, "kept in the combined view")
+  end)
+
   describe("the shared search index", function()
     it("holds the guild bank's items beside the bags', and drops them when the guild bank closes", function()
       loadTabs()

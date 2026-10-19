@@ -118,7 +118,8 @@ nothing.
   bags use, each tab's free slots its own Free Space entry, the same item stacked across tabs.
 - **A tab by itself** (the Show Bags view, `SECTION_ALL_BAGS`, as the bank's Bank Tabs mode): that
   tab's slots in order, empty slots in place, one headerless section named `#<tab>: <name>`, no
-  virtual stacks. The panel switches the guild kind's view between the two
+  virtual stacks, and no Free Space: its free slots are those in place (data-loader.md §8; a Free
+  Space entry took one of them out of the grid, leaving a gap). The footer counts them. The panel switches the guild kind's view between the two
   (`database:SetBagView(GUILD, ...)`) and recalculates (`bags/Rederive { guild, resetLayout }`).
 
 ## 5. BetterBags Next's guild bank (`NextGuildBank`, `NextGuildButton`)
