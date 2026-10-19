@@ -375,8 +375,11 @@ function buttonProto:OnReceiveDrag()
   end
 end
 
--- OnEnter shows Blizzard's tooltip for the slot (a caged battle pet's own, as Blizzard's guild bank
--- does), or for a free slot its tab and what a drop does.
+-- OnEnter shows Blizzard's tooltip for the slot, or for a free slot its tab and what a drop does. On
+-- retail and WoW: Forever SetGuildBankItem is a tooltip data accessor that returns only whether it
+-- showed (TooltipDataHandler.lua), and Blizzard's Mainline button reads nothing from it; on Classic it
+-- is the native method, which returns a caged battle pet's values for the pet's own tooltip, as
+-- Blizzard's TBC button shows it.
 function buttonProto:OnEnter()
   local tab, slot = self:location()
   if tab == nil then
@@ -391,6 +394,10 @@ function buttonProto:OnEnter()
     end
     GameTooltip:AddLine(L:G("Drop an item here to put it in this tab"), 0.8, 0.8, 0.8)
     GameTooltip:Show()
+    return
+  end
+  if addon.isRetail then
+    GameTooltip:SetGuildBankItem(tab, slot)
     return
   end
   local speciesID, level, breedQuality, maxHealth, power, speed, name = GameTooltip:SetGuildBankItem(tab, slot)

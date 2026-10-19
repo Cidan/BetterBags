@@ -191,6 +191,13 @@ describe("a guild bank visit on the whole addon", function()
     local names = {}
     for _, section in ipairs(panel.content.order) do table.insert(names, section.name) end
     assert.is_true(#names >= 2, table.concat(names, ", "))
+    -- Hovering an item shows Blizzard's tooltip for its slot (retail's SetGuildBankItem returns only
+    -- true or false; reading a battle pet from it errored on every hover).
+    _G._guildBankCalls.tooltips = {}
+    ore.button:GetScript("OnEnter")(ore.button)
+    assert.are.same({ { tab = 2, slot = 2 } }, _G._guildBankCalls.tooltips)
+    assert.are.same({}, handle.errors, "hovering")
+    ore.button:GetScript("OnLeave")(ore.button)
     assert.are.equal(_G.BetterBagsSneakyFrame, GuildBankFrame:GetParent(), "Blizzard's frame never seen")
     assert.is_true(GuildBankFrame:IsShown(), "and still shown to Blizzard's code")
     assert.are.same({}, handle.errors)

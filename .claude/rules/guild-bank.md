@@ -183,8 +183,19 @@ element (its styler guards the parts a plain item button lacks).
   `StackSplitFrame:OpenStackSplitFrame`, Classic's global `OpenStackSplitFrame`; neither client has
   the other) and `SplitStack` splits from the item's tab, gold on the cursor is deposited
   (`"money"`) or put back (`"guildbankmoney"`), a right click withdraws, a left click picks up; drag
-  start and receive drag pick up; the tooltip is `GameTooltip:SetGuildBankItem` (a caged battle pet's
-  own, `BattlePetToolTip_Show`, as Blizzard's); hiding closes the stack split it opened. A free slot
+  start and receive drag pick up; the tooltip is `GameTooltip:SetGuildBankItem`; hiding closes the
+  stack split it opened.
+- **The tooltip's return differs by client.** On retail and WoW: Forever `GameTooltip` inherits
+  `GameTooltipDataMixin` (`CreateFromMixins(TooltipDataHandlerMixin)`, `Mainline/GameTooltip.lua`), so
+  `SetGuildBankItem` is a tooltip data accessor that returns only `true` (shown) or `false` (no data,
+  hidden), from `TooltipDataHandlerMixin:InternalProcessInfo`; Blizzard's Mainline button reads
+  nothing from it. On Classic `GameTooltipMixin` has no data handler, so it is the native method,
+  which returns a caged battle pet's values, and Blizzard's TBC button shows the pet's own tooltip
+  (`BattlePetToolTip_Show`) when the species is above 0. The button does each client's.
+  **Failure mode (fixed):** it used the TBC pattern everywhere, and on retail compared `true` with 0
+  on every hover (`attempt to compare number with boolean`). The spec mock returned nothing, and the
+  battle pet test installed Classic's return while the client was retail; the mock now follows
+  retail's accessor, and Classic's return is installed only by Classic tests. A free slot
   takes the item held: the slot itself (a tab by itself), or the tab's first free slot (All Tabs).
 - The canvas takes these buttons through `NextContent:SetButtonSource`, so `Bind`'s sections, order,
   gaps and free space are the bags'.

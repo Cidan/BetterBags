@@ -2957,9 +2957,20 @@ _G.C_TooltipInfo.GetGuildBankItem = function(tab, slot)
   local item = guildSlot(tab, slot)
   return { type = 0, lines = item and item.tooltipLines or {}, dataInstanceID = item and item.dataInstanceID }
 end
+-- GameTooltip:SetGuildBankItem(tab, slot) as retail and WoW: Forever define it: a tooltip data
+-- accessor (TooltipDataHandler.lua, GameTooltipDataMixin = CreateFromMixins(TooltipDataHandlerMixin)),
+-- which shows C_TooltipInfo.GetGuildBankItem's data and returns true, or hides the tooltip and returns
+-- false without data (TooltipDataHandlerMixin:InternalProcessInfo). It returns nothing else. Classic's
+-- is the native method, which returns a caged battle pet's values (TBC Blizzard_GuildBankUI.lua); specs
+-- for Classic install it.
 function _G.GameTooltip:SetGuildBankItem(tab, slot)
   table.insert(_G._guildBankCalls.tooltips, { tab = tab, slot = slot })
+  if not _G.C_TooltipInfo.GetGuildBankItem(tab, slot) then
+    self:Hide()
+    return false
+  end
   self:Show()
+  return true
 end
 -- The stack split frame: StackSplitFrame:OpenStackSplitFrame(maxStack, parent, anchor, anchorTo) on
 -- retail, the global OpenStackSplitFrame on Classic (each guild bank's item button).

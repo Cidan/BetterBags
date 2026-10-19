@@ -413,12 +413,34 @@ describe("NextGuildButton", function()
       assert.are.same({ { tab = 2, slot = 7 } }, _G._guildBankCalls.tooltips)
     end)
 
-    it("shows a caged battle pet's own tooltip, as Blizzard's guild bank does", function()
-      local saved = GameTooltip.SetGuildBankItem
-      GameTooltip.SetGuildBankItem = function() return 1234, 25, 3, 1400, 300, 280, "Whelpling" end
+    -- Retail's SetGuildBankItem is a tooltip data accessor, which returns only whether it showed
+    -- (TooltipDataHandler.lua); Blizzard's Mainline guild bank button reads nothing from it. Reading a
+    -- battle pet from it compared true with 0 on every hover.
+    it("reads nothing from the tooltip on retail, whose SetGuildBankItem returns only true or false", function()
+      local ok, err = pcall(script, b, "OnEnter")
+      assert.is_true(ok, tostring(err))
+      assert.are.same({ { tab = 2, slot = 7 } }, _G._guildBankCalls.tooltips)
+      assert.is_true(GameTooltip:IsShown())
+      assert.is_nil(calls.petTooltip)
+    end)
+
+    -- Classic's is the native method, which returns a caged battle pet's values; Blizzard's TBC guild
+    -- bank button shows the pet's own tooltip with them (TBC Blizzard_GuildBankUI.lua).
+    it("shows a caged battle pet's own tooltip on Classic, as Blizzard's TBC guild bank does", function()
+      addon.isRetail = false
+      override(GameTooltip, "SetGuildBankItem", function(_, tab, slot)
+        assert.are.same({ 2, 7 }, { tab, slot })
+        return 1234, 25, 3, 1400, 300, 280, "Whelpling"
+      end)
       script(b, "OnEnter")
-      GameTooltip.SetGuildBankItem = saved
       assert.are.same({ 1234, 25, 3, 1400, 300, 280, "Whelpling" }, calls.petTooltip)
+    end)
+
+    it("shows no battle pet tooltip on Classic for an item that is not a caged pet", function()
+      addon.isRetail = false
+      override(GameTooltip, "SetGuildBankItem", function() return nil end)
+      script(b, "OnEnter")
+      assert.is_nil(calls.petTooltip)
     end)
 
     it("closes the stack split it opened when it hides", function()
