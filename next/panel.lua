@@ -553,11 +553,6 @@ function panelProto:BuildPanel(name)
   local feather = frame:CreateTexture(nil, "BACKGROUND")
   local wash = frame:CreateTexture(nil, "BORDER")
   feather:SetColorTexture(1, 1, 1, 1)
-  if left then
-    feather:SetGradient("HORIZONTAL", style:CreateColor("Body"), style:CreateColor("Body", 0))
-  else
-    feather:SetGradient("HORIZONTAL", style:CreateColor("Body", 0), style:CreateColor("Body"))
-  end
   fill:SetColorTexture(unpack(style.Color.Body))
   self.fill = fill
   self.feather = feather
@@ -570,14 +565,13 @@ function panelProto:BuildPanel(name)
   if left then
     outerFeather:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 0)
     outerFeather:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 0)
-    outerFeather:SetGradient("HORIZONTAL", style:CreateColor("Body", 0), style:CreateColor("Body"))
   else
     outerFeather:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, 0)
     outerFeather:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 0, 0)
-    outerFeather:SetGradient("HORIZONTAL", style:CreateColor("Body"), style:CreateColor("Body", 0))
   end
   outerFeather:Hide()
   self.outerFeather = outerFeather
+  self:paintFeathers(1, 1)
   self.docked = true
 
   wash:SetHeight(260)
@@ -616,6 +610,28 @@ function panelProto:BuildPanel(name)
   glow:SetAlpha(0)
   glow:Hide()
   self.dropGlow = glow
+end
+
+-- paintFeathers draws the feathers at a strength, 0 to 1: the inner one, from the body's color at the
+-- body's inner side out to nothing, and the far one, toward the middle of the screen. A gradient is
+-- the texture's vertex colors (warcraft.wiki.gg TextureBase:SetGradient; Blizzard puts a gradient's
+-- alpha in its colors, Blizzard_NamePlates.lua), so a feather fades by its gradient's alpha, as the
+-- wash does (paintWash). Faded with SetAlpha instead, they did not fade at all in game.
+---@param inner number
+---@param outer number
+function panelProto:paintFeathers(inner, outer)
+  local a = style.Color.Body[4]
+  local function paint(texture, strength, solidOnLeft)
+    local solid, clear = style:CreateColor("Body", a * strength), style:CreateColor("Body", 0)
+    if solidOnLeft then
+      texture:SetGradient("HORIZONTAL", solid, clear)
+    else
+      texture:SetGradient("HORIZONTAL", clear, solid)
+    end
+  end
+  local left = self.side == "LEFT"
+  paint(self.feather, inner, left)
+  paint(self.outerFeather, outer, not left)
 end
 
 -- IsSmall says the panel is small (docs/next-small-mode.md): a movable panel, its body alone.
@@ -896,7 +912,7 @@ function panelProto:Morph()
   local frame, feather, edges, outerFeather = self.frame, self.feather, self.edges, self.outerFeather
   feather:Show()
   -- A full panel away from its screen edge has a far feather too (SetDocked): it fades with the near
-  -- one (its alpha, at.outer), and the switch's end decides whether it shows (ApplyGeometry).
+  -- one (at.outer), and the switch's end decides whether it shows (ApplyGeometry).
   outerFeather:Show()
   if small then
     feather:ClearAllPoints()
@@ -924,8 +940,7 @@ function panelProto:Morph()
     frame:ClearAllPoints()
     frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x - bodyLeft, at.y)
     frame:SetSize(width, at.h)
-    feather:SetAlpha(at.full)
-    outerFeather:SetAlpha(at.outer)
+    self:paintFeathers(at.full, at.outer)
     for _, edge in ipairs(edges) do
       edge:SetAlpha(at.edge)
     end
@@ -937,8 +952,7 @@ function panelProto:Morph()
 
   morph.finish = function()
     self.morph = nil
-    feather:SetAlpha(1)
-    outerFeather:SetAlpha(1)
+    self:paintFeathers(1, 1)
     for _, edge in ipairs(edges) do
       edge:SetAlpha(1)
     end

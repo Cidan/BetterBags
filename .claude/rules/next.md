@@ -1237,6 +1237,10 @@ end of a switch. `BuildPanel` only makes the parts.
     small place, or its full rest offset, `chain:RestOffset`), the feathers fading out or in (a
     shrinking panel's feather beside its inner side, re-anchored there; the far feather, `outerFeather`,
     with it), the beam shortening or growing.
+  - **The feathers fade through their gradients** (`paintFeathers`, which also draws them when the
+    panel is made): a feather is a gradient texture, its alpha in its vertex colors, and faded with
+    `SetAlpha` it did not fade at all in game (reported); the wash has always faded this way
+    (`paintWash`). See `.context/patterns-ui.md`, "Fade a Gradient Texture Through Its Colors".
   - **The border** (`inOutSine`, `Time.MorphEdge`): the small panel's edge.
   - **Shrinking: the glide, then the border fades in; growing: the border fades out, then the glide.**
     Asked: the edge used to cross-fade with the feather over the whole glide, so the border showed
