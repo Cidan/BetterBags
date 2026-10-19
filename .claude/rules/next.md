@@ -45,6 +45,9 @@ button in Next's own header switch between the two designs at once, without a re
   `addon.Bags` (it is no bag, and the render recorder walks `addon.Bags`), and `NextVendor:TakeOver`
   puts Blizzard's merchant frame under the hidden frame Blizzard's bags are under. Its name is in
   `UISpecialFrames`.
+- On a client with a guild bank (`addon.hasGuildBank`), the same setting makes the guild bank (§13):
+  `addon.Bags.GuildBank = NextGuildBank:Create(ctx)`, and `NextGuildBank:TakeOver` takes Blizzard's
+  guild bank frame whenever it is shown (guild-bank.md §5). Its name is in `UISpecialFrames`.
 - **The interface Next provides** (what the rest of the addon calls on the backpack; the bank's
   additions are in §6): `kind`,
   `frame`, `searchBox`, `behavior` (`SwitchToGroup`, for Quick Find and the group dialogs),
@@ -62,7 +65,7 @@ button in Next's own header switch between the two designs at once, without a re
   backpack is created as before; the search keybinding keeps the overlay (the classic bag has no
   `ToggleSearch`); the guards are no-ops for the classic bags (they have an anchor, a window and
   `SetTabByID`); the vendor is not made and Blizzard's merchant frame is left alone (§10). The
-  twelve `next\*.lua` files load for everyone and only register modules and
+  `next\*.lua` files load for everyone and only register modules and
   prototypes: no frame or font is made until `NextBag:Create` or `NextBank:Create`. Every TOC loads each module a file looks up at load before that
   file, checked by `spec/render/toc_spec.lua` ("loads every module a file looks up at load before
   that file, in every TOC"), which would otherwise be an error for every player.
@@ -377,6 +380,9 @@ names the action ("Move to Herbs", "Move to the Warbank"...).
 | the other panel's body | **Move to the other bag**: every item of the section is moved there, as the classic header's right click does (`SectionFrame:MoveItems`, the movement flow: the bank type the bank shows) |
 | a group tab of the other panel | **Move to the other bag, into that tab**: the items move (into the group's bank type when the target is the bank) and the category is assigned to that group in the other bag |
 | a Blizzard tab of the other panel (Bank Tabs mode) | **Move to the other bag**: the items move into that tab's bank type; where they land is up to the game (`C_Container.UseContainerItem` names a bank type, not a tab) |
+| the guild bank's body, from the backpack (at the guild bank) | **Deposit**: into the guild bank's deposit tab (the tab shown by itself, else Blizzard's current tab), asking first for a tab the player cannot withdraw from (guild-bank.md §5) |
+| a guild tab, from the backpack | **Deposit** into that tab, only a tab the player may deposit in |
+| the backpack's body or a group tab, from the guild bank | **Withdraw**, and on a group tab assign the category to that group |
 
 Not targets (the section lands back where it was): the tab already shown, "+", purchase tabs, a
 bank group of the other bank type than the section's (Character Bank categories cannot go to
@@ -510,7 +516,8 @@ strings no template has; they now use the templates' font (`GameFontHighlightSma
   they land in.
 - Moving a section between the Character Bank and the Warbank (within the bank) is not offered.
 - The backpack was seen in game once, which found the section title font error (§8); not seen
-  since that fix. The bank, moving sections and the vendor (§10) have not been seen in game.
+  since that fix. The bank, moving sections, the vendor (§10) and the guild bank (§13) have not been
+  seen in game.
 
 ## 10. The vendor (`next/merchant.lua`, `next/vendorbutton.lua`, `next/vendor.lua`)
 
@@ -748,7 +755,7 @@ to classic though").
 ### 11a. One design in use; the other made once and unhooked
 
 `BagSystem` makes the bags of one design, `"classic"` or `"next"`, each set (backpack, bank with
-Enable Bank Bags, and Next's vendor) **in an event scope of its own** (`events:NewScope`,
+Enable Bank Bags, and Next's vendor and, on a client with one, guild bank) **in an event scope of its own** (`events:NewScope`,
 `events:InScope`, event-buckets.md §5). Nearly everything a design registers is registered while
 its bags are made: the classic `bagFrame:Create` and its behaviors' `OnCreate`/`RegisterEvents`
 (groups, bank tabs, the cooldown bucket), the slots panels (`BagSlots`/`BankSlots:CreatePanel`),
@@ -763,13 +770,14 @@ window manager, Masque, ConsolePort's context menus), shared by both designs; fr
 inactive design's frames, which are hidden and so never run; Sonata's registration of the classic
 windows (decorated again only when a theme is applied); `NextDrag`'s registry of panels and
 sellers (it skips hidden ones); the hook on Blizzard's merchant frame's `Hide` (it cannot be taken
-off; with Next off it does nothing, §10a).
+off; with Next off it does nothing, §10a), and the guild bank's hooks on `ShowUIPanel` and its frame's
+`Hide` (the same, guild-bank.md §5).
 
 ### 11b. The switch (`BagSystem:Switch(ctx, design)`)
 
 1. **Refusals**, with Blizzard's error text (`UIErrorsFrame`): in combat (making the classic bags
-   makes secure tab buttons), at the bank, and at a vendor (Blizzard's merchant frame shown, or
-   Next's vendor at one). The merchant frame would have to change parents while shown: reparenting
+   makes secure tab buttons), at the bank, at a vendor (Blizzard's merchant frame shown, or
+   Next's vendor at one), and at the guild bank (`addon.atGuildBank`: its frame changes hands too). The merchant frame would have to change parents while shown: reparenting
    a shown frame to a visible one runs Blizzard's `OnShow` from our code, which writes
    `MerchantFrame.selectedTab`, a field its bag code reads before the protected `UseContainerItem`.
    The bank's frames are the same for both designs, but its open state lives in each design's bank.
@@ -777,18 +785,19 @@ off; with Next off it does nothing, §10a).
    its `OnHide` still runs its close work: Recent Items expiry, the cursor) and lets go of every
    button it drew (`Wipe`). The classic bag also hides its overlay search and its anchor's frame
    (keeping the anchor's saved state). Then its scope is switched off, and Next gives Blizzard's
-   merchant frame back to `UIParent` (`NextVendor:GiveBack`).
+   merchant frame back to `UIParent` (`NextVendor:GiveBack`), and the guild bank Blizzard's guild
+   bank frame, with its `OnHide` (`NextGuildBank:GiveBack`).
 3. **The other design**: made the first time (`CreateBackpack`, `CreateRest`, `Finish`: title,
    `UISpecialFrames`; the bag-bar highlight hooks, `addon:WatchBackpackFrame`; ConsolePort's
-   cursor frames), else its scope switched back on, Next taking the merchant frame again
-   (`TakeOver`, hooking `Hide` once per frame), and each bag catching up (`Activate`): what its
+   cursor frames), else its scope switched back on, Next taking the merchant frame and the guild
+   bank's again (`TakeOver`, hooking each once), and each bag catching up (`Activate`): what its
    handlers would have done while unhooked. Classic: the search box's setting, its behavior's
    `Resync` (the backpack lists its groups as tabs; the retail bank its tabs and Purchase Bank
    button; the Classic and Era banks nothing, they have no bank events), the money, the
    currencies, the slots panel, the anchor as saved. Next: the search box's setting, the tabs, the
    money; the bank its Purchase Bank button on retail; the vendor nothing (the next vendor that
    opens draws everything).
-4. **Taking over**: `addon.Bags.Backpack`, `addon.Bags.Bank` and `addon.Vendor` become the new
+4. **Taking over**: `addon.Bags.Backpack`, `addon.Bags.Bank`, `addon.Bags.GuildBank` and `addon.Vendor` become the new
    design's, the setting is saved (`database:SetNextEnabled`), the backpack's `loaded` flag (and
    the bank's) carries over, and the backpack draws the data last read
    (`items:GetAllSlotInfo()[BACKPACK]`; no bag is read again) and opens if the old one was open:
@@ -890,8 +899,8 @@ joining its companion when it opens ("option a").
 
 ### 12a. Three layouts
 
-The backpack faces left (its title, tabs and ribbon on its left), its companion (the bank or the
-vendor, whichever is open) faces right. That leaves three layouts, saved as the profile's
+The backpack faces left (its title, tabs and ribbon on its left), its companion (the bank, the
+vendor or the guild bank, whichever is open) faces right. That leaves three layouts, saved as the profile's
 `nextChain` (`DB:GetNextChain`/`SetNextChain`, default `"apart"`):
 
 | Layout | Left edge | Right edge |
@@ -1075,3 +1084,11 @@ that first survived led to the edge-case closing tests above.
 
 Seen in game (the player): the whole of §12, including closing through the anchor's edge, the
 feathers and the sparkles.
+
+## 13. The guild bank (`next/guildbank.lua`, `next/guildbutton.lua`)
+
+With BetterBags Next on, a panel on the left stands in for Blizzard's guild bank frame: every tab's
+items in the bags' categories (All Tabs) or a tab by itself in slot order, its slots Blizzard's own
+guild bank item buttons, gold in and out, buying and renaming tabs, and sections dragged in
+(deposited) and out (withdrawn). Blizzard's frame stays shown but is never seen. Everything about it,
+from the data engine's third kind of bag to the takeover, is in guild-bank.md.

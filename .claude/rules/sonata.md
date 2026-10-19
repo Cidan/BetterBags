@@ -290,7 +290,10 @@ Details:
   `spec/sonata/theme_ports_spec.lua` ("styles InputBoxTemplate edit boxes without touching their
   font"); each guard was mutation-tested.
 - **Item decorations** are made once per button (`item:GetDecoration`, item-drawing.md §7a)
-  and registered as `ItemButton` elements; a theme never builds its own.
+  and registered as `ItemButton` elements; a theme never builds its own. BetterBags Next's guild
+  bank buttons, Blizzard's plain item buttons, are registered as `ItemButton` elements too
+  (guild-bank.md §5); the styler leaves the parts they lack (the upgrade icon is their own, the
+  quest texture absent) to their nil guards.
 - Edge sizes and insets are in UI units. Pixel-perfect edges at any scale are not yet
   expressible.
 

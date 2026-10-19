@@ -15,6 +15,11 @@ Historically, the data sweep phase dynamically instantiated transient `ItemMixin
   ```
 - **Mutation:** The cached `ItemMixin` handles any item changes internally when queried (as its state is bound by slot location, not static values). Therefore, the cached mixin should never be recreated or released back to any pool.
 
+### 1a. The Guild Bank Is a Third Kind
+The guild bank's tabs are containers of the guild kind (`const.BAG_KIND.GUILD`), read through every
+phase like the bags but from the guild bank's own functions, since a guild slot has no item
+location (no `ItemMixin` by slot, no GUID): guild-bank.md §3.
+
 ### 2. Native Asynchronous Cache-Priming via `ContinuableContainer`
 To prevent visual flickers, blank slots, and lag-induced loading glitches, UI rendering must only occur after the client's internal C-level cache is fully primed with item data.
 - **Rule:** Never attempt to read details or draw items from a raw, uncached `BAG_UPDATE` event.

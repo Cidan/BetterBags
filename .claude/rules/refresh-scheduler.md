@@ -422,6 +422,15 @@ read"; "upgrade verdict cache": which events read and which recalculate),
 `spec/bags/bank_context_refresh_spec.lua`, `spec/bags/backpack_spec.lua`, `spec/items_spec.lua`
 (late Pawn registration).
 
+## 12. The Guild Bank
+
+The guild bank is a third kind of bag, read only while it is open and BetterBags Next's guild bank
+panel has shown, the way a bank open is (§11): `guildbank/Opened` shows the panel and loads the tabs
+once it has shown (`GUILD_SHOW_TIMEOUT`), each tab loaded is read once its items' data has loaded
+(`ItemLoader:PrimeGuildBank`, `GUILD_PRIME_TIMEOUT`), and the first read of a visit has a fresh
+layout. `RefreshRequest.guild` sweeps it after the bank and before the backpack; a wipe sweeps it,
+and `bags/Rederive` naming no kind recalculates every kind. Details: guild-bank.md §3.
+
 ## 11. Opening the Bank: Show at Once, Load Once Shown, Read Once Primed
 
 Bank containers have no slots until the bank opens, so the startup read's priming (§8,
