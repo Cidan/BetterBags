@@ -34,7 +34,10 @@ local tween = addon:GetModule('NextTween')
 -- leaves its canvas for the drag layer with its real item buttons and follows the cursor, the
 -- canvas keeping a gap where it would go; dropping it reorders it (saving its place), assigns its
 -- category to a tab's group, moves its items to the other bag (and that bag's tab), or sells them
--- to a seller (the vendor). Drop targets are found from the cursor's position every frame.
+-- to a seller (the vendor). Drop targets are found from the cursor's position every frame. A move the
+-- target confirms first (a sale past what buyback keeps, a deposit that cannot be taken back) docks
+-- the section in the target, glowing, until a double click confirms it or it is cancelled; the
+-- source keeps its gap meanwhile.
 ---@class NextDrag: AceModule
 local nextDrag = addon:NewModule('NextDrag')
 
@@ -54,12 +57,22 @@ local COVER_MARGIN = 20
 local COVER_ABOVE = 100
 -- The highest frame level there is (warcraft.wiki.gg "Frame Strata").
 local MAX_LEVEL = 10000
+-- The dock (a move waiting to be confirmed): the room round its card's content, the card's place
+-- below the top of the target's scroll area, the glow's width, its pulse's period in seconds, and the
+-- heights of its title, warning and hint lines.
+local CARD_PAD = 12
+local CARD_TOP = 12
+local GLOW_WIDTH = 2
+local PULSE_PERIOD = 1.2
+local TITLE_HEIGHT = 22
+local LINE_HEIGHT = 16
 
 ---@alias NextDropKind "reorder"|"tab"|"bagtab"|"bag"|"sell"
 
 -- NextSeller is a panel that buys sections (BetterBags Next's vendor, next.md §10): never a source,
 -- a target for backpack sections anywhere on its body or tabs.
 ---@class NextSeller
+---@field frame Frame
 ---@field body Frame
 ---@field tabs NextTabRail
 ---@field scroll ScrollboxDrawable
@@ -67,7 +80,33 @@ local MAX_LEVEL = 10000
 ---@field IsShown fun(self): boolean
 ---@field SetDropGlow fun(self, on: boolean)
 ---@field SaleOf fun(self, list: ItemData[]): ItemData[] What of the section's items it would sell.
----@field Sell fun(self, ctx: Context, sale: ItemData[]): string "sold", or "asked" when it asks first.
+---@field Sell fun(self, ctx: Context, sale: ItemData[], confirmed?: boolean): string, NextConfirmation? "sold", or "confirm" and what to confirm with.
+
+-- NextConfirmation is what a dock shows for a move its target confirms first.
+---@class (exact) NextConfirmation
+---@field title string What the move does ("Sell 23 items?").
+---@field warning string Why it asks.
+---@field hint string How to answer ("Double-click to sell · Right-click to cancel").
+
+-- NextPending is a move waiting to be confirmed: where, and what confirming does with the section's
+-- items as they are then (true when it moved them).
+---@class (exact) NextPending
+---@field target NextDropTarget
+---@field confirm fun(ctx: Context, items: ItemData[]): boolean
+
+---@class NextDock
+---@field frame Frame Over the target's scroll area, dimming it and taking its clicks.
+---@field scrim Texture
+---@field card Frame
+---@field halo Texture
+---@field glow Texture[]
+---@field title FontString
+---@field warning FontString
+---@field hint FontString
+---@field slot Frame Where the section sits in the card.
+---@field catcher Button Over the card and the section's item buttons, taking the clicks.
+---@field elapsed number
+---@field laidOut? number The section height the card was laid out for.
 
 ---@class (exact) NextDropTarget
 ---@field type NextDropKind
@@ -83,8 +122,9 @@ local MAX_LEVEL = 10000
 ---@field scale number
 ---@field startIndex number Where its gap was at pickup.
 ---@field target? NextDropTarget
----@field landing boolean It was dropped and is flying to where it goes.
+---@field landing boolean It was dropped and is flying to where it goes, or waits in a dock.
 ---@field released? number Frames in a row the left button was up without a drop.
+---@field pending? NextPending A move waiting to be confirmed, the section in the dock.
 
 ---@type NextDragState?
 nextDrag.current = nil
@@ -186,7 +226,14 @@ end
 ---@param section NextSection
 ---@return boolean
 function nextDrag:Begin(panel, section)
-  if self.current or section.kind ~= "category" or not panel:IsShown() or panel.closing then
+  if section.kind ~= "category" or not panel:IsShown() or panel.closing then
+    return false
+  end
+  -- A move waiting to be confirmed is put back at once: picking up another section answers it.
+  if self.current and self.current.pending then
+    self:Cancel()
+  end
+  if self.current then
     return false
   end
   if database:GetBagView(panel.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
@@ -567,6 +614,7 @@ function nextDrag:finish()
   if state and state.target then
     self:showTarget(nil)
   end
+  self:hideDock()
   self.current = nil
   tween:Stop(self)
   if self.layer then
@@ -574,19 +622,30 @@ function nextDrag:finish()
   end
 end
 
--- land flies the section from where it is into its canvas's gap and back to full size, aiming at
--- the gap every frame, then puts it back in the canvas there.
+-- NextDragPoint is where a section starts a flight from: its top left in UIParent's coordinates, at
+-- a scale (a section leaving the dock, not the cursor).
+---@class (exact) NextDragPoint
+---@field left number
+---@field top number
+---@field scale number
+
+-- land flies the section from where it is (the cursor's place, or from) into its canvas's gap and back
+-- to full size, aiming at the gap every frame, then puts it back in the canvas there.
 ---@private
 ---@param commit boolean The section takes its gap's place in the order.
 ---@param after? fun()
-function nextDrag:land(commit, after)
+---@param from? NextDragPoint
+function nextDrag:land(commit, after, from)
   local state = self.current
   local canvas = state.panel.content
   local frame = state.section.frame
-  local s0 = state.scale
+  local s0 = from and from.scale or state.scale
   -- Where place put it: the client reports a scaled frame's edges in its own scale.
   local cx, cy = cursor()
   local left0, top0 = cx - state.grabX * s0, cy + state.grabY * s0
+  if from then
+    left0, top0 = from.left, from.top
+  end
   local shadow0 = self.shadow:GetAlpha()
   tween:Play(self, {
     duration = style.Time.Land,
@@ -614,18 +673,23 @@ function nextDrag:land(commit, after)
   })
 end
 
--- flyAway flies the section into a point (a tab, the other panel), shrinking and fading, then
--- puts it back in its canvas hidden and leaving.
+-- flyAway flies the section from where it is (the cursor's place, or from) into a point (a tab, the
+-- other panel), shrinking and fading, then puts it back in its canvas hidden and leaving.
 ---@private
 ---@param x number
 ---@param y number
 ---@param after fun()
-function nextDrag:flyAway(x, y, after)
+---@param from? NextDragPoint
+function nextDrag:flyAway(x, y, after, from)
   local state = self.current
   local canvas = state.panel.content
   local frame = state.section.frame
-  local s0 = state.scale
+  local s0 = from and from.scale or state.scale
   local x0, y0 = cursor()
+  if from then
+    state.scale = s0
+    x0, y0 = from.left + state.grabX * s0, from.top - state.grabY * s0
+  end
   tween:Play(self, {
     duration = style.Time.FlyAway,
     from = 0,
@@ -645,6 +709,296 @@ function nextDrag:flyAway(x, y, after)
       after()
     end,
   })
+end
+
+-- screenPoint returns a frame's top left in UIParent's coordinates and its scale relative to
+-- UIParent, or nil before the client has placed it. The client reports a frame's edges in the
+-- frame's own effective scale.
+---@param frame Frame
+---@return NextDragPoint?
+local function screenPoint(frame)
+  local left, top = frame:GetLeft(), frame:GetTop()
+  if left == nil or top == nil then
+    return nil
+  end
+  local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+  return { left = left * scale, top = top * scale, scale = scale }
+end
+
+-- buildDock makes the dock a move waits in to be confirmed (asked: a sale past what buyback keeps
+-- asked in a dialog that "blends right in" while the section snapped back to the backpack). Over the
+-- target's scroll area: a scrim that dims it and takes its clicks (nothing behind is bought), and a
+-- card holding the section, edged in a pulsing amber glow, with what the move does, why it asks, and
+-- how to answer. A catcher lies over the card above the section's item buttons, so a click there
+-- answers rather than picking an item up: a double click confirms, a right click cancels.
+---@private
+function nextDrag:buildDock()
+  if self.dock then
+    return
+  end
+  local frame = CreateFrame("Frame", nil, UIParent)
+  frame:EnableMouse(true)
+  frame:Hide()
+  local scrim = frame:CreateTexture(nil, "BACKGROUND")
+  scrim:SetAllPoints(frame)
+  scrim:SetColorTexture(unpack(style.Color.Scrim))
+  local card = CreateFrame("Frame", nil, frame)
+  card:SetPoint("TOP", frame, "TOP", 0, -CARD_TOP)
+  local halo = card:CreateTexture(nil, "BACKGROUND", nil, -2)
+  halo:SetTexture(style.CLOUD_GLOW)
+  halo:SetBlendMode("ADD")
+  halo:SetVertexColor(unpack(style.Color.Gold))
+  halo:SetPoint("TOPLEFT", card, "TOPLEFT", -28, 28)
+  halo:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", 28, -28)
+  local background = card:CreateTexture(nil, "BACKGROUND", nil, -1)
+  background:SetAllPoints(card)
+  background:SetColorTexture(unpack(style.Color.Card))
+  local glow = {}
+  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+    local edge = card:CreateTexture(nil, "BORDER")
+    edge:SetColorTexture(unpack(style.Color.Gold))
+    if side == "TOP" or side == "BOTTOM" then
+      local y = side == "TOP" and GLOW_WIDTH or -GLOW_WIDTH
+      edge:SetPoint(side .. "LEFT", card, side .. "LEFT", -GLOW_WIDTH, y)
+      edge:SetPoint(side .. "RIGHT", card, side .. "RIGHT", GLOW_WIDTH, y)
+      edge:SetHeight(GLOW_WIDTH)
+    else
+      local x = side == "LEFT" and -GLOW_WIDTH or GLOW_WIDTH
+      edge:SetPoint("TOP" .. side, card, "TOP" .. side, x, 0)
+      edge:SetPoint("BOTTOM" .. side, card, "BOTTOM" .. side, x, 0)
+      edge:SetWidth(GLOW_WIDTH)
+    end
+    table.insert(glow, edge)
+  end
+  local title = card:CreateFontString(nil, "OVERLAY")
+  title:SetFontObject(style:Font("ConfirmTitle"))
+  title:SetJustifyH("LEFT")
+  title:SetHeight(TITLE_HEIGHT)
+  title:SetPoint("TOPLEFT", card, "TOPLEFT", CARD_PAD, -CARD_PAD)
+  title:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CARD_PAD, -CARD_PAD)
+  local warning = card:CreateFontString(nil, "OVERLAY")
+  warning:SetFontObject(style:Font("ConfirmWarning"))
+  warning:SetJustifyH("LEFT")
+  warning:SetHeight(LINE_HEIGHT)
+  warning:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
+  warning:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -4)
+  local slot = CreateFrame("Frame", nil, card)
+  slot:SetPoint("TOPLEFT", warning, "BOTTOMLEFT", 0, -10)
+  local hint = card:CreateFontString(nil, "OVERLAY")
+  hint:SetFontObject(style:Font("ConfirmHint"))
+  hint:SetJustifyH("LEFT")
+  hint:SetHeight(LINE_HEIGHT)
+  hint:SetPoint("TOPLEFT", slot, "BOTTOMLEFT", 0, -8)
+  local catcher = CreateFrame("Button", nil, frame)
+  catcher:SetAllPoints(card)
+  catcher:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  -- A double click is a mouse click, the hardware event selling and moving items need.
+  addon.SetScript(catcher, "OnDoubleClick", function(ctx, _, button)
+    if button == "LeftButton" then
+      self:ConfirmPending(ctx)
+    end
+  end)
+  addon.SetScript(catcher, "OnClick", function(_, _, button)
+    if button == "RightButton" then
+      self:CancelPending()
+    end
+  end)
+  addon.SetScript(frame, "OnMouseUp", function(_, _, button)
+    if button == "RightButton" then
+      self:CancelPending()
+    end
+  end)
+  self.dock = {
+    frame = frame, scrim = scrim, card = card, halo = halo, glow = glow, title = title, warning = warning,
+    hint = hint, slot = slot, catcher = catcher, elapsed = 0,
+  }
+end
+
+-- layoutDock sizes the card round the section and its lines, scaled down to fit the target's scroll
+-- area when it is taller.
+---@private
+function nextDrag:layoutDock()
+  local d = self.dock
+  local section = self.current.section
+  local width = section.frame:GetWidth()
+  local height = section.height or section.frame:GetHeight()
+  d.slot:SetSize(width, height)
+  local cardHeight = CARD_PAD + TITLE_HEIGHT + 4 + LINE_HEIGHT + 10 + height + 8 + LINE_HEIGHT + CARD_PAD
+  d.card:SetSize(width + CARD_PAD * 2, cardHeight)
+  local room = d.frame:GetHeight()
+  local scale = 1
+  if room ~= nil and room > CARD_TOP * 2 then
+    scale = math.min(1, (room - CARD_TOP * 2) / cardHeight)
+  end
+  d.card:SetScale(scale)
+  d.laidOut = height
+end
+
+-- pulse brightens and dims the dock's glow, and lays the card out again when the section's height
+-- changed (the backpack drew it again).
+---@private
+---@param elapsed number
+function nextDrag:pulse(elapsed)
+  local d = self.dock
+  d.elapsed = d.elapsed + elapsed
+  local wave = 0.5 + 0.5 * math.sin(d.elapsed * 2 * math.pi / PULSE_PERIOD)
+  local alpha = 0.35 + 0.65 * wave
+  for _, edge in ipairs(d.glow) do
+    edge:SetAlpha(alpha)
+  end
+  d.halo:SetAlpha(0.15 + 0.35 * wave)
+  local state = self.current
+  if state and state.section.height ~= d.laidOut then
+    self:layoutDock()
+  end
+end
+
+-- Pend docks the dropped section in its target to wait for a confirmation: the dock over the target's
+-- scroll area, with the confirmation's text, and the section flying from where it was dropped into
+-- its card. The source keeps its gap (the drag goes on), so nothing goes back to it meanwhile.
+-- confirm moves the section's items, as they are when confirmed.
+---@param target NextDropTarget
+---@param confirmation NextConfirmation
+---@param confirm fun(ctx: Context, items: ItemData[]): boolean
+function nextDrag:Pend(target, confirmation, confirm)
+  local state = self.current
+  self:buildDock()
+  local d = self.dock
+  local panel = target.panel
+  state.pending = { target = target, confirm = confirm }
+  local frame = state.section.frame
+  local from = screenPoint(frame)
+  local cx, cy = cursor()
+  if from == nil then
+    from = { left = cx - state.grabX * state.scale, top = cy + state.grabY * state.scale, scale = state.scale }
+  end
+  d.frame:SetParent(panel.frame)
+  d.frame:SetFrameStrata(panel.frame:GetFrameStrata())
+  d.frame:SetFrameLevel(math.min(MAX_LEVEL - COVER_ABOVE * 2, maxLevel(panel.scroll.frame) + 10))
+  d.frame:ClearAllPoints()
+  d.frame:SetAllPoints(panel.scroll.frame)
+  d.title:SetText(confirmation.title)
+  d.warning:SetText(confirmation.warning)
+  d.hint:SetText(confirmation.hint)
+  d.elapsed = 0
+  self:layoutDock()
+  self:pulse(0)
+  d.frame:SetAlpha(0)
+  d.frame:Show()
+  addon.SetScript(d.frame, "OnUpdate", function(_, _, elapsed)
+    self:pulse(elapsed)
+  end)
+  self.shadow:Hide()
+  self.hint:Hide()
+  self.cover:Hide()
+  local to = screenPoint(d.slot)
+  tween:Play(self, {
+    duration = style.Time.Land,
+    from = 0,
+    to = 1,
+    ease = "outCubic",
+    onUpdate = function(t)
+      d.frame:SetAlpha(t)
+      if to then
+        local s = from.scale + (to.scale - from.scale) * t
+        frame:SetScale(s)
+        frame:ClearAllPoints()
+        frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (from.left + (to.left - from.left) * t) / s,
+          (from.top + (to.top - from.top) * t) / s)
+      end
+    end,
+    onDone = function()
+      self:seat()
+    end,
+  })
+end
+
+-- seat puts the section in the card's slot, at full size, under the catcher.
+---@private
+function nextDrag:seat()
+  local d = self.dock
+  local frame = self.current.section.frame
+  frame:SetParent(d.card)
+  frame:SetScale(1)
+  frame:SetAlpha(1)
+  frame:SetFrameStrata(d.frame:GetFrameStrata())
+  -- Above the card, never lower: every frame in it moves with it, and one that would go below 0
+  -- jumps to the top level (warcraft.wiki.gg "Frame Strata"), where the catcher cannot be above it.
+  frame:SetFrameLevel(math.max(frame:GetFrameLevel(), d.card:GetFrameLevel() + 1))
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", d.slot, "TOPLEFT", 0, 0)
+  frame:Show()
+  d.catcher:SetFrameLevel(math.min(MAX_LEVEL, maxLevel(frame) + COVER_ABOVE))
+  d.frame:SetAlpha(1)
+end
+
+-- undock takes the section out of the dock onto the drag layer where it was on screen, and hides the
+-- dock. It returns where the section was, for its flight out (nil before the client placed it).
+---@private
+---@return NextDragPoint?
+function nextDrag:undock()
+  local state = self.current
+  tween:Stop(self, true)
+  local frame = state.section.frame
+  local from = screenPoint(frame)
+  frame:SetParent(self.layer)
+  frame:SetFrameStrata("TOOLTIP")
+  frame:SetFrameLevel(math.max(frame:GetFrameLevel(), self.layer:GetFrameLevel() + 2))
+  if from then
+    frame:SetScale(from.scale)
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", from.left / from.scale, from.top / from.scale)
+  end
+  state.pending = nil
+  self:hideDock()
+  return from
+end
+
+-- hideDock hides the dock and stops its pulse.
+---@private
+function nextDrag:hideDock()
+  local d = self.dock
+  if d == nil then
+    return
+  end
+  d.frame:SetScript("OnUpdate", nil)
+  d.frame:Hide()
+end
+
+-- ConfirmPending confirms the move waiting in the dock (a double click on it): the target moves the
+-- section's items as they are now, and the section flies into it, or lands back in its gap when
+-- nothing was moved (nothing in it is left to move, or the target is closing).
+---@param ctx Context
+function nextDrag:ConfirmPending(ctx)
+  local state = self.current
+  local pending = state and state.pending
+  if pending == nil then
+    return
+  end
+  local target = pending.target
+  local moved = false
+  if target.panel:IsShown() and not target.panel.closing then
+    moved = pending.confirm(ctx, self:SectionItems(state.section))
+  end
+  local from = self:undock()
+  if not moved then
+    state.panel.content:SetDragIndex(state.startIndex)
+    self:land(false, nil, from)
+    return
+  end
+  self:moveDone(ctx, target, nil, from)
+end
+
+-- CancelPending cancels the move waiting in the dock (a right click): the section lands back in its
+-- gap, as the player asked.
+function nextDrag:CancelPending()
+  local state = self.current
+  if state == nil or state.pending == nil then
+    return
+  end
+  local from = self:undock()
+  state.panel.content:SetDragIndex(state.startIndex)
+  self:land(false, nil, from)
 end
 
 -- Drop drops the dragged section where the cursor is (the header's OnDragStop: a mouse release,
@@ -696,9 +1050,17 @@ function nextDrag:Drop(ctx, noMoves)
   local list = self:SectionItems(state.section)
   local rederive
   if (target.type == "bag" or target.type == "bagtab") and isGuild(target.panel) then
-    -- Deposited into the tab dropped on, else the guild bank's deposit tab; back in its place while
-    -- the guild bank asks first, or when nothing in it can go in.
-    if target.panel:Deposit(ctx, list, target.tab and target.tab.id or nil) ~= "deposited" then
+    -- Deposited into the tab dropped on, else the guild bank's deposit tab; docked there while the
+    -- guild bank waits for a confirmation; back in its place when nothing in it can go in.
+    local container = target.tab and target.tab.id or nil
+    local result, confirmation = target.panel:Deposit(ctx, list, container)
+    if result == "confirm" then
+      self:Pend(target, confirmation, function(c, items)
+        return target.panel:Deposit(c, items, container, true) == "deposited"
+      end)
+      return
+    end
+    if result ~= "deposited" then
       canvas:SetDragIndex(state.startIndex)
       self:land(false)
       return
@@ -710,11 +1072,21 @@ function nextDrag:Drop(ctx, noMoves)
       rederive = { resetLayout = true }
     end
   elseif target.type == "sell" then
-    -- Back in its place when nothing sells, or while the seller asks first.
+    -- Back in its place when nothing sells; docked in the seller while it waits for a confirmation,
+    -- which sells what of the section's items sells then.
     local sale = target.panel:SaleOf(list)
-    if #sale == 0 or target.panel:Sell(ctx, sale) ~= "sold" then
+    if #sale == 0 then
       canvas:SetDragIndex(state.startIndex)
       self:land(false)
+      return
+    end
+    local result, confirmation = target.panel:Sell(ctx, sale)
+    if result == "confirm" then
+      local seller = target.panel
+      self:Pend(target, confirmation, function(c, items)
+        local now = seller:SaleOf(items)
+        return #now > 0 and seller:Sell(c, now, true) == "sold"
+      end)
       return
     end
   elseif target.type == "tab" then
@@ -738,6 +1110,17 @@ function nextDrag:Drop(ctx, noMoves)
     sectionFrame:MoveItems(list)
   end
 
+  self:moveDone(ctx, target, rederive)
+end
+
+-- moveDone flies a section whose items moved into its target (the tab, else the panel's scroll
+-- area), pulses the tab, and recalculates when the move assigned a category.
+---@private
+---@param ctx Context
+---@param target NextDropTarget
+---@param rederive? table What to recalculate (bags/Rederive), if anything.
+---@param from? NextDragPoint
+function nextDrag:moveDone(ctx, target, rederive, from)
   local x, y
   if target.tab then
     x, y = target.tab.button:GetCenter()
@@ -754,10 +1137,11 @@ function nextDrag:Drop(ctx, noMoves)
     if rederive then
       events:SendMessage(ctx, 'bags/Rederive', rederive)
     end
-  end)
+  end, from)
 end
 
--- Cancel puts the dragged section straight back in its canvas, doing nothing.
+-- Cancel puts the dragged section straight back in its canvas, doing nothing (a move waiting to be
+-- confirmed too: finish hides the dock).
 function nextDrag:Cancel()
   local state = self.current
   if state == nil then
@@ -776,10 +1160,11 @@ function nextDrag:Cancel()
   self:finish()
 end
 
--- PanelHidden cancels a drag from a panel that closed.
+-- PanelHidden cancels a drag from a panel that closed, and a move waiting to be confirmed in it.
 ---@param panel NextPanelFrame
 function nextDrag:PanelHidden(panel)
-  if self.current and self.current.panel == panel then
+  local state = self.current
+  if state and (state.panel == panel or (state.pending and state.pending.target.panel == panel)) then
     self:Cancel()
   end
   panel:SetDropGlow(false)

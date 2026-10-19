@@ -207,8 +207,11 @@ element (its styler guards the parts a plain item button lacks).
   (the tab shown by itself, else the current tab), one dropped on a guild tab into that tab; only
   tabs the player may deposit in are targets (not All Tabs, nor "+"). Every item and every pile its
   virtual stack hides, in the backpack's bags, bound items left out.
-- **Into a tab the player cannot withdraw from, it asks first**: those items cannot be taken back.
-  The section lands back meanwhile.
+- **Into a tab the player cannot withdraw from, it is confirmed first**: those items cannot be taken
+  back. `Deposit` deposits nothing unless `confirmed` and returns `"confirm"` ("Deposit 15 items?",
+  "You cannot take them back out of Donations.", "Double-click to deposit · Right-click to
+  cancel"), and the section docks in the guild bank until a double click (next.md §7, "Confirming in
+  the target"); the backpack keeps its gap meanwhile.
 - A guild section dropped on the backpack is withdrawn; on a backpack group tab it is also assigned
   to that group. A guild section header's right click withdraws it (the bank's moves it to the open
   window; the guild bank's open window is the bags).
