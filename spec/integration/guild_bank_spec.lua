@@ -14,6 +14,9 @@ describe("a guild bank visit on the whole addon", function()
       handle:Restore()
     end
     handle = nil
+    -- Timers that never ran (timeouts) hold the loaded addon; busted keeps this file's closures, and
+    -- with them this list, for the whole run.
+    timers = nil
     ResetMockGuildBank()
   end)
 

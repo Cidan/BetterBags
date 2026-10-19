@@ -164,6 +164,9 @@ function WholeAddon.Load(opts)
     end)
   end
   keepAsIs(_G.SlashCmdList)
+  -- The shared tooltip keeps its owner (the mock does not clear it on Hide): a loaded addon's button
+  -- hovered in a test kept the whole loaded addon in memory for the rest of the run.
+  keepAsIs(_G.GameTooltip)
   -- The libraries' own registries: what they were embedded in (AceHook's embeded, keyed by the
   -- addon), AceDB's databases, AceConsole's commands, and the like.
   for _, lib in pairs(LibStub.libs) do
@@ -375,7 +378,7 @@ function WholeAddon.Load(opts)
     onEvent(aceAddon.frame, "PLAYER_LOGIN")
   end
 
-  -- Restore frees the loaded addon too (a load and start take about 940 MB of mock frames): a full
+  -- Restore frees the loaded addon too (a load and start hold about 80 MB of mock frames): a full
   -- collection, so no more than one load is ever in memory.
   function handle:Restore()
     for i = #restorers, 1, -1 do restorers[i]() end

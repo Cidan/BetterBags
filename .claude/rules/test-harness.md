@@ -134,24 +134,51 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   `embeded` and `registry` are keyed by the addon; AceDB's databases; AceConsole's commands),
   `SlashCmdList`, the children lists of frames made before the load, the AceAddon registry and
   queues, LibStub's libraries, the `Enum` tables, and every global as it was. Then it collects.
-- **Memory (the failure mode):** a load and start take about 940 MB, because the frame mock makes
-  its 178 methods as fresh closures for every frame and the addon makes about 2,700 item buttons
-  at login. Anything left reachable after `Restore` keeps all of it: before these restores, each
-  load stayed in memory, the integration spec alone peaked at 24.8 GB, and GitHub's runner was
-  shut down mid-run twice (no test failed; it ran out of memory). Each holder was found with a
-  reference search from the globals, the registry and the stacks (Lua 5.1 rules: a weak-keyed
-  table's values are strong). `spec/integration/bag_switch_spec.lua` ("lets the loaded addon be
-  collected once restored") fails if a load is kept, run alone or in the full suite. The libraries
-  the harness loads are loaded fresh, with any copy another spec registered set aside: LibStub
-  upgrades an existing copy in place, and LibWindow's `windowData` (keyed by the bags' frames)
-  then outlived the load, which only the full suite showed. Measured now: 3 MB kept after each
-  load; the integration spec peaks at 2.2 GB alone, the full suite at 5.2 GB (5.0 GB without it).
-- **Cost:** about 1.1 s per load and start, 0.8 s of it the real `ItemFrame:OnEnable` making every
-  item button of every slot at login, plus the collection in `Restore`, which walks the whole heap
-  (the other specs' too): the integration spec takes about 26 s alone and adds about 32 s to the
-  full suite (16 s without it, 48 s with it). Keep whole-addon specs few and pointed: a test needs its own load only when it needs
-  a fresh start (what it checks happens the first time something is made). Making the frame mock
-  share its methods (one set behind a metatable) would cut both, for every spec.
+- **Memory: the frame mock shares its methods.** `CreateMockWidget` (`spec/helpers/wow_mocks.lua`)
+  used to define its ~188 methods as fresh closures inside every widget, and gave every widget but
+  a texture seven child textures up front (`NormalTexture`, `PushedTexture`, `HighlightTexture`,
+  `NewItemTexture`, `BattlepayItemTexture`, `ItemContextOverlay`, `UpgradeIcon`), each with its own
+  copy: about 1,500 closures per frame. A whole-addon load (about 2,700 item buttons) held 1.6 GB
+  live, the suite peaked at 19.4 GB resident in one process, a GitHub runner (16 GB) was shut down
+  mid-run twice, and a local run locked a 93 GB machine. Now the methods are defined once
+  (`WidgetMethods`, item buttons' own in `ItemButtonMethods`) and found through one metatable
+  (`WidgetMeta`); a widget holds only its state; the seven textures are made the first time
+  something reads them (`LAZY_TEXTURES`; their getters read the field with `rawget`, or the lazy
+  lookup would call itself). Behavior is unchanged: every spec passed without a change. Measured: a load holds
+  78 MB live (was 1.6 GB); the largest file peaks at 183 MB alone (was 5.3 GB); every file run
+  alone sums to 2.1 GB of peaks (was 23.5 GB); the full suite peaks at 1.25 GB in one process (was
+  19.4 GB) and takes 17 s (was 112 s).
+  - **A method is shared, so it must not read the constructor's locals**: use the widget's fields
+    (`self._type`, `self._name`, `self._parent`). Per-widget state goes in the constructor.
+  - **Overriding a method on one widget** (`frame.Method = ...`, a spec's `override`) sets the
+    widget's own field, which shadows the shared one; restoring it to `rawget`'s nil brings the
+    shared one back.
+- **Memory: nothing may keep a loaded addon after `Restore`.** Anything left reachable keeps the
+  whole load. Holders found so far, each with a reference search from the globals, the registry
+  and the stacks (Lua 5.1 rules: a weak-keyed table's values are strong):
+  - shared tables the loaded addon adds to: library registries, `SlashCmdList`, frames' children
+    lists, LibStub's libraries (loaded fresh; LibWindow's `windowData` outlived a load), and the
+    shared `GameTooltip`, whose owner a hovered button of the loaded addon became (the mock keeps an
+    owner after `Hide`); `Restore` puts each back as it was;
+  - **a spec's own locals**: busted keeps every spec's closures, and so their upvalues, for the
+    whole run. A fake clock's list of timers that never ran (the 2-second timeouts) held the loaded
+    addon of the guild bank and bank open specs' last test until the suite ended. Clear such lists
+    in `after_each` after `Restore` (`timers = nil`).
+  - `spec/integration/bag_switch_spec.lua` ("lets the loaded addon be collected once restored", and
+    "... after one of its frames owned the tooltip") fails if a load is kept.
+- **Measure one file at a time.** A single process holds every spec it ran, so a memory problem is
+  found file by file: `/usr/bin/time -f "%M" ~/.local/lua51/bin/busted spec/<file>` gives a file's
+  peak resident memory in KB. To see what is live, a busted helper outside the repository
+  (`--helper=/tmp/x.lua` that `dofile`s `spec/setup.lua` and subscribes to `{ "test", "end" }` /
+  `{ "file", "end" }`) can print `collectgarbage("count")` after a full collection; a load that
+  stays live after `Restore` is a leak. Run the whole suite in one process only under a cap
+  (`(ulimit -v 4000000; ~/.local/lua51/bin/busted)`), as CI does (`.github/workflows/test.yml`
+  caps its test step at 4 GB, so a regression fails with "not enough memory" rather than shutting
+  the runner down).
+- **Cost:** a load and start take about 0.2 s, most of it the real `ItemFrame:OnEnable` making
+  every item button of every slot at login. Keep whole-addon specs few and pointed: a test needs
+  its own load only when it needs a fresh start (what it checks happens the first time something
+  is made).
 - Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e; and §1: a new
   install starts with Next, an existing one keeps the classic bags),
   `spec/integration/bank_open_spec.lua` (refresh-scheduler.md §11).

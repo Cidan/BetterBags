@@ -50,8 +50,8 @@ describe("switching bag designs on the whole addon", function()
     return found
   end
 
-  -- A load and start take about 940 MB of mock frames: anything the loaded addon leaves reachable
-  -- after Restore keeps all of it, and a CI runner ran out of memory over a run of these specs.
+  -- Anything the loaded addon leaves reachable after Restore keeps all of it, and a CI runner ran out
+  -- of memory over a run of these specs (test-harness.md, memory).
   it("lets the loaded addon be collected once restored", function()
     local held = setmetatable({}, { __mode = "v" })
     local function loadAndSwitch()
@@ -66,6 +66,24 @@ describe("switching bag designs on the whole addon", function()
     assert.is_nil(held.addon, "the addon")
     assert.is_nil(held.frame, "its frames")
     assert.is_nil(held.items, "its modules")
+  end)
+
+  -- A loaded addon's button hovered in a test is the shared GameTooltip's owner, and the mock keeps
+  -- an owner after Hide: the guild bank spec's hover kept a whole load for the rest of the run.
+  it("lets the loaded addon be collected once restored after one of its frames owned the tooltip", function()
+    local held = setmetatable({}, { __mode = "v" })
+    local function loadAndHover()
+      local addon = start({ next = true })
+      GameTooltip:SetOwner(addon.Bags.Backpack.frame, "ANCHOR_RIGHT")
+      GameTooltip:Hide()
+      held.addon, held.frame = addon, addon.Bags.Backpack.frame
+      handle:Restore()
+      handle = nil
+    end
+    loadAndHover()
+    collectgarbage("collect")
+    assert.is_nil(held.addon, "the addon")
+    assert.is_nil(held.frame, "its frames")
   end)
 
   -- AceEvent dispatches through CallbackHandler, which calls each handler with
