@@ -1,0 +1,23 @@
+{
+  "id": 1792386492,
+  "version": "v0.6.2-2-g3040528",
+  "channel": "alpha",
+  "date": "2026-10-19",
+  "from": "2b4ea20786e0b472ca1d3737466dc2a814704a56",
+  "to": "3040528ccee22bb131bd3d4b42e901ffcaf4968c",
+  "headline": "BetterBags Next features clearer search boxes and an in-place confirmation card for bulk sales and deposits.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Clearer search boxes in BetterBags Next",
+      "details": "Search boxes across all BetterBags Next panels now feature higher contrast, lavender accents, and clearer placeholder text that stands out against the background. The vendor search box also no longer leaves placeholder text visible beneath typed searches.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Confirmation card for bulk sales and deposits",
+      "details": "In BetterBags Next, dragging a category of more than 12 items to a vendor or into a restricted guild bank tab now docks the items directly inside the window with an amber glowing card instead of opening a popup dialog. Double-click to confirm the sale or deposit, or right-click to cancel.",
+      "clients": []
+    }
+  ]
+}
