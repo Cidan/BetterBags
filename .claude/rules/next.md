@@ -1234,26 +1234,30 @@ end of a switch. `BuildPanel` only makes the parts.
   (its width is the same at both sizes). Nothing reaches past the screen edge on the way
   (`SetDocked(false)`).
   - **The glide** (`inOutCubic`, `Time.Morph`): the body from where it was to where it rests (its
-    small place, or its full rest offset, `chain:RestOffset`), the feathers fading out or in (a
-    shrinking panel's feather beside its inner side, re-anchored there; the far feather, `outerFeather`,
-    with it), the beam shortening or growing.
+    small place, or its full rest offset, `chain:RestOffset`), the beam shortening or growing, and
+    what the old size had fading out on the way: shrinking, the feathers (a shrinking panel's feather
+    beside its inner side, re-anchored there; the far feather, `outerFeather`, with it); growing, the
+    small border.
+  - **The fade** (`inOutSine`, `Time.MorphFade`): what the new size has, once it is there: shrinking,
+    the small border fades in; growing, the feathers fade in (the far feather only when it ends away
+    from its screen edge, beside its partner: at the edge a full panel has none).
   - **The feathers fade through their gradients** (`paintFeathers`, which also draws them when the
     panel is made): a feather is a gradient texture, its alpha in its vertex colors, and faded with
     `SetAlpha` it did not fade at all in game (reported); the wash has always faded this way
     (`paintWash`). See `.context/patterns-ui.md`, "Fade a Gradient Texture Through Its Colors".
-  - **The border** (`inOutSine`, `Time.MorphEdge`): the small panel's edge.
-  - **Shrinking: the glide, then the border fades in; growing: the border fades out, then the glide.**
-    Asked: the edge used to cross-fade with the feather over the whole glide, so the border showed
-    while the feather was still there, "making it look like the feathering is spilled out"; "a 2
-    step animation" instead, and "in reverse, border should fully vanish first". The edge also hung on
-    the frame, which for a full panel reaches over its feather, so a growing panel's fading border
-    outlined the feather too: it hangs on the body now.
+  - **Why:** the edge used to cross-fade with the feather over the whole glide, so the border showed
+    while the feather was still there, "making it look like the feathering is spilled out"; asked
+    for "a 2 step animation". Growing first let the border go before moving, and "it doesn't feel
+    good that it doesn't start moving right away": it moves at once, the border fading on the way,
+    then the feathers fade in, "basically the inverse of shrinking". The edge also hung on the frame,
+    which for a full panel reaches over its feather, so a growing panel's fading border outlined the
+    feather too: it hangs on the body now.
   - The content is laid out once, at the end. At the end it couples again if the new size chains it
     (`chain:Arrived`; `UpdateCoupling` waits while either bag of the pair still switches).
 - **Switched back mid-switch,** it turns around from where it is (`morph.at`: its place, height, beam,
-  feathers and border), the first switch stopped. A step with nothing to do is skipped (no glide back
-  for a panel that had not moved yet, no border fade for one that had no border), and a partly faded
-  border takes only its share of `MorphEdge`.
+  feathers and border), the first switch stopped. A step with nothing to do is skipped (switched twice
+  in a row, it ends where it started at once), and a fade part way done takes only its share of
+  `MorphFade`.
 - **Anything that places the panel ends a switch first, both steps** (`setOffset` calls `endMorph`,
   which stops the step playing and puts the panel at the switch's end; every slide, flight and refit
   goes through it), and so does `StartMove` (it moves the frame itself). Showing an

@@ -124,10 +124,11 @@ style.Time = {
   Enter = 0.5,
   Couple = 0.35,
   Uncouple = 0.25,
-  -- An open panel switching between full and small (docs/next-small-mode.md): its size, feather and
-  -- beam, then (shrinking) or first (growing) its small border.
+  -- An open panel switching between full and small (docs/next-small-mode.md): the glide (its size and
+  -- beam, the feathers fading out as it shrinks or the small border as it grows), then the fade (the
+  -- small border in once small, or the feathers in once full).
   Morph = 0.4,
-  MorphEdge = 0.2,
+  MorphFade = 0.2,
 }
 style.RISE = 12
 

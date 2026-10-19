@@ -111,9 +111,10 @@ From `next/panel.lua`, `next/chain.lua` and `next/style.lua`:
   showed while the feather was still fading, "making it look like the feathering is spilled out"):
   - **Shrinking:** the glide first (its visible rect, the body, eases to its small place and height,
     `style.Time.Morph`, the feather fading out and the beam shortening), then the small border fades
-    in (`style.Time.MorphEdge`).
-  - **Growing:** the reverse: the border fades out first, then the glide (the feather fading in, the
-    beam growing).
+    in (`style.Time.MorphFade`).
+  - **Growing:** the inverse: the glide starts at once, the border fading out on the way and the beam
+    growing, then the feathers fade in (asked, of a first version that let the border go before
+    moving: "it doesn't feel good that it doesn't start moving right away").
 - **The content is not laid out every frame:** the body's width does not change, so the scroll area
   only gets taller or shorter as it moves; the content is laid out once at the end, at its new size.
 - **Panels not shown** take the new size at once, and use it when they next open.

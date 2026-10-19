@@ -892,13 +892,14 @@ function panelProto:PrepareResize(size)
 end
 
 -- Morph switches the panel to its new size in two steps (asked: a "2 step" animation, so the feather
--- never looks "spilled out" past the border). The glide: the body glides from where it was
--- (PrepareResize) to where it rests at its new size, its top left and its height (its width is the
--- same at both), the feathers fading out or in and the beam shortening or growing. The border: the
--- small panel's edge fades in once it has shrunk, or out before it grows. Its parts are the new
--- size's from the start (ApplyGeometry), the frame anchored by its top left and sized as it goes, so
--- the body only moves and stretches; nothing reaches past the screen edge on the way. A step with
--- nothing to do (turned around) is skipped. The content is laid out once, at the end.
+-- never looks "spilled out" past the border, and growing the inverse of shrinking, moving at once).
+-- The glide: the body glides from where it was (PrepareResize) to where it rests at its new size, its
+-- top left and its height (its width is the same at both), the beam shortening or growing, and what
+-- the old size had fading out on the way: the feathers as it shrinks, the small border as it grows.
+-- The fade: what the new size has fades in once it is there: the small border, or the feathers. Its
+-- parts are the new size's from the start (ApplyGeometry), the frame anchored by its top left and
+-- sized as it goes, so the body only moves and stretches; nothing reaches past the screen edge on the
+-- way. A step with nothing to do (turned around) is skipped. The content is laid out once, at the end.
 function panelProto:Morph()
   local from = self.morphFrom --[[@as NextMorphPoint]]
   self.morphFrom = nil
@@ -929,7 +930,6 @@ function panelProto:Morph()
     edge:Show()
   end
   local bodyLeft, width = self:BodyLeft(), self:Width()
-  local toFull = small and 0 or 1
   local at = { x = from.x, y = from.y, h = from.h, ribbon = from.ribbon, full = from.full, outer = from.outer,
     edge = from.edge }
   ---@type NextMorph
@@ -961,11 +961,18 @@ function panelProto:Morph()
     chain:Arrived(self)
   end
 
-  -- The glide: the body, the feathers and the beam.
+  -- The glide: the body and the beam, with the feathers (shrinking) or the border (growing) fading out.
   local function glide(after)
-    local x0, y0, h0, r0, f0, o0 = at.x, at.y, at.h, at.ribbon, at.full, at.outer
+    local x0, y0, h0, r0, f0, o0, e0 = at.x, at.y, at.h, at.ribbon, at.full, at.outer, at.edge
+    local f1, o1, e1 = f0, o0, e0
+    if small then
+      f1, o1 = 0, 0
+    else
+      e1 = 0
+    end
     if math.abs(tx - x0) < 0.01 and math.abs(ty - y0) < 0.01 and math.abs(th - h0) < 0.01
-      and math.abs(toRibbon - r0) < 0.01 and math.abs(toFull - f0) < 0.001 and math.abs(toFull - o0) < 0.001 then
+      and math.abs(toRibbon - r0) < 0.01 and math.abs(f1 - f0) < 0.001 and math.abs(o1 - o0) < 0.001
+      and math.abs(e1 - e0) < 0.001 then
       after()
       return
     end
@@ -979,28 +986,38 @@ function panelProto:Morph()
         at.y = y0 + (ty - y0) * t
         at.h = h0 + (th - h0) * t
         at.ribbon = r0 + (toRibbon - r0) * t
-        at.full = f0 + (toFull - f0) * t
-        at.outer = o0 + (toFull - o0) * t
+        at.full = f0 + (f1 - f0) * t
+        at.outer = o0 + (o1 - o0) * t
+        at.edge = e0 + (e1 - e0) * t
         draw()
       end,
       onDone = after,
     })
   end
 
-  -- The border, fading to an alpha, for the share of MorphEdge it has to go.
-  local function border(to, after)
-    local e0 = at.edge
-    if math.abs(to - e0) < 0.001 then
+  -- The fade: the small border (shrinking) or the feathers (growing) fading in, for the share of
+  -- MorphFade they have to go. The far feather only away from the screen edge (SetDocked).
+  local toOuter = (not small and self.offset ~= 0) and 1 or 0
+  local function fade(after)
+    local f0, o0, e0 = at.full, at.outer, at.edge
+    local f1, o1, e1 = f0, o0, 1
+    if not small then
+      f1, o1, e1 = 1, toOuter, e0
+    end
+    local share = math.max(math.abs(f1 - f0), math.abs(o1 - o0), math.abs(e1 - e0))
+    if share < 0.001 then
       after()
       return
     end
     tween:Play(morph, {
-      duration = style.Time.MorphEdge * math.abs(to - e0),
+      duration = style.Time.MorphFade * share,
       from = 0,
       to = 1,
       ease = "inOutSine",
       onUpdate = function(t)
-        at.edge = e0 + (to - e0) * t
+        at.full = f0 + (f1 - f0) * t
+        at.outer = o0 + (o1 - o0) * t
+        at.edge = e0 + (e1 - e0) * t
         draw()
       end,
       onDone = after,
@@ -1008,15 +1025,9 @@ function panelProto:Morph()
   end
 
   draw()
-  if small then
-    glide(function()
-      border(1, morph.finish)
-    end)
-  else
-    border(0, function()
-      glide(morph.finish)
-    end)
-  end
+  glide(function()
+    fade(morph.finish)
+  end)
 end
 
 -- endMorph puts a panel switching size at the end of its switch at once, both steps (anything else
