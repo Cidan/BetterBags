@@ -1228,19 +1228,31 @@ end of a switch. `BuildPanel` only makes the parts.
   computed. Then every panel updates its size button.
 - **A panel not shown** (a closing one finishes closing first) takes the size at once and lays its
   content out for its new height (its root renders while hidden: it has no `ShouldRender`).
-- **A shown panel glides:** its opening slide or flight is finished, its body's place is kept
-  (`BodyRect`), and `Morph` gives it the new size's parts at once (`ApplyGeometry`), then anchors the
-  frame by its top left and sizes it as the body glides (`inOutCubic`, `Time.Morph`) from where it was
-  to where it rests (its small place, or its full rest offset, `chain:RestOffset`). The body's width
-  is the same at both sizes, so it only moves and stretches. Nothing reaches past the screen edge on
-  the way (`SetDocked(false)`). The feather and the edge cross-fade (a shrinking panel's feather fades
-  out beside its inner side, re-anchored there for the glide), the beam grows or shrinks, and the
-  content is laid out once, at the end. At the end it couples again if the new size chains it
-  (`chain:Arrived`; `UpdateCoupling` waits while either bag of the pair still glides).
-- **Switched back mid-glide,** it turns around from where it is (`morph.at`, its place, height, beam
-  and how full it looks), the first glide stopped.
-- **Anything that places the panel ends a glide first** (`setOffset` calls `endMorph`; every slide,
-  flight and refit goes through it), and so does `StartMove` (it moves the frame itself). Showing an
+- **A shown panel switches in two steps** (`Morph`). Its opening slide or flight is finished, its
+  body's place is kept (`BodyRect`), and it gets the new size's parts at once (`ApplyGeometry`); the
+  frame is then anchored by its top left and sized as it goes, so the body only moves and stretches
+  (its width is the same at both sizes). Nothing reaches past the screen edge on the way
+  (`SetDocked(false)`).
+  - **The glide** (`inOutCubic`, `Time.Morph`): the body from where it was to where it rests (its
+    small place, or its full rest offset, `chain:RestOffset`), the feathers fading out or in (a
+    shrinking panel's feather beside its inner side, re-anchored there; the far feather, `outerFeather`,
+    with it), the beam shortening or growing.
+  - **The border** (`inOutSine`, `Time.MorphEdge`): the small panel's edge.
+  - **Shrinking: the glide, then the border fades in; growing: the border fades out, then the glide.**
+    Asked: the edge used to cross-fade with the feather over the whole glide, so the border showed
+    while the feather was still there, "making it look like the feathering is spilled out"; "a 2
+    step animation" instead, and "in reverse, border should fully vanish first". The edge also hung on
+    the frame, which for a full panel reaches over its feather, so a growing panel's fading border
+    outlined the feather too: it hangs on the body now.
+  - The content is laid out once, at the end. At the end it couples again if the new size chains it
+    (`chain:Arrived`; `UpdateCoupling` waits while either bag of the pair still switches).
+- **Switched back mid-switch,** it turns around from where it is (`morph.at`: its place, height, beam,
+  feathers and border), the first switch stopped. A step with nothing to do is skipped (no glide back
+  for a panel that had not moved yet, no border fade for one that had no border), and a partly faded
+  border takes only its share of `MorphEdge`.
+- **Anything that places the panel ends a switch first, both steps** (`setOffset` calls `endMorph`,
+  which stops the step playing and puts the panel at the switch's end; every slide, flight and refit
+  goes through it), and so does `StartMove` (it moves the frame itself). Showing an
   open panel again (a refresh) does not end it.
 
 ### 14e. Chaining small bags by dragging them together (`next/chain.lua`)
@@ -1281,16 +1293,18 @@ them/coming out the side though!"
 
 ### 14f. Coverage
 
-`spec/next/small_spec.lua` (61): the geometry (size, place, no feather, the edge, the beam, sparkles
+`spec/next/small_spec.lua` (64): the geometry (size, place, no feather, the edge, the beam, sparkles
 on both sides, the root, a saved place kept on the screen), opening and closing (slide and fade,
 reopening mid-close, the screen at opening, never chained, closing with a chain layout saved),
 moving (by the title row and the title, saved per kind, the layout cache flag, kept on the screen,
 the cursor, finishing the opening, hiding, header buttons above the mover, the screen changing, full
 panels never move), switching sizes (the button's art on retail and Classic, its place and tooltip,
-saving, closed panels with their content laid out, the glide's path both ways, the cross-fade and the
-beam, nothing past the edge, one layout at the end, a close or a move mid-glide, a closing panel, a
-pair's braid let go and braided again only once both arrive, turning around mid-glide, Escape
-mid-glide, a refresh mid-glide, the feather's anchors after both ways), chaining (the gap, dropping
+saving, closed panels with their content laid out, the glide's path both ways, the two steps both
+ways (the feather and beam with the size, the border only after shrinking and before growing, the far
+feather with the near one), the border round the body, nothing past the edge, one layout at the end,
+a close or a move mid-switch (both steps finished), a closing panel, a pair's braid let go and
+braided again only once both arrive, turning around mid-glide and mid-border, a border brought
+straight back, Escape mid-switch, a refresh mid-switch, the feather's anchors after both ways), chaining (the gap, dropping
 beside either partner, too far, too high, facing away, a pair that would not fit, the braid's
 halves and knot, the edge sparkles in the gap and back, the anchor moving both, letting go and
 chaining again, opening beside an open anchor, beside where it was left, the backpack beside a

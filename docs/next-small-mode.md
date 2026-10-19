@@ -107,9 +107,13 @@ From `next/panel.lua`, `next/chain.lua` and `next/style.lua`:
 
 ### Switching sizes (the morph)
 
-- **Every open panel morphs:** its visible rect (the body: in full mode, the frame less the feather)
-  eases from where it is to where it goes (`style.Time.Morph`), the feather fades out (or in), and
-  the ribbon shrinks (or grows) to its new length.
+- **Every open panel morphs, in two steps** (asked after the first version, 2026-10-19: the border
+  showed while the feather was still fading, "making it look like the feathering is spilled out"):
+  - **Shrinking:** the glide first (its visible rect, the body, eases to its small place and height,
+    `style.Time.Morph`, the feather fading out and the beam shortening), then the small border fades
+    in (`style.Time.MorphEdge`).
+  - **Growing:** the reverse: the border fades out first, then the glide (the feather fading in, the
+    beam growing).
 - **The content is not laid out every frame:** the body's width does not change, so the scroll area
   only gets taller or shorter as it moves; the content is laid out once at the end, at its new size.
 - **Panels not shown** take the new size at once, and use it when they next open.

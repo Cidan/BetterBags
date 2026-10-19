@@ -514,6 +514,12 @@ describe("BetterBags Next's small mode", function()
       assert.is_true(v > lo and v < hi, what .. ": " .. v .. " is not between " .. a .. " and " .. b)
     end
 
+    local function edgeAlpha(bag)
+      local alpha = bag.edges[1]:GetAlpha()
+      for _, edge in ipairs(bag.edges) do assert.are.equal(alpha, edge:GetAlpha(), "every edge alike") end
+      return alpha
+    end
+
     it("has a button on the backpack with Blizzard's minimize art while full, maximize while small", function()
       db.size = "full"
       local bag = nextBag:Create(ctx())
@@ -586,33 +592,56 @@ describe("BetterBags Next's small mode", function()
       assert.are.equal(1, bag.frame:GetAlpha())
     end)
 
-    it("fades the feather out and the edge in as it shrinks, its beam shortening", function()
+    -- Asked: shrinking, the border appeared while the feather was still there, "making it look like
+    -- the feathering is spilled out": a "2 step" animation, the size with the feather and the beam
+    -- first, then the border.
+    it("shrinks first, its feather fading and its beam shortening, and shows its border only once small", function()
       db.size = "full"
       local bag = opened(function(c) return nextBag:Create(c) end)
       click(bag)
       step(style.Time.Morph / 2)
       assert.is_true(bag.feather:IsShown())
       between(bag.feather:GetAlpha(), 0, 1, "feather")
-      for _, edge in ipairs(bag.edges) do
-        assert.is_true(edge:IsShown())
-        between(edge:GetAlpha(), 0, 1, "edge")
-      end
+      assert.are.equal(0, edgeAlpha(bag), "no border while it shrinks")
       between(bag.ribbonLength, style.RIBBON_LENGTH, style.Small.Ribbon, "beam")
+      step(style.Time.Morph / 2 + 0.001)
+      assert.are.equal(0, bag.feather:GetAlpha(), "the feather is gone once it is small")
+      assert.are.equal(smallHeight(), bag.frame:GetHeight())
+      assert.are.equal(style.Small.Ribbon, bag.ribbonLength)
+      assert.are.equal(0, edgeAlpha(bag))
+      step(style.Time.MorphEdge / 2)
+      between(edgeAlpha(bag), 0, 1, "the border fades in")
+      assert.are.equal(0, bag.feather:GetAlpha())
+      assert.are.equal(smallHeight(), bag.frame:GetHeight())
       finishTweens()
       assert.is_false(bag.feather:IsShown())
       assert.are.equal(1, bag.feather:GetAlpha())
-      for _, edge in ipairs(bag.edges) do assert.are.equal(1, edge:GetAlpha()) end
+      assert.are.equal(1, bag.outerFeather:GetAlpha(), "ready for a full panel's flights")
+      assert.are.equal(1, edgeAlpha(bag))
       assert.are.equal(style.Small.Ribbon, bag.ribbonLength)
     end)
 
-    it("grows back to its screen edge, the feather fading in and the edge out", function()
+    -- The same in reverse: the border goes first, then the size with the feather and the beam.
+    it("lets its border go first, then grows to its screen edge, the feather fading in", function()
       local bag = opened(function(c) return nextBag:Create(c) end)
+      local x0, y0 = topLeft(bag)
       click(bag)
+      step(style.Time.MorphEdge / 2)
+      between(edgeAlpha(bag), 0, 1, "the border fades out")
+      local x, y, height = body(bag)
+      assert.are.same({ x0, y0, smallHeight() }, { x, y, height }, "it does not move yet")
+      assert.are.equal(0, bag.feather:GetAlpha())
+      assert.are.equal(0, bag.outerFeather:GetAlpha())
+      assert.are.equal(style.Small.Ribbon, bag.ribbonLength)
+      step(style.Time.MorphEdge / 2 + 0.001)
+      assert.are.equal(0, edgeAlpha(bag))
       step(style.Time.Morph / 2)
+      assert.are.equal(0, edgeAlpha(bag), "no border while it grows")
       between(bag.feather:GetAlpha(), 0, 1, "feather")
-      for _, edge in ipairs(bag.edges) do between(edge:GetAlpha(), 0, 1, "edge") end
-      local _, _, height = body(bag)
-      between(height, smallHeight(), UIParent:GetHeight(), "height")
+      between(bag.outerFeather:GetAlpha(), 0, 1, "far feather")
+      between(bag.ribbonLength, style.Small.Ribbon, style.RIBBON_LENGTH, "beam")
+      local _, _, h = body(bag)
+      between(h, smallHeight(), UIParent:GetHeight(), "height")
       finishTweens()
       assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, 0 }, { bag.frame:GetPoint(1) })
       assert.are.same({ "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 0 }, { bag.frame:GetPoint(2) })
@@ -622,6 +651,49 @@ describe("BetterBags Next's small mode", function()
       for _, edge in ipairs(bag.edges) do assert.is_false(edge:IsShown()) end
       assert.is_true(bag.docked)
       assert.are.equal(style.RIBBON_LENGTH, bag.ribbonLength)
+      assert.are.equal(1, bag.outerFeather:GetAlpha())
+    end)
+
+    -- Its border outlines its body, not the frame: a full panel's frame reaches over its feather.
+    it("draws its border round its body", function()
+      local bag = nextBag:Create(ctx())
+      for _, edge in ipairs(bag.edges) do
+        for i = 1, edge:GetNumPoints() do
+          local _, rel = edge:GetPoint(i)
+          assert.are.equal(bag.body, rel)
+        end
+      end
+    end)
+
+    it("brings its border straight back when switched back before it moved", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.MorphEdge / 2)
+      local edge = edgeAlpha(bag)
+      click(bag)
+      step(style.Time.MorphEdge * (1 - edge) + 0.001)
+      assert.are.equal(1, edgeAlpha(bag))
+      assert.is_nil(bag.morph)
+    end)
+
+    it("turns around from where it is while its border fades in", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      click(bag)
+      step(style.Time.Morph + 0.001)
+      step(style.Time.MorphEdge / 2)
+      local edge = edgeAlpha(bag)
+      between(edge, 0, 1, "border")
+      click(bag)
+      assert.are.equal(edge, edgeAlpha(bag), "the border fades back from where it was")
+      step(0.01)
+      assert.is_true(edgeAlpha(bag) < edge)
+      -- In its share of the fade's time, not all of it.
+      step(style.Time.MorphEdge * edge)
+      assert.are.equal(0, edgeAlpha(bag))
+      finishTweens()
+      assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, 0 }, { bag.frame:GetPoint(1) })
+      assert.is_false(bag.edges[1]:IsShown())
     end)
 
     it("turns around from where it is when switched back mid-glide", function()
@@ -638,6 +710,10 @@ describe("BetterBags Next's small mode", function()
         "it starts back from where it was")
       assert.is_true(math.abs(bag.feather:GetAlpha() - feather) < 1e-6)
       assert.is_true(math.abs(bag.ribbonLength - ribbon) < 1e-6)
+      -- No border to fade (it had none yet): it glides back at once.
+      step(0.01)
+      local _, _, hNext = body(bag)
+      assert.is_true(hNext > h, "it is on its way back")
       -- The first glide would have ended here: it was stopped, and does not end the second.
       step(style.Time.Morph / 2 + 0.01)
       assert.is_not_nil(bag.morph)
@@ -725,6 +801,7 @@ describe("BetterBags Next's small mode", function()
       assert.is_nil(bag.morph)
       assert.are.same({ UIParent:GetWidth() - style.BODY_WIDTH - style.Small.Margin,
         (UIParent:GetHeight() + smallHeight()) / 2 }, { topLeft(bag) })
+      assert.are.equal(1, edgeAlpha(bag), "both steps are finished")
     end)
 
     it("finishes closing before it switches a closing panel", function()

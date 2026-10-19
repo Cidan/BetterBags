@@ -124,8 +124,10 @@ style.Time = {
   Enter = 0.5,
   Couple = 0.35,
   Uncouple = 0.25,
-  -- An open panel switching between full and small (docs/next-small-mode.md).
+  -- An open panel switching between full and small (docs/next-small-mode.md): its size, feather and
+  -- beam, then (shrinking) or first (growing) its small border.
   Morph = 0.4,
+  MorphEdge = 0.2,
 }
 style.RISE = 12
 

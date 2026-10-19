@@ -84,18 +84,23 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 
 ---@alias NextSide "RIGHT"|"LEFT"
 
--- Where a panel's body is, part way between its sizes: its top left (in UIParent's units), its
--- height, its beam's length, and how full it looks (1: the feather shown and no edge; 0: small).
+-- Where a panel is, part way between its sizes: its body's top left (in UIParent's units) and height,
+-- its beam's length, its feathers' alpha (full: the inner one; outer: the far one, away from its
+-- screen edge) and its small border's.
 ---@class (exact) NextMorphPoint
 ---@field x number
 ---@field y number
 ---@field h number
 ---@field ribbon number
 ---@field full number
+---@field outer number
+---@field edge number
 
--- A glide between sizes (panelProto:Morph): the tween's key, and where the body is now.
+-- A switch between sizes (panelProto:Morph): the tween's key, where the panel is now, and what puts
+-- it at its end at once.
 ---@class (exact) NextMorph
 ---@field at NextMorphPoint
+---@field finish fun()
 
 -- A bag's half of the braid two coupled bags' ribbons twist into (next.md §12): two strands of
 -- lines from its body edge to the middle of the gap, lights running along them, and the knot in the
@@ -580,20 +585,23 @@ function panelProto:BuildPanel(name)
   wash:SetBlendMode("ADD")
   self:paintWash(style.Color.Wash)
 
-  -- A small panel's 1-pixel lavender edge all round, so it reads against the world.
+  -- A small panel's 1-pixel lavender edge round its body, so it reads against the world. On the body,
+  -- not the frame: a full panel's frame reaches over its feather, and a growing panel has the full
+  -- panel's frame while its edge fades (Morph).
   self.edges = {}
   local l = style.Color.Lavender
+  local body = self.body
   for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
     local edge = frame:CreateTexture(nil, "BORDER", nil, 1)
     edge:SetColorTexture(1, 1, 1, 1)
     edge:SetVertexColor(l[1], l[2], l[3], style.Small.Edge)
     if side == "TOP" or side == "BOTTOM" then
-      edge:SetPoint(side .. "LEFT", frame, side .. "LEFT", 0, 0)
-      edge:SetPoint(side .. "RIGHT", frame, side .. "RIGHT", 0, 0)
+      edge:SetPoint(side .. "LEFT", body, side .. "LEFT", 0, 0)
+      edge:SetPoint(side .. "RIGHT", body, side .. "RIGHT", 0, 0)
       edge:SetHeight(1)
     else
-      edge:SetPoint("TOP" .. side, frame, "TOP" .. side, 0, 0)
-      edge:SetPoint("BOTTOM" .. side, frame, "BOTTOM" .. side, 0, 0)
+      edge:SetPoint("TOP" .. side, body, "TOP" .. side, 0, 0)
+      edge:SetPoint("BOTTOM" .. side, body, "BOTTOM" .. side, 0, 0)
       edge:SetWidth(1)
     end
     edge:Hide()
@@ -855,18 +863,26 @@ function panelProto:PrepareResize(size)
     -- An opening slide or a flight ends where it was going: its end says the panel has shown.
     tween:Stop(self, true)
     local x, y, h = self:BodyRect()
-    self.morphFrom = { x = x, y = y, h = h, ribbon = self.ribbonLength, full = self:IsSmall() and 0 or 1 }
+    local small = self:IsSmall()
+    self.morphFrom = {
+      x = x, y = y, h = h, ribbon = self.ribbonLength,
+      full = small and 0 or 1,
+      outer = (not small and not self.docked) and 1 or 0,
+      edge = small and 1 or 0,
+    }
   end
   self.size = size
   return true
 end
 
--- Morph glides the panel's body from where it was (PrepareResize) to where it rests at its new size:
--- its top left and its height (its width is the same at both). Its parts are the new size's from the
--- start (ApplyGeometry) and the frame is anchored by its top left and sized as it goes, so the body
--- only moves and stretches. Nothing reaches past the screen edge on the way. The feather and the
--- small panel's edge cross-fade (a small panel's feather fades out beside its inner side), the beam
--- grows or shrinks, and the content is laid out once, at the end, for its new size.
+-- Morph switches the panel to its new size in two steps (asked: a "2 step" animation, so the feather
+-- never looks "spilled out" past the border). The glide: the body glides from where it was
+-- (PrepareResize) to where it rests at its new size, its top left and its height (its width is the
+-- same at both), the feathers fading out or in and the beam shortening or growing. The border: the
+-- small panel's edge fades in once it has shrunk, or out before it grows. Its parts are the new
+-- size's from the start (ApplyGeometry), the frame anchored by its top left and sized as it goes, so
+-- the body only moves and stretches; nothing reaches past the screen edge on the way. A step with
+-- nothing to do (turned around) is skipped. The content is laid out once, at the end.
 function panelProto:Morph()
   local from = self.morphFrom --[[@as NextMorphPoint]]
   self.morphFrom = nil
@@ -877,8 +893,11 @@ function panelProto:Morph()
   local tx, ty, th = self:BodyRect()
   local toRibbon = self.ribbonLength
   self:SetDocked(false)
-  local frame, feather, edges = self.frame, self.feather, self.edges
+  local frame, feather, edges, outerFeather = self.frame, self.feather, self.edges, self.outerFeather
   feather:Show()
+  -- A full panel away from its screen edge has a far feather too (SetDocked): it fades with the near
+  -- one (its alpha, at.outer), and the switch's end decides whether it shows (ApplyGeometry).
+  outerFeather:Show()
   if small then
     feather:ClearAllPoints()
     if self.side == "LEFT" then
@@ -895,51 +914,105 @@ function panelProto:Morph()
   end
   local bodyLeft, width = self:BodyLeft(), self:Width()
   local toFull = small and 0 or 1
+  local at = { x = from.x, y = from.y, h = from.h, ribbon = from.ribbon, full = from.full, outer = from.outer,
+    edge = from.edge }
   ---@type NextMorph
-  local morph = { at = { x = from.x, y = from.y, h = from.h, ribbon = from.ribbon, full = from.full } }
+  local morph = { at = at, finish = function() end }
   self.morph = morph
-  local at = morph.at
-  tween:Play(morph, {
-    duration = style.Time.Morph,
-    from = 0,
-    to = 1,
-    ease = "inOutCubic",
-    onUpdate = function(t)
-      at.x = from.x + (tx - from.x) * t
-      at.y = from.y + (ty - from.y) * t
-      at.h = from.h + (th - from.h) * t
-      at.ribbon = from.ribbon + (toRibbon - from.ribbon) * t
-      at.full = from.full + (toFull - from.full) * t
-      frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x - bodyLeft, at.y)
-      frame:SetSize(width, at.h)
-      feather:SetAlpha(at.full)
-      for _, edge in ipairs(edges) do
-        edge:SetAlpha(1 - at.full)
-      end
-      self.ribbonLength = at.ribbon
-      for _, line in ipairs(self.ribbonLines) do
-        line:SetWidth(at.ribbon)
-      end
-    end,
-    onDone = function()
-      self.morph = nil
-      feather:SetAlpha(1)
-      for _, edge in ipairs(edges) do
-        edge:SetAlpha(1)
-      end
-      self:ApplyGeometry()
-      render:Invalidate(self.root)
-      chain:Arrived(self)
-    end,
-  })
+
+  local function draw()
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x - bodyLeft, at.y)
+    frame:SetSize(width, at.h)
+    feather:SetAlpha(at.full)
+    outerFeather:SetAlpha(at.outer)
+    for _, edge in ipairs(edges) do
+      edge:SetAlpha(at.edge)
+    end
+    self.ribbonLength = at.ribbon
+    for _, line in ipairs(self.ribbonLines) do
+      line:SetWidth(at.ribbon)
+    end
+  end
+
+  morph.finish = function()
+    self.morph = nil
+    feather:SetAlpha(1)
+    outerFeather:SetAlpha(1)
+    for _, edge in ipairs(edges) do
+      edge:SetAlpha(1)
+    end
+    self:ApplyGeometry()
+    render:Invalidate(self.root)
+    chain:Arrived(self)
+  end
+
+  -- The glide: the body, the feathers and the beam.
+  local function glide(after)
+    local x0, y0, h0, r0, f0, o0 = at.x, at.y, at.h, at.ribbon, at.full, at.outer
+    if math.abs(tx - x0) < 0.01 and math.abs(ty - y0) < 0.01 and math.abs(th - h0) < 0.01
+      and math.abs(toRibbon - r0) < 0.01 and math.abs(toFull - f0) < 0.001 and math.abs(toFull - o0) < 0.001 then
+      after()
+      return
+    end
+    tween:Play(morph, {
+      duration = style.Time.Morph,
+      from = 0,
+      to = 1,
+      ease = "inOutCubic",
+      onUpdate = function(t)
+        at.x = x0 + (tx - x0) * t
+        at.y = y0 + (ty - y0) * t
+        at.h = h0 + (th - h0) * t
+        at.ribbon = r0 + (toRibbon - r0) * t
+        at.full = f0 + (toFull - f0) * t
+        at.outer = o0 + (toFull - o0) * t
+        draw()
+      end,
+      onDone = after,
+    })
+  end
+
+  -- The border, fading to an alpha, for the share of MorphEdge it has to go.
+  local function border(to, after)
+    local e0 = at.edge
+    if math.abs(to - e0) < 0.001 then
+      after()
+      return
+    end
+    tween:Play(morph, {
+      duration = style.Time.MorphEdge * math.abs(to - e0),
+      from = 0,
+      to = 1,
+      ease = "inOutSine",
+      onUpdate = function(t)
+        at.edge = e0 + (to - e0) * t
+        draw()
+      end,
+      onDone = after,
+    })
+  end
+
+  draw()
+  if small then
+    glide(function()
+      border(1, morph.finish)
+    end)
+  else
+    border(0, function()
+      glide(morph.finish)
+    end)
+  end
 end
 
--- endMorph ends a glide to a new size where it was going (anything else that places the panel).
+-- endMorph puts a panel switching size at the end of its switch at once, both steps (anything else
+-- that places the panel).
 ---@private
 function panelProto:endMorph()
-  if self.morph ~= nil then
-    tween:Stop(self.morph, true)
+  local morph = self.morph
+  if morph ~= nil then
+    tween:Stop(morph)
+    morph.finish()
   end
 end
 
