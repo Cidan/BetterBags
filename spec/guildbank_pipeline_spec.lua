@@ -289,8 +289,10 @@ describe("the guild bank through the data engine", function()
     items:Init()
     for _, kind in ipairs({ 0, 1, GUILD }) do items._firstLoad[kind] = false end
     refresh:Init()
-    done = {}
-    events:RegisterMessage("items/RefreshGuildBank/Done", function(_, slotInfo) table.insert(done, slotInfo) end)
+    -- AceEvent keeps every earlier test's handler, so each test's handler fills its own list.
+    local mine = {}
+    done = mine
+    events:RegisterMessage("items/RefreshGuildBank/Done", function(_, slotInfo) table.insert(mine, slotInfo) end)
 
     _G._guildBank.tabs = {
       { name = "Gear", icon = 1, isViewable = true, canDeposit = true, slots = {
@@ -490,6 +492,19 @@ describe("the guild bank through the data engine", function()
       items:ProcessRefresh(context:New("backpack"), 0)
       assert.is_nil(search:Search("Copper")[keyOf(2, 2)])
     end)
+  end)
+
+  -- A read parks after its harvest (one frame); the guild bank can close meanwhile, and its items
+  -- were forgotten then (ClearGuildBankCache).
+  it("commits nothing for a read whose visit ended while it was parked", function()
+    loadTabs()
+    async.Yield = function()
+      fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", Enum.PlayerInteractionType.GuildBanker)
+      items:ClearGuildBankCache(context:New("closed"))
+    end
+    local slotInfo = read()
+    assert.is_nil(slotInfo.itemsBySlotKey[keyOf(1, 1)])
+    assert.are.equal(0, #done)
   end)
 
   it("knows a guild container's kind", function()

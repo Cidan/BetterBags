@@ -17,6 +17,9 @@ _G.C_Container.GetContainerNumSlots = function(bagID)
   return 2 -- Let's return 2 slots for each bag in tests
 end
 
+-- Loaded here, not by the first test, so each test passes alone and shuffled.
+LoadBetterBagsModule("data/loader.lua")
+
 describe("ItemLoader", function()
   before_each(function()
     -- Reset stub/event registry
@@ -109,6 +112,35 @@ describe("ItemLoader", function()
     -- Bags 0, 1, 5 and 10 have two slots each in this spec.
     assert.equal(8, bagSlots)
     assert.equal(INVSLOT_LAST_EQUIPPED - INVSLOT_FIRST_EQUIPPED + 1, equipped)
+  end)
+
+  -- A guild bank slot has no item location, so its item is loaded by its link
+  -- (Item:CreateFromItemLink), once its tab has arrived (guild-bank.md §3).
+  it("primes the items of the guild bank tabs given, by their links, in one load", function()
+    local loader = addon:GetModule("ItemLoader")
+    loader:Init()
+    const.GUILD_BANK_SLOTS = 98
+    ResetMockGuildBank()
+    _G._guildBank.tabs = {
+      { name = "A", slots = { [1] = { link = "|Hitem:1|h" }, [98] = { link = "|Hitem:2|h" } } },
+      { name = "B", slots = { [5] = { link = "|Hitem:3|h" } } },
+    }
+    _G._guildBank.delivered = { true, true }
+    local containers, added = 0, {}
+    local originalCreate = _G.ContinuableContainer.Create
+    _G.ContinuableContainer.Create = function()
+      containers = containers + 1
+      return {
+        AddContinuable = function(_, mixin) table.insert(added, mixin:GetItemLink()) end,
+        ContinueOnLoad = function(_, cb) cb() end,
+      }
+    end
+    local primed = 0
+    loader:PrimeGuildBank({ 1 }, function() primed = primed + 1 end)
+    _G.ContinuableContainer.Create = originalCreate
+    assert.equal(1, containers)
+    assert.equal(1, primed)
+    assert.are.same({ "|Hitem:1|h", "|Hitem:2|h" }, added, "only the tabs given")
   end)
 
   -- Bank containers hold no slots until the bank opens, so PrimeAll at login cannot cover

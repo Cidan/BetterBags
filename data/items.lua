@@ -1934,6 +1934,12 @@ function items:RunRefresh(ectx, kind)
   -- next frame against the state committed by then.
   async:Yield()
 
+  -- A guild bank read whose visit ended while it waited commits nothing: the guild bank's items
+  -- were forgotten when it closed (ClearGuildBankCache).
+  if kind == const.BAG_KIND.GUILD and not addon.atGuildBank then
+    return
+  end
+
   if self._firstLoad[kind] == true then
     self._firstLoad[kind] = false
     ectx:Set("wipe", true)

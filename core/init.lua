@@ -185,6 +185,7 @@ function addon:OnInitialize()
   -- 3. Data Models and Scanners
   addon:GetModule('TooltipScanner'):Init()
   itemLoader:Init()
+  addon:GetModule('GuildBank'):Init()
   categories:Init()
   addon:GetModule('Groups'):Init()
   addon:GetModule('EquipmentSets'):Init()
@@ -304,7 +305,10 @@ function addon:GetBagFromBagID(bagid)
     return addon.Bags.Backpack
   elseif const.BANK_BAGS[bagid] then
     return addon.Bags.Bank
-  elseif const.ACCOUNT_BANK_BAGS[bagid] then
+  elseif const.GUILD_BANK_BAGS[bagid] then
+    return addon.Bags.GuildBank
+  elseif const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid] then
+    -- Classic has no Warbank (no ACCOUNT_BANK_BAGS).
     return addon.Bags.Bank
   else
     return nil
@@ -318,6 +322,8 @@ function addon:GetBagFromKind(kind)
     return addon.Bags.Backpack
   elseif kind == const.BAG_KIND.BANK then
     return addon.Bags.Bank
+  elseif kind == const.BAG_KIND.GUILD then
+    return addon.Bags.GuildBank
   else
     return nil
   end
@@ -392,6 +398,7 @@ function addon:OnEnable()
   pawn:Enable()
   question:Enable()
   itemLoader:Enable()
+  addon:GetModule('GuildBank'):Enable()
   refresh:Enable()
   views:Enable()
   searchCategoryConfig:Enable()
@@ -445,6 +452,17 @@ function addon:OnEnable()
       addon.Bags.Bank:Draw(ctx, slotInfo, drawn)
     end)
   end
+
+  -- The guild bank's panel exists only with BetterBags Next, which a switch can make after this
+  -- (next.md §11), so it is looked for at each read.
+  events:RegisterMessage('items/RefreshGuildBank/Done', function(ctx, slotInfo)
+    local guildBank = addon.Bags.GuildBank
+    if guildBank then
+      guildBank:Draw(ctx, slotInfo, function()
+        events:SendMessage(ctx, 'bags/Draw/GuildBank/Done')
+      end)
+    end
+  end)
 
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
 

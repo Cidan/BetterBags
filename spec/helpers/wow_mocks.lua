@@ -2580,6 +2580,17 @@ _G.Item.CreateFromItemLocation = function(_, itemLocation)
   function item:IsItemEmpty() return false end
   return item
 end
+-- Item:CreateFromItemLink(itemLink): an item known by its link alone (Blizzard_ObjectAPI Item.lua).
+_G.Item.CreateFromItemLink = function(_, itemLink)
+  local item = {
+    _itemLink = itemLink,
+  }
+  function item:GetItemLink() return self._itemLink end
+  function item:IsItemEmpty() return false end
+  function item:IsItemDataLoaded() return true end
+  function item:ContinueOnItemLoad(callback) callback() end
+  return item
+end
 _G.Item.CreateFromItemID = function(_, itemID)
   local item = {
     _itemID = itemID,

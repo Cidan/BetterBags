@@ -97,6 +97,25 @@ function loader:PrimeBank(callback)
   self:LoadTheseItemsAndCallback(mixins, callback)
 end
 
+-- PrimeGuildBank loads the item data of every item in the guild bank tabs given, in one
+-- ContinuableContainer, and calls callback once when all of it has loaded (synchronously when it
+-- already is). A guild bank slot has no item location, so each item is loaded by its link
+-- (Item:CreateFromItemLink); a tab's slots read nothing until the server sent the tab.
+---@param tabs number[]
+---@param callback fun()
+function loader:PrimeGuildBank(tabs, callback)
+  local mixins = {}
+  for _, tab in ipairs(tabs) do
+    for slot = 1, const.GUILD_BANK_SLOTS do
+      local link = GetGuildBankItemLink(tab, slot)
+      if link then
+        mixins[#mixins + 1] = Item:CreateFromItemLink(link)
+      end
+    end
+  end
+  self:LoadTheseItemsAndCallback(mixins, callback)
+end
+
 function loader:ScanBag(bagID)
   if not bagID then return end
   local ok, totalSlots = pcall(C_Container.GetContainerNumSlots, bagID)
