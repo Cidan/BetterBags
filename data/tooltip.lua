@@ -265,6 +265,41 @@ function tooltipScanner:GetMerchantItemText(index)
   return joinScanLines(self.scanTooltip)
 end
 
+-- GetGuildBankItemText returns the tooltip text of a guild bank item, for search
+-- (items:AttachGuildBankItemInfo): C_TooltipInfo.GetGuildBankItem on retail, the scan tooltip's
+-- SetGuildBankItem on Classic. A guild bank slot has no item GUID, so the text is cached by the
+-- item's link (an item's text is the same wherever it lies), under "guild:" .. link, a key no GUID
+-- has; a sparse retail tooltip resolves as a bag item's does (OnTooltipDataResolved).
+---@param tab number
+---@param slot number
+---@param link string
+---@return string?
+function tooltipScanner:GetGuildBankItemText(tab, slot, link)
+  local key = "guild:" .. link
+  if self.cache[key] then
+    return self.cache[key]
+  end
+  local text, dataInstanceID
+  if addon.isRetail then
+    if C_TooltipInfo and C_TooltipInfo.GetGuildBankItem then
+      local data = C_TooltipInfo.GetGuildBankItem(tab, slot)
+      text = joinRetailLines(data)
+      dataInstanceID = data and data.dataInstanceID
+    end
+  elseif self.scanTooltip then
+    self.scanTooltip:ClearLines()
+    self.scanTooltip:SetGuildBankItem(tab, slot)
+    text = joinScanLines(self.scanTooltip)
+  end
+  if text and text ~= "" then
+    self.cache[key] = text
+    if dataInstanceID ~= nil and (self.resolveRescans[key] or 0) < MAX_RESOLVE_RESCANS then
+      self:RecordInstance(key, dataInstanceID)
+    end
+  end
+  return text
+end
+
 -- GetInventoryRepairCost returns what repairing an equipped item costs: the TooltipData's
 -- repairCost on retail (Blizzard's TooltipDataRules.lua reads it), the third return of the scan
 -- tooltip's SetInventoryItem on Classic (PaperDollFrame.lua). 0 when nothing says.
@@ -362,9 +397,10 @@ function tooltipScanner:OnTooltipDataResolved(resolved)
   if not invalidated then return end
   -- Recalculate the bags: the sweep re-scans the invalidated items (a cache miss, now
   -- warm) and re-indexes them, without reading the bags (refresh-scheduler.md §10). The
-  -- backpack always; the bank only when it is open.
+  -- backpack always; the bank and the guild bank only when they are open.
   local ctx = context:New('TooltipDataResolved')
-  events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = addon.atBank == true })
+  events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = addon.atBank == true,
+    guild = addon.atGuildBank == true or nil })
 end
 
 --- Get the current cache size (for debugging/monitoring)

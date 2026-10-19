@@ -170,6 +170,18 @@ function DB:GetShowBankTabs()
   return DB.data.profile.showBankTabs
 end
 
+-- The guild bank shows its own tabs, one at a time, instead of every tab in categories
+-- (guild-bank.md §4).
+---@param shown boolean
+function DB:SetShowGuildBankTabs(shown)
+  DB.data.profile.showGuildBankTabs = shown
+end
+
+---@return boolean
+function DB:GetShowGuildBankTabs()
+  return DB.data.profile.showGuildBankTabs
+end
+
 ---@param enabled boolean
 function DB:SetEnableBagFading(enabled)
   DB.data.profile.enableBagFading = enabled

@@ -522,4 +522,118 @@ describe("Constants Module Offsets", function()
       assert.are.equal(Enum.BagIndex.Bank, const.BANK_BAGS[Enum.BagIndex.Bank])
     end)
   end)
+
+  -- The guild bank is the data engine's third kind of bag (guild-bank.md §1): its tabs are
+  -- containers with ids of their own, above every bag index the client has, so a guild slot's key
+  -- ("<container>_<slot>") never names a bag slot.
+  describe("guild bank", function()
+    local savedLoadUI, savedMaxTabs, savedHasGuildBank
+
+    local function reload()
+      addon.modules["Constants"] = nil
+      local aceAddon = LibStub("AceAddon-3.0")
+      if aceAddon.addons["BetterBags_Constants"] then
+        aceAddon.addons["BetterBags_Constants"] = nil
+      end
+      loadfile("core/constants.lua")("BetterBags")
+      return addon:GetModule("Constants")
+    end
+
+    before_each(function()
+      savedLoadUI = _G.GuildBankFrame_LoadUI
+      savedMaxTabs = _G.MAX_GUILDBANK_TABS
+      savedHasGuildBank = addon.hasGuildBank
+    end)
+
+    after_each(function()
+      _G.GuildBankFrame_LoadUI = savedLoadUI
+      _G.MAX_GUILDBANK_TABS = savedMaxTabs
+      addon.hasGuildBank = savedHasGuildBank
+    end)
+
+    it("is a third kind of bag", function()
+      local const = reload()
+      assert.are.equal(2, const.BAG_KIND.GUILD)
+    end)
+
+    it("gives each guild bank tab a container above every bag index", function()
+      _G.MAX_GUILDBANK_TABS = 8
+      local const = reload()
+      local highest = 0
+      for _, id in pairs(Enum.BagIndex) do
+        if id > highest then highest = id end
+      end
+      assert.are.equal(8, #const.GUILD_BANK_BAGS_LIST)
+      for tab, container in ipairs(const.GUILD_BANK_BAGS_LIST) do
+        assert.is_true(container > highest)
+        assert.are.equal(tab, const.GUILD_BANK_BAGS[container])
+        assert.are.equal(container, const.GUILD_BANK_TAB_CONTAINER[tab])
+      end
+      assert.are.equal(const.GUILD_BANK_BAGS_LIST[1] + 7, const.GUILD_BANK_BAGS_LIST[8])
+      assert.are.equal(98, const.GUILD_BANK_SLOTS)
+    end)
+
+    it("is 1000 above tab 0 on a real client's bag indices", function()
+      local savedBagIndex = _G.Enum.BagIndex
+      -- WoW: Forever 1.60.1's enum: 9 character and 9 account tabs, the highest index 23.
+      local forever = {
+        Accountbanktab = -3, Characterbanktab = -2, Keyring = -1,
+        Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
+      }
+      for i = 1, 9 do
+        forever["CharacterBankTab_" .. i] = 5 + i
+        forever["AccountBankTab_" .. i] = 14 + i
+      end
+      _G.Enum.BagIndex = forever
+      local ok, const = pcall(reload)
+      _G.Enum.BagIndex = savedBagIndex
+      assert.is_true(ok, tostring(const))
+      assert.are.equal(1001, const.GUILD_BANK_BAGS_LIST[1])
+    end)
+
+    it("has as many tabs as the client's guild bank (6 on TBC Anniversary)", function()
+      _G.MAX_GUILDBANK_TABS = 6
+      local const = reload()
+      assert.are.equal(6, #const.GUILD_BANK_BAGS_LIST)
+    end)
+
+    it("names the tab of the combined view apart from every guild container", function()
+      local const = reload()
+      assert.is_nil(const.GUILD_BANK_BAGS[const.GUILD_BANK_ALL_TAB])
+    end)
+
+    it("exists where Blizzard's client has a guild bank (GuildBankFrame_LoadUI), not on Classic Era", function()
+      _G.GuildBankFrame_LoadUI = function() end
+      reload()
+      assert.is_true(addon.hasGuildBank)
+      _G.GuildBankFrame_LoadUI = nil
+      reload()
+      assert.is_false(addon.hasGuildBank)
+    end)
+
+    it("starts with every per-bag setting the bank has, and its tabs mode off", function()
+      local const = reload()
+      local profile = const.DATABASE_DEFAULTS.profile
+      local GUILD, BANK = const.BAG_KIND.GUILD, const.BAG_KIND.BANK
+      local perKind = 0
+      for name, value in pairs(profile) do
+        if type(value) == "table" and value[BANK] ~= nil and value[const.BAG_KIND.BACKPACK] ~= nil then
+          perKind = perKind + 1
+          assert.is_not_nil(value[GUILD], name .. " has no guild bank default")
+          -- The guild bank has no groups (guild-bank.md §1).
+          if name ~= "categoryToGroup" and name ~= "groups" and name ~= "groupCounter" and name ~= "groupsEnabled" then
+            assert.are.same(value[BANK], value[GUILD], name)
+          end
+        end
+      end
+      for _, view in pairs(const.BAG_VIEW) do
+        if profile.size[view] then
+          assert.are.same(profile.size[view][BANK], profile.size[view][GUILD])
+        end
+      end
+      assert.is_true(perKind > 15)
+      assert.is_false(profile.showGuildBankTabs)
+      assert.is_false(profile.groupsEnabled[GUILD])
+    end)
+  end)
 end)

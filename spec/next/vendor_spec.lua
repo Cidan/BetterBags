@@ -126,6 +126,7 @@ describe("NextVendor", function()
     nextDrag:Init()
     vendorButton:Init()
     ResetMockMerchant()
+    ResetMockGuildBank()
     eventsRegistered, buckets, timers = {}, {}, {}
     calls = { sellAll = 0, sellSlots = {}, repairAll = {}, purchase = {} }
     asked = nil
@@ -198,6 +199,7 @@ describe("NextVendor", function()
   after_each(function()
     restore()
     ResetMockMerchant()
+    ResetMockGuildBank()
     _G._cursorHasItem = false
     _G._extendedPriceShown = false
     _G._lastContextMenu = nil
@@ -511,7 +513,7 @@ describe("NextVendor", function()
     it("repairs everything from the player's gold or the guild's, telling what it costs", function()
       _G._merchant.canRepair, _G._merchant.canGuildRepair = true, true
       _G._merchant.repairCost = 20000
-      _G._merchant.guildWithdraw, _G._merchant.guildMoney = 5000, 900000
+      _G._guildBank.withdrawMoney, _G._guildBank.money = 5000, 900000
       local v = open()
       v.repairAllButton:GetScript("OnEnter")(v.repairAllButton)
       local text = {}
@@ -536,9 +538,9 @@ describe("NextVendor", function()
         v.guildRepairButton:GetScript("OnEnter")(v.guildRepairButton)
         return GameTooltip.lines[2].text
       end
-      _G._merchant.guildWithdraw, _G._merchant.guildMoney = -1, 900000
+      _G._guildBank.withdrawMoney, _G._guildBank.money = -1, 900000
       assert.are.equal("The guild pays up to 90g", said())
-      _G._merchant.guildWithdraw, _G._merchant.guildMoney = 500000, 300
+      _G._guildBank.withdrawMoney, _G._guildBank.money = 500000, 300
       assert.are.equal("The guild pays up to 3s", said())
     end)
 

@@ -96,6 +96,7 @@ const.DATABASE_DEFAULTS = {
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
+    showGuildBankTabs = false,
     debug = false,
     inBagSearch = true,
     categorySell = false,
@@ -224,6 +225,14 @@ describe("Database", function()
     it("GetEnableBankBag / SetEnableBankBag", function()
       DB:SetEnableBankBag(false)
       assert.is_false(DB:GetEnableBankBag())
+    end)
+
+    it("GetShowGuildBankTabs / SetShowGuildBankTabs, off until turned on", function()
+      assert.is_false(DB:GetShowGuildBankTabs())
+      DB:SetShowGuildBankTabs(true)
+      assert.is_true(DB:GetShowGuildBankTabs())
+      DB:SetShowGuildBankTabs(false)
+      assert.is_false(DB:GetShowGuildBankTabs())
     end)
 
     it("GetShowBankTabs / SetShowBankTabs", function()

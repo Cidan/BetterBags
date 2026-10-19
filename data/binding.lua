@@ -13,6 +13,28 @@ local binding = addon:NewModule('Binding')
 ---@field binding BindingScope
 ---@field bound boolean
 
+-- FromBindType is the binding of an item that is not bound, from its bind type alone: what a slot
+-- with no item location (a guild bank slot, which holds no bound item) can say of it.
+---@param bindType number
+---@return BindingInfo
+function binding.FromBindType(bindType)
+  ---@type BindingInfo
+  local bindinginfo = {
+    binding = const.BINDING_SCOPE.UNKNOWN,
+    bound = false
+  }
+  if (bindType == 0) then
+    bindinginfo.binding = const.BINDING_SCOPE.NONBINDING
+  elseif (bindType == 2) then
+    bindinginfo.binding = const.BINDING_SCOPE.BOE
+  elseif (bindType == 3) then
+    bindinginfo.binding = const.BINDING_SCOPE.BOU
+  elseif (bindType == 8) then -- only Hoard of Draconic Delicacies uses this
+    bindinginfo.binding = const.BINDING_SCOPE.BNET
+  end
+  return bindinginfo
+end
+
 ---@param itemLocation ItemLocationMixin
 ---@param bindType Enum.ItemBind
 ---@return BindingInfo
@@ -27,15 +49,7 @@ function binding.GetItemBinding(itemLocation, bindType)
   }
 
   if not C_Item.IsBound(itemLocation) then
-    if (bindType == 0) then
-      bindinginfo.binding = const.BINDING_SCOPE.NONBINDING
-    elseif (bindType == 2) then
-      bindinginfo.binding = const.BINDING_SCOPE.BOE
-    elseif (bindType == 3) then
-      bindinginfo.binding = const.BINDING_SCOPE.BOU
-    elseif (bindType == 8) then -- only Hoard of Draconic Delicacies uses this
-      bindinginfo.binding = const.BINDING_SCOPE.BNET
-    end
+    bindinginfo = binding.FromBindType(bindType)
     -- retail only Warbound until Equip
     if C_Item.IsBoundToAccountUntilEquip and C_Item.IsBoundToAccountUntilEquip(itemLocation) then
       bindinginfo.bound = true

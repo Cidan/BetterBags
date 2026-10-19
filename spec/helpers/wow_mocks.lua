@@ -2645,11 +2645,11 @@ _G.ItemButtonUtil = {
 --     isUsable, hasExtendedCost, currencyID, spellID, isQuestStartItem, maxStack, canAfford,
 --     refundable, costs = { { texture, value, link, currencyName } } }
 --   buyback[i] = { name, texture, price, quantity, numAvailable, isUsable, isBound, link }
---   canRepair, repairCost, canGuildRepair, guildWithdraw, guildMoney, junk, sellJunkEnabled,
+--   canRepair, repairCost, canGuildRepair, junk, sellJunkEnabled (the guild's money: _G._guildBank),
 --   currencies, filter, open
 function _G.ResetMockMerchant()
   _G._merchant = { items = {}, buyback = {}, canRepair = false, repairCost = 0, canGuildRepair = false,
-    guildWithdraw = 0, guildMoney = 0, junk = 0, sellJunkEnabled = true, currencies = {}, filter = 1,
+    junk = 0, sellJunkEnabled = true, currencies = {}, filter = 1,
     open = true, repairMode = false }
   _G._merchantCalls = { buy = {}, buyback = {}, repair = {}, pickup = {}, closed = 0, sellJunk = 0,
     confirmExtended = {}, confirmHighCost = {}, sellJunkClicked = 0, inventoryPickups = {}, filters = {} }
@@ -2728,8 +2728,6 @@ _G.CanMerchantRepair = function() return _G._merchant.canRepair end
 _G.GetRepairAllCost = function() return _G._merchant.repairCost, _G._merchant.repairCost > 0 end
 _G.RepairAllItems = function(guild) table.insert(_G._merchantCalls.repair, guild == true) end
 _G.CanGuildBankRepair = function() return _G._merchant.canGuildRepair end
-_G.GetGuildBankWithdrawMoney = function() return _G._merchant.guildWithdraw end
-_G.GetGuildBankMoney = function() return _G._merchant.guildMoney end
 _G.ShowRepairCursor = function() _G._merchant.repairMode = true end
 _G.HideRepairCursor = function() _G._merchant.repairMode = false end
 _G.InRepairMode = function() return _G._merchant.repairMode end
@@ -2813,6 +2811,132 @@ _G.C_TooltipInfo.GetMerchantItem = function(index)
   local item = merchantItem(index)
   return { type = 0, lines = item and item.tooltipLines or {} }
 end
+-- The guild bank. Its functions are legacy globals with no generated documentation (only
+-- C_GuildBank.IsGuildBankEnabled and its events are documented, GuildBankDocumentation.lua); their
+-- shapes are what Blizzard's guild bank UI reads (Blizzard_GuildBankUI Mainline and TBC
+-- Blizzard_GuildBankUI.lua) and warcraft.wiki.gg's API list (World_of_Warcraft_API, Guild Bank).
+-- Specs describe the guild bank in _G._guildBank and read what was asked of it in
+-- _G._guildBankCalls (reset both with ResetMockGuildBank):
+--   tabs[t] = { name, icon, isViewable, canDeposit, numWithdrawals, remainingWithdrawals, filtered,
+--     slots = { [slot] = { link, texture, count, locked, isFiltered, quality, tooltipLines } } }
+--   delivered[t]: the server sent the tab (a query was answered). Until then its slots read nothing,
+--     like a tab the client never received.
+--   current: the current tab (GetCurrentGuildBankTab; Blizzard's frame acts only on it).
+--   money, withdrawMoney (-1: no limit), canWithdrawMoney, isLeader, tabCost (nil when every tab is
+--   bought), canEditTabs, guildName (nil: not in a guild).
+-- Each action records the current tab when it was asked (current), so a spec sees which tab it
+-- acted on.
+_G.MAX_GUILDBANK_TABS = 8
+_G.MAX_BUY_GUILDBANK_TABS = 6
+-- The guild bank's bootstrap file defines this at startup on retail (Blizzard_GuildBankUI_Bootstrap.lua).
+_G.GuildBankFrame_LoadUI = function() return true end
+function _G.ResetMockGuildBank()
+  _G._guildBank = { tabs = {}, delivered = {}, current = 1, money = 0, withdrawMoney = 0, canWithdrawMoney = false,
+    isLeader = false, tabCost = nil, canEditTabs = false, guildName = "The Guild" }
+  _G._guildBankCalls = { queries = {}, setCurrent = {}, pickup = {}, autoStore = {}, split = {}, deposits = {},
+    withdrawals = {}, closed = 0, bought = 0, tabInfo = {}, tooltips = {}, splitFrames = {}, cursorMoneyDropped = 0 }
+end
+_G.ResetMockGuildBank()
+
+local function guildSlot(tab, slot)
+  local t = _G._guildBank.tabs[tab]
+  if t == nil or not _G._guildBank.delivered[tab] then return nil end
+  return t.slots and t.slots[slot]
+end
+
+-- GetNumGuildBankTabs() -> numTabs (purchased tabs).
+_G.GetNumGuildBankTabs = function() return #_G._guildBank.tabs end
+-- GetGuildBankTabInfo(tab) -> name, icon, isViewable, canDeposit, numWithdrawals, remainingWithdrawals,
+-- filtered. Nothing for a tab past the purchased ones.
+_G.GetGuildBankTabInfo = function(tab)
+  local t = _G._guildBank.tabs[tab]
+  if t == nil then return nil end
+  return t.name, t.icon, t.isViewable ~= false, t.canDeposit ~= false, t.numWithdrawals or 0,
+    t.remainingWithdrawals or 0, t.filtered == true
+end
+-- GetGuildBankItemInfo(tab, slot) -> texture, itemCount, locked, isFiltered, quality; nothing for an
+-- empty slot.
+_G.GetGuildBankItemInfo = function(tab, slot)
+  local item = guildSlot(tab, slot)
+  if item == nil then return nil end
+  return item.texture, item.count or 1, item.locked == true, item.isFiltered == true, item.quality
+end
+_G.GetGuildBankItemLink = function(tab, slot) local item = guildSlot(tab, slot) return item and item.link end
+_G.GetCurrentGuildBankTab = function() return _G._guildBank.current end
+_G.SetCurrentGuildBankTab = function(tab)
+  table.insert(_G._guildBankCalls.setCurrent, tab)
+  _G._guildBank.current = tab
+end
+_G.QueryGuildBankTab = function(tab) table.insert(_G._guildBankCalls.queries, tab) end
+_G.PickupGuildBankItem = function(tab, slot)
+  table.insert(_G._guildBankCalls.pickup, { tab = tab, slot = slot, current = _G._guildBank.current })
+end
+_G.AutoStoreGuildBankItem = function(tab, slot)
+  table.insert(_G._guildBankCalls.autoStore, { tab = tab, slot = slot, current = _G._guildBank.current })
+end
+_G.SplitGuildBankItem = function(tab, slot, amount)
+  table.insert(_G._guildBankCalls.split, { tab = tab, slot = slot, amount = amount, current = _G._guildBank.current })
+end
+_G.GetGuildBankMoney = function() return _G._guildBank.money end
+_G.GetGuildBankWithdrawMoney = function() return _G._guildBank.withdrawMoney end
+_G.CanWithdrawGuildBankMoney = function() return _G._guildBank.canWithdrawMoney end
+_G.DepositGuildBankMoney = function(money) table.insert(_G._guildBankCalls.deposits, money) end
+_G.WithdrawGuildBankMoney = function(money) table.insert(_G._guildBankCalls.withdrawals, money) end
+-- DropCursorMoney() puts money on the cursor back (Blizzard's item button, for "guildbankmoney").
+_G.DropCursorMoney = function() _G._guildBankCalls.cursorMoneyDropped = _G._guildBankCalls.cursorMoneyDropped + 1 end
+_G.CloseGuildBankFrame = function() _G._guildBankCalls.closed = _G._guildBankCalls.closed + 1 end
+_G.IsGuildLeader = function() return _G._guildBank.isLeader end
+_G.GetGuildBankTabCost = function() return _G._guildBank.tabCost end
+_G.BuyGuildBankTab = function() _G._guildBankCalls.bought = _G._guildBankCalls.bought + 1 end
+_G.CanEditGuildBankTabInfo = function() return _G._guildBank.canEditTabs end
+_G.SetGuildBankTabInfo = function(tab, name, icon)
+  table.insert(_G._guildBankCalls.tabInfo, { tab = tab, name = name, icon = icon })
+end
+-- GetGuildInfo(unit) -> guildName, guildRankName, guildRankIndex; nothing when not in a guild.
+_G.GetGuildInfo = function()
+  if _G._guildBank.guildName == nil then return nil end
+  return _G._guildBank.guildName, "Member", 3
+end
+-- C_TooltipInfo.GetGuildBankItem(tab, slot) -> TooltipData (TooltipInfoDocumentation.lua).
+_G.C_TooltipInfo.GetGuildBankItem = function(tab, slot)
+  local item = guildSlot(tab, slot)
+  return { type = 0, lines = item and item.tooltipLines or {}, dataInstanceID = item and item.dataInstanceID }
+end
+function _G.GameTooltip:SetGuildBankItem(tab, slot)
+  table.insert(_G._guildBankCalls.tooltips, { tab = tab, slot = slot })
+  self:Show()
+end
+-- The stack split frame: StackSplitFrame:OpenStackSplitFrame(maxStack, parent, anchor, anchorTo) on
+-- retail, the global OpenStackSplitFrame on Classic (each guild bank's item button).
+_G.StackSplitFrame = _G.StackSplitFrame or {}
+function _G.StackSplitFrame:OpenStackSplitFrame(maxStack, owner, anchor, anchorTo)
+  table.insert(_G._guildBankCalls.splitFrames, { max = maxStack, owner = owner, anchor = anchor, anchorTo = anchorTo })
+end
+_G.OpenStackSplitFrame = function(maxStack, owner, anchor, anchorTo)
+  _G.StackSplitFrame:OpenStackSplitFrame(maxStack, owner, anchor, anchorTo)
+end
+-- Blizzard's strings its guild bank UI formats (GlobalStrings, enUS).
+_G.GUILDBANK_TAB_NUMBER = "Tab %d"
+_G.GUILDBANK_TAB_FULL_ACCESS = "(Full Access)"
+_G.GUILDBANK_TAB_DEPOSIT_ONLY = "(Deposit Only)"
+_G.GUILDBANK_TAB_WITHDRAW_ONLY = "(Withdraw Only)"
+_G.GUILDBANK_TAB_LOCKED = "(Locked)"
+_G.GUILDBANK_REMAINING_MONEY = "Remaining daily withdrawals for %s: %s"
+_G.STACKS = "%d stacks"
+_G.UNLIMITED = "Unlimited"
+_G.NONE = _G.NONE or "None"
+_G.BUY_GUILDBANK_TAB = "Buy Guild Bank Tab"
+_G.SOUNDKIT.GUILD_VAULT_OPEN = _G.SOUNDKIT.GUILD_VAULT_OPEN or 12188
+_G.SOUNDKIT.GUILD_VAULT_CLOSE = _G.SOUNDKIT.GUILD_VAULT_CLOSE or 12189
+_G.SOUNDKIT.GUILD_BANK_OPEN_BAG = _G.SOUNDKIT.GUILD_BANK_OPEN_BAG or 12206
+-- Enum.PlayerInteractionType: the interactions BetterBags follows (PlayerInteractionType in
+-- Blizzard_APIDocumentationGenerated, live branch).
+_G.Enum.PlayerInteractionType = _G.Enum.PlayerInteractionType or {
+  None = 0, TradePartner = 1, Item = 2, Gossip = 3, QuestGiver = 4, Merchant = 5, TaxiNode = 6, Trainer = 7,
+  Banker = 8, GuildBanker = 10, Vendor = 12, MailInfo = 17, Auctioneer = 21, VoidStorageBanker = 26,
+  ScrappingMachine = 40, ItemUpgrade = 53, CharacterBanker = 67, AccountBanker = 68,
+}
+
 -- HandleModifiedItemClick(link) -> handled (a chat link, a dress-up: ItemButtonTemplate.lua);
 -- DressUpItemLink(link); SetCursor(cursor), ResetCursor().
 _G.HandleModifiedItemClick = function() return _G._modifiedClickHandled == true end
