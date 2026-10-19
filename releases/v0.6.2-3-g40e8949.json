@@ -1,0 +1,17 @@
+{
+  "id": 1792391040,
+  "version": "v0.6.2-3-g40e8949",
+  "channel": "alpha",
+  "date": "2026-10-19",
+  "from": "3040528ccee22bb131bd3d4b42e901ffcaf4968c",
+  "to": "40e8949b53324387f688f82243b89441ba210d70",
+  "headline": "Introduces small mode for BetterBags Next with movable panels, animated resizing, and chaining by dragging.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Small mode for BetterBags Next",
+      "details": "Bags can now be toggled into a compact, movable mode suited for smaller screens using a button on the backpack header. Panels remember their positions, smoothly animate when resizing, and can be chained together by dragging them side by side.",
+      "clients": []
+    }
+  ]
+}
