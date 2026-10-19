@@ -725,6 +725,10 @@ const.DATABASE_DEFAULTS = {
     -- opposite edges, chained "left" (the companion at the left edge, the backpack beside it) or
     -- "right" (the backpack at the right edge, the companion beside it). next.md §12.
     nextChain = "apart",
+    -- BetterBags Next's panels: "full" height on the screen's edges, or "small" movable ones
+    -- (docs/next-small-mode.md); and where each kind's small panel was left (its top left).
+    nextSize = "full",
+    nextSmallPlaces = {},
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,

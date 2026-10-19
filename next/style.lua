@@ -127,6 +127,22 @@ style.Time = {
 }
 style.RISE = 12
 
+-- Small mode (docs/next-small-mode.md): smaller, movable panels for smaller screens. The knobs to
+-- toy with, in one place.
+style.Small = {
+  -- The panel's height, a share of the screen's.
+  Height = 0.66,
+  -- The title's ribbon (the beam), and how far out along it its sparkles are born.
+  Ribbon = 120,
+  SparkSpread = 48,
+  -- How far it slides in from its edge side as it fades in, and back out as it fades out.
+  Slide = 24,
+  -- The alpha of its 1-pixel lavender edge, so it reads against the world.
+  Edge = 0.35,
+  -- How far in from its screen edge a panel sits until it is first moved.
+  Margin = 40,
+}
+
 -- The sparkle sprite: the cooldown "bling" star, on every client.
 style.SPARKLE_TEXTURE = "Interface\\Cooldown\\star4"
 -- The ribbon running from the title out of the window, at full length.

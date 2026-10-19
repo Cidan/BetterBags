@@ -233,6 +233,42 @@ function DB:SetNextChain(layout)
   DB.data.profile.nextChain = layout
 end
 
+---@alias NextSize "full"|"small"
+
+-- GetNextSize returns BetterBags Next's panel size: "full" height on the screen's edges, or "small"
+-- movable panels (docs/next-small-mode.md).
+---@return NextSize
+function DB:GetNextSize()
+  return DB.data.profile.nextSize
+end
+
+---@param size NextSize
+function DB:SetNextSize(size)
+  if size ~= "full" and size ~= "small" then
+    error("unknown BetterBags Next size: " .. tostring(size))
+  end
+  DB.data.profile.nextSize = size
+end
+
+-- GetNextSmallPlace returns where a kind's small panel was left: its top left in UIParent's units,
+-- or nothing before it was first moved.
+---@param kind BagKind
+---@return number? x, number? y
+function DB:GetNextSmallPlace(kind)
+  local place = DB.data.profile.nextSmallPlaces[kind]
+  if place == nil then
+    return nil
+  end
+  return place.x, place.y
+end
+
+---@param kind BagKind
+---@param x number
+---@param y number
+function DB:SetNextSmallPlace(kind, x, y)
+  DB.data.profile.nextSmallPlaces[kind] = { x = x, y = y }
+end
+
 ---@param kind BagKind
 ---@return boolean
 function DB:GetGroupsEnabled(kind)

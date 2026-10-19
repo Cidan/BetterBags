@@ -190,6 +190,12 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field loaded boolean
 ---@field bankTab? number
 ---@field watchesCooldowns? boolean It refreshes its buttons' cooldowns (the backpack).
+---@field size NextSize "full" height on its screen edge, or "small" and movable (docs/next-small-mode.md).
+---@field edges Texture[] A small panel's 1-pixel lavender edge, all round.
+---@field mover Frame A small panel's title row, dragged to move it.
+---@field placeX? number A small panel's place: its top left in UIParent's units.
+---@field placeY? number
+---@field moving? boolean The player is dragging the small panel.
 local panelProto = {}
 nextPanel.proto = panelProto
 addon:GetModule('Perf'):RegisterPrototype(panelProto, 'NextPanelFrame')
@@ -207,13 +213,13 @@ end
 function rootProto:PreRender()
   return {
     Width = style.GRID_WIDTH + style.GUTTER,
-    Height = math.max(1, UIParent:GetHeight() - style.CONTENT_TOP - style.FOOTER),
+    Height = math.max(1, self.bag:Height() - style.CONTENT_TOP - style.FOOTER),
   }
 end
 
 ---@return RenderResult
 function rootProto:Render()
-  return { Width = style.WIDTH, Height = UIParent:GetHeight() }
+  return { Width = self.bag:Width(), Height = self.bag:Height() }
 end
 
 -- Extend makes proto a kind's prototype: its instances fall back to the panel's methods, and the
@@ -247,7 +253,9 @@ function nextPanel:Create(proto, opts)
   p.drawOnClose = false
   p.drawPendingOnShow = false
   p.drawnButtons = {}
+  p.size = database:GetNextSize()
   p:BuildPanel(opts.name)
+  p:BuildMover()
   p:BuildSearch()
   p:BuildHeader(opts.title)
   p:BuildContent(opts.scrollName)
@@ -260,6 +268,7 @@ function nextPanel:Create(proto, opts)
     nextDrag:Register(p)
   end
   chain:Register(p, opts.chainRole)
+  p:ApplyGeometry()
   return p
 end
 
@@ -270,18 +279,29 @@ function panelProto:Outward()
   return self.side == "LEFT" and 1 or -1
 end
 
--- HiddenOffset is where the panel is when it has slid off the screen.
+-- HiddenOffset is where the panel is when it has slid off the screen; a small panel, a short way
+-- toward its edge side from its place, faded out.
 ---@return number
 function panelProto:HiddenOffset()
+  if self:IsSmall() then
+    return -self:Outward() * style.Small.Slide
+  end
   return -self:Outward() * (style.WIDTH + style.OVERREACH)
 end
 
+-- setOffset puts the panel x from where it rests: from its screen edge, top to bottom; a small
+-- panel, x along from its place, fading as it leaves it (its slide in and out).
 ---@private
 ---@param x number
 function panelProto:setOffset(x)
   self.offset = x
   local frame = self.frame
   frame:ClearAllPoints()
+  if self:IsSmall() then
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.placeX + x, self.placeY)
+    frame:SetAlpha(1 - math.min(1, math.abs(x) / style.Small.Slide))
+    return
+  end
   if self.side == "LEFT" then
     frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, 0)
     frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, 0)
@@ -302,6 +322,11 @@ end
 -- they stop at the frame and the far edge feathers out toward the middle of the screen.
 ---@param docked boolean
 function panelProto:SetDocked(docked)
+  if self:IsSmall() then
+    -- A small panel is never at its screen edge: its fill is its frame.
+    self.docked = false
+    return
+  end
   self.docked = docked
   local reach = docked and style.OVERREACH or 0
   local frame = self.frame
@@ -466,53 +491,26 @@ function panelProto:BuildPanel(name)
   frame:SetFrameStrata("HIGH")
   frame:SetFrameLevel(PANEL_LEVEL)
   frame:SetToplevel(true)
-  frame:SetWidth(style.WIDTH)
   frame:EnableMouse(true)
-  if left then
-    frame:SetHitRectInsets(0, style.FEATHER, 0, 0)
-  else
-    frame:SetHitRectInsets(style.FEATHER, 0, 0, 0)
-  end
   frame:Hide()
   self.frame = frame
-  self:setOffset(0)
+  -- Its geometry (the frame's size and place, the body, the fill, the feather) is its size's
+  -- (ApplyGeometry).
+  self.body = CreateFrame("Frame", nil, frame)
 
-  local body = CreateFrame("Frame", nil, frame)
-  if left then
-    body:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-    body:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -style.FEATHER, 0)
-  else
-    body:SetPoint("TOPLEFT", frame, "TOPLEFT", style.FEATHER, 0)
-    body:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
-  end
-  self.body = body
-
-  -- The fill reaches past the screen edge so the opening overshoot never shows what is behind.
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   local feather = frame:CreateTexture(nil, "BACKGROUND")
   local wash = frame:CreateTexture(nil, "BORDER")
-  feather:SetWidth(style.FEATHER)
   feather:SetColorTexture(1, 1, 1, 1)
   if left then
-    fill:SetPoint("TOPLEFT", frame, "TOPLEFT", -style.OVERREACH, 0)
-    fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -style.FEATHER, 0)
-    feather:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
-    feather:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
     feather:SetGradient("HORIZONTAL", style:CreateColor("Body"), style:CreateColor("Body", 0))
-    wash:SetPoint("TOPLEFT", frame, "TOPLEFT", -style.OVERREACH, 0)
-    wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -style.FEATHER, 0)
   else
-    fill:SetPoint("TOPLEFT", frame, "TOPLEFT", style.FEATHER, 0)
-    fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", style.OVERREACH, 0)
-    feather:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-    feather:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
     feather:SetGradient("HORIZONTAL", style:CreateColor("Body", 0), style:CreateColor("Body"))
-    wash:SetPoint("TOPLEFT", frame, "TOPLEFT", style.FEATHER, 0)
-    wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", style.OVERREACH, 0)
   end
   fill:SetColorTexture(unpack(style.Color.Body))
   self.fill = fill
   self.feather = feather
+  self.wash = wash
 
   -- The far edge feathered out toward the middle of the screen, while not at its edge (SetDocked).
   local outerFeather = frame:CreateTexture(nil, "BACKGROUND")
@@ -534,17 +532,246 @@ function panelProto:BuildPanel(name)
   wash:SetHeight(260)
   wash:SetColorTexture(1, 1, 1, 1)
   wash:SetBlendMode("ADD")
-  self.wash = wash
   self:paintWash(style.Color.Wash)
 
+  -- A small panel's 1-pixel lavender edge all round, so it reads against the world.
+  self.edges = {}
+  local l = style.Color.Lavender
+  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+    local edge = frame:CreateTexture(nil, "BORDER", nil, 1)
+    edge:SetColorTexture(1, 1, 1, 1)
+    edge:SetVertexColor(l[1], l[2], l[3], style.Small.Edge)
+    if side == "TOP" or side == "BOTTOM" then
+      edge:SetPoint(side .. "LEFT", frame, side .. "LEFT", 0, 0)
+      edge:SetPoint(side .. "RIGHT", frame, side .. "RIGHT", 0, 0)
+      edge:SetHeight(1)
+    else
+      edge:SetPoint("TOP" .. side, frame, "TOP" .. side, 0, 0)
+      edge:SetPoint("BOTTOM" .. side, frame, "BOTTOM" .. side, 0, 0)
+      edge:SetWidth(1)
+    end
+    edge:Hide()
+    table.insert(self.edges, edge)
+  end
+
   local glow = frame:CreateTexture(nil, "BORDER")
-  glow:SetAllPoints(body)
+  glow:SetAllPoints(self.body)
   glow:SetColorTexture(1, 1, 1, 1)
   glow:SetVertexColor(unpack(style.Color.Lavender))
   glow:SetBlendMode("ADD")
   glow:SetAlpha(0)
   glow:Hide()
   self.dropGlow = glow
+end
+
+-- IsSmall says the panel is small (docs/next-small-mode.md): a movable panel, its body alone.
+---@return boolean
+function panelProto:IsSmall()
+  return self.size == "small"
+end
+
+-- SmallHeight is a small panel's height on this screen: a share of the screen's, in whole units.
+---@return number
+function panelProto:SmallHeight()
+  return math.floor(UIParent:GetHeight() * style.Small.Height)
+end
+
+-- Height is how tall the panel is: the screen's height, or a small panel's.
+---@return number
+function panelProto:Height()
+  if self:IsSmall() then
+    return self:SmallHeight()
+  end
+  return UIParent:GetHeight()
+end
+
+-- Width is how wide the panel's frame is: its body and its feather, or a small panel's body alone.
+---@return number
+function panelProto:Width()
+  if self:IsSmall() then
+    return style.BODY_WIDTH
+  end
+  return style.WIDTH
+end
+
+-- BodyLeft is where the body starts, from the frame's left edge: past the feather on the full
+-- backpack (its feather is on its left), else at the frame's edge.
+---@return number
+function panelProto:BodyLeft()
+  if self.side == "RIGHT" and not self:IsSmall() then
+    return style.FEATHER
+  end
+  return 0
+end
+
+-- RibbonBase is the ribbon's length while the panel is not coupled: a small panel's beam is
+-- shorter. SparkSpreadBase is how far out along it the ribbon's sparkles are born.
+---@return number
+function panelProto:RibbonBase()
+  return self:IsSmall() and style.Small.Ribbon or RIBBON_LENGTH
+end
+
+---@return number
+function panelProto:SparkSpreadBase()
+  return self:IsSmall() and style.Small.SparkSpread or 70
+end
+
+-- clampPlace keeps a small panel's place (its top left) on the screen.
+---@private
+---@param x number
+---@param y number
+---@return number x, number y
+function panelProto:clampPlace(x, y)
+  x = math.max(0, math.min(UIParent:GetWidth() - style.BODY_WIDTH, x))
+  y = math.max(self:SmallHeight(), math.min(UIParent:GetHeight(), y))
+  return x, y
+end
+
+-- SmallPlace is where a small panel sits: where the player left it, else a margin in from its own
+-- screen edge (the backpack's right, a companion's left), centered; on the screen either way.
+---@return number x, number y
+function panelProto:SmallPlace()
+  local x, y = database:GetNextSmallPlace(self.kind)
+  if x == nil then
+    y = (UIParent:GetHeight() + self:SmallHeight()) / 2
+    if self.side == "RIGHT" then
+      x = UIParent:GetWidth() - style.BODY_WIDTH - style.Small.Margin
+    else
+      x = style.Small.Margin
+    end
+  end
+  return self:clampPlace(x, y)
+end
+
+-- ApplyGeometry shapes the panel for its size and puts it where it is for that size (its offset).
+-- Full (next.md §3): the frame on its screen edge, top to bottom, the body inside its feathered
+-- inner edge, no clicks taken over the feather, the fill and the wash reaching past the screen edge
+-- while docked. Small (docs/next-small-mode.md): the frame is the body, a share of the screen tall,
+-- at its place, edged in faint lavender, moved by its title row, its beam shorter.
+function panelProto:ApplyGeometry()
+  local small = self:IsSmall()
+  local frame, body = self.frame, self.body
+  local bodyLeft = self:BodyLeft()
+  local bodyRight = (not small and self.side == "LEFT") and style.FEATHER or 0
+  frame:SetWidth(self:Width())
+  if small then
+    frame:SetHeight(self:SmallHeight())
+  end
+  frame:SetHitRectInsets(bodyLeft, bodyRight, 0, 0)
+  body:ClearAllPoints()
+  body:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
+  body:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -bodyRight, 0)
+  local fill, wash = self.fill, self.wash
+  fill:ClearAllPoints()
+  fill:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
+  fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -bodyRight, 0)
+  wash:ClearAllPoints()
+  wash:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
+  wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -bodyRight, 0)
+  self.feather:SetShown(not small)
+  if not small then
+    self:growFeather(0)
+  end
+  for _, edge in ipairs(self.edges) do
+    edge:SetShown(small)
+  end
+  self.ribbonLength = self:RibbonBase()
+  for _, line in ipairs(self.ribbonLines) do
+    line:SetWidth(self.ribbonLength)
+  end
+  self.sparkSpread = self:SparkSpreadBase()
+  frame:SetMovable(small)
+  frame:SetClampedToScreen(small)
+  self.mover:SetShown(small)
+  if small then
+    self.placeX, self.placeY = self:SmallPlace()
+    self.docked = false
+    self.outerFeather:Hide()
+  else
+    frame:SetAlpha(1)
+    -- The fill and the wash reach past the screen edge while it rests there (SetDocked).
+    self:SetDocked((self.offset or 0) == 0)
+  end
+  self:setOffset(self.offset or 0)
+end
+
+-- FitSmall sizes a small panel for the screen as it is now and puts it at its place, kept on the
+-- screen: on opening (the screen may have changed while it was closed) and when the screen changes.
+-- Its content is laid out again when its height changed.
+function panelProto:FitSmall()
+  local height = self:SmallHeight()
+  local changed = self.frame:GetHeight() ~= height
+  self.frame:SetHeight(height)
+  self.placeX, self.placeY = self:SmallPlace()
+  self:setOffset(self.offset)
+  if changed then
+    render:Invalidate(self.root)
+  end
+end
+
+-- BuildMover makes what moves a small panel (docs/next-small-mode.md): its title row, from the top
+-- of the body down to the search box, dragged. The title (a button over it) moves it too, and the
+-- header buttons above it still click. Over a full panel it is hidden: there the frame takes it.
+function panelProto:BuildMover()
+  local mover = CreateFrame("Frame", nil, self.frame)
+  mover:SetPoint("TOPLEFT", self.body, "TOPLEFT", 0, 0)
+  mover:SetPoint("TOPRIGHT", self.body, "TOPRIGHT", 0, 0)
+  mover:SetHeight(style.SEARCH_TOP - 4)
+  mover:SetFrameLevel(self.frame:GetFrameLevel() + 1)
+  mover:EnableMouse(true)
+  mover:RegisterForDrag("LeftButton")
+  addon.SetScript(mover, "OnDragStart", function()
+    self:StartMove()
+  end)
+  addon.SetScript(mover, "OnDragStop", function()
+    self:StopMove()
+  end)
+  -- It covers part of the panel, which is a drop target (Watch): an item dropped or clicked onto
+  -- the title row goes into the bag too.
+  addon.SetScript(mover, "OnReceiveDrag", function()
+    self:PlaceCursorItem()
+  end)
+  addon.SetScript(mover, "OnMouseUp", function(_, _, button)
+    if button == "LeftButton" then
+      self:PlaceCursorItem()
+    end
+  end)
+  mover:Hide()
+  self.mover = mover
+end
+
+-- StartMove starts moving a small panel with the mouse, finishing its opening slide first. A full
+-- panel, one closing, or a press with something on the cursor (a drop, not a move) does not move.
+-- It returns whether it did.
+---@return boolean
+function panelProto:StartMove()
+  if not self:IsSmall() or self.closing or self.moving or GetCursorInfo() ~= nil then
+    return false
+  end
+  tween:Stop(self, true)
+  self.frame:StartMoving()
+  -- StartMoving flags the frame user-placed, and the client then restores a named frame's place
+  -- from its layout cache at login (warcraft.wiki.gg Frame:StartMoving): the place is ours to keep.
+  self.frame:SetUserPlaced(false)
+  self.moving = true
+  return true
+end
+
+-- StopMove ends a move: the panel's new place, kept on the screen, is saved for its kind, and it is
+-- anchored there again (the client anchors a moved frame to the nearest corner of the screen).
+function panelProto:StopMove()
+  if not self.moving then
+    return
+  end
+  self.moving = false
+  local frame = self.frame
+  frame:StopMovingOrSizing()
+  local x, y = frame:GetLeft(), frame:GetTop()
+  if x ~= nil and y ~= nil then
+    self.placeX, self.placeY = self:clampPlace(x, y)
+    database:SetNextSmallPlace(self.kind, self.placeX, self.placeY)
+  end
+  self:setOffset(0)
 end
 
 -- SetDropGlow lights the body while a section from the other bag would drop on it.
@@ -687,6 +914,8 @@ end
 function panelProto:headerButton(spec)
   local button = CreateFrame("Button", nil, self.frame)
   button:SetSize(22, 22)
+  -- Above a small panel's mover, which lies over the title row.
+  button:SetFrameLevel(self.frame:GetFrameLevel() + 3)
   local icon = button:CreateTexture(nil, "ARTWORK")
   icon:SetAllPoints()
   if spec.atlas then
@@ -906,6 +1135,14 @@ function panelProto:BuildTitleButton()
   addon.SetScript(button, "OnClick", function(ctx)
     chain:Click(ctx, self)
   end)
+  -- Dragging the title moves a small panel, as its title row does.
+  button:RegisterForDrag("LeftButton")
+  addon.SetScript(button, "OnDragStart", function()
+    self:StartMove()
+  end)
+  addon.SetScript(button, "OnDragStop", function()
+    self:StopMove()
+  end)
   addon.SetScript(button, "OnEnter", function()
     self:lightTitle(true)
     GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
@@ -990,7 +1227,8 @@ function panelProto:SetCoupling(amount, half, chained, phase, time, feather)
   local braid = self.braid
   braid.amount, braid.half, braid.chained, braid.phase, braid.time = amount, half, chained, phase, time
   self:growFeather((feather - style.FEATHER) * amount)
-  self.ribbonLength = RIBBON_LENGTH + (math.min(half, RIBBON_LENGTH) - RIBBON_LENGTH) * amount
+  local base = self:RibbonBase()
+  self.ribbonLength = base + (math.min(half, base) - base) * amount
   for _, line in ipairs(self.ribbonLines) do
     line:SetWidth(self.ribbonLength)
   end
@@ -1001,7 +1239,7 @@ function panelProto:SetCoupling(amount, half, chained, phase, time, feather)
     o.Life = { 1.0, 1.6 }
     o.Speed = { 3, half * 0.5 / 1.6 }
   else
-    self.sparkSpread = 70
+    self.sparkSpread = self:SparkSpreadBase()
     o.Life = { 2.0, 3.6 }
     o.Speed = { 22, 64 }
   end
@@ -1337,18 +1575,24 @@ function panelProto:BuildSparkles()
   local out = self:Outward()
   -- Where the ribbon starts, from the panel's top left: 10 pixels outside the title.
   local _, joinX, inward = self:TitleJoin()
-  -- The title's side the join is measured from: its left edge on the backpack, its right on the
-  -- bank, from the panel's top left.
-  local titleEdge
-  local edge
-  if self.side == "LEFT" then
-    titleEdge = style.BODY_WIDTH - (style.PAD + 4)
-    edge = style.BODY_WIDTH
-  else
-    titleEdge = style.FEATHER + style.PAD + 4
-    edge = style.FEATHER
+  -- From the panel's top left, for its size now: the title's side the join is measured from (its
+  -- left edge on the backpack, its right on the bank), where the ribbon starts, and the body's inner
+  -- edge.
+  local function titleEdge()
+    if self.side == "LEFT" then
+      return self:BodyLeft() + style.BODY_WIDTH - (style.PAD + 4)
+    end
+    return self:BodyLeft() + style.PAD + 4
   end
-  local ribbonStart = titleEdge + joinX
+  local function ribbonStart()
+    return titleEdge() + joinX
+  end
+  local function innerEdge()
+    if self.side == "LEFT" then
+      return self:BodyLeft() + style.BODY_WIDTH
+    end
+    return self:BodyLeft()
+  end
   local titleMiddle = -(style.TITLE_TOP + 13)
   -- Born in the cloud above or below the title, never over it, most of them near the join.
   self.cloudSparkles = sparkles:Create(fx, {
@@ -1360,15 +1604,15 @@ function panelProto:BuildSparkles()
       if math.random() < 0.5 then
         y = -y
       end
-      return titleEdge + joinX + inward * span * math.random() ^ 1.7, titleMiddle + y
+      return ribbonStart() + inward * span * math.random() ^ 1.7, titleMiddle + y
     end,
   })
-  self.sparkSpread = 70
+  self.sparkSpread = self:SparkSpreadBase()
   self.sparkles = sparkles:Create(fx, {
     Rate = 8, Max = 28, Life = { 2.0, 3.6 }, Size = { 6, 15 }, Speed = { 22, 64 }, Rise = { -8, 10 },
     Wobble = 4, Spin = 1.5, Direction = out,
     Spawn = function()
-      return ribbonStart + out * math.random() * self.sparkSpread, titleMiddle + (math.random() * 2 - 1) * 8
+      return ribbonStart() + out * math.random() * self.sparkSpread, titleMiddle + (math.random() * 2 - 1) * 8
     end,
   })
   -- Along the inner feathered edge, chained or not (asked, of an earlier version that stopped them
@@ -1378,7 +1622,7 @@ function panelProto:BuildSparkles()
     Rate = 2.5, Max = 12, Life = { 2.4, 4.2 }, Size = { 4, 9 }, Speed = { 14, 36 }, Rise = { -6, 6 },
     Wobble = 3, Spin = 1, Alpha = 0.6, Direction = out,
     Spawn = function()
-      return edge + out * math.random() * 24, -math.random() * fx:GetHeight()
+      return innerEdge() + out * math.random() * 24, -math.random() * fx:GetHeight()
     end,
   })
   -- From the knot in the middle of the gap, as the pair couples (BurstKnot).
@@ -1386,7 +1630,7 @@ function panelProto:BuildSparkles()
     Rate = 0, Max = 16, Life = { 0.5, 1.1 }, Size = { 4, 10 }, Speed = { 12, 40 }, Rise = { -16, 16 },
     Wobble = 2, Spin = 2, Alpha = 0.9, Direction = out,
     Spawn = function()
-      return ribbonStart + out * self.braid.half, titleMiddle
+      return ribbonStart() + out * self.braid.half, titleMiddle
     end,
   })
 end
@@ -1563,7 +1807,15 @@ function panelProto:Show(ctx, slotInfo, onShown)
   -- beside its open anchor, after the anchor, from beyond the anchor's edge; chained to a backpack
   -- about to open, out of sight until it does; else at its own edge, from its edge.
   local to = self:RestOffset()
-  if sliding then
+  if self:IsSmall() then
+    -- Where it was left (docs/next-small-mode.md), sliding a short way in from its edge side as it
+    -- fades in; opened again as it slid out, from where it is.
+    self.target = 0
+    if not sliding then
+      self:FitSmall()
+    end
+    self:moveIn(sliding and self.offset or self:HiddenOffset(), 0, style.Time.Open, "outCubic", 0)
+  elseif sliding then
     self.target = to
     self:SetDocked(to == 0)
     if to == 0 then
@@ -1676,6 +1928,7 @@ end
 ---@param ctx Context
 function panelProto:OnHidden(ctx)
   nextDrag:PanelHidden(self)
+  self:StopMove()
   self.closing = false
   tween:Stop(self)
   tween:Stop(self.spark)

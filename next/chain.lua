@@ -92,6 +92,14 @@ local function isOpen(panel)
   return panel ~= nil and panel.frame:IsShown() and not panel.closing
 end
 
+-- isSmall says panel is small (docs/next-small-mode.md): the player places it, and the layouts of
+-- the screen's edges do not apply to it.
+---@param panel? NextPanelFrame
+---@return boolean
+local function isSmall(panel)
+  return panel ~= nil and panel.size == "small"
+end
+
 -- Companion returns the companion that is open, if any.
 ---@return NextPanelFrame?
 function chain:Companion()
@@ -147,7 +155,7 @@ function chain:Pair(layout)
     return nil, nil
   end
   local companion = self:Companion()
-  if companion == nil then
+  if companion == nil or isSmall(self.backpack) or isSmall(companion) then
     return nil, nil
   end
   local anchor, chained = companion, self.backpack
@@ -200,7 +208,7 @@ end
 ---@return NextPanelFrame?
 function chain:ShownAnchorOf(panel)
   local role = ANCHOR_ROLE[self:Layout()]
-  if role == nil or panel.chainRole == role then
+  if role == nil or panel.chainRole == role or isSmall(panel) then
     return nil
   end
   if role == "backpack" then
@@ -268,12 +276,16 @@ end
 
 -- Click runs a click on panel's name. It returns what it did, for profiler traces: "chained" (it
 -- flies to its partner, the anchor), "unchained" (a chained bag goes back to its edge), "moved" (the
--- anchor's name: both bags go to the other side), "alone" (no partner is open: nothing) or "no room"
--- (the screen is too narrow for the two side by side).
+-- anchor's name: both bags go to the other side), "alone" (no partner is open: nothing), "no room"
+-- (the screen is too narrow for the two side by side) or "small" (a small panel's name moves it when
+-- dragged, and a click does nothing).
 ---@param ctx Context
 ---@param panel NextPanelFrame
 ---@return string
 function chain:Click(ctx, panel)
+  if isSmall(panel) then
+    return "small"
+  end
   local partner = self:Partner(panel)
   if partner == nil then
     return "alone"
@@ -310,7 +322,12 @@ function chain:Update(ctx, snap)
     table.insert(panels, companion)
   end
   for _, panel in ipairs(panels) do
-    if isOpen(panel) then
+    if isOpen(panel) and isSmall(panel) then
+      -- Where the player put it; the screen changed: still on it, its height the screen's share.
+      if snap then
+        panel:FitSmall()
+      end
+    elseif isOpen(panel) then
       local to = self:RestOffset(panel)
       if panel.waiting then
         -- Its anchor has opened: it comes in after it.
@@ -454,6 +471,9 @@ end
 ---@param panel NextPanelFrame
 ---@return string
 function chain:Tooltip(panel)
+  if isSmall(panel) then
+    return L:G("Drag to move it.")
+  end
   local partner = self:Partner(panel)
   if partner == nil then
     if panel.chainRole == "backpack" then
