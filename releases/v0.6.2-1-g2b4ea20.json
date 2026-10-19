@@ -1,0 +1,23 @@
+{
+  "id": 1792380481,
+  "version": "v0.6.2-1-g2b4ea20",
+  "channel": "alpha",
+  "date": "2026-10-19",
+  "from": "34538842a8bb6d0aed129f99cf4207ec92169461",
+  "to": "2b4ea20786e0b472ca1d3737466dc2a814704a56",
+  "headline": "BetterBags Next now supports the guild bank, along with a fix for slot-order bag views.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Guild bank support in BetterBags Next",
+      "details": "BetterBags Next now replaces Blizzard's guild bank interface with a categorized side panel. You can browse all tabs combined or view individual tabs in slot order, drag categories between your backpack and the guild bank to deposit or withdraw items, and manage guild funds.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Empty slot gap in slot-order views",
+      "details": "Fixed an issue in slot-order views, such as Bank Tabs and Show Bags, where an empty slot was moved into a separate Free Space section and left a gap in the grid.",
+      "clients": []
+    }
+  ]
+}
