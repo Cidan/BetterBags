@@ -38,6 +38,7 @@ local nextBag = addon:NewModule('NextBag')
 
 ---@class NextBackpack: NextPanelFrame
 ---@field sortButton Button
+---@field sizeButton Button Switches every panel between full and small (UpdateSizeButton).
 ---@field settingsButton Button
 ---@field behavior {SwitchToGroup: fun(self: any, ctx: Context, id: number)}
 ---@field helper BackpackBehaviorProto The classic behavior, for its group dialogs.
@@ -59,6 +60,7 @@ function nextBag:Create(ctx)
     closeSound = SOUNDKIT.IG_BACKPACK_CLOSE,
     chainRole = "backpack",
   })
+  b:UpdateSizeButton()
   b.helper = backpackBehavior:Create(b)
   b.behavior = {
     SwitchToGroup = function(_, ectx, id)
@@ -81,7 +83,36 @@ function bagProto:GetHeaderButtons()
       texture = not addon.isRetail and "Interface\\Buttons\\Button-Backpack-Up" or nil,
       tooltip = L:G("Switch to Classic Bags"),
       onClick = function(ctx) addon:GetModule('BagSystem'):Switch(ctx, "classic") end },
+    -- Small mode (docs/next-small-mode.md): every BetterBags Next panel full height or small and
+    -- movable. Its art is UpdateSizeButton's.
+    { key = "sizeButton", tooltipFunc = function() self:SizeTooltip() end,
+      onClick = function(ctx) nextPanel:SetSize(ctx, self:IsSmall() and "full" or "small") end },
   }
+end
+
+-- UpdateSizeButton shows what the size button does: Blizzard's minimize art while full, its maximize
+-- art while small (MaximizeMinimizeButtonFrameTemplate's RedButton-Condense and RedButton-Expand on
+-- retail and WoW: Forever; Classic's smaller and bigger buttons, SharedUIPanelTemplates.xml).
+function bagProto:UpdateSizeButton()
+  local small = self:IsSmall()
+  local icon = self.sizeButton.icon
+  if addon.isRetail then
+    icon:SetAtlas(small and "RedButton-Expand" or "RedButton-Condense")
+  else
+    icon:SetTexture(small and "Interface\\Buttons\\UI-Panel-BiggerButton-Up"
+      or "Interface\\Buttons\\UI-Panel-SmallerButton-Up")
+  end
+end
+
+-- SizeTooltip says what the size button does.
+function bagProto:SizeTooltip()
+  if self:IsSmall() then
+    GameTooltip:SetText(L:G("Full Size Bags"), 1, 1, 1, 1, true)
+    GameTooltip:AddLine(L:G("Full-height bags on the edges of the screen."), nil, nil, nil, true)
+  else
+    GameTooltip:SetText(L:G("Small Bags"), 1, 1, 1, 1, true)
+    GameTooltip:AddLine(L:G("Smaller bags you can move anywhere: drag a bag by its title."), nil, nil, nil, true)
+  end
 end
 
 ---@return Money

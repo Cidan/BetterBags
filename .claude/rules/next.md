@@ -1147,3 +1147,181 @@ items in the bags' categories (All Tabs) or a tab by itself in slot order, its s
 guild bank item buttons, gold in and out, buying and renaming tabs, and sections dragged in
 (deposited) and out (withdrawn). Blizzard's frame stays shown but is never seen. Everything about it,
 from the data engine's third kind of bag to the takeover, is in guild-bank.md.
+
+## 14. Small mode (`next/panel.lua`, `next/chain.lua`)
+
+A second size for every Next panel: smaller, movable panels that keep Next's look, for players on
+smaller screens. The plan, the reasoning and what was asked are in `docs/next-small-mode.md`
+(asked: "the biggest pain is two panels open for people with smaller screens ... a smaller panel,
+like ESO ... a panel we can move ... a button toggle to swap between small and full mode (animated
+of course)"). Phase 1 is small panels, moving them and switching sizes (§14a-d); phase 2 is chaining
+small panels by dragging them together (§14e).
+
+### 14a. The setting and the size
+
+- `nextSize` (profile, `"full"` by default; `DB:Get/SetNextSize`, nothing else accepted) is every
+  Next panel's size; `nextSmallPlaces[kind]` (`DB:Get/SetNextSmallPlace`) where each kind's small
+  panel was left (its top left in UIParent's units), nothing until first moved.
+- Each panel keeps its own `size`, read from the setting when it is made, so a panel can be part way
+  through a switch (§14d). `IsSmall`, `Height`, `Width`, `BodyLeft`, `RibbonBase` and
+  `SparkSpreadBase` answer for it.
+- The knobs are in one place, `style.Small` (`next/style.lua`): the height share (0.66), the beam
+  (120) and how far out along it its sparkles are born (48), the open slide (24), the edge's alpha
+  (0.35), the default margin (40). `style.Time.Morph` (0.4 s) is the switch.
+
+### 14b. The geometry (`ApplyGeometry`)
+
+One function shapes a panel for its size and places it at its offset, run when it is made and at the
+end of a switch. `BuildPanel` only makes the parts.
+- **Full** is unchanged (§3): the frame on its screen edge, top to bottom; the body inside the
+  feather; no clicks over the feather (hit rect insets); the fill and the wash reaching past the
+  screen edge while docked (`SetDocked`).
+- **Small:** the frame is the body (`BODY_WIDTH` wide, the same as the full body, so the grid,
+  sections, drag and drop and the tab rail are unchanged), `SmallHeight` tall (a share of the screen,
+  whole units), anchored by its top left at its place (`SmallPlace`: where it was left, else a margin
+  in from its own screen edge, centered; always kept on the screen, `clampPlace`). No feather, clicks
+  everywhere, a 1-pixel lavender edge all round (`edges`), the shorter beam. `SetDocked` does nothing
+  to a small panel (it is never at its screen edge). The render root hands the content the panel's
+  height less its header and footer.
+- **Sparkles follow the geometry:** every emitter computes its spawn points from `BodyLeft` at spawn
+  time (they were constants of the full width), so the edge sparkles still drift out of a small
+  panel's inner side and the ribbon's along its shorter beam.
+
+### 14c. Opening, closing and moving a small panel
+
+- **Opening:** it takes the screen as it is (`FitSmall`: its height, a place still on the screen),
+  then slides `Small.Slide` in from its edge side as it fades in (`setOffset` for a small panel is
+  its place plus the offset, its alpha falling with the distance; `HiddenOffset` is the slide). The
+  sections cascade in as before. Opened again while it slides out, it comes back from where it is.
+- **Closing:** the reverse. Every way of closing works as before. `chain:ExitOffset` never sends a
+  small panel off through a partner's edge: the full mode's chain layout (`nextChain`) is kept for
+  full mode, and would otherwise fly a small bag across the screen.
+- **Moving:** dragging the title row (`mover`: the body's top down to the search box, under the
+  header buttons, which stay clickable above it) or the title (`titleButton`) calls `StartMove`
+  (`frame:StartMoving()`) and `StopMove`: the place, kept on the screen, is saved for the kind and the
+  frame anchored there again (the client anchors a moved frame to the nearest screen corner).
+  - `StartMoving` flags a frame user-placed, and the client then restores a named frame's place from
+    its layout cache at login (warcraft.wiki.gg Frame:StartMoving): `StartMove` clears the flag
+    (`SetUserPlaced(false)`), as the wiki says to.
+  - No move with something on the cursor: pressing on the bag is a drop. The mover passes drops and
+    clicks with an item to the bag, like the rest of the panel (`PlaceCursorItem`).
+  - An opening slide is finished first. Hiding ends a move (`OnHidden`).
+  - Nothing in the panels is protected (`BankPanelPurchaseButtonScriptTemplate` is not), so moving
+    works in combat (`StartMoving` is blocked only on protected frames).
+- **The screen changing** (`UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED`, `chain:Update` with snap)
+  refits an open small panel and lays its content out again; a closed one refits when it opens.
+- **The full chain** (§12) leaves small panels alone: never paired (`Pair`), never placed by the full
+  layouts (`Update`), never sent through a partner's edge (`ShownAnchorOf`); a small panel's title's
+  click does nothing (`Click` returns `"small"`) and its tooltip says to drag it. Small panels chain
+  their own way (§14e).
+
+### 14d. Switching sizes (`nextPanel:SetSize`, `PrepareResize`, `Morph`)
+
+- **The button** (`sizeButton`, the backpack's header, after the button back to the classic bags):
+  Blizzard's own minimize art while full and maximize art while small (`MaximizeMinimizeButtonFrameTemplate`'s
+  `RedButton-Condense` / `RedButton-Expand` on retail and WoW: Forever; Classic's
+  `UI-Panel-SmallerButton-Up` / `UI-Panel-BiggerButton-Up`, `SharedUIPanelTemplates.xml`), with a
+  tooltip. A click calls `nextPanel:SetSize(ctx, size)`, which returns `"switched"` or `"same"`.
+- **SetSize** saves the size, lets go of a coupled pair's braid at once (`chain:LetGo`), switches
+  every panel (`PrepareResize`), then starts the switch of every shown one (`Morph`): where a full
+  panel rests depends on its partner's size, so every panel has its new size before any target is
+  computed. Then every panel updates its size button.
+- **A panel not shown** (a closing one finishes closing first) takes the size at once and lays its
+  content out for its new height (its root renders while hidden: it has no `ShouldRender`).
+- **A shown panel switches in two steps** (`Morph`). Its opening slide or flight is finished, its
+  body's place is kept (`BodyRect`), and it gets the new size's parts at once (`ApplyGeometry`); the
+  frame is then anchored by its top left and sized as it goes, so the body only moves and stretches
+  (its width is the same at both sizes). Nothing reaches past the screen edge on the way
+  (`SetDocked(false)`).
+  - **The glide** (`inOutCubic`, `Time.Morph`): the body from where it was to where it rests (its
+    small place, or its full rest offset, `chain:RestOffset`), the beam shortening or growing, and
+    what the old size had fading out on the way: shrinking, the feathers (a shrinking panel's feather
+    beside its inner side, re-anchored there; the far feather, `outerFeather`, with it); growing, the
+    small border.
+  - **The fade** (`inOutSine`, `Time.MorphFade`): what the new size has, once it is there: shrinking,
+    the small border fades in; growing, the feathers fade in (the far feather only when it ends away
+    from its screen edge, beside its partner: at the edge a full panel has none).
+  - **The feathers fade through their gradients** (`paintFeathers`, which also draws them when the
+    panel is made): a feather is a gradient texture, its alpha in its vertex colors, and faded with
+    `SetAlpha` it did not fade at all in game (reported); the wash has always faded this way
+    (`paintWash`). See `.context/patterns-ui.md`, "Fade a Gradient Texture Through Its Colors".
+  - **Why:** the edge used to cross-fade with the feather over the whole glide, so the border showed
+    while the feather was still there, "making it look like the feathering is spilled out"; asked
+    for "a 2 step animation". Growing first let the border go before moving, and "it doesn't feel
+    good that it doesn't start moving right away": it moves at once, the border fading on the way,
+    then the feathers fade in, "basically the inverse of shrinking". The edge also hung on the frame,
+    which for a full panel reaches over its feather, so a growing panel's fading border outlined the
+    feather too: it hangs on the body now.
+  - The content is laid out once, at the end. At the end it couples again if the new size chains it
+    (`chain:Arrived`; `UpdateCoupling` waits while either bag of the pair still switches).
+- **Switched back mid-switch,** it turns around from where it is (`morph.at`: its place, height, beam,
+  feathers and border), the first switch stopped. A step with nothing to do is skipped (switched twice
+  in a row, it ends where it started at once), and a fade part way done takes only its share of
+  `MorphFade`.
+- **Anything that places the panel ends a switch first, both steps** (`setOffset` calls `endMorph`,
+  which stops the step playing and puts the panel at the switch's end; every slide, flight and refit
+  goes through it), and so does `StartMove` (it moves the frame itself). Showing an
+  open panel again (a refresh) does not end it.
+
+### 14e. Chaining small bags by dragging them together (`next/chain.lua`)
+
+Asked: "they can still chain to each other if dragged close by. still want the sparkles between
+them/coming out the side though!"
+- **The small chain** is its own setting, `nextSmallChain` (`DB:Get/SetNextSmallChain`): `"apart"`,
+  `"backpack"` (a companion was dropped beside the backpack: the backpack anchors) or `"companion"`
+  (the backpack was dropped beside a companion, and sits beside whichever is open). Full mode's
+  `nextChain` is untouched; each size keeps its own chain.
+- **Where a chained bag sits** (`ChainedPlace`): a companion left of the backpack, the backpack right
+  of a companion (only their facing sides chain), tops aligned, `SmallGap` between them (both tab
+  rails, each its widest tab plus the hover slide, and a margin; at least `Small.MinGap`).
+  `SmallPlace` of a chained bag is that spot beside its anchor where the anchor is now
+  (`LivePlace`: under the mouse while dragged, else its place, saved or default, so a companion opens
+  straight beside where the backpack was left, open or not). There is no waiting for the anchor.
+- **Dropping beside a partner chains** (`chain:Dropped`, from `StopMove`): an open small partner, the
+  dropped bag's spot beside it on the screen, and the drop within `Small.SnapReach` (80) across and
+  `Small.SnapRise` (160) up or down of it. The partner becomes the anchor, the dropped bag glides into
+  its spot (`GlideTo`, `Time.Glide`), its place saved there.
+- **Dragging the anchor moves both:** its partner (`chain:Follower`) is placed beside it every frame
+  of the drag (the mover's `OnUpdate`, cleared at the drop; a glide into its spot is finished first),
+  the braid with them; at the drop both places are saved.
+- **Dragging the other lets it go** (`chain:Detach`, from `StartMove`): the chain is `"apart"` and the
+  braid comes apart at once; dropped back beside the anchor, it chains again.
+- **The braid** (`UpdateCoupling` with `SmallPair`, `applyCoupling`): once both are open and still
+  (`SmallPlaced`: neither sliding, gliding or switching size), their ribbons twist into the braid
+  across the gap between their bodies where they are now (`SmallLeft`), the chained bag showing the
+  knot, which bursts. One of the pair closing lets go; it braids again when it opens.
+- **Sparkles between them, never over them:** the ribbon sparkles shorten as in full mode; a braided
+  small bag's edge sparkles live shorter and drift slower (`SetCoupling`), so they die before the
+  middle of a narrow gap (born up to 24 out, 24 + half the gap / 2 stays below the gap, which is at
+  least 64). Apart, they drift as before.
+- **When a chained bag's spot moves** (the gap changes: a tab rail grows), it glides there
+  (`chain:Settle`, from `Update` and `Arrived`), but never while it slides in or switches size: a
+  slide's end says the bag has shown (a bank open waits for it), so it settles once it arrives. A bag
+  chained to a closed backpack stays where it is.
+
+### 14f. Coverage
+
+`spec/next/small_spec.lua` (64): the geometry (size, place, no feather, the edge, the beam, sparkles
+on both sides, the root, a saved place kept on the screen), opening and closing (slide and fade,
+reopening mid-close, the screen at opening, never chained, closing with a chain layout saved),
+moving (by the title row and the title, saved per kind, the layout cache flag, kept on the screen,
+the cursor, finishing the opening, hiding, header buttons above the mover, the screen changing, full
+panels never move), switching sizes (the button's art on retail and Classic, its place and tooltip,
+saving, closed panels with their content laid out, the glide's path both ways, the two steps both
+ways (the feather and beam with the size, the border only after shrinking and before growing, the far
+feather with the near one), the border round the body, nothing past the edge, one layout at the end,
+a close or a move mid-switch (both steps finished), a closing panel, a pair's braid let go and
+braided again only once both arrive, turning around mid-glide and mid-border, a border brought
+straight back, Escape mid-switch, a refresh mid-switch, the feather's anchors after both ways), chaining (the gap, dropping
+beside either partner, too far, too high, facing away, a pair that would not fit, the braid's
+halves and knot, the edge sparkles in the gap and back, the anchor moving both, letting go and
+chaining again, opening beside an open anchor, beside where it was left, the backpack beside a
+companion, closing and reopening one of the pair, a spot that moves, one that moves while sliding in
+or switching size, a closed anchor, a partner gliding when the anchor is dragged, each size's chain).
+`spec/database_spec.lua` and `spec/core/constants_spec.lua` (the settings). The other Next specs run
+full size. Every guard was mutation-tested (80 mutations): the redundant ones it found were removed
+(nine), each one it showed untested got a test, and it found one bug before it shipped (a glide that
+would have cut a bag's slide in short, dropping what waited for it to show).
+
+Not verified in game yet: how the small panels look, the glide, moving them, and the button's art
+(a red Blizzard button among flat icons).

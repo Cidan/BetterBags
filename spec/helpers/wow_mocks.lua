@@ -451,12 +451,21 @@ function WidgetMethods:RegisterForDrag(...)
   self._registeredDrags = {...}
 end
 -- Frame:StartMoving() / StopMovingOrSizing() (SimpleFrameAPIDocumentation.lua).
--- Frame:StartMoving() errors on a frame that is not movable (warcraft.wiki.gg).
+-- Frame:StartMoving() errors on a frame that is not movable, and flags the frame user-placed
+-- (warcraft.wiki.gg).
 function WidgetMethods:StartMoving()
   if not self._movable then
     error("Frame:StartMoving(): Frame is not movable", 2)
   end
   self._moving = true
+  self._userPlaced = true
+end
+-- Frame:SetUserPlaced(userPlaced) / IsUserPlaced() -> isUserPlaced (SimpleFrameAPIDocumentation).
+function WidgetMethods:SetUserPlaced(userPlaced)
+  self._userPlaced = userPlaced
+end
+function WidgetMethods:IsUserPlaced()
+  return self._userPlaced == true
 end
 function WidgetMethods:StopMovingOrSizing()
   self._moving = false
@@ -729,6 +738,10 @@ function WidgetMethods:SetClampRectInsets(left, right, top, bottom)
 end
 function WidgetMethods:SetMovable(movable)
   self._movable = movable
+end
+-- Frame:IsMovable() -> isMovable (SimpleFrameAPIDocumentation).
+function WidgetMethods:IsMovable()
+  return self._movable == true
 end
 function WidgetMethods:SetScale(scale)
   self._scale = scale

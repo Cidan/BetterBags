@@ -92,6 +92,14 @@ local function isOpen(panel)
   return panel ~= nil and panel.frame:IsShown() and not panel.closing
 end
 
+-- isSmall says panel is small (docs/next-small-mode.md): the player places it, and the layouts of
+-- the screen's edges do not apply to it.
+---@param panel? NextPanelFrame
+---@return boolean
+local function isSmall(panel)
+  return panel ~= nil and panel.size == "small"
+end
+
 -- Companion returns the companion that is open, if any.
 ---@return NextPanelFrame?
 function chain:Companion()
@@ -147,7 +155,7 @@ function chain:Pair(layout)
     return nil, nil
   end
   local companion = self:Companion()
-  if companion == nil then
+  if companion == nil or isSmall(self.backpack) or isSmall(companion) then
     return nil, nil
   end
   local anchor, chained = companion, self.backpack
@@ -158,6 +166,158 @@ function chain:Pair(layout)
     return nil, nil
   end
   return anchor, chained
+end
+
+-- SmallLayout returns which small panel anchors a chained pair (docs/next-small-mode.md).
+---@return NextSmallChain
+function chain:SmallLayout()
+  return database:GetNextSmallChain()
+end
+
+-- SmallGap is the room between two small bags side by side: both tab rails hang into it, each its
+-- widest tab plus the hover slide, with a margin between them; never less than Small.MinGap.
+---@param a NextPanelFrame
+---@param b NextPanelFrame
+---@return number
+function chain:SmallGap(a, b)
+  local tabs = a.tabs:Width() + b.tabs:Width() + 2 * style.TAB_HOVER + style.Chain.TabMargin
+  return math.max(style.Small.MinGap, tabs)
+end
+
+-- SmallAnchorOf returns the bag a small panel sits beside, when the small chain makes it the chained
+-- one: the backpack for a companion (layout "backpack", open or not: a companion opens beside where
+-- it was left), the open companion for the backpack (layout "companion").
+---@param panel NextPanelFrame
+---@return NextPanelFrame?
+function chain:SmallAnchorOf(panel)
+  local layout = self:SmallLayout()
+  if layout == "backpack" and panel.chainRole == "companion" then
+    return self.backpack
+  end
+  if layout == "companion" and panel.chainRole == "backpack" then
+    return self:Companion()
+  end
+  return nil
+end
+
+-- ChainedPlace is where panel sits beside anchor, whose top left is ax, ay: a companion left of the
+-- backpack, the backpack right of a companion, the gap between them, their tops aligned.
+---@param panel NextPanelFrame
+---@param anchor NextPanelFrame
+---@param ax number
+---@param ay number
+---@return number x, number y
+function chain:ChainedPlace(panel, anchor, ax, ay)
+  local gap = self:SmallGap(panel, anchor)
+  if panel.chainRole == "companion" then
+    return ax - gap - style.BODY_WIDTH, ay
+  end
+  return ax + style.BODY_WIDTH + gap, ay
+end
+
+-- SmallPair returns the anchor and the chained bag when the small chain chains them and both are open
+-- and small.
+---@return NextPanelFrame? anchor, NextPanelFrame? chained
+function chain:SmallPair()
+  local backpack = self.backpack
+  if not isOpen(backpack) then
+    return nil, nil
+  end
+  -- Every panel switches size together (nextPanel:SetSize): the companion's is the pair's.
+  local companion = self:Companion()
+  if companion == nil or not isSmall(companion) then
+    return nil, nil
+  end
+  local layout = self:SmallLayout()
+  if layout == "backpack" then
+    return backpack, companion
+  end
+  if layout == "companion" then
+    return companion, backpack
+  end
+  return nil, nil
+end
+
+-- SmallPlaced says a small pair is in place to braid: neither sliding, gliding or switching size. A
+-- chained bag is at its spot once still: a bag whose spot moves glides there (Settle), and dragging
+-- the chained bag lets it go (Detach).
+---@param anchor NextPanelFrame
+---@param chained NextPanelFrame
+---@return boolean
+function chain:SmallPlaced(anchor, chained)
+  for _, panel in ipairs({ anchor, chained }) do
+    if panel.morph ~= nil or tween:IsPlaying(panel) then
+      return false
+    end
+  end
+  return true
+end
+
+-- Settle glides a small bag chained to an open anchor to its spot when the spot moved (the gap
+-- changed). It returns whether it glides.
+---@param panel NextPanelFrame
+---@return boolean
+function chain:Settle(panel)
+  local anchor = self:SmallAnchorOf(panel)
+  if anchor == nil or not isOpen(anchor) then
+    return false
+  end
+  local x, y = panel:SmallPlace()
+  if math.abs(x - panel.placeX) < PLACED and math.abs(y - panel.placeY) < PLACED then
+    return false
+  end
+  panel:GlideTo(x, y)
+  return true
+end
+
+-- Dropped runs when the player lets go of a small bag at x, y: dropped beside its open partner's
+-- facing side (its inner side within Small.SnapReach of its spot, its top within Small.SnapRise), it
+-- chains to it, the partner the anchor, and Dropped returns its spot. A pair that would not fit on
+-- the screen does not chain.
+---@param panel NextPanelFrame
+---@param x number
+---@param y number
+---@return number? x, number? y
+function chain:Dropped(panel, x, y)
+  local partner = self:Partner(panel)
+  if partner == nil or not isSmall(partner) then
+    return nil, nil
+  end
+  local px, py = partner:SmallPlace()
+  local wx, wy = self:ChainedPlace(panel, partner, px, py)
+  if wx < 0 or wx + style.BODY_WIDTH > UIParent:GetWidth() then
+    return nil, nil
+  end
+  if math.abs(x - wx) > style.Small.SnapReach or math.abs(y - wy) > style.Small.SnapRise then
+    return nil, nil
+  end
+  database:SetNextSmallChain(partner.chainRole)
+  return wx, wy
+end
+
+-- Detach lets a small bag go of its anchor as the player starts to drag it away; its partner braids
+-- no more. It returns whether it was chained.
+---@param panel NextPanelFrame
+---@return boolean
+function chain:Detach(panel)
+  if self:SmallAnchorOf(panel) == nil then
+    return false
+  end
+  database:SetNextSmallChain("apart")
+  self:UpdateCoupling()
+  return true
+end
+
+-- Follower returns the open small bag chained to panel, when panel anchors the small pair: it moves
+-- along with panel.
+---@param panel NextPanelFrame
+---@return NextPanelFrame?
+function chain:Follower(panel)
+  local anchor, chained = self:SmallPair()
+  if anchor == panel then
+    return chained
+  end
+  return nil
 end
 
 -- RestOffset is where panel rests (as an offset from its own edge, setOffset): beside its anchor
@@ -200,7 +360,7 @@ end
 ---@return NextPanelFrame?
 function chain:ShownAnchorOf(panel)
   local role = ANCHOR_ROLE[self:Layout()]
-  if role == nil or panel.chainRole == role then
+  if role == nil or panel.chainRole == role or isSmall(panel) then
     return nil
   end
   if role == "backpack" then
@@ -268,12 +428,16 @@ end
 
 -- Click runs a click on panel's name. It returns what it did, for profiler traces: "chained" (it
 -- flies to its partner, the anchor), "unchained" (a chained bag goes back to its edge), "moved" (the
--- anchor's name: both bags go to the other side), "alone" (no partner is open: nothing) or "no room"
--- (the screen is too narrow for the two side by side).
+-- anchor's name: both bags go to the other side), "alone" (no partner is open: nothing), "no room"
+-- (the screen is too narrow for the two side by side) or "small" (a small panel's name moves it when
+-- dragged, and a click does nothing).
 ---@param ctx Context
 ---@param panel NextPanelFrame
 ---@return string
 function chain:Click(ctx, panel)
+  if isSmall(panel) then
+    return "small"
+  end
   local partner = self:Partner(panel)
   if partner == nil then
     return "alone"
@@ -299,18 +463,34 @@ function chain:Click(ctx, panel)
   return "chained"
 end
 
+-- Panels returns every registered panel: the backpack, then its companions.
+---@return NextPanelFrame[]
+function chain:Panels()
+  local panels = { self.backpack }
+  for _, companion in ipairs(self.companions) do
+    table.insert(panels, companion)
+  end
+  return panels
+end
+
 -- Update sends every open bag to where it rests now (flying, or at once with snap: the screen
 -- changed), then couples or uncouples the pair.
 ---@param ctx Context
 ---@param snap? boolean
 function chain:Update(ctx, snap)
   local _ = ctx
-  local panels = { self.backpack }
-  for _, companion in ipairs(self.companions) do
-    table.insert(panels, companion)
-  end
-  for _, panel in ipairs(panels) do
-    if isOpen(panel) then
+  for _, panel in ipairs(self:Panels()) do
+    if isOpen(panel) and isSmall(panel) then
+      -- Where the player put it; the screen changed: still on it, its height the screen's share. A
+      -- chained bag whose spot beside its open anchor moved (the gap changed) glides there.
+      if snap then
+        panel:FitSmall()
+      elseif panel.morph == nil and not tween:IsPlaying(panel) then
+        -- Never cutting a slide or a switch short (a slide's end says the bag has shown): Arrived
+        -- settles it once there.
+        self:Settle(panel)
+      end
+    elseif isOpen(panel) then
       local to = self:RestOffset(panel)
       if panel.waiting then
         -- Its anchor has opened: it comes in after it.
@@ -334,7 +514,10 @@ end
 ---@param panel NextPanelFrame
 ---@return string
 function chain:Arrived(panel)
-  local _ = panel
+  -- A small chained bag whose spot moved on the way glides there first ("settling").
+  if isSmall(panel) and self:Settle(panel) then
+    return "settling"
+  end
   return self:UpdateCoupling()
 end
 
@@ -349,10 +532,23 @@ end
 ---@return string
 function chain:UpdateCoupling()
   local anchor, chained = self:Pair()
-  local c = self.coupling
+  local placed, arrived = false, false
   if chained ~= nil then
     local rest = self:RestOffset(chained)
-    if math.abs((chained.target or 0) - rest) < PLACED then
+    placed = math.abs((chained.target or 0) - rest) < PLACED
+    -- Switching size, either may still be gliding to its place (Morph): its offset is already the
+    -- place.
+    arrived = placed and math.abs(chained.offset - rest) < PLACED and anchor.morph == nil and chained.morph == nil
+  else
+    anchor, chained = self:SmallPair()
+    if chained ~= nil then
+      placed = self:SmallPlaced(anchor, chained)
+      arrived = placed
+    end
+  end
+  local c = self.coupling
+  if chained ~= nil then
+    if placed then
       local same = c ~= nil and ((c.anchor == anchor and c.chained == chained) or (c.anchor == chained and c.chained == anchor))
       if same then
         c.anchor, c.chained = anchor, chained
@@ -363,7 +559,7 @@ function chain:UpdateCoupling()
         return "kept"
       end
       if c == nil then
-        if math.abs(chained.offset - rest) >= PLACED then
+        if not arrived then
           return "on its way"
         end
         self.coupling = { anchor = anchor, chained = chained, amount = 0, target = 0, phase = 0, time = 0 }
@@ -382,6 +578,20 @@ function chain:UpdateCoupling()
     return "letting go"
   end
   return "apart"
+end
+
+-- LetGo ends the coupling at once, both halves of the braid hidden: the bags are switching size
+-- (nextPanel:SetSize), and small panels are not chained yet (docs/next-small-mode.md).
+function chain:LetGo()
+  local c = self.coupling
+  if c == nil then
+    return
+  end
+  tween:Stop(c)
+  self.coupling = nil
+  self.driver:SetScript("OnUpdate", nil)
+  c.anchor:SetCoupling(0, 0, false, 0, 0, style.FEATHER)
+  c.chained:SetCoupling(0, 0, false, 0, 0, style.FEATHER)
 end
 
 -- Turn turns the braid elapsed seconds on and runs its lights along it.
@@ -439,6 +649,18 @@ function chain:applyCoupling()
   if c == nil then
     return
   end
+  if isSmall(c.anchor) then
+    -- Two free bags: the gap between the backpack's body and its companion's, where they are now.
+    local backpack, companion = c.anchor, c.chained
+    if backpack.chainRole ~= "backpack" then
+      backpack, companion = companion, backpack
+    end
+    local gap = backpack:SmallLeft() - (companion:SmallLeft() + style.BODY_WIDTH)
+    local half = math.max(0, gap / 2)
+    c.anchor:SetCoupling(c.amount, half, false, c.phase, c.time, style.FEATHER)
+    c.chained:SetCoupling(c.amount, half, true, c.phase, c.time, style.FEATHER)
+    return
+  end
   local gap = UIParent:GetWidth() - 2 * (style.WIDTH - style.FEATHER) - math.abs(c.anchor.offset)
     - math.abs(c.chained.offset)
   local half = math.max(0, gap / 2)
@@ -454,6 +676,9 @@ end
 ---@param panel NextPanelFrame
 ---@return string
 function chain:Tooltip(panel)
+  if isSmall(panel) then
+    return L:G("Drag to move it.")
+  end
   local partner = self:Partner(panel)
   if partner == nil then
     if panel.chainRole == "backpack" then

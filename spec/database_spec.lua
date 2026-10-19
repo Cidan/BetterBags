@@ -93,6 +93,9 @@ const.DATABASE_DEFAULTS = {
     animateItemMovement = false,
     nextEnabled = false,
     nextChain = "apart",
+    nextSize = "full",
+    nextSmallPlaces = {},
+    nextSmallChain = "apart",
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
@@ -319,6 +322,40 @@ describe("Database", function()
       end
       assert.has_error(function() DB:SetNextChain("middle") end)
       assert.are.equal("apart", DB:GetNextChain())
+    end)
+
+    -- BetterBags Next's size (docs/next-small-mode.md): full-height panels until switched to small,
+    -- movable ones.
+    it("GetNextSize / SetNextSize, full until switched, and nothing but a size", function()
+      assert.are.equal("full", DB:GetNextSize())
+      DB:SetNextSize("small")
+      assert.are.equal("small", DB:GetNextSize())
+      assert.has_error(function() DB:SetNextSize("tiny") end)
+      assert.are.equal("small", DB:GetNextSize())
+      DB:SetNextSize("full")
+      assert.are.equal("full", DB:GetNextSize())
+    end)
+
+    -- Each kind of bag keeps where its small panel was left: its top left, in UIParent's units.
+    it("GetNextSmallPlace / SetNextSmallPlace, per kind, nothing until moved", function()
+      assert.is_nil(DB:GetNextSmallPlace(0))
+      DB:SetNextSmallPlace(0, 1200.5, 900)
+      DB:SetNextSmallPlace(1, 40, 800)
+      assert.are.same({ 1200.5, 900 }, { DB:GetNextSmallPlace(0) })
+      assert.are.same({ 40, 800 }, { DB:GetNextSmallPlace(1) })
+      assert.is_nil(DB:GetNextSmallPlace(2))
+    end)
+
+    -- Which small bag is the anchor of a chained pair (docs/next-small-mode.md): the one the other
+    -- was dropped beside.
+    it("GetNextSmallChain / SetNextSmallChain, apart until chained, and nothing but a layout", function()
+      assert.are.equal("apart", DB:GetNextSmallChain())
+      for _, layout in ipairs({ "backpack", "companion", "apart" }) do
+        DB:SetNextSmallChain(layout)
+        assert.are.equal(layout, DB:GetNextSmallChain())
+      end
+      assert.has_error(function() DB:SetNextSmallChain("left") end)
+      assert.are.equal("apart", DB:GetNextSmallChain())
     end)
 
     it("GetAnimateItemMovement / SetAnimateItemMovement, off until turned on", function()

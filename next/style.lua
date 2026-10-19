@@ -124,8 +124,34 @@ style.Time = {
   Enter = 0.5,
   Couple = 0.35,
   Uncouple = 0.25,
+  -- An open panel switching between full and small (docs/next-small-mode.md): the glide (its size and
+  -- beam, the feathers fading out as it shrinks or the small border as it grows), then the fade (the
+  -- small border in once small, or the feathers in once full).
+  Morph = 0.4,
+  MorphFade = 0.2,
 }
 style.RISE = 12
+
+-- Small mode (docs/next-small-mode.md): smaller, movable panels for smaller screens. The knobs to
+-- toy with, in one place.
+style.Small = {
+  -- The panel's height, a share of the screen's.
+  Height = 0.66,
+  -- The title's ribbon (the beam), and how far out along it its sparkles are born.
+  Ribbon = 120,
+  SparkSpread = 48,
+  -- How far it slides in from its edge side as it fades in, and back out as it fades out.
+  Slide = 24,
+  -- The alpha of its 1-pixel lavender edge, so it reads against the world.
+  Edge = 0.35,
+  -- How far in from its screen edge a panel sits until it is first moved.
+  Margin = 40,
+  -- Chaining by dropping a bag beside its partner: how close its inner side must be to where it
+  -- would sit, how far apart their tops may be, and the least room between them.
+  SnapReach = 80,
+  SnapRise = 160,
+  MinGap = 64,
+}
 
 -- The sparkle sprite: the cooldown "bling" star, on every client.
 style.SPARKLE_TEXTURE = "Interface\\Cooldown\\star4"
