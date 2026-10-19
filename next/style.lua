@@ -148,7 +148,12 @@ style.Chain = {
 -- Join puff sits on the ribbon's end. Each puff breathes, out of step
 -- with the others: its alpha by Depth and its height by Drift pixels, over a few seconds. When the
 -- shimmer arrives the cloud brightens by Swell and the Join puff by JoinSwell.
+-- SecretTitleWidth stands in for the title's width when the client will not say it: a vendor's name
+-- is secret in an instance (UnitName is SecretWhenUnitNameIdentityRestricted), and a font string
+-- showing a secret has a secret width (GetStringWidth is SecretWhenAnchoringSecret). About a
+-- typical NPC name in the 26-pixel title font.
 style.Cloud = {
+  SecretTitleWidth = 160,
   Pad = 16, Swell = 0.6, JoinSwell = 0.45, Depth = 0.15, Drift = 1.5,
   Join = { Size = 34, Color = "Gold", A = 0.35 },
   Puffs = {

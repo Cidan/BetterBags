@@ -317,6 +317,47 @@ describe("NextVendor", function()
     end)
   end)
 
+  -- Reported, at a vendor in an instance: "next/panel.lua:742: attempt to perform arithmetic on a
+  -- secret number value (execution tainted by 'BetterBags')" in CloudSpan, from SetTitle in
+  -- OnShowing. UnitName is SecretWhenUnitNameIdentityRestricted (UnitDocumentation.lua), so in a
+  -- dungeon or raid the vendor's name is secret; FontString:SetText takes it, and GetStringWidth is
+  -- then secret (SecretWhenAnchoringSecret, SimpleFontStringAPIDocumentation.lua).
+  describe("with a secret vendor name (an instance)", function()
+    local name
+    before_each(function()
+      override(_G, "issecretvalue", IsMockSecret)
+      name = MockSecret("Mira the Smith")
+      override(_G, "UnitName", function(unit) if unit == "npc" then return name end return "Me" end)
+    end)
+
+    it("opens, still shows the name, and lays its cloud out without measuring it", function()
+      local v = open()
+      assert.is_true(v:IsShown())
+      assert.are.equal(name, v.title:GetText(), "the name still shows")
+      assert.are.equal(style.Cloud.SecretTitleWidth + style.PAD + 4 + style.Cloud.Pad, v:CloudSpan())
+      for _ = 1, 20 do
+        v.cloudSparkles.options.Spawn()
+      end
+    end)
+
+    it("calls itself Vendor in its title's tooltip, never by the secret name", function()
+      local v = open()
+      v.titleButton:GetScript("OnEnter")(v.titleButton)
+      assert.are.equal("Vendor", GameTooltip._header)
+      v.titleButton:GetScript("OnLeave")(v.titleButton)
+    end)
+
+    it("measures its name again once the name is no longer secret", function()
+      local v = open()
+      v:Hide(ctx())
+      finishTweens()
+      name = "Mira the Smith"
+      eventsRegistered["MERCHANT_SHOW"](ctx())
+      finishTweens()
+      assert.are.equal(#"Mira the Smith" * 6 + style.PAD + 4 + style.Cloud.Pad, v:CloudSpan())
+    end)
+  end)
+
   describe("opening", function()
     it("shows the vendor's name, resets the filter and draws what it sells in categories", function()
       local v = open()

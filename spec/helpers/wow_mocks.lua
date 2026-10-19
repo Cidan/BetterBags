@@ -131,6 +131,46 @@ local function CreateMockAnimationGroup(region, name)
 end
 
 -- Stateful Widget factory helper
+-- Secret values (warcraft.wiki.gg Secret Values, patch 12.0.0): under addon restrictions some APIs
+-- return secrets. Addon (tainted) code may store them, pass them to Lua functions and concatenate
+-- them; arithmetic, comparisons and indexing error. MockSecret(value) makes one, IsMockSecret(v)
+-- tells one. issecretvalue is not defined here: Classic has none, and specs that need it install
+-- _G.issecretvalue = IsMockSecret.
+local secretMeta = {}
+local function secretError(operation)
+  return function()
+    error("attempt to perform " .. operation .. " on a secret value (execution tainted by 'BetterBags')", 2)
+  end
+end
+for _, event in ipairs({ "__add", "__sub", "__mul", "__div", "__mod", "__pow", "__unm" }) do
+  secretMeta[event] = secretError("arithmetic")
+end
+for _, event in ipairs({ "__lt", "__le", "__eq" }) do
+  secretMeta[event] = secretError("comparison")
+end
+secretMeta.__index = secretError("indexed access")
+secretMeta.__newindex = secretError("indexed assignment")
+-- Concatenation is allowed, and its result is secret too.
+secretMeta.__concat = function(a, b)
+  return _G.MockSecret(nil)
+end
+_G.MockSecret = function(value)
+  return setmetatable({ value }, secretMeta)
+end
+_G.IsMockSecret = function(value)
+  return type(value) == "table" and getmetatable(value) == secretMeta
+end
+-- rejectSecret raises the error a C function not marked up to take secrets from tainted callers
+-- raises (warcraft.wiki.gg Secret Values: "an API must be explicitly marked up as accepting
+-- secrets from tainted callers").
+local function rejectSecret(api, ...)
+  for i = 1, select("#", ...) do
+    if _G.IsMockSecret((select(i, ...))) then
+      error(api .. ": secret value given to an API that does not take secrets from tainted callers", 3)
+    end
+  end
+end
+
 local function CreateMockWidget(widgetType, name, parent)
   local widget = {}
   widget._type = widgetType
@@ -806,10 +846,20 @@ local function CreateMockWidget(widgetType, name, parent)
   -- FontString:SetText(text): the font must be set before showing text (warcraft.wiki.gg
   -- API_FontString_SetText); the client raises "FontString:SetText(): Font not set" for a font
   -- string with no font (none set, no inherited template).
+  -- FontString:SetText takes secrets (SecretArguments AllowedWhenTainted) and gives the font
+  -- string the secret Text aspect (SecretArgumentsAddAspect): GetText returns the secret, and
+  -- GetStringWidth a secret number (SecretWhenAnchoringSecret, SimpleFontStringAPIDocumentation),
+  -- until a plain text is set.
   function widget:SetText(text)
     if self._type == "FontString" and self._font == nil and self._fontObject == nil and self._inherits == nil then
       error("FontString:SetText(): Font not set", 2)
     end
+    if _G.IsMockSecret(text) then
+      self._secretText = text
+      self._text = ""
+      return
+    end
+    self._secretText = nil
     self._text = tostring(text or "")
     if self._fontString ~= nil then
       self._fontString._text = self._text
@@ -916,12 +966,21 @@ local function CreateMockWidget(widgetType, name, parent)
     return 0, 0
   end
   function widget:GetText()
+    if self._secretText ~= nil then
+      return self._secretText
+    end
     return self._text
   end
   function widget:GetTextWidth()
+    if self._secretText ~= nil then
+      return _G.MockSecret(nil)
+    end
     return #self._text * 6
   end
   function widget:GetStringWidth()
+    if self._secretText ~= nil then
+      return _G.MockSecret(nil)
+    end
     return #self._text * 6
   end
   -- FontString:GetNumLines() -> numLines, IsTruncated() -> isTruncated, CanWordWrap() -> wrap
@@ -2192,8 +2251,16 @@ function _G.GameTooltip:SetOwner(owner, anchor, x, y)
   self.lines = {}
   self.doubleLines = {}
 end
+-- GameTooltip:SetText and AddLine are not in the generated API documentation, so nothing marks
+-- them as taking secrets from tainted callers: they reject them.
 function _G.GameTooltip:AddLine(text, r, g, b)
+  rejectSecret("GameTooltip:AddLine", text)
   table.insert(self.lines, {text = text, r = r, g = g, b = b})
+end
+function _G.GameTooltip:SetText(text, ...)
+  rejectSecret("GameTooltip:SetText", text)
+  self._text = tostring(text or "")
+  self._header = text
 end
 -- GameTooltip:IsOwned(frame) is true when frame owns the tooltip.
 function _G.GameTooltip:IsOwned(frame)

@@ -160,6 +160,8 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field dropGlow Texture Lit while a section from the other bag would drop here (next.md §7).
 ---@field washColor number[] The wash's color now.
 ---@field title FontString
+---@field label string What the bag is called ("Backpack", "Bank", "Vendor"): never secret, unlike a
+--- vendor's title in an instance, so tooltips name the bag by it.
 ---@field ribbon Texture The ribbon's brightest line.
 ---@field spark Texture What glides in along the ribbon and settles into the cloud.
 ---@field cloud NextCloud Round the title, the ribbon flowing into it.
@@ -234,6 +236,7 @@ function nextPanel:Create(proto, opts)
   ---@type NextPanelFrame
   local p = setmetatable({}, { __index = proto })
   p.kind = opts.kind
+  p.label = opts.title
   p.side = opts.side
   p.openSound = opts.openSound
   p.closeSound = opts.closeSound
@@ -739,7 +742,13 @@ end
 -- title's far side, for the title as it is now.
 ---@return number
 function panelProto:CloudSpan()
-  return self.title:GetStringWidth() + style.PAD + 4 + style.Cloud.Pad
+  local width = self.title:GetStringWidth()
+  -- Secret while the title shows a secret (a vendor's name in an instance): addon code may not do
+  -- arithmetic on it. Clients without secrets have no issecretvalue.
+  if issecretvalue ~= nil and issecretvalue(width) then
+    width = style.Cloud.SecretTitleWidth
+  end
+  return width + style.PAD + 4 + style.Cloud.Pad
 end
 
 -- LayoutCloud spreads the cloud's puffs across the title as it is now (a share of the way across
@@ -900,7 +909,7 @@ function panelProto:BuildTitleButton()
   addon.SetScript(button, "OnEnter", function()
     self:lightTitle(true)
     GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
-    GameTooltip:SetText(self.title:GetText())
+    GameTooltip:SetText(self.label)
     GameTooltip:AddLine(chain:Tooltip(self), 1, 1, 1, true)
     GameTooltip:Show()
   end)

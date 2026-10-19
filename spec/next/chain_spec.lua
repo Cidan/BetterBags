@@ -1109,6 +1109,27 @@ describe("NextChain", function()
       backpack.titleButton:GetScript("OnLeave")(backpack.titleButton)
     end)
 
+    -- A vendor's title is the vendor's name, secret in an instance (UnitName is
+    -- SecretWhenUnitNameIdentityRestricted), and GameTooltip's methods are not marked up to take
+    -- secrets: tooltips name a bag by its label, never by its title.
+    it("names bags by their labels in tooltips, never by a title that can be secret", function()
+      override(_G, "issecretvalue", IsMockSecret)
+      open(bank)
+      open(backpack)
+      settle()
+      bank.title:SetText(MockSecret("A Secret Name"))
+      local function tip(panel)
+        panel.titleButton:GetScript("OnEnter")(panel.titleButton)
+        return GameTooltip._header, GameTooltip.lines[1] and GameTooltip.lines[1].text
+      end
+      local header, line = tip(backpack)
+      assert.are.equal("Backpack", header)
+      assert.are.equal("Click to chain to the Bank.", line)
+      header = tip(bank)
+      assert.are.equal("Bank", header)
+      backpack.titleButton:GetScript("OnLeave")(backpack.titleButton)
+    end)
+
     it("lights up while the pointer is over it", function()
       local b, glow = backpack.titleButton, backpack.titleGlow
       assert.are.equal(0, glow:GetAlpha())

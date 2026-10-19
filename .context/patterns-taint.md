@@ -89,3 +89,11 @@ Use `C_Timer.After(0, ...)` to clear the Retail guard after event processing com
 **Purchases**: buy through Blizzard's own confirmation functions (`MerchantFrame_ConfirmExtendedItemCost`, `MerchantFrame_ConfirmHighCostItem`), called the way its item button calls them, never instead of them. They run from our click, so they write `MerchantFrame.itemIndex`/`count`/`price` and show the popup tainted (see the section above); their accept calls `BuyMerchantItem`, which is not protected. Not verified in game; CompactVendor ships the same calls.
 
 **Related Files**: `next/vendor.lua` (`TakeOver`, `EndVisitLater`), `next/merchant.lua` (`Purchase`), `util/movementflow.lua`, `.claude/rules/next.md` §10
+
+## Secret Values: Show Them, Never Measure Them
+
+**Problem**: from patch 12.0.0, APIs return secret values under addon restrictions (a dungeon, a raid, combat, an encounter). Addon code may store them, pass them to Lua functions and concatenate them, but arithmetic, comparisons, `#` and table keys error (warcraft.wiki.gg Secret Values). Secrecy spreads: a widget given a secret gets a secret aspect, and its other APIs then return secrets (a font string showing a secret name has a secret width, `SecretWhenAnchoringSecret`). BetterBags Next's vendor put the vendor's name (`UnitName("npc")`, `SecretWhenUnitNameIdentityRestricted`) in its title and measured the title to lay out the cloud: an error in every instance.
+
+**Solution**: check each API's flags in `Blizzard_APIDocumentationGenerated` (`SecretReturns`, `SecretWhen*`, `ConditionalSecret` on a return, `SecretReturnsForAspect`, `SecretArgumentsAddAspect`). Show a secret through an API that takes one (`SecretArguments = "AllowedWhenTainted"`), and never read the widget back for arithmetic: check `issecretvalue` (nil on Classic) and use a stand-in, or keep the value the addon set itself. Never pass a secret to an API the documentation does not mark as taking one from addon code (`GameTooltip` methods are not documented at all); keep a plain value for those (the panel's `label`). Test with the frame mock's `MockSecret`.
+
+**Related Files**: `next/panel.lua` (`CloudSpan`, the title button), `next/chain.lua` (`Tooltip`), `spec/helpers/wow_mocks.lua` (`MockSecret`), `.claude/rules/next.md` §10b
