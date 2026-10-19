@@ -302,6 +302,7 @@ globals = {
 	"wipe",
 	"ItemButtonUtil",
 	"CloseBankFrame",
+	"issecretvalue",
 }
 
 files["spec/**/*.lua"] = {
@@ -313,6 +314,8 @@ files["spec/**/*.lua"] = {
 		"UseSonataTextRoles",
 		"MockData",
 		"ResetMockMerchant",
+		"MockSecret",
+		"IsMockSecret",
 	},
 	ignore = {
 		"212", -- unused argument (common in mock functions)

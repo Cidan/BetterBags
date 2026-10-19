@@ -555,6 +555,27 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   vendor's own buttons with `BindSections` (it never claims item buttons there).
 - **Title:** the vendor's name (`UnitName("npc")`), cut to one line in the room right of the shown
   header buttons.
+  - **Secret in an instance.** `UnitName` is `SecretWhenUnitNameIdentityRestricted`
+    (`UnitDocumentation.lua`): in a dungeon or raid an NPC's name is a secret value. The title shows it
+    (`FontString:SetText` takes secrets from addon code, `SecretArguments = "AllowedWhenTainted"`, and
+    gives the font string the secret Text aspect), but its width is then secret too
+    (`GetStringWidth` is `SecretWhenAnchoringSecret`, `SimpleFontStringAPIDocumentation.lua`), and
+    addon code may not do arithmetic on a secret (warcraft.wiki.gg Secret Values). Reported:
+    `next/panel.lua:742: attempt to perform arithmetic on a secret number value (execution tainted by
+    'BetterBags')` in `CloudSpan`, from `SetTitle` in `OnShowing`, opening a vendor in an instance.
+    `CloudSpan` (the cloud round the title and its sparkles) now uses `style.Cloud.SecretTitleWidth`
+    (160, about a typical NPC name) while the width is secret (`issecretvalue`, on retail and WoW:
+    Forever; none on Classic, where nothing is secret). Tooltips name a bag by `panel.label` (its
+    title when made: "Backpack", "Bank", "Vendor"), never by reading its title back:
+    `GameTooltip:SetText` and `AddLine` are not in the generated API documentation, so nothing marks
+    them as taking secrets from addon code. Every other `UnitName` call in BetterBags asks for
+    `"player"`, which is never secret. Of the documented APIs the vendor calls, only `UnitName` can
+    return a secret; the older global merchant functions (`GetMerchantItemInfo` and the rest) are
+    not in the generated documentation. The frame mock's `MockSecret` (`spec/helpers/wow_mocks.lua`)
+    models secrets: arithmetic and comparisons error, a font string given one returns a secret width,
+    the tooltip's `SetText`/`AddLine` reject one. Coverage: `spec/next/vendor_spec.lua` ("with a
+    secret vendor name (an instance)"), `spec/next/chain_spec.lua` ("names bags by their labels in
+    tooltips"). Not seen in game yet.
 - **Header buttons** (from the screen edge): close; settings; the filter (retail and Forever, unless
   `Enum.GameRule.MerchantFilterDisabled`: Blizzard's own radio list, each spec, the class, Bind on
   Equip, everything, through `MenuUtil.CreateContextMenu`, `SetMerchantFilter`); Sell Junk; Repair

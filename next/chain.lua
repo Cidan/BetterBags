@@ -468,7 +468,7 @@ function chain:Tooltip(panel)
   if anchor == panel then
     return L:G("Click to move both bags to the other side.")
   end
-  return format(L:G("Click to chain to the %s."), partner.title:GetText())
+  return format(L:G("Click to chain to the %s."), partner.label)
 end
 
 chain:Init()
