@@ -1,0 +1,23 @@
+{
+  "id": 1792474867,
+  "version": "v0.7.0-5-ge5ba379",
+  "channel": "alpha",
+  "date": "2026-10-20",
+  "from": "5b5029e8531d7a1228fdd17ae124ea70e30c5330",
+  "to": "e5ba3794b08871ded1de48d5197dc9c227f63bae",
+  "headline": "This build introduces a unified set of header button icons and fixes backpack title alignment in small mode.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Unified header button glyphs",
+      "details": "All header buttons across bag, bank, and vendor panels now share a sharp, consistent icon style matching the settings gear. Themes can also recolor these glyphs or replace them with custom artwork.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Backpack title alignment in small mode",
+      "details": "Fixed an issue where the backpack title would shift toward the center rather than staying left-aligned when using small mode.",
+      "clients": []
+    }
+  ]
+}
