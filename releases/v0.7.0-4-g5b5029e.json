@@ -1,0 +1,17 @@
+{
+  "id": 1792473004,
+  "version": "v0.7.0-4-g5b5029e",
+  "channel": "alpha",
+  "date": "2026-10-20",
+  "from": "aea3d824badb4684200132ca72a6015c7761fae7",
+  "to": "5b5029e8531d7a1228fdd17ae124ea70e30c5330",
+  "headline": "You can now freely resize minimized bags using draggable corner grips.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Resize grips for small bags",
+      "details": "Hover over the bottom corners of a minimized bag to reveal resize grips you can drag to adjust the window width and height. Custom sizes are saved per bag type, and Shift-clicking a grip smoothly resets the bag to its default dimensions.",
+      "clients": []
+    }
+  ]
+}
