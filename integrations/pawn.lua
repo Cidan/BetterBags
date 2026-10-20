@@ -28,13 +28,23 @@ function pawn:Register()
     return false
   end
 
+  -- Pawn's answer is passed on as it is: true, false, or nil for "we're not sure yet", which
+  -- ResolveUpgrade does not keep. The answers are kept on each item (cacheable) until Pawn says bag
+  -- arrows may have changed: PawnResetBags, which Pawn calls when scales, its settings or the spec
+  -- change, and after inventory changes (Pawn 2.13 Pawn.lua). It starts a new upgrade generation
+  -- without a refresh, as before the next refresh asked Pawn again (caches.md §2).
   items:RegisterUpgradeProvider("Pawn", function(data)
     if not data or data.isItemEmpty or not data.itemInfo or not data.itemInfo.itemLink then
       return false
     end
-    local isUpgrade = PawnShouldItemLinkHaveUpgradeArrowUnbudgeted(data.itemInfo.itemLink, true)
-    return isUpgrade or false
-  end)
+    return PawnShouldItemLinkHaveUpgradeArrowUnbudgeted(data.itemInfo.itemLink, true)
+  end, { cacheable = true })
+  if not self._hooked and type(PawnResetBags) == "function" then
+    hooksecurefunc("PawnResetBags", function()
+      items:InvalidateUpgrades(false)
+    end)
+    self._hooked = true
+  end
 
   self._registered = true
   print("BetterBags: Pawn integration enabled.")
@@ -51,7 +61,7 @@ function pawn:OnEnable()
   events:RegisterEvent("ADDON_LOADED", function(ctx)
     if pawn._registered then return end
     if pawn:Register() then
-      events:SendMessage(ctx, 'bags/Rederive')
+      events:SendMessage(ctx, 'bags/Rederive', { categoriesUnchanged = true })
     end
   end)
 end

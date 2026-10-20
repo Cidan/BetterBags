@@ -377,14 +377,14 @@ request, is swept only while it is open.
 |---|---|
 | Config data settings (upgrade provider, section and item order, groups, category filters, stacking except Split Transmogged, free space, gaps) | `bags/Rederive { resetLayout, buttons }` |
 | Categories: create from an item, delete, rename, hide/show, reprocess (`categories:ReprocessAllItems`), category pane edits, search categories, item drops on a header, group drag and drop | `bags/Rederive { resetLayout, buttons }` |
-| In-bag search toggle (`search/SetInFrame` → `bag:SetSearchShown`) | `bags/Rederive { resetLayout, buttons }` |
+| In-bag search toggle (`search/SetInFrame` → `bag:SetSearchShown`) | `bags/Rederive { resetLayout, buttons, categoriesUnchanged }` |
 | Show Bags toggles (`ContextMenu:ToggleBagSlots`: the context menu, a theme's ShowBags action button) | `bags/Rederive { resetLayout }`: nothing a button draws depends on the view except through data its draw record holds, so unchanged buttons skip |
-| Interaction window opens the backpack / closes (`core/hooks.lua`) | `bags/Rederive { resetLayout, backpack, bank = items:NeedsInteractionRecalculation(BANK) }`: the backpack's grey-out depends on the open window; the bank's only interaction-dependent input is stack unmerging, so it is recalculated only when its committed stacks were built under the other interaction state (recorded per kind at commit, `items._stackedInteracting`). A captured bank open recalculated the bank (149 ms) into the layout its own read had just committed under the banker interaction |
+| Interaction window opens the backpack / closes (`core/hooks.lua`) | `bags/Rederive { resetLayout, backpack, bank = items:NeedsInteractionRecalculation(BANK), categoriesUnchanged }`: the backpack's grey-out depends on the open window; the bank's only interaction-dependent input is stack unmerging, so it is recalculated only when its committed stacks were built under the other interaction state (recorded per kind at commit, `items._stackedInteracting`). A captured bank open recalculated the bank (149 ms) into the layout its own read had just committed under the banker interaction |
 | `EQUIPMENT_SETS_CHANGED` | derive of both kinds with `resetLayout` |
-| Tooltip resolved (`TooltipScanner:OnTooltipDataResolved`) | `bags/Rederive { backpack, bank = atBank }` |
-| Upgrade inputs: `PLAYER_EQUIPMENT_CHANGED`, skills, spec; the gear harvest's bank refresh | `bags/Rederive` for the kinds (`items:RequestUpgradeRefresh`) |
-| Bank tab switches (grey-out) | `bags/Rederive { backpack }` |
-| A bag's refresh on close (`OnRefresh`: Recent Items expiry, held gaps); Pawn or SimpleItemLevel registering late | `bags/Rederive` for that bag / both |
+| Tooltip resolved (`TooltipScanner:OnTooltipDataResolved`) | `bags/Rederive { backpack, bank = atBank, guild = atGuildBank, categoriesUnchanged }` |
+| Upgrade inputs: `PLAYER_EQUIPMENT_CHANGED`, skills, spec; the gear harvest's bank refresh | `bags/Rederive { categoriesUnchanged }` for the kinds (`items:RequestUpgradeRefresh`) |
+| Bank tab switches (grey-out) | `bags/Rederive { backpack, categoriesUnchanged }` |
+| A bag's refresh on close (`OnRefresh`, `Refresh`: Recent Items expiry, held gaps); Pawn or SimpleItemLevel registering late | `bags/Rederive { categoriesUnchanged }` for that bag / both |
 
 The settings and category requests keep everything the full refresh they replace did except
 the reads: a fresh layout and a full redraw of every button. They no longer clear the bank's
@@ -403,19 +403,32 @@ committed items while the bank is closed (the next bank open reads the bank anyw
 - The bank tab panel closing (`frames/bankslots.lua`): it clears the bank cache, then reads.
 - `bags/FullRefreshAll` itself is unchanged (a wipe), for these and for other addons.
 
+**`categoriesUnchanged` (data-loader.md §18).** Each item keeps its categories and grey-out until
+something they read changes. A derive works every item's category out again unless it says
+`categoriesUnchanged`: its cause changes nothing a category reads (the grey-out, the upgrade
+arrows, a tooltip that loaded, recency, the search box; each of those reaches the items it affects
+by itself). The table above marks them; settings, categories, groups, Show Bags, gear sets and the
+guild bank's view keep working every category out. Reads keep categories, so a read that absorbs a
+derive without `categoriesUnchanged` carries `recategorize`, which works them out again. Both reach
+the sweep as context keys of the same names.
+
 **Merging (§7).** A read never rides on a waiting derive (a derive reads nothing). A derive
 rides on a waiting derive, a waiting wipe, or a waiting read that reads every bag of the
 derive's kinds; not on a read of some bags, which carries the other bags' items over without
 refreshing them (a re-scanned tooltip in another bag would be missed). `restyle` merges as
-an or; `resetLayout` as for reads. The startup read absorbs derives like any request.
+an or; `resetLayout` as for reads; `categoriesUnchanged` as an and (two derives keep categories
+only when both say so); a read absorbing a derive without it gets `recategorize`. The startup read
+absorbs derives like any request.
 
 Coverage: `spec/refresh_pipeline_spec.lua` ("recalculating without reading (derive)": no slot
 read and the same committed items; the same state as a read when nothing changed; category,
 tooltip, gear set and new-item changes applied; a moved item left alone; never-read and
 emptied kinds; a pending sort; the draw generation; the equipped gear. "merging derives";
 "the startup read" → "recalculates, without reading the bags again, what changes after the
-read"; "upgrade verdict cache": which events read and which recalculate),
-`spec/refresh_spec.lua` (routing of `bags/Rederive` and `EQUIPMENT_SETS_CHANGED`),
+read"; "upgrade verdict cache": which events read and which recalculate; "merging derives":
+`categoriesUnchanged` and `recategorize`; "deriving only what changed"),
+`spec/refresh_spec.lua` (routing of `bags/Rederive`, `categoriesUnchanged` included, and
+`EQUIPMENT_SETS_CHANGED`),
 `spec/config/config_redraw_spec.lua` (every data setting; Split Transmogged still reads),
 `spec/categories_spec.lua` ("refreshes"), `spec/core/interaction_refresh_spec.lua`,
 `spec/frames/contextmenu_spec.lua`, `spec/tooltip_spec.lua`,

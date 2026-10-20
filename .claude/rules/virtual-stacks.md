@@ -53,3 +53,23 @@ The persistent-gap diff (data-loader.md §13) pairs the previous layout with the
 - Still a gap: a pile whose new hash joins a different, already-placed stack (its visible entry is now hidden inside that stack), and a stack that rehashes and re-roots to another pile in the same sweep.
 - The pairing never crosses slots, so a Character Bank to Warbank move (§6) stays a remove + add.
 - Stacking is unaffected: `Phase7_ApplyVirtualStacks` runs before the diff and keys only on the hash.
+
+### 9. A Stack Is Recent While Any Pile It Merges Is
+A stack shows one icon, its root's (the largest pile, ties to the greater slot key, §2), in one
+section. Its section came from the root alone: with Recent Items on, the stack was in Recent Items
+only while its root was recent.
+- **Failure mode (reported, fixed):** "virtual stacks get drawn up to recent items, then back to
+  their category, ping pong, if you keep looting the item". Looting into an old stack and a new pile
+  of the same item makes whichever pile is larger the root: a new pile larger than the old one put
+  the stack in Recent Items, the old pile topping up past it took it back out, and so on. With Merge
+  Partial off, a recent partial pile shows alone in Recent Items until it fills, then merges and
+  showed as the old full pile, in its category (or in Recent Items, depending on which slot key is
+  greater). Reproduced by `spec/refresh_pipeline_spec.lua` ("virtual stacks and Recent Items"),
+  which failed before the fix.
+- **Rule:** `Phase7_ApplyVirtualStacks` sets `stackRecent` on a root when any pile it merges is
+  recent (`IsNewItem`), and clears it on every item first. `GetCategory` treats a root with
+  `stackRecent` as recent; its own category (`own`, what search categories match) goes by the item
+  alone. The stack leaves Recent Items once no pile it merges is recent: the recent piles used up,
+  their timers expired on close (recent-items.md §2), or a sort.
+- Recency is part of what an item's shown category is worked out from (data-loader.md §18), so a
+  stack whose recency changes is worked out again in the same sweep.

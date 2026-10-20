@@ -140,6 +140,8 @@ end
 ---@field resetLayout? boolean Ignore the previous gap layout and rebuild a fresh, gapless sort
 ---@field onlyIfSortPending? boolean Sweep each requested kind only if its sort has not been shown yet (the sort fallback)
 ---@field derive? boolean Recalculate from the items the last read committed, reading no bag slot (§10)
+---@field categoriesUnchanged? boolean A derive whose cause changes nothing an item's category reads, so kept categories stand (data-loader.md §18)
+---@field recategorize? boolean Work every item's category out again (a read that absorbed a derive without categoriesUnchanged)
 ---@field restyle? boolean Every button of the swept kinds draws in full (a new draw generation)
 ---@field merged? number How many requests this one carries (set by merging, for profiler traces)
 ---@field startup? string Why the startup read ran (set on the startup read, for profiler traces)
@@ -202,6 +204,13 @@ local function mergeInto(waiting, incoming)
     waiting.bags = bags
   end
   waiting.restyle = waiting.restyle or incoming.restyle
+  -- Kept categories stand only when every request merged says nothing categories read changed. A
+  -- read keeps categories; a read that absorbs a recalculation that changed them must not.
+  if waiting.derive and incoming.derive then
+    waiting.categoriesUnchanged = (waiting.categoriesUnchanged and incoming.categoriesUnchanged) or nil
+  elseif incoming.derive and not incoming.categoriesUnchanged then
+    waiting.recategorize = true
+  end
   -- A bank open's read carries on: the next tab loads once this request has run. An open has one
   -- read waiting at a time, so a read riding on another open's is the newer open's (that one ended).
   if incoming.bankWave ~= nil then
@@ -372,6 +381,12 @@ function refresh:_RunUnit(request)
   if request.derive then
     ctx:Set('derive', true)
   end
+  if request.categoriesUnchanged then
+    ctx:Set('categoriesUnchanged', true)
+  end
+  if request.recategorize then
+    ctx:Set('recategorize', true)
+  end
   if request.restyle then
     ctx:Set('restyle', true)
   end
@@ -493,9 +508,11 @@ function refresh:OnEnable()
   events:RegisterMessage('bags/Redraw', function(_, options)
     self:RequestRedraw(options ~= nil and options.buttons == true)
   end)
-  -- bags/Rederive (ctx, { backpack?, bank?, guild?, resetLayout?, buttons? }?) recalculates the
-  -- bags from the items already read (§10); naming no kind recalculates every kind. buttons makes
-  -- every button draw in full, for settings the buttons draw from.
+  -- bags/Rederive (ctx, { backpack?, bank?, guild?, resetLayout?, buttons?, categoriesUnchanged? }?)
+  -- recalculates the bags from the items already read (§10); naming no kind recalculates every kind.
+  -- buttons makes every button draw in full, for settings the buttons draw from. categoriesUnchanged
+  -- says the cause changes nothing an item's category reads (data-loader.md §18): the grey-out, the
+  -- upgrade arrows, a tooltip that loaded, recency, the search box; kept categories then stand.
   events:RegisterMessage('bags/Rederive', function(_, options)
     options = options or {}
     local all = options.backpack == nil and options.bank == nil and options.guild == nil
@@ -506,6 +523,7 @@ function refresh:OnEnable()
       guild = (all or options.guild == true) or nil,
       resetLayout = options.resetLayout == true or nil,
       restyle = options.buttons == true or nil,
+      categoriesUnchanged = options.categoriesUnchanged == true or nil,
     })
   end)
   events:RegisterMessage('bags/RefreshBank', function()

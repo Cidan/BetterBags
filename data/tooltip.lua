@@ -400,7 +400,7 @@ function tooltipScanner:OnTooltipDataResolved(resolved)
   -- backpack always; the bank and the guild bank only when they are open.
   local ctx = context:New('TooltipDataResolved')
   events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = addon.atBank == true,
-    guild = addon.atGuildBank == true or nil })
+    guild = addon.atGuildBank == true or nil, categoriesUnchanged = true })
 end
 
 --- Get the current cache size (for debugging/monitoring)

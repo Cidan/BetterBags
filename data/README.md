@@ -42,7 +42,7 @@ items:RefreshBank(ctx)
 -- Get item data from a slot key
 items:GetItemDataFromSlotKey(slotkey)
 
--- Mark an item as new
+-- Mark an item as new (starts its Recent Items timer; the next refresh shows it there)
 items:MarkItemAsNew(ctx, data)
 
 -- Get item category

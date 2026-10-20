@@ -414,6 +414,24 @@ describe("the guild bank through the data engine", function()
       assert.are.equal(sword, slotInfo.itemsBySlotKey[keyOf(1, 1)])
       assert.are.equal(0, reads)
     end)
+
+    -- A guild item's category and search entry are kept with it (data-loader.md §18); tooltip text
+    -- is one of their inputs, and a tooltip that finished loading changes it in place.
+    it("finds an item by tooltip text that loaded after it was read", function()
+      local texts = {}
+      override(addon:GetModule("TooltipScanner"), "GetGuildBankItemText", function(_, tab, slotID)
+        return texts[tab .. ":" .. slotID] or ""
+      end)
+      loadTabs()
+      read()
+      assert.is_nil(search:Search("sharpens")[keyOf(1, 1)])
+      texts["1:1"] = "Use: sharpens a blade"
+      local ctx = context:New("guild derive")
+      ctx:Set("derive", true)
+      ctx:Set("categoriesUnchanged", true)
+      items:ProcessRefresh(ctx, GUILD)
+      assert.is_true(search:Search("sharpens")[keyOf(1, 1)])
+    end)
   end)
 
   -- The combined view is every tab's items in categories; a tab shown by itself is its slots in

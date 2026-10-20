@@ -381,7 +381,7 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     events.SendMessage = savedSend
     assert.equal(1, #sent)
     assert.equal("bags/Rederive", sent[1].message)
-    assert.same({ backpack = true, bank = false }, sent[1].options)
+    assert.same({ backpack = true, bank = false, categoriesUnchanged = true }, sent[1].options)
   end)
 
   it("only refreshes cooldowns while shown, and refreshes them whenever the bag opens", function()

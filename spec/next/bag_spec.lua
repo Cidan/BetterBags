@@ -341,7 +341,7 @@ describe("NextBag", function()
       inBagSearch = true
       messages["search/SetInFrame"](ctx())
       assert.is_true(box.frame:IsShown())
-      assert.are.same({ { "bags/Rederive", { resetLayout = true, buttons = true } } }, sentNamed("bags/Rederive"))
+      assert.are.same({ { "bags/Rederive", { resetLayout = true, buttons = true, categoriesUnchanged = true } } }, sentNamed("bags/Rederive"))
       local _ = bag
     end)
   end)
@@ -723,7 +723,7 @@ describe("NextBag", function()
       bag.frame:Show()
       bag.frame:Hide()
       bag.frame:GetScript("OnHide")(bag.frame)
-      assert.are.same({ { "bags/Rederive", { backpack = true, bank = false } } }, sentNamed("bags/Rederive"))
+      assert.are.same({ { "bags/Rederive", { backpack = true, bank = false, categoriesUnchanged = true } } }, sentNamed("bags/Rederive"))
       expired = false
       bag.drawOnClose = true
       bag.frame:Show()

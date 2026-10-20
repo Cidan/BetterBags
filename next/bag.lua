@@ -208,7 +208,7 @@ end
 -- Refresh recalculates the backpack from what was last read.
 ---@param ctx Context
 function bagProto:Refresh(ctx)
-  events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false })
+  events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false, categoriesUnchanged = true })
 end
 
 ---@param ctx Context

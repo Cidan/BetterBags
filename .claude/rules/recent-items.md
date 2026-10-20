@@ -27,6 +27,13 @@ has an entry in `items._newItemTimers[kind]`. Nothing else decides it.
   post-hooked.
 - **No timer for an empty GUID.** `items:SeedNewItemTimer` and `MarkItemAsNew` skip `""`. A shared `""`
   key would make every GUID-less item recent, and expiring it would clear all their flags.
+- **A virtual stack is recent while any pile it merges is** (`stackRecent`, set by Phase 7 on the
+  stack's root, read by `GetCategory`; virtual-stacks.md §9). Its icon shows the largest pile, which
+  looting changes, so going by that pile alone moved a stack between Recent Items and its category.
+- **Starting or ending a timer changes no category by itself.** `MarkItemAsNew` and
+  `ClearNewItemFromData` change the timer and the glow flag; the refresh that follows sees the item's
+  recency change and works its category out again (data-loader.md §18). Both are only called by the
+  pipeline, before Phases 6 and 8.
 
 **Failure mode (fixed):** `IsNewItem` used to return true whenever the client flag was set, with
 no time limit, and fell back to `time() - started < newItemTime` only once the flag was gone. An
@@ -92,5 +99,10 @@ leaves on the following close once it is old enough.
   something expired, when gaps are held, or both; none when neither; nothing while the frame is
   still shown; the bank kind; `WatchForClose` wiring through `OnHide`; `Create` calls it.
 - `spec/bags/backpack_spec.lua` ("does not refresh from its own OnHide, with or without fading").
+- `spec/refresh_pipeline_spec.lua` ("virtual stacks and Recent Items": a stack looted into stays in
+  Recent Items whichever pile is largest, including a recent partial pile filling and merging, in a
+  slot before or after the old one; it goes back once no pile is recent; the same however the piles
+  are read. "deriving only what changed": an own category that follows recency; a pile's own
+  category once stacking stops merging it).
 
 Every guard in this file was mutation-tested: removing any one fails at least one of these tests.

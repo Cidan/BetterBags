@@ -1826,7 +1826,7 @@ describe("Bag Draw: shared item button ownership across global sections and view
       inBagSearch = true
       bag:SetSearchShown(context:New("spec"))
       assert.is_true(bag.searchBox.frame:IsShown())
-      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true, categoriesUnchanged = true } }, sent[#sent])
     end)
 
     -- A bag made after a theme was applied (the classic bags made the first time the bags switch

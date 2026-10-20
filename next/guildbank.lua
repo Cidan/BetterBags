@@ -527,7 +527,7 @@ end
 -- Refresh recalculates the guild bank from what was last read (nothing while it is closed).
 ---@param ctx Context
 function guildProto:Refresh(ctx)
-  events:SendMessage(ctx, 'bags/Rederive', { guild = true })
+  events:SendMessage(ctx, 'bags/Rederive', { guild = true, categoriesUnchanged = true })
 end
 
 -- DepositTab is the tab a section dropped on the guild bank goes into: the tab shown by itself, else
