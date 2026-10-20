@@ -1,7 +1,8 @@
 -- bank_open_spec.lua -- Opening the bank on the whole addon (spec/helpers/whole_addon.lua), in
 -- both designs: the bank's window shows at once, nothing reads the bank until its show animation
--- has finished, then the bank is read once (refresh-scheduler.md §11). Asked: "finish our bank
--- window show animation, before we start loading in bank info, just to prevent hitching".
+-- has finished, then the bank is read (refresh-scheduler.md §11): tab by tab, and with every bag
+-- empty here (no tab with slots) once. Asked: "finish our bank window show animation, before we
+-- start loading in bank info, just to prevent hitching".
 
 local WholeAddon = dofile("spec/helpers/whole_addon.lua")
 

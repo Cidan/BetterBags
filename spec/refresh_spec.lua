@@ -259,38 +259,68 @@ describe("Refresh Module", function()
   end)
 
   -- A capture of opening the bank read 478 of 491 bank items before the client had their
-  -- data; it arrived 1.2 s later and set off another refresh. The bank now shows at once and
-  -- is read once its item data has loaded (refresh-scheduler.md §11).
+  -- data; it arrived 1.2 s later and set off another refresh. The bank shows at once and is read
+  -- once its item data has loaded (refresh-scheduler.md §11). It is read tab by tab, as the guild
+  -- bank is (asked: "pop in data for each physical tab (non-virtual tab) one by one ... mimic the
+  -- guild bank behavior as close as possible"): a capture of a bank open (500 items) spent 520 ms
+  -- in one frame reading and drawing them all at once.
   describe("opening the bank", function()
-    local prime, primes, shown, onShown, savedPrimeBank, savedGetShowBankTabs, savedGameMenu
+    local primes, shown, onShown, loaded, slotsOf, requests, warm
+    local savedPrimeBank, savedGetShowBankTabs, savedGameMenu, savedNumSlots, savedAccount
+    local savedBankBags, savedSetLoaded, savedLoaded, savedRequest
 
     before_each(function()
       events:Init()
       addon.isRetail = true
-      prime, primes, shown, onShown = nil, 0, 0, nil
+      primes, shown, onShown, loaded, requests, warm = {}, 0, nil, "unset", {}, false
+      -- Character tabs 6 and 7, Warbank tab 13, each with slots.
+      slotsOf = { [6] = 4, [7] = 4, [13] = 4 }
+      savedAccount = const.ACCOUNT_BANK_BAGS
+      const.ACCOUNT_BANK_BAGS = { [13] = 13 }
+      savedNumSlots = _G.C_Container.GetContainerNumSlots
+      _G.C_Container.GetContainerNumSlots = function(bag) return slotsOf[bag] or 0 end
+      savedBankBags, savedSetLoaded, savedLoaded = items.BankBags, items.SetLoadedBankBags, items.LoadedBankBags
+      items.BankBags = function() return { [6] = 6, [7] = 7, [13] = 13 } end
+      items.SetLoadedBankBags = function(_, bags) loaded = bags end
+      items.LoadedBankBags = function() return loaded end
       savedPrimeBank = loader.PrimeBank
-      loader.PrimeBank = function(_, cb)
-        primes = primes + 1
-        prime = cb
+      -- PrimeBank(bags, callback): one load per tab.
+      loader.PrimeBank = function(_, bags, cb)
+        table.insert(primes, { bags = bags, cb = cb })
+        if warm then cb() end
       end
       savedGetShowBankTabs = db.GetShowBankTabs
       db.GetShowBankTabs = function() return false end
       savedGameMenu = _G.GameMenuFrame
       _G.GameMenuFrame = { IsShown = function() return false end }
-      -- Show(ctx, slotInfo, onShown): onShown runs once the window has finished showing.
-      addon.Bags = { Bank = { bankTab = 1, Show = function(_, _, _, cb)
+      -- Show(ctx, slotInfo, onShown): onShown runs once the window has finished showing. The
+      -- character bank is shown (bankTab: the bank's tab, as both bag designs keep it).
+      addon.Bags = { Bank = { bankTab = 6, Show = function(_, _, _, cb)
         shown = shown + 1
         onShown = cb
       end } }
       refresh:OnEnable()
-      spy.on(refresh, "RequestUpdate")
+      -- The startup read OnEnable holds every sweep for (refresh-scheduler.md §8): a bank open
+      -- reads one tab per read, the next once the read before it has run, so reads must run.
+      refresh:_StartupRead("primed")
+      savedRequest = refresh.RequestUpdate
+      -- Each request as it was made: merging folds later requests into a waiting one.
+      refresh.RequestUpdate = function(self, r)
+        local copy = {}
+        for k, v in pairs(r) do copy[k] = v end
+        table.insert(requests, copy)
+        return savedRequest(self, r)
+      end
     end)
 
     after_each(function()
       loader.PrimeBank = savedPrimeBank
       db.GetShowBankTabs = savedGetShowBankTabs
       _G.GameMenuFrame = savedGameMenu
-      refresh.RequestUpdate:revert()
+      _G.C_Container.GetContainerNumSlots = savedNumSlots
+      const.ACCOUNT_BANK_BAGS = savedAccount
+      items.BankBags, items.SetLoadedBankBags, items.LoadedBankBags = savedBankBags, savedSetLoaded, savedLoaded
+      refresh.RequestUpdate = savedRequest
       addon.atBank = false
     end)
 
@@ -310,9 +340,24 @@ describe("Refresh Module", function()
       return timers(refresh.BANK_PRIME_TIMEOUT)
     end
 
-    -- afterStartup runs the startup read OnEnable holds every sweep for (refresh-scheduler.md §8).
-    local function afterStartup()
-      refresh:_StartupRead("primed")
+    -- prime calls back the load of a tab.
+    local function prime(bag)
+      for _, p in ipairs(primes) do
+        if p.bags[1] == bag then
+          p.cb()
+          return
+        end
+      end
+      error("no load of tab " .. tostring(bag))
+    end
+
+    -- waves lists the tab each read of the open read, in order.
+    local function waves()
+      local out = {}
+      for _, r in ipairs(requests) do
+        if r.bankWaveTab then out[#out + 1] = r.bankWaveTab end
+      end
+      return out
     end
 
     -- Asked: "finish our bank window show animation, before we start loading in bank info, just
@@ -322,30 +367,179 @@ describe("Refresh Module", function()
       assert.equal(1, shown)
       assert.is_true(addon.atBank)
       assert.is_function(onShown, "asks to hear when the window has finished showing")
-      assert.equal(0, primes, "loads nothing while the window shows")
+      assert.equal(0, #primes, "loads nothing while the window shows")
       assert.equal(0, #timeouts())
-      assert.spy(refresh.RequestUpdate).was_not.called()
+      assert.equal(0, #requests)
       onShown()
-      assert.equal(1, primes)
-      assert.spy(refresh.RequestUpdate).was_not.called()
-      prime()
-      assert.spy(refresh.RequestUpdate).was.called(1)
-      assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true, resetLayout = true, bankOpen = "primed" })
-      timeouts()[1].fn()
-      timers(refresh.BANK_SHOW_TIMEOUT)[1].fn()
-      assert.spy(refresh.RequestUpdate).was.called(1, "the timeouts do nothing once read")
-      assert.equal(1, primes)
+      assert.equal(0, #requests)
+      assert.are.same({}, loaded, "no tab loaded yet: a read of the bank reads nothing")
     end)
 
-    it("reads it when the data has not loaded in time, and again when it arrives", function()
+    -- The guild bank's tabs come from the server one at a time (GuildBank:Load); the bank's are all
+    -- on the client, so their item data loads at once, each tab in a load of its own.
+    it("loads every tab's item data at once, each in a load of its own, only tabs with slots", function()
+      slotsOf[7] = 0
+      fire("BANKFRAME_OPENED")
+      onShown()
+      local bags = {}
+      for _, p in ipairs(primes) do
+        assert.equal(1, #p.bags)
+        bags[#bags + 1] = p.bags[1]
+      end
+      table.sort(bags)
+      assert.are.same({ 6, 13 }, bags)
+      assert.equal(1, #timeouts())
+    end)
+
+    it("reads each tab once its item data has loaded, the shown one first, the first read afresh", function()
+      fire("BANKFRAME_OPENED")
+      onShown()
+      prime(7)
+      assert.equal(0, #requests, "waits for the tab shown")
+      prime(6)
+      assert.are.same({ 6, 7 }, waves(), "then the next, as soon as the read before it has run")
+      assert.is_true(requests[1].resetLayout)
+      assert.equal("primed", requests[1].bankOpen)
+      assert.is_true(requests[1].bank)
+      assert.is_nil(requests[2].resetLayout, "later reads keep the layout, as the guild bank's do")
+      assert.are.same({ [6] = true, [7] = true }, loaded)
+      prime(13)
+      assert.are.same({ 6, 7, 13 }, waves())
+      assert.is_nil(loaded, "every tab read: reads read every bank bag again")
+      timeouts()[1].fn()
+      timers(refresh.BANK_SHOW_TIMEOUT)[1].fn()
+      assert.equal(3, #requests, "the timeouts do nothing once read")
+      assert.equal(3, #primes)
+    end)
+
+    it("reads the shown tab's bank type first: the Warbank's tabs while it shows", function()
+      warm = true
+      addon.Bags.Bank.bankTab = 13
+      fire("BANKFRAME_OPENED")
+      onShown()
+      assert.are.same({ 13, 6, 7 }, waves())
+    end)
+
+    it("reads the Blizzard tab shown first (tab mode), then the rest of its bank type", function()
+      warm = true
+      addon.Bags.Bank.blizzardBankTab = 7
+      addon.Bags.Bank.bankTab = 7
+      fire("BANKFRAME_OPENED")
+      onShown()
+      assert.are.same({ 7, 6, 13 }, waves())
+    end)
+
+    -- Choosing a guild bank tab while it loads moves that tab to the front (GuildBank:LoadTab).
+    it("reads a tab chosen while it loads next", function()
+      fire("BANKFRAME_OPENED")
+      onShown()
+      prime(6)
+      addon.Bags.Bank.blizzardBankTab = 13
+      addon.Bags.Bank.bankTab = 13
+      prime(7)
+      assert.are.same({ 6 }, waves(), "waits for the tab chosen")
+      prime(13)
+      assert.are.same({ 6, 13, 7 }, waves())
+    end)
+
+    it("reads one tab per read even when every tab's data is already loaded", function()
+      warm = true
+      local seen = {}
+      local runRefresh = items.RunRefresh
+      items.RunRefresh = function(_, _, kind)
+        if kind == const.BAG_KIND.BANK then
+          local copy = {}
+          for bag in pairs(loaded or {}) do copy[#copy + 1] = bag end
+          table.sort(copy)
+          seen[#seen + 1] = table.concat(copy, ",")
+        end
+      end
+      fire("BANKFRAME_OPENED")
+      onShown()
+      items.RunRefresh = runRefresh
+      assert.are.same({ "6", "6,7", "6,7,13" }, seen)
+    end)
+
+    it("reads every tab when the data has not loaded in time, and a tab again when its data arrives", function()
       fire("BANKFRAME_OPENED")
       onShown()
       assert.equal(1, #timeouts())
       timeouts()[1].fn()
-      assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true, resetLayout = true, bankOpen = "timeout" })
-      prime()
-      assert.spy(refresh.RequestUpdate).was.called(2)
-      assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true })
+      assert.are.same({ 6, 7, 13 }, waves())
+      assert.equal("timeout", requests[1].bankOpen)
+      assert.is_true(requests[1].resetLayout)
+      prime(7)
+      assert.equal(4, #requests)
+      assert.are.same({ bank = true }, requests[4], "read again, warm")
+      prime(6)
+      assert.equal(5, #requests)
+    end)
+
+    it("reads a tab whose data arrives after the timeout but before its turn once, warm", function()
+      fire("BANKFRAME_OPENED")
+      onShown()
+      -- The shown tab's read waits in the queue, so the other tabs wait their turn.
+      refresh._held = true
+      timeouts()[1].fn()
+      assert.are.same({ 6 }, waves())
+      prime(7)
+      refresh._held = false
+      refresh:RequestUpdate({ backpack = true })
+      assert.are.same({ 6, 7, 13 }, waves())
+      for _, r in ipairs(requests) do
+        if r.bankWaveTab == 7 then
+          assert.equal("primed", r.bankOpen, "tab 7 says its data had loaded")
+        end
+      end
+      for _, r in ipairs(requests) do
+        assert.is_false(r.bank == true and r.bankWaveTab == nil, "no read again for a tab read warm in its turn")
+      end
+    end)
+
+    -- On Classic the bank, its bags, then the reagent bank (Enum.BagIndex.Reagentbank is -3).
+    it("reads the bank, then its bags, then the reagent bank on Classic", function()
+      warm = true
+      local savedBankBagsConst = const.BANK_BAGS
+      const.BANK_BAGS = { [-1] = -1, [6] = 6, [7] = 7 }
+      const.ACCOUNT_BANK_BAGS = nil
+      items.BankBags = function() return { [-1] = -1, [6] = 6, [7] = 7, [-3] = -3 } end
+      slotsOf = { [-1] = 28, [6] = 4, [7] = 4, [-3] = 98 }
+      addon.Bags.Bank.bankTab = -1
+      fire("BANKFRAME_OPENED")
+      onShown()
+      const.BANK_BAGS = savedBankBagsConst
+      assert.are.same({ -1, 6, 7, -3 }, waves())
+    end)
+
+    it("reads the bank once when it has no tab with slots (WoW: Forever before its first tab)", function()
+      slotsOf = {}
+      fire("BANKFRAME_OPENED")
+      onShown()
+      assert.equal(0, #primes)
+      assert.equal(1, #requests)
+      assert.are.same({ bank = true, resetLayout = true, bankOpen = "empty" }, requests[1])
+      assert.is_nil(loaded)
+    end)
+
+    it("lets the next tab load after a read that failed", function()
+      warm = true
+      local errors = 0
+      local savedHandler = _G.geterrorhandler
+      _G.geterrorhandler = function() return function() errors = errors + 1 end end
+      local runRefresh = items.RunRefresh
+      local failed = false
+      items.RunRefresh = function(_, _, kind)
+        if kind == const.BAG_KIND.BANK and not failed then
+          failed = true
+          error("a read that fails")
+        end
+      end
+      fire("BANKFRAME_OPENED")
+      onShown()
+      items.RunRefresh = runRefresh
+      _G.geterrorhandler = savedHandler
+      assert.equal(1, errors)
+      assert.are.same({ 6, 7, 13 }, waves())
     end)
 
     it("does not load or read for an open that has ended", function()
@@ -354,23 +548,74 @@ describe("Refresh Module", function()
       fire("BANKFRAME_CLOSED")
       firstShown()
       timers(refresh.BANK_SHOW_TIMEOUT)[1].fn()
-      assert.equal(0, primes, "closed while it showed")
+      assert.equal(0, #primes, "closed while it showed")
 
       fire("BANKFRAME_OPENED")
       onShown()
-      local first = prime
+      local first = primes
+      primes = {}
       fire("BANKFRAME_CLOSED")
-      first()
-      assert.spy(refresh.RequestUpdate).was_not.called()
+      assert.is_nil(loaded, "closing stops limiting reads to the tabs loaded")
+      first[1].cb()
+      assert.equal(0, #requests)
 
       fire("BANKFRAME_OPENED")
       onShown()
-      local second = prime
-      first()
+      for _, p in ipairs(first) do p.cb() end
       timeouts()[1].fn()
-      assert.spy(refresh.RequestUpdate).was_not.called()
-      second()
-      assert.spy(refresh.RequestUpdate).was.called(1)
+      assert.equal(0, #requests, "the old open's loads and timeout do nothing")
+      prime(6)
+      assert.are.same({ 6 }, waves())
+
+      -- An open whose tabs were read before their data arrived, then closed: the data arriving
+      -- later reads nothing, for this open or the next.
+      fire("BANKFRAME_CLOSED")
+      primes, requests = {}, {}
+      fire("BANKFRAME_OPENED")
+      onShown()
+      timeouts()[#timeouts()].fn()
+      local timedOut = primes
+      primes = {}
+      fire("BANKFRAME_CLOSED")
+      fire("BANKFRAME_OPENED")
+      onShown()
+      local before = #requests
+      for _, p in ipairs(timedOut) do p.cb() end
+      assert.equal(before, #requests)
+    end)
+
+    -- The first read of an open that ended can still wait in the queue when the next open's first
+    -- read arrives; the two merge. The merged read is the newer open's, or that open never loads
+    -- its next tab.
+    it("carries on loading when its first read merges into the last open's", function()
+      fire("BANKFRAME_OPENED")
+      onShown()
+      refresh._held = true
+      prime(6)
+      fire("BANKFRAME_CLOSED")
+      primes = {}
+      fire("BANKFRAME_OPENED")
+      onShown()
+      warm = true
+      prime(6)
+      prime(7)
+      prime(13)
+      assert.equal(1, #refresh._queue, "merged")
+      refresh._held = false
+      refresh:RequestUpdate({ backpack = true })
+      assert.are.same({ 6, 6, 7, 13 }, waves())
+      assert.is_nil(loaded, "every tab read")
+    end)
+
+    it("stops loading tabs when the bank closes", function()
+      fire("BANKFRAME_OPENED")
+      onShown()
+      prime(6)
+      fire("BANKFRAME_CLOSED")
+      prime(7)
+      prime(13)
+      assert.are.same({ 6 }, waves())
+      assert.is_nil(loaded)
     end)
 
     -- Escape can hide the window mid-animation (its callback is dropped) while the bank stays
@@ -380,9 +625,9 @@ describe("Refresh Module", function()
       assert.equal(1, #timers(refresh.BANK_SHOW_TIMEOUT))
       assert.is_true(refresh.BANK_SHOW_TIMEOUT >= 0.45 and refresh.BANK_SHOW_TIMEOUT < refresh.BANK_PRIME_TIMEOUT)
       timers(refresh.BANK_SHOW_TIMEOUT)[1].fn()
-      assert.equal(1, primes)
+      assert.equal(3, #primes)
       onShown()
-      assert.equal(1, primes, "loads once")
+      assert.equal(3, #primes, "loads once")
     end)
 
     it("says why each open stopped waiting for its window, for profiler traces", function()
@@ -405,13 +650,13 @@ describe("Refresh Module", function()
     it("loads at once without a bank window (Enable Bank Bags off)", function()
       addon.Bags = {}
       fire("BANKFRAME_OPENED")
-      assert.equal(1, primes)
+      assert.equal(3, #primes)
     end)
 
-    -- Nothing reads the bank while its window shows: the open's read reads every bank bag
-    -- after, so a bank sweep asked for meanwhile is covered. The backpack is not held.
+    -- Nothing reads the bank while its window shows: the open's reads, which follow, read every
+    -- bank tab after, so a bank sweep asked for meanwhile is covered. The backpack is not held.
     it("sweeps no bank while its window shows, and the backpack as usual", function()
-      afterStartup()
+      warm = true
       spy.on(items, "RunRefresh")
       fire("BANKFRAME_OPENED")
       refresh:RequestUpdate({ backpack = true, bank = true, bags = { [6] = true } })
@@ -419,25 +664,23 @@ describe("Refresh Module", function()
       assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
       assert.spy(items.RunRefresh).was_not.called_with(items, match._, const.BAG_KIND.BANK)
       onShown()
-      prime()
       assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
       refresh:RequestUpdate({ bank = true, bags = { [6] = true } })
       local bankSweeps = 0
       for _, call in ipairs(items.RunRefresh.calls) do
         if call.vals[3] == const.BAG_KIND.BANK then bankSweeps = bankSweeps + 1 end
       end
-      assert.equal(2, bankSweeps, "the open's read, then sweeps as usual")
+      assert.equal(4, bankSweeps, "a read per tab, then sweeps as usual")
       items.RunRefresh:revert()
     end)
 
     it("sweeps the bank again once the bank closes during the animation and reopens", function()
-      afterStartup()
+      warm = true
       spy.on(items, "RunRefresh")
       fire("BANKFRAME_OPENED")
       fire("BANKFRAME_CLOSED")
       fire("BANKFRAME_OPENED")
       onShown()
-      prime()
       assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
       items.RunRefresh:revert()
     end)

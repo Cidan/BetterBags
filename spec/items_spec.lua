@@ -1233,6 +1233,58 @@ describe("Items (New Data Farming Engine)", function()
       assert.are.equal(const.BACKPACK_BAGS, backpackBags)
     end)
 
+    -- The bank is read tab by tab as it opens, as the guild bank is (refresh-scheduler.md §11):
+    -- while only some tabs are loaded, a read of the bank reads only those, as a guild bank read
+    -- reads only the tabs received (LoadedContainers). nil means every bank bag.
+    describe("the bank's tabs loaded so far", function()
+      local Context, savedOnlyBags, savedToInventory
+
+      before_each(function()
+        Context = addon:GetModule("Context")
+        addon.isRetail = true
+        const.BANK_TAB = const.BANK_TAB or {}
+        -- Other specs leave their own bank bag tables and container mocks behind.
+        savedOnlyBags = const.BANK_ONLY_BAGS
+        const.BANK_ONLY_BAGS = {}
+        savedToInventory = _G.C_Container.ContainerIDToInventoryID
+        _G.C_Container.ContainerIDToInventoryID = function() return nil end
+      end)
+
+      after_each(function()
+        items:SetLoadedBankBags(nil)
+        const.BANK_ONLY_BAGS = savedOnlyBags
+        _G.C_Container.ContainerIDToInventoryID = savedToInventory
+      end)
+
+      it("lists the bank's bags as a read of it reads them: every character and Warbank tab", function()
+        local bags = items:BankBags()
+        local expected = {}
+        for bag in pairs(const.BANK_BAGS) do expected[bag] = bag end
+        for bag in pairs(const.ACCOUNT_BANK_BAGS) do expected[bag] = bag end
+        assert.are.same(expected, bags)
+        assert.are.same(bags, items:Phase1_DetermineBags(Context:New("T"), const.BAG_KIND.BANK))
+      end)
+
+      it("reads only the tabs loaded, even when a read names others", function()
+        items:SetLoadedBankBags({ [7] = true, [13] = true })
+        assert.are.same({ [7] = 7, [13] = 13 }, items:Phase1_DetermineBags(Context:New("T"), const.BAG_KIND.BANK))
+        local ctx = Context:New("T")
+        ctx:Set("targetedBags", { [7] = true, [8] = true })
+        assert.are.same({ [7] = 7 }, items:Phase1_DetermineBags(ctx, const.BAG_KIND.BANK))
+        assert.are.same({ [7] = true, [13] = true }, items:LoadedBankBags())
+        assert.are.same(const.BACKPACK_BAGS, items:Phase1_DetermineBags(Context:New("T"), const.BAG_KIND.BACKPACK),
+          "never the backpack's")
+      end)
+
+      it("reads every bank bag again once nothing limits it", function()
+        items:SetLoadedBankBags({})
+        assert.are.same({}, items:Phase1_DetermineBags(Context:New("T"), const.BAG_KIND.BANK))
+        items:SetLoadedBankBags(nil)
+        assert.is_nil(items:LoadedBankBags())
+        assert.are.same(items:BankBags(), items:Phase1_DetermineBags(Context:New("T"), const.BAG_KIND.BANK))
+      end)
+    end)
+
     it("Phase4_ClearMovedItemGlows clears new item status on the moved item's harvested data", function()
       local ctx = addon:GetModule("Context"):New("TestPhase3")
       local clearedData = nil

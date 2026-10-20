@@ -146,7 +146,7 @@ describe("ItemLoader", function()
   -- Bank containers hold no slots until the bank opens, so PrimeAll at login cannot cover
   -- them; the bank primes on its own when it opens. A capture of opening the bank read 478 of
   -- 491 bank items before their data had loaded.
-  it("primes every bank bag, and only bank bags, in one load, then calls back once", function()
+  it("primes the bank tabs it is given in one load, then calls back once", function()
     local loader = addon:GetModule("ItemLoader")
     loader:Init()
     loader:OnEnable()
@@ -163,8 +163,8 @@ describe("ItemLoader", function()
       }
     end
     local primed = 0
-    loader:PrimeBank(function() primed = primed + 1 end)
-    _G.ContinuableContainer.Create = originalCreate
+    -- The bank is loaded tab by tab (refresh-scheduler.md §11): each call primes the tabs given.
+    loader:PrimeBank({ 5, 10 }, function() primed = primed + 1 end)
 
     assert.equal(1, containers)
     assert.equal(1, primed)
@@ -175,6 +175,17 @@ describe("ItemLoader", function()
     end
     -- Bank bag 5 and account bank bag 10 have two slots each in this spec.
     assert.same({ [5] = 2, [10] = 2 }, bags)
+
+    added = {}
+    loader:PrimeBank({ 10 }, function() primed = primed + 1 end)
+    _G.ContinuableContainer.Create = originalCreate
+    assert.equal(2, containers, "a load of its own")
+    assert.equal(2, primed)
+    bags = {}
+    for _, mixin in ipairs(added) do
+      bags[mixin._bagID] = (bags[mixin._bagID] or 0) + 1
+    end
+    assert.same({ [10] = 2 }, bags, "only the tab given")
   end)
 
   it("should support registering callbacks for bag updates", function()

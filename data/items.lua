@@ -953,50 +953,18 @@ function items:Phase1_DetermineBags(ctx, kind)
         end
       end
     end
-
-    local blizzardTab = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
-    if addon.isRetail then
-      ctx:Set("bagid", const.BANK_TAB.BANK)
-      for _, bag in pairs(const.BANK_BAGS) do
-        bagList[bag] = bag
-      end
-      if const.ACCOUNT_BANK_BAGS then
-        for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
-          bagList[bag] = bag
+    bagList = self:BankBags(ctx)
+    -- While a bank open loads the bank tab by tab, only the tabs loaded so far, as a guild bank
+    -- read reads only the tabs received (refresh-scheduler.md §11).
+    local loaded = self._loadedBankBags
+    if loaded ~= nil then
+      local onlyLoaded = {}
+      for bagID in pairs(bagList) do
+        if loaded[bagID] then
+          onlyLoaded[bagID] = bagList[bagID]
         end
       end
-      local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
-      if reagentBank then
-        bagList[reagentBank] = reagentBank
-      end
-    elseif blizzardTab and addon.isRetail then
-      if Enum.BagIndex and Enum.BagIndex.AccountBankTab_1 and blizzardTab >= Enum.BagIndex.AccountBankTab_1 then
-        ctx:Set("bagid", const.BANK_TAB.ACCOUNT_BANK_1)
-      else
-        ctx:Set("bagid", const.BANK_TAB.BANK)
-      end
-      bagList[blizzardTab] = blizzardTab
-    else
-      local activeGroupID = database:GetActiveGroup(const.BAG_KIND.BANK)
-      local activeGroup = activeGroupID and database:GetGroup(const.BAG_KIND.BANK, activeGroupID)
-      local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
-
-      if activeGroup and addon.isRetail and activeGroup.bankType == (Enum and Enum.BankType and Enum.BankType.Account) then
-        ctx:Set("bagid", const.BANK_TAB.ACCOUNT_BANK_1)
-        if const.ACCOUNT_BANK_BAGS then
-          for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
-            bagList[bag] = bag
-          end
-        end
-      else
-        ctx:Set("bagid", const.BANK_TAB.BANK)
-        for _, bag in pairs(const.BANK_BAGS) do
-          bagList[bag] = bag
-        end
-        if reagentBank then
-          bagList[reagentBank] = reagentBank
-        end
-      end
+      bagList = onlyLoaded
     end
   end
 
@@ -1012,6 +980,78 @@ function items:Phase1_DetermineBags(ctx, kind)
   end
 
   return bagList
+end
+
+-- BankBags returns the bags a read of the bank reads: on retail every character and Warbank tab; on
+-- Classic the bank, its bags and the reagent bank. With a ctx it marks which bank the read is of
+-- (bagid), for the free slot count.
+---@param ctx? Context
+---@return table<number, number>
+function items:BankBags(ctx)
+  local bagList = {}
+  local function mark(bagid)
+    if ctx ~= nil then
+      ctx:Set("bagid", bagid)
+    end
+  end
+  local blizzardTab = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
+  if addon.isRetail then
+    mark(const.BANK_TAB.BANK)
+    for _, bag in pairs(const.BANK_BAGS) do
+      bagList[bag] = bag
+    end
+    if const.ACCOUNT_BANK_BAGS then
+      for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
+        bagList[bag] = bag
+      end
+    end
+    local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
+    if reagentBank then
+      bagList[reagentBank] = reagentBank
+    end
+  elseif blizzardTab and addon.isRetail then
+    if Enum.BagIndex and Enum.BagIndex.AccountBankTab_1 and blizzardTab >= Enum.BagIndex.AccountBankTab_1 then
+      mark(const.BANK_TAB.ACCOUNT_BANK_1)
+    else
+      mark(const.BANK_TAB.BANK)
+    end
+    bagList[blizzardTab] = blizzardTab
+  else
+    local activeGroupID = database:GetActiveGroup(const.BAG_KIND.BANK)
+    local activeGroup = activeGroupID and database:GetGroup(const.BAG_KIND.BANK, activeGroupID)
+    local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
+
+    if activeGroup and addon.isRetail and activeGroup.bankType == (Enum and Enum.BankType and Enum.BankType.Account) then
+      mark(const.BANK_TAB.ACCOUNT_BANK_1)
+      if const.ACCOUNT_BANK_BAGS then
+        for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
+          bagList[bag] = bag
+        end
+      end
+    else
+      mark(const.BANK_TAB.BANK)
+      for _, bag in pairs(const.BANK_BAGS) do
+        bagList[bag] = bag
+      end
+      if reagentBank then
+        bagList[reagentBank] = reagentBank
+      end
+    end
+  end
+  return bagList
+end
+
+-- SetLoadedBankBags limits reads of the bank to the tabs a bank open has loaded so far (a set of bag
+-- IDs), or, with nil, lets them read every bank bag again (refresh-scheduler.md §11).
+---@param bags? table<number, boolean>
+function items:SetLoadedBankBags(bags)
+  self._loadedBankBags = bags
+end
+
+-- LoadedBankBags is the set of bank tabs reads of the bank are limited to, or nil for every bank bag.
+---@return table<number, boolean>?
+function items:LoadedBankBags()
+  return self._loadedBankBags
 end
 
 -- NeedsInteractionRecalculation says whether an interaction window opening or closing

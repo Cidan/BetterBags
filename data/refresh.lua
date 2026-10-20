@@ -30,8 +30,8 @@ refresh.SORT_FALLBACK_SECONDS = 0.5
 refresh.STARTUP_SETTLE_TIMEOUT = 2
 -- How long to wait for the item data before reading anyway (the late data is read again):
 refresh.STARTUP_PRIME_TIMEOUT = 2
--- Seconds a bank open waits for the bank's item data before reading it anyway (the captured
--- opens received it 1.2 s after BANKFRAME_OPENED).
+-- Seconds a bank open waits for a bank tab's item data before reading the tab anyway (the captured
+-- opens received the whole bank's 1.2 s after BANKFRAME_OPENED); the late data is read again.
 refresh.BANK_PRIME_TIMEOUT = 2
 -- Seconds a bank open waits for the bank window to say it has finished showing before loading the
 -- bank anyway (Escape can hide it mid-animation while the bank stays open). The longest built-in
@@ -67,6 +67,8 @@ function refresh:Init()
   -- on, and a unit's commit+draw can never share a frame with the next unit's harvest.
   self._queue = {}
   self._active = nil
+  -- The request the active unit runs.
+  self._activeRequest = nil
   self._idlePending = false
   self._running = false
   -- While held (from OnEnable until the startup read), requests wait in the queue.
@@ -141,7 +143,9 @@ end
 ---@field restyle? boolean Every button of the swept kinds draws in full (a new draw generation)
 ---@field merged? number How many requests this one carries (set by merging, for profiler traces)
 ---@field startup? string Why the startup read ran (set on the startup read, for profiler traces)
----@field bankOpen? string Why a bank open's read ran, "primed" or "timeout" (for profiler traces)
+---@field bankOpen? string Why a bank open's read ran: "primed", "timeout", or "empty" with no tab (for profiler traces)
+---@field bankWave? number The bank open read this is (_LoadNextBankTab); the next tab loads once it has run
+---@field bankWaveTab? number The bank tab that read added (for profiler traces)
 ---@field guild? boolean Update the guild bank's items (only while it is open)
 ---@field guildLoad? string Why a guild bank read ran, "primed" or "timeout" (for profiler traces)
 
@@ -198,6 +202,11 @@ local function mergeInto(waiting, incoming)
     waiting.bags = bags
   end
   waiting.restyle = waiting.restyle or incoming.restyle
+  -- A bank open's read carries on: the next tab loads once this request has run. An open has one
+  -- read waiting at a time, so a read riding on another open's is the newer open's (that one ended).
+  if incoming.bankWave ~= nil then
+    waiting.bankWave, waiting.bankWaveTab, waiting.bankOpen = incoming.bankWave, incoming.bankWaveTab, incoming.bankOpen
+  end
   waiting.merged = (waiting.merged or 1) + (incoming.merged or 1)
 end
 
@@ -245,11 +254,23 @@ function refresh:_Resume()
     if geterrorhandler then
       geterrorhandler()(err)
     end
+    self:_UnitDone()
     return
   end
   if coroutine.status(co) == 'dead' then
     self._active = nil
     self._idlePending = true
+    self:_UnitDone()
+  end
+end
+
+-- _UnitDone runs when a unit has finished, or failed: a bank open's read lets the next bank tab
+-- load (_BankWaveDone), even after a failure, so one bad read never stops the bank loading.
+function refresh:_UnitDone()
+  local request = self._activeRequest
+  self._activeRequest = nil
+  if request and request.bankWave then
+    self:_BankWaveDone(request.bankWave)
   end
 end
 
@@ -274,6 +295,7 @@ function refresh:_Step()
     return
   end
 
+  self._activeRequest = request
   self._active = coroutine.create(function()
     self:_RunUnit(request)
   end)
@@ -413,8 +435,8 @@ function refresh:_RunUnit(request)
     sorter()
   end
 
-  -- While the bank window shows after an open, the bank is not swept: the open's read, which
-  -- follows, reads every bank bag (_OpenBank).
+  -- While the bank window shows after an open, the bank is not swept: the open's reads, which
+  -- follow, read every bank tab (_OpenBank).
   if request.bank and addon.atBank and addon.Bags.Bank and not self:BankShowing() then
     local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
     if addon.atWarbank and addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab < accountBankStart then
@@ -538,6 +560,7 @@ function refresh:OnEnable()
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
     self._bankOpen = nil
+    items:SetLoadedBankBags(nil)
   end)
 
   if not addon.isRetail then
@@ -741,10 +764,10 @@ function refresh:_OnStartupFrame()
 end
 
 -- _OpenBank shows the bank window at once (with the bank's committed items: none after a close)
--- and loads the bank only once the window has finished showing, so the bank's read and draw never
+-- and loads the bank only once the window has finished showing, so the bank's reads and draws never
 -- land in its show animation (asked: "finish our bank window show animation, before we start
 -- loading in bank info, just to prevent hitching"; refresh-scheduler.md §11). Until then no sweep
--- reads the bank (_RunUnit): the open's read reads every bank bag after.
+-- reads the bank (_RunUnit): the open's reads read every bank tab after.
 ---@param ctx Context
 function refresh:_OpenBank(ctx)
   local open = { showing = true }
@@ -772,7 +795,7 @@ function refresh:_BankShown(open, reason)
     return 'already'
   end
   open.showing = false
-  self:_PrimeBankAndRead(open)
+  self:_LoadBank(open)
   return 'loading'
 end
 
@@ -782,26 +805,170 @@ function refresh:BankShowing()
   return self._bankOpen ~= nil and self._bankOpen.showing == true
 end
 
--- _PrimeBankAndRead loads the bank's item data, then reads the bank, from a clean, gapless
--- layout (gaps held from a previous visit collapse). It reads after BANK_PRIME_TIMEOUT if the
--- data has not all arrived, and reads again when it does, since that read found it cold.
--- Neither happens for an open that has ended (the bank closed, or opened again).
----@param open table The open being loaded (refresh._bankOpen).
-function refresh:_PrimeBankAndRead(open)
-  local read = false
-  local function readBank(reason)
-    if self._bankOpen ~= open then return end
-    if read then
-      if reason == 'primed' then
-        self:RequestUpdate({ bank = true })
-      end
-      return
+-- isWarbankBag says whether a bag is a Warbank tab.
+---@param bag? number
+---@return boolean
+local function isWarbankBag(bag)
+  return bag ~= nil and const.ACCOUNT_BANK_BAGS ~= nil and const.ACCOUNT_BANK_BAGS[bag] ~= nil
+end
+
+-- BankTabs lists the bank's tabs that have slots (Items:BankBags, the bags a read of the bank reads),
+-- in the bank's order: the character bank's (on Classic the bank, then its bags), then the Warbank's
+-- or, on Classic, the reagent bank (Enum.BagIndex.Reagentbank, -3, after the bank's bags).
+---@return number[]
+function refresh:BankTabs()
+  local tabs = {}
+  for bag in pairs(items:BankBags()) do
+    if (C_Container.GetContainerNumSlots(bag) or 0) > 0 then
+      table.insert(tabs, bag)
     end
-    read = true
-    self:RequestUpdate({ bank = true, resetLayout = true, bankOpen = reason })
   end
-  C_Timer.After(self.BANK_PRIME_TIMEOUT, function() readBank('timeout') end)
-  addon:GetModule('ItemLoader'):PrimeBank(function() readBank('primed') end)
+  local function rank(bag)
+    return const.BANK_BAGS and const.BANK_BAGS[bag] and 0 or 1
+  end
+  table.sort(tabs, function(a, b)
+    local ra, rb = rank(a), rank(b)
+    if ra ~= rb then return ra < rb end
+    return a < b
+  end)
+  return tabs
+end
+
+-- _LoadBank loads the bank tab by tab, as the guild bank loads (GuildBank:Load, refresh-scheduler.md
+-- §11). Asked: "pop in data for each physical tab (non-virtual tab) one by one ... mimic the guild bank
+-- behavior as close as possible"; a captured open (500 items) read and drew the whole bank in one
+-- 520 ms frame. Reads of the bank read only the tabs loaded so far (Items:SetLoadedBankBags), as guild
+-- bank reads read only the tabs received. The guild bank's tabs come from the server one query at a
+-- time; the bank's are all on the client, so every tab's item data loads at once, each tab in a load
+-- of its own (or for BANK_PRIME_TIMEOUT), and the tabs are read one per read (_LoadNextBankTab). A
+-- bank with no tab with slots (WoW: Forever before its first tab) is read once, empty.
+---@param open table The open being loaded (refresh._bankOpen).
+function refresh:_LoadBank(open)
+  local tabs = self:BankTabs()
+  if #tabs == 0 then
+    items:SetLoadedBankBags(nil)
+    self:RequestUpdate({ bank = true, resetLayout = true, bankOpen = 'empty' })
+    return
+  end
+  open.order, open.tabs, open.waiting, open.loaded, open.first = tabs, {}, {}, {}, true
+  for _, bag in ipairs(tabs) do
+    open.tabs[bag] = { ready = false, read = false }
+    open.waiting[bag] = true
+  end
+  items:SetLoadedBankBags(open.loaded)
+  C_Timer.After(self.BANK_PRIME_TIMEOUT, function()
+    for _, bag in ipairs(tabs) do
+      self:_BankTabReady(open, bag, 'timeout')
+    end
+  end)
+  local loader = addon:GetModule('ItemLoader')
+  for _, bag in ipairs(tabs) do
+    loader:PrimeBank({ bag }, function() self:_BankTabReady(open, bag, 'primed') end)
+  end
+end
+
+-- _BankTabReady says a bank tab's item data has loaded ("primed"), or that the open stopped waiting
+-- for it ("timeout"), and reads the next tab if it is that one's turn. A tab read before its data
+-- arrived is read again when it does, as a guild bank tab is. It returns what it did, for profiler
+-- traces: "ready", "read again", "already" or "ended" (the open has ended).
+---@param open table
+---@param bag number
+---@param reason string
+---@return string
+function refresh:_BankTabReady(open, bag, reason)
+  if self._bankOpen ~= open then
+    return 'ended'
+  end
+  local tab = open.tabs[bag]
+  if tab.ready then
+    if reason ~= 'primed' then
+      return 'already'
+    end
+    if tab.read then
+      self:RequestUpdate({ bank = true })
+      return 'read again'
+    end
+    tab.reason = 'primed'
+    return 'already'
+  end
+  tab.ready, tab.reason = true, reason
+  self:_LoadNextBankTab(open)
+  return 'ready'
+end
+
+-- _NextBankTab is the bank tab to read next: the Blizzard tab shown (tab mode), else the first of
+-- the bank type shown (Warbank or character bank, from the bank's bankTab, which both bag designs
+-- keep), else the first left. A tab chosen while the bank loads is read next, as a guild bank tab
+-- chosen while it loads is queried next (GuildBank:LoadTab).
+---@param open table
+---@return number?
+function refresh:_NextBankTab(open)
+  local bank = addon.Bags and addon.Bags.Bank
+  local shown = bank and bank.blizzardBankTab
+  if shown ~= nil and open.waiting[shown] then
+    return shown
+  end
+  local warbank = isWarbankBag(bank and bank.bankTab)
+  for _, bag in ipairs(open.order) do
+    if open.waiting[bag] and isWarbankBag(bag) == warbank then
+      return bag
+    end
+  end
+  for _, bag in ipairs(open.order) do
+    if open.waiting[bag] then
+      return bag
+    end
+  end
+  return nil
+end
+
+-- _LoadNextBankTab reads the next bank tab once the read before it has run and the tab's item data
+-- has loaded: one tab per read, so each read shows one more tab, frames apart, even when every tab's
+-- data was already loaded. The first read of an open rebuilds the layout; later ones keep it, as the
+-- guild bank's do. Once every tab is read, reads of the bank read every bank bag again. It returns
+-- the tab it read, or why it read none, for profiler traces: "reading", "waiting" (for the tab's
+-- data) or "done". It is only called with the open under way.
+---@param open table
+---@return number|string
+function refresh:_LoadNextBankTab(open)
+  if open.reading ~= nil then
+    return 'reading'
+  end
+  local bag = self:_NextBankTab(open)
+  if bag == nil then
+    items:SetLoadedBankBags(nil)
+    return 'done'
+  end
+  local tab = open.tabs[bag]
+  if not tab.ready then
+    return 'waiting'
+  end
+  open.waiting[bag] = nil
+  open.loaded[bag] = true
+  tab.read = true
+  self._bankWaves = (self._bankWaves or 0) + 1
+  open.reading = self._bankWaves
+  local first = open.first
+  open.first = false
+  self:RequestUpdate({
+    bank = true,
+    resetLayout = first or nil,
+    bankOpen = tab.reason,
+    bankWave = open.reading,
+    bankWaveTab = bag,
+  })
+  return bag
+end
+
+-- _BankWaveDone runs once a bank open's read has run (or failed): the next tab may load.
+---@param wave number
+function refresh:_BankWaveDone(wave)
+  local open = self._bankOpen
+  if open == nil or open.reading ~= wave then
+    return
+  end
+  open.reading = nil
+  self:_LoadNextBankTab(open)
 end
 
 -- _StartupPrime loads the item data of every bag slot and every equipped slot, then reads.
