@@ -81,7 +81,35 @@ _G.LoadFreshBetterBagsModule = function(name, filePath)
   return addon:GetModule(name)
 end
 
---- Make Sonata's text roles usable in a spec whose code draws text with them
+--- FreshNextThemes loads a new SonataNext (sonata/next.lua) with BetterBags Next's own themes
+-- registered (sonata/themes/next/*.lua, Default first), replacing one another spec file changed or
+-- removed, and returns it. spec/setup.lua loads one for every spec: next/style.lua reads the Default
+-- theme when it loads. A spec that changes SonataNext's themes calls it again in its teardown.
+---@return table sonataNext
+_G.FreshNextThemes = function()
+  _G.ResetModuleStub("SonataNext", "sonata/next.lua")
+  _G.LoadBetterBagsModule("sonata/next.lua")
+  local files = {}
+  local list = io.popen("ls sonata/themes/next/*.lua")
+  for file in list:lines() do
+    table.insert(files, file)
+  end
+  list:close()
+  table.sort(files, function(a, b)
+    local da, db = a:match("/default%.lua$") ~= nil, b:match("/default%.lua$") ~= nil
+    if da ~= db then
+      return da
+    end
+    return a < b
+  end)
+  for _, file in ipairs(files) do
+    loadedModules[file] = nil
+    _G.LoadBetterBagsModule(file)
+  end
+  return addon:GetModule("SonataNext")
+end
+
+-- Make Sonata's text roles usable in a spec whose code draws text with them
 --- (Sonata:CreateText, SetTextRole, GetTextFont): loads the engine and SonataApply when they
 --- are not loaded, registers the real Base theme (replacing a stand-in Base without text
 --- roles, which other specs register) and Default when Sonata has none, forgets its resolved

@@ -1,6 +1,7 @@
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 describe("Core Init and Enable flow", function()
+  local savedNextInit
   local savedDatabase
   local oldOnInitialize, oldOnEnable
   local oldBags
@@ -56,6 +57,10 @@ describe("Core Init and Enable flow", function()
       stub.Init = stub.Init or spy.new(function() end)
       stub.Enable = stub.Enable or spy.new(function() end)
     end
+    -- SonataNext is real in every spec (spec/setup.lua) and its Init reads the saved Next theme.
+    local sonataNext = addon:GetModule("SonataNext")
+    savedNextInit = sonataNext.Init
+    sonataNext.Init = spy.new(function() end)
     local perfSessions = addon:GetModule("PerfSessions")
     perfSessions.StartIfArmed = perfSessions.StartIfArmed or spy.new(function() return false end)
     local nextVendor = addon:GetModule("NextVendor")
@@ -140,6 +145,7 @@ describe("Core Init and Enable flow", function()
   end)
 
   after_each(function()
+    addon:GetModule("SonataNext").Init = savedNextInit
     local db = addon:GetModule("Database")
     db.Init, db.GetNextEnabled = savedDatabase.Init, savedDatabase.GetNextEnabled
     addon.OnInitialize = oldOnInitialize

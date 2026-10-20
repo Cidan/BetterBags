@@ -42,6 +42,12 @@ LoadBetterBagsModule("render/flow.lua")
 -- Motion positions the cells and sections of every grid (render/motion.lua); grids and sections
 -- look it up when they load.
 LoadBetterBagsModule("render/motion.lua")
+-- Sonata resolves its themes and BetterBags Next's with SonataResolve (sonata/resolve.lua), which
+-- the engine looks up when it loads.
+LoadBetterBagsModule("sonata/resolve.lua")
+-- BetterBags Next's theme engine and its themes (sonata/next.lua, sonata/themes/next): next/style.lua
+-- reads the Default theme when it loads.
+FreshNextThemes()
 
 -- Step 4: Load shared mock data factories
 dofile("spec/helpers/mock_data.lua")

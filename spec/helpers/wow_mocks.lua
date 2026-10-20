@@ -1311,6 +1311,14 @@ end
 
 _G.IsAccountSecured = function() return true end
 
+-- C_AddOns.IsAddOnLoaded(name) -> loadedOrLoading, loaded (AddOnsDocumentation.lua, every client).
+-- Specs mark an addon loaded with _G._loadedAddOns[name] = true.
+_G.C_AddOns = _G.C_AddOns or {}
+_G.C_AddOns.IsAddOnLoaded = function(name)
+  local loaded = (_G._loadedAddOns or {})[name] == true
+  return loaded, loaded
+end
+
 _G.ContainerFrame_GetContainerNumSlots = function(bagID)
   local numSlots = _G.C_Container and _G.C_Container.GetContainerNumSlots(bagID) or 16
   return bagID, numSlots

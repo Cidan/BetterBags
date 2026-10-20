@@ -96,6 +96,7 @@ const.DATABASE_DEFAULTS = {
     nextSize = "full",
     nextSmallPlaces = {},
     nextSmallChain = "apart",
+    nextTheme = "Default",
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
@@ -356,6 +357,13 @@ describe("Database", function()
       end
       assert.has_error(function() DB:SetNextSmallChain("left") end)
       assert.are.equal("apart", DB:GetNextSmallChain())
+    end)
+
+    -- BetterBags Next's theme (next-themes.md): the Default theme until another is picked.
+    it("GetNextTheme / SetNextTheme, Default until another is picked", function()
+      assert.are.equal("Default", DB:GetNextTheme())
+      DB:SetNextTheme("Ember")
+      assert.are.equal("Ember", DB:GetNextTheme())
     end)
 
     it("GetAnimateItemMovement / SetAnimateItemMovement, off until turned on", function()

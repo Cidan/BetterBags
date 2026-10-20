@@ -198,6 +198,8 @@ function addon:OnInitialize()
   addon:GetModule('Motion'):Init()
   addon:GetModule('Window'):Init()
   addon:GetModule('Sonata'):Init()
+  -- BetterBags Next's look, from its saved theme, before any of its panels is made.
+  addon:GetModule('SonataNext'):Init()
   addon:GetModule('Tabs'):Init()
   itemFrame:Init()
   sectionFrame:Init()
