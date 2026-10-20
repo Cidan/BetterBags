@@ -170,6 +170,19 @@ describe("NextStyle", function()
       assert.is_truthy(a:GetName():find("BetterBagsNextFontCount", 1, true))
     end)
 
+    -- A theme may add roles of its own; text left on one keeps its font object until its widget
+    -- restyles it with the next theme's roles.
+    it("leaves text on a role the next theme lacks on its font object", function()
+      sonataNext:RegisterTheme({ Name = "Spec", Fonts = { Mine = { Size = 9 } } })
+      style:Use(resolved("Spec"))
+      local text = style:CreateText(CreateFrame("Frame"), "Mine")
+      local mine = text:GetFontObject()
+      style:Use(resolved("Default"))
+      assert.are.equal(mine, text:GetFontObject())
+      style:SetFont(text, "Count")
+      assert.are.equal(style:Font("Count"), text:GetFontObject())
+    end)
+
     it("refuses a role no theme defines", function()
       assert.has_error(function() style:Font("NoSuchRole") end)
     end)

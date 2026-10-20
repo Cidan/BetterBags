@@ -68,8 +68,12 @@ function style:Use(theme)
   self.TAB_GROUP_GAP = L.TabGroupGap
   self.HEADER_BUTTON = L.HeaderButton
   self.HEADER_BUTTON_GAP = L.HeaderButtonGap
+  self.HEADER_BUTTON_TOP = L.HeaderButtonTop
+  self.EMPTY_TOP = L.EmptyTop
+  self.FOOTER_TEXT = L.FooterText
+  self.FOOTER_MONEY = L.FooterMoney
 
-  local edge, icon = theme.Search.Edge, theme.Search.Icon
+  local edge, icon = theme.Search.Edge or { Idle = 0, Hover = 0, Focus = 0 }, theme.Search.Icon
   self.SearchEdge = { Idle = edge.Idle, Hover = edge.Hover, Focus = edge.Focus }
   self.SearchIcon = { Idle = icon.Idle, Active = icon.Active }
 
@@ -79,7 +83,7 @@ function style:Use(theme)
   for key, value in pairs(theme.Small) do
     self.Small[key] = value
   end
-  self.Small.Edge = theme.Panel.Edge.Alpha
+  self.Small.Edge = theme.Panel.Edge and theme.Panel.Edge.Alpha or 0
   self.Chain = theme.Chain
   self.Cloud = theme.Header.Cloud or nil
   local ribbon = theme.Header.Ribbon
@@ -137,6 +141,8 @@ end
 
 style.fonts = {} ---@type table<string, Font>
 style.texts = setmetatable({}, { __mode = "k" }) ---@type table<FontString|EditBox, string>
+-- Text whose template colors it, colored by its role too (SetTemplateFont).
+style.templated = setmetatable({}, { __mode = "k" }) ---@type table<FontString|EditBox, boolean>
 
 -- The number of font objects made: their names must be unique.
 local fontCount = 0
@@ -195,6 +201,67 @@ function style:SetFont(text, role)
   self.texts[text] = role
 end
 
+-- SetTemplateFont draws text a Blizzard template colors itself with a role: SetFont, and the role's
+-- color and shadow set on the text too, now and with every theme. A template's own color wins over
+-- a font object's (InputBoxInstructions_UpdateColorForEnabledState sets an edit box's, an XML
+-- <Color> a font string's), as Sonata's apply:Font does.
+---@param text FontString|EditBox
+---@param role string
+function style:SetTemplateFont(text, role)
+  self.templated[text] = true
+  self:SetFont(text, role)
+  self:colorText(text)
+end
+
+-- colorText sets the color and shadow of a text's role on the text itself: from the role's font
+-- object, never one read back from the text (an InputBoxTemplate edit box's GetFontObject returns a
+-- font of its own, .context/patterns-ui.md).
+---@private
+---@param text FontString|EditBox
+function style:colorText(text)
+  local font = self:Font(self.texts[text])
+  text:SetTextColor(font:GetTextColor())
+  text:SetShadowColor(font:GetShadowColor())
+  text:SetShadowOffset(font:GetShadowOffset())
+end
+
+-- Paint draws a texture from a theme's texture spec: a solid Color (a palette name or a color, alpha
+-- replaced when given), or a Texture (one of the theme's Textures by name, a file or file ID) or an
+-- Atlas tinted by Color; with TexCoords { left, right, top, bottom }, HorizTile and VertTile (the
+-- REPEAT wrap mode, so a tiled texture repeats rather than streaking its edge), BlendMode and
+-- Desaturated. Everything it does not set is reset, so a texture painted again keeps nothing of
+-- the last spec.
+---@param texture Texture
+---@param spec table
+---@param alpha? number
+function style:Paint(texture, spec, alpha)
+  local r, g, b, a = self:RGBA(spec.Color or "White", alpha)
+  texture:SetTexCoord(0, 1, 0, 1)
+  texture:SetHorizTile(false)
+  texture:SetVertTile(false)
+  if spec.Texture ~= nil or spec.Atlas ~= nil then
+    local wrapH = spec.HorizTile and "REPEAT" or nil
+    local wrapV = spec.VertTile and "REPEAT" or nil
+    if spec.Atlas ~= nil then
+      texture:SetAtlas(spec.Atlas, false, nil, nil, wrapH, wrapV)
+    else
+      texture:SetTexture(self:TexturePath(spec.Texture), wrapH, wrapV)
+    end
+    local c = spec.TexCoords
+    if c ~= nil then
+      texture:SetTexCoord(c[1], c[2], c[3], c[4])
+    end
+    texture:SetHorizTile(spec.HorizTile == true)
+    texture:SetVertTile(spec.VertTile == true)
+    texture:SetVertexColor(r, g, b, a)
+  else
+    texture:SetColorTexture(r, g, b, a)
+    texture:SetVertexColor(1, 1, 1, 1)
+  end
+  texture:SetBlendMode(spec.BlendMode or "BLEND")
+  texture:SetDesaturated(spec.Desaturated == true)
+end
+
 -- CreateText makes a font string drawn with a role.
 ---@param parent Frame
 ---@param role string
@@ -206,12 +273,20 @@ function style:CreateText(parent, role, layer)
   return text
 end
 
--- newFonts starts a new set of font objects and moves every text to its role's new one.
+-- newFonts starts a new set of font objects and moves every text to its role's new one. Text whose
+-- role the theme does not define (another theme's own role) keeps its font object: its widget gives
+-- it one of this theme's roles as it restyles.
 ---@private
 function style:newFonts()
   self.fonts = {}
+  local roles = self.Theme.Fonts
   for text, role in pairs(self.texts) do
-    text:SetFontObject(self:Font(role))
+    if roles[role] ~= nil then
+      text:SetFontObject(self:Font(role))
+      if self.templated[text] then
+        self:colorText(text)
+      end
+    end
   end
 end
 

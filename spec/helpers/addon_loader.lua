@@ -109,6 +109,26 @@ _G.FreshNextThemes = function()
   return addon:GetModule("SonataNext")
 end
 
+-- UseNextTheme makes BetterBags Next draw with a theme for a spec: theme (a Next theme table, named
+-- "Spec" here, inheriting from Default) registered in SonataNext, replacing the last one, and handed
+-- to NextStyle; nil goes back to Default. Returns the resolved theme. Widgets restyle with their own
+-- ApplyStyle.
+---@param theme? table
+---@return table
+_G.UseNextTheme = function(theme)
+  local sonataNext = addon:GetModule("SonataNext")
+  sonataNext.themes.Spec = nil
+  local key = "Default"
+  if theme ~= nil then
+    theme.Name = "Spec"
+    sonataNext:RegisterTheme(theme)
+    key = "Spec"
+  end
+  local style = addon:GetModule("NextStyle")
+  style:Use(sonataNext:Resolve(key))
+  return style.Theme
+end
+
 -- Make Sonata's text roles usable in a spec whose code draws text with them
 --- (Sonata:CreateText, SetTextRole, GetTextFont): loads the engine and SonataApply when they
 --- are not loaded, registers the real Base theme (replacing a stand-in Base without text

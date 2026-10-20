@@ -104,7 +104,7 @@ sonataNext:RegisterTheme({
     Feather = 96,
     -- The header, from the body's top: the title, then the search box; the content starts below.
     TitleTop = 24,
-    -- The title, and the header buttons, in from the body's edge past Pad.
+    -- Text in from the body's edge past Pad: the title, and the footer's free slots.
     TitleInset = 4,
     SearchTop = 70,
     SearchHeight = 26,
@@ -114,7 +114,12 @@ sonataNext:RegisterTheme({
     SearchGap = 8,
     SearchRight = 24,
     ContentTop = 110,
+    -- "Nothing here yet", below the content's top.
+    EmptyTop = 40,
     Footer = 40,
+    -- The footer's free slots and money, up from the body's bottom.
+    FooterText = 14,
+    FooterMoney = 12,
     -- Sections: a header row above the icons, and the room between sections.
     SectionHeader = 24,
     SectionSpacing = 16,
@@ -129,9 +134,10 @@ sonataNext:RegisterTheme({
     TabIconGap = 6,
     -- Between the bank's character tabs and its Warbank tabs.
     TabGroupGap = 10,
-    -- The header buttons, and the room between them.
+    -- The header buttons: their size, the room between them, how far down from the body's top.
     HeaderButton = 22,
     HeaderButtonGap = 8,
+    HeaderButtonTop = 27,
   },
 
   -- Animations: how long (seconds) and how (an ease of next/tween.lua: linear, outCubic, inCubic,
@@ -256,8 +262,12 @@ sonataNext:RegisterTheme({
         { F = 0.70, Y = -18, W = 32, H = 28, Color = "Lavender", A = 0.09 },
       },
     },
-    -- The header buttons' icons: tinted, and brighter under the pointer.
-    Buttons = { Color = "ButtonIcon", HoverColor = "White" },
+    -- The header buttons' icons: tinted, and brighter under the pointer. Icons replaces a button's
+    -- icon by its key (settingsButton, sortButton, classicButton, closeButton, bankTabsButton,
+    -- depositButton, withdrawButton, filterButton, sellJunkButton, repairAllButton, guildRepairButton;
+    -- the size button by its state, sizeButtonFull and sizeButtonSmall) with { Atlas } or { Texture,
+    -- TexCoords }.
+    Buttons = { Color = "ButtonIcon", HoverColor = "White", Icons = {} },
   },
 
   Search = {
@@ -272,6 +282,10 @@ sonataNext:RegisterTheme({
   },
 
   Sections = {
+    -- The title, from the section's top left; the count after it, and the line after the count.
+    Title = { X = 2, Y = -4 },
+    CountGap = 8,
+    LineGap = 10,
     TitleFont = "Section",
     RecentFont = "SectionRecent",
     FreeFont = "SectionFree",
@@ -337,6 +351,8 @@ sonataNext:RegisterTheme({
   -- Thickness, Alpha in front (Depth less behind), in Color; Beads lights (BeadColor) running along it
   -- in BeadTime, BeadSize; the knot KnotSize, KnotAlpha, swelling by KnotSwell, in KnotColor.
   Chain = {
+    -- The braid the two ribbons twist into as two bags couple (false: none).
+    Braid = true,
     Stagger = 0.08,
     AnchorWait = 0.25,
     TabMargin = 24,

@@ -95,13 +95,15 @@ end
 -- retail and WoW: Forever; Classic's smaller and bigger buttons, SharedUIPanelTemplates.xml).
 function bagProto:UpdateSizeButton()
   local small = self:IsSmall()
-  local icon = self.sizeButton.icon
+  local art
   if addon.isRetail then
-    icon:SetAtlas(small and "RedButton-Expand" or "RedButton-Condense")
+    art = { atlas = small and "RedButton-Expand" or "RedButton-Condense" }
   else
-    icon:SetTexture(small and "Interface\\Buttons\\UI-Panel-BiggerButton-Up"
-      or "Interface\\Buttons\\UI-Panel-SmallerButton-Up")
+    art = { texture = small and "Interface\\Buttons\\UI-Panel-BiggerButton-Up"
+      or "Interface\\Buttons\\UI-Panel-SmallerButton-Up" }
   end
+  -- A theme can draw its own for either state (Header.Buttons.Icons: sizeButtonSmall, sizeButtonFull).
+  self:SetHeaderIcon(self.sizeButton, small and "sizeButtonSmall" or "sizeButtonFull", art)
 end
 
 -- SizeTooltip says what the size button does.

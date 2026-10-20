@@ -92,7 +92,7 @@ function nextGuildBank:Create(ctx)
   g.closeRequested = false
   g.wipeWhenHidden = false
   g.content:SetButtonSource(guildButton)
-  g:paintWash(style.Color.GuildWash)
+  g:SetWash("Guild", true)
   self.panel = g
   return g
 end
@@ -285,7 +285,7 @@ function guildProto:RefreshTabs()
         id = info.container,
         name = info.name,
         icon = info.icon,
-        accent = style.Color.Guild,
+        accent = "Guild",
         gap = first and style.TAB_GROUP_GAP or nil,
         tooltip = function()
           self:ShowTabTooltip(info)
@@ -434,7 +434,7 @@ function guildProto:OnShowing(ctx)
     self.shownTab = container
   end
   self:useView()
-  self:SetWash("GuildWash")
+  self:SetWash("Guild")
   self:RefreshTabs()
   self:updateTitle()
   self:UpdateHeader()

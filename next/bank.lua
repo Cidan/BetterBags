@@ -250,7 +250,7 @@ function bankProto:RefreshTabs()
   local bank, warbank = {}, {}
   for id, group in pairs(groups:GetAllGroups(self.kind)) do
     if isWarbankGroup(group) then
-      table.insert(warbank, { id = id, name = group.name, accent = style.Color.Warbank, atlas = "warbands-icon" })
+      table.insert(warbank, { id = id, name = group.name, accent = "Warbank", atlas = "warbands-icon" })
     else
       table.insert(bank, { id = id, name = group.name })
     end
@@ -342,7 +342,7 @@ function bankProto:ListBankTabs()
         id = t.ID,
         name = t.name,
         icon = self:tabIcon(bankType, t),
-        accent = warbank and style.Color.Warbank or nil,
+        accent = warbank and "Warbank" or nil,
         gap = i == 1 and gap or nil,
         draggable = slots ~= nil and slots:GetBagSocketIndex(bankType, t.ID) ~= nil,
         tooltip = function()
@@ -355,7 +355,7 @@ function bankProto:ListBankTabs()
         id = purchaseID,
         name = "+",
         secure = bankType,
-        accent = bankType == Enum.BankType.Account and style.Color.Warbank or nil,
+        accent = bankType == Enum.BankType.Account and "Warbank" or nil,
         tooltip = { purchaseTitle, L:G("Click to purchase this tab") },
       })
     end
@@ -434,7 +434,7 @@ function bankProto:useBankType(warbank, bagIndex)
   else
     self.bankTab = const.BANK_TAB.BANK
   end
-  self:SetWash(warbank and "WarbankWash" or "Wash")
+  self:SetWash(warbank and "Warbank" or "Default")
   self:UpdatePurchaseBankButton()
 end
 

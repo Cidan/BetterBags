@@ -617,7 +617,7 @@ function chain:tweenCoupling(to)
     duration = to == 1 and style.Time.Couple or style.Time.Uncouple,
     from = c.amount,
     to = to,
-    ease = to == 1 and "outCubic" or "inOutSine",
+    ease = style:Ease(to == 1 and "Couple" or "Uncouple"),
     onUpdate = function(v)
       c.amount = v
       self:applyCoupling()

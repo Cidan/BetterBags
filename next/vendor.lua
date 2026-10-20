@@ -101,7 +101,7 @@ function nextVendor:Create(ctx)
   v.atMerchant = false
   v.closeRequested = false
   v.buttons = {}
-  v.content:SetCellHeight(style.ICON + style.VENDOR_PRICE)
+  v.content:SetPriceRow(true)
   nextDrag:RegisterSeller(v)
   self.panel = v
   return v

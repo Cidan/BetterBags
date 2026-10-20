@@ -32,7 +32,11 @@ local tween = addon:GetModule('NextTween')
 ---@class NextContent: AceModule
 local nextContent = addon:NewModule('NextContent')
 
-local STEP = style.ICON + style.GAP
+-- step is the distance from one button's left edge to the next's, for the current theme.
+---@return number
+local function step()
+  return style.ICON + style.GAP
+end
 
 ---@class (exact) NextSectionEntry
 ---@field item? Item
@@ -46,6 +50,7 @@ local STEP = style.ICON + style.GAP
 ---@field title FontString
 ---@field count FontString
 ---@field line Texture
+---@field highlight Texture Lit under the title row while the pointer is over it.
 ---@field cells Frame The item buttons hang from it.
 ---@field header Button Across the title row: dragging it moves the section (next.md §7).
 ---@field entries NextSectionEntry[]
@@ -80,7 +85,7 @@ local STEP = style.ICON + style.GAP
 ---@field dragSlotY? number Where the last render put the dragged section's gap.
 ---@field leaving table<string, number> Sections moved away, left out until this time (GetTime).
 ---@field headerHandler? NextHeaderHandler
----@field cellHeight number How tall a row of buttons is, without the gap (the vendor's are taller).
+---@field priceRow boolean Its buttons have a price row under their icons (the vendor's: SetPriceRow).
 ---@field buttonSource {GetButton: fun(self: any, ctx: Context, slotkey: string): Item} Where Bind takes its buttons: the item buttons, or the guild bank's (SetButtonSource).
 local canvasProto = drawable:Extend({}, 'NextCanvas')
 
@@ -98,7 +103,7 @@ function nextContent:Create(parent)
   canvas.buttons = {}
   canvas.freeTotal = 0
   canvas.leaving = {}
-  canvas.cellHeight = style.ICON
+  canvas.priceRow = false
   canvas.buttonSource = itemFrame
   addon.SetScript(canvas.frame, "OnHide", function()
     canvas:Settle()
@@ -118,25 +123,85 @@ function canvasProto:newSection()
   local inner = CreateFrame("Frame", nil, frame)
   inner:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
   local title = inner:CreateFontString(nil, "OVERLAY")
-  title:SetPoint("TOPLEFT", inner, "TOPLEFT", 2, -4)
   local count = inner:CreateFontString(nil, "OVERLAY")
-  count:SetFontObject(style:Font("Count"))
-  count:SetPoint("LEFT", title, "RIGHT", 8, 0)
   local line = inner:CreateTexture(nil, "ARTWORK")
   line:SetColorTexture(1, 1, 1, 1)
-  line:SetGradient("HORIZONTAL", style:CreateColor("Lavender", 0.35), style:CreateColor("Lavender", 0))
-  line:SetHeight(1)
-  line:SetPoint("LEFT", count, "RIGHT", 10, 0)
-  line:SetPoint("RIGHT", inner, "RIGHT", 0, 0)
   local cells = CreateFrame("Frame", nil, inner)
-  cells:SetPoint("TOPLEFT", inner, "TOPLEFT", 0, -style.SECTION_HEADER)
   ---@type NextSection
   local section = {
     name = "", kind = "category", frame = frame, inner = inner, title = title, count = count,
     line = line, cells = cells, entries = {}, isNew = true, rise = 0, y = 0, height = 0,
   }
   section.header = self:newHeader(section)
+  self:styleSection(section)
   return section
+end
+
+-- titleRole is the theme's text role for a section's title, by its kind.
+---@param kind "recent"|"category"|"free"
+---@return string
+local function titleRole(kind)
+  local S = style.Theme.Sections
+  if kind == "recent" then
+    return S.RecentFont
+  elseif kind == "free" then
+    return S.FreeFont
+  end
+  return S.TitleFont
+end
+
+-- styleSection draws a section's title row from the theme: the title and count in its roles and
+-- places, the line after them (or none), the header's height and highlight (or none), the cells
+-- below it.
+---@private
+---@param section NextSection
+function canvasProto:styleSection(section)
+  local S = style.Theme.Sections
+  local inner, title, count, line = section.inner, section.title, section.count, section.line
+  style:SetFont(title, titleRole(section.kind))
+  style:SetFont(count, S.CountFont)
+  title:ClearAllPoints()
+  title:SetPoint("TOPLEFT", inner, "TOPLEFT", S.Title.X, S.Title.Y)
+  count:ClearAllPoints()
+  count:SetPoint("LEFT", title, "RIGHT", S.CountGap, 0)
+  line:ClearAllPoints()
+  line:SetPoint("LEFT", count, "RIGHT", S.LineGap, 0)
+  line:SetPoint("RIGHT", inner, "RIGHT", 0, 0)
+  local spec = S.Line
+  if spec then
+    line:SetHeight(spec.Size)
+    line:SetGradient("HORIZONTAL", style:CreateColor(spec.Color, spec.From), style:CreateColor(spec.Color, spec.To))
+    line:Show()
+  else
+    line:Hide()
+  end
+  section.cells:ClearAllPoints()
+  section.cells:SetPoint("TOPLEFT", inner, "TOPLEFT", 0, -style.SECTION_HEADER)
+  section.header:SetHeight(style.SECTION_HEADER)
+  local highlight, glow = section.highlight, S.Highlight
+  if glow then
+    highlight:SetGradient("HORIZONTAL", style:CreateColor(glow.Color, glow.From), style:CreateColor(glow.Color, glow.To))
+    highlight:Show()
+  else
+    highlight:Hide()
+  end
+end
+
+-- ApplyStyle restyles every section it holds (drawn, kept from the last pass, pooled) for the
+-- current theme, and lays them out again (SonataNext applied a theme). Its buttons take the theme's
+-- icon size when they are drawn next (claim).
+---@param ctx Context
+function canvasProto:ApplyStyle(ctx)
+  local _ = ctx
+  for _, list in ipairs({ self.order, self.pool }) do
+    for _, section in ipairs(list) do
+      self:styleSection(section)
+    end
+  end
+  for _, section in pairs(self.stale) do
+    self:styleSection(section)
+  end
+  self:Invalidate()
 end
 
 -- newHeader makes a section's header: a button across its title row that passes drags, clicks
@@ -148,13 +213,12 @@ function canvasProto:newHeader(section)
   local header = CreateFrame("Button", nil, section.inner)
   header:SetPoint("TOPLEFT", section.inner, "TOPLEFT", 0, 0)
   header:SetPoint("TOPRIGHT", section.inner, "TOPRIGHT", 0, 0)
-  header:SetHeight(style.SECTION_HEADER)
   header:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   header:RegisterForDrag("LeftButton")
   local highlight = header:CreateTexture(nil, "HIGHLIGHT")
   highlight:SetAllPoints()
   highlight:SetColorTexture(1, 1, 1, 1)
-  highlight:SetGradient("HORIZONTAL", style:CreateColor("Lavender", 0.12), style:CreateColor("Lavender", 0))
+  section.highlight = highlight
   local function call(name, ...)
     local handler = self.headerHandler
     if handler and handler[name] then
@@ -207,8 +271,7 @@ function canvasProto:section(name, kind)
   section.name = name
   section.kind = kind
   section.entries = {}
-  local font = kind == "recent" and "SectionRecent" or kind == "free" and "SectionFree" or "Section"
-  section.title:SetFontObject(style:Font(font))
+  style:SetFont(section.title, titleRole(kind))
   section.title:SetText(name)
   self.byName[name] = section
   table.insert(self.order, section)
@@ -305,11 +368,18 @@ function canvasProto:SetButtonSource(source)
   self.buttonSource = source
 end
 
--- SetCellHeight sets how tall a row of buttons is, without the gap.
----@param height number
-function canvasProto:SetCellHeight(height)
-  self.cellHeight = height
+-- SetPriceRow says its buttons have a price row under their icons (the vendor's), so its rows are
+-- that much taller.
+---@param on boolean
+function canvasProto:SetPriceRow(on)
+  self.priceRow = on
   self:Invalidate()
+end
+
+-- CellHeight is how tall a row of buttons is, without the gap, for the current theme.
+---@return number
+function canvasProto:CellHeight()
+  return style.ICON + (self.priceRow and style.VENDOR_PRICE or 0)
 end
 
 ---@class (exact) NextCanvasSection
@@ -426,6 +496,7 @@ end
 ---@return RenderResult
 function canvasProto:Render(parentResult)
   local width = parentResult and parentResult.Width or style.GRID_WIDTH
+  local STEP = step()
   local perRow = math.max(1, math.floor((width + style.GAP) / STEP))
   local animated = self.frame:IsVisible()
   if animated then
@@ -445,7 +516,7 @@ function canvasProto:Render(parentResult)
     y = y + drag.height
     placed = placed + 1
   end
-  local rowStep = self.cellHeight + style.GAP
+  local rowStep = self:CellHeight() + style.GAP
   for _, section in ipairs(self.order) do
     local rows = math.max(1, math.ceil(#section.entries / perRow))
     local height = style.SECTION_HEADER + rows * rowStep - style.GAP
@@ -504,7 +575,7 @@ function canvasProto:Cascade(all, delay)
         delay = (delay or 0) + i * style.Time.Stagger,
         from = 0,
         to = 1,
-        ease = "outCubic",
+        ease = style:Ease("Cascade"),
         onUpdate = function(v)
           section.frame:SetAlpha(v)
           setRise(section, (1 - v) * style.RISE)

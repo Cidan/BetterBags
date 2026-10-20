@@ -231,7 +231,7 @@ describe("NextVendor", function()
       assert.are.equal("BetterBagsNextVendor", v:GetName())
       assert.are.equal("LEFT", v.side)
       assert.is_false(v:IsShown())
-      assert.are.equal(style.ICON + style.VENDOR_PRICE, v.content.cellHeight)
+      assert.are.equal(style.ICON + style.VENDOR_PRICE, v.content:CellHeight())
       assert.are.equal("HIGH", v.frame:GetFrameStrata())
     end)
 

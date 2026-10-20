@@ -356,6 +356,7 @@ files["spec/**/*.lua"] = {
 		"LoadFreshBetterBagsModule",
 		"UseSonataTextRoles",
 		"FreshNextThemes",
+		"UseNextTheme",
 		"MockData",
 		"ResetMockMerchant",
 		"ResetMockGuildBank",
