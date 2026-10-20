@@ -1,0 +1,17 @@
+{
+  "id": 1792470108,
+  "version": "v0.7.0-2-ge10eebd",
+  "channel": "alpha",
+  "date": "2026-10-20",
+  "from": "88931a1a236b4dc8396378e2b76691fd3eed638a",
+  "to": "e10eebd13061dc2ca7336d28aa9d0461b0ad6bdb",
+  "headline": "The bank now loads tab by tab to prevent game freezing when opened.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Progressive tab loading when opening the bank",
+      "details": "Opening the bank now loads and displays items tab by tab rather than processing every tab at once, matching how guild banks open. The currently active tab appears first, eliminating large frame drops and hitching when accessing large banks.",
+      "clients": []
+    }
+  ]
+}
