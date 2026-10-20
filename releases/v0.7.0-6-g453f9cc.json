@@ -1,0 +1,17 @@
+{
+  "id": 1792476544,
+  "version": "v0.7.0-6-g453f9cc",
+  "channel": "alpha",
+  "date": "2026-10-20",
+  "from": "e5ba3794b08871ded1de48d5197dc9c227f63bae",
+  "to": "453f9ccf070b6fa054bc62b5cf051e303524b316",
+  "headline": "This build refines header icon scaling for themes, giving the Quiet theme more proportional icons.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Header icon scaling in Quiet theme",
+      "details": "Header icons now scale according to the active theme. In the Quiet theme, icons are drawn slightly smaller to match its compact header text, while keeping button click areas unchanged.",
+      "clients": []
+    }
+  ]
+}
