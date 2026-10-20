@@ -1,0 +1,17 @@
+{
+  "id": 1792459246,
+  "version": "v0.7.0-1-g88931a1",
+  "channel": "alpha",
+  "date": "2026-10-20",
+  "from": "40e8949b53324387f688f82243b89441ba210d70",
+  "to": "88931a1a236b4dc8396378e2b76691fd3eed638a",
+  "headline": "Introduces theme support for BetterBags Next alongside four built-in themes and a settings page.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Theme support for BetterBags Next",
+      "details": "BetterBags Next now supports custom themes through a new Next Theme settings page with live previews. Shipped themes include Default, Ember (a charcoal and warm amber palette with drifting sparks), Parchment (an inked, classic fantasy paper look), and Quiet (a compact, clean layout without particle effects).",
+      "clients": []
+    }
+  ]
+}
