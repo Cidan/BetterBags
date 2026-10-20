@@ -103,8 +103,11 @@ describe("SonataNext", function()
 
     it("takes Requires as a list of addon names, and nothing else", function()
       sonataNext:RegisterTheme({ Name = "Elvish", Requires = { "ElvUI" } })
-      assert.has_error(function() sonataNext:RegisterTheme({ Name = "R1", Requires = "ElvUI" }) end)
-      assert.has_error(function() sonataNext:RegisterTheme({ Name = "R2", Requires = { 3 } }) end)
+      for _, bad in ipairs({ { Name = "R1", Requires = "ElvUI" }, { Name = "R2", Requires = { 3 } } }) do
+        local ok, err = pcall(function() sonataNext:RegisterTheme(bad) end)
+        assert.is_false(ok)
+        assert.is_truthy(tostring(err):find("Requires is a list of addon names", 1, true), tostring(err))
+      end
     end)
   end)
 
@@ -243,6 +246,30 @@ describe("SonataNext", function()
       assert.are.equal(1, styled)
       assert.are.equal(1, #errors)
       assert.is_truthy(tostring(errors[1]):find("broken widget", 1, true))
+    end)
+
+    -- A widget restyling can make another go away (a panel releasing a part): one gone before its turn
+    -- is not styled.
+    it("skips a widget unregistered while another restyles", function()
+      sonataNext:RegisterTheme({ Name = "Ember" })
+      local styled, widgets = 0, {}
+      for i = 1, 5 do
+        widgets[i] = { ApplyStyle = function()
+          styled = styled + 1
+          for _, other in ipairs(widgets) do sonataNext:UnregisterWidget(other) end
+        end }
+        sonataNext:RegisterWidget(widgets[i])
+      end
+      sonataNext:ApplyTheme(ctx(), "Ember")
+      assert.are.equal(1, styled)
+    end)
+
+    it("restores nothing while the saved theme is the one in use", function()
+      sent = {}
+      local generation = sonataNext:GetGeneration()
+      sonataNext:RestoreSavedTheme(ctx())
+      assert.are.equal(generation, sonataNext:GetGeneration())
+      assert.are.same({}, sent)
     end)
 
     it("forgets a widget unregistered", function()

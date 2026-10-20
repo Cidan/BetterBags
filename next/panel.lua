@@ -1995,8 +1995,8 @@ end
 
 -- styleSearch places and draws the search box from the theme (Layout, Search): where it sits, its
 -- border's size (or none), its magnifier, its help text and what is typed in their roles (the
--- template colors both itself, so the roles' colors are set on them too), then its look for its
--- state.
+-- template gives the help text a color of its own, so its role's color is set on it too), then its
+-- look for its state.
 ---@private
 function panelProto:styleSearch()
   local sf, S = self.searchBox, style.Theme.Search
@@ -2028,7 +2028,7 @@ function panelProto:styleSearch()
   help:SetPoint("LEFT", icon, "RIGHT", style.SEARCH_GAP, 0)
   help:SetPoint("RIGHT", t, "RIGHT", -style.SEARCH_RIGHT, 0)
   style:SetTemplateFont(help, S.HelpFont)
-  style:SetTemplateFont(t, S.TextFont)
+  style:SetFont(t, S.TextFont)
   t:SetTextInsets(style.SEARCH_GAP * 2 + style.SEARCH_ICON, style.SEARCH_RIGHT, 0, 0)
   self:UpdateSearchLook(true)
 end

@@ -442,9 +442,9 @@ describe("BetterBags Next's panels and themes", function()
       for _, edge in ipairs(bag.searchEdges) do assert.is_false(edge:IsShown()) end
     end)
 
-    -- Blizzard's search template sets its own text colors (InputBoxInstructions_UpdateColorForEnabledState,
-    -- the help text's XML color), so the role's color is set on the text too, with every theme.
-    it("writes what is typed and its help in its roles' colors, over the template's", function()
+    -- Blizzard's search template gives its help text a color of its own (InputBoxInstructionsTemplate's
+    -- XML <Color>, 0.35 gray), so the help's role color is set on it too, with every theme.
+    it("writes what is typed and its help in its roles' colors, the help's over the template's", function()
       local bag = nextBag:Create(ctx())
       local t = bag.searchBox.textBox
       apply({ Fonts = { SearchText = { Size = 15, Color = "Gold" }, Search = { Size = 11, Color = "White" } } })
@@ -455,6 +455,25 @@ describe("BetterBags Next's panels and themes", function()
       backToDefault()
       assert.are.same(style.Color.Text, { t:GetTextColor() })
       assert.are.same(style.Color.Muted, { t.Instructions:GetTextColor() })
+    end)
+  end)
+
+  describe("its tabs and sections", function()
+    it("restyles its tab rail and its sections with the panel", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:Draw(ctx(), slots[BACKPACK])
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      -- Tabs of its own: this bank has no groups or tabs bought.
+      bank.tabs:SetTabs({ { id = 1, name = "One" }, { id = 2, name = "Two" } })
+      local section = bag.content.order[1]
+      assert.is_not_nil(section)
+      apply({ Fonts = { Small = { Size = 9 } }, Tabs = { Font = "Small", SelectedFont = "Small" },
+        Sections = { Line = false } })
+      for _, tab in ipairs(bank.tabs.tabs) do
+        assert.are.equal(style:Font("Small"), tab.text:GetFontObject())
+      end
+      assert.is_true(#bank.tabs.tabs > 0)
+      assert.is_false(section.line:IsShown())
     end)
   end)
 
@@ -533,6 +552,11 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.same({ 0.78, 0.72, 1.0, 1 }, { bag.braid.strands[1][1]:GetVertexColor() })
       bag:SetCoupling(1, 100, true, 0, 0, 120)
       assert.is_true(bag.braid.strands[1][1]:IsShown())
+      apply({ Chain = { Segments = 2 } })
+      bag:SetCoupling(1, 100, true, 0, 0, 120)
+      for i, line in ipairs(bag.braid.linePools[1]) do
+        assert.are.equal(i <= 2, line:IsShown(), "segment " .. i)
+      end
       apply({ Chain = { Braid = false } })
       bag:SetCoupling(1, 100, true, 0, 0, 120)
       for _, strand in ipairs(bag.braid.strands) do

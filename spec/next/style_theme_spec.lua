@@ -183,6 +183,18 @@ describe("NextStyle", function()
       assert.are.equal(style:Font("Count"), text:GetFontObject())
     end)
 
+    -- A Blizzard template colors its own text; such text takes its role's color too, with every theme,
+    -- with nothing else restyling it.
+    it("colors text a template colors by its role, with every theme", function()
+      local text = CreateFrame("Frame"):CreateFontString(nil, "OVERLAY")
+      text:SetTextColor(0.35, 0.35, 0.35, 1)
+      style:SetTemplateFont(text, "Search")
+      assert.are.same({ style:Font("Search"):GetTextColor() }, { text:GetTextColor() })
+      sonataNext:RegisterTheme({ Name = "Spec", Fonts = { Search = { Color = "Gold" } } })
+      style:Use(resolved("Spec"))
+      assert.are.same({ 1, 0.84, 0.5, 1 }, { text:GetTextColor() })
+    end)
+
     it("refuses a role no theme defines", function()
       assert.has_error(function() style:Font("NoSuchRole") end)
     end)

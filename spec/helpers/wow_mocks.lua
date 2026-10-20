@@ -2205,6 +2205,9 @@ _G.__mockTemplates.SearchBoxTemplate = function(box)
   box.Middle = box:CreateTexture(nil, "BACKGROUND")
   box.Middle:SetAtlas("common-search-border-middle")
   box.Instructions = box:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+  -- Its XML <Color r="0.35" g="0.35" b="0.35"/> (InputBoxInstructionsTemplate): the font string's own
+  -- color, over its font object's.
+  box.Instructions:SetTextColor(0.35, 0.35, 0.35)
   box.Instructions:SetPoint("TOPLEFT", box, "TOPLEFT", 16, 0)
   box.Instructions:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -20, 0)
   box.searchIcon = box:CreateTexture(nil, "OVERLAY")

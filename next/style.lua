@@ -203,8 +203,8 @@ end
 
 -- SetTemplateFont draws text a Blizzard template colors itself with a role: SetFont, and the role's
 -- color and shadow set on the text too, now and with every theme. A template's own color wins over
--- a font object's (InputBoxInstructions_UpdateColorForEnabledState sets an edit box's, an XML
--- <Color> a font string's), as Sonata's apply:Font does.
+-- a font object's (an XML <Color>, as InputBoxInstructionsTemplate gives its help text 0.35 gray), as
+-- Sonata's apply:Font handles it.
 ---@param text FontString|EditBox
 ---@param role string
 function style:SetTemplateFont(text, role)
