@@ -174,6 +174,8 @@ sonataNext:RegisterTheme({
       -- Switching between full and small: the glide, then the fade.
       Morph = 0.4,
       MorphFade = 0.2,
+      -- A small panel gliding back to its default size (Shift-click on a grip).
+      Resize = 0.4,
     },
     Ease = {
       -- Opening's overshoot sets how far the body reaches past the screen edge, so the bounce never
@@ -196,6 +198,7 @@ sonataNext:RegisterTheme({
       Uncouple = "inOutSine",
       Morph = "inOutCubic",
       MorphFade = "inOutSine",
+      Resize = "inOutCubic",
     },
     -- How far sections rise as they cascade in.
     Rise = 12,
@@ -376,6 +379,19 @@ sonataNext:RegisterTheme({
   -- until first moved; chaining by dropping a bag beside its partner: how close, how far apart their
   -- tops may be, and the least room between them.
   Small = {
+    -- The grips on a small panel's bottom corners (next.md §14g): Blizzard's chat size grabber
+    -- (FloatingChatFrame.xml's resize button), Size square, Inset in from the corner, mirrored on the
+    -- left, seen only while the pointer is over one (ShowOnHover; false: at all times); and the least
+    -- room a narrowed panel keeps for its title, cut short past that.
+    Grip = {
+      Size = 16,
+      Inset = 2,
+      ShowOnHover = true,
+      Normal = { Texture = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up" },
+      Highlight = { Texture = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight", BlendMode = "ADD" },
+      Pushed = { Texture = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down" },
+    },
+    MinTitle = 60,
     Height = 0.66,
     Ribbon = 120,
     SparkSpread = 48,

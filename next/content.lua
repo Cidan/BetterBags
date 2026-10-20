@@ -87,6 +87,7 @@ end
 ---@field headerHandler? NextHeaderHandler
 ---@field priceRow boolean Its buttons have a price row under their icons (the vendor's: SetPriceRow).
 ---@field buttonSource {GetButton: fun(self: any, ctx: Context, slotkey: string): Item} Where Bind takes its buttons: the item buttons, or the guild bank's (SetButtonSource).
+---@field instant boolean It places everything at once, nothing gliding (SetInstant: its panel is being resized).
 local canvasProto = drawable:Extend({}, 'NextCanvas')
 
 ---@param parent Frame
@@ -104,6 +105,7 @@ function nextContent:Create(parent)
   canvas.freeTotal = 0
   canvas.leaving = {}
   canvas.priceRow = false
+  canvas.instant = false
   canvas.buttonSource = itemFrame
   addon.SetScript(canvas.frame, "OnHide", function()
     canvas:Settle()
@@ -490,15 +492,23 @@ function canvasProto:Bind(ctx, slotInfo, tabID, claims)
   self:finishBind()
 end
 
+-- SetInstant makes the canvas place everything at once while on: its panel is being resized
+-- (next.md §14g), and its rows reflow with the edge as a web page's do, nothing gliding behind it.
+---@param on boolean
+function canvasProto:SetInstant(on)
+  self.instant = on
+end
+
 -- Render lays the sections out in one column, in rows of as many icons as fit the width it is
--- given; while the canvas is shown, through a Motion pass, so what changed place travels there.
+-- given; while the canvas is shown, through a Motion pass, so what changed place travels there
+-- (but not while it places at once, SetInstant).
 ---@param parentResult? RenderResult
 ---@return RenderResult
 function canvasProto:Render(parentResult)
   local width = parentResult and parentResult.Width or style.GRID_WIDTH
   local STEP = step()
   local perRow = math.max(1, math.floor((width + style.GAP) / STEP))
-  local animated = self.frame:IsVisible()
+  local animated = self.frame:IsVisible() and not self.instant
   if animated then
     motion:BeginPass(self, style.Time.Interaction)
   else

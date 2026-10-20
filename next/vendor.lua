@@ -18,9 +18,6 @@ local question = addon:GetModule('Question')
 ---@class Render: AceModule
 local render = addon:GetModule('Render')
 
----@class NextStyle: AceModule
-local style = addon:GetModule('NextStyle')
-
 ---@class NextPanel: AceModule
 local nextPanel = addon:GetModule('NextPanel')
 
@@ -74,6 +71,9 @@ local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED"
 ---@field closeRequested boolean It asked the vendor to close.
 ---@field buttons table<string, NextVendorButtonFrame> This draw's buttons, by key.
 local vendorProto = nextPanel:Extend({}, 'NextVendorPanel')
+-- A vendor's name can be any length: it is cut short to the room its header buttons leave at either
+-- size (FitTitle).
+vendorProto.fitsTitle = true
 
 -- mainline is whether the client runs Blizzard's retail merchant frame (retail and WoW: Forever).
 ---@return boolean
@@ -206,13 +206,6 @@ function vendorProto:ApplySearch()
   end
 end
 
--- ApplyStyle restyles the vendor like any panel, and fits its name to the theme's header again.
----@param ctx Context
-function vendorProto:ApplyStyle(ctx)
-  nextPanel.proto.ApplyStyle(self, ctx)
-  self:fitTitle()
-end
-
 -- UpdateHeader shows what the vendor offers and enables what can be done: the filter (retail,
 -- unless a game rule turns it off), the repair buttons at a vendor that repairs (the guild's when
 -- the guild pays), Sell Junk with junk in the bags.
@@ -229,23 +222,9 @@ function vendorProto:UpdateHeader()
   self:setEnabled(self.repairAllButton, anything)
   self:setEnabled(self.guildRepairButton, anything)
   self:setEnabled(self.sellJunkButton, merchant:NumJunk() > 0)
+  -- The vendor's name (any length) stays on one line in the room right of the shown header buttons,
+  -- cut short rather than over them (FitTitle, which laying the header out runs).
   self:LayoutHeader()
-  self:fitTitle()
-end
-
--- fitTitle keeps the vendor's name (any length) on one line in the room right of the shown header
--- buttons, cut short rather than over them.
----@private
-function vendorProto:fitTitle()
-  local shown = 0
-  for _, button in ipairs(self.headerButtons) do
-    if button:IsShown() then
-      shown = shown + 1
-    end
-  end
-  local buttons = shown * style.HEADER_BUTTON + math.max(0, shown - 1) * style.HEADER_BUTTON_GAP
-  self.title:SetWordWrap(false)
-  self.title:SetWidth(style.BODY_WIDTH - (style.PAD + style.TITLE_INSET) - (style.PAD + buttons) - 12)
 end
 
 ---@private

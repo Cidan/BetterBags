@@ -1162,20 +1162,23 @@ smaller screens. The plan, the reasoning and what was asked are in `docs/next-sm
 (asked: "the biggest pain is two panels open for people with smaller screens ... a smaller panel,
 like ESO ... a panel we can move ... a button toggle to swap between small and full mode (animated
 of course)"). Phase 1 is small panels, moving them and switching sizes (§14a-d); phase 2 is chaining
-small panels by dragging them together (§14e).
+small panels by dragging them together (§14e); then resizing them with grips (§14g).
 
 ### 14a. The setting and the size
 
 - `nextSize` (profile, `"full"` by default; `DB:Get/SetNextSize`, nothing else accepted) is every
   Next panel's size; `nextSmallPlaces[kind]` (`DB:Get/SetNextSmallPlace`) where each kind's small
-  panel was left (its top left in UIParent's units), nothing until first moved.
+  panel was left (its top left in UIParent's units), nothing until first moved;
+  `nextSmallSizes[kind]` (`DB:Get/SetNextSmallSize`, `{ width, height }`) the size the player gave it
+  with its grips (§14g), nothing while it is the default size (a reset clears it).
 - Each panel keeps its own `size`, read from the setting when it is made, so a panel can be part way
   through a switch (§14d). `IsSmall`, `Height`, `Width`, `BodyLeft`, `RibbonBase` and
   `SparkSpreadBase` answer for it.
 - The knobs are the Next theme's `Small` (next-themes.md), read through `style.Small`: the height share
   (0.66), the beam (120) and how far out along it its sparkles are born (48), the open slide (24), the
-  default margin (40); the edge's alpha is `Panel.Edge.Alpha` (0.35). `Motion.Time.Morph` (0.4 s) is
-  the switch.
+  default margin (40), the grips (`Grip`) and the least room kept for the title (`MinTitle`, 60); the
+  edge's alpha is `Panel.Edge.Alpha` (0.35). `Motion.Time.Morph` (0.4 s) is the switch,
+  `Motion.Time.Resize` (0.4 s) the glide back to the default size.
 
 ### 14b. The geometry (`ApplyGeometry`)
 
@@ -1184,13 +1187,15 @@ end of a switch. `BuildPanel` only makes the parts.
 - **Full** is unchanged (§3): the frame on its screen edge, top to bottom; the body inside the
   feather; no clicks over the feather (hit rect insets); the fill and the wash reaching past the
   screen edge while docked (`SetDocked`).
-- **Small:** the frame is the body (`BODY_WIDTH` wide, the same as the full body, so the grid,
-  sections, drag and drop and the tab rail are unchanged), `SmallHeight` tall (a share of the screen,
-  whole units), anchored by its top left at its place (`SmallPlace`: where it was left, else a margin
-  in from its own screen edge, centered; always kept on the screen, `clampPlace`). No feather, clicks
-  everywhere, a 1-pixel lavender edge all round (`edges`), the shorter beam. `SetDocked` does nothing
-  to a small panel (it is never at its screen edge). The render root hands the content the panel's
-  height less its header and footer.
+- **Small:** the frame is the body, its size `SmallSize`: the size the player gave it (§14g), else
+  `BODY_WIDTH` wide (the full body's) and a share of the screen tall (whole units), never below its
+  minimum nor past the screen. It is anchored by its top left at its place (`SmallPlace`: where it was
+  left, else a margin in from its own screen edge, centered; always kept on the screen, `clampPlace`,
+  for its own width). No feather, clicks everywhere, a 1-pixel lavender edge all round (`edges`), the
+  shorter beam, a grip on each bottom corner (§14g). `SetDocked` does nothing to a small panel (it is
+  never at its screen edge). The render root hands the content the body's width less its padding
+  (`BodyWidth`: the full body's at full size, a small panel's own) and the panel's height less its
+  header and footer.
 - **Sparkles follow the geometry:** every emitter computes its spawn points from `BodyLeft` at spawn
   time (they were constants of the full width), so the edge sparkles still drift out of a small
   panel's inner side and the ribbon's along its shorter beam.
@@ -1237,12 +1242,15 @@ end of a switch. `BuildPanel` only makes the parts.
 - **A panel not shown** (a closing one finishes closing first) takes the size at once and lays its
   content out for its new height (its root renders while hidden: it has no `ShouldRender`).
 - **A shown panel switches in two steps** (`Morph`). Its opening slide or flight is finished, its
-  body's place is kept (`BodyRect`), and it gets the new size's parts at once (`ApplyGeometry`); the
-  frame is then anchored by its top left and sized as it goes, so the body only moves and stretches
-  (its width is the same at both sizes). Nothing reaches past the screen edge on the way
-  (`SetDocked(false)`).
+  body's place and size are kept (`BodyRect`), and it gets the new size's parts at once
+  (`ApplyGeometry`); the frame is then anchored by its top left and sized as it goes (the body plus
+  the feather at full size), so the body only moves and stretches. Nothing reaches past the screen
+  edge on the way (`SetDocked(false)`).
   - **The glide** (`inOutCubic`, `Time.Morph`): the body from where it was to where it rests (its
-    small place, or its full rest offset, `chain:RestOffset`), the beam shortening or growing, and
+    small place, or its full rest offset, `chain:RestOffset`) and from its width to the new size's (a
+    small panel the player sized is wider or narrower than the full body, §14g; when the body
+    narrows, the content is laid out at once for the width it ends at, so nothing is cut off on the
+    way, and again at the end), the beam shortening or growing, and
     what the old size had fading out on the way: shrinking, the feathers (a shrinking panel's feather
     beside its inner side, re-anchored there; the far feather, `outerFeather`, with it); growing, the
     small border.
@@ -1280,7 +1288,8 @@ them/coming out the side though!"
   (the backpack was dropped beside a companion, and sits beside whichever is open). Full mode's
   `nextChain` is untouched; each size keeps its own chain.
 - **Where a chained bag sits** (`ChainedPlace`): a companion left of the backpack, the backpack right
-  of a companion (only their facing sides chain), tops aligned, `SmallGap` between them (both tab
+  of a companion (only their facing sides chain), each as wide as the player made it (§14g), tops
+  aligned, `SmallGap` between them (both tab
   rails, each its widest tab plus the hover slide, and a margin; at least `Small.MinGap`).
   `SmallPlace` of a chained bag is that spot beside its anchor where the anchor is now
   (`LivePlace`: under the mouse while dragged, else its place, saved or default, so a companion opens
@@ -1309,7 +1318,7 @@ them/coming out the side though!"
 
 ### 14f. Coverage
 
-`spec/next/small_spec.lua` (64): the geometry (size, place, no feather, the edge, the beam, sparkles
+`spec/next/small_spec.lua` (116, the resizing tests listed in §14g): the geometry (size, place, no feather, the edge, the beam, sparkles
 on both sides, the root, a saved place kept on the screen), opening and closing (slide and fade,
 reopening mid-close, the screen at opening, never chained, closing with a chain layout saved),
 moving (by the title row and the title, saved per kind, the layout cache flag, kept on the screen,
@@ -1333,3 +1342,102 @@ would have cut a bag's slide in short, dropping what waited for it to show).
 
 Not verified in game yet: how the small panels look, the glide, moving them, and the button's art
 (a red Blizzard button among flat icons).
+
+### 14g. Resizing a small panel (the grips)
+
+Asked: "a window handle when in minimized mode that lets users resize the window, dom like, just like
+the original bags ... make this resize static though, i.e. no snapping"; then grips on "both sides,
+but disable it on the side it's chained on, if it's chained"; the room left past the last icon "all on
+the right ... let's not center in the next design"; "remember what the custom window sizing is"; a
+tooltip; "shift + left click the grip to reset to default size (animated, of course)"; and, after
+trying them in game, "auto-hide the handles so they only show on hover".
+
+- **The grips** (`BuildGrips`, `styleGrips`, the theme's `Small.Grip`): a button on each bottom corner
+  of a small panel's body, `Inset` (2) in, `Size` (16) square, drawn with Blizzard's chat size grabber
+  (`UI-ChatIM-SizeGrabber-Up`, `-Highlight`, `-Down`: the art of `FloatingChatFrame.xml`'s resize
+  button and of the classic bags' grip, on every client), turned around on the left corner (its
+  texture coordinates). Full panels have none (`UpdateGrips`). The tooltip reads "Resize", "Drag to
+  resize.", "Shift-click to reset to the default size."
+- **Seen only under the pointer** (`fadeGrip`): a grip is transparent until the pointer is over it,
+  as the classic bags' grip is (`window.lua`, `ShowOnHover`), fading in and out over `Time.Hover` as
+  Next's other hovers do; it stays seen while it is dragged, wherever the pointer goes, and fades once
+  let go away from it. Transparent, it still takes the pointer, so hovering the corner finds it. A
+  theme with `Small.Grip.ShowOnHover = false` shows them at all times; a theme switch sets each grip
+  at once for where the pointer is, cutting a fade short.
+- **No grip on the chained side** (`chain:ChainedSide`, `UpdateGrips`): a bag chained beside its
+  anchor has none on its facing side (its place hangs from the anchor's, open or not), and an anchor
+  none on its facing side while its chained bag is open; facing is the backpack's left and a
+  companion's right. Updated with the coupling (`chain:UpdateCoupling`, which every open, close and
+  chain change reaches) and as a drop chains (`chain:Dropped`); a grip being dragged stays until let
+  go. So neither bag's chained side ever moves: the chained bag's spot (`ChainedPlace`) is measured
+  from the anchor's facing side, and nothing pushes the partner.
+- **Dragging a grip** (`StartSizing`, `Resized`, `StopSizing`): `Frame:StartSizing` from the grip's
+  corner (`BOTTOMLEFT` or `BOTTOMRIGHT`) and from where it was pressed (`alwaysStartFromMouse`, as the
+  classic window does), within `MinWidth`/`MinHeight` and the screen (`SetResizeBounds`); the corner
+  across from it stays still. Its opening slide, a size switch or a glide back is finished first. It
+  does not size while closing or moving, nor with something on the cursor: pressing a grip is then a
+  drop, which the grip passes to the bag (`PlaceCursorItem`, on release and on `OnReceiveDrag`).
+  - **Live reflow, like a web page:** while a grip sizes the panel, the frame's own `OnSizeChanged`
+    (`Resized`) fits the title and invalidates the render root, so the content lays out again every
+    frame at the new width, as many icons per row as fit; the canvas places everything at once
+    meanwhile (`canvas:SetInstant`), so nothing glides behind the moving edge. A size change of its
+    own (a switch) lays nothing out from there.
+  - **Let go, it stays exactly the size it is** (no snapping), saved for its kind with its place (its
+    top left, which the left grip moves). A press that changes the size by less than half a unit saves
+    nothing, so the default size keeps following the screen. Hiding it (Escape) ends the sizing,
+    keeping the size reached (`OnHidden`).
+- **Its size** (`SmallSize`): the saved size, else `BODY_WIDTH` wide and `Small.Height` of the screen
+  tall; never below its minimum nor past the screen, without changing what was saved.
+  - `MinWidth`: room for the shown header buttons, 12, and `Small.MinTitle` of the title (cut short
+    past that); for the footer's free slots, 12 and the money (`frames/money.lua`: 128 wide); and for
+    one column of icons with the scroll box's room and the padding. `MinHeight`: the header, the
+    footer, a section's title and one row of icons (`CellHeight`).
+  - `SmallWidth`/`SmallHeight` read the frame while a grip sizes it or it glides back, else the size it
+    took last (`smallWidth`, `smallHeight`, from `ApplyGeometry` and `FitSmall`).
+  - The room past the last column of icons is left on the right, as a web page's (asked: no centering
+    in Next's design).
+  - It comes back at its saved size after a switch to full size and back. When the screen changes
+    (`FitSmall`) it is refitted to it and laid out again if its width or height changed; what was
+    saved is kept.
+- **The title** (`FitTitle`): a small panel's title stays on one line in the room its shown header
+  buttons leave, cut short rather than under them; so does the vendor's at either size (`fitsTitle`:
+  a vendor's name can be any length; this replaced its own `fitTitle`). A full panel's other titles
+  are as long as they are (width 0, wrapping on). Run by `LayoutHeader`, `SetTitle`, `ApplyGeometry`,
+  `FitSmall` and every size change while sized or gliding back.
+- **Shift-click** (`ResetSize`): the panel glides (`Time.Resize`, `Ease.Resize`) back to its default
+  size, the corner across from the grip still (the right grip keeps the top left, the left grip the
+  top right), its content reflowing at once on the way as while dragging; the saved size is cleared,
+  so the default follows the screen again, and the place saved. It returns `"resetting"`, `"default"`
+  (nothing was saved) or `"closing"`. Anything that places, moves, sizes, switches or hides the panel
+  ends the glide where it was going first (`endReset`, from `setOffset`, `StartMove`, `StartSizing`,
+  `PrepareResize`, `OnHidden`).
+- **Everything that read one width reads each panel's own:** `ChainedPlace`, `Dropped` (a bag too wide
+  to sit beside its partner on the screen does not chain), the braid's gap (`applyCoupling`),
+  `clampPlace`, the default place, `BodyRect`, the sparkles' spawn points and the root's constraints.
+  While a bag is sized or glides back, `LivePlace` and `SmallLeft` read its frame, so a partner's spot
+  and the braid follow it, and `chain:Update` leaves it alone (it places itself once let go).
+- **Combat:** nothing in the panels is protected, and `Frame:StartSizing` is restricted only on
+  protected frames in combat (warcraft.wiki.gg Frame:StartSizing), so resizing works in combat.
+
+Coverage: `spec/next/small_spec.lua` ("resizing it": the grips' corners, art, mirroring and tooltip;
+unseen until hovered, fading in and out, kept while dragged, a theme that shows them, a theme switch
+mid-fade; sizing from either corner from the mouse, the bounds, the footer's room, live reflow with
+nothing gliding, the size kept and saved with its place, the left grip's edge, the title cut short,
+a drop, a slide finished first, hiding mid-drag, a press that sizes nothing; the saved size at
+opening, clamped, after a switch and back, the width gliding through a switch and the content laid
+out early when narrowing, the screen changing (both ways), a wide panel's default and saved places,
+the sparkles at its width; Shift-click from both grips, reflowing on the way, at the default size,
+while closing, ended by a move, a sizing, a close, Escape and a switch; the chained side without a
+grip both ways, after a drop, while dragged, a chained bag resized beside its anchor, a bag being
+sized left alone and followed by its partner and the braid, bags of any width side by side, the
+braid between them, a bag too wide to chain), `spec/database_spec.lua` ("GetNextSmallSize /
+SetNextSmallSize"), `spec/core/constants_spec.lua`. Every guard was mutation-tested (93 mutations,
+each caught): the 17 the first pass missed led to new tests, and to removing code they showed was not
+needed: a `SetUserPlaced(false)` in `StartSizing` (the flag comes from `StartMoving` and the layout
+cache, warcraft.wiki.gg Frame:SetUserPlaced, not from sizing) and the chained-bag branch in
+`StopSizing`, which the grip turned off on the chained side made pointless (its chained side never
+moves); the same branch in `ResetSize` went for the same reason.
+
+Not verified in game yet: the hover fade, the glide back, chained bags' grips, and how the grips look
+on the other Next themes (Parchment's light paper). A render recording of a resize (render-recorder.md)
+would show the reflow and the room left on the right.

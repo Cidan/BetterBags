@@ -222,6 +222,15 @@ end
 ---@field moving? boolean The player is dragging the small panel.
 ---@field morph? NextMorph Set while it glides to its new size (Morph).
 ---@field morphFrom? NextMorphPoint Where its body was as it switched.
+---@field grips table<"LEFT"|"RIGHT", Button> A small panel's grips on its bottom corners (next.md §14g).
+---@field gripHover table<"LEFT"|"RIGHT", boolean> The pointer is over the grip.
+---@field sizing? "LEFT"|"RIGHT" The grip the player is sizing the small panel with.
+---@field sizingFrom? number[] Its width and height when the sizing started.
+---@field resetting boolean It glides back to its default size (ResetSize).
+---@field resetKey table The reset glide's tween key.
+---@field smallWidth? number A small panel's size, as it last took it (SmallSize).
+---@field smallHeight? number
+---@field fitsTitle? boolean Its title is cut short to the room its header buttons leave at full size too (the vendor's).
 local panelProto = {}
 nextPanel.proto = panelProto
 addon:GetModule('Perf'):RegisterPrototype(panelProto, 'NextPanelFrame')
@@ -238,7 +247,7 @@ end
 ---@return RenderResult
 function rootProto:PreRender()
   return {
-    Width = style.GRID_WIDTH + style.GUTTER,
+    Width = self.bag:BodyWidth() - 2 * style.PAD,
     Height = math.max(1, self.bag:Height() - style.CONTENT_TOP - style.FOOTER),
   }
 end
@@ -279,6 +288,8 @@ function nextPanel:Create(proto, opts)
   p.drawOnClose = false
   p.drawPendingOnShow = false
   p.drawnButtons = {}
+  p.resetting = false
+  p.resetKey = {}
   p.size = database:GetNextSize()
   p:BuildPanel(opts.name)
   p:BuildMover()
@@ -288,6 +299,7 @@ function nextPanel:Create(proto, opts)
   p:BuildFooter()
   p:BuildSparkles()
   p:BuildTabs()
+  p:BuildGrips()
   p:StyleParts()
   sonataNext:RegisterWidget(p)
   p:Watch()
@@ -351,8 +363,10 @@ end
 ---@private
 ---@param x number
 function panelProto:setOffset(x)
-  -- Anything that places the panel while it glides to a new size ends the glide first.
+  -- Anything that places the panel while it glides to a new size, or back to its default size, ends
+  -- the glide first.
   self:endMorph()
+  self:endReset()
   self.offset = x
   local frame = self.frame
   frame:ClearAllPoints()
@@ -713,10 +727,65 @@ function panelProto:IsSmall()
   return self.size == "small"
 end
 
--- SmallHeight is a small panel's height on this screen: a share of the screen's, in whole units.
+-- SmallSize is the size a small panel takes on this screen while nothing sizes it (next.md §14g):
+-- the size the player gave it with its grips (saved for its kind), else the full body's width and a
+-- share of the screen's height in whole units; never below its minimum, nor past the screen.
+---@return number width, number height
+function panelProto:SmallSize()
+  local w, h = database:GetNextSmallSize(self.kind)
+  w = w or style.BODY_WIDTH
+  h = h or math.floor(UIParent:GetHeight() * style.Small.Height)
+  return math.min(UIParent:GetWidth(), math.max(self:MinWidth(), w)),
+    math.min(UIParent:GetHeight(), math.max(self:MinHeight(), h))
+end
+
+-- SmallWidth and SmallHeight are a small panel's size now: the frame's while a grip sizes it or it
+-- glides back to its default size, else the size it took last (ApplyGeometry, FitSmall).
+---@return number
+function panelProto:SmallWidth()
+  if self.sizing ~= nil or self.resetting then
+    return self.frame:GetWidth()
+  end
+  return self.smallWidth or style.BODY_WIDTH
+end
+
 ---@return number
 function panelProto:SmallHeight()
-  return math.floor(UIParent:GetHeight() * style.Small.Height)
+  if self.sizing ~= nil or self.resetting then
+    return self.frame:GetHeight()
+  end
+  return self.smallHeight or math.floor(UIParent:GetHeight() * style.Small.Height)
+end
+
+-- headerButtonsWidth is how much of the header its shown buttons take, with the room between them.
+---@private
+---@return number
+function panelProto:headerButtonsWidth()
+  local shown = 0
+  for _, button in ipairs(self.headerButtons) do
+    if button:IsShown() then
+      shown = shown + 1
+    end
+  end
+  return shown * style.HEADER_BUTTON + math.max(0, shown - 1) * style.HEADER_BUTTON_GAP
+end
+
+-- MinWidth is the narrowest a small panel goes (next.md §14g): room for its shown header buttons and
+-- Small.MinTitle of its title (cut short past that, FitTitle), for its footer's free slots and money,
+-- and for one column of icons.
+---@return number
+function panelProto:MinWidth()
+  local header = 2 * style.PAD + style.TITLE_INSET + self:headerButtonsWidth() + 12 + style.Small.MinTitle
+  local money = self.moneyFrame ~= nil and self.moneyFrame.frame:GetWidth() or 0
+  local footer = 2 * style.PAD + style.TITLE_INSET + self.freeText:GetStringWidth() + 12 + money
+  local column = 2 * style.PAD + style.GUTTER + style.ICON
+  return math.ceil(math.max(header, footer, column))
+end
+
+-- MinHeight is the shortest a small panel goes: its header, its footer, and one row of a section.
+---@return number
+function panelProto:MinHeight()
+  return style.CONTENT_TOP + style.FOOTER + style.SECTION_HEADER + self.content:CellHeight()
 end
 
 -- Height is how tall the panel is: the screen's height, or a small panel's.
@@ -732,9 +801,18 @@ end
 ---@return number
 function panelProto:Width()
   if self:IsSmall() then
-    return style.BODY_WIDTH
+    return self:SmallWidth()
   end
   return style.WIDTH
+end
+
+-- BodyWidth is how wide the body is: the full body's at full size, a small panel's own width.
+---@return number
+function panelProto:BodyWidth()
+  if self:IsSmall() then
+    return self:SmallWidth()
+  end
+  return style.BODY_WIDTH
 end
 
 -- BodyLeft is where the body starts, from the frame's left edge: past the feather on the full
@@ -766,7 +844,7 @@ end
 ---@param y number
 ---@return number x, number y
 function panelProto:clampPlace(x, y)
-  x = math.max(0, math.min(UIParent:GetWidth() - style.BODY_WIDTH, x))
+  x = math.max(0, math.min(UIParent:GetWidth() - self:SmallWidth(), x))
   y = math.max(self:SmallHeight(), math.min(UIParent:GetHeight(), y))
   return x, y
 end
@@ -784,7 +862,7 @@ function panelProto:SmallPlace()
   if x == nil then
     y = (UIParent:GetHeight() + self:SmallHeight()) / 2
     if self.side == "RIGHT" then
-      x = UIParent:GetWidth() - style.BODY_WIDTH - style.Small.Margin
+      x = UIParent:GetWidth() - self:SmallWidth() - style.Small.Margin
     else
       x = style.Small.Margin
     end
@@ -792,11 +870,11 @@ function panelProto:SmallPlace()
   return self:clampPlace(x, y)
 end
 
--- LivePlace is where a small panel's top left is now: under the mouse while the player drags it, else
--- its place.
+-- LivePlace is where a small panel's top left is now: under the mouse while the player drags it, or
+-- where the frame is while it is sized or glides back to its default size, else its place.
 ---@return number x, number y
 function panelProto:LivePlace()
-  if self.moving then
+  if self.moving or self.sizing ~= nil or self.resetting then
     local x, y = self.frame:GetLeft(), self.frame:GetTop()
     if x ~= nil and y ~= nil then
       return x, y
@@ -805,11 +883,11 @@ function panelProto:LivePlace()
   return self:SmallPlace()
 end
 
--- SmallLeft is where a shown small panel's left edge is now: under the mouse while dragged, else its
--- place plus its slide.
+-- SmallLeft is where a shown small panel's left edge is now: under the mouse while dragged, the
+-- frame's while sized or gliding back to its default size, else its place plus its slide.
 ---@return number
 function panelProto:SmallLeft()
-  if self.moving then
+  if self.moving or self.sizing ~= nil or self.resetting then
     local x = self.frame:GetLeft()
     if x ~= nil then
       return x
@@ -855,9 +933,11 @@ function panelProto:ApplyGeometry()
   local frame, body = self.frame, self.body
   local bodyLeft = self:BodyLeft()
   local bodyRight = (not small and self.side == "LEFT") and style.FEATHER or 0
-  frame:SetWidth(self:Width())
   if small then
-    frame:SetHeight(self:SmallHeight())
+    self.smallWidth, self.smallHeight = self:SmallSize()
+    frame:SetSize(self.smallWidth, self.smallHeight)
+  else
+    frame:SetWidth(self:Width())
   end
   frame:SetHitRectInsets(bodyLeft, bodyRight, 0, 0)
   body:ClearAllPoints()
@@ -885,8 +965,11 @@ function panelProto:ApplyGeometry()
   end
   self.sparkSpread = self:SparkSpreadBase()
   frame:SetMovable(small)
+  frame:SetResizable(small)
   frame:SetClampedToScreen(small)
   self.mover:SetShown(small)
+  self:UpdateGrips()
+  self:FitTitle()
   if small then
     self.placeX, self.placeY = self:SmallPlace()
     self.docked = false
@@ -903,28 +986,30 @@ end
 -- screen: on opening (the screen may have changed while it was closed) and when the screen changes.
 -- Its content is laid out again when its height changed.
 function panelProto:FitSmall()
-  local height = self:SmallHeight()
-  local changed = self.frame:GetHeight() ~= height
-  self.frame:SetHeight(height)
+  local width, height = self:SmallSize()
+  local changed = self.frame:GetWidth() ~= width or self.frame:GetHeight() ~= height
+  self.smallWidth, self.smallHeight = width, height
+  self.frame:SetSize(width, height)
   self.placeX, self.placeY = self:SmallPlace()
   self:setOffset(self.offset)
+  self:FitTitle()
   if changed then
     render:Invalidate(self.root)
   end
 end
 
 -- BodyRect is where the body is on screen for the panel's size and offset now: its top left (in
--- UIParent's units) and its height. Its width is BODY_WIDTH at both sizes.
----@return number x, number y, number height
+-- UIParent's units), its height and its width (the full body's, or a small panel's own).
+---@return number x, number y, number height, number width
 function panelProto:BodyRect()
   if self:IsSmall() then
-    return self.placeX + self.offset, self.placeY, self:SmallHeight()
+    return self.placeX + self.offset, self.placeY, self:SmallHeight(), self:SmallWidth()
   end
   local left = self.offset
   if self.side == "RIGHT" then
     left = UIParent:GetWidth() - style.WIDTH + self.offset
   end
-  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight()
+  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight(), style.BODY_WIDTH
 end
 
 -- PrepareResize switches the panel's size (nextPanel:SetSize). Not shown (a closing one finishes
@@ -934,6 +1019,7 @@ end
 ---@param size NextSize
 ---@return boolean
 function panelProto:PrepareResize(size)
+  self:endReset()
   if self.closing then
     tween:Stop(self, true)
   end
@@ -953,10 +1039,10 @@ function panelProto:PrepareResize(size)
   else
     -- An opening slide or a flight ends where it was going: its end says the panel has shown.
     tween:Stop(self, true)
-    local x, y, h = self:BodyRect()
+    local x, y, h, w = self:BodyRect()
     local small = self:IsSmall()
     self.morphFrom = {
-      x = x, y = y, h = h, ribbon = self.ribbonLength,
+      x = x, y = y, h = h, w = w, ribbon = self.ribbonLength,
       full = small and 0 or 1,
       outer = (not small and not self.docked) and 1 or 0,
       edge = self:EdgeAlphaFor(small),
@@ -969,12 +1055,13 @@ end
 -- Morph switches the panel to its new size in two steps (asked: a "2 step" animation, so the feather
 -- never looks "spilled out" past the border, and growing the inverse of shrinking, moving at once).
 -- The glide: the body glides from where it was (PrepareResize) to where it rests at its new size, its
--- top left and its height (its width is the same at both), the beam shortening or growing, and what
--- the old size had fading out on the way: the feathers as it shrinks, the small border as it grows.
--- The fade: what the new size has fades in once it is there: the small border, or the feathers. Its
--- parts are the new size's from the start (ApplyGeometry), the frame anchored by its top left and
--- sized as it goes, so the body only moves and stretches; nothing reaches past the screen edge on the
--- way. A step with nothing to do (turned around) is skipped. The content is laid out once, at the end.
+-- top left, its height and its width (a small panel's own, next.md §14g), the beam shortening or
+-- growing, and what the old size had fading out on the way: the feathers as it shrinks, the small
+-- border as it grows. The fade: what the new size has fades in once it is there: the small border, or
+-- the feathers. Its parts are the new size's from the start (ApplyGeometry), the frame anchored by its
+-- top left and sized as it goes, so the body only moves and stretches; nothing reaches past the screen
+-- edge on the way. A step with nothing to do (turned around) is skipped. The content is laid out at
+-- the end, and also at once when the body narrows, so nothing is cut off on the way.
 function panelProto:Morph()
   local from = self.morphFrom --[[@as NextMorphPoint]]
   self.morphFrom = nil
@@ -982,7 +1069,10 @@ function panelProto:Morph()
   self.offset = small and 0 or chain:RestOffset(self)
   self.target = self.offset
   self:ApplyGeometry()
-  local tx, ty, th = self:BodyRect()
+  local tx, ty, th, tw = self:BodyRect()
+  if tw < from.w - 0.5 then
+    render:Invalidate(self.root)
+  end
   local toRibbon = self.ribbonLength
   self:SetDocked(false)
   local frame, feather, edges, outerFeather = self.frame, self.feather, self.edges, self.outerFeather
@@ -1004,9 +1094,10 @@ function panelProto:Morph()
   for _, edge in ipairs(edges) do
     edge:Show()
   end
-  local bodyLeft, width = self:BodyLeft(), self:Width()
-  local at = { x = from.x, y = from.y, h = from.h, ribbon = from.ribbon, full = from.full, outer = from.outer,
-    edge = from.edge }
+  -- The frame is the body plus the feather at full size: only the body's width glides.
+  local bodyLeft, extra = self:BodyLeft(), self:Width() - self:BodyWidth()
+  local at = { x = from.x, y = from.y, h = from.h, w = from.w, ribbon = from.ribbon, full = from.full,
+    outer = from.outer, edge = from.edge }
   ---@type NextMorph
   local morph = { at = at, finish = function() end }
   self.morph = morph
@@ -1014,7 +1105,7 @@ function panelProto:Morph()
   local function draw()
     frame:ClearAllPoints()
     frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x - bodyLeft, at.y)
-    frame:SetSize(width, at.h)
+    frame:SetSize(at.w + extra, at.h)
     self:paintFeathers(at.full, at.outer)
     self:paintEdges(at.edge)
     self.ribbonLength = at.ribbon
@@ -1034,7 +1125,7 @@ function panelProto:Morph()
 
   -- The glide: the body and the beam, with the feathers (shrinking) or the border (growing) fading out.
   local function glide(after)
-    local x0, y0, h0, r0, f0, o0, e0 = at.x, at.y, at.h, at.ribbon, at.full, at.outer, at.edge
+    local x0, y0, h0, w0, r0, f0, o0, e0 = at.x, at.y, at.h, at.w, at.ribbon, at.full, at.outer, at.edge
     local f1, o1, e1 = f0, o0, e0
     if small then
       f1, o1 = 0, 0
@@ -1042,7 +1133,7 @@ function panelProto:Morph()
       e1 = self:EdgeAlphaFor(false)
     end
     if math.abs(tx - x0) < 0.01 and math.abs(ty - y0) < 0.01 and math.abs(th - h0) < 0.01
-      and math.abs(toRibbon - r0) < 0.01 and math.abs(f1 - f0) < 0.001 and math.abs(o1 - o0) < 0.001
+      and math.abs(tw - w0) < 0.01 and math.abs(toRibbon - r0) < 0.01 and math.abs(f1 - f0) < 0.001 and math.abs(o1 - o0) < 0.001
       and math.abs(e1 - e0) < 0.001 then
       after()
       return
@@ -1056,6 +1147,7 @@ function panelProto:Morph()
         at.x = x0 + (tx - x0) * t
         at.y = y0 + (ty - y0) * t
         at.h = h0 + (th - h0) * t
+        at.w = w0 + (tw - w0) * t
         at.ribbon = r0 + (toRibbon - r0) * t
         at.full = f0 + (f1 - f0) * t
         at.outer = o0 + (o1 - o0) * t
@@ -1152,10 +1244,11 @@ end
 -- It returns whether it did.
 ---@return boolean
 function panelProto:StartMove()
-  if not self:IsSmall() or self.closing or self.moving or GetCursorInfo() ~= nil then
+  if not self:IsSmall() or self.closing or self.moving or self.sizing ~= nil or GetCursorInfo() ~= nil then
     return false
   end
   self:endMorph()
+  self:endReset()
   tween:Stop(self, true)
   self.frame:StartMoving()
   -- StartMoving flags the frame user-placed, and the client then restores a named frame's place
@@ -1208,6 +1301,257 @@ function panelProto:StopMove()
     follower.placeX, follower.placeY = follower:SmallPlace()
     follower:setOffset(0)
     database:SetNextSmallPlace(follower.kind, follower.placeX, follower.placeY)
+  end
+end
+
+-- The grips' art states: the theme's key, the button's setter, its getter.
+local GRIP_STATES = {
+  { "Normal", "SetNormalTexture", "GetNormalTexture" },
+  { "Highlight", "SetHighlightTexture", "GetHighlightTexture" },
+  { "Pushed", "SetPushedTexture", "GetPushedTexture" },
+}
+
+-- BuildGrips makes the grips on a small panel's bottom corners (next.md §14g, asked: "a window handle
+-- when in minimized mode that lets users resize the window, dom like, just like the original bags").
+-- Dragged, a grip sizes the panel from its corner; Shift-clicked, the panel glides back to its default
+-- size. Pressed with something on the cursor, it is a drop, as the rest of the panel is. Under the
+-- pointer it shows (fadeGrip), and a tooltip says so.
+function panelProto:BuildGrips()
+  self.grips = {}
+  self.gripHover = {}
+  for _, side in ipairs({ "LEFT", "RIGHT" }) do
+    local grip = CreateFrame("Button", nil, self.frame)
+    grip:SetFrameLevel(self.frame:GetFrameLevel() + 4)
+    grip:EnableMouse(true)
+    addon.SetScript(grip, "OnMouseDown", function(_, _, button)
+      if button == "LeftButton" and not IsShiftKeyDown() then
+        self:StartSizing(side)
+      end
+    end)
+    addon.SetScript(grip, "OnMouseUp", function(_, _, button)
+      if button ~= "LeftButton" then
+        return
+      end
+      if self.sizing == side then
+        self:StopSizing()
+      elseif GetCursorInfo() ~= nil then
+        self:PlaceCursorItem()
+      elseif IsShiftKeyDown() then
+        self:ResetSize(side)
+      end
+    end)
+    addon.SetScript(grip, "OnReceiveDrag", function()
+      self:PlaceCursorItem()
+    end)
+    addon.SetScript(grip, "OnEnter", function()
+      self.gripHover[side] = true
+      self:fadeGrip(side)
+      GameTooltip:SetOwner(grip, side == "LEFT" and "ANCHOR_TOPRIGHT" or "ANCHOR_TOPLEFT")
+      GameTooltip:SetText(L:G("Resize"))
+      GameTooltip:AddLine(L:G("Drag to resize."), 1, 1, 1, true)
+      GameTooltip:AddLine(L:G("Shift-click to reset to the default size."), 1, 1, 1, true)
+      GameTooltip:Show()
+    end)
+    addon.SetScript(grip, "OnLeave", function()
+      self.gripHover[side] = false
+      self:fadeGrip(side)
+      GameTooltip:Hide()
+    end)
+    self.grips[side] = grip
+    self.gripHover[side] = false
+  end
+end
+
+-- styleGrips draws the grips from the theme (Small.Grip): its size, in from the corners by its inset,
+-- its art for each state, turned around on the left corner, seen or not as the pointer has it.
+---@private
+function panelProto:styleGrips()
+  local G = style.Small.Grip
+  for side, grip in pairs(self.grips) do
+    grip:SetSize(G.Size, G.Size)
+    grip:ClearAllPoints()
+    if side == "LEFT" then
+      grip:SetPoint("BOTTOMLEFT", self.body, "BOTTOMLEFT", G.Inset, G.Inset)
+    else
+      grip:SetPoint("BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -G.Inset, G.Inset)
+    end
+    for _, state in ipairs(GRIP_STATES) do
+      local spec = G[state[1]]
+      grip[state[2]](grip, style:TexturePath(spec.Texture))
+      local texture = grip[state[3]](grip)
+      style:Paint(texture, spec)
+      if side == "LEFT" then
+        local c = spec.TexCoords or { 0, 1, 0, 1 }
+        texture:SetTexCoord(c[2], c[1], c[3], c[4])
+      end
+    end
+    self:fadeGrip(side, true)
+  end
+end
+
+-- fadeGrip shows a grip while it is wanted (asked: "auto-hide the handles so they only show on
+-- hover"): while the pointer is over it or it is dragged, as the original bags' grip shows (window.lua,
+-- ShowOnHover), or at all times for a theme whose grips do not hide (Small.Grip.ShowOnHover false).
+-- Unseen, it still takes the pointer, so hovering the corner finds it. It fades as Next's hovers do,
+-- or turns at once with now.
+---@private
+---@param side "LEFT"|"RIGHT"
+---@param now? boolean
+function panelProto:fadeGrip(side, now)
+  local grip = self.grips[side]
+  local wanted = not style.Small.Grip.ShowOnHover or self.gripHover[side] or self.sizing == side
+  local to = wanted and 1 or 0
+  if now then
+    tween:Stop(grip)
+    grip:SetAlpha(to)
+    return
+  end
+  tween:Play(grip, {
+    duration = style.Time.Hover,
+    from = grip:GetAlpha(),
+    to = to,
+    ease = style:Ease("Hover"),
+    onUpdate = function(v)
+      grip:SetAlpha(v)
+    end,
+  })
+end
+
+-- UpdateGrips shows a small panel's grips, but for the one on the side its chained partner is on
+-- (chain:ChainedSide), which would push the partner (asked: "disable it on the side it's chained on,
+-- if it's chained"). A grip being dragged stays until it is let go.
+function panelProto:UpdateGrips()
+  local small = self:IsSmall()
+  local chained = small and chain:ChainedSide(self) or nil
+  for side, grip in pairs(self.grips) do
+    grip:SetShown(small and (side ~= chained or self.sizing == side))
+  end
+end
+
+-- StartSizing starts sizing a small panel from a grip's corner (next.md §14g), from where it was
+-- pressed (alwaysStartFromMouse, as the classic bags do), within its minimum and the screen. The
+-- corner across from it stays still. Its opening slide or a glide is finished first, and its content
+-- reflows at once as it goes. A full panel, one closing, moving or already sizing, or a press with
+-- something on the cursor (a drop) does not size. It returns whether it did.
+---@param side "LEFT"|"RIGHT"
+---@return boolean
+function panelProto:StartSizing(side)
+  if not self:IsSmall() or self.closing or self.moving or self.sizing ~= nil or GetCursorInfo() ~= nil then
+    return false
+  end
+  self:endMorph()
+  self:endReset()
+  tween:Stop(self, true)
+  local frame = self.frame
+  frame:SetResizeBounds(self:MinWidth(), self:MinHeight(), UIParent:GetWidth(), UIParent:GetHeight())
+  self.sizingFrom = { frame:GetWidth(), frame:GetHeight() }
+  self.sizing = side
+  self.content:SetInstant(true)
+  frame:StartSizing(side == "LEFT" and "BOTTOMLEFT" or "BOTTOMRIGHT", true)
+  return true
+end
+
+-- Resized runs whenever the frame's size changes: while a grip sizes it, its title fits the new width
+-- and its content reflows there.
+function panelProto:Resized()
+  if self.sizing == nil then
+    return
+  end
+  self:FitTitle()
+  render:Invalidate(self.root)
+end
+
+-- StopSizing ends a grip's sizing: the panel keeps the size it was let go at (asked: "static ... no
+-- snapping"), saved for its kind with its place, on the screen. A press let go without sizing it saves
+-- nothing, so the default size still follows the screen.
+function panelProto:StopSizing()
+  if self.sizing == nil then
+    return
+  end
+  local frame = self.frame
+  frame:StopMovingOrSizing()
+  local x, y, w, h = frame:GetLeft(), frame:GetTop(), frame:GetWidth(), frame:GetHeight()
+  local from, side = self.sizingFrom, self.sizing
+  self.sizing = nil
+  -- Let go away from the pointer, it fades now.
+  self:fadeGrip(side)
+  self.sizingFrom = nil
+  self.content:SetInstant(false)
+  if x ~= nil and y ~= nil and (math.abs(w - from[1]) >= 0.5 or math.abs(h - from[2]) >= 0.5) then
+    database:SetNextSmallSize(self.kind, w, h)
+    self.smallWidth, self.smallHeight = self:SmallSize()
+    -- A chained bag's grip on its chained side is off (UpdateGrips), so its chained side stayed beside
+    -- its partner: where the frame is, is its spot.
+    self.placeX, self.placeY = self:clampPlace(x, y)
+    database:SetNextSmallPlace(self.kind, self.placeX, self.placeY)
+  end
+  frame:SetSize(self:SmallWidth(), self:SmallHeight())
+  self:setOffset(0)
+  self:FitTitle()
+  self:UpdateGrips()
+  render:Invalidate(self.root)
+end
+
+-- ResetSize glides a small panel back to its default size (asked: "shift + left click the grip to
+-- reset to default size (animated, of course)"): the corner across from the grip stays still, the
+-- right grip keeping its top left and the left grip its top right, and the default size follows the
+-- screen again. Its content reflows on the way, at once, as it does while a grip is dragged. It returns
+-- what it did, for profiler traces: "resetting", "default" (it is the default size already) or
+-- "closing".
+---@param side "LEFT"|"RIGHT"
+---@return string
+function panelProto:ResetSize(side)
+  if self.closing then
+    return "closing"
+  end
+  if database:GetNextSmallSize(self.kind) == nil then
+    return "default"
+  end
+  self:endMorph()
+  self:endReset()
+  tween:Stop(self, true)
+  local frame = self.frame
+  local x0, y0 = self.placeX + self.offset, self.placeY
+  local w0, h0 = frame:GetWidth(), frame:GetHeight()
+  database:SetNextSmallSize(self.kind, nil, nil)
+  local w1, h1 = self:SmallSize()
+  self.smallWidth, self.smallHeight = w1, h1
+  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + w0 - w1 or x0, y0)
+  self.placeX, self.placeY = x1, y1
+  self.offset = 0
+  database:SetNextSmallPlace(self.kind, x1, y1)
+  self.resetting = true
+  self.content:SetInstant(true)
+  tween:Play(self.resetKey, {
+    duration = style.Time.Resize,
+    from = 0,
+    to = 1,
+    ease = style:Ease("Resize"),
+    onUpdate = function(t)
+      frame:ClearAllPoints()
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)
+      frame:SetSize(w0 + (w1 - w0) * t, h0 + (h1 - h0) * t)
+      self:FitTitle()
+      render:Invalidate(self.root)
+    end,
+    onDone = function()
+      self.resetting = false
+      self.content:SetInstant(false)
+      frame:SetSize(w1, h1)
+      self:setOffset(0)
+      self:FitTitle()
+      render:Invalidate(self.root)
+    end,
+  })
+  return "resetting"
+end
+
+-- endReset puts a panel gliding back to its default size at its end at once (anything else that
+-- places or sizes it).
+---@private
+function panelProto:endReset()
+  if self.resetting then
+    tween:Stop(self.resetKey, true)
   end
 end
 
@@ -1976,6 +2320,23 @@ function panelProto:LayoutHeader()
       previous = button
     end
   end
+  self:FitTitle()
+end
+
+-- FitTitle keeps the title on one line in the room the shown header buttons leave it, cut short
+-- rather than over them: on every small panel, whose width the player sets (next.md §14g), and at
+-- either size on a panel whose title can be any length (fitsTitle: a vendor's name). Else the title
+-- is as long as it is.
+function panelProto:FitTitle()
+  local title = self.title
+  if not (self.fitsTitle or self:IsSmall()) then
+    title:SetWordWrap(true)
+    title:SetWidth(0)
+    return
+  end
+  title:SetWordWrap(false)
+  title:SetWidth(math.max(1, self:BodyWidth() - (style.PAD + style.TITLE_INSET)
+    - (style.PAD + self:headerButtonsWidth()) - 12))
 end
 
 -- BuildSearch takes the panel's search box (the kind's in-bag box, whose query the data phase reads,
@@ -2252,7 +2613,7 @@ function panelProto:BuildSparkles()
   -- edge.
   local function titleEdge()
     if self.side == "LEFT" then
-      return self:BodyLeft() + style.BODY_WIDTH - (style.PAD + style.TITLE_INSET)
+      return self:BodyLeft() + self:BodyWidth() - (style.PAD + style.TITLE_INSET)
     end
     return self:BodyLeft() + style.PAD + style.TITLE_INSET
   end
@@ -2261,7 +2622,7 @@ function panelProto:BuildSparkles()
   end
   local function innerEdge()
     if self.side == "LEFT" then
-      return self:BodyLeft() + style.BODY_WIDTH
+      return self:BodyLeft() + self:BodyWidth()
     end
     return self:BodyLeft()
   end
@@ -2347,6 +2708,7 @@ function panelProto:StyleParts()
   self:styleContent()
   self:styleFooter()
   self:styleSparkles()
+  self:styleGrips()
   self.tabs:ApplyStyle()
   self.content:ApplyStyle()
 end
@@ -2428,6 +2790,9 @@ function panelProto:Watch()
   end)
   addon.SetScript(frame, "OnHide", function(ctx)
     self:OnHidden(ctx)
+  end)
+  addon.SetScript(frame, "OnSizeChanged", function()
+    self:Resized()
   end)
   addon.SetScript(frame, "OnReceiveDrag", function()
     self:PlaceCursorItem()
@@ -2664,6 +3029,7 @@ end
 ---@param text string
 function panelProto:SetTitle(text)
   self.title:SetText(text)
+  self:FitTitle()
   self:LayoutCloud()
 end
 
@@ -2673,6 +3039,8 @@ end
 function panelProto:OnHidden(ctx)
   nextDrag:PanelHidden(self)
   self:StopMove()
+  self:StopSizing()
+  self:endReset()
   self.closing = false
   tween:Stop(self)
   tween:Stop(self.spark)
