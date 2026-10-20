@@ -1940,11 +1940,14 @@ function panelProto:styleHeader()
   local H = style.Theme.Header
   style:SetFont(title, H.Title.Font)
   title:ClearAllPoints()
+  -- Justified toward its anchor: a small panel's title has a width (FitTitle), and text is centered in
+  -- its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER).
   if left then
     title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(style.PAD + style.TITLE_INSET), -style.TITLE_TOP)
     title:SetJustifyH("RIGHT")
   else
     title:SetPoint("TOPLEFT", body, "TOPLEFT", style.PAD + style.TITLE_INSET, -style.TITLE_TOP)
+    title:SetJustifyH("LEFT")
   end
   local point, joinX = self:TitleJoin()
 

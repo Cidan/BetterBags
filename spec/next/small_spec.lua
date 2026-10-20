@@ -287,6 +287,24 @@ describe("BetterBags Next's small mode", function()
       assert.are.same({ style.BODY_WIDTH, smallHeight() }, { result.Width, result.Height })
     end)
 
+    -- A small panel's title has a width (FitTitle: cut short in the room its header buttons leave), and
+    -- text is centered in its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER):
+    -- the backpack's title moved right of where it starts (reported: titles "shift right" in small
+    -- mode, and sit where they should at full size, where the title is as wide as its text). It is
+    -- justified toward the side it is anchored on, through a theme's restyle too.
+    it("keeps its title where it starts, justified toward its anchor", function()
+      local bag = nextBag:Create(ctx())
+      assert.is_true(bag.title:GetWidth() > 0, "a small panel's title has a width")
+      assert.are.equal("LEFT", bag.title:GetJustifyH())
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + style.TITLE_INSET, -style.TITLE_TOP },
+        { bag.title:GetPoint(1) })
+      bag.title:SetJustifyH("CENTER")
+      bag:StyleParts()
+      assert.are.equal("LEFT", bag.title:GetJustifyH())
+      local bank = nextBank:Create(ctx())
+      assert.are.equal("RIGHT", bank.title:GetJustifyH())
+    end)
+
     it("opens where it was left, kept on the screen", function()
       db.places[BACKPACK] = { 300, 900 }
       local bag = nextBag:Create(ctx())

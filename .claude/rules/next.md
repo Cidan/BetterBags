@@ -1400,6 +1400,12 @@ trying them in game, "auto-hide the handles so they only show on hover".
   a vendor's name can be any length; this replaced its own `fitTitle`). A full panel's other titles
   are as long as they are (width 0, wrapping on). Run by `LayoutHeader`, `SetTitle`, `ApplyGeometry`,
   `FitSmall` and every size change while sized or gliding back.
+  - **Justified toward its anchor** (`styleHeader`): left on the backpack, right on the companions.
+    Text is centered in a font string's width unless justified otherwise (`justifyH` defaults to
+    `CENTER`, `Blizzard_SharedXML/UI.xsd`), and the backpack's title set none, so once small panels'
+    titles had a width it sat in the middle of the room it had (reported: titles "shift right" in
+    small mode and not at full size, where a title is as wide as its text). The companions already
+    right-justified. The frame mock now answers `CENTER` for a font string never justified.
 - **Shift-click** (`ResetSize`): the panel glides (`Time.Resize`, `Ease.Resize`) back to its default
   size, the corner across from the grip still (the right grip keeps the top left, the left grip the
   top right), its content reflowing at once on the way as while dragging; the saved size is cleared,
