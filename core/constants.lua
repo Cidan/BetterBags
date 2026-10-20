@@ -726,9 +726,11 @@ const.DATABASE_DEFAULTS = {
     -- "right" (the backpack at the right edge, the companion beside it). next.md §12.
     nextChain = "apart",
     -- BetterBags Next's panels: "full" height on the screen's edges, or "small" movable ones
-    -- (docs/next-small-mode.md); and where each kind's small panel was left (its top left).
+    -- (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
+    -- size the player gave it with its grips (next.md §14g).
     nextSize = "full",
     nextSmallPlaces = {},
+    nextSmallSizes = {},
     -- Which small panel anchors a chained pair: "apart", "backpack" or "companion" (the one the
     -- other was dropped beside).
     nextSmallChain = "apart",

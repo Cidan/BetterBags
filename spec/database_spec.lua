@@ -95,6 +95,7 @@ const.DATABASE_DEFAULTS = {
     nextChain = "apart",
     nextSize = "full",
     nextSmallPlaces = {},
+    nextSmallSizes = {},
     nextSmallChain = "apart",
     nextTheme = "Default",
     showBagButton = true,
@@ -345,6 +346,19 @@ describe("Database", function()
       assert.are.same({ 1200.5, 900 }, { DB:GetNextSmallPlace(0) })
       assert.are.same({ 40, 800 }, { DB:GetNextSmallPlace(1) })
       assert.is_nil(DB:GetNextSmallPlace(2))
+    end)
+
+    -- And the size the player gave it (next.md §14g): nothing until resized, cleared by a reset.
+    it("GetNextSmallSize / SetNextSmallSize, per kind, nothing until resized, cleared with nothing", function()
+      assert.is_nil(DB:GetNextSmallSize(0))
+      DB:SetNextSmallSize(0, 640.5, 500)
+      DB:SetNextSmallSize(1, 380, 720)
+      assert.are.same({ 640.5, 500 }, { DB:GetNextSmallSize(0) })
+      assert.are.same({ 380, 720 }, { DB:GetNextSmallSize(1) })
+      DB:SetNextSmallSize(0, nil, nil)
+      assert.is_nil(DB:GetNextSmallSize(0))
+      assert.is_nil(DB.data.profile.nextSmallSizes[0], "nothing left behind")
+      assert.are.same({ 380, 720 }, { DB:GetNextSmallSize(1) })
     end)
 
     -- Which small bag is the anchor of a chained pair (docs/next-small-mode.md): the one the other

@@ -269,6 +269,30 @@ function DB:SetNextSmallPlace(kind, x, y)
   DB.data.profile.nextSmallPlaces[kind] = { x = x, y = y }
 end
 
+-- GetNextSmallSize returns the size the player gave a kind's small panel with its grips (next.md
+-- §14g), in UIParent's units, or nothing while it is the default size.
+---@param kind BagKind
+---@return number? width, number? height
+function DB:GetNextSmallSize(kind)
+  local size = DB.data.profile.nextSmallSizes[kind]
+  if size == nil then
+    return nil
+  end
+  return size.width, size.height
+end
+
+-- SetNextSmallSize saves a kind's small panel's size; nothing puts it back to the default size.
+---@param kind BagKind
+---@param width? number
+---@param height? number
+function DB:SetNextSmallSize(kind, width, height)
+  if width == nil then
+    DB.data.profile.nextSmallSizes[kind] = nil
+    return
+  end
+  DB.data.profile.nextSmallSizes[kind] = { width = width, height = height }
+end
+
 -- GetNextTheme returns BetterBags Next's saved theme (SonataNext): Default until another is picked.
 ---@return string
 function DB:GetNextTheme()

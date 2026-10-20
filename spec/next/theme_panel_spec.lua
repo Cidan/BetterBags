@@ -141,6 +141,8 @@ describe("BetterBags Next's panels and themes", function()
       if p then return p[1], p[2] end
     end)
     override(stubs.database, "SetNextSmallPlace", function(_, kind, x, y) db.places[kind] = { x, y } end)
+    override(stubs.database, "GetNextSmallSize", function() return nil end)
+    override(stubs.database, "SetNextSmallSize", function() end)
     override(stubs.database, "GetNextSmallChain", function() return db.smallChain end)
     override(stubs.database, "SetNextSmallChain", function(_, layout) db.smallChain = layout end)
     override(stubs.database, "GetNextChain", function() return "apart" end)

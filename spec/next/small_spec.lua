@@ -120,7 +120,7 @@ describe("BetterBags Next's small mode", function()
     nextDrag:Init()
     chain:Init()
     sent, buttons, placed = {}, {}, {}
-    db = { size = "small", places = {}, smallChain = "apart", view = { [BACKPACK] = SECTION_GRID, [BANK] = SECTION_GRID },
+    db = { size = "small", places = {}, sizes = {}, smallChain = "apart", view = { [BACKPACK] = SECTION_GRID, [BANK] = SECTION_GRID },
       active = { [BACKPACK] = 1, [BANK] = 10 } }
     slots = {
       [BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = { { name = "Herbs" } }, items = { item("0_1", "Herbs") } } } },
@@ -149,6 +149,13 @@ describe("BetterBags Next's small mode", function()
       if p then return p[1], p[2] end
     end)
     override(stubs.database, "SetNextSmallPlace", function(_, kind, x, y) db.places[kind] = { x, y } end)
+    override(stubs.database, "GetNextSmallSize", function(_, kind)
+      local size = db.sizes[kind]
+      if size then return size[1], size[2] end
+    end)
+    override(stubs.database, "SetNextSmallSize", function(_, kind, w, h)
+      db.sizes[kind] = w ~= nil and { w, h } or nil
+    end)
     override(stubs.database, "GetNextSmallChain", function() return db.smallChain end)
     override(stubs.database, "SetNextSmallChain", function(_, layout) db.smallChain = layout end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
@@ -482,6 +489,748 @@ describe("BetterBags Next's small mode", function()
       assert.is_false(bag.frame:IsClampedToScreen())
       bag.titleButton:GetScript("OnDragStart")(bag.titleButton, "LeftButton")
       assert.is_nil(bag.frame._moving)
+    end)
+  end)
+
+  -- A grip on each bottom corner resizes a small panel, its content reflowing as it goes, like an
+  -- element in a web page (asked: "a window handle when in minimized mode that lets users resize the
+  -- window, dom like, just like the original bags ... static though, i.e. no snapping"; "both sides,
+  -- but disable it on the side it's chained on"; "remember what the custom window sizing is"; a
+  -- tooltip; "shift + left click the grip to reset to default size (animated, of course)").
+  describe("resizing it", function()
+    local function step(seconds)
+      tween.driver:GetScript("OnUpdate")(tween.driver, seconds)
+    end
+
+    local function opened(create)
+      local panel = create(ctx())
+      panel:Show(ctx())
+      finishTweens()
+      return panel
+    end
+
+    local function press(grip)
+      grip:GetScript("OnMouseDown")(grip, "LeftButton")
+    end
+
+    local function release(grip)
+      grip:GetScript("OnMouseUp")(grip, "LeftButton")
+    end
+
+    -- The client sizes the frame with the mouse from the corner pressed, the opposite corner still;
+    -- the frame says so (OnSizeChanged).
+    local function sizeTo(panel, side, w, h)
+      local f = panel.frame
+      -- Where it is: the rect the client last gave it, else its anchor (the mock works out no rect
+      -- from anchors).
+      local left, top = f:GetLeft(), f:GetTop()
+      if left == nil then
+        left, top = topLeft(panel)
+      end
+      local right = left + f:GetWidth()
+      f:_SetRect(side == "LEFT" and right - w or left, top - h, w, h)
+      f:GetScript("OnSizeChanged")(f, w, h)
+    end
+
+    local function resize(panel, side, w, h)
+      press(panel.grips[side])
+      sizeTo(panel, side, w, h)
+      release(panel.grips[side])
+    end
+
+    local function perRow(panel)
+      local width = panel.root:PreRender().Width - panel.scroll:GetGutterWidth()
+      local STEP = style.ICON + style.GAP
+      return math.floor((width + style.GAP) / STEP)
+    end
+
+    describe("the grips", function()
+      it("sits on both bottom corners of a small panel, there but unseen until the pointer is over it", function()
+        local bag = nextBag:Create(ctx())
+        local inset = style.Small.Grip.Inset
+        assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", inset, inset }, { bag.grips.LEFT:GetPoint(1) })
+        assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", -inset, inset }, { bag.grips.RIGHT:GetPoint(1) })
+        for _, side in ipairs({ "LEFT", "RIGHT" }) do
+          local grip = bag.grips[side]
+          assert.is_true(grip:IsShown(), side)
+          assert.is_true(grip:IsMouseEnabled(), side .. " is found by the pointer")
+          assert.are.equal(0, grip:GetAlpha(), side .. " is unseen until hovered")
+          assert.are.same({ style.Small.Grip.Size, style.Small.Grip.Size }, { grip:GetWidth(), grip:GetHeight() })
+          assert.is_true(grip:GetFrameLevel() > bag.frame:GetFrameLevel())
+        end
+      end)
+
+      it("has no grips at full size", function()
+        db.size = "full"
+        local bag = nextBag:Create(ctx())
+        assert.is_false(bag.grips.LEFT:IsShown())
+        assert.is_false(bag.grips.RIGHT:IsShown())
+        assert.is_false(bag.frame:IsResizable())
+      end)
+
+      -- Blizzard's own resize button (FloatingChatFrame.xml): the size grabber, its highlight and
+      -- its pressed art. The original bags draw the same.
+      it("draws Blizzard's chat size grabber, turned around on the left corner", function()
+        local bag = nextBag:Create(ctx())
+        local right, left = bag.grips.RIGHT, bag.grips.LEFT
+        assert.are.equal("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up", right:GetNormalTexture():GetTexture())
+        assert.are.equal("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight", right:GetHighlightTexture():GetTexture())
+        assert.are.equal("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down", right:GetPushedTexture():GetTexture())
+        -- GetTexCoord gives the corners: upper left x first, upper right x fifth.
+        for _, get in ipairs({ "GetNormalTexture", "GetHighlightTexture", "GetPushedTexture" }) do
+          local c = { right[get](right):GetTexCoord() }
+          assert.are.same({ 0, 1 }, { c[1], c[5] }, get)
+          c = { left[get](left):GetTexCoord() }
+          assert.are.same({ 1, 0 }, { c[1], c[5] }, get .. " mirrored")
+        end
+      end)
+
+      -- Asked, after trying it: "can we auto-hide the handles so they only show on hover?" As the
+      -- original bags' grip (window.lua, ShowOnHover), faded as Next's other hovers are.
+      it("fades in while the pointer is over it, and out once it leaves", function()
+        local bag = nextBag:Create(ctx())
+        local grip = bag.grips.LEFT
+        grip:GetScript("OnEnter")(grip)
+        step(style.Time.Hover / 2)
+        local a = grip:GetAlpha()
+        assert.is_true(a > 0 and a < 1, "fading in: " .. a)
+        finishTweens()
+        assert.are.equal(1, grip:GetAlpha())
+        assert.are.equal(0, bag.grips.RIGHT:GetAlpha(), "only the grip under the pointer")
+        grip:GetScript("OnLeave")(grip)
+        step(style.Time.Hover / 2)
+        a = grip:GetAlpha()
+        assert.is_true(a > 0 and a < 1, "fading out: " .. a)
+        finishTweens()
+        assert.are.equal(0, grip:GetAlpha())
+      end)
+
+      it("stays shown while it is dragged, the pointer over it or not, and fades once let go", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local grip = bag.grips.RIGHT
+        grip:GetScript("OnEnter")(grip)
+        press(grip)
+        grip:GetScript("OnLeave")(grip)
+        finishTweens()
+        assert.are.equal(1, grip:GetAlpha())
+        release(grip)
+        finishTweens()
+        assert.are.equal(0, grip:GetAlpha())
+      end)
+
+      it("stays shown when let go with the pointer still over it", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local grip = bag.grips.RIGHT
+        grip:GetScript("OnEnter")(grip)
+        press(grip)
+        release(grip)
+        finishTweens()
+        assert.are.equal(1, grip:GetAlpha())
+      end)
+
+      it("keeps each grip as the pointer has it when a theme restyles them", function()
+        local bag = nextBag:Create(ctx())
+        local grip = bag.grips.LEFT
+        grip:GetScript("OnEnter")(grip)
+        finishTweens()
+        bag:StyleParts()
+        assert.are.equal(1, grip:GetAlpha())
+        assert.are.equal(0, bag.grips.RIGHT:GetAlpha())
+      end)
+
+      it("shows them at all times for a theme whose grips do not hide", function()
+        local G = {}
+        for key, value in pairs(style.Small.Grip) do G[key] = value end
+        G.ShowOnHover = false
+        override(style.Small, "Grip", G)
+        local bag = nextBag:Create(ctx())
+        assert.are.equal(1, bag.grips.LEFT:GetAlpha())
+        assert.are.equal(1, bag.grips.RIGHT:GetAlpha())
+        bag.grips.LEFT:GetScript("OnEnter")(bag.grips.LEFT)
+        bag.grips.LEFT:GetScript("OnLeave")(bag.grips.LEFT)
+        finishTweens()
+        assert.are.equal(1, bag.grips.LEFT:GetAlpha())
+      end)
+
+      it("shows them at once for a theme that stops hiding them, a fade out cut short", function()
+        local bag = nextBag:Create(ctx())
+        local grip = bag.grips.LEFT
+        grip:GetScript("OnEnter")(grip)
+        finishTweens()
+        grip:GetScript("OnLeave")(grip)
+        step(style.Time.Hover / 2)
+        local G = {}
+        for key, value in pairs(style.Small.Grip) do G[key] = value end
+        G.ShowOnHover = false
+        override(style.Small, "Grip", G)
+        bag:StyleParts()
+        assert.are.equal(1, grip:GetAlpha())
+        finishTweens()
+        assert.are.equal(1, grip:GetAlpha())
+      end)
+
+      it("says what it does when the pointer is over it", function()
+        local bag = nextBag:Create(ctx())
+        local grip = bag.grips.RIGHT
+        grip:GetScript("OnEnter")(grip)
+        assert.is_true(GameTooltip:IsOwned(grip))
+        assert.are.equal("Resize", GameTooltip:GetText())
+        local lines = {}
+        for _, line in ipairs(GameTooltip.lines) do table.insert(lines, line.text) end
+        assert.are.same({ "Drag to resize.", "Shift-click to reset to the default size." }, lines)
+        grip:GetScript("OnLeave")(grip)
+        assert.is_false(GameTooltip:IsShown())
+      end)
+    end)
+
+    describe("dragging a grip", function()
+      it("sizes it from the corner pressed, from where it was pressed", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        assert.is_true(bag.frame:IsResizable())
+        press(bag.grips.RIGHT)
+        assert.are.equal("BOTTOMRIGHT", bag.frame._sizing)
+        assert.is_true(bag.frame._sizingFromMouse)
+        release(bag.grips.RIGHT)
+        press(bag.grips.LEFT)
+        assert.are.equal("BOTTOMLEFT", bag.frame._sizing)
+        release(bag.grips.LEFT)
+      end)
+
+      it("goes no smaller than its header, footer and one column need, nor larger than the screen", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        press(bag.grips.RIGHT)
+        local b = bag.frame._resizeBounds
+        assert.are.same({ bag:MinWidth(), bag:MinHeight(), UIParent:GetWidth(), UIParent:GetHeight() },
+          { b.minWidth, b.minHeight, b.maxWidth, b.maxHeight })
+        release(bag.grips.RIGHT)
+        local row = 0
+        for _, button in ipairs(bag.headerButtons) do
+          if button:IsShown() then row = row + style.HEADER_BUTTON + style.HEADER_BUTTON_GAP end
+        end
+        row = row - style.HEADER_BUTTON_GAP
+        local header = 2 * style.PAD + style.TITLE_INSET + row + 12 + style.Small.MinTitle
+        local column = 2 * style.PAD + style.GUTTER + style.ICON
+        assert.are.equal(math.ceil(math.max(header, column)), bag:MinWidth())
+        assert.are.equal(style.CONTENT_TOP + style.FOOTER + style.SECTION_HEADER + style.ICON, bag:MinHeight())
+      end)
+
+      it("leaves room for the footer's free slots and money", function()
+        local bag = nextBag:Create(ctx())
+        bag.freeText:SetText(string.rep("8", 60))
+        bag.moneyFrame.frame:SetWidth(128)
+        local footer = 2 * style.PAD + style.TITLE_INSET + bag.freeText:GetStringWidth() + 12 + 128
+        assert.are.equal(math.ceil(footer), bag:MinWidth())
+      end)
+
+      it("reflows its content at once as it is dragged", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local invalidated = 0
+        local invalidate = render.Invalidate
+        override(render, "Invalidate", function(r, d)
+          if d == bag.root then invalidated = invalidated + 1 end
+          return invalidate(r, d)
+        end)
+        press(bag.grips.RIGHT)
+        assert.is_true(bag.content.instant, "nothing glides to its place while the grip is dragged")
+        sizeTo(bag, "RIGHT", 358, 600)
+        assert.are.equal(1, invalidated)
+        assert.are.equal(358 - 2 * style.PAD, bag.root:PreRender().Width)
+        assert.are.equal(600 - style.CONTENT_TOP - style.FOOTER, bag.root:PreRender().Height)
+        assert.are.equal(6, perRow(bag))
+        sizeTo(bag, "RIGHT", 708, 600)
+        assert.are.equal(13, perRow(bag))
+        release(bag.grips.RIGHT)
+        assert.is_false(bag.content.instant)
+      end)
+
+      it("keeps the size it is let go at, without snapping, saved for its kind with its place", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local x0, y0 = topLeft(bag)
+        resize(bag, "RIGHT", 377, 640)
+        assert.are.same({ 377, 640 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        assert.are.same({ 377, 640 }, db.sizes[BACKPACK])
+        assert.are.same({ x0, y0 }, { topLeft(bag) })
+        assert.are.same({ x0, y0 }, db.places[BACKPACK])
+        assert.is_nil(db.sizes[BANK])
+        finishTweens()
+        assert.are.same({ 377, 640 }, { bag.frame:GetWidth(), bag.frame:GetHeight() }, "no snap")
+      end)
+
+      it("moves its left edge from the left grip, its right edge still", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local x0, y0 = topLeft(bag)
+        local right = x0 + bag.frame:GetWidth()
+        resize(bag, "LEFT", 600, 500)
+        assert.are.same({ right - 600, y0 }, { topLeft(bag) })
+        assert.are.same({ right - 600, y0 }, db.places[BACKPACK])
+        assert.are.equal(600, bag.frame:GetWidth())
+      end)
+
+      it("cuts its title short in the room its header buttons leave", function()
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        resize(bank, "LEFT", bank:MinWidth(), 500)
+        local row = 0
+        for _, button in ipairs(bank.headerButtons) do
+          if button:IsShown() then row = row + style.HEADER_BUTTON + style.HEADER_BUTTON_GAP end
+        end
+        row = row - style.HEADER_BUTTON_GAP
+        assert.are.equal(bank:MinWidth() - (style.PAD + style.TITLE_INSET) - (style.PAD + row) - 12, bank.title:GetWidth())
+        assert.is_false(bank.title._wordWrap)
+        nextPanel:SetSize(ctx(), "full")
+        finishTweens()
+        assert.are.equal(0, bank.title:GetWidth(), "a full panel's title is as long as it is")
+      end)
+
+      it("does not resize with something on the cursor: pressing a grip is a drop", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        _G._cursorType = "item"
+        press(bag.grips.RIGHT)
+        assert.is_nil(bag.frame._sizing)
+        release(bag.grips.RIGHT)
+        bag.grips.LEFT:GetScript("OnReceiveDrag")(bag.grips.LEFT)
+        assert.are.same({ BACKPACK, BACKPACK }, placed)
+      end)
+
+      it("finishes opening before it resizes", function()
+        local bag = nextBag:Create(ctx())
+        bag:Show(ctx())
+        press(bag.grips.RIGHT)
+        assert.is_false(tween:IsPlaying(bag))
+        assert.are.equal(1, bag.frame:GetAlpha())
+      end)
+
+      it("places its content at once while a grip is dragged, nothing gliding there", function()
+        local herbs = {}
+        for i = 1, 10 do table.insert(herbs, item("0_" .. i, "Herbs")) end
+        slots[BACKPACK].tabs[1].items = herbs
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        bag:Draw(ctx(), slots[BACKPACK], function() end)
+        render:Flush()
+        press(bag.grips.RIGHT)
+        sizeTo(bag, "RIGHT", 358, 600)
+        render:Flush()
+        local _, _, _, x, y = buttons["0_7"].frame:GetPoint(1)
+        assert.are.same({ 0, -(style.ICON + style.GAP) }, { x, y }, "the 7th icon starts the second row of 6")
+        assert.is_nil(motion:GetMove(buttons["0_7"].frame))
+        release(bag.grips.RIGHT)
+      end)
+
+      -- Only a grip's dragging reflows it: a size change of its own (a switch, which lays its content
+      -- out at its end) does not.
+      it("lays its content out only while a grip sizes it", function()
+        db.size = "full"
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local renders = 0
+        override(render, "Invalidate", function(_, d) if d == bag.root then renders = renders + 1 end end)
+        nextPanel:SetSize(ctx(), "small")
+        step(style.Time.Morph / 2)
+        local before = renders
+        bag.frame:GetScript("OnSizeChanged")(bag.frame, bag.frame:GetWidth(), bag.frame:GetHeight())
+        assert.are.equal(before, renders)
+      end)
+
+      -- A press let go without sizing it keeps nothing: the default size still follows the screen.
+      it("saves nothing for a press that does not size it", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local w, h = bag.frame:GetWidth(), bag.frame:GetHeight()
+        press(bag.grips.RIGHT)
+        sizeTo(bag, "RIGHT", w + 0.2, h - 0.2)
+        release(bag.grips.RIGHT)
+        assert.is_nil(db.sizes[BACKPACK])
+        assert.is_nil(db.places[BACKPACK])
+        assert.are.same({ w, h }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+      end)
+
+      it("stops resizing when it hides, keeping the size it had", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        press(bag.grips.RIGHT)
+        sizeTo(bag, "RIGHT", 400, 500)
+        bag.frame:Hide()
+        bag.frame:GetScript("OnHide")(bag.frame)
+        assert.is_nil(bag.frame._sizing)
+        assert.is_nil(bag.sizing)
+        assert.are.same({ 400, 500 }, db.sizes[BACKPACK])
+      end)
+    end)
+
+    describe("its size", function()
+      it("opens at its saved size, where it was left", function()
+        db.sizes[BACKPACK] = { 640, 500 }
+        db.places[BACKPACK] = { 300, 900 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        assert.are.same({ 640, 500 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        assert.are.same({ 300, 900 }, { topLeft(bag) })
+        assert.are.same({ 640, 500 }, { bag.root:Render().Width, bag.root:Render().Height })
+      end)
+
+      it("keeps its saved size within its minimum and the screen", function()
+        db.sizes[BACKPACK] = { 10, 10 }
+        db.sizes[BANK] = { 5000, 5000 }
+        local bag = nextBag:Create(ctx())
+        local bank = nextBank:Create(ctx())
+        assert.are.same({ bag:MinWidth(), bag:MinHeight() }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        assert.are.same({ UIParent:GetWidth(), UIParent:GetHeight() }, { bank.frame:GetWidth(), bank.frame:GetHeight() })
+        assert.are.same({ 10, 10 }, db.sizes[BACKPACK], "what was saved is kept")
+      end)
+
+      it("keeps a wide panel on the screen, the backpack a margin in from its edge by default", function()
+        db.sizes[BACKPACK] = { 640, 500 }
+        local bag = nextBag:Create(ctx())
+        assert.are.equal(UIParent:GetWidth() - 640 - style.Small.Margin, topLeft(bag))
+        db.places[BANK] = { 1800, 900 }
+        db.sizes[BANK] = { 640, 500 }
+        local bank = nextBank:Create(ctx())
+        assert.are.equal(UIParent:GetWidth() - 640, topLeft(bank))
+      end)
+
+      it("lays its content out again on a screen that changes only its width", function()
+        db.sizes[BACKPACK] = { 640, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local renders = 0
+        override(render, "Invalidate", function(_, d) if d == bag.root then renders = renders + 1 end end)
+        UIParent:_SetRect(0, 0, 600, 1200)
+        chain:Update(ctx(), true)
+        assert.are.equal(600, bag.frame:GetWidth())
+        assert.are.equal(1, renders)
+      end)
+
+      it("comes back at its saved size after a switch to full size and back", function()
+        db.sizes[BACKPACK] = { 640, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        nextPanel:SetSize(ctx(), "full")
+        finishTweens()
+        assert.are.same({ style.WIDTH, UIParent:GetHeight() }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        nextPanel:SetSize(ctx(), "small")
+        finishTweens()
+        assert.are.same({ 640, 500 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+      end)
+
+      it("glides its width as it switches to and from a small size of its own", function()
+        db.sizes[BACKPACK] = { 640, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        nextPanel:SetSize(ctx(), "full")
+        step(style.Time.Morph / 2)
+        local width = bag.frame:GetWidth() - style.FEATHER
+        assert.is_true(width > style.BODY_WIDTH and width < 640, "body width " .. width)
+        finishTweens()
+        nextPanel:SetSize(ctx(), "small")
+        step(style.Time.Morph / 2)
+        width = bag.frame:GetWidth()
+        assert.is_true(width > style.BODY_WIDTH and width < 640, "growing body width " .. width)
+        finishTweens()
+        assert.are.equal(640, bag.frame:GetWidth())
+      end)
+
+      -- Narrowing, its content is laid out at once for the width it ends at, so nothing is cut off
+      -- on the way; widening, once it is there.
+      it("lays its content out for the narrower width when a switch starts", function()
+        db.sizes[BACKPACK] = { 640, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local renders = 0
+        local invalidate = render.Invalidate
+        override(render, "Invalidate", function(r, d)
+          if d == bag.root then renders = renders + 1 end
+          return invalidate(r, d)
+        end)
+        nextPanel:SetSize(ctx(), "full")
+        assert.are.equal(1, renders, "narrowing: at once")
+        finishTweens()
+        assert.are.equal(2, renders, "and once it is there")
+        renders = 0
+        nextPanel:SetSize(ctx(), "small")
+        assert.are.equal(0, renders, "widening: not yet")
+        finishTweens()
+        assert.are.equal(1, renders)
+      end)
+
+      it("is its saved size on a screen that changes, kept on it", function()
+        db.sizes[BACKPACK] = { 640, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        UIParent:_SetRect(0, 0, 1280, 720)
+        chain:Update(ctx(), true)
+        assert.are.same({ 640, 500 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        UIParent:_SetRect(0, 0, 600, 400)
+        chain:Update(ctx(), true)
+        assert.are.same({ 600, 400 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        assert.are.same({ 640, 500 }, db.sizes[BACKPACK])
+      end)
+
+      it("sends its edge sparkles out of its inner side at its own width", function()
+        db.sizes[BANK] = { 600, 500 }
+        local bank = nextBank:Create(ctx())
+        for _ = 1, 20 do
+          local x = bank.edgeSparkles.options.Spawn()
+          assert.is_true(x >= 600 and x <= 624, "bank edge sparkle at " .. x)
+        end
+      end)
+    end)
+
+    describe("Shift-clicking a grip", function()
+      local function shiftClick(grip)
+        _G._isShiftKeyDown = true
+        press(grip)
+        release(grip)
+        _G._isShiftKeyDown = false
+      end
+
+      after_each(function()
+        _G._isShiftKeyDown = false
+      end)
+
+      it("glides it back to its default size, its top left still from the right grip", function()
+        db.sizes[BACKPACK] = { 700, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local x0, y0 = topLeft(bag)
+        shiftClick(bag.grips.RIGHT)
+        assert.is_nil(bag.frame._sizing, "a Shift-click does not size it")
+        step(style.Time.Resize / 2)
+        local w, h = bag.frame:GetWidth(), bag.frame:GetHeight()
+        assert.is_true(w > style.BODY_WIDTH and w < 700, "width " .. w)
+        assert.is_true(h > 500 and h < smallHeight(), "height " .. h)
+        assert.are.same({ x0, y0 }, { topLeft(bag) })
+        finishTweens()
+        assert.are.same({ style.BODY_WIDTH, smallHeight() }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        assert.is_nil(db.sizes[BACKPACK], "the default follows the screen again")
+        assert.are.same({ x0, y0 }, { topLeft(bag) })
+        assert.are.same({ x0, y0 }, db.places[BACKPACK])
+      end)
+
+      it("keeps its right edge still from the left grip", function()
+        db.sizes[BACKPACK] = { 700, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local x0, y0 = topLeft(bag)
+        local right = x0 + 700
+        shiftClick(bag.grips.LEFT)
+        step(style.Time.Resize / 2)
+        local x = topLeft(bag)
+        assert.are.equal(right, x + bag.frame:GetWidth())
+        finishTweens()
+        assert.are.same({ right - style.BODY_WIDTH, y0 }, { topLeft(bag) })
+        assert.are.same({ right - style.BODY_WIDTH, y0 }, db.places[BACKPACK])
+      end)
+
+      it("reflows its content as it glides, nothing gliding to its place", function()
+        db.sizes[BACKPACK] = { 700, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local invalidated = 0
+        local invalidate = render.Invalidate
+        override(render, "Invalidate", function(r, d)
+          if d == bag.root then invalidated = invalidated + 1 end
+          return invalidate(r, d)
+        end)
+        shiftClick(bag.grips.RIGHT)
+        step(style.Time.Resize / 2)
+        assert.is_true(invalidated >= 2)
+        assert.is_true(bag.content.instant)
+        assert.are.equal(bag.frame:GetWidth() - 2 * style.PAD, bag.root:PreRender().Width)
+        finishTweens()
+        assert.is_false(bag.content.instant)
+        assert.are.equal(8, perRow(bag))
+      end)
+
+      it("does nothing at its default size", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        assert.are.equal("default", bag:ResetSize("RIGHT"))
+        assert.is_false(tween:IsPlaying(bag.resetKey))
+      end)
+
+      it("ends the glide where it was going when it is moved, sized or closed", function()
+        db.sizes[BACKPACK] = { 700, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        shiftClick(bag.grips.RIGHT)
+        step(style.Time.Resize / 4)
+        bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+        assert.are.same({ style.BODY_WIDTH, smallHeight() }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        bag.mover:GetScript("OnDragStop")(bag.mover)
+        db.sizes[BACKPACK] = { 700, 500 }
+        bag.frame:SetSize(700, 500)
+        shiftClick(bag.grips.RIGHT)
+        step(style.Time.Resize / 4)
+        press(bag.grips.RIGHT)
+        assert.are.equal(style.BODY_WIDTH, bag.frame:GetWidth())
+        release(bag.grips.RIGHT)
+        -- Escape hides it at once (no slide).
+        db.sizes[BACKPACK] = { 700, 500 }
+        bag.frame:SetSize(700, 500)
+        shiftClick(bag.grips.RIGHT)
+        step(style.Time.Resize / 4)
+        assert.is_true(bag.frame:GetWidth() > style.BODY_WIDTH, "gliding")
+        bag.frame:Hide()
+        bag.frame:GetScript("OnHide")(bag.frame)
+        assert.is_nil(db.sizes[BACKPACK])
+        assert.are.equal(style.BODY_WIDTH, bag.frame:GetWidth())
+      end)
+
+      it("ends the glide where it was going as it starts to close", function()
+        db.sizes[BACKPACK] = { 700, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        shiftClick(bag.grips.RIGHT)
+        step(style.Time.Resize / 4)
+        bag:Hide(ctx())
+        assert.are.equal(style.BODY_WIDTH, bag.frame:GetWidth())
+      end)
+
+      it("does nothing while it closes", function()
+        db.sizes[BACKPACK] = { 700, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        bag:Hide(ctx())
+        assert.are.equal("closing", bag:ResetSize("RIGHT"))
+        assert.are.same({ 700, 500 }, db.sizes[BACKPACK])
+      end)
+
+      -- A size switch mid-glide starts from where the glide was going: from the left grip, the
+      -- default width with its right edge where it was.
+      it("switches size from the end of the glide", function()
+        db.sizes[BACKPACK] = { 700, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local right = topLeft(bag) + 700
+        shiftClick(bag.grips.LEFT)
+        step(style.Time.Resize / 4)
+        nextPanel:SetSize(ctx(), "full")
+        assert.are.equal(style.BODY_WIDTH, bag.morph.at.w)
+        assert.are.equal(right - style.BODY_WIDTH, bag.morph.at.x)
+      end)
+    end)
+
+    -- Chained, a grip on the side facing the partner would push the partner: it is off there.
+    describe("chained", function()
+      -- The bank chained beside the backpack, settled into its spot.
+      local function chainBank(bag, bank)
+        db.smallChain = "backpack"
+        chain:Update(ctx())
+        finishTweens()
+        return bag, bank
+      end
+
+      it("turns off the grip on the side each bag is chained on, while it is chained", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        assert.is_true(bag.grips.LEFT:IsShown() and bank.grips.RIGHT:IsShown(), "apart")
+        chainBank(bag, bank)
+        assert.is_false(bank.grips.RIGHT:IsShown(), "the bank, beside the backpack")
+        assert.is_true(bank.grips.LEFT:IsShown())
+        assert.is_false(bag.grips.LEFT:IsShown(), "the backpack, the bank beside it")
+        assert.is_true(bag.grips.RIGHT:IsShown())
+        bank:Hide(ctx())
+        assert.is_true(bag.grips.LEFT:IsShown(), "nothing beside the backpack once the bank closes")
+        finishTweens()
+        bag:Hide(ctx())
+        finishTweens()
+        bank:Show(ctx())
+        finishTweens()
+        assert.is_false(bank.grips.RIGHT:IsShown(), "the bank's place hangs from the backpack's, open or not")
+      end)
+
+      it("turns them off the same way with the backpack chained beside the bank", function()
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        db.smallChain = "companion"
+        chain:UpdateCoupling()
+        assert.is_false(bag.grips.LEFT:IsShown())
+        assert.is_false(bank.grips.RIGHT:IsShown())
+        assert.is_true(bag.grips.RIGHT:IsShown() and bank.grips.LEFT:IsShown())
+      end)
+
+      it("turns the grip off as soon as a drop chains the bag", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local x, y = chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY)
+        bank.mover:GetScript("OnDragStart")(bank.mover, "LeftButton")
+        bank.frame:_SetRect(x, y - bank.frame:GetHeight(), bank.frame:GetWidth(), bank.frame:GetHeight())
+        bank.mover:GetScript("OnDragStop")(bank.mover)
+        assert.are.equal("backpack", db.smallChain)
+        assert.is_false(bank.grips.RIGHT:IsShown(), "before it has glided in")
+      end)
+
+      it("keeps a bag's chained side beside its partner as it is resized", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        chainBank(bag, bank)
+        local bagLeft = topLeft(bag)
+        local bankRight = select(1, topLeft(bank)) + bank.frame:GetWidth()
+        resize(bank, "LEFT", 620, 480)
+        finishTweens()
+        assert.are.equal(bankRight, select(1, topLeft(bank)) + 620, "the bank's chained side is still")
+        assert.are.equal(bagLeft, select(1, topLeft(bag)))
+        assert.are.same({ chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY) }, { topLeft(bank) })
+        -- The backpack's right edge is 40 from the screen's; the client keeps a sized frame on it.
+        resize(bag, "RIGHT", 490, 480)
+        finishTweens()
+        assert.are.equal(bagLeft, select(1, topLeft(bag)))
+        assert.are.equal(bankRight, select(1, topLeft(bank)) + 620)
+      end)
+
+      it("keeps the grip it is dragged by while a chain forms, until it is let go", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        press(bank.grips.RIGHT)
+        db.smallChain = "backpack"
+        chain:UpdateCoupling()
+        assert.is_true(bank.grips.RIGHT:IsShown())
+        release(bank.grips.RIGHT)
+        assert.is_false(bank.grips.RIGHT:IsShown())
+        local _ = bag
+      end)
+
+      -- The chain moves no bag the player is sizing: it places itself once let go.
+      it("leaves a bag being sized where it is", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        chainBank(bag, bank)
+        press(bank.grips.LEFT)
+        sizeTo(bank, "LEFT", 620, 480)
+        chain:Update(ctx())
+        assert.is_false(tween:IsPlaying(bank))
+        chain:Update(ctx(), true)
+        assert.are.same({ 620, 480 }, { bank.frame:GetWidth(), bank.frame:GetHeight() })
+        release(bank.grips.LEFT)
+      end)
+
+      -- While a bag is sized, where it is comes from its frame: the backpack chained beside the bank
+      -- stays beside the bank's chained side, and the braid spans the gap there.
+      it("works out where it is from its frame while it is sized", function()
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        db.smallChain = "companion"
+        chain:Update(ctx())
+        finishTweens()
+        local x, y = bag:SmallPlace()
+        press(bank.grips.LEFT)
+        sizeTo(bank, "LEFT", 620, 480)
+        assert.are.same({ x, y }, { bag:SmallPlace() }, "the backpack's spot does not move")
+        local gap = bag:SmallLeft() - (bank.frame:GetLeft() + 620)
+        chain:Turn(0.016)
+        assert.are.equal(gap / 2, bag.braid.half)
+        release(bank.grips.LEFT)
+      end)
+
+      it("does not chain a backpack too wide to sit beside the bank on the screen", function()
+        db.sizes[BACKPACK] = { 1000, 480 }
+        db.places[BANK] = { 400, 900 }
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local x, y = chain:ChainedPlace(bag, bank, bank.placeX, bank.placeY)
+        assert.is_nil((chain:Dropped(bag, x, y)))
+      end)
+
+      it("sits beside a partner of any width", function()
+        db.sizes[BANK] = { 620, 480 }
+        db.sizes[BACKPACK] = { 560, 480 }
+        local bag = nextBag:Create(ctx())
+        local bank = nextBank:Create(ctx())
+        local gap = chain:SmallGap(bank, bag)
+        assert.are.same({ 1000 - gap - 620, 900 }, { chain:ChainedPlace(bank, bag, 1000, 900) })
+        assert.are.same({ 100 + 620 + gap, 900 }, { chain:ChainedPlace(bag, bank, 100, 900) })
+      end)
+
+      it("braids across the gap between bags of any width", function()
+        db.sizes[BANK] = { 620, 480 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        chainBank(bag, bank)
+        local gap = bag:SmallLeft() - (bank:SmallLeft() + 620)
+        assert.are.equal(gap / 2, bank.braid.half)
+      end)
     end)
   end)
 

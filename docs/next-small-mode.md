@@ -132,7 +132,7 @@ guild bank, Masque, ConsolePort, the classic bags, and switching between the cla
 All in `style.Small` (`next/style.lua`), one place: the height share, the ribbon's length, the open
 slide, the edge, the snap and unsnap distances, the default margins. Possible later knobs, if small
 panels still feel big: denser icons (the grid's 44-unit icons and 6-unit gaps, used everywhere
-through `style.ICON` and `style.GAP`), and resizing a small panel with a grip.
+through `style.ICON` and `style.GAP`). Resizing a small panel with a grip is done (phase 3).
 
 ## Phases
 
@@ -143,7 +143,10 @@ through `style.ICON` and `style.GAP`), and resizing a small panel with a grip.
 2. **Chaining by dragging** (done; `.claude/rules/next.md` §14e): the snap, moving a chained pair
    together, letting go, the braid and its sparkles between two free panels, a companion opening
    beside its anchor.
-3. **Tuning** with the player, in game.
+3. **Resizing with grips** (done; `.claude/rules/next.md` §14g): a grip on each bottom corner, seen
+   under the pointer, none on the chained side, live reflow, the size kept and saved per bag, and
+   Shift-click to glide back to the default size.
+4. **Tuning** with the player, in game.
 
 Each phase is tested first (specs that fail before), documented in `.claude/rules/next.md`, and
 verified in game with the render recorder (render-recorder.md) where it is about how things look.

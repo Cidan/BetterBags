@@ -482,6 +482,7 @@ function WidgetMethods:IsUserPlaced()
 end
 function WidgetMethods:StopMovingOrSizing()
   self._moving = false
+  self._sizing = nil
 end
 -- Button: Enable() / Disable() / IsEnabled() -> boolean, LockHighlight() / UnlockHighlight().
 function WidgetMethods:Enable()
@@ -723,6 +724,10 @@ end
 -- SetMovable(movable), SetScale(scale) / GetScale().
 function WidgetMethods:SetResizable(resizable)
   self._resizable = resizable
+end
+-- Frame:IsResizable() -> resizable (SimpleFrameAPIDocumentation).
+function WidgetMethods:IsResizable()
+  return self._resizable == true
 end
 function WidgetMethods:SetResizeBounds(minWidth, minHeight, maxWidth, maxHeight)
   self._resizeBounds = { minWidth = minWidth, minHeight = minHeight, maxWidth = maxWidth, maxHeight = maxHeight }
