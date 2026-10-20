@@ -359,6 +359,7 @@ describe("NextDrag", function()
   end)
 
   teardown(function()
+    UseNextTheme(nil)
     for i = #modules, 1, -1 do ResetModuleStub(modules[i][1]) end
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
   end)
@@ -373,6 +374,27 @@ describe("NextDrag", function()
       assert.are.equal(herbs.cells, buttons["0_3"].frame:GetParent(), "its buttons come with it")
       assert.are.same({ "TOPLEFT", UIParent, "BOTTOMLEFT", left, top }, { herbs.frame:GetPoint(1) })
       assert.is_true(nextDrag.shadow:IsShown())
+    end)
+
+    -- A Next theme (next-themes.md) draws the lift: its scale, the shadow and the hint's role.
+    it("lifts by the theme's scale, with its shadow, naming the drop in its role", function()
+      UseNextTheme({ Fonts = { Hint = { Size = 10 } },
+        Drag = { LiftScale = 0.8, Shadow = { Color = "Gold", Alpha = 0.5, Spread = 4 }, HintFont = "Hint" } })
+      nextDrag:ApplyStyle(context:New("spec"))
+      local herbs = pickUp(backpack, "Herbs")
+      finishTweens()
+      assert.are.equal(0.8, nextDrag.current.scale)
+      assert.are.equal(0.5, nextDrag.shadow:GetAlpha())
+      local c = nextDrag.shadow._colorTexture
+      assert.are.same({ 1, 0.84, 0.5, 1 }, { c.r, c.g, c.b, c.a })
+      assert.are.same({ "TOPLEFT", herbs.frame, "TOPLEFT", -4, 4 }, { nextDrag.shadow:GetPoint(1) })
+      assert.are.equal(style:Font("Hint"), nextDrag.hint:GetFontObject())
+      UseNextTheme(nil)
+      nextDrag:ApplyStyle(context:New("spec"))
+      assert.are.same(style.Color.Black, { nextDrag.shadow._colorTexture.r, nextDrag.shadow._colorTexture.g,
+        nextDrag.shadow._colorTexture.b, nextDrag.shadow._colorTexture.a }, "restyled while lifted")
+      drop(herbs)
+      finishTweens()
     end)
 
     it("shrinks a little around the point that was grabbed, which stays under the cursor", function()
@@ -991,6 +1013,30 @@ describe("NextDrag", function()
         assert.are.same({ true, false }, seller.glows)
         assert.is_false(nextDrag.hint:IsShown())
         assert.is_false(nextDrag.cover:IsShown())
+      end)
+
+      -- A Next theme draws the dock, and one applied while it waits restyles it.
+      it("draws the dock from the theme, restyling it while it waits", function()
+        UseNextTheme({ Palette = { Paper = { 0.9, 0.85, 0.7, 1 } }, Fonts = { Big = { Size = 20 } },
+          Dock = { Card = { Color = "Paper" }, Pad = 20, Halo = false, TitleFont = "Big",
+            Glow = { Color = "White", Width = 4, Low = 0.2, High = 0.6, Period = 2 } } })
+        nextDrag:ApplyStyle(context:New("spec"))
+        local d = dock()
+        local c = d.background._colorTexture
+        assert.are.same({ 0.9, 0.85, 0.7, 1 }, { c.r, c.g, c.b, c.a })
+        assert.are.equal(4, d.glow[1]:GetHeight())
+        assert.are.equal(4, d.glow[3]:GetWidth())
+        local r, g, b = d.glow[1]:GetVertexColor()
+        assert.are.same({ 1, 1, 1 }, { r, g, b })
+        assert.is_false(d.halo:IsShown())
+        assert.are.equal(style:Font("Big"), d.title:GetFontObject())
+        assert.are.equal(herbs.frame:GetWidth() + 40, d.card:GetWidth())
+        d.elapsed = 0
+        d.frame:GetScript("OnUpdate")(d.frame, 0)
+        assert.is_true(math.abs(d.glow[1]:GetAlpha() - 0.4) < 1e-6, "halfway between its low and high")
+        UseNextTheme(nil)
+        nextDrag:ApplyStyle(context:New("spec"))
+        assert.is_true(d.halo:IsShown())
       end)
 
       it("keeps the section's item buttons from taking the clicks", function()

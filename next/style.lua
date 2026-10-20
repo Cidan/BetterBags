@@ -3,286 +3,292 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
--- NextStyle holds BetterBagsNext's look in one place (next.md): sizes, colors, timings and fonts.
--- Next draws itself and does not follow the theme.
+---@class SonataNext: AceModule
+local sonataNext = addon:GetModule('SonataNext')
+
+-- NextStyle is BetterBags Next's look, read from the current Next theme (.claude/rules/next-themes.md):
+-- SonataNext hands it every theme it applies (Use). Its long-standing fields (ICON, PAD, Color,
+-- Time, Small, Chain, Cloud, ...) are views of the theme, so Next's code reads them as it always
+-- has; the theme's widget specs are on style.Theme. Read them when drawing, never into a value kept
+-- at load: a theme can change them at any time. Font objects are made per theme application and
+-- never changed (text).
 ---@class NextStyle: AceModule
+---@field Theme table The current Next theme, resolved.
+---@field Color table<string, number[]> The theme's palette.
 local style = addon:NewModule('NextStyle')
 
--- Item icons and the room between them.
-style.ICON = 44
--- The room under a vendor button's icon for its price (next.md §10).
-style.VENDOR_PRICE = 14
-style.GAP = 6
-style.PER_ROW = 8
--- The scroll box keeps its bar's room on both sides (render/scrollbox.lua, Symmetric).
-style.GUTTER = 28
--- The room between the body's edges and the scroll box.
-style.PAD = 18
-style.GRID_WIDTH = style.PER_ROW * style.ICON + (style.PER_ROW - 1) * style.GAP
-style.BODY_WIDTH = style.GRID_WIDTH + style.GUTTER + style.PAD * 2
--- The feathered edge left of the body, transparent to opaque.
-style.FEATHER = 96
-style.WIDTH = style.FEATHER + style.BODY_WIDTH
--- How far the body reaches past the screen edge, so the opening bounce never shows what is behind
--- the panel (next.md §3). The panel slides in WIDTH + OVERREACH (HiddenOffset) with outBack
--- (next/tween.lua), which swings a tenth of that past its place, so the reach must be at least
--- WIDTH / 9; 4 pixels more spare it rounding.
-style.OPEN_OVERSHOOT = 0.1
-style.OVERREACH = math.ceil(style.WIDTH * style.OPEN_OVERSHOOT / (1 - style.OPEN_OVERSHOOT)) + 4
+-- How far past its end each ease swings (next/tween.lua): outBack about a tenth, outBackSoft a
+-- fiftieth. Opening with one, the body must reach that much past the screen edge (OVERREACH).
+local OVERSHOOT = { outBack = 0.1, outBackSoft = 0.02 }
 
--- The header, from the body's top: the title, then the search box; the content starts below.
-style.TITLE_TOP = 24
-style.SEARCH_TOP = 70
-style.SEARCH_HEIGHT = 26
--- The search box's magnifier, and the room left of it and between it and the text.
-style.SEARCH_ICON = 14
-style.SEARCH_GAP = 8
--- How strong the search box's lavender edge is: idle, under the pointer or holding a search, and
--- focused. Asked: the box was "very difficult to see"; it stands out without leaving Next's look.
-style.SearchEdge = { Idle = 0.3, Hover = 0.55, Focus = 1 }
--- How strong its lavender magnifier is: idle, and under the pointer or holding a search (it is
--- white while focused).
-style.SearchIcon = { Idle = 0.85, Active = 1 }
-style.CONTENT_TOP = 110
-style.FOOTER = 40
+-- Use makes theme the look: every field below is read from it, and every text drawn with a role
+-- moves to a new font object of its role.
+---@param theme table A resolved Next theme (SonataNext:Resolve).
+function style:Use(theme)
+  self.Theme = theme
+  local L, M = theme.Layout, theme.Motion
+  self.Color = theme.Palette
 
--- Sections: a header row above the icons, and the room between sections.
-style.SECTION_HEADER = 24
-style.SECTION_SPACING = 16
+  self.ICON = L.Icon
+  self.VENDOR_PRICE = L.VendorPrice
+  self.GAP = L.Gap
+  self.PER_ROW = L.PerRow
+  self.GUTTER = L.Gutter
+  self.PAD = L.Pad
+  self.FEATHER = L.Feather
+  self.GRID_WIDTH = self.PER_ROW * self.ICON + (self.PER_ROW - 1) * self.GAP
+  self.BODY_WIDTH = self.GRID_WIDTH + self.GUTTER + self.PAD * 2
+  self.WIDTH = self.FEATHER + self.BODY_WIDTH
+  -- How far the body reaches past the screen edge, so the opening bounce never shows what is behind
+  -- the panel: it slides in WIDTH + OVERREACH (HiddenOffset) and swings OPEN_OVERSHOOT of that past
+  -- its place; 4 more spare it rounding.
+  local overshoot = OVERSHOOT[M.Ease.Open] or 0
+  self.OPEN_OVERSHOOT = overshoot
+  self.OVERREACH = math.ceil(self.WIDTH * overshoot / (1 - overshoot)) + 4
 
--- Tabs down the body's left edge.
-style.TAB_HEIGHT = 30
-style.TAB_SPACING = 6
-style.TAB_MIN_WIDTH = 76
-style.TAB_MAX_WIDTH = 150
-style.TAB_PADDING = 14
-style.TAB_HOVER = 6
-style.TAB_ICON = 16
-style.TAB_ICON_GAP = 6
--- The room between the bank's character tabs and its Warbank tabs.
-style.TAB_GROUP_GAP = 10
+  self.TITLE_TOP = L.TitleTop
+  self.TITLE_INSET = L.TitleInset
+  self.SEARCH_TOP = L.SearchTop
+  self.SEARCH_HEIGHT = L.SearchHeight
+  self.SEARCH_ICON = L.SearchIcon
+  self.SEARCH_GAP = L.SearchGap
+  self.SEARCH_RIGHT = L.SearchRight
+  self.CONTENT_TOP = L.ContentTop
+  self.FOOTER = L.Footer
+  self.SECTION_HEADER = L.SectionHeader
+  self.SECTION_SPACING = L.SectionSpacing
+  self.TAB_HEIGHT = L.TabHeight
+  self.TAB_SPACING = L.TabSpacing
+  self.TAB_MIN_WIDTH = L.TabMinWidth
+  self.TAB_MAX_WIDTH = L.TabMaxWidth
+  self.TAB_PADDING = L.TabPadding
+  self.TAB_HOVER = L.TabHover
+  self.TAB_ICON = L.TabIcon
+  self.TAB_ICON_GAP = L.TabIconGap
+  self.TAB_GROUP_GAP = L.TabGroupGap
+  self.HEADER_BUTTON = L.HeaderButton
+  self.HEADER_BUTTON_GAP = L.HeaderButtonGap
+  self.HEADER_BUTTON_TOP = L.HeaderButtonTop
+  self.EMPTY_TOP = L.EmptyTop
+  self.FOOTER_TEXT = L.FooterText
+  self.FOOTER_MONEY = L.FooterMoney
 
--- Colors as { r, g, b, a }.
-style.Color = {
-  Body = { 0.045, 0.04, 0.085, 0.94 },
-  Wash = { 0.55, 0.45, 1.0, 0.16 },
-  Gold = { 1.0, 0.84, 0.5, 1 },
-  -- The Warbank's accent, and the wash the panel takes while it shows a Warbank tab.
-  Warbank = { 0.35, 0.85, 0.95, 1 },
-  WarbankWash = { 0.3, 0.75, 1.0, 0.16 },
-  -- The guild bank's accent and wash: the guild's green (guild chat's color).
-  Guild = { 0.4, 1.0, 0.5, 1 },
-  GuildWash = { 0.3, 1.0, 0.45, 0.16 },
-  White = { 1, 1, 1, 1 },
-  Lavender = { 0.78, 0.72, 1.0, 1 },
-  Text = { 0.96, 0.95, 1.0, 1 },
-  Muted = { 0.62, 0.58, 0.78, 1 },
-  Tab = { 0.09, 0.08, 0.16, 0.92 },
-  TabSelected = { 0.18, 0.15, 0.32, 0.96 },
-  -- A move waiting to be confirmed (NextDrag's dock): its card, the scrim dimming the panel behind
-  -- it, and the amber of its glow and warning (Gold).
-  Card = { 0.1, 0.085, 0.19, 0.98 },
-  Scrim = { 0, 0, 0, 0.6 },
-  -- The search box's fill, idle and focused: lighter than the body, so it reads as a field.
-  SearchFill = { 0.133, 0.114, 0.239, 1 },
-  SearchFillFocus = { 0.165, 0.141, 0.314, 1 },
-}
+  local edge, icon = theme.Search.Edge or { Idle = 0, Hover = 0, Focus = 0 }, theme.Search.Icon
+  self.SearchEdge = { Idle = edge.Idle, Hover = edge.Hover, Focus = edge.Focus }
+  self.SearchIcon = { Idle = icon.Idle, Active = icon.Active }
 
--- Timings, in seconds, and the cascade's rise in pixels.
--- How long everything that moves in answer to the player takes: items and sections gliding to their
--- new places (sorting, looting, switching tabs, making room for a dragged section), a dropped
--- section landing or flying into its target, and the tab bar gliding. Not the panel's own slides
--- in and out (Open, Close), which are tuned on their own.
-local INTERACTION = 0.24
+  self.Time = M.Time
+  self.RISE = M.Rise
+  self.Small = {}
+  for key, value in pairs(theme.Small) do
+    self.Small[key] = value
+  end
+  self.Small.Edge = theme.Panel.Edge and theme.Panel.Edge.Alpha or 0
+  self.Chain = theme.Chain
+  self.Cloud = theme.Header.Cloud or nil
+  local ribbon = theme.Header.Ribbon
+  self.RIBBON_LENGTH = ribbon and ribbon.Length or 0
+  self.SPARKLE_TEXTURE = self:TexturePath(theme.Sparkles and theme.Sparkles.Texture or "Sparkle")
+  self.CLOUD_GLOW = self:TexturePath("Glow")
 
-style.Time = {
-  Interaction = INTERACTION,
-  Open = 0.45,
-  Close = 0.24,
-  Cascade = 0.32,
-  Stagger = 0.045,
-  OpenCascadeDelay = 0.12,
-  Glide = INTERACTION,
-  -- The wash at the top of the panel fading to another color.
-  Wash = 0.44,
-  Hover = 0.15,
-  Shimmer = 1.4,
-  ShimmerEvery = 3.4,
-  -- How long the shimmer takes to settle into the title's cloud once it arrives.
-  Absorb = 0.7,
-  -- Moving sections (next.md §7).
-  Lift = 0.12,
-  Land = INTERACTION,
-  FlyAway = INTERACTION,
-  Pulse = 0.6,
-  -- Chaining (next.md §12): a bag flying to its partner, or home, or both moving across; a chained
-  -- bag coming in beside its open partner; the ribbons twisting together, and coming apart. The
-  -- first ones felt "too slow and... linear almost" at 0.7 s with an in-out sine.
-  Fly = 0.45,
-  -- The chained bag coming in from its anchor's edge, falling into place (outBackSoft). Asked:
-  -- "stagger them appearing from the border they are chained to ... and have them fall in place".
-  Enter = 0.5,
-  Couple = 0.35,
-  Uncouple = 0.25,
-  -- An open panel switching between full and small (docs/next-small-mode.md): the glide (its size and
-  -- beam, the feathers fading out as it shrinks or the small border as it grows), then the fade (the
-  -- small border in once small, or the feathers in once full).
-  Morph = 0.4,
-  MorphFade = 0.2,
-}
-style.RISE = 12
+  self:newFonts()
+end
 
--- Small mode (docs/next-small-mode.md): smaller, movable panels for smaller screens. The knobs to
--- toy with, in one place.
-style.Small = {
-  -- The panel's height, a share of the screen's.
-  Height = 0.66,
-  -- The title's ribbon (the beam), and how far out along it its sparkles are born.
-  Ribbon = 120,
-  SparkSpread = 48,
-  -- How far it slides in from its edge side as it fades in, and back out as it fades out.
-  Slide = 24,
-  -- The alpha of its 1-pixel lavender edge, so it reads against the world.
-  Edge = 0.35,
-  -- How far in from its screen edge a panel sits until it is first moved.
-  Margin = 40,
-  -- Chaining by dropping a bag beside its partner: how close its inner side must be to where it
-  -- would sit, how far apart their tops may be, and the least room between them.
-  SnapReach = 80,
-  SnapRise = 160,
-  MinGap = 64,
-}
+-- RGBA returns a color: a palette name, or { r, g, b, a } given outright, alpha replaced when given.
+---@param ref string|number[]
+---@param alpha? number
+---@return number r, number g, number b, number a
+function style:RGBA(ref, alpha)
+  local c = ref
+  if type(ref) == "string" then
+    c = self.Color[ref]
+    if c == nil then
+      error("the Next theme has no color named " .. ref)
+    end
+  end
+  return c[1], c[2], c[3], alpha or c[4] or 1
+end
 
--- The sparkle sprite: the cooldown "bling" star, on every client.
-style.SPARKLE_TEXTURE = "Interface\\Cooldown\\star4"
--- The ribbon running from the title out of the window, at full length.
-style.RIBBON_LENGTH = 300
+-- CreateColor returns a color as a ColorMixin: a palette name or { r, g, b, a }, alpha replaced when
+-- given.
+---@param ref string|number[]
+---@param alpha? number
+---@return ColorMixin
+function style:CreateColor(ref, alpha)
+  return CreateColor(self:RGBA(ref, alpha))
+end
 
--- Chaining the backpack and its companion (next.md §12).
--- A chained bag comes in from its anchor's edge, out from beneath the anchor: Stagger seconds after
--- an anchor still coming in. A companion chained to the backpack that opens first (at a bank or a
--- vendor the backpack opens a frame later) waits out of sight up to AnchorWait seconds for it, and
--- comes in alone from its own edge if it does not open.
--- TabMargin: the room between the two bags' tab rails, which hang into the gap between the bodies.
--- OuterFeather: how far a bag away from its screen edge feathers out on its far side, toward the
--- rest of the screen (asked, at the full FEATHER: "too heavy. tone it down a bit").
--- CoupledFeather: how far into the gap each coupled bag's inner feather reaches, as a share of the
--- gap (past the middle, so the two overlap and the bags look closer; under the whole gap, so there
--- is still a gap). Asked: "grow the feathering between two coupled bags a bit".
--- The braid the two ribbons twist into: Segments lines per strand on each bag's half of the gap,
--- Amplitude pixels either side of the ribbon at the middle of the gap (none at the bodies),
--- Wavelength pixels per turn, turning Turn radians a second, Thickness pixels thick, Alpha bright
--- in front (Depth less behind); Beads lights running along it from each cloud to the knot in
--- BeadTime seconds; the knot KnotSize pixels, KnotAlpha bright, swelling by KnotSwell as they couple.
-style.Chain = {
-  Stagger = 0.08,
-  AnchorWait = 0.25,
-  TabMargin = 24,
-  OuterFeather = 48,
-  CoupledFeather = 0.65,
-  Segments = 16, Amplitude = 7, Wavelength = 64, Turn = 0.9, Thickness = 2, Alpha = 0.85, Depth = 0.5,
-  Beads = 3, BeadTime = 1.6, BeadSize = 12,
-  KnotSize = 30, KnotAlpha = 0.5, KnotSwell = 0.5,
-}
+-- Ease returns the ease the theme gives an animation (next/tween.lua's names).
+---@param name string
+---@return NextEase
+function style:Ease(name)
+  return self.Theme.Motion.Ease[name] or "outCubic"
+end
 
--- The cloud round the title the ribbon flows into (next.md §3): puffs of a soft glow that fades to
--- nothing at its edge (tools/textures/next_glow.py), so there is no line anywhere. The cloud
--- reaches from the window's hard edge, where the ribbon ends, to Pad past the title's far side. A
--- puff sits a share F of the way across it from the ribbon's end, Y above the title's middle, W x H
--- pixels (W false: as wide as the cloud times Wide), in a color of the palette at alpha A. The
--- Join puff sits on the ribbon's end. Each puff breathes, out of step
--- with the others: its alpha by Depth and its height by Drift pixels, over a few seconds. When the
--- shimmer arrives the cloud brightens by Swell and the Join puff by JoinSwell.
--- SecretTitleWidth stands in for the title's width when the client will not say it: a vendor's name
--- is secret in an instance (UnitName is SecretWhenUnitNameIdentityRestricted), and a font string
--- showing a secret has a secret width (GetStringWidth is SecretWhenAnchoringSecret). About a
--- typical NPC name in the 26-pixel title font.
-style.Cloud = {
-  SecretTitleWidth = 160,
-  Pad = 16, Swell = 0.6, JoinSwell = 0.45, Depth = 0.15, Drift = 1.5,
-  Join = { Size = 34, Color = "Gold", A = 0.35 },
-  Puffs = {
-    { F = 0.45, Y = 0, W = false, Wide = 1.15, H = 60, Color = "Lavender", A = 0.09 },
-    { F = 0.10, Y = 5, W = 54, H = 50, Color = "Gold", A = 0.24 },
-    { F = 0.21, Y = -8, W = 50, H = 46, Color = "Gold", A = 0.2 },
-    { F = 0.34, Y = 9, W = 60, H = 54, Color = "Lavender", A = 0.17 },
-    { F = 0.48, Y = -7, W = 66, H = 56, Color = "Lavender", A = 0.16 },
-    { F = 0.62, Y = 8, W = 58, H = 52, Color = "Lavender", A = 0.15 },
-    { F = 0.77, Y = -6, W = 52, H = 46, Color = "Lavender", A = 0.12 },
-    { F = 0.91, Y = 3, W = 42, H = 40, Color = "Lavender", A = 0.1 },
-    { F = 0.16, Y = 17, W = 30, H = 26, Color = "Gold", A = 0.12 },
-    { F = 0.28, Y = -19, W = 34, H = 30, Color = "Lavender", A = 0.11 },
-    { F = 0.55, Y = 19, W = 38, H = 32, Color = "Lavender", A = 0.11 },
-    { F = 0.70, Y = -18, W = 32, H = 28, Color = "Lavender", A = 0.09 },
-  },
-}
--- White, the shape in the alpha: a soft round glow.
-style.CLOUD_GLOW = "Interface\\AddOns\\BetterBags\\textures\\next\\glow.png"
--- The spark that sweeps along the title's ribbon.
-style.SPARK_TEXTURE = "Interface\\COMMON\\StreamSpark"
+-- TexturePath returns a texture the theme names (its Textures), or ref itself (a file or file ID).
+---@param ref string|number
+---@return string|number
+function style:TexturePath(ref)
+  local named = type(ref) == "string" and self.Theme.Textures[ref]
+  return named or ref
+end
 
----@class (exact) NextFontSpec
----@field size number
----@field color number[]
----@field shadow? boolean
-
----@type table<string, NextFontSpec>
-local FONTS = {
-  Title = { size = 26, color = style.Color.White, shadow = true },
-  Section = { size = 14, color = style.Color.Text, shadow = true },
-  SectionRecent = { size = 14, color = style.Color.Gold, shadow = true },
-  SectionFree = { size = 13, color = style.Color.Muted },
-  Count = { size = 11, color = style.Color.Muted },
-  Tab = { size = 12, color = style.Color.Muted },
-  TabSelected = { size = 12, color = style.Color.White, shadow = true },
-  Footer = { size = 12, color = style.Color.Muted },
-  -- A move waiting to be confirmed (NextDrag's dock): what it does, its warning, and how to answer.
-  ConfirmTitle = { size = 18, color = style.Color.White, shadow = true },
-  ConfirmWarning = { size = 12, color = style.Color.Gold },
-  ConfirmHint = { size = 12, color = style.Color.Lavender },
-  -- The search box's help text ("Search Backpack"), and what is typed in it.
-  Search = { size = 12, color = style.Color.Muted },
-  SearchText = { size = 13, color = style.Color.Text },
-  -- The vendor's buttons (next.md §10): the price under the icon, the stack size and stock on it.
-  Price = { size = 10, color = style.Color.White, shadow = true },
-  Stack = { size = 11, color = style.Color.White, shadow = true },
-}
+-- Text. Every theme application makes a new font object for each role asked for, and moves every
+-- text drawn with a role to its role's new one: a font object is never changed after it is made
+-- (asked: "don't re-use text objects across themes, make whole new ones"; Sonata's lesson, sonata.md
+-- 3c: a font object changed while text used it left that text out of step). Text drawn with a role
+-- must not set its own color or shadow: a state that looks different is another role.
 
 style.fonts = {} ---@type table<string, Font>
+style.texts = setmetatable({}, { __mode = "k" }) ---@type table<FontString|EditBox, string>
+-- Text whose template colors it, colored by its role too (SetTemplateFont).
+style.templated = setmetatable({}, { __mode = "k" }) ---@type table<FontString|EditBox, boolean>
 
--- Font returns Next's font object of a name, made the first time it is asked for in the
--- client's own font file (the locale's), at Next's size and color.
----@param name string Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price or Stack.
+-- The number of font objects made: their names must be unique.
+local fontCount = 0
+
+-- makeFont makes a font object for a role's spec: the client's own font file (the locale's) unless
+-- the spec names one, at its size and flags, in its color, with its shadow or none.
+---@param role string
+---@param spec table
 ---@return Font
-function style:Font(name)
-  local font = self.fonts[name]
-  if font ~= nil then
-    return font
+function style:makeFont(role, spec)
+  fontCount = fontCount + 1
+  local font = CreateFont("BetterBagsNextFont" .. role .. fontCount)
+  local path = spec.File or GameFontNormal:GetFont()
+  font:SetFont(path, spec.Size, spec.Flags or "")
+  font:SetTextColor(self:RGBA(spec.Color or "White"))
+  local shadow = spec.Shadow
+  if shadow == true then
+    shadow = self.Theme.FontShadow
   end
-  local spec = FONTS[name]
-  if spec == nil then
-    error("BetterBagsNext has no font named " .. tostring(name))
-  end
-  local path = GameFontNormal:GetFont()
-  font = CreateFont("BetterBagsNextFont" .. name)
-  font:SetFont(path, spec.size, "")
-  font:SetTextColor(unpack(spec.color))
-  if spec.shadow then
-    font:SetShadowColor(0, 0, 0, 0.85)
-    font:SetShadowOffset(0, -2)
+  if type(shadow) == "table" then
+    font:SetShadowColor(self:RGBA(shadow.Color or "Black"))
+    font:SetShadowOffset(shadow.X or 0, shadow.Y or 0)
   else
     font:SetShadowColor(0, 0, 0, 0)
     font:SetShadowOffset(0, 0)
   end
-  self.fonts[name] = font
+  if spec.Justify ~= nil then
+    font:SetJustifyH(spec.Justify)
+  end
   return font
 end
 
--- Color returns a color of the palette as a ColorMixin, alpha replaced when given.
----@param name string
----@param alpha? number
----@return ColorMixin
-function style:CreateColor(name, alpha)
-  local c = self.Color[name]
-  return CreateColor(c[1], c[2], c[3], alpha or c[4])
+-- Font returns the current theme's font object of a role, made the first time it is asked for.
+---@param role string
+---@return Font
+function style:Font(role)
+  local font = self.fonts[role]
+  if font ~= nil then
+    return font
+  end
+  local spec = self.Theme.Fonts[role]
+  if spec == nil then
+    error("BetterBags Next has no font role named " .. tostring(role))
+  end
+  font = self:makeFont(role, spec)
+  self.fonts[role] = font
+  return font
 end
+
+-- SetFont draws a font string or edit box with a role, and keeps it on its role's font object
+-- through every theme.
+---@param text FontString|EditBox
+---@param role string
+function style:SetFont(text, role)
+  text:SetFontObject(self:Font(role))
+  self.texts[text] = role
+end
+
+-- SetTemplateFont draws text a Blizzard template colors itself with a role: SetFont, and the role's
+-- color and shadow set on the text too, now and with every theme. A template's own color wins over
+-- a font object's (an XML <Color>, as InputBoxInstructionsTemplate gives its help text 0.35 gray), as
+-- Sonata's apply:Font handles it.
+---@param text FontString|EditBox
+---@param role string
+function style:SetTemplateFont(text, role)
+  self.templated[text] = true
+  self:SetFont(text, role)
+  self:colorText(text)
+end
+
+-- colorText sets the color and shadow of a text's role on the text itself: from the role's font
+-- object, never one read back from the text (an InputBoxTemplate edit box's GetFontObject returns a
+-- font of its own, .context/patterns-ui.md).
+---@private
+---@param text FontString|EditBox
+function style:colorText(text)
+  local font = self:Font(self.texts[text])
+  text:SetTextColor(font:GetTextColor())
+  text:SetShadowColor(font:GetShadowColor())
+  text:SetShadowOffset(font:GetShadowOffset())
+end
+
+-- Paint draws a texture from a theme's texture spec: a solid Color (a palette name or a color, alpha
+-- replaced when given), or a Texture (one of the theme's Textures by name, a file or file ID) or an
+-- Atlas tinted by Color; with TexCoords { left, right, top, bottom }, HorizTile and VertTile (the
+-- REPEAT wrap mode, so a tiled texture repeats rather than streaking its edge), BlendMode and
+-- Desaturated. Everything it does not set is reset, so a texture painted again keeps nothing of
+-- the last spec.
+---@param texture Texture
+---@param spec table
+---@param alpha? number
+function style:Paint(texture, spec, alpha)
+  local r, g, b, a = self:RGBA(spec.Color or "White", alpha)
+  texture:SetTexCoord(0, 1, 0, 1)
+  texture:SetHorizTile(false)
+  texture:SetVertTile(false)
+  if spec.Texture ~= nil or spec.Atlas ~= nil then
+    local wrapH = spec.HorizTile and "REPEAT" or nil
+    local wrapV = spec.VertTile and "REPEAT" or nil
+    if spec.Atlas ~= nil then
+      texture:SetAtlas(spec.Atlas, false, nil, nil, wrapH, wrapV)
+    else
+      texture:SetTexture(self:TexturePath(spec.Texture), wrapH, wrapV)
+    end
+    local c = spec.TexCoords
+    if c ~= nil then
+      texture:SetTexCoord(c[1], c[2], c[3], c[4])
+    end
+    texture:SetHorizTile(spec.HorizTile == true)
+    texture:SetVertTile(spec.VertTile == true)
+    texture:SetVertexColor(r, g, b, a)
+  else
+    texture:SetColorTexture(r, g, b, a)
+    texture:SetVertexColor(1, 1, 1, 1)
+  end
+  texture:SetBlendMode(spec.BlendMode or "BLEND")
+  texture:SetDesaturated(spec.Desaturated == true)
+end
+
+-- CreateText makes a font string drawn with a role.
+---@param parent Frame
+---@param role string
+---@param layer? DrawLayer OVERLAY when unset.
+---@return FontString
+function style:CreateText(parent, role, layer)
+  local text = parent:CreateFontString(nil, layer or "OVERLAY")
+  self:SetFont(text, role)
+  return text
+end
+
+-- newFonts starts a new set of font objects and moves every text to its role's new one. Text whose
+-- role the theme does not define (another theme's own role) keeps its font object: its widget gives
+-- it one of this theme's roles as it restyles.
+---@private
+function style:newFonts()
+  self.fonts = {}
+  local roles = self.Theme.Fonts
+  for text, role in pairs(self.texts) do
+    if roles[role] ~= nil then
+      text:SetFontObject(self:Font(role))
+      if self.templated[text] then
+        self:colorText(text)
+      end
+    end
+  end
+end
+
+-- Until SonataNext starts (with the saved theme), and for specs, the look is the Default theme.
+style:Use(sonataNext:Resolve("Default"))

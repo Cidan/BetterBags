@@ -27,6 +27,9 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
+---@class SonataNext: AceModule
+local sonataNext = addon:GetModule('SonataNext')
+
 ---@class NextTween: AceModule
 local tween = addon:GetModule('NextTween')
 
@@ -41,9 +44,6 @@ local tween = addon:GetModule('NextTween')
 ---@class NextDrag: AceModule
 local nextDrag = addon:NewModule('NextDrag')
 
--- How much a picked-up section shrinks, and how small it gets flying into a target.
-local LIFT_SCALE = 0.94
-local FLY_SCALE = 0.15
 -- How far from the scroll area's top or bottom it scrolls, and how fast at the edge (per second).
 local SCROLL_EDGE = 40
 local SCROLL_SPEED = 700
@@ -57,15 +57,6 @@ local COVER_MARGIN = 20
 local COVER_ABOVE = 100
 -- The highest frame level there is (warcraft.wiki.gg "Frame Strata").
 local MAX_LEVEL = 10000
--- The dock (a move waiting to be confirmed): the room round its card's content, the card's place
--- below the top of the target's scroll area, the glow's width, its pulse's period in seconds, and the
--- heights of its title, warning and hint lines.
-local CARD_PAD = 12
-local CARD_TOP = 12
-local GLOW_WIDTH = 2
-local PULSE_PERIOD = 1.2
-local TITLE_HEIGHT = 22
-local LINE_HEIGHT = 16
 
 ---@alias NextDropKind "reorder"|"tab"|"bagtab"|"bag"|"sell"
 
@@ -177,10 +168,8 @@ function nextDrag:buildLayer()
   layer:SetFrameStrata("TOOLTIP")
   layer:EnableMouse(false)
   local shadow = layer:CreateTexture(nil, "BACKGROUND")
-  shadow:SetColorTexture(0, 0, 0, 1)
   shadow:Hide()
   local hint = layer:CreateFontString(nil, "OVERLAY")
-  hint:SetFontObject(style:Font("TabSelected"))
   hint:Hide()
   -- The cover lies over a dragged section and takes the mouse, so the release lands on it and
   -- not on one of the section's item buttons: their OnReceiveDrag is a left click
@@ -193,6 +182,8 @@ function nextDrag:buildLayer()
   self.layer = layer
   self.shadow = shadow
   self.hint = hint
+  self:styleLayer()
+  sonataNext:RegisterWidget(self)
   self.cover = cover
 end
 
@@ -262,11 +253,13 @@ function nextDrag:Begin(panel, section)
   -- level (warcraft.wiki.gg "Frame Strata"), where the cover cannot be above it.
   frame:SetFrameLevel(math.max(frame:GetFrameLevel(), self.layer:GetFrameLevel() + 2))
   self:place(x, y)
+  local D = style.Theme.Drag
+  local spread = D.Shadow and D.Shadow.Spread or 0
   self.shadow:ClearAllPoints()
-  self.shadow:SetPoint("TOPLEFT", frame, "TOPLEFT", -10, 10)
-  self.shadow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 10, -10)
+  self.shadow:SetPoint("TOPLEFT", frame, "TOPLEFT", -spread, spread)
+  self.shadow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", spread, -spread)
   self.shadow:SetAlpha(0)
-  self.shadow:Show()
+  self.shadow:SetShown(D.Shadow and true or false)
   local cover = self.cover
   cover:ClearAllPoints()
   cover:SetPoint("TOPLEFT", frame, "TOPLEFT", -COVER_MARGIN, COVER_MARGIN)
@@ -278,9 +271,10 @@ function nextDrag:Begin(panel, section)
     duration = style.Time.Lift,
     from = 0,
     to = 1,
+    ease = style:Ease("Lift"),
     onUpdate = function(t)
-      state.scale = 1 - (1 - LIFT_SCALE) * t
-      self.shadow:SetAlpha(0.35 * t)
+      state.scale = 1 - (1 - D.LiftScale) * t
+      self.shadow:SetAlpha(self:shadowAlpha() * t)
       if not state.landing then
         self:place(cursor())
       end
@@ -468,7 +462,7 @@ function nextDrag:showTarget(target)
   if text then
     self.hint:SetText(text)
     self.hint:ClearAllPoints()
-    self.hint:SetPoint("TOP", state.section.frame, "BOTTOM", 0, -6)
+    self.hint:SetPoint("TOP", state.section.frame, "BOTTOM", 0, -style.Theme.Drag.HintGap)
     self.hint:Show()
   else
     self.hint:Hide()
@@ -651,7 +645,7 @@ function nextDrag:land(commit, after, from)
     duration = style.Time.Land,
     from = 0,
     to = 1,
-    ease = "outCubic",
+    ease = style:Ease("Land"),
     onUpdate = function(t)
       local left = (canvas.frame:GetLeft() or left0)
       local top = (canvas.frame:GetTop() or top0) - (canvas:GetDragSlotY() or 0)
@@ -690,15 +684,16 @@ function nextDrag:flyAway(x, y, after, from)
     state.scale = s0
     x0, y0 = from.left + state.grabX * s0, from.top - state.grabY * s0
   end
+  local flyScale, shadow = style.Theme.Drag.FlyScale, self:shadowAlpha()
   tween:Play(self, {
     duration = style.Time.FlyAway,
     from = 0,
     to = 1,
-    ease = "inCubic",
+    ease = style:Ease("FlyAway"),
     onUpdate = function(t)
-      state.scale = s0 + (FLY_SCALE - s0) * t
+      state.scale = s0 + (flyScale - s0) * t
       frame:SetAlpha(1 - t)
-      self.shadow:SetAlpha(0.35 * (1 - t))
+      self.shadow:SetAlpha(shadow * (1 - t))
       self:place(x0 + (x - x0) * t, y0 + (y - y0) * t)
     end,
     onDone = function()
@@ -741,53 +736,24 @@ function nextDrag:buildDock()
   frame:Hide()
   local scrim = frame:CreateTexture(nil, "BACKGROUND")
   scrim:SetAllPoints(frame)
-  scrim:SetColorTexture(unpack(style.Color.Scrim))
   local card = CreateFrame("Frame", nil, frame)
-  card:SetPoint("TOP", frame, "TOP", 0, -CARD_TOP)
   local halo = card:CreateTexture(nil, "BACKGROUND", nil, -2)
-  halo:SetTexture(style.CLOUD_GLOW)
-  halo:SetBlendMode("ADD")
-  halo:SetVertexColor(unpack(style.Color.Gold))
-  halo:SetPoint("TOPLEFT", card, "TOPLEFT", -28, 28)
-  halo:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", 28, -28)
   local background = card:CreateTexture(nil, "BACKGROUND", nil, -1)
   background:SetAllPoints(card)
-  background:SetColorTexture(unpack(style.Color.Card))
   local glow = {}
-  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
-    local edge = card:CreateTexture(nil, "BORDER")
-    edge:SetColorTexture(unpack(style.Color.Gold))
-    if side == "TOP" or side == "BOTTOM" then
-      local y = side == "TOP" and GLOW_WIDTH or -GLOW_WIDTH
-      edge:SetPoint(side .. "LEFT", card, side .. "LEFT", -GLOW_WIDTH, y)
-      edge:SetPoint(side .. "RIGHT", card, side .. "RIGHT", GLOW_WIDTH, y)
-      edge:SetHeight(GLOW_WIDTH)
-    else
-      local x = side == "LEFT" and -GLOW_WIDTH or GLOW_WIDTH
-      edge:SetPoint("TOP" .. side, card, "TOP" .. side, x, 0)
-      edge:SetPoint("BOTTOM" .. side, card, "BOTTOM" .. side, x, 0)
-      edge:SetWidth(GLOW_WIDTH)
-    end
-    table.insert(glow, edge)
+  for _ = 1, 4 do
+    table.insert(glow, card:CreateTexture(nil, "BORDER"))
   end
   local title = card:CreateFontString(nil, "OVERLAY")
-  title:SetFontObject(style:Font("ConfirmTitle"))
   title:SetJustifyH("LEFT")
-  title:SetHeight(TITLE_HEIGHT)
-  title:SetPoint("TOPLEFT", card, "TOPLEFT", CARD_PAD, -CARD_PAD)
-  title:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CARD_PAD, -CARD_PAD)
   local warning = card:CreateFontString(nil, "OVERLAY")
-  warning:SetFontObject(style:Font("ConfirmWarning"))
   warning:SetJustifyH("LEFT")
-  warning:SetHeight(LINE_HEIGHT)
   warning:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
   warning:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -4)
   local slot = CreateFrame("Frame", nil, card)
   slot:SetPoint("TOPLEFT", warning, "BOTTOMLEFT", 0, -10)
   local hint = card:CreateFontString(nil, "OVERLAY")
-  hint:SetFontObject(style:Font("ConfirmHint"))
   hint:SetJustifyH("LEFT")
-  hint:SetHeight(LINE_HEIGHT)
   hint:SetPoint("TOPLEFT", slot, "BOTTOMLEFT", 0, -8)
   local catcher = CreateFrame("Button", nil, frame)
   catcher:SetAllPoints(card)
@@ -809,9 +775,112 @@ function nextDrag:buildDock()
     end
   end)
   self.dock = {
-    frame = frame, scrim = scrim, card = card, halo = halo, glow = glow, title = title, warning = warning,
-    hint = hint, slot = slot, catcher = catcher, elapsed = 0,
+    frame = frame, scrim = scrim, card = card, halo = halo, background = background, glow = glow, title = title,
+    warning = warning, hint = hint, slot = slot, catcher = catcher, elapsed = 0,
   }
+  self:styleDock()
+  sonataNext:RegisterWidget(self)
+end
+
+-- shadowAlpha is how dark the shadow under a lifted section gets (the theme's Drag.Shadow), 0 with none.
+---@private
+---@return number
+function nextDrag:shadowAlpha()
+  local shadow = style.Theme.Drag.Shadow
+  return shadow and shadow.Alpha or 0
+end
+
+-- styleLayer draws the drag layer's parts from the theme (Drag): the shadow's color, and the hint
+-- naming the drop in its role.
+---@private
+function nextDrag:styleLayer()
+  local D = style.Theme.Drag
+  if D.Shadow then
+    style:Paint(self.shadow, { Color = D.Shadow.Color })
+  else
+    self.shadow:Hide()
+  end
+  style:SetFont(self.hint, D.HintFont)
+end
+
+-- styleDock draws the dock from the theme (Dock): the scrim and the card (texture specs), the glowing
+-- edge round the card (color, width, or none), the halo behind it (or none), its lines in their roles.
+---@private
+function nextDrag:styleDock()
+  local d, D = self.dock, style.Theme.Dock
+  style:Paint(d.scrim, D.Scrim)
+  style:Paint(d.background, D.Card)
+  d.card:ClearAllPoints()
+  d.card:SetPoint("TOP", d.frame, "TOP", 0, -D.Top)
+  local G = D.Glow
+  local sides = { "TOP", "BOTTOM", "LEFT", "RIGHT" }
+  for i, edge in ipairs(d.glow) do
+    edge:ClearAllPoints()
+    if G then
+      local w, side = G.Width, sides[i]
+      edge:SetColorTexture(1, 1, 1, 1)
+      edge:SetVertexColor(style:RGBA(G.Color))
+      if side == "TOP" or side == "BOTTOM" then
+        local y = side == "TOP" and w or -w
+        edge:SetPoint(side .. "LEFT", d.card, side .. "LEFT", -w, y)
+        edge:SetPoint(side .. "RIGHT", d.card, side .. "RIGHT", w, y)
+        edge:SetHeight(w)
+      else
+        local x = side == "LEFT" and -w or w
+        edge:SetPoint("TOP" .. side, d.card, "TOP" .. side, x, 0)
+        edge:SetPoint("BOTTOM" .. side, d.card, "BOTTOM" .. side, x, 0)
+        edge:SetWidth(w)
+      end
+      edge:Show()
+    else
+      edge:Hide()
+    end
+  end
+  local H = D.Halo
+  d.halo:ClearAllPoints()
+  if H then
+    style:Paint(d.halo, { Texture = H.Texture, Color = H.Color, BlendMode = H.BlendMode or "ADD" })
+    d.halo:SetPoint("TOPLEFT", d.card, "TOPLEFT", -H.Spread, H.Spread)
+    d.halo:SetPoint("BOTTOMRIGHT", d.card, "BOTTOMRIGHT", H.Spread, -H.Spread)
+    d.halo:Show()
+  else
+    d.halo:Hide()
+  end
+  style:SetFont(d.title, D.TitleFont)
+  style:SetFont(d.warning, D.WarningFont)
+  style:SetFont(d.hint, D.HintFont)
+  d.title:SetHeight(D.TitleHeight)
+  d.title:ClearAllPoints()
+  d.title:SetPoint("TOPLEFT", d.card, "TOPLEFT", D.Pad, -D.Pad)
+  d.title:SetPoint("TOPRIGHT", d.card, "TOPRIGHT", -D.Pad, -D.Pad)
+  d.warning:SetHeight(D.LineHeight)
+  d.hint:SetHeight(D.LineHeight)
+end
+
+-- ApplyStyle restyles what the drag has made for the theme SonataNext applied: the drag layer, and the
+-- dock, laid out again while a move waits in it.
+---@param ctx Context
+function nextDrag:ApplyStyle(ctx)
+  local _ = ctx
+  if self.layer then
+    self:styleLayer()
+    local state = self.current
+    if state ~= nil and state.pending == nil then
+      local D, frame = style.Theme.Drag, state.section.frame
+      local spread = D.Shadow and D.Shadow.Spread or 0
+      self.shadow:ClearAllPoints()
+      self.shadow:SetPoint("TOPLEFT", frame, "TOPLEFT", -spread, spread)
+      self.shadow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", spread, -spread)
+      self.shadow:SetShown(D.Shadow and true or false)
+    end
+  end
+  if self.dock then
+    self:styleDock()
+    if self.current ~= nil and self.current.pending ~= nil then
+      self:layoutDock()
+      self:pulse(0)
+    end
+  end
 end
 
 -- layoutDock sizes the card round the section and its lines, scaled down to fit the target's scroll
@@ -820,15 +889,16 @@ end
 function nextDrag:layoutDock()
   local d = self.dock
   local section = self.current.section
+  local D = style.Theme.Dock
   local width = section.frame:GetWidth()
   local height = section.height or section.frame:GetHeight()
   d.slot:SetSize(width, height)
-  local cardHeight = CARD_PAD + TITLE_HEIGHT + 4 + LINE_HEIGHT + 10 + height + 8 + LINE_HEIGHT + CARD_PAD
-  d.card:SetSize(width + CARD_PAD * 2, cardHeight)
+  local cardHeight = D.Pad + D.TitleHeight + 4 + D.LineHeight + 10 + height + 8 + D.LineHeight + D.Pad
+  d.card:SetSize(width + D.Pad * 2, cardHeight)
   local room = d.frame:GetHeight()
   local scale = 1
-  if room ~= nil and room > CARD_TOP * 2 then
-    scale = math.min(1, (room - CARD_TOP * 2) / cardHeight)
+  if room ~= nil and room > D.Top * 2 then
+    scale = math.min(1, (room - D.Top * 2) / cardHeight)
   end
   d.card:SetScale(scale)
   d.laidOut = height
@@ -841,12 +911,20 @@ end
 function nextDrag:pulse(elapsed)
   local d = self.dock
   d.elapsed = d.elapsed + elapsed
-  local wave = 0.5 + 0.5 * math.sin(d.elapsed * 2 * math.pi / PULSE_PERIOD)
-  local alpha = 0.35 + 0.65 * wave
-  for _, edge in ipairs(d.glow) do
-    edge:SetAlpha(alpha)
+  local D = style.Theme.Dock
+  local G, H = D.Glow, D.Halo
+  local function wave(period)
+    return 0.5 + 0.5 * math.sin(d.elapsed * 2 * math.pi / period)
   end
-  d.halo:SetAlpha(0.15 + 0.35 * wave)
+  if G then
+    local alpha = G.Low + (G.High - G.Low) * wave(G.Period)
+    for _, edge in ipairs(d.glow) do
+      edge:SetAlpha(alpha)
+    end
+  end
+  if H then
+    d.halo:SetAlpha(H.Low + (H.High - H.Low) * wave(H.Period))
+  end
   local state = self.current
   if state and state.section.height ~= d.laidOut then
     self:layoutDock()
@@ -896,7 +974,7 @@ function nextDrag:Pend(target, confirmation, confirm)
     duration = style.Time.Land,
     from = 0,
     to = 1,
-    ease = "outCubic",
+    ease = style:Ease("Land"),
     onUpdate = function(t)
       d.frame:SetAlpha(t)
       if to then

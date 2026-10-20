@@ -269,6 +269,17 @@ function DB:SetNextSmallPlace(kind, x, y)
   DB.data.profile.nextSmallPlaces[kind] = { x = x, y = y }
 end
 
+-- GetNextTheme returns BetterBags Next's saved theme (SonataNext): Default until another is picked.
+---@return string
+function DB:GetNextTheme()
+  return DB.data.profile.nextTheme
+end
+
+---@param key string
+function DB:SetNextTheme(key)
+  DB.data.profile.nextTheme = key
+end
+
 ---@alias NextSmallChain "apart"|"backpack"|"companion"
 
 -- GetNextSmallChain returns which small panel anchors a chained pair (docs/next-small-mode.md):

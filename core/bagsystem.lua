@@ -171,6 +171,8 @@ function bagSystem:Use(design)
   addon.Bags.Bank = s.bank
   addon.Bags.GuildBank = s.guild
   addon.Vendor = s.vendor
+  -- A Next theme styles the item buttons only while BetterBags Next is in use (next-themes.md).
+  addon:GetModule('SonataNext'):SetActive(design == "next")
 end
 
 -- Finish titles a design's backpack and lets Escape close its windows.

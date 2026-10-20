@@ -9,20 +9,12 @@ local style = addon:GetModule('NextStyle')
 -- NextSparkles is a small particle emitter (next.md §4): star sprites born where Spawn says,
 -- drifting left (or right) while they twinkle, spin, shrink and fade. Sprites are pooled. An emitter runs
 -- only while started, and its driver is a child of the frame it draws on, so it also stops while
--- that frame is hidden. It spawns nothing in combat; sparkles already out finish their lives.
+-- that frame is hidden. It spawns nothing in combat; sparkles already out finish their lives. How a
+-- sparkle looks and fades, twinkles, shrinks and wobbles is the Next theme's (Sparkles,
+-- next-themes.md), read as sparkles are born and drawn; an emitter a theme turns off (SetEnabled)
+-- never starts.
 ---@class NextSparkles: AceModule
 local sparkles = addon:NewModule('NextSparkles')
-
--- The share of a sparkle's life it spends fading in, and fading out.
-local FADE_IN = 0.15
-local FADE_OUT = 0.4
--- How fast a sparkle twinkles (radians a second) and how deep.
-local TWINKLE_SPEED = 7
-local TWINKLE_DEPTH = 0.3
--- How much a sparkle shrinks by the end of its life.
-local SHRINK = 0.35
--- How fast a sparkle wobbles up and down (radians a second).
-local WOBBLE_SPEED = 2.3
 
 ---@class (exact) NextSparklesOptions
 ---@field Rate number Sparkles a second.
@@ -35,8 +27,8 @@ local WOBBLE_SPEED = 2.3
 ---@field Wobble number How far a sparkle bobs up and down, in pixels.
 ---@field Spin number How fast a sparkle spins, radians a second.
 ---@field Spawn fun(): number, number Where one is born, from the parent's top left.
----@field Colors? number[][] The palette; default starlight gold, white and moon lavender.
----@field Texture? string Default the cooldown star.
+---@field Colors? (string|number[])[] Palette names or colors; default the theme's (Sparkles.Colors).
+---@field Texture? string|number Default the theme's (Sparkles.Texture).
 ---@field Alpha? number The brightest a sparkle gets; default 0.9.
 ---@field Random? fun(): number A source of numbers in [0, 1); default math.random.
 
@@ -60,6 +52,7 @@ local WOBBLE_SPEED = 2.3
 ---@field alive NextSparkle[]
 ---@field pool Texture[]
 ---@field accumulated number Sparkles owed since the last spawn.
+---@field disabled? boolean Turned off by the theme: it never starts (SetEnabled).
 local emitterProto = {}
 addon:GetModule('Perf'):RegisterPrototype(emitterProto, 'NextSparkleEmitter')
 
@@ -86,6 +79,9 @@ local function between(random, range)
 end
 
 function emitterProto:Start()
+  if self.disabled then
+    return
+  end
   self.frame:SetScript("OnUpdate", function(_, elapsed)
     self:Step(elapsed)
   end)
@@ -95,7 +91,7 @@ end
 -- they live out their lives.
 ---@param n number
 function emitterProto:Burst(n)
-  if InCombatLockdown() then
+  if InCombatLockdown() or self.disabled then
     return
   end
   for _ = 1, n do
@@ -106,6 +102,15 @@ function emitterProto:Burst(n)
   end
   if self.frame:GetScript("OnUpdate") == nil then
     self:Start()
+  end
+end
+
+-- SetEnabled turns the emitter on or off (a theme's Sparkles): off, it stops and never starts.
+---@param on boolean
+function emitterProto:SetEnabled(on)
+  self.disabled = not on
+  if self.disabled then
+    self:Stop()
   end
 end
 
@@ -130,15 +135,14 @@ end
 function emitterProto:spawn()
   local o = self.options
   local random = o.Random or math.random
-  local texture = table.remove(self.pool)
-  if texture == nil then
-    texture = self.frame:CreateTexture(nil, "OVERLAY")
-    texture:SetTexture(o.Texture or style.SPARKLE_TEXTURE)
-    texture:SetBlendMode("ADD")
-  end
-  local colors = o.Colors or { style.Color.Gold, style.Color.White, style.Color.Lavender }
+  local S = style.Theme.Sparkles
+  local texture = table.remove(self.pool) or self.frame:CreateTexture(nil, "OVERLAY")
+  texture:SetTexture(style:TexturePath(o.Texture or S.Texture))
+  texture:SetBlendMode(S.BlendMode or "ADD")
+  local colors = o.Colors or S.Colors
   local color = colors[math.min(#colors, math.floor(random() * #colors) + 1)]
-  texture:SetVertexColor(color[1], color[2], color[3], 1)
+  local r, g, b = style:RGBA(color)
+  texture:SetVertexColor(r, g, b, 1)
   local x, y = o.Spawn()
   local spinDirection = random() < 0.5 and -1 or 1
   ---@type NextSparkle
@@ -164,17 +168,17 @@ end
 ---@private
 ---@param p NextSparkle
 function emitterProto:draw(p)
-  local o = self.options
+  local o, S = self.options, style.Theme.Sparkles
   local f = p.age / p.life
   local fade = 1
-  if f < FADE_IN then
-    fade = f / FADE_IN
-  elseif f > 1 - FADE_OUT then
-    fade = (1 - f) / FADE_OUT
+  if f < S.FadeIn then
+    fade = f / S.FadeIn
+  elseif f > 1 - S.FadeOut then
+    fade = (1 - f) / S.FadeOut
   end
-  local twinkle = 1 - TWINKLE_DEPTH + TWINKLE_DEPTH * math.sin(p.age * TWINKLE_SPEED + p.phase)
-  local wobble = (o.Wobble or 0) * math.sin(p.age * WOBBLE_SPEED + p.phase)
-  local size = p.size * (1 - SHRINK * f)
+  local twinkle = 1 - S.TwinkleDepth + S.TwinkleDepth * math.sin(p.age * S.TwinkleSpeed + p.phase)
+  local wobble = (o.Wobble or 0) * math.sin(p.age * S.WobbleSpeed + p.phase)
+  local size = p.size * (1 - S.Shrink * f)
   local texture = p.texture
   texture:SetPoint("CENTER", self.anchor, "TOPLEFT", p.x, p.y + wobble)
   texture:SetSize(size, size)

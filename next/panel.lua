@@ -39,6 +39,9 @@ local scrollbox = addon:GetModule('Scrollbox')
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
+---@class SonataNext: AceModule
+local sonataNext = addon:GetModule('SonataNext')
+
 ---@class NextTween: AceModule
 local tween = addon:GetModule('NextTween')
 
@@ -71,16 +74,16 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@field proto NextPanelFrame The panel's prototype every kind's chains to.
 local nextPanel = addon:NewModule('NextPanel')
 
--- The ribbon running from the title out of the window.
-local RIBBON_LENGTH = style.RIBBON_LENGTH
 -- The panel's frame level in the HIGH strata; a chained bag coming in from beneath its anchor is
 -- lowered below it for the way, and put back here once in place.
 local PANEL_LEVEL = 500
--- The spark gliding in along it, and how much it grows as it settles into the title's cloud.
-local SPARK_SIZE = 26
-local SPARK_GROWTH = 18
--- The ribbon's glow: thin lines above and below it, fainter the further out.
-local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 0.15 }, { 6, 0.06 }, { -6, 0.06 } }
+
+-- sparkSize is the spark's size (the theme's Header.Spark), 0 with none.
+---@return number
+local function sparkSize()
+  local spark = style.Theme.Header.Spark
+  return spark and spark.Size or 0
+end
 
 ---@alias NextSide "RIGHT"|"LEFT"
 
@@ -177,6 +180,9 @@ local RIBBON_GLOW = { { 0, 0.9 }, { 2, 0.35 }, { -2, 0.35 }, { 4, 0.15 }, { -4, 
 ---@field wash Texture The faint color at the top of the body.
 ---@field dropGlow Texture Lit while a section from the other bag would drop here (next.md §7).
 ---@field washColor number[] The wash's color now.
+---@field washKey string What the wash is the color of (the theme's Panel.Washes: Default, Warbank, Guild).
+---@field ribbonPool Texture[] Every ribbon line made; ribbonLines are the ones the theme draws.
+---@field footerLine Texture The line above the footer.
 ---@field title FontString
 ---@field label string What the bag is called ("Backpack", "Bank", "Vendor"): never secret, unlike a
 --- vendor's title in an instance, so tooltips name the bag by it.
@@ -282,6 +288,8 @@ function nextPanel:Create(proto, opts)
   p:BuildFooter()
   p:BuildSparkles()
   p:BuildTabs()
+  p:StyleParts()
+  sonataNext:RegisterWidget(p)
   p:Watch()
   p.content:SetHeaderHandler(p)
   if not opts.noDrag then
@@ -421,7 +429,7 @@ function panelProto:FlyTo(to)
     duration = style.Time.Fly,
     from = from,
     to = to,
-    ease = "inOutCubic",
+    ease = style:Ease("Fly"),
     onUpdate = function(x)
       self:setOffset(x)
     end,
@@ -501,7 +509,7 @@ function panelProto:Enter(to, delay)
   if anchor ~= nil then
     self.frame:SetFrameLevel(math.max(1, anchor.frame:GetFrameLevel() - 100))
   end
-  self:moveIn(chain:EntranceOffset(self), to, style.Time.Enter, "outBackSoft", delay)
+  self:moveIn(chain:EntranceOffset(self), to, style.Time.Enter, style:Ease("Enter"), delay)
 end
 
 -- WaitForAnchor holds a chained bag out of sight beyond its anchor's edge while the anchor is
@@ -525,7 +533,7 @@ function panelProto:WaitForAnchor()
       self.waiting = false
       self.target = 0
       self:SetDocked(true)
-      self:moveIn(self:HiddenOffset(), 0, style.Time.Open, "outBack", 0)
+      self:moveIn(self:HiddenOffset(), 0, style.Time.Open, style:Ease("Open"), 0)
     end,
   })
 end
@@ -553,14 +561,12 @@ function panelProto:BuildPanel(name)
   local feather = frame:CreateTexture(nil, "BACKGROUND")
   local wash = frame:CreateTexture(nil, "BORDER")
   feather:SetColorTexture(1, 1, 1, 1)
-  fill:SetColorTexture(unpack(style.Color.Body))
   self.fill = fill
   self.feather = feather
   self.wash = wash
 
   -- The far edge feathered out toward the middle of the screen, while not at its edge (SetDocked).
   local outerFeather = frame:CreateTexture(nil, "BACKGROUND")
-  outerFeather:SetWidth(style.Chain.OuterFeather)
   outerFeather:SetColorTexture(1, 1, 1, 1)
   if left then
     outerFeather:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 0)
@@ -571,32 +577,25 @@ function panelProto:BuildPanel(name)
   end
   outerFeather:Hide()
   self.outerFeather = outerFeather
-  self:paintFeathers(1, 1)
   self.docked = true
 
-  wash:SetHeight(260)
   wash:SetColorTexture(1, 1, 1, 1)
-  wash:SetBlendMode("ADD")
-  self:paintWash(style.Color.Wash)
+  self.washKey = "Default"
 
   -- A small panel's 1-pixel lavender edge round its body, so it reads against the world. On the body,
   -- not the frame: a full panel's frame reaches over its feather, and a growing panel has the full
   -- panel's frame while its edge fades (Morph).
   self.edges = {}
-  local l = style.Color.Lavender
   local body = self.body
   for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
     local edge = frame:CreateTexture(nil, "BORDER", nil, 1)
     edge:SetColorTexture(1, 1, 1, 1)
-    edge:SetVertexColor(l[1], l[2], l[3], style.Small.Edge)
     if side == "TOP" or side == "BOTTOM" then
       edge:SetPoint(side .. "LEFT", body, side .. "LEFT", 0, 0)
       edge:SetPoint(side .. "RIGHT", body, side .. "RIGHT", 0, 0)
-      edge:SetHeight(1)
     else
       edge:SetPoint("TOP" .. side, body, "TOP" .. side, 0, 0)
       edge:SetPoint("BOTTOM" .. side, body, "BOTTOM" .. side, 0, 0)
-      edge:SetWidth(1)
     end
     edge:Hide()
     table.insert(self.edges, edge)
@@ -605,11 +604,80 @@ function panelProto:BuildPanel(name)
   local glow = frame:CreateTexture(nil, "BORDER")
   glow:SetAllPoints(self.body)
   glow:SetColorTexture(1, 1, 1, 1)
-  glow:SetVertexColor(unpack(style.Color.Lavender))
-  glow:SetBlendMode("ADD")
   glow:SetAlpha(0)
   glow:Hide()
   self.dropGlow = glow
+  self:styleBody()
+end
+
+-- styleBody draws the body from the theme (Panel): its fill (a color, or art), its feathers, the
+-- wash at its top (or none), its border's color and size, and the drop glow's color.
+---@private
+function panelProto:styleBody()
+  local P = style.Theme.Panel
+  style:Paint(self.fill, P.Fill)
+  self.outerFeather:SetWidth(style.Chain.OuterFeather)
+  self:paintFeathers(1, 1)
+  local wash = self.wash
+  if P.Wash then
+    wash:SetHeight(P.Wash.Height)
+    wash:SetBlendMode(P.Wash.BlendMode or "ADD")
+    self:paintWash(self:WashColor(self.washKey))
+    wash:Show()
+  else
+    wash:Hide()
+  end
+  local E = P.Edge
+  for i, edge in ipairs(self.edges) do
+    if E then
+      if i <= 2 then
+        edge:SetHeight(E.Size)
+      else
+        edge:SetWidth(E.Size)
+      end
+    end
+  end
+  self:paintEdges(1)
+  local G = P.DropGlow
+  if G then
+    -- A texture's alpha is its vertex color's (§ paintEdges): colored, it keeps the alpha it shows.
+    local alpha = self.dropGlow:GetAlpha()
+    local r, g, b = style:RGBA(G.Color)
+    self.dropGlow:SetVertexColor(r, g, b)
+    self.dropGlow:SetAlpha(alpha)
+    self.dropGlow:SetBlendMode(G.BlendMode or "ADD")
+  else
+    tween:Stop(self.dropGlow)
+    self.dropGlow:SetAlpha(0)
+    self.dropGlow:Hide()
+  end
+end
+
+-- paintEdges draws the border at a strength, 0 to 1, of the theme's alpha. A texture's alpha is its
+-- vertex color's alpha: SetAlpha replaces the alpha SetVertexColor gave it and the other way round
+-- (Blizzard sets a chat window's alpha with SetAlpha and reads it back from GetVertexColor,
+-- FloatingChatFrame.lua). So the border is faded through its vertex color alone: a size switch that
+-- faded it with SetAlpha left it at full strength, brighter than the theme's 0.35, until a theme
+-- colored it again (reported in game).
+---@param strength number
+function panelProto:paintEdges(strength)
+  local E = style.Theme.Panel.Edge
+  if not E then
+    return
+  end
+  local r, g, b, a = style:RGBA(E.Color, E.Alpha)
+  for _, edge in ipairs(self.edges) do
+    edge:SetVertexColor(r, g, b, a * strength)
+  end
+end
+
+-- EdgeAlphaFor is how strong the border is at a size: 1 where the theme draws it (a small panel's,
+-- a full one's too with Panel.Edge.Full), else 0.
+---@param small boolean
+---@return number
+function panelProto:EdgeAlphaFor(small)
+  local E = style.Theme.Panel.Edge
+  return (E and (small or E.Full)) and 1 or 0
 end
 
 -- paintFeathers draws the feathers at a strength, 0 to 1: the inner one, from the body's color at the
@@ -620,9 +688,14 @@ end
 ---@param inner number
 ---@param outer number
 function panelProto:paintFeathers(inner, outer)
-  local a = style.Color.Body[4]
+  local F = style.Theme.Panel.Feather
+  local color = F and F.Color or "Body"
+  local _, _, _, a = style:RGBA(color)
+  if not F then
+    a = 0
+  end
   local function paint(texture, strength, solidOnLeft)
-    local solid, clear = style:CreateColor("Body", a * strength), style:CreateColor("Body", 0)
+    local solid, clear = style:CreateColor(color, a * strength), style:CreateColor(color, 0)
     if solidOnLeft then
       texture:SetGradient("HORIZONTAL", solid, clear)
     else
@@ -678,12 +751,13 @@ end
 -- shorter. SparkSpreadBase is how far out along it the ribbon's sparkles are born.
 ---@return number
 function panelProto:RibbonBase()
-  return self:IsSmall() and style.Small.Ribbon or RIBBON_LENGTH
+  return self:IsSmall() and style.Small.Ribbon or style.RIBBON_LENGTH
 end
 
 ---@return number
 function panelProto:SparkSpreadBase()
-  return self:IsSmall() and style.Small.SparkSpread or 70
+  local R = style.Theme.Sparkles and style.Theme.Sparkles.Ribbon
+  return self:IsSmall() and style.Small.SparkSpread or (R and R.Spread or 0)
 end
 
 -- clampPlace keeps a small panel's place (its top left) on the screen.
@@ -758,7 +832,7 @@ function panelProto:GlideTo(x, y)
     duration = style.Time.Glide,
     from = 0,
     to = 1,
-    ease = "outCubic",
+    ease = style:Ease("Glide"),
     onUpdate = function(t)
       frame:ClearAllPoints()
       frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", fromX + (x - fromX) * t, fromY + (y - fromY) * t)
@@ -801,8 +875,9 @@ function panelProto:ApplyGeometry()
     self.feather:ClearAllPoints()
     self:growFeather(0)
   end
+  local edgeShown = self:EdgeAlphaFor(small) > 0
   for _, edge in ipairs(self.edges) do
-    edge:SetShown(small)
+    edge:SetShown(edgeShown)
   end
   self.ribbonLength = self:RibbonBase()
   for _, line in ipairs(self.ribbonLines) do
@@ -884,7 +959,7 @@ function panelProto:PrepareResize(size)
       x = x, y = y, h = h, ribbon = self.ribbonLength,
       full = small and 0 or 1,
       outer = (not small and not self.docked) and 1 or 0,
-      edge = small and 1 or 0,
+      edge = self:EdgeAlphaFor(small),
     }
   end
   self.size = size
@@ -941,9 +1016,7 @@ function panelProto:Morph()
     frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x - bodyLeft, at.y)
     frame:SetSize(width, at.h)
     self:paintFeathers(at.full, at.outer)
-    for _, edge in ipairs(edges) do
-      edge:SetAlpha(at.edge)
-    end
+    self:paintEdges(at.edge)
     self.ribbonLength = at.ribbon
     for _, line in ipairs(self.ribbonLines) do
       line:SetWidth(at.ribbon)
@@ -953,9 +1026,7 @@ function panelProto:Morph()
   morph.finish = function()
     self.morph = nil
     self:paintFeathers(1, 1)
-    for _, edge in ipairs(edges) do
-      edge:SetAlpha(1)
-    end
+    self:paintEdges(1)
     self:ApplyGeometry()
     render:Invalidate(self.root)
     chain:Arrived(self)
@@ -968,7 +1039,7 @@ function panelProto:Morph()
     if small then
       f1, o1 = 0, 0
     else
-      e1 = 0
+      e1 = self:EdgeAlphaFor(false)
     end
     if math.abs(tx - x0) < 0.01 and math.abs(ty - y0) < 0.01 and math.abs(th - h0) < 0.01
       and math.abs(toRibbon - r0) < 0.01 and math.abs(f1 - f0) < 0.001 and math.abs(o1 - o0) < 0.001
@@ -980,7 +1051,7 @@ function panelProto:Morph()
       duration = style.Time.Morph,
       from = 0,
       to = 1,
-      ease = "inOutCubic",
+      ease = style:Ease("Morph"),
       onUpdate = function(t)
         at.x = x0 + (tx - x0) * t
         at.y = y0 + (ty - y0) * t
@@ -1000,7 +1071,7 @@ function panelProto:Morph()
   local toOuter = (not small and self.offset ~= 0) and 1 or 0
   local function fade(after)
     local f0, o0, e0 = at.full, at.outer, at.edge
-    local f1, o1, e1 = f0, o0, 1
+    local f1, o1, e1 = f0, o0, self:EdgeAlphaFor(true)
     if not small then
       f1, o1, e1 = 1, toOuter, e0
     end
@@ -1013,7 +1084,7 @@ function panelProto:Morph()
       duration = style.Time.MorphFade * share,
       from = 0,
       to = 1,
-      ease = "inOutSine",
+      ease = style:Ease("MorphFade"),
       onUpdate = function(t)
         at.full = f0 + (f1 - f0) * t
         at.outer = o0 + (o1 - o0) * t
@@ -1052,7 +1123,7 @@ function panelProto:BuildMover()
   local mover = CreateFrame("Frame", nil, self.frame)
   mover:SetPoint("TOPLEFT", self.body, "TOPLEFT", 0, 0)
   mover:SetPoint("TOPRIGHT", self.body, "TOPRIGHT", 0, 0)
-  mover:SetHeight(style.SEARCH_TOP - 4)
+  mover:SetHeight(math.max(1, style.SEARCH_TOP - 4))
   mover:SetFrameLevel(self.frame:GetFrameLevel() + 1)
   mover:EnableMouse(true)
   mover:RegisterForDrag("LeftButton")
@@ -1143,14 +1214,18 @@ end
 -- SetDropGlow lights the body while a section from the other bag would drop on it.
 ---@param on boolean
 function panelProto:SetDropGlow(on)
-  local glow = self.dropGlow
+  local glow, G = self.dropGlow, style.Theme.Panel.DropGlow
+  if not G then
+    return
+  end
   if on then
     glow:Show()
   end
   tween:Play(glow, {
     duration = style.Time.Hover,
     from = glow:GetAlpha(),
-    to = on and 0.12 or 0,
+    to = on and G.Alpha or 0,
+    ease = style:Ease("Hover"),
     onUpdate = function(v)
       glow:SetAlpha(v)
     end,
@@ -1254,16 +1329,33 @@ function panelProto:paintWash(c)
   self.wash:SetGradient("VERTICAL", CreateColor(c[1], c[2], c[3], 0), CreateColor(c[1], c[2], c[3], c[4]))
 end
 
--- SetWash fades the wash at the top of the panel to a color of the palette.
----@param name string
-function panelProto:SetWash(name)
+-- WashColor is the wash's color for what the panel shows: the theme's Panel.Washes by key (Default,
+-- Warbank, Guild), or a palette color by name.
+---@param key string
+---@return number[]
+function panelProto:WashColor(key)
+  local washes = style.Theme.Panel.Washes
+  return { style:RGBA(washes[key] or key) }
+end
+
+-- SetWash fades the wash at the top of the panel to its color for what it shows (WashColor), at once
+-- with now; a theme applied later paints it in that theme's color for the same key.
+---@param key string
+---@param now? boolean
+function panelProto:SetWash(key, now)
+  self.washKey = key
   local from = self.washColor
-  local to = style.Color[name]
+  local to = self:WashColor(key)
+  if now then
+    tween:Stop(self.wash)
+    self:paintWash(to)
+    return
+  end
   tween:Play(self.wash, {
     duration = style.Time.Wash,
     from = 0,
     to = 1,
-    ease = "inOutSine",
+    ease = style:Ease("Wash"),
     onUpdate = function(t)
       local c = {}
       for i = 1, 4 do
@@ -1279,23 +1371,16 @@ end
 ---@return Button
 function panelProto:headerButton(spec)
   local button = CreateFrame("Button", nil, self.frame)
-  button:SetSize(22, 22)
   -- Above a small panel's mover, which lies over the title row.
   button:SetFrameLevel(self.frame:GetFrameLevel() + 3)
   local icon = button:CreateTexture(nil, "ARTWORK")
   icon:SetAllPoints()
-  if spec.atlas then
-    icon:SetAtlas(spec.atlas)
-  else
-    icon:SetTexture(spec.texture)
-    if spec.texCoords then
-      icon:SetTexCoord(unpack(spec.texCoords))
-    end
-  end
-  icon:SetVertexColor(0.85, 0.82, 1, 1)
   button.icon = icon
+  button.key = spec.key
+  self:SetHeaderIcon(button, spec.key, spec)
   button:SetScript("OnEnter", function()
-    icon:SetVertexColor(1, 1, 1, 1)
+    local B = style.Theme.Header.Buttons
+    icon:SetVertexColor(style:RGBA(button.glyph and B.HoverColor or B.ArtHoverColor))
     GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
     if spec.tooltipFunc then
       spec.tooltipFunc(button)
@@ -1305,13 +1390,54 @@ function panelProto:headerButton(spec)
     GameTooltip:Show()
   end)
   button:SetScript("OnLeave", function()
-    icon:SetVertexColor(0.85, 0.82, 1, 1)
+    local B = style.Theme.Header.Buttons
+    icon:SetVertexColor(style:RGBA(button.glyph and B.Color or B.ArtColor))
     GameTooltip:Hide()
   end)
   addon.SetScript(button, "OnClick", function(ctx)
     spec.onClick(ctx)
   end)
   return button
+end
+
+-- SetHeaderIcon draws a header button's icon: the theme's for iconKey (Header.Buttons.Icons), else
+-- art (an atlas, or a texture and its coordinates), tinted by the theme: a glyph (a white,
+-- one-color icon: settings, close) in the glyph color, full-color art in the art color. A tint
+-- multiplies the art, so one dark enough for glyphs on light paper inked every colored icon into a
+-- black shape (Parchment, asked with a screenshot). It is kept, so a theme applied later draws the
+-- button again (styleHeader).
+---@param button Button
+---@param iconKey string
+---@param art {atlas?: string, texture?: string|number, texCoords?: number[], glyph?: boolean}
+function panelProto:SetHeaderIcon(button, iconKey, art)
+  button.iconKey, button.art = iconKey, art
+  local icon = button.icon
+  local B = style.Theme.Header.Buttons
+  local custom = B.Icons and B.Icons[iconKey]
+  if custom then
+    button.glyph = custom.Glyph == true
+  else
+    button.glyph = art.glyph == true
+  end
+  icon:SetTexCoord(0, 1, 0, 1)
+  if custom then
+    if custom.Atlas then
+      icon:SetAtlas(custom.Atlas)
+    else
+      icon:SetTexture(style:TexturePath(custom.Texture))
+      if custom.TexCoords then
+        icon:SetTexCoord(unpack(custom.TexCoords))
+      end
+    end
+  elseif art.atlas then
+    icon:SetAtlas(art.atlas)
+  else
+    icon:SetTexture(art.texture)
+    if art.texCoords then
+      icon:SetTexCoord(unpack(art.texCoords))
+    end
+  end
+  icon:SetVertexColor(style:RGBA(button.glyph and B.Color or B.ArtColor))
 end
 
 -- GetHeaderButtons returns the header's buttons, in order from the screen edge.
@@ -1326,7 +1452,7 @@ end
 -- into the window (asked: it should "stop flush with the hard edge of the window").
 ---@return string point, number x, number inward
 function panelProto:TitleJoin()
-  local edge = style.PAD + 4
+  local edge = style.PAD + style.TITLE_INSET
   if self.side == "LEFT" then
     return "RIGHT", edge, -1
   end
@@ -1340,16 +1466,20 @@ function panelProto:CloudSpan()
   local width = self.title:GetStringWidth()
   -- Secret while the title shows a secret (a vendor's name in an instance): addon code may not do
   -- arithmetic on it. Clients without secrets have no issecretvalue.
+  local C = style.Cloud
   if issecretvalue ~= nil and issecretvalue(width) then
-    width = style.Cloud.SecretTitleWidth
+    width = C and C.SecretTitleWidth or 0
   end
-  return width + style.PAD + 4 + style.Cloud.Pad
+  return width + style.PAD + style.TITLE_INSET + (C and C.Pad or 0)
 end
 
 -- LayoutCloud spreads the cloud's puffs across the title as it is now (a share of the way across
 -- from the join, the widest as wide as the cloud) and draws them.
 function panelProto:LayoutCloud()
   local C = style.Cloud
+  if not C then
+    return
+  end
   local _, joinX, inward = self:TitleJoin()
   local span = self:CloudSpan()
   for i, puff in ipairs(self.cloud.puffs) do
@@ -1371,6 +1501,9 @@ end
 ---@private
 function panelProto:applyCloud()
   local C, cloud = style.Cloud, self.cloud
+  if not C then
+    return
+  end
   local point = self:TitleJoin()
   local lift = 1 + C.Swell * cloud.swell
   for _, puff in ipairs(cloud.puffs) do
@@ -1396,57 +1529,17 @@ end
 -- edge.
 ---@param text string
 function panelProto:BuildHeader(text)
-  local frame, body = self.frame, self.body
-  local left = self.side == "LEFT"
-  local C = style.Cloud
+  local frame = self.frame
   local title = frame:CreateFontString(nil, "OVERLAY")
-  title:SetFontObject(style:Font("Title"))
-  if left then
-    title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(style.PAD + 4), -style.TITLE_TOP)
-    title:SetJustifyH("RIGHT")
-  else
-    title:SetPoint("TOPLEFT", body, "TOPLEFT", style.PAD + 4, -style.TITLE_TOP)
-  end
+  style:SetFont(title, style.Theme.Header.Title.Font)
   title:SetText(text)
   self.title = title
 
-  local point, joinX = self:TitleJoin()
-  local function puffOf(sublevel, color)
-    local t = frame:CreateTexture(nil, "ARTWORK", nil, sublevel)
-    t:SetTexture(style.CLOUD_GLOW)
-    t:SetBlendMode("ADD")
-    local c = style.Color[color]
-    t:SetVertexColor(c[1], c[2], c[3])
-    return t
-  end
-  local cloud = { puffs = {}, time = 0, swell = 0 }
-  for i, spec in ipairs(C.Puffs) do
-    -- Out of step: each breathes at its own pace, from its own point in the breath.
-    table.insert(cloud.puffs, { texture = puffOf(-2, spec.Color), period = 4 + (i % 4) * 0.9, phase = i * 1.7 })
-  end
-  cloud.join = puffOf(1, C.Join.Color)
-  cloud.join:SetSize(C.Join.Size, C.Join.Size)
-  cloud.join:SetPoint("CENTER", title, point, joinX, 0)
-
+  local cloud = { puffs = {}, pool = {}, time = 0, swell = 0 }
+  cloud.join = frame:CreateTexture(nil, "ARTWORK", nil, 1)
   self.ribbonLines = {}
-  self.ribbonLength = RIBBON_LENGTH
-  for _, glow in ipairs(RIBBON_GLOW) do
-    local line = frame:CreateTexture(nil, "ARTWORK", nil, 0)
-    table.insert(self.ribbonLines, line)
-    line:SetSize(RIBBON_LENGTH, 2)
-    line:SetColorTexture(1, 1, 1, 1)
-    if left then
-      line:SetPoint("LEFT", title, point, joinX, glow[1])
-      line:SetGradient("HORIZONTAL", style:CreateColor("Gold", glow[2]), style:CreateColor("Gold", 0))
-    else
-      line:SetPoint("RIGHT", title, point, joinX, glow[1])
-      line:SetGradient("HORIZONTAL", style:CreateColor("Gold", 0), style:CreateColor("Gold", glow[2]))
-    end
-    line:SetBlendMode("ADD")
-    if glow[1] == 0 then
-      self.ribbon = line
-    end
-  end
+  self.ribbonPool = {}
+  self.ribbonLength = style.RIBBON_LENGTH
 
   cloud.driver = CreateFrame("Frame", nil, frame)
   -- A child of the panel: it runs only while the panel shows.
@@ -1457,15 +1550,9 @@ function panelProto:BuildHeader(text)
   self.cloud = cloud
 
   local spark = frame:CreateTexture(nil, "OVERLAY")
-  spark:SetTexture(style.SPARKLE_TEXTURE)
-  spark:SetBlendMode("ADD")
-  spark:SetVertexColor(unpack(style.Color.Gold))
-  spark:SetSize(SPARK_SIZE, SPARK_SIZE)
-  spark:SetPoint("CENTER", self.ribbon, left and "LEFT" or "RIGHT", 0, 0)
   spark:SetAlpha(0)
   self.spark = spark
 
-  self:LayoutCloud()
   self:BuildBraid()
   self:BuildTitleButton()
 
@@ -1475,6 +1562,139 @@ function panelProto:BuildHeader(text)
     self[spec.key] = button
     table.insert(self.headerButtons, button)
   end
+  self:styleHeader()
+end
+
+-- styleHeader draws the header from the theme (Header, Layout): the title in its role where it goes,
+-- the cloud's puffs (as many as it lists, or none), the ribbon's lines (as many as its glow lists,
+-- at its length and thickness, or none), the spark, the title's glow, the braid, and the buttons (their
+-- size, icons and tint), then lays the cloud and the buttons out.
+---@private
+function panelProto:styleHeader()
+  local frame, body, title = self.frame, self.body, self.title
+  local left = self.side == "LEFT"
+  local H = style.Theme.Header
+  style:SetFont(title, H.Title.Font)
+  title:ClearAllPoints()
+  if left then
+    title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(style.PAD + style.TITLE_INSET), -style.TITLE_TOP)
+    title:SetJustifyH("RIGHT")
+  else
+    title:SetPoint("TOPLEFT", body, "TOPLEFT", style.PAD + style.TITLE_INSET, -style.TITLE_TOP)
+  end
+  local point, joinX = self:TitleJoin()
+
+  -- The cloud: a puff per entry, out of step (each breathes at its own pace, from its own point in
+  -- the breath); the ones it no longer lists are hidden.
+  local cloud, C = self.cloud, H.Cloud
+  cloud.puffs = {}
+  if C then
+    for i, spec in ipairs(C.Puffs) do
+      local t = cloud.pool[i]
+      if t == nil then
+        t = frame:CreateTexture(nil, "ARTWORK", nil, -2)
+        cloud.pool[i] = t
+      end
+      style:Paint(t, { Texture = C.Texture, Color = spec.Color, BlendMode = C.BlendMode })
+      t:Show()
+      table.insert(cloud.puffs, { texture = t, period = 4 + (i % 4) * 0.9, phase = i * 1.7 })
+    end
+    style:Paint(cloud.join, { Texture = C.Texture, Color = C.Join.Color, BlendMode = C.BlendMode })
+    cloud.join:SetSize(C.Join.Size, C.Join.Size)
+    cloud.join:ClearAllPoints()
+    cloud.join:SetPoint("CENTER", title, point, joinX, 0)
+    cloud.join:Show()
+  else
+    cloud.join:Hide()
+  end
+  for i = #cloud.puffs + 1, #cloud.pool do
+    cloud.pool[i]:Hide()
+  end
+
+  -- The ribbon: a line per glow entry ({ offset, alpha }), fading out toward its far end.
+  local R = H.Ribbon
+  self.ribbonLines = {}
+  local glows = R and R.Glow or {}
+  for i, glow in ipairs(glows) do
+    local line = self.ribbonPool[i]
+    if line == nil then
+      line = frame:CreateTexture(nil, "ARTWORK", nil, 0)
+      line:SetColorTexture(1, 1, 1, 1)
+      self.ribbonPool[i] = line
+    end
+    table.insert(self.ribbonLines, line)
+    line:SetSize(self.ribbonLength, R.Thickness)
+    line:ClearAllPoints()
+    if left then
+      line:SetPoint("LEFT", title, point, joinX, glow[1])
+      line:SetGradient("HORIZONTAL", style:CreateColor(R.Color, glow[2]), style:CreateColor(R.Color, 0))
+    else
+      line:SetPoint("RIGHT", title, point, joinX, glow[1])
+      line:SetGradient("HORIZONTAL", style:CreateColor(R.Color, 0), style:CreateColor(R.Color, glow[2]))
+    end
+    line:SetBlendMode(R.BlendMode or "ADD")
+    line:Show()
+  end
+  for i = #glows + 1, #self.ribbonPool do
+    self.ribbonPool[i]:Hide()
+  end
+  -- The brightest line, the spark's path; with no ribbon, an unseen one where it would start.
+  if self.ribbonPool[1] == nil then
+    local line = frame:CreateTexture(nil, "ARTWORK", nil, 0)
+    line:SetColorTexture(1, 1, 1, 1)
+    line:SetPoint(left and "LEFT" or "RIGHT", title, point, joinX, 0)
+    line:Hide()
+    self.ribbonPool[1] = line
+  end
+  self.ribbon = self.ribbonLines[1] or self.ribbonPool[1]
+  for i, glow in ipairs(glows) do
+    if glow[1] == 0 then
+      self.ribbon = self.ribbonLines[i]
+      break
+    end
+  end
+
+  -- Painted, the spark and the title's glow keep the alpha they show: a texture's alpha is its vertex
+  -- color's (paintEdges), and Paint colors them. Painting the glow left it lit until it was hovered
+  -- (reported in game).
+  local spark, S = self.spark, H.Spark
+  spark:ClearAllPoints()
+  spark:SetPoint("CENTER", self.ribbon, left and "LEFT" or "RIGHT", 0, 0)
+  if S then
+    local alpha = spark:GetAlpha()
+    style:Paint(spark, { Texture = S.Texture, Color = S.Color, BlendMode = S.BlendMode or "ADD" })
+    spark:SetAlpha(alpha)
+    spark:SetSize(S.Size, S.Size)
+    spark:Show()
+  else
+    tween:Stop(spark)
+    spark:SetAlpha(0)
+    spark:Hide()
+    -- Its shimmer swelled the cloud; with no spark, nothing would settle it.
+    self:SetCloudSwell(0)
+  end
+
+  local glow, G = self.titleGlow, H.TitleGlow
+  glow:ClearAllPoints()
+  if G then
+    local alpha = glow:GetAlpha()
+    style:Paint(glow, { Texture = G.Texture, Color = G.Color, BlendMode = G.BlendMode or "ADD" })
+    glow:SetAlpha(alpha)
+    glow:SetPoint("TOPLEFT", title, "TOPLEFT", -G.X, G.Y)
+    glow:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", G.X, -G.Y)
+    glow:Show()
+  else
+    tween:Stop(glow)
+    glow:SetAlpha(0)
+    glow:Hide()
+  end
+
+  self:styleBraid()
+  for _, button in ipairs(self.headerButtons) do
+    button:SetSize(style.HEADER_BUTTON, style.HEADER_BUTTON)
+    self:SetHeaderIcon(button, button.iconKey, button.art)
+  end
+  self:LayoutCloud()
   self:LayoutHeader()
 end
 
@@ -1484,12 +1704,6 @@ end
 function panelProto:BuildTitleButton()
   local frame, title = self.frame, self.title
   local glow = frame:CreateTexture(nil, "ARTWORK", nil, -3)
-  glow:SetTexture(style.CLOUD_GLOW)
-  glow:SetBlendMode("ADD")
-  local gold = style.Color.Gold
-  glow:SetVertexColor(gold[1], gold[2], gold[3])
-  glow:SetPoint("TOPLEFT", title, "TOPLEFT", -24, 14)
-  glow:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", 24, -14)
   glow:SetAlpha(0)
   self.titleGlow = glow
 
@@ -1526,11 +1740,15 @@ end
 ---@private
 ---@param on boolean
 function panelProto:lightTitle(on)
-  local glow = self.titleGlow
+  local glow, G = self.titleGlow, style.Theme.Header.TitleGlow
+  if not G then
+    return
+  end
   tween:Play(glow, {
     duration = style.Time.Hover,
     from = glow:GetAlpha(),
-    to = on and 0.3 or 0,
+    to = on and G.Alpha or 0,
+    ease = style:Ease("Hover"),
     onUpdate = function(v)
       glow:SetAlpha(v)
     end,
@@ -1540,43 +1758,61 @@ end
 -- BuildBraid makes this bag's half of the braid (next.md §12), hidden until it couples: two strands
 -- of additive gold lines, the lights that run along them, and the knot in the middle of the gap.
 function panelProto:BuildBraid()
-  local C = style.Chain
-  local gold = style.Color.Gold
   -- Its own layer above the panel: a coupled bag's grown feather reaches into the other bag's half
   -- of the gap, and would cover that half if the braid were drawn with the panel's own regions.
   local frame = CreateFrame("Frame", nil, self.frame)
   frame:SetAllPoints(self.frame)
   frame:SetFrameLevel(self.frame:GetFrameLevel() + 40)
-  local braid = { strands = { {}, {} }, beads = {}, amount = 0, half = 0, chained = false, phase = 0, time = 0,
-    swell = 0, layer = frame }
+  local braid = { strands = { {}, {} }, linePools = { {}, {} }, beads = {}, beadPool = {}, amount = 0, half = 0,
+    chained = false, phase = 0, time = 0, swell = 0, layer = frame }
+  braid.knot = frame:CreateTexture(nil, "ARTWORK", nil, 3)
+  braid.knot:Hide()
+  self.braid = braid
+end
+
+-- styleBraid draws the braid's parts from the theme (Chain): as many segments per strand and beads as
+-- it says, in its colors and thickness; the ones it no longer uses are hidden.
+---@private
+function panelProto:styleBraid()
+  local C, braid = style.Chain, self.braid
   for s = 1, 2 do
-    for _ = 1, C.Segments do
-      local line = frame:CreateLine(nil, "ARTWORK", nil, 1)
-      line:SetColorTexture(1, 1, 1, 1)
-      line:SetVertexColor(gold[1], gold[2], gold[3])
+    local pool = braid.linePools[s]
+    braid.strands[s] = {}
+    for i = 1, C.Segments do
+      local line = pool[i]
+      if line == nil then
+        line = braid.layer:CreateLine(nil, "ARTWORK", nil, 1)
+        line:SetColorTexture(1, 1, 1, 1)
+        line:Hide()
+        pool[i] = line
+      end
+      line:SetVertexColor(style:RGBA(C.Color))
       line:SetBlendMode("ADD")
       line:SetThickness(C.Thickness)
-      line:Hide()
-      table.insert(braid.strands[s], line)
+      braid.strands[s][i] = line
+    end
+    for i = C.Segments + 1, #pool do
+      pool[i]:Hide()
     end
   end
-  for _ = 1, C.Beads do
-    local bead = frame:CreateTexture(nil, "ARTWORK", nil, 2)
-    bead:SetTexture(style.CLOUD_GLOW)
-    bead:SetBlendMode("ADD")
-    bead:SetVertexColor(1, 0.95, 0.8)
+  braid.beads = {}
+  for i = 1, C.Beads do
+    local bead = braid.beadPool[i]
+    if bead == nil then
+      bead = braid.layer:CreateTexture(nil, "ARTWORK", nil, 2)
+      bead:Hide()
+      braid.beadPool[i] = bead
+    end
+    style:Paint(bead, { Texture = "Glow", Color = C.BeadColor, BlendMode = "ADD" })
     bead:SetSize(C.BeadSize, C.BeadSize)
-    bead:Hide()
-    table.insert(braid.beads, bead)
+    braid.beads[i] = bead
   end
-  local knot = frame:CreateTexture(nil, "ARTWORK", nil, 3)
-  knot:SetTexture(style.CLOUD_GLOW)
-  knot:SetBlendMode("ADD")
-  knot:SetVertexColor(gold[1], gold[2], gold[3])
-  knot:SetSize(C.KnotSize, C.KnotSize)
-  knot:Hide()
-  braid.knot = knot
-  self.braid = braid
+  for i = C.Beads + 1, #braid.beadPool do
+    braid.beadPool[i]:Hide()
+  end
+  style:Paint(braid.knot, { Texture = "Glow", Color = C.KnotColor, BlendMode = "ADD" })
+  braid.knot:SetSize(C.KnotSize, C.KnotSize)
+  self:applyBraid()
 end
 
 -- SetCoupling draws this bag's half of the braid: amount from 0 (straight ribbon, no braid) to 1,
@@ -1598,27 +1834,29 @@ function panelProto:SetCoupling(amount, half, chained, phase, time, feather)
   for _, line in ipairs(self.ribbonLines) do
     line:SetWidth(self.ribbonLength)
   end
-  local o = self.sparkles.options
+  self.coupled = amount > 0
+  local S = style.Theme.Sparkles or {}
+  local o, ribbon = self.sparkles.options, S.Ribbon
   if amount > 0 then
     -- Ribbon sparkles die before the middle of the gap, so none drifts over the other bag.
     self.sparkSpread = half * 0.3
     o.Life = { 1.0, 1.6 }
     o.Speed = { 3, half * 0.5 / 1.6 }
-  else
+  elseif ribbon then
     self.sparkSpread = self:SparkSpreadBase()
-    o.Life = { 2.0, 3.6 }
-    o.Speed = { 22, 64 }
+    o.Life = ribbon.Life
+    o.Speed = ribbon.Speed
   end
-  local e = self.edgeSparkles.options
+  local e, edge = self.edgeSparkles.options, S.Edge
   if amount > 0 and self:IsSmall() then
     -- Two small bags braided (docs/next-small-mode.md): their gap can be narrow, so the edge
     -- sparkles die before the middle of it, never over the other bag (born up to 24 out, half the
     -- gap at least 32: 24 + half * 0.5 stays below the gap).
     e.Life = { 1.0, 1.6 }
     e.Speed = { 3, math.max(3, half * 0.5 / 1.6) }
-  else
-    e.Life = { 2.4, 4.2 }
-    e.Speed = { 14, 36 }
+  elseif edge then
+    e.Life = edge.Life
+    e.Speed = edge.Speed
   end
   self:applyBraid()
 end
@@ -1647,7 +1885,7 @@ end
 ---@private
 function panelProto:applyBraid()
   local braid, C = self.braid, style.Chain
-  local shown = braid.amount > 0 and braid.half > 0
+  local shown = braid.amount > 0 and braid.half > 0 and C.Braid ~= false
   if not shown then
     for _, strand in ipairs(braid.strands) do
       for _, line in ipairs(strand) do
@@ -1711,7 +1949,8 @@ function panelProto:BurstKnot()
       self:applyBraid()
     end,
   })
-  self.knotSparkles:Burst(12)
+  local knot = style.Theme.Sparkles and style.Theme.Sparkles.Knot
+  self.knotSparkles:Burst(knot and knot.Burst or 0)
 end
 
 -- LayoutHeader lines the shown header buttons up from the screen edge, so a hidden one leaves
@@ -1725,14 +1964,14 @@ function panelProto:LayoutHeader()
     if button:IsShown() then
       if previous == nil then
         if left then
-          button:SetPoint("TOPLEFT", body, "TOPLEFT", style.PAD, -(style.TITLE_TOP + 3))
+          button:SetPoint("TOPLEFT", body, "TOPLEFT", style.PAD, -style.HEADER_BUTTON_TOP)
         else
-          button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3))
+          button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -style.PAD, -style.HEADER_BUTTON_TOP)
         end
       elseif left then
-        button:SetPoint("LEFT", previous, "RIGHT", 8, 0)
+        button:SetPoint("LEFT", previous, "RIGHT", style.HEADER_BUTTON_GAP, 0)
       else
-        button:SetPoint("RIGHT", previous, "LEFT", -8, 0)
+        button:SetPoint("RIGHT", previous, "LEFT", -style.HEADER_BUTTON_GAP, 0)
       end
       previous = button
     end
@@ -1746,10 +1985,6 @@ end
 -- help text in Next's muted lavender after it, instead of the template's border and 35% gray text.
 function panelProto:BuildSearch()
   local sf = self:CreateSearchBox()
-  sf.frame:ClearAllPoints()
-  sf.frame:SetPoint("TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.SEARCH_TOP)
-  sf.frame:SetPoint("TOPRIGHT", self.body, "TOPRIGHT", -style.PAD, -style.SEARCH_TOP)
-  sf.frame:SetHeight(style.SEARCH_HEIGHT)
   local t = sf.textBox
   for _, key in ipairs({ "Left", "Middle", "Right" }) do
     t[key]:SetAlpha(0)
@@ -1765,29 +2000,16 @@ function panelProto:BuildSearch()
     if side == "TOP" or side == "BOTTOM" then
       edge:SetPoint(side .. "LEFT", sf.frame, side .. "LEFT", 0, 0)
       edge:SetPoint(side .. "RIGHT", sf.frame, side .. "RIGHT", 0, 0)
-      edge:SetHeight(1)
     else
       edge:SetPoint("TOP" .. side, sf.frame, "TOP" .. side, 0, 0)
       edge:SetPoint("BOTTOM" .. side, sf.frame, "BOTTOM" .. side, 0, 0)
-      edge:SetWidth(1)
     end
     table.insert(self.searchEdges, edge)
   end
-  self.searchEdgeAlpha = style.SearchEdge.Idle
-
-  local icon = t.searchIcon
-  icon:ClearAllPoints()
-  icon:SetPoint("LEFT", t, "LEFT", style.SEARCH_GAP, 0)
-  icon:SetSize(style.SEARCH_ICON, style.SEARCH_ICON)
   local help = t.Instructions
-  help:ClearAllPoints()
-  help:SetPoint("LEFT", icon, "RIGHT", style.SEARCH_GAP, 0)
-  help:SetPoint("RIGHT", t, "RIGHT", -24, 0)
   help:SetJustifyH("LEFT")
-  help:SetFontObject(style:Font("Search"))
-  t:SetFontObject(style:Font("SearchText"))
-  t:SetTextColor(unpack(style.Color.Text))
-  t:SetTextInsets(style.SEARCH_GAP * 2 + style.SEARCH_ICON, 24, 0, 0)
+  self.searchBox = sf
+  self:styleSearch()
 
   -- Hooked after the template's scripts (and the box's own OnTextChanged, which replaced the
   -- template's: InputBoxInstructions_OnTextChanged hid the help text), so Next's colors win.
@@ -1805,9 +2027,47 @@ function panelProto:BuildSearch()
     help:SetShown(t:GetText() == "")
     self:UpdateSearchLook()
   end)
-  self.searchBox = sf
-  self:UpdateSearchLook(true)
   self:UpdateSearchShown()
+end
+
+-- styleSearch places and draws the search box from the theme (Layout, Search): where it sits, its
+-- border's size (or none), its magnifier, its help text and what is typed in their roles (the
+-- template gives the help text a color of its own, so its role's color is set on it too), then its
+-- look for its state.
+---@private
+function panelProto:styleSearch()
+  local sf, S = self.searchBox, style.Theme.Search
+  local t = sf.textBox
+  sf.frame:ClearAllPoints()
+  sf.frame:SetPoint("TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.SEARCH_TOP)
+  sf.frame:SetPoint("TOPRIGHT", self.body, "TOPRIGHT", -style.PAD, -style.SEARCH_TOP)
+  sf.frame:SetHeight(style.SEARCH_HEIGHT)
+  local E = S.Edge
+  for i, edge in ipairs(self.searchEdges) do
+    if E then
+      if i <= 2 then
+        edge:SetHeight(E.Size)
+      else
+        edge:SetWidth(E.Size)
+      end
+      edge:Show()
+    else
+      edge:Hide()
+    end
+  end
+  self.searchEdgeAlpha = E and E.Idle or 0
+  local icon = t.searchIcon
+  icon:ClearAllPoints()
+  icon:SetPoint("LEFT", t, "LEFT", style.SEARCH_GAP, 0)
+  icon:SetSize(style.SEARCH_ICON, style.SEARCH_ICON)
+  local help = t.Instructions
+  help:ClearAllPoints()
+  help:SetPoint("LEFT", icon, "RIGHT", style.SEARCH_GAP, 0)
+  help:SetPoint("RIGHT", t, "RIGHT", -style.SEARCH_RIGHT, 0)
+  style:SetTemplateFont(help, S.HelpFont)
+  style:SetFont(t, S.TextFont)
+  t:SetTextInsets(style.SEARCH_GAP * 2 + style.SEARCH_ICON, style.SEARCH_RIGHT, 0, 0)
+  self:UpdateSearchLook(true)
 end
 
 -- SearchState is how the search box looks now: "focus" while typed in, "hover" under the pointer,
@@ -1831,24 +2091,27 @@ end
 -- fading to its strength (at once with now).
 ---@param now? boolean
 function panelProto:UpdateSearchLook(now)
+  local S = style.Theme.Search
   local state = self:SearchState()
   local focused = state == "focus"
-  local fill = style.Color[focused and "SearchFillFocus" or "SearchFill"]
-  self.searchFill:SetVertexColor(fill[1], fill[2], fill[3], fill[4])
-  local icon = self.searchBox.textBox.searchIcon
+  self.searchFill:SetVertexColor(style:RGBA(focused and S.FocusFill or S.Fill))
+  local icon, I = self.searchBox.textBox.searchIcon, S.Icon
   if focused then
-    icon:SetVertexColor(1, 1, 1, 1)
+    icon:SetVertexColor(style:RGBA(I.FocusColor))
   else
-    local c = style.Color.Lavender
-    icon:SetVertexColor(c[1], c[2], c[3], state == "idle" and style.SearchIcon.Idle or style.SearchIcon.Active)
+    icon:SetVertexColor(style:RGBA(I.Color, state == "idle" and I.Idle or I.Active))
   end
-  local target = focused and style.SearchEdge.Focus
-    or (state == "idle" and style.SearchEdge.Idle or style.SearchEdge.Hover)
+  local E = S.Edge
+  if not E then
+    tween:Stop(self.searchEdges)
+    return
+  end
+  local target = focused and E.Focus or (state == "idle" and E.Idle or E.Hover)
   local function paint(alpha)
     self.searchEdgeAlpha = alpha
-    local c = style.Color.Lavender
+    local r, g, b = style:RGBA(E.Color)
     for _, edge in ipairs(self.searchEdges) do
-      edge:SetVertexColor(c[1], c[2], c[3], alpha)
+      edge:SetVertexColor(r, g, b, alpha)
     end
   end
   if now then
@@ -1861,7 +2124,7 @@ function panelProto:UpdateSearchLook(now)
     duration = style.Time.Hover,
     from = 0,
     to = 1,
-    ease = "outCubic",
+    ease = style:Ease("Hover"),
     onUpdate = function(t) paint(t >= 1 and target or from + (target - from) * t) end,
   })
 end
@@ -1883,19 +2146,29 @@ end
 ---@param scrollName string
 function panelProto:BuildContent(scrollName)
   local scroll = scrollbox:Create(self.frame, scrollName, { Symmetric = true, AutoHideBar = true })
-  scroll.frame:SetPoint("TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.CONTENT_TOP)
-  scroll.frame:SetPoint("BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -style.PAD, style.FOOTER)
   self.scroll = scroll
   self.content = nextContent:Create(scroll.scrollChild)
   scroll:SetChild(self.content)
   self.root = drawable:Create(rootProto, { frame = self.frame, bag = self })
 
-  local emptyText = self.frame:CreateFontString(nil, "OVERLAY")
-  emptyText:SetFontObject(style:Font("Footer"))
-  emptyText:SetPoint("TOP", scroll.frame, "TOP", 0, -40)
+  local emptyText = style:CreateText(self.frame, style.Theme.Footer.EmptyFont)
   emptyText:SetText(L:G("Nothing here yet"))
   emptyText:Hide()
   self.emptyText = emptyText
+  self:styleContent()
+end
+
+-- styleContent places the scroll box between the header and the footer, and the empty tab's text,
+-- from the theme.
+---@private
+function panelProto:styleContent()
+  local scroll = self.scroll
+  scroll.frame:ClearAllPoints()
+  scroll.frame:SetPoint("TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.CONTENT_TOP)
+  scroll.frame:SetPoint("BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -style.PAD, style.FOOTER)
+  style:SetFont(self.emptyText, style.Theme.Footer.EmptyFont)
+  self.emptyText:ClearAllPoints()
+  self.emptyText:SetPoint("TOP", scroll.frame, "TOP", 0, -style.EMPTY_TOP)
 end
 
 -- CreateMoney returns the money frame the footer shows, or nil for none.
@@ -1907,38 +2180,60 @@ end
 -- BuildFooter puts the free slots on the inner side and the money on the screen-edge side, under
 -- a fading line.
 function panelProto:BuildFooter()
-  local body = self.body
-  local left = self.side == "LEFT"
   local line = self.frame:CreateTexture(nil, "ARTWORK")
-  line:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER - 4)
-  line:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER - 4)
-  line:SetHeight(1)
   line:SetColorTexture(1, 1, 1, 1)
-  if left then
-    line:SetGradient("HORIZONTAL", style:CreateColor("Lavender", 0.05), style:CreateColor("Lavender", 0.35))
-  else
-    line:SetGradient("HORIZONTAL", style:CreateColor("Lavender", 0.35), style:CreateColor("Lavender", 0.05))
-  end
-
-  local freeText = self.frame:CreateFontString(nil, "OVERLAY")
-  freeText:SetFontObject(style:Font("Footer"))
-  if left then
-    freeText:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -(style.PAD + 4), 14)
-  else
-    freeText:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD + 4, 14)
-  end
-  self.freeText = freeText
-
+  self.footerLine = line
+  self.freeText = style:CreateText(self.frame, style.Theme.Footer.Font)
   local m = self:CreateMoney()
   if m ~= nil then
     m.frame:SetParent(self.frame)
+    self.moneyFrame = m
+  end
+  self:styleFooter()
+end
+
+-- styleFooter draws the footer from the theme (Footer, Layout): its line fading toward the inner side
+-- (or none), the free slots on the inner side in its role, the money on the screen-edge side.
+---@private
+function panelProto:styleFooter()
+  local body, line, F = self.body, self.footerLine, style.Theme.Footer
+  local left = self.side == "LEFT"
+  line:ClearAllPoints()
+  line:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER - 4)
+  line:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER - 4)
+  local spec = F.Line
+  if spec then
+    line:SetHeight(spec.Size)
+    local inner, outer = style:CreateColor(spec.Color, spec.Inner), style:CreateColor(spec.Color, spec.Outer)
+    if left then
+      line:SetGradient("HORIZONTAL", inner, outer)
+    else
+      line:SetGradient("HORIZONTAL", outer, inner)
+    end
+    line:Show()
+  else
+    line:Hide()
+  end
+
+  local freeText = self.freeText
+  style:SetFont(freeText, F.Font)
+  freeText:ClearAllPoints()
+  if left then
+    freeText:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -(style.PAD + style.TITLE_INSET), style.FOOTER_TEXT)
+  else
+    freeText:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD + style.TITLE_INSET, style.FOOTER_TEXT)
+  end
+  local m = self.moneyFrame
+  if m ~= nil then
+    if m.text ~= nil then
+      style:SetFont(m.text, F.MoneyFont)
+    end
     m.frame:ClearAllPoints()
     if left then
-      m.frame:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, 12)
+      m.frame:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_MONEY)
     else
-      m.frame:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, 12)
+      m.frame:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_MONEY)
     end
-    self.moneyFrame = m
   end
 end
 
@@ -1957,9 +2252,9 @@ function panelProto:BuildSparkles()
   -- edge.
   local function titleEdge()
     if self.side == "LEFT" then
-      return self:BodyLeft() + style.BODY_WIDTH - (style.PAD + 4)
+      return self:BodyLeft() + style.BODY_WIDTH - (style.PAD + style.TITLE_INSET)
     end
-    return self:BodyLeft() + style.PAD + 4
+    return self:BodyLeft() + style.PAD + style.TITLE_INSET
   end
   local function ribbonStart()
     return titleEdge() + joinX
@@ -1970,46 +2265,115 @@ function panelProto:BuildSparkles()
     end
     return self:BodyLeft()
   end
-  local titleMiddle = -(style.TITLE_TOP + 13)
+  local function titleMiddle()
+    return -(style.TITLE_TOP + 13)
+  end
   -- Born in the cloud above or below the title, never over it, most of them near the join.
   self.cloudSparkles = sparkles:Create(fx, {
-    Rate = 3, Max = 10, Life = { 1.4, 2.6 }, Size = { 4, 9 }, Speed = { 3, 12 }, Rise = { -3, 5 },
-    Wobble = 2, Spin = 1.2, Alpha = 0.7, Direction = out,
+    Direction = out,
     Spawn = function()
       local span = self:CloudSpan()
       local y = 14 + math.random() * 14
       if math.random() < 0.5 then
         y = -y
       end
-      return ribbonStart() + inward * span * math.random() ^ 1.7, titleMiddle + y
+      return ribbonStart() + inward * span * math.random() ^ 1.7, titleMiddle() + y
     end,
   })
   self.sparkSpread = self:SparkSpreadBase()
   self.sparkles = sparkles:Create(fx, {
-    Rate = 8, Max = 28, Life = { 2.0, 3.6 }, Size = { 6, 15 }, Speed = { 22, 64 }, Rise = { -8, 10 },
-    Wobble = 4, Spin = 1.5, Direction = out,
+    Direction = out,
     Spawn = function()
-      return ribbonStart() + out * math.random() * self.sparkSpread, titleMiddle + (math.random() * 2 - 1) * 8
+      return ribbonStart() + out * math.random() * self.sparkSpread, titleMiddle() + (math.random() * 2 - 1) * 8
     end,
   })
   -- Along the inner feathered edge, chained or not (asked, of an earlier version that stopped them
   -- while coupled: "let's not do that"). Coupled, they drift into the gap and die before the other
   -- bag: they travel at most 36 * 4.2 + 24 pixels, the gap is at least 192.
   self.edgeSparkles = sparkles:Create(fx, {
-    Rate = 2.5, Max = 12, Life = { 2.4, 4.2 }, Size = { 4, 9 }, Speed = { 14, 36 }, Rise = { -6, 6 },
-    Wobble = 3, Spin = 1, Alpha = 0.6, Direction = out,
+    Direction = out,
     Spawn = function()
-      return innerEdge() + out * math.random() * 24, -math.random() * fx:GetHeight()
+      local edge = style.Theme.Sparkles.Edge
+      return innerEdge() + out * math.random() * (edge and edge.Reach or 0), -math.random() * fx:GetHeight()
     end,
   })
   -- From the knot in the middle of the gap, as the pair couples (BurstKnot).
   self.knotSparkles = sparkles:Create(fx, {
-    Rate = 0, Max = 16, Life = { 0.5, 1.1 }, Size = { 4, 10 }, Speed = { 12, 40 }, Rise = { -16, 16 },
-    Wobble = 2, Spin = 2, Alpha = 0.9, Direction = out,
+    Direction = out,
     Spawn = function()
-      return ribbonStart() + out * self.braid.half, titleMiddle
+      return ribbonStart() + out * self.braid.half, titleMiddle()
     end,
   })
+  self:styleSparkles()
+end
+
+-- The emitters and the theme's Sparkles entry for each.
+local EMITTERS = { cloudSparkles = "Cloud", sparkles = "Ribbon", edgeSparkles = "Edge", knotSparkles = "Knot" }
+
+-- styleSparkles gives each emitter the theme's rate, life, size, speed, rise, wobble, spin and alpha
+-- (the Sparkles entry of its name), or turns it off (none for its name, or no sparkles at all). A
+-- coupled bag's ribbon and edge sparkles keep their shorter lives (SetCoupling).
+---@private
+function panelProto:styleSparkles()
+  local S = style.Theme.Sparkles
+  for field, name in pairs(EMITTERS) do
+    local emitter, spec = self[field], S and S[name]
+    if spec then
+      local o = emitter.options
+      for _, key in ipairs({ "Rate", "Max", "Life", "Size", "Speed", "Rise", "Wobble", "Spin", "Alpha" }) do
+        o[key] = spec[key]
+      end
+      emitter:SetEnabled(true)
+    else
+      emitter:SetEnabled(false)
+    end
+  end
+  if self.coupled then
+    local braid = self.braid
+    self:SetCoupling(braid.amount, braid.half, braid.chained, braid.phase, braid.time,
+      style.FEATHER + (self.feather:GetWidth() - style.FEATHER) / math.max(braid.amount, 1e-6))
+  else
+    self.sparkSpread = self:SparkSpreadBase()
+  end
+end
+
+-- StyleParts draws every part of the panel from the current theme: its body, header, search box,
+-- content, footer, sparkles and tabs.
+function panelProto:StyleParts()
+  self:styleBody()
+  self.mover:SetHeight(math.max(1, style.SEARCH_TOP - 4))
+  self:styleSearch()
+  self:styleHeader()
+  self:styleContent()
+  self:styleFooter()
+  self:styleSparkles()
+  self.tabs:ApplyStyle()
+  self.content:ApplyStyle()
+end
+
+-- ApplyStyle restyles the panel for the theme SonataNext applied: every part (StyleParts), its
+-- shape for its size and the theme's sizes (ApplyGeometry), where a chained pair rests, its emitters
+-- running again while it shows, and its content drawn again with the theme's sizes (at once while it
+-- shows, else when it next shows).
+---@param ctx Context
+function panelProto:ApplyStyle(ctx)
+  self:StyleParts()
+  self:ApplyGeometry()
+  chain:Update(ctx)
+  local shown = self.frame:IsShown() and not self.closing
+  if shown then
+    for field in pairs(EMITTERS) do
+      if field ~= "knotSparkles" then
+        self[field]:Start()
+      end
+    end
+    if not tween:IsPlaying(self.spark) then
+      self:playShimmer()
+    end
+  end
+  if self.lastSlotInfo ~= nil then
+    self:Draw(ctx, self.lastSlotInfo)
+  end
 end
 
 -- BuildTabs makes the tab rail down the body's inner edge and lists the kind's tabs.
@@ -2096,10 +2460,13 @@ end
 -- settles, every ShimmerEvery seconds. Everything eases in and out: nothing jumps.
 ---@private
 function panelProto:playShimmer()
-  local spark = self.spark
+  local spark, S = self.spark, style.Theme.Header.Spark
+  if not S then
+    return
+  end
   local out = self:Outward()
   local inner = self.side == "LEFT" and "LEFT" or "RIGHT"
-  local size = SPARK_SIZE
+  local size = S.Size
   tween:Play(spark, {
     duration = style.Time.Shimmer,
     delay = math.max(0, style.Time.ShimmerEvery - style.Time.Shimmer - style.Time.Absorb),
@@ -2121,7 +2488,7 @@ function panelProto:playShimmer()
         to = 1,
         ease = "linear",
         onUpdate = function(t)
-          local grown = size + SPARK_GROWTH * (1 - (1 - t) ^ 2)
+          local grown = size + S.Growth * (1 - (1 - t) ^ 2)
           spark:SetSize(grown, grown)
           spark:SetAlpha((1 - t) ^ 1.5)
           self:SetCloudSwell((1 - t) ^ 2)
@@ -2191,14 +2558,14 @@ function panelProto:Show(ctx, slotInfo, onShown)
     if not sliding then
       self:FitSmall()
     end
-    self:moveIn(sliding and self.offset or self:HiddenOffset(), 0, style.Time.Open, "outCubic", 0)
+    self:moveIn(sliding and self.offset or self:HiddenOffset(), 0, style.Time.Open, style:Ease("SmallOpen"), 0)
   elseif sliding then
     self.target = to
     self:SetDocked(to == 0)
     if to == 0 then
-      self:moveIn(self.offset, 0, style.Time.Open, "outBack", 0)
+      self:moveIn(self.offset, 0, style.Time.Open, style:Ease("Open"), 0)
     else
-      self:moveIn(self.offset, to, style.Time.Enter, "outBackSoft", 0)
+      self:moveIn(self.offset, to, style.Time.Enter, style:Ease("Enter"), 0)
     end
   elseif chain:AnchorOf(self) ~= nil then
     self:Enter(to, chain:EntranceDelay(self))
@@ -2207,7 +2574,7 @@ function panelProto:Show(ctx, slotInfo, onShown)
   else
     self.target = 0
     self:SetDocked(true)
-    self:moveIn(self:HiddenOffset(), 0, style.Time.Open, "outBack", 0)
+    self:moveIn(self:HiddenOffset(), 0, style.Time.Open, style:Ease("Open"), 0)
   end
   self.sparkles:Start()
   self.edgeSparkles:Start()
@@ -2252,7 +2619,7 @@ function panelProto:Hide(ctx)
     duration = style.Time.Close,
     from = from,
     to = to,
-    ease = "inCubic",
+    ease = style:Ease(self:IsSmall() and "SmallClose" or "Close"),
     onUpdate = function(x)
       self:setOffset(x)
     end,
@@ -2310,7 +2677,7 @@ function panelProto:OnHidden(ctx)
   tween:Stop(self)
   tween:Stop(self.spark)
   self.spark:SetAlpha(0)
-  self.spark:SetSize(SPARK_SIZE, SPARK_SIZE)
+  self.spark:SetSize(sparkSize(), sparkSize())
   self:SetCloudSwell(0)
   self.sparkles:Stop()
   self.edgeSparkles:Stop()

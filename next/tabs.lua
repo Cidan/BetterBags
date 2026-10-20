@@ -24,7 +24,8 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field id number
 ---@field name string
 ---@field tooltip? string[]|fun(owner: Button) { title, text }, or a function that fills GameTooltip.
----@field accent? number[] The bar's color while it is selected; default gold.
+---@field accent? string|number[] The bar's color while it is selected: an accent of the theme by name
+--- (Tabs.Accents: Warbank, Guild), a palette color, or a color; the theme's bar color by default.
 ---@field icon? number|string A texture shown beside the name.
 ---@field atlas? string An atlas shown beside the name.
 ---@field gap? number Extra room above the tab, in pixels.
@@ -43,7 +44,7 @@ local nextTabs = addon:NewModule('NextTabs')
 --- float error at a UI scale).
 ---@field y number How far below the rail's top it is.
 ---@field secure boolean It is a purchase tab.
----@field accent? number[]
+---@field accent? string|number[]
 ---@field tooltip? string[]|fun(owner: Button)
 ---@field draggable? boolean
 
@@ -57,14 +58,33 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field securePool NextTab[] Purchase tabs not in use, hidden.
 ---@field selected? number
 ---@field dropTarget? number The tab a dragged section would drop on (next.md §7).
+---@field entries NextTabEntry[] What SetTabs was last given, laid out again by a theme (ApplyStyle).
 ---@field onClick? fun(ctx: Context, id: number, button: string)
 ---@field onDrag? fun(ctx: Context, id: number)
 ---@field onResize? fun(ctx: Context) Runs after the tabs are set, which can change the rail's width.
 local railProto = {}
 addon:GetModule('Perf'):RegisterPrototype(railProto, 'NextTabRail')
 
--- The distance from one tab's top to the next's.
-local STEP = style.TAB_HEIGHT + style.TAB_SPACING
+-- step is the distance from one tab's top to the next's, for the current theme.
+---@return number
+local function step()
+  return style.TAB_HEIGHT + style.TAB_SPACING
+end
+
+-- accentColor is the color of the bar beside a selected tab: its accent (an accent of the theme by
+-- name, a palette color, or a color given outright), else the theme's bar color.
+---@param accent? string|number[]
+---@return number r, number g, number b, number a
+local function accentColor(accent)
+  local T = style.Theme.Tabs
+  if accent == nil then
+    return style:RGBA(T.Indicator and T.Indicator.Color or "Gold")
+  end
+  if type(accent) == "string" then
+    return style:RGBA(T.Accents[accent] or accent)
+  end
+  return style:RGBA(accent)
+end
 
 -- Create makes a rail for a panel on side of the screen ("RIGHT", the default, or "LEFT").
 ---@param body Frame
@@ -73,23 +93,82 @@ local STEP = style.TAB_HEIGHT + style.TAB_SPACING
 function nextTabs:Create(body, side)
   local rail = setmetatable({}, { __index = railProto })
   rail.side = side or "RIGHT"
+  rail.body = body
   rail.frame = CreateFrame("Frame", nil, body)
-  if rail.side == "LEFT" then
-    rail.frame:SetPoint("TOPLEFT", body, "TOPRIGHT", 0, -style.CONTENT_TOP)
-  else
-    rail.frame:SetPoint("TOPRIGHT", body, "TOPLEFT", 0, -style.CONTENT_TOP)
-  end
-  rail.frame:SetSize(style.TAB_MAX_WIDTH, 1)
   rail.indicator = rail.frame:CreateTexture(nil, "OVERLAY")
   rail.indicator:SetColorTexture(1, 1, 1, 1)
-  rail.indicator:SetVertexColor(unpack(style.Color.Gold))
-  rail.indicator:SetSize(3, style.TAB_HEIGHT)
   rail.indicator:Hide()
   rail.indicatorY = 0
   rail.tabs = {}
+  rail.entries = {}
   rail.pool = {}
   rail.securePool = {}
+  rail:styleRail()
   return rail
+end
+
+-- styleRail hangs the rail below the header and sizes the bar from the theme.
+---@private
+function railProto:styleRail()
+  local frame, body = self.frame, self.body
+  frame:ClearAllPoints()
+  if self.side == "LEFT" then
+    frame:SetPoint("TOPLEFT", body, "TOPRIGHT", 0, -style.CONTENT_TOP)
+  else
+    frame:SetPoint("TOPRIGHT", body, "TOPLEFT", 0, -style.CONTENT_TOP)
+  end
+  frame:SetSize(style.TAB_MAX_WIDTH, 1)
+  local bar = style.Theme.Tabs.Indicator
+  self.indicator:SetSize(bar and bar.Width or 0, style.TAB_HEIGHT)
+end
+
+-- styleTab draws a tab's parts from the theme: its height, its glow's color, its name and icon where
+-- they go (its fill and font are its state's, paint).
+---@private
+---@param tab NextTab
+function railProto:styleTab(tab)
+  local button, text, icon = tab.button, tab.text, tab.icon
+  button:SetHeight(style.TAB_HEIGHT)
+  local glow = style.Theme.Tabs.Glow
+  if glow then
+    -- A texture's alpha is its vertex color's (NextPanel:paintEdges): colored, it keeps what it shows.
+    local alpha = tab.glow:GetAlpha()
+    local r, g, b = style:RGBA(glow.Color)
+    tab.glow:SetVertexColor(r, g, b)
+    tab.glow:SetAlpha(alpha)
+    tab.glow:SetBlendMode(glow.BlendMode or "ADD")
+  else
+    tween:Stop(tab.glow)
+    tab.glow:Hide()
+  end
+  icon:SetSize(style.TAB_ICON, style.TAB_ICON)
+  text:ClearAllPoints()
+  icon:ClearAllPoints()
+  if self.side == "LEFT" then
+    text:SetPoint("LEFT", button, "LEFT", style.TAB_PADDING, 0)
+    text:SetJustifyH("LEFT")
+    icon:SetPoint("LEFT", text, "RIGHT", style.TAB_ICON_GAP, 0)
+  else
+    text:SetPoint("RIGHT", button, "RIGHT", -style.TAB_PADDING, 0)
+    text:SetJustifyH("RIGHT")
+    icon:SetPoint("RIGHT", text, "LEFT", -style.TAB_ICON_GAP, 0)
+  end
+end
+
+-- ApplyStyle restyles the rail and every tab it holds (shown or pooled) for the current theme, and
+-- lays its tabs out again: their widths follow their names in the new fonts (SonataNext applied a
+-- theme).
+---@param ctx? Context
+function railProto:ApplyStyle(ctx)
+  local _ = ctx
+  self:styleRail()
+  for _, list in ipairs({ self.tabs, self.pool, self.securePool }) do
+    for _, tab in ipairs(list) do
+      self:styleTab(tab)
+      self:paint(tab)
+    end
+  end
+  self:SetTabs(self.entries)
 end
 
 ---@param fn fun(ctx: Context, id: number, button: string)
@@ -133,32 +212,19 @@ function railProto:newTab(secure)
     button = CreateFrame("Button", nil, self.frame)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   end
-  button:SetHeight(style.TAB_HEIGHT)
   local bg = button:CreateTexture(nil, "BACKGROUND")
   bg:SetAllPoints()
   bg:SetColorTexture(1, 1, 1, 1)
   local glow = button:CreateTexture(nil, "ARTWORK")
   glow:SetAllPoints()
   glow:SetColorTexture(1, 1, 1, 1)
-  glow:SetVertexColor(unpack(style.Color.Lavender))
-  glow:SetBlendMode("ADD")
   glow:Hide()
-  local text = button:CreateFontString(nil, "OVERLAY")
-  text:SetFontObject(style:Font("Tab"))
+  local text = style:CreateText(button, style.Theme.Tabs.Font)
   local icon = button:CreateTexture(nil, "ARTWORK")
-  icon:SetSize(style.TAB_ICON, style.TAB_ICON)
   icon:Hide()
-  if self.side == "LEFT" then
-    text:SetPoint("LEFT", button, "LEFT", style.TAB_PADDING, 0)
-    text:SetJustifyH("LEFT")
-    icon:SetPoint("LEFT", text, "RIGHT", style.TAB_ICON_GAP, 0)
-  else
-    text:SetPoint("RIGHT", button, "RIGHT", -style.TAB_PADDING, 0)
-    text:SetJustifyH("RIGHT")
-    icon:SetPoint("RIGHT", text, "LEFT", -style.TAB_ICON_GAP, 0)
-  end
   ---@type NextTab
   local tab = { id = 0, button = button, text = text, icon = icon, bg = bg, glow = glow, slide = 0, y = 0, secure = secure }
+  self:styleTab(tab)
   if not secure then
     addon.SetScript(button, "OnClick", function(ctx, _, mouseButton)
       if self.onClick then
@@ -217,6 +283,7 @@ function railProto:slideTo(tab, to)
     duration = style.Time.Hover,
     from = tab.slide,
     to = to,
+    ease = style:Ease("Hover"),
     onUpdate = function(v)
       tab.slide = v
       self:place(tab)
@@ -248,6 +315,7 @@ end
 -- it had of the same kind (ordinary or purchase), so kept tabs are never hidden in between.
 ---@param entries NextTabEntry[]
 function railProto:SetTabs(entries)
+  self.entries = entries
   local had = { [false] = {}, [true] = {} }
   for _, tab in ipairs(self.tabs) do
     table.insert(had[tab.secure], tab)
@@ -277,7 +345,7 @@ function railProto:SetTabs(entries)
   for i, entry in ipairs(entries) do
     local tab = self.tabs[i]
     if i > 1 then
-      y = y + STEP
+      y = y + step()
     end
     y = y + (entry.gap or 0)
     tab.id = entry.id
@@ -309,7 +377,7 @@ function railProto:SetTabs(entries)
     self:place(tab)
     tab.button:Show()
   end
-  self.frame:SetHeight(#entries > 0 and (y + STEP) or 1)
+  self.frame:SetHeight(#entries > 0 and (y + step()) or 1)
   self:Select(self.selected)
   if self.onResize then
     self.onResize(context:New("NextTabs_Resize"))
@@ -332,16 +400,17 @@ end
 ---@private
 ---@param tab NextTab
 function railProto:paint(tab)
+  local T = style.Theme.Tabs
   local selected = tab.id == self.selected or tab.id == self.dropTarget
-  local color = selected and style.Color.TabSelected or style.Color.Tab
-  local faint = CreateColor(color[1], color[2], color[3], color[4] * 0.35)
-  local solid = CreateColor(color[1], color[2], color[3], color[4])
+  local r, g, b, a = style:RGBA(selected and T.SelectedFill or T.Fill)
+  local faint = CreateColor(r, g, b, a * T.Fade)
+  local solid = CreateColor(r, g, b, a)
   if self.side == "LEFT" then
     tab.bg:SetGradient("HORIZONTAL", solid, faint)
   else
     tab.bg:SetGradient("HORIZONTAL", faint, solid)
   end
-  tab.text:SetFontObject(style:Font(selected and "TabSelected" or "Tab"))
+  style:SetFont(tab.text, selected and T.SelectedFont or T.Font)
 end
 
 ---@private
@@ -396,8 +465,11 @@ function railProto:SetDropTarget(id)
   local new = self:Tab(id)
   if new then
     tween:Stop(new.glow)
-    new.glow:SetAlpha(0.3)
-    new.glow:Show()
+    local glow = style.Theme.Tabs.Glow
+    if glow then
+      new.glow:SetAlpha(glow.Drop)
+      new.glow:Show()
+    end
     self:slideTo(new, style.TAB_HOVER)
     self:paint(new)
   end
@@ -407,15 +479,17 @@ end
 ---@param id number
 function railProto:Pulse(id)
   local tab = self:Tab(id)
-  if tab == nil then
+  local spec = style.Theme.Tabs.Glow
+  if tab == nil or not spec then
     return
   end
   local glow = tab.glow
   glow:Show()
   tween:Play(glow, {
     duration = style.Time.Pulse,
-    from = 0.8,
+    from = spec.Pulse,
     to = 0,
+    ease = style:Ease("Pulse"),
     onUpdate = function(v)
       glow:SetAlpha(v)
     end,
@@ -440,17 +514,18 @@ function railProto:Select(id, animate)
       accent = tab.accent
     end
   end
-  if target == nil then
+  if target == nil or not style.Theme.Tabs.Indicator then
     tween:Stop(self.indicator)
     self.indicator:Hide()
     return
   end
-  self.indicator:SetVertexColor(unpack(accent or style.Color.Gold))
+  self.indicator:SetVertexColor(accentColor(accent))
   if animate and self.indicator:IsShown() then
     tween:Play(self.indicator, {
       duration = style.Time.Glide,
       from = self.indicatorY,
       to = target,
+      ease = style:Ease("Glide"),
       onUpdate = function(v)
         self:moveIndicator(v)
       end,

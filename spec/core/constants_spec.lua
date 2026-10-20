@@ -153,6 +153,7 @@ describe("Constants Module Offsets", function()
     assert.are.equal("full", const.DATABASE_DEFAULTS.profile.nextSize)
     assert.are.same({}, const.DATABASE_DEFAULTS.profile.nextSmallPlaces)
     assert.are.equal("apart", const.DATABASE_DEFAULTS.profile.nextSmallChain)
+    assert.are.equal("Default", const.DATABASE_DEFAULTS.profile.nextTheme)
   end)
 
   it("leaves animating item movement off by default", function()

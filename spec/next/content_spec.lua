@@ -384,13 +384,13 @@ describe("NextContent", function()
       assert.are.same({ v1 = a, v2 = b, v3 = c }, canvas.buttons)
     end)
 
-    it("steps rows by its cell height", function()
-      canvas:SetCellHeight(style.ICON + 14)
+    it("steps rows by its icons and the price row under them", function()
+      canvas:SetPriceRow(true)
       local list = {}
       for i = 1, 9 do list[i] = vendorButton("v" .. i) end
       canvas:BindSections({ { name = "Food", buttons = list } })
       draw()
-      local rowStep = style.ICON + 14 + style.GAP
+      local rowStep = style.ICON + style.VENDOR_PRICE + style.GAP
       assert.are.same({ canvas.order[1].cells, 0, -rowStep }, { at(list[9].frame) })
       assert.are.equal(style.SECTION_HEADER + 2 * rowStep - style.GAP, canvas.order[1].height)
     end)
@@ -611,6 +611,106 @@ describe("NextContent", function()
       header:GetScript("OnClick")(header, "RightButton")
       header:GetScript("OnReceiveDrag")(header)
       assert.are.same({ { "start", "A" }, { "stop", "A" }, { "click", "A", "RightButton" }, { "drop", "A" } }, seen)
+    end)
+  end)
+
+  -- A Next theme (next-themes.md): everything the canvas draws comes from it, and a theme applied
+  -- while sections are out restyles them.
+  describe("a theme", function()
+    after_each(function()
+      UseNextTheme(nil)
+    end)
+
+    local function sections()
+      bind(data({ recent = { item("0_9", "Recent Items") }, categories = { { name = "A" } },
+        items = { item("0_1", "A"), item("0_2", "A") }, free = { buttons = {} } }))
+      draw()
+    end
+
+    it("lays rows out with its icons, gaps, headers and spacing, read as it draws", function()
+      sections()
+      UseNextTheme({ Layout = { Icon = 30, Gap = 2, SectionHeader = 18, SectionSpacing = 5 } })
+      canvas:ApplyStyle(context:New("spec"))
+      -- Hidden, it places at once (shown, Motion carries each button to its new place).
+      parent:Hide()
+      bind(data({ categories = { { name = "A" }, { name = "B" } },
+        items = { item("0_1", "A"), item("0_2", "A"), item("0_3", "B") } }))
+      draw(100)
+      local perRow = math.floor((100 + 2) / 32)
+      assert.are.equal(3, perRow)
+      assert.are.same({ canvas.order[1].cells, 32, 0 }, { at(buttons["0_2"].frame) })
+      assert.are.equal(30, buttons["0_1"].frame:GetWidth(), "its buttons at its icon size")
+      assert.are.equal(18 + 30, canvas.order[1].height)
+      assert.are.same({ canvas.frame, 0, -(18 + 30 + 5) }, { at(canvas.order[2].frame) })
+      assert.are.same({ "TOPLEFT", canvas.order[1].inner, "TOPLEFT", 0, -18 }, { canvas.order[1].cells:GetPoint(1) })
+      assert.are.equal(18, canvas.order[1].header:GetHeight())
+    end)
+
+    it("draws section titles and counts in its roles, by kind, moving them to new fonts", function()
+      sections()
+      local recent, category = canvas.byName["Recent Items"], canvas.byName.A
+      UseNextTheme({
+        Fonts = { Loud = { Size = 20, Color = "Gold" }, Small = { Size = 9, Color = "Muted" } },
+        Sections = { TitleFont = "Loud", RecentFont = "Small", CountFont = "Small" },
+      })
+      canvas:ApplyStyle(context:New("spec"))
+      assert.are.equal(style:Font("Loud"), category.title:GetFontObject())
+      assert.are.equal(style:Font("Small"), recent.title:GetFontObject())
+      assert.are.equal(style:Font("Small"), category.count:GetFontObject())
+      bind(data({ recent = { item("0_9", "Recent Items") }, categories = { { name = "A" } },
+        items = { item("0_1", "A") } }))
+      assert.are.equal(style:Font("Small"), canvas.byName["Recent Items"].title:GetFontObject())
+    end)
+
+    it("draws the line after a title and the header's highlight in its colors, or none", function()
+      sections()
+      UseNextTheme({ Palette = { Rose = { 1, 0.4, 0.6, 1 } },
+        Sections = { Line = { Color = "Rose", From = 0.8, To = 0.2, Size = 2 }, Highlight = false } })
+      canvas:ApplyStyle(context:New("spec"))
+      local section = canvas.byName.A
+      local g = section.line._gradient
+      assert.are.same({ 1, 0.4, 0.6, 0.8 }, { g.min.r, g.min.g, g.min.b, g.min.a })
+      assert.are.equal(0.2, g.max.a)
+      assert.are.equal(2, section.line:GetHeight())
+      assert.is_true(section.line:IsShown())
+      assert.is_false(section.highlight:IsShown())
+      UseNextTheme({ Sections = { Line = false } })
+      canvas:ApplyStyle(context:New("spec"))
+      assert.is_false(section.line:IsShown())
+      assert.is_true(section.highlight:IsShown())
+      assert.are.equal(0.12, section.highlight._gradient.min.a)
+    end)
+
+    it("places a section's title, count and line where it says", function()
+      sections()
+      UseNextTheme({ Sections = { Title = { X = 9, Y = -2 }, CountGap = 3, LineGap = 7 } })
+      canvas:ApplyStyle(context:New("spec"))
+      local s = canvas.byName.A
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 9, -2 }, { s.title:GetPoint(1) })
+      assert.are.same({ "LEFT", s.title, "RIGHT", 3, 0 }, { s.count:GetPoint(1) })
+      assert.are.same({ "LEFT", s.count, "RIGHT", 7, 0 }, { s.line:GetPoint(1) })
+    end)
+
+    it("restyles the sections it keeps for later too", function()
+      sections()
+      bind(data({ categories = {}, items = {} }))
+      draw()
+      local pooled = canvas.pool[1]
+      assert.is_not_nil(pooled)
+      UseNextTheme({ Sections = { Line = false } })
+      canvas:ApplyStyle(context:New("spec"))
+      assert.is_false(pooled.line:IsShown())
+    end)
+
+    it("cascades with its ease, time and rise", function()
+      UseNextTheme({ Motion = { Time = { Cascade = 1, Stagger = 0 }, Ease = { Cascade = "linear" }, Rise = 40 } })
+      sections()
+      canvas:Cascade(true)
+      local update = tween.driver:GetScript("OnUpdate")
+      update(tween.driver, 0.5)
+      local s = canvas.order[1]
+      assert.is_true(math.abs(s.frame:GetAlpha() - 0.5) < 1e-6, "linear")
+      assert.is_true(math.abs(s.rise - 20) < 1e-6)
     end)
   end)
 

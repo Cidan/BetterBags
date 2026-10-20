@@ -153,6 +153,36 @@ describe("render pipeline and Sonata load order", function()
     pipe:close()
   end)
 
+  -- BetterBags Next's theme engine and themes (next-themes.md): the resolver before both engines,
+  -- the Next engine after Sonata's, and every Next theme after it and before next\style.lua, which
+  -- reads Default when it loads.
+  it("lists the Next theme engine and every Next theme file in every TOC, before Next's style", function()
+    local themes = {}
+    local list = io.popen("ls sonata/themes/next/*.lua")
+    for file in list:lines() do
+      table.insert(themes, (file:gsub("/", "\\")))
+    end
+    list:close()
+    assert.is_true(#themes >= 1)
+    local pipe = io.popen("ls *.toc")
+    for path in pipe:lines() do
+      local lines = readToc(path)
+      local resolver = indexOf(lines, "sonata\\resolve.lua")
+      local engine = indexOf(lines, "sonata\\engine.lua")
+      local nextEngine = indexOf(lines, "sonata\\next.lua")
+      local style = indexOf(lines, "next\\style.lua")
+      assert.is_not_nil(resolver, path)
+      assert.is_not_nil(nextEngine, path)
+      assert.is_true(resolver < engine and engine < nextEngine, path)
+      for _, theme in ipairs(themes) do
+        local at = indexOf(lines, theme)
+        assert.is_not_nil(at, path .. " lists " .. theme)
+        assert.is_true(nextEngine < at and at < style, path .. " " .. theme)
+      end
+    end
+    pipe:close()
+  end)
+
   it("initializes the render module, then Sonata and the tab bars, before the frames", function()
     local f = assert(io.open("core/init.lua", "r"))
     local source = f:read("*a")
@@ -172,6 +202,13 @@ describe("render pipeline and Sonata load order", function()
     local tabsInit = source:find("GetModule%('Tabs'%):Init%(%)")
     assert.is_not_nil(tabsInit)
     assert.is_true(sonataInit < tabsInit)
+    -- BetterBags Next's theme engine starts after Sonata and before any bag is made (its panels read
+    -- the saved Next theme as they are built).
+    local nextInit = source:find("GetModule%('SonataNext'%):Init%(%)")
+    local firstBag = source:find("bagSystem:CreateBackpack%(")
+    assert.is_not_nil(nextInit)
+    assert.is_true(sonataInit < nextInit)
+    assert.is_true(nextInit < firstBag)
     -- The old theme module is gone: nothing initializes or enables it.
     assert.is_nil(source:find("themes:Init%(%)"))
     assert.is_nil(source:find("themes:Enable%(%)"))

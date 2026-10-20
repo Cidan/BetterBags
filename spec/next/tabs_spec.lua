@@ -313,6 +313,97 @@ describe("NextTabs", function()
     end)
   end)
 
+  -- A Next theme (next-themes.md): the rail draws everything from it, and a theme applied while its
+  -- tabs show restyles and lays them out again.
+  describe("a theme", function()
+    after_each(function()
+      UseNextTheme(nil)
+    end)
+
+    local function restyle(theme)
+      UseNextTheme(theme)
+      rail:ApplyStyle(nil)
+    end
+
+    it("sizes, steps and places its tabs with its layout, laying them out again", function()
+      rail:SetTabs(groups)
+      restyle({ Layout = { TabHeight = 20, TabSpacing = 2, TabPadding = 5, TabMinWidth = 10, ContentTop = 90 } })
+      assert.are.same({ "TOPRIGHT", body, "TOPLEFT", 0, -90 }, { rail.frame:GetPoint(1) })
+      for i, tab in ipairs(rail.tabs) do
+        assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(i - 1) * 22 }, { tab.button:GetPoint(1) })
+        assert.are.equal(20, tab.button:GetHeight())
+      end
+      assert.are.equal(#"Consumables" * 6 + 10, rail.tabs[2].button:GetWidth())
+      assert.are.same({ "RIGHT", rail.tabs[2].button, "RIGHT", -5, 0 }, { rail.tabs[2].text:GetPoint(1) })
+    end)
+
+    it("fills its tabs with its colors, fading by its share, the selected one in its own", function()
+      rail:SetTabs(groups)
+      rail:Select(1)
+      restyle({ Palette = { A = { 0.1, 0.2, 0.3, 0.8 }, B = { 0.5, 0.6, 0.7, 1 } },
+        Tabs = { Fill = "A", SelectedFill = "B", Fade = 0.5 } })
+      local g = rail.tabs[2].bg._gradient
+      assert.are.same({ 0.1, 0.2, 0.3, 0.4 }, { g.min.r, g.min.g, g.min.b, g.min.a }, "faded on the far side")
+      assert.are.same({ 0.1, 0.2, 0.3, 0.8 }, { g.max.r, g.max.g, g.max.b, g.max.a })
+      assert.are.equal(1, rail.tabs[1].bg._gradient.max.a)
+    end)
+
+    it("writes its tabs in its roles, moving them to its new fonts", function()
+      rail:SetTabs(groups)
+      rail:Select(2)
+      local before = rail.tabs[1].text:GetFontObject()
+      restyle({ Fonts = { Tab = { Size = 9 }, Shout = { Size = 16 } }, Tabs = { SelectedFont = "Shout" } })
+      assert.are_not.equal(before, rail.tabs[1].text:GetFontObject())
+      assert.are.equal(style:Font("Tab"), rail.tabs[1].text:GetFontObject())
+      assert.are.equal(style:Font("Shout"), rail.tabs[2].text:GetFontObject())
+    end)
+
+    it("draws the bar in its color and width, an accent by its name, or no bar", function()
+      rail:SetTabs({ { id = 1, name = "Bank" }, { id = 2, name = "Warbank", accent = "Warbank" } })
+      rail:Select(1)
+      restyle({ Palette = { Sky = { 0.3, 0.6, 1, 1 }, Sea = { 0, 0.4, 0.5, 1 } },
+        Tabs = { Indicator = { Color = "Sky", Width = 5 }, Accents = { Warbank = "Sea" } } })
+      assert.are.same({ 0.3, 0.6, 1, 1 }, { rail.indicator:GetVertexColor() })
+      assert.are.equal(5, rail.indicator:GetWidth())
+      assert.are.equal(style.TAB_HEIGHT, rail.indicator:GetHeight())
+      rail:Select(2)
+      assert.are.same({ 0, 0.4, 0.5, 1 }, { rail.indicator:GetVertexColor() })
+      restyle({ Tabs = { Indicator = false } })
+      assert.is_false(rail.indicator:IsShown())
+      rail:Select(1)
+      assert.is_false(rail.indicator:IsShown())
+    end)
+
+    it("lights a drop target and a pulse in its glow, or none", function()
+      rail:SetTabs(groups)
+      restyle({ Palette = { Mint = { 0.4, 1, 0.7, 1 } }, Tabs = { Glow = { Color = "Mint", Drop = 0.5, Pulse = 0.9 } } })
+      rail:SetDropTarget(2)
+      local glow = rail.tabs[2].glow
+      local r, g, b = glow:GetVertexColor()
+      assert.are.same({ 0.4, 1, 0.7 }, { r, g, b })
+      assert.are.equal(0.5, glow:GetAlpha())
+      -- A texture's alpha is its vertex color's: restyled, it keeps what it shows.
+      rail:ApplyStyle(nil)
+      assert.are.equal(0.5, glow:GetAlpha())
+      rail:SetDropTarget(nil)
+      restyle({ Tabs = { Glow = false } })
+      rail:SetDropTarget(2)
+      assert.is_false(glow:IsShown())
+      rail:Pulse(2)
+      assert.is_false(glow:IsShown())
+    end)
+
+    it("slides a hovered tab out by its hover, in its time and ease", function()
+      restyle({ Layout = { TabHover = 12 }, Motion = { Time = { Hover = 1 }, Ease = { Hover = "linear" } } })
+      rail:SetTabs(groups)
+      local button = rail.tabs[1].button
+      button:GetScript("OnEnter")(button)
+      tween.driver:GetScript("OnUpdate")(tween.driver, 0.25)
+      local _, _, _, x = button:GetPoint(1)
+      assert.is_true(math.abs(x + 3) < 1e-6, "a quarter of the way, linearly: " .. x)
+    end)
+  end)
+
   it("reuses its tabs when the groups change, hiding the ones it no longer needs", function()
     rail:SetTabs(groups)
     local first = rail.tabs[1].button

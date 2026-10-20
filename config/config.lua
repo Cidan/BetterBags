@@ -218,6 +218,16 @@ function config:CreateConfig()
     bagKind = nil,
   })
 
+  -- BetterBags Next's own themes (next-themes.md), picked the same way.
+  f:AddPaneLink({
+    title = 'Next Theme',
+    description = 'Change the look of BetterBags Next.',
+    createPane = function(parent, _)
+      return themePane:Create(parent, addon:GetModule('SonataNext'))
+    end,
+    bagKind = nil,
+  })
+
   f:AddPaneLink({
     title = 'Currency',
     description = 'Configure which currencies are shown in your backpack.',

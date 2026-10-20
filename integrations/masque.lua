@@ -114,6 +114,22 @@ function masque:OnEnable()
     skinVendor(b)
   end)
 
+  -- A BetterBags Next theme can resize them (its icons and price row, next-themes.md §6), and Masque
+  -- sizes a skin to the button when it skins it (Masque 12.1.0 Core.lua UpdateScale), so each Next
+  -- theme applied skins them again. (Bag item buttons re-skin on item/Updated: a resized one draws in
+  -- full, itemProto:SetSize.)
+  events:RegisterMessage('sonata/NextThemeChanged', function()
+    if not sonata:UsesMasque() then return end
+    local group = self.groups["Vendor"]
+    for b in pairs(self.vendorButtons) do
+      if self.added[b.button] == group then
+        group:ReSkin(b.button)
+      else
+        skinVendor(b)
+      end
+    end
+  end)
+
   -- BetterBags Next's guild bank buttons (next/guildbutton.lua) are Blizzard's own item buttons, made
   -- once and reused, each announced once; Masque finds an item button's parts itself, as for the
   -- item decorations. Every draw rewrites their quality border as an item draw does (Blizzard's

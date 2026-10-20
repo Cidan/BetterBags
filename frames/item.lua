@@ -86,6 +86,8 @@ end
 ---@field UpdateTooltip function
 ---@field IconQuestTexture Texture
 ---@field drawState table|nil The inputs of the last full draw (see DrawInputChanged).
+---@field width? number The size SetSize gave it (never read back from the client).
+---@field height? number
 ---@field cooldownState table|nil The cooldown last applied (see UpdateCooldown).
 itemFrame.itemProto = {}
 -- Bumped by RestyleButtons; part of every button's draw record.
@@ -784,11 +786,19 @@ function itemFrame.itemProto:ResetSize(ctx)
 	end
 end
 
+-- SetSize sizes the button. A new size makes its next draw a full one: Masque sizes a skin to the
+-- button when it skins it (Masque 12.1.0 Core.lua UpdateScale) and re-skins it on item/Updated, which
+-- only a full draw sends, so a button resized with nothing else changed kept a skin for its old size
+-- (BetterBags Next's Quiet theme, next-themes.md §6).
 ---@param ctx Context
 ---@param width number
 ---@param height number
 function itemFrame.itemProto:SetSize(ctx, width, height)
 	local decoration = self:GetDecoration(ctx)
+	if (self.width ~= width or self.height ~= height) and self.drawState then
+		self.drawState.valid = false
+	end
+	self.width, self.height = width, height
 	self.frame:SetSize(width, height)
 	self.button:SetSize(width, height)
 	decoration:SetSize(width, height)

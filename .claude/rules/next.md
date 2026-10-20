@@ -7,6 +7,10 @@ the window. Asked for: "magical, with whimsy and animations; nice to use, but fu
 "bank next, but, on the opposite side! remember we have warbank, etc." It replaces only how the bags
 are drawn: the data pipeline, the item buttons and every setting that feeds the data are the same.
 
+Its look is a Next theme (next-themes.md): `NextStyle` (`next/style.lua`) reads every size, color,
+font, texture and animation from the current one, and the Default theme is the design described
+here. The values this file quotes are Default's.
+
 Off by default. **BetterBags Next (experimental)** in the general settings (right below Animate
 Item Movement), `/bb next`, **Switch to Next** in the classic backpack's menu, and the backpack
 button in Next's own header switch between the two designs at once, without a reload (§11).
@@ -564,7 +568,8 @@ strings no template has; they now use the templates' font (`GameFontHighlightSma
 
 - No Show Bags panel for the backpack (the bank's Bank Tabs mode is there), currencies, bag anchor
   or bag menu; the size and opacity settings do not apply (the panels have one size).
-- Item buttons keep the active theme's style.
+- Item buttons keep the classic bags' theme's style, unless the Next theme gives its own (`ItemButton`,
+  next-themes.md §6).
 - Dropping on a Blizzard bank tab moves items into that tab's bank type; the game decides which tab
   they land in.
 - Moving a section between the Character Bank and the Warbank (within the bank) is not offered.
@@ -1165,9 +1170,10 @@ small panels by dragging them together (§14e).
 - Each panel keeps its own `size`, read from the setting when it is made, so a panel can be part way
   through a switch (§14d). `IsSmall`, `Height`, `Width`, `BodyLeft`, `RibbonBase` and
   `SparkSpreadBase` answer for it.
-- The knobs are in one place, `style.Small` (`next/style.lua`): the height share (0.66), the beam
-  (120) and how far out along it its sparkles are born (48), the open slide (24), the edge's alpha
-  (0.35), the default margin (40). `style.Time.Morph` (0.4 s) is the switch.
+- The knobs are the Next theme's `Small` (next-themes.md), read through `style.Small`: the height share
+  (0.66), the beam (120) and how far out along it its sparkles are born (48), the open slide (24), the
+  default margin (40); the edge's alpha is `Panel.Edge.Alpha` (0.35). `Motion.Time.Morph` (0.4 s) is
+  the switch.
 
 ### 14b. The geometry (`ApplyGeometry`)
 

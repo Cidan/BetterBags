@@ -207,6 +207,7 @@ describe("NextVendor", function()
   end)
 
   teardown(function()
+    UseNextTheme(nil)
     for i = #modules, 1, -1 do ResetModuleStub(modules[i][1]) end
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
   end)
@@ -231,7 +232,7 @@ describe("NextVendor", function()
       assert.are.equal("BetterBagsNextVendor", v:GetName())
       assert.are.equal("LEFT", v.side)
       assert.is_false(v:IsShown())
-      assert.are.equal(style.ICON + style.VENDOR_PRICE, v.content.cellHeight)
+      assert.are.equal(style.ICON + style.VENDOR_PRICE, v.content:CellHeight())
       assert.are.equal("HIGH", v.frame:GetFrameStrata())
     end)
 
@@ -324,6 +325,17 @@ describe("NextVendor", function()
       _G._merchant.canRepair = false
       eventsRegistered["MERCHANT_SHOW"](ctx())
       assert.are.equal(room(4), v.title:GetWidth())
+    end)
+
+    -- A Next theme's header sizes (next-themes.md): the name fits the room they leave.
+    it("fits the vendor's name to a theme's button size, gap and inset", function()
+      _G._merchant.canRepair, _G._merchant.canGuildRepair = true, true
+      local v = open()
+      UseNextTheme({ Layout = { HeaderButton = 30, HeaderButtonGap = 2, TitleInset = 10 } })
+      v:ApplyStyle(ctx())
+      assert.are.equal(style.BODY_WIDTH - (style.PAD + 10) - (style.PAD + 6 * 30 + 5 * 2) - 12, v.title:GetWidth())
+      UseNextTheme(nil)
+      v:ApplyStyle(ctx())
     end)
 
     it("hides the filter where a game rule turns it off", function()

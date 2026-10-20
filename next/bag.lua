@@ -73,7 +73,7 @@ end
 ---@return NextHeaderButton[]
 function bagProto:GetHeaderButtons()
   return {
-    { key = "settingsButton", atlas = "uitools-icon-settings", tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", atlas = "uitools-icon-settings", glyph = true, tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
     { key = "sortButton", atlas = "bags-button-autosort-up", tooltip = L:G("Sort Bags"),
       onClick = function(ctx) self:Sort(ctx) end },
@@ -95,13 +95,15 @@ end
 -- retail and WoW: Forever; Classic's smaller and bigger buttons, SharedUIPanelTemplates.xml).
 function bagProto:UpdateSizeButton()
   local small = self:IsSmall()
-  local icon = self.sizeButton.icon
+  local art
   if addon.isRetail then
-    icon:SetAtlas(small and "RedButton-Expand" or "RedButton-Condense")
+    art = { atlas = small and "RedButton-Expand" or "RedButton-Condense" }
   else
-    icon:SetTexture(small and "Interface\\Buttons\\UI-Panel-BiggerButton-Up"
-      or "Interface\\Buttons\\UI-Panel-SmallerButton-Up")
+    art = { texture = small and "Interface\\Buttons\\UI-Panel-BiggerButton-Up"
+      or "Interface\\Buttons\\UI-Panel-SmallerButton-Up" }
   end
+  -- A theme can draw its own for either state (Header.Buttons.Icons: sizeButtonSmall, sizeButtonFull).
+  self:SetHeaderIcon(self.sizeButton, small and "sizeButtonSmall" or "sizeButtonFull", art)
 end
 
 -- SizeTooltip says what the size button does.

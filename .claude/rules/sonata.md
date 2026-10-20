@@ -29,7 +29,10 @@ register as they load, before `Init`, which never clears `sonata.themes`.
 | `Elements` | element styles by element kind (item buttons, tabs, ...) |
 | `Clients` | partial themes applied on a client (below) |
 
-`Sonata:Resolve(key)` returns a **new, complete** table:
+`Sonata:Resolve(key)` returns a **new, complete** table. The resolution itself is `SonataResolve`
+(`sonata/resolve.lua`), shared with BetterBags Next's own theme engine (SonataNext, next-themes.md),
+which resolves Next's themes the same way with `Default` as their base; `Sonata:RegisterNextTheme`
+registers one there (the "other registration path"):
 
 1. The chain is the theme, its parent, ... up to `Base`. A missing parent or a cycle is an error.
 2. From `Base` down, each level merges into the result, then each of the level's `Clients`
@@ -97,6 +100,9 @@ Resolution never changes the registered tables.
   Default), cached until the next apply. `GetWindowStyle(kind)` / `GetElementStyle(kind)` read
   it; a kind the theme does not style gets one shared, read-only empty table. **Styles are
   shared and read-only.** `UsesMasque()` is `theme.Masque ~= false`.
+- `SetElementStyleOverride(kind, style)` styles every element of a kind with `style` in place of the
+  theme's (restyling them at once once a theme was applied; nil gives the theme's back), through
+  every apply. BetterBags Next uses it for item buttons while Next is in use (next-themes.md §6).
 - The generation changes on every apply: anything that records what it drew with a theme (item
   button draw records, caches.md §4) compares it.
 
@@ -553,7 +559,8 @@ ending on the same font object as the entries never hovered),
 
 ## 4. Load order
 
-`sonata\engine.lua`, `sonata\apply.lua`, `sonata\decoration.lua`, `sonata\elements.lua` follow
+`sonata\resolve.lua`, `sonata\engine.lua`, `sonata\next.lua` (BetterBags Next's engine,
+next-themes.md), `sonata\apply.lua`, `sonata\decoration.lua`, `sonata\elements.lua` follow
 the render modules in every TOC, and `window\window.lua` follows them; `core/init.lua` calls `addon:GetModule('Sonata'):Init()` after Render's
 (initialization.md). Modules start disabled; Sonata is enabled once windows exist.
 

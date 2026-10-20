@@ -732,6 +732,8 @@ const.DATABASE_DEFAULTS = {
     -- Which small panel anchors a chained pair: "apart", "backpack" or "companion" (the one the
     -- other was dropped beside).
     nextSmallChain = "apart",
+    -- BetterBags Next's theme (SonataNext, .claude/rules/next-themes.md).
+    nextTheme = "Default",
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,

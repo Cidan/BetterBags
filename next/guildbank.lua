@@ -92,7 +92,7 @@ function nextGuildBank:Create(ctx)
   g.closeRequested = false
   g.wipeWhenHidden = false
   g.content:SetButtonSource(guildButton)
-  g:paintWash(style.Color.GuildWash)
+  g:SetWash("Guild", true)
   self.panel = g
   return g
 end
@@ -174,9 +174,9 @@ end
 ---@return NextHeaderButton[]
 function guildProto:GetHeaderButtons()
   return {
-    { key = "closeButton", atlas = "uitools-icon-close", tooltip = L:G("Close"),
+    { key = "closeButton", atlas = "uitools-icon-close", glyph = true, tooltip = L:G("Close"),
       onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", atlas = "uitools-icon-settings", tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", atlas = "uitools-icon-settings", glyph = true, tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
     { key = "depositButton", texture = "Interface\\Icons\\INV_Misc_Coin_01", tooltip = L:G("Deposit Gold"),
       onClick = function() guildBank:DepositMoney() end },
@@ -207,8 +207,7 @@ end
 function guildProto:CreateMoney()
   local frame = CreateFrame("Frame")
   frame:SetSize(200, 16)
-  local text = frame:CreateFontString(nil, "OVERLAY")
-  text:SetFontObject(style:Font("Footer"))
+  local text = style:CreateText(frame, style.Theme.Footer.MoneyFont)
   text:SetPoint("LEFT", frame, "LEFT", 0, 0)
   return {
     frame = frame,
@@ -285,7 +284,7 @@ function guildProto:RefreshTabs()
         id = info.container,
         name = info.name,
         icon = info.icon,
-        accent = style.Color.Guild,
+        accent = "Guild",
         gap = first and style.TAB_GROUP_GAP or nil,
         tooltip = function()
           self:ShowTabTooltip(info)
@@ -434,7 +433,7 @@ function guildProto:OnShowing(ctx)
     self.shownTab = container
   end
   self:useView()
-  self:SetWash("GuildWash")
+  self:SetWash("Guild")
   self:RefreshTabs()
   self:updateTitle()
   self:UpdateHeader()

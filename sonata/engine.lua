@@ -19,6 +19,9 @@ end
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class SonataResolve: AceModule
+local resolve = addon:GetModule('SonataResolve')
+
 -- Sonata is BetterBags' theme engine (from Moonlight's Sonata). A theme is data: a table of
 -- window styles and element styles, with no code. A theme inherits every value it does not
 -- set from its Parent (Base when it names none), each level's per-client overrides apply
@@ -32,6 +35,7 @@ local context = addon:GetModule('Context')
 ---@field private decorations table<table, any> What the decorator returned for each window.
 ---@field private elements table<string, table<table, boolean>>
 ---@field private elementStylers table<string, fun(element: table, style: table, theme: SonataTheme)>
+---@field private overrides table<string, table> Element styles that replace the theme's (SetElementStyleOverride).
 ---@field private windowDecorator? fun(window: table, style: table, theme: SonataTheme)
 ---@field private current? string
 ---@field private resolved? SonataTheme
@@ -45,6 +49,7 @@ local sonata = addon:NewModule('Sonata')
 
 -- Themes register as their files load, before Init runs.
 sonata.themes = {}
+sonata.overrides = {}
 
 ---@class SonataTheme
 ---@field Name string The key the theme is saved and registered under.
@@ -60,31 +65,8 @@ sonata.themes = {}
 ---@field Text? table<string, SonataFont> Text roles: the fonts of BetterBags' own text in windows and on the bag.
 ---@field Clients? table<string, SonataTheme> Partial themes applied on a client (Retail, Forever, Classic, Era, TBC, Mists, Anniversary, Cata).
 
--- The client override keys a theme may use (GetClientKeys).
-local CLIENT_KEYS = {
-  Retail = true,
-  Forever = true,
-  Classic = true,
-  Era = true,
-  TBC = true,
-  Mists = true,
-  Anniversary = true,
-  Cata = true,
-}
-
 -- The style handed out for a window or element kind a theme does not style.
 local EMPTY = setmetatable({}, { __newindex = function() error("Sonata styles are read-only") end })
-
--- Keys of a theme that describe it rather than style anything.
-local META_KEYS = {
-  Name = true,
-  DisplayName = true,
-  Description = true,
-  Parent = true,
-  Hidden = true,
-  Available = true,
-  Clients = true,
-}
 
 function sonata:Init()
   self.windows = {}
@@ -92,6 +74,7 @@ function sonata:Init()
   self.decorations = setmetatable({}, { __mode = "k" })
   self.elements = {}
   self.elementStylers = self.elementStylers or {}
+  self.overrides = {}
   self.textFonts = {}
   self.texts = setmetatable({}, { __mode = "k" })
   self.buttonTexts = setmetatable({}, { __mode = "k" })
@@ -109,120 +92,6 @@ function sonata:Init()
   self.generation = 0
 end
 
--- isObject reports a table that is an object rather than data (it has a metatable, or is a
--- frame): such values are kept by reference, never copied or merged into.
----@param value any
----@return boolean
-local function isObject(value)
-  return type(value) == "table" and (getmetatable(value) ~= nil or type(rawget(value, 0)) == "userdata")
-end
-
----@param value any
----@return any
-local function deepCopy(value)
-  if type(value) ~= "table" or isObject(value) then
-    return value
-  end
-  local copy = {}
-  for k, v in pairs(value) do
-    copy[k] = deepCopy(v)
-  end
-  return copy
-end
-
----@param value any
----@return boolean
-local function isList(value)
-  return type(value) == "table" and value[1] ~= nil
-end
-
--- merge folds from into into. Tables merge key by key, lists replace, and false replacing
--- a table removes it (a theme turns off something it inherited).
----@param into table
----@param from table
-local function merge(into, from)
-  for k, v in pairs(from) do
-    local existing = into[k]
-    if v == false and type(existing) == "table" then
-      into[k] = nil
-    elseif type(v) == "table" and not isList(v) and not isObject(v)
-      and type(existing) == "table" and not isList(existing) and not isObject(existing) then
-      merge(existing, v)
-    else
-      into[k] = deepCopy(v)
-    end
-  end
-end
-
----@param theme SonataTheme
----@return table
-local function styleOf(theme)
-  local style = {}
-  for k, v in pairs(theme) do
-    if not META_KEYS[k] then
-      style[k] = v
-    end
-  end
-  return style
-end
-
--- substitute replaces every "$Name" string in value (a whole string, spaces around the name
--- allowed) with a copy of lookup(name).
----@param value any
----@param lookup fun(name: string): any
----@return any
-local function substitute(value, lookup)
-  if type(value) == "string" then
-    local name = value:match("^%s*%$([%a_][%w_]*)%s*$")
-    if name then
-      return deepCopy(lookup(name))
-    end
-    return value
-  end
-  if type(value) == "table" and not isObject(value) then
-    for k, v in pairs(value) do
-      value[k] = substitute(v, lookup)
-    end
-  end
-  return value
-end
-
--- resolveVariables evaluates a theme's variables: functions are called, and variables that
--- refer to other variables are filled in.
----@param raw table<string, any>
----@return table<string, any> vars, fun(name: string): any lookup
-local function resolveVariables(raw)
-  local vars, state = {}, {}
-  local lookup
-  lookup = function(name)
-    if state[name] == "done" then
-      return vars[name]
-    end
-    if state[name] == "busy" then
-      error("theme variables refer to each other in a cycle: $" .. name)
-    end
-    local value = raw[name]
-    if value == nil then
-      error("theme variable $" .. name .. " is not defined")
-    end
-    state[name] = "busy"
-    if type(value) == "function" then
-      value = value()
-      if value == nil then
-        error("theme variable $" .. name .. " returned nothing")
-      end
-    end
-    value = substitute(deepCopy(value), lookup)
-    vars[name] = value
-    state[name] = "done"
-    return value
-  end
-  for name in pairs(raw) do
-    lookup(name)
-  end
-  return vars, lookup
-end
-
 ---@param theme SonataTheme
 function sonata:RegisterTheme(theme)
   if type(theme) ~= "table" or type(theme.Name) ~= "string" or theme.Name == "" then
@@ -231,17 +100,20 @@ function sonata:RegisterTheme(theme)
   if self.themes[theme.Name] ~= nil then
     error("a theme named " .. theme.Name .. " has already been registered")
   end
-  for clientKey in pairs(theme.Clients or {}) do
-    if not CLIENT_KEYS[clientKey] then
-      error("theme " .. theme.Name .. " has overrides for an unknown client: " .. tostring(clientKey))
-    end
-  end
+  resolve:CheckClients(theme)
   self.themes[theme.Name] = theme
   -- A theme from another addon registers when that addon loads, after Sonata applied Default
   -- in place of the saved theme; the saved theme is applied as soon as it can be.
   if self.applied and self.current ~= theme.Name and db():GetTheme() == theme.Name and self:IsSelectable(theme.Name) then
     self:ApplyTheme(context:New('Sonata_LateTheme'), theme.Name, false)
   end
+end
+
+-- RegisterNextTheme registers a theme for BetterBags Next's panels, the other registration path
+-- (SonataNext, sonata/next.lua): data only, inheriting from Next's Default.
+---@param theme NextTheme
+function sonata:RegisterNextTheme(theme)
+  addon:GetModule('SonataNext'):RegisterTheme(theme)
 end
 
 ---@param key string
@@ -298,85 +170,20 @@ end
 -- GetClientKeys returns the client override keys for this client, general first.
 ---@return string[]
 function sonata:GetClientKeys()
-  if addon.isRetail then
-    if addon.isForever then
-      return { "Retail", "Forever" }
-    end
-    return { "Retail" }
-  end
-  local keys = { "Classic" }
-  if addon.isAnniversary then
-    table.insert(keys, "TBC")
-    table.insert(keys, "Anniversary")
-  elseif addon.isClassic then
-    table.insert(keys, "Era")
-  elseif addon.isBCC then
-    table.insert(keys, "TBC")
-  elseif addon.isMists then
-    table.insert(keys, "Mists")
-  elseif addon.isCata then
-    table.insert(keys, "Cata")
-  end
-  return keys
+  return resolve:ClientKeys()
 end
 
 ---@param key string
 ---@return SonataTheme[] chain The theme first, Base last.
 function sonata:chainOf(key)
-  local chain = {}
-  local seen = {}
-  local name = key
-  while name ~= nil do
-    local theme = self.themes[name]
-    if theme == nil then
-      error("theme " .. tostring(name) .. " is not registered")
-    end
-    if seen[name] then
-      error("theme " .. key .. " inherits from itself")
-    end
-    seen[name] = true
-    table.insert(chain, theme)
-    if theme.Parent ~= nil then
-      name = theme.Parent
-    elseif name ~= "Base" and self.themes.Base ~= nil then
-      name = "Base"
-    else
-      name = nil
-    end
-  end
-  return chain
+  return resolve:Chain(self.themes, key, "Base")
 end
 
 -- Resolve returns the complete style of a theme: a new table, safe to keep.
 ---@param key string
 ---@return SonataTheme
 function sonata:Resolve(key)
-  local chain = self:chainOf(key)
-  local clientKeys = self:GetClientKeys()
-  local resolved = {}
-  for i = #chain, 1, -1 do
-    local level = chain[i]
-    merge(resolved, styleOf(level))
-    if level.Clients ~= nil then
-      for _, clientKey in ipairs(clientKeys) do
-        local override = level.Clients[clientKey]
-        if override ~= nil then
-          merge(resolved, styleOf(override))
-        end
-      end
-    end
-  end
-
-  local vars, lookup = resolveVariables(resolved.Variables or {})
-  resolved.Variables = nil
-  substitute(resolved, lookup)
-  resolved.Variables = deepCopy(vars)
-
-  local leaf = chain[1]
-  resolved.Name = leaf.Name
-  resolved.DisplayName = leaf.DisplayName or leaf.Name
-  resolved.Description = leaf.Description or ""
-  resolved.Hidden = leaf.Hidden
+  local resolved = resolve:Resolve(self.themes, key, "Base")
   resolved.Windows = resolved.Windows or {}
   resolved.Elements = resolved.Elements or {}
   resolved.Text = resolved.Text or {}
@@ -446,7 +253,7 @@ function sonata:style(kind, element)
     return
   end
   local theme = self:GetCurrentTheme()
-  local ok, err = pcall(styler, element, theme.Elements[kind] or EMPTY, theme)
+  local ok, err = pcall(styler, element, self.overrides[kind] or theme.Elements[kind] or EMPTY, theme)
   if not ok then
     geterrorhandler()(err)
   end
@@ -672,7 +479,19 @@ end
 ---@param kind string
 ---@return table
 function sonata:GetElementStyle(kind)
-  return self:GetCurrentTheme().Elements[kind] or EMPTY
+  return self.overrides[kind] or self:GetCurrentTheme().Elements[kind] or EMPTY
+end
+
+-- SetElementStyleOverride styles every element of a kind with style in place of the theme's, until
+-- it is set to nil (BetterBags Next's theme styles the item buttons while Next is in use,
+-- next-themes.md). Elements of the kind are restyled at once when a theme was applied.
+---@param kind string
+---@param style? table
+function sonata:SetElementStyleOverride(kind, style)
+  self.overrides[kind] = style
+  if self.applied then
+    self:restyleKind(kind)
+  end
 end
 
 -- GetGeneration changes every time a theme is applied: anything that records what it drew

@@ -70,7 +70,9 @@ render\flow.lua
 render\motion.lua
 
 # Sonata, the theme engine. Theme data files register after the engine.
+sonata\resolve.lua
 sonata\engine.lua
+sonata\next.lua
 sonata\apply.lua
 sonata\decoration.lua
 sonata\elements.lua
@@ -85,6 +87,10 @@ sonata\themes\simpledark.lua
 sonata\themes\moonlight.lua
 sonata\themes\elvui.lua
 sonata\themes\gw2.lua
+sonata\themes\next\default.lua
+sonata\themes\next\ember.lua
+sonata\themes\next\parchment.lua
+sonata\themes\next\quiet.lua
 
 # The Theme API loads earlier than actual themes.
 

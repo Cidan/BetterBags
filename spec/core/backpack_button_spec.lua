@@ -19,6 +19,7 @@
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 describe("Bag-bar backpack button click", function()
+  local savedNextInit
   local savedDatabase
   local oldOnInitialize, oldOnEnable, oldToggleAllBags
   local oldBags, originalUISpecialFrames, oldBindingFrame
@@ -64,6 +65,10 @@ describe("Bag-bar backpack button click", function()
       stub.Init = stub.Init or function() end
       stub.Enable = stub.Enable or function() end
     end
+    -- SonataNext is real in every spec (spec/setup.lua) and its Init reads the saved Next theme.
+    local sonataNext = addon:GetModule("SonataNext")
+    savedNextInit = sonataNext.Init
+    sonataNext.Init = spy.new(function() end)
     local perfSessions = addon:GetModule("PerfSessions")
     perfSessions.StartIfArmed = perfSessions.StartIfArmed or function() return false end
 
@@ -149,6 +154,7 @@ describe("Bag-bar backpack button click", function()
   end)
 
   after_each(function()
+    addon:GetModule("SonataNext").Init = savedNextInit
     local db = addon:GetModule("Database")
     db.Init, db.GetNextEnabled = savedDatabase.Init, savedDatabase.GetNextEnabled
     addon.OnInitialize = oldOnInitialize

@@ -29,7 +29,7 @@ local bucket = stubModule("Bucket")
 local form = stubModule("Form")
 local sonata = stubModule("Sonata")
 stubModule("CategoryPane")
-stubModule("ThemePane")
+local themePane = stubModule("ThemePane")
 stubModule("CurrencyPane")
 stubModule("ItemColorPane")
 
@@ -515,6 +515,25 @@ describe("Config settings refreshes", function()
         assert.are.equal(90, savedValues[1][3])
       end
     end)
+  end)
+
+  -- BetterBags Next's themes are picked on their own page, right after the bags' Theme page, with
+  -- the same pane over SonataNext (next-themes.md).
+  it("offers BetterBags Next's themes on their own page, after the bags' themes", function()
+    local theme, nextTheme
+    for i, entry in ipairs(entries) do
+      if entry.kind == "AddPaneLink" and entry.opts.title == "Theme" then theme = i end
+      if entry.kind == "AddPaneLink" and entry.opts.title == "Next Theme" then nextTheme = i end
+    end
+    assert.is_not_nil(nextTheme)
+    assert.are.equal(theme + 1, nextTheme)
+    local engines = {}
+    local original = themePane.Create
+    themePane.Create = function(_, _, engine) table.insert(engines, engine or "none") return CreateFrame("Frame") end
+    entries[theme].opts.createPane(CreateFrame("Frame"))
+    entries[nextTheme].opts.createPane(CreateFrame("Frame"))
+    themePane.Create = original
+    assert.are.same({ "none", addon:GetModule("SonataNext") }, engines)
   end)
 
   -- The item hash, which decides what stacks, includes the transmog appearance only with

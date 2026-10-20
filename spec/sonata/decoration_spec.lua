@@ -639,6 +639,16 @@ describe("SonataDecoration", function()
       assert.are.equal(1, deco:GetTexture("Edge"):GetAlpha())
     end)
 
+    -- A texture's alpha is its vertex color's (FloatingChatFrame.lua): a tint's alpha is part of what
+    -- the opacity fades, never replaced by it.
+    it("fades a tinted texture from its tint's alpha", function()
+      local window = newWindow({ opacity = 50 })
+      local deco = decorate(window, { Textures = {
+        { Name = "Tinted", Texture = "art", VertexColor = { 1, 1, 1, 0.5 }, Opacity = true, Alpha = 0.8 },
+      } })
+      assert.are.equal(0.2, deco:GetTexture("Tinted"):GetAlpha())
+    end)
+
     it("does not fade the textures of a theme it switched away from", function()
       local window = newWindow({ opacity = 50 })
       local deco = decorate(window, { Background = { Color = { 0, 0, 0, 1 } } })
