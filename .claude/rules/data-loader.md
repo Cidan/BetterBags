@@ -153,7 +153,7 @@ Upgrade arrows (`data.isUpgrade`, resolved in `Phase6_EnrichData` via `items:Res
   The smart providers are the external integrations `"Pawn"` (`integrations/pawn.lua`) and `"SimpleItemLevel"` (`integrations/simpleitemlevel.lua`), which register themselves via `items:RegisterUpgradeProvider` in their `OnEnable`.
 - **Precedence rule (`items:GetActiveUpgradeProvider`, the single resolver used by both `ResolveUpgrade` and the config dropdown's `getValue`):** if the user has **explicitly** chosen a provider (`database:GetUpgradeIconProviderUserSet()` is true — the flag is set only by `DB:SetUpgradeIconProvider`, i.e. the config dropdown `setValue`), honor `database:GetUpgradeIconProvider()` exactly. Otherwise (legacy default, setting never touched) an available external provider **takes precedence** over the stored `"None"`/`"BetterBags"` value, `"Pawn"` winning over `"SimpleItemLevel"`. `upgradeIconProviderUserSet` defaults to `false` (`const.DATABASE_DEFAULTS`) so existing users automatically get Pawn/SimpleItemLevel arrows again.
 - **Failure mode (regression from #1036):** pre-#1036 the Pawn integration registered an always-on `bag/Rendered` handler that **overrode** every arrow with Pawn's verdict, so Pawn users got correct arrows regardless of the (never-Pawn) dropdown value. #1036 turned Pawn into an opt-in provider consulted only when `upgradeIconProvider == "Pawn"`, with no migration — so existing users silently fell back to the naive `"BetterBags"` provider (arrows on wrong armor types / wrong stats), and `"Pawn"` was a value they had never selected. `GetActiveUpgradeProvider`'s precedence restores the automatic behavior without overriding a real explicit choice.
-- **Verdict cache (built-in provider only):** the built-in provider's verdicts are kept on each item and reused until an input changes; the inputs and their invalidations are in caches.md §2. Pawn and SimpleItemLevel are asked on every sweep; why Pawn is not cached is in caches.md §2.
+- **Verdict cache (built-in provider and Pawn):** both register `{ cacheable = true }`; their verdicts are kept on each item and reused until an input changes, Pawn's until Pawn says bag arrows may have changed (`PawnResetBags`). A provider's `nil` answer (Pawn: "we're not sure yet") draws no arrow and is not kept. The inputs and their invalidations are in caches.md §2. SimpleItemLevel is asked on every sweep.
 - **Robust registration (load-order resilience):** `pawn:OnEnable`/`simpleItemLevel:OnEnable` delegate to a `:Register()` helper that early-returns `false` when the external addon's globals are absent. When that happens `OnEnable` registers an `ADDON_LOADED` retry (via the `Events` module) so the provider still appears once the external addon finishes loading — otherwise a load-order race left the provider (and its dropdown entry) permanently missing. `:Register()` is idempotent (guarded by `self._registered`) and prints the "integration enabled" line exactly once.
 - **Config dropdown:** the items list is built dynamically from `items.upgradeProviders` (`config/config.lua`), and `getValue` highlights `items:GetActiveUpgradeProvider()` (the provider actually in effect), so the highlighted option matches the arrows being drawn even when precedence is active.
 - **Coverage:** `spec/items_spec.lua` ("Upgrade Icon Providers": built-in usability gating — CanUseItem, preferred-armor, cloak/shield/weapon exclusions, and the graceful naive fallback when the APIs are absent — empty slots, handedness and dual wield, the level gate, and the primary-stat gate including real retail items' stat keys — plus Pawn/SimpleItemLevel registration, late ADDON_LOADED registration, precedence, and explicit-choice override) and `spec/database_spec.lua` ("tracks whether the user explicitly set a provider").
@@ -161,8 +161,8 @@ Upgrade arrows (`data.isUpgrade`, resolved in `Phase6_EnrichData` via `items:Res
 ### 16. Per-Slot Harvest Cache (Unchanged Slots Keep Their Item)
 `AttachItemInfo` costs on the order of 100 µs per slot in the client (about fifteen client API calls plus link parsing and the stat hash), and a targeted sweep harvests every slot of every bag `BAG_UPDATE` named. Using a potion re-read all 20-36 slots of its bag for one count change (~2.7 ms of a profiled refresh on WoW: Forever).
 - **Rule:** `items:Harvest` (Phase 2) receives the kind's committed `itemsBySlotKey` on every sweep that is not a wipe, and for each slot calls `items:ReuseHarvestedSlot`. A slot keeps its committed ItemData when the client's `ContainerItemInfo` matches what the item was read from (item ID, hyperlink, count, name, icon, quality, lock, bound, readable, loot, filtered, no-value), its item GUID matches (two identical full stacks swapped between slots match on every container field but not on GUID), **and** its `C_Item.GetCurrentItemLevel` matches (scaling changes an item's current item level without changing its link). The full invalidation list for every cache is in caches.md. Otherwise the slot goes through `AttachItemInfo`, which is handed the container info the check already read.
-- **Refreshed on a kept item** (`items:RefreshKeptItem`, which recalculations, refresh-scheduler.md §10, also run on every item still in its slot)**:** the fields that change without the slot's contents changing, each computed exactly as `AttachItemInfo` computes it: `itemInfo.isNewItem` (`items:ClientNewItemFlag`: the client's `C_NewItems` flag alone, which drives the glow; the Recent Items timer, seeded by the shared `items:SeedNewItemTimer`, decides the category through `IsNewItem` in `GetCategory`), `itemInfo.equipmentSets` (the set map is rebuilt every sweep, §14), `questInfo`, and `itemInfo.tooltipText` (a cache hit in the tooltip scanner, or a re-scan after a `TOOLTIP_DATA_UPDATE` invalidated it, tooltip-scanning.md). A kept item must match what a fresh read of the slot would produce; `spec/refresh_pipeline_spec.lua` compares the new-item flag of a kept slot with an `AttachItemInfo` read of the same slot after the player hovered it.
-- **Nothing else is written to a kept item during the harvest.** It is still the committed item until the sweep commits a frame later (the harvest runs before the sweep's yield), and the bag can draw from committed state in between (a tab switch, a bag opening with a pending draw). Every derived field (category, virtual stack root and total, search match, upgrade, context match, draw generation) is rewritten by Phases 6-8 every sweep, after the yield, exactly as for items in bags the sweep did not visit, which have always been carried over as the same objects. Writing a derived field early showed a stack root's own pile count instead of its total for that frame.
+- **Refreshed on a kept item** (`items:RefreshKeptItem`, which recalculations, refresh-scheduler.md §10, also run on every item still in its slot)**:** the fields that change without the slot's contents changing, each computed exactly as `AttachItemInfo` computes it: `itemInfo.isNewItem` (`items:ClientNewItemFlag`: the client's `C_NewItems` flag alone, which drives the glow; the Recent Items timer, seeded by the shared `items:SeedNewItemTimer`, decides the category through `IsNewItem` in `GetCategory`), `itemInfo.equipmentSets` (the set map is rebuilt every sweep, §14), `questInfo`, and `itemInfo.tooltipText` (a cache hit in the tooltip scanner, or a re-scan after a `TOOLTIP_DATA_UPDATE` invalidated it, tooltip-scanning.md). A kept item must match what a fresh read of the slot would produce; `spec/refresh_pipeline_spec.lua` compares the new-item flag of a kept slot with an `AttachItemInfo` read of the same slot after the player hovered it. When the quest state, the tooltip text or the gear sets differ from what the item held, nothing kept about the item stands (`item.derived` is dropped, §18): they are inputs of its category and its search entry.
+- **Nothing else is written to a kept item during the harvest** (besides dropping `item.derived`, which no draw reads). It is still the committed item until the sweep commits a frame later (the harvest runs before the sweep's yield), and the bag can draw from committed state in between (a tab switch, a bag opening with a pending draw). Every derived field (category, virtual stack root and total, search match, upgrade, context match, draw generation) is set by Phases 6-8, after the yield, exactly as for items in bags the sweep did not visit, which have always been carried over as the same objects; the category, upgrade and context match are worked out again only when an input changed (§18). Writing a derived field early showed a stack root's own pile count instead of its total for that frame.
 - **Never reused:** empty slots (cheap to read), a slot read while the client had no item info for it (`harvestIncomplete`: `GetItemInfo` returned nil or there was no container info, the issue #1090 cold cache), and any sweep with `wipe` (all of `bags/FullRefreshAll`, `BAG_CONTAINER_UPDATE`, `EQUIPMENT_SETS_CHANGED` and the first sweep, which also run against an emptied committed state).
 - **Raw values:** `AttachItemInfo` fills fallbacks into `containerInfo` (`itemName`, `iconFileID`, `quality`), so it saves the values the client returned as `rawItemName`/`rawIconFileID`/`rawQuality` and the check compares against those; comparing against the filled values would make a slot with a client-side nil never match.
 - **Virtual stacks:** stacking keys on `itemHash`, which a kept item keeps (it is computed from the link, binding and stats, all unchanged by definition). `Phase7_ApplyVirtualStacks` re-totals every stack from the current `currentItemCount` of every pile each sweep, so a kept pile counts correctly, re-roots when another pile overtakes it, and unmerges when a stacking rule stops applying.
@@ -172,3 +172,91 @@ Upgrade arrows (`data.isUpgrade`, resolved in `Phase6_EnrichData` via `items:Res
 
 ### 17. Draw Generation
 Every item carries `drawGeneration`, stamped in `Phase6_EnrichData` from `items._drawGeneration[kind]`, which `RunRefresh` bumps on every wipe sweep of the kind. Item buttons include it in the inputs that decide whether a redraw can be skipped (item-drawing.md §7b): a setting the data phase reads (stacking rules, the upgrade provider) sends `bags/FullRefreshAll`, a wipe, so a new generation makes every button of the kind draw in full. It is per kind, so a bank wipe does not redraw the backpack. Settings that only change how a button draws (glow intensity, item level display) do not wipe: they redraw with `ItemFrame:RestyleButtons()`, and a theme change bumps Sonata's generation (`Sonata:GetGeneration()`, refresh-scheduler.md §9). Coverage: `spec/refresh_pipeline_spec.lua` ("draw generation").
+
+### 18. Deriving Only What Changed (Kept Per-Item Work)
+A refresh used to work out every item's category, grey-out and upgrade arrow again, and compare
+every item with its search entry, whatever it read: the per-slot harvest cache (§16) and the
+button draw record (item-drawing.md §7b) skipped unchanged slots, but the phases between did not.
+**Measured** (a retail capture of opening BetterBags Next's bank, 500 items, Pawn the provider):
+of about 2.1 s of refresh work, 1.35 s was Pawn's upgrade check, asked 8,136 times over the 14
+bank refreshes of one open (each tab's read and each tooltip resolution asked about every item
+loaded so far); backpack refreshes cost about 25 ms each, 21 ms of it on items that had not
+changed. Asked: "if we read a set of slots, we shouldn't need to cache anything, it should only
+check those slots."
+
+**The rule:** what an item is worked out with is kept on it, with the inputs it was worked out
+from, and worked out again only when one of them changed. A refresh costs the slots it read, plus
+whatever an input every item shares (a setting, the gear, the open window) changed.
+
+- **What is kept** (`item.derived`, a table on the ItemData; a re-read slot is a new ItemData, so
+  nothing is kept for it):
+  - `ownCategory` (Phase 6: `GetCategory` with `own`, no search categories), with `category` (the
+    stamp it was worked out under: `items:categoryStamp(kind)`, the kind's category generation and
+    the Categories module's) and `recent` (`IsNewItem`).
+  - `final` (Phase 8: the category the item is shown in outside Show Bags), with `searchCategory`
+    and `searchPriority` (its slot's entries in the search cache, rebuilt every sweep) and
+    `finalRecent` (its own or its stack's recency). Worked out again when its own category was
+    (Phase 6 drops `final`).
+  - `context` (Phase 6: grey-out, `itemContextMatchResult`), with the signature it was worked out
+    under (`items:contextSignature()`: whether the bank is open and shows a Warbank tab). While an
+    item context is active (`ItemButtonUtil.GetItemContext()` not nil) there is no signature and
+    grey-out is worked out every sweep: Blizzard's answer then can depend on the spell being cast
+    (Enchanting, CheckItemCondition, ReplaceBonusTree, JumpUpgradeTrack) or the recipe being
+    recrafted (`ItemButtonUtil.GetItemContextMatchResultForItem`).
+  - `indexPending`: the item's own category was worked out again and it has not been compared with
+    its search entry yet (below).
+  - Upgrade verdicts stay where they were (`upgradeVerdict`, caches.md §2); Pawn's are now kept too.
+- **What makes it be worked out again:**
+  - An in-place change of the item's own inputs drops `derived`: quest state, tooltip text, gear
+    sets (`RefreshKeptItem`, §16), a guild item's tooltip text (`RederiveGuildBank`).
+  - Recency is compared every sweep (a timer starting or expiring, a sort clearing them).
+  - The kind's category generation (`items._categoryGeneration[kind]`) changes on every wipe and on
+    every recalculation that does not say `categoriesUnchanged`, or a read that absorbed one
+    (`recategorize`, refresh-scheduler.md §10).
+  - The Categories module's generation (`categories:GetGeneration()`) changes with every change made
+    through it (create, delete, rename, file or remove an item, toggle, hide, register a category
+    function, reprocess), including another addon filing items without asking for a refresh. Not
+    when `GetCustomCategory` files an item a category function named while working a category out.
+  - Every config category setting and the category pane send a recalculation without
+    `categoriesUnchanged`; the pane's only direct database write (Remove) does too.
+- **What is still worked out for every item every sweep**, as before: virtual stacks (Phase 7, with
+  each stack's recency, virtual-stacks.md §9), the search cache (`RefreshSearchCache`), the live
+  search match (`isSearchResult`), the Show Bags section names, the draw generation, the order,
+  gaps, partition and commit. None calls a provider or reads the client per item.
+- **The search index** (search-indexing.md §1): `search:SyncKind` gets the items marked
+  `indexPending` (gathered by `items:syncIndex`, which clears the marks once indexed) and compares
+  only those and the items that are other objects than their slot was indexed from. A mark is on
+  the item, so a sweep that fails after Phase 6 and before Phase 8 leaves it for the next sweep;
+  the object check brings the index back after a sweep that failed after indexing and before
+  committing. Phase 8 also tells the index every change of the shown category, Show Bags names
+  included (they used to reach it only through the other kind's next sync).
+- **Search categories still match each item's own category** (§8): while one is enabled for the
+  kind, Phase 8 sets each item whose shown category differs back to its own (and the index with it)
+  before matching, then sets the shown one again.
+- **Equivalence:** `spec/refresh_pipeline_spec.lua` ("deriving only what changed" → "equals a full
+  recalculation", six seeds of 200 random steps: loot, top-ups, use, moves, client new-item flags,
+  categories filed without a refresh, search categories, item contexts, the bank opening and
+  switching tabs, gear, tooltips, gear sets by a read or a recalculation, quests, Recent Items
+  cleared and expiring, stacking options, Show Bags, the search box, the bank, full reads and
+  wipes) compares, after every step, each item's category, upgrade, grey-out, shown stack count
+  and search match with a full recalculation that keeps nothing, and the search index with a clean
+  rebuild.
+- **Measured offline** (PUC Lua 5.1, the `test.lua` profile's backpack, 176 slots and 57 items, a
+  counted Pawn answering at once, median of 60): a read with one slot changed 2.65 ms before, 0.91 ms
+  after, asking Pawn about 1 item instead of 57; a read with nothing changed 2.61 / 0.84 ms (0 asks);
+  a recalculation that changes no category 2.69 / 0.91 ms; one that changes categories 2.68 /
+  2.70 ms (every category, no Pawn ask). In game each Pawn ask avoided saves the 0.24-0.39 ms the
+  capture measured. Not captured in game yet.
+- **Coverage:** `spec/refresh_pipeline_spec.lua` ("deriving only what changed": providers asked
+  only about changed items; categories worked out again only for an item or input that changed;
+  grey-out only on a context change, every sweep under an active context, the Warbank; the index
+  touched only for changed items, after a sweep that failed before committing and one that failed
+  before indexing; an own category that follows recency, its own and its stack's; a pile's own
+  category once stacking stops; a search category changing at the same priority; the randomized
+  equivalence; "virtual stacks and Recent Items"; "merging derives"), `spec/categories_spec.lua`
+  ("generation"), `spec/search_spec.lua` ("with the items that changed"), `spec/items_spec.lua`
+  ("kept verdicts" for Pawn), `spec/guildbank_pipeline_spec.lua` ("finds an item by tooltip text
+  that loaded after it was read"), `spec/refresh_spec.lua` (routing `categoriesUnchanged`). Every
+  guard was mutation-tested (53 mutations, each caught; of the 13 that first survived, 12 led to
+  tests and one to removing a dead merge line). Reviewing how a sweep can fail partway led to
+  `indexPending` replacing a per-sweep set of changed items.

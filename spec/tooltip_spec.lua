@@ -278,7 +278,7 @@ describe("TooltipScanner", function()
       assert.is_nil(tooltipScanner.guidToInstance["guid-potion"])
       -- The next sweep re-scans the item (a cache miss) without reading the bags.
       assert.are.same({ "bags/Rederive" }, sentMessages)
-      assert.are.same({ backpack = true, bank = false }, sentOptions[1])
+      assert.are.same({ backpack = true, bank = false, categoriesUnchanged = true }, sentOptions[1])
     end)
 
     it("re-scans warm on the next lookup after invalidation", function()
@@ -311,7 +311,7 @@ describe("TooltipScanner", function()
       addon.atBank = true
       capturedBucket(context:New("t"), { { eventName = "TOOLTIP_DATA_UPDATE", args = { 555 } } })
       assert.are.same({ "bags/Rederive" }, sentMessages)
-      assert.are.same({ backpack = true, bank = true }, sentOptions[1])
+      assert.are.same({ backpack = true, bank = true, categoriesUnchanged = true }, sentOptions[1])
     end)
 
     it("keeps the instance maps 1:1 with the cache when re-scanned under a new instance", function()
@@ -610,7 +610,7 @@ describe("TooltipScanner", function()
       tooltipScanner:GetGuildBankItemText(1, 1, "|Hitem:9|h")
       capturedBucket(context:New("t"), { { eventName = "TOOLTIP_DATA_UPDATE", args = { 777 } } })
       assert.are.same({ "bags/Rederive" }, sentMessages)
-      assert.are.same({ backpack = true, bank = false, guild = true }, sentOptions[1])
+      assert.are.same({ backpack = true, bank = false, guild = true, categoriesUnchanged = true }, sentOptions[1])
       _G.C_TooltipInfo.GetGuildBankItem = function()
         return { dataInstanceID = 777, lines = { { leftText = "Elixir" }, { leftText = "Use: Agility" } } }
       end

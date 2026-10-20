@@ -46,7 +46,7 @@ function simpleItemLevel:OnEnable()
   events:RegisterEvent("ADDON_LOADED", function(ctx)
     if simpleItemLevel._registered then return end
     if simpleItemLevel:Register() then
-      events:SendMessage(ctx, 'bags/Rederive')
+      events:SendMessage(ctx, 'bags/Rederive', { categoriesUnchanged = true })
     end
   end)
 end

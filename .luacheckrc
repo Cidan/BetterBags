@@ -319,6 +319,7 @@ globals = {
 	"PawnGetItemData",
 	"PawnIsContainerItemAnUpgrade",
 	"PawnShouldItemLinkHaveUpgradeArrowUnbudgeted",
+	"PawnResetBags",
 	"UIDropDownMenu_AddButton",
 	"UIDropDownCustomMenuEntryMixin",
 	"UIDropDownMenu_CreateInfo",

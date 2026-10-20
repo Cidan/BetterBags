@@ -219,7 +219,7 @@ function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
 	-- backpack must be recalculated and redrawn or its grey-out stays stale until the
 	-- next backpack refresh (previously only a manual sort cleared it).
 	if addon.atBank then
-		events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false })
+		events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false, categoriesUnchanged = true })
 	end
 end
 
@@ -585,7 +585,7 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 	-- backpack must be recalculated and redrawn or its grey-out stays stale until the
 	-- next backpack refresh (previously only a manual sort cleared it).
 	if addon.atBank then
-		events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false })
+		events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false, categoriesUnchanged = true })
 	end
 end
 

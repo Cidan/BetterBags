@@ -256,6 +256,8 @@ describe("Refresh Module", function()
     assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, resetLayout = true, restyle = true })
     events:SendMessage(ctx, "bags/Rederive", { backpack = false, bank = true })
     assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, bank = true })
+    events:SendMessage(ctx, "bags/Rederive", { backpack = true, categoriesUnchanged = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, categoriesUnchanged = true })
   end)
 
   -- A capture of opening the bank read 478 of 491 bank items before the client had their

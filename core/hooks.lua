@@ -68,6 +68,7 @@ local function interactionRecalculation()
     resetLayout = true,
     backpack = true,
     bank = items:NeedsInteractionRecalculation(const.BAG_KIND.BANK),
+    categoriesUnchanged = true,
   }
 end
 

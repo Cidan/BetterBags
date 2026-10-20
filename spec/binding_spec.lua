@@ -18,8 +18,15 @@ const.BINDING_SCOPE = {
   WUE = 10,
 }
 
--- Mock WoW APIs for binding detection
+-- Mock WoW APIs for binding detection. The globals this file replaces are put back when it ends
+-- (teardown below), or later specs read binding through them (a bound item everywhere).
 _G.C_Item = _G.C_Item or {}
+local savedGlobals = {
+  IsBound = _G.C_Item.IsBound,
+  IsBoundToAccountUntilEquip = _G.C_Item.IsBoundToAccountUntilEquip,
+  C_Bank = _G.C_Bank,
+  GetContainerItemPurchaseInfo = _G.C_Container and _G.C_Container.GetContainerItemPurchaseInfo,
+}
 _G.C_Bank = nil
 _G.C_Container = _G.C_Container or {}
 _G.Enum = _G.Enum or {}
@@ -39,6 +46,13 @@ local function MockItemLocation(opts)
 end
 
 describe("Binding", function()
+
+  teardown(function()
+    _G.C_Item.IsBound = savedGlobals.IsBound
+    _G.C_Item.IsBoundToAccountUntilEquip = savedGlobals.IsBoundToAccountUntilEquip
+    _G.C_Bank = savedGlobals.C_Bank
+    _G.C_Container.GetContainerItemPurchaseInfo = savedGlobals.GetContainerItemPurchaseInfo
+  end)
 
   before_each(function()
     -- Reset C_Item mocks

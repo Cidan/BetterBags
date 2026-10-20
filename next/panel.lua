@@ -2446,7 +2446,7 @@ function panelProto:Watch()
   end
   events:RegisterMessage("search/SetInFrame", function(ctx)
     self:UpdateSearchShown()
-    events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+    events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true, categoriesUnchanged = true })
   end)
   self:WatchKind()
 end

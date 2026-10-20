@@ -152,6 +152,8 @@ end
 function search:Init()
   self.indicies = {}
   self.indexed = {}
+  -- The item object each slot was indexed from (SyncKind skips one still indexed from it).
+  self.indexedItems = {}
   -- String indexes
   self:CreateIndex('name')
   self:CreateIndex('type')
@@ -214,6 +216,7 @@ function search:Wipe()
     index.numbers = trees.NewIntervalTree()
   end
   self.indexed = {}
+  self.indexedItems = {}
 end
 
 -- IndexItems replaces the previous indexes and indexes a completely fresh collection of flat items
@@ -232,10 +235,16 @@ end
 -- with. With rebuild set, every item of the kind is removed and re-added. The result is the
 -- index search:IndexItems would build over the same items (spec/search_spec.lua checks this
 -- over randomized sequences).
+--
+-- With changed (a set of slot keys), an item that is the very object its slot was indexed from
+-- and is not in changed is taken as indexed already, without comparing its values: the pipeline
+-- passes the items whose values it set again (data-loader.md §18), and every other in-place change
+-- of an indexed value goes through UpdateCategoryIndex. Without changed every item is compared.
 ---@param kind BagKind
 ---@param items table<string, ItemData>|nil
 ---@param rebuild? boolean
-function search:SyncKind(kind, items, rebuild)
+---@param changed? table<string, any>
+function search:SyncKind(kind, items, rebuild, changed)
   for slotkey, snap in pairs(self.indexed) do
     if snap.kind == kind then
       local item = items and items[slotkey]
@@ -249,8 +258,12 @@ function search:SyncKind(kind, items, rebuild)
       local snap = self.indexed[slotkey]
       if not snap then
         self:Add(item)
-      elseif not sameSnapshot(fillSnapshot(scratch, item), snap) then
-        self:Add(item)
+      elseif changed == nil or changed[slotkey] or self.indexedItems[slotkey] ~= item then
+        if sameSnapshot(fillSnapshot(scratch, item), snap) then
+          self.indexedItems[slotkey] = item
+        else
+          self:Add(item)
+        end
       end
     end
   end
@@ -347,6 +360,7 @@ function search:UpdateCategoryIndex(item, oldCategory)
   if item == nil or item.isItemEmpty or item.itemInfo.category == nil then return end
   local snap = self.indexed[item.slotkey]
   if snap then
+    if snap.category == item.itemInfo.category then return end
     oldCategory = snap.category
     snap.category = item.itemInfo.category
   end
@@ -419,6 +433,7 @@ function search:removeSnapshot(slotkey, s)
     end
   end
   self.indexed[slotkey] = nil
+  self.indexedItems[slotkey] = nil
 end
 
 -- Add indexes an item, replacing whatever its slot was indexed with.
@@ -432,6 +447,7 @@ function search:Add(item)
   local snap = fillSnapshot({}, item)
   self:indexSnapshot(item.slotkey, snap)
   self.indexed[item.slotkey] = snap
+  self.indexedItems[item.slotkey] = item
 end
 
 -- Remove removes an item's slot from the index, with the values it was indexed with.

@@ -2651,6 +2651,8 @@ _G.ItemLocation.CreateFromBagAndSlot = function(_, bagID, slotID)
   function loc:GetEquipmentSlot() return nil end
   function loc:IsEquipmentSlot() return false end
   function loc:IsBagAndSlot() return true end
+  -- ItemLocationMixin:HasAnyLocation (Blizzard_ObjectAPI/Mainline/ItemLocation.lua).
+  function loc:HasAnyLocation() return true end
   function loc:IsValid() return true end
   return loc
 end
@@ -2666,6 +2668,7 @@ _G.ItemLocation.CreateFromEquipmentSlot = function(_, slotID)
   function loc:GetEquipmentSlot() return self._equipSlot end
   function loc:IsEquipmentSlot() return true end
   function loc:IsBagAndSlot() return false end
+  function loc:HasAnyLocation() return true end
   function loc:IsValid() return true end
   return loc
 end

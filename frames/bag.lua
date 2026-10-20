@@ -977,7 +977,7 @@ end
 ---@param ctx Context
 function bagFrame.bagProto:SetSearchShown(ctx)
 	self:UpdateSearchShown()
-	events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+	events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true, categoriesUnchanged = true })
 end
 
 --- SwitchToBankAndWipe delegates to behavior for bank-specific implementation.

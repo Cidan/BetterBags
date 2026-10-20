@@ -2288,6 +2288,65 @@ describe("Upgrade Icon Providers", function()
       assert.is_false(items:ResolveUpgrade(data))
     end)
 
+    -- Pawn tells bag addons when their arrows may have changed (PawnResetBags: scale and setting
+    -- edits, spec changes, and its own throttled check after inventory changes; Pawn 2.13
+    -- Pawn.lua). Its verdicts are kept on each item until then, and until an upgrade input BetterBags
+    -- watches changes (caches.md §2), so an item is asked about once, not on every refresh.
+    describe("kept verdicts", function()
+      local verdict, asked, savedReset
+
+      before_each(function()
+        verdict, asked = true, 0
+        savedReset = _G.PawnResetBags
+        _G.PawnResetBags = function() end
+        _G.PawnGetItemData = function() return {} end
+        _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function()
+          asked = asked + 1
+          return verdict
+        end
+        pawn._registered = nil
+        pawn._hooked = nil
+        pawn:OnEnable()
+        database.GetUpgradeIconProvider = function() return "Pawn" end
+        items.equipmentCache = {}
+      end)
+
+      after_each(function()
+        _G.PawnResetBags = savedReset
+        items.equipmentCache = nil
+      end)
+
+      it("keeps Pawn's verdict until Pawn says the arrows may have changed", function()
+        local data = equippableItem({})
+        assert.is_true(items:ResolveUpgrade(data))
+        verdict = false
+        assert.is_true(items:ResolveUpgrade(data), "kept")
+        assert.equal(1, asked)
+        _G.PawnResetBags()
+        assert.is_false(items:ResolveUpgrade(data), "asked again")
+        assert.equal(2, asked)
+      end)
+
+      -- PawnShouldItemLinkHaveUpgradeArrowUnbudgeted returns nil for "we're not sure yet" (no item
+      -- data or stats, or Pawn not initialized).
+      it("draws no arrow while Pawn is not sure, and asks again until it is", function()
+        local data = equippableItem({})
+        verdict = nil
+        assert.is_false(items:ResolveUpgrade(data))
+        verdict = true
+        assert.is_true(items:ResolveUpgrade(data))
+        assert.equal(2, asked)
+      end)
+
+      it("hooks Pawn's reset once, however often it registers", function()
+        pawn._registered = nil
+        pawn:OnEnable()
+        local generation = items._upgradeGeneration
+        _G.PawnResetBags()
+        assert.equal(generation + 1, items._upgradeGeneration)
+      end)
+    end)
+
     it("returns false for empty items without calling Pawn", function()
       _G.PawnGetItemData = function() return {} end
       local called = false

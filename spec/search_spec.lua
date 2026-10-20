@@ -565,7 +565,7 @@ describe("Search incremental indexing (SyncKind)", function()
   -- cleanState is the index a clean rebuild over the given items produces. The live
   -- (incremental) index is set aside and restored, so drift can accumulate across steps.
   local function cleanState(itemsByKind)
-    local saved = { search.indicies, search.indexLookup, search.indexed }
+    local saved = { search.indicies, search.indexLookup, search.indexed, search.indexedItems }
     search:Init()
     local all = {}
     for _, kindItems in pairs(itemsByKind) do
@@ -573,7 +573,7 @@ describe("Search incremental indexing (SyncKind)", function()
     end
     search:IndexItems(all)
     local state = indexState()
-    search.indicies, search.indexLookup, search.indexed = saved[1], saved[2], saved[3]
+    search.indicies, search.indexLookup, search.indexed, search.indexedItems = saved[1], saved[2], saved[3], saved[4]
     return state
   end
 
@@ -612,6 +612,50 @@ describe("Search incremental indexing (SyncKind)", function()
     assert.is_true(search:isInIndex("category", "junk")["a"])
     assert.is_nil(search:isInIndex("count", 1)["a"])
     assert.is_true(search:isInIndex("count", 4)["a"])
+  end)
+
+  -- With changed (data-loader.md §18), only the items named in it and the items that are other
+  -- objects than their slot was indexed from are compared: the pipeline names every item whose
+  -- indexed values it set again, so an unchanged object is not looked at.
+  describe("with the items that changed", function()
+    it("does not compare an item that is the object its slot was indexed from", function()
+      local sword = item({ slotkey = "a", name = "Sword", count = 1, kind = BACKPACK })
+      local bag = { a = sword }
+      search:SyncKind(BACKPACK, bag)
+      sword.itemInfo.currentItemCount = 4
+      search:SyncKind(BACKPACK, bag, false, {})
+      assert.is_true(search:isInIndex("count", 1)["a"], "not compared")
+      search:SyncKind(BACKPACK, bag, false, { a = true })
+      assert.is_true(search:isInIndex("count", 4)["a"], "named as changed")
+    end)
+
+    it("compares an item that is another object than its slot was indexed from", function()
+      local bag = { a = item({ slotkey = "a", name = "Sword", count = 1, kind = BACKPACK }) }
+      search:SyncKind(BACKPACK, bag)
+      bag.a = item({ slotkey = "a", name = "Sword", count = 4, kind = BACKPACK })
+      search:SyncKind(BACKPACK, bag, false, {})
+      assert.is_true(search:isInIndex("count", 4)["a"])
+    end)
+
+    it("takes a new object with the values it was indexed with as indexed from then on", function()
+      local bag = { a = item({ slotkey = "a", name = "Sword", count = 1, kind = BACKPACK }) }
+      search:SyncKind(BACKPACK, bag)
+      local same = item({ slotkey = "a", name = "Sword", count = 1, kind = BACKPACK })
+      bag.a = same
+      search:SyncKind(BACKPACK, bag, false, {})
+      assert.are.equal(same, search.indexedItems.a)
+    end)
+
+    it("forgets the item of a slot it removes, and every item on a wipe", function()
+      local bag = { a = item({ slotkey = "a", name = "Sword", kind = BACKPACK }), b = item({ slotkey = "b", name = "Shield", kind = BACKPACK }) }
+      search:SyncKind(BACKPACK, bag)
+      bag.a = nil
+      search:SyncKind(BACKPACK, bag, false, {})
+      assert.is_nil(search.indexedItems.a)
+      assert.are.equal(bag.b, search.indexedItems.b)
+      search:Wipe()
+      assert.is_nil(next(search.indexedItems))
+    end)
   end)
 
   it("removes an item that left the bag or whose slot is now empty", function()

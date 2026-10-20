@@ -44,6 +44,24 @@ local context = addon:GetModule('Context')
 ---@field private ephemeralCategoryByItemID table<number, CustomCategoryFilter>
 local categories = addon:NewModule('Categories')
 
+-- The generation of everything a custom category lookup (GetCustomCategory) reads. It changes with
+-- every change made through this module, so the bags work every item's category out again on their
+-- next refresh even when the caller (another addon filing items) asks for no refresh
+-- (data-loader.md §18). It is never reset.
+categories.generation = 0
+
+-- GetGeneration says which generation the custom categories are at.
+---@return number
+function categories:GetGeneration()
+  return self.generation
+end
+
+-- changed starts a new generation.
+---@private
+function categories:changed()
+  self.generation = self.generation + 1
+end
+
 function categories:Init()
   self.categoryFunctions = {}
   self.itemsWithNoCategory = {}
@@ -132,6 +150,7 @@ function categories:AddPermanentItemToCategory(ctx, id, category)
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
 
+  self:changed()
   self.itemsWithNoCategory[id] = nil
 
   if not database:ItemCategoryExists(category) then
@@ -163,6 +182,17 @@ function categories:AddItemToCategory(ctx, id, category)
     id = ctx
     ctx = context:New('AddItemToCategory')
   end
+  self:changed()
+  self:addItemToCategory(ctx, id, category)
+end
+
+-- addItemToCategory files an item, without starting a new generation: GetCustomCategory files the
+-- items a category function names while it works an item's category out.
+---@private
+---@param ctx Context
+---@param id number
+---@param category string
+function categories:addItemToCategory(ctx, id, category)
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
@@ -197,6 +227,7 @@ function categories:WipeCategory(ctx, category)
     category = ctx
     ctx = context:New('WipeCategory')
   end
+  self:changed()
   database:WipeItemCategory(category)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].itemList = self.ephemeralCategories[category].itemList or {}
@@ -232,6 +263,7 @@ end
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 function categories:ToggleCategory(kind, category)
+  self:changed()
   if self.ephemeralCategories[category] then
     local enabled = not self.ephemeralCategories[category].enabled[kind]
     self.ephemeralCategories[category].enabled[kind] = enabled
@@ -248,6 +280,7 @@ end
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 function categories:EnableCategory(kind, category)
+  self:changed()
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = true
     database:SetEphemeralItemCategoryEnabled(kind, category, true)
@@ -262,6 +295,7 @@ end
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 function categories:DisableCategory(kind, category)
+  self:changed()
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = false
     database:SetEphemeralItemCategoryEnabled(kind, category, false)
@@ -287,6 +321,7 @@ end
 ---@param category string The name of the custom category to toggle.
 ---@param enabled boolean
 function categories:SetCategoryState(kind, category, enabled)
+  self:changed()
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = enabled
     database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
@@ -306,6 +341,7 @@ function categories:CreateCategory(ctx, category)
     category = ctx --[[@as CustomCategoryFilter]]
     ctx = context:New('CreateCategory')
   end
+  self:changed()
   category.enabled = category.enabled or {
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
@@ -376,6 +412,7 @@ end
 ---@param ctx Context
 ---@param category string
 function categories:DeleteCategory(ctx, category)
+  self:changed()
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
   if type(ctx) == "string" then
@@ -402,6 +439,7 @@ end
 ---@param newName string
 ---@return boolean success
 function categories:RenameCategory(ctx, oldName, newName)
+  self:changed()
   -- Trim whitespace and validate new name
   newName = strtrim(newName)
   if newName == "" then
@@ -469,6 +507,7 @@ end
 ---@param ctx Context
 ---@param category string
 function categories:HideCategory(ctx, category)
+  self:changed()
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
   if type(ctx) == "string" then
@@ -482,6 +521,7 @@ end
 ---@param ctx Context
 ---@param category string
 function categories:ShowCategory(ctx, category)
+  self:changed()
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
   if type(ctx) == "string" then
@@ -520,6 +560,7 @@ end
 ---@param ctx Context
 ---@param category string
 function categories:ToggleCategoryShown(ctx, category)
+  self:changed()
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
   if type(ctx) == "string" then
@@ -571,7 +612,7 @@ function categories:GetCustomCategory(ctx, kind, data)
     if success and args ~= nil then
       local category = select(1, args) --[[@as string]]
       local found = self.ephemeralCategories[category] and true or false
-      self:AddItemToCategory(ctx, itemID, category)
+      self:addItemToCategory(ctx, itemID, category)
       if not found then
         self.categoryCount = self.categoryCount + 1
         events:SendMessage(ctx, 'categories/Changed')
@@ -600,6 +641,7 @@ end
 --- the user's hand-filed persisted assignment with no signal to the caller
 --- (issue #1079). Pass `category` explicitly to remove a persisted assignment.
 function categories:RemoveItemFromCategory(id, category)
+  self:changed()
   self.itemsWithNoCategory[id] = nil
 
   if category ~= nil then
@@ -639,6 +681,7 @@ end
 ---@param func fun(data: ItemData): string|nil The function to call to get the category name for an item.
 function categories:RegisterCategoryFunction(id, func)
   assert(not self.categoryFunctions[id], 'category function already registered: '.. id)
+  self:changed()
   self.categoryFunctions[id] = func
   wipe(self.itemsWithNoCategory)
 end
@@ -649,6 +692,7 @@ end
 -- reprocessed and re-categorized.
 ---@param ctx Context
 function categories:ReprocessAllItems(ctx)
+  self:changed()
   wipe(self.itemsWithNoCategory)
   events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end

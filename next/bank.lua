@@ -468,7 +468,7 @@ function bankProto:shown(ctx, id)
   self:Draw(ctx, items:GetAllSlotInfo()[self.kind], function() end)
   addon.TriggerItemContextChanged()
   if addon.atBank then
-    events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false })
+    events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false, categoriesUnchanged = true })
   end
 end
 
@@ -685,7 +685,7 @@ end
 -- closed (refresh-scheduler.md §10).
 ---@param ctx Context
 function bankProto:Refresh(ctx)
-  events:SendMessage(ctx, 'bags/Rederive', { backpack = false, bank = true })
+  events:SendMessage(ctx, 'bags/Rederive', { backpack = false, bank = true, categoriesUnchanged = true })
 end
 
 -- Sort sorts the bank as the menu button's right click does on retail (the Warbank while a

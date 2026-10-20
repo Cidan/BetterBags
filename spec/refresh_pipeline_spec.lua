@@ -120,6 +120,17 @@ local function stubModules()
   local loader = stubModule("ItemLoader")
   override(loader, "TellMeWhenABagIsUpdated", function() end)
   override(loader, "GetItemMixinFromSlotKey", function() return nil end)
+
+  -- The bank's partition asks Groups for a tab's group. Another spec file can leave a Groups
+  -- stub without it, or the real module, which asks the database (busted --shuffle-files); no
+  -- group then, as with no Groups module.
+  local groups = stubModule("Groups")
+  if not groups.GetGroup then
+    override(groups, "GetGroup", function() return nil end)
+  end
+  if not database.GetGroup then
+    override(database, "GetGroup", function() return nil end)
+  end
 end
 
 local savedGlobals = {}
@@ -268,6 +279,9 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end
     if opts and opts.derive then
       ctx:Set("derive", true)
+    end
+    if opts and opts.categoriesUnchanged then
+      ctx:Set("categoriesUnchanged", true)
     end
     if opts and opts.restyle then
       ctx:Set("restyle", true)
@@ -931,7 +945,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         runTimers()
         assert.are.same({ case[3] }, sent, "the bank is closed")
         if derive then
-          assert.are.same({ backpack = true, bank = false }, sentOptions[1])
+          assert.are.same({ backpack = true, bank = false, categoriesUnchanged = true }, sentOptions[1])
         end
         refreshBackpack(derive and { derive = true } or nil)
         assert.are.same({ "0_1", "0_2" }, askedKeys())
@@ -1052,7 +1066,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       sent = {}
       runTimers()
       assert.are.same({ "bags/Rederive" }, sent)
-      assert.are.same({ backpack = true, bank = true }, sentOptions[1])
+      assert.are.same({ backpack = true, bank = true, categoriesUnchanged = true }, sentOptions[1])
     end)
 
     it("registers its cache events when the module is enabled", function()
@@ -1117,7 +1131,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       for i, event in ipairs(sent) do
         if event:match("^bags/") then table.insert(requested, { event, sentOptions[i] }) end
       end
-      assert.are.same({ { "bags/Rederive", { backpack = false, bank = true } } }, requested,
+      assert.are.same({ { "bags/Rederive", { backpack = false, bank = true, categoriesUnchanged = true } } }, requested,
         "the open bank is recalculated")
     end)
 
@@ -1722,7 +1736,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       return out
     end
     local function cleanState()
-      local saved = { search.indicies, search.indexLookup, search.indexed }
+      local saved = { search.indicies, search.indexLookup, search.indexed, search.indexedItems }
       search:Init()
       local all = {}
       for _, kind in ipairs({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }) do
@@ -1730,7 +1744,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       end
       search:IndexItems(all)
       local state = indexState()
-      search.indicies, search.indexLookup, search.indexed = saved[1], saved[2], saved[3]
+      search.indicies, search.indexLookup, search.indexed, search.indexedItems = saved[1], saved[2], saved[3], saved[4]
       return state
     end
     local function refreshBank(wipe)
@@ -1810,6 +1824,736 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are.same(cleanState(), indexState(), "after a sale")
       assert.is_nil(search.indexed["1_1"])
       assert.is_not_nil(search.indexed["6_2"], "the bank stays indexed")
+    end)
+  end)
+
+  -- A virtual stack shows one icon for every pile of an item, and that icon sits in one section.
+  -- Reported: a stack being looted into "gets drawn up to Recent Items, then back to its category,
+  -- ping pong, if you keep looting the item". The stack's section came from its root pile alone,
+  -- the pile holding the most, so it moved whenever looting made a different pile the largest. A
+  -- stack is in Recent Items while any pile it merges is recent.
+  describe("virtual stacks and Recent Items", function()
+    local ORE = 2771
+    local BACKPACK = 0
+
+    local function stacking(opts)
+      override(database, "GetStackingOptions", function()
+        local o = { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+          dontMergePartial = false, dontMergeTransmog = false }
+        for k, v in pairs(opts or {}) do o[k] = v end
+        return o
+      end)
+    end
+
+    before_each(function()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      stacking()
+    end)
+
+    -- shown lists, for every icon of the item, its section and the count it shows.
+    local function shown(itemID)
+      local out = {}
+      for _, item in pairs(items.slotInfo[BACKPACK]:GetVisibleItems()) do
+        if not item.isItemEmpty and item.itemInfo.itemID == itemID then
+          table.insert(out, item.itemInfo.category .. ":" .. tostring(item.stackedCount or item.itemInfo.currentItemCount))
+        end
+      end
+      table.sort(out)
+      return table.concat(out, ",")
+    end
+
+    local function bag(slots)
+      mockContainer[0] = {}
+      for i = 1, 8 do mockContainer[0][i] = slots[i] or {} end
+    end
+
+    -- loot adds count of the item to a pile, as the client does, then reads the bag.
+    local function loot(slot, count, guid)
+      local pile = mockContainer[0][slot]
+      if pile.itemID then
+        pile.count = pile.count + count
+      else
+        mockContainer[0][slot] = { itemID = ORE, guid = guid, count = count }
+        newSlots["0_" .. slot] = true
+      end
+      refreshBackpack({ bags = { [0] = true } })
+      return shown(ORE)
+    end
+
+    -- The item stacks to 20 (the GetItemInfo mock).
+    it("stays in Recent Items while a pile it merges is recent, whichever pile is largest", function()
+      bag({ [3] = { itemID = ORE, guid = "ore-old", count = 12 } })
+      refreshBackpack({ wipe = true })
+      assert.equal("Everything:12", shown(ORE))
+      assert.equal("Recent Items:27", loot(5, 15, "ore-new"), "a new pile, larger than the old one")
+      assert.equal("Recent Items:33", loot(3, 6), "the old pile tops up and is largest again")
+      assert.equal("Recent Items:35", loot(5, 2), "the two tie")
+      assert.equal("Recent Items:40", loot(3, 2) and loot(5, 3), "both full")
+      assert.equal("Recent Items:45", loot(6, 5, "ore-third"), "a third pile")
+    end)
+
+    it("stays in Recent Items when a recent partial pile fills and merges (Merge Partial off)", function()
+      stacking({ dontMergePartial = true })
+      bag({ [3] = { itemID = ORE, guid = "ore-old", count = 20 } })
+      refreshBackpack({ wipe = true })
+      assert.equal("Everything:20", shown(ORE))
+      assert.equal("Everything:20,Recent Items:15", loot(5, 15, "ore-new"), "the partial pile apart")
+      assert.equal("Recent Items:40", loot(5, 5), "full: it merges, and the stack is recent")
+      assert.equal("Recent Items:3,Recent Items:40", loot(6, 3, "ore-third"))
+    end)
+
+    -- The same with the new pile in an earlier slot: two full piles tie, and the root was the old
+    -- pile, whose slot key is greater.
+    it("stays in Recent Items when a recent pile in an earlier slot fills and merges", function()
+      stacking({ dontMergePartial = true })
+      bag({ [6] = { itemID = ORE, guid = "ore-old", count = 20 } })
+      refreshBackpack({ wipe = true })
+      assert.equal("Everything:20,Recent Items:15", loot(2, 15, "ore-new"))
+      assert.equal("Recent Items:40", loot(2, 5), "full: it merges, and the stack is recent")
+    end)
+
+    it("goes back to its category once no pile it merges is recent", function()
+      bag({ [3] = { itemID = ORE, guid = "ore-old", count = 18 }, [5] = { itemID = ORE, guid = "ore-new", count = 2 } })
+      newSlots["0_5"] = true
+      refreshBackpack({ wipe = true })
+      refreshBackpack({ bags = { [0] = true } })
+      assert.equal("Recent Items:20", shown(ORE))
+      mockContainer[0][5] = {}
+      refreshBackpack({ bags = { [0] = true } })
+      assert.equal("Everything:18", shown(ORE), "the recent pile was used up")
+    end)
+
+    it("shows the same section and count however the piles are read", function()
+      bag({ [3] = { itemID = ORE, guid = "ore-old", count = 12 } })
+      refreshBackpack({ wipe = true })
+      loot(5, 15, "ore-new")
+      loot(3, 6)
+      local targeted = shown(ORE)
+      refreshBackpack()
+      assert.equal(targeted, shown(ORE), "a read of every bag")
+      refreshBackpack({ derive = true })
+      assert.equal(targeted, shown(ORE), "a recalculation")
+    end)
+  end)
+
+  -- A refresh recalculates only what changed (data-loader.md §18). An item's category, upgrade
+  -- arrow and grey-out are kept with it, and computed again only when the item is read anew, when an
+  -- input of its own changes (recency, tooltip text, gear sets, quest state), or when an input every
+  -- item shares changes: category settings and definitions (a recalculation that does not say
+  -- categoriesUnchanged, or the categories module's generation), the item context, the upgrade
+  -- generation. A captured bank open spent 1.35 s asking Pawn about items it had already asked about.
+  describe("deriving only what changed", function()
+    local BACKPACK, BANK = 0, 1
+    local asked, contextAsked, customAsked, categoryAsked, added
+    local itemContext, gear, catGen, customOf, tooltipOf, setsOf, searchCats, stackOpts, questOf, allowedInWarbank
+
+    -- A pile of an item, with a link in the client's format (ParseItemLink reads the item ID from
+    -- it, so different items hash apart).
+    local function pile(id, guid, count)
+      return { itemID = id, guid = guid, count = count,
+        link = "|cnIQ1:|Hitem:" .. id .. ":0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[TestItem " .. id .. "]|h|r" }
+    end
+
+    local function distinct(list)
+      local seen, out = {}, {}
+      for _, v in ipairs(list) do
+        if not seen[v] then
+          seen[v] = true
+          out[#out + 1] = v
+        end
+      end
+      table.sort(out)
+      return out
+    end
+
+    local function reset()
+      asked, contextAsked, customAsked, categoryAsked, added = {}, {}, {}, {}, {}
+    end
+
+    local function refreshBank(opts)
+      local ctx = context:New("refresh-bank")
+      if opts and opts.wipe then ctx:Set("wipe", true) end
+      if opts and opts.derive then ctx:Set("derive", true) end
+      if opts and opts.categoriesUnchanged then ctx:Set("categoriesUnchanged", true) end
+      items:RefreshBank(ctx)
+    end
+
+    before_each(function()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      reset()
+      gear, catGen, itemContext = 1, 1, nil
+      customOf, tooltipOf, setsOf, searchCats, questOf = {}, {}, {}, {}, {}
+      saveGlobal(_G.C_Container, "GetContainerItemQuestInfo")
+      _G.C_Container.GetContainerItemQuestInfo = function(bagid, slotid)
+        return questOf[bagid .. "_" .. slotid] or { isQuestItem = false, isActive = false }
+      end
+      -- The Warbank (bag 13 here) and whether it takes an item (C_Bank.IsItemAllowedInBankType): a
+      -- property of the item, so every pile of an item answers alike (binding reads it too).
+      override(_G.Enum.BagIndex, "AccountBankTab_1", 13)
+      allowedInWarbank = function(itemID) return itemID % 2 == 0 end
+      saveGlobal(_G, "C_Bank")
+      _G.C_Bank = { IsItemAllowedInBankType = function(_, location)
+        local bagid, slotid = location:GetBagAndSlot()
+        local itemID = _G.C_Container.GetContainerItemID(bagid, slotid)
+        return itemID ~= nil and allowedInWarbank(itemID)
+      end }
+      stackOpts = { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+        dontMergePartial = false, dontMergeTransmog = false }
+      override(database, "GetStackingOptions", function() return stackOpts end)
+      items:RegisterUpgradeProvider("Counted", function(data)
+        asked[#asked + 1] = data.slotkey
+        return (data.itemInfo.itemID + gear) % 2 == 0
+      end, { cacheable = true })
+      override(database, "GetUpgradeIconProvider", function() return "Counted" end)
+      override(database, "GetUpgradeIconProviderUserSet", function() return true end)
+      saveGlobal(_G, "ItemButtonUtil")
+      _G.ItemButtonUtil = {
+        ItemContextMatchResult = { Match = 1, Mismatch = 2, DoesNotApply = 0 },
+        GetItemContext = function() return itemContext end,
+        GetItemContextMatchResultForItem = function(location)
+          local bagid, slotid = location:GetBagAndSlot()
+          contextAsked[#contextAsked + 1] = bagid .. "_" .. slotid
+          if itemContext == nil then return 0 end
+          return (slotid + #itemContext) % 2 == 0 and 1 or 2
+        end,
+      }
+      override(categories, "GetGeneration", function() return catGen end)
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        customAsked[#customAsked + 1] = data.slotkey
+        local name = customOf[data.itemInfo.itemID]
+        if name then return name, 10 end
+        return nil, nil
+      end)
+      override(categories, "GetSortedSearchCategories", function()
+        local out = {}
+        for _, c in ipairs(searchCats) do
+          table.insert(out, { name = c[1], priority = c[3] or 10,
+            enabled = { [BACKPACK] = true, [BANK] = true },
+            searchCategory = { query = c[2], groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } })
+        end
+        return out
+      end)
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      override(tooltipScanner, "GetTooltipText", function(_, bagid, slotid)
+        return tooltipOf[bagid .. "_" .. slotid] or ""
+      end)
+      local equipmentSets = addon:GetModule("EquipmentSets")
+      override(equipmentSets, "GetItemSets", function(_, bagid, slotid)
+        return setsOf[bagid .. "_" .. slotid]
+      end)
+      local add = search.Add
+      override(search, "Add", function(self, it)
+        added[#added + 1] = it.slotkey
+        return add(self, it)
+      end)
+      local getCategory = items.GetCategory
+      override(items, "GetCategory", function(self, ctx, data, own)
+        if data and not data.isItemEmpty then categoryAsked[#categoryAsked + 1] = data.slotkey end
+        return getCategory(self, ctx, data, own)
+      end)
+    end)
+
+    local function threeItems()
+      mockContainer[0] = {
+        pile(101, "g101", 1),
+        pile(202, "g202", 5),
+        pile(303, "g303", 1),
+        {},
+      }
+      refreshBackpack({ wipe = true })
+      reset()
+    end
+
+    it("asks the upgrade provider only about items a read finds changed", function()
+      threeItems()
+      mockContainer[0][4] = pile(404, "g404", 1)
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_4" }, distinct(asked), "the new item")
+      reset()
+      mockContainer[0][2].count = 6
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_2" }, distinct(asked), "the stack that grew")
+      reset()
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({}, asked, "a recalculation of something else")
+      items:InvalidateUpgrades(false)
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_1", "0_2", "0_3", "0_4" }, distinct(asked), "every item after the gear changed")
+    end)
+
+    it("recalculates an item's category only when the item or one of its inputs changes", function()
+      threeItems()
+      mockContainer[0][4] = pile(404, "g404", 1)
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_4" }, distinct(customAsked), "the new item")
+      reset()
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({}, customAsked, "nothing changed")
+      newSlots["0_1"] = true
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_1" }, distinct(categoryAsked), "the item that became recent")
+      assert.equal("Recent Items", items.slotInfo[BACKPACK].itemsBySlotKey["0_1"].itemInfo.category)
+      reset()
+      tooltipOf["0_3"] = "shiny"
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({ "0_3" }, distinct(customAsked), "the item whose tooltip changed")
+      reset()
+      catGen = catGen + 1
+      customOf[202] = "Gems"
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_1", "0_2", "0_3", "0_4" }, distinct(categoryAsked), "every item once a category changed")
+      assert.equal("Gems", items.slotInfo[BACKPACK].itemsBySlotKey["0_2"].itemInfo.category)
+      reset()
+      refreshBackpack({ derive = true })
+      assert.are.same({ "0_1", "0_2", "0_3", "0_4" }, distinct(categoryAsked), "a recalculation that may change them")
+    end)
+
+    it("works grey-out out again only when the item context changes", function()
+      threeItems()
+      mockContainer[0][4] = pile(404, "g404", 1)
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_4" }, distinct(contextAsked))
+      reset()
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({}, contextAsked)
+      itemContext = "Scrapping"
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({ "0_1", "0_2", "0_3", "0_4" }, distinct(contextAsked), "a vendor or scrapper opened")
+      -- The mock matches slots whose number plus the context's length is even.
+      assert.equal(1, items.slotInfo[BACKPACK].itemsBySlotKey["0_1"].itemContextMatchResult)
+      assert.equal(2, items.slotInfo[BACKPACK].itemsBySlotKey["0_2"].itemContextMatchResult)
+      -- While a context is active Blizzard's answer can depend on more than the context: the spell
+      -- being cast for Enchanting, CheckItemCondition, ReplaceBonusTree, JumpUpgradeTrack
+      -- (ItemButtonUtil.GetItemContextMatchResultForItem). So every refresh works it out.
+      reset()
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({ "0_1", "0_2", "0_3", "0_4" }, distinct(contextAsked), "while a context is active")
+      itemContext = nil
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      reset()
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({}, contextAsked, "no context")
+      addon.atBank = true
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_1", "0_2", "0_3", "0_4" }, distinct(contextAsked), "the bank opened")
+    end)
+
+    -- At the bank, the backpack is greyed out by what the shown bank takes: the Warbank takes fewer
+    -- items than the character bank (ResolveItemContextMatchResult).
+    it("works grey-out out again when the bank shows the Warbank instead of the character bank", function()
+      threeItems()
+      addon.atBank = true
+      addon.Bags = { Bank = { bankTab = 6 } }
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      local slot1 = function() return items.slotInfo[BACKPACK].itemsBySlotKey["0_1"].itemContextMatchResult end
+      assert.equal(0, slot1(), "the character bank takes everything")
+      addon.Bags.Bank.bankTab = 13
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.equal(2, slot1(), "the Warbank does not take it")
+      addon.Bags.Bank.bankTab = 6
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.equal(0, slot1())
+    end)
+
+    -- An item's own category includes its recency (GetCategory with own), and search categories
+    -- match it (data-loader.md §8). A search category on "recent items" matches an item only while it
+    -- is recent, so the item's own category must follow its recency, its own and its stack's.
+    describe("an own category that follows recency", function()
+      before_each(function()
+        searchCats = { { "Was Recent", 'category = "recent items"', 1 } }
+      end)
+
+      local function categoryOf(slotkey)
+        return items.slotInfo[BACKPACK].itemsBySlotKey[slotkey].itemInfo.category
+      end
+
+      it("lets an item go once it is no longer recent", function()
+        threeItems()
+        newSlots["0_1"] = true
+        refreshBackpack({ bags = { [0] = true } })
+        assert.equal("Recent Items", categoryOf("0_1"))
+        for guid in pairs(items._newItemTimers[BACKPACK]) do items._newItemTimers[BACKPACK][guid] = 0 end
+        newSlots["0_1"] = nil
+        items:ExpireRecentItems(BACKPACK)
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.equal("Everything", categoryOf("0_1"))
+      end)
+
+      it("lets a stack go once no pile it merges is recent", function()
+        mockContainer[0] = { pile(101, "old", 15), {}, {} }
+        refreshBackpack({ wipe = true })
+        mockContainer[0][2] = pile(101, "new", 3)
+        newSlots["0_2"] = true
+        refreshBackpack({ bags = { [0] = true } })
+        assert.equal("Recent Items", categoryOf("0_1"), "the stack shows the recent pile")
+        catGen = catGen + 1
+        refreshBackpack({ derive = true })
+        mockContainer[0][2] = {}
+        refreshBackpack({ bags = { [0] = true } })
+        assert.equal("Everything", categoryOf("0_1"))
+      end)
+    end)
+
+    -- A stack is recent while a pile it merges is (stackRecent); the largest pile shows it. Once
+    -- stacking is off every pile shows its own.
+    it("shows a pile's own category once stacking stops merging it", function()
+      mockContainer[0] = { pile(101, "old", 15), pile(101, "new", 3), {} }
+      refreshBackpack({ wipe = true })
+      newSlots["0_2"] = true
+      refreshBackpack({ bags = { [0] = true } })
+      assert.equal("Recent Items", items.slotInfo[BACKPACK].itemsBySlotKey["0_1"].itemInfo.category)
+      stackOpts.mergeStacks = false
+      refreshBackpack({ derive = true, resetLayout = true })
+      assert.equal("Everything", items.slotInfo[BACKPACK].itemsBySlotKey["0_1"].itemInfo.category)
+      assert.equal("Recent Items", items.slotInfo[BACKPACK].itemsBySlotKey["0_2"].itemInfo.category)
+    end)
+
+    -- Every input of the category an item is shown in is recorded, the search category included:
+    -- in the game a change of search categories also starts a new categories generation, which
+    -- works everything out again; the record does not rely on it.
+    it("works an item's shown category out again when its search category changes", function()
+      searchCats = { { "Shiny", "alpha", 10 } }
+      threeItems()
+      assert.equal("Shiny", items.slotInfo[BACKPACK].itemsBySlotKey["0_1"].itemInfo.category)
+      searchCats = { { "Swords", "alpha", 10 } }
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.equal("Swords", items.slotInfo[BACKPACK].itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    -- A sweep can fail after it indexed its items and before it committed them: the index then
+    -- holds items the bag never got. The other bag's next sweep brings the index back to the
+    -- committed items (search:SyncKind compares an item that is not the object its slot was
+    -- indexed from).
+    it("brings the index back to the committed items after a sweep failed before committing", function()
+      threeItems()
+      mockContainer[6] = { pile(505, "g505", 1) }
+      refreshBank()
+      local partition = items.Phase10_PartitionIntoTabs
+      override(items, "Phase10_PartitionIntoTabs", function() error("spec: fails after indexing") end)
+      mockContainer[0][2] = pile(606, "g606", 1)
+      pcall(refreshBackpack, { bags = { [0] = true } })
+      override(items, "Phase10_PartitionIntoTabs", partition)
+      assert.is_true(search:isInIndex("id", 606)["0_2"], "the failed sweep indexed its item")
+      refreshBank()
+      assert.is_nil(search:isInIndex("id", 606)["0_2"])
+      assert.is_true(search:isInIndex("id", 202)["0_2"], "the item the bag still has")
+    end)
+
+    -- A sweep can also fail after it worked an item out again (Phase 6) and before it indexed it
+    -- (Phase 8). The item is the committed object, so nothing in the next sweep looks changed; it
+    -- must still be indexed with what it holds now.
+    it("indexes an item worked out by a sweep that failed before indexing it", function()
+      threeItems()
+      local stacks = items.Phase7_ApplyVirtualStacks
+      override(items, "Phase7_ApplyVirtualStacks", function() error("spec: fails before indexing") end)
+      tooltipOf["0_3"] = "Use: sharpens a blade"
+      pcall(refreshBackpack, { derive = true, categoriesUnchanged = true })
+      override(items, "Phase7_ApplyVirtualStacks", stacks)
+      assert.is_nil(search:Search("sharpens")["0_3"])
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.is_true(search:Search("sharpens")["0_3"])
+      for slotkey, it in pairs(items.slotInfo[BACKPACK].itemsBySlotKey) do
+        assert.is_nil(it.derived and it.derived.indexPending, slotkey .. " is indexed: no mark left")
+      end
+    end)
+
+    it("re-indexes only the items that changed, and nothing on a recalculation of something else", function()
+      threeItems()
+      mockContainer[0][4] = pile(404, "g404", 1)
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_4" }, added)
+      added = {}
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      mockContainer[6] = { pile(505, "g505", 1) }
+      refreshBank()
+      added = {}
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({}, added, "the bank's items are left alone")
+    end)
+
+    -- The safety net: whatever happens, what a refresh keeps equals what a full recalculation of
+    -- every item would give, as search-indexing.md §1 checks the search index against a rebuild.
+    describe("equals a full recalculation", function()
+      local function sets(t)
+        local out = {}
+        for value, slots in pairs(t) do
+          local keys = {}
+          for k in pairs(slots) do keys[#keys + 1] = k end
+          table.sort(keys)
+          out[tostring(value)] = table.concat(keys, ",")
+        end
+        return out
+      end
+      local function numbers(node, out)
+        if node then
+          numbers(node.left, out)
+          local keys = {}
+          for k in pairs(node.data) do keys[#keys + 1] = k end
+          table.sort(keys)
+          out[tostring(node.value)] = table.concat(keys, ",")
+          numbers(node.right, out)
+        end
+        return out
+      end
+      local function indexState()
+        local out = {}
+        for name, index in pairs(search.indicies) do
+          out[name] = { sets(index.ngrams), sets(index.fullText), sets(index.bools), numbers(index.numbers.root, {}) }
+        end
+        return out
+      end
+      local function cleanState()
+        local saved = { search.indicies, search.indexLookup, search.indexed, search.indexedItems }
+        search:Init()
+        local all = {}
+        for _, kind in ipairs({ BACKPACK, BANK }) do
+          for slotkey, it in pairs(items.slotInfo[kind].itemsBySlotKey or {}) do all[slotkey] = it end
+        end
+        search:IndexItems(all)
+        local state = indexState()
+        search.indicies, search.indexLookup, search.indexed, search.indexedItems = saved[1], saved[2], saved[3], saved[4]
+        return state
+      end
+
+      local function capture()
+        local out = {}
+        for _, kind in ipairs({ BACKPACK, BANK }) do
+          local si = items.slotInfo[kind]
+          local visible = si:GetVisibleItems()
+          for slotkey, it in pairs(si.itemsBySlotKey or {}) do
+            if not it.isItemEmpty then
+              out[slotkey] = table.concat({ tostring(it.itemInfo.category), tostring(it.isUpgrade),
+                tostring(it.itemContextMatchResult), tostring(visible[slotkey] ~= nil and it.stackedCount or "-"),
+                tostring(it.isSearchResult) }, "|")
+            end
+          end
+        end
+        return out
+      end
+
+      -- A full recalculation: nothing kept about any item (derived), no kept verdict, every
+      -- category worked out again (a recalculation that does not say categoriesUnchanged).
+      local function compare(step, what)
+        local kept, keptIndex = capture(), indexState()
+        assert.are.same(cleanState(), keptIndex, "search index, step " .. step .. " (" .. what .. ")")
+        for _, kind in ipairs({ BACKPACK, BANK }) do
+          for _, it in pairs(items.slotInfo[kind].itemsBySlotKey or {}) do
+            it.derived = nil
+            it.stackRecent = nil
+          end
+        end
+        items:InvalidateUpgrades(false)
+        refreshBackpack({ derive = true })
+        refreshBank({ derive = true })
+        assert.are.same(capture(), kept, "step " .. step .. " (" .. what .. ")")
+      end
+
+      local function run(seed, steps)
+        local state = seed
+        local function rand(n)
+          state = (state * 1103515245 + 12345) % 2147483648
+          return (math.floor(state / 65536) % n) + 1
+        end
+        local guid = 0
+        local function newGuid()
+          guid = guid + 1
+          return "r" .. guid
+        end
+        local ids = { 101, 202, 303 }
+        mockContainer[0], mockContainer[1], mockContainer[6] = {}, {}, {}
+        for i = 1, 8 do mockContainer[0][i] = {} end
+        for i = 1, 5 do mockContainer[1][i] = {} end
+        for i = 1, 4 do mockContainer[6][i] = {} end
+        mockContainer[0][1] = pile(101, newGuid(), 5)
+        mockContainer[0][2] = pile(202, newGuid(), 20)
+        mockContainer[6][1] = pile(303, newGuid(), 2)
+        refreshBank({ wipe = true })
+        refreshBackpack({ wipe = true })
+
+        local function slots(occupied, bags)
+          local out = {}
+          for _, bagid in ipairs(bags or { 0, 1 }) do
+            for slotid, slot in ipairs(mockContainer[bagid]) do
+              if (slot.itemID ~= nil) == occupied then out[#out + 1] = { bagid, slotid } end
+            end
+          end
+          return out
+        end
+        local function pick(list) return list[rand(#list)] end
+        local function key(bs) return bs[1] .. "_" .. bs[2] end
+
+        local actions = {
+          { "loot a new pile", 4, function()
+            local at = pick(slots(false))
+            if not at then return end
+            mockContainer[at[1]][at[2]] = pile(pick(ids), newGuid(), rand(20))
+            newSlots[key(at)] = rand(2) == 1
+            refreshBackpack({ bags = { [at[1]] = true } })
+          end },
+          { "top up a pile", 3, function()
+            local at = pick(slots(true))
+            if not at then return end
+            local slot = mockContainer[at[1]][at[2]]
+            slot.count = math.min(20, slot.count + rand(4))
+            refreshBackpack({ bags = { [at[1]] = true } })
+          end },
+          { "use up a pile", 2, function()
+            local at = pick(slots(true))
+            if not at then return end
+            mockContainer[at[1]][at[2]] = {}
+            refreshBackpack({ bags = { [at[1]] = true } })
+          end },
+          { "move a pile", 2, function()
+            local from, to = pick(slots(true)), pick(slots(false))
+            if not from or not to then return end
+            mockContainer[to[1]][to[2]] = mockContainer[from[1]][from[2]]
+            mockContainer[from[1]][from[2]] = {}
+            refreshBackpack({ bags = { [from[1]] = true, [to[1]] = true } })
+          end },
+          { "the client flags a pile new", 1, function()
+            local at = pick(slots(true))
+            if not at then return end
+            newSlots[key(at)] = true
+            refreshBackpack({ bags = { [at[1]] = true } })
+          end },
+          { "a plugin files an item (no refresh asked)", 1, function()
+            local names = { false, "Mats", "Gems" }
+            customOf[pick(ids)] = names[rand(3)] or nil
+            catGen = catGen + 1
+            local at = pick(slots(true)) or { 0, 1 }
+            refreshBackpack({ bags = { [at[1]] = true } })
+            refreshBank()
+          end },
+          { "search categories change", 1, function()
+            local lists = { {}, { { "Shiny", "shiny" } }, { { "Alpha", "alpha" }, { "Meta", 'category = "alpha"', 1 } },
+              { { "Recent Mats", 'category = "recent items"', 1 } } }
+            searchCats = lists[rand(#lists)]
+            refreshBackpack({ derive = true })
+            refreshBank({ derive = true })
+          end },
+          -- An input both bags share: both are recalculated, as the game does.
+          { "the item context changes", 1, function()
+            local contexts = { false, "Scrapping", "Enchanting" }
+            itemContext = contexts[rand(3)] or nil
+            refreshBackpack({ derive = true, categoriesUnchanged = true })
+            refreshBank({ derive = true, categoriesUnchanged = true })
+          end },
+          { "the bank opens or closes", 1, function()
+            addon.atBank = not addon.atBank
+            refreshBackpack({ derive = true, categoriesUnchanged = true })
+            refreshBank({ derive = true, categoriesUnchanged = true })
+          end },
+          { "the gear changes", 1, function()
+            gear = gear + 1
+            items:InvalidateUpgrades(false)
+            refreshBackpack({ derive = true, categoriesUnchanged = true })
+            refreshBank({ derive = true, categoriesUnchanged = true })
+          end },
+          { "a tooltip finishes loading", 1, function()
+            local at = pick(slots(true))
+            if not at then return end
+            local texts = { "", "shiny", "alpha dust" }
+            tooltipOf[key(at)] = texts[rand(3)]
+            refreshBackpack({ derive = true, categoriesUnchanged = true })
+            refreshBank({ derive = true, categoriesUnchanged = true })
+          end },
+          -- The set map is rebuilt by every sweep, so a read can see a set change before
+          -- EQUIPMENT_SETS_CHANGED's recalculation runs.
+          { "gear sets change", 1, function()
+            local at = pick(slots(true))
+            if not at then return end
+            setsOf[key(at)] = rand(2) == 1 and { "Tank" } or nil
+            override(database, "GetCategoryFilter", function(_, _, filter)
+              return filter == "RecentItems" or filter == "GearSet"
+            end)
+            if rand(2) == 1 then
+              refreshBackpack()
+            else
+              refreshBackpack({ derive = true })
+              refreshBank({ derive = true })
+            end
+          end },
+          { "a quest starts or ends", 1, function()
+            local at = pick(slots(true))
+            if not at then return end
+            questOf[key(at)] = rand(2) == 1 and { isQuestItem = true, questID = 77, isActive = rand(2) == 1 } or nil
+            refreshBackpack()
+          end },
+          { "the bank shows another tab", 1, function()
+            addon.Bags.Bank.bankTab = rand(2) == 1 and 13 or 6
+            refreshBackpack({ derive = true, categoriesUnchanged = true })
+          end },
+          { "Recent Items are cleared (a sort)", 1, function()
+            items:ClearNewItems(BACKPACK)
+            refreshBackpack()
+          end },
+          { "stacking options change", 1, function()
+            stackOpts.dontMergePartial = rand(2) == 1
+            stackOpts.mergeStacks = rand(4) ~= 1
+            refreshBackpack({ derive = true })
+            refreshBank({ derive = true })
+          end },
+          { "the search box", 1, function()
+            local texts = { "", "test", "shiny", "recent" }
+            searchText = texts[rand(#texts)]
+            refreshBackpack({ derive = true, categoriesUnchanged = true })
+            refreshBank({ derive = true, categoriesUnchanged = true })
+          end },
+          { "the bank changes", 1, function()
+            local at = pick(slots(false, { 6 }))
+            if at then
+              mockContainer[6][at[2]] = pile(pick(ids), newGuid(), rand(20))
+            end
+            refreshBank()
+          end },
+          -- The bag closing: Recent Items that are old enough expire, then a recalculation that
+          -- changes nothing categories read (OnClosed, recent-items.md §3).
+          { "the bag closes and Recent Items expire", 1, function()
+            local timers = items._newItemTimers[BACKPACK]
+            for timerGuid in pairs(timers) do
+              if rand(2) == 1 then timers[timerGuid] = 0 end
+            end
+            items:ExpireRecentItems(BACKPACK)
+            refreshBackpack({ derive = true, categoriesUnchanged = true })
+          end },
+          { "Show Bags is toggled", 0.5, function()
+            local showBags = rand(2) == 1
+            override(database, "GetBagView", function()
+              return showBags and const.BAG_VIEW.SECTION_ALL_BAGS or const.BAG_VIEW.SECTION_GRID
+            end)
+            refreshBackpack({ derive = true })
+            refreshBank({ derive = true })
+          end },
+          { "a full read", 1, function()
+            refreshBackpack()
+          end },
+          { "a wipe", 0.25, function()
+            refreshBank({ wipe = true })
+            refreshBackpack({ wipe = true })
+          end },
+        }
+        local total = 0
+        for _, a in ipairs(actions) do total = total + a[2] end
+        for step = 1, steps do
+          local roll = rand(1000) / 1000 * total
+          local chosen
+          for _, a in ipairs(actions) do
+            roll = roll - a[2]
+            if roll <= 0 then chosen = a break end
+          end
+          chosen = chosen or actions[1]
+          chosen[3]()
+          compare(step, chosen[1])
+        end
+      end
+
+      for _, seed in ipairs({ 7, 1234, 98765, 424242, 31337, 2026 }) do
+        it("over random changes (seed " .. seed .. ")", function()
+          addon.atBank = false
+          addon.Bags = { Bank = { bankTab = 6 } }
+          run(seed, 200)
+        end)
+      end
     end)
   end)
 
@@ -3184,6 +3928,8 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
           reset = ectx:Get("resetLayout") == true,
           derive = ectx:Get("derive") == true,
           restyle = ectx:Get("restyle") == true,
+          categoriesUnchanged = ectx:Get("categoriesUnchanged") == true,
+          recategorize = ectx:Get("recategorize") == true,
         })
         return run(self, ectx, kind)
       end)
@@ -3371,6 +4117,58 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.equal(2, #sweeps)
         assert.is_false(sweeps[2].derive)
         assert.is_true(sweeps[2].restyle)
+      end)
+
+      -- data-loader.md §18: kept categories stand only when every merged request says nothing they
+      -- read changed. A read keeps them, so one that absorbs a recalculation that changed them must
+      -- work them out again.
+      it("keeps categories only when every merged derive says they are unchanged", function()
+        refresh:RequestUpdate({ backpack = true }) -- runs now
+        refresh:RequestUpdate({ derive = true, backpack = true, categoriesUnchanged = true })
+        refresh:RequestUpdate({ derive = true, backpack = true, categoriesUnchanged = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_true(sweeps[2].categoriesUnchanged)
+        sweeps = {}
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true, categoriesUnchanged = true })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_false(sweeps[2].categoriesUnchanged, "one changed them")
+      end)
+
+      it("makes a read that absorbs a recalculation of categories work them out again", function()
+        refresh:RequestUpdate({ backpack = true }) -- runs now
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true, categoriesUnchanged = true })
+        drain()
+        assert.is_false(sweeps[2].recategorize, "nothing changed them")
+        sweeps = {}
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_false(sweeps[2].derive)
+        assert.is_true(sweeps[2].recategorize)
+      end)
+
+      it("works categories out again after a merged read that absorbed their change", function()
+        local custom
+        override(categories, "GetCustomCategory", function(_, _, _, data)
+          if custom and data.itemInfo.itemID == 101 then return custom, 10 end
+          return nil, nil
+        end)
+        mockContainer[0] = { { itemID = 101, guid = "g101b", count = 1 } }
+        refresh:RequestUpdate({ backpack = true, wipe = true })
+        drain()
+        custom = "Swords"
+        refresh:RequestUpdate({ backpack = true }) -- runs now
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        drain()
+        assert.equal("Swords", items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"].itemInfo.category)
       end)
 
       -- A targeted read carries the other bags' items over without refreshing them, so it

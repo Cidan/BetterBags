@@ -72,8 +72,10 @@ re-scans just that item; every other item hits the warm cache. The recalculation
 slot: it refreshes each committed item still in its slot (`items:RefreshKeptItem`), including
 `tooltipText` from `GetTooltipText`, and re-reads one that was read without its data (most
 resolutions are of such items: the client had not loaded them yet), precisely so this re-scan lands (data-loader.md §16,
-refresh-scheduler.md §10). Its new text then makes `search:SyncKind` re-index that one item
-(search-indexing.md §1).
+refresh-scheduler.md §10). Its new text drops what was kept about that item (data-loader.md §18),
+so its category is worked out again and `search:SyncKind` re-indexes it, and only it
+(search-indexing.md §1). The recalculation says `categoriesUnchanged`: no other item's category
+reads the tooltip.
 
 **History:** until the `BucketEvent` fix (event-buckets.md), this listener's callback was
 discarded after its first flush, so the re-scan only ever worked for the first burst after

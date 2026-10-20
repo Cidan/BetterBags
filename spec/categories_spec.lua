@@ -105,6 +105,56 @@ describe("Categories", function()
     categories:Init()
   end)
 
+  -- The bags keep each item's category until something it reads changes (data-loader.md §18), so
+  -- every change made through this module starts a new generation, including other addons filing
+  -- items without asking for a refresh.
+  describe("generation", function()
+    local function bumps(fn)
+      local before = categories:GetGeneration()
+      fn()
+      return categories:GetGeneration() > before
+    end
+
+    it("changes with every change of what a category lookup reads", function()
+      local ctx = context:New("test")
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      local changes = {
+        CreateCategory = function() categories:CreateCategory(ctx, { name = "Gems", itemList = {} }) end,
+        AddItemToCategory = function() categories:AddItemToCategory(ctx, 101, "Gems") end,
+        AddPermanentItemToCategory = function() categories:AddPermanentItemToCategory(ctx, 102, "Mats") end,
+        RemoveItemFromCategory = function() categories:RemoveItemFromCategory(101, "Gems") end,
+        WipeCategory = function() categories:WipeCategory(ctx, "Mats") end,
+        ToggleCategory = function() categories:ToggleCategory(0, "Gems") end,
+        EnableCategory = function() categories:EnableCategory(0, "Gems") end,
+        DisableCategory = function() categories:DisableCategory(0, "Gems") end,
+        SetCategoryState = function() categories:SetCategoryState(0, "Gems", true) end,
+        RegisterCategoryFunction = function() categories:RegisterCategoryFunction("spec", function() return nil end) end,
+        HideCategory = function() categories:HideCategory(ctx, "Mats") end,
+        ShowCategory = function() categories:ShowCategory(ctx, "Mats") end,
+        ToggleCategoryShown = function() categories:ToggleCategoryShown(ctx, "Mats") end,
+        RenameCategory = function() categories:RenameCategory(ctx, "Mats", "Metals") end,
+        DeleteCategory = function() categories:DeleteCategory(ctx, "Metals") end,
+        ReprocessAllItems = function() categories:ReprocessAllItems(ctx) end,
+      }
+      for _, name in ipairs({ "CreateCategory", "AddItemToCategory", "AddPermanentItemToCategory",
+        "RemoveItemFromCategory", "WipeCategory", "ToggleCategory", "EnableCategory", "DisableCategory",
+        "SetCategoryState", "RegisterCategoryFunction", "HideCategory", "ShowCategory", "ToggleCategoryShown",
+        "RenameCategory", "DeleteCategory", "ReprocessAllItems" }) do
+        assert.is_true(bumps(changes[name]), name)
+      end
+    end)
+
+    it("does not change while a lookup files an item a category function names", function()
+      local ctx = context:New("test")
+      categories:CreateCategory(ctx, { name = "Fish", itemList = {} })
+      categories:RegisterCategoryFunction("fish", function() return "Fish" end)
+      local data = { itemInfo = { itemID = 555 } }
+      assert.is_false(bumps(function()
+        assert.equal("Fish", (categories:GetCustomCategory(ctx, 0, data)))
+      end))
+    end)
+  end)
+
   -- ─── CreateCategory ─────────────────────────────────────────────────────────
 
   describe("CreateCategory", function()
