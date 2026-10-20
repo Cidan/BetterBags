@@ -148,6 +148,9 @@ describe("BetterBags Next's shipped themes", function()
       assert.is_true(t.Motion.Time.Open < 0.45)
       -- Asked: no border on a full panel docked at its edge ("there shouldn't be").
       assert.is_false(t.Panel.Edge.Full)
+      -- Asked: its header icons scaled down, with its smaller title (next-themes.md §11).
+      assert.is_true(t.Header.Buttons.Scale < 1)
+      assert.are.equal(1, sonataNext:Resolve("Default").Header.Buttons.Scale)
     end)
   end)
 end)

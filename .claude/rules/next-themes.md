@@ -77,7 +77,7 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 | `Layout` | Sizes: Icon, VendorPrice, Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
 | `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
 | `Panel` | `Fill` (texture spec), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false). |
-| `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`). |
+| `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button). |
 | `Search` | `Fill`, `FocusFill`, `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`), `HelpFont`, `TextFont`. |
 | `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Line` (`Color`, `From`, `To`, `Size`, or false), `Highlight` (`Color`, `From`, `To`, or false). |
 | `Tabs` | `Fill`, `SelectedFill`, `Fade`, `Font`, `SelectedFont`, `Glow` (`Color`, `BlendMode`, `Drop`, `Pulse`, or false), `Indicator` (`Color`, `Width`, or false), `Accents` (Warbank, Guild). A tab entry's `accent` is an accent name, a palette name or a color. |
@@ -173,7 +173,8 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
   icons keep one); ink and sealing-wax lines, bars and glows drawn normally, not added as light; no
   sparkles, cloud, spark or wash; glyph icons in ink, colored icons in their own colors. Its paper
   color (feather, tabs) is the art's measured average (0.83, 0.78, 0.70).
-- **Quiet**: cool grays, smaller icons nine to a row, a shorter header, no ribbon, cloud, spark,
+- **Quiet**: cool grays, smaller icons nine to a row, a shorter header with its button icons at 0.8
+  of their buttons (§11), no ribbon, cloud, spark,
   sparkles or braid, quicker opening without a bounce (the body reaches only 4 past the edge), a
   fainter small border. Its first version drew the border on full panels too; asked: a full panel
   docked at its edge should have none, so it no longer sets `Panel.Edge.Full`.
@@ -253,6 +254,13 @@ close button included.
   guild bank's withdraw gold): drawn at `DisabledAlpha` (Default 0.3) of the color it would have, never
   brighter under the pointer; art desaturated too. Desaturating, as before, does nothing to a white
   glyph: a disabled button looked enabled. One alpha follows every theme's own icon color.
+- **Scale** (asked: "we need to scale our icons as part of the quiet theme (icon scale should be part
+  of theme spec in sonata)"): an icon is `Layout.HeaderButton` times `Header.Buttons.Scale` (Default
+  1) times its own `Scale` (an icon in `Icons` may carry one, for art that needs fitting) across,
+  centered in its button (`SetHeaderIcon`, so a theme switch and the size button's state change size
+  it again). The button, its click area and its place in the header stay the layout's: shrinking the
+  buttons themselves is `Layout.HeaderButton`. Quiet draws them at 0.8: its title is 20 against
+  Default's 26, and 0.8 keeps the icons' share of the title about Default's.
 - **Every client draws the same**: the art branches per client are gone (Blizzard's backpack art,
   `RedButton-Condense`/`-Expand` or Classic's smaller and bigger buttons, the merchant's
   `SpellIcon-256x256-*` atlases or Classic's repair icons and a coin).
@@ -261,9 +269,12 @@ Coverage: `spec/sonata/next_themes_spec.lua` ("names a glyph BetterBags ships fo
 in Default": every key, a file of its own, a 64 x 64 RGBA PNG on disk, nothing else),
 `spec/next/theme_panel_spec.lua` ("header icons": Default's color on every button, a theme's glyph
 colors and hover, a theme's own art and glyph, texture coordinates, one button's own colors, disabled
-glyph and art, hovered and through a theme switch, a missing key), `spec/next/bag_spec.lua`,
+glyph and art, hovered and through a theme switch, a missing key; each icon its button's size and
+centered in Default, scaled by the theme and by its own `Scale`, the button unchanged, through a size
+switch, a share of the layout's button size), `spec/sonata/next_themes_spec.lua` ("Quiet": its scale
+below 1, Default's 1), `spec/next/bag_spec.lua`,
 `spec/next/bank_spec.lua`, `spec/next/vendor_spec.lua`, `spec/next/guildbank_spec.lua` and
-`spec/next/small_spec.lua` (each panel's icons, on retail and Classic, and the trilinear filter). 31
+`spec/next/small_spec.lua` (each panel's icons, on retail and Classic, and the trilinear filter). 37
 mutations, each caught (the one that first survived, art hovered in the glyph color, led to a test
 whose two hover colors differ).
 

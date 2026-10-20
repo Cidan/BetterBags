@@ -597,6 +597,40 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal(0.4, a)
     end)
 
+    -- Asked: "we need to scale our icons as part of the quiet theme (icon scale should be part of
+    -- theme spec in sonata)". An icon's size is a share of its button (Header.Buttons.Scale, times its
+    -- own Scale), centered in it; the button, its click area and its place stay the layout's.
+    local function iconSize(button)
+      return { button.icon:GetWidth(), button.icon:GetHeight() }
+    end
+
+    it("draws every icon its button's size in Default, centered on it", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      for _, panel in ipairs({ bag, bank }) do
+        every(panel, function(button)
+          assert.are.same({ style.HEADER_BUTTON, style.HEADER_BUTTON }, iconSize(button), button.key)
+          assert.are.same({ "CENTER", button, "CENTER", 0, 0 }, { button.icon:GetPoint(1) }, button.key)
+        end)
+      end
+    end)
+
+    it("scales every icon in its button by the theme's Scale, one icon by its own too", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Header = { Buttons = { Scale = 0.5, Icons = { closeButton = { Scale = 0.5 } } } } })
+      assert.are.same({ 11, 11 }, iconSize(bag.settingsButton))
+      assert.are.same({ 11, 11 }, iconSize(bag.sizeButton))
+      assert.are.same({ 5.5, 5.5 }, iconSize(bank.closeButton))
+      assert.are.equal(22, bag.settingsButton:GetWidth(), "the button keeps its size")
+      assert.are.same({ "CENTER", bag.settingsButton, "CENTER", 0, 0 }, { bag.settingsButton.icon:GetPoint(1) })
+      bag:UpdateSizeButton()
+      assert.are.same({ 11, 11 }, iconSize(bag.sizeButton), "through a size switch")
+      apply({ Layout = { HeaderButton = 30 }, Header = { Buttons = { Scale = 0.5 } } })
+      assert.are.same({ 15, 15 }, iconSize(bag.settingsButton), "a share of the layout's button")
+      backToDefault()
+      assert.are.same({ 22, 22 }, iconSize(bag.settingsButton))
+      assert.are.same({ 22, 22 }, iconSize(bank.closeButton))
+    end)
+
     it("names the button whose icon the theme does not give", function()
       local bag = nextBag:Create(ctx())
       assert.has_error(function() bag:SetHeaderIcon(bag.sortButton, "nopeButton") end,

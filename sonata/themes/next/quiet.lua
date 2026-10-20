@@ -6,9 +6,10 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
--- Quiet: BetterBags Next calm and compact. Cool grays; smaller icons, nine to a row; a shorter header;
--- no ribbon, cloud, spark, sparkles or braid; panels that open and come in without a bounce, a little
--- quicker; a fainter border round a small panel. Data only (next-themes.md).
+-- Quiet: BetterBags Next calm and compact. Cool grays; smaller icons, nine to a row; a shorter header,
+-- its button icons smaller with its smaller title; no ribbon, cloud, spark, sparkles or braid; panels
+-- that open and come in without a bounce, a little quicker; a fainter border round a small panel.
+-- Data only (next-themes.md).
 sonataNext:RegisterTheme({
   Name = "Quiet",
   DisplayName = "Quiet",
@@ -63,6 +64,8 @@ sonataNext:RegisterTheme({
     Cloud = false,
     Spark = false,
     TitleGlow = false,
+    -- Its title is 20 against Default's 26: its icons keep Default's share of the title's size.
+    Buttons = { Scale = 0.8 },
   },
 
   Sparkles = false,

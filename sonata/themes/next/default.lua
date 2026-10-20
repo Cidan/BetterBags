@@ -287,9 +287,11 @@ sonataNext:RegisterTheme({
     -- white and one color, drawn in Color and brighter in HoverColor; Glyph = false makes it full-color
     -- art, drawn in ArtColor and ArtHoverColor (a tint multiplies the art: a dark one blackens it). An
     -- icon may have its own Color and HoverColor. A disabled button is drawn at DisabledAlpha of its
-    -- color (a white glyph looks the same desaturated), art desaturated too.
+    -- color (a white glyph looks the same desaturated), art desaturated too. Scale is an icon's size
+    -- as a share of its button (Layout.HeaderButton), centered in it; an icon's own Scale multiplies
+    -- it (art that needs fitting). The buttons keep their size and places.
     Buttons = { Color = "ButtonIcon", HoverColor = "White", ArtColor = "ButtonIcon", ArtHoverColor = "White",
-      DisabledAlpha = 0.3,
+      DisabledAlpha = 0.3, Scale = 1,
       Icons = {
         settingsButton = { Texture = "IconSettings" },
         closeButton = { Texture = "IconClose" },
