@@ -1716,7 +1716,7 @@ function panelProto:headerButton(spec)
   -- Above a small panel's mover, which lies over the title row.
   button:SetFrameLevel(self.frame:GetFrameLevel() + 3)
   local icon = button:CreateTexture(nil, "ARTWORK")
-  icon:SetAllPoints()
+  icon:SetPoint("CENTER", button, "CENTER", 0, 0)
   button.icon = icon
   button.key = spec.key
   button.hover = false
@@ -1744,10 +1744,11 @@ function panelProto:headerButton(spec)
 end
 
 -- SetHeaderIcon draws a header button's icon from the theme (Header.Buttons.Icons[iconKey],
--- next-themes.md §3): an Atlas (it wins over a Texture the theme inherits), else a Texture (one of
+-- next-themes.md §11): an Atlas (it wins over a Texture the theme inherits), else a Texture (one of
 -- the theme's Textures, or a file) with its TexCoords, filtered trilinearly so a glyph drawn smaller
--- than its file stays smooth. The key is kept, so a theme applied later draws the button again
--- (styleHeader). A key the theme gives no icon is an error naming it.
+-- than its file stays smooth; centered in its button, the theme's Scale of it times the icon's own.
+-- The key is kept, so a theme applied later draws the button again (styleHeader). A key the theme
+-- gives no icon is an error naming it.
 ---@param button Button
 ---@param iconKey string
 function panelProto:SetHeaderIcon(button, iconKey)
@@ -1758,6 +1759,8 @@ function panelProto:SetHeaderIcon(button, iconKey)
   button.iconKey = iconKey
   button.glyph = spec.Glyph ~= false
   local icon = button.icon
+  local size = style.HEADER_BUTTON * style.Theme.Header.Buttons.Scale * (spec.Scale or 1)
+  icon:SetSize(size, size)
   icon:SetTexCoord(0, 1, 0, 1)
   if spec.Atlas then
     icon:SetAtlas(spec.Atlas)
