@@ -542,6 +542,37 @@ describe("BetterBags Next's panels and themes", function()
     end)
   end)
 
+  -- Every theme BetterBags ships, applied in turn to open bags at both sizes, draws without an error
+  -- (SonataNext reports a widget's failure to the error handler and carries on).
+  describe("every shipped theme", function()
+    it("applies to open, drawn bags at both sizes, in turn, and back to Default", function()
+      local errors = {}
+      override(_G, "geterrorhandler", function() return function(e) table.insert(errors, tostring(e)) end end)
+      for _, size in ipairs({ "full", "small" }) do
+        db.size = size
+        sonataNext:Init()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        bag:Draw(ctx(), slots[BACKPACK])
+        bank:Draw(ctx(), slots[BANK])
+        local keys = {}
+        for key in pairs(sonataNext:GetThemes()) do table.insert(keys, key) end
+        table.sort(keys)
+        assert.is_true(#keys >= 4)
+        for _, key in ipairs(keys) do
+          sonataNext:ApplyTheme(ctx(), key, false)
+          finishTweens()
+          assert.are.equal(bag:Width(), bag.frame:GetWidth(), key .. ": shaped for its sizes")
+          assert.are.equal(bank:Width(), bank.frame:GetWidth(), key)
+        end
+        backToDefault()
+        finishTweens()
+        assert.are.same({}, errors, size)
+        assert.are.same(style.Color.Body, rgba(bag.fill._colorTexture))
+      end
+    end)
+  end)
+
   describe("animations", function()
     it("opens in its time and ease", function()
       local bag = nextBag:Create(ctx())

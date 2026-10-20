@@ -85,6 +85,9 @@ sonata\themes\moonlight.lua
 sonata\themes\elvui.lua
 sonata\themes\gw2.lua
 sonata\themes\next\default.lua
+sonata\themes\next\ember.lua
+sonata\themes\next\parchment.lua
+sonata\themes\next\quiet.lua
 
 # The Theme API loads earlier than actual themes.
 

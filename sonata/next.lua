@@ -311,6 +311,73 @@ function sonataNext:GetCurrentTheme()
   return self.resolved
 end
 
+-- Keys whose value names a palette color (or gives one as { r, g, b, a }, or is a texture spec).
+local COLOR_KEYS = {
+  Color = true, Fill = true, SelectedFill = true, FocusFill = true, HoverColor = true, FocusColor = true,
+  BeadColor = true, KnotColor = true, Unusable = true, SoldOut = true, SoldOutUnusable = true,
+}
+-- Tables whose values name palette colors.
+local COLOR_MAPS = { Washes = true, Accents = true, Colors = true }
+-- Keys whose value names a text role (Fonts).
+local FONT_KEYS = {
+  Font = true, SelectedFont = true, TitleFont = true, RecentFont = true, FreeFont = true, CountFont = true,
+  HelpFont = true, TextFont = true, EmptyFont = true, MoneyFont = true, HintFont = true, WarningFont = true,
+  PriceFont = true, UnaffordableFont = true, StackFont = true,
+}
+-- Keys whose value names one of the theme's Textures, or is a file (a path or a file ID).
+local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true }
+-- Parts that are not Next's widgets' specs: checked elsewhere or not at all.
+local UNCHECKED = { Palette = true, Variables = true, Textures = true, ItemButton = true }
+
+-- Check returns what a theme names but does not define, each as "path: problem": a palette color, a
+-- text role, a texture, an ease. Empty for a theme with nothing wrong. For theme authors and specs.
+---@param key string
+---@return string[]
+function sonataNext:Check(key)
+  local theme = self:Resolve(key)
+  local problems = {}
+  local palette, fonts, textures = theme.Palette or {}, theme.Fonts or {}, theme.Textures or {}
+  local function color(value, path)
+    if type(value) == "string" and palette[value] == nil then
+      table.insert(problems, path .. ": no color named " .. value)
+    end
+  end
+  local walk
+  local function check(k, v, here)
+    if COLOR_MAPS[k] and type(v) == "table" then
+      for name, value in pairs(v) do
+        color(value, here .. "." .. tostring(name))
+      end
+    elseif COLOR_KEYS[k] and type(v) ~= "table" then
+      color(v, here)
+    elseif FONT_KEYS[k] and type(v) == "string" and fonts[v] == nil then
+      table.insert(problems, here .. ": no font named " .. v)
+    elseif TEXTURE_KEYS[k] and type(v) == "string" and textures[v] == nil and not v:find("[\\/]") then
+      table.insert(problems, here .. ": no texture named " .. v)
+    elseif type(v) == "table" then
+      walk(v, here)
+    end
+  end
+  walk = function(node, path)
+    for k, v in pairs(node) do
+      if not (path == "" and UNCHECKED[k]) then
+        check(k, v, path == "" and tostring(k) or (path .. "." .. tostring(k)))
+      end
+    end
+  end
+  walk(theme, "")
+  local tween = addon:GetModule('NextTween', true)
+  local motion = theme.Motion
+  if tween ~= nil and motion ~= nil and motion.Ease ~= nil then
+    for name, ease in pairs(motion.Ease) do
+      if tween.Ease[ease] == nil then
+        table.insert(problems, "Motion.Ease." .. name .. ": no ease named " .. tostring(ease))
+      end
+    end
+  end
+  return problems
+end
+
 -- GetGeneration changes every time a theme is applied.
 ---@return number
 function sonataNext:GetGeneration()

@@ -310,6 +310,47 @@ describe("SonataNext", function()
     end)
   end)
 
+  -- Check finds what a theme names but no theme defines: a palette color, a text role, a texture,
+  -- an ease. Every shipped theme is checked (next_themes_spec.lua).
+  describe("checking a theme", function()
+    before_each(function()
+      -- The eases a theme may name are NextTween's.
+      if addon:GetModule("NextTween", true) == nil then
+        ResetModuleStub("NextTween", "next/tween.lua")
+        LoadBetterBagsModule("next/tween.lua")
+      end
+      sonataNext.themes = {}
+      FreshNextThemes()
+      sonataNext = addon:GetModule("SonataNext")
+      sonataNext:Init()
+    end)
+
+    it("finds nothing wrong with Default", function()
+      assert.are.same({}, sonataNext:Check("Default"))
+    end)
+
+    it("names every color, role, texture and ease it cannot find, by where it is", function()
+      sonataNext:RegisterTheme({ Name = "Broken",
+        Panel = { Fill = { Color = "Nope" }, DropGlow = { Color = { 1, 0, 0, 1 } } },
+        Sections = { TitleFont = "Missing" },
+        Header = { Cloud = { Texture = "NoArt" }, Spark = { Texture = "Interface\\Art\\Spark" } },
+        Sparkles = { Colors = { "Gold", "Ghost" } },
+        Motion = { Ease = { Open = "wobbly" } },
+        Fonts = { Title = { Color = "AlsoNope" } },
+      })
+      local problems = sonataNext:Check("Broken")
+      table.sort(problems)
+      assert.are.same({
+        "Fonts.Title.Color: no color named AlsoNope",
+        "Header.Cloud.Texture: no texture named NoArt",
+        "Motion.Ease.Open: no ease named wobbly",
+        "Panel.Fill.Color: no color named Nope",
+        "Sections.TitleFont: no font named Missing",
+        "Sparkles.Colors.2: no color named Ghost",
+      }, problems)
+    end)
+  end)
+
   -- The other registration path on Sonata itself (asked: "original themes, next themes").
   it("is reached from Sonata's RegisterNextTheme too", function()
     LoadBetterBagsModule("sonata/engine.lua")
