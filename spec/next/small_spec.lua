@@ -1280,14 +1280,14 @@ describe("BetterBags Next's small mode", function()
       return math.floor(alpha / style.Small.Edge * 1e9 + 0.5) / 1e9
     end
 
-    it("has a button on the backpack with Blizzard's minimize art while full, maximize while small", function()
+    it("has a button on the backpack drawn with arrows in while full and arrows out while small", function()
       db.size = "full"
       local bag = nextBag:Create(ctx())
-      assert.are.equal("RedButton-Condense", bag.sizeButton.icon:GetAtlas())
+      assert.are.equal("small", NextIconName(bag.sizeButton))
       click(bag)
-      assert.are.equal("RedButton-Expand", bag.sizeButton.icon:GetAtlas())
+      assert.are.equal("full", NextIconName(bag.sizeButton))
       click(bag)
-      assert.are.equal("RedButton-Condense", bag.sizeButton.icon:GetAtlas())
+      assert.are.equal("small", NextIconName(bag.sizeButton))
     end)
 
     it("sits after the button back to the classic bags, saying what it does", function()
@@ -1301,13 +1301,13 @@ describe("BetterBags Next's small mode", function()
       assert.are.equal("Full Size Bags", GameTooltip:GetText())
     end)
 
-    it("uses Classic's own smaller and bigger buttons on Classic", function()
+    it("draws the same on Classic", function()
       override(addon, "isRetail", false)
       db.size = "full"
       local bag = nextBag:Create(ctx())
-      assert.are.equal("Interface\\Buttons\\UI-Panel-SmallerButton-Up", bag.sizeButton.icon:GetTexture())
+      assert.are.equal("small", NextIconName(bag.sizeButton))
       click(bag)
-      assert.are.equal("Interface\\Buttons\\UI-Panel-BiggerButton-Up", bag.sizeButton.icon:GetTexture())
+      assert.are.equal("full", NextIconName(bag.sizeButton))
     end)
 
     it("saves the size, and does nothing when it is already the size", function()

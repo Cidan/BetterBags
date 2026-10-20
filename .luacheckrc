@@ -358,6 +358,7 @@ files["spec/**/*.lua"] = {
 		"UseSonataTextRoles",
 		"FreshNextThemes",
 		"UseNextTheme",
+		"NextIconName",
 		"MockData",
 		"ResetMockMerchant",
 		"ResetMockGuildBank",

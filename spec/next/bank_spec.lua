@@ -454,14 +454,13 @@ describe("NextBank", function()
   describe("its header", function()
     local function headerKinds(bank)
       local out = {}
-      for _, b in ipairs(bank.headerButtons) do table.insert(out, b.icon:GetAtlas() or b.icon:GetTexture()) end
+      for _, b in ipairs(bank.headerButtons) do table.insert(out, NextIconName(b)) end
       return out
     end
 
     it("lines its buttons up from the left edge: close, settings, bank tabs, deposit, sort", function()
       local bank = nextBank:Create(ctx())
-      assert.are.same({ "uitools-icon-close", "uitools-icon-settings", EMPTY_BAG_SLOT, "warbands-icon",
-        "bags-button-autosort-up" }, headerKinds(bank))
+      assert.are.same({ "close", "settings", "banktabs", "deposit", "sort" }, headerKinds(bank))
       assert.are.same({ "TOPLEFT", bank.body, "TOPLEFT", style.PAD, -(style.TITLE_TOP + 3) }, { bank.closeButton:GetPoint(1) })
       assert.are.same({ "LEFT", bank.closeButton, "RIGHT", 8, 0 }, { bank.settingsButton:GetPoint(1) })
     end)
@@ -469,14 +468,13 @@ describe("NextBank", function()
     it("has no deposit button without a Warbank, and no bank tabs or sort where the client lacks them", function()
       client("forever")
       local forever = nextBank:Create(ctx())
-      assert.are.same({ "uitools-icon-close", "uitools-icon-settings", EMPTY_BAG_SLOT, "bags-button-autosort-up" },
-        headerKinds(forever))
+      assert.are.same({ "close", "settings", "banktabs", "sort" }, headerKinds(forever))
       client("classic")
       local classic = nextBank:Create(ctx())
-      assert.are.same({ "uitools-icon-close", "uitools-icon-settings" }, headerKinds(classic))
+      assert.are.same({ "close", "settings" }, headerKinds(classic))
       override(_G, "SortBankBags", function() end)
       local sorting = nextBank:Create(ctx())
-      assert.are.same({ "uitools-icon-close", "uitools-icon-settings", "bags-button-autosort-up" }, headerKinds(sorting))
+      assert.are.same({ "close", "settings", "sort" }, headerKinds(sorting))
     end)
 
     it("closes the bank, opens the settings and deposits Warbound items", function()

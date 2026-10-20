@@ -54,7 +54,6 @@ local SELL_DELAY = 0.2
 -- How many items sold buyback keeps (Blizzard's BUYBACK_ITEMS_PER_PAGE); a section sale of more
 -- asks first.
 local BUYBACK_KEEPS = 12
-local REPAIR_ICONS = "Interface\\MerchantFrame\\UI-Merchant-RepairIcons"
 -- Blizzard's merchant purchase prompts, closed when the vendor closes (MerchantFrame_OnHide).
 local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED", "CONFIRM_REFUND_TOKEN_ITEM",
   "CONFIRM_REFUND_MAX_HONOR", "CONFIRM_REFUND_MAX_ARENA_POINTS" }
@@ -140,26 +139,20 @@ end
 
 ---@return NextHeaderButton[]
 function vendorProto:GetHeaderButtons()
-  local m = mainline()
   local buttons = {
-    { key = "closeButton", atlas = "uitools-icon-close", glyph = true, tooltip = L:G("Close"),
-      onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", atlas = "uitools-icon-settings", glyph = true, tooltip = L:G("Open Options Screen"),
+    { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
+    { key = "settingsButton", tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
   }
-  if m and SetMerchantFilter ~= nil and MenuUtil ~= nil then
-    table.insert(buttons, { key = "filterButton", atlas = "ui-questtrackerbutton-filter",
-      tooltip = L:G("Filter what the vendor shows"), onClick = function() self:OpenFilter() end })
+  if mainline() and SetMerchantFilter ~= nil and MenuUtil ~= nil then
+    table.insert(buttons, { key = "filterButton", tooltip = L:G("Filter what the vendor shows"),
+      onClick = function() self:OpenFilter() end })
   end
-  table.insert(buttons, { key = "sellJunkButton", atlas = m and "SpellIcon-256x256-SellJunk" or nil,
-    texture = not m and "Interface\\Icons\\INV_Misc_Coin_02" or nil, tooltip = L:G("Sell all junk"),
-    onClick = function() self:SellJunk() end })
-  table.insert(buttons, { key = "repairAllButton", atlas = m and "SpellIcon-256x256-RepairAll" or nil,
-    texture = not m and REPAIR_ICONS or nil, texCoords = not m and { 0.28125, 0.5625, 0, 0.5625 } or nil,
-    tooltipFunc = function() self:RepairTooltip(false) end, onClick = function() self:RepairAll(false) end })
-  table.insert(buttons, { key = "guildRepairButton", atlas = m and "SpellIcon-256x256-RepairAllGuild" or nil,
-    texture = not m and REPAIR_ICONS or nil, texCoords = not m and { 0.5625, 0.84375, 0, 0.5625 } or nil,
-    tooltipFunc = function() self:RepairTooltip(true) end, onClick = function() self:RepairAll(true) end })
+  table.insert(buttons, { key = "sellJunkButton", tooltip = L:G("Sell all junk"), onClick = function() self:SellJunk() end })
+  table.insert(buttons, { key = "repairAllButton", tooltipFunc = function() self:RepairTooltip(false) end,
+    onClick = function() self:RepairAll(false) end })
+  table.insert(buttons, { key = "guildRepairButton", tooltipFunc = function() self:RepairTooltip(true) end,
+    onClick = function() self:RepairAll(true) end })
   return buttons
 end
 
@@ -219,20 +212,12 @@ function vendorProto:UpdateHeader()
   local _, anything = GetRepairAllCost()
   self.repairAllButton:SetShown(canRepair)
   self.guildRepairButton:SetShown(canRepair and CanGuildBankRepair())
-  self:setEnabled(self.repairAllButton, anything)
-  self:setEnabled(self.guildRepairButton, anything)
-  self:setEnabled(self.sellJunkButton, merchant:NumJunk() > 0)
+  self:SetHeaderButtonEnabled(self.repairAllButton, anything)
+  self:SetHeaderButtonEnabled(self.guildRepairButton, anything)
+  self:SetHeaderButtonEnabled(self.sellJunkButton, merchant:NumJunk() > 0)
   -- The vendor's name (any length) stays on one line in the room right of the shown header buttons,
   -- cut short rather than over them (FitTitle, which laying the header out runs).
   self:LayoutHeader()
-end
-
----@private
----@param button Button
----@param enabled boolean
-function vendorProto:setEnabled(button, enabled)
-  button:SetEnabled(enabled and true or false)
-  button.icon:SetDesaturated(not enabled)
 end
 
 -- RefreshTabs lists Buy and Buyback, and Repair at a vendor that repairs.

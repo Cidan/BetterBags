@@ -324,9 +324,12 @@ describe("NextGuildBank", function()
 
     it("has close, settings, deposit gold and withdraw gold in its header", function()
       local g = open()
-      assert.are.same({ g.closeButton, g.settingsButton, g.depositButton, g.withdrawButton }, g.headerButtons)
-      click(g.depositButton)
-      click(g.withdrawButton)
+      assert.are.same({ g.closeButton, g.settingsButton, g.depositGoldButton, g.withdrawGoldButton }, g.headerButtons)
+      local names = {}
+      for _, b in ipairs(g.headerButtons) do table.insert(names, NextIconName(b)) end
+      assert.are.same({ "close", "settings", "depositgold", "withdrawgold" }, names)
+      click(g.depositGoldButton)
+      click(g.withdrawGoldButton)
       assert.are.equal(1, calls.deposit)
       assert.are.equal(1, calls.withdraw)
       click(g.settingsButton)
@@ -336,10 +339,12 @@ describe("NextGuildBank", function()
     it("enables withdrawing gold only for a member who may", function()
       data.canWithdraw = false
       local g = open()
-      assert.is_false(g.withdrawButton:IsEnabled())
+      assert.is_false(g.withdrawGoldButton:IsEnabled())
+      assert.are.equal(style.Theme.Header.Buttons.DisabledAlpha, g.withdrawGoldButton.icon:GetAlpha())
       data.canWithdraw = true
       handlers["guildbank/MoneyChanged"](ctx())
-      assert.is_true(g.withdrawButton:IsEnabled())
+      assert.is_true(g.withdrawGoldButton:IsEnabled())
+      assert.are.equal(1, g.withdrawGoldButton.icon:GetAlpha())
     end)
 
     it("updates the gold when the guild bank's money changes", function()

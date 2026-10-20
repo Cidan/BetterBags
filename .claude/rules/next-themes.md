@@ -77,7 +77,7 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 | `Layout` | Sizes: Icon, VendorPrice, Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
 | `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
 | `Panel` | `Fill` (texture spec), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false). |
-| `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (`Color` and `HoverColor` for glyphs, the white one-color icons: settings, close, marked `glyph = true` in their button specs; `ArtColor` and `ArtHoverColor` for full-color art: a tint multiplies the art, and Parchment's ink first turned every colored icon into a black shape, asked with a screenshot; `Icons` by button key: `{ Atlas }` or `{ Texture, TexCoords }`, `Glyph = true` for a glyph; the size button by state, `sizeButtonFull`, `sizeButtonSmall`). |
+| `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`). |
 | `Search` | `Fill`, `FocusFill`, `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`), `HelpFont`, `TextFont`. |
 | `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Line` (`Color`, `From`, `To`, `Size`, or false), `Highlight` (`Color`, `From`, `To`, or false). |
 | `Tabs` | `Fill`, `SelectedFill`, `Fade`, `Font`, `SelectedFont`, `Glow` (`Color`, `BlendMode`, `Drop`, `Pulse`, or false), `Indicator` (`Color`, `Width`, or false), `Accents` (Warbank, Guild). A tab entry's `accent` is an accent name, a palette name or a color. |
@@ -209,6 +209,65 @@ own: `SetAlpha` does not fade a gradient texture (§14d of next.md; `.context/pa
 - The spec mock models it (`spec/helpers/wow_mocks.lua`, `SetAlpha`/`SetVertexColor`/`GetVertexColor`
   on textures and lines): read a texture's alpha with `GetAlpha` and its color with the first three
   values of `GetVertexColor`.
+
+## 11. Header icons
+
+Asked: "these icons on the top right, i don't like how they are all different. i *love* the gear
+icon; can we make icons for each button we use (including the bank, guild bank, etc) in the same
+style please? remember themes: these buttons should be colorable via themes, and even replacable
+with custom art"; then, shown a draft set, to use BetterBags' own for every button, the gear and the
+close button included.
+
+- **The art** (`tools/textures/next_icons.py`, standard-library Python like `next_glow.py`; run from
+  the repository root): fourteen glyphs, `textures/next/icons/*.png`, 64 x 64, white, the shape in the
+  alpha. Drawn in the style of Blizzard's `uitools-icon` family, measured from its atlas (file 5400310,
+  `UiTextureAtlas` 2561 on wago.tools): a 20-unit grid, a 1.5-unit stroke, about 1.5 to 18.5 across,
+  so they fill a 22-unit button as the gear did. Blizzard's family has no sort, bag, bank tab,
+  deposit, gold, filter, junk or repair icon, so BetterBags draws all fourteen, the gear and the close
+  button too, so every button matches in weight and sharpness on every client (Blizzard's are 20
+  pixels and blur when scaled up). Each is a set of signed-distance shapes (strokes, fills,
+  knock-outs) sampled once per pixel with a one-pixel edge: settings (a gear), close, sort (a broom
+  with a sparkle, as Blizzard's sort button), classic bags (a backpack), small and full size (arrows
+  in, arrows out), bank tabs (a tabbed panel), Warbank deposit (an arrow into a tray), deposit and
+  withdraw gold (a coin stack with an arrow), filter (a funnel), sell junk (a price tag), repair (a
+  hammer), guild repair (a hammer with a guild shield).
+- **Drawn smooth:** `SetTexture(file, nil, nil, "TRILINEAR")` (`SimpleTextureBaseAPIDocumentation`:
+  `filterMode`), as Blizzard draws its map tiles on every client, so a 64-pixel glyph drawn at 22 units
+  (often 14 to 22 pixels) stays smooth, and stays sharp on large screens.
+- **The theme gives every icon** (`Header.Buttons.Icons`, by button key): `settingsButton`,
+  `closeButton`, `sortButton`, `classicButton`, `sizeButtonFull` and `sizeButtonSmall` (the size
+  button by state), `bankTabsButton`, `depositButton` (the Warbank), `depositGoldButton`,
+  `withdrawGoldButton` (the guild bank's: renamed from `depositButton`/`withdrawButton`, which would
+  have shared the Warbank's key), `filterButton`, `sellJunkButton`, `repairAllButton`,
+  `guildRepairButton`. Default names its glyphs in `Textures` (`IconSettings`, `IconSort`, ...), so a
+  theme can repoint one file for every use. The panels' button lists carry no art; a key the theme
+  gives no icon is an error naming it (`SetHeaderIcon`), and every theme inherits Default's.
+- **Replacing one:** `Icons.<key> = { Texture, TexCoords }` or `{ Atlas }`. Theme tables merge key by
+  key, so a replacement inherits what it leaves out: an `Atlas` wins over an inherited `Texture`;
+  colored art says `Glyph = false` (an icon is a glyph unless it says so).
+- **Colors** (`PaintHeaderIcon`): a glyph in `Color`, brighter in `HoverColor` under the pointer; art
+  (`Glyph = false`) in `ArtColor` and `ArtHoverColor` (a tint suits a white glyph and darkens colored
+  art into a silhouette: Parchment's ink did, asked with a screenshot). An icon's own `Color` and
+  `HoverColor` win over both. Parchment inks every glyph (`Color = "Ink"`).
+- **Disabled** (`SetHeaderButtonEnabled`: the vendor's Repair All, guild repair and Sell Junk, the
+  guild bank's withdraw gold): drawn at `DisabledAlpha` (Default 0.3) of the color it would have, never
+  brighter under the pointer; art desaturated too. Desaturating, as before, does nothing to a white
+  glyph: a disabled button looked enabled. One alpha follows every theme's own icon color.
+- **Every client draws the same**: the art branches per client are gone (Blizzard's backpack art,
+  `RedButton-Condense`/`-Expand` or Classic's smaller and bigger buttons, the merchant's
+  `SpellIcon-256x256-*` atlases or Classic's repair icons and a coin).
+
+Coverage: `spec/sonata/next_themes_spec.lua` ("names a glyph BetterBags ships for every header button
+in Default": every key, a file of its own, a 64 x 64 RGBA PNG on disk, nothing else),
+`spec/next/theme_panel_spec.lua` ("header icons": Default's color on every button, a theme's glyph
+colors and hover, a theme's own art and glyph, texture coordinates, one button's own colors, disabled
+glyph and art, hovered and through a theme switch, a missing key), `spec/next/bag_spec.lua`,
+`spec/next/bank_spec.lua`, `spec/next/vendor_spec.lua`, `spec/next/guildbank_spec.lua` and
+`spec/next/small_spec.lua` (each panel's icons, on retail and Classic, and the trilinear filter). 31
+mutations, each caught (the one that first survived, art hovered in the glyph color, led to a test
+whose two hover colors differ).
+
+Not verified in game yet: how the glyphs look in each theme, and the trilinear filter on each client.
 
 ## 9. Coverage
 

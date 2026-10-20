@@ -147,10 +147,8 @@ end
 ---@field chainRole "backpack"|"companion" What it is in the chain (next.md §12).
 
 ---@class (exact) NextHeaderButton
----@field key string The field the button is kept in on the panel.
----@field atlas? string
----@field texture? string|number
----@field texCoords? number[] Of the texture: left, right, top, bottom.
+---@field key string The field the button is kept in on the panel, and its icon's key in the theme (Header.Buttons.Icons).
+---@field iconKey? string Its icon's key when it is not key (the size button's, by its state).
 ---@field tooltip string
 ---@field tooltipFunc? fun(button: Button) Fills the tooltip instead of tooltip.
 ---@field onClick fun(ctx: Context)
@@ -1721,10 +1719,11 @@ function panelProto:headerButton(spec)
   icon:SetAllPoints()
   button.icon = icon
   button.key = spec.key
-  self:SetHeaderIcon(button, spec.key, spec)
+  button.hover = false
+  self:SetHeaderIcon(button, spec.iconKey or spec.key)
   button:SetScript("OnEnter", function()
-    local B = style.Theme.Header.Buttons
-    icon:SetVertexColor(style:RGBA(button.glyph and B.HoverColor or B.ArtHoverColor))
+    button.hover = true
+    self:PaintHeaderIcon(button)
     GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
     if spec.tooltipFunc then
       spec.tooltipFunc(button)
@@ -1734,8 +1733,8 @@ function panelProto:headerButton(spec)
     GameTooltip:Show()
   end)
   button:SetScript("OnLeave", function()
-    local B = style.Theme.Header.Buttons
-    icon:SetVertexColor(style:RGBA(button.glyph and B.Color or B.ArtColor))
+    button.hover = false
+    self:PaintHeaderIcon(button)
     GameTooltip:Hide()
   end)
   addon.SetScript(button, "OnClick", function(ctx)
@@ -1744,44 +1743,65 @@ function panelProto:headerButton(spec)
   return button
 end
 
--- SetHeaderIcon draws a header button's icon: the theme's for iconKey (Header.Buttons.Icons), else
--- art (an atlas, or a texture and its coordinates), tinted by the theme: a glyph (a white,
--- one-color icon: settings, close) in the glyph color, full-color art in the art color. A tint
--- multiplies the art, so one dark enough for glyphs on light paper inked every colored icon into a
--- black shape (Parchment, asked with a screenshot). It is kept, so a theme applied later draws the
--- button again (styleHeader).
+-- SetHeaderIcon draws a header button's icon from the theme (Header.Buttons.Icons[iconKey],
+-- next-themes.md §3): an Atlas (it wins over a Texture the theme inherits), else a Texture (one of
+-- the theme's Textures, or a file) with its TexCoords, filtered trilinearly so a glyph drawn smaller
+-- than its file stays smooth. The key is kept, so a theme applied later draws the button again
+-- (styleHeader). A key the theme gives no icon is an error naming it.
 ---@param button Button
 ---@param iconKey string
----@param art {atlas?: string, texture?: string|number, texCoords?: number[], glyph?: boolean}
-function panelProto:SetHeaderIcon(button, iconKey, art)
-  button.iconKey, button.art = iconKey, art
+function panelProto:SetHeaderIcon(button, iconKey)
+  local spec = style.Theme.Header.Buttons.Icons[iconKey]
+  if spec == nil then
+    error("the Next theme has no icon for " .. iconKey)
+  end
+  button.iconKey = iconKey
+  button.glyph = spec.Glyph ~= false
   local icon = button.icon
-  local B = style.Theme.Header.Buttons
-  local custom = B.Icons and B.Icons[iconKey]
-  if custom then
-    button.glyph = custom.Glyph == true
-  else
-    button.glyph = art.glyph == true
-  end
   icon:SetTexCoord(0, 1, 0, 1)
-  if custom then
-    if custom.Atlas then
-      icon:SetAtlas(custom.Atlas)
-    else
-      icon:SetTexture(style:TexturePath(custom.Texture))
-      if custom.TexCoords then
-        icon:SetTexCoord(unpack(custom.TexCoords))
-      end
-    end
-  elseif art.atlas then
-    icon:SetAtlas(art.atlas)
+  if spec.Atlas then
+    icon:SetAtlas(spec.Atlas)
   else
-    icon:SetTexture(art.texture)
-    if art.texCoords then
-      icon:SetTexCoord(unpack(art.texCoords))
+    icon:SetTexture(style:TexturePath(spec.Texture), nil, nil, "TRILINEAR")
+    if spec.TexCoords then
+      icon:SetTexCoord(unpack(spec.TexCoords))
     end
   end
-  icon:SetVertexColor(style:RGBA(button.glyph and B.Color or B.ArtColor))
+  self:PaintHeaderIcon(button)
+end
+
+-- PaintHeaderIcon colors a header button's icon for how it is now: its own color (its icon's Color,
+-- HoverColor), else the theme's for a glyph (Color, HoverColor) or for art (ArtColor, ArtHoverColor),
+-- brighter under the pointer. A tint suits a white glyph and darkens full-color art into a silhouette
+-- (asked with a Parchment screenshot), so the two are colored apart. A disabled button is not brighter
+-- under the pointer: it is drawn at DisabledAlpha of its color, and art desaturated too (a white glyph
+-- looks the same desaturated).
+---@param button Button
+function panelProto:PaintHeaderIcon(button)
+  local B = style.Theme.Header.Buttons
+  local own = B.Icons[button.iconKey]
+  local enabled = button:IsEnabled()
+  local color
+  if button.hover and enabled then
+    color = own.HoverColor or (button.glyph and B.HoverColor or B.ArtHoverColor)
+  else
+    color = own.Color or (button.glyph and B.Color or B.ArtColor)
+  end
+  local r, g, b, a = style:RGBA(color)
+  if not enabled then
+    a = a * B.DisabledAlpha
+  end
+  local icon = button.icon
+  icon:SetDesaturated(not enabled and not button.glyph)
+  icon:SetVertexColor(r, g, b, a)
+end
+
+-- SetHeaderButtonEnabled enables or disables a header button, its icon drawn for it (PaintHeaderIcon).
+---@param button Button
+---@param enabled boolean
+function panelProto:SetHeaderButtonEnabled(button, enabled)
+  button:SetEnabled(enabled and true or false)
+  self:PaintHeaderIcon(button)
 end
 
 -- GetHeaderButtons returns the header's buttons, in order from the screen edge.
@@ -2036,7 +2056,7 @@ function panelProto:styleHeader()
   self:styleBraid()
   for _, button in ipairs(self.headerButtons) do
     button:SetSize(style.HEADER_BUTTON, style.HEADER_BUTTON)
-    self:SetHeaderIcon(button, button.iconKey, button.art)
+    self:SetHeaderIcon(button, button.iconKey)
   end
   self:LayoutCloud()
   self:LayoutHeader()

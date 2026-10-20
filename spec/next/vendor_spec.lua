@@ -276,25 +276,22 @@ describe("NextVendor", function()
   describe("its header", function()
     local function icons(v)
       local out = {}
-      for _, b in ipairs(v.headerButtons) do table.insert(out, b.icon:GetAtlas() or b.icon:GetTexture()) end
+      for _, b in ipairs(v.headerButtons) do table.insert(out, NextIconName(b)) end
       return out
     end
 
     it("lines up close, settings, the filter, Sell Junk, Repair All and the guild's repair on retail", function()
       local v = nextVendor:Create(ctx())
-      assert.are.same({ "uitools-icon-close", "uitools-icon-settings", "ui-questtrackerbutton-filter",
-        "SpellIcon-256x256-SellJunk", "SpellIcon-256x256-RepairAll", "SpellIcon-256x256-RepairAllGuild" }, icons(v))
+      assert.are.same({ "close", "settings", "filter", "selljunk", "repair", "guildrepair" }, icons(v))
     end)
 
-    it("uses Classic's repair icons and a coin for Sell Junk, and has no filter there", function()
+    it("draws the same icons on Classic, which has no filter", function()
       override(addon, "isRetail", false)
       override(C_MerchantFrame, "GetItemInfo", nil)
       override(_G, "SetMerchantFilter", nil)
       local v = nextVendor:Create(ctx())
-      assert.are.same({ "uitools-icon-close", "uitools-icon-settings", "Interface\\Icons\\INV_Misc_Coin_02",
-        "Interface\\MerchantFrame\\UI-Merchant-RepairIcons", "Interface\\MerchantFrame\\UI-Merchant-RepairIcons" },
-        icons(v))
-      assert.are.same({ 0.28125, 0.5625, 0, 0.5625 }, v.repairAllButton.icon._texCoords)
+      assert.are.same({ "close", "settings", "selljunk", "repair", "guildrepair" }, icons(v))
+      assert.are.same({ 0, 1, 0, 1 }, v.repairAllButton.icon._texCoords)
     end)
 
     it("shows the repair buttons only at a vendor that repairs, the guild's only when the guild pays", function()
@@ -482,10 +479,12 @@ describe("NextVendor", function()
       data.junk = 0
       eventsRegistered["BAG_UPDATE_DELAYED"](ctx())
       assert.is_false(v.sellJunkButton:IsEnabled())
-      assert.is_true(v.sellJunkButton.icon:IsDesaturated())
+      -- A glyph does not show desaturation: it fades (Header.Buttons.DisabledAlpha).
+      assert.are.equal(style.Theme.Header.Buttons.DisabledAlpha, v.sellJunkButton.icon:GetAlpha())
       data.junk = 1
       eventsRegistered["PLAYER_MONEY"](ctx())
       assert.is_true(v.sellJunkButton:IsEnabled())
+      assert.are.equal(1, v.sellJunkButton.icon:GetAlpha())
     end)
   end)
 
@@ -575,6 +574,7 @@ describe("NextVendor", function()
       _G._merchant.canRepair, _G._merchant.repairCost = true, 0
       local v = open()
       assert.is_false(v.repairAllButton:IsEnabled())
+      assert.are.equal(style.Theme.Header.Buttons.DisabledAlpha, v.repairAllButton.icon:GetAlpha())
     end)
   end)
 
