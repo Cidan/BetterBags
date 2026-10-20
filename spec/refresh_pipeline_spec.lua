@@ -3635,7 +3635,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         }
         local loader = addon:GetModule("ItemLoader")
         local bankPrimed
-        override(loader, "PrimeBank", function(_, cb) bankPrimed = cb end)
+        override(loader, "PrimeBank", function(_, _, cb) bankPrimed = cb end)
         override(database, "GetShowBankTabs", function() return false end)
         override(_G, "GameMenuFrame", { IsShown = function() return false end })
         local shown, bankShown = 0, nil
@@ -3700,6 +3700,174 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.equal(2, #layouts)
         assert.is_false(layouts[1].cold or layouts[2].cold, "nothing committed cold")
         assert.equal(layouts[1].order, layouts[2].order, "nothing moves after the open")
+      end)
+
+      -- The bank is read tab by tab as it opens, as the guild bank is (refresh-scheduler.md §11):
+      -- each read shows one more tab, frames apart, the tab shown first. Asked: "pop in data for each
+      -- physical tab (non-virtual tab) one by one ... mimic the guild bank behavior as close as
+      -- possible". A captured open (500 items) read and drew them all in one 520 ms frame.
+      describe("opening the bank, tab by tab", function()
+        local bankShown, commits, frameNo, loads
+
+        -- run steps the queue frame by frame until it is idle, numbering the frames.
+        local function run()
+          for _ = 1, 100 do
+            frameNo = frameNo + 1
+            if advance() == 0 then return end
+          end
+          error("the refresh queue never went idle")
+        end
+
+        local function shownTabs(i)
+          return commits[i] and commits[i].bags
+        end
+
+        before_each(function()
+          items:OnEnable()
+          refresh:OnEnable()
+          mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+          fire("LOADING_SCREEN_DISABLED")
+          frame()
+          primed()
+          drain()
+          mockContainer[6] = { { itemID = 601, guid = "g601", count = 1 }, {} }
+          mockContainer[7] = { { itemID = 701, guid = "g701", count = 1 } }
+          mockContainer[13] = { { itemID = 1301, guid = "g1301", count = 1 } }
+          loads = {}
+          local loader = addon:GetModule("ItemLoader")
+          override(loader, "PrimeBank", function(_, bags, cb)
+            assert.equal(1, #bags, "a load per tab")
+            loads[bags[1]] = cb
+          end)
+          override(database, "GetShowBankTabs", function() return false end)
+          override(_G, "GameMenuFrame", { IsShown = function() return false end })
+          override(addon, "Bags", { Bank = { bankTab = 6, Show = function(_, _, _, onShown)
+            bankShown = onShown
+          end } })
+          override(addon, "atBank", false)
+          frameNo = 0
+          commits = {}
+          local commit = items.Phase11_CommitAndDispatch
+          override(items, "Phase11_CommitAndDispatch", function(self, ectx, kind, ...)
+            local result = commit(self, ectx, kind, ...)
+            if kind == const.BAG_KIND.BANK then
+              local bags, seen = {}, {}
+              for _, item in pairs(self.slotInfo[kind].itemsBySlotKey) do
+                if not item.isItemEmpty and not seen[item.bagid] then
+                  seen[item.bagid] = true
+                  bags[#bags + 1] = item.bagid
+                end
+              end
+              table.sort(bags)
+              table.insert(commits, { bags = table.concat(bags, ","), frame = frameNo })
+            end
+            return result
+          end)
+        end)
+
+        local function open()
+          fire("BANKFRAME_OPENED")
+          drain()
+          bankShown()
+        end
+
+        local function loadAll()
+          for _, bag in ipairs({ 6, 7, 13 }) do
+            if loads[bag] then loads[bag]() end
+          end
+        end
+
+        it("shows one more tab with each read, frames apart, the shown bank type first", function()
+          open()
+          loadAll()
+          run()
+          assert.equal(3, #commits)
+          assert.are.same({ "6", "6,7", "6,7,13" }, { shownTabs(1), shownTabs(2), shownTabs(3) })
+          assert.is_true(commits[2].frame - commits[1].frame >= 2, "a read per unit: commit, idle, read")
+          assert.is_true(commits[3].frame - commits[2].frame >= 2)
+          local bankSweeps = {}
+          for _, sweep in ipairs(sweeps) do
+            if sweep.kind == const.BAG_KIND.BANK then bankSweeps[#bankSweeps + 1] = sweep end
+          end
+          assert.equal(3, #bankSweeps)
+          assert.is_true(bankSweeps[1].reset, "the first read afresh")
+          assert.is_false(bankSweeps[2].reset)
+          assert.is_false(bankSweeps[3].reset)
+          assert.is_nil(items:LoadedBankBags(), "every tab read")
+        end)
+
+        it("reads the Warbank first while it shows", function()
+          addon.Bags.Bank.bankTab = 13
+          open()
+          loadAll()
+          run()
+          assert.are.same({ "13", "6,13", "6,7,13" }, { shownTabs(1), shownTabs(2), shownTabs(3) })
+        end)
+
+        it("shows only the tabs loaded to a bank read asked for while it loads", function()
+          open()
+          loads[6]()
+          run()
+          refresh:RequestUpdate({ bank = true, bags = { [13] = true } })
+          refresh:RequestUpdate({ wipe = true })
+          run()
+          for _, c in ipairs(commits) do
+            assert.equal("6", c.bags, "the Warbank's tab is not read before its turn")
+          end
+          loads[7]()
+          loads[13]()
+          run()
+          assert.equal("6,7,13", commits[#commits].bags)
+        end)
+
+        it("reads a tab that gains slots after the open, like any change", function()
+          mockContainer[7] = {}
+          open()
+          loadAll()
+          run()
+          assert.equal("6,13", commits[#commits].bags)
+          mockContainer[7] = { { itemID = 701, guid = "g701", count = 1 } }
+          refresh:RequestUpdate({ bank = true })
+          run()
+          assert.equal("6,7,13", commits[#commits].bags)
+        end)
+
+        -- A read of an open that ended finishing while the next open loads must not load the next
+        -- open's next tab before that open's own read has run.
+        it("lets only an open's own read load its next tab", function()
+          fire("BANKFRAME_OPENED")
+          drain()
+          bankShown()
+          loads[6]() -- the first open's read: harvested now, parked until the next frame
+          fire("BANKFRAME_CLOSED")
+          loads = {}
+          fire("BANKFRAME_OPENED")
+          bankShown()
+          loadAll() -- the second open's first read waits behind the first open's
+          assert.equal(1, #refresh._queue)
+          advance() -- the first open's read finishes
+          assert.equal(1, #refresh._queue, "the second open still waits for its own read")
+          run()
+          assert.are.same({ "6", "6", "6,7", "6,7,13" }, { shownTabs(1), shownTabs(2), shownTabs(3), shownTabs(4) })
+        end)
+
+        it("starts over, afresh, when the bank closes while it loads and opens again", function()
+          open()
+          loads[6]()
+          run()
+          fire("BANKFRAME_CLOSED")
+          items:ClearBankCache(context:New("Close"))
+          addon.atBank = false
+          loads[7]()
+          run()
+          assert.equal(1, #commits, "the closed open reads nothing more")
+          loads = {}
+          addon.Bags.Bank.bankTab = 13
+          open()
+          loadAll()
+          run()
+          assert.are.same({ "13", "6,13", "6,7,13" }, { shownTabs(2), shownTabs(3), shownTabs(4) })
+        end)
       end)
 
       it("recalculates, without reading the bags again, what changes after the read", function()

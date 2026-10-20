@@ -109,6 +109,7 @@ nothing.
   again (primed), `guildbank/TabsChanged` reads, `guildbank/Closed` forgets the guild bank. Nothing
   happens for a visit that has ended. `RefreshRequest.guild` sweeps the guild bank after the bank and
   before the backpack, only while it is open and its panel has shown; a wipe sweeps it;
+  the bank now loads the same way, tab by tab (refresh-scheduler.md §11a);
   `bags/Rederive` naming no kind recalculates every kind. `guildLoad` says why a read ran
   (`"primed"`, `"timeout"`), for profiler traces.
 

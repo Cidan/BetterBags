@@ -431,7 +431,7 @@ once it has shown (`GUILD_SHOW_TIMEOUT`), each tab loaded is read once its items
 layout. `RefreshRequest.guild` sweeps it after the bank and before the backpack; a wipe sweeps it,
 and `bags/Rederive` naming no kind recalculates every kind. Details: guild-bank.md §3.
 
-## 11. Opening the Bank: Show at Once, Load Once Shown, Read Once Primed
+## 11. Opening the Bank: Show at Once, Load Once Shown, Read Tab by Tab
 
 Bank containers have no slots until the bank opens, so the startup read's priming (§8,
 `PrimeAll`) cannot cover them, and `BANKFRAME_OPENED` used to request the bank read at once.
@@ -470,40 +470,97 @@ Now `BANKFRAME_OPENED` (`data/refresh.lua`):
    read, which follows, reads every bank bag with a fresh layout, so a bank `BAG_UPDATE` batch, a
    Classic `PLAYERBANKSLOTS_CHANGED`, a wipe or a bank sort's sweep asked for meanwhile is covered
    (a sort's pending mark stays set and that read clears it);
-6. `refresh:_BankShown(open, reason)` ends the wait, once, and loads: `_PrimeBankAndRead(open)`.
-   `itemLoader:PrimeBank` loads every bank slot's item data in one `ContinuableContainer`, and the
-   read (`{ bank = true, resetLayout = true, bankOpen = "primed" }`) runs when it completes.
-   `_BankShown` is a method, so a capture's call trace shows when the wait ended and why
-   (`reason` "finished", "timeout" or "no window", with Enable Bank Bags off) and what it did (it
-   returns "loading", "already" or "ended");
-7. `BANK_PRIME_TIMEOUT` (2 s) bounds the wait for the data: Blizzard drops the callbacks of an
-   item whose load fails (`ITEM_DATA_LOAD_RESULT` with `success == false`,
-   `AsyncCallbackSystem.lua`), so the container may never complete. Then the read runs with
-   `bankOpen = "timeout"`, and when the data does arrive the bank is read again (`{ bank = true }`),
-   since that read found it cold;
-8. an open that has ended (`BANKFRAME_CLOSED`, or a new open) does nothing when its window says it
-   has shown, or its priming or a timeout completes. Closing also ends the hold.
+6. `refresh:_BankShown(open, reason)` ends the wait, once, and loads the bank tab by tab
+   (`_LoadBank`, below). `_BankShown` is a method, so a capture's call trace shows when the wait
+   ended and why (`reason` "finished", "timeout" or "no window", with Enable Bank Bags off) and what
+   it did (it returns "loading", "already" or "ended");
+7. an open that has ended (`BANKFRAME_CLOSED`, or a new open) does nothing when its window says it
+   has shown, or a tab's data or a timeout arrives. Closing also ends the hold and lets reads of the
+   bank read every bank bag again.
 
-`items/RefreshBank/Done` (`core/init.lua`) then draws the shown bank. `bankOpen` marks the read
-in captures, so a capture shows whether the open waited for the data or timed out.
+`items/RefreshBank/Done` (`core/init.lua`) draws the shown bank after every read, in both bag
+designs.
+
+### 11a. Tab by tab, as the guild bank
+
+Asked: "pop in data for each physical tab (non-virtual tab) one by one ... i want to mimic the guild
+bank behavior as close as possible, so look at that as your north star. this goes for both next and
+original bags." The guild bank's tabs come from the server one query at a time and each is read as
+it arrives (guild-bank.md §2, §3), so its work lands in many small frames. The bank used to read and
+draw every tab in one go. **Measured** (a retail capture of opening BetterBags Next's bank, 500
+items, Pawn the upgrade provider): one frame of 520 ms of BetterBags time after a 128 ms harvest
+frame; of it, Pawn's upgrade check about 200 ms (0.39 ms per item on its first ask, 0.24 ms per item
+when asked again a second later) and drawing about 180 ms.
+
+- **The tabs** (`refresh:BankTabs()`): every bag a read of the bank reads (`Items:BankBags`: on
+  retail every character and Warbank tab, on Classic the bank, its bags and the reagent bank) that
+  has slots, in the bank's order (character bank, then the Warbank's; on Classic the bank, its bags,
+  then the reagent bank). A bank with none (WoW: Forever before its first tab) is read once, empty
+  (`bankOpen = "empty"`), so the window still draws (and shows its Purchase Bank button).
+- **Reads see only the tabs loaded** (`Items:SetLoadedBankBags`, read by `Phase1_DetermineBags`), as a
+  guild bank read reads only the tabs received (`LoadedContainers`): any read of the bank during the
+  load (a `BAG_UPDATE`, a wipe, a sort's sweep) shows only the tabs loaded so far, and nothing pops in
+  before its turn. Once every tab is read, and when the bank closes, the limit goes (nil: every bank
+  bag), so a tab that gains slots later is read like any change.
+- **Item data loads at once, each tab on its own.** The guild bank's tabs arrive from the server; the
+  bank's are all on the client, so `_LoadBank` starts every tab's load at once
+  (`itemLoader:PrimeBank({ bag }, ...)`, one `ContinuableContainer` each), so the server sends them
+  in parallel as before. A tab is ready once its data has loaded (`"primed"`) or after
+  `BANK_PRIME_TIMEOUT` (2 s, one timer for every tab: Blizzard drops the callbacks of an item whose
+  load fails, `ITEM_DATA_LOAD_RESULT` with `success == false`, `AsyncCallbackSystem.lua`); a tab read
+  before its data arrived is read again when it does (`{ bank = true }`), as a guild tab is. A tab
+  whose data arrives after the timeout but before its turn is read once, warm.
+- **One tab per read** (`_LoadNextBankTab`). The next tab is read once the read before it has run:
+  the read's request carries `bankWave`, and when its unit finishes, or fails, `_UnitDone` calls
+  `_BankWaveDone`, which loads the next. So each read shows one more tab, a few frames apart (harvest,
+  commit and draw, the idle frame), even when every tab's data was already loaded and would otherwise
+  have merged into one read. A read failing never stops the load. A wave's request that merges into
+  a waiting one carries its `bankWave` (the newest: the only other one waiting can be an ended
+  open's, whose read would otherwise strand the new open).
+- **Order** (`_NextBankTab`): the Blizzard tab shown (tab mode, `blizzardBankTab`), else the tabs of
+  the bank type shown (Warbank or character bank, from `bankTab`: both bag designs keep both fields on
+  `addon.Bags.Bank`), then the others. It is chosen afresh before each read, so a tab chosen while the
+  bank loads is read next, as a guild tab chosen while loading is queried next (`GuildBank:LoadTab`).
+- **Layout:** the first read rebuilds the layout (`resetLayout`); later reads keep it, as the guild
+  bank's do, so with "Preserve Empty Slots as Gaps" (on by default) a later tab's items are added at
+  the end of their sections (data-loader.md §13) until the bank is next opened.
+- **Traces** (data-driven.md): the request names the tab it adds (`bankWaveTab`) and why it ran
+  (`bankOpen`: "primed", "timeout", "empty"); `_BankTabReady` returns "ready", "read again",
+  "already" or "ended", and `_LoadNextBankTab` the tab it read or "reading", "waiting", "done".
+
+**Not measured yet:** a capture of a bank open with the tabs (in game, before and after). Inferred
+from the capture above: each read asks the upgrade provider about every item loaded so far (Pawn is
+not cached, caches.md §2), so later reads cost about 0.24 ms per item already loaded, and the reads
+together ask Pawn about more items than one read did. The guild bank pays the same.
 
 **The cost:** the bank's contents appear once its window has shown: 0.45 s later on Next, 0.1 s
-on classic with fading on. Priming also starts after the animation (asked: nothing loads before
-it), so a session's first open, which waits about 1.2 s for the server, waits that much longer;
-priming at once and holding only the read would hide that wait behind the animation, at the cost
-of a loop over every bank slot in its first frame.
+on classic with fading on, then tab by tab. Priming also starts after the animation (asked: nothing
+loads before it), so a session's first open, which waits about 1.2 s for the server, waits that much
+longer; priming at once and holding only the reads would hide that wait behind the animation, at the
+cost of a loop over every bank slot in its first frame.
 
-Coverage: `spec/refresh_spec.lua` ("opening the bank": shown at once and loaded only once shown,
-read once primed and not again on the timeouts; read on the data timeout and again when the data
-arrives; nothing for an ended open, closed while it showed or after; loaded on the show timeout;
-`_BankShown`'s reasons and returns; loaded at once with no bank window; no bank sweep while it
-shows, the backpack as usual, then sweeps as usual; a reopen), `spec/loader_spec.lua` ("primes
-every bank bag, and only bank bags, in one load"), `spec/refresh_pipeline_spec.lua` ("reads the
-bank once, warm, through a bank open in the captured order": replays a captured open, the window
-finishing its show, cold item data, the banker interaction, then the data and the tooltip
-resolution arriving, through the real pipeline and queue), and
+Coverage: `spec/refresh_spec.lua` ("opening the bank": shown at once and loaded only once shown;
+every tab's data loaded at once, a load each, only tabs with slots; each tab read once its data has
+loaded, the shown one first, the first read afresh, the limit gone at the end, the timeouts doing
+nothing after; the Warbank first while it shows; the Blizzard tab shown first; a tab chosen while it
+loads read next; one tab per read with every tab's data loaded; every tab read on the timeout and a
+tab again when its data arrives; a tab whose data arrives before its turn read once, warm; Classic's
+order with the reagent bank last; an empty bank read once; loading on after a failed read; nothing
+for an ended open, including late data; a first read merging into an ended open's; stopping on
+close; the show timeout; `_BankShown`'s reasons and returns; no bank window; no bank sweep while it
+shows, then sweeps as usual; a reopen), `spec/loader_spec.lua` ("primes the bank tabs it is given in
+one load"), `spec/items_spec.lua` ("the bank's tabs loaded so far": `BankBags`, Phase 1 limited to
+the tabs loaded, also against a read naming others, and unlimited again),
+`spec/refresh_pipeline_spec.lua` ("reads the bank once, warm, through a bank open in the captured
+order": replays a captured open, the window finishing its show, cold item data, the banker
+interaction, then the data and the tooltip resolution arriving, through the real pipeline and
+queue; "opening the bank, tab by tab": each read one more tab, frames apart, the first afresh; the
+Warbank first; a bank read during the load shows only the tabs loaded; a tab gaining slots after; only
+an open's own read loads its next tab; starting over on a reopen), and
 `spec/integration/bank_open_spec.lua` (the whole addon: no bank read while Next's bank slides in or
 the classic bank fades in, then one read, and Loading... gone once drawn; at once with fading
 off). 29 mutations; the four that first survived led to a harness test (an error in a message
 handler reaches the harness, test-harness.md §5) and to removing two resets of Next's callback list
-that every new slide already does.
+that every new slide already does. Tab by tab: 22 mutations, each failing at least one test; the four
+that first survived led to three tests (Classic's order, late data after an open ended, an ended
+open's read finishing during the next) and the merge fix above, and to removing a redundant check.

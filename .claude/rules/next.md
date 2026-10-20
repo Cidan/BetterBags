@@ -276,6 +276,8 @@ the tabs stick out to the right. It does everything the classic retail, WoW: For
 banks do (`bags/bank.lua`, `bags/classic/bank.lua`, `bags/era/bank.lua`, `frames/bankslots.lua`),
 reusing their code wherever it is not drawing.
 
+- **Loading:** the bank's tabs pop in one at a time as it opens, the tab shown first, as the guild
+  bank's do (refresh-scheduler.md §11a); the classic bank loads the same way.
 - **Title:** the group shown (Bank, Warbank, a custom group), or the Blizzard bank tab's name.
 - **Header buttons** (from the screen edge): close (`uitools-icon-close`); settings; Show Bank Tabs
   (retail); Deposit Warbound Items (retail with a Warbank: `C_Bank.AutoDepositItemsIntoBank` for
