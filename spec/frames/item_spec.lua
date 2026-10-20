@@ -905,6 +905,21 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           sonata.generation = 0
         end)
 
+        -- Masque sizes a skin to the button when it skins it (Masque 12.1.0 Core.lua UpdateScale) and
+        -- re-skins it on item/Updated, which only a full draw sends: a button given another size (a
+        -- BetterBags Next theme's icons) draws in full, so its skin follows its size.
+        it("draws in full again after its size changed, and not when it is the same", function()
+          item:SetSize(btnCtx, 44, 44)
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(1, fullDraws)
+          item:SetSize(btnCtx, 44, 44)
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(1, fullDraws)
+          item:SetSize(btnCtx, 38, 38)
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(2, fullDraws)
+        end)
+
         it("skips the setters but still points the button at the new data", function()
           local again = data()
           item:SetItemFromData(btnCtx, again)

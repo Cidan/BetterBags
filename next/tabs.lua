@@ -131,7 +131,11 @@ function railProto:styleTab(tab)
   button:SetHeight(style.TAB_HEIGHT)
   local glow = style.Theme.Tabs.Glow
   if glow then
-    tab.glow:SetVertexColor(style:RGBA(glow.Color))
+    -- A texture's alpha is its vertex color's (NextPanel:paintEdges): colored, it keeps what it shows.
+    local alpha = tab.glow:GetAlpha()
+    local r, g, b = style:RGBA(glow.Color)
+    tab.glow:SetVertexColor(r, g, b)
+    tab.glow:SetAlpha(alpha)
     tab.glow:SetBlendMode(glow.BlendMode or "ADD")
   else
     tween:Stop(tab.glow)

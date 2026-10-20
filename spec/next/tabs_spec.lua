@@ -379,7 +379,11 @@ describe("NextTabs", function()
       restyle({ Palette = { Mint = { 0.4, 1, 0.7, 1 } }, Tabs = { Glow = { Color = "Mint", Drop = 0.5, Pulse = 0.9 } } })
       rail:SetDropTarget(2)
       local glow = rail.tabs[2].glow
-      assert.are.same({ 0.4, 1, 0.7, 1 }, { glow:GetVertexColor() })
+      local r, g, b = glow:GetVertexColor()
+      assert.are.same({ 0.4, 1, 0.7 }, { r, g, b })
+      assert.are.equal(0.5, glow:GetAlpha())
+      -- A texture's alpha is its vertex color's: restyled, it keeps what it shows.
+      rail:ApplyStyle(nil)
       assert.are.equal(0.5, glow:GetAlpha())
       rail:SetDropTarget(nil)
       restyle({ Tabs = { Glow = false } })

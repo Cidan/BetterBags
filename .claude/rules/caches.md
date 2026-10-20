@@ -102,7 +102,8 @@ upgrade provider reads `equipmentCache` (`GetItemDataFromInventorySlot`).
 ### 4. Button draw record (`item.drawState`, item-drawing.md §7b)
 Kept value: what the button shows. A redraw whose inputs (the item's `itemHash` and every other
 field the setters read, `drawGeneration`, the decoration and Sonata's generation) match
-the record is skipped. Invalidated by `ResetVisuals` (a release, or item/free/empty mode changes)
+the record is skipped. Invalidated by `ResetVisuals` (a release, or item/free/empty mode changes),
+`SetSize` with a new size (Masque's skin follows the size only through a full draw's re-skin)
 and `Lock`; `UpdateSearch` keeps the search match current. `drawGeneration` changes on every wipe;
 `ItemFrame.styleGeneration` (also in the record, bumped by `RestyleButtons`) changes when a setting
 the setters read changes with no new data (glow intensity, item level display), which reach the

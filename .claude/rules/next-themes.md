@@ -143,6 +143,17 @@ called by `BagSystem:Use`; while Next is in use and its theme sets `ItemButton`,
 override, and `ItemFrame:RestyleButtons()` makes every button draw in full again. Default sets none,
 so item buttons look as before. Masque is still decided by the bags' theme.
 
+**Sizes and Masque.** Masque sizes a skin to the button when it skins it (Masque 12.1.0 `Core.lua`
+`UpdateScale`, from `Button:GetSize()`, in `SkinButton`, which both `AddButton` and `ReSkin` run).
+Bag item buttons are re-skinned on `item/Updated`, which only a full draw sends, and a redraw whose
+inputs are unchanged is skipped (item-drawing.md §7b). **Failure mode (fixed, reported in game):**
+Quiet's 38-pixel icons resized every button with nothing else changed, so no draw was full and the
+skin stayed sized for 44: Masque's frame and the default border both showed, and switching back left
+broken borders. `itemProto:SetSize` now makes the next draw full when the size changes (the record
+is invalidated, as `Lock` does). Vendor buttons are skinned once and not drawn again on a theme
+change, so the Masque integration re-skins them on `sonata/NextThemeChanged`. Guild bank buttons
+re-skin on every draw already, and a theme redraws the guild bank.
+
 ## 7. Picking a theme
 
 The settings window's **Next Theme** page (right after **Theme**) is the Theme pane over SonataNext
@@ -162,10 +173,41 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
   sparkles, cloud, spark or wash. Its paper color (feather, tabs) is the art's measured average
   (0.83, 0.78, 0.70).
 - **Quiet**: cool grays, smaller icons nine to a row, a shorter header, no ribbon, cloud, spark,
-  sparkles or braid, quicker opening without a bounce (the body reaches only 4 past the edge), a thin
-  border at both sizes.
+  sparkles or braid, quicker opening without a bounce (the body reaches only 4 past the edge), a
+  fainter small border. Its first version drew the border on full panels too; asked: a full panel
+  docked at its edge should have none, so it no longer sets `Panel.Edge.Full`.
 
 Not seen in game yet: any theme but Default.
+
+## 10. A texture's alpha is its vertex color's
+
+For a texture (and a line), `SetAlpha` and `SetVertexColor`'s alpha are **one value**: each replaces
+the other. Blizzard's own code relies on it: `FCF_SetWindowAlpha` sets a chat window's alpha with
+`SetAlpha` on its textures, and `FCF_GetChatWindowInfo` reads it back from
+`background:GetVertexColor()` (`Blizzard_ChatFrameBase/Mainline/FloatingChatFrame.lua`); both setters
+add the same Alpha secret aspect (`SimpleRegionAPIDocumentation.lua`). A gradient's alphas are its
+own: `SetAlpha` does not fade a gradient texture (§14d of next.md; `.context/patterns-ui.md`).
+
+**Reported in game, all from treating the two as separate:**
+- The small border looked bright after any size switch and dim after a theme: the switch faded it
+  with `SetAlpha` and ended at `SetAlpha(1)`, replacing the theme's 0.35, until a theme colored it
+  again. Since v0.7.0's small mode.
+- The title's hover glow lit up when a bag opened or a theme applied, until hovered: `Paint` colored
+  it (`SetVertexColor(..., 1)`) after its `SetAlpha(0)`. The spark the same, while its shimmer waited.
+
+**Rules (they give the same result whichever way the client counts):**
+- A texture whose alpha is animated gets its color first and its alpha after: anything that colors
+  it again (a theme) keeps the alpha it shows (`GetAlpha` before, `SetAlpha` after): the title's
+  glow, the spark, the drop glow, a tab's glow. Textures whose alpha is set every frame (cloud
+  puffs, sparkles, braid lines, the dock's glow) need nothing more.
+- A texture with a theme alpha that also fades is faded through its vertex color alone, never with
+  `SetAlpha`: the small border (`paintEdges(strength)`: the theme's alpha times the strength).
+- Classic Sonata the same: `apply:Texture` and `apply:ButtonStates` set a tint's color, then one
+  alpha, the tint's alpha times `Alpha`; the decorator fades a texture from that product
+  (`apply:TextureAlpha`). No shipped classic theme gives a faded texture a tint alpha below 1.
+- The spec mock models it (`spec/helpers/wow_mocks.lua`, `SetAlpha`/`SetVertexColor`/`GetVertexColor`
+  on textures and lines): read a texture's alpha with `GetAlpha` and its color with the first three
+  values of `GetVertexColor`.
 
 ## 9. Coverage
 
@@ -188,5 +230,13 @@ Not seen in game yet: any theme but Default.
 - Settings and wiring: `spec/config/themepane_spec.lua` (the pane over SonataNext),
   `spec/config/config_redraw_spec.lua` (the page), `spec/bagsystem_spec.lua` (`SetActive`),
   `spec/database_spec.lua`, `spec/core/constants_spec.lua`, `spec/render/toc_spec.lua`.
-- Every guard was mutation-tested (about 80 mutations): each that survived led to a test or to
-  removing what it showed unneeded (the edit box's template color).
+- Alphas (§10): `spec/next/theme_panel_spec.lua` ("alphas": the title's glow through a theme, lit and
+  dark; the border's alpha after any number of size switches and part way through one; the spark
+  while its shimmer waits; a hidden drop glow; the cloud settling when the spark goes),
+  `spec/next/chain_spec.lua` (the glow dark until hovered), `spec/next/tabs_spec.lua` (a drop target
+  restyled), `spec/sonata/apply_spec.lua` and `spec/sonata/decoration_spec.lua` (tint alpha times
+  Alpha, a tinted texture faded).
+- Sizes and Masque: `spec/frames/item_spec.lua` ("draws in full again after its size changed"),
+  `spec/integrations/masque_spec.lua` ("skins them again when a Next theme applies").
+- Every guard was mutation-tested (about 95 mutations): each that survived led to a test or to
+  removing what it showed unneeded (the edit box's template color, the border's kept strength).

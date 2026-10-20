@@ -8,7 +8,7 @@ local sonataNext = addon:GetModule('SonataNext')
 
 -- Quiet: BetterBags Next calm and compact. Cool grays; smaller icons, nine to a row; a shorter header;
 -- no ribbon, cloud, spark, sparkles or braid; panels that open and come in without a bounce, a little
--- quicker; and a thin border round every panel, at both sizes. Data only (next-themes.md).
+-- quicker; a fainter border round a small panel. Data only (next-themes.md).
 sonataNext:RegisterTheme({
   Name = "Quiet",
   DisplayName = "Quiet",
@@ -55,7 +55,7 @@ sonataNext:RegisterTheme({
   },
 
   Panel = {
-    Edge = { Color = "Lavender", Alpha = 0.18, Full = true },
+    Edge = { Color = "Lavender", Alpha = 0.18 },
   },
 
   Header = {

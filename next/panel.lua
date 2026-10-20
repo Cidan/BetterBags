@@ -630,7 +630,6 @@ function panelProto:styleBody()
   local E = P.Edge
   for i, edge in ipairs(self.edges) do
     if E then
-      edge:SetVertexColor(style:RGBA(E.Color, E.Alpha))
       if i <= 2 then
         edge:SetHeight(E.Size)
       else
@@ -638,14 +637,37 @@ function panelProto:styleBody()
       end
     end
   end
+  self:paintEdges(1)
   local G = P.DropGlow
   if G then
-    self.dropGlow:SetVertexColor(style:RGBA(G.Color))
+    -- A texture's alpha is its vertex color's (§ paintEdges): colored, it keeps the alpha it shows.
+    local alpha = self.dropGlow:GetAlpha()
+    local r, g, b = style:RGBA(G.Color)
+    self.dropGlow:SetVertexColor(r, g, b)
+    self.dropGlow:SetAlpha(alpha)
     self.dropGlow:SetBlendMode(G.BlendMode or "ADD")
   else
     tween:Stop(self.dropGlow)
     self.dropGlow:SetAlpha(0)
     self.dropGlow:Hide()
+  end
+end
+
+-- paintEdges draws the border at a strength, 0 to 1, of the theme's alpha. A texture's alpha is its
+-- vertex color's alpha: SetAlpha replaces the alpha SetVertexColor gave it and the other way round
+-- (Blizzard sets a chat window's alpha with SetAlpha and reads it back from GetVertexColor,
+-- FloatingChatFrame.lua). So the border is faded through its vertex color alone: a size switch that
+-- faded it with SetAlpha left it at full strength, brighter than the theme's 0.35, until a theme
+-- colored it again (reported in game).
+---@param strength number
+function panelProto:paintEdges(strength)
+  local E = style.Theme.Panel.Edge
+  if not E then
+    return
+  end
+  local r, g, b, a = style:RGBA(E.Color, E.Alpha)
+  for _, edge in ipairs(self.edges) do
+    edge:SetVertexColor(r, g, b, a * strength)
   end
 end
 
@@ -994,9 +1016,7 @@ function panelProto:Morph()
     frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x - bodyLeft, at.y)
     frame:SetSize(width, at.h)
     self:paintFeathers(at.full, at.outer)
-    for _, edge in ipairs(edges) do
-      edge:SetAlpha(at.edge)
-    end
+    self:paintEdges(at.edge)
     self.ribbonLength = at.ribbon
     for _, line in ipairs(self.ribbonLines) do
       line:SetWidth(at.ribbon)
@@ -1006,9 +1026,7 @@ function panelProto:Morph()
   morph.finish = function()
     self.morph = nil
     self:paintFeathers(1, 1)
-    for _, edge in ipairs(edges) do
-      edge:SetAlpha(1)
-    end
+    self:paintEdges(1)
     self:ApplyGeometry()
     render:Invalidate(self.root)
     chain:Arrived(self)
@@ -1626,23 +1644,32 @@ function panelProto:styleHeader()
     end
   end
 
+  -- Painted, the spark and the title's glow keep the alpha they show: a texture's alpha is its vertex
+  -- color's (paintEdges), and Paint colors them. Painting the glow left it lit until it was hovered
+  -- (reported in game).
   local spark, S = self.spark, H.Spark
   spark:ClearAllPoints()
   spark:SetPoint("CENTER", self.ribbon, left and "LEFT" or "RIGHT", 0, 0)
   if S then
+    local alpha = spark:GetAlpha()
     style:Paint(spark, { Texture = S.Texture, Color = S.Color, BlendMode = S.BlendMode or "ADD" })
+    spark:SetAlpha(alpha)
     spark:SetSize(S.Size, S.Size)
     spark:Show()
   else
     tween:Stop(spark)
     spark:SetAlpha(0)
     spark:Hide()
+    -- Its shimmer swelled the cloud; with no spark, nothing would settle it.
+    self:SetCloudSwell(0)
   end
 
   local glow, G = self.titleGlow, H.TitleGlow
   glow:ClearAllPoints()
   if G then
+    local alpha = glow:GetAlpha()
     style:Paint(glow, { Texture = G.Texture, Color = G.Color, BlendMode = G.BlendMode or "ADD" })
+    glow:SetAlpha(alpha)
     glow:SetPoint("TOPLEFT", title, "TOPLEFT", -G.X, G.Y)
     glow:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", G.X, -G.Y)
     glow:Show()

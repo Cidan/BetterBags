@@ -283,6 +283,19 @@ describe("Masque integration", function()
       assert.are.same({ "skin" }, groups["Vendor"].log, "once")
     end)
 
+    -- A BetterBags Next theme can resize them (its icons, next-themes.md §6), and Masque sizes a skin
+    -- to the button when it skins it (Masque 12.1.0 Core.lua UpdateScale): each Next theme applied
+    -- skins them again.
+    it("skins them again when a Next theme applies", function()
+      local b = vendorButton()
+      announce(b)
+      events:SendMessage(context:New("test"), "sonata/NextThemeChanged", "Quiet")
+      assert.are.same({ "skin", "skin" }, groups["Vendor"].log)
+      disableMasque = true
+      events:SendMessage(context:New("test"), "sonata/NextThemeChanged", "Default")
+      assert.are.same({ "skin", "skin" }, groups["Vendor"].log, "not under a theme without Masque")
+    end)
+
     it("takes it out when a theme turns Masque off, and back in when one turns it on", function()
       local b = vendorButton()
       announce(b)

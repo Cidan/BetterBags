@@ -523,10 +523,12 @@ describe("BetterBags Next's small mode", function()
       return math.max(g.min.a, g.max.a) / style.Color.Body[4]
     end
 
+    -- How strong the border is, 0 to 1: its alpha against the theme's (a texture's alpha is its
+    -- vertex color's, so the border fades through it, next-themes.md §10). Rounded: 0.35 * x / 0.35.
     local function edgeAlpha(bag)
       local alpha = bag.edges[1]:GetAlpha()
       for _, edge in ipairs(bag.edges) do assert.are.equal(alpha, edge:GetAlpha(), "every edge alike") end
-      return alpha
+      return math.floor(alpha / style.Small.Edge * 1e9 + 0.5) / 1e9
     end
 
     it("has a button on the backpack with Blizzard's minimize art while full, maximize while small", function()
@@ -841,7 +843,7 @@ describe("BetterBags Next's small mode", function()
       step(style.Time.Morph / 2)
       bag:Hide(ctx())
       assert.is_false(bag.feather:IsShown())
-      for _, edge in ipairs(bag.edges) do assert.are.equal(1, edge:GetAlpha()) end
+      assert.are.equal(1, edgeAlpha(bag), "its border at full strength")
       finishTweens()
       assert.is_false(bag:IsShown())
       assert.are.equal(style.Small.Slide, bag.offset)

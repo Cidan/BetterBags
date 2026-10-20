@@ -153,8 +153,14 @@ function apply:Texture(texture, spec)
   if spec.VertTile ~= nil then
     texture:SetVertTile(spec.VertTile)
   end
+  -- A texture's alpha is its vertex color's (Blizzard sets a chat window's alpha with SetAlpha and
+  -- reads it back from GetVertexColor, FloatingChatFrame.lua): a tint's alpha and Alpha make one
+  -- alpha, their product, set once after the color.
+  local tintAlpha = 1
   if spec.VertexColor ~= nil then
-    texture:SetVertexColor(self:Color(spec.VertexColor))
+    local r, g, b, a = self:Color(spec.VertexColor)
+    texture:SetVertexColor(r, g, b)
+    tintAlpha = a
   end
   if spec.BlendMode ~= nil then
     texture:SetBlendMode(spec.BlendMode)
@@ -162,9 +168,17 @@ function apply:Texture(texture, spec)
   if spec.Desaturated ~= nil then
     texture:SetDesaturated(spec.Desaturated)
   end
-  if spec.Alpha ~= nil then
-    texture:SetAlpha(spec.Alpha)
+  if spec.Alpha ~= nil or tintAlpha ~= 1 then
+    texture:SetAlpha(tintAlpha * (spec.Alpha or 1))
   end
+end
+
+-- TextureAlpha is the alpha a texture spec draws at: its tint's alpha times its Alpha (Texture).
+---@param spec SonataTexture
+---@return number
+function apply:TextureAlpha(spec)
+  local _, _, _, a = self:Color(spec.VertexColor)
+  return a * (spec.Alpha or 1)
 end
 
 -- ResetTexture returns a texture to blank, for reuse.
@@ -257,10 +271,12 @@ function apply:ButtonStates(button, spec)
         if coords ~= nil then
           region:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
         end
-        if s.Color ~= nil then
-          region:SetVertexColor(self:Color(s.Color))
-        elseif s.VertexColor ~= nil then
-          region:SetVertexColor(self:Color(s.VertexColor))
+        -- One alpha: the color's times Alpha, after the color (apply:Texture).
+        local tint, tintAlpha = s.Color or s.VertexColor, 1
+        if tint ~= nil then
+          local r, g, b, a = self:Color(tint)
+          region:SetVertexColor(r, g, b)
+          tintAlpha = a
         end
         if s.BlendMode ~= nil then
           region:SetBlendMode(s.BlendMode)
@@ -268,8 +284,8 @@ function apply:ButtonStates(button, spec)
         if s.Inset ~= nil then
           self:Inset(region, button, s.Inset)
         end
-        if s.Alpha ~= nil then
-          region:SetAlpha(s.Alpha)
+        if s.Alpha ~= nil or tintAlpha ~= 1 then
+          region:SetAlpha(tintAlpha * (s.Alpha or 1))
         end
       end
     end

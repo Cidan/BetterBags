@@ -574,7 +574,7 @@ function decorationProto:Apply(style, theme)
   if backgroundSpec ~= nil then
     local bg = self:buildTexture("Background", backgroundSpec, "BACKGROUND", true)
     if backgroundSpec.Opacity ~= false then
-      table.insert(self.fading, { texture = bg, alpha = backgroundSpec.Alpha or 1 })
+      table.insert(self.fading, { texture = bg, alpha = apply:TextureAlpha(backgroundSpec) })
     end
   end
   local borderSpec = spec(s.Border)
@@ -584,7 +584,7 @@ function decorationProto:Apply(style, theme)
   for i, textureSpec in ipairs(spec(s.Textures) or {}) do
     local texture = self:buildTexture(textureSpec.Name or ("Texture" .. i), textureSpec, "ARTWORK", false)
     if textureSpec.Opacity == true then
-      table.insert(self.fading, { texture = texture, alpha = textureSpec.Alpha or 1 })
+      table.insert(self.fading, { texture = texture, alpha = apply:TextureAlpha(textureSpec) })
     end
   end
   if titleSpec ~= nil then

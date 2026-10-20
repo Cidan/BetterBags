@@ -368,8 +368,21 @@ function WidgetMethods:IsMouseOver(offsetTop, offsetBottom, offsetLeft, offsetRi
   return x >= left + (offsetLeft or 0) and x <= right + (offsetRight or 0)
     and y >= bottom + (offsetBottom or 0) and y <= top + (offsetTop or 0)
 end
+-- A texture's (and a line's) alpha is its vertex color's alpha: SetAlpha replaces the alpha
+-- SetVertexColor gave it, and SetVertexColor (its alpha defaulting to 1) replaces the one SetAlpha
+-- gave it. Both setters add the same Alpha secret aspect (SimpleRegionAPIDocumentation.lua); the rest
+-- is inferred from the client (next-themes.md §10: a size switch's SetAlpha(1) brightened BetterBags
+-- Next's 0.35 border until its vertex color was set again, and a SetVertexColor after SetAlpha(0)
+-- lit the title's glow until a hover set its alpha). A gradient's alphas are its own: SetAlpha does
+-- not fade a gradient texture (BetterBags Next's feathers did not fade with it).
+local function isTextureType(widget)
+  return widget._type == "Texture" or widget._type == "Line"
+end
 function WidgetMethods:SetAlpha(alpha)
   self._alpha = alpha
+  if isTextureType(self) and self._vertexColor then
+    self._vertexColor.a = alpha
+  end
 end
 function WidgetMethods:GetAlpha()
   return self._alpha or 1
@@ -690,6 +703,7 @@ end
 function WidgetMethods:GetVertexColor()
   local c = self._vertexColor
   if c then return c.r, c.g, c.b, c.a end
+  if isTextureType(self) then return 1, 1, 1, self._alpha end
   return 1, 1, 1, 1
 end
 -- FontInstance: SetFontObject(font) / GetFontObject(), SetShadowOffset(offsetX, offsetY).
@@ -1119,6 +1133,9 @@ function WidgetMethods:GetFontObject()
 end
 function WidgetMethods:SetVertexColor(r, g, b, a)
   self._vertexColor = {r = r, g = g, b = b, a = a or 1}
+  if isTextureType(self) then
+    self._alpha = a or 1
+  end
 end
 function WidgetMethods:SetJustifyH(justify)
   self._justifyH = justify
