@@ -1,0 +1,23 @@
+{
+  "id": 1792470222,
+  "version": "v0.7.0-3-gaea3d82",
+  "channel": "alpha",
+  "date": "2026-10-20",
+  "from": "e10eebd13061dc2ca7336d28aa9d0461b0ad6bdb",
+  "to": "aea3d824badb4684200132ca72a6015c7761fae7",
+  "headline": "Bag and bank refreshes are significantly faster, and virtual stacks handle recent items more reliably.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Faster bag and bank refreshes",
+      "details": "Items now retain their calculated details, such as categories, search data, and upgrade indicators, across refreshes until something actually changes. This substantially reduces refresh time and stutter, especially when opening large bags or playing with Pawn installed.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Virtual stacks bouncing out of Recent Items",
+      "details": "Merged item stacks now stay in the Recent Items section whenever any pile in the stack is recent, rather than jumping between categories depending on which pile is largest.",
+      "clients": []
+    }
+  ]
+}
