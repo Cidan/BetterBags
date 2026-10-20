@@ -56,6 +56,22 @@ sonataNext:RegisterTheme({
     Glow = "Interface\\AddOns\\BetterBags\\textures\\next\\glow.png",
     -- The cooldown "bling" star, on every client.
     Sparkle = "Interface\\Cooldown\\star4",
+    -- The header buttons' glyphs (tools/textures/next_icons.py): white line art, the shape in the
+    -- alpha, in the style of Blizzard's settings gear.
+    IconSettings = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\settings.png",
+    IconClose = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\close.png",
+    IconSort = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\sort.png",
+    IconBags = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\bags.png",
+    IconSmall = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\small.png",
+    IconFull = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\full.png",
+    IconBankTabs = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\banktabs.png",
+    IconDeposit = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\deposit.png",
+    IconDepositGold = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\depositgold.png",
+    IconWithdrawGold = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\withdrawgold.png",
+    IconFilter = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\filter.png",
+    IconSellJunk = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\selljunk.png",
+    IconRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\repair.png",
+    IconGuildRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\guildrepair.png",
   },
 
   -- Text roles: Size, Color, Shadow (true: FontShadow; a table: its own; unset: none), Flags, File (a
@@ -265,15 +281,31 @@ sonataNext:RegisterTheme({
         { F = 0.70, Y = -18, W = 32, H = 28, Color = "Lavender", A = 0.09 },
       },
     },
-    -- The header buttons' icons: tinted, and brighter under the pointer. Glyphs (white, one-color:
-    -- settings, close) take Color and HoverColor; full-color art (sort, backpack, size, deposit,
-    -- coins, repair) ArtColor and ArtHoverColor (a tint multiplies the art: a dark one blackens it).
-    -- Icons replaces a button's icon by its key (settingsButton, sortButton, classicButton,
-    -- closeButton, bankTabsButton, depositButton, withdrawButton, filterButton, sellJunkButton,
-    -- repairAllButton, guildRepairButton; the size button by its state, sizeButtonFull and
-    -- sizeButtonSmall) with { Atlas } or { Texture, TexCoords }, and Glyph = true for a glyph.
+    -- The header buttons' icons (next-themes.md §3). Icons gives each button its icon by its key (the
+    -- size button by its state: sizeButtonFull, sizeButtonSmall): a Texture (one of Textures, or a
+    -- file) with its TexCoords, or an Atlas (it wins over an inherited Texture). An icon is a glyph,
+    -- white and one color, drawn in Color and brighter in HoverColor; Glyph = false makes it full-color
+    -- art, drawn in ArtColor and ArtHoverColor (a tint multiplies the art: a dark one blackens it). An
+    -- icon may have its own Color and HoverColor. A disabled button is drawn at DisabledAlpha of its
+    -- color (a white glyph looks the same desaturated), art desaturated too.
     Buttons = { Color = "ButtonIcon", HoverColor = "White", ArtColor = "ButtonIcon", ArtHoverColor = "White",
-      Icons = {} },
+      DisabledAlpha = 0.3,
+      Icons = {
+        settingsButton = { Texture = "IconSettings" },
+        closeButton = { Texture = "IconClose" },
+        sortButton = { Texture = "IconSort" },
+        classicButton = { Texture = "IconBags" },
+        sizeButtonFull = { Texture = "IconSmall" },
+        sizeButtonSmall = { Texture = "IconFull" },
+        bankTabsButton = { Texture = "IconBankTabs" },
+        depositButton = { Texture = "IconDeposit" },
+        depositGoldButton = { Texture = "IconDepositGold" },
+        withdrawGoldButton = { Texture = "IconWithdrawGold" },
+        filterButton = { Texture = "IconFilter" },
+        sellJunkButton = { Texture = "IconSellJunk" },
+        repairAllButton = { Texture = "IconRepair" },
+        guildRepairButton = { Texture = "IconGuildRepair" },
+      } },
   },
 
   Search = {

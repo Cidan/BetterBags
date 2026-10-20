@@ -487,52 +487,120 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal("my-sort", bag.sortButton.icon:GetAtlas())
       assert.are.equal("Interface\\Small", bag.sizeButton.icon:GetTexture())
       backToDefault()
-      assert.are.equal("bags-button-autosort-up", bag.sortButton.icon:GetAtlas())
-      assert.are.equal("RedButton-Condense", bag.sizeButton.icon:GetAtlas())
+      assert.are.equal("sort", NextIconName(bag.sortButton))
+      assert.is_nil(bag.sortButton.icon:GetAtlas())
+      assert.are.equal("small", NextIconName(bag.sizeButton))
       assert.are.same({ 0.85, 0.82, 1, 1 }, { first.icon:GetVertexColor() })
     end)
   end)
 
-  -- Asked (a Parchment screenshot: the colored icons inked into black shapes): a tint suits the white
-  -- glyph icons (settings, close), and darkens full-color art (sort, backpack, size, deposit) into a
-  -- silhouette, so a theme tints the two apart.
+  -- Every header button is a glyph in the gear's style (asked: "make icons for each button we use ...
+  -- in the same style"; "these buttons should be colorable via themes, and even replacable with custom
+  -- art"). A tint suits a white glyph and darkens full-color art into a silhouette (asked with a
+  -- Parchment screenshot), so a theme's own art says which it is (Glyph = false: art).
   describe("header icons", function()
     local function color(button)
       local r, g, b = button.icon:GetVertexColor()
       return { r, g, b }
     end
 
-    it("tints glyphs with its glyph color and art with its art color, hovered and not", function()
+    local function every(panel, fn)
+      for _, button in ipairs(panel.headerButtons) do fn(button) end
+    end
+
+    it("draws every button in Default's icon color", function()
       local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
-      apply({ Palette = { Ink = { 0.2, 0.1, 0.05, 1 }, Wax = { 0.6, 0.1, 0.1, 1 }, Plain = { 0.9, 0.9, 0.9, 1 } },
-        Header = { Buttons = { Color = "Ink", HoverColor = "Wax", ArtColor = "Plain", ArtHoverColor = "White" } } })
-      assert.are.same({ 0.2, 0.1, 0.05 }, color(bag.settingsButton))
-      assert.are.same({ 0.2, 0.1, 0.05 }, color(bank.closeButton))
-      for _, art in ipairs({ bag.sortButton, bag.classicButton, bag.sizeButton }) do
-        assert.are.same({ 0.9, 0.9, 0.9 }, color(art))
+      for _, panel in ipairs({ bag, bank }) do
+        every(panel, function(button)
+          assert.are.same({ 0.85, 0.82, 1, 1 }, { button.icon:GetVertexColor() }, button.key)
+          assert.is_false(button.icon:IsDesaturated(), button.key)
+        end)
+      end
+    end)
+
+    it("draws every glyph in the theme's colors, hovered and not", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Palette = { Ink = { 0.2, 0.1, 0.05, 1 }, Wax = { 0.6, 0.1, 0.1, 1 } },
+        Header = { Buttons = { Color = "Ink", HoverColor = "Wax" } } })
+      for _, panel in ipairs({ bag, bank }) do
+        every(panel, function(button) assert.are.same({ 0.2, 0.1, 0.05 }, color(button), button.key) end)
       end
       bag.sortButton:GetScript("OnEnter")(bag.sortButton)
-      assert.are.same({ 1, 1, 1 }, color(bag.sortButton))
+      assert.are.same({ 0.6, 0.1, 0.1 }, color(bag.sortButton))
       bag.sortButton:GetScript("OnLeave")(bag.sortButton)
-      assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.sortButton))
-      bag.settingsButton:GetScript("OnEnter")(bag.settingsButton)
-      assert.are.same({ 0.6, 0.1, 0.1 }, color(bag.settingsButton))
-      bag.settingsButton:GetScript("OnLeave")(bag.settingsButton)
-    end)
-
-    it("tints a theme's own icon by what the theme says it is", function()
-      local bag = nextBag:Create(ctx())
-      apply({ Palette = { Ink = { 0.2, 0.1, 0.05, 1 } },
-        Header = { Buttons = { Color = "Ink", ArtColor = "White",
-          Icons = { sortButton = { Atlas = "my-glyph", Glyph = true }, settingsButton = { Atlas = "my-art" } } } } })
       assert.are.same({ 0.2, 0.1, 0.05 }, color(bag.sortButton))
-      assert.are.same({ 1, 1, 1 }, color(bag.settingsButton))
     end)
 
-    it("tints both alike in Default, as before", function()
+    it("draws a theme's own art in its art colors, and its own glyph in the glyph colors", function()
       local bag = nextBag:Create(ctx())
-      assert.are.same(color(bag.settingsButton), color(bag.sortButton))
-      assert.are.same({ 0.85, 0.82, 1 }, color(bag.sortButton))
+      apply({ Palette = { Ink = { 0.2, 0.1, 0.05, 1 }, Plain = { 0.9, 0.9, 0.9, 1 } },
+        Header = { Buttons = { Color = "Ink", ArtColor = "Plain", ArtHoverColor = "Gold",
+          Icons = { sortButton = { Atlas = "my-art", Glyph = false },
+            settingsButton = { Texture = "Interface\\MyGear" },
+            classicButton = { Texture = "Interface\\Sheet", TexCoords = { 0.5, 1, 0, 0.5 }, Glyph = false } } } } })
+      assert.are.equal("my-art", bag.sortButton.icon:GetAtlas())
+      assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.sortButton))
+      bag.sortButton:GetScript("OnEnter")(bag.sortButton)
+      assert.are.same({ 1, 0.84, 0.5 }, color(bag.sortButton), "art brightens in its own hover color")
+      bag.sortButton:GetScript("OnLeave")(bag.sortButton)
+      assert.are.equal("Interface\\MyGear", bag.settingsButton.icon:GetTexture())
+      assert.are.same({ 0.2, 0.1, 0.05 }, color(bag.settingsButton), "a glyph unless it says otherwise")
+      assert.are.equal("Interface\\Sheet", bag.classicButton.icon:GetTexture())
+      assert.are.same({ 0.5, 1, 0, 0.5 }, bag.classicButton.icon._texCoords)
+      assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.classicButton))
+      backToDefault()
+      assert.are.equal("sort", NextIconName(bag.sortButton))
+      assert.are.same({ 0, 1, 0, 1 }, bag.classicButton.icon._texCoords)
+    end)
+
+    it("colors one button its own way", function()
+      local bank = nextBank:Create(ctx())
+      apply({ Palette = { Wax = { 0.6, 0.1, 0.1, 1 } },
+        Header = { Buttons = { Icons = { closeButton = { Color = "Wax", HoverColor = "Gold" } } } } })
+      assert.are.same({ 0.6, 0.1, 0.1 }, color(bank.closeButton))
+      bank.closeButton:GetScript("OnEnter")(bank.closeButton)
+      assert.are.same({ 1, 0.84, 0.5 }, color(bank.closeButton))
+      bank.closeButton:GetScript("OnLeave")(bank.closeButton)
+      assert.are.same({ 0.85, 0.82, 1 }, color(bank.settingsButton), "the others in the theme's")
+      assert.are.equal("close", NextIconName(bank.closeButton), "its art kept")
+    end)
+
+    -- A white glyph looks the same desaturated, so a disabled button fades (DisabledAlpha) instead,
+    -- art desaturated too; under the pointer it stays disabled.
+    it("fades a disabled button, glyph or art, hovered or not, and brings it back", function()
+      local bank = nextBank:Create(ctx())
+      local alpha = style.Theme.Header.Buttons.DisabledAlpha
+      assert.is_true(alpha > 0 and alpha < 1)
+      bank:SetHeaderButtonEnabled(bank.settingsButton, false)
+      assert.is_false(bank.settingsButton:IsEnabled())
+      assert.are.same({ 0.85, 0.82, 1, alpha }, { bank.settingsButton.icon:GetVertexColor() })
+      assert.is_false(bank.settingsButton.icon:IsDesaturated())
+      bank.settingsButton:GetScript("OnEnter")(bank.settingsButton)
+      assert.are.same({ 0.85, 0.82, 1, alpha }, { bank.settingsButton.icon:GetVertexColor() })
+      bank.settingsButton:GetScript("OnLeave")(bank.settingsButton)
+      bank:SetHeaderButtonEnabled(bank.settingsButton, true)
+      assert.are.same({ 0.85, 0.82, 1, 1 }, { bank.settingsButton.icon:GetVertexColor() })
+      apply({ Header = { Buttons = { DisabledAlpha = 0.5, Icons = { settingsButton = { Atlas = "my-art", Glyph = false } } } } })
+      bank:SetHeaderButtonEnabled(bank.settingsButton, false)
+      local _, _, _, a = bank.settingsButton.icon:GetVertexColor()
+      assert.are.equal(0.5, a)
+      assert.is_true(bank.settingsButton.icon:IsDesaturated())
+      bank:SetHeaderButtonEnabled(bank.settingsButton, true)
+      assert.is_false(bank.settingsButton.icon:IsDesaturated())
+    end)
+
+    it("keeps a button disabled through a theme switch", function()
+      local bank = nextBank:Create(ctx())
+      bank:SetHeaderButtonEnabled(bank.settingsButton, false)
+      apply({ Header = { Buttons = { DisabledAlpha = 0.4 } } })
+      local _, _, _, a = bank.settingsButton.icon:GetVertexColor()
+      assert.are.equal(0.4, a)
+    end)
+
+    it("names the button whose icon the theme does not give", function()
+      local bag = nextBag:Create(ctx())
+      assert.has_error(function() bag:SetHeaderIcon(bag.sortButton, "nopeButton") end,
+        "the Next theme has no icon for nopeButton")
     end)
   end)
 

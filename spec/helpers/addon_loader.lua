@@ -129,6 +129,20 @@ _G.UseNextTheme = function(theme)
   return style.Theme
 end
 
+-- NextIconName names what a BetterBags Next header button draws: its icon's file name without its
+-- folder or extension ("sort" for ...\\icons\\sort.png), or its atlas.
+---@param button table
+---@return string?
+_G.NextIconName = function(button)
+  local icon = button.icon
+  local atlas = icon:GetAtlas()
+  if atlas ~= nil then
+    return atlas
+  end
+  local path = icon:GetTexture()
+  return type(path) == "string" and (path:match("([^\\/]+)%.png$") or path) or path
+end
+
 -- Make Sonata's text roles usable in a spec whose code draws text with them
 --- (Sonata:CreateText, SetTextRole, GetTextFont): loads the engine and SonataApply when they
 --- are not loaded, registers the real Base theme (replacing a stand-in Base without text

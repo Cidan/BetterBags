@@ -51,11 +51,10 @@ From `next/panel.lua`, `next/chain.lua` and `next/style.lua`:
 
 - One setting for every Next panel: `nextSize`, `"full"` (the default: nothing changes for anyone
   who does not switch) or `"small"`, in the profile next to `nextChain`.
-- **The toggle** is a header button on the backpack: Blizzard's expand and condense art (the
-  `RedButton-Expand` / `RedButton-Condense` atlases on retail and WoW: Forever, the
-  `UI-Panel-BiggerButton-Up` / `UI-Panel-SmallerButton-Up` textures on Classic, the maximize and
-  minimize buttons of Blizzard's own frames). It switches every Next panel, open or not, and every
-  open one morphs to its new size (below).
+- **The toggle** is a header button on the backpack: arrows in while full, arrows out while small
+  (BetterBags' own glyphs, `.claude/rules/next-themes.md` §11; first Blizzard's red expand and
+  condense art). It switches every Next panel, open or not, and every open one morphs to its new
+  size (below).
 
 ### A small panel
 

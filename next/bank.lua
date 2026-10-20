@@ -100,23 +100,20 @@ end
 ---@return NextHeaderButton[]
 function bankProto:GetHeaderButtons()
   local buttons = {
-    { key = "closeButton", atlas = "uitools-icon-close", glyph = true, tooltip = L:G("Close"),
-      onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", atlas = "uitools-icon-settings", glyph = true, tooltip = L:G("Open Options Screen"),
+    { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
+    { key = "settingsButton", tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
   }
   if addon.isRetail then
-    table.insert(buttons, { key = "bankTabsButton", texture = EMPTY_BAG_SLOT_TEXTURE,
-      tooltip = L:G("Switch between your groups and the bank's own tabs"),
+    table.insert(buttons, { key = "bankTabsButton", tooltip = L:G("Switch between your groups and the bank's own tabs"),
       onClick = function(ctx) self:ToggleBankTabs(ctx) end })
   end
   if addon.hasWarbank then
-    table.insert(buttons, { key = "depositButton", atlas = "warbands-icon", tooltip = L:G("Deposit Warbank Items"),
+    table.insert(buttons, { key = "depositButton", tooltip = L:G("Deposit Warbank Items"),
       onClick = function() C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account) end })
   end
   if (C_Container and C_Container.SortBankBags) or _G.SortBankBags then
-    table.insert(buttons, { key = "sortButton", atlas = "bags-button-autosort-up", tooltip = L:G("Sort Bank"),
-      onClick = function(ctx) self:Sort(ctx) end })
+    table.insert(buttons, { key = "sortButton", tooltip = L:G("Sort Bank"), onClick = function(ctx) self:Sort(ctx) end })
   end
   return buttons
 end

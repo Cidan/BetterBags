@@ -67,8 +67,8 @@ local DIALOGS = { "GUILDBANK_DEPOSIT", "GUILDBANK_WITHDRAW", "CONFIRM_BUY_GUILDB
 ---@class NextGuildBankPanel: NextPanelFrame
 ---@field closeButton Button
 ---@field settingsButton Button
----@field depositButton Button
----@field withdrawButton Button
+---@field depositGoldButton Button
+---@field withdrawGoldButton Button
 ---@field shownTab? number The container of the tab shown by itself, nil while every tab shows.
 ---@field closeRequested boolean It asked the guild bank to close.
 ---@field wipeWhenHidden boolean The visit ended while the panel slid out: let go of its buttons once hidden.
@@ -174,14 +174,12 @@ end
 ---@return NextHeaderButton[]
 function guildProto:GetHeaderButtons()
   return {
-    { key = "closeButton", atlas = "uitools-icon-close", glyph = true, tooltip = L:G("Close"),
-      onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", atlas = "uitools-icon-settings", glyph = true, tooltip = L:G("Open Options Screen"),
+    { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
+    { key = "settingsButton", tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
-    { key = "depositButton", texture = "Interface\\Icons\\INV_Misc_Coin_01", tooltip = L:G("Deposit Gold"),
-      onClick = function() guildBank:DepositMoney() end },
-    { key = "withdrawButton", texture = "Interface\\Icons\\INV_Misc_Coin_02",
-      tooltipFunc = function() self:WithdrawTooltip() end, onClick = function() guildBank:WithdrawMoney() end },
+    { key = "depositGoldButton", tooltip = L:G("Deposit Gold"), onClick = function() guildBank:DepositMoney() end },
+    { key = "withdrawGoldButton", tooltipFunc = function() self:WithdrawTooltip() end,
+      onClick = function() guildBank:WithdrawMoney() end },
   }
 end
 
@@ -220,9 +218,7 @@ end
 
 -- UpdateHeader enables what the player may do: withdrawing gold only for a member who may.
 function guildProto:UpdateHeader()
-  local enabled = CanWithdrawGuildBankMoney() and true or false
-  self.withdrawButton:SetEnabled(enabled)
-  self.withdrawButton.icon:SetDesaturated(not enabled)
+  self:SetHeaderButtonEnabled(self.withdrawGoldButton, CanWithdrawGuildBankMoney() and true or false)
 end
 
 ---@return number

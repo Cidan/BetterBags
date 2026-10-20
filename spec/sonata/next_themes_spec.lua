@@ -60,6 +60,42 @@ describe("BetterBags Next's shipped themes", function()
     end
   end)
 
+  -- Every header button's glyph (next-themes.md §3, tools/textures/next_icons.py): one per key, each
+  -- its own file, shipped with BetterBags as a 64 x 64 PNG with an alpha channel (the shape is in the
+  -- alpha, white, so the theme tints it).
+  it("names a glyph BetterBags ships for every header button in Default", function()
+    local theme = sonataNext:Resolve("Default")
+    local icons = theme.Header.Buttons.Icons
+    local keys = { "settingsButton", "closeButton", "sortButton", "classicButton", "sizeButtonFull",
+      "sizeButtonSmall", "bankTabsButton", "depositButton", "depositGoldButton", "withdrawGoldButton",
+      "filterButton", "sellJunkButton", "repairAllButton", "guildRepairButton" }
+    local files = {}
+    for _, key in ipairs(keys) do
+      local spec = icons[key]
+      assert.is_not_nil(spec, key)
+      assert.is_nil(spec.Atlas, key)
+      assert.is_not_false(spec.Glyph, key)
+      local path = theme.Textures[spec.Texture]
+      assert.is_not_nil(path, key .. " names one of the theme's textures")
+      assert.is_nil(files[path], key .. " has a file of its own")
+      files[path] = true
+      local file = path:gsub("^Interface\\AddOns\\BetterBags\\", ""):gsub("\\", "/")
+      local f = io.open(file, "rb")
+      assert.is_not_nil(f, file)
+      local data = f:read("*a")
+      f:close()
+      assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), file)
+      local function u32(i)
+        local a, b, c, d = data:byte(i, i + 3)
+        return ((a * 256 + b) * 256 + c) * 256 + d
+      end
+      assert.are.same({ 64, 64, 8, 6 }, { u32(17), u32(21), data:byte(25), data:byte(26) }, file .. ": 64 x 64 RGBA")
+    end
+    local count = 0
+    for _ in pairs(icons) do count = count + 1 end
+    assert.are.equal(#keys, count, "and nothing else")
+  end)
+
   it("needs no other addon", function()
     for _, key in ipairs(shipped()) do
       assert.is_true(sonataNext:IsSelectable(key), key)

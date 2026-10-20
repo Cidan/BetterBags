@@ -1145,8 +1145,9 @@ end
 function WidgetMethods:SetJustifyH(justify)
   self._justifyH = justify
 end
+-- Centered until justified otherwise: justifyH defaults to CENTER (Blizzard_SharedXML/UI.xsd).
 function WidgetMethods:GetJustifyH()
-  return self._justifyH
+  return self._justifyH or "CENTER"
 end
 function WidgetMethods:SetJustifyV(justify)
   self._justifyV = justify

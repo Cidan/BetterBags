@@ -145,10 +145,9 @@ section dragged out of a panel returns to the panel's strata (§7).
   **ribbon** running left from the cloud across the feather and out of the window (a thin gold line
   and a soft glow, both fading out to the left) with a spark that glides in along it every few
   seconds (the title's cloud, below); sort and
-  settings buttons at the top right (`bags-button-autosort-up`, `uitools-icon-settings`). Both
-  atlases are in the client's atlas table (`UiTextureAtlasMember`, wago.tools) on retail 12.1.5,
-  WoW: Forever 1.60.1, Classic Era 1.15.9, Mists 5.5.4 and Anniversary 2.5.6. The settings button
-  first used `GM-icon-settings`, which Classic Era and Mists do not have: the button was blank there.
+  settings buttons at the top right, drawn with BetterBags' own glyphs from the theme, the same on
+  every client (next-themes.md §11). The settings button first used `GM-icon-settings`, which Classic
+  Era and Mists do not have: the button was blank there; then Blizzard's `uitools-icon-settings`.
 - **The title's cloud** (asked: the ribbon "ending at the text is meh", "flow into a bubble behind
   and around the word backpack, with the sparkles and glow ... don't drown the text", "seamless and
   not abrupt", then "more like a cloud, no hard lines around it"). A first version, a capsule with a
@@ -284,8 +283,7 @@ reusing their code wherever it is not drawing.
   the account bank, the menu button's Shift right click); sort, where the client can sort the bank
   (`C_Container.SortBankBags` or `SortBankBags`): the menu button's right click
   (`BagMenuButton:Sort`: the Warbank's sort while a Warbank tab shows, else the bank's; with Shift
-  it deposits). Icons are in the atlas table of every client that shows them (`warbands-icon`:
-  retail and Forever).
+  it deposits). Their icons are the theme's glyphs (next-themes.md §11).
 - **Tabs, in two modes, as the classic bank:**
   - **Groups** (default): the bank's groups, character groups first and then, after a gap, the
     Warbank groups, each with a teal bar and the Warbank glyph; then "+". Left click shows a group:
@@ -647,10 +645,9 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   `Enum.GameRule.MerchantFilterDisabled`: Blizzard's own radio list, each spec, the class, Bind on
   Equip, everything, through `MenuUtil.CreateContextMenu`, `SetMerchantFilter`); Sell Junk; Repair
   All; the guild's repair (only where `CanGuildBankRepair()`). Repair buttons only at a vendor that
-  repairs (`CanMerchantRepair()`), disabled with nothing to repair; Sell Junk disabled with no junk.
-  Icons: Blizzard's own, `SpellIcon-256x256-SellJunk`, `-RepairAll`, `-RepairAllGuild` on retail and
-  Forever (both load the mainline merchant XML); Classic's `UI-Merchant-RepairIcons` with its
-  coordinates, and a coin for Sell Junk (Classic has no such button). Hidden buttons leave no gap
+  repairs (`CanMerchantRepair()`), disabled with nothing to repair; Sell Junk disabled with no junk
+  (`SetHeaderButtonEnabled`: a disabled glyph fades). Icons: the theme's glyphs, the same on every
+  client (next-themes.md §11). Hidden buttons leave no gap
   (`NextPanel:LayoutHeader`). The repair tooltips are Blizzard's: the cost, not enough money, and
   what the guild pays (`GetGuildBankWithdrawMoney`, -1 for a guild leader: the whole balance).
 - **Tabs:** Buy, Buyback, and Repair at a vendor that repairs. It opens on Buy.
@@ -881,8 +878,8 @@ time. Not measured in game; capture a switch with the profiler (`BagSystem.Switc
 - **`/bb next`:** switches to the other design.
 - **The classic backpack's menu:** **Switch to Next**, above What's New (not the bank's: it is shown
   at the bank, where the bags cannot switch). bag-menu-button.md §3.
-- **Next's backpack header:** a button with Blizzard's backpack art (`bag-main` on retail and WoW:
-  Forever, `Interface\Buttons\Button-Backpack-Up` on Classic), "Switch to Classic Bags".
+- **Next's backpack header:** a button with a backpack glyph (next-themes.md §11), "Switch to Classic
+  Bags".
 
 ### 11d. Startup
 
@@ -1231,10 +1228,10 @@ end of a switch. `BuildPanel` only makes the parts.
 ### 14d. Switching sizes (`nextPanel:SetSize`, `PrepareResize`, `Morph`)
 
 - **The button** (`sizeButton`, the backpack's header, after the button back to the classic bags):
-  Blizzard's own minimize art while full and maximize art while small (`MaximizeMinimizeButtonFrameTemplate`'s
-  `RedButton-Condense` / `RedButton-Expand` on retail and WoW: Forever; Classic's
-  `UI-Panel-SmallerButton-Up` / `UI-Panel-BiggerButton-Up`, `SharedUIPanelTemplates.xml`), with a
-  tooltip. A click calls `nextPanel:SetSize(ctx, size)`, which returns `"switched"` or `"same"`.
+  arrows pointing in while full and out while small (the theme's `sizeButtonFull` and
+  `sizeButtonSmall` icons, `SizeIconKey`, next-themes.md §11), with a tooltip. Blizzard's red minimize
+  and maximize art stood out among the flat icons. A click calls `nextPanel:SetSize(ctx, size)`,
+  which returns `"switched"` or `"same"`.
 - **SetSize** saves the size, lets go of a coupled pair's braid at once (`chain:LetGo`), switches
   every panel (`PrepareResize`), then starts the switch of every shown one (`Morph`): where a full
   panel rests depends on its partner's size, so every panel has its new size before any target is
@@ -1340,8 +1337,7 @@ full size. Every guard was mutation-tested (80 mutations): the redundant ones it
 (nine), each one it showed untested got a test, and it found one bug before it shipped (a glide that
 would have cut a bag's slide in short, dropping what waited for it to show).
 
-Not verified in game yet: how the small panels look, the glide, moving them, and the button's art
-(a red Blizzard button among flat icons).
+Not verified in game yet: how the small panels look, the glide, and moving them.
 
 ### 14g. Resizing a small panel (the grips)
 
@@ -1404,6 +1400,12 @@ trying them in game, "auto-hide the handles so they only show on hover".
   a vendor's name can be any length; this replaced its own `fitTitle`). A full panel's other titles
   are as long as they are (width 0, wrapping on). Run by `LayoutHeader`, `SetTitle`, `ApplyGeometry`,
   `FitSmall` and every size change while sized or gliding back.
+  - **Justified toward its anchor** (`styleHeader`): left on the backpack, right on the companions.
+    Text is centered in a font string's width unless justified otherwise (`justifyH` defaults to
+    `CENTER`, `Blizzard_SharedXML/UI.xsd`), and the backpack's title set none, so once small panels'
+    titles had a width it sat in the middle of the room it had (reported: titles "shift right" in
+    small mode and not at full size, where a title is as wide as its text). The companions already
+    right-justified. The frame mock now answers `CENTER` for a font string never justified.
 - **Shift-click** (`ResetSize`): the panel glides (`Time.Resize`, `Ease.Resize`) back to its default
   size, the corner across from the grip still (the right grip keeps the top left, the left grip the
   top right), its content reflowing at once on the way as while dragging; the saved size is cleared,

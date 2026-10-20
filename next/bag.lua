@@ -73,37 +73,30 @@ end
 ---@return NextHeaderButton[]
 function bagProto:GetHeaderButtons()
   return {
-    { key = "settingsButton", atlas = "uitools-icon-settings", glyph = true, tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
-    { key = "sortButton", atlas = "bags-button-autosort-up", tooltip = L:G("Sort Bags"),
+    { key = "sortButton", tooltip = L:G("Sort Bags"),
       onClick = function(ctx) self:Sort(ctx) end },
-    -- The way back to the classic bags, without a reload (next.md §11): Blizzard's backpack button's
-    -- art, bag-main on retail and WoW: Forever, Button-Backpack-Up on Classic.
-    { key = "classicButton", atlas = addon.isRetail and "bag-main" or nil,
-      texture = not addon.isRetail and "Interface\\Buttons\\Button-Backpack-Up" or nil,
-      tooltip = L:G("Switch to Classic Bags"),
+    -- The way back to the classic bags, without a reload (next.md §11).
+    { key = "classicButton", tooltip = L:G("Switch to Classic Bags"),
       onClick = function(ctx) addon:GetModule('BagSystem'):Switch(ctx, "classic") end },
     -- Small mode (docs/next-small-mode.md): every BetterBags Next panel full height or small and
-    -- movable. Its art is UpdateSizeButton's.
-    { key = "sizeButton", tooltipFunc = function() self:SizeTooltip() end,
+    -- movable. Its icon is its state's (SizeIconKey).
+    { key = "sizeButton", iconKey = self:SizeIconKey(), tooltipFunc = function() self:SizeTooltip() end,
       onClick = function(ctx) nextPanel:SetSize(ctx, self:IsSmall() and "full" or "small") end },
   }
 end
 
--- UpdateSizeButton shows what the size button does: Blizzard's minimize art while full, its maximize
--- art while small (MaximizeMinimizeButtonFrameTemplate's RedButton-Condense and RedButton-Expand on
--- retail and WoW: Forever; Classic's smaller and bigger buttons, SharedUIPanelTemplates.xml).
+-- SizeIconKey is the size button's icon for the panel's size (Header.Buttons.Icons): sizeButtonFull
+-- while full (arrows in: Small Bags), sizeButtonSmall while small (arrows out: Full Size Bags).
+---@return string
+function bagProto:SizeIconKey()
+  return self:IsSmall() and "sizeButtonSmall" or "sizeButtonFull"
+end
+
+-- UpdateSizeButton shows what the size button does.
 function bagProto:UpdateSizeButton()
-  local small = self:IsSmall()
-  local art
-  if addon.isRetail then
-    art = { atlas = small and "RedButton-Expand" or "RedButton-Condense" }
-  else
-    art = { texture = small and "Interface\\Buttons\\UI-Panel-BiggerButton-Up"
-      or "Interface\\Buttons\\UI-Panel-SmallerButton-Up" }
-  end
-  -- A theme can draw its own for either state (Header.Buttons.Icons: sizeButtonSmall, sizeButtonFull).
-  self:SetHeaderIcon(self.sizeButton, small and "sizeButtonSmall" or "sizeButtonFull", art)
+  self:SetHeaderIcon(self.sizeButton, self:SizeIconKey())
 end
 
 -- SizeTooltip says what the size button does.

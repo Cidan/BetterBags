@@ -899,20 +899,20 @@ describe("NextBag", function()
   end)
 
   describe("buttons and search", function()
-    -- Both atlases are in the atlas table of retail, WoW: Forever, Classic Era, Mists and
-    -- Anniversary; GM-icon-settings, the first settings icon, is missing on Classic Era and Mists.
-    it("draws its header icons with atlases every client has, settings at the screen edge", function()
+    -- BetterBags' own glyphs (tools/textures/next_icons.py, next-themes.md §3), the same on every
+    -- client, filtered trilinearly so they stay smooth drawn smaller than their 64 pixels.
+    it("draws its header icons with BetterBags' glyphs, settings at the screen edge", function()
       local bag = opened()
-      assert.are.equal("uitools-icon-settings", bag.settingsButton.icon:GetAtlas())
-      assert.are.equal("bags-button-autosort-up", bag.sortButton.icon:GetAtlas())
+      assert.are.equal("settings", NextIconName(bag.settingsButton))
+      assert.are.equal("sort", NextIconName(bag.sortButton))
+      assert.are.equal("TRILINEAR", bag.sortButton.icon._filterMode)
       assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3) },
         { bag.settingsButton:GetPoint(1) })
       assert.are.same({ "RIGHT", bag.settingsButton, "LEFT", -8, 0 }, { bag.sortButton:GetPoint(1) })
     end)
 
-    -- The way back from BetterBags Next without a reload (next.md §11): the backpack's own icon,
-    -- Blizzard's backpack button's art on each client (bag-main on retail and WoW: Forever,
-    -- MainMenuBarBagButtons.lua; Button-Backpack-Up on Classic, MainMenuBarBagButtons.xml).
+    -- The way back from BetterBags Next without a reload (next.md §11): a backpack glyph, the same on
+    -- every client.
     it("switches the bags to the classic design from a backpack button in its header", function()
       local switched = {}
       override(stubs.bagSystem, "Switch", function(_, c, design)
@@ -922,7 +922,7 @@ describe("NextBag", function()
       end)
       override(addon, "isRetail", true)
       local bag = opened()
-      assert.are.equal("bag-main", bag.classicButton.icon:GetAtlas())
+      assert.are.equal("bags", NextIconName(bag.classicButton))
       assert.are.same({ "RIGHT", bag.sortButton, "LEFT", -8, 0 }, { bag.classicButton:GetPoint(1) })
       bag.classicButton:GetScript("OnClick")(bag.classicButton, "LeftButton")
       assert.are.same({ "classic" }, switched)
@@ -930,7 +930,7 @@ describe("NextBag", function()
       assert.are.equal("Switch to Classic Bags", GameTooltip:GetText())
       override(addon, "isRetail", false)
       local classicClient = nextBag:Create(ctx())
-      assert.are.equal("Interface\\Buttons\\Button-Backpack-Up", classicClient.classicButton.icon:GetTexture())
+      assert.are.equal("bags", NextIconName(classicClient.classicButton))
     end)
 
     it("sorts the backpack and opens the settings from its header", function()
