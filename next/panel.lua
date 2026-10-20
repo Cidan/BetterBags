@@ -1379,7 +1379,8 @@ function panelProto:headerButton(spec)
   button.key = spec.key
   self:SetHeaderIcon(button, spec.key, spec)
   button:SetScript("OnEnter", function()
-    icon:SetVertexColor(style:RGBA(style.Theme.Header.Buttons.HoverColor))
+    local B = style.Theme.Header.Buttons
+    icon:SetVertexColor(style:RGBA(button.glyph and B.HoverColor or B.ArtHoverColor))
     GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
     if spec.tooltipFunc then
       spec.tooltipFunc(button)
@@ -1389,7 +1390,8 @@ function panelProto:headerButton(spec)
     GameTooltip:Show()
   end)
   button:SetScript("OnLeave", function()
-    icon:SetVertexColor(style:RGBA(style.Theme.Header.Buttons.Color))
+    local B = style.Theme.Header.Buttons
+    icon:SetVertexColor(style:RGBA(button.glyph and B.Color or B.ArtColor))
     GameTooltip:Hide()
   end)
   addon.SetScript(button, "OnClick", function(ctx)
@@ -1399,16 +1401,24 @@ function panelProto:headerButton(spec)
 end
 
 -- SetHeaderIcon draws a header button's icon: the theme's for iconKey (Header.Buttons.Icons), else
--- art (an atlas, or a texture and its coordinates), tinted by the theme. It is kept, so a theme
--- applied later draws the button again (styleHeader).
+-- art (an atlas, or a texture and its coordinates), tinted by the theme: a glyph (a white,
+-- one-color icon: settings, close) in the glyph color, full-color art in the art color. A tint
+-- multiplies the art, so one dark enough for glyphs on light paper inked every colored icon into a
+-- black shape (Parchment, asked with a screenshot). It is kept, so a theme applied later draws the
+-- button again (styleHeader).
 ---@param button Button
 ---@param iconKey string
----@param art {atlas?: string, texture?: string|number, texCoords?: number[]}
+---@param art {atlas?: string, texture?: string|number, texCoords?: number[], glyph?: boolean}
 function panelProto:SetHeaderIcon(button, iconKey, art)
   button.iconKey, button.art = iconKey, art
   local icon = button.icon
   local B = style.Theme.Header.Buttons
   local custom = B.Icons and B.Icons[iconKey]
+  if custom then
+    button.glyph = custom.Glyph == true
+  else
+    button.glyph = art.glyph == true
+  end
   icon:SetTexCoord(0, 1, 0, 1)
   if custom then
     if custom.Atlas then
@@ -1427,7 +1437,7 @@ function panelProto:SetHeaderIcon(button, iconKey, art)
       icon:SetTexCoord(unpack(art.texCoords))
     end
   end
-  icon:SetVertexColor(style:RGBA(B.Color))
+  icon:SetVertexColor(style:RGBA(button.glyph and B.Color or B.ArtColor))
 end
 
 -- GetHeaderButtons returns the header's buttons, in order from the screen edge.

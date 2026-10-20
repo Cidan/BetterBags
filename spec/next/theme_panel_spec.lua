@@ -491,6 +491,49 @@ describe("BetterBags Next's panels and themes", function()
     end)
   end)
 
+  -- Asked (a Parchment screenshot: the colored icons inked into black shapes): a tint suits the white
+  -- glyph icons (settings, close), and darkens full-color art (sort, backpack, size, deposit) into a
+  -- silhouette, so a theme tints the two apart.
+  describe("header icons", function()
+    local function color(button)
+      local r, g, b = button.icon:GetVertexColor()
+      return { r, g, b }
+    end
+
+    it("tints glyphs with its glyph color and art with its art color, hovered and not", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Palette = { Ink = { 0.2, 0.1, 0.05, 1 }, Wax = { 0.6, 0.1, 0.1, 1 }, Plain = { 0.9, 0.9, 0.9, 1 } },
+        Header = { Buttons = { Color = "Ink", HoverColor = "Wax", ArtColor = "Plain", ArtHoverColor = "White" } } })
+      assert.are.same({ 0.2, 0.1, 0.05 }, color(bag.settingsButton))
+      assert.are.same({ 0.2, 0.1, 0.05 }, color(bank.closeButton))
+      for _, art in ipairs({ bag.sortButton, bag.classicButton, bag.sizeButton }) do
+        assert.are.same({ 0.9, 0.9, 0.9 }, color(art))
+      end
+      bag.sortButton:GetScript("OnEnter")(bag.sortButton)
+      assert.are.same({ 1, 1, 1 }, color(bag.sortButton))
+      bag.sortButton:GetScript("OnLeave")(bag.sortButton)
+      assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.sortButton))
+      bag.settingsButton:GetScript("OnEnter")(bag.settingsButton)
+      assert.are.same({ 0.6, 0.1, 0.1 }, color(bag.settingsButton))
+      bag.settingsButton:GetScript("OnLeave")(bag.settingsButton)
+    end)
+
+    it("tints a theme's own icon by what the theme says it is", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Palette = { Ink = { 0.2, 0.1, 0.05, 1 } },
+        Header = { Buttons = { Color = "Ink", ArtColor = "White",
+          Icons = { sortButton = { Atlas = "my-glyph", Glyph = true }, settingsButton = { Atlas = "my-art" } } } } })
+      assert.are.same({ 0.2, 0.1, 0.05 }, color(bag.sortButton))
+      assert.are.same({ 1, 1, 1 }, color(bag.settingsButton))
+    end)
+
+    it("tints both alike in Default, as before", function()
+      local bag = nextBag:Create(ctx())
+      assert.are.same(color(bag.settingsButton), color(bag.sortButton))
+      assert.are.same({ 0.85, 0.82, 1 }, color(bag.sortButton))
+    end)
+  end)
+
   describe("the search box", function()
     it("sits where its layout says, in its fill, border and magnifier colors", function()
       local bag = nextBag:Create(ctx())

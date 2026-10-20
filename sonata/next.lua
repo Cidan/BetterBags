@@ -315,6 +315,7 @@ end
 local COLOR_KEYS = {
   Color = true, Fill = true, SelectedFill = true, FocusFill = true, HoverColor = true, FocusColor = true,
   BeadColor = true, KnotColor = true, Unusable = true, SoldOut = true, SoldOutUnusable = true,
+  ArtColor = true, ArtHoverColor = true,
 }
 -- Tables whose values name palette colors.
 local COLOR_MAPS = { Washes = true, Accents = true, Colors = true }

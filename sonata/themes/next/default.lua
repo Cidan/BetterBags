@@ -262,12 +262,15 @@ sonataNext:RegisterTheme({
         { F = 0.70, Y = -18, W = 32, H = 28, Color = "Lavender", A = 0.09 },
       },
     },
-    -- The header buttons' icons: tinted, and brighter under the pointer. Icons replaces a button's
-    -- icon by its key (settingsButton, sortButton, classicButton, closeButton, bankTabsButton,
-    -- depositButton, withdrawButton, filterButton, sellJunkButton, repairAllButton, guildRepairButton;
-    -- the size button by its state, sizeButtonFull and sizeButtonSmall) with { Atlas } or { Texture,
-    -- TexCoords }.
-    Buttons = { Color = "ButtonIcon", HoverColor = "White", Icons = {} },
+    -- The header buttons' icons: tinted, and brighter under the pointer. Glyphs (white, one-color:
+    -- settings, close) take Color and HoverColor; full-color art (sort, backpack, size, deposit,
+    -- coins, repair) ArtColor and ArtHoverColor (a tint multiplies the art: a dark one blackens it).
+    -- Icons replaces a button's icon by its key (settingsButton, sortButton, classicButton,
+    -- closeButton, bankTabsButton, depositButton, withdrawButton, filterButton, sellJunkButton,
+    -- repairAllButton, guildRepairButton; the size button by its state, sizeButtonFull and
+    -- sizeButtonSmall) with { Atlas } or { Texture, TexCoords }, and Glyph = true for a glyph.
+    Buttons = { Color = "ButtonIcon", HoverColor = "White", ArtColor = "ButtonIcon", ArtHoverColor = "White",
+      Icons = {} },
   },
 
   Search = {

@@ -100,9 +100,9 @@ end
 ---@return NextHeaderButton[]
 function bankProto:GetHeaderButtons()
   local buttons = {
-    { key = "closeButton", atlas = "uitools-icon-close", tooltip = L:G("Close"),
+    { key = "closeButton", atlas = "uitools-icon-close", glyph = true, tooltip = L:G("Close"),
       onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", atlas = "uitools-icon-settings", tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", atlas = "uitools-icon-settings", glyph = true, tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
   }
   if addon.isRetail then

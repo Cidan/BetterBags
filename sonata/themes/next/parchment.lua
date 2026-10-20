@@ -31,6 +31,8 @@ sonataNext:RegisterTheme({
     InkMuted = { 0.455, 0.286, 0.176, 1 },
     -- Sealing wax: the accent.
     Seal = { 0.55, 0.12, 0.06, 1 },
+    -- Full-color icons keep their colors on the paper, a touch dimmed until hovered.
+    Art = { 0.9, 0.88, 0.85, 1 },
     Body = { 0.83, 0.78, 0.70, 0.97 },
     Tab = { 0.74, 0.67, 0.57, 0.95 },
     TabSelected = { 0.9, 0.86, 0.78, 1 },
@@ -75,7 +77,9 @@ sonataNext:RegisterTheme({
     Ribbon = { Color = "Seal", BlendMode = "BLEND", Glow = { { 0, 0.8 }, { 1, 0.3 }, { -1, 0.3 } } },
     Spark = false,
     Cloud = false,
-    Buttons = { Color = "Ink", HoverColor = "Seal" },
+    -- The glyphs (settings, close) in ink; the colored icons in their own colors (inked, they turned
+    -- into black shapes: asked, with a screenshot).
+    Buttons = { Color = "Ink", HoverColor = "Seal", ArtColor = "Art", ArtHoverColor = "White" },
   },
 
   Search = {

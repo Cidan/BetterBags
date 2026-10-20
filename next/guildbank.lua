@@ -174,9 +174,9 @@ end
 ---@return NextHeaderButton[]
 function guildProto:GetHeaderButtons()
   return {
-    { key = "closeButton", atlas = "uitools-icon-close", tooltip = L:G("Close"),
+    { key = "closeButton", atlas = "uitools-icon-close", glyph = true, tooltip = L:G("Close"),
       onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", atlas = "uitools-icon-settings", tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", atlas = "uitools-icon-settings", glyph = true, tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
     { key = "depositButton", texture = "Interface\\Icons\\INV_Misc_Coin_01", tooltip = L:G("Deposit Gold"),
       onClick = function() guildBank:DepositMoney() end },

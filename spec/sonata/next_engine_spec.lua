@@ -359,8 +359,10 @@ describe("SonataNext", function()
     it("names every color, role, texture and ease it cannot find, by where it is", function()
       sonataNext:RegisterTheme({ Name = "Broken",
         Panel = { Fill = { Color = "Nope" }, DropGlow = { Color = { 1, 0, 0, 1 } } },
+        Header = { Buttons = { ArtColor = "Pale" }, Cloud = { Texture = "NoArt" },
+          Spark = { Texture = "Interface\\Art\\Spark" } },
         Sections = { TitleFont = "Missing" },
-        Header = { Cloud = { Texture = "NoArt" }, Spark = { Texture = "Interface\\Art\\Spark" } },
+
         Sparkles = { Colors = { "Gold", "Ghost" } },
         Motion = { Ease = { Open = "wobbly" } },
         Fonts = { Title = { Color = "AlsoNope" } },
@@ -369,6 +371,7 @@ describe("SonataNext", function()
       table.sort(problems)
       assert.are.same({
         "Fonts.Title.Color: no color named AlsoNope",
+        "Header.Buttons.ArtColor: no color named Pale",
         "Header.Cloud.Texture: no texture named NoArt",
         "Motion.Ease.Open: no ease named wobbly",
         "Panel.Fill.Color: no color named Nope",

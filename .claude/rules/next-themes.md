@@ -53,7 +53,8 @@ Load order (every TOC, `spec/render/toc_spec.lua`): `sonata\resolve.lua` before 
   makes its first button.
 - **`Check(key)`**: what a theme names but does not define, each as `"path: problem"`: palette colors
   (keys `Color`, `Fill`, `SelectedFill`, `FocusFill`, `HoverColor`, `FocusColor`, `BeadColor`,
-  `KnotColor`, `Unusable`, `SoldOut`, `SoldOutUnusable`, and the values of `Washes`, `Accents`,
+  `KnotColor`, `Unusable`, `SoldOut`, `SoldOutUnusable`, `ArtColor`, `ArtHoverColor`, and the values
+  of `Washes`, `Accents`,
   `Colors`), text roles (`Font`, `SelectedFont`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`,
   `HelpFont`, `TextFont`, `EmptyFont`, `MoneyFont`, `HintFont`, `WarningFont`, `PriceFont`,
   `UnaffordableFont`, `StackFont`), textures (`Texture`, `QualityBorder`, `QuestMark`: a `Textures`
@@ -76,7 +77,7 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 | `Layout` | Sizes: Icon, VendorPrice, Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
 | `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
 | `Panel` | `Fill` (texture spec), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false). |
-| `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (`Color`, `HoverColor`, `Icons` by button key: `{ Atlas }` or `{ Texture, TexCoords }`; the size button by state, `sizeButtonFull`, `sizeButtonSmall`). |
+| `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (`Color` and `HoverColor` for glyphs, the white one-color icons: settings, close, marked `glyph = true` in their button specs; `ArtColor` and `ArtHoverColor` for full-color art: a tint multiplies the art, and Parchment's ink first turned every colored icon into a black shape, asked with a screenshot; `Icons` by button key: `{ Atlas }` or `{ Texture, TexCoords }`, `Glyph = true` for a glyph; the size button by state, `sizeButtonFull`, `sizeButtonSmall`). |
 | `Search` | `Fill`, `FocusFill`, `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`), `HelpFont`, `TextFont`. |
 | `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Line` (`Color`, `From`, `To`, `Size`, or false), `Highlight` (`Color`, `From`, `To`, or false). |
 | `Tabs` | `Fill`, `SelectedFill`, `Fade`, `Font`, `SelectedFont`, `Glow` (`Color`, `BlendMode`, `Drop`, `Pulse`, or false), `Indicator` (`Color`, `Width`, or false), `Accents` (Warbank, Guild). A tab entry's `accent` is an accent name, a palette name or a color. |
@@ -170,8 +171,8 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
 - **Parchment**: Moonlight's parchment art (the plain middle, away from its burnt edges) for the body
   and the dock's card; dark ink text in Blizzard's parchment text colors with no shadow (numbers over
   icons keep one); ink and sealing-wax lines, bars and glows drawn normally, not added as light; no
-  sparkles, cloud, spark or wash. Its paper color (feather, tabs) is the art's measured average
-  (0.83, 0.78, 0.70).
+  sparkles, cloud, spark or wash; glyph icons in ink, colored icons in their own colors. Its paper
+  color (feather, tabs) is the art's measured average (0.83, 0.78, 0.70).
 - **Quiet**: cool grays, smaller icons nine to a row, a shorter header, no ribbon, cloud, spark,
   sparkles or braid, quicker opening without a bounce (the body reaches only 4 past the edge), a
   fainter small border. Its first version drew the border on full panels too; asked: a full panel

@@ -73,7 +73,7 @@ end
 ---@return NextHeaderButton[]
 function bagProto:GetHeaderButtons()
   return {
-    { key = "settingsButton", atlas = "uitools-icon-settings", tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", atlas = "uitools-icon-settings", glyph = true, tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
     { key = "sortButton", atlas = "bags-button-autosort-up", tooltip = L:G("Sort Bags"),
       onClick = function(ctx) self:Sort(ctx) end },

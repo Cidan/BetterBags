@@ -90,6 +90,10 @@ describe("BetterBags Next's shipped themes", function()
       assert.is_nil(t.Header.Spark)
       assert.is_nil(t.Panel.Wash)
       assert.are.equal("BLEND", t.Header.Ribbon.BlendMode, "ink, not light")
+      -- Glyphs inked, colored icons in their own colors (inked, they turned into black shapes).
+      assert.are.equal("Ink", t.Header.Buttons.Color)
+      local art = t.Palette[t.Header.Buttons.ArtColor]
+      assert.is_true(art[1] > 0.8 and art[2] > 0.8 and art[3] > 0.8, "a light tint keeps their colors")
     end)
   end)
 
