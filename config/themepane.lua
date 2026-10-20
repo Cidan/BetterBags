@@ -12,8 +12,23 @@ local sonata = addon:GetModule('Sonata')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+-- ThemePane is the settings window's theme picker: a list of themes and the picked one's details,
+-- previewing a pick on the next frame and saving it only with Apply. It picks from an engine: Sonata
+-- (the bags' themes, the Theme page) or SonataNext (BetterBags Next's themes, the Next Theme page,
+-- next-themes.md), which answer the same calls (GetThemes, IsAvailable, IsSelectable,
+-- GetCurrentThemeKey, GetSavedThemeKey, ApplyTheme, RestoreSavedTheme). Its own text is drawn with
+-- the bags' theme's roles either way: the settings window is the bags' theme's.
 ---@class ThemePane: AceModule
 local themePane = addon:NewModule('ThemePane')
+
+---@class ThemeEngine
+---@field GetThemes fun(self): table<string, table>
+---@field IsAvailable fun(self, key: string): boolean
+---@field IsSelectable fun(self, key: string): boolean
+---@field GetCurrentThemeKey fun(self): string?
+---@field GetSavedThemeKey fun(self): string
+---@field ApplyTheme fun(self, ctx: Context, key: string, save?: boolean)
+---@field RestoreSavedTheme fun(self, ctx: Context)
 
 ---@class ThemePaneListButton: Button
 ---@field ThemeName FontString
@@ -29,6 +44,7 @@ local themePane = addon:NewModule('ThemePane')
 ---@field active boolean It is the saved theme (the one in effect outside a preview).
 
 ---@class ThemePaneFrame
+---@field engine ThemeEngine The themes it picks from.
 ---@field frame Frame
 ---@field listFrame ListFrame
 ---@field detailFrame Frame
@@ -126,7 +142,7 @@ function themePaneProto:SelectTheme(themeKey)
   -- Deselect previous
   if self.selectedButton then
     local prevTheme = self.selectedTheme
-    if prevTheme and sonata:IsAvailable(prevTheme) then
+    if prevTheme and self.engine:IsAvailable(prevTheme) then
       self.selectedButton:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
     else
       self.selectedButton:SetBackdropColor(0, 0, 0, 0)
@@ -173,12 +189,13 @@ end
 ---@param themeKey string
 function themePaneProto:Preview(themeKey)
   local ctx = context:New('ThemePane_Preview')
-  if sonata:IsSelectable(themeKey) then
-    if sonata:GetCurrentThemeKey() ~= themeKey then
-      sonata:ApplyTheme(ctx, themeKey, false)
+  local engine = self.engine
+  if engine:IsSelectable(themeKey) then
+    if engine:GetCurrentThemeKey() ~= themeKey then
+      engine:ApplyTheme(ctx, themeKey, false)
     end
   else
-    sonata:RestoreSavedTheme(ctx)
+    engine:RestoreSavedTheme(ctx)
   end
 end
 
@@ -187,7 +204,7 @@ end
 ---@param ctx Context
 function themePaneProto:EndPreview(ctx)
   self.pendingPreview = nil
-  sonata:RestoreSavedTheme(ctx)
+  self.engine:RestoreSavedTheme(ctx)
   self.selectedTheme = nil
   self.selectedButton = nil
   if self.initialized then
@@ -207,7 +224,7 @@ function themePaneProto:UpdateDetailPanel()
     return
   end
 
-  local entry = themePane:Entry(self.selectedTheme)
+  local entry = themePane:Entry(self.selectedTheme, self.engine)
   if entry then
     self:ShowThemeDetail(entry)
   else
@@ -322,7 +339,7 @@ function themePaneProto:CreateThemeDetailPanel()
   applyButton:SetText("Apply Theme")
   addon.SetScript(applyButton, "OnClick", function(ctx)
     if self.themeDetail.currentThemeKey then
-      sonata:ApplyTheme(ctx, self.themeDetail.currentThemeKey)
+      self.engine:ApplyTheme(ctx, self.themeDetail.currentThemeKey)
       -- Refresh the list to update current theme highlighting
       self:RefreshList()
       -- Update the detail panel to reflect the new active state
@@ -332,19 +349,22 @@ function themePaneProto:CreateThemeDetailPanel()
   self.themeDetail.applyButton = applyButton
 end
 
--- RefreshList lists every theme Sonata knows, by name.
+-- RefreshList lists every theme its engine knows, by name.
 function themePaneProto:RefreshList()
   self.listFrame:Wipe()
-  for _, entry in ipairs(themePane:Entries()) do
+  for _, entry in ipairs(themePane:Entries(self.engine)) do
     self.listFrame:AddToEnd(entry)
   end
 end
 
--- Entry describes the theme of key for the pane, or nil for a theme Sonata does not list.
+-- Entry describes the theme of key for the pane, or nil for a theme the engine (Sonata by default)
+-- does not list.
 ---@param key string
+---@param engine? ThemeEngine
 ---@return ThemePaneEntry?
-function themePane:Entry(key)
-  local theme = sonata:GetThemes()[key]
+function themePane:Entry(key, engine)
+  engine = engine or sonata
+  local theme = engine:GetThemes()[key]
   if theme == nil then
     return nil
   end
@@ -352,18 +372,20 @@ function themePane:Entry(key)
     key = key,
     name = theme.DisplayName or theme.Name,
     description = theme.Description or "No description available.",
-    available = sonata:IsAvailable(key),
-    active = key == sonata:GetSavedThemeKey(),
+    available = engine:IsAvailable(key),
+    active = key == engine:GetSavedThemeKey(),
   }
 end
 
--- Entries describes every theme Sonata knows that is not hidden, those whose addon is not
--- loaded too, sorted by name.
+-- Entries describes every theme the engine (Sonata by default) knows that is not hidden, those whose
+-- addon is not loaded too, sorted by name.
+---@param engine? ThemeEngine
 ---@return ThemePaneEntry[]
-function themePane:Entries()
+function themePane:Entries(engine)
+  engine = engine or sonata
   local entries = {}
-  for key in pairs(sonata:GetThemes()) do
-    table.insert(entries, self:Entry(key))
+  for key in pairs(engine:GetThemes()) do
+    table.insert(entries, self:Entry(key, engine))
   end
   table.sort(entries, function(a, b)
     return a.name < b.name
@@ -371,17 +393,20 @@ function themePane:Entries()
   return entries
 end
 
--- Create returns the pane's frame, for the settings window.
+-- Create returns the pane's frame, for the settings window: the bags' themes, or an engine's.
 ---@param parent Frame
+---@param engine? ThemeEngine Sonata when unset.
 ---@return Frame
-function themePane:Create(parent)
-  return self:New(parent).frame
+function themePane:Create(parent, engine)
+  return self:New(parent, engine).frame
 end
 
 ---@param parent Frame
+---@param engine? ThemeEngine Sonata when unset.
 ---@return ThemePaneFrame
-function themePane:New(parent)
+function themePane:New(parent, engine)
   local pane = setmetatable({}, { __index = themePaneProto })
+  pane.engine = engine or sonata
 
   -- Create main frame
   pane.frame = CreateFrame("Frame", nil, parent)

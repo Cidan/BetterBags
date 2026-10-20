@@ -316,6 +316,8 @@ sonataNext:RegisterTheme({
     Line = { Color = "Lavender", Inner = 0.05, Outer = 0.35, Size = 1 },
     Font = "Footer",
     EmptyFont = "Empty",
+    -- Gold written as text (the guild bank's; the bags' money frame is Blizzard's).
+    MoneyFont = "Footer",
   },
 
   -- Sparkles: Texture and Colors (palette names) for every emitter; how a sparkle fades in and out

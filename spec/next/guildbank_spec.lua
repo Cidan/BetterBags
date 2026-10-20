@@ -263,6 +263,7 @@ describe("NextGuildBank", function()
   end)
 
   teardown(function()
+    UseNextTheme(nil)
     for i = #modules, 1, -1 do ResetModuleStub(modules[i][1]) end
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
   end)
@@ -306,6 +307,19 @@ describe("NextGuildBank", function()
     it("shows the guild's gold at its screen edge", function()
       local g = open()
       assert.are.equal(C_CurrencyInfo.GetCoinTextureString(1234567), g.moneyFrame.text:GetText())
+      assert.are.equal(style:Font("Footer"), g.moneyFrame.text:GetFontObject())
+    end)
+
+    -- A Next theme (next-themes.md): its wash and its gold's role follow the theme.
+    it("washes in a theme's guild color and writes its gold in the theme's role", function()
+      local g = open()
+      UseNextTheme({ Palette = { Moss = { 0.2, 0.5, 0.2, 0.3 } }, Fonts = { Coins = { Size = 14 } },
+        Panel = { Washes = { Guild = "Moss" } }, Footer = { MoneyFont = "Coins" } })
+      g:ApplyStyle(ctx())
+      assert.are.same({ 0.2, 0.5, 0.2, 0.3 }, g.washColor)
+      assert.are.equal(style:Font("Coins"), g.moneyFrame.text:GetFontObject())
+      UseNextTheme(nil)
+      g:ApplyStyle(ctx())
     end)
 
     it("has close, settings, deposit gold and withdraw gold in its header", function()

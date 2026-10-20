@@ -2188,6 +2188,9 @@ function panelProto:styleFooter()
   end
   local m = self.moneyFrame
   if m ~= nil then
+    if m.text ~= nil then
+      style:SetFont(m.text, F.MoneyFont)
+    end
     m.frame:ClearAllPoints()
     if left then
       m.frame:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_MONEY)

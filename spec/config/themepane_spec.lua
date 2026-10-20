@@ -260,4 +260,84 @@ describe("ThemePane", function()
       assert.are.equal(entry.key == "Default", entry.active, entry.key)
     end
   end)
+
+  -- BetterBags Next's themes (next-themes.md) are picked the same way, in their own pane over
+  -- SonataNext: listed by name, previewed on the next frame without saving, saved by Apply, the
+  -- saved one put back when the pane hides.
+  describe("BetterBags Next's themes", function()
+    local sonataNext, savedNext, queued
+
+    before_each(function()
+      sonataNext = FreshNextThemes()
+      -- SonataNext hands every theme to Next's style.
+      ResetModuleStub("NextStyle", "next/style.lua")
+      LoadBetterBagsModule("next/style.lua")
+      sonataNext:RegisterTheme({ Name = "Ember", DisplayName = "Ember", Description = "Warm." })
+      sonataNext:RegisterTheme({ Name = "Elvish", DisplayName = "Elvish", Requires = { "ElvUI" } })
+      savedNext = "Default"
+      override(db, "GetNextTheme", function() return savedNext end)
+      override(db, "SetNextTheme", function(_, key) savedNext = key end)
+      sonataNext:Init()
+      queued = {}
+      override(_G.C_Timer, "After", function(_, fn) table.insert(queued, fn) end)
+    end)
+
+    teardown(function()
+      FreshNextThemes()
+    end)
+
+    local function nextFrame()
+      local due = queued
+      queued = {}
+      for _, fn in ipairs(due) do fn() end
+    end
+
+    local function nextPane()
+      return themePane:New(CreateFrame("Frame", nil, UIParent), sonataNext)
+    end
+
+    it("lists Next's themes, not the bags' themes, those it cannot use too", function()
+      local pane = nextPane()
+      pane:RefreshList()
+      local byKey, names = {}, {}
+      for _, entry in ipairs(pane.listFrame.items) do
+        byKey[entry.key] = entry
+        table.insert(names, entry.name)
+      end
+      assert.are.same({ "Default", "Elvish", "Ember" }, names)
+      assert.is_true(byKey.Default.active)
+      assert.is_false(byKey.Elvish.available)
+      assert.are.equal("Warm.", byKey.Ember.description)
+    end)
+
+    it("previews a picked theme on the next frame without saving it, and Apply saves it", function()
+      local pane = nextPane()
+      pane:SelectTheme("Ember")
+      assert.are.equal("Default", sonataNext:GetCurrentThemeKey())
+      nextFrame()
+      assert.are.equal("Ember", sonataNext:GetCurrentThemeKey())
+      assert.are.equal("Default", savedNext)
+      assert.are.equal("Default", sonata:GetCurrentThemeKey(), "the bags' theme is left alone")
+      pane.themeDetail.applyButton:GetScript("OnClick")(pane.themeDetail.applyButton, "LeftButton")
+      assert.are.equal("Ember", savedNext)
+      assert.are.equal("Currently Active", pane.themeDetail.statusLabel:GetText())
+    end)
+
+    it("puts the saved theme back when the pane hides", function()
+      local pane = nextPane()
+      pane:SelectTheme("Ember")
+      nextFrame()
+      pane.frame:GetScript("OnHide")(pane.frame)
+      assert.are.equal("Default", sonataNext:GetCurrentThemeKey())
+      assert.are.equal("Default", savedNext)
+    end)
+
+    it("shows a theme whose addon is not loaded as unavailable, and previews the saved one", function()
+      local pane = nextPane()
+      pane:SelectTheme("Elvish")
+      assert.are.equal("Unavailable", pane.themeDetail.statusLabel:GetText())
+      nextFrame()
+      assert.are.equal("Default", sonataNext:GetCurrentThemeKey())
+    end)
+  end)
 end)

@@ -207,8 +207,7 @@ end
 function guildProto:CreateMoney()
   local frame = CreateFrame("Frame")
   frame:SetSize(200, 16)
-  local text = frame:CreateFontString(nil, "OVERLAY")
-  text:SetFontObject(style:Font("Footer"))
+  local text = style:CreateText(frame, style.Theme.Footer.MoneyFont)
   text:SetPoint("LEFT", frame, "LEFT", 0, 0)
   return {
     frame = frame,
