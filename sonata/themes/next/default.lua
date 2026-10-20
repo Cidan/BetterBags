@@ -395,14 +395,15 @@ sonataNext:RegisterTheme({
   -- card (Pad inside, Top below the target's top), its glow edge pulsing from Low to High every
   -- Period seconds and its halo, and its lines.
   Dock = {
-    Scrim = "Scrim",
-    Card = "Card",
+    -- Texture specs (Color, Texture, Atlas, ...), so a card can be art.
+    Scrim = { Color = "Scrim" },
+    Card = { Color = "Card" },
     Pad = 12,
     Top = 12,
     TitleHeight = 22,
     LineHeight = 16,
     Glow = { Color = "Gold", Width = 2, Low = 0.35, High = 1, Period = 1.2 },
-    Halo = { Texture = "Glow", Color = "Gold", Spread = 28, Low = 0.15, High = 0.5, BlendMode = "ADD" },
+    Halo = { Texture = "Glow", Color = "Gold", Spread = 28, Low = 0.15, High = 0.5, Period = 1.2, BlendMode = "ADD" },
     TitleFont = "ConfirmTitle",
     WarningFont = "ConfirmWarning",
     HintFont = "ConfirmHint",
@@ -411,6 +412,10 @@ sonataNext:RegisterTheme({
   -- The vendor's buttons: dimmed when a search leaves them out; lit under the pointer; tinted when
   -- unusable or sold out; the durability bar.
   Vendor = {
+    -- The border round an item from Uncommon up, in its quality's color (false: none), and the mark
+    -- on an item that starts a quest.
+    QualityBorder = "Interface\\Common\\WhiteIconFrame",
+    QuestMark = "Interface\\ContainerFrame\\UI-Icon-QuestBang",
     SearchDim = 0.25,
     Highlight = { 1, 1, 1, 0.15 },
     Unusable = "Unusable",

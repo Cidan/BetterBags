@@ -267,6 +267,49 @@ describe("SonataNext", function()
     end)
   end)
 
+  -- Item buttons are styled by Sonata's ItemButton element (the bags' theme); while Next is the design
+  -- in use, a Next theme's own ItemButton style replaces it.
+  describe("item buttons", function()
+    local overrides, restyled, originals
+
+    before_each(function()
+      LoadBetterBagsModule("sonata/engine.lua")
+      local sonata = addon:GetModule("Sonata")
+      local itemFrame = trackStub("ItemFrame")
+      originals = { sonata.SetElementStyleOverride, itemFrame.RestyleButtons }
+      overrides, restyled = {}, 0
+      sonata.SetElementStyleOverride = function(_, kind, style) table.insert(overrides, { kind, style }) end
+      itemFrame.RestyleButtons = function() restyled = restyled + 1 end
+      sonataNext:RegisterTheme({ Name = "Glassy", ItemButton = { Backdrop = { Color = { 0, 0, 0, 0.5 } } } })
+    end)
+
+    after_each(function()
+      addon:GetModule("Sonata").SetElementStyleOverride = originals[1]
+      addon:GetModule("ItemFrame").RestyleButtons = originals[2]
+    end)
+
+    it("styles them with the theme's ItemButton while Next is in use, and the bags' theme otherwise", function()
+      sonataNext:ApplyTheme(ctx(), "Glassy", false)
+      assert.are.same({}, overrides, "not while the classic bags are in use")
+      sonataNext:SetActive(true)
+      assert.are.equal("ItemButton", overrides[1][1])
+      assert.are.same({ Backdrop = { Color = { 0, 0, 0, 0.5 } } }, overrides[1][2])
+      assert.are.equal(1, restyled, "every button draws in full again")
+      sonataNext:SetActive(false)
+      assert.are.same({ "ItemButton", nil }, overrides[2])
+      assert.are.equal(2, restyled)
+    end)
+
+    it("follows the theme applied while Next is in use, back to the bags' theme with one without", function()
+      sonataNext:SetActive(true)
+      assert.are.same({}, overrides, "Default has none: nothing to change")
+      sonataNext:ApplyTheme(ctx(), "Glassy", false)
+      assert.is_not_nil(overrides[1][2])
+      sonataNext:ApplyTheme(ctx(), "Default", false)
+      assert.is_nil(overrides[2][2])
+    end)
+  end)
+
   -- The other registration path on Sonata itself (asked: "original themes, next themes").
   it("is reached from Sonata's RegisterNextTheme too", function()
     LoadBetterBagsModule("sonata/engine.lua")

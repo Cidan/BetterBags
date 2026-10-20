@@ -593,6 +593,34 @@ describe("Sonata engine", function()
       assert.are.equal(1, #styled)
     end)
 
+    -- BetterBags Next's theme can style item buttons while Next is in use (next-themes.md): its
+    -- style replaces the theme's for that kind, and taking it away gives the theme's back.
+    it("styles a kind with an override in place of the theme's, restyling it at once, and back", function()
+      sonata:ApplyTheme(context:New("test"), "Other")
+      local font = {}
+      sonata:RegisterElement("SectionHeader", font)
+      local override = { Font = { Object = "GameFontHighlight" } }
+      sonata:SetElementStyleOverride("SectionHeader", override)
+      assert.are.equal(override, styled[#styled].style)
+      assert.are.equal(override, sonata:GetElementStyle("SectionHeader"))
+      sonata:ApplyTheme(context:New("test"), "Default")
+      assert.are.equal(override, styled[#styled].style, "a theme applied keeps it")
+      sonata:SetElementStyleOverride("SectionHeader", nil)
+      assert.are.same({ Font = { Object = "GameFontNormal" } }, styled[#styled].style)
+      assert.are.equal(font, styled[#styled].element)
+      sonata.overrides = {}
+    end)
+
+    it("takes an override before any theme is applied, styling with it once one is", function()
+      sonata:RegisterElement("SectionHeader", {})
+      local override = { Font = { Object = "GameFontHighlight" } }
+      sonata:SetElementStyleOverride("SectionHeader", override)
+      assert.are.equal(0, #styled)
+      sonata:ApplyTheme(context:New("test"), "Other")
+      assert.are.equal(override, styled[1].style)
+      sonata.overrides = {}
+    end)
+
     it("reuses the resolved theme until the next apply", function()
       sonata:ApplyTheme(context:New("test"), "Other")
       local calls = 0

@@ -24,6 +24,9 @@ local context = addon:GetModule('Context')
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
+---@class SonataNext: AceModule
+local sonataNext = addon:GetModule('SonataNext')
+
 -- NextVendorButton is a button of BetterBags Next's vendor (next.md §10): an item for sale, a
 -- buyback, or an item to repair. It shows the icon, stack size, stock, quality, the quest mark, what
 -- makes it unusable or sold out (as Blizzard's MerchantFrame_UpdateMerchantInfo tints them), and its
@@ -40,10 +43,6 @@ local COIN_ICONS = {
   "Interface\\MoneyFrame\\UI-SilverIcon",
   "Interface\\MoneyFrame\\UI-CopperIcon",
 }
-local QUEST_BANG = "Interface\\ContainerFrame\\UI-Icon-QuestBang"
-local QUALITY_BORDER = "Interface\\Common\\WhiteIconFrame"
--- How much a search leaves the buttons it does not match.
-local SEARCH_DIM = 0.25
 
 ---@alias NextVendorButtonMode "buy"|"buyback"|"repair"
 
@@ -68,6 +67,8 @@ addon:GetModule('Perf'):RegisterPrototype(buttonProto, 'NextVendorButtonFrame')
 
 function vendorButton:Init()
   self.pool = {} ---@type NextVendorButtonFrame[]
+  -- Every button made, for a theme to restyle (ApplyStyle).
+  self.all = {} ---@type NextVendorButtonFrame[]
 end
 
 vendorButton:Init()
@@ -112,51 +113,72 @@ end
 ---@return NextVendorButtonFrame
 local function newButton()
   local frame = CreateFrame("Frame")
-  frame:SetSize(style.ICON, style.ICON + style.VENDOR_PRICE)
   local button = CreateFrame("Button", nil, frame)
-  button:SetSize(style.ICON, style.ICON)
   button:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local icon = button:CreateTexture(nil, "ARTWORK")
-  icon:SetSize(style.ICON, style.ICON)
   icon:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
   button.icon = icon
   local border = button:CreateTexture(nil, "OVERLAY")
-  border:SetTexture(QUALITY_BORDER)
   border:SetAllPoints(icon)
   border:Hide()
   button.IconBorder = border
   local quest = button:CreateTexture(nil, "OVERLAY", nil, 2)
-  quest:SetTexture(QUEST_BANG)
   quest:SetAllPoints(icon)
   quest:Hide()
   local highlight = button:CreateTexture(nil, "HIGHLIGHT")
   highlight:SetAllPoints(icon)
-  highlight:SetColorTexture(1, 1, 1, 0.15)
   local durability = button:CreateTexture(nil, "OVERLAY", nil, 3)
-  durability:SetHeight(3)
   durability:SetPoint("BOTTOMLEFT", icon, "BOTTOMLEFT", 0, 0)
   durability:SetColorTexture(1, 1, 1, 1)
   durability:Hide()
   local count = button:CreateFontString(nil, "OVERLAY")
-  count:SetFontObject(style:Font("Stack"))
   count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
   button.Count = count
   local stock = button:CreateFontString(nil, "OVERLAY")
-  stock:SetFontObject(style:Font("Stack"))
   stock:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
   local price = frame:CreateFontString(nil, "OVERLAY")
-  price:SetFontObject(style:Font("Price"))
   price:SetPoint("TOP", button, "BOTTOM", 0, -1)
   ---@type NextVendorButtonFrame
   local b = setmetatable({
     key = "", frame = frame, button = button, icon = icon, border = border, quest = quest, count = count,
-    stock = stock, price = price, durability = durability, highlight = highlight,
+    stock = stock, price = price, durability = durability, highlight = highlight, affordable = true,
   }, { __index = buttonProto })
+  b:Style()
   button:SetScript("OnEnter", function() b:OnEnter() end)
   button:SetScript("OnLeave", function() b:OnLeave() end)
   addon.SetScript(button, "OnClick", function(_, _, mouse) b:OnClick(mouse) end)
   return b
+end
+
+-- Style draws the button from the Next theme (Layout, Vendor): its size and the room for its price,
+-- its highlight, quest mark and durability bar, its stack, stock and price in their roles.
+function buttonProto:Style()
+  local V = style.Theme.Vendor
+  self.frame:SetSize(style.ICON, style.ICON + style.VENDOR_PRICE)
+  self.button:SetSize(style.ICON, style.ICON)
+  self.icon:SetSize(style.ICON, style.ICON)
+  self.highlight:SetColorTexture(style:RGBA(V.Highlight))
+  self.quest:SetTexture(style:TexturePath(V.QuestMark))
+  if V.QualityBorder then
+    self.border:SetTexture(style:TexturePath(V.QualityBorder))
+  else
+    self.border:Hide()
+  end
+  self.durability:SetHeight(V.DurabilityHeight)
+  style:SetFont(self.count, V.StackFont)
+  style:SetFont(self.stock, V.StackFont)
+  style:SetFont(self.price, self.affordable and V.PriceFont or V.UnaffordableFont)
+end
+
+-- ApplyStyle restyles every vendor button made, in use or pooled (SonataNext applied a theme); the
+-- vendor draws the ones in use again.
+---@param ctx? Context
+function vendorButton:ApplyStyle(ctx)
+  local _ = ctx
+  for _, b in ipairs(self.all) do
+    b:Style()
+  end
 end
 
 -- MasqueRegions returns the parts Masque skins, by its region names (Skins/Regions.lua, Item).
@@ -172,6 +194,8 @@ function vendorButton:Acquire()
   local b = table.remove(self.pool)
   if b == nil then
     b = newButton()
+    table.insert(self.all, b)
+    sonataNext:RegisterWidget(self)
     events:SendMessage(context:New('NextVendorButton'), 'vendor/NewButton', b)
   end
   b.frame:Show()
@@ -199,9 +223,10 @@ function buttonProto:reset(texture, quality)
   self.stock:Hide()
   self.quest:Hide()
   self.durability:Hide()
-  self.price:SetTextColor(1, 1, 1, 1)
+  self:setAffordable(true)
   self.frame:SetAlpha(1)
-  local color = quality ~= nil and quality >= const.ITEM_QUALITY.Uncommon and const.ITEM_QUALITY_COLOR[quality]
+  local color = style.Theme.Vendor.QualityBorder and quality ~= nil and quality >= const.ITEM_QUALITY.Uncommon
+    and const.ITEM_QUALITY_COLOR[quality]
   if color then
     self.border:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
     self.border:Show()
@@ -231,22 +256,30 @@ function buttonProto:SetBuy(item)
     self.stock:Show()
   end
   self.quest:SetShown(item.isQuestStartItem)
-  -- As MerchantFrame_UpdateMerchantInfo tints it.
+  -- As MerchantFrame_UpdateMerchantInfo tints it, in the theme's colors.
+  local V = style.Theme.Vendor
   local tintRed = not item.isPurchasable or not item.isUsable
   if item.numAvailable == 0 or item.isKnownHeirloom then
     if tintRed then
-      self.icon:SetVertexColor(0.5, 0, 0, 1)
+      self.icon:SetVertexColor(style:RGBA(V.SoldOutUnusable))
     else
-      self.icon:SetVertexColor(0.5, 0.5, 0.5, 1)
+      self.icon:SetVertexColor(style:RGBA(V.SoldOut))
     end
   elseif tintRed then
-    self.icon:SetVertexColor(0.9, 0, 0, 1)
+    self.icon:SetVertexColor(style:RGBA(V.Unusable))
   end
   self.icon:SetDesaturated(item.isKnownHeirloom)
+  self:setAffordable(item.canAfford and true or false)
   self.price:SetText(vendorButton:PriceText(item.price, item.costs))
-  if not item.canAfford then
-    self.price:SetTextColor(1, 0.25, 0.25, 1)
-  end
+end
+
+-- setAffordable writes the price in the theme's role for whether the player can afford it.
+---@private
+---@param affordable boolean
+function buttonProto:setAffordable(affordable)
+  self.affordable = affordable
+  local V = style.Theme.Vendor
+  style:SetFont(self.price, affordable and V.PriceFont or V.UnaffordableFont)
 end
 
 -- SetBuyback shows an item that was sold.
@@ -257,7 +290,7 @@ function buttonProto:SetBuyback(entry)
   self:reset(entry.texture, entry.quality)
   self:setCount(entry.quantity)
   if not entry.isUsable then
-    self.icon:SetVertexColor(0.9, 0, 0, 1)
+    self.icon:SetVertexColor(style:RGBA(style.Theme.Vendor.Unusable))
   end
   self.price:SetText(vendorButton:PriceText(entry.price, {}))
 end
@@ -280,7 +313,7 @@ end
 -- SetSearchMatch dims the button when a search leaves it out.
 ---@param match boolean
 function buttonProto:SetSearchMatch(match)
-  self.frame:SetAlpha(match and 1 or SEARCH_DIM)
+  self.frame:SetAlpha(match and 1 or style.Theme.Vendor.SearchDim)
 end
 
 ---@param costs NextVendorCost[]

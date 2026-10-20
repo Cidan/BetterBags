@@ -35,6 +35,7 @@ local resolve = addon:GetModule('SonataResolve')
 ---@field private decorations table<table, any> What the decorator returned for each window.
 ---@field private elements table<string, table<table, boolean>>
 ---@field private elementStylers table<string, fun(element: table, style: table, theme: SonataTheme)>
+---@field private overrides table<string, table> Element styles that replace the theme's (SetElementStyleOverride).
 ---@field private windowDecorator? fun(window: table, style: table, theme: SonataTheme)
 ---@field private current? string
 ---@field private resolved? SonataTheme
@@ -48,6 +49,7 @@ local sonata = addon:NewModule('Sonata')
 
 -- Themes register as their files load, before Init runs.
 sonata.themes = {}
+sonata.overrides = {}
 
 ---@class SonataTheme
 ---@field Name string The key the theme is saved and registered under.
@@ -72,6 +74,7 @@ function sonata:Init()
   self.decorations = setmetatable({}, { __mode = "k" })
   self.elements = {}
   self.elementStylers = self.elementStylers or {}
+  self.overrides = {}
   self.textFonts = {}
   self.texts = setmetatable({}, { __mode = "k" })
   self.buttonTexts = setmetatable({}, { __mode = "k" })
@@ -250,7 +253,7 @@ function sonata:style(kind, element)
     return
   end
   local theme = self:GetCurrentTheme()
-  local ok, err = pcall(styler, element, theme.Elements[kind] or EMPTY, theme)
+  local ok, err = pcall(styler, element, self.overrides[kind] or theme.Elements[kind] or EMPTY, theme)
   if not ok then
     geterrorhandler()(err)
   end
@@ -476,7 +479,19 @@ end
 ---@param kind string
 ---@return table
 function sonata:GetElementStyle(kind)
-  return self:GetCurrentTheme().Elements[kind] or EMPTY
+  return self.overrides[kind] or self:GetCurrentTheme().Elements[kind] or EMPTY
+end
+
+-- SetElementStyleOverride styles every element of a kind with style in place of the theme's, until
+-- it is set to nil (BetterBags Next's theme styles the item buttons while Next is in use,
+-- next-themes.md). Elements of the kind are restyled at once when a theme was applied.
+---@param kind string
+---@param style? table
+function sonata:SetElementStyleOverride(kind, style)
+  self.overrides[kind] = style
+  if self.applied then
+    self:restyleKind(kind)
+  end
 end
 
 -- GetGeneration changes every time a theme is applied: anything that records what it drew

@@ -41,6 +41,8 @@ end
 ---@field private current? string
 ---@field private resolved? NextTheme
 ---@field private started boolean Init has run: the saved choice can be read.
+---@field private active boolean BetterBags Next is the design in use (SetActive).
+---@field private itemButtonStyle? table The item button style it gave Sonata (syncItemButtons).
 ---@field private generation number
 ---@field private widgets table<table, boolean>
 local sonataNext = addon:NewModule('SonataNext')
@@ -61,6 +63,7 @@ local BASE = "Default"
 ---@field Hidden? boolean
 ---@field Requires? string[] Addons that must be loaded for the theme to be picked.
 ---@field Variables? table<string, any>
+---@field ItemButton? table Item buttons while Next is in use: a Sonata ItemButton element style (sonata.md 3a).
 ---@field Clients? table<string, table> Partial themes applied on a client (Retail, Forever, Classic, ...).
 
 -- Init starts Next with the saved theme (Default while it cannot be used), before Next's panels are
@@ -71,7 +74,34 @@ function sonataNext:Init()
   self.resolved = nil
   self.generation = 0
   self.started = true
+  self.active = false
+  self.itemButtonStyle = nil
   self:use(self:GetSavedThemeKey())
+end
+
+-- SetActive says whether BetterBags Next is the design in use (BagSystem:Use): only then does a Next
+-- theme style the item buttons.
+---@param active boolean
+function sonataNext:SetActive(active)
+  self.active = active
+  self:syncItemButtons()
+end
+
+-- syncItemButtons gives Sonata the current theme's item button style (ItemButton) while Next is in
+-- use, in place of the bags' theme's, or takes it away; the buttons then draw in full again. Item
+-- buttons are shared by both designs and styled by Sonata's ItemButton element (sonata.md 3a).
+---@private
+function sonataNext:syncItemButtons()
+  local style = self.active and self.resolved and self.resolved.ItemButton or nil
+  if style == nil and self.itemButtonStyle == nil then
+    return
+  end
+  self.itemButtonStyle = style
+  addon:GetModule('Sonata'):SetElementStyleOverride("ItemButton", style)
+  local itemFrame = addon:GetModule('ItemFrame', true)
+  if itemFrame ~= nil then
+    itemFrame:RestyleButtons()
+  end
 end
 
 -- checkData errors when value holds anything but data: a function, an object (a table with a
@@ -241,6 +271,7 @@ function sonataNext:ApplyTheme(ctx, key, save)
     db():SetNextTheme(key)
   end
   nextStyle():Use(resolved)
+  self:syncItemButtons()
   local list = {}
   for widget in pairs(self.widgets) do
     table.insert(list, widget)

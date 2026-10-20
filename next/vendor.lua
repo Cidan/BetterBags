@@ -206,6 +206,13 @@ function vendorProto:ApplySearch()
   end
 end
 
+-- ApplyStyle restyles the vendor like any panel, and fits its name to the theme's header again.
+---@param ctx Context
+function vendorProto:ApplyStyle(ctx)
+  nextPanel.proto.ApplyStyle(self, ctx)
+  self:fitTitle()
+end
+
 -- UpdateHeader shows what the vendor offers and enables what can be done: the filter (retail,
 -- unless a game rule turns it off), the repair buttons at a vendor that repairs (the guild's when
 -- the guild pays), Sell Junk with junk in the bags.
@@ -236,9 +243,9 @@ function vendorProto:fitTitle()
       shown = shown + 1
     end
   end
-  local buttons = shown * 22 + math.max(0, shown - 1) * 8
+  local buttons = shown * style.HEADER_BUTTON + math.max(0, shown - 1) * style.HEADER_BUTTON_GAP
   self.title:SetWordWrap(false)
-  self.title:SetWidth(style.BODY_WIDTH - (style.PAD + 4) - (style.PAD + buttons) - 12)
+  self.title:SetWidth(style.BODY_WIDTH - (style.PAD + style.TITLE_INSET) - (style.PAD + buttons) - 12)
 end
 
 ---@private

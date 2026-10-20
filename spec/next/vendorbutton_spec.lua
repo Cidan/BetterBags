@@ -93,6 +93,7 @@ describe("NextVendorButton", function()
   end)
 
   teardown(function()
+    UseNextTheme(nil)
     ResetModuleStub("NextVendorButton")
     ResetModuleStub("NextStyle")
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
@@ -193,8 +194,63 @@ describe("NextVendorButton", function()
       local b = vendorButton:Acquire()
       b:SetBuy(item({ price = 500, canAfford = false }))
       assert.are.same({ 1, 0.25, 0.25, 1 }, { b.price:GetTextColor() })
+      assert.are.equal(style:Font("PriceUnaffordable"), b.price:GetFontObject())
       b:SetBuy(item({ price = 500 }))
       assert.are.same({ 1, 1, 1, 1 }, { b.price:GetTextColor() })
+      assert.are.equal(style:Font("Price"), b.price:GetFontObject())
+    end)
+
+    -- A Next theme (next-themes.md): sizes, roles, tints, highlight and search dimming, applied to
+    -- every button made, pooled ones too.
+    describe("a theme", function()
+      after_each(function()
+        UseNextTheme(nil)
+        vendorButton:ApplyStyle()
+      end)
+
+      it("sizes every button it made to its icon and price row, and writes them in its roles", function()
+        local live, pooled = vendorButton:Acquire(), vendorButton:Acquire()
+        pooled:Release()
+        UseNextTheme({ Fonts = { Tiny = { Size = 8 } }, Layout = { Icon = 32, VendorPrice = 10 },
+          Vendor = { StackFont = "Tiny", PriceFont = "Tiny", DurabilityHeight = 5 } })
+        vendorButton:ApplyStyle()
+        for _, b in ipairs({ live, pooled }) do
+          assert.are.same({ 32, 42 }, { b.frame:GetSize() })
+          assert.are.same({ 32, 32 }, { b.button:GetSize() })
+          assert.are.same({ 32, 32 }, { b.icon:GetSize() })
+          assert.are.equal(style:Font("Tiny"), b.count:GetFontObject())
+          assert.are.equal(style:Font("Tiny"), b.price:GetFontObject())
+          assert.are.equal(5, b.durability:GetHeight())
+        end
+      end)
+
+      it("tints with its colors, lights in its highlight, and dims by its share", function()
+        UseNextTheme({ Palette = { Blood = { 0.6, 0.1, 0.1, 1 }, Ash = { 0.3, 0.3, 0.3, 1 } },
+          Vendor = { Unusable = "Blood", SoldOut = "Ash", Highlight = { 1, 0.9, 0.6, 0.3 }, SearchDim = 0.5 } })
+        vendorButton:ApplyStyle()
+        local b = vendorButton:Acquire()
+        b:SetBuy(item({ isUsable = false }))
+        assert.are.same({ r = 0.6, g = 0.1, b = 0.1, a = 1 }, b.icon._vertexColor)
+        b:SetBuy(item({ numAvailable = 0 }))
+        assert.are.same({ r = 0.3, g = 0.3, b = 0.3, a = 1 }, b.icon._vertexColor)
+        local h = b.highlight._colorTexture
+        assert.are.same({ 1, 0.9, 0.6, 0.3 }, { h.r, h.g, h.b, h.a })
+        b:SetSearchMatch(false)
+        assert.are.equal(0.5, b.frame:GetAlpha())
+      end)
+
+      it("draws a quality border in its art, or none", function()
+        local b = vendorButton:Acquire()
+        UseNextTheme({ Vendor = { QualityBorder = false } })
+        vendorButton:ApplyStyle()
+        b:SetBuy(item({ quality = 4 }))
+        assert.is_false(b.border:IsShown())
+        UseNextTheme(nil)
+        vendorButton:ApplyStyle()
+        b:SetBuy(item({ quality = 4 }))
+        assert.is_true(b.border:IsShown())
+        assert.are.equal("Interface\\Common\\WhiteIconFrame", b.border:GetTexture())
+      end)
     end)
 
     it("dims what a search leaves out", function()
