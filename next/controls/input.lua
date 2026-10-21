@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
@@ -35,6 +38,7 @@ local DEFAULT_WIDTH = 200
 ---@field maxLetters? number
 ---@field onChange? fun(ctx: Context, text: string, userInput: boolean)
 ---@field onEnter? fun(ctx: Context, text: string)
+---@field commitOnBlur? boolean Losing focus with its text changed commits it too (calls onEnter), as Enter does.
 ---@field icon? fun(): {Texture: string, Size: number, Color: string} An icon inside its left edge (the settings' magnifier), read from the theme every time it is styled.
 
 ---@class NextInputFrame
@@ -195,6 +199,9 @@ end
 function inputProto:OnFocus(focused)
   if focused then
     self.focusText = self:GetText()
+  elseif self.opts.commitOnBlur and self:GetText() ~= self.focusText then
+    self:Commit(context:New('NextInput_Blur'))
+    return
   end
   self:Paint()
 end

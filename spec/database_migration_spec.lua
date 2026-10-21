@@ -411,6 +411,7 @@ describe("Database Migration", function()
       }
       DB:Migrate()
       assert.are.same({}, profile.customCategoryFilters.Test1.itemList)
+      assert.is_true(profile.customCategoryFilters.Test1.save, "a saved category says so")
       assert.is_nil(profile.customCategoryFilters.Blank.searchCategory)
       assert.are.same({ query = "type = armor" }, profile.customCategoryFilters.Kept.searchCategory)
     end)

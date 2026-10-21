@@ -27,6 +27,7 @@ StubBetterBagsModule("Bucket")
 local bagSystem = StubBetterBagsModule("BagSystem")
 StubBetterBagsModule("Items")
 StubBetterBagsModule("Categories")
+StubBetterBagsModule("Search")
 StubBetterBagsModule("ItemRowFrame")
 local sonata = StubBetterBagsModule("Sonata")
 local debugModule = StubBetterBagsModule("Debug")
@@ -41,6 +42,7 @@ for _, m in ipairs({ { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle",
   { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
   { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" },
   { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" },
+  { "NextSettingsBagCategories", "next/settings/bagcategories.lua" },
   { "NextSettingsCurrency", "next/settings/currency.lua" },
   { "NextSettingsContent", "next/settings/content.lua" } }) do
   ResetModuleStub(m[1], m[2])
@@ -165,7 +167,38 @@ describe("NextSettingsContent", function()
         table.insert(list, page.group .. ": " .. page.title)
       end
       assert.are.same({ "BetterBags: General", "BetterBags: Appearance", "BetterBags: Item Colors",
-        "Bags: Backpack", "Bags: Bank", "Profiles: Profiles", "Integrations: QuickFind" }, list)
+        "BetterBags: Categories", "Bags: Backpack", "Bags: Bank", "Profiles: Profiles", "Integrations: QuickFind" }, list)
+    end)
+
+    -- Categories are defined once, on their own page (category-lifecycle.md §6), for both designs; a
+    -- bag arranges them on its Categories tab.
+    it("defines every category on the Categories page, for both designs, with the bags the settings show", function()
+      local made
+      local editor = addon:GetModule("NextSettingsCategories")
+      override(editor, "Create", function(_, parent, windowFrame, bags)
+        made = { owner = windowFrame, bags = bags }
+        return addon:GetModule("NextSettingsRows"):CreateText(parent, "editor")
+      end)
+      override(db, "GetMaxItemLevel", function() return 100 end)
+      settings:Open("categories")
+      assert.are.equal("categories", settings.pageId)
+      assert.are.equal(settings.frame, made.owner)
+      local function kinds()
+        local list = {}
+        for _, bag in ipairs(made.bags()) do table.insert(list, bag.kind) end
+        return list
+      end
+      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }, kinds())
+      addon.hasGuildBank = true
+      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }, kinds(),
+        "the guild bank like any bag")
+      design = "classic"
+      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }, kinds(), "the classic bags have none")
+      local titles = {}
+      for _, title in ipairs(settings.page.titles) do
+        if title:IsShown() then table.insert(titles, title:GetText()) end
+      end
+      assert.are.same({}, titles, "the page's title says it: no section title")
     end)
 
     -- The classic bags' currency icons (frames/currency.lua): on clients with currencies (retail, WoW:
@@ -181,19 +214,19 @@ describe("NextSettingsContent", function()
         return list
       end
       addon.isRetail = true
-      assert.are.same({ "General", "Appearance", "Item Colors", "Currency", "Backpack", "Bank", "Profiles",
-        "QuickFind" }, listed())
+      assert.are.same({ "General", "Appearance", "Item Colors", "Categories", "Currency", "Backpack", "Bank",
+        "Profiles", "QuickFind" }, listed())
       addon.isRetail = false
       addon.isMists = true
-      assert.are.equal("Currency", listed()[4])
+      assert.are.equal("Currency", listed()[5])
       addon.isMists = false
       addon.isBCC = true
-      assert.are.equal("Backpack", listed()[4], "none on TBC")
+      assert.are.equal("Backpack", listed()[5], "none on TBC")
       addon.isBCC, addon.isClassic = false, true
-      assert.are.equal("Backpack", listed()[4], "none on Era")
+      assert.are.equal("Backpack", listed()[5], "none on Era")
       addon.isClassic, addon.isRetail = false, true
       design = "next"
-      assert.are.equal("Backpack", listed()[4], "BetterBags Next shows no currencies")
+      assert.are.equal("Backpack", listed()[5], "BetterBags Next shows no currencies")
     end)
 
     it("shows every currency on the Currency page, and finds it by name", function()
@@ -248,13 +281,13 @@ describe("NextSettingsContent", function()
           "dontMergePartial", "dontMergeTransmog", "unmergeAtShop" } },
         { "Categories", "Automatic", { "filterEquipmentLocation", "filterExpansion", "filterGearSet",
           "filterRecentItems", "filterTradeSkill", "filterType", "filterSubtype" } },
-        { "Categories", "Your Categories", { "Your Categories" } },
+        { "Categories", "In This Bag", { "Categories in This Bag" } },
       }, idsOf(page))
     end)
 
-    it("manages the bag's own categories on its Categories tab, bound to it", function()
+    it("arranges the categories on a bag's Categories tab, bound to it", function()
       local made
-      local manager = addon:GetModule("NextSettingsCategories")
+      local manager = addon:GetModule("NextSettingsBagCategories")
       override(manager, "Create", function(_, parent, windowFrame, bag)
         made = { parent = parent, owner = windowFrame, bag = bag }
         return addon:GetModule("NextSettingsRows"):CreateText(parent, "manager")

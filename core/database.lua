@@ -755,7 +755,8 @@ local function normalizeRule(filter)
 end
 
 -- NormalizeCategories brings saved categories to the unified shape (category-lifecycle.md §6): every
--- category used in every bag it does not leave out, an item list, group by its own and no empty rule;
+-- category used in every bag it does not leave out, marked saved, an item list, group by its own and no
+-- empty rule;
 -- the item index rebuilt from the item lists (an item listed in several keeps the category its index
 -- names, else the lowest priority number, then the first name; entries naming no list are dropped);
 -- hidden sections dropped (hiding was retired). Run on every load and every import; it changes nothing
@@ -767,6 +768,7 @@ function DB:NormalizeCategories()
   profile.ephemeralCategoryFilters = profile.ephemeralCategoryFilters or {}
   for name, filter in pairs(profile.customCategoryFilters) do
     filter.name = name
+    filter.save = true
     filter.itemList = type(filter.itemList) == "table" and filter.itemList or {}
     filter.enabled = normalizeEnabled(filter.enabled)
     normalizeRule(filter)

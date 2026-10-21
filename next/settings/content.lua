@@ -40,7 +40,10 @@ local settings = addon:GetModule('NextSettings')
 local themes = addon:GetModule('NextSettingsThemes')
 
 ---@class NextSettingsCategories: AceModule
-local categoryManager = addon:GetModule('NextSettingsCategories')
+local categoryEditor = addon:GetModule('NextSettingsCategories')
+
+---@class NextSettingsBagCategories: AceModule
+local bagCategories = addon:GetModule('NextSettingsBagCategories')
 
 ---@class NextSettingsCurrency: AceModule
 local currencyList = addon:GetModule('NextSettingsCurrency')
@@ -279,6 +282,10 @@ local function importCategories(ctx)
     end)
 end
 
+-- The bag pages, in the sidebar's order: their ids and bags.
+---@type {id: string, bag: SettingBag}[]
+local BAG_PAGES = {}
+
 -- bagPage defines a bag's page: its layout, items and categories, its settings bound to it.
 ---@param id string
 ---@param bag SettingBag
@@ -286,6 +293,7 @@ end
 ---@param design? BagDesign
 local function bagPage(id, bag, shown, design)
   local name = string.lower(bag.name)
+  table.insert(BAG_PAGES, { id = id, bag = bag })
   pages:Define({
     id = id, group = L:G("Bags"), title = L:G(bag.name), bag = bag, shown = shown, design = design,
     description = format(L:G("How the %s lays out, shows and sorts its items."), name),
@@ -316,19 +324,36 @@ local function bagPage(id, bag, shown, design)
           { setting = 'filterRecentItems' }, { setting = 'filterTradeSkill' }, { setting = 'filterType' },
           { setting = 'filterSubtype' },
         } },
-        { title = L:G("Your Categories"), note = L:G("(drag to reorder, Shift-click to pin)"), rows = { {
-          title = L:G("Your Categories"),
-          keywords = { "category", "categories", "pinned", "pin", "search category", "custom", "priority", "color" },
-          block = function(parent, window) return categoryManager:Create(parent, window, bag) end,
+        -- Categories are defined on the Categories page; a bag arranges them (category-lifecycle.md §6).
+        { title = L:G("In This Bag"), note = L:G("(drag to reorder, Shift-click to pin)"), rows = { {
+          title = L:G("Categories in This Bag"),
+          keywords = { "category", "categories", "pinned", "pin", "order", "used", "custom" },
+          block = function(parent, window) return bagCategories:Create(parent, window, bag) end,
         } } },
       } },
     },
   })
 end
 
+-- shownBags returns the bags whose pages the settings show (the guild bank's only with BetterBags Next,
+-- on a client with one): the bags a category can be used in.
+---@return SettingBag[]
+local function shownBags()
+  local list = {}
+  for _, entry in ipairs(BAG_PAGES) do
+    local page = pages:Get(entry.id)
+    if page and pages:IsShown(page) then
+      table.insert(list, entry.bag)
+    end
+  end
+  return list
+end
+
 -- Init defines the pages, in the sidebar's order.
 function content:Init()
   self.exportArea, self.importArea = nil, nil
+  BAG_PAGES = {}
+  categoryEditor:Init()
   pages:Define({
     id = "general", group = L:G("BetterBags"), title = L:G("General"),
     description = L:G("How BetterBags works in every bag."),
@@ -391,6 +416,18 @@ function content:Init()
           end },
         } },
       } },
+    } } },
+  })
+  -- Every category, defined once (category-lifecycle.md §6), for both designs.
+  pages:Define({
+    id = "categories", group = L:G("BetterBags"), title = L:G("Categories"),
+    description = L:G("Your categories: a rule, items you place in them, or both. Each bag uses those you choose."),
+    tabs = { { id = "main", title = L:G("Categories"), sections = {
+      { title = L:G("Categories"), titleHidden = function() return true end, rows = { {
+        title = L:G("Categories"),
+        keywords = { "category", "categories", "search category", "rule", "custom", "priority", "color", "group by" },
+        block = function(parent, window) return categoryEditor:Create(parent, window, shownBags) end,
+      } } },
     } } },
   })
   -- The classic bags' currency icons (frames/currency.lua), on clients with currencies: retail, WoW:

@@ -182,6 +182,10 @@ sonataNext:RegisterTheme({
       Indicator = { Color = "Seal" },
       SelectedFill = { Color = "Ink", Alpha = 0.08 },
       HoverFill = { Color = "Ink", Alpha = 0.04 },
+    },
+    BagCategories = {
+      Fill = { Color = "Ink", Alpha = 0.035 },
+      HoverFill = { Color = "Ink", Alpha = 0.04 },
       DropMarker = { Color = "Seal" },
     },
   },

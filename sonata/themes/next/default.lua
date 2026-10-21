@@ -601,22 +601,32 @@ sonataNext:RegisterTheme({
     },
     -- The footer: Height tall, Pad in, the line along its top.
     Footer = { Height = 56, Pad = 24, Line = { Color = "Lavender", Alpha = 0.12, Size = 1 } },
-    -- The category manager on a bag's Categories tab: Height tall, its list ListWidth wide and Gap from
-    -- its details, over its Fill; list rows RowHeight tall (headings GroupHeight), Indent in; the chosen
-    -- one's bar and fill, the light under the pointer, the marker where a dragged row would land; the
-    -- details' fields FieldGap apart, their names LabelWidth wide, the query QueryHeight tall, item rows
-    -- ItemHeight tall; the fonts.
+    -- The Categories page (next-settings.md §5): Height tall, its list ListWidth wide and Gap from the
+    -- category's settings, over its Fill, Pad inside; list rows RowHeight tall (a name and a line of
+    -- what is in it; headings GroupHeight), Indent in; the chosen one's bar and fill, the light under
+    -- the pointer; the settings' rows FieldGap apart, their names LabelWidth wide, the rule QueryHeight
+    -- tall, item rows ItemHeight tall; up to Icons icons of what it holds, IconSize square, IconGap
+    -- apart; the fonts.
     Categories = {
-      Height = 460, ListWidth = 230, Gap = 16, Pad = 10, RowHeight = 26, GroupHeight = 24, Indent = 10,
+      Height = 470, ListWidth = 250, Gap = 16, Pad = 10, RowHeight = 38, GroupHeight = 24, Indent = 10,
       Fill = { Color = "Lavender", Alpha = 0.035 },
       Indicator = { Color = "Gold", Width = 3 },
       SelectedFill = { Color = "Lavender", Alpha = 0.1 },
       HoverFill = { Color = "Lavender", Alpha = 0.05 },
-      DropMarker = { Color = "Gold", Alpha = 0.9, Size = 2 },
-      FieldGap = 10, LabelWidth = 110, QueryHeight = 80, ItemHeight = 26,
+      FieldGap = 8, LabelWidth = 90, QueryHeight = 60, ItemHeight = 26, Icons = 12, IconSize = 20, IconGap = 4,
       GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
       TitleFont = "DialogTitle", LabelFont = "SettingsText", TextFont = "SettingsText",
       WarningFont = "ButtonDanger", HintFont = "SettingsSectionNote",
+    },
+    -- A bag's categories, on its Categories tab: Height tall over its Fill, Pad inside; rows RowHeight
+    -- tall (headings GroupHeight), Indent in; the light under the pointer and the marker where a dragged
+    -- row would land; the fonts.
+    BagCategories = {
+      Height = 420, Pad = 10, RowHeight = 30, GroupHeight = 24, Indent = 10,
+      Fill = { Color = "Lavender", Alpha = 0.035 },
+      HoverFill = { Color = "Lavender", Alpha = 0.05 },
+      DropMarker = { Color = "Gold", Alpha = 0.9, Size = 2 },
+      GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
     },
     -- The classic bags' Currency page: headings HeaderHeight tall, currencies RowHeight tall with their
     -- icon IconSize square and Gap from their name; the fonts.
