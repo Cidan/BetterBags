@@ -19,9 +19,9 @@ local bucket = addon:GetModule('Bucket')
 local sonata = addon:GetModule('Sonata')
 
 -- SettingsCatalog defines every setting once (docs/next-settings.md): its kind, name, description,
--- choices or range, how it is read and written, and what it sends so the bags show it. Both settings
--- windows build their rows from it: the classic one (config/config.lua) and BetterBags Next's
--- (next/settings/). A bag's settings are bound to a bag when they are asked for (Get(id, bag)).
+-- choices or range, how it is read and written, and what it sends so the bags show it. The settings
+-- window (next/settings/) builds its rows from it, for the classic bags and BetterBags Next alike. A
+-- bag's settings are bound to a bag when they are asked for (Get(id, bag)).
 ---@class SettingsCatalog: AceModule
 ---@field private defs table<string, SettingDefinition>
 ---@field private order string[]
@@ -67,11 +67,6 @@ local catalog = addon:NewModule('SettingsCatalog')
 ---@field reload? boolean
 ---@field get fun(ctx: Context): any
 ---@field set fun(ctx: Context, value: any): boolean?
-
--- What a window does around a change: ask for a reload, show the settings again.
----@class (exact) SettingHooks
----@field reload? fun()
----@field refresh? fun()
 
 catalog.defs = {}
 catalog.order = {}
@@ -180,42 +175,6 @@ function catalog:Get(id, bag)
     get = function(ctx) return def.get(ctx, bag) end,
     set = function(ctx, value) return def.set(ctx, value, bag) end,
   }
-end
-
--- Form returns a setting as the classic window's form takes it (forms/layouts/layout.lua): a
--- choice's getValue tests an item. After a change it asks for a reload (hooks.reload) for a setting
--- that needs one, and shows the settings again (hooks.refresh) when the change was refused.
----@param id string
----@param bag? SettingBag
----@param hooks? SettingHooks
----@return table
-function catalog:Form(id, bag, hooks)
-  local setting = self:Get(id, bag)
-  local opts = {
-    title = setting.title,
-    description = setting.description,
-    setValue = function(ctx, value)
-      local applied = setting.set(ctx, value)
-      if applied == false then
-        if hooks and hooks.refresh then hooks.refresh() end
-        return
-      end
-      if setting.reload and hooks and hooks.reload then
-        hooks.reload()
-      end
-    end,
-  }
-  if setting.kind == "dropdown" then
-    opts.items = setting.items
-    opts.itemsFunction = setting.itemsFunction
-    opts.getValue = function(ctx, value) return setting.get(ctx) == value end
-  else
-    opts.getValue = setting.get
-  end
-  if setting.kind == "slider" then
-    opts.min, opts.max, opts.step = setting.min, setting.max, setting.step
-  end
-  return opts
 end
 
 --[[

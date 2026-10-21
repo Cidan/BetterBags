@@ -1,8 +1,8 @@
 -- next_settings_spec.lua -- BetterBags Next's settings window (next-settings.md) on the whole addon
 -- (spec/helpers/whole_addon.lua): every file of the TOC loaded and started as the client does, with the
--- real database, catalog, categories and bags. The settings open in the window of the design in use,
--- every page and tab builds, search finds settings, and switching design from the window opens the
--- other design's.
+-- real database, catalog, categories and bags. One settings window for both designs (next-settings.md
+-- §7): it opens for either, builds every page and tab of each, finds settings, and turning BetterBags
+-- Next off from it shows the classic bags' settings without closing.
 local WholeAddon = dofile("spec/helpers/whole_addon.lua")
 
 describe("BetterBags Next's settings window on the whole addon", function()
@@ -36,24 +36,33 @@ describe("BetterBags Next's settings window on the whole addon", function()
     end
   end
 
-  it("opens BetterBags Next's window while Next is in use, and builds every page and tab", function()
-    local addon = start({ next = true })
+  -- builtEveryTab opens every page and tab the design in use has and returns them, "page > tab".
+  local function builtEveryTab(addon)
     local settings = addon:GetModule("NextSettings")
-    addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
-    assert.is_true(settings:IsShown())
-    assert.is_false(addon:GetModule("Config").configFrame:GetFrame():IsShown())
     local pages = addon:GetModule("NextSettingsPages")
-    local built = 0
+    local built = {}
     for _, page in ipairs(pages:List()) do
       for _, tab in ipairs(page.tabs) do
         settings:Open(page.id, tab.id)
         assert.are.same({}, handle.errors, page.id .. " > " .. tab.id)
         assert.are.equal(page.id, settings.pageId)
         assert.is_true(#settings.page.sections > 0, page.id .. " > " .. tab.id .. " shows something")
-        built = built + 1
+        table.insert(built, page.id .. " > " .. tab.id)
       end
     end
-    assert.is_true(built >= 13, "every page and tab")
+    return built
+  end
+
+  it("opens for BetterBags Next and builds every page and tab", function()
+    local addon = start({ next = true })
+    local settings = addon:GetModule("NextSettings")
+    addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
+    assert.is_true(settings:IsShown())
+    assert.is_nil(addon:GetModule("Config").configFrame, "no classic window")
+    assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "backpack > layout",
+      "backpack > items", "backpack > categories", "bank > layout", "bank > items", "bank > categories",
+      "guild > layout", "guild > items", "guild > categories", "profiles > profiles", "profiles > transfer",
+      "quickfind > main" }, builtEveryTab(addon))
     settings:Close()
     assert.are.same({}, handle.errors, "closing")
   end)
@@ -78,22 +87,31 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.is_true(#settings.page.sections >= 2, "the stacking settings of every bag")
   end)
 
-  it("opens the classic window while the classic bags are in use", function()
+  it("opens for the classic bags too, with their own settings, and builds every page and tab", function()
     local addon = start({})
+    local settings = addon:GetModule("NextSettings")
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
-    assert.is_true(addon:GetModule("Config").configFrame:GetFrame():IsShown())
-    assert.is_false(addon:GetModule("NextSettings"):IsShown())
+    assert.is_true(settings:IsShown())
+    assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "currency > main",
+      "backpack > layout", "backpack > items", "backpack > categories", "bank > layout", "bank > items",
+      "bank > categories", "profiles > profiles", "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
+    settings:Open("backpack", "layout")
+    assert.is_not_nil(rowOf(settings, "itemsPerRow"), "rows and columns, for the classic bags")
+    assert.is_not_nil(rowOf(settings, "columns"))
   end)
 
-  it("opens the classic window when BetterBags Next is turned off from its own", function()
+  it("shows the classic bags' settings, staying open, when BetterBags Next is turned off from it", function()
     local addon = start({ next = true })
     local settings = addon:GetModule("NextSettings")
     settings:Open("general")
+    assert.is_nil(rowOf(settings, "bagFading"))
     local row = rowOf(settings, "nextEnabled")
     row.control.frame:GetScript("OnClick")(row.control.frame, "LeftButton")
     assert.are.same({}, handle.errors, "switching")
     assert.are.equal("classic", addon:GetModule("BagSystem"):ActiveDesign())
-    assert.is_false(settings:IsShown())
-    assert.is_true(addon:GetModule("Config").configFrame:GetFrame():IsShown())
+    assert.is_true(settings:IsShown())
+    assert.are.equal("general", settings.pageId)
+    assert.is_not_nil(rowOf(settings, "bagFading"), "the classic bags' own settings")
+    assert.is_false(rowOf(settings, "nextEnabled").control:GetChecked())
   end)
 end)

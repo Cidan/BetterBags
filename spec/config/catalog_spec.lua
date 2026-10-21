@@ -2,8 +2,8 @@
 -- defined once, read and written through it by both settings windows. These check what the catalog
 -- itself promises: settings bound to a bag, the shapes the windows read, the rules (a setting that
 -- needs a reload, a change that was refused) and what each kind of setting sends so the bags show
--- it. The classic window built on it is checked against what players saw before by
--- classic_settings_layout_spec.lua, and its refreshes by config_redraw_spec.lua.
+-- it. What each setting sends is checked by settings_effects_spec.lua; the window built on it by
+-- spec/next/settings/.
 
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
@@ -141,13 +141,6 @@ describe("The settings catalog", function()
     assert.are.same({ "BetterBags", "None", "Pawn" }, list)
   end)
 
-  it("hands the classic window a choice as a test of each item", function()
-    local opts = catalog:Form("sectionOrder", backpack)
-    assert.is_true(opts.getValue(ctx(), "Size Descending"))
-    assert.is_false(opts.getValue(ctx(), "Alphabetically"))
-    assert.are.same({ "Alphabetically", "Size Descending", "Size Ascending" }, opts.items)
-  end)
-
   it("reads a number within its range, and writes a number", function()
     local perRow = catalog:Get("itemsPerRow", backpack)
     assert.are.equal("slider", perRow.kind)
@@ -158,17 +151,14 @@ describe("The settings catalog", function()
     assert.are.same({ { message = "bags/Redraw", args = {} } }, sent)
   end)
 
-  it("says which settings take effect after a reload, and the classic window asks for one", function()
+  it("says which settings take effect after a reload", function()
     assert.is_true(catalog:Get("enableBankBags").reload)
     assert.is_nil(catalog:Get("inBagSearch").reload)
-    local asked = 0
-    local opts = catalog:Form("enableBankBags", nil, { reload = function() asked = asked + 1 end })
-    opts.setValue(ctx(), false)
+    catalog:Get("enableBankBags").set(ctx(), false)
     assert.is_false(db._bankBag)
-    assert.are.equal(1, asked)
   end)
 
-  it("says a change was refused, and the classic window shows the setting again", function()
+  it("says a change was refused", function()
     local switched = true
     override(bagSystem, "Switch", function(_, _, design)
       db._design = design
@@ -180,12 +170,9 @@ describe("The settings catalog", function()
     switched = false
     assert.is_false(setting.set(ctx(), false))
     assert.are.equal("classic", db._design)
-    local refreshed = 0
-    catalog:Form("nextEnabled", nil, { refresh = function() refreshed = refreshed + 1 end }).setValue(ctx(), true)
-    assert.are.equal(1, refreshed)
   end)
 
-  it("defines every setting of the classic window, once each", function()
+  it("defines every setting the classic window had, once each", function()
     local ids = catalog:Ids()
     local seen = {}
     for _, id in ipairs(ids) do

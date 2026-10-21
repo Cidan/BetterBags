@@ -1,35 +1,32 @@
--- plugin_spec.lua -- Config:AddPluginConfig (config/plugin.lua): the plugin API. A plugin's options become
--- rows of the classic settings window, as they always did, and a page of BetterBags Next's
--- (NextSettingsContent:AddPlugin, next-settings.md §4).
+-- plugin_spec.lua -- Config:AddPluginConfig (config/plugin.lua): the plugin API. A plugin's AceConfig
+-- options become its page of the settings window (NextSettingsContent:AddPlugin, next-settings.md §4);
+-- the classic settings window that also took them is gone (§7).
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
-local debugModule = StubBetterBagsModule("Debug")
-debugModule.Log = debugModule.Log or function() end
 local config = StubBetterBagsModule("Config")
 local content = StubBetterBagsModule("NextSettingsContent")
 LoadBetterBagsModule("config/plugin.lua")
 
 describe("Config:AddPluginConfig", function()
-  local added, rows, savedFrame, savedAdd
+  local added, savedAdd, savedEnable, enabled
 
   before_each(function()
-    added, rows = {}, {}
-    savedFrame, savedAdd = config.configFrame, content.AddPlugin
-    config.configFrame = setmetatable({}, { __index = function(_, method)
-      return function(_, opts) table.insert(rows, { method, opts and opts.title }) end
-    end })
+    added, enabled = {}, 0
+    savedAdd, savedEnable = content.AddPlugin, config.OnEnable
     content.AddPlugin = function(_, title, options) table.insert(added, { title, options }) end
+    config.OnEnable = function() enabled = enabled + 1 end
   end)
 
   after_each(function()
-    config.configFrame, content.AddPlugin = savedFrame, savedAdd
+    content.AddPlugin, config.OnEnable = savedAdd, savedEnable
   end)
 
-  it("adds the plugin's options to the classic window and gives it a page in BetterBags Next's", function()
+  it("gives the plugin its page of the settings window, and builds nothing else", function()
     local options = { on = { type = "toggle", name = "On", get = function() return true end, set = function() end } }
     config:AddPluginConfig("Some Plugin", options)
-    assert.are.same({ { "AddSubIndex", "Some Plugin" }, { "AddCheckbox", "On" } }, rows)
     assert.are.same({ { "Some Plugin", options } }, added)
+    assert.are.equal(0, enabled, "no classic window to build first")
+    assert.is_nil(config.configFrame)
   end)
 
   it("is in the addon's modules", function()

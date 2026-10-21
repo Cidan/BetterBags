@@ -191,10 +191,6 @@ next\guildbutton.lua
 next\guildbank.lua
 
 
-config\categorypane.lua
-config\themepane.lua
-config\classic\currencypane.lua
-config\itemcolorpane.lua
 config\catalog.lua
 config\config.lua
 config\plugin.lua
