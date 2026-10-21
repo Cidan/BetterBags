@@ -337,3 +337,23 @@ switch while open and while closed, search), `spec/next/settings/content_spec.lu
 contents with their designs marked, the classic-only settings all marked classic, the guild bank per
 design, rows and columns per design, Appearance per design), `spec/config/catalog_spec.lua` (What's
 New on login). Mutation-tested (12 mutations; the one that first survived led to a test).
+
+## 8. The Currency page (`next/settings/currency.lua`, `NextSettingsCurrency`)
+
+The classic bags' currency icons (`frames/currency.lua`, up to 7 at the bottom of the backpack) read
+Blizzard's own "show in backpack" flag. The Currency page (BetterBags group, after Item Colors,
+`design = "classic"`, shown on clients with currencies: retail, WoW: Forever and Mists Classic; TBC and
+Era have none, where the classic window said "not available") replaces the classic window's currency
+panes with a wide row: every currency under its headings (the headings Blizzard keeps collapsed are
+expanded, as the backpack's icons expand them), each with its icon, how many you have (of its most)
+and a switch. The switch writes `SetCurrencyBackpack`; once the game has taken it (0.1 s, as the
+classic pane waited) the page reads the list again and sends `currency/Updated`, which redraws the
+backpack's icons. `C_CurrencyInfo` where the client has it, else the legacy globals (Mists Classic),
+whose expand and show flags are numbers (`ExpandCurrencyList(i, 1)`, `SetCurrencyBackpack(i, 1|0)`,
+Blizzard_TokenUI). No cap on how many are shown: the classic pane had none (Blizzard's token frame caps
+its own display, `MAX_WATCHED_TOKENS`).
+
+Coverage: `spec/next/settings/currency_spec.lua` (the list and its expansion, a row's icon, count and
+switch, headings without one, writing and the message after the game took it, the legacy API, height
+and the empty text), `spec/next/settings/content_spec.lua` (the page per client and design, search).
+Mutation-tested (10 mutations, each caught).

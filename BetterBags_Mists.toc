@@ -204,6 +204,7 @@ next\settings\pages.lua
 next\settings\window.lua
 next\settings\themes.lua
 next\settings\categories.lua
+next\settings\currency.lua
 next\settings\content.lua
 
 integrations\consoleport.lua

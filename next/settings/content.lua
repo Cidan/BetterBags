@@ -42,6 +42,9 @@ local themes = addon:GetModule('NextSettingsThemes')
 ---@class NextSettingsCategories: AceModule
 local categoryManager = addon:GetModule('NextSettingsCategories')
 
+---@class NextSettingsCurrency: AceModule
+local currencyList = addon:GetModule('NextSettingsCurrency')
+
 -- NextSettingsContent is what BetterBags Next's settings window shows (next-settings.md §4): its pages,
 -- defined in Init in the order of the sidebar (General, Appearance, Item Colors; a page per bag;
 -- Profiles; QuickFind), and a page per plugin (AddPlugin, from Config:AddPluginConfig). Settings of the
@@ -388,6 +391,19 @@ function content:Init()
           end },
         } },
       } },
+    } } },
+  })
+  -- The classic bags' currency icons (frames/currency.lua), on clients with currencies: retail, WoW:
+  -- Forever and Mists Classic (TBC and Era have none: the classic window said so there).
+  pages:Define({
+    id = "currency", group = L:G("BetterBags"), title = L:G("Currency"), design = "classic",
+    shown = function() return addon.isRetail == true or addon.isMists == true end,
+    description = L:G("The currencies shown at the bottom of your backpack."),
+    tabs = { { id = "main", title = L:G("Currency"), sections = {
+      { title = L:G("Currencies"), note = L:G("(the backpack shows up to 7)"), rows = { {
+        title = L:G("Currency"), keywords = { "currency", "currencies", "tokens", "backpack" },
+        block = function(parent) return currencyList:Create(parent) end,
+      } } },
     } } },
   })
   bagPage("backpack", { name = 'Backpack', kind = const.BAG_KIND.BACKPACK })

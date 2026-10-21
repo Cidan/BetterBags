@@ -618,6 +618,13 @@ sonataNext:RegisterTheme({
       TitleFont = "DialogTitle", LabelFont = "SettingsText", TextFont = "SettingsText",
       WarningFont = "ButtonDanger", HintFont = "SettingsSectionNote",
     },
+    -- The classic bags' Currency page: headings HeaderHeight tall, currencies RowHeight tall with their
+    -- icon IconSize square and Gap from their name; the fonts.
+    Currency = {
+      HeaderHeight = 26, RowHeight = 30, IconSize = 18, Gap = 8,
+      GroupFont = "SettingsSection", NameFont = "SettingsLabel", TextFont = "SettingsText",
+      Hover = { Color = "Lavender", Alpha = 0.05 },
+    },
     -- Cards of a page's own (the themes): Height tall, at least MinWidth wide, Gap apart, Pad inside;
     -- their fill (under the pointer), edge (the one chosen), fonts, and each status's font.
     Cards = {

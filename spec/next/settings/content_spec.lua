@@ -41,6 +41,7 @@ for _, m in ipairs({ { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle",
   { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
   { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" },
   { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" },
+  { "NextSettingsCurrency", "next/settings/currency.lua" },
   { "NextSettingsContent", "next/settings/content.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -165,6 +166,51 @@ describe("NextSettingsContent", function()
       end
       assert.are.same({ "BetterBags: General", "BetterBags: Appearance", "BetterBags: Item Colors",
         "Bags: Backpack", "Bags: Bank", "Profiles: Profiles", "Integrations: QuickFind" }, list)
+    end)
+
+    -- The classic bags' currency icons (frames/currency.lua): on clients with currencies (retail, WoW:
+    -- Forever, Mists Classic; the classic window showed "not available" on TBC and Era).
+    it("lists the classic bags' pages: Currency after Item Colors, on a client with currencies", function()
+      design = "classic"
+      for _, flag in ipairs({ "isRetail", "isMists", "isBCC", "isClassic" }) do
+        override(addon, flag, false)
+      end
+      local function listed()
+        local list = {}
+        for _, page in ipairs(pages:List()) do table.insert(list, page.title) end
+        return list
+      end
+      addon.isRetail = true
+      assert.are.same({ "General", "Appearance", "Item Colors", "Currency", "Backpack", "Bank", "Profiles",
+        "QuickFind" }, listed())
+      addon.isRetail = false
+      addon.isMists = true
+      assert.are.equal("Currency", listed()[4])
+      addon.isMists = false
+      addon.isBCC = true
+      assert.are.equal("Backpack", listed()[4], "none on TBC")
+      addon.isBCC, addon.isClassic = false, true
+      assert.are.equal("Backpack", listed()[4], "none on Era")
+      addon.isClassic, addon.isRetail = false, true
+      design = "next"
+      assert.are.equal("Backpack", listed()[4], "BetterBags Next shows no currencies")
+    end)
+
+    it("shows every currency on the Currency page, and finds it by name", function()
+      design = "classic"
+      override(addon, "isRetail", true)
+      local made = 0
+      local currency = addon:GetModule("NextSettingsCurrency")
+      override(currency, "Create", function(_, parent)
+        made = made + 1
+        return addon:GetModule("NextSettingsRows"):CreateText(parent, "currencies")
+      end)
+      override(db, "GetMaxItemLevel", function() return 100 end)
+      settings:Open("currency")
+      assert.are.equal("currency", settings.pageId)
+      assert.are.equal(1, made)
+      settings:Search(addon:GetModule("Context"):New("spec"), "currenc")
+      assert.are.equal("Currency", settings.page.sections[1].title)
     end)
 
     it("shows the guild bank's page on a client with one, while BetterBags Next is in use", function()
