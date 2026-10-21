@@ -615,9 +615,41 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
 ### 10b. The panel (`next/vendor.lua`, `NextVendor`)
 
 - A `NextPanel` (§3) on the left, `kind = BAG_KIND.UNDEFINED`, `noDrag` (its sections are not
-  registered with `NextDrag`: nothing is dragged from or to it), its rows as tall as an icon plus
-  the price (`style.VENDOR_PRICE`, `NextCanvas:SetCellHeight`). The canvas lays out sections of the
-  vendor's own buttons with `BindSections` (it never claims item buttons there).
+  registered with `NextDrag`: nothing is dragged from or to it), its items cards (`NextCanvas:SetCards`,
+  `CellWidth`; rows as tall as an icon). The canvas lays out sections of the vendor's own buttons with
+  `BindSections` (it never claims item buttons there).
+- **Cards** (asked, from a user: the price under the icon was "way too small"; a first version put
+  it in three rows beside the icon, still too small; then: "let's actually do this like this, which
+  is the gw2 addon ... name too?"): each item is a card, as Blizzard's merchant (`MerchantItemTemplate`:
+  the icon, the name to its right in two lines, the price under it) and GW2_UI (which restyles that
+  template, a backdrop per item, two columns) draw it.
+  - `Layout.VendorColumns` (2) cards across the full grid (`style.VENDOR_CARD_WIDTH`, the grid less
+    the gaps between them, divided); a small vendor made wider fits more of them, one made narrower
+    fewer (`NextPanel:MinWidth` keeps one card).
+  - Beside the icon (`VendorTextGap` from it, as much again from the card's right edge): the name at
+    the top (`Vendor.NameFont`, `VendorName` 13; Quiet 12), up to two lines, from Uncommon up in its
+    quality's color, else the role's (Parchment's ink on its paper); and the price on one line at the
+    bottom, `VendorPriceRaise` (3; Quiet 2) up from the card's edge (asked: "2-3 pixels up from the
+    border"), in the price font (13; Quiet 12), written as Blizzard's merchant writes it
+    (`NextVendorButton:PriceText`): each coin of the gold it has (gold, silver, copper; none for a coin
+    it has none of), each amount then its coin (`Vendor.CoinSize`), then each other cost the same way;
+    cut short when it does not fit (the tooltip shows the whole price). Two lines of the name, a line
+    of the price and the raise fit the icon's height in every shipped theme.
+  - The card's fill (`Vendor.CardFill`) and a light over it under the pointer (`CardHover`, from the
+    icon or anywhere on the card), each a color or false. The whole card takes the clicks and the
+    pointer (`card`, a button under the icon's): its tooltip, its buy, buyback and repair.
+  - **Drops sell** (`NextMerchant:SellCursorItem`, moved there from the vendor panel): an item dropped
+    on a card or its icon, or left-clicked onto one, is sold, as on Blizzard's merchant item buttons
+    (`OnReceiveDrag` runs their left click, which picks the merchant item up while holding the
+    player's). Blizzard asks first about a refundable item. A right click holding an item still buys,
+    as on Blizzard's buttons. The cards cover most of the panel: without this a drop on one did
+    nothing.
+  - The name's and price's layout (justification, line limit) is set again after every font object
+    change (affordable or not, a theme): a font string takes its layout from its font object.
+  - **The stack count and stock** are in the bags' item count font (asked: "the count for items in
+    vendor, that font size should match our item count in bags"): the `Stack` role copies
+    `NumberFontNormal` (ItemButtonTemplate's Count: Arial Narrow 14 with an outline, its own font per
+    alphabet), through the new font key `Object` (next-themes.md §3).
 - **Title:** the vendor's name (`UnitName("npc")`), cut to one line in the room right of the shown
   header buttons.
   - **Secret in an instance.** `UnitName` is `SecretWhenUnitNameIdentityRestricted`
@@ -680,7 +712,7 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   or the double click; a drag ended without a release sells nothing. Unlike a right click on the
   header (Move Categories), it does not need Enable Category Sell and Deposit and is not cut to 10
   items: the drag is the deliberate act, and the confirmation covers what buyback cannot.
-- **Masque:** each button is a holder the canvas places (`frame`, as tall as the icon and its price)
+- **Masque:** each button is a card the canvas places (`frame`, the icon with its name and price)
   holding the square button that takes the clicks (`button`), so Masque, which sizes a skin to the
   button it skins (Masque 12.1.0 `Core.lua` `UpdateScale`), skins the icon alone. The button carries
   Masque's names for an item button's parts (`icon`, `IconBorder`, `Count`; `Skins/Regions.lua`),

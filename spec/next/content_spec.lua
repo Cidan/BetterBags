@@ -384,15 +384,27 @@ describe("NextContent", function()
       assert.are.same({ v1 = a, v2 = b, v3 = c }, canvas.buttons)
     end)
 
-    it("steps rows by its icons and the price row under them", function()
-      canvas:SetPriceRow(true)
+    -- The vendor's buttons are cards: an icon with its name and price beside it, in the theme's
+    -- columns at the full width, and more of them in a wider small panel.
+    it("steps across by its cards in the theme's columns, and down by its icons", function()
+      canvas:SetCards(true)
+      local width = style.VENDOR_CARD_WIDTH
+      assert.are.same({ width, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
       local list = {}
-      for i = 1, 9 do list[i] = vendorButton("v" .. i) end
+      for i = 1, 5 do list[i] = vendorButton("v" .. i) end
       canvas:BindSections({ { name = "Food", buttons = list } })
       draw()
-      local rowStep = style.ICON + style.VENDOR_PRICE + style.GAP
-      assert.are.same({ canvas.order[1].cells, 0, -rowStep }, { at(list[9].frame) })
-      assert.are.equal(style.SECTION_HEADER + 2 * rowStep - style.GAP, canvas.order[1].height)
+      local columns = style.VENDOR_COLUMNS
+      assert.are.same({ canvas.order[1].cells, width + style.GAP, 0 }, { at(list[2].frame) })
+      local rowStep = style.ICON + style.GAP
+      assert.are.same({ canvas.order[1].cells, 0, -rowStep }, { at(list[columns + 1].frame) })
+      assert.are.equal(style.SECTION_HEADER + math.ceil(5 / columns) * rowStep - style.GAP, canvas.order[1].height)
+      canvas:SetInstant(true)
+      draw(3 * width + 2 * style.GAP)
+      assert.are.same({ canvas.order[1].cells, 2 * (width + style.GAP), 0 }, { at(list[3].frame) }, "three in a wider panel")
+      canvas:SetInstant(false)
+      canvas:SetCards(false)
+      assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
     end)
 
     it("reuses a section of the same name and releases the rest", function()

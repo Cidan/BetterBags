@@ -408,6 +408,30 @@ describe("NextMerchant", function()
     end)
   end)
 
+  -- As dropping an item on Blizzard's merchant frame, or on one of its item buttons, sells it.
+  describe("selling what is on the cursor", function()
+    it("sells it, and nothing without one", function()
+      _G._cursorHasItem = true
+      assert.are.equal("sold", merchant:SellCursorItem())
+      assert.are.same({ 0 }, _G._merchantCalls.pickup)
+      _G._cursorHasItem = false
+      assert.are.equal("nothing", merchant:SellCursorItem())
+      assert.are.same({ 0 }, _G._merchantCalls.pickup)
+    end)
+
+    it("lets Blizzard ask first about selling a refundable item, as its merchant frame does", function()
+      _G._cursorHasItem = true
+      override(_G, "MerchantFrame", { refundItem = "bag button", refundItemEquipped = false })
+      _G._extendedPriceShown = true
+      assert.are.equal("asked", merchant:SellCursorItem())
+      assert.are.same({}, _G._merchantCalls.pickup)
+      assert.are.equal("bag button", _G._extendedPriceAsked.button)
+      _G._extendedPriceShown = false
+      assert.are.equal("sold", merchant:SellCursorItem(), "not refundable: sold")
+      _G._cursorHasItem = false
+    end)
+  end)
+
   describe("junk", function()
     it("sells all junk through Blizzard's own confirmation where the client has it", function()
       _G._merchant.junk = 3

@@ -100,7 +100,7 @@ function nextVendor:Create(ctx)
   v.atMerchant = false
   v.closeRequested = false
   v.buttons = {}
-  v.content:SetPriceRow(true)
+  v.content:SetCards(true)
   nextDrag:RegisterSeller(v)
   self.panel = v
   return v
@@ -485,17 +485,9 @@ function vendorProto:Wipe(ctx)
   self.buttons = {}
 end
 
--- SellCursorItem sells the item on the cursor, as dropping it on Blizzard's merchant frame does
--- (its OnMouseUp): Blizzard asks first about a refundable item.
+-- SellCursorItem sells the item on the cursor (NextMerchant:SellCursorItem).
 function vendorProto:SellCursorItem()
-  if not CursorHasItem() then
-    return
-  end
-  if MerchantFrame and MerchantFrame.refundItem
-    and ContainerFrame_GetExtendedPriceString(MerchantFrame.refundItem, MerchantFrame.refundItemEquipped) then
-    return
-  end
-  PickupMerchantItem(0)
+  merchant:SellCursorItem()
 end
 
 ---@return string

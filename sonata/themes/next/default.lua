@@ -100,16 +100,24 @@ sonataNext:RegisterTheme({
     SearchText = { Size = 13, Color = "Text" },
     -- The vendor's buttons: the price under the icon (and one the player cannot afford), the stack
     -- size and stock on it.
-    Price = { Size = 10, Color = "White", Shadow = true },
-    PriceUnaffordable = { Size = 10, Color = "Unaffordable", Shadow = true },
-    Stack = { Size = 11, Color = "White", Shadow = true },
+    Price = { Size = 13, Color = "White", Shadow = true },
+    PriceUnaffordable = { Size = 13, Color = "Unaffordable", Shadow = true },
+    -- A vendor item's name on its card (from Uncommon up, in its quality's color).
+    VendorName = { Size = 13, Color = "Text", Shadow = true },
+    -- A vendor item's stack count and stock: the bags' item count font (ItemButtonTemplate's Count,
+    -- NumberFontNormal), copied (Object).
+    Stack = { Object = "NumberFontNormal" },
   },
 
   -- Sizes, in UI units.
   Layout = {
-    -- Item icons, the room under a vendor button's icon for its price, between icons, per row.
+    -- Item icons; the vendor's cards across its full width (an item's name and price beside its
+    -- icon, next.md §10b), and the room between an icon and its name and price; between icons; per row.
     Icon = 44,
-    VendorPrice = 14,
+    VendorColumns = 2,
+    VendorTextGap = 8,
+    -- How far a card's price sits up from its bottom edge.
+    VendorPriceRaise = 3,
     Gap = 6,
     PerRow = 8,
     -- The scroll box keeps its bar's room on both sides (render/scrollbox.lua, Symmetric).
@@ -478,6 +486,12 @@ sonataNext:RegisterTheme({
     SoldOut = "SoldOut",
     PriceFont = "Price",
     UnaffordableFont = "PriceUnaffordable",
+    -- A card's name (two lines of it and a line of the price fit beside the icon), the coin icons in
+    -- its price, its fill and the light over it under the pointer (false: none).
+    NameFont = "VendorName",
+    CoinSize = 13,
+    CardFill = { 0.78, 0.72, 1, 0.05 },
+    CardHover = { 1, 1, 1, 0.07 },
     StackFont = "Stack",
     DurabilityHeight = 3,
   },

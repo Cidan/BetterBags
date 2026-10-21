@@ -32,12 +32,6 @@ local tween = addon:GetModule('NextTween')
 ---@class NextContent: AceModule
 local nextContent = addon:NewModule('NextContent')
 
--- step is the distance from one button's left edge to the next's, for the current theme.
----@return number
-local function step()
-  return style.ICON + style.GAP
-end
-
 ---@class (exact) NextSectionEntry
 ---@field item? Item
 ---@field gap? boolean
@@ -85,7 +79,7 @@ end
 ---@field dragSlotY? number Where the last render put the dragged section's gap.
 ---@field leaving table<string, number> Sections moved away, left out until this time (GetTime).
 ---@field headerHandler? NextHeaderHandler
----@field priceRow boolean Its buttons have a price row under their icons (the vendor's: SetPriceRow).
+---@field cards boolean Its buttons are cards, an item's name and price beside its icon (the vendor's: SetCards).
 ---@field buttonSource {GetButton: fun(self: any, ctx: Context, slotkey: string): Item} Where Bind takes its buttons: the item buttons, or the guild bank's (SetButtonSource).
 ---@field instant boolean It places everything at once, nothing gliding (SetInstant: its panel is being resized).
 local canvasProto = drawable:Extend({}, 'NextCanvas')
@@ -104,7 +98,7 @@ function nextContent:Create(parent)
   canvas.buttons = {}
   canvas.freeTotal = 0
   canvas.leaving = {}
-  canvas.priceRow = false
+  canvas.cards = false
   canvas.instant = false
   canvas.buttonSource = itemFrame
   addon.SetScript(canvas.frame, "OnHide", function()
@@ -370,18 +364,24 @@ function canvasProto:SetButtonSource(source)
   self.buttonSource = source
 end
 
--- SetPriceRow says its buttons have a price row under their icons (the vendor's), so its rows are
--- that much taller.
+-- SetCards says its buttons are cards (the vendor's): an item's name and price beside its icon, as
+-- wide as the theme's columns make them.
 ---@param on boolean
-function canvasProto:SetPriceRow(on)
-  self.priceRow = on
+function canvasProto:SetCards(on)
+  self.cards = on
   self:Invalidate()
+end
+
+-- CellWidth is how wide a button is, without the gap, for the current theme: its icon, or a card.
+---@return number
+function canvasProto:CellWidth()
+  return self.cards and style.VENDOR_CARD_WIDTH or style.ICON
 end
 
 -- CellHeight is how tall a row of buttons is, without the gap, for the current theme.
 ---@return number
 function canvasProto:CellHeight()
-  return style.ICON + (self.priceRow and style.VENDOR_PRICE or 0)
+  return style.ICON
 end
 
 ---@class (exact) NextCanvasSection
@@ -499,14 +499,14 @@ function canvasProto:SetInstant(on)
   self.instant = on
 end
 
--- Render lays the sections out in one column, in rows of as many icons as fit the width it is
+-- Render lays the sections out in one column, in rows of as many cells as fit the width it is
 -- given; while the canvas is shown, through a Motion pass, so what changed place travels there
 -- (but not while it places at once, SetInstant).
 ---@param parentResult? RenderResult
 ---@return RenderResult
 function canvasProto:Render(parentResult)
   local width = parentResult and parentResult.Width or style.GRID_WIDTH
-  local STEP = step()
+  local STEP = self:CellWidth() + style.GAP
   local perRow = math.max(1, math.floor((width + style.GAP) / STEP))
   local animated = self.frame:IsVisible() and not self.instant
   if animated then
