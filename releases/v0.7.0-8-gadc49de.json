@@ -1,0 +1,29 @@
+{
+  "id": 1792567690,
+  "version": "v0.7.0-8-gadc49de",
+  "channel": "alpha",
+  "date": "2026-10-21",
+  "from": "b2b7ac6d4c6d343acf9e19ad83454de6ba977686",
+  "to": "adc49de3b2a30e3d8fdbf9fe09f8f669a09226bc",
+  "headline": "BetterBags introduces a unified, themable settings window and an overhauled category management system.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Unified settings window",
+      "details": "Both classic bags and BetterBags Next now share a sleek, searchable settings window built with custom themable controls and smooth animations. The window automatically adapts to show options for whichever bag design is currently active, completely replacing the classic settings panel.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Unified category management",
+      "details": "Categories are now unified into a single type supporting search rules, manual item assignments, or both, and now work in the guild bank as well. A dedicated Categories settings page provides live rule testing, a drag-and-drop item grid, and per-bag toggles, alongside per-bag pinning and reordering. In addition, manually placed items now win priority ties over search rules, and section hiding has been retired.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Themable scrollbars for Next bags",
+      "details": "All BetterBags Next panels, including the backpack, bank, vendor, and guild bank, now feature custom scrollbars that match your active theme.",
+      "clients": []
+    }
+  ]
+}
