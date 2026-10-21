@@ -166,6 +166,8 @@ frames\bag.lua
 
 next\style.lua
 next\tween.lua
+next\controls\base.lua
+next\controls\scrollbar.lua
 next\sparkles.lua
 next\tabs.lua
 next\content.lua

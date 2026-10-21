@@ -36,6 +36,9 @@ local drawable = addon:GetModule('Drawable')
 ---@class Scrollbox: AceModule
 local scrollbox = addon:GetModule('Scrollbox')
 
+---@class NextScrollBar: AceModule
+local nextScrollBar = addon:GetModule('NextScrollBar')
+
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
@@ -2529,10 +2532,15 @@ function panelProto:UpdateSearchShown()
   self.searchBox.frame:SetShown(database:GetInBagSearch() and true or false)
 end
 
--- BuildContent makes the scroll box between the header and the footer and the canvas it holds.
+-- BuildContent makes the scroll box between the header and the footer and the canvas it holds. It
+-- scrolls with BetterBags Next's own bar (next-settings.md §2), hidden until it is used.
 ---@param scrollName string
 function panelProto:BuildContent(scrollName)
-  local scroll = scrollbox:Create(self.frame, scrollName, { Symmetric = true, AutoHideBar = true })
+  local scroll = scrollbox:Create(self.frame, scrollName, {
+    Symmetric = true,
+    AutoHideBar = true,
+    CreateBar = function(box, opts) return nextScrollBar:Create(box, opts) end,
+  })
   self.scroll = scroll
   self.content = nextContent:Create(scroll.scrollChild)
   scroll:SetChild(self.content)

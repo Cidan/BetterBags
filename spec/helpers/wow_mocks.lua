@@ -1437,24 +1437,103 @@ _G.__mockTemplates.WowScrollBox = function(frame)
     self:SetView(view)
     self._scrolledToBegin = true
   end
-  -- ScrollBoxBaseMixin:GetDerivedScrollRange() (the content's extent less the visible extent;
-  -- specs set _scrollRange), GetDerivedScrollOffset() (range * scroll percentage), and
-  -- ScrollToOffset(offset, noInterpolation): nothing without a range, else the percentage
-  -- offset / range, kept between 0 and 1 (ScrollControllerMixin.SetScrollPercentage saturates).
-  function frame:GetDerivedScrollRange() return self._scrollRange or 0 end
+  -- CallbackRegistryMixin (CallbackRegistry.lua): RegisterCallback(event, func, owner) keeps one
+  -- callback per owner per event; TriggerEvent(event, ...) calls each as func(owner, ...).
+  frame._callbacks = {}
+  function frame:RegisterCallback(event, func, owner)
+    self._callbacks[event] = self._callbacks[event] or {}
+    self._callbacks[event][owner or func] = func
+    return owner
+  end
+  function frame:UnregisterCallback(event, owner)
+    if self._callbacks[event] then self._callbacks[event][owner] = nil end
+  end
+  function frame:TriggerEvent(event, ...)
+    local list = {}
+    for owner, func in pairs(self._callbacks[event] or {}) do list[#list + 1] = { owner, func } end
+    for _, entry in ipairs(list) do entry[2](entry[1], ...) end
+  end
+  -- ScrollBoxBaseMixin (ScrollBox.lua): GetDerivedExtent() is the view's extent (here, the
+  -- scrollable children's heights; specs may set _extent), GetVisibleExtent() the box's own height,
+  -- rounded; GetDerivedScrollRange() the extent less the visible extent (specs may set
+  -- _scrollRange), GetDerivedScrollOffset() range * scroll percentage; GetVisibleExtentPercentage()
+  -- visible / extent (0 without an extent); HasScrollableExtent() that percentage strictly between
+  -- 0 and 1; GetPanExtent() the view's pan extent, CalculatePanExtentPercentage() it over the range.
+  function frame:GetDerivedExtent()
+    if self._extent ~= nil then return self._extent end
+    local extent = 0
+    for _, child in ipairs(self.view and self.view.frames or {}) do extent = extent + (child:GetHeight() or 0) end
+    return extent
+  end
+  function frame:GetVisibleExtent() return math.floor((self:GetHeight() or 0) + 0.5) end
+  function frame:GetDerivedScrollRange()
+    if self._scrollRange ~= nil then return self._scrollRange end
+    return math.max(0, self:GetDerivedExtent() - self:GetVisibleExtent())
+  end
   function frame:GetDerivedScrollOffset() return self:GetDerivedScrollRange() * (self._scrollPercentage or 0) end
-  function frame:ScrollToOffset(offset)
+  function frame:GetVisibleExtentPercentage()
+    local extent = self:GetDerivedExtent()
+    if extent > 0 then return self:GetVisibleExtent() / extent end
+    return 0
+  end
+  function frame:HasScrollableExtent()
+    local p = self:GetVisibleExtentPercentage()
+    return p > 0.0001 and p < 0.9999
+  end
+  function frame:GetPanExtent() return self.view and self.view._panExtent or 0 end
+  function frame:CalculatePanExtentPercentage()
+    local range = self:GetDerivedScrollRange()
+    if range > 0 then return self:GetPanExtent() / range end
+    return 0
+  end
+  -- ScrollControllerMixin: GetScrollPercentage(); SetScrollPercentage(percentage, noInterpolation)
+  -- saturates it, and ScrollBoxBaseMixin sends OnScroll(percentage, visible extent percentage, pan
+  -- extent percentage) as it moves the scroll target (SetScrollTargetOffset); here at once, the
+  -- last call's noInterpolation kept in _noInterpolation. ScrollToOffset(offset, noInterpolation):
+  -- nothing without a range, else that percentage. ScrollInDirection(percentage, direction) moves
+  -- by percentage (Directions: Increase 1, Decrease -1) unless scrolling is not allowed;
+  -- SetScrollAllowed sends OnAllowScrollChanged when it changes.
+  function frame:GetScrollPercentage() return self._scrollPercentage or 0 end
+  function frame:sendScroll()
+    self:TriggerEvent(BaseScrollBoxEvents.OnScroll, self:GetScrollPercentage(), self:GetVisibleExtentPercentage(),
+      self:CalculatePanExtentPercentage())
+  end
+  function frame:SetScrollPercentage(percentage, noInterpolation)
+    self._noInterpolation = noInterpolation
+    self._scrollPercentage = math.max(0, math.min(1, percentage))
+    self:sendScroll()
+  end
+  function frame:ScrollToOffset(offset, noInterpolation)
     local range = self:GetDerivedScrollRange()
     if range > 0 then
-      self._scrollPercentage = math.max(0, math.min(1, offset / range))
+      self:SetScrollPercentage(offset / range, noInterpolation)
     end
   end
+  function frame:IsScrollAllowed() return self._allowScroll ~= false end
+  function frame:SetScrollAllowed(allowScroll)
+    local old = self:IsScrollAllowed()
+    self._allowScroll = allowScroll
+    if old ~= allowScroll then self:TriggerEvent(BaseScrollBoxEvents.OnAllowScrollChanged, allowScroll) end
+  end
+  function frame:ScrollInDirection(percentage, direction)
+    if not self:IsScrollAllowed() then return end
+    self:SetScrollPercentage(self:GetScrollPercentage() + percentage * direction)
+  end
+  -- FullUpdate lays the children out again, which places the scroll target (OnScroll).
   function frame:FullUpdate(immediately)
     self._fullUpdates = (self._fullUpdates or 0) + 1
     self._lastFullUpdateImmediate = immediately
     self:layoutScrollChildren()
+    self:sendScroll()
   end
 end
+
+-- BaseScrollBoxEvents (ScrollBox.lua, CopyValuesAsKeys) and ScrollControllerMixin.Directions
+-- (ScrollController.lua).
+_G.BaseScrollBoxEvents = { OnAllowScrollChanged = "OnAllowScrollChanged", OnSizeChanged = "OnSizeChanged",
+  OnScroll = "OnScroll", OnLayout = "OnLayout" }
+_G.ScrollControllerMixin = _G.ScrollControllerMixin or {}
+_G.ScrollControllerMixin.Directions = { Increase = 1, Decrease = -1 }
 
 -- WowScrollBoxList (Blizzard_SharedXML/Shared/Scroll/ScrollTemplates.xml: ScrollBoxBaseTemplate
 -- with ScrollBoxListMixin): a scroll box whose view holds a data provider. Init(view) sets the

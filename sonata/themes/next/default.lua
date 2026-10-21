@@ -48,6 +48,13 @@ sonataNext:RegisterTheme({
     SoldOutUnusable = { 0.5, 0, 0, 1 },
     SoldOut = { 0.5, 0.5, 0.5, 1 },
     Unaffordable = { 1, 0.25, 0.25, 1 },
+    -- The controls (next-settings.md): a field's fill idle, under the pointer and pressed; a switch
+    -- that is off and a slider's empty track; and a warning (a button that deletes).
+    ControlFill = { 0.118, 0.101, 0.212, 1 },
+    ControlHover = { 0.153, 0.131, 0.275, 1 },
+    ControlPressed = { 0.094, 0.08, 0.17, 1 },
+    Track = { 0.2, 0.18, 0.33, 1 },
+    Danger = { 1, 0.45, 0.45, 1 },
   },
 
   -- Files the theme draws with, named.
@@ -72,6 +79,11 @@ sonataNext:RegisterTheme({
     IconSellJunk = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\selljunk.png",
     IconRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\repair.png",
     IconGuildRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\guildrepair.png",
+    -- The controls' glyphs: a dropdown's chevron, a menu's check, the search box's magnifier, a plus.
+    IconChevron = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\chevron.png",
+    IconCheck = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\check.png",
+    IconSearch = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\search.png",
+    IconPlus = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\plus.png",
   },
 
   -- Text roles: Size, Color, Shadow (true: FontShadow; a table: its own; unset: none), Flags, File (a
@@ -107,6 +119,24 @@ sonataNext:RegisterTheme({
     -- A vendor item's stack count and stock: the bags' item count font (ItemButtonTemplate's Count,
     -- NumberFontNormal), copied (Object).
     Stack = { Object = "NumberFontNormal" },
+    -- The controls: text in a field (and muted, for one that is off), a field's help while empty; a
+    -- button's label, plain, primary and danger, and a link's; a menu's items (the chosen one); a
+    -- dialog's title and text; a page's tabs (chosen, under the pointer).
+    ControlText = { Size = 12, Color = "Text" },
+    ControlMuted = { Size = 12, Color = "Muted" },
+    ControlHelp = { Size = 12, Color = "Muted" },
+    Button = { Size = 12, Color = "Text", Shadow = true },
+    ButtonPrimary = { Size = 12, Color = "Gold", Shadow = true },
+    ButtonDanger = { Size = 12, Color = "Danger", Shadow = true },
+    Link = { Size = 12, Color = "Lavender" },
+    LinkHover = { Size = 12, Color = "White" },
+    MenuItem = { Size = 12, Color = "Text" },
+    MenuItemSelected = { Size = 12, Color = "Gold" },
+    DialogTitle = { Size = 16, Color = "White", Shadow = true },
+    DialogText = { Size = 12, Color = "Text" },
+    TopTab = { Size = 13, Color = "Muted" },
+    TopTabHover = { Size = 13, Color = "Text" },
+    TopTabSelected = { Size = 13, Color = "White", Shadow = true },
   },
 
   -- Sizes, in UI units.
@@ -200,6 +230,9 @@ sonataNext:RegisterTheme({
       MorphFade = 0.2,
       -- A small panel gliding back to its default size (Shift-click on a grip).
       Resize = 0.4,
+      -- A switch's knob sliding; a page's tab marker gliding to the tab chosen.
+      Toggle = 0.18,
+      TabMarker = 0.22,
     },
     Ease = {
       -- Opening's overshoot sets how far the body reaches past the screen edge, so the bounce never
@@ -223,6 +256,8 @@ sonataNext:RegisterTheme({
       Morph = "inOutCubic",
       MorphFade = "inOutSine",
       Resize = "inOutCubic",
+      Toggle = "outCubic",
+      TabMarker = "outCubic",
     },
     -- How far sections rise as they cascade in.
     Rise = 12,
@@ -494,5 +529,122 @@ sonataNext:RegisterTheme({
     CardHover = { 1, 1, 1, 0.07 },
     StackFont = "Stack",
     DurabilityHeight = 3,
+  },
+
+  -- BetterBags Next's controls (next-settings.md): every one is BetterBags' own, drawn from here. A
+  -- fill is a texture spec (Color, Alpha; or a Texture or Atlas, tinted by Color), false for none; an
+  -- edge is a Color, Alpha and Size (false: none).
+  Controls = {
+    -- The scroll bar of every Next scroll box (the bags' too): Width wide where it takes the mouse,
+    -- Inset in from the box's right edge; the track and the thumb Size wide (HoverSize under the
+    -- pointer or while dragged), the thumb at least MinThumb tall. An auto-hiding bar fades in over
+    -- FadeIn while the pointer is over it or the box scrolls, stays Linger seconds, fades out over
+    -- FadeOut.
+    ScrollBar = {
+      Width = 12, Inset = 1, Size = 4, HoverSize = 6, MinThumb = 24,
+      Track = { Color = "Lavender", Alpha = 0.06 },
+      Thumb = { Color = "Lavender", Alpha = 0.35 },
+      ThumbHover = { Color = "Lavender", Alpha = 0.65 },
+      ThumbDrag = { Color = "Gold", Alpha = 0.85 },
+      FadeIn = 0.15, FadeOut = 0.3, Linger = 1,
+    },
+    -- A switch: its track off and on, its edge, its knob (KnobSize, KnobInset from the track's ends)
+    -- off and on, and the light over it under the pointer.
+    Toggle = {
+      Width = 36, Height = 18, KnobSize = 12, KnobInset = 3,
+      Off = { Color = "Track" },
+      On = { Color = "Gold", Alpha = 0.9 },
+      Edge = { Color = "Lavender", Alpha = 0.2, Size = 1 },
+      Knob = { Color = "Lavender" },
+      KnobOn = { Color = "White" },
+      Hover = { Color = "White", Alpha = 0.08 },
+    },
+    -- Buttons: Height tall, Padding either side of the label, at least MinWidth; each style's fills
+    -- idle, under the pointer and pressed, its edges idle and under the pointer, its font (HoverFont
+    -- under the pointer, when set). A disabled button is drawn at DisabledAlpha.
+    Button = {
+      Height = 26, Padding = 16, MinWidth = 72, DisabledAlpha = 0.4,
+      Plain = {
+        Fill = { Color = "ControlFill" }, HoverFill = { Color = "ControlHover" }, PressedFill = { Color = "ControlPressed" },
+        Edge = { Color = "Lavender", Alpha = 0.3, Size = 1 }, HoverEdge = { Color = "Lavender", Alpha = 0.6, Size = 1 },
+        Font = "Button",
+      },
+      Primary = {
+        Fill = { Color = "Gold", Alpha = 0.14 }, HoverFill = { Color = "Gold", Alpha = 0.24 },
+        PressedFill = { Color = "Gold", Alpha = 0.08 },
+        Edge = { Color = "Gold", Alpha = 0.6, Size = 1 }, HoverEdge = { Color = "Gold", Alpha = 1, Size = 1 },
+        Font = "ButtonPrimary",
+      },
+      Danger = {
+        Fill = { Color = "Danger", Alpha = 0.1 }, HoverFill = { Color = "Danger", Alpha = 0.2 },
+        PressedFill = { Color = "Danger", Alpha = 0.06 },
+        Edge = { Color = "Danger", Alpha = 0.5, Size = 1 }, HoverEdge = { Color = "Danger", Alpha = 0.9, Size = 1 },
+        Font = "ButtonDanger",
+      },
+      Link = {
+        Fill = false, HoverFill = false, PressedFill = false, Edge = false, HoverEdge = false,
+        Font = "Link", HoverFont = "LinkHover",
+      },
+    },
+    -- A text field and a text area: Height (a field's), Padding inside; their fill, focused; their
+    -- edge, its strength idle, under the pointer and focused; their text and help fonts.
+    Input = {
+      Height = 26, Padding = 8,
+      Fill = { Color = "ControlFill" }, FocusFill = { Color = "ControlHover" },
+      Edge = { Color = "Lavender", Size = 1, Idle = 0.25, Hover = 0.5, Focus = 0.9 },
+      Font = "ControlText", HelpFont = "ControlHelp",
+    },
+    -- A slider: its track Width wide and TrackSize thick, filled up to the thumb, the thumb (under
+    -- the pointer or dragged: ThumbHover), and the number box ValueWidth wide, ValueGap after it.
+    Slider = {
+      Width = 120, Height = 18, TrackSize = 4, ThumbSize = 12, ValueWidth = 46, ValueGap = 10,
+      Track = { Color = "Track" },
+      Fill = { Color = "Gold", Alpha = 0.9 },
+      Thumb = { Color = "Lavender" },
+      ThumbHover = { Color = "White" },
+    },
+    -- A dropdown: its size, Padding inside, its fills (idle, under the pointer, open), its edge's
+    -- strength the same way, its text, and its chevron.
+    Dropdown = {
+      Width = 170, Height = 26, Padding = 10,
+      Fill = { Color = "ControlFill" }, HoverFill = { Color = "ControlHover" }, OpenFill = { Color = "ControlHover" },
+      Edge = { Color = "Lavender", Size = 1, Idle = 0.25, Hover = 0.5, Open = 0.9 },
+      Font = "ControlText",
+      Chevron = { Texture = "IconChevron", Color = "Lavender", Size = 12 },
+    },
+    -- A menu of choices: its card and edge, Gap below what opened it, Padding inside, rows ItemHeight
+    -- tall (MaxRows before it scrolls), the light under the pointer, its fonts, and the chosen row's
+    -- check.
+    Menu = {
+      Gap = 2, Padding = 4, ItemHeight = 24, MaxRows = 12,
+      Fill = { Color = "Card" },
+      Edge = { Color = "Lavender", Alpha = 0.35, Size = 1 },
+      HoverFill = { Color = "Lavender", Alpha = 0.14 },
+      Font = "MenuItem", SelectedFont = "MenuItemSelected",
+      Check = { Texture = "IconCheck", Color = "Gold", Size = 12 },
+    },
+    -- A color swatch: Size square, its edge idle and under the pointer.
+    Swatch = {
+      Size = 20,
+      Edge = { Color = "White", Alpha = 0.45, Size = 1 },
+      HoverEdge = { Color = "White", Alpha = 0.9, Size = 1 },
+    },
+    -- Tabs across a page: Height tall, Gap between labels, their fonts, the marker under the chosen
+    -- one (Height thick), and the line under them all.
+    TopTabs = {
+      Height = 34, Gap = 28,
+      Font = "TopTab", HoverFont = "TopTabHover", SelectedFont = "TopTabSelected",
+      Indicator = { Color = "Gold", Height = 2 },
+      Line = { Color = "Lavender", Alpha = 0.12, Size = 1 },
+    },
+    -- A dialog over a window: Width wide, Pad inside, Gap between its parts and ButtonGap between its
+    -- buttons; the scrim behind it, its card and edge, its fonts.
+    Dialog = {
+      Width = 380, Pad = 20, Gap = 12, ButtonGap = 8,
+      Scrim = { Color = "Scrim" },
+      Card = { Color = "Card" },
+      Edge = { Color = "Gold", Alpha = 0.45, Size = 1 },
+      TitleFont = "DialogTitle", TextFont = "DialogText",
+    },
   },
 })

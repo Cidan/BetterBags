@@ -317,13 +317,14 @@ local COLOR_KEYS = {
   BeadColor = true, KnotColor = true, Unusable = true, SoldOut = true, SoldOutUnusable = true,
   ArtColor = true, ArtHoverColor = true,
 }
+-- The controls' fills and edges are texture specs whose Color is checked as any Color is.
 -- Tables whose values name palette colors.
 local COLOR_MAPS = { Washes = true, Accents = true, Colors = true }
 -- Keys whose value names a text role (Fonts).
 local FONT_KEYS = {
   Font = true, SelectedFont = true, TitleFont = true, RecentFont = true, FreeFont = true, CountFont = true,
   HelpFont = true, TextFont = true, EmptyFont = true, MoneyFont = true, HintFont = true, WarningFont = true,
-  PriceFont = true, UnaffordableFont = true, StackFont = true,
+  PriceFont = true, UnaffordableFont = true, StackFont = true, NameFont = true, HoverFont = true,
 }
 -- Keys whose value names one of the theme's Textures, or is a file (a path or a file ID).
 local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true }

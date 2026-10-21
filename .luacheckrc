@@ -279,6 +279,7 @@ globals = {
 	"ResetCursor",
 	"ScrollBoxConstants",
 	"ScrollUtil",
+	"ScrollControllerMixin",
 	"SetCurrencyBackpack",
 	"SetCursor",
 	"SetItemButtonCount",
