@@ -62,8 +62,8 @@ local sonataNext = addon:GetModule('SonataNext')
 
 -- NextSettingsCategories is the category manager on a bag's Categories tab (next-settings.md §5), a
 -- wide row: the bag's categories down its left (Pinned in their order, then every other one by name),
--- and the chosen one's settings on its right. It keeps everything the classic pane does
--- (config/categorypane.lua, category-lifecycle.md) through the same Categories and Database calls:
+-- and the chosen one's settings on its right. It keeps everything the classic settings window's
+-- category pane did (category-lifecycle.md) through the same Categories and Database calls:
 -- pinning and reordering (customSectionSort), a search category's query and group by kept in step, its
 -- priority, color (Warcraft gold, the default, saved as none), Show Section, the items added to it, Save,
 -- Rename (not a dynamic category), Delete (not a group by sub-category), and Remove for a built-in or

@@ -166,13 +166,14 @@ re-skin on every draw already, and a theme redraws the guild bank.
 
 ## 7. Picking a theme
 
-BetterBags Next's own settings window picks it on its **Appearance** page (next-settings.md §4: theme
-cards, the same preview rules). In the classic settings window, the **Next Theme** page (right after
-**Theme**) is the Theme pane over SonataNext
-(`themePane:Create(parent, sonataNext)`; the pane takes any engine with GetThemes, IsAvailable,
-IsSelectable, GetCurrentThemeKey, GetSavedThemeKey, ApplyTheme, RestoreSavedTheme): themes by name,
+The settings window picks it on its **Appearance** page (next-settings.md §4, §7): theme cards over
+SonataNext (`NextSettingsThemes:Create(parent, sonataNext)`; the cards take any engine with GetThemes,
+IsAvailable, IsSelectable, GetCurrentThemeKey, GetSavedThemeKey, ApplyTheme, RestoreSavedTheme), the
+**Theme** section while BetterBags Next is in use and the **Settings Window** section for the classic
+bags (Next's themes draw the window either way). The classic settings window's Next Theme page, the
+Theme pane over SonataNext, was removed with that window. The rules are those it had: themes by name,
 those whose addons are not loaded shown as unavailable, a pick previewed on the next frame without
-saving, **Apply Theme** saves, the saved one put back when the page hides. The bags' theme is left
+saving, **Apply Theme** saves, the saved one put back when the page is left. The bags' theme is left
 alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
 
 ## 8. The shipped themes
@@ -314,8 +315,8 @@ Not verified in game yet: how the glyphs look in each theme, and the trilinear f
   `spec/next/guildbank_spec.lua` ("a theme" blocks).
 - Themes: `spec/sonata/next_themes_spec.lua` (each resolves on every client and checks clean; each
   looks as described).
-- Settings and wiring: `spec/config/themepane_spec.lua` (the pane over SonataNext),
-  `spec/config/config_redraw_spec.lua` (the page), `spec/bagsystem_spec.lua` (`SetActive`),
+- Settings and wiring: `spec/next/settings/themes_spec.lua` (the cards),
+  `spec/next/settings/content_spec.lua` (Appearance per design), `spec/bagsystem_spec.lua` (`SetActive`),
   `spec/database_spec.lua`, `spec/core/constants_spec.lua`, `spec/render/toc_spec.lua`.
 - Alphas (§10): `spec/next/theme_panel_spec.lua` ("alphas": the title's glow through a theme, lit and
   dark; the border's alpha after any number of size switches and part way through one; the spark

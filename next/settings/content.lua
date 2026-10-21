@@ -56,7 +56,7 @@ local currencyList = addon:GetModule('NextSettingsCurrency')
 ---@field importArea? NextSettingsRow
 local content = addon:NewModule('NextSettingsContent')
 
--- The classic bags' share of the levels for the item level colors (config/itemcolorpane.lua).
+-- The share of the highest level seen where the item level colors change (util/color.lua's levels).
 local MID_SHARE, HIGH_SHARE = 0.61, 0.86
 
 -- A profile's name is at most this long, as in the classic window.

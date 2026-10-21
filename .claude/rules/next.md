@@ -522,8 +522,9 @@ events per client; closing: ending the interaction once on retail and after the 
 nothing from Escape, the wipe after the slide, Classic's tab reset, Recent Items; the Purchase
 Bank button), `spec/frames/bankslots_spec.lua` (the socket and tab-settings helpers from the
 module), `spec/core/init_spec.lua` ("makes the backpack a BetterBags Next panel when it is on",
-"makes the bank a BetterBags Next panel when it is on"), `spec/config/config_redraw_spec.lua` (the
-checkbox, `/bb next`, `/bbanchor` without anchors, the Scale slider without a window),
+"makes the bank a BetterBags Next panel when it is on"), `spec/config/config_spec.lua` (`/bb next`,
+`/bbanchor` without anchors), `spec/config/settings_effects_spec.lua` (the switch, the Scale setting
+without a window),
 `spec/frames/search_overlay_spec.lua` (the keybinding), `spec/quickfind_spec.lua` (a bank whose
 tabs have no visual switch), `spec/core/constants_spec.lua`, `spec/database_spec.lua`,
 `spec/render/toc_spec.lua` (load order). Moving sections: `spec/next/drag_spec.lua` (on the real
@@ -932,7 +933,7 @@ loaded flag and the search carried over, the same design, the three refusals),
 `spec/frames/bag_draw_ownership_spec.lua` ("switching designs"), `spec/bags/backpack_spec.lua`
 and `spec/bags/bank_spec.lua` (`Resync`), `spec/next/bag_spec.lua`, `spec/next/bank_spec.lua`,
 `spec/next/vendor_spec.lua` (`Deactivate`, `Activate`, `GiveBack`, one hook),
-`spec/frames/contextmenu_spec.lua`, `spec/config/config_redraw_spec.lua`, `spec/core/init_spec.lua`,
+`spec/frames/contextmenu_spec.lua`, `spec/config/config_spec.lua`, `spec/core/init_spec.lua`,
 `spec/core/backpack_button_spec.lua`. 71 mutations: two survivors led to tests, one showed a guard a
 second `Disable` makes unnecessary (removed), one was a malformed mutation.
 

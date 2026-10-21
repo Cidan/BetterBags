@@ -32,8 +32,10 @@ For years `DeleteItemCategory` scrubbed only `customCategoryFilters`, `ephemeral
 and `customCategoryIndex`, leaving `customSectionSort`, `categoryOptions` and `categoryToGroup`
 behind (and `collapsedSections`, from section collapsing, since removed; `DB:Migrate` drops it).
 
-**Failure mode (the "undeletable dynamic category" bug):** the config Categories pane's
-`categoryPaneProto:LoadPinnedItems` (`config/categorypane.lua`) inserts **every**
+**Failure mode (the "undeletable dynamic category" bug):** the classic settings window's Categories
+pane (since replaced by the category manager, next-settings.md §5, which lists what is pinned the same
+way and keeps the Remove Category escape hatch of §4) — its
+`categoryPaneProto:LoadPinnedItems` (`config/categorypane.lua`, removed) — inserted **every**
 `customSectionSort[kind]` entry into the list with no existence check. A deleted-but-still-pinned
 category therefore reappears forever under "Pinned". Selecting it makes
 `categoryPaneProto:UpdateDetailPanel` call `GetCategoryByName` → `nil` → it falls through to
@@ -66,17 +68,20 @@ profile across a load, built-in ones included", on the real profile in `test.lua
 
 ## 4. UI escape hatch for any unfindable category
 
-`categoryPaneProto:ShowDynamicCategoryDetail` now carries a **"Remove Category"** button that
-calls `categories:DeleteCategory` on the selected name. Because `GetCategoryByName == nil` is
-the only route into that panel and genuine in-memory dynamic/groupBy categories are *findable*
-(they route to the manual/search panels instead), everything reaching this panel is effectively
-an orphan or a persisted-but-unloaded ephemeral — both are safe to scrub. This covers the
+The category manager (`next/settings/categories.lua`, next-settings.md §5; before it the classic
+pane's `ShowDynamicCategoryDetail`) shows a category with no filter as built-in or leftover, with a
+**"Remove Category"** button that calls `categories:DeleteCategory` on the selected name. Because
+`GetCategoryByName == nil` is the only route into that view and genuine in-memory dynamic/groupBy
+categories are *findable* (they show as search or item list categories instead), everything reaching
+it is effectively an orphan, a built-in category, or a persisted-but-unloaded ephemeral — all safe to
+scrub. This covers the
 sub-case §2 cannot (a non-dynamic ephemeral pin still present in
 `ephemeralCategoryFilters` but never reloaded into memory by the `if category.dynamic` guard in
 `categories:OnEnable`), and orphans left by deletes made before §2. Do **not** drop that reload
 guard to "fix" this — it intentionally keeps transient non-dynamic ephemerals out of the list;
-the correct levers are the delete scrub (§2) and this removal button. A built-in category also
-reaches this panel (it has no filter); removing one only clears its pin, visibility and group.
+the correct levers are the delete scrub (§2) and this removal button. Removing a built-in category
+only clears its pin, visibility and group. Coverage: `spec/next/settings/categories_spec.lua` ("says
+what a built-in or leftover category is, and removes it after asking").
 
 ## 5. Built-in category names, and settings that follow a renamed one
 

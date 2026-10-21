@@ -25,9 +25,9 @@ the guild bank and BetterBags reads none of it.
 - **Settings.** Every per-bag profile default the bank has is copied for the guild kind (no groups:
   `groups`, `groupCounter`, `categoryToGroup` start empty and `groupsEnabled` is false), and
   `showGuildBankTabs` (false) keeps whether a tab shows by itself (§4). The settings window has a
-  **Guild Bank** section after the Bank's on clients with a guild bank (`config/config.lua`'s list of
-  bag types), every setting the guild kind's; its window size settings do nothing, as for every
-  BetterBags Next panel (next.md §9).
+  **Guild Bank** page after the Bank's on clients with a guild bank while BetterBags Next is in use
+  (the classic bags have no guild bank; next-settings.md §4, §7), every setting the guild kind's
+  (`SettingsCatalog:Bags()`).
 
 ## 2. The guild bank as a data source (`GuildBank`)
 
@@ -294,7 +294,8 @@ bank"), `spec/core/init_spec.lua`, `spec/next/guildbutton_spec.lua`, `spec/next/
 `spec/next/content_spec.lua` ("a source of buttons of its own"), `spec/next/drag_spec.lua` ("the guild
 bank"), `spec/frames/search_spec.lua` ("the guild bank"), `spec/bagsystem_spec.lua`,
 `spec/integrations/consoleport_spec.lua`, `spec/integrations/masque_spec.lua` ("guild bank buttons"),
-`spec/config/config_redraw_spec.lua` ("the guild bank's settings"), `spec/frames/item_classic_spec.lua`
+`spec/config/settings_effects_spec.lua` ("writes the guild bank's own settings"),
+`spec/next/settings/content_spec.lua` (the page per client and design), `spec/frames/item_classic_spec.lua`
 (`DrawQualityGlowFor`), and on the whole addon `spec/integration/guild_bank_spec.lua` (a visit from the
 interaction to items drawn, closing, the switch refused, the classic bags left alone). The mocks gained
 Blizzard's guild bank functions (`ResetMockGuildBank`), the item button's parts (the `ItemButton`

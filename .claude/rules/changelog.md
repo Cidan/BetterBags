@@ -62,7 +62,8 @@ fade. Built the first time it opens.
 - Opens: by itself on the first `LOADING_SCREEN_DISABLED` of a session when `ShouldOpenOnLogin()`
   (once per session); on the `changelog/Open` message, sent by the bag menu's **What's New** entry
   (`frames/contextmenu.lua`, above Open Options Screen) and by `/bb changelog` (`config/config.lua`;
-  `/bb` alone opens the settings). Opened by request it lists every bundled release, seen or not.
+  `/bb` alone opens the settings). The settings window's General page has "Show What's New on Login"
+  (the same `autoOpen` setting as the checkbox, next-settings.md §7). Opened by request it lists every bundled release, seen or not.
 
 ## 2. Generating the notes in CI (`tools/changelog`, Go, standard library only)
 
@@ -179,7 +180,8 @@ data under it. The `changelog-generator` job runs the Go tests.
   Okay!, marking seen on close, opening once per session on login, not when off or all seen,
   `changelog/Open`, the empty text), `spec/frames/contextmenu_spec.lua` (What's New),
   `spec/core/init_spec.lua` ("enables the changelog window"),
-  `spec/config/config_redraw_spec.lua` ("slash commands").
+  `spec/config/config_spec.lua` ("opens the changelog on /bb changelog"),
+  `spec/config/catalog_spec.lua` ("turns What's New on login on and off").
 - Generator: `go test ./tools/changelog/` (the Markdown against a golden file, its sections,
   client notes and escaping, the build's own notes only, removed on a failure, and `.pkgmeta` and
   the workflows naming the same file; validation and repeated titles, ranges, the Gemini

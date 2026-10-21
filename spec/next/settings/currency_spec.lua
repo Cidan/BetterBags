@@ -1,7 +1,7 @@
 -- currency_spec.lua -- NextSettingsCurrency (next/settings/currency.lua): the classic bags' Currency page
--- (next-settings.md §8), in place of the classic window's currency panes (config/currencypane.lua,
--- config/classic/currencypane.lua): every currency under its headings, with a switch that shows it in
--- the backpack, through C_CurrencyInfo or, on Mists Classic, the legacy globals.
+-- (next-settings.md §8), in place of the classic window's currency panes (removed): every currency
+-- under its headings, with a switch that shows it in the backpack, through C_CurrencyInfo or, on Mists
+-- Classic, the legacy globals.
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 LoadBetterBagsModule("core/context.lua")

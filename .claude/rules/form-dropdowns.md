@@ -20,8 +20,11 @@ A dropdown is added with either a static `opts.items` array or a dynamic
 
 ## 2. Failure mode this prevents (the "Pawn not in the provider dropdown" bug)
 
-The config pane is built eagerly by `config:OnEnable` → `config:CreateConfig`
-(`config/config.lua`). In `core/init.lua`'s `addon:OnEnable`, `config:Enable()` runs
+The classic settings window (since removed; the settings window is now `next/settings/`, whose
+`NextDropdown` reads `itemsFunction` each time it opens, `spec/next/controls/dropdown_spec.lua` "reads
+its choices each time it opens") was built eagerly by `config:OnEnable` → `config:CreateConfig`
+(`config/config.lua`). The Form module keeps this rule for its remaining users (the profiler's
+settings). In `core/init.lua`'s `addon:OnEnable`, `config:Enable()` runs
 **before** `pawn:Enable()` (and Pawn can register even later via its `ADDON_LOADED` retry —
 see data-loader.md §15). The "Upgrade Icon Provider" dropdown's `itemsFunction` iterates
 `items.upgradeProviders`. When the list was snapshotted at build time it contained only the

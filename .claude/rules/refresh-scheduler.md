@@ -323,7 +323,7 @@ The slider now saves only user input; the number box saves a typed value itself,
 and only when it moved the slider. The spec mock's `SetValue` fires `OnValueChanged` the
 same way the client does.
 
-Coverage: `spec/config/config_redraw_spec.lua` (each setting above sends `bags/Redraw`, with
+Coverage: `spec/config/settings_effects_spec.lua` (each setting above sends `bags/Redraw`, with
 or without buttons; the data settings are covered in §10),
 `spec/refresh_spec.lua` ("redraw-only settings", including one draw per frame), `spec/themes_spec.lua` ("ApplyTheme
 refresh"), `spec/frames/item_spec.lua` ("redraws once after the buttons were restyled", for
@@ -429,7 +429,7 @@ read"; "upgrade verdict cache": which events read and which recalculate; "mergin
 `categoriesUnchanged` and `recategorize`; "deriving only what changed"),
 `spec/refresh_spec.lua` (routing of `bags/Rederive`, `categoriesUnchanged` included, and
 `EQUIPMENT_SETS_CHANGED`),
-`spec/config/config_redraw_spec.lua` (every data setting; Split Transmogged still reads),
+`spec/config/settings_effects_spec.lua` (every data setting; Split Transmogged still reads),
 `spec/categories_spec.lua` ("refreshes"), `spec/core/interaction_refresh_spec.lua`,
 `spec/frames/contextmenu_spec.lua`, `spec/tooltip_spec.lua`,
 `spec/bags/bank_context_refresh_spec.lua`, `spec/bags/backpack_spec.lua`, `spec/items_spec.lua`

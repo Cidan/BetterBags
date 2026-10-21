@@ -217,7 +217,7 @@ content its size without the client's float error"), `spec/render/scrollbox_spec
 the height that shows its whole child"), `spec/frames/bagcanvas_spec.lua` ("places each container
 where the plan puts it"),
 `spec/sonata/theme_ports_spec.lua` ("pads every theme's bag the same on both sides"),
-`spec/config/config_redraw_spec.lua` ("Snap to Content"). Every guard was
+`spec/config/settings_effects_spec.lua` ("Snap to Content"). Every guard was
 mutation-tested. To check a theme in game, record rendering (render-recorder.md): each bag
 snapshot has a `padding` line with both sides.
 
@@ -369,14 +369,15 @@ settings, saved size, minimums, close, scale and opacity per draw, size mode onl
 search box placement and reserve, footer, menu button, `OnResize` in both modes; "showing a bag
 (Show)": the callback; "the loading text"),
 `spec/frames/bagcanvas_spec.lua`, `spec/frames/menubutton_spec.lua`, `spec/sonata/themes_spec.lua`,
-`spec/config/config_redraw_spec.lua` ("opacity and scale"), `spec/database_spec.lua` (size mode),
+`spec/config/settings_effects_spec.lua` ("opacity and scale"), `spec/database_spec.lua` (size mode),
 `spec/views/persistent_tabs_spec.lua` ("sizes the bag window around its canvas").
 
 ## 8. The other windows
 
 Every BetterBags window is a Window; none builds its own frame, chrome, drag or fade.
 
-- **Forms** (`forms/form.lua`: the settings window, the profiler's Settings): Panel windows,
+- **Forms** (`forms/form.lua`: the profiler's Settings; the settings window is BetterBags Next's own,
+  `next/settings/`, next-settings.md, for both designs): Panel windows,
   strata DIALOG at level 500, in the window mode with `Resizable = false`, so the size their
   owner gives them (`GetFrame():SetSize`) holds across themes and the player cannot change it.
   The form's scroll box fills the window's content box, its scroll bar sits 16 pixels in from
@@ -385,7 +386,7 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   fade). Their opacity is the backpack's (`Opacity` option), reapplied by
   `Sonata:UpdateOpacity()`. Coverage: `spec/forms/form_spec.lua`.
 - **Question dialogs** (`frames/question.lua`: `YesNo`, `Alert`, `AskForInput`): pooled
-  (`CreateObjectPool`) Dialog windows, strata DIALOG at level 600 (above the settings window),
+  (`CreateObjectPool`) Dialog windows, strata DIALOG at level 600 (above the profiler's settings),
   centered, not movable, shown and hidden at once (`Fade` false). The content is a body
   drawable (the text 250 wide, the input box, the buttons) that renders 290 wide and as tall
   as the text plus the buttons plus 80, so the window is 300 wide as before. One question is
@@ -448,6 +449,6 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
 - The side theme-configuration panel (`frames/themeconfig.lua`) and the window grouping it was
   the only user of (`util/windowgroup.lua`) were removed: nothing had opened the panel since
   the window group's opener was removed, so it was a hidden frame built at every login. Themes
-  are chosen in the settings window's Theme pane. `frames/overlay.lua` (an unused overlay
+  are chosen on the settings window's Appearance page (next-settings.md §4). `frames/overlay.lua` (an unused overlay
   frame, in no TOC) and the unused `AttachFadeAndSlideLeft`/`AttachFadeAndSlideTop` animation
   helpers were removed too.

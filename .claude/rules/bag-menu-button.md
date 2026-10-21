@@ -88,7 +88,8 @@ slots panel. **Switch to Next** (asked) switches the bags to BetterBags Next wit
 (next.md §11); only the backpack's menu has it, since the bank's is shown at the bank, where the
 bags cannot switch.
 
-- **Drag to Resize** is the Resizable Window option (`config/config.lua`) as a toggle: checked
+- **Drag to Resize** is the Resizable Window option (`config/catalog.lua`, a bag's Layout tab in the
+  settings window) as a toggle: checked
   while `database:GetBagSizeMode(kind) == "window"`; a click sets "window" or "content" for the
   view the bag shows and sends `bags/Redraw`, whose draw applies it (`bagProto:ApplySizeSettings`).
   The options screen reads the same setting when it opens.

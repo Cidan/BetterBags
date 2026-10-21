@@ -1,9 +1,11 @@
 # BetterBags Next: Settings
 
 A new settings window for BetterBags Next, built from nothing: modern, in Next's look, with every
-control drawn by BetterBags and styled by the Next theme. The classic bags keep the settings window
-they have, as they keep their bags. This document is the plan, and tracks the work;
-`.claude/rules/next-settings.md` describes what is built.
+control drawn by BetterBags and styled by the Next theme. This document is the plan, and tracks the
+work; `.claude/rules/next-settings.md` describes what is built. The plan first kept the classic
+settings window for the classic bags; asked later (below, "One window"), the new window became the
+settings window of both designs and the classic one was removed. "What there is today" describes the
+classic window as it was when the plan was written.
 
 ## Why
 
@@ -253,4 +255,25 @@ and committed. Status is tracked below.
 | 4. Pages | done (`.claude/rules/next-settings.md` §4) |
 | 5. The category manager | done (`.claude/rules/next-settings.md` §5) |
 | 6. Themes | done (`.claude/rules/next-settings.md` §6) |
+| One window for both designs | done (`.claude/rules/next-settings.md` §7, §8) |
 | 7. In game | not started |
+
+## One window (asked 2026-10-20, after phase 6)
+
+> 1) let's make the window fade in and out with the same animation as bags when they are detached
+> 2) Let's remove the settings from Next's config when we're in Next mode: Item Buttons themes, Rows
+> and Columns [...] 3) let's make this settings screen the default for Classic bags as well when they
+> are enabled (completely eliminate the classic settings pane!) 4) make sure we have an answer for
+> everything that is missing in the next settings pane -- we can't miss options.
+
+Then: rows and columns in the classic bags' Layout and not Next's, and the search box's text drawn
+over its magnifier after a theme change (a screenshot). Done:
+- the search box lays out its own room for its icon (next-settings.md §2, §3);
+- the window comes and goes as a detached Next bag does; Escape closes it at once (§3);
+- pages, sections and rows can belong to one design; the window shows what the bags in use read and
+  follows a switch without closing (§7);
+- the classic bags' own settings (fading, item movement, a bag's window, rows and columns, section
+  names, their theme) and a Currency page (§8); BetterBags Next's guild bank page and theme picker
+  alone; Show What's New on Login for both;
+- the classic window and its panes removed; a plugin's page is its only page, so it now reads hidden,
+  disabled and names after every change, as AceConfigDialog does (§4).

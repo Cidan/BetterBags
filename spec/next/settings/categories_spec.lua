@@ -1,6 +1,6 @@
 -- categories_spec.lua -- NextSettingsCategories (next/settings/categories.lua): the category manager on a
--- bag's Categories tab (next-settings.md §5), keeping everything the classic pane does
--- (config/categorypane.lua, category-lifecycle.md): the list (pinned first, then the rest), pinning and
+-- bag's Categories tab (next-settings.md §5), keeping everything the classic window's category pane did
+-- (category-lifecycle.md): the list (pinned first, then the rest), pinning and
 -- reordering, new item list and search categories, a search category's query and group by kept in step,
 -- priority, color, Show Section, the items added to it, Save, Rename, Delete, and Remove for a built-in or
 -- leftover category.

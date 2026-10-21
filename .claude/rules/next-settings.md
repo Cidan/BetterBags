@@ -1,9 +1,10 @@
 # BetterBags Next's Settings
 
-BetterBags Next has its own settings window, built from nothing (asked; the plan and its status are
-in `docs/next-settings.md`): pages grouped down a sidebar, tabs across a page, two-column rows, and
-every control BetterBags' own, styled by the Next theme. The classic bags keep the classic settings
-window (`config/config.lua`), as they keep their bags. Both build their settings from one catalog.
+BetterBags has one settings window, built from nothing for BetterBags Next (asked; the plan and its
+status are in `docs/next-settings.md`): pages grouped down a sidebar, tabs across a page, two-column
+rows, and every control BetterBags' own, styled by the Next theme. It is the classic bags' settings
+window too, showing what the bags in use read (§7); the classic settings window was removed. It builds
+its settings from one catalog.
 
 ## 1. The settings catalog (`config/catalog.lua`, `SettingsCatalog`)
 
@@ -12,7 +13,8 @@ words a search finds it by (`keywords`), its choices (`items`, or `itemsFunction
 menu opens, form-dropdowns.md) or range (`min`, `max`, `step`), and `get`/`set`: how it is read and
 written and what it sends so the bags show it (`bags/Rederive`, `bags/Redraw`, `bags/FullRefreshAll`,
 `search/SetInFrame`, `groups/EnabledChanged`; refresh-scheduler.md §9, §10). Before, all of this was
-written inside the classic window's code, so a second window would have had to copy every setter.
+written inside the classic window's code (since removed), so a second window would have had to copy
+every setter.
 
 - **A bag's setting** (`bag = true`) is bound to a bag when asked for: `Get(id, bag)` with a
   `SettingBag` (`{ name, kind }`; `Bags()` lists the backpack, the bank, and the guild bank where
@@ -20,28 +22,23 @@ written inside the classic window's code, so a second window would have had to c
   `only` limits it to some kinds (Enable Groups: the backpack); `Has(id, bag)` says whether a bag
   has it. Asking for a bag's setting without a bag, a general one with a bag, or a setting a bag
   does not have is an error naming it.
-- **What a window reads** (`SettingOption`): a choice's `get` returns the item chosen (the old form
-  asked each item whether it was chosen; `Form` gives it that shape), a slider's its number.
+- **What a window reads** (`SettingOption`): a choice's `get` returns the item chosen, a slider's its
+  number.
 - **Rules a window follows:** `reload` marks a setting that takes effect after a reload (Enable
   Bank Bags), and `set` returning `false` means the change was refused (BetterBags Next while
   switching is refused: combat, the bank, a vendor) and the window must show the setting again.
-- **`Form(id, bag, hooks)`** is a setting as the classic window's form takes it
-  (forms/layouts/layout.lua), calling `hooks.reload` and `hooks.refresh` for those two rules.
 - `Ids()` lists every setting in definition order. Defining one twice is an error.
 
-**The classic window is built on it, unchanged for players.** `config/config.lua` adds each
-setting with `addSetting(f, id, bag, hooks)` (the form control of its kind), in the order and
-sections it always had; its panes, profiles, import and export are as they were. It loads after
-the catalog in every TOC.
+While the classic window existed it was rebuilt on the catalog first, checked entry for entry against
+a recording of it (237 entries); that check and the window went together.
 
 Coverage: `spec/config/catalog_spec.lua` (bags, binding to a bag and its text, refusals, choices,
-the classic shape, ranges, reload and refusal rules, every classic setting defined once, keywords),
-`spec/config/classic_settings_layout_spec.lua` (every entry the classic window adds, in order, with
-its title, description, choices and range, equal to `spec/fixtures/classic_settings_layout.lua`,
-recorded from the window before the catalog, with and without a guild bank) and
-`spec/config/config_redraw_spec.lua` (each setting's refresh, unchanged). Mutation-tested (a
-setting renamed, dropped or moved, the hooks, the slider range, the dropdown shape, Enable Groups
-on every bag, a bag's name in a description: each caught).
+ranges, reload and refusal rules, every setting the classic window had defined once, keywords, What's
+New on login) and `spec/config/settings_effects_spec.lua` (what each setting sends: redraws,
+recalculations, reads, the guild bank's own, size mode, Snap to Content, Animate Item Movement, the
+design switch and its refusal, opacity and scale). Mutation-tested (a setting renamed, dropped or
+moved, the slider range, the dropdown shape, Enable Groups on every bag, a bag's name in a
+description: each caught).
 
 ## 2. Controls (`next/controls/`)
 
@@ -115,8 +112,10 @@ and at most 95% of either side of the screen (`Settings.Width` x `Height`).
   under them.
 - **Content**: the page's tab as a `NextSettingsPage`, made the first time it shows and kept, in a
   Scrollbox with the Next scroll bar; its values are read again every time it shows (they can change
-  elsewhere: the classic window, a bag's buttons). The window is a render root handing the scroll box
-  the content's width and height.
+  elsewhere: a bag's buttons and menus). The window is a render root handing the scroll box the
+  content's width and height. A row or a section can be hidden while a function says so
+  (`hidden`; a section's title alone with `titleHidden`), checked at every layout; the window lays
+  itself out again after every change (`Refresh`), and search finds no hidden row.
 - **Footer** (`Settings.Footer`): What's New (a link: `changelog/Open`) and Done (primary: closes).
 - **Remembers** the page and tab shown for the session; `Open(pageId, tabId)` goes to one. A page not
   shown now (or unknown) falls back to the first page shown.
@@ -140,11 +139,9 @@ and at most 95% of either side of the screen (`Settings.Width` x `Height`).
 - **Theme**: `ApplyStyle` restyles every part and lays the window out again.
 
 **Opening it** (`config/config.lua`): `config:Open` (the `config/Open` message: the settings
-buttons, the bag menu, `/bb`) opens `NextSettings` while BetterBags Next is in use
-(`BagSystem:ActiveDesign()`) and the classic window otherwise. On `bags/DesignChanged`, a switch made
-from the classic window (it is shown, the design is now `next`) hides it and opens BetterBags Next's
-on General, where the switch is; one made from BetterBags Next's (shown, design now classic) closes
-it and shows the classic one. `core/init.lua` calls `NextSettings:Init()` after `SonataNext`
+buttons, the bag menu, `/bb`) opens `NextSettings`, for either design. On `bags/DesignChanged` the
+window, if open, shows the new design's settings and stays open (§7). `core/init.lua` calls
+`NextSettings:Init()` after `SonataNext`
 (initialization.md). The settings files load after `config\plugin.lua` in every TOC (they need the
 catalog).
 
@@ -155,8 +152,9 @@ empty text), `spec/next/settings/window_spec.lua` (built on first open, centered
 fitting a small screen, closing three ways, the menu and dialog closing with it, What's New, the
 sidebar and its pages, navigation, hover, pages defined later, tabs, content and its scroll bar,
 remembering the page, values read again on open, a page not shown, search: matching, live rows,
-links, nothing found, hidden pages; a theme), `spec/config/config_redraw_spec.lua` (opening the
-design's window, swapping windows on a switch), `spec/core/init_spec.lua` (the init order).
+links, nothing found, hidden pages; rows and sections hidden while a function says so, a title hidden
+alone and its room given back, search skipping them; a theme), `spec/config/config_spec.lua` (opening
+the window for either design, a switch shown to it), `spec/core/init_spec.lua` (the init order).
 Mutation-tested (26 mutations; the one that first survived led to a test).
 
 ## 4. The pages (`next/settings/content.lua`, `NextSettingsContent`)
@@ -164,23 +162,24 @@ Mutation-tested (26 mutations; the one that first survived led to a test).
 `Init` (from `core/init.lua`, after `NextSettings:Init`) defines the pages in the sidebar's order;
 `OnEnable` (from `addon:OnEnable`) names the item level colors' ranges again when the highest item
 level seen changes (`itemLevel/MaxChanged`) while Item Colors shows. Every page writes through the
-same database calls, with the same effects, as the classic window; every question is a
-`NextDialog` over the window (no `StaticPopup`).
+same database calls, with the same effects, as the classic window did; every question is a
+`NextDialog` over the window (no `StaticPopup`). A page, section or row may belong to one design
+(§7); the table marks those.
 
 | Group | Page (id) | What it shows |
 |---|---|---|
-| BetterBags | General (`general`) | *Bags:* BetterBags Next, Enable Bank Bags, Show Blizzard Bag Button. *Search:* In-Bag Search, Enter to Make Category. *Items:* Upgrade Icon Provider, New Item Duration, Category Sell and Deposit. |
-| | Appearance (`appearance`) | Two theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext), then the classic themes (Sonata), which draw Next's item buttons and dialogs unless the Next theme does. |
+| BetterBags | General (`general`) | *Bags:* BetterBags Next, Enable Bank Bags, Show Blizzard Bag Button, Enable Bag Fading (classic), Animate Item Movement (classic). *Search:* In-Bag Search, Enter to Make Category. *Items:* Upgrade Icon Provider, New Item Duration, Category Sell and Deposit. *What's New:* Show What's New on Login. |
+| | Appearance (`appearance`) | Theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext) while Next is in use; for the classic bags, their Bag Theme (Sonata), then Settings Window (SonataNext: Next's themes draw this window). |
 | | Item Colors (`itemcolors`) | The four item level colors as swatches, named with their ranges (61% and 86% of the highest item level seen, as the classic pane); a picked color is saved and sent as `itemLevel/MaxChanged` (Cancel saves the color back too); the highest level seen; Reset Colors, Reset Max Item Level. |
 | Bags | Backpack, Bank, Guild Bank (`backpack`, `bank`, `guild`) | Each bound to its bag. *Layout:* Order (Section, Item), Tabs (Enable Groups: the backpack only; the bank's Tabs section is left out), Slots (All Free Space, Gaps). *Items:* Item Level (two), Quality (Glow Intensity), Stacking (seven). *Categories:* Automatic (the seven filters). The guild bank's page shows on a client with one (`addon.hasGuildBank`). |
 | Profiles | Profiles (`profiles`) | Tab *Profiles:* the active profile (a pick asks, then switches and reloads), the characters on each, New, Copy, Rename, Delete, Reset to Defaults (the classic flows: Copy creates then copies; Delete switches to Default first; Default cannot be renamed or deleted; a name is asked again while empty). Tab *Import / Export* (`transfer`): Export Categories fills a text area and selects it; Import Categories asks, imports (`DB:ImportSettings`), clears the area and offers a reload, or says what is wrong. |
 | Integrations | QuickFind (`quickfind`) | What the integration does. |
 | | a plugin (`plugin:<title>`) | Below. |
 
-Settings only the classic bags read stay in the classic window: Enable Bag Fading, Animate Item
-Movement, Show Full Section Names, Resizable Window, Snap to Content, Items Per Row, Columns,
-Opacity, Scale; and Currency. A spec checks every setting a page names exists in the catalog for
-its bag, and none of these is named.
+A bag's Layout tab adds, for the classic bags only, *Window:* Resizable Window, Snap to Content, Items
+Per Row, Columns, Opacity, Scale, and *Sections:* Show Full Section Names; the Currency page (§8) is
+theirs too, and the Guild Bank page is BetterBags Next's alone (§7). A spec checks every setting a page
+names exists in the catalog for its bag, and that every classic-only one is marked classic.
 
 **The theme picker** (`NextSettingsThemes`, a wide row): a card per theme the engine lists (not
 hidden; unavailable ones too, marked so), sorted by name, each with its description and status
@@ -190,21 +189,28 @@ click (the classic theme pane's lesson, sonata.md §2). Apply Theme saves it and
 nothing to save; a pick that cannot be used shows the saved theme; leaving the page (another page,
 the window closing: `OnPageLeft`, sent by the page's `Leave`) puts the saved theme back.
 
-**Plugins** (`AddPlugin`, called by `Config:AddPluginConfig`, which still fills the classic window
-too): the options are read the way AceConfigDialog-3.0 reads them (its source, vendored in `libs/`):
+**Plugins** (`AddPlugin`, called by `Config:AddPluginConfig`; the plugin's only page since the classic
+window went): the options are read the way AceConfigDialog-3.0 reads them (its source, vendored in
+`libs/`), checked against 12 published plugins' option tables:
 - `options` is an AceConfig group, or the `args` of one (what plugins pass today);
 - `get`, `set`, `func`, `confirm`, `validate`, `disabled`, `hidden` are inherited from the groups above;
   a member that is a function is called with AceConfig's `info` (the keys of the way, `options`,
   `option`, `type`, `arg`, `handler`, `appName`), and a string is a method of the nearest `handler`,
   except `name`, `desc` and the other literal members;
-- options are in `order` (100 when unset, negative ones last), then by name; hidden ones are left out
-  (read when the page is first built);
+- options are in `order` (100 when unset, negative ones last), then by name;
+- `hidden`, `disabled` and names are read again after every change, as AceConfigDialog reads them:
+  an option is hidden while it or any group it is in says so (a hidden group's options never show,
+  whatever they say of themselves), and a hidden `header` hides only its line, never the options after
+  it. Real plugins need it: BetterBags_ImportExport shows its "Unknown Items" header, list and Recheck
+  button only once an export finds unknown items. (The classic window ignored `hidden`; the first
+  version of this page read it once, so they never showed.) A button (an execute) follows its
+  `disabled` and its name;
 - the plugin's own options go in a section under its title, each group's in a section under the
   group's name, and a `header` starts a section;
 - toggle, select (its names shown, its key written; `sorting`, else keys sorted as strings),
   multiselect (a switch per value), range (`softMin`/`softMax`/`bigStep` first; a step of 0 is a
   hundredth of the range), input (one line, or a text area with Accept for `multiline`), color
-  (`hasAlpha`), execute, description; anything else is logged, as the classic window does;
+  (`hasAlpha`), execute, description; anything else is logged, as the classic window did;
 - a change goes through `pattern` and `validate` (false or a message refuses it, said in a dialog;
   the row shows the value again), then `confirm` (asked in a dialog), then `set` (`func` for an
   execute, its errors reported to `geterrorhandler`), and the page shows every value again.
@@ -213,9 +219,13 @@ Coverage: `spec/next/settings/content_spec.lua` (the pages' order and contents, 
 the bank without Enable Groups, Appearance's engines, Item Colors (names, saving, Cancel, resets, a
 new highest level), every profile flow, import and export, QuickFind, and a plugin page: sections,
 order, hidden, toggles with `info`, selects and their order and `sorting`, handler methods by name,
-colors, `validate`, multi-line Accept, execute and `confirm`, a group as the root),
+colors, `validate`, multi-line Accept, execute and `confirm`, a group as the root; "what a plugin shows,
+hides and disables as it changes": BetterBags_ImportExport's shape, a hidden group's options, a hidden
+header's line alone, a button's disabled and name), `spec/integration/next_settings_spec.lua` (both
+designs on the whole addon),
 `spec/next/settings/themes_spec.lua` (cards, layout, previewing on the next frame, the last pick,
-Apply Theme, an unusable pick, leaving the page, hover), `spec/config/plugin_spec.lua`,
+Apply Theme, an unusable pick, leaving the page, hover), `spec/config/plugin_spec.lua` (a plugin's
+page and nothing else),
 `spec/core/init_spec.lua` (init order, enabling). Mutation-tested (39 mutations; the three that first
 survived led to two tests and to removing dead code).
 
@@ -227,8 +237,9 @@ session").
 ## 5. The category manager (`next/settings/categories.lua`, `NextSettingsCategories`)
 
 The last section of each bag page's Categories tab ("Your Categories"), a wide row made for its bag
-(`Create(parent, window, bag)`), `Settings.Categories` tall. It keeps everything the classic pane does
-(config/categorypane.lua, category-lifecycle.md), through the same `Categories` and `Database` calls,
+(`Create(parent, window, bag)`), `Settings.Categories` tall. It keeps everything the classic window's
+category pane did (category-lifecycle.md; that pane was removed with the window, §7), through the same
+`Categories` and `Database` calls,
 every question a `NextDialog` over the window.
 
 - **The list** (left, `ListWidth`): "Pinned", the pinned categories in their order
@@ -331,12 +342,24 @@ gone), it shows only what the bags in use read, and nothing the classic window h
 - **Show What's New on Login** (General → What's New, `changelogOnLogin` in the catalog,
   `DB:Get/SetChangelogAutoOpen`): before, only the changelog window's "Don't show me this again"
   checkbox set it. The changelog window reads it when it opens, so both agree.
+- **The classic window was removed** with everything only it used: `config/config.lua`'s form window,
+  the Theme, Category, Currency (retail, Classic, Era) and Item Color panes, and the catalog's `Form`
+  adapter. `Config` keeps the slash commands (`/bb`, `/bb changelog`, `/bb next`, `/bbanchor`,
+  `/bbdb`), `config/Open` and `Config:AddPluginConfig` (config/README.md). The Form module stays: the
+  profiler's settings use it. Every option the classic window had has a place here; besides, three
+  options live where they always did, outside any settings window: debug mode (`/bbdb`), and the bag
+  menu's Bag Anchor and Drag to Resize (the latter is Resizable Window too).
 
 Coverage: `spec/next/settings/window_spec.lua` ("by design": pages, sections and rows per design, a
 switch while open and while closed, search), `spec/next/settings/content_spec.lua` (each page's
 contents with their designs marked, the classic-only settings all marked classic, the guild bank per
 design, rows and columns per design, Appearance per design), `spec/config/catalog_spec.lua` (What's
-New on login). Mutation-tested (12 mutations; the one that first survived led to a test).
+New on login), `spec/config/config_spec.lua` (one window for either design, a switch shown to it, the
+slash commands, no classic window), `spec/config/settings_effects_spec.lua` (what every setting sends,
+moved from the classic window's spec) and `spec/integration/next_settings_spec.lua` (on the whole
+addon: every page and tab of each design built, rows and columns for the classic bags, turning
+BetterBags Next off from the window keeping it open on the classic bags' settings). Mutation-tested
+(12 mutations for the designs, 4 for `Config`; the one that first survived led to a test).
 
 ## 8. The Currency page (`next/settings/currency.lua`, `NextSettingsCurrency`)
 
