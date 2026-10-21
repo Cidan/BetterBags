@@ -289,4 +289,10 @@ clean on every client), `spec/next/settings/window_spec.lua` ("is restyled by a 
 applies"). Mutation-tested (11 mutations: misspelled colors, fonts, glyphs and palette names in both
 sections, and Ember's and Quiet's fields left indigo; each caught).
 
+On the whole addon (`spec/integration/next_settings_spec.lua`: every TOC file, the real database,
+catalog, categories and bags): `config/Open` opens the window of the design in use, every page and
+tab builds without an error and shows something, rows read the real settings, search finds the
+stacking settings of every bag, and turning BetterBags Next off from its own window opens the classic
+one.
+
 Not seen in game yet: the whole window, on every theme (phase 7 of docs/next-settings.md).
