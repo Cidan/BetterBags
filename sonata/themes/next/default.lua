@@ -614,14 +614,14 @@ sonataNext:RegisterTheme({
     -- The Categories page (next-settings.md §5). Its list, in the sidebar: rows RowHeight tall (a name
     -- and a line of what is in it; headings GroupHeight), the name Indent in from the sidebar's Pad with
     -- its color's dot (Dot square) before it; the chosen one's bar and fill, the light under the
-    -- pointer. Its tabs: Pad inside, rows FieldGap apart, names LabelWidth wide, the rule QueryHeight
-    -- tall, the items' filter FilterWidth wide. The fonts.
+    -- pointer. Its tabs: Pad inside, rows FieldGap apart, names LabelWidth wide, the items' filter
+    -- FilterWidth wide. The fonts.
     Categories = {
       RowHeight = 38, GroupHeight = 24, Indent = 12, Dot = 6,
       Indicator = { Color = "Gold", Width = 3 },
       SelectedFill = { Color = "Lavender", Alpha = 0.1 },
       HoverFill = { Color = "Lavender", Alpha = 0.05 },
-      Pad = 18, FieldGap = 10, LabelWidth = 110, QueryHeight = 84, FilterWidth = 200,
+      Pad = 18, FieldGap = 10, LabelWidth = 110, FilterWidth = 200,
       GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
       LabelFont = "SettingsText", TextFont = "SettingsText", SectionFont = "SettingsSection",
       HintFont = "SettingsSectionNote",

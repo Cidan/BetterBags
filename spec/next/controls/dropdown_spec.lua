@@ -79,6 +79,19 @@ describe("NextMenu", function()
     assert.is_true(nextMenu:IsOpenFor(anchor))
   end)
 
+  -- Seen in game: a menu opened from an item cell (36 wide) read "Rem..." for Remove. Its rows sit in a
+  -- list inset Padding on both sides, which the width left out.
+  it("gives every choice its whole text, however narrow what opened it", function()
+    anchor:SetSize(36, 36)
+    local frame = open({ { text = "Remove", value = 1 }, { text = "Remove From Category", value = 2 } })
+    local check = M().Check
+    local textLeft = M().Padding + check.Size + M().Padding
+    local room = frame:GetWidth() - 2 * M().Padding - textLeft - M().Padding
+    for _, row in ipairs(nextMenu:Rows()) do
+      assert.is_true(room >= row.label:GetStringWidth(), row.label:GetText())
+    end
+  end)
+
   it("marks the chosen choice with its check and its font", function()
     open(items(3))
     local rows = nextMenu:Rows()

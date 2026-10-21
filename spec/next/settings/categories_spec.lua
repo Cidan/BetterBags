@@ -213,6 +213,8 @@ describe("NextSettingsCategories", function()
       if query == "broken (" then error("unexpected end") end
       if query == "type = consumable" then return matches end
       if query == "ore" then return { ["0_4"] = true } end
+      -- As the bags' search box: nothing typed filters nothing.
+      if query == "" then return { ["0_1"] = true, ["0_2"] = true } end
       return {}
     end)
     override(C_Item, "GetItemNameByID", function(id) return itemNames[id] end)
@@ -259,11 +261,11 @@ describe("NextSettingsCategories", function()
         "# Your Categories",
         "Empty | Nothing in it yet · Priority 10",
         "Mats | 2 added items · Priority 5",
-        "Midnight | Rule and 1 added item · Priority 2",
-        "Potions | Rule · Priority 10",
+        "Midnight | Search Rule and 1 added item · Priority 2",
+        "Potions | Search Rule · Priority 10",
         "# From Plugins",
         "Openable | 1 added item · Priority 1",
-        "Ores | Rule · Priority 3",
+        "Ores | Search Rule · Priority 3",
       }, listed(), "a group by's sub-categories are not listed")
     end)
 
@@ -278,7 +280,7 @@ describe("NextSettingsCategories", function()
     it("keeps only the categories whose name has what is typed in its filter", function()
       list.filter.frame:SetText("MID")
       list.filter.frame:GetScript("OnTextChanged")(list.filter.frame, true)
-      assert.are.same({ "# Your Categories", "Midnight | Rule and 1 added item · Priority 2" }, listed())
+      assert.are.same({ "# Your Categories", "Midnight | Search Rule and 1 added item · Priority 2" }, listed())
     end)
 
     it("chooses the first category when none is, and the one clicked, marking it", function()
@@ -342,7 +344,7 @@ describe("NextSettingsCategories", function()
     it("names the chosen category and says what is in it, or asks for one", function()
       assert.are.same({ "Categories", "Make a category to sort your items your way." }, { editor:Heading() })
       editor.selected = "Midnight"
-      assert.are.same({ "Midnight", "Rule and 1 added item · Priority 2" }, { editor:Heading() })
+      assert.are.same({ "Midnight", "Search Rule and 1 added item · Priority 2" }, { editor:Heading() })
       editor.selected = "Openable"
       assert.are.same({ "Openable", "Made by a plugin · 1 added item · Priority 1" }, { editor:Heading() })
     end)
@@ -476,6 +478,9 @@ describe("NextSettingsCategories", function()
     it("shows what of your bags shows in it now (its group by's sections too), an item a cell", function()
       editor.selected = "Potions"
       place(tab)
+      assert.are.equal("Current Items in this Group", tab.labels.inBags:GetText())
+      assert.are.equal("There are no current items in your inventory that match this category",
+        tab.grid.empty:GetText())
       assert.are.equal("Backpack: 2 items · Bank: 1 item", tab.inBags:GetText())
       assert.are.same({ 53, 51, 50 }, ids(tab.grid), "by name: Antidote, Bandage, Flask")
       assert.are.equal(8, entryOf(tab.grid, 51).count, "both of its stacks")
@@ -511,23 +516,47 @@ describe("NextSettingsCategories", function()
       place(tab)
     end)
 
-    it("shows its search and how many items in your bags it matches, as it is typed", function()
+    it("is the Search Rule, its matches the Search Results, counted beside their name as it is typed", function()
+      assert.are.equal("Search Rule", tab.labels.rule:GetText())
+      assert.are.equal("Apply Search Rule", tab.apply.label:GetText())
       assert.are.equal("type = consumable", tab.rule:GetText())
-      assert.are.equal("Matches 5 items in your bags.", tab.count:GetText())
+      assert.are.equal("Search Results (5 results)", tab.results:GetText())
       typed("ore")
-      assert.are.equal("Matches 1 item in your bags.", tab.count:GetText())
+      assert.are.equal("Search Results (1 result)", tab.results:GetText())
       typed("broken (")
-      assert.are.equal("This search has a mistake.", tab.count:GetText())
+      assert.are.equal("Search Results (invalid search)", tab.results:GetText())
       assert.are.same({}, ids(tab.grid))
       typed("")
-      assert.are.equal("No rule: only the items added by hand belong here.", tab.count:GetText())
+      assert.are.equal("Search Results (0 results)", tab.results:GetText(), "no search rule matches nothing")
+      assert.are.same({}, ids(tab.grid))
     end)
 
-    it("shows the items it matches, those in it first, those shown in another category faded, saying where", function()
+    -- Asked: the two item boxes slightly apart made switching between the tabs messy.
+    it("keeps its results box exactly where the Settings tab keeps its own, and its name level with that one's", function()
+      local settingsTab = place(editor:CreateSettingsTab(CreateFrame("Frame"), owner, bagsFn))
+      -- Where a region sits in its tab: its point, the tab's point, and the offsets.
+      local function at(region)
+        local point, _, relativePoint, x, y = region:GetPoint(1)
+        return { point, relativePoint, x, y }
+      end
+      assert.are.same(at(settingsTab.grid.frame), at(tab.grid.frame))
+      assert.are.same({ settingsTab.grid.frame:GetSize() }, { tab.grid.frame:GetSize() })
+      assert.are.same(at(settingsTab.labels.inBags), at(tab.results))
+      local B = controls:Theme("Button")
+      local _, _, _, _, colorMiddle = settingsTab.labels.color:GetPoint(1)
+      local _, _, _, _, nameMiddle = settingsTab.labels.inBags:GetPoint(1)
+      assert.is_true(-nameMiddle - B.Height / 2 >= -colorMiddle + B.Height / 2, "the box's name under the Color row")
+      editor.selected = "Openable"
+      settingsTab:Refresh(ctx())
+      assert.are.same(at(tab.grid.frame), at(settingsTab.grid.frame), "without group by too")
+    end)
+
+    -- Asked: the results in full color; their tooltip still says where one shows.
+    it("shows the items it matches in full color, those in it first, saying where the others show", function()
       assert.are.same({ 53, 51, 50, 52, 54 }, ids(tab.grid), "Antidote, Bandage, Flask; then Crab, Elixir")
-      assert.is_false(entryOf(tab.grid, 50).dim == true, "a group by's section is the category's")
+      assert.is_nil(entryOf(tab.grid, 50).note, "a group by's section is the category's")
       local crab = entryOf(tab.grid, 52)
-      assert.is_true(crab.dim)
+      assert.is_falsy(crab.dim)
       assert.are.equal("Shows in Recent Items.", crab.note)
     end)
 
@@ -670,6 +699,11 @@ describe("NextSettingsCategories", function()
       assert.is_false(tab.removeAll.frame:IsShown())
       assert.is_nil(tab.readOnly.frame:GetScript("OnReceiveDrag"))
       assert.are.equal("The plugin that made this category adds these items.", tab.help:GetText())
+    end)
+
+    it("says, simply, how to add an item", function()
+      assert.are.equal("Drag an item here to manually add it to this category.", tab.help:GetText())
+      assert.are.equal("No items added yet.", tab.grid.empty:GetText())
     end)
   end)
 end)

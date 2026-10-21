@@ -55,7 +55,7 @@ Asked: "this also means redoing all our controls (including scrollbars ...) so t
 | `NextToggle` | `toggle.lua` | A switch: the knob slides (`Motion.Time.Toggle`), the on color fades in with it. A click flips it and calls back; `SetChecked` calls nothing back. |
 | `NextInput` | `input.lua` | A text field (an `EditBox`: its text `Padding` in, after an optional `icon` it draws and makes room for itself, help while empty and unfocused) and `CreateArea`, a text area (a multi-line edit box in a Blizzard scroll box with the scroll bar, the wheel taken only while focused, the cursor kept in sight). Only typed text is reported (`OnTextChanged`'s `userInput`); Enter reports and lets go of focus; Escape puts back the text it had when focused. |
 | `NextSlider` | `slider.lua` | A track filled up to a thumb, pressed or dragged with the left button, and a number box (`NextInput`); every value snapped to the step and kept in range; a change calls back once per value; the wheel is left to the page. |
-| `NextMenu` | `menu.lua` | One menu at a time, `FULLSCREEN_DIALOG`, below what opened it (`Gap`), a row per choice, the chosen one checked, scrolling past `MaxRows`. Closes on a pick, a click or the wheel outside it (a screen-sized catcher), Escape, a second open for the same frame, or that frame hiding. |
+| `NextMenu` | `menu.lua` | One menu at a time, `FULLSCREEN_DIALOG`, below what opened it (`Gap`), a row per choice, the chosen one checked, scrolling past `MaxRows`; as wide as its widest choice needs, the list's `Padding` on both sides included (it was left out, and a menu opened from a 36-wide item cell read "Rem..."), at least its anchor. Closes on a pick, a click or the wheel outside it (a screen-sized catcher), Escape, a second open for the same frame, or that frame hiding. |
 | `NextDropdown` | `dropdown.lua` | The choice made and a chevron; a click opens a `NextMenu`, its choices read each time (`itemsFunction`, form-dropdowns.md); the choice already made calls nothing back. |
 | `NextSwatch` | `swatch.lua` | A square of its color. A click opens Blizzard's color picker (`ColorPickerFrame:SetupColorPickerAndShow`, loaded at login on every client); each color picked (`swatchFunc`, `opacityFunc`) calls back, and Cancel puts the color back and calls that back too, so what was saved follows (the classic item color pane left the saved color changed on Cancel). |
 | `NextTopTabs` | `toptabs.lua` | A page's tabs, left to right `Gap` apart, the chosen one in its font and underlined by a marker that glides (`Motion.Time.TabMarker`). The chosen tab calls nothing back. |
@@ -276,8 +276,8 @@ their section titles hidden, each filling the content without scrolling (`Conten
 page's `Content.Top` and `Bottom`).
 - **The list** (in the sidebar): a filter box where the settings search box is; "Your Categories"
   (saved), then "From Plugins" (not saved), each by name, a group by's sub-categories left out; each
-  row a color dot, the name and a line of what is in it ("Rule", "2 added items", "Rule and 1 added
-  item", "Nothing in it yet") and its priority; New Category at the bottom where the version is
+  row a color dot, the name and a line of what is in it ("Search Rule", "2 added items", "Search Rule
+  and 1 added item", "Nothing in it yet") and its priority; New Category at the bottom where the version is
   (`{ name, itemList = {}, save = true }`, chosen). The first category is chosen when none is
   (`EnsureChosen`); clicking one chooses it (`Choose`, then `Reselect`). On `categories/Changed` while
   it shows, the page shows again, the first chosen for one that is gone.
@@ -285,19 +285,26 @@ page's `Content.Top` and `Bottom`).
   "Categories" and "Make a category to sort your items your way." for none. Rename and Delete for your
   categories; for a plugin's or none they hide and the buttons' frame shrinks so the title takes the
   room.
-- **Settings tab**: Used In (a switch per bag the settings show, the guild bank like any), Priority
-  (two digits; saved on Enter or when the field is left; nothing entered shows it again; the same value
-  saves nothing), Group By (yours only), Color (and Reset Color: none, drawn in gold); then **In Your
-  Bags Now**: how many items each bag shows in it (its group by's sections too) and those items in a
-  read-only grid, one cell per item with how many there are, by name. With no category it says to make
-  one.
-- **Rule tab** (yours, and a plugin's that has a rule): the search; as it is typed, how many items in
-  your bags it matches (through `Search:Search` in a protected call: a mistake says so), and the
-  matches in a grid, those showing in this category first, the others faded with "Shows in X."; Apply
-  Rule is on only when the rule changed and has no mistake, and saves it (none for an empty one). What
-  is typed is kept while the same category shows. A plugin's rule shows read-only (the field disabled,
-  no Apply Rule).
-- **Added Items tab** (asked: "Placed Here" made no sense): how many items were added (or "3 of 12"
+- **The two item boxes stay put** (asked: boxes a few pixels apart made switching tabs messy): the
+  Settings and Search Rule tabs put their box's name row and their box at the same place
+  (`boxRows`: under four rows of settings, a row for the name, the box down to the tab's bottom).
+- **Settings tab**: four rows, Used In (a switch per bag the settings show, the guild bank like any),
+  Priority (two digits; saved on Enter or when the field is left; nothing entered shows it again; the
+  same value saves nothing), Group By (yours only; the row stays empty for a plugin's), Color (and
+  Reset Color: none, drawn in gold); then **Current Items in this Group** (the player's wording): how
+  many items each bag shows in it (its group by's sections too) and those items in a read-only grid,
+  one cell per item with how many there are, by name, or "There are no current items in your
+  inventory that match this category". With no category it says to make one.
+- **Search Rule tab** (asked: "Search Rule" everywhere; yours, and a plugin's that has a rule): the
+  search in a field taking the room down to the **Search Results** row, which counts them beside its
+  name as it is typed ("Search Results (3 results)", "(invalid search)" for a mistake, caught from
+  `Search:Search` in a protected call; asked: no line about an empty rule), with Apply Search Rule on
+  its right, on only when the rule changed and has no mistake (it saves it, none for an empty one).
+  The results are a grid in full color (asked), those showing in this category first; the tooltip of
+  one showing elsewhere says "Shows in X." What is typed is kept while the same category shows. A
+  plugin's rule shows read-only (the field disabled, no Apply Search Rule).
+- **Added Items tab** (asked: "Placed Here" made no sense; its line "Drag an item here to manually add
+  it to this category."): how many items were added (or "3 of 12"
   while filtered), a filter by name, Remove All (asks first; `WipeCategory`, then the bags
   recalculated), and the items in a `NextItemGrid` that holds thousands: icons at once
   (`GetItemInfoInstant`), names and qualities from `C_Item.GetItemNameByID` / `GetItemQualityByID`, the
@@ -332,16 +339,18 @@ sections from its committed items (not empty slots, Recent Items, Free Space, or
 Coverage: `spec/next/settings/categories_spec.lua` (the list: order, place, filter, choosing,
 a category chosen elsewhere, New Category, a search waiting, changes; the heading and which tabs show;
 Rename and Delete; the Settings tab: its height, none, fields, saving, a plugin's, what the bags show
-and reading them again; the Rule tab: typing, the matches, Apply Rule, typed text kept, a plugin's; the
-Added Items tab: order, icons, faded items, the filter, names loading once, drops, removing, Remove All,
-a plugin's), `spec/next/controls/itemgrid_spec.lua` (columns, only the rows in view, scrolling to the
+and reading them again; the Search Rule tab: its names, the count as typed, the results in full color,
+the box where the Settings tab's is, Apply Search Rule, typed text kept, a plugin's; the Added Items
+tab: order, icons, faded items, the filter, names loading once, drops, removing, Remove All, a plugin's,
+its line), `spec/next/controls/itemgrid_spec.lua` (columns, only the rows in view, scrolling to the
 end, empty text, cells, tooltips, clicks, drops, the theme), `spec/next/settings/window_spec.lua` ("a
 page with its own list": sliding, Back, opening on it, the first Escape, closing and reopening on it, a
 fade-out, heading and buttons, tabs shown, tabs read after the list, Reselect, a search, nothing while
 closed), `spec/next/settings/bagcategories_spec.lua`, `spec/next/settings/content_spec.lua` (the page's
 list, heading, buttons and three tabs, the bags shown), `spec/integration/next_settings_spec.lua`
 (every tab built on the whole addon; the list in the sidebar and the first Escape on the real window),
-`spec/next/controls/input_spec.lua` (`commitOnBlur`, a disabled text area), `spec/frames/search_spec.lua`
+`spec/next/controls/input_spec.lua` (`commitOnBlur`, a disabled text area),
+`spec/next/controls/dropdown_spec.lua` (a menu's whole text from a narrow anchor), `spec/frames/search_spec.lua`
 and `spec/config/config_spec.lua` (Enter to Make Category). Mutation-tested: the window's list mode and
 the grid (37 mutations; the three survivors led to two tests and dead code removed), the tabs (50; the
 survivors led to three tests and two dead guards removed), the controls and the recorder (10; one

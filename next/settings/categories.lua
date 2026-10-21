@@ -67,8 +67,8 @@ local sonataNext = addon:GetModule('SonataNext')
 -- page's heading, Rename and Delete its buttons in the header, and three tabs show it:
 -- - Settings: the bags it is used in, its priority, group by and color, and what of your bags shows in
 --   it now, as items.
--- - Rule: its search, how many items in your bags it matches as it is typed, Apply Rule, and the
---   matches as items, those showing in another category faded.
+-- - Search Rule: its search, Apply Search Rule, and the Search Results (counted beside their name as it
+--   is typed) as items, those showing in another category saying where.
 -- - Added Items: the items added to it by hand, as a grid that holds thousands (NextItemGrid), filtered
 --   by name; an item dropped anywhere on it is added, a right click removes one, Remove All asks first.
 -- A plugin's category can be used in bags, colored and prioritized; its rule (when it has one) and its
@@ -154,9 +154,9 @@ local function describe(filter)
   local rule = categories:RuleOf(filter) ~= nil
   local what
   if rule and n > 0 then
-    what = L:G("Rule and ") .. count(n, L:G("%d added item"), L:G("%d added items"))
+    what = L:G("Search Rule and ") .. count(n, L:G("%d added item"), L:G("%d added items"))
   elseif rule then
-    what = L:G("Rule")
+    what = L:G("Search Rule")
   elseif n > 0 then
     what = count(n, L:G("%d added item"), L:G("%d added items"))
   else
@@ -239,7 +239,7 @@ function editor:Heading()
   return self.selected, line
 end
 
--- RuleTabShown says whether the Rule tab shows: for your categories, and a plugin's with a rule.
+-- RuleTabShown says whether the Search Rule tab shows: for your categories, and a plugin's with a rule.
 ---@return boolean
 function editor:RuleTabShown()
   local filter = self:Chosen()
@@ -734,6 +734,17 @@ local function label(tab, key, text, font)
   tab.labels[key] = l
 end
 
+-- boxRows returns where the Settings and Search Rule tabs put their item box's name row and the box,
+-- down from the tab's top: under four rows of settings, the same in both, so the box stays put as the
+-- tabs change (asked).
+---@return number nameRow, number box
+local function boxRows()
+  local K = style.Theme.Settings.Categories
+  local B = controls:Theme("Button")
+  local row = K.Pad + 4 * (B.Height + K.FieldGap) + K.FieldGap
+  return row, row + B.Height + K.FieldGap
+end
+
 -- placeTab anchors a tab's frame where the page put it.
 ---@param tab table
 ---@param x number
@@ -803,10 +814,12 @@ function editor:CreateSettingsTab(parent, owner, bags)
       tab:update(ctx, { color = false })
     end,
   })
-  label(tab, "inBags", L:G("In Your Bags Now"), K.SectionFont)
+  label(tab, "inBags", L:G("Current Items in this Group"), K.SectionFont)
   tab.inBags = style:CreateText(frame, K.HintFont)
   tab.inBags:SetJustifyH("LEFT")
-  tab.grid = nextItemGrid:Create(frame, { empty = L:G("Nothing in your bags shows in this category now.") })
+  tab.grid = nextItemGrid:Create(frame, {
+    empty = L:G("There are no current items in your inventory that match this category"),
+  })
   tab:Style()
   return tab
 end
@@ -966,8 +979,9 @@ function settingsTabProto:showInBags(name)
   self.grid:SetEntries(list)
 end
 
--- layout stacks the settings: the bags it is used in, priority, group by, color; what of your bags
--- shows in it under them, taking the room left.
+-- layout puts the settings in four rows (the bags it is used in, priority, group by, color; group by's
+-- row left empty for a plugin's), then the current items in their box, where the Search Rule tab puts
+-- its own.
 ---@private
 function settingsTabProto:layout()
   local K = style.Theme.Settings.Categories
@@ -976,64 +990,49 @@ function settingsTabProto:layout()
   local width = self.width - 2 * pad
   self.none:ClearAllPoints()
   self.none:SetPoint("CENTER", frame, "CENTER", 0, 0)
-  local y = pad
-  local function row(key)
+  -- row puts a setting's name in its row (1 to 4), and returns the middle of the row.
+  local function row(key, i)
+    local middle = pad + (i - 1) * (B.Height + gap) + B.Height / 2
     local l = self.labels[key]
     l:ClearAllPoints()
-    l:SetPoint("LEFT", frame, "TOPLEFT", pad, -(y + B.Height / 2))
-    return y + B.Height / 2
+    l:SetPoint("LEFT", frame, "TOPLEFT", pad, -middle)
+    return middle
   end
-  if self.labels.bags:IsShown() then
-    local middle = row("bags")
-    local x = pad + K.LabelWidth
-    for _, bag in ipairs(self.bags()) do
-      local toggle, text = self.toggles[bag.kind], self.toggleLabels[bag.kind]
-      if toggle and toggle.frame:IsShown() then
-        toggle.frame:ClearAllPoints()
-        toggle.frame:SetPoint("LEFT", frame, "TOPLEFT", x, -middle)
-        text:ClearAllPoints()
-        text:SetPoint("LEFT", toggle.frame, "RIGHT", 6, 0)
-        x = x + toggle.frame:GetWidth() + 6 + math.ceil(text:GetStringWidth()) + 2 * gap
-      end
+  local middle = row("bags", 1)
+  local x = pad + K.LabelWidth
+  for _, bag in ipairs(self.bags()) do
+    local toggle, text = self.toggles[bag.kind], self.toggleLabels[bag.kind]
+    if toggle and toggle.frame:IsShown() then
+      toggle.frame:ClearAllPoints()
+      toggle.frame:SetPoint("LEFT", frame, "TOPLEFT", x, -middle)
+      text:ClearAllPoints()
+      text:SetPoint("LEFT", toggle.frame, "RIGHT", 6, 0)
+      x = x + toggle.frame:GetWidth() + 6 + math.ceil(text:GetStringWidth()) + 2 * gap
     end
-    y = y + B.Height + gap
-    local pmiddle = row("priority")
-    self.priority.frame:ClearAllPoints()
-    self.priority.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -pmiddle)
-    self.priorityHint:ClearAllPoints()
-    self.priorityHint:SetPoint("LEFT", self.priority.frame, "RIGHT", gap, 0)
-    y = y + B.Height + gap
   end
-  if self.groupBy.frame:IsShown() then
-    local gmiddle = row("groupBy")
-    self.groupBy.frame:ClearAllPoints()
-    self.groupBy.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -gmiddle)
-    self.groupByHint:ClearAllPoints()
-    self.groupByHint:SetPoint("LEFT", self.groupBy.frame, "RIGHT", gap, 0)
-    y = y + B.Height + gap
-  end
-  if self.swatch.frame:IsShown() then
-    local cmiddle = row("color")
-    self.swatch.frame:ClearAllPoints()
-    self.swatch.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -cmiddle)
-    self.resetColor.frame:ClearAllPoints()
-    self.resetColor.frame:SetPoint("LEFT", self.swatch.frame, "RIGHT", gap, 0)
-    y = y + B.Height + gap
-  end
-  if self.grid.frame:IsShown() then
-    y = y + gap
-    self.labels.inBags:ClearAllPoints()
-    self.labels.inBags:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
-    self.inBags:ClearAllPoints()
-    self.inBags:SetPoint("LEFT", self.labels.inBags, "RIGHT", gap, 0)
-    y = y + math.ceil(self.labels.inBags:GetStringHeight()) + gap
-    self.grid.frame:ClearAllPoints()
-    self.grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
-    self.grid:Place(width, math.max(1, self.height - y - pad))
-  end
+  self.priority.frame:ClearAllPoints()
+  self.priority.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("priority", 2))
+  self.priorityHint:ClearAllPoints()
+  self.priorityHint:SetPoint("LEFT", self.priority.frame, "RIGHT", gap, 0)
+  self.groupBy.frame:ClearAllPoints()
+  self.groupBy.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("groupBy", 3))
+  self.groupByHint:ClearAllPoints()
+  self.groupByHint:SetPoint("LEFT", self.groupBy.frame, "RIGHT", gap, 0)
+  self.swatch.frame:ClearAllPoints()
+  self.swatch.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("color", 4))
+  self.resetColor.frame:ClearAllPoints()
+  self.resetColor.frame:SetPoint("LEFT", self.swatch.frame, "RIGHT", gap, 0)
+  local nameRow, box = boxRows()
+  self.labels.inBags:ClearAllPoints()
+  self.labels.inBags:SetPoint("LEFT", frame, "TOPLEFT", pad, -(nameRow + B.Height / 2))
+  self.inBags:ClearAllPoints()
+  self.inBags:SetPoint("LEFT", self.labels.inBags, "RIGHT", gap, 0)
+  self.grid.frame:ClearAllPoints()
+  self.grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -box)
+  self.grid:Place(width, math.max(1, self.height - box - pad))
 end
 
--- The Rule tab.
+-- The Search Rule tab.
 
 ---@class NextCategoryRuleTab
 ---@field frame Frame
@@ -1053,19 +1052,18 @@ function editor:CreateRuleTab(parent, owner, bags)
   local tab = makeTab(parent, ruleTabProto, { bags = bags, labels = {} })
   local K = style.Theme.Settings.Categories
   local frame = tab.frame
-  label(tab, "rule", L:G("Rule"))
+  label(tab, "rule", L:G("Search Rule"))
   tab.help = style:CreateText(frame, K.HintFont)
   tab.help:SetJustifyH("LEFT")
   tab.rule = nextInput:CreateArea(frame, {
-    height = K.QueryHeight, help = L:G("For example: type = consumable"),
+    height = 1, help = L:G("For example: type = consumable"),
     onChange = function() tab:Check() end,
   })
-  tab.count = style:CreateText(frame, K.HintFont)
-  tab.count:SetJustifyH("LEFT")
   tab.apply = nextButton:Create(frame, {
-    text = L:G("Apply Rule"), style = "Primary", onClick = function(ctx) tab:Apply(ctx) end,
+    text = L:G("Apply Search Rule"), style = "Primary", onClick = function(ctx) tab:Apply(ctx) end,
   })
-  label(tab, "matches", L:G("Matches in Your Bags"), K.SectionFont)
+  tab.results = style:CreateText(frame, K.SectionFont)
+  tab.results:SetJustifyH("LEFT")
   tab.grid = nextItemGrid:Create(frame, { empty = L:G("No item in your bags matches.") })
   tab:Style()
   return tab
@@ -1074,9 +1072,8 @@ end
 function ruleTabProto:Style()
   local K = style.Theme.Settings.Categories
   style:SetFont(self.labels.rule, K.LabelFont)
-  style:SetFont(self.labels.matches, K.SectionFont)
+  style:SetFont(self.results, K.SectionFont)
   style:SetFont(self.help, K.HintFont)
-  style:SetFont(self.count, K.HintFont)
   if self.width then
     self:layout()
   end
@@ -1114,7 +1111,7 @@ function ruleTabProto:Refresh(ctx)
   end
   self.rule:SetEnabled(not plugins)
   self.apply.frame:SetShown(not plugins)
-  self.help:SetText(plugins and L:G("The plugin that made this category gives its rule.")
+  self.help:SetText(plugins and L:G("The plugin that made this category gives its search rule.")
     or L:G("A search, as in your bags' search box: the items it matches belong here."))
   self:Check()
 end
@@ -1137,9 +1134,9 @@ function ruleTabProto:matchesOf(query)
   return list
 end
 
--- Check says, as the rule is typed, how many items in your bags it matches, shows them (those showing
--- in another category faded, saying where), and turns Apply Rule on when the rule changed and has no
--- mistake.
+-- Check shows, as the rule is typed, the Search Results (counted beside their name, in full color, those
+-- showing in another category saying where in their tooltip), and turns Apply Search Rule on when the
+-- rule changed and has no mistake.
 function ruleTabProto:Check()
   local filter = editor:Chosen()
   if filter == nil then
@@ -1148,75 +1145,69 @@ function ruleTabProto:Check()
   local text = strtrim(self.rule:GetText() or "")
   local valid = true
   local entries = {}
-  if text == "" then
-    self.count:SetText(L:G("No rule: only the items added by hand belong here."))
+  local found = text == "" and {} or self:matchesOf(text)
+  if found == nil then
+    valid = false
+    self.results:SetText(format(L:G("Search Results (%s)"), L:G("invalid search")))
   else
-    local found = self:matchesOf(text)
-    if found == nil then
-      valid = false
-      self.count:SetText(L:G("This search has a mistake."))
-    else
-      self.count:SetText(count(#found, L:G("Matches %d item in your bags."), L:G("Matches %d items in your bags.")))
-      for _, data in ipairs(found) do
-        local info = data.itemInfo
-        local here = isShownIn(filter.name, info.category or "")
-        table.insert(entries, {
-          id = data.slotkey, itemID = info.itemID, icon = info.itemIcon, quality = info.itemQuality,
-          link = info.itemLink, name = info.itemName, count = info.currentItemCount, here = here, dim = not here,
-          note = not here and format(L:G("Shows in %s."), info.category or "") or nil,
-        })
-      end
-      table.sort(entries, function(a, b)
-        if a.here ~= b.here then
-          return a.here
-        end
-        return byName(a, b)
-      end)
+    self.results:SetText(format(L:G("Search Results (%s)"), count(#found, L:G("%d result"), L:G("%d results"))))
+    for _, data in ipairs(found) do
+      local info = data.itemInfo
+      local here = isShownIn(filter.name, info.category or "")
+      table.insert(entries, {
+        id = data.slotkey, itemID = info.itemID, icon = info.itemIcon, quality = info.itemQuality,
+        link = info.itemLink, name = info.itemName, count = info.currentItemCount, here = here,
+        note = not here and format(L:G("Shows in %s."), info.category or "") or nil,
+      })
     end
+    table.sort(entries, function(a, b)
+      if a.here ~= b.here then
+        return a.here
+      end
+      return byName(a, b)
+    end)
   end
   self.grid:SetEntries(entries)
   local saved = categories:RuleOf(filter) or ""
   self.apply:SetEnabled(not isPlugins(filter) and valid and text ~= saved)
 end
 
--- Apply saves the rule typed (none for an empty one). Its button is on only when that can be saved.
+-- Apply saves the search rule typed (none for an empty one). Its button is on only when that can be
+-- saved.
 ---@param ctx Context
 function ruleTabProto:Apply(ctx)
   categories:UpdateCategory(ctx, editor.selected, { rule = strtrim(self.rule:GetText() or "") })
   self:Check()
 end
 
--- layout puts the rule's name and help, the field, its count and Apply Rule, then what it matches,
--- taking the room left.
+-- layout puts the search rule's name and help, the field taking the room down to the Search Results'
+-- row (their name and count, Apply Search Rule on its right), and the results in their box, where the
+-- Settings tab puts its own.
 ---@private
 function ruleTabProto:layout()
   local K = style.Theme.Settings.Categories
   local B = controls:Theme("Button")
   local frame, pad, gap = self.frame, K.Pad, K.FieldGap
   local width = self.width - 2 * pad
-  local y = pad
+  local nameRow, box = boxRows()
   self.labels.rule:ClearAllPoints()
-  self.labels.rule:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
+  self.labels.rule:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad)
   self.help:ClearAllPoints()
   self.help:SetPoint("LEFT", self.labels.rule, "RIGHT", gap, 0)
   self.help:SetPoint("RIGHT", frame, "RIGHT", -pad, 0)
-  y = y + math.ceil(self.labels.rule:GetStringHeight()) + gap
+  local top = pad + math.ceil(self.labels.rule:GetStringHeight()) + gap
   self.rule.frame:ClearAllPoints()
-  self.rule.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
-  self.rule.frame:SetSize(width, K.QueryHeight)
-  y = y + K.QueryHeight + gap
+  self.rule.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -top)
+  self.rule.frame:SetSize(width, math.max(B.Height, nameRow - gap - top))
+  local middle = nameRow + B.Height / 2
   self.apply.frame:ClearAllPoints()
-  self.apply.frame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -y)
-  self.count:ClearAllPoints()
-  self.count:SetPoint("LEFT", frame, "TOPLEFT", pad, -(y + B.Height / 2))
-  self.count:SetPoint("RIGHT", self.apply.frame, "LEFT", -gap, 0)
-  y = y + B.Height + 2 * gap
-  self.labels.matches:ClearAllPoints()
-  self.labels.matches:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
-  y = y + math.ceil(self.labels.matches:GetStringHeight()) + gap
+  self.apply.frame:SetPoint("RIGHT", frame, "TOPRIGHT", -pad, -middle)
+  self.results:ClearAllPoints()
+  self.results:SetPoint("LEFT", frame, "TOPLEFT", pad, -middle)
+  self.results:SetPoint("RIGHT", self.apply.frame, "LEFT", -gap, 0)
   self.grid.frame:ClearAllPoints()
-  self.grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
-  self.grid:Place(width, math.max(1, self.height - y - pad))
+  self.grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -box)
+  self.grid:Place(width, math.max(1, self.height - box - pad))
 end
 
 -- The Added Items tab.
@@ -1259,7 +1250,7 @@ function editor:CreateItemsTab(parent, owner, bags)
     onDrop = function(ctx) tab:Drop(ctx) end,
     onRightClick = function(ctx, entry, cell) tab:OfferRemove(ctx, entry, cell) end,
     hint = L:G("Right-click to remove it."),
-    empty = L:G("No items added yet. Drag an item here to add it."),
+    empty = L:G("No items added yet."),
   })
   tab.readOnly = nextItemGrid:Create(frame, { empty = L:G("The plugin added no items.") })
   tab:Style()
@@ -1305,7 +1296,7 @@ function itemsTabProto:Refresh(ctx)
   self.readOnly.frame:SetShown(plugins)
   self.removeAll.frame:SetShown(not plugins)
   self.help:SetText(plugins and L:G("The plugin that made this category adds these items.")
-    or L:G("Drag an item here to add it. An item is in one category at a time: adding it here takes it out of another."))
+    or L:G("Drag an item here to manually add it to this category."))
   self:ShowItems()
   if self.width then
     self:layout()

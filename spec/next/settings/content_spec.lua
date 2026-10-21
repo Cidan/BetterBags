@@ -213,7 +213,7 @@ describe("NextSettingsContent", function()
         for _, t in ipairs(settings.tabs.list) do table.insert(list, t.text) end
         return list
       end
-      assert.are.same({ "Settings", "Rule", "Added Items" }, tabs())
+      assert.are.same({ "Settings", "Search Rule", "Added Items" }, tabs())
       assert.are.equal(settings.frame, made.CreateSettingsTab.owner)
       local function kinds(name)
         local list = {}

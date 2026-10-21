@@ -278,7 +278,9 @@ function nextMenu:Style()
   local shown = math.min(#items, M.MaxRows)
   local scrolls = #items > M.MaxRows
   local S = controls:Theme("ScrollBar")
-  local width = math.ceil(textLeft + widest + M.Padding + (scrolls and (S.Width + S.Inset) or 0))
+  -- The rows sit in a list inset Padding on both sides: the menu holds that, the text's left, the
+  -- widest text and the room right of it.
+  local width = math.ceil(2 * M.Padding + textLeft + widest + M.Padding + (scrolls and (S.Width + S.Inset) or 0))
   width = math.max(width, self.anchor:GetWidth(), self.opts.width or 0)
   frame:SetSize(width, shown * M.ItemHeight + 2 * M.Padding)
   self.box:ClearAllPoints()
