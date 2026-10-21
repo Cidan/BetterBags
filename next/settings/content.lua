@@ -773,9 +773,10 @@ local function rowsOf(o)
           function() return tostring(value(o, "get") or "") end)
         return area
       end },
-      { buttons = { { text = L:G("Accept"), style = "Primary", onClick = function(ctx)
-        write(o, ctx, area.area:GetText())
-      end } } },
+      { buttons = { { text = L:G("Accept"), style = "Primary",
+        disabled = function() return value(o, "disabled") and true or false end,
+        onClick = function(ctx) write(o, ctx, area.area:GetText()) end,
+      } } },
     }
   elseif kind == "input" then
     local opt = optionOf(o, "input")
@@ -792,7 +793,8 @@ local function rowsOf(o)
     return { { option = opt } }
   elseif kind == "execute" then
     return { { buttons = { {
-      text = value(o, "name") or "", tooltip = value(o, "desc"),
+      text = function() return value(o, "name") or "" end, tooltip = value(o, "desc"),
+      disabled = function() return value(o, "disabled") and true or false end,
       onClick = function(ctx) write(o, ctx) end,
     } } } }
   elseif kind == "description" then
@@ -803,7 +805,10 @@ local function rowsOf(o)
 end
 
 -- pluginSections makes a plugin's sections: its own options under its title, each group's under the
--- group's name, a header starting a section of its own; options a plugin hides are left out.
+-- group's name, a header starting a section of its own. What a plugin hides (hidden: its own, or a
+-- group's it is in, whatever it says of itself, as AceConfigDialog never shows a hidden group's
+-- options) is left out while it is hidden, read again at every layout as AceConfigDialog reads it
+-- after every change. A hidden header is a line left out: the options after it stay.
 ---@param title string
 ---@param options table An AceConfig group, or the args of one (Config:AddPluginConfig's).
 ---@return NextSettingsSectionDef[]
@@ -815,28 +820,31 @@ local function pluginSections(title, options)
   ---@type NextPluginOption
   local top = { option = root, chain = { root }, path = {}, handler = root.handler, root = root, appName = title }
   local sections = {}
-  local function walk(group, sectionTitle)
-    local current = { title = sectionTitle, rows = {} }
+  -- walk adds a group's sections; groupHidden says whether the group (or one it is in) is hidden now.
+  local function walk(group, sectionTitle, groupHidden)
+    local current = { title = sectionTitle, rows = {}, hidden = groupHidden }
     table.insert(sections, current)
     for _, o in ipairs(sortedChildren(group)) do
-      if not value(o, "hidden") then
-        local kind = o.option.type
-        if kind == "group" then
-          walk(o, value(o, "name") or o.path[#o.path])
-          current = { title = sectionTitle, rows = {} }
-          table.insert(sections, current)
-        elseif kind == "header" then
-          current = { title = value(o, "name") or "", rows = {} }
-          table.insert(sections, current)
-        else
-          for _, def in ipairs(rowsOf(o)) do
-            table.insert(current.rows, def)
-          end
+      local function hidden()
+        return groupHidden() or value(o, "hidden") and true or false
+      end
+      local kind = o.option.type
+      if kind == "group" then
+        walk(o, value(o, "name") or o.path[#o.path], hidden)
+        current = { title = sectionTitle, rows = {}, hidden = groupHidden }
+        table.insert(sections, current)
+      elseif kind == "header" then
+        current = { title = value(o, "name") or "", rows = {}, hidden = groupHidden, titleHidden = hidden }
+        table.insert(sections, current)
+      else
+        for _, def in ipairs(rowsOf(o)) do
+          def.hidden = hidden
+          table.insert(current.rows, def)
         end
       end
     end
   end
-  walk(top, title)
+  walk(top, title, function() return false end)
   local kept = {}
   for _, section in ipairs(sections) do
     if #section.rows > 0 then

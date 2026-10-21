@@ -20,16 +20,19 @@ local pages = addon:NewModule('NextSettingsPages')
 ---@field setting? string A settings catalog id.
 ---@field option? NextSettingsOption
 ---@field text? string
----@field buttons? {text: string, style?: NextButtonStyle, onClick: fun(ctx: Context), tooltip?: string}[]
+---@field buttons? {text: string|fun(): string, style?: NextButtonStyle, onClick: fun(ctx: Context), tooltip?: string, disabled?: fun(): boolean}[] A button's text and disabled are read again with every refresh.
 ---@field block? fun(parent: Frame, owner: Frame): NextSettingsRow A row of the page's own making (wide).
 ---@field title? string A block's name, for search.
 ---@field keywords? string[] A block's searching words.
 ---@field design? BagDesign Shown only while these bags are in use.
+---@field hidden? fun(): boolean Left out while it says so, checked at every layout (a plugin's hidden).
 
 ---@class (exact) NextSettingsSectionDef
 ---@field title string
 ---@field note? string
 ---@field design? BagDesign
+---@field hidden? fun(): boolean Left out, rows and all, while it says so.
+---@field titleHidden? fun(): boolean Its title left out while it says so, its rows kept (a plugin's hidden header).
 ---@field rows NextSettingsRowDef[]
 
 ---@class (exact) NextSettingsTabDef

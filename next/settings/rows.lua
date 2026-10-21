@@ -74,6 +74,9 @@ local rows = addon:NewModule('NextSettingsRows')
 ---@field option? NextSettingsOption
 ---@field owner? Frame The window a dialog shows over.
 ---@field hovered boolean
+---@field buttons? NextButtonFrame[]
+---@field buttonSpecs? table[] What its buttons were made from: their text and disabled, read again on refresh.
+---@field hidden? fun(): boolean Left out of its page while it says so (next/settings/page.lua).
 local rowProto = {}
 addon:GetModule('Perf'):RegisterPrototype(rowProto, 'NextSettingsRow')
 
@@ -209,13 +212,15 @@ function rows:CreateButtons(parent, buttons)
   local row = newRow(parent, true)
   row.frame:EnableMouse(false)
   row.buttons = {}
+  row.buttonSpecs = buttons
   for i, spec in ipairs(buttons) do
     row.buttons[i] = nextButton:Create(row.frame, {
-      text = spec.text, style = spec.style, tooltip = spec.tooltip,
+      text = rows:TextOf(spec.text), style = spec.style, tooltip = spec.tooltip,
       onClick = function(ctx) spec.onClick(ctx) end,
     })
   end
   row:Style()
+  row:Refresh()
   return row
 end
 
@@ -316,6 +321,16 @@ end
 function rowProto:Refresh(ctx)
   local option, control = self.option, self.control
   if option == nil then
+    -- A button's text and whether it is enabled may change (a plugin's execute: its name, disabled).
+    for i, spec in ipairs(self.buttonSpecs or {}) do
+      local b = self.buttons[i]
+      if type(spec.text) == "function" then
+        b:SetText(spec.text() or "")
+      end
+      if spec.disabled ~= nil then
+        b:SetEnabled(spec.disabled() ~= true)
+      end
+    end
     if type(self.text) == "function" then
       self.label:SetText(self.text())
     elseif self.area and self.get then

@@ -537,6 +537,97 @@ describe("NextSettings", function()
 
   -- The window shows what the bags in use read (next-settings.md §7): a page, section or row with a
   -- design shows only while that design is in use.
+  -- A row or a section can be hidden while a function says so (a plugin's hidden, AceConfig): checked
+  -- at every layout, and the window lays itself out again after every change on the page.
+  describe("rows and sections hidden while a function says so", function()
+    local hide
+
+    local function laidOut()
+      local list = {}
+      for _, section in ipairs(settings.page.sections) do
+        for _, row in ipairs(section.rows) do
+          if row.frame:IsShown() then table.insert(list, row.label:GetText()) end
+        end
+      end
+      return list
+    end
+
+    local function titles()
+      local list = {}
+      for _, title in ipairs(settings.page.titles) do
+        if title:IsShown() then table.insert(list, title:GetText()) end
+      end
+      return list
+    end
+
+    before_each(function()
+      hide = { row = true, section = false }
+      local function sometimes(title, key)
+        local row = toggle(title, key)
+        row.hidden = function() return hide.row end
+        return row
+      end
+      pages:Define({ id = "hiding", group = "Bags", title = "Hiding", description = "",
+        tabs = { { id = "main", title = "Hiding", sections = {
+          { title = "Shown", rows = { toggle("Always", "bank"), sometimes("Sometimes", "free") } },
+          { title = "Maybe", hidden = function() return hide.section end, rows = { toggle("In Maybe", "merge") } },
+          { title = "Only Hidden", rows = { sometimes("Alone", "search") } },
+        } } } })
+    end)
+
+    it("leaves out a hidden row, and shows it once a refresh finds it shown", function()
+      open("hiding")
+      assert.are.same({ "Always", "In Maybe" }, laidOut())
+      hide.row = false
+      settings:Refresh()
+      render:Flush()
+      assert.are.same({ "Always", "Sometimes", "In Maybe", "Alone" }, laidOut())
+    end)
+
+    it("leaves out a hidden section, title and all, and one whose rows are all hidden", function()
+      open("hiding")
+      assert.are.same({ "SHOWN", "MAYBE" }, titles())
+      hide.section = true
+      settings:Refresh()
+      render:Flush()
+      assert.are.same({ "SHOWN" }, titles())
+      assert.are.same({ "Always" }, laidOut())
+    end)
+
+    it("can hide a section's title alone, keeping its rows", function()
+      pages:Define({ id = "untitled", group = "Bags", title = "Untitled", description = "",
+        tabs = { { id = "main", title = "Untitled", sections = {
+          { title = "First", rows = { toggle("Top", "bank") } },
+          { title = "Quiet", titleHidden = function() return hide.row end, rows = { toggle("Under", "merge") } },
+        } } } })
+      local function under()
+        local _, _, _, _, y = settings.page.sections[2].rows[1].frame:GetPoint(1)
+        return y
+      end
+      open("untitled")
+      assert.are.same({ "FIRST" }, titles())
+      assert.are.same({ "Top", "Under" }, laidOut())
+      local without = under()
+      hide.row = false
+      settings:Refresh()
+      render:Flush()
+      assert.are.same({ "FIRST", "QUIET" }, titles())
+      assert.are.equal(style.Theme.Settings.Content.TitleHeight, without - under(), "no room kept for a hidden title")
+    end)
+
+    it("finds no hidden row", function()
+      open("hiding")
+      settings:Search(addon:GetModule("Context"):New("spec"), "sometimes")
+      assert.are.same({}, shownRows())
+      hide.row = false
+      settings:Search(addon:GetModule("Context"):New("spec"), "sometimes")
+      assert.are.same({ "Sometimes" }, shownRows())
+      hide.section = true
+      settings:Search(addon:GetModule("Context"):New("spec"), "in maybe")
+      assert.are.same({}, shownRows(), "nor a row of a hidden section")
+    end)
+  end)
+
   describe("by design", function()
     local function only(d, def)
       def.design = d

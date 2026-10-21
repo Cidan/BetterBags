@@ -22,7 +22,10 @@ local sonataNext = addon:GetModule('SonataNext')
 -- laying its sections out at the width it is given (render-pipeline.md), inside the window's scroll
 -- box. A section is its title in capitals (and a note after it), then a card of its rows: two columns
 -- when the page is at least twice MinColumn wide, a pair of rows as tall as the taller, a wide row
--- across both on a line of its own; lines between the card's lines and between its columns.
+-- across both on a line of its own; lines between the card's lines and between its columns. A row with
+-- a hidden function (row.hidden) is left out while it says so, checked at every layout (the window lays
+-- itself out again after every change), and a section with no row shown is left out; a section's title
+-- can be left out alone (section.titleHidden).
 ---@class NextSettingsPage: AceModule
 ---@field all NextSettingsPageFrame[]
 local nextPage = addon:NewModule('NextSettingsPage')
@@ -31,6 +34,7 @@ local nextPage = addon:NewModule('NextSettingsPage')
 ---@class (exact) NextSettingsSection
 ---@field title string
 ---@field note? string
+---@field titleHidden? fun(): boolean Its title left out while it says so.
 ---@field rows NextSettingsRow[]
 
 ---@class NextSettingsPageFrame: Drawable
@@ -160,6 +164,22 @@ function pageProto:line(n, x, y, width, height)
   return n
 end
 
+-- visibleRows returns a section's rows shown now, marking in hidden each one its hidden function hides.
+---@param section NextSettingsSection
+---@param hidden table<NextSettingsRow, boolean>
+---@return NextSettingsRow[]
+local function visibleRows(section, hidden)
+  local visible = {}
+  for _, row in ipairs(section.rows) do
+    if row.hidden ~= nil and row.hidden() == true then
+      hidden[row] = true
+    else
+      table.insert(visible, row)
+    end
+  end
+  return visible
+end
+
 ---@param parentResult? RenderResult
 ---@return RenderResult
 function pageProto:Render(parentResult)
@@ -170,76 +190,86 @@ function pageProto:Render(parentResult)
   local column = columns == 2 and inner / 2 or inner
   local divider = C.Divider.Size or 1
   local placed = {}
+  local hidden = {}
   local lines = 0
   local y = C.Top
-  for i, section in ipairs(self.sections) do
-    if i > 1 then
-      y = y + C.SectionGap
-    end
-    local title = self:part(self.titles, i, function() return style:CreateText(self.frame, C.TitleFont) end)
-    title:SetText(string.upper(section.title or ""))
-    title:ClearAllPoints()
-    title:SetPoint("BOTTOMLEFT", self.frame, "TOPLEFT", C.Pad, -(y + C.TitleHeight - 6))
-    title:Show()
-    local note = self:part(self.notes, i, function() return style:CreateText(self.frame, C.NoteFont) end)
-    note:SetText(section.note or "")
-    note:ClearAllPoints()
-    note:SetPoint("LEFT", title, "RIGHT", 6, 0)
-    note:SetShown(section.note ~= nil and section.note ~= "")
-    y = y + C.TitleHeight
-    local top = y
-    local pending = {}
-    local first = true
-    -- flush lays the pending pair (or single row) out on a line of its own.
-    local function flush()
-      if #pending == 0 then
-        return
+  local shown = 0
+  for _, section in ipairs(self.sections) do
+    local visible = visibleRows(section, hidden)
+    if #visible > 0 then
+      shown = shown + 1
+      local i = shown
+      if i > 1 then
+        y = y + C.SectionGap
       end
-      if not first then
-        lines = self:line(lines, C.Pad, y, inner, divider)
+      local titled = section.titleHidden == nil or section.titleHidden() ~= true
+      local title = self:part(self.titles, i, function() return style:CreateText(self.frame, C.TitleFont) end)
+      title:SetText(string.upper(section.title or ""))
+      title:ClearAllPoints()
+      title:SetPoint("BOTTOMLEFT", self.frame, "TOPLEFT", C.Pad, -(y + C.TitleHeight - 6))
+      title:SetShown(titled)
+      local note = self:part(self.notes, i, function() return style:CreateText(self.frame, C.NoteFont) end)
+      note:SetText(section.note or "")
+      note:ClearAllPoints()
+      note:SetPoint("LEFT", title, "RIGHT", 6, 0)
+      note:SetShown(titled and section.note ~= nil and section.note ~= "")
+      if titled then
+        y = y + C.TitleHeight
       end
-      first = false
-      local height = 0
-      for _, row in ipairs(pending) do
-        height = math.max(height, row:Measure(column))
-      end
-      for k, row in ipairs(pending) do
-        row:Place(C.Pad + (k - 1) * column, y, column, height)
-        placed[row] = true
-      end
-      if #pending == 2 then
-        lines = self:line(lines, C.Pad + column, y, divider, height)
-      end
-      y = y + height
-      pending = {}
-    end
-    for _, row in ipairs(section.rows) do
-      if row.wide then
-        flush()
+      local top = y
+      local pending = {}
+      local first = true
+      -- flush lays the pending pair (or single row) out on a line of its own.
+      local function flush()
+        if #pending == 0 then
+          return
+        end
         if not first then
           lines = self:line(lines, C.Pad, y, inner, divider)
         end
         first = false
-        local height = row:Measure(inner)
-        row:Place(C.Pad, y, inner, height)
-        placed[row] = true
+        local height = 0
+        for _, row in ipairs(pending) do
+          height = math.max(height, row:Measure(column))
+        end
+        for k, row in ipairs(pending) do
+          row:Place(C.Pad + (k - 1) * column, y, column, height)
+          placed[row] = true
+        end
+        if #pending == 2 then
+          lines = self:line(lines, C.Pad + column, y, divider, height)
+        end
         y = y + height
-      else
-        table.insert(pending, row)
-        if #pending == columns then
+        pending = {}
+      end
+      for _, row in ipairs(visible) do
+        if row.wide then
           flush()
+          if not first then
+            lines = self:line(lines, C.Pad, y, inner, divider)
+          end
+          first = false
+          local height = row:Measure(inner)
+          row:Place(C.Pad, y, inner, height)
+          placed[row] = true
+          y = y + height
+        else
+          table.insert(pending, row)
+          if #pending == columns then
+            flush()
+          end
         end
       end
+      flush()
+      local card = self:part(self.cards, i, function() return self.frame:CreateTexture(nil, "BACKGROUND") end)
+      controls:Paint(card, C.Card)
+      card:ClearAllPoints()
+      card:SetPoint("TOPLEFT", self.frame, "TOPLEFT", C.Pad, -top)
+      card:SetSize(inner, math.max(1, y - top))
+      card:SetShown(y > top)
     end
-    flush()
-    local card = self:part(self.cards, i, function() return self.frame:CreateTexture(nil, "BACKGROUND") end)
-    controls:Paint(card, C.Card)
-    card:ClearAllPoints()
-    card:SetPoint("TOPLEFT", self.frame, "TOPLEFT", C.Pad, -top)
-    card:SetSize(inner, math.max(1, y - top))
-    card:SetShown(y > top)
   end
-  for i = #self.sections + 1, #self.titles do
+  for i = shown + 1, #self.titles do
     self.titles[i]:Hide()
     self.notes[i]:Hide()
     self.cards[i]:Hide()
@@ -247,13 +277,17 @@ function pageProto:Render(parentResult)
   for i = lines + 1, #self.lines do
     self.lines[i]:Hide()
   end
+  -- A row not placed is hidden: those of the last layout, and those hidden from the start.
   for row in pairs(self.shownRows) do
     if not placed[row] then
       row.frame:Hide()
     end
   end
+  for row in pairs(hidden) do
+    row.frame:Hide()
+  end
   self.shownRows = placed
-  local empty = #self.sections == 0
+  local empty = shown == 0
   self.empty:SetShown(empty)
   if empty then
     self.empty:ClearAllPoints()

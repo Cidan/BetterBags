@@ -624,14 +624,21 @@ describe("NextSettingsContent", function()
       assert.are.equal("Integrations", page.group)
       local list = pages:List()
       assert.are.equal(page, list[#list])
+      -- What is laid out: a hidden option (order 100, after Look) is left out, and its section with it.
       local titles = {}
-      for _, section in ipairs(settings.page.sections) do table.insert(titles, section.title) end
-      assert.are.same({ "Some Plugin", "Look" }, titles)
+      for _, title in ipairs(settings.page.titles) do
+        if title:IsShown() then table.insert(titles, title:GetText()) end
+      end
+      assert.are.same({ "SOME PLUGIN", "LOOK" }, titles)
       local labels = {}
       for _, row in ipairs(settings.page.sections[1].rows) do
-        table.insert(labels, row.label and row.label:GetText() or (row.buttons and row.buttons[1].label:GetText()))
+        if row.frame:IsShown() then
+          table.insert(labels, row.label and row.label:GetText() or (row.buttons and row.buttons[1].label:GetText()))
+        end
       end
-      assert.are.same({ "Some words.", "Enabled", "Mode", "Sorted", "Run" }, labels, "by order; hidden left out")
+      assert.are.same({ "Some words.", "Enabled", "Mode", "Sorted", "Run" }, labels, "by order")
+      local hidden = rowTitled("Hidden")
+      assert.is_false(hidden.frame:IsShown(), "hidden left out")
     end)
 
     it("reads and writes a toggle with AceConfig's info", function()
@@ -721,6 +728,98 @@ describe("NextSettingsContent", function()
         get = function() return true end, set = function() end } } })
       settings:Open("plugin:Grouped")
       assert.is_not_nil(rowTitled("On"))
+    end)
+
+    -- AceConfigDialog reads hidden, disabled and names again after every change. Real plugins rely on
+    -- it: BetterBags_ImportExport shows its "Unknown Items" header, list and Recheck button only once an
+    -- export found unknown items. The classic window ignored hidden; read once, they never showed.
+    describe("what a plugin shows, hides and disables as it changes", function()
+      local live
+
+      local function shownTitles()
+        local list = {}
+        for _, title in ipairs(settings.page.titles) do
+          if title:IsShown() then table.insert(list, title:GetText()) end
+        end
+        return list
+      end
+
+      local function rowWith(text)
+        for _, row in ipairs(rowsShown()) do
+          for _, b in ipairs(row.buttons or {}) do
+            if b.label:GetText() == text then return row, b end
+          end
+        end
+      end
+
+      before_each(function()
+        live = { errors = "", name = "Recheck Items", locked = true }
+        local function unknown() return live.errors == "" end
+        content:AddPlugin("Export", {
+          export = { type = "execute", name = "Export", order = 1, func = function() live.errors = "1,2," end },
+          errorsection = { type = "header", name = "Unknown Items", order = 2, hidden = unknown },
+          errors = { type = "input", multiline = 3, name = "Items with no name", order = 3, hidden = unknown,
+            get = function() return live.errors end, set = function() end },
+          recheck = { type = "execute", name = function() return live.name end, order = 4, hidden = unknown,
+            disabled = function() return live.locked end, func = function() live.ran = true end },
+          gone = { type = "group", inline = true, name = "Gone", order = 5, hidden = true, args = {
+            inner = { type = "toggle", name = "Inner", hidden = false, get = function() return true end,
+              set = function() end },
+            sub = { type = "group", inline = true, name = "Sub", hidden = false, args = {
+              deep = { type = "toggle", name = "Deep", get = function() return true end, set = function() end },
+            } },
+          } },
+          quiet = { type = "header", name = "Quiet Header", order = 6, hidden = true },
+          after = { type = "toggle", name = "After Quiet", order = 7, get = function() return true end,
+            set = function() end },
+        })
+        settings:Open("plugin:Export")
+      end)
+
+      it("shows what it hid once a change makes it shown", function()
+        assert.are.same({ "EXPORT" }, shownTitles())
+        assert.is_false((rowWith("Recheck Items")).frame:IsShown())
+        local _, export = rowWith("Export")
+        export.frame:GetScript("OnClick")(export.frame, "LeftButton")
+        render:Flush()
+        assert.are.same({ "EXPORT", "UNKNOWN ITEMS" }, shownTitles())
+        assert.is_true((rowWith("Recheck Items")).frame:IsShown())
+      end)
+
+      it("never shows what is in a hidden group, whatever it says of itself", function()
+        local _, export = rowWith("Export")
+        export.frame:GetScript("OnClick")(export.frame, "LeftButton")
+        render:Flush()
+        for _, name in ipairs({ "Inner", "Deep" }) do
+          local row = rowTitled(name)
+          assert.is_false(row ~= nil and row.frame:IsShown(), name)
+        end
+        for _, title in ipairs(shownTitles()) do
+          assert.are_not.equal("GONE", title)
+          assert.are_not.equal("SUB", title)
+        end
+      end)
+
+      -- A header is a line: hiding it hides the line, never the options after it (AceConfigDialog).
+      it("hides only the line of a hidden header, not the options after it", function()
+        assert.is_true(rowTitled("After Quiet").frame:IsShown())
+        for _, title in ipairs(shownTitles()) do
+          assert.are_not.equal("QUIET HEADER", title)
+        end
+      end)
+
+      it("disables a button while the plugin says so, and names it as the plugin does now", function()
+        local _, export = rowWith("Export")
+        export.frame:GetScript("OnClick")(export.frame, "LeftButton")
+        local _, recheck = rowWith("Recheck Items")
+        assert.is_false(recheck.frame:IsEnabled())
+        live.locked, live.name = false, "Check Again"
+        settings:Refresh()
+        assert.is_true(recheck.frame:IsEnabled())
+        assert.are.equal("Check Again", recheck.label:GetText())
+        recheck.frame:GetScript("OnClick")(recheck.frame, "LeftButton")
+        assert.is_true(live.ran)
+      end)
     end)
   end)
 end)

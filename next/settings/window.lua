@@ -676,28 +676,58 @@ function settings:paintNav()
   end
 end
 
--- makeRow makes the row of a row definition on a page, nil for a setting its bag does not have.
+-- hiddenOf returns whether a row is hidden now: its own hidden or its section's (nil when neither
+-- can hide it).
+---@param section NextSettingsSectionDef
+---@param def NextSettingsRowDef
+---@return (fun(): boolean)?
+local function hiddenOf(section, def)
+  local own, theirs = def.hidden, section.hidden
+  if own == nil and theirs == nil then
+    return nil
+  end
+  return function()
+    return (theirs ~= nil and theirs() == true) or (own ~= nil and own() == true)
+  end
+end
+
+-- isHidden says whether a row definition of a section is hidden now.
+---@param section NextSettingsSectionDef
+---@param def NextSettingsRowDef
+---@return boolean
+local function isHidden(section, def)
+  local hidden = hiddenOf(section, def)
+  return hidden ~= nil and hidden()
+end
+
+-- makeRow makes the row of a row definition of a section on a page, nil for a setting its bag does not
+-- have. A row that can be hidden (its own hidden or its section's) carries it, for the page to check.
 ---@private
 ---@param page NextSettingsPageDef
 ---@param def NextSettingsRowDef
 ---@param parent Frame
+---@param section NextSettingsSectionDef
 ---@return NextSettingsRow?
-function settings:makeRow(page, def, parent)
+function settings:makeRow(page, def, parent, section)
+  local row
   if def.setting ~= nil then
     if not catalog:Has(def.setting, page.bag) then
       return nil
     end
-    return rows:Create(parent, catalog:Get(def.setting, page.bag), self.frame)
+    row = rows:Create(parent, catalog:Get(def.setting, page.bag), self.frame)
   elseif def.option ~= nil then
-    return rows:Create(parent, def.option, self.frame)
+    row = rows:Create(parent, def.option, self.frame)
   elseif def.text ~= nil then
-    return rows:CreateText(parent, def.text)
+    row = rows:CreateText(parent, def.text)
   elseif def.buttons ~= nil then
-    return rows:CreateButtons(parent, def.buttons)
+    row = rows:CreateButtons(parent, def.buttons)
   elseif def.block ~= nil then
-    return def.block(parent, self.frame)
+    row = def.block(parent, self.frame)
   end
-  return nil
+  if row ~= nil then
+    row.hidden = hiddenOf(section, def)
+  end
+  return row
 end
 
 -- pageFor returns a page's tab as a page of rows, made the first time it shows.
@@ -722,14 +752,14 @@ function settings:pageFor(page, tab)
   for _, sdef in ipairs(pages:Sections(tab)) do
     local list = {}
     for _, rdef in ipairs(pages:InDesign(sdef) and sdef.rows or {}) do
-      local row = pages:InDesign(rdef) and self:makeRow(page, rdef, drawn.frame) or nil
+      local row = pages:InDesign(rdef) and self:makeRow(page, rdef, drawn.frame, sdef) or nil
       if row ~= nil then
         table.insert(list, row)
       end
     end
     -- A section none of whose rows the page's bag has is left out.
     if #list > 0 then
-      table.insert(sections, { title = sdef.title, note = sdef.note, rows = list })
+      table.insert(sections, { title = sdef.title, note = sdef.note, titleHidden = sdef.titleHidden, rows = list })
     end
   end
   drawn:SetSections(sections)
@@ -831,7 +861,7 @@ end
 ---@param needle string
 ---@return boolean
 function settings:matches(page, section, def, needle)
-  if not pages:InDesign(section) or not pages:InDesign(def) then
+  if not pages:InDesign(section) or not pages:InDesign(def) or isHidden(section, def) then
     return false
   end
   local option
@@ -871,7 +901,7 @@ function settings:resultRow(page, tab, s, r, def)
   local key = page.id .. "\0" .. tab.id .. "\0" .. s .. "\0" .. r .. "\0" .. pages:DesignInUse()
   local row = self.resultRows[key]
   if row == nil and def.block == nil then
-    row = self:makeRow(page, def, self.results.frame)
+    row = self:makeRow(page, def, self.results.frame, pages:Sections(tab)[s])
     self.resultRows[key] = row
   end
   return row
