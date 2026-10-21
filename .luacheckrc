@@ -189,6 +189,7 @@ globals = {
 	"GameFontBlack",
 	"Number12Font",
 	"NumberFontNormalRight",
+	"NumberFontNormal",
 	"GameTooltip",
 	"GameMenuFrame",
 	"GetCursorInfo",

@@ -227,12 +227,19 @@ describe("NextVendor", function()
   end)
 
   describe("the panel", function()
-    it("is a hidden, named panel on the left, its rows tall enough for prices", function()
+    it("is a hidden, named panel on the left, its items cards with their names and prices", function()
       local v = nextVendor:Create(ctx())
       assert.are.equal("BetterBagsNextVendor", v:GetName())
       assert.are.equal("LEFT", v.side)
       assert.is_false(v:IsShown())
-      assert.are.equal(style.ICON + style.VENDOR_PRICE, v.content:CellHeight())
+      assert.are.equal(style.VENDOR_CARD_WIDTH, v.content:CellWidth())
+      assert.are.equal(style.ICON, v.content:CellHeight())
+      -- A small vendor is never narrower than one of its cards (with one column, a card sets the
+      -- narrowest it goes).
+      assert.is_true(v:MinWidth() >= 2 * style.PAD + style.GUTTER + v.content:CellWidth())
+      UseNextTheme({ Layout = { VendorColumns = 1 } })
+      assert.are.equal(2 * style.PAD + style.GUTTER + style.GRID_WIDTH, v:MinWidth())
+      UseNextTheme(nil)
       assert.are.equal("HIGH", v.frame:GetFrameStrata())
     end)
 
@@ -596,35 +603,30 @@ describe("NextVendor", function()
     end)
   end)
 
+  -- Selling what is on the cursor is NextMerchant's (SellCursorItem, merchant_spec): Blizzard's refund
+  -- question first, nothing without an item.
   describe("selling by dropping", function()
-    it("sells an item dropped on it or let go over it", function()
-      local v = open()
-      _G._cursorHasItem = true
-      v.frame:GetScript("OnReceiveDrag")(v.frame)
-      v.frame:GetScript("OnMouseUp")(v.frame, "LeftButton")
-      assert.are.same({ 0, 0 }, _G._merchantCalls.pickup)
-      _G._cursorHasItem = false
-      v.frame:GetScript("OnReceiveDrag")(v.frame)
-      assert.are.equal(2, #_G._merchantCalls.pickup)
+    local sales
+
+    before_each(function()
+      sales = 0
+      override(stubs.merchant, "SellCursorItem", function() sales = sales + 1 return "sold" end)
     end)
 
-    it("lets Blizzard ask first about selling a refundable item, as its merchant frame does", function()
+    it("sells an item dropped on it or let go over it", function()
       local v = open()
-      _G._cursorHasItem = true
-      MerchantFrame.refundItem = "bag button"
-      MerchantFrame.refundItemEquipped = false
-      _G._extendedPriceShown = true
       v.frame:GetScript("OnReceiveDrag")(v.frame)
-      assert.are.same({}, _G._merchantCalls.pickup)
-      assert.are.equal("bag button", _G._extendedPriceAsked.button)
+      v.frame:GetScript("OnMouseUp")(v.frame, "LeftButton")
+      assert.are.equal(2, sales)
+      v.frame:GetScript("OnMouseUp")(v.frame, "RightButton")
+      assert.are.equal(2, sales, "not on a right click")
     end)
 
     it("sells an item dropped on a section header too", function()
       local v = open()
-      _G._cursorHasItem = true
       local h = v.content.order[1].header
       h:GetScript("OnReceiveDrag")(h)
-      assert.are.same({ 0 }, _G._merchantCalls.pickup)
+      assert.are.equal(1, sales)
     end)
   end)
 

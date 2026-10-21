@@ -96,6 +96,26 @@ describe("BetterBags Next's shipped themes", function()
     assert.are.equal(#keys, count, "and nothing else")
   end)
 
+  -- The vendor's cards (next.md §10b): two lines of an item's name and a line of its price (raised off
+  -- the card's edge) fit beside its icon, the coins no taller than the price, in every theme on every
+  -- client.
+  it("fits a vendor card's name and price beside its icon", function()
+    for client, flags in pairs(CLIENTS) do
+      for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+      for _, key in ipairs(shipped()) do
+        local t = sonataNext:Resolve(key)
+        local L, V = t.Layout, t.Vendor
+        local name = t.Fonts[V.NameFont].Size
+        for _, role in ipairs({ V.PriceFont, V.UnaffordableFont }) do
+          local size = t.Fonts[role].Size
+          assert.is_true(2 * name + size + L.VendorPriceRaise <= L.Icon, key .. " " .. role .. " on " .. client)
+          assert.is_true(V.CoinSize <= size + 1, key .. " coins no taller than the price")
+        end
+        assert.is_true(L.VendorColumns >= 1, key)
+      end
+    end
+  end)
+
   it("needs no other addon", function()
     for _, key in ipairs(shipped()) do
       assert.is_true(sonataNext:IsSelectable(key), key)
@@ -148,6 +168,10 @@ describe("BetterBags Next's shipped themes", function()
       assert.is_true(t.Motion.Time.Open < 0.45)
       -- Asked: no border on a full panel docked at its edge ("there shouldn't be").
       assert.is_false(t.Panel.Edge.Full)
+      -- Its vendor prices smaller than Default's, with its smaller icons (still larger than v0.7.0's 10).
+      local default = sonataNext:Resolve("Default")
+      assert.is_true(t.Fonts.Price.Size < default.Fonts.Price.Size and t.Fonts.Price.Size > 10)
+      assert.are.equal(t.Fonts.Price.Size, t.Fonts.PriceUnaffordable.Size)
       -- Asked: its header icons scaled down, with its smaller title (next-themes.md §11).
       assert.is_true(t.Header.Buttons.Scale < 1)
       assert.are.equal(1, sonataNext:Resolve("Default").Header.Buttons.Scale)

@@ -526,6 +526,23 @@ function merchant:JunkSlots()
   return slots
 end
 
+-- SellCursorItem sells the item on the cursor, as dropping it on Blizzard's merchant frame does (its
+-- OnMouseUp), or on one of its item buttons (a left click picks the merchant item up while holding
+-- the player's: a sale): Blizzard asks first about a refundable item. It returns what it did, for
+-- profiler traces: "sold", "asked" (Blizzard's refund question) or "nothing" (no item on the cursor).
+---@return string
+function merchant:SellCursorItem()
+  if not CursorHasItem() then
+    return "nothing"
+  end
+  if MerchantFrame and MerchantFrame.refundItem
+    and ContainerFrame_GetExtendedPriceString(MerchantFrame.refundItem, MerchantFrame.refundItemEquipped) then
+    return "asked"
+  end
+  PickupMerchantItem(0)
+  return "sold"
+end
+
 ---@return number
 function merchant:NumJunk()
   if C_MerchantFrame and C_MerchantFrame.GetNumJunkItems then

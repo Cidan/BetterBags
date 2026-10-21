@@ -1149,6 +1149,20 @@ end
 function WidgetMethods:GetJustifyH()
   return self._justifyH or "CENTER"
 end
+-- FontString:SetSpacing(spacing) / GetSpacing(), SetMaxLines(maxLines) / GetMaxLines()
+-- (SimpleFontStringAPIDocumentation, every client): the room between lines, and the most lines shown.
+function WidgetMethods:SetSpacing(spacing)
+  self._spacing = spacing
+end
+function WidgetMethods:GetSpacing()
+  return self._spacing or 0
+end
+function WidgetMethods:SetMaxLines(maxLines)
+  self._maxLines = maxLines
+end
+function WidgetMethods:GetMaxLines()
+  return self._maxLines or 0
+end
 function WidgetMethods:SetJustifyV(justify)
   self._justifyV = justify
 end

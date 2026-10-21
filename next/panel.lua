@@ -770,13 +770,13 @@ end
 
 -- MinWidth is the narrowest a small panel goes (next.md §14g): room for its shown header buttons and
 -- Small.MinTitle of its title (cut short past that, FitTitle), for its footer's free slots and money,
--- and for one column of icons.
+-- and for one column of its cells (an icon, or a card in the vendor).
 ---@return number
 function panelProto:MinWidth()
   local header = 2 * style.PAD + style.TITLE_INSET + self:headerButtonsWidth() + 12 + style.Small.MinTitle
   local money = self.moneyFrame ~= nil and self.moneyFrame.frame:GetWidth() or 0
   local footer = 2 * style.PAD + style.TITLE_INSET + self.freeText:GetStringWidth() + 12 + money
-  local column = 2 * style.PAD + style.GUTTER + style.ICON
+  local column = 2 * style.PAD + style.GUTTER + self.content:CellWidth()
   return math.ceil(math.max(header, footer, column))
 end
 

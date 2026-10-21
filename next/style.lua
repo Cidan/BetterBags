@@ -30,13 +30,18 @@ function style:Use(theme)
   self.Color = theme.Palette
 
   self.ICON = L.Icon
-  self.VENDOR_PRICE = L.VendorPrice
   self.GAP = L.Gap
   self.PER_ROW = L.PerRow
   self.GUTTER = L.Gutter
   self.PAD = L.Pad
   self.FEATHER = L.Feather
   self.GRID_WIDTH = self.PER_ROW * self.ICON + (self.PER_ROW - 1) * self.GAP
+  -- The vendor's cards (next.md §10b): VendorColumns across the full grid; a small panel made wider
+  -- fits more of them.
+  self.VENDOR_COLUMNS = L.VendorColumns
+  self.VENDOR_TEXT_GAP = L.VendorTextGap
+  self.VENDOR_PRICE_RAISE = L.VendorPriceRaise
+  self.VENDOR_CARD_WIDTH = math.floor((self.GRID_WIDTH - (self.VENDOR_COLUMNS - 1) * self.GAP) / self.VENDOR_COLUMNS)
   self.BODY_WIDTH = self.GRID_WIDTH + self.GUTTER + self.PAD * 2
   self.WIDTH = self.FEATHER + self.BODY_WIDTH
   -- How far the body reaches past the screen edge, so the opening bounce never shows what is behind
@@ -147,18 +152,11 @@ style.templated = setmetatable({}, { __mode = "k" }) ---@type table<FontString|E
 -- The number of font objects made: their names must be unique.
 local fontCount = 0
 
--- makeFont makes a font object for a role's spec: the client's own font file (the locale's) unless
--- the spec names one, at its size and flags, in its color, with its shadow or none.
----@param role string
----@param spec table
----@return Font
-function style:makeFont(role, spec)
-  fontCount = fontCount + 1
-  local font = CreateFont("BetterBagsNextFont" .. role .. fontCount)
-  local path = spec.File or GameFontNormal:GetFont()
-  font:SetFont(path, spec.Size, spec.Flags or "")
-  font:SetTextColor(self:RGBA(spec.Color or "White"))
-  local shadow = spec.Shadow
+-- shadowFont gives a font object a role's shadow: true for the theme's, a table, or none.
+---@private
+---@param font Font
+---@param shadow? boolean|table
+function style:shadowFont(font, shadow)
   if shadow == true then
     shadow = self.Theme.FontShadow
   end
@@ -168,6 +166,39 @@ function style:makeFont(role, spec)
   else
     font:SetShadowColor(0, 0, 0, 0)
     font:SetShadowOffset(0, 0)
+  end
+end
+
+-- makeFont makes a font object for a role's spec: the client's own font file (the locale's) unless
+-- the spec names one, at its size and flags, in its color, with its shadow or none. A role naming one
+-- of the client's fonts (Object, a font object's global name) copies it (its file, size and flags,
+-- in every locale, its color and shadow), changing only what the role also sets.
+---@param role string
+---@param spec table
+---@return Font
+function style:makeFont(role, spec)
+  fontCount = fontCount + 1
+  local font = CreateFont("BetterBagsNextFont" .. role .. fontCount)
+  if spec.Object ~= nil then
+    local base = _G[spec.Object]
+    if type(base) ~= "table" or base.GetFont == nil then
+      error("BetterBags Next's font role " .. role .. " copies no client font named " .. tostring(spec.Object))
+    end
+    font:CopyFontObject(base)
+    if spec.File ~= nil or spec.Size ~= nil or spec.Flags ~= nil then
+      local path, size, flags = font:GetFont()
+      font:SetFont(spec.File or path, spec.Size or size, spec.Flags or flags)
+    end
+    if spec.Color ~= nil then
+      font:SetTextColor(self:RGBA(spec.Color))
+    end
+    if spec.Shadow ~= nil then
+      self:shadowFont(font, spec.Shadow)
+    end
+  else
+    font:SetFont(spec.File or GameFontNormal:GetFont(), spec.Size, spec.Flags or "")
+    font:SetTextColor(self:RGBA(spec.Color or "White"))
+    self:shadowFont(font, spec.Shadow)
   end
   if spec.Justify ~= nil then
     font:SetJustifyH(spec.Justify)

@@ -48,7 +48,9 @@ describe("NextStyle", function()
     it("is BetterBags Next's design as it was before themes, value for value", function()
       style:Use(resolved("Default"))
       local fields = {
-        "ICON", "VENDOR_PRICE", "GAP", "PER_ROW", "GUTTER", "PAD", "GRID_WIDTH", "BODY_WIDTH", "FEATHER",
+        -- VENDOR_PRICE (the room under a vendor icon for its price) went with the vendor's cards
+        -- (asked: prices too small to read), below.
+        "ICON", "GAP", "PER_ROW", "GUTTER", "PAD", "GRID_WIDTH", "BODY_WIDTH", "FEATHER",
         "WIDTH", "OPEN_OVERSHOOT", "OVERREACH", "TITLE_TOP", "SEARCH_TOP", "SEARCH_HEIGHT", "SEARCH_ICON",
         "SEARCH_GAP", "SearchEdge", "SearchIcon", "CONTENT_TOP", "FOOTER", "SECTION_HEADER",
         "SECTION_SPACING", "TAB_HEIGHT", "TAB_SPACING", "TAB_MIN_WIDTH", "TAB_MAX_WIDTH", "TAB_PADDING",
@@ -74,7 +76,7 @@ describe("NextStyle", function()
     it("draws every font as it was", function()
       style:Use(resolved("Default"))
       for _, name in ipairs({ "Title", "Section", "SectionRecent", "SectionFree", "Count", "Tab", "TabSelected",
-        "Footer", "ConfirmTitle", "ConfirmWarning", "ConfirmHint", "Search", "SearchText", "Price", "Stack" }) do
+        "Footer", "ConfirmTitle", "ConfirmWarning", "ConfirmHint", "Search", "SearchText" }) do
         local a, b = old:Font(name), style:Font(name)
         assert.are.same({ a:GetFont() }, { b:GetFont() }, name)
         assert.are.same({ a:GetTextColor() }, { b:GetTextColor() }, name)
@@ -86,11 +88,41 @@ describe("NextStyle", function()
     -- Roles that used another role's font before themes split off, drawn the same.
     it("draws the roles split off from others as those were", function()
       style:Use(resolved("Default"))
-      for role, was in pairs({ Empty = "Footer", DragHint = "TabSelected", PriceUnaffordable = "Price" }) do
+      for role, was in pairs({ Empty = "Footer", DragHint = "TabSelected" }) do
         assert.are.same({ old:Font(was):GetFont() }, { style:Font(role):GetFont() }, role)
         assert.are.same({ old:Font(was):GetShadowOffset() }, { style:Font(role):GetShadowOffset() }, role)
       end
       assert.are.same({ 1, 0.25, 0.25, 1 }, { style:Font("PriceUnaffordable"):GetTextColor() })
+    end)
+
+    -- Changed since v0.7.0 on purpose (asked: "the count for items in vendor, that font size should match
+    -- our item count in bags"): the vendor's stack counts in the bags' count font.
+    it("writes vendor stack counts in the bags' item count font, NumberFontNormal", function()
+      style:Use(resolved("Default"))
+      local font = style:Font("Stack")
+      assert.are.same({ NumberFontNormal:GetFont() }, { font:GetFont() })
+      assert.are.same({ NumberFontNormal:GetTextColor() }, { font:GetTextColor() })
+      assert.are.same({ NumberFontNormal:GetShadowOffset() }, { font:GetShadowOffset() })
+    end)
+
+    -- Changed since v0.7.0 on purpose (asked: a user found vendor prices too small to read; then cards
+    -- as GW2_UI draws the merchant): each vendor item a card, its name and price beside its icon, in
+    -- larger fonts; what cannot be afforded in the price's font, red.
+    it("draws vendor items as cards, their prices larger than v0.7.0", function()
+      style:Use(resolved("Default"))
+      local _, oldSize = old:Font("Price"):GetFont()
+      local file, size, flags = style:Font("Price"):GetFont()
+      assert.is_true(size > oldSize, "larger than " .. oldSize)
+      assert.are.same({ old:Font("Price"):GetTextColor() }, { style:Font("Price"):GetTextColor() })
+      assert.are.same({ old:Font("Price"):GetShadowOffset() }, { style:Font("Price"):GetShadowOffset() })
+      assert.are.same({ file, size, flags }, { style:Font("PriceUnaffordable"):GetFont() })
+      assert.is_nil(style.VENDOR_PRICE)
+      assert.are.equal(2, style.VENDOR_COLUMNS)
+      assert.are.equal(math.floor((style.GRID_WIDTH - style.GAP) / 2), style.VENDOR_CARD_WIDTH)
+      -- Two lines of its name and a line of its price, raised off the card's edge, fit beside the icon.
+      local _, nameSize = style:Font(style.Theme.Vendor.NameFont):GetFont()
+      assert.is_true(nameSize >= size)
+      assert.is_true(2 * nameSize + size + style.VENDOR_PRICE_RAISE <= style.ICON)
     end)
   end)
 
@@ -100,6 +132,28 @@ describe("NextStyle", function()
       sonataNext:RegisterTheme(theme)
       return resolved("Spec")
     end
+
+    -- A role can copy one of the client's fonts (Object: its file, size and flags, in every locale,
+    -- its color and shadow), changing only what the role also sets.
+    it("copies a client font for a role that names one, changing only what the role sets", function()
+      style:Use(register({ Palette = { Ruby = { 1, 0, 0, 1 } },
+        Fonts = { Plain = { Object = "NumberFontNormal" }, Shadowed = { Object = "GameFontNormal" },
+          Bigger = { Object = "NumberFontNormal", Size = 18, Color = "Ruby", Shadow = true } } }))
+      local plain, bigger = style:Font("Plain"), style:Font("Bigger")
+      assert.are.same({ NumberFontNormal:GetFont() }, { plain:GetFont() })
+      assert.are.same({ NumberFontNormal:GetTextColor() }, { plain:GetTextColor() })
+      assert.are.same({ NumberFontNormal:GetShadowOffset() }, { plain:GetShadowOffset() })
+      assert.are.same({ GameFontNormal:GetShadowOffset() }, { style:Font("Shadowed"):GetShadowOffset() },
+        "the client font's own shadow kept")
+      assert.are.same({ GameFontNormal:GetShadowColor() }, { style:Font("Shadowed"):GetShadowColor() })
+      local path, _, flags = NumberFontNormal:GetFont()
+      assert.are.same({ path, 18, flags }, { bigger:GetFont() })
+      assert.are.same({ 1, 0, 0, 1 }, { bigger:GetTextColor() })
+      assert.are.same({ style.Theme.FontShadow.X or 0, style.Theme.FontShadow.Y or 0 }, { bigger:GetShadowOffset() })
+      sonataNext.themes.Spec = nil
+      style:Use(register({ Fonts = { Odd = { Object = "NoSuchFont" } } }))
+      assert.has_error(function() style:Font("Odd") end, "BetterBags Next's font role Odd copies no client font named NoSuchFont")
+    end)
 
     it("lays everything out from its own sizes, the reach past the screen edge from its open ease", function()
       style:Use(register({ Layout = { Icon = 36, Gap = 4, PerRow = 9, Pad = 10, Feather = 64 },

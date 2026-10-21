@@ -34,6 +34,10 @@ sonataNext:RegisterTheme({
     Title = { Size = 20 },
     Section = { Size = 13 },
     SectionRecent = { Size = 13 },
+    -- A vendor card's name and price beside its smaller icon.
+    Price = { Size = 12 },
+    PriceUnaffordable = { Size = 12 },
+    VendorName = { Size = 12 },
   },
 
   Layout = {
@@ -47,6 +51,7 @@ sonataNext:RegisterTheme({
     ContentTop = 92,
     SectionHeader = 22,
     SectionSpacing = 12,
+    VendorPriceRaise = 2,
   },
 
   Motion = {
@@ -71,6 +76,8 @@ sonataNext:RegisterTheme({
   Sparkles = false,
 
   Chain = { Braid = false },
+
+  Vendor = { CoinSize = 12 },
 
   Dock = { Halo = false },
 })

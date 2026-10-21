@@ -60,6 +60,7 @@ sonataNext:RegisterTheme({
     SearchText = { Color = "Ink" },
     Price = { Color = "Ink" },
     PriceUnaffordable = { Color = "Seal" },
+    VendorName = { Color = "Ink", Shadow = false },
     Stack = { Shadow = { Color = "Black", X = 1, Y = -1 } },
     DragHint = { Shadow = { Color = "Black", X = 1, Y = -1 } },
   },
@@ -114,5 +115,10 @@ sonataNext:RegisterTheme({
     Halo = false,
   },
 
-  Vendor = { Highlight = { 0, 0, 0, 0.12 } },
+  Vendor = {
+    Highlight = { 0, 0, 0, 0.12 },
+    -- Cards inked faintly on the paper.
+    CardFill = { 46 / 255, 31 / 255, 15 / 255, 0.06 },
+    CardHover = { 46 / 255, 31 / 255, 15 / 255, 0.08 },
+  },
 })

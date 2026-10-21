@@ -29,12 +29,13 @@ local sonataNext = addon:GetModule('SonataNext')
 
 -- NextVendorButton is a button of BetterBags Next's vendor (next.md §10): an item for sale, a
 -- buyback, or an item to repair. It shows the icon, stack size, stock, quality, the quest mark, what
--- makes it unusable or sold out (as Blizzard's MerchantFrame_UpdateMerchantInfo tints them), and its
--- price under the icon; its tooltip is Blizzard's; its clicks buy (NextMerchant:Purchase, through
+-- makes it unusable or sold out (as Blizzard's MerchantFrame_UpdateMerchantInfo tints them), and, on
+-- a card beside the icon, its name and price; its tooltip is Blizzard's; its clicks buy (NextMerchant:Purchase, through
 -- Blizzard's confirmations), ask a quantity (our own dialog, as CompactVendor has its own), buy
 -- back or repair, the way Blizzard's merchant item buttons do. A left click never puts the item on
 -- the cursor, so it cannot be bought by dropping it on a bag slot past Blizzard's confirmations.
--- The buttons are plain Buttons: nothing they call is protected.
+-- An item dropped on it is sold, as on Blizzard's merchant item buttons. The buttons are plain
+-- Buttons: nothing they call is protected.
 ---@class NextVendorButton: AceModule
 local vendorButton = addon:NewModule('NextVendorButton')
 
@@ -44,12 +45,17 @@ local COIN_ICONS = {
   "Interface\\MoneyFrame\\UI-CopperIcon",
 }
 
+
 ---@alias NextVendorButtonMode "buy"|"buyback"|"repair"
 
 ---@class NextVendorButtonFrame
 ---@field key string What the canvas knows it by.
----@field frame Frame The holder the canvas places: the button and its price under it.
+---@field frame Frame The card the canvas places: the button, and its name and price beside it.
 ---@field button Button The square button: it takes the clicks, and Masque skins it.
+---@field card Button The whole card: it takes the clicks and the pointer beside the icon too.
+---@field cardFill Texture
+---@field cardHover Texture Shown while the pointer is over the card or its icon.
+---@field name FontString
 ---@field highlight Texture
 ---@field icon Texture
 ---@field border Texture
@@ -73,47 +79,54 @@ end
 
 vendorButton:Init()
 
--- markup is a texture in text, at the size of the price's font.
----@param texture number|string
----@return string
-local function markup(texture)
-  return "|T" .. texture .. ":12:12:2:0|t"
-end
-
--- PriceText is what a button shows of a price, short enough to sit under its icon: the first other
--- cost (with "+" when it costs more than that), else the largest coin of the gold. The tooltip shows
--- all of it.
+-- PriceText is a price on one line, as Blizzard's merchant writes it: each coin of the gold it has
+-- (gold, silver, copper; none for a coin it has none of), each amount then its coin, then each other
+-- cost the same way (Vendor.CoinSize). It is cut short when it does not fit; the tooltip shows it all.
 ---@param price number
 ---@param costs NextVendorCost[]
 ---@return string
 function vendorButton:PriceText(price, costs)
-  local first = costs[1]
-  if first then
-    local more = (#costs > 1 or price > 0) and "+" or ""
-    return first.value .. markup(first.texture) .. more
+  local size = style.Theme.Vendor.CoinSize
+  local parts = {}
+  local function add(n, texture)
+    table.insert(parts, n .. "|T" .. texture .. ":" .. size .. ":" .. size .. ":2:0|t")
   end
-  if price <= 0 then
-    return ""
+  if price and price > 0 then
+    local coins = { math.floor(price / 10000), math.floor(price / 100) % 100, price % 100 }
+    for i, n in ipairs(coins) do
+      if n > 0 then
+        add(n, COIN_ICONS[i])
+      end
+    end
   end
-  local gold, silver = math.floor(price / 10000), math.floor(price / 100) % 100
-  if gold > 0 then
-    return gold .. markup(COIN_ICONS[1])
+  for _, cost in ipairs(costs) do
+    add(cost.value, cost.texture)
   end
-  if silver > 0 then
-    return silver .. markup(COIN_ICONS[2])
-  end
-  return (price % 100) .. markup(COIN_ICONS[3])
+  return table.concat(parts, " ")
 end
 
 ---@return NextVendorButtonFrame
--- newButton makes a button: a holder the canvas places, as tall as the icon and its price, and in
--- it the square button that takes the clicks and that Masque skins. Masque sizes a skin to the
--- button it skins (Core.lua UpdateScale), and finds an item button's parts by these names
--- (Masque 12.1.0 Skins/Regions.lua, Item): icon, IconBorder, Count.
+-- newButton makes a button: a card the canvas places (asked: as Blizzard's merchant and GW2_UI draw
+-- an item, its icon with its name and price beside it), and on it the square button that takes the
+-- clicks and that Masque skins, over the card's own click area. Masque sizes a skin to the button it
+-- skins (Core.lua UpdateScale), and finds an item button's parts by these names (Masque 12.1.0
+-- Skins/Regions.lua, Item): icon, IconBorder, Count.
 ---@return NextVendorButtonFrame
 local function newButton()
   local frame = CreateFrame("Frame")
+  local cardFill = frame:CreateTexture(nil, "BACKGROUND")
+  cardFill:SetAllPoints(frame)
+  cardFill:SetColorTexture(1, 1, 1, 1)
+  local cardHover = frame:CreateTexture(nil, "BORDER")
+  cardHover:SetAllPoints(frame)
+  cardHover:SetColorTexture(1, 1, 1, 1)
+  cardHover:Hide()
+  local card = CreateFrame("Button", nil, frame)
+  card:SetAllPoints(frame)
+  card:SetFrameLevel(frame:GetFrameLevel() + 1)
+  card:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local button = CreateFrame("Button", nil, frame)
+  button:SetFrameLevel(frame:GetFrameLevel() + 2)
   button:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local icon = button:CreateTexture(nil, "ARTWORK")
@@ -137,27 +150,51 @@ local function newButton()
   button.Count = count
   local stock = button:CreateFontString(nil, "OVERLAY")
   stock:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
+  local name = frame:CreateFontString(nil, "OVERLAY")
   local price = frame:CreateFontString(nil, "OVERLAY")
-  price:SetPoint("TOP", button, "BOTTOM", 0, -1)
   ---@type NextVendorButtonFrame
   local b = setmetatable({
-    key = "", frame = frame, button = button, icon = icon, border = border, quest = quest, count = count,
-    stock = stock, price = price, durability = durability, highlight = highlight, affordable = true,
+    key = "", frame = frame, button = button, card = card, cardFill = cardFill, cardHover = cardHover,
+    icon = icon, border = border, quest = quest, count = count, stock = stock, name = name, price = price,
+    durability = durability, highlight = highlight, affordable = true, quality = nil,
   }, { __index = buttonProto })
   b:Style()
-  button:SetScript("OnEnter", function() b:OnEnter() end)
-  button:SetScript("OnLeave", function() b:OnLeave() end)
-  addon.SetScript(button, "OnClick", function(_, _, mouse) b:OnClick(mouse) end)
+  for _, target in ipairs({ button, card }) do
+    target:SetScript("OnEnter", function() b:OnEnter() end)
+    target:SetScript("OnLeave", function() b:OnLeave() end)
+    addon.SetScript(target, "OnClick", function(_, _, mouse) b:OnClick(mouse) end)
+    addon.SetScript(target, "OnReceiveDrag", function() b:OnReceiveDrag() end)
+  end
   return b
 end
 
--- Style draws the button from the Next theme (Layout, Vendor): its size and the room for its price,
--- its highlight, quest mark and durability bar, its stack, stock and price in their roles.
+-- Style draws the button from the Next theme (Layout, Vendor): its card's size (VendorColumns across
+-- the grid), fill and hover light, its name at the top beside the icon (up to two lines) and its price
+-- on one line at the bottom, its highlight, quest mark and durability bar, its stack, stock, name and
+-- price in their roles.
 function buttonProto:Style()
   local V = style.Theme.Vendor
-  self.frame:SetSize(style.ICON, style.ICON + style.VENDOR_PRICE)
+  self.frame:SetSize(style.VENDOR_CARD_WIDTH, style.ICON)
   self.button:SetSize(style.ICON, style.ICON)
   self.icon:SetSize(style.ICON, style.ICON)
+  local gap = style.VENDOR_TEXT_GAP
+  local textWidth = style.VENDOR_CARD_WIDTH - style.ICON - 2 * gap
+  local name, price = self.name, self.price
+  name:ClearAllPoints()
+  name:SetPoint("TOPLEFT", self.button, "TOPRIGHT", gap, 0)
+  name:SetWidth(textWidth)
+  price:ClearAllPoints()
+  price:SetPoint("BOTTOMLEFT", self.button, "BOTTOMRIGHT", gap, style.VENDOR_PRICE_RAISE)
+  price:SetWidth(textWidth)
+  self.cardFill:SetShown(V.CardFill and true or false)
+  if V.CardFill then
+    self.cardFill:SetVertexColor(style:RGBA(V.CardFill))
+  end
+  if V.CardHover then
+    self.cardHover:SetVertexColor(style:RGBA(V.CardHover))
+  else
+    self.cardHover:Hide()
+  end
   self.highlight:SetColorTexture(style:RGBA(V.Highlight))
   self.quest:SetTexture(style:TexturePath(V.QuestMark))
   if V.QualityBorder then
@@ -168,7 +205,47 @@ function buttonProto:Style()
   self.durability:SetHeight(V.DurabilityHeight)
   style:SetFont(self.count, V.StackFont)
   style:SetFont(self.stock, V.StackFont)
-  style:SetFont(self.price, self.affordable and V.PriceFont or V.UnaffordableFont)
+  self:setNameFont()
+  self:setPriceFont()
+end
+
+-- setNameFont writes the name in the theme's role, left-aligned from the top, at most two lines (a
+-- font string wraps unless told not to, UI.xsd), in its quality's color from Uncommon up. The layout is set again after the font object: a font string
+-- takes its layout from the font object it is given.
+---@private
+function buttonProto:setNameFont()
+  local name = self.name
+  style:SetFont(name, style.Theme.Vendor.NameFont)
+  name:SetJustifyH("LEFT")
+  name:SetJustifyV("TOP")
+  name:SetMaxLines(2)
+  local color = self.quality ~= nil and self.quality >= const.ITEM_QUALITY.Uncommon and const.ITEM_QUALITY_COLOR[self.quality]
+  if color then
+    name:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+  else
+    name:SetTextColor(style:Font(style.Theme.Vendor.NameFont):GetTextColor())
+  end
+end
+
+-- setName shows an item's name in its quality's color.
+---@private
+---@param text? string
+---@param quality? number
+function buttonProto:setName(text, quality)
+  self.quality = quality
+  self.name:SetText(text or "")
+  self:setNameFont()
+end
+
+-- setPriceFont writes the price in the theme's role for whether the player can afford it, on one
+-- line, left-aligned; set again after the font object, as the name's is.
+---@private
+function buttonProto:setPriceFont()
+  local V, price = style.Theme.Vendor, self.price
+  style:SetFont(price, self.affordable and V.PriceFont or V.UnaffordableFont)
+  price:SetJustifyH("LEFT")
+  price:SetWordWrap(false)
+  price:SetMaxLines(1)
 end
 
 -- ApplyStyle restyles every vendor button made, in use or pooled (SonataNext applied a theme); the
@@ -270,6 +347,7 @@ function buttonProto:SetBuy(item)
   end
   self.icon:SetDesaturated(item.isKnownHeirloom)
   self:setAffordable(item.canAfford and true or false)
+  self:setName(item.name, item.quality)
   self.price:SetText(vendorButton:PriceText(item.price, item.costs))
 end
 
@@ -278,8 +356,7 @@ end
 ---@param affordable boolean
 function buttonProto:setAffordable(affordable)
   self.affordable = affordable
-  local V = style.Theme.Vendor
-  style:SetFont(self.price, affordable and V.PriceFont or V.UnaffordableFont)
+  self:setPriceFont()
 end
 
 -- SetBuyback shows an item that was sold.
@@ -292,6 +369,7 @@ function buttonProto:SetBuyback(entry)
   if not entry.isUsable then
     self.icon:SetVertexColor(style:RGBA(style.Theme.Vendor.Unusable))
   end
+  self:setName(entry.name, entry.quality)
   self.price:SetText(vendorButton:PriceText(entry.price, {}))
 end
 
@@ -307,6 +385,7 @@ function buttonProto:SetRepair(entry)
   self.durability:SetWidth(math.max(1, style.ICON * fraction))
   self.durability:SetVertexColor(1 - fraction, fraction, 0.1, 1)
   self.durability:Show()
+  self:setName(entry.link and entry.link:match("%[(.-)%]"), quality)
   self.price:SetText(vendorButton:PriceText(entry.cost, {}))
 end
 
@@ -326,9 +405,12 @@ local function addCosts(price, costs)
   end
 end
 
--- OnEnter shows Blizzard's tooltip for what the button shows, with its price and what clicking
--- does, and the cursor Blizzard's merchant shows over it.
+-- OnEnter lights the card and shows Blizzard's tooltip for what the button shows, with its price and
+-- what clicking does, and the cursor Blizzard's merchant shows over it.
 function buttonProto:OnEnter()
+  if style.Theme.Vendor.CardHover then
+    self.cardHover:Show()
+  end
   GameTooltip:SetOwner(self.button, "ANCHOR_RIGHT")
   if self.mode == "buy" then
     local item = self.item
@@ -364,8 +446,14 @@ function buttonProto:OnEnter()
 end
 
 function buttonProto:OnLeave()
+  self.cardHover:Hide()
   GameTooltip:Hide()
   ResetCursor()
+end
+
+-- OnReceiveDrag sells the item dropped on the card, as Blizzard's merchant item buttons do.
+function buttonProto:OnReceiveDrag()
+  merchant:SellCursorItem()
 end
 
 -- askQuantity asks how many to buy, within what can be bought at once, then buys that many.
@@ -383,11 +471,15 @@ function buttonProto:askQuantity()
     end)
 end
 
--- OnClick runs a click as Blizzard's merchant buttons do: a modified click Blizzard handles (a
--- chat link, a preview) goes to it, Shift asks a quantity, a right click buys; a buyback is bought
--- back and a damaged item repaired on any click.
+-- OnClick runs a click as Blizzard's merchant buttons do: a left click holding an item sells it, a
+-- modified click Blizzard handles (a chat link, a preview) goes to it, Shift asks a quantity, a right
+-- click buys; a buyback is bought back and a damaged item repaired on any click.
 ---@param mouse string
 function buttonProto:OnClick(mouse)
+  if mouse == "LeftButton" and CursorHasItem() then
+    merchant:SellCursorItem()
+    return
+  end
   local link = self.item and self.item.link or (self.buyback and self.buyback.link) or (self.repair and self.repair.link)
   if IsModifiedClick() and link and HandleModifiedItemClick(link) then
     return

@@ -100,9 +100,14 @@ describe("NextVendorButton", function()
   end)
 
   describe("its look", function()
-    it("is a big icon with room for its price under it, and is reused once released", function()
+    -- Asked (a user found the price under the icon too small, then: "let's actually do this like this,
+    -- which is the gw2 addon ... name too?"): each item a card, as Blizzard's merchant and GW2_UI draw
+    -- it: the icon, its name beside it, its price on one line under the name, in larger fonts.
+    it("is a card as wide as its theme's columns make it and as tall as its icon, reused once released", function()
       local b = vendorButton:Acquire()
-      assert.are.same({ style.ICON, style.ICON + style.VENDOR_PRICE }, { b.frame:GetSize() })
+      local width = math.floor((style.GRID_WIDTH - (style.VENDOR_COLUMNS - 1) * style.GAP) / style.VENDOR_COLUMNS)
+      assert.are.equal(width, style.VENDOR_CARD_WIDTH)
+      assert.are.same({ width, style.ICON }, { b.frame:GetSize() })
       assert.are.same({ style.ICON, style.ICON }, { b.button:GetSize() })
       b:Release()
       assert.is_false(b.frame:IsShown())
@@ -111,8 +116,8 @@ describe("NextVendorButton", function()
     end)
 
     -- Masque skins a button against its own size (Core.lua UpdateScale), so the button it skins is
-    -- the square icon, the price a label under it on the holder the canvas places.
-    it("holds a square button with Masque's parts, its price under it", function()
+    -- the square icon; the name and price are labels beside it on the card the canvas places.
+    it("holds a square button with Masque's parts, its name and price beside it", function()
       local b = vendorButton:Acquire()
       assert.are.equal("Button", b.button:GetObjectType())
       assert.are.equal(b.frame, b.button:GetParent())
@@ -125,7 +130,21 @@ describe("NextVendorButton", function()
       assert.are.same({ Icon = b.icon, IconBorder = b.border, Count = b.count, Highlight = b.highlight },
         b:MasqueRegions())
       assert.are.equal("HIGHLIGHT", b.highlight:GetDrawLayer())
-      assert.are.same({ "TOP", b.button, "BOTTOM", 0, -1 }, { b.price:GetPoint(1) })
+      local textWidth = style.VENDOR_CARD_WIDTH - style.ICON - 2 * style.VENDOR_TEXT_GAP
+      assert.are.same({ "TOPLEFT", b.button, "TOPRIGHT", style.VENDOR_TEXT_GAP, 0 }, { b.name:GetPoint(1) })
+      assert.are.equal(textWidth, b.name:GetWidth())
+      assert.are.same({ "LEFT", "TOP" }, { b.name:GetJustifyH(), b.name:GetJustifyV() })
+      assert.is_true(b.name:CanWordWrap())
+      assert.are.equal(2, b.name:GetMaxLines())
+      -- Raised a little off the card's bottom edge (asked: "2-3 pixels up from the border").
+      assert.is_true(style.VENDOR_PRICE_RAISE >= 2 and style.VENDOR_PRICE_RAISE <= 3)
+      assert.are.same({ "BOTTOMLEFT", b.button, "BOTTOMRIGHT", style.VENDOR_TEXT_GAP, style.VENDOR_PRICE_RAISE },
+        { b.price:GetPoint(1) })
+      assert.are.equal(textWidth, b.price:GetWidth())
+      assert.are.equal("LEFT", b.price:GetJustifyH())
+      assert.is_false(b.price:CanWordWrap())
+      assert.are.equal(1, b.price:GetMaxLines())
+      assert.are.equal(style:Font(style.Theme.Vendor.NameFont), b.name:GetFontObject())
     end)
 
     it("announces each new button once, for Masque", function()
@@ -134,6 +153,16 @@ describe("NextVendorButton", function()
       vendorButton:Acquire()
       assert.are.equal(1, #calls.messages)
       assert.are.same({ "vendor/NewButton", b }, { calls.messages[1].name, calls.messages[1].args[1] })
+    end)
+
+    -- Asked: "the count for items in vendor, that font size should match our item count in bags":
+    -- the bags' item buttons write their count in NumberFontNormal (ItemButtonTemplate.xml's Count),
+    -- which the Stack role copies (its file, size and outline, in every locale).
+    it("writes its stack count and stock in the bags' item count font", function()
+      local b = vendorButton:Acquire()
+      assert.are.equal(style:Font("Stack"), b.count:GetFontObject())
+      assert.are.equal(style:Font("Stack"), b.stock:GetFontObject())
+      assert.are.same({ NumberFontNormal:GetFont() }, { style:Font("Stack"):GetFont() })
     end)
 
     it("shows an item for sale: icon, stack size, stock and the quest mark", function()
@@ -180,14 +209,94 @@ describe("NextVendorButton", function()
       assert.is_false(b.icon:IsDesaturated())
     end)
 
-    it("prices it in its largest coin, or its first cost, marking more", function()
-      assert.are.equal("12|TInterface\\MoneyFrame\\UI-GoldIcon:12:12:2:0|t", vendorButton:PriceText(123456, {}))
-      assert.are.equal("34|TInterface\\MoneyFrame\\UI-SilverIcon:12:12:2:0|t", vendorButton:PriceText(3456, {}))
-      assert.are.equal("7|TInterface\\MoneyFrame\\UI-CopperIcon:12:12:2:0|t", vendorButton:PriceText(7, {}))
-      assert.are.equal("30|T77:12:12:2:0|t", vendorButton:PriceText(0, { { texture = 77, value = 30 } }))
-      assert.are.equal("30|T77:12:12:2:0|t+", vendorButton:PriceText(0, { { texture = 77, value = 30 }, { texture = 78, value = 1 } }))
-      assert.are.equal("30|T77:12:12:2:0|t+", vendorButton:PriceText(500, { { texture = 77, value = 30 } }))
+    -- One line, as Blizzard's merchant writes a price: each coin it has (gold, silver, copper; none for
+    -- a coin it has none of), each amount then its coin, then each other cost the same way.
+    local GOLD, SILVER, COPPER = "Interface\\MoneyFrame\\UI-GoldIcon", "Interface\\MoneyFrame\\UI-SilverIcon",
+      "Interface\\MoneyFrame\\UI-CopperIcon"
+    local function coin(amount, texture)
+      local size = style.Theme.Vendor.CoinSize
+      return amount .. "|T" .. texture .. ":" .. size .. ":" .. size .. ":2:0|t"
+    end
+
+    it("prices it on one line: each coin it has, then each other cost", function()
+      assert.are.equal(coin(12, GOLD) .. " " .. coin(34, SILVER) .. " " .. coin(56, COPPER),
+        vendorButton:PriceText(123456, {}))
+      assert.are.equal(coin(34, SILVER) .. " " .. coin(56, COPPER), vendorButton:PriceText(3456, {}))
+      assert.are.equal(coin(7, COPPER), vendorButton:PriceText(7, {}))
+      assert.are.equal(coin(2, GOLD) .. " " .. coin(5, COPPER), vendorButton:PriceText(20005, {}))
+      assert.are.equal(coin(123456, GOLD), vendorButton:PriceText(1234560000, {}))
+      assert.are.equal(coin(30, 77), vendorButton:PriceText(0, { { texture = 77, value = 30 } }))
+      assert.are.equal(coin(5, SILVER) .. " " .. coin(30, 77) .. " " .. coin(1, 78),
+        vendorButton:PriceText(500, { { texture = 77, value = 30 }, { texture = 78, value = 1 } }))
       assert.are.equal("", vendorButton:PriceText(0, {}))
+    end)
+
+    it("names it in its quality's color from Uncommon up, else in its role's color", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ name = "Arcanite Reaper", quality = 4, price = 123456 }))
+      assert.are.equal("Arcanite Reaper", b.name:GetText())
+      assert.are.same({ 0.64, 0.21, 0.93, 1 }, { b.name:GetTextColor() })
+      assert.are.equal(coin(12, GOLD) .. " " .. coin(34, SILVER) .. " " .. coin(56, COPPER), b.price:GetText())
+      b:SetBuy(item({ name = "Bread", quality = 1 }))
+      assert.are.equal("Bread", b.name:GetText())
+      assert.are.same({ style:Font(style.Theme.Vendor.NameFont):GetTextColor() }, { b.name:GetTextColor() })
+      b:SetBuyback({ index = 1, name = "Sold Sword", texture = 1, price = 300, quantity = 1, isUsable = true, quality = 2 })
+      assert.are.equal("Sold Sword", b.name:GetText())
+      assert.are.same({ 0.12, 1, 0, 1 }, { b.name:GetTextColor() })
+    end)
+
+    it("lights its whole card under the pointer, from its icon or its card", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item())
+      assert.is_false(b.cardHover:IsShown())
+      b.card:GetScript("OnEnter")(b.card)
+      assert.is_true(b.cardHover:IsShown())
+      assert.are.same({ style:RGBA(style.Theme.Vendor.CardHover) }, { b.cardHover:GetVertexColor() })
+      assert.is_true(GameTooltip:IsOwned(b.button), "the item's tooltip, from its card too")
+      b.card:GetScript("OnLeave")(b.card)
+      assert.is_false(b.cardHover:IsShown())
+      enter(b)
+      assert.is_true(b.cardHover:IsShown())
+      b.button:GetScript("OnLeave")(b.button)
+      assert.is_false(b.cardHover:IsShown())
+      assert.are.same({ b.frame:GetPoint(1) }, { b.frame:GetPoint(1) })
+      assert.are.equal("BACKGROUND", b.cardFill:GetDrawLayer())
+      assert.is_true(b.card:GetFrameLevel() < b.button:GetFrameLevel(), "under its icon")
+    end)
+
+    it("buys from its card as from its icon", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item())
+      b.card:GetScript("OnClick")(b.card, "RightButton")
+      assert.are.equal(1, #calls.purchase)
+      assert.are.equal(b.button, calls.purchase[1].frame)
+    end)
+
+    -- As Blizzard's merchant item buttons sell what is dropped on them (OnReceiveDrag runs their
+    -- left click, which picks the merchant item up while holding the player's: a sale): the cards
+    -- cover most of the panel, so a drop on one sells, through NextMerchant:SellCursorItem.
+    it("sells what is dropped on it or left-clicked onto it, on its icon or its card", function()
+      local sold = 0
+      override(stubs.merchant, "SellCursorItem", function() sold = sold + 1 return "sold" end)
+      local b = vendorButton:Acquire()
+      b:SetBuy(item())
+      b.card:GetScript("OnReceiveDrag")(b.card)
+      b.button:GetScript("OnReceiveDrag")(b.button)
+      assert.are.equal(2, sold)
+      _G._cursorHasItem = true
+      click(b, "LeftButton")
+      b.card:GetScript("OnClick")(b.card, "LeftButton")
+      _G._cursorHasItem = false
+      assert.are.equal(4, sold)
+      assert.are.equal(0, #calls.purchase, "nothing bought")
+      click(b, "LeftButton")
+      assert.are.equal(4, sold, "a plain left click sells nothing")
+      -- As on Blizzard's merchant buttons, only a left click sells what is held: a right click buys.
+      _G._cursorHasItem = true
+      click(b, "RightButton")
+      _G._cursorHasItem = false
+      assert.are.equal(4, sold)
+      assert.are.equal(1, #calls.purchase)
     end)
 
     it("prices what it cannot afford in red", function()
@@ -208,19 +317,36 @@ describe("NextVendorButton", function()
         vendorButton:ApplyStyle()
       end)
 
-      it("sizes every button it made to its icon and price row, and writes them in its roles", function()
+      it("sizes every button it made to its icon and columns, and writes them in its roles", function()
         local live, pooled = vendorButton:Acquire(), vendorButton:Acquire()
         pooled:Release()
-        UseNextTheme({ Fonts = { Tiny = { Size = 8 } }, Layout = { Icon = 32, VendorPrice = 10 },
-          Vendor = { StackFont = "Tiny", PriceFont = "Tiny", DurabilityHeight = 5 } })
+        UseNextTheme({ Palette = { Fog = { 0.5, 0.5, 0.5, 0.2 } }, Fonts = { Tiny = { Size = 8 } },
+          Layout = { Icon = 32, VendorColumns = 3, VendorTextGap = 5, VendorPriceRaise = 4 },
+          Vendor = { StackFont = "Tiny", PriceFont = "Tiny", NameFont = "Tiny", DurabilityHeight = 5, CoinSize = 9,
+            CardFill = "Fog", CardHover = false } })
         vendorButton:ApplyStyle()
+        assert.are.equal("7|TInterface\\MoneyFrame\\UI-CopperIcon:9:9:2:0|t", vendorButton:PriceText(7, {}))
+        local width = math.floor((style.GRID_WIDTH - 2 * style.GAP) / 3)
         for _, b in ipairs({ live, pooled }) do
-          assert.are.same({ 32, 42 }, { b.frame:GetSize() })
+          assert.are.same({ width, 32 }, { b.frame:GetSize() })
+          assert.are.same({ "BOTTOMLEFT", b.button, "BOTTOMRIGHT", 5, 4 }, { b.price:GetPoint(1) })
+          assert.are.equal(width - 32 - 10, b.name:GetWidth())
+          assert.are.equal(style:Font("Tiny"), b.name:GetFontObject())
+          assert.are.same({ 0.5, 0.5, 0.5, 0.2 }, { b.cardFill:GetVertexColor() })
+          assert.is_true(b.cardFill:IsShown())
+          b.card:GetScript("OnEnter")(b.card)
+          assert.is_false(b.cardHover:IsShown(), "no hover light")
+          b.card:GetScript("OnLeave")(b.card)
           assert.are.same({ 32, 32 }, { b.button:GetSize() })
           assert.are.same({ 32, 32 }, { b.icon:GetSize() })
           assert.are.equal(style:Font("Tiny"), b.count:GetFontObject())
           assert.are.equal(style:Font("Tiny"), b.price:GetFontObject())
           assert.are.equal(5, b.durability:GetHeight())
+        end
+        UseNextTheme({ Vendor = { CardFill = false } })
+        vendorButton:ApplyStyle()
+        for _, b in ipairs({ live, pooled }) do
+          assert.is_false(b.cardFill:IsShown(), "no fill")
         end
       end)
 
@@ -364,11 +490,13 @@ describe("NextVendorButton", function()
   describe("a repair", function()
     it("shows how worn it is as a bar along the icon's bottom, and what repairing it costs", function()
       local b = vendorButton:Acquire()
-      b:SetRepair({ slot = 1, texture = 7, durability = 25, maxDurability = 100, cost = 30000 })
+      b:SetRepair({ slot = 1, texture = 7, link = "|Hitem:10|h[Ten]|h", durability = 25, maxDurability = 100, cost = 30000 })
       assert.are.equal(7, b.icon:GetTexture())
       assert.is_true(b.durability:IsShown())
       assert.are.equal(style.ICON * 0.25, b.durability:GetWidth())
-      assert.are.equal("3|TInterface\\MoneyFrame\\UI-GoldIcon:12:12:2:0|t", b.price:GetText())
+      local size = style.Theme.Vendor.CoinSize
+      assert.are.equal("3|TInterface\\MoneyFrame\\UI-GoldIcon:" .. size .. ":" .. size .. ":2:0|t", b.price:GetText())
+      assert.are.equal("Ten", b.name:GetText(), "named from its link")
       b:SetBuy(item())
       assert.is_false(b.durability:IsShown())
     end)
