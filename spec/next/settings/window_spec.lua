@@ -301,6 +301,59 @@ describe("NextSettings", function()
       assert.is_false(settings.page.sections[1].rows[1].control:GetChecked())
     end)
 
+    it("tells the page it leaves, for another page or when it closes", function()
+      local left = {}
+      pages:Define({ id = "appearance", group = "BetterBags", title = "Appearance", description = "",
+        tabs = { { id = "main", title = "Appearance", sections = { { title = "Themes", rows = {
+          { block = function(parent)
+            local row = addon:GetModule("NextSettingsRows"):CreateText(parent, "themes")
+            function row:OnPageLeft() table.insert(left, "left") end
+            return row
+          end, title = "Theme" },
+        } } } } } })
+      open("appearance")
+      open("general")
+      assert.are.same({ "left" }, left)
+      open("appearance")
+      settings:Close()
+      assert.are.same({ "left", "left" }, left)
+    end)
+
+    it("shows the page's values again when told", function()
+      open()
+      values.bank = false
+      settings:Refresh()
+      assert.is_false(settings.page.sections[1].rows[1].control:GetChecked())
+    end)
+
+    it("leaves out a section with no rows (a bag without the setting)", function()
+      pages:Define({ id = "empty", group = "Bags", title = "Empty", description = "",
+        tabs = { { id = "main", title = "Empty", sections = {
+          { title = "Nothing", rows = {} },
+          { title = "Something", rows = { toggle("Something", "bank") } },
+        } } } })
+      open("empty")
+      assert.are.equal(1, #settings.page.sections)
+      assert.are.equal("Something", settings.page.sections[1].title)
+    end)
+
+    it("forgets the page of a window from an earlier session", function()
+      local left = 0
+      pages:Define({ id = "leaving", group = "Bags", title = "Leaving", description = "",
+        tabs = { { id = "main", title = "Leaving", sections = { { title = "S", rows = {
+          { block = function(parent)
+            local row = addon:GetModule("NextSettingsRows"):CreateText(parent, "x")
+            function row:OnPageLeft() left = left + 1 end
+            return row
+          end, title = "x" },
+        } } } } } })
+      open("leaving")
+      settings:Close()
+      settings:Init()
+      open("general")
+      assert.are.equal(1, left, "only the close left it")
+    end)
+
     it("shows General for a page that is not shown", function()
       open("hidden")
       assert.are.equal("general", settings.pageId)

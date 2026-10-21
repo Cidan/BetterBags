@@ -88,8 +88,11 @@ function swatchProto:SetColor(color)
   self:Style()
 end
 
--- Open shows Blizzard's color picker with the swatch's color.
+-- Open shows Blizzard's color picker with the swatch's color (not while disabled).
 function swatchProto:Open()
+  if not self.frame:IsEnabled() then
+    return
+  end
   local before = self:GetColor()
   local hasOpacity = self.opts.hasOpacity == true
   local function picked()
@@ -107,6 +110,13 @@ function swatchProto:Open()
       self.opts.onChange(context:New('NextSwatch_Cancel'), self:GetColor())
     end,
   })
+end
+
+-- SetEnabled takes or refuses clicks, drawn at DisabledAlpha while refusing.
+---@param enabled boolean
+function swatchProto:SetEnabled(enabled)
+  self.frame:SetEnabled(enabled)
+  self.frame:SetAlpha(enabled and 1 or controls:Theme("Button").DisabledAlpha)
 end
 
 ---@param hovered boolean

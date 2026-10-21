@@ -150,6 +150,52 @@ describe("NextSettingsRows", function()
     _G._cursorX, _G._cursorY = 0, 0
   end)
 
+  it("makes a one-line text kind, writing what is typed on Enter", function()
+    value = "Bags"
+    local row = rows:Create(owner, option("input"), owner)
+    assert.are.equal("Bags", row.control:GetText())
+    row.control.frame:SetText("Loot")
+    row.control.frame:GetScript("OnEnterPressed")(row.control.frame)
+    assert.are.same({ "Loot" }, writes)
+  end)
+
+  it("draws a setting it says is disabled as disabled, read again each time", function()
+    local off = true
+    value = true
+    local row = rows:Create(owner, option("toggle", { disabled = function() return off end }), owner)
+    row:Refresh(ctx())
+    assert.is_false(row.control.frame:IsEnabled())
+    off = false
+    row:Refresh(ctx())
+    assert.is_true(row.control.frame:IsEnabled())
+    value = 5
+    local s = rows:Create(owner, option("slider", { min = 0, max = 10, step = 1, disabled = true }), owner)
+    s:Refresh(ctx())
+    assert.is_false(s.control.track:IsEnabled())
+    value = { 1, 1, 1, 1 }
+    local c = rows:Create(owner, option("color", { disabled = true }), owner)
+    c:Refresh(ctx())
+    assert.is_false(c.control.frame:IsEnabled())
+  end)
+
+  it("reads a text row's text again when it is a function", function()
+    local n = 1
+    local text = rows:CreateText(owner, function() return "Default: " .. n .. " characters" end)
+    assert.are.equal("Default: 1 characters", text.label:GetText())
+    n = 2
+    text:Refresh(ctx())
+    assert.are.equal("Default: 2 characters", text.label:GetText())
+  end)
+
+  it("makes a text area across the page, its height and the row's padding tall", function()
+    local area = rows:CreateArea(owner, { height = 120, help = "Paste here" })
+    assert.is_true(area.wide)
+    assert.are.equal("Paste here", area.area.help:GetText())
+    assert.are.equal(120 + C().RowPad, area:Measure(600))
+    area:Place(0, 0, 600, 134)
+    assert.are.same({ "TOPLEFT", area.frame, "TOPLEFT", C().RowPad, -C().RowPad / 2 }, { area.area.frame:GetPoint(1) })
+  end)
+
   it("makes rows across the page: text, buttons, a link", function()
     local text = rows:CreateText(owner, "Export your categories.")
     assert.is_true(text.wide)
@@ -261,6 +307,16 @@ describe("NextSettingsPage", function()
       if line:IsShown() then shown = shown + 1 end
     end
     assert.are.equal(2, shown, "one between the two lines, one between the columns of the pair")
+  end)
+
+  it("tells its rows when the page is left (a theme preview ends)", function()
+    local page = nextPage:Create(parent)
+    local a = fakeRow(44)
+    local left = 0
+    function a:OnPageLeft() left = left + 1 end
+    page:SetSections({ { title = "Order", rows = { a, fakeRow(44) } } })
+    page:Leave(ctx())
+    assert.are.equal(1, left)
   end)
 
   it("tells its rows to show their values again", function()

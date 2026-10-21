@@ -149,3 +149,68 @@ remembering the page, values read again on open, a page not shown, search: match
 links, nothing found, hidden pages; a theme), `spec/config/config_redraw_spec.lua` (opening the
 design's window, swapping windows on a switch), `spec/core/init_spec.lua` (the init order).
 Mutation-tested (26 mutations; the one that first survived led to a test).
+
+## 4. The pages (`next/settings/content.lua`, `NextSettingsContent`)
+
+`Init` (from `core/init.lua`, after `NextSettings:Init`) defines the pages in the sidebar's order;
+`OnEnable` (from `addon:OnEnable`) names the item level colors' ranges again when the highest item
+level seen changes (`itemLevel/MaxChanged`) while Item Colors shows. Every page writes through the
+same database calls, with the same effects, as the classic window; every question is a
+`NextDialog` over the window (no `StaticPopup`).
+
+| Group | Page (id) | What it shows |
+|---|---|---|
+| BetterBags | General (`general`) | *Bags:* BetterBags Next, Enable Bank Bags, Show Blizzard Bag Button. *Search:* In-Bag Search, Enter to Make Category. *Items:* Upgrade Icon Provider, New Item Duration, Category Sell and Deposit. |
+| | Appearance (`appearance`) | Two theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext), then the classic themes (Sonata), which draw Next's item buttons and dialogs unless the Next theme does. |
+| | Item Colors (`itemcolors`) | The four item level colors as swatches, named with their ranges (61% and 86% of the highest item level seen, as the classic pane); a picked color is saved and sent as `itemLevel/MaxChanged` (Cancel saves the color back too); the highest level seen; Reset Colors, Reset Max Item Level. |
+| Bags | Backpack, Bank, Guild Bank (`backpack`, `bank`, `guild`) | Each bound to its bag. *Layout:* Order (Section, Item), Tabs (Enable Groups: the backpack only; the bank's Tabs section is left out), Slots (All Free Space, Gaps). *Items:* Item Level (two), Quality (Glow Intensity), Stacking (seven). *Categories:* Automatic (the seven filters). The guild bank's page shows on a client with one (`addon.hasGuildBank`). |
+| Profiles | Profiles (`profiles`) | Tab *Profiles:* the active profile (a pick asks, then switches and reloads), the characters on each, New, Copy, Rename, Delete, Reset to Defaults (the classic flows: Copy creates then copies; Delete switches to Default first; Default cannot be renamed or deleted; a name is asked again while empty). Tab *Import / Export* (`transfer`): Export Categories fills a text area and selects it; Import Categories asks, imports (`DB:ImportSettings`), clears the area and offers a reload, or says what is wrong. |
+| Integrations | QuickFind (`quickfind`) | What the integration does. |
+| | a plugin (`plugin:<title>`) | Below. |
+
+Settings only the classic bags read stay in the classic window: Enable Bag Fading, Animate Item
+Movement, Show Full Section Names, Resizable Window, Snap to Content, Items Per Row, Columns,
+Opacity, Scale; and Currency. A spec checks every setting a page names exists in the catalog for
+its bag, and none of these is named.
+
+**The theme picker** (`NextSettingsThemes`, a wide row): a card per theme the engine lists (not
+hidden; unavailable ones too, marked so), sorted by name, each with its description and status
+(Active, Previewing, Unavailable). A pick is previewed (applied unsaved) **on the next frame**, the
+last pick before then winning: applying restyles this window, which must not happen inside the
+click (the classic theme pane's lesson, sonata.md §2). Apply Theme saves it and is off while there is
+nothing to save; a pick that cannot be used shows the saved theme; leaving the page (another page,
+the window closing: `OnPageLeft`, sent by the page's `Leave`) puts the saved theme back.
+
+**Plugins** (`AddPlugin`, called by `Config:AddPluginConfig`, which still fills the classic window
+too): the options are read the way AceConfigDialog-3.0 reads them (its source, vendored in `libs/`):
+- `options` is an AceConfig group, or the `args` of one (what plugins pass today);
+- `get`, `set`, `func`, `confirm`, `validate`, `disabled`, `hidden` are inherited from the groups above;
+  a member that is a function is called with AceConfig's `info` (the keys of the way, `options`,
+  `option`, `type`, `arg`, `handler`, `appName`), and a string is a method of the nearest `handler`,
+  except `name`, `desc` and the other literal members;
+- options are in `order` (100 when unset, negative ones last), then by name; hidden ones are left out
+  (read when the page is first built);
+- the plugin's own options go in a section under its title, each group's in a section under the
+  group's name, and a `header` starts a section;
+- toggle, select (its names shown, its key written; `sorting`, else keys sorted as strings),
+  multiselect (a switch per value), range (`softMin`/`softMax`/`bigStep` first; a step of 0 is a
+  hundredth of the range), input (one line, or a text area with Accept for `multiline`), color
+  (`hasAlpha`), execute, description; anything else is logged, as the classic window does;
+- a change goes through `pattern` and `validate` (false or a message refuses it, said in a dialog;
+  the row shows the value again), then `confirm` (asked in a dialog), then `set` (`func` for an
+  execute, its errors reported to `geterrorhandler`), and the page shows every value again.
+
+Coverage: `spec/next/settings/content_spec.lua` (the pages' order and contents, the catalog check,
+the bank without Enable Groups, Appearance's engines, Item Colors (names, saving, Cancel, resets, a
+new highest level), every profile flow, import and export, QuickFind, and a plugin page: sections,
+order, hidden, toggles with `info`, selects and their order and `sorting`, handler methods by name,
+colors, `validate`, multi-line Accept, execute and `confirm`, a group as the root),
+`spec/next/settings/themes_spec.lua` (cards, layout, previewing on the next frame, the last pick,
+Apply Theme, an unusable pick, leaving the page, hover), `spec/config/plugin_spec.lua`,
+`spec/core/init_spec.lua` (init order, enabling). Mutation-tested (39 mutations; the three that first
+survived led to two tests and to removing dead code).
+
+`NextSettings:Init` now forgets the page shown too: a new session kept the old window's page and
+left it again when showing the first page (seen as the theme pickers restoring a theme of a window
+long gone; `spec/next/settings/window_spec.lua`, "forgets the page of a window from an earlier
+session").

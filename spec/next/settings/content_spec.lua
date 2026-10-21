@@ -1,0 +1,609 @@
+-- content_spec.lua -- NextSettingsContent (next/settings/content.lua): the pages of BetterBags Next's
+-- settings window (next-settings.md §4): where every setting goes, Appearance's theme pickers, Item
+-- Colors, Profiles, Import / Export, QuickFind, and a page per plugin built from its AceConfig options.
+-- The pages are opened in the real window, on the real settings catalog.
+local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
+
+local const = StubBetterBagsModule("Constants")
+const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
+const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
+const.SECTION_SORT_TYPE = const.SECTION_SORT_TYPE or { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
+const.ITEM_SORT_TYPE = const.ITEM_SORT_TYPE
+  or { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
+
+LoadBetterBagsModule("core/context.lua")
+LoadBetterBagsModule("render/render.lua")
+LoadBetterBagsModule("render/drawable.lua")
+LoadBetterBagsModule("render/scrollbox.lua")
+local L = StubBetterBagsModule("Localization")
+L.G = L.G or function(_, key) return key end
+local events = StubBetterBagsModule("Events")
+local db = StubBetterBagsModule("Database")
+-- The saved BetterBags Next theme (DB:GetNextTheme), which SonataNext reads.
+db.GetNextTheme = db.GetNextTheme or function() return "Default" end
+StubBetterBagsModule("Bucket")
+StubBetterBagsModule("BagSystem")
+StubBetterBagsModule("Items")
+local sonata = StubBetterBagsModule("Sonata")
+local debugModule = StubBetterBagsModule("Debug")
+debugModule.Log = debugModule.Log or function() end
+for _, m in ipairs({ { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle", "next/style.lua" },
+  { "NextTween", "next/tween.lua" }, { "NextControls", "next/controls/base.lua" },
+  { "NextScrollBar", "next/controls/scrollbar.lua" }, { "NextButton", "next/controls/button.lua" },
+  { "NextToggle", "next/controls/toggle.lua" }, { "NextInput", "next/controls/input.lua" },
+  { "NextSlider", "next/controls/slider.lua" }, { "NextMenu", "next/controls/menu.lua" },
+  { "NextDropdown", "next/controls/dropdown.lua" }, { "NextSwatch", "next/controls/swatch.lua" },
+  { "NextTopTabs", "next/controls/toptabs.lua" }, { "NextDialog", "next/controls/dialog.lua" },
+  { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
+  { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" },
+  { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextSettingsContent", "next/settings/content.lua" } }) do
+  ResetModuleStub(m[1], m[2])
+  LoadBetterBagsModule(m[2])
+end
+
+local content = addon:GetModule("NextSettingsContent")
+local settings = addon:GetModule("NextSettings")
+local pages = addon:GetModule("NextSettingsPages")
+local catalog = addon:GetModule("SettingsCatalog")
+local nextDialog = addon:GetModule("NextDialog")
+local nextMenu = addon:GetModule("NextMenu")
+local controls = addon:GetModule("NextControls")
+local render = addon:GetModule("Render")
+local tween = addon:GetModule("NextTween")
+local sonataNext = addon:GetModule("SonataNext")
+
+describe("NextSettingsContent", function()
+  local sent, calls, saved, timers, reloads, handlers
+
+  local function override(tbl, key, value)
+    table.insert(saved, { tbl, key, rawget(tbl, key) })
+    tbl[key] = value
+  end
+
+  local function call(name)
+    return function(_, ...)
+      table.insert(calls, { name, ... })
+    end
+  end
+
+  local function idsOf(page)
+    local list = {}
+    for _, tab in ipairs(page.tabs) do
+      for _, section in ipairs(pages:Sections(tab)) do
+        local ids = {}
+        for _, row in ipairs(section.rows) do
+          table.insert(ids, row.setting or row.title or (row.option and row.option.title) or row.text or "?")
+        end
+        table.insert(list, { tab.title, section.title, ids })
+      end
+    end
+    return list
+  end
+
+  local function rowsShown()
+    local list = {}
+    for _, section in ipairs(settings.page.sections) do
+      for _, row in ipairs(section.rows) do
+        table.insert(list, row)
+      end
+    end
+    return list
+  end
+
+  local function rowTitled(title)
+    for _, row in ipairs(rowsShown()) do
+      if row.label and row.label:GetText() == title then return row end
+    end
+  end
+
+  local function button(text)
+    for _, row in ipairs(rowsShown()) do
+      for _, b in ipairs(row.buttons or {}) do
+        if b.label:GetText() == text then return b end
+      end
+    end
+    error("no button " .. text)
+  end
+
+  local function click(b)
+    b.frame:GetScript("OnClick")(b.frame, "LeftButton")
+  end
+
+  -- answer clicks the dialog's button labelled text.
+  local function answer(text)
+    assert.is_true(nextDialog:IsShown(), "a dialog is shown")
+    for i, spec in ipairs(nextDialog.opts.buttons) do
+      if spec.text == text then
+        click(nextDialog.buttons[i])
+        return
+      end
+    end
+    error("the dialog has no button " .. text)
+  end
+
+  before_each(function()
+    sent, calls, saved, timers, reloads, handlers = {}, {}, {}, {}, 0, {}
+    override(_G, "UISpecialFrames", {})
+    override(C_Timer, "After", function(_, fn) table.insert(timers, fn) end)
+    override(_G, "ReloadUI", function() reloads = reloads + 1 end)
+    override(events, "SendMessage", function(_, _, message, ...) table.insert(sent, { message, ... }) end)
+    override(events, "RegisterMessage", function(_, message, fn) handlers[message] = fn end)
+    override(addon, "hasGuildBank", false)
+    controls.escape = {}
+    render:Init()
+    tween:Init()
+    pages:Clear()
+    settings:Init()
+    content:Init()
+  end)
+
+  after_each(function()
+    settings:Close()
+    nextMenu:Close()
+    nextDialog:Hide()
+    for i = #saved, 1, -1 do
+      saved[i][1][saved[i][2]] = saved[i][3]
+    end
+  end)
+
+  describe("the pages", function()
+    it("lists BetterBags, the bags, Profiles and Integrations, in that order", function()
+      local list = {}
+      for _, page in ipairs(pages:List()) do
+        table.insert(list, page.group .. ": " .. page.title)
+      end
+      assert.are.same({ "BetterBags: General", "BetterBags: Appearance", "BetterBags: Item Colors",
+        "Bags: Backpack", "Bags: Bank", "Profiles: Profiles", "Integrations: QuickFind" }, list)
+    end)
+
+    it("shows the guild bank's page on a client with one", function()
+      assert.is_false(pages:IsShown(pages:Get("guild")))
+      addon.hasGuildBank = true
+      assert.is_true(pages:IsShown(pages:Get("guild")))
+      assert.are.equal("Guild Bank", pages:Get("guild").bag.name)
+    end)
+
+    it("puts the bags' general settings on General", function()
+      assert.are.same({
+        { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton" } },
+        { "General", "Search", { "inBagSearch", "enterToMakeCategory" } },
+        { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell" } },
+      }, idsOf(pages:Get("general")))
+    end)
+
+    it("gives every bag its layout, items and categories, bound to it", function()
+      local page = pages:Get("bank")
+      assert.are.equal(const.BAG_KIND.BANK, page.bag.kind)
+      assert.are.same({
+        { "Layout", "Order", { "sectionOrder", "itemOrder" } },
+        { "Layout", "Tabs", { "enableGroups" } },
+        { "Layout", "Slots", { "showAllFreeSpace", "preserveGaps" } },
+        { "Items", "Item Level", { "itemLevel", "itemLevelColor" } },
+        { "Items", "Quality", { "glowIntensity" } },
+        { "Items", "Stacking", { "markRecentItems", "newItemFlash", "mergeStacks", "mergeUnstackable",
+          "dontMergePartial", "dontMergeTransmog", "unmergeAtShop" } },
+        { "Categories", "Automatic", { "filterEquipmentLocation", "filterExpansion", "filterGearSet",
+          "filterRecentItems", "filterTradeSkill", "filterType", "filterSubtype" } },
+      }, idsOf(page))
+    end)
+
+    it("names only settings the catalog has, for the page's bag, and none of the classic bags' alone", function()
+      local classicOnly = { bagFading = true, animateItemMovement = true, fullSectionNames = true,
+        resizableWindow = true, snapToContent = true, itemsPerRow = true, columns = true, opacity = true, scale = true }
+      addon.hasGuildBank = true
+      content:Init()
+      local named = 0
+      for _, page in ipairs(pages.list) do
+        for _, tab in ipairs(page.tabs) do
+          for _, section in ipairs(pages:Sections(tab)) do
+            for _, row in ipairs(section.rows) do
+              if row.setting then
+                named = named + 1
+                assert.is_nil(classicOnly[row.setting], row.setting)
+                if catalog:Has(row.setting, page.bag) then
+                  assert.has_no.errors(function() catalog:Get(row.setting, page.bag) end, row.setting)
+                else
+                  assert.are.equal("enableGroups", row.setting, "only Enable Groups is a backpack's alone")
+                end
+              end
+            end
+          end
+        end
+      end
+      assert.are.equal(8 + 3 * 22, named)
+    end)
+
+    it("shows the bank's Layout without the backpack's Enable Groups", function()
+      for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetItemSortType", "GetGroupsEnabled",
+        "GetShowAllFreeSpace", "GetPreserveItemGaps" }) do
+        override(db, name, function() return 1 end)
+      end
+      settings:Open("bank", "layout")
+      local sections = {}
+      for _, section in ipairs(settings.page.sections) do table.insert(sections, section.title) end
+      assert.are.same({ "Order", "Slots" }, sections)
+      settings:Open("backpack", "layout")
+      assert.is_not_nil(rowTitled("Enable Groups"))
+    end)
+  end)
+
+  describe("Appearance", function()
+    it("picks BetterBags Next's theme, then the classic theme its item buttons and dialogs may use", function()
+      override(sonata, "GetThemes", function() return {} end)
+      override(sonata, "IsAvailable", function() return true end)
+      override(sonata, "IsSelectable", function() return true end)
+      override(sonata, "GetSavedThemeKey", function() return "Default" end)
+      override(sonata, "GetCurrentThemeKey", function() return "Default" end)
+      override(sonata, "RestoreSavedTheme", function() end)
+      settings:Open("appearance")
+      local rows = rowsShown()
+      assert.are.equal(2, #rows)
+      assert.are.equal(sonataNext, rows[1].engine)
+      assert.are.equal(sonata, rows[2].engine)
+      assert.are.same({ "Theme", "Item Buttons" }, { settings.page.sections[1].title, settings.page.sections[2].title })
+    end)
+  end)
+
+  describe("Item Colors", function()
+    local colors
+
+    before_each(function()
+      colors = {
+        low = { red = 0.6, green = 0.6, blue = 0.6, alpha = 1 }, mid = { red = 1, green = 1, blue = 1, alpha = 1 },
+        high = { red = 0, green = 0.55, blue = 0.87, alpha = 1 }, max = { red = 1, green = 0.5, blue = 0, alpha = 1 },
+      }
+      override(db, "GetMaxItemLevel", function() return 100 end)
+      override(db, "GetItemLevelColors", function() return colors end)
+      override(db, "SetItemLevelColor", function(_, key, color) colors[key] = color end)
+      override(db, "ResetItemLevelColors", function() table.insert(calls, { "ResetItemLevelColors" })
+        colors.low = { red = 0.1, green = 0.1, blue = 0.1, alpha = 1 } end)
+      override(db, "ResetMaxItemLevel", call("ResetMaxItemLevel"))
+      ColorPickerFrame:Hide()
+    end)
+
+    it("names each color with its range of item levels, from the highest seen", function()
+      settings:Open("itemcolors")
+      assert.is_not_nil(rowTitled("Low Item Level Color (1-60)"))
+      assert.is_not_nil(rowTitled("Mid Item Level Color (61-85)"))
+      assert.is_not_nil(rowTitled("High Item Level Color (86-99)"))
+      assert.is_not_nil(rowTitled("Max Item Level Color (100+)"))
+      assert.are.same({ 0, 0.55, 0.87, 1 }, rowTitled("High Item Level Color (86-99)").control:GetColor())
+    end)
+
+    it("saves a color picked and has the buttons show it; cancelling puts the saved one back too", function()
+      settings:Open("itemcolors")
+      local row = rowTitled("Low Item Level Color (1-60)")
+      click(row.control)
+      ColorPickerFrame:_Pick(0.2, 0.3, 0.4, 0.5)
+      assert.are.same({ red = 0.2, green = 0.3, blue = 0.4, alpha = 0.5 }, colors.low)
+      assert.are.same({ "itemLevel/MaxChanged", 100 }, sent[#sent])
+      ColorPickerFrame:_Cancel()
+      assert.are.same({ red = 0.6, green = 0.6, blue = 0.6, alpha = 1 }, colors.low)
+    end)
+
+    it("resets the colors and the highest item level seen", function()
+      settings:Open("itemcolors")
+      click(button("Reset Colors"))
+      assert.are.same({ "ResetItemLevelColors" }, calls[1])
+      assert.are.same({ "itemLevel/MaxChanged", 100 }, sent[#sent])
+      assert.are.same({ 0.1, 0.1, 0.1, 1 }, rowTitled("Low Item Level Color (1-60)").control:GetColor())
+      click(button("Reset Max Item Level"))
+      assert.are.equal("ResetMaxItemLevel", calls[2][1])
+    end)
+
+    it("names the ranges again when the highest item level seen changes while it shows", function()
+      settings:Open("itemcolors")
+      content:OnEnable()
+      override(db, "GetMaxItemLevel", function() return 200 end)
+      handlers["itemLevel/MaxChanged"](nil, 200)
+      assert.is_not_nil(rowTitled("Max Item Level Color (200+)"))
+    end)
+  end)
+
+  describe("Profiles", function()
+    local current, profiles
+
+    before_each(function()
+      current, profiles = "Raid", { "Default", "Raid" }
+      override(db, "GetCurrentProfileName", function() return current end)
+      override(db, "GetAvailableProfiles", function() return profiles end)
+      override(db, "GetProfileCharacterCounts", function() return { Default = 2, Raid = 1, Unused = 0 } end)
+      override(db, "SwitchToProfile", call("SwitchToProfile"))
+      override(db, "CreateProfile", function(_, name)
+        table.insert(calls, { "CreateProfile", name })
+        if name == "Raid" then return false, "A profile with this name already exists" end
+        return true, "ok"
+      end)
+      override(db, "CopyFromProfile", function(_, name) table.insert(calls, { "CopyFromProfile", name }) return true, "ok" end)
+      override(db, "RenameProfile", function(_, a, b) table.insert(calls, { "RenameProfile", a, b }) return true, "ok" end)
+      override(db, "DeleteProfile", function(_, name) table.insert(calls, { "DeleteProfile", name }) return true, "ok" end)
+      override(db, "ResetCurrentProfile", call("ResetCurrentProfile"))
+      settings:Open("profiles", "profiles")
+    end)
+
+    it("shows the active profile and how many characters use each", function()
+      local row = rowTitled("Active Profile")
+      assert.are.equal("Raid", row.control.text:GetText())
+      local found = false
+      for _, r in ipairs(rowsShown()) do
+        if r.label and r.label:GetText() == "Characters: Default: 2 characters  |  Raid: 1 character" then found = true end
+      end
+      assert.is_true(found)
+    end)
+
+    it("asks before switching profiles, then switches and reloads", function()
+      local row = rowTitled("Active Profile")
+      click(row.control)
+      local menuRows = nextMenu:Rows()
+      menuRows[1].frame:GetScript("OnClick")(menuRows[1].frame, "LeftButton")
+      assert.are.equal("Raid", row.control.text:GetText(), "still the active one until the reload")
+      answer("Cancel")
+      assert.are.same({}, calls)
+      click(row.control)
+      nextMenu:Rows()[1].frame:GetScript("OnClick")(nextMenu:Rows()[1].frame, "LeftButton")
+      answer("Switch")
+      assert.are.same({ { "SwitchToProfile", "Default" } }, calls)
+      assert.are.equal(1, reloads)
+    end)
+
+    it("keeps asking while no name is given", function()
+      click(button("New Profile"))
+      nextDialog.input.frame:SetText("   ")
+      answer("Create")
+      assert.is_true(nextDialog:IsShown())
+      assert.are.equal("Name the new profile:", nextDialog.text:GetText())
+      assert.are.same({}, calls)
+    end)
+
+    it("makes a new profile and offers to switch to it, or says why it cannot", function()
+      click(button("New Profile"))
+      nextDialog.input.frame:SetText("Mythic")
+      answer("Create")
+      assert.are.same({ "CreateProfile", "Mythic" }, calls[1])
+      answer("Switch")
+      assert.are.same({ "SwitchToProfile", "Mythic" }, calls[2])
+      assert.are.equal(1, reloads)
+      click(button("New Profile"))
+      nextDialog.input.frame:SetText("Raid")
+      answer("Create")
+      assert.are.equal("A profile with this name already exists", nextDialog.text:GetText())
+    end)
+
+    it("copies the active profile to a new one, then reloads", function()
+      click(button("Copy Profile"))
+      nextDialog.input.frame:SetText("Raid Copy")
+      answer("Copy")
+      assert.are.same({ { "CreateProfile", "Raid Copy" }, { "CopyFromProfile", "Raid" } }, calls)
+      answer("Reload")
+      assert.are.equal(1, reloads)
+    end)
+
+    it("renames the active profile, but never Default", function()
+      click(button("Rename Profile"))
+      assert.are.equal("Raid", nextDialog.input:GetText())
+      nextDialog.input.frame:SetText("Heroic")
+      answer("Rename")
+      assert.are.same({ { "RenameProfile", "Raid", "Heroic" } }, calls)
+      assert.are.equal(1, reloads)
+      current = "Default"
+      click(button("Rename Profile"))
+      assert.are.equal("The Default profile cannot be renamed.", nextDialog.text:GetText())
+    end)
+
+    it("deletes the active profile after asking, switching to Default first, but never Default", function()
+      click(button("Delete Profile"))
+      answer("Delete")
+      assert.are.same({ { "SwitchToProfile", "Default" }, { "DeleteProfile", "Raid" } }, calls)
+      assert.are.equal(1, reloads)
+      current = "Default"
+      click(button("Delete Profile"))
+      assert.are.equal("The Default profile cannot be deleted.", nextDialog.text:GetText())
+    end)
+
+    it("resets the active profile after asking", function()
+      click(button("Reset to Defaults"))
+      answer("Cancel")
+      assert.are.same({}, calls)
+      click(button("Reset to Defaults"))
+      answer("Reset")
+      assert.are.same({ { "ResetCurrentProfile" } }, calls)
+      assert.are.equal(1, reloads)
+    end)
+  end)
+
+  describe("Import / Export", function()
+    local imported
+
+    before_each(function()
+      imported = { true, "" }
+      override(db, "ExportSettings", function() return "!BB:exported" end)
+      override(db, "ImportSettings", function(_, text)
+        table.insert(calls, { "ImportSettings", text })
+        return imported[1], imported[2]
+      end)
+      settings:Open("profiles", "transfer")
+    end)
+
+    it("exports the categories into its text area, selected to copy", function()
+      click(button("Export Categories"))
+      assert.are.equal("!BB:exported", content.exportArea.area:GetText())
+      assert.is_true(content.exportArea.area.editBox:HasFocus())
+    end)
+
+    it("imports the categories pasted after asking, and offers to reload", function()
+      content.importArea.area:SetText("!BB:pasted")
+      click(button("Import Categories"))
+      answer("Import")
+      assert.are.same({ { "ImportSettings", "!BB:pasted" } }, calls)
+      assert.are.equal("", content.importArea.area:GetText())
+      answer("Reload")
+      assert.are.equal(1, reloads)
+    end)
+
+    it("says what is wrong: nothing pasted, or a string it cannot read", function()
+      click(button("Import Categories"))
+      assert.are.equal("Paste a category configuration string to import first.", nextDialog.text:GetText())
+      answer("OK")
+      imported = { false, "bad string" }
+      content.importArea.area:SetText("junk")
+      click(button("Import Categories"))
+      answer("Import")
+      assert.are.equal("The categories could not be imported: bad string", nextDialog.text:GetText())
+      assert.are.equal("junk", content.importArea.area:GetText())
+    end)
+  end)
+
+  describe("QuickFind", function()
+    it("says what the integration does", function()
+      settings:Open("quickfind")
+      assert.is_true(#rowsShown() >= 2)
+      assert.is_true(rowsShown()[1].label:GetText():find("QuickFind") ~= nil)
+    end)
+  end)
+
+  describe("a plugin's page", function()
+    local state, handler
+
+    local function plugin()
+      state = { enabled = true, mode = "b", size = 5, name = "x", notes = "hi", color = { 1, 0, 0, 0.5 }, ran = 0 }
+      handler = { info = {} }
+      function handler:GetSize(info) table.insert(self.info, info) return state.size end
+      function handler:SetSize(info, value) table.insert(self.info, info) state.size = value end
+      return {
+        enabled = { type = "toggle", name = "Enabled", desc = "Turns it on.", order = 1,
+          get = function(info) assert.are.equal("enabled", info[#info]) return state.enabled end,
+          set = function(_, value) state.enabled = value end },
+        mode = { type = "select", name = "Mode", order = 2,
+          values = { a = "Echo", b = "Delta", c = "Charlie", d = "Bravo", e = "Alpha" },
+          get = function() return state.mode end, set = function(_, value) state.mode = value end },
+        sorted = { type = "select", name = "Sorted", order = 2.5, values = { x = "Ex", y = "Why", z = "Zed" },
+          sorting = { "z", "x", "y" }, get = function() return "x" end, set = function() end },
+        hidden = { type = "toggle", name = "Hidden", hidden = true, get = function() return true end, set = function() end },
+        run = { type = "execute", name = "Run", order = 3, func = function() state.ran = state.ran + 1 end },
+        about = { type = "description", name = "Some words.", order = 0 },
+        look = { type = "group", name = "Look", order = 10, handler = handler, get = "GetSize", set = "SetSize", args = {
+          size = { type = "range", name = "Size", min = 1, max = 10, step = 1, order = 1 },
+          tint = { type = "color", name = "Tint", hasAlpha = true, order = 2,
+            get = function() return unpack(state.color) end,
+            set = function(_, r, g, b, a) state.color = { r, g, b, a } end },
+          label = { type = "input", name = "Label", order = 3, get = function() return state.name end,
+            set = function(_, value) state.name = value end,
+            validate = function(_, value) return value ~= "" or "Label: it needs a name" end },
+          notes = { type = "input", name = "Notes", multiline = true, order = 4, get = function() return state.notes end,
+            set = function(_, value) state.notes = value end },
+          danger = { type = "execute", name = "Wipe", order = 5, confirm = true, confirmText = "Wipe everything?",
+            func = function() state.ran = state.ran + 10 end },
+        } },
+      }
+    end
+
+    before_each(function()
+      content:AddPlugin("Some Plugin", plugin())
+      settings:Open("plugin:Some Plugin")
+    end)
+
+    it("is a page under Integrations, after QuickFind, a section per group in AceConfig's order", function()
+      local page = pages:Get("plugin:Some Plugin")
+      assert.are.equal("Integrations", page.group)
+      local list = pages:List()
+      assert.are.equal(page, list[#list])
+      local titles = {}
+      for _, section in ipairs(settings.page.sections) do table.insert(titles, section.title) end
+      assert.are.same({ "Some Plugin", "Look" }, titles)
+      local labels = {}
+      for _, row in ipairs(settings.page.sections[1].rows) do
+        table.insert(labels, row.label and row.label:GetText() or (row.buttons and row.buttons[1].label:GetText()))
+      end
+      assert.are.same({ "Some words.", "Enabled", "Mode", "Sorted", "Run" }, labels, "by order; hidden left out")
+    end)
+
+    it("reads and writes a toggle with AceConfig's info", function()
+      local row = rowTitled("Enabled")
+      assert.is_true(row.control:GetChecked())
+      click(row.control)
+      assert.is_false(state.enabled)
+    end)
+
+    it("shows a select's names and writes its keys", function()
+      local row = rowTitled("Mode")
+      assert.are.equal("Delta", row.control.text:GetText())
+      click(row.control)
+      local names = {}
+      for _, r in ipairs(nextMenu:Rows()) do table.insert(names, r.label:GetText()) end
+      assert.are.same({ "Echo", "Delta", "Charlie", "Bravo", "Alpha" }, names, "sorted by key, as AceConfig sorts them")
+      nextMenu:Rows()[1].frame:GetScript("OnClick")(nextMenu:Rows()[1].frame, "LeftButton")
+      assert.are.equal("a", state.mode)
+    end)
+
+    it("lists a select's names in its own sorting when it has one", function()
+      local row = rowTitled("Sorted")
+      click(row.control)
+      local names = {}
+      for _, r in ipairs(nextMenu:Rows()) do table.insert(names, r.label:GetText()) end
+      assert.are.same({ "Zed", "Ex", "Why" }, names)
+    end)
+
+    it("calls a handler's methods named by a group, for its options", function()
+      local row = rowTitled("Size")
+      assert.are.equal(5, row.control:GetValue())
+      row.control.value.frame:SetText("7")
+      row.control.value.frame:GetScript("OnEnterPressed")(row.control.value.frame)
+      assert.are.equal(7, state.size)
+      local info = handler.info[#handler.info]
+      assert.are.same({ "look", "size" }, { info[1], info[2] })
+      assert.are.equal("range", info.type)
+      assert.are.equal(handler, info.handler)
+    end)
+
+    it("reads and writes a color, with its alpha", function()
+      local row = rowTitled("Tint")
+      assert.are.same({ 1, 0, 0, 0.5 }, row.control:GetColor())
+      click(row.control)
+      ColorPickerFrame:_Pick(0, 1, 0, 0.25)
+      assert.are.same({ 0, 1, 0, 0.25 }, state.color)
+    end)
+
+    it("refuses a value its validate rejects, saying why", function()
+      local row = rowTitled("Label")
+      row.control.frame:SetText("")
+      row.control.frame:GetScript("OnEnterPressed")(row.control.frame)
+      assert.are.equal("x", state.name)
+      assert.are.equal("Label: it needs a name", nextDialog.text:GetText())
+      answer("OK")
+      assert.are.equal("x", row.control:GetText(), "the field shows the value again")
+      row.control.frame:SetText("y")
+      row.control.frame:GetScript("OnEnterPressed")(row.control.frame)
+      assert.are.equal("y", state.name)
+    end)
+
+    it("writes a multi-line input when Accept is clicked", function()
+      local area
+      for _, row in ipairs(rowsShown()) do
+        if row.area then area = row end
+      end
+      assert.are.equal("hi", area.area:GetText())
+      area.area:SetText("new notes")
+      click(button("Accept"))
+      assert.are.equal("new notes", state.notes)
+    end)
+
+    it("runs an execute, asking first when it must be confirmed", function()
+      click(button("Run"))
+      assert.are.equal(1, state.ran)
+      click(button("Wipe"))
+      assert.are.equal("Wipe everything?", nextDialog.text:GetText())
+      answer("Cancel")
+      assert.are.equal(1, state.ran)
+      click(button("Wipe"))
+      answer("Accept")
+      assert.are.equal(11, state.ran)
+    end)
+
+    it("takes an AceConfig group as well as its args", function()
+      content:AddPlugin("Grouped", { type = "group", args = { on = { type = "toggle", name = "On",
+        get = function() return true end, set = function() end } } })
+      settings:Open("plugin:Grouped")
+      assert.is_not_nil(rowTitled("On"))
+    end)
+  end)
+end)

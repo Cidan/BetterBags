@@ -203,6 +203,8 @@ next\settings\rows.lua
 next\settings\page.lua
 next\settings\pages.lua
 next\settings\window.lua
+next\settings\themes.lua
+next\settings\content.lua
 
 integrations\consoleport.lua
 integrations\pawn.lua

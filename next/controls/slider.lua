@@ -179,7 +179,7 @@ end
 ---@param ctx Context
 ---@param button string
 function sliderProto:Press(ctx, button)
-  if button ~= "LeftButton" then
+  if button ~= "LeftButton" or not self.track:IsEnabled() then
     return
   end
   local value = self:cursorValue()
@@ -215,6 +215,14 @@ function sliderProto:Type(ctx, text)
     return
   end
   self:change(ctx, value)
+end
+
+-- SetEnabled takes or refuses the pointer and the box, drawn at DisabledAlpha while refusing.
+---@param enabled boolean
+function sliderProto:SetEnabled(enabled)
+  self.track:SetEnabled(enabled)
+  self.value:SetEnabled(enabled)
+  self.frame:SetAlpha(enabled and 1 or controls:Theme("Button").DisabledAlpha)
 end
 
 ---@param hovered boolean

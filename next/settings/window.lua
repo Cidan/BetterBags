@@ -111,6 +111,7 @@ function settings:Init()
     self.frame:Hide()
   end
   self.frame = nil
+  self.page = nil
   self.cache = {}
   self.resultRows = {}
   self.navRows = {}
@@ -160,6 +161,9 @@ function settings:hidden()
   end
   self.shown = false
   controls:ReleaseEscape(self.frame)
+  if self.page ~= nil then
+    self.page:Leave(context:New('NextSettings_Hidden'))
+  end
   nextMenu:Close()
   if nextDialog:IsShown() then
     nextDialog:Hide()
@@ -650,7 +654,10 @@ function settings:pageFor(page, tab)
         table.insert(list, row)
       end
     end
-    table.insert(sections, { title = sdef.title, note = sdef.note, rows = list })
+    -- A section none of whose rows the page's bag has is left out.
+    if #list > 0 then
+      table.insert(sections, { title = sdef.title, note = sdef.note, rows = list })
+    end
   end
   drawn:SetSections(sections)
   byTab[tab.id] = drawn
@@ -663,6 +670,9 @@ end
 ---@param ctx Context
 function settings:show(drawn, ctx)
   if self.page ~= drawn then
+    if self.page ~= nil then
+      self.page:Leave(ctx)
+    end
     self.scroll:SetChild(drawn)
     self.page = drawn
   end
@@ -714,6 +724,15 @@ function settings:Select(pageId, tabId, ctx)
   self:show(self:pageFor(page, tab), ctx)
 end
 
+-- Refresh shows the values of the page shown again (a block changed them: a reset).
+---@param ctx? Context
+function settings:Refresh(ctx)
+  if self.page ~= nil then
+    self.page:Refresh(ctx or context:New('NextSettings_Refresh'))
+    render:Invalidate(self.root)
+  end
+end
+
 -- matches says whether a row definition of a page matches a search: a setting by its name,
 -- description, searching words or section; a block by its name or searching words.
 ---@private
@@ -733,7 +752,8 @@ function settings:matches(page, section, def, needle)
     option = def.option
   end
   local function has(text)
-    return text ~= nil and string.find(string.lower(text), needle, 1, true) ~= nil
+    text = rows:TextOf(text)
+    return type(text) == "string" and string.find(string.lower(text), needle, 1, true) ~= nil
   end
   local words = option and option.keywords or def.keywords or {}
   for _, word in ipairs(words) do

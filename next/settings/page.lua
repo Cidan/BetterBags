@@ -90,6 +90,19 @@ function pageProto:SetEmptyText(text)
   self.empty:SetText(text)
 end
 
+-- Leave tells the rows the page is left (another page, the window closing; a row that cares has
+-- OnPageLeft): a theme preview ends.
+---@param ctx Context
+function pageProto:Leave(ctx)
+  for _, section in ipairs(self.sections) do
+    for _, row in ipairs(section.rows) do
+      if row.OnPageLeft ~= nil then
+        row:OnPageLeft(ctx)
+      end
+    end
+  end
+end
+
 -- Refresh shows every row's value again.
 ---@param ctx? Context
 function pageProto:Refresh(ctx)

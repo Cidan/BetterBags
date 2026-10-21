@@ -24,6 +24,9 @@ local nextSlider = addon:GetModule('NextSlider')
 ---@class NextSwatch: AceModule
 local nextSwatch = addon:GetModule('NextSwatch')
 
+---@class NextInput: AceModule
+local nextInput = addon:GetModule('NextInput')
+
 ---@class NextButton: AceModule
 local nextButton = addon:GetModule('NextButton')
 
@@ -47,9 +50,9 @@ local rows = addon:NewModule('NextSettingsRows')
 
 -- An option a row edits: a settings catalog option (SettingOption), or a page's own.
 ---@class (exact) NextSettingsOption
----@field kind "toggle"|"dropdown"|"slider"|"color"
----@field title string
----@field description? string
+---@field kind "toggle"|"dropdown"|"slider"|"color"|"input"
+---@field title string|fun(): string Read again every time the row shows its value when a function.
+---@field description? string|fun(): string?
 ---@field keywords? string[]
 ---@field items? string[]
 ---@field itemsFunction? fun(ctx: Context): string[]
@@ -58,6 +61,7 @@ local rows = addon:NewModule('NextSettingsRows')
 ---@field step? number
 ---@field hasOpacity? boolean
 ---@field reload? boolean
+---@field disabled? boolean|fun(): boolean Drawn disabled, read each time the row shows its value.
 ---@field get fun(ctx: Context): any
 ---@field set fun(ctx: Context, value: any): boolean?
 
@@ -74,6 +78,16 @@ local rowProto = {}
 addon:GetModule('Perf'):RegisterPrototype(rowProto, 'NextSettingsRow')
 
 rows.all = {}
+
+-- TextOf returns a text that may be a function, read now.
+---@param text? string|fun(): string?
+---@return string?
+function rows:TextOf(text)
+  if type(text) == "function" then
+    return text()
+  end
+  return text
+end
 
 ---@param ctx? Context
 function rows:ApplyStyle(ctx)
@@ -113,7 +127,7 @@ function rows:Create(parent, option, owner)
   row.label = style:CreateText(row.frame, C.LabelFont)
   row.label:SetJustifyH("LEFT")
   row.label:SetWordWrap(true)
-  row.label:SetText(option.title)
+  row.label:SetText(rows:TextOf(option.title) or "")
   local frame, kind = row.frame, option.kind
   local function write(ctx, value) row:Write(ctx, value) end
   local get = option.get
@@ -134,6 +148,10 @@ function rows:Create(parent, option, owner)
   elseif kind == "color" then
     row.control = nextSwatch:Create(frame, { color = get(nil), hasOpacity = option.hasOpacity, onChange = write })
     mouseFrames = { row.control.frame }
+  elseif kind == "input" then
+    row.control = nextInput:Create(frame, { text = get(nil) or "", width = controls:Theme("Dropdown").Width,
+      onEnter = write })
+    mouseFrames = { row.control.frame }
   else
     error("a settings row has no control for " .. tostring(kind))
   end
@@ -147,9 +165,10 @@ function rows:Create(parent, option, owner)
   return row
 end
 
--- CreateText makes a paragraph across the page.
+-- CreateText makes a paragraph across the page; text may be a function, read again every time the
+-- row shows its value.
 ---@param parent Frame
----@param text string
+---@param text string|fun(): string
 ---@return NextSettingsRow
 function rows:CreateText(parent, text)
   local row = newRow(parent, true)
@@ -157,7 +176,27 @@ function rows:CreateText(parent, text)
   row.label = style:CreateText(row.frame, style.Theme.Settings.Content.TextFont)
   row.label:SetJustifyH("LEFT")
   row.label:SetWordWrap(true)
-  row.label:SetText(text)
+  row.text = text
+  row.label:SetText(type(text) == "function" and text() or text)
+  row:Style()
+  return row
+end
+
+-- CreateArea makes a text area across the page (NextInput:CreateArea), opts.height tall; with get,
+-- its text is read from it every time the row shows its value.
+---@param parent Frame
+---@param opts NextTextAreaOptions
+---@param get? fun(): string
+---@return NextSettingsRow
+function rows:CreateArea(parent, opts, get)
+  local row = newRow(parent, true)
+  row.frame:EnableMouse(false)
+  row.area = nextInput:CreateArea(row.frame, opts)
+  row.areaHeight = opts.height
+  row.get = get
+  if get then
+    row.area:SetText(get() or "")
+  end
   row:Style()
   return row
 end
@@ -222,6 +261,9 @@ function rowProto:Measure(width)
   if self.button then
     return self.button.frame:GetHeight() + pad
   end
+  if self.area then
+    return self.areaHeight + pad
+  end
   self.label:SetWidth(math.max(1, width - 2 * pad))
   return math.ceil(self.label:GetStringHeight()) + pad
 end
@@ -256,6 +298,12 @@ function rowProto:Place(x, y, width, height)
   elseif self.button then
     self.button.frame:ClearAllPoints()
     self.button.frame:SetPoint("LEFT", frame, "LEFT", pad, 0)
+  elseif self.area then
+    local area = self.area.frame
+    area:ClearAllPoints()
+    area:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad / 2)
+    area:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -pad / 2)
+    area:SetHeight(self.areaHeight)
   else
     self.label:ClearAllPoints()
     self.label:SetPoint("LEFT", frame, "LEFT", pad, 0)
@@ -268,7 +316,22 @@ end
 function rowProto:Refresh(ctx)
   local option, control = self.option, self.control
   if option == nil then
+    if type(self.text) == "function" then
+      self.label:SetText(self.text())
+    elseif self.area and self.get then
+      self.area:SetText(self.get() or "")
+    end
     return
+  end
+  if type(option.title) == "function" then
+    self.label:SetText(option.title() or "")
+  end
+  local disabled = option.disabled
+  if type(disabled) == "function" then
+    disabled = disabled()
+  end
+  if control.SetEnabled then
+    control:SetEnabled(disabled ~= true)
   end
   local kind = option.kind
   if kind == "toggle" then
@@ -279,6 +342,8 @@ function rowProto:Refresh(ctx)
     control:SetValue(option.get(ctx))
   elseif kind == "color" then
     control:SetColor(option.get(ctx))
+  elseif kind == "input" then
+    control:SetText(option.get(ctx) or "")
   end
 end
 
@@ -312,10 +377,11 @@ function rowProto:Enter()
   self.hovered = true
   self.hover:Show()
   local option = self.option
-  if option and option.description and option.description ~= "" then
+  local description = option and rows:TextOf(option.description)
+  if description and description ~= "" then
     GameTooltip:SetOwner(self.frame, "ANCHOR_TOP")
-    GameTooltip:SetText(option.title, 1, 1, 1, 1, true)
-    GameTooltip:AddLine(option.description, nil, nil, nil, true)
+    GameTooltip:SetText(rows:TextOf(option.title) or "", 1, 1, 1, 1, true)
+    GameTooltip:AddLine(description, nil, nil, nil, true)
     GameTooltip:Show()
   end
 end

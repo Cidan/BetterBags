@@ -48,7 +48,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
       "GuildBank", "NextGuildBank"
     }
 
@@ -217,12 +217,23 @@ describe("Core Init and Enable flow", function()
     local nextSettings = addon:GetModule("NextSettings")
     local sonataNext = addon:GetModule("SonataNext")
     local order = {}
-    local savedSettings, savedNext = nextSettings.Init, sonataNext.Init
+    local content = addon:GetModule("NextSettingsContent")
+    local savedSettings, savedNext, savedContent = nextSettings.Init, sonataNext.Init, content.Init
     nextSettings.Init = function() table.insert(order, "NextSettings") end
     sonataNext.Init = function() table.insert(order, "SonataNext") end
+    content.Init = function() table.insert(order, "NextSettingsContent") end
     addon:OnInitialize()
-    nextSettings.Init, sonataNext.Init = savedSettings, savedNext
-    assert.are.same({ "SonataNext", "NextSettings" }, order)
+    nextSettings.Init, sonataNext.Init, content.Init = savedSettings, savedNext, savedContent
+    assert.are.same({ "SonataNext", "NextSettings", "NextSettingsContent" }, order)
+  end)
+
+  -- Its pages listen for the highest item level seen (next-settings.md §4).
+  it("enables BetterBags Next's settings pages", function()
+    local content = addon:GetModule("NextSettingsContent")
+    content.Enable = spy.new(function() end)
+    addon:OnInitialize()
+    addon:OnEnable()
+    assert.spy(content.Enable).was.called(1)
   end)
 
   -- The guild bank's data source (data/guildbank.lua) follows the guild banker interaction from its

@@ -601,6 +601,15 @@ sonataNext:RegisterTheme({
     },
     -- The footer: Height tall, Pad in, the line along its top.
     Footer = { Height = 56, Pad = 24, Line = { Color = "Lavender", Alpha = 0.12, Size = 1 } },
+    -- Cards of a page's own (the themes): Height tall, at least MinWidth wide, Gap apart, Pad inside;
+    -- their fill (under the pointer), edge (the one chosen), fonts, and each status's font.
+    Cards = {
+      Height = 78, MinWidth = 220, Gap = 10, Pad = 12,
+      Fill = { Color = "Lavender", Alpha = 0.04 }, HoverFill = { Color = "Lavender", Alpha = 0.09 },
+      Edge = { Color = "Lavender", Alpha = 0.18, Size = 1 }, SelectedEdge = { Color = "Gold", Alpha = 0.9, Size = 1 },
+      NameFont = "SettingsLabel", TextFont = "SettingsText",
+      ActiveFont = "SettingsLink", PreviewFont = "SettingsNavHover", UnavailableFont = "ControlMuted",
+    },
   },
 
   -- BetterBags Next's controls (next-settings.md): every one is BetterBags' own, drawn from here. A

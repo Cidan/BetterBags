@@ -21,9 +21,12 @@ function config:flattenPluginConfig(c, result)
   end
 end
 
+-- AddPluginConfig adds a plugin's AceConfig options to the classic settings window and gives the
+-- plugin a page of BetterBags Next's (next/settings/content.lua, next-settings.md §4).
 ---@param title string
 ---@param c AceConfig.OptionsTable
 function config:AddPluginConfig(title, c)
+  addon:GetModule('NextSettingsContent'):AddPlugin(title, c)
   if not self.configFrame then
     config:OnEnable()
     self.configFrame:AddSection({
