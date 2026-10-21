@@ -48,7 +48,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
       "GuildBank", "NextGuildBank"
     }
 
@@ -209,6 +209,20 @@ describe("Core Init and Enable flow", function()
     addon:OnInitialize()
     addon:OnEnable()
     assert.spy(changelogWindow.Enable).was.called(1)
+  end)
+
+  -- BetterBags Next's settings window (next-settings.md §3) starts its session after SonataNext, the
+  -- look it is drawn in; it is built the first time it opens.
+  it("starts BetterBags Next's settings window after SonataNext", function()
+    local nextSettings = addon:GetModule("NextSettings")
+    local sonataNext = addon:GetModule("SonataNext")
+    local order = {}
+    local savedSettings, savedNext = nextSettings.Init, sonataNext.Init
+    nextSettings.Init = function() table.insert(order, "NextSettings") end
+    sonataNext.Init = function() table.insert(order, "SonataNext") end
+    addon:OnInitialize()
+    nextSettings.Init, sonataNext.Init = savedSettings, savedNext
+    assert.are.same({ "SonataNext", "NextSettings" }, order)
   end)
 
   -- The guild bank's data source (data/guildbank.lua) follows the guild banker interaction from its

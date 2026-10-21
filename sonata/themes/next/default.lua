@@ -55,6 +55,8 @@ sonataNext:RegisterTheme({
     ControlPressed = { 0.094, 0.08, 0.17, 1 },
     Track = { 0.2, 0.18, 0.33, 1 },
     Danger = { 1, 0.45, 0.45, 1 },
+    -- The settings window's sidebar, over its body: darker.
+    Sidebar = { 0, 0, 0, 0.28 },
   },
 
   -- Files the theme draws with, named.
@@ -137,6 +139,22 @@ sonataNext:RegisterTheme({
     TopTab = { Size = 13, Color = "Muted" },
     TopTabHover = { Size = 13, Color = "Text" },
     TopTabSelected = { Size = 13, Color = "White", Shadow = true },
+    -- The settings window (next-settings.md): the brand, the sidebar's headings and pages (under the
+    -- pointer, chosen), the version; a page's title and description; a section's title and note; a
+    -- setting's name; text on a page (a paragraph, "nothing found"); a search result's page.
+    SettingsBrand = { Size = 20, Color = "White", Shadow = true },
+    SettingsNavGroup = { Size = 11, Color = "Gold" },
+    SettingsNav = { Size = 13, Color = "Muted" },
+    SettingsNavHover = { Size = 13, Color = "Text" },
+    SettingsNavSelected = { Size = 13, Color = "White", Shadow = true },
+    SettingsVersion = { Size = 10, Color = "Muted" },
+    SettingsTitle = { Size = 26, Color = "White", Shadow = true },
+    SettingsDescription = { Size = 13, Color = "Muted" },
+    SettingsSection = { Size = 11, Color = "Lavender" },
+    SettingsSectionNote = { Size = 11, Color = "Muted" },
+    SettingsLabel = { Size = 13, Color = "Text" },
+    SettingsText = { Size = 12, Color = "Muted" },
+    SettingsLink = { Size = 12, Color = "Gold" },
   },
 
   -- Sizes, in UI units.
@@ -529,6 +547,60 @@ sonataNext:RegisterTheme({
     CardHover = { 1, 1, 1, 0.07 },
     StackFont = "Stack",
     DurabilityHeight = 3,
+  },
+
+  -- The settings window (next-settings.md): a page per entry down its sidebar, tabs across a page,
+  -- sections of settings in two columns.
+  Settings = {
+    -- The window: Width x Height (scaled down to fit a small screen), its body, the wash at its top,
+    -- its edge.
+    Width = 1000, Height = 660,
+    Fill = { Color = "Body" },
+    Wash = { Color = "Wash", Height = 220, BlendMode = "ADD" },
+    Edge = { Color = "Lavender", Alpha = 0.35, Size = 1 },
+    -- Down its left: Width wide, Pad inside; its fill and the line along its inner side.
+    Sidebar = { Width = 232, Pad = 16, Fill = { Color = "Sidebar" }, Line = { Color = "Lavender", Alpha = 0.15, Size = 1 } },
+    -- At the sidebar's top: the bag glyph and "BetterBags", Height tall, the gold line fading out
+    -- under them.
+    Brand = {
+      Height = 72, Icon = "IconBags", IconSize = 28, IconColor = "Gold", Gap = 10, Font = "SettingsBrand",
+      Line = { Color = "Gold", From = 0.7, To = 0, Size = 1 },
+    },
+    -- The search box under the brand (Controls.Input), its magnifier IconSize, Gap below it.
+    Search = { Icon = "IconSearch", IconSize = 14, IconColor = "Lavender", Gap = 14 },
+    -- The pages: their headings (GroupHeight tall, GroupGap above every one but the first), rows
+    -- ItemHeight tall Indent in; the chosen page's bar and fill, the fill under the pointer; their fonts.
+    Nav = {
+      ItemHeight = 28, Indent = 14, GroupHeight = 24, GroupGap = 14,
+      Indicator = { Color = "Gold", Width = 3 },
+      SelectedFill = { Color = "Lavender", Alpha = 0.1 },
+      HoverFill = { Color = "Lavender", Alpha = 0.05 },
+      GroupFont = "SettingsNavGroup", Font = "SettingsNav", HoverFont = "SettingsNavHover",
+      SelectedFont = "SettingsNavSelected",
+    },
+    -- At the sidebar's bottom: the version.
+    Version = { Font = "SettingsVersion", Bottom = 14 },
+    -- A page's header: Height tall, Pad in, the title TitleTop down and the description under it; the
+    -- close button (a glyph, Size square, Inset from the window's top right corner).
+    Header = {
+      Height = 100, Pad = 32, TitleTop = 26, Gap = 6, TitleFont = "SettingsTitle", DescriptionFont = "SettingsDescription",
+      Close = { Icon = "IconClose", Size = 22, Inset = 14, Color = "ButtonIcon", HoverColor = "White" },
+    },
+    -- The page's tabs (Controls.TopTabs) under the header, Pad in.
+    -- The page: Pad either side and Top above the first section; sections SectionGap apart, their
+    -- titles TitleHeight above their card; a setting's row at least RowHeight tall, its name and its
+    -- control RowPad in; two columns when the page is at least twice MinColumn wide. The card, the
+    -- lines between rows and columns, the light under the pointer; the fonts.
+    Content = {
+      Pad = 32, Top = 18, Bottom = 24, SectionGap = 22, TitleHeight = 24, RowHeight = 44, RowPad = 14, MinColumn = 300,
+      Card = { Color = "Lavender", Alpha = 0.035 },
+      Divider = { Color = "Lavender", Alpha = 0.08, Size = 1 },
+      Hover = { Color = "Lavender", Alpha = 0.05 },
+      TitleFont = "SettingsSection", NoteFont = "SettingsSectionNote", LabelFont = "SettingsLabel",
+      TextFont = "SettingsText", LinkFont = "SettingsLink",
+    },
+    -- The footer: Height tall, Pad in, the line along its top.
+    Footer = { Height = 56, Pad = 24, Line = { Color = "Lavender", Alpha = 0.12, Size = 1 } },
   },
 
   -- BetterBags Next's controls (next-settings.md): every one is BetterBags' own, drawn from here. A

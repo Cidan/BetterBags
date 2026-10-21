@@ -249,7 +249,7 @@ and committed. Status is tracked below.
 |---|---|
 | 1. The catalog | done (`.claude/rules/next-settings.md` §1) |
 | 2. Controls | done (`.claude/rules/next-settings.md` §2) |
-| 3. The window | not started |
+| 3. The window | done (`.claude/rules/next-settings.md` §3) |
 | 4. Pages | not started |
 | 5. The category manager | not started |
 | 6. Themes | not started |

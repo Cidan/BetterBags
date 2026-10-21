@@ -679,8 +679,14 @@ function config:CreateConfig()
   self.configFrame = f
 end
 
+-- Open opens the settings window of the bags' design in use: BetterBags Next's own
+-- (next/settings/window.lua, next-settings.md §3) while Next is in use, this one otherwise.
 ---@diagnostic disable-next-line: duplicate-set-field
 function config:Open()
+  if addon:GetModule('BagSystem'):ActiveDesign() == "next" then
+    addon:GetModule('NextSettings'):Open()
+    return
+  end
   self.configFrame:Show()
 end
 
@@ -720,9 +726,19 @@ function config:RegisterSettings()
     self:Open()
   end)
 
-  -- The bags switched design from a menu (next.md §11): the checkbox shows it.
-  events:RegisterMessage('bags/DesignChanged', function()
+  -- The bags switched design from a menu (next.md §11): the checkbox shows it. Switched from a
+  -- settings window, that window closes and the other design's opens: BetterBags Next's on General,
+  -- where the switch is (next-settings.md §3).
+  events:RegisterMessage('bags/DesignChanged', function(_, design)
     self.configFrame:ReloadAllFormElements()
+    local nextSettings = addon:GetModule('NextSettings')
+    if design == "next" and self.configFrame:GetFrame():IsShown() then
+      self.configFrame:Hide()
+      nextSettings:Open('general')
+    elseif design ~= "next" and nextSettings:IsShown() then
+      nextSettings:Close()
+      self.configFrame:Show()
+    end
   end)
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbdb", function()

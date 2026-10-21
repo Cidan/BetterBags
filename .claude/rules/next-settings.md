@@ -91,3 +91,61 @@ Coverage: `spec/next/controls/*_spec.lua` (each control's look, states, callback
 the Escape stack both ways round), `spec/render/scrollbox_spec.lua` ("with a bar of its own"),
 `spec/next/bag_spec.lua` (a panel's bar). Mutation-tested (42 mutations; the three that first
 survived led to two tests and to removing a redundant guard).
+
+## 3. The window (`next/settings/`)
+
+| Module | File | What it is |
+|---|---|---|
+| `NextSettingsPages` | `pages.lua` | The pages, in the order defined (`Define`, replacing one with the same id in its place): each in a `group` (the sidebar's headings, in the order their first page was defined), with a `title`, a `description`, an optional `bag` its settings are bound to, `shown()` (a page shown only sometimes: the guild bank), and `tabs`. A tab's `sections` (a list, or a function read when the tab is built) hold row definitions: `setting` (a catalog id, bound to the page's bag; one the bag does not have is left out), `option` (a page's own), `text`, `buttons`, or `block` (a function making a wide row, with a `title` and `keywords` for search). Pages are data. |
+| `NextSettingsRows` | `rows.lua` | A setting's row: its name (wrapping) on the left and its control on the right (`toggle`, `dropdown`, `slider`, `color`), at least `RowHeight` tall. It reads the option into the control (`Refresh`), writes what the player changes, shows the option again when the change was refused (`set` returns false), and asks in a `NextDialog` over the window to reload after a change that needs one (`reload`). Its description is its tooltip, which stays while the pointer is over its control (`IsMouseOver` on leaving). Rows across the page: `CreateText`, `CreateButtons`, `CreateLink`. Every row answers `Measure(width)`, `Place(x, y, width, height)`, `Refresh(ctx)`, and `wide`. |
+| `NextSettingsPage` | `page.lua` | A drawable (render-pipeline.md) laying sections out at the width it is given: a title in capitals and a note, a card of rows in two columns when the page is at least twice `MinColumn` wide (one otherwise), a pair as tall as its taller row, a wide row on a line of its own across both; lines between the card's lines and between a pair's columns; rows of an earlier layout not placed again are hidden; empty text when there are no sections. |
+| `NextSettings` | `window.lua` | The window, below. |
+
+**The window** (`BetterBagsNextSettings`, `DIALOG` strata, above every Next panel, toplevel, clamped):
+built the first time it opens; centered on every open (moved by dragging its header or brand,
+`SetUserPlaced(false)` after a move so the client does not keep the position), its scale at most 1
+and at most 95% of either side of the screen (`Settings.Width` x `Height`).
+- **Sidebar** (`Settings.Sidebar`): the brand (the bag glyph and "BetterBags", a gold line fading out),
+  the search box (a `NextInput` with a magnifier), the pages under their headings (rebuilt on every
+  open, so a page defined since shows: plugins), the chosen one with a gold bar, a fill and its font,
+  the others lit under the pointer; the version (`C_AddOns.GetAddOnMetadata`, nothing for a source
+  checkout's `@project-version@`).
+- **Header** (`Settings.Header`): the page's title and description; the close glyph at the top right.
+- **Tabs**: a `NextTopTabs` under the header for a page with more than one tab; the content starts
+  under them.
+- **Content**: the page's tab as a `NextSettingsPage`, made the first time it shows and kept, in a
+  Scrollbox with the Next scroll bar; its values are read again every time it shows (they can change
+  elsewhere: the classic window, a bag's buttons). The window is a render root handing the scroll box
+  the content's width and height.
+- **Footer** (`Settings.Footer`): What's New (a link: `changelog/Open`) and Done (primary: closes).
+- **Remembers** the page and tab shown for the session; `Open(pageId, tabId)` goes to one. A page not
+  shown now (or unknown) falls back to the first page shown.
+- **Escape**: the window takes its place in the controls' Escape stack when it opens and gives it
+  back when it hides; a menu or a dialog over it closes first, and both close with it.
+- **Search**: typing lists every setting matching the text (case-insensitive, in its name,
+  description, searching words or section's title; a block by its name or words) as live rows, a
+  section per page and tab ("Backpack > Items", a page with one tab by its title alone) led by a link
+  to it (going there leaves the search). Pages not shown are left out; nothing found says so;
+  clearing the box (or Escape in it) goes back to the page. Result rows are made once per setting and
+  kept for later searches.
+- **Theme**: `ApplyStyle` restyles every part and lays the window out again.
+
+**Opening it** (`config/config.lua`): `config:Open` (the `config/Open` message: the settings
+buttons, the bag menu, `/bb`) opens `NextSettings` while BetterBags Next is in use
+(`BagSystem:ActiveDesign()`) and the classic window otherwise. On `bags/DesignChanged`, a switch made
+from the classic window (it is shown, the design is now `next`) hides it and opens BetterBags Next's
+on General, where the switch is; one made from BetterBags Next's (shown, design now classic) closes
+it and shows the classic one. `core/init.lua` calls `NextSettings:Init()` after `SonataNext`
+(initialization.md). The settings files load after `config\plugin.lua` in every TOC (they need the
+catalog).
+
+Coverage: `spec/next/settings/page_spec.lua` (rows: each control kind, layout, refusals, the reload
+dialog, the light and tooltip over the control, text, buttons, links; the page: two columns, one
+column, wide rows, sections and notes and cards, lines, refresh, rows of an earlier layout hidden,
+empty text), `spec/next/settings/window_spec.lua` (built on first open, centered, sized, body, moving,
+fitting a small screen, closing three ways, the menu and dialog closing with it, What's New, the
+sidebar and its pages, navigation, hover, pages defined later, tabs, content and its scroll bar,
+remembering the page, values read again on open, a page not shown, search: matching, live rows,
+links, nothing found, hidden pages; a theme), `spec/config/config_redraw_spec.lua` (opening the
+design's window, swapping windows on a switch), `spec/core/init_spec.lua` (the init order).
+Mutation-tested (26 mutations; the one that first survived led to a test).

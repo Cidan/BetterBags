@@ -315,7 +315,7 @@ end
 local COLOR_KEYS = {
   Color = true, Fill = true, SelectedFill = true, FocusFill = true, HoverColor = true, FocusColor = true,
   BeadColor = true, KnotColor = true, Unusable = true, SoldOut = true, SoldOutUnusable = true,
-  ArtColor = true, ArtHoverColor = true,
+  ArtColor = true, ArtHoverColor = true, IconColor = true,
 }
 -- The controls' fills and edges are texture specs whose Color is checked as any Color is.
 -- Tables whose values name palette colors.
@@ -325,9 +325,10 @@ local FONT_KEYS = {
   Font = true, SelectedFont = true, TitleFont = true, RecentFont = true, FreeFont = true, CountFont = true,
   HelpFont = true, TextFont = true, EmptyFont = true, MoneyFont = true, HintFont = true, WarningFont = true,
   PriceFont = true, UnaffordableFont = true, StackFont = true, NameFont = true, HoverFont = true,
+  DescriptionFont = true, NoteFont = true, LabelFont = true, LinkFont = true, GroupFont = true,
 }
 -- Keys whose value names one of the theme's Textures, or is a file (a path or a file ID).
-local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true }
+local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true, Icon = true }
 -- Parts that are not Next's widgets' specs: checked elsewhere or not at all.
 local UNCHECKED = { Palette = true, Variables = true, Textures = true, ItemButton = true }
 

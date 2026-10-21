@@ -188,10 +188,67 @@ describe("Config settings refreshes", function()
     it("shows the bags' design again in the settings when it changes", function()
       local reloads = 0
       local savedFrame = config.configFrame
-      config.configFrame = { ReloadAllFormElements = function() reloads = reloads + 1 end }
+      local nextSettings = stubModule("NextSettings")
+      local savedShown = nextSettings.IsShown
+      nextSettings.IsShown = function() return false end
+      local frame = CreateFrame("Frame")
+      frame:Hide()
+      config.configFrame = {
+        ReloadAllFormElements = function() reloads = reloads + 1 end,
+        GetFrame = function() return frame end,
+      }
       handlers["message bags/DesignChanged"](context:New("Test"), "next")
+      handlers["message bags/DesignChanged"](context:New("Test"), "classic")
+      nextSettings.IsShown = savedShown
       config.configFrame = savedFrame
-      assert.are.equal(1, reloads)
+      assert.are.equal(2, reloads)
+    end)
+
+    -- BetterBags Next has its own settings window (next-settings.md §3): switching the bags' design
+    -- from either window closes it and opens the other design's, BetterBags Next's on General, where
+    -- the switch is.
+    describe("the window of the other design", function()
+      local nextSettings, classicShown, log, savedFrame
+
+      before_each(function()
+        log = {}
+        classicShown = false
+        nextSettings = stubModule("NextSettings")
+        nextSettings.shown = false
+        nextSettings.Open = function(_, page) table.insert(log, "next open " .. tostring(page)) nextSettings.shown = true end
+        nextSettings.Close = function() table.insert(log, "next close") nextSettings.shown = false end
+        nextSettings.IsShown = function() return nextSettings.shown end
+        savedFrame = config.configFrame
+        local frame = CreateFrame("Frame")
+        config.configFrame = {
+          ReloadAllFormElements = function() end,
+          GetFrame = function() frame:SetShown(classicShown) return frame end,
+          Show = function() table.insert(log, "classic show") classicShown = true end,
+          Hide = function() table.insert(log, "classic hide") classicShown = false end,
+        }
+      end)
+
+      after_each(function()
+        config.configFrame = savedFrame
+      end)
+
+      it("opens BetterBags Next's on General when the switch is made in the classic one", function()
+        classicShown = true
+        handlers["message bags/DesignChanged"](context:New("Test"), "next")
+        assert.are.same({ "classic hide", "next open general" }, log)
+      end)
+
+      it("opens the classic one when the switch is made in BetterBags Next's", function()
+        nextSettings.shown = true
+        handlers["message bags/DesignChanged"](context:New("Test"), "classic")
+        assert.are.same({ "next close", "classic show" }, log)
+      end)
+
+      it("opens neither when neither was open", function()
+        handlers["message bags/DesignChanged"](context:New("Test"), "next")
+        handlers["message bags/DesignChanged"](context:New("Test"), "classic")
+        assert.are.same({}, log)
+      end)
     end)
 
     -- A BetterBagsNext backpack has no anchor (next.md §1).
@@ -349,6 +406,23 @@ describe("Config settings refreshes", function()
         assert.are_not.equal("Guild Bank", title)
       end
     end)
+  end)
+
+  -- Opening the settings (config/Open, /bb, a bag's settings button) opens the window of the bags'
+  -- design in use (next-settings.md §3).
+  it("opens BetterBags Next's settings while Next is in use, and the classic ones otherwise", function()
+    local bagSystem = stubModule("BagSystem")
+    local nextSettings = stubModule("NextSettings")
+    local savedDesign, savedOpen, savedFrame = bagSystem.ActiveDesign, nextSettings.Open, config.configFrame
+    local log = {}
+    nextSettings.Open = function() table.insert(log, "next") end
+    config.configFrame = { Show = function() table.insert(log, "classic") end }
+    bagSystem.ActiveDesign = function() return "next" end
+    config:Open()
+    bagSystem.ActiveDesign = function() return "classic" end
+    config:Open()
+    bagSystem.ActiveDesign, nextSettings.Open, config.configFrame = savedDesign, savedOpen, savedFrame
+    assert.are.same({ "next", "classic" }, log)
   end)
 
   it("makes each bag a window the player sizes, or one sized to its items, and redraws it", function()
