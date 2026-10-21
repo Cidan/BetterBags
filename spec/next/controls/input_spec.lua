@@ -114,6 +114,23 @@ describe("NextInput", function()
     assert.is_false(f.frame:HasFocus())
   end)
 
+  it("draws an icon inside its left edge, its text and help after it, read from the theme each time", function()
+    local spec = { Texture = "IconSearch", Size = 14, Color = "Lavender" }
+    local f = make({ icon = function() return spec end, help = "Search" })
+    local left = I().Padding + 14 + I().Padding / 2
+    assert.are.equal(style.Theme.Textures.IconSearch, f.icon:GetTexture())
+    assert.are.same({ 14, 14 }, { f.icon:GetSize() })
+    assert.are.same({ "LEFT", f.frame, "LEFT", I().Padding, 0 }, { f.icon:GetPoint(1) })
+    assert.are.same({ left, I().Padding, 0, 0 }, { f.frame:GetTextInsets() })
+    assert.are.same({ "LEFT", f.frame, "LEFT", left, 0 }, { f.help:GetPoint(1) })
+    spec = { Texture = "IconSearch", Size = 20, Color = "Gold" }
+    nextInput:ApplyStyle()
+    assert.are.same({ 20, 20 }, { f.icon:GetSize() })
+    assert.are.equal(I().Padding + 20 + I().Padding / 2, (f.frame:GetTextInsets()))
+    local plain = make()
+    assert.is_nil(plain.icon)
+  end)
+
   it("takes only digits when numeric, and at most its letters", function()
     local f = make({ numeric = true, maxLetters = 2 })
     assert.is_true(f.frame._numeric)

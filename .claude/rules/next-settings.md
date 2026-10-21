@@ -56,7 +56,7 @@ Asked: "this also means redoing all our controls (including scrollbars ...) so t
 | `NextScrollBar` | `scrollbar.lua` | A track and thumb in a scroll box's right edge (`Width`, `Inset`; `Size`, `HoverSize` under the pointer), the thumb the share shown (at least `MinThumb`), hidden while nothing scrolls. |
 | `NextButton` | `button.lua` | `Plain`, `Primary`, `Danger`, `Link`: fills and edges idle, under the pointer, pressed; a link is its text alone. As wide as its label and `Padding` (at least `MinWidth`) unless given a width; disabled at `DisabledAlpha`, calling nothing. A tooltip when given. |
 | `NextToggle` | `toggle.lua` | A switch: the knob slides (`Motion.Time.Toggle`), the on color fades in with it. A click flips it and calls back; `SetChecked` calls nothing back. |
-| `NextInput` | `input.lua` | A text field (an `EditBox`: its text `Padding` in, help while empty and unfocused) and `CreateArea`, a text area (a multi-line edit box in a Blizzard scroll box with the scroll bar, the wheel taken only while focused, the cursor kept in sight). Only typed text is reported (`OnTextChanged`'s `userInput`); Enter reports and lets go of focus; Escape puts back the text it had when focused. |
+| `NextInput` | `input.lua` | A text field (an `EditBox`: its text `Padding` in, after an optional `icon` it draws and makes room for itself, help while empty and unfocused) and `CreateArea`, a text area (a multi-line edit box in a Blizzard scroll box with the scroll bar, the wheel taken only while focused, the cursor kept in sight). Only typed text is reported (`OnTextChanged`'s `userInput`); Enter reports and lets go of focus; Escape puts back the text it had when focused. |
 | `NextSlider` | `slider.lua` | A track filled up to a thumb, pressed or dragged with the left button, and a number box (`NextInput`); every value snapped to the step and kept in range; a change calls back once per value; the wheel is left to the page. |
 | `NextMenu` | `menu.lua` | One menu at a time, `FULLSCREEN_DIALOG`, below what opened it (`Gap`), a row per choice, the chosen one checked, scrolling past `MaxRows`. Closes on a pick, a click or the wheel outside it (a screen-sized catcher), Escape, a second open for the same frame, or that frame hiding. |
 | `NextDropdown` | `dropdown.lua` | The choice made and a chevron; a click opens a `NextMenu`, its choices read each time (`itemsFunction`, form-dropdowns.md); the choice already made calls nothing back. |
@@ -106,7 +106,7 @@ built the first time it opens; centered on every open (moved by dragging its hea
 `SetUserPlaced(false)` after a move so the client does not keep the position), its scale at most 1
 and at most 95% of either side of the screen (`Settings.Width` x `Height`).
 - **Sidebar** (`Settings.Sidebar`): the brand (the bag glyph and "BetterBags", a gold line fading out),
-  the search box (a `NextInput` with a magnifier), the pages under their headings (rebuilt on every
+  the search box (a `NextInput` whose `icon` is the magnifier: the field lays out its own room for it, so a theme restyling the fields after the window can no longer put the help text over it, as seen in game), the pages under their headings (rebuilt on every
   open, so a page defined since shows: plugins), the chosen one with a gold bar, a fill and its font,
   the others lit under the pointer; the version (`C_AddOns.GetAddOnMetadata`, nothing for a source
   checkout's `@project-version@`).

@@ -214,6 +214,24 @@ describe("NextSettings", function()
       assert.is_true(settings.version:GetText():find("^v") ~= nil or settings.version:GetText() == "")
     end)
 
+    -- Seen in game after changing themes: the help text over the magnifier. A theme restyles every
+    -- widget in no set order, and the text fields put back the room the window had made for it.
+    it("keeps its search box's text clear of the magnifier, whatever restyles last", function()
+      open()
+      local I, SR = style.Theme.Controls.Input, style.Theme.Settings.Search
+      local left = I.Padding + SR.IconSize + I.Padding / 2
+      local function check()
+        assert.are.same({ left, I.Padding, 0, 0 }, { settings.search.frame:GetTextInsets() })
+        assert.are.same({ "LEFT", settings.search.frame, "LEFT", left, 0 }, { settings.search.help:GetPoint(1) })
+        assert.are.equal(style.Theme.Textures[SR.Icon], settings.search.icon:GetTexture())
+        assert.are.same({ "LEFT", settings.search.frame, "LEFT", I.Padding, 0 }, { settings.search.icon:GetPoint(1) })
+      end
+      check()
+      settings:ApplyStyle()
+      addon:GetModule("NextInput"):ApplyStyle()
+      check()
+    end)
+
     it("lists the pages shown under their headings, in order, the first one chosen", function()
       open()
       local seen = {}

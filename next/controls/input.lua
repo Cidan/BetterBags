@@ -35,12 +35,14 @@ local DEFAULT_WIDTH = 200
 ---@field maxLetters? number
 ---@field onChange? fun(ctx: Context, text: string, userInput: boolean)
 ---@field onEnter? fun(ctx: Context, text: string)
+---@field icon? fun(): {Texture: string, Size: number, Color: string} An icon inside its left edge (the settings' magnifier), read from the theme every time it is styled.
 
 ---@class NextInputFrame
 ---@field frame EditBox
 ---@field fill Texture
 ---@field edge NextEdge
 ---@field help FontString
+---@field icon? Texture
 ---@field hovered boolean
 ---@field focusText string The text it had when focused, put back by Escape.
 ---@field opts NextInputOptions
@@ -94,7 +96,7 @@ function nextInput:Create(parent, opts)
   ---@type NextInputFrame
   local f = setmetatable({
     frame = frame, fill = fill, edge = controls:CreateEdge(frame), help = help, hovered = false,
-    focusText = "", opts = opts,
+    focusText = "", opts = opts, icon = opts.icon and frame:CreateTexture(nil, "OVERLAY") or nil,
   }, { __index = inputProto })
   style:SetFont(frame, controls:Theme("Input").Font)
   style:SetFont(help, controls:Theme("Input").HelpFont)
@@ -117,11 +119,22 @@ function inputProto:Style()
   local I = controls:Theme("Input")
   local frame = self.frame
   frame:SetHeight(I.Height)
-  frame:SetTextInsets(I.Padding, I.Padding, 0, 0)
+  -- Its text and help start after its icon, when it has one: it lays out its own room for it, so no
+  -- restyle of another widget can put its text over the icon.
+  local left = I.Padding
+  if self.icon then
+    local spec = self.opts.icon()
+    self.icon:SetSize(spec.Size, spec.Size)
+    self.icon:ClearAllPoints()
+    self.icon:SetPoint("LEFT", frame, "LEFT", I.Padding, 0)
+    controls:Paint(self.icon, { Texture = spec.Texture, Color = spec.Color })
+    left = I.Padding + spec.Size + I.Padding / 2
+  end
+  frame:SetTextInsets(left, I.Padding, 0, 0)
   style:SetFont(frame, I.Font)
   style:SetFont(self.help, I.HelpFont)
   self.help:ClearAllPoints()
-  self.help:SetPoint("LEFT", frame, "LEFT", I.Padding, 0)
+  self.help:SetPoint("LEFT", frame, "LEFT", left, 0)
   self.help:SetPoint("RIGHT", frame, "RIGHT", -I.Padding, 0)
   self.help:SetJustifyH("LEFT")
   self.help:SetWordWrap(false)

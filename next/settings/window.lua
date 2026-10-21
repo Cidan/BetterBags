@@ -227,8 +227,11 @@ function settings:buildSidebar()
   self.search = nextInput:Create(sidebar, {
     help = L:G("Search settings"),
     onChange = function(ctx, text) self:Search(ctx, text) end,
+    icon = function()
+      local SR = style.Theme.Settings.Search
+      return { Texture = SR.Icon, Size = SR.IconSize, Color = SR.IconColor }
+    end,
   })
-  self.searchIcon = self.search.frame:CreateTexture(nil, "OVERLAY")
   addon.HookScript(self.search.frame, "OnEscapePressed", function(ctx) self:Search(ctx, "") end)
   local navBox = CreateFrame("Frame", nil, sidebar, "WowScrollBox") --[[@as WowScrollBox]]
   navBox:SetInterpolateScroll(true)
@@ -380,14 +383,7 @@ function settings:Style()
   search.frame:ClearAllPoints()
   search.frame:SetPoint("TOPLEFT", self.sidebar, "TOPLEFT", SB.Pad, -(B.Height + SR.Gap))
   search.frame:SetPoint("TOPRIGHT", self.sidebar, "TOPRIGHT", -SB.Pad, -(B.Height + SR.Gap))
-  local I = controls:Theme("Input")
-  search.frame:SetTextInsets(I.Padding + SR.IconSize + I.Padding / 2, I.Padding, 0, 0)
-  search.help:ClearAllPoints()
-  search.help:SetPoint("LEFT", search.frame, "LEFT", I.Padding + SR.IconSize + I.Padding / 2, 0)
-  self.searchIcon:SetSize(SR.IconSize, SR.IconSize)
-  self.searchIcon:ClearAllPoints()
-  self.searchIcon:SetPoint("LEFT", search.frame, "LEFT", I.Padding, 0)
-  controls:Paint(self.searchIcon, { Texture = SR.Icon, Color = SR.IconColor })
+  search:Style()
 
   local V = T.Version
   style:SetFont(self.version, V.Font)
