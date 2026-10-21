@@ -876,7 +876,9 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_Item.GetItemInfo = savedGetItemInfo
     end)
 
-    it("filters out hidden categories and their items upstream from slotInfo.tabs", function()
+    -- Hiding sections was retired (category-lifecycle.md §6): a plugin saying a category is hidden
+    -- changes nothing.
+    it("shows every category, whatever IsCategoryShown says", function()
       -- Enable groups in Database
       local DB = addon:GetModule("Database")
       local originalGetGroupsEnabled = DB.GetGroupsEnabled
@@ -954,16 +956,15 @@ describe("Items (New Data Farming Engine)", function()
       end
       assert.is_true(hasArmorInTab1)
 
-      -- Item 1002 (Quest) belongs to Custom Group (tab 100) but is hidden,
-      -- so it should NOT be in tab 100.
+      -- Item 1002 (Quest) belongs to Custom Group (tab 100), and shows there.
       local hasQuestInTab100 = false
       for _, item in ipairs(slotInfo.tabs[100].items) do
         if item.itemInfo and item.itemInfo.category == "Quest" then
           hasQuestInTab100 = true
         end
       end
-      assert.is_false(hasQuestInTab100)
-      assert.are.equal(0, #slotInfo.tabs[100].categories)
+      assert.is_true(hasQuestInTab100)
+      assert.are.equal(1, #slotInfo.tabs[100].categories)
 
       -- Clean up mocks
       DB.GetGroupsEnabled = originalGetGroupsEnabled

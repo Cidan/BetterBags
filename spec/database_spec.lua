@@ -169,7 +169,6 @@ const.DATABASE_DEFAULTS = {
     },
     views = { [0] = 2, [1] = 2 },
     previousViews = { [0] = 2, [1] = 2 },
-    categoryOptions = {},
     customCategoryFilters = {},
     ephemeralCategoryFilters = {},
     customCategoryIndex = {},
@@ -798,20 +797,6 @@ describe("Database", function()
 
   -- ─── Category options ──────────────────────────────────────────────────────────
 
-  describe("category options", function()
-
-    it("GetCategoryOptions returns defaults for unknown category", function()
-      local opts = DB:GetCategoryOptions("NewCategory")
-      assert.is_true(opts.shown)
-    end)
-
-    it("GetCategoryOptions returns stored options", function()
-      DB.data.profile.categoryOptions["TestCat"] = { shown = false }
-      local opts = DB:GetCategoryOptions("TestCat")
-      assert.is_false(opts.shown)
-    end)
-  end)
-
   -- ─── SaveItemToCategory / DeleteItemFromCategory ───────────────────────────────
 
   describe("item category assignment", function()
@@ -848,6 +833,17 @@ describe("Database", function()
       DB:DeleteItemFromCategory(1234, "Weapons")
       assert.is_nil(DB.data.profile.customCategoryFilters["Weapons"].itemList[1234])
       assert.is_nil(DB.data.profile.customCategoryIndex[1234])
+    end)
+
+    -- The index entry is the item's home; removing it from a category it is not filed in must not
+    -- unfile it from its home (one of the ways real profiles' indexes drifted).
+    it("DeleteItemFromCategory leaves the item filed where it is when it names another category", function()
+      DB.data.profile.customCategoryFilters["Weapons"] = { name = "Weapons", itemList = { [1234] = true } }
+      DB.data.profile.customCategoryFilters["Junk"] = { name = "Junk", itemList = {} }
+      DB.data.profile.customCategoryIndex[1234] = "Weapons"
+      DB:DeleteItemFromCategory(1234, "Junk")
+      assert.are.equal("Weapons", DB.data.profile.customCategoryIndex[1234])
+      assert.is_true(DB.data.profile.customCategoryFilters["Weapons"].itemList[1234])
     end)
 
     it("GetItemCategoryByItemID returns category for an item", function()
@@ -890,6 +886,16 @@ describe("Database", function()
   -- ─── Category CRUD ─────────────────────────────────────────────────────────────
 
   describe("category CRUD", function()
+
+    -- A plugin makes its category again at every load; what the player set for it stays.
+    it("keeps the bags, color and priority set for a plugin's category when the plugin makes it again", function()
+      DB:UpdateEphemeralItemCategory("Openable", { enabled = { [0] = false }, color = { 0, 0, 1 }, priority = 7 })
+      DB:CreateOrUpdateCategory({ name = "Openable", enabled = { [0] = false }, color = { 0, 1, 0 }, priority = 1 })
+      local saved = DB.data.profile.ephemeralCategoryFilters["Openable"]
+      assert.are.same({ 0, 0, 1 }, saved.color)
+      assert.are.equal(7, saved.priority)
+      assert.are.same({ [0] = false }, saved.enabled)
+    end)
 
     it("CreateOrUpdateCategory creates a persistent category", function()
       DB:CreateOrUpdateCategory({
@@ -941,7 +947,7 @@ describe("Database", function()
       assert.is_nil(DB.data.profile.customCategoryIndex[2])
     end)
 
-    it("DeleteItemCategory scrubs pinned sort, options, and group for all kinds", function()
+    it("DeleteItemCategory scrubs pinned sort and group for all kinds", function()
       -- Reproduces the orphaned-category bug: deleting a category must remove
       -- every reference to it, otherwise a leftover customSectionSort ("Pinned")
       -- entry resurfaces it forever as an undeletable "dynamic" category.
@@ -951,7 +957,6 @@ describe("Database", function()
       DB.data.profile.customCategoryIndex[50] = "Orphan"
       DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Orphan"] = 3
       DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["Orphan"] = 4
-      DB.data.profile.categoryOptions["Orphan"] = { shown = false }
       DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Orphan"] = 5
       DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["Orphan"] = 7
 
@@ -959,7 +964,6 @@ describe("Database", function()
 
       assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Orphan"])
       assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["Orphan"])
-      assert.is_nil(DB.data.profile.categoryOptions["Orphan"])
       assert.is_nil(DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Orphan"])
       assert.is_nil(DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["Orphan"])
     end)
@@ -969,13 +973,11 @@ describe("Database", function()
         name = "Parent", itemList = {}, enabled = { [0] = true, [1] = true }
       }
       DB.data.profile.ephemeralCategoryFilters["Parent - Consumable"] = { name = "Parent - Consumable" }
-      DB.data.profile.categoryOptions["Parent - Consumable"] = { shown = true }
       DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Parent - Consumable"] = 2
 
       DB:DeleteItemCategory("Parent")
 
       assert.is_nil(DB.data.profile.ephemeralCategoryFilters["Parent - Consumable"])
-      assert.is_nil(DB.data.profile.categoryOptions["Parent - Consumable"])
       assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Parent - Consumable"])
     end)
 
@@ -1036,7 +1038,6 @@ describe("Database", function()
       DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK]["OldName"] = 1
       DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["OldName"] = 2
       DB.data.profile.ephemeralCategoryFilters["OldName"] = { name = "OldName", enabled = { [0] = true, [1] = true } }
-      DB.data.profile.categoryOptions["OldName"] = { shown = false }
       DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["OldName"] = 5
       DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["OldName"] = 3
     end)
@@ -1071,12 +1072,6 @@ describe("Database", function()
       assert.is_not_nil(DB.data.profile.ephemeralCategoryFilters["NewName"])
     end)
 
-    it("updates categoryOptions", function()
-      DB:RenameCategory("OldName", "NewName")
-      assert.is_nil(DB.data.profile.categoryOptions["OldName"])
-      assert.is_false(DB.data.profile.categoryOptions["NewName"].shown)
-    end)
-
     it("updates customSectionSort for all kinds", function()
       DB:RenameCategory("OldName", "NewName")
       assert.are.equal(5, DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["NewName"])
@@ -1101,13 +1096,11 @@ describe("Database", function()
 
     it("cleans up grouped sub-categories", function()
       DB.data.profile.ephemeralCategoryFilters["OldName - Consumable"] = { name = "OldName - Consumable" }
-      DB.data.profile.categoryOptions["OldName - Consumable"] = { shown = true }
       DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["OldName - Consumable"] = 2
 
       DB:RenameCategory("OldName", "NewName")
 
       assert.is_nil(DB.data.profile.ephemeralCategoryFilters["OldName - Consumable"])
-      assert.is_nil(DB.data.profile.categoryOptions["OldName - Consumable"])
       assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["OldName - Consumable"])
     end)
   end)
@@ -1356,6 +1349,38 @@ describe("Database", function()
     it("ImportSettings returns false for invalid base64", function()
       local ok = DB:ImportSettings("!BB!!!not-valid-base64!!!")
       assert.is_false(ok)
+    end)
+
+    it("exports version 2, without the hidden sections", function()
+      DB.data.profile.categoryOptions = { Junk = { shown = false } }
+      local serialization = addon:GetModule("Serialization")
+      local data = serialization:Deserialize(serialization:DecodeBase64(DB:ExportSettings():sub(4)))
+      assert.are.equal(2, data.version)
+      assert.is_nil(data.categoryOptions)
+      DB.data.profile.categoryOptions = nil
+    end)
+
+    -- An old export carries the old shapes; importing it brings them to the current one, as a load does.
+    it("imports a version 1 export into the current shape", function()
+      local serialization = addon:GetModule("Serialization")
+      local old = "!BB" .. serialization:EncodeBase64(serialization:Serialize({
+        version = 1,
+        customCategoryFilters = {
+          Mats = { name = "Mats", itemList = { [42] = true }, enabled = { [0] = true, [1] = false } },
+          Gear = { name = "Gear", itemList = {}, searchCategory = { query = "type = armor group by type" } },
+        },
+        customCategoryIndex = {},
+        categoryOptions = { Mats = { shown = false } },
+      }))
+      local ok, msg = DB:ImportSettings(old)
+      assert.is_true(ok, msg)
+      local f = DB.data.profile.customCategoryFilters
+      assert.is_false(f.Mats.enabled[const.BAG_KIND.BANK])
+      assert.is_true(f.Mats.enabled[const.BAG_KIND.BACKPACK])
+      assert.are.equal("Mats", DB.data.profile.customCategoryIndex[42])
+      assert.are.same({ query = "type = armor" }, f.Gear.searchCategory)
+      assert.are.equal(1, f.Gear.groupBy)
+      assert.is_nil(DB.data.profile.categoryOptions)
     end)
 
     it("round-trip export/import preserves category data", function()
