@@ -19,6 +19,7 @@ local controls = addon:NewModule('NextControls')
 ---@field Bottom Texture
 ---@field Left Texture
 ---@field Right Texture
+---@field label? FontString The text of its control, for the render recorder.
 
 local SIDES = { "Top", "Bottom", "Left", "Right" }
 
@@ -49,6 +50,9 @@ function controls:Paint(texture, fill, alpha)
   texture:Show()
 end
 
+-- Every edge made, for the render recorder (render-recorder.md §2), held weakly.
+controls.edges = setmetatable({}, { __mode = "k" }) ---@type table<NextEdge, boolean>
+
 -- CreateEdge makes the four lines of an edge round frame, in layer (BORDER when unset).
 ---@param frame Frame
 ---@param layer? DrawLayer
@@ -59,6 +63,7 @@ function controls:CreateEdge(frame, layer, subLevel)
   for _, side in ipairs(SIDES) do
     edge[side] = frame:CreateTexture(nil, layer or "BORDER", nil, subLevel)
   end
+  self.edges[edge] = true
   return edge
 end
 

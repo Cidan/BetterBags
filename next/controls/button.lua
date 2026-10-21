@@ -71,6 +71,7 @@ function nextButton:Create(parent, opts)
     style = opts.style or "Plain", width = opts.width, hovered = false, pressed = false,
     onClick = opts.onClick, tooltip = opts.tooltip,
   }, { __index = buttonProto })
+  b.edge.label = label
   style:SetFont(label, self:Look(b.style).Font)
   label:SetText(opts.text)
   addon.SetScript(frame, "OnClick", function(ctx, _, mouse) b:Click(ctx, mouse) end)

@@ -780,6 +780,9 @@ end
 function WidgetMethods:GetScale()
   return self._scale or 1
 end
+-- GetPhysicalScreenSize() -> sizeX, sizeY (ScreenDocumentation.lua; Blizzard's PixelUtil calls it on
+-- every client).
+_G.GetPhysicalScreenSize = function() return 1920, 1080 end
 -- Region:GetEffectiveScale() -> the frame's scale times every parent's.
 function WidgetMethods:GetEffectiveScale()
   local scale = self:GetScale()

@@ -413,6 +413,84 @@ describe("RenderRecorder", function()
     assert.are.same({ "resize start", "resize started", "resize stop", "resize stopped", "on screen", "position saved" }, steps)
   end)
 
+  -- The settings window's control edges (render-recorder.md §2): its scale and the screen, then each
+  -- edge drawn in it, every side in screen pixels, a side whose two edges fall on the same pixel
+  -- marked "collapses". Added to confirm a button's edge that went missing in game.
+  describe("the settings window", function()
+    local controls, savedEdges, savedScreen, settingsFrame
+
+    -- edgeAt makes a control's edge at left, bottom (UI units), w x h, its sides one unit thick.
+    local function edgeAt(parent, left, bottom, w, h, text)
+      local f = CreateFrame("Button", nil, parent)
+      f:Show()
+      f:_SetRect(left, bottom, w, h)
+      local e = { frame = f }
+      for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+        e[side] = f:CreateTexture()
+        e[side]:Show()
+      end
+      e.Top:_SetRect(left, bottom + h - 1, w, 1)
+      e.Bottom:_SetRect(left, bottom, w, 1)
+      e.Left:_SetRect(left, bottom + 1, 1, h - 2)
+      e.Right:_SetRect(left + w - 1, bottom + 1, 1, h - 2)
+      if text then
+        e.label = f:CreateFontString()
+        e.label:SetFontObject(GameFontNormal)
+        e.label:SetText(text)
+      end
+      controls.edges[e] = true
+      return e
+    end
+
+    before_each(function()
+      controls = addon:GetModule("NextControls", true) or StubBetterBagsModule("NextControls")
+      savedEdges = rawget(controls, "edges")
+      controls.edges = setmetatable({}, { __mode = "k" })
+      savedScreen = _G.GetPhysicalScreenSize
+      _G.GetPhysicalScreenSize = function() return 1920, 1080 end
+      settingsFrame = CreateFrame("Frame", "SpecSettings", UIParent)
+      settingsFrame:Show()
+      settingsFrame:SetScale(0.5)
+      settingsFrame:_SetRect(0, 0, 1000, 720)
+    end)
+
+    after_each(function()
+      controls.edges = savedEdges
+      _G.GetPhysicalScreenSize = savedScreen
+    end)
+
+    it("gives its scale and each edge's sides in screen pixels, marking a side that collapses", function()
+      -- 1080 / 768 * 0.5: 0.703125 pixels per unit.
+      -- Its bottom side spans 140.59-141.29 pixels: both ends round to pixel 141, so it draws nothing.
+      edgeAt(settingsFrame, 100, 199.95, 80, 26, "Apply Rule")
+      local hidden = edgeAt(settingsFrame, 0, 0, 10, 10, "Hidden")
+      hidden.frame:Hide()
+      edgeAt(CreateFrame("Frame"), 0, 0, 10, 10, "Elsewhere")
+      recorder:Start()
+      recorder:SettingsRendered(settingsFrame)
+      local recording = recorder:Stop()
+      assert.are.equal(1, #recording.entries)
+      local entry = recording.entries[1]
+      assert.are.equal("settings", entry.kind)
+      assert.are.same({
+        "settings scale=0.5000 effective=0.5000 screen=1920x1080 pixels per unit=0.7031",
+        'edge "Apply Rule" @100.0,494.1 80.0x26.0 | top 158.17-158.87 bottom 140.59-141.29 collapses'
+          .. ' left 70.31-71.02 right 125.86-126.56',
+      }, entry.lines, "only edges shown in the window")
+    end)
+
+    it("adds a snapshot only when it changed, and nothing while stopped", function()
+      edgeAt(settingsFrame, 100, 200, 80, 26)
+      recorder:SettingsRendered(settingsFrame)
+      recorder:Start()
+      recorder:SettingsRendered(settingsFrame)
+      recorder:SettingsRendered(settingsFrame)
+      edgeAt(settingsFrame, 10, 10, 20, 20)
+      recorder:SettingsRendered(settingsFrame)
+      assert.are.equal(2, #recorder:Stop().entries)
+    end)
+  end)
+
   it("records nothing while stopped", function()
     local w = newWindow({ 640, 480 })
     render:NewRenderChain(w, {})

@@ -783,6 +783,16 @@ function settings:show(drawn, ctx)
   self:placeContent()
   render:RenderNow(self.root, { ctx = ctx })
   self.scroll.scrollBox:SetScrollPercentage(0, true)
+  self:recordRender()
+end
+
+-- recordRender gives the render recorder (render-recorder.md §2) the window as it is drawn now.
+---@private
+function settings:recordRender()
+  local recorder = addon:GetModule('RenderRecorder', true)
+  if recorder ~= nil and recorder.recording then
+    recorder:SettingsRendered(self.frame)
+  end
 end
 
 -- Select shows a page's tab (General, the first page shown, for a page not shown now; its first tab

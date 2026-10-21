@@ -184,6 +184,12 @@ describe("NextControls", function()
       assert.are.equal(0.9, edge.Left._colorTexture.a)
     end)
 
+    -- The render recorder lists every edge drawn in the settings window (render-recorder.md).
+    it("is kept in the controls' list of edges, weakly", function()
+      assert.is_true(controls.edges[edge])
+      assert.are.equal("k", getmetatable(controls.edges).__mode)
+    end)
+
     it("hides for none", function()
       controls:PaintEdge(edge, { Color = "Lavender", Size = 1 })
       controls:PaintEdge(edge, false)

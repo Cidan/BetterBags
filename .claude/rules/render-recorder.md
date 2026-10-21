@@ -65,17 +65,33 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   texture (Moonlight's frames: measured from the image files instead). Left and right should
   match on every theme (window.md §3b). Added for centering the bag's content.
 
+- **BetterBags Next's settings window** (`recorder:SettingsRendered(frame)`, from
+  `NextSettings:show` every time it shows a page, tab or search, only when the snapshot changed): a
+  `settings` entry whose first line is `settings scale=<frame scale> effective=<effective scale>
+  screen=<physical width>x<height> pixels per unit=<effective * height / 768>` (Blizzard's
+  `PixelUtil.GetPixelToUIUnitFactor` is 768 / the physical height), then one line per control edge
+  shown in it (`controls.edges`, every `CreateEdge`, held weakly), top to bottom:
+  `edge "<its button's text>" @x,y WxH | top a-b bottom a-b left a-b right a-b`, each side across its
+  thickness in screen pixels, ending `collapses` when both ends round to the same pixel (a line under
+  a pixel thick that can draw nothing). Added for a settings button whose bottom edge was missing in
+  game while the others showed, at about 0.91 screen pixels per unit (read from a screenshot: 909
+  pixels for the 1,000-unit window); the snapshot is to show whether that side collapses before the
+  edges are changed (data-driven.md).
+
 ## 3. Storage
 
 `BetterBagsPerfDB.renderRecordings`: the newest last, at most `MAX_RECORDINGS` (5). A recording is
 `{ id, startedAt, stoppedAt, character, realm, gameVersion, gameBuild, full?, entries }`; an entry
 is `{ t = "<ms since start>", kind = "render", window, lines = { ... } }`,
-`{ t, kind = "step", window, step, geometry }` or `{ t, kind = "text", step, role, line }`. A recording takes at most `MAX_ENTRIES` (20000)
+`{ t, kind = "step", window, step, geometry }`, `{ t, kind = "text", step, role, line }` or
+`{ t, kind = "settings", lines = { ... } }`. A recording takes at most `MAX_ENTRIES` (20000)
 entries and then sets `full`. `BetterBagsPerfDB` is separate from the AceDB profile, like the
 profiler's sessions; the recorder's `Init` runs right after `PerfSessions:Init` (initialization.md).
 Read offline from `WTF/Account/<ACCOUNT>/SavedVariables/BetterBags.lua`.
 
 Coverage: `spec/debug/render_recorder_spec.lua` (records on render and only on change, a bag's
 snapshot down to its item buttons, resize steps, nothing while stopped, recording limits, the
-state message, logout) and `spec/frames/perfpane_spec.lua` ("records rendering from its own
+state message, logout; the settings window's scale and edges in pixels, a collapsing side, only
+edges shown in it, only on change), `spec/next/settings/window_spec.lua` ("gives the render recorder
+the window each time it shows a page"), `spec/next/controls/base_spec.lua` (edges kept weakly) and `spec/frames/perfpane_spec.lua` ("records rendering from its own
 button").

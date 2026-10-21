@@ -292,6 +292,22 @@ describe("NextSettings", function()
       assert.is_false(nextDialog:IsShown())
     end)
 
+    -- render-recorder.md §2: while rendering is recorded, each page shown is snapshotted.
+    it("gives the render recorder the window each time it shows a page, while it records", function()
+      local recorder = addon:GetModule("RenderRecorder", true) or StubBetterBagsModule("RenderRecorder")
+      local savedRecording, savedRendered = rawget(recorder, "recording"), rawget(recorder, "SettingsRendered")
+      local given = {}
+      recorder.SettingsRendered = function(_, frame) table.insert(given, frame) end
+      recorder.recording = false
+      open()
+      assert.are.same({}, given, "not while stopped")
+      recorder.recording = true
+      settings:Select("backpack")
+      settings:Select("backpack", "items")
+      recorder.recording, recorder.SettingsRendered = savedRecording, savedRendered
+      assert.are.same({ settings.frame, settings.frame }, given)
+    end)
+
     it("opens the changelog from What's New", function()
       open()
       settings.whatsNew.frame:GetScript("OnClick")(settings.whatsNew.frame, "LeftButton")

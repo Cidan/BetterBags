@@ -216,6 +216,7 @@ globals = {
 	"GetNumBankSlots",
 	"GetRealmName",
 	"GetScreenHeight",
+	"GetPhysicalScreenSize",
 	"GetScreenWidth",
 	"GetTalentTabInfo",
 	"GetTime",
