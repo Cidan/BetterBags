@@ -422,6 +422,27 @@ describe("NextSettings", function()
   end)
 
   describe("a theme", function()
+    -- The shipped Parchment, applied through SonataNext as the Appearance page applies it.
+    it("is restyled by a theme SonataNext applies, controls and all", function()
+      local sonataNext = addon:GetModule("SonataNext")
+      LoadBetterBagsModule("sonata/themes/next/parchment.lua")
+      local db = StubBetterBagsModule("Database")
+      local savedGet = db.GetNextTheme
+      db.GetNextTheme = function() return "Default" end
+      open()
+      sonataNext:ApplyTheme(addon:GetModule("Context"):New("spec"), "Parchment", false)
+      local paper = "Interface\\AddOns\\BetterBags\\textures\\moonlight\\parchment.png"
+      assert.are.equal(paper, settings.fill:GetTexture())
+      assert.is_false(settings.wash:IsShown())
+      local r, g, b = style:RGBA("Seal")
+      local edge = style.Theme.Controls.Button.Primary.Edge
+      assert.are.equal("Seal", edge.Color)
+      assert.are.same({ r = r, g = g, b = b, a = edge.Alpha }, settings.done.edge.Top._colorTexture, "its Done button sealed")
+      sonataNext:ApplyTheme(addon:GetModule("Context"):New("spec"), "Default", false)
+      db.GetNextTheme = savedGet
+      assert.is_true(settings.wash:IsShown())
+    end)
+
     it("restyles the window: its sizes, sidebar and fonts", function()
       open()
       UseNextTheme({ Settings = { Width = 900, Sidebar = { Width = 200 } } })

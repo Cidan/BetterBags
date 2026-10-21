@@ -263,3 +263,30 @@ and its color and priority, Show Section, Rename both failures, Delete; an item 
 Save, items dropped and removed, non-items; the rules; nothing chosen) and
 `spec/next/settings/content_spec.lua` (the manager on the Categories tab, bound to its bag).
 Mutation-tested (40 mutations; the three that first survived led to three tests).
+
+## 6. The themes
+
+Default carries every `Settings` and `Controls` value (next-themes.md §3), from palette colors, so a
+theme that only changes its palette changes the window too; each shipped theme sets what its look
+needs beyond that:
+- **Ember** and **Quiet**: `ControlFill`, `ControlHover`, `ControlPressed` and `Track` in their own
+  colors (Default's are indigo: on their bodies they would be patches of the wrong color), derived from
+  their search box fills as Default's are from its own (0.89, 1.15 and 0.71 of it; the track 1.5).
+  Ember's `Danger` is a red apart from its amber. Quiet's settings titles are smaller with its smaller
+  panel title, and its switches and tab markers quicker.
+- **Parchment**: the window's body, its menus and its dialogs on the paper art (`Settings.Fill`,
+  `Controls.Menu.Fill`, `Controls.Dialog.Card`), no wash; every text role of the window and the
+  controls in ink (`Ink`, `InkSoft`, `InkMuted`), sealing wax (`Seal`) where Default is gold (the
+  chosen page's bar, the brand, the tab marker, a switch on, a slider's fill, a primary button, the
+  category manager's marks); fields a lighter paper edged in ink; `Danger` Blizzard's
+  `PARCHMENT_ACCESSIBILITY_RED`, as the bags' Parchment theme uses.
+
+`SonataNext:Check` checks every name in both sections on every client (its color keys gained
+`IconColor`; its font keys the new role keys; its texture keys `Icon`).
+
+Coverage: `spec/sonata/next_themes_spec.lua` (each theme's settings and controls; every theme checked
+clean on every client), `spec/next/settings/window_spec.lua` ("is restyled by a theme SonataNext
+applies"). Mutation-tested (11 mutations: misspelled colors, fonts, glyphs and palette names in both
+sections, and Ember's and Quiet's fields left indigo; each caught).
+
+Not seen in game yet: the whole window, on every theme (phase 7 of docs/next-settings.md).

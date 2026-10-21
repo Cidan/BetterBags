@@ -28,6 +28,12 @@ sonataNext:RegisterTheme({
     SearchFill = { 0.12, 0.13, 0.16, 1 },
     SearchFillFocus = { 0.16, 0.17, 0.21, 1 },
     ButtonIcon = { 0.8, 0.82, 0.88, 1 },
+    -- The settings window's controls (next-settings.md §6), in its search box's grays as Default's are
+    -- in its own.
+    ControlFill = { 0.107, 0.116, 0.142, 1 },
+    ControlHover = { 0.138, 0.15, 0.184, 1 },
+    ControlPressed = { 0.085, 0.092, 0.114, 1 },
+    Track = { 0.18, 0.195, 0.24, 1 },
   },
 
   Fonts = {
@@ -38,6 +44,9 @@ sonataNext:RegisterTheme({
     Price = { Size = 12 },
     PriceUnaffordable = { Size = 12 },
     VendorName = { Size = 12 },
+    -- The settings window's titles, smaller with its smaller panel title.
+    SettingsTitle = { Size = 20 },
+    SettingsBrand = { Size = 17 },
   },
 
   Layout = {
@@ -55,7 +64,7 @@ sonataNext:RegisterTheme({
   },
 
   Motion = {
-    Time = { Open = 0.3, Enter = 0.35, Cascade = 0.2, Stagger = 0.02, Hover = 0.1 },
+    Time = { Open = 0.3, Enter = 0.35, Cascade = 0.2, Stagger = 0.02, Hover = 0.1, Toggle = 0.12, TabMarker = 0.15 },
     Ease = { Open = "outCubic", Enter = "outCubic" },
     Rise = 6,
   },
