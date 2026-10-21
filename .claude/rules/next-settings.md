@@ -122,6 +122,15 @@ and at most 95% of either side of the screen (`Settings.Width` x `Height`).
   shown now (or unknown) falls back to the first page shown.
 - **Escape**: the window takes its place in the controls' Escape stack when it opens and gives it
   back when it hides; a menu or a dialog over it closes first, and both close with it.
+- **Coming and going** (asked: "the same animation as bags when they are detached"): as a small
+  Next panel does (next/panel.lua `setOffset`), it slides `Small.Slide` in from the right as it fades
+  in, over `Motion.Time.Open` with the `SmallOpen` ease, and out to the right as it fades out, over
+  `Time.Close` with `SmallClose`, then hides; its alpha is `1 - |offset| / Small.Slide`. It is closed
+  from the moment it starts fading (`IsShown` false, its page left, a menu or dialog over it closed).
+  It slides from where it is: centered on opening, where the player moved it on closing; opened again
+  while fading out, it comes back from where it is. Escape hides it at once, as it does a bag (Blizzard's
+  `CloseSpecialWindows` hides the frame), stopping the slide and putting it back at full strength. A
+  drag while it slides in settles it into place first. No sound plays.
 - **Search**: typing lists every setting matching the text (case-insensitive, in its name,
   description, searching words or section's title; a block by its name or words) as live rows, a
   section per page and tab ("Backpack > Items", a page with one tab by its title alone) led by a link

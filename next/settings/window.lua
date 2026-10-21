@@ -30,6 +30,9 @@ local style = addon:GetModule('NextStyle')
 ---@class NextControls: AceModule
 local controls = addon:GetModule('NextControls')
 
+---@class NextTween: AceModule
+local tween = addon:GetModule('NextTween')
+
 ---@class NextScrollBar: AceModule
 local nextScrollBar = addon:GetModule('NextScrollBar')
 
@@ -66,7 +69,8 @@ local sonataNext = addon:GetModule('SonataNext')
 -- when it has more than one, its sections scrolling in the content (NextSettingsPage), and the footer
 -- (What's New, Done). It is built the first time it opens, centered, shrunk to fit a small screen,
 -- moved by its header, and closed with Escape (the controls' Escape stack: a menu or a dialog open
--- over it closes first). It shows the page and tab it showed last this session. Typing in the
+-- over it closes first). It comes and goes as a detached Next bag does: sliding a short way in from
+-- the right as it fades in, and out again as it fades out; Escape closes it at once, as it does a bag. It shows the page and tab it showed last this session. Typing in the
 -- search box lists every setting that matches as live rows under their page and tab.
 ---@class NextSettings: AceModule
 ---@field frame? Frame
@@ -80,7 +84,10 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@field pageId? string
 ---@field tabId? string
 ---@field query? string
----@field shown boolean
+---@field shown boolean Open: shown and not fading out.
+---@field closing boolean Fading out.
+---@field offset number How far right of where it rests it is, as it slides.
+---@field motion table The slide's tween key.
 local settings = addon:NewModule('NextSettings')
 
 -- The share of the screen the window takes at most.
@@ -117,6 +124,9 @@ function settings:Init()
   self.navRows = {}
   self.pageId, self.tabId, self.query = nil, nil, nil
   self.shown = false
+  self.closing = false
+  self.offset = 0
+  self.motion = {}
 end
 
 settings:Init()
@@ -127,40 +137,87 @@ settings:Init()
 function settings:Open(pageId, tabId)
   self:build()
   local frame = self.frame
-  local T = style.Theme.Settings
-  local scale = math.min(1, UIParent:GetWidth() * SCREEN_SHARE / T.Width, UIParent:GetHeight() * SCREEN_SHARE / T.Height)
-  frame:SetScale(scale)
-  frame:ClearAllPoints()
-  frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+  if not frame:IsShown() then
+    local T = style.Theme.Settings
+    local scale = math.min(1, UIParent:GetWidth() * SCREEN_SHARE / T.Width, UIParent:GetHeight() * SCREEN_SHARE / T.Height)
+    frame:SetScale(scale)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    self:anchorSlide()
+    self:setOffset(style.Small.Slide)
+  end
+  local coming = self.closing or not frame:IsShown()
+  self.closing = false
   self:buildNav()
   frame:Show()
   self.shown = true
   controls:PushEscape(frame)
   self:Select(pageId or self.pageId, tabId or (pageId == nil and self.tabId or nil))
+  if coming then
+    tween:Play(self.motion, {
+      duration = style.Time.Open,
+      ease = style:Ease("SmallOpen"),
+      from = self.offset,
+      to = 0,
+      onUpdate = function(x) self:setOffset(x) end,
+    })
+  end
+end
+
+-- anchorSlide keeps where the window is (centered, or where it was moved) as the place it slides from.
+---@private
+function settings:anchorSlide()
+  local point, relativeTo, relativePoint, x, y = self.frame:GetPoint(1)
+  self.slideFrom = { point or "CENTER", relativeTo or UIParent, relativePoint or "CENTER", (x or 0) - self.offset, y or 0 }
+end
+
+-- setOffset puts the window x right of where it rests, as faded as a detached bag that far from its
+-- place (next/panel.lua setOffset).
+---@private
+---@param x number
+function settings:setOffset(x)
+  self.offset = x
+  local a = self.slideFrom
+  local frame = self.frame
+  frame:ClearAllPoints()
+  frame:SetPoint(a[1], a[2], a[3], a[4] + x, a[5])
+  frame:SetAlpha(1 - math.min(1, math.abs(x) / style.Small.Slide))
 end
 
 ---@return boolean
 function settings:IsShown()
-  return self.frame ~= nil and self.frame:IsShown()
+  return self.frame ~= nil and self.shown
 end
 
--- Close hides the window.
+-- Close fades the window out, sliding right, then hides it. It is closed from the start: what is open
+-- over it closes, and the page it shows is left.
 function settings:Close()
   if self.frame == nil or not self.shown then
     return
   end
-  self.frame:Hide()
-  self:hidden()
+  self:ended()
+  self.closing = true
+  self:anchorSlide()
+  tween:Play(self.motion, {
+    duration = style.Time.Close,
+    ease = style:Ease("SmallClose"),
+    from = self.offset,
+    to = style.Small.Slide,
+    onUpdate = function(x) self:setOffset(x) end,
+    onDone = function()
+      self.frame:Hide()
+      self:hidden()
+    end,
+  })
 end
 
--- hidden ends the window's showing however it hid (Close, Escape): the menu and dialog over it close.
+-- ended ends the window's showing: the menu and dialog over it close, its page is left.
 ---@private
-function settings:hidden()
+function settings:ended()
   if not self.shown then
     return
   end
   self.shown = false
-  controls:ReleaseEscape(self.frame)
   if self.page ~= nil then
     self.page:Leave(context:New('NextSettings_Hidden'))
   end
@@ -168,6 +225,18 @@ function settings:hidden()
   if nextDialog:IsShown() then
     nextDialog:Hide()
   end
+end
+
+-- hidden runs however the window hid (its fade ended, Escape hid it at once): its showing ends, its
+-- slide stops, and it is back in place and at full strength for the next time.
+---@private
+function settings:hidden()
+  self:ended()
+  self.closing = false
+  tween:Stop(self.motion)
+  self.offset = 0
+  self.frame:SetAlpha(1)
+  controls:ReleaseEscape(self.frame)
 end
 
 -- build makes the window, the first time it opens.
@@ -264,7 +333,13 @@ end
 function settings:makeMover(part)
   part:EnableMouse(true)
   part:RegisterForDrag("LeftButton")
-  addon.SetScript(part, "OnDragStart", function() self.frame:StartMoving() end)
+  addon.SetScript(part, "OnDragStart", function()
+    -- Sliding in, it settles into place first: the slide would fight the drag.
+    if not self.closing then
+      tween:Stop(self.motion, true)
+    end
+    self.frame:StartMoving()
+  end)
   addon.SetScript(part, "OnDragStop", function()
     self.frame:StopMovingOrSizing()
     -- It opens centered every time: the client is not to keep where it was moved.
