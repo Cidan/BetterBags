@@ -121,12 +121,10 @@ function barProto:Paint()
 end
 
 -- Bind makes the bar drive box and follow it: it listens to the box's scroll, size and scrolling
--- being allowed, as ScrollUtil's registration does, once per box.
+-- being allowed, as ScrollUtil's registration does (the box keeps one callback per owner: binding
+-- again replaces them).
 ---@param box WowScrollBox
 function barProto:Bind(box)
-  if self.box == box then
-    return
-  end
   self.box = box
   box:RegisterCallback(BaseScrollBoxEvents.OnScroll, function(_, percentage, visible)
     self:OnScroll(percentage, visible)

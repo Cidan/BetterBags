@@ -98,6 +98,68 @@ function controls:PaintEdge(edge, spec, alpha)
   end
 end
 
+-- Escape closes the innermost thing open: a menu, then a dialog, then the window. Each takes the
+-- place of the one under it in UISpecialFrames while it is open (Blizzard's CloseSpecialWindows
+-- hides every shown frame the list names; SetPropagateKeyboardInput, which would let a frame take
+-- Escape itself, is protected). CloseSpecialWindows walks the list with pairs while it hides frames,
+-- so a hide never changes the list: ReleaseEscape waits for the next frame.
+controls.escape = {} ---@type Frame[] Bottom to top.
+
+-- setSpecial names a frame in UISpecialFrames, once, or takes it out.
+---@param name string
+---@param on boolean
+local function setSpecial(name, on)
+  local list = UISpecialFrames
+  for i = #list, 1, -1 do
+    if list[i] == name then
+      table.remove(list, i)
+    end
+  end
+  if on then
+    table.insert(list, name)
+  end
+end
+
+-- PushEscape makes frame (a named frame, just shown) the one Escape closes, in place of the one under
+-- it.
+---@param frame Frame
+function controls:PushEscape(frame)
+  local stack = self.escape
+  for i = #stack, 1, -1 do
+    if stack[i] == frame then
+      table.remove(stack, i)
+    end
+  end
+  local under = stack[#stack]
+  if under ~= nil then
+    setSpecial(under:GetName(), false)
+  end
+  table.insert(stack, frame)
+  setSpecial(frame:GetName(), true)
+end
+
+-- ReleaseEscape, from frame's OnHide, gives Escape back to the frame under it on the next frame,
+-- unless frame was shown again by then.
+---@param frame Frame
+function controls:ReleaseEscape(frame)
+  C_Timer.After(0, function()
+    if frame:IsShown() then
+      return
+    end
+    local stack = self.escape
+    for i = #stack, 1, -1 do
+      if stack[i] == frame then
+        table.remove(stack, i)
+      end
+    end
+    setSpecial(frame:GetName(), false)
+    local top = stack[#stack]
+    if top ~= nil and top:IsShown() then
+      setSpecial(top:GetName(), true)
+    end
+  end)
+end
+
 -- Theme returns the current theme's spec of a control (Controls[name]).
 ---@param name string
 ---@return table

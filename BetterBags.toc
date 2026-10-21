@@ -165,6 +165,15 @@ next\style.lua
 next\tween.lua
 next\controls\base.lua
 next\controls\scrollbar.lua
+next\controls\button.lua
+next\controls\toggle.lua
+next\controls\input.lua
+next\controls\slider.lua
+next\controls\menu.lua
+next\controls\dropdown.lua
+next\controls\swatch.lua
+next\controls\toptabs.lua
+next\controls\dialog.lua
 next\sparkles.lua
 next\tabs.lua
 next\content.lua

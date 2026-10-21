@@ -57,6 +57,99 @@ describe("NextControls", function()
     end)
   end)
 
+  -- Escape closes the innermost thing open (a menu, then a dialog, then the window: next-settings.md
+  -- §2). Blizzard's CloseSpecialWindows hides every shown frame named in UISpecialFrames, walking it
+  -- with pairs while it hides them, so the list is changed when something opens and, after a hide,
+  -- only on the next frame (a table changed while pairs walks it is undefined behavior).
+  describe("Escape, innermost first", function()
+    local timers, saved
+
+    local function frame(name)
+      local f = CreateFrame("Frame", name)
+      f:Show()
+      return f
+    end
+
+    local function nextFrame()
+      local due = timers
+      timers = {}
+      for _, fn in ipairs(due) do fn() end
+    end
+
+    before_each(function()
+      timers = {}
+      saved = { _G.UISpecialFrames, C_Timer.After }
+      _G.UISpecialFrames = { "SomeoneElsesFrame" }
+      C_Timer.After = function(_, fn) table.insert(timers, fn) end
+      controls.escape = {}
+    end)
+
+    after_each(function()
+      _G.UISpecialFrames, C_Timer.After = saved[1], saved[2]
+    end)
+
+    it("names only the innermost frame open, beside every other addon's", function()
+      local window, menu = frame("SpecWindow"), frame("SpecMenu")
+      controls:PushEscape(window)
+      assert.are.same({ "SomeoneElsesFrame", "SpecWindow" }, UISpecialFrames)
+      controls:PushEscape(menu)
+      assert.are.same({ "SomeoneElsesFrame", "SpecMenu" }, UISpecialFrames)
+    end)
+
+    it("gives the frame under it back to Escape a frame after it hides, never while hiding", function()
+      local window, menu = frame("SpecWindow"), frame("SpecMenu")
+      controls:PushEscape(window)
+      controls:PushEscape(menu)
+      menu:Hide()
+      controls:ReleaseEscape(menu)
+      assert.are.same({ "SomeoneElsesFrame", "SpecMenu" }, UISpecialFrames, "unchanged while Escape walks it")
+      nextFrame()
+      assert.are.same({ "SomeoneElsesFrame", "SpecWindow" }, UISpecialFrames)
+      window:Hide()
+      controls:ReleaseEscape(window)
+      nextFrame()
+      assert.are.same({ "SomeoneElsesFrame" }, UISpecialFrames)
+    end)
+
+    it("keeps a frame shown again before then", function()
+      local window = frame("SpecWindow")
+      controls:PushEscape(window)
+      window:Hide()
+      controls:ReleaseEscape(window)
+      window:Show()
+      nextFrame()
+      assert.are.same({ "SomeoneElsesFrame", "SpecWindow" }, UISpecialFrames)
+    end)
+
+    it("does not give Escape back to a frame under it that hid too", function()
+      local window, menu = frame("SpecWindow"), frame("SpecMenu")
+      controls:PushEscape(window)
+      controls:PushEscape(menu)
+      window:Hide()
+      menu:Hide()
+      controls:ReleaseEscape(window)
+      controls:ReleaseEscape(menu)
+      nextFrame()
+      assert.are.same({ "SomeoneElsesFrame" }, UISpecialFrames)
+      -- The other way round: the menu released first, the window under it hidden but not yet released.
+      controls:PushEscape(window)
+      controls:PushEscape(menu)
+      window:Hide()
+      menu:Hide()
+      controls:ReleaseEscape(menu)
+      nextFrame()
+      assert.are.same({ "SomeoneElsesFrame" }, UISpecialFrames)
+    end)
+
+    it("names a frame once when pushed again", function()
+      local window = frame("SpecWindow")
+      controls:PushEscape(window)
+      controls:PushEscape(window)
+      assert.are.same({ "SomeoneElsesFrame", "SpecWindow" }, UISpecialFrames)
+      assert.are.equal(1, #controls.escape)
+    end)
+  end)
+
   describe("an edge", function()
     local frame, edge
 

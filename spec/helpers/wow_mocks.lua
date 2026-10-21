@@ -453,6 +453,10 @@ end
 function WidgetMethods:EnableMouseWheel(enable)
   self._mouseWheelEnabled = enable
 end
+-- Frame:IsMouseWheelEnabled() (SimpleFrameAPIDocumentation).
+function WidgetMethods:IsMouseWheelEnabled()
+  return self._mouseWheelEnabled == true
+end
 -- Frame:EnableKeyboard(enable)
 function WidgetMethods:EnableKeyboard(enable)
   self._keyboardEnabled = enable
@@ -495,6 +499,14 @@ function WidgetMethods:IsEnabled()
   return self._enabled ~= false
 end
 -- SetEnabled(enabled) (SimpleButtonAPIDocumentation.lua).
+-- Button:SetMotionScriptsWhileDisabled(motionScriptsWhileDisabled) / GetMotionScriptsWhileDisabled()
+-- (SimpleButtonAPIDocumentation, every client): OnEnter and OnLeave fire on a disabled button too.
+function WidgetMethods:SetMotionScriptsWhileDisabled(enabled)
+  self._motionWhileDisabled = enabled
+end
+function WidgetMethods:GetMotionScriptsWhileDisabled()
+  return self._motionWhileDisabled == true
+end
 function WidgetMethods:SetEnabled(enabled)
   self._enabled = enabled and true or false
 end
@@ -984,6 +996,14 @@ function WidgetMethods:SetCountInvisibleLetters(count)
 end
 function WidgetMethods:SetAutoFocus(autoFocus)
   self._autoFocus = autoFocus
+end
+-- EditBox:IsAutoFocus() and HighlightText(start = 0, stop = -1) (SimpleEditBoxAPIDocumentation): an
+-- edit box focuses itself when shown unless told not to.
+function WidgetMethods:IsAutoFocus()
+  return self._autoFocus ~= false
+end
+function WidgetMethods:HighlightText(start, stop)
+  self._highlight = { start or 0, stop or -1 }
 end
 function WidgetMethods:SetFocus()
   self._hasFocus = true
@@ -3275,4 +3295,35 @@ _G.MenuUtil.CreateContextMenu = function(owner, generator, ...)
   generator(owner, root, ...)
   _G._lastContextMenu = { owner = owner, root = root }
   return root
+end
+
+-- ColorPickerFrame (Blizzard_ColorPickerFrame, loaded at login on every client: ColorPickerFrameMixin):
+-- SetupColorPickerAndShow(info) keeps info's swatchFunc, opacityFunc, cancelFunc and hasOpacity, its
+-- color as previousValues ({ r, g, b, a = info.opacity }), and shows; GetColorRGB() and
+-- GetColorAlpha() read the color picked. Blizzard calls swatchFunc as the color changes, opacityFunc as
+-- the opacity does, and cancelFunc(previousValues) on Cancel. Specs pick with _Pick(r, g, b, a) and
+-- cancel with _Cancel().
+_G.ColorPickerFrame = CreateFrame("Frame", "ColorPickerFrame")
+_G.ColorPickerFrame:Hide()
+function _G.ColorPickerFrame:SetupColorPickerAndShow(info)
+  self.info = info
+  self.swatchFunc, self.opacityFunc, self.cancelFunc = info.swatchFunc, info.opacityFunc, info.cancelFunc
+  self.hasOpacity = info.hasOpacity
+  self.previousValues = { r = info.r, g = info.g, b = info.b, a = info.opacity }
+  self._r, self._g, self._b, self._a = info.r, info.g, info.b, info.opacity or 1
+  self:Show()
+end
+function _G.ColorPickerFrame:GetColorRGB() return self._r, self._g, self._b end
+function _G.ColorPickerFrame:GetColorAlpha() return self._a end
+function _G.ColorPickerFrame:_Pick(r, g, b, a)
+  self._r, self._g, self._b = r, g, b
+  if self.swatchFunc then self.swatchFunc() end
+  if a ~= nil then
+    self._a = a
+    if self.opacityFunc then self.opacityFunc() end
+  end
+end
+function _G.ColorPickerFrame:_Cancel()
+  self:Hide()
+  if self.cancelFunc then self.cancelFunc(self.previousValues) end
 end
