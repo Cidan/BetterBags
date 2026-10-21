@@ -247,7 +247,7 @@ and committed. Status is tracked below.
 
 | Phase | State |
 |---|---|
-| 1. The catalog | not started |
+| 1. The catalog | done (`.claude/rules/next-settings.md` §1) |
 | 2. Controls | not started |
 | 3. The window | not started |
 | 4. Pages | not started |

@@ -33,6 +33,10 @@ local themePane = stubModule("ThemePane")
 stubModule("CurrencyPane")
 stubModule("ItemColorPane")
 
+stubModule("BagSystem")
+stubModule("Items")
+-- Every setting is defined in the settings catalog (config/catalog.lua), which the window is built on.
+LoadFreshBetterBagsModule("SettingsCatalog", "config/catalog.lua")
 LoadFreshBetterBagsModule("Config", "config/config.lua")
 local config = addon:GetModule("Config")
 

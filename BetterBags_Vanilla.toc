@@ -185,6 +185,7 @@ config\themepane.lua
 config\currencypane.lua
 config\era\currencypane.lua
 config\itemcolorpane.lua
+config\catalog.lua
 config\config.lua
 config\plugin.lua
 

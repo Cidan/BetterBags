@@ -36,9 +36,26 @@ local currencyPane = addon:GetModule('CurrencyPane')
 ---@class ItemColorPane: AceModule
 local itemColorPane = addon:GetModule('ItemColorPane')
 
+---@class SettingsCatalog: AceModule
+local catalog = addon:GetModule('SettingsCatalog')
+
 ---@class Config: AceModule
 ---@field configFrame FormFrame
 local config = addon:NewModule('Config')
+
+-- The form's control for each kind of setting (forms/layouts/layout.lua).
+local ADD = { toggle = 'AddCheckbox', dropdown = 'AddDropdown', slider = 'AddSlider' }
+
+-- addSetting adds a setting of the catalog (config/catalog.lua) to the form, as the control of its
+-- kind.
+---@param f FormFrame
+---@param id string
+---@param bag? SettingBag
+---@param hooks? SettingHooks
+local function addSetting(f, id, bag, hooks)
+  local kind = catalog:Get(id, bag).kind
+  f[ADD[kind]](f, catalog:Form(id, bag, hooks))
+end
 
 -- askToReload asks the player to reload the UI, for a setting that takes effect only then.
 local function askToReload()
@@ -64,150 +81,20 @@ function config:CreateConfig()
     index = true,
     tabbed = true
   })
- f:AddSection({
-   title = 'General',
-   description = 'General settings for BetterBags.',
- })
-  f:AddCheckbox({
-   title = 'Enable In-Bag Search',
-   description = 'If enabled, a search bar will appear at the top of your bags.',
-   getValue = function(_)
-    return db:GetInBagSearch()
-   end,
-    setValue = function(ctx, value)
-      db:SetInBagSearch(value)
-      events:SendMessage(ctx, 'search/SetInFrame', value)
-    end
+  f:AddSection({
+    title = 'General',
+    description = 'General settings for BetterBags.',
   })
-  f:AddCheckbox({
-    title = 'Enable Enter to Make Category',
-    description = 'If enabled, pressing Enter with a search query will open the make category menu.',
-    getValue = function(_)
-      return db:GetEnterToMakeCategory()
-    end,
-    setValue = function(_, value)
-      db:SetEnterToMakeCategory(value)
-    end
-  })
-  f:AddCheckbox({
-    title = 'Enable Category Sell and Deposit',
-    description = 'If enabled, right-clicking a category header at an NPC shop will sell all its contents, or deposit to bank.',
-    getValue = function(_)
-      return db:GetCategorySell()
-    end,
-    setValue = function(_, value)
-      db:SetCategorySell(value)
-    end
-  })
-  f:AddCheckbox({
-    title = 'Show Blizzard Bag Button',
-    description = 'Show or hide the default Blizzard bag button.',
-    getValue = function(_)
-      return db:GetShowBagButton()
-    end,
-    setValue = function(_, value)
-      db:SetShowBagButton(value)
-      local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
-      if value then
-        BagsBar:SetParent(UIParent)
-      else
-        BagsBar:SetParent(sneakyFrame)
-      end
-    end
-  })
-
-  f:AddCheckbox({
-    title = 'Enable Bank Bags',
-    description = 'Enable BetterBags for bank. If disabled, the default Blizzard bank UI will be used. Requires a UI reload to take effect.',
-    getValue = function(_)
-      return db:GetEnableBankBag()
-    end,
-    setValue = function(_, value)
-      db:SetEnableBankBag(value)
-      askToReload()
-    end
-  })
-
-  f:AddCheckbox({
-    title = 'Enable Bag Fading',
-    description = 'If enabled, bags will smoothly fade in and out when opening/closing.',
-    getValue = function(_)
-      return db:GetEnableBagFading()
-    end,
-    setValue = function(_, value)
-      db:SetEnableBagFading(value)
-    end
-  })
-
-  f:AddCheckbox({
-    title = 'Animate Item Movement',
-    description = 'If enabled, items, sections and rows glide to their new places when the bags rearrange (sorting, looting, resizing).',
-    getValue = function(_)
-      return db:GetAnimateItemMovement()
-    end,
-    setValue = function(_, value)
-      db:SetAnimateItemMovement(value)
-    end
-  })
-
-  f:AddCheckbox({
-    title = 'BetterBags Next (experimental)',
-    description = 'An experimental new backpack: a panel that slides in from the right edge of the screen, '
-      .. 'with tabs down its side and your categories in one column. Switches at once, outside combat, '
-      .. 'the bank and vendors.',
-    getValue = function(_)
-      return db:GetNextEnabled()
-    end,
-    setValue = function(ctx, value)
-      -- A switch refused (combat, the bank, a vendor) leaves the setting as it was: show it again.
-      if not addon:GetModule('BagSystem'):Switch(ctx, value and "next" or "classic") then
-        self.configFrame:ReloadAllFormElements()
-      end
-    end
-  })
-
-  f:AddDropdown({
-    title = 'Upgrade Icon Provider',
-    description = 'Select the icon provider for item upgrades.',
-    itemsFunction = function()
-      local list = {'None', 'BetterBags'}
-      local itemsModule = addon:GetModule('Items')
-      if itemsModule and itemsModule.upgradeProviders then
-        for provider in pairs(itemsModule.upgradeProviders) do
-          if provider ~= 'BetterBags' then
-            table.insert(list, provider)
-          end
-        end
-      end
-      return list
-    end,
-    getValue = function(_, value)
-      -- Reflect the provider actually in effect (which may be an external
-      -- provider taking precedence when the user has not made an explicit
-      -- choice), so the highlighted option matches the arrows being drawn.
-      return value == addon:GetModule('Items'):GetActiveUpgradeProvider()
-    end,
-    setValue = function(ctx, value)
-      db:SetUpgradeIconProvider(value)
-      -- The data sweep re-resolves each item's data.isUpgrade with the newly selected
-      -- provider; a redraw alone would draw the committed (stale) isUpgrade.
-      events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-    end,
-  })
-
-  f:AddSlider({
-    title = 'New Item Duration',
-    description = 'The duration in minutes that an item is considered new.',
-    min = 1,
-    max = 120,
-    step = 1,
-    getValue = function(_)
-      return db:GetData().profile.newItemTime / 60
-    end,
-    setValue = function(_, value)
-      db:GetData().profile.newItemTime = value * 60
-    end,
-  })
+  -- A setting that takes effect after a reload asks for one; a change refused (switching the bags'
+  -- design in combat, at the bank or a vendor) shows the settings again as they are.
+  local hooks = {
+    reload = askToReload,
+    refresh = function() self.configFrame:ReloadAllFormElements() end,
+  }
+  for _, id in ipairs({ 'inBagSearch', 'enterToMakeCategory', 'categorySell', 'showBagButton', 'enableBankBags',
+    'bagFading', 'animateItemMovement', 'nextEnabled', 'upgradeProvider', 'newItemDuration' }) do
+    addSetting(f, id, nil, hooks)
+  end
 
   f:AddPaneLink({
     title = 'Theme',
@@ -246,443 +133,62 @@ function config:CreateConfig()
     bagKind = nil,
   })
 
-  local bagTypes = {
-    {name = 'Backpack', kind = const.BAG_KIND.BACKPACK},
-    {name = 'Bank', kind = const.BAG_KIND.BANK}
-  }
-  -- The guild bank (BetterBags Next's, guild-bank.md §5) has its own, on a client with one.
-  if addon.hasGuildBank then
-    table.insert(bagTypes, {name = 'Guild Bank', kind = const.BAG_KIND.GUILD})
-  end
-  for _, bagType in ipairs(bagTypes) do
-
+  for _, bag in ipairs(catalog:Bags()) do
+    local name = string.lower(bag.name)
     f:AddSection({
-      title = bagType.name,
-      description = 'Settings for the ' .. string.lower(bagType.name) .. '.',
+      title = bag.name,
+      description = 'Settings for the ' .. name .. '.',
     })
-    local sectionOrders = {
-      ["Alphabetically"] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
-      ["Size Descending"] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
-      ["Size Ascending"] = const.SECTION_SORT_TYPE.SIZE_ASCENDING,
-    }
-    f:AddDropdown({
-      title = 'Section Order',
-      description = 'The order of sections in the ' .. string.lower(bagType.name) .. ' when not pinned.',
-      items = {'Alphabetically', 'Size Descending', 'Size Ascending'},
-      getValue = function(_, value)
-        return sectionOrders[value] == db:GetSectionSortType(bagType.kind, db:GetBagView(bagType.kind))
-      end,
-      setValue = function(ctx, value)
-        db:SetSectionSortType(bagType.kind, db:GetBagView(bagType.kind), sectionOrders[value])
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end,
-    })
-
-    local itemOrders = {
-      ["Alphabetically"] = const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY,
-      ["Quality"] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-      ["Item Level"] = const.ITEM_SORT_TYPE.ITEM_LEVEL,
-      ["Expansion"] = const.ITEM_SORT_TYPE.EXPANSION,
-    }
-    f:AddDropdown({
-      title = 'Item Order',
-      description = 'The default order of items within each section.',
-      items = {'Alphabetically', 'Quality', 'Item Level', 'Expansion'},
-      getValue = function(_, value)
-        return itemOrders[value] == db:GetItemSortType(bagType.kind, db:GetBagView(bagType.kind))
-      end,
-      setValue = function(ctx, value)
-        db:SetItemSortType(bagType.kind, db:GetBagView(bagType.kind), itemOrders[value])
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end,
-    })
-
-    -- Enable Groups checkbox - only for Backpack
-    if bagType.kind == const.BAG_KIND.BACKPACK then
-      f:AddCheckbox({
-        title = 'Enable Groups',
-        description = 'Show group tabs at the bottom of the backpack. Groups allow you to organize categories into separate tabs. When disabled, all categories are shown in a single view.',
-        getValue = function(_)
-          return db:GetGroupsEnabled(bagType.kind)
-        end,
-        setValue = function(ctx, value)
-          db:SetGroupsEnabled(bagType.kind, value)
-          events:SendMessage(ctx, 'groups/EnabledChanged', bagType.kind, value)
-          events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-        end
-      })
+    addSetting(f, 'sectionOrder', bag)
+    addSetting(f, 'itemOrder', bag)
+    if catalog:Has('enableGroups', bag) then
+      addSetting(f, 'enableGroups', bag)
     end
 
     f:AddInlineSubSection({
       title = 'Categories',
-      description = 'Settings for Blizzard item categories in the ' .. string.lower(bagType.name) .. '.',
+      description = 'Settings for Blizzard item categories in the ' .. name .. '.',
     })
-
     f:AddLabel({
       description = 'To create a custom category, drag an item into the bag button on the top of your bag and let go.',
     })
-
-    f:AddCheckbox({
-      title = 'Equipment Location',
-      description = 'Sort items into categories based on equipment location (Main Hand, Head, etc).',
-      getValue = function(_)
-        return db:GetCategoryFilters(bagType.kind).EquipmentLocation
-      end,
-      setValue = function(ctx, value)
-        db:GetCategoryFilters(bagType.kind).EquipmentLocation = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Expansion',
-      description = 'Sort items into categories based on their expansion.',
-      getValue = function(_)
-        return db:GetCategoryFilters(bagType.kind).Expansion
-      end,
-      setValue = function(ctx, value)
-        db:GetCategoryFilters(bagType.kind).Expansion = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Equipment Set',
-      description = 'Sort items into categories based on equipment sets.',
-      getValue = function(_)
-        return db:GetCategoryFilters(bagType.kind).GearSet
-      end,
-      setValue = function(ctx, value)
-        db:GetCategoryFilters(bagType.kind).GearSet = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Recent Items',
-      description = 'Enable the Recent Items category for new items.',
-      getValue = function(_)
-        return db:GetCategoryFilters(bagType.kind).RecentItems
-      end,
-      setValue = function(ctx, value)
-        db:GetCategoryFilters(bagType.kind).RecentItems = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Trade Skill',
-      description = 'Sort items into categories based on their trade skill usage.',
-      getValue = function(_)
-        return db:GetCategoryFilters(bagType.kind).TradeSkill
-      end,
-      setValue = function(ctx, value)
-        db:GetCategoryFilters(bagType.kind).TradeSkill = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Type',
-      description = 'Sort items into categories based on their equipment type (Consumable, Quest, etc).',
-      getValue = function(_)
-        return db:GetCategoryFilters(bagType.kind).Type
-      end,
-      setValue = function(ctx, value)
-        db:GetCategoryFilters(bagType.kind).Type = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Sub Type',
-      description = 'Sort items into categories based on sub type (Potions, Bandages, etc).',
-      getValue = function(_)
-        return db:GetCategoryFilters(bagType.kind).Subtype
-      end,
-      setValue = function(ctx, value)
-        db:GetCategoryFilters(bagType.kind).Subtype = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
+    for _, id in ipairs({ 'filterEquipmentLocation', 'filterExpansion', 'filterGearSet', 'filterRecentItems',
+      'filterTradeSkill', 'filterType', 'filterSubtype' }) do
+      addSetting(f, id, bag)
+    end
 
     f:AddInlineSubSection({
       title = 'Item Stacking',
-      description = 'Settings for item stacking in the ' .. string.lower(bagType.name) .. '.',
+      description = 'Settings for item stacking in the ' .. name .. '.',
     })
-
-    f:AddCheckbox({
-      title = 'All Items Recent',
-      description = 'All new items you loot, pickup, or move into the bag will be marked as recent.',
-      getValue = function(_)
-        return db:GetMarkRecentItems(bagType.kind)
-      end,
-      setValue = function(_, value)
-        db:SetMarkRecentItems(bagType.kind, value)
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Flash Stacks',
-      description = 'When a stack of items gets a new item, the stack will flash.',
-      getValue = function(_)
-        return db:GetShowNewItemFlash(bagType.kind)
-      end,
-      setValue = function(_, value)
-        db:SetShowNewItemFlash(bagType.kind, value)
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Merge Stacks',
-      description = 'Stackable items will merge into a single item button in your ' .. string.lower(bagType.name) .. '.',
-      getValue = function(_)
-        return db:GetStackingOptions(bagType.kind).mergeStacks
-      end,
-      setValue = function(ctx, value)
-        db:GetStackingOptions(bagType.kind).mergeStacks = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Merge Unstackable',
-      description = 'Unstackable items, such as armor and weapons, will merge into a single item button in your ' .. string.lower(bagType.name) .. '.',
-      getValue = function(_)
-        return db:GetStackingOptions(bagType.kind).mergeUnstackable
-      end,
-      setValue = function(ctx, value)
-        db:GetStackingOptions(bagType.kind).mergeUnstackable = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = "Don't Merge Partial Stacks",
-      description = 'Partial stacks of items will not merge with other partial or full stacks.',
-      getValue = function(_)
-        return db:GetStackingOptions(bagType.kind).dontMergePartial
-      end,
-      setValue = function(ctx, value)
-        db:GetStackingOptions(bagType.kind).dontMergePartial = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = "Split Transmogged Items",
-      description = 'Transmogged items will be split into a separate, stackable button in your ' .. string.lower(bagType.name) .. '.',
-      getValue = function(_)
-        return db:GetStackingOptions(bagType.kind).dontMergeTransmog
-      end,
-      setValue = function(ctx, value)
-        db:GetStackingOptions(bagType.kind).dontMergeTransmog = value
-        -- The item hash includes the transmog appearance only with this setting, and a slot's
-        -- hash is computed when the slot is read, so the bags are read again.
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Unmerge on Interactions',
-      description = 'When you interact a vendor, mailbox, auction house, etc, all merged items will unmerge.',
-      getValue = function(_)
-        return db:GetStackingOptions(bagType.kind).unmergeAtShop
-      end,
-      setValue = function(ctx, value)
-        db:GetStackingOptions(bagType.kind).unmergeAtShop = value
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
+    for _, id in ipairs({ 'markRecentItems', 'newItemFlash', 'mergeStacks', 'mergeUnstackable', 'dontMergePartial',
+      'dontMergeTransmog', 'unmergeAtShop' }) do
+      addSetting(f, id, bag)
+    end
 
     f:AddInlineSubSection({
       title = 'Item Level',
-      description = 'Settings for item level in the ' .. string.lower(bagType.name) .. '.',
+      description = 'Settings for item level in the ' .. name .. '.',
     })
-
-    f:AddCheckbox({
-      title = 'Show Item Level',
-      description = 'Show the item level on item buttons in the ' .. string.lower(bagType.name) .. '.',
-      getValue = function(_)
-        return db:GetItemLevelOptions(bagType.kind).enabled
-      end,
-      setValue = function(ctx, value)
-        db:GetItemLevelOptions(bagType.kind).enabled = value
-        events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Show Item Level Color',
-      description = 'Show the item level in color on item buttons in the ' .. string.lower(bagType.name) .. '.',
-      getValue = function(_)
-        return db:GetItemLevelOptions(bagType.kind).color
-      end,
-      setValue = function(ctx, value)
-        db:GetItemLevelOptions(bagType.kind).color = value
-        events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
-      end
-    })
+    addSetting(f, 'itemLevel', bag)
+    addSetting(f, 'itemLevelColor', bag)
 
     f:AddInlineSubSection({
       title = 'Display',
-      description = 'Settings that adjust layout and visual aspects of the ' .. string.lower(bagType.name) .. '.',
+      description = 'Settings that adjust layout and visual aspects of the ' .. name .. '.',
     })
-
-    f:AddCheckbox({
-      title = 'Show Full Section Names',
-      description = 'Show the full section names for each section and do not cut them off.',
-      getValue = function(_)
-        return db:GetShowFullSectionNames(bagType.kind)
-      end,
-      setValue = function(ctx, value)
-        db:SetShowFullSectionNames(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/Redraw')
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Show All Free Space Slots',
-      description = 'Show all free space slots, individually, at the bottom of the ' .. string.lower(bagType.name) .. '.',
-      getValue = function(_)
-        return db:GetShowAllFreeSpace(bagType.kind)
-      end,
-      setValue = function(ctx, value)
-        db:SetShowAllFreeSpace(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Preserve Empty Slots as Gaps',
-      description = 'When an item is used, sold, moved, or removed, keep an empty gap in its place until you close the ' .. string.lower(bagType.name) .. ' or sort it. New items appear elsewhere and never fill the gap.',
-      getValue = function(_)
-        return db:GetPreserveItemGaps(bagType.kind)
-      end,
-      setValue = function(ctx, value)
-        db:SetPreserveItemGaps(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-      end
-    })
-
-    f:AddSlider({
-      title = 'Quality Glow Intensity',
-      description = 'How strongly item buttons show their quality color, from 0 to 100. '
-        .. 'At 0 there is no border at all. Up to 60 it is a flat colored border that fades in. '
-        .. 'Above 60 the glowing halo alphas in, reaching a blinding maximum at 100.',
-      min = 0,
-      max = 100,
-      step = 1,
-      getValue = function(_)
-        return db:GetGlowIntensity(bagType.kind)
-      end,
-      setValue = function(ctx, value)
-        db:SetGlowIntensity(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Resizable Window',
-      description = 'If enabled, the ' .. string.lower(bagType.name) .. ' is a window you size by dragging its corner, '
-        .. 'and its sections fill it (Columns still sets how many sit side by side). '
-        .. 'If disabled, it sizes itself to its items, Items Per Row wide.',
-      getValue = function(_)
-        return db:GetBagSizeMode(bagType.kind) == "window"
-      end,
-      setValue = function(ctx, value)
-        db:SetBagSizeMode(bagType.kind, value and "window" or "content")
-        events:SendMessage(ctx, 'bags/Redraw')
-      end
-    })
-
-    f:AddCheckbox({
-      title = 'Snap to Content',
-      description = 'With Resizable Window on, when you let go after resizing the ' .. string.lower(bagType.name)
-        .. ', it shrinks to fit its items, so there is no empty space at the sides or below them.',
-      getValue = function(_)
-        return db:GetBagSnapToContent(bagType.kind)
-      end,
-      setValue = function(_, value)
-        db:SetBagSnapToContent(bagType.kind, value)
-      end
-    })
-
-    f:AddSlider({
-      title = 'Items Per Row',
-      description = 'The number of items per row in each section.',
-      min = 3,
-      max = 20,
-      step = 1,
-      getValue = function(_)
-        return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).itemsPerRow > 20 and 20 or db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).itemsPerRow
-      end,
-      setValue = function(ctx, value)
-        db:SetBagViewSizeItems(bagType.kind, db:GetBagView(bagType.kind), value)
-        bucket:Later("setItemsPerRow", 0.2, function()
-          events:SendMessage(ctx, 'bags/Redraw')
-        end)
-      end,
-    })
-
-    f:AddSlider({
-      title = 'Columns',
-      description = 'The number of columns in the ' .. string.lower(bagType.name) .. '.',
-      min = 1,
-      max = 20,
-      step = 1,
-      getValue = function(_)
-        return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).columnCount > 20 and 20 or db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).columnCount
-      end,
-      setValue = function(ctx, value)
-        db:SetBagViewSizeColumn(bagType.kind, db:GetBagView(bagType.kind), value)
-        bucket:Later("setSectionsPerRow", 0.2, function()
-          events:SendMessage(ctx, 'bags/Redraw')
-        end)
-      end,
-    })
-
-    f:AddSlider({
-      title = 'Opacity',
-      description = 'The opacity of the background of the ' .. string.lower(bagType.name) .. '.',
-      min = 0,
-      max = 100,
-      step = 1,
-      getValue = function(_)
-        return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).opacity
-      end,
-      setValue = function(_, value)
-        db:SetBagViewSizeOpacity(bagType.kind, db:GetBagView(bagType.kind), value)
-        sonata:UpdateOpacity()
-      end,
-    })
-
-    f:AddSlider({
-      title = 'Scale',
-      description = 'The scale of the ' .. string.lower(bagType.name) .. '.',
-      min = 50,
-      max = 200,
-      step = 1,
-      getValue = function(_)
-        return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).scale
-      end,
-      setValue = function(_, value)
-        db:SetBagViewSizeScale(bagType.kind, db:GetBagView(bagType.kind), value)
-        local bag = addon:GetBagFromKind(bagType.kind)
-        -- A BetterBags Next backpack has no window: it has one size.
-        if bag and bag.window then
-          bag.window:UpdateScale()
-        end
-      end,
-    })
+    for _, id in ipairs({ 'fullSectionNames', 'showAllFreeSpace', 'preserveGaps', 'glowIntensity', 'resizableWindow',
+      'snapToContent', 'itemsPerRow', 'columns', 'opacity', 'scale' }) do
+      addSetting(f, id, bag)
+    end
 
     f:AddPaneLink({
       title = 'Categories',
-      description = 'Manage and reorder categories for the ' .. string.lower(bagType.name) .. '.',
+      description = 'Manage and reorder categories for the ' .. name .. '.',
       createPane = function(parent, kind)
         return categoryPane:Create(parent, kind)
       end,
-      bagKind = bagType.kind,
+      bagKind = bag.kind,
     })
   end
 
