@@ -1,0 +1,17 @@
+{
+  "id": 1792546672,
+  "version": "v0.7.0-7-gb2b7ac6",
+  "channel": "alpha",
+  "date": "2026-10-21",
+  "from": "453f9ccf070b6fa054bc62b5cf051e303524b316",
+  "to": "b2b7ac6d4c6d343acf9e19ad83454de6ba977686",
+  "headline": "Merchant items in BetterBags Next now display as readable cards with larger text and full-card clicking.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Vendor items display as cards with larger text",
+      "details": "Merchant items now show as two-column cards with the item name and price beside the icon at a larger, more legible font size. You can click anywhere on a card to interact with it, and dropping an item onto a card will sell it.",
+      "clients": []
+    }
+  ]
+}
