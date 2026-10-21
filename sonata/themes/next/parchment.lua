@@ -161,6 +161,7 @@ sonataNext:RegisterTheme({
     Sidebar = { Fill = { Color = "Ink", Alpha = 0.06 }, Line = { Color = "Ink", Alpha = 0.25 } },
     Brand = { IconColor = "Seal", Line = { Color = "Seal" } },
     Search = { IconColor = "Ink" },
+    Back = { IconColor = "Ink" },
     Nav = {
       Indicator = { Color = "Seal" },
       SelectedFill = { Color = "Ink", Alpha = 0.08 },

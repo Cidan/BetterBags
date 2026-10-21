@@ -200,11 +200,15 @@ def guildRepair():
     shield = [(12.0, 10.6), (18.4, 10.6), (18.4, 14.2), (15.2, 18.4), (12.0, 14.2)]
     return union(cut(hammer(2.8, 15.4), fill(shield), 1.6), stroke(shield, True))
 
-# The controls' glyphs (next-settings.md): a dropdown's chevron, a menu's check, a search box's
-# magnifier, and the plus of a button that makes something new.
+# The controls' glyphs (next-settings.md): a dropdown's chevron, the settings window's Back, a menu's
+# check, a search box's magnifier, and the plus of a button that makes something new.
 
 def chevronDown():
     return chevron(10, 13.2, 0, 1, 4.6)
+
+def chevronLeft():
+    # The settings window's Back: the dropdown's chevron turned to point left, centered the same way.
+    return chevron(7.7, 10, -1, 0, 4.6)
 
 def check():
     return stroke([(4.4, 10.4), (8.2, 14.2), (15.6, 5.8)])
@@ -219,7 +223,7 @@ GLYPHS = {
     "settings": gear, "close": close, "sort": sort, "bags": bag, "small": shrink, "full": expand,
     "banktabs": tabs, "deposit": deposit, "depositgold": depositGold, "withdrawgold": withdrawGold,
     "filter": filt, "selljunk": tag, "repair": repair, "guildrepair": guildRepair,
-    "chevron": chevronDown, "check": check, "search": magnifier, "plus": plus,
+    "chevron": chevronDown, "back": chevronLeft, "check": check, "search": magnifier, "plus": plus,
 }
 
 if __name__ == "__main__":

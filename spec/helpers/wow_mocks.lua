@@ -780,6 +780,14 @@ end
 function WidgetMethods:GetScale()
   return self._scale or 1
 end
+-- Frame:SetClipsChildren(clipped) and DoesClipChildren() (SimpleFrameAPIDocumentation.lua, every
+-- client): whether the frame cuts its children's drawing at its edges.
+function WidgetMethods:SetClipsChildren(clipped)
+  self._clipsChildren = clipped == true
+end
+function WidgetMethods:DoesClipChildren()
+  return self._clipsChildren == true
+end
 -- GetPhysicalScreenSize() -> sizeX, sizeY (ScreenDocumentation.lua; Blizzard's PixelUtil calls it on
 -- every client).
 _G.GetPhysicalScreenSize = function() return 1920, 1080 end
@@ -2570,6 +2578,18 @@ function _G.GameTooltip:SetBagItem(bag, slot)
   end
   self:Hide()
   return false
+end
+
+-- GameTooltip:SetHyperlink(link) and SetItemByID(itemID) are TooltipDataHandler accessors on retail
+-- (GetHyperlink, GetItemByID; Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua) and native on
+-- Classic: they fill the tooltip with the item's and show it.
+function _G.GameTooltip:SetHyperlink(link)
+  self._hyperlink, self._itemByID = link, nil
+  self:Show()
+end
+function _G.GameTooltip:SetItemByID(itemID)
+  self._itemByID, self._hyperlink = itemID, nil
+  self:Show()
 end
 
 -- Cursor APIs

@@ -173,6 +173,7 @@ next\controls\dropdown.lua
 next\controls\swatch.lua
 next\controls\toptabs.lua
 next\controls\dialog.lua
+next\controls\itemgrid.lua
 next\sparkles.lua
 next\tabs.lua
 next\content.lua

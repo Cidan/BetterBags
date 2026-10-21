@@ -147,6 +147,7 @@ describe("NextSettings", function()
       assert.is_true(frame:IsToplevel())
       assert.is_true(frame:IsClampedToScreen())
       assert.are.same({ S().Width, S().Height }, { frame:GetSize() })
+      assert.are.same({ 1000, 720 }, { S().Width, S().Height }, "asked: taller, for the Categories page")
       tween:Step(1)
       assert.are.same({ "CENTER", UIParent, "CENTER", 0, 0 }, { frame:GetPoint(1) }, "once it has slid in")
     end)
@@ -555,6 +556,193 @@ describe("NextSettings", function()
   -- design shows only while that design is in use.
   -- A row or a section can be hidden while a function says so (a plugin's hidden, AceConfig): checked
   -- at every layout, and the window lays itself out again after every change on the page.
+  -- A page with its own list (pages.lua sidebar, next-settings.md §5): choosing it slides the pages
+  -- out of the sidebar and its list in, Back on top; its heading and actions in the header; its tabs
+  -- shown while they say so. Asked: the first Escape goes back, the next closes the window.
+  describe("a page with its own list", function()
+    local state, made
+
+    before_each(function()
+      state = { title = "Mats", description = "2 items", rule = false, refreshed = 0, actionsRefreshed = 0 }
+      made = {}
+      pages:Define({
+        id = "cats", group = "BetterBags", title = "Categories", description = "Every category.",
+        sidebar = function(parent, owner)
+          local sb = { frame = CreateFrame("Frame", nil, parent), parent = parent, owner = owner }
+          function sb:Place(w, h) self.placed = { w, h } end
+          function sb:Refresh() state.refreshed = state.refreshed + 1 end
+          table.insert(made, sb)
+          return sb
+        end,
+        heading = function() return state.title, state.description end,
+        actions = function(parent, owner)
+          local a = { frame = CreateFrame("Frame", nil, parent), owner = owner }
+          a.frame:SetSize(160, 28)
+          function a:Refresh() state.actionsRefreshed = state.actionsRefreshed + 1 end
+          state.actions = a
+          return a
+        end,
+        tabs = {
+          { id = "settings", title = "Settings", sections = { { title = "S", rows = { { text = "Its settings." } } } } },
+          { id = "rule", title = "Rule", shown = function() return state.rule end,
+            sections = { { title = "R", rows = { { text = "Its rule." } } } } },
+          { id = "items", title = "Added Items", sections = { { title = "I", rows = { { text = "Its items." } } } } },
+        },
+      })
+    end)
+
+    local function tabTitles()
+      local list = {}
+      for _, t in ipairs(settings.tabs.list) do table.insert(list, t.text) end
+      return list
+    end
+
+    local function settle()
+      tween:Step(10)
+    end
+
+    it("slides the pages out and its list in when chosen, and back with Back", function()
+      open()
+      settle()
+      local W = S().Sidebar.Width
+      settings:Select("cats")
+      assert.are.equal(pages:Get("cats"), settings.sidebarPage)
+      assert.are.equal(1, #made, "its list, made once")
+      assert.are.equal(settings.listHost, made[1].parent)
+      assert.are.equal(settings.frame, made[1].owner)
+      assert.are.same({ W, S().Height - S().Brand.Height }, made[1].placed)
+      assert.is_true(state.refreshed > 0)
+      assert.is_true(settings.sidebar:DoesClipChildren())
+      tween:Step(style.Time.Interaction / 2)
+      local _, _, _, navX = settings.navPanel:GetPoint(1)
+      local _, _, _, listX = settings.listPanel:GetPoint(1)
+      assert.is_true(navX < 0 and navX > -W, "the pages on their way out")
+      assert.is_true(listX > 0 and listX < W, "its list on its way in")
+      settle()
+      assert.is_false(settings.navPanel:IsShown())
+      assert.are.same({ "TOPLEFT", settings.sidebar, "TOPLEFT", 0, 0 }, { settings.listPanel:GetPoint(1) })
+      assert.are.equal("All Settings", settings.backLabel:GetText())
+      settings.back:GetScript("OnClick")(settings.back, "LeftButton")
+      assert.is_nil(settings.sidebarPage)
+      settle()
+      assert.is_true(settings.navPanel:IsShown())
+      assert.is_false(settings.listPanel:IsShown())
+      assert.are.same({ "TOPLEFT", settings.sidebar, "TOPLEFT", 0, 0 }, { settings.navPanel:GetPoint(1) })
+      settings:Select("cats")
+      assert.are.equal(1, #made, "the same list the next time")
+    end)
+
+    it("goes back to the page and tab it came from, or the first page", function()
+      open("backpack", "items")
+      settings:Select("cats")
+      settings:Back()
+      assert.are.same({ "backpack", "items" }, { settings.pageId, settings.tabId })
+      settings:Init()
+      open("cats")
+      settings:Back()
+      assert.are.equal("general", settings.pageId)
+    end)
+
+    it("opens straight on its list, without sliding", function()
+      open("cats")
+      assert.is_false(settings.navPanel:IsShown())
+      assert.is_true(settings.listPanel:IsShown())
+      assert.are.equal(1, settings.listPanel:GetAlpha())
+    end)
+
+    it("goes back on the first Escape, and closes the window on the next", function()
+      open()
+      settings:Select("cats")
+      assert.are.same({ "BetterBagsNextSettingsBack" }, UISpecialFrames)
+      local key = settings.backKey
+      key:Hide()
+      key:GetScript("OnHide")(key)
+      assert.is_nil(settings.sidebarPage)
+      assert.is_true(settings:IsShown())
+      for _, fn in ipairs(timers) do fn() end
+      assert.are.same({ "BetterBagsNextSettings" }, UISpecialFrames)
+    end)
+
+    it("gives Escape back when the window closes on its list, and takes it again when it opens there", function()
+      open()
+      settings:Select("cats")
+      settings:Close()
+      tween:Step(10)
+      local key = settings.backKey
+      key:GetScript("OnHide")(key)
+      assert.are.equal(pages:Get("cats"), settings.sidebarPage, "closing is not going back")
+      assert.is_false(key:IsShown(), "no hidden frame left to take Escape")
+      for _, fn in ipairs(timers) do fn() end
+      assert.are.same({}, UISpecialFrames)
+      open()
+      assert.are.equal(pages:Get("cats"), settings.sidebarPage, "it opens on the list it showed")
+      assert.are.same({ "BetterBagsNextSettingsBack" }, UISpecialFrames)
+    end)
+
+    it("goes back on the first Escape when opened again while it fades out on its list", function()
+      open()
+      settings:Select("cats")
+      settings:Close()
+      tween:Step(style.Time.Close / 2)
+      open()
+      for _, fn in ipairs(timers) do fn() end
+      assert.are.same({ "BetterBagsNextSettingsBack" }, UISpecialFrames)
+      assert.are.same({ settings.frame, settings.backKey }, controls.escape)
+    end)
+
+    it("shows its heading and its actions in the header, and the page's own elsewhere", function()
+      open()
+      settings:Select("cats")
+      assert.are.equal("Mats", settings.title:GetText())
+      assert.are.equal("2 items", settings.description:GetText())
+      local a = state.actions
+      assert.are.equal(settings.header, a.frame:GetParent())
+      assert.are.equal(settings.frame, a.owner)
+      assert.is_true(a.frame:IsShown())
+      assert.is_true(state.actionsRefreshed > 0)
+      local H, X = S().Header, S().Header.Close
+      assert.are.same({ "TOPRIGHT", settings.header, "TOPRIGHT", -(X.Inset + X.Size + H.Actions.Gap), -H.Actions.Top },
+        { a.frame:GetPoint(1) })
+      assert.are.same({ "RIGHT", a.frame, "LEFT", -H.Actions.Gap, 0 }, { settings.title:GetPoint(2) })
+      settings:Select("general")
+      assert.is_false(a.frame:IsShown())
+      assert.are.equal("General", settings.title:GetText())
+      assert.is_nil(settings.title:GetPoint(2), "the title as wide as it likes")
+    end)
+
+    it("shows only the tabs that say so, the first shown for one hidden", function()
+      open()
+      settings:Select("cats", "rule")
+      assert.are.same({ "Settings", "Added Items" }, tabTitles())
+      assert.are.equal("settings", settings.tabId)
+      state.rule = true
+      settings:Select("cats", "rule")
+      assert.are.same({ "Settings", "Rule", "Added Items" }, tabTitles())
+      assert.are.equal("rule", settings.tabId)
+    end)
+
+    it("reads its heading, actions, tabs and list again when told (Reselect)", function()
+      open()
+      settings:Select("cats", "items")
+      local refreshed, actions = state.refreshed, state.actionsRefreshed
+      state.title, state.rule = "Metals", true
+      settings:Reselect()
+      assert.are.equal("Metals", settings.title:GetText())
+      assert.are.same({ "Settings", "Rule", "Added Items" }, tabTitles())
+      assert.are.equal("items", settings.tabId, "on the same tab")
+      assert.is_true(state.refreshed > refreshed and state.actionsRefreshed > actions)
+    end)
+
+    it("leaves its list for a search", function()
+      open()
+      settings:Select("cats")
+      settings:Search(addon:GetModule("Context"):New("spec"), "merge")
+      assert.is_nil(settings.sidebarPage)
+      for _, fn in ipairs(timers) do fn() end
+      assert.are.same({ "BetterBagsNextSettings" }, UISpecialFrames)
+    end)
+  end)
+
   describe("rows and sections hidden while a function says so", function()
     local hide
 

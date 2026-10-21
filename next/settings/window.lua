@@ -71,7 +71,9 @@ local sonataNext = addon:GetModule('SonataNext')
 -- moved by its header, and closed with Escape (the controls' Escape stack: a menu or a dialog open
 -- over it closes first). It comes and goes as a detached Next bag does: sliding a short way in from
 -- the right as it fades in, and out again as it fades out; Escape closes it at once, as it does a bag. It shows the page and tab it showed last this session. Typing in the
--- search box lists every setting that matches as live rows under their page and tab.
+-- search box lists every setting that matches as live rows under their page and tab. A page with its
+-- own list (the Categories page) slides the pages out of the sidebar and its list in, Back on top
+-- (the first Escape goes back too), with its heading and buttons in the header.
 ---@class NextSettings: AceModule
 ---@field frame? Frame
 ---@field root Drawable
@@ -88,6 +90,15 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@field closing boolean Fading out.
 ---@field offset number How far right of where it rests it is, as it slides.
 ---@field motion table The slide's tween key.
+---@field sidebarPage? NextSettingsPageDef The page whose own list the sidebar shows.
+---@field returnTo? {pageId: string, tabId: string} Where Back goes.
+---@field shift number How far the sidebar has slid to a page's own list, from 0 (the pages) to 1.
+---@field shiftMotion table The sidebar slide's tween key.
+---@field lists table<NextSettingsPageDef, NextSettingsSidebar>
+---@field actionsOf table<NextSettingsPageDef, NextSettingsActions>
+---@field actions? NextSettingsActions The buttons in the header now.
+---@field backKeyHeld boolean The frame the first Escape hides holds Escape.
+---@field arriving boolean The window is coming in (Open is showing a page).
 local settings = addon:NewModule('NextSettings')
 
 -- The share of the screen the window takes at most.
@@ -127,6 +138,12 @@ function settings:Init()
   self.closing = false
   self.offset = 0
   self.motion = {}
+  self.sidebarPage, self.returnTo, self.actions = nil, nil, nil
+  self.backKeyHeld, self.arriving = false, false
+  self.shift = 0
+  self.shiftMotion = {}
+  self.lists = {}
+  self.actionsOf = {}
 end
 
 settings:Init()
@@ -152,7 +169,10 @@ function settings:Open(pageId, tabId)
   frame:Show()
   self.shown = true
   controls:PushEscape(frame)
+  -- Coming in, a page's own list is in place at once: the window slides as a whole.
+  self.arriving = coming
   self:Select(pageId or self.pageId, tabId or (pageId == nil and self.tabId or nil))
+  self.arriving = false
   if coming then
     tween:Play(self.motion, {
       duration = style.Time.Open,
@@ -218,6 +238,7 @@ function settings:ended()
     return
   end
   self.shown = false
+  self:releaseBackKey()
   if self.page ~= nil then
     self.page:Leave(context:New('NextSettings_Hidden'))
   end
@@ -236,6 +257,9 @@ function settings:hidden()
   tween:Stop(self.motion)
   self.offset = 0
   self.frame:SetAlpha(1)
+  -- Escape's first press goes back only while the window shows: a hidden key frame still shown would
+  -- take Escape from the game (CloseSpecialWindows reads IsShown).
+  self:releaseBackKey()
   controls:ReleaseEscape(self.frame)
 end
 
@@ -277,23 +301,29 @@ function settings:buildSidebar()
   local sidebar = CreateFrame("Frame", nil, frame)
   sidebar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
   sidebar:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+  -- The pages and a page's own list slide past each other inside it.
+  sidebar:SetClipsChildren(true)
   self.sidebar = sidebar
   self.sidebarFill = sidebar:CreateTexture(nil, "BACKGROUND", nil, -7)
   self.sidebarFill:SetAllPoints(sidebar)
   self.sidebarLine = sidebar:CreateTexture(nil, "BORDER")
   self.sidebarLine:SetPoint("TOPRIGHT", sidebar, "TOPRIGHT", 0, 0)
   self.sidebarLine:SetPoint("BOTTOMRIGHT", sidebar, "BOTTOMRIGHT", 0, 0)
-  -- The brand: dragging it moves the window, as the header does.
+  -- The brand's row: dragging it moves the window, as the header does. It stays as the panels slide.
   local brand = CreateFrame("Frame", nil, sidebar)
   brand:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 0, 0)
   brand:SetPoint("TOPRIGHT", sidebar, "TOPRIGHT", 0, 0)
   self:makeMover(brand)
   self.brand = brand
-  self.brandIcon = brand:CreateTexture(nil, "ARTWORK")
-  self.brandText = style:CreateText(brand, style.Theme.Settings.Brand.Font)
+  -- The pages: the brand, the search box, the pages, the version.
+  local navPanel = CreateFrame("Frame", nil, sidebar)
+  self.navPanel = navPanel
+  self.brandIcon = navPanel:CreateTexture(nil, "ARTWORK")
+  self.brandText = style:CreateText(navPanel, style.Theme.Settings.Brand.Font)
   self.brandText:SetText(L:G("BetterBags"))
-  self.brandLine = brand:CreateTexture(nil, "ARTWORK")
-  self.search = nextInput:Create(sidebar, {
+  self.brandLine = navPanel:CreateTexture(nil, "ARTWORK")
+  self:buildListPanel()
+  self.search = nextInput:Create(navPanel, {
     help = L:G("Search settings"),
     onChange = function(ctx, text) self:Search(ctx, text) end,
     icon = function()
@@ -302,7 +332,7 @@ function settings:buildSidebar()
     end,
   })
   addon.HookScript(self.search.frame, "OnEscapePressed", function(ctx) self:Search(ctx, "") end)
-  local navBox = CreateFrame("Frame", nil, sidebar, "WowScrollBox") --[[@as WowScrollBox]]
+  local navBox = CreateFrame("Frame", nil, navPanel, "WowScrollBox") --[[@as WowScrollBox]]
   navBox:SetInterpolateScroll(true)
   local navList = CreateFrame("Frame", nil, navBox)
   navList.scrollable = true
@@ -312,8 +342,40 @@ function settings:buildSidebar()
   self.navBar = nextScrollBar:Create(navBox)
   self.navBar:Bind(navBox)
   self.navBox, self.navList = navBox, navList
-  self.version = style:CreateText(sidebar, style.Theme.Settings.Version.Font)
+  self.version = style:CreateText(navPanel, style.Theme.Settings.Version.Font)
   self.version:SetText(self:VersionText())
+end
+
+-- buildListPanel makes the panel a page's own list slides in on: Back in the brand's row (above the
+-- brand's mover), its line, and the place the list goes; and the frame Escape hides first while it
+-- shows, which goes back.
+---@private
+function settings:buildListPanel()
+  local panel = CreateFrame("Frame", nil, self.sidebar)
+  panel:Hide()
+  self.listPanel = panel
+  local back = CreateFrame("Button", nil, panel)
+  back:RegisterForClicks("LeftButtonUp")
+  back:SetFrameLevel(self.brand:GetFrameLevel() + 5)
+  self.back = back
+  self.backIcon = back:CreateTexture(nil, "ARTWORK")
+  self.backLabel = style:CreateText(back, style.Theme.Settings.Back.Font)
+  self.backLabel:SetText(L:G("All Settings"))
+  self.backLine = panel:CreateTexture(nil, "ARTWORK")
+  addon.SetScript(back, "OnClick", function(ctx) self:Back(ctx) end)
+  addon.SetScript(back, "OnEnter", function() style:SetFont(self.backLabel, style.Theme.Settings.Back.HoverFont) end)
+  addon.SetScript(back, "OnLeave", function() style:SetFont(self.backLabel, style.Theme.Settings.Back.Font) end)
+  self.listHost = CreateFrame("Frame", nil, panel)
+  local key = CreateFrame("Frame", "BetterBagsNextSettingsBack", self.frame)
+  key:Hide()
+  -- Escape hid it (its own flag is off) while the window shows: go back. Hidden with the window, or
+  -- by leaving the list, it does nothing.
+  addon.SetScript(key, "OnHide", function(ctx)
+    if self.shown and self.sidebarPage ~= nil and not key:IsShown() then
+      self:Back(ctx)
+    end
+  end)
+  self.backKey = key
 end
 
 -- VersionText returns "v" and the addon's version, nothing for a copy that has none (a source
@@ -355,6 +417,7 @@ function settings:buildHeader()
   self.header = header
   self.title = style:CreateText(header, style.Theme.Settings.Header.TitleFont)
   self.title:SetJustifyH("LEFT")
+  self.title:SetWordWrap(false)
   self.description = style:CreateText(header, style.Theme.Settings.Header.DescriptionFont)
   self.description:SetJustifyH("LEFT")
   self.description:SetWordWrap(false)
@@ -436,37 +499,27 @@ function settings:Style()
   self.brand:SetHeight(B.Height)
   self.brandIcon:SetSize(B.IconSize, B.IconSize)
   self.brandIcon:ClearAllPoints()
-  self.brandIcon:SetPoint("LEFT", self.brand, "LEFT", SB.Pad, 0)
+  self.brandIcon:SetPoint("LEFT", self.navPanel, "TOPLEFT", SB.Pad, -B.Height / 2)
   controls:Paint(self.brandIcon, { Texture = B.Icon, Color = B.IconColor })
   style:SetFont(self.brandText, B.Font)
   self.brandText:ClearAllPoints()
   self.brandText:SetPoint("LEFT", self.brandIcon, "RIGHT", B.Gap, 0)
-  self.brandLine:ClearAllPoints()
-  self.brandLine:SetPoint("BOTTOMLEFT", self.brand, "BOTTOMLEFT", SB.Pad, 0)
-  self.brandLine:SetPoint("BOTTOMRIGHT", self.brand, "BOTTOMRIGHT", -SB.Pad, 0)
-  self.brandLine:SetHeight(B.Line and B.Line.Size or 1)
-  if B.Line then
-    local r, g, b = style:RGBA(B.Line.Color)
-    self.brandLine:SetColorTexture(1, 1, 1, 1)
-    self.brandLine:SetGradient("HORIZONTAL", CreateColor(r, g, b, B.Line.From), CreateColor(r, g, b, B.Line.To))
-    self.brandLine:Show()
-  else
-    self.brandLine:Hide()
-  end
+  self:paintBrandLine(self.brandLine, self.navPanel)
 
   local search, SR = self.search, T.Search
   search.frame:ClearAllPoints()
-  search.frame:SetPoint("TOPLEFT", self.sidebar, "TOPLEFT", SB.Pad, -(B.Height + SR.Gap))
-  search.frame:SetPoint("TOPRIGHT", self.sidebar, "TOPRIGHT", -SB.Pad, -(B.Height + SR.Gap))
+  search.frame:SetPoint("TOPLEFT", self.navPanel, "TOPLEFT", SB.Pad, -(B.Height + SR.Gap))
+  search.frame:SetPoint("TOPRIGHT", self.navPanel, "TOPRIGHT", -SB.Pad, -(B.Height + SR.Gap))
   search:Style()
 
   local V = T.Version
   style:SetFont(self.version, V.Font)
   self.version:ClearAllPoints()
-  self.version:SetPoint("BOTTOMLEFT", self.sidebar, "BOTTOMLEFT", SB.Pad, V.Bottom)
+  self.version:SetPoint("BOTTOMLEFT", self.navPanel, "BOTTOMLEFT", SB.Pad, V.Bottom)
   self.navBox:ClearAllPoints()
   self.navBox:SetPoint("TOPLEFT", search.frame, "BOTTOMLEFT", -SB.Pad, -SR.Gap)
-  self.navBox:SetPoint("BOTTOMRIGHT", self.sidebar, "BOTTOMRIGHT", 0, V.Bottom * 2 + 12)
+  self.navBox:SetPoint("BOTTOMRIGHT", self.navPanel, "BOTTOMRIGHT", 0, V.Bottom * 2 + 12)
+  self:styleListPanel()
 
   local H = T.Header
   self.header:ClearAllPoints()
@@ -474,8 +527,7 @@ function settings:Style()
   self.header:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
   self.header:SetHeight(H.Height)
   style:SetFont(self.title, H.TitleFont)
-  self.title:ClearAllPoints()
-  self.title:SetPoint("TOPLEFT", self.header, "TOPLEFT", H.Pad, -H.TitleTop)
+  self:placeHeading()
   style:SetFont(self.description, H.DescriptionFont)
   self.description:ClearAllPoints()
   self.description:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, -H.Gap)
@@ -501,6 +553,209 @@ function settings:Style()
   self.done.frame:ClearAllPoints()
   self.done.frame:SetPoint("RIGHT", self.footer, "RIGHT", -F.Pad, 0)
   self:placeContent()
+end
+
+-- paintBrandLine draws the gold line under the brand's row of a panel (the pages', a page's list's).
+---@private
+---@param line Texture
+---@param panel Frame
+function settings:paintBrandLine(line, panel)
+  local SB, B = style.Theme.Settings.Sidebar, style.Theme.Settings.Brand
+  line:ClearAllPoints()
+  line:SetPoint("TOPLEFT", panel, "TOPLEFT", SB.Pad, -(B.Height - (B.Line and B.Line.Size or 1)))
+  line:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -SB.Pad, -(B.Height - (B.Line and B.Line.Size or 1)))
+  line:SetHeight(B.Line and B.Line.Size or 1)
+  if B.Line then
+    local r, g, b = style:RGBA(B.Line.Color)
+    line:SetColorTexture(1, 1, 1, 1)
+    line:SetGradient("HORIZONTAL", CreateColor(r, g, b, B.Line.From), CreateColor(r, g, b, B.Line.To))
+    line:Show()
+  else
+    line:Hide()
+  end
+end
+
+-- styleListPanel lays out the panel a page's own list slides in on: Back in the brand's row, its line,
+-- and the list under it; then both panels where the slide has them.
+---@private
+function settings:styleListPanel()
+  local T = style.Theme.Settings
+  local SB, B, K = T.Sidebar, T.Brand, T.Back
+  self.back:ClearAllPoints()
+  self.back:SetPoint("TOPLEFT", self.listPanel, "TOPLEFT", 0, 0)
+  self.back:SetPoint("TOPRIGHT", self.listPanel, "TOPRIGHT", 0, 0)
+  self.back:SetHeight(B.Height)
+  self.backIcon:SetSize(K.IconSize, K.IconSize)
+  self.backIcon:ClearAllPoints()
+  self.backIcon:SetPoint("LEFT", self.back, "LEFT", SB.Pad, 0)
+  controls:Paint(self.backIcon, { Texture = K.Icon, Color = K.IconColor })
+  style:SetFont(self.backLabel, K.Font)
+  self.backLabel:ClearAllPoints()
+  self.backLabel:SetPoint("LEFT", self.backIcon, "RIGHT", K.Gap, 0)
+  self:paintBrandLine(self.backLine, self.listPanel)
+  self.listHost:ClearAllPoints()
+  self.listHost:SetPoint("TOPLEFT", self.listPanel, "TOPLEFT", 0, -B.Height)
+  self.listHost:SetSize(SB.Width, T.Height - B.Height)
+  if self.sidebarPage ~= nil then
+    self:listOf(self.sidebarPage):Place(SB.Width, T.Height - B.Height)
+  end
+  self:placeSidebar()
+end
+
+-- placeSidebar puts the pages and a page's list where the slide has them: the pages shift left out of
+-- the sidebar as the list comes in from its right, each fading as it leaves; a panel all the way out
+-- hides.
+---@private
+function settings:placeSidebar()
+  local T = style.Theme.Settings
+  local width, p = T.Sidebar.Width, self.shift
+  for _, part in ipairs({ { self.navPanel, -p * width, 1 - p }, { self.listPanel, (1 - p) * width, p } }) do
+    local panel = part[1]
+    panel:ClearAllPoints()
+    panel:SetPoint("TOPLEFT", self.sidebar, "TOPLEFT", part[2], 0)
+    panel:SetSize(width, T.Height)
+    panel:SetAlpha(part[3])
+    panel:SetShown(part[3] > 0)
+  end
+end
+
+-- slideTo slides the sidebar to the pages (0) or a page's list (1); at once while the window is not
+-- shown or is opening.
+---@private
+---@param target number
+---@param animate boolean
+function settings:slideTo(target, animate)
+  if not animate then
+    tween:Stop(self.shiftMotion)
+    self.shift = target
+    self:placeSidebar()
+    return
+  end
+  tween:Play(self.shiftMotion, {
+    duration = style.Theme.Settings.Back.Slide,
+    ease = style:Ease("Glide"),
+    from = self.shift,
+    to = target,
+    onUpdate = function(v)
+      self.shift = v
+      self:placeSidebar()
+    end,
+  })
+end
+
+-- listOf returns a page's own list, made the first time it shows.
+---@private
+---@param page NextSettingsPageDef
+---@return NextSettingsSidebar
+function settings:listOf(page)
+  local list = self.lists[page]
+  if list == nil then
+    list = page.sidebar(self.listHost, self.frame)
+    self.lists[page] = list
+    local T = style.Theme.Settings
+    list:Place(T.Sidebar.Width, T.Height - T.Brand.Height)
+  end
+  return list
+end
+
+-- enterList shows a page's own list in the sidebar, sliding it in from the pages (at once while the
+-- window opens), and makes the first Escape go back.
+---@private
+---@param page NextSettingsPageDef
+---@param ctx Context
+---@param animate boolean
+function settings:enterList(page, ctx, animate)
+  local list = self:listOf(page)
+  for p, other in pairs(self.lists) do
+    other.frame:SetShown(p == page)
+  end
+  if self.sidebarPage ~= page then
+    self.sidebarPage = page
+    self:slideTo(1, animate)
+  end
+  list:Refresh(ctx)
+  if self.shown and not self.backKeyHeld then
+    self.backKey:Show()
+    controls:PushEscape(self.backKey)
+    self.backKeyHeld = true
+  end
+end
+
+-- releaseBackKey hides the frame the first Escape hides (when Escape did not already) and gives
+-- Escape back to the window.
+---@private
+function settings:releaseBackKey()
+  if not self.backKeyHeld then
+    return
+  end
+  self.backKeyHeld = false
+  self.backKey:Hide()
+  controls:ReleaseEscape(self.backKey)
+end
+
+-- leaveList slides the pages back into the sidebar; Escape closes the window again.
+---@private
+---@param animate boolean
+function settings:leaveList(animate)
+  if self.sidebarPage == nil then
+    return
+  end
+  self.sidebarPage = nil
+  self:slideTo(0, animate)
+  self:releaseBackKey()
+end
+
+-- Back leaves a page's own list for the page (and tab) shown before it, or the first page.
+---@param ctx? Context
+function settings:Back(ctx)
+  local to = self.returnTo
+  self:Select(to and to.pageId or nil, to and to.tabId or nil, ctx)
+end
+
+-- Reselect shows the page again: its heading, buttons, tabs, list and rows read again (a page's own
+-- list chose something else, or what it shows changed).
+---@param ctx? Context
+function settings:Reselect(ctx)
+  if self.frame ~= nil and self.shown and self.query == nil then
+    self:Select(self.pageId, self.tabId, ctx)
+  end
+end
+
+-- placeHeading puts the page's buttons (when it has them) right of its title, left of the close
+-- button, the title stopping short of them.
+---@private
+function settings:placeHeading()
+  local H = style.Theme.Settings.Header
+  self.title:ClearAllPoints()
+  self.title:SetPoint("TOPLEFT", self.header, "TOPLEFT", H.Pad, -H.TitleTop)
+  local actions = self.actions
+  if actions ~= nil then
+    local X = H.Close
+    actions.frame:ClearAllPoints()
+    actions.frame:SetPoint("TOPRIGHT", self.header, "TOPRIGHT", -(X.Inset + X.Size + H.Actions.Gap), -H.Actions.Top)
+    self.title:SetPoint("RIGHT", actions.frame, "LEFT", -H.Actions.Gap, 0)
+  end
+end
+
+-- showActions shows a page's buttons in the header (none for a page without), read again.
+---@private
+---@param page? NextSettingsPageDef
+---@param ctx Context
+function settings:showActions(page, ctx)
+  local actions
+  if page ~= nil and page.actions ~= nil then
+    actions = self.actionsOf[page]
+    if actions == nil then
+      actions = page.actions(self.header, self.frame)
+      self.actionsOf[page] = actions
+    end
+    actions:Refresh(ctx)
+  end
+  for _, other in pairs(self.actionsOf) do
+    other.frame:SetShown(other == actions)
+  end
+  self.actions = actions
+  self:placeHeading()
 end
 
 -- placeContent puts the tabs under the header and the content between them (or the header) and the
@@ -809,22 +1064,38 @@ function settings:Select(pageId, tabId, ctx)
   if page == nil then
     return
   end
-  local tab = page.tabs[1]
-  for _, t in ipairs(page.tabs) do
+  local tabs = pages:ShownTabs(page)
+  local tab = tabs[1] or page.tabs[1]
+  for _, t in ipairs(tabs) do
     if t.id == tabId then
       tab = t
     end
+  end
+  -- Coming into a page's own list from the pages: Back goes to the page left.
+  if page.sidebar ~= nil and self.sidebarPage == nil then
+    self.returnTo = self.pageId and { pageId = self.pageId, tabId = self.tabId } or nil
   end
   self.pageId, self.tabId = page.id, tab.id
   if self.query ~= nil then
     self.query = nil
     self.search:SetText("")
   end
-  self.title:SetText(page.title)
-  self.description:SetText(page.description or "")
-  if #page.tabs > 1 then
+  local animate = self.shown and not self.arriving
+  if page.sidebar ~= nil then
+    self:enterList(page, ctx, animate)
+  else
+    self:leaveList(animate)
+  end
+  local title, description = page.title, page.description
+  if page.heading ~= nil then
+    title, description = page.heading()
+  end
+  self.title:SetText(title)
+  self.description:SetText(description or "")
+  self:showActions(page, ctx)
+  if #tabs > 1 then
     local list = {}
-    for i, t in ipairs(page.tabs) do
+    for i, t in ipairs(tabs) do
       list[i] = { id = t.id, text = t.title }
     end
     self.tabs:SetTabs(list)
@@ -948,6 +1219,8 @@ function settings:Search(ctx, text)
     return
   end
   self.query = text
+  self:leaveList(self.shown)
+  self:showActions(nil, ctx)
   local needle = string.lower(text)
   local sections = {}
   for _, page in ipairs(pages:List()) do

@@ -83,6 +83,7 @@ sonataNext:RegisterTheme({
     IconGuildRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\guildrepair.png",
     -- The controls' glyphs: a dropdown's chevron, a menu's check, the search box's magnifier, a plus.
     IconChevron = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\chevron.png",
+    IconBack = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\back.png",
     IconCheck = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\check.png",
     IconSearch = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\search.png",
     IconPlus = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\plus.png",
@@ -554,7 +555,7 @@ sonataNext:RegisterTheme({
   Settings = {
     -- The window: Width x Height (scaled down to fit a small screen), its body, the wash at its top,
     -- its edge.
-    Width = 1000, Height = 660,
+    Width = 1000, Height = 720,
     Fill = { Color = "Body" },
     Wash = { Color = "Wash", Height = 220, BlendMode = "ADD" },
     Edge = { Color = "Lavender", Alpha = 0.35, Size = 1 },
@@ -568,6 +569,12 @@ sonataNext:RegisterTheme({
     },
     -- The search box under the brand (Controls.Input), its magnifier IconSize, Gap below it.
     Search = { Icon = "IconSearch", IconSize = 14, IconColor = "Lavender", Gap = 14 },
+    -- In place of the brand while a page's own list shows (a page's sidebar, next-settings.md §5): Back,
+    -- its chevron IconSize, Gap before its text; the list slides in over Slide seconds.
+    Back = {
+      Icon = "IconBack", IconSize = 14, IconColor = "Lavender", Gap = 8, Font = "SettingsNav",
+      HoverFont = "SettingsNavHover", Slide = 0.28,
+    },
     -- The pages: their headings (GroupHeight tall, GroupGap above every one but the first), rows
     -- ItemHeight tall Indent in; the chosen page's bar and fill, the fill under the pointer; their fonts.
     Nav = {
@@ -585,6 +592,9 @@ sonataNext:RegisterTheme({
     Header = {
       Height = 100, Pad = 32, TitleTop = 26, Gap = 6, TitleFont = "SettingsTitle", DescriptionFont = "SettingsDescription",
       Close = { Icon = "IconClose", Size = 22, Inset = 14, Color = "ButtonIcon", HoverColor = "White" },
+      -- A page's actions (Rename, Delete): their top Top down, Gap left of the close button and right of
+      -- the title.
+      Actions = { Top = 22, Gap = 16 },
     },
     -- The page's tabs (Controls.TopTabs) under the header, Pad in.
     -- The page: Pad either side and Top above the first section; sections SectionGap apart, their
@@ -708,6 +718,17 @@ sonataNext:RegisterTheme({
       Fill = { Color = "ControlFill" }, FocusFill = { Color = "ControlHover" },
       Edge = { Color = "Lavender", Size = 1, Idle = 0.25, Hover = 0.5, Focus = 0.9 },
       Font = "ControlText", HelpFont = "ControlHelp",
+    },
+    -- A grid of item icons (next/controls/itemgrid.lua): cells Size square, Gap apart, Pad inside its
+    -- fill and edge (an input's); an item's quality on its cell's edge, Common and Poor items the
+    -- CommonEdge; an item showing in another category at DimAlpha; the light under the pointer; the
+    -- count's font, and the text it shows when empty.
+    ItemGrid = {
+      Size = 36, Gap = 4, Pad = 6,
+      CommonEdge = { Color = "Lavender", Alpha = 0.25, Size = 1 },
+      DimAlpha = 0.35,
+      Hover = { Color = "Lavender", Alpha = 0.18 },
+      CountFont = "Stack", EmptyFont = "Empty",
     },
     -- A slider: its track Width wide and TrackSize thick, filled up to the thumb, the thumb (under
     -- the pointer or dragged: ThumbHover), and the number box ValueWidth wide, ValueGap after it.

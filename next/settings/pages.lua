@@ -38,7 +38,19 @@ local pages = addon:NewModule('NextSettingsPages')
 ---@class (exact) NextSettingsTabDef
 ---@field id string
 ---@field title string
+---@field shown? fun(): boolean Left out of the tabs while it says so.
 ---@field sections NextSettingsSectionDef[]|fun(): NextSettingsSectionDef[]
+
+-- A page's own list, shown in the sidebar in place of the pages while the page shows.
+---@class NextSettingsSidebar
+---@field frame Frame
+---@field Place fun(self: NextSettingsSidebar, width: number, height: number)
+---@field Refresh fun(self: NextSettingsSidebar, ctx: Context)
+
+-- A page's buttons in the header, right of its title.
+---@class NextSettingsActions
+---@field frame Frame Sized by itself.
+---@field Refresh fun(self: NextSettingsActions, ctx: Context)
 
 ---@class (exact) NextSettingsPageDef
 ---@field id string
@@ -49,6 +61,9 @@ local pages = addon:NewModule('NextSettingsPages')
 ---@field shown? fun(): boolean
 ---@field design? BagDesign
 ---@field keywords? string[]
+---@field sidebar? fun(parent: Frame, owner: Frame): NextSettingsSidebar Its own list (next-settings.md §5), made once.
+---@field heading? fun(): string, string? Its title and description now, in place of title and description.
+---@field actions? fun(parent: Frame, owner: Frame): NextSettingsActions Its buttons in the header, made once.
 ---@field tabs NextSettingsTabDef[]
 
 pages.list = {}
@@ -99,6 +114,19 @@ end
 ---@return boolean
 function pages:IsShown(page)
   return self:InDesign(page) and (page.shown == nil or page.shown() == true)
+end
+
+-- ShownTabs returns a page's tabs shown now, in order.
+---@param page NextSettingsPageDef
+---@return NextSettingsTabDef[]
+function pages:ShownTabs(page)
+  local list = {}
+  for _, tab in ipairs(page.tabs) do
+    if tab.shown == nil or tab.shown() == true then
+      table.insert(list, tab)
+    end
+  end
+  return list
 end
 
 -- List returns the pages shown now, in order.
