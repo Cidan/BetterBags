@@ -39,6 +39,14 @@ sonataNext:RegisterTheme({
     SearchFill = { 0.74, 0.67, 0.57, 1 },
     SearchFillFocus = { 0.9, 0.86, 0.78, 1 },
     Scrim = { 0, 0, 0, 0.35 },
+    -- The settings window's controls (next-settings.md §6): fields a lighter paper than the page, a
+    -- darker one when pressed and for a slider's or switch's empty track; Blizzard's parchment red
+    -- (PARCHMENT_ACCESSIBILITY_RED, as the bags' Parchment theme uses) for what deletes.
+    ControlFill = { 0.86, 0.82, 0.74, 1 },
+    ControlHover = { 0.9, 0.86, 0.78, 1 },
+    ControlPressed = { 0.78, 0.72, 0.63, 1 },
+    Track = { 0.7, 0.63, 0.53, 1 },
+    Danger = { 172 / 255, 3 / 255, 3 / 255, 1 },
   },
 
   -- No shadow on the paper; the numbers drawn over item icons keep one of their own.
@@ -63,6 +71,36 @@ sonataNext:RegisterTheme({
     VendorName = { Color = "Ink", Shadow = false },
     Stack = { Shadow = { Color = "Black", X = 1, Y = -1 } },
     DragHint = { Shadow = { Color = "Black", X = 1, Y = -1 } },
+    -- The settings window and its controls, in ink; sealing wax for what leads (a primary button, a
+    -- heading in the sidebar, a link under the pointer).
+    ControlText = { Color = "Ink" },
+    ControlMuted = { Color = "InkMuted" },
+    ControlHelp = { Color = "InkMuted" },
+    Button = { Color = "Ink" },
+    ButtonPrimary = { Color = "Seal" },
+    ButtonDanger = { Color = "Danger" },
+    Link = { Color = "InkSoft" },
+    LinkHover = { Color = "Seal" },
+    MenuItem = { Color = "Ink" },
+    MenuItemSelected = { Color = "Seal" },
+    DialogTitle = { Color = "Ink" },
+    DialogText = { Color = "InkSoft" },
+    TopTab = { Color = "InkMuted" },
+    TopTabHover = { Color = "InkSoft" },
+    TopTabSelected = { Color = "Ink" },
+    SettingsBrand = { Color = "Ink" },
+    SettingsNavGroup = { Color = "Seal" },
+    SettingsNav = { Color = "InkSoft" },
+    SettingsNavHover = { Color = "Ink" },
+    SettingsNavSelected = { Color = "Ink" },
+    SettingsVersion = { Color = "InkMuted" },
+    SettingsTitle = { Color = "Ink" },
+    SettingsDescription = { Color = "InkSoft" },
+    SettingsSection = { Color = "InkMuted" },
+    SettingsSectionNote = { Color = "InkMuted" },
+    SettingsLabel = { Color = "Ink" },
+    SettingsText = { Color = "InkSoft" },
+    SettingsLink = { Color = "Seal" },
   },
 
   Panel = {
@@ -113,6 +151,79 @@ sonataNext:RegisterTheme({
     Card = { Texture = "Paper", TexCoords = { 0.25, 0.75, 0.3, 0.5 }, Color = "White" },
     Glow = { Color = "Seal" },
     Halo = false,
+  },
+
+  -- The settings window on the paper art, its lines and lights in ink, its marks in sealing wax.
+  Settings = {
+    Fill = { Texture = "Paper", TexCoords = { 0.25, 0.75, 0.3, 0.5 }, Color = "White" },
+    Wash = false,
+    Edge = { Color = "Ink", Alpha = 0.5 },
+    Sidebar = { Fill = { Color = "Ink", Alpha = 0.06 }, Line = { Color = "Ink", Alpha = 0.25 } },
+    Brand = { IconColor = "Seal", Line = { Color = "Seal" } },
+    Search = { IconColor = "Ink" },
+    Back = { IconColor = "Ink" },
+    Nav = {
+      Indicator = { Color = "Seal" },
+      SelectedFill = { Color = "Ink", Alpha = 0.08 },
+      HoverFill = { Color = "Ink", Alpha = 0.04 },
+    },
+    Header = { Close = { Color = "Ink", HoverColor = "Seal" } },
+    Content = {
+      Card = { Color = "Ink", Alpha = 0.04 },
+      Divider = { Color = "Ink", Alpha = 0.15 },
+      Hover = { Color = "Ink", Alpha = 0.05 },
+    },
+    Footer = { Line = { Color = "Ink", Alpha = 0.25 } },
+    Cards = {
+      Fill = { Color = "Ink", Alpha = 0.04 }, HoverFill = { Color = "Ink", Alpha = 0.08 },
+      Edge = { Color = "Ink", Alpha = 0.25 }, SelectedEdge = { Color = "Seal", Alpha = 0.9 },
+    },
+    Categories = {
+      Indicator = { Color = "Seal" },
+      SelectedFill = { Color = "Ink", Alpha = 0.08 },
+      HoverFill = { Color = "Ink", Alpha = 0.04 },
+    },
+    BagCategories = {
+      Fill = { Color = "Ink", Alpha = 0.035 },
+      HoverFill = { Color = "Ink", Alpha = 0.04 },
+      DropMarker = { Color = "Seal" },
+    },
+  },
+
+  -- Its controls: paper fields edged in ink, sealing wax where Default is gold; a menu and a dialog are
+  -- slips of the same paper.
+  Controls = {
+    ScrollBar = {
+      Track = { Color = "Ink", Alpha = 0.06 }, Thumb = { Color = "Ink", Alpha = 0.3 },
+      ThumbHover = { Color = "Ink", Alpha = 0.55 }, ThumbDrag = { Color = "Seal", Alpha = 0.85 },
+    },
+    Toggle = {
+      On = { Color = "Seal", Alpha = 0.9 }, Edge = { Color = "Ink", Alpha = 0.35 },
+      Knob = { Color = "PaperLight" }, KnobOn = { Color = "PaperLight" }, Hover = { Color = "Ink", Alpha = 0.06 },
+    },
+    Button = {
+      Plain = { Edge = { Color = "Ink", Alpha = 0.35 }, HoverEdge = { Color = "Ink", Alpha = 0.6 } },
+      Primary = {
+        Fill = { Color = "Seal", Alpha = 0.12 }, HoverFill = { Color = "Seal", Alpha = 0.2 },
+        PressedFill = { Color = "Seal", Alpha = 0.06 },
+        Edge = { Color = "Seal", Alpha = 0.6 }, HoverEdge = { Color = "Seal", Alpha = 1 },
+      },
+    },
+    Input = { Edge = { Color = "Ink" } },
+    Slider = { Fill = { Color = "Seal" }, Thumb = { Color = "Ink" }, ThumbHover = { Color = "Seal" } },
+    Dropdown = { Edge = { Color = "Ink" }, Chevron = { Color = "Ink" } },
+    Menu = {
+      Fill = { Texture = "Paper", TexCoords = { 0.25, 0.75, 0.3, 0.5 }, Color = "White" },
+      Edge = { Color = "Ink", Alpha = 0.5 },
+      HoverFill = { Color = "Ink", Alpha = 0.08 },
+      Check = { Color = "Seal" },
+    },
+    Swatch = { Edge = { Color = "Ink", Alpha = 0.5 }, HoverEdge = { Color = "Ink", Alpha = 0.9 } },
+    TopTabs = { Indicator = { Color = "Seal" }, Line = { Color = "Ink", Alpha = 0.2 } },
+    Dialog = {
+      Card = { Texture = "Paper", TexCoords = { 0.25, 0.75, 0.3, 0.5 }, Color = "White" },
+      Edge = { Color = "Seal", Alpha = 0.6 },
+    },
   },
 
   Vendor = {

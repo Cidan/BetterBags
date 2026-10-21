@@ -195,7 +195,7 @@ function merchant:searchCategoriesOf(records)
   for _, filter in ipairs(categories:GetSortedSearchCategories() or {}) do
     if filter.enabled and filter.enabled[kind] and filter.searchCategory then
       local priority = filter.priority or 10
-      local groupBy = filter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+      local groupBy = filter.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
       for slotkey in pairs(self.search:Search(filter.searchCategory.query)) do
         local record = records[slotkey]
         if record ~= nil and (found[slotkey] == nil or priority < found[slotkey].priority) then
@@ -278,10 +278,10 @@ function merchant:ReadItems(ctx)
   for _, item in ipairs(list) do
     local hit = found[item.record.slotkey]
     if hit then
-      -- As items:GetCategory weighs them: a custom category beats a search category only with a
-      -- lower priority number; a tie goes to the search category.
+      -- As items:GetCategory weighs them: a rule beats an item placed by hand only with a lower
+      -- priority number; at a tie the item stays where it was placed.
       local custom, customPriority = categories:GetCustomCategory(ctx, const.BAG_KIND.BACKPACK, item.record)
-      if not custom or (customPriority or 10) >= hit.priority then
+      if not custom or (customPriority or 10) > hit.priority then
         local old = item.category
         item.category = hit.name
         item.record.itemInfo.category = hit.name

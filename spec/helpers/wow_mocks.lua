@@ -453,6 +453,10 @@ end
 function WidgetMethods:EnableMouseWheel(enable)
   self._mouseWheelEnabled = enable
 end
+-- Frame:IsMouseWheelEnabled() (SimpleFrameAPIDocumentation).
+function WidgetMethods:IsMouseWheelEnabled()
+  return self._mouseWheelEnabled == true
+end
 -- Frame:EnableKeyboard(enable)
 function WidgetMethods:EnableKeyboard(enable)
   self._keyboardEnabled = enable
@@ -495,6 +499,14 @@ function WidgetMethods:IsEnabled()
   return self._enabled ~= false
 end
 -- SetEnabled(enabled) (SimpleButtonAPIDocumentation.lua).
+-- Button:SetMotionScriptsWhileDisabled(motionScriptsWhileDisabled) / GetMotionScriptsWhileDisabled()
+-- (SimpleButtonAPIDocumentation, every client): OnEnter and OnLeave fire on a disabled button too.
+function WidgetMethods:SetMotionScriptsWhileDisabled(enabled)
+  self._motionWhileDisabled = enabled
+end
+function WidgetMethods:GetMotionScriptsWhileDisabled()
+  return self._motionWhileDisabled == true
+end
 function WidgetMethods:SetEnabled(enabled)
   self._enabled = enabled and true or false
 end
@@ -768,6 +780,17 @@ end
 function WidgetMethods:GetScale()
   return self._scale or 1
 end
+-- Frame:SetClipsChildren(clipped) and DoesClipChildren() (SimpleFrameAPIDocumentation.lua, every
+-- client): whether the frame cuts its children's drawing at its edges.
+function WidgetMethods:SetClipsChildren(clipped)
+  self._clipsChildren = clipped == true
+end
+function WidgetMethods:DoesClipChildren()
+  return self._clipsChildren == true
+end
+-- GetPhysicalScreenSize() -> sizeX, sizeY (ScreenDocumentation.lua; Blizzard's PixelUtil calls it on
+-- every client).
+_G.GetPhysicalScreenSize = function() return 1920, 1080 end
 -- Region:GetEffectiveScale() -> the frame's scale times every parent's.
 function WidgetMethods:GetEffectiveScale()
   local scale = self:GetScale()
@@ -984,6 +1007,14 @@ function WidgetMethods:SetCountInvisibleLetters(count)
 end
 function WidgetMethods:SetAutoFocus(autoFocus)
   self._autoFocus = autoFocus
+end
+-- EditBox:IsAutoFocus() and HighlightText(start = 0, stop = -1) (SimpleEditBoxAPIDocumentation): an
+-- edit box focuses itself when shown unless told not to.
+function WidgetMethods:IsAutoFocus()
+  return self._autoFocus ~= false
+end
+function WidgetMethods:HighlightText(start, stop)
+  self._highlight = { start or 0, stop or -1 }
 end
 function WidgetMethods:SetFocus()
   self._hasFocus = true
@@ -1437,24 +1468,103 @@ _G.__mockTemplates.WowScrollBox = function(frame)
     self:SetView(view)
     self._scrolledToBegin = true
   end
-  -- ScrollBoxBaseMixin:GetDerivedScrollRange() (the content's extent less the visible extent;
-  -- specs set _scrollRange), GetDerivedScrollOffset() (range * scroll percentage), and
-  -- ScrollToOffset(offset, noInterpolation): nothing without a range, else the percentage
-  -- offset / range, kept between 0 and 1 (ScrollControllerMixin.SetScrollPercentage saturates).
-  function frame:GetDerivedScrollRange() return self._scrollRange or 0 end
+  -- CallbackRegistryMixin (CallbackRegistry.lua): RegisterCallback(event, func, owner) keeps one
+  -- callback per owner per event; TriggerEvent(event, ...) calls each as func(owner, ...).
+  frame._callbacks = {}
+  function frame:RegisterCallback(event, func, owner)
+    self._callbacks[event] = self._callbacks[event] or {}
+    self._callbacks[event][owner or func] = func
+    return owner
+  end
+  function frame:UnregisterCallback(event, owner)
+    if self._callbacks[event] then self._callbacks[event][owner] = nil end
+  end
+  function frame:TriggerEvent(event, ...)
+    local list = {}
+    for owner, func in pairs(self._callbacks[event] or {}) do list[#list + 1] = { owner, func } end
+    for _, entry in ipairs(list) do entry[2](entry[1], ...) end
+  end
+  -- ScrollBoxBaseMixin (ScrollBox.lua): GetDerivedExtent() is the view's extent (here, the
+  -- scrollable children's heights; specs may set _extent), GetVisibleExtent() the box's own height,
+  -- rounded; GetDerivedScrollRange() the extent less the visible extent (specs may set
+  -- _scrollRange), GetDerivedScrollOffset() range * scroll percentage; GetVisibleExtentPercentage()
+  -- visible / extent (0 without an extent); HasScrollableExtent() that percentage strictly between
+  -- 0 and 1; GetPanExtent() the view's pan extent, CalculatePanExtentPercentage() it over the range.
+  function frame:GetDerivedExtent()
+    if self._extent ~= nil then return self._extent end
+    local extent = 0
+    for _, child in ipairs(self.view and self.view.frames or {}) do extent = extent + (child:GetHeight() or 0) end
+    return extent
+  end
+  function frame:GetVisibleExtent() return math.floor((self:GetHeight() or 0) + 0.5) end
+  function frame:GetDerivedScrollRange()
+    if self._scrollRange ~= nil then return self._scrollRange end
+    return math.max(0, self:GetDerivedExtent() - self:GetVisibleExtent())
+  end
   function frame:GetDerivedScrollOffset() return self:GetDerivedScrollRange() * (self._scrollPercentage or 0) end
-  function frame:ScrollToOffset(offset)
+  function frame:GetVisibleExtentPercentage()
+    local extent = self:GetDerivedExtent()
+    if extent > 0 then return self:GetVisibleExtent() / extent end
+    return 0
+  end
+  function frame:HasScrollableExtent()
+    local p = self:GetVisibleExtentPercentage()
+    return p > 0.0001 and p < 0.9999
+  end
+  function frame:GetPanExtent() return self.view and self.view._panExtent or 0 end
+  function frame:CalculatePanExtentPercentage()
+    local range = self:GetDerivedScrollRange()
+    if range > 0 then return self:GetPanExtent() / range end
+    return 0
+  end
+  -- ScrollControllerMixin: GetScrollPercentage(); SetScrollPercentage(percentage, noInterpolation)
+  -- saturates it, and ScrollBoxBaseMixin sends OnScroll(percentage, visible extent percentage, pan
+  -- extent percentage) as it moves the scroll target (SetScrollTargetOffset); here at once, the
+  -- last call's noInterpolation kept in _noInterpolation. ScrollToOffset(offset, noInterpolation):
+  -- nothing without a range, else that percentage. ScrollInDirection(percentage, direction) moves
+  -- by percentage (Directions: Increase 1, Decrease -1) unless scrolling is not allowed;
+  -- SetScrollAllowed sends OnAllowScrollChanged when it changes.
+  function frame:GetScrollPercentage() return self._scrollPercentage or 0 end
+  function frame:sendScroll()
+    self:TriggerEvent(BaseScrollBoxEvents.OnScroll, self:GetScrollPercentage(), self:GetVisibleExtentPercentage(),
+      self:CalculatePanExtentPercentage())
+  end
+  function frame:SetScrollPercentage(percentage, noInterpolation)
+    self._noInterpolation = noInterpolation
+    self._scrollPercentage = math.max(0, math.min(1, percentage))
+    self:sendScroll()
+  end
+  function frame:ScrollToOffset(offset, noInterpolation)
     local range = self:GetDerivedScrollRange()
     if range > 0 then
-      self._scrollPercentage = math.max(0, math.min(1, offset / range))
+      self:SetScrollPercentage(offset / range, noInterpolation)
     end
   end
+  function frame:IsScrollAllowed() return self._allowScroll ~= false end
+  function frame:SetScrollAllowed(allowScroll)
+    local old = self:IsScrollAllowed()
+    self._allowScroll = allowScroll
+    if old ~= allowScroll then self:TriggerEvent(BaseScrollBoxEvents.OnAllowScrollChanged, allowScroll) end
+  end
+  function frame:ScrollInDirection(percentage, direction)
+    if not self:IsScrollAllowed() then return end
+    self:SetScrollPercentage(self:GetScrollPercentage() + percentage * direction)
+  end
+  -- FullUpdate lays the children out again, which places the scroll target (OnScroll).
   function frame:FullUpdate(immediately)
     self._fullUpdates = (self._fullUpdates or 0) + 1
     self._lastFullUpdateImmediate = immediately
     self:layoutScrollChildren()
+    self:sendScroll()
   end
 end
+
+-- BaseScrollBoxEvents (ScrollBox.lua, CopyValuesAsKeys) and ScrollControllerMixin.Directions
+-- (ScrollController.lua).
+_G.BaseScrollBoxEvents = { OnAllowScrollChanged = "OnAllowScrollChanged", OnSizeChanged = "OnSizeChanged",
+  OnScroll = "OnScroll", OnLayout = "OnLayout" }
+_G.ScrollControllerMixin = _G.ScrollControllerMixin or {}
+_G.ScrollControllerMixin.Directions = { Increase = 1, Decrease = -1 }
 
 -- WowScrollBoxList (Blizzard_SharedXML/Shared/Scroll/ScrollTemplates.xml: ScrollBoxBaseTemplate
 -- with ScrollBoxListMixin): a scroll box whose view holds a data provider. Init(view) sets the
@@ -2066,6 +2176,15 @@ end
 _G.C_Item.GetItemSubClassInfo = _G.C_Item.GetItemSubClassInfo or function(classID, subclassID)
   return "Bag"
 end
+-- C_Item.GetItemNameByID(itemInfo) -> itemName and GetItemQualityByID(itemInfo) -> itemQuality, both
+-- nilable (ItemDocumentation.lua; nil while the client has not loaded the item): read from whatever
+-- C_Item.GetItemInfo answers now, so a spec's own GetItemInfo drives them.
+_G.C_Item.GetItemNameByID = _G.C_Item.GetItemNameByID or function(itemID)
+  return (_G.C_Item.GetItemInfo(itemID))
+end
+_G.C_Item.GetItemQualityByID = _G.C_Item.GetItemQualityByID or function(itemID)
+  return (select(3, _G.C_Item.GetItemInfo(itemID)))
+end
 _G.GetInventoryItemLink = _G.GetInventoryItemLink or function(unit, invid)
   return "|Hitem:12345|h[Mock Bag]|h"
 end
@@ -2468,6 +2587,18 @@ function _G.GameTooltip:SetBagItem(bag, slot)
   end
   self:Hide()
   return false
+end
+
+-- GameTooltip:SetHyperlink(link) and SetItemByID(itemID) are TooltipDataHandler accessors on retail
+-- (GetHyperlink, GetItemByID; Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua) and native on
+-- Classic: they fill the tooltip with the item's and show it.
+function _G.GameTooltip:SetHyperlink(link)
+  self._hyperlink, self._itemByID = link, nil
+  self:Show()
+end
+function _G.GameTooltip:SetItemByID(itemID)
+  self._itemByID, self._hyperlink = itemID, nil
+  self:Show()
 end
 
 -- Cursor APIs
@@ -3196,4 +3327,35 @@ _G.MenuUtil.CreateContextMenu = function(owner, generator, ...)
   generator(owner, root, ...)
   _G._lastContextMenu = { owner = owner, root = root }
   return root
+end
+
+-- ColorPickerFrame (Blizzard_ColorPickerFrame, loaded at login on every client: ColorPickerFrameMixin):
+-- SetupColorPickerAndShow(info) keeps info's swatchFunc, opacityFunc, cancelFunc and hasOpacity, its
+-- color as previousValues ({ r, g, b, a = info.opacity }), and shows; GetColorRGB() and
+-- GetColorAlpha() read the color picked. Blizzard calls swatchFunc as the color changes, opacityFunc as
+-- the opacity does, and cancelFunc(previousValues) on Cancel. Specs pick with _Pick(r, g, b, a) and
+-- cancel with _Cancel().
+_G.ColorPickerFrame = CreateFrame("Frame", "ColorPickerFrame")
+_G.ColorPickerFrame:Hide()
+function _G.ColorPickerFrame:SetupColorPickerAndShow(info)
+  self.info = info
+  self.swatchFunc, self.opacityFunc, self.cancelFunc = info.swatchFunc, info.opacityFunc, info.cancelFunc
+  self.hasOpacity = info.hasOpacity
+  self.previousValues = { r = info.r, g = info.g, b = info.b, a = info.opacity }
+  self._r, self._g, self._b, self._a = info.r, info.g, info.b, info.opacity or 1
+  self:Show()
+end
+function _G.ColorPickerFrame:GetColorRGB() return self._r, self._g, self._b end
+function _G.ColorPickerFrame:GetColorAlpha() return self._a end
+function _G.ColorPickerFrame:_Pick(r, g, b, a)
+  self._r, self._g, self._b = r, g, b
+  if self.swatchFunc then self.swatchFunc() end
+  if a ~= nil then
+    self._a = a
+    if self.opacityFunc then self.opacityFunc() end
+  end
+end
+function _G.ColorPickerFrame:_Cancel()
+  self:Hide()
+  if self.cancelFunc then self.cancelFunc(self.previousValues) end
 end

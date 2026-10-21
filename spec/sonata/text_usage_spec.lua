@@ -4,16 +4,8 @@
 -- (Parchment) such text was white on parchment. This scans the files that draw that text.
 local FILES = {
   "forms/layouts/stacked.lua",
-  "config/categorypane.lua",
-  "config/config.lua",
-  "config/currencypane.lua",
-  "config/classic/currencypane.lua",
-  "config/era/currencypane.lua",
-  "config/itemcolorpane.lua",
-  "config/themepane.lua",
   "frames/question.lua",
   "frames/groupdialog.lua",
-  "frames/searchcategory.lua",
   "frames/debug.lua",
   "frames/perfpane.lua",
   "frames/simulatepane.lua",

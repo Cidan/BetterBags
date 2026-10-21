@@ -29,6 +29,14 @@ sonataNext:RegisterTheme({
     Bead = { 1.0, 0.9, 0.7, 1 },
     -- The hot orange of a live coal.
     Ember = { 1.0, 0.35, 0.1, 1 },
+    -- The settings window's controls (next-settings.md §6): its search box's charcoal, a little darker
+    -- idle and when pressed, lighter under the pointer, as Default's are to its own; and a red apart
+    -- from its amber for what deletes.
+    ControlFill = { 0.178, 0.08, 0.053, 1 },
+    ControlHover = { 0.23, 0.104, 0.069, 1 },
+    ControlPressed = { 0.142, 0.064, 0.043, 1 },
+    Track = { 0.3, 0.135, 0.09, 1 },
+    Danger = { 1.0, 0.3, 0.25, 1 },
   },
 
   -- Embers drift slowly and rise as they go.

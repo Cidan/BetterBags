@@ -396,6 +396,104 @@ function recorder:TextChanged(text, role, step)
   self:add({ kind = "text", step = step, role = tostring(role), line = describeText(text) })
 end
 
+-- inside says whether frame is root or one of its descendants.
+---@param frame Frame
+---@param root Frame
+---@return boolean
+local function inside(frame, root)
+  local f = frame
+  while f ~= nil do
+    if f == root then
+      return true
+    end
+    f = f:GetParent()
+  end
+  return false
+end
+
+-- sideOf describes one side of an edge in screen pixels (k pixels per unit of its frame): across its
+-- thickness (bottom to top for a top or bottom side, left to right for a left or right one), and
+-- whether both ends round to the same pixel, in which case it draws nothing.
+---@param name string
+---@param texture Texture
+---@param k number
+---@return string?
+local function sideOf(name, texture, k)
+  if not texture:IsShown() or texture:GetLeft() == nil then
+    return nil
+  end
+  local a, b
+  if name == "Top" or name == "Bottom" then
+    a, b = texture:GetBottom() * k, texture:GetTop() * k
+  else
+    a, b = texture:GetLeft() * k, texture:GetRight() * k
+  end
+  local collapses = math.floor(a + 0.5) == math.floor(b + 0.5)
+  return string.format("%s %.2f-%.2f%s", name:lower(), a, b, collapses and " collapses" or "")
+end
+
+-- SettingsSnapshot describes BetterBags Next's settings window as drawn: its scale and the screen,
+-- then every control edge shown in it (render-recorder.md §2), top to bottom.
+---@param frame Frame
+---@return string[]
+function recorder:SettingsSnapshot(frame)
+  local width, height = GetPhysicalScreenSize()
+  local effective = frame:GetEffectiveScale()
+  local lines = {
+    string.format("settings scale=%.4f effective=%.4f screen=%dx%d pixels per unit=%.4f", frame:GetScale(), effective,
+      width, height, effective * height / 768),
+  }
+  local controls = addon:GetModule('NextControls', true)
+  local found = {}
+  for edge in pairs(controls and controls.edges or {}) do
+    local f = edge.frame
+    if f:IsVisible() and inside(f, frame) and f:GetLeft() ~= nil then
+      local k = f:GetEffectiveScale() * height / 768
+      local parts = {}
+      for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+        local part = sideOf(side, edge[side], k)
+        if part then
+          table.insert(parts, part)
+        end
+      end
+      local text = edge.label and edge.label:GetText()
+      table.insert(found, {
+        top = f:GetTop() or 0, left = f:GetLeft() or 0,
+        line = string.format("edge %s%s | %s", text and string.format("%q ", text) or "", rectIn(f, frame),
+          table.concat(parts, " ")),
+      })
+    end
+  end
+  table.sort(found, function(a, b)
+    if a.top ~= b.top then
+      return a.top > b.top
+    end
+    if a.left ~= b.left then
+      return a.left < b.left
+    end
+    return a.line < b.line
+  end)
+  for _, e in ipairs(found) do
+    table.insert(lines, e.line)
+  end
+  return lines
+end
+
+-- SettingsRendered adds a snapshot of the settings window when what it shows changed since its last.
+---@param frame Frame
+function recorder:SettingsRendered(frame)
+  if not self.recording then
+    return
+  end
+  local lines = self:SettingsSnapshot(frame)
+  local key = table.concat(lines, "\n")
+  if self.last.settings == key then
+    return
+  end
+  self.last.settings = key
+  self:add({ kind = "settings", lines = lines })
+end
+
 -- WindowStep adds a step of a resize or a move, with the window's geometry.
 ---@param window BetterBagsWindow
 ---@param step string

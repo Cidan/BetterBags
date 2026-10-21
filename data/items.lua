@@ -1942,20 +1942,13 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
     end
   end
 
-  -- Filter and assign items to their respective tabs
+  -- Assign items to their respective tabs (every category shows: hiding was retired).
   for _, item in ipairs(sortedItems) do
-    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-    local isShown = true
-    if viewBagView ~= const.BAG_VIEW.SECTION_ALL_BAGS and categories.IsCategoryShown then
-      isShown = categories:IsCategoryShown(category) ~= false
-    end
-    if isShown then
-      for tabID, tabData in pairs(tabs) do
-        if ItemBelongsToTab(kind, item, tabID, viewBagView) then
-          table.insert(tabData.items, item)
-          if not item.isFreeSlot and not item.isItemGap then
-            tabData.totalItems = tabData.totalItems + 1
-          end
+    for tabID, tabData in pairs(tabs) do
+      if ItemBelongsToTab(kind, item, tabID, viewBagView) then
+        table.insert(tabData.items, item)
+        if not item.isFreeSlot and not item.isItemGap then
+          tabData.totalItems = tabData.totalItems + 1
         end
       end
     end
@@ -1976,7 +1969,6 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
           isFreeSpace = (category == L:G("Free Space")),
           isRecent = (category == L:G("Recent Items")),
           fillWidth = false,
-          shown = (not categories.IsCategoryShown) or (categories:IsCategoryShown(category) ~= false),
         }
         table.insert(categoryOrder, categoryTally[category])
       end
@@ -2231,46 +2223,74 @@ function items:WipeSearchCache(kind)
   if self.categoryPriorityCache[kind] then wipe(self.categoryPriorityCache[kind]) end
 end
 
+-- GroupedCategory returns the category an item placed in a category by hand shows in: the category, or
+-- its sub-category for the item when it groups its members (its groupBy), made when missing.
+---@param ctx Context
+---@param name string
+---@param filter? CustomCategoryFilter
+---@param data ItemData
+---@return string
+function items:GroupedCategory(ctx, name, filter, data)
+  local groupBy = filter and filter.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+  if groupBy == const.SEARCH_CATEGORY_GROUP_BY.NONE then
+    return name
+  end
+  local suffix = self:GetGroupBySuffix(data, groupBy)
+  if not suffix or suffix == "" then
+    return name
+  end
+  local grouped = name .. " - " .. suffix
+  self:ensureSubcategory(ctx, filter, grouped)
+  return grouped
+end
+
+-- ensureSubcategory makes a grouped category's sub-category for one group, unless it exists: used in
+-- the same bags, with the same color and priority.
+---@private
+---@param ctx Context
+---@param filter CustomCategoryFilter
+---@param name string
+function items:ensureSubcategory(ctx, filter, name)
+  if categories:DoesCategoryExist(name) then
+    return
+  end
+  categories:CreateCategory(ctx, {
+    name = name,
+    itemList = {},
+    enabled = filter.enabled,
+    dynamic = true,
+    isGroupBySubcategory = true,
+    groupByParent = filter.name,
+    priority = filter.priority or 10,
+    color = filter.color,
+  })
+end
+
 function items:RefreshSearchCache(kind, itemData)
   itemData = itemData or (self.slotInfo[kind] and self.slotInfo[kind].itemsBySlotKey) or {}
   self:WipeSearchCache(kind)
   if not categories or not categories.GetSortedSearchCategories then return end
   local ctx = context:New('RefreshSearchCache')
   local categoryTable = categories:GetSortedSearchCategories()
-  local createdGroupByCategories = {} -- Track created groupBy categories to avoid duplicates
 
   for _, categoryFilter in ipairs(categoryTable) do
     if categoryFilter.enabled[kind] then
       local results = search:Search(categoryFilter.searchCategory.query)
-      local groupBy = categoryFilter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+      local groupBy = categoryFilter.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
       local priority = categoryFilter.priority or 10
 
       for slotkey, match in pairs(results) do
         if match then
           local categoryName = categoryFilter.name
 
-          -- Apply groupBy logic to generate dynamic category name
+          -- A grouping category's match shows in its sub-category for the item.
           if groupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
             local currentItem = itemData[slotkey]
             if currentItem and not currentItem.isItemEmpty then
               local suffix = self:GetGroupBySuffix(currentItem, groupBy)
               if suffix and suffix ~= "" then
                 categoryName = categoryFilter.name .. " - " .. suffix
-
-                -- Create the groupBy subcategory object if it doesn't exist yet
-                if not createdGroupByCategories[categoryName] and not categories:DoesCategoryExist(categoryName) then
-                  categories:CreateCategory(ctx, {
-                    name = categoryName,
-                    itemList = {},
-                    enabled = categoryFilter.enabled,
-                    dynamic = true,
-                    isGroupBySubcategory = true,
-                    groupByParent = categoryFilter.name,
-                    priority = priority,
-                    color = categoryFilter.color,
-                  })
-                  createdGroupByCategories[categoryName] = true
-                end
+                self:ensureSubcategory(ctx, categoryFilter, categoryName)
               end
             end
           end
@@ -3493,27 +3513,23 @@ function items:GetCategory(ctx, data, own)
     searchCategory = self.searchCache[data.kind] and self.searchCache[data.kind][data.slotkey]
     searchPriority = self.categoryPriorityCache[data.kind] and self.categoryPriorityCache[data.kind][data.slotkey]
   end
-  local customCategory, customPriority = categories:GetCustomCategory(ctx, data.kind, data)
+  local customCategory, customPriority, customFilter = categories:GetCustomCategory(ctx, data.kind, data)
 
-  -- If both exist, compare priorities
+  -- A category's rule and the items placed in it by hand compete by priority (category-lifecycle.md
+  -- §6): the lower number wins; at equal priority an item placed by hand stays where it was placed.
   if searchCategory and customCategory then
-    local sPriority = searchPriority or 10
-    local cPriority = customPriority or 10
-    -- Lower priority number wins (1 > 10); if equal, search category wins (tie-breaker)
-    if cPriority < sPriority then
-      return customCategory
-    else
-      return searchCategory
+    if (customPriority or 10) <= (searchPriority or 10) then
+      return self:GroupedCategory(ctx, customCategory, customFilter, data)
     end
+    return searchCategory
   end
 
-  -- If only one exists, return it
   if searchCategory then
     return searchCategory
   end
 
   if customCategory then
-    return customCategory
+    return self:GroupedCategory(ctx, customCategory, customFilter, data)
   end
 
   local quality = data.containerInfo and data.containerInfo.quality

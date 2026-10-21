@@ -80,21 +80,20 @@ Resolution never changes the registered tables.
 - **Previews.** `GetSavedThemeKey()` names the theme the saved setting puts in effect (the
   saved theme, or Default while it is missing, hidden or unavailable), and
   `RestoreSavedTheme(ctx)` applies it, unsaved, when another theme is applied (nothing before
-  the first apply, nothing when it is already applied). The settings window's Theme pane
-  (`config/themepane.lua`) previews: picking a selectable theme applies it unsaved
-  (`ApplyTheme(ctx, key, false)`; picking the saved one or an unavailable one shows the saved
-  one), its status reads "Previewing", and only **Apply Theme** saves it. The preview applies
-  on the **next frame** (`QueuePreview`, one `C_Timer.After(0)`; the last pick before then
-  wins), never inside the click on the list: applying restyles and resizes the settings window
-  around the list, and applying inside the click sometimes left the list blank until it was
-  scrolled (reported in game). A pane that hides before then previews nothing. The pane's frame hides
-  when the player opens another settings page or closes the settings window (`OnHide` also
-  fires when an ancestor hides); `EndPreview` then restores the saved theme and forgets the pick.
-  The list's check mark and "Currently Active" follow the saved theme, not the one previewed.
-  Coverage: `spec/sonata/engine_spec.lua` ("names the theme the saved setting puts in effect",
-  "puts the saved theme back after a preview", "restores nothing before Sonata applied a theme")
-  and `spec/config/themepane_spec.lua` ("previewing").
-- `GetThemes()` lists every theme that is not hidden, available or not (the theme pane shows
+  the first apply, nothing when it is already applied). The settings window's Appearance page
+  (theme cards, `next/settings/themes.lua`, next-settings.md §4; the classic bags' Bag Theme over
+  Sonata) previews: picking a selectable theme applies it unsaved (`ApplyTheme(ctx, key, false)`;
+  picking the saved one or an unavailable one shows the saved one), its card reads "Previewing",
+  and only **Apply Theme** saves it. The preview applies on the **next frame** (one
+  `C_Timer.After(0)`; the last pick before then wins), never inside the click: applying restyles
+  and resizes what is around the cards (the classic Theme pane, now removed, sometimes left its
+  list blank until scrolled when it applied inside the click, reported in game). A page left before
+  then previews nothing. Leaving the page (another page, the window closing: `OnPageLeft`) restores
+  the saved theme and forgets the pick. The check mark and "Active" follow the saved theme, not
+  the one previewed. Coverage: `spec/sonata/engine_spec.lua` ("names the theme the saved setting
+  puts in effect", "puts the saved theme back after a preview", "restores nothing before Sonata
+  applied a theme") and `spec/next/settings/themes_spec.lua`.
+- `GetThemes()` lists every theme that is not hidden, available or not (the theme cards show
   unavailable ones as such); `GetAllThemes()` lists only those a player can pick now.
 - `GetCurrentTheme()` is the resolved active theme (before any apply: the saved one, or
   Default), cached until the next apply. `GetWindowStyle(kind)` / `GetElementStyle(kind)` read
@@ -321,8 +320,8 @@ ElvUI, GW2 and Simple Dark are backdrops, whose edge the recorder reads (render-
 Each theme is a data file that calls `sonata:RegisterTheme`, listed in every TOC right after
 `window\window.lua`, Base first.
 Window kinds: **Bag** (the backpack and bank), **Panel** (forms: the settings and profiler
-settings windows; the group dialog), **Flat** (the debug window), **Dialog** (question dialogs,
-the search category editor), **Slots** (the Show Bags and bank tab panels), **Search** (the
+settings windows; the group dialog), **Flat** (the debug window), **Dialog** (question dialogs),
+**Slots** (the Show Bags and bank tab panels), **Search** (the
 overlay search panel).
 
 - **Base** (hidden): what every theme inherits. Its `Windows.Bag` carries the bag's insets
@@ -465,7 +464,7 @@ the other windows, the search box). Every file in
 
 ## 3c. Text roles (`Sonata:GetTextFont`, `CreateText`, `SetTextRole`, `SetButtonTextRole`)
 
-BetterBags' own text (the settings window and its panes, dialogs, the search category editor,
+BetterBags' own text (the settings window and its panes, dialogs,
 the overlay search panel, the debug window's tabs, the bag footer's money and currency counts,
 the empty-group hint) is drawn with **text roles**: named fonts in the theme's `Text` table,
 each a font spec (§3). Before roles every such text hard-coded a client font and white, gold or
@@ -552,7 +551,7 @@ on a role the new theme lacks, new role fonts at the client's sizes after a resc
 than inheriting fonts, one text-size callback across `Init`s, unknown roles),
 `spec/forms/stacked_text_spec.lua` (including a hovered settings entry after a theme application
 ending on the same font object as the entries never hovered),
-`spec/config/themepane_spec.lua`, `spec/frames/perfpane_spec.lua`, `spec/frames/money_spec.lua`,
+`spec/frames/perfpane_spec.lua`, `spec/frames/money_spec.lua`,
 `spec/frames/debug_window_spec.lua`, `spec/frames/search_overlay_spec.lua`,
 `spec/frames/simulatepane_spec.lua`, and the Parchment and dark-theme tests in
 `spec/sonata/theme_ports_spec.lua`.

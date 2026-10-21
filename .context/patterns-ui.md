@@ -70,7 +70,7 @@ if dialog then dialog.data = { value = x } end  -- too late!
 -- GOOD: data is assigned before OnShow
 StaticPopup_Show("MY_DIALOG", nil, nil, { value = x })
 ```
-**Related Files**: `config/categorypane.lua:354`, `bags/backpack.lua:508, 534`
+**Related Files**: `bags/backpack.lua` (its `StaticPopup_Show` calls). BetterBags Next's settings use no `StaticPopup` (`NextDialog`).
 
 ## Object Pooling Patterns
 

@@ -50,6 +50,7 @@ LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
+  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
   ResetModuleStub(m[1], m[2])
@@ -223,6 +224,20 @@ describe("NextBag", function()
       assert.are.equal(style.Color.Body[4], g.max.a)
       assert.are.equal(style.FEATHER, bag.feather:GetWidth())
       assert.are.same({ style.FEATHER, 0, 0, 0 }, { bag.frame:GetHitRectInsets() })
+    end)
+
+    -- Asked: the bags' scroll bar themable too (next-settings.md §2): BetterBags Next's own, in place
+    -- of Blizzard's MinimalScrollBar, keeping its room on both sides and hidden until it is used.
+    it("scrolls with BetterBags Next's own scroll bar, hidden until it is used", function()
+      local bag = nextBag:Create(ctx())
+      local bar = bag.scroll.bar
+      assert.is_not_nil(bar)
+      assert.are.equal(addon:GetModule("NextScrollBar").all[#addon:GetModule("NextScrollBar").all], bar)
+      assert.are.equal(bar.frame, bag.scroll.scrollBar)
+      assert.are.equal(bag.scroll.scrollBox, bar.box)
+      assert.is_true(bar.autoHide)
+      assert.are.equal(28, bag.scroll:GetGutterWidth())
+      assert.is_nil(bag.scroll.scrollBox._scrollBar, "no Blizzard bar")
     end)
 
     it("titles itself in its title", function()

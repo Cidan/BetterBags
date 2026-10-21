@@ -332,16 +332,6 @@ describe("Database Migration", function()
       assert.are.same({ Key = 2 }, profile.customSectionSort[const.BAG_KIND.BANK])
     end)
 
-    it("moves the hidden state to the new name", function()
-      profile.categoryOptions["Quest - Quest"] = { shown = false }
-      profile.categoryOptions["Quest - Quest - Classic"] = { shown = false }
-      DB:Migrate()
-      assert.are.same({ shown = false }, profile.categoryOptions["Quest"])
-      assert.are.same({ shown = false }, profile.categoryOptions["Quest - Classic"])
-      assert.is_nil(profile.categoryOptions["Quest - Quest"])
-      assert.is_nil(profile.categoryOptions["Quest - Quest - Classic"])
-    end)
-
     it("moves group assignments, including the per-bank-type ones", function()
       profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Quest - Quest"] = 2
       profile.categoryToGroup[const.BAG_KIND.BANK][Enum.BankType.Character] = { ["Key - Key - Classic"] = 3 }
@@ -362,25 +352,134 @@ describe("Database Migration", function()
     end)
 
     it("keeps a setting already saved under the new name", function()
-      profile.categoryOptions["Quest"] = { shown = true }
-      profile.categoryOptions["Quest - Quest"] = { shown = false }
+      profile.customSectionSort[const.BAG_KIND.BACKPACK] = { Quest = 1, ["Quest - Quest"] = 2 }
       DB:Migrate()
-      assert.are.same({ shown = true }, profile.categoryOptions["Quest"])
-      assert.is_nil(profile.categoryOptions["Quest - Quest"])
+      assert.are.same({ Quest = 1 }, profile.customSectionSort[const.BAG_KIND.BACKPACK])
     end)
 
     it("leaves other names and custom categories alone", function()
-      profile.categoryOptions["Weapon - One-Handed Swords"] = { shown = false }
+      profile.customSectionSort[const.BAG_KIND.BACKPACK] = { ["Weapon - One-Handed Swords"] = 1, ["Loot - Loot"] = 2 }
       profile.customCategoryFilters["Loot - Loot"] = { name = "Loot - Loot", itemList = {} }
-      profile.categoryOptions["Loot - Loot"] = { shown = false }
       profile.ephemeralCategoryFilters["Gear - Gear"] = { name = "Gear - Gear", dynamic = true }
       profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear - Gear"] = 2
       DB:Migrate()
-      assert.are.same({ shown = false }, profile.categoryOptions["Weapon - One-Handed Swords"])
-      assert.are.same({ shown = false }, profile.categoryOptions["Loot - Loot"])
+      assert.are.same({ ["Weapon - One-Handed Swords"] = 1, ["Loot - Loot"] = 2 },
+        profile.customSectionSort[const.BAG_KIND.BACKPACK])
       assert.are.equal(2, profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear - Gear"])
-      assert.is_nil(profile.categoryOptions["Loot"])
       assert.is_nil(profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear"])
+    end)
+  end)
+
+  -- Categories are one kind (a rule, items placed by hand, or both), defined once and applied to each
+  -- bag (category-lifecycle.md §6). Every load (and every import) brings saved categories to that
+  -- shape; the cases come from real profiles (test.lua).
+  describe("unified categories", function()
+    local profile
+
+    before_each(function()
+      const.BAG_KIND.GUILD = 2
+      profile = DB.data.profile
+      profile.customCategoryFilters = {}
+      profile.ephemeralCategoryFilters = {}
+      profile.customCategoryIndex = {}
+    end)
+
+    after_each(function()
+      const.BAG_KIND.GUILD = nil
+    end)
+
+    it("applies every category to every bag the same way: a bag it does not name, it is used in", function()
+      profile.customCategoryFilters = {
+        Mats = { name = "Mats", itemList = {}, enabled = { [0] = true, [1] = false } },
+        Gems = { name = "Gems", itemList = {} },
+        Old = { name = "Old", itemList = {}, enabled = false },
+      }
+      profile.ephemeralCategoryFilters = { Openable = { name = "Openable", dynamic = true, enabled = { [0] = false } } }
+      DB:Migrate()
+      assert.are.same({ [0] = true, [1] = false, [2] = true }, profile.customCategoryFilters.Mats.enabled)
+      assert.are.same({ [0] = true, [1] = true, [2] = true }, profile.customCategoryFilters.Gems.enabled)
+      assert.are.same({ [0] = false, [1] = false, [2] = false }, profile.customCategoryFilters.Old.enabled,
+        "a category saved off everywhere stays off everywhere")
+      assert.are.same({ [0] = false, [1] = true, [2] = true }, profile.ephemeralCategoryFilters.Openable.enabled)
+    end)
+
+    it("gives every category an item list, and no rule for an empty search", function()
+      profile.customCategoryFilters = {
+        Test1 = { name = "Test1" },
+        Blank = { name = "Blank", itemList = {}, searchCategory = { query = "   " } },
+        Kept = { name = "Kept", itemList = {}, searchCategory = { query = "type = armor" } },
+      }
+      DB:Migrate()
+      assert.are.same({}, profile.customCategoryFilters.Test1.itemList)
+      assert.is_true(profile.customCategoryFilters.Test1.save, "a saved category says so")
+      assert.is_nil(profile.customCategoryFilters.Blank.searchCategory)
+      assert.are.same({ query = "type = armor" }, profile.customCategoryFilters.Kept.searchCategory)
+    end)
+
+    it("makes group by the category's own, from the rule or a clause left in its search", function()
+      profile.customCategoryFilters = {
+        Midnight = { name = "Midnight", itemList = {}, searchCategory = { query = "exp = mid", groupBy = 1 } },
+        Clause = { name = "Clause", itemList = {}, searchCategory = { query = "type = armor group by Subtype" } },
+        Only = { name = "Only", itemList = { [5] = true }, searchCategory = { query = "group by expansion" } },
+        Word = { name = "Word", itemList = {}, searchCategory = { query = "name = regroup by type" } },
+      }
+      DB:Migrate()
+      local f = profile.customCategoryFilters
+      assert.are.equal(1, f.Midnight.groupBy)
+      assert.are.same({ query = "exp = mid" }, f.Midnight.searchCategory)
+      assert.are.equal(2, f.Clause.groupBy)
+      assert.are.same({ query = "type = armor" }, f.Clause.searchCategory)
+      assert.are.equal(3, f.Only.groupBy, "grouping items placed by hand, with no search")
+      assert.is_nil(f.Only.searchCategory)
+      assert.is_nil(f.Word.groupBy, "a word ending in group is not a clause")
+      assert.are.same({ query = "name = regroup by type" }, f.Word.searchCategory)
+    end)
+
+    it("files every listed item where its list says, as the real profiles needed", function()
+      profile.customCategoryFilters = {
+        Midnight = { name = "Midnight", itemList = { [202395] = true }, priority = 2 },
+        Test = { name = "Test", itemList = { [58259] = true } },
+      }
+      -- Default: Midnight listed 202395 with no index entry; Not Max Level: 58259 indexed to "ddd", gone.
+      profile.customCategoryIndex = { [58259] = "ddd", [777] = "Test" }
+      DB:Migrate()
+      assert.are.same({ [202395] = "Midnight", [58259] = "Test" }, profile.customCategoryIndex)
+    end)
+
+    it("keeps an item listed twice in one category: the one its index names, else the lowest priority", function()
+      profile.customCategoryFilters = {
+        A = { name = "A", itemList = { [1] = true, [2] = true, [3] = true }, priority = 5 },
+        B = { name = "B", itemList = { [1] = true, [2] = true, [3] = true }, priority = 2 },
+        C = { name = "C", itemList = { [3] = true }, priority = 2 },
+      }
+      profile.customCategoryIndex = { [1] = "A" }
+      DB:Migrate()
+      local f = profile.customCategoryFilters
+      assert.are.same({ [1] = "A", [2] = "B", [3] = "B" }, profile.customCategoryIndex,
+        "the index's, else the lowest priority, else the first name")
+      assert.are.same({ [1] = true }, f.A.itemList)
+      assert.are.same({ [2] = true, [3] = true }, f.B.itemList)
+      assert.are.same({}, f.C.itemList)
+    end)
+
+    it("drops what hiding sections saved: no section is hidden any more", function()
+      profile.categoryOptions = { Junk = { shown = false } }
+      DB:Migrate()
+      assert.is_nil(profile.categoryOptions)
+    end)
+
+    it("changes nothing a second time", function()
+      profile.customCategoryFilters = {
+        Midnight = { name = "Midnight", itemList = { [202395] = true }, searchCategory = { query = "x group by type" } },
+      }
+      DB:Migrate()
+      local first = DB:GetAllItemCategories().Midnight
+      local copy = { enabled = {}, itemList = {} }
+      for k, v in pairs(first.enabled) do copy.enabled[k] = v end
+      DB:Migrate()
+      assert.are.same(copy.enabled, first.enabled)
+      assert.are.same({ query = "x" }, first.searchCategory)
+      assert.are.equal(1, first.groupBy)
     end)
   end)
 end)

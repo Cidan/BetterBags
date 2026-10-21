@@ -971,8 +971,6 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.GUILD] = const.BAG_VIEW.SECTION_GRID,
     },
-    ---@type table<string, CategoryOptions>
-    categoryOptions = {},
     ---@type table<string, CustomCategoryFilter>
     customCategoryFilters = {},
     ---@type table<string, CustomCategoryFilter>

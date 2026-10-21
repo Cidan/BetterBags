@@ -48,6 +48,15 @@ sonataNext:RegisterTheme({
     SoldOutUnusable = { 0.5, 0, 0, 1 },
     SoldOut = { 0.5, 0.5, 0.5, 1 },
     Unaffordable = { 1, 0.25, 0.25, 1 },
+    -- The controls (next-settings.md): a field's fill idle, under the pointer and pressed; a switch
+    -- that is off and a slider's empty track; and a warning (a button that deletes).
+    ControlFill = { 0.118, 0.101, 0.212, 1 },
+    ControlHover = { 0.153, 0.131, 0.275, 1 },
+    ControlPressed = { 0.094, 0.08, 0.17, 1 },
+    Track = { 0.2, 0.18, 0.33, 1 },
+    Danger = { 1, 0.45, 0.45, 1 },
+    -- The settings window's sidebar, over its body: darker.
+    Sidebar = { 0, 0, 0, 0.28 },
   },
 
   -- Files the theme draws with, named.
@@ -72,6 +81,12 @@ sonataNext:RegisterTheme({
     IconSellJunk = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\selljunk.png",
     IconRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\repair.png",
     IconGuildRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\guildrepair.png",
+    -- The controls' glyphs: a dropdown's chevron, a menu's check, the search box's magnifier, a plus.
+    IconChevron = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\chevron.png",
+    IconBack = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\back.png",
+    IconCheck = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\check.png",
+    IconSearch = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\search.png",
+    IconPlus = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\plus.png",
   },
 
   -- Text roles: Size, Color, Shadow (true: FontShadow; a table: its own; unset: none), Flags, File (a
@@ -107,6 +122,40 @@ sonataNext:RegisterTheme({
     -- A vendor item's stack count and stock: the bags' item count font (ItemButtonTemplate's Count,
     -- NumberFontNormal), copied (Object).
     Stack = { Object = "NumberFontNormal" },
+    -- The controls: text in a field (and muted, for one that is off), a field's help while empty; a
+    -- button's label, plain, primary and danger, and a link's; a menu's items (the chosen one); a
+    -- dialog's title and text; a page's tabs (chosen, under the pointer).
+    ControlText = { Size = 12, Color = "Text" },
+    ControlMuted = { Size = 12, Color = "Muted" },
+    ControlHelp = { Size = 12, Color = "Muted" },
+    Button = { Size = 12, Color = "Text", Shadow = true },
+    ButtonPrimary = { Size = 12, Color = "Gold", Shadow = true },
+    ButtonDanger = { Size = 12, Color = "Danger", Shadow = true },
+    Link = { Size = 12, Color = "Lavender" },
+    LinkHover = { Size = 12, Color = "White" },
+    MenuItem = { Size = 12, Color = "Text" },
+    MenuItemSelected = { Size = 12, Color = "Gold" },
+    DialogTitle = { Size = 16, Color = "White", Shadow = true },
+    DialogText = { Size = 12, Color = "Text" },
+    TopTab = { Size = 13, Color = "Muted" },
+    TopTabHover = { Size = 13, Color = "Text" },
+    TopTabSelected = { Size = 13, Color = "White", Shadow = true },
+    -- The settings window (next-settings.md): the brand, the sidebar's headings and pages (under the
+    -- pointer, chosen), the version; a page's title and description; a section's title and note; a
+    -- setting's name; text on a page (a paragraph, "nothing found"); a search result's page.
+    SettingsBrand = { Size = 20, Color = "White", Shadow = true },
+    SettingsNavGroup = { Size = 11, Color = "Gold" },
+    SettingsNav = { Size = 13, Color = "Muted" },
+    SettingsNavHover = { Size = 13, Color = "Text" },
+    SettingsNavSelected = { Size = 13, Color = "White", Shadow = true },
+    SettingsVersion = { Size = 10, Color = "Muted" },
+    SettingsTitle = { Size = 26, Color = "White", Shadow = true },
+    SettingsDescription = { Size = 13, Color = "Muted" },
+    SettingsSection = { Size = 11, Color = "Lavender" },
+    SettingsSectionNote = { Size = 11, Color = "Muted" },
+    SettingsLabel = { Size = 13, Color = "Text" },
+    SettingsText = { Size = 12, Color = "Muted" },
+    SettingsLink = { Size = 12, Color = "Gold" },
   },
 
   -- Sizes, in UI units.
@@ -200,6 +249,9 @@ sonataNext:RegisterTheme({
       MorphFade = 0.2,
       -- A small panel gliding back to its default size (Shift-click on a grip).
       Resize = 0.4,
+      -- A switch's knob sliding; a page's tab marker gliding to the tab chosen.
+      Toggle = 0.18,
+      TabMarker = 0.22,
     },
     Ease = {
       -- Opening's overshoot sets how far the body reaches past the screen edge, so the bounce never
@@ -223,6 +275,8 @@ sonataNext:RegisterTheme({
       Morph = "inOutCubic",
       MorphFade = "inOutSine",
       Resize = "inOutCubic",
+      Toggle = "outCubic",
+      TabMarker = "outCubic",
     },
     -- How far sections rise as they cascade in.
     Rise = 12,
@@ -494,5 +548,237 @@ sonataNext:RegisterTheme({
     CardHover = { 1, 1, 1, 0.07 },
     StackFont = "Stack",
     DurabilityHeight = 3,
+  },
+
+  -- The settings window (next-settings.md): a page per entry down its sidebar, tabs across a page,
+  -- sections of settings in two columns.
+  Settings = {
+    -- The window: Width x Height (scaled down to fit a small screen), its body, the wash at its top,
+    -- its edge.
+    Width = 1000, Height = 720,
+    Fill = { Color = "Body" },
+    Wash = { Color = "Wash", Height = 220, BlendMode = "ADD" },
+    Edge = { Color = "Lavender", Alpha = 0.35, Size = 1 },
+    -- Down its left: Width wide, Pad inside; its fill and the line along its inner side.
+    Sidebar = { Width = 232, Pad = 16, Fill = { Color = "Sidebar" }, Line = { Color = "Lavender", Alpha = 0.15, Size = 1 } },
+    -- At the sidebar's top: the bag glyph and "BetterBags", Height tall, the gold line fading out
+    -- under them.
+    Brand = {
+      Height = 72, Icon = "IconBags", IconSize = 28, IconColor = "Gold", Gap = 10, Font = "SettingsBrand",
+      Line = { Color = "Gold", From = 0.7, To = 0, Size = 1 },
+    },
+    -- The search box under the brand (Controls.Input), its magnifier IconSize, Gap below it.
+    Search = { Icon = "IconSearch", IconSize = 14, IconColor = "Lavender", Gap = 14 },
+    -- In place of the brand while a page's own list shows (a page's sidebar, next-settings.md §5): Back,
+    -- its chevron IconSize, Gap before its text; the list slides in over Slide seconds.
+    Back = {
+      Icon = "IconBack", IconSize = 14, IconColor = "Lavender", Gap = 8, Font = "SettingsNav",
+      HoverFont = "SettingsNavHover", Slide = 0.28,
+    },
+    -- The pages: their headings (GroupHeight tall, GroupGap above every one but the first), rows
+    -- ItemHeight tall Indent in; the chosen page's bar and fill, the fill under the pointer; their fonts.
+    Nav = {
+      ItemHeight = 28, Indent = 14, GroupHeight = 24, GroupGap = 14,
+      Indicator = { Color = "Gold", Width = 3 },
+      SelectedFill = { Color = "Lavender", Alpha = 0.1 },
+      HoverFill = { Color = "Lavender", Alpha = 0.05 },
+      GroupFont = "SettingsNavGroup", Font = "SettingsNav", HoverFont = "SettingsNavHover",
+      SelectedFont = "SettingsNavSelected",
+    },
+    -- At the sidebar's bottom: the version.
+    Version = { Font = "SettingsVersion", Bottom = 14 },
+    -- A page's header: Height tall, Pad in, the title TitleTop down and the description under it; the
+    -- close button (a glyph, Size square, Inset from the window's top right corner).
+    Header = {
+      Height = 100, Pad = 32, TitleTop = 26, Gap = 6, TitleFont = "SettingsTitle", DescriptionFont = "SettingsDescription",
+      Close = { Icon = "IconClose", Size = 22, Inset = 14, Color = "ButtonIcon", HoverColor = "White" },
+      -- A page's actions (Rename, Delete): their top Top down, Gap left of the close button and right of
+      -- the title.
+      Actions = { Top = 22, Gap = 16 },
+    },
+    -- The page's tabs (Controls.TopTabs) under the header, Pad in.
+    -- The page: Pad either side and Top above the first section; sections SectionGap apart, their
+    -- titles TitleHeight above their card; a setting's row at least RowHeight tall, its name and its
+    -- control RowPad in; two columns when the page is at least twice MinColumn wide. The card, the
+    -- lines between rows and columns, the light under the pointer; the fonts.
+    Content = {
+      Pad = 32, Top = 18, Bottom = 24, SectionGap = 22, TitleHeight = 24, RowHeight = 44, RowPad = 14, MinColumn = 300,
+      Card = { Color = "Lavender", Alpha = 0.035 },
+      Divider = { Color = "Lavender", Alpha = 0.08, Size = 1 },
+      Hover = { Color = "Lavender", Alpha = 0.05 },
+      TitleFont = "SettingsSection", NoteFont = "SettingsSectionNote", LabelFont = "SettingsLabel",
+      TextFont = "SettingsText", LinkFont = "SettingsLink",
+    },
+    -- The footer: Height tall, Pad in, the line along its top.
+    Footer = { Height = 56, Pad = 24, Line = { Color = "Lavender", Alpha = 0.12, Size = 1 } },
+    -- The Categories page (next-settings.md §5). Its list, in the sidebar: rows RowHeight tall (a name
+    -- and a line of what is in it; headings GroupHeight), the name Indent in from the sidebar's Pad with
+    -- its color's dot (Dot square) before it; the chosen one's bar and fill, the light under the
+    -- pointer. Its tabs: Pad inside, rows FieldGap apart, names LabelWidth wide, the items' filter
+    -- FilterWidth wide. The fonts.
+    Categories = {
+      RowHeight = 38, GroupHeight = 24, Indent = 12, Dot = 6,
+      Indicator = { Color = "Gold", Width = 3 },
+      SelectedFill = { Color = "Lavender", Alpha = 0.1 },
+      HoverFill = { Color = "Lavender", Alpha = 0.05 },
+      Pad = 18, FieldGap = 10, LabelWidth = 110, FilterWidth = 200,
+      GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
+      LabelFont = "SettingsText", TextFont = "SettingsText", SectionFont = "SettingsSection",
+      HintFont = "SettingsSectionNote",
+    },
+    -- A bag's categories, on its Categories tab: Height tall over its Fill, Pad inside; rows RowHeight
+    -- tall (headings GroupHeight), Indent in; the light under the pointer and the marker where a dragged
+    -- row would land; the fonts.
+    BagCategories = {
+      Height = 420, Pad = 10, RowHeight = 30, GroupHeight = 24, Indent = 10,
+      Fill = { Color = "Lavender", Alpha = 0.035 },
+      HoverFill = { Color = "Lavender", Alpha = 0.05 },
+      DropMarker = { Color = "Gold", Alpha = 0.9, Size = 2 },
+      GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
+    },
+    -- The classic bags' Currency page: headings HeaderHeight tall, currencies RowHeight tall with their
+    -- icon IconSize square and Gap from their name; the fonts.
+    Currency = {
+      HeaderHeight = 26, RowHeight = 30, IconSize = 18, Gap = 8,
+      GroupFont = "SettingsSection", NameFont = "SettingsLabel", TextFont = "SettingsText",
+      Hover = { Color = "Lavender", Alpha = 0.05 },
+    },
+    -- Cards of a page's own (the themes): Height tall, at least MinWidth wide, Gap apart, Pad inside;
+    -- their fill (under the pointer), edge (the one chosen), fonts, and each status's font.
+    Cards = {
+      Height = 78, MinWidth = 220, Gap = 10, Pad = 12,
+      Fill = { Color = "Lavender", Alpha = 0.04 }, HoverFill = { Color = "Lavender", Alpha = 0.09 },
+      Edge = { Color = "Lavender", Alpha = 0.18, Size = 1 }, SelectedEdge = { Color = "Gold", Alpha = 0.9, Size = 1 },
+      NameFont = "SettingsLabel", TextFont = "SettingsText",
+      ActiveFont = "SettingsLink", PreviewFont = "SettingsNavHover", UnavailableFont = "ControlMuted",
+    },
+  },
+
+  -- BetterBags Next's controls (next-settings.md): every one is BetterBags' own, drawn from here. A
+  -- fill is a texture spec (Color, Alpha; or a Texture or Atlas, tinted by Color), false for none; an
+  -- edge is a Color, Alpha and Size (false: none).
+  Controls = {
+    -- The scroll bar of every Next scroll box (the bags' too): Width wide where it takes the mouse,
+    -- Inset in from the box's right edge; the track and the thumb Size wide (HoverSize under the
+    -- pointer or while dragged), the thumb at least MinThumb tall. An auto-hiding bar fades in over
+    -- FadeIn while the pointer is over it or the box scrolls, stays Linger seconds, fades out over
+    -- FadeOut.
+    ScrollBar = {
+      Width = 12, Inset = 1, Size = 4, HoverSize = 6, MinThumb = 24,
+      Track = { Color = "Lavender", Alpha = 0.06 },
+      Thumb = { Color = "Lavender", Alpha = 0.35 },
+      ThumbHover = { Color = "Lavender", Alpha = 0.65 },
+      ThumbDrag = { Color = "Gold", Alpha = 0.85 },
+      FadeIn = 0.15, FadeOut = 0.3, Linger = 1,
+    },
+    -- A switch: its track off and on, its edge, its knob (KnobSize, KnobInset from the track's ends)
+    -- off and on, and the light over it under the pointer.
+    Toggle = {
+      Width = 36, Height = 18, KnobSize = 12, KnobInset = 3,
+      Off = { Color = "Track" },
+      On = { Color = "Gold", Alpha = 0.9 },
+      Edge = { Color = "Lavender", Alpha = 0.2, Size = 1 },
+      Knob = { Color = "Lavender" },
+      KnobOn = { Color = "White" },
+      Hover = { Color = "White", Alpha = 0.08 },
+    },
+    -- Buttons: Height tall, Padding either side of the label, at least MinWidth; each style's fills
+    -- idle, under the pointer and pressed, its edges idle and under the pointer, its font (HoverFont
+    -- under the pointer, when set). A disabled button is drawn at DisabledAlpha.
+    Button = {
+      Height = 26, Padding = 16, MinWidth = 72, DisabledAlpha = 0.4,
+      Plain = {
+        Fill = { Color = "ControlFill" }, HoverFill = { Color = "ControlHover" }, PressedFill = { Color = "ControlPressed" },
+        Edge = { Color = "Lavender", Alpha = 0.3, Size = 1 }, HoverEdge = { Color = "Lavender", Alpha = 0.6, Size = 1 },
+        Font = "Button",
+      },
+      Primary = {
+        Fill = { Color = "Gold", Alpha = 0.14 }, HoverFill = { Color = "Gold", Alpha = 0.24 },
+        PressedFill = { Color = "Gold", Alpha = 0.08 },
+        Edge = { Color = "Gold", Alpha = 0.6, Size = 1 }, HoverEdge = { Color = "Gold", Alpha = 1, Size = 1 },
+        Font = "ButtonPrimary",
+      },
+      Danger = {
+        Fill = { Color = "Danger", Alpha = 0.1 }, HoverFill = { Color = "Danger", Alpha = 0.2 },
+        PressedFill = { Color = "Danger", Alpha = 0.06 },
+        Edge = { Color = "Danger", Alpha = 0.5, Size = 1 }, HoverEdge = { Color = "Danger", Alpha = 0.9, Size = 1 },
+        Font = "ButtonDanger",
+      },
+      Link = {
+        Fill = false, HoverFill = false, PressedFill = false, Edge = false, HoverEdge = false,
+        Font = "Link", HoverFont = "LinkHover",
+      },
+    },
+    -- A text field and a text area: Height (a field's), Padding inside; their fill, focused; their
+    -- edge, its strength idle, under the pointer and focused; their text and help fonts.
+    Input = {
+      Height = 26, Padding = 8,
+      Fill = { Color = "ControlFill" }, FocusFill = { Color = "ControlHover" },
+      Edge = { Color = "Lavender", Size = 1, Idle = 0.25, Hover = 0.5, Focus = 0.9 },
+      Font = "ControlText", HelpFont = "ControlHelp",
+    },
+    -- A grid of item icons (next/controls/itemgrid.lua): cells Size square, Gap apart, Pad inside its
+    -- fill and edge (an input's); an item's quality on its cell's edge, Common and Poor items the
+    -- CommonEdge; an item showing in another category at DimAlpha; the light under the pointer; the
+    -- count's font, and the text it shows when empty.
+    ItemGrid = {
+      Size = 36, Gap = 4, Pad = 6,
+      CommonEdge = { Color = "Lavender", Alpha = 0.25, Size = 1 },
+      DimAlpha = 0.35,
+      Hover = { Color = "Lavender", Alpha = 0.18 },
+      CountFont = "Stack", EmptyFont = "Empty",
+    },
+    -- A slider: its track Width wide and TrackSize thick, filled up to the thumb, the thumb (under
+    -- the pointer or dragged: ThumbHover), and the number box ValueWidth wide, ValueGap after it.
+    Slider = {
+      Width = 120, Height = 18, TrackSize = 4, ThumbSize = 12, ValueWidth = 46, ValueGap = 10,
+      Track = { Color = "Track" },
+      Fill = { Color = "Gold", Alpha = 0.9 },
+      Thumb = { Color = "Lavender" },
+      ThumbHover = { Color = "White" },
+    },
+    -- A dropdown: its size, Padding inside, its fills (idle, under the pointer, open), its edge's
+    -- strength the same way, its text, and its chevron.
+    Dropdown = {
+      Width = 170, Height = 26, Padding = 10,
+      Fill = { Color = "ControlFill" }, HoverFill = { Color = "ControlHover" }, OpenFill = { Color = "ControlHover" },
+      Edge = { Color = "Lavender", Size = 1, Idle = 0.25, Hover = 0.5, Open = 0.9 },
+      Font = "ControlText",
+      Chevron = { Texture = "IconChevron", Color = "Lavender", Size = 12 },
+    },
+    -- A menu of choices: its card and edge, Gap below what opened it, Padding inside, rows ItemHeight
+    -- tall (MaxRows before it scrolls), the light under the pointer, its fonts, and the chosen row's
+    -- check.
+    Menu = {
+      Gap = 2, Padding = 4, ItemHeight = 24, MaxRows = 12,
+      Fill = { Color = "Card" },
+      Edge = { Color = "Lavender", Alpha = 0.35, Size = 1 },
+      HoverFill = { Color = "Lavender", Alpha = 0.14 },
+      Font = "MenuItem", SelectedFont = "MenuItemSelected",
+      Check = { Texture = "IconCheck", Color = "Gold", Size = 12 },
+    },
+    -- A color swatch: Size square, its edge idle and under the pointer.
+    Swatch = {
+      Size = 20,
+      Edge = { Color = "White", Alpha = 0.45, Size = 1 },
+      HoverEdge = { Color = "White", Alpha = 0.9, Size = 1 },
+    },
+    -- Tabs across a page: Height tall, Gap between labels, their fonts, the marker under the chosen
+    -- one (Height thick), and the line under them all.
+    TopTabs = {
+      Height = 34, Gap = 28,
+      Font = "TopTab", HoverFont = "TopTabHover", SelectedFont = "TopTabSelected",
+      Indicator = { Color = "Gold", Height = 2 },
+      Line = { Color = "Lavender", Alpha = 0.12, Size = 1 },
+    },
+    -- A dialog over a window: Width wide, Pad inside, Gap between its parts and ButtonGap between its
+    -- buttons; the scrim behind it, its card and edge, its fonts.
+    Dialog = {
+      Width = 380, Pad = 20, Gap = 12, ButtonGap = 8,
+      Scrim = { Color = "Scrim" },
+      Card = { Color = "Card" },
+      Edge = { Color = "Gold", Alpha = 0.45, Size = 1 },
+      TitleFont = "DialogTitle", TextFont = "DialogText",
+    },
   },
 })

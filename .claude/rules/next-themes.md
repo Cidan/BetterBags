@@ -70,10 +70,10 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 
 | Key | What |
 |---|---|
-| `Palette` | Every named color. |
-| `Textures` | Named files (`Glow`, `Sparkle`; Parchment adds `Paper`). |
+| `Palette` | Every named color. The controls and the settings window (next-settings.md) add `ControlFill`, `ControlHover`, `ControlPressed` (a field idle, under the pointer, pressed), `Track` (a switch off, a slider's empty track), `Danger` (what deletes) and `Sidebar`; a theme whose body is not indigo sets the first four in its own colors. |
+| `Textures` | Named files (`Glow`, `Sparkle`; Parchment adds `Paper`), and the glyphs (`Icon...`; the controls' `IconChevron`, `IconCheck`, `IconSearch`, `IconPlus`, made by `tools/textures/next_icons.py`). |
 | `FontShadow` | The shadow `Shadow = true` means. |
-| `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`; or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack. |
+| `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`; or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
 | `Layout` | Sizes: Icon, VendorColumns, VendorTextGap, VendorPriceRaise (the vendor's cards, next.md §10b), Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
 | `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
 | `Panel` | `Fill` (texture spec), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false). |
@@ -89,6 +89,8 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 | `Dock` | `Scrim`, `Card` (texture specs: a card can be art), `Pad`, `Top`, `TitleHeight`, `LineHeight`, `Glow` (`Color`, `Width`, `Low`, `High`, `Period`, or false), `Halo` (`Texture`, `Color`, `Spread`, `Low`, `High`, `Period`, `BlendMode`, or false), its line roles. |
 | `Vendor` | `QualityBorder` (a file, or false), `QuestMark`, `SearchDim`, `Highlight` (a color), tints (`Unusable`, `SoldOutUnusable`, `SoldOut`), roles (`PriceFont`, `UnaffordableFont`, `NameFont`, `StackFont`), a card's `CoinSize`, `CardFill` and `CardHover` (colors, or false), `DurabilityHeight`. |
 | `ItemButton` | Optional: a Sonata `ItemButton` element style (sonata.md §3a) for item buttons while Next is in use (§6). |
+| `Settings` | The settings window (next-settings.md §3): `Width`, `Height`, `Fill`, `Wash` (or false), `Edge`; `Sidebar` (`Width`, `Pad`, `Fill`, `Line`), `Brand` (`Height`, `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `Line`: `Color`, `From`, `To`, `Size`), `Search` (`Icon`, `IconSize`, `IconColor`, `Gap`), `Back` (a page's own list: `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `HoverFont`, `Slide` seconds), `Nav` (`ItemHeight`, `Indent`, `GroupHeight`, `GroupGap`, `Indicator`, `SelectedFill`, `HoverFill`, its four fonts), `Version`, `Header` (`Height`, `Pad`, `TitleTop`, `Gap`, its fonts, `Close`: `Icon`, `Size`, `Inset`, `Color`, `HoverColor`; `Actions`: `Top`, `Gap`), `Content` (padding, `RowHeight`, `RowPad`, `MinColumn`, `Card`, `Divider`, `Hover`, its fonts), `Footer`, `Cards` (the theme pickers: sizes, fills, edges, status fonts), `Categories` (the Categories page, next-settings.md §5: its list's rows, `Dot`, `Indicator`, fills; its tabs' `Pad`, `FieldGap`, `LabelWidth`, `FilterWidth`; fonts), `BagCategories` (a bag's arrangement of them). |
+| `Controls` | Every control (next-settings.md §2): `ScrollBar` (the bags' too), `Toggle`, `Button` (`Plain`, `Primary`, `Danger`, `Link`: fills, edges and fonts by state), `Input`, `Slider`, `Dropdown`, `Menu`, `Swatch`, `TopTabs`, `Dialog`, `ItemGrid` (`Size`, `Gap`, `Pad`, `CommonEdge`, `DimAlpha`, `Hover`, `CountFont`, `EmptyFont`). A fill is a texture spec, a palette color or false; an edge a `Color`, `Alpha`, `Size` (and strengths `Idle`, `Hover`, `Focus`/`Open` for fields). `Motion.Time` adds `Toggle` and `TabMarker`. |
 
 **Default is the v0.7.0 design, value for value**: `spec/fixtures/next_style_v0_7_0.lua` freezes
 v0.7.0's `next/style.lua`, and `spec/next/style_theme_spec.lua` checks every value and every font
@@ -136,6 +138,11 @@ calls again. Sizes are read when used (no value kept at load).
 - **Vendor buttons** (`next/vendorbutton.lua`): every button made, in use or pooled; the vendor
   fits its name to the theme's header sizes again.
 - **Size button**: its icon follows the theme by state (`SetHeaderIcon`).
+- **Controls and the settings window** (next-settings.md §2, §3): every control module restyles every
+  instance it made (`NextScrollBar`, `NextButton`, `NextToggle`, `NextInput`, `NextSlider`, `NextMenu`
+  while open, `NextDropdown`, `NextSwatch`, `NextTopTabs`, `NextDialog` while shown); the window
+  restyles every part and lays itself out again; its pages, theme pickers and category managers
+  restyle theirs.
 
 ## 6. Item buttons
 
@@ -159,11 +166,14 @@ re-skin on every draw already, and a theme redraws the guild bank.
 
 ## 7. Picking a theme
 
-The settings window's **Next Theme** page (right after **Theme**) is the Theme pane over SonataNext
-(`themePane:Create(parent, sonataNext)`; the pane takes any engine with GetThemes, IsAvailable,
-IsSelectable, GetCurrentThemeKey, GetSavedThemeKey, ApplyTheme, RestoreSavedTheme): themes by name,
+The settings window picks it on its **Appearance** page (next-settings.md §4, §7): theme cards over
+SonataNext (`NextSettingsThemes:Create(parent, sonataNext)`; the cards take any engine with GetThemes,
+IsAvailable, IsSelectable, GetCurrentThemeKey, GetSavedThemeKey, ApplyTheme, RestoreSavedTheme), the
+**Theme** section while BetterBags Next is in use and the **Settings Window** section for the classic
+bags (Next's themes draw the window either way). The classic settings window's Next Theme page, the
+Theme pane over SonataNext, was removed with that window. The rules are those it had: themes by name,
 those whose addons are not loaded shown as unavailable, a pick previewed on the next frame without
-saving, **Apply Theme** saves, the saved one put back when the page hides. The bags' theme is left
+saving, **Apply Theme** saves, the saved one put back when the page is left. The bags' theme is left
 alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
 
 ## 8. The shipped themes
@@ -180,6 +190,11 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
   sparkles or braid, quicker opening without a bounce (the body reaches only 4 past the edge), a
   fainter small border. Its first version drew the border on full panels too; asked: a full panel
   docked at its edge should have none, so it no longer sets `Panel.Edge.Full`.
+
+Each draws the settings window and its controls in its own look (next-settings.md §6): Ember and Quiet
+their control colors in their own charcoal and grays (Quiet also smaller settings titles and quicker
+switches and tab markers); Parchment the window, its menus and dialogs on the paper art, ink text and
+edges, sealing wax for the accents, Blizzard's parchment red for what deletes.
 
 Not seen in game yet: any theme but Default.
 
@@ -300,8 +315,8 @@ Not verified in game yet: how the glyphs look in each theme, and the trilinear f
   `spec/next/guildbank_spec.lua` ("a theme" blocks).
 - Themes: `spec/sonata/next_themes_spec.lua` (each resolves on every client and checks clean; each
   looks as described).
-- Settings and wiring: `spec/config/themepane_spec.lua` (the pane over SonataNext),
-  `spec/config/config_redraw_spec.lua` (the page), `spec/bagsystem_spec.lua` (`SetActive`),
+- Settings and wiring: `spec/next/settings/themes_spec.lua` (the cards),
+  `spec/next/settings/content_spec.lua` (Appearance per design), `spec/bagsystem_spec.lua` (`SetActive`),
   `spec/database_spec.lua`, `spec/core/constants_spec.lua`, `spec/render/toc_spec.lua`.
 - Alphas (§10): `spec/next/theme_panel_spec.lua` ("alphas": the title's glow through a theme, lit and
   dark; the border's alpha after any number of size switches and part way through one; the spark

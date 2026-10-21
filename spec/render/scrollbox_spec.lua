@@ -370,6 +370,46 @@ describe("Scrollbox", function()
     end)
   end)
 
+  -- A bar of the caller's (CreateBar: BetterBags Next's own, next-settings.md §2) in place of
+  -- Blizzard's MinimalScrollBar: made for the box once the box has its view, told whether to hide
+  -- itself, bound to the box, and the bar Render marks for ConsolePort.
+  describe("with a bar of its own (CreateBar)", function()
+    local made
+
+    local function fakeBar(box, opts)
+      local bar = { frame = CreateFrame("Frame", nil, box), opts = opts, bound = {} }
+      function bar:Bind(b) table.insert(self.bound, b) end
+      made = { bar = bar, box = box, view = box:GetView() }
+      return bar
+    end
+
+    it("makes it for the box once the box has its view, and binds it, with no Blizzard bar", function()
+      local sb = scrollbox:Create(CreateFrame("Frame"), nil, { CreateBar = fakeBar })
+      assert.are.equal(sb.scrollBox, made.box)
+      assert.is_not_nil(made.view, "the box was initialized first")
+      assert.are.same({ sb.scrollBox }, made.bar.bound)
+      assert.are.equal(made.bar, sb.bar)
+      assert.are.equal(made.bar.frame, sb.scrollBar)
+      assert.is_nil(sb.scrollBox._scrollBar, "no Blizzard bar bound")
+      assert.are.equal(sb.scrollBox:GetScrollTarget(), sb.scrollChild:GetParent())
+      assert.is_false(made.bar.opts.AutoHide)
+    end)
+
+    it("tells it to hide itself for an auto-hiding box, and leaves the fading to it", function()
+      local sb = scrollbox:Create(CreateFrame("Frame"), nil, { CreateBar = fakeBar, AutoHideBar = true, Symmetric = true })
+      assert.is_true(made.bar.opts.AutoHide)
+      assert.is_nil(sb.barDriver)
+      assert.are.equal(28, sb:GetGutterWidth())
+    end)
+
+    it("marks it for ConsolePort as it renders", function()
+      local sb = scrollbox:Create(CreateFrame("Frame"), nil, { CreateBar = fakeBar })
+      sb:SetChild(child(100, 800))
+      render:NewRenderChain(root(sb, { MaxHeight = 500 }), {})
+      assert.is_false(made.bar.frame:GetAttribute("nodeignore"))
+    end)
+  end)
+
   it("errors when rendered without a child", function()
     local sb = scrollbox:Create(CreateFrame("Frame"))
     assert.has_error(function() render:NewRenderChain(root(sb, { MaxHeight = 500 }), {}) end)

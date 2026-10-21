@@ -70,9 +70,6 @@ local itemLoader = addon:GetModule('ItemLoader')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
----@class SearchCategoryConfig: AceModule
-local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
-
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
@@ -200,6 +197,9 @@ function addon:OnInitialize()
   addon:GetModule('Sonata'):Init()
   -- BetterBags Next's look, from its saved theme, before any of its panels is made.
   addon:GetModule('SonataNext'):Init()
+  -- BetterBags Next's settings window (next-settings.md §3): built the first time it opens.
+  addon:GetModule('NextSettings'):Init()
+  addon:GetModule('NextSettingsContent'):Init()
   addon:GetModule('Tabs'):Init()
   itemFrame:Init()
   sectionFrame:Init()
@@ -403,10 +403,10 @@ function addon:OnEnable()
   addon:GetModule('GuildBank'):Enable()
   refresh:Enable()
   views:Enable()
-  searchCategoryConfig:Enable()
   async:Enable()
   form:Enable()
   addon:GetModule('ChangelogWindow'):Enable()
+  addon:GetModule('NextSettingsContent'):Enable()
 
   consoleport:Enable()
   quickfind:Enable()

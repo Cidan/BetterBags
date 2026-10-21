@@ -132,6 +132,60 @@ describe("BetterBags Next's shipped themes", function()
     end)
   end)
 
+  -- The settings window and its controls (next-settings.md §6) take each theme's look: Default's are
+  -- indigo, which on another theme's body would be a patch of the wrong color.
+  local function warm(c) return c[1] > c[3] + 0.05 end
+  local function cool(c) return c[3] >= c[1] and (math.max(c[1], c[2], c[3]) - math.min(c[1], c[2], c[3])) < 0.1 end
+
+  describe("Ember's settings and controls", function()
+    it("are charcoal and amber, with a danger red apart from its amber", function()
+      local t = sonataNext:Resolve("Ember")
+      for _, name in ipairs({ "ControlFill", "ControlHover", "ControlPressed", "Track" }) do
+        assert.is_true(warm(t.Palette[name]), name)
+      end
+      assert.is_true(t.Palette.ControlHover[1] > t.Palette.ControlFill[1], "lighter under the pointer")
+      assert.is_true(t.Palette.ControlPressed[1] < t.Palette.ControlFill[1], "darker when pressed")
+      assert.is_true(t.Palette.Gold[2] - t.Palette.Danger[2] > 0.2, "danger is redder than amber")
+    end)
+  end)
+
+  describe("Quiet's settings and controls", function()
+    it("are cool grays, its settings' titles smaller and its controls' motion quicker", function()
+      local t = sonataNext:Resolve("Quiet")
+      local default = sonataNext:Resolve("Default")
+      for _, name in ipairs({ "ControlFill", "ControlHover", "ControlPressed", "Track" }) do
+        assert.is_true(cool(t.Palette[name]), name)
+      end
+      assert.is_true(t.Fonts.SettingsTitle.Size < default.Fonts.SettingsTitle.Size)
+      assert.is_true(t.Fonts.SettingsBrand.Size < default.Fonts.SettingsBrand.Size)
+      assert.is_true(t.Motion.Time.Toggle < default.Motion.Time.Toggle)
+      assert.is_true(t.Motion.Time.TabMarker < default.Motion.Time.TabMarker)
+    end)
+  end)
+
+  describe("Parchment's settings and controls", function()
+    it("are paper and ink: the window on the paper art, dark text, sealing wax for the accents", function()
+      local t = sonataNext:Resolve("Parchment")
+      assert.are.equal("Paper", t.Settings.Fill.Texture)
+      assert.is_nil(t.Settings.Wash, "no light washed over the paper")
+      assert.are.equal("Paper", t.Controls.Menu.Fill.Texture, "a menu is a slip of paper")
+      assert.are.equal("Paper", t.Controls.Dialog.Card.Texture)
+      for _, role in ipairs({ "SettingsBrand", "SettingsNav", "SettingsNavHover", "SettingsNavSelected",
+        "SettingsTitle", "SettingsDescription", "SettingsSection", "SettingsLabel", "SettingsText", "SettingsVersion",
+        "ControlText", "ControlHelp", "Button", "MenuItem", "TopTab", "TopTabHover", "TopTabSelected", "DialogTitle",
+        "DialogText", "Link" }) do
+        local c = t.Palette[t.Fonts[role].Color]
+        assert.is_true(c[1] < 0.5 and c[2] < 0.5 and c[3] < 0.5, role .. " is ink")
+      end
+      for _, accent in ipairs({ t.Settings.Nav.Indicator, t.Settings.Brand, t.Controls.TopTabs.Indicator,
+        t.Controls.Toggle.On, t.Settings.Categories.Indicator }) do
+        assert.are.equal("Seal", accent.Color or accent.IconColor)
+      end
+      assert.are.same({ 172 / 255, 3 / 255, 3 / 255, 1 }, t.Palette.Danger, "Blizzard's parchment red")
+      assert.are.equal("Ink", t.Controls.ScrollBar.Thumb.Color)
+    end)
+  end)
+
   describe("Parchment", function()
     it("is paper: art for its body and cards, dark ink with no shadow, no glowing effects", function()
       local t = sonataNext:Resolve("Parchment")

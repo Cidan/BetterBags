@@ -17,7 +17,6 @@ LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 addon:GetModule("Events"):Init()
 StubBetterBagsModule("Search")
-StubBetterBagsModule("SearchCategoryConfig")
 
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
@@ -147,6 +146,32 @@ describe("SearchBox:GetSearchText", function()
       box:UpdateSearch(ctx)
       assert.are.equal(1, reset)
     end)
+  end)
+
+  -- Enter to Make Category opens the Categories page with a new category from the search
+  -- (category-lifecycle.md §6); the old search category dialog is gone.
+  it("asks for a category made from the search on Enter, when Enter to Make Category is on", function()
+    local events = addon:GetModule("Events")
+    local savedSend, savedOn, savedAttach, savedRegister = events.SendMessage, database.GetEnterToMakeCategory,
+      rawget(addon:GetModule("Animations"), "AttachFadeGroup"), rawget(addon:GetModule("Sonata"), "RegisterElement")
+    local sent = {}
+    events.SendMessage = function(_, _, message, ...) table.insert(sent, { message, ... }) end
+    addon:GetModule("Animations").AttachFadeGroup = function()
+      local group = { Play = function() end }
+      return group, group
+    end
+    addon:GetModule("Sonata").RegisterElement = function() end
+    local on = true
+    database.GetEnterToMakeCategory = function() return on end
+    local box = searchBox:CreateBox(const.BAG_KIND.BACKPACK, CreateFrame("Frame"))
+    box.textBox:SetText("rarity = epic")
+    box.textBox:GetScript("OnEnterPressed")(box.textBox)
+    on = false
+    box.textBox:GetScript("OnEnterPressed")(box.textBox)
+    events.SendMessage, database.GetEnterToMakeCategory = savedSend, savedOn
+    addon:GetModule("Animations").AttachFadeGroup = savedAttach
+    addon:GetModule("Sonata").RegisterElement = savedRegister
+    assert.are.same({ { "config/NewCategoryFromSearch", "rarity = epic" } }, sent)
   end)
 
   it("returns empty string when no search box holds any text", function()

@@ -126,7 +126,6 @@ forms\layouts\twocolumn.lua
 
 forms\form.lua
 
-frames\searchcategory.lua
 frames\question.lua
 frames\groupdialog.lua
 frames\changelog.lua
@@ -166,6 +165,18 @@ frames\bag.lua
 
 next\style.lua
 next\tween.lua
+next\controls\base.lua
+next\controls\scrollbar.lua
+next\controls\button.lua
+next\controls\toggle.lua
+next\controls\input.lua
+next\controls\slider.lua
+next\controls\menu.lua
+next\controls\dropdown.lua
+next\controls\swatch.lua
+next\controls\toptabs.lua
+next\controls\dialog.lua
+next\controls\itemgrid.lua
 next\sparkles.lua
 next\tabs.lua
 next\content.lua
@@ -181,12 +192,18 @@ next\guildbutton.lua
 next\guildbank.lua
 
 
-config\categorypane.lua
-config\themepane.lua
-config\currencypane.lua
-config\itemcolorpane.lua
+config\catalog.lua
 config\config.lua
 config\plugin.lua
+next\settings\rows.lua
+next\settings\page.lua
+next\settings\pages.lua
+next\settings\window.lua
+next\settings\themes.lua
+next\settings\categories.lua
+next\settings\bagcategories.lua
+next\settings\currency.lua
+next\settings\content.lua
 
 integrations\consoleport.lua
 integrations\pawn.lua

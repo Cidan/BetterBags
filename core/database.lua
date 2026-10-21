@@ -567,7 +567,10 @@ end
 function DB:DeleteItemFromCategory(itemID, category)
   if DB.data.profile.customCategoryFilters[category] then
     DB.data.profile.customCategoryFilters[category].itemList[itemID] = nil
-    DB.data.profile.customCategoryIndex[itemID] = nil
+    -- Only its home: an item filed elsewhere stays filed there.
+    if DB.data.profile.customCategoryIndex[itemID] == category then
+      DB.data.profile.customCategoryIndex[itemID] = nil
+    end
   end
 end
 
@@ -603,13 +606,6 @@ function DB:DeleteItemCategory(category)
   -- as an undeletable "dynamic" category (see config's LoadPinnedItems /
   -- UpdateDetailPanel). Also drops any grouped sub-categories ("Name - X").
   local groupedPrefix = category .. " - "
-
-  DB.data.profile.categoryOptions[category] = nil
-  for name in pairs(DB.data.profile.categoryOptions) do
-    if name:sub(1, #groupedPrefix) == groupedPrefix then
-      DB.data.profile.categoryOptions[name] = nil
-    end
-  end
 
   for name in pairs(DB.data.profile.ephemeralCategoryFilters) do
     if name:sub(1, #groupedPrefix) == groupedPrefix then
@@ -655,10 +651,9 @@ local function nameWithoutRepeatedType(name)
   return nil
 end
 
--- RenameRepeatedTypeCategories moves the hidden state, group assignments and pinned order
--- saved under a category name that repeated its item type (issue #183) to the category's
--- current name. Custom categories keep their names, and a setting already saved under the
--- current name wins.
+-- RenameRepeatedTypeCategories moves the group assignments and pinned order saved under a
+-- category name that repeated its item type (issue #183) to the category's current name. Custom
+-- categories keep their names, and a setting already saved under the current name wins.
 function DB:RenameRepeatedTypeCategories()
   local profile = DB.data.profile
   ---@param map table<any, any>
@@ -679,7 +674,6 @@ function DB:RenameRepeatedTypeCategories()
     end
   end
 
-  renameKeys(profile.categoryOptions)
   for _, kind in pairs(const.BAG_KIND) do
     if type(profile.customSectionSort[kind]) == "table" then
       renameKeys(profile.customSectionSort[kind])
@@ -694,6 +688,130 @@ function DB:RenameRepeatedTypeCategories()
       end
     end
   end
+end
+
+-- The words a search's "group by" clause names, and the group by each means.
+local GROUP_BY_WORDS = { none = 0, type = 1, subtype = 2, expansion = 3, exp = 3 }
+
+-- categoryKinds returns every bag kind a category can be used in.
+---@return BagKind[]
+local function categoryKinds()
+  local kinds = {}
+  for name, kind in pairs(const.BAG_KIND) do
+    if name ~= "UNDEFINED" then
+      table.insert(kinds, kind)
+    end
+  end
+  return kinds
+end
+
+-- normalizeEnabled returns the bags a category is used in, one entry per bag: a bag it does not name,
+-- it is used in; the old single flag (a boolean) holds for every bag.
+---@param enabled any
+---@return table<BagKind, boolean>
+local function normalizeEnabled(enabled)
+  local all
+  if type(enabled) == "boolean" then
+    all = enabled
+  end
+  if type(enabled) ~= "table" then
+    enabled = {}
+  end
+  for _, kind in ipairs(categoryKinds()) do
+    if enabled[kind] == nil then
+      if all ~= nil then
+        enabled[kind] = all
+      else
+        enabled[kind] = true
+      end
+    end
+  end
+  return enabled
+end
+
+-- normalizeRule makes group by the category's own (from its rule, or a "group by" clause left at the
+-- end of its search) and drops a rule whose search is empty.
+---@param filter CustomCategoryFilter
+local function normalizeRule(filter)
+  local rule = filter.searchCategory
+  if type(rule) ~= "table" then
+    filter.searchCategory = nil
+    return
+  end
+  local query = strtrim(rule.query or "")
+  local lower = query:lower()
+  local from, _, word = lower:find("group%s+by%s+(%w+)%s*$")
+  if from ~= nil and (from == 1 or lower:sub(from - 1, from - 1):match("%s")) and GROUP_BY_WORDS[word] then
+    filter.groupBy = GROUP_BY_WORDS[word]
+    query = strtrim(query:sub(1, from - 1))
+  elseif filter.groupBy == nil and rule.groupBy ~= nil then
+    filter.groupBy = rule.groupBy
+  end
+  if query == "" then
+    filter.searchCategory = nil
+  else
+    filter.searchCategory = { query = query }
+  end
+end
+
+-- NormalizeCategories brings saved categories to the unified shape (category-lifecycle.md §6): every
+-- category used in every bag it does not leave out, marked saved, an item list, group by its own and no
+-- empty rule;
+-- the item index rebuilt from the item lists (an item listed in several keeps the category its index
+-- names, else the lowest priority number, then the first name; entries naming no list are dropped);
+-- hidden sections dropped (hiding was retired). Run on every load and every import; it changes nothing
+-- a second time.
+function DB:NormalizeCategories()
+  local profile = DB.data.profile
+  profile.categoryOptions = nil
+  profile.customCategoryFilters = profile.customCategoryFilters or {}
+  profile.ephemeralCategoryFilters = profile.ephemeralCategoryFilters or {}
+  for name, filter in pairs(profile.customCategoryFilters) do
+    filter.name = name
+    filter.save = true
+    filter.itemList = type(filter.itemList) == "table" and filter.itemList or {}
+    filter.enabled = normalizeEnabled(filter.enabled)
+    normalizeRule(filter)
+  end
+  for name, filter in pairs(profile.ephemeralCategoryFilters) do
+    filter.name = name
+    filter.enabled = normalizeEnabled(filter.enabled)
+  end
+
+  local old = profile.customCategoryIndex or {}
+  local claims = {}
+  for _, filter in pairs(profile.customCategoryFilters) do
+    for itemID in pairs(filter.itemList) do
+      claims[itemID] = claims[itemID] or {}
+      table.insert(claims[itemID], filter)
+    end
+  end
+  local index = {}
+  for itemID, list in pairs(claims) do
+    local home
+    for _, filter in ipairs(list) do
+      if filter.name == old[itemID] then
+        home = filter
+      end
+    end
+    if home == nil then
+      table.sort(list, function(a, b)
+        local pa, pb = a.priority or 10, b.priority or 10
+        if pa ~= pb then
+          return pa < pb
+        end
+        return a.name < b.name
+      end)
+      home = list[1]
+    end
+    for _, filter in ipairs(list) do
+      if filter ~= home then
+        filter.itemList[itemID] = nil
+      end
+    end
+    index[itemID] = home.name
+  end
+  profile.customCategoryIndex = index
 end
 
 ---@param category string
@@ -751,6 +869,9 @@ function DB:CreateOrUpdateCategory(category)
       DB.data.profile.customCategoryIndex[itemID] = category.name
     end
   else
+    -- A plugin's category saves only what is the player's (its bags, and the color and priority they
+    -- set): the plugin gives the rest again when it makes it.
+    local saved = DB.data.profile.ephemeralCategoryFilters[category.name]
     DB.data.profile.ephemeralCategoryFilters[category.name] = {
       name = category.name,
       enabled = category.enabled,
@@ -758,27 +879,31 @@ function DB:CreateOrUpdateCategory(category)
       isGroupBySubcategory = category.isGroupBySubcategory,
       groupByParent = category.groupByParent,
       itemList = {},
+      color = saved and saved.color,
+      priority = saved and saved.priority,
     }
   end
+end
+
+-- UpdateEphemeralItemCategory saves what a player set for a plugin's category (its bags, color,
+-- priority).
+---@param name string
+---@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number}
+function DB:UpdateEphemeralItemCategory(name, fields)
+  local saved = DB.data.profile.ephemeralCategoryFilters[name]
+  if saved == nil then
+    saved = { name = name, itemList = {} }
+    DB.data.profile.ephemeralCategoryFilters[name] = saved
+  end
+  saved.enabled = fields.enabled
+  saved.color = fields.color
+  saved.priority = fields.priority
 end
 
 ---@param category string
 ---@return boolean
 function DB:IsSearchCategory(category)
   return DB.data.profile.searchCategories[category] ~= nil
-end
-
----@param category string
----@return CategoryOptions
-function DB:GetCategoryOptions(category)
-  local options = DB.data.profile.categoryOptions[category]
-  if not options then
-    options = {
-      shown = true,
-    }
-    DB.data.profile.categoryOptions[category] = options
-  end
-  return options
 end
 
 ---@return boolean
@@ -1125,20 +1250,7 @@ function DB:RenameCategory(oldName, newName)
     end
   end
 
-  -- 5. Update display options
-  if DB.data.profile.categoryOptions[oldName] then
-    DB.data.profile.categoryOptions[newName] = DB.data.profile.categoryOptions[oldName]
-    DB.data.profile.categoryOptions[oldName] = nil
-  end
-
-  -- Delete grouped sub-categories from display options
-  for categoryName, _ in pairs(DB.data.profile.categoryOptions) do
-    if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
-      DB.data.profile.categoryOptions[categoryName] = nil
-    end
-  end
-
-  -- 6. Update custom section sort (pinned position) for all bag kinds
+  -- 5. Update custom section sort (pinned position) for all bag kinds
   for _, kind in pairs(const.BAG_KIND) do
     if DB.data.profile.customSectionSort[kind] and DB.data.profile.customSectionSort[kind][oldName] ~= nil then
       DB.data.profile.customSectionSort[kind][newName] = DB.data.profile.customSectionSort[kind][oldName]
@@ -1306,12 +1418,13 @@ function DB:ExportSettings()
   local serialization = addon:GetModule('Serialization')
 
   -- Create a table with only category configuration settings
+  -- Version 2: unified categories (DB:NormalizeCategories), no hidden sections. Version 1 imports
+  -- are brought to it.
   local exportData = {
-    version = 1, -- Version number for future compatibility
+    version = 2,
     customCategoryFilters = serialization:DeepCopy(DB.data.profile.customCategoryFilters),
     customCategoryIndex = serialization:DeepCopy(DB.data.profile.customCategoryIndex),
     ephemeralCategoryFilters = serialization:DeepCopy(DB.data.profile.ephemeralCategoryFilters),
-    categoryOptions = serialization:DeepCopy(DB.data.profile.categoryOptions),
     categoryFilters = serialization:DeepCopy(DB.data.profile.categoryFilters),
     customSectionSort = serialization:DeepCopy(DB.data.profile.customSectionSort),
   }
@@ -1376,10 +1489,6 @@ function DB:ImportSettings(dataString)
     DB.data.profile.ephemeralCategoryFilters = serialization:DeepCopy(importData.ephemeralCategoryFilters)
   end
 
-  if importData.categoryOptions then
-    DB.data.profile.categoryOptions = serialization:DeepCopy(importData.categoryOptions)
-  end
-
   if importData.categoryFilters then
     DB.data.profile.categoryFilters = serialization:DeepCopy(importData.categoryFilters)
   end
@@ -1388,6 +1497,7 @@ function DB:ImportSettings(dataString)
     DB.data.profile.customSectionSort = serialization:DeepCopy(importData.customSectionSort)
   end
 
+  DB:NormalizeCategories()
   return true, "Category configuration imported successfully"
 end
 
@@ -1411,19 +1521,9 @@ function DB:Migrate()
     DB:SetBagView(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID)
   end
 
-  --[[
-    Migration of the custom category filters from single filter to per-bag filter.
-    Do not remove before Q4'24.
-  ]]
-  for name, _ in pairs(DB.data.profile.customCategoryFilters) do
-    if type(DB.data.profile.customCategoryFilters[name].enabled) == "boolean" then
-      local value = DB.data.profile.customCategoryFilters[name].enabled --[[@as boolean]]
-      DB.data.profile.customCategoryFilters[name].enabled = {
-        [const.BAG_KIND.BACKPACK] = value,
-        [const.BAG_KIND.BANK] = value
-      }
-    end
-  end
+  -- Unified categories, every load (category-lifecycle.md §6). It also turns the old single enabled
+  -- flag into one per bag.
+  DB:NormalizeCategories()
 
   -- Fix the column count and items per row values from a previous bug.
   -- Do not remove before Q1'25.

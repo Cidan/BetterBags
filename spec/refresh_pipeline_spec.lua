@@ -1571,10 +1571,41 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.equal("Searchy", items:GetSearchCategory(const.BAG_KIND.BACKPACK, "0_1"), "search category must match the item")
     assert.equal("Custom", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
 
-    -- ... and the search category wins once it carries the higher priority.
+    -- At equal priority an item placed by hand stays where it was placed (category-lifecycle.md §6).
     override(categories, "GetSortedSearchCategories", searchCategoryWithPriority(1))
     slotInfo = refreshBackpack()
+    assert.equal("Custom", slotInfo.itemsBySlotKey["0_1"].itemInfo.category, "a tie")
+
+    -- ... and the search category wins once it carries the higher priority.
+    override(categories, "GetSortedSearchCategories", searchCategoryWithPriority(0))
+    slotInfo = refreshBackpack()
     assert.equal("Searchy", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+  end)
+
+  -- Group by is the category's own: the items placed in it by hand are grouped as its rule's matches
+  -- are, into sub-categories made for them (category-lifecycle.md §6).
+  it("groups the items placed in a category by hand, making the sub-category", function()
+    local mats = { name = "Mats", groupBy = const.SEARCH_CATEGORY_GROUP_BY.TYPE, priority = 4, color = { 1, 0, 0 },
+      enabled = { [const.BAG_KIND.BACKPACK] = true } }
+    override(categories, "GetCustomCategory", function(_, _, _, data)
+      if data.itemInfo.itemID == 101 then return "Mats", 4, mats end
+      return nil, nil
+    end)
+    local made = {}
+    override(categories, "DoesCategoryExist", function(_, name) return made[name] ~= nil end)
+    override(categories, "CreateCategory", function(_, _, category) made[category.name] = category end)
+    mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+    local slotInfo = refreshBackpack()
+    local item = slotInfo.itemsBySlotKey["0_1"]
+    local grouped = "Mats - " .. item.itemInfo.itemType
+    assert.equal(grouped, item.itemInfo.category)
+    local sub = made[grouped]
+    assert.is_not_nil(sub, "the sub-category is made")
+    assert.is_true(sub.isGroupBySubcategory)
+    assert.equal("Mats", sub.groupByParent)
+    assert.equal(mats.enabled, sub.enabled)
+    assert.same({ 1, 0, 0 }, sub.color)
+    assert.equal(4, sub.priority)
   end)
 
   -- Search categories are matched against each item's own category (the one it has without any
@@ -1639,8 +1670,9 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         return nil, nil
       end)
       local list = { { "By Custom", "category = custom" } }
+      -- Ahead of Custom: at equal priority the item would stay in the category it was placed in.
       override(categories, "GetSortedSearchCategories", function()
-        return { { name = list[1][1], priority = 10, enabled = { [const.BAG_KIND.BACKPACK] = true },
+        return { { name = list[1][1], priority = 9, enabled = { [const.BAG_KIND.BACKPACK] = true },
           searchCategory = { query = list[1][2], groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } } }
       end)
       slotInfo = refreshBackpack({ derive = true })

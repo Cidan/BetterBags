@@ -323,7 +323,7 @@ The slider now saves only user input; the number box saves a typed value itself,
 and only when it moved the slider. The spec mock's `SetValue` fires `OnValueChanged` the
 same way the client does.
 
-Coverage: `spec/config/config_redraw_spec.lua` (each setting above sends `bags/Redraw`, with
+Coverage: `spec/config/settings_effects_spec.lua` (each setting above sends `bags/Redraw`, with
 or without buttons; the data settings are covered in §10),
 `spec/refresh_spec.lua` ("redraw-only settings", including one draw per frame), `spec/themes_spec.lua` ("ApplyTheme
 refresh"), `spec/frames/item_spec.lua` ("redraws once after the buttons were restyled", for
@@ -376,7 +376,7 @@ request, is swept only while it is open.
 | Trigger | Request |
 |---|---|
 | Config data settings (upgrade provider, section and item order, groups, category filters, stacking except Split Transmogged, free space, gaps) | `bags/Rederive { resetLayout, buttons }` |
-| Categories: create from an item, delete, rename, hide/show, reprocess (`categories:ReprocessAllItems`), category pane edits, search categories, item drops on a header, group drag and drop | `bags/Rederive { resetLayout, buttons }` |
+| Categories: create from an item, delete, rename, `UpdateCategory` (bags, rule, group by, priority, color), reprocess (`categories:ReprocessAllItems`), Categories page edits, search categories, item drops on a header, group drag and drop | `bags/Rederive { resetLayout, buttons }` |
 | In-bag search toggle (`search/SetInFrame` → `bag:SetSearchShown`) | `bags/Rederive { resetLayout, buttons, categoriesUnchanged }` |
 | Show Bags toggles (`ContextMenu:ToggleBagSlots`: the context menu, a theme's ShowBags action button) | `bags/Rederive { resetLayout }`: nothing a button draws depends on the view except through data its draw record holds, so unchanged buttons skip |
 | Interaction window opens the backpack / closes (`core/hooks.lua`) | `bags/Rederive { resetLayout, backpack, bank = items:NeedsInteractionRecalculation(BANK), categoriesUnchanged }`: the backpack's grey-out depends on the open window; the bank's only interaction-dependent input is stack unmerging, so it is recalculated only when its committed stacks were built under the other interaction state (recorded per kind at commit, `items._stackedInteracting`). A captured bank open recalculated the bank (149 ms) into the layout its own read had just committed under the banker interaction |
@@ -429,7 +429,7 @@ read"; "upgrade verdict cache": which events read and which recalculate; "mergin
 `categoriesUnchanged` and `recategorize`; "deriving only what changed"),
 `spec/refresh_spec.lua` (routing of `bags/Rederive`, `categoriesUnchanged` included, and
 `EQUIPMENT_SETS_CHANGED`),
-`spec/config/config_redraw_spec.lua` (every data setting; Split Transmogged still reads),
+`spec/config/settings_effects_spec.lua` (every data setting; Split Transmogged still reads),
 `spec/categories_spec.lua` ("refreshes"), `spec/core/interaction_refresh_spec.lua`,
 `spec/frames/contextmenu_spec.lua`, `spec/tooltip_spec.lua`,
 `spec/bags/bank_context_refresh_spec.lua`, `spec/bags/backpack_spec.lua`, `spec/items_spec.lua`

@@ -15,7 +15,8 @@ debug.Log = function() end
 debug.Inspect = function() end
 
 local const = StubBetterBagsModule("Constants")
-const.BAG_KIND = { BACKPACK = 0, BANK = 1 }
+const.BAG_KIND = { BACKPACK = 0, BANK = 1, GUILD = 2, UNDEFINED = -1 }
+const.SEARCH_CATEGORY_GROUP_BY = const.SEARCH_CATEGORY_GROUP_BY or { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
 
 -- In-memory database mock for categories
 local database = StubBetterBagsModule("Database")
@@ -32,11 +33,18 @@ database.SaveItemToCategory = function(_, id, name)
   dbCategories[name] = dbCategories[name] or {name = name, itemList = {}}
   dbCategories[name].itemList[id] = true
 end
+-- As the real database: a saved category is kept as given; a plugin's keeps only its saved state (its
+-- bags, flags, and the color and priority a player set), a copy.
 database.CreateOrUpdateCategory = function(_, category)
   if category.save then
     dbCategories[category.name] = category
   else
-    dbEphemeralCategories[category.name] = category
+    local saved = dbEphemeralCategories[category.name]
+    dbEphemeralCategories[category.name] = {
+      name = category.name, enabled = category.enabled, dynamic = category.dynamic,
+      isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
+      color = saved and saved.color, priority = saved and saved.priority,
+    }
   end
 end
 database.DeleteItemCategory = function(_, name)
@@ -71,9 +79,10 @@ database.DeleteItemFromCategory = function(_, id, name)
     dbCategories[name].itemList[id] = nil
   end
 end
-database.GetCategoryOptions = function(_, name)
-  dbCategoryOptions[name] = dbCategoryOptions[name] or {shown = true}
-  return dbCategoryOptions[name]
+-- The saved state of a plugin's category: the bags, color and priority a player set for it.
+database.UpdateEphemeralItemCategory = function(_, name, fields)
+  dbEphemeralCategories[name] = dbEphemeralCategories[name] or { name = name, itemList = {} }
+  for k, v in pairs(fields) do dbEphemeralCategories[name][k] = v end
 end
 database.RenameCategory = function(_, oldName, newName)
   if dbCategories[oldName] then
@@ -129,17 +138,15 @@ describe("Categories", function()
         DisableCategory = function() categories:DisableCategory(0, "Gems") end,
         SetCategoryState = function() categories:SetCategoryState(0, "Gems", true) end,
         RegisterCategoryFunction = function() categories:RegisterCategoryFunction("spec", function() return nil end) end,
-        HideCategory = function() categories:HideCategory(ctx, "Mats") end,
-        ShowCategory = function() categories:ShowCategory(ctx, "Mats") end,
-        ToggleCategoryShown = function() categories:ToggleCategoryShown(ctx, "Mats") end,
+        UpdateCategory = function() categories:UpdateCategory(ctx, "Mats", { priority = 4 }) end,
         RenameCategory = function() categories:RenameCategory(ctx, "Mats", "Metals") end,
         DeleteCategory = function() categories:DeleteCategory(ctx, "Metals") end,
         ReprocessAllItems = function() categories:ReprocessAllItems(ctx) end,
       }
       for _, name in ipairs({ "CreateCategory", "AddItemToCategory", "AddPermanentItemToCategory",
         "RemoveItemFromCategory", "WipeCategory", "ToggleCategory", "EnableCategory", "DisableCategory",
-        "SetCategoryState", "RegisterCategoryFunction", "HideCategory", "ShowCategory", "ToggleCategoryShown",
-        "RenameCategory", "DeleteCategory", "ReprocessAllItems" }) do
+        "SetCategoryState", "RegisterCategoryFunction", "UpdateCategory", "RenameCategory", "DeleteCategory",
+        "ReprocessAllItems" }) do
         assert.is_true(bumps(changes[name]), name)
       end
     end)
@@ -178,15 +185,25 @@ describe("Categories", function()
       assert.is_true(categories:DoesCategoryExist("Dynamic"))
     end)
 
-    it("sets default enabled state for both bag kinds", function()
+    -- Every bag the same way, the guild bank included (category-lifecycle.md §6).
+    it("uses a new category in every bag", function()
       local ctx = context:New("Test")
       categories:CreateCategory(ctx, {
         name = "Test",
         itemList = {},
         save = true,
       })
-      assert.is_true(dbCategories["Test"].enabled[const.BAG_KIND.BACKPACK])
-      assert.is_true(dbCategories["Test"].enabled[const.BAG_KIND.BANK])
+      assert.are.same({ [0] = true, [1] = true, [2] = true }, dbCategories["Test"].enabled)
+    end)
+
+    -- Plugins create their categories again at every load; that must not undo the bags a player chose.
+    it("keeps the bags a category is used in when it is made again without saying", function()
+      local ctx = context:New("Test")
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, enabled = { [0] = true, [1] = false, [2] = true } }
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      assert.is_false(dbCategories["Mats"].enabled[const.BAG_KIND.BANK])
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true, enabled = { [0] = true, [1] = true, [2] = true } })
+      assert.is_true(dbCategories["Mats"].enabled[const.BAG_KIND.BANK], "unless it says")
     end)
 
     it("handles legacy call without context (backwards compat)", function()
@@ -362,32 +379,134 @@ describe("Categories", function()
 
   -- ─── Category visibility ───────────────────────────────────────────────────
 
-  describe("Category visibility", function()
-
-    it("IsCategoryShown returns true by default", function()
-      assert.is_true(categories:IsCategoryShown("AnyCategory"))
-    end)
-
-    it("HideCategory sets shown to false", function()
+  -- Hiding a section was retired (category-lifecycle.md §6): every section shows. Plugins may still
+  -- call the old functions; they do nothing.
+  describe("Category visibility (retired)", function()
+    it("shows every section, whatever hides it", function()
       local ctx = context:New("Test")
       categories:HideCategory(ctx, "Hidden")
-      assert.is_false(categories:IsCategoryShown("Hidden"))
+      categories:ToggleCategoryShown(ctx, "Hidden")
+      categories:ToggleCategoryShown(ctx, "Hidden")
+      assert.is_true(categories:IsCategoryShown("Hidden"))
+      categories:ShowCategory(ctx, "Hidden")
+      assert.is_true(categories:IsCategoryShown("Hidden"))
+    end)
+  end)
+
+  -- ─── One kind of category ──────────────────────────────────────────────────
+
+  describe("rules and group by", function()
+    it("reads a category's rule: its search, none when empty", function()
+      assert.are.equal("type = armor", categories:RuleOf({ searchCategory = { query = "  type = armor " } }))
+      assert.is_nil(categories:RuleOf({ searchCategory = { query = "  " } }))
+      assert.is_nil(categories:RuleOf({}))
+      assert.is_nil(categories:RuleOf(nil))
     end)
 
-    it("ShowCategory sets shown to true", function()
+    -- Group by is the category's own (its hand-placed items are grouped too); plugins may still pass it
+    -- in the rule, where it was.
+    it("makes a rule's group by the category's own when a category is made", function()
       local ctx = context:New("Test")
-      categories:HideCategory(ctx, "Toggle")
-      categories:ShowCategory(ctx, "Toggle")
-      assert.is_true(categories:IsCategoryShown("Toggle"))
+      categories:CreateCategory(ctx, { name = "Gear", itemList = {}, save = true, searchCategory = { query = "x", groupBy = 1 } })
+      assert.are.equal(1, dbCategories["Gear"].groupBy)
+      categories:CreateCategory(ctx, { name = "Own", itemList = {}, save = true, groupBy = 2,
+        searchCategory = { query = "x", groupBy = 1 } })
+      assert.are.equal(2, dbCategories["Own"].groupBy, "its own wins")
     end)
 
-    it("ToggleCategoryShown flips visibility", function()
+    it("names the category it found for an item, for the bags to group its items", function()
       local ctx = context:New("Test")
-      assert.is_true(categories:IsCategoryShown("Flip"))
-      categories:ToggleCategoryShown(ctx, "Flip")
-      assert.is_false(categories:IsCategoryShown("Flip"))
-      categories:ToggleCategoryShown(ctx, "Flip")
-      assert.is_true(categories:IsCategoryShown("Flip"))
+      dbCategories["Mats"] = { name = "Mats", itemList = { [9] = true }, save = true, priority = 4, groupBy = 1,
+        enabled = { [0] = true } }
+      local name, priority, filter = categories:GetCustomCategory(ctx, const.BAG_KIND.BACKPACK, { itemInfo = { itemID = 9 } })
+      assert.are.equal("Mats", name)
+      assert.are.equal(4, priority)
+      assert.are.equal(dbCategories["Mats"], filter)
+    end)
+
+    it("lists as search categories only those with a rule", function()
+      dbCategories["Empty"] = { name = "Empty", itemList = {}, searchCategory = { query = "" } }
+      dbCategories["Rule"] = { name = "Rule", itemList = {}, searchCategory = { query = "a" } }
+      local found = categories:GetAllSearchCategories()
+      assert.is_nil(found.Empty)
+      assert.is_not_nil(found.Rule)
+    end)
+  end)
+
+  describe("UpdateCategory", function()
+    local sent, savedSend
+
+    before_each(function()
+      sent = {}
+      savedSend = events.SendMessage
+      events.SendMessage = function(_, _, message, ...) table.insert(sent, { message, ... }) end
+    end)
+
+    after_each(function()
+      events.SendMessage = savedSend
+    end)
+
+    it("changes what it is given, keeps the items, and recalculates the bags", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = { [5] = true }, save = true, priority = 10,
+        enabled = { [0] = true, [1] = true, [2] = true }, color = { 1, 0, 0 } }
+      local before = categories:GetGeneration()
+      assert.is_true(categories:UpdateCategory(context:New("Test"), "Mats", {
+        priority = 3, enabled = { [1] = false }, rule = " type = trade goods ", groupBy = 1, color = false,
+      }))
+      local f = dbCategories["Mats"]
+      assert.are.equal(3, f.priority)
+      assert.are.same({ [0] = true, [1] = false, [2] = true }, f.enabled)
+      assert.are.same({ query = "type = trade goods" }, f.searchCategory)
+      assert.are.equal(1, f.groupBy)
+      assert.is_nil(f.color)
+      assert.are.same({ [5] = true }, f.itemList)
+      assert.is_true(categories:GetGeneration() > before)
+      assert.are.same({ "categories/Changed" }, sent[1])
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[2])
+    end)
+
+    it("drops a rule set to nothing", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, searchCategory = { query = "x" } }
+      categories:UpdateCategory(context:New("Test"), "Mats", { rule = "  " })
+      assert.is_nil(dbCategories["Mats"].searchCategory)
+    end)
+
+    it("keeps the bags, color and priority set for a plugin's category across its next creation", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1, color = { 0, 1, 0 } })
+      categories:UpdateCategory(ctx, "Openable", { enabled = { [0] = false }, priority = 7, color = { 0, 0, 1 },
+        rule = "ignored", groupBy = 2 })
+      local live = categories:GetCategoryByName("Openable")
+      assert.are.equal(7, live.priority)
+      assert.is_false(live.enabled[const.BAG_KIND.BACKPACK])
+      assert.is_nil(live.searchCategory, "a plugin's category keeps its own rule")
+      -- The next session: the plugin makes it again with its own values.
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1, color = { 0, 1, 0 } })
+      live = categories:GetCategoryByName("Openable")
+      assert.are.equal(7, live.priority)
+      assert.are.same({ 0, 0, 1 }, live.color)
+      assert.is_false(live.enabled[const.BAG_KIND.BACKPACK])
+    end)
+
+    it("says when there is no such category", function()
+      assert.is_false(categories:UpdateCategory(context:New("Test"), "Nope", { priority = 1 }))
+      assert.are.same({}, sent)
+    end)
+  end)
+
+  describe("AddPermanentItemToCategory", function()
+    it("files the item in the saved category, which still reports its bags", function()
+      local ctx = context:New("Test")
+      _G.C_Item = _G.C_Item or {}
+      local savedInstant = C_Item.GetItemInfoInstant
+      C_Item.GetItemInfoInstant = function() return 5 end
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, enabled = { [0] = true, [1] = false, [2] = true } }
+      categories:AddPermanentItemToCategory(ctx, 5, "Mats")
+      C_Item.GetItemInfoInstant = savedInstant
+      assert.is_true(dbCategories["Mats"].itemList[5])
+      assert.is_true(categories:IsCategoryEnabled(const.BAG_KIND.BACKPACK, "Mats"))
+      assert.is_false(categories:IsCategoryEnabled(const.BAG_KIND.BANK, "Mats"))
     end)
   end)
 
@@ -636,12 +755,12 @@ describe("Categories", function()
       assertRecalculated()
     end)
 
-    it("recalculates after a category is hidden, shown or toggled", function()
+    it("asks for nothing when a plugin hides, shows or toggles a section (retired)", function()
       local ctx = context:New("Test")
       categories:HideCategory(ctx, "Shy")
       categories:ShowCategory(ctx, "Shy")
       categories:ToggleCategoryShown(ctx, "Shy")
-      assertRecalculated()
+      assert.are.same({}, sent)
     end)
 
     it("recalculates when every item is reprocessed", function()

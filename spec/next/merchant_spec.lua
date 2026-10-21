@@ -243,18 +243,21 @@ describe("NextMerchant", function()
       assert.are.equal("Early", merchant:ReadItems(ctx())[1].category)
     end)
 
-    it("gives a tie between a custom and a search category to the search category, as the bags do", function()
+    -- category-lifecycle.md §6: at equal priority an item placed in a category by hand stays there.
+    it("gives a tie between an item placed by hand and a rule to where it was placed, as the bags do", function()
       _G._merchant.items = { vendorItem(13) }
       customByID[13] = { "Blades", 3 }
       searchCategories = { { name = "Shiny", priority = 3, enabled = { [BACKPACK] = true },
         searchCategory = { query = "rarity >= 3" } } }
-      assert.are.equal("Shiny", merchant:ReadItems(ctx())[1].category)
+      assert.are.equal("Blades", merchant:ReadItems(ctx())[1].category)
+      searchCategories[1].priority = 2
+      assert.are.equal("Shiny", merchant:ReadItems(ctx())[1].category, "a rule with a lower number wins")
     end)
 
     it("names a grouped search category after the item, creating nothing", function()
       _G._merchant.items = { vendorItem(11), vendorItem(13) }
-      searchCategories = { { name = "Gear", priority = 10, enabled = { [BACKPACK] = true },
-        searchCategory = { query = "rarity >= 3", groupBy = GROUP_BY_TYPE } } }
+      searchCategories = { { name = "Gear", priority = 10, enabled = { [BACKPACK] = true }, groupBy = GROUP_BY_TYPE,
+        searchCategory = { query = "rarity >= 3" } } }
       local list = merchant:ReadItems(ctx())
       assert.are.same({ "Gear - Armor", "Gear - Weapon" }, { list[1].category, list[2].category })
     end)

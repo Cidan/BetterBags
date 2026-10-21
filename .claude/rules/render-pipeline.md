@@ -185,7 +185,8 @@ bags, densest, measures kept and forgotten, centering). Every guard was mutation
 what changed place moves: a section alone, an item alone, or any mix. The motion eases slow, fast,
 slow. It is an option, off by default (asked).
 
-- **The setting.** "Animate Item Movement" (`config/config.lua`, right below Enable Bag Fading),
+- **The setting.** "Animate Item Movement" (`config/catalog.lua`; the settings window's General page,
+  right below Enable Bag Fading, for the classic bags only, next-settings.md §7),
   one profile flag for both bags: `animateItemMovement`, `false` in `const.DATABASE_DEFAULTS`,
   `DB:GetAnimateItemMovement()` / `SetAnimateItemMovement`. The canvas reads it on every render, so
   changing it needs no refresh: off, the next render forgets the canvas (moves end at their
@@ -259,7 +260,7 @@ only while shown and turned on, forgotten on hide, the pass closed, containers b
 moves), `spec/debug/render_recorder_spec.lua` ("says which sections, items and containers are
 moving"), `spec/core/constants_spec.lua` ("leaves animating item movement off by default"),
 `spec/database_spec.lua` ("GetAnimateItemMovement / SetAnimateItemMovement"),
-`spec/config/config_redraw_spec.lua` ("turns Animate Item Movement on and off"). Every guard was
+`spec/config/settings_effects_spec.lua` ("turns Animate Item Movement on and off"). Every guard was
 mutation-tested (30 mutations; each that first survived led to a test or
 to removing dead code).
 
