@@ -214,3 +214,52 @@ survived led to two tests and to removing dead code).
 left it again when showing the first page (seen as the theme pickers restoring a theme of a window
 long gone; `spec/next/settings/window_spec.lua`, "forgets the page of a window from an earlier
 session").
+
+## 5. The category manager (`next/settings/categories.lua`, `NextSettingsCategories`)
+
+The last section of each bag page's Categories tab ("Your Categories"), a wide row made for its bag
+(`Create(parent, window, bag)`), `Settings.Categories` tall. It keeps everything the classic pane does
+(config/categorypane.lua, category-lifecycle.md), through the same `Categories` and `Database` calls,
+every question a `NextDialog` over the window.
+
+- **The list** (left, `ListWidth`): "Pinned", the pinned categories in their order
+  (`customSectionSort[kind]`), then "Other Categories": every other one by name, the categories defined
+  (`Categories:GetAllCategories`) and the bag's sections read from its **committed items**
+  (`Items.slotInfo[kind].itemsBySlotKey`, `itemInfo.category`; not empty slots, Recent Items or Free
+  Space, and none in Show Bags, whose sections are the bags). The classic pane read the classic view's
+  sections, which BetterBags Next does not have. Each shows its priority ("P:n"). The list is read again
+  when the bag's items are (`items/Refresh<Kind>/Done`) while it shows, and every time the page shows.
+- **Pinning:** Shift-click pins a category at the top of Pinned, or unpins a pinned one (the classic
+  pane only pinned). Dragging a row (the left button, a marker where it would land) drops it after the
+  entry above the pointer's half of a row: above the "Other Categories" heading it is pinned at that
+  place, below it unpinned. The order is saved from 1, as the classic pane saved it
+  (`ClearCustomSectionSort`, `SetCustomSectionSort`), and the bags recalculated
+  (`bags/Rederive { resetLayout, buttons }`).
+- **New Category** asks for a name (asked again while empty or taken) and makes an item list category
+  (`CreateCategory { name, itemList = {}, save = true }`). **New Search Category** (new) asks for a name
+  and shows the category as a draft: it is made when saved with a query (an empty query is refused,
+  as the search category editor refuses one).
+- **A search category:** its query (a text area), the group by clause kept in step both ways (typing
+  `group by type` picks Type; picking one rewrites the clause; a stored group by not in the query is
+  added to it), Priority (0-99, 10 when it cannot be read), Group By, Color (and Reset Color, Warcraft
+  gold), Show Section (`ToggleCategoryShown`, at once), its items, Save (`CreateCategory` with the query
+  without its clause, the group by, the items kept, the color none for gold), Rename, Delete.
+- **An item list category:** Color, Priority, Show Section, its items, Save (keeping how it is saved:
+  `save = filter.save`), Rename, Delete.
+- **Items:** item rows (`ItemRowFrame`, released when the list changes) of
+  `Categories:GetMergedCategory`'s items. An item dropped on them (`OnReceiveDrag`, or a left click
+  holding one) is added (`AddPermanentItemToCategory`, `ClearCursor`); anything not an item is ignored.
+  A right click on a row offers Remove (`DeleteItemFromCategory`).
+- **A built-in or leftover category** (no filter): what it is, and Remove Category (the escape hatch,
+  category-lifecycle.md §4; `DeleteCategory`).
+- **Rules kept:** a dynamic category cannot be renamed ("Cannot Rename"), a group by sub-category
+  cannot be deleted ("Cannot Delete"); a rename to a taken name is asked again, and one
+  `RenameCategory` refuses says so; renaming keeps the category chosen, deleting chooses none.
+
+Coverage: `spec/next/settings/categories_spec.lua` (the list and its sources, Show Bags, layout,
+choosing, Shift-click both ways, drops and a pinned row moved down, dragging with the mouse, reading
+the list again, new categories of both kinds, a search category's fields, the clause both ways, Save
+and its color and priority, Show Section, Rename both failures, Delete; an item list category's fields,
+Save, items dropped and removed, non-items; the rules; nothing chosen) and
+`spec/next/settings/content_spec.lua` (the manager on the Categories tab, bound to its bag).
+Mutation-tested (40 mutations; the three that first survived led to three tests).

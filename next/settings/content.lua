@@ -39,6 +39,9 @@ local settings = addon:GetModule('NextSettings')
 ---@class NextSettingsThemes: AceModule
 local themes = addon:GetModule('NextSettingsThemes')
 
+---@class NextSettingsCategories: AceModule
+local categoryManager = addon:GetModule('NextSettingsCategories')
+
 -- NextSettingsContent is what BetterBags Next's settings window shows (next-settings.md §4): its pages,
 -- defined in Init in the order of the sidebar (General, Appearance, Item Colors; a page per bag;
 -- Profiles; QuickFind), and a page per plugin (AddPlugin, from Config:AddPluginConfig). Settings of the
@@ -303,6 +306,11 @@ local function bagPage(id, bag, shown)
           { setting = 'filterRecentItems' }, { setting = 'filterTradeSkill' }, { setting = 'filterType' },
           { setting = 'filterSubtype' },
         } },
+        { title = L:G("Your Categories"), note = L:G("(drag to reorder, Shift-click to pin)"), rows = { {
+          title = L:G("Your Categories"),
+          keywords = { "category", "categories", "pinned", "pin", "search category", "custom", "priority", "color" },
+          block = function(parent, window) return categoryManager:Create(parent, window, bag) end,
+        } } },
       } },
     },
   })

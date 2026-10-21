@@ -251,6 +251,6 @@ and committed. Status is tracked below.
 | 2. Controls | done (`.claude/rules/next-settings.md` §2) |
 | 3. The window | done (`.claude/rules/next-settings.md` §3) |
 | 4. Pages | done (`.claude/rules/next-settings.md` §4) |
-| 5. The category manager | not started |
+| 5. The category manager | done (`.claude/rules/next-settings.md` §5) |
 | 6. Themes | not started |
 | 7. In game | not started |

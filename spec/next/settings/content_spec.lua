@@ -7,6 +7,8 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
+const.BAG_VIEW = const.BAG_VIEW or { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
+const.SEARCH_CATEGORY_GROUP_BY = const.SEARCH_CATEGORY_GROUP_BY or { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
 const.SECTION_SORT_TYPE = const.SECTION_SORT_TYPE or { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
 const.ITEM_SORT_TYPE = const.ITEM_SORT_TYPE
   or { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
@@ -24,6 +26,8 @@ db.GetNextTheme = db.GetNextTheme or function() return "Default" end
 StubBetterBagsModule("Bucket")
 StubBetterBagsModule("BagSystem")
 StubBetterBagsModule("Items")
+StubBetterBagsModule("Categories")
+StubBetterBagsModule("ItemRowFrame")
 local sonata = StubBetterBagsModule("Sonata")
 local debugModule = StubBetterBagsModule("Debug")
 debugModule.Log = debugModule.Log or function() end
@@ -36,7 +40,8 @@ for _, m in ipairs({ { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle",
   { "NextTopTabs", "next/controls/toptabs.lua" }, { "NextDialog", "next/controls/dialog.lua" },
   { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
   { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" },
-  { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextSettingsContent", "next/settings/content.lua" } }) do
+  { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" },
+  { "NextSettingsContent", "next/settings/content.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -184,7 +189,23 @@ describe("NextSettingsContent", function()
           "dontMergePartial", "dontMergeTransmog", "unmergeAtShop" } },
         { "Categories", "Automatic", { "filterEquipmentLocation", "filterExpansion", "filterGearSet",
           "filterRecentItems", "filterTradeSkill", "filterType", "filterSubtype" } },
+        { "Categories", "Your Categories", { "Your Categories" } },
       }, idsOf(page))
+    end)
+
+    it("manages the bag's own categories on its Categories tab, bound to it", function()
+      local made
+      local manager = addon:GetModule("NextSettingsCategories")
+      override(manager, "Create", function(_, parent, windowFrame, bag)
+        made = { parent = parent, owner = windowFrame, bag = bag }
+        return addon:GetModule("NextSettingsRows"):CreateText(parent, "manager")
+      end)
+      for _, name in ipairs({ "GetCategoryFilters" }) do
+        override(db, name, function() return {} end)
+      end
+      settings:Open("bank", "categories")
+      assert.are.equal(settings.frame, made.owner)
+      assert.are.equal(const.BAG_KIND.BANK, made.bag.kind)
     end)
 
     it("names only settings the catalog has, for the page's bag, and none of the classic bags' alone", function()

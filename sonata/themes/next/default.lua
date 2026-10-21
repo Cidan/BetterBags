@@ -601,6 +601,23 @@ sonataNext:RegisterTheme({
     },
     -- The footer: Height tall, Pad in, the line along its top.
     Footer = { Height = 56, Pad = 24, Line = { Color = "Lavender", Alpha = 0.12, Size = 1 } },
+    -- The category manager on a bag's Categories tab: Height tall, its list ListWidth wide and Gap from
+    -- its details, over its Fill; list rows RowHeight tall (headings GroupHeight), Indent in; the chosen
+    -- one's bar and fill, the light under the pointer, the marker where a dragged row would land; the
+    -- details' fields FieldGap apart, their names LabelWidth wide, the query QueryHeight tall, item rows
+    -- ItemHeight tall; the fonts.
+    Categories = {
+      Height = 460, ListWidth = 230, Gap = 16, Pad = 10, RowHeight = 26, GroupHeight = 24, Indent = 10,
+      Fill = { Color = "Lavender", Alpha = 0.035 },
+      Indicator = { Color = "Gold", Width = 3 },
+      SelectedFill = { Color = "Lavender", Alpha = 0.1 },
+      HoverFill = { Color = "Lavender", Alpha = 0.05 },
+      DropMarker = { Color = "Gold", Alpha = 0.9, Size = 2 },
+      FieldGap = 10, LabelWidth = 110, QueryHeight = 80, ItemHeight = 26,
+      GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
+      TitleFont = "DialogTitle", LabelFont = "SettingsText", TextFont = "SettingsText",
+      WarningFont = "ButtonDanger", HintFont = "SettingsSectionNote",
+    },
     -- Cards of a page's own (the themes): Height tall, at least MinWidth wide, Gap apart, Pad inside;
     -- their fill (under the pointer), edge (the one chosen), fonts, and each status's font.
     Cards = {
