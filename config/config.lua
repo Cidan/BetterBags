@@ -56,6 +56,13 @@ function config:RegisterSettings()
     self:Open()
   end)
 
+  -- The search box's Enter to Make Category: the Categories page asks for the new category's name, its
+  -- rule the search (next-settings.md §5).
+  events:RegisterMessage('config/NewCategoryFromSearch', function(_, query)
+    addon:GetModule('NextSettingsCategories'):NewFromSearch(query)
+    addon:GetModule('NextSettings'):Open("categories")
+  end)
+
   -- The bags switched design (next.md §11), from the settings or elsewhere: the window, if open, shows
   -- the new design's settings and stays open (next-settings.md §7).
   events:RegisterMessage('bags/DesignChanged', function(ctx)

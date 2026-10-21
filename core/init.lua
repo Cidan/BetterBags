@@ -70,9 +70,6 @@ local itemLoader = addon:GetModule('ItemLoader')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
----@class SearchCategoryConfig: AceModule
-local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
-
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
@@ -406,7 +403,6 @@ function addon:OnEnable()
   addon:GetModule('GuildBank'):Enable()
   refresh:Enable()
   views:Enable()
-  searchCategoryConfig:Enable()
   async:Enable()
   form:Enable()
   addon:GetModule('ChangelogWindow'):Enable()

@@ -259,7 +259,7 @@ describe("NextSettingsContent", function()
       assert.are.same({
         { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton", "bagFading [classic]",
           "animateItemMovement [classic]" } },
-        { "General", "Search", { "inBagSearch", "enterToMakeCategory" } },
+        { "General", "Search", { "inBagSearch", "enterToMakeCategory [classic]" } },
         { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell" } },
         { "General", "What's New", { "changelogOnLogin" } },
       }, idsOf(pages:Get("general")))

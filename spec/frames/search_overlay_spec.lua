@@ -20,7 +20,6 @@ local const = stubModule("Constants")
 const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 local database = stubModule("Database")
 local search = stubModule("Search")
-stubModule("SearchCategoryConfig")
 local fonts = stubModule("Fonts")
 fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsSearchOverlaySpecYellow")
 

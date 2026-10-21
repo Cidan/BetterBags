@@ -46,7 +46,7 @@ describe("Core Init and Enable flow", function()
       "Localization", "Database", "BagFrame", "Constants", "Items", "ItemFrame",
       "Events", "Masque", "SectionFrame", "Categories", "ContextMenu", "Config",
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
-      "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
+      "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
       "GuildBank", "NextGuildBank"

@@ -124,7 +124,6 @@ forms\layouts\twocolumn.lua
 
 forms\form.lua
 
-frames\searchcategory.lua
 frames\question.lua
 frames\groupdialog.lua
 frames\changelog.lua

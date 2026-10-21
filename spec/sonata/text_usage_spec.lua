@@ -6,7 +6,6 @@ local FILES = {
   "forms/layouts/stacked.lua",
   "frames/question.lua",
   "frames/groupdialog.lua",
-  "frames/searchcategory.lua",
   "frames/debug.lua",
   "frames/perfpane.lua",
   "frames/simulatepane.lua",

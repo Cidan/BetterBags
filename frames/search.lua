@@ -21,9 +21,6 @@ local context = addon:GetModule('Context')
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
----@class SearchCategoryConfig: AceModule
-local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -279,16 +276,10 @@ function searchBox:Create(_ctx, parent)
     sf:UpdateSearch(ectx)
   end)
 
-  textBox:SetScript("OnEnterPressed", function()
+  -- Enter to Make Category: the Categories page makes a category from the search (Config).
+  addon.SetScript(textBox, "OnEnterPressed", function(ctx)
     if database:GetEnterToMakeCategory() then
-      searchCategoryConfig:Open({
-        name = "",
-        itemList = {},
-        priority = 10,
-        searchCategory = {
-          query = searchBox:GetText(),
-        }
-      })
+      events:SendMessage(ctx, 'config/NewCategoryFromSearch', searchBox:GetText())
     end
   end)
 
@@ -331,16 +322,9 @@ function searchBox:CreateBox(kind, parent)
     sf:UpdateSearch(ctx)
   end)
 
-  textBox:SetScript("OnEnterPressed", function()
+  addon.SetScript(textBox, "OnEnterPressed", function(ctx)
     if database:GetEnterToMakeCategory() then
-      searchCategoryConfig:Open({
-        name = "",
-        itemList = {},
-        priority = 10,
-        searchCategory = {
-          query = textBox:GetText(),
-        }
-      })
+      events:SendMessage(ctx, 'config/NewCategoryFromSearch', textBox:GetText())
     end
   end)
 
