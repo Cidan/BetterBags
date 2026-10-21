@@ -742,7 +742,8 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   tooltip text from `TooltipScanner:GetMerchantItemText`), and `items:GetCategory` names it: custom
   item lists, type, subtype, equipment slot, expansion, as in the backpack. The backpack's search
   categories are evaluated over the vendor's own index, the lowest priority number winning, a custom
-  category beating a search one only with a lower number (a tie goes to search), a grouped one
+  category beating a search one with a lower or equal number (at a tie an item placed by hand stays,
+  category-lifecycle.md §6), a grouped one
   named after the item (`GetGroupBySuffix`); none is created. `ReadItems` says when an item's data
   was not loaded yet.
 - **Its own search index:** an instance of the search module (`setmetatable({}, {__index = search})`,

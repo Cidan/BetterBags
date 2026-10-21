@@ -27,7 +27,8 @@ the guild bank and BetterBags reads none of it.
   `showGuildBankTabs` (false) keeps whether a tab shows by itself (§4). The settings window has a
   **Guild Bank** page after the Bank's on clients with a guild bank while BetterBags Next is in use
   (the classic bags have no guild bank; next-settings.md §4, §7), every setting the guild kind's
-  (`SettingsCatalog:Bags()`).
+  (`SettingsCatalog:Bags()`). The player's categories are used in the guild bank as in any bag
+  (category-lifecycle.md §6; before, no category was ever enabled for it).
 
 ## 2. The guild bank as a data source (`GuildBank`)
 

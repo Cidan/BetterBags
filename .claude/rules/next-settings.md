@@ -234,55 +234,69 @@ left it again when showing the first page (seen as the theme pickers restoring a
 long gone; `spec/next/settings/window_spec.lua`, "forgets the page of a window from an earlier
 session").
 
-## 5. The category manager (`next/settings/categories.lua`, `NextSettingsCategories`)
+## 5. Categories: the Categories page and each bag's arrangement
 
-The last section of each bag page's Categories tab ("Your Categories"), a wide row made for its bag
-(`Create(parent, window, bag)`), `Settings.Categories` tall. It keeps everything the classic window's
-category pane did (category-lifecycle.md; that pane was removed with the window, §7), through the same
-`Categories` and `Database` calls,
-every question a `NextDialog` over the window.
+Asked (2026-10-20): categories get a dedicated space, as currency did; defined once, applied to bags;
+item and search categories combined, each able to hold both. The data model is
+category-lifecycle.md §6. Every question is a `NextDialog` over the window.
 
-- **The list** (left, `ListWidth`): "Pinned", the pinned categories in their order
-  (`customSectionSort[kind]`), then "Other Categories": every other one by name, the categories defined
-  (`Categories:GetAllCategories`) and the bag's sections read from its **committed items**
-  (`Items.slotInfo[kind].itemsBySlotKey`, `itemInfo.category`; not empty slots, Recent Items or Free
-  Space, and none in Show Bags, whose sections are the bags). The classic pane read the classic view's
-  sections, which BetterBags Next does not have. Each shows its priority ("P:n"). The list is read again
-  when the bag's items are (`items/Refresh<Kind>/Done`) while it shows, and every time the page shows.
-- **Pinning:** Shift-click pins a category at the top of Pinned, or unpins a pinned one (the classic
-  pane only pinned). Dragging a row (the left button, a marker where it would land) drops it after the
-  entry above the pointer's half of a row: above the "Other Categories" heading it is pinned at that
-  place, below it unpinned. The order is saved from 1, as the classic pane saved it
-  (`ClearCustomSectionSort`, `SetCustomSectionSort`), and the bags recalculated
-  (`bags/Rederive { resetLayout, buttons }`).
-- **New Category** asks for a name (asked again while empty or taken) and makes an item list category
-  (`CreateCategory { name, itemList = {}, save = true }`). **New Search Category** (new) asks for a name
-  and shows the category as a draft: it is made when saved with a query (an empty query is refused,
-  as the search category editor refuses one).
-- **A search category:** its query (a text area), the group by clause kept in step both ways (typing
-  `group by type` picks Type; picking one rewrites the clause; a stored group by not in the query is
-  added to it), Priority (0-99, 10 when it cannot be read), Group By, Color (and Reset Color, Warcraft
-  gold), Show Section (`ToggleCategoryShown`, at once), its items, Save (`CreateCategory` with the query
-  without its clause, the group by, the items kept, the color none for gold), Rename, Delete.
-- **An item list category:** Color, Priority, Show Section, its items, Save (keeping how it is saved:
-  `save = filter.save`), Rename, Delete.
-- **Items:** item rows (`ItemRowFrame`, released when the list changes) of
-  `Categories:GetMergedCategory`'s items. An item dropped on them (`OnReceiveDrag`, or a left click
-  holding one) is added (`AddPermanentItemToCategory`, `ClearCursor`); anything not an item is ignored.
-  A right click on a row offers Remove (`DeleteItemFromCategory`).
-- **A built-in or leftover category** (no filter): what it is, and Remove Category (the escape hatch,
-  category-lifecycle.md §4; `DeleteCategory`).
-- **Rules kept:** a dynamic category cannot be renamed ("Cannot Rename"), a group by sub-category
-  cannot be deleted ("Cannot Delete"); a rename to a taken name is asked again, and one
-  `RenameCategory` refuses says so; renaming keeps the category chosen, deleting chooses none.
+**The Categories page** (`next/settings/categories.lua`, `NextSettingsCategories`; page `categories`,
+BetterBags group after Item Colors, both designs, its one section's title hidden: the page's title
+says it). A wide row, `Settings.Categories` tall, `Create(parent, window, bags)` where `bags()` lists
+the bags whose pages the settings show (backpack and bank; the guild bank with BetterBags Next on a
+client with one).
+- **The list** (left, `ListWidth`): a filter box (by name, any case); "Your Categories" (saved), then
+  "From Plugins" (not saved), each by name, a group by's sub-categories left out (they are not
+  definitions). Each row: a color dot, the name, and a line of what is in it ("Rule", "2 items",
+  "Rule and 1 item", "Nothing in it yet") and its priority. New Category under it asks for a name
+  (again while empty or taken) and makes `{ name, itemList = {}, save = true }`, chosen. The list is
+  read again on `categories/Changed` while it shows.
+- **The chosen category** (the first when none, or the one asked for): name with Rename and Delete;
+  "Used In", a switch per bag from `bags()` (`UpdateCategory { enabled = { [kind] = on } }`, at once);
+  Priority (two digits; saved on Enter or when the field is left, NextInput `commitOnBlur`; nothing
+  entered shows it again); Group By (at once); Color (the picker, at once; Reset Color is none, drawn
+  in Warcraft gold); the Rule (a text area: as it is typed it says how many items in the bags it
+  matches, through `Search:Search` in a protected call, or that the search has a mistake, or that
+  there is no rule; Apply Rule, on only when it changed and has no mistake, saves it, none for an
+  empty one); the items placed here (item rows; drop one to place it, `AddPermanentItemToCategory`;
+  right-click Take Out, `RemoveItemFromCategory`; each recalculates the bags).
+- **What it holds in the bags now**, at the bottom: how many items show in it (its group by's
+  sub-categories too) in each bag, with up to `Icons` icons, and where what else it claims (its rule's
+  matches, its hand-placed items) shows instead ("Shown elsewhere: 1 in Elixirs, ..."), most first. It
+  is shown again when any bag's items are read (`items/Refresh<Kind>/Done`).
+- **A plugin's category**: its bags, priority and color; a note says its rule and items are the
+  plugin's (no rule, items, group by, rename or delete).
+- `NextSettingsCategories:Show(name)` chooses a category the next time the page shows (a bag's tab
+  links here); `NewFromSearch(query)` makes the page ask for a new category's name with the search as
+  its rule (the search box's Enter to Make Category, through `config/NewCategoryFromSearch`, which
+  Config handles by opening the page). Both are used once.
 
-Coverage: `spec/next/settings/categories_spec.lua` (the list and its sources, Show Bags, layout,
-choosing, Shift-click both ways, drops and a pinned row moved down, dragging with the mouse, reading
-the list again, new categories of both kinds, a search category's fields, the clause both ways, Save
-and its color and priority, Show Section, Rename both failures, Delete; an item list category's fields,
-Save, items dropped and removed, non-items; the rules; nothing chosen) and
-`spec/next/settings/content_spec.lua` (the manager on the Categories tab, bound to its bag).
-Mutation-tested (40 mutations; the three that first survived led to three tests).
+**A bag's Categories tab** keeps Automatic (the built-in filters) and, in place of the old manager,
+"In This Bag" (`next/settings/bagcategories.lua`, `NextSettingsBagCategories`, `Create(parent,
+window, bag)`, `Settings.BagCategories` tall): a filter box; "Pinned" in their order
+(`customSectionSort[kind]`), then "Other Categories" by name: the categories defined and the bag's
+sections from its committed items (not empty slots, Recent Items, Free Space, or Show Bags' bags).
+- A defined category has a switch for this bag (`UpdateCategory { enabled = { [kind] = on } }`); its
+  name opens it on the Categories page (`Show`, then `NextSettings:Open("categories")`).
+- A group by's sub-category says whose it is ("Grouped by Potions") and opens that one.
+- A built-in section says "Automatic"; a pinned name that is neither (a leftover) has Remove
+  (category-lifecycle.md §4).
+- Shift-click pins at the top or unpins; dragging a row drops it after the entry above the pointer's
+  half of a row (above the "Other Categories" heading pinned there, below it unpinned). The order is
+  saved from 1 (the pins a filter hides keep their order after the ones it shows) and the bags
+  recalculated (`bags/Rederive { resetLayout, buttons }`). Read again on the bag's
+  `items/Refresh<Kind>/Done` and on `categories/Changed` while it shows.
+
+Coverage: `spec/next/settings/categories_spec.lua` (the list, layout, filter, choosing, New Category,
+reading again; a category's fields, the bags switches per `bags()`, priority, group by, color; the rule
+as typed, a mistake, Apply Rule; items placed and taken out, non-items; what it holds by bag, icons,
+elsewhere, read again; rename and delete; a plugin's category; Show and NewFromSearch),
+`spec/next/settings/bagcategories_spec.lua` (the list and its sources, Show Bags, filter, switches,
+opening on the page, leftovers, pinning, drops, pins a filter hides, dragging, reading again),
+`spec/next/settings/content_spec.lua` (the page for both designs with the bags shown, the tab bound to
+its bag), `spec/next/controls/input_spec.lua` (`commitOnBlur`), `spec/frames/search_spec.lua` and
+`spec/config/config_spec.lua` (Enter to Make Category). Mutation-tested (44 mutations; the survivors
+led to three tests and three dead guards removed).
 
 ## 6. The themes
 
@@ -331,7 +345,8 @@ gone), it shows only what the bags in use read, and nothing the classic window h
   design does not have) or its search again, staying open. Closed, it does nothing; the next open
   builds for the design in use.
 - **What each design reads** (checked with `grep` over `next/`, `frames/`, `views/`, `core/`):
-  - **Classic only:** General → Bags: Enable Bag Fading, Animate Item Movement; a bag's Layout →
+  - **Classic only:** General → Bags: Enable Bag Fading, Animate Item Movement; General → Search:
+    Enable Enter to Make Category (only the classic bags' search box reads it); a bag's Layout →
     Window: Resizable Window, Snap to Content, Items Per Row, Columns, Opacity, Scale, and → Sections:
     Show Full Section Names (asked: rows and columns in the classic bags' Layout, not Next's);
     Appearance: Bag Theme (Sonata) and Settings Window (SonataNext: Next's themes draw this window);

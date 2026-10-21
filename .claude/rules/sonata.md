@@ -320,8 +320,8 @@ ElvUI, GW2 and Simple Dark are backdrops, whose edge the recorder reads (render-
 Each theme is a data file that calls `sonata:RegisterTheme`, listed in every TOC right after
 `window\window.lua`, Base first.
 Window kinds: **Bag** (the backpack and bank), **Panel** (forms: the settings and profiler
-settings windows; the group dialog), **Flat** (the debug window), **Dialog** (question dialogs,
-the search category editor), **Slots** (the Show Bags and bank tab panels), **Search** (the
+settings windows; the group dialog), **Flat** (the debug window), **Dialog** (question dialogs),
+**Slots** (the Show Bags and bank tab panels), **Search** (the
 overlay search panel).
 
 - **Base** (hidden): what every theme inherits. Its `Windows.Bag` carries the bag's insets
@@ -464,7 +464,7 @@ the other windows, the search box). Every file in
 
 ## 3c. Text roles (`Sonata:GetTextFont`, `CreateText`, `SetTextRole`, `SetButtonTextRole`)
 
-BetterBags' own text (the settings window and its panes, dialogs, the search category editor,
+BetterBags' own text (the settings window and its panes, dialogs,
 the overlay search panel, the debug window's tabs, the bag footer's money and currency counts,
 the empty-group hint) is drawn with **text roles**: named fonts in the theme's `Text` table,
 each a font spec (§3). Before roles every such text hard-coded a client font and white, gold or

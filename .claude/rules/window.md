@@ -406,13 +406,8 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   the border Default draws over the content box's right edge (changelog.md); the scroll box
   scrolls a canvas laying the releases out at its width.
   `OnHide` marks the notes seen. Details: changelog.md. Coverage: `spec/frames/changelog_spec.lua`.
-- **The search category editor** (`frames/searchcategory.lua`): a Dialog window named
-  `BetterBagsSearchCategoryConfig`, strata DIALOG, 430 x 450 in the window mode with
-  `Resizable = false`, movable. Its fields sit in the content box (the first label at 15, -15,
-  Save at -15, 15). `Open` anchors it to the left of the frame that asked (or the center of the
-  screen) and shows it with the theme's fade, focusing the name box once shown; opening the
-  same category again, Save and Cancel hide it; `Close(callback)` calls back once hidden. Its
-  edit boxes and buttons are Sonata elements. Coverage: `spec/frames/searchcategory_spec.lua`.
+- **The search category editor** (`frames/searchcategory.lua`) was removed: the search box's Enter
+  to Make Category opens the settings window's Categories page instead (next-settings.md §5).
 - **The debug window** (`frames/debug.lua`, `/bbdb`): a Flat window named
   `BetterBagsDebugWindow`, 800 x 600 in the window mode with `Resizable = false`, movable, no
   fade, in the `DIALOG` strata (above BetterBags Next's `HIGH` panels, next.md §3, which it is

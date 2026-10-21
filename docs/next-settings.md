@@ -256,6 +256,7 @@ and committed. Status is tracked below.
 | 5. The category manager | done (`.claude/rules/next-settings.md` §5) |
 | 6. Themes | done (`.claude/rules/next-settings.md` §6) |
 | One window for both designs | done (`.claude/rules/next-settings.md` §7, §8) |
+| Categories page | done (`.claude/rules/next-settings.md` §5, `category-lifecycle.md` §6) |
 | 7. In game | not started |
 
 ## One window (asked 2026-10-20, after phase 6)
@@ -277,3 +278,17 @@ over its magnifier after a theme change (a screenshot). Done:
   alone; Show What's New on Login for both;
 - the classic window and its panes removed; a plugin's page is its only page, so it now reads hidden,
   disabled and names after every change, as AceConfigDialog does (§4).
+
+## Categories (asked 2026-10-20, after "One window")
+
+> you know how the currency settings is it's own section? i want to do the same for categories overall.
+> we should have global categories (so category definition is only once), but then we apply those
+> categories to banks or bags. [...] we combine item and search categories, we don't need to split them
+> anymore, meaning both types of categories can have one another in them, and that should be the default.
+
+Decided with the player: at equal priority an item placed by hand stays where it was placed; the guild
+bank is treated exactly like the other bags; hiding sections is retired silently (tabs do it better).
+Done: the unified data model and its normalization at every load and import (category-lifecycle.md
+§6), resolution (the tie, group by for hand-placed items), the Categories page, each bag's arrangement
+on its Categories tab, and the search box's Enter to Make Category opening the page (next-settings.md
+§5). The old search category dialog was removed.
