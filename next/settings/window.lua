@@ -238,6 +238,8 @@ function settings:ended()
     return
   end
   self.shown = false
+  -- Escape's first press goes back only while the window shows: a hidden key frame still shown would
+  -- take Escape from the game (CloseSpecialWindows reads IsShown).
   self:releaseBackKey()
   if self.page ~= nil then
     self.page:Leave(context:New('NextSettings_Hidden'))
@@ -257,9 +259,6 @@ function settings:hidden()
   tween:Stop(self.motion)
   self.offset = 0
   self.frame:SetAlpha(1)
-  -- Escape's first press goes back only while the window shows: a hidden key frame still shown would
-  -- take Escape from the game (CloseSpecialWindows reads IsShown).
-  self:releaseBackKey()
   controls:ReleaseEscape(self.frame)
 end
 
@@ -1064,6 +1063,21 @@ function settings:Select(pageId, tabId, ctx)
   if page == nil then
     return
   end
+  -- Coming into a page's own list from the pages: Back goes to the page left.
+  if page.sidebar ~= nil and self.sidebarPage == nil then
+    self.returnTo = self.pageId and { pageId = self.pageId, tabId = self.tabId } or nil
+  end
+  if self.query ~= nil then
+    self.query = nil
+    self.search:SetText("")
+  end
+  -- The list first: it may choose what the page shows, and so its tabs.
+  local animate = self.shown and not self.arriving
+  if page.sidebar ~= nil then
+    self:enterList(page, ctx, animate)
+  else
+    self:leaveList(animate)
+  end
   local tabs = pages:ShownTabs(page)
   local tab = tabs[1] or page.tabs[1]
   for _, t in ipairs(tabs) do
@@ -1071,21 +1085,7 @@ function settings:Select(pageId, tabId, ctx)
       tab = t
     end
   end
-  -- Coming into a page's own list from the pages: Back goes to the page left.
-  if page.sidebar ~= nil and self.sidebarPage == nil then
-    self.returnTo = self.pageId and { pageId = self.pageId, tabId = self.tabId } or nil
-  end
   self.pageId, self.tabId = page.id, tab.id
-  if self.query ~= nil then
-    self.query = nil
-    self.search:SetText("")
-  end
-  local animate = self.shown and not self.arriving
-  if page.sidebar ~= nil then
-    self:enterList(page, ctx, animate)
-  else
-    self:leaveList(animate)
-  end
   local title, description = page.title, page.description
   if page.heading ~= nil then
     title, description = page.heading()

@@ -39,6 +39,7 @@ for _, m in ipairs({ { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle",
   { "NextSlider", "next/controls/slider.lua" }, { "NextMenu", "next/controls/menu.lua" },
   { "NextDropdown", "next/controls/dropdown.lua" }, { "NextSwatch", "next/controls/swatch.lua" },
   { "NextTopTabs", "next/controls/toptabs.lua" }, { "NextDialog", "next/controls/dialog.lua" },
+  { "NextItemGrid", "next/controls/itemgrid.lua" },
   { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
   { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" },
   { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" },
@@ -172,33 +173,73 @@ describe("NextSettingsContent", function()
 
     -- Categories are defined once, on their own page (category-lifecycle.md §6), for both designs; a
     -- bag arranges them on its Categories tab.
-    it("defines every category on the Categories page, for both designs, with the bags the settings show", function()
-      local made
+    -- Categories are defined once, on their own page (category-lifecycle.md §6, next-settings.md §5): its
+    -- list in the sidebar, its heading and buttons in the header, and three tabs, for both designs.
+    it("defines every category on the Categories page: its list, heading, buttons and three tabs", function()
+      local made = {}
       local editor = addon:GetModule("NextSettingsCategories")
-      override(editor, "Create", function(_, parent, windowFrame, bags)
-        made = { owner = windowFrame, bags = bags }
-        return addon:GetModule("NextSettingsRows"):CreateText(parent, "editor")
+      local rows = addon:GetModule("NextSettingsRows")
+      local chosen, rule = true, true
+      override(editor, "CreateList", function(_, parent, owner)
+        made.list = { parent = parent, owner = owner }
+        local list = { frame = CreateFrame("Frame", nil, parent) }
+        function list:Place() end
+        function list:Refresh() end
+        return list
       end)
+      override(editor, "CreateActions", function(_, parent, owner)
+        made.actions = { parent = parent, owner = owner }
+        local a = { frame = CreateFrame("Frame", nil, parent) }
+        function a:Refresh() end
+        return a
+      end)
+      override(editor, "Heading", function() return "Mats", "2 added items" end)
+      override(editor, "RuleTabShown", function() return rule end)
+      override(editor, "ItemsTabShown", function() return chosen end)
+      for _, name in ipairs({ "CreateSettingsTab", "CreateRuleTab", "CreateItemsTab" }) do
+        override(editor, name, function(_, parent, owner, bags)
+          made[name] = { owner = owner, bags = bags }
+          return rows:CreateText(parent, name)
+        end)
+      end
       override(db, "GetMaxItemLevel", function() return 100 end)
       settings:Open("categories")
       assert.are.equal("categories", settings.pageId)
-      assert.are.equal(settings.frame, made.owner)
-      local function kinds()
+      assert.are.equal(settings.frame, made.list.owner)
+      assert.are.equal(settings.header, made.actions.parent)
+      assert.are.equal("Mats", settings.title:GetText())
+      local function tabs()
         local list = {}
-        for _, bag in ipairs(made.bags()) do table.insert(list, bag.kind) end
+        for _, t in ipairs(settings.tabs.list) do table.insert(list, t.text) end
         return list
       end
-      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }, kinds())
+      assert.are.same({ "Settings", "Rule", "Added Items" }, tabs())
+      assert.are.equal(settings.frame, made.CreateSettingsTab.owner)
+      local function kinds(name)
+        local list = {}
+        for _, bag in ipairs(made[name].bags()) do table.insert(list, bag.kind) end
+        return list
+      end
+      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }, kinds("CreateSettingsTab"))
       addon.hasGuildBank = true
-      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }, kinds(),
+      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }, kinds("CreateSettingsTab"),
         "the guild bank like any bag")
       design = "classic"
-      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }, kinds(), "the classic bags have none")
+      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }, kinds("CreateSettingsTab"), "the classic bags have none")
+      design = "next"
+      settings:Select("categories", "rule")
+      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }, kinds("CreateRuleTab"))
+      settings:Select("categories", "items")
+      assert.are.equal(settings.frame, made.CreateItemsTab.owner)
       local titles = {}
       for _, title in ipairs(settings.page.titles) do
         if title:IsShown() then table.insert(titles, title:GetText()) end
       end
-      assert.are.same({}, titles, "the page's title says it: no section title")
+      assert.are.same({}, titles, "the tab's name says it: no section title")
+      rule, chosen = false, false
+      settings:Select("categories", "rule")
+      assert.are.equal("settings", settings.tabId)
+      assert.is_false(settings.tabs.frame:IsShown(), "one tab: no tab bar")
     end)
 
     -- The classic bags' currency icons (frames/currency.lua): on clients with currencies (retail, WoW:

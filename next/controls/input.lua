@@ -303,6 +303,17 @@ function areaProto:Paint()
   self.help:SetShown(not focused and self:GetText() == "")
 end
 
+-- SetEnabled takes typing or refuses it (faded, as a disabled button, letting go of focus).
+---@param enabled boolean
+function areaProto:SetEnabled(enabled)
+  self.editBox:SetEnabled(enabled)
+  if not enabled then
+    self.editBox:ClearFocus()
+  end
+  self.frame:SetAlpha(enabled and 1 or controls:Theme("Button").DisabledAlpha)
+  self:Paint()
+end
+
 ---@param focused boolean
 function areaProto:OnFocus(focused)
   self.box:EnableMouseWheel(focused)

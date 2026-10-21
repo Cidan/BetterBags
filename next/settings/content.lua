@@ -349,6 +349,19 @@ local function shownBags()
   return list
 end
 
+-- tabSection is a tab of the Categories page: one block filling it, its section's title hidden (the
+-- tab's name says it), found by its name and searching words.
+---@param title string
+---@param keywords string[]
+---@param block fun(parent: Frame, owner: Frame): NextSettingsRow
+---@return NextSettingsSectionDef
+local function tabSection(title, keywords, block)
+  return {
+    title = title, titleHidden = function() return true end,
+    rows = { { title = title, keywords = keywords, block = block } },
+  }
+end
+
 -- Init defines the pages, in the sidebar's order.
 function content:Init()
   self.exportArea, self.importArea = nil, nil
@@ -422,14 +435,22 @@ function content:Init()
   -- Every category, defined once (category-lifecycle.md §6), for both designs.
   pages:Define({
     id = "categories", group = L:G("BetterBags"), title = L:G("Categories"),
-    description = L:G("Your categories: a rule, items you place in them, or both. Each bag uses those you choose."),
-    tabs = { { id = "main", title = L:G("Categories"), sections = {
-      { title = L:G("Categories"), titleHidden = function() return true end, rows = { {
-        title = L:G("Categories"),
-        keywords = { "category", "categories", "search category", "rule", "custom", "priority", "color", "group by" },
-        block = function(parent, window) return categoryEditor:Create(parent, window, shownBags) end,
-      } } },
-    } } },
+    description = L:G("Your categories: a rule, items you add, or both. Each bag uses those you choose."),
+    -- Its own list in the sidebar, the chosen category's name and buttons in the header (next-settings.md §5).
+    sidebar = function(parent, window) return categoryEditor:CreateList(parent, window) end,
+    heading = function() return categoryEditor:Heading() end,
+    actions = function(parent, window) return categoryEditor:CreateActions(parent, window) end,
+    tabs = {
+      { id = "settings", title = L:G("Settings"), sections = { tabSection(L:G("Category Settings"),
+        { "category", "categories", "custom", "priority", "color", "group by", "bags", "used in" },
+        function(parent, window) return categoryEditor:CreateSettingsTab(parent, window, shownBags) end) } },
+      { id = "rule", title = L:G("Rule"), shown = function() return categoryEditor:RuleTabShown() end,
+        sections = { tabSection(L:G("Category Rule"), { "rule", "search category", "search", "query" },
+          function(parent, window) return categoryEditor:CreateRuleTab(parent, window, shownBags) end) } },
+      { id = "items", title = L:G("Added Items"), shown = function() return categoryEditor:ItemsTabShown() end,
+        sections = { tabSection(L:G("Added Items"), { "items", "added", "manual", "drag" },
+          function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags) end) } },
+    },
   })
   -- The classic bags' currency icons (frames/currency.lua), on clients with currencies: retail, WoW:
   -- Forever and Mists Classic (TBC and Era have none: the classic window said so there).

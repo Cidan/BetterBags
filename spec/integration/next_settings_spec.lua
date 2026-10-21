@@ -46,6 +46,7 @@ describe("BetterBags Next's settings window on the whole addon", function()
         settings:Open(page.id, tab.id)
         assert.are.same({}, handle.errors, page.id .. " > " .. tab.id)
         assert.are.equal(page.id, settings.pageId)
+        assert.are.equal(tab.id, settings.tabId, page.id .. " > " .. tab.id .. " shows")
         assert.is_true(#settings.page.sections > 0, page.id .. " > " .. tab.id .. " shows something")
         table.insert(built, page.id .. " > " .. tab.id)
       end
@@ -53,18 +54,50 @@ describe("BetterBags Next's settings window on the whole addon", function()
     return built
   end
 
+  -- A category of the player's, so the Categories page shows its Rule and Added Items tabs too.
+  local function makeCategory(addon)
+    addon:GetModule("Categories"):CreateCategory(ctx(addon), { name = "Spec Mats", itemList = { [2589] = true },
+      save = true, searchCategory = { query = "type = trade goods" } })
+  end
+
   it("opens for BetterBags Next and builds every page and tab", function()
     local addon = start({ next = true })
+    makeCategory(addon)
     local settings = addon:GetModule("NextSettings")
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
     assert.is_true(settings:IsShown())
     assert.is_nil(addon:GetModule("Config").configFrame, "no classic window")
-    assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "categories > main", "backpack > layout",
+    assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "categories > settings",
+      "categories > rule", "categories > items", "backpack > layout",
       "backpack > items", "backpack > categories", "bank > layout", "bank > items", "bank > categories",
       "guild > layout", "guild > items", "guild > categories", "profiles > profiles", "profiles > transfer",
       "quickfind > main" }, builtEveryTab(addon))
     settings:Close()
     assert.are.same({}, handle.errors, "closing")
+  end)
+
+  -- The Categories page on the real window (next-settings.md §5): its list slides into the sidebar, the
+  -- chosen category titles the page, and the first Escape goes back.
+  it("shows the Categories page's list in the sidebar, the category chosen in the header", function()
+    local addon = start({ next = true })
+    makeCategory(addon)
+    local settings = addon:GetModule("NextSettings")
+    settings:Open("general")
+    settings:Select("categories")
+    assert.are.same({}, handle.errors)
+    local list = settings.lists[settings.sidebarPage]
+    assert.is_not_nil(list:RowFor("Spec Mats"))
+    assert.are.equal("Spec Mats", addon:GetModule("NextSettingsCategories").selected)
+    assert.are.equal("Spec Mats", settings.title:GetText())
+    local listed = {}
+    for _, name in ipairs(UISpecialFrames) do listed[name] = true end
+    assert.is_true(listed.BetterBagsNextSettingsBack, "the first Escape goes back")
+    assert.is_nil(listed.BetterBagsNextSettings, "not closing the window")
+    settings.backKey:Hide()
+    settings.backKey:GetScript("OnHide")(settings.backKey)
+    assert.are.equal("general", settings.pageId)
+    assert.is_nil(settings.sidebarPage)
+    assert.are.same({}, handle.errors)
   end)
 
   it("reads the real settings into its rows", function()
@@ -89,10 +122,12 @@ describe("BetterBags Next's settings window on the whole addon", function()
 
   it("opens for the classic bags too, with their own settings, and builds every page and tab", function()
     local addon = start({})
+    makeCategory(addon)
     local settings = addon:GetModule("NextSettings")
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
     assert.is_true(settings:IsShown())
-    assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "categories > main", "currency > main",
+    assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "categories > settings",
+      "categories > rule", "categories > items", "currency > main",
       "backpack > layout", "backpack > items", "backpack > categories", "bank > layout", "bank > items",
       "bank > categories", "profiles > profiles", "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
     settings:Open("backpack", "layout")

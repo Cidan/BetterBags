@@ -2176,6 +2176,15 @@ end
 _G.C_Item.GetItemSubClassInfo = _G.C_Item.GetItemSubClassInfo or function(classID, subclassID)
   return "Bag"
 end
+-- C_Item.GetItemNameByID(itemInfo) -> itemName and GetItemQualityByID(itemInfo) -> itemQuality, both
+-- nilable (ItemDocumentation.lua; nil while the client has not loaded the item): read from whatever
+-- C_Item.GetItemInfo answers now, so a spec's own GetItemInfo drives them.
+_G.C_Item.GetItemNameByID = _G.C_Item.GetItemNameByID or function(itemID)
+  return (_G.C_Item.GetItemInfo(itemID))
+end
+_G.C_Item.GetItemQualityByID = _G.C_Item.GetItemQualityByID or function(itemID)
+  return (select(3, _G.C_Item.GetItemInfo(itemID)))
+end
 _G.GetInventoryItemLink = _G.GetInventoryItemLink or function(unit, invid)
   return "|Hitem:12345|h[Mock Bag]|h"
 end

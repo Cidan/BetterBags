@@ -179,7 +179,6 @@ sonataNext:RegisterTheme({
       Edge = { Color = "Ink", Alpha = 0.25 }, SelectedEdge = { Color = "Seal", Alpha = 0.9 },
     },
     Categories = {
-      Fill = { Color = "Ink", Alpha = 0.035 },
       Indicator = { Color = "Seal" },
       SelectedFill = { Color = "Ink", Alpha = 0.08 },
       HoverFill = { Color = "Ink", Alpha = 0.04 },

@@ -611,22 +611,20 @@ sonataNext:RegisterTheme({
     },
     -- The footer: Height tall, Pad in, the line along its top.
     Footer = { Height = 56, Pad = 24, Line = { Color = "Lavender", Alpha = 0.12, Size = 1 } },
-    -- The Categories page (next-settings.md §5): Height tall, its list ListWidth wide and Gap from the
-    -- category's settings, over its Fill, Pad inside; list rows RowHeight tall (a name and a line of
-    -- what is in it; headings GroupHeight), Indent in; the chosen one's bar and fill, the light under
-    -- the pointer; the settings' rows FieldGap apart, their names LabelWidth wide, the rule QueryHeight
-    -- tall, item rows ItemHeight tall; up to Icons icons of what it holds, IconSize square, IconGap
-    -- apart; the fonts.
+    -- The Categories page (next-settings.md §5). Its list, in the sidebar: rows RowHeight tall (a name
+    -- and a line of what is in it; headings GroupHeight), the name Indent in from the sidebar's Pad with
+    -- its color's dot (Dot square) before it; the chosen one's bar and fill, the light under the
+    -- pointer. Its tabs: Pad inside, rows FieldGap apart, names LabelWidth wide, the rule QueryHeight
+    -- tall, the items' filter FilterWidth wide. The fonts.
     Categories = {
-      Height = 470, ListWidth = 250, Gap = 16, Pad = 10, RowHeight = 38, GroupHeight = 24, Indent = 10,
-      Fill = { Color = "Lavender", Alpha = 0.035 },
+      RowHeight = 38, GroupHeight = 24, Indent = 12, Dot = 6,
       Indicator = { Color = "Gold", Width = 3 },
       SelectedFill = { Color = "Lavender", Alpha = 0.1 },
       HoverFill = { Color = "Lavender", Alpha = 0.05 },
-      FieldGap = 8, LabelWidth = 90, QueryHeight = 60, ItemHeight = 26, Icons = 12, IconSize = 20, IconGap = 4,
+      Pad = 18, FieldGap = 10, LabelWidth = 110, QueryHeight = 84, FilterWidth = 200,
       GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
-      TitleFont = "DialogTitle", LabelFont = "SettingsText", TextFont = "SettingsText",
-      WarningFont = "ButtonDanger", HintFont = "SettingsSectionNote",
+      LabelFont = "SettingsText", TextFont = "SettingsText", SectionFont = "SettingsSection",
+      HintFont = "SettingsSectionNote",
     },
     -- A bag's categories, on its Categories tab: Height tall over its Fill, Pad inside; rows RowHeight
     -- tall (headings GroupHeight), Indent in; the light under the pointer and the marker where a dragged

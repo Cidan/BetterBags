@@ -643,6 +643,25 @@ describe("NextSettings", function()
       assert.are.equal("general", settings.pageId)
     end)
 
+    it("still goes back to where it came from after its list chose something else", function()
+      open("backpack", "items")
+      settings:Select("cats")
+      settings:Reselect()
+      settings:Select("cats", "items")
+      settings:Back()
+      assert.are.same({ "backpack", "items" }, { settings.pageId, settings.tabId })
+    end)
+
+    it("reads nothing again while closed", function()
+      open()
+      settings:Select("cats")
+      settings:Close()
+      tween:Step(10)
+      local refreshed = state.refreshed
+      settings:Reselect()
+      assert.are.equal(refreshed, state.refreshed)
+    end)
+
     it("opens straight on its list, without sliding", function()
       open("cats")
       assert.is_false(settings.navPanel:IsShown())
@@ -716,6 +735,21 @@ describe("NextSettings", function()
       assert.are.same({ "Settings", "Added Items" }, tabTitles())
       assert.are.equal("settings", settings.tabId)
       state.rule = true
+      settings:Select("cats", "rule")
+      assert.are.same({ "Settings", "Rule", "Added Items" }, tabTitles())
+      assert.are.equal("rule", settings.tabId)
+    end)
+
+    -- The list chooses what the page shows (the Categories page: the first category, when none is), so
+    -- the tabs are read after it.
+    it("reads its tabs after its list, which may change what they show", function()
+      local savedSidebar = pages:Get("cats").sidebar
+      pages:Get("cats").sidebar = function(parent, owner)
+        local sb = savedSidebar(parent, owner)
+        function sb:Refresh() state.rule = true end
+        return sb
+      end
+      open()
       settings:Select("cats", "rule")
       assert.are.same({ "Settings", "Rule", "Added Items" }, tabTitles())
       assert.are.equal("rule", settings.tabId)

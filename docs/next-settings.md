@@ -292,3 +292,10 @@ Done: the unified data model and its normalization at every load and import (cat
 §6), resolution (the tie, group by for hand-placed items), the Categories page, each bag's arrangement
 on its Categories tab, and the search box's Enter to Make Category opening the page (next-settings.md
 §5). The old search category dialog was removed.
+
+Then (asked 2026-10-21, from screenshots): the first page crowded a list and an editor into one box.
+The list moves into the sidebar, which slides the pages out (Back on top; the first Escape goes back),
+the category gets the whole content area in three tabs (Settings, Rule, Added Items), "Placed Here"
+became Added Items, a grid that holds thousands and takes drops anywhere, and the window is 720 tall.
+A missing button edge is recorded first (render-recorder.md: the settings window's edges in pixels),
+to be confirmed before the edges change.

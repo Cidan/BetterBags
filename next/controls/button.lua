@@ -114,6 +114,13 @@ function buttonProto:Fit()
   self.frame:SetWidth(width)
 end
 
+-- SetWidth gives the button a fixed width, or (nil) sizes it to its label again.
+---@param width? number
+function buttonProto:SetWidth(width)
+  self.width = width
+  self:Fit()
+end
+
 -- Paint draws the fill, edge and font for the button's state: pressed, under the pointer, or idle.
 function buttonProto:Paint()
   local look = nextButton:Look(self.style)
