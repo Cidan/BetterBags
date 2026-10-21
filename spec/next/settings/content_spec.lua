@@ -24,7 +24,7 @@ local db = StubBetterBagsModule("Database")
 -- The saved BetterBags Next theme (DB:GetNextTheme), which SonataNext reads.
 db.GetNextTheme = db.GetNextTheme or function() return "Default" end
 StubBetterBagsModule("Bucket")
-StubBetterBagsModule("BagSystem")
+local bagSystem = StubBetterBagsModule("BagSystem")
 StubBetterBagsModule("Items")
 StubBetterBagsModule("Categories")
 StubBetterBagsModule("ItemRowFrame")
@@ -58,7 +58,7 @@ local tween = addon:GetModule("NextTween")
 local sonataNext = addon:GetModule("SonataNext")
 
 describe("NextSettingsContent", function()
-  local sent, calls, saved, timers, reloads, handlers
+  local sent, calls, saved, timers, reloads, handlers, design
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -71,15 +71,19 @@ describe("NextSettingsContent", function()
     end
   end
 
+  -- idsOf lists a page's sections and their rows' settings, marking what shows for one design only.
   local function idsOf(page)
+    local function marked(text, thing)
+      return thing.design and (text .. " [" .. thing.design .. "]") or text
+    end
     local list = {}
     for _, tab in ipairs(page.tabs) do
       for _, section in ipairs(pages:Sections(tab)) do
         local ids = {}
         for _, row in ipairs(section.rows) do
-          table.insert(ids, row.setting or row.title or (row.option and row.option.title) or row.text or "?")
+          table.insert(ids, marked(row.setting or row.title or (row.option and row.option.title) or row.text or "?", row))
         end
-        table.insert(list, { tab.title, section.title, ids })
+        table.insert(list, { tab.title, marked(section.title, section), ids })
       end
     end
     return list
@@ -134,6 +138,8 @@ describe("NextSettingsContent", function()
     override(events, "SendMessage", function(_, _, message, ...) table.insert(sent, { message, ... }) end)
     override(events, "RegisterMessage", function(_, message, fn) handlers[message] = fn end)
     override(addon, "hasGuildBank", false)
+    design = "next"
+    override(bagSystem, "ActiveDesign", function() return design end)
     controls.escape = {}
     render:Init()
     tween:Init()
@@ -161,18 +167,22 @@ describe("NextSettingsContent", function()
         "Bags: Backpack", "Bags: Bank", "Profiles: Profiles", "Integrations: QuickFind" }, list)
     end)
 
-    it("shows the guild bank's page on a client with one", function()
+    it("shows the guild bank's page on a client with one, while BetterBags Next is in use", function()
       assert.is_false(pages:IsShown(pages:Get("guild")))
       addon.hasGuildBank = true
       assert.is_true(pages:IsShown(pages:Get("guild")))
       assert.are.equal("Guild Bank", pages:Get("guild").bag.name)
+      design = "classic"
+      assert.is_false(pages:IsShown(pages:Get("guild")), "the classic bags have no guild bank")
     end)
 
-    it("puts the bags' general settings on General", function()
+    it("puts the bags' general settings on General, the classic bags' own only for them", function()
       assert.are.same({
-        { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton" } },
+        { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton", "bagFading [classic]",
+          "animateItemMovement [classic]" } },
         { "General", "Search", { "inBagSearch", "enterToMakeCategory" } },
         { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell" } },
+        { "General", "What's New", { "changelogOnLogin" } },
       }, idsOf(pages:Get("general")))
     end)
 
@@ -183,6 +193,9 @@ describe("NextSettingsContent", function()
         { "Layout", "Order", { "sectionOrder", "itemOrder" } },
         { "Layout", "Tabs", { "enableGroups" } },
         { "Layout", "Slots", { "showAllFreeSpace", "preserveGaps" } },
+        { "Layout", "Window [classic]", { "resizableWindow", "snapToContent", "itemsPerRow", "columns", "opacity",
+          "scale" } },
+        { "Layout", "Sections [classic]", { "fullSectionNames" } },
         { "Items", "Item Level", { "itemLevel", "itemLevelColor" } },
         { "Items", "Quality", { "glowIntensity" } },
         { "Items", "Stacking", { "markRecentItems", "newItemFlash", "mergeStacks", "mergeUnstackable",
@@ -208,7 +221,7 @@ describe("NextSettingsContent", function()
       assert.are.equal(const.BAG_KIND.BANK, made.bag.kind)
     end)
 
-    it("names only settings the catalog has, for the page's bag, and none of the classic bags' alone", function()
+    it("names only settings the catalog has, for the page's bag; the classic bags' own only for them", function()
       local classicOnly = { bagFading = true, animateItemMovement = true, fullSectionNames = true,
         resizableWindow = true, snapToContent = true, itemsPerRow = true, columns = true, opacity = true, scale = true }
       addon.hasGuildBank = true
@@ -220,7 +233,9 @@ describe("NextSettingsContent", function()
             for _, row in ipairs(section.rows) do
               if row.setting then
                 named = named + 1
-                assert.is_nil(classicOnly[row.setting], row.setting)
+                if classicOnly[row.setting] then
+                  assert.are.equal("classic", row.design or section.design, row.setting)
+                end
                 if catalog:Has(row.setting, page.bag) then
                   assert.has_no.errors(function() catalog:Get(row.setting, page.bag) end, row.setting)
                 else
@@ -231,7 +246,7 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      assert.are.equal(8 + 3 * 22, named)
+      assert.are.equal(11 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -246,22 +261,57 @@ describe("NextSettingsContent", function()
       settings:Open("backpack", "layout")
       assert.is_not_nil(rowTitled("Enable Groups"))
     end)
+
+    -- Asked: rows and columns in the classic bags' Layout, and not in BetterBags Next's.
+    it("shows a bag's window, rows and columns in the classic bags' Layout only", function()
+      for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetItemSortType", "GetGroupsEnabled",
+        "GetShowAllFreeSpace", "GetPreserveItemGaps", "GetBagSnapToContent", "GetShowFullSectionNames" }) do
+        override(db, name, function() return 1 end)
+      end
+      override(db, "GetBagSizeMode", function() return "content" end)
+      override(db, "GetBagSizeInfo", function() return { itemsPerRow = 7, columnCount = 2, opacity = 100, scale = 100 } end)
+      settings:Open("bank", "layout")
+      assert.is_nil(rowTitled("Items Per Row"))
+      assert.is_nil(rowTitled("Columns"))
+      settings:Close()
+      tween:Step(1)
+      design = "classic"
+      settings:Open("bank", "layout")
+      local sections = {}
+      for _, section in ipairs(settings.page.sections) do table.insert(sections, section.title) end
+      assert.are.same({ "Order", "Slots", "Window", "Sections" }, sections)
+      assert.are.equal(7, rowTitled("Items Per Row").control:GetValue())
+      assert.are.equal(2, rowTitled("Columns").control:GetValue())
+    end)
   end)
 
   describe("Appearance", function()
-    it("picks BetterBags Next's theme, then the classic theme its item buttons and dialogs may use", function()
+    before_each(function()
       override(sonata, "GetThemes", function() return {} end)
       override(sonata, "IsAvailable", function() return true end)
       override(sonata, "IsSelectable", function() return true end)
       override(sonata, "GetSavedThemeKey", function() return "Default" end)
       override(sonata, "GetCurrentThemeKey", function() return "Default" end)
       override(sonata, "RestoreSavedTheme", function() end)
+    end)
+
+    -- Asked: no classic (item button) themes while BetterBags Next is in use.
+    it("picks BetterBags Next's theme alone while Next is in use", function()
+      settings:Open("appearance")
+      local rows = rowsShown()
+      assert.are.equal(1, #rows)
+      assert.are.equal(sonataNext, rows[1].engine)
+      assert.are.equal("Theme", settings.page.sections[1].title)
+    end)
+
+    it("picks the bags' theme, then this window's, for the classic bags", function()
+      design = "classic"
       settings:Open("appearance")
       local rows = rowsShown()
       assert.are.equal(2, #rows)
-      assert.are.equal(sonataNext, rows[1].engine)
-      assert.are.equal(sonata, rows[2].engine)
-      assert.are.same({ "Theme", "Item Buttons" }, { settings.page.sections[1].title, settings.page.sections[2].title })
+      assert.are.equal(sonata, rows[1].engine)
+      assert.are.equal(sonataNext, rows[2].engine)
+      assert.are.same({ "Bag Theme", "Settings Window" }, { settings.page.sections[1].title, settings.page.sections[2].title })
     end)
   end)
 

@@ -203,6 +203,20 @@ describe("The settings catalog", function()
     end
   end)
 
+  -- Before, only the changelog window's "Don't show me this again" checkbox set it (next-settings.md §7).
+  it("turns What's New on login on and off, sending nothing", function()
+    local auto = true
+    override(db, "GetChangelogAutoOpen", function() return auto end)
+    override(db, "SetChangelogAutoOpen", function(_, value) auto = value end)
+    local setting = catalog:Get("changelogOnLogin")
+    assert.are.equal("toggle", setting.kind)
+    assert.is_true(setting.get(ctx()))
+    setting.set(ctx(), false)
+    assert.is_false(auto)
+    assert.is_false(setting.get(ctx()))
+    assert.are.same({}, sent)
+  end)
+
   it("keeps searching words beside a setting's own text", function()
     local glow = catalog:Get("glowIntensity", backpack)
     assert.is_true(#glow.keywords > 0)

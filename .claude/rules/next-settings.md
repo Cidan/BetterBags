@@ -305,3 +305,35 @@ stacking settings of every bag, and turning BetterBags Next off from its own win
 one.
 
 Not seen in game yet: the whole window, on every theme (phase 7 of docs/next-settings.md).
+
+## 7. One window for both designs (what the bags in use read)
+
+Asked (2026-10-20): this window is the settings window of the classic bags too (the classic window is
+gone), it shows only what the bags in use read, and nothing the classic window had is missed.
+
+- **`design`** on a page, a section or a row (`"next"` or `"classic"`) shows it only while those bags
+  are in use (`NextSettingsPages:DesignInUse()`: `BagSystem:ActiveDesign() == "next"`, else classic).
+  The window filters pages (`IsShown`), sections and rows when it builds a tab (each tab is made once
+  per design: the cache key is `design:tab`) and when it searches.
+- **A design switch while the window is open** (`NextSettings:OnDesignChanged`, from
+  `bags/DesignChanged`): it lists its pages again and shows its page (the first page for one the new
+  design does not have) or its search again, staying open. Closed, it does nothing; the next open
+  builds for the design in use.
+- **What each design reads** (checked with `grep` over `next/`, `frames/`, `views/`, `core/`):
+  - **Classic only:** General → Bags: Enable Bag Fading, Animate Item Movement; a bag's Layout →
+    Window: Resizable Window, Snap to Content, Items Per Row, Columns, Opacity, Scale, and → Sections:
+    Show Full Section Names (asked: rows and columns in the classic bags' Layout, not Next's);
+    Appearance: Bag Theme (Sonata) and Settings Window (SonataNext: Next's themes draw this window);
+    Currency (§8).
+  - **Next only:** the Guild Bank page (the classic bags have no guild bank); Appearance: Theme
+    (SonataNext). The classic themes' picker (item buttons) is not shown in Next (asked).
+  - Everything else, both.
+- **Show What's New on Login** (General → What's New, `changelogOnLogin` in the catalog,
+  `DB:Get/SetChangelogAutoOpen`): before, only the changelog window's "Don't show me this again"
+  checkbox set it. The changelog window reads it when it opens, so both agree.
+
+Coverage: `spec/next/settings/window_spec.lua` ("by design": pages, sections and rows per design, a
+switch while open and while closed, search), `spec/next/settings/content_spec.lua` (each page's
+contents with their designs marked, the classic-only settings all marked classic, the guild bank per
+design, rows and columns per design, Appearance per design), `spec/config/catalog_spec.lua` (What's
+New on login). Mutation-tested (12 mutations; the one that first survived led to a test).

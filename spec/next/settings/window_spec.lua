@@ -12,6 +12,7 @@ local L = StubBetterBagsModule("Localization")
 L.G = L.G or function(_, key) return key end
 local events = StubBetterBagsModule("Events")
 StubBetterBagsModule("SettingsCatalog")
+local bagSystem = StubBetterBagsModule("BagSystem")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextToggle", "next/controls/toggle.lua" },
@@ -39,7 +40,7 @@ local function S()
 end
 
 describe("NextSettings", function()
-  local values, sent, saved, timers
+  local values, sent, saved, timers, design
 
   local function toggle(title, key, description, keywords)
     return {
@@ -110,7 +111,9 @@ describe("NextSettings", function()
     values = { bank = true, button = false, search = true, free = false, merge = true }
     sent = {}
     timers = {}
-    saved = { _G.UISpecialFrames, C_Timer.After, events.SendMessage }
+    saved = { _G.UISpecialFrames, C_Timer.After, events.SendMessage, bagSystem.ActiveDesign }
+    design = "next"
+    bagSystem.ActiveDesign = function() return design end
     _G.UISpecialFrames = {}
     C_Timer.After = function(_, fn) table.insert(timers, fn) end
     events.SendMessage = function(_, _, message, ...) table.insert(sent, { message, ... }) end
@@ -125,7 +128,7 @@ describe("NextSettings", function()
     if settings.frame then settings:Close() end
     nextMenu:Close()
     nextDialog:Hide()
-    _G.UISpecialFrames, C_Timer.After, events.SendMessage = saved[1], saved[2], saved[3]
+    _G.UISpecialFrames, C_Timer.After, events.SendMessage, bagSystem.ActiveDesign = saved[1], saved[2], saved[3], saved[4]
     UseNextTheme(nil)
   end)
 
@@ -529,6 +532,78 @@ describe("NextSettings", function()
       open()
       search("merge")
       assert.are.equal(1, #settings.page.sections)
+    end)
+  end)
+
+  -- The window shows what the bags in use read (next-settings.md §7): a page, section or row with a
+  -- design shows only while that design is in use.
+  describe("by design", function()
+    local function only(d, def)
+      def.design = d
+      return def
+    end
+
+    before_each(function()
+      pages:Define({ id = "nextonly", group = "Bags", title = "Next Only", description = "", design = "next",
+        tabs = { { id = "main", title = "Next Only", sections = { { title = "N", rows = { toggle("Next Thing", "bank") } } } } } })
+      pages:Define({ id = "mixed", group = "Bags", title = "Mixed", description = "",
+        tabs = { { id = "main", title = "Mixed", sections = {
+          { title = "Both", rows = { toggle("Both Thing", "bank"), only("classic", toggle("Classic Row", "button")) } },
+          only("classic", { title = "Classic Section", rows = { toggle("Classic Thing", "search") } }),
+        } } } })
+    end)
+
+    it("shows a page, section or row only while its design is in use", function()
+      open()
+      assert.is_not_nil(navRow("Next Only"))
+      open("mixed")
+      assert.are.same({ "Both Thing" }, shownRows())
+      settings:Close()
+      tween:Step(1)
+      design = "classic"
+      open()
+      assert.is_nil(navRow("Next Only"))
+      open("mixed")
+      assert.are.same({ "Both Thing", "Classic Row", "Classic Thing" }, shownRows())
+    end)
+
+    it("shows the settings of the design the bags switch to, staying open", function()
+      open("nextonly")
+      design = "classic"
+      settings:OnDesignChanged(addon:GetModule("Context"):New("spec"))
+      assert.is_true(settings:IsShown())
+      assert.are.equal("general", settings.pageId, "its page is gone: the first page")
+      assert.is_nil(navRow("Next Only"))
+      open("mixed")
+      assert.are.same({ "Both Thing", "Classic Row", "Classic Thing" }, shownRows())
+      design = "next"
+      settings:OnDesignChanged(addon:GetModule("Context"):New("spec"))
+      assert.are.equal("mixed", settings.pageId, "a page both designs have stays")
+      assert.are.same({ "Both Thing" }, shownRows())
+    end)
+
+    it("does nothing for a switch while it is closed", function()
+      open("mixed")
+      settings:Close()
+      tween:Step(1)
+      local page = settings.page
+      design = "classic"
+      settings:OnDesignChanged(addon:GetModule("Context"):New("spec"))
+      assert.is_false(settings.frame:IsShown())
+      assert.are.equal(page, settings.page, "no page built for a closed window")
+    end)
+
+    it("finds only the settings of the design in use", function()
+      open()
+      settings:Search(addon:GetModule("Context"):New("spec"), "thing")
+      assert.are.same({ "Next Thing", "Both Thing" }, shownRows())
+      settings:Search(addon:GetModule("Context"):New("spec"), "row")
+      assert.are.same({}, shownRows(), "a row of the other design")
+      design = "classic"
+      settings:Search(addon:GetModule("Context"):New("spec"), "thing")
+      assert.are.same({ "Both Thing", "Classic Thing" }, shownRows())
+      settings:Search(addon:GetModule("Context"):New("spec"), "row")
+      assert.are.same({ "Classic Row" }, shownRows())
     end)
   end)
 

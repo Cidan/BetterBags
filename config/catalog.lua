@@ -339,6 +339,17 @@ define('upgradeProvider', {
   end,
 })
 
+-- Before the settings window had it, only the changelog window's "Don't show me this again" checkbox
+-- set it (frames/changelog.lua, changelog.md).
+define('changelogOnLogin', {
+  kind = "toggle",
+  title = "Show What's New on Login",
+  description = "Open What's New when you log in after BetterBags was updated.",
+  keywords = { 'changelog', "what's new", 'updates', 'patch notes' },
+  get = function() return db:GetChangelogAutoOpen() == true end,
+  set = function(_, value) db:SetChangelogAutoOpen(value) end,
+})
+
 define('newItemDuration', {
   kind = "slider",
   title = 'New Item Duration',

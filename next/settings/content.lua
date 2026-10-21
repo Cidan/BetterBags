@@ -280,16 +280,23 @@ end
 ---@param id string
 ---@param bag SettingBag
 ---@param shown? fun(): boolean
-local function bagPage(id, bag, shown)
+---@param design? BagDesign
+local function bagPage(id, bag, shown, design)
   local name = string.lower(bag.name)
   pages:Define({
-    id = id, group = L:G("Bags"), title = L:G(bag.name), bag = bag, shown = shown,
+    id = id, group = L:G("Bags"), title = L:G(bag.name), bag = bag, shown = shown, design = design,
     description = format(L:G("How the %s lays out, shows and sorts its items."), name),
     tabs = {
       { id = "layout", title = L:G("Layout"), sections = {
         { title = L:G("Order"), rows = { { setting = 'sectionOrder' }, { setting = 'itemOrder' } } },
         { title = L:G("Tabs"), rows = { { setting = 'enableGroups' } } },
         { title = L:G("Slots"), rows = { { setting = 'showAllFreeSpace' }, { setting = 'preserveGaps' } } },
+        -- Only the classic bags read these (frames/bag.lua, frames/bagcanvas.lua, frames/section.lua).
+        { title = L:G("Window"), design = "classic", rows = {
+          { setting = 'resizableWindow' }, { setting = 'snapToContent' }, { setting = 'itemsPerRow' },
+          { setting = 'columns' }, { setting = 'opacity' }, { setting = 'scale' },
+        } },
+        { title = L:G("Sections"), design = "classic", rows = { { setting = 'fullSectionNames' } } },
       } },
       { id = "items", title = L:G("Items"), sections = {
         { title = L:G("Item Level"), rows = { { setting = 'itemLevel' }, { setting = 'itemLevelColor' } } },
@@ -323,23 +330,33 @@ function content:Init()
     id = "general", group = L:G("BetterBags"), title = L:G("General"),
     description = L:G("How BetterBags works in every bag."),
     tabs = { { id = "main", title = L:G("General"), sections = {
-      { title = L:G("Bags"), rows = { { setting = 'nextEnabled' }, { setting = 'enableBankBags' }, { setting = 'showBagButton' } } },
+      { title = L:G("Bags"), rows = {
+        { setting = 'nextEnabled' }, { setting = 'enableBankBags' }, { setting = 'showBagButton' },
+        { setting = 'bagFading', design = "classic" }, { setting = 'animateItemMovement', design = "classic" },
+      } },
       { title = L:G("Search"), rows = { { setting = 'inBagSearch' }, { setting = 'enterToMakeCategory' } } },
       { title = L:G("Items"), rows = { { setting = 'upgradeProvider' }, { setting = 'newItemDuration' }, { setting = 'categorySell' } } },
+      { title = L:G("What's New"), rows = { { setting = 'changelogOnLogin' } } },
     } } },
   })
   pages:Define({
     id = "appearance", group = L:G("BetterBags"), title = L:G("Appearance"),
-    description = L:G("How BetterBags Next looks. A theme you pick shows at once; Apply Theme keeps it."),
+    description = L:G("How BetterBags looks. A theme you pick shows at once; Apply Theme keeps it."),
+    -- BetterBags Next's themes draw its bags and this window; the classic bags' themes draw theirs.
     tabs = { { id = "main", title = L:G("Appearance"), sections = {
-      { title = L:G("Theme"), rows = { {
+      { title = L:G("Theme"), design = "next", rows = { {
         title = L:G("Theme"), keywords = { "theme", "look", "skin", "appearance", "style" },
         block = function(parent) return themes:Create(parent, sonataNext) end,
       } } },
-      { title = L:G("Item Buttons"), note = L:G("(the classic themes, for item buttons and dialogs)"), rows = { {
-        title = L:G("Item Buttons"), keywords = { "theme", "item buttons", "dialogs", "classic", "masque" },
+      { title = L:G("Bag Theme"), design = "classic", rows = { {
+        title = L:G("Bag Theme"), keywords = { "theme", "look", "skin", "appearance", "style", "bags" },
         block = function(parent) return themes:Create(parent, sonata) end,
       } } },
+      { title = L:G("Settings Window"), design = "classic", note = L:G("(BetterBags Next's themes draw this window)"),
+        rows = { {
+          title = L:G("Settings Window Theme"), keywords = { "theme", "settings", "window" },
+          block = function(parent) return themes:Create(parent, sonataNext) end,
+        } } },
     } } },
   })
   pages:Define({
@@ -375,8 +392,9 @@ function content:Init()
   })
   bagPage("backpack", { name = 'Backpack', kind = const.BAG_KIND.BACKPACK })
   bagPage("bank", { name = 'Bank', kind = const.BAG_KIND.BANK })
-  -- BetterBags Next's guild bank (guild-bank.md §5), on a client with one.
-  bagPage("guild", { name = 'Guild Bank', kind = const.BAG_KIND.GUILD }, function() return addon.hasGuildBank == true end)
+  -- BetterBags Next's guild bank (guild-bank.md §5), on a client with one; the classic bags have none.
+  bagPage("guild", { name = 'Guild Bank', kind = const.BAG_KIND.GUILD }, function() return addon.hasGuildBank == true end,
+    "next")
   pages:Define({
     id = "profiles", group = L:G("Profiles"), title = L:G("Profiles"),
     description = L:G("Your settings, saved under a name and shared by the characters that use it."),

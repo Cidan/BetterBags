@@ -711,7 +711,9 @@ function settings:pageFor(page, tab)
     byTab = {}
     self.cache[page] = byTab
   end
-  local drawn = byTab[tab.id]
+  -- A tab is made once for each design: the two show different rows.
+  local key = pages:DesignInUse() .. ":" .. tab.id
+  local drawn = byTab[key]
   if drawn ~= nil then
     return drawn
   end
@@ -719,8 +721,8 @@ function settings:pageFor(page, tab)
   local sections = {}
   for _, sdef in ipairs(pages:Sections(tab)) do
     local list = {}
-    for _, rdef in ipairs(sdef.rows) do
-      local row = self:makeRow(page, rdef, drawn.frame)
+    for _, rdef in ipairs(pages:InDesign(sdef) and sdef.rows or {}) do
+      local row = pages:InDesign(rdef) and self:makeRow(page, rdef, drawn.frame) or nil
       if row ~= nil then
         table.insert(list, row)
       end
@@ -731,7 +733,7 @@ function settings:pageFor(page, tab)
     end
   end
   drawn:SetSections(sections)
-  byTab[tab.id] = drawn
+  byTab[key] = drawn
   return drawn
 end
 
@@ -795,6 +797,22 @@ function settings:Select(pageId, tabId, ctx)
   self:show(self:pageFor(page, tab), ctx)
 end
 
+-- OnDesignChanged shows, while the window is open, the settings of the design the bags switched to:
+-- its pages again, and the page it showed (the first page for one the design does not have) or its
+-- search.
+---@param ctx Context
+function settings:OnDesignChanged(ctx)
+  if not self.shown then
+    return
+  end
+  self:buildNav()
+  if self.query ~= nil then
+    self:Search(ctx, self.query)
+  else
+    self:Select(self.pageId, self.tabId, ctx)
+  end
+end
+
 -- Refresh shows the values of the page shown again (a block changed them: a reset).
 ---@param ctx? Context
 function settings:Refresh(ctx)
@@ -813,6 +831,9 @@ end
 ---@param needle string
 ---@return boolean
 function settings:matches(page, section, def, needle)
+  if not pages:InDesign(section) or not pages:InDesign(def) then
+    return false
+  end
   local option
   if def.setting ~= nil then
     if not catalog:Has(def.setting, page.bag) then
@@ -847,7 +868,7 @@ end
 ---@param def NextSettingsRowDef
 ---@return NextSettingsRow?
 function settings:resultRow(page, tab, s, r, def)
-  local key = page.id .. "\0" .. tab.id .. "\0" .. s .. "\0" .. r
+  local key = page.id .. "\0" .. tab.id .. "\0" .. s .. "\0" .. r .. "\0" .. pages:DesignInUse()
   local row = self.resultRows[key]
   if row == nil and def.block == nil then
     row = self:makeRow(page, def, self.results.frame)

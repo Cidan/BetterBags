@@ -9,7 +9,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 -- row is a setting of the settings catalog (setting, bound to the page's bag), an option of the
 -- page's own, text, buttons, or a block (a function making the row, with its searching words). A
 -- page may be shown only sometimes (shown); a tab's sections may be a function, read each time it
--- is built. Pages are data: the window (NextSettings) makes their rows.
+-- is built. A page, a section or a row with a design ("next" or "classic") shows only while the bags
+-- of that design are in use: the window shows what the bags in use read. Pages are data: the window
+-- (NextSettings) makes their rows.
 ---@class NextSettingsPages: AceModule
 ---@field list NextSettingsPageDef[]
 local pages = addon:NewModule('NextSettingsPages')
@@ -22,10 +24,12 @@ local pages = addon:NewModule('NextSettingsPages')
 ---@field block? fun(parent: Frame, owner: Frame): NextSettingsRow A row of the page's own making (wide).
 ---@field title? string A block's name, for search.
 ---@field keywords? string[] A block's searching words.
+---@field design? BagDesign Shown only while these bags are in use.
 
 ---@class (exact) NextSettingsSectionDef
 ---@field title string
 ---@field note? string
+---@field design? BagDesign
 ---@field rows NextSettingsRowDef[]
 
 ---@class (exact) NextSettingsTabDef
@@ -40,6 +44,7 @@ local pages = addon:NewModule('NextSettingsPages')
 ---@field description string
 ---@field bag? SettingBag The bag its settings are bound to.
 ---@field shown? fun(): boolean
+---@field design? BagDesign
 ---@field keywords? string[]
 ---@field tabs NextSettingsTabDef[]
 
@@ -73,11 +78,24 @@ function pages:Get(id)
   return nil
 end
 
+-- DesignInUse returns the design of the bags in use: "next", else "classic".
+---@return BagDesign
+function pages:DesignInUse()
+  return addon:GetModule('BagSystem'):ActiveDesign() == "next" and "next" or "classic"
+end
+
+-- InDesign says whether a page, section or row shows with the bags in use.
+---@param thing {design?: BagDesign}
+---@return boolean
+function pages:InDesign(thing)
+  return thing.design == nil or thing.design == self:DesignInUse()
+end
+
 -- IsShown says whether a page is shown now.
 ---@param page NextSettingsPageDef
 ---@return boolean
 function pages:IsShown(page)
-  return page.shown == nil or page.shown() == true
+  return self:InDesign(page) and (page.shown == nil or page.shown() == true)
 end
 
 -- List returns the pages shown now, in order.
