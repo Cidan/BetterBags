@@ -471,7 +471,7 @@ Either side of a comparison can be worked out:
 - `min(...)`, `max(...)`, `floor(x)`, `ceil(x)`, `abs(x)` (maxlevel >= min(player.ilvl * 0.95, player.ilvl - 5)). `math.min` and the others work too.
 - Money: `5g`, `50s`, `1g50s`, `20c` (price < 2g50s) are amounts in copper.
 - Fields compared with fields, or with math on them (maxlevel > ilvl, price * count > 5g), are checked item by item.
-- Your character: `player.level`, `player.ilvl` (your average item level, bags included), `player.equippedilvl` (what you wear), `player.class` (its name or its English token, `paladin`), `player.classid`, `player.spec`, `player.specid`, `player.profession` (any of your professions, by name or skill line: `player.profession = tailoring`), `player.name`, `player.realm`. A comparison of your character alone (player.level >= 80) matches every item or none, so `player.class = mage AND ...` limits a category to one class.
+- Your character: `player.level`, `player.ilvl` (your average item level, bags included), `player.equippedilvl` (what you wear), `player.class` (its name or its English token, `paladin`), `player.classid`, `player.spec`, `player.specid`, `player.profession` (any of your professions, by name or skill line: `player.profession = tailoring`), `player.name`, `player.realm`. A comparison of your character alone (player.level >= 80) matches every item or none, so `player.class = mage AND ...` limits a category to one class. Compared with an item's text, a value of your character is its value: `tooltip %= player.class` finds items whose tooltip names your class.
 
 <div align="center" style="text-align:center">
 <a href="https://i.imgur.com/H2jgRO8.png" target="_blank"><img src="https://i.imgur.com/H2jgRO8.png" alt="Complex Search in Retail."></a>

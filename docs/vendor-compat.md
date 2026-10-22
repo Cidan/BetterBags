@@ -10,8 +10,9 @@ BetterBags' query engine.
 indexed item outside their part, anywhere in a query; `.claude/rules/search-indexing.md` §5), and
 precedence (AND before OR, saved rules rewritten once to keep their meaning; §6), `bagname` (§7),
 expansions in release order (§8), `quality` as the crafting quality tier (§9), the new item fields
-of §10-§13 ("Proposed: new fields" marks each), checked against a capture from the game ("What a
-capture settled"). The rest is planned.
+of §10-§17 ("Proposed: new fields" marks each), checked against captures from the game ("What a
+capture settled"), arithmetic, money, functions and player values (§15), and the conversion of
+Vendor's rules (§18, functions only). What is left is how a player imports.
 
 ## Why
 
@@ -599,7 +600,8 @@ Made by the player (2026-10-21):
 1. **Precedence**: AND binds tighter than OR, as in Lua. Saved rules that mix them without
    parentheses are rewritten once with parentheses that keep their meaning.
 2. **Vendor's spellings**: not accepted in search. Vendor rules come in through an import that
-   converts them to BetterBags' search instead (planned separately).
+   converts them to BetterBags' search instead (planned separately). Asked (2026-10-22): build and
+   test the conversion and import functions only; how a player imports is still to be designed.
 3. **Expansion order**: `<` and `>` compare expansion names by expansion ID.
 4. **`bagname`**: the plain container name.
 
@@ -617,7 +619,10 @@ import.
 4. The parser and evaluator: `==`/`~=`, arithmetic, functions; constants folded into index
    lookups, the per-item check narrowed by the index: done (search-indexing.md §15; operators need
    spaces around them, the open question of "Grammar").
-5. Importing Vendor's rules, converted to BetterBags' search.
+5. Importing Vendor's rules, converted to BetterBags' search: the functions are done
+   (search-indexing.md §18), nothing calls them yet. What does not convert: Vendor's lists, other
+   addons' data, the account's watermark, Lua patterns with classes or anchors, and the properties
+   with no field (§18 lists them).
 
 Each step updates the README's search section and `.claude/rules/search-indexing.md`.
 

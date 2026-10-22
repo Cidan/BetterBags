@@ -754,6 +754,17 @@ describe("Search", function()
       assert.are.same(keys("helm"), result)
     end)
 
+    -- Vendor's TooltipContains(PlayerClass()): the class's token or name, in the text.
+    it("compares a text field with a player value, by any of its names", function()
+      search:Add(MockSearchItem({ slotkey = "trinket", name = "Someone's Trinket", tooltipText = "Classes: Paladin",
+        traits = { stats = {} } }))
+      search:Add(MockSearchItem({ slotkey = "mage", name = "Robe", tooltipText = "Classes: Mage", traits = { stats = {} } }))
+      assert.are.same(keys("trinket"), search:Search("tooltip %= player.class"))
+      assert.are.same(keys("trinket"), search:Search("name = player.name"))
+      assert.are.same(keys("sword", "swordlong", "potion", "cheese", "cold", "mage"),
+        search:Search("NOT tooltip %= player.class"))
+    end)
+
     it("keeps reading a word compared with a text field as text", function()
       search:Add(MockSearchItem({ slotkey = "lvl", name = "Level Up", traits = { stats = {} } }))
       assert.are.same(keys("lvl"), search:Search("name = level"))

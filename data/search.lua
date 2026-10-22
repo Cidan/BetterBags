@@ -1270,7 +1270,9 @@ function search:EvaluateAST(node, within)
     elseif cmp.right.type == 'word' and rightItem and not leftItem and FLIPPED[cmp.operator] then
       field, constant, operator = cmp.right.value, cmp.left, FLIPPED[cmp.operator]
     end
-    if field and LIST_KEYS[ALIASES[string.lower(field)] or string.lower(field)] == nil then
+    -- A value with several names (a player's class: its token and its name) is checked item by item.
+    if field and LIST_KEYS[ALIASES[string.lower(field)] or string.lower(field)] == nil
+      and type(self:ValueOf(constant)) ~= 'table' then
       local value = indexValue(self:ValueOf(constant))
       if value == nil then return {} end
       return evaluate_condition(field, operator, value)
@@ -1280,8 +1282,9 @@ function search:EvaluateAST(node, within)
   end
 
   -- comparison answers field op word as queries always have, reading the word by the field's type:
-  -- a player value, money or another numeric field compared with a numeric field takes the new
-  -- meaning (a number, item by item); for anything else the word is what it always was.
+  -- a player value is the player's with any field; money or another numeric field compared with a
+  -- numeric field takes the new meaning (a number, item by item); for anything else the word is what
+  -- it always was.
   ---@param cmp QueryNode
   ---@return table<string, boolean>
   local function comparison(cmp)
@@ -1303,8 +1306,11 @@ function search:EvaluateAST(node, within)
       return evaluate_condition(cmp.field, cmp.operator, cmp.value)
     end
     local value = string.lower(cmp.value)
+    if value:sub(1, 7) == 'player.' then
+      return asExpression()
+    end
     if NUMERIC[key or ''] then
-      if value:sub(1, 7) == 'player.' or (fieldKey(value) ~= nil and tonumber(value) == nil) then
+      if fieldKey(value) ~= nil and tonumber(value) == nil then
         return asExpression()
       end
       local money = moneyOf(value)

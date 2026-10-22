@@ -242,10 +242,13 @@ Step 4 of docs/vendor-compat.md ("Proposed: the math"), with the player values o
 - **Reading a word** (`search:ValueOf`): quoted, text; `player.<name>`, a player value; a number or
   money (`5g`, `50s`, `1g50s`, `20c`, `moneyOf`), a number; a field (`fieldKey`, aliases included),
   the item's snapshot value; anything else, text. A `comparison` reads its word by the field's type,
-  so every query keeps its meaning: only for a numeric field does a player value, money or another
-  numeric field's name take its new meaning; with a text field the word is text (`name = level`); an
-  equipment slot token (`INVTYPE_HEAD`) on `slot` is the slot's name; a word naming no field on the
-  left matches nothing, as an unknown field always has, unless it is a player value or a number.
+  so every query keeps its meaning: a `player.` word is the player value with any field (Vendor's
+  `TooltipContains(PlayerClass())` converts to `tooltip %= player.class`); only for a numeric field do
+  money and another numeric field's name take their new meaning; with a text field any other word is
+  text (`name = level`); an equipment slot token (`INVTYPE_HEAD`) on `slot` is the slot's name; a word
+  naming no field on the left matches nothing, as an unknown field always has, unless it is a player
+  value or a number. A constant that is a list (a class's token and name, every profession) is
+  checked item by item, any of its values matching.
 - **Answering a comparison** (`EvaluateAST`): with no field on either side, the same for every item
   (`everything`) or none; a bare field against a constant (folded: player values and arithmetic on
   them), from the index as before, sides swapped (`FLIPPED`; `%=` cannot be) when the field is on the
@@ -331,3 +334,77 @@ item's own source (`source = known` / `unknown`), text fields.
   following), `spec/search_spec.lua` (the fields; per-field re-index tests),
   `spec/next/merchant_spec.lua`, `spec/debug_dump_harness_spec.lua` (the capture's cloak). 14
   mutations: three first survived and led to tests.
+
+### 18. Converting Vendor's Rules (`util/vendorrule.lua`, `data/vendorimport.lua`)
+Step 5 of docs/vendor-compat.md: a Vendor rule becomes a BetterBags search (decision 2: Vendor's
+spellings are converted, never accepted in search). **Functions only, asked (2026-10-22):** no window
+calls them; how a player imports is still to be designed.
+- **`VendorRule:Convert(script, opts)`** returns `{ query?, problem?, notes }`: the search, or the
+  first reason it cannot be made, and what the search reads differently from Vendor. `opts.params`
+  gives the rule's parameters (`ITEMLEVEL`), `opts.classic` Classic's binding and
+  `CURRENT_EXPANSION`, `opts.globals` where stat names are read (default `_G`). The rule is never run:
+  it is lexed and parsed as Lua 5.1 (comments short and long, every string form, hex and exponent
+  numbers, a call with a bare string argument; Lua's priorities from `lparser.c`, `not` and unary minus
+  at 8, `^` and `..` to the right). Anything else Lua allows but a rule has no use for (tables,
+  functions, `[ ]`, methods other than `find` and `match`) is a problem. A query the search would not
+  parse is a problem too (never seen; a guard).
+- **Reading the result as Vendor does** (`rules/rule.lua`): a boolean as is, a number when not 0,
+  anything else false; `and`/`or` give one of their values, so `Level or IsToy` is `ilvl != 0` and
+  `IsToy or Level` is `toy = true OR ilvl != 0`. Inside the rule every value of an item is true
+  (Vendor's properties are never nil). `and`/`or` between two constants used as a value give Lua's
+  answer with a note (`Quality == (POOR or COMMON)` is `rarity = 0`); between conditions, a condition.
+  A rule that is the same for every item is a problem ("It matches every item", "no item").
+- **Properties**: numbers to their fields (`Level` `ilvl`, `Quality` `rarity`, `TypeId` `class`,
+  `CraftedQuality` `quality`, ...), `ExpansionPackId` to `exp` against a number and `expansionid` in
+  arithmetic, `TotalValue` `price * count`, `UnitGoldValue` `floor(price / 10000)`; texts (`Name`,
+  `Type`, `SubType`, `GUID`, `UpgradeTrack`); booleans as `field = true` (`IsEquipment`, `IsToy`,
+  `IsAlreadyKnown`, `IsUsable`, `IsEquippable`, `HasAppearance` and `IsTransmogEquipment` as
+  `transmoggable`, ...); `IsSoulbound` the three soulbound scopes on retail and `bound = true` on
+  Classic (binding.lua has no split there); `IsBindOnEquip` `boe` or `wue`; `IsWarbound` `warbound` or
+  `wue`; `IsUnsellable` `price = 0`; `IsFullyUpgraded`; `IsProfessionEquipment` `equipment = true AND
+  class = 19`; the appearance flags `appearance = known`/`unknown` (noted: Vendor counts soulbound
+  items as collected); `IsBagAndSlot` always true and `IsEquipped` always false for a bag item. With
+  nothing to read: `Link`, `InventoryType`, `IsConduit`, `IsAzeriteItem`, the pet's name, type,
+  tradability and species, `AppearanceId`, `SourceId`, the raw tooltip and location. A property called
+  as a function (`Level()`, old rules) is the property, noted.
+- **Slots**: `EquipLoc` holds the token, so `EquipLoc == "INVTYPE_HEAD"` is `slot == INVTYPE_HEAD`.
+  Vendor imports Blizzard's `INVTYPE_HEAD` global, the slot's localized name (rules/manager.lua,
+  `ImportGlobals`), so `EquipLoc == INVTYPE_HEAD` never matches in Vendor: it converts to the slot
+  comparison it means, with a note. `EquipLocName == INVTYPE_HEAD` converts without one.
+- **Functions**: Vendor's player functions to `player.*`; `TooltipContains(text)` `tooltip %= "text"`
+  (a Lua pattern of plain characters is read as plain text, `%` escapes dropped and a note when it has
+  `. * + - ? ( )`; classes, sets and anchors are a problem; a side or line is noted; a player text
+  works, `TooltipContains(PlayerClass())` being `tooltip %= player.class`); `HasStat` through Vendor's
+  alias table to Blizzard's stat names (`stat == "Critical Strike"`; `armor` is "Bonus Armor"), an
+  unknown alias dropped as Vendor drops it; `HasProfession` to the primary professions' skill lines
+  (Vendor checks only those); `IsInEquipmentSet()` `inset = true`, with names `equipmentset ==`;
+  `TotalItemCount` `total` (noted when it asks for the bank); `WatermarkLevel()` `slotbest` (the
+  account's is a problem); `CurrentEquippedLevel()` `slotequipped`; `Pawn_IsUpgrade()` `upgrade =
+  true`, noted; `math.min`/`max`/`floor`/`ceil`/`abs`, folded when fixed; `string.find`/`match` and
+  `Name:find(...)` on an item's text `field %= "text"`. Vendor's lists (`IsInList`, ...) and other
+  addons' functions (TSM, Auctionator, All The Things, Can I Mog It, Pawn's others) are problems.
+- **Constants**: Vendor's qualities, expansions (`CURRENT_EXPANSION` as Vendor sets it: The War Within
+  on retail, Mists on Classic), professions, `INVSLOT_*`; a rule's parameters before them.
+- **The search written**: numbers compare with `=`/`!=`, texts with `==`/`~=` (quoted, single quotes
+  when the text has a double one), conditions `field = true`; parentheses only where precedence needs
+  them; a negative number one word (`-5`), unary minus spaced (`- count`); numbers in `%.14g`, or
+  `%.17g` when that would not read back exactly.
+- **`VendorImport`**: `Rules()` reads `Vendor_CustomRuleDefinitions` (only there while Vendor is
+  loaded): the list Vendor reads, then the entries an older Vendor saved under their ID (Vendor's own
+  test data has three; Vendor no longer reads them), by ID; each rule once, whatever its ID's case.
+  Each rule's `params` are its `Params` defaults, overridden by the active profile's entry
+  (`Vendor_Profiles[Vendor_ActiveProfile]`, its `rules:keep`/`sell`/`destroy` lists, `{ rule = id, KEY
+  = value }`, ID case ignored). `Convert(rule)` converts for the client BetterBags runs on.
+  `Import(ctx, rules?)` makes a saved search category (`categories:CreateCategory`, `save = true`) per
+  rule that converts, named as the rule (trimmed); a name already taken or a rule that does not convert
+  is skipped with its reason; one `bags/Rederive { resetLayout, buttons }` when anything was made. It
+  returns `{ created = { rule, query, notes }, skipped = { rule, reason } }`.
+- **Coverage:** `spec/vendorrule_spec.lua`: Vendor's built-in and extension rules (rules/definitions.lua,
+  systems/extensionmanager: the 25 distinct scripts that convert, Classic's included, and the 8 that
+  read Vendor's lists or another addon) and the corpus's 23 player rules, each against its expected
+  search or problem; Lua's syntax and priorities; every property, function and constant; and 4,500 random rules
+  over 40 random items (three seeds) run as Lua the way Vendor runs them and, converted, through the real
+  search: the same items every time. `spec/vendorimport_spec.lua`: Vendor's own saved-variables test
+  data (its ten custom rules), parameters from defaults and the active profile, the client, and every
+  import outcome. 108 mutations: 26 first survived and led to tests (one, OR's parentheses, to removing
+  code that could never run).
