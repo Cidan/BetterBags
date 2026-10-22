@@ -39,6 +39,8 @@ local SNAPSHOT_FIELDS = {
   'kind', 'name', 'type', 'subtype', 'category', 'guid', 'expansion', 'equipmentlocation',
   'binding', 'tooltip', 'bagname', 'level', 'rarity', 'quality', 'id', 'stackcount', 'class', 'subclass',
   'bagid', 'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
+  'minlevel', 'stacksize', 'price', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable', 'upgradeable',
+  'track', 'upgradelevel', 'upgrademax', 'maxlevel',
 }
 -- expansionid is not compared: it follows expansion, which is.
 
@@ -98,7 +100,6 @@ local function fillSnapshot(s, item)
   s.bagname = item.bagName
   s.level = info.currentItemLevel
   s.rarity = info.itemQuality
-  s.quality = info.craftingQuality
   s.id = info.itemID
   s.stackcount = info.currentItemCount
   s.class = info.classID
@@ -112,6 +113,32 @@ local function fillSnapshot(s, item)
   s.bound = bindingInfo and bindingInfo.bound
   s.quest = item.questInfo and item.questInfo.isQuestItem
   s.activequest = item.questInfo and item.questInfo.isActive
+  -- Read from the item's link once its data has loaded (items:ReadItemTraits); an item read cold
+  -- has none (rule #1, data-loader.md §19).
+  local t = info.traits
+  s.quality = t and t.craftingQuality
+  s.minlevel = t and t.minLevel
+  s.stacksize = t and t.stackSize
+  s.price = t and t.sellPrice
+  s.equipment = t and t.isEquipment
+  s.hasuse = t and t.hasUse
+  s.cosmetic = t and t.isCosmetic
+  s.pet = t and t.isPet
+  s.scrappable = t and t.isScrappable
+  s.upgradeable = t and t.upgradeTrack ~= nil
+  s.track = t and t.upgradeTrack
+  s.upgradelevel = t and t.upgradeLevel
+  s.upgrademax = t and t.upgradeMax
+  -- Vendor's MaxLevel: the fully upgraded item level, never below the current one.
+  local level = info.currentItemLevel
+  if t and t.upgradeMaxItemLevel and level then
+    s.maxlevel = math.max(t.upgradeMaxItemLevel, level)
+  elseif t then
+    s.maxlevel = level
+  else
+    s.maxlevel = nil
+  end
+  s.stats = copyList(s.stats, t and t.stats)
   return s
 end
 
@@ -133,15 +160,18 @@ local function sameSnapshot(a, b)
   for _, field in ipairs(SNAPSHOT_FIELDS) do
     if a[field] ~= b[field] then return false end
   end
-  return sameList(a.sets, b.sets) and sameList(a.bonusIDs, b.bonusIDs)
+  return sameList(a.sets, b.sets) and sameList(a.bonusIDs, b.bonusIDs) and sameList(a.stats, b.stats)
 end
 
 -- Number and boolean snapshot fields share their name with the index they go into.
 local NUMBER_FIELDS = {
   'level', 'rarity', 'quality', 'id', 'stackcount', 'class', 'subclass', 'bagid', 'slotid', 'bindtype',
-  'expansionid',
+  'expansionid', 'minlevel', 'stacksize', 'price', 'upgradelevel', 'upgrademax', 'maxlevel',
 }
-local BOOL_FIELDS = { 'reagent', 'isbound', 'bound', 'quest', 'activequest' }
+local BOOL_FIELDS = {
+  'reagent', 'isbound', 'bound', 'quest', 'activequest', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable',
+  'upgradeable',
+}
 
 -- scratch is reused to snapshot each item SyncKind compares, so an unchanged item costs no
 -- allocation.
@@ -182,6 +212,8 @@ function search:Init()
   self:CreateIndex('bagname')
   self:CreateIndex('guid')
   self:CreateIndex('binding')
+  self:CreateIndex('track')
+  self:CreateIndex('stat')
   -- Tooltip text runs to hundreds of characters; indexing every prefix of it is
   -- quadratic per item and dominated the cost of each sweep.
   self:CreateIndex('tooltip', true)
@@ -198,6 +230,12 @@ function search:Init()
   self:CreateIndex('slotid')
   self:CreateIndex('bindtype')
   self:CreateIndex('expansionid')
+  self:CreateIndex('minlevel')
+  self:CreateIndex('stacksize')
+  self:CreateIndex('price')
+  self:CreateIndex('upgradelevel')
+  self:CreateIndex('upgrademax')
+  self:CreateIndex('maxlevel')
   self:CreateIndex('bonusid')
 
   -- Boolean indexes
@@ -206,6 +244,12 @@ function search:Init()
   self:CreateIndex('bound') -- from Binding
   self:CreateIndex('quest')
   self:CreateIndex('activequest')
+  self:CreateIndex('equipment')
+  self:CreateIndex('hasuse')
+  self:CreateIndex('cosmetic')
+  self:CreateIndex('pet')
+  self:CreateIndex('scrappable')
+  self:CreateIndex('upgradeable')
 
   self.defaultIndicies = {
     'name',
@@ -405,6 +449,10 @@ function search:indexSnapshot(slotkey, s)
   self:addStringToIndex(idx.binding, s.binding, slotkey)
   self:addStringToIndex(idx.tooltip, s.tooltip, slotkey)
   self:addStringToIndex(idx.bagname, s.bagname, slotkey)
+  self:addStringToIndex(idx.track, s.track, slotkey)
+  for _, stat in ipairs(s.stats) do
+    self:addStringToIndex(idx.stat, stat, slotkey)
+  end
   for _, field in ipairs(NUMBER_FIELDS) do
     if s[field] ~= nil then
       self:addNumberToIndex(idx[field], s[field], slotkey)
@@ -439,6 +487,10 @@ function search:removeSnapshot(slotkey, s)
   self:removeStringFromIndex(idx.binding, s.binding, slotkey)
   self:removeStringFromIndex(idx.tooltip, s.tooltip, slotkey)
   self:removeStringFromIndex(idx.bagname, s.bagname, slotkey)
+  self:removeStringFromIndex(idx.track, s.track, slotkey)
+  for _, stat in ipairs(s.stats) do
+    self:removeStringFromIndex(idx.stat, stat, slotkey)
+  end
   for _, field in ipairs(NUMBER_FIELDS) do
     if s[field] ~= nil then
       self:removeNumberFromIndex(idx[field], s[field], slotkey)

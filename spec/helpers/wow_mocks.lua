@@ -2755,6 +2755,18 @@ _G.C_Item.GetItemFamily = function(itemInfo) return _G._itemFamilies[itemInfo] e
 _G.C_TradeSkillUI = _G.C_TradeSkillUI or {}
 _G.C_TradeSkillUI.GetItemReagentQualityByItemInfo = function(itemInfo) return nil end
 _G.C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function(itemInfo) return nil end
+-- What items are, from ItemDocumentation.lua; by default an item has none of these (no Use spell,
+-- not cosmetic, no upgrade track, not scrappable). GetItemSpell is documented with non-nilable
+-- returns, but Blizzard's /use code treats its result as a truth value (ChatFrameUtilOverrides.lua),
+-- and an item with no spell returns nothing.
+_G.C_Item.GetItemSpell = function(itemInfo) return nil end
+_G.C_Item.IsCosmeticItem = function(itemInfo) return false end
+_G.C_Item.GetItemUpgradeInfo = function(itemInfo) return nil end
+_G.C_Item.CanScrapItem = function(itemLocation) return false end
+-- C_PetJournal.GetPetInfoByItemID(itemID) -> name, ..., speciesID (13th), nothing for an item that
+-- teaches no pet (warcraft.wiki.gg; Blizzard's PlayerChoice treats it as a truth value).
+_G.C_PetJournal = _G.C_PetJournal or {}
+_G.C_PetJournal.GetPetInfoByItemID = function(itemID) return nil end
 -- C_Item.CanBeRefunded(itemLocation) -> bool (ItemDocumentation.lua). Specs list
 -- refundable locations in _G._refundableLocations["bag:slot"].
 _G._refundableLocations = {}

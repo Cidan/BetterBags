@@ -149,8 +149,8 @@ local function recordOf(item)
     info.itemID = info.itemID or instID
     info.itemType, info.itemSubType, info.itemEquipLoc = instType, instSubType, instEquipLoc
     info.classID, info.subclassID = instClassID, instSubclassID
-    local name, _, quality, level, minLevel, itemType, itemSubType, _, equipLoc, _, sellPrice, classID, subclassID,
-      bindType, expacID, _, isCraftingReagent = C_Item.GetItemInfo(link)
+    local name, _, quality, level, minLevel, itemType, itemSubType, stackSize, equipLoc, _, sellPrice, classID,
+      subclassID, bindType, expacID, _, isCraftingReagent = C_Item.GetItemInfo(link)
     if name ~= nil then
       warm = true
       info.itemName = name
@@ -167,7 +167,7 @@ local function recordOf(item)
       info.expacID = expacID
       info.isCraftingReagent = isCraftingReagent
       info.currentItemLevel = C_Item.GetDetailedItemLevelInfo and C_Item.GetDetailedItemLevelInfo(link) or level
-      info.craftingQuality = items:CraftingQualityOf(link)
+      info.traits = items:ReadItemTraits(info.itemID, link, minLevel, stackSize, sellPrice)
     end
   end
   info.tooltipText = tooltipScanner:GetMerchantItemText(item.index)

@@ -9,8 +9,8 @@ BetterBags' query engine.
 **Status** (2026-10-21): decided (below, "Decisions"). Built: negation (NOT and `!=` match every
 indexed item outside their part, anywhere in a query; `.claude/rules/search-indexing.md` §5), and
 precedence (AND before OR, saved rules rewritten once to keep their meaning; §6), `bagname` (§7),
-expansions in release order (§8), and `quality` as the crafting quality tier (§9). The rest is
-planned.
+expansions in release order (§8), `quality` as the crafting quality tier (§9), and the first batch
+of new item fields (§10; "Proposed: new fields" marks each). The rest is planned.
 
 ## Why
 
@@ -440,28 +440,28 @@ with its invalidation, as that file requires.
 |---|---|---|---|---|
 | `quality` (done) | number | the crafting tier: `GetItemReagentQualityByItemInfo`, else `GetItemCraftedQualityByItemInfo`, from the link | retail | the slot changes |
 | `bagname`, `bag` (done) | text | `items:GetPlainBagName(bagid)` (`C_Container.GetBagName`) | all | read every sweep |
-| `minlevel` | number | `GetItemInfo(link)` 5th | all | the slot changes |
-| `maxlevel` | number | `GetItemUpgradeInfo(link).maxItemLevel`, else `level` | retail (else `level`) | the slot changes |
-| `upgradeable`, `track`, `upgradelevel`, `upgrademax` | bool, text, numbers | `GetItemUpgradeInfo(link)` | retail | the slot changes |
-| `stacksize` | number | `GetItemInfo` 8th | all | |
-| `price`, `totalprice` | numbers (copper) | `GetItemInfo(link)` 11th; times `count` | all | the slot changes |
-| `sellable` | bool | not `ContainerItemInfo.hasNoValue` | all | the slot changes (container info, compared every sweep, caches.md §1) |
-| `equipment` | bool | `C_Item.IsEquippableItem(id)` | all | |
-| `usable`, `equippable` | bool | `C_PlayerInfo.CanUseItem(id)` (and `equipment`) | retail | skills, level, spec (caches.md §2's events) |
-| `hasuse` | bool | `C_Item.GetItemSpell(id)` (verify) | all | |
-| `toy`, `known` | bool | `C_ToyBox.GetToyInfo`, `PlayerHasToy`; the tooltip's `ITEM_SPELL_KNOWN` line | retail (toys) | learning it (`NEW_TOY_ADDED`; for the rest, the tooltip text, re-scanned on `TOOLTIP_DATA_UPDATE`, tooltip-scanning.md) |
-| `pet`, `petcount`, `petlimit`, `collectable` | bool, numbers | `C_PetJournal.GetPetInfoByItemID`, `GetNumCollectedInfo` | retail | learning a pet (`NEW_PET_ADDED`) |
-| `cosmetic` | bool | `C_Item.IsCosmeticItem` | retail | |
-| `hasappearance`, `appearance`, `source` | bool, known/unknown | `C_TransmogCollection` as Vendor (above) | retail | collecting an appearance (`TRANSMOG_COLLECTION_SOURCE_ADDED`); today a known staleness of kept slots, caches.md §1 |
-| `transmoggable` | bool | the equip location | retail | |
-| `professiongear` | bool | `equipment` and class 19 | retail | |
-| `scrappable` | bool | `C_Item.CanScrapItem(location)` | retail | |
-| `soulbound`, `boe`, `bou`, `warbound`, `wue` | bool | `binding` (above) | all (warbound: retail) | |
-| `inset` | bool | `equipmentSets` is not empty | all with sets | `EQUIPMENT_SETS_CHANGED` (already a recalculation) |
-| `stat` | text set | `GetItemStats(link)` keys, localized short names and Vendor's aliases | all | |
-| `upgrade` | bool | the item's upgrade verdict (`data.isUpgrade`) | all | caches.md §2 |
-| `total` | number | the item's count across the kind's bags (the virtual stack total) | all | every sweep |
-| `slotbest`, `slotequipped` | numbers, per item | `C_ItemUpgrade.GetHighWatermarkForItem(link)`; the worn gear (`equipmentCache`) | retail; all | `PLAYER_EQUIPMENT_CHANGED` |
+| `minlevel` (done) | number | `GetItemInfo(link)` 5th | all | the slot changes |
+| `maxlevel` (done) | number | `GetItemUpgradeInfo(link).maxItemLevel`, else `level` | retail (else `level`) | the slot changes |
+| `upgradeable`, `track`, `upgradelevel`, `upgrademax` (done) | bool, text, numbers | `GetItemUpgradeInfo(link)` | retail | the slot changes |
+| `stacksize` (done) | number | `GetItemInfo(link)` 8th | all | the slot changes |
+| `price` (done); `totalprice` (dropped: `price * count` once arithmetic exists) | numbers (copper) | `GetItemInfo(link)` 11th | all | the slot changes |
+| `sellable` (dropped: `price > 0`) | bool | | | |
+| `equipment` (done) | bool | `C_Item.IsEquippableItem(link)` | all | the slot changes |
+| `usable`, `equippable` (next batch) | bool | `C_PlayerInfo.CanUseItem(id)` (and `equipment`) | retail | skills, level, spec (caches.md §2's events) |
+| `hasuse` (done) | bool | `C_Item.GetItemSpell(link)` returns something (Blizzard's `/use` code's test) | all | the slot changes |
+| `toy`, `known` (after a capture: no Blizzard code tells a bag item is a toy) | bool | `C_ToyBox.GetToyInfo`, `PlayerHasToy`; the tooltip's `ITEM_SPELL_KNOWN` line | retail (toys) | learning it (`NEW_TOY_ADDED`; for the rest, the tooltip text, re-scanned on `TOOLTIP_DATA_UPDATE`, tooltip-scanning.md) |
+| `pet` (done); `petcount`, `petlimit`, `collectable` (next batch) | bool, numbers | `C_PetJournal.GetPetInfoByItemID`, `GetNumCollectedInfo` | retail | learning a pet (`NEW_PET_ADDED`) |
+| `cosmetic` (done) | bool | `C_Item.IsCosmeticItem` | retail | the slot changes |
+| `hasappearance`, `appearance`, `source` (next batch) | bool, known/unknown | `C_TransmogCollection` as Vendor (above) | retail | collecting an appearance (`TRANSMOG_COLLECTION_SOURCE_ADDED`); today a known staleness of kept slots, caches.md §1 |
+| `transmoggable` (with the appearance fields) | bool | | retail | |
+| `professiongear` (dropped: `equipment = true AND class = 19`) | bool | | | |
+| `scrappable` (done) | bool | `C_Item.CanScrapItem(location)` | retail, bag slots | the slot changes |
+| `soulbound`, `boe`, `bou`, `warbound`, `wue` (dropped: `binding = ...` with OR says each) | bool | | | |
+| `inset` (next batch) | bool | `equipmentSets` is not empty | all with sets | `EQUIPMENT_SETS_CHANGED` (already a recalculation) |
+| `stat` (done) | text set | `GetItemStats(link)` keys' global strings (the names match from their start: `stat = crit`) | all | the slot changes |
+| `upgrade` (next batch) | bool | the item's upgrade verdict (`data.isUpgrade`) | all | caches.md §2 |
+| `total` (next batch) | number | the item's count across the kind's bags (the virtual stack total) | all | every sweep |
+| `slotbest`, `slotequipped` (with the player values) | numbers, per item | `C_ItemUpgrade.GetHighWatermarkForItem(link)`; the worn gear (`equipmentCache`) | retail; all | `PLAYER_EQUIPMENT_CHANGED` |
 | `player.level`, `player.ilvl`, `player.equippedilvl`, `player.class`, `player.classid`, `player.spec`, `player.specid`, `player.profession`, `player.name`, `player.realm` | values | `UnitLevel`, `GetAverageItemLevel`, `UnitClass`, `GetSpecializationInfo`, `GetProfessions`, `UnitFullName` | all (spec: retail) | the events above |
 
 Every field is read only once the item's data has loaded (rule #1, the player's: item data is

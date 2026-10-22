@@ -2918,14 +2918,76 @@ function items:HasReagentBag()
   return true
 end
 
----@param itemLink string
----@return Enum.ItemBind?
-function items:GetBindTypeFromLink(itemLink)
-  local bindType = nil
-  if strfind(itemLink, "item:") then
-    bindType = select(14, C_Item.GetItemInfo(itemLink))
+-- ReadLinkInfo reads C_Item.GetItemInfo for the slot's link (the item in the slot), where the item
+-- ID describes its base item: its required level, max stack, sell price and bind type. Only an item
+-- link ("item:"; a caged pet's is battlepet:) is read; loaded is false when its data has not loaded.
+---@param itemLink? string
+---@return number? minLevel, number? stackSize, number? sellPrice, Enum.ItemBind? bindType, boolean loaded
+function items:ReadLinkInfo(itemLink)
+  if itemLink == nil or not strfind(itemLink, "item:") then
+    return nil, nil, nil, nil, true
   end
-  return bindType
+  local name, _, _, _, minLevel, _, _, stackSize, _, _, sellPrice, _, _, bindType = C_Item.GetItemInfo(itemLink)
+  return minLevel, stackSize, sellPrice, bindType, name ~= nil
+end
+
+-- ReadItemTraits reads what the search knows of an item beyond its name and type
+-- (search-indexing.md §10), from the slot's link: what it is, its upgrade track, its stats, its
+-- crafting tier. minLevel, stackSize and sellPrice are its link's (ReadLinkInfo). Call it only once
+-- the item's data has loaded (rule #1, data-loader.md §19).
+---@param itemID number
+---@param itemLink string
+---@param minLevel? number
+---@param stackSize? number
+---@param sellPrice? number
+---@return ItemTraits
+function items:ReadItemTraits(itemID, itemLink, minLevel, stackSize, sellPrice)
+  ---@type ItemTraits
+  local traits = {
+    minLevel = minLevel,
+    stackSize = stackSize,
+    sellPrice = sellPrice,
+    craftingQuality = self:CraftingQualityOf(itemLink),
+    stats = {},
+  }
+  if C_Item.IsEquippableItem then
+    traits.isEquipment = C_Item.IsEquippableItem(itemLink) == true
+  end
+  if C_Item.GetItemSpell then
+    traits.hasUse = C_Item.GetItemSpell(itemLink) ~= nil
+  end
+  if C_Item.IsCosmeticItem then
+    traits.isCosmetic = C_Item.IsCosmeticItem(itemLink) == true
+  end
+  -- Takes an item ID only: a link raises an error (warcraft.wiki.gg).
+  if C_PetJournal and C_PetJournal.GetPetInfoByItemID then
+    local name, _, _, _, _, _, _, _, _, _, _, _, speciesID = C_PetJournal.GetPetInfoByItemID(itemID)
+    traits.isPet = name ~= nil
+    traits.petSpeciesID = speciesID
+  end
+  -- Only equipment has a track (Vendor asks only equipment): one without a track string has none.
+  if traits.isEquipment and C_Item.GetItemUpgradeInfo then
+    local upgrade = C_Item.GetItemUpgradeInfo(itemLink)
+    if upgrade and upgrade.trackString then
+      traits.upgradeTrack = upgrade.trackString
+      traits.upgradeLevel = upgrade.currentLevel
+      traits.upgradeMax = upgrade.maxLevel
+      traits.upgradeMaxItemLevel = upgrade.maxItemLevel
+    end
+  end
+  -- The stats' names (GetItemStats keys are global strings: ITEM_MOD_HASTE_RATING_SHORT is "Haste").
+  local getItemStats = C_Item.GetItemStats or _G.GetItemStats
+  local stats = getItemStats and getItemStats(itemLink)
+  if stats then
+    for key in pairs(stats) do
+      local name = _G[key]
+      if type(name) == "string" and name ~= "" then
+        table.insert(traits.stats, name)
+      end
+    end
+    table.sort(traits.stats)
+  end
+  return traits
 end
 
 ---@param itemMixin ItemMixin
@@ -3112,6 +3174,10 @@ function items:AttachItemInfo(data, kind, containerInfo)
     equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
     tooltipText = tooltipText,
   })
+  -- Scrapping asks about the item where it is; only a bag slot has a location.
+  if data.itemInfo.traits and C_Item.CanScrapItem then
+    data.itemInfo.traits.isScrappable = C_Item.CanScrapItem(itemLocation) == true
+  end
   return self:FinishItemData(data, kind, harvestIncomplete, true)
 end
 
@@ -3179,11 +3245,15 @@ function items:ReadItemProperties(itemID, itemLink)
   props.classID = instClassID or props.classID
   props.subclassID = instSubclassID or props.subclassID
 
-  props.bindType = self:GetBindTypeFromLink(itemLink) or bindType or 0 --link overrides itemID if set
-  -- Item data is read only once it has loaded (C_Item.GetItemInfoInstant aside). A read without it
-  -- is incomplete, and the item is read again (harvestIncomplete); until then it has none of these.
+  local linkMinLevel, linkStackSize, linkSellPrice, linkBindType, linkLoaded = self:ReadLinkInfo(itemLink)
+  props.bindType = linkBindType or bindType or 0 --link overrides itemID if set
+  -- Item data is read only once it has loaded (C_Item.GetItemInfoInstant aside; rule #1,
+  -- data-loader.md §19): the item in the slot (its link) as well as its base item. A read without it
+  -- is incomplete, and the item is read again (harvestIncomplete); until then it has no traits.
+  props.incomplete = props.incomplete or not linkLoaded
   if not props.incomplete then
-    props.craftingQuality = self:CraftingQualityOf(itemLink)
+    props.traits = self:ReadItemTraits(itemID, itemLink, linkMinLevel or props.itemMinLevel,
+      linkStackSize or props.itemStackCount, linkSellPrice or props.sellPrice)
   end
 
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
@@ -3247,7 +3317,7 @@ function items:ItemInfoOf(props, slot)
     expacID = props.expacID,
     setID = props.setID or 0,
     isCraftingReagent = props.isCraftingReagent,
-    craftingQuality = props.craftingQuality,
+    traits = props.traits,
     effectiveIlvl = props.effectiveIlvl --[[@as number]],
     isPreview = props.isPreview --[[@as boolean]],
     baseIlvl = props.baseIlvl --[[@as number]],

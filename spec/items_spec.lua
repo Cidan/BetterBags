@@ -363,12 +363,11 @@ describe("Items (New Data Farming Engine)", function()
 
   -- The quality search field: an item's crafting quality tier (docs/vendor-compat.md).
   describe("crafting quality", function()
-    local saved, link
+    local saved
 
     before_each(function()
       saved = { api = _G.C_TradeSkillUI, reagent = C_TradeSkillUI.GetItemReagentQualityByItemInfo,
         crafted = C_TradeSkillUI.GetItemCraftedQualityByItemInfo }
-      link = "|cffffffff|Hitem:42::::::::80:::::|h[Draconium Ore]|h|r"
     end)
 
     after_each(function()
@@ -402,27 +401,163 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_TradeSkillUI = nil
       assert.is_nil(items:CraftingQualityOf(42))
     end)
+  end)
 
-    -- Rule #1: item data is read only once it has loaded (C_Item.GetItemInfoInstant aside). A read
-    -- without it is marked incomplete and read again; until then the item has no tier.
-    it("is not read for an item whose data has not loaded", function()
+  -- What the search knows of an item beyond its name and type (docs/vendor-compat.md, "Proposed:
+  -- new fields"): read from the slot's link, and only once the item's data has loaded (rule #1,
+  -- data-loader.md §19). An item read cold has no traits until it is read again.
+  describe("item traits", function()
+    local saved, link, base
+    local function savedOf(t, k) return { t, k, t[k] } end
+
+    before_each(function()
+      link = "|cffa335ee|Hitem:42::::::::80::::2:6652:10390::::|h[Gleaming Blade]|h|r"
+      base = "|cffffffff|Hitem:42::::::::80:::::|h[Gleaming Blade]|h|r"
+      saved = {
+        savedOf(_G, "C_TradeSkillUI"), savedOf(_G, "C_PetJournal"),
+        savedOf(C_Item, "GetItemInfo"), savedOf(C_Item, "GetItemStats"), savedOf(C_Item, "IsEquippableItem"),
+        savedOf(C_Item, "GetItemSpell"), savedOf(C_Item, "IsCosmeticItem"), savedOf(C_Item, "GetItemUpgradeInfo"),
+        savedOf(_G, "ITEM_MOD_CRIT_RATING_SHORT"), savedOf(_G, "ITEM_MOD_HASTE_RATING_SHORT"),
+      }
+      _G.ITEM_MOD_CRIT_RATING_SHORT = "Critical Strike"
+      _G.ITEM_MOD_HASTE_RATING_SHORT = "Haste"
+      -- The link describes the item in the slot, the item ID its base item: they answer differently.
+      C_Item.GetItemInfo = function(info)
+        if info == link then
+          return "Gleaming Blade", link, 4, 600, 70, "Weapon", "Swords", 1, "INVTYPE_WEAPON", 1, 52000, 2, 7, 2, 10
+        end
+        return "Gleaming Blade", base, 4, 580, 68, "Weapon", "Swords", 1, "INVTYPE_WEAPON", 1, 41000, 2, 7, 1, 10
+      end
+      C_Item.GetItemStats = function(l)
+        if l == link then
+          return { ITEM_MOD_HASTE_RATING_SHORT = 120, ITEM_MOD_CRIT_RATING_SHORT = 80, ITEM_MOD_NOT_A_GLOBAL_SHORT = 1 }
+        end
+        return {}
+      end
+      C_Item.IsEquippableItem = function(l) return l == link end
+      C_Item.GetItemSpell = function(l) if l == link then return "Gleam", 1234 end end
+      C_Item.IsCosmeticItem = function(l) return l == link and false or nil end
+      C_Item.GetItemUpgradeInfo = function(l)
+        if l == link then
+          return { currentLevel = 3, maxLevel = 6, maxItemLevel = 619, trackString = "Hero", trackStringID = 1 }
+        end
+      end
+      _G.C_PetJournal = { GetPetInfoByItemID = function() return nil end }
+      _G.C_TradeSkillUI = { GetItemReagentQualityByItemInfo = function() return nil end,
+        GetItemCraftedQualityByItemInfo = function(l) return l == link and 3 or 1 end }
+    end)
+
+    after_each(function()
+      for i = #saved, 1, -1 do saved[i][1][saved[i][2]] = saved[i][3] end
+    end)
+
+    it("reads the required level, max stack and sell price from the slot's link", function()
+      local props = items:ReadItemProperties(42, link)
+      assert.are.equal(70, props.traits.minLevel)
+      assert.are.equal(1, props.traits.stackSize)
+      assert.are.equal(52000, props.traits.sellPrice)
+      assert.are.equal(2, props.bindType, "the link's bind type, as before")
+      assert.are.equal(68, props.itemMinLevel, "the fields read by item ID stay as they were")
+    end)
+
+    it("reads what the item is from its link", function()
+      local t = items:ReadItemProperties(42, link).traits
+      assert.are.equal(3, t.craftingQuality, "a crafted item's tier is its own")
+      assert.is_true(t.isEquipment)
+      assert.is_true(t.hasUse)
+      assert.is_false(t.isCosmetic)
+      assert.is_false(t.isPet)
+      assert.are.same({ "Critical Strike", "Haste" }, t.stats, "the stats' names, sorted, unknown keys left out")
+    end)
+
+    it("reads the upgrade track of equipment, as Vendor does", function()
+      local t = items:ReadItemProperties(42, link).traits
+      assert.are.equal("Hero", t.upgradeTrack)
+      assert.are.equal(3, t.upgradeLevel)
+      assert.are.equal(6, t.upgradeMax)
+      assert.are.equal(619, t.upgradeMaxItemLevel)
       local asked = 0
-      C_TradeSkillUI.GetItemReagentQualityByItemInfo = function() asked = asked + 1; return 2 end
-      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function() asked = asked + 1; return 2 end
-      local savedInfo = C_Item.GetItemInfo
+      C_Item.IsEquippableItem = function() return false end
+      C_Item.GetItemUpgradeInfo = function() asked = asked + 1 end
+      t = items:ReadItemProperties(42, link).traits
+      assert.is_nil(t.upgradeTrack)
+      assert.are.equal(0, asked, "not asked for an item that is not equipment")
+    end)
+
+    it("has no upgrade track for equipment the client gives none", function()
+      C_Item.GetItemUpgradeInfo = function() return { currentLevel = 0, maxLevel = 0, maxItemLevel = 600 } end
+      local t = items:ReadItemProperties(42, link).traits
+      assert.is_nil(t.upgradeTrack)
+      assert.is_nil(t.upgradeMaxItemLevel)
+    end)
+
+    -- C_PetJournal.GetPetInfoByItemID only takes an item ID (the wiki: a link raises an error).
+    it("asks whether it teaches a pet by item ID", function()
+      local asked
+      _G.C_PetJournal = { GetPetInfoByItemID = function(id)
+        asked = id
+        return "Albino Snake", 1, 1, 1, "", "", false, true, true, false, true, 1, 635
+      end }
+      local t = items:ReadItemProperties(42, link).traits
+      assert.are.equal(42, asked)
+      assert.is_true(t.isPet)
+      assert.are.equal(635, t.petSpeciesID)
+    end)
+
+    it("reads nothing a client does not have", function()
+      C_Item.IsCosmeticItem = nil
+      C_Item.GetItemUpgradeInfo = nil
+      C_Item.GetItemSpell = nil
+      _G.C_PetJournal = nil
+      local t = items:ReadItemProperties(42, link).traits
+      assert.is_nil(t.isCosmetic)
+      assert.is_nil(t.upgradeTrack)
+      assert.is_nil(t.hasUse)
+      assert.is_nil(t.isPet)
+      assert.is_true(t.isEquipment)
+    end)
+
+    -- Rule #1: no item data is read before the item's data has loaded.
+    it("has no traits, and reads none, while the item's data has not loaded", function()
+      local asked = 0
+      local function count() asked = asked + 1 end
+      C_Item.GetItemStats, C_Item.IsEquippableItem, C_Item.GetItemSpell = count, count, count
+      C_Item.IsCosmeticItem, C_Item.GetItemUpgradeInfo = count, count
+      _G.C_PetJournal = { GetPetInfoByItemID = count }
+      _G.C_TradeSkillUI = { GetItemReagentQualityByItemInfo = count, GetItemCraftedQualityByItemInfo = count }
       C_Item.GetItemInfo = function() return nil end
-      local read, props = pcall(items.ReadItemProperties, items, 42, link)
-      C_Item.GetItemInfo = savedInfo
-      assert(read, props)
+      local props = items:ReadItemProperties(42, link)
       assert.is_true(props.incomplete)
-      assert.is_nil(props.craftingQuality)
+      assert.is_nil(props.traits)
       assert.are.equal(0, asked)
     end)
 
-    -- A crafted item's tier is its own: two copies of one item can differ, and the link says which.
-    it("is read from the slot's link, not the item ID", function()
-      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function(info) return info == link and 3 or 1 end
-      assert.are.equal(3, items:ReadItemProperties(42, link).craftingQuality)
+    -- The base item can be loaded while the item in the slot is not; the read is incomplete then, so
+    -- it is read again.
+    it("has no traits while the slot's link has not loaded, though its item ID has", function()
+      local idOnly = C_Item.GetItemInfo
+      C_Item.GetItemInfo = function(info)
+        if info == link then return nil end
+        return idOnly(info)
+      end
+      local props = items:ReadItemProperties(42, link)
+      assert.is_true(props.incomplete)
+      assert.is_nil(props.traits)
+    end)
+
+    -- A caged battle pet's link is a battlepet: link; it is read by item ID, as its bind type was.
+    it("reads an item whose link is not an item link by its item ID", function()
+      local pet = "|cff0070dd|Hbattlepet:635:1:3:152:13:12:0000000000000000|h[Adder]|h|r"
+      local byID = C_Item.GetItemInfo
+      C_Item.GetItemInfo = function(info)
+        assert.are_not.equal(pet, info, "GetItemInfo takes an item ID or an item link")
+        return byID(info)
+      end
+      local props = items:ReadItemProperties(42, pet)
+      assert.is_false(props.incomplete)
+      assert.are.equal(68, props.traits.minLevel)
+      assert.are.equal(41000, props.traits.sellPrice)
+      assert.are.equal(1, props.bindType)
     end)
   end)
 

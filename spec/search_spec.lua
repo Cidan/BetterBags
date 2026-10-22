@@ -322,9 +322,9 @@ describe("Search", function()
     end
 
     before_each(function()
-      search:Add(MockSearchItem({ slotkey = "ore1", quality = 1, craftingQuality = 1 }))
-      search:Add(MockSearchItem({ slotkey = "ore2", quality = 1, craftingQuality = 2 }))
-      search:Add(MockSearchItem({ slotkey = "ring5", quality = 4, craftingQuality = 5 }))
+      search:Add(MockSearchItem({ slotkey = "ore1", quality = 1, traits = { craftingQuality = 1 } }))
+      search:Add(MockSearchItem({ slotkey = "ore2", quality = 1, traits = { craftingQuality = 2 } }))
+      search:Add(MockSearchItem({ slotkey = "ring5", quality = 4, traits = { craftingQuality = 5 } }))
       search:Add(MockSearchItem({ slotkey = "sword", quality = 1 }))
     end)
 
@@ -334,6 +334,86 @@ describe("Search", function()
       assert.are.same(keys("ring5"), search:Search("quality > 2 AND rarity = epic"))
       assert.are.same(keys("ore2", "ring5", "sword"), search:Search("quality != 1"))
       assert.are.same({}, search:Search("quality = epic"), "rarity names are rarity's")
+    end)
+  end)
+
+  -- ─── Item traits ────────────────────────────────────────────────────────────
+
+  -- The fields read from an item's link once its data has loaded (items:ReadItemTraits,
+  -- docs/vendor-compat.md "Proposed: new fields"). An item read cold has none.
+  describe("item traits", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      search:Add(MockSearchItem({ slotkey = "blade", currentItemLevel = 600, traits = {
+        minLevel = 70, stackSize = 1, sellPrice = 52000, isEquipment = true, hasUse = true, isCosmetic = false,
+        isPet = false, isScrappable = true, upgradeTrack = "Hero", upgradeLevel = 3, upgradeMax = 6,
+        upgradeMaxItemLevel = 619, stats = { "Critical Strike", "Haste" } } }))
+      search:Add(MockSearchItem({ slotkey = "ore", currentItemLevel = 1, traits = {
+        minLevel = 0, stackSize = 200, sellPrice = 0, isEquipment = false, hasUse = false, isCosmetic = false,
+        isPet = false, isScrappable = false, stats = {} } }))
+      search:Add(MockSearchItem({ slotkey = "snake", currentItemLevel = 25, traits = {
+        minLevel = 0, stackSize = 1, sellPrice = 100, isEquipment = false, hasUse = true, isPet = true,
+        stats = {} } }))
+      search:Add(MockSearchItem({ slotkey = "cold", currentItemLevel = 1 }))
+    end)
+
+    it("finds items by required level, max stack and sell price", function()
+      assert.are.same(keys("blade"), search:Search("minlevel > 60"))
+      assert.are.same(keys("ore", "snake"), search:Search("minlevel = 0"))
+      assert.are.same(keys("ore"), search:Search("stacksize >= 200"))
+      assert.are.same(keys("ore"), search:Search("price = 0"))
+      assert.are.same(keys("blade"), search:Search("price > 10000"))
+    end)
+
+    it("finds items by what they are", function()
+      assert.are.same(keys("blade"), search:Search("equipment = true"))
+      assert.are.same(keys("ore", "snake"), search:Search("equipment = false"))
+      assert.are.same(keys("blade", "snake"), search:Search("hasuse = true"))
+      assert.are.same(keys("blade", "ore"), search:Search("cosmetic = false"), "a client without the answer has none")
+      assert.are.same(keys("snake"), search:Search("pet = true"))
+      assert.are.same(keys("blade"), search:Search("scrappable = true"))
+    end)
+
+    it("finds equipment by its upgrade track", function()
+      assert.are.same(keys("blade"), search:Search("upgradeable = true"))
+      assert.are.same(keys("ore", "snake"), search:Search("upgradeable = false"))
+      assert.are.same(keys("blade"), search:Search("track = hero"))
+      assert.are.same(keys("blade"), search:Search("upgradelevel = 3 AND upgrademax = 6"))
+    end)
+
+    -- Vendor's MaxLevel: the fully upgraded item level, never below the current one; the current one
+    -- for an item without a track.
+    it("finds items by their fully upgraded item level", function()
+      assert.are.same(keys("blade"), search:Search("maxlevel = 619"))
+      assert.are.same(keys("snake"), search:Search("maxlevel = 25"))
+      assert.are.same({}, search:Search("maxlevel = 600"))
+    end)
+
+    it("takes the current item level as the max when an upgrade would lower it", function()
+      search:Add(MockSearchItem({ slotkey = "squished", currentItemLevel = 640, traits = {
+        isEquipment = true, upgradeTrack = "Myth", upgradeLevel = 1, upgradeMax = 6, upgradeMaxItemLevel = 619,
+        stats = {} } }))
+      assert.are.same(keys("squished"), search:Search("maxlevel = 640"))
+    end)
+
+    it("finds items by their stats, by the start of a stat's name or anywhere in it", function()
+      assert.are.same(keys("blade"), search:Search("stat = haste"))
+      assert.are.same(keys("blade"), search:Search("stat = crit"))
+      assert.are.same(keys("blade"), search:Search("stat %= strike"))
+      assert.are.same({}, search:Search("stat = mastery"))
+    end)
+
+    -- Rule #1: an item read before its data loaded matches no trait until it is read again.
+    it("matches no trait of an item read cold", function()
+      for _, q in ipairs({ "minlevel >= 0", "price >= 0", "equipment = false", "hasuse = false", "pet = false",
+        "upgradeable = false", "maxlevel >= 0", "stacksize >= 0", "quality >= 0" }) do
+        assert.is_nil(search:Search(q).cold, q)
+      end
     end)
   end)
 
@@ -964,13 +1044,30 @@ describe("Search incremental indexing (SyncKind)", function()
       { "equipment sets", function(it) it.itemInfo.equipmentSets = { "Tank" } end },
       { "bonus IDs", function(it) it.itemLinkInfo.bonusIDs = { "6652" } end },
       { "bag name", function(it) it.bagName = "Large Sack" end },
-      { "crafting quality", function(it) it.itemInfo.craftingQuality = 2 end },
+      { "crafting quality", function(it) it.itemInfo.traits.craftingQuality = 2 end },
+      { "required level", function(it) it.itemInfo.traits.minLevel = 30 end },
+      { "max stack", function(it) it.itemInfo.traits.stackSize = 20 end },
+      { "sell price", function(it) it.itemInfo.traits.sellPrice = 999 end },
+      { "equipment flag", function(it) it.itemInfo.traits.isEquipment = true end },
+      { "use flag", function(it) it.itemInfo.traits.hasUse = true end },
+      { "cosmetic flag", function(it) it.itemInfo.traits.isCosmetic = true end },
+      { "pet flag", function(it) it.itemInfo.traits.isPet = true end },
+      { "scrappable flag", function(it) it.itemInfo.traits.isScrappable = true end },
+      { "upgrade track", function(it) it.itemInfo.traits.upgradeTrack = "Veteran" end },
+      { "upgrade level", function(it) it.itemInfo.traits.upgradeLevel = 2 end },
+      { "upgrade max", function(it) it.itemInfo.traits.upgradeMax = 8 end },
+      { "upgraded item level", function(it) it.itemInfo.traits.upgradeMaxItemLevel = 700 end },
+      { "stats", function(it) it.itemInfo.traits.stats = { "Versatility" } end },
+      { "traits read once loaded", function(it) it.itemInfo.traits = nil end },
     }
     for _, change in ipairs(changes) do
       it(change[1], function()
         local savedHead = _G.INVTYPE_HEAD
         _G.INVTYPE_HEAD = "Head"
         local sword = item({ slotkey = "a", name = "Sword", kind = BACKPACK, tooltipText = "Use: Restores health." })
+        sword.itemInfo.traits = { minLevel = 10, stackSize = 1, sellPrice = 5, isEquipment = false, hasUse = false,
+          isCosmetic = false, isPet = false, isScrappable = false, upgradeTrack = "Hero", upgradeLevel = 1,
+          upgradeMax = 6, upgradeMaxItemLevel = 619, stats = { "Haste" } }
         local bag = { a = sword }
         search:SyncKind(BACKPACK, bag)
         change[2](sword)
@@ -1044,7 +1141,22 @@ describe("Search incremental indexing (SyncKind)", function()
       elseif which == 16 then info.isCraftingReagent = not info.isCraftingReagent
       elseif which == 17 then it.questInfo.isQuestItem = not it.questInfo.isQuestItem
       elseif which == 18 then it.bagName = pick({ "Backpack", "Herb Satchel", "Large Sack" })
-      elseif which == 19 then info.craftingQuality = random(3) == 1 and nil or random(5)
+      elseif which == 19 then
+        if random(4) == 1 then
+          info.traits = nil
+        else
+          info.traits = info.traits or {}
+          local t = info.traits
+          local f = random(8)
+          if f == 1 then t.craftingQuality = random(3) == 1 and nil or random(5)
+          elseif f == 2 then t.minLevel = random(4) * 10
+          elseif f == 3 then t.sellPrice = random(3) - 1
+          elseif f == 4 then t.isEquipment = random(2) == 1
+          elseif f == 5 then t.upgradeTrack = pick({ "Hero", "Myth", nil })
+          elseif f == 6 then t.upgradeMaxItemLevel = random(3) * 100
+          elseif f == 7 then t.stats = random(2) == 1 and { pick({ "Haste", "Mastery" }) } or nil
+          else t.isPet = random(2) == 1 end
+        end
       else it.bindingInfo.binding = random(3) - 1 end
     end
 

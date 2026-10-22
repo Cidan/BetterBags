@@ -138,6 +138,7 @@ globals = {
 	"C_EquipmentSet",
 	"C_Item",
 	"C_NewItems",
+	"C_PetJournal",
 	"C_Timer",
 	"C_TooltipInfo",
 	"C_TradeSkillUI",

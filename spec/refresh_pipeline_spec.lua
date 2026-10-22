@@ -1685,8 +1685,8 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       end)
       mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
       local slotInfo = refreshBackpack()
-      assert.is_nil(slotInfo.itemsBySlotKey["0_1"].itemInfo.craftingQuality)
-      assert.are.equal(2, slotInfo.itemsBySlotKey["0_2"].itemInfo.craftingQuality)
+      assert.is_nil(slotInfo.itemsBySlotKey["0_1"].itemInfo.traits.craftingQuality)
+      assert.are.equal(2, slotInfo.itemsBySlotKey["0_2"].itemInfo.traits.craftingQuality)
       searchCategories({ { "Tier 2", "quality = 2" } })
       slotInfo = refreshBackpack({ derive = true })
       assert.equal("Tier 2", categoryOf(slotInfo, "0_2"))
@@ -1708,11 +1708,44 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       mockContainer[0] = { { itemID = 202, guid = "guid-202", count = 1 } }
       local slotInfo = refreshBackpack({ wipe = true })
       assert.is_true(slotInfo.itemsBySlotKey["0_1"].harvestIncomplete)
-      assert.is_nil(slotInfo.itemsBySlotKey["0_1"].itemInfo.craftingQuality)
+      assert.is_nil(slotInfo.itemsBySlotKey["0_1"].itemInfo.traits)
       assert.are.equal(0, asked)
       cold = false
       slotInfo = refreshBackpack({ derive = true })
-      assert.are.equal(2, slotInfo.itemsBySlotKey["0_1"].itemInfo.craftingQuality, "read again once loaded")
+      assert.are.equal(2, slotInfo.itemsBySlotKey["0_1"].itemInfo.traits.craftingQuality, "read again once loaded")
+    end)
+
+    -- One search category per new field group, end to end: the harvest reads the traits from the
+    -- slot's link, the index holds them, and a kept slot keeps them.
+    it("reads each item's traits from its link, and searches them", function()
+      override(_G.C_Item, "IsEquippableItem", function(l) return tostring(l):find("item:101", 1, true) ~= nil end)
+      override(_G.C_Item, "GetItemSpell", function(l)
+        if tostring(l):find("item:202", 1, true) then return "Shield Wall", 871 end
+      end)
+      override(_G.C_Item, "CanScrapItem", function(location)
+        local bag, slot = location:GetBagAndSlot()
+        return bag == 0 and slot == 1
+      end)
+      local asked = 0
+      local getItemSpell = _G.C_Item.GetItemSpell
+      override(_G.C_Item, "GetItemSpell", function(l)
+        asked = asked + 1
+        return getItemSpell(l)
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      local sword = slotInfo.itemsBySlotKey["0_1"].itemInfo.traits
+      assert.is_true(sword.isEquipment)
+      assert.is_true(sword.isScrappable)
+      assert.are.equal(10, sword.sellPrice)
+      assert.are.same({ ["0_1"] = true }, search:Search("equipment = true AND scrappable = true"))
+      assert.are.same({ ["0_2"] = true }, search:Search("hasuse = true"))
+      searchCategories({ { "Usable", "hasuse = true AND price = 10" } })
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Usable", categoryOf(slotInfo, "0_2"))
+      asked = 0
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.equal(0, asked, "a kept slot keeps its traits")
     end)
 
     it("gives every item the plain name of its bag, for the bagname field", function()

@@ -120,7 +120,11 @@ describe("NextMerchant", function()
       if groupBy == GROUP_BY_TYPE then return data.itemInfo.itemType end
     end)
     override(stubs.items, "GetAllSlotInfo", function() return {} end)
-    override(stubs.items, "CraftingQualityOf", function(_, l) return idOf(l) == 12 and 2 or nil end)
+    override(stubs.items, "ReadItemTraits", function(_, id, l, minLevel, stackSize, sellPrice)
+      assert.are.equal(idOf(l), id)
+      return { craftingQuality = idOf(l) == 12 and 2 or nil, minLevel = minLevel, stackSize = stackSize,
+        sellPrice = sellPrice, stats = {} }
+    end)
     override(stubs.categories, "GetCustomCategory", function(_, _, kind, data)
       assert.are.equal(BACKPACK, kind)
       local c = customByID[data.itemInfo.itemID]
@@ -286,16 +290,18 @@ describe("NextMerchant", function()
       assert.are.same({}, search:Search("NOT plate"), "nor in a NOT over the bags' index")
     end)
 
-    it("searches a vendor item's crafting tier, read from its link", function()
+    it("searches a vendor item's traits, read from its link", function()
       _G._merchant.items = { vendorItem(10), vendorItem(12) }
       merchant:ReadItems(ctx())
       assert.are.same({ ["vendor:2"] = true }, merchant:Search("quality = 2"))
+      assert.are.same({ ["vendor:1"] = true, ["vendor:2"] = true }, merchant:Search("price = 5 AND minlevel = 1"))
+      assert.are.same({ ["vendor:1"] = true, ["vendor:2"] = true }, merchant:Search("stacksize = 20"))
     end)
 
     -- Rule #1: read once the item's data has loaded; the vendor reads again on GET_ITEM_INFO_RECEIVED.
-    it("reads no crafting tier for a vendor item whose data has not loaded", function()
+    it("reads no traits for a vendor item whose data has not loaded", function()
       local asked = 0
-      override(stubs.items, "CraftingQualityOf", function() asked = asked + 1; return 2 end)
+      override(stubs.items, "ReadItemTraits", function() asked = asked + 1; return { craftingQuality = 2 } end)
       _G._merchant.items = { vendorItem(14) }
       local _, cold = merchant:ReadItems(ctx())
       assert.is_true(cold)

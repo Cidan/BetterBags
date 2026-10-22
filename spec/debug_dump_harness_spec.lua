@@ -357,7 +357,9 @@ describe("Debug Dump Harness with test.lua", function()
       return nil
     end
 
-    _G.C_Item.GetItemInfo = function(itemID)
+    -- C_Item.GetItemInfo takes an item ID or an item link (warcraft.wiki.gg).
+    _G.C_Item.GetItemInfo = function(itemInfo)
+      local itemID = tonumber(itemInfo) or tonumber(tostring(itemInfo):match("item:(%d+)"))
       for _, item in pairs(dumpItems) do
         if item.containerInfo and item.containerInfo.itemID == itemID then
           local info = item.itemInfo
@@ -419,6 +421,19 @@ describe("Debug Dump Harness with test.lua", function()
     assert.are.equal("Light's Preservation", item2.itemInfo.itemName)
     assert.are.equal(241287, item2.itemInfo.itemID)
     assert.are.equal("Midnight - Potions", item2.itemInfo.category)
+
+    -- Every dumped item's data is there (its link included), so each is read complete, with the
+    -- traits the search indexes (items:ReadItemTraits).
+    local read = 0
+    for slotkey, item in pairs(slotInfo.itemsBySlotKey) do
+      if not item.isItemEmpty then
+        read = read + 1
+        assert.is_false(item.harvestIncomplete, slotkey)
+        assert.is_not_nil(item.itemInfo.traits, slotkey)
+      end
+    end
+    assert.is_true(read > 0)
+    assert.are.equal(dumpItems["1_3"].itemInfo.sellPrice, item2.itemInfo.traits.sellPrice)
 
     -- Ensure empty slots are also handled cleanly
     local emptySlot = slotInfo.itemsBySlotKey["5_25"]

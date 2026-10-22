@@ -396,6 +396,8 @@ Search allows you to find items by the following indices (based on the item belo
 - `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped). **Note:** soulbound and warbound are only available on Retail because of API limitations on non-Retail versions.
 - `tooltip` (tooltip = health) The full text of the item's tooltip. Unlike the other string fields, `=` and `!=` match the value anywhere in the tooltip, not only at the start.
 - `bagname` or `bag` (bag = "Herb Satchel") The name of the bag the item is in: Backpack, the bag's own name, Keyring, Bank, Reagent Bank, a bank bag's name, or a guild bank tab's name. A plain search word does not look in it.
+- `track` (track = hero) The upgrade track of upgradeable gear (Retail): Explorer, Adventurer, Veteran, Champion, Hero, Myth, in the game's language.
+- `stat` (stat = haste) The stats on the item, by name: Haste, Critical Strike, Versatility, Mastery, Stamina, Strength, Agility, Intellect, Leech, Speed, Avoidance, sockets, and so on. `stat = crit` finds Critical Strike, as names match from their start.
 
 ### Numbers
 - `level` or `ilvl` (ilvl = 528) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
@@ -408,6 +410,11 @@ Search allows you to find items by the following indices (based on the item belo
 - `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 5-10 (Classic) / 5-11 (MoP) / 6-11 (Retail) for bank bags, -1 for the bank (Classic/MoP), -2 for the keyring (Classic), -1 for the keyring (WoW: Forever), and 12-16 for warbank tabs. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/BagID) for specifics for each version of the game.
 - `slotid` (slotid = 11) The slot that the item is in, in the bag that contains it. Numbered from 1 to N for each bagID, where N is the size of the container.
 - `bindtype` (bindtype = 1) The binding type of the item returned by GetItemInfo(). 1 = BoP, 2 = BoE, 3 = BoU, 4 = Quest, 7 = BtA, 8 = BtW, 9 = WuE. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/Enum.ItemBind) for specifics.
+- `minlevel` (minlevel > 70) The character level required to use the item, 0 for none. Not the item level (that is `level`).
+- `stacksize` (stacksize = 200) The most of the item one stack holds. The size of a stack in your bags is `count`.
+- `price` (price > 10000) The vendor sell price of one of the item, in copper (10000 is 1 gold). 0 for items a vendor will not buy.
+- `maxlevel` (maxlevel >= 600) The item level of upgradeable gear once fully upgraded (Retail); for anything else, its item level.
+- `upgradelevel`, `upgrademax` (upgradelevel = 3) How many upgrades upgradeable gear has, and how many its track has (Retail): an item shown as "Hero 3/6" has upgradelevel 3 and upgrademax 6.
 
 ### Booleans
 - `reagent` (reagent = false) Is the item classified as a reagent?
@@ -415,6 +422,14 @@ Search allows you to find items by the following indices (based on the item belo
 - `isbound` (isbound = true) Is the item bound to the character or account? (From Blizzard C_Item)
 - `quest` (quest = false) Is the item for a non-active quest?
 - `activeQuest` (activeQuest = false) Is the item for an active quest?
+- `equipment` (equipment = true) Can the item be equipped (gear)?
+- `hasuse` (hasuse = true) Does the item have a Use: effect?
+- `cosmetic` (cosmetic = true) Is the item cosmetic gear (Retail)?
+- `pet` (pet = true) Does the item teach a battle pet (Retail)?
+- `upgradeable` (upgradeable = true) Is the item gear on an upgrade track (Retail)?
+- `scrappable` (scrappable = true) Can the item be scrapped (Retail)?
+
+The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable` and `scrappable` are read once the game has sent the item's data: an item that has just arrived may match none of them for a moment.
 
 ### Logical Operators
 - `AND` (slot = Legs AND ilvl > 500 \[This will match leg pieces that are also greater than 500 ilvl.\]) The intersection of two terms. Items must match both sides of the AND.
