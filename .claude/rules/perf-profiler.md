@@ -529,6 +529,26 @@ PerfSessions listens to `ADDON_RESTRICTION_STATE_CHANGED` where the client has i
 `[event] ADDON_RESTRICTION_STATE_CHANGED(type, state)` call at the moment it happened. The
 Simulate tab shows the live state.
 
+## 10b. Collections in captures
+
+The pet journal, the toy box and the appearance collection load on their own schedule at login,
+and the search fields that read them (pet counts, collected appearances) need to know when. A first
+login capture could not say: the profiler records only events BetterBags listens to, and BetterBags
+listened to none of theirs. PerfSessions now listens, where the client has them
+(`C_EventUtils.IsEventValid`), to `PerfSessions.COLLECTION_EVENTS`: `PET_JOURNAL_LIST_UPDATE`,
+`NEW_PET_ADDED`, `PET_JOURNAL_PET_DELETED`, `TRANSMOG_COLLECTION_UPDATED`,
+`TRANSMOG_COLLECTION_SOURCE_ADDED`, `TRANSMOG_COLLECTION_SOURCE_REMOVED`, `NEW_TOY_ADDED`,
+`TOYS_UPDATED` (each in the client's API documentation). Each fire is an `[event]` call in the
+trace, and while a capture runs it holds a `[collections]` call whose argument is
+`perfSessions:CollectionCounts()`: `pets`, `petsOwned` (`C_PetJournal.GetNumPets`, as
+Blizzard_PetCollection.lua counts them), `toys`, `toysLearned` (the toy box's displayed totals, as
+Blizzard_ToyBox.lua counts them), `transmogSources` (`C_TransmogCollection.GetNumTransmogSources`);
+nothing is read while no capture runs. The counts at the start and the end are in
+`meta.collectionsStart` / `collectionsStop` (nil on a client with none of these APIs).
+Coverage: `spec/debug/perf_sessions_spec.lua` (counts at start and stop, missing APIs, each event
+traced with its counts, nothing read while idle, no event a client lacks); 8 mutations, all caught
+(one led to the missing-event test).
+
 ## 10. Testing
 
 - Engine (`spec/debug/perf_engine_spec.lua`): a fake clock (`perf:SetClock`) makes timings

@@ -388,6 +388,98 @@ describe("PerfSessions", function()
       assert.is_nil(registered.ADDON_RESTRICTION_STATE_CHANGED)
     end)
 
+    -- When the pet journal, the toy box and the appearance collection have loaded, against the bag
+    -- reads (docs/vendor-compat.md, "Needs an in-game check"): their counts at the start and the
+    -- end, and each collection event with the counts at that moment, in the trace.
+    local function collections()
+      local saved = { _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection }
+      _G.C_PetJournal = { GetNumPets = function() return 1200, 850 end }
+      _G.C_ToyBox = { GetNumTotalDisplayedToys = function() return 900 end,
+        GetNumLearnedDisplayedToys = function() return 410 end }
+      _G.C_TransmogCollection = { GetNumTransmogSources = function() return 31000 end }
+      return function() _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection = saved[1], saved[2], saved[3] end
+    end
+
+    it("records the collections' counts when it starts and stops", function()
+      local restore = collections()
+      perfSessions:StartCapture("manual")
+      _G.C_PetJournal.GetNumPets = function() return 1201, 851 end
+      local session = perfSessions:StopCapture()
+      restore()
+      assert.are.same({ pets = 1200, petsOwned = 850, toys = 900, toysLearned = 410, transmogSources = 31000 },
+        session.meta.collectionsStart)
+      assert.are.equal(851, session.meta.collectionsStop.petsOwned)
+    end)
+
+    it("leaves out what a client has no collection for", function()
+      local saved = { _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection }
+      _G.C_PetJournal, _G.C_ToyBox = nil, nil
+      _G.C_TransmogCollection = { GetNumTransmogSources = function() return 5 end }
+      perfSessions:StartCapture("manual")
+      local session = perfSessions:StopCapture()
+      _G.C_TransmogCollection = nil
+      perfSessions:StartCapture("manual")
+      local none = perfSessions:StopCapture()
+      _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection = saved[1], saved[2], saved[3]
+      assert.are.same({ transmogSources = 5 }, session.meta.collectionsStart)
+      assert.is_nil(none.meta.collectionsStart)
+    end)
+
+    it("traces each collection event with the counts at that moment", function()
+      local restore = collections()
+      local savedUtils = _G.C_EventUtils
+      _G.C_EventUtils = { IsEventValid = function() return true end }
+      perfSessions._eventsHooked = nil
+      registered = {}
+      perfSessions:Init()
+      _G.C_EventUtils = savedUtils
+      for _, name in ipairs({ "PET_JOURNAL_LIST_UPDATE", "NEW_PET_ADDED", "PET_JOURNAL_PET_DELETED",
+        "TRANSMOG_COLLECTION_UPDATED", "TRANSMOG_COLLECTION_SOURCE_ADDED", "TRANSMOG_COLLECTION_SOURCE_REMOVED",
+        "NEW_TOY_ADDED", "TOYS_UPDATED" }) do
+        assert.is_function(registered[name], name)
+      end
+      perfSessions:StartCapture("manual")
+      registered.PET_JOURNAL_LIST_UPDATE("PET_JOURNAL_LIST_UPDATE")
+      local session = perfSessions:StopCapture()
+      restore()
+      local trace = addon:GetModule("PerfFormat"):OpenTrace(session)
+      local sample
+      for i = 1, trace:Count() do
+        if trace:Get(i).name == "[collections]" then sample = trace:Get(i) end
+      end
+      assert.is_not_nil(sample)
+      local text = trace:Text(sample.args)
+      assert.is_truthy(text:find("petsOwned=850", 1, true), text)
+      assert.is_truthy(text:find("toysLearned=410", 1, true), text)
+    end)
+
+    it("listens to no collection event a client does not have", function()
+      local savedUtils = _G.C_EventUtils
+      _G.C_EventUtils = { IsEventValid = function(name) return name == "ADDON_RESTRICTION_STATE_CHANGED" end }
+      perfSessions._eventsHooked = nil
+      registered = {}
+      perfSessions:Init()
+      _G.C_EventUtils = savedUtils
+      for _, name in ipairs(perfSessions.COLLECTION_EVENTS) do
+        assert.is_nil(registered[name], name)
+      end
+    end)
+
+    it("samples nothing while no capture runs", function()
+      local restore = collections()
+      local savedUtils = _G.C_EventUtils
+      _G.C_EventUtils = { IsEventValid = function() return true end }
+      perfSessions._eventsHooked = nil
+      registered = {}
+      perfSessions:Init()
+      _G.C_EventUtils = savedUtils
+      local asked = 0
+      _G.C_PetJournal.GetNumPets = function() asked = asked + 1 return 1, 1 end
+      registered.PET_JOURNAL_LIST_UPDATE("PET_JOURNAL_LIST_UPDATE")
+      restore()
+      assert.are.equal(0, asked)
+    end)
+
     it("keeps metadata the starter adds, such as the simulation it runs", function()
       perfSessions:StartCapture("simulate", { simulation = { event = "BAG_UPDATE_COOLDOWN", rate = 12 } })
       local session = perfSessions:StopCapture()

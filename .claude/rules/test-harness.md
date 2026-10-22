@@ -198,3 +198,8 @@ values, or `{ error = ... }`). Older dumps have no `apiProbe`.
   API takes them; `C_TooltipInfo.GetBagItem` from the recorded lines) and runs the real pipeline
   and search over it. Its expectations were read from the raw answers. Not probed, so taken from
   the dumped item: `C_Item.GetItemQuality` (the container info's quality), the item GUID.
+- **`spec/fixtures/dump_retail_12_1_5_bag.lua`**: a second capture the same day, 33 items, with a
+  bag (Horadric Haversack). Its block in the same spec ("a capture with a bag") shares the mocks
+  through `clientAnswers(fixturePath)`, which installs them before each test of the block that
+  calls it. A new capture becomes a fixture the same way: extract it, add a block calling
+  `clientAnswers`, and write its expectations from the raw answers.

@@ -423,7 +423,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `isbound` (isbound = true) Is the item bound to the character or account? (From Blizzard C_Item)
 - `quest` (quest = false) Is the item for a non-active quest?
 - `activeQuest` (activeQuest = false) Is the item for an active quest?
-- `equipment` (equipment = true) Can the item be equipped (gear)?
+- `equipment` (equipment = true) Can the item be equipped (gear, and bags, which go in the bag slots)?
 - `hasuse` (hasuse = true) Does the item have a Use: line in its tooltip, "Use: Teaches you..." on recipes and pets included?
 - `cosmetic` (cosmetic = true) Is the item cosmetic gear (Retail)?
 - `pet` (pet = true) Does the item teach a battle pet (Retail)?

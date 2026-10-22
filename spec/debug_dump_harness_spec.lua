@@ -793,13 +793,16 @@ describe("Debug Dump Harness with test.lua", function()
   end)
 end)
 
--- The client's own answers: a Dump tab capture whose items carry apiProbe, what every Blizzard API
+-- The client's own answers: Dump tab captures whose items carry apiProbe, what every Blizzard API
 -- returned about them in game (debug/itemprobe.lua, test-harness.md §5). Every API the harvest
--- calls is answered from it, so the real pipeline runs on what the game said. Retail 12.1.5
--- (build 70448, enUS), 88 items. The expected values below were read from the raw answers
--- (docs/vendor-compat.md, "What a capture settled").
-describe("Dump harness: the client's own answers (spec/fixtures/dump_retail_12_1_5.lua)", function()
-  local fixture = dofile("spec/fixtures/dump_retail_12_1_5.lua")
+-- calls is answered from one, so the real pipeline runs on what the game said. The expected values
+-- below were read from the raw answers (docs/vendor-compat.md, "What a capture settled").
+
+-- clientAnswers runs the tests of a block on a capture: before each, every API the harvest calls
+-- answers from the fixture's apiProbe (by location, item ID or link, as each API takes them).
+---@param fixturePath string
+local function clientAnswers(fixturePath)
+  local fixture = dofile(fixturePath)
   local oldBetterBagsDB
   local saved
   local slots, byLink, byID, bySpecies, maxSlot
@@ -943,24 +946,34 @@ describe("Dump harness: the client's own answers (spec/fixtures/dump_retail_12_1
     _G.BetterBagsDB = oldBetterBagsDB
   end)
 
-  local function read()
+  local h = {}
+
+  function h.read()
     local ctx = context:New("ClientAnswers")
     ctx:Set("wipe", true)
     items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
     return items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey
   end
 
-  local function keys(...)
+  function h.keys(...)
     local set = {}
     for _, k in ipairs({...}) do set[k] = true end
     return set
   end
 
-  local function count(set)
+  function h.count(set)
     local n = 0
     for _ in pairs(set) do n = n + 1 end
     return n
   end
+
+  return h
+end
+
+-- Retail 12.1.5 (build 70448, enUS), 88 items.
+describe("Dump harness: the client's own answers (spec/fixtures/dump_retail_12_1_5.lua)", function()
+  local h = clientAnswers("spec/fixtures/dump_retail_12_1_5.lua")
+  local read, keys, count = h.read, h.keys, h.count
 
   it("reads every item with its data, and its traits", function()
     local n = 0
@@ -1037,5 +1050,21 @@ describe("Dump harness: the client's own answers (spec/fixtures/dump_retail_12_1
     read()
     assert.are.equal(20, count(search:Search("bag = backpack")))
     assert.are.equal(68, count(search:Search("bag = shrouded")))
+  end)
+end)
+
+-- A second capture, the same day, with a bag in the backpack (33 items): IsEquippableItem says a bag
+-- is equipment. Vendor's IsEquipment calls the same API (itemproperties.lua:176, interop.lua:46).
+describe("Dump harness: a capture with a bag (spec/fixtures/dump_retail_12_1_5_bag.lua)", function()
+  local h = clientAnswers("spec/fixtures/dump_retail_12_1_5_bag.lua")
+  local read, keys = h.read, h.keys
+
+  it("takes a bag as equipment the character can equip, worth nothing to a vendor", function()
+    local bag = read()["3_17"]
+    assert.are.equal("Horadric Haversack", bag.itemInfo.itemName)
+    assert.are.same(keys("1_6", "3_17"), search:Search("equipment = true"))
+    assert.are.same(keys("1_6", "3_17"), search:Search("equippable = true"))
+    assert.is_true(search:Search("price = 0")["3_17"])
+    assert.is_nil(search:Search("upgradeable = true")["3_17"])
   end)
 end)

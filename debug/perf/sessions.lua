@@ -155,6 +155,40 @@ function perfSessions:RestrictionStates()
   return out
 end
 
+-- COLLECTION_EVENTS are the pet journal's, the appearance collection's and the toy box's: recorded
+-- during a capture with the collections' counts at that moment, so a capture shows when each has
+-- loaded against the bag reads. BetterBags does not listen to them otherwise.
+perfSessions.COLLECTION_EVENTS = {
+  'PET_JOURNAL_LIST_UPDATE', 'NEW_PET_ADDED', 'PET_JOURNAL_PET_DELETED',
+  'TRANSMOG_COLLECTION_UPDATED', 'TRANSMOG_COLLECTION_SOURCE_ADDED', 'TRANSMOG_COLLECTION_SOURCE_REMOVED',
+  'NEW_TOY_ADDED', 'TOYS_UPDATED',
+}
+
+-- CollectionCounts reads how many pets, toys and appearance sources the account has, as Blizzard's
+-- collection panels count them (C_PetJournal.GetNumPets, Blizzard_PetCollection.lua; the toy box's
+-- learned and total counts, Blizzard_ToyBox.lua; C_TransmogCollection.GetNumTransmogSources), or
+-- nil when the client has none of them.
+---@return table?
+function perfSessions:CollectionCounts()
+  local out = {}
+  local pets = _G.C_PetJournal
+  if pets and pets.GetNumPets then
+    out.pets, out.petsOwned = pets.GetNumPets()
+  end
+  local toys = _G.C_ToyBox
+  if toys and toys.GetNumTotalDisplayedToys and toys.GetNumLearnedDisplayedToys then
+    out.toys, out.toysLearned = toys.GetNumTotalDisplayedToys(), toys.GetNumLearnedDisplayedToys()
+  end
+  local transmog = _G.C_TransmogCollection
+  if transmog and transmog.GetNumTransmogSources then
+    out.transmogSources = transmog.GetNumTransmogSources()
+  end
+  if next(out) == nil then
+    return nil
+  end
+  return out
+end
+
 -- instanceInfo says where the player is (GetInstanceInfo).
 local function instanceInfo()
   if GetInstanceInfo == nil then return nil end
@@ -214,6 +248,17 @@ function perfSessions:Init()
     if _G.C_EventUtils and _G.C_EventUtils.IsEventValid
       and _G.C_EventUtils.IsEventValid('ADDON_RESTRICTION_STATE_CHANGED') then
       events:RegisterEvent('ADDON_RESTRICTION_STATE_CHANGED', function() end)
+    end
+    -- The dispatcher records each as an "[event]" call; inside it, a "[collections]" call carries
+    -- the counts, read only while a capture runs.
+    for _, name in ipairs(self.COLLECTION_EVENTS) do
+      if _G.C_EventUtils and _G.C_EventUtils.IsEventValid and _G.C_EventUtils.IsEventValid(name) then
+        events:RegisterEvent(name, function()
+          if perf:IsActive() then
+            perf:Exit(perf:Enter('[collections]', self:CollectionCounts()))
+          end
+        end)
+      end
     end
   end
 end
@@ -317,6 +362,7 @@ function perfSessions:StartCapture(reason, extra)
     memoryStartKB = addonMemoryKB(),
     luaMemoryStartKB = collectgarbage('count'),
     restrictionsStart = self:RestrictionStates(),
+    collectionsStart = self:CollectionCounts(),
     instanceStart = instanceInfo(),
     topAddonsStart = topAddons(),
   }
@@ -342,6 +388,7 @@ function perfSessions:StopCapture()
   meta.memoryStopKB = addonMemoryKB()
   meta.luaMemoryStopKB = collectgarbage('count')
   meta.restrictionsStop = self:RestrictionStates()
+  meta.collectionsStop = self:CollectionCounts()
   meta.instanceStop = instanceInfo()
   meta.topAddonsStop = topAddons()
   meta.backpackItems = itemCount(0)

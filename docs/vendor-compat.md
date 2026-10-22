@@ -521,7 +521,10 @@ item's data loaded), kept as `spec/fixtures/dump_retail_12_1_5.lua`. What each A
   the items with a `Use:` line (type 44), plus 8 recipes and pets whose `Use: Teaches you` lines are
   type 38 (ItemSpellTriggerLearn) and return the spell "Learning". `hasuse` is any Use line.
 - **Equipment.** `C_Item.IsEquippableItem` was true for the cloak only (consumables, recipes,
-  reagents, quest items, housing dyes all false). No bag was in the dump.
+  reagents, quest items, housing dyes all false). A second capture the same day
+  (`spec/fixtures/dump_retail_12_1_5_bag.lua`, 33 items) had a bag, a Horadric Haversack: equippable
+  true, usable true, sell price 0, no Use spell, no appearance. So `equipment` includes bags, as
+  Vendor's `IsEquipment` does (the same API).
 - **Appearances.** `C_TransmogCollection.GetItemInfo` returned nothing for 87 items and an
   appearance for the cloak (collected).
 - **Usability.** `C_PlayerInfo.CanUseItem` was false for the 9 recipes of professions the character
@@ -543,13 +546,15 @@ The Dump tab records, with each item, what every API below answers (`apiProbe`,
   level-scaled gear and an item in timewalking.
 - An upgradeable item on a track (Veteran and up): its `maxItemLevel`, and whether curve 92181 is
   still needed; a Poor Bind-on-Equip item's level.
-- `C_Item.IsEquippableItem` on a bag (bags go in equipment slots).
 - `C_Container.GetBagName` on a retail bank tab and a Warbank tab.
 - `GetItemCraftedQualityByItemInfo` on two copies of a crafted item at different tiers.
 - A toy not learned yet: no `Already known` line.
-- When the pet journal and the appearance collection have loaded at login (for pet counts and
-  appearances): a profiler capture of a fresh login (Capture next reload, then relaunch) shows when
-  `PET_JOURNAL_LIST_UPDATE` and `TRANSMOG_COLLECTION_UPDATED` fire against the startup read.
+- When the pet journal, the toy box and the appearance collection have loaded at login (for pet
+  counts and appearances). A first login capture (2026-10-21) could not show it: the profiler only
+  records events BetterBags listens to, and BetterBags listened to none of the collection events.
+  Captures now record those events and the collections' counts (perf-profiler.md §10b); a profiler
+  capture of a fresh login (Capture next reload, then relaunch) shows when each fires against the
+  startup read.
 - That `NEW_TOY_ADDED`, `NEW_PET_ADDED` and `TRANSMOG_COLLECTION_SOURCE_ADDED` fire when a toy, pet
   or appearance is learned from a bag item, and that the item's tooltip text changes then.
 
