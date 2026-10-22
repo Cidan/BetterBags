@@ -158,8 +158,14 @@ Global string values from Blizzard's enUS strings (Ketho/BlizzardInterfaceResour
   `items:ReadCharacterState`), and `items:RefreshCharacterState` asks again on every kept item (`RefreshKeptItem`, a guild bank
   recalculation), marking the item `indexPending` when the answer changed (data-loader.md §18).
   What changes it (level, skills, spec, gear) already requests a recalculation for the upgrade
-  arrows (caches.md §2); reputation and spells (`UPDATE_FACTION`, `SPELLS_CHANGED`) do not, so an
-  answer they change waits for the next refresh. The vendor's records take the merchant's own flag
+  arrows (caches.md §2). Spells and reputations (`SPELLS_CHANGED`, `UPDATE_FACTION`, bucketed:
+  they fire often) run `items:OnCharacterStateChanged(false)`, which asks every committed item of
+  the open kinds again (`CharacterStateChanged`) and recalculates only the kinds where an answer
+  changed. **Why:** a diagnostics login capture (retail 12.1.5, 2026-10-21) had `CanUseItem` answer
+  false for all 30 backpack items, food included, at the end of the loading screen, false for 6
+  after the first `SPELLS_CHANGED`, and true for all after the second, about 2.2 s later; the first
+  bag read came only 0.23 to 0.3 s after it in every login captured, so a slower login would have
+  kept "unusable" until some other refresh. On a `/reload` the answers were right from the start. The vendor's records take the merchant's own flag
   (`GetMerchantItemInfo`'s isUsable).
 - **`equippable`**: usable and equipment.
 - **`transmoggable`** (a trait): the item has an appearance (`C_TransmogCollection.GetItemInfo`
@@ -186,28 +192,35 @@ item that teaches no pet, absent for an item with no answer about pets.
   (`GetPetInfoByItemID`, §10). Like `usable`, the counts follow the account, not the item: read with
   the item's data (`items:ReadCharacterState`) and again on every kept item
   (`RefreshCharacterState`), which marks it `indexPending` when they changed.
-- **Not before the journal has loaded.** A fresh-login capture (retail 12.1.5, 2026-10-21):
+- **Not before the journal has loaded, and known on a reload.** A fresh-login capture (retail 12.1.5, 2026-10-21):
   `C_PetJournal.GetNumPets` answered 2014 pets, 0 owned, at 6.9 s (during the loading screen), and
   2045, 234 owned at the first `PET_JOURNAL_LIST_UPDATE`, at 13.36 s, just after the loading screen
-  ended (13.34 s) and 1.4 s before the startup read (14.80 s). `PetCountsOf` answers nil until
-  `items:OnPetJournalChanged` has run once (`items._petJournalLoaded`), so a count read too early is
-  absent, never 0.
+  ended (13.34 s) and 1.4 s before the startup read (14.80 s). A diagnostics run's `/reload` capture:
+  the journal answered 234 owned from its first sample (at `ADDON_LOADED`), and its first
+  `PET_JOURNAL_LIST_UPDATE` came 59 ms after the first bag read had started. So `PetCountsOf` takes the
+  journal as loaded (`items._petJournalLoaded`) once the event has fired or `GetNumPets` reports a
+  pet owned (no capture showed a partial count: 0, then the full count, in three logins), and
+  answers nil until then, so a count read too early is absent, never 0. An account without a pet
+  waits for the event.
 - **Events** (registered in `RegisterCacheEvents` where the client has them): `PET_JOURNAL_LIST_UPDATE`,
-  `NEW_PET_ADDED`, `PET_JOURNAL_PET_DELETED`, `PET_JOURNAL_PET_RESTORED` (PetJournalInfoDocumentation).
-  `OnPetJournalChanged` marks the journal loaded, asks the counts of every committed pet item of the
-  backpack (and of the bank and guild bank while open: opening them reads them), and sends
-  `bags/Rederive` naming only the kinds where one changed; nothing when none did. At login both
-  `PET_JOURNAL_LIST_UPDATE`s came before the startup read, so nothing was recalculated.
+  `NEW_PET_ADDED`, `PET_JOURNAL_PET_DELETED`, `PET_JOURNAL_PET_RESTORED` (PetJournalInfoDocumentation)
+  run `items:OnCharacterStateChanged(true)` (shared with usability, §13): it marks the journal
+  loaded, asks every committed item of the backpack (and of the bank and guild bank while open:
+  opening them reads them) again, and sends `bags/Rederive` naming only the kinds where an answer
+  changed; nothing when none did. When the journal first loads it recalculates every open kind
+  regardless: on a `/reload` the event came while the first read was under way, with nothing
+  committed to compare, and the request waits for that read in the queue.
 - **Vendor items** take the counts when the vendor's items are read (`next/merchant.lua`); a pet
   learned while the vendor stays open is shown at the next read of the vendor.
-- **Not verified:** whether `PET_JOURNAL_LIST_UPDATE` fires on a `/reload`. If it does not, the
-  counts stay absent after a reload until a pet changes (never wrong); a `/reload` capture settles it.
 - **Coverage:** `spec/items_spec.lua` ("knows a pet's counts only once the pet journal has loaded"),
   `spec/refresh_pipeline_spec.lua` ("pet counts": the events, nothing before the journal loads, a
   recalculation on a change and only then, the limit alone, the bank only while open, a pet read
   after the load), `spec/search_spec.lua` (the fields; per-field re-index tests on a pet; the
   randomized test), `spec/next/merchant_spec.lua` (a vendor pet), `spec/debug_dump_harness_spec.lua`
-  (the capture's pets, 1 of 1). 22 mutations: five first survived; three led to tests (the limit
+  (the capture's pets, 1 of 1), and for the reload case and the shared check: "knows the counts at
+  once when the account already owns pets", "recalculates the bags when the journal first loads, even
+  with nothing committed yet", "usability that changes with spells and reputations" (8 more
+  mutations, all caught). 22 mutations: five first survived; three led to tests (the limit
   alone, a closed bank, a pet's count changed alone) and two to removing code that guarded nothing
   (comparing `collectable`, which follows compared fields; a pet check on items that cannot have
   counts otherwise).

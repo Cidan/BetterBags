@@ -1812,11 +1812,14 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     -- capture: 0 owned until PET_JOURNAL_LIST_UPDATE); the journal's events recalculate the bags
     -- holding a pet item whose counts changed, and nothing else.
     describe("pet counts", function()
-      local registered, sent, owned
+      local registered, sent, owned, journal
 
       before_each(function()
         registered, sent, owned = {}, {}, { [635] = 1 }
+        -- Before the journal has loaded, a login capture had GetNumPets answer 0 owned.
+        journal = { total = 2014, owned = 0 }
         override(events, "RegisterEvent", function(_, name, cb) registered[name] = cb end)
+        override(events, "BucketEvent", function() end)
         local send = events.SendMessage
         override(events, "SendMessage", function(self, ctx, event, ...)
           if event == "bags/Rederive" then table.insert(sent, (...)) end
@@ -1827,6 +1830,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
             if id == 101 then return "Adder", 1, 1, 1, "", "", false, true, true, false, true, 1, 635 end
           end,
           GetNumCollectedInfo = function(species) return owned[species] or 0, 3 end,
+          GetNumPets = function() return journal.total, journal.owned end,
         })
         items._petJournalLoaded = false
         items:RegisterCacheEvents()
@@ -1861,6 +1865,8 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         refreshBackpack()
         sent = {}
         registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        sent = {}
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
         assert.are.same({}, sent, "the counts did not change")
         owned[635] = 3
         registered.NEW_PET_ADDED(context:New("evt"), "NEW_PET_ADDED", "BattlePet-0-1")
@@ -1870,9 +1876,25 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.are.same({ ["0_1"] = true }, search:Search("petcount = 3"))
       end)
 
+      -- A /reload capture: the journal answered 234 owned from the first sample, and its event came
+      -- 59 ms after the first bag read had started.
+      it("knows the counts at once when the account already owns pets (a /reload)", function()
+        journal.owned = 234
+        local slotInfo = refreshBackpack()
+        assert.are.equal(1, slotInfo.itemsBySlotKey["0_1"].petOwned)
+      end)
+
+      -- The journal's first event can come while a read is under way, before anything is committed:
+      -- the bags are recalculated anyway (the request waits for the read).
+      it("recalculates the bags when the journal first loads, even with nothing committed yet", function()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        assert.are.same({ { backpack = true, bank = false, guild = false } }, sent)
+      end)
+
       it("recalculates when only the limit changed", function()
         registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
         refreshBackpack()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
         sent = {}
         override(_G.C_PetJournal, "GetNumCollectedInfo", function(species) return owned[species] or 0, 5 end)
         registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
@@ -1887,6 +1909,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
           itemInfo = { itemID = 101, traits = { isPet = true, petSpeciesID = 635, stats = {} } } }
         items.slotInfo[bank] = { itemsBySlotKey = { ["6_1"] = pet } }
         addon.atBank = false
+        items._petJournalLoaded = true
         registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
         local closed = sent
         sent = {}
@@ -1902,6 +1925,50 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         local slotInfo = refreshBackpack()
         assert.are.same({ 1, 3 }, { slotInfo.itemsBySlotKey["0_1"].petOwned, slotInfo.itemsBySlotKey["0_1"].petLimit })
         assert.is_nil(slotInfo.itemsBySlotKey["0_2"].petOwned, "not a pet")
+      end)
+    end)
+
+    -- A login capture (retail 12.1.5): C_PlayerInfo.CanUseItem answered false for all 30 backpack
+    -- items at the end of the loading screen, false for 6 after the first SPELLS_CHANGED, and true
+    -- for all after the second, about 2.2 s later; the first bag read came 0.23 to 0.3 s after it in
+    -- every login captured. Spells and reputations change the answers, so committed items are asked
+    -- again when they change, and the bags where an answer changed are recalculated.
+    describe("usability that changes with spells and reputations", function()
+      local buckets, sent, can
+
+      before_each(function()
+        buckets, sent, can = {}, {}, { [101] = false, [202] = false }
+        override(events, "RegisterEvent", function() end)
+        override(events, "BucketEvent", function(_, name, cb) buckets[name] = cb end)
+        local send = events.SendMessage
+        override(events, "SendMessage", function(self, ctx, event, ...)
+          if event == "bags/Rederive" then table.insert(sent, (...)) end
+          return send(self, ctx, event, ...)
+        end)
+        override(_G, "C_PlayerInfo", { CanUseItem = function(id) return can[id] == true end })
+        items:RegisterCacheEvents()
+        mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      end)
+
+      it("listens to spells and reputations, bucketed", function()
+        assert.is_function(buckets.SPELLS_CHANGED)
+        assert.is_function(buckets.UPDATE_FACTION)
+      end)
+
+      it("recalculates the bags when an answer changed, and keeps the search current", function()
+        refreshBackpack()
+        assert.are.same({}, search:Search("usable = true"))
+        can[101], can[202] = true, true
+        buckets.SPELLS_CHANGED(context:New("evt"), {})
+        assert.are.same({ { backpack = true, bank = false, guild = false } }, sent)
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.same({ ["0_1"] = true, ["0_2"] = true }, search:Search("usable = true"))
+      end)
+
+      it("does nothing when no answer changed", function()
+        refreshBackpack()
+        buckets.UPDATE_FACTION(context:New("evt"), {})
+        assert.are.same({}, sent)
       end)
     end)
 

@@ -543,28 +543,54 @@ perf-profiler.md §10b): the pet journal answered 0 owned at 6.9 s (during the l
 (13.34 s) and 1.4 s before the startup read (14.80 s); the toy box had loaded by then too (0 at
 6.9 s, 165 of 1003 at 13.36 s). `TRANSMOG_COLLECTION_UPDATED` fired once, at 6.9 s.
 
+A diagnostics run the same evening (a login capture and a `/reload` capture with samples, and a dump
+with the bank, 509 bank items, the worn gear and every bag's name):
+
+- **Usability** (`C_PlayerInfo.CanUseItem`): false for all 30 backpack items, food included, at the
+  end of the login's loading screen; false for 6 after the first `SPELLS_CHANGED`; right for all
+  after the second, about 2.2 s later. The first bag read came 0.23 to 0.3 s after it in every login
+  captured. Right from the start on a `/reload`. BetterBags now asks again on `SPELLS_CHANGED` and
+  `UPDATE_FACTION` (search-indexing.md §13).
+- **Pet journal on a `/reload`**: the counts are there from the start (234 owned at `ADDON_LOADED`);
+  `PET_JOURNAL_LIST_UPDATE` fires twice, the first 59 ms after the first bag read began
+  (search-indexing.md §14).
+- **Appearance collection**: 0 collected until `PLAYER_ENTERING_WORLD`, then 3,083, on the login and
+  on the reload, both before the first bag read. `TRANSMOG_COLLECTION_UPDATED` is no sign it has
+  loaded: at login it fired during the loading screen with 0 collected.
+- **Appearances per item**: 141 items with an appearance, every one collected by its own source
+  (`PlayerHasTransmogItemModifiedAppearance`), by `GetSourceInfo` and by some source of the
+  appearance; `PlayerHasTransmogByItemInfo` said false for 3 of them (The Silver Hand, Ashbringer,
+  Truthguard: artifacts). No uncollected appearance to check the other way.
+- **Player values** (for `player.*`): at `ADDON_LOADED` the level, class and professions are right,
+  but the specialization reads 1 (2 later) and the average item level 0; both are right by about
+  11 s, during the loading screen, before any bag read. Not with their own events: the change was
+  first seen at `TOYS_UPDATED` and `SKILL_LINES_CHANGED`. `C_PaperDollInfo.GetMinItemLevel` returned
+  nil; `GetAverageItemLevel` gave the same 233.6875 three times.
+- **Item level**: the tooltip shows `C_Item.GetCurrentItemLevel` at the item's location; the link
+  (`GetDetailedItemLevelInfo`) differs for two items (Heart of Azeroth: tooltip and location 29, link
+  207; Tamed Eagle: 71 and 362). Bag items already read the location; guild bank items, which have
+  none, read the link. Poor Bind-on-Equip items: link, location and tooltip agree.
+- **Upgrade tracks**: all 18 worn items name a track (Adventurer, Veteran, Champion) with 0/0 levels
+  and maximum item level 0, and none has an upgrade level line in its tooltip
+  (`TooltipDataLineType.ItemUpgradeLevel`); the rule of §10 holds. No item had levels, so whether
+  curve 92181 is needed stays open.
+- **Bag names**: `C_Container.GetBagName` names every character bank tab "Bank" and every Warbank tab
+  "Warband Bank" (not the tabs' own names); -2 and -3 have none.
+- **Toys**: a toy recipe holds the toy's "Toy" line after a `NestedBlock` line (search-indexing.md
+  §12); `C_ToyBox.GetToyInfo` answered for the toys only.
+- **Crafting tiers**: 63 item IDs with a tier, none with copies at different tiers.
+
 ## Needs an in-game check
 
-One diagnostics run (perf-profiler.md §10c: Capture Diagnostics, quit and start the game, open a
-bank and Dump, `/reload`) answers every question below that the player's items can: the login and
-reload captures sample the collections, the player values and each backpack item's usability,
-appearance and pet counts against the bag reads; the dump probes the backpack, the bank, the worn
-gear (upgrade tracks and watermarks), every bag's name and the player values.
+Only items this character does not have can settle these; the Dump tab records what is needed when
+one is in the bags or the bank.
 
-- `C_Item.GetCurrentItemLevel(location)` against `GetDetailedItemLevelInfo(link)` on an heirloom,
-  level-scaled gear and an item in timewalking.
-- An upgradeable item on a track (Veteran and up): its `maxItemLevel`, and whether curve 92181 is
-  still needed; a Poor Bind-on-Equip item's level.
-- `C_Container.GetBagName` on a retail bank tab and a Warbank tab.
-- `GetItemCraftedQualityByItemInfo` on two copies of a crafted item at different tiers.
-- A toy not learned yet: no `Already known` line.
-- When the appearance collection has loaded at login. The second login capture recorded the wrong
-  count for it (`GetNumTransmogSources`, 7 throughout, the wardrobe's source filters); captures now
-  record collected appearances (perf-profiler.md §10b), so a fresh-login capture shows it.
-- Whether `PET_JOURNAL_LIST_UPDATE` fires on a `/reload` (search-indexing.md §14): a capture of a
-  `/reload` (Capture next reload, then `/reload`).
-- That `NEW_TOY_ADDED`, `NEW_PET_ADDED` and `TRANSMOG_COLLECTION_SOURCE_ADDED` fire when a toy, pet
-  or appearance is learned from a bag item, and that the item's tooltip text changes then.
+- An item with upgrade levels (Veteran and up, with levels): its `maxItemLevel`, and whether curve
+  92181 is still needed.
+- An heirloom and level-scaled gear: `GetCurrentItemLevel(location)` against the tooltip.
+- Two copies of a crafted item at different tiers.
+- An uncollected appearance: which of the ways of asking says so.
+- A known recipe: where its "Already known" line sits against its nested item.
 
 ## Decisions
 

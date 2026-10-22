@@ -464,8 +464,16 @@ function items:RegisterCacheEvents()
   for _, name in ipairs({ 'PET_JOURNAL_LIST_UPDATE', 'NEW_PET_ADDED', 'PET_JOURNAL_PET_DELETED',
     'PET_JOURNAL_PET_RESTORED' }) do
     register(name, function()
-      self:OnPetJournalChanged()
+      self:OnCharacterStateChanged(true)
     end)
+  end
+  -- What the character can use follows its spells and reputations, which change often: bucketed.
+  for _, name in ipairs({ 'UPDATE_FACTION', 'SPELLS_CHANGED' }) do
+    if isEventValid(name) then
+      events:BucketEvent(name, function()
+        self:OnCharacterStateChanged(false)
+      end)
+    end
   end
 end
 
@@ -2989,13 +2997,22 @@ end
 
 -- PetCountsOf says how many of a battle pet species the account has and may have
 -- (C_PetJournal.GetNumCollectedInfo: numOwned, maxAllowed, as Blizzard_PetBattleUI.lua reads it), or
--- nil until the pet journal has loaded (OnPetJournalChanged): a login capture had
--- C_PetJournal.GetNumPets report 0 owned until PET_JOURNAL_LIST_UPDATE.
+-- nil until the pet journal has loaded. Login captures had C_PetJournal.GetNumPets report 0 owned
+-- until it loaded, just before PET_JOURNAL_LIST_UPDATE; a /reload capture had it report the
+-- account's pets from the start, with the event 59 ms after the first bag read began. So the journal
+-- has loaded once the event fired (OnCharacterStateChanged) or the account owns a pet.
 ---@param speciesID? number
 ---@return number? owned, number? limit
 function items:PetCountsOf(speciesID)
   local api = _G.C_PetJournal
-  if not self._petJournalLoaded or speciesID == nil or not (api and api.GetNumCollectedInfo) then
+  if speciesID == nil or not (api and api.GetNumCollectedInfo) then
+    return nil
+  end
+  if not self._petJournalLoaded and api.GetNumPets then
+    local _, owned = api.GetNumPets()
+    self._petJournalLoaded = owned ~= nil and owned > 0
+  end
+  if not self._petJournalLoaded then
     return nil
   end
   return api.GetNumCollectedInfo(speciesID)
@@ -3022,12 +3039,35 @@ function items:RefreshCharacterState(item)
   end
 end
 
--- OnPetJournalChanged: the pet journal has loaded, or a pet was learned, caged, released or
--- restored. The committed items that teach a pet are asked their counts again, and the kinds where
--- one changed are recalculated (refresh-scheduler.md §10); nothing else. The bank and the guild bank
--- only while open: opening them reads them.
-function items:OnPetJournalChanged()
-  self._petJournalLoaded = true
+-- characterStateChanged says whether a committed item's character state (ReadCharacterState) no
+-- longer matches what the client answers.
+---@param item ItemData
+---@return boolean
+function items:CharacterStateChanged(item)
+  if self:CanUseItem(item.itemInfo.itemID) ~= item.isUsable then
+    return true
+  end
+  local species = item.itemInfo.traits.petSpeciesID
+  if species ~= nil then
+    local owned, limit = self:PetCountsOf(species)
+    return owned ~= item.petOwned or limit ~= item.petLimit
+  end
+  return false
+end
+
+-- OnCharacterStateChanged: something the items' character state follows may have changed: the pet
+-- journal loaded, or a pet was learned, caged, released or restored (petJournal); spells or
+-- reputations, which C_PlayerInfo.CanUseItem follows. The committed items are asked again and the
+-- kinds where an answer changed are recalculated (refresh-scheduler.md §10); nothing else. When the
+-- journal first loads every kind is recalculated: its event can come while a read is under way,
+-- before anything is committed (the request waits for the read). The bank and the guild bank only
+-- while open: opening them reads them.
+---@param petJournal boolean
+function items:OnCharacterStateChanged(petJournal)
+  local firstLoad = petJournal and not self._petJournalLoaded
+  if petJournal then
+    self._petJournalLoaded = true
+  end
   local kinds = {
     { const.BAG_KIND.BACKPACK, 'backpack', true },
     { const.BAG_KIND.BANK, 'bank', addon.atBank == true },
@@ -3036,23 +3076,20 @@ function items:OnPetJournalChanged()
   local options, changed = {}, false
   for _, entry in ipairs(kinds) do
     local kind, name, open = entry[1], entry[2], entry[3]
-    options[name] = false
+    options[name] = open and firstLoad
+    changed = changed or options[name]
     local slotInfo = self.slotInfo[kind]
-    if open and slotInfo then
+    if open and not firstLoad and slotInfo then
       for _, item in pairs(slotInfo.itemsBySlotKey) do
-        local traits = not item.isItemEmpty and item.itemInfo.traits
-        if traits and traits.petSpeciesID then
-          local owned, limit = self:PetCountsOf(traits.petSpeciesID)
-          if owned ~= item.petOwned or limit ~= item.petLimit then
-            options[name], changed = true, true
-            break
-          end
+        if not item.isItemEmpty and item.itemInfo.traits and self:CharacterStateChanged(item) then
+          options[name], changed = true, true
+          break
         end
       end
     end
   end
   if changed then
-    events:SendMessage(context:New('PetJournalChanged'), 'bags/Rederive', options)
+    events:SendMessage(context:New('CharacterStateChanged'), 'bags/Rederive', options)
   end
 end
 

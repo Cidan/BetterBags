@@ -518,6 +518,7 @@ describe("Items (New Data Farming Engine)", function()
         return species == 635 and 2 or 0, 3
       end }
       items._petJournalLoaded = false
+      _G.C_PetJournal.GetNumPets = function() return 2014, 0 end
       assert.is_nil(items:PetCountsOf(635))
       assert.are.equal(0, asked)
       items._petJournalLoaded = true
@@ -525,6 +526,16 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_nil(items:PetCountsOf(nil), "no species, no counts")
       _G.C_PetJournal = {}
       assert.is_nil(items:PetCountsOf(635), "a client without the API")
+      items._petJournalLoaded = false
+    end)
+
+    -- A /reload capture: the journal answered 234 owned from its first sample, before its event.
+    it("knows the pet journal has loaded when the account owns a pet", function()
+      _G.C_PetJournal = { GetNumPets = function() return 2045, 234 end,
+        GetNumCollectedInfo = function() return 1, 3 end }
+      items._petJournalLoaded = false
+      assert.are.same({ 1, 3 }, { items:PetCountsOf(635) })
+      assert.is_true(items._petJournalLoaded)
       items._petJournalLoaded = false
     end)
 
