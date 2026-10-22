@@ -11,8 +11,8 @@ indexed item outside their part, anywhere in a query; `.claude/rules/search-inde
 precedence (AND before OR, saved rules rewritten once to keep their meaning; §6), `bagname` (§7),
 expansions in release order (§8), `quality` as the crafting quality tier (§9), the new item fields
 of §10-§17 ("Proposed: new fields" marks each), checked against captures from the game ("What a
-capture settled"), arithmetic, money, functions and player values (§15), and the conversion of
-Vendor's rules (§18, functions only). What is left is how a player imports.
+capture settled"), and arithmetic, money, functions and player values (§15). Importing Vendor's
+rules was dropped (decision 2).
 
 ## Why
 
@@ -386,8 +386,7 @@ primary     := number | money | string | name | name "(" args ")" | "(" expressi
 - **Bare words stay text searches.** A bare word is a full-text search today, and real rules rely on
   it: the real profile's rule `cosmetic` searches for the word. A boolean field is tested with
   `field = true` (as `reagent = true` today), never by its bare name, so adding a `cosmetic` field
-  does not change that rule. Vendor's own spellings are converted by an import, not accepted here
-  (decision 2).
+  does not change that rule. Vendor's own spellings are not accepted (decision 2).
 - **Money**: `5g`, `50s`, `1g50s` as copper.
 
 ### Evaluation
@@ -499,7 +498,8 @@ way to limit a match to one line if that turns out to be wanted.
   useful part.
 - Vendor's lists as search fields: a category's added items are the list.
 - Reproducing Lua's value semantics for `and`/`or` (`Quality == (POOR or COMMON)`).
-- Vendor's own spellings in search (`IsSoulbound`, `PlayerLevel()`): an import converts them.
+- Vendor's own spellings in search (`IsSoulbound`, `PlayerLevel()`), and importing Vendor's rules
+  (decision 2).
 - `IsEquipped`, `IsConduit`, `IsAzeriteItem`, the debug properties.
 
 ## What a capture settled
@@ -599,9 +599,12 @@ one is in the bags or the bank.
 Made by the player (2026-10-21):
 1. **Precedence**: AND binds tighter than OR, as in Lua. Saved rules that mix them without
    parentheses are rewritten once with parentheses that keep their meaning.
-2. **Vendor's spellings**: not accepted in search. Vendor rules come in through an import that
-   converts them to BetterBags' search instead (planned separately). Asked (2026-10-22): build and
-   test the conversion and import functions only; how a player imports is still to be designed.
+2. **Vendor's spellings**: not accepted in search. No import and no integration with Vendor
+   (decided 2026-10-22, after a converter and an importer had been built and were removed): players
+   rewrite their rules as searches by hand, and Vendor-like actions on categories are BetterBags' own
+   (`.claude/rules/automation.md`). Vendor's public API could not list or toggle its rules nor tell
+   another addon when they change (its `publicAPI.lua`), and its own BetterBags feature is commented
+   out of `Vendor.toc` and written against an API BetterBags never had.
 3. **Expansion order**: `<` and `>` compare expansion names by expansion ID.
 4. **`bagname`**: the plain container name.
 
@@ -619,10 +622,8 @@ import.
 4. The parser and evaluator: `==`/`~=`, arithmetic, functions; constants folded into index
    lookups, the per-item check narrowed by the index: done (search-indexing.md §15; operators need
    spaces around them, the open question of "Grammar").
-5. Importing Vendor's rules, converted to BetterBags' search: the functions are done
-   (search-indexing.md §18), nothing calls them yet. What does not convert: Vendor's lists, other
-   addons' data, the account's watermark, Lua patterns with classes or anchors, and the properties
-   with no field (§18 lists them).
+5. Importing Vendor's rules: dropped (decision 2). Vendor-like actions on categories instead
+   (`.claude/rules/automation.md`).
 
 Each step updates the README's search section and `.claude/rules/search-indexing.md`.
 

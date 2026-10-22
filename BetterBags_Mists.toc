@@ -96,14 +96,12 @@ sonata\themes\next\quiet.lua
 util\trees\trees.lua
 util\trees\intervaltree.lua
 util\query.lua
-util\vendorrule.lua
 
 data\binding.lua
 data\search.lua
 data\tooltip.lua
 data\equipmentsets.lua
 data\categories.lua
-data\vendorimport.lua
 data\groups.lua
 data\guildbank.lua
 data\items.lua
