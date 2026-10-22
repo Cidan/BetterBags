@@ -59,3 +59,20 @@ reasoning about it can suggest a cause; it does not establish one.
   and returns what it did ("loading", "already", "ended"), so a capture of a bank open shows whether
   the bank loaded after the show animation or on the timeout. Added with the change that loads the
   bank once its window has shown, so the capture asked for before and after can show it.
+- **What the client answered about an item** (`debug/itemprobe.lua`, `ItemProbe`): the Dump tab of
+  `/bbdb` stores, beside each dumped backpack item (`apiProbe`), every value each Blizzard API
+  returned about it: `GetItemInfo` by item ID and by link (`n` is how many values, so "returned
+  nothing" and "returned nil" differ), `GetItemInfoInstant`, item levels (`GetDetailedItemLevelInfo`
+  by ID and by link, `GetCurrentItemLevel`), whether its data was loaded (`IsItemDataCached`,
+  `IsItemDataCachedByID`), `IsEquippableItem`, `GetItemSpell`, `IsCosmeticItem`,
+  `GetItemUpgradeInfo`, `CanScrapItem`, `GetItemStats`, both crafting tiers, the pet journal (and
+  the species' collected count), the toy box (`C_ToyBox.GetToyInfo`, `PlayerHasToy`),
+  `C_PlayerInfo.CanUseItem`, the upgrade watermark, the appearance and whether it is collected, the
+  bag's name, and the tooltip's lines with their types (`C_TooltipInfo.GetBagItem`). Each call is
+  protected (an error is recorded, not raised), a value the addon may not access is recorded as
+  `<secret type>` and never read, and an API the client lacks is left out. The dump records the
+  client it came from (`debugBackpackDumpClient`: version, build, interface, locale). Added to
+  settle the open questions of docs/vendor-compat.md ("Needs an in-game check": the link against the
+  item ID, toys, bags as equipment, cold reads) from one capture. Coverage:
+  `spec/debug/itemprobe_spec.lua`, `spec/frames/debug_window_spec.lua` ("dumps each backpack item
+  with what the client's APIs answered about it"); 11 mutations, all caught.

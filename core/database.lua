@@ -2068,8 +2068,10 @@ end
 
 --- Save a backpack dump
 ---@param dump table
-function DB:SetDebugBackpackDump(dump)
+function DB:SetDebugBackpackDump(dump, client)
   DB.data.profile.debugBackpackDump = dump
+  -- The client the dump was taken on (ItemProbe:Client).
+  DB.data.profile.debugBackpackDumpClient = client
 end
 
 DB:Enable()

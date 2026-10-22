@@ -30,6 +30,9 @@ local perfPane = addon:GetModule('PerfPane')
 ---@class SimulatePane: AceModule
 local simulatePane = addon:GetModule('SimulatePane')
 
+---@class ItemProbe: AceModule
+local itemProbe = addon:GetModule('ItemProbe')
+
 ---@class WindowModule: AceModule
 local window = addon:GetModule('Window')
 
@@ -233,7 +236,7 @@ function debugWindow:CreateDumpFrame()
   desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
   desc:SetWidth(760)
   desc:SetJustifyH("LEFT")
-  desc:SetText("Dump your current full backpack item data to saved variables. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
+  desc:SetText("Dump your current full backpack item data to saved variables, with what the game answered about each item. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
 
   -- Status Label
   local status = sonata:CreateText(f, "Field")
@@ -256,6 +259,7 @@ function debugWindow:CreateDumpFrame()
   dumpButton:SetSize(200, 35)
   dumpButton:SetPoint("TOPLEFT", status, "BOTTOMLEFT", 0, -20)
   dumpButton:SetText("Dump Backpack Items")
+  f.dumpButton = dumpButton
 
   addon.SetScript(dumpButton, "OnClick", function(_ctx)
     local itemsModule = addon:GetModule("Items")
@@ -263,7 +267,13 @@ function debugWindow:CreateDumpFrame()
     local backpackItems = slotInfo and slotInfo.itemsBySlotKey
     if backpackItems then
       local sanitized = sanitizeForDump(backpackItems)
-      database:SetDebugBackpackDump(sanitized)
+      -- What the client's APIs answered about each item, raw (debug/itemprobe.lua).
+      for _, item in pairs(sanitized) do
+        if not item.isItemEmpty and item.bagid and item.slotid then
+          item.apiProbe = itemProbe:Probe(item.bagid, item.slotid)
+        end
+      end
+      database:SetDebugBackpackDump(sanitized, itemProbe:Client())
       f.Update()
       print("BetterBags: Dumped backpack items to saved variables!")
     else

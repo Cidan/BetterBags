@@ -183,3 +183,11 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   install starts with Next, an existing one keeps the classic bags),
   `spec/integration/bank_open_spec.lua` (refresh-scheduler.md §11).
 
+### 5. What the Game Answered (`apiProbe`)
+A dump taken since `debug/itemprobe.lua` carries, on each item, `apiProbe`: every value each
+Blizzard API returned about it when the dump was taken (data-driven.md, "What the client answered
+about an item"), and the profile carries `debugBackpackDumpClient` (the client's version, build and
+locale). Mocks built from a dump should answer from `apiProbe` where it has the call, so a harness
+test runs on what the game answered rather than on what BetterBags made of it: `itemInfoByLink`
+for `C_Item.GetItemInfo(link)`, `itemInfoByID` for the item ID, and so on (each a list with `n`
+values, or `{ error = ... }`). Older dumps have no `apiProbe`.

@@ -44,6 +44,7 @@ core\pool.lua
 debug\debug.lua
 debug\frames.lua
 debug\items.lua
+debug\itemprobe.lua
 debug\analytics.lua
 
 core\events.lua

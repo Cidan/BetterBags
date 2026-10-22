@@ -502,6 +502,9 @@ way to limit a match to one line if that turns out to be wanted.
 
 ## Needs an in-game check
 
+A dump from the `/bbdb` Dump tab now records, with each item, what every API below answered
+(`apiProbe`, `.claude/rules/data-driven.md`), so one dump of a full backpack settles most of these.
+
 - `C_Item.GetCurrentItemLevel(location)` against `GetDetailedItemLevelInfo(link)` on an heirloom,
   level-scaled gear and an item in timewalking: which matches the tooltip.
 - `GetItemInfo` by ID against by link for upgraded or scaled gear: required level and sell price.

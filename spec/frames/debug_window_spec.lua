@@ -18,7 +18,7 @@ local function stubModule(name)
   return mod
 end
 
-stubModule("Constants")
+local constants = stubModule("Constants")
 local database = stubModule("Database")
 local fonts = stubModule("Fonts")
 fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsDebugSpecYellow")
@@ -27,6 +27,10 @@ local list = stubModule("List")
 local itemBrowser = stubModule("ItemBrowser")
 local perfPane = stubModule("PerfPane")
 local simulatePane = stubModule("SimulatePane")
+local itemsModule = stubModule("Items")
+ResetModuleStub("ItemProbe", "debug/itemprobe.lua")
+LoadBetterBagsModule("debug/itemprobe.lua")
+local itemProbe = addon:GetModule("ItemProbe")
 
 local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
 libWindow.RegisterConfig = libWindow.RegisterConfig or function() end
@@ -193,6 +197,27 @@ describe("DebugWindow", function()
     assert.are.equal(sonata:GetTextFont("Title"), row.Category:GetFontObject())
     assert.are.equal(sonata:GetTextFont("Title"), row.Message:GetFontObject())
     assert.are.equal("3", row.RowNumber:GetText())
+  end)
+
+  -- A dump from the game settles what an API does (data-driven.md): each dumped item carries what
+  -- the client's APIs answered about it (ItemProbe), and the dump says which client it came from.
+  it("dumps each backpack item with what the client's APIs answered about it", function()
+    local stored, client
+    override(database, "SetDebugBackpackDump", function(_, dump, c) stored, client = dump, c end)
+    override(database, "GetDebugBackpackDump", function() return stored or {} end)
+    override(constants, "BAG_KIND", { BACKPACK = 0, BANK = 1 })
+    override(itemsModule, "slotInfo", { [0] = { itemsBySlotKey = {
+      ["0_1"] = { bagid = 0, slotid = 1, slotkey = "0_1", isItemEmpty = false, itemInfo = { itemID = 42 } },
+      ["0_2"] = { bagid = 0, slotid = 2, slotkey = "0_2", isItemEmpty = true, itemInfo = {} },
+    } } })
+    override(itemProbe, "Probe", function(_, bag, slot) return { asked = bag .. "_" .. slot } end)
+    override(itemProbe, "Client", function() return { version = "12.1.5" } end)
+    local dump = debugWindow.contentFrames[3]
+    dump.dumpButton:GetScript("OnClick")(dump.dumpButton)
+    assert.are.same({ asked = "0_1" }, stored["0_1"].apiProbe)
+    assert.are.equal(42, stored["0_1"].itemInfo.itemID, "the item as BetterBags read it, as before")
+    assert.is_nil(stored["0_2"].apiProbe, "an empty slot has nothing to ask about")
+    assert.are.same({ version = "12.1.5" }, client)
   end)
 
   it("has a Performance tab after the existing ones, then the Simulate tab", function()
