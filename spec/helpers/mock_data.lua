@@ -58,6 +58,9 @@ function M.ItemData(opts)
       expacID = opts.expacID,
       setID = opts.setID or 0,
       isCraftingReagent = opts.isReagent or false,
+      -- What the search knows of the item once its data has loaded (items:ReadItemTraits); nil for an
+      -- item read cold.
+      traits = opts.traits,
       effectiveIlvl = opts.effectiveIlvl or opts.itemLevel or 1,
       isPreview = false,
       baseIlvl = opts.baseIlvl or opts.itemLevel or 1,

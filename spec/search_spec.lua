@@ -41,7 +41,8 @@ const.ITEM_QUALITY_TO_ENUM = {
   legendary = 5,
 }
 
--- Stub Items (search.EvaluateQuery JIT-loads Items for standalone != queries)
+-- Stub Items: a negation covers the indexed items (search:Universe), never the bags' committed
+-- items, so this stub has none.
 local items = StubBetterBagsModule("Items")
 items.GetAllSlotInfo = function() return {} end
 
@@ -178,14 +179,656 @@ describe("Search", function()
 
   -- ─── Negation ───────────────────────────────────────────────────────────────
 
-  describe("Negation (isNotInIndex)", function()
+  -- A NOT or a != matches every indexed item the negated part does not: on its own, inside an OR,
+  -- around a group. Before, a negation only marked what it excluded, and only an AND (or a bare
+  -- `field != value`) used that, so `NOT rarity = poor` on its own matched nothing
+  -- (docs/vendor-compat.md, "The query engine today").
+  describe("Negation", function()
+    local items4
 
-    it("returns negated results with ___NEGATED___ marker", function()
-      search:Add(MockSearchItem({slotkey = "s1", name = "Sword", quality = 4}))
-      search:Add(MockSearchItem({slotkey = "s2", name = "Shield", quality = 1}))
-      local results = search:isNotInIndex("rarity", 4)
-      assert.is_true(results["___NEGATED___"] or false)
-      assert.are.equal(false, results["s1"])
+    before_each(function()
+      items4 = {
+        sword = MockSearchItem({slotkey = "sword", name = "Thunderfury", quality = 4, itemLevel = 300}),
+        shield = MockSearchItem({slotkey = "shield", name = "Bulwark", quality = 3, itemLevel = 200}),
+        potion = MockSearchItem({slotkey = "potion", name = "Healing Potion", quality = 1, itemLevel = 50}),
+        junk = MockSearchItem({slotkey = "junk", name = "Broken Tooth", quality = 0, itemLevel = 1}),
+      }
+      for _, item in pairs(items4) do search:Add(item) end
+    end)
+
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    it("matches every item a NOT excludes, on its own", function()
+      assert.are.same(keys("sword", "shield", "junk"), search:Search("NOT rarity = 1"))
+      assert.are.same(keys("sword", "shield", "potion"), search:Search("not rarity = poor"))
+    end)
+
+    it("matches every other item for !=, with nothing else in the results", function()
+      assert.are.same(keys("sword", "shield", "junk"), search:Search("rarity != 1"))
+      assert.are.same(keys("sword", "shield", "potion"), search:Search("rarity != poor"))
+    end)
+
+    it("keeps a negation's matches through an OR", function()
+      assert.are.same(keys("sword", "shield", "junk"), search:Search("NOT rarity = 1 OR level > 250"))
+      assert.are.same(keys("potion", "junk"), search:Search("rarity = 1 OR NOT level > 100"))
+      assert.are.same(keys("sword", "shield", "potion", "junk"), search:Search("rarity != 4 OR name = thunderfury"))
+    end)
+
+    it("negates a group, and cancels a double NOT", function()
+      assert.are.same(keys("potion", "junk"), search:Search("NOT (rarity = 4 OR rarity = 3)"))
+      assert.are.same(keys("sword"), search:Search("NOT NOT rarity = 4"))
+    end)
+
+    it("combines negations with AND", function()
+      assert.are.same(keys("shield", "potion"), search:Search("NOT rarity = 4 AND NOT rarity = 0"))
+      assert.are.same(keys("shield"), search:Search("level > 100 AND rarity != 4"))
+      assert.are.same(keys("shield"), search:Search("NOT rarity = 4 AND level > 100"))
+      assert.are.same(keys("shield"), search:Search("level > 100 AND NOT rarity = 4"))
+      assert.are.same(keys("junk"), search:Search("NOT (rarity = 4 OR rarity = 3) AND NOT potion"))
+    end)
+
+    -- Measured offline: `A AND NOT B` over 1,500 items took 0.18 ms through the complement and
+    -- 0.06 ms as A minus B (docs/vendor-compat.md).
+    it("takes an AND with a NOT as one side minus the other, never every indexed item", function()
+      local original = search.Complement
+      local calls = 0
+      search.Complement = function(self, set)
+        calls = calls + 1
+        return original(self, set)
+      end
+      local ok, err = pcall(function()
+        assert.are.same(keys("shield"), search:Search("level > 100 AND NOT rarity = 4"))
+        assert.are.same(keys("shield"), search:Search("NOT rarity = 4 AND level > 100"))
+      end)
+      search.Complement = original
+      assert(ok, err)
+      assert.are.equal(0, calls)
+    end)
+
+    it("negates a word searched in every field", function()
+      assert.are.same(keys("sword", "shield", "junk"), search:Search("NOT potion"))
+    end)
+
+    -- The items a negation covers are the ones indexed now. Before, a bare != read the bags'
+    -- committed items, which, while a sweep runs, are the previous sweep's: an item that arrived in
+    -- the sweep did not match until the next one.
+    it("covers every indexed item, and only those, whatever the bags have committed", function()
+      local looted = MockSearchItem({slotkey = "looted", name = "Fresh Loot", quality = 2, itemLevel = 10})
+      search:Add(looted)
+      assert.are.same(keys("sword", "shield", "looted", "junk"), search:Search("rarity != 1"))
+      search:Remove(items4.junk)
+      assert.are.same(keys("sword", "shield", "looted"), search:Search("NOT rarity = 1"))
+    end)
+
+    it("answers a negation for one item (Find)", function()
+      assert.is_true(search:Find("NOT rarity = 4", items4.potion))
+      assert.is_false(search:Find("NOT rarity = 4", items4.sword))
+      assert.is_true(search:Find("rarity != 4", items4.junk))
+    end)
+
+    it("returns the other items from isNotInIndex, as a plain set", function()
+      assert.are.same(keys("shield", "potion", "junk"), search:isNotInIndex("rarity", 4))
+    end)
+
+    it("matches nothing, without failing, for a NOT right after a word", function()
+      assert.are.same({}, search:Search("thunderfury NOT bulwark"))
+      assert.are.same({}, search:Search("level > 1 AND thunderfury NOT bulwark"))
+    end)
+
+    it("matches nothing for != on a field that does not exist, as for =", function()
+      assert.are.same({}, search:Search("nosuchfield != 1"))
+      assert.are.same({}, search:Search("nosuchfield = 1"))
+    end)
+  end)
+
+  -- ─── Bag name ───────────────────────────────────────────────────────────────
+
+  -- The bag holding an item, by its plain name (asked: docs/vendor-compat.md, "Decisions"). The field
+  -- existed as `bagName` and was never filled, and could not have been found: field names are
+  -- lower-cased before the lookup.
+  describe("bag name", function()
+    before_each(function()
+      search:Add(MockSearchItem({ slotkey = "s1", name = "Sword", bagName = "Backpack" }))
+      search:Add(MockSearchItem({ slotkey = "s2", name = "Peacebloom", bagName = "Herb Satchel" }))
+    end)
+
+    it("finds items by the plain name of their bag, as bagname or bag", function()
+      assert.are.same({ s1 = true }, search:Search("bagname = backpack"))
+      assert.are.same({ s1 = true }, search:Search("bagName = Back"), "as the field was always written")
+      assert.are.same({ s2 = true }, search:Search("bag = herb"))
+      assert.are.same({ s2 = true }, search:Search("bag %= satchel"))
+      assert.are.same({ s2 = true }, search:Search("bag != backpack"))
+    end)
+
+    it("is not searched by a bare word", function()
+      assert.are.same({}, search:Search("satchel"))
+    end)
+  end)
+
+  -- ─── Crafting quality ───────────────────────────────────────────────────────
+
+  -- quality is the crafting quality tier of reagents and crafted items; an item's quality in the
+  -- Poor-to-Legendary sense is rarity (the player, docs/vendor-compat.md). The index existed and
+  -- was never filled.
+  describe("crafting quality", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      search:Add(MockSearchItem({ slotkey = "ore1", quality = 1, traits = { craftingQuality = 1 } }))
+      search:Add(MockSearchItem({ slotkey = "ore2", quality = 1, traits = { craftingQuality = 2 } }))
+      search:Add(MockSearchItem({ slotkey = "ring5", quality = 4, traits = { craftingQuality = 5 } }))
+      search:Add(MockSearchItem({ slotkey = "sword", quality = 1 }))
+    end)
+
+    it("finds items by their crafting tier, never by their rarity", function()
+      assert.are.same(keys("ore1"), search:Search("quality = 1"))
+      assert.are.same(keys("ore2", "ring5"), search:Search("quality >= 2"))
+      assert.are.same(keys("ring5"), search:Search("quality > 2 AND rarity = epic"))
+      assert.are.same(keys("ore2", "ring5", "sword"), search:Search("quality != 1"))
+      assert.are.same({}, search:Search("quality = epic"), "rarity names are rarity's")
+    end)
+  end)
+
+  -- ─── Item traits ────────────────────────────────────────────────────────────
+
+  -- The fields read from an item's link once its data has loaded (items:ReadItemTraits,
+  -- docs/vendor-compat.md "Proposed: new fields"). An item read cold has none.
+  describe("item traits", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      search:Add(MockSearchItem({ slotkey = "blade", currentItemLevel = 600, traits = {
+        minLevel = 70, stackSize = 1, sellPrice = 52000, isEquipment = true, hasUse = true, isCosmetic = false,
+        isPet = false, isScrappable = true, upgradeTrack = "Hero", upgradeLevel = 3, upgradeMax = 6,
+        upgradeMaxItemLevel = 619, stats = { "Critical Strike", "Haste" } } }))
+      search:Add(MockSearchItem({ slotkey = "ore", currentItemLevel = 1, traits = {
+        minLevel = 0, stackSize = 200, sellPrice = 0, isEquipment = false, hasUse = false, isCosmetic = false,
+        isPet = false, isScrappable = false, stats = {} } }))
+      search:Add(MockSearchItem({ slotkey = "snake", currentItemLevel = 25, traits = {
+        minLevel = 0, stackSize = 1, sellPrice = 100, isEquipment = false, hasUse = true, isPet = true,
+        stats = {} } }))
+      local cold = MockSearchItem({ slotkey = "cold", currentItemLevel = 1 })
+      cold.itemInfo.tooltipMarks = { toy = true, known = true }
+      search:Add(cold)
+    end)
+
+    it("finds items by required level, max stack and sell price", function()
+      assert.are.same(keys("blade"), search:Search("minlevel > 60"))
+      assert.are.same(keys("ore", "snake"), search:Search("minlevel = 0"))
+      assert.are.same(keys("ore"), search:Search("stacksize >= 200"))
+      assert.are.same(keys("ore"), search:Search("price = 0"))
+      assert.are.same(keys("blade"), search:Search("price > 10000"))
+    end)
+
+    it("finds items by what they are", function()
+      assert.are.same(keys("blade"), search:Search("equipment = true"))
+      assert.are.same(keys("ore", "snake"), search:Search("equipment = false"))
+      assert.are.same(keys("blade", "snake"), search:Search("hasuse = true"))
+      assert.are.same(keys("blade", "ore"), search:Search("cosmetic = false"), "a client without the answer has none")
+      assert.are.same(keys("snake"), search:Search("pet = true"))
+      assert.are.same(keys("blade"), search:Search("scrappable = true"))
+    end)
+
+    it("finds equipment by its upgrade track", function()
+      assert.are.same(keys("blade"), search:Search("upgradeable = true"))
+      assert.are.same(keys("ore", "snake"), search:Search("upgradeable = false"))
+      assert.are.same(keys("blade"), search:Search("track = hero"))
+      assert.are.same(keys("blade"), search:Search("upgradelevel = 3 AND upgrademax = 6"))
+    end)
+
+    -- Vendor's MaxLevel: the fully upgraded item level, never below the current one; the current one
+    -- for an item without a track.
+    it("finds items by their fully upgraded item level", function()
+      assert.are.same(keys("blade"), search:Search("maxlevel = 619"))
+      assert.are.same(keys("snake"), search:Search("maxlevel = 25"))
+      assert.are.same({}, search:Search("maxlevel = 600"))
+    end)
+
+    it("takes the current item level as the max when an upgrade would lower it", function()
+      search:Add(MockSearchItem({ slotkey = "squished", currentItemLevel = 640, traits = {
+        isEquipment = true, upgradeTrack = "Myth", upgradeLevel = 1, upgradeMax = 6, upgradeMaxItemLevel = 619,
+        stats = {} } }))
+      assert.are.same(keys("squished"), search:Search("maxlevel = 640"))
+    end)
+
+    it("finds items by their stats, by the start of a stat's name or anywhere in it", function()
+      assert.are.same(keys("blade"), search:Search("stat = haste"))
+      assert.are.same(keys("blade"), search:Search("stat = crit"))
+      assert.are.same(keys("blade"), search:Search("stat %= strike"))
+      assert.are.same({}, search:Search("stat = mastery"))
+    end)
+
+    -- Rule #1: an item read before its data loaded matches no trait until it is read again.
+    it("matches no trait of an item read cold", function()
+      for _, q in ipairs({ "minlevel >= 0", "price >= 0", "equipment = false", "hasuse = false", "pet = false",
+        "upgradeable = false", "maxlevel >= 0", "stacksize >= 0", "quality >= 0", "toy = true", "toy = false",
+        "known = true", "known = false" }) do
+        assert.is_nil(search:Search(q).cold, q)
+      end
+    end)
+  end)
+
+  -- ─── Fields the pipeline works out ──────────────────────────────────────────
+
+  describe("gear sets, upgrade arrows and totals", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      local helm = MockSearchItem({ slotkey = "helm", equipmentSets = { "Tank" } })
+      helm.isUpgrade = true
+      helm.itemTotal = 1
+      local potion = MockSearchItem({ slotkey = "potion" })
+      potion.isUpgrade = false
+      potion.itemTotal = 45
+      local cold = MockSearchItem({ slotkey = "cold" })
+      cold.isUpgrade = true
+      cold.harvestIncomplete = true
+      cold.itemTotal = 2
+      search:Add(helm)
+      search:Add(potion)
+      search:Add(cold)
+    end)
+
+    it("finds items in any gear set", function()
+      assert.are.same(keys("helm"), search:Search("inset = true"))
+      assert.are.same(keys("potion", "cold"), search:Search("inset = false"))
+    end)
+
+    -- The arrow BetterBags draws, from the active provider (data-loader.md §15).
+    it("finds items the upgrade arrow marks, but not one read before its data loaded", function()
+      assert.are.same(keys("helm"), search:Search("upgrade = true"))
+      assert.are.same(keys("potion"), search:Search("upgrade = false"))
+    end)
+
+    it("finds items by how many of them the bags hold", function()
+      assert.are.same(keys("potion"), search:Search("total >= 40"))
+      assert.are.same(keys("helm", "cold"), search:Search("total < 10"))
+    end)
+  end)
+
+  -- ─── Usability and appearances ──────────────────────────────────────────────
+
+  describe("usability and appearances", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      local cloak = MockSearchItem({ slotkey = "cloak", traits = { isEquipment = true, transmoggable = true, stats = {} } })
+      cloak.isUsable = true
+      local plate = MockSearchItem({ slotkey = "plate", traits = { isEquipment = true, transmoggable = true, stats = {} } })
+      plate.isUsable = false
+      local recipe = MockSearchItem({ slotkey = "recipe", traits = { isEquipment = false, transmoggable = false, stats = {} } })
+      recipe.isUsable = false
+      local classic = MockSearchItem({ slotkey = "classic", traits = { isEquipment = true, stats = {} } })
+      local cold = MockSearchItem({ slotkey = "cold" })
+      cold.isUsable = true
+      for _, item in ipairs({ cloak, plate, recipe, classic, cold }) do search:Add(item) end
+    end)
+
+    it("finds items the character can use, and gear the character can wear", function()
+      assert.are.same(keys("cloak"), search:Search("usable = true"))
+      assert.are.same(keys("plate", "recipe"), search:Search("usable = false"))
+      assert.are.same(keys("cloak"), search:Search("equippable = true"))
+      assert.are.same(keys("plate", "recipe"), search:Search("equippable = false"),
+        "a client that cannot say whether it is usable says nothing")
+    end)
+
+    -- Vendor's PetCount, PetLimit and IsPetCollectable (itemproperties.lua): the account's count of
+    -- the species, its limit, and whether one more can be learned.
+    it("finds pets by how many the account has, and whether one more can be learned", function()
+      local snake = MockSearchItem({ slotkey = "snake", traits = { isPet = true, petSpeciesID = 635, stats = {} } })
+      snake.petOwned, snake.petLimit = 1, 3
+      local full = MockSearchItem({ slotkey = "full", traits = { isPet = true, petSpeciesID = 243, stats = {} } })
+      full.petOwned, full.petLimit = 1, 1
+      local unloaded = MockSearchItem({ slotkey = "unloaded", traits = { isPet = true, petSpeciesID = 9, stats = {} } })
+      local ore = MockSearchItem({ slotkey = "ore", traits = { isPet = false, stats = {} } })
+      for _, item in ipairs({ snake, full, unloaded, ore }) do search:Add(item) end
+      assert.are.same(keys("snake"), search:Search("collectable = true"))
+      assert.are.same(keys("full", "ore"), search:Search("collectable = false"),
+        "not a pet is not collectable; a pet whose counts are not known yet is neither, nor an item with no "
+          .. "answer about pets (the recipe, as on a client without a pet journal)")
+      assert.are.same(keys("snake", "full"), search:Search("petcount = 1"))
+      assert.are.same(keys("snake"), search:Search("petlimit = 3"))
+      assert.are.same({}, search:Search("petcount = 0"), "no count before the journal loaded")
+    end)
+
+    it("finds items whose appearance is collected, through any source or this one", function()
+      local cloak = MockSearchItem({ slotkey = "c", traits = { transmoggable = true, stats = {} } })
+      cloak.appearanceKnown, cloak.sourceKnown = true, false
+      local robe = MockSearchItem({ slotkey = "r", traits = { transmoggable = true, stats = {} } })
+      robe.appearanceKnown, robe.sourceKnown = false, false
+      local unloaded = MockSearchItem({ slotkey = "u", traits = { transmoggable = true, stats = {} } })
+      for _, item in ipairs({ cloak, robe, unloaded }) do search:Add(item) end
+      assert.are.same(keys("c"), search:Search("appearance = known"))
+      assert.are.same(keys("r"), search:Search("appearance = unknown"))
+      assert.are.same(keys("c", "r"), search:Search("source = unknown"))
+    end)
+
+    it("finds items with an appearance", function()
+      assert.are.same(keys("cloak", "plate"), search:Search("transmoggable = true"))
+      assert.are.same(keys("recipe"), search:Search("transmoggable = false"))
+    end)
+  end)
+
+  -- ─── Expressions (docs/vendor-compat.md, "Proposed: the math") ─────────────
+
+  describe("expressions", function()
+    local saved
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+    local function override(tbl, key, value)
+      table.insert(saved, { tbl, key, rawget(tbl, key) })
+      tbl[key] = value
+    end
+
+    before_each(function()
+      saved = {}
+      -- Player values as a retail capture recorded them (12.1.5): a level 90 Protection Paladin,
+      -- average item level 233.6875, Tailoring, Enchanting and three secondary professions.
+      override(_G, "UnitLevel", function(unit) return unit == "player" and 90 or 0 end)
+      override(_G, "GetAverageItemLevel", function() return 233.6875, 229.25, 230 end)
+      override(_G, "UnitClass", function() return "Paladin", "PALADIN", 2 end)
+      override(_G, "UnitFullName", function() return "Someone", "Somewhere" end)
+      override(_G, "C_SpecializationInfo", { GetSpecialization = function() return 2 end,
+        GetSpecializationInfo = function(index) if index == 2 then return 66, "Protection" end end })
+      override(_G, "GetProfessions", function() return 7, 8, 10, 9, 6 end)
+      local professions = { [7] = { "Tailoring", 197 }, [8] = { "Enchanting", 333 }, [10] = { "Archaeology", 794 },
+        [9] = { "Fishing", 356 }, [6] = { "Cooking", 185 } }
+      override(_G, "GetProfessionInfo", function(index)
+        local p = professions[index]
+        return p[1], 1, 50, 100, 2, 0, p[2]
+      end)
+      -- traits = false: an item read before its data loaded, which has none.
+      local function item(key, opts)
+        opts.slotkey = key
+        if opts.traits == false then
+          opts.traits = nil
+        elseif opts.traits == nil then
+          opts.traits = { stats = {} }
+        end
+        search:Add(MockSearchItem(opts))
+      end
+      item("sword", { name = "Sword", currentItemLevel = 220, quality = 4, count = 1,
+        traits = { sellPrice = 52000, upgradeMaxItemLevel = 240, stats = {} } })
+      item("swordlong", { name = "Sword of the Ages", currentItemLevel = 70, quality = 3, count = 1,
+        traits = { sellPrice = 9000, stats = {} } })
+      item("potion", { name = "Potion", currentItemLevel = 80, quality = 1, count = 20,
+        traits = { sellPrice = 600, stats = {} } })
+      item("cheese", { name = "Cheese", currentItemLevel = 12, quality = 1, count = 5,
+        traits = { sellPrice = 0, stats = {} } })
+      item("cold", { name = "Cold", currentItemLevel = 10, quality = 0, count = 1, traits = false })
+    end)
+
+    after_each(function()
+      for i = #saved, 1, -1 do saved[i][1][saved[i][2]] = saved[i][3] end
+    end)
+
+    it("compares a whole text with ==, and its negation with ~=", function()
+      assert.are.same(keys("sword"), search:Search("name == sword"))
+      assert.are.same(keys("sword", "swordlong"), search:Search("name = sword"), "= still starts the text")
+      assert.are.same(keys("swordlong", "potion", "cheese", "cold"), search:Search("name ~= sword"))
+      assert.are.same(keys("potion"), search:Search("count == 20"))
+    end)
+
+    it("reads money as copper", function()
+      assert.are.same(keys("sword"), search:Search("price > 5g"))
+      assert.are.same(keys("swordlong"), search:Search("price = 90s"))
+      assert.are.same(keys("sword", "swordlong"), search:Search("price >= 1g50s - 60s"))
+      assert.are.same(keys("potion", "cheese"), search:Search("price < 6s1c"))
+      assert.are.same({}, search:Search("price > 5gx"), "not money: matches nothing, as before")
+    end)
+
+    it("folds player values into an index lookup", function()
+      assert.are.same(keys("potion", "swordlong", "cheese", "cold"), search:Search("ilvl <= player.level - 10"))
+      assert.are.same(keys("sword"), search:Search("ilvl > player.ilvl - 20"))
+      assert.are.same(keys("swordlong", "potion", "cheese", "cold"), search:Search("80 >= ilvl"), "flipped")
+      assert.are.same(keys("sword", "swordlong", "potion"), search:Search("60 < ilvl"))
+      assert.are.same(keys("sword", "potion"), search:Search("70 < ilvl"))
+      assert.are.same(keys("sword", "swordlong", "potion"), search:Search("70 <= ilvl"))
+      assert.are.same(keys("swordlong", "potion", "cheese", "cold"), search:Search("ilvl < player.level"),
+        "a player value written as a plain word")
+    end)
+
+    it("works out the parts that do not depend on the item once", function()
+      local asked = 0
+      local playerValue = search.PlayerValue
+      search.PlayerValue = function(self, name)
+        asked = asked + 1
+        return playerValue(self, name)
+      end
+      local result = search:Search("price * count > player.level")
+      search.PlayerValue = playerValue
+      assert.are.same(keys("sword", "swordlong", "potion"), result)
+      assert.are.equal(1, asked)
+    end)
+
+    it("negates within the items the rest of an AND matched", function()
+      local universe = search.Universe
+      local whole = 0
+      search.Universe = function(self)
+        whole = whole + 1
+        return universe(self)
+      end
+      local result = search:Search("rarity = epic AND (NOT name = sword OR name = sword)")
+      search.Universe = universe
+      assert.are.same(keys("sword"), result)
+      assert.are.equal(0, whole, "the NOT went over the AND's matches, not every item")
+    end)
+
+    it("answers a comparison of player values alone for every item, or none", function()
+      assert.are.same(keys("sword", "swordlong", "potion", "cheese", "cold"), search:Search("player.level >= 80"))
+      assert.are.same({}, search:Search("player.level < 80"))
+      assert.are.same(keys("potion"), search:Search("player.class = paladin AND name = potion"))
+      assert.are.same({}, search:Search("player.class = mage"))
+    end)
+
+    it("reads every player value", function()
+      local all = keys("sword", "swordlong", "potion", "cheese", "cold")
+      for _, query in ipairs({ "player.level == 90", "player.ilvl == 233", "player.equippedilvl == 229",
+        "player.class == paladin", "player.class == PALADIN", "player.classid == 2", "player.spec == protection",
+        "player.spec = prot", "player.specid == 66", "player.profession = tailoring", "player.profession = 197",
+        "player.profession = cook", "player.name == someone", "player.realm == somewhere" }) do
+        assert.are.same(all, search:Search(query), query)
+      end
+      assert.are.same({}, search:Search("player.profession = mining"))
+      assert.are.same({}, search:Search("player.unknown = 1"), "an unknown player value matches nothing")
+    end)
+
+    it("has no specialization before one is known", function()
+      _G.C_SpecializationInfo.GetSpecialization = function() return 0 end
+      local asked = 0
+      _G.C_SpecializationInfo.GetSpecializationInfo = function() asked = asked + 1 end
+      assert.are.same({}, search:Search("player.specid > 0"))
+      assert.are.equal(0, asked, "index 0 is no specialization")
+    end)
+
+    it("reads the class by its token or its name", function()
+      _G.UnitClass = function() return "Death Knight", "DEATHKNIGHT", 6 end
+      local all = keys("sword", "swordlong", "potion", "cheese", "cold")
+      assert.are.same(all, search:Search('player.class == "death knight"'))
+      assert.are.same(all, search:Search("player.class == deathknight"))
+    end)
+
+    it("compares a field with another field, item by item", function()
+      assert.are.same(keys("sword"), search:Search("maxlevel > ilvl"))
+      assert.are.same(keys("swordlong", "potion", "cheese"), search:Search("maxlevel == ilvl"))
+    end)
+
+    it("does arithmetic on fields, item by item", function()
+      assert.are.same(keys("sword", "potion"), search:Search("price * count >= 1g"))
+      assert.are.same(keys("sword", "swordlong", "potion"), search:Search("price * count > 0"))
+      assert.are.same(keys("potion"), search:Search("count % 2 == 0 AND count > 10"))
+    end)
+
+    -- Vendor's Potential Upgrades rule.
+    it("calls functions", function()
+      assert.are.same(keys("sword"), search:Search("maxlevel >= min(player.ilvl * 0.95, player.ilvl - 5)"))
+      assert.are.same(keys("sword"), search:Search("maxlevel >= math.max(floor(221.9), ceil(220.1), abs(-1))"))
+    end)
+
+    it("negates an expression against every item", function()
+      assert.are.same(keys("swordlong", "cheese", "cold"), search:Search("NOT price * count >= 1g"))
+    end)
+
+    it("matches nothing where a value is missing, and never fails", function()
+      assert.are.same({}, search:Search("price * count > 0 AND name = cold"))
+      assert.are.same({}, search:Search("name + 1 > 2"))
+      assert.are.same({}, search:Search("price / 0 < 0"))
+    end)
+
+    -- Within an AND, the side the index answers is found first, and the other side checks only its
+    -- matches.
+    it("checks item by item only the items the rest of an AND matched", function()
+      local checked = {}
+      local matchEach = search.MatchEach
+      search.MatchEach = function(self, node, candidates)
+        local n = 0
+        for _ in pairs(candidates) do n = n + 1 end
+        table.insert(checked, n)
+        return matchEach(self, node, candidates)
+      end
+      local result = search:Search("price * count > 0 AND rarity = epic")
+      local reversed = search:Search("rarity = epic AND price * count > 0")
+      search.MatchEach = matchEach
+      assert.are.same(keys("sword"), result)
+      assert.are.same(keys("sword"), reversed)
+      assert.are.same({ 1, 1 }, checked)
+    end)
+
+    -- The index and the check made item by item must agree: "field op N" is answered from the index,
+    -- "field + 0 op N" item by item.
+    it("answers a comparison the same from the index and item by item, over random items", function()
+      math.randomseed(7)
+      search:Init()
+      local fields = { "level", "ilvl", "rarity", "count", "price", "maxlevel", "minlevel" }
+      local ops = { "=", "==", "!=", "~=", "<", "<=", ">", ">=" }
+      for i = 1, 60 do
+        local traits = math.random(5) > 1 and { sellPrice = math.random(0, 5) * 100, minLevel = math.random(0, 3) * 10,
+          upgradeMaxItemLevel = math.random(3) == 1 and math.random(10, 40) or nil, stats = {} } or nil
+        search:Add(MockSearchItem({ slotkey = "r" .. i, currentItemLevel = math.random(10, 30), quality = math.random(0, 5),
+          count = math.random(1, 4), traits = traits }))
+      end
+      for _ = 1, 300 do
+        local field, op, n = fields[math.random(#fields)], ops[math.random(#ops)], math.random(0, 40) * 10 / 10
+        if field == "price" then n = math.random(0, 5) * 100 end
+        local indexed = search:Search(field .. " " .. op .. " " .. n)
+        local each = search:Search(field .. " + 0 " .. op .. " " .. n)
+        assert.are.same(indexed, each, field .. " " .. op .. " " .. n)
+        local other = fields[math.random(#fields)] .. " > " .. math.random(0, 30)
+        for _, join in ipairs({ " AND ", " OR ", " AND NOT " }) do
+          local q1 = field .. " " .. op .. " " .. n .. join .. other
+          local q2 = field .. " + 0 " .. op .. " " .. n .. join .. other
+          assert.are.same(search:Search(q1), search:Search(q2), q1)
+        end
+      end
+    end)
+
+    it("reads an equipment slot token as the slot's name", function()
+      local head = _G.INVTYPE_HEAD
+      _G.INVTYPE_HEAD = "Head"
+      search:Add(MockSearchItem({ slotkey = "helm", name = "Helm", equipLoc = "INVTYPE_HEAD", traits = { stats = {} } }))
+      local result = search:Search("slot = INVTYPE_HEAD")
+      _G.INVTYPE_HEAD = head
+      assert.are.same(keys("helm"), result)
+    end)
+
+    -- Vendor's TooltipContains(PlayerClass()): the class's token or name, in the text.
+    it("compares a text field with a player value, by any of its names", function()
+      search:Add(MockSearchItem({ slotkey = "trinket", name = "Someone's Trinket", tooltipText = "Classes: Paladin",
+        traits = { stats = {} } }))
+      search:Add(MockSearchItem({ slotkey = "mage", name = "Robe", tooltipText = "Classes: Mage", traits = { stats = {} } }))
+      assert.are.same(keys("trinket"), search:Search("tooltip %= player.class"))
+      assert.are.same(keys("trinket"), search:Search("name = player.name"))
+      assert.are.same(keys("sword", "swordlong", "potion", "cheese", "cold", "mage"),
+        search:Search("NOT tooltip %= player.class"))
+    end)
+
+    it("keeps reading a word compared with a text field as text", function()
+      search:Add(MockSearchItem({ slotkey = "lvl", name = "Level Up", traits = { stats = {} } }))
+      assert.are.same(keys("lvl"), search:Search("name = level"))
+      assert.are.same(keys("lvl"), search:Search('name == "level up"'))
+    end)
+  end)
+
+  -- ─── Expansion order ────────────────────────────────────────────────────────
+
+  -- Asked (docs/vendor-compat.md, "Decisions"): < and > compare expansions in release order. The
+  -- field holds a short name, and comparing it matched nothing.
+  describe("expansion order", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      search:Add(MockSearchItem({ slotkey = "classic", expacID = 0 }))
+      search:Add(MockSearchItem({ slotkey = "bc", expacID = 1 }))
+      search:Add(MockSearchItem({ slotkey = "cata", expacID = 3 }))
+      search:Add(MockSearchItem({ slotkey = "tww", expacID = 9 }))
+      search:Add(MockSearchItem({ slotkey = "none" }))
+    end)
+
+    it("orders expansions named in a comparison by their release", function()
+      assert.are.same(keys("classic", "bc"), search:Search("exp < cata"))
+      assert.are.same(keys("cata", "tww"), search:Search("exp >= cata"))
+      assert.are.same(keys("cata", "tww"), search:Search("expansion > bc"))
+      assert.are.same(keys("classic", "bc", "cata"), search:Search("exp <= CATA"))
+    end)
+
+    it("takes an expansion's number", function()
+      assert.are.same(keys("classic", "bc"), search:Search("exp <= 1"))
+      assert.are.same(keys("cata"), search:Search("exp = 3"))
+      assert.are.same(keys("classic", "bc", "tww", "none"), search:Search("exp != 3"))
+    end)
+
+    it("takes the start of a name when only one expansion has it, and matches nothing otherwise", function()
+      assert.are.same(keys("classic", "bc", "cata"), search:Search("exp < tw"))
+      assert.are.same({}, search:Search("exp < c"), "classic or cata")
+      assert.are.same({}, search:Search("exp < nosuchexpansion"))
+    end)
+
+    it("still matches names as text for = and !=", function()
+      assert.are.same(keys("cata"), search:Search("exp = cata"))
+      assert.are.same(keys("classic", "cata"), search:Search("exp = c"))
+    end)
+
+    -- TBC Anniversary tags its items 254, which BetterBags names bc (const.BRIEF_EXPANSION_MAP, set
+    -- when the addon loads, before the search module is initialized).
+    it("orders an expansion by its name, whatever number the client tags it with", function()
+      const.BRIEF_EXPANSION_MAP[254] = "bc"
+      local ok, err = pcall(function()
+        search:Init()
+        search:Add(MockSearchItem({ slotkey = "bc", expacID = 1 }))
+        search:Add(MockSearchItem({ slotkey = "anniversary", expacID = 254 }))
+        search:Add(MockSearchItem({ slotkey = "cata", expacID = 3 }))
+        assert.are.same(keys("bc", "anniversary"), search:Search("exp < cata"))
+        assert.are.same(keys("bc", "anniversary"), search:Search("exp = 1"))
+      end)
+      const.BRIEF_EXPANSION_MAP[254] = nil
+      assert(ok, err)
     end)
   end)
 
@@ -305,12 +948,10 @@ describe("Search", function()
 
     it("supports != (not equal) queries", function()
       local results = search:Search("rarity != 1")
-      -- != returns negated results: items with rarity=1 are excluded
-      assert.is_nil(results["potion"])
+      assert.are.same({ sword = true, shield = true }, results)
     end)
 
     it("supports NOT combined with AND", function()
-      -- Standalone NOT only marks exclusions; combine with AND to filter
       local results = search:Search("type %= weapon AND NOT rarity = 1")
       assert.is_true(results["sword"] or false)
       assert.is_nil(results["potion"])
@@ -485,9 +1126,8 @@ describe("Search", function()
     it("excludes items whose tooltip contains x for `tooltip != x`", function()
       search:IndexItems({potion = potion(), sword = sword()})
       local results = search:isNotInIndex("tooltip", "health")
-      assert.is_true(results["___NEGATED___"] or false)
-      assert.are.equal(false, results["potion"])
-      assert.is_nil(results["sword"])
+      assert.are.same({ sword = true }, results)
+      assert.are.same({ sword = true }, search:Search("tooltip != health"))
 
       local combined = search:Search("name %= u AND tooltip != health")
       assert.is_true(combined["sword"] or false)
@@ -758,12 +1398,53 @@ describe("Search incremental indexing (SyncKind)", function()
       { "active quest flag", function(it) it.questInfo.isActive = true end },
       { "equipment sets", function(it) it.itemInfo.equipmentSets = { "Tank" } end },
       { "bonus IDs", function(it) it.itemLinkInfo.bonusIDs = { "6652" } end },
+      { "bag name", function(it) it.bagName = "Large Sack" end },
+      { "crafting quality", function(it) it.itemInfo.traits.craftingQuality = 2 end },
+      { "required level", function(it) it.itemInfo.traits.minLevel = 30 end },
+      { "max stack", function(it) it.itemInfo.traits.stackSize = 20 end },
+      { "sell price", function(it) it.itemInfo.traits.sellPrice = 999 end },
+      { "equipment flag", function(it) it.itemInfo.traits.isEquipment = true end },
+      { "use flag", function(it) it.itemInfo.traits.hasUse = true end },
+      { "cosmetic flag", function(it) it.itemInfo.traits.isCosmetic = true end },
+      { "pet flag", function(it) it.itemInfo.traits.isPet = true end },
+      { "scrappable flag", function(it) it.itemInfo.traits.isScrappable = true end },
+      { "upgrade track", function(it) it.itemInfo.traits.upgradeTrack = "Veteran" end },
+      { "upgrade level", function(it) it.itemInfo.traits.upgradeLevel = 2 end },
+      { "upgrade max", function(it) it.itemInfo.traits.upgradeMax = 8 end },
+      { "upgraded item level", function(it) it.itemInfo.traits.upgradeMaxItemLevel = 700 end },
+      { "stats", function(it) it.itemInfo.traits.stats = { "Versatility" } end },
+      { "traits read once loaded", function(it) it.itemInfo.traits = nil end },
+      { "upgrade arrow", function(it) it.isUpgrade = true end },
+      { "total held", function(it) it.itemTotal = 99 end },
+      { "read cold", function(it) it.harvestIncomplete = true; it.isUpgrade = true end },
+      { "toy mark", function(it) it.itemInfo.tooltipMarks = { toy = true } end },
+      { "known mark", function(it) it.itemInfo.tooltipMarks = { known = true } end },
+      { "usable", function(it) it.isUsable = true end },
+      { "appearance", function(it) it.itemInfo.traits.transmoggable = true end },
+      { "slot equipped", function(it) it.slotEquipped = 200 end },
+      { "slot best", function(it) it.slotBest = 250 end },
+      { "appearance known", function(it) it.appearanceKnown = true end, appearance = true },
+      { "source known", function(it) it.appearanceKnown, it.sourceKnown = true, true end, appearance = true },
+      { "pet count", function(it) it.petOwned = 2 end, pet = true },
+      { "pet limit", function(it) it.petLimit = 5 end, pet = true },
+      { "pet counts known", function(it) it.petOwned, it.petLimit = nil, nil end, pet = true },
     }
     for _, change in ipairs(changes) do
       it(change[1], function()
         local savedHead = _G.INVTYPE_HEAD
         _G.INVTYPE_HEAD = "Head"
         local sword = item({ slotkey = "a", name = "Sword", kind = BACKPACK, tooltipText = "Use: Restores health." })
+        sword.itemInfo.traits = { minLevel = 10, stackSize = 1, sellPrice = 5, isEquipment = false, hasUse = false,
+          isCosmetic = false, isPet = false, isScrappable = false, upgradeTrack = "Hero", upgradeLevel = 1,
+          upgradeMax = 6, upgradeMaxItemLevel = 619, stats = { "Haste" } }
+        -- A pet whose counts are known, for the changes that only a pet has.
+        if change.pet then
+          sword.itemInfo.traits.isPet = true
+          sword.petOwned, sword.petLimit = 1, 3
+        end
+        if change.appearance then
+          sword.appearanceKnown, sword.sourceKnown = false, false
+        end
         local bag = { a = sword }
         search:SyncKind(BACKPACK, bag)
         change[2](sword)
@@ -818,7 +1499,7 @@ describe("Search incremental indexing (SyncKind)", function()
 
     local function mutate(it)
       local info = it.itemInfo
-      local which = random(18)
+      local which = random(25)
       if which == 1 then info.category = pick(CATEGORIES)
       elseif which == 2 then info.currentItemCount = random(20)
       elseif which == 3 then info.tooltipText = pick(TOOLTIPS)
@@ -836,6 +1517,32 @@ describe("Search incremental indexing (SyncKind)", function()
       elseif which == 15 then info.isBound = not info.isBound
       elseif which == 16 then info.isCraftingReagent = not info.isCraftingReagent
       elseif which == 17 then it.questInfo.isQuestItem = not it.questInfo.isQuestItem
+      elseif which == 18 then it.bagName = pick({ "Backpack", "Herb Satchel", "Large Sack" })
+      elseif which == 19 then
+        if random(4) == 1 then
+          info.traits = nil
+        else
+          info.traits = info.traits or {}
+          local t = info.traits
+          local f = random(8)
+          if f == 1 then t.craftingQuality = random(3) == 1 and nil or random(5)
+          elseif f == 2 then t.minLevel = random(4) * 10
+          elseif f == 3 then t.sellPrice = random(3) - 1
+          elseif f == 4 then t.isEquipment = random(2) == 1
+          elseif f == 5 then t.upgradeTrack = pick({ "Hero", "Myth", nil })
+          elseif f == 6 then t.upgradeMaxItemLevel = random(3) * 100
+          elseif f == 7 then t.stats = random(2) == 1 and { pick({ "Haste", "Mastery" }) } or nil
+          else t.isPet = random(2) == 1 end
+        end
+      elseif which == 20 then it.isUpgrade = random(2) == 1
+      elseif which == 21 then it.itemTotal = random(3) * 10
+      elseif which == 22 then it.itemInfo.tooltipMarks = pick({ { toy = true }, { known = true }, { toy = true, known = true }, false }) or nil
+      elseif which == 23 then it.isUsable = pick({ true, false, "none" })
+        if it.isUsable == "none" then it.isUsable = nil end
+      elseif which == 24 then
+        if it.itemInfo.traits then it.itemInfo.traits.isPet = random(2) == 1 end
+        it.petOwned = random(3) == 1 and nil or random(3) - 1
+        it.petLimit = it.petOwned and 3 or nil
       else it.bindingInfo.binding = random(3) - 1 end
     end
 

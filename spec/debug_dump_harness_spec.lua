@@ -357,7 +357,9 @@ describe("Debug Dump Harness with test.lua", function()
       return nil
     end
 
-    _G.C_Item.GetItemInfo = function(itemID)
+    -- C_Item.GetItemInfo takes an item ID or an item link (warcraft.wiki.gg).
+    _G.C_Item.GetItemInfo = function(itemInfo)
+      local itemID = tonumber(itemInfo) or tonumber(tostring(itemInfo):match("item:(%d+)"))
       for _, item in pairs(dumpItems) do
         if item.containerInfo and item.containerInfo.itemID == itemID then
           local info = item.itemInfo
@@ -419,6 +421,19 @@ describe("Debug Dump Harness with test.lua", function()
     assert.are.equal("Light's Preservation", item2.itemInfo.itemName)
     assert.are.equal(241287, item2.itemInfo.itemID)
     assert.are.equal("Midnight - Potions", item2.itemInfo.category)
+
+    -- Every dumped item's data is there (its link included), so each is read complete, with the
+    -- traits the search indexes (items:ReadItemTraits).
+    local read = 0
+    for slotkey, item in pairs(slotInfo.itemsBySlotKey) do
+      if not item.isItemEmpty then
+        read = read + 1
+        assert.is_false(item.harvestIncomplete, slotkey)
+        assert.is_not_nil(item.itemInfo.traits, slotkey)
+      end
+    end
+    assert.is_true(read > 0)
+    assert.are.equal(dumpItems["1_3"].itemInfo.sellPrice, item2.itemInfo.traits.sellPrice)
 
     -- Ensure empty slots are also handled cleanly
     local emptySlot = slotInfo.itemsBySlotKey["5_25"]
@@ -775,5 +790,311 @@ describe("Debug Dump Harness with test.lua", function()
     local exported = 0
     for _ in string.gmatch(json, '"ph":"X"') do exported = exported + 1 end
     assert.are.equal(trace:Count(), exported)
+  end)
+end)
+
+-- The client's own answers: Dump tab captures whose items carry apiProbe, what every Blizzard API
+-- returned about them in game (debug/itemprobe.lua, test-harness.md §5). Every API the harvest
+-- calls is answered from one, so the real pipeline runs on what the game said. The expected values
+-- below were read from the raw answers (docs/vendor-compat.md, "What a capture settled").
+
+-- clientAnswers runs the tests of a block on a capture: before each, every API the harvest calls
+-- answers from the fixture's apiProbe (by location, item ID or link, as each API takes them).
+---@param fixturePath string
+local function clientAnswers(fixturePath)
+  local fixture = dofile(fixturePath)
+  local oldBetterBagsDB
+  local saved
+  local slots, byLink, byID, bySpecies, maxSlot
+
+  local function override(tbl, key, value)
+    table.insert(saved, { tbl, key, rawget(tbl, key) })
+    tbl[key] = value
+  end
+
+  -- The values a recorded call returned (unpacked with their count), or nothing.
+  local function answer(rec)
+    if type(rec) ~= "table" or rec.error then return end
+    return unpack(rec, 1, rec.n or 0)
+  end
+
+  -- The probe of the item at a bag location; nothing for an equipment slot (the gear is not dumped).
+  local function probeAt(location)
+    local bag, slot = location:GetBagAndSlot()
+    local item = bag and slot and slots[bag .. "_" .. slot]
+    return item and item.apiProbe
+  end
+
+  local function probeOf(info)
+    if type(info) == "number" then return byID[info] end
+    return byLink[info]
+  end
+
+  -- What Blizzard's enUS global strings hold (Ketho/BlizzardInterfaceResources, live,
+  -- Resources/GlobalStrings/enUS.lua at 36dd01db): the stat keys the dump's items have, and the
+  -- tooltip lines toys and known items carry.
+  local strings = {
+    ITEM_MOD_HASTE_RATING_SHORT = "Haste", ITEM_MOD_VERSATILITY = "Versatility",
+    ITEM_MOD_STAMINA_SHORT = "Stamina", ITEM_MOD_STRENGTH_SHORT = "Strength", RESISTANCE0_NAME = "Armor",
+    TOY = "Toy", ITEM_SPELL_KNOWN = "Already known",
+  }
+
+  before_each(function()
+    saved = {}
+    oldBetterBagsDB = _G.BetterBagsDB
+    _G.BetterBagsDB = nil
+    dofile(dumpPath)
+    DB:Init()
+    tooltipScanner:Init()
+    equipmentSets:Init()
+    categories:Init()
+    categories:OnEnable()
+    search:Init()
+    items:Init()
+    items:OnEnable()
+    DB.data:SetProfile("Default")
+
+    slots, byLink, byID, bySpecies, maxSlot = {}, {}, {}, {}, {}
+    for slotkey, item in pairs(fixture.items) do
+      slots[slotkey] = item
+      maxSlot[item.bagid] = math.max(maxSlot[item.bagid] or 0, item.slotid)
+      local p = item.apiProbe
+      if p then
+        byLink[p.link] = p
+        byID[p.itemID] = p
+        local species = p.petInfo and p.petInfo[13]
+        if species then bySpecies[species] = p end
+      end
+    end
+    for key, text in pairs(strings) do override(_G, key, text) end
+
+    local function at(bag, slot)
+      local item = bag and slot and slots[bag .. "_" .. slot]
+      if item and not item.isItemEmpty then return item end
+    end
+    override(C_Container, "GetContainerNumSlots", function(bag) return maxSlot[bag] or 0 end)
+    override(C_Container, "GetContainerItemID", function(bag, slot) local i = at(bag, slot) return i and i.apiProbe.itemID end)
+    override(C_Container, "GetContainerItemLink", function(bag, slot) local i = at(bag, slot) return i and i.apiProbe.link end)
+    override(C_Container, "GetContainerItemInfo", function(bag, slot) local i = at(bag, slot) return i and i.containerInfo end)
+    override(C_Container, "GetContainerItemQuestInfo", function(bag, slot) local i = at(bag, slot) return i and i.questInfo end)
+    override(C_Container, "GetBagName", function(bag)
+      for _, item in pairs(slots) do
+        if item.bagid == bag and item.apiProbe then return answer(item.apiProbe.bagName) end
+      end
+    end)
+    override(C_Item, "GetItemGUID", function(location)
+      local bag, slot = location:GetBagAndSlot()
+      local i = at(bag, slot)
+      return i and i.itemInfo.itemGUID
+    end)
+    -- Not probed: the slot's own quality, which its container info also reports.
+    override(C_Item, "GetItemQuality", function(location)
+      local bag, slot = location:GetBagAndSlot()
+      local i = at(bag, slot)
+      return i and i.containerInfo.quality
+    end)
+    override(C_Item, "IsItemDataCached", function(location) local p = probeAt(location) return answer(p and p.dataCached) end)
+    override(C_Item, "GetItemInfo", function(info)
+      local p = probeOf(info)
+      if not p then return nil end
+      return answer(type(info) == "number" and p.itemInfoByID or p.itemInfoByLink)
+    end)
+    override(C_Item, "GetItemInfoInstant", function(info)
+      local p = probeOf(info)
+      return answer(p and p.itemInfoInstant)
+    end)
+    override(C_Item, "GetDetailedItemLevelInfo", function(info)
+      local p = probeOf(info)
+      if not p then return nil end
+      return answer(type(info) == "number" and p.detailedItemLevelByID or p.detailedItemLevelByLink)
+    end)
+    override(C_Item, "GetCurrentItemLevel", function(location) local p = probeAt(location) return answer(p and p.currentItemLevel) end)
+    override(C_Item, "IsEquippableItem", function(link) local p = probeOf(link) return answer(p and p.equippable) end)
+    override(C_Item, "GetItemSpell", function(link) local p = probeOf(link) return answer(p and p.itemSpell) end)
+    override(C_Item, "IsCosmeticItem", function(link) local p = probeOf(link) return answer(p and p.cosmetic) end)
+    override(C_Item, "GetItemUpgradeInfo", function(link) local p = probeOf(link) return answer(p and p.upgradeInfo) end)
+    override(C_Item, "GetItemStats", function(link) local p = probeOf(link) return answer(p and p.stats) end)
+    override(C_Item, "CanScrapItem", function(location) local p = probeAt(location) return answer(p and p.scrappable) end)
+    override(_G, "C_TradeSkillUI", {
+      GetItemReagentQualityByItemInfo = function(link) local p = probeOf(link) return answer(p and p.reagentQuality) end,
+      GetItemCraftedQualityByItemInfo = function(link) local p = probeOf(link) return answer(p and p.craftedQuality) end,
+    })
+    override(_G, "C_PetJournal", {
+      GetPetInfoByItemID = function(id) local p = byID[id] return answer(p and p.petInfo) end,
+      GetNumCollectedInfo = function(species) local p = bySpecies[species] return answer(p and p.petCollected) end,
+    })
+    override(_G, "C_PlayerInfo", { CanUseItem = function(id) local p = byID[id] return answer(p and p.canUse) end })
+    -- The bySource map answers the source's collected state the dump recorded; a capture with
+    -- answers about items' appearances had the collection loaded.
+    local bySource = {}
+    for _, p in pairs(byLink) do
+      local source = p.transmog and p.transmog[2]
+      if source and p.transmogCollected then bySource[source] = p end
+    end
+    override(_G, "C_TransmogCollection", {
+      GetItemInfo = function(link) local p = probeOf(link) return answer(p and p.transmog) end,
+      PlayerHasTransmog = function() return false end,
+      GetCategoryCollectedCount = function(category) return next(bySource) and category == 1 and 1 or 0 end,
+      PlayerHasTransmogItemModifiedAppearance = function(source)
+        local p = bySource[source]
+        return answer(p and p.transmogCollected)
+      end,
+    })
+    items._appearancesLoaded = false
+    override(C_TooltipInfo, "GetBagItem", function(bag, slot)
+      local i = at(bag, slot)
+      if not i or not i.apiProbe.tooltip then return nil end
+      local lines = {}
+      for _, line in ipairs(i.apiProbe.tooltip) do
+        table.insert(lines, { type = line.type, leftText = line.left, rightText = line.right })
+      end
+      return { lines = lines }
+    end)
+  end)
+
+  after_each(function()
+    for i = #saved, 1, -1 do
+      saved[i][1][saved[i][2]] = saved[i][3]
+    end
+    _G.BetterBagsDB = oldBetterBagsDB
+  end)
+
+  local h = {}
+
+  function h.read()
+    local ctx = context:New("ClientAnswers")
+    ctx:Set("wipe", true)
+    items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+    return items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey
+  end
+
+  function h.keys(...)
+    local set = {}
+    for _, k in ipairs({...}) do set[k] = true end
+    return set
+  end
+
+  function h.count(set)
+    local n = 0
+    for _ in pairs(set) do n = n + 1 end
+    return n
+  end
+
+  return h
+end
+
+-- Retail 12.1.5 (build 70448, enUS), 88 items.
+describe("Dump harness: the client's own answers (spec/fixtures/dump_retail_12_1_5.lua)", function()
+  local h = clientAnswers("spec/fixtures/dump_retail_12_1_5.lua")
+  local read, keys, count = h.read, h.keys, h.count
+
+  it("reads every item with its data, and its traits", function()
+    local n = 0
+    for slotkey, item in pairs(read()) do
+      if not item.isItemEmpty then
+        n = n + 1
+        assert.is_false(item.harvestIncomplete, slotkey)
+        assert.is_not_nil(item.itemInfo.traits, slotkey)
+      end
+    end
+    assert.are.equal(88, n)
+  end)
+
+  -- The one item whose link and item ID answered differently: an upgraded cloak. Its link has the
+  -- item in the bag; its item ID the base item (item level 80, required level 80, 225552 copper).
+  it("reads the cloak's required level and price from its link, not its base item", function()
+    local cloak = read()["1_6"]
+    assert.are.equal("Voidfused Wing Cloak", cloak.itemInfo.itemName)
+    assert.are.equal(90, cloak.itemInfo.traits.minLevel)
+    assert.are.equal(325268, cloak.itemInfo.traits.sellPrice)
+    assert.are.equal(230, cloak.itemInfo.currentItemLevel)
+    -- Three foods need level 90 too, by link and by item ID alike.
+    assert.are.same(keys("0_3", "0_5", "0_6", "1_6"), search:Search("minlevel = 90"))
+    assert.is_nil(search:Search("minlevel = 80")["1_6"], "not its base item's required level")
+    assert.are.same(keys("1_6"), search:Search("price = 325268"))
+    assert.are.same({}, search:Search("price = 225552"), "not its base item's price")
+    assert.are.same(keys("1_6"), search:Search("maxlevel = 230"))
+  end)
+
+  -- The cloak's upgrade info names a track (Adventurer) with no levels (0/0, max item level 0), and
+  -- its tooltip has no upgrade level line: it is not on a track the game shows.
+  it("does not take a track with no levels as an upgrade track", function()
+    local cloak = read()["1_6"]
+    assert.is_nil(cloak.itemInfo.traits.upgradeTrack)
+    assert.are.same({}, search:Search("upgradeable = true"))
+    assert.are.same({}, search:Search("track = adventurer"))
+  end)
+
+  it("finds the cloak as the only equipment, by its stats", function()
+    read()
+    assert.are.same(keys("1_6"), search:Search("equipment = true"))
+    assert.are.same(keys("1_6"), search:Search("stat = haste AND stat = vers"))
+    assert.are.same(keys("1_6"), search:Search("stat = armor"))
+  end)
+
+  it("finds the two pets, the three tiered reagents, and the Use: items", function()
+    read()
+    assert.are.same(keys("2_16", "2_9"), search:Search("pet = true"))
+    assert.are.same(keys("1_16", "1_17", "1_4"), search:Search("quality = 1"))
+    -- 43 Use: lines and 8 recipes and pets whose "Use: Teaches you" lines GetItemSpell answers too.
+    assert.are.equal(51, count(search:Search("hasuse = true")))
+    assert.are.equal(37, count(search:Search("hasuse = false")))
+  end)
+
+  -- Both toys: the tooltip has a line "Toy" (TOY) and, learned, "Already known" (ITEM_SPELL_KNOWN,
+  -- a UsageRequirement line); C_ToyBox.GetToyInfo also answered for these two and no other item.
+  it("finds the toys, and the items already known, by their tooltip lines", function()
+    read()
+    assert.are.same(keys("0_2", "2_29"), search:Search("toy = true"))
+    assert.are.same(keys("0_2", "2_29"), search:Search("known = true"))
+    assert.are.equal(86, count(search:Search("toy = false")))
+  end)
+
+  -- CanUseItem said no to the 9 recipes of professions the character does not have.
+  -- GetNumCollectedInfo answered 1 of 1 for both pets: neither can be learned again.
+  it("finds the pets the account cannot learn again", function()
+    items._petJournalLoaded = true
+    read()
+    items._petJournalLoaded = false
+    assert.are.same(keys("2_16", "2_9"), search:Search("petcount = 1 AND petlimit = 1"))
+    assert.are.same({}, search:Search("collectable = true"))
+    assert.is_true(search:Search("collectable = false")["2_16"])
+  end)
+
+  it("finds what the character can use, wear, and transmog", function()
+    read()
+    assert.are.same(keys("1_10", "1_11", "1_12", "1_13", "1_14", "1_15", "1_7", "1_8", "1_9"),
+      search:Search("usable = false"))
+    assert.are.same(keys("1_6"), search:Search("equippable = true"))
+    assert.are.same(keys("1_6"), search:Search("transmoggable = true"))
+  end)
+
+  it("finds the cloak's appearance and source collected", function()
+    read()
+    assert.are.same(keys("1_6"), search:Search("appearance = known"))
+    assert.are.same(keys("1_6"), search:Search("source = known"))
+    assert.are.same({}, search:Search("appearance = unknown"))
+  end)
+
+  it("finds items by the plain name of their bag", function()
+    read()
+    assert.are.equal(20, count(search:Search("bag = backpack")))
+    assert.are.equal(68, count(search:Search("bag = shrouded")))
+  end)
+end)
+
+-- A second capture, the same day, with a bag in the backpack (33 items): IsEquippableItem says a bag
+-- is equipment. Vendor's IsEquipment calls the same API (itemproperties.lua:176, interop.lua:46).
+describe("Dump harness: a capture with a bag (spec/fixtures/dump_retail_12_1_5_bag.lua)", function()
+  local h = clientAnswers("spec/fixtures/dump_retail_12_1_5_bag.lua")
+  local read, keys = h.read, h.keys
+
+  it("takes a bag as equipment the character can equip, worth nothing to a vendor", function()
+    local bag = read()["3_17"]
+    assert.are.equal("Horadric Haversack", bag.itemInfo.itemName)
+    assert.are.same(keys("1_6", "3_17"), search:Search("equipment = true"))
+    assert.are.same(keys("1_6", "3_17"), search:Search("equippable = true"))
+    assert.is_true(search:Search("price = 0")["3_17"])
+    assert.is_nil(search:Search("upgradeable = true")["3_17"])
   end)
 end)

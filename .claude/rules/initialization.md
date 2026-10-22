@@ -60,6 +60,7 @@ the session. See `.claude/rules/perf-profiler.md`.
   search:Init()
   items:Init()
   refresh:Init()
+  addon:GetModule('Automation'):Init()
 
   -- 4. Themes and Presentation Frames
   addon:GetModule('Render'):Init()

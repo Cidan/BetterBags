@@ -90,13 +90,10 @@ local MAX_ITEM_COST = 3
 ---@field cost number Copper.
 
 function merchant:Init()
-  -- A search instance of its own: the search module keeps everything it indexes on itself.
+  -- A search instance of its own: the search module keeps everything it indexes on itself, so a
+  -- negated query covers the vendor's items, not the bags' (search:Universe).
   local index = setmetatable({}, { __index = search })
   index:Init()
-  -- A negated query covers the vendor's items, not the bags'.
-  index.Universe = function(own)
-    return own.indexed
-  end
   self.search = index
 end
 
@@ -152,8 +149,8 @@ local function recordOf(item)
     info.itemID = info.itemID or instID
     info.itemType, info.itemSubType, info.itemEquipLoc = instType, instSubType, instEquipLoc
     info.classID, info.subclassID = instClassID, instSubclassID
-    local name, _, quality, level, minLevel, itemType, itemSubType, _, equipLoc, _, sellPrice, classID, subclassID,
-      bindType, expacID, _, isCraftingReagent = C_Item.GetItemInfo(link)
+    local name, _, quality, level, minLevel, itemType, itemSubType, stackSize, equipLoc, _, sellPrice, classID,
+      subclassID, bindType, expacID, _, isCraftingReagent = C_Item.GetItemInfo(link)
     if name ~= nil then
       warm = true
       info.itemName = name
@@ -170,9 +167,10 @@ local function recordOf(item)
       info.expacID = expacID
       info.isCraftingReagent = isCraftingReagent
       info.currentItemLevel = C_Item.GetDetailedItemLevelInfo and C_Item.GetDetailedItemLevelInfo(link) or level
+      info.traits = items:ReadItemTraits(info.itemID, link, minLevel, stackSize, sellPrice)
     end
   end
-  info.tooltipText = tooltipScanner:GetMerchantItemText(item.index)
+  info.tooltipText, info.tooltipMarks = tooltipScanner:GetMerchantItemText(item.index)
   ---@type ItemData
   local record = {
     kind = const.BAG_KIND.BACKPACK,
@@ -180,6 +178,12 @@ local function recordOf(item)
     itemInfo = info,
     containerInfo = { quality = info.itemQuality },
   }
+  -- The merchant's own answer (GetMerchantItemInfo's isUsable), read with the item's data.
+  if info.traits then
+    record.isUsable = item.isUsable
+    record.petOwned, record.petLimit = items:PetCountsOf(info.traits.petSpeciesID)
+    record.appearanceKnown, record.sourceKnown = items:AppearanceStateOf(info.traits, link)
+  end
   return record, warm
 end
 
@@ -329,14 +333,7 @@ function merchant:Search(text)
   if text == nil or text == "" then
     return nil
   end
-  -- Only the vendor's slots: the search's results can carry markers of its own (___NEGATED___).
-  local results = {}
-  for slotkey in pairs(self.search:Search(text)) do
-    if self.search.indexed[slotkey] ~= nil then
-      results[slotkey] = true
-    end
-  end
-  return results
+  return self.search:Search(text)
 end
 
 ---@param link? string

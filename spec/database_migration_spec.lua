@@ -53,6 +53,7 @@ end
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 LoadBetterBagsModule("util/serialization.lua")
+LoadBetterBagsModule("util/query.lua")
 
 addon:GetModule("Context")
 local events = addon:GetModule("Events")
@@ -373,6 +374,75 @@ describe("Database Migration", function()
   -- Categories are one kind (a rule, items placed by hand, or both), defined once and applied to each
   -- bag (category-lifecycle.md §6). Every load (and every import) brings saved categories to that
   -- shape; the cases come from real profiles (test.lua).
+  -- AND binds tighter than OR (docs/vendor-compat.md, "Decisions"). Saved rules were written when
+  -- they had one precedence and grouped left to right; each profile's are rewritten once to keep
+  -- their meaning, and the profile records it (searchRuleVersion).
+  describe("search rules written before AND bound tighter than OR", function()
+    local profile, QueryParser
+
+    local function rule(name)
+      local f = profile.customCategoryFilters[name]
+      return f.searchCategory and f.searchCategory.query
+    end
+
+    before_each(function()
+      QueryParser = addon:GetModule("QueryParser")
+      profile = DB.data.profile
+      profile.searchRuleVersion = nil
+      profile.customCategoryFilters = {
+        Mixed = { name = "Mixed", itemList = {}, searchCategory = { query = "type = armor OR type = weapon AND ilvl > 200" } },
+        Plain = { name = "Plain", itemList = {}, searchCategory = { query = "tradeskill AND (exp = tww)" } },
+        Listed = { name = "Listed", itemList = { [5] = true } },
+      }
+      profile.customCategoryIndex = { [5] = "Listed" }
+    end)
+
+    it("rewrites a rule that mixes them, keeping its meaning, and leaves the others alone", function()
+      DB:Migrate()
+      assert.are.equal("(type = armor OR type = weapon) AND ilvl > 200", rule("Mixed"))
+      assert.are.equal("tradeskill AND (exp = tww)", rule("Plain"))
+      assert.is_nil(rule("Listed"))
+      assert.are.equal(QueryParser.VERSION, profile.searchRuleVersion)
+    end)
+
+    it("does it once: a rule written afterwards keeps the precedence it was written for", function()
+      DB:Migrate()
+      profile.customCategoryFilters.Mixed.searchCategory.query = "a OR b AND c"
+      DB:Migrate()
+      assert.are.equal("a OR b AND c", rule("Mixed"))
+    end)
+
+    it("leaves a profile already on the current version alone", function()
+      profile.searchRuleVersion = QueryParser.VERSION
+      DB:Migrate()
+      assert.are.equal("type = armor OR type = weapon AND ilvl > 200", rule("Mixed"))
+    end)
+
+    -- A new or reset profile has no old rules; the player may write some before the next load.
+    it("marks a new profile and a reset one as current", function()
+      local start = DB:GetCurrentProfileName()
+      DB:CreateProfile("Fresh Rules")
+      assert.are.equal(QueryParser.VERSION, DB.data.profile.searchRuleVersion)
+      DB.data.profile.searchRuleVersion = nil
+      DB:ResetCurrentProfile()
+      assert.are.equal(QueryParser.VERSION, DB.data.profile.searchRuleVersion)
+      DB:SwitchToProfile(start)
+      DB.data:DeleteProfile("Fresh Rules", true)
+    end)
+
+    it("rewrites the rules of an old profile copied into this one", function()
+      DB.data.sv.profiles["Old Rules"] = {
+        customCategoryFilters = { Old = { name = "Old", itemList = {}, searchCategory = { query = "a OR b AND c" } } },
+      }
+      profile.searchRuleVersion = QueryParser.VERSION
+      DB:CopyFromProfile("Old Rules")
+      profile = DB.data.profile
+      assert.are.equal("(a OR b) AND c", rule("Old"))
+      assert.are.equal(QueryParser.VERSION, profile.searchRuleVersion)
+      DB.data.sv.profiles["Old Rules"] = nil
+    end)
+  end)
+
   describe("unified categories", function()
     local profile
 

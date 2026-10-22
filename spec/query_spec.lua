@@ -25,17 +25,17 @@ describe("QueryParser", function()
 
     it("tokenizes double-quoted strings", function()
       local tokens = QueryParser:Lexer('"hello world"')
-      assert.same({{type = "term", value = "hello world"}}, tokens)
+      assert.same({{type = "term", value = "hello world", quoted = true}}, tokens)
     end)
 
     it("tokenizes single-quoted strings", function()
       local tokens = QueryParser:Lexer("'hello world'")
-      assert.same({{type = "term", value = "hello world"}}, tokens)
+      assert.same({{type = "term", value = "hello world", quoted = true}}, tokens)
     end)
 
     it("handles escaped quotes inside quoted strings", function()
       local tokens = QueryParser:Lexer('"he said \\"hello\\""')
-      assert.same({{type = "term", value = 'he said "hello"'}}, tokens)
+      assert.same({{type = "term", value = 'he said "hello"', quoted = true}}, tokens)
     end)
 
     it("tokenizes the = operator", function()
@@ -90,6 +90,45 @@ describe("QueryParser", function()
         {type = "operator", value = "<"},
         {type = "term", value = "b"},
       }, tokens)
+    end)
+
+    it("tokenizes == and ~=, spaced or not", function()
+      assert.same({
+        {type = "term", value = "name"},
+        {type = "operator", value = "=="},
+        {type = "term", value = "sword"},
+      }, (QueryParser:Lexer("name == sword")))
+      assert.same({
+        {type = "term", value = "a"},
+        {type = "operator", value = "~="},
+        {type = "term", value = "b"},
+      }, (QueryParser:Lexer("a~=b")))
+    end)
+
+    -- A sign is an operator only on its own, so every hyphenated word works as it did.
+    it("tokenizes a lone arithmetic sign as an operator, and keeps signs inside words", function()
+      assert.same({
+        {type = "term", value = "level"},
+        {type = "arith", value = "-"},
+        {type = "term", value = "10"},
+      }, (QueryParser:Lexer("level - 10")))
+      assert.same({{type = "term", value = "100-10"}}, (QueryParser:Lexer("100-10")))
+      assert.same({{type = "term", value = "-5"}}, (QueryParser:Lexer("-5")))
+      for _, sign in ipairs({ "+", "*", "/", "%" }) do
+        assert.same({ type = "arith", value = sign }, QueryParser:Lexer("a " .. sign .. " b")[2], sign)
+      end
+      assert.same({ type = "operator", value = "%=" }, QueryParser:Lexer("a %= b")[2])
+    end)
+
+    it("tokenizes commas between function arguments", function()
+      assert.same({
+        {type = "term", value = "min"},
+        {type = "paren", value = "("},
+        {type = "term", value = "a"},
+        {type = "comma", value = ","},
+        {type = "term", value = "b"},
+        {type = "paren", value = ")"},
+      }, (QueryParser:Lexer("min(a, b)")))
     end)
 
     it("tokenizes AND as a logical operator", function()
@@ -288,7 +327,7 @@ describe("QueryParser", function()
       }, ast)
     end)
 
-    it("parses mixed AND/OR left-to-right (no precedence)", function()
+    it("parses mixed AND then OR as (a AND b) OR c", function()
       local ast = parse("a AND b OR c")
       assert.same({
         type = "logical",
@@ -301,6 +340,25 @@ describe("QueryParser", function()
         },
         right = {type = "term", value = "c"},
       }, ast)
+    end)
+
+    -- Asked (docs/vendor-compat.md, "Decisions"): AND binds tighter than OR, as in Lua. Queries used
+    -- to group left to right, so `a OR b AND c` read as `(a OR b) AND c`.
+    it("binds AND tighter than OR, as Lua does", function()
+      local function shape(n)
+        if n.type == "term" then return n.value end
+        if n.type == "comparison" then return n.field .. n.operator .. n.value end
+        if n.operator == "NOT" then return "NOT " .. shape(n.expression) end
+        return "(" .. shape(n.left) .. " " .. n.operator .. " " .. shape(n.right) .. ")"
+      end
+      assert.are.equal("(a OR (b AND c))", shape(parse("a OR b AND c")))
+      assert.are.equal("((a OR (b AND c)) OR d)", shape(parse("a OR b AND c OR d")))
+      assert.are.equal("((a AND b) OR (c AND d))", shape(parse("a AND b OR c AND d")))
+      assert.are.equal("(NOT a OR (b AND c))", shape(parse("NOT a OR b AND c")))
+      assert.are.equal("(a OR (NOT b AND c))", shape(parse("a OR NOT b AND c")))
+      assert.are.equal("((a OR b) OR c)", shape(parse("a OR b OR c")), "OR still groups left to right")
+      assert.are.equal("((a OR b) AND c)", shape(parse("(a OR b) AND c")))
+      assert.are.equal("(ilvl>5 OR (rarity=4 AND name=x))", shape(parse("ilvl > 5 or rarity = 4 and name = x")))
     end)
 
     it("parses parenthesized expressions for grouping", function()
@@ -346,6 +404,61 @@ describe("QueryParser", function()
       }, ast)
     end)
 
+    it("parses == and ~= comparisons as plain comparisons", function()
+      assert.same({ type = "comparison", field = "name", operator = "==", value = "sword" }, parse("name == sword"))
+      assert.same({ type = "comparison", field = "name", operator = "~=", value = "sword" }, parse("name ~= sword"))
+    end)
+
+    it("says when a comparison's value was quoted", function()
+      assert.same({ type = "comparison", field = "name", operator = "=", value = "level", quoted = true },
+        parse('name = "level"'))
+    end)
+
+    -- Words stay words: the search decides what a word names (a field, a player value, a number,
+    -- money, text), by the field compared with.
+    it("parses arithmetic in a comparison, multiplication first", function()
+      assert.same({
+        type = "compare",
+        left = { type = "word", value = "ilvl" },
+        operator = "<=",
+        right = { type = "arith", operator = "-", left = { type = "word", value = "player.level" },
+          right = { type = "word", value = "10" } },
+      }, parse("ilvl <= player.level - 10"))
+      assert.same({
+        type = "arith", operator = "+", left = { type = "word", value = "a" },
+        right = { type = "arith", operator = "*", left = { type = "word", value = "b" },
+          right = { type = "word", value = "c" } },
+      }, parse("a + b * c > 1").left)
+      assert.same(parse("price * count > 5g"), parse("(price * count) > 5g"))
+      assert.are.equal("arith", parse("price * count > 5g").left.type)
+    end)
+
+    it("parses function calls and unary minus", function()
+      local ast = parse("maxlevel >= min(player.ilvl * 0.95, player.ilvl - 5)")
+      assert.are.equal("call", ast.right.type)
+      assert.are.equal("min", ast.right.name)
+      assert.are.equal(2, #ast.right.args)
+      assert.are.equal("max", parse("level < math.max(1, 2)").right.name, "Vendor's math. spelling")
+      assert.same({ type = "neg", expression = { type = "word", value = "level" } }, parse("- level < 0").left)
+    end)
+
+    it("keeps a quoted word text, even beside arithmetic", function()
+      assert.same({ type = "word", value = "level", quoted = true }, parse('name == "level" + 1').right.left)
+    end)
+
+    it("mixes comparisons with arithmetic and logic", function()
+      local ast = parse("ilvl < player.level - 5 AND rarity = epic")
+      assert.are.equal("AND", ast.operator)
+      assert.are.equal("compare", ast.left.type)
+      assert.same({ type = "comparison", field = "ilvl", operator = "<", value = "player.level" },
+        parse("ilvl < player.level"), "a word compared with a word stays a plain comparison")
+      assert.same({ type = "comparison", field = "rarity", operator = "=", value = "epic" }, ast.right)
+    end)
+
+    it("keeps a word with a sign inside it one value, as before", function()
+      assert.same({ type = "comparison", field = "ilvl", operator = ">", value = "100-10" }, parse("ilvl > 100-10"))
+    end)
+
     it("parses a complex nested expression", function()
       local ast = parse("quality >= 4 AND (name %= sword OR name %= shield)")
       assert.same({
@@ -379,6 +492,127 @@ describe("QueryParser", function()
 
   -- ─── Query (integration) ───────────────────────────────────────────────────
 
+  -- ─── Rewriting rules written before AND bound tighter than OR ─────────────────
+
+  describe("GroupLeftToRight", function()
+    -- The parser as it was before AND bound tighter than OR: AND and OR at one precedence, grouped
+    -- left to right; a term, `field op value`, `NOT term` or a parenthesized group, the closing
+    -- parenthesis optional; whatever follows the first expression ignored.
+    local function oldParse(tokens)
+      local i = 1
+      local function peek() return tokens[i] end
+      local expression
+      local function term()
+        local t = peek()
+        if t and t.type == "paren" and t.value == "(" then
+          i = i + 1
+          local e = expression()
+          if peek() and peek().type == "paren" and peek().value == ")" then i = i + 1 end
+          return e
+        elseif t and t.type == "logical" and t.value == "NOT" then
+          i = i + 1
+          return { type = "logical", operator = "NOT", expression = term() }
+        elseif t and t.type == "term" then
+          i = i + 1
+          if peek() and peek().type == "operator" then
+            local op = peek().value
+            i = i + 1
+            local v = assert(peek() and peek().type == "term" and peek(), "value")
+            i = i + 1
+            return { type = "comparison", field = t.value, operator = op, value = v.value }
+          end
+          return { type = "term", value = t.value }
+        end
+        error("unexpected")
+      end
+      expression = function()
+        local left = term()
+        while peek() and peek().type == "logical" do
+          local op = peek().value
+          assert(op ~= "NOT", "binary NOT")
+          i = i + 1
+          left = { type = "logical", operator = op, left = left, right = term() }
+        end
+        return left
+      end
+      return expression()
+    end
+
+    local function shape(n)
+      if n == nil then return "nil" end
+      if n.type == "term" then return n.value end
+      if n.type == "comparison" then return n.field .. n.operator .. n.value end
+      if n.operator == "NOT" then return "NOT " .. shape(n.expression) end
+      return "(" .. shape(n.left) .. " " .. n.operator .. " " .. shape(n.right) .. ")"
+    end
+
+    local function oldShape(text)
+      local ok, ast = pcall(function() return oldParse(QueryParser:Lexer(text)) end)
+      return ok and shape(ast) or "invalid"
+    end
+
+    it("adds parentheses so a rule keeps the meaning it had", function()
+      assert.are.equal("(a OR b) AND c", QueryParser:GroupLeftToRight("a OR b AND c"))
+      assert.are.equal("((a OR b) AND c OR d) AND e", QueryParser:GroupLeftToRight("a OR b AND c OR d AND e"))
+      assert.are.equal("(a AND b OR c) AND d", QueryParser:GroupLeftToRight("a AND b OR c AND d"))
+      assert.are.equal("(a OR b) AND c AND d", QueryParser:GroupLeftToRight("a OR b AND c AND d"), "no more than needed")
+      assert.are.equal("x AND ((a OR b) AND c)", QueryParser:GroupLeftToRight("x AND (a OR b AND c)"))
+      assert.are.equal("(NOT a or b) and c", QueryParser:GroupLeftToRight("NOT a or b and c"))
+      assert.are.equal('(type = armor OR name = "Large Sack") AND ilvl > 200',
+        QueryParser:GroupLeftToRight('type = armor OR name = "Large Sack" AND ilvl > 200'), "quotes kept")
+      assert.are.equal("(tradeskill OR (a OR b)) AND exp = tww",
+        QueryParser:GroupLeftToRight("tradeskill OR (a OR b) AND exp = tww"))
+    end)
+
+    it("leaves a rule that does not mix them, or that does not parse, as it is", function()
+      for _, q in ipairs({ "a AND b OR c", "a OR b OR c", "a AND b AND c", "(a OR b) AND c", "rarity = epic",
+        "exp = mid and not \"housing decor\"", "ilvl < 220 and (armor or weapon)", "", "AND a", "a = ", "a NOT b" }) do
+        assert.are.equal(q, QueryParser:GroupLeftToRight(q), q)
+      end
+    end)
+
+    -- The lexer rejects a control character; a saved rule holding one must not stop the load.
+    it("leaves a rule the lexer cannot read as it is, without failing", function()
+      local odd = "a OR b\001 AND c"
+      assert.are.equal(odd, QueryParser:GroupLeftToRight(odd))
+      assert.are.equal("a OR AND b", QueryParser:GroupLeftToRight("a OR AND b"))
+    end)
+
+    it("keeps what an unclosed parenthesis or a stray one meant", function()
+      assert.are.equal(oldShape("(a OR b AND c"), shape(QueryParser:Query(QueryParser:GroupLeftToRight("(a OR b AND c"))))
+      assert.are.equal(oldShape("a OR b) AND c"), shape(QueryParser:Query(QueryParser:GroupLeftToRight("a OR b) AND c"))))
+    end)
+
+    -- A thousand random rules, each read as the old parser read it and as the current one reads its
+    -- rewrite: the two must be the same expression.
+    it("gives every rule the meaning it had, over random rules", function()
+      local seed = 1177
+      local function random(n)
+        seed = (seed * 1103515245 + 12345) % 2147483648
+        return seed % n + 1
+      end
+      local atoms = { "a", "b", "c", "ilvl > 5", 'name = "x y"', "rarity = epic", "tradeskill" }
+      local ops = { "AND", "OR", "and", "or" }
+      local function expr(depth)
+        local parts = {}
+        for n = 1, random(4) do
+          if n > 1 then table.insert(parts, ops[random(#ops)]) end
+          local item = atoms[random(#atoms)]
+          if depth < 3 and random(4) == 1 then item = "(" .. expr(depth + 1) .. ")" end
+          if random(5) == 1 then item = "NOT " .. item end
+          table.insert(parts, item)
+        end
+        return table.concat(parts, " ")
+      end
+      for _ = 1, 1000 do
+        local q = expr(1)
+        local rewritten = QueryParser:GroupLeftToRight(q)
+        assert.are.equal(oldShape(q), shape(QueryParser:Query(rewritten)), q .. " -> " .. rewritten)
+        assert.are.equal(rewritten, QueryParser:GroupLeftToRight(rewritten), "a rewrite needs no other")
+      end
+    end)
+  end)
+
   describe("Query", function()
 
     it("returns an AST for a valid simple query", function()
@@ -397,6 +631,25 @@ describe("QueryParser", function()
     it("returns nil for malformed input (missing value after operator)", function()
       local ast = QueryParser:Query("quality =")
       assert.is_nil(ast)
+    end)
+
+    -- NOT only ever comes before what it negates. After a term it used to make a NOT node with two
+    -- sides and nothing to negate, which the search evaluated to nothing, or failed on.
+    it("returns nil for a NOT right after a term", function()
+      assert.is_nil(QueryParser:Query("alpha NOT beta"))
+      assert.is_nil(QueryParser:Query("alpha AND beta NOT gamma"))
+      assert.is_not_nil(QueryParser:Query("alpha AND NOT beta"))
+    end)
+
+    it("returns nil for arithmetic that is not compared, an unknown function, or a missing side", function()
+      assert.is_nil(QueryParser:Query("level + 1"))
+      assert.is_nil(QueryParser:Query("foo(1) > 2"))
+      assert.is_nil(QueryParser:Query("level > min(1,"))
+      assert.is_nil(QueryParser:Query("level >"))
+      assert.is_nil(QueryParser:Query("level > 1 +"))
+      assert.is_nil(QueryParser:Query("(rarity = epic) + 1 > 2"), "a condition is not a number")
+      assert.is_nil(QueryParser:Query("(rarity = epic) > 2"))
+      assert.is_nil(QueryParser:Query("2 < (rarity = epic)"))
     end)
 
     it("returns nil for unexpected tokens", function()

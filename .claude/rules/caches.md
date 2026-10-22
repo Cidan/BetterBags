@@ -36,12 +36,15 @@ item was read from:
 | Input | Check |
 |---|---|
 | Item ID, link, count, name, icon, quality, lock, bound, readable, loot, filtered, no-value | `C_Container.GetContainerItemInfo`, compared to the raw values (`rawItemName`, `rawIconFileID`, `rawQuality` before fallbacks) |
+| Item traits (`itemInfo.traits`: crafting tier, required level, max stack, sell price, equipment, use, cosmetic, pet, upgrade track, stats; search-indexing.md §10) | the link above: each is a property of the item in the slot; scrappable is asked of the slot's location, which a kept slot keeps |
 | Item identity (two identical stacks swapped) | `C_Item.GetItemGUID` |
 | Current item level (scaling changes it without the link) | `C_Item.GetCurrentItemLevel` |
 | Cold read | `harvestIncomplete` items are never kept |
 Refreshed on every kept item, computed exactly as a fresh read (`items:RefreshKeptItem`, also run
 by recalculations on every item still in its slot): new-item flag (`items:ClientNewItemFlag`),
-gear sets, quest state, tooltip text. Known staleness, the same as an unvisited bag: a refundable
+gear sets, quest state, tooltip text, whether the character can use it, how many of its pet the
+account has and whether its appearance is collected (`items:RefreshCharacterState`,
+search-indexing.md §13, §14 and §17). Known staleness, the same as an unvisited bag: a refundable
 purchase's binding expiring, an appearance being collected (until the slot changes or a wipe).
 
 A guild bank slot (guild-bank.md §3) is kept the same way by `items:HarvestGuildBank`, compared on
@@ -67,7 +70,7 @@ kind requested later in the frame).
 | Equipped gear read cold | No verdict is kept while any equipped slot reads cold (`_equipmentIncomplete`); once it reads warm the harvest invalidates (and refreshes the open bank), and that same sweep asks every backpack verdict again. The startup read primes the gear's item data, so it normally reads warm the first time |
 | Player level and effective level (the item's level requirement, usability, scaling) | `PLAYER_LEVEL_UP`, `PLAYER_LEVEL_CHANGED` (level sync and other effective-level changes), `PLAYER_AVG_ITEM_LEVEL_UPDATE`; each also re-reads all gear |
 | Proficiencies, skills and dual wield (`C_PlayerInfo.CanUseItem`, `CanDualWield`) | `SKILL_LINES_CHANGED`, `LEARNED_SPELL_IN_SKILL_LINE` (learning Dual Wield) |
-| Reputation and spells (`C_PlayerInfo.CanUseItem`; the events Blizzard's usability refresh in `Blizzard_Wardrobe.lua` listens for) | `UPDATE_FACTION`, `SPELLS_CHANGED`: they fire often, so they invalidate without a refresh; the next refresh recomputes the verdicts, as before caching |
+| Reputation and spells (`C_PlayerInfo.CanUseItem`; the events Blizzard's usability refresh in `Blizzard_Wardrobe.lua` listens for) | `UPDATE_FACTION`, `SPELLS_CHANGED`: they fire often, so they invalidate without a refresh; the next refresh recomputes the verdicts, as before caching. The same events, bucketed, recalculate the bags when an item's usability changed (search-indexing.md §13), and that refresh recomputes the verdicts too |
 | Specialization (the spec's primary stat; dual wield) | `PLAYER_SPECIALIZATION_CHANGED` for `"player"` |
 | The item's stats (primary stats) | Part of the item: a changed slot is a new ItemData; scaling items change with level (above) |
 | Settings | No setting but the provider is an input; every wipe invalidates anyway |
@@ -141,8 +144,9 @@ value either drops the item's kept work (which marks it) or goes through `Update
 Checked against a clean rebuild by a randomized test and a per-field test.
 
 ### 7. Tooltip text (`TooltipScanner`, tooltip-scanning.md)
-Kept value: an item's tooltip text by GUID. Invalidated by `TOOLTIP_DATA_UPDATE` for the item's
-tooltip instance (bounded re-scans). Kept harvest slots and recalculations re-fetch it, so a
+Kept value: an item's tooltip text by GUID, and what its whole lines mark (toy, already known;
+search-indexing.md §12), kept and dropped together. Invalidated by `TOOLTIP_DATA_UPDATE` for the
+item's tooltip instance (bounded re-scans). Kept harvest slots and recalculations re-fetch it, so a
 re-scan lands; a resolution asks for a recalculation, not a read.
 
 ### 8. Kept per-item work (`item.derived`, data-loader.md §18)
@@ -162,7 +166,8 @@ record that claims more: `indexPending` stays on an item until it is indexed.
 
 ### Not caches
 - Phase 6's bag names and qualities for empty slots are looked up once per bag **per sweep**
-  (`bagDetailsOf`); nothing is kept across sweeps, because bags can be swapped.
+  (`bagDetailsOf`), and so is every item's plain bag name (`item.bagName`, `items:GetPlainBagName`,
+  the `bagname` search field); nothing is kept across sweeps, because bags can be swapped.
 
 ## Coverage
 `spec/refresh_pipeline_spec.lua` ("per-slot harvest cache", "equipped gear cache", "upgrade

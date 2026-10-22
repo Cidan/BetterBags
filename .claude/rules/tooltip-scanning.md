@@ -113,3 +113,12 @@ the door"), and that an item stops being tracked after three resolution re-scans
 tracking an item after 3 resolution re-scans"). The spec reuses the real `Events`/`Context` modules when present (only
 loading them when absent, to avoid double-`NewModule` collisions) and restores the two
 overridden `Events` methods on teardown.
+
+## 5. Line marks
+
+Besides the joined text, each scan notes the whole left lines equal to `TOY` ("Toy") or
+`ITEM_SPELL_KNOWN` ("Already known") as marks (`markLine`), cached with the text under the same key
+(`self.marks`, kept 1:1 with `cache`: `RemoveFromCache` and `ClearCache` drop both) and returned as
+the second value of `GetTooltipText`, `GetGuildBankItemText` and `GetMerchantItemText`. A
+resolution re-scan replaces both. They feed the `toy` and `known` search fields
+(search-indexing.md §12). Coverage: `spec/tooltip_spec.lua` ("line marks").

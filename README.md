@@ -390,15 +390,19 @@ Search allows you to find items by the following indices (based on the item belo
 - `subtype` (subtype = Miscellaneous) The subtype of the item. Some examples include Leather, Potion, Bag, and Bows. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding type and subtype.
 - `category` (category = "Gear: MW DPS") The category that the item is sorted into in BetterBags. In a search category's query, it is the category the item has without any search category (a custom category, a gear set, or its type), so a search category is never matched through its own name or another search category's.
 - `equipmentLocation` or `slot` (slot = Trinket) The item slot that the gear is for. Examples include Head, Legs, Main-Hand, and Finger.
-- `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW, Mid.
+- `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW, Mid. `<`, `<=`, `>` and `>=` compare expansions in release order (`exp < legion` finds everything from before Legion), and an expansion can be given by its number (`exp = 3` for Cataclysm, 0 being Classic). In a comparison the start of a name works when only one expansion starts that way (`exp >= mid`, not `exp >= c`).
 - `equipmentSet` (equipmentSet = "MW DPS") The equipment set(s) that a piece of gear is part of.
 - `guid` (guid = 'item-60-0-4000000CAEA5CBE3') The globally unique identifier of the item. This string is unique to the specific instance of an item.
 - `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped). **Note:** soulbound and warbound are only available on Retail because of API limitations on non-Retail versions.
 - `tooltip` (tooltip = health) The full text of the item's tooltip. Unlike the other string fields, `=` and `!=` match the value anywhere in the tooltip, not only at the start.
+- `bagname` or `bag` (bag = "Herb Satchel") The name of the bag the item is in: Backpack, the bag's own name, Keyring, Bank, Reagent Bank, a bank bag's name, or a guild bank tab's name. A plain search word does not look in it.
+- `track` (track = hero) The upgrade track of upgradeable gear (Retail): Explorer, Adventurer, Veteran, Champion, Hero, Myth, in the game's language.
+- `stat` (stat = haste) The stats on the item, by name: Haste, Critical Strike, Versatility, Mastery, Stamina, Strength, Agility, Intellect, Leech, Speed, Avoidance, sockets, and so on. `stat = crit` finds Critical Strike, as names match from their start.
 
 ### Numbers
 - `level` or `ilvl` (ilvl = 528) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
 - `rarity` (rarity = epic or rarity = 4) The rarity of the item. Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Artifact = 6, Heirloom = 7.
+- `quality` (quality >= 2) The crafting quality tier of a profession reagent or a crafted item, the number its quality icon shows (Retail only). Items without a tier have none, so `quality != 2` includes them. For Poor to Legendary, use `rarity`.
 - `id` (id = 212685) The internal itemID of the item. A number uniquely identifying the base item. Specific ItemIDs can be found in the url on the item's WoWHead page.
 - `stackCount` or `count` (stackCount = 1) The number of items in the stack for the item. **NOTE:** Currently count only takes into account the stack size of the "base" stack when using virtual stacks. For example, a virtual stack of 20, 20, and 3 to total 43 items will only be matched with either 20 or 3, not both.
 - `class` (class = 4) The numeric representation of itemType.
@@ -406,6 +410,15 @@ Search allows you to find items by the following indices (based on the item belo
 - `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 5-10 (Classic) / 5-11 (MoP) / 6-11 (Retail) for bank bags, -1 for the bank (Classic/MoP), -2 for the keyring (Classic), -1 for the keyring (WoW: Forever), and 12-16 for warbank tabs. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/BagID) for specifics for each version of the game.
 - `slotid` (slotid = 11) The slot that the item is in, in the bag that contains it. Numbered from 1 to N for each bagID, where N is the size of the container.
 - `bindtype` (bindtype = 1) The binding type of the item returned by GetItemInfo(). 1 = BoP, 2 = BoE, 3 = BoU, 4 = Quest, 7 = BtA, 8 = BtW, 9 = WuE. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/Enum.ItemBind) for specifics.
+- `minlevel` (minlevel > 70) The character level required to use the item, 0 for none. Not the item level (that is `level`).
+- `stacksize` (stacksize = 200) The most of the item one stack holds. The size of a stack in your bags is `count`.
+- `price` (price > 10000) The vendor sell price of one of the item, in copper (10000 is 1 gold). 0 for items a vendor will not buy.
+- `maxlevel` (maxlevel >= 600) The item level of upgradeable gear once fully upgraded (Retail); for anything else, its item level.
+- `upgradelevel`, `upgrademax` (upgradelevel = 3) How many upgrades upgradeable gear has, and how many its track has (Retail): an item shown as "Hero 3/6" has upgradelevel 3 and upgrademax 6.
+- `petcount`, `petlimit` (petcount = 0) How many of a battle pet item's pet you have, and how many you may have (Retail).
+- `slotequipped` (ilvl > slotequipped) For gear, the lowest item level you wear in its slots (both rings for a ring), 0 when you wear nothing there. A one-hander counts your off hand only if you can dual wield.
+- `slotbest` (maxlevel >= slotbest) For gear, the best item level your character has had in its slot (Retail).
+- `total` (total >= 100) How many of the item the bags hold altogether (the backpack's bags for the backpack, the bank's for the bank), counting every stack of it.
 
 ### Booleans
 - `reagent` (reagent = false) Is the item classified as a reagent?
@@ -413,15 +426,36 @@ Search allows you to find items by the following indices (based on the item belo
 - `isbound` (isbound = true) Is the item bound to the character or account? (From Blizzard C_Item)
 - `quest` (quest = false) Is the item for a non-active quest?
 - `activeQuest` (activeQuest = false) Is the item for an active quest?
+- `equipment` (equipment = true) Can the item be equipped (gear, and bags, which go in the bag slots)?
+- `hasuse` (hasuse = true) Does the item have a Use: line in its tooltip, "Use: Teaches you..." on recipes and pets included?
+- `cosmetic` (cosmetic = true) Is the item cosmetic gear (Retail)?
+- `pet` (pet = true) Does the item teach a battle pet (Retail)?
+- `upgradeable` (upgradeable = true) Is the item gear on an upgrade track (Retail)?
+- `scrappable` (scrappable = true) Can the item be scrapped (Retail)?
+- `inset` (inset = true) Is the item in any equipment set? (`equipmentSet` names one.)
+- `upgrade` (upgrade = true) Does BetterBags show the upgrade arrow on the item? It follows the upgrade provider chosen in the settings (BetterBags, Pawn or SimpleItemLevel).
+- `usable` (usable = false) Can your character use the item? (Weapon and armor skills, level, professions, reputation: the red text in its tooltip.)
+- `equippable` (equippable = true) Is the item gear your character can wear?
+- `transmoggable` (transmoggable = true) Does the item have an appearance (Retail)?
+- `collectable` (collectable = true) Is the item a battle pet you can still learn one more of (Retail)?
+- `appearance` (appearance = unknown) Is the item's look in your collection? `known` when any item that gives the same appearance has been collected, `unknown` when none has (Retail).
+- `source` (source = unknown) Is this very item's appearance source in your collection? `known` or `unknown` (Retail).
+- `toy` (toy = true) Is the item a toy? (Its tooltip says "Toy".)
+- `known` (known = true) Does the item's tooltip say "Already known" (a toy, recipe, pet or mount you already have)?
+
+The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable`, `scrappable`, `toy`, `known`, `transmoggable`, `usable`, `equippable` and `upgrade` are read once the game has sent the item's data, `petcount`, `petlimit` and `collectable` once your pet journal has loaded, and `appearance` and `source` once your appearance collection has loaded: an item that has just arrived may match none of them for a moment.
 
 ### Logical Operators
 - `AND` (slot = Legs AND ilvl > 500 \[This will match leg pieces that are also greater than 500 ilvl.\]) The intersection of two terms. Items must match both sides of the AND.
 - `OR` (slot = Legs OR ilvl > 500 \[This will match items that are leg pieces or are greater than 500 ilvl.\]) The union of two terms. Items can match either or both sides of the OR.
-- `NOT` (NOT slot = Legs \[This will match any item that cannot be equipped in the leg slot.\]) The complement of a term. Items must not match the NOT.
+- `NOT` (NOT slot = Legs \[This will match any item that cannot be equipped in the leg slot.\]) The complement of a term. Items must not match the NOT. It works on its own, inside an `OR`, and before a group (`NOT (rarity = poor OR rarity = common)`).
 - `(` and `)` To group search terms.
+- **Precedence:** `NOT` applies first, then `AND`, then `OR`, as in most query languages: `type = armor OR type = weapon AND ilvl > 200` matches all armor, and weapons above item level 200. Use parentheses to group differently: `(type = armor OR type = weapon) AND ilvl > 200`. Rules saved before this precedence were rewritten once with parentheses, so they still mean what they meant.
 - `=` (type = Armor, ilvl = 506) Items with a value equal to the text or number on the right side. This will find any items starting with the value.
 - `%=` (slot %= Hand \[This will match any gear pieces that are slotted into any slot with `Hand` in the name. eg. Hands, Main Hand, Offhand\]) Items with the value in the full text of the field(s).
 - `!=` (expansion != DF) Items with a value not equal to the text or number on the right side. This will find any items NOT starting with the value.
+- `==` (name == "Hearthstone") Items whose whole value is the text (in any case), not just its start. With a number, the same as `=`.
+- `~=` (name ~= "Hearthstone") Every item `==` does not find.
 - `"` or `'` (slot = "Main Hand") To search for a multi-word string.
 
 ### Comparison Operators
@@ -430,6 +464,14 @@ Search allows you to find items by the following indices (based on the item belo
 - `<` Items with a value less than the number on the right side.
 - `>=` Items with a value greater than or equal to the number on the right side.
 - `<=` Items with a value less than or equal to the number on the right side.
+
+### Math, money and your character
+Either side of a comparison can be worked out:
+- `+`, `-`, `*`, `/`, `%` (ilvl <= player.level - 10) Arithmetic. Put spaces around the sign: `100-10` is still one word, as before.
+- `min(...)`, `max(...)`, `floor(x)`, `ceil(x)`, `abs(x)` (maxlevel >= min(player.ilvl * 0.95, player.ilvl - 5)). `math.min` and the others work too.
+- Money: `5g`, `50s`, `1g50s`, `20c` (price < 2g50s) are amounts in copper.
+- Fields compared with fields, or with math on them (maxlevel > ilvl, price * count > 5g), are checked item by item.
+- Your character: `player.level`, `player.ilvl` (your average item level, bags included), `player.equippedilvl` (what you wear), `player.class` (its name or its English token, `paladin`), `player.classid`, `player.spec`, `player.specid`, `player.profession` (any of your professions, by name or skill line: `player.profession = tailoring`), `player.name`, `player.realm`. A comparison of your character alone (player.level >= 80) matches every item or none, so `player.class = mage AND ...` limits a category to one class. Compared with an item's text, a value of your character is its value: `tooltip %= player.class` finds items whose tooltip names your class.
 
 <div align="center" style="text-align:center">
 <a href="https://i.imgur.com/H2jgRO8.png" target="_blank"><img src="https://i.imgur.com/H2jgRO8.png" alt="Complex Search in Retail."></a>
@@ -510,6 +552,13 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 		</td>
 	</tr>
 </table>
+
+### Automation
+A category can act on its items on its own. Pick it on the Categories page (`/bb`), then its **Automation** tab:
+- **Sell at Merchants**: when you open a merchant, the category's items in your backpack are sold, all at once. Hold Shift as you open the merchant to keep them. By default it stops after 12 items, so everything sold can be bought back (General > Items, "Sell at Most 12 Items per Visit").
+- **Destroy**: a merchant buys any of its items it can first. With BetterBags Next, the rest wait at the bottom of the vendor in a card edged in crimson: each click on it destroys the next one, a whole stack. Anywhere, **Destroy Next Item** (Key Bindings > BetterBags) does the same. The game only lets an addon destroy one item per key press or click.
+
+The two switches are exclusive: a category sells or destroys, not both. Automation never sells or destroys an item in an equipment set or a purchase you can still refund, and acts on a newly looted item by its category even while it shows under Recent Items. A rule like `rarity = poor`, `ilvl < player.ilvl - 50 AND binding = soulbound` or `toy = true AND known = true` makes a category worth automating.
 
 ## Themes
 BetterBags offers built-in themes, chosen in Settings > Theme: Default (Blizzard's look), Simple Dark, and Slate, Dark and Parchment, from BetterBags' sister addon Moonlight.  

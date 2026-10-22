@@ -237,7 +237,7 @@ nextPanel.proto = panelProto
 addon:GetModule('Perf'):RegisterPrototype(panelProto, 'NextPanelFrame')
 
 -- The panel's render root: it hands the scroll box the content's width and the height between
--- the header and the footer.
+-- the header and what is under the scroll area (ContentBottom).
 local rootProto = drawable:Extend({}, 'NextPanelRoot')
 
 ---@return RenderPlan
@@ -249,7 +249,7 @@ end
 function rootProto:PreRender()
   return {
     Width = self.bag:BodyWidth() - 2 * style.PAD,
-    Height = math.max(1, self.bag:Height() - style.CONTENT_TOP - style.FOOTER),
+    Height = math.max(1, self.bag:Height() - style.CONTENT_TOP - self.bag:ContentBottom()),
   }
 end
 
@@ -783,10 +783,18 @@ function panelProto:MinWidth()
   return math.ceil(math.max(header, footer, column))
 end
 
--- MinHeight is the shortest a small panel goes: its header, its footer, and one row of a section.
+-- MinHeight is the shortest a small panel goes: its header, what is under its scroll area, and one
+-- row of a section.
 ---@return number
 function panelProto:MinHeight()
-  return style.CONTENT_TOP + style.FOOTER + style.SECTION_HEADER + self.content:CellHeight()
+  return style.CONTENT_TOP + self:ContentBottom() + style.SECTION_HEADER + self.content:CellHeight()
+end
+
+-- ContentBottom is how far above the body's bottom the scroll area ends: the footer's height, and
+-- whatever a kind puts between the two (the vendor's destroy card).
+---@return number
+function panelProto:ContentBottom()
+  return style.FOOTER
 end
 
 -- Height is how tall the panel is: the screen's height, or a small panel's.
@@ -2553,14 +2561,14 @@ function panelProto:BuildContent(scrollName)
   self:styleContent()
 end
 
--- styleContent places the scroll box between the header and the footer, and the empty tab's text,
--- from the theme.
+-- styleContent places the scroll box between the header and what is under it (ContentBottom), and
+-- the empty tab's text, from the theme.
 ---@private
 function panelProto:styleContent()
   local scroll = self.scroll
   scroll.frame:ClearAllPoints()
   scroll.frame:SetPoint("TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.CONTENT_TOP)
-  scroll.frame:SetPoint("BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -style.PAD, style.FOOTER)
+  scroll.frame:SetPoint("BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -style.PAD, self:ContentBottom())
   style:SetFont(self.emptyText, style.Theme.Footer.EmptyFont)
   self.emptyText:ClearAllPoints()
   self.emptyText:SetPoint("TOP", scroll.frame, "TOP", 0, -style.EMPTY_TOP)

@@ -176,6 +176,7 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     -- Load real Context, Database, Groups, Tabs
     ResetModuleStub("Context", "core/context.lua")
     LoadBetterBagsModule("core/context.lua")
+    ResetModuleStub("Database", "core/database.lua")
     LoadBetterBagsModule("core/database.lua")
     LoadBetterBagsModule("data/groups.lua")
 

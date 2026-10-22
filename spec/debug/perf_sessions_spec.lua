@@ -388,6 +388,279 @@ describe("PerfSessions", function()
       assert.is_nil(registered.ADDON_RESTRICTION_STATE_CHANGED)
     end)
 
+    -- When the pet journal, the toy box and the appearance collection have loaded, against the bag
+    -- reads (docs/vendor-compat.md, "Needs an in-game check"): their counts at the start and the
+    -- end, and each collection event with the counts at that moment, in the trace.
+    -- Appearances collected: GetCategoryCollectedCount summed over every category (TransmogCollectionType,
+    -- TransmogSharedDocumentation.lua) but None. (GetNumTransmogSources, used at first, is the number of
+    -- source filters, Blizzard_Wardrobe.lua:67: 7 in a login capture whatever was collected.)
+    local function collections()
+      local saved = { _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection, _G.Enum.TransmogCollectionType }
+      _G.C_PetJournal = { GetNumPets = function() return 1200, 850 end }
+      _G.C_ToyBox = { GetNumTotalDisplayedToys = function() return 900 end,
+        GetNumLearnedDisplayedToys = function() return 410 end }
+      _G.Enum.TransmogCollectionType = { None = 0, Head = 1, Shoulder = 2, Paired = 29 }
+      local collected = { [0] = 1000000, [1] = 300, [2] = 250, [29] = 50 }
+      _G.C_TransmogCollection = { GetCategoryCollectedCount = function(category) return collected[category] end }
+      return function()
+        _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection = saved[1], saved[2], saved[3]
+        _G.Enum.TransmogCollectionType = saved[4]
+      end
+    end
+
+    it("records the collections' counts when it starts and stops", function()
+      local restore = collections()
+      perfSessions:StartCapture("manual")
+      _G.C_PetJournal.GetNumPets = function() return 1201, 851 end
+      local session = perfSessions:StopCapture()
+      restore()
+      assert.are.same({ pets = 1200, petsOwned = 850, toys = 900, toysLearned = 410, appearances = 600 },
+        session.meta.collectionsStart)
+      assert.are.equal(851, session.meta.collectionsStop.petsOwned)
+    end)
+
+    it("leaves out what a client has no collection for", function()
+      local restore = collections()
+      _G.C_PetJournal, _G.C_ToyBox = nil, nil
+      perfSessions:StartCapture("manual")
+      local session = perfSessions:StopCapture()
+      _G.Enum.TransmogCollectionType = nil
+      perfSessions:StartCapture("manual")
+      local none = perfSessions:StopCapture()
+      restore()
+      assert.are.same({ appearances = 600 }, session.meta.collectionsStart)
+      assert.is_nil(none.meta.collectionsStart, "no categories to count")
+    end)
+
+    it("traces each collection event with the counts at that moment", function()
+      local restore = collections()
+      local savedUtils = _G.C_EventUtils
+      _G.C_EventUtils = { IsEventValid = function() return true end }
+      perfSessions._eventsHooked = nil
+      registered = {}
+      perfSessions:Init()
+      _G.C_EventUtils = savedUtils
+      for _, name in ipairs({ "PET_JOURNAL_LIST_UPDATE", "NEW_PET_ADDED", "PET_JOURNAL_PET_DELETED",
+        "TRANSMOG_COLLECTION_UPDATED", "TRANSMOG_COLLECTION_SOURCE_ADDED", "TRANSMOG_COLLECTION_SOURCE_REMOVED",
+        "NEW_TOY_ADDED", "TOYS_UPDATED" }) do
+        assert.is_function(registered[name], name)
+      end
+      perfSessions:StartCapture("manual")
+      registered.PET_JOURNAL_LIST_UPDATE("PET_JOURNAL_LIST_UPDATE")
+      local session = perfSessions:StopCapture()
+      restore()
+      local trace = addon:GetModule("PerfFormat"):OpenTrace(session)
+      local sample
+      for i = 1, trace:Count() do
+        if trace:Get(i).name == "[collections]" then sample = trace:Get(i) end
+      end
+      assert.is_not_nil(sample)
+      local text = trace:Text(sample.args)
+      assert.is_truthy(text:find("petsOwned=850", 1, true), text)
+      assert.is_truthy(text:find("toysLearned=410", 1, true), text)
+    end)
+
+    it("listens to no collection event a client does not have", function()
+      local savedUtils = _G.C_EventUtils
+      _G.C_EventUtils = { IsEventValid = function(name) return name == "ADDON_RESTRICTION_STATE_CHANGED" end }
+      perfSessions._eventsHooked = nil
+      registered = {}
+      perfSessions:Init()
+      _G.C_EventUtils = savedUtils
+      for _, name in ipairs(perfSessions.COLLECTION_EVENTS) do
+        assert.is_nil(registered[name], name)
+      end
+    end)
+
+    it("samples nothing while no capture runs", function()
+      local restore = collections()
+      local savedUtils = _G.C_EventUtils
+      _G.C_EventUtils = { IsEventValid = function() return true end }
+      perfSessions._eventsHooked = nil
+      registered = {}
+      perfSessions:Init()
+      _G.C_EventUtils = savedUtils
+      local asked = 0
+      _G.C_PetJournal.GetNumPets = function() asked = asked + 1 return 1, 1 end
+      registered.PET_JOURNAL_LIST_UPDATE("PET_JOURNAL_LIST_UPDATE")
+      restore()
+      assert.are.equal(0, asked)
+    end)
+
+    -- One play session answers every open in-game question (docs/vendor-compat.md): a diagnostics
+    -- run captures the next two loads (a fresh login, then a /reload), each stopping on its own a
+    -- minute after entering the world, sampling what follows the character and the account.
+    describe("diagnostics", function()
+      local timers, probeState, probe, probeCreated, savedSample, savedAfter
+
+      local function fireTimers(delay)
+        local pending = timers
+        timers = {}
+        for _, t in ipairs(pending) do
+          if t.delay == delay then t.fn() else table.insert(timers, t) end
+        end
+      end
+
+      local function scheduled(delay)
+        local n = 0
+        for _, t in ipairs(timers) do if t.delay == delay then n = n + 1 end end
+        return n
+      end
+
+      before_each(function()
+        timers = {}
+        savedAfter = _G.C_Timer.After
+        _G.C_Timer.After = function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end
+        probe, probeCreated = StubBetterBagsModule("ItemProbe")
+        savedSample = probe.Sample
+        probeState = { level = 90 }
+        probe.Sample = function() return { level = probeState.level } end
+      end)
+
+      after_each(function()
+        _G.C_Timer.After = savedAfter
+        probe.Sample = savedSample
+        if probeCreated then ResetModuleStub("ItemProbe") end
+      end)
+
+      it("arms the next two loads", function()
+        perfSessions:ArmDiagnostics()
+        assert.is_true(perfSessions:IsArmedForNextReload())
+        assert.are.equal(2, perfSessions:GetArmedLoads())
+        assert.is_true(perfSessions:StartIfArmed())
+        assert.is_true(perfSessions.pendingMeta.diagnostics)
+        assert.are.equal(1, perfSessions:GetArmedLoads())
+        perfSessions:StopCapture()
+        assert.is_true(perfSessions:StartIfArmed())
+        assert.are.equal(0, perfSessions:GetArmedLoads())
+        assert.is_false(perfSessions:IsArmedForNextReload())
+        perfSessions:StopCapture()
+        assert.is_false(perfSessions:StartIfArmed())
+      end)
+
+      it("stops each capture on its own a minute after entering the world", function()
+        perfSessions:ArmDiagnostics()
+        perfSessions:StartIfArmed()
+        assert.are.equal(0, scheduled(perfSessions.DIAGNOSTICS.stopAfterSec))
+        perfSessions:OnEnteringWorld(true, false)
+        assert.are.equal(1, scheduled(perfSessions.DIAGNOSTICS.stopAfterSec))
+        perfSessions:OnEnteringWorld(false, false)
+        assert.are.equal(1, scheduled(perfSessions.DIAGNOSTICS.stopAfterSec), "later loading screens add none")
+        fireTimers(perfSessions.DIAGNOSTICS.stopAfterSec)
+        assert.is_false(perf:IsActive())
+        local sessions = perfSessions:GetSessions()
+        assert.are.equal("login", sessions[#sessions].meta.reason)
+      end)
+
+      it("leaves a later capture running when an earlier one's stop comes due", function()
+        perfSessions:ArmDiagnostics()
+        perfSessions:StartIfArmed()
+        perfSessions:OnEnteringWorld(true, false)
+        perfSessions:StopCapture()
+        perfSessions:StartCapture("manual")
+        fireTimers(perfSessions.DIAGNOSTICS.stopAfterSec)
+        assert.is_true(perf:IsActive())
+      end)
+
+      it("leaves Capture next reload as it was: one load, no stop of its own, no samples", function()
+        perfSessions:SetArmedForNextReload(true)
+        assert.are.equal(1, perfSessions:GetArmedLoads())
+        perfSessions:StartIfArmed()
+        perfSessions:OnEnteringWorld(true, false)
+        assert.are.equal(0, scheduled(perfSessions.DIAGNOSTICS.stopAfterSec))
+        assert.are.equal(0, scheduled(perfSessions.DIAGNOSTICS.sampleEverySec))
+        local session = perfSessions:StopCapture()
+        assert.is_nil(session.meta.diagnostics)
+        assert.is_nil(session.samples)
+      end)
+
+      it("is disarmed by unticking Capture next reload", function()
+        perfSessions:ArmDiagnostics()
+        perfSessions:SetArmedForNextReload(false)
+        assert.is_false(perfSessions:IsArmedForNextReload())
+        assert.are.equal(0, perfSessions:GetArmedLoads())
+      end)
+
+      it("samples every quarter second, keeping only changes, with the time on the capture's clock", function()
+        now = 1000
+        perfSessions:ArmDiagnostics()
+        perfSessions:StartIfArmed()
+        now = 1250
+        fireTimers(perfSessions.DIAGNOSTICS.sampleEverySec)
+        now = 1500
+        probeState.level = 91
+        fireTimers(perfSessions.DIAGNOSTICS.sampleEverySec)
+        now = 1600
+        local session = perfSessions:StopCapture()
+        local whys, ats, levels = {}, {}, {}
+        for i, sample in ipairs(session.samples) do
+          whys[i], ats[i], levels[i] = sample.why, sample.at, sample.state.probe.level
+        end
+        assert.are.same({ "start", "tick", "stop" }, whys)
+        assert.are.same({ 0, 500, 600 }, ats)
+        assert.are.same({ 90, 91, 91 }, levels)
+        fireTimers(perfSessions.DIAGNOSTICS.sampleEverySec)
+        assert.are.equal(0, scheduled(perfSessions.DIAGNOSTICS.sampleEverySec), "no ticks once stopped")
+      end)
+
+      it("leaves an earlier capture's sampling behind when a new capture starts", function()
+        perfSessions:ArmDiagnostics()
+        perfSessions:StartIfArmed()
+        perfSessions:StopCapture()
+        perfSessions:StartIfArmed()
+        assert.are.equal(2, scheduled(perfSessions.DIAGNOSTICS.sampleEverySec), "the old tick and the new one")
+        fireTimers(perfSessions.DIAGNOSTICS.sampleEverySec)
+        assert.are.equal(1, scheduled(perfSessions.DIAGNOSTICS.sampleEverySec), "only the new capture samples on")
+        perfSessions:StopCapture()
+      end)
+
+      it("samples the collections' counts with the probe's state", function()
+        local saved = _G.C_PetJournal
+        _G.C_PetJournal = { GetNumPets = function() return 10, 4 end }
+        perfSessions:ArmDiagnostics()
+        perfSessions:StartIfArmed()
+        local session = perfSessions:StopCapture()
+        _G.C_PetJournal = saved
+        assert.are.equal(4, session.samples[1].state.collections.petsOwned)
+      end)
+
+      it("samples on the events it listens to, and once the backpack has been read", function()
+        local savedUtils, messages = _G.C_EventUtils, {}
+        local savedRegisterMessage = events.RegisterMessage
+        events.RegisterMessage = function(_, name, fn) messages[name] = fn end
+        _G.C_EventUtils = { IsEventValid = function() return true end }
+        perfSessions._eventsHooked = nil
+        registered = {}
+        perfSessions:Init()
+        _G.C_EventUtils = savedUtils
+        events.RegisterMessage = savedRegisterMessage
+        for _, name in ipairs(perfSessions.SAMPLE_EVENTS) do
+          assert.is_function(registered[name], name)
+        end
+        perfSessions:ArmDiagnostics()
+        perfSessions:StartIfArmed()
+        probeState.level = 91
+        registered.SKILL_LINES_CHANGED("SKILL_LINES_CHANGED")
+        probeState.level = 92
+        registered.PET_JOURNAL_LIST_UPDATE("PET_JOURNAL_LIST_UPDATE")
+        probeState.level = 93
+        messages["items/RefreshBackpack/Done"]()
+        local session = perfSessions:StopCapture()
+        local whys = {}
+        for i, sample in ipairs(session.samples) do whys[i] = sample.why end
+        assert.are.same({ "start", "SKILL_LINES_CHANGED", "PET_JOURNAL_LIST_UPDATE", "items/RefreshBackpack/Done",
+          "stop" }, whys)
+      end)
+
+      it("records a probe that fails, and keeps capturing", function()
+        probe.Sample = function() error("not ready") end
+        perfSessions:ArmDiagnostics()
+        perfSessions:StartIfArmed()
+        local session = perfSessions:StopCapture()
+        assert.is_truthy(tostring(session.samples[1].state.probeError):find("not ready", 1, true))
+      end)
+    end)
+
     it("keeps metadata the starter adds, such as the simulation it runs", function()
       perfSessions:StartCapture("simulate", { simulation = { event = "BAG_UPDATE_COOLDOWN", rate = 12 } })
       local session = perfSessions:StopCapture()

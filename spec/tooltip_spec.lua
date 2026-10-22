@@ -686,4 +686,121 @@ describe("TooltipScanner", function()
       assert.are.equal(0, tooltipScanner:GetInventoryRepairCost(5))
     end)
   end)
+  -- Two of a tooltip's lines say what an item is, as whole lines: "Toy" (TOY) and "Already known"
+  -- (ITEM_SPELL_KNOWN, a UsageRequirement line). Both seen on the two toys of a retail dump
+  -- (spec/fixtures/dump_retail_12_1_5.lua). The joined text cannot tell a whole line from words
+  -- inside one, so the scan marks them as it reads the lines.
+  describe("line marks (toy, already known)", function()
+    local saved
+
+    before_each(function()
+      saved = { isRetail = addon.isRetail, scan = tooltipScanner.scanTooltip, info = _G.C_TooltipInfo,
+        toy = _G.TOY, known = _G.ITEM_SPELL_KNOWN }
+      _G.TOY = "Toy"
+      _G.ITEM_SPELL_KNOWN = "Already known"
+      addon.isRetail = true
+      tooltipScanner:Init()
+    end)
+
+    after_each(function()
+      addon.isRetail = saved.isRetail
+      tooltipScanner.scanTooltip = saved.scan
+      _G.C_TooltipInfo = saved.info
+      _G.TOY, _G.ITEM_SPELL_KNOWN = saved.toy, saved.known
+      _G["BetterBagsScanTooltipTextLeft1"] = nil
+      _G["BetterBagsScanTooltipTextLeft2"] = nil
+    end)
+
+    local function toyTooltip()
+      return { lines = {
+        { type = 22, leftText = "Flight Master's Whistle" },
+        { type = 20, leftText = "Soulbound" },
+        { type = 0, leftText = "Toy" },
+        { type = 0, leftText = "Use: Adds this toy to your Toy Box." },
+        { type = 43, leftText = "Already known" },
+      } }
+    end
+
+    it("marks a toy and an item already known by their whole lines", function()
+      _G.C_TooltipInfo = { GetBagItem = toyTooltip }
+      local text, _, marks = tooltipScanner:ExtractRetail(0, 1)
+      assert.is_truthy(text:find("Already known", 1, true))
+      assert.are.same({ toy = true, known = true }, marks)
+    end)
+
+    -- A recipe's tooltip holds the item it makes after a NestedBlock line (TooltipDataLineType 19), in
+    -- the same flat list: a toy recipe has the toy's "Toy" line. From a retail dump (12.1.5),
+    -- Schematic: Stonebound Lantern, its lines as recorded.
+    it("does not take a toy recipe for a toy", function()
+      _G.C_TooltipInfo = { GetBagItem = function()
+        return { lines = {
+          { type = 22, leftText = "Schematic: Stonebound Lantern" },
+          { type = 20, leftText = "Warbound" },
+          { type = 19, leftText = "" },
+          { type = 22, leftText = "\nStonebound Lantern" },
+          { type = 0, leftText = "Toy" },
+          { type = 0, leftText = "Use: Adds this toy to your Toy Box." },
+          { type = 1, leftText = " " },
+          { type = 44, leftText = "Place a lantern to illuminate your surroundings." },
+          { type = 38, leftText = "Use: Teaches you how to make a Stonebound Lantern." },
+          { type = 43, leftText = "Requires Khaz Algar Engineering (1)" },
+        } }
+      end }
+      local _, _, marks = tooltipScanner:ExtractRetail(0, 1)
+      assert.is_nil(marks)
+    end)
+
+    it("marks nothing for the words inside a line", function()
+      _G.C_TooltipInfo = { GetBagItem = function()
+        return { lines = { { leftText = "Toy Robot" }, { leftText = "Use: Adds this toy to your Toy Box." },
+          { leftText = "Not already known" } } }
+      end }
+      local _, _, marks = tooltipScanner:ExtractRetail(0, 1)
+      assert.is_nil(marks)
+    end)
+
+    it("keeps the marks with the cached text, and forgets them with it", function()
+      local scans = 0
+      _G.C_TooltipInfo = { GetBagItem = function()
+        scans = scans + 1
+        return toyTooltip()
+      end }
+      local text, marks = tooltipScanner:GetTooltipText(0, 1, "guid-toy")
+      assert.is_not_nil(text)
+      assert.are.same({ toy = true, known = true }, marks)
+      local again, cached = tooltipScanner:GetTooltipText(0, 1, "guid-toy")
+      assert.are.equal(text, again)
+      assert.are.same({ toy = true, known = true }, cached)
+      assert.are.equal(1, scans)
+      tooltipScanner:RemoveFromCache("guid-toy")
+      assert.is_nil(tooltipScanner.marks["guid-toy"])
+      tooltipScanner:GetTooltipText(0, 1, "guid-toy")
+      tooltipScanner:ClearCache()
+      assert.is_nil(next(tooltipScanner.marks))
+    end)
+
+    it("marks the lines of a Classic scan", function()
+      addon.isRetail = false
+      tooltipScanner:Init()
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetBagItem = function() end,
+        NumLines = function() return 2 end,
+      }
+      _G["BetterBagsScanTooltipTextLeft1"] = { GetText = function() return "Pattern: Runecloth Bag" end }
+      _G["BetterBagsScanTooltipTextLeft2"] = { GetText = function() return "Already known" end }
+      local _, marks = tooltipScanner:ExtractClassic(0, 1)
+      assert.are.same({ known = true }, marks)
+    end)
+
+    it("marks a guild bank item's and a vendor item's lines", function()
+      _G.C_TooltipInfo = { GetGuildBankItem = toyTooltip, GetMerchantItem = toyTooltip }
+      local _, guildMarks = tooltipScanner:GetGuildBankItemText(1, 1, "|Hitem:168667|h")
+      assert.are.same({ toy = true, known = true }, guildMarks)
+      local _, cached = tooltipScanner:GetGuildBankItemText(1, 1, "|Hitem:168667|h")
+      assert.are.same({ toy = true, known = true }, cached)
+      local _, vendorMarks = tooltipScanner:GetMerchantItemText(3)
+      assert.are.same({ toy = true, known = true }, vendorMarks)
+    end)
+  end)
 end)

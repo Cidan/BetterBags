@@ -2185,6 +2185,9 @@ end
 _G.C_Item.GetItemQualityByID = _G.C_Item.GetItemQualityByID or function(itemID)
   return (select(3, _G.C_Item.GetItemInfo(itemID)))
 end
+-- GetInventoryItemID(unit, slot) -> itemID, nothing for an empty slot (Blizzard_TutorialLogic.lua
+-- reads it so); by default nothing is worn.
+_G.GetInventoryItemID = _G.GetInventoryItemID or function(unit, slot) return nil end
 _G.GetInventoryItemLink = _G.GetInventoryItemLink or function(unit, invid)
   return "|Hitem:12345|h[Mock Bag]|h"
 end
@@ -2613,6 +2616,9 @@ _G._cursorX = 0
 _G._cursorY = 0
 
 _G.CursorHasItem = function() return _G._cursorHasItem or false end
+-- DeleteCursorItem destroys the item on the cursor (GameCursorDocumentation.lua: no arguments, no
+-- returns, HasRestrictions).
+_G.DeleteCursorItem = function() _G._cursorHasItem = false end
 _G.IsShiftKeyDown = function() return _G._isShiftKeyDown or false end
 -- IsMouseButtonDown([button]) -> down (InputDocumentation.lua): any button without one. Specs set
 -- _G._mouseButtonsDown = { LeftButton = true }.
@@ -2749,6 +2755,24 @@ end
 _G._itemFamilies = {}
 _G.C_Item = _G.C_Item or {}
 _G.C_Item.GetItemFamily = function(itemInfo) return _G._itemFamilies[itemInfo] end
+-- C_TradeSkillUI.GetItemReagentQualityByItemInfo / GetItemCraftedQualityByItemInfo(itemInfo) ->
+-- the item's crafting quality tier, a reagent's or a crafted item's (TradeSkillUIDocumentation.lua,
+-- Nilable). No item has one unless a spec gives it one.
+_G.C_TradeSkillUI = _G.C_TradeSkillUI or {}
+_G.C_TradeSkillUI.GetItemReagentQualityByItemInfo = function(itemInfo) return nil end
+_G.C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function(itemInfo) return nil end
+-- What items are, from ItemDocumentation.lua; by default an item has none of these (no Use spell,
+-- not cosmetic, no upgrade track, not scrappable). GetItemSpell is documented with non-nilable
+-- returns, but Blizzard's /use code treats its result as a truth value (ChatFrameUtilOverrides.lua),
+-- and an item with no spell returns nothing.
+_G.C_Item.GetItemSpell = function(itemInfo) return nil end
+_G.C_Item.IsCosmeticItem = function(itemInfo) return false end
+_G.C_Item.GetItemUpgradeInfo = function(itemInfo) return nil end
+_G.C_Item.CanScrapItem = function(itemLocation) return false end
+-- C_PetJournal.GetPetInfoByItemID(itemID) -> name, ..., speciesID (13th), nothing for an item that
+-- teaches no pet (warcraft.wiki.gg; Blizzard's PlayerChoice treats it as a truth value).
+_G.C_PetJournal = _G.C_PetJournal or {}
+_G.C_PetJournal.GetPetInfoByItemID = function(itemID) return nil end
 -- C_Item.CanBeRefunded(itemLocation) -> bool (ItemDocumentation.lua). Specs list
 -- refundable locations in _G._refundableLocations["bag:slot"].
 _G._refundableLocations = {}
@@ -2941,9 +2965,29 @@ _G.abs = math.abs
 _G.max = math.max
 _G.min = math.min
 
--- Equipment Slot constants
+-- Equipment Slot constants (Blizzard_FrameXMLBase/Constants.lua)
 _G.INVSLOT_FIRST_EQUIPPED = 1
 _G.INVSLOT_LAST_EQUIPPED = 19
+_G.INVSLOT_AMMO = _G.INVSLOT_AMMO or 0
+_G.INVSLOT_HEAD = _G.INVSLOT_HEAD or 1
+_G.INVSLOT_NECK = _G.INVSLOT_NECK or 2
+_G.INVSLOT_SHOULDER = _G.INVSLOT_SHOULDER or 3
+_G.INVSLOT_BODY = _G.INVSLOT_BODY or 4
+_G.INVSLOT_CHEST = _G.INVSLOT_CHEST or 5
+_G.INVSLOT_WAIST = _G.INVSLOT_WAIST or 6
+_G.INVSLOT_LEGS = _G.INVSLOT_LEGS or 7
+_G.INVSLOT_FEET = _G.INVSLOT_FEET or 8
+_G.INVSLOT_WRIST = _G.INVSLOT_WRIST or 9
+_G.INVSLOT_HAND = _G.INVSLOT_HAND or 10
+_G.INVSLOT_FINGER1 = _G.INVSLOT_FINGER1 or 11
+_G.INVSLOT_FINGER2 = _G.INVSLOT_FINGER2 or 12
+_G.INVSLOT_TRINKET1 = _G.INVSLOT_TRINKET1 or 13
+_G.INVSLOT_TRINKET2 = _G.INVSLOT_TRINKET2 or 14
+_G.INVSLOT_BACK = _G.INVSLOT_BACK or 15
+_G.INVSLOT_MAINHAND = _G.INVSLOT_MAINHAND or 16
+_G.INVSLOT_OFFHAND = _G.INVSLOT_OFFHAND or 17
+_G.INVSLOT_RANGED = _G.INVSLOT_RANGED or 18
+_G.INVSLOT_TABARD = _G.INVSLOT_TABARD or 19
 
 -- UnitStat indexes (client constants; values from Blizzard's LuaEnum, matching the
 -- SPELL_STAT<n>_NAME global strings: 1 Strength, 2 Agility, 3 Stamina, 4 Intellect).
@@ -3128,6 +3172,30 @@ function _G.GameTooltip:SetInventoryItem(unit, slot)
   self:Show()
   return true, false, _G._repairCosts["inv:" .. slot]
 end
+-- Enum.TransmogCollectionType (TransmogSharedDocumentation.lua), every value.
+_G.Enum.TransmogCollectionType = {
+  None = 0, Head = 1, Shoulder = 2, Back = 3, Chest = 4, Shirt = 5, Tabard = 6, Wrist = 7,
+  Hands = 8, Waist = 9, Legs = 10, Feet = 11, Wand = 12, OneHAxe = 13, OneHSword = 14,
+  OneHMace = 15, Dagger = 16, Fist = 17, Shield = 18, Holdable = 19, TwoHAxe = 20, TwoHSword = 21,
+  TwoHMace = 22, Staff = 23, Polearm = 24, Bow = 25, Gun = 26, Crossbow = 27, Warglaives = 28,
+  Paired = 29,
+}
+-- Enum.TooltipDataLineType (TooltipInfoSharedDocumentation.lua), every value.
+_G.Enum.TooltipDataLineType = {
+  None = 0, Blank = 1, UnitName = 2, GemSocket = 3, AzeriteEssenceSlot = 4,
+  AzeriteEssencePower = 5, LearnableSpell = 6, UnitThreat = 7, QuestObjective = 8,
+  AzeriteItemPowerDescription = 9, RuneforgeLegendaryPowerDescription = 10, SellPrice = 11,
+  ProfessionCraftingQuality = 12, SpellName = 13, CurrencyTotal = 14,
+  ItemEnchantmentPermanent = 15, UnitOwner = 16, QuestTitle = 17, QuestPlayer = 18,
+  NestedBlock = 19, ItemBinding = 20, EquipSlot = 21, ItemName = 22, Separator = 23, ToyName = 24,
+  ToyText = 25, ToyEffect = 26, ToyDuration = 27, ToyDescription = 28, ToySource = 29,
+  GemSocketEnchantment = 30, ItemLevel = 31, ItemUpgradeLevel = 32, SpellPassive = 33,
+  SpellDescription = 34, ItemQuality = 35, TradeTimeRemaining = 36, FlavorText = 37,
+  ItemSpellTriggerLearn = 38, LearnTransmogSet = 39, LearnTransmogIllusion = 40, ErrorLine = 41,
+  DisabledLine = 42, UsageRequirement = 43, ItemSpellTriggerOnUse = 44,
+  ItemSpellTriggerOnEquip = 45, ItemSpellTriggerOnProc = 46, UnitLevel = 47, UnitType = 48,
+  UnitDead = 49, UnitCriteriaProgress = 50, AuraCaster = 51,
+}
 _G.C_TooltipInfo = _G.C_TooltipInfo or {}
 _G.C_TooltipInfo.GetInventoryItem = function(unit, slot)
   return { type = 0, lines = {}, repairCost = _G._repairCosts["inv:" .. slot] }

@@ -196,7 +196,8 @@ describe("NextSettingsContent", function()
       override(editor, "Heading", function() return "Mats", "2 added items" end)
       override(editor, "RuleTabShown", function() return rule end)
       override(editor, "ItemsTabShown", function() return chosen end)
-      for _, name in ipairs({ "CreateSettingsTab", "CreateRuleTab", "CreateItemsTab" }) do
+      override(editor, "AutomationTabShown", function() return chosen end)
+      for _, name in ipairs({ "CreateSettingsTab", "CreateRuleTab", "CreateItemsTab", "CreateAutomationTab" }) do
         override(editor, name, function(_, parent, owner, bags)
           made[name] = { owner = owner, bags = bags }
           return rows:CreateText(parent, name)
@@ -213,7 +214,7 @@ describe("NextSettingsContent", function()
         for _, t in ipairs(settings.tabs.list) do table.insert(list, t.text) end
         return list
       end
-      assert.are.same({ "Settings", "Search Rule", "Added Items" }, tabs())
+      assert.are.same({ "Settings", "Search Rule", "Added Items", "Automation" }, tabs())
       assert.are.equal(settings.frame, made.CreateSettingsTab.owner)
       local function kinds(name)
         local list = {}
@@ -229,6 +230,8 @@ describe("NextSettingsContent", function()
       design = "next"
       settings:Select("categories", "rule")
       assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }, kinds("CreateRuleTab"))
+      settings:Select("categories", "automation")
+      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }, kinds("CreateAutomationTab"))
       settings:Select("categories", "items")
       assert.are.equal(settings.frame, made.CreateItemsTab.owner)
       local titles = {}
@@ -301,7 +304,7 @@ describe("NextSettingsContent", function()
         { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton", "bagFading [classic]",
           "animateItemMovement [classic]" } },
         { "General", "Search", { "inBagSearch", "enterToMakeCategory [classic]" } },
-        { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell" } },
+        { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell", "autoSellLimit" } },
         { "General", "What's New", { "changelogOnLogin" } },
       }, idsOf(pages:Get("general")))
     end)
@@ -366,7 +369,7 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      assert.are.equal(11 + 3 * 29, named)
+      assert.are.equal(12 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()

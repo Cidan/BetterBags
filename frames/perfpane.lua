@@ -1081,7 +1081,10 @@ function paneProto:UpdateStatus()
     return
   end
   local text = 'Idle, ' .. plural(#perfSessions:GetSessions(), 'saved session')
-  if perfSessions:IsArmedForNextReload() then
+  local loads = perfSessions:GetArmedLoads()
+  if loads > 1 then
+    text = text .. string.format(', diagnostics armed for the next %d loads', loads)
+  elseif loads == 1 then
     text = text .. ', capture armed for the next reload'
   end
   self.status:SetText(text)

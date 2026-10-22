@@ -49,7 +49,7 @@ describe("Core Init and Enable flow", function()
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
-      "GuildBank", "NextGuildBank"
+      "GuildBank", "NextGuildBank", "Automation"
     }
 
     for _, name in ipairs(modules) do
@@ -203,6 +203,17 @@ describe("Core Init and Enable flow", function()
   -- core/boot.lua turns Ace's automatic module enabling off (SetDefaultModuleState(false)), so
   -- OnEnable enables each module whose OnEnable registers something. The changelog window
   -- registers its login check and changelog/Open there: not enabled, it never opens.
+  -- Category automation (automation.md) listens to merchants from its OnEnable.
+  it("starts and enables category automation", function()
+    local automation = addon:GetModule("Automation")
+    automation.Init = spy.new(function() end)
+    automation.Enable = spy.new(function() end)
+    addon:OnInitialize()
+    addon:OnEnable()
+    assert.spy(automation.Init).was.called(1)
+    assert.spy(automation.Enable).was.called(1)
+  end)
+
   it("enables the changelog window", function()
     local changelogWindow = addon:GetModule("ChangelogWindow")
     changelogWindow.Enable = spy.new(function() end)

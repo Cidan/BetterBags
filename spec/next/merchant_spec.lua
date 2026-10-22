@@ -19,6 +19,9 @@ end
 
 local const = trackStub("Constants")
 const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0, BANK = 1 }
+-- core/constants.lua defines it before next/merchant.lua loads, whose Init runs the search
+-- module's (search:Init reads it).
+const.BRIEF_EXPANSION_MAP = const.BRIEF_EXPANSION_MAP or {}
 local BACKPACK = const.BAG_KIND.BACKPACK
 
 local stubs = {
@@ -117,6 +120,13 @@ describe("NextMerchant", function()
       if groupBy == GROUP_BY_TYPE then return data.itemInfo.itemType end
     end)
     override(stubs.items, "GetAllSlotInfo", function() return {} end)
+    override(stubs.items, "PetCountsOf", function() return nil end)
+    override(stubs.items, "AppearanceStateOf", function() return nil end)
+    override(stubs.items, "ReadItemTraits", function(_, id, l, minLevel, stackSize, sellPrice)
+      assert.are.equal(idOf(l), id)
+      return { craftingQuality = idOf(l) == 12 and 2 or nil, minLevel = minLevel, stackSize = stackSize,
+        sellPrice = sellPrice, stats = {} }
+    end)
     override(stubs.categories, "GetCustomCategory", function(_, _, kind, data)
       assert.are.equal(BACKPACK, kind)
       local c = customByID[data.itemInfo.itemID]
@@ -277,7 +287,61 @@ describe("NextMerchant", function()
       assert.is_nil(merchant:Search(""))
       assert.are.same({ ["vendor:2"] = true }, merchant:Search("plate"))
       assert.are.same({ ["vendor:1"] = true }, merchant:Search("type != armor"))
+      assert.are.same({ ["vendor:1"] = true }, merchant:Search("NOT type = armor"), "a NOT covers the vendor's items")
       assert.are.same({}, search:Search("plate"), "nothing in the bags' index")
+      assert.are.same({}, search:Search("NOT plate"), "nor in a NOT over the bags' index")
+    end)
+
+    -- The merchant's own flag: whether the character can use the item (Blizzard tints it red).
+    it("searches whether the character can use a vendor item", function()
+      _G._merchant.items = { vendorItem(10), vendorItem(12, { isUsable = false }) }
+      merchant:ReadItems(ctx())
+      assert.are.same({ ["vendor:1"] = true }, merchant:Search("usable = true"))
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("usable = false"))
+    end)
+
+    -- A vendor's pets, by whether the account can learn one more (read when the vendor's items are).
+    it("searches a vendor item's uncollected appearance", function()
+      override(stubs.items, "ReadItemTraits", function(_, id)
+        return { transmoggable = id == 12, appearanceID = id == 12 and 1001 or nil, sourceID = id == 12 and 2002 or nil,
+          stats = {} }
+      end)
+      override(stubs.items, "AppearanceStateOf", function(_, traits)
+        if traits and traits.appearanceID then return false, false end
+      end)
+      _G._merchant.items = { vendorItem(10), vendorItem(12) }
+      merchant:ReadItems(ctx())
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("appearance = unknown"))
+    end)
+
+    it("searches a vendor pet by its counts", function()
+      override(stubs.items, "ReadItemTraits", function(_, id)
+        return { isPet = id == 12, petSpeciesID = id == 12 and 635 or nil, stats = {} }
+      end)
+      override(stubs.items, "PetCountsOf", function(_, species) if species == 635 then return 1, 3 end end)
+      _G._merchant.items = { vendorItem(10), vendorItem(12) }
+      merchant:ReadItems(ctx())
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("collectable = true"))
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("petcount = 1 AND petlimit = 3"))
+    end)
+
+    it("searches a vendor item's traits, read from its link", function()
+      _G._merchant.items = { vendorItem(10), vendorItem(12) }
+      merchant:ReadItems(ctx())
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("quality = 2"))
+      assert.are.same({ ["vendor:1"] = true, ["vendor:2"] = true }, merchant:Search("price = 5 AND minlevel = 1"))
+      assert.are.same({ ["vendor:1"] = true, ["vendor:2"] = true }, merchant:Search("stacksize = 20"))
+    end)
+
+    -- Rule #1: read once the item's data has loaded; the vendor reads again on GET_ITEM_INFO_RECEIVED.
+    it("reads no traits for a vendor item whose data has not loaded", function()
+      local asked = 0
+      override(stubs.items, "ReadItemTraits", function() asked = asked + 1; return { craftingQuality = 2 } end)
+      _G._merchant.items = { vendorItem(14) }
+      local _, cold = merchant:ReadItems(ctx())
+      assert.is_true(cold)
+      assert.are.equal(0, asked)
+      assert.are.same({}, merchant:Search("quality = 2"))
     end)
 
     it("forgets the last vendor's items", function()

@@ -1199,6 +1199,14 @@ function perf:IsActive()
   return capturing
 end
 
+-- ElapsedMs is how long the running capture has run, on the clock its trace is timed with
+-- (excluding the profiler's own time); nil while no capture runs.
+---@return number?
+function perf:ElapsedMs()
+  if not capturing then return nil end
+  return vclock() - startTime
+end
+
 ---@return number overheadMs
 -- Calibrate measures what one wrapped call costs, split by where the cursor charges it:
 -- the part before the entry clock read and after the exit read lands on the caller, the

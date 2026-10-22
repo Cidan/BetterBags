@@ -361,6 +361,372 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 
+  -- The quality search field: an item's crafting quality tier (docs/vendor-compat.md).
+  describe("crafting quality", function()
+    local saved
+
+    before_each(function()
+      saved = { api = _G.C_TradeSkillUI, reagent = C_TradeSkillUI.GetItemReagentQualityByItemInfo,
+        crafted = C_TradeSkillUI.GetItemCraftedQualityByItemInfo }
+    end)
+
+    after_each(function()
+      _G.C_TradeSkillUI = saved.api
+      C_TradeSkillUI.GetItemReagentQualityByItemInfo = saved.reagent
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = saved.crafted
+    end)
+
+    it("is a reagent's tier, else a crafted item's, as Blizzard's item buttons read it", function()
+      local asked, askedCrafted = {}, {}
+      C_TradeSkillUI.GetItemReagentQualityByItemInfo = function(info)
+        table.insert(asked, info)
+        return info == "reagent" and 2 or nil
+      end
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function(info)
+        table.insert(askedCrafted, info)
+        return 4
+      end
+      assert.are.equal(2, items:CraftingQualityOf("reagent"))
+      assert.are.equal(4, items:CraftingQualityOf("crafted"))
+      assert.are.same({ "reagent", "crafted" }, asked)
+      assert.are.same({ "crafted" }, askedCrafted, "a reagent's crafted tier is never asked for")
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function() return nil end
+      assert.is_nil(items:CraftingQualityOf("plain"))
+    end)
+
+    it("is nothing on a client without crafting quality", function()
+      C_TradeSkillUI.GetItemReagentQualityByItemInfo = nil
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = nil
+      assert.is_nil(items:CraftingQualityOf(42))
+      _G.C_TradeSkillUI = nil
+      assert.is_nil(items:CraftingQualityOf(42))
+    end)
+  end)
+
+  -- What the search knows of an item beyond its name and type (docs/vendor-compat.md, "Proposed:
+  -- new fields"): read from the slot's link, and only once the item's data has loaded (rule #1,
+  -- data-loader.md §19). An item read cold has no traits until it is read again.
+  describe("item traits", function()
+    local saved, link, base
+    local function savedOf(t, k) return { t, k, t[k] } end
+
+    before_each(function()
+      link = "|cffa335ee|Hitem:42::::::::80::::2:6652:10390::::|h[Gleaming Blade]|h|r"
+      base = "|cffffffff|Hitem:42::::::::80:::::|h[Gleaming Blade]|h|r"
+      saved = {
+        savedOf(_G, "C_TradeSkillUI"), savedOf(_G, "C_PetJournal"),
+        savedOf(C_Item, "GetItemInfo"), savedOf(C_Item, "GetItemStats"), savedOf(C_Item, "IsEquippableItem"),
+        savedOf(C_Item, "GetItemSpell"), savedOf(C_Item, "IsCosmeticItem"), savedOf(C_Item, "GetItemUpgradeInfo"),
+        savedOf(_G, "ITEM_MOD_CRIT_RATING_SHORT"), savedOf(_G, "ITEM_MOD_HASTE_RATING_SHORT"),
+        savedOf(_G, "C_TransmogCollection"),
+      }
+      _G.ITEM_MOD_CRIT_RATING_SHORT = "Critical Strike"
+      _G.ITEM_MOD_HASTE_RATING_SHORT = "Haste"
+      -- The link describes the item in the slot, the item ID its base item: they answer differently.
+      C_Item.GetItemInfo = function(info)
+        if info == link then
+          return "Gleaming Blade", link, 4, 600, 70, "Weapon", "Swords", 1, "INVTYPE_WEAPON", 1, 52000, 2, 7, 2, 10
+        end
+        return "Gleaming Blade", base, 4, 580, 68, "Weapon", "Swords", 1, "INVTYPE_WEAPON", 1, 41000, 2, 7, 1, 10
+      end
+      C_Item.GetItemStats = function(l)
+        if l == link then
+          return { ITEM_MOD_HASTE_RATING_SHORT = 120, ITEM_MOD_CRIT_RATING_SHORT = 80, ITEM_MOD_NOT_A_GLOBAL_SHORT = 1 }
+        end
+        return {}
+      end
+      C_Item.IsEquippableItem = function(l) return l == link end
+      C_Item.GetItemSpell = function(l) if l == link then return "Gleam", 1234 end end
+      C_Item.IsCosmeticItem = function(l) return l == link and false or nil end
+      C_Item.GetItemUpgradeInfo = function(l)
+        if l == link then
+          return { currentLevel = 3, maxLevel = 6, maxItemLevel = 619, trackString = "Hero", trackStringID = 1 }
+        end
+      end
+      _G.C_PetJournal = { GetPetInfoByItemID = function() return nil end }
+      _G.C_TradeSkillUI = { GetItemReagentQualityByItemInfo = function() return nil end,
+        GetItemCraftedQualityByItemInfo = function(l) return l == link and 3 or 1 end }
+      -- A retail capture: nothing for an item without an appearance, the two IDs for the cloak.
+      _G.C_TransmogCollection = { GetItemInfo = function(l) if l == link then return 1001, 2002 end end }
+    end)
+
+    after_each(function()
+      for i = #saved, 1, -1 do saved[i][1][saved[i][2]] = saved[i][3] end
+    end)
+
+    it("reads the required level, max stack and sell price from the slot's link", function()
+      local props = items:ReadItemProperties(42, link)
+      assert.are.equal(70, props.traits.minLevel)
+      assert.are.equal(1, props.traits.stackSize)
+      assert.are.equal(52000, props.traits.sellPrice)
+      assert.are.equal(2, props.bindType, "the link's bind type, as before")
+      assert.are.equal(68, props.itemMinLevel, "the fields read by item ID stay as they were")
+    end)
+
+    it("reads what the item is from its link", function()
+      local t = items:ReadItemProperties(42, link).traits
+      assert.are.equal(3, t.craftingQuality, "a crafted item's tier is its own")
+      assert.is_true(t.isEquipment)
+      assert.is_true(t.hasUse)
+      assert.is_false(t.isCosmetic)
+      assert.is_false(t.isPet)
+      assert.are.same({ "Critical Strike", "Haste" }, t.stats, "the stats' names, sorted, unknown keys left out")
+      assert.is_true(t.transmoggable, "it has an appearance")
+      assert.are.same({ 1001, 2002 }, { t.appearanceID, t.sourceID })
+      _G.C_TransmogCollection.GetItemInfo = function() end
+      assert.is_false(items:ReadItemProperties(42, link).traits.transmoggable)
+    end)
+
+    it("reads the upgrade track of equipment, as Vendor does", function()
+      local t = items:ReadItemProperties(42, link).traits
+      assert.are.equal("Hero", t.upgradeTrack)
+      assert.are.equal(3, t.upgradeLevel)
+      assert.are.equal(6, t.upgradeMax)
+      assert.are.equal(619, t.upgradeMaxItemLevel)
+      local asked = 0
+      C_Item.IsEquippableItem = function() return false end
+      C_Item.GetItemUpgradeInfo = function() asked = asked + 1 end
+      t = items:ReadItemProperties(42, link).traits
+      assert.is_nil(t.upgradeTrack)
+      assert.are.equal(0, asked, "not asked for an item that is not equipment")
+    end)
+
+    it("has no upgrade track for equipment the client gives none", function()
+      C_Item.GetItemUpgradeInfo = function() return { currentLevel = 0, maxLevel = 0, maxItemLevel = 600 } end
+      local t = items:ReadItemProperties(42, link).traits
+      assert.is_nil(t.upgradeTrack)
+      assert.is_nil(t.upgradeMaxItemLevel)
+    end)
+
+    -- A retail dump's Adventurer cloak (spec/fixtures/dump_retail_12_1_5.lua): a track string with
+    -- no levels, and no upgrade line in its tooltip. Not a track the game shows.
+    it("has no upgrade track for a track string with no levels", function()
+      C_Item.GetItemUpgradeInfo = function()
+        return { currentLevel = 0, maxLevel = 0, maxItemLevel = 0, trackString = "Adventurer", trackStringID = 971 }
+      end
+      local t = items:ReadItemProperties(42, link).traits
+      assert.is_nil(t.upgradeTrack)
+      assert.is_nil(t.upgradeMaxItemLevel)
+    end)
+
+    -- How many of a pet species the account has: C_PetJournal.GetNumCollectedInfo returns numOwned,
+    -- maxAllowed (Blizzard_PetBattleUI.lua). A login capture had C_PetJournal.GetNumPets report 0
+    -- owned until PET_JOURNAL_LIST_UPDATE, so nothing is asked before the journal has loaded.
+    it("knows a pet's counts only once the pet journal has loaded", function()
+      local asked = 0
+      _G.C_PetJournal = { GetNumCollectedInfo = function(species)
+        asked = asked + 1
+        return species == 635 and 2 or 0, 3
+      end }
+      items._petJournalLoaded = false
+      _G.C_PetJournal.GetNumPets = function() return 2014, 0 end
+      assert.is_nil(items:PetCountsOf(635))
+      assert.are.equal(0, asked)
+      items._petJournalLoaded = true
+      assert.are.same({ 2, 3 }, { items:PetCountsOf(635) })
+      assert.is_nil(items:PetCountsOf(nil), "no species, no counts")
+      _G.C_PetJournal = {}
+      assert.is_nil(items:PetCountsOf(635), "a client without the API")
+      items._petJournalLoaded = false
+    end)
+
+    -- Whether an item's appearance is collected, every way Vendor asks (itemproperties.lua): its own
+    -- source, any source of the appearance, the item itself. Captures had the collection count 0
+    -- until the player entered the world, then 3,083 (on a login and a reload).
+    describe("appearances", function()
+      local savedApis, cloak, traits, counts, own, others, byItem
+
+      before_each(function()
+        savedApis = { _G.C_TransmogCollection, _G.GetTime }
+        cloak = "|cff0070dd|Hitem:42::::::::80:::::|h[Cloak]|h|r"
+        traits = { appearanceID = 1001, sourceID = 2002 }
+        counts, own, others, byItem = 3083, false, false, false
+        _G.C_TransmogCollection = {
+          GetCategoryCollectedCount = function(category) return category == 1 and counts or 0 end,
+          PlayerHasTransmogItemModifiedAppearance = function(source) return source == 2002 and own end,
+          GetAppearanceSources = function(appearance)
+            return { { sourceID = 2002, isCollected = own }, { sourceID = 2003, isCollected = others } }
+          end,
+          PlayerHasTransmogByItemInfo = function(l) return l == cloak and byItem end,
+        }
+        items._appearancesLoaded = false
+      end)
+
+      after_each(function()
+        _G.C_TransmogCollection, _G.GetTime = savedApis[1], savedApis[2]
+        items._appearancesLoaded = false
+      end)
+
+      it("says nothing before the collection has loaded", function()
+        counts = 0
+        assert.is_nil(items:AppearanceStateOf(traits, cloak))
+        counts = 3083
+        _G.GetTime = function() return 2 end
+        assert.are.same({ false, false }, { items:AppearanceStateOf(traits, cloak) })
+      end)
+
+      it("asks whether the collection has loaded once a frame until it has", function()
+        counts = 0
+        local asked = 0
+        local count = _G.C_TransmogCollection.GetCategoryCollectedCount
+        _G.C_TransmogCollection.GetCategoryCollectedCount = function(c) asked = asked + 1 return count(c) end
+        _G.GetTime = function() return 5 end
+        items:AppearanceStateOf(traits, cloak)
+        local once = asked
+        items:AppearanceStateOf(traits, cloak)
+        assert.are.equal(once, asked, "the same frame")
+        _G.GetTime = function() return 6 end
+        counts = 3083
+        assert.are.same({ false, false }, { items:AppearanceStateOf(traits, cloak) })
+        asked = 0
+        _G.GetTime = function() return 7 end
+        assert.are.same({ false, false }, { items:AppearanceStateOf(traits, cloak) })
+        assert.are.equal(0, asked, "loaded for good")
+      end)
+
+      it("does not take the None category for a collection", function()
+        _G.C_TransmogCollection.GetCategoryCollectedCount = function(category) return category == 0 and 5 or 0 end
+        assert.is_nil(items:AppearanceStateOf(traits, cloak))
+      end)
+
+      it("knows the appearance through its own source, another source, or the item", function()
+        own = true
+        assert.are.same({ true, true }, { items:AppearanceStateOf(traits, cloak) })
+        own, others = false, true
+        assert.are.same({ true, false }, { items:AppearanceStateOf(traits, cloak) })
+        others, byItem = false, true
+        assert.are.same({ true, false }, { items:AppearanceStateOf(traits, cloak) })
+        byItem = false
+        assert.are.same({ false, false }, { items:AppearanceStateOf(traits, cloak) })
+      end)
+
+      it("says nothing for an item without an appearance", function()
+        assert.is_nil(items:AppearanceStateOf({}, cloak))
+        assert.is_nil(items:AppearanceStateOf(nil, cloak))
+      end)
+    end)
+
+    -- A /reload capture: the journal answered 234 owned from its first sample, before its event.
+    it("knows the pet journal has loaded when the account owns a pet", function()
+      _G.C_PetJournal = { GetNumPets = function() return 2045, 234 end,
+        GetNumCollectedInfo = function() return 1, 3 end }
+      items._petJournalLoaded = false
+      assert.are.same({ 1, 3 }, { items:PetCountsOf(635) })
+      assert.is_true(items._petJournalLoaded)
+      items._petJournalLoaded = false
+    end)
+
+    -- C_PetJournal.GetPetInfoByItemID only takes an item ID (the wiki: a link raises an error).
+    it("asks whether it teaches a pet by item ID", function()
+      local asked
+      _G.C_PetJournal = { GetPetInfoByItemID = function(id)
+        asked = id
+        return "Albino Snake", 1, 1, 1, "", "", false, true, true, false, true, 1, 635
+      end }
+      local t = items:ReadItemProperties(42, link).traits
+      assert.are.equal(42, asked)
+      assert.is_true(t.isPet)
+      assert.are.equal(635, t.petSpeciesID)
+    end)
+
+    it("reads nothing a client does not have", function()
+      C_Item.IsCosmeticItem = nil
+      C_Item.GetItemUpgradeInfo = nil
+      C_Item.GetItemSpell = nil
+      _G.C_PetJournal = nil
+      _G.C_TransmogCollection = nil
+      local t = items:ReadItemProperties(42, link).traits
+      assert.is_nil(t.transmoggable)
+      assert.is_nil(t.isCosmetic)
+      assert.is_nil(t.upgradeTrack)
+      assert.is_nil(t.hasUse)
+      assert.is_nil(t.isPet)
+      assert.is_true(t.isEquipment)
+    end)
+
+    -- Rule #1: no item data is read before the item's data has loaded.
+    it("has no traits, and reads none, while the item's data has not loaded", function()
+      local asked = 0
+      local function count() asked = asked + 1 end
+      C_Item.GetItemStats, C_Item.IsEquippableItem, C_Item.GetItemSpell = count, count, count
+      C_Item.IsCosmeticItem, C_Item.GetItemUpgradeInfo = count, count
+      _G.C_PetJournal = { GetPetInfoByItemID = count }
+      _G.C_TransmogCollection = { GetItemInfo = count }
+      _G.C_TradeSkillUI = { GetItemReagentQualityByItemInfo = count, GetItemCraftedQualityByItemInfo = count }
+      C_Item.GetItemInfo = function() return nil end
+      local props = items:ReadItemProperties(42, link)
+      assert.is_true(props.incomplete)
+      assert.is_nil(props.traits)
+      assert.are.equal(0, asked)
+    end)
+
+    -- The base item can be loaded while the item in the slot is not; the read is incomplete then, so
+    -- it is read again.
+    it("has no traits while the slot's link has not loaded, though its item ID has", function()
+      local idOnly = C_Item.GetItemInfo
+      C_Item.GetItemInfo = function(info)
+        if info == link then return nil end
+        return idOnly(info)
+      end
+      local props = items:ReadItemProperties(42, link)
+      assert.is_true(props.incomplete)
+      assert.is_nil(props.traits)
+    end)
+
+    -- A caged battle pet's link is a battlepet: link; it is read by item ID, as its bind type was.
+    it("reads an item whose link is not an item link by its item ID", function()
+      local pet = "|cff0070dd|Hbattlepet:635:1:3:152:13:12:0000000000000000|h[Adder]|h|r"
+      local byID = C_Item.GetItemInfo
+      C_Item.GetItemInfo = function(info)
+        assert.are_not.equal(pet, info, "GetItemInfo takes an item ID or an item link")
+        return byID(info)
+      end
+      local props = items:ReadItemProperties(42, pet)
+      assert.is_false(props.incomplete)
+      assert.are.equal(68, props.traits.minLevel)
+      assert.are.equal(41000, props.traits.sellPrice)
+      assert.are.equal(1, props.bindType)
+    end)
+  end)
+
+  -- The bagname search field: a bag's name as Show Bags shows it, without its number.
+  describe("plain bag names", function()
+    local savedBags, savedKeyring, savedName
+
+    before_each(function()
+      savedBags, savedKeyring, savedName = const.BACKPACK_BAGS, Enum.BagIndex.Keyring, C_Container.GetBagName
+      const.BACKPACK_BAGS = { [0] = 0, [1] = 1, [-2] = -2 }
+      Enum.BagIndex.Keyring = -2
+      C_Container.GetBagName = function(bagid)
+        return ({ [0] = "Backpack", [1] = "Herb Satchel", [7] = "Large Bank Sack" })[bagid]
+      end
+    end)
+
+    after_each(function()
+      const.BACKPACK_BAGS, Enum.BagIndex.Keyring, C_Container.GetBagName = savedBags, savedKeyring, savedName
+    end)
+
+    it("names each bag as Show Bags does, without the number", function()
+      assert.are.equal("Backpack", items:GetPlainBagName(0))
+      assert.are.equal("#1: Backpack", items:GetBagName(0))
+      assert.are.equal("Herb Satchel", items:GetPlainBagName(1))
+      assert.are.equal("#2: Herb Satchel", items:GetBagName(1))
+      assert.are.equal("Keyring", items:GetPlainBagName(-2))
+      assert.are.equal("Bank", items:GetPlainBagName(-1))
+      assert.are.equal("#1: Bank", items:GetBagName(-1))
+      assert.are.equal("Reagent Bank", items:GetPlainBagName(-3))
+      assert.are.equal("#1: Reagent Bank", items:GetBagName(-3))
+      assert.are.equal("Large Bank Sack", items:GetPlainBagName(7))
+      assert.are.equal("#3: Large Bank Sack", items:GetBagName(7))
+    end)
+
+    it("names a bag the client has no name for as Show Bags does", function()
+      C_Container.GetBagName = function() return nil end
+      assert.are.equal("Unknown", items:GetPlainBagName(1))
+      assert.are.equal("Bank Bag", items:GetPlainBagName(7))
+    end)
+  end)
+
   -- Issue #183: quest items are type "Quest" and subtype "Quest", which read
   -- "Quest - Quest" with the Type and Subtype filters both on.
   describe("Category names from type and subtype (issue #183)", function()
@@ -1633,6 +1999,20 @@ describe("Items (New Data Farming Engine)", function()
     after_each(function()
       _G.time = savedTime
       _G.C_NewItems.IsNewItem, _G.C_NewItems.RemoveNewItem = savedIsNewItem, savedRemoveNewItem
+    end)
+
+    -- Category automation acts on an item by its own category, whether or not it is recent.
+    it("gives an item's category without Recent Items when asked", function()
+      local ctx = addon:GetModule("Context"):New("TestIgnoreRecent")
+      local item = newItem(0, 1, "GUID_A")
+      item.containerInfo = { quality = 0 }
+      items:MarkItemAsNew(ctx, item)
+      local filter = database.GetCategoryFilter
+      database.GetCategoryFilter = function(_, _, name) return name == "RecentItems" end
+      local recent, own = items:GetCategory(ctx, item), items:GetCategory(ctx, item, false, true)
+      database.GetCategoryFilter = filter
+      assert.are.equal("Recent Items", recent)
+      assert.are.equal("Junk", own)
     end)
 
     it("keeps an item recent after its duration has passed, until the bag closes", function()

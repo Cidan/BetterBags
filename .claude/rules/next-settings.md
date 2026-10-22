@@ -266,7 +266,8 @@ Asked (2026-10-20): categories get a dedicated space, as currency did; defined o
 item and search categories combined, each able to hold both. Then (2026-10-21), after the first version
 crowded a list and an editor into one box (a cut-off button, a scrolling page, unclear "Placed Here",
 icons over text, no room to drop onto a long list): the list moves to the sidebar, the category gets
-the whole content area in three tabs, and the window grew to 720. The data model is
+the whole content area in three tabs, and the window grew to 720. A fourth, Automation, came with
+category automation (2026-10-22, automation.md). The data model is
 category-lifecycle.md §6. Every question is a `NextDialog` over the window.
 
 **The Categories page** (`next/settings/categories.lua`, `NextSettingsCategories`; page `categories`,
@@ -314,6 +315,11 @@ page's `Content.Top` and `Bottom`).
   (`AddPermanentItemToCategory`, `ClearCursor`, the bags recalculated; asked: the items themselves
   are drop targets); a right click offers Remove. A plugin's items show read-only (no drop, no remove,
   no Remove All).
+- **Automation tab** (automation.md §5): two switches, Sell at Merchants and Destroy, at most one on
+  (turning one on turns the other off; both off is nothing), saved at once, and nothing else (asked:
+  no dropdown, no explanations, no item box, no Destroy Next Item button). Shown while a category is
+  chosen, a plugin's too. The list line and the heading end "Sells at merchants" or "Destroys on
+  command". General > Items gained Sell at Most 12 Items per Visit (`autoSellLimit`).
 - `NextSettingsCategories:Show(name)` chooses a category for the next time the page shows (a bag's tab
   links here); `NewFromSearch(query)` makes the list ask for a new category's name with the search as
   its rule (the search box's Enter to Make Category, through `config/NewCategoryFromSearch`, which

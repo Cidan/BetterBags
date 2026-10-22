@@ -529,6 +529,71 @@ PerfSessions listens to `ADDON_RESTRICTION_STATE_CHANGED` where the client has i
 `[event] ADDON_RESTRICTION_STATE_CHANGED(type, state)` call at the moment it happened. The
 Simulate tab shows the live state.
 
+## 10b. Collections in captures
+
+The pet journal, the toy box and the appearance collection load on their own schedule at login,
+and the search fields that read them (pet counts, collected appearances) need to know when. A first
+login capture could not say: the profiler records only events BetterBags listens to, and BetterBags
+listened to none of theirs. PerfSessions now listens, where the client has them
+(`C_EventUtils.IsEventValid`), to `PerfSessions.COLLECTION_EVENTS`: `PET_JOURNAL_LIST_UPDATE`,
+`NEW_PET_ADDED`, `PET_JOURNAL_PET_DELETED`, `TRANSMOG_COLLECTION_UPDATED`,
+`TRANSMOG_COLLECTION_SOURCE_ADDED`, `TRANSMOG_COLLECTION_SOURCE_REMOVED`, `NEW_TOY_ADDED`,
+`TOYS_UPDATED` (each in the client's API documentation). Each fire is an `[event]` call in the
+trace, and while a capture runs it holds a `[collections]` call whose argument is
+`perfSessions:CollectionCounts()`: `pets`, `petsOwned` (`C_PetJournal.GetNumPets`, as
+Blizzard_PetCollection.lua counts them), `toys`, `toysLearned` (the toy box's displayed totals, as
+Blizzard_ToyBox.lua counts them), `appearances` (`C_TransmogCollection.GetCategoryCollectedCount`
+summed over every `Enum.TransmogCollectionType` but None: the unfiltered count of what the
+wardrobe's progress bar shows, which reads `GetFilteredCategoryCollectedCount`, Blizzard_Wardrobe.lua).
+The first version recorded `GetNumTransmogSources`, which is the number of source filters the
+wardrobe loops over (Blizzard_Wardrobe.lua:67): 7 throughout a login capture;
+nothing is read while no capture runs. The counts at the start and the end are in
+`meta.collectionsStart` / `collectionsStop` (nil on a client with none of these APIs).
+Coverage: `spec/debug/perf_sessions_spec.lua` (counts at start and stop, missing APIs, each event
+traced with its counts, nothing read while idle, no event a client lacks); 8 mutations, all caught
+(one led to the missing-event test).
+
+## 10c. Diagnostics runs
+
+Asked by the player: one play session should answer every open in-game question, instead of one
+capture per question. **Capture Diagnostics** (the Dump tab of `/bbdb`) calls
+`perfSessions:ArmDiagnostics()`, which arms the next `DIAGNOSTICS.loads` (2) loads: the player quits
+and starts the game (a login capture), then `/reload`s (a reload capture).
+
+- **Arming**: `db.armLoads` counts the loads left; `GetArmedLoads()` is it, or 1 for "Capture next
+  reload" (`db.armNextReload`, unchanged: one load, no stop of its own, no samples).
+  `IsArmedForNextReload()` is true while any load is armed; unticking the checkbox
+  (`SetArmedForNextReload(false)`) disarms a run too. `StartIfArmed()` consumes one load and starts a
+  capture with `meta.diagnostics = true`. The Performance tab's status says "diagnostics armed for
+  the next N loads".
+- **Stopping on its own**: when a diagnostics capture learns which load it is (`OnEnteringWorld`,
+  the first `PLAYER_ENTERING_WORLD`), it schedules its stop `DIAGNOSTICS.stopAfterSec` (60 s) later.
+  Each capture has a token (`captureToken`), so a stop or a sample scheduled for one capture never
+  touches a later one. A capture still running at logout is saved then, as before.
+- **Samples** (`session.samples`, diagnostics captures only, so profiling captures are not disturbed):
+  `TakeSample(why)` records `{ at, why, state }`, `at` on the trace's clock (`perf:ElapsedMs()`, the
+  virtual clock since the capture started), `state = { collections = CollectionCounts(), probe =
+  ItemProbe:Sample() }` (`probeError` when the probe raised). Taken at the start and the stop always,
+  and otherwise only when the state differs from the last one kept: every `DIAGNOSTICS.sampleEverySec`
+  (0.25 s, chained `C_Timer.After`; timers do not run during a loading screen), on the collection
+  events (§10b), on `SAMPLE_EVENTS` (`LOADING_SCREEN_DISABLED`, `PLAYER_SPECIALIZATION_CHANGED`,
+  `SKILL_LINES_CHANGED`, `PLAYER_LEVEL_UP`, `PLAYER_AVG_ITEM_LEVEL_UPDATE`, `SPELLS_CHANGED`,
+  `PLAYER_EQUIPMENT_CHANGED`, where valid), on `PLAYER_ENTERING_WORLD`, and on
+  `items/RefreshBackpack/Done` (right after each backpack read, the startup read first).
+  `ItemProbe:Sample()` reads, straight from the client, the player values (as `Player()`, without who
+  the player is) and, for each item in the backpack once per item ID: whether the character can use
+  it, whether its appearance's source is collected, and its pet's counts. So a capture shows when each
+  of them is known at login against the bag reads.
+- Optional in the session format (no version change).
+
+Coverage: `spec/debug/perf_sessions_spec.lua` ("diagnostics": two loads armed and consumed, the stop
+a minute after entering the world and only once, a later capture left alone by an earlier stop or
+tick, "Capture next reload" unchanged, unticking, samples every quarter second kept on change with
+the capture's clock, collections in samples, every sample event and the backpack read, a failing
+probe), `spec/debug/itemprobe_spec.lua` (`Sample`), `spec/frames/debug_window_spec.lua` (the button
+and its status), `spec/frames/perfpane_spec.lua` (the status). 34 mutations: five first survived; four
+led to tests and one to removing a guard that could not change anything.
+
 ## 10. Testing
 
 - Engine (`spec/debug/perf_engine_spec.lua`): a fake clock (`perf:SetClock`) makes timings

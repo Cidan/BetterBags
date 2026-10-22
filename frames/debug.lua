@@ -30,6 +30,12 @@ local perfPane = addon:GetModule('PerfPane')
 ---@class SimulatePane: AceModule
 local simulatePane = addon:GetModule('SimulatePane')
 
+---@class ItemProbe: AceModule
+local itemProbe = addon:GetModule('ItemProbe')
+
+---@class PerfSessions: AceModule
+local perfSessions = addon:GetModule('PerfSessions')
+
 ---@class WindowModule: AceModule
 local window = addon:GetModule('Window')
 
@@ -79,6 +85,19 @@ local function sanitizeForDump(val, seen)
   return copy
 end
 
+
+-- probeItems adds to each dumped item what the client's APIs answered about it (debug/itemprobe.lua),
+-- and returns the dump.
+---@param dump table<string, table>
+---@return table<string, table>
+local function probeItems(dump)
+  for _, item in pairs(dump) do
+    if not item.isItemEmpty and item.bagid and item.slotid then
+      item.apiProbe = itemProbe:Probe(item.bagid, item.slotid)
+    end
+  end
+  return dump
+end
 
 ---@param button BetterBagsDebugListButton
 ---@param elementData table
@@ -233,7 +252,7 @@ function debugWindow:CreateDumpFrame()
   desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
   desc:SetWidth(760)
   desc:SetJustifyH("LEFT")
-  desc:SetText("Dump your current full backpack item data to saved variables. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
+  desc:SetText("Dump your current full backpack item data to saved variables, with what the game answered about each item, your worn gear, your character and every bag's name; at a bank, the bank's items too. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
 
   -- Status Label
   local status = sonata:CreateText(f, "Field")
@@ -249,6 +268,12 @@ function debugWindow:CreateDumpFrame()
       end
     end
     status:SetText(format("Current Dumped Items Count: %d", count))
+    local loads = perfSessions:GetArmedLoads()
+    if loads > 0 then
+      f.diagnosticsStatus:SetText(format("Diagnostics armed: the next %d loads will be captured.", loads))
+    else
+      f.diagnosticsStatus:SetText("Diagnostics not armed.")
+    end
   end
 
   -- Dump Button
@@ -256,6 +281,7 @@ function debugWindow:CreateDumpFrame()
   dumpButton:SetSize(200, 35)
   dumpButton:SetPoint("TOPLEFT", status, "BOTTOMLEFT", 0, -20)
   dumpButton:SetText("Dump Backpack Items")
+  f.dumpButton = dumpButton
 
   addon.SetScript(dumpButton, "OnClick", function(_ctx)
     local itemsModule = addon:GetModule("Items")
@@ -263,7 +289,18 @@ function debugWindow:CreateDumpFrame()
     local backpackItems = slotInfo and slotInfo.itemsBySlotKey
     if backpackItems then
       local sanitized = sanitizeForDump(backpackItems)
-      database:SetDebugBackpackDump(sanitized)
+      probeItems(sanitized)
+      local extras = {
+        player = itemProbe:Player(),
+        equipped = itemProbe:ProbeEquipment(),
+        bagNames = itemProbe:BagNames(),
+      }
+      -- The bank's items exist only while it is open.
+      local bankInfo = itemsModule.slotInfo[const.BAG_KIND.BANK]
+      if addon.atBank and bankInfo and bankInfo.itemsBySlotKey then
+        extras.bank = probeItems(sanitizeForDump(bankInfo.itemsBySlotKey))
+      end
+      database:SetDebugBackpackDump(sanitized, itemProbe:Client(), extras)
       f.Update()
       print("BetterBags: Dumped backpack items to saved variables!")
     else
@@ -281,6 +318,29 @@ function debugWindow:CreateDumpFrame()
     database:SetDebugBackpackDump({})
     f.Update()
     print("BetterBags: Cleared dumped backpack items!")
+  end)
+
+  -- A diagnostics run (PerfSessions:ArmDiagnostics): one play session that answers every open
+  -- in-game question.
+  local diagnosticsButton = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  diagnosticsButton:SetSize(200, 35)
+  diagnosticsButton:SetPoint("TOPLEFT", dumpButton, "BOTTOMLEFT", 0, -30)
+  diagnosticsButton:SetText("Capture Diagnostics")
+  f.diagnosticsButton = diagnosticsButton
+
+  f.diagnosticsStatus = sonata:CreateText(f, "Field")
+  f.diagnosticsStatus:SetPoint("LEFT", diagnosticsButton, "RIGHT", 20, 0)
+
+  local diagnosticsHelp = sonata:CreateText(f, "Body")
+  diagnosticsHelp:SetPoint("TOPLEFT", diagnosticsButton, "BOTTOMLEFT", 0, -10)
+  diagnosticsHelp:SetWidth(760)
+  diagnosticsHelp:SetJustifyH("LEFT")
+  diagnosticsHelp:SetText("Capture Diagnostics records your next two loads with the profiler: quit and start the game, then /reload. Each capture stops by itself a minute after you enter the world.")
+
+  addon.SetScript(diagnosticsButton, "OnClick", function(_ctx)
+    perfSessions:ArmDiagnostics()
+    f.Update()
+    print("BetterBags: Diagnostics armed. Quit and start the game, then /reload.")
   end)
 
   return f

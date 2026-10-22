@@ -68,7 +68,7 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.is_true(settings:IsShown())
     assert.is_nil(addon:GetModule("Config").configFrame, "no classic window")
     assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "categories > settings",
-      "categories > rule", "categories > items", "backpack > layout",
+      "categories > rule", "categories > items", "categories > automation", "backpack > layout",
       "backpack > items", "backpack > categories", "bank > layout", "bank > items", "bank > categories",
       "guild > layout", "guild > items", "guild > categories", "profiles > profiles", "profiles > transfer",
       "quickfind > main" }, builtEveryTab(addon))
@@ -127,7 +127,7 @@ describe("BetterBags Next's settings window on the whole addon", function()
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
     assert.is_true(settings:IsShown())
     assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "categories > settings",
-      "categories > rule", "categories > items", "currency > main",
+      "categories > rule", "categories > items", "categories > automation", "currency > main",
       "backpack > layout", "backpack > items", "backpack > categories", "bank > layout", "bank > items",
       "bank > categories", "profiles > profiles", "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
     settings:Open("backpack", "layout")

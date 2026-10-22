@@ -745,6 +745,8 @@ const.DATABASE_DEFAULTS = {
     debug = false,
     inBagSearch = true,
     categorySell = false,
+    -- Category automation sells at most what buyback keeps (automation.md).
+    autoSellLimit = true,
     showKeybindWarning = true,
     enterToMakeCategory = true,
     upgradeIconProvider = 'None',

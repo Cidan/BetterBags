@@ -344,6 +344,28 @@ local EventFrame = {}
 function EquipmentManager_UnpackLocation(location) end
 
 -- ItemInfo is the information about an item that is returned by GetItemInfo.
+-- What the search knows of an item beyond its name and type (items:ReadItemTraits), read from its
+-- link once its data has loaded. A field the client has no answer for is nil.
+---@class (exact) ItemTraits
+---@field minLevel? number The level required to use it.
+---@field stackSize? number The most per stack.
+---@field sellPrice? number The vendor price of one, in copper; 0 cannot be sold.
+---@field craftingQuality? number The crafting quality tier of a reagent or a crafted item.
+---@field isEquipment? boolean
+---@field hasUse? boolean It has a Use spell.
+---@field isCosmetic? boolean
+---@field isPet? boolean It teaches a battle pet.
+---@field petSpeciesID? number
+---@field upgradeTrack? string The upgrade track's name; nil for an item without one.
+---@field upgradeLevel? number
+---@field upgradeMax? number
+---@field upgradeMaxItemLevel? number The item level once fully upgraded.
+---@field isScrappable? boolean Bag slots only.
+---@field transmoggable? boolean It has an appearance (C_TransmogCollection.GetItemInfo).
+---@field appearanceID? number Its appearance, when it has one.
+---@field sourceID? number Its own source (item modified appearance), when it has an appearance.
+---@field stats string[] Its stats' names, sorted.
+
 ---@class (exact) ExpandedItemInfo
 ---@field itemID number
 ---@field itemGUID string
@@ -364,6 +386,8 @@ function EquipmentManager_UnpackLocation(location) end
 ---@field expacID ExpansionType
 ---@field setID number
 ---@field isCraftingReagent boolean
+---@field traits? ItemTraits What the search knows of the item, read once its data has loaded; nil for an item read cold.
+---@field tooltipMarks? {toy?: boolean, known?: boolean} What whole tooltip lines say (TooltipScanner): "Toy", "Already known".
 ---@field effectiveIlvl number
 ---@field isPreview boolean
 ---@field baseIlvl number

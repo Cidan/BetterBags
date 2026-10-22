@@ -767,6 +767,112 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       reads = {}
     end)
 
+    -- Vendor's CurrentEquippedLevel and WatermarkLevel, per item (search-indexing.md §16).
+    describe("slot values", function()
+      local bagGear
+
+      before_each(function()
+        -- Bag items 101 (a ring), 102 (a one-hander), 103 (a two-hander), 104 (not equipment).
+        -- Enum.InventoryType's finger (11), weapon (13) and two-hand (17) types, and their slots as
+        -- core/constants.lua maps them (this spec stubs the constants).
+        bagGear = {
+          [101] = { "INVTYPE_FINGER", 11 },
+          [102] = { "INVTYPE_WEAPON", 13 },
+          [103] = { "INVTYPE_2HWEAPON", 17 },
+        }
+        override(const, "INVENTORY_TYPE_TO_INVENTORY_SLOTS", { [1] = { 1 }, [11] = { 11, 12 }, [13] = { 16, 17 },
+          [17] = { 16 } })
+        -- An item ID or an item link, as GetItemInfoInstant and IsEquippableItem take them.
+        local function idOf(l) return tonumber(l) or tonumber(tostring(l):match("item:(%d+)")) end
+        local instant = _G.C_Item.GetItemInfoInstant
+        override(_G.C_Item, "GetItemInfoInstant", function(info)
+          local gear = bagGear[idOf(info)]
+          if gear then return idOf(info), "Armor", "Misc", gear[1], 134400, 4, 0 end
+          return instant(info)
+        end)
+        override(_G.C_Item, "IsEquippableItem", function(l) return bagGear[idOf(l)] ~= nil end)
+        local bagItem = _G.Item.CreateFromBagAndSlot
+        override(_G.Item, "CreateFromBagAndSlot", function(item, bag, slot)
+          local mixin = bagItem(item, bag, slot)
+          local held = mockContainer[bag] and mockContainer[bag][slot]
+          local gear = held and bagGear[held.itemID]
+          if gear then
+            function mixin:GetInventoryType() return gear[2] end
+          end
+          return mixin
+        end)
+        override(_G, "C_ItemUpgrade", { GetHighWatermarkForItem = function(l)
+          if bagGear[idOf(l)] then return 246, 250 end
+          return 0, 0
+        end })
+        override(_G, "CanDualWield", function() return true end)
+        override(_G, "UnitClass", function() return "Paladin", "PALADIN", 2 end)
+        mockContainer[0] = { { itemID = 101, guid = "ring", count = 1 }, { itemID = 102, guid = "sword", count = 1 },
+          { itemID = 103, guid = "axe", count = 1 }, { itemID = 104, guid = "cheese", count = 1 } }
+        equip(11, 511, 230)
+        equip(12, 512, 210)
+        equip(16, 516, 200)
+        equip(17, 517, 150)
+      end)
+
+      it("gives equipment the lowest item level worn in its slots, and its slot's best", function()
+        local slotInfo = refreshBackpack({ wipe = true })
+        local ring = slotInfo.itemsBySlotKey["0_1"]
+        assert.are.equal(210, ring.slotEquipped)
+        assert.are.equal(246, ring.slotBest)
+        assert.are.same({ ["0_1"] = true }, search:Search("slotequipped = 210"))
+        assert.is_true(search:Search("slotbest = 246")["0_1"])
+        assert.is_nil(slotInfo.itemsBySlotKey["0_4"].slotEquipped, "not equipment")
+        assert.is_nil(slotInfo.itemsBySlotKey["0_4"].slotBest)
+      end)
+
+      it("counts the off hand for a one-hander only with dual wield", function()
+        local slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(150, slotInfo.itemsBySlotKey["0_2"].slotEquipped)
+        _G.CanDualWield = function() return false end
+        slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(200, slotInfo.itemsBySlotKey["0_2"].slotEquipped)
+      end)
+
+      it("counts both hands for a warrior's two-hander", function()
+        local slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(200, slotInfo.itemsBySlotKey["0_3"].slotEquipped)
+        _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
+        slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(150, slotInfo.itemsBySlotKey["0_3"].slotEquipped)
+      end)
+
+      it("is 0 when nothing is worn in the slots", function()
+        equipped[11], equipped[12] = nil, nil
+        local slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(0, slotInfo.itemsBySlotKey["0_1"].slotEquipped)
+      end)
+
+      -- The worn gear changes without the item changing: a recalculation keeps the search current.
+      it("keeps a kept item's slot values current when the worn gear changes", function()
+        refreshBackpack({ wipe = true })
+        local kept = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"]
+        equip(12, 612, 260)
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.equal(kept, items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"])
+        assert.are.equal(230, kept.slotEquipped)
+        assert.are.same({ ["0_1"] = true }, search:Search("slotequipped = 230"))
+        assert.are.same({}, search:Search("slotequipped = 210"))
+        assert.is_true(search:Search("ilvl < slotequipped")["0_1"], "a field compared with a slot value")
+      end)
+
+      it("has no slot values for an item read before its data loaded", function()
+        local info = _G.C_Item.GetItemInfo
+        override(_G.C_Item, "GetItemInfo", function(x)
+          if tostring(x):find("101", 1, true) then return nil end
+          return info(x)
+        end)
+        local slotInfo = refreshBackpack({ wipe = true })
+        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].slotEquipped)
+        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].slotBest)
+      end)
+    end)
+
     it("keeps every slot whose link and item level are unchanged", function()
       refreshBackpack()
       assert.are.same({}, readSlots())
@@ -886,6 +992,20 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       refreshBackpack({ wipe = true })
       assert.are.same({ "0_1", "0_2" }, askedKeys())
       sent = {}
+    end)
+
+    -- The upgrade field follows the arrow on an item the sweep kept (data-loader.md §18: a value
+    -- set again in place is re-indexed only when the item is marked).
+    it("keeps the upgrade field current when a kept item's arrow changes", function()
+      assert.are.same({ ["0_1"] = true }, search:Search("upgrade = true"))
+      local kept = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"]
+      verdicts[101] = false
+      items:InvalidateUpgrades()
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.are.equal(kept, slotInfo.itemsBySlotKey["0_1"], "the same item, kept")
+      assert.is_false(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+      assert.are.same({}, search:Search("upgrade = true"))
+      assert.is_true(search:Search("upgrade = false")["0_1"])
     end)
 
     it("asks again only for the slot that changed", function()
@@ -1677,6 +1797,346 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       end)
       slotInfo = refreshBackpack({ derive = true })
       assert.equal("By Custom", categoryOf(slotInfo, "0_1"))
+    end)
+
+    it("reads each item's crafting tier from its link, for the quality field", function()
+      override(_G.C_TradeSkillUI, "GetItemReagentQualityByItemInfo", function(info)
+        return tostring(info):find("item:202", 1, true) and 2 or nil
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.is_nil(slotInfo.itemsBySlotKey["0_1"].itemInfo.traits.craftingQuality)
+      assert.are.equal(2, slotInfo.itemsBySlotKey["0_2"].itemInfo.traits.craftingQuality)
+      searchCategories({ { "Tier 2", "quality = 2" } })
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Tier 2", categoryOf(slotInfo, "0_2"))
+      assert.are_not.equal("Tier 2", categoryOf(slotInfo, "0_1"))
+    end)
+
+    it("reads no crafting tier while an item's data has not loaded, and reads it once it has", function()
+      local asked = 0
+      override(_G.C_TradeSkillUI, "GetItemReagentQualityByItemInfo", function()
+        asked = asked + 1
+        return 2
+      end)
+      local getItemInfo = _G.C_Item.GetItemInfo
+      local cold = true
+      override(_G.C_Item, "GetItemInfo", function(id)
+        if cold then return nil end
+        return getItemInfo(id)
+      end)
+      mockContainer[0] = { { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].harvestIncomplete)
+      assert.is_nil(slotInfo.itemsBySlotKey["0_1"].itemInfo.traits)
+      assert.are.equal(0, asked)
+      cold = false
+      slotInfo = refreshBackpack({ derive = true })
+      assert.are.equal(2, slotInfo.itemsBySlotKey["0_1"].itemInfo.traits.craftingQuality, "read again once loaded")
+    end)
+
+    -- One search category per new field group, end to end: the harvest reads the traits from the
+    -- slot's link, the index holds them, and a kept slot keeps them.
+    it("reads each item's traits from its link, and searches them", function()
+      override(_G.C_Item, "IsEquippableItem", function(l) return tostring(l):find("item:101", 1, true) ~= nil end)
+      override(_G.C_Item, "GetItemSpell", function(l)
+        if tostring(l):find("item:202", 1, true) then return "Shield Wall", 871 end
+      end)
+      override(_G.C_Item, "CanScrapItem", function(location)
+        local bag, slot = location:GetBagAndSlot()
+        return bag == 0 and slot == 1
+      end)
+      local asked = 0
+      local getItemSpell = _G.C_Item.GetItemSpell
+      override(_G.C_Item, "GetItemSpell", function(l)
+        asked = asked + 1
+        return getItemSpell(l)
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      local sword = slotInfo.itemsBySlotKey["0_1"].itemInfo.traits
+      assert.is_true(sword.isEquipment)
+      assert.is_true(sword.isScrappable)
+      assert.are.equal(10, sword.sellPrice)
+      assert.are.same({ ["0_1"] = true }, search:Search("equipment = true AND scrappable = true"))
+      assert.are.same({ ["0_2"] = true }, search:Search("hasuse = true"))
+      searchCategories({ { "Usable", "hasuse = true AND price = 10" } })
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Usable", categoryOf(slotInfo, "0_2"))
+      asked = 0
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.equal(0, asked, "a kept slot keeps its traits")
+    end)
+
+    -- How many of the item the kind's bags hold, by item ID (Vendor's TotalItemCount). A slot that
+    -- changes changes the total of the kept items of the same item, which are re-indexed.
+    it("counts each item across the bags, and keeps a kept item's total current", function()
+      mockContainer[0] = { { itemID = 101, guid = "a", count = 5 }, { itemID = 101, guid = "b", count = 7 },
+        { itemID = 202, guid = "c", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.are.equal(12, slotInfo.itemsBySlotKey["0_1"].itemTotal)
+      assert.are.equal(1, slotInfo.itemsBySlotKey["0_3"].itemTotal)
+      assert.are.same({ ["0_1"] = true, ["0_2"] = true }, search:Search("total = 12"))
+      mockContainer[1] = { { itemID = 101, guid = "d", count = 3 } }
+      local kept = slotInfo.itemsBySlotKey["0_1"]
+      slotInfo = refreshBackpack({ bags = { [1] = true } })
+      assert.are.equal(kept, slotInfo.itemsBySlotKey["0_1"], "bag 0 was not read")
+      assert.are.same({ ["0_1"] = true, ["0_2"] = true, ["1_1"] = true }, search:Search("total = 15"))
+      assert.are.same({}, search:Search("total = 12"))
+    end)
+
+    -- usable follows the character (skills, level, spec): a kept item is asked again each sweep.
+    it("asks whether the character can use each item, again on a kept item, never cold", function()
+      local can = { [101] = true, [202] = false }
+      local asked = 0
+      override(_G, "C_PlayerInfo", { CanUseItem = function(id)
+        asked = asked + 1
+        return can[id]
+      end })
+      override(_G.C_Item, "IsEquippableItem", function(l) return tostring(l):find("item:101", 1, true) ~= nil end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isUsable)
+      assert.are.same({ ["0_1"] = true }, search:Search("usable = true"))
+      assert.are.same({ ["0_1"] = true }, search:Search("equippable = true"))
+      can[202] = true
+      local kept = slotInfo.itemsBySlotKey["0_2"]
+      -- A recalculation that changes no category: only the answer re-indexes the item.
+      slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.equal(kept, slotInfo.itemsBySlotKey["0_2"])
+      assert.are.same({ ["0_1"] = true, ["0_2"] = true }, search:Search("usable = true"))
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function() return nil end)
+      mockContainer[0][3] = { itemID = 303, guid = "guid-303", count = 1 }
+      asked = 0
+      slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.is_nil(slotInfo.itemsBySlotKey["0_3"].isUsable, "not asked before the item's data loaded")
+      override(_G.C_Item, "GetItemInfo", getItemInfo)
+    end)
+
+    -- Pet counts follow the account. Nothing is asked before the pet journal has loaded (a login
+    -- capture: 0 owned until PET_JOURNAL_LIST_UPDATE); the journal's events recalculate the bags
+    -- holding a pet item whose counts changed, and nothing else.
+    describe("pet counts", function()
+      local registered, sent, owned, journal
+
+      before_each(function()
+        registered, sent, owned = {}, {}, { [635] = 1 }
+        -- Before the journal has loaded, a login capture had GetNumPets answer 0 owned.
+        journal = { total = 2014, owned = 0 }
+        override(events, "RegisterEvent", function(_, name, cb) registered[name] = cb end)
+        override(events, "BucketEvent", function() end)
+        local send = events.SendMessage
+        override(events, "SendMessage", function(self, ctx, event, ...)
+          if event == "bags/Rederive" then table.insert(sent, (...)) end
+          return send(self, ctx, event, ...)
+        end)
+        override(_G, "C_PetJournal", {
+          GetPetInfoByItemID = function(id)
+            if id == 101 then return "Adder", 1, 1, 1, "", "", false, true, true, false, true, 1, 635 end
+          end,
+          GetNumCollectedInfo = function(species) return owned[species] or 0, 3 end,
+          GetNumPets = function() return journal.total, journal.owned end,
+        })
+        items._petJournalLoaded = false
+        items:RegisterCacheEvents()
+        mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      end)
+
+      after_each(function()
+        items._petJournalLoaded = false
+      end)
+
+      it("listens to the pet journal's events", function()
+        for _, name in ipairs({ "PET_JOURNAL_LIST_UPDATE", "NEW_PET_ADDED", "PET_JOURNAL_PET_DELETED",
+          "PET_JOURNAL_PET_RESTORED" }) do
+          assert.is_function(registered[name], name)
+        end
+      end)
+
+      it("has no counts before the journal has loaded, then recalculates the bag with the pet", function()
+        local slotInfo = refreshBackpack()
+        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].petOwned)
+        assert.are.same({}, search:Search("collectable = true"))
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        assert.are.same({ { backpack = true, bank = false, guild = false } }, sent)
+        slotInfo = refreshBackpack({ derive = true })
+        assert.are.equal(1, slotInfo.itemsBySlotKey["0_1"].petOwned)
+        assert.are.same({ ["0_1"] = true }, search:Search("collectable = true"))
+        assert.are.same({ ["0_1"] = true }, search:Search("petcount = 1"))
+      end)
+
+      it("recalculates when a pet is learned, and not when nothing changed", function()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        refreshBackpack()
+        sent = {}
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        sent = {}
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        assert.are.same({}, sent, "the counts did not change")
+        owned[635] = 3
+        registered.NEW_PET_ADDED(context:New("evt"), "NEW_PET_ADDED", "BattlePet-0-1")
+        assert.are.equal(1, #sent)
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.same({}, search:Search("collectable = true"))
+        assert.are.same({ ["0_1"] = true }, search:Search("petcount = 3"))
+      end)
+
+      -- A /reload capture: the journal answered 234 owned from the first sample, and its event came
+      -- 59 ms after the first bag read had started.
+      it("knows the counts at once when the account already owns pets (a /reload)", function()
+        journal.owned = 234
+        local slotInfo = refreshBackpack()
+        assert.are.equal(1, slotInfo.itemsBySlotKey["0_1"].petOwned)
+      end)
+
+      -- The journal's first event can come while a read is under way, before anything is committed:
+      -- the bags are recalculated anyway (the request waits for the read).
+      it("recalculates the bags when the journal first loads, even with nothing committed yet", function()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        assert.are.same({ { backpack = true, bank = false, guild = false } }, sent)
+      end)
+
+      it("recalculates when only the limit changed", function()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        refreshBackpack()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        sent = {}
+        override(_G.C_PetJournal, "GetNumCollectedInfo", function(species) return owned[species] or 0, 5 end)
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        assert.are.equal(1, #sent)
+      end)
+
+      -- Opening the bank reads it, so a closed bank's pets are not recalculated.
+      it("recalculates the bank only while it is open", function()
+        local bank = const.BAG_KIND.BANK
+        local saved = { items.slotInfo[bank], addon.atBank }
+        local pet = { bagid = 6, slotid = 1, isItemEmpty = false, petOwned = 0, petLimit = 3,
+          itemInfo = { itemID = 101, traits = { isPet = true, petSpeciesID = 635, stats = {} } } }
+        items.slotInfo[bank] = { itemsBySlotKey = { ["6_1"] = pet } }
+        addon.atBank = false
+        items._petJournalLoaded = true
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        local closed = sent
+        sent = {}
+        addon.atBank = true
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        items.slotInfo[bank], addon.atBank = saved[1], saved[2]
+        assert.are.same({}, closed)
+        assert.are.same({ { backpack = false, bank = true, guild = false } }, sent)
+      end)
+
+      it("reads the counts of a pet item read after the journal loaded", function()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        local slotInfo = refreshBackpack()
+        assert.are.same({ 1, 3 }, { slotInfo.itemsBySlotKey["0_1"].petOwned, slotInfo.itemsBySlotKey["0_1"].petLimit })
+        assert.is_nil(slotInfo.itemsBySlotKey["0_2"].petOwned, "not a pet")
+      end)
+    end)
+
+    -- A login capture (retail 12.1.5): C_PlayerInfo.CanUseItem answered false for all 30 backpack
+    -- items at the end of the loading screen, false for 6 after the first SPELLS_CHANGED, and true
+    -- for all after the second, about 2.2 s later; the first bag read came 0.23 to 0.3 s after it in
+    -- every login captured. Spells and reputations change the answers, so committed items are asked
+    -- again when they change, and the bags where an answer changed are recalculated.
+    describe("usability that changes with spells and reputations", function()
+      local buckets, sent, can
+
+      before_each(function()
+        buckets, sent, can = {}, {}, { [101] = false, [202] = false }
+        override(events, "RegisterEvent", function() end)
+        override(events, "BucketEvent", function(_, name, cb) buckets[name] = cb end)
+        local send = events.SendMessage
+        override(events, "SendMessage", function(self, ctx, event, ...)
+          if event == "bags/Rederive" then table.insert(sent, (...)) end
+          return send(self, ctx, event, ...)
+        end)
+        override(_G, "C_PlayerInfo", { CanUseItem = function(id) return can[id] == true end })
+        items:RegisterCacheEvents()
+        mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      end)
+
+      it("listens to spells, reputations and the appearance collection, bucketed", function()
+        for _, name in ipairs({ "SPELLS_CHANGED", "UPDATE_FACTION", "TRANSMOG_COLLECTION_UPDATED",
+          "TRANSMOG_COLLECTION_SOURCE_ADDED", "TRANSMOG_COLLECTION_SOURCE_REMOVED" }) do
+          assert.is_function(buckets[name], name)
+        end
+      end)
+
+      it("recalculates the bags when an appearance is collected, and keeps the search current", function()
+        local collected = false
+        override(_G, "C_TransmogCollection", {
+          GetItemInfo = function(l) if tostring(l):find("item:101", 1, true) then return 1001, 2002 end end,
+          GetCategoryCollectedCount = function(category) return category == 1 and 100 or 0 end,
+          PlayerHasTransmogItemModifiedAppearance = function() return collected end,
+          GetAppearanceSources = function() return {} end,
+          PlayerHasTransmogByItemInfo = function() return false end,
+          PlayerHasTransmog = function() return false end,
+        })
+        items._appearancesLoaded = false
+        refreshBackpack()
+        assert.are.same({ ["0_1"] = true }, search:Search("appearance = unknown"))
+        assert.are.same({ ["0_1"] = true }, search:Search("source = unknown"))
+        collected = true
+        buckets.TRANSMOG_COLLECTION_SOURCE_ADDED(context:New("evt"), {})
+        assert.are.equal(1, #sent)
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.same({ ["0_1"] = true }, search:Search("appearance = known"))
+        assert.are.same({ ["0_1"] = true }, search:Search("source = known"))
+        items._appearancesLoaded = false
+      end)
+
+      it("recalculates the bags when an answer changed, and keeps the search current", function()
+        refreshBackpack()
+        assert.are.same({}, search:Search("usable = true"))
+        can[101], can[202] = true, true
+        buckets.SPELLS_CHANGED(context:New("evt"), {})
+        assert.are.same({ { backpack = true, bank = false, guild = false } }, sent)
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.same({ ["0_1"] = true, ["0_2"] = true }, search:Search("usable = true"))
+      end)
+
+      it("does nothing when no answer changed", function()
+        refreshBackpack()
+        buckets.UPDATE_FACTION(context:New("evt"), {})
+        assert.are.same({}, sent)
+      end)
+    end)
+
+    it("gives every item the plain name of its bag, for the bagname field", function()
+      override(_G.C_Container, "GetBagName", function(bagid)
+        return ({ [0] = "Backpack", [1] = "Herb Satchel" })[bagid]
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      mockContainer[1] = { { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.are.equal("Backpack", slotInfo.itemsBySlotKey["0_1"].bagName)
+      assert.are.equal("Herb Satchel", slotInfo.itemsBySlotKey["1_1"].bagName)
+      assert.are.same({ ["1_1"] = true }, search:Search("bag = herb"))
+      searchCategories({ { "Herbs", "bagname = herb satchel" } })
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Herbs", categoryOf(slotInfo, "1_1"))
+    end)
+
+    -- A rule that is only a negation (docs/vendor-compat.md): it matched nothing before.
+    it("puts every item a NOT rule does not exclude in its category", function()
+      searchCategories({ { "Not Alpha", "NOT alpha" } })
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.are_not.equal("Not Alpha", categoryOf(slotInfo, "0_1"))
+      assert.equal("Not Alpha", categoryOf(slotInfo, "0_2"))
+    end)
+
+    -- A != covers the items indexed in this sweep. It used to read the bags' committed items,
+    -- the previous sweep's while a sweep runs, so a looted item missed it for one sweep.
+    it("matches an item arriving in a sweep against a != rule in that sweep", function()
+      searchCategories({ { "Not Alpha", "name != alpha" } })
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      refreshBackpack()
+      mockContainer[0][2] = { itemID = 303, guid = "guid-303", count = 1 }
+      local slotInfo = refreshBackpack()
+      assert.equal("Not Alpha", categoryOf(slotInfo, "0_2"))
+      assert.are_not.equal("Not Alpha", categoryOf(slotInfo, "0_1"))
     end)
 
     it("still lets the search box find items by the search category they are in", function()
@@ -3488,6 +3948,17 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       end)
     end)
 
+    it("keeps inset current when a kept item leaves its set", function()
+      pendingSets[0] = { [1] = { "Demo" } }
+      mockContainer[0] = { { itemID = 101, guid = "gear-demo", count = 1 } }
+      refreshBackpack()
+      assert.are.same({ ["0_1"] = true }, search:Search("inset = true"))
+      pendingSets[0] = {}
+      refreshBackpack({ derive = true })
+      assert.are.same({}, search:Search("inset = true"))
+      assert.is_true(search:Search("inset = false")["0_1"])
+    end)
+
     it("rebuilds the set map each sweep so a set item is labeled", function()
       pendingSets[0] = { [1] = { "Demo" } }
       mockContainer[0] = {
@@ -3599,6 +4070,30 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       local results = search:Search("zephyrium")
       assert.is_true(results["0_1"] == true,
         "free-text search should match text found only in the tooltip body")
+    end)
+
+    -- toy and known come from whole tooltip lines (TooltipScanner); a kept item takes the marks of
+    -- its tooltip as it is now, as it takes its text.
+    it("finds toys and items already known, and follows a kept item's tooltip", function()
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      local learned = false
+      -- The marks come from the lines the text joins: a learned toy's text has its "Already known".
+      override(tooltipScanner, "GetTooltipText", function(_, bagid, slotid)
+        if bagid == 0 and slotid == 1 then
+          if learned then
+            return "Flight Master's Whistle Toy Already known", { toy = true, known = true }
+          end
+          return "Flight Master's Whistle Toy", { toy = true }
+        end
+        return "", nil
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      refreshBackpack()
+      assert.are.same({ ["0_1"] = true }, search:Search("toy = true"))
+      assert.are.same({}, search:Search("known = true"))
+      learned = true
+      refreshBackpack({ derive = true })
+      assert.are.same({ ["0_1"] = true }, search:Search("known = true"))
     end)
 
     it("leaves the tooltip index empty for items with no tooltip text", function()

@@ -203,8 +203,9 @@ whatever an input every item shares (a setting, the gear, the open window) chang
     grey-out is worked out every sweep: Blizzard's answer then can depend on the spell being cast
     (Enchanting, CheckItemCondition, ReplaceBonusTree, JumpUpgradeTrack) or the recipe being
     recrafted (`ItemButtonUtil.GetItemContextMatchResultForItem`).
-  - `indexPending`: the item's own category was worked out again and it has not been compared with
-    its search entry yet (below).
+  - `indexPending`: the item's own category was worked out again, or its upgrade arrow or its total
+    changed (search-indexing.md §11), and it has not been compared with its search entry yet
+    (below).
   - Upgrade verdicts stay where they were (`upgradeVerdict`, caches.md §2); Pawn's are now kept too.
 - **What makes it be worked out again:**
   - An in-place change of the item's own inputs drops `derived`: quest state, tooltip text, gear
@@ -260,3 +261,11 @@ whatever an input every item shares (a setting, the gear, the open window) chang
   guard was mutation-tested (53 mutations, each caught; of the 13 that first survived, 12 led to
   tests and one to removing a dead merge line). Reviewing how a sweep can fail partway led to
   `indexPending` replacing a per-sweep set of changed items.
+
+### 19. Rule #1: No Item Data Is Read Before It Has Loaded
+The player's rule #1 (2026-10-21): assume item data does not work until the item's data load is complete. Every read of item data waits for it, except `C_Item.GetItemInfoInstant`, which never needs a server query. Do not reason about whether an API happens to answer for an item that has not loaded: assume it does not, and gate it.
+- **Not every harvest runs after the loader's ready callback.** `BAG_UPDATE` batches do (`itemLoader:TellMeWhenABagIsUpdated`, `data/refresh.lua`). These read without it: the wipes of `bags/RefreshAll`, `bags/FullRefreshAll` and `BAG_CONTAINER_UPDATE`; `bags/RefreshBackpack` and `bags/RefreshBank`; `PLAYERBANKSLOTS_CHANGED` on Classic and WoW: Forever; the startup read and the bank open once their wait for item data times out (refresh-scheduler.md §8, §11). So a read in the harvest still needs the gate.
+- **The gate is the harvest's own cold mark.** `items:ReadItemProperties` marks a read incomplete when `C_Item.GetItemInfo` has no data (`props.incomplete`, then `harvestIncomplete`), and such an item is read again: a kept slot never keeps it (§16), a recalculation re-reads it (refresh-scheduler.md §10), and its data's arrival brings a refresh. A value gated on that mark is therefore always read once the item has loaded. Reads added under this rule are made only when the read is not incomplete; until then the value is absent (nil), never a fallback a search could match.
+- **Gated so far:** the item traits (`itemInfo.traits`: the crafting tier and the fields of search-indexing.md §10), built only for a complete read, in the harvest and in the vendor's records (`next/merchant.lua`, which reads an item only inside the branch where `C_Item.GetItemInfo` answered, and reads again on `GET_ITEM_INFO_RECEIVED`). A read is incomplete when either the item ID's or the slot link's `GetItemInfo` has no data (`items:ReadLinkInfo`). Every new item field follows the same rule.
+- **Read without the gate today, from before this rule:** the item level (`GetDetailedItemLevelInfo`, `GetCurrentItemLevel`), the appearance (`C_TransmogCollection`), the stats in the item hash (`GetItemStats`, virtual-stacks.md §4), binding, and the `GetItemInfo` fields' fallbacks (`expacID` 0 is Classic). A cold item shows those until it is read again.
+- **Coverage:** `spec/items_spec.lua` ("is not read for an item whose data has not loaded"), `spec/refresh_pipeline_spec.lua` ("reads no crafting tier while an item's data has not loaded, and reads it once it has"), `spec/next/merchant_spec.lua` ("reads no crafting tier for a vendor item whose data has not loaded"). Removing either gate fails a test.

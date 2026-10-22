@@ -8,6 +8,7 @@ addon:SetDefaultModuleState(false)
 -- Keybinding globals that boot.lua sets
 _G.BINDING_NAME_BETTERBAGS_TOGGLESEARCH = "Search Bags"
 _G.BINDING_NAME_BETTERBAGS_TOGGLEBAGS = "Toggle Bags"
+_G.BINDING_NAME_BETTERBAGS_DESTROYNEXT = "Destroy Next Item"
 
 -- Track which module files have been loaded to prevent double-registration
 local loadedModules = {}

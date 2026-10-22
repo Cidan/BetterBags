@@ -183,3 +183,26 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   install starts with Next, an existing one keeps the classic bags),
   `spec/integration/bank_open_spec.lua` (refresh-scheduler.md §11).
 
+### 5. What the Game Answered (`apiProbe`)
+A dump taken since `debug/itemprobe.lua` carries, on each item, `apiProbe`: every value each
+Blizzard API returned about it when the dump was taken (data-driven.md, "What the client answered
+about an item"), and the profile carries `debugBackpackDumpClient` (the client's version, build and
+locale). Mocks built from a dump should answer from `apiProbe` where it has the call, so a harness
+test runs on what the game answered rather than on what BetterBags made of it: `itemInfoByLink`
+for `C_Item.GetItemInfo(link)`, `itemInfoByID` for the item ID, and so on (each a list with `n`
+values, or `{ error = ... }`). Older dumps have no `apiProbe`.
+- **`spec/fixtures/dump_retail_12_1_5.lua`**: a capture's dumped items and client only (no other
+  part of the profile), written by extracting `debugBackpackDump` and `debugBackpackDumpClient` from
+  the SavedVariables, keys sorted. `spec/debug_dump_harness_spec.lua` ("Dump harness: the client's
+  own answers") answers every API the harvest calls from it (by location, item ID or link, as each
+  API takes them; `C_TooltipInfo.GetBagItem` from the recorded lines) and runs the real pipeline
+  and search over it. Its expectations were read from the raw answers. Not probed, so taken from
+  the dumped item: `C_Item.GetItemQuality` (the container info's quality), the item GUID.
+- **`spec/fixtures/dump_retail_12_1_5_bag.lua`**: a second capture the same day, 33 items, with a
+  bag (Horadric Haversack). Its block in the same spec ("a capture with a bag") shares the mocks
+  through `clientAnswers(fixturePath)`, which installs them before each test of the block that
+  calls it. A new capture becomes a fixture the same way: extract it, add a block calling
+  `clientAnswers`, and write its expectations from the raw answers.
+- **Who the player is never goes in a fixture.** Dumps record the player's name and realm
+  (`debugDumpExtras.player.fullName`) and sessions record them in `meta`; an extracted fixture leaves
+  them out.

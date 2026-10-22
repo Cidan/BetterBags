@@ -43,7 +43,7 @@ database.CreateOrUpdateCategory = function(_, category)
     dbEphemeralCategories[category.name] = {
       name = category.name, enabled = category.enabled, dynamic = category.dynamic,
       isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
-      color = saved and saved.color, priority = saved and saved.priority,
+      color = saved and saved.color, priority = saved and saved.priority, automation = saved and saved.automation,
     }
   end
 end
@@ -489,9 +489,47 @@ describe("Categories", function()
       assert.is_false(live.enabled[const.BAG_KIND.BACKPACK])
     end)
 
+    -- What a category does on its own (automation.md) changes no item's category: the bags are not
+    -- recalculated for it.
+    it("sets a category's automation without recalculating the bags", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      assert.is_true(categories:UpdateCategory(context:New("Test"), "Mats", { automation = "sell" }))
+      assert.are.equal("sell", dbCategories["Mats"].automation)
+      assert.are.same({ { "categories/Changed" } }, sent)
+      categories:UpdateCategory(context:New("Test"), "Mats", { automation = false })
+      assert.is_nil(dbCategories["Mats"].automation)
+      sent = {}
+      categories:UpdateCategory(context:New("Test"), "Mats", { automation = "destroy", priority = 4 })
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[2], "with another change")
+    end)
+
+    it("keeps the automation set for a plugin's category across its next creation", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:UpdateCategory(ctx, "Openable", { automation = "destroy" })
+      assert.are.equal("destroy", categories:GetCategoryByName("Openable").automation)
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1, automation = "sell" })
+      assert.are.equal("destroy", categories:GetCategoryByName("Openable").automation, "the player's choice wins")
+    end)
+
     it("says when there is no such category", function()
       assert.is_false(categories:UpdateCategory(context:New("Test"), "Nope", { priority = 1 }))
       assert.are.same({}, sent)
+    end)
+  end)
+
+  describe("AutomationOf", function()
+    it("gives a category's automation, a group by's sections their category's", function()
+      local ctx = context:New("Test")
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell" }
+      dbCategories["Plain"] = { name = "Plain", itemList = {}, save = true }
+      categories:CreateCategory(ctx, { name = "Mats - Cloth", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Mats" })
+      assert.are.equal("sell", categories:AutomationOf("Mats"))
+      assert.are.equal("sell", categories:AutomationOf("Mats - Cloth"))
+      assert.is_nil(categories:AutomationOf("Plain"))
+      assert.is_nil(categories:AutomationOf("Armor"), "a built-in category has none")
     end)
   end)
 

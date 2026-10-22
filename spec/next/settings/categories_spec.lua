@@ -176,6 +176,7 @@ describe("NextSettingsCategories", function()
       if fields.groupBy then f.groupBy = fields.groupBy end
       if fields.color ~= nil then f.color = fields.color or nil end
       if fields.rule ~= nil then f.searchCategory = fields.rule ~= "" and { query = fields.rule } or nil end
+      if fields.automation ~= nil then f.automation = fields.automation or nil end
       for k, v in pairs(fields.enabled or {}) do f.enabled[k] = v end
       return true
     end)
@@ -349,9 +350,21 @@ describe("NextSettingsCategories", function()
       assert.are.same({ "Openable", "Made by a plugin · 1 added item · Priority 1" }, { editor:Heading() })
     end)
 
+    it("says what a category does on its own", function()
+      filters.Mats.automation = "sell"
+      editor.selected = "Mats"
+      assert.are.same({ "Mats", "2 added items · Priority 5 · Sells at merchants" }, { editor:Heading() })
+      filters.Mats.automation = "destroy"
+      assert.are.same({ "Mats", "2 added items · Priority 5 · Destroys on command" }, { editor:Heading() })
+    end)
+
     it("says which tabs show: Rule for yours and a plugin's with a rule; Added Items while one is chosen", function()
       assert.is_false(editor:RuleTabShown())
       assert.is_false(editor:ItemsTabShown())
+      assert.is_false(editor:AutomationTabShown())
+      editor.selected = "Openable"
+      assert.is_true(editor:AutomationTabShown(), "a plugin's category too: what it does is yours to choose")
+      editor.selected = nil
       editor.selected = "Mats"
       assert.is_true(editor:RuleTabShown())
       assert.is_true(editor:ItemsTabShown())
@@ -596,6 +609,80 @@ describe("NextSettingsCategories", function()
       tab:Refresh(ctx())
       assert.is_true(tab.rule.editBox:IsEnabled())
       assert.is_true(tab.apply.frame:IsShown())
+    end)
+  end)
+
+  -- What a category does with its items on its own (automation.md): two switches, at most one on.
+  describe("the Automation tab", function()
+    local tab
+
+    before_each(function()
+      tab = editor:CreateAutomationTab(CreateFrame("Frame"), owner, bagsFn)
+    end)
+
+    it("fills the page's content without scrolling, as a wide row", function()
+      local C = style.Theme.Settings.Content
+      assert.is_true(tab.wide)
+      assert.are.equal(CONTENT_HEIGHT - C.Top - C.Bottom, tab:Measure(700))
+    end)
+
+    it("says to make a category while there is none", function()
+      place(tab)
+      assert.is_true(tab.none:IsShown())
+      assert.is_false(tab.sell.frame:IsShown())
+      assert.is_false(tab.destroy.frame:IsShown())
+    end)
+
+    it("shows what the category does as two switches", function()
+      editor.selected = "Mats"
+      place(tab)
+      assert.is_false(tab.sell:GetChecked())
+      assert.is_false(tab.destroy:GetChecked())
+      filters.Mats.automation = "sell"
+      tab:Refresh(ctx())
+      assert.is_true(tab.sell:GetChecked())
+      assert.is_false(tab.destroy:GetChecked())
+      filters.Mats.automation = "destroy"
+      tab:Refresh(ctx())
+      assert.is_false(tab.sell:GetChecked())
+      assert.is_true(tab.destroy:GetChecked())
+    end)
+
+    it("turns one switch on and the other off, saving at once", function()
+      editor.selected = "Mats"
+      place(tab)
+      click(tab.sell)
+      assert.is_true(tab.sell:GetChecked())
+      click(tab.destroy)
+      assert.is_false(tab.sell:GetChecked(), "only one is on")
+      assert.is_true(tab.destroy:GetChecked())
+      click(tab.destroy)
+      assert.is_false(tab.destroy:GetChecked())
+      assert.are.same({
+        { "UpdateCategory", "Mats", { automation = "sell" } },
+        { "UpdateCategory", "Mats", { automation = "destroy" } },
+        { "UpdateCategory", "Mats", { automation = false } },
+      }, updates())
+    end)
+
+    it("lets a plugin's category be automated", function()
+      editor.selected = "Openable"
+      place(tab)
+      assert.is_true(tab.sell.frame:IsShown())
+      assert.is_true(tab.destroy.frame:IsShown())
+    end)
+
+    it("shows nothing else", function()
+      editor.selected = "Mats"
+      place(tab)
+      assert.are.same({ "destroy", "sell" }, (function()
+        local keys = {}
+        for key in pairs(tab.labels) do table.insert(keys, key) end
+        table.sort(keys)
+        return keys
+      end)())
+      assert.is_nil(tab.grid)
+      assert.is_nil(tab.hint)
     end)
   end)
 

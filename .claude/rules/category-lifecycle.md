@@ -8,11 +8,12 @@ custom categories, and how orphaned categories are prevented and healed.
 A custom category's name is a key in **multiple** independent profile tables (`core/database.lua`):
 
 - `customCategoryFilters[name]` — persistent categories (`save = true`). The authoritative
-  filter (§6 for its shape). `GetItemCategory` / `GetAllItemCategories` read this.
+  filter (§6 for its shape), its automation included (automation.md). `GetItemCategory` /
+  `GetAllItemCategories` read this.
 - `ephemeralCategoryFilters[name]` — the saved state of plugins' (ephemeral) categories:
   their bags (`enabled`), flags (`dynamic`; groupBy sub-categories `"Parent - Suffix"`,
-  `isGroupBySubcategory = true`) and the color and priority a player set. `itemList` is empty
-  here: the plugin gives its items again each session.
+  `isGroupBySubcategory = true`) and the color, priority and automation a player set
+  (automation.md). `itemList` is empty here: the plugin gives its items again each session.
 - `customCategoryIndex[itemID] = name` — the item's home: the persistent category it was placed
   in by hand. Rebuilt from the item lists at every load (§6).
 - `categoryToGroup[kind][name]` (and, on retail bank, `categoryToGroup[kind][groupID][name]`)
