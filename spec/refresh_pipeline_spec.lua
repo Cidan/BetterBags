@@ -767,6 +767,112 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       reads = {}
     end)
 
+    -- Vendor's CurrentEquippedLevel and WatermarkLevel, per item (search-indexing.md §16).
+    describe("slot values", function()
+      local bagGear
+
+      before_each(function()
+        -- Bag items 101 (a ring), 102 (a one-hander), 103 (a two-hander), 104 (not equipment).
+        -- Enum.InventoryType's finger (11), weapon (13) and two-hand (17) types, and their slots as
+        -- core/constants.lua maps them (this spec stubs the constants).
+        bagGear = {
+          [101] = { "INVTYPE_FINGER", 11 },
+          [102] = { "INVTYPE_WEAPON", 13 },
+          [103] = { "INVTYPE_2HWEAPON", 17 },
+        }
+        override(const, "INVENTORY_TYPE_TO_INVENTORY_SLOTS", { [1] = { 1 }, [11] = { 11, 12 }, [13] = { 16, 17 },
+          [17] = { 16 } })
+        -- An item ID or an item link, as GetItemInfoInstant and IsEquippableItem take them.
+        local function idOf(l) return tonumber(l) or tonumber(tostring(l):match("item:(%d+)")) end
+        local instant = _G.C_Item.GetItemInfoInstant
+        override(_G.C_Item, "GetItemInfoInstant", function(info)
+          local gear = bagGear[idOf(info)]
+          if gear then return idOf(info), "Armor", "Misc", gear[1], 134400, 4, 0 end
+          return instant(info)
+        end)
+        override(_G.C_Item, "IsEquippableItem", function(l) return bagGear[idOf(l)] ~= nil end)
+        local bagItem = _G.Item.CreateFromBagAndSlot
+        override(_G.Item, "CreateFromBagAndSlot", function(item, bag, slot)
+          local mixin = bagItem(item, bag, slot)
+          local held = mockContainer[bag] and mockContainer[bag][slot]
+          local gear = held and bagGear[held.itemID]
+          if gear then
+            function mixin:GetInventoryType() return gear[2] end
+          end
+          return mixin
+        end)
+        override(_G, "C_ItemUpgrade", { GetHighWatermarkForItem = function(l)
+          if bagGear[idOf(l)] then return 246, 250 end
+          return 0, 0
+        end })
+        override(_G, "CanDualWield", function() return true end)
+        override(_G, "UnitClass", function() return "Paladin", "PALADIN", 2 end)
+        mockContainer[0] = { { itemID = 101, guid = "ring", count = 1 }, { itemID = 102, guid = "sword", count = 1 },
+          { itemID = 103, guid = "axe", count = 1 }, { itemID = 104, guid = "cheese", count = 1 } }
+        equip(11, 511, 230)
+        equip(12, 512, 210)
+        equip(16, 516, 200)
+        equip(17, 517, 150)
+      end)
+
+      it("gives equipment the lowest item level worn in its slots, and its slot's best", function()
+        local slotInfo = refreshBackpack({ wipe = true })
+        local ring = slotInfo.itemsBySlotKey["0_1"]
+        assert.are.equal(210, ring.slotEquipped)
+        assert.are.equal(246, ring.slotBest)
+        assert.are.same({ ["0_1"] = true }, search:Search("slotequipped = 210"))
+        assert.is_true(search:Search("slotbest = 246")["0_1"])
+        assert.is_nil(slotInfo.itemsBySlotKey["0_4"].slotEquipped, "not equipment")
+        assert.is_nil(slotInfo.itemsBySlotKey["0_4"].slotBest)
+      end)
+
+      it("counts the off hand for a one-hander only with dual wield", function()
+        local slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(150, slotInfo.itemsBySlotKey["0_2"].slotEquipped)
+        _G.CanDualWield = function() return false end
+        slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(200, slotInfo.itemsBySlotKey["0_2"].slotEquipped)
+      end)
+
+      it("counts both hands for a warrior's two-hander", function()
+        local slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(200, slotInfo.itemsBySlotKey["0_3"].slotEquipped)
+        _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
+        slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(150, slotInfo.itemsBySlotKey["0_3"].slotEquipped)
+      end)
+
+      it("is 0 when nothing is worn in the slots", function()
+        equipped[11], equipped[12] = nil, nil
+        local slotInfo = refreshBackpack({ wipe = true })
+        assert.are.equal(0, slotInfo.itemsBySlotKey["0_1"].slotEquipped)
+      end)
+
+      -- The worn gear changes without the item changing: a recalculation keeps the search current.
+      it("keeps a kept item's slot values current when the worn gear changes", function()
+        refreshBackpack({ wipe = true })
+        local kept = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"]
+        equip(12, 612, 260)
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.equal(kept, items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"])
+        assert.are.equal(230, kept.slotEquipped)
+        assert.are.same({ ["0_1"] = true }, search:Search("slotequipped = 230"))
+        assert.are.same({}, search:Search("slotequipped = 210"))
+        assert.is_true(search:Search("ilvl < slotequipped")["0_1"], "a field compared with a slot value")
+      end)
+
+      it("has no slot values for an item read before its data loaded", function()
+        local info = _G.C_Item.GetItemInfo
+        override(_G.C_Item, "GetItemInfo", function(x)
+          if tostring(x):find("101", 1, true) then return nil end
+          return info(x)
+        end)
+        local slotInfo = refreshBackpack({ wipe = true })
+        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].slotEquipped)
+        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].slotBest)
+      end)
+    end)
+
     it("keeps every slot whose link and item level are unchanged", function()
       refreshBackpack()
       assert.are.same({}, readSlots())

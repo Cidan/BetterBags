@@ -416,6 +416,8 @@ Search allows you to find items by the following indices (based on the item belo
 - `maxlevel` (maxlevel >= 600) The item level of upgradeable gear once fully upgraded (Retail); for anything else, its item level.
 - `upgradelevel`, `upgrademax` (upgradelevel = 3) How many upgrades upgradeable gear has, and how many its track has (Retail): an item shown as "Hero 3/6" has upgradelevel 3 and upgrademax 6.
 - `petcount`, `petlimit` (petcount = 0) How many of a battle pet item's pet you have, and how many you may have (Retail).
+- `slotequipped` (ilvl > slotequipped) For gear, the lowest item level you wear in its slots (both rings for a ring), 0 when you wear nothing there. A one-hander counts your off hand only if you can dual wield.
+- `slotbest` (maxlevel >= slotbest) For gear, the best item level your character has had in its slot (Retail).
 - `total` (total >= 100) How many of the item the bags hold altogether (the backpack's bags for the backpack, the bank's for the bank), counting every stack of it.
 
 ### Booleans

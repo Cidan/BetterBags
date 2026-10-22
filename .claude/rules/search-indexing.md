@@ -283,3 +283,25 @@ Step 4 of docs/vendor-compat.md ("Proposed: the math"), with the player values o
   round), folding once (`PlayerValue` asked once), the NOT within an AND (`Universe` never asked),
   slot tokens, text fields; the randomized index-against-item test). 39 mutations: eight first
   survived and led to tests.
+
+### 16. Slot Values: `slotequipped` and `slotbest`
+Vendor's `CurrentEquippedLevel()` and `WatermarkLevel()` (`systems/rules/builtins.lua`), per item, so
+a rule compares an item with what the character wears (`ilvl > slotequipped`, Vendor's Side-grade or
+Better: `maxlevel >= slotbest`).
+- **`items:SlotLevelsOf`** (Phase 6, next to the upgrade arrow, every sweep): for equipment read with
+  its data (`traits.isEquipment`), `slotequipped` is the lowest current item level worn in the item's
+  slots (`inventorySlots`; `equipmentCache`, keyed by the worn item's own slot), 0 when nothing is
+  worn there, as Vendor's; a one-hander (`INVTYPE_WEAPON`) counts only the main hand without
+  `CanDualWield()`, and a Warrior's two-hander both hands, as Vendor's. Nil before the worn gear has
+  been read. `slotbest` is `C_ItemUpgrade.GetHighWatermarkForItem(link)`'s first return, the
+  character's (retail; the dump recorded 246 for the worn 246 items). Nil for anything else.
+- **Kept current**: they change with the worn gear, not the item: `PLAYER_EQUIPMENT_CHANGED` already
+  recalculates the bags (caches.md §2), and Phase 6 marks an item `indexPending` when either changed,
+  as for the arrow (§11).
+- **Not verified at login**: whether the watermark answers before the first bag read; a later
+  recalculation corrects it.
+- The spec mocks gained Blizzard's `INVSLOT_*` values (`Blizzard_FrameXMLBase/Constants.lua`).
+- **Coverage:** `spec/refresh_pipeline_spec.lua` ("slot values": lowest worn level and the watermark,
+  dual wield, a Warrior's two-hander, nothing worn, kept current over a gear change with a field
+  compared against it, read cold), `spec/search_spec.lua` (per-field re-index tests). 8 mutations, all
+  caught.

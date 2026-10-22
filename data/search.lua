@@ -41,7 +41,7 @@ local SNAPSHOT_FIELDS = {
   'bagid', 'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
   'minlevel', 'stacksize', 'price', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable', 'upgradeable',
   'track', 'upgradelevel', 'upgrademax', 'maxlevel', 'upgrade', 'total', 'toy', 'known', 'transmoggable',
-  'usable', 'petcount', 'petlimit',
+  'usable', 'petcount', 'petlimit', 'slotequipped', 'slotbest',
 }
 -- expansionid is not compared: it follows expansion, which is.
 
@@ -169,6 +169,9 @@ local function fillSnapshot(s, item)
     s.upgrade = item.isUpgrade == true
   end
   s.total = item.itemTotal
+  -- Follow the worn gear (items:SlotLevelsOf); Phase 6 marks an item whose values changed.
+  s.slotequipped = item.slotEquipped
+  s.slotbest = item.slotBest
   return s
 end
 
@@ -197,7 +200,7 @@ end
 local NUMBER_FIELDS = {
   'level', 'rarity', 'quality', 'id', 'stackcount', 'class', 'subclass', 'bagid', 'slotid', 'bindtype',
   'expansionid', 'minlevel', 'stacksize', 'price', 'upgradelevel', 'upgrademax', 'maxlevel', 'total',
-  'petcount', 'petlimit',
+  'petcount', 'petlimit', 'slotequipped', 'slotbest',
 }
 local BOOL_FIELDS = {
   'reagent', 'isbound', 'bound', 'quest', 'activequest', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable',
@@ -436,6 +439,8 @@ function search:Init()
   self:CreateIndex('collectable')
   self:CreateIndex('petcount')
   self:CreateIndex('petlimit')
+  self:CreateIndex('slotequipped')
+  self:CreateIndex('slotbest')
 
   self.defaultIndicies = {
     'name',

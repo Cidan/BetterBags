@@ -462,7 +462,7 @@ with its invalidation, as that file requires.
 | `stat` (done) | text set | `GetItemStats(link)` keys' global strings (the names match from their start: `stat = crit`) | all | the slot changes |
 | `upgrade` (done) | bool | the item's upgrade verdict (`data.isUpgrade`) | all | caches.md §2 |
 | `total` (done) | number | the item's count across the kind's bags, by item ID | all | every sweep |
-| `slotbest`, `slotequipped` (with the player values) | numbers, per item | `C_ItemUpgrade.GetHighWatermarkForItem(link)`; the worn gear (`equipmentCache`) | retail; all | `PLAYER_EQUIPMENT_CHANGED` |
+| `slotbest`, `slotequipped` (done) | numbers, per item | `C_ItemUpgrade.GetHighWatermarkForItem(link)`; the worn gear (`equipmentCache`) | retail; all | `PLAYER_EQUIPMENT_CHANGED` |
 | `player.level`, `player.ilvl`, `player.equippedilvl`, `player.class`, `player.classid`, `player.spec`, `player.specid`, `player.profession`, `player.name`, `player.realm` | values | `UnitLevel`, `GetAverageItemLevel`, `UnitClass`, `GetSpecializationInfo`, `GetProfessions`, `UnitFullName` | all (spec: retail) | the events above |
 
 Every field is read only once the item's data has loaded (rule #1, the player's: item data is

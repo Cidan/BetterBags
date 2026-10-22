@@ -80,6 +80,8 @@ local async = addon:GetModule("Async")
 ---@field isUsable? boolean Whether the character can use it (CanUseItem); nil read cold or without the API.
 ---@field petOwned? number How many of its pet the account has (PetCountsOf); nil until the pet journal loaded.
 ---@field petLimit? number How many of its pet the account may have.
+---@field slotEquipped? number The lowest item level worn in its slots (SlotLevelsOf).
+---@field slotBest? number The character's best item level in its slot (SlotLevelsOf).
 ---@field inventoryType number
 ---@field inventorySlots number[]
 ---@field slotkey string
@@ -1317,10 +1319,14 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
     -- Kept verdicts are reused inside (caches.md §2). The search indexes the arrow: a kept item
     -- whose arrow changed is compared with its search entry again (search-indexing.md §11).
     local upgrade = self:ResolveUpgrade(currentItem)
-    if currentItem.derived and currentItem.isUpgrade ~= upgrade then
+    -- The slot values follow the worn gear, as the arrow does (search-indexing.md §16).
+    local slotEquipped, slotBest = self:SlotLevelsOf(currentItem)
+    if currentItem.derived and (currentItem.isUpgrade ~= upgrade or currentItem.slotEquipped ~= slotEquipped
+      or currentItem.slotBest ~= slotBest) then
       currentItem.derived.indexPending = true
     end
     currentItem.isUpgrade = upgrade
+    currentItem.slotEquipped, currentItem.slotBest = slotEquipped, slotBest
     currentItem.drawGeneration = self._drawGeneration[kind]
   end
 
@@ -2980,6 +2986,45 @@ function items:ReadLinkInfo(itemLink)
   end
   local name, _, _, _, minLevel, _, _, stackSize, _, _, sellPrice, _, _, bindType = C_Item.GetItemInfo(itemLink)
   return minLevel, stackSize, sellPrice, bindType, name ~= nil
+end
+
+-- SlotLevelsOf works out an equipment item's slot values (search-indexing.md §16): the lowest item
+-- level worn in its slots, 0 when nothing is worn there (slotequipped, Vendor's CurrentEquippedLevel:
+-- a one-hander counts the off hand only with dual wield, a Warrior's two-hander both hands), and the
+-- character's best item level in its slot (slotbest, Vendor's WatermarkLevel,
+-- C_ItemUpgrade.GetHighWatermarkForItem). Nil for an item that is not equipment or was read before
+-- its data loaded; slotequipped also before the worn gear has been read.
+---@param item ItemData
+---@return number? slotEquipped, number? slotBest
+function items:SlotLevelsOf(item)
+  local traits = not item.isItemEmpty and item.itemInfo.traits
+  if not traits or not traits.isEquipment then
+    return nil, nil
+  end
+  local best
+  local upgrade = _G.C_ItemUpgrade
+  if upgrade and upgrade.GetHighWatermarkForItem and item.itemInfo.itemLink then
+    best = upgrade.GetHighWatermarkForItem(item.itemInfo.itemLink)
+  end
+  if self.equipmentCache == nil then
+    return nil, best
+  end
+  local slots = item.inventorySlots or {}
+  local equipLoc = item.itemInfo.itemEquipLoc
+  if equipLoc == "INVTYPE_WEAPON" and not (_G.CanDualWield and _G.CanDualWield()) then
+    slots = { INVSLOT_MAINHAND }
+  elseif equipLoc == "INVTYPE_2HWEAPON" and _G.UnitClass and select(3, UnitClass("player")) == 1 then
+    slots = { INVSLOT_MAINHAND, INVSLOT_OFFHAND }
+  end
+  local lowest = 0
+  for _, slot in ipairs(slots) do
+    local worn = self.equipmentCache[slot]
+    local level = worn and worn.itemInfo.currentItemLevel
+    if level and (lowest == 0 or level < lowest) then
+      lowest = level
+    end
+  end
+  return lowest, best
 end
 
 -- CanUseItem says whether the character can use an item (C_PlayerInfo.CanUseItem: proficiency,

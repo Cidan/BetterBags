@@ -1398,6 +1398,8 @@ describe("Search incremental indexing (SyncKind)", function()
       { "known mark", function(it) it.itemInfo.tooltipMarks = { known = true } end },
       { "usable", function(it) it.isUsable = true end },
       { "appearance", function(it) it.itemInfo.traits.transmoggable = true end },
+      { "slot equipped", function(it) it.slotEquipped = 200 end },
+      { "slot best", function(it) it.slotBest = 250 end },
       { "pet count", function(it) it.petOwned = 2 end, pet = true },
       { "pet limit", function(it) it.petLimit = 5 end, pet = true },
       { "pet counts known", function(it) it.petOwned, it.petLimit = nil, nil end, pet = true },
