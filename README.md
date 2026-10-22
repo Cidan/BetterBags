@@ -450,6 +450,8 @@ The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlev
 - `=` (type = Armor, ilvl = 506) Items with a value equal to the text or number on the right side. This will find any items starting with the value.
 - `%=` (slot %= Hand \[This will match any gear pieces that are slotted into any slot with `Hand` in the name. eg. Hands, Main Hand, Offhand\]) Items with the value in the full text of the field(s).
 - `!=` (expansion != DF) Items with a value not equal to the text or number on the right side. This will find any items NOT starting with the value.
+- `==` (name == "Hearthstone") Items whose whole value is the text (in any case), not just its start. With a number, the same as `=`.
+- `~=` (name ~= "Hearthstone") Every item `==` does not find.
 - `"` or `'` (slot = "Main Hand") To search for a multi-word string.
 
 ### Comparison Operators
@@ -458,6 +460,14 @@ The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlev
 - `<` Items with a value less than the number on the right side.
 - `>=` Items with a value greater than or equal to the number on the right side.
 - `<=` Items with a value less than or equal to the number on the right side.
+
+### Math, money and your character
+Either side of a comparison can be worked out:
+- `+`, `-`, `*`, `/`, `%` (ilvl <= player.level - 10) Arithmetic. Put spaces around the sign: `100-10` is still one word, as before.
+- `min(...)`, `max(...)`, `floor(x)`, `ceil(x)`, `abs(x)` (maxlevel >= min(player.ilvl * 0.95, player.ilvl - 5)). `math.min` and the others work too.
+- Money: `5g`, `50s`, `1g50s`, `20c` (price < 2g50s) are amounts in copper.
+- Fields compared with fields, or with math on them (maxlevel > ilvl, price * count > 5g), are checked item by item.
+- Your character: `player.level`, `player.ilvl` (your average item level, bags included), `player.equippedilvl` (what you wear), `player.class` (its name or its English token, `paladin`), `player.classid`, `player.spec`, `player.specid`, `player.profession` (any of your professions, by name or skill line: `player.profession = tailoring`), `player.name`, `player.realm`. A comparison of your character alone (player.level >= 80) matches every item or none, so `player.class = mage AND ...` limits a category to one class.
 
 <div align="center" style="text-align:center">
 <a href="https://i.imgur.com/H2jgRO8.png" target="_blank"><img src="https://i.imgur.com/H2jgRO8.png" alt="Complex Search in Retail."></a>

@@ -208,6 +208,150 @@ local BOOL_FIELDS = {
 -- allocation.
 local scratch = {}
 
+-- What a query's words name, for comparisons answered item by item (search:MatchEach) and for
+-- deciding how a word compared with a field is read.
+local ALIASES = { ilvl = 'level', count = 'stackcount', exp = 'expansion', slot = 'equipmentlocation', bag = 'bagname' }
+local TEXT_FIELDS = {
+  name = true, type = true, subtype = true, category = true, guid = true, expansion = true,
+  equipmentlocation = true, binding = true, tooltip = true, bagname = true, track = true,
+}
+-- List fields: an item can hold several values; a comparison matches when any value does.
+local LIST_KEYS = { equipmentset = 'sets', stat = 'stats', bonusid = 'bonusIDs' }
+local NUMERIC = {}
+for _, field in ipairs(NUMBER_FIELDS) do NUMERIC[field] = true end
+local BOOLEAN = {}
+for _, field in ipairs(BOOL_FIELDS) do BOOLEAN[field] = true end
+
+-- fieldKey returns the snapshot key holding a field's value (aliases resolved), or nil for a word
+-- that names no field.
+---@param word string A lower-case word.
+---@return string?
+local function fieldKey(word)
+  word = ALIASES[word] or word
+  if NUMERIC[word] or TEXT_FIELDS[word] or BOOLEAN[word] then
+    return word
+  end
+  return LIST_KEYS[word]
+end
+
+-- moneyOf reads gold, silver and copper (5g, 50s, 1g50s, 20c) as copper; nil for anything else.
+---@param word string A lower-case word.
+---@return number?
+local function moneyOf(word)
+  local gold = word:match("^(%d+)g")
+  local rest = gold and word:sub(#gold + 2) or word
+  local silver = rest:match("^(%d+)s")
+  rest = silver and rest:sub(#silver + 2) or rest
+  local copper = rest:match("^(%d+)c")
+  rest = copper and rest:sub(#copper + 2) or rest
+  if rest ~= "" or not (gold or silver or copper) then return nil end
+  return (tonumber(gold) or 0) * 10000 + (tonumber(silver) or 0) * 100 + (tonumber(copper) or 0)
+end
+
+-- QUERY_FUNCTIONS are what a query's functions compute (QueryParser.FUNCTIONS names them); any
+-- argument that is not a number makes nothing.
+local QUERY_FUNCTIONS = {
+  min = function(args)
+    local best
+    for _, v in ipairs(args) do
+      if type(v) ~= 'number' then return nil end
+      if best == nil or v < best then best = v end
+    end
+    return best
+  end,
+  max = function(args)
+    local best
+    for _, v in ipairs(args) do
+      if type(v) ~= 'number' then return nil end
+      if best == nil or v > best then best = v end
+    end
+    return best
+  end,
+  floor = function(args) return type(args[1]) == 'number' and math.floor(args[1]) or nil end,
+  ceil = function(args) return type(args[1]) == 'number' and math.ceil(args[1]) or nil end,
+  abs = function(args) return type(args[1]) == 'number' and math.abs(args[1]) or nil end,
+}
+
+---@param op string
+---@param a any
+---@param b any
+---@return number?
+local function arithmetic(op, a, b)
+  if type(a) ~= 'number' or type(b) ~= 'number' then return nil end
+  if op == '+' then return a + b
+  elseif op == '-' then return a - b
+  elseif op == '*' then return a * b
+  elseif op == '/' then return a / b
+  end
+  return a % b
+end
+
+---@param v any
+---@return any
+local function asBoolean(v)
+  if v == "true" then return true end
+  if v == "false" then return false end
+  return v
+end
+
+-- compareValues compares two values as a query does: numbers by value; text without case, = by its
+-- start, == whole, %= anywhere; booleans by value. A list (a player's professions) matches when any
+-- of its values does, and != or ~= when none does. A missing value matches only != and ~=, as the
+-- index answers them (isNotInIndex: items without the field included).
+---@param a any
+---@param op string
+---@param b any
+---@return boolean
+local function compareValues(a, op, b)
+  if op == '!=' then return not compareValues(a, '=', b) end
+  if op == '~=' then return not compareValues(a, '==', b) end
+  if a == nil or b == nil then return false end
+  if type(a) == 'table' then
+    for _, v in ipairs(a) do
+      if compareValues(v, op, b) then return true end
+    end
+    return false
+  end
+  if type(b) == 'table' then
+    for _, v in ipairs(b) do
+      if compareValues(a, op, v) then return true end
+    end
+    return false
+  end
+  if type(a) == 'boolean' or type(b) == 'boolean' then
+    a, b = asBoolean(a), asBoolean(b)
+    return (op == '=' or op == '==') and a == b
+  end
+  if type(a) ~= type(b) then
+    a, b = tonumber(a), tonumber(b)
+    if a == nil or b == nil then return false end
+  end
+  if type(a) == 'number' then
+    if op == '=' or op == '==' then return a == b
+    elseif op == '<' then return a < b
+    elseif op == '<=' then return a <= b
+    elseif op == '>' then return a > b
+    elseif op == '>=' then return a >= b
+    elseif op == '%=' then return string.find(tostring(a), tostring(b), 1, true) ~= nil
+    end
+    return false
+  end
+  a, b = string.lower(a), string.lower(b)
+  if op == '=' then return a:sub(1, #b) == b
+  elseif op == '==' then return a == b
+  elseif op == '%=' then return string.find(a, b, 1, true) ~= nil
+  elseif op == '<' then return a < b
+  elseif op == '<=' then return a <= b
+  elseif op == '>' then return a > b
+  elseif op == '>=' then return a >= b
+  end
+  return false
+end
+
+-- FLIPPED is the operator that keeps a comparison's meaning with its sides swapped; %= has none.
+local FLIPPED = { ['<'] = '>', ['<='] = '>=', ['>'] = '<', ['>='] = '<=', ['='] = '=', ['=='] = '==',
+  ['!='] = '!=', ['~='] = '~=' }
+
 ---@param name string
 ---@param fullTextOnly? boolean
 function search:CreateIndex(name, fullTextOnly)
@@ -622,18 +766,33 @@ function search:isNotInIndex(name, value)
   return self:Complement(self:isInIndex(name, value))
 end
 
--- Complement returns every item a query can match (Universe) that is not in set.
+-- Complement returns every item a query can match (Universe), or of within, that is not in set.
 ---@param set table<string, boolean>
+---@param within? table<string, any>
 ---@return table<string, boolean>
-function search:Complement(set)
+function search:Complement(set, within)
   ---@type table<string, boolean>
   local results = {}
-  for slotkey in pairs(self:Universe()) do
+  for slotkey in pairs(within or self:Universe()) do
     if not set[slotkey] then
       results[slotkey] = true
     end
   end
   return results
+end
+
+-- isExactly returns the items whose value is exactly value (==): a whole text, without case; a
+-- number or a boolean as = finds it.
+---@param name string
+---@param value any
+---@return table<string, boolean>
+function search:isExactly(name, value)
+  local index = self:GetIndex(name)
+  if not index then return {} end
+  if not index.fullTextOnly and (tonumber(value) ~= nil or self:StringToBoolean(string.lower(value)) ~= nil) then
+    return self:isInIndex(name, value)
+  end
+  return index.fullText[string.lower(value)] or {}
 end
 
 ---@param value any
@@ -835,7 +994,197 @@ end
 -- Expansions compare by release for these operators, and for = and != with a number.
 local ORDERED = { ["<"] = true, ["<="] = true, [">"] = true, [">="] = true }
 
-function search:EvaluateAST(node)
+---@return number? specID, string? name
+local function playerSpecialization()
+  local api = _G.C_SpecializationInfo
+  local get = api and api.GetSpecialization or _G.GetSpecialization
+  local info = api and api.GetSpecializationInfo or _G.GetSpecializationInfo
+  if get == nil or info == nil then return nil end
+  local index = get()
+  if index == nil or index == 0 then return nil end
+  local id, name = info(index)
+  return id, name
+end
+
+-- PlayerValue reads a player value (player.level, ...) as Vendor's player functions do, when the
+-- query is evaluated; nil for one the client cannot say or a name that is none. Text values that
+-- have several names are lists (the class's token and its name; every profession's name and skill
+-- line), matching when any does.
+---@param name string The lower-case name after "player.".
+---@return any
+function search:PlayerValue(name)
+  if name == 'level' then
+    return _G.UnitLevel and UnitLevel("player")
+  elseif name == 'ilvl' or name == 'equippedilvl' then
+    if not _G.GetAverageItemLevel then return nil end
+    local overall, equipped = GetAverageItemLevel()
+    local value = name == 'ilvl' and overall or equipped
+    return value and math.floor(value)
+  elseif name == 'class' or name == 'classid' then
+    if not _G.UnitClass then return nil end
+    local className, token, classID = UnitClass("player")
+    if name == 'classid' then return classID end
+    return { token, className }
+  elseif name == 'spec' or name == 'specid' then
+    local id, specName = playerSpecialization()
+    if name == 'specid' then return id end
+    return specName
+  elseif name == 'profession' then
+    if not _G.GetProfessions or not _G.GetProfessionInfo then return nil end
+    local values = {}
+    for _, index in pairs({ GetProfessions() }) do
+      local professionName, _, _, _, _, _, skillLine = GetProfessionInfo(index)
+      table.insert(values, professionName)
+      table.insert(values, skillLine)
+    end
+    return values
+  elseif name == 'name' or name == 'realm' then
+    if not _G.UnitFullName then return nil end
+    local playerName, realm = UnitFullName("player")
+    return name == 'name' and playerName or realm
+  end
+  return nil
+end
+
+-- dependsOnItem says whether an expression reads an item's field, so it has a value only for an item.
+---@param node QueryNode
+---@return boolean
+local function dependsOnItem(node)
+  if node.type == 'word' then
+    if node.quoted then return false end
+    local word = string.lower(node.value)
+    return word:sub(1, 7) ~= 'player.' and tonumber(word) == nil and moneyOf(word) == nil
+      and fieldKey(word) ~= nil
+  elseif node.type == 'arith' then
+    return dependsOnItem(node.left) or dependsOnItem(node.right)
+  elseif node.type == 'neg' then
+    return dependsOnItem(node.expression)
+  elseif node.type == 'call' then
+    for _, arg in ipairs(node.args) do
+      if dependsOnItem(arg) then return true end
+    end
+  end
+  return false
+end
+
+-- ValueOf works out an expression's value: for an item's snapshot (search.indexed), or, without
+-- one, for what does not depend on an item (a field then has no value).
+---@param node QueryNode
+---@param snapshot? table
+---@return any
+function search:ValueOf(node, snapshot)
+  if node.type == 'value' then
+    return node.value
+  elseif node.type == 'word' then
+    if node.quoted then return node.value end
+    local word = string.lower(node.value)
+    if word:sub(1, 7) == 'player.' then
+      return self:PlayerValue(word:sub(8))
+    end
+    local number = tonumber(word) or moneyOf(word)
+    if number then return number end
+    local key = fieldKey(word)
+    if key then
+      return snapshot and snapshot[key]
+    end
+    return node.value
+  elseif node.type == 'arith' then
+    return arithmetic(node.operator, self:ValueOf(node.left, snapshot), self:ValueOf(node.right, snapshot))
+  elseif node.type == 'neg' then
+    local v = self:ValueOf(node.expression, snapshot)
+    return type(v) == 'number' and -v or nil
+  elseif node.type == 'call' then
+    local args = {}
+    for i, arg in ipairs(node.args) do
+      args[i] = self:ValueOf(arg, snapshot)
+    end
+    return QUERY_FUNCTIONS[node.name](args)
+  end
+  return nil
+end
+
+-- Fold replaces each part of an expression that does not depend on an item with its value, so a
+-- check made item by item works it out once.
+---@param node QueryNode
+---@return QueryNode
+function search:Fold(node)
+  if not dependsOnItem(node) then
+    return { type = 'value', value = self:ValueOf(node) }
+  elseif node.type == 'arith' then
+    return { type = 'arith', operator = node.operator, left = self:Fold(node.left), right = self:Fold(node.right) }
+  elseif node.type == 'neg' then
+    return { type = 'neg', expression = self:Fold(node.expression) }
+  elseif node.type == 'call' then
+    local args = {}
+    for i, arg in ipairs(node.args) do args[i] = self:Fold(arg) end
+    return { type = 'call', name = node.name, args = args }
+  end
+  return node
+end
+
+-- MatchEach checks a comparison (its constant parts folded) item by item, over candidates: the items
+-- the rest of an AND matched, or every item.
+---@param node QueryNode A compare node.
+---@param candidates table<string, any>
+---@return table<string, boolean>
+function search:MatchEach(node, candidates)
+  ---@type table<string, boolean>
+  local results = {}
+  for slotkey in pairs(candidates) do
+    local snapshot = self.indexed[slotkey]
+    if snapshot and compareValues(self:ValueOf(node.left, snapshot), node.operator,
+      self:ValueOf(node.right, snapshot)) then
+      results[slotkey] = true
+    end
+  end
+  return results
+end
+
+-- everything returns every item a query can match within candidates (or the universe), for a
+-- comparison that holds whatever the item.
+---@param within? table<string, any>
+---@return table<string, boolean>
+function search:everything(within)
+  ---@type table<string, boolean>
+  local results = {}
+  for slotkey in pairs(within or self:Universe()) do
+    results[slotkey] = true
+  end
+  return results
+end
+
+---@param value any
+---@return string?
+local function indexValue(value)
+  if type(value) == 'number' then return tostring(value) end
+  if type(value) == 'boolean' then return value and "true" or "false" end
+  if type(value) == 'string' then return value end
+  return nil
+end
+
+-- needsItems says whether a condition is checked item by item somewhere (search:MatchEach), so an
+-- AND evaluates its other side first and checks only that side's matches.
+---@param node QueryNode
+---@return boolean
+local function needsItems(node)
+  if node.type == 'logical' then
+    if node.operator == 'NOT' then return needsItems(node.expression) end
+    return needsItems(node.left) or needsItems(node.right)
+  elseif node.type == 'compare' then
+    return dependsOnItem(node.left) and dependsOnItem(node.right)
+      or not ((node.left.type == 'word' and dependsOnItem(node.left)) or (node.right.type == 'word' and dependsOnItem(node.right)))
+  elseif node.type == 'comparison' then
+    local value = string.lower(node.value)
+    return not node.quoted and NUMERIC[fieldKey(string.lower(node.field)) or ''] == true
+      and fieldKey(value) ~= nil and tonumber(value) == nil
+  end
+  return false
+end
+
+---@param node QueryNode
+---@param within? table<string, any> The only items whose answer matters (an AND's other side).
+---@return table<string, boolean>
+function search:EvaluateAST(node, within)
   if node == nil then
       error("Encountered nil node in AST")
   end
@@ -849,11 +1198,12 @@ function search:EvaluateAST(node)
       field = string.lower(field)
       -- Rarity is a special case, as it is an enum.
       if field == "rarity" then
-        return self:isRarity(operator, value)
+        return self:isRarity(operator == "==" and "=" or operator == "~=" and "!=" or operator, value)
       end
       -- Expansions order by release (expansionid): a comparison, or a number, never a name as text.
       if (field == "expansion" or field == "exp")
-        and (ORDERED[operator] or (tonumber(value) and (operator == "=" or operator == "!="))) then
+        and (ORDERED[operator] or (tonumber(value) and (operator == "=" or operator == "!="
+          or operator == "==" or operator == "~="))) then
         local number = tonumber(value) or self:ExpansionNumberOf(value)
         if number == nil then
           return {}
@@ -862,8 +1212,13 @@ function search:EvaluateAST(node)
       end
       if operator == "=" then
         return self:isInIndex(field, value)
+      elseif operator == "==" then
+        return self:isExactly(field, value)
       elseif operator == "!=" then
         return self:isNotInIndex(field, value)
+      elseif operator == "~=" then
+        if not self:GetIndex(field) then return {} end
+        return self:Complement(self:isExactly(field, value))
       elseif operator == "%=" then
         return self:isFullTextMatch(field, value)
       elseif operator == ">=" then
@@ -879,10 +1234,80 @@ function search:EvaluateAST(node)
       end
   end
 
+  -- compare answers a comparison of two expressions: with no field, the same for every item; a field
+  -- against a constant, from the index (sides swapped if needed); else item by item.
+  ---@param cmp QueryNode
+  ---@return table<string, boolean>
+  local function compare(cmp)
+    local leftItem, rightItem = dependsOnItem(cmp.left), dependsOnItem(cmp.right)
+    if not leftItem and not rightItem then
+      if compareValues(self:ValueOf(cmp.left), cmp.operator, self:ValueOf(cmp.right)) then
+        return self:everything(within)
+      end
+      return {}
+    end
+    local field, constant, operator
+    if cmp.left.type == 'word' and leftItem and not rightItem then
+      field, constant, operator = cmp.left.value, cmp.right, cmp.operator
+    elseif cmp.right.type == 'word' and rightItem and not leftItem and FLIPPED[cmp.operator] then
+      field, constant, operator = cmp.right.value, cmp.left, FLIPPED[cmp.operator]
+    end
+    if field and LIST_KEYS[ALIASES[string.lower(field)] or string.lower(field)] == nil then
+      local value = indexValue(self:ValueOf(constant))
+      if value == nil then return {} end
+      return evaluate_condition(field, operator, value)
+    end
+    local folded = { type = 'compare', left = self:Fold(cmp.left), operator = cmp.operator, right = self:Fold(cmp.right) }
+    return self:MatchEach(folded, within or self:Universe())
+  end
+
+  -- comparison answers field op word as queries always have, reading the word by the field's type:
+  -- a player value, money or another numeric field compared with a numeric field takes the new
+  -- meaning (a number, item by item); for anything else the word is what it always was.
+  ---@param cmp QueryNode
+  ---@return table<string, boolean>
+  local function comparison(cmp)
+    local field = string.lower(cmp.field)
+    local key = fieldKey(field)
+    local asExpression = function()
+      return compare({ type = 'compare', left = { type = 'word', value = cmp.field }, operator = cmp.operator,
+        right = { type = 'word', value = cmp.value, quoted = cmp.quoted } })
+    end
+    -- A word that names no field: a player value or a number compares as an expression; anything
+    -- else matches nothing, as an unknown field always has.
+    if not self:GetIndex(field) then
+      if field:sub(1, 7) == 'player.' or tonumber(field) or moneyOf(field) then
+        return asExpression()
+      end
+      return {}
+    end
+    if cmp.quoted then
+      return evaluate_condition(cmp.field, cmp.operator, cmp.value)
+    end
+    local value = string.lower(cmp.value)
+    if NUMERIC[key or ''] then
+      if value:sub(1, 7) == 'player.' or (fieldKey(value) ~= nil and tonumber(value) == nil) then
+        return asExpression()
+      end
+      local money = moneyOf(value)
+      if money then
+        return evaluate_condition(cmp.field, cmp.operator, tostring(money))
+      end
+    end
+    if key == 'equipmentlocation' and value:match("^invtype_") then
+      local slotName = _G[string.upper(value)]
+      if type(slotName) == 'string' and slotName ~= "" then
+        return evaluate_condition(cmp.field, cmp.operator, slotName)
+      end
+    end
+    return evaluate_condition(cmp.field, cmp.operator, cmp.value)
+  end
+
   if node.type == "logical" then
       if node.operator == "AND" then
           -- A side that is a NOT removes its expression's items from the other side, which costs
-          -- what that side holds, not every indexed item (Complement).
+          -- what that side holds, not every indexed item (Complement). Otherwise the side the index
+          -- answers goes first, and the other is checked only on its matches.
           local keep, drop = node.left, nil
           if node.right.type == "logical" and node.right.operator == "NOT" then
             drop = node.right.expression
@@ -892,17 +1317,22 @@ function search:EvaluateAST(node)
           ---@type table<string, boolean>
           local result = {}
           if drop then
-            local removed = self:EvaluateAST(drop)
-            for k, v in pairs(self:EvaluateAST(keep)) do
+            local kept = self:EvaluateAST(keep, within)
+            local removed = self:EvaluateAST(drop, kept)
+            for k, v in pairs(kept) do
               if v and not removed[k] then
                 result[k] = true
               end
             end
             return result
           end
-          local right = self:EvaluateAST(node.right)
-          for k, v in pairs(self:EvaluateAST(node.left)) do
-            if v and right[k] then
+          local first, second = node.left, node.right
+          if needsItems(first) and not needsItems(second) then
+            first, second = second, first
+          end
+          local firstResult = self:EvaluateAST(first, within)
+          for k, v in pairs(self:EvaluateAST(second, firstResult)) do
+            if v and firstResult[k] then
               result[k] = true
             end
           end
@@ -910,20 +1340,22 @@ function search:EvaluateAST(node)
       elseif node.operator == "OR" then
           ---@type table<string, boolean>
           local result = {}
-          for k, v in pairs(self:EvaluateAST(node.left)) do
+          for k, v in pairs(self:EvaluateAST(node.left, within)) do
             if v then result[k] = true end
           end
-          for k, v in pairs(self:EvaluateAST(node.right)) do
+          for k, v in pairs(self:EvaluateAST(node.right, within)) do
             if v then result[k] = true end
           end
           return result
       elseif node.operator == "NOT" then
-          return self:Complement(self:EvaluateAST(node.expression))
+          return self:Complement(self:EvaluateAST(node.expression, within), within)
       else
           error("Unknown logical operator: " .. node.operator)
       end
   elseif node.type == "comparison" then
-      return evaluate_condition(node.field, node.operator, node.value)
+      return comparison(node)
+  elseif node.type == "compare" then
+      return compare(node)
   elseif node.type == "term" then
       return self:DefaultSearch(node.value)
   else

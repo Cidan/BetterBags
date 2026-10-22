@@ -224,3 +224,62 @@ item that teaches no pet, absent for an item with no answer about pets.
   alone, a closed bank, a pet's count changed alone) and two to removing code that guarded nothing
   (comparing `collectable`, which follows compared fields; a pet check on items that cannot have
   counts otherwise).
+
+### 15. Expressions: Arithmetic, Money, Functions and Player Values
+Step 4 of docs/vendor-compat.md ("Proposed: the math"), with the player values of step 3.
+- **Lexer** (`util/query.lua`): `==` and `~=` are operators (also unspaced, `a~=b`); a comma is a
+  token; a word that is only `+ - * / %` is an arithmetic token (a lone `%` too, `%=` stays an
+  operator). Signs inside a word stay part of it (`100-10`, `-5`), so every word reads as before.
+  A quoted string's token says `quoted`.
+- **Parser**: `or := and (OR and)*`, `and := not (AND not)*`, `not := NOT not | comparison`,
+  `comparison := sum [op sum]`, `sum := product ((+|-) product)*`, `product := unary ((*|/|%)
+  unary)*`, `unary := - unary | primary`, `primary := ( or ) | word | word ( args )`. A word compared
+  with a word is the `comparison` node it always was (with `quoted` when the value was quoted); any
+  other comparison is a `compare` node of expressions (`word`, `arith`, `neg`, `call`). A condition
+  used as a number, a number used as a condition, an unknown function (`QueryParser.FUNCTIONS`: min,
+  max, floor, ceil, abs; `math.` accepted), and arithmetic that is not compared are parse errors:
+  the query matches nothing.
+- **Reading a word** (`search:ValueOf`): quoted, text; `player.<name>`, a player value; a number or
+  money (`5g`, `50s`, `1g50s`, `20c`, `moneyOf`), a number; a field (`fieldKey`, aliases included),
+  the item's snapshot value; anything else, text. A `comparison` reads its word by the field's type,
+  so every query keeps its meaning: only for a numeric field does a player value, money or another
+  numeric field's name take its new meaning; with a text field the word is text (`name = level`); an
+  equipment slot token (`INVTYPE_HEAD`) on `slot` is the slot's name; a word naming no field on the
+  left matches nothing, as an unknown field always has, unless it is a player value or a number.
+- **Answering a comparison** (`EvaluateAST`): with no field on either side, the same for every item
+  (`everything`) or none; a bare field against a constant (folded: player values and arithmetic on
+  them), from the index as before, sides swapped (`FLIPPED`; `%=` cannot be) when the field is on the
+  right; anything else item by item (`search:MatchEach` over the snapshots, its constant parts folded
+  once, `search:Fold`). `compareValues` follows the index's semantics (text without case, `=` by its
+  start, `==` whole, `%=` anywhere; a missing value matches only `!=` and `~=`, as `isNotInIndex`
+  answers them), which a randomized test checks against the index (`field op N` against `field + 0
+  op N`, alone and inside AND, OR and AND NOT).
+- **Narrowing**: within an AND, a side the index answers is evaluated first and the other gets its
+  matches as `within`; item-by-item checks and NOTs (`Complement(set, within)`) go only over those.
+- **`==` / `~=`** (`search:isExactly`): a text index's whole lowercased value (`fullText`), a number
+  or boolean as `=`; rarity and expansions map them to `=` and `!=`.
+- **Player values** (`search:PlayerValue`), read when the query is evaluated, as Vendor's player
+  functions are: `level` (`UnitLevel`), `ilvl` and `equippedilvl` (`GetAverageItemLevel`'s first and
+  second returns, floored, as Vendor's `PlayerItemLevel`), `class` (the English token and the
+  localized name, either matches), `classid`, `spec` and `specid` (`GetSpecializationInfo` of
+  `C_SpecializationInfo.GetSpecialization`, else the globals; none for index 0), `profession` (every
+  profession's name and skill line, from `GetProfessions` and `GetProfessionInfo`'s 1st and 7th
+  returns, as a retail capture recorded them), `name`, `realm` (`UnitFullName`). A diagnostics capture
+  showed the specialization reading 1 and the average item level 0 early in the load, both right
+  about 11 s in, before any bag read (docs/vendor-compat.md, "What a capture settled").
+- **Kept current**: every event that changes a player value (`PLAYER_LEVEL_UP`, `PLAYER_LEVEL_CHANGED`,
+  `PLAYER_AVG_ITEM_LEVEL_UPDATE`, `SKILL_LINES_CHANGED`, `LEARNED_SPELL_IN_SKILL_LINE`,
+  `PLAYER_SPECIALIZATION_CHANGED`) already recalculates the backpack and the open bank for the upgrade
+  arrows (caches.md §2), and a recalculation runs every search category again. Class, name and realm
+  do not change. Not refreshed by them: the guild bank and the vendor's items (read again when opened).
+- **Changed meaning**: a lone `+ - * / %` or a comma used to be a word; after a comparison such a
+  word was ignored (`category = Gear - Tank` was `category = Gear`). It is now arithmetic or an
+  argument separator, so such a rule matches nothing; quote the text. The real profile's saved rules
+  have none.
+- **Coverage:** `spec/query_spec.lua` (tokens, precedence, calls, unary minus, quoted words, the old
+  forms unchanged, parse errors), `spec/search_spec.lua` ("expressions": `==`/`~=`, money, folding,
+  flipping, every player value, no specialization, field against field, arithmetic, functions (Vendor's
+  Potential Upgrades rule), NOT, missing values, narrowing (`MatchEach` given one candidate either way
+  round), folding once (`PlayerValue` asked once), the NOT within an AND (`Universe` never asked),
+  slot tokens, text fields; the randomized index-against-item test). 39 mutations: eight first
+  survived and led to tests.

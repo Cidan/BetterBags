@@ -25,17 +25,17 @@ describe("QueryParser", function()
 
     it("tokenizes double-quoted strings", function()
       local tokens = QueryParser:Lexer('"hello world"')
-      assert.same({{type = "term", value = "hello world"}}, tokens)
+      assert.same({{type = "term", value = "hello world", quoted = true}}, tokens)
     end)
 
     it("tokenizes single-quoted strings", function()
       local tokens = QueryParser:Lexer("'hello world'")
-      assert.same({{type = "term", value = "hello world"}}, tokens)
+      assert.same({{type = "term", value = "hello world", quoted = true}}, tokens)
     end)
 
     it("handles escaped quotes inside quoted strings", function()
       local tokens = QueryParser:Lexer('"he said \\"hello\\""')
-      assert.same({{type = "term", value = 'he said "hello"'}}, tokens)
+      assert.same({{type = "term", value = 'he said "hello"', quoted = true}}, tokens)
     end)
 
     it("tokenizes the = operator", function()
@@ -90,6 +90,45 @@ describe("QueryParser", function()
         {type = "operator", value = "<"},
         {type = "term", value = "b"},
       }, tokens)
+    end)
+
+    it("tokenizes == and ~=, spaced or not", function()
+      assert.same({
+        {type = "term", value = "name"},
+        {type = "operator", value = "=="},
+        {type = "term", value = "sword"},
+      }, (QueryParser:Lexer("name == sword")))
+      assert.same({
+        {type = "term", value = "a"},
+        {type = "operator", value = "~="},
+        {type = "term", value = "b"},
+      }, (QueryParser:Lexer("a~=b")))
+    end)
+
+    -- A sign is an operator only on its own, so every hyphenated word works as it did.
+    it("tokenizes a lone arithmetic sign as an operator, and keeps signs inside words", function()
+      assert.same({
+        {type = "term", value = "level"},
+        {type = "arith", value = "-"},
+        {type = "term", value = "10"},
+      }, (QueryParser:Lexer("level - 10")))
+      assert.same({{type = "term", value = "100-10"}}, (QueryParser:Lexer("100-10")))
+      assert.same({{type = "term", value = "-5"}}, (QueryParser:Lexer("-5")))
+      for _, sign in ipairs({ "+", "*", "/", "%" }) do
+        assert.same({ type = "arith", value = sign }, QueryParser:Lexer("a " .. sign .. " b")[2], sign)
+      end
+      assert.same({ type = "operator", value = "%=" }, QueryParser:Lexer("a %= b")[2])
+    end)
+
+    it("tokenizes commas between function arguments", function()
+      assert.same({
+        {type = "term", value = "min"},
+        {type = "paren", value = "("},
+        {type = "term", value = "a"},
+        {type = "comma", value = ","},
+        {type = "term", value = "b"},
+        {type = "paren", value = ")"},
+      }, (QueryParser:Lexer("min(a, b)")))
     end)
 
     it("tokenizes AND as a logical operator", function()
@@ -365,6 +404,61 @@ describe("QueryParser", function()
       }, ast)
     end)
 
+    it("parses == and ~= comparisons as plain comparisons", function()
+      assert.same({ type = "comparison", field = "name", operator = "==", value = "sword" }, parse("name == sword"))
+      assert.same({ type = "comparison", field = "name", operator = "~=", value = "sword" }, parse("name ~= sword"))
+    end)
+
+    it("says when a comparison's value was quoted", function()
+      assert.same({ type = "comparison", field = "name", operator = "=", value = "level", quoted = true },
+        parse('name = "level"'))
+    end)
+
+    -- Words stay words: the search decides what a word names (a field, a player value, a number,
+    -- money, text), by the field compared with.
+    it("parses arithmetic in a comparison, multiplication first", function()
+      assert.same({
+        type = "compare",
+        left = { type = "word", value = "ilvl" },
+        operator = "<=",
+        right = { type = "arith", operator = "-", left = { type = "word", value = "player.level" },
+          right = { type = "word", value = "10" } },
+      }, parse("ilvl <= player.level - 10"))
+      assert.same({
+        type = "arith", operator = "+", left = { type = "word", value = "a" },
+        right = { type = "arith", operator = "*", left = { type = "word", value = "b" },
+          right = { type = "word", value = "c" } },
+      }, parse("a + b * c > 1").left)
+      assert.same(parse("price * count > 5g"), parse("(price * count) > 5g"))
+      assert.are.equal("arith", parse("price * count > 5g").left.type)
+    end)
+
+    it("parses function calls and unary minus", function()
+      local ast = parse("maxlevel >= min(player.ilvl * 0.95, player.ilvl - 5)")
+      assert.are.equal("call", ast.right.type)
+      assert.are.equal("min", ast.right.name)
+      assert.are.equal(2, #ast.right.args)
+      assert.are.equal("max", parse("level < math.max(1, 2)").right.name, "Vendor's math. spelling")
+      assert.same({ type = "neg", expression = { type = "word", value = "level" } }, parse("- level < 0").left)
+    end)
+
+    it("keeps a quoted word text, even beside arithmetic", function()
+      assert.same({ type = "word", value = "level", quoted = true }, parse('name == "level" + 1').right.left)
+    end)
+
+    it("mixes comparisons with arithmetic and logic", function()
+      local ast = parse("ilvl < player.level - 5 AND rarity = epic")
+      assert.are.equal("AND", ast.operator)
+      assert.are.equal("compare", ast.left.type)
+      assert.same({ type = "comparison", field = "ilvl", operator = "<", value = "player.level" },
+        parse("ilvl < player.level"), "a word compared with a word stays a plain comparison")
+      assert.same({ type = "comparison", field = "rarity", operator = "=", value = "epic" }, ast.right)
+    end)
+
+    it("keeps a word with a sign inside it one value, as before", function()
+      assert.same({ type = "comparison", field = "ilvl", operator = ">", value = "100-10" }, parse("ilvl > 100-10"))
+    end)
+
     it("parses a complex nested expression", function()
       local ast = parse("quality >= 4 AND (name %= sword OR name %= shield)")
       assert.same({
@@ -545,6 +639,17 @@ describe("QueryParser", function()
       assert.is_nil(QueryParser:Query("alpha NOT beta"))
       assert.is_nil(QueryParser:Query("alpha AND beta NOT gamma"))
       assert.is_not_nil(QueryParser:Query("alpha AND NOT beta"))
+    end)
+
+    it("returns nil for arithmetic that is not compared, an unknown function, or a missing side", function()
+      assert.is_nil(QueryParser:Query("level + 1"))
+      assert.is_nil(QueryParser:Query("foo(1) > 2"))
+      assert.is_nil(QueryParser:Query("level > min(1,"))
+      assert.is_nil(QueryParser:Query("level >"))
+      assert.is_nil(QueryParser:Query("level > 1 +"))
+      assert.is_nil(QueryParser:Query("(rarity = epic) + 1 > 2"), "a condition is not a number")
+      assert.is_nil(QueryParser:Query("(rarity = epic) > 2"))
+      assert.is_nil(QueryParser:Query("2 < (rarity = epic)"))
     end)
 
     it("returns nil for unexpected tokens", function()

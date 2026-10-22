@@ -610,10 +610,12 @@ import.
 1. Negation (NOT and `!=` against every indexed item), precedence (with the saved-rule rewrite),
    `bagname`, expansion order and `quality` as the crafting tier: done.
 2. The new item fields ("Proposed: new fields"), each read only once the item's data has loaded
-   (rule #1, `.claude/rules/data-loader.md` §19) and with its invalidation in caches.md.
-3. Player values (`player.level`, `player.ilvl`, ...), with the events that keep them current.
+   (rule #1, `.claude/rules/data-loader.md` §19) and with its invalidation in caches.md: done.
+3. Player values (`player.level`, `player.ilvl`, ...), with the events that keep them current: done
+   (search-indexing.md §15).
 4. The parser and evaluator: `==`/`~=`, arithmetic, functions; constants folded into index
-   lookups, the per-item check narrowed by the index.
+   lookups, the per-item check narrowed by the index: done (search-indexing.md §15; operators need
+   spaces around them, the open question of "Grammar").
 5. Importing Vendor's rules, converted to BetterBags' search.
 
 Each step updates the README's search section and `.claude/rules/search-indexing.md`.
