@@ -2774,9 +2774,15 @@ _G.C_Item.CanScrapItem = function(itemLocation) return false end
 _G.C_PetJournal = _G.C_PetJournal or {}
 _G.C_PetJournal.GetPetInfoByItemID = function(itemID) return nil end
 -- C_Item.CanBeRefunded(itemLocation) -> bool (ItemDocumentation.lua). Specs list
--- refundable locations in _G._refundableLocations["bag:slot"].
+-- refundable locations in _G._refundableLocations["bag:slot"]. Its argument is an ItemLocation,
+-- not an EmptiableItemLocation (DoesItemExist's): a location with no item is an error, as a capture
+-- from the game showed ("bad argument #1 to '?' (Usage: local canBeRefunded =
+-- C_Item.CanBeRefunded(itemLocation))"). Blizzard's callers check itemLocation:IsValid() first.
 _G._refundableLocations = {}
 _G.C_Item.CanBeRefunded = function(itemLocation)
+  if not _G.C_Item.DoesItemExist(itemLocation) then
+    error("bad argument #1 to '?' (Usage: local canBeRefunded = C_Item.CanBeRefunded(itemLocation))", 2)
+  end
   local bag, slot = itemLocation:GetBagAndSlot()
   return bag ~= nil and _G._refundableLocations[bag .. ":" .. slot] == true
 end
@@ -2856,9 +2862,16 @@ local function itemAtLocation(itemLocation)
   if bag == nil then return nil end
   return _G._itemsAtLocation[bag .. ":" .. slot]
 end
--- C_Item.DoesItemExist(emptiableItemLocation) -> itemExists
+-- C_Item.DoesItemExist(emptiableItemLocation) -> itemExists: an item is at a bag slot when a spec put
+-- one there (_itemsAtLocation) or the container reports one (C_Container.GetContainerItemID, as the
+-- client's bags do).
 _G.C_Item.DoesItemExist = function(itemLocation)
-  return itemAtLocation(itemLocation) ~= nil
+  if itemAtLocation(itemLocation) ~= nil then
+    return true
+  end
+  local bag, slot = itemLocation:GetBagAndSlot()
+  return bag ~= nil and _G.C_Container ~= nil and _G.C_Container.GetContainerItemID ~= nil
+    and _G.C_Container.GetContainerItemID(bag, slot) ~= nil
 end
 -- C_Item.GetItemIcon(itemLocation) -> icon (fileID, nilable)
 _G.C_Item.GetItemIcon = function(itemLocation)

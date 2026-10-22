@@ -32,9 +32,25 @@ Vendor rule.
   `ignoreRecent` argument): a newly looted item is acted on by the category it will have, as a Vendor rule
   matches by the item. Search categories count; `GetCategory` already honors each category's bags.
 - **Left alone, with why** (`BlockedReason`): an item read before its data loaded (its category may be
-  wrong), an item in an equipment set, a purchase that can still be refunded (`C_Item.CanBeRefunded`;
+  wrong), an item in an equipment set, a purchase that can still be refunded (`itemInfo.refundable`;
   Blizzard asks before refunding, `ContainerFrame_GetExtendedPriceString`, and selling it directly would
   skip that), and, to sell, one merchants do not buy (`hasNoValue`).
+- **Decided from the bags' last read alone; the client is asked only when acting.** Everything above
+  reads the committed items. The client can have changed a slot since that read: a sale empties slots,
+  and BetterBags reads the bags again only after `BAG_UPDATE_DELAYED` (the loader, then the refresh
+  queue, which commits frames later). Refundability is read with the slot (`items:AttachItemInfo`, and
+  again on a kept item, `RefreshKeptItem`: the refund window ends without the slot changing), so the
+  decision reads it from the item. Only `StillThere`, when selling or destroying, asks the client, after
+  `GetContainerItemInfo` shows the slot still holds the item.
+  - **Failure mode (fixed, reported in game):** `BlockedReason` asked `C_Item.CanBeRefunded` about each
+    committed item's slot. BetterBags Next's vendor drew the destroy card on `PLAYER_MONEY` and
+    `BAG_UPDATE_DELAYED`, which fire after the sale emptied slots and before the bags were read again,
+    so it asked about empty slots: 58 errors, `bad argument #1 to '?' (Usage: local canBeRefunded =
+    C_Item.CanBeRefunded(itemLocation))`, at bag 4 slot 4, from `next/vendor.lua` Draw in that handler.
+    `CanBeRefunded` takes an `ItemLocation`, not an `EmptiableItemLocation` (`DoesItemExist`'s,
+    ItemDocumentation.lua), and Blizzard checks `itemLocation:IsValid()` before calling it
+    (`BankUtil_IsAccountBankDepositRefundable`). The spec mocks now raise the same error for an empty
+    location, and `C_Item.DoesItemExist` sees an item wherever `GetContainerItemID` reports one.
 - **What is sold** (`SellList`): what sell and destroy categories hold, not left alone, that merchants
   buy. An item to destroy is sold instead when it can be (it is worth gold and can be bought back), as
   Vendor does. **What is destroyed** (`DestroyList`): what destroy categories hold, not left alone.
@@ -68,14 +84,15 @@ Vendor rule.
 - `DeleteCursorItem` has restrictions (`HasRestrictions`, GameCursorDocumentation.lua): an addon can
   only destroy on a key press or a click, one item each (Vendor's destroy.lua: "Blizzard Protected
   DeleteCursorItem() in 9.0.2").
-- **The destroy queue** (`DestroyQueue`): what destroy categories hold (`DestroyList`) that is still in
-  its slot (`StillThere`), by bag and slot, leaving out every item this merchant's sale holds or sold
-  (`claimed`, by item GUID: claimed when the sale starts, given back when it ends unsold, past the limit
-  or skipped, and forgotten at the next merchant). So nothing the merchant is about to buy is ever
-  destroyed, and an item sold is not shown again while the bags catch up.
-- **`DestroyNext`** destroys the queue's first item, the whole stack: `PickupContainerItem`, then
-  `DeleteCursorItem` only if the item is on the cursor, and prints what it destroyed. It refuses in
-  combat and while the cursor holds an item (it would delete the wrong one).
+- **The destroy queue** (`DestroyQueue`): what destroy categories hold (`DestroyList`) as the bags were
+  last read, by bag and slot, leaving out every item this merchant's sale holds or sold (`claimed`, by
+  item GUID: claimed when the sale starts, given back when it ends unsold, past the limit or skipped,
+  and forgotten at the next merchant). So nothing the merchant is about to buy is ever destroyed, and an
+  item sold is not shown again while the bags catch up.
+- **`DestroyNext`** destroys the first item of the queue still in its slot (`StillThere`), the whole
+  stack: `PickupContainerItem`, then `DeleteCursorItem` only if the item is on the cursor, and prints
+  what it destroyed. It refuses in combat and while the cursor holds an item (it would delete the wrong
+  one). An item destroyed shows on the card until the bags are read again; a second click skips it.
 - **Where a player destroys:** at a merchant in BetterBags Next, the **destroy card** at the bottom of
   the vendor (asked: "move the item to the vendor screen, but towards the bottom of it ... with a more
   crimson outline, and a click to [destroy] next helper text (one click only)"; next.md §10b): one left

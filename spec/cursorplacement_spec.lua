@@ -18,13 +18,18 @@ describe("CursorPlacement", function()
     table.insert(saved, { tbl = tbl, key = key, value = tbl[key] })
   end
 
-  -- Puts an item on the cursor, picked up from location (nil when the client gives none).
+  -- Puts an item on the cursor, picked up from location (nil when the client gives none). An item
+  -- picked up from a bag stays in its slot until it is put down (C_Cursor.GetCursorItem names it).
   local function holding(itemID, location)
     _G._cursorHasItem = true
     _G._cursorType = "item"
     _G._cursorItemID = itemID
     _G._cursorItemLink = "[Item " .. itemID .. "]"
     _G._cursorItemLocation = location
+    if location and location:IsBagAndSlot() then
+      local bag, slot = location:GetBagAndSlot()
+      _G._itemsAtLocation[bag .. ":" .. slot] = { itemID = itemID }
+    end
   end
 
   local function fromBag(bag, slot)
@@ -86,6 +91,7 @@ describe("CursorPlacement", function()
     end
     saved = {}
     _G.ClearCursor()
+    _G._itemsAtLocation = {}
   end)
 
   describe("in the backpack", function()

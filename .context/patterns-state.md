@@ -137,6 +137,24 @@ if childData and childData.itemInfo.currentItemCount ~= ... then
 
 **Rule**: Phase functions receive the transient `itemData` / `previousItems` tables as arguments; anything they mutate must be reached through those arguments (`items:ClearNewItemFromData(ctx, addedItem)`), never through `GetItemDataFromSlotKey`, which only reflects the last commit.
 
+## Decide From the Committed Read; Ask the Client Only When Acting
+**Problem**: Category automation listed the committed items but asked the client, per item,
+`C_Item.CanBeRefunded` about its slot. Between a slot changing in the client and BetterBags reading it
+again (after `BAG_UPDATE_DELAYED`, committed frames later), the committed items name slots the client
+has emptied; BetterBags Next's vendor drew in that window (`PLAYER_MONEY`, `BAG_UPDATE_DELAYED`) and
+the call raised on every empty slot (58 errors in game). Two moments mixed in one decision.
+
+**Rule**: Anything that decides from the committed items reads only the items: a client property it
+needs is read with the slot, in the harvest (and refreshed on kept items), as every location property
+is. The client is asked only at the moment of acting, after `C_Container.GetContainerItemInfo` shows
+the slot still holds the item (its GUID), because location functions documented with an `ItemLocation`
+argument (not an `EmptiableItemLocation`) raise an error for an empty slot. Mocks raise it too.
+
+**Not yet verified**: `C_Item.GetItemGUID` is documented with an `ItemLocation` argument as well, and
+`items:Phase2_Rederive` asks it about every committed item's slot before knowing the slot holds
+anything. No error from it has been seen; Blizzard checks `DoesItemExist` before it (the WoW Token sell
+frame).
+
 ## Dual-Bank Tab Routing (Retail Character Bank vs Warbank)
 **Problem**: In Retail, Character Bank (`bankType = Character`) and Account Bank (`bankType = Account`) share `const.BAG_KIND.BANK`. If `categoryToGroup[BANK]` is stored as a flat dictionary, assigning a category to a Warbank tab overwrites the Character Bank assignment. `ItemBelongsToTab` strictly filters items by `itemIsAccountBank == tabIsAccountBank`, so Character Bank items of that category cannot show in the Warbank tab, cannot show in any Character Bank tab (since `assignedGroup` points to the Warbank tab), and are rejected by default Tab 1 (which only accepts unassigned categories). The items completely vanish from all bank tabs.
 

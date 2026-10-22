@@ -2865,11 +2865,21 @@ function items:ReuseHarvestedSlot(kind, previous, bagid, slotid)
   return previous, info
 end
 
+-- refundableAt says whether the item at a location can still be refunded. It is read with the slot,
+-- as every location property: CanBeRefunded takes an ItemLocation that holds an item (not an
+-- EmptiableItemLocation, ItemDocumentation.lua) and raises an error for an empty one, so it is asked
+-- only by reads that know the slot holds the item.
+---@param itemLocation ItemLocationMixin
+---@return boolean
+local function refundableAt(itemLocation)
+  return C_Item.CanBeRefunded ~= nil and C_Item.CanBeRefunded(itemLocation) == true
+end
+
 -- RefreshKeptItem refreshes the fields of a kept item that change without its slot
 -- changing, each computed exactly as AttachItemInfo computes it: quest state, tooltip text
 -- (a cache hit, or a re-scan after TOOLTIP_DATA_UPDATE dropped it), gear sets (the set map
--- is rebuilt every sweep) and the new-item flag. The caller has checked that the slot still
--- holds the item (its GUID).
+-- is rebuilt every sweep), the new-item flag and whether it can still be refunded (its refund
+-- window ends). The caller has checked that the slot still holds the item (its GUID).
 ---@param kind BagKind
 ---@param item ItemData
 ---@param bagid number
@@ -2893,6 +2903,7 @@ function items:RefreshKeptItem(kind, item, bagid, slotid, itemGUID)
   itemInfo.tooltipMarks = tooltipMarks
   itemInfo.equipmentSets = equipmentSets:GetItemSets(bagid, slotid)
   itemInfo.isNewItem = self:ClientNewItemFlag(bagid, slotid)
+  itemInfo.refundable = refundableAt(ItemLocation:CreateFromBagAndSlot(bagid, slotid))
   self:SeedNewItemTimer(kind, item)
   -- Quest state, tooltip text and gear sets are inputs of the item's category and search entry:
   -- when one changed, nothing kept about the item stands (data-loader.md §18).
@@ -3464,6 +3475,8 @@ function items:AttachItemInfo(data, kind, containerInfo)
     tooltipText = tooltipText,
     tooltipMarks = tooltipMarks,
   })
+  -- A purchase that can still be refunded: category automation leaves it alone (automation.md §2).
+  data.itemInfo.refundable = refundableAt(itemLocation)
   -- Scrapping asks about the item where it is; only a bag slot has a location.
   if data.itemInfo.traits and C_Item.CanScrapItem then
     data.itemInfo.traits.isScrappable = C_Item.CanScrapItem(itemLocation) == true

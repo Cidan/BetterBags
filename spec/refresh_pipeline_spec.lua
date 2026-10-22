@@ -1835,6 +1835,25 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are.equal(2, slotInfo.itemsBySlotKey["0_1"].itemInfo.traits.craftingQuality, "read again once loaded")
     end)
 
+    -- Category automation leaves a purchase that can still be refunded alone, deciding from the bags'
+    -- last read (automation.md §2): so the read records it, from the slot that holds the item, and a
+    -- kept slot reads it again (the refund window ends without the slot changing).
+    it("reads whether each item can still be refunded, and again while it stays in its slot", function()
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      override(_G, "_refundableLocations", { ["0:1"] = true })
+      local slotInfo = refreshBackpack()
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].itemInfo.refundable)
+      assert.is_false(slotInfo.itemsBySlotKey["0_2"].itemInfo.refundable)
+      _G._refundableLocations["0:1"] = nil
+      local before = slotInfo.itemsBySlotKey["0_1"]
+      slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.equal(before, slotInfo.itemsBySlotKey["0_1"], "kept")
+      assert.is_false(slotInfo.itemsBySlotKey["0_1"].itemInfo.refundable, "its window ended")
+      _G._refundableLocations["0:2"] = true
+      slotInfo = refreshBackpack({ derive = true })
+      assert.is_true(slotInfo.itemsBySlotKey["0_2"].itemInfo.refundable, "a recalculation reads it too")
+    end)
+
     -- One search category per new field group, end to end: the harvest reads the traits from the
     -- slot's link, the index holds them, and a kept slot keeps them.
     it("reads each item's traits from its link, and searches them", function()
@@ -4127,6 +4146,15 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       override(items, "Phase11_CommitAndDispatch", function(...)
         commits = commits + 1
         return commit(...)
+      end)
+      -- The CanBeRefunded mock looks the slot up to know whether it holds an item; the client's reads no
+      -- bag slot, so that lookup is not counted.
+      local canBeRefunded = _G.C_Item.CanBeRefunded
+      override(_G.C_Item, "CanBeRefunded", function(...)
+        local before = reads
+        local refundable = canBeRefunded(...)
+        reads = before
+        return refundable
       end)
     end)
 

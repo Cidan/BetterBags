@@ -35,7 +35,8 @@ describe("Automation", function()
     return context:New("spec")
   end
 
-  -- put puts an item in a backpack slot, committed and live: its category, its price and what it is.
+  -- put puts an item in a backpack slot, as the bags last read it (data) and as the client has it now
+  -- (live, guid): its category, its price and what it is.
   local function put(bag, slot, id, category, extra)
     extra = extra or {}
     local key = bag .. "_" .. slot
@@ -43,11 +44,12 @@ describe("Automation", function()
       bagid = bag, slotid = slot, slotkey = key, kind = BACKPACK, isItemEmpty = false,
       harvestIncomplete = extra.cold,
       itemInfo = { itemID = id, itemGUID = "guid-" .. key, itemLink = "[Item " .. id .. "]", sellPrice = 5,
-        traits = { sellPrice = extra.price or 100 }, equipmentSets = extra.sets },
+        traits = { sellPrice = extra.price or 100 }, equipmentSets = extra.sets, refundable = extra.refundable == true },
       containerInfo = { hasNoValue = extra.noValue == true, stackCount = extra.count or 1 },
     }
     slots[key] = { data = data, live = { stackCount = extra.count or 1, hasNoValue = extra.noValue == true,
       isLocked = false }, guid = "guid-" .. key }
+    refundable[key] = extra.refundable == true
     ofCategory[key] = category
     return data
   end
@@ -105,13 +107,24 @@ describe("Automation", function()
         cursor = true
       end,
     })
+    -- An item is in a slot while the client reports it (live); the bags' last read (data) can lag.
+    local function exists(location)
+      local bag, slot = location:GetBagAndSlot()
+      local s = slots[bag .. "_" .. slot]
+      return s ~= nil and s.live ~= nil
+    end
     override(_G, "C_Item", {
       GetItemGUID = function(location)
         local bag, slot = location:GetBagAndSlot()
         local s = slots[bag .. "_" .. slot]
         return s and s.guid
       end,
+      -- As the client: an empty slot is an error (a capture: "bad argument #1 to '?' (Usage: local
+      -- canBeRefunded = C_Item.CanBeRefunded(itemLocation))").
       CanBeRefunded = function(location)
+        if not exists(location) then
+          error("bad argument #1 to '?' (Usage: local canBeRefunded = C_Item.CanBeRefunded(itemLocation))")
+        end
         local bag, slot = location:GetBagAndSlot()
         return refundable[bag .. "_" .. slot] == true
       end,
@@ -158,8 +171,7 @@ describe("Automation", function()
 
     it("says why it leaves an item alone", function()
       put(0, 1, 11, "Junk", { sets = { "Tank" } })
-      put(0, 2, 12, "Junk")
-      refundable["0_2"] = true
+      put(0, 2, 12, "Junk", { refundable = true })
       put(0, 3, 13, "Junk", { noValue = true })
       put(0, 4, 14, "Trash", { noValue = true })
       put(0, 5, 15, "Junk", { cold = true })
@@ -172,6 +184,29 @@ describe("Automation", function()
       assert.are.equal("none", reasons["0_4"], "an item merchants do not buy can still be destroyed")
       assert.truthy(reasons["0_5"]:find("not loaded", 1, true))
       assert.are.equal("none", reasons["0_6"])
+    end)
+
+    -- Reported: 58 errors from CanBeRefunded on an emptied slot. A sale empties slots before the bags
+    -- are read again, and BetterBags Next's vendor drew on PLAYER_MONEY and BAG_UPDATE_DELAYED in
+    -- between, asking the client about the slots the last read had. What automation decides comes from
+    -- that read alone; only acting asks the client, once it shows the item is still there.
+    it("decides from the bags' last read, asking the client nothing, and acts only on what is still there", function()
+      put(0, 1, 11, "Junk")
+      put(0, 2, 12, "Trash", { noValue = true })
+      put(0, 3, 13, "Trash", { refundable = true })
+      for _, key in ipairs({ "0_1", "0_2", "0_3" }) do
+        slots[key].live, slots[key].guid = nil, nil
+      end
+      local reasons = {}
+      assert.has_no.errors(function()
+        for _, e in ipairs(automation:Entries(ctx())) do reasons[e.data.slotkey] = e.blocked or "none" end
+      end)
+      assert.are.equal("none", reasons["0_1"])
+      assert.truthy(reasons["0_3"]:find("refunded", 1, true), "as the read had it")
+      sell()
+      assert.are.same({}, used)
+      assert.are.equal("nothing", automation:DestroyNext(ctx()))
+      assert.are.same({}, picked)
     end)
 
     -- An item a category destroys is sold instead when a merchant buys it, as Vendor does.
@@ -328,12 +363,12 @@ describe("Automation", function()
       return keys
     end
 
-    it("lists what destroy categories hold that is still in its slot", function()
+    it("lists what destroy categories hold, as the bags were last read", function()
       put(0, 1, 11, "Trash", { noValue = true })
       put(0, 2, 12, "Trash", { noValue = true })
       put(0, 3, 13, "Junk", { noValue = true })
       slots["0_2"].guid = "another item"
-      assert.are.same({ "0_1" }, keysOf(automation:DestroyQueue(ctx())))
+      assert.are.same({ "0_1", "0_2" }, keysOf(automation:DestroyQueue(ctx())))
     end)
 
     it("leaves out what a sale holds, until the sale is done with it", function()
@@ -355,11 +390,12 @@ describe("Automation", function()
 
     it("keeps what a sale sold out of it while the bags catch up", function()
       put(0, 1, 11, "Trash")
-      C_Container.UseContainerItem = function(bag, slot) table.insert(used, bag .. "_" .. slot) end
+      local read = slots["0_1"].data
       automation:OnMerchantShow(ctx())
       run()
       assert.are.same({ "0_1" }, used)
-      assert.are.same({}, keysOf(automation:DestroyQueue(ctx())), "sold, though the client still shows it")
+      slots["0_1"] = { data = read }
+      assert.are.same({}, keysOf(automation:DestroyQueue(ctx())), "sold, though the last read still has it")
     end)
 
     it("starts again at each merchant", function()

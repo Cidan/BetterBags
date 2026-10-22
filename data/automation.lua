@@ -73,8 +73,9 @@ local function locationOf(data)
   return ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
 end
 
--- refundable says whether a purchase can still be refunded: Blizzard asks before refunding one
--- (ContainerFrame_GetExtendedPriceString), which automation would skip.
+-- refundable says whether a purchase can still be refunded now: Blizzard asks before refunding one
+-- (ContainerFrame_GetExtendedPriceString), which automation would skip. Only for a location that holds
+-- an item (CanBeRefunded raises an error for an empty one): StillThere, acting, after the slot's info.
 ---@param location ItemLocationMixin
 ---@return boolean
 local function refundable(location)
@@ -99,7 +100,9 @@ end
 
 -- BlockedReason says why automation leaves an item alone, or nil: an item whose data has not
 -- loaded (its category may be wrong), one in an equipment set, a purchase that can still be
--- refunded, and, to sell, one merchants do not buy.
+-- refunded, and, to sell, one merchants do not buy. It reads only the item as the bags last read it:
+-- the client may have changed the slot since (a sale empties slots before the bags are read again),
+-- so what is still there is asked only when acting (StillThere).
 ---@param data ItemData
 ---@param action string
 ---@return string?
@@ -110,7 +113,7 @@ function automation:BlockedReason(data, action)
   if data.itemInfo.equipmentSets and data.itemInfo.equipmentSets[1] ~= nil then
     return L:G("It is in an equipment set.")
   end
-  if refundable(locationOf(data)) then
+  if data.itemInfo.refundable then
     return L:G("It can still be refunded.")
   end
   if action == self.SELL and data.containerInfo and data.containerInfo.hasNoValue then
@@ -174,15 +177,15 @@ function automation:DestroyList(ctx)
 end
 
 -- DestroyQueue lists what destroying takes, in order (BetterBags Next's vendor shows it on its destroy
--- card): what destroy categories hold that is still in its slot (StillThere), leaving out what this
--- merchant's sale holds or sold (the bags may not show a sale yet). An item the sale left unsold (past
--- the limit) is back in it.
+-- card): what destroy categories hold as the bags were last read, leaving out what this merchant's sale
+-- holds or sold (the bags may not show a sale yet). An item the sale left unsold (past the limit) is
+-- back in it. Destroying skips an item no longer where the read had it (DestroyNext).
 ---@param ctx Context
 ---@return AutomationEntry[]
 function automation:DestroyQueue(ctx)
   local list = {}
   for _, entry in ipairs(self:DestroyList(ctx)) do
-    if not self.claimed[entry.data.itemInfo.itemGUID] and self:StillThere(entry, false) then
+    if not self.claimed[entry.data.itemInfo.itemGUID] then
       table.insert(list, entry)
     end
   end
@@ -326,10 +329,10 @@ function automation:FinishSale(sale, reason)
   return reason
 end
 
--- DestroyNext destroys the first item of the destroy queue (DestroyQueue), the whole stack: one item
--- each time, since Blizzard lets an addon destroy only on a key press or a click (DeleteCursorItem has
--- restrictions, GameCursorDocumentation.lua). Not in combat, nor while the cursor holds an item. It
--- says what it destroyed, and returns what it did.
+-- DestroyNext destroys the first item of the destroy queue (DestroyQueue) still in its slot
+-- (StillThere), the whole stack: one item each time, since Blizzard lets an addon destroy only on a key
+-- press or a click (DeleteCursorItem has restrictions, GameCursorDocumentation.lua). Not in combat, nor
+-- while the cursor holds an item. It says what it destroyed, and returns what it did.
 ---@param ctx Context
 ---@return string
 function automation:DestroyNext(ctx)
@@ -341,7 +344,13 @@ function automation:DestroyNext(ctx)
     print("BetterBags: " .. L:G("Put down the item you are holding first."))
     return "cursor"
   end
-  local entry = self:DestroyQueue(ctx)[1]
+  local entry
+  for _, queued in ipairs(self:DestroyQueue(ctx)) do
+    if self:StillThere(queued, false) then
+      entry = queued
+      break
+    end
+  end
   if entry == nil then
     print("BetterBags: " .. L:G("There is nothing to destroy."))
     return "nothing"

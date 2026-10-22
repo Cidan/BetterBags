@@ -674,6 +674,8 @@ describe("NextVendor", function()
       override(C_Container, "GetContainerItemInfo", function(bag, slot)
         return infos[bag .. "_" .. slot] or { hasNoValue = false }
       end)
+      -- Every slot holds an item here, as its info says (C_Item.DoesItemExist reads the item ID).
+      override(C_Container, "GetContainerItemID", function() return 1 end)
     end)
 
     after_each(function()
