@@ -164,10 +164,11 @@ perfSessions.COLLECTION_EVENTS = {
   'NEW_TOY_ADDED', 'TOYS_UPDATED',
 }
 
--- CollectionCounts reads how many pets, toys and appearance sources the account has, as Blizzard's
--- collection panels count them (C_PetJournal.GetNumPets, Blizzard_PetCollection.lua; the toy box's
--- learned and total counts, Blizzard_ToyBox.lua; C_TransmogCollection.GetNumTransmogSources), or
--- nil when the client has none of them.
+-- CollectionCounts reads how many pets, toys and appearances the account has: pets and toys as
+-- Blizzard's collection panels count them (C_PetJournal.GetNumPets, Blizzard_PetCollection.lua; the
+-- toy box's learned and total counts, Blizzard_ToyBox.lua), appearances as the unfiltered
+-- C_TransmogCollection.GetCategoryCollectedCount summed over every category but None (the wardrobe's
+-- progress bar reads the filtered one, Blizzard_Wardrobe.lua). Nil when the client has none of them.
 ---@return table?
 function perfSessions:CollectionCounts()
   local out = {}
@@ -180,8 +181,15 @@ function perfSessions:CollectionCounts()
     out.toys, out.toysLearned = toys.GetNumTotalDisplayedToys(), toys.GetNumLearnedDisplayedToys()
   end
   local transmog = _G.C_TransmogCollection
-  if transmog and transmog.GetNumTransmogSources then
-    out.transmogSources = transmog.GetNumTransmogSources()
+  local categories = Enum and Enum.TransmogCollectionType
+  if transmog and transmog.GetCategoryCollectedCount and categories then
+    local collected = 0
+    for _, category in pairs(categories) do
+      if category ~= categories.None then
+        collected = collected + (transmog.GetCategoryCollectedCount(category) or 0)
+      end
+    end
+    out.appearances = collected
   end
   if next(out) == nil then
     return nil

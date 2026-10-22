@@ -542,7 +542,11 @@ listened to none of theirs. PerfSessions now listens, where the client has them
 trace, and while a capture runs it holds a `[collections]` call whose argument is
 `perfSessions:CollectionCounts()`: `pets`, `petsOwned` (`C_PetJournal.GetNumPets`, as
 Blizzard_PetCollection.lua counts them), `toys`, `toysLearned` (the toy box's displayed totals, as
-Blizzard_ToyBox.lua counts them), `transmogSources` (`C_TransmogCollection.GetNumTransmogSources`);
+Blizzard_ToyBox.lua counts them), `appearances` (`C_TransmogCollection.GetCategoryCollectedCount`
+summed over every `Enum.TransmogCollectionType` but None: the unfiltered count of what the
+wardrobe's progress bar shows, which reads `GetFilteredCategoryCollectedCount`, Blizzard_Wardrobe.lua).
+The first version recorded `GetNumTransmogSources`, which is the number of source filters the
+wardrobe loops over (Blizzard_Wardrobe.lua:67): 7 throughout a login capture;
 nothing is read while no capture runs. The counts at the start and the end are in
 `meta.collectionsStart` / `collectionsStop` (nil on a client with none of these APIs).
 Coverage: `spec/debug/perf_sessions_spec.lua` (counts at start and stop, missing APIs, each event

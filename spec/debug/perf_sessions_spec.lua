@@ -391,13 +391,21 @@ describe("PerfSessions", function()
     -- When the pet journal, the toy box and the appearance collection have loaded, against the bag
     -- reads (docs/vendor-compat.md, "Needs an in-game check"): their counts at the start and the
     -- end, and each collection event with the counts at that moment, in the trace.
+    -- Appearances collected: GetCategoryCollectedCount summed over every category (TransmogCollectionType,
+    -- TransmogSharedDocumentation.lua) but None. (GetNumTransmogSources, used at first, is the number of
+    -- source filters, Blizzard_Wardrobe.lua:67: 7 in a login capture whatever was collected.)
     local function collections()
-      local saved = { _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection }
+      local saved = { _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection, _G.Enum.TransmogCollectionType }
       _G.C_PetJournal = { GetNumPets = function() return 1200, 850 end }
       _G.C_ToyBox = { GetNumTotalDisplayedToys = function() return 900 end,
         GetNumLearnedDisplayedToys = function() return 410 end }
-      _G.C_TransmogCollection = { GetNumTransmogSources = function() return 31000 end }
-      return function() _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection = saved[1], saved[2], saved[3] end
+      _G.Enum.TransmogCollectionType = { None = 0, Head = 1, Shoulder = 2, Paired = 29 }
+      local collected = { [0] = 1000000, [1] = 300, [2] = 250, [29] = 50 }
+      _G.C_TransmogCollection = { GetCategoryCollectedCount = function(category) return collected[category] end }
+      return function()
+        _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection = saved[1], saved[2], saved[3]
+        _G.Enum.TransmogCollectionType = saved[4]
+      end
     end
 
     it("records the collections' counts when it starts and stops", function()
@@ -406,23 +414,22 @@ describe("PerfSessions", function()
       _G.C_PetJournal.GetNumPets = function() return 1201, 851 end
       local session = perfSessions:StopCapture()
       restore()
-      assert.are.same({ pets = 1200, petsOwned = 850, toys = 900, toysLearned = 410, transmogSources = 31000 },
+      assert.are.same({ pets = 1200, petsOwned = 850, toys = 900, toysLearned = 410, appearances = 600 },
         session.meta.collectionsStart)
       assert.are.equal(851, session.meta.collectionsStop.petsOwned)
     end)
 
     it("leaves out what a client has no collection for", function()
-      local saved = { _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection }
+      local restore = collections()
       _G.C_PetJournal, _G.C_ToyBox = nil, nil
-      _G.C_TransmogCollection = { GetNumTransmogSources = function() return 5 end }
       perfSessions:StartCapture("manual")
       local session = perfSessions:StopCapture()
-      _G.C_TransmogCollection = nil
+      _G.Enum.TransmogCollectionType = nil
       perfSessions:StartCapture("manual")
       local none = perfSessions:StopCapture()
-      _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection = saved[1], saved[2], saved[3]
-      assert.are.same({ transmogSources = 5 }, session.meta.collectionsStart)
-      assert.is_nil(none.meta.collectionsStart)
+      restore()
+      assert.are.same({ appearances = 600 }, session.meta.collectionsStart)
+      assert.is_nil(none.meta.collectionsStart, "no categories to count")
     end)
 
     it("traces each collection event with the counts at that moment", function()
