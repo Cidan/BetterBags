@@ -497,47 +497,25 @@ function search:isInIndex(name, value)
   return index.ngrams[string.lower(value)] or {}
 end
 
+-- isNotInIndex returns every indexed item whose value is not the one isInIndex looks for, items
+-- without the field included: the other items, as a plain set. An unknown field matches nothing.
 ---@param name string The name of the search index to lookup
 ---@param value any
 ---@return table<string, boolean>
 function search:isNotInIndex(name, value)
-  local index = self:GetIndex(name)
-  if not index then return {} end
+  if not self:GetIndex(name) then return {} end
+  return self:Complement(self:isInIndex(name, value))
+end
+
+-- Complement returns every item a query can match (Universe) that is not in set.
+---@param set table<string, boolean>
+---@return table<string, boolean>
+function search:Complement(set)
   ---@type table<string, boolean>
-  local results = {
-    ["___NEGATED___"] = true
-  }
-  if index.fullTextOnly then
-    for k in pairs(self:isFullTextMatch(name, tostring(value))) do
-      results[k] = false
-    end
-    return results
-  end
-  if type(tonumber(value)) == 'number' then
-    local node = index.numbers:ExactMatch(tonumber(value)--[[@as number]])
-    if node then
-      for k in pairs(node.data) do
-        results[k] = false
-      end
-      return results
-    else
-      return results
-    end
-  end
-
-  local b = self:StringToBoolean(string.lower(value))
-  if b ~= nil then
-    if index.bools[b] then
-      for k in pairs(index.bools[b]) do
-        results[k] = false
-      end
-    end
-    return results
-  end
-
-  if index.ngrams[string.lower(value)] ~= nil then
-    for k in pairs(index.ngrams[string.lower(value)]) do
-      results[k] = false
+  local results = {}
+  for slotkey in pairs(self:Universe()) do
+    if not set[slotkey] then
+      results[slotkey] = true
     end
   end
   return results
@@ -560,9 +538,7 @@ end
 ---@param item ItemData
 ---@return boolean
 function search:Find(query, item)
-  local ast = QueryParser:Query(query)
-  local p, n = self:EvaluateQuery(ast)
-  return p[item.slotkey] and not n[item.slotkey]
+  return self:EvaluateQuery(QueryParser:Query(query))[item.slotkey] == true
 end
 
 ---@param query string
@@ -570,10 +546,8 @@ end
 function search:Search(query)
   ---@type table<string, boolean>
   local results = {}
-  local ast = QueryParser:Query(query)
-  local p, n = self:EvaluateQuery(ast)
-  for k, v in pairs(p) do
-    if v and not n[k] then
+  for k, v in pairs(self:EvaluateQuery(QueryParser:Query(query))) do
+    if v then
       results[k] = true
     end
   end
@@ -758,78 +732,46 @@ function search:EvaluateAST(node)
       end
   end
 
-  ---@param op string
-  ---@param left table<string, boolean>
-  ---@param right table<string, boolean>
-  ---@return table<string, boolean>
-  local function combine_results(op, left, right)
-    ---@type table<string, boolean>
-    local result = {}
-    if op == "AND" then
-      for k in pairs(left) do
-        if left[k] == true then
-          if right[k] == true or (right[k] == nil and right["___NEGATED___"] == true) then
-            result[k] = true
-          else
-            result[k] = false
-          end
-        elseif left[k] == false then
-          result[k] = false
-        elseif left[k] == nil and left["___NEGATED___"] == true then
-          if right[k] == false then
-            result[k] = true
-          else
-            result[k] = false
-          end
-        end
-      end
-      for k in pairs(right) do
-        if not result[k] then
-          if right[k] == true then
-            if left[k] == true or (left[k] == nil and left["___NEGATED___"] == true) then
-              result[k] = true
-            else
-              result[k] = false
-            end
-          elseif right[k] == false then
-              result[k] = false
-          elseif right[k] == nil and right["___NEGATED___"] == true then
-            if left[k] == false then
-              result[k] = true
-            else
-              result[k] = false
-            end
-          end
-        end
-      end
-    elseif op == "OR" then
-      for k, v in pairs(left) do result[k] = v end
-      for k, v in pairs(right) do
-        if result[k] == nil or (result[k] == false and v == true) then
-          result[k] = v
-        end
-      end
-    end
-    return result
-  end
-
   if node.type == "logical" then
-      if node.operator == "AND" or node.operator == "OR" then
-          local left = self:EvaluateAST(node.left)
+      if node.operator == "AND" then
+          -- A side that is a NOT removes its expression's items from the other side, which costs
+          -- what that side holds, not every indexed item (Complement).
+          local keep, drop = node.left, nil
+          if node.right.type == "logical" and node.right.operator == "NOT" then
+            drop = node.right.expression
+          elseif node.left.type == "logical" and node.left.operator == "NOT" then
+            keep, drop = node.right, node.left.expression
+          end
+          ---@type table<string, boolean>
+          local result = {}
+          if drop then
+            local removed = self:EvaluateAST(drop)
+            for k, v in pairs(self:EvaluateAST(keep)) do
+              if v and not removed[k] then
+                result[k] = true
+              end
+            end
+            return result
+          end
           local right = self:EvaluateAST(node.right)
-          return combine_results(node.operator, left, right)
+          for k, v in pairs(self:EvaluateAST(node.left)) do
+            if v and right[k] then
+              result[k] = true
+            end
+          end
+          return result
+      elseif node.operator == "OR" then
+          ---@type table<string, boolean>
+          local result = {}
+          for k, v in pairs(self:EvaluateAST(node.left)) do
+            if v then result[k] = true end
+          end
+          for k, v in pairs(self:EvaluateAST(node.right)) do
+            if v then result[k] = true end
+          end
+          return result
       elseif node.operator == "NOT" then
-          if node.expression == nil then
-              return {}
-          end
-          local result = self:EvaluateAST(node.expression)
-         ---@type table<string, boolean>
-          local negated = {}
-          for k in pairs(result) do
-              negated[k] = false
-          end
-          negated["___NEGATED___"] = true
-          return negated
+          return self:Complement(self:EvaluateAST(node.expression))
       else
           error("Unknown logical operator: " .. node.operator)
       end
@@ -842,48 +784,24 @@ function search:EvaluateAST(node)
   end
 end
 
+-- EvaluateQuery returns the items a parsed query matches, by slot key. Every part of a query is a
+-- set of the items it matches: AND keeps the items in both, OR the items in either, and NOT (and !=)
+-- every item a query can match (Universe) outside its part's set.
 ---@param ast? QueryNode
----@return table<string, boolean>, table<string, boolean>
+---@return table<string, boolean>
 function search:EvaluateQuery(ast)
-  if ast == nil then return {}, {} end
+  if ast == nil then return {} end
   debug:Inspect("ast", ast)
   local result = self:EvaluateAST(ast)
   debug:Inspect("ast result", result)
-
-  ---@type table<string, boolean>, table<string, boolean>
-  local positive, negative = {}, {}
-  for k, v in pairs(result) do
-      if v then
-          positive[k] = true
-      else
-          negative[k] = true
-      end
-  end
-
-  -- This is a special case where we want to return all items in the index that are not
-  -- in the result set, as this is a negation of the entire index.
-  if not ast.left and not ast.right and ast.operator == "!=" then
-    for k in pairs(self:Universe()) do
-      if not negative[k] then
-        positive[k] = true
-      end
-    end
-  end
-  return positive, negative
+  return result
 end
 
--- Universe returns every slot key a negated query covers: every item of both bags. A search
--- index of other items (BetterBags Next's vendor, next/merchant.lua) returns its own.
+-- Universe returns every item a query can match, by slot key: every item indexed now. During a
+-- sweep that is this sweep's items of the kind being read and the committed items of the others
+-- (Phase 8 syncs both before searching, search-indexing.md §4); a search instance of other items
+-- (BetterBags Next's vendor, next/merchant.lua) has its own.
 ---@return table<string, any>
 function search:Universe()
-  -- JIT load this module, as there is a circular dependency.
-  ---@class Items: AceModule
-  local items = addon:GetModule('Items')
-  local all = {}
-  for _, slotInfo in pairs(items:GetAllSlotInfo()) do
-    for k in pairs(slotInfo.itemsBySlotKey) do
-      all[k] = true
-    end
-  end
-  return all
+  return self.indexed
 end

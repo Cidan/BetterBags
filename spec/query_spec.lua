@@ -399,6 +399,14 @@ describe("QueryParser", function()
       assert.is_nil(ast)
     end)
 
+    -- NOT only ever comes before what it negates. After a term it used to make a NOT node with two
+    -- sides and nothing to negate, which the search evaluated to nothing, or failed on.
+    it("returns nil for a NOT right after a term", function()
+      assert.is_nil(QueryParser:Query("alpha NOT beta"))
+      assert.is_nil(QueryParser:Query("alpha AND beta NOT gamma"))
+      assert.is_not_nil(QueryParser:Query("alpha AND NOT beta"))
+    end)
+
     it("returns nil for unexpected tokens", function()
       -- A lone closing paren with nothing before it
       local ast = QueryParser:Query(")")

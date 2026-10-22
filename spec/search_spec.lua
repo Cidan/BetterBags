@@ -41,7 +41,8 @@ const.ITEM_QUALITY_TO_ENUM = {
   legendary = 5,
 }
 
--- Stub Items (search.EvaluateQuery JIT-loads Items for standalone != queries)
+-- Stub Items: a negation covers the indexed items (search:Universe), never the bags' committed
+-- items, so this stub has none.
 local items = StubBetterBagsModule("Items")
 items.GetAllSlotInfo = function() return {} end
 
@@ -178,14 +179,109 @@ describe("Search", function()
 
   -- ─── Negation ───────────────────────────────────────────────────────────────
 
-  describe("Negation (isNotInIndex)", function()
+  -- A NOT or a != matches every indexed item the negated part does not: on its own, inside an OR,
+  -- around a group. Before, a negation only marked what it excluded, and only an AND (or a bare
+  -- `field != value`) used that, so `NOT rarity = poor` on its own matched nothing
+  -- (docs/vendor-compat.md, "The query engine today").
+  describe("Negation", function()
+    local items4
 
-    it("returns negated results with ___NEGATED___ marker", function()
-      search:Add(MockSearchItem({slotkey = "s1", name = "Sword", quality = 4}))
-      search:Add(MockSearchItem({slotkey = "s2", name = "Shield", quality = 1}))
-      local results = search:isNotInIndex("rarity", 4)
-      assert.is_true(results["___NEGATED___"] or false)
-      assert.are.equal(false, results["s1"])
+    before_each(function()
+      items4 = {
+        sword = MockSearchItem({slotkey = "sword", name = "Thunderfury", quality = 4, itemLevel = 300}),
+        shield = MockSearchItem({slotkey = "shield", name = "Bulwark", quality = 3, itemLevel = 200}),
+        potion = MockSearchItem({slotkey = "potion", name = "Healing Potion", quality = 1, itemLevel = 50}),
+        junk = MockSearchItem({slotkey = "junk", name = "Broken Tooth", quality = 0, itemLevel = 1}),
+      }
+      for _, item in pairs(items4) do search:Add(item) end
+    end)
+
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    it("matches every item a NOT excludes, on its own", function()
+      assert.are.same(keys("sword", "shield", "junk"), search:Search("NOT rarity = 1"))
+      assert.are.same(keys("sword", "shield", "potion"), search:Search("not rarity = poor"))
+    end)
+
+    it("matches every other item for !=, with nothing else in the results", function()
+      assert.are.same(keys("sword", "shield", "junk"), search:Search("rarity != 1"))
+      assert.are.same(keys("sword", "shield", "potion"), search:Search("rarity != poor"))
+    end)
+
+    it("keeps a negation's matches through an OR", function()
+      assert.are.same(keys("sword", "shield", "junk"), search:Search("NOT rarity = 1 OR level > 250"))
+      assert.are.same(keys("potion", "junk"), search:Search("rarity = 1 OR NOT level > 100"))
+      assert.are.same(keys("sword", "shield", "potion", "junk"), search:Search("rarity != 4 OR name = thunderfury"))
+    end)
+
+    it("negates a group, and cancels a double NOT", function()
+      assert.are.same(keys("potion", "junk"), search:Search("NOT (rarity = 4 OR rarity = 3)"))
+      assert.are.same(keys("sword"), search:Search("NOT NOT rarity = 4"))
+    end)
+
+    it("combines negations with AND", function()
+      assert.are.same(keys("shield", "potion"), search:Search("NOT rarity = 4 AND NOT rarity = 0"))
+      assert.are.same(keys("shield"), search:Search("level > 100 AND rarity != 4"))
+      assert.are.same(keys("shield"), search:Search("NOT rarity = 4 AND level > 100"))
+      assert.are.same(keys("shield"), search:Search("level > 100 AND NOT rarity = 4"))
+      assert.are.same(keys("junk"), search:Search("NOT (rarity = 4 OR rarity = 3) AND NOT potion"))
+    end)
+
+    -- Measured offline: `A AND NOT B` over 1,500 items took 0.18 ms through the complement and
+    -- 0.06 ms as A minus B (docs/vendor-compat.md).
+    it("takes an AND with a NOT as one side minus the other, never every indexed item", function()
+      local original = search.Complement
+      local calls = 0
+      search.Complement = function(self, set)
+        calls = calls + 1
+        return original(self, set)
+      end
+      local ok, err = pcall(function()
+        assert.are.same(keys("shield"), search:Search("level > 100 AND NOT rarity = 4"))
+        assert.are.same(keys("shield"), search:Search("NOT rarity = 4 AND level > 100"))
+      end)
+      search.Complement = original
+      assert(ok, err)
+      assert.are.equal(0, calls)
+    end)
+
+    it("negates a word searched in every field", function()
+      assert.are.same(keys("sword", "shield", "junk"), search:Search("NOT potion"))
+    end)
+
+    -- The items a negation covers are the ones indexed now. Before, a bare != read the bags'
+    -- committed items, which, while a sweep runs, are the previous sweep's: an item that arrived in
+    -- the sweep did not match until the next one.
+    it("covers every indexed item, and only those, whatever the bags have committed", function()
+      local looted = MockSearchItem({slotkey = "looted", name = "Fresh Loot", quality = 2, itemLevel = 10})
+      search:Add(looted)
+      assert.are.same(keys("sword", "shield", "looted", "junk"), search:Search("rarity != 1"))
+      search:Remove(items4.junk)
+      assert.are.same(keys("sword", "shield", "looted"), search:Search("NOT rarity = 1"))
+    end)
+
+    it("answers a negation for one item (Find)", function()
+      assert.is_true(search:Find("NOT rarity = 4", items4.potion))
+      assert.is_false(search:Find("NOT rarity = 4", items4.sword))
+      assert.is_true(search:Find("rarity != 4", items4.junk))
+    end)
+
+    it("returns the other items from isNotInIndex, as a plain set", function()
+      assert.are.same(keys("shield", "potion", "junk"), search:isNotInIndex("rarity", 4))
+    end)
+
+    it("matches nothing, without failing, for a NOT right after a word", function()
+      assert.are.same({}, search:Search("thunderfury NOT bulwark"))
+      assert.are.same({}, search:Search("level > 1 AND thunderfury NOT bulwark"))
+    end)
+
+    it("matches nothing for != on a field that does not exist, as for =", function()
+      assert.are.same({}, search:Search("nosuchfield != 1"))
+      assert.are.same({}, search:Search("nosuchfield = 1"))
     end)
   end)
 
@@ -305,12 +401,10 @@ describe("Search", function()
 
     it("supports != (not equal) queries", function()
       local results = search:Search("rarity != 1")
-      -- != returns negated results: items with rarity=1 are excluded
-      assert.is_nil(results["potion"])
+      assert.are.same({ sword = true, shield = true }, results)
     end)
 
     it("supports NOT combined with AND", function()
-      -- Standalone NOT only marks exclusions; combine with AND to filter
       local results = search:Search("type %= weapon AND NOT rarity = 1")
       assert.is_true(results["sword"] or false)
       assert.is_nil(results["potion"])
@@ -485,9 +579,8 @@ describe("Search", function()
     it("excludes items whose tooltip contains x for `tooltip != x`", function()
       search:IndexItems({potion = potion(), sword = sword()})
       local results = search:isNotInIndex("tooltip", "health")
-      assert.is_true(results["___NEGATED___"] or false)
-      assert.are.equal(false, results["potion"])
-      assert.is_nil(results["sword"])
+      assert.are.same({ sword = true }, results)
+      assert.are.same({ sword = true }, search:Search("tooltip != health"))
 
       local combined = search:Search("name %= u AND tooltip != health")
       assert.is_true(combined["sword"] or false)

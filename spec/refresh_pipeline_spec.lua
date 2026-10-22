@@ -1679,6 +1679,27 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal("By Custom", categoryOf(slotInfo, "0_1"))
     end)
 
+    -- A rule that is only a negation (docs/vendor-compat.md): it matched nothing before.
+    it("puts every item a NOT rule does not exclude in its category", function()
+      searchCategories({ { "Not Alpha", "NOT alpha" } })
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.are_not.equal("Not Alpha", categoryOf(slotInfo, "0_1"))
+      assert.equal("Not Alpha", categoryOf(slotInfo, "0_2"))
+    end)
+
+    -- A != covers the items indexed in this sweep. It used to read the bags' committed items,
+    -- the previous sweep's while a sweep runs, so a looted item missed it for one sweep.
+    it("matches an item arriving in a sweep against a != rule in that sweep", function()
+      searchCategories({ { "Not Alpha", "name != alpha" } })
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      refreshBackpack()
+      mockContainer[0][2] = { itemID = 303, guid = "guid-303", count = 1 }
+      local slotInfo = refreshBackpack()
+      assert.equal("Not Alpha", categoryOf(slotInfo, "0_2"))
+      assert.are_not.equal("Not Alpha", categoryOf(slotInfo, "0_1"))
+    end)
+
     it("still lets the search box find items by the search category they are in", function()
       searchCategories({ { "Alpha Items", "alpha" } })
       mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }

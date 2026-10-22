@@ -143,6 +143,10 @@ function QueryParser:Parser(tokens)
 
     while peek() and peek().type == "logical" do
       local op = peek().value
+      -- NOT only comes before what it negates (parse_term).
+      if op == "NOT" then
+        error("Unexpected NOT after a term")
+      end
       advance()
       local right = parse_term()
       left = {type = "logical", operator = op, left = left, right = right}

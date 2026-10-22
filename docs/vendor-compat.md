@@ -4,7 +4,11 @@ The plan to make BetterBags' search speak everything the Vendor addon's rules ca
 rule can be written as a BetterBags search rule (a category's rule, or the bags' search box). This
 document is the research behind it: what each Vendor property and function really reads, what
 BetterBags' search has today, what is missing, and what the "math" in Vendor's rules needs from
-BetterBags' query engine. Nothing here is built yet.
+BetterBags' query engine.
+
+**Status** (2026-10-21): decided (below, "Decisions"). Built: negation (NOT and `!=` match every
+indexed item outside their part, anywhere in a query; `.claude/rules/search-indexing.md` §5). The
+rest is planned.
 
 ## Why
 
@@ -153,10 +157,10 @@ noted), and what BetterBags' search has for it today (`fillSnapshot`, `data/sear
 | `IsAlreadyKnown` | the tooltip contains `ITEM_SPELL_KNOWN`, only when `HasUseAbility` | none (`tooltip %= "already known"` works in English) | Proposed `known`: toys from `PlayerHasToy` (`Blizzard_ToyBox.lua:248`), otherwise the tooltip line `ITEM_SPELL_KNOWN`, localized. |
 | `IsPet`, `PetName`, `PetType`, `IsPetTradeable`, `PetSpeciesId`, `PetCount`, `PetLimit` | `C_PetJournal.GetPetInfoByItemID`, `GetNumCollectedInfo` (retail) | none | Proposed `pet`, `petcount`, `petlimit`. |
 | `IsPetCollectable` | `PetCount < PetLimit` | none | Vendor's help says "True if PetCount == PetLimit", the opposite of the code. The code (can still collect) is the useful meaning. Proposed `collectable`. |
-| `CraftedQuality` | `C_TradeSkillUI.GetItemCraftedQualityByItemInfo(link)` (retail) | none | Proposed `craftedquality`. |
+| `CraftedQuality` | `C_TradeSkillUI.GetItemCraftedQualityByItemInfo(link)` (retail) | none | `quality` (below): the crafting tier, a reagent's or a crafted item's. |
 | `IsScrappable` | `C_Item.CanScrapItem(location)` (retail) | none | Proposed `scrappable`. |
 | `IsConduit`, `IsAzeriteItem` | Shadowlands and Battle for Azeroth APIs | none | Old content. Not proposed. |
-| `Quality` | `GetItemInfo(link)` 3rd | `rarity` (`C_Item.GetItemQuality(location)`); `quality` is dead (below) | Same values. Proposed: make `quality` an alias of `rarity`. |
+| `Quality` | `GetItemInfo(link)` 3rd | `rarity` (`C_Item.GetItemQuality(location)`); `quality` is dead (below) | Same values as `rarity`. `quality` stays for crafting quality (below). |
 
 ### Binding
 
@@ -327,9 +331,13 @@ What these mean for Vendor rules:
 Both were added with today's search engine (Search Redone, #494, 2024-07-29) and have never matched
 anything:
 - `quality` is created (`data/search.lua:176`) and never filled; `rarity` holds the item quality.
-  **Fix**: make `quality` an alias of `rarity`, including the quality names (`quality = epic`,
-  `quality >= rare`); `evaluate_condition` special-cases `field == "rarity"` and must take the alias
-  into account.
+  It was meant for crafting quality (the tiers of profession reagents and crafted items), which is
+  why the item quality is `rarity` (the player, 2026-10-21). Nothing in the repository records that:
+  it was created next to `rarity` in #494 with no comment, and no commit, README line or issue
+  mentions crafting quality. **Fix**: fill it with the crafting tier as Blizzard's item buttons
+  read it: `C_TradeSkillUI.GetItemReagentQualityByItemInfo`, else
+  `GetItemCraftedQualityByItemInfo` (`Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua:330-334`;
+  both documented in `TradeSkillUIDocumentation.lua`, a nilable number); retail only.
 - `bagName` is created (`data/search.lua:165`), and the lines that would fill it were commented out
   from the start. **It is also unreachable**: the evaluator lower-cases every field name before
   looking it up (`evaluate_condition`, `data/search.lua:737`), every other index is created
@@ -373,8 +381,8 @@ primary     := number | money | string | name | name "(" args ")" | "(" expressi
 - **Bare words stay text searches.** A bare word is a full-text search today, and real rules rely on
   it: the real profile's rule `cosmetic` searches for the word. A boolean field is tested with
   `field = true` (as `reagent = true` today), never by its bare name, so adding a `cosmetic` field
-  does not change that rule. Accepting Vendor's own spellings (`IsSoulbound`, `PlayerLevel()`) as
-  aliases is a separate decision (end).
+  does not change that rule. Vendor's own spellings are converted by an import, not accepted here
+  (decision 2).
 - **Money**: `5g`, `50s`, `1g50s` as copper.
 
 ### Evaluation
@@ -427,7 +435,7 @@ with its invalidation, as that file requires.
 
 | Field | Type | Source | Clients | Changes when |
 |---|---|---|---|---|
-| `quality` | alias of `rarity` | | all | |
+| `quality` | number | the crafting tier: `GetItemReagentQualityByItemInfo`, else `GetItemCraftedQualityByItemInfo` | retail | |
 | `bagname`, `bag` | text | `C_Container.GetBagName(bagid)` | all | bag swap (a wipe) |
 | `minlevel` | number | `GetItemInfo(link)` 5th | all | the slot changes |
 | `maxlevel` | number | `GetItemUpgradeInfo(link).maxItemLevel`, else `level` | retail (else `level`) | the slot changes |
@@ -443,7 +451,6 @@ with its invalidation, as that file requires.
 | `cosmetic` | bool | `C_Item.IsCosmeticItem` | retail | |
 | `hasappearance`, `appearance`, `source` | bool, known/unknown | `C_TransmogCollection` as Vendor (above) | retail | collecting an appearance (`TRANSMOG_COLLECTION_SOURCE_ADDED`); today a known staleness of kept slots, caches.md §1 |
 | `transmoggable` | bool | the equip location | retail | |
-| `craftedquality` | number | `C_TradeSkillUI.GetItemCraftedQualityByItemInfo(link)` | retail | |
 | `professiongear` | bool | `equipment` and class 19 | retail | |
 | `scrappable` | bool | `C_Item.CanScrapItem(location)` | retail | |
 | `soulbound`, `boe`, `bou`, `warbound`, `wue` | bool | `binding` (above) | all (warbound: retail) | |
@@ -483,6 +490,7 @@ way to limit a match to one line if that turns out to be wanted.
   useful part.
 - Vendor's lists as search fields: a category's added items are the list.
 - Reproducing Lua's value semantics for `and`/`or` (`Quality == (POOR or COMMON)`).
+- Vendor's own spellings in search (`IsSoulbound`, `PlayerLevel()`): an import converts them.
 - `IsEquipped`, `IsConduit`, `IsAzeriteItem`, the debug properties.
 
 ## Needs an in-game check
@@ -502,24 +510,23 @@ way to limit a match to one line if that turns out to be wanted.
 
 ## Decisions
 
-1. **Precedence**: give AND precedence over OR (Lua's), rewriting saved rules that mix them once
-   with parentheses that keep their meaning. Recommended.
-2. **Vendor's spellings**: accept Vendor's names and syntax as aliases (`IsSoulbound` for
-   `soulbound = true`, `PlayerLevel()` for `player.level`, `Quality == EPIC`), so a Vendor rule
-   pasted into BetterBags works, at the cost of a second vocabulary to maintain. Only exact
-   Vendor identifiers (case-sensitive `Is...`, `Has...`, `Player...()`) would be aliases, so bare
-   lower-case words stay text searches.
-3. **Expansion order**: let `<`/`>` compare expansion names by expansion ID.
-4. **`bagname`**: the plain container name, or Show Bags' numbered label.
+Made by the player (2026-10-21):
+1. **Precedence**: AND binds tighter than OR, as in Lua. Saved rules that mix them without
+   parentheses are rewritten once with parentheses that keep their meaning.
+2. **Vendor's spellings**: not accepted in search. Vendor rules come in through an import that
+   converts them to BetterBags' search instead (planned separately).
+3. **Expansion order**: `<` and `>` compare expansion names by expansion ID.
+4. **`bagname`**: the plain container name.
 
 ## Order of work
 
-1. Fix `quality` and `bagname`, and negation (NOT and `!=` against every item). Tests first.
+1. Negation (NOT and `!=` against every indexed item): done. Then precedence, `bagname`, expansion
+   order, and `quality` as the crafting tier. Tests first.
 2. The parser: precedence (with the saved-rule rewrite), `==`/`~=`, arithmetic, functions, player
    values; the evaluator: folding, index lookups, the per-item check narrowed by the index.
 3. The fields above, the cheap ones first (`minlevel`, `price`, `sellable`, `stacksize`,
    `equipment`, `upgrade`, `inset`, the binding booleans), each with its invalidation in caches.md.
-4. Vendor's spellings, if decided.
+4. Importing Vendor's rules, converted to BetterBags' search.
 5. The README's search section and `.claude/rules/search-indexing.md`.
 
 ## Appendix: the player rules in the corpus

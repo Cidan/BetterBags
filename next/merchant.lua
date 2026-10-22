@@ -90,13 +90,10 @@ local MAX_ITEM_COST = 3
 ---@field cost number Copper.
 
 function merchant:Init()
-  -- A search instance of its own: the search module keeps everything it indexes on itself.
+  -- A search instance of its own: the search module keeps everything it indexes on itself, so a
+  -- negated query covers the vendor's items, not the bags' (search:Universe).
   local index = setmetatable({}, { __index = search })
   index:Init()
-  -- A negated query covers the vendor's items, not the bags'.
-  index.Universe = function(own)
-    return own.indexed
-  end
   self.search = index
 end
 
@@ -329,14 +326,7 @@ function merchant:Search(text)
   if text == nil or text == "" then
     return nil
   end
-  -- Only the vendor's slots: the search's results can carry markers of its own (___NEGATED___).
-  local results = {}
-  for slotkey in pairs(self.search:Search(text)) do
-    if self.search.indexed[slotkey] ~= nil then
-      results[slotkey] = true
-    end
-  end
-  return results
+  return self.search:Search(text)
 end
 
 ---@param link? string
