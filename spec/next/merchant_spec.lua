@@ -19,6 +19,9 @@ end
 
 local const = trackStub("Constants")
 const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0, BANK = 1 }
+-- core/constants.lua defines it before next/merchant.lua loads, whose Init runs the search
+-- module's (search:Init reads it).
+const.BRIEF_EXPANSION_MAP = const.BRIEF_EXPANSION_MAP or {}
 local BACKPACK = const.BAG_KIND.BACKPACK
 
 local stubs = {

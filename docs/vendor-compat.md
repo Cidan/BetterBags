@@ -8,8 +8,8 @@ BetterBags' query engine.
 
 **Status** (2026-10-21): decided (below, "Decisions"). Built: negation (NOT and `!=` match every
 indexed item outside their part, anywhere in a query; `.claude/rules/search-indexing.md` §5), and
-precedence (AND before OR, saved rules rewritten once to keep their meaning; §6), and `bagname`
-(§7). The rest is planned.
+precedence (AND before OR, saved rules rewritten once to keep their meaning; §6), `bagname` (§7),
+and expansions in release order (§8). The rest is planned.
 
 ## Why
 
@@ -147,7 +147,7 @@ noted), and what BetterBags' search has for it today (`fillSnapshot`, `data/sear
 | `EquipLoc` | 9th: the token (`"INVTYPE_HEAD"`) | `slot` / `equipmentlocation` holds the localized name (`_G[token]`) | Vendor rules compare against `INVTYPE_*` constants. Proposed: accept the tokens as values of `slot`. |
 | `EquipLocName` | `_G[EquipLoc]` | `slot` | Same value. |
 | `InventoryType` | `ItemMixin:GetInventoryType()` (`Enum.InventoryType`) | none (`data.inventoryType` is read, not indexed) | Low value; the slot covers it. |
-| `ExpansionPackId` | `GetItemInfo` 15th | `expansion` / `exp` holds a short name (`classic`, `bc`, ... `midnight`) | A string field, so `<` and `>` do not work on it (measured below). Vendor's own help warns the ID is set reliably only on equipment. Proposed: order expansion names by their ID, so `exp < legion` works, and accept numbers. |
+| `ExpansionPackId` | `GetItemInfo` 15th | `expansion` / `exp` holds a short name (`classic`, `bc`, ... `midnight`) | A string field, so `<` and `>` did not work on it (measured below). Vendor's own help warns the ID is set reliably only on equipment. Done: `<`/`>` order expansions by release (`exp < legion`), and numbers work (`exp = 3`). |
 | `IsCraftingReagent` | `GetItemInfo` 17th | `reagent` | Same. |
 | `IsEquipment` | `C_Item.IsEquippableItem(id)` | none | The API answers "is gear", not "can this character wear it": Blizzard's `/use` equips anything it accepts that is not worn (`SecureTemplates.lua:430`). Proposed `equipment`. |
 | `IsProfessionEquipment` | `IsEquipment and TypeId == 19` (retail) | none | Proposed `professiongear`, or `equipment and class = 19`. |
@@ -521,8 +521,8 @@ Made by the player (2026-10-21):
 
 ## Order of work
 
-1. Negation (NOT and `!=` against every indexed item), precedence (with the saved-rule rewrite) and
-   `bagname`: done. Then expansion order, and `quality` as the crafting tier. Tests first.
+1. Negation (NOT and `!=` against every indexed item), precedence (with the saved-rule rewrite),
+   `bagname` and expansion order: done. Then `quality` as the crafting tier. Tests first.
 2. The parser: `==`/`~=`, arithmetic, functions, player values; the evaluator: folding, index
    lookups, the per-item check narrowed by the index.
 3. The fields above, the cheap ones first (`minlevel`, `price`, `sellable`, `stacksize`,

@@ -56,6 +56,8 @@ const.OFFSETS = {
 const.BACKPACK_BAGS = { [0] = true, [1] = true }
 const.BANK_BAGS = { [6] = 6, [7] = 7, [8] = 8, [9] = 9, [10] = 10, [11] = 11 }
 const.ACCOUNT_BANK_BAGS = {}
+-- core/constants.lua always defines it; the search module reads it when initialized.
+const.BRIEF_EXPANSION_MAP = const.BRIEF_EXPANSION_MAP or { [0] = "classic" }
 
 local sort = StubBetterBagsModule("Sort")
 sort.SortSectionsAlphabetically = function() return true end

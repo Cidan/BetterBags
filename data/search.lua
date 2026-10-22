@@ -40,6 +40,13 @@ local SNAPSHOT_FIELDS = {
   'binding', 'tooltip', 'bagname', 'level', 'rarity', 'id', 'stackcount', 'class', 'subclass', 'bagid',
   'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
 }
+-- expansionid is not compared: it follows expansion, which is.
+
+-- expansionNumbers maps each expansion's short name to the number it orders by: the lowest expansion
+-- ID const.BRIEF_EXPANSION_MAP gives that name, so TBC Anniversary's 254 ("bc") orders as 1. Built
+-- by search:Init.
+---@type table<string, number>
+local expansionNumbers = {}
 
 ---@param into table[]|nil
 ---@param list string[]|nil
@@ -70,6 +77,7 @@ local function fillSnapshot(s, item)
   s.guid = info.itemGUID
   s.sets = copyList(s.sets, info.equipmentSets)
   s.expansion = info.expacID ~= nil and const.BRIEF_EXPANSION_MAP[info.expacID] or nil
+  s.expansionid = s.expansion and expansionNumbers[s.expansion] or nil
   local equipLoc = info.itemEquipLoc
   if equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and _G[equipLoc] ~= nil and _G[equipLoc] ~= "" then
     s.equipmentlocation = _G[equipLoc]
@@ -130,6 +138,7 @@ end
 -- Number and boolean snapshot fields share their name with the index they go into.
 local NUMBER_FIELDS = {
   'level', 'rarity', 'id', 'stackcount', 'class', 'subclass', 'bagid', 'slotid', 'bindtype',
+  'expansionid',
 }
 local BOOL_FIELDS = { 'reagent', 'isbound', 'bound', 'quest', 'activequest' }
 
@@ -151,6 +160,12 @@ function search:CreateIndex(name, fullTextOnly)
 end
 
 function search:Init()
+  expansionNumbers = {}
+  for id, name in pairs(const.BRIEF_EXPANSION_MAP) do
+    if expansionNumbers[name] == nil or id < expansionNumbers[name] then
+      expansionNumbers[name] = id
+    end
+  end
   self.indicies = {}
   self.indexed = {}
   -- The item object each slot was indexed from (SyncKind skips one still indexed from it).
@@ -181,6 +196,7 @@ function search:Init()
   self:CreateIndex('bagid')
   self:CreateIndex('slotid')
   self:CreateIndex('bindtype')
+  self:CreateIndex('expansionid')
   self:CreateIndex('bonusid')
 
   -- Boolean indexes
@@ -701,6 +717,29 @@ end
 
 ---@param node QueryNode
 ---@return table<string, boolean>
+-- ExpansionNumberOf returns the number an expansion orders by (expansionNumber), from its short
+-- name, or the start of exactly one expansion's name; nil for none or several.
+---@param text string A lower-case name.
+---@return number?
+function search:ExpansionNumberOf(text)
+  if expansionNumbers[text] then
+    return expansionNumbers[text]
+  end
+  local found
+  for name, number in pairs(expansionNumbers) do
+    if name:sub(1, #text) == text then
+      if found then
+        return nil
+      end
+      found = number
+    end
+  end
+  return found
+end
+
+-- Expansions compare by release for these operators, and for = and != with a number.
+local ORDERED = { ["<"] = true, ["<="] = true, [">"] = true, [">="] = true }
+
 function search:EvaluateAST(node)
   if node == nil then
       error("Encountered nil node in AST")
@@ -716,6 +755,15 @@ function search:EvaluateAST(node)
       -- Rarity is a special case, as it is an enum.
       if field == "rarity" then
         return self:isRarity(operator, value)
+      end
+      -- Expansions order by release (expansionid): a comparison, or a number, never a name as text.
+      if (field == "expansion" or field == "exp")
+        and (ORDERED[operator] or (tonumber(value) and (operator == "=" or operator == "!="))) then
+        local number = tonumber(value) or self:ExpansionNumberOf(value)
+        if number == nil then
+          return {}
+        end
+        field, value = "expansionid", tostring(number)
       end
       if operator == "=" then
         return self:isInIndex(field, value)

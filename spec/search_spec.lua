@@ -309,6 +309,66 @@ describe("Search", function()
     end)
   end)
 
+  -- ─── Expansion order ────────────────────────────────────────────────────────
+
+  -- Asked (docs/vendor-compat.md, "Decisions"): < and > compare expansions in release order. The
+  -- field holds a short name, and comparing it matched nothing.
+  describe("expansion order", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      search:Add(MockSearchItem({ slotkey = "classic", expacID = 0 }))
+      search:Add(MockSearchItem({ slotkey = "bc", expacID = 1 }))
+      search:Add(MockSearchItem({ slotkey = "cata", expacID = 3 }))
+      search:Add(MockSearchItem({ slotkey = "tww", expacID = 9 }))
+      search:Add(MockSearchItem({ slotkey = "none" }))
+    end)
+
+    it("orders expansions named in a comparison by their release", function()
+      assert.are.same(keys("classic", "bc"), search:Search("exp < cata"))
+      assert.are.same(keys("cata", "tww"), search:Search("exp >= cata"))
+      assert.are.same(keys("cata", "tww"), search:Search("expansion > bc"))
+      assert.are.same(keys("classic", "bc", "cata"), search:Search("exp <= CATA"))
+    end)
+
+    it("takes an expansion's number", function()
+      assert.are.same(keys("classic", "bc"), search:Search("exp <= 1"))
+      assert.are.same(keys("cata"), search:Search("exp = 3"))
+      assert.are.same(keys("classic", "bc", "tww", "none"), search:Search("exp != 3"))
+    end)
+
+    it("takes the start of a name when only one expansion has it, and matches nothing otherwise", function()
+      assert.are.same(keys("classic", "bc", "cata"), search:Search("exp < tw"))
+      assert.are.same({}, search:Search("exp < c"), "classic or cata")
+      assert.are.same({}, search:Search("exp < nosuchexpansion"))
+    end)
+
+    it("still matches names as text for = and !=", function()
+      assert.are.same(keys("cata"), search:Search("exp = cata"))
+      assert.are.same(keys("classic", "cata"), search:Search("exp = c"))
+    end)
+
+    -- TBC Anniversary tags its items 254, which BetterBags names bc (const.BRIEF_EXPANSION_MAP, set
+    -- when the addon loads, before the search module is initialized).
+    it("orders an expansion by its name, whatever number the client tags it with", function()
+      const.BRIEF_EXPANSION_MAP[254] = "bc"
+      local ok, err = pcall(function()
+        search:Init()
+        search:Add(MockSearchItem({ slotkey = "bc", expacID = 1 }))
+        search:Add(MockSearchItem({ slotkey = "anniversary", expacID = 254 }))
+        search:Add(MockSearchItem({ slotkey = "cata", expacID = 3 }))
+        assert.are.same(keys("bc", "anniversary"), search:Search("exp < cata"))
+        assert.are.same(keys("bc", "anniversary"), search:Search("exp = 1"))
+      end)
+      const.BRIEF_EXPANSION_MAP[254] = nil
+      assert(ok, err)
+    end)
+  end)
+
   -- ─── Index Aliases ──────────────────────────────────────────────────────────
 
   describe("Index aliases", function()
