@@ -3895,12 +3895,15 @@ function items:AttachBasicItemInfo(itemID, data)
 end
 
 -- GetCategory returns the category data is shown in. With own, it leaves search categories out:
--- the item's own category, which search categories are matched against (Phase6_EnrichData).
+-- the item's own category, which search categories are matched against (Phase6_EnrichData). With
+-- ignoreRecent, a recent item gets the category it has once it is no longer recent (category
+-- automation acts by it, automation.md).
 ---@param ctx Context
 ---@param data ItemData
 ---@param own? boolean
+---@param ignoreRecent? boolean
 ---@return string
-function items:GetCategory(ctx, data, own)
+function items:GetCategory(ctx, data, own, ignoreRecent)
   if not data or data.isItemEmpty then
     return L:G("Empty Slot")
   end
@@ -3909,7 +3912,7 @@ function items:GetCategory(ctx, data, own)
     data.itemInfo = {}
   end
 
-  if database:GetCategoryFilter(data.kind, "RecentItems") then
+  if not ignoreRecent and database:GetCategoryFilter(data.kind, "RecentItems") then
     -- A virtual stack root is recent while any pile it merges is (stackRecent, Phase 7). Its own
     -- category (own) goes by the item alone: the search index holds it.
     if items:IsNewItem(data) or (not own and data.stackRecent) then

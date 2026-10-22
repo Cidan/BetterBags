@@ -106,6 +106,7 @@ const.DATABASE_DEFAULTS = {
     debug = false,
     inBagSearch = true,
     categorySell = false,
+    autoSellLimit = true,
     showKeybindWarning = true,
     enterToMakeCategory = true,
     upgradeIconProvider = 'None',
@@ -401,6 +402,12 @@ describe("Database", function()
     it("GetInBagSearch / SetInBagSearch", function()
       DB:SetInBagSearch(false)
       assert.is_false(DB:GetInBagSearch())
+    end)
+
+    it("GetAutoSellLimit / SetAutoSellLimit", function()
+      assert.is_true(DB:GetAutoSellLimit())
+      DB:SetAutoSellLimit(false)
+      assert.is_false(DB:GetAutoSellLimit())
     end)
 
     it("GetCategorySell / SetCategorySell", function()
@@ -896,6 +903,15 @@ describe("Database", function()
       assert.are.same({ 0, 0, 1 }, saved.color)
       assert.are.equal(7, saved.priority)
       assert.are.same({ [0] = false }, saved.enabled)
+    end)
+
+    it("keeps the automation set for a plugin's category when the plugin makes it again", function()
+      DB:UpdateEphemeralItemCategory("Openable", { enabled = { [0] = true }, automation = "sell" })
+      assert.are.equal("sell", DB.data.profile.ephemeralCategoryFilters["Openable"].automation)
+      DB:CreateOrUpdateCategory({ name = "Openable", enabled = { [0] = true }, priority = 1 })
+      assert.are.equal("sell", DB.data.profile.ephemeralCategoryFilters["Openable"].automation)
+      DB:UpdateEphemeralItemCategory("Openable", { enabled = { [0] = true } })
+      assert.is_nil(DB.data.profile.ephemeralCategoryFilters["Openable"].automation, "turned off")
     end)
 
     it("CreateOrUpdateCategory creates a persistent category", function()

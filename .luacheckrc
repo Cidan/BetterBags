@@ -111,6 +111,7 @@ globals = {
 	"HandleModifiedItemClick",
 
 	"bit",
+	"BINDING_NAME_BETTERBAGS_DESTROYNEXT",
 	"BINDING_NAME_BETTERBAGS_TOGGLEBAGS",
 	"BINDING_NAME_BETTERBAGS_TOGGLESEARCH",
 	"BANK_BAG_PURCHASE",
@@ -122,6 +123,7 @@ globals = {
 	"AccountBankPanel",
 	"BankPanel",
 	"BankPanelMixin",
+	"BetterBags_DestroyNextItem",
 	"BetterBags_ToggleBags",
 	"BetterBags_ToggleSearch",
 	"BetterBagsPerfDB",
@@ -166,6 +168,7 @@ globals = {
 	"CreateScrollBoxListLinearView",
 	"CreateScrollBoxLinearView",
 	"CursorUpdate",
+	"DeleteCursorItem",
 	"CursorHasItem",
 	"DAMAGE_TEXT_FONT",
 	"date",

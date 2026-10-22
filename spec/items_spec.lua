@@ -2001,6 +2001,20 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_NewItems.IsNewItem, _G.C_NewItems.RemoveNewItem = savedIsNewItem, savedRemoveNewItem
     end)
 
+    -- Category automation acts on an item by its own category, whether or not it is recent.
+    it("gives an item's category without Recent Items when asked", function()
+      local ctx = addon:GetModule("Context"):New("TestIgnoreRecent")
+      local item = newItem(0, 1, "GUID_A")
+      item.containerInfo = { quality = 0 }
+      items:MarkItemAsNew(ctx, item)
+      local filter = database.GetCategoryFilter
+      database.GetCategoryFilter = function(_, _, name) return name == "RecentItems" end
+      local recent, own = items:GetCategory(ctx, item), items:GetCategory(ctx, item, false, true)
+      database.GetCategoryFilter = filter
+      assert.are.equal("Recent Items", recent)
+      assert.are.equal("Junk", own)
+    end)
+
     it("keeps an item recent after its duration has passed, until the bag closes", function()
       local ctx = addon:GetModule("Context"):New("TestTimerOnly")
       local item = newItem(0, 1, "GUID_A")

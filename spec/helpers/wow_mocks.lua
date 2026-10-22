@@ -2616,6 +2616,9 @@ _G._cursorX = 0
 _G._cursorY = 0
 
 _G.CursorHasItem = function() return _G._cursorHasItem or false end
+-- DeleteCursorItem destroys the item on the cursor (GameCursorDocumentation.lua: no arguments, no
+-- returns, HasRestrictions).
+_G.DeleteCursorItem = function() _G._cursorHasItem = false end
 _G.IsShiftKeyDown = function() return _G._isShiftKeyDown or false end
 -- IsMouseButtonDown([button]) -> down (InputDocumentation.lua): any button without one. Specs set
 -- _G._mouseButtonsDown = { LeftButton = true }.

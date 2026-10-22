@@ -889,8 +889,8 @@ function DB:CreateOrUpdateCategory(category)
       DB.data.profile.customCategoryIndex[itemID] = category.name
     end
   else
-    -- A plugin's category saves only what is the player's (its bags, and the color and priority they
-    -- set): the plugin gives the rest again when it makes it.
+    -- A plugin's category saves only what is the player's (its bags, and the color, priority and
+    -- automation they set): the plugin gives the rest again when it makes it.
     local saved = DB.data.profile.ephemeralCategoryFilters[category.name]
     DB.data.profile.ephemeralCategoryFilters[category.name] = {
       name = category.name,
@@ -901,14 +901,15 @@ function DB:CreateOrUpdateCategory(category)
       itemList = {},
       color = saved and saved.color,
       priority = saved and saved.priority,
+      automation = saved and saved.automation,
     }
   end
 end
 
 -- UpdateEphemeralItemCategory saves what a player set for a plugin's category (its bags, color,
--- priority).
+-- priority, automation).
 ---@param name string
----@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number}
+---@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string}
 function DB:UpdateEphemeralItemCategory(name, fields)
   local saved = DB.data.profile.ephemeralCategoryFilters[name]
   if saved == nil then
@@ -918,6 +919,7 @@ function DB:UpdateEphemeralItemCategory(name, fields)
   saved.enabled = fields.enabled
   saved.color = fields.color
   saved.priority = fields.priority
+  saved.automation = fields.automation
 end
 
 ---@param category string
@@ -999,6 +1001,17 @@ end
 ---@param enabled boolean
 function DB:SetCategorySell(enabled)
   DB.data.profile.categorySell = enabled
+end
+
+-- GetAutoSellLimit says whether category automation stops selling at what buyback keeps (automation.md).
+---@return boolean
+function DB:GetAutoSellLimit()
+  return DB.data.profile.autoSellLimit
+end
+
+---@param enabled boolean
+function DB:SetAutoSellLimit(enabled)
+  DB.data.profile.autoSellLimit = enabled
 end
 
 ---@return boolean

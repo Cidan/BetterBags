@@ -377,7 +377,8 @@ function content:Init()
       } },
       -- Only the classic bags' search box makes a category on Enter (frames/search.lua).
       { title = L:G("Search"), rows = { { setting = 'inBagSearch' }, { setting = 'enterToMakeCategory', design = "classic" } } },
-      { title = L:G("Items"), rows = { { setting = 'upgradeProvider' }, { setting = 'newItemDuration' }, { setting = 'categorySell' } } },
+      { title = L:G("Items"), rows = { { setting = 'upgradeProvider' }, { setting = 'newItemDuration' }, { setting = 'categorySell' },
+        { setting = 'autoSellLimit' } } },
       { title = L:G("What's New"), rows = { { setting = 'changelogOnLogin' } } },
     } } },
   })
@@ -450,6 +451,10 @@ function content:Init()
       { id = "items", title = L:G("Added Items"), shown = function() return categoryEditor:ItemsTabShown() end,
         sections = { tabSection(L:G("Added Items"), { "items", "added", "manual", "drag" },
           function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags) end) } },
+      -- What the category does on its own (automation.md).
+      { id = "automation", title = L:G("Automation"), shown = function() return categoryEditor:AutomationTabShown() end,
+        sections = { tabSection(L:G("Automation"), { "automation", "sell", "vendor", "merchant", "destroy", "junk" },
+          function(parent, window) return categoryEditor:CreateAutomationTab(parent, window, shownBags) end) } },
     },
   })
   -- The classic bags' currency icons (frames/currency.lua), on clients with currencies: retail, WoW:

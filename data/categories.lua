@@ -38,6 +38,7 @@ local context = addon:GetModule('Context')
 ---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
 ---@field isGroupBySubcategory? boolean If true, this category is a groupBy subcategory and should not be manually deleted.
 ---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
+---@field automation? string What it does with its items on its own: "sell" or "destroy" (automation.md).
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -381,13 +382,16 @@ function categories:CreateCategory(ctx, category)
       category.isGroupBySubcategory = savedState.isGroupBySubcategory
       category.groupByParent = savedState.groupByParent
     end
-    -- The color and priority a player set for a plugin's category win over the plugin's.
+    -- The color, priority and automation a player set for a plugin's category win over the plugin's.
     if savedState then
       if savedState.color ~= nil then
         category.color = savedState.color
       end
       if savedState.priority ~= nil then
         category.priority = savedState.priority
+      end
+      if savedState.automation ~= nil then
+        category.automation = savedState.automation
       end
     end
     self.ephemeralCategories[category.name] = category
@@ -427,12 +431,13 @@ end
 
 -- UpdateCategory changes a category in place, keeping its items: fields may hold color (a color, or
 -- false for none), priority, enabled (the bags named are set, the others kept), rule (its search;
--- empty for none) and groupBy. A plugin's category keeps its own rule and group by; the bags, color and
--- priority set for it are saved, and win when the plugin makes it again. It returns false for a name
--- no category has.
+-- empty for none), groupBy and automation ("sell", "destroy", or false for none). A plugin's category
+-- keeps its own rule and group by; the bags, color, priority and automation set for it are saved, and
+-- win when the plugin makes it again. The bags are recalculated unless only the automation changed,
+-- which changes no item's category. It returns false for a name no category has.
 ---@param ctx Context
 ---@param name string
----@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number}
+---@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false}
 ---@return boolean
 function categories:UpdateCategory(ctx, name, fields)
   local saved = database:GetItemCategory(name)
@@ -446,6 +451,9 @@ function categories:UpdateCategory(ctx, name, fields)
   end
   if fields.priority ~= nil then
     filter.priority = fields.priority
+  end
+  if fields.automation ~= nil then
+    filter.automation = fields.automation or nil
   end
   if fields.enabled ~= nil then
     filter.enabled = filter.enabled or everyBag()
@@ -462,11 +470,32 @@ function categories:UpdateCategory(ctx, name, fields)
       saved.groupBy = fields.groupBy
     end
   else
-    database:UpdateEphemeralItemCategory(name, { enabled = filter.enabled, color = filter.color, priority = filter.priority })
+    database:UpdateEphemeralItemCategory(name, { enabled = filter.enabled, color = filter.color, priority = filter.priority,
+      automation = filter.automation })
   end
   events:SendMessage(ctx, 'categories/Changed')
-  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+  local onlyAutomation = fields.automation ~= nil
+  for key in pairs(fields) do
+    if key ~= 'automation' then
+      onlyAutomation = false
+    end
+  end
+  if not onlyAutomation then
+    events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+  end
   return true
+end
+
+-- AutomationOf returns what a category does with its items on its own ("sell", "destroy" or nil;
+-- automation.md): a group by's sections do what their category does. A built-in category has none.
+---@param name string
+---@return string?
+function categories:AutomationOf(name)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    filter = self:GetCategoryByName(filter.groupByParent)
+  end
+  return filter and filter.automation or nil
 end
 
 -- Returns a sorted list of search categories, by priority (ascending).

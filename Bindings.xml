@@ -5,4 +5,7 @@
  <Binding name="BETTERBAGS_TOGGLEBAGS" category="BetterBags">
   BetterBags_ToggleBags()
  </Binding>
+ <Binding name="BETTERBAGS_DESTROYNEXT" category="BetterBags">
+  BetterBags_DestroyNextItem()
+ </Binding>
 </Bindings>

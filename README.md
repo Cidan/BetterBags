@@ -553,6 +553,13 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 	</tr>
 </table>
 
+### Automation
+A category can act on its items on its own. Pick it on the Categories page (`/bb`), then its **Automation** tab:
+- **Sell at Merchants**: when you open a merchant, the category's items in your backpack are sold, one at a time. Hold Shift as you open the merchant to keep them. By default it stops after 12 items, so everything sold can be bought back (General > Items, "Sell at Most 12 Items per Visit").
+- **Destroy**: each press of **Destroy Next Item** (Key Bindings > BetterBags, or the button in the tab) destroys the next of its items, a whole stack. The game only lets an addon destroy one item per key press or click. A merchant buys any of them it can first.
+
+Automation never sells or destroys an item in an equipment set or a purchase you can still refund, and acts on a newly looted item by its category even while it shows under Recent Items. The tab shows which of your backpack's items it would act on now. A rule like `rarity = poor`, `ilvl < player.ilvl - 50 AND binding = soulbound` or `toy = true AND known = true` makes a category worth automating.
+
 ## Themes
 BetterBags offers built-in themes, chosen in Settings > Theme: Default (Blizzard's look), Simple Dark, and Slate, Dark and Parchment, from BetterBags' sister addon Moonlight.  
 BetterBags will detect if you have ElvUI or GW2 UI installed and offer an addon specific theme that follows your ElvUI or GW2 UI settings.
