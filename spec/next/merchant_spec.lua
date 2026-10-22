@@ -120,6 +120,7 @@ describe("NextMerchant", function()
       if groupBy == GROUP_BY_TYPE then return data.itemInfo.itemType end
     end)
     override(stubs.items, "GetAllSlotInfo", function() return {} end)
+    override(stubs.items, "CraftingQualityOf", function(_, l) return idOf(l) == 12 and 2 or nil end)
     override(stubs.categories, "GetCustomCategory", function(_, _, kind, data)
       assert.are.equal(BACKPACK, kind)
       local c = customByID[data.itemInfo.itemID]
@@ -283,6 +284,12 @@ describe("NextMerchant", function()
       assert.are.same({ ["vendor:1"] = true }, merchant:Search("NOT type = armor"), "a NOT covers the vendor's items")
       assert.are.same({}, search:Search("plate"), "nothing in the bags' index")
       assert.are.same({}, search:Search("NOT plate"), "nor in a NOT over the bags' index")
+    end)
+
+    it("searches a vendor item's crafting tier, read from its link", function()
+      _G._merchant.items = { vendorItem(10), vendorItem(12) }
+      merchant:ReadItems(ctx())
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("quality = 2"))
     end)
 
     it("forgets the last vendor's items", function()

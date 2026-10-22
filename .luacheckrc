@@ -140,6 +140,7 @@ globals = {
 	"C_NewItems",
 	"C_Timer",
 	"C_TooltipInfo",
+	"C_TradeSkillUI",
 	"C_TransmogCollection",
 	"COSTS_LABEL",
 	"C_UI",

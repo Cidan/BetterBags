@@ -3115,6 +3115,24 @@ function items:AttachItemInfo(data, kind, containerInfo)
   return self:FinishItemData(data, kind, harvestIncomplete, true)
 end
 
+-- CraftingQualityOf returns an item's crafting quality tier: a reagent's, else a crafted item's, in
+-- the order Blizzard's item buttons read them (SetItemCraftingQualityOverlay,
+-- Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua); nil for an item without one, or on a client
+-- without them. itemInfo is a link or an item ID: a crafted item's tier is its own, so a slot's link.
+---@param itemInfo string|number
+---@return number?
+function items:CraftingQualityOf(itemInfo)
+  local api = C_TradeSkillUI
+  if api == nil then
+    return nil
+  end
+  local tier = api.GetItemReagentQualityByItemInfo and api.GetItemReagentQualityByItemInfo(itemInfo)
+  if tier == nil and api.GetItemCraftedQualityByItemInfo then
+    tier = api.GetItemCraftedQualityByItemInfo(itemInfo)
+  end
+  return tier
+end
+
 -- ReadItemProperties reads what an item is, whatever slot holds it: C_Item.GetItemInfo, with every
 -- field it has no data for yet filled with a fallback (incomplete is then true), and the fields
 -- categories depend on from C_Item.GetItemInfoInstant, which never needs a server query.
@@ -3162,6 +3180,7 @@ function items:ReadItemProperties(itemID, itemLink)
   props.subclassID = instSubclassID or props.subclassID
 
   props.bindType = self:GetBindTypeFromLink(itemLink) or bindType or 0 --link overrides itemID if set
+  props.craftingQuality = self:CraftingQualityOf(itemLink)
 
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
   props.effectiveIlvl = effectiveIlvl or props.itemLevel or 0
@@ -3224,6 +3243,7 @@ function items:ItemInfoOf(props, slot)
     expacID = props.expacID,
     setID = props.setID or 0,
     isCraftingReagent = props.isCraftingReagent,
+    craftingQuality = props.craftingQuality,
     effectiveIlvl = props.effectiveIlvl --[[@as number]],
     isPreview = props.isPreview --[[@as boolean]],
     baseIlvl = props.baseIlvl --[[@as number]],

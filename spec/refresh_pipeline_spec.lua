@@ -1679,6 +1679,20 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal("By Custom", categoryOf(slotInfo, "0_1"))
     end)
 
+    it("reads each item's crafting tier from its link, for the quality field", function()
+      override(_G.C_TradeSkillUI, "GetItemReagentQualityByItemInfo", function(info)
+        return tostring(info):find("item:202", 1, true) and 2 or nil
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.is_nil(slotInfo.itemsBySlotKey["0_1"].itemInfo.craftingQuality)
+      assert.are.equal(2, slotInfo.itemsBySlotKey["0_2"].itemInfo.craftingQuality)
+      searchCategories({ { "Tier 2", "quality = 2" } })
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Tier 2", categoryOf(slotInfo, "0_2"))
+      assert.are_not.equal("Tier 2", categoryOf(slotInfo, "0_1"))
+    end)
+
     it("gives every item the plain name of its bag, for the bagname field", function()
       override(_G.C_Container, "GetBagName", function(bagid)
         return ({ [0] = "Backpack", [1] = "Herb Satchel" })[bagid]

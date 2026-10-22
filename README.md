@@ -400,6 +400,7 @@ Search allows you to find items by the following indices (based on the item belo
 ### Numbers
 - `level` or `ilvl` (ilvl = 528) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
 - `rarity` (rarity = epic or rarity = 4) The rarity of the item. Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Artifact = 6, Heirloom = 7.
+- `quality` (quality >= 2) The crafting quality tier of a profession reagent or a crafted item, the number its quality icon shows (Retail only). Items without a tier have none, so `quality != 2` includes them. For Poor to Legendary, use `rarity`.
 - `id` (id = 212685) The internal itemID of the item. A number uniquely identifying the base item. Specific ItemIDs can be found in the url on the item's WoWHead page.
 - `stackCount` or `count` (stackCount = 1) The number of items in the stack for the item. **NOTE:** Currently count only takes into account the stack size of the "base" stack when using virtual stacks. For example, a virtual stack of 20, 20, and 3 to total 43 items will only be matched with either 20 or 3, not both.
 - `class` (class = 4) The numeric representation of itemType.

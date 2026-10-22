@@ -9,7 +9,8 @@ BetterBags' query engine.
 **Status** (2026-10-21): decided (below, "Decisions"). Built: negation (NOT and `!=` match every
 indexed item outside their part, anywhere in a query; `.claude/rules/search-indexing.md` §5), and
 precedence (AND before OR, saved rules rewritten once to keep their meaning; §6), `bagname` (§7),
-and expansions in release order (§8). The rest is planned.
+expansions in release order (§8), and `quality` as the crafting quality tier (§9). The rest is
+planned.
 
 ## Why
 
@@ -335,10 +336,11 @@ anything:
   It was meant for crafting quality (the tiers of profession reagents and crafted items), which is
   why the item quality is `rarity` (the player, 2026-10-21). Nothing in the repository records that:
   it was created next to `rarity` in #494 with no comment, and no commit, README line or issue
-  mentions crafting quality. **Fix**: fill it with the crafting tier as Blizzard's item buttons
-  read it: `C_TradeSkillUI.GetItemReagentQualityByItemInfo`, else
+  mentions crafting quality. **Fixed**: it holds the crafting tier, read in the order Blizzard's item
+  buttons read it: `C_TradeSkillUI.GetItemReagentQualityByItemInfo`, else
   `GetItemCraftedQualityByItemInfo` (`Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua:330-334`;
-  both documented in `TradeSkillUIDocumentation.lua`, a nilable number); retail only.
+  both documented in `TradeSkillUIDocumentation.lua`, a nilable number); retail only
+  (`.claude/rules/search-indexing.md` §9).
 - `bagName` is created (`data/search.lua:165`), and the lines that would fill it were commented out
   from the start. **It is also unreachable**: the evaluator lower-cases every field name before
   looking it up (`evaluate_condition`, `data/search.lua:737`), every other index is created
@@ -436,8 +438,8 @@ with its invalidation, as that file requires.
 
 | Field | Type | Source | Clients | Changes when |
 |---|---|---|---|---|
-| `quality` | number | the crafting tier: `GetItemReagentQualityByItemInfo`, else `GetItemCraftedQualityByItemInfo` | retail | |
-| `bagname`, `bag` | text | `C_Container.GetBagName(bagid)` | all | bag swap (a wipe) |
+| `quality` (done) | number | the crafting tier: `GetItemReagentQualityByItemInfo`, else `GetItemCraftedQualityByItemInfo`, from the link | retail | the slot changes |
+| `bagname`, `bag` (done) | text | `items:GetPlainBagName(bagid)` (`C_Container.GetBagName`) | all | read every sweep |
 | `minlevel` | number | `GetItemInfo(link)` 5th | all | the slot changes |
 | `maxlevel` | number | `GetItemUpgradeInfo(link).maxItemLevel`, else `level` | retail (else `level`) | the slot changes |
 | `upgradeable`, `track`, `upgradelevel`, `upgrademax` | bool, text, numbers | `GetItemUpgradeInfo(link)` | retail | the slot changes |
@@ -505,6 +507,8 @@ way to limit a match to one line if that turns out to be wanted.
 - `C_Item.IsUsableItem` and `C_Item.GetItemSpell` on an item with a Use effect, one without, and one
   the character cannot use yet.
 - `C_Container.GetBagName` on a retail bank tab and a Warbank tab.
+- `C_TradeSkillUI.GetItemReagentQualityByItemInfo` for a reagent whose item data has not loaded yet,
+  and `GetItemCraftedQualityByItemInfo` on two copies of a crafted item at different tiers.
 - That `NEW_TOY_ADDED`, `NEW_PET_ADDED` and `TRANSMOG_COLLECTION_SOURCE_ADDED` (all documented)
   fire when a toy, pet or appearance is learned from a bag item, and that the item's tooltip text
   changes then ("Already known").
@@ -522,7 +526,7 @@ Made by the player (2026-10-21):
 ## Order of work
 
 1. Negation (NOT and `!=` against every indexed item), precedence (with the saved-rule rewrite),
-   `bagname` and expansion order: done. Then `quality` as the crafting tier. Tests first.
+   `bagname`, expansion order and `quality` as the crafting tier: done.
 2. The parser: `==`/`~=`, arithmetic, functions, player values; the evaluator: folding, index
    lookups, the per-item check narrowed by the index.
 3. The fields above, the cheap ones first (`minlevel`, `price`, `sellable`, `stacksize`,

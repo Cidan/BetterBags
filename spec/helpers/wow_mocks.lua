@@ -2749,6 +2749,12 @@ end
 _G._itemFamilies = {}
 _G.C_Item = _G.C_Item or {}
 _G.C_Item.GetItemFamily = function(itemInfo) return _G._itemFamilies[itemInfo] end
+-- C_TradeSkillUI.GetItemReagentQualityByItemInfo / GetItemCraftedQualityByItemInfo(itemInfo) ->
+-- the item's crafting quality tier, a reagent's or a crafted item's (TradeSkillUIDocumentation.lua,
+-- Nilable). No item has one unless a spec gives it one.
+_G.C_TradeSkillUI = _G.C_TradeSkillUI or {}
+_G.C_TradeSkillUI.GetItemReagentQualityByItemInfo = function(itemInfo) return nil end
+_G.C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function(itemInfo) return nil end
 -- C_Item.CanBeRefunded(itemLocation) -> bool (ItemDocumentation.lua). Specs list
 -- refundable locations in _G._refundableLocations["bag:slot"].
 _G._refundableLocations = {}

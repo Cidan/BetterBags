@@ -37,8 +37,8 @@ local search = addon:NewModule('Search')
 -- whose indexed values changed.
 local SNAPSHOT_FIELDS = {
   'kind', 'name', 'type', 'subtype', 'category', 'guid', 'expansion', 'equipmentlocation',
-  'binding', 'tooltip', 'bagname', 'level', 'rarity', 'id', 'stackcount', 'class', 'subclass', 'bagid',
-  'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
+  'binding', 'tooltip', 'bagname', 'level', 'rarity', 'quality', 'id', 'stackcount', 'class', 'subclass',
+  'bagid', 'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
 }
 -- expansionid is not compared: it follows expansion, which is.
 
@@ -98,6 +98,7 @@ local function fillSnapshot(s, item)
   s.bagname = item.bagName
   s.level = info.currentItemLevel
   s.rarity = info.itemQuality
+  s.quality = info.craftingQuality
   s.id = info.itemID
   s.stackcount = info.currentItemCount
   s.class = info.classID
@@ -137,7 +138,7 @@ end
 
 -- Number and boolean snapshot fields share their name with the index they go into.
 local NUMBER_FIELDS = {
-  'level', 'rarity', 'id', 'stackcount', 'class', 'subclass', 'bagid', 'slotid', 'bindtype',
+  'level', 'rarity', 'quality', 'id', 'stackcount', 'class', 'subclass', 'bagid', 'slotid', 'bindtype',
   'expansionid',
 }
 local BOOL_FIELDS = { 'reagent', 'isbound', 'bound', 'quest', 'activequest' }

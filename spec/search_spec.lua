@@ -309,6 +309,34 @@ describe("Search", function()
     end)
   end)
 
+  -- ─── Crafting quality ───────────────────────────────────────────────────────
+
+  -- quality is the crafting quality tier of reagents and crafted items; an item's quality in the
+  -- Poor-to-Legendary sense is rarity (the player, docs/vendor-compat.md). The index existed and
+  -- was never filled.
+  describe("crafting quality", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      search:Add(MockSearchItem({ slotkey = "ore1", quality = 1, craftingQuality = 1 }))
+      search:Add(MockSearchItem({ slotkey = "ore2", quality = 1, craftingQuality = 2 }))
+      search:Add(MockSearchItem({ slotkey = "ring5", quality = 4, craftingQuality = 5 }))
+      search:Add(MockSearchItem({ slotkey = "sword", quality = 1 }))
+    end)
+
+    it("finds items by their crafting tier, never by their rarity", function()
+      assert.are.same(keys("ore1"), search:Search("quality = 1"))
+      assert.are.same(keys("ore2", "ring5"), search:Search("quality >= 2"))
+      assert.are.same(keys("ring5"), search:Search("quality > 2 AND rarity = epic"))
+      assert.are.same(keys("ore2", "ring5", "sword"), search:Search("quality != 1"))
+      assert.are.same({}, search:Search("quality = epic"), "rarity names are rarity's")
+    end)
+  end)
+
   -- ─── Expansion order ────────────────────────────────────────────────────────
 
   -- Asked (docs/vendor-compat.md, "Decisions"): < and > compare expansions in release order. The
@@ -936,6 +964,7 @@ describe("Search incremental indexing (SyncKind)", function()
       { "equipment sets", function(it) it.itemInfo.equipmentSets = { "Tank" } end },
       { "bonus IDs", function(it) it.itemLinkInfo.bonusIDs = { "6652" } end },
       { "bag name", function(it) it.bagName = "Large Sack" end },
+      { "crafting quality", function(it) it.itemInfo.craftingQuality = 2 end },
     }
     for _, change in ipairs(changes) do
       it(change[1], function()
@@ -996,7 +1025,7 @@ describe("Search incremental indexing (SyncKind)", function()
 
     local function mutate(it)
       local info = it.itemInfo
-      local which = random(19)
+      local which = random(20)
       if which == 1 then info.category = pick(CATEGORIES)
       elseif which == 2 then info.currentItemCount = random(20)
       elseif which == 3 then info.tooltipText = pick(TOOLTIPS)
@@ -1015,6 +1044,7 @@ describe("Search incremental indexing (SyncKind)", function()
       elseif which == 16 then info.isCraftingReagent = not info.isCraftingReagent
       elseif which == 17 then it.questInfo.isQuestItem = not it.questInfo.isQuestItem
       elseif which == 18 then it.bagName = pick({ "Backpack", "Herb Satchel", "Large Sack" })
+      elseif which == 19 then info.craftingQuality = random(3) == 1 and nil or random(5)
       else it.bindingInfo.binding = random(3) - 1 end
     end
 

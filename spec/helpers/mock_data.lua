@@ -58,6 +58,7 @@ function M.ItemData(opts)
       expacID = opts.expacID,
       setID = opts.setID or 0,
       isCraftingReagent = opts.isReagent or false,
+      craftingQuality = opts.craftingQuality,
       effectiveIlvl = opts.effectiveIlvl or opts.itemLevel or 1,
       isPreview = false,
       baseIlvl = opts.baseIlvl or opts.itemLevel or 1,

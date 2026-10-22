@@ -36,6 +36,7 @@ item was read from:
 | Input | Check |
 |---|---|
 | Item ID, link, count, name, icon, quality, lock, bound, readable, loot, filtered, no-value | `C_Container.GetContainerItemInfo`, compared to the raw values (`rawItemName`, `rawIconFileID`, `rawQuality` before fallbacks) |
+| Crafting quality tier (`itemInfo.craftingQuality`, read from the link) | the link above: a reagent's tier is its item's, a crafted item's is in its link |
 | Item identity (two identical stacks swapped) | `C_Item.GetItemGUID` |
 | Current item level (scaling changes it without the link) | `C_Item.GetCurrentItemLevel` |
 | Cold read | `harvestIncomplete` items are never kept |

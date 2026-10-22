@@ -361,6 +361,55 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 
+  -- The quality search field: an item's crafting quality tier (docs/vendor-compat.md).
+  describe("crafting quality", function()
+    local saved, link
+
+    before_each(function()
+      saved = { api = _G.C_TradeSkillUI, reagent = C_TradeSkillUI.GetItemReagentQualityByItemInfo,
+        crafted = C_TradeSkillUI.GetItemCraftedQualityByItemInfo }
+      link = "|cffffffff|Hitem:42::::::::80:::::|h[Draconium Ore]|h|r"
+    end)
+
+    after_each(function()
+      _G.C_TradeSkillUI = saved.api
+      C_TradeSkillUI.GetItemReagentQualityByItemInfo = saved.reagent
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = saved.crafted
+    end)
+
+    it("is a reagent's tier, else a crafted item's, as Blizzard's item buttons read it", function()
+      local asked, askedCrafted = {}, {}
+      C_TradeSkillUI.GetItemReagentQualityByItemInfo = function(info)
+        table.insert(asked, info)
+        return info == "reagent" and 2 or nil
+      end
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function(info)
+        table.insert(askedCrafted, info)
+        return 4
+      end
+      assert.are.equal(2, items:CraftingQualityOf("reagent"))
+      assert.are.equal(4, items:CraftingQualityOf("crafted"))
+      assert.are.same({ "reagent", "crafted" }, asked)
+      assert.are.same({ "crafted" }, askedCrafted, "a reagent's crafted tier is never asked for")
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function() return nil end
+      assert.is_nil(items:CraftingQualityOf("plain"))
+    end)
+
+    it("is nothing on a client without crafting quality", function()
+      C_TradeSkillUI.GetItemReagentQualityByItemInfo = nil
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = nil
+      assert.is_nil(items:CraftingQualityOf(42))
+      _G.C_TradeSkillUI = nil
+      assert.is_nil(items:CraftingQualityOf(42))
+    end)
+
+    -- A crafted item's tier is its own: two copies of one item can differ, and the link says which.
+    it("is read from the slot's link, not the item ID", function()
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function(info) return info == link and 3 or 1 end
+      assert.are.equal(3, items:ReadItemProperties(42, link).craftingQuality)
+    end)
+  end)
+
   -- The bagname search field: a bag's name as Show Bags shows it, without its number.
   describe("plain bag names", function()
     local savedBags, savedKeyring, savedName

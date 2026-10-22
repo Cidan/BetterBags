@@ -364,6 +364,7 @@ function EquipmentManager_UnpackLocation(location) end
 ---@field expacID ExpansionType
 ---@field setID number
 ---@field isCraftingReagent boolean
+---@field craftingQuality? number The crafting quality tier (items:CraftingQualityOf); nil without one.
 ---@field effectiveIlvl number
 ---@field isPreview boolean
 ---@field baseIlvl number
