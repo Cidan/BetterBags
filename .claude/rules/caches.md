@@ -42,8 +42,9 @@ item was read from:
 | Cold read | `harvestIncomplete` items are never kept |
 Refreshed on every kept item, computed exactly as a fresh read (`items:RefreshKeptItem`, also run
 by recalculations on every item still in its slot): new-item flag (`items:ClientNewItemFlag`),
-gear sets, quest state, tooltip text, whether the character can use it and how many of its pet the
-account has (`items:RefreshCharacterState`, search-indexing.md §13 and §14). Known staleness, the same as an unvisited bag: a refundable
+gear sets, quest state, tooltip text, whether the character can use it, how many of its pet the
+account has and whether its appearance is collected (`items:RefreshCharacterState`,
+search-indexing.md §13, §14 and §17). Known staleness, the same as an unvisited bag: a refundable
 purchase's binding expiring, an appearance being collected (until the slot changes or a wipe).
 
 A guild bank slot (guild-bank.md §3) is kept the same way by `items:HarvestGuildBank`, compared on

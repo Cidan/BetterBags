@@ -453,7 +453,7 @@ with its invalidation, as that file requires.
 | `toy`, `known` (done) | bool | whole tooltip lines `TOY` and `ITEM_SPELL_KNOWN` ("What a capture settled") | all | learning it (`NEW_TOY_ADDED`; for the rest, the tooltip text, re-scanned on `TOOLTIP_DATA_UPDATE`, tooltip-scanning.md) |
 | `pet`, `petcount`, `petlimit`, `collectable` (done) | bool, numbers | `C_PetJournal.GetPetInfoByItemID`, `GetNumCollectedInfo` | retail | learning a pet (`NEW_PET_ADDED`) |
 | `cosmetic` (done) | bool | `C_Item.IsCosmeticItem` | retail | the slot changes |
-| `hasappearance` (as `transmoggable`); `appearance`, `source` (after a login capture) | bool, known/unknown | `C_TransmogCollection` as Vendor (above) | retail | collecting an appearance (`TRANSMOG_COLLECTION_SOURCE_ADDED`); today a known staleness of kept slots, caches.md §1 |
+| `hasappearance` (as `transmoggable`); `appearance`, `source` (done) | bool, known/unknown | `C_TransmogCollection` as Vendor (above) | retail | collecting an appearance (`TRANSMOG_COLLECTION_SOURCE_ADDED`); today a known staleness of kept slots, caches.md §1 |
 | `transmoggable` (done) | bool | `C_TransmogCollection.GetItemInfo(link)` returns an appearance | retail | the slot changes |
 | `professiongear` (dropped: `equipment = true AND class = 19`) | bool | | | |
 | `scrappable` (done) | bool | `C_Item.CanScrapItem(location)` | retail, bag slots | the slot changes |
@@ -589,7 +589,8 @@ one is in the bags or the bank.
   92181 is still needed.
 - An heirloom and level-scaled gear: `GetCurrentItemLevel(location)` against the tooltip.
 - Two copies of a crafted item at different tiers.
-- An uncollected appearance: which of the ways of asking says so.
+- An uncollected appearance: which of the ways of asking says so (BetterBags asks all three, in
+  Vendor's order).
 - A known recipe: where its "Already known" line sits against its nested item.
 
 ## Decisions

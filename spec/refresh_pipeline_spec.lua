@@ -2056,9 +2056,34 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
       end)
 
-      it("listens to spells and reputations, bucketed", function()
-        assert.is_function(buckets.SPELLS_CHANGED)
-        assert.is_function(buckets.UPDATE_FACTION)
+      it("listens to spells, reputations and the appearance collection, bucketed", function()
+        for _, name in ipairs({ "SPELLS_CHANGED", "UPDATE_FACTION", "TRANSMOG_COLLECTION_UPDATED",
+          "TRANSMOG_COLLECTION_SOURCE_ADDED", "TRANSMOG_COLLECTION_SOURCE_REMOVED" }) do
+          assert.is_function(buckets[name], name)
+        end
+      end)
+
+      it("recalculates the bags when an appearance is collected, and keeps the search current", function()
+        local collected = false
+        override(_G, "C_TransmogCollection", {
+          GetItemInfo = function(l) if tostring(l):find("item:101", 1, true) then return 1001, 2002 end end,
+          GetCategoryCollectedCount = function(category) return category == 1 and 100 or 0 end,
+          PlayerHasTransmogItemModifiedAppearance = function() return collected end,
+          GetAppearanceSources = function() return {} end,
+          PlayerHasTransmogByItemInfo = function() return false end,
+          PlayerHasTransmog = function() return false end,
+        })
+        items._appearancesLoaded = false
+        refreshBackpack()
+        assert.are.same({ ["0_1"] = true }, search:Search("appearance = unknown"))
+        assert.are.same({ ["0_1"] = true }, search:Search("source = unknown"))
+        collected = true
+        buckets.TRANSMOG_COLLECTION_SOURCE_ADDED(context:New("evt"), {})
+        assert.are.equal(1, #sent)
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.same({ ["0_1"] = true }, search:Search("appearance = known"))
+        assert.are.same({ ["0_1"] = true }, search:Search("source = known"))
+        items._appearancesLoaded = false
       end)
 
       it("recalculates the bags when an answer changed, and keeps the search current", function()

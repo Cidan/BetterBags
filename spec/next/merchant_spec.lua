@@ -121,6 +121,7 @@ describe("NextMerchant", function()
     end)
     override(stubs.items, "GetAllSlotInfo", function() return {} end)
     override(stubs.items, "PetCountsOf", function() return nil end)
+    override(stubs.items, "AppearanceStateOf", function() return nil end)
     override(stubs.items, "ReadItemTraits", function(_, id, l, minLevel, stackSize, sellPrice)
       assert.are.equal(idOf(l), id)
       return { craftingQuality = idOf(l) == 12 and 2 or nil, minLevel = minLevel, stackSize = stackSize,
@@ -300,6 +301,19 @@ describe("NextMerchant", function()
     end)
 
     -- A vendor's pets, by whether the account can learn one more (read when the vendor's items are).
+    it("searches a vendor item's uncollected appearance", function()
+      override(stubs.items, "ReadItemTraits", function(_, id)
+        return { transmoggable = id == 12, appearanceID = id == 12 and 1001 or nil, sourceID = id == 12 and 2002 or nil,
+          stats = {} }
+      end)
+      override(stubs.items, "AppearanceStateOf", function(_, traits)
+        if traits and traits.appearanceID then return false, false end
+      end)
+      _G._merchant.items = { vendorItem(10), vendorItem(12) }
+      merchant:ReadItems(ctx())
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("appearance = unknown"))
+    end)
+
     it("searches a vendor pet by its counts", function()
       override(stubs.items, "ReadItemTraits", function(_, id)
         return { isPet = id == 12, petSpeciesID = id == 12 and 635 or nil, stats = {} }

@@ -924,10 +924,23 @@ local function clientAnswers(fixturePath)
       GetNumCollectedInfo = function(species) local p = bySpecies[species] return answer(p and p.petCollected) end,
     })
     override(_G, "C_PlayerInfo", { CanUseItem = function(id) local p = byID[id] return answer(p and p.canUse) end })
+    -- The bySource map answers the source's collected state the dump recorded; a capture with
+    -- answers about items' appearances had the collection loaded.
+    local bySource = {}
+    for _, p in pairs(byLink) do
+      local source = p.transmog and p.transmog[2]
+      if source and p.transmogCollected then bySource[source] = p end
+    end
     override(_G, "C_TransmogCollection", {
       GetItemInfo = function(link) local p = probeOf(link) return answer(p and p.transmog) end,
       PlayerHasTransmog = function() return false end,
+      GetCategoryCollectedCount = function(category) return next(bySource) and category == 1 and 1 or 0 end,
+      PlayerHasTransmogItemModifiedAppearance = function(source)
+        local p = bySource[source]
+        return answer(p and p.transmogCollected)
+      end,
     })
+    items._appearancesLoaded = false
     override(C_TooltipInfo, "GetBagItem", function(bag, slot)
       local i = at(bag, slot)
       if not i or not i.apiProbe.tooltip then return nil end
@@ -1054,6 +1067,13 @@ describe("Dump harness: the client's own answers (spec/fixtures/dump_retail_12_1
       search:Search("usable = false"))
     assert.are.same(keys("1_6"), search:Search("equippable = true"))
     assert.are.same(keys("1_6"), search:Search("transmoggable = true"))
+  end)
+
+  it("finds the cloak's appearance and source collected", function()
+    read()
+    assert.are.same(keys("1_6"), search:Search("appearance = known"))
+    assert.are.same(keys("1_6"), search:Search("source = known"))
+    assert.are.same({}, search:Search("appearance = unknown"))
   end)
 
   it("finds items by the plain name of their bag", function()

@@ -511,6 +511,18 @@ describe("Search", function()
       assert.are.same({}, search:Search("petcount = 0"), "no count before the journal loaded")
     end)
 
+    it("finds items whose appearance is collected, through any source or this one", function()
+      local cloak = MockSearchItem({ slotkey = "c", traits = { transmoggable = true, stats = {} } })
+      cloak.appearanceKnown, cloak.sourceKnown = true, false
+      local robe = MockSearchItem({ slotkey = "r", traits = { transmoggable = true, stats = {} } })
+      robe.appearanceKnown, robe.sourceKnown = false, false
+      local unloaded = MockSearchItem({ slotkey = "u", traits = { transmoggable = true, stats = {} } })
+      for _, item in ipairs({ cloak, robe, unloaded }) do search:Add(item) end
+      assert.are.same(keys("c"), search:Search("appearance = known"))
+      assert.are.same(keys("r"), search:Search("appearance = unknown"))
+      assert.are.same(keys("c", "r"), search:Search("source = unknown"))
+    end)
+
     it("finds items with an appearance", function()
       assert.are.same(keys("cloak", "plate"), search:Search("transmoggable = true"))
       assert.are.same(keys("recipe"), search:Search("transmoggable = false"))
@@ -1400,6 +1412,8 @@ describe("Search incremental indexing (SyncKind)", function()
       { "appearance", function(it) it.itemInfo.traits.transmoggable = true end },
       { "slot equipped", function(it) it.slotEquipped = 200 end },
       { "slot best", function(it) it.slotBest = 250 end },
+      { "appearance known", function(it) it.appearanceKnown = true end, appearance = true },
+      { "source known", function(it) it.appearanceKnown, it.sourceKnown = true, true end, appearance = true },
       { "pet count", function(it) it.petOwned = 2 end, pet = true },
       { "pet limit", function(it) it.petLimit = 5 end, pet = true },
       { "pet counts known", function(it) it.petOwned, it.petLimit = nil, nil end, pet = true },
@@ -1416,6 +1430,9 @@ describe("Search incremental indexing (SyncKind)", function()
         if change.pet then
           sword.itemInfo.traits.isPet = true
           sword.petOwned, sword.petLimit = 1, 3
+        end
+        if change.appearance then
+          sword.appearanceKnown, sword.sourceKnown = false, false
         end
         local bag = { a = sword }
         search:SyncKind(BACKPACK, bag)

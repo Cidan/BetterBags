@@ -438,10 +438,12 @@ Search allows you to find items by the following indices (based on the item belo
 - `equippable` (equippable = true) Is the item gear your character can wear?
 - `transmoggable` (transmoggable = true) Does the item have an appearance (Retail)?
 - `collectable` (collectable = true) Is the item a battle pet you can still learn one more of (Retail)?
+- `appearance` (appearance = unknown) Is the item's look in your collection? `known` when any item that gives the same appearance has been collected, `unknown` when none has (Retail).
+- `source` (source = unknown) Is this very item's appearance source in your collection? `known` or `unknown` (Retail).
 - `toy` (toy = true) Is the item a toy? (Its tooltip says "Toy".)
 - `known` (known = true) Does the item's tooltip say "Already known" (a toy, recipe, pet or mount you already have)?
 
-The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable`, `scrappable`, `toy`, `known`, `transmoggable`, `usable`, `equippable` and `upgrade` are read once the game has sent the item's data, and `petcount`, `petlimit` and `collectable` once your pet journal has loaded: an item that has just arrived may match none of them for a moment.
+The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable`, `scrappable`, `toy`, `known`, `transmoggable`, `usable`, `equippable` and `upgrade` are read once the game has sent the item's data, `petcount`, `petlimit` and `collectable` once your pet journal has loaded, and `appearance` and `source` once your appearance collection has loaded: an item that has just arrived may match none of them for a moment.
 
 ### Logical Operators
 - `AND` (slot = Legs AND ilvl > 500 \[This will match leg pieces that are also greater than 500 ilvl.\]) The intersection of two terms. Items must match both sides of the AND.

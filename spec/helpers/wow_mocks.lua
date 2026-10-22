@@ -3169,6 +3169,14 @@ function _G.GameTooltip:SetInventoryItem(unit, slot)
   self:Show()
   return true, false, _G._repairCosts["inv:" .. slot]
 end
+-- Enum.TransmogCollectionType (TransmogSharedDocumentation.lua), every value.
+_G.Enum.TransmogCollectionType = {
+  None = 0, Head = 1, Shoulder = 2, Back = 3, Chest = 4, Shirt = 5, Tabard = 6, Wrist = 7,
+  Hands = 8, Waist = 9, Legs = 10, Feet = 11, Wand = 12, OneHAxe = 13, OneHSword = 14,
+  OneHMace = 15, Dagger = 16, Fist = 17, Shield = 18, Holdable = 19, TwoHAxe = 20, TwoHSword = 21,
+  TwoHMace = 22, Staff = 23, Polearm = 24, Bow = 25, Gun = 26, Crossbow = 27, Warglaives = 28,
+  Paired = 29,
+}
 -- Enum.TooltipDataLineType (TooltipInfoSharedDocumentation.lua), every value.
 _G.Enum.TooltipDataLineType = {
   None = 0, Blank = 1, UnitName = 2, GemSocket = 3, AzeriteEssenceSlot = 4,

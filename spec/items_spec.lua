@@ -472,6 +472,7 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_false(t.isPet)
       assert.are.same({ "Critical Strike", "Haste" }, t.stats, "the stats' names, sorted, unknown keys left out")
       assert.is_true(t.transmoggable, "it has an appearance")
+      assert.are.same({ 1001, 2002 }, { t.appearanceID, t.sourceID })
       _G.C_TransmogCollection.GetItemInfo = function() end
       assert.is_false(items:ReadItemProperties(42, link).traits.transmoggable)
     end)
@@ -527,6 +528,82 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_PetJournal = {}
       assert.is_nil(items:PetCountsOf(635), "a client without the API")
       items._petJournalLoaded = false
+    end)
+
+    -- Whether an item's appearance is collected, every way Vendor asks (itemproperties.lua): its own
+    -- source, any source of the appearance, the item itself. Captures had the collection count 0
+    -- until the player entered the world, then 3,083 (on a login and a reload).
+    describe("appearances", function()
+      local savedApis, cloak, traits, counts, own, others, byItem
+
+      before_each(function()
+        savedApis = { _G.C_TransmogCollection, _G.GetTime }
+        cloak = "|cff0070dd|Hitem:42::::::::80:::::|h[Cloak]|h|r"
+        traits = { appearanceID = 1001, sourceID = 2002 }
+        counts, own, others, byItem = 3083, false, false, false
+        _G.C_TransmogCollection = {
+          GetCategoryCollectedCount = function(category) return category == 1 and counts or 0 end,
+          PlayerHasTransmogItemModifiedAppearance = function(source) return source == 2002 and own end,
+          GetAppearanceSources = function(appearance)
+            return { { sourceID = 2002, isCollected = own }, { sourceID = 2003, isCollected = others } }
+          end,
+          PlayerHasTransmogByItemInfo = function(l) return l == cloak and byItem end,
+        }
+        items._appearancesLoaded = false
+      end)
+
+      after_each(function()
+        _G.C_TransmogCollection, _G.GetTime = savedApis[1], savedApis[2]
+        items._appearancesLoaded = false
+      end)
+
+      it("says nothing before the collection has loaded", function()
+        counts = 0
+        assert.is_nil(items:AppearanceStateOf(traits, cloak))
+        counts = 3083
+        _G.GetTime = function() return 2 end
+        assert.are.same({ false, false }, { items:AppearanceStateOf(traits, cloak) })
+      end)
+
+      it("asks whether the collection has loaded once a frame until it has", function()
+        counts = 0
+        local asked = 0
+        local count = _G.C_TransmogCollection.GetCategoryCollectedCount
+        _G.C_TransmogCollection.GetCategoryCollectedCount = function(c) asked = asked + 1 return count(c) end
+        _G.GetTime = function() return 5 end
+        items:AppearanceStateOf(traits, cloak)
+        local once = asked
+        items:AppearanceStateOf(traits, cloak)
+        assert.are.equal(once, asked, "the same frame")
+        _G.GetTime = function() return 6 end
+        counts = 3083
+        assert.are.same({ false, false }, { items:AppearanceStateOf(traits, cloak) })
+        asked = 0
+        _G.GetTime = function() return 7 end
+        assert.are.same({ false, false }, { items:AppearanceStateOf(traits, cloak) })
+        assert.are.equal(0, asked, "loaded for good")
+      end)
+
+      it("does not take the None category for a collection", function()
+        _G.C_TransmogCollection.GetCategoryCollectedCount = function(category) return category == 0 and 5 or 0 end
+        assert.is_nil(items:AppearanceStateOf(traits, cloak))
+      end)
+
+      it("knows the appearance through its own source, another source, or the item", function()
+        own = true
+        assert.are.same({ true, true }, { items:AppearanceStateOf(traits, cloak) })
+        own, others = false, true
+        assert.are.same({ true, false }, { items:AppearanceStateOf(traits, cloak) })
+        others, byItem = false, true
+        assert.are.same({ true, false }, { items:AppearanceStateOf(traits, cloak) })
+        byItem = false
+        assert.are.same({ false, false }, { items:AppearanceStateOf(traits, cloak) })
+      end)
+
+      it("says nothing for an item without an appearance", function()
+        assert.is_nil(items:AppearanceStateOf({}, cloak))
+        assert.is_nil(items:AppearanceStateOf(nil, cloak))
+      end)
     end)
 
     -- A /reload capture: the journal answered 234 owned from its first sample, before its event.

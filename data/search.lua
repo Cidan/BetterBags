@@ -41,7 +41,7 @@ local SNAPSHOT_FIELDS = {
   'bagid', 'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
   'minlevel', 'stacksize', 'price', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable', 'upgradeable',
   'track', 'upgradelevel', 'upgrademax', 'maxlevel', 'upgrade', 'total', 'toy', 'known', 'transmoggable',
-  'usable', 'petcount', 'petlimit', 'slotequipped', 'slotbest',
+  'usable', 'petcount', 'petlimit', 'slotequipped', 'slotbest', 'appearance', 'source',
 }
 -- expansionid is not compared: it follows expansion, which is.
 
@@ -66,6 +66,9 @@ local function copyList(into, list)
   end
   return into
 end
+
+-- KNOWN names a collected state as the appearance and source fields hold it.
+local KNOWN = { [true] = "known", [false] = "unknown" }
 
 ---@param s table The snapshot to fill (reused across items).
 ---@param item ItemData
@@ -172,6 +175,9 @@ local function fillSnapshot(s, item)
   -- Follow the worn gear (items:SlotLevelsOf); Phase 6 marks an item whose values changed.
   s.slotequipped = item.slotEquipped
   s.slotbest = item.slotBest
+  -- Collected or not (items:AppearanceStateOf), known once the collection loaded.
+  s.appearance = KNOWN[item.appearanceKnown]
+  s.source = KNOWN[item.sourceKnown]
   return s
 end
 
@@ -217,6 +223,7 @@ local ALIASES = { ilvl = 'level', count = 'stackcount', exp = 'expansion', slot 
 local TEXT_FIELDS = {
   name = true, type = true, subtype = true, category = true, guid = true, expansion = true,
   equipmentlocation = true, binding = true, tooltip = true, bagname = true, track = true,
+  appearance = true, source = true,
 }
 -- List fields: an item can hold several values; a comparison matches when any value does.
 local LIST_KEYS = { equipmentset = 'sets', stat = 'stats', bonusid = 'bonusIDs' }
@@ -392,6 +399,8 @@ function search:Init()
   self:CreateIndex('binding')
   self:CreateIndex('track')
   self:CreateIndex('stat')
+  self:CreateIndex('appearance')
+  self:CreateIndex('source')
   -- Tooltip text runs to hundreds of characters; indexing every prefix of it is
   -- quadratic per item and dominated the cost of each sweep.
   self:CreateIndex('tooltip', true)
@@ -641,6 +650,8 @@ function search:indexSnapshot(slotkey, s)
   self:addStringToIndex(idx.tooltip, s.tooltip, slotkey)
   self:addStringToIndex(idx.bagname, s.bagname, slotkey)
   self:addStringToIndex(idx.track, s.track, slotkey)
+  self:addStringToIndex(idx.appearance, s.appearance, slotkey)
+  self:addStringToIndex(idx.source, s.source, slotkey)
   for _, stat in ipairs(s.stats) do
     self:addStringToIndex(idx.stat, stat, slotkey)
   end
@@ -679,6 +690,8 @@ function search:removeSnapshot(slotkey, s)
   self:removeStringFromIndex(idx.tooltip, s.tooltip, slotkey)
   self:removeStringFromIndex(idx.bagname, s.bagname, slotkey)
   self:removeStringFromIndex(idx.track, s.track, slotkey)
+  self:removeStringFromIndex(idx.appearance, s.appearance, slotkey)
+  self:removeStringFromIndex(idx.source, s.source, slotkey)
   for _, stat in ipairs(s.stats) do
     self:removeStringFromIndex(idx.stat, stat, slotkey)
   end

@@ -80,6 +80,8 @@ local async = addon:GetModule("Async")
 ---@field isUsable? boolean Whether the character can use it (CanUseItem); nil read cold or without the API.
 ---@field petOwned? number How many of its pet the account has (PetCountsOf); nil until the pet journal loaded.
 ---@field petLimit? number How many of its pet the account may have.
+---@field appearanceKnown? boolean Its appearance is collected (AppearanceStateOf); nil without one or before the collection loaded.
+---@field sourceKnown? boolean Its own source is collected.
 ---@field slotEquipped? number The lowest item level worn in its slots (SlotLevelsOf).
 ---@field slotBest? number The character's best item level in its slot (SlotLevelsOf).
 ---@field inventoryType number
@@ -469,8 +471,10 @@ function items:RegisterCacheEvents()
       self:OnCharacterStateChanged(true)
     end)
   end
-  -- What the character can use follows its spells and reputations, which change often: bucketed.
-  for _, name in ipairs({ 'UPDATE_FACTION', 'SPELLS_CHANGED' }) do
+  -- What the character can use follows its spells and reputations, which change often; what is
+  -- collected follows the appearance collection: bucketed.
+  for _, name in ipairs({ 'UPDATE_FACTION', 'SPELLS_CHANGED', 'TRANSMOG_COLLECTION_UPDATED',
+    'TRANSMOG_COLLECTION_SOURCE_ADDED', 'TRANSMOG_COLLECTION_SOURCE_REMOVED' }) do
     if isEventValid(name) then
       events:BucketEvent(name, function()
         self:OnCharacterStateChanged(false)
@@ -3063,13 +3067,74 @@ function items:PetCountsOf(speciesID)
   return api.GetNumCollectedInfo(speciesID)
 end
 
+-- AppearanceCollectionLoaded says whether the account's appearance collection has loaded: some
+-- appearance collected (C_TransmogCollection.GetCategoryCollectedCount over every category but
+-- None). Captures had 0 until the player entered the world, then 3,083, on a login and on a reload;
+-- TRANSMOG_COLLECTION_UPDATED fired at login with 0 collected, so it is no sign. Asked at most once a
+-- frame until it has loaded, then never again; an account with no appearance never loads.
+---@return boolean
+function items:AppearanceCollectionLoaded()
+  if self._appearancesLoaded then
+    return true
+  end
+  local now = GetTime()
+  if self._appearancesCheckedAt == now then
+    return false
+  end
+  self._appearancesCheckedAt = now
+  local api, collectionTypes = _G.C_TransmogCollection, Enum and Enum.TransmogCollectionType
+  if not (api and api.GetCategoryCollectedCount and collectionTypes) then
+    return false
+  end
+  for _, category in pairs(collectionTypes) do
+    if category ~= collectionTypes.None and (api.GetCategoryCollectedCount(category) or 0) > 0 then
+      self._appearancesLoaded = true
+      return true
+    end
+  end
+  return false
+end
+
+-- AppearanceStateOf says whether an item's appearance is collected, every way Vendor asks
+-- (itemproperties.lua; its soulbound shortcut aside): through its own source, any source of the
+-- appearance, or the item itself (PlayerHasTransmogByItemInfo); and whether its own source is. A
+-- retail dump had all three agree on 141 items, but for 3 artifacts PlayerHasTransmogByItemInfo said
+-- no where the others said yes. Nil for an item without an appearance or before the collection has
+-- loaded.
+---@param traits? ItemTraits
+---@param itemLink? string
+---@return boolean? appearanceKnown, boolean? sourceKnown
+function items:AppearanceStateOf(traits, itemLink)
+  if not traits or traits.sourceID == nil or not self:AppearanceCollectionLoaded() then
+    return nil
+  end
+  local api = _G.C_TransmogCollection
+  local source = api.PlayerHasTransmogItemModifiedAppearance
+    and api.PlayerHasTransmogItemModifiedAppearance(traits.sourceID) == true
+  if source then
+    return true, true
+  end
+  if api.GetAppearanceSources then
+    for _, other in ipairs(api.GetAppearanceSources(traits.appearanceID) or {}) do
+      if other.isCollected then
+        return true, false
+      end
+    end
+  end
+  local known = api.PlayerHasTransmogByItemInfo and itemLink ~= nil
+    and api.PlayerHasTransmogByItemInfo(itemLink) == true
+  return known == true, false
+end
+
 -- ReadCharacterState reads what follows the character and the account rather than the item:
--- whether the character can use it, and how many of its pet the account has. Only for an item read
--- with its data (rule #1).
+-- whether the character can use it, how many of its pet the account has, and whether its appearance
+-- is collected. Only for an item read with its data (rule #1).
 ---@param item ItemData
 function items:ReadCharacterState(item)
+  local traits = item.itemInfo.traits
   item.isUsable = self:CanUseItem(item.itemInfo.itemID)
-  item.petOwned, item.petLimit = self:PetCountsOf(item.itemInfo.traits.petSpeciesID)
+  item.petOwned, item.petLimit = self:PetCountsOf(traits.petSpeciesID)
+  item.appearanceKnown, item.sourceKnown = self:AppearanceStateOf(traits, item.itemInfo.itemLink)
 end
 
 -- RefreshCharacterState reads a kept item's character state again (a kept item was read with its
@@ -3078,8 +3143,10 @@ end
 ---@param item ItemData
 function items:RefreshCharacterState(item)
   local usable, owned, limit = item.isUsable, item.petOwned, item.petLimit
+  local appearance, source = item.appearanceKnown, item.sourceKnown
   self:ReadCharacterState(item)
-  if (usable ~= item.isUsable or owned ~= item.petOwned or limit ~= item.petLimit) and item.derived then
+  if (usable ~= item.isUsable or owned ~= item.petOwned or limit ~= item.petLimit
+    or appearance ~= item.appearanceKnown or source ~= item.sourceKnown) and item.derived then
     item.derived.indexPending = true
   end
 end
@@ -3092,9 +3159,13 @@ function items:CharacterStateChanged(item)
   if self:CanUseItem(item.itemInfo.itemID) ~= item.isUsable then
     return true
   end
-  local species = item.itemInfo.traits.petSpeciesID
-  if species ~= nil then
-    local owned, limit = self:PetCountsOf(species)
+  local traits = item.itemInfo.traits
+  local appearance, source = self:AppearanceStateOf(traits, item.itemInfo.itemLink)
+  if appearance ~= item.appearanceKnown or source ~= item.sourceKnown then
+    return true
+  end
+  if traits.petSpeciesID ~= nil then
+    local owned, limit = self:PetCountsOf(traits.petSpeciesID)
     return owned ~= item.petOwned or limit ~= item.petLimit
   end
   return false
@@ -3169,8 +3240,11 @@ function items:ReadItemTraits(itemID, itemLink, minLevel, stackSize, sellPrice)
   -- Nothing for an item without an appearance (a retail capture: 87 of 88 items).
   local transmog = _G.C_TransmogCollection
   if transmog and transmog.GetItemInfo then
-    local appearanceID = transmog.GetItemInfo(itemLink)
+    local appearanceID, sourceID = transmog.GetItemInfo(itemLink)
     traits.transmoggable = appearanceID ~= nil and appearanceID ~= 0
+    if traits.transmoggable then
+      traits.appearanceID, traits.sourceID = appearanceID, sourceID
+    end
   end
   -- Takes an item ID only: a link raises an error (warcraft.wiki.gg).
   if C_PetJournal and C_PetJournal.GetPetInfoByItemID then

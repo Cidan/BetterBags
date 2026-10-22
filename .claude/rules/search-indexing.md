@@ -305,3 +305,29 @@ Better: `maxlevel >= slotbest`).
   dual wield, a Warrior's two-hander, nothing worn, kept current over a gear change with a field
   compared against it, read cold), `spec/search_spec.lua` (per-field re-index tests). 8 mutations, all
   caught.
+
+### 17. Collected Appearances: `appearance` and `source`
+Vendor's `IsAppearanceCollected` / `IsUnknownAppearance` (`appearance = known` / `unknown`) and this
+item's own source (`source = known` / `unknown`), text fields.
+- **Read** (`items:AppearanceStateOf(traits, link)`): the traits keep the appearance and source IDs
+  (`C_TransmogCollection.GetItemInfo(link)`, the call `transmoggable` already makes). The appearance
+  is known through its own source (`PlayerHasTransmogItemModifiedAppearance`), any source of the
+  appearance (`GetAppearanceSources`, `isCollected`), or the item (`PlayerHasTransmogByItemInfo`), in
+  that order, as Vendor asks (its soulbound shortcut left out: not checked against data). A retail
+  dump: all three agreed on 141 items, except `PlayerHasTransmogByItemInfo` saying no for 3 artifacts
+  where the others said yes. No uncollected appearance was in a dump.
+- **Not before the collection has loaded** (`items:AppearanceCollectionLoaded`): loaded once
+  `GetCategoryCollectedCount` is above 0 for a category other than None. Captures: 0 until the player
+  entered the world, then 3,083, on a login and a reload, both before the first bag read;
+  `TRANSMOG_COLLECTION_UPDATED` fired at login with 0 collected, so it is no sign. Asked at most once a
+  frame until loaded, then never. An account with nothing collected never loads: the fields stay absent.
+- **Follows the account**, like usability and pet counts (`ReadCharacterState`, `RefreshCharacterState`,
+  `CharacterStateChanged`): `TRANSMOG_COLLECTION_UPDATED`, `TRANSMOG_COLLECTION_SOURCE_ADDED` and
+  `_REMOVED` (bucketed, with spells and reputations) recalculate the kinds where an answer changed, so
+  a read made before the collection loaded is corrected too. Vendor items take it when read.
+- **Coverage:** `spec/items_spec.lua` ("appearances": nothing before the load, once a frame until
+  loaded and then never, None not counted, each way of knowing, no appearance),
+  `spec/refresh_pipeline_spec.lua` (the events, a collected appearance recalculating and the search
+  following), `spec/search_spec.lua` (the fields; per-field re-index tests),
+  `spec/next/merchant_spec.lua`, `spec/debug_dump_harness_spec.lua` (the capture's cloak). 14
+  mutations: three first survived and led to tests.
