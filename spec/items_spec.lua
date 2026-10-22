@@ -508,6 +508,26 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_nil(t.upgradeMaxItemLevel)
     end)
 
+    -- How many of a pet species the account has: C_PetJournal.GetNumCollectedInfo returns numOwned,
+    -- maxAllowed (Blizzard_PetBattleUI.lua). A login capture had C_PetJournal.GetNumPets report 0
+    -- owned until PET_JOURNAL_LIST_UPDATE, so nothing is asked before the journal has loaded.
+    it("knows a pet's counts only once the pet journal has loaded", function()
+      local asked = 0
+      _G.C_PetJournal = { GetNumCollectedInfo = function(species)
+        asked = asked + 1
+        return species == 635 and 2 or 0, 3
+      end }
+      items._petJournalLoaded = false
+      assert.is_nil(items:PetCountsOf(635))
+      assert.are.equal(0, asked)
+      items._petJournalLoaded = true
+      assert.are.same({ 2, 3 }, { items:PetCountsOf(635) })
+      assert.is_nil(items:PetCountsOf(nil), "no species, no counts")
+      _G.C_PetJournal = {}
+      assert.is_nil(items:PetCountsOf(635), "a client without the API")
+      items._petJournalLoaded = false
+    end)
+
     -- C_PetJournal.GetPetInfoByItemID only takes an item ID (the wiki: a link raises an error).
     it("asks whether it teaches a pet by item ID", function()
       local asked

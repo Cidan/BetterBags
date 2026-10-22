@@ -492,6 +492,25 @@ describe("Search", function()
         "a client that cannot say whether it is usable says nothing")
     end)
 
+    -- Vendor's PetCount, PetLimit and IsPetCollectable (itemproperties.lua): the account's count of
+    -- the species, its limit, and whether one more can be learned.
+    it("finds pets by how many the account has, and whether one more can be learned", function()
+      local snake = MockSearchItem({ slotkey = "snake", traits = { isPet = true, petSpeciesID = 635, stats = {} } })
+      snake.petOwned, snake.petLimit = 1, 3
+      local full = MockSearchItem({ slotkey = "full", traits = { isPet = true, petSpeciesID = 243, stats = {} } })
+      full.petOwned, full.petLimit = 1, 1
+      local unloaded = MockSearchItem({ slotkey = "unloaded", traits = { isPet = true, petSpeciesID = 9, stats = {} } })
+      local ore = MockSearchItem({ slotkey = "ore", traits = { isPet = false, stats = {} } })
+      for _, item in ipairs({ snake, full, unloaded, ore }) do search:Add(item) end
+      assert.are.same(keys("snake"), search:Search("collectable = true"))
+      assert.are.same(keys("full", "ore"), search:Search("collectable = false"),
+        "not a pet is not collectable; a pet whose counts are not known yet is neither, nor an item with no "
+          .. "answer about pets (the recipe, as on a client without a pet journal)")
+      assert.are.same(keys("snake", "full"), search:Search("petcount = 1"))
+      assert.are.same(keys("snake"), search:Search("petlimit = 3"))
+      assert.are.same({}, search:Search("petcount = 0"), "no count before the journal loaded")
+    end)
+
     it("finds items with an appearance", function()
       assert.are.same(keys("cloak", "plate"), search:Search("transmoggable = true"))
       assert.are.same(keys("recipe"), search:Search("transmoggable = false"))
@@ -1147,6 +1166,9 @@ describe("Search incremental indexing (SyncKind)", function()
       { "known mark", function(it) it.itemInfo.tooltipMarks = { known = true } end },
       { "usable", function(it) it.isUsable = true end },
       { "appearance", function(it) it.itemInfo.traits.transmoggable = true end },
+      { "pet count", function(it) it.petOwned = 2 end, pet = true },
+      { "pet limit", function(it) it.petLimit = 5 end, pet = true },
+      { "pet counts known", function(it) it.petOwned, it.petLimit = nil, nil end, pet = true },
     }
     for _, change in ipairs(changes) do
       it(change[1], function()
@@ -1156,6 +1178,11 @@ describe("Search incremental indexing (SyncKind)", function()
         sword.itemInfo.traits = { minLevel = 10, stackSize = 1, sellPrice = 5, isEquipment = false, hasUse = false,
           isCosmetic = false, isPet = false, isScrappable = false, upgradeTrack = "Hero", upgradeLevel = 1,
           upgradeMax = 6, upgradeMaxItemLevel = 619, stats = { "Haste" } }
+        -- A pet whose counts are known, for the changes that only a pet has.
+        if change.pet then
+          sword.itemInfo.traits.isPet = true
+          sword.petOwned, sword.petLimit = 1, 3
+        end
         local bag = { a = sword }
         search:SyncKind(BACKPACK, bag)
         change[2](sword)
@@ -1210,7 +1237,7 @@ describe("Search incremental indexing (SyncKind)", function()
 
     local function mutate(it)
       local info = it.itemInfo
-      local which = random(24)
+      local which = random(25)
       if which == 1 then info.category = pick(CATEGORIES)
       elseif which == 2 then info.currentItemCount = random(20)
       elseif which == 3 then info.tooltipText = pick(TOOLTIPS)
@@ -1250,6 +1277,10 @@ describe("Search incremental indexing (SyncKind)", function()
       elseif which == 22 then it.itemInfo.tooltipMarks = pick({ { toy = true }, { known = true }, { toy = true, known = true }, false }) or nil
       elseif which == 23 then it.isUsable = pick({ true, false, "none" })
         if it.isUsable == "none" then it.isUsable = nil end
+      elseif which == 24 then
+        if it.itemInfo.traits then it.itemInfo.traits.isPet = random(2) == 1 end
+        it.petOwned = random(3) == 1 and nil or random(3) - 1
+        it.petLimit = it.petOwned and 3 or nil
       else it.bindingInfo.binding = random(3) - 1 end
     end
 

@@ -120,6 +120,7 @@ describe("NextMerchant", function()
       if groupBy == GROUP_BY_TYPE then return data.itemInfo.itemType end
     end)
     override(stubs.items, "GetAllSlotInfo", function() return {} end)
+    override(stubs.items, "PetCountsOf", function() return nil end)
     override(stubs.items, "ReadItemTraits", function(_, id, l, minLevel, stackSize, sellPrice)
       assert.are.equal(idOf(l), id)
       return { craftingQuality = idOf(l) == 12 and 2 or nil, minLevel = minLevel, stackSize = stackSize,
@@ -296,6 +297,18 @@ describe("NextMerchant", function()
       merchant:ReadItems(ctx())
       assert.are.same({ ["vendor:1"] = true }, merchant:Search("usable = true"))
       assert.are.same({ ["vendor:2"] = true }, merchant:Search("usable = false"))
+    end)
+
+    -- A vendor's pets, by whether the account can learn one more (read when the vendor's items are).
+    it("searches a vendor pet by its counts", function()
+      override(stubs.items, "ReadItemTraits", function(_, id)
+        return { isPet = id == 12, petSpeciesID = id == 12 and 635 or nil, stats = {} }
+      end)
+      override(stubs.items, "PetCountsOf", function(_, species) if species == 635 then return 1, 3 end end)
+      _G._merchant.items = { vendorItem(10), vendorItem(12) }
+      merchant:ReadItems(ctx())
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("collectable = true"))
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("petcount = 1 AND petlimit = 3"))
     end)
 
     it("searches a vendor item's traits, read from its link", function()

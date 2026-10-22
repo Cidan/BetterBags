@@ -1038,6 +1038,16 @@ describe("Dump harness: the client's own answers (spec/fixtures/dump_retail_12_1
   end)
 
   -- CanUseItem said no to the 9 recipes of professions the character does not have.
+  -- GetNumCollectedInfo answered 1 of 1 for both pets: neither can be learned again.
+  it("finds the pets the account cannot learn again", function()
+    items._petJournalLoaded = true
+    read()
+    items._petJournalLoaded = false
+    assert.are.same(keys("2_16", "2_9"), search:Search("petcount = 1 AND petlimit = 1"))
+    assert.are.same({}, search:Search("collectable = true"))
+    assert.is_true(search:Search("collectable = false")["2_16"])
+  end)
+
   it("finds what the character can use, wear, and transmog", function()
     read()
     assert.are.same(keys("1_10", "1_11", "1_12", "1_13", "1_14", "1_15", "1_7", "1_8", "1_9"),

@@ -1808,6 +1808,103 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       override(_G.C_Item, "GetItemInfo", getItemInfo)
     end)
 
+    -- Pet counts follow the account. Nothing is asked before the pet journal has loaded (a login
+    -- capture: 0 owned until PET_JOURNAL_LIST_UPDATE); the journal's events recalculate the bags
+    -- holding a pet item whose counts changed, and nothing else.
+    describe("pet counts", function()
+      local registered, sent, owned
+
+      before_each(function()
+        registered, sent, owned = {}, {}, { [635] = 1 }
+        override(events, "RegisterEvent", function(_, name, cb) registered[name] = cb end)
+        local send = events.SendMessage
+        override(events, "SendMessage", function(self, ctx, event, ...)
+          if event == "bags/Rederive" then table.insert(sent, (...)) end
+          return send(self, ctx, event, ...)
+        end)
+        override(_G, "C_PetJournal", {
+          GetPetInfoByItemID = function(id)
+            if id == 101 then return "Adder", 1, 1, 1, "", "", false, true, true, false, true, 1, 635 end
+          end,
+          GetNumCollectedInfo = function(species) return owned[species] or 0, 3 end,
+        })
+        items._petJournalLoaded = false
+        items:RegisterCacheEvents()
+        mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      end)
+
+      after_each(function()
+        items._petJournalLoaded = false
+      end)
+
+      it("listens to the pet journal's events", function()
+        for _, name in ipairs({ "PET_JOURNAL_LIST_UPDATE", "NEW_PET_ADDED", "PET_JOURNAL_PET_DELETED",
+          "PET_JOURNAL_PET_RESTORED" }) do
+          assert.is_function(registered[name], name)
+        end
+      end)
+
+      it("has no counts before the journal has loaded, then recalculates the bag with the pet", function()
+        local slotInfo = refreshBackpack()
+        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].petOwned)
+        assert.are.same({}, search:Search("collectable = true"))
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        assert.are.same({ { backpack = true, bank = false, guild = false } }, sent)
+        slotInfo = refreshBackpack({ derive = true })
+        assert.are.equal(1, slotInfo.itemsBySlotKey["0_1"].petOwned)
+        assert.are.same({ ["0_1"] = true }, search:Search("collectable = true"))
+        assert.are.same({ ["0_1"] = true }, search:Search("petcount = 1"))
+      end)
+
+      it("recalculates when a pet is learned, and not when nothing changed", function()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        refreshBackpack()
+        sent = {}
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        assert.are.same({}, sent, "the counts did not change")
+        owned[635] = 3
+        registered.NEW_PET_ADDED(context:New("evt"), "NEW_PET_ADDED", "BattlePet-0-1")
+        assert.are.equal(1, #sent)
+        refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.same({}, search:Search("collectable = true"))
+        assert.are.same({ ["0_1"] = true }, search:Search("petcount = 3"))
+      end)
+
+      it("recalculates when only the limit changed", function()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        refreshBackpack()
+        sent = {}
+        override(_G.C_PetJournal, "GetNumCollectedInfo", function(species) return owned[species] or 0, 5 end)
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        assert.are.equal(1, #sent)
+      end)
+
+      -- Opening the bank reads it, so a closed bank's pets are not recalculated.
+      it("recalculates the bank only while it is open", function()
+        local bank = const.BAG_KIND.BANK
+        local saved = { items.slotInfo[bank], addon.atBank }
+        local pet = { bagid = 6, slotid = 1, isItemEmpty = false, petOwned = 0, petLimit = 3,
+          itemInfo = { itemID = 101, traits = { isPet = true, petSpeciesID = 635, stats = {} } } }
+        items.slotInfo[bank] = { itemsBySlotKey = { ["6_1"] = pet } }
+        addon.atBank = false
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        local closed = sent
+        sent = {}
+        addon.atBank = true
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        items.slotInfo[bank], addon.atBank = saved[1], saved[2]
+        assert.are.same({}, closed)
+        assert.are.same({ { backpack = false, bank = true, guild = false } }, sent)
+      end)
+
+      it("reads the counts of a pet item read after the journal loaded", function()
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        local slotInfo = refreshBackpack()
+        assert.are.same({ 1, 3 }, { slotInfo.itemsBySlotKey["0_1"].petOwned, slotInfo.itemsBySlotKey["0_1"].petLimit })
+        assert.is_nil(slotInfo.itemsBySlotKey["0_2"].petOwned, "not a pet")
+      end)
+    end)
+
     it("gives every item the plain name of its bag, for the bagname field", function()
       override(_G.C_Container, "GetBagName", function(bagid)
         return ({ [0] = "Backpack", [1] = "Herb Satchel" })[bagid]

@@ -41,7 +41,7 @@ local SNAPSHOT_FIELDS = {
   'bagid', 'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
   'minlevel', 'stacksize', 'price', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable', 'upgradeable',
   'track', 'upgradelevel', 'upgrademax', 'maxlevel', 'upgrade', 'total', 'toy', 'known', 'transmoggable',
-  'usable',
+  'usable', 'petcount', 'petlimit',
 }
 -- expansionid is not compared: it follows expansion, which is.
 
@@ -148,6 +148,18 @@ local function fillSnapshot(s, item)
   -- Whether the character can use it (items:CanUseItem); equippable follows it and equipment.
   s.usable = t and item.isUsable
   s.equippable = t and item.isUsable and t.isEquipment == true
+  -- How many of its pet the account has (items:PetCountsOf), known once the pet journal loaded; only
+  -- a pet has counts. collectable follows them and pet, which are compared.
+  local counted = t and item.petOwned ~= nil and item.petLimit ~= nil
+  s.petcount = counted and item.petOwned or nil
+  s.petlimit = counted and item.petLimit or nil
+  if t and t.isPet == false then
+    s.collectable = false
+  elseif counted then
+    s.collectable = item.petOwned < item.petLimit
+  else
+    s.collectable = nil
+  end
   -- Follows the sets above, which are compared.
   s.inset = info.equipmentSets ~= nil and info.equipmentSets[1] ~= nil
   -- The arrow BetterBags draws, for an item read with its data (rule #1).
@@ -185,10 +197,11 @@ end
 local NUMBER_FIELDS = {
   'level', 'rarity', 'quality', 'id', 'stackcount', 'class', 'subclass', 'bagid', 'slotid', 'bindtype',
   'expansionid', 'minlevel', 'stacksize', 'price', 'upgradelevel', 'upgrademax', 'maxlevel', 'total',
+  'petcount', 'petlimit',
 }
 local BOOL_FIELDS = {
   'reagent', 'isbound', 'bound', 'quest', 'activequest', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable',
-  'upgradeable', 'inset', 'upgrade', 'toy', 'known', 'transmoggable', 'usable', 'equippable',
+  'upgradeable', 'inset', 'upgrade', 'toy', 'known', 'transmoggable', 'usable', 'equippable', 'collectable',
 }
 
 -- scratch is reused to snapshot each item SyncKind compares, so an unchanged item costs no
@@ -276,6 +289,9 @@ function search:Init()
   self:CreateIndex('transmoggable')
   self:CreateIndex('usable')
   self:CreateIndex('equippable')
+  self:CreateIndex('collectable')
+  self:CreateIndex('petcount')
+  self:CreateIndex('petlimit')
 
   self.defaultIndicies = {
     'name',

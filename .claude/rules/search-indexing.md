@@ -147,8 +147,8 @@ Global string values from Blizzard's enUS strings (Ketho/BlizzardInterfaceResour
 - **`usable`** (boolean): whether the character can use the item, `items:CanUseItem`
   (`C_PlayerInfo.CanUseItem`, retail; nil without it). A retail capture: false for the 9 recipes of
   professions the character lacks, true for the other 79 items. It follows the character, so it is
-  not a trait: the harvest asks it for an item read with its data (bag and guild bank slots), and
-  `items:RefreshUsable` asks again on every kept item (`RefreshKeptItem`, a guild bank
+  not a trait: the harvest asks it for an item read with its data (bag and guild bank slots,
+  `items:ReadCharacterState`), and `items:RefreshCharacterState` asks again on every kept item (`RefreshKeptItem`, a guild bank
   recalculation), marking the item `indexPending` when the answer changed (data-loader.md §18).
   What changes it (level, skills, spec, gear) already requests a recalculation for the upgrade
   arrows (caches.md §2); reputation and spells (`UPDATE_FACTION`, `SPELLS_CHANGED`) do not, so an
@@ -157,8 +157,8 @@ Global string values from Blizzard's enUS strings (Ketho/BlizzardInterfaceResour
 - **`equippable`**: usable and equipment.
 - **`transmoggable`** (a trait): the item has an appearance (`C_TransmogCollection.GetItemInfo`
   returns one: the capture's cloak; nothing for the other 87 items).
-- Whether an appearance or a pet is collected waits for a login capture: when the collections load
-  is not known (docs/vendor-compat.md, "Needs an in-game check").
+- Whether an appearance is collected waits for a login capture: when the appearance collection
+  loads is not known yet (docs/vendor-compat.md, "Needs an in-game check"). Pets: §14.
 - **Coverage:** `spec/search_spec.lua` ("usability and appearances"; the per-field and randomized
   re-index tests change both), `spec/items_spec.lua` (traits: appearances, missing API, not read
   cold), `spec/refresh_pipeline_spec.lua` ("asks whether the character can use each item, again on a
@@ -167,3 +167,40 @@ Global string values from Blizzard's enUS strings (Ketho/BlizzardInterfaceResour
   `spec/debug_dump_harness_spec.lua` (the capture's 9 recipes, the cloak). 14 mutations: the three
   that first survived led to a recalculation test that changes no category and to removing two
   guards that could not change anything (a kept item always has traits; `nil and x` is nil).
+
+### 14. Pet Counts
+Vendor's `PetCount`, `PetLimit` and `IsPetCollectable` (`itemproperties.lua`): **`petcount`** and
+**`petlimit`** (numbers), how many of the item's battle pet species the account has and may have,
+and **`collectable`** (boolean), whether one more can be learned (count below limit); false for an
+item that teaches no pet, absent for an item with no answer about pets.
+- **Read:** `items:PetCountsOf(speciesID)`, `C_PetJournal.GetNumCollectedInfo` (not in the generated
+  API documentation; Blizzard_PetBattleUI.lua reads it as `numOwned, maxAllowed`, and a retail
+  capture answered 1 of 1 for both of its pets). The species comes from the item's traits
+  (`GetPetInfoByItemID`, §10). Like `usable`, the counts follow the account, not the item: read with
+  the item's data (`items:ReadCharacterState`) and again on every kept item
+  (`RefreshCharacterState`), which marks it `indexPending` when they changed.
+- **Not before the journal has loaded.** A fresh-login capture (retail 12.1.5, 2026-10-21):
+  `C_PetJournal.GetNumPets` answered 2014 pets, 0 owned, at 6.9 s (during the loading screen), and
+  2045, 234 owned at the first `PET_JOURNAL_LIST_UPDATE`, at 13.36 s, just after the loading screen
+  ended (13.34 s) and 1.4 s before the startup read (14.80 s). `PetCountsOf` answers nil until
+  `items:OnPetJournalChanged` has run once (`items._petJournalLoaded`), so a count read too early is
+  absent, never 0.
+- **Events** (registered in `RegisterCacheEvents` where the client has them): `PET_JOURNAL_LIST_UPDATE`,
+  `NEW_PET_ADDED`, `PET_JOURNAL_PET_DELETED`, `PET_JOURNAL_PET_RESTORED` (PetJournalInfoDocumentation).
+  `OnPetJournalChanged` marks the journal loaded, asks the counts of every committed pet item of the
+  backpack (and of the bank and guild bank while open: opening them reads them), and sends
+  `bags/Rederive` naming only the kinds where one changed; nothing when none did. At login both
+  `PET_JOURNAL_LIST_UPDATE`s came before the startup read, so nothing was recalculated.
+- **Vendor items** take the counts when the vendor's items are read (`next/merchant.lua`); a pet
+  learned while the vendor stays open is shown at the next read of the vendor.
+- **Not verified:** whether `PET_JOURNAL_LIST_UPDATE` fires on a `/reload`. If it does not, the
+  counts stay absent after a reload until a pet changes (never wrong); a `/reload` capture settles it.
+- **Coverage:** `spec/items_spec.lua` ("knows a pet's counts only once the pet journal has loaded"),
+  `spec/refresh_pipeline_spec.lua` ("pet counts": the events, nothing before the journal loads, a
+  recalculation on a change and only then, the limit alone, the bank only while open, a pet read
+  after the load), `spec/search_spec.lua` (the fields; per-field re-index tests on a pet; the
+  randomized test), `spec/next/merchant_spec.lua` (a vendor pet), `spec/debug_dump_harness_spec.lua`
+  (the capture's pets, 1 of 1). 22 mutations: five first survived; three led to tests (the limit
+  alone, a closed bank, a pet's count changed alone) and two to removing code that guarded nothing
+  (comparing `collectable`, which follows compared fields; a pet check on items that cannot have
+  counts otherwise).

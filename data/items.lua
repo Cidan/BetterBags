@@ -78,6 +78,8 @@ local async = addon:GetModule("Async")
 ---@field bagName? string The plain name of the item's bag (GetPlainBagName), set in Phase 6.
 ---@field itemTotal? number How many of its item the kind's bags hold (CountItemTotals).
 ---@field isUsable? boolean Whether the character can use it (CanUseItem); nil read cold or without the API.
+---@field petOwned? number How many of its pet the account has (PetCountsOf); nil until the pet journal loaded.
+---@field petLimit? number How many of its pet the account may have.
 ---@field inventoryType number
 ---@field inventorySlots number[]
 ---@field slotkey string
@@ -457,6 +459,12 @@ function items:RegisterCacheEvents()
   for _, name in ipairs({ 'UPDATE_FACTION', 'SPELLS_CHANGED' }) do
     register(name, function()
       self:InvalidateUpgrades(false)
+    end)
+  end
+  for _, name in ipairs({ 'PET_JOURNAL_LIST_UPDATE', 'NEW_PET_ADDED', 'PET_JOURNAL_PET_DELETED',
+    'PET_JOURNAL_PET_RESTORED' }) do
+    register(name, function()
+      self:OnPetJournalChanged()
     end)
   end
 end
@@ -2874,7 +2882,7 @@ function items:RefreshKeptItem(kind, item, bagid, slotid, itemGUID)
     or not sameQuest(item.questInfo, oldQuest) then
     item.derived = nil
   end
-  self:RefreshUsable(item)
+  self:RefreshCharacterState(item)
 end
 
 -- REUSED DETAILED METADATA UTILITIES FROM LEGACY IMPLEMENTATION
@@ -2979,17 +2987,72 @@ function items:CanUseItem(itemID)
   return nil
 end
 
--- RefreshUsable asks again whether the character can use a kept item (a kept item was read with
--- its data: a cold read is never kept), and marks it for re-indexing when the answer changed
--- (data-loader.md §18).
+-- PetCountsOf says how many of a battle pet species the account has and may have
+-- (C_PetJournal.GetNumCollectedInfo: numOwned, maxAllowed, as Blizzard_PetBattleUI.lua reads it), or
+-- nil until the pet journal has loaded (OnPetJournalChanged): a login capture had
+-- C_PetJournal.GetNumPets report 0 owned until PET_JOURNAL_LIST_UPDATE.
+---@param speciesID? number
+---@return number? owned, number? limit
+function items:PetCountsOf(speciesID)
+  local api = _G.C_PetJournal
+  if not self._petJournalLoaded or speciesID == nil or not (api and api.GetNumCollectedInfo) then
+    return nil
+  end
+  return api.GetNumCollectedInfo(speciesID)
+end
+
+-- ReadCharacterState reads what follows the character and the account rather than the item:
+-- whether the character can use it, and how many of its pet the account has. Only for an item read
+-- with its data (rule #1).
 ---@param item ItemData
-function items:RefreshUsable(item)
-  local usable = self:CanUseItem(item.itemInfo.itemID)
-  if usable ~= item.isUsable then
-    item.isUsable = usable
-    if item.derived then
-      item.derived.indexPending = true
+function items:ReadCharacterState(item)
+  item.isUsable = self:CanUseItem(item.itemInfo.itemID)
+  item.petOwned, item.petLimit = self:PetCountsOf(item.itemInfo.traits.petSpeciesID)
+end
+
+-- RefreshCharacterState reads a kept item's character state again (a kept item was read with its
+-- data: a cold read is never kept), and marks it for re-indexing when it changed (data-loader.md
+-- §18).
+---@param item ItemData
+function items:RefreshCharacterState(item)
+  local usable, owned, limit = item.isUsable, item.petOwned, item.petLimit
+  self:ReadCharacterState(item)
+  if (usable ~= item.isUsable or owned ~= item.petOwned or limit ~= item.petLimit) and item.derived then
+    item.derived.indexPending = true
+  end
+end
+
+-- OnPetJournalChanged: the pet journal has loaded, or a pet was learned, caged, released or
+-- restored. The committed items that teach a pet are asked their counts again, and the kinds where
+-- one changed are recalculated (refresh-scheduler.md §10); nothing else. The bank and the guild bank
+-- only while open: opening them reads them.
+function items:OnPetJournalChanged()
+  self._petJournalLoaded = true
+  local kinds = {
+    { const.BAG_KIND.BACKPACK, 'backpack', true },
+    { const.BAG_KIND.BANK, 'bank', addon.atBank == true },
+    { const.BAG_KIND.GUILD, 'guild', addon.atGuildBank == true },
+  }
+  local options, changed = {}, false
+  for _, entry in ipairs(kinds) do
+    local kind, name, open = entry[1], entry[2], entry[3]
+    options[name] = false
+    local slotInfo = self.slotInfo[kind]
+    if open and slotInfo then
+      for _, item in pairs(slotInfo.itemsBySlotKey) do
+        local traits = not item.isItemEmpty and item.itemInfo.traits
+        if traits and traits.petSpeciesID then
+          local owned, limit = self:PetCountsOf(traits.petSpeciesID)
+          if owned ~= item.petOwned or limit ~= item.petLimit then
+            options[name], changed = true, true
+            break
+          end
+        end
+      end
     end
+  end
+  if changed then
+    events:SendMessage(context:New('PetJournalChanged'), 'bags/Rederive', options)
   end
 end
 
@@ -3250,7 +3313,7 @@ function items:AttachItemInfo(data, kind, containerInfo)
     data.itemInfo.traits.isScrappable = C_Item.CanScrapItem(itemLocation) == true
   end
   if data.itemInfo.traits then
-    data.isUsable = self:CanUseItem(itemID)
+    self:ReadCharacterState(data)
   end
   return self:FinishItemData(data, kind, harvestIncomplete, true)
 end
@@ -3512,7 +3575,7 @@ function items:AttachGuildBankItemInfo(data, read)
     tooltipMarks = tooltipMarks,
   })
   if data.itemInfo.traits then
-    data.isUsable = self:CanUseItem(itemID)
+    self:ReadCharacterState(data)
   end
   return self:FinishItemData(data, const.BAG_KIND.GUILD, props.incomplete, false)
 end
@@ -3582,7 +3645,7 @@ function items:RederiveGuildBank(committedItems)
           item.itemInfo.tooltipMarks = marks
           item.derived = nil
         end
-        self:RefreshUsable(item)
+        self:RefreshCharacterState(item)
       end
     end
     itemData[slotkey] = item

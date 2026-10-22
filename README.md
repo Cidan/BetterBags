@@ -415,6 +415,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `price` (price > 10000) The vendor sell price of one of the item, in copper (10000 is 1 gold). 0 for items a vendor will not buy.
 - `maxlevel` (maxlevel >= 600) The item level of upgradeable gear once fully upgraded (Retail); for anything else, its item level.
 - `upgradelevel`, `upgrademax` (upgradelevel = 3) How many upgrades upgradeable gear has, and how many its track has (Retail): an item shown as "Hero 3/6" has upgradelevel 3 and upgrademax 6.
+- `petcount`, `petlimit` (petcount = 0) How many of a battle pet item's pet you have, and how many you may have (Retail).
 - `total` (total >= 100) How many of the item the bags hold altogether (the backpack's bags for the backpack, the bank's for the bank), counting every stack of it.
 
 ### Booleans
@@ -434,10 +435,11 @@ Search allows you to find items by the following indices (based on the item belo
 - `usable` (usable = false) Can your character use the item? (Weapon and armor skills, level, professions, reputation: the red text in its tooltip.)
 - `equippable` (equippable = true) Is the item gear your character can wear?
 - `transmoggable` (transmoggable = true) Does the item have an appearance (Retail)?
+- `collectable` (collectable = true) Is the item a battle pet you can still learn one more of (Retail)?
 - `toy` (toy = true) Is the item a toy? (Its tooltip says "Toy".)
 - `known` (known = true) Does the item's tooltip say "Already known" (a toy, recipe, pet or mount you already have)?
 
-The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable`, `scrappable`, `toy`, `known`, `transmoggable`, `usable`, `equippable` and `upgrade` are read once the game has sent the item's data: an item that has just arrived may match none of them for a moment.
+The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable`, `scrappable`, `toy`, `known`, `transmoggable`, `usable`, `equippable` and `upgrade` are read once the game has sent the item's data, and `petcount`, `petlimit` and `collectable` once your pet journal has loaded: an item that has just arrived may match none of them for a moment.
 
 ### Logical Operators
 - `AND` (slot = Legs AND ilvl > 500 \[This will match leg pieces that are also greater than 500 ilvl.\]) The intersection of two terms. Items must match both sides of the AND.

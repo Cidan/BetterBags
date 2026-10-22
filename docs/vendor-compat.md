@@ -451,7 +451,7 @@ with its invalidation, as that file requires.
 | `usable`, `equippable` (done) | bool | `C_PlayerInfo.CanUseItem(id)` (and `equipment`) | retail | skills, level, spec (caches.md §2's events) |
 | `hasuse` (done) | bool | `C_Item.GetItemSpell(link)` returns something: any `Use:` line, learn lines included ("What a capture settled") | all | the slot changes |
 | `toy`, `known` (done) | bool | whole tooltip lines `TOY` and `ITEM_SPELL_KNOWN` ("What a capture settled") | all | learning it (`NEW_TOY_ADDED`; for the rest, the tooltip text, re-scanned on `TOOLTIP_DATA_UPDATE`, tooltip-scanning.md) |
-| `pet` (done); `petcount`, `petlimit`, `collectable` (after a login capture) | bool, numbers | `C_PetJournal.GetPetInfoByItemID`, `GetNumCollectedInfo` | retail | learning a pet (`NEW_PET_ADDED`) |
+| `pet`, `petcount`, `petlimit`, `collectable` (done) | bool, numbers | `C_PetJournal.GetPetInfoByItemID`, `GetNumCollectedInfo` | retail | learning a pet (`NEW_PET_ADDED`) |
 | `cosmetic` (done) | bool | `C_Item.IsCosmeticItem` | retail | the slot changes |
 | `hasappearance` (as `transmoggable`); `appearance`, `source` (after a login capture) | bool, known/unknown | `C_TransmogCollection` as Vendor (above) | retail | collecting an appearance (`TRANSMOG_COLLECTION_SOURCE_ADDED`); today a known staleness of kept slots, caches.md §1 |
 | `transmoggable` (done) | bool | `C_TransmogCollection.GetItemInfo(link)` returns an appearance | retail | the slot changes |
@@ -537,6 +537,12 @@ item's data loaded), kept as `spec/fixtures/dump_retail_12_1_5.lua`. What each A
 - **Bags.** `C_Container.GetBagName` gave "Backpack" and the bag's item name ("Shrouded Cloth Bag").
 - No API raised an error.
 
+A fresh-login profiler capture the same day (with the collection events and counts,
+perf-profiler.md §10b): the pet journal answered 0 owned at 6.9 s (during the loading screen) and
+234 owned at its first `PET_JOURNAL_LIST_UPDATE` at 13.36 s, just after the loading screen ended
+(13.34 s) and 1.4 s before the startup read (14.80 s); the toy box had loaded by then too (0 at
+6.9 s, 165 of 1003 at 13.36 s). `TRANSMOG_COLLECTION_UPDATED` fired once, at 6.9 s.
+
 ## Needs an in-game check
 
 The Dump tab records, with each item, what every API below answers (`apiProbe`,
@@ -549,12 +555,11 @@ The Dump tab records, with each item, what every API below answers (`apiProbe`,
 - `C_Container.GetBagName` on a retail bank tab and a Warbank tab.
 - `GetItemCraftedQualityByItemInfo` on two copies of a crafted item at different tiers.
 - A toy not learned yet: no `Already known` line.
-- When the pet journal, the toy box and the appearance collection have loaded at login (for pet
-  counts and appearances). A first login capture (2026-10-21) could not show it: the profiler only
-  records events BetterBags listens to, and BetterBags listened to none of the collection events.
-  Captures now record those events and the collections' counts (perf-profiler.md §10b); a profiler
-  capture of a fresh login (Capture next reload, then relaunch) shows when each fires against the
-  startup read.
+- When the appearance collection has loaded at login. The second login capture recorded the wrong
+  count for it (`GetNumTransmogSources`, 7 throughout, the wardrobe's source filters); captures now
+  record collected appearances (perf-profiler.md §10b), so a fresh-login capture shows it.
+- Whether `PET_JOURNAL_LIST_UPDATE` fires on a `/reload` (search-indexing.md §14): a capture of a
+  `/reload` (Capture next reload, then `/reload`).
 - That `NEW_TOY_ADDED`, `NEW_PET_ADDED` and `TRANSMOG_COLLECTION_SOURCE_ADDED` fire when a toy, pet
   or appearance is learned from a bag item, and that the item's tooltip text changes then.
 

@@ -181,6 +181,7 @@ local function recordOf(item)
   -- The merchant's own answer (GetMerchantItemInfo's isUsable), read with the item's data.
   if info.traits then
     record.isUsable = item.isUsable
+    record.petOwned, record.petLimit = items:PetCountsOf(info.traits.petSpeciesID)
   end
   return record, warm
 end
