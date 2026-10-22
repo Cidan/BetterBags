@@ -208,6 +208,7 @@ globals = {
 	"GetDetailedItemLevelInfo",
 	"GetFramerate",
 	"GetInstanceInfo",
+	"GetInventoryItemID",
 	"GetInventoryItemLink",
 	"GetInventoryItemTexture",
 	"GetInventoryItemQuality",

@@ -2185,6 +2185,9 @@ end
 _G.C_Item.GetItemQualityByID = _G.C_Item.GetItemQualityByID or function(itemID)
   return (select(3, _G.C_Item.GetItemInfo(itemID)))
 end
+-- GetInventoryItemID(unit, slot) -> itemID, nothing for an empty slot (Blizzard_TutorialLogic.lua
+-- reads it so); by default nothing is worn.
+_G.GetInventoryItemID = _G.GetInventoryItemID or function(unit, slot) return nil end
 _G.GetInventoryItemLink = _G.GetInventoryItemLink or function(unit, invid)
   return "|Hitem:12345|h[Mock Bag]|h"
 end

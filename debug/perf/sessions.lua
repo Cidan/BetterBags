@@ -164,6 +164,34 @@ perfSessions.COLLECTION_EVENTS = {
   'NEW_TOY_ADDED', 'TOYS_UPDATED',
 }
 
+-- DIAGNOSTICS is a diagnostics run (ArmDiagnostics): the loads it captures, how long after entering
+-- the world each capture stops, and how often it samples (TakeSample).
+perfSessions.DIAGNOSTICS = { loads = 2, stopAfterSec = 60, sampleEverySec = 0.25 }
+
+-- SAMPLE_EVENTS change what a diagnostics capture samples (the player values and the items'
+-- usability), so it samples when they fire too; the collection events do as well.
+perfSessions.SAMPLE_EVENTS = {
+  'LOADING_SCREEN_DISABLED', 'PLAYER_SPECIALIZATION_CHANGED', 'SKILL_LINES_CHANGED', 'PLAYER_LEVEL_UP',
+  'PLAYER_AVG_ITEM_LEVEL_UPDATE', 'SPELLS_CHANGED', 'PLAYER_EQUIPMENT_CHANGED',
+}
+
+-- serialize writes a value with sorted keys, so two equal states compare equal.
+---@param value any
+---@return string
+local function serialize(value)
+  if type(value) ~= 'table' then
+    return tostring(value)
+  end
+  local keys = {}
+  for k in pairs(value) do keys[#keys + 1] = k end
+  table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+  local parts = {}
+  for _, k in ipairs(keys) do
+    parts[#parts + 1] = tostring(k) .. '=' .. serialize(value[k])
+  end
+  return '{' .. table.concat(parts, ',') .. '}'
+end
+
 -- CollectionCounts reads how many pets, toys and appearances the account has: pets and toys as
 -- Blizzard's collection panels count them (C_PetJournal.GetNumPets, Blizzard_PetCollection.lua; the
 -- toy box's learned and total counts, Blizzard_ToyBox.lua), appearances as the unfiltered
@@ -250,6 +278,7 @@ function perfSessions:Init()
     end)
     events:RegisterEvent('PLAYER_ENTERING_WORLD', function(_, _, isInitialLogin, isReloadingUi)
       self:OnEnteringWorld(isInitialLogin, isReloadingUi)
+      self:TakeSample('PLAYER_ENTERING_WORLD')
     end)
     -- Listening is enough: the event dispatcher records each change, with its type and
     -- state, as an "[event] ADDON_RESTRICTION_STATE_CHANGED" call in a capture's trace.
@@ -265,9 +294,21 @@ function perfSessions:Init()
           if perf:IsActive() then
             perf:Exit(perf:Enter('[collections]', self:CollectionCounts()))
           end
+          self:TakeSample(name)
         end)
       end
     end
+    for _, name in ipairs(self.SAMPLE_EVENTS) do
+      if _G.C_EventUtils and _G.C_EventUtils.IsEventValid and _G.C_EventUtils.IsEventValid(name) then
+        events:RegisterEvent(name, function()
+          self:TakeSample(name)
+        end)
+      end
+    end
+    -- The first backpack read at login is the startup read: sample right after each.
+    events:RegisterMessage('items/RefreshBackpack/Done', function()
+      self:TakeSample('items/RefreshBackpack/Done')
+    end)
   end
 end
 
@@ -381,14 +422,61 @@ function perfSessions:StartCapture(reason, extra)
     return false
   end
   self.pendingMeta = meta
+  local token = {}
+  self.captureToken = token
+  if meta.diagnostics then
+    self.samples, self.lastSampleKey = {}, nil
+    self:TakeSample('start', true)
+    self:ScheduleSample(token)
+  end
   send('perf/StateChanged', true)
   return true
 end
 
+-- ScheduleSample samples again in a quarter of a second, for as long as the capture of token runs.
+---@param token table
+function perfSessions:ScheduleSample(token)
+  C_Timer.After(self.DIAGNOSTICS.sampleEverySec, function()
+    if self.captureToken ~= token or not perf:IsActive() then return end
+    self:TakeSample('tick')
+    self:ScheduleSample(token)
+  end)
+end
+
+-- TakeSample records, in a diagnostics capture, the collections' counts and what the item probe
+-- samples (ItemProbe:Sample), with when (the capture's clock) and why; kept only when it differs
+-- from the last sample, except at the start and the stop.
+---@param why string
+---@param always? boolean
+function perfSessions:TakeSample(why, always)
+  if not self.samples or not perf:IsActive() then return end
+  local state = { collections = self:CollectionCounts() }
+  local probe = addon:GetModule('ItemProbe', true)
+  if probe and probe.Sample then
+    local ok, sample = pcall(probe.Sample, probe)
+    if ok then
+      state.probe = sample
+    else
+      state.probeError = tostring(sample)
+    end
+  end
+  local key = serialize(state)
+  if always or key ~= self.lastSampleKey then
+    table.insert(self.samples, { at = perf:ElapsedMs(), why = why, state = state })
+    self.lastSampleKey = key
+  end
+end
+
 ---@return table|nil session
 function perfSessions:StopCapture()
+  local samples = self.samples
+  if samples then
+    self:TakeSample('stop', true)
+  end
+  self.samples, self.lastSampleKey, self.captureToken = nil, nil, nil
   local session = perf:Stop()
   if not session then return nil end
+  session.samples = samples
   local meta = self.pendingMeta or {}
   self.pendingMeta = nil
   meta.stoppedAt = time()
@@ -487,20 +575,48 @@ end
 ---@param armed boolean
 function perfSessions:SetArmedForNextReload(armed)
   self.db.armNextReload = armed and true or nil
+  if not armed then
+    self.db.armLoads = nil
+  end
   send('perf/StateChanged', perf:IsActive())
 end
 
 ---@return boolean
 function perfSessions:IsArmedForNextReload()
-  return self.db.armNextReload == true
+  return self:GetArmedLoads() > 0
 end
 
--- StartIfArmed consumes the one-shot "capture next reload" switch. The switch applies to
--- the next load, a full relaunch as much as a /reload; the capture is labeled 'startup'
--- until the first PLAYER_ENTERING_WORLD says which it was (OnEnteringWorld).
+-- ArmDiagnostics arms a diagnostics run: the next DIAGNOSTICS.loads loads (a fresh login, then a
+-- /reload) are each captured, sampled (TakeSample), and stopped on their own DIAGNOSTICS.stopAfterSec
+-- after entering the world, so one play session answers every open in-game question.
+function perfSessions:ArmDiagnostics()
+  self.db.armNextReload = nil
+  self.db.armLoads = self.DIAGNOSTICS.loads
+  send('perf/StateChanged', perf:IsActive())
+end
+
+-- GetArmedLoads says how many of the next loads will be captured.
+---@return number
+function perfSessions:GetArmedLoads()
+  if (self.db.armLoads or 0) > 0 then
+    return self.db.armLoads
+  end
+  return self.db.armNextReload == true and 1 or 0
+end
+
+-- StartIfArmed consumes the one-shot "capture next reload" switch, or one load of a diagnostics
+-- run. It applies to the next load, a full relaunch as much as a /reload; the capture is labeled
+-- 'startup' until the first PLAYER_ENTERING_WORLD says which it was (OnEnteringWorld).
 ---@return boolean started
 function perfSessions:StartIfArmed()
-  if not self:IsArmedForNextReload() then return false end
+  if (self.db.armLoads or 0) > 0 then
+    self.db.armLoads = self.db.armLoads - 1
+    if self.db.armLoads == 0 then
+      self.db.armLoads = nil
+    end
+    return self:StartCapture('startup', { diagnostics = true })
+  end
+  if self.db.armNextReload ~= true then return false end
   self.db.armNextReload = nil
   return self:StartCapture('startup')
 end
@@ -516,6 +632,16 @@ function perfSessions:OnEnteringWorld(isInitialLogin, isReloadingUi)
     meta.reason = 'login'
   elseif isReloadingUi then
     meta.reason = 'reload'
+  end
+  -- A diagnostics capture stops on its own a while after entering the world (once: the label is
+  -- set only once).
+  if meta.diagnostics then
+    local token = self.captureToken
+    C_Timer.After(self.DIAGNOSTICS.stopAfterSec, function()
+      if self.captureToken == token and perf:IsActive() then
+        self:StopCapture()
+      end
+    end)
   end
 end
 

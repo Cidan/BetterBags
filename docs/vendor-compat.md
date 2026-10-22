@@ -545,8 +545,11 @@ perf-profiler.md §10b): the pet journal answered 0 owned at 6.9 s (during the l
 
 ## Needs an in-game check
 
-The Dump tab records, with each item, what every API below answers (`apiProbe`,
-`.claude/rules/data-driven.md`); one dump settles each of these with the right items in the bags.
+One diagnostics run (perf-profiler.md §10c: Capture Diagnostics, quit and start the game, open a
+bank and Dump, `/reload`) answers every question below that the player's items can: the login and
+reload captures sample the collections, the player values and each backpack item's usability,
+appearance and pet counts against the bag reads; the dump probes the backpack, the bank, the worn
+gear (upgrade tracks and watermarks), every bag's name and the player values.
 
 - `C_Item.GetCurrentItemLevel(location)` against `GetDetailedItemLevelInfo(link)` on an heirloom,
   level-scaled gear and an item in timewalking.

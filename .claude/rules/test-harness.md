@@ -203,3 +203,6 @@ values, or `{ error = ... }`). Older dumps have no `apiProbe`.
   through `clientAnswers(fixturePath)`, which installs them before each test of the block that
   calls it. A new capture becomes a fixture the same way: extract it, add a block calling
   `clientAnswers`, and write its expectations from the raw answers.
+- **Who the player is never goes in a fixture.** Dumps record the player's name and realm
+  (`debugDumpExtras.player.fullName`) and sessions record them in `meta`; an extracted fixture leaves
+  them out.

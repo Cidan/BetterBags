@@ -71,7 +71,15 @@ reasoning about it can suggest a cause; it does not establish one.
   bag's name, and the tooltip's lines with their types (`C_TooltipInfo.GetBagItem`). Each call is
   protected (an error is recorded, not raised), a value the addon may not access is recorded as
   `<secret type>` and never read, and an API the client lacks is left out. The dump records the
-  client it came from (`debugBackpackDumpClient`: version, build, interface, locale). Added to
+  client it came from (`debugBackpackDumpClient`: version, build, interface, locale). For an item
+  with an appearance it also records every way Vendor asks whether it is collected
+  (`GetSourceInfo`, `PlayerCanCollectSource`, `GetAppearanceSources`, `PlayerHasTransmogByItemInfo`).
+  The dump also stores `debugDumpExtras`: `player` (`ItemProbe:Player()`: level, effective level,
+  average item levels, minimum item level, class, who the player is, specialization and its info,
+  professions and each one's info, dual wield, all raw), `equipped` (`ProbeEquipment()`: each worn
+  item probed as a bag item is, by equipment slot, with its tooltip from
+  `C_TooltipInfo.GetInventoryItem`), `bagNames` (`BagNames()`: every `Enum.BagIndex` container's name,
+  slots and free slots), and `bank` (the open bank's items, probed) when dumped at a bank. Added to
   settle the open questions of docs/vendor-compat.md ("Needs an in-game check": the link against the
   item ID, toys, bags as equipment, cold reads) from one capture. Coverage:
   `spec/debug/itemprobe_spec.lua`, `spec/frames/debug_window_spec.lua` ("dumps each backpack item

@@ -2068,10 +2068,13 @@ end
 
 --- Save a backpack dump
 ---@param dump table
-function DB:SetDebugBackpackDump(dump, client)
+function DB:SetDebugBackpackDump(dump, client, extras)
   DB.data.profile.debugBackpackDump = dump
   -- The client the dump was taken on (ItemProbe:Client).
   DB.data.profile.debugBackpackDumpClient = client
+  -- What else the dump recorded: the player values, the worn gear, every bag's name, the open
+  -- bank's items (frames/debug.lua).
+  DB.data.profile.debugDumpExtras = extras
 end
 
 DB:Enable()
