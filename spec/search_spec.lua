@@ -285,6 +285,30 @@ describe("Search", function()
     end)
   end)
 
+  -- ─── Bag name ───────────────────────────────────────────────────────────────
+
+  -- The bag holding an item, by its plain name (asked: docs/vendor-compat.md, "Decisions"). The field
+  -- existed as `bagName` and was never filled, and could not have been found: field names are
+  -- lower-cased before the lookup.
+  describe("bag name", function()
+    before_each(function()
+      search:Add(MockSearchItem({ slotkey = "s1", name = "Sword", bagName = "Backpack" }))
+      search:Add(MockSearchItem({ slotkey = "s2", name = "Peacebloom", bagName = "Herb Satchel" }))
+    end)
+
+    it("finds items by the plain name of their bag, as bagname or bag", function()
+      assert.are.same({ s1 = true }, search:Search("bagname = backpack"))
+      assert.are.same({ s1 = true }, search:Search("bagName = Back"), "as the field was always written")
+      assert.are.same({ s2 = true }, search:Search("bag = herb"))
+      assert.are.same({ s2 = true }, search:Search("bag %= satchel"))
+      assert.are.same({ s2 = true }, search:Search("bag != backpack"))
+    end)
+
+    it("is not searched by a bare word", function()
+      assert.are.same({}, search:Search("satchel"))
+    end)
+  end)
+
   -- ─── Index Aliases ──────────────────────────────────────────────────────────
 
   describe("Index aliases", function()
@@ -851,6 +875,7 @@ describe("Search incremental indexing (SyncKind)", function()
       { "active quest flag", function(it) it.questInfo.isActive = true end },
       { "equipment sets", function(it) it.itemInfo.equipmentSets = { "Tank" } end },
       { "bonus IDs", function(it) it.itemLinkInfo.bonusIDs = { "6652" } end },
+      { "bag name", function(it) it.bagName = "Large Sack" end },
     }
     for _, change in ipairs(changes) do
       it(change[1], function()
@@ -911,7 +936,7 @@ describe("Search incremental indexing (SyncKind)", function()
 
     local function mutate(it)
       local info = it.itemInfo
-      local which = random(18)
+      local which = random(19)
       if which == 1 then info.category = pick(CATEGORIES)
       elseif which == 2 then info.currentItemCount = random(20)
       elseif which == 3 then info.tooltipText = pick(TOOLTIPS)
@@ -929,6 +954,7 @@ describe("Search incremental indexing (SyncKind)", function()
       elseif which == 15 then info.isBound = not info.isBound
       elseif which == 16 then info.isCraftingReagent = not info.isCraftingReagent
       elseif which == 17 then it.questInfo.isQuestItem = not it.questInfo.isQuestItem
+      elseif which == 18 then it.bagName = pick({ "Backpack", "Herb Satchel", "Large Sack" })
       else it.bindingInfo.binding = random(3) - 1 end
     end
 

@@ -37,7 +37,7 @@ local search = addon:NewModule('Search')
 -- whose indexed values changed.
 local SNAPSHOT_FIELDS = {
   'kind', 'name', 'type', 'subtype', 'category', 'guid', 'expansion', 'equipmentlocation',
-  'binding', 'tooltip', 'level', 'rarity', 'id', 'stackcount', 'class', 'subclass', 'bagid',
+  'binding', 'tooltip', 'bagname', 'level', 'rarity', 'id', 'stackcount', 'class', 'subclass', 'bagid',
   'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
 }
 
@@ -87,6 +87,7 @@ local function fillSnapshot(s, item)
   else
     s.tooltip = nil
   end
+  s.bagname = item.bagName
   s.level = info.currentItemLevel
   s.rarity = info.itemQuality
   s.id = info.itemID
@@ -162,7 +163,7 @@ function search:Init()
   self:CreateIndex('equipmentlocation')
   self:CreateIndex('expansion')
   self:CreateIndex('equipmentset')
-  self:CreateIndex('bagName')
+  self:CreateIndex('bagname')
   self:CreateIndex('guid')
   self:CreateIndex('binding')
   -- Tooltip text runs to hundreds of characters; indexing every prefix of it is
@@ -204,6 +205,7 @@ function search:Init()
     slot = self.indicies.equipmentlocation,
     ilvl = self.indicies.level,
     count = self.indicies.stackcount,
+    bag = self.indicies.bagname,
   }
 end
 
@@ -385,6 +387,7 @@ function search:indexSnapshot(slotkey, s)
   self:addStringToIndex(idx.equipmentlocation, s.equipmentlocation, slotkey)
   self:addStringToIndex(idx.binding, s.binding, slotkey)
   self:addStringToIndex(idx.tooltip, s.tooltip, slotkey)
+  self:addStringToIndex(idx.bagname, s.bagname, slotkey)
   for _, field in ipairs(NUMBER_FIELDS) do
     if s[field] ~= nil then
       self:addNumberToIndex(idx[field], s[field], slotkey)
@@ -418,6 +421,7 @@ function search:removeSnapshot(slotkey, s)
   self:removeStringFromIndex(idx.equipmentlocation, s.equipmentlocation, slotkey)
   self:removeStringFromIndex(idx.binding, s.binding, slotkey)
   self:removeStringFromIndex(idx.tooltip, s.tooltip, slotkey)
+  self:removeStringFromIndex(idx.bagname, s.bagname, slotkey)
   for _, field in ipairs(NUMBER_FIELDS) do
     if s[field] ~= nil then
       self:removeNumberFromIndex(idx[field], s[field], slotkey)

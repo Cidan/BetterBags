@@ -1679,6 +1679,21 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal("By Custom", categoryOf(slotInfo, "0_1"))
     end)
 
+    it("gives every item the plain name of its bag, for the bagname field", function()
+      override(_G.C_Container, "GetBagName", function(bagid)
+        return ({ [0] = "Backpack", [1] = "Herb Satchel" })[bagid]
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      mockContainer[1] = { { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.are.equal("Backpack", slotInfo.itemsBySlotKey["0_1"].bagName)
+      assert.are.equal("Herb Satchel", slotInfo.itemsBySlotKey["1_1"].bagName)
+      assert.are.same({ ["1_1"] = true }, search:Search("bag = herb"))
+      searchCategories({ { "Herbs", "bagname = herb satchel" } })
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Herbs", categoryOf(slotInfo, "1_1"))
+    end)
+
     -- A rule that is only a negation (docs/vendor-compat.md): it matched nothing before.
     it("puts every item a NOT rule does not exclude in its category", function()
       searchCategories({ { "Not Alpha", "NOT alpha" } })

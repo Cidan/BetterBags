@@ -524,6 +524,12 @@ describe("the guild bank through the data engine", function()
       items:ProcessRefresh(context:New("backpack"), 0)
       assert.is_nil(search:Search("Copper")[keyOf(2, 2)])
     end)
+
+    it("finds a guild bank item by its tab's name (bagname)", function()
+      loadTabs()
+      read()
+      assert.is_true(search:Search("bagname = mats")[keyOf(2, 2)])
+    end)
   end)
 
   -- A read parks after its harvest (one frame); the guild bank can close meanwhile, and its items

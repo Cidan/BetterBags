@@ -75,6 +75,7 @@ local async = addon:GetModule("Async")
 ---@field bindingInfo BindingInfo
 ---@field bagid number
 ---@field slotid number
+---@field bagName? string The plain name of the item's bag (GetPlainBagName), set in Phase 6.
 ---@field inventoryType number
 ---@field inventorySlots number[]
 ---@field slotkey string
@@ -776,20 +777,43 @@ function items:guildFreeSlots(itemData)
   return emptySlots, emptySlotsByBag
 end
 
+-- GetPlainBagName returns a bag's name: a guild tab's name, the keyring, the bank, or the client's
+-- name for the container (C_Container.GetBagName). Show Bags labels it with a number
+-- (GetBagName); the bagname search field holds it as it is.
 ---@param bagid number
 ---@return string
-function items:GetBagName(bagid)
+function items:GetPlainBagName(bagid)
   local guildTab = guildTabOf(bagid)
   if guildTab then
     local info = guildBankSource():TabInfo(guildTab)
-    return string.format("#%d: %s", guildTab, info and info.name or format(GUILDBANK_TAB_NUMBER, guildTab))
+    return info and info.name or format(GUILDBANK_TAB_NUMBER, guildTab)
   end
-  local isBackpack = const.BACKPACK_BAGS[bagid] ~= nil
-  if isBackpack then
-    local isKeyring = Enum and Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring
-    local bagname = isKeyring and L:G('Keyring') or C_Container.GetBagName(bagid)
+  if const.BACKPACK_BAGS[bagid] ~= nil then
+    if Enum and Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
+      return L:G('Keyring')
+    end
+    return C_Container.GetBagName(bagid) or "Unknown"
+  end
+  if bagid == -1 then
+    return L:G('Bank')
+  elseif bagid == -3 then
+    return L:G('Reagent Bank')
+  end
+  return C_Container.GetBagName(bagid) or L:G("Bank Bag")
+end
+
+-- GetBagName returns a bag's Show Bags label: "#<n>: <name>" (GetPlainBagName).
+---@param bagid number
+---@return string
+function items:GetBagName(bagid)
+  local name = self:GetPlainBagName(bagid)
+  local guildTab = guildTabOf(bagid)
+  if guildTab then
+    return string.format("#%d: %s", guildTab, name)
+  end
+  if const.BACKPACK_BAGS[bagid] ~= nil then
     local displayid = bagid + 1
-    if isKeyring then
+    if Enum and Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
       -- After the last bag: #6 on Classic Era (bags 0-4), #7 on Forever (with the reagent bag).
       local lastBag = 0
       for id in pairs(const.BACKPACK_BAGS) do
@@ -799,18 +823,12 @@ function items:GetBagName(bagid)
       end
       displayid = lastBag + 2
     end
-    return string.format("#%d: %s", displayid, bagname or "Unknown")
+    return string.format("#%d: %s", displayid, name)
   end
-
-  local id = bagid
-  if id == -1 then
-    return string.format("#%d: %s", 1, L:G('Bank'))
-  elseif id == -3 then
-    return string.format("#%d: %s", 1, L:G('Reagent Bank'))
-  else
-    local bagname = C_Container.GetBagName(id)
-    return string.format("#%d: %s", id - 4, bagname or L:G("Bank Bag"))
+  if bagid == -1 or bagid == -3 then
+    return string.format("#%d: %s", 1, name)
   end
+  return string.format("#%d: %s", bagid - 4, name)
 end
 
 -- CloneAsGap produces a frameless gap placeholder from a previous layout entry,
@@ -1221,9 +1239,16 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
     return details
   end
 
+  -- Each item's bag by name, for the bagname search field (Phase 8 indexes it), also looked up once
+  -- per bag per sweep.
+  local bagNames = {}
+
   for _, currentItem in pairs(itemData) do
     local bagid = currentItem.bagid
     local name
+
+    bagNames[bagid] = bagNames[bagid] or self:GetPlainBagName(bagid)
+    currentItem.bagName = bagNames[bagid]
 
     if currentItem.isItemEmpty then
       local details = bagDetailsOf(bagid)

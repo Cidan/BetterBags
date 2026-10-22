@@ -162,7 +162,8 @@ record that claims more: `indexPending` stays on an item until it is indexed.
 
 ### Not caches
 - Phase 6's bag names and qualities for empty slots are looked up once per bag **per sweep**
-  (`bagDetailsOf`); nothing is kept across sweeps, because bags can be swapped.
+  (`bagDetailsOf`), and so is every item's plain bag name (`item.bagName`, `items:GetPlainBagName`,
+  the `bagname` search field); nothing is kept across sweeps, because bags can be swapped.
 
 ## Coverage
 `spec/refresh_pipeline_spec.lua` ("per-slot harvest cache", "equipped gear cache", "upgrade

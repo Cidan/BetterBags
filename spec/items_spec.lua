@@ -361,6 +361,44 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 
+  -- The bagname search field: a bag's name as Show Bags shows it, without its number.
+  describe("plain bag names", function()
+    local savedBags, savedKeyring, savedName
+
+    before_each(function()
+      savedBags, savedKeyring, savedName = const.BACKPACK_BAGS, Enum.BagIndex.Keyring, C_Container.GetBagName
+      const.BACKPACK_BAGS = { [0] = 0, [1] = 1, [-2] = -2 }
+      Enum.BagIndex.Keyring = -2
+      C_Container.GetBagName = function(bagid)
+        return ({ [0] = "Backpack", [1] = "Herb Satchel", [7] = "Large Bank Sack" })[bagid]
+      end
+    end)
+
+    after_each(function()
+      const.BACKPACK_BAGS, Enum.BagIndex.Keyring, C_Container.GetBagName = savedBags, savedKeyring, savedName
+    end)
+
+    it("names each bag as Show Bags does, without the number", function()
+      assert.are.equal("Backpack", items:GetPlainBagName(0))
+      assert.are.equal("#1: Backpack", items:GetBagName(0))
+      assert.are.equal("Herb Satchel", items:GetPlainBagName(1))
+      assert.are.equal("#2: Herb Satchel", items:GetBagName(1))
+      assert.are.equal("Keyring", items:GetPlainBagName(-2))
+      assert.are.equal("Bank", items:GetPlainBagName(-1))
+      assert.are.equal("#1: Bank", items:GetBagName(-1))
+      assert.are.equal("Reagent Bank", items:GetPlainBagName(-3))
+      assert.are.equal("#1: Reagent Bank", items:GetBagName(-3))
+      assert.are.equal("Large Bank Sack", items:GetPlainBagName(7))
+      assert.are.equal("#3: Large Bank Sack", items:GetBagName(7))
+    end)
+
+    it("names a bag the client has no name for as Show Bags does", function()
+      C_Container.GetBagName = function() return nil end
+      assert.are.equal("Unknown", items:GetPlainBagName(1))
+      assert.are.equal("Bank Bag", items:GetPlainBagName(7))
+    end)
+  end)
+
   -- Issue #183: quest items are type "Quest" and subtype "Quest", which read
   -- "Quest - Quest" with the Type and Subtype filters both on.
   describe("Category names from type and subtype (issue #183)", function()

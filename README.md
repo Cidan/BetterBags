@@ -395,6 +395,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `guid` (guid = 'item-60-0-4000000CAEA5CBE3') The globally unique identifier of the item. This string is unique to the specific instance of an item.
 - `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped). **Note:** soulbound and warbound are only available on Retail because of API limitations on non-Retail versions.
 - `tooltip` (tooltip = health) The full text of the item's tooltip. Unlike the other string fields, `=` and `!=` match the value anywhere in the tooltip, not only at the start.
+- `bagname` or `bag` (bag = "Herb Satchel") The name of the bag the item is in: Backpack, the bag's own name, Keyring, Bank, Reagent Bank, a bank bag's name, or a guild bank tab's name. A plain search word does not look in it.
 
 ### Numbers
 - `level` or `ilvl` (ilvl = 528) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
