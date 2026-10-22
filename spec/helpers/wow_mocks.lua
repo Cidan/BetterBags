@@ -3149,6 +3149,22 @@ function _G.GameTooltip:SetInventoryItem(unit, slot)
   self:Show()
   return true, false, _G._repairCosts["inv:" .. slot]
 end
+-- Enum.TooltipDataLineType (TooltipInfoSharedDocumentation.lua), every value.
+_G.Enum.TooltipDataLineType = {
+  None = 0, Blank = 1, UnitName = 2, GemSocket = 3, AzeriteEssenceSlot = 4,
+  AzeriteEssencePower = 5, LearnableSpell = 6, UnitThreat = 7, QuestObjective = 8,
+  AzeriteItemPowerDescription = 9, RuneforgeLegendaryPowerDescription = 10, SellPrice = 11,
+  ProfessionCraftingQuality = 12, SpellName = 13, CurrencyTotal = 14,
+  ItemEnchantmentPermanent = 15, UnitOwner = 16, QuestTitle = 17, QuestPlayer = 18,
+  NestedBlock = 19, ItemBinding = 20, EquipSlot = 21, ItemName = 22, Separator = 23, ToyName = 24,
+  ToyText = 25, ToyEffect = 26, ToyDuration = 27, ToyDescription = 28, ToySource = 29,
+  GemSocketEnchantment = 30, ItemLevel = 31, ItemUpgradeLevel = 32, SpellPassive = 33,
+  SpellDescription = 34, ItemQuality = 35, TradeTimeRemaining = 36, FlavorText = 37,
+  ItemSpellTriggerLearn = 38, LearnTransmogSet = 39, LearnTransmogIllusion = 40, ErrorLine = 41,
+  DisabledLine = 42, UsageRequirement = 43, ItemSpellTriggerOnUse = 44,
+  ItemSpellTriggerOnEquip = 45, ItemSpellTriggerOnProc = 46, UnitLevel = 47, UnitType = 48,
+  UnitDead = 49, UnitCriteriaProgress = 50, AuraCaster = 51,
+}
 _G.C_TooltipInfo = _G.C_TooltipInfo or {}
 _G.C_TooltipInfo.GetInventoryItem = function(unit, slot)
   return { type = 0, lines = {}, repairCost = _G._repairCosts["inv:" .. slot] }

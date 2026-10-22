@@ -728,6 +728,28 @@ describe("TooltipScanner", function()
       assert.are.same({ toy = true, known = true }, marks)
     end)
 
+    -- A recipe's tooltip holds the item it makes after a NestedBlock line (TooltipDataLineType 19), in
+    -- the same flat list: a toy recipe has the toy's "Toy" line. From a retail dump (12.1.5),
+    -- Schematic: Stonebound Lantern, its lines as recorded.
+    it("does not take a toy recipe for a toy", function()
+      _G.C_TooltipInfo = { GetBagItem = function()
+        return { lines = {
+          { type = 22, leftText = "Schematic: Stonebound Lantern" },
+          { type = 20, leftText = "Warbound" },
+          { type = 19, leftText = "" },
+          { type = 22, leftText = "\nStonebound Lantern" },
+          { type = 0, leftText = "Toy" },
+          { type = 0, leftText = "Use: Adds this toy to your Toy Box." },
+          { type = 1, leftText = " " },
+          { type = 44, leftText = "Place a lantern to illuminate your surroundings." },
+          { type = 38, leftText = "Use: Teaches you how to make a Stonebound Lantern." },
+          { type = 43, leftText = "Requires Khaz Algar Engineering (1)" },
+        } }
+      end }
+      local _, _, marks = tooltipScanner:ExtractRetail(0, 1)
+      assert.is_nil(marks)
+    end)
+
     it("marks nothing for the words inside a line", function()
       _G.C_TooltipInfo = { GetBagItem = function()
         return { lines = { { leftText = "Toy Robot" }, { leftText = "Use: Adds this toy to your Toy Box." },

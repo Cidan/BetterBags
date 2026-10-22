@@ -126,7 +126,14 @@ Global string values from Blizzard's enUS strings (Ketho/BlizzardInterfaceResour
 - **The scan marks them** (`markLine`, `data/tooltip.lua`): the joined tooltip text cannot tell a
   whole line from words inside one ("Use: Adds this toy to your Toy Box." is not the toy line), so
   each extraction (bag items on retail and Classic, guild bank and vendor items) notes the left
-  texts equal to either string. Marks are cached with the text, under the same key, kept 1:1 with
+  texts equal to either string. A recipe's tooltip holds the item it makes after a `NestedBlock`
+  line (`TooltipDataLineType` 19), in the same flat list with no end marker: a retail dump's
+  Schematic: Stonebound Lantern has the toy's own "Toy" line after it. A toy line counts only
+  before a `NestedBlock` line (retail; Classic scans have no line types). `known` still counts
+  anywhere: a recipe's own "Already known" (a UsageRequirement line, as its "Requires ..." line in
+  the same tooltip) comes after the nested item, and no capture had a known recipe to place it.
+  Vendor's own check (`IsItemToyInTooltip`) matches "Toy" anywhere in any line, so it takes the
+  recipe for a toy too. Marks are cached with the text, under the same key, kept 1:1 with
   it (`tooltipScanner.marks`; `RemoveFromCache` and `ClearCache` drop them), returned as the second
   value of `GetTooltipText`, `GetGuildBankItemText` and `GetMerchantItemText`; the tooltip's search
   text is unchanged.

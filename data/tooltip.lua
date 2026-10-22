@@ -20,17 +20,28 @@ local context = addon:GetModule('Context')
 -- tooltip is left as cached.
 local MAX_RESOLVE_RESCANS = 3
 
+-- isNestedBlock says whether a C_TooltipInfo line starts a nested item (TooltipDataLineType.NestedBlock).
+---@param line table
+---@return boolean
+local function isNestedBlock(line)
+  local types = Enum and Enum.TooltipDataLineType
+  return types ~= nil and types.NestedBlock ~= nil and line.type == types.NestedBlock
+end
+
 -- markLine notes what a whole tooltip line says about the item: a toy ("Toy", TOY) or something
 -- already known ("Already known", ITEM_SPELL_KNOWN). The joined text cannot tell a whole line from
--- words inside one. Returns marks, made the first time a line marks something.
+-- words inside one. A recipe's tooltip holds the item it makes after a NestedBlock line, in the same
+-- list (a retail dump: a toy recipe's tooltip has the toy's "Toy" line), so a toy line counts only
+-- before it (nested). Returns marks, made the first time a line marks something.
 ---@param marks? table
 ---@param text? string
+---@param nested? boolean The line is in the nested item's lines.
 ---@return table?
-local function markLine(marks, text)
+local function markLine(marks, text, nested)
   if text == nil or text == "" then
     return marks
   end
-  if text == _G.TOY then
+  if text == _G.TOY and not nested then
     marks = marks or {}
     marks.toy = true
   elseif text == _G.ITEM_SPELL_KNOWN then
@@ -151,7 +162,7 @@ function tooltipScanner:ExtractRetail(bagid, slotid)
   end
 
   local lines = {}
-  local marks
+  local marks, nested
   for _, line in ipairs(tooltipData.lines) do
     -- Extract both left and right text from each line
     if line.leftText and line.leftText ~= "" then
@@ -160,7 +171,8 @@ function tooltipScanner:ExtractRetail(bagid, slotid)
     if line.rightText and line.rightText ~= "" then
       table.insert(lines, line.rightText)
     end
-    marks = markLine(marks, line.leftText)
+    nested = nested or isNestedBlock(line)
+    marks = markLine(marks, line.leftText, nested)
   end
 
   if #lines == 0 then
@@ -242,7 +254,7 @@ local function joinRetailLines(tooltipData)
     return nil
   end
   local lines = {}
-  local marks
+  local marks, nested
   for _, line in ipairs(tooltipData.lines) do
     if line.leftText and line.leftText ~= "" then
       table.insert(lines, line.leftText)
@@ -250,7 +262,8 @@ local function joinRetailLines(tooltipData)
     if line.rightText and line.rightText ~= "" then
       table.insert(lines, line.rightText)
     end
-    marks = markLine(marks, line.leftText)
+    nested = nested or isNestedBlock(line)
+    marks = markLine(marks, line.leftText, nested)
   end
   if #lines == 0 then
     return nil
