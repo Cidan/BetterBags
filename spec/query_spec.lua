@@ -288,7 +288,7 @@ describe("QueryParser", function()
       }, ast)
     end)
 
-    it("parses mixed AND/OR left-to-right (no precedence)", function()
+    it("parses mixed AND then OR as (a AND b) OR c", function()
       local ast = parse("a AND b OR c")
       assert.same({
         type = "logical",
@@ -301,6 +301,25 @@ describe("QueryParser", function()
         },
         right = {type = "term", value = "c"},
       }, ast)
+    end)
+
+    -- Asked (docs/vendor-compat.md, "Decisions"): AND binds tighter than OR, as in Lua. Queries used
+    -- to group left to right, so `a OR b AND c` read as `(a OR b) AND c`.
+    it("binds AND tighter than OR, as Lua does", function()
+      local function shape(n)
+        if n.type == "term" then return n.value end
+        if n.type == "comparison" then return n.field .. n.operator .. n.value end
+        if n.operator == "NOT" then return "NOT " .. shape(n.expression) end
+        return "(" .. shape(n.left) .. " " .. n.operator .. " " .. shape(n.right) .. ")"
+      end
+      assert.are.equal("(a OR (b AND c))", shape(parse("a OR b AND c")))
+      assert.are.equal("((a OR (b AND c)) OR d)", shape(parse("a OR b AND c OR d")))
+      assert.are.equal("((a AND b) OR (c AND d))", shape(parse("a AND b OR c AND d")))
+      assert.are.equal("(NOT a OR (b AND c))", shape(parse("NOT a OR b AND c")))
+      assert.are.equal("(a OR (NOT b AND c))", shape(parse("a OR NOT b AND c")))
+      assert.are.equal("((a OR b) OR c)", shape(parse("a OR b OR c")), "OR still groups left to right")
+      assert.are.equal("((a OR b) AND c)", shape(parse("(a OR b) AND c")))
+      assert.are.equal("(ilvl>5 OR (rarity=4 AND name=x))", shape(parse("ilvl > 5 or rarity = 4 and name = x")))
     end)
 
     it("parses parenthesized expressions for grouping", function()
@@ -378,6 +397,127 @@ describe("QueryParser", function()
   end)
 
   -- ─── Query (integration) ───────────────────────────────────────────────────
+
+  -- ─── Rewriting rules written before AND bound tighter than OR ─────────────────
+
+  describe("GroupLeftToRight", function()
+    -- The parser as it was before AND bound tighter than OR: AND and OR at one precedence, grouped
+    -- left to right; a term, `field op value`, `NOT term` or a parenthesized group, the closing
+    -- parenthesis optional; whatever follows the first expression ignored.
+    local function oldParse(tokens)
+      local i = 1
+      local function peek() return tokens[i] end
+      local expression
+      local function term()
+        local t = peek()
+        if t and t.type == "paren" and t.value == "(" then
+          i = i + 1
+          local e = expression()
+          if peek() and peek().type == "paren" and peek().value == ")" then i = i + 1 end
+          return e
+        elseif t and t.type == "logical" and t.value == "NOT" then
+          i = i + 1
+          return { type = "logical", operator = "NOT", expression = term() }
+        elseif t and t.type == "term" then
+          i = i + 1
+          if peek() and peek().type == "operator" then
+            local op = peek().value
+            i = i + 1
+            local v = assert(peek() and peek().type == "term" and peek(), "value")
+            i = i + 1
+            return { type = "comparison", field = t.value, operator = op, value = v.value }
+          end
+          return { type = "term", value = t.value }
+        end
+        error("unexpected")
+      end
+      expression = function()
+        local left = term()
+        while peek() and peek().type == "logical" do
+          local op = peek().value
+          assert(op ~= "NOT", "binary NOT")
+          i = i + 1
+          left = { type = "logical", operator = op, left = left, right = term() }
+        end
+        return left
+      end
+      return expression()
+    end
+
+    local function shape(n)
+      if n == nil then return "nil" end
+      if n.type == "term" then return n.value end
+      if n.type == "comparison" then return n.field .. n.operator .. n.value end
+      if n.operator == "NOT" then return "NOT " .. shape(n.expression) end
+      return "(" .. shape(n.left) .. " " .. n.operator .. " " .. shape(n.right) .. ")"
+    end
+
+    local function oldShape(text)
+      local ok, ast = pcall(function() return oldParse(QueryParser:Lexer(text)) end)
+      return ok and shape(ast) or "invalid"
+    end
+
+    it("adds parentheses so a rule keeps the meaning it had", function()
+      assert.are.equal("(a OR b) AND c", QueryParser:GroupLeftToRight("a OR b AND c"))
+      assert.are.equal("((a OR b) AND c OR d) AND e", QueryParser:GroupLeftToRight("a OR b AND c OR d AND e"))
+      assert.are.equal("(a AND b OR c) AND d", QueryParser:GroupLeftToRight("a AND b OR c AND d"))
+      assert.are.equal("(a OR b) AND c AND d", QueryParser:GroupLeftToRight("a OR b AND c AND d"), "no more than needed")
+      assert.are.equal("x AND ((a OR b) AND c)", QueryParser:GroupLeftToRight("x AND (a OR b AND c)"))
+      assert.are.equal("(NOT a or b) and c", QueryParser:GroupLeftToRight("NOT a or b and c"))
+      assert.are.equal('(type = armor OR name = "Large Sack") AND ilvl > 200',
+        QueryParser:GroupLeftToRight('type = armor OR name = "Large Sack" AND ilvl > 200'), "quotes kept")
+      assert.are.equal("(tradeskill OR (a OR b)) AND exp = tww",
+        QueryParser:GroupLeftToRight("tradeskill OR (a OR b) AND exp = tww"))
+    end)
+
+    it("leaves a rule that does not mix them, or that does not parse, as it is", function()
+      for _, q in ipairs({ "a AND b OR c", "a OR b OR c", "a AND b AND c", "(a OR b) AND c", "rarity = epic",
+        "exp = mid and not \"housing decor\"", "ilvl < 220 and (armor or weapon)", "", "AND a", "a = ", "a NOT b" }) do
+        assert.are.equal(q, QueryParser:GroupLeftToRight(q), q)
+      end
+    end)
+
+    -- The lexer rejects a control character; a saved rule holding one must not stop the load.
+    it("leaves a rule the lexer cannot read as it is, without failing", function()
+      local odd = "a OR b\001 AND c"
+      assert.are.equal(odd, QueryParser:GroupLeftToRight(odd))
+      assert.are.equal("a OR AND b", QueryParser:GroupLeftToRight("a OR AND b"))
+    end)
+
+    it("keeps what an unclosed parenthesis or a stray one meant", function()
+      assert.are.equal(oldShape("(a OR b AND c"), shape(QueryParser:Query(QueryParser:GroupLeftToRight("(a OR b AND c"))))
+      assert.are.equal(oldShape("a OR b) AND c"), shape(QueryParser:Query(QueryParser:GroupLeftToRight("a OR b) AND c"))))
+    end)
+
+    -- A thousand random rules, each read as the old parser read it and as the current one reads its
+    -- rewrite: the two must be the same expression.
+    it("gives every rule the meaning it had, over random rules", function()
+      local seed = 1177
+      local function random(n)
+        seed = (seed * 1103515245 + 12345) % 2147483648
+        return seed % n + 1
+      end
+      local atoms = { "a", "b", "c", "ilvl > 5", 'name = "x y"', "rarity = epic", "tradeskill" }
+      local ops = { "AND", "OR", "and", "or" }
+      local function expr(depth)
+        local parts = {}
+        for n = 1, random(4) do
+          if n > 1 then table.insert(parts, ops[random(#ops)]) end
+          local item = atoms[random(#atoms)]
+          if depth < 3 and random(4) == 1 then item = "(" .. expr(depth + 1) .. ")" end
+          if random(5) == 1 then item = "NOT " .. item end
+          table.insert(parts, item)
+        end
+        return table.concat(parts, " ")
+      end
+      for _ = 1, 1000 do
+        local q = expr(1)
+        local rewritten = QueryParser:GroupLeftToRight(q)
+        assert.are.equal(oldShape(q), shape(QueryParser:Query(rewritten)), q .. " -> " .. rewritten)
+        assert.are.equal(rewritten, QueryParser:GroupLeftToRight(rewritten), "a rewrite needs no other")
+      end
+    end)
+  end)
 
   describe("Query", function()
 

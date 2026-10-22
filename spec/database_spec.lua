@@ -54,6 +54,7 @@ end
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 LoadBetterBagsModule("util/serialization.lua")
+LoadBetterBagsModule("util/query.lua")
 
 addon:GetModule("Context")
 local events = addon:GetModule("Events")
@@ -1351,11 +1352,12 @@ describe("Database", function()
       assert.is_false(ok)
     end)
 
-    it("exports version 2, without the hidden sections", function()
+    -- Version 3: rules written with AND binding tighter than OR.
+    it("exports version 3, without the hidden sections", function()
       DB.data.profile.categoryOptions = { Junk = { shown = false } }
       local serialization = addon:GetModule("Serialization")
       local data = serialization:Deserialize(serialization:DecodeBase64(DB:ExportSettings():sub(4)))
-      assert.are.equal(2, data.version)
+      assert.are.equal(3, data.version)
       assert.is_nil(data.categoryOptions)
       DB.data.profile.categoryOptions = nil
     end)
@@ -1381,6 +1383,26 @@ describe("Database", function()
       assert.are.same({ query = "type = armor" }, f.Gear.searchCategory)
       assert.are.equal(1, f.Gear.groupBy)
       assert.is_nil(DB.data.profile.categoryOptions)
+    end)
+
+    -- An export from before AND bound tighter than OR has rules grouped left to right.
+    it("keeps the meaning of an older export's rules, and leaves a version 3 export's as they are", function()
+      local serialization = addon:GetModule("Serialization")
+      local function export(version)
+        return "!BB" .. serialization:EncodeBase64(serialization:Serialize({
+          version = version,
+          customCategoryFilters = {
+            Gear = { name = "Gear", itemList = {}, searchCategory = { query = "type = armor OR type = weapon AND ilvl > 200" } },
+          },
+          customCategoryIndex = {},
+        }))
+      end
+      assert.is_true((DB:ImportSettings(export(2))))
+      assert.are.equal("(type = armor OR type = weapon) AND ilvl > 200",
+        DB.data.profile.customCategoryFilters.Gear.searchCategory.query)
+      assert.is_true((DB:ImportSettings(export(3))))
+      assert.are.equal("type = armor OR type = weapon AND ilvl > 200",
+        DB.data.profile.customCategoryFilters.Gear.searchCategory.query)
     end)
 
     it("round-trip export/import preserves category data", function()

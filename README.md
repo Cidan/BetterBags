@@ -417,8 +417,9 @@ Search allows you to find items by the following indices (based on the item belo
 ### Logical Operators
 - `AND` (slot = Legs AND ilvl > 500 \[This will match leg pieces that are also greater than 500 ilvl.\]) The intersection of two terms. Items must match both sides of the AND.
 - `OR` (slot = Legs OR ilvl > 500 \[This will match items that are leg pieces or are greater than 500 ilvl.\]) The union of two terms. Items can match either or both sides of the OR.
-- `NOT` (NOT slot = Legs \[This will match any item that cannot be equipped in the leg slot.\]) The complement of a term. Items must not match the NOT.
+- `NOT` (NOT slot = Legs \[This will match any item that cannot be equipped in the leg slot.\]) The complement of a term. Items must not match the NOT. It works on its own, inside an `OR`, and before a group (`NOT (rarity = poor OR rarity = common)`).
 - `(` and `)` To group search terms.
+- **Precedence:** `NOT` applies first, then `AND`, then `OR`, as in most query languages: `type = armor OR type = weapon AND ilvl > 200` matches all armor, and weapons above item level 200. Use parentheses to group differently: `(type = armor OR type = weapon) AND ilvl > 200`. Rules saved before this precedence were rewritten once with parentheses, so they still mean what they meant.
 - `=` (type = Armor, ilvl = 506) Items with a value equal to the text or number on the right side. This will find any items starting with the value.
 - `%=` (slot %= Hand \[This will match any gear pieces that are slotted into any slot with `Hand` in the name. eg. Hands, Main Hand, Offhand\]) Items with the value in the full text of the field(s).
 - `!=` (expansion != DF) Items with a value not equal to the text or number on the right side. This will find any items NOT starting with the value.

@@ -814,6 +814,26 @@ function DB:NormalizeCategories()
   profile.customCategoryIndex = index
 end
 
+-- MigrateSearchRules brings the profile's saved rules to the query language QueryParser reads
+-- now, once: rules written in version 1 (AND and OR at one precedence, grouped left to right) get
+-- the parentheses that keep their meaning with AND binding tighter (QueryParser:GroupLeftToRight).
+-- from is the version they were written in: the profile's (searchRuleVersion), else 1.
+---@param from? number
+function DB:MigrateSearchRules(from)
+  ---@class QueryParser: AceModule
+  local QueryParser = addon:GetModule('QueryParser')
+  local profile = DB.data.profile
+  if (from or profile.searchRuleVersion or 1) < 2 then
+    for _, filter in pairs(profile.customCategoryFilters or {}) do
+      local rule = filter.searchCategory
+      if type(rule) == "table" and type(rule.query) == "string" then
+        rule.query = QueryParser:GroupLeftToRight(rule.query)
+      end
+    end
+  end
+  profile.searchRuleVersion = QueryParser.VERSION
+end
+
 ---@param category string
 function DB:WipeItemCategory(category)
   if DB.data.profile.customCategoryFilters[category] then
@@ -1418,10 +1438,10 @@ function DB:ExportSettings()
   local serialization = addon:GetModule('Serialization')
 
   -- Create a table with only category configuration settings
-  -- Version 2: unified categories (DB:NormalizeCategories), no hidden sections. Version 1 imports
-  -- are brought to it.
+  -- Version 2: unified categories (DB:NormalizeCategories), no hidden sections. Version 3: rules
+  -- written with AND binding tighter than OR (search rule version 2). Older imports are brought to it.
   local exportData = {
-    version = 2,
+    version = 3,
     customCategoryFilters = serialization:DeepCopy(DB.data.profile.customCategoryFilters),
     customCategoryIndex = serialization:DeepCopy(DB.data.profile.customCategoryIndex),
     ephemeralCategoryFilters = serialization:DeepCopy(DB.data.profile.ephemeralCategoryFilters),
@@ -1498,6 +1518,8 @@ function DB:ImportSettings(dataString)
   end
 
   DB:NormalizeCategories()
+  -- Exports before version 3 hold rules of search rule version 1.
+  DB:MigrateSearchRules(importData.version >= 3 and 2 or 1)
   return true, "Category configuration imported successfully"
 end
 
@@ -1524,6 +1546,9 @@ function DB:Migrate()
   -- Unified categories, every load (category-lifecycle.md §6). It also turns the old single enabled
   -- flag into one per bag.
   DB:NormalizeCategories()
+
+  -- Saved rules from before AND bound tighter than OR, once per profile (search-indexing.md §6).
+  DB:MigrateSearchRules()
 
   -- Fix the column count and items per row values from a previous bug.
   -- Do not remove before Q1'25.
@@ -1938,6 +1963,8 @@ function DB:CreateProfile(name)
 
   -- SetProfile creates new profile if doesn't exist
   DB.data:SetProfile(name)
+  -- No old rules in it; rules written before the next load are current ones.
+  DB:MigrateSearchRules(addon:GetModule('QueryParser').VERSION)
   return true, "Profile created successfully"
 end
 
@@ -1967,6 +1994,8 @@ function DB:CopyFromProfile(sourceName)
 
   -- Copy from source to current profile
   DB.data:CopyProfile(sourceName)
+  -- The copy has the source's rules, in the version the source has.
+  DB:MigrateSearchRules()
   return true, "Profile copied successfully"
 end
 
@@ -2027,6 +2056,7 @@ end
 ---@return string message
 function DB:ResetCurrentProfile()
   DB.data:ResetProfile(false, true)
+  DB:MigrateSearchRules(addon:GetModule('QueryParser').VERSION)
   return true, "Profile reset to defaults"
 end
 

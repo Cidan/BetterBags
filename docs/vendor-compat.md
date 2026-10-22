@@ -7,8 +7,9 @@ BetterBags' search has today, what is missing, and what the "math" in Vendor's r
 BetterBags' query engine.
 
 **Status** (2026-10-21): decided (below, "Decisions"). Built: negation (NOT and `!=` match every
-indexed item outside their part, anywhere in a query; `.claude/rules/search-indexing.md` §5). The
-rest is planned.
+indexed item outside their part, anywhere in a query; `.claude/rules/search-indexing.md` §5), and
+precedence (AND before OR, saved rules rewritten once to keep their meaning; §6). The rest is
+planned.
 
 ## Why
 
@@ -520,10 +521,10 @@ Made by the player (2026-10-21):
 
 ## Order of work
 
-1. Negation (NOT and `!=` against every indexed item): done. Then precedence, `bagname`, expansion
-   order, and `quality` as the crafting tier. Tests first.
-2. The parser: precedence (with the saved-rule rewrite), `==`/`~=`, arithmetic, functions, player
-   values; the evaluator: folding, index lookups, the per-item check narrowed by the index.
+1. Negation (NOT and `!=` against every indexed item) and precedence (with the saved-rule rewrite):
+   done. Then `bagname`, expansion order, and `quality` as the crafting tier. Tests first.
+2. The parser: `==`/`~=`, arithmetic, functions, player values; the evaluator: folding, index
+   lookups, the per-item check narrowed by the index.
 3. The fields above, the cheap ones first (`minlevel`, `price`, `sellable`, `stacksize`,
    `equipment`, `upgrade`, `inset`, the binding booleans), each with its invalidation in caches.md.
 4. Importing Vendor's rules, converted to BetterBags' search.
