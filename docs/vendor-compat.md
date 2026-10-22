@@ -464,6 +464,10 @@ with its invalidation, as that file requires.
 | `slotbest`, `slotequipped` | numbers, per item | `C_ItemUpgrade.GetHighWatermarkForItem(link)`; the worn gear (`equipmentCache`) | retail; all | `PLAYER_EQUIPMENT_CHANGED` |
 | `player.level`, `player.ilvl`, `player.equippedilvl`, `player.class`, `player.classid`, `player.spec`, `player.specid`, `player.profession`, `player.name`, `player.realm` | values | `UnitLevel`, `GetAverageItemLevel`, `UnitClass`, `GetSpecializationInfo`, `GetProfessions`, `UnitFullName` | all (spec: retail) | the events above |
 
+Every field is read only once the item's data has loaded (rule #1, the player's: item data is
+assumed not to work until its load completes; `C_Item.GetItemInfoInstant` aside; data-loader.md
+§19); an item read cold has none of them until it is read again.
+
 Every field read from the item goes through `fillSnapshot` (search-indexing.md §1), so the
 incremental index stays equal to a clean rebuild; the randomized test there must cover each new
 field.
@@ -507,8 +511,7 @@ way to limit a match to one line if that turns out to be wanted.
 - `C_Item.IsUsableItem` and `C_Item.GetItemSpell` on an item with a Use effect, one without, and one
   the character cannot use yet.
 - `C_Container.GetBagName` on a retail bank tab and a Warbank tab.
-- `C_TradeSkillUI.GetItemReagentQualityByItemInfo` for a reagent whose item data has not loaded yet,
-  and `GetItemCraftedQualityByItemInfo` on two copies of a crafted item at different tiers.
+- `GetItemCraftedQualityByItemInfo` on two copies of a crafted item at different tiers.
 - That `NEW_TOY_ADDED`, `NEW_PET_ADDED` and `TRANSMOG_COLLECTION_SOURCE_ADDED` (all documented)
   fire when a toy, pet or appearance is learned from a bag item, and that the item's tooltip text
   changes then ("Already known").
@@ -525,14 +528,19 @@ Made by the player (2026-10-21):
 
 ## Order of work
 
+Asked (2026-10-21): the new item fields first, then player values, then arithmetic, then the
+import.
+
 1. Negation (NOT and `!=` against every indexed item), precedence (with the saved-rule rewrite),
    `bagname`, expansion order and `quality` as the crafting tier: done.
-2. The parser: `==`/`~=`, arithmetic, functions, player values; the evaluator: folding, index
+2. The new item fields ("Proposed: new fields"), each read only once the item's data has loaded
+   (rule #1, `.claude/rules/data-loader.md` §19) and with its invalidation in caches.md.
+3. Player values (`player.level`, `player.ilvl`, ...), with the events that keep them current.
+4. The parser and evaluator: `==`/`~=`, arithmetic, functions; constants folded into index
    lookups, the per-item check narrowed by the index.
-3. The fields above, the cheap ones first (`minlevel`, `price`, `sellable`, `stacksize`,
-   `equipment`, `upgrade`, `inset`, the binding booleans), each with its invalidation in caches.md.
-4. Importing Vendor's rules, converted to BetterBags' search.
-5. The README's search section and `.claude/rules/search-indexing.md`.
+5. Importing Vendor's rules, converted to BetterBags' search.
+
+Each step updates the README's search section and `.claude/rules/search-indexing.md`.
 
 ## Appendix: the player rules in the corpus
 

@@ -403,6 +403,22 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_nil(items:CraftingQualityOf(42))
     end)
 
+    -- Rule #1: item data is read only once it has loaded (C_Item.GetItemInfoInstant aside). A read
+    -- without it is marked incomplete and read again; until then the item has no tier.
+    it("is not read for an item whose data has not loaded", function()
+      local asked = 0
+      C_TradeSkillUI.GetItemReagentQualityByItemInfo = function() asked = asked + 1; return 2 end
+      C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function() asked = asked + 1; return 2 end
+      local savedInfo = C_Item.GetItemInfo
+      C_Item.GetItemInfo = function() return nil end
+      local read, props = pcall(items.ReadItemProperties, items, 42, link)
+      C_Item.GetItemInfo = savedInfo
+      assert(read, props)
+      assert.is_true(props.incomplete)
+      assert.is_nil(props.craftingQuality)
+      assert.are.equal(0, asked)
+    end)
+
     -- A crafted item's tier is its own: two copies of one item can differ, and the link says which.
     it("is read from the slot's link, not the item ID", function()
       C_TradeSkillUI.GetItemCraftedQualityByItemInfo = function(info) return info == link and 3 or 1 end

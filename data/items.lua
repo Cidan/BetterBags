@@ -3180,7 +3180,11 @@ function items:ReadItemProperties(itemID, itemLink)
   props.subclassID = instSubclassID or props.subclassID
 
   props.bindType = self:GetBindTypeFromLink(itemLink) or bindType or 0 --link overrides itemID if set
-  props.craftingQuality = self:CraftingQualityOf(itemLink)
+  -- Item data is read only once it has loaded (C_Item.GetItemInfoInstant aside). A read without it
+  -- is incomplete, and the item is read again (harvestIncomplete); until then it has none of these.
+  if not props.incomplete then
+    props.craftingQuality = self:CraftingQualityOf(itemLink)
+  end
 
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
   props.effectiveIlvl = effectiveIlvl or props.itemLevel or 0

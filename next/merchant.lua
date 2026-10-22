@@ -167,8 +167,8 @@ local function recordOf(item)
       info.expacID = expacID
       info.isCraftingReagent = isCraftingReagent
       info.currentItemLevel = C_Item.GetDetailedItemLevelInfo and C_Item.GetDetailedItemLevelInfo(link) or level
+      info.craftingQuality = items:CraftingQualityOf(link)
     end
-    info.craftingQuality = items:CraftingQualityOf(link)
   end
   info.tooltipText = tooltipScanner:GetMerchantItemText(item.index)
   ---@type ItemData

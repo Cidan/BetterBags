@@ -1693,6 +1693,28 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are_not.equal("Tier 2", categoryOf(slotInfo, "0_1"))
     end)
 
+    it("reads no crafting tier while an item's data has not loaded, and reads it once it has", function()
+      local asked = 0
+      override(_G.C_TradeSkillUI, "GetItemReagentQualityByItemInfo", function()
+        asked = asked + 1
+        return 2
+      end)
+      local getItemInfo = _G.C_Item.GetItemInfo
+      local cold = true
+      override(_G.C_Item, "GetItemInfo", function(id)
+        if cold then return nil end
+        return getItemInfo(id)
+      end)
+      mockContainer[0] = { { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].harvestIncomplete)
+      assert.is_nil(slotInfo.itemsBySlotKey["0_1"].itemInfo.craftingQuality)
+      assert.are.equal(0, asked)
+      cold = false
+      slotInfo = refreshBackpack({ derive = true })
+      assert.are.equal(2, slotInfo.itemsBySlotKey["0_1"].itemInfo.craftingQuality, "read again once loaded")
+    end)
+
     it("gives every item the plain name of its bag, for the bagname field", function()
       override(_G.C_Container, "GetBagName", function(bagid)
         return ({ [0] = "Backpack", [1] = "Herb Satchel" })[bagid]

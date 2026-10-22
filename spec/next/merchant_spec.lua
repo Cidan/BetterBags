@@ -292,6 +292,17 @@ describe("NextMerchant", function()
       assert.are.same({ ["vendor:2"] = true }, merchant:Search("quality = 2"))
     end)
 
+    -- Rule #1: read once the item's data has loaded; the vendor reads again on GET_ITEM_INFO_RECEIVED.
+    it("reads no crafting tier for a vendor item whose data has not loaded", function()
+      local asked = 0
+      override(stubs.items, "CraftingQualityOf", function() asked = asked + 1; return 2 end)
+      _G._merchant.items = { vendorItem(14) }
+      local _, cold = merchant:ReadItems(ctx())
+      assert.is_true(cold)
+      assert.are.equal(0, asked)
+      assert.are.same({}, merchant:Search("quality = 2"))
+    end)
+
     it("forgets the last vendor's items", function()
       _G._merchant.items = { vendorItem(10), vendorItem(11) }
       merchant:ReadItems(ctx())
