@@ -315,12 +315,11 @@ page's `Content.Top` and `Bottom`).
   (`AddPermanentItemToCategory`, `ClearCursor`, the bags recalculated; asked: the items themselves
   are drop targets); a right click offers Remove. A plugin's items show read-only (no drop, no remove,
   no Remove All).
-- **Automation tab** (automation.md §5): what the category does with the backpack's items on its own
-  (Nothing, Sell at Merchants, Destroy, saved at once; Destroy Next Item beside it for Destroy), what
-  the action does and what it never touches, and the items it acts on in the item box, those it leaves
-  alone faded with why. Shown while a category is chosen, a plugin's too. The list line and the heading
-  end "Sells at merchants" or "Destroys on command". General > Items gained Sell at Most 12 Items per
-  Visit (`autoSellLimit`).
+- **Automation tab** (automation.md §5): two switches, Sell at Merchants and Destroy, at most one on
+  (turning one on turns the other off; both off is nothing), saved at once, and nothing else (asked:
+  no dropdown, no explanations, no item box, no Destroy Next Item button). Shown while a category is
+  chosen, a plugin's too. The list line and the heading end "Sells at merchants" or "Destroys on
+  command". General > Items gained Sell at Most 12 Items per Visit (`autoSellLimit`).
 - `NextSettingsCategories:Show(name)` chooses a category for the next time the page shows (a bag's tab
   links here); `NewFromSearch(query)` makes the list ask for a new category's name with the search as
   its rule (the search box's Enter to Make Category, through `config/NewCategoryFromSearch`, which

@@ -18,7 +18,6 @@ local categories = StubBetterBagsModule("Categories")
 local items = StubBetterBagsModule("Items")
 local search = StubBetterBagsModule("Search")
 local settings = StubBetterBagsModule("NextSettings")
-local automation = StubBetterBagsModule("Automation")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextToggle", "next/controls/toggle.lua" },
@@ -613,25 +612,11 @@ describe("NextSettingsCategories", function()
     end)
   end)
 
-  -- What a category does with its items on its own (automation.md): the engine (Automation) is
-  -- stood in for: its entries are given, and Destroy Next Item recorded.
+  -- What a category does with its items on its own (automation.md): two switches, at most one on.
   describe("the Automation tab", function()
-    local tab, entries, destroyed
-
-    local function entry(slotkey, itemID, category, action, extra)
-      extra = extra or {}
-      return { category = category, action = action, blocked = extra.blocked,
-        data = { slotkey = slotkey, itemInfo = { itemID = itemID, itemIcon = itemID * 10, itemName = "Item " .. itemID,
-          itemLink = "|Hitem:" .. itemID .. "|h", itemQuality = 0, currentItemCount = extra.count or 1 } } }
-    end
+    local tab
 
     before_each(function()
-      entries, destroyed = {}, 0
-      override(automation, "Entries", function() return entries end)
-      override(automation, "DestroyNext", function()
-        destroyed = destroyed + 1
-        return "destroyed"
-      end)
       tab = editor:CreateAutomationTab(CreateFrame("Frame"), owner, bagsFn)
     end)
 
@@ -644,36 +629,35 @@ describe("NextSettingsCategories", function()
     it("says to make a category while there is none", function()
       place(tab)
       assert.is_true(tab.none:IsShown())
-      assert.is_false(tab.action.frame:IsShown())
-      assert.is_false(tab.grid.frame:IsShown())
+      assert.is_false(tab.sell.frame:IsShown())
+      assert.is_false(tab.destroy.frame:IsShown())
     end)
 
-    it("shows the action and says what it does", function()
+    it("shows what the category does as two switches", function()
       editor.selected = "Mats"
       place(tab)
-      assert.are.equal("Nothing", tab.action.text:GetText())
-      assert.truthy(tab.hint:GetText():find("alone", 1, true))
-      assert.is_false(tab.destroy.frame:IsShown())
+      assert.is_false(tab.sell:GetChecked())
+      assert.is_false(tab.destroy:GetChecked())
       filters.Mats.automation = "sell"
       tab:Refresh(ctx())
-      assert.are.equal("Sell at Merchants", tab.action.text:GetText())
-      assert.truthy(tab.hint:GetText():find("Shift", 1, true))
-      assert.is_false(tab.destroy.frame:IsShown())
+      assert.is_true(tab.sell:GetChecked())
+      assert.is_false(tab.destroy:GetChecked())
       filters.Mats.automation = "destroy"
       tab:Refresh(ctx())
-      assert.are.equal("Destroy", tab.action.text:GetText())
-      assert.truthy(tab.hint:GetText():find("Destroy Next Item", 1, true))
-      assert.is_true(tab.destroy.frame:IsShown())
-      assert.truthy(tab.protected:GetText():find("equipment set", 1, true))
+      assert.is_false(tab.sell:GetChecked())
+      assert.is_true(tab.destroy:GetChecked())
     end)
 
-    it("saves the action at once", function()
+    it("turns one switch on and the other off, saving at once", function()
       editor.selected = "Mats"
       place(tab)
-      for _, row in ipairs({ 2, 3, 1 }) do
-        click(tab.action)
-        nextMenu:Rows()[row].frame:GetScript("OnClick")(nextMenu:Rows()[row].frame, "LeftButton")
-      end
+      click(tab.sell)
+      assert.is_true(tab.sell:GetChecked())
+      click(tab.destroy)
+      assert.is_false(tab.sell:GetChecked(), "only one is on")
+      assert.is_true(tab.destroy:GetChecked())
+      click(tab.destroy)
+      assert.is_false(tab.destroy:GetChecked())
       assert.are.same({
         { "UpdateCategory", "Mats", { automation = "sell" } },
         { "UpdateCategory", "Mats", { automation = "destroy" } },
@@ -681,72 +665,24 @@ describe("NextSettingsCategories", function()
       }, updates())
     end)
 
-    it("lets a plugin's category be given an action", function()
+    it("lets a plugin's category be automated", function()
       editor.selected = "Openable"
       place(tab)
-      assert.is_true(tab.action.frame:IsShown())
+      assert.is_true(tab.sell.frame:IsShown())
+      assert.is_true(tab.destroy.frame:IsShown())
     end)
 
-    it("destroys the next item on a click", function()
-      filters.Mats.automation = "destroy"
+    it("shows nothing else", function()
       editor.selected = "Mats"
       place(tab)
-      click(tab.destroy)
-      assert.are.equal(1, destroyed)
-    end)
-
-    -- Its items and those of its group by's sections, an item a cell with how many there are; those it
-    -- leaves alone faded, saying why.
-    it("shows which of your backpack's items it acts on", function()
-      filters.Potions.automation = "sell"
-      entries = {
-        entry("0_1", 50, "Potions - Flask", "sell", { count = 2 }),
-        entry("0_2", 51, "Potions", "sell", { count = 3 }),
-        entry("0_3", 51, "Potions", "sell", { count = 4 }),
-        entry("0_4", 52, "Potions", "sell", { blocked = "It is in an equipment set." }),
-        entry("0_5", 60, "Mats", "sell"),
-      }
-      editor.selected = "Potions"
-      place(tab)
-      assert.are.same({ 50, 51, 52 }, ids(tab.grid))
-      assert.are.equal(7, entryOf(tab.grid, 51).count)
-      assert.is_true(entryOf(tab.grid, 52).dim)
-      assert.are.equal("It is in an equipment set.", entryOf(tab.grid, 52).note)
-      assert.is_falsy(entryOf(tab.grid, 50).dim)
-      assert.are.equal("3 items sell at the next merchant", tab.count:GetText())
-      filters.Potions.automation = "destroy"
-      for _, e in ipairs(entries) do e.action = "destroy" end
-      tab:Refresh(ctx())
-      assert.are.equal("3 items to destroy", tab.count:GetText())
-    end)
-
-    it("says what it acts on when there is nothing, or no action", function()
-      local asked = 0
-      local entriesOf = automation.Entries
-      automation.Entries = function(...)
-        asked = asked + 1
-        return entriesOf(...)
-      end
-      editor.selected = "Mats"
-      place(tab)
-      assert.are.equal(0, asked, "with no action, nothing to look for")
-      assert.are.same({}, tab.grid.entries)
-      assert.are.equal("", tab.count:GetText())
-      assert.truthy(tab.grid.empty:GetText():find("Choose an action", 1, true))
-      filters.Mats.automation = "sell"
-      tab:Refresh(ctx())
-      assert.truthy(tab.grid.empty:GetText():find("no items", 1, true))
-    end)
-
-    it("shows again when the bags are read", function()
-      filters.Mats.automation = "sell"
-      editor.selected = "Mats"
-      place(tab)
-      tab.frame:SetParent(owner)
-      tab.frame:Show()
-      entries = { entry("0_9", 70, "Mats", "sell") }
-      for _, fn in ipairs(handlers["items/RefreshBackpack/Done"]) do fn(ctx()) end
-      assert.are.same({ 70 }, ids(tab.grid))
+      assert.are.same({ "destroy", "sell" }, (function()
+        local keys = {}
+        for key in pairs(tab.labels) do table.insert(keys, key) end
+        table.sort(keys)
+        return keys
+      end)())
+      assert.is_nil(tab.grid)
+      assert.is_nil(tab.hint)
     end)
   end)
 

@@ -6,9 +6,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -63,9 +60,6 @@ local settings = addon:GetModule('NextSettings')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
----@class Automation: AceModule
-local automation = addon:GetModule('Automation')
-
 -- NextSettingsCategories is the Categories page (next-settings.md §5, category-lifecycle.md §6), where
 -- every category is defined once: one kind of category, a rule, items added by hand, or both. The page
 -- shows its own list in the window's sidebar (pages.lua sidebar): your categories, then the plugins',
@@ -75,8 +69,8 @@ local automation = addon:GetModule('Automation')
 --   it now, as items.
 -- - Search Rule: its search, Apply Search Rule, and the Search Results (counted beside their name as it
 --   is typed) as items, those showing in another category saying where.
--- - Automation: what it does with your backpack's items on its own (automation.md): nothing, sell them
---   at merchants, or destroy them on command; and the items it acts on.
+-- - Automation: what it does with your backpack's items on its own (automation.md): two switches, at
+--   most one on, to sell them at merchants or destroy them on command.
 -- - Added Items: the items added to it by hand, as a grid that holds thousands (NextItemGrid), filtered
 --   by name; an item dropped anywhere on it is added, a right click removes one, Remove All asks first.
 -- A plugin's category can be used in bags, colored, prioritized and automated; its rule (when it has one)
@@ -102,11 +96,7 @@ local NAME_OF_GROUP_BY = {
   [GROUP_BY.SUBTYPE] = L:G("Subtype"), [GROUP_BY.EXPANSION] = L:G("Expansion"),
 }
 
--- The automation choices (automation.md), in the dropdown's order.
-local ACTION_NAMES = { L:G("Nothing"), L:G("Sell at Merchants"), L:G("Destroy") }
-local ACTION_OF_NAME = { [L:G("Sell at Merchants")] = "sell", [L:G("Destroy")] = "destroy" }
-local NAME_OF_ACTION = { sell = L:G("Sell at Merchants"), destroy = L:G("Destroy") }
--- What each choice does, in the category's list line.
+-- What a category does on its own (automation.md), in its list line.
 local DOES = { sell = L:G("Sells at merchants"), destroy = L:G("Destroys on command") }
 
 -- The messages a bag kind's committed sweep sends (data/items.lua Phase11): what the bags hold changed.
@@ -1486,22 +1476,21 @@ function itemsTabProto:layout()
   end
 end
 
--- The Automation tab (automation.md): what the category does with your backpack's items on its own.
+-- The Automation tab (automation.md): what the category does with your backpack's items on its own,
+-- as two switches, at most one on.
 
 ---@class NextCategoryAutomationTab
 ---@field frame Frame
 ---@field wide boolean
 ---@field bags fun(): SettingBag[]
 ---@field labels table<string, FontString>
+---@field sell NextToggleFrame
+---@field destroy NextToggleFrame
 local automationTabProto = {}
 addon:GetModule('Perf'):RegisterPrototype(automationTabProto, 'NextCategoryAutomationTab')
 
--- What each choice does, under the dropdown.
-local HINTS = {
-  none = L:G("BetterBags leaves this category's items alone."),
-  sell = L:G("Its items in your backpack are sold when you open a merchant, one at a time. Hold Shift as you open the merchant to keep them."),
-  destroy = L:G("Its items in your backpack are destroyed one at a time, each time you press Destroy Next Item (Key Bindings, BetterBags) or the button above. A merchant buys any it can first."),
-}
+-- The switches, in their rows' order: what each turns on.
+local SWITCHES = { "sell", "destroy" }
 
 ---@param parent Frame
 ---@param owner Frame
@@ -1511,51 +1500,25 @@ function editor:CreateAutomationTab(parent, owner, bags)
   local _ = owner
   local tab = makeTab(parent, automationTabProto, { bags = bags, labels = {} })
   local K = style.Theme.Settings.Categories
-  local frame = tab.frame
-  tab.none = style:CreateText(frame, K.TextFont)
+  tab.none = style:CreateText(tab.frame, K.TextFont)
   tab.none:SetText(L:G("You have no categories yet. Make one with New Category, under the list."))
-  label(tab, "action", L:G("Action"))
-  tab.action = nextDropdown:Create(frame, {
-    items = ACTION_NAMES, width = 180,
-    get = function()
-      local filter = editor:Chosen()
-      return NAME_OF_ACTION[filter and filter.automation] or L:G("Nothing")
-    end,
-    onChange = function(ctx, name)
-      if editor.selected then
-        categories:UpdateCategory(ctx, editor.selected, { automation = ACTION_OF_NAME[name] or false })
-      end
-    end,
-  })
-  tab.destroy = nextButton:Create(frame, {
-    text = L:G("Destroy Next Item"),
-    onClick = function(ctx)
-      automation:DestroyNext(ctx)
-      tab:Refresh(ctx)
-    end,
-  })
-  tab.hint = style:CreateText(frame, K.HintFont)
-  tab.hint:SetJustifyH("LEFT")
-  tab.protected = style:CreateText(frame, K.HintFont)
-  tab.protected:SetJustifyH("LEFT")
-  tab.protected:SetText(L:G("Never sold or destroyed: items in an equipment set, and purchases that can still be refunded."))
-  label(tab, "items", L:G("Items It Acts On"), K.SectionFont)
-  tab.count = style:CreateText(frame, K.HintFont)
-  tab.count:SetJustifyH("LEFT")
-  tab.grid = nextItemGrid:Create(frame, {})
+  label(tab, "sell", L:G("Sell at Merchants"))
+  label(tab, "destroy", L:G("Destroy"))
+  for _, action in ipairs(SWITCHES) do
+    tab[action] = nextToggle:Create(tab.frame, {
+      onChange = function(ctx, on) tab:Choose(ctx, action, on) end,
+    })
+  end
   tab:Style()
   return tab
 end
 
 function automationTabProto:Style()
   local K = style.Theme.Settings.Categories
-  for key, l in pairs(self.labels) do
-    style:SetFont(l, key == "items" and K.SectionFont or K.LabelFont)
+  for _, l in pairs(self.labels) do
+    style:SetFont(l, K.LabelFont)
   end
   style:SetFont(self.none, K.TextFont)
-  for _, hint in ipairs({ self.hint, self.protected, self.count }) do
-    style:SetFont(hint, K.HintFont)
-  end
   if self.width then
     self:layout()
   end
@@ -1577,102 +1540,46 @@ function automationTabProto:Place(x, y, width, height)
   self:layout()
 end
 
--- Refresh shows the chosen category's action, what it does, and the items of your backpack it acts
--- on: an item a cell with how many there are (its group by's sections too), those it leaves alone
--- faded, saying why.
+-- Choose saves a switch turned on (the other one goes off: a category does one thing) or off.
+---@param ctx Context
+---@param action string
+---@param on boolean
+function automationTabProto:Choose(ctx, action, on)
+  if editor.selected then
+    categories:UpdateCategory(ctx, editor.selected, { automation = on and action or false })
+  end
+  self:Refresh(ctx)
+end
+
+-- Refresh shows the chosen category's switches.
 ---@param ctx? Context
 function automationTabProto:Refresh(ctx)
+  local _ = ctx
   local filter = editor:Chosen()
   self.none:SetShown(filter == nil)
-  for _, part in ipairs({ self.labels.action, self.action.frame, self.hint, self.protected, self.labels.items,
-    self.count, self.grid.frame }) do
-    part:SetShown(filter ~= nil)
-  end
-  local action = filter and filter.automation
-  self.destroy.frame:SetShown(action == "destroy")
-  if filter ~= nil then
-    self.action:Refresh()
-    self.hint:SetText(HINTS[action or "none"] or HINTS.none)
-    self:showItems(ctx or context:New('NextCategoryAutomationTab'), filter.name, action)
+  for _, action in ipairs(SWITCHES) do
+    self.labels[action]:SetShown(filter ~= nil)
+    self[action].frame:SetShown(filter ~= nil)
+    self[action]:SetChecked(filter ~= nil and filter.automation == action)
   end
   if self.width then
     self:layout()
   end
 end
 
--- showItems shows the items of your backpack the category acts on now, and how many it would sell or
--- destroy.
----@private
----@param ctx Context
----@param name string
----@param action? string
-function automationTabProto:showItems(ctx, name, action)
-  local list, byKey, acted = {}, {}, 0
-  if action then
-    for _, entry in ipairs(automation:Entries(ctx)) do
-      if isShownIn(name, entry.category) then
-        local info = entry.data.itemInfo
-        if not entry.blocked then
-          acted = acted + 1
-        end
-        local key = info.itemID .. ":" .. (entry.blocked or "")
-        local cell = byKey[key]
-        if cell == nil then
-          cell = { id = key, itemID = info.itemID, icon = info.itemIcon, quality = info.itemQuality,
-            link = info.itemLink, name = info.itemName, count = 0, dim = entry.blocked ~= nil, note = entry.blocked }
-          byKey[key] = cell
-          table.insert(list, cell)
-        end
-        cell.count = cell.count + (info.currentItemCount or 1)
-      end
-    end
-  end
-  table.sort(list, byName)
-  if action == "sell" then
-    self.count:SetText(count(acted, L:G("%d item sells at the next merchant"), L:G("%d items sell at the next merchant")))
-  elseif action == "destroy" then
-    self.count:SetText(count(acted, L:G("%d item to destroy"), L:G("%d items to destroy")))
-  else
-    self.count:SetText("")
-  end
-  local empty = action and L:G("There are no items in your backpack for it to act on.")
-    or L:G("Choose an action to see the items it would act on.")
-  self.grid:SetEntries(list, empty)
-end
-
--- layout puts the action and the destroy button in the first row, what the action does under them,
--- what it never touches in the fourth row, then the items it acts on in their box, where the other
--- tabs put theirs.
+-- layout puts each switch in its row, its name in the labels' column.
 ---@private
 function automationTabProto:layout()
   local K = style.Theme.Settings.Categories
   local B = controls:Theme("Button")
   local frame, pad, gap = self.frame, K.Pad, K.FieldGap
-  local width = self.width - 2 * pad
   self.none:ClearAllPoints()
   self.none:SetPoint("CENTER", frame, "CENTER", 0, 0)
-  local function top(i)
-    return pad + (i - 1) * (B.Height + gap)
+  for i, action in ipairs(SWITCHES) do
+    local middle = pad + (i - 1) * (B.Height + gap) + B.Height / 2
+    self.labels[action]:ClearAllPoints()
+    self.labels[action]:SetPoint("LEFT", frame, "TOPLEFT", pad, -middle)
+    self[action].frame:ClearAllPoints()
+    self[action].frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -middle)
   end
-  local middle = top(1) + B.Height / 2
-  self.labels.action:ClearAllPoints()
-  self.labels.action:SetPoint("LEFT", frame, "TOPLEFT", pad, -middle)
-  self.action.frame:ClearAllPoints()
-  self.action.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -middle)
-  self.destroy.frame:ClearAllPoints()
-  self.destroy.frame:SetPoint("LEFT", self.action.frame, "RIGHT", gap, 0)
-  self.hint:ClearAllPoints()
-  self.hint:SetPoint("TOPLEFT", frame, "TOPLEFT", pad + K.LabelWidth, -top(2))
-  self.hint:SetWidth(math.max(1, width - K.LabelWidth))
-  self.protected:ClearAllPoints()
-  self.protected:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -(top(4) + B.Height / 2))
-  self.protected:SetWidth(math.max(1, width - K.LabelWidth))
-  local nameRow, box = boxRows()
-  self.labels.items:ClearAllPoints()
-  self.labels.items:SetPoint("LEFT", frame, "TOPLEFT", pad, -(nameRow + B.Height / 2))
-  self.count:ClearAllPoints()
-  self.count:SetPoint("LEFT", self.labels.items, "RIGHT", gap, 0)
-  self.grid.frame:ClearAllPoints()
-  self.grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -box)
-  self.grid:Place(width, math.max(1, self.height - box - pad))
 end

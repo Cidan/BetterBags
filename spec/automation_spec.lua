@@ -24,7 +24,7 @@ local BACKPACK = 0
 
 describe("Automation", function()
   local saved, slots, actions, ofCategory, timers, printed, used, picked, deleted, cursor, shift, combat
-  local buys, refundable, limit, registered, asked
+  local buys, refundable, limit, registered, asked, messages
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -72,6 +72,7 @@ describe("Automation", function()
     saved, slots, ofCategory, timers, printed, used, picked, deleted, asked = {}, {}, {}, {}, {}, {}, {}, 0, {}
     actions = { Junk = "sell", Trash = "destroy", Mats = nil }
     cursor, shift, combat, buys, refundable, limit, registered = false, false, false, true, {}, true, {}
+    messages = {}
     automation:Init()
     -- The committed items: rebuilt from the slots each time they are read.
     override(items, "slotInfo", setmetatable({}, { __index = function(_, kind)
@@ -87,6 +88,7 @@ describe("Automation", function()
     override(categories, "AutomationOf", function(_, name) return actions[name] end)
     override(database, "GetAutoSellLimit", function() return limit end)
     override(events, "RegisterEvent", function(_, name, fn) registered[name] = fn end)
+    override(events, "SendMessage", function(_, _, name) table.insert(messages, name) end)
     override(const, "BACKPACK_BAGS", { [0] = 0, [1] = 1, [2] = 2 })
     override(_G, "C_Timer", { After = function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end })
     override(_G, "C_Container", {
@@ -117,9 +119,11 @@ describe("Automation", function()
     override(_G, "C_MerchantFrame", { IsSellAllJunkEnabled = function() return buys end })
     override(_G, "C_CurrencyInfo", { GetCoinTextureString = function(copper) return copper .. "c" end })
     override(_G, "CursorHasItem", function() return cursor end)
+    -- The item on the cursor is gone, and so is what its slot held.
     override(_G, "DeleteCursorItem", function()
       deleted = deleted + 1
       cursor = false
+      slots[picked[#picked]] = nil
     end)
     override(_G, "IsShiftKeyDown", function() return shift end)
     override(_G, "InCombatLockdown", function() return combat end)
@@ -199,19 +203,18 @@ describe("Automation", function()
       assert.are.same({}, used, "closed before the first sale")
     end)
 
-    it("sells one item a frame, then says what it sold for", function()
+    -- In bulk, as a backpack section dragged onto BetterBags Next's vendor sells (asked).
+    it("sells everything at once, the frame after the merchant opens, then says what it sold for", function()
       put(0, 1, 11, "Junk", { count = 3, price = 100 })
       put(0, 2, 12, "Trash", { price = 50 })
       put(0, 3, 13, "Mats")
       assert.are.equal("selling", automation:OnMerchantShow(ctx()))
       assert.are.same({}, used, "nothing in the frame the merchant opens")
-      run()
-      assert.are.same({ "0_1" }, used)
-      run()
+      assert.are.equal(1, run())
       assert.are.same({ "0_1", "0_2" }, used)
-      run()
       assert.are.same({ "BetterBags: Sold 2 items for 350c." }, printed)
       assert.is_nil(automation.sale)
+      assert.are.same({}, timers, "done in one go")
     end)
 
     it("sells nothing while Shift is held, at a merchant that does not buy, or with nothing to sell", function()
@@ -270,19 +273,18 @@ describe("Automation", function()
       assert.are.equal(1, #printed)
     end)
 
-    it("stops when the merchant closes", function()
+    it("sells nothing when the merchant closed before the sale", function()
       put(0, 1, 11, "Junk")
-      put(0, 2, 12, "Junk")
       automation:OnMerchantShow(ctx())
-      run()
       automation:OnMerchantClosed(ctx())
       run()
-      assert.are.same({ "0_1" }, used)
-      assert.are.same({ "BetterBags: Sold 1 item for 100c." }, printed)
+      assert.are.same({}, used)
+      assert.are.same({}, printed)
     end)
 
     it("waits while the cursor holds an item", function()
       put(0, 1, 11, "Junk")
+      put(0, 2, 12, "Junk")
       automation:OnMerchantShow(ctx())
       cursor = true
       run()
@@ -290,7 +292,7 @@ describe("Automation", function()
       assert.is_true(timers[1].delay > 0, "checks again a moment later")
       cursor = false
       run()
-      assert.are.same({ "0_1" }, used)
+      assert.are.same({ "0_1", "0_2" }, used)
     end)
 
     it("skips an item that moved, locked, or can now be refunded", function()
@@ -302,19 +304,85 @@ describe("Automation", function()
       slots["0_1"].guid = "another item"
       slots["0_2"].live.isLocked = true
       refundable["0_3"] = true
-      for _ = 1, 10 do run() end
+      run()
       assert.are.same({ "0_4" }, used)
     end)
 
-    it("finishes a sale the merchant reopened on before going on", function()
+    it("sells once when the merchant reopened before the sale", function()
       put(0, 1, 11, "Junk")
       put(0, 2, 12, "Junk")
       automation:OnMerchantShow(ctx())
-      run()
       automation:OnMerchantShow(ctx())
-      for _ = 1, 10 do run() end
+      run()
       assert.are.same({ "0_1", "0_2" }, used)
-      assert.are.same({ "BetterBags: Sold 1 item for 100c.", "BetterBags: Sold 1 item for 100c." }, printed)
+      assert.are.same({ "BetterBags: Sold 2 items for 200c." }, printed)
+    end)
+  end)
+
+  -- What BetterBags Next's vendor shows on its destroy card (automation.md §4), and what a click
+  -- destroys: never an item a sale holds.
+  describe("the destroy queue", function()
+    local function keysOf(list)
+      local keys = {}
+      for i, e in ipairs(list) do keys[i] = e.data.slotkey end
+      return keys
+    end
+
+    it("lists what destroy categories hold that is still in its slot", function()
+      put(0, 1, 11, "Trash", { noValue = true })
+      put(0, 2, 12, "Trash", { noValue = true })
+      put(0, 3, 13, "Junk", { noValue = true })
+      slots["0_2"].guid = "another item"
+      assert.are.same({ "0_1" }, keysOf(automation:DestroyQueue(ctx())))
+    end)
+
+    it("leaves out what a sale holds, until the sale is done with it", function()
+      put(0, 1, 11, "Trash")
+      put(0, 2, 12, "Trash", { noValue = true })
+      automation:OnMerchantShow(ctx())
+      assert.are.same({ "0_2" }, keysOf(automation:DestroyQueue(ctx())), "to be sold the next frame")
+      assert.are.equal("destroyed", automation:DestroyNext(ctx()))
+      assert.are.same({ "0_2" }, picked, "the click never destroys what the merchant buys")
+    end)
+
+    it("gives back what a sale left unsold", function()
+      for slot = 1, 13 do put(1, slot, 100 + slot, "Trash") end
+      automation:OnMerchantShow(ctx())
+      run()
+      assert.are.equal(12, #used)
+      assert.are.same({ "1_13" }, keysOf(automation:DestroyQueue(ctx())), "past the limit")
+    end)
+
+    it("keeps what a sale sold out of it while the bags catch up", function()
+      put(0, 1, 11, "Trash")
+      C_Container.UseContainerItem = function(bag, slot) table.insert(used, bag .. "_" .. slot) end
+      automation:OnMerchantShow(ctx())
+      run()
+      assert.are.same({ "0_1" }, used)
+      assert.are.same({}, keysOf(automation:DestroyQueue(ctx())), "sold, though the client still shows it")
+    end)
+
+    it("starts again at each merchant", function()
+      put(0, 1, 11, "Trash")
+      C_Container.UseContainerItem = function(bag, slot) table.insert(used, bag .. "_" .. slot) end
+      automation:OnMerchantShow(ctx())
+      run()
+      buys = false
+      automation:OnMerchantShow(ctx())
+      assert.are.same({ "0_1" }, keysOf(automation:DestroyQueue(ctx())))
+    end)
+
+    it("says when it may have changed: a sale starting and ending, and an item destroyed", function()
+      put(0, 1, 11, "Trash")
+      put(0, 2, 12, "Trash", { noValue = true })
+      automation:OnMerchantShow(ctx())
+      assert.are.same({ "automation/Changed" }, messages)
+      run()
+      assert.are.same({ "automation/Changed", "automation/Changed" }, messages)
+      automation:DestroyNext(ctx())
+      assert.are.equal(3, #messages)
+      automation:DestroyNext(ctx())
+      assert.are.equal(3, #messages, "nothing destroyed")
     end)
   end)
 

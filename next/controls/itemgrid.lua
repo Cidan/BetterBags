@@ -148,13 +148,12 @@ function gridProto:Place(width, height)
   self:Layout()
 end
 
--- SetEntries shows a list of items, in its order, and with none emptyText (else its own).
+-- SetEntries shows a list of items, in its order.
 ---@param entries NextItemGridEntry[]
----@param emptyText? string
-function gridProto:SetEntries(entries, emptyText)
+function gridProto:SetEntries(entries)
   self.entries = entries
   local empty = #entries == 0
-  self.empty:SetText(emptyText or self.opts.empty or "")
+  self.empty:SetText(self.opts.empty or "")
   self.empty:SetShown(empty)
   self:Layout()
 end

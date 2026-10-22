@@ -55,6 +55,8 @@ sonataNext:RegisterTheme({
     ControlPressed = { 0.094, 0.08, 0.17, 1 },
     Track = { 0.2, 0.18, 0.33, 1 },
     Danger = { 1, 0.45, 0.45, 1 },
+    -- The vendor's destroy card's edge (automation.md §4).
+    Crimson = { 0.86, 0.08, 0.24, 1 },
     -- The settings window's sidebar, over its body: darker.
     Sidebar = { 0, 0, 0, 0.28 },
   },
@@ -548,6 +550,9 @@ sonataNext:RegisterTheme({
     CardHover = { 1, 1, 1, 0.07 },
     StackFont = "Stack",
     DurabilityHeight = 3,
+    -- The edge round the destroy card, what destroy categories hold (automation.md §4): a color and a
+    -- width. The card's fill and its line are the dock's (Dock.Card, Dock.HintFont).
+    DestroyEdge = { Color = "Crimson", Width = 2 },
   },
 
   -- The settings window (next-settings.md): a page per entry down its sidebar, tabs across a page,
