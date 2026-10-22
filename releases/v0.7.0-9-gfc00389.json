@@ -1,0 +1,29 @@
+{
+  "id": 1792711192,
+  "version": "v0.7.0-9-gfc00389",
+  "channel": "alpha",
+  "date": "2026-10-22",
+  "from": "adc49de3b2a30e3d8fdbf9fe09f8f669a09226bc",
+  "to": "fc00389b81481d2487ebfa1299bce8b584f03fd9",
+  "headline": "This update introduces category automation for selling and destroying items, alongside major search upgrades including arithmetic expressions, new item properties, and query evaluation improvements.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Category automation to sell or destroy items",
+      "details": "Categories now feature an Automation tab to automatically sell matching items upon visiting a merchant or queue them for destruction. Destroyable items can be deleted one by one from a dedicated merchant panel in BetterBags Next or via a key binding, with safety protections in place for equipment sets and refundable items.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Expanded search syntax, properties, and expressions",
+      "details": "Search queries now support arithmetic, money amounts, math functions, and comparisons against player attributes like level, class, and item level. Many new item fields are also available to search, including usability, required level, stack size, stats, appearance collection state, and pet counts.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Search precedence and query evaluation",
+      "details": "Search rules now prioritize AND conditions before OR, and existing saved rules are automatically updated on load to preserve their original logic. Negation queries with NOT or inequality operators now correctly return all items outside the excluded criteria, and container names, crafting qualities, and expansion release orders are properly recognized.",
+      "clients": []
+    }
+  ]
+}
