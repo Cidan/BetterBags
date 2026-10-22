@@ -1779,6 +1779,35 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are.same({}, search:Search("total = 12"))
     end)
 
+    -- usable follows the character (skills, level, spec): a kept item is asked again each sweep.
+    it("asks whether the character can use each item, again on a kept item, never cold", function()
+      local can = { [101] = true, [202] = false }
+      local asked = 0
+      override(_G, "C_PlayerInfo", { CanUseItem = function(id)
+        asked = asked + 1
+        return can[id]
+      end })
+      override(_G.C_Item, "IsEquippableItem", function(l) return tostring(l):find("item:101", 1, true) ~= nil end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isUsable)
+      assert.are.same({ ["0_1"] = true }, search:Search("usable = true"))
+      assert.are.same({ ["0_1"] = true }, search:Search("equippable = true"))
+      can[202] = true
+      local kept = slotInfo.itemsBySlotKey["0_2"]
+      -- A recalculation that changes no category: only the answer re-indexes the item.
+      slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.equal(kept, slotInfo.itemsBySlotKey["0_2"])
+      assert.are.same({ ["0_1"] = true, ["0_2"] = true }, search:Search("usable = true"))
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function() return nil end)
+      mockContainer[0][3] = { itemID = 303, guid = "guid-303", count = 1 }
+      asked = 0
+      slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.is_nil(slotInfo.itemsBySlotKey["0_3"].isUsable, "not asked before the item's data loaded")
+      override(_G.C_Item, "GetItemInfo", getItemInfo)
+    end)
+
     it("gives every item the plain name of its bag, for the bagname field", function()
       override(_G.C_Container, "GetBagName", function(bagid)
         return ({ [0] = "Backpack", [1] = "Herb Satchel" })[bagid]

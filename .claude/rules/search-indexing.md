@@ -142,3 +142,28 @@ Global string values from Blizzard's enUS strings (Ketho/BlizzardInterfaceResour
   per-field and randomized tests change the marks), `spec/debug_dump_harness_spec.lua` (the capture's
   two toys). 19 mutations, all caught (the one that first survived led to a cold item carrying
   marks in the tests).
+
+### 13. Usability and Appearances
+- **`usable`** (boolean): whether the character can use the item, `items:CanUseItem`
+  (`C_PlayerInfo.CanUseItem`, retail; nil without it). A retail capture: false for the 9 recipes of
+  professions the character lacks, true for the other 79 items. It follows the character, so it is
+  not a trait: the harvest asks it for an item read with its data (bag and guild bank slots), and
+  `items:RefreshUsable` asks again on every kept item (`RefreshKeptItem`, a guild bank
+  recalculation), marking the item `indexPending` when the answer changed (data-loader.md §18).
+  What changes it (level, skills, spec, gear) already requests a recalculation for the upgrade
+  arrows (caches.md §2); reputation and spells (`UPDATE_FACTION`, `SPELLS_CHANGED`) do not, so an
+  answer they change waits for the next refresh. The vendor's records take the merchant's own flag
+  (`GetMerchantItemInfo`'s isUsable).
+- **`equippable`**: usable and equipment.
+- **`transmoggable`** (a trait): the item has an appearance (`C_TransmogCollection.GetItemInfo`
+  returns one: the capture's cloak; nothing for the other 87 items).
+- Whether an appearance or a pet is collected waits for a login capture: when the collections load
+  is not known (docs/vendor-compat.md, "Needs an in-game check").
+- **Coverage:** `spec/search_spec.lua` ("usability and appearances"; the per-field and randomized
+  re-index tests change both), `spec/items_spec.lua` (traits: appearances, missing API, not read
+  cold), `spec/refresh_pipeline_spec.lua` ("asks whether the character can use each item, again on a
+  kept item, never cold"), `spec/guildbank_pipeline_spec.lua` ("finds the guild bank items the
+  character can use"), `spec/next/merchant_spec.lua` (the merchant's flag),
+  `spec/debug_dump_harness_spec.lua` (the capture's 9 recipes, the cloak). 14 mutations: the three
+  that first survived led to a recalculation test that changes no category and to removing two
+  guards that could not change anything (a kept item always has traits; `nil and x` is nil).

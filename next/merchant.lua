@@ -178,6 +178,10 @@ local function recordOf(item)
     itemInfo = info,
     containerInfo = { quality = info.itemQuality },
   }
+  -- The merchant's own answer (GetMerchantItemInfo's isUsable), read with the item's data.
+  if info.traits then
+    record.isUsable = item.isUsable
+  end
   return record, warm
 end
 

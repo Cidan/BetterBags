@@ -10,7 +10,7 @@ BetterBags' query engine.
 indexed item outside their part, anywhere in a query; `.claude/rules/search-indexing.md` §5), and
 precedence (AND before OR, saved rules rewritten once to keep their meaning; §6), `bagname` (§7),
 expansions in release order (§8), `quality` as the crafting quality tier (§9), the new item fields
-of §10-§12 ("Proposed: new fields" marks each), checked against a capture from the game ("What a
+of §10-§13 ("Proposed: new fields" marks each), checked against a capture from the game ("What a
 capture settled"). The rest is planned.
 
 ## Why
@@ -448,13 +448,13 @@ with its invalidation, as that file requires.
 | `price` (done); `totalprice` (dropped: `price * count` once arithmetic exists) | numbers (copper) | `GetItemInfo(link)` 11th | all | the slot changes |
 | `sellable` (dropped: `price > 0`) | bool | | | |
 | `equipment` (done) | bool | `C_Item.IsEquippableItem(link)` | all | the slot changes |
-| `usable`, `equippable` (next batch) | bool | `C_PlayerInfo.CanUseItem(id)` (and `equipment`) | retail | skills, level, spec (caches.md §2's events) |
+| `usable`, `equippable` (done) | bool | `C_PlayerInfo.CanUseItem(id)` (and `equipment`) | retail | skills, level, spec (caches.md §2's events) |
 | `hasuse` (done) | bool | `C_Item.GetItemSpell(link)` returns something: any `Use:` line, learn lines included ("What a capture settled") | all | the slot changes |
 | `toy`, `known` (done) | bool | whole tooltip lines `TOY` and `ITEM_SPELL_KNOWN` ("What a capture settled") | all | learning it (`NEW_TOY_ADDED`; for the rest, the tooltip text, re-scanned on `TOOLTIP_DATA_UPDATE`, tooltip-scanning.md) |
-| `pet` (done); `petcount`, `petlimit`, `collectable` (next batch) | bool, numbers | `C_PetJournal.GetPetInfoByItemID`, `GetNumCollectedInfo` | retail | learning a pet (`NEW_PET_ADDED`) |
+| `pet` (done); `petcount`, `petlimit`, `collectable` (after a login capture) | bool, numbers | `C_PetJournal.GetPetInfoByItemID`, `GetNumCollectedInfo` | retail | learning a pet (`NEW_PET_ADDED`) |
 | `cosmetic` (done) | bool | `C_Item.IsCosmeticItem` | retail | the slot changes |
-| `hasappearance`, `appearance`, `source` (next batch) | bool, known/unknown | `C_TransmogCollection` as Vendor (above) | retail | collecting an appearance (`TRANSMOG_COLLECTION_SOURCE_ADDED`); today a known staleness of kept slots, caches.md §1 |
-| `transmoggable` (with the appearance fields) | bool | | retail | |
+| `hasappearance` (as `transmoggable`); `appearance`, `source` (after a login capture) | bool, known/unknown | `C_TransmogCollection` as Vendor (above) | retail | collecting an appearance (`TRANSMOG_COLLECTION_SOURCE_ADDED`); today a known staleness of kept slots, caches.md §1 |
+| `transmoggable` (done) | bool | `C_TransmogCollection.GetItemInfo(link)` returns an appearance | retail | the slot changes |
 | `professiongear` (dropped: `equipment = true AND class = 19`) | bool | | | |
 | `scrappable` (done) | bool | `C_Item.CanScrapItem(location)` | retail, bag slots | the slot changes |
 | `soulbound`, `boe`, `bou`, `warbound`, `wue` (dropped: `binding = ...` with OR says each) | bool | | | |

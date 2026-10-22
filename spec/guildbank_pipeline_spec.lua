@@ -525,6 +525,20 @@ describe("the guild bank through the data engine", function()
       assert.is_nil(search:Search("Copper")[keyOf(2, 2)])
     end)
 
+    -- Whether the character can use a guild bank item, asked again on a recalculation.
+    it("finds the guild bank items the character can use, and follows a change", function()
+      local can = { [100] = true }
+      saveGlobal(_G, "C_PlayerInfo")
+      _G.C_PlayerInfo = { CanUseItem = function(id) return can[id] == true end }
+      loadTabs()
+      read()
+      assert.is_true(search:Search("usable = true")[keyOf(1, 1)])
+      assert.is_nil(search:Search("usable = true")[keyOf(2, 2)])
+      can[200] = true
+      read({ derive = true })
+      assert.is_true(search:Search("usable = true")[keyOf(2, 2)], "asked again")
+    end)
+
     it("finds a guild bank item by its tab's name (bagname)", function()
       loadTabs()
       read()

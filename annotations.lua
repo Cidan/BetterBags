@@ -361,6 +361,7 @@ function EquipmentManager_UnpackLocation(location) end
 ---@field upgradeMax? number
 ---@field upgradeMaxItemLevel? number The item level once fully upgraded.
 ---@field isScrappable? boolean Bag slots only.
+---@field transmoggable? boolean It has an appearance (C_TransmogCollection.GetItemInfo).
 ---@field stats string[] Its stats' names, sorted.
 
 ---@class (exact) ExpandedItemInfo

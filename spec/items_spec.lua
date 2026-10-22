@@ -418,6 +418,7 @@ describe("Items (New Data Farming Engine)", function()
         savedOf(C_Item, "GetItemInfo"), savedOf(C_Item, "GetItemStats"), savedOf(C_Item, "IsEquippableItem"),
         savedOf(C_Item, "GetItemSpell"), savedOf(C_Item, "IsCosmeticItem"), savedOf(C_Item, "GetItemUpgradeInfo"),
         savedOf(_G, "ITEM_MOD_CRIT_RATING_SHORT"), savedOf(_G, "ITEM_MOD_HASTE_RATING_SHORT"),
+        savedOf(_G, "C_TransmogCollection"),
       }
       _G.ITEM_MOD_CRIT_RATING_SHORT = "Critical Strike"
       _G.ITEM_MOD_HASTE_RATING_SHORT = "Haste"
@@ -445,6 +446,8 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_PetJournal = { GetPetInfoByItemID = function() return nil end }
       _G.C_TradeSkillUI = { GetItemReagentQualityByItemInfo = function() return nil end,
         GetItemCraftedQualityByItemInfo = function(l) return l == link and 3 or 1 end }
+      -- A retail capture: nothing for an item without an appearance, the two IDs for the cloak.
+      _G.C_TransmogCollection = { GetItemInfo = function(l) if l == link then return 1001, 2002 end end }
     end)
 
     after_each(function()
@@ -468,6 +471,9 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_false(t.isCosmetic)
       assert.is_false(t.isPet)
       assert.are.same({ "Critical Strike", "Haste" }, t.stats, "the stats' names, sorted, unknown keys left out")
+      assert.is_true(t.transmoggable, "it has an appearance")
+      _G.C_TransmogCollection.GetItemInfo = function() end
+      assert.is_false(items:ReadItemProperties(42, link).traits.transmoggable)
     end)
 
     it("reads the upgrade track of equipment, as Vendor does", function()
@@ -520,7 +526,9 @@ describe("Items (New Data Farming Engine)", function()
       C_Item.GetItemUpgradeInfo = nil
       C_Item.GetItemSpell = nil
       _G.C_PetJournal = nil
+      _G.C_TransmogCollection = nil
       local t = items:ReadItemProperties(42, link).traits
+      assert.is_nil(t.transmoggable)
       assert.is_nil(t.isCosmetic)
       assert.is_nil(t.upgradeTrack)
       assert.is_nil(t.hasUse)
@@ -535,6 +543,7 @@ describe("Items (New Data Farming Engine)", function()
       C_Item.GetItemStats, C_Item.IsEquippableItem, C_Item.GetItemSpell = count, count, count
       C_Item.IsCosmeticItem, C_Item.GetItemUpgradeInfo = count, count
       _G.C_PetJournal = { GetPetInfoByItemID = count }
+      _G.C_TransmogCollection = { GetItemInfo = count }
       _G.C_TradeSkillUI = { GetItemReagentQualityByItemInfo = count, GetItemCraftedQualityByItemInfo = count }
       C_Item.GetItemInfo = function() return nil end
       local props = items:ReadItemProperties(42, link)

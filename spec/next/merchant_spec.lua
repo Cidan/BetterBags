@@ -290,6 +290,14 @@ describe("NextMerchant", function()
       assert.are.same({}, search:Search("NOT plate"), "nor in a NOT over the bags' index")
     end)
 
+    -- The merchant's own flag: whether the character can use the item (Blizzard tints it red).
+    it("searches whether the character can use a vendor item", function()
+      _G._merchant.items = { vendorItem(10), vendorItem(12, { isUsable = false }) }
+      merchant:ReadItems(ctx())
+      assert.are.same({ ["vendor:1"] = true }, merchant:Search("usable = true"))
+      assert.are.same({ ["vendor:2"] = true }, merchant:Search("usable = false"))
+    end)
+
     it("searches a vendor item's traits, read from its link", function()
       _G._merchant.items = { vendorItem(10), vendorItem(12) }
       merchant:ReadItems(ctx())

@@ -920,6 +920,11 @@ describe("Dump harness: the client's own answers (spec/fixtures/dump_retail_12_1
       GetPetInfoByItemID = function(id) local p = byID[id] return answer(p and p.petInfo) end,
       GetNumCollectedInfo = function(species) local p = bySpecies[species] return answer(p and p.petCollected) end,
     })
+    override(_G, "C_PlayerInfo", { CanUseItem = function(id) local p = byID[id] return answer(p and p.canUse) end })
+    override(_G, "C_TransmogCollection", {
+      GetItemInfo = function(link) local p = probeOf(link) return answer(p and p.transmog) end,
+      PlayerHasTransmog = function() return false end,
+    })
     override(C_TooltipInfo, "GetBagItem", function(bag, slot)
       local i = at(bag, slot)
       if not i or not i.apiProbe.tooltip then return nil end
@@ -1017,6 +1022,15 @@ describe("Dump harness: the client's own answers (spec/fixtures/dump_retail_12_1
     assert.are.same(keys("0_2", "2_29"), search:Search("toy = true"))
     assert.are.same(keys("0_2", "2_29"), search:Search("known = true"))
     assert.are.equal(86, count(search:Search("toy = false")))
+  end)
+
+  -- CanUseItem said no to the 9 recipes of professions the character does not have.
+  it("finds what the character can use, wear, and transmog", function()
+    read()
+    assert.are.same(keys("1_10", "1_11", "1_12", "1_13", "1_14", "1_15", "1_7", "1_8", "1_9"),
+      search:Search("usable = false"))
+    assert.are.same(keys("1_6"), search:Search("equippable = true"))
+    assert.are.same(keys("1_6"), search:Search("transmoggable = true"))
   end)
 
   it("finds items by the plain name of their bag", function()

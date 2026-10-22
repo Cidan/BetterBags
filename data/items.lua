@@ -77,6 +77,7 @@ local async = addon:GetModule("Async")
 ---@field slotid number
 ---@field bagName? string The plain name of the item's bag (GetPlainBagName), set in Phase 6.
 ---@field itemTotal? number How many of its item the kind's bags hold (CountItemTotals).
+---@field isUsable? boolean Whether the character can use it (CanUseItem); nil read cold or without the API.
 ---@field inventoryType number
 ---@field inventorySlots number[]
 ---@field slotkey string
@@ -2873,6 +2874,7 @@ function items:RefreshKeptItem(kind, item, bagid, slotid, itemGUID)
     or not sameQuest(item.questInfo, oldQuest) then
     item.derived = nil
   end
+  self:RefreshUsable(item)
 end
 
 -- REUSED DETAILED METADATA UTILITIES FROM LEGACY IMPLEMENTATION
@@ -2964,6 +2966,33 @@ function items:ReadLinkInfo(itemLink)
   return minLevel, stackSize, sellPrice, bindType, name ~= nil
 end
 
+-- CanUseItem says whether the character can use an item (C_PlayerInfo.CanUseItem: proficiency,
+-- level, profession, reputation), or nil on a client without the API. It follows the character,
+-- so a kept item is asked again (RefreshKeptItem).
+---@param itemID number
+---@return boolean?
+function items:CanUseItem(itemID)
+  local api = _G.C_PlayerInfo
+  if api and api.CanUseItem then
+    return api.CanUseItem(itemID) == true
+  end
+  return nil
+end
+
+-- RefreshUsable asks again whether the character can use a kept item (a kept item was read with
+-- its data: a cold read is never kept), and marks it for re-indexing when the answer changed
+-- (data-loader.md §18).
+---@param item ItemData
+function items:RefreshUsable(item)
+  local usable = self:CanUseItem(item.itemInfo.itemID)
+  if usable ~= item.isUsable then
+    item.isUsable = usable
+    if item.derived then
+      item.derived.indexPending = true
+    end
+  end
+end
+
 -- ReadItemTraits reads what the search knows of an item beyond its name and type
 -- (search-indexing.md §10), from the slot's link: what it is, its upgrade track, its stats, its
 -- crafting tier. minLevel, stackSize and sellPrice are its link's (ReadLinkInfo). Call it only once
@@ -2991,6 +3020,12 @@ function items:ReadItemTraits(itemID, itemLink, minLevel, stackSize, sellPrice)
   end
   if C_Item.IsCosmeticItem then
     traits.isCosmetic = C_Item.IsCosmeticItem(itemLink) == true
+  end
+  -- Nothing for an item without an appearance (a retail capture: 87 of 88 items).
+  local transmog = _G.C_TransmogCollection
+  if transmog and transmog.GetItemInfo then
+    local appearanceID = transmog.GetItemInfo(itemLink)
+    traits.transmoggable = appearanceID ~= nil and appearanceID ~= 0
   end
   -- Takes an item ID only: a link raises an error (warcraft.wiki.gg).
   if C_PetJournal and C_PetJournal.GetPetInfoByItemID then
@@ -3213,6 +3248,9 @@ function items:AttachItemInfo(data, kind, containerInfo)
   -- Scrapping asks about the item where it is; only a bag slot has a location.
   if data.itemInfo.traits and C_Item.CanScrapItem then
     data.itemInfo.traits.isScrappable = C_Item.CanScrapItem(itemLocation) == true
+  end
+  if data.itemInfo.traits then
+    data.isUsable = self:CanUseItem(itemID)
   end
   return self:FinishItemData(data, kind, harvestIncomplete, true)
 end
@@ -3473,6 +3511,9 @@ function items:AttachGuildBankItemInfo(data, read)
     tooltipText = tooltipText,
     tooltipMarks = tooltipMarks,
   })
+  if data.itemInfo.traits then
+    data.isUsable = self:CanUseItem(itemID)
+  end
   return self:FinishItemData(data, const.BAG_KIND.GUILD, props.incomplete, false)
 end
 
@@ -3541,6 +3582,7 @@ function items:RederiveGuildBank(committedItems)
           item.itemInfo.tooltipMarks = marks
           item.derived = nil
         end
+        self:RefreshUsable(item)
       end
     end
     itemData[slotkey] = item

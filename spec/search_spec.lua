@@ -462,6 +462,42 @@ describe("Search", function()
     end)
   end)
 
+  -- ─── Usability and appearances ──────────────────────────────────────────────
+
+  describe("usability and appearances", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      local cloak = MockSearchItem({ slotkey = "cloak", traits = { isEquipment = true, transmoggable = true, stats = {} } })
+      cloak.isUsable = true
+      local plate = MockSearchItem({ slotkey = "plate", traits = { isEquipment = true, transmoggable = true, stats = {} } })
+      plate.isUsable = false
+      local recipe = MockSearchItem({ slotkey = "recipe", traits = { isEquipment = false, transmoggable = false, stats = {} } })
+      recipe.isUsable = false
+      local classic = MockSearchItem({ slotkey = "classic", traits = { isEquipment = true, stats = {} } })
+      local cold = MockSearchItem({ slotkey = "cold" })
+      cold.isUsable = true
+      for _, item in ipairs({ cloak, plate, recipe, classic, cold }) do search:Add(item) end
+    end)
+
+    it("finds items the character can use, and gear the character can wear", function()
+      assert.are.same(keys("cloak"), search:Search("usable = true"))
+      assert.are.same(keys("plate", "recipe"), search:Search("usable = false"))
+      assert.are.same(keys("cloak"), search:Search("equippable = true"))
+      assert.are.same(keys("plate", "recipe"), search:Search("equippable = false"),
+        "a client that cannot say whether it is usable says nothing")
+    end)
+
+    it("finds items with an appearance", function()
+      assert.are.same(keys("cloak", "plate"), search:Search("transmoggable = true"))
+      assert.are.same(keys("recipe"), search:Search("transmoggable = false"))
+    end)
+  end)
+
   -- ─── Expansion order ────────────────────────────────────────────────────────
 
   -- Asked (docs/vendor-compat.md, "Decisions"): < and > compare expansions in release order. The
@@ -1109,6 +1145,8 @@ describe("Search incremental indexing (SyncKind)", function()
       { "read cold", function(it) it.harvestIncomplete = true; it.isUpgrade = true end },
       { "toy mark", function(it) it.itemInfo.tooltipMarks = { toy = true } end },
       { "known mark", function(it) it.itemInfo.tooltipMarks = { known = true } end },
+      { "usable", function(it) it.isUsable = true end },
+      { "appearance", function(it) it.itemInfo.traits.transmoggable = true end },
     }
     for _, change in ipairs(changes) do
       it(change[1], function()
@@ -1172,7 +1210,7 @@ describe("Search incremental indexing (SyncKind)", function()
 
     local function mutate(it)
       local info = it.itemInfo
-      local which = random(23)
+      local which = random(24)
       if which == 1 then info.category = pick(CATEGORIES)
       elseif which == 2 then info.currentItemCount = random(20)
       elseif which == 3 then info.tooltipText = pick(TOOLTIPS)
@@ -1210,6 +1248,8 @@ describe("Search incremental indexing (SyncKind)", function()
       elseif which == 20 then it.isUpgrade = random(2) == 1
       elseif which == 21 then it.itemTotal = random(3) * 10
       elseif which == 22 then it.itemInfo.tooltipMarks = pick({ { toy = true }, { known = true }, { toy = true, known = true }, false }) or nil
+      elseif which == 23 then it.isUsable = pick({ true, false, "none" })
+        if it.isUsable == "none" then it.isUsable = nil end
       else it.bindingInfo.binding = random(3) - 1 end
     end
 
