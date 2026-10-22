@@ -40,7 +40,7 @@ local SNAPSHOT_FIELDS = {
   'binding', 'tooltip', 'bagname', 'level', 'rarity', 'quality', 'id', 'stackcount', 'class', 'subclass',
   'bagid', 'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
   'minlevel', 'stacksize', 'price', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable', 'upgradeable',
-  'track', 'upgradelevel', 'upgrademax', 'maxlevel', 'upgrade', 'total',
+  'track', 'upgradelevel', 'upgrademax', 'maxlevel', 'upgrade', 'total', 'toy', 'known',
 }
 -- expansionid is not compared: it follows expansion, which is.
 
@@ -139,6 +139,10 @@ local function fillSnapshot(s, item)
     s.maxlevel = nil
   end
   s.stats = copyList(s.stats, t and t.stats)
+  -- What the tooltip's whole lines mark (TooltipScanner), read with the item's data.
+  local marks = info.tooltipMarks
+  s.toy = t and (marks ~= nil and marks.toy == true)
+  s.known = t and (marks ~= nil and marks.known == true)
   -- Follows the sets above, which are compared.
   s.inset = info.equipmentSets ~= nil and info.equipmentSets[1] ~= nil
   -- The arrow BetterBags draws, for an item read with its data (rule #1).
@@ -179,7 +183,7 @@ local NUMBER_FIELDS = {
 }
 local BOOL_FIELDS = {
   'reagent', 'isbound', 'bound', 'quest', 'activequest', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable',
-  'upgradeable', 'inset', 'upgrade',
+  'upgradeable', 'inset', 'upgrade', 'toy', 'known',
 }
 
 -- scratch is reused to snapshot each item SyncKind compares, so an unchanged item costs no
@@ -262,6 +266,8 @@ function search:Init()
   self:CreateIndex('upgradeable')
   self:CreateIndex('inset')
   self:CreateIndex('upgrade')
+  self:CreateIndex('toy')
+  self:CreateIndex('known')
 
   self.defaultIndicies = {
     'name',

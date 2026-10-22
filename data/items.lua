@@ -2860,7 +2860,10 @@ function items:RefreshKeptItem(kind, item, bagid, slotid, itemGUID)
   end
   ---@class TooltipScanner: AceModule
   local tooltipScanner = addon:GetModule('TooltipScanner')
-  itemInfo.tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID) or ""
+  local tooltipText, tooltipMarks = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
+  itemInfo.tooltipText = tooltipText or ""
+  -- Marks come from the same scan as the text, so they change only with it.
+  itemInfo.tooltipMarks = tooltipMarks
   itemInfo.equipmentSets = equipmentSets:GetItemSets(bagid, slotid)
   itemInfo.isNewItem = self:ClientNewItemFlag(bagid, slotid)
   self:SeedNewItemTimer(kind, item)
@@ -2998,7 +3001,9 @@ function items:ReadItemTraits(itemID, itemLink, minLevel, stackSize, sellPrice)
   -- Only equipment has a track (Vendor asks only equipment): one without a track string has none.
   if traits.isEquipment and C_Item.GetItemUpgradeInfo then
     local upgrade = C_Item.GetItemUpgradeInfo(itemLink)
-    if upgrade and upgrade.trackString then
+    -- A track with no levels is not one the game shows: a retail dump's Adventurer cloak had
+    -- trackString with 0/0 and maxItemLevel 0, and no upgrade line in its tooltip.
+    if upgrade and upgrade.trackString and (upgrade.maxLevel or 0) > 0 then
       traits.upgradeTrack = upgrade.trackString
       traits.upgradeLevel = upgrade.currentLevel
       traits.upgradeMax = upgrade.maxLevel
@@ -3184,7 +3189,7 @@ function items:AttachItemInfo(data, kind, containerInfo)
   ---@class TooltipScanner: AceModule
   local tooltipScanner = addon:GetModule('TooltipScanner')
   local itemGUID = C_Item.GetItemGUID(itemLocation) or ""
-  local tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
+  local tooltipText, tooltipMarks = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
 
   data.inventoryType = invType --[[@as number]]
   data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType]
@@ -3203,6 +3208,7 @@ function items:AttachItemInfo(data, kind, containerInfo)
     currentItemLevel = C_Item.GetCurrentItemLevel and C_Item.GetCurrentItemLevel(itemLocation) or props.effectiveIlvl or 0,
     equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
     tooltipText = tooltipText,
+    tooltipMarks = tooltipMarks,
   })
   -- Scrapping asks about the item where it is; only a bag slot has a location.
   if data.itemInfo.traits and C_Item.CanScrapItem then
@@ -3361,6 +3367,7 @@ function items:ItemInfoOf(props, slot)
     currentItemLevel = slot.currentItemLevel,
     equipmentSets = slot.equipmentSets,
     tooltipText = slot.tooltipText or "",
+    tooltipMarks = slot.tooltipMarks,
   } --[[@as ItemInfo]]
 end
 
@@ -3451,6 +3458,7 @@ function items:AttachGuildBankItemInfo(data, read)
   data.inventoryType = invType
   data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType] or { 0 }
   local level = C_Item.GetDetailedItemLevelInfo(read.link)
+  local tooltipText, tooltipMarks = tooltipScanner:GetGuildBankItemText(tab, data.slotid, read.link)
   data.itemInfo = self:ItemInfoOf(props, {
     itemGUID = "",
     itemName = props.itemName,
@@ -3462,7 +3470,8 @@ function items:AttachGuildBankItemInfo(data, read)
     isBattlePayItem = false,
     currentItemCount = read.count,
     currentItemLevel = level or props.effectiveIlvl or 0,
-    tooltipText = tooltipScanner:GetGuildBankItemText(tab, data.slotid, read.link),
+    tooltipText = tooltipText,
+    tooltipMarks = tooltipMarks,
   })
   return self:FinishItemData(data, const.BAG_KIND.GUILD, props.incomplete, false)
 end
@@ -3524,10 +3533,12 @@ function items:RederiveGuildBank(committedItems)
         data.bagid, data.slotid = item.bagid, item.slotid
         item = self:AttachGuildBankItemInfo(data, guildBankSource():ReadSlot(item.guildTab, item.slotid))
       else
-        local text = tooltipScanner:GetGuildBankItemText(item.guildTab, item.slotid, item.itemInfo.itemLink) or ""
+        local text, marks = tooltipScanner:GetGuildBankItemText(item.guildTab, item.slotid, item.itemInfo.itemLink)
+        text = text or ""
         -- Tooltip text is an input of the item's category and search entry (data-loader.md §18).
         if text ~= item.itemInfo.tooltipText then
           item.itemInfo.tooltipText = text
+          item.itemInfo.tooltipMarks = marks
           item.derived = nil
         end
       end

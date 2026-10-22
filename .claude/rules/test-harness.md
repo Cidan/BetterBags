@@ -191,3 +191,10 @@ locale). Mocks built from a dump should answer from `apiProbe` where it has the 
 test runs on what the game answered rather than on what BetterBags made of it: `itemInfoByLink`
 for `C_Item.GetItemInfo(link)`, `itemInfoByID` for the item ID, and so on (each a list with `n`
 values, or `{ error = ... }`). Older dumps have no `apiProbe`.
+- **`spec/fixtures/dump_retail_12_1_5.lua`**: a capture's dumped items and client only (no other
+  part of the profile), written by extracting `debugBackpackDump` and `debugBackpackDumpClient` from
+  the SavedVariables, keys sorted. `spec/debug_dump_harness_spec.lua` ("Dump harness: the client's
+  own answers") answers every API the harvest calls from it (by location, item ID or link, as each
+  API takes them; `C_TooltipInfo.GetBagItem` from the recorded lines) and runs the real pipeline
+  and search over it. Its expectations were read from the raw answers. Not probed, so taken from
+  the dumped item: `C_Item.GetItemQuality` (the container info's quality), the item GUID.

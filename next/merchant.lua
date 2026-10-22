@@ -170,7 +170,7 @@ local function recordOf(item)
       info.traits = items:ReadItemTraits(info.itemID, link, minLevel, stackSize, sellPrice)
     end
   end
-  info.tooltipText = tooltipScanner:GetMerchantItemText(item.index)
+  info.tooltipText, info.tooltipMarks = tooltipScanner:GetMerchantItemText(item.index)
   ---@type ItemData
   local record = {
     kind = const.BAG_KIND.BACKPACK,

@@ -3748,6 +3748,30 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         "free-text search should match text found only in the tooltip body")
     end)
 
+    -- toy and known come from whole tooltip lines (TooltipScanner); a kept item takes the marks of
+    -- its tooltip as it is now, as it takes its text.
+    it("finds toys and items already known, and follows a kept item's tooltip", function()
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      local learned = false
+      -- The marks come from the lines the text joins: a learned toy's text has its "Already known".
+      override(tooltipScanner, "GetTooltipText", function(_, bagid, slotid)
+        if bagid == 0 and slotid == 1 then
+          if learned then
+            return "Flight Master's Whistle Toy Already known", { toy = true, known = true }
+          end
+          return "Flight Master's Whistle Toy", { toy = true }
+        end
+        return "", nil
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      refreshBackpack()
+      assert.are.same({ ["0_1"] = true }, search:Search("toy = true"))
+      assert.are.same({}, search:Search("known = true"))
+      learned = true
+      refreshBackpack({ derive = true })
+      assert.are.same({ ["0_1"] = true }, search:Search("known = true"))
+    end)
+
     it("leaves the tooltip index empty for items with no tooltip text", function()
       local tooltipScanner = addon:GetModule("TooltipScanner")
       override(tooltipScanner, "GetTooltipText", function() return "" end)

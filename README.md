@@ -424,15 +424,17 @@ Search allows you to find items by the following indices (based on the item belo
 - `quest` (quest = false) Is the item for a non-active quest?
 - `activeQuest` (activeQuest = false) Is the item for an active quest?
 - `equipment` (equipment = true) Can the item be equipped (gear)?
-- `hasuse` (hasuse = true) Does the item have a Use: effect?
+- `hasuse` (hasuse = true) Does the item have a Use: line in its tooltip, "Use: Teaches you..." on recipes and pets included?
 - `cosmetic` (cosmetic = true) Is the item cosmetic gear (Retail)?
 - `pet` (pet = true) Does the item teach a battle pet (Retail)?
 - `upgradeable` (upgradeable = true) Is the item gear on an upgrade track (Retail)?
 - `scrappable` (scrappable = true) Can the item be scrapped (Retail)?
 - `inset` (inset = true) Is the item in any equipment set? (`equipmentSet` names one.)
 - `upgrade` (upgrade = true) Does BetterBags show the upgrade arrow on the item? It follows the upgrade provider chosen in the settings (BetterBags, Pawn or SimpleItemLevel).
+- `toy` (toy = true) Is the item a toy? (Its tooltip says "Toy".)
+- `known` (known = true) Does the item's tooltip say "Already known" (a toy, recipe, pet or mount you already have)?
 
-The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable` and `scrappable` are read once the game has sent the item's data: an item that has just arrived may match none of them for a moment.
+The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable`, `scrappable`, `toy`, `known` and `upgrade` are read once the game has sent the item's data: an item that has just arrived may match none of them for a moment.
 
 ### Logical Operators
 - `AND` (slot = Legs AND ilvl > 500 \[This will match leg pieces that are also greater than 500 ilvl.\]) The intersection of two terms. Items must match both sides of the AND.

@@ -142,8 +142,9 @@ value either drops the item's kept work (which marks it) or goes through `Update
 Checked against a clean rebuild by a randomized test and a per-field test.
 
 ### 7. Tooltip text (`TooltipScanner`, tooltip-scanning.md)
-Kept value: an item's tooltip text by GUID. Invalidated by `TOOLTIP_DATA_UPDATE` for the item's
-tooltip instance (bounded re-scans). Kept harvest slots and recalculations re-fetch it, so a
+Kept value: an item's tooltip text by GUID, and what its whole lines mark (toy, already known;
+search-indexing.md §12), kept and dropped together. Invalidated by `TOOLTIP_DATA_UPDATE` for the
+item's tooltip instance (bounded re-scans). Kept harvest slots and recalculations re-fetch it, so a
 re-scan lands; a resolution asks for a recalculation, not a read.
 
 ### 8. Kept per-item work (`item.derived`, data-loader.md §18)

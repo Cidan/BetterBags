@@ -359,7 +359,9 @@ describe("Search", function()
       search:Add(MockSearchItem({ slotkey = "snake", currentItemLevel = 25, traits = {
         minLevel = 0, stackSize = 1, sellPrice = 100, isEquipment = false, hasUse = true, isPet = true,
         stats = {} } }))
-      search:Add(MockSearchItem({ slotkey = "cold", currentItemLevel = 1 }))
+      local cold = MockSearchItem({ slotkey = "cold", currentItemLevel = 1 })
+      cold.itemInfo.tooltipMarks = { toy = true, known = true }
+      search:Add(cold)
     end)
 
     it("finds items by required level, max stack and sell price", function()
@@ -411,7 +413,8 @@ describe("Search", function()
     -- Rule #1: an item read before its data loaded matches no trait until it is read again.
     it("matches no trait of an item read cold", function()
       for _, q in ipairs({ "minlevel >= 0", "price >= 0", "equipment = false", "hasuse = false", "pet = false",
-        "upgradeable = false", "maxlevel >= 0", "stacksize >= 0", "quality >= 0" }) do
+        "upgradeable = false", "maxlevel >= 0", "stacksize >= 0", "quality >= 0", "toy = true", "toy = false",
+        "known = true", "known = false" }) do
         assert.is_nil(search:Search(q).cold, q)
       end
     end)
@@ -1104,6 +1107,8 @@ describe("Search incremental indexing (SyncKind)", function()
       { "upgrade arrow", function(it) it.isUpgrade = true end },
       { "total held", function(it) it.itemTotal = 99 end },
       { "read cold", function(it) it.harvestIncomplete = true; it.isUpgrade = true end },
+      { "toy mark", function(it) it.itemInfo.tooltipMarks = { toy = true } end },
+      { "known mark", function(it) it.itemInfo.tooltipMarks = { known = true } end },
     }
     for _, change in ipairs(changes) do
       it(change[1], function()
@@ -1167,7 +1172,7 @@ describe("Search incremental indexing (SyncKind)", function()
 
     local function mutate(it)
       local info = it.itemInfo
-      local which = random(22)
+      local which = random(23)
       if which == 1 then info.category = pick(CATEGORIES)
       elseif which == 2 then info.currentItemCount = random(20)
       elseif which == 3 then info.tooltipText = pick(TOOLTIPS)
@@ -1204,6 +1209,7 @@ describe("Search incremental indexing (SyncKind)", function()
         end
       elseif which == 20 then it.isUpgrade = random(2) == 1
       elseif which == 21 then it.itemTotal = random(3) * 10
+      elseif which == 22 then it.itemInfo.tooltipMarks = pick({ { toy = true }, { known = true }, { toy = true, known = true }, false }) or nil
       else it.bindingInfo.binding = random(3) - 1 end
     end
 

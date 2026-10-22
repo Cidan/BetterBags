@@ -384,6 +384,7 @@ function EquipmentManager_UnpackLocation(location) end
 ---@field setID number
 ---@field isCraftingReagent boolean
 ---@field traits? ItemTraits What the search knows of the item, read once its data has loaded; nil for an item read cold.
+---@field tooltipMarks? {toy?: boolean, known?: boolean} What whole tooltip lines say (TooltipScanner): "Toy", "Already known".
 ---@field effectiveIlvl number
 ---@field isPreview boolean
 ---@field baseIlvl number

@@ -491,6 +491,17 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_nil(t.upgradeMaxItemLevel)
     end)
 
+    -- A retail dump's Adventurer cloak (spec/fixtures/dump_retail_12_1_5.lua): a track string with
+    -- no levels, and no upgrade line in its tooltip. Not a track the game shows.
+    it("has no upgrade track for a track string with no levels", function()
+      C_Item.GetItemUpgradeInfo = function()
+        return { currentLevel = 0, maxLevel = 0, maxItemLevel = 0, trackString = "Adventurer", trackStringID = 971 }
+      end
+      local t = items:ReadItemProperties(42, link).traits
+      assert.is_nil(t.upgradeTrack)
+      assert.is_nil(t.upgradeMaxItemLevel)
+    end)
+
     -- C_PetJournal.GetPetInfoByItemID only takes an item ID (the wiki: a link raises an error).
     it("asks whether it teaches a pet by item ID", function()
       local asked

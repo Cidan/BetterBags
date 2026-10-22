@@ -9,8 +9,9 @@ BetterBags' query engine.
 **Status** (2026-10-21): decided (below, "Decisions"). Built: negation (NOT and `!=` match every
 indexed item outside their part, anywhere in a query; `.claude/rules/search-indexing.md` §5), and
 precedence (AND before OR, saved rules rewritten once to keep their meaning; §6), `bagname` (§7),
-expansions in release order (§8), `quality` as the crafting quality tier (§9), and the first batch
-of new item fields (§10; "Proposed: new fields" marks each). The rest is planned.
+expansions in release order (§8), `quality` as the crafting quality tier (§9), the new item fields
+of §10-§12 ("Proposed: new fields" marks each), checked against a capture from the game ("What a
+capture settled"). The rest is planned.
 
 ## Why
 
@@ -448,8 +449,8 @@ with its invalidation, as that file requires.
 | `sellable` (dropped: `price > 0`) | bool | | | |
 | `equipment` (done) | bool | `C_Item.IsEquippableItem(link)` | all | the slot changes |
 | `usable`, `equippable` (next batch) | bool | `C_PlayerInfo.CanUseItem(id)` (and `equipment`) | retail | skills, level, spec (caches.md §2's events) |
-| `hasuse` (done) | bool | `C_Item.GetItemSpell(link)` returns something (Blizzard's `/use` code's test) | all | the slot changes |
-| `toy`, `known` (after a capture: no Blizzard code tells a bag item is a toy) | bool | `C_ToyBox.GetToyInfo`, `PlayerHasToy`; the tooltip's `ITEM_SPELL_KNOWN` line | retail (toys) | learning it (`NEW_TOY_ADDED`; for the rest, the tooltip text, re-scanned on `TOOLTIP_DATA_UPDATE`, tooltip-scanning.md) |
+| `hasuse` (done) | bool | `C_Item.GetItemSpell(link)` returns something: any `Use:` line, learn lines included ("What a capture settled") | all | the slot changes |
+| `toy`, `known` (done) | bool | whole tooltip lines `TOY` and `ITEM_SPELL_KNOWN` ("What a capture settled") | all | learning it (`NEW_TOY_ADDED`; for the rest, the tooltip text, re-scanned on `TOOLTIP_DATA_UPDATE`, tooltip-scanning.md) |
 | `pet` (done); `petcount`, `petlimit`, `collectable` (next batch) | bool, numbers | `C_PetJournal.GetPetInfoByItemID`, `GetNumCollectedInfo` | retail | learning a pet (`NEW_PET_ADDED`) |
 | `cosmetic` (done) | bool | `C_Item.IsCosmeticItem` | retail | the slot changes |
 | `hasappearance`, `appearance`, `source` (next batch) | bool, known/unknown | `C_TransmogCollection` as Vendor (above) | retail | collecting an appearance (`TRANSMOG_COLLECTION_SOURCE_ADDED`); today a known staleness of kept slots, caches.md §1 |
@@ -500,24 +501,57 @@ way to limit a match to one line if that turns out to be wanted.
 - Vendor's own spellings in search (`IsSoulbound`, `PlayerLevel()`): an import converts them.
 - `IsEquipped`, `IsConduit`, `IsAzeriteItem`, the debug properties.
 
+## What a capture settled
+
+A Dump tab capture on retail 12.1.5 (build 70448, enUS, 2026-10-21; 88 items in the backpack, every
+item's data loaded), kept as `spec/fixtures/dump_retail_12_1_5.lua`. What each API answered:
+
+- **Link against item ID.** One item of 88 answered differently: an upgraded Voidfused Wing Cloak,
+  by item ID item level 80, required level 80, Uncommon, 225,552 copper; by link 230, 90, Rare,
+  325,268. The new fields read the link (`minlevel`, `price`); `C_Item.GetCurrentItemLevel` at its
+  location gave 230, the link's level, for every item.
+- **Upgrade tracks.** `C_Item.GetItemUpgradeInfo` returned a table for every item (zeros for
+  cheese and recipes). The cloak's named a track (Adventurer) with 0/0 levels and max item level 0,
+  and its tooltip had no upgrade level line: a track string alone is not a track. `upgradeable`
+  needs a track string and a max level above 0.
+- **Toys.** `C_ToyBox.GetToyInfo` answered with an item ID for the two toys and for no other item;
+  both toys' tooltips have a line `Toy` (`TOY`) and, learned, a line `Already known`
+  (`ITEM_SPELL_KNOWN`, line type 43, UsageRequirement). `toy` and `known` read those lines.
+- **Use spells.** `C_Item.GetItemSpell` returned a spell for 51 items and nothing for 37: exactly
+  the items with a `Use:` line (type 44), plus 8 recipes and pets whose `Use: Teaches you` lines are
+  type 38 (ItemSpellTriggerLearn) and return the spell "Learning". `hasuse` is any Use line.
+- **Equipment.** `C_Item.IsEquippableItem` was true for the cloak only (consumables, recipes,
+  reagents, quest items, housing dyes all false). No bag was in the dump.
+- **Appearances.** `C_TransmogCollection.GetItemInfo` returned nothing for 87 items and an
+  appearance for the cloak (collected).
+- **Usability.** `C_PlayerInfo.CanUseItem` was false for the 9 recipes of professions the character
+  does not have, true for everything else.
+- **Crafting tiers.** Three items answered tier 1 to both `GetItemReagentQualityByItemInfo` and
+  `GetItemCraftedQualityByItemInfo`; their tooltips show the tier icon
+  (`Professions-Icon-Quality-12-...`).
+- **Pets.** `C_PetJournal.GetPetInfoByItemID` answered for the two pet items (species 243 and 3580),
+  `GetNumCollectedInfo` 1 of 1 for both.
+- **Bags.** `C_Container.GetBagName` gave "Backpack" and the bag's item name ("Shrouded Cloth Bag").
+- No API raised an error.
+
 ## Needs an in-game check
 
-A dump from the `/bbdb` Dump tab now records, with each item, what every API below answered
-(`apiProbe`, `.claude/rules/data-driven.md`), so one dump of a full backpack settles most of these.
+The Dump tab records, with each item, what every API below answers (`apiProbe`,
+`.claude/rules/data-driven.md`); one dump settles each of these with the right items in the bags.
 
 - `C_Item.GetCurrentItemLevel(location)` against `GetDetailedItemLevelInfo(link)` on an heirloom,
-  level-scaled gear and an item in timewalking: which matches the tooltip.
-- `GetItemInfo` by ID against by link for upgraded or scaled gear: required level and sell price.
-- Whether curve 92181 is still needed: an upgradeable item's `maxItemLevel`, and a Poor
-  Bind-on-Equip item's level, against their tooltips.
+  level-scaled gear and an item in timewalking.
+- An upgradeable item on a track (Veteran and up): its `maxItemLevel`, and whether curve 92181 is
+  still needed; a Poor Bind-on-Equip item's level.
 - `C_Item.IsEquippableItem` on a bag (bags go in equipment slots).
-- `C_Item.IsUsableItem` and `C_Item.GetItemSpell` on an item with a Use effect, one without, and one
-  the character cannot use yet.
 - `C_Container.GetBagName` on a retail bank tab and a Warbank tab.
 - `GetItemCraftedQualityByItemInfo` on two copies of a crafted item at different tiers.
-- That `NEW_TOY_ADDED`, `NEW_PET_ADDED` and `TRANSMOG_COLLECTION_SOURCE_ADDED` (all documented)
-  fire when a toy, pet or appearance is learned from a bag item, and that the item's tooltip text
-  changes then ("Already known").
+- A toy not learned yet: no `Already known` line.
+- When the pet journal and the appearance collection have loaded at login (for pet counts and
+  appearances): a profiler capture of a fresh login (Capture next reload, then relaunch) shows when
+  `PET_JOURNAL_LIST_UPDATE` and `TRANSMOG_COLLECTION_UPDATED` fire against the startup read.
+- That `NEW_TOY_ADDED`, `NEW_PET_ADDED` and `TRANSMOG_COLLECTION_SOURCE_ADDED` fire when a toy, pet
+  or appearance is learned from a bag item, and that the item's tooltip text changes then.
 
 ## Decisions
 
