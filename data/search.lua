@@ -40,7 +40,7 @@ local SNAPSHOT_FIELDS = {
   'binding', 'tooltip', 'bagname', 'level', 'rarity', 'quality', 'id', 'stackcount', 'class', 'subclass',
   'bagid', 'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
   'minlevel', 'stacksize', 'price', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable', 'upgradeable',
-  'track', 'upgradelevel', 'upgrademax', 'maxlevel',
+  'track', 'upgradelevel', 'upgrademax', 'maxlevel', 'upgrade', 'total',
 }
 -- expansionid is not compared: it follows expansion, which is.
 
@@ -139,6 +139,15 @@ local function fillSnapshot(s, item)
     s.maxlevel = nil
   end
   s.stats = copyList(s.stats, t and t.stats)
+  -- Follows the sets above, which are compared.
+  s.inset = info.equipmentSets ~= nil and info.equipmentSets[1] ~= nil
+  -- The arrow BetterBags draws, for an item read with its data (rule #1).
+  if item.harvestIncomplete then
+    s.upgrade = nil
+  else
+    s.upgrade = item.isUpgrade == true
+  end
+  s.total = item.itemTotal
   return s
 end
 
@@ -166,11 +175,11 @@ end
 -- Number and boolean snapshot fields share their name with the index they go into.
 local NUMBER_FIELDS = {
   'level', 'rarity', 'quality', 'id', 'stackcount', 'class', 'subclass', 'bagid', 'slotid', 'bindtype',
-  'expansionid', 'minlevel', 'stacksize', 'price', 'upgradelevel', 'upgrademax', 'maxlevel',
+  'expansionid', 'minlevel', 'stacksize', 'price', 'upgradelevel', 'upgrademax', 'maxlevel', 'total',
 }
 local BOOL_FIELDS = {
   'reagent', 'isbound', 'bound', 'quest', 'activequest', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable',
-  'upgradeable',
+  'upgradeable', 'inset', 'upgrade',
 }
 
 -- scratch is reused to snapshot each item SyncKind compares, so an unchanged item costs no
@@ -236,6 +245,7 @@ function search:Init()
   self:CreateIndex('upgradelevel')
   self:CreateIndex('upgrademax')
   self:CreateIndex('maxlevel')
+  self:CreateIndex('total')
   self:CreateIndex('bonusid')
 
   -- Boolean indexes
@@ -250,6 +260,8 @@ function search:Init()
   self:CreateIndex('pet')
   self:CreateIndex('scrappable')
   self:CreateIndex('upgradeable')
+  self:CreateIndex('inset')
+  self:CreateIndex('upgrade')
 
   self.defaultIndicies = {
     'name',

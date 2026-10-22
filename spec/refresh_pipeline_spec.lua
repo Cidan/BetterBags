@@ -888,6 +888,20 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       sent = {}
     end)
 
+    -- The upgrade field follows the arrow on an item the sweep kept (data-loader.md §18: a value
+    -- set again in place is re-indexed only when the item is marked).
+    it("keeps the upgrade field current when a kept item's arrow changes", function()
+      assert.are.same({ ["0_1"] = true }, search:Search("upgrade = true"))
+      local kept = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"]
+      verdicts[101] = false
+      items:InvalidateUpgrades()
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.are.equal(kept, slotInfo.itemsBySlotKey["0_1"], "the same item, kept")
+      assert.is_false(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+      assert.are.same({}, search:Search("upgrade = true"))
+      assert.is_true(search:Search("upgrade = false")["0_1"])
+    end)
+
     it("asks again only for the slot that changed", function()
       mockContainer[0][2].count = 4
       local slotInfo = refreshBackpack({ bags = { [0] = true } })
@@ -1746,6 +1760,23 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       asked = 0
       refreshBackpack({ bags = { [0] = true } })
       assert.are.equal(0, asked, "a kept slot keeps its traits")
+    end)
+
+    -- How many of the item the kind's bags hold, by item ID (Vendor's TotalItemCount). A slot that
+    -- changes changes the total of the kept items of the same item, which are re-indexed.
+    it("counts each item across the bags, and keeps a kept item's total current", function()
+      mockContainer[0] = { { itemID = 101, guid = "a", count = 5 }, { itemID = 101, guid = "b", count = 7 },
+        { itemID = 202, guid = "c", count = 1 } }
+      local slotInfo = refreshBackpack()
+      assert.are.equal(12, slotInfo.itemsBySlotKey["0_1"].itemTotal)
+      assert.are.equal(1, slotInfo.itemsBySlotKey["0_3"].itemTotal)
+      assert.are.same({ ["0_1"] = true, ["0_2"] = true }, search:Search("total = 12"))
+      mockContainer[1] = { { itemID = 101, guid = "d", count = 3 } }
+      local kept = slotInfo.itemsBySlotKey["0_1"]
+      slotInfo = refreshBackpack({ bags = { [1] = true } })
+      assert.are.equal(kept, slotInfo.itemsBySlotKey["0_1"], "bag 0 was not read")
+      assert.are.same({ ["0_1"] = true, ["0_2"] = true, ["1_1"] = true }, search:Search("total = 15"))
+      assert.are.same({}, search:Search("total = 12"))
     end)
 
     it("gives every item the plain name of its bag, for the bagname field", function()
@@ -3591,6 +3622,17 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       override(database, "GetCategoryFilter", function(_, _, filter)
         return filter == "GearSet"
       end)
+    end)
+
+    it("keeps inset current when a kept item leaves its set", function()
+      pendingSets[0] = { [1] = { "Demo" } }
+      mockContainer[0] = { { itemID = 101, guid = "gear-demo", count = 1 } }
+      refreshBackpack()
+      assert.are.same({ ["0_1"] = true }, search:Search("inset = true"))
+      pendingSets[0] = {}
+      refreshBackpack({ derive = true })
+      assert.are.same({}, search:Search("inset = true"))
+      assert.is_true(search:Search("inset = false")["0_1"])
     end)
 
     it("rebuilds the set map each sweep so a set item is labeled", function()

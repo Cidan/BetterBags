@@ -92,3 +92,25 @@ The fields Vendor's rules use that BetterBags did not have (docs/vendor-compat.m
 - **Left out, and why:** binding booleans (`binding = soulbound OR binding = quest` says it), profession gear (`equipment = true AND class = 19`), sellable (`price > 0`), total price (`price * count`, once arithmetic exists); toys and "already known" (no Blizzard code tells an arbitrary bag item is a toy, Vendor found the toy box API unreliable and reads the tooltip, and BetterBags' tooltip text joins its lines: settled by an in-game capture first); appearance fields, usability and pet counts (they follow the character's collections and skills: the next batch); the slot-relative values (with the player values).
 - **Cost** (offline, PUC Lua 5.1, the real profile's backpack, 57 items, 40 full re-reads, Blizzard's APIs mocked): 4.62-4.79 ms per re-read before, 5.20-5.31 ms after, about 9 µs per item read; only re-read slots pay it. The game's own API calls are not in that figure.
 - **Coverage:** `spec/items_spec.lua` ("item traits": the link's values, the item ID's left alone, each trait, upgrade info only for equipment and only with a track, a pet by item ID, missing APIs, cold reads of the item ID and of the link alone, a battle pet link never read as an item link), `spec/search_spec.lua` ("item traits": every field, `maxlevel` with and without a track and above the track's max, stat names by their start, a cold item matching no trait; the per-field and randomized re-index tests change every trait), `spec/refresh_pipeline_spec.lua` ("reads each item's traits from its link, and searches them", a kept slot keeping them), `spec/next/merchant_spec.lua` (the vendor's traits, none read cold), `spec/debug_dump_harness_spec.lua` (every item of the real profile read complete with its traits; its `GetItemInfo` mock now takes links, as the API does). 31 mutations, all caught (the two that first survived led to a test that a battle pet link is never read as an item link and a per-field test changing a track).
+
+### 11. Fields the Pipeline Works Out: `inset`, `upgrade`, `total`
+These change on an item a sweep kept, without its slot being read: the gear-set map, the worn gear
+or the upgrade provider, another slot of the same item. The index compares only the items marked
+`indexPending` and the ones that are new objects (data-loader.md §18), so each marks the item when
+it changes.
+- **`inset`** (boolean): the item is in any equipment set (`itemInfo.equipmentSets` has a name).
+  It follows the sets, which `fillSnapshot` compares, and which `RefreshKeptItem` refreshes,
+  dropping the item's `derived` (so Phase 6 marks it) when they change.
+- **`upgrade`** (boolean): the arrow BetterBags draws (`item.isUpgrade`, Phase 6, from the active
+  provider, data-loader.md §15). Phase 6 marks the item when its arrow changed. Absent for an item
+  read before its data loaded (rule #1, data-loader.md §19), whose arrow is a guess.
+- **`total`** (number): how many of the item the kind's bags hold, by item ID, every stack counted
+  (Vendor's `TotalItemCount`). `items:CountItemTotals`, between Phase 7 and Phase 8, every sweep,
+  marks an item whose total changed. Per kind: the backpack's bags for the backpack, the bank's for
+  the bank, a guild bank's tabs for it.
+- **Coverage:** `spec/search_spec.lua` ("gear sets, upgrade arrows and totals"; the per-field and
+  randomized re-index tests change the arrow, the total and the cold mark),
+  `spec/refresh_pipeline_spec.lua` ("keeps the upgrade field current when a kept item's arrow
+  changes", "keeps inset current when a kept item leaves its set", "counts each item across the
+  bags, and keeps a kept item's total current"). The randomized "equals a full recalculation" test
+  compares the index with a clean rebuild after gear changes. 10 mutations, all caught.

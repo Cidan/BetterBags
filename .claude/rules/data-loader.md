@@ -203,8 +203,9 @@ whatever an input every item shares (a setting, the gear, the open window) chang
     grey-out is worked out every sweep: Blizzard's answer then can depend on the spell being cast
     (Enchanting, CheckItemCondition, ReplaceBonusTree, JumpUpgradeTrack) or the recipe being
     recrafted (`ItemButtonUtil.GetItemContextMatchResultForItem`).
-  - `indexPending`: the item's own category was worked out again and it has not been compared with
-    its search entry yet (below).
+  - `indexPending`: the item's own category was worked out again, or its upgrade arrow or its total
+    changed (search-indexing.md §11), and it has not been compared with its search entry yet
+    (below).
   - Upgrade verdicts stay where they were (`upgradeVerdict`, caches.md §2); Pawn's are now kept too.
 - **What makes it be worked out again:**
   - An in-place change of the item's own inputs drops `derived`: quest state, tooltip text, gear

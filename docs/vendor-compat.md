@@ -457,10 +457,10 @@ with its invalidation, as that file requires.
 | `professiongear` (dropped: `equipment = true AND class = 19`) | bool | | | |
 | `scrappable` (done) | bool | `C_Item.CanScrapItem(location)` | retail, bag slots | the slot changes |
 | `soulbound`, `boe`, `bou`, `warbound`, `wue` (dropped: `binding = ...` with OR says each) | bool | | | |
-| `inset` (next batch) | bool | `equipmentSets` is not empty | all with sets | `EQUIPMENT_SETS_CHANGED` (already a recalculation) |
+| `inset` (done) | bool | `equipmentSets` is not empty | all with sets | `EQUIPMENT_SETS_CHANGED` (already a recalculation) |
 | `stat` (done) | text set | `GetItemStats(link)` keys' global strings (the names match from their start: `stat = crit`) | all | the slot changes |
-| `upgrade` (next batch) | bool | the item's upgrade verdict (`data.isUpgrade`) | all | caches.md §2 |
-| `total` (next batch) | number | the item's count across the kind's bags (the virtual stack total) | all | every sweep |
+| `upgrade` (done) | bool | the item's upgrade verdict (`data.isUpgrade`) | all | caches.md §2 |
+| `total` (done) | number | the item's count across the kind's bags, by item ID | all | every sweep |
 | `slotbest`, `slotequipped` (with the player values) | numbers, per item | `C_ItemUpgrade.GetHighWatermarkForItem(link)`; the worn gear (`equipmentCache`) | retail; all | `PLAYER_EQUIPMENT_CHANGED` |
 | `player.level`, `player.ilvl`, `player.equippedilvl`, `player.class`, `player.classid`, `player.spec`, `player.specid`, `player.profession`, `player.name`, `player.realm` | values | `UnitLevel`, `GetAverageItemLevel`, `UnitClass`, `GetSpecializationInfo`, `GetProfessions`, `UnitFullName` | all (spec: retail) | the events above |
 

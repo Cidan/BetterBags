@@ -415,6 +415,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `price` (price > 10000) The vendor sell price of one of the item, in copper (10000 is 1 gold). 0 for items a vendor will not buy.
 - `maxlevel` (maxlevel >= 600) The item level of upgradeable gear once fully upgraded (Retail); for anything else, its item level.
 - `upgradelevel`, `upgrademax` (upgradelevel = 3) How many upgrades upgradeable gear has, and how many its track has (Retail): an item shown as "Hero 3/6" has upgradelevel 3 and upgrademax 6.
+- `total` (total >= 100) How many of the item the bags hold altogether (the backpack's bags for the backpack, the bank's for the bank), counting every stack of it.
 
 ### Booleans
 - `reagent` (reagent = false) Is the item classified as a reagent?
@@ -428,6 +429,8 @@ Search allows you to find items by the following indices (based on the item belo
 - `pet` (pet = true) Does the item teach a battle pet (Retail)?
 - `upgradeable` (upgradeable = true) Is the item gear on an upgrade track (Retail)?
 - `scrappable` (scrappable = true) Can the item be scrapped (Retail)?
+- `inset` (inset = true) Is the item in any equipment set? (`equipmentSet` names one.)
+- `upgrade` (upgrade = true) Does BetterBags show the upgrade arrow on the item? It follows the upgrade provider chosen in the settings (BetterBags, Pawn or SimpleItemLevel).
 
 The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable` and `scrappable` are read once the game has sent the item's data: an item that has just arrived may match none of them for a moment.
 

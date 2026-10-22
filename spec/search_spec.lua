@@ -417,6 +417,48 @@ describe("Search", function()
     end)
   end)
 
+  -- ─── Fields the pipeline works out ──────────────────────────────────────────
+
+  describe("gear sets, upgrade arrows and totals", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      local helm = MockSearchItem({ slotkey = "helm", equipmentSets = { "Tank" } })
+      helm.isUpgrade = true
+      helm.itemTotal = 1
+      local potion = MockSearchItem({ slotkey = "potion" })
+      potion.isUpgrade = false
+      potion.itemTotal = 45
+      local cold = MockSearchItem({ slotkey = "cold" })
+      cold.isUpgrade = true
+      cold.harvestIncomplete = true
+      cold.itemTotal = 2
+      search:Add(helm)
+      search:Add(potion)
+      search:Add(cold)
+    end)
+
+    it("finds items in any gear set", function()
+      assert.are.same(keys("helm"), search:Search("inset = true"))
+      assert.are.same(keys("potion", "cold"), search:Search("inset = false"))
+    end)
+
+    -- The arrow BetterBags draws, from the active provider (data-loader.md §15).
+    it("finds items the upgrade arrow marks, but not one read before its data loaded", function()
+      assert.are.same(keys("helm"), search:Search("upgrade = true"))
+      assert.are.same(keys("potion"), search:Search("upgrade = false"))
+    end)
+
+    it("finds items by how many of them the bags hold", function()
+      assert.are.same(keys("potion"), search:Search("total >= 40"))
+      assert.are.same(keys("helm", "cold"), search:Search("total < 10"))
+    end)
+  end)
+
   -- ─── Expansion order ────────────────────────────────────────────────────────
 
   -- Asked (docs/vendor-compat.md, "Decisions"): < and > compare expansions in release order. The
@@ -1059,6 +1101,9 @@ describe("Search incremental indexing (SyncKind)", function()
       { "upgraded item level", function(it) it.itemInfo.traits.upgradeMaxItemLevel = 700 end },
       { "stats", function(it) it.itemInfo.traits.stats = { "Versatility" } end },
       { "traits read once loaded", function(it) it.itemInfo.traits = nil end },
+      { "upgrade arrow", function(it) it.isUpgrade = true end },
+      { "total held", function(it) it.itemTotal = 99 end },
+      { "read cold", function(it) it.harvestIncomplete = true; it.isUpgrade = true end },
     }
     for _, change in ipairs(changes) do
       it(change[1], function()
@@ -1122,7 +1167,7 @@ describe("Search incremental indexing (SyncKind)", function()
 
     local function mutate(it)
       local info = it.itemInfo
-      local which = random(20)
+      local which = random(22)
       if which == 1 then info.category = pick(CATEGORIES)
       elseif which == 2 then info.currentItemCount = random(20)
       elseif which == 3 then info.tooltipText = pick(TOOLTIPS)
@@ -1157,6 +1202,8 @@ describe("Search incremental indexing (SyncKind)", function()
           elseif f == 7 then t.stats = random(2) == 1 and { pick({ "Haste", "Mastery" }) } or nil
           else t.isPet = random(2) == 1 end
         end
+      elseif which == 20 then it.isUpgrade = random(2) == 1
+      elseif which == 21 then it.itemTotal = random(3) * 10
       else it.bindingInfo.binding = random(3) - 1 end
     end
 

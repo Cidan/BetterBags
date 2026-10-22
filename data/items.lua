@@ -76,6 +76,7 @@ local async = addon:GetModule("Async")
 ---@field bagid number
 ---@field slotid number
 ---@field bagName? string The plain name of the item's bag (GetPlainBagName), set in Phase 6.
+---@field itemTotal? number How many of its item the kind's bags hold (CountItemTotals).
 ---@field inventoryType number
 ---@field inventorySlots number[]
 ---@field slotkey string
@@ -1296,8 +1297,13 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
         d.context = contextSig
       end
     end
-    -- Kept verdicts are reused inside (caches.md §2).
-    currentItem.isUpgrade = self:ResolveUpgrade(currentItem)
+    -- Kept verdicts are reused inside (caches.md §2). The search indexes the arrow: a kept item
+    -- whose arrow changed is compared with its search entry again (search-indexing.md §11).
+    local upgrade = self:ResolveUpgrade(currentItem)
+    if currentItem.derived and currentItem.isUpgrade ~= upgrade then
+      currentItem.derived.indexPending = true
+    end
+    currentItem.isUpgrade = upgrade
     currentItem.drawGeneration = self._drawGeneration[kind]
   end
 
@@ -1482,6 +1488,29 @@ function items:syncIndex(kind, kindItems, rebuild)
   search:SyncKind(kind, kindItems, rebuild, pending)
   for _, item in pairs(pending) do
     item.derived.indexPending = nil
+  end
+end
+
+-- CountItemTotals gives each item how many of its item the kind's bags hold, by item ID
+-- (itemTotal, the search's total field), and marks for re-indexing a kept item whose total changed:
+-- a slot that changes changes the total of every other slot of its item.
+---@param itemData table<string, ItemData>
+function items:CountItemTotals(itemData)
+  local totals = {}
+  for _, item in pairs(itemData) do
+    if not item.isItemEmpty then
+      local id = item.itemInfo.itemID
+      totals[id] = (totals[id] or 0) + (item.itemInfo.currentItemCount or 0)
+    end
+  end
+  for _, item in pairs(itemData) do
+    if not item.isItemEmpty then
+      local total = totals[item.itemInfo.itemID]
+      if item.derived and item.itemTotal ~= total then
+        item.derived.indexPending = true
+      end
+      item.itemTotal = total
+    end
   end
 end
 
@@ -2197,6 +2226,7 @@ function items:RunRefresh(ectx, kind)
 
   local stackedInteracting = addon.atInteracting == true
   local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
+  self:CountItemTotals(itemData)
   local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
   local sortedItems = self:BuildOrderedItems(ectx, kind, visibleItemsBySlotKey, emptySlotByBagAndSlot, previousSortedItems)
   local tabData = self:Phase10_PartitionIntoTabs(ectx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
