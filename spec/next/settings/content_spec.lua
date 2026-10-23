@@ -42,7 +42,8 @@ for _, m in ipairs({ { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle",
   { "NextItemGrid", "next/controls/itemgrid.lua" },
   { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
   { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" },
-  { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" },
+  { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextLift", "next/lift.lua" }, { "NextListReorder", "next/settings/reorder.lua" },
+  { "NextSettingsCategories", "next/settings/categories.lua" },
   { "NextSettingsBagCategories", "next/settings/bagcategories.lua" },
   { "NextSettingsCurrency", "next/settings/currency.lua" },
   { "NextSettingsContent", "next/settings/content.lua" } }) do
@@ -239,10 +240,9 @@ describe("NextSettingsContent", function()
       assert.are.equal(1, #sections)
       assert.are.equal("Merchants", sections[1].title)
       local automationRows = sections[1].rows
-      assert.are.equal(2, #automationRows)
-      assert.are.same({ "toggle", "Auto Sell", "toggle", "Destroy What Can't Be Sold" },
-        { automationRows[1].option.kind, automationRows[1].option.title, automationRows[2].option.kind,
-          automationRows[2].option.title })
+      local rowTitles = {}
+      for i, row in ipairs(automationRows) do rowTitles[i] = row.option.title end
+      assert.are.same({ "Auto Sell", "Confirm Auto Sell", "Destroy What Can't Be Sold" }, rowTitles)
       settings:Select("categories", "items")
       assert.are.equal(settings.frame, made.CreateItemsTab.owner)
       local titles = {}

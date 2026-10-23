@@ -349,6 +349,16 @@ selling a backpack section by dragging it onto the vendor: a panel registered wi
 while it is shown, checked before the bags' panels; it says what sells (`SaleOf`) and sells it
 (`Sell`), and the section flies into it only when it sold (§10b).
 
+**One drag for sections and settings rows** (`NextLift`, `next/lift.lua`). Lifting a frame onto the
+drag layer, its cover and shadow, following the cursor, landing it where its owner says and scrolling a
+list near its edges were NextDrag's own; they moved to `NextLift` when the settings lists' rows were made
+to move as sections do (next-settings.md §5, "Dragging a row"; asked: "we do this amazingly in the bags
+today"), so both drags are the same code. NextDrag keeps the section's part: the canvas's gap, drop
+targets, the hint, flying away, the dock. `NextDrag.layer`, `.shadow` and `.cover` are NextLift's; the
+shadow is restyled by NextLift's own `ApplyStyle`. One frame is lifted at a time (`NextLift:IsHolding`).
+The move changed nothing about the bags' drag: its 67 tests pass with only the shadow's restyle call
+added.
+
 **Picking up.** Every section has a header button over its title row. Dragging it (left button,
 the client's drag threshold: `RegisterForDrag`, `OnDragStart`) picks up a category section; Recent
 Items and Free Space stay put, and nothing is picked up in the Show Bags view (`SECTION_ALL_BAGS`,
@@ -378,6 +388,11 @@ section is being dragged or landing.
   nothing either).
 - It lifts: it shrinks to 94% around the point that was grabbed, with a soft shadow, over 0.12 s.
   From then on it follows the cursor, the grabbed point staying under it.
+- A section waiting in another panel's dock is held out of the column (`NextContent:HoldOut`, §7
+  "Docked sections"): never placed, never in a drag's places, never faded in, kept bound.
+- A section moved away is left out while leaving (`MarkLeaving`) and comes back once its time is up with
+  its items still there; `MarkLeaving` lays the column out again then (`C_Timer.After`), since nothing
+  else may draw the bag (reported: a section the merchant did not take all of stayed hidden, "limbo").
 - The canvas keeps a gap the section's height where it was (`NextContent:BeginDrag`), so the other
   sections do not move until the cursor does.
 
@@ -447,37 +462,76 @@ is no hardware event, so a drop on the other bag or its tabs lands back.
 buyback keeps, §10; a deposit into a guild tab the player cannot withdraw from, guild-bank.md §5)
 used to open the question dialog while the section landed back in its source. Asked: the dialog
 "blends right in", and the section snapping back drew the eye back to the backpack; "maybe ... the
-category itself sticks in the vendor with a 'double click to confirm sell' and a glowing pulse". Now
-the target's `Sell` or `Deposit` returns `"confirm"` and a `NextConfirmation` (title, warning,
-hint), and the drop docks the section in the target:
-- **The dock** (`buildDock`, one, reused): over the target's scroll area, a scrim (`Color.Scrim`)
-  that dims the target's own items and takes their clicks, so nothing behind is bought; a card
-  (`NextDockCard`, `next/dockcard.lua`, shared with the vendor's destroy card so the two look alike;
-  `Color.Card`) edged in an amber glow (`Color.Gold`, a 2-pixel edge and a soft halo) that pulses
-  (`PULSE_PERIOD`, 1.2 s), with the title (`ConfirmTitle`, 18, white), the warning (`ConfirmWarning`,
-  gold) and the hint (`ConfirmHint`, lavender) around the section. The card is scaled down when it
-  is taller than the scroll area, and laid out again when the section's height changes.
-- **The section** flies from where it was dropped into the card (`Time.Land`) and sits there with
-  its real item buttons. A catcher lies over the card above them (as the drag's cover does), so a
-  click answers rather than picking an item up. The drag goes on (`state.pending`, `landing`), so
-  the source keeps its gap and nothing goes back to it meanwhile. Its level is only ever raised:
-  lowering it threw a descendant to the top level (warcraft.wiki.gg "Frame Strata"), above the
-  catcher.
-- **A double click confirms** (`ConfirmPending`): a mouse click, the hardware event selling and
-  moving need. The target acts on the section's items as they are then (`SectionItems`; the
-  vendor recomputes `SaleOf`), and the section flies into it as a move that did not ask does
-  (`moveDone`). Nothing moved (nothing left in it, or the target is closing): it lands back.
-- **Cancelled** by a right click (on the card or the scrim; it lands back in its gap, the one time
-  it does, because the player asked), the target or the source hiding (`PanelHidden`; Escape
-  closes the vendor as always, which cancels), the section leaving the data, or another section
-  being picked up (`Begin` puts it back at once). There is no timeout.
-- Coverage: `spec/next/drag_spec.lua` ("a sale it confirms first": docked with the text and the gap
-  kept, the catcher above the buttons, double click with the items as they are then, single click,
-  right click on the card and the scrim, nothing left, closing, the seller hiding, a new pickup, the
-  section leaving the data, the pulse; "the guild bank": a deposit docked and confirmed),
-  `spec/next/vendor_spec.lua` and `spec/next/guildbank_spec.lua` (`Sell` and `Deposit` confirm
-  rather than ask). Every guard was mutation-tested; one that survived was dead code (`Cancel`
-  hiding the dock, which `finish` does) and was removed.
+category itself sticks in the vendor with a 'double click to confirm sell' and a glowing pulse". The
+target's `Sell` or `Deposit` returns `"confirm"` and a `NextConfirmation` (title, warning, hint), and
+the drop ends the drag (NextLift lets go, the canvas's drag ends uncommitted) and docks the section in
+the target (below). Confirming moves the section's items as they are then (`SectionItems`; the vendor
+recomputes `SaleOf`) and the section flies into the target; nothing moved (nothing left in it, the
+target closing) sends it back. A section waiting in a dock is no longer a drag: another section can be
+picked up meanwhile, and docks under it.
+
+**Docked sections** (`NextDock`, `next/dock.lua`). Every move waiting for the player waits in one
+interface (CLAUDE.md "UI Consistency" 5): a section dragged onto the vendor or the guild bank that
+must be confirmed, and a category Auto Sell or Destroy What Can't Be Sold offers at a merchant
+(automation.md §4a). Asked: "a list of categories that move over to the vendor window (scroll the
+vendor window if needed) to double click to sell, and selling (or cancelling) animates the next section
+to the position above it (can autosell a section in the middle, for example)". The first version had
+one dock over the target's scroll area (a scrim dimming it, one card, the drag kept going so the source
+kept a gap) and a separate destroy card along the vendor's bottom; both are gone.
+- **A list per panel** (`NextDock:ListOf`): its cards lead the panel's own column
+  (`NextContent:SetLead`), above the panel's sections, one under another in the order they came, so
+  they scroll with it; each laid out by Motion as sections are, so when one goes the ones below slide up
+  into its place, wherever it was in the list. A card newly docked out of view scrolls the panel to it a
+  frame later (`Reveal`, as the text area follows its cursor), once the scroll box has the column's new
+  height.
+- **Each card** (`NextDockCard`: its fill, fonts, edge, halo and pulse) holds the section, scaled down
+  to fit the column with the halo's `Spread` round it, and a catcher above the section's item buttons
+  (levels only ever raised: lowering threw a descendant to the top level, warcraft.wiki.gg "Frame
+  Strata"), so a click answers rather than picking an item up. Its offer (`NextDockOffer`) says its text
+  and its glow color (the dock's, or `Dock.DestroyColor` while destroying), read again at every layout
+  and after every answer.
+- **The section leaves its bag's column** (`NextContent:HoldOut`): the others close up, it stays bound
+  (its buttons drawn and kept up to date), and it flies from where it is into its card (`NextLift:Land`,
+  aimed at the card each frame, to its scale there). Its bag reading it again resizes it, and the card
+  follows.
+- **Answering later:** an offer that acts on its own (a sale, sold one item at a time) is told it is
+  docked (`docked(entry)`), says how far it is with `NextDock:Refresh(entry)` and answers once done with
+  `NextDock:Answer(entry, answer)`; an answer for a section no longer docked does nothing (a sale that
+  ended as it started answers while its double click is still answering). Every way a section leaves the
+  dock (an answer, a right click, a panel closing, its bag dropping it) calls the offer's `cancel`, which
+  stops what it started.
+- **Answers:** a double click (`confirm`) and a left click (`click`) go to the offer: "moved" flies the
+  section into the panel (the tab it came in by, else the scroll area's middle; `NextLift:FlyAway`),
+  then it returns to its bag's column hidden and leaving (`MarkLeaving`, as a move's section does) and
+  the tab pulses; "stay" keeps it, reading its card again (its hovered tooltip too); "back" sends it
+  back. A right click sends it back: it flies to its place in its bag's column, which makes room for it
+  (`NextContent:Returning`), and takes it (`Return`). Clicks are the hardware event selling, moving and
+  destroying need.
+- **Ends:** the panel or the section's bag hiding sends its sections back at once
+  (`NextDock:PanelHidden`, from every panel's `OnHidden`, and from the vendor's `Wipe` and merchant
+  close); the section leaving its bag's data gives its frame back to its canvas before the canvas lets it
+  go (`HoldOut`'s `onLost`).
+- Coverage: `spec/next/dock_spec.lua` (docking out of the bag into the column's first card, the text,
+  the glow and a destroy color, fitting the column, flying in, the catcher, docking once, stacking in
+  order, scrolling to a card out of view, the pulse; a double click moving it with the next sliding up,
+  the tab pulsed, staying restyled, nothing for an offer that does not act, a single click, sent back by
+  the offer and by a right click to its place; leaving the data, the panel or the bag closing, the pulse
+  stopped, a theme), `spec/next/content_spec.lua` ("holding sections out", "leading frames"),
+  `spec/next/lift_spec.lua` ("flying a frame it does not hold", flying away, releasing),
+  `spec/next/drag_spec.lua` ("a sale it confirms first": docked with the text, the drag over, double
+  click with the items as they are then, single click, right click, nothing left, closing, the seller
+  hiding, another section docked under it, the section leaving the data; "the guild bank": a deposit
+  docked and confirmed, the tab it was dropped on pulsing; a docked section not picked up),
+  `spec/next/vendor_spec.lua` (automation.md §4a), `spec/next/guildbank_spec.lua` (`Deposit` confirms
+  rather than asks), `spec/next/bag_spec.lua` (a bag hiding sends its docked sections back).
+- Mutation-tested with the canvas, lift, drag, vendor, Automation and the setting: 97 mutations. Fifteen
+  first survived: thirteen led to tests (seated at the card's scale, laid out again when the section
+  grows, aiming at its place on the way back, a fly-away leaving the held frame's shadow alone and
+  starting where the frame was, the tab a guild deposit was dropped on, a docked section not picked up,
+  a bag's hide, a leaving or elsewhere-docked section not offered, a big sale's double click as its
+  confirmation, a sale finding nothing going back, a single click keeping a sale, no tooltip on a sale)
+  and two were dead code, removed (the dock's `docked` checks in `Click` and `DoubleClick`: a free
+  card's catcher has no entry; the vendor's `atMerchant` check: it shows only at a merchant).
 
 **Positions** are in `UIParent`'s coordinates: the cursor (`GetCursorPosition` over `UIParent`'s
 effective scale), the canvas, tabs and scroll area (all at scale 1 under `UIParent`). The client
@@ -704,30 +758,24 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   every pile its virtual stack hides (`sectionFrame:WithStacks`, shared with Move Categories), in
   the backpack's bags, each slot once, leaving out what the vendor does not buy (`hasNoValue`) and
   refundable purchases (`C_Item.CanBeRefunded`: Blizzard asks before refunding one, and
-  `UseContainerItem` would refund it without asking). `Sell` sells it at once (`SellSlots`, while
-  the vendor is open) when buyback can keep all of it (12, Blizzard's `BUYBACK_ITEMS_PER_PAGE`).
-  Past that, `Sell` sells nothing unless `confirmed` and returns `"confirm"` with the text to
-  confirm with ("Sell 13 items?", "Only the last 12 items sold can be bought back.", "Double-click
-  to sell · Right-click to cancel"): the section docks in the vendor until a double click confirms
-  it (§7, "Confirming in the target"). The section flies into the vendor when it sold, and lands
-  back in its place when nothing sells. Selling needs a mouse click, as moves do: the drop's release,
-  or the double click; a drag ended without a release sells nothing. Unlike a right click on the
+  `UseContainerItem` would refund it without asking), and what this merchant refused (seller.md §3:
+  it stays in the bags until a merchant buys it). A section with something to sell docks in the vendor
+  (§7, "Docked sections") with the vendor's `SaleOffer` (`SectionOffer`, the offer a category Auto Sell
+  offers uses too, automation.md §4a): when buyback can keep all of it (12, Blizzard's
+  `BUYBACK_ITEMS_PER_PAGE`) it sells as it docks; past that it waits for a double click ("Sell 13
+  items?", "Only the last 12 items sold can be bought back.", "Double-click to sell · Right-click to
+  cancel"). The Seller (seller.md) sells it one item at a time while the card says how far it is
+  ("Selling N of M..."); then the section flies into the vendor, or goes back to its place with what
+  the merchant did not take. It lands back in its place at once when nothing sells. Until this change a
+  sale of up to 12 sold everything at once and flew straight into the vendor, which hit "That object
+  is busy." and could hide unsold items (reported). Selling needs a mouse click, as moves do: the drop's
+  release, or the double click; a drag ended without a release sells nothing. Unlike a right click on the
   header (Move Categories), it does not need Enable Category Sell and Deposit and is not cut to 10
   items: the drag is the deliberate act, and the confirmation covers what buyback cannot.
-- **The destroy card** (automation.md §4): while a merchant is open and Automation's destroy queue
-  holds anything (what Destroy What Can't Be Sold categories hold that no merchant buys), the dock's
-  card (`NextDockCard`, the one a section waits in to be sold, §7: its fill, fonts, edge, halo and pulse)
-  sits along the bottom of the body above the footer, as wide as what the vendor sells, its edge and
-  halo in `Dock.DestroyColor`: "Destroy N items", "No merchant buys these.", the queue's icons in its
-  slot (the next first, counts above one, "+N" in the last place when they do not fit), "Click to
-  destroy next". A button over the card takes the clicks: a left click destroys the next item
-  (`Automation:DestroyNext`), hovering shows that item's tooltip with "Click to destroy it.". It pulses
-  from the moment it appears. The scroll area ends above it: the panel's `ContentBottom()`
-  (`style.FOOTER` by default; the root's constraints, the scroll frame's anchor and `MinHeight` read it)
-  adds the card's height and `DESTROY_GAP` (8, clear of the edge) while it shows. It follows the queue
-  on every draw, on `items/RefreshBackpack/Done`, `automation/Changed` and `categories/Changed`, fades
-  in when it appears, laying the panel out again when it appears or goes, and goes when the merchant
-  closes and when BetterBags Next is switched off (`Wipe`).
+- **Categories waiting at a merchant** (automation.md §4a): a backpack category whose sale Auto Sell
+  confirms, or that holds items no merchant buys to destroy, docks in the vendor once the backpack and
+  the vendor show (`OfferAutomation`), in the same dock a dragged section's sale waits in (§7), red while
+  destroying. The vendor keeps no room of its own for it: its `ContentBottom` is the panel's.
 - **Masque:** each button is a card the canvas places (`frame`, the icon with its name and price)
   holding the square button that takes the clicks (`button`), so Masque, which sizes a skin to the
   button it skins (Masque 12.1.0 `Core.lua` `UpdateScale`), skins the icon alone. The button carries
@@ -801,9 +849,8 @@ asks it with its stack split frame (not a confirmation).
 - **Sell Junk:** retail and Forever call `MerchantFrame_OnSellAllJunkButtonClicked`, Blizzard's own
   button handler (its confirmation, then `C_MerchantFrame.SellAllJunkItems`). Classic has neither:
   BetterBags asks (its own dialog, saying only the last 12 sold can be bought back), then sells the
-  poor items worth something (`UpdateJunkItem`'s rule) with `C_Container.UseContainerItem`, three
-  rounds 0.2 s apart while junk is left and the vendor is open (items lock while they sell; GW2_UI
-  sells the same way), as Move Categories already sells.
+  poor items worth something (`UpdateJunkItem`'s rule) through the Seller (seller.md), one at a time
+  while the vendor is open, as every sale.
 
 ### 10e. Taint, and what is not verified
 

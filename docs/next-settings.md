@@ -286,8 +286,9 @@ over its magnifier after a theme change (a screenshot). Done:
 > categories to banks or bags. [...] we combine item and search categories, we don't need to split them
 > anymore, meaning both types of categories can have one another in them, and that should be the default.
 
-Decided with the player: at equal priority an item placed by hand stays where it was placed; the guild
-bank is treated exactly like the other bags; hiding sections is retired silently (tabs do it better).
+Decided with the player: at equal priority an item placed by hand stays where it was placed (since
+2026-10-22: an item added by hand stays whatever the order, the order of the list being the priority,
+category-lifecycle.md §7); the guild bank is treated exactly like the other bags; hiding sections is retired silently (tabs do it better).
 Done: the unified data model and its normalization at every load and import (category-lifecycle.md
 §6), resolution (the tie, group by for hand-placed items), the Categories page, each bag's arrangement
 on its Categories tab, and the search box's Enter to Make Category opening the page (next-settings.md

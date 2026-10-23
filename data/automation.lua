@@ -21,6 +21,9 @@ local items = addon:GetModule('Items')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Seller: AceModule
+local seller = addon:GetModule('Seller')
+
 -- Automation is what a category does with its items on its own, set in its Automation tab
 -- (.claude/rules/automation.md): Auto Sell sells them when a merchant opens, and Destroy What Can't Be
 -- Sold (which needs Auto Sell) destroys, one at a time on a click (BetterBags Next's vendor card) or a
@@ -34,11 +37,6 @@ local automation = addon:NewModule('Automation')
 -- What a category's automation holds: Auto Sell, or Auto Sell and Destroy What Can't Be Sold.
 automation.SELL = "sell"
 automation.DESTROY = "destroy"
--- A sale sells this many items at once, then the next as many a moment later, until all are sold.
-automation.WAVE = 12
-automation.WAVE_DELAY = 0.2
--- How long a sale waits to look again while the cursor holds an item.
-automation.CURSOR_WAIT = 0.2
 
 ---@class AutomationEntry
 ---@field data ItemData The item, as the bags last read it.
@@ -48,9 +46,8 @@ automation.CURSOR_WAIT = 0.2
 
 ---@class AutomationSale
 ---@field list AutomationEntry[]
----@field index number The next entry to sell.
----@field sold number
----@field value number Copper.
+---@field job? SellerJob Its sale, once started (Seller).
+---@field finished? boolean
 
 function automation:Init()
   self.atMerchant = false
@@ -60,21 +57,6 @@ end
 function automation:OnEnable()
   events:RegisterEvent('MERCHANT_SHOW', function(ctx) self:OnMerchantShow(ctx) end)
   events:RegisterEvent('MERCHANT_CLOSED', function(ctx) self:OnMerchantClosed(ctx) end)
-end
-
----@param data ItemData
----@return ItemLocationMixin
-local function locationOf(data)
-  return ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
-end
-
--- refundable says whether a purchase can still be refunded now: Blizzard asks before refunding one
--- (ContainerFrame_GetExtendedPriceString), which automation would skip. Only for a location that holds
--- an item (CanBeRefunded raises an error for an empty one): StillThere, acting, after the slot's info.
----@param location ItemLocationMixin
----@return boolean
-local function refundable(location)
-  return C_Item.CanBeRefunded ~= nil and C_Item.CanBeRefunded(location) == true
 end
 
 ---@param copper number
@@ -118,13 +100,19 @@ function automation:BlockedReason(data, action)
 end
 
 -- Entries lists the backpack's items whose category has an action, by bag and slot, each with why
--- automation leaves it alone, if it does.
+-- automation leaves it alone, if it does: the items given (a section docked in BetterBags Next's vendor,
+-- automation.md §4), else every item as the bags were last read.
 ---@param ctx Context
+---@param only? ItemData[]
 ---@return AutomationEntry[]
-function automation:Entries(ctx)
-  local slotInfo = items.slotInfo and items.slotInfo[const.BAG_KIND.BACKPACK]
+function automation:Entries(ctx, only)
+  local source = only
+  if source == nil then
+    local slotInfo = items.slotInfo and items.slotInfo[const.BAG_KIND.BACKPACK]
+    source = slotInfo and slotInfo.itemsBySlotKey or {}
+  end
   local list = {}
-  for _, data in pairs(slotInfo and slotInfo.itemsBySlotKey or {}) do
+  for _, data in pairs(source) do
     if not data.isItemEmpty and data.itemInfo and const.BACKPACK_BAGS[data.bagid] ~= nil then
       local category = items:GetCategory(ctx, data, false, true)
       local action = categories:AutomationOf(category)
@@ -144,30 +132,65 @@ function automation:Entries(ctx)
 end
 
 -- SellList lists what a merchant is sold: the items either action holds (both sell) that are not left
--- alone and that merchants buy.
+-- alone, that merchants buy and that the merchant open has not refused (Seller:Refuses: back in the bags
+-- until a merchant buys them), of the items given (else of every item).
 ---@param ctx Context
+---@param only? ItemData[]
 ---@return AutomationEntry[]
-function automation:SellList(ctx)
+function automation:SellList(ctx, only)
   local list = {}
-  for _, entry in ipairs(self:Entries(ctx)) do
-    if not entry.blocked and not (entry.data.containerInfo and entry.data.containerInfo.hasNoValue) then
+  for _, entry in ipairs(self:Entries(ctx, only)) do
+    if not entry.blocked and not (entry.data.containerInfo and entry.data.containerInfo.hasNoValue)
+      and not seller:Refuses(entry.data) then
       table.insert(list, entry)
     end
   end
   return list
 end
 
--- DestroyQueue lists what destroying takes, in order (BetterBags Next's vendor shows it on its destroy
--- card): the items destroy categories hold, as the bags were last read, that are not left alone and that
--- no merchant buys (hasNoValue). It never holds an item a sale would sell. Destroying skips an item no
--- longer where the read had it (DestroyNext).
+-- DestroyQueue lists what destroying takes, in order: the items destroy categories hold, as the bags
+-- were last read, that are not left alone and that no merchant buys (hasNoValue), of the items given
+-- (a section docked in BetterBags Next's vendor) or of every item. It never holds an item a sale would
+-- sell. Destroying skips an item no longer where the read had it (DestroyNext).
 ---@param ctx Context
+---@param only? ItemData[]
 ---@return AutomationEntry[]
-function automation:DestroyQueue(ctx)
+function automation:DestroyQueue(ctx, only)
   local list = {}
-  for _, entry in ipairs(self:Entries(ctx)) do
+  for _, entry in ipairs(self:Entries(ctx, only)) do
     if entry.action == self.DESTROY and not entry.blocked and entry.data.containerInfo
       and entry.data.containerInfo.hasNoValue then
+      table.insert(list, entry)
+    end
+  end
+  return list
+end
+
+-- SaleOffer lists what of the items given Auto Sell sells once the player confirms it in BetterBags Next's
+-- vendor dock (§4): the entries of SellList whose category confirms its sale (Confirm Auto Sell on), still
+-- there to sell (StillThere: one already selling is locked).
+---@param ctx Context
+---@param only ItemData[]
+---@return AutomationEntry[]
+function automation:SaleOffer(ctx, only)
+  local list = {}
+  for _, entry in ipairs(self:SellList(ctx, only)) do
+    if categories:ConfirmsSaleOf(entry.category) and self:StillThere(entry, true) then
+      table.insert(list, entry)
+    end
+  end
+  return list
+end
+
+-- DestroyLeft lists what of the items given is left to destroy: the entries of DestroyQueue still in
+-- their slot (StillThere).
+---@param ctx Context
+---@param only ItemData[]
+---@return AutomationEntry[]
+function automation:DestroyLeft(ctx, only)
+  local list = {}
+  for _, entry in ipairs(self:DestroyQueue(ctx, only)) do
+    if self:StillThere(entry, false) then
       table.insert(list, entry)
     end
   end
@@ -180,11 +203,15 @@ local function changed(ctx)
   events:SendMessage(ctx or context:New('Automation_Changed'), 'automation/Changed')
 end
 
--- MerchantBuys says whether the merchant open buys items: retail shows its Sell All Junk button
--- (C_MerchantFrame.IsSellAllJunkEnabled) only where it does, as Vendor reads it; a Classic merchant
--- buys when it sells anything. A repair-only merchant does not.
+-- MerchantBuys says whether the merchant open buys items: not one that refused to buy anything
+-- (Seller:BuysNothing); retail shows its Sell All Junk button (C_MerchantFrame.IsSellAllJunkEnabled)
+-- only where it does, as Vendor reads it; a Classic merchant buys when it sells anything. A repair-only
+-- merchant does not.
 ---@return boolean
 function automation:MerchantBuys()
+  if seller:BuysNothing() then
+    return false
+  end
   if C_MerchantFrame and C_MerchantFrame.IsSellAllJunkEnabled then
     return C_MerchantFrame.IsSellAllJunkEnabled() == true
   end
@@ -192,32 +219,21 @@ function automation:MerchantBuys()
 end
 
 -- StillThere returns how many items a slot holds when it still holds the entry's item (the same item
--- GUID), unlocked and not refundable, and, to sell, one merchants buy; else nil. The bags may have
--- changed since they were read.
+-- GUID, never an empty one), unlocked and not refundable, and, to sell, one merchants buy; else nil
+-- (Seller:StillThere, the check every sale makes before each item). The bags may have changed since
+-- they were read.
 ---@param entry AutomationEntry
 ---@param forSale boolean
 ---@return number?
 function automation:StillThere(entry, forSale)
-  local data = entry.data
-  local guid = data.itemInfo.itemGUID
-  if guid == nil or guid == "" then
-    return nil
-  end
-  local info = C_Container.GetContainerItemInfo(data.bagid, data.slotid)
-  if info == nil or info.isLocked or (forSale and info.hasNoValue) then
-    return nil
-  end
-  local location = locationOf(data)
-  if C_Item.GetItemGUID(location) ~= guid or refundable(location) then
-    return nil
-  end
-  return info.stackCount or 1
+  return seller:StillThere(entry.data, forSale)
 end
 
--- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy: a wave at
--- once from the frame after it opens (as a section dragged onto BetterBags Next's vendor sells), then the
--- next a moment later, until all are sold. Holding Shift as it opens sells nothing. It returns what it
--- did, for profiler traces.
+-- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy in the
+-- categories that do not confirm their sale (Confirm Auto Sell off), from the frame after it opens
+-- (StartSale). A category that confirms waits in BetterBags Next's vendor dock for the player (§4); the
+-- classic design has no dock and leaves it to the player. Holding Shift as it opens sells nothing. It
+-- returns what it did, for profiler traces.
 ---@param ctx Context
 ---@return string
 function automation:OnMerchantShow(ctx)
@@ -231,14 +247,19 @@ function automation:OnMerchantShow(ctx)
   if not self:MerchantBuys() then
     return "not buying"
   end
-  local list = self:SellList(ctx)
+  local list = {}
+  for _, entry in ipairs(self:SellList(ctx)) do
+    if not categories:ConfirmsSaleOf(entry.category) then
+      table.insert(list, entry)
+    end
+  end
   if #list == 0 then
     return "nothing"
   end
   ---@type AutomationSale
-  local sale = { list = list, index = 1, sold = 0, value = 0 }
+  local sale = { list = list }
   self.sale = sale
-  C_Timer.After(0, function() self:SellStep(sale) end)
+  C_Timer.After(0, function() self:StartSale(sale) end)
   return "selling"
 end
 
@@ -248,63 +269,64 @@ function automation:OnMerchantClosed(ctx)
   self.atMerchant = false
 end
 
--- SellStep sells the sale's next wave: up to WAVE items still there, at once, then the next wave
--- WAVE_DELAY later. It waits while the cursor holds an item, and sells nothing once the merchant closed.
--- It returns what it did.
+-- StartSale sells the sale through the seller (Seller:Sell): one item at a time, each still there when
+-- its turn comes, until all are sold, the merchant closes, or a new sale replaces it (the merchant
+-- opened again). It returns what it did.
 ---@param sale AutomationSale
 ---@return string
-function automation:SellStep(sale)
+function automation:StartSale(sale)
   if self.sale ~= sale then
     return "replaced"
   end
-  if not self.atMerchant then
-    return self:FinishSale(sale, "closed")
+  local list = {}
+  for _, entry in ipairs(sale.list) do
+    table.insert(list, entry.data)
   end
-  if CursorHasItem() then
-    C_Timer.After(self.CURSOR_WAIT, function() self:SellStep(sale) end)
-    return "waiting"
-  end
-  local wave = 0
-  while sale.index <= #sale.list do
-    local entry = sale.list[sale.index]
-    sale.index = sale.index + 1
-    local count = self:StillThere(entry, true)
-    if count then
-      C_Container.UseContainerItem(entry.data.bagid, entry.data.slotid)
-      sale.sold = sale.sold + 1
-      sale.value = sale.value + count * priceOf(entry.data)
-      wave = wave + 1
-      if wave >= self.WAVE and sale.index <= #sale.list then
-        C_Timer.After(self.WAVE_DELAY, function() self:SellStep(sale) end)
-        return "wave"
-      end
-    end
-  end
-  return self:FinishSale(sale, "done")
+  sale.job = seller:Sell(list, {
+    stillOpen = function() return self.atMerchant end,
+    onDone = function(_, reason) self:FinishSale(sale, reason) end,
+  })
+  return "selling"
 end
 
--- FinishSale ends a sale and says what it sold. It returns why it ended.
+-- FinishSale ends a sale, once (a sale replaced stops selling), and says what it sold: the items the
+-- merchant took, each with how many its slot held. It returns why it ended.
 ---@param sale AutomationSale
 ---@param reason string
 ---@return string
 function automation:FinishSale(sale, reason)
+  if sale.finished then
+    return reason
+  end
+  sale.finished = true
   if self.sale == sale then
     self.sale = nil
   end
-  if sale.sold > 0 then
-    local what = sale.sold == 1 and L:G("Sold %d item for %s.") or L:G("Sold %d items for %s.")
-    print("BetterBags: " .. format(what, sale.sold, coins(sale.value)))
+  local job = sale.job
+  if job == nil then
+    return reason
+  end
+  seller:Cancel(job)
+  local sold, value = 0, 0
+  for _, item in ipairs(job.sold) do
+    sold = sold + 1
+    value = value + (item.count or 1) * priceOf(item.data)
+  end
+  if sold > 0 then
+    local what = sold == 1 and L:G("Sold %d item for %s.") or L:G("Sold %d items for %s.")
+    print("BetterBags: " .. format(what, sold, coins(value)))
   end
   return reason
 end
 
--- DestroyNext destroys the first item of the destroy queue (DestroyQueue) still in its slot
--- (StillThere), the whole stack: one item each time, since Blizzard lets an addon destroy only on a key
--- press or a click (DeleteCursorItem has restrictions, GameCursorDocumentation.lua). Not in combat, nor
--- while the cursor holds an item. It says what it destroyed, and returns what it did.
+-- DestroyNext destroys the first item of the destroy queue (DestroyQueue, of the items given when given)
+-- still in its slot (StillThere), the whole stack: one item each time, since Blizzard lets an addon
+-- destroy only on a key press or a click (DeleteCursorItem has restrictions, GameCursorDocumentation.lua).
+-- Not in combat, nor while the cursor holds an item. It says what it destroyed, and returns what it did.
 ---@param ctx Context
+---@param only? ItemData[]
 ---@return string
-function automation:DestroyNext(ctx)
+function automation:DestroyNext(ctx, only)
   if InCombatLockdown() then
     print("BetterBags: " .. L:G("Cannot destroy items in combat."))
     return "combat"
@@ -314,7 +336,7 @@ function automation:DestroyNext(ctx)
     return "cursor"
   end
   local entry
-  for _, queued in ipairs(self:DestroyQueue(ctx)) do
+  for _, queued in ipairs(self:DestroyQueue(ctx, only)) do
     if self:StillThere(queued, false) then
       entry = queued
       break

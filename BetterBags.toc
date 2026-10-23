@@ -108,6 +108,7 @@ data\stacks.lua
 data\slots.lua
 data\loader.lua
 data\refresh.lua
+data\seller.lua
 data\automation.lua
 data\changelogdata.lua
 data\changelog.lua
@@ -164,6 +165,7 @@ frames\bag.lua
 
 next\style.lua
 next\tween.lua
+next\lift.lua
 next\controls\base.lua
 next\controls\scrollbar.lua
 next\controls\button.lua
@@ -180,6 +182,7 @@ next\sparkles.lua
 next\tabs.lua
 next\content.lua
 next\dockcard.lua
+next\dock.lua
 next\drag.lua
 next\chain.lua
 next\panel.lua
@@ -200,6 +203,7 @@ next\settings\page.lua
 next\settings\pages.lua
 next\settings\window.lua
 next\settings\themes.lua
+next\settings\reorder.lua
 next\settings\categories.lua
 next\settings\bagcategories.lua
 next\settings\currency.lua

@@ -130,7 +130,7 @@ describe("NextMerchant", function()
     override(stubs.categories, "GetCustomCategory", function(_, _, kind, data)
       assert.are.equal(BACKPACK, kind)
       local c = customByID[data.itemInfo.itemID]
-      if c then return c[1], c[2] end
+      if c then return c[1], c[2], c[3] end
       return nil, nil
     end)
     override(stubs.categories, "GetSortedSearchCategories", function() return searchCategories end)
@@ -253,10 +253,19 @@ describe("NextMerchant", function()
       assert.are.equal("Early", merchant:ReadItems(ctx())[1].category)
     end)
 
-    -- category-lifecycle.md §6: at equal priority an item placed in a category by hand stays there.
-    it("gives a tie between an item placed by hand and a rule to where it was placed, as the bags do", function()
+    -- category-lifecycle.md §7: an item added by hand to a category of yours stays there, whatever the
+    -- order; a plugin's item lists compete with rules by priority, the list winning a tie.
+    it("keeps an item added by hand to a category of yours there, even with a rule above it, as the bags do", function()
       _G._merchant.items = { vendorItem(13) }
-      customByID[13] = { "Blades", 3 }
+      customByID[13] = { "Blades", 5, { name = "Blades", save = true } }
+      searchCategories = { { name = "Shiny", priority = 1, enabled = { [BACKPACK] = true },
+        searchCategory = { query = "rarity >= 3" } } }
+      assert.are.equal("Blades", merchant:ReadItems(ctx())[1].category)
+    end)
+
+    it("gives a tie between a plugin's item list and a rule to the list, as the bags do", function()
+      _G._merchant.items = { vendorItem(13) }
+      customByID[13] = { "Blades", 3, { name = "Blades" } }
       searchCategories = { { name = "Shiny", priority = 3, enabled = { [BACKPACK] = true },
         searchCategory = { query = "rarity >= 3" } } }
       assert.are.equal("Blades", merchant:ReadItems(ctx())[1].category)
@@ -523,15 +532,6 @@ describe("NextMerchant", function()
       assert.is_false(merchant:HasSellAllJunk())
       assert.are.same({ { bag = 0, slot = 1 }, { bag = 1, slot = 1 } }, merchant:JunkSlots())
       assert.are.equal(2, merchant:NumJunk())
-    end)
-
-    it("sells junk slots one by one while the merchant is open", function()
-      local used = {}
-      override(C_Container, "UseContainerItem", function(bag, slot) table.insert(used, { bag, slot }) end)
-      merchant:SellSlots({ { bag = 0, slot = 1 }, { bag = 1, slot = 4 } })
-      assert.are.same({ { 0, 1 }, { 1, 4 } }, used)
-      merchant:SellSlots({ { bag = 0, slot = 1 } }, function() return false end)
-      assert.are.equal(2, #used, "not once the merchant has closed")
     end)
   end)
 end)

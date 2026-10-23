@@ -30,20 +30,23 @@ local vendorButton = addon:GetModule('NextVendorButton')
 ---@class NextDrag: AceModule
 local nextDrag = addon:GetModule('NextDrag')
 
+---@class NextDock: AceModule
+local nextDock = addon:GetModule('NextDock')
+
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
----@class NextTween: AceModule
-local tween = addon:GetModule('NextTween')
-
 ---@class Automation: AceModule
 local automation = addon:GetModule('Automation')
 
----@class NextDockCard: AceModule
-local dockCard = addon:GetModule('NextDockCard')
+---@class Seller: AceModule
+local seller = addon:GetModule('Seller')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
 
 -- NextVendor is BetterBags Next's vendor (next.md §10): a panel on the left, as the bank's, that
 -- stands in for Blizzard's merchant frame while BetterBags Next is on. It shows what the vendor
@@ -59,15 +62,9 @@ local dockCard = addon:GetModule('NextDockCard')
 local nextVendor = addon:NewModule('NextVendor')
 
 local TAB_BUY, TAB_BUYBACK, TAB_REPAIR = 1, 2, 3
--- How many times Classic's Sell Junk sells what junk is left, a moment apart (items lock while they
--- sell; GW2_UI sells the same way).
-local SELL_ROUNDS = 3
-local SELL_DELAY = 0.2
 -- How many items sold buyback keeps (Blizzard's BUYBACK_ITEMS_PER_PAGE); a section sale of more
 -- asks first.
 local BUYBACK_KEEPS = 12
--- How far the destroy card sits under the scroll area: clear of its glowing edge.
-nextVendor.DESTROY_GAP = 8
 -- Blizzard's merchant purchase prompts, closed when the vendor closes (MerchantFrame_OnHide).
 local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED", "CONFIRM_REFUND_TOKEN_ITEM",
   "CONFIRM_REFUND_MAX_HONOR", "CONFIRM_REFUND_MAX_ARENA_POINTS" }
@@ -83,24 +80,11 @@ local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED"
 ---@field atMerchant boolean A vendor is open (MERCHANT_SHOW to MERCHANT_CLOSED).
 ---@field closeRequested boolean It asked the vendor to close.
 ---@field buttons table<string, NextVendorButtonFrame> This draw's buttons, by key.
----@field destroyCard? NextDestroyCard Made the first time something waits to be destroyed.
+---@field offered table<string, boolean> The backpack categories docked in it this visit (OfferAutomation).
 local vendorProto = nextPanel:Extend({}, 'NextVendorPanel')
 -- A vendor's name can be any length: it is cut short to the room its header buttons leave at either
 -- size (FitTitle).
 vendorProto.fitsTitle = true
-
--- NextDestroyCard is what destroy categories hold that no merchant buys, waiting at the bottom of the
--- vendor (automation.md §4): the card a dragged section waits in to be sold (NextDockCard), glowing in
--- the theme's destroy color, their icons in its slot; one click destroys the next.
----@class (exact) NextDestroyCard
----@field box NextDockCardFrame
----@field frame Frame The card (box.frame).
----@field catcher Button Over the card and its icons, taking the clicks and the pointer.
----@field elapsed number How long it has shown, for its pulse.
----@field more FontString How many more than the icons shown.
----@field icons {texture: Texture, count: FontString}[] Made as needed.
----@field queue AutomationEntry[] What a click destroys, the first first.
----@field shown boolean
 
 -- mainline is whether the client runs Blizzard's retail merchant frame (retail and WoW: Forever).
 ---@return boolean
@@ -128,6 +112,7 @@ function nextVendor:Create(ctx)
   v.atMerchant = false
   v.closeRequested = false
   v.buttons = {}
+  v.offered = {}
   v.content:SetCards(true)
   nextDrag:RegisterSeller(v)
   self.panel = v
@@ -296,6 +281,7 @@ end
 function vendorProto:OnMerchantShow(ctx)
   self.atMerchant = true
   self.closeRequested = false
+  self.offered = {}
   if ResetSetMerchantFilter then
     ResetSetMerchantFilter()
   end
@@ -308,7 +294,7 @@ end
 function vendorProto:OnMerchantClosed(ctx)
   self.atMerchant = false
   self.closeRequested = false
-  self:RefreshDestroyCard(ctx)
+  nextDock:PanelHidden(self)
   ResetCursor()
   for _, which in ipairs(PROMPTS) do
     StaticPopup_Hide(which)
@@ -489,7 +475,6 @@ function vendorProto:Draw(ctx, _, callback)
   for _, b in pairs(previous) do
     b:Release()
   end
-  self:UpdateDestroyCard(ctx)
   render:RenderNow(self.root, { ctx = ctx })
   self.freeText:SetText(footer)
   self.emptyText:SetText(empty)
@@ -504,229 +489,209 @@ function vendorProto:Draw(ctx, _, callback)
   end
 end
 
--- Wipe lets go of every button and section.
+-- Wipe lets go of every button and section, and sends back what waits in its dock.
 ---@param ctx Context
 function vendorProto:Wipe(ctx)
+  local _ = ctx
+  nextDock:PanelHidden(self)
   self.content:Release()
   for _, b in pairs(self.buttons) do
     b:Release()
   end
   self.buttons = {}
-  self:UpdateDestroyCard(ctx, true)
 end
 
--- StyleParts draws the panel's parts, then the destroy card, from the current theme (the scroll area
--- already ends above the card at the theme's height: ContentBottom reads it).
-function vendorProto:StyleParts()
-  nextPanel.proto.StyleParts(self)
-  if self.destroyCard then
-    self:styleDestroyCard()
-  end
-end
-
--- ContentBottom leaves room under the scroll area for the destroy card while it shows.
----@return number
-function vendorProto:ContentBottom()
-  local bottom = nextPanel.proto.ContentBottom(self)
-  if self.destroyCard and self.destroyCard.shown then
-    bottom = bottom + self:DestroyCardHeight() + nextVendor.DESTROY_GAP
-  end
-  return bottom
-end
-
--- DestroyCardHeight is how tall the destroy card is: the dock's card holding a row of icons.
----@return number
-function vendorProto:DestroyCardHeight()
-  return dockCard:Height(style.ICON)
-end
-
--- DestroyCardSlotWidth is how wide the destroy card's row of icons is: what the vendor sells is as wide,
--- less the card's padding.
----@return number
-function vendorProto:DestroyCardSlotWidth()
-  return self:BodyWidth() - 2 * style.PAD - 2 * style.Theme.Dock.Pad
-end
-
--- DestroyCardFits is how many icons fit across the destroy card.
----@return number
-function vendorProto:DestroyCardFits()
-  return math.max(1, math.floor((self:DestroyCardSlotWidth() + style.GAP) / (style.ICON + style.GAP)))
-end
-
--- buildDestroyCard makes the destroy card, hidden: a dock card (NextDockCard) along the bottom of the
--- body, under a button, so one click anywhere on it destroys the next item and hovering it shows that
--- item, pulsing while it shows.
----@private
----@return NextDestroyCard
-function vendorProto:buildDestroyCard()
-  if self.destroyCard then
-    return self.destroyCard
-  end
-  local box = dockCard:Create(self.frame)
-  box.frame:Hide()
-  local catcher = CreateFrame("Button", nil, box.frame)
-  catcher:SetAllPoints(box.frame)
-  catcher:RegisterForClicks("LeftButtonUp")
-  -- A click is the hardware event DeleteCursorItem needs.
-  addon.SetScript(catcher, "OnClick", function(ctx) self:DestroyNext(ctx) end)
-  addon.SetScript(catcher, "OnEnter", function() self:ShowDestroyTooltip() end)
-  addon.SetScript(catcher, "OnLeave", function()
-    if GameTooltip:IsOwned(catcher) then
-      GameTooltip:Hide()
-    end
-  end)
-  local more = style:CreateText(box.slot, style.Theme.Dock.HintFont)
-  more:Hide()
-  local card = { box = box, frame = box.frame, catcher = catcher, more = more, icons = {}, queue = {},
-    shown = false, elapsed = 0 }
-  addon.SetScript(box.frame, "OnUpdate", function(_, _, elapsed)
-    card.elapsed = card.elapsed + elapsed
-    box:Pulse(card.elapsed)
-  end)
-  self.destroyCard = card
-  self:styleDestroyCard()
-  return card
-end
-
--- styleDestroyCard draws the destroy card from the theme: the dock's card (NextDockCard), its edge and
--- halo in Dock.DestroyColor, along the bottom of the body above the footer.
----@private
-function vendorProto:styleDestroyCard()
-  local card = self.destroyCard
-  card.box:Style(style.Theme.Dock.DestroyColor)
-  style:SetFont(card.more, style.Theme.Dock.HintFont)
-  for _, icon in ipairs(card.icons) do
-    style:SetFont(icon.count, style.Theme.Vendor.StackFont)
-  end
-  card.frame:SetFrameLevel(self.scroll.frame:GetFrameLevel() + 5)
-  card.catcher:SetFrameLevel(card.frame:GetFrameLevel() + 5)
-  card.frame:ClearAllPoints()
-  card.frame:SetPoint("BOTTOMLEFT", self.body, "BOTTOMLEFT", style.PAD, style.FOOTER)
-  card.box:Size(self:DestroyCardSlotWidth(), style.ICON)
-  if card.shown then
-    self:layoutDestroyCard()
-  end
-end
-
--- layoutDestroyCard puts the queue's items in a row in the card's slot, the next one first, each with
--- its count above one, as many as fit (the last place saying how many more when they do not), under
--- the card's title and warning and over its hint.
----@private
-function vendorProto:layoutDestroyCard()
-  local card = self.destroyCard
-  local queue, fit = card.queue, self:DestroyCardFits()
-  local n = #queue
-  card.box:Size(self:DestroyCardSlotWidth(), style.ICON)
-  card.box:SetText(format(n == 1 and L:G("Destroy %d item") or L:G("Destroy %d items"), n),
-    L:G("No merchant buys these."), L:G("Click to destroy next"))
-  local shown = math.min(n, fit)
-  if n > fit and fit > 1 then
-    shown = fit - 1
-  end
-  local step = style.ICON + style.GAP
-  local slot = card.box.slot
-  for i = 1, shown do
-    local icon = card.icons[i]
-    if icon == nil then
-      icon = { texture = slot:CreateTexture(nil, "ARTWORK"),
-        count = style:CreateText(slot, style.Theme.Vendor.StackFont) }
-      icon.count:SetJustifyH("RIGHT")
-      card.icons[i] = icon
-    end
-    local info = queue[i].data.itemInfo
-    icon.texture:ClearAllPoints()
-    icon.texture:SetPoint("TOPLEFT", slot, "TOPLEFT", (i - 1) * step, 0)
-    icon.texture:SetSize(style.ICON, style.ICON)
-    icon.texture:SetTexture(info.itemIcon)
-    icon.texture:Show()
-    local count = info.currentItemCount or 1
-    icon.count:ClearAllPoints()
-    icon.count:SetPoint("BOTTOMRIGHT", icon.texture, "BOTTOMRIGHT", -2, 2)
-    icon.count:SetText(count > 1 and tostring(count) or "")
-    icon.count:SetShown(count > 1)
-  end
-  for i = shown + 1, #card.icons do
-    card.icons[i].texture:Hide()
-    card.icons[i].count:Hide()
-  end
-  card.more:ClearAllPoints()
-  card.more:SetPoint("CENTER", slot, "TOPLEFT", shown * step + style.ICON / 2, -style.ICON / 2)
-  card.more:SetText("+" .. (n - shown))
-  card.more:SetShown(n > shown)
-end
-
--- UpdateDestroyCard shows what destroy categories hold that no merchant buys while a merchant is open
--- (Automation's destroy queue), fading the card in and starting its pulse when it appears, and hides it
--- when nothing waits, or with hide. It returns whether the card appeared or went (the scroll area
--- changed: its owner renders again).
+-- OfferAutomation docks in the vendor (NextDock), while both the vendor (shown only at a merchant) and
+-- the backpack show, each backpack category that waits for the player (automation.md §4): one whose sale
+-- Auto Sell confirms (Confirm Auto Sell on) and that holds items to sell, or one holding items to
+-- destroy. Its section flies over and waits there as a section dragged onto the vendor does (the same
+-- dock, CLAUDE.md "UI Consistency" 5), in the backpack's order, each once a visit (one sent back stays
+-- back). A category with no section in the backpack's view (on another tab, or only in Recent Items) is
+-- not offered, and no sale is where the merchant buys nothing (Automation:MerchantBuys). It returns how
+-- many it docked.
 ---@param ctx Context
----@param hide? boolean
----@return boolean
-function vendorProto:UpdateDestroyCard(ctx, hide)
-  local queue = (self.atMerchant and not hide) and automation:DestroyQueue(ctx) or {}
-  local show = #queue > 0
-  if not show and self.destroyCard == nil then
-    return false
+---@return number
+function vendorProto:OfferAutomation(ctx)
+  local backpack = addon.Bags and addon.Bags.Backpack
+  if not self:IsShown() or self.closing or backpack == nil or backpack.content == nil
+    or not backpack:IsShown() or backpack.closing then
+    return 0
   end
-  local card = self:buildDestroyCard()
-  card.queue = queue
-  local changed = card.shown ~= show
-  card.shown = show
-  if show then
-    self:layoutDestroyCard()
-    if changed then
-      card.elapsed = 0
-      card.box:Pulse(0)
-      card.frame:Show()
-      tween:Play(card, {
-        duration = style.Time.Land, from = 0, to = 1, ease = style:Ease("Land"),
-        onUpdate = function(t) card.frame:SetAlpha(t) end,
-      })
-    end
-  else
-    tween:Stop(card)
-    card.frame:Hide()
-  end
-  if changed then
-    self:styleContent()
-  end
-  if GameTooltip:IsOwned(card.catcher) then
-    if show then
-      self:ShowDestroyTooltip()
-    else
-      GameTooltip:Hide()
+  local canvas, docked = backpack.content, 0
+  local buys = automation:MerchantBuys()
+  for _, section in ipairs(canvas.order) do
+    if section.kind == "category" and not self.offered[section.name] and not canvas:IsAway(section)
+      and not canvas:IsLeaving(section) then
+      local items = nextDrag:SectionItems(section)
+      local phase
+      if buys and #automation:SaleOffer(ctx, items) > 0 then
+        phase = "confirm"
+      elseif #automation:DestroyLeft(ctx, items) > 0 then
+        phase = "destroy"
+      end
+      if phase then
+        self.offered[section.name] = true
+        nextDock:Add(self, { section = section, source = backpack,
+          offer = self:SectionOffer(section, { automation = true, phase = phase }) })
+        docked = docked + 1
+      end
     end
   end
-  return changed
+  return docked
 end
 
--- RefreshDestroyCard updates the destroy card, and lays the panel out again when the card appeared or
--- went while the panel shows.
----@param ctx Context
-function vendorProto:RefreshDestroyCard(ctx)
-  if self:UpdateDestroyCard(ctx) and self.frame:IsShown() then
-    render:RenderNow(self.root, { ctx = ctx })
+-- SaleOffer is what a backpack section dragged onto the vendor waits in its dock for (NextDrag docks it,
+-- NextSeller): its sale (SectionOffer).
+---@param section NextSection
+---@return NextDockOffer
+function vendorProto:SaleOffer(section)
+  return self:SectionOffer(section, {})
+end
+
+-- SectionOffer is what a backpack section waiting in the vendor's dock is for (NextDockOffer), read from
+-- its section's items as they are each time. A sale: of a dragged section, what of it the vendor buys
+-- (SaleOf), sold as it docks when buyback keeps all of it, else once double-clicked; of a category Auto
+-- Sell offers (automation), what it sells (Automation:SaleOffer), once double-clicked. The seller sells
+-- it one item at a time while the card says how far it is; once it ends the section flies into the
+-- vendor, or goes back to the backpack with what the merchant did not take (refused items stay in the
+-- bags until a merchant buys them; asked). Then, for a category, what is left to destroy, glowing in the
+-- theme's destroy color, one item per click (Automation:DestroyNext; a double click is two clicks,
+-- OnDoubleClick blocking the second OnClick, warcraft.wiki.gg). A right click stops what is left of a
+-- sale (cancel).
+---@param section NextSection
+---@param opts {automation?: boolean, phase?: "confirm"|"destroy"}
+---@return NextDockOffer
+function vendorProto:SectionOffer(section, opts)
+  local function items()
+    return nextDrag:SectionItems(section)
   end
-end
-
--- DestroyNext destroys the next item the card shows (Automation:DestroyNext), then shows what is left.
----@param ctx Context
-function vendorProto:DestroyNext(ctx)
-  automation:DestroyNext(ctx)
-  self:RefreshDestroyCard(ctx)
-end
-
--- ShowDestroyTooltip shows the item a click destroys, and that it does.
-function vendorProto:ShowDestroyTooltip()
-  local card = self.destroyCard
-  local entry = card and card.queue[1]
-  if entry == nil then
-    return
+  local function ctxOf()
+    return context:New('NextVendor_Offer')
   end
-  GameTooltip:SetOwner(card.catcher, "ANCHOR_TOP")
-  GameTooltip:SetBagItem(entry.data.bagid, entry.data.slotid)
-  GameTooltip:AddLine(L:G("Click to destroy it."), style:RGBA(style.Theme.Dock.DestroyColor))
-  GameTooltip:Show()
+  local function saleOf(ctx)
+    if not opts.automation then
+      return self:SaleOf(items())
+    end
+    local sale = {}
+    for _, entry in ipairs(automation:SaleOffer(ctx, items())) do
+      table.insert(sale, entry.data)
+    end
+    return sale
+  end
+  local phase = opts.phase
+  if phase == nil then
+    phase = #saleOf(ctxOf()) > BUYBACK_KEEPS and "confirm" or "selling"
+  end
+  local offer, job, total, entry = {}, nil, 0, nil
+  local function destroyLeft(ctx)
+    return opts.automation and #automation:DestroyLeft(ctx, items()) > 0
+  end
+  -- after says what follows a sale: what is left to destroy, else the section goes.
+  local function after(sold)
+    if destroyLeft(ctxOf()) then
+      phase = "destroy"
+      return "stay"
+    end
+    if sold == nil or sold.unsold > 0 then
+      return "back"
+    end
+    return "moved"
+  end
+  local function start(ctx)
+    local sale = saleOf(ctx)
+    if #sale == 0 or self.closing or not self.atMerchant then
+      return false
+    end
+    phase, total = "selling", #sale
+    job = seller:Sell(sale, {
+      stillOpen = function() return self.atMerchant end,
+      onProgress = function()
+        if entry then
+          nextDock:Refresh(entry)
+        end
+      end,
+      onDone = function(done)
+        if entry then
+          nextDock:Answer(entry, after(done))
+        end
+      end,
+    })
+    return true
+  end
+  local function destroyOne(ctx)
+    automation:DestroyNext(ctx, items())
+    if #automation:DestroyLeft(ctx, items()) > 0 then
+      return "stay"
+    end
+    return "moved"
+  end
+  offer.docked = function(e)
+    entry = e
+    if phase == "selling" and not start(ctxOf()) then
+      nextDock:Answer(e, "back")
+    end
+  end
+  offer.text = function()
+    local ctx = ctxOf()
+    if phase == "selling" then
+      local left = job and seller:Left(job) or 0
+      return format(L:G("Selling %d of %d..."), total - left, total), L:G("One item at a time, as the merchant takes them."),
+        L:G("Right-click to stop")
+    end
+    if phase == "confirm" then
+      local n = #saleOf(ctx)
+      return format(n == 1 and L:G("Sell %d item?") or L:G("Sell %d items?"), n),
+        n > BUYBACK_KEEPS and format(L:G("Only the last %d items sold can be bought back."), BUYBACK_KEEPS)
+          or L:G("You can buy them back."),
+        L:G("Double-click to sell · Right-click to cancel")
+    end
+    local n = #automation:DestroyLeft(ctx, items())
+    return format(n == 1 and L:G("Destroy %d item") or L:G("Destroy %d items"), n), L:G("No merchant buys these."),
+      L:G("Click to destroy next · Right-click to cancel")
+  end
+  offer.color = function()
+    return phase == "destroy" and style.Theme.Dock.DestroyColor or nil
+  end
+  offer.confirm = function(ctx)
+    if phase == "destroy" then
+      return destroyOne(ctx)
+    end
+    if phase ~= "confirm" then
+      return nil
+    end
+    if start(ctx) then
+      return "stay"
+    end
+    return after(nil)
+  end
+  offer.click = function(ctx)
+    if phase == "destroy" then
+      return destroyOne(ctx)
+    end
+    return nil
+  end
+  -- A sale already ended is no longer selling: cancelling it does nothing (Seller:Cancel).
+  offer.cancel = function()
+    local running = job
+    job = nil
+    if running then
+      seller:Cancel(running)
+    end
+  end
+  offer.tooltip = function(owner)
+    if phase ~= "destroy" then
+      return
+    end
+    local next = automation:DestroyLeft(ctxOf(), items())[1]
+    if next == nil then
+      return
+    end
+    GameTooltip:SetOwner(owner, "ANCHOR_TOP")
+    GameTooltip:SetBagItem(next.data.bagid, next.data.slotid)
+    GameTooltip:AddLine(L:G("Click to destroy it."), style:RGBA(style.Theme.Dock.DestroyColor))
+    GameTooltip:Show()
+  end
+  return offer
 end
 
 -- SellCursorItem sells the item on the cursor (NextMerchant:SellCursorItem).
@@ -774,8 +739,9 @@ end
 
 -- SaleOf returns what of a backpack section dropped on the vendor sells: every item and every pile
 -- its virtual stack hides (sectionFrame:WithStacks, what Move Categories sells), in the backpack's
--- bags, once each, leaving out what the vendor does not buy (hasNoValue) and refundable purchases,
--- which Blizzard asks about before refunding them (ContainerFrame_GetExtendedPriceString).
+-- bags, once each, leaving out what the vendor does not buy (hasNoValue), refundable purchases,
+-- which Blizzard asks about before refunding them (ContainerFrame_GetExtendedPriceString), and what
+-- this merchant refused (Seller:Refuses: it stays in the bags until a merchant buys it).
 ---@param list ItemData[]
 ---@return ItemData[]
 function vendorProto:SaleOf(list)
@@ -786,7 +752,8 @@ function vendorProto:SaleOf(list)
     if not seen[key] and const.BACKPACK_BAGS[bag] ~= nil then
       seen[key] = true
       local info = C_Container.GetContainerItemInfo(bag, slot)
-      if info and not info.hasNoValue and not C_Item.CanBeRefunded(ItemLocation:CreateFromBagAndSlot(bag, slot)) then
+      if info and not info.hasNoValue and not C_Item.CanBeRefunded(ItemLocation:CreateFromBagAndSlot(bag, slot))
+        and not seller:Refuses(data) then
         table.insert(sale, data)
       end
     end
@@ -794,33 +761,9 @@ function vendorProto:SaleOf(list)
   return sale
 end
 
--- Sell sells a section's sale while the vendor is open: at once when buyback can keep all of it, or
--- once confirmed. Unconfirmed past that it sells nothing and returns "confirm" with what to confirm
--- with: NextDrag docks the section in the vendor with that text until a double click confirms it.
----@param ctx Context
----@param sale ItemData[]
----@param confirmed? boolean
----@return string result "sold" or "confirm"
----@return NextConfirmation? confirmation
-function vendorProto:Sell(ctx, sale, confirmed)
-  local _ = ctx
-  local slots = {}
-  for _, data in ipairs(sale) do
-    table.insert(slots, { bag = data.bagid, slot = data.slotid })
-  end
-  if not confirmed and #slots > BUYBACK_KEEPS then
-    return "confirm", {
-      title = format(L:G("Sell %d items?"), #slots),
-      warning = format(L:G("Only the last %d items sold can be bought back."), BUYBACK_KEEPS),
-      hint = L:G("Double-click to sell · Right-click to cancel"),
-    }
-  end
-  merchant:SellSlots(slots, function() return self.atMerchant end)
-  return "sold"
-end
-
 -- SellJunk sells the junk in the bags: through Blizzard's own Sell All Junk where the client has
--- it (its confirmation included), else after asking, a few rounds a moment apart.
+-- it (its confirmation included), else after asking, through the seller, one item at a time while the
+-- vendor is open.
 function vendorProto:SellJunk()
   if merchant:HasSellAllJunk() then
     merchant:SellAllJunk()
@@ -832,25 +775,9 @@ function vendorProto:SellJunk()
   end
   question:YesNo(L:G("Sell Junk"),
     format(L:G("Sell %d junk items? Only the last 12 items sold can be bought back."), n),
-    function() self:sellJunkRound(SELL_ROUNDS) end, function() end)
-end
-
----@private
----@param rounds number
-function vendorProto:sellJunkRound(rounds)
-  if not self.atMerchant then
-    return
-  end
-  local slots = merchant:JunkSlots()
-  if #slots == 0 then
-    return
-  end
-  merchant:SellSlots(slots, function() return self.atMerchant end)
-  if rounds > 1 then
-    C_Timer.After(SELL_DELAY, function()
-      self:sellJunkRound(rounds - 1)
-    end)
-  end
+    function()
+      seller:Sell(merchant:JunkSlots(), { stillOpen = function() return self.atMerchant end })
+    end, function() end)
 end
 
 -- RepairAll repairs everything, from the guild bank with guild, as Blizzard's repair buttons do.
@@ -931,9 +858,9 @@ function vendorProto:WatchKind()
   events:BucketEvent("GET_ITEM_INFO_RECEIVED", function(ctx) self:Refresh(ctx) end, function()
     return self.frame:IsShown()
   end)
-  -- What waits to be destroyed (the destroy card): the bags read, a sale or a destroy, a category's
-  -- automation changed.
-  for _, message in ipairs({ "items/RefreshBackpack/Done", "automation/Changed", "categories/Changed" }) do
-    events:RegisterMessage(message, function(ctx) self:RefreshDestroyCard(ctx) end)
+  -- What waits for the player (OfferAutomation): once the backpack or the vendor has slid in, when the
+  -- backpack draws again, and when a category's automation changes.
+  for _, message in ipairs({ "next/PanelShown", "bags/Draw/Backpack/Done", "automation/Changed", "categories/Changed" }) do
+    events:RegisterMessage(message, function(ctx) self:OfferAutomation(ctx) end)
   end
 end

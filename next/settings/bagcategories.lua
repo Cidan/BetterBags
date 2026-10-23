@@ -54,6 +54,9 @@ local editor = addon:GetModule('NextSettingsCategories')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextListReorder: AceModule
+local reorder = addon:GetModule('NextListReorder')
+
 -- NextSettingsBagCategories is a bag's categories, on its Categories tab (next-settings.md §5,
 -- category-lifecycle.md §6): categories are defined once on the Categories page, and a bag arranges
 -- them. A wide row listing the pinned categories in their order (customSectionSort), then every other
@@ -89,8 +92,11 @@ local DONE = {
 ---@field owner Frame
 ---@field bag SettingBag
 ---@field entries table[] { header = true, title } or { name }
----@field rows NextBagCategoryRow[]
----@field dragging? string
+---@field rows NextBagCategoryRow[] The rows of the entries, in the same order.
+---@field byKey table<string|table, NextBagCategoryRow> Each entry's own row (a category's by its name, a
+--- heading's by its own key): moved in the order, it slides.
+---@field free NextBagCategoryRow[] Rows no entry has, hidden, to reuse.
+---@field drag NextListReorderList Arranges the rows; dragging one pins it where it lands, or unpins it.
 local listProto = {}
 addon:GetModule('Perf'):RegisterPrototype(listProto, 'NextBagCategoryList')
 
@@ -110,6 +116,20 @@ local function rederive(ctx)
   events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
+-- A heading's row is kept under a table of its own, a key no category's name can be.
+local headingKeys = setmetatable({}, { __index = function(keys, title)
+  local key = {}
+  keys[title] = key
+  return key
+end })
+
+-- keyOf returns the key of the row an entry has: a category's name, or its heading's own key.
+---@param entry table
+---@return string|table
+local function keyOf(entry)
+  return entry.name or headingKeys[entry.title]
+end
+
 ---@param parent Frame
 ---@param owner Frame The window its dialogs show over.
 ---@param bag SettingBag
@@ -117,8 +137,8 @@ end
 function bagCategories:Create(parent, owner, bag)
   local frame = CreateFrame("Frame", nil, parent)
   ---@type NextBagCategoryList
-  local block = setmetatable({ frame = frame, wide = true, owner = owner, bag = bag, entries = {}, rows = {} },
-    { __index = listProto })
+  local block = setmetatable({ frame = frame, wide = true, owner = owner, bag = bag, entries = {}, rows = {},
+    byKey = {}, free = {} }, { __index = listProto })
   block.fill = frame:CreateTexture(nil, "BACKGROUND")
   block.filter = nextInput:Create(frame, {
     help = L:G("Find a category"),
@@ -138,8 +158,17 @@ function bagCategories:Create(parent, owner, bag)
   block.bar = nextScrollBar:Create(box)
   block.bar:Bind(box)
   block.listBox, block.listContent = box, content
-  block.marker = content:CreateTexture(nil, "OVERLAY")
-  block.marker:Hide()
+  -- A row lands after the Pinned heading, the list's first entry.
+  block.drag = reorder:Create({
+    box = box, content = content, first = 2,
+    entries = function() return block.entries end,
+    rowOf = function(entry) return block.byKey[keyOf(entry)].frame end,
+    heightOf = function(entry)
+      local K = style.Theme.Settings.BagCategories
+      return entry.header and K.GroupHeight or K.RowHeight
+    end,
+    onDrop = function(name, after) block:Drop(name, after) end,
+  })
   table.insert(self.all, block)
   sonataNext:RegisterWidget(self)
   for _, message in ipairs({ DONE[bag.kind], 'categories/Changed' }) do
@@ -157,8 +186,6 @@ end
 function listProto:Style()
   local K = style.Theme.Settings.BagCategories
   controls:Paint(self.fill, K.Fill)
-  controls:Paint(self.marker, { Color = K.DropMarker.Color }, K.DropMarker.Alpha)
-  self.marker:SetHeight(K.DropMarker.Size or 2)
   for _, row in ipairs(self.rows) do
     self:paintRow(row)
   end
@@ -167,16 +194,11 @@ function listProto:Style()
   end
 end
 
--- RowFor returns the row of a category.
+-- RowFor returns the row of a category the list shows.
 ---@param name string
 ---@return NextBagCategoryRow?
 function listProto:RowFor(name)
-  for i, entry in ipairs(self.entries) do
-    if entry.name == name then
-      return self.rows[i]
-    end
-  end
-  return nil
+  return self.byKey[name]
 end
 
 -- sections returns the bag's sections from its committed items (none in Show Bags, whose sections are
@@ -260,20 +282,30 @@ function listProto:kindOf(name)
   return "leftover"
 end
 
--- row returns the i-th row, made the first time it is needed.
+-- rowFor returns an entry's own row, taking one no entry has, or making one, the first time.
 ---@private
----@param i number
+---@param entry table
 ---@return NextBagCategoryRow
-function listProto:row(i)
-  local row = self.rows[i]
-  if row ~= nil then
-    return row
+function listProto:rowFor(entry)
+  local key = keyOf(entry)
+  local row = self.byKey[key]
+  if row == nil then
+    row = table.remove(self.free) or self:newRow()
+    self.byKey[key] = row
   end
+  return row
+end
+
+-- newRow makes a row.
+---@private
+---@return NextBagCategoryRow
+function listProto:newRow()
   local K = style.Theme.Settings.BagCategories
   local frame = CreateFrame("Button", nil, self.listContent)
   frame:RegisterForClicks("LeftButtonUp")
   frame:RegisterForDrag("LeftButton")
-  row = {
+  ---@type NextBagCategoryRow
+  local row = {
     frame = frame,
     hover = frame:CreateTexture(nil, "BACKGROUND"),
     label = style:CreateText(frame, K.Font),
@@ -318,27 +350,26 @@ function listProto:row(i)
   end)
   addon.SetScript(frame, "OnDragStart", function()
     if row.entry and row.entry.name then
-      self:StartDrag(row.entry.name)
+      self.drag:Start(row.entry.name)
     end
   end)
-  self.rows[i] = row
   return row
 end
 
--- layoutList places the rows, headings GroupHeight tall and categories RowHeight tall, each with what
--- belongs on its right.
+-- layoutList shows each entry in its own row, headings GroupHeight tall and categories RowHeight tall,
+-- each with what belongs on its right, and puts the rows of entries no longer listed away; the list's
+-- arrangement places them (NextListReorder: a row that moved slides).
 ---@private
 function listProto:layoutList()
   local K = style.Theme.Settings.BagCategories
-  local y = 0
+  local listed = {}
+  self.rows = {}
   for i, entry in ipairs(self.entries) do
-    local row = self:row(i)
+    local row = self:rowFor(entry)
+    listed[keyOf(entry)] = true
+    self.rows[i] = row
     row.entry = entry
-    local height = entry.header and K.GroupHeight or K.RowHeight
-    row.frame:ClearAllPoints()
-    row.frame:SetPoint("TOPLEFT", self.listContent, "TOPLEFT", 0, -y)
-    row.frame:SetPoint("TOPRIGHT", self.listContent, "TOPRIGHT", 0, -y)
-    row.frame:SetHeight(height)
+    row.frame:SetHeight(entry.header and K.GroupHeight or K.RowHeight)
     row.frame:EnableMouse(entry.header ~= true)
     row.toggle.frame:Hide()
     row.remove.frame:Hide()
@@ -362,14 +393,16 @@ function listProto:layoutList()
     end
     row.frame:Show()
     self:paintRow(row)
-    y = y + height
   end
-  for i = #self.entries + 1, #self.rows do
-    self.rows[i].entry = nil
-    self.rows[i].frame:Hide()
+  for key, row in pairs(self.byKey) do
+    if not listed[key] then
+      self.byKey[key] = nil
+      row.entry = nil
+      row.frame:Hide()
+      table.insert(self.free, row)
+    end
   end
-  self.listContent:SetHeight(math.max(1, y))
-  self.listBox:FullUpdate(true)
+  self.drag:Arrange()
 end
 
 -- paintRow draws a row: a heading, or a category, lit under the pointer.
@@ -500,62 +533,6 @@ function listProto:Drop(name, after)
   self:Refresh()
 end
 
--- gapAt returns the entry a row dropped where the pointer is would land after, and where its marker
--- goes.
----@private
----@return number?, number?
-function listProto:gapAt()
-  local top = self.listBox:GetTop()
-  if top == nil then
-    return nil
-  end
-  local K = style.Theme.Settings.BagCategories
-  local _, cursorY = GetCursorPosition()
-  local down = top - cursorY / self.listBox:GetEffectiveScale() + self.listBox:GetDerivedScrollOffset()
-  local y = 0
-  for i, entry in ipairs(self.entries) do
-    local height = entry.header and K.GroupHeight or K.RowHeight
-    if down < y + height then
-      if down - y < height / 2 then
-        return i - 1, y
-      end
-      return i, y + height
-    end
-    y = y + height
-  end
-  return #self.entries, y
-end
-
--- StartDrag drags a category until the left button is let go, a marker where it would land.
----@param name string
-function listProto:StartDrag(name)
-  self.dragging = name
-  addon.SetScript(self.listBox, "OnUpdate", function() self:FollowDrag() end)
-end
-
----@private
-function listProto:FollowDrag()
-  local after, y = self:gapAt()
-  if not IsMouseButtonDown("LeftButton") then
-    self.listBox:SetScript("OnUpdate", nil)
-    self.marker:Hide()
-    local name = self.dragging
-    self.dragging = nil
-    if name and after then
-      self:Drop(name, after)
-    end
-    return
-  end
-  if after == nil then
-    self.marker:Hide()
-    return
-  end
-  self.marker:ClearAllPoints()
-  self.marker:SetPoint("TOPLEFT", self.listContent, "TOPLEFT", 0, -y)
-  self.marker:SetPoint("TOPRIGHT", self.listContent, "TOPRIGHT", 0, -y)
-  self.marker:Show()
-end
-
 -- AskRemove removes a leftover after asking: categories:DeleteCategory scrubs what it left in every bag
 -- (its pins and tabs, category-lifecycle.md §2).
 ---@param ctx Context
@@ -603,5 +580,6 @@ function listProto:Place(x, y, width, height)
   self.listBox:ClearAllPoints()
   self.listBox:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -(pad + I.Height + pad))
   self.listBox:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -pad, pad)
+  self.drag:Arrange(width - 2 * pad)
   frame:Show()
 end

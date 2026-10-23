@@ -39,6 +39,10 @@ elements.GetSectionHeaderColor = function() return 0.2, 0.4, 0.6, 1 end
 local items = StubBetterBagsModule("Items")
 local movementFlow = StubBetterBagsModule("MovementFlow")
 movementFlow.GetMovementFlow = function() return 0 end
+-- Every sale goes through the seller, one item at a time (data/seller.lua).
+local sellerModule = StubBetterBagsModule("Seller")
+local sold = {}
+sellerModule.Sell = function(_, list) table.insert(sold, list) end
 
 local groups = StubBetterBagsModule("Groups")
 groups.GetGroupForCategory = function() return nil end
@@ -360,8 +364,12 @@ describe("Section Frame", function()
         database.GetCategorySell = function() return true end
         local list = {}
         for i = 1, 12 do list[i] = item(i) end
+        for i = #sold, 1, -1 do sold[i] = nil end
         sectionFrame:MoveItems(list)
-        assert.are.equal(10, #used)
+        assert.are.equal(0, #used, "never all at once: the seller sells them one at a time")
+        assert.are.equal(1, #sold)
+        assert.are.equal(10, #sold[1])
+        assert.are.equal(list[1], sold[1][1])
       end)
     end)
   end)

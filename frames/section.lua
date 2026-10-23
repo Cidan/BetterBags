@@ -40,6 +40,9 @@ local items = addon:GetModule('Items')
 ---@class MovementFlow: AceModule
 local movementFlow = addon:GetModule('MovementFlow')
 
+---@class Seller: AceModule
+local seller = addon:GetModule('Seller')
+
 ---@class Pool: AceModule
 local pool = addon:GetModule('Pool')
 
@@ -504,7 +507,8 @@ end
 -- MoveItems moves items, with every other pile of their virtual stacks, to the window the
 -- movement flow names (Move Categories): the bank (the bank type it shows), the mailbox, the trade
 -- window, or a vendor (with the category-sell setting, ten items at most, so they can be bought
--- back). With bankType the items go into that bank, while the bank is open.
+-- back, sold one at a time by the Seller like every sale). With bankType the items go into that bank,
+-- while the bank is open.
 ---@param list ItemData[]
 ---@param bankType? number
 function sectionFrame:MoveItems(list, bankType)
@@ -528,7 +532,8 @@ function sectionFrame:MoveItems(list, bankType)
         table.insert(newlist, all[i])
       end
     end
-    all = newlist
+    seller:Sell(newlist)
+    return
   end
 
   -- Only DF since warbank has Enum.BankType

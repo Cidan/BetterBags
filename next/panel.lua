@@ -60,6 +60,9 @@ local nextContent = addon:GetModule('NextContent')
 ---@class NextDrag: AceModule
 local nextDrag = addon:GetModule('NextDrag')
 
+---@class NextDock: AceModule
+local nextDock = addon:GetModule('NextDock')
+
 ---@class NextChain: AceModule
 local chain = addon:GetModule('NextChain')
 
@@ -414,7 +417,9 @@ function panelProto:SetDocked(docked)
   self.outerFeather:SetShown(not docked)
 end
 
--- finishShowing calls what waited for the panel to finish showing (Show's onShown), once.
+-- finishShowing calls what waited for the panel to finish showing (Show's onShown), once, and says it
+-- has (next/PanelShown, with the panel: the vendor docks what waits at a merchant once the backpack is on
+-- screen, automation.md §4).
 ---@private
 function panelProto:finishShowing()
   local callbacks = self.onShown or {}
@@ -422,6 +427,7 @@ function panelProto:finishShowing()
   for _, callback in ipairs(callbacks) do
     callback()
   end
+  events:SendMessage(context:New('NextPanel_Shown'), 'next/PanelShown', self)
 end
 
 -- FlyTo flies the panel to an offset (chaining, next.md §12): detached from its edge as it leaves,
@@ -3075,11 +3081,13 @@ function panelProto:SetTitle(text)
   self:LayoutCloud()
 end
 
--- OnHidden runs on every way the panel hides (the slide's end, Escape hiding it at once): the
--- slide, the sparkles and the spark stop, and OnClosed runs.
+-- OnHidden runs on every way the panel hides (the slide's end, Escape hiding it at once): a drag from it
+-- ends, what waits in its dock or came from it goes back (NextDock), the slide, the sparkles and the
+-- spark stop, and OnClosed runs.
 ---@param ctx Context
 function panelProto:OnHidden(ctx)
   nextDrag:PanelHidden(self)
+  nextDock:PanelHidden(self)
   self:StopMove()
   self:StopSizing()
   self:endReset()

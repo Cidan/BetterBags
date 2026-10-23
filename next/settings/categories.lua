@@ -60,12 +60,19 @@ local settings = addon:GetModule('NextSettings')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextListReorder: AceModule
+local reorder = addon:GetModule('NextListReorder')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 -- NextSettingsCategories is the Categories page (next-settings.md §5, category-lifecycle.md §6), where
 -- every category is defined once: one kind of category, a rule, items added by hand, or both. The page
--- shows its own list in the window's sidebar (pages.lua sidebar): your categories, then the plugins',
--- filtered by name, New Category under them. The chosen category's name and what is in it are the
+-- shows its own list in the window's sidebar (pages.lua sidebar): every category, yours and the plugins',
+-- in their order, which is their priority (category-lifecycle.md §7: dragging a row moves it), filtered
+-- by name, New Category under them. The chosen category's name and what is in it are the
 -- page's heading, Rename and Delete its buttons in the header, and four tabs show it:
--- - Settings: the bags it is used in, its priority, group by and color, and what of your bags shows in
+-- - Settings: the bags it is used in, its group by and color, and what of your bags shows in
 --   it now, as items.
 -- - Search Rule: its search, Apply Search Rule, and the Search Results (counted beside their name as it
 --   is typed) as items, those showing in another category saying where.
@@ -73,7 +80,7 @@ local sonataNext = addon:GetModule('SonataNext')
 --   Destroy What Can't Be Sold, which needs Auto Sell on, as settings rows (AutomationOptions).
 -- - Added Items: the items added to it by hand, as a grid that holds thousands (NextItemGrid), filtered
 --   by name; an item dropped anywhere on it is added, a right click removes one, Remove All asks first.
--- A plugin's category can be used in bags, colored, prioritized and automated; its rule (when it has one)
+-- A plugin's category can be used in bags, colored, ordered and automated; its rule (when it has one)
 -- and its items show read-only.
 ---@class NextSettingsCategories: AceModule
 ---@field selected? string The category chosen.
@@ -96,8 +103,11 @@ local NAME_OF_GROUP_BY = {
   [GROUP_BY.SUBTYPE] = L:G("Subtype"), [GROUP_BY.EXPANSION] = L:G("Expansion"),
 }
 
--- What a category does on its own (automation.md), in its list line.
+-- What a category does on its own (automation.md), in its heading's line.
 local DOES = { sell = L:G("Sells at merchants"), destroy = L:G("Sells, destroys the rest") }
+
+-- The messages that say a bag's items were read (data/items.lua Phase11): the list counts again.
+local BAG_READ = { 'items/RefreshBackpack/Done', 'items/RefreshBank/Done', 'items/RefreshGuildBank/Done' }
 
 -- The messages a bag kind's committed sweep sends (data/items.lua Phase11): what the bags hold changed.
 local READ = { 'items/RefreshBackpack/Done', 'items/RefreshBank/Done', 'items/RefreshGuildBank/Done' }
@@ -151,7 +161,8 @@ local function addedCount(filter)
   return n
 end
 
--- describe says what is in a category and its priority: its list row's line, and its heading's.
+-- describe says whose a category is (a plugin's), what is in it and what it does on its own: its
+-- heading's line.
 ---@param filter CustomCategoryFilter
 ---@return string
 local function describe(filter)
@@ -167,7 +178,10 @@ local function describe(filter)
   else
     what = L:G("Nothing in it yet")
   end
-  local line = what .. " · " .. format(L:G("Priority %d"), filter.priority or 10)
+  local line = what
+  if isPlugins(filter) then
+    line = L:G("Made by a plugin") .. " · " .. line
+  end
   if DOES[filter.automation] then
     line = line .. " · " .. DOES[filter.automation]
   end
@@ -182,20 +196,18 @@ local function isShownIn(name, category)
   return category == name or category:sub(1, #name + 3) == name .. " - "
 end
 
--- namesOf returns the categories defined, your own then the plugins', each by name (not a group by's
--- sub-categories), those whose name has needle.
+-- ordered returns every category's name in their order (categories:GetOrder: not a group by's
+-- sections), those whose name has needle.
 ---@param needle? string
----@return string[] yours, string[] plugins
-local function namesOf(needle)
-  local yours, plugins = {}, {}
-  for name, filter in pairs(categories:GetAllCategories()) do
-    if not filter.isGroupBySubcategory and (needle == nil or needle == "" or name:lower():find(needle, 1, true)) then
-      table.insert(isPlugins(filter) and plugins or yours, name)
+---@return string[]
+local function ordered(needle)
+  local names = {}
+  for _, name in ipairs(categories:GetOrder()) do
+    if needle == nil or needle == "" or name:lower():find(needle, 1, true) then
+      table.insert(names, name)
     end
   end
-  table.sort(yours)
-  table.sort(plugins)
-  return yours, plugins
+  return names
 end
 
 -- Chosen returns the category chosen.
@@ -209,8 +221,7 @@ function editor:EnsureChosen()
   if self:Chosen() ~= nil then
     return
   end
-  local yours, plugins = namesOf()
-  self.selected = yours[1] or plugins[1]
+  self.selected = ordered()[1]
 end
 
 -- Choose chooses a category and shows the page again for it.
@@ -241,11 +252,7 @@ function editor:Heading()
   if filter == nil then
     return L:G("Categories"), L:G("Make a category to sort your items your way.")
   end
-  local line = describe(filter)
-  if isPlugins(filter) then
-    line = L:G("Made by a plugin") .. " · " .. line
-  end
-  return self.selected, line
+  return self.selected, describe(filter)
 end
 
 -- RuleTabShown says whether the Search Rule tab shows: for your categories, and a plugin's with a rule.
@@ -269,9 +276,10 @@ function editor:AutomationTabShown()
 end
 
 -- AutomationOptions returns the Automation tab's settings (automation.md §5), which the page draws as
--- rows of a section, as every page draws its settings: Auto Sell ("sell"), and Destroy What Can't Be
--- Sold ("destroy", which sells too), disabled while Auto Sell is off; Auto Sell turned off takes it with
--- it. Each saves at once and shows the page's rows again, so the other one follows.
+-- rows of a section, as every page draws its settings: Auto Sell ("sell"), Confirm Auto Sell (on unless
+-- turned off: the category's section waits in the vendor's dock to be sold), and Destroy What Can't Be
+-- Sold ("destroy", which sells too); the last two disabled while Auto Sell is off, which takes Destroy
+-- with it. Each saves at once and shows the page's rows again, so the others follow.
 ---@return NextSettingsOption[]
 function editor:AutomationOptions()
   local function automation()
@@ -296,6 +304,23 @@ function editor:AutomationOptions()
       keywords = { "automation", "sell", "vendor", "merchant", "junk" },
       get = sells,
       set = function(ctx, on) save(ctx, on and "sell" or false) end,
+    },
+    {
+      kind = "toggle",
+      title = L:G("Confirm Auto Sell"),
+      description = L:G("At a vendor, this category's section waits there to be sold with a double click (BetterBags Next). Turned off, it is sold as soon as the vendor opens."),
+      keywords = { "automation", "sell", "confirm", "vendor", "merchant" },
+      disabled = function() return not sells() end,
+      get = function()
+        local filter = self:Chosen()
+        return not (filter and filter.confirmSale == false)
+      end,
+      set = function(ctx, on)
+        if self.selected then
+          categories:UpdateCategory(ctx, self.selected, { confirmSale = on })
+        end
+        settings:Refresh(ctx)
+      end,
     },
     {
       kind = "toggle",
@@ -370,6 +395,29 @@ local function bagItemsOf(bags, fn)
   end
 end
 
+-- matchingCounts returns how many items each category holds in bags, as its Settings tab's Current Items
+-- in this Group lists them: each item once, its group by's sections with it (isShownIn: an item in
+-- "Potions - Flask" counts for Potions). One pass: an item counts for its category and for every name
+-- that category is a section of.
+---@param bags SettingBag[]
+---@return table<string, number>
+local function matchingCounts(bags)
+  local seen, counts = {}, {}
+  bagItemsOf(bags, function(_, _, data)
+    local id = data.itemInfo.itemID
+    local name = data.itemInfo.category
+    while name ~= nil and name ~= "" do
+      seen[name] = seen[name] or {}
+      if not seen[name][id] then
+        seen[name][id] = true
+        counts[name] = (counts[name] or 0) + 1
+      end
+      name = name:match("^(.*) %- ")
+    end
+  end)
+  return counts
+end
+
 -- byName orders grid entries by name (those not known yet after, by item ID).
 ---@param a table
 ---@param b table
@@ -405,19 +453,25 @@ end
 ---@field box WowScrollBox
 ---@field content Frame
 ---@field newCategory NextButtonFrame
----@field entries table[] { header = true, title } or { name }
----@field rows NextCategoryListRow[]
+---@field bags fun(): SettingBag[] The bags the settings show.
+---@field entries table[] { name }, in their order
+---@field rows NextCategoryListRow[] The rows of the entries, in the same order.
+---@field byName table<string, NextCategoryListRow> Each category's own row: moved in the order, it slides.
+---@field free NextCategoryListRow[] Rows no category has, hidden, to reuse.
+---@field drag NextListReorderList Arranges the rows; dragging one moves its category in the order.
 local listProto = {}
 addon:GetModule('Perf'):RegisterPrototype(listProto, 'NextCategoryList')
 
 -- CreateList makes the page's list (pages.lua sidebar).
 ---@param parent Frame
 ---@param owner Frame The window its dialogs show over.
+---@param bags fun(): SettingBag[] The bags the settings show.
 ---@return NextCategoryList
-function editor:CreateList(parent, owner)
+function editor:CreateList(parent, owner, bags)
   local frame = CreateFrame("Frame", nil, parent)
   ---@type NextCategoryList
-  local list = setmetatable({ frame = frame, owner = owner, entries = {}, rows = {} }, { __index = listProto })
+  local list = setmetatable({ frame = frame, owner = owner, bags = bags, entries = {}, rows = {}, byName = {},
+    free = {} }, { __index = listProto })
   list.filter = nextInput:Create(frame, {
     help = L:G("Find a category"),
     onChange = function() list:RefreshRows() end,
@@ -436,6 +490,13 @@ function editor:CreateList(parent, owner)
   list.bar = nextScrollBar:Create(box)
   list.bar:Bind(box)
   list.box, list.content = box, content
+  list.drag = reorder:Create({
+    box = box, content = content,
+    entries = function() return list.entries end,
+    rowOf = function(entry) return list.byName[entry.name].frame end,
+    heightOf = function() return style.Theme.Settings.Categories.RowHeight end,
+    onDrop = function(name, after) list:Drop(name, after) end,
+  })
   list.newCategory = nextButton:Create(frame, {
     text = L:G("New Category"), onClick = function() askNewCategory(owner) end,
   })
@@ -447,6 +508,14 @@ function editor:CreateList(parent, owner)
       settings:Reselect(ctx)
     end
   end)
+  -- A bag's items were read: what each category holds may have changed.
+  for _, message in ipairs(BAG_READ) do
+    events:RegisterMessage(message, function()
+      if frame:IsVisible() then
+        list:RefreshRows()
+      end
+    end)
+  end
   table.insert(self.all, list)
   sonataNext:RegisterWidget(self)
   list:Style()
@@ -487,6 +556,7 @@ function listProto:Place(width, height)
   self.box:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -top)
   self.box:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, bottom)
   self.box:SetSize(width, math.max(1, height - top - bottom))
+  self.drag:Arrange(width)
 end
 
 -- Refresh lists the categories again, makes sure one is chosen, and asks for a new category's name
@@ -503,47 +573,78 @@ function listProto:Refresh(ctx)
   end
 end
 
--- RefreshRows lists the categories whose name has the filter's text: yours, then the plugins'.
+-- RefreshRows lists the categories whose name has the filter's text, in their order.
 function listProto:RefreshRows()
-  local yours, plugins = namesOf(strtrim(self.filter:GetText() or ""):lower())
   local entries = {}
-  for _, group in ipairs({ { L:G("Your Categories"), yours }, { L:G("From Plugins"), plugins } }) do
-    if #group[2] > 0 then
-      table.insert(entries, { header = true, title = group[1] })
-      for _, name in ipairs(group[2]) do
-        table.insert(entries, { name = name })
-      end
-    end
+  for _, name in ipairs(ordered(strtrim(self.filter:GetText() or ""):lower())) do
+    table.insert(entries, { name = name })
   end
   self.entries = entries
   self:layoutRows()
 end
 
--- RowFor returns the row of a category.
+-- Drop moves a category let go after the after-th row shown, in the order: after the category of that
+-- row, or, let go above every row shown, right before the first of them (at the top when nothing is
+-- above it, or when no filter hides any). The categories a filter hides keep their places.
+---@param name string
+---@param after number
+function listProto:Drop(name, after)
+  local shown = {}
+  for i, entry in ipairs(self.entries) do
+    if entry.name == name then
+      if i <= after then
+        after = after - 1
+      end
+    else
+      table.insert(shown, entry.name)
+    end
+  end
+  local anchor
+  if after >= 1 then
+    anchor = shown[math.min(after, #shown)]
+  elseif shown[1] ~= nil then
+    for _, n in ipairs(categories:GetOrder()) do
+      if n == shown[1] then
+        break
+      end
+      if n ~= name then
+        anchor = n
+      end
+    end
+  end
+  categories:MoveCategory(context:New('NextCategoryList_Drop'), name, anchor)
+end
+
+-- RowFor returns the row of a category the list shows.
 ---@param name string
 ---@return NextCategoryListRow?
 function listProto:RowFor(name)
-  for i, entry in ipairs(self.entries) do
-    if entry.name == name then
-      return self.rows[i]
-    end
-  end
-  return nil
+  return self.byName[name]
 end
 
--- row returns the i-th row, made the first time it is needed.
+-- rowFor returns a category's own row, taking one no category has, or making one, the first time.
 ---@private
----@param i number
+---@param name string
 ---@return NextCategoryListRow
-function listProto:row(i)
-  local row = self.rows[i]
-  if row ~= nil then
-    return row
+function listProto:rowFor(name)
+  local row = self.byName[name]
+  if row == nil then
+    row = table.remove(self.free) or self:newRow()
+    self.byName[name] = row
   end
+  return row
+end
+
+-- newRow makes a row.
+---@private
+---@return NextCategoryListRow
+function listProto:newRow()
   local K = style.Theme.Settings.Categories
   local frame = CreateFrame("Button", nil, self.content)
   frame:RegisterForClicks("LeftButtonUp")
-  row = {
+  frame:RegisterForDrag("LeftButton")
+  ---@type NextCategoryListRow
+  local row = {
     frame = frame,
     fill = frame:CreateTexture(nil, "BACKGROUND"),
     hover = frame:CreateTexture(nil, "BACKGROUND", nil, 1),
@@ -572,47 +673,48 @@ function listProto:row(i)
     row.hovered = false
     self:paintRow(row)
   end)
-  self.rows[i] = row
+  addon.SetScript(frame, "OnDragStart", function()
+    if row.entry and row.entry.name then
+      self.drag:Start(row.entry.name)
+    end
+  end)
   return row
 end
 
--- layoutRows places the rows, headings GroupHeight tall and categories RowHeight tall.
+-- layoutRows shows each category listed in its own row, RowHeight tall, saying how many of the shown bags'
+-- items it holds (asked: "x items matching"), and puts the rows of those no longer listed away; the list's arrangement places them (NextListReorder: a row that moved slides).
 ---@private
 function listProto:layoutRows()
   local K = style.Theme.Settings.Categories
-  local y = 0
+  local listed = {}
+  local counts = matchingCounts(self.bags())
+  self.rows = {}
   for i, entry in ipairs(self.entries) do
-    local row = self:row(i)
+    local row = self:rowFor(entry.name)
+    listed[entry.name] = true
+    self.rows[i] = row
     row.entry = entry
-    local height = entry.header and K.GroupHeight or K.RowHeight
-    row.frame:ClearAllPoints()
-    row.frame:SetPoint("TOPLEFT", self.content, "TOPLEFT", 0, -y)
-    row.frame:SetPoint("TOPRIGHT", self.content, "TOPRIGHT", 0, -y)
-    row.frame:SetHeight(height)
-    row.frame:EnableMouse(entry.header ~= true)
-    if entry.header then
-      row.label:SetText(string.upper(entry.title))
-      row.detail:SetText("")
-    else
-      local filter = categories:GetCategoryByName(entry.name)
-      row.label:SetText(entry.name)
-      row.detail:SetText(filter and describe(filter) or "")
-      local c = filter and filter.color or GOLD
-      row.dot:SetColorTexture(c[1], c[2], c[3], 1)
-    end
+    row.frame:SetHeight(K.RowHeight)
+    local filter = categories:GetCategoryByName(entry.name)
+    row.label:SetText(entry.name)
+    row.detail:SetText(count(counts[entry.name] or 0, L:G("%d item matching"), L:G("%d items matching")))
+    local c = filter and filter.color or GOLD
+    row.dot:SetColorTexture(c[1], c[2], c[3], 1)
     row.frame:Show()
     self:paintRow(row)
-    y = y + height
   end
-  for i = #self.entries + 1, #self.rows do
-    self.rows[i].entry = nil
-    self.rows[i].frame:Hide()
+  for name, row in pairs(self.byName) do
+    if not listed[name] then
+      self.byName[name] = nil
+      row.entry = nil
+      row.frame:Hide()
+      table.insert(self.free, row)
+    end
   end
-  self.content:SetHeight(math.max(1, y))
-  self.box:FullUpdate(true)
+  self.drag:Arrange()
 end
 
--- paintRow draws a row: a heading, or a category chosen, under the pointer, or neither.
+-- paintRow draws a row: its category chosen, under the pointer, or neither.
 ---@private
 ---@param row NextCategoryListRow
 function listProto:paintRow(row)
@@ -620,9 +722,7 @@ function listProto:paintRow(row)
   local entry = row.entry
   row.label:ClearAllPoints()
   row.detail:ClearAllPoints()
-  if entry == nil or entry.header then
-    style:SetFont(row.label, K.GroupFont)
-    row.label:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", SB.Pad, 4)
+  if entry == nil then
     row.fill:Hide()
     row.hover:Hide()
     row.indicator:Hide()
@@ -792,13 +892,13 @@ local function label(tab, key, text, font)
 end
 
 -- boxRows returns where the Settings and Search Rule tabs put their item box's name row and the box,
--- down from the tab's top: under four rows of settings, the same in both, so the box stays put as the
+-- down from the tab's top: under three rows of settings, the same in both, so the box stays put as the
 -- tabs change (asked).
 ---@return number nameRow, number box
 local function boxRows()
   local K = style.Theme.Settings.Categories
   local B = controls:Theme("Button")
-  local row = K.Pad + 4 * (B.Height + K.FieldGap) + K.FieldGap
+  local row = K.Pad + 3 * (B.Height + K.FieldGap) + K.FieldGap
   return row, row + B.Height + K.FieldGap
 end
 
@@ -841,13 +941,6 @@ function editor:CreateSettingsTab(parent, owner, bags)
   tab.none = style:CreateText(frame, K.TextFont)
   tab.none:SetText(L:G("You have no categories yet. Make one with New Category, under the list."))
   label(tab, "bags", L:G("Used In"))
-  label(tab, "priority", L:G("Priority"))
-  tab.priority = nextInput:Create(frame, {
-    width = 50, numeric = true, maxLetters = 2, commitOnBlur = true,
-    onEnter = function(ctx, text) tab:SavePriority(ctx, text) end,
-  })
-  tab.priorityHint = style:CreateText(frame, K.HintFont)
-  tab.priorityHint:SetText(L:G("Lower wins when an item fits more than one category."))
   label(tab, "groupBy", L:G("Group By"))
   tab.groupBy = nextDropdown:Create(frame, {
     items = GROUP_BY_NAMES, width = 140,
@@ -890,7 +983,7 @@ function settingsTabProto:Style()
     style:SetFont(l, K.TextFont)
   end
   style:SetFont(self.none, K.TextFont)
-  for _, hint in ipairs({ self.priorityHint, self.groupByHint, self.inBags }) do
+  for _, hint in ipairs({ self.groupByHint, self.inBags }) do
     style:SetFont(hint, K.HintFont)
   end
   if self.width then
@@ -941,24 +1034,6 @@ function settingsTabProto:update(ctx, fields)
   end
 end
 
--- SavePriority saves the priority entered (two digits: 0 to 99); nothing shows the priority again.
----@param ctx Context
----@param text string
-function settingsTabProto:SavePriority(ctx, text)
-  local filter = editor:Chosen()
-  if filter == nil then
-    return
-  end
-  local n = tonumber(text)
-  if n == nil then
-    self.priority:SetText(tostring(filter.priority or 10))
-    return
-  end
-  if n ~= (filter.priority or 10) then
-    self:update(ctx, { priority = n })
-  end
-end
-
 -- Refresh shows the chosen category's settings, and what of your bags shows in it now.
 ---@param ctx? Context
 function settingsTabProto:Refresh(ctx)
@@ -976,15 +1051,13 @@ function settingsTabProto:Refresh(ctx)
     toggle.frame:SetShown(shown[kind] == true)
     self.toggleLabels[kind]:SetShown(shown[kind] == true)
   end
-  for _, part in ipairs({ self.labels.bags, self.labels.priority, self.priority.frame, self.priorityHint,
-    self.labels.color, self.swatch.frame, self.resetColor.frame, self.labels.inBags, self.inBags, self.grid.frame }) do
+  for _, part in ipairs({ self.labels.bags, self.labels.color, self.swatch.frame, self.resetColor.frame, self.labels.inBags, self.inBags, self.grid.frame }) do
     part:SetShown(filter ~= nil)
   end
   for _, part in ipairs({ self.labels.groupBy, self.groupBy.frame, self.groupByHint }) do
     part:SetShown(yours)
   end
   if filter ~= nil then
-    self.priority:SetText(tostring(filter.priority or 10))
     local c = filter.color
     self.swatch:SetColor(c and { c[1], c[2], c[3], 1 } or GOLD)
     self.groupBy:Refresh()
@@ -1036,9 +1109,8 @@ function settingsTabProto:showInBags(name)
   self.grid:SetEntries(list)
 end
 
--- layout puts the settings in four rows (the bags it is used in, priority, group by, color; group by's
--- row left empty for a plugin's), then the current items in their box, where the Search Rule tab puts
--- its own.
+-- layout puts the settings in three rows (the bags it is used in, group by, color; group by's row left
+-- empty for a plugin's), then the current items in their box, where the Search Rule tab puts its own.
 ---@private
 function settingsTabProto:layout()
   local K = style.Theme.Settings.Categories
@@ -1047,7 +1119,7 @@ function settingsTabProto:layout()
   local width = self.width - 2 * pad
   self.none:ClearAllPoints()
   self.none:SetPoint("CENTER", frame, "CENTER", 0, 0)
-  -- row puts a setting's name in its row (1 to 4), and returns the middle of the row.
+  -- row puts a setting's name in its row (1 to 3), and returns the middle of the row.
   local function row(key, i)
     local middle = pad + (i - 1) * (B.Height + gap) + B.Height / 2
     local l = self.labels[key]
@@ -1067,16 +1139,12 @@ function settingsTabProto:layout()
       x = x + toggle.frame:GetWidth() + 6 + math.ceil(text:GetStringWidth()) + 2 * gap
     end
   end
-  self.priority.frame:ClearAllPoints()
-  self.priority.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("priority", 2))
-  self.priorityHint:ClearAllPoints()
-  self.priorityHint:SetPoint("LEFT", self.priority.frame, "RIGHT", gap, 0)
   self.groupBy.frame:ClearAllPoints()
-  self.groupBy.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("groupBy", 3))
+  self.groupBy.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("groupBy", 2))
   self.groupByHint:ClearAllPoints()
   self.groupByHint:SetPoint("LEFT", self.groupBy.frame, "RIGHT", gap, 0)
   self.swatch.frame:ClearAllPoints()
-  self.swatch.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("color", 4))
+  self.swatch.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("color", 3))
   self.resetColor.frame:ClearAllPoints()
   self.resetColor.frame:SetPoint("LEFT", self.swatch.frame, "RIGHT", gap, 0)
   local nameRow, box = boxRows()

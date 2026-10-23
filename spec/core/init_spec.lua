@@ -49,7 +49,7 @@ describe("Core Init and Enable flow", function()
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
-      "GuildBank", "NextGuildBank", "Automation"
+      "GuildBank", "NextGuildBank", "Automation", "Seller"
     }
 
     for _, name in ipairs(modules) do
@@ -212,6 +212,17 @@ describe("Core Init and Enable flow", function()
     addon:OnEnable()
     assert.spy(automation.Init).was.called(1)
     assert.spy(automation.Enable).was.called(1)
+  end)
+
+  -- Every sale goes through the seller (automation.md §3), which listens to merchants and their errors.
+  it("starts and enables the seller", function()
+    local s = addon:GetModule("Seller")
+    s.Init = spy.new(function() end)
+    s.Enable = spy.new(function() end)
+    addon:OnInitialize()
+    addon:OnEnable()
+    assert.spy(s.Init).was.called(1)
+    assert.spy(s.Enable).was.called(1)
   end)
 
   it("enables the changelog window", function()

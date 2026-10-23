@@ -57,7 +57,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
+  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
   { "NextBank", "next/bank.lua" }, { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -68,6 +68,9 @@ local nextBag = addon:GetModule("NextBag")
 local nextBank = addon:GetModule("NextBank")
 local nextGuildBank = addon:GetModule("NextGuildBank")
 local nextDrag = addon:GetModule("NextDrag")
+local nextDock = addon:GetModule("NextDock")
+local nextContent = addon:GetModule("NextContent")
+local lift = addon:GetModule("NextLift")
 local style = addon:GetModule("NextStyle")
 local tween = addon:GetModule("NextTween")
 local render = addon:GetModule("Render")
@@ -228,6 +231,7 @@ describe("NextDrag", function()
     tween:Init()
     motion:Init()
     nextDrag:Init()
+    nextDock:Init()
     buttons, sent = {}, {}
     pins = {}
     db = { view = { [BACKPACK] = SECTION_GRID, [BANK] = SECTION_GRID }, active = { [BACKPACK] = 1, [BANK] = 10 },
@@ -377,11 +381,13 @@ describe("NextDrag", function()
       assert.is_true(nextDrag.shadow:IsShown())
     end)
 
-    -- A Next theme (next-themes.md) draws the lift: its scale, the shadow and the hint's role.
+    -- A Next theme (next-themes.md) draws the lift: its scale, the shadow and the hint's role. The shadow
+    -- is NextLift's (next/lift.lua), restyled as every widget is when a theme applies.
     it("lifts by the theme's scale, with its shadow, naming the drop in its role", function()
       UseNextTheme({ Fonts = { Hint = { Size = 10 } },
         Drag = { LiftScale = 0.8, Shadow = { Color = "Gold", Alpha = 0.5, Spread = 4 }, HintFont = "Hint" } })
       nextDrag:ApplyStyle(context:New("spec"))
+      lift:ApplyStyle(context:New("spec"))
       local herbs = pickUp(backpack, "Herbs")
       finishTweens()
       assert.are.equal(0.8, nextDrag.current.scale)
@@ -392,6 +398,7 @@ describe("NextDrag", function()
       assert.are.equal(style:Font("Hint"), nextDrag.hint:GetFontObject())
       UseNextTheme(nil)
       nextDrag:ApplyStyle(context:New("spec"))
+      lift:ApplyStyle(context:New("spec"))
       assert.are.same(style.Color.Black, { nextDrag.shadow._colorTexture.r, nextDrag.shadow._colorTexture.g,
         nextDrag.shadow._colorTexture.b, nextDrag.shadow._colorTexture.a }, "restyled while lifted")
       drop(herbs)
@@ -497,6 +504,24 @@ describe("NextDrag", function()
       assert.are.same({ { backpack = true, bank = false } }, sentNamed("bags/Rederive"))
       render:Flush()
       assert.is_nil(motion:GetMove(herbs.frame), "lands exactly where the canvas puts it")
+    end)
+
+    it("aims at its gap as it lands", function()
+      local armor = section(backpack, "Armor")
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(herbs.frame:GetLeft() + 20, armor.frame:GetTop() - 5)
+      flush()
+      drop(herbs)
+      local canvas = backpack.content
+      local slotY = canvas:GetDragSlotY()
+      assert.is_true(slotY > 0)
+      tween:Step(style.Time.Land - 0.001)
+      tween:Step(0.0005)
+      local s = herbs.frame:GetScale()
+      local _, _, _, ox, oy = herbs.frame:GetPoint(1)
+      assert.is_true(math.abs(ox * s - canvas.frame:GetLeft()) < 0.5)
+      assert.is_true(math.abs(oy * s - (canvas.frame:GetTop() - slotY)) < 0.5, "the gap's top: " .. oy * s)
+      finishTweens()
     end)
 
     it("starts landing from exactly where it was dropped", function()
@@ -814,18 +839,35 @@ describe("NextDrag", function()
       finishTweens()
       assert.are.same({}, calls.deposited)
       assert.is_nil(asked, "no dialog")
-      local d = nextDrag.dock
-      assert.is_true(d.frame:IsShown())
-      assert.are.equal(guild.frame, d.frame:GetParent())
-      assert.are.equal("Deposit 2 items?", d.title:GetText())
-      assert.are.equal("You cannot take them back out of Donations.", d.warning:GetText())
-      assert.are.equal(d.card, herbs.frame:GetParent())
-      assert.are.equal(herbs, backpack.content.drag.section, "the backpack keeps its gap")
-      d.catcher:GetScript("OnDoubleClick")(d.catcher, "LeftButton")
+      local e = nextDock:EntryOf(guild, "Herbs")
+      assert.are.equal(guild.content.frame, e.holder:GetParent(), "in the guild bank's own column")
+      assert.are.equal("Deposit 2 items?", e.box.title:GetText())
+      assert.are.equal("You cannot take them back out of Donations.", e.box.warning:GetText())
+      assert.are.equal(e.box.frame, herbs.frame:GetParent())
+      assert.is_true(backpack.content:IsAway(herbs))
+      e.catcher:GetScript("OnDoubleClick")(e.catcher, "LeftButton")
       assert.are.same({ { { "0_3", "0_4" }, 4 } }, calls.deposited)
+      tween:Step(style.Time.FlyAway + 0.001)
+      assert.is_true(guild.tabs:Tab(1004).glow:IsShown(), "the tab it was dropped on pulses")
       finishTweens()
       assert.is_not_nil(backpack.content.leaving.Herbs)
-      assert.is_false(d.frame:IsShown())
+      assert.is_nil(nextDock:EntryOf(guild, "Herbs"))
+    end)
+
+    it("deposits nothing on the double click once the guild bank is closing, and sends it back", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(guild.tabs:Tab(1004).button))
+      drop(herbs)
+      finishTweens()
+      local e = nextDock:EntryOf(guild, "Herbs")
+      guild.closing = true
+      e.catcher:GetScript("OnDoubleClick")(e.catcher, "LeftButton")
+      finishTweens()
+      assert.are.same({}, calls.deposited)
+      assert.is_nil(nextDock:EntryOf(guild, "Herbs"))
+      assert.is_false(backpack.content:IsAway(herbs))
+      assert.is_nil(backpack.content.leaving.Herbs)
+      guild.closing = false
     end)
 
     it("withdraws a guild section into the backpack", function()
@@ -898,6 +940,8 @@ describe("NextDrag", function()
       bank.frame:Hide()
       seller = { kind = -1, closing = false, glows = {}, sales = {}, asked = {}, sells = nil, answer = "sold" }
       seller.frame = CreateFrame("Frame")
+      seller.frame:Show()
+      seller.content = nextContent:Create(seller.frame)
       seller.body = CreateFrame("Frame")
       seller.body:_SetRect(0, 0, style.BODY_WIDTH, 1200)
       seller.scroll = { frame = CreateFrame("Frame") }
@@ -906,21 +950,31 @@ describe("NextDrag", function()
       tabButton:_SetRect(style.BODY_WIDTH, 900, 100, style.TAB_HEIGHT)
       seller.tabs = { TabAt = function()
         return tabButton:IsMouseOver() and { id = 2, button = tabButton } or nil
-      end }
+      end, Pulse = function() end }
       seller.tabButton = tabButton
       function seller:IsShown() return self.frame:IsShown() end
       function seller:SetDropGlow(on) table.insert(self.glows, on) end
       function seller:SaleOf(list) return self.sells or list end
-      -- As the vendor's: "sold", or "confirm" and the text to confirm with while unconfirmed.
-      function seller:Sell(c, sale, confirmed)
-        assert.is_not_nil(c)
-        if self.answer == "confirm" and not confirmed then
-          table.insert(self.asked, keys(sale))
-          return "confirm", { title = "Sell 2 items?", warning = "Only the last 12 items sold can be bought back.",
-            hint = "Double-click to sell · Right-click to cancel" }
+      -- As the vendor's (NextVendor:SaleOffer): a sale the dock confirms with a double click, or one that
+      -- sells as it docks and answers once sold.
+      function seller:SaleOffer(dropped)
+        local offer = {
+          text = function() return "Sell 2 items?", "Only the last 12 items sold can be bought back.",
+            "Double-click to sell · Right-click to cancel" end,
+        }
+        local function sell()
+          local now = self:SaleOf(nextDrag:SectionItems(dropped))
+          if #now == 0 or self.closing then return "back" end
+          table.insert(self.sales, keys(now))
+          return "moved"
         end
-        table.insert(self.sales, keys(sale))
-        return "sold"
+        if self.answer == "confirm" then
+          table.insert(self.asked, keys(self:SaleOf(nextDrag:SectionItems(dropped))))
+          offer.confirm = sell
+        else
+          offer.docked = function(entry) nextDock:Answer(entry, sell()) end
+        end
+        return offer
       end
       nextDrag:RegisterSeller(seller)
     end)
@@ -962,11 +1016,13 @@ describe("NextDrag", function()
     -- Asked: a sale past what buyback keeps asked in a dialog that "blends right in", and the section
     -- snapped back to the backpack meanwhile, drawing the eye away. Now the section stays in the
     -- seller, glowing, until it is confirmed with a double click or cancelled.
+    -- The sale waits in the seller's dock (NextDock, next.md §7): a list of sections, each confirmed with a
+    -- double click or sent back with a right click.
     describe("a sale it confirms first", function()
       local herbs
 
-      local function dock()
-        return nextDrag.dock
+      local function entry()
+        return nextDock:EntryOf(seller, "Herbs")
       end
 
       before_each(function()
@@ -978,77 +1034,41 @@ describe("NextDrag", function()
       end)
 
       local function doubleClick()
-        local catcher = dock().catcher
+        local catcher = entry().catcher
         catcher:GetScript("OnDoubleClick")(catcher, "LeftButton")
       end
 
       local function click(mouse)
-        local catcher = dock().catcher
+        local catcher = entry().catcher
         catcher:GetScript("OnClick")(catcher, mouse)
       end
 
       local function backInPlace()
+        finishTweens()
         assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
         assert.is_true(herbs.frame:IsShown())
-        assert.is_false(dock().frame:IsShown())
-        assert.is_false(nextDrag:IsActive())
-        assert.is_nil(backpack.content.drag)
+        assert.is_nil(entry())
+        assert.is_false(backpack.content:IsAway(herbs))
         assert.is_nil(backpack.content.leaving.Herbs)
       end
 
-      it("docks the section in the seller with what it asks, selling nothing and keeping the backpack's gap", function()
+      it("docks the section in the seller with what it asks, selling nothing, the drag over", function()
         assert.are.same({ { "0_3", "0_4" } }, seller.asked)
         assert.are.same({}, seller.sales)
-        local d = dock()
-        assert.is_true(d.frame:IsShown())
-        assert.are.equal(seller.frame, d.frame:GetParent())
-        assert.are.equal("Sell 2 items?", d.title:GetText())
-        assert.are.equal("Only the last 12 items sold can be bought back.", d.warning:GetText())
-        assert.are.equal("Double-click to sell · Right-click to cancel", d.hint:GetText())
-        assert.are.equal(d.card, herbs.frame:GetParent())
-        assert.is_true(herbs.frame:IsShown())
-        assert.is_true(d.scrim:IsShown(), "the seller's own items dim behind it")
-        assert.are.equal(herbs, backpack.content.drag.section, "the backpack keeps its gap")
+        local e = entry()
+        assert.are.equal("Sell 2 items?", e.box.title:GetText())
+        assert.are.equal("Only the last 12 items sold can be bought back.", e.box.warning:GetText())
+        assert.are.equal("Double-click to sell · Right-click to cancel", e.box.hint:GetText())
+        assert.are.equal(e.box.frame, herbs.frame:GetParent())
+        assert.are.equal(seller.content.frame, e.holder:GetParent(), "in the seller's column")
+        assert.is_true(backpack.content:IsAway(herbs), "out of the backpack's column")
+        assert.is_nil(backpack.content.drag)
         assert.is_nil(backpack.content.leaving.Herbs)
-        assert.is_true(nextDrag:IsActive())
+        assert.is_false(nextDrag:IsActive())
+        assert.is_false(lift:IsHolding())
         assert.are.same({ true, false }, seller.glows)
         assert.is_false(nextDrag.hint:IsShown())
         assert.is_false(nextDrag.cover:IsShown())
-      end)
-
-      -- A Next theme draws the dock, and one applied while it waits restyles it.
-      it("draws the dock from the theme, restyling it while it waits", function()
-        UseNextTheme({ Palette = { Paper = { 0.9, 0.85, 0.7, 1 } }, Fonts = { Big = { Size = 20 } },
-          Dock = { Card = { Color = "Paper" }, Pad = 20, Halo = false, TitleFont = "Big",
-            Glow = { Color = "White", Width = 4, Low = 0.2, High = 0.6, Period = 2 } } })
-        nextDrag:ApplyStyle(context:New("spec"))
-        local d = dock()
-        local c = d.background._colorTexture
-        assert.are.same({ 0.9, 0.85, 0.7, 1 }, { c.r, c.g, c.b, c.a })
-        assert.are.equal(4, d.glow[1]:GetHeight())
-        assert.are.equal(4, d.glow[3]:GetWidth())
-        local r, g, b = d.glow[1]:GetVertexColor()
-        assert.are.same({ 1, 1, 1 }, { r, g, b })
-        assert.is_false(d.halo:IsShown())
-        assert.are.equal(style:Font("Big"), d.title:GetFontObject())
-        assert.are.equal(herbs.frame:GetWidth() + 40, d.card:GetWidth())
-        d.elapsed = 0
-        d.frame:GetScript("OnUpdate")(d.frame, 0)
-        assert.is_true(math.abs(d.glow[1]:GetAlpha() - 0.4) < 1e-6, "halfway between its low and high")
-        UseNextTheme(nil)
-        nextDrag:ApplyStyle(context:New("spec"))
-        assert.is_true(d.halo:IsShown())
-      end)
-
-      it("keeps the section's item buttons from taking the clicks", function()
-        local d = dock()
-        local function maxLevel(f)
-          local level = f:GetFrameLevel()
-          for _, child in ipairs({ f:GetChildren() }) do level = math.max(level, maxLevel(child)) end
-          return level
-        end
-        assert.is_true(d.catcher:IsMouseEnabled())
-        assert.is_true(d.catcher:GetFrameLevel() > maxLevel(herbs.frame))
       end)
 
       it("sells on a double click, with the section's items as they are then, and flies it in", function()
@@ -1060,68 +1080,62 @@ describe("NextDrag", function()
         doubleClick()
         assert.are.same({ { "0_3" } }, seller.sales)
         finishTweens()
-        assert.is_false(dock().frame:IsShown())
+        assert.is_nil(entry())
         assert.is_false(herbs.frame:IsShown())
         assert.is_not_nil(backpack.content.leaving.Herbs)
-        assert.is_false(nextDrag:IsActive())
-        assert.is_nil(backpack.content.drag)
       end)
 
       it("does nothing on a single click", function()
         click("LeftButton")
         finishTweens()
         assert.are.same({}, seller.sales)
-        assert.is_true(dock().frame:IsShown())
-        assert.are.equal(dock().card, herbs.frame:GetParent())
+        assert.are.equal(entry().box.frame, herbs.frame:GetParent())
       end)
 
-      it("cancels on a right click: the section lands back in its gap, nothing sold", function()
+      it("sends it back on a right click: the section goes back to its place, nothing sold", function()
         click("RightButton")
-        finishTweens()
         assert.are.same({}, seller.sales)
         backInPlace()
       end)
 
-      it("covers the seller's own items, so nothing behind it is bought, and cancels on a right click there too", function()
-        local d = dock()
-        assert.is_true(d.frame:IsMouseEnabled())
-        d.frame:GetScript("OnMouseUp")(d.frame, "LeftButton")
-        assert.is_true(d.frame:IsShown())
-        d.frame:GetScript("OnMouseUp")(d.frame, "RightButton")
-        finishTweens()
-        assert.are.same({}, seller.sales)
-        backInPlace()
-      end)
-
-      it("sells nothing on a double click once the seller is closing, and lands back", function()
+      it("sells nothing on a double click once the seller is closing, and sends it back", function()
         seller.closing = true
         doubleClick()
-        finishTweens()
         assert.are.same({}, seller.sales)
         backInPlace()
       end)
 
-      it("lands back when nothing is left to sell at the double click", function()
+      it("sends it back when nothing is left to sell at the double click", function()
         seller.sells = {}
         doubleClick()
-        finishTweens()
         assert.are.same({}, seller.sales)
         backInPlace()
       end)
 
-      it("cancels when the seller closes", function()
+      -- As a panel's OnHidden does.
+      it("sends it back when the seller closes", function()
         seller.frame:Hide()
         nextDrag:PanelHidden(seller)
+        nextDock:PanelHidden(seller)
         assert.are.same({}, seller.sales)
         backInPlace()
       end)
 
-      it("puts the section back first when another one is picked up", function()
+      it("is no section to pick up while it waits", function()
+        assert.is_false(nextDrag:Begin(backpack, herbs))
+        assert.is_false(nextDrag:IsActive())
+      end)
+
+      -- Asked: "a list of categories that move over to the vendor window".
+      it("waits on while another section is picked up, and docks that one under it", function()
         local armor = pickUp(backpack, "Armor")
         assert.are.equal(armor, nextDrag.current.section)
-        assert.are.equal(backpack.content.frame, herbs.frame:GetParent())
-        assert.is_false(dock().frame:IsShown())
+        assert.are.equal(entry().box.frame, herbs.frame:GetParent())
+        moveTo(300, 600)
         drop(armor)
+        finishTweens()
+        local list = nextDock:Entries(seller)
+        assert.are.same({ "Herbs", "Armor" }, { list[1].section.name, list[2].section.name })
       end)
 
       it("goes away with the section when its category leaves the data", function()
@@ -1130,22 +1144,8 @@ describe("NextDrag", function()
         })
         backpack:Draw(ctx(), slots[BACKPACK], function() end)
         flush()
-        assert.is_false(dock().frame:IsShown())
-        assert.is_false(nextDrag:IsActive())
+        assert.is_nil(entry())
         assert.are.same({}, seller.sales)
-      end)
-
-      it("pulses its glow", function()
-        local d = dock()
-        local update = d.frame:GetScript("OnUpdate")
-        local alphas = {}
-        for _ = 1, 6 do
-          update(d.frame, 0.2)
-          table.insert(alphas, d.glow[1]:GetAlpha())
-        end
-        local low, high = math.min(unpack(alphas)), math.max(unpack(alphas))
-        assert.is_true(high - low > 0.3, "it pulses: " .. table.concat(alphas, ", "))
-        for _, edge in ipairs(d.glow) do assert.are.equal(alphas[#alphas], edge:GetAlpha()) end
       end)
     end)
 

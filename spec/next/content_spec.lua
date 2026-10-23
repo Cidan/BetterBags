@@ -561,6 +561,42 @@ describe("NextContent", function()
       assert.are.equal(2 * ONE, y(s.C))
     end)
 
+    -- Reported: a section sold into the vendor that the merchant did not take all of stayed hidden in
+    -- the backpack ("limbo"): nothing drew the bag again once its time was up.
+    it("lays the column out again when a leaving section's time is up, showing it while its items are there", function()
+      local s = threeSections()
+      local now, timers = 100, {}
+      override(_G, "GetTime", function() return now end)
+      override(C_Timer, "After", function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end)
+      canvas:MarkLeaving("B")
+      local leavingTimer
+      for _, t in ipairs(timers) do
+        if t.delay == nextContent.LEAVING_SECONDS then leavingTimer = t end
+      end
+      assert.is_not_nil(leavingTimer)
+      render:Flush()
+      assert.is_false(s.B.frame:IsShown())
+      now = 100 + nextContent.LEAVING_SECONDS
+      leavingTimer.fn()
+      assert.is_true(render:IsDirty(canvas))
+      render:Flush()
+      assert.is_true(s.B.frame:IsShown())
+    end)
+
+    it("does not lay the column out for a leaving section already forgotten", function()
+      threeSections()
+      local timers = {}
+      override(C_Timer, "After", function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end)
+      canvas:MarkLeaving("B", 3)
+      render:Flush()
+      bind(data({ categories = { { name = "A" }, { name = "C" } }, items = { item("0_1", "A"), item("0_3", "C") } }))
+      render:Flush()
+      for _, t in ipairs(timers) do
+        if t.delay == 3 then t.fn() end
+      end
+      assert.is_false(render:IsDirty(canvas))
+    end)
+
     it("keeps hiding a leaving section with nothing but gaps, and forgets it once it is gone", function()
       local now = 100
       override(_G, "GetTime", function() return now end)
@@ -594,6 +630,135 @@ describe("NextContent", function()
       canvas:Cascade(true)
       assert.are.equal(1, s.B.frame:GetAlpha())
       assert.are.equal(0, s.A.frame:GetAlpha())
+    end)
+  end)
+
+  -- A section waiting in another panel's dock (NextDock, next.md §7) is held out of its column; sent back,
+  -- it flies to its place, which the column keeps for it, then takes it.
+  describe("holding sections out", function()
+    local ONE = style.SECTION_HEADER + style.ICON + style.SECTION_SPACING
+
+    local function threeSections()
+      bind(data({
+        categories = { { name = "A" }, { name = "B" }, { name = "C" } },
+        items = { item("0_1", "A"), item("0_2", "B"), item("0_3", "C") },
+      }))
+      draw()
+      return canvas.byName
+    end
+
+    -- y returns where a section is in the column once its slide (Motion) has ended.
+    local function y(section)
+      motion:Step(1)
+      local _, _, _, _, oy = section.frame:GetPoint(1)
+      return -oy
+    end
+
+    it("takes a held section out of the column, the others closing up, its frame left alone", function()
+      local s = threeSections()
+      local dock = CreateFrame("Frame")
+      canvas:HoldOut(s.B)
+      s.B.frame:SetParent(dock)
+      s.B.frame:ClearAllPoints()
+      s.B.frame:SetPoint("TOPLEFT", dock, "TOPLEFT", 3, -4)
+      draw()
+      assert.are.equal(ONE, y(s.C), "C closes up")
+      assert.are.same({ dock, 3, -4 }, { at(s.B.frame) })
+      assert.is_true(canvas:IsAway(s.B))
+      assert.are.same({ "A", "B", "C" }, names(), "still bound")
+    end)
+
+    it("keeps a returning section's room without placing it, then places it once it is back", function()
+      local s = threeSections()
+      canvas:HoldOut(s.B)
+      draw()
+      local dock = CreateFrame("Frame")
+      s.B.frame:SetParent(dock)
+      s.B.frame:ClearAllPoints()
+      s.B.frame:SetPoint("TOPLEFT", dock, "TOPLEFT", 3, -4)
+      canvas:Returning(s.B)
+      draw()
+      assert.are.equal(2 * ONE, y(s.C), "C makes room")
+      assert.are.equal(ONE, s.B.y, "where it flies to")
+      assert.are.same({ dock, 3, -4 }, { at(s.B.frame) }, "not placed while it flies")
+      s.B.frame:SetParent(canvas.frame)
+      canvas:Return(s.B)
+      assert.are.same({ canvas.frame, 0, -ONE }, { at(s.B.frame) }, "at its place at once")
+      assert.is_false(canvas:IsAway(s.B))
+      draw()
+      assert.is_nil(motion:GetMove(s.B.frame))
+      assert.are.equal(ONE, y(s.B))
+    end)
+
+    it("calls back when a held section leaves the data, before letting it go", function()
+      local s = threeSections()
+      local lost, shownWhenLost = 0, nil
+      canvas:HoldOut(s.B, function()
+        lost = lost + 1
+        shownWhenLost = s.B.frame:IsShown()
+      end)
+      bind(data({ categories = { { name = "A" }, { name = "C" } }, items = { item("0_1", "A"), item("0_3", "C") } }))
+      assert.are.equal(1, lost)
+      assert.is_true(shownWhenLost)
+      assert.is_false(canvas:IsAway(s.B))
+    end)
+
+    it("keeps held sections out of a drag's places, and in their place in the order when it commits", function()
+      local s = threeSections()
+      canvas:HoldOut(s.B)
+      canvas:BeginDrag(s.C)
+      assert.are.equal(2, canvas.drag.index, "after A only")
+      canvas:SetDragIndex(1)
+      canvas:EndDrag(true)
+      assert.are.same({ "C", "B", "A" }, names(), "B keeps its place; C and A swap")
+    end)
+
+    it("never fades a held section in", function()
+      local s = threeSections()
+      canvas:HoldOut(s.B)
+      s.B.frame:SetAlpha(1)
+      canvas:Cascade(true)
+      assert.is_false(tween:IsPlaying(s.B))
+    end)
+  end)
+
+  -- The cards a panel's dock holds (NextDock) lead its column, above its sections.
+  describe("leading frames", function()
+    it("lays them out first, centered, as tall as they say, the sections below them", function()
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+      local one, two = CreateFrame("Frame", nil, canvas.frame), CreateFrame("Frame", nil, canvas.frame)
+      one:SetSize(100, 50)
+      two:SetSize(style.GRID_WIDTH, 30)
+      local widths = {}
+      canvas:SetLead(function(width)
+        table.insert(widths, width)
+        return { { frame = one, height = 50 }, { frame = two, height = 30 } }
+      end)
+      local result = draw()
+      assert.are.same({ style.GRID_WIDTH }, widths)
+      assert.are.same({ canvas.frame, (style.GRID_WIDTH - 100) / 2, 0 }, { at(one) })
+      assert.are.same({ canvas.frame, 0, -(50 + style.SECTION_SPACING) }, { at(two) })
+      local _, _, sy = at(canvas.byName.A.frame)
+      assert.are.equal(-(50 + 30 + 2 * style.SECTION_SPACING), sy)
+      assert.are.equal(50 + 30 + 2 * style.SECTION_SPACING + canvas.byName.A.height, result.Height)
+    end)
+
+    it("slides what is below one that goes", function()
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+      local one, two = CreateFrame("Frame", nil, canvas.frame), CreateFrame("Frame", nil, canvas.frame)
+      one:SetSize(style.GRID_WIDTH, 50)
+      two:SetSize(style.GRID_WIDTH, 30)
+      local leads = { { frame = one, height = 50 }, { frame = two, height = 30 } }
+      canvas:SetLead(function() return leads end)
+      parent:Show()
+      canvas.frame:Show()
+      draw()
+      draw()
+      table.remove(leads, 1)
+      draw()
+      local _, y0, _, y1 = motion:GetMove(two)
+      assert.are.same({ -(50 + style.SECTION_SPACING), 0 }, { y0, y1 })
+      assert.is_not_nil(motion:GetMove(canvas.byName.A.frame))
     end)
   end)
 

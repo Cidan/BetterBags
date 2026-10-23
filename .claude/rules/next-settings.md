@@ -275,12 +275,20 @@ BetterBags group after Item Colors, both designs). It is a page with its own lis
 `CreateList`, its heading `Heading()`, its buttons `CreateActions`, and its tabs one wide block each,
 their section titles hidden, each filling the content without scrolling (`ContentHeight` less the
 page's `Content.Top` and `Bottom`).
-- **The list** (in the sidebar): a filter box where the settings search box is; "Your Categories"
-  (saved), then "From Plugins" (not saved), each by name, a group by's sub-categories left out; each
-  row a color dot, the name and a line of what is in it ("Search Rule", "2 added items", "Search Rule
-  and 1 added item", "Nothing in it yet") and its priority; New Category at the bottom where the version is
-  (`{ name, itemList = {}, save = true }`, chosen). The first category is chosen when none is
-  (`EnsureChosen`); clicking one chooses it (`Choose`, then `Reselect`). On `categories/Changed` while
+- **The list** (in the sidebar): a filter box where the settings search box is; every category, yours
+  and the plugins', in their order, which is their priority (category-lifecycle.md §7), a group by's
+  sub-categories left out; each row a color dot, the name and how many of the shown bags' items it
+  holds, "N items matching" ("1 item matching"; asked: "just have the subtext to categories say 'x
+  items matching'"). The count is the Settings tab's Current Items in this Group: each item once, its
+  group by's sections with it, in the bags the settings show (`matchingCounts`, one pass over the
+  items, each counted for its category and every name its category is a section of: `isShownIn`'s
+  rule). It is counted again on `items/Refresh<Kind>/Done` (every bag) while the list shows. New
+  Category at the bottom where the version is (`{ name, itemList = {}, save = true }`, chosen, on top).
+  Dragging a row moves its category (`listProto:Drop` → `categories:MoveCategory`): after the row above
+  where it is let go, or right before the first row shown when let go above them; the categories a
+  filter hides keep their places. The rows are arranged and dragged by `NextListReorder` (below). No
+  tooltip (asked: no help text yet). The first category is chosen when
+  none is (`EnsureChosen`); clicking one chooses it (`Choose`, then `Reselect`). On `categories/Changed` while
   it shows, the page shows again, the first chosen for one that is gone.
 - **The header**: the chosen category's name, and its line (a plugin's starts "Made by a plugin");
   "Categories" and "Make a category to sort your items your way." for none. Rename and Delete for your
@@ -288,10 +296,9 @@ page's `Content.Top` and `Bottom`).
   room.
 - **The two item boxes stay put** (asked: boxes a few pixels apart made switching tabs messy): the
   Settings and Search Rule tabs put their box's name row and their box at the same place
-  (`boxRows`: under four rows of settings, a row for the name, the box down to the tab's bottom).
-- **Settings tab**: four rows, Used In (a switch per bag the settings show, the guild bank like any),
-  Priority (two digits; saved on Enter or when the field is left; nothing entered shows it again; the
-  same value saves nothing), Group By (yours only; the row stays empty for a plugin's), Color (and
+  (`boxRows`: under three rows of settings, a row for the name, the box down to the tab's bottom).
+- **Settings tab**: three rows, Used In (a switch per bag the settings show, the guild bank like any),
+  Group By (yours only; the row stays empty for a plugin's), Color (and
   Reset Color: none, drawn in gold); then **Current Items in this Group** (the player's wording): how
   many items each bag shows in it (its group by's sections too) and those items in a read-only grid,
   one cell per item with how many there are, by name, or "There are no current items in your
@@ -315,11 +322,11 @@ page's `Content.Top` and `Bottom`).
   (`AddPermanentItemToCategory`, `ClearCursor`, the bags recalculated; asked: the items themselves
   are drop targets); a right click offers Remove. A plugin's items show read-only (no drop, no remove,
   no Remove All).
-- **Automation tab** (automation.md §5): a section ("Merchants") of two settings rows, drawn as every
-  page's settings (not controls of its own): Auto Sell, and Destroy What Can't Be Sold, disabled while
-  Auto Sell is off, saved at once (`NextSettingsCategories:AutomationOptions`). Shown while a category
-  is chosen, a plugin's too. The list line and the heading end "Sells at merchants" or "Sells, destroys
-  the rest".
+- **Automation tab** (automation.md §5): a section ("Merchants") of three settings rows, drawn as every
+  page's settings (not controls of its own): Auto Sell, Confirm Auto Sell (on by default) and Destroy
+  What Can't Be Sold, the last two disabled while Auto Sell is off, saved at once
+  (`NextSettingsCategories:AutomationOptions`). Shown while a category is chosen, a plugin's too. The
+  heading's line ends "Sells at merchants" or "Sells, destroys the rest".
 - `NextSettingsCategories:Show(name)` chooses a category for the next time the page shows (a bag's tab
   links here); `NewFromSearch(query)` makes the list ask for a new category's name with the search as
   its rule (the search box's Enter to Make Category, through `config/NewCategoryFromSearch`, which
@@ -337,13 +344,59 @@ sections from its committed items (not empty slots, Recent Items, Free Space, or
 - A built-in section says "Automatic"; a pinned name that is neither (a leftover) has Remove
   (category-lifecycle.md §4).
 - Shift-click pins at the top or unpins; dragging a row drops it after the entry above the pointer's
-  half of a row (above the "Other Categories" heading pinned there, below it unpinned). The order is
-  saved from 1 (the pins a filter hides keep their order after the ones it shows) and the bags
-  recalculated (`bags/Rederive { resetLayout, buttons }`). Read again on the bag's
-  `items/Refresh<Kind>/Done` and on `categories/Changed` while it shows.
+  half of a row (above the "Other Categories" heading pinned there, below it unpinned; never above the
+  "Pinned" heading, `first = 2`). The order is saved from 1 (the pins a filter hides keep their order
+  after the ones it shows) and the bags recalculated (`bags/Rederive { resetLayout, buttons }`). Read
+  again on the bag's `items/Refresh<Kind>/Done` and on `categories/Changed` while it shows.
+
+**Dragging a row** (`NextListReorder`, `next/settings/reorder.lua`), shared by both lists. Asked:
+"instead of a line on drag, let's animate the move like we do categories (again, re-inventing drag
+handling, we do this amazingly in the bags today, look how it's done, be careful)". The first version
+drew a gold line where the row would land, a drag of its own; now a row moves exactly as a bag's
+section does (next.md §7), through the same code:
+- **Each entry has its own row** (`rowOf`: the Categories page keys them by name, the bag's tab by name
+  and a heading by a key of its own, so a category named like a heading still has its own). Rows of
+  entries no longer listed (a filter, a delete) hide and wait to be reused. So when a category moves in
+  the order, its own row slides there.
+- **Arranging** (`Arrange(width)`): the rows one under another, each as wide as the list (Motion anchors
+  only a frame's top left), placed through Motion in a pass of the list (`BeginPass(list,
+  Time.Interaction)`), as the canvas places sections: while the list shows, a row whose place changed
+  slides there (0.24 s, the bags' interaction time); a row newly shown, and everything while the list is
+  hidden, is put there at once. The content is as tall as the rows. Both lists call it after every
+  layout, and when they are placed (a new width).
+- **Picking up** (the row's `OnDragStart`): the row is lifted with `NextLift` (`next/lift.lua`, moved out
+  of NextDrag so both drags are one): onto the drag layer where it was on screen, a cover over it, the
+  theme's shadow under it, shrinking to `Drag.LiftScale` around the point grabbed over `Time.Lift`,
+  following the cursor. The list keeps a room the row's height where it was. One drag at a time, and
+  none while NextLift holds another frame (a section waiting in the vendor's dock).
+- **Making room**: every frame the room goes before the first other row whose middle is below the cursor
+  (counting what the list is scrolled), never before `first`, and the rows slide out of its way. Near the
+  list's top or bottom (40 pixels) the list scrolls toward the edge, faster closer (`NextLift:AutoScroll`,
+  the bags' auto-scroll).
+- **Letting go** (the left button found up): the row lands into its room over `Time.Land`, back to full
+  size, aiming at the room every frame (`NextLift:Land`), then goes back in the list there. Its owner is
+  told what it lands after, counted with the row itself (`onDrop(name, after)`, 0 before the first:
+  the owners' `Drop` contract), unless it landed where it was. An owner that draws the list again (the
+  bag's tab, and the Categories page through `categories/Changed`) shows the new order; otherwise the
+  list reorders its entries itself, so nothing slides back.
+- **Ending early**: the list hiding mid-drag, or the dragged entry leaving the list, puts the row
+  straight back in its place.
+- No hardware event is needed (nothing protected runs), so letting go is read from the mouse button
+  each frame, as the bags read a missed release.
+- Mutation-tested with the shared lift and NextDrag on it: 74 mutations. Twelve first survived: ten led
+  to tests (a frame with its own strata, the level it is put back at, a second drag, the half-row rule,
+  following the cursor, ignoring the cursor while landing, a scrolled landing, reusing rows put away,
+  the Pinned heading staying on top, NextDrag's landing aiming at its gap), one was a redundant tween stop
+  in NextDrag's Cancel (removed: putting the frame back stops it), and one cannot be told apart with the
+  mocks (NextDrag finishing a section's flight into the dock before it leaves the dock: the mock frames'
+  screen rectangles do not follow their anchors). That last one is NextDrag's behavior from before,
+  unchanged.
 
 Coverage: `spec/next/settings/categories_spec.lua` (the list: order, place, filter, choosing,
-a category chosen elsewhere, New Category, a search waiting, changes; the heading and which tabs show;
+a category chosen elsewhere, New Category, a search waiting, changes; "N items matching" as the Settings
+tab counts, in the bags shown, counted again when a bag is read while it shows; a drag lifting a row,
+the others making room, landing it and moving its category; each category's own row, its width, rows put
+away; the heading and which tabs show;
 Rename and Delete; the Settings tab: its height, none, fields, saving, a plugin's, what the bags show
 and reading them again; the Search Rule tab: its names, the count as typed, the results in full color,
 the box where the Settings tab's is, Apply Search Rule, typed text kept, a plugin's; the Added Items
@@ -352,7 +405,13 @@ its line), `spec/next/controls/itemgrid_spec.lua` (columns, only the rows in vie
 end, empty text, cells, tooltips, clicks, drops, the theme), `spec/next/settings/window_spec.lua` ("a
 page with its own list": sliding, Back, opening on it, the first Escape, closing and reopening on it, a
 fade-out, heading and buttons, tabs shown, tabs read after the list, Reselect, a search, nothing while
-closed), `spec/next/settings/bagcategories_spec.lua`, `spec/next/settings/content_spec.lua` (the page's
+closed), `spec/next/settings/bagcategories_spec.lua` (and its drag: lifted, room made, pinned where
+it lands, never above the Pinned heading; its own rows, a category named like a heading),
+`spec/next/settings/reorder_spec.lua` (arranging: places, widths, height, at once while hidden, sliding
+while shown in the interaction time; dragging: the lift, the room under the cursor, `first`, scrolled,
+no place on screen, auto-scroll, one drag at a time; letting go: landing aimed at the room, what it lands
+after, before every other, the order shown by the list or its owner, nothing for no move; ending when the
+list hides or the entry goes), `spec/next/lift_spec.lua` (the shared lift), `spec/next/settings/content_spec.lua` (the page's
 list, heading, buttons and three tabs, the bags shown), `spec/integration/next_settings_spec.lua`
 (every tab built on the whole addon; the list in the sidebar and the first Escape on the real window),
 `spec/next/controls/input_spec.lua` (`commitOnBlur`, a disabled text area),

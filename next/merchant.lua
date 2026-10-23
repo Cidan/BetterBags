@@ -282,10 +282,12 @@ function merchant:ReadItems(ctx)
   for _, item in ipairs(list) do
     local hit = found[item.record.slotkey]
     if hit then
-      -- As items:GetCategory weighs them: a rule beats an item placed by hand only with a lower
-      -- priority number; at a tie the item stays where it was placed.
-      local custom, customPriority = categories:GetCustomCategory(ctx, const.BAG_KIND.BACKPACK, item.record)
-      if not custom or (customPriority or 10) > hit.priority then
+      -- As items:GetCategory weighs them (category-lifecycle.md §7): an item added by hand to a category
+      -- of yours stays there; a plugin's item list loses to a rule only with a lower priority number.
+      local custom, customPriority, customFilter = categories:GetCustomCategory(ctx, const.BAG_KIND.BACKPACK,
+        item.record)
+      local yours = customFilter ~= nil and customFilter.save == true
+      if not custom or (not yours and (customPriority or 10) > hit.priority) then
         local old = item.category
         item.category = hit.name
         item.record.itemInfo.category = hit.name
@@ -551,19 +553,6 @@ end
 -- SellAllJunk is Blizzard's Sell All Junk button: its confirmation, then C_MerchantFrame.SellAllJunkItems.
 function merchant:SellAllJunk()
   MerchantFrame_OnSellAllJunkButtonClicked()
-end
-
--- SellSlots sells items to the merchant one by one, as a right click at a merchant does, while
--- stillOpen (when given) says the merchant is open.
----@param slots {bag: number, slot: number}[]
----@param stillOpen? fun(): boolean
-function merchant:SellSlots(slots, stillOpen)
-  for _, s in ipairs(slots) do
-    if stillOpen and not stillOpen() then
-      return
-    end
-    C_Container.UseContainerItem(s.bag, s.slot)
-  end
 end
 
 merchant:Init()

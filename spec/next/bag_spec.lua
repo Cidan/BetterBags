@@ -52,7 +52,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
+  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -63,6 +63,8 @@ local tween = addon:GetModule("NextTween")
 local render = addon:GetModule("Render")
 local motion = addon:GetModule("Motion")
 local context = addon:GetModule("Context")
+local nextDock = addon:GetModule("NextDock")
+local nextContent = addon:GetModule("NextContent")
 
 describe("NextBag", function()
   local buttons, sent, messages, buckets, groupsEnabled, activeGroup, allGroups, expired, inBagSearch
@@ -195,6 +197,21 @@ describe("NextBag", function()
     finishTweens()
     return bag
   end
+
+  -- A section waiting in another panel's dock (NextDock, next.md §7) comes back when its bag hides.
+  it("sends its sections waiting in a dock back when it hides", function()
+    nextDock:Init()
+    local bag = opened()
+    local section = bag.content.order[1]
+    local frame = CreateFrame("Frame", nil, UIParent)
+    local target = { frame = frame, content = nextContent:Create(frame), scroll = { frame = CreateFrame("Frame") } }
+    nextDock:Add(target, { section = section, source = bag,
+      offer = { text = function() return "Sell 1 item?", "", "" end } })
+    assert.is_true(bag.content:IsAway(section))
+    bag.frame:GetScript("OnHide")(bag.frame)
+    assert.are.same({}, nextDock:Entries(target))
+    assert.is_false(bag.content:IsAway(section))
+  end)
 
   describe("the panel", function()
     it("is a hidden, named, full-height panel on the right edge of the screen", function()
@@ -617,6 +634,25 @@ describe("NextBag", function()
         assert.equal(0, offset(bag), "in its place")
         finishTweens()
         assert.equal(1, c.n, "once")
+      end)
+
+      -- The vendor docks what waits at a merchant once the backpack is on screen (automation.md §4).
+      it("says so, once it has slid into place", function()
+        local bag = nextBag:Create(ctx())
+        bag:Show(ctx(), nil)
+        tween:Step(style.Time.Open * 0.9)
+        local function shown()
+          local list = {}
+          for _, m in ipairs(sent) do
+            if m[1] == "next/PanelShown" then table.insert(list, m[2]) end
+          end
+          return list
+        end
+        assert.are.same({}, shown(), "still sliding")
+        tween:Step(style.Time.Open * 0.2)
+        assert.are.same({ bag }, shown())
+        finishTweens()
+        assert.are.same({ bag }, shown(), "once")
       end)
 
       it("calls back at once when it is already open", function()

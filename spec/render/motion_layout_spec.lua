@@ -38,6 +38,7 @@ local originalHeaderColor = rawget(elements, "GetSectionHeaderColor")
 elements.GetSectionHeaderColor = function() return 1, 1, 1, 1 end
 trackStub("Items")
 trackStub("MovementFlow").GetMovementFlow = function() return 0 end
+trackStub("Seller")
 local groups = trackStub("Groups")
 groups.GetGroupForCategory = function() return nil end
 groups.IsDefaultGroup = function() return false end

@@ -186,7 +186,6 @@ sonataNext:RegisterTheme({
     BagCategories = {
       Fill = { Color = "Ink", Alpha = 0.035 },
       HoverFill = { Color = "Ink", Alpha = 0.04 },
-      DropMarker = { Color = "Seal" },
     },
   },
 

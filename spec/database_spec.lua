@@ -907,6 +907,12 @@ describe("Database", function()
       assert.is_nil(DB.data.profile.ephemeralCategoryFilters["Openable"].automation, "turned off")
     end)
 
+    it("keeps confirming set off for a plugin's category when the plugin makes it again", function()
+      DB:UpdateEphemeralItemCategory("Openable", { enabled = { [0] = true }, automation = "sell", confirmSale = false })
+      DB:CreateOrUpdateCategory({ name = "Openable", enabled = { [0] = true }, priority = 1 })
+      assert.is_false(DB.data.profile.ephemeralCategoryFilters["Openable"].confirmSale)
+    end)
+
     it("CreateOrUpdateCategory creates a persistent category", function()
       DB:CreateOrUpdateCategory({
         name = "Persistent", save = true, enabled = { [0] = true, [1] = true }

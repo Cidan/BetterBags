@@ -44,6 +44,7 @@ database.CreateOrUpdateCategory = function(_, category)
       name = category.name, enabled = category.enabled, dynamic = category.dynamic,
       isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
       color = saved and saved.color, priority = saved and saved.priority, automation = saved and saved.automation,
+      confirmSale = saved and saved.confirmSale,
     }
   end
 end
@@ -513,6 +514,30 @@ describe("Categories", function()
       assert.are.equal("destroy", categories:GetCategoryByName("Openable").automation, "the player's choice wins")
     end)
 
+    -- Asked: "Confirm autosell", a toggle that defaults to on (automation.md §3).
+    it("turns confirming a category's sale off and on, keeping only off, without recalculating the bags", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell" }
+      categories:UpdateCategory(context:New("Test"), "Mats", { confirmSale = false })
+      assert.is_false(dbCategories["Mats"].confirmSale)
+      assert.are.same({ { "categories/Changed" } }, sent)
+      categories:UpdateCategory(context:New("Test"), "Mats", { confirmSale = true })
+      assert.is_nil(dbCategories["Mats"].confirmSale, "on is the default")
+      assert.are.same({ { "categories/Changed" }, { "categories/Changed" } }, sent)
+    end)
+
+    it("keeps a plugin's confirming across its next creation and a move in the order", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:UpdateCategory(ctx, "Openable", { automation = "sell", confirmSale = false })
+      assert.is_false(dbEphemeralCategories["Openable"].confirmSale)
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, priority = 5 }
+      categories:MoveCategory(ctx, "Openable", "Mats")
+      assert.is_false(dbEphemeralCategories["Openable"].confirmSale, "a move keeps it")
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      assert.is_false(categories:GetCategoryByName("Openable").confirmSale, "the player's choice wins")
+    end)
+
     it("says when there is no such category", function()
       assert.is_false(categories:UpdateCategory(context:New("Test"), "Nope", { priority = 1 }))
       assert.are.same({}, sent)
@@ -530,6 +555,18 @@ describe("Categories", function()
       assert.are.equal("sell", categories:AutomationOf("Mats - Cloth"))
       assert.is_nil(categories:AutomationOf("Plain"))
       assert.is_nil(categories:AutomationOf("Armor"), "a built-in category has none")
+    end)
+
+    it("confirms a sale unless turned off, a group by's sections as their category does", function()
+      local ctx = context:New("Test")
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell" }
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, automation = "sell", confirmSale = false }
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      assert.is_true(categories:ConfirmsSaleOf("Mats"))
+      assert.is_false(categories:ConfirmsSaleOf("Ore"))
+      assert.is_false(categories:ConfirmsSaleOf("Ore - Copper"))
+      assert.is_true(categories:ConfirmsSaleOf("Armor"))
     end)
   end)
 
@@ -570,6 +607,151 @@ describe("Categories", function()
       assert.are.equal("Low", sorted[1].name)
       -- Default priority is 10, same as "High"
       assert.are.equal(3, #sorted)
+    end)
+
+    -- Ties are alphabetical, as the Categories list shows them (asked), not left to the sort.
+    it("GetSortedSearchCategories breaks ties by name, ignoring case", function()
+      for _, spec in ipairs({ { "beta", 10 }, { "Alpha", 10 }, { "Gamma", 5 }, { "alpha2", 10 } }) do
+        dbCategories[spec[1]] = { name = spec[1], itemList = {}, searchCategory = { query = "x" }, priority = spec[2] }
+      end
+      local names = {}
+      for i, filter in ipairs(categories:GetSortedSearchCategories()) do names[i] = filter.name end
+      assert.are.same({ "Gamma", "Alpha", "alpha2", "beta" }, names)
+    end)
+  end)
+
+  -- The order of the Categories list is the categories' priority (category-lifecycle.md §7): a
+  -- category higher up wins an item that fits more than one. The number is kept underneath, never shown.
+  describe("the order", function()
+    local sent, savedSend
+
+    before_each(function()
+      sent = {}
+      savedSend = events.SendMessage
+      events.SendMessage = function(_, _, message, ...) table.insert(sent, { message, ... }) end
+    end)
+
+    after_each(function()
+      events.SendMessage = savedSend
+    end)
+
+    local function saved(name, priority, extra)
+      dbCategories[name] = { name = name, itemList = {}, save = true, priority = priority,
+        enabled = { [0] = true, [1] = true, [2] = true } }
+      for k, v in pairs(extra or {}) do dbCategories[name][k] = v end
+    end
+
+    -- A plugin's category seen in an earlier session (its saved state exists).
+    local function known(name, priority, savedPriority)
+      dbEphemeralCategories[name] = { name = name, enabled = { [0] = true, [1] = true, [2] = true },
+        itemList = {}, priority = savedPriority }
+      categories:CreateCategory(context:New("Test"), { name = name, itemList = {}, priority = priority })
+    end
+
+    local function messages()
+      local list = {}
+      for _, m in ipairs(sent) do table.insert(list, m[1]) end
+      return list
+    end
+
+    it("lists every category but a group by's sections, by priority, then by name ignoring case", function()
+      saved("Mats", 5)
+      saved("Potions", 10)
+      saved("apples", 10)
+      saved("Zinc")
+      known("Openable", 1, 3)
+      known("Mats - Cloth", 5)
+      categories:GetCategoryByName("Mats - Cloth").isGroupBySubcategory = true
+      assert.are.same({ "Openable", "Mats", "apples", "Potions", "Zinc" }, categories:GetOrder())
+    end)
+
+    -- Asked: "newest on top".
+    it("puts a new category of yours on top", function()
+      saved("Mats", 5)
+      saved("Gems", 2)
+      categories:CreateCategory(context:New("Test"), { name = "New", itemList = {}, save = true })
+      assert.are.equal("New", categories:GetOrder()[1])
+      assert.is_true(dbCategories["New"].priority < 2)
+      categories:CreateCategory(context:New("Test"), { name = "Newer", itemList = {}, save = true })
+      assert.are.same({ "Newer", "New", "Gems", "Mats" }, categories:GetOrder())
+    end)
+
+    it("leaves a category of yours made again where it was", function()
+      saved("Mats", 5)
+      saved("Gems", 2)
+      categories:CreateCategory(context:New("Test"), dbCategories["Mats"])
+      assert.are.same({ "Gems", "Mats" }, categories:GetOrder())
+    end)
+
+    it("puts a plugin's category seen for the first time on top, and keeps it there next session", function()
+      saved("Mats", 5)
+      categories:CreateCategory(context:New("Test"), { name = "Plug", itemList = {}, priority = 50 })
+      assert.are.same({ "Plug", "Mats" }, categories:GetOrder())
+      assert.are.equal(categories:GetCategoryByName("Plug").priority, dbEphemeralCategories["Plug"].priority,
+        "its place is saved")
+      categories:Init()
+      categories:CreateCategory(context:New("Test"), { name = "Plug", itemList = {}, priority = 50 })
+      assert.are.same({ "Plug", "Mats" }, categories:GetOrder())
+    end)
+
+    it("keeps a plugin's category it saw before where its own priority puts it, until the player moves it", function()
+      saved("Mats", 5)
+      saved("Gems", 9)
+      known("Known", 7)
+      assert.are.same({ "Mats", "Known", "Gems" }, categories:GetOrder())
+    end)
+
+    it("never puts a group by's section on top", function()
+      saved("Mats", 5)
+      saved("Gems", 2)
+      categories:CreateCategory(context:New("Test"), { name = "Mats - Cloth", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Mats", priority = 5 })
+      assert.are.equal(5, categories:GetCategoryByName("Mats - Cloth").priority)
+    end)
+
+    it("moves a category after another, numbering every category from 1, once", function()
+      saved("Mats", 5)
+      saved("Potions", 10)
+      saved("Zinc", 10)
+      known("Openable", 1, 3)
+      sent = {}
+      assert.is_true(categories:MoveCategory(context:New("Test"), "Zinc", "Openable"))
+      assert.are.same({ "Openable", "Zinc", "Mats", "Potions" }, categories:GetOrder())
+      assert.are.same({ 1, 2, 3, 4 }, { categories:GetCategoryByName("Openable").priority, dbCategories["Zinc"].priority,
+        dbCategories["Mats"].priority, dbCategories["Potions"].priority })
+      assert.are.equal(1, dbEphemeralCategories["Openable"].priority, "a plugin's place is saved")
+      assert.are.same({ "categories/Changed", "bags/Rederive" }, messages())
+      assert.are.same({ resetLayout = true, buttons = true }, sent[2][2])
+    end)
+
+    it("moves a category to the top without one to follow", function()
+      saved("Mats", 5)
+      saved("Potions", 10)
+      assert.is_true(categories:MoveCategory(context:New("Test"), "Potions", nil))
+      assert.are.same({ "Potions", "Mats" }, categories:GetOrder())
+    end)
+
+    it("takes a group by's sections along with their category", function()
+      saved("Mats", 5)
+      saved("Potions", 10)
+      known("Mats - Cloth", 5)
+      local section = categories:GetCategoryByName("Mats - Cloth")
+      section.isGroupBySubcategory, section.groupByParent = true, "Mats"
+      categories:MoveCategory(context:New("Test"), "Mats", "Potions")
+      assert.are.equal(dbCategories["Mats"].priority, section.priority)
+      assert.are.equal(section.priority, dbEphemeralCategories["Mats - Cloth"].priority)
+    end)
+
+    it("changes nothing when the category lands where it was, or there is none", function()
+      saved("Mats", 5)
+      saved("Potions", 10)
+      sent = {}
+      assert.is_false(categories:MoveCategory(context:New("Test"), "Potions", "Mats"))
+      assert.is_false(categories:MoveCategory(context:New("Test"), "Mats", nil))
+      assert.is_false(categories:MoveCategory(context:New("Test"), "Nope", nil))
+      assert.is_false(categories:MoveCategory(context:New("Test"), "Potions", "Nope"), "an anchor that is none")
+      assert.are.same({ 5, 10 }, { dbCategories["Mats"].priority, dbCategories["Potions"].priority })
+      assert.are.same({}, sent)
     end)
   end)
 

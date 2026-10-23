@@ -3952,10 +3952,10 @@ function items:GetCategory(ctx, data, own, ignoreRecent)
   end
   local customCategory, customPriority, customFilter = categories:GetCustomCategory(ctx, data.kind, data)
 
-  -- A category's rule and the items placed in it by hand compete by priority (category-lifecycle.md
-  -- §6): the lower number wins; at equal priority an item placed by hand stays where it was placed.
+  -- An item added by hand to a category of yours stays there, whatever the order (category-lifecycle.md
+  -- §7). A plugin's item lists compete with rules by priority, the list winning a tie.
   if searchCategory and customCategory then
-    if (customPriority or 10) <= (searchPriority or 10) then
+    if (customFilter and customFilter.save) or (customPriority or 10) <= (searchPriority or 10) then
       return self:GroupedCategory(ctx, customCategory, customFilter, data)
     end
     return searchCategory

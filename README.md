@@ -530,7 +530,7 @@ Any search you complete has the option to be turned into a custom category. Thes
 To create a Search Category, type in a search, then press `Enter`. Fill out the required information in the dialogue box and save.
 - Category Name (string) is what the new category will be named.
 - Search Query (string) is the search that will be run to determine which items will be in the category. Any search options (described above) will work in the query.
-- Priority (number) is the order in which search categories will "steal" items. Items can only be in 1 category at a time and higher priority will get items first.
+- The order of your categories decides which one gets an item that fits more than one: the higher one wins. Drag them in the list on the Categories page to change it. A new category starts at the top, and an item you add to a category by hand stays there.
 - Group By (string) allows you to create multiple categories from 1 string. Valid options are none, type, subtype, and expansion. This can be chosen as an option or included directly in the search string.  
 `exp = mid and not "housing decor" group by type` will create a category for every type of item from the Midnight expansion, eg. "Midnight - Armor", "Midnight - Weapon", etc.
 
@@ -555,10 +555,13 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 
 ### Automation
 A category can act on its items on its own. Pick it on the Categories page (`/bb`), then its **Automation** tab:
-- **Auto Sell**: when you open a merchant, the category's items in your backpack are sold, a dozen at a time a moment apart, until all are sold. Hold Shift as you open the merchant to keep them.
-- **Destroy What Can't Be Sold** (needs Auto Sell on): the category's items no merchant buys are destroyed. With BetterBags Next, they wait at the bottom of the vendor in a card that glows crimson: each click on it destroys the next one, a whole stack. Anywhere, **Destroy Next Item** (Key Bindings > BetterBags) does the same. The game only lets an addon destroy one item per key press or click.
+- **Auto Sell**: when you open a merchant, the category's items in your backpack are sold.
+- **Confirm Auto Sell** (on by default): with BetterBags Next, the category's section flies over to the vendor and waits there, glowing, as a category you drag onto the vendor does: double-click it to sell, right-click to put it back. Turned off, its items are sold as soon as you open the merchant. Hold Shift as you open the merchant to keep them. The classic bags have no such box: with it on, sell the category yourself by right-clicking its title.
 
-Automation never sells or destroys an item in an equipment set or a purchase you can still refund, and acts on a newly looted item by its category even while it shows under Recent Items. A rule like `rarity = poor`, `ilvl < player.ilvl - 50 AND binding = soulbound` or `toy = true AND known = true` makes a category worth automating.
+Every sale, automatic or not, sells one item at a time, as fast as your connection allows (at least 0.2 seconds apart): selling everything at once makes the game answer "That object is busy." Anything a merchant won't buy stays in your bags, and isn't offered to that merchant again; the next merchant that buys it gets it. A merchant that buys nothing at all is sold nothing.
+- **Destroy What Can't Be Sold** (needs Auto Sell on): the category's items no merchant buys are destroyed. With BetterBags Next, its section waits at the vendor like a sale, glowing red: each click destroys the next item, a whole stack. Anywhere, **Destroy Next Item** (Key Bindings > BetterBags) does the same. The game only lets an addon destroy one item per key press or click.
+
+Automation never sells or destroys an item in an equipment set or a purchase you can still refund. Selling at once acts on a newly looted item by its category even while it shows under Recent Items; a section waiting at the vendor holds only the items it shows, and a category that isn't on the backpack's current tab doesn't fly over. A rule like `rarity = poor`, `ilvl < player.ilvl - 50 AND binding = soulbound` or `toy = true AND known = true` makes a category worth automating.
 
 ## Themes
 BetterBags offers built-in themes, chosen in Settings > Theme: Default (Blizzard's look), Simple Dark, and Slate, Dark and Parchment, from BetterBags' sister addon Moonlight.  

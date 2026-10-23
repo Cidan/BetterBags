@@ -153,9 +153,10 @@ them over the plugin's values). `GetCustomCategory` also returns the category it
 `HideCategory`, `ShowCategory` and `ToggleCategoryShown` do nothing, and `IsCategoryShown` is always
 true; the partition no longer drops "hidden" categories.
 
-**Resolution** (`items:GetCategory`, and the vendor's copy in `next/merchant.lua`): a rule's match
-and an item placed by hand compete by priority, the lower number winning; at equal priority the item
-stays where it was placed (before, the rule won ties). A category with a group by shows a hand-placed
+**Resolution** (`items:GetCategory`, and the vendor's copy in `next/merchant.lua`): an item added by
+hand to a category of yours stays there, whatever the order (§7); a plugin's item lists compete with
+rules by priority, the lower number winning, the list winning a tie (before §7, an item placed by hand
+also only won ties). A category with a group by shows a hand-placed
 item in its sub-category for the item (`items:GroupedCategory`), made as for rule matches
 (`items:ensureSubcategory`: the same bags, color and priority).
 
@@ -172,3 +173,45 @@ by moved, `GetCustomCategory`'s category, rules, `UpdateCategory` for both kinds
 `spec/refresh_pipeline_spec.lua` (the tie, grouping hand-placed items), `spec/items_spec.lua` (every
 category shows), `spec/next/merchant_spec.lua` (the vendor's tie). Mutation-tested (36 mutations; the
 three survivors led to tests and a mock corrected to store a copy, as the database does).
+
+## 7. The order of the Categories list is the priority
+
+Asked (2026-10-22): "remove priority as a numbered concept, and instead just drag the categories in the
+list so they are in priority order -- migrate priority first time as needed"; one list, yours and the
+plugins' together; newest on top; "when tied, do alphabetical for first import"; an item added by hand
+stays where it was put. No help text yet (a help system is planned).
+
+- **The order** (`categories:GetOrder()`): every category but a group by's sections, by `priority`
+  (10 when unset), then by name ignoring case. Higher in the list wins an item that fits more than one
+  category. The Categories page's list shows it (next-settings.md §5) and the rules are tried in it
+  (`GetSortedSearchCategories`, same comparison), so the bags, the vendor and the list agree. Ties used
+  to be decided by an unstable sort over a hash table.
+- **The number stays underneath, never shown.** Rule matching, the vendor, an item's home among your
+  lists (`DB:NormalizeCategories`) and plugins keep reading `priority`; nothing but the screen changed.
+- **Moving** (`categories:MoveCategory(ctx, name, after)`): right after `after`, or to the top without
+  one; then every category in the order is numbered from 1 (yours in their saved filters, a plugin's in
+  its saved state, as `UpdateCategory` saves it), so none ties, and a group by's sections take their
+  category's number. One `categories/Changed` and one `bags/Rederive { resetLayout, buttons }`. Nothing
+  changes for an unknown name, an anchor that is none, or a category that lands where it was.
+- **No migration writes anything.** A profile from before the order is already ordered: its numbers,
+  ties alphabetical, which is what was asked for the first import. Writing numbers at load could not
+  place a plugin's categories, which their plugins make later in the session; read this way they land
+  where their own number puts them. The first drag numbers everything.
+- **New categories go on top** (`CreateCategory`): one of yours never saved before, or a plugin's never
+  seen before (no saved state), gets a number below every other (`topPriority`); a plugin's is saved
+  with it, so it stays there next session. A plugin's category seen before keeps the number the player
+  gave it, else its own; a category made again, and a group by's section, keep theirs.
+- **Hand-added items** (§6, Resolution): an item you add to a category of yours stays there whatever
+  the order; the order decides between rules, and between a rule and a plugin's item list.
+- **Plugins** still pass `priority` to `CreateCategory`; it places a category the player has not moved,
+  and only once its saved state exists (a category new to the player goes on top).
+
+Coverage: `spec/categories_spec.lua` ("the order": the order and its ties, new categories of yours and
+a plugin's on top and kept there, a plugin's seen before, a group by's section, moving and numbering
+with one recalculation, the top, sections following, nothing changed; ties among rules),
+`spec/refresh_pipeline_spec.lua` ("keeps an item added by hand to a category of yours there"),
+`spec/next/merchant_spec.lua` (the vendor's copy), `spec/next/settings/categories_spec.lua` (the list,
+dragging and dropping, a filter), `spec/next/settings/reorder_spec.lua` (the shared drag). 37 mutations
+for the order, the list and the drag, and 2 for the vendor: four first survived and led to tests or
+removed dead code; two are equivalent (the drop's check that the anchor is not the dragged category,
+whose every case ends in no move anyway; clearing the dragged name after a drop).
