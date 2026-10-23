@@ -1,0 +1,23 @@
+{
+  "id": 1792715239,
+  "version": "v0.7.0-10-g6ffc2c0",
+  "channel": "alpha",
+  "date": "2026-10-23",
+  "from": "fc00389b81481d2487ebfa1299bce8b584f03fd9",
+  "to": "6ffc2c0eccc5d1a3146e23e03c448a5062df2dbe",
+  "headline": "Merchant automation now sells items in continuous waves, features updated settings and visuals, and resolves vendor errors.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Merchant auto-selling and item destruction",
+      "details": "Auto-selling now clears items in waves of 12 until finished rather than stopping at the first 12 items. The Automation settings tab has been redesigned to match the rest of the menu, featuring an option to destroy unsellable items alongside Auto Sell, and the vendor destroy card now matches the styling of the sell dock.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Lua error when selling items at vendors",
+      "details": "Fixed an error checking refundable item status that could occur while selling items at a merchant.",
+      "clients": []
+    }
+  ]
+}
