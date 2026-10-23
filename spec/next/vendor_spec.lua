@@ -51,7 +51,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
+  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
   { "NextVendor", "next/vendor.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])

@@ -631,13 +631,12 @@ sonataNext:RegisterTheme({
       HintFont = "SettingsSectionNote",
     },
     -- A bag's categories, on its Categories tab: Height tall over its Fill, Pad inside; rows RowHeight
-    -- tall (headings GroupHeight), Indent in; the light under the pointer and the marker where a dragged
-    -- row would land; the fonts.
+    -- tall (headings GroupHeight), Indent in; the light under the pointer; the fonts. A dragged row is
+    -- lifted as a bag's section is (Drag).
     BagCategories = {
       Height = 420, Pad = 10, RowHeight = 30, GroupHeight = 24, Indent = 10,
       Fill = { Color = "Lavender", Alpha = 0.035 },
       HoverFill = { Color = "Lavender", Alpha = 0.05 },
-      DropMarker = { Color = "Gold", Alpha = 0.9, Size = 2 },
       GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
     },
     -- The classic bags' Currency page: headings HeaderHeight tall, currencies RowHeight tall with their

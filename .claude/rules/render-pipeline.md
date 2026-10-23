@@ -193,6 +193,9 @@ slow. It is an option, off by default (asked).
   targets) and places at once; on, the first render after places at once and the ones after move.
   Specs that render a canvas with a stubbed database stub it off.
 
+- **The settings lists use it too.** `NextListReorder` (next-settings.md §5) places a settings list's rows
+  through Motion in passes of the list, in the interaction time, so a category moved in the order (or a
+  dragged row's room moving) slides its rows as a bag's sections slide.
 - **One function places the bag's frames.** `Motion:Place(frame, relativeTo, x, y)` anchors a
   frame's TOPLEFT to `relativeTo`'s TOPLEFT at an offset. Every grid cell goes through it
   (`gridProto:PlaceCell`: item buttons in sections, sections in views, slots panels, currency

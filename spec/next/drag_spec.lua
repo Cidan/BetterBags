@@ -57,7 +57,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
+  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
   { "NextBank", "next/bank.lua" }, { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -68,6 +68,7 @@ local nextBag = addon:GetModule("NextBag")
 local nextBank = addon:GetModule("NextBank")
 local nextGuildBank = addon:GetModule("NextGuildBank")
 local nextDrag = addon:GetModule("NextDrag")
+local lift = addon:GetModule("NextLift")
 local style = addon:GetModule("NextStyle")
 local tween = addon:GetModule("NextTween")
 local render = addon:GetModule("Render")
@@ -377,11 +378,13 @@ describe("NextDrag", function()
       assert.is_true(nextDrag.shadow:IsShown())
     end)
 
-    -- A Next theme (next-themes.md) draws the lift: its scale, the shadow and the hint's role.
+    -- A Next theme (next-themes.md) draws the lift: its scale, the shadow and the hint's role. The shadow
+    -- is NextLift's (next/lift.lua), restyled as every widget is when a theme applies.
     it("lifts by the theme's scale, with its shadow, naming the drop in its role", function()
       UseNextTheme({ Fonts = { Hint = { Size = 10 } },
         Drag = { LiftScale = 0.8, Shadow = { Color = "Gold", Alpha = 0.5, Spread = 4 }, HintFont = "Hint" } })
       nextDrag:ApplyStyle(context:New("spec"))
+      lift:ApplyStyle(context:New("spec"))
       local herbs = pickUp(backpack, "Herbs")
       finishTweens()
       assert.are.equal(0.8, nextDrag.current.scale)
@@ -392,6 +395,7 @@ describe("NextDrag", function()
       assert.are.equal(style:Font("Hint"), nextDrag.hint:GetFontObject())
       UseNextTheme(nil)
       nextDrag:ApplyStyle(context:New("spec"))
+      lift:ApplyStyle(context:New("spec"))
       assert.are.same(style.Color.Black, { nextDrag.shadow._colorTexture.r, nextDrag.shadow._colorTexture.g,
         nextDrag.shadow._colorTexture.b, nextDrag.shadow._colorTexture.a }, "restyled while lifted")
       drop(herbs)
@@ -497,6 +501,24 @@ describe("NextDrag", function()
       assert.are.same({ { backpack = true, bank = false } }, sentNamed("bags/Rederive"))
       render:Flush()
       assert.is_nil(motion:GetMove(herbs.frame), "lands exactly where the canvas puts it")
+    end)
+
+    it("aims at its gap as it lands", function()
+      local armor = section(backpack, "Armor")
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(herbs.frame:GetLeft() + 20, armor.frame:GetTop() - 5)
+      flush()
+      drop(herbs)
+      local canvas = backpack.content
+      local slotY = canvas:GetDragSlotY()
+      assert.is_true(slotY > 0)
+      tween:Step(style.Time.Land - 0.001)
+      tween:Step(0.0005)
+      local s = herbs.frame:GetScale()
+      local _, _, _, ox, oy = herbs.frame:GetPoint(1)
+      assert.is_true(math.abs(ox * s - canvas.frame:GetLeft()) < 0.5)
+      assert.is_true(math.abs(oy * s - (canvas.frame:GetTop() - slotY)) < 0.5, "the gap's top: " .. oy * s)
+      finishTweens()
     end)
 
     it("starts landing from exactly where it was dropped", function()

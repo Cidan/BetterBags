@@ -22,7 +22,7 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextToggle", "next/controls/toggle.lua" },
   { "NextInput", "next/controls/input.lua" }, { "NextMenu", "next/controls/menu.lua" },
-  { "NextDialog", "next/controls/dialog.lua" }, { "NextListReorder", "next/settings/reorder.lua" },
+  { "NextDialog", "next/controls/dialog.lua" }, { "NextLift", "next/lift.lua" }, { "NextListReorder", "next/settings/reorder.lua" },
   { "NextSettingsBagCategories", "next/settings/bagcategories.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -33,6 +33,9 @@ local nextDialog = addon:GetModule("NextDialog")
 local controls = addon:GetModule("NextControls")
 local context = addon:GetModule("Context")
 local style = addon:GetModule("NextStyle")
+local lift = addon:GetModule("NextLift")
+local tween = addon:GetModule("NextTween")
+local motion = addon:GetModule("Motion")
 
 local BANK = 1
 
@@ -86,6 +89,21 @@ describe("NextSettingsBagCategories", function()
     local row = block:RowFor(name)
     row.frame:GetScript("OnClick")(row.frame, "LeftButton")
     _G._isShiftKeyDown = false
+  end
+
+  local function finishTweens()
+    for _ = 1, 400 do
+      local update = tween.driver and tween.driver:GetScript("OnUpdate")
+      if update == nil then return end
+      update(tween.driver, 0.05)
+    end
+  end
+
+  -- yOf returns where a row is in the list once its slide (Motion) has ended.
+  local function yOf(name)
+    motion:Step(1)
+    local _, _, _, _, y = block:RowFor(name).frame:GetPoint(1)
+    return -y
   end
 
   local function pinned()
@@ -235,23 +253,76 @@ describe("NextSettingsBagCategories", function()
     assert.are.same({ "Ghost", "Tokens", "Mats" }, pinned(), "a pinned one moved up")
   end)
 
-  it("drags a row with the mouse, marking where it would land", function()
+  -- Asked: "instead of a line on drag, let's animate the move like we do categories" (NextListReorder).
+  it("drags a row as the bags drag a section: lifted, the others making room, landing where let go", function()
     local K = style.Theme.Settings.BagCategories
-    local I = controls:Theme("Input")
     block.listBox:_SetRect(0, 0, 300, 300)
     local row = block:RowFor("Tokens")
+    row.frame:_SetRect(0, 300 - yOf("Tokens") - K.RowHeight, 300, K.RowHeight)
     -- A quarter of the way down the first pinned row: in its top half, so before it.
     _G._cursorX, _G._cursorY = 20, 300 - (K.GroupHeight + 0.25 * K.RowHeight)
     _G._mouseButtonsDown = { LeftButton = true }
     row.frame:GetScript("OnDragStart")(row.frame)
-    block.listBox:GetScript("OnUpdate")(block.listBox, 0.016)
-    assert.is_true(block.drag.marker:IsShown())
+    assert.are.equal(lift.layer, row.frame:GetParent(), "lifted")
+    block.drag:Update(0.016)
+    assert.are.equal(K.GroupHeight + K.RowHeight, yOf("Potions"), "Potions makes room above it")
     _G._mouseButtonsDown = {}
-    block.listBox:GetScript("OnUpdate")(block.listBox, 0.016)
-    assert.is_false(block.drag.marker:IsShown())
-    assert.are.same({ "Tokens", "Potions", "Mats", "Ghost" }, pinned())
+    block.drag:Update(0.016)
+    finishTweens()
     _G._cursorX, _G._cursorY = 0, 0
-    local _ = I
+    assert.are.same({ "Tokens", "Potions", "Mats", "Ghost" }, pinned())
+    assert.are.equal(block.listContent, row.frame:GetParent())
+    assert.are.equal(row, block:RowFor("Tokens"), "its own row, in its new place")
+    assert.are.equal(K.GroupHeight, yOf("Tokens"))
+  end)
+
+  it("never drops a row above the Pinned heading", function()
+    local K = style.Theme.Settings.BagCategories
+    block.listBox:_SetRect(0, 0, 300, 300)
+    local row = block:RowFor("Mats")
+    row.frame:_SetRect(0, 300 - yOf("Mats") - K.RowHeight, 300, K.RowHeight)
+    _G._cursorX, _G._cursorY = 20, 299
+    _G._mouseButtonsDown = { LeftButton = true }
+    row.frame:GetScript("OnDragStart")(row.frame)
+    block.drag:Update(0.016)
+    motion:Step(1)
+    local _, _, _, _, headingY = block.rows[1].frame:GetPoint(1)
+    assert.are.equal(0, headingY, "the Pinned heading stays on top")
+    assert.are.equal(0, yOf("Potions") - K.GroupHeight - K.RowHeight, "the room is under the heading")
+    _G._mouseButtonsDown = {}
+    block.drag:Update(0.016)
+    finishTweens()
+    _G._cursorX, _G._cursorY = 0, 0
+    assert.are.same({ "Mats", "Potions", "Ghost" }, pinned())
+  end)
+
+  it("gives a category named like a heading a row of its own", function()
+    filters["# Pinned"] = { name = "# Pinned", save = true, itemList = {}, enabled = { [1] = true } }
+    filters["Pinned"] = { name = "Pinned", save = true, itemList = {}, enabled = { [1] = true } }
+    block:Refresh(ctx())
+    assert.are.equal("# Pinned", block:RowFor("# Pinned").label:GetText())
+    assert.are.equal("Pinned", block:RowFor("Pinned").label:GetText())
+    assert.are.equal("PINNED", block.rows[1].label:GetText(), "the heading keeps its own")
+  end)
+
+  -- Rows belong to their categories, so one moved in the order slides to its new place (Motion).
+  it("keeps each category's row its own, as wide as the list, hiding a row it no longer lists", function()
+    local K = style.Theme.Settings.BagCategories
+    local armor, potions = block:RowFor("Armor"), block:RowFor("Potions")
+    rowClick("Armor", true)
+    assert.are.equal(armor, block:RowFor("Armor"))
+    assert.are.equal(potions, block:RowFor("Potions"))
+    assert.are.equal("Armor", armor.label:GetText())
+    assert.are.equal(K.GroupHeight, yOf("Armor"))
+    assert.are.equal(700 - 2 * K.Pad, potions.frame:GetWidth())
+    block.filter.frame:SetText("pot")
+    block.filter.frame:GetScript("OnTextChanged")(block.filter.frame, true)
+    assert.is_nil(block:RowFor("Armor"))
+    assert.is_false(armor.frame:IsShown())
+    local free = #block.free
+    block.filter.frame:SetText("")
+    block.filter.frame:GetScript("OnTextChanged")(block.filter.frame, true)
+    assert.are.equal(0, #block.free, "the rows put away are used again: " .. free)
   end)
 
   it("lists the bag's sections again when its items are read, and the categories when they change", function()

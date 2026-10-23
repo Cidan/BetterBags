@@ -167,6 +167,7 @@ frames\bag.lua
 
 next\style.lua
 next\tween.lua
+next\lift.lua
 next\controls\base.lua
 next\controls\scrollbar.lua
 next\controls\button.lua

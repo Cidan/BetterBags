@@ -103,8 +103,11 @@ local NAME_OF_GROUP_BY = {
   [GROUP_BY.SUBTYPE] = L:G("Subtype"), [GROUP_BY.EXPANSION] = L:G("Expansion"),
 }
 
--- What a category does on its own (automation.md), in its list line.
+-- What a category does on its own (automation.md), in its heading's line.
 local DOES = { sell = L:G("Sells at merchants"), destroy = L:G("Sells, destroys the rest") }
+
+-- The messages that say a bag's items were read (data/items.lua Phase11): the list counts again.
+local BAG_READ = { 'items/RefreshBackpack/Done', 'items/RefreshBank/Done', 'items/RefreshGuildBank/Done' }
 
 -- The messages a bag kind's committed sweep sends (data/items.lua Phase11): what the bags hold changed.
 local READ = { 'items/RefreshBackpack/Done', 'items/RefreshBank/Done', 'items/RefreshGuildBank/Done' }
@@ -158,8 +161,8 @@ local function addedCount(filter)
   return n
 end
 
--- describe says whose a category is (a plugin's), what is in it and what it does on its own: its list
--- row's line, and its heading's.
+-- describe says whose a category is (a plugin's), what is in it and what it does on its own: its
+-- heading's line.
 ---@param filter CustomCategoryFilter
 ---@return string
 local function describe(filter)
@@ -374,6 +377,29 @@ local function bagItemsOf(bags, fn)
   end
 end
 
+-- matchingCounts returns how many items each category holds in bags, as its Settings tab's Current Items
+-- in this Group lists them: each item once, its group by's sections with it (isShownIn: an item in
+-- "Potions - Flask" counts for Potions). One pass: an item counts for its category and for every name
+-- that category is a section of.
+---@param bags SettingBag[]
+---@return table<string, number>
+local function matchingCounts(bags)
+  local seen, counts = {}, {}
+  bagItemsOf(bags, function(_, _, data)
+    local id = data.itemInfo.itemID
+    local name = data.itemInfo.category
+    while name ~= nil and name ~= "" do
+      seen[name] = seen[name] or {}
+      if not seen[name][id] then
+        seen[name][id] = true
+        counts[name] = (counts[name] or 0) + 1
+      end
+      name = name:match("^(.*) %- ")
+    end
+  end)
+  return counts
+end
+
 -- byName orders grid entries by name (those not known yet after, by item ID).
 ---@param a table
 ---@param b table
@@ -409,20 +435,25 @@ end
 ---@field box WowScrollBox
 ---@field content Frame
 ---@field newCategory NextButtonFrame
+---@field bags fun(): SettingBag[] The bags the settings show.
 ---@field entries table[] { name }, in their order
----@field rows NextCategoryListRow[]
----@field drag NextListReorderDrag Dragging a row moves its category in the order.
+---@field rows NextCategoryListRow[] The rows of the entries, in the same order.
+---@field byName table<string, NextCategoryListRow> Each category's own row: moved in the order, it slides.
+---@field free NextCategoryListRow[] Rows no category has, hidden, to reuse.
+---@field drag NextListReorderList Arranges the rows; dragging one moves its category in the order.
 local listProto = {}
 addon:GetModule('Perf'):RegisterPrototype(listProto, 'NextCategoryList')
 
 -- CreateList makes the page's list (pages.lua sidebar).
 ---@param parent Frame
 ---@param owner Frame The window its dialogs show over.
+---@param bags fun(): SettingBag[] The bags the settings show.
 ---@return NextCategoryList
-function editor:CreateList(parent, owner)
+function editor:CreateList(parent, owner, bags)
   local frame = CreateFrame("Frame", nil, parent)
   ---@type NextCategoryList
-  local list = setmetatable({ frame = frame, owner = owner, entries = {}, rows = {} }, { __index = listProto })
+  local list = setmetatable({ frame = frame, owner = owner, bags = bags, entries = {}, rows = {}, byName = {},
+    free = {} }, { __index = listProto })
   list.filter = nextInput:Create(frame, {
     help = L:G("Find a category"),
     onChange = function() list:RefreshRows() end,
@@ -444,6 +475,7 @@ function editor:CreateList(parent, owner)
   list.drag = reorder:Create({
     box = box, content = content,
     entries = function() return list.entries end,
+    rowOf = function(entry) return list.byName[entry.name].frame end,
     heightOf = function() return style.Theme.Settings.Categories.RowHeight end,
     onDrop = function(name, after) list:Drop(name, after) end,
   })
@@ -458,6 +490,14 @@ function editor:CreateList(parent, owner)
       settings:Reselect(ctx)
     end
   end)
+  -- A bag's items were read: what each category holds may have changed.
+  for _, message in ipairs(BAG_READ) do
+    events:RegisterMessage(message, function()
+      if frame:IsVisible() then
+        list:RefreshRows()
+      end
+    end)
+  end
   table.insert(self.all, list)
   sonataNext:RegisterWidget(self)
   list:Style()
@@ -465,7 +505,6 @@ function editor:CreateList(parent, owner)
 end
 
 function listProto:Style()
-  self.drag:Style()
   for _, row in ipairs(self.rows) do
     self:paintRow(row)
   end
@@ -499,6 +538,7 @@ function listProto:Place(width, height)
   self.box:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -top)
   self.box:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, bottom)
   self.box:SetSize(width, math.max(1, height - top - bottom))
+  self.drag:Arrange(width)
 end
 
 -- Refresh lists the categories again, makes sure one is chosen, and asks for a new category's name
@@ -557,32 +597,36 @@ function listProto:Drop(name, after)
   categories:MoveCategory(context:New('NextCategoryList_Drop'), name, anchor)
 end
 
--- RowFor returns the row of a category.
+-- RowFor returns the row of a category the list shows.
 ---@param name string
 ---@return NextCategoryListRow?
 function listProto:RowFor(name)
-  for i, entry in ipairs(self.entries) do
-    if entry.name == name then
-      return self.rows[i]
-    end
-  end
-  return nil
+  return self.byName[name]
 end
 
--- row returns the i-th row, made the first time it is needed.
+-- rowFor returns a category's own row, taking one no category has, or making one, the first time.
 ---@private
----@param i number
+---@param name string
 ---@return NextCategoryListRow
-function listProto:row(i)
-  local row = self.rows[i]
-  if row ~= nil then
-    return row
+function listProto:rowFor(name)
+  local row = self.byName[name]
+  if row == nil then
+    row = table.remove(self.free) or self:newRow()
+    self.byName[name] = row
   end
+  return row
+end
+
+-- newRow makes a row.
+---@private
+---@return NextCategoryListRow
+function listProto:newRow()
   local K = style.Theme.Settings.Categories
   local frame = CreateFrame("Button", nil, self.content)
   frame:RegisterForClicks("LeftButtonUp")
   frame:RegisterForDrag("LeftButton")
-  row = {
+  ---@type NextCategoryListRow
+  local row = {
     frame = frame,
     fill = frame:CreateTexture(nil, "BACKGROUND"),
     hover = frame:CreateTexture(nil, "BACKGROUND", nil, 1),
@@ -616,38 +660,40 @@ function listProto:row(i)
       self.drag:Start(row.entry.name)
     end
   end)
-  self.rows[i] = row
   return row
 end
 
--- layoutRows places the rows, RowHeight tall each.
+-- layoutRows shows each category listed in its own row, RowHeight tall, saying how many of the shown bags'
+-- items it holds (asked: "x items matching"), and puts the rows of those no longer listed away; the list's arrangement places them (NextListReorder: a row that moved slides).
 ---@private
 function listProto:layoutRows()
   local K = style.Theme.Settings.Categories
-  local y = 0
+  local listed = {}
+  local counts = matchingCounts(self.bags())
+  self.rows = {}
   for i, entry in ipairs(self.entries) do
-    local row = self:row(i)
+    local row = self:rowFor(entry.name)
+    listed[entry.name] = true
+    self.rows[i] = row
     row.entry = entry
-    local height = K.RowHeight
-    row.frame:ClearAllPoints()
-    row.frame:SetPoint("TOPLEFT", self.content, "TOPLEFT", 0, -y)
-    row.frame:SetPoint("TOPRIGHT", self.content, "TOPRIGHT", 0, -y)
-    row.frame:SetHeight(height)
+    row.frame:SetHeight(K.RowHeight)
     local filter = categories:GetCategoryByName(entry.name)
     row.label:SetText(entry.name)
-    row.detail:SetText(filter and describe(filter) or "")
+    row.detail:SetText(count(counts[entry.name] or 0, L:G("%d item matching"), L:G("%d items matching")))
     local c = filter and filter.color or GOLD
     row.dot:SetColorTexture(c[1], c[2], c[3], 1)
     row.frame:Show()
     self:paintRow(row)
-    y = y + height
   end
-  for i = #self.entries + 1, #self.rows do
-    self.rows[i].entry = nil
-    self.rows[i].frame:Hide()
+  for name, row in pairs(self.byName) do
+    if not listed[name] then
+      self.byName[name] = nil
+      row.entry = nil
+      row.frame:Hide()
+      table.insert(self.free, row)
+    end
   end
-  self.content:SetHeight(math.max(1, y))
-  self.box:FullUpdate(true)
+  self.drag:Arrange()
 end
 
 -- paintRow draws a row: its category chosen, under the pointer, or neither.

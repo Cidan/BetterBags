@@ -36,9 +36,12 @@ local tween = addon:GetModule('NextTween')
 ---@class NextDockCard: AceModule
 local dockCard = addon:GetModule('NextDockCard')
 
+---@class NextLift: AceModule
+local lift = addon:GetModule('NextLift')
+
 -- NextDrag moves BetterBagsNext's sections by their headers (next.md §7). A section picked up
--- leaves its canvas for the drag layer with its real item buttons and follows the cursor, the
--- canvas keeping a gap where it would go; dropping it reorders it (saving its place), assigns its
+-- leaves its canvas for the drag layer with its real item buttons and follows the cursor (NextLift,
+-- which the settings lists' rows are dragged with too), the canvas keeping a gap where it would go; dropping it reorders it (saving its place), assigns its
 -- category to a tab's group, moves its items to the other bag (and that bag's tab), or sells them
 -- to a seller (the vendor). Drop targets are found from the cursor's position every frame. A move the
 -- target confirms first (a sale past what buyback keeps, a deposit that cannot be taken back) docks
@@ -47,19 +50,8 @@ local dockCard = addon:GetModule('NextDockCard')
 ---@class NextDrag: AceModule
 local nextDrag = addon:NewModule('NextDrag')
 
--- How far from the scroll area's top or bottom it scrolls, and how fast at the edge (per second).
-local SCROLL_EDGE = 40
-local SCROLL_SPEED = 700
 -- How long a section moved away stays out of its column while its items are still there.
 local LEAVING_SECONDS = 3
--- How far past a dragged section's edges its cover reaches: the client starts a drag only once
--- the cursor has moved a little, so the point grabbed can be just outside the section.
-local COVER_MARGIN = 20
--- How far above the highest frame in a dragged section its cover sits, for buttons drawn into it
--- while it is dragged.
-local COVER_ABOVE = 100
--- The highest frame level there is (warcraft.wiki.gg "Frame Strata").
-local MAX_LEVEL = 10000
 
 ---@alias NextDropKind "reorder"|"tab"|"bagtab"|"bag"|"sell"
 
@@ -108,16 +100,14 @@ local MAX_LEVEL = 10000
 ---@field panel NextPanelFrame
 ---@field tab? NextTab
 
----@class (exact) NextDragState
+-- NextDragState is a section's drag; NextLift fills in where it was grabbed and its scale. landing:
+-- it was dropped and is flying to where it goes, or waits in a dock.
+---@class NextDragState: NextLifted
 ---@field panel NextPanelFrame The panel the section came from.
 ---@field section NextSection
 ---@field name string
----@field grabX number From the section's left to the cursor at pickup.
----@field grabY number From the section's top down to the cursor at pickup.
----@field scale number
 ---@field startIndex number Where its gap was at pickup.
 ---@field target? NextDropTarget
----@field landing boolean It was dropped and is flying to where it goes, or waits in a dock.
 ---@field released? number Frames in a row the left button was up without a drop.
 ---@field pending? NextPending A move waiting to be confirmed, the section in the dock.
 
@@ -152,67 +142,19 @@ function nextDrag:IsActive()
   return self.current ~= nil
 end
 
--- cursor returns the cursor's position in UIParent's coordinates.
----@return number x, number y
-local function cursor()
-  local x, y = GetCursorPosition()
-  local scale = UIParent:GetEffectiveScale()
-  return x / scale, y / scale
-end
-
--- buildLayer makes the full-screen drag layer above everything, with the shadow a picked-up
--- section casts and the line naming what dropping does. It takes no mouse.
+-- buildLayer adds the line naming what dropping does to the drag layer (NextLift's: it holds the
+-- section and its shadow and cover).
 ---@private
 function nextDrag:buildLayer()
   if self.layer then
     return
   end
-  local layer = CreateFrame("Frame", "BetterBagsNextDragLayer", UIParent)
-  layer:SetAllPoints(UIParent)
-  layer:SetFrameStrata("TOOLTIP")
-  layer:EnableMouse(false)
-  local shadow = layer:CreateTexture(nil, "BACKGROUND")
-  shadow:Hide()
+  local layer = lift:Layer()
   local hint = layer:CreateFontString(nil, "OVERLAY")
   hint:Hide()
-  -- The cover lies over a dragged section and takes the mouse, so the release lands on it and
-  -- not on one of the section's item buttons: their OnReceiveDrag is a left click
-  -- (ContainerFrameItemButtonMixin), which picks the item up. It does nothing with it. The drop
-  -- is the header's OnDragStop, which the client sends to the frame being dragged wherever the
-  -- cursor is, and targets are found by position, so neither depends on what is under the cursor.
-  local cover = CreateFrame("Frame", nil, layer)
-  cover:EnableMouse(true)
-  cover:Hide()
-  self.layer = layer
-  self.shadow = shadow
-  self.hint = hint
+  self.layer, self.shadow, self.cover, self.hint = layer, lift.shadow, lift.cover, hint
   self:styleLayer()
   sonataNext:RegisterWidget(self)
-  self.cover = cover
-end
-
--- maxLevel returns the highest frame level in frame and every frame below it.
----@param frame Frame
----@return number
-local function maxLevel(frame)
-  local level = frame:GetFrameLevel()
-  for _, child in ipairs({ frame:GetChildren() }) do
-    level = math.max(level, maxLevel(child))
-  end
-  return level
-end
-
--- place puts the dragged section so that the point grabbed is at x, y, at its scale.
----@private
----@param x number
----@param y number
-function nextDrag:place(x, y)
-  local state = self.current
-  local frame = state.section.frame
-  local s = state.scale
-  frame:SetScale(s)
-  frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x - state.grabX * s) / s, (y + state.grabY * s) / s)
 end
 
 -- Begin picks a panel's section up, unless it is not a category, the panel shows the Show Bags
@@ -235,56 +177,17 @@ function nextDrag:Begin(panel, section)
     return false
   end
   local frame = section.frame
-  local left, top = frame:GetLeft(), frame:GetTop()
-  if left == nil or top == nil then
+  if frame:GetLeft() == nil or frame:GetTop() == nil then
     return false
   end
   self:buildLayer()
-  local x, y = cursor()
   local canvas = panel.content
   canvas:BeginDrag(section, function()
     self:Cancel()
   end)
   ---@type NextDragState
-  self.current = {
-    panel = panel, section = section, name = section.name, grabX = x - left, grabY = top - y, scale = 1,
-    startIndex = canvas.drag.index, landing = false,
-  }
-  GameTooltip:Hide()
-  frame:SetParent(self.layer)
-  frame:SetFrameStrata("TOOLTIP")
-  -- Never lower it: every frame in it moves with it, and one that would go below 0 jumps to the top
-  -- level (warcraft.wiki.gg "Frame Strata"), where the cover cannot be above it.
-  frame:SetFrameLevel(math.max(frame:GetFrameLevel(), self.layer:GetFrameLevel() + 2))
-  self:place(x, y)
-  local D = style.Theme.Drag
-  local spread = D.Shadow and D.Shadow.Spread or 0
-  self.shadow:ClearAllPoints()
-  self.shadow:SetPoint("TOPLEFT", frame, "TOPLEFT", -spread, spread)
-  self.shadow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", spread, -spread)
-  self.shadow:SetAlpha(0)
-  self.shadow:SetShown(D.Shadow and true or false)
-  local cover = self.cover
-  cover:ClearAllPoints()
-  cover:SetPoint("TOPLEFT", frame, "TOPLEFT", -COVER_MARGIN, COVER_MARGIN)
-  cover:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", COVER_MARGIN, -COVER_MARGIN)
-  cover:SetFrameLevel(math.min(MAX_LEVEL, maxLevel(frame) + COVER_ABOVE))
-  cover:Show()
-  local state = self.current
-  tween:Play(self, {
-    duration = style.Time.Lift,
-    from = 0,
-    to = 1,
-    ease = style:Ease("Lift"),
-    onUpdate = function(t)
-      state.scale = 1 - (1 - D.LiftScale) * t
-      self.shadow:SetAlpha(self:shadowAlpha() * t)
-      if not state.landing then
-        self:place(cursor())
-      end
-    end,
-  })
-  self.layer:SetScript("OnUpdate", function(_, elapsed)
+  self.current = { panel = panel, section = section, name = section.name, startIndex = canvas.drag.index }
+  lift:Pick(self.current, frame, function(elapsed)
     self:Update(elapsed)
   end)
   canvas:Invalidate()
@@ -473,28 +376,6 @@ function nextDrag:showTarget(target)
   end
 end
 
--- autoScroll scrolls the source panel's content while the cursor is near its top or bottom.
----@private
----@param y number
----@param elapsed number
-function nextDrag:autoScroll(y, elapsed)
-  local scroll = self.current.panel.scroll
-  local top, bottom = scroll.frame:GetTop(), scroll.frame:GetBottom()
-  if top == nil or bottom == nil then
-    return
-  end
-  local closeness = 0
-  if y > top - SCROLL_EDGE then
-    closeness = -math.min(1, (y - (top - SCROLL_EDGE)) / SCROLL_EDGE)
-  elseif y < bottom + SCROLL_EDGE then
-    closeness = math.min(1, ((bottom + SCROLL_EDGE) - y) / SCROLL_EDGE)
-  end
-  if closeness ~= 0 then
-    local box = scroll.scrollBox
-    box:ScrollToOffset(math.max(0, box:GetDerivedScrollOffset() + closeness * SCROLL_SPEED * elapsed), true)
-  end
-end
-
 -- Update runs a frame of the drag: the section follows the cursor, the target under the cursor
 -- lights up, and over its own panel the gap moves under the cursor and the content scrolls near
 -- its edges.
@@ -515,8 +396,8 @@ function nextDrag:Update(elapsed)
   else
     state.released = 0
   end
-  local x, y = cursor()
-  self:place(x, y)
+  local x, y = lift:Cursor()
+  lift:Place(state, x, y)
   local target = self:FindTarget()
   self:showTarget(target)
   if target and target.type == "reorder" then
@@ -525,7 +406,8 @@ function nextDrag:Update(elapsed)
     if top then
       canvas:SetDragIndex(canvas:DragIndexAt(top - y))
     end
-    self:autoScroll(y, elapsed)
+    local scroll = state.panel.scroll
+    lift:AutoScroll(scroll.frame, scroll.scrollBox, y, elapsed)
   end
 end
 
@@ -590,19 +472,12 @@ function nextDrag:reattach(hidden)
   local state = self.current
   local canvas = state.panel.content
   local frame = state.section.frame
-  frame:SetParent(canvas.frame)
-  frame:SetScale(1)
-  frame:SetAlpha(1)
-  frame:SetFrameStrata(canvas.frame:GetFrameStrata())
-  frame:SetFrameLevel(canvas.frame:GetFrameLevel() + 1)
-  frame:ClearAllPoints()
+  lift:Put(state, canvas.frame)
   frame:SetPoint("TOPLEFT", canvas.frame, "TOPLEFT", 0, -(canvas:GetDragSlotY() or state.section.y or 0))
   if hidden then
     frame:Hide()
   end
-  self.shadow:Hide()
   self.hint:Hide()
-  self.cover:Hide()
 end
 
 -- finish ends the drag: the target unlit, the driver stopped.
@@ -614,18 +489,10 @@ function nextDrag:finish()
   end
   self:hideDock()
   self.current = nil
-  tween:Stop(self)
-  if self.layer then
-    self.layer:SetScript("OnUpdate", nil)
+  if state then
+    tween:Stop(state)
   end
 end
-
--- NextDragPoint is where a section starts a flight from: its top left in UIParent's coordinates, at
--- a scale (a section leaving the dock, not the cursor).
----@class (exact) NextDragPoint
----@field left number
----@field top number
----@field scale number
 
 -- land flies the section from where it is (the cursor's place, or from) into its canvas's gap and back
 -- to full size, aiming at the gap every frame, then puts it back in the canvas there.
@@ -636,39 +503,16 @@ end
 function nextDrag:land(commit, after, from)
   local state = self.current
   local canvas = state.panel.content
-  local frame = state.section.frame
-  local s0 = from and from.scale or state.scale
-  -- Where place put it: the client reports a scaled frame's edges in its own scale.
-  local cx, cy = cursor()
-  local left0, top0 = cx - state.grabX * s0, cy + state.grabY * s0
-  if from then
-    left0, top0 = from.left, from.top
-  end
-  local shadow0 = self.shadow:GetAlpha()
-  tween:Play(self, {
-    duration = style.Time.Land,
-    from = 0,
-    to = 1,
-    ease = style:Ease("Land"),
-    onUpdate = function(t)
-      local left = (canvas.frame:GetLeft() or left0)
-      local top = (canvas.frame:GetTop() or top0) - (canvas:GetDragSlotY() or 0)
-      local s = s0 + (1 - s0) * t
-      local x, y = left0 + (left - left0) * t, top0 + (top - top0) * t
-      frame:SetScale(s)
-      frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / s, y / s)
-      self.shadow:SetAlpha(shadow0 * (1 - t))
-    end,
-    onDone = function()
-      self:reattach(false)
-      canvas:EndDrag(commit)
-      self:finish()
-      if after then
-        after()
-      end
-    end,
-  })
+  lift:Land(state, function(left0, top0)
+    return canvas.frame:GetLeft() or left0, (canvas.frame:GetTop() or top0) - (canvas:GetDragSlotY() or 0)
+  end, function()
+    self:reattach(false)
+    canvas:EndDrag(commit)
+    self:finish()
+    if after then
+      after()
+    end
+  end, from)
 end
 
 -- flyAway flies the section from where it is (the cursor's place, or from) into a point (a tab, the
@@ -683,13 +527,13 @@ function nextDrag:flyAway(x, y, after, from)
   local canvas = state.panel.content
   local frame = state.section.frame
   local s0 = from and from.scale or state.scale
-  local x0, y0 = cursor()
+  local x0, y0 = lift:Cursor()
   if from then
     state.scale = s0
     x0, y0 = from.left + state.grabX * s0, from.top - state.grabY * s0
   end
-  local flyScale, shadow = style.Theme.Drag.FlyScale, self:shadowAlpha()
-  tween:Play(self, {
+  local flyScale, shadow = style.Theme.Drag.FlyScale, lift:ShadowAlpha()
+  tween:Play(state, {
     duration = style.Time.FlyAway,
     from = 0,
     to = 1,
@@ -698,7 +542,7 @@ function nextDrag:flyAway(x, y, after, from)
       state.scale = s0 + (flyScale - s0) * t
       frame:SetAlpha(1 - t)
       self.shadow:SetAlpha(shadow * (1 - t))
-      self:place(x0 + (x - x0) * t, y0 + (y - y0) * t)
+      lift:Place(state, x0 + (x - x0) * t, y0 + (y - y0) * t)
     end,
     onDone = function()
       self:reattach(true)
@@ -708,20 +552,6 @@ function nextDrag:flyAway(x, y, after, from)
       after()
     end,
   })
-end
-
--- screenPoint returns a frame's top left in UIParent's coordinates and its scale relative to
--- UIParent, or nil before the client has placed it. The client reports a frame's edges in the
--- frame's own effective scale.
----@param frame Frame
----@return NextDragPoint?
-local function screenPoint(frame)
-  local left, top = frame:GetLeft(), frame:GetTop()
-  if left == nil or top == nil then
-    return nil
-  end
-  local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
-  return { left = left * scale, top = top * scale, scale = scale }
 end
 
 -- buildDock makes the dock a move waits in to be confirmed (asked: a sale past what buyback keeps
@@ -769,25 +599,11 @@ function nextDrag:buildDock()
   sonataNext:RegisterWidget(self)
 end
 
--- shadowAlpha is how dark the shadow under a lifted section gets (the theme's Drag.Shadow), 0 with none.
----@private
----@return number
-function nextDrag:shadowAlpha()
-  local shadow = style.Theme.Drag.Shadow
-  return shadow and shadow.Alpha or 0
-end
-
--- styleLayer draws the drag layer's parts from the theme (Drag): the shadow's color, and the hint
--- naming the drop in its role.
+-- styleLayer draws the hint naming the drop in its role (the theme's Drag.HintFont); NextLift draws
+-- the shadow.
 ---@private
 function nextDrag:styleLayer()
-  local D = style.Theme.Drag
-  if D.Shadow then
-    style:Paint(self.shadow, { Color = D.Shadow.Color })
-  else
-    self.shadow:Hide()
-  end
-  style:SetFont(self.hint, D.HintFont)
+  style:SetFont(self.hint, style.Theme.Drag.HintFont)
 end
 
 -- styleDock draws the dock from the theme (Dock): the scrim (a texture spec) and the card
@@ -801,22 +617,13 @@ function nextDrag:styleDock()
   d.card:SetPoint("TOP", d.frame, "TOP", 0, -D.Top)
 end
 
--- ApplyStyle restyles what the drag has made for the theme SonataNext applied: the drag layer, and the
--- dock, laid out again while a move waits in it.
+-- ApplyStyle restyles what the drag has made for the theme SonataNext applied: the hint, and the dock,
+-- laid out again while a move waits in it (NextLift restyles the shadow).
 ---@param ctx Context
 function nextDrag:ApplyStyle(ctx)
   local _ = ctx
   if self.layer then
     self:styleLayer()
-    local state = self.current
-    if state ~= nil and state.pending == nil then
-      local D, frame = style.Theme.Drag, state.section.frame
-      local spread = D.Shadow and D.Shadow.Spread or 0
-      self.shadow:ClearAllPoints()
-      self.shadow:SetPoint("TOPLEFT", frame, "TOPLEFT", -spread, spread)
-      self.shadow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", spread, -spread)
-      self.shadow:SetShown(D.Shadow and true or false)
-    end
   end
   if self.dock then
     self:styleDock()
@@ -874,14 +681,14 @@ function nextDrag:Pend(target, confirmation, confirm)
   local panel = target.panel
   state.pending = { target = target, confirm = confirm }
   local frame = state.section.frame
-  local from = screenPoint(frame)
-  local cx, cy = cursor()
+  local from = lift:ScreenPoint(frame)
+  local cx, cy = lift:Cursor()
   if from == nil then
     from = { left = cx - state.grabX * state.scale, top = cy + state.grabY * state.scale, scale = state.scale }
   end
   d.frame:SetParent(panel.frame)
   d.frame:SetFrameStrata(panel.frame:GetFrameStrata())
-  d.frame:SetFrameLevel(math.min(MAX_LEVEL - COVER_ABOVE * 2, maxLevel(panel.scroll.frame) + 10))
+  d.frame:SetFrameLevel(math.min(lift.MAX_LEVEL - lift.COVER_ABOVE * 2, lift:MaxLevel(panel.scroll.frame) + 10))
   d.frame:ClearAllPoints()
   d.frame:SetAllPoints(panel.scroll.frame)
   d.title:SetText(confirmation.title)
@@ -895,11 +702,10 @@ function nextDrag:Pend(target, confirmation, confirm)
   addon.SetScript(d.frame, "OnUpdate", function(_, _, elapsed)
     self:pulse(elapsed)
   end)
-  self.shadow:Hide()
+  lift:Detach()
   self.hint:Hide()
-  self.cover:Hide()
-  local to = screenPoint(d.slot)
-  tween:Play(self, {
+  local to = lift:ScreenPoint(d.slot)
+  tween:Play(state, {
     duration = style.Time.Land,
     from = 0,
     to = 1,
@@ -935,7 +741,7 @@ function nextDrag:seat()
   frame:ClearAllPoints()
   frame:SetPoint("TOPLEFT", d.slot, "TOPLEFT", 0, 0)
   frame:Show()
-  d.catcher:SetFrameLevel(math.min(MAX_LEVEL, maxLevel(frame) + COVER_ABOVE))
+  d.catcher:SetFrameLevel(math.min(lift.MAX_LEVEL, lift:MaxLevel(frame) + lift.COVER_ABOVE))
   d.frame:SetAlpha(1)
 end
 
@@ -945,17 +751,8 @@ end
 ---@return NextDragPoint?
 function nextDrag:undock()
   local state = self.current
-  tween:Stop(self, true)
-  local frame = state.section.frame
-  local from = screenPoint(frame)
-  frame:SetParent(self.layer)
-  frame:SetFrameStrata("TOOLTIP")
-  frame:SetFrameLevel(math.max(frame:GetFrameLevel(), self.layer:GetFrameLevel() + 2))
-  if from then
-    frame:SetScale(from.scale)
-    frame:ClearAllPoints()
-    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", from.left / from.scale, from.top / from.scale)
-  end
+  tween:Stop(state, true)
+  local from = lift:Raise(state.section.frame)
   state.pending = nil
   self:hideDock()
   return from
@@ -1135,7 +932,7 @@ function nextDrag:moveDone(ctx, target, rederive, from)
     x, y = target.panel.scroll.frame:GetCenter()
   end
   if x == nil then
-    x, y = cursor()
+    x, y = lift:Cursor()
   end
   self:flyAway(x, y, function()
     if target.tab then
@@ -1157,7 +954,6 @@ function nextDrag:Cancel()
   if state.target then
     self:showTarget(nil)
   end
-  tween:Stop(self)
   local canvas = state.panel.content
   local dragging = canvas.drag ~= nil and canvas.drag.section == state.section
   self:reattach(false)

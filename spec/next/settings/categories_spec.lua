@@ -24,12 +24,15 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextInput", "next/controls/input.lua" }, { "NextMenu", "next/controls/menu.lua" },
   { "NextDropdown", "next/controls/dropdown.lua" }, { "NextSwatch", "next/controls/swatch.lua" },
   { "NextDialog", "next/controls/dialog.lua" }, { "NextItemGrid", "next/controls/itemgrid.lua" },
-  { "NextListReorder", "next/settings/reorder.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" } }) do
+  { "NextLift", "next/lift.lua" }, { "NextListReorder", "next/settings/reorder.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
 
 local editor = addon:GetModule("NextSettingsCategories")
+local lift = addon:GetModule("NextLift")
+local tween = addon:GetModule("NextTween")
+local motion = addon:GetModule("Motion")
 local nextDialog = addon:GetModule("NextDialog")
 local nextMenu = addon:GetModule("NextMenu")
 local controls = addon:GetModule("NextControls")
@@ -272,45 +275,121 @@ describe("NextSettingsCategories", function()
     end
 
     before_each(function()
-      list = editor:CreateList(CreateFrame("Frame"), owner)
+      list = editor:CreateList(CreateFrame("Frame"), owner, bagsFn)
       list:Place(232, 648)
       list:Refresh(ctx())
     end)
 
-    -- Asked: priority is the order of one list, yours and the plugins' together, a plugin's marked.
-    it("lists every category in their order, a plugin's marked, with what is in it", function()
+    local function finishTweens()
+      for _ = 1, 400 do
+        local update = tween.driver and tween.driver:GetScript("OnUpdate")
+        if update == nil then return end
+        update(tween.driver, 0.05)
+      end
+    end
+
+    -- yOf returns where a row is in the list once its slide (Motion) has ended.
+    local function yOf(name)
+      motion:Step(1)
+      local _, _, _, _, y = list:RowFor(name).frame:GetPoint(1)
+      return -y
+    end
+
+    -- Asked: priority is the order of one list, yours and the plugins' together; then: "can you just
+    -- have the subtext to categories say 'x items matching' please?"
+    it("lists every category in their order, each saying how many of your items it holds", function()
       assert.are.same({
-        "Openable | Made by a plugin · 1 added item",
-        "Midnight | Search Rule and 1 added item",
-        "Ores | Made by a plugin · Search Rule",
-        "Mats | 2 added items",
-        "Empty | Nothing in it yet",
-        "Potions | Search Rule",
+        "Openable | 0 items matching",
+        "Midnight | 0 items matching",
+        "Ores | 0 items matching",
+        "Mats | 0 items matching",
+        "Empty | 0 items matching",
+        "Potions | 3 items matching",
       }, listed(), "a group by's sub-categories are not listed")
     end)
 
-    it("drags a category to a new place: after the one above where it is let go, or to the top", function()
+    -- The count is the Settings tab's Current Items in this Group: each item once (two Bandage stacks
+    -- are one), its group by's sections with it (the Flask in "Potions - Flask"), in the bags the
+    -- settings show.
+    it("counts what its Settings tab shows as Current Items in this Group, one item singular", function()
+      local tab = editor:CreateSettingsTab(CreateFrame("Frame"), owner, bagsFn)
+      editor.selected = "Potions"
+      place(tab)
+      assert.are.equal(3, #tab.grid.entries)
+      committed[BACKPACK]["0_7"] = { slotkey = "0_7", itemInfo = { itemID = 12, category = "Mats" } }
+      committed[BACKPACK]["0_8"] = { slotkey = "0_8", itemInfo = { itemID = 12, category = "Mats - Gems" } }
+      list:RefreshRows()
+      assert.are.equal("1 item matching", list:RowFor("Mats").detail:GetText())
+      bags = { bags[2] }
+      list:RefreshRows()
+      assert.are.equal("1 item matching", list:RowFor("Potions").detail:GetText(), "the bank's only")
+      assert.are.equal("0 items matching", list:RowFor("Mats").detail:GetText())
+    end)
+
+    it("counts again when a bag's items are read while it shows", function()
+      list.frame:GetParent():Show()
+      list.frame:Show()
+      committed[BANK]["6_3"] = { slotkey = "6_3", itemInfo = { itemID = 55, category = "Potions" } }
+      handlers["items/RefreshBank/Done"][1](ctx())
+      assert.are.equal("4 items matching", list:RowFor("Potions").detail:GetText())
+      list.frame:Hide()
+      committed[BANK]["6_4"] = { slotkey = "6_4", itemInfo = { itemID = 56, category = "Potions" } }
+      handlers["items/RefreshBackpack/Done"][1](ctx())
+      assert.are.equal("4 items matching", list:RowFor("Potions").detail:GetText(), "not while hidden")
+    end)
+
+    -- Asked: "instead of a line on drag, let's animate the move like we do categories" (NextListReorder).
+    it("drags a category as the bags drag a section, moving it after the one above where it lands", function()
       local K = style.Theme.Settings.Categories
       list.box:_SetRect(0, 0, 232, 600)
       local row = list:RowFor("Potions")
+      row.frame:_SetRect(0, 600 - yOf("Potions") - K.RowHeight, 232, K.RowHeight)
       -- A quarter of the way down the second row: in its top half, so after the first.
       _G._cursorX, _G._cursorY = 20, 600 - (K.RowHeight + 0.25 * K.RowHeight)
       _G._mouseButtonsDown = { LeftButton = true }
       row.frame:GetScript("OnDragStart")(row.frame)
-      list.box:GetScript("OnUpdate")(list.box, 0.016)
-      assert.is_true(list.drag.marker:IsShown())
+      assert.are.equal(lift.layer, row.frame:GetParent(), "lifted")
+      list.drag:Update(0.016)
+      assert.are.equal(2 * K.RowHeight, yOf("Midnight"), "Midnight makes room under Openable")
       _G._mouseButtonsDown = {}
-      list.box:GetScript("OnUpdate")(list.box, 0.016)
+      list.drag:Update(0.016)
+      finishTweens()
       _G._cursorX, _G._cursorY = 0, 0
-      assert.is_false(list.drag.marker:IsShown())
+      assert.are.same({ "MoveCategory", "Potions", "Openable" }, calls[#calls])
+      assert.are.equal(list.content, row.frame:GetParent())
+      assert.are.equal(K.RowHeight, yOf("Potions"), "in its new place")
       list:Drop("Potions", 0)
       list:Drop("Openable", 2)
       local moves = {}
       for _, call in ipairs(calls) do
         if call[1] == "MoveCategory" then table.insert(moves, call) end
       end
+      -- The stand-in MoveCategory draws nothing again, so the list shows the order the drag left:
+      -- Openable, Potions, Midnight...
       assert.are.same({ { "MoveCategory", "Potions", "Openable" }, { "MoveCategory", "Potions", nil },
-        { "MoveCategory", "Openable", "Midnight" } }, moves)
+        { "MoveCategory", "Openable", "Potions" } }, moves)
+    end)
+
+    -- Rows belong to their categories, so one moved in the order slides to its new place (Motion).
+    it("keeps each category's row its own, as wide as the list, hiding a row it no longer lists", function()
+      local K = style.Theme.Settings.Categories
+      local potions, mats = list:RowFor("Potions"), list:RowFor("Mats")
+      filters.Potions.priority = 0
+      list:RefreshRows()
+      assert.are.equal(potions, list:RowFor("Potions"))
+      assert.are.equal(mats, list:RowFor("Mats"))
+      assert.are.equal("Potions", potions.label:GetText())
+      assert.are.equal(0, yOf("Potions"))
+      assert.are.equal(232, mats.frame:GetWidth())
+      list.filter.frame:SetText("pot")
+      list.filter.frame:GetScript("OnTextChanged")(list.filter.frame, true)
+      assert.is_nil(list:RowFor("Mats"))
+      assert.is_false(mats.frame:IsShown())
+      local free = #list.free
+      list.filter.frame:SetText("")
+      list.filter.frame:GetScript("OnTextChanged")(list.filter.frame, true)
+      assert.are.equal(0, #list.free, "the rows put away are used again: " .. free)
+      local _ = K
     end)
 
     -- A filter shows some of the order: a category dropped among them lands next to them in the whole
@@ -318,7 +397,7 @@ describe("NextSettingsCategories", function()
     it("drops among the categories a filter shows next to them in the whole order", function()
       list.filter.frame:SetText("s")
       list.filter.frame:GetScript("OnTextChanged")(list.filter.frame, true)
-      assert.are.same({ "Ores | Made by a plugin · Search Rule", "Mats | 2 added items", "Potions | Search Rule" },
+      assert.are.same({ "Ores | 0 items matching", "Mats | 0 items matching", "Potions | 3 items matching" },
         listed())
       list:Drop("Potions", 0)
       list:Drop("Ores", 2)
@@ -337,7 +416,7 @@ describe("NextSettingsCategories", function()
     it("keeps only the categories whose name has what is typed in its filter", function()
       list.filter.frame:SetText("MID")
       list.filter.frame:GetScript("OnTextChanged")(list.filter.frame, true)
-      assert.are.same({ "Midnight | Search Rule and 1 added item" }, listed())
+      assert.are.same({ "Midnight | 0 items matching" }, listed())
     end)
 
     it("chooses the first category when none is, and the one clicked, marking it", function()

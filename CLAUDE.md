@@ -29,12 +29,12 @@ Never make any changes without directly confirming that the functions, code, API
 
 Every UI element must reuse the design that already exists for that kind of element, and look like it belongs beside it. Consistent design is a requirement, not polish.
 
-1. **Find the existing component first.** Before building any UI, find where BetterBags already shows the same kind of thing (a setting, a section, a confirmation card, a dialog, a button, a list, an item grid) and use that component: settings go in a page's `sections` and `rows` (`next/settings/rows.lua`), confirmation cards are `NextDockCard`, questions are `NextDialog`, controls come from `next/controls/`, and the classic bags' parts are Sonata elements.
+1. **Find the existing component first.** Before building any UI, find where BetterBags already shows the same kind of thing (a setting, a section, a confirmation card, a dialog, a button, a list, an item grid) and use that component: settings go in a page's `sections` and `rows` (`next/settings/rows.lua`), confirmation cards are `NextDockCard`, questions are `NextDialog`, controls come from `next/controls/`, dragging anything is `NextLift` (and a reorderable settings list is `NextListReorder`), things that move between places go through Motion, and the classic bags' parts are Sonata elements.
 2. **Never hand-place controls or rebuild a look a component already draws.** If no component fits as is, extend it, or move the existing one into a shared component that both uses go through. Never make a lookalike.
 3. **Take fonts, colors, spacing and art from the theme keys the existing element uses.** Add a theme key only for what is actually new (a different glow color), never new values for the same thing.
 4. **Compare before reporting.** Before calling UI work done, compare it with the closest existing screen (layout, fill, fonts, spacing, motion) and say how it matches. If you cannot see it in game, say so.
 
-Mistakes this rule comes from: the category Automation tab first hand-placed bare switches instead of the settings rows every other page uses, and the vendor's destroy card was first drawn with art of its own instead of the sell dock's card.
+Mistakes this rule comes from: the category Automation tab first hand-placed bare switches instead of the settings rows every other page uses; the vendor's destroy card was first drawn with art of its own instead of the sell dock's card; and the settings lists first got a drag of their own (a drop line) instead of the lift-and-slide the bags' sections already had.
 
 ## Mocking and WoW API Mocks
 

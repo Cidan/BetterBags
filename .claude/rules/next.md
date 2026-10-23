@@ -349,6 +349,16 @@ selling a backpack section by dragging it onto the vendor: a panel registered wi
 while it is shown, checked before the bags' panels; it says what sells (`SaleOf`) and sells it
 (`Sell`), and the section flies into it only when it sold (§10b).
 
+**One drag for sections and settings rows** (`NextLift`, `next/lift.lua`). Lifting a frame onto the
+drag layer, its cover and shadow, following the cursor, landing it where its owner says and scrolling a
+list near its edges were NextDrag's own; they moved to `NextLift` when the settings lists' rows were made
+to move as sections do (next-settings.md §5, "Dragging a row"; asked: "we do this amazingly in the bags
+today"), so both drags are the same code. NextDrag keeps the section's part: the canvas's gap, drop
+targets, the hint, flying away, the dock. `NextDrag.layer`, `.shadow` and `.cover` are NextLift's; the
+shadow is restyled by NextLift's own `ApplyStyle`. One frame is lifted at a time (`NextLift:IsHolding`).
+The move changed nothing about the bags' drag: its 67 tests pass with only the shadow's restyle call
+added.
+
 **Picking up.** Every section has a header button over its title row. Dragging it (left button,
 the client's drag threshold: `RegisterForDrag`, `OnDragStart`) picks up a category section; Recent
 Items and Free Space stay put, and nothing is picked up in the Show Bags view (`SECTION_ALL_BAGS`,
