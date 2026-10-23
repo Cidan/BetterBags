@@ -115,13 +115,19 @@ function automation:BlockedReason(data, action)
 end
 
 -- Entries lists the backpack's items whose category has an action, by bag and slot, each with why
--- automation leaves it alone, if it does.
+-- automation leaves it alone, if it does: the items given (a section docked in BetterBags Next's vendor,
+-- automation.md §4), else every item as the bags were last read.
 ---@param ctx Context
+---@param only? ItemData[]
 ---@return AutomationEntry[]
-function automation:Entries(ctx)
-  local slotInfo = items.slotInfo and items.slotInfo[const.BAG_KIND.BACKPACK]
+function automation:Entries(ctx, only)
+  local source = only
+  if source == nil then
+    local slotInfo = items.slotInfo and items.slotInfo[const.BAG_KIND.BACKPACK]
+    source = slotInfo and slotInfo.itemsBySlotKey or {}
+  end
   local list = {}
-  for _, data in pairs(slotInfo and slotInfo.itemsBySlotKey or {}) do
+  for _, data in pairs(source) do
     if not data.isItemEmpty and data.itemInfo and const.BACKPACK_BAGS[data.bagid] ~= nil then
       local category = items:GetCategory(ctx, data, false, true)
       local action = categories:AutomationOf(category)
@@ -141,12 +147,13 @@ function automation:Entries(ctx)
 end
 
 -- SellList lists what a merchant is sold: the items either action holds (both sell) that are not left
--- alone and that merchants buy.
+-- alone and that merchants buy, of the items given (else of every item).
 ---@param ctx Context
+---@param only? ItemData[]
 ---@return AutomationEntry[]
-function automation:SellList(ctx)
+function automation:SellList(ctx, only)
   local list = {}
-  for _, entry in ipairs(self:Entries(ctx)) do
+  for _, entry in ipairs(self:Entries(ctx, only)) do
     if not entry.blocked and not (entry.data.containerInfo and entry.data.containerInfo.hasNoValue) then
       table.insert(list, entry)
     end
@@ -154,17 +161,49 @@ function automation:SellList(ctx)
   return list
 end
 
--- DestroyQueue lists what destroying takes, in order (BetterBags Next's vendor shows it on its destroy
--- card): the items destroy categories hold, as the bags were last read, that are not left alone and that
--- no merchant buys (hasNoValue). It never holds an item a sale would sell. Destroying skips an item no
--- longer where the read had it (DestroyNext).
+-- DestroyQueue lists what destroying takes, in order: the items destroy categories hold, as the bags
+-- were last read, that are not left alone and that no merchant buys (hasNoValue), of the items given
+-- (a section docked in BetterBags Next's vendor) or of every item. It never holds an item a sale would
+-- sell. Destroying skips an item no longer where the read had it (DestroyNext).
 ---@param ctx Context
+---@param only? ItemData[]
 ---@return AutomationEntry[]
-function automation:DestroyQueue(ctx)
+function automation:DestroyQueue(ctx, only)
   local list = {}
-  for _, entry in ipairs(self:Entries(ctx)) do
+  for _, entry in ipairs(self:Entries(ctx, only)) do
     if entry.action == self.DESTROY and not entry.blocked and entry.data.containerInfo
       and entry.data.containerInfo.hasNoValue then
+      table.insert(list, entry)
+    end
+  end
+  return list
+end
+
+-- SaleOffer lists what of the items given Auto Sell sells once the player confirms it in BetterBags Next's
+-- vendor dock (§4): the entries of SellList whose category confirms its sale (Confirm Auto Sell on), still
+-- there to sell (StillThere: one already selling is locked).
+---@param ctx Context
+---@param only ItemData[]
+---@return AutomationEntry[]
+function automation:SaleOffer(ctx, only)
+  local list = {}
+  for _, entry in ipairs(self:SellList(ctx, only)) do
+    if categories:ConfirmsSaleOf(entry.category) and self:StillThere(entry, true) then
+      table.insert(list, entry)
+    end
+  end
+  return list
+end
+
+-- DestroyLeft lists what of the items given is left to destroy: the entries of DestroyQueue still in
+-- their slot (StillThere).
+---@param ctx Context
+---@param only ItemData[]
+---@return AutomationEntry[]
+function automation:DestroyLeft(ctx, only)
+  local list = {}
+  for _, entry in ipairs(self:DestroyQueue(ctx, only)) do
+    if self:StillThere(entry, false) then
       table.insert(list, entry)
     end
   end
@@ -211,9 +250,11 @@ function automation:StillThere(entry, forSale)
   return info.stackCount or 1
 end
 
--- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy, from the
--- frame after it opens (StartSale). Holding Shift as it opens sells nothing. It returns what it did, for
--- profiler traces.
+-- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy in the
+-- categories that do not confirm their sale (Confirm Auto Sell off), from the frame after it opens
+-- (StartSale). A category that confirms waits in BetterBags Next's vendor dock for the player (§4); the
+-- classic design has no dock and leaves it to the player. Holding Shift as it opens sells nothing. It
+-- returns what it did, for profiler traces.
 ---@param ctx Context
 ---@return string
 function automation:OnMerchantShow(ctx)
@@ -227,7 +268,12 @@ function automation:OnMerchantShow(ctx)
   if not self:MerchantBuys() then
     return "not buying"
   end
-  local list = self:SellList(ctx)
+  local list = {}
+  for _, entry in ipairs(self:SellList(ctx)) do
+    if not categories:ConfirmsSaleOf(entry.category) then
+      table.insert(list, entry)
+    end
+  end
   if #list == 0 then
     return "nothing"
   end
@@ -305,13 +351,14 @@ function automation:FinishSale(sale, reason)
   return reason
 end
 
--- DestroyNext destroys the first item of the destroy queue (DestroyQueue) still in its slot
--- (StillThere), the whole stack: one item each time, since Blizzard lets an addon destroy only on a key
--- press or a click (DeleteCursorItem has restrictions, GameCursorDocumentation.lua). Not in combat, nor
--- while the cursor holds an item. It says what it destroyed, and returns what it did.
+-- DestroyNext destroys the first item of the destroy queue (DestroyQueue, of the items given when given)
+-- still in its slot (StillThere), the whole stack: one item each time, since Blizzard lets an addon
+-- destroy only on a key press or a click (DeleteCursorItem has restrictions, GameCursorDocumentation.lua).
+-- Not in combat, nor while the cursor holds an item. It says what it destroyed, and returns what it did.
 ---@param ctx Context
+---@param only? ItemData[]
 ---@return string
-function automation:DestroyNext(ctx)
+function automation:DestroyNext(ctx, only)
   if InCombatLockdown() then
     print("BetterBags: " .. L:G("Cannot destroy items in combat."))
     return "combat"
@@ -321,7 +368,7 @@ function automation:DestroyNext(ctx)
     return "cursor"
   end
   local entry
-  for _, queued in ipairs(self:DestroyQueue(ctx)) do
+  for _, queued in ipairs(self:DestroyQueue(ctx, only)) do
     if self:StillThere(queued, false) then
       entry = queued
       break

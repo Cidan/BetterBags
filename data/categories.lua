@@ -39,6 +39,7 @@ local context = addon:GetModule('Context')
 ---@field isGroupBySubcategory? boolean If true, this category is a groupBy subcategory and should not be manually deleted.
 ---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
 ---@field automation? string What it does with its items on its own: "sell" or "destroy" (automation.md).
+---@field confirmSale? boolean false when Auto Sell sells at once; confirmed in the vendor's dock otherwise (automation.md §3).
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -418,6 +419,9 @@ function categories:CreateCategory(ctx, category)
       if savedState.automation ~= nil then
         category.automation = savedState.automation
       end
+      if savedState.confirmSale ~= nil then
+        category.confirmSale = savedState.confirmSale
+      end
     end
     self.ephemeralCategories[category.name] = category
     category.itemList = category.itemList or {}
@@ -465,6 +469,13 @@ function categories:GetOrder()
   return names
 end
 
+-- saveState saves what a player set for a plugin's category (its saved state, category-lifecycle.md §1).
+---@param filter CustomCategoryFilter
+local function saveState(filter)
+  database:UpdateEphemeralItemCategory(filter.name, { enabled = filter.enabled, color = filter.color,
+    priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale })
+end
+
 -- setPriority sets a category's place, saving a plugin's in its saved state as UpdateCategory does.
 ---@private
 ---@param name string
@@ -473,8 +484,7 @@ function categories:setPriority(name, priority)
   local filter = self:GetCategoryByName(name)
   filter.priority = priority
   if database:GetItemCategory(name) == nil then
-    database:UpdateEphemeralItemCategory(name, { enabled = filter.enabled, color = filter.color, priority = priority,
-      automation = filter.automation })
+    saveState(filter)
   end
 end
 
@@ -558,13 +568,14 @@ end
 
 -- UpdateCategory changes a category in place, keeping its items: fields may hold color (a color, or
 -- false for none), priority, enabled (the bags named are set, the others kept), rule (its search;
--- empty for none), groupBy and automation ("sell", "destroy", or false for none). A plugin's category
--- keeps its own rule and group by; the bags, color, priority and automation set for it are saved, and
--- win when the plugin makes it again. The bags are recalculated unless only the automation changed,
--- which changes no item's category. It returns false for a name no category has.
+-- empty for none), groupBy, automation ("sell", "destroy", or false for none) and confirmSale (false:
+-- Auto Sell sells at once; true, the default, is not stored). A plugin's category keeps its own rule and
+-- group by; the bags, color, priority and automation set for it are saved, and win when the plugin makes
+-- it again. The bags are recalculated unless only the automation changed, which changes no item's
+-- category. It returns false for a name no category has.
 ---@param ctx Context
 ---@param name string
----@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false}
+---@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false, confirmSale?: boolean}
 ---@return boolean
 function categories:UpdateCategory(ctx, name, fields)
   local saved = database:GetItemCategory(name)
@@ -582,6 +593,11 @@ function categories:UpdateCategory(ctx, name, fields)
   if fields.automation ~= nil then
     filter.automation = fields.automation or nil
   end
+  if fields.confirmSale == false then
+    filter.confirmSale = false
+  elseif fields.confirmSale ~= nil then
+    filter.confirmSale = nil
+  end
   if fields.enabled ~= nil then
     filter.enabled = filter.enabled or everyBag()
     for kind, on in pairs(fields.enabled) do
@@ -597,13 +613,12 @@ function categories:UpdateCategory(ctx, name, fields)
       saved.groupBy = fields.groupBy
     end
   else
-    database:UpdateEphemeralItemCategory(name, { enabled = filter.enabled, color = filter.color, priority = filter.priority,
-      automation = filter.automation })
+    saveState(filter)
   end
   events:SendMessage(ctx, 'categories/Changed')
-  local onlyAutomation = fields.automation ~= nil
+  local onlyAutomation = fields.automation ~= nil or fields.confirmSale ~= nil
   for key in pairs(fields) do
-    if key ~= 'automation' then
+    if key ~= 'automation' and key ~= 'confirmSale' then
       onlyAutomation = false
     end
   end
@@ -623,6 +638,18 @@ function categories:AutomationOf(name)
     filter = self:GetCategoryByName(filter.groupByParent)
   end
   return filter and filter.automation or nil
+end
+
+-- ConfirmsSaleOf says whether Auto Sell waits for the player to confirm a category's sale in the
+-- vendor's dock (true unless turned off; automation.md §3): a group by's sections as their category does.
+---@param name string
+---@return boolean
+function categories:ConfirmsSaleOf(name)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    filter = self:GetCategoryByName(filter.groupByParent)
+  end
+  return not (filter and filter.confirmSale == false)
 end
 
 -- GetSortedSearchCategories returns the categories with a rule in the order (category-lifecycle.md §7):

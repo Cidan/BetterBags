@@ -19,7 +19,9 @@ local tween = addon:GetModule('NextTween')
 -- above it, a cover over it taking the release and a shadow under it; it shrinks to the theme's
 -- Drag.LiftScale around the point grabbed over Time.Lift and follows the cursor, that point staying
 -- under it, until its owner lands it (back to full size where the owner says, over Time.Land) and puts
--- it back. One frame is held at a time.
+-- it back. One frame is held at a time. It also flies frames it does not hold (a section docked in a
+-- panel, NextDock: into its card, back to its bag, away into the panel), leaving the held frame's shadow
+-- and cover alone.
 ---@class NextLift: AceModule
 ---@field layer? Frame
 ---@field shadow? Texture
@@ -191,12 +193,12 @@ function lift:Place(held, x, y)
   frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x - held.grabX * s) / s, (y + held.grabY * s) / s)
 end
 
--- Land flies the held frame from where it is (the cursor's place, or from) to the top left to(left0,
--- top0) returns (UIParent's coordinates, asked every frame: the place may still be moving; left0, top0
--- is where the flight started) and back to full size, its shadow fading, then calls onDone, which puts
--- it back (Put).
+-- Land flies a frame from where it is (the cursor's place, or from) to the top left to(left0, top0)
+-- returns (UIParent's coordinates, asked every frame: the place may still be moving; left0, top0 is
+-- where the flight started) and to the scale it returns third (full size when it returns none), the held
+-- frame's shadow fading, then calls onDone, which puts it back (Put).
 ---@param held NextLifted
----@param to fun(left0: number, top0: number): number, number
+---@param to fun(left0: number, top0: number): number, number, number?
 ---@param onDone fun()
 ---@param from? NextDragPoint
 function lift:Land(held, to, onDone, from)
@@ -215,13 +217,50 @@ function lift:Land(held, to, onDone, from)
     to = 1,
     ease = style:Ease("Land"),
     onUpdate = function(t)
-      local left, top = to(left0, top0)
-      local s = s0 + (1 - s0) * t
+      local left, top, s1 = to(left0, top0)
+      local s = s0 + ((s1 or 1) - s0) * t
       local x, y = left0 + (left - left0) * t, top0 + (top - top0) * t
       frame:SetScale(s)
       frame:ClearAllPoints()
       frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / s, y / s)
-      self.shadow:SetAlpha(shadow0 * (1 - t))
+      if held == self.held then
+        self.shadow:SetAlpha(shadow0 * (1 - t))
+      end
+    end,
+    onDone = onDone,
+  })
+end
+
+-- FlyAway flies a frame from where it is (the cursor's place, or from) into a point (UIParent's
+-- coordinates), its grabbed point travelling there, shrinking to the theme's Drag.FlyScale and fading
+-- over Time.FlyAway (the held frame's shadow too), then calls onDone (a section moved into a tab, the
+-- other bag, a vendor).
+---@param held NextLifted
+---@param x number
+---@param y number
+---@param onDone fun()
+---@param from? NextDragPoint
+function lift:FlyAway(held, x, y, onDone, from)
+  local frame = held.frame
+  local s0 = from and from.scale or held.scale
+  local x0, y0 = self:Cursor()
+  if from then
+    held.scale = s0
+    x0, y0 = from.left + held.grabX * s0, from.top - held.grabY * s0
+  end
+  local flyScale, shadow = style.Theme.Drag.FlyScale, self:ShadowAlpha()
+  tween:Play(held, {
+    duration = style.Time.FlyAway,
+    from = 0,
+    to = 1,
+    ease = style:Ease("FlyAway"),
+    onUpdate = function(t)
+      held.scale = s0 + (flyScale - s0) * t
+      frame:SetAlpha(1 - t)
+      if held == self.held then
+        self.shadow:SetAlpha(shadow * (1 - t))
+      end
+      self:Place(held, x0 + (x - x0) * t, y0 + (y - y0) * t)
     end,
     onDone = onDone,
   })
@@ -235,14 +274,17 @@ function lift:Detach()
   self.cover:Hide()
 end
 
--- Raise takes a detached frame back onto the layer where it is on screen, and returns where that is
--- (nil before the client placed it), for its flight out.
+-- Raise takes a frame onto the layer where it is on screen (the held frame back from a dock, or a frame
+-- it is to fly), and returns where that is (nil before the client placed it), for its flight.
 ---@param frame Frame
 ---@return NextDragPoint?
 function lift:Raise(frame)
   local from = self:ScreenPoint(frame)
+  self:Layer()
   raise(frame)
-  self.detached = false
+  if self.held ~= nil and self.held.frame == frame then
+    self.detached = false
+  end
   if from then
     frame:SetScale(from.scale)
     frame:ClearAllPoints()
@@ -251,26 +293,34 @@ function lift:Raise(frame)
   return from
 end
 
--- Put puts the held frame back in parent, at full size, one level above parent, with no anchors (its
--- owner places it), and ends the lift: the shadow and the cover hide, the frame callback stops.
+-- Put puts a frame back in parent, at full size, one level above parent, with no anchors (its owner
+-- places it), and ends its lift (Release).
 ---@param held NextLifted
 ---@param parent Frame
 function lift:Put(held, parent)
   local frame = held.frame
-  tween:Stop(held)
+  self:Release(held)
   frame:SetParent(parent)
   frame:SetScale(1)
   frame:SetAlpha(1)
   frame:SetFrameStrata(parent:GetFrameStrata())
   frame:SetFrameLevel(parent:GetFrameLevel() + 1)
   frame:ClearAllPoints()
+end
+
+-- Release ends a frame's lift where the frame is: its flight stops, and, for the held frame, the shadow
+-- and the cover hide and the frame callback stops (a section handed to a dock, NextDock).
+---@param held NextLifted
+function lift:Release(held)
+  tween:Stop(held)
+  if self.held ~= held then
+    return
+  end
+  self.held = nil
+  self.detached = false
   self.shadow:Hide()
   self.cover:Hide()
   self.layer:SetScript("OnUpdate", nil)
-  if self.held == held then
-    self.held = nil
-  end
-  self.detached = false
 end
 
 -- ShadowAlpha is how dark the shadow under a lifted frame gets (the theme's Drag.Shadow), 0 with none.

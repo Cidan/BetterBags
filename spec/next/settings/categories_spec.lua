@@ -200,6 +200,11 @@ describe("NextSettingsCategories", function()
       if fields.color ~= nil then f.color = fields.color or nil end
       if fields.rule ~= nil then f.searchCategory = fields.rule ~= "" and { query = fields.rule } or nil end
       if fields.automation ~= nil then f.automation = fields.automation or nil end
+      if fields.confirmSale == false then
+        f.confirmSale = false
+      elseif fields.confirmSale ~= nil then
+        f.confirmSale = nil
+      end
       for k, v in pairs(fields.enabled or {}) do f.enabled[k] = v end
       return true
     end)
@@ -758,34 +763,40 @@ describe("NextSettingsCategories", function()
   -- Be Sold, which needs Auto Sell on ("sell"; "destroy" is both). Asked: drawn as every other page's
   -- settings, rows of a section (the window's rows, next/settings/rows.lua), not controls of its own.
   describe("the Automation tab's settings", function()
-    local sellOption, destroyOption
+    local sellOption, confirmOption, destroyOption
 
     before_each(function()
-      sellOption, destroyOption = unpack(editor:AutomationOptions())
+      sellOption, confirmOption, destroyOption = unpack(editor:AutomationOptions())
     end)
 
-    it("are two switches, named and described", function()
-      assert.are.same({ "toggle", "toggle" }, { sellOption.kind, destroyOption.kind })
+    it("are three switches, named and described", function()
+      assert.are.same({ "toggle", "toggle", "toggle" }, { sellOption.kind, confirmOption.kind, destroyOption.kind })
       assert.are.equal("Auto Sell", sellOption.title)
+      assert.are.equal("Confirm Auto Sell", confirmOption.title)
       assert.are.equal("Destroy What Can't Be Sold", destroyOption.title)
-      assert.truthy(sellOption.description:find("merchant", 1, true))
-      assert.truthy(destroyOption.description:find("merchant", 1, true))
-      assert.truthy(#sellOption.keywords > 0 and #destroyOption.keywords > 0)
+      for _, option in ipairs({ sellOption, confirmOption, destroyOption }) do
+        assert.truthy(option.description:find("merchant", 1, true) or option.description:find("vendor", 1, true))
+        assert.truthy(#option.keywords > 0)
+      end
     end)
 
-    it("show what the chosen category does, Destroy What Can't Be Sold only with Auto Sell", function()
+    it("show what the chosen category does, the other two only with Auto Sell", function()
       editor.selected = "Mats"
       assert.is_false(sellOption.get())
+      assert.is_true(confirmOption.get(), "on by default")
       assert.is_false(destroyOption.get())
+      assert.is_true(confirmOption.disabled())
       assert.is_true(destroyOption.disabled())
       filters.Mats.automation = "sell"
       assert.is_true(sellOption.get())
       assert.is_false(destroyOption.get())
+      assert.is_false(confirmOption.disabled())
       assert.is_false(destroyOption.disabled())
       filters.Mats.automation = "destroy"
+      filters.Mats.confirmSale = false
       assert.is_true(sellOption.get())
+      assert.is_false(confirmOption.get())
       assert.is_true(destroyOption.get())
-      assert.is_false(destroyOption.disabled())
     end)
 
     it("save at once, Auto Sell turned off taking Destroy with it, and show the page's rows again", function()
@@ -795,14 +806,18 @@ describe("NextSettingsCategories", function()
       destroyOption.set(ctx(), false)
       destroyOption.set(ctx(), true)
       sellOption.set(ctx(), false)
+      confirmOption.set(ctx(), false)
+      confirmOption.set(ctx(), true)
       assert.are.same({
         { "UpdateCategory", "Mats", { automation = "sell" } },
         { "UpdateCategory", "Mats", { automation = "destroy" } },
         { "UpdateCategory", "Mats", { automation = "sell" } },
         { "UpdateCategory", "Mats", { automation = "destroy" } },
         { "UpdateCategory", "Mats", { automation = false } },
+        { "UpdateCategory", "Mats", { confirmSale = false } },
+        { "UpdateCategory", "Mats", { confirmSale = true } },
       }, updates())
-      assert.are.equal(5, refreshed, "the other switch's state follows")
+      assert.are.equal(7, refreshed, "the other switches' state follows")
       assert.is_true(destroyOption.disabled())
     end)
 
@@ -816,6 +831,7 @@ describe("NextSettingsCategories", function()
       editor.selected = nil
       assert.is_false(sellOption.get())
       sellOption.set(ctx(), true)
+      confirmOption.set(ctx(), false)
       assert.are.same({}, updates())
     end)
   end)

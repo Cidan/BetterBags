@@ -510,15 +510,13 @@ sonataNext:RegisterTheme({
     HintGap = 6,
   },
 
-  -- A move waiting to be confirmed, docked in its target (next.md §7): the scrim over the target, the
-  -- card (Pad inside, Top below the target's top), its glow edge pulsing from Low to High every
-  -- Period seconds and its halo, and its lines.
+  -- A section waiting in a panel's dock (next.md §7, NextDock): its card (Pad inside), its glow edge
+  -- pulsing from Low to High every Period seconds and its halo (whose Spread the column leaves round
+  -- the card), and its lines.
   Dock = {
-    -- Texture specs (Color, Texture, Atlas, ...), so a card can be art.
-    Scrim = { Color = "Scrim" },
+    -- A texture spec (Color, Texture, Atlas, ...), so a card can be art.
     Card = { Color = "Card" },
     Pad = 12,
-    Top = 12,
     TitleHeight = 22,
     LineHeight = 16,
     Glow = { Color = "Gold", Width = 2, Low = 0.35, High = 1, Period = 1.2 },
@@ -526,7 +524,7 @@ sonataNext:RegisterTheme({
     TitleFont = "ConfirmTitle",
     WarningFont = "ConfirmWarning",
     HintFont = "ConfirmHint",
-    -- The vendor's destroy card (automation.md §4) is this card, its edge and halo in this color.
+    -- A section waiting to be destroyed (automation.md §4) glows in this color.
     DestroyColor = "Crimson",
   },
 

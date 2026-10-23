@@ -276,9 +276,10 @@ function editor:AutomationTabShown()
 end
 
 -- AutomationOptions returns the Automation tab's settings (automation.md §5), which the page draws as
--- rows of a section, as every page draws its settings: Auto Sell ("sell"), and Destroy What Can't Be
--- Sold ("destroy", which sells too), disabled while Auto Sell is off; Auto Sell turned off takes it with
--- it. Each saves at once and shows the page's rows again, so the other one follows.
+-- rows of a section, as every page draws its settings: Auto Sell ("sell"), Confirm Auto Sell (on unless
+-- turned off: the category's section waits in the vendor's dock to be sold), and Destroy What Can't Be
+-- Sold ("destroy", which sells too); the last two disabled while Auto Sell is off, which takes Destroy
+-- with it. Each saves at once and shows the page's rows again, so the others follow.
 ---@return NextSettingsOption[]
 function editor:AutomationOptions()
   local function automation()
@@ -303,6 +304,23 @@ function editor:AutomationOptions()
       keywords = { "automation", "sell", "vendor", "merchant", "junk" },
       get = sells,
       set = function(ctx, on) save(ctx, on and "sell" or false) end,
+    },
+    {
+      kind = "toggle",
+      title = L:G("Confirm Auto Sell"),
+      description = L:G("At a vendor, this category's section waits there to be sold with a double click (BetterBags Next). Turned off, it is sold as soon as the vendor opens."),
+      keywords = { "automation", "sell", "confirm", "vendor", "merchant" },
+      disabled = function() return not sells() end,
+      get = function()
+        local filter = self:Chosen()
+        return not (filter and filter.confirmSale == false)
+      end,
+      set = function(ctx, on)
+        if self.selected then
+          categories:UpdateCategory(ctx, self.selected, { confirmSale = on })
+        end
+        settings:Refresh(ctx)
+      end,
     },
     {
       kind = "toggle",

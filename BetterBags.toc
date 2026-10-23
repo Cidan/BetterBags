@@ -181,6 +181,7 @@ next\sparkles.lua
 next\tabs.lua
 next\content.lua
 next\dockcard.lua
+next\dock.lua
 next\drag.lua
 next\chain.lua
 next\panel.lua

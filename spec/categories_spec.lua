@@ -44,6 +44,7 @@ database.CreateOrUpdateCategory = function(_, category)
       name = category.name, enabled = category.enabled, dynamic = category.dynamic,
       isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
       color = saved and saved.color, priority = saved and saved.priority, automation = saved and saved.automation,
+      confirmSale = saved and saved.confirmSale,
     }
   end
 end
@@ -513,6 +514,30 @@ describe("Categories", function()
       assert.are.equal("destroy", categories:GetCategoryByName("Openable").automation, "the player's choice wins")
     end)
 
+    -- Asked: "Confirm autosell", a toggle that defaults to on (automation.md §3).
+    it("turns confirming a category's sale off and on, keeping only off, without recalculating the bags", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell" }
+      categories:UpdateCategory(context:New("Test"), "Mats", { confirmSale = false })
+      assert.is_false(dbCategories["Mats"].confirmSale)
+      assert.are.same({ { "categories/Changed" } }, sent)
+      categories:UpdateCategory(context:New("Test"), "Mats", { confirmSale = true })
+      assert.is_nil(dbCategories["Mats"].confirmSale, "on is the default")
+      assert.are.same({ { "categories/Changed" }, { "categories/Changed" } }, sent)
+    end)
+
+    it("keeps a plugin's confirming across its next creation and a move in the order", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:UpdateCategory(ctx, "Openable", { automation = "sell", confirmSale = false })
+      assert.is_false(dbEphemeralCategories["Openable"].confirmSale)
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, priority = 5 }
+      categories:MoveCategory(ctx, "Openable", "Mats")
+      assert.is_false(dbEphemeralCategories["Openable"].confirmSale, "a move keeps it")
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      assert.is_false(categories:GetCategoryByName("Openable").confirmSale, "the player's choice wins")
+    end)
+
     it("says when there is no such category", function()
       assert.is_false(categories:UpdateCategory(context:New("Test"), "Nope", { priority = 1 }))
       assert.are.same({}, sent)
@@ -530,6 +555,18 @@ describe("Categories", function()
       assert.are.equal("sell", categories:AutomationOf("Mats - Cloth"))
       assert.is_nil(categories:AutomationOf("Plain"))
       assert.is_nil(categories:AutomationOf("Armor"), "a built-in category has none")
+    end)
+
+    it("confirms a sale unless turned off, a group by's sections as their category does", function()
+      local ctx = context:New("Test")
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true, automation = "sell" }
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, automation = "sell", confirmSale = false }
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      assert.is_true(categories:ConfirmsSaleOf("Mats"))
+      assert.is_false(categories:ConfirmsSaleOf("Ore"))
+      assert.is_false(categories:ConfirmsSaleOf("Ore - Copper"))
+      assert.is_true(categories:ConfirmsSaleOf("Armor"))
     end)
   end)
 

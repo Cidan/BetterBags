@@ -32,7 +32,7 @@ local BACKPACK = 0
 
 describe("Automation", function()
   local saved, slots, actions, ofCategory, timers, printed, used, picked, deleted, cursor, shift, combat
-  local buys, refundable, registered, asked, messages
+  local buys, refundable, registered, asked, messages, confirms
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -81,6 +81,8 @@ describe("Automation", function()
   before_each(function()
     saved, slots, ofCategory, timers, printed, used, picked, deleted, asked = {}, {}, {}, {}, {}, {}, {}, 0, {}
     actions = { Junk = "sell", Trash = "destroy", Mats = nil }
+    -- Which categories confirm their sale in BetterBags Next's dock: none here, so a sale sells at once.
+    confirms = {}
     cursor, shift, combat, buys, refundable, registered = false, false, false, true, {}, {}
     messages = {}
     automation:Init()
@@ -96,6 +98,7 @@ describe("Automation", function()
       return ofCategory[data.slotkey]
     end)
     override(categories, "AutomationOf", function(_, name) return actions[name] end)
+    override(categories, "ConfirmsSaleOf", function(_, name) return confirms[name] == true end)
     override(events, "RegisterEvent", function(_, name, fn) registered[name] = fn end)
     override(events, "SendMessage", function(_, _, name) table.insert(messages, name) end)
     override(const, "BACKPACK_BAGS", { [0] = 0, [1] = 1, [2] = 2 })
@@ -166,6 +169,46 @@ describe("Automation", function()
       assert.are.same({ "0_3:Trash:destroy", "1_1:Junk:sell", "1_2:Junk:sell" }, keys)
       assert.is_true(asked[1].ignoreRecent, "a recent item is acted on by its own category")
       assert.is_falsy(asked[1].own, "search categories count")
+    end)
+
+    -- What a docked section holds to sell and to destroy (BetterBags Next's vendor, automation.md §4):
+    -- the same rules, over the items given.
+    it("lists only the items given, when given", function()
+      local a = put(0, 1, 11, "Junk")
+      put(0, 2, 12, "Junk")
+      local c = put(0, 3, 13, "Trash", { noValue = true })
+      local d = put(0, 4, 14, "Junk", { sets = { "Tank" } })
+      local function keysOf(list)
+        local keys = {}
+        for i, e in ipairs(list) do keys[i] = e.data.slotkey end
+        return keys
+      end
+      assert.are.same({ "0_1", "0_3", "0_4" }, keysOf(automation:Entries(ctx(), { d, c, a })))
+      assert.are.same({ "0_1" }, keysOf(automation:SellList(ctx(), { a, c, d })), "never one left alone")
+      assert.are.same({ "0_3" }, keysOf(automation:DestroyQueue(ctx(), { a, c })))
+      assert.are.same({}, keysOf(automation:DestroyQueue(ctx(), { a })))
+    end)
+
+    -- What BetterBags Next's vendor offers in its dock for a section (automation.md §4).
+    it("offers to sell, of the items given, what a confirming category holds that is still there", function()
+      local a = put(0, 1, 11, "Junk")
+      local b = put(0, 2, 12, "Junk")
+      local c = put(0, 3, 13, "Trash")
+      local d = put(0, 4, 14, "Trash", { noValue = true })
+      confirms.Junk = true
+      local function keysOf(list)
+        local keys = {}
+        for i, e in ipairs(list) do keys[i] = e.data.slotkey end
+        return keys
+      end
+      assert.are.same({ "0_1", "0_2" }, keysOf(automation:SaleOffer(ctx(), { a, b, c, d })), "Trash sells at once")
+      slots["0_2"].live.isLocked = true
+      assert.are.same({ "0_1" }, keysOf(automation:SaleOffer(ctx(), { a, b })), "one selling is not offered again")
+      confirms.Trash = true
+      assert.are.same({ "0_3" }, keysOf(automation:SaleOffer(ctx(), { c, d })), "never one merchants do not buy")
+      assert.are.same({ "0_4" }, keysOf(automation:DestroyLeft(ctx(), { a, c, d })))
+      slots["0_4"] = nil
+      assert.are.same({}, keysOf(automation:DestroyLeft(ctx(), { a, c, d })), "destroyed: no longer there")
     end)
 
     it("leaves out slots outside the backpack's bags", function()
@@ -328,6 +371,19 @@ describe("Automation", function()
       assert.are.same({ "BetterBags: Sold 1 item for 100c." }, printed)
       assert.are.same({}, timers)
       assert.is_nil(automation.sale)
+    end)
+
+    -- Asked: "Confirm autosell", on by default; turned off, the category sells at once (automation.md §3).
+    it("sells at once only the categories that do not confirm their sale", function()
+      put(0, 1, 11, "Junk")
+      put(0, 2, 12, "Trash")
+      confirms.Junk = true
+      sell()
+      assert.are.same({ "0_2" }, used)
+      confirms.Trash = true
+      used = {}
+      assert.are.equal("nothing", sell(), "every one confirms")
+      assert.are.same({}, used)
     end)
 
     it("sells nothing while Shift is held, at a merchant that does not buy, or with nothing to sell", function()
@@ -534,6 +590,14 @@ describe("Automation", function()
       put(0, 1, 11, "Trash")
       assert.are.equal("nothing", automation:DestroyNext(ctx()))
       assert.are.equal(0, deleted)
+    end)
+
+    it("destroys the next item of the items given, when given", function()
+      put(0, 1, 11, "Trash", { noValue = true })
+      local b = put(0, 2, 12, "Trash", { noValue = true })
+      assert.are.equal("destroyed", automation:DestroyNext(ctx(), { b }))
+      assert.are.same({ "0_2" }, picked)
+      assert.are.equal("nothing", automation:DestroyNext(ctx(), { b }), "nothing left of them")
     end)
 
     it("destroys nothing it could not pick up", function()

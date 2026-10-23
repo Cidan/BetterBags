@@ -32,6 +32,9 @@ local tween = addon:GetModule('NextTween')
 ---@class NextContent: AceModule
 local nextContent = addon:NewModule('NextContent')
 
+-- How long a section moved away stays out of its column while its items are still there (MarkLeaving).
+nextContent.LEAVING_SECONDS = 3
+
 ---@class (exact) NextSectionEntry
 ---@field item? Item
 ---@field gap? boolean
@@ -52,6 +55,11 @@ local nextContent = addon:NewModule('NextContent')
 ---@field rise number How far below its place it is, in pixels.
 ---@field y number Where the last render put it, from the canvas's top.
 ---@field height number Its height in the last render.
+
+-- NextCanvasAway is a section held out of the column (HoldOut).
+---@class (exact) NextCanvasAway
+---@field returning boolean It flies back to its place: the column keeps its room, its frame is not placed.
+---@field onLost? fun() Called when it leaves the data, or the canvas is torn down, while held.
 
 ---@class (exact) NextCanvasDrag
 ---@field section NextSection The section picked up.
@@ -78,6 +86,8 @@ local nextContent = addon:NewModule('NextContent')
 ---@field drag? NextCanvasDrag The section being dragged.
 ---@field dragSlotY? number Where the last render put the dragged section's gap.
 ---@field leaving table<string, number> Sections moved away, left out until this time (GetTime).
+---@field away table<NextSection, NextCanvasAway> Sections held out of the column: waiting in a dock (NextDock), or flying back to their place (returning).
+---@field lead? fun(width: number): {frame: Frame, height: number}[] Frames laid out above the sections (a dock's cards, SetLead).
 ---@field headerHandler? NextHeaderHandler
 ---@field cards boolean Its buttons are cards, an item's name and price beside its icon (the vendor's: SetCards).
 ---@field buttonSource {GetButton: fun(self: any, ctx: Context, slotkey: string): Item} Where Bind takes its buttons: the item buttons, or the guild bank's (SetButtonSource).
@@ -98,6 +108,7 @@ function nextContent:Create(parent)
   canvas.buttons = {}
   canvas.freeTotal = 0
   canvas.leaving = {}
+  canvas.away = {}
   canvas.cards = false
   canvas.instant = false
   canvas.buttonSource = itemFrame
@@ -282,6 +293,13 @@ function canvasProto:release(section)
     self.drag = nil
     if drag.onLost then
       drag.onLost()
+    end
+  end
+  local away = self.away[section]
+  if away ~= nil then
+    self.away[section] = nil
+    if away.onLost then
+      away.onLost()
     end
   end
   tween:Stop(section)
@@ -517,6 +535,14 @@ function canvasProto:Render(parentResult)
   local drag = self.drag
   local y, placed, others = 0, 0, 0
   self.dragSlotY = nil
+  for _, lead in ipairs(self.lead and self.lead(width) or {}) do
+    if placed > 0 then
+      y = y + style.SECTION_SPACING
+    end
+    motion:Place(lead.frame, self.frame, (width - lead.frame:GetWidth()) / 2, -y)
+    y = y + lead.height
+    placed = placed + 1
+  end
   -- gap keeps the dragged section's room in the column.
   local function gap()
     if placed > 0 then
@@ -541,11 +567,13 @@ function canvasProto:Render(parentResult)
         entry.item.frame:Show()
       end
     end
+    -- A section waiting in a dock is out of the column, its frame the dock's.
+    local away = self.away[section]
     if drag ~= nil and section == drag.section then
       drag.height = height
     elseif self:IsLeaving(section) then
       section.frame:Hide()
-    else
+    elseif away == nil or away.returning then
       others = others + 1
       if drag ~= nil and others == drag.index then
         gap()
@@ -554,8 +582,10 @@ function canvasProto:Render(parentResult)
         y = y + style.SECTION_SPACING
       end
       section.y = y
-      motion:Place(section.frame, self.frame, 0, -y)
-      section.frame:Show()
+      if away == nil then
+        motion:Place(section.frame, self.frame, 0, -y)
+        section.frame:Show()
+      end
       y = y + height
       placed = placed + 1
     end
@@ -579,7 +609,7 @@ function canvasProto:Cascade(all, delay)
   local i = 0
   for _, section in ipairs(self.order) do
     local dragged = self.drag ~= nil and self.drag.section == section
-    if (all or section.isNew) and not dragged then
+    if (all or section.isNew) and not dragged and self.away[section] == nil then
       tween:Play(section, {
         duration = style.Time.Cascade,
         delay = (delay or 0) + i * style.Time.Stagger,
@@ -602,7 +632,7 @@ end
 function canvasProto:others()
   local out = {}
   for _, section in ipairs(self.order) do
-    if (self.drag == nil or section ~= self.drag.section) and not self:IsLeaving(section) then
+    if (self.drag == nil or section ~= self.drag.section) and not self:isOut(section) then
       table.insert(out, section)
     end
   end
@@ -636,7 +666,7 @@ function canvasProto:BeginDrag(section, onLost)
     if other == section then
       break
     end
-    if not self:IsLeaving(other) then
+    if not self:isOut(other) then
       index = index + 1
     end
   end
@@ -696,10 +726,10 @@ function canvasProto:EndDrag(commit)
   if commit then
     local others = self:othersExcept(drag.section)
     table.insert(others, math.min(drag.index, #others + 1), drag.section)
-    -- Leaving sections keep their places; every other place takes the next of the new order.
+    -- Leaving and held sections keep their places; every other place takes the next of the new order.
     local order, o = {}, 1
     for _, section in ipairs(self.order) do
-      if section ~= drag.section and self:IsLeaving(section) then
+      if section ~= drag.section and self:isOut(section) then
         table.insert(order, section)
       else
         table.insert(order, others[o])
@@ -717,20 +747,82 @@ end
 function canvasProto:othersExcept(except)
   local out = {}
   for _, section in ipairs(self.order) do
-    if section ~= except and not self:IsLeaving(section) then
+    if section ~= except and not self:isOut(section) then
       table.insert(out, section)
     end
   end
   return out
 end
 
--- MarkLeaving leaves a section that was moved away out of the column for seconds: it stays out
--- until its category is gone from the data, while it has nothing but gaps, or until the time is
--- up with its items still there (a move the game refused).
+-- isOut says whether a section is out of the column: moved away (IsLeaving), or waiting in a dock (held,
+-- not flying back).
+---@private
+---@param section NextSection
+---@return boolean
+function canvasProto:isOut(section)
+  local away = self.away[section]
+  return (away ~= nil and not away.returning) or self:IsLeaving(section)
+end
+
+-- HoldOut takes a section out of the column, as it waits in another panel's dock (NextDock): the others
+-- close up, its frame is left to the dock, and it is still bound (its buttons drawn, kept up to date).
+-- onLost is called if it leaves the data, or the canvas is torn down, while held: before it is let go,
+-- so its frame can come back first.
+---@param section NextSection
+---@param onLost? fun()
+function canvasProto:HoldOut(section, onLost)
+  tween:Stop(section, true)
+  self.away[section] = { returning = false, onLost = onLost }
+  self:Invalidate()
+end
+
+-- Returning keeps a held section's room in the column, where it is flying back to: renders lay it out
+-- (section.y) but do not place its frame.
+---@param section NextSection
+function canvasProto:Returning(section)
+  local away = self.away[section]
+  if away ~= nil then
+    away.returning = true
+    self:Invalidate()
+  end
+end
+
+-- Return puts a held section back in the column, anchored at once where it is laid out (the last
+-- render's section.y): it is there already.
+---@param section NextSection
+function canvasProto:Return(section)
+  if self.away[section] == nil then
+    return
+  end
+  self.away[section] = nil
+  section.frame:ClearAllPoints()
+  section.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -(section.y or 0))
+  section.frame:Show()
+  self:Invalidate()
+end
+
+-- IsAway says whether a section is held out of the column (HoldOut), waiting or flying back.
+---@param section NextSection
+---@return boolean
+function canvasProto:IsAway(section)
+  return self.away[section] ~= nil
+end
+
+-- SetLead lays frames out above the sections, centered, each as tall as it says (a dock's cards): lead
+-- is asked for them, with the column's width, at every render, and they move as sections do.
+---@param lead? fun(width: number): {frame: Frame, height: number}[]
+function canvasProto:SetLead(lead)
+  self.lead = lead
+  self:Invalidate()
+end
+
+-- MarkLeaving leaves a section that was moved away out of the column for seconds (LEAVING_SECONDS when
+-- not given): it stays out until its category is gone from the data, while it has nothing but gaps, or
+-- until the time is up with its items still there (a move the game refused).
 ---@param name string
----@param seconds number
+---@param seconds? number
 function canvasProto:MarkLeaving(name, seconds)
-  self.leaving[name] = GetTime() + seconds
+  self.leaving[name] = GetTime() + (seconds or nextContent.LEAVING_SECONDS)
   self:Invalidate()
 end
 

@@ -454,7 +454,7 @@ function content:Init()
       -- What the category does on its own (automation.md §5), drawn as settings rows like every page's.
       { id = "automation", title = L:G("Automation"), shown = function() return categoryEditor:AutomationTabShown() end,
         sections = { { title = L:G("Merchants"), rows = {
-          { option = automationOptions[1] }, { option = automationOptions[2] },
+          { option = automationOptions[1] }, { option = automationOptions[2] }, { option = automationOptions[3] },
         } } } },
     },
   })

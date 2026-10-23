@@ -51,7 +51,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
+  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
   { "NextVendor", "next/vendor.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -66,7 +66,8 @@ local tween = addon:GetModule("NextTween")
 local render = addon:GetModule("Render")
 local motion = addon:GetModule("Motion")
 local context = addon:GetModule("Context")
-local dockCard = addon:GetModule("NextDockCard")
+local nextDock = addon:GetModule("NextDock")
+local nextContent = addon:GetModule("NextContent")
 
 describe("NextVendor", function()
   local eventsRegistered, buckets, timers, calls, data, asked, messages
@@ -126,6 +127,7 @@ describe("NextVendor", function()
     render:Init()
     tween:Init()
     motion:Init()
+    nextDock:Init()
     nextDrag:Init()
     vendorButton:Init()
     ResetMockMerchant()
@@ -161,12 +163,28 @@ describe("NextVendor", function()
       messages[name] = messages[name] or {}
       table.insert(messages[name], fn)
     end)
-    data.destroy = {}
-    calls.destroyed = 0
-    override(stubs.automation, "DestroyQueue", function() return data.destroy end)
-    override(stubs.automation, "DestroyNext", function()
-      calls.destroyed = calls.destroyed + 1
-      table.remove(data.destroy, 1)
+    -- Automation, stood in for: which categories a sale waits to be confirmed for (sell) and which hold
+    -- items to destroy (destroy), over the items given; gone: slots sold or destroyed.
+    data.sell, data.destroy, data.gone = {}, {}, {}
+    calls.destroyed = {}
+    local function entriesOf(items, which)
+      local list = {}
+      for _, item in ipairs(items) do
+        local category = item.itemInfo.category
+        if which[category] and not data.gone[item.slotkey] and (which ~= data.sell or not item.noValue)
+          and (which ~= data.destroy or item.noValue) then
+          table.insert(list, { data = item, category = category, action = "sell" })
+        end
+      end
+      return list
+    end
+    override(stubs.automation, "SaleOffer", function(_, _, items) return entriesOf(items, data.sell) end)
+    override(stubs.automation, "DestroyLeft", function(_, _, items) return entriesOf(items, data.destroy) end)
+    override(stubs.automation, "DestroyNext", function(_, _, items)
+      local left = entriesOf(items, data.destroy)
+      if left[1] == nil then return "nothing" end
+      data.gone[left[1].data.slotkey] = true
+      table.insert(calls.destroyed, left[1].data.slotkey)
       return "destroyed"
     end)
     override(stubs.events, "RegisterEvent", function(_, name, fn) eventsRegistered[name] = fn end)
@@ -720,226 +738,283 @@ describe("NextVendor", function()
     end)
   end)
 
-  -- What destroy categories hold that no merchant buys, waiting at the bottom of the vendor
-  -- (automation.md §4): the dock a dragged section waits in (NextDockCard), glowing in the theme's
-  -- destroy color; one click destroys the next item. The engine (Automation) is stood in for.
-  describe("the destroy card", function()
-    local function toDestroy(slot, itemID, count)
-      return { category = "Trash", action = "destroy", data = { bagid = 0, slotid = slot, slotkey = "0_" .. slot,
-        itemInfo = { itemID = itemID, itemIcon = itemID * 10, currentItemCount = count or 1,
-          itemLink = "|Hitem:" .. itemID .. "|h" } } }
+  -- What waits for the player at a merchant (automation.md §4): each backpack category whose sale Auto
+  -- Sell confirms (Confirm Auto Sell) or which holds items to destroy, its section docked in the vendor
+  -- (NextDock), the one interface a dragged section's sale uses too. Asked: "we probably have a list of
+  -- categories that move over to the vendor window ... selling (or cancelling) animates the next section
+  -- to the position above it"; destroying "should function just like the above, but with a red outline".
+  describe("offering categories at a merchant", function()
+    local backpack, items
+
+    local function send(name, ...)
+      for _, fn in ipairs(messages[name] or {}) do fn(ctx(), ...) end
     end
 
-    local function send(name)
-      for _, fn in ipairs(messages[name] or {}) do fn(ctx()) end
+    local function item(slot, category, noValue)
+      local slotkey = "0_" .. slot
+      items[slotkey] = { slotkey = slotkey, bagid = 0, slotid = slot, noValue = noValue,
+        itemInfo = { category = category } }
+      return items[slotkey]
     end
 
-    local function pointOf(frame, which)
-      for i = 1, frame:GetNumPoints() do
-        local point, relativeTo, relativePoint, x, y = frame:GetPoint(i)
-        if point == which then return relativeTo, relativePoint, x, y end
+    -- bind gives the backpack its sections, in this order.
+    local function bind(list)
+      local categories, ordered = {}, {}
+      for _, entry in ipairs(list) do
+        table.insert(categories, { name = entry[1] })
+        for _, it in ipairs(entry[2]) do table.insert(ordered, it) end
       end
+      backpack.content:Bind(ctx(), { sortedItems = {}, tabs = { [1] = { categories = categories, items = ordered } } },
+        1, {})
+      render:NewRenderChain(backpack.content, { ctx = ctx() }, { Width = style.GRID_WIDTH })
     end
 
-    local function bottomOf(frame)
-      return pointOf(frame, "BOTTOMRIGHT")
+    local function docked(v)
+      local out = {}
+      for _, e in ipairs(nextDock:Entries(v)) do table.insert(out, e.section.name) end
+      return out
     end
 
-    local function shownIcons(card)
+    local function entry(v, name)
+      return nextDock:EntryOf(v, name)
+    end
+
+    local function doubleClick(e)
+      e.catcher:GetScript("OnDoubleClick")(e.catcher, "LeftButton")
+    end
+
+    local function textOf(e)
+      return { e.box.title:GetText(), e.box.warning:GetText(), e.box.hint:GetText() }
+    end
+
+    local function glowOf(e)
+      local r, g, b = e.box.glow[1]:GetVertexColor()
+      return { r, g, b }
+    end
+
+    before_each(function()
+      items = {}
+      local frame = CreateFrame("Frame", nil, UIParent)
+      frame:Show()
+      backpack = { frame = frame, kind = 0, closing = false }
+      backpack.content = nextContent:Create(frame)
+      backpack.scroll = { frame = CreateFrame("Frame", nil, frame) }
+      function backpack:IsShown() return self.frame:IsShown() end
+      local buttonsByKey = {}
+      backpack.content:SetButtonSource({ GetButton = function(_, _, slotkey)
+        if buttonsByKey[slotkey] == nil then
+          local b = { frame = CreateFrame("Frame") }
+          b.frame:SetSize(37, 37)
+          function b:SetItemFromData() end
+          function b:SetSize(_, w, h) self.frame:SetSize(w, h) end
+          function b:GetItemData() return items[slotkey] end
+          buttonsByKey[slotkey] = b
+        end
+        return buttonsByKey[slotkey]
+      end })
+      override(addon, "Bags", { Backpack = backpack })
+      bind({ { "Junk", { item(1, "Junk"), item(2, "Junk") } }, { "Mats", { item(3, "Mats") } },
+        { "Trash", { item(4, "Trash", true) } }, { "Ore", { item(5, "Ore") } } })
+      data.sell = { Junk = true, Ore = true }
+      data.destroy = { Trash = true }
+    end)
+
+    it("docks, once both show, each category that waits, in the backpack's order", function()
+      local v = open()
+      send("next/PanelShown", v)
+      assert.are.same({ "Junk", "Trash", "Ore" }, docked(v))
+      for _, name in ipairs({ "Junk", "Trash", "Ore" }) do
+        assert.is_true(backpack.content:IsAway(backpack.content.byName[name]), name)
+      end
+      assert.is_false(backpack.content:IsAway(backpack.content.byName.Mats))
+    end)
+
+    it("says what a sale sells and how to answer, in the dock's glow", function()
+      local v = open()
+      send("next/PanelShown", v)
+      assert.are.same({ "Sell 2 items?", "You can buy them back.", "Double-click to sell · Right-click to cancel" },
+        textOf(entry(v, "Junk")))
+      local r, g, b = style:RGBA(style.Theme.Dock.Glow.Color)
+      assert.are.same({ r, g, b }, glowOf(entry(v, "Junk")))
+      assert.are.equal("Sell 1 item?", entry(v, "Ore").box.title:GetText())
+    end)
+
+    it("warns when buyback cannot keep all of a sale", function()
       local list = {}
-      for _, icon in ipairs(card.icons) do
-        if icon.texture:IsShown() then table.insert(list, icon.texture:GetTexture()) end
-      end
-      return list
-    end
-
-    it("shows at a merchant what one click destroys, in the dock's card at the bottom of the vendor", function()
-      data.destroy = { toDestroy(1, 11, 3), toDestroy(2, 12) }
+      for slot = 1, 13 do table.insert(list, item(slot, "Junk")) end
+      bind({ { "Junk", list } })
       local v = open()
-      local card = v.destroyCard
-      assert.is_true(card.frame:IsShown())
-      assert.are.equal(card.box.frame, card.frame)
-      assert.are.same({ "Destroy 2 items", "No merchant buys these.", "Click to destroy next" },
-        { card.box.title:GetText(), card.box.warning:GetText(), card.box.hint:GetText() })
-      assert.are.same({ 110, 120 }, shownIcons(card))
-      assert.are.equal(card.box.slot, card.icons[1].texture:GetParent())
-      assert.are.equal("3", card.icons[1].count:GetText())
-      assert.is_false(card.icons[2].count:IsShown(), "no count on one item")
-      local relativeTo, relativePoint, x, y = pointOf(card.frame, "BOTTOMLEFT")
-      assert.are.same({ v.body, "BOTTOMLEFT", style.PAD, style.FOOTER }, { relativeTo, relativePoint, x, y })
-      assert.are.equal(v:BodyWidth() - 2 * style.PAD, card.frame:GetWidth(), "as wide as what the vendor sells")
-      assert.are.equal("Destroy 1 item", (function()
-        data.destroy = { toDestroy(1, 11) }
-        send("automation/Changed")
-        return card.box.title:GetText()
-      end)())
+      send("next/PanelShown", v)
+      assert.are.same({ "Sell 13 items?", "Only the last 12 items sold can be bought back.",
+        "Double-click to sell · Right-click to cancel" }, textOf(entry(v, "Junk")))
+      doubleClick(entry(v, "Junk"))
+      assert.are.equal(13, #calls.sellSlots[1].slots, "the double click is the confirmation")
     end)
 
-    -- Asked: "the crimson block isn't styled like the category drag sell box -- please make it match,
-    -- including the subtle color blink".
-    it("looks like the dock a dragged section waits in, glowing in the theme's destroy color", function()
-      data.destroy = { toDestroy(1, 11) }
+    -- Asked: "with a red outline like we have now, when it's destroying".
+    it("glows in the theme's destroy color for what it destroys, a click destroying the next", function()
       local v = open()
-      local box, dock = v.destroyCard.box, dockCard:Create(CreateFrame("Frame"))
-      local D = style.Theme.Dock
-      assert.are.same({ style:RGBA("Crimson") }, { style:RGBA(D.DestroyColor) })
-      local r, g, b = style:RGBA(D.DestroyColor)
-      for _, edge in ipairs(box.glow) do
-        local er, eg, eb = edge:GetVertexColor()
-        assert.are.same({ r, g, b }, { er, eg, eb })
-      end
-      local hr, hg, hb = box.halo:GetVertexColor()
-      assert.are.same({ r, g, b }, { hr, hg, hb })
-      assert.are.same(dock.background._colorTexture, box.background._colorTexture)
-      assert.are.equal(dock.glow[1]:GetHeight(), box.glow[1]:GetHeight())
-      assert.are.equal(dock.halo:GetTexture(), box.halo:GetTexture())
-      for _, line in ipairs({ "title", "warning", "hint" }) do
-        assert.are.equal(dock[line]:GetFontObject(), box[line]:GetFontObject(), line)
-      end
+      send("next/PanelShown", v)
+      local trash = entry(v, "Trash")
+      assert.are.same({ "Destroy 1 item", "No merchant buys these.", "Click to destroy next · Right-click to cancel" },
+        textOf(trash))
+      local r, g, b = style:RGBA(style.Theme.Dock.DestroyColor)
+      assert.are.same({ r, g, b }, glowOf(trash))
     end)
 
-    it("pulses its glow as the dock does", function()
-      data.destroy = { toDestroy(1, 11) }
+    it("sells on a double click through the vendor's own sale, the next coming up into its place", function()
       local v = open()
-      local frame, box = v.destroyCard.frame, v.destroyCard.box
-      local G = style.Theme.Dock.Glow
-      local update = frame:GetScript("OnUpdate")
-      local alphas = {}
-      for _ = 1, 6 do
-        update(frame, 0.2)
-        table.insert(alphas, box.glow[1]:GetAlpha())
-      end
-      local low, high = math.min(unpack(alphas)), math.max(unpack(alphas))
-      assert.is_true(high - low > 0.3, "it pulses: " .. table.concat(alphas, ", "))
-      assert.is_true(low >= G.Low - 1e-6 and high <= G.High + 1e-6)
+      send("next/PanelShown", v)
+      doubleClick(entry(v, "Junk"))
+      assert.are.same({ { slots = { { bag = 0, slot = 1 }, { bag = 0, slot = 2 } }, open = true } }, calls.sellSlots)
+      assert.are.same({ "Trash", "Ore" }, docked(v))
     end)
 
-    it("makes room for itself: what the vendor sells ends above it", function()
-      data.destroy = { toDestroy(1, 11) }
+    it("turns into a destroy, glowing red, when items no merchant buys are left after its sale", function()
+      bind({ { "Trash", { item(1, "Trash"), item(2, "Trash", true), item(3, "Trash", true) } } })
+      data.sell = { Trash = true }
       local v = open()
-      local bottom = style.FOOTER + v:DestroyCardHeight() + nextVendor.DESTROY_GAP
-      assert.are.equal(bottom, v:ContentBottom())
-      local _, _, _, y = bottomOf(v.scroll.frame)
-      assert.are.equal(bottom, y)
-      assert.are.equal(math.max(1, v:Height() - style.CONTENT_TOP - bottom), v.root:PreRender().Height)
+      send("next/PanelShown", v)
+      local trash = entry(v, "Trash")
+      assert.are.equal("Sell 1 item?", trash.box.title:GetText())
+      doubleClick(trash)
+      assert.are.equal(1, #calls.sellSlots)
+      assert.are.same({ "Trash" }, docked(v), "it waits on")
+      assert.are.equal("Destroy 2 items", trash.box.title:GetText())
+      local r, g, b = style:RGBA(style.Theme.Dock.DestroyColor)
+      assert.are.same({ r, g, b }, glowOf(trash))
     end)
 
-    it("counts itself in how short a small vendor goes", function()
+    -- OnDoubleClick blocks OnClick when it fires (warcraft.wiki.gg UIHANDLER_OnDoubleClick): every click
+    -- of a fast pair destroys one, so a double click destroys two.
+    it("destroys one item per click, double clicks included, and goes when none is left", function()
+      bind({ { "Trash", { item(1, "Trash", true), item(2, "Trash", true), item(3, "Trash", true) } } })
       local v = open()
-      local without = v:MinHeight()
-      data.destroy = { toDestroy(1, 11) }
-      send("automation/Changed")
-      assert.are.equal(without + v:DestroyCardHeight() + nextVendor.DESTROY_GAP, v:MinHeight())
+      send("next/PanelShown", v)
+      local trash = entry(v, "Trash")
+      click(trash.catcher)
+      assert.are.same({ "0_1" }, calls.destroyed)
+      assert.are.equal("Destroy 2 items", trash.box.title:GetText())
+      doubleClick(trash)
+      assert.are.same({ "0_1", "0_2" }, calls.destroyed)
+      click(trash.catcher)
+      assert.are.same({ "0_1", "0_2", "0_3" }, calls.destroyed)
+      assert.are.same({}, docked(v))
     end)
 
-    it("lays the panel out again when it appears or goes", function()
+    it("sells nothing on a single click, and waits on", function()
       local v = open()
-      local renders = 0
-      local renderNow = render.RenderNow
-      override(render, "RenderNow", function(r, root, opts)
-        if root == v.root then renders = renders + 1 end
-        return renderNow(r, root, opts)
-      end)
-      send("automation/Changed")
-      assert.are.equal(0, renders, "nothing changed")
-      data.destroy = { toDestroy(1, 11) }
-      send("automation/Changed")
-      assert.are.equal(1, renders)
-      send("automation/Changed")
-      assert.are.equal(1, renders, "still shown: the same room")
-      data.destroy = {}
-      send("automation/Changed")
-      assert.are.equal(2, renders)
+      send("next/PanelShown", v)
+      click(entry(v, "Junk").catcher)
+      assert.are.same({}, calls.sellSlots)
+      assert.are.same({}, calls.destroyed)
+      assert.is_not_nil(entry(v, "Junk"))
     end)
 
-    it("shows nothing, and takes no room, with nothing to destroy", function()
+    it("goes back when nothing is left to sell at the double click", function()
       local v = open()
-      assert.is_true(v.destroyCard == nil or not v.destroyCard.frame:IsShown())
-      assert.are.equal(style.FOOTER, v:ContentBottom())
-      local _, _, _, y = bottomOf(v.scroll.frame)
-      assert.are.equal(style.FOOTER, y)
+      send("next/PanelShown", v)
+      data.gone["0_1"], data.gone["0_2"] = true, true
+      doubleClick(entry(v, "Junk"))
+      finishTweens()
+      assert.are.same({}, calls.sellSlots)
+      assert.is_nil(entry(v, "Junk"))
+      assert.is_false(backpack.content:IsLeaving(backpack.content.byName.Junk), "back, not moved")
     end)
 
-    it("destroys the next item on one click, then shows what is left, and goes once nothing is", function()
-      data.destroy = { toDestroy(1, 11), toDestroy(2, 12) }
+    it("shows no tooltip while it waits to be sold", function()
+      bind({ { "Trash", { item(1, "Trash"), item(2, "Trash", true) } } })
+      data.sell = { Trash = true }
       local v = open()
-      local card = v.destroyCard
-      assert.are.same({ "LeftButtonUp" }, card.catcher._registeredClicks)
-      click(card.catcher)
-      assert.are.equal(1, calls.destroyed)
-      assert.are.same({ 120 }, shownIcons(card))
-      click(card.catcher)
-      assert.are.equal(2, calls.destroyed)
-      assert.is_false(card.frame:IsShown())
-      assert.are.equal(style.FOOTER, v:ContentBottom())
+      send("next/PanelShown", v)
+      local trash = entry(v, "Trash")
+      GameTooltip:Hide()
+      trash.catcher:GetScript("OnEnter")(trash.catcher)
+      assert.is_false(GameTooltip:IsOwned(trash.catcher))
     end)
 
-    it("shows the next item's tooltip, saying a click destroys it", function()
-      data.destroy = { toDestroy(4, 11), toDestroy(5, 12) }
+    it("shows the next item to destroy in its tooltip, and the one after once it is gone", function()
+      bind({ { "Trash", { item(4, "Trash", true), item(5, "Trash", true) } } })
       local v = open()
-      v.destroyCard.catcher:GetScript("OnEnter")(v.destroyCard.catcher)
+      send("next/PanelShown", v)
+      local trash = entry(v, "Trash")
+      trash.catcher:GetScript("OnEnter")(trash.catcher)
       assert.are.same({ bag = 0, slot = 4 }, GameTooltip._bagItem)
       local text = {}
       for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
       assert.are.same({ "Click to destroy it." }, text)
-      click(v.destroyCard.catcher)
-      assert.are.same({ bag = 0, slot = 5 }, GameTooltip._bagItem, "the next one, once the first is gone")
+      click(trash.catcher)
+      assert.are.same({ bag = 0, slot = 5 }, GameTooltip._bagItem)
     end)
 
-    it("follows what is left to destroy when the bags are read or automation changes, fading in", function()
+    it("offers each category once a visit: one sent back stays back until the next visit", function()
       local v = open()
-      data.destroy = { toDestroy(1, 11) }
-      send("items/RefreshBackpack/Done")
-      local card = v.destroyCard
-      assert.is_true(card.frame:IsShown())
-      assert.are.equal(0, card.frame:GetAlpha())
+      send("next/PanelShown", v)
+      local junk = entry(v, "Junk")
+      click(junk.catcher, "RightButton")
       finishTweens()
-      assert.are.equal(1, card.frame:GetAlpha())
-      local _, _, _, y = bottomOf(v.scroll.frame)
-      assert.are.equal(v:ContentBottom(), y)
-      data.destroy = {}
-      send("automation/Changed")
-      assert.is_false(card.frame:IsShown())
-      data.destroy = { toDestroy(1, 11) }
-      send("categories/Changed")
-      assert.is_true(card.frame:IsShown())
-    end)
-
-    it("shows as many as fit, and how many more", function()
-      for slot = 1, 40 do table.insert(data.destroy, toDestroy(slot, 100 + slot)) end
-      local v = open()
-      local card = v.destroyCard
-      local fit = v:DestroyCardFits()
-      assert.is_true(fit > 1 and fit < 40)
-      assert.are.equal(fit - 1, #shownIcons(card))
-      assert.is_true(card.more:IsShown())
-      assert.are.equal("+" .. (40 - (fit - 1)), card.more:GetText())
-      data.destroy = { toDestroy(1, 11) }
-      send("automation/Changed")
-      assert.is_false(card.more:IsShown())
-    end)
-
-    it("goes when the merchant closes, and when BetterBags Next is switched off", function()
-      data.destroy = { toDestroy(1, 11) }
-      local v = open()
+      send("bags/Draw/Backpack/Done")
+      assert.are.same({ "Trash", "Ore" }, docked(v))
       eventsRegistered["MERCHANT_CLOSED"](ctx())
-      assert.is_false(v.destroyCard.frame:IsShown())
-      assert.are.equal(style.FOOTER, v:ContentBottom())
+      assert.are.same({}, docked(v), "every one goes back when the merchant closes")
       MerchantFrame:Show()
       eventsRegistered["MERCHANT_SHOW"](ctx())
       finishTweens()
-      assert.is_true(v.destroyCard.frame:IsShown())
-      v:Deactivate(ctx())
-      assert.is_false(v.destroyCard.frame:IsShown())
-      assert.are.equal(style.FOOTER, v:ContentBottom())
+      send("next/PanelShown", backpack)
+      assert.are.same({ "Junk", "Trash", "Ore" }, docked(v))
     end)
 
-    it("keeps its look in every theme", function()
-      data.destroy = { toDestroy(1, 11) }
+    it("offers what starts waiting later in the visit, when the backpack draws or automation changes", function()
       local v = open()
-      v:ApplyStyle(ctx())
-      assert.is_true(v.destroyCard.frame:IsShown())
-      assert.are.equal(v:ContentBottom(), select(4, bottomOf(v.scroll.frame)))
+      send("next/PanelShown", v)
+      data.sell.Mats = true
+      send("automation/Changed")
+      assert.are.same({ "Junk", "Trash", "Ore", "Mats" }, docked(v))
+    end)
+
+    it("offers nothing away from a merchant, with the backpack hidden or closing, or for a section docked already", function()
+      local v = open()
+      backpack.frame:Hide()
+      send("next/PanelShown", v)
+      assert.are.same({}, docked(v))
+      backpack.frame:Show()
+      backpack.closing = true
+      send("bags/Draw/Backpack/Done")
+      assert.are.same({}, docked(v))
+      backpack.closing = false
+      nextDock:Add(v, { section = backpack.content.byName.Junk, source = backpack,
+        offer = { text = function() return "Sell 2 items?", "", "" end } })
+      send("bags/Draw/Backpack/Done")
+      assert.are.same({ "Junk", "Trash", "Ore" }, docked(v), "the dragged one is not docked twice")
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      send("bags/Draw/Backpack/Done")
+      assert.are.same({}, docked(v))
+    end)
+
+    it("offers no section that is leaving the backpack (sold by a drag) or docked in another panel", function()
+      local v = open()
+      backpack.content:MarkLeaving("Junk")
+      local other = { frame = CreateFrame("Frame"), scroll = { frame = CreateFrame("Frame") } }
+      other.content = nextContent:Create(other.frame)
+      nextDock:Add(other, { section = backpack.content.byName.Ore, source = backpack,
+        offer = { text = function() return "", "", "" end } })
+      send("next/PanelShown", v)
+      assert.are.same({ "Trash" }, docked(v))
+    end)
+
+    it("sends everything back when BetterBags Next is switched off", function()
+      local v = open()
+      send("next/PanelShown", v)
+      v:Deactivate(ctx())
+      assert.are.same({}, docked(v))
+      assert.is_false(backpack.content:IsAway(backpack.content.byName.Junk))
+    end)
+
+    it("leaves the vendor's own content where it was: nothing under it, no room kept", function()
+      local v = open()
+      send("next/PanelShown", v)
+      assert.are.equal(style.FOOTER, v:ContentBottom())
+      assert.is_nil(v.destroyCard)
     end)
   end)
 

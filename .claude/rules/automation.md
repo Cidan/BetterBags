@@ -1,7 +1,8 @@
 # Category Automation (`data/automation.lua`, the Automation tab)
 
-A category can act on its items on its own, set with two switches in its Automation tab on the
-Categories page: **Auto Sell**, and **Destroy What Can't Be Sold**, which needs Auto Sell on. Asked (2026-10-22), after deciding against
+A category can act on its items on its own, set with three switches in its Automation tab on the
+Categories page: **Auto Sell**, **Confirm Auto Sell** (on by default) and **Destroy What Can't Be
+Sold**, the last two needing Auto Sell on. Asked (2026-10-22), after deciding against
 importing Vendor's rules or integrating with Vendor (docs/vendor-compat.md, decision 2): "we add
 vendor-like features to a new Automation tab for categories". A category's rule is a search, which
 already speaks what Vendor's rules use (search-indexing.md §10-§17), so a category plus an action is a
@@ -21,6 +22,13 @@ Vendor rule.
   item's category.
 - **Read** with `categories:AutomationOf(name)`: a group by's sections (`isGroupBySubcategory`) do what
   their category does; a built-in category ("Armor", "Junk") has none.
+- **Confirm Auto Sell** (asked: "another toggle that defaults to on: 'Confirm autosell' which makes the
+  sell box for the category appear at the vendor (double click to sell, etc) -- exact same box, instead
+  of just yolo selling. turning this off does yolo sell"): stored as `confirmSale = false` only when
+  turned off (on, the default, is no field), set with `UpdateCategory { confirmSale = true | false }`
+  (no `bags/Rederive` either), a plugin's in its saved state as its automation is (one `saveState`
+  helper writes both, from `UpdateCategory` and `setPriority`), read with `categories:ConfirmsSaleOf
+  (name)` (a group by's sections as their category).
 - **No limit.** A sale used to stop at 12 items (what buyback keeps), behind a setting, `autoSellLimit`.
   Asked: "just keep selling past that limit in waves, don't block there. that's pointless." The setting
   is gone, and `DB:Migrate` drops its saved value.
@@ -67,6 +75,11 @@ Vendor rule.
   not buy (retail: `C_MerchantFrame.IsSellAllJunkEnabled`, the check Blizzard shows its Sell All Junk
   button by and Vendor reads; undocumented beyond that, and a wrong "no" only sells nothing; Classic:
   `GetMerchantNumItems() > 0`), or with nothing to sell.
+- **Only the categories that do not confirm** (Confirm Auto Sell off) sell on their own when the
+  merchant opens. A category that confirms waits for the player: in BetterBags Next its section is docked
+  in the vendor (§4), the same box a dragged section's sale waits in; the classic design has no such box,
+  so it is left to the player's usual Move Categories right click on its title (never a dialog of its
+  own: one interface for one action, CLAUDE.md "UI Consistency" 5).
 - **Through the vendor's own sale, in rounds** (`NextMerchant:SellRounds`, shared with BetterBags
   Next's Classic Sell Junk). Reported: "our yolo sell only sells 10 items, then stops ... look at our
   autosell code we have already and see how it manages to autosell (or auto deposit in the case of
@@ -109,34 +122,70 @@ Vendor rule.
   stack: `PickupContainerItem`, then `DeleteCursorItem` only if the item is on the cursor, and prints
   what it destroyed. It refuses in combat and while the cursor holds an item (it would delete the wrong
   one). An item destroyed shows on the card until the bags are read again; a second click skips it.
-- **Where a player destroys:** at a merchant in BetterBags Next, the **destroy card** at the bottom of
-  the vendor (asked: "move the item to the vendor screen, but towards the bottom of it ... with a more
-  crimson outline, and a click to [destroy] next helper text (one click only)"; then: style it like the
-  category drag sell box, "including the subtle color blink"; next.md §10b): the dock card a dragged
-  section waits in (`NextDockCard`), its edge and halo in `Dock.DestroyColor` (Default's `Crimson`),
-  titled "Destroy N items", "No merchant buys these.", the icons, "Click to destroy next"; one left
-  click destroys the next item. Anywhere, the **Destroy Next Item** key binding (Bindings.xml,
-  `BetterBags_DestroyNextItem`, Key Bindings > BetterBags). The classic design's merchant (Blizzard's
-  frame) shows no card.
-- **`automation/Changed`** (no arguments): sent after a destroy, so whatever shows the queue updates
-  (the vendor's card). A sale changes nothing the queue holds.
+- **Where a player destroys:** at a merchant in BetterBags Next, in the vendor's dock (below); anywhere,
+  the **Destroy Next Item** key binding (Bindings.xml, `BetterBags_DestroyNextItem`, Key Bindings >
+  BetterBags). The classic design's merchant (Blizzard's frame) has no dock.
+
+### 4a. At a BetterBags Next vendor: categories docked in it (`NextVendor:OfferAutomation`)
+
+Asked: "a list of categories that move over to the vendor window (scroll the vendor window if needed) to
+double click to sell, and selling (or cancelling) animates the next section to the position above it
+(can autosell a section in the middle, for example)"; "our destroy section should function just like
+the above, but with a red outline like we have now, when it's destroying. as far as placement, let's
+stop treating it specially." The destroy card at the bottom of the vendor (its own icon row, its own
+room under the scroll area) is gone: a category's items wait in the vendor's dock (`NextDock`, next.md
+§7) exactly as a section dragged onto the vendor waits there.
+
+- **What is offered**, while a merchant is open and the vendor and the backpack both show, on
+  `next/PanelShown` (either one finished sliding in), `bags/Draw/Backpack/Done`, `automation/Changed` and
+  `categories/Changed`: each category section of the backpack's view, in its order, not docked already
+  (a dragged one, or waiting) nor leaving, whose items (`NextDrag:SectionItems`) hold something
+  `Automation:SaleOffer` sells once confirmed (Confirm Auto Sell on, `StillThere`) or
+  `Automation:DestroyLeft` destroys (the destroy queue's items still there). **Each once a visit**
+  (`offered`, cleared on `MERCHANT_SHOW`): one sent back stays back until the next merchant.
+- **What is not offered:** a category with no section in the backpack's view (on another tab, in the
+  Show Bags view) and items of it shown under Recent Items. The box holds the section (asked, option 1 of
+  two: the literal box, not a second interface drawing the items); a confirming category with no section
+  there is not sold. Auto Sell with Confirm off sells them anyway (it reads categories without Recent
+  Items, §2).
+- **Its card** (`AutomationOffer`), read from the section's items each time it is laid out: a sale,
+  "Sell N items?", "You can buy them back." (or, past what buyback keeps, "Only the last 12 items sold
+  can be bought back."), "Double-click to sell · Right-click to cancel", in the dock's own glow; a destroy,
+  "Destroy N items", "No merchant buys these.", "Click to destroy next · Right-click to cancel", its
+  glow in `Dock.DestroyColor` (Default's `Crimson`), and as its tooltip the next item a click destroys
+  ("Click to destroy it.").
+- **A double click on a sale** sells what it offers then, through `NextVendor:Sell`, the same call a
+  dragged section's confirmed sale makes. If the section holds items no merchant buys, the card stays and
+  turns into their destroy, red; otherwise it flies into the vendor. A double click that found nothing to
+  sell sends it back.
+- **A click on a destroy** destroys the next item (`DestroyNext` with the section's items), one each
+  click. A double click destroys one too: `OnDoubleClick` blocks the second click's `OnClick`
+  (warcraft.wiki.gg `UIHANDLER_OnDoubleClick`: "Continuous button-mashing alternates between OnClick and
+  OnDoubleClick"), so without it every other click would do nothing. Once nothing is left, the section
+  flies into the vendor. A single click on a sale does nothing.
+- **A right click** sends the section back to its place in the backpack. The merchant closing (or Next
+  switched off) sends every one back at once.
+- **`automation/Changed`** (no arguments): sent after a destroy, and the vendor offers again then. A
+  sale changes nothing the queue holds.
 
 ## 5. The Automation tab (`next/settings/content.lua`, `NextSettingsCategories:AutomationOptions`)
 
 Fourth tab of the Categories page (next-settings.md §5), shown while a category is chosen, a plugin's
 too (what it does is the player's choice). It is drawn as every page draws its settings: a section
-("Merchants") of settings rows (`next/settings/rows.lua`), two switches side by side, each its name on
+("Merchants") of settings rows (`next/settings/rows.lua`), three switches, each its name on
 the left and its switch on the right, with its description as its tooltip. Asked: switches, not a
 dropdown; no explanations on the tab, no list of the items it acts on, no Destroy Next Item button; then
 Auto Sell, and Destroy What Can't Be Sold, which needs Auto Sell on; then, after a first version
 hand-placed bare switches ("bland ... unstyled ... compare to the other screenshot"): like the other
 pages. The options are page options (`NextSettingsOption`), from `AutomationOptions()`:
 - **Auto Sell**: on saves `"sell"`, off saves none (`false`), taking Destroy What Can't Be Sold with it.
+- **Confirm Auto Sell**: on by default, disabled while Auto Sell is off; saves `confirmSale` (§1).
 - **Destroy What Can't Be Sold**: disabled while Auto Sell is off (the row's `disabled`); on saves
   `"destroy"`, off `"sell"`.
-- Each saves at once (`UpdateCategory { automation }`) and then `NextSettings:Refresh`, so the other
-  row's state follows; `categories/Changed` also shows the page again.
-The category's list line ends "Sells at merchants" or "Sells, destroys the rest".
+- Each saves at once (`UpdateCategory { automation }` or `{ confirmSale }`) and then
+  `NextSettings:Refresh`, so the other rows' state follows; `categories/Changed` also shows the page
+  again.
+The category's heading line ends "Sells at merchants" or "Sells, destroys the rest".
 
 ## 6. Coverage
 
@@ -151,20 +200,27 @@ The category's list line ends "Sells at merchants" or "Sells, destroys the rest"
   item, the cursor, combat, nothing left, an item that moved, one not picked up, the key binding).
 - `spec/next/merchant_spec.lua` ("in rounds": all at once then again what is left, the bound, the
   merchant closing, waiting without counting a round); `spec/next/vendor_spec.lua` (Classic Sell Junk
-  handing its three rounds to them); `spec/next/vendor_spec.lua` ("the destroy card": the items, the line, the crimson edge and its place;
-  the scroll area's room and the root's height; nothing to destroy; one click, then what is left, then
-  gone; the tooltip and its next item; following the queue on each message, fading in; the minimum
-  height; laying out again only when it appears or goes; as many as fit and "+N"; the merchant closing
-  and BetterBags Next switched off; a theme applied).
+  handing its three rounds to them); `spec/next/vendor_spec.lua` ("offering categories at a merchant":
+  docked once both show, in the backpack's order; a sale's text and glow, the buyback warning; a destroy's
+  text and red glow; a double click selling through the vendor's sale, the next coming up; a sale turning
+  into a destroy; one item per click, double clicks included, gone when none is left; nothing on a
+  single click of a sale; the tooltip and the next item; once a visit, every one back when the merchant
+  closes, offered again next visit; offered later when automation changes; nothing away from a merchant,
+  with the backpack hidden or closing, nor twice; everything back when Next is switched off; no room kept
+  under the vendor's content); `spec/next/dock_spec.lua` (the dock itself, next.md §7);
+  `spec/next/bag_spec.lua` (`next/PanelShown` once a panel has slid in).
+- `spec/automation_spec.lua` also: only the categories that do not confirm sell at once; the items given
+  to `Entries`, `SellList`, `DestroyQueue` and `DestroyNext`; `SaleOffer` and `DestroyLeft`.
 - `spec/categories_spec.lua` (saving without recalculating, a plugin's kept across creation,
-  `AutomationOf` and sub-categories), `spec/database_spec.lua` (a plugin's saved state),
+  `AutomationOf` and sub-categories; Confirm Auto Sell: off kept, on dropped, a plugin's across creation
+  and a move, `ConfirmsSaleOf` and sub-categories), `spec/database_spec.lua` (a plugin's saved state, its confirming too),
   `spec/items_spec.lua` (`GetCategory` ignoring Recent Items), `spec/database_migration_spec.lua` (the
   limit's saved value dropped), `spec/next/settings/content_spec.lua` (four tabs),
   `spec/next/settings/categories_spec.lua` ("the Automation tab's settings": names, descriptions and
-  keywords, Destroy only with Auto Sell, saving and the page's rows shown again, Auto Sell off taking
-  Destroy with it, a plugin's, nothing chosen; the list line, which tabs show),
-  `spec/next/settings/content_spec.lua` (the tab is a section of two settings rows), `spec/next/dockcard_spec.lua` (the shared card), `spec/next/drag_spec.lua`
-  (the dock on it, unchanged), `spec/core/init_spec.lua` (initialized and
+  keywords, Confirm and Destroy only with Auto Sell, Confirm on by default, saving and the page's rows
+  shown again, Auto Sell off taking Destroy with it, a plugin's, nothing chosen; which tabs show),
+  `spec/next/settings/content_spec.lua` (the tab is a section of three settings rows),
+  `spec/next/dockcard_spec.lua` (the shared card), `spec/next/drag_spec.lua` (a dragged sale docked), `spec/core/init_spec.lua` (initialized and
   enabled), `spec/integration/next_settings_spec.lua` (built on the whole addon).
 - Mutation-tested: 72 mutations for the first version, 44 for the switches, the bulk sale and the card,
   7 for reading refundability with the slot, 32 for waves, the two switches, the shared card and
@@ -175,11 +231,13 @@ The category's list line ends "Sells at merchants" or "Sells, destroys the rest"
   Sell Junk on them; four first survived: three led to tests (a wait not counted over two rounds, the
   merchant closing mid-round, a merchant reopened mid-sale saying each sale once) and one was a
   redundant check, removed (`StartSale` returning for a replaced sale, which the open check already
-  stops at its first round).
+  stops at its first round). Confirm Auto Sell and the dock at the vendor: part of the 97 mutations in
+  next.md §7 ("Docked sections"), every one caught after the tests and removals listed there.
 
 **Not verified in game:** a sale at a real merchant (retail, Classic, WoW: Forever), selling every item
 in one round against the server, the trade-timer question during a sale, `IsSellAllJunkEnabled` at a
-repair-only merchant, whether a sold slot reads locked at once, and destroying from the card and the key
-binding. To check: make a category `rarity = poor` with Auto Sell on, open a merchant (once holding
-Shift), and a category with Destroy What Can't Be Sold on holding an item merchants do not buy; open a
-merchant with BetterBags Next and click the card. `/console taintLog 1` should log nothing for BetterBags.
+repair-only merchant, whether a sold slot reads locked at once, the docked sections flying over and
+their double clicks, and destroying from the dock and the key binding. To check: make a category
+`rarity = poor` with Auto Sell on, open a merchant (once holding Shift; once with Confirm Auto Sell off),
+and a category with Destroy What Can't Be Sold on holding an item merchants do not buy; open a merchant
+with BetterBags Next, double-click the sale, click the destroy. `/console taintLog 1` should log nothing for BetterBags.

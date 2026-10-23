@@ -555,10 +555,11 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 
 ### Automation
 A category can act on its items on its own. Pick it on the Categories page (`/bb`), then its **Automation** tab:
-- **Auto Sell**: when you open a merchant, the category's items in your backpack are sold, all at once; anything the merchant doesn't take is tried again a moment later, until all are sold. Hold Shift as you open the merchant to keep them.
-- **Destroy What Can't Be Sold** (needs Auto Sell on): the category's items no merchant buys are destroyed. With BetterBags Next, they wait at the bottom of the vendor in a card that glows crimson: each click on it destroys the next one, a whole stack. Anywhere, **Destroy Next Item** (Key Bindings > BetterBags) does the same. The game only lets an addon destroy one item per key press or click.
+- **Auto Sell**: when you open a merchant, the category's items in your backpack are sold.
+- **Confirm Auto Sell** (on by default): with BetterBags Next, the category's section flies over to the vendor and waits there, glowing, as a category you drag onto the vendor does: double-click it to sell, right-click to put it back. Turned off, its items are sold as soon as you open the merchant, all at once; anything the merchant doesn't take is tried again a moment later, until all are sold. Hold Shift as you open the merchant to keep them. The classic bags have no such box: with it on, sell the category yourself by right-clicking its title.
+- **Destroy What Can't Be Sold** (needs Auto Sell on): the category's items no merchant buys are destroyed. With BetterBags Next, its section waits at the vendor like a sale, glowing red: each click destroys the next item, a whole stack. Anywhere, **Destroy Next Item** (Key Bindings > BetterBags) does the same. The game only lets an addon destroy one item per key press or click.
 
-Automation never sells or destroys an item in an equipment set or a purchase you can still refund, and acts on a newly looted item by its category even while it shows under Recent Items. A rule like `rarity = poor`, `ilvl < player.ilvl - 50 AND binding = soulbound` or `toy = true AND known = true` makes a category worth automating.
+Automation never sells or destroys an item in an equipment set or a purchase you can still refund. Selling at once acts on a newly looted item by its category even while it shows under Recent Items; a section waiting at the vendor holds only the items it shows, and a category that isn't on the backpack's current tab doesn't fly over. A rule like `rarity = poor`, `ilvl < player.ilvl - 50 AND binding = soulbound` or `toy = true AND known = true` makes a category worth automating.
 
 ## Themes
 BetterBags offers built-in themes, chosen in Settings > Theme: Default (Blizzard's look), Simple Dark, and Slate, Dark and Parchment, from BetterBags' sister addon Moonlight.  

@@ -240,10 +240,9 @@ describe("NextSettingsContent", function()
       assert.are.equal(1, #sections)
       assert.are.equal("Merchants", sections[1].title)
       local automationRows = sections[1].rows
-      assert.are.equal(2, #automationRows)
-      assert.are.same({ "toggle", "Auto Sell", "toggle", "Destroy What Can't Be Sold" },
-        { automationRows[1].option.kind, automationRows[1].option.title, automationRows[2].option.kind,
-          automationRows[2].option.title })
+      local rowTitles = {}
+      for i, row in ipairs(automationRows) do rowTitles[i] = row.option.title end
+      assert.are.same({ "Auto Sell", "Confirm Auto Sell", "Destroy What Can't Be Sold" }, rowTitles)
       settings:Select("categories", "items")
       assert.are.equal(settings.frame, made.CreateItemsTab.owner)
       local titles = {}
