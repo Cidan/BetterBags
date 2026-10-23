@@ -725,6 +725,9 @@ const.DATABASE_DEFAULTS = {
     -- opposite edges, chained "left" (the companion at the left edge, the backpack beside it) or
     -- "right" (the backpack at the right edge, the companion beside it). next.md §12.
     nextChain = "apart",
+    -- The order the player moved each BetterBags Next tab rail's tabs to, by rail ("backpack", "bank",
+    -- "bankTabs", "guild", "vendor"): tab ids, those not in it after them (docs/next-batch-2.md §5).
+    nextTabOrder = {},
     -- BetterBags Next's panels: "full" height on the screen's edges, or "small" movable ones
     -- (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
     -- size the player gave it with its grips (next.md §14g).

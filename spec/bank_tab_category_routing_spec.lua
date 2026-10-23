@@ -315,6 +315,42 @@ describe("Bank tab category routing bug reproduction", function()
     assert.are.same({ 4 }, warHelmTabs, "Warbank helm should remain in Warbank Armor tab (4)")
   end)
 
+  -- Reported: a category moved from the bank into a backpack group with the group's tab open "shows up
+  -- visually, but when you sort the bag, it snaps back to backpack" (docs/next-batch-2.md §6). The moved
+  -- items show in Recent Items, which every tab shows; once a sort clears it they go to their category's
+  -- group, which a drop on the bag's items never set. It now does, as a drop on the tab does.
+  it("keeps a category in the backpack group it was moved to once its items are no longer recent", function()
+    _G.BetterBagsDB = nil
+    database:Init()
+    groups:Init()
+    categories:Init()
+    items:Init()
+    local ctx = context:New("MovedIntoGroup")
+    local BACKPACK = const.BAG_KIND.BACKPACK
+    database.data.profile.groups[BACKPACK] = {
+      [1] = { id = 1, name = "Backpack", kind = BACKPACK, order = 1 },
+      [2] = { id = 2, name = "Gems", kind = BACKPACK, order = 2 },
+    }
+    database.data.profile.groupsEnabled[BACKPACK] = true
+    local leather = mockData.ItemData({ bagid = 0, slotid = 1, slotkey = "0_1", kind = BACKPACK,
+      name = "Leather", category = "Leather" })
+    local function tabsOf()
+      local tabs = items:Phase10_PartitionIntoTabs(ctx, BACKPACK, { leather }, {}, {}, {}, { ["0_1"] = leather })
+      local list = {}
+      for tabID, tab in pairs(tabs) do
+        for _, item in ipairs(tab.items) do
+          if item.slotkey == "0_1" then table.insert(list, tabID) end
+        end
+      end
+      return list
+    end
+    assert.are.same({ 1 }, tabsOf(), "unassigned: the default group, where it snapped back")
+    groups:AssignCategoryToGroup(ctx, BACKPACK, "Leather", 2)
+    assert.are.same({ 2 }, tabsOf())
+    groups:AssignCategoryToGroup(ctx, BACKPACK, "Leather", 1)
+    assert.are.same({ 1 }, tabsOf(), "dropped on the default group: back there")
+  end)
+
   it("reproduces the bug using the user's actual SavedVariables file from ~/Downloads/BetterBags.lua", function()
     local dumpPath = "/home/antonio/Downloads/BetterBags.lua"
     local f = io.open(dumpPath, "r")

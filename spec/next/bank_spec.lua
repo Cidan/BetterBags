@@ -32,6 +32,7 @@ local stubs = {
   bankSlots = trackStub("BankSlots"),
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
+  categories = trackStub("Categories"),
 }
 
 -- Every value this spec replaces, put back after each test.
@@ -52,8 +53,8 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
-  { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBank", "next/bank.lua" } }) do
+  { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBank", "next/bank.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -173,6 +174,9 @@ describe("NextBank", function()
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
     override(stubs.database, "GetInBagSearch", function() return db.inBagSearch end)
+    db.tabOrder = {}
+    override(stubs.database, "GetNextTabOrder", function(_, key) return db.tabOrder[key] or {} end)
+    override(stubs.database, "SetNextTabOrder", function(_, key, ids) db.tabOrder[key] = ids end)
     override(stubs.database, "GetShowBankTabs", function() return db.showBankTabs end)
     override(stubs.database, "SetShowBankTabs", function(_, on) db.showBankTabs = on end)
     override(stubs.database, "GetBagView", function() return db.view end)
@@ -585,6 +589,23 @@ describe("NextBank", function()
       assert.are.equal(2, bank.tabs.selected)
     end)
 
+    -- Asked: tabs reorderable, "make sure it saves" (docs/next-batch-2.md §5): the character groups and the
+    -- Warbank groups each among themselves, the gap above whichever Warbank group is first.
+    it("lists each block of groups in the order saved, and saves the order they are moved to", function()
+      db.tabOrder.bank = { 5, 3, 4, 2 }
+      local bank = opened()
+      assert.are.same({ 4, 2, 5, 3, 0 }, tabIDs(bank))
+      local step = style.TAB_HEIGHT + style.TAB_SPACING
+      assert.are.equal(2 * step + style.TAB_GROUP_GAP, tabOf(bank, 5).y)
+      assert.are.equal(3 * step + style.TAB_GROUP_GAP, tabOf(bank, 3).y)
+      assert.are.equal("bank", tabOf(bank, 2).block)
+      assert.are.equal("warbank", tabOf(bank, 3).block)
+      assert.is_false(tabOf(bank, 0).movable)
+      bank.tabs.onReorder(ctx(), { 2, 4, 3, 5, 0 })
+      assert.are.same({ 2, 4, 3, 5, 0 }, db.tabOrder.bank)
+      assert.are.same({ 2, 4, 3, 5, 0 }, tabIDs(bank))
+    end)
+
     it("shows a group on a click: its bank type, title, items and the backpack's grey-out", function()
       local bank = opened()
       local before = calls.purchaseUpdates
@@ -680,6 +701,17 @@ describe("NextBank", function()
       assert.are.same({ 6, 7, 12, -2 }, tabIDs(bank))
     end)
 
+    it("lists each bank type's tabs in the order saved apart from the groups', buying ones last", function()
+      db.tabOrder.bankTabs = { 7, 6 }
+      db.tabOrder.bank = { 6, 7 }
+      local bank = inTabMode()
+      assert.are.same({ 7, 6, -1, 12, -2 }, tabIDs(bank))
+      assert.is_false(tabOf(bank, -1).movable)
+      bank.tabs.onReorder(ctx(), { 6, 7, -1, 12, -2 })
+      assert.are.same({ 6, 7, -1, 12, -2 }, db.tabOrder.bankTabs)
+      assert.are.same({ 6, 7 }, db.tabOrder.bank, "the groups' order is their own")
+    end)
+
     it("shows the first purchased tab when it opens without one", function()
       local bank = inTabMode()
       assert.are.equal(6, bank.blizzardBankTab)
@@ -751,10 +783,11 @@ describe("NextBank", function()
 
       it("never moves bags through the bagless base tab", function()
         local bank = inTabMode()
-        local base = tabOf(bank, 6).button
-        assert.is_nil(base._registeredDrags)
+        local base = tabOf(bank, 6)
+        assert.is_falsy(base.draggable, "its drag moves the tab (docs/next-batch-2.md §5), never a bag")
+        assert.is_true(base.movable)
         _G._cursorType = "item"
-        click(base)
+        click(base.button)
         assert.are.same({}, calls.pickups)
       end)
 

@@ -215,3 +215,70 @@ dragging and dropping, a filter), `spec/next/settings/reorder_spec.lua` (the sha
 for the order, the list and the drag, and 2 for the vendor: four first survived and led to tests or
 removed dead code; two are equivalent (the drop's check that the anchor is not the dragged category,
 whose every case ends in no move anyway; clearing the dragged name after a drop).
+
+## 8. Ignored Items: items a category never takes
+
+Asked (2026-10-22): "a new tab next to 'Added Items' called 'Ignored Items', same interface/layout as
+Added Items, but items in this are *ignored* from the category and never land in there under any
+circumstance, no matter if it's added in Added Items, or in a Search Filter." docs/next-batch-2.md §2.
+
+- **Stored on the category** as `ignoredItems = { [itemID] = true }` (none: no field). Yours in its saved
+  filter (`customCategoryFilters[name]`, so renaming and deleting carry it as they carry the rest); a
+  plugin's in its saved state (`ephemeralCategoryFilters[name]`, `saveState`, restored by
+  `CreateCategory` and `DB:CreateOrUpdateCategory` when the plugin makes it again), the player's choice
+  as its color is.
+- **API** (`data/categories.lua`): `IgnoreItem(ctx, itemID, name)`, `UnignoreItem`, `ClearIgnoredItems`
+  (each false for a name no category has; each starts a new generation; the bags are the caller's to
+  recalculate, as `AddPermanentItemToCategory`'s are), `IgnoresItem(name, itemID)` (a group by's
+  sections ignore what their category does; a built-in category ignores nothing), `GetIgnoredItems(name)`
+  (a copy).
+- **Ignoring wins over everything that gives the category the item:**
+  - added by hand, or in a plugin's list: `GetCustomCategory` passes over a category that ignores the
+    item, so the item lands where it would without it (an item stays in Added Items while ignored; the
+    Added Items tab fades it, "Ignored in this category.");
+  - a category function (a plugin's): the item is not filed there, and the next function is asked;
+    with none left the item is remembered as having none (`itemsWithNoCategory`), which `UnignoreItem`
+    and `ClearIgnoredItems` forget so the function is asked again;
+  - a rule: `items:RefreshSearchCache` skips a rule for an item its category ignores, so the next rule
+    by priority takes it, else its own category; a group by's sections included (they are their
+    category's rule).
+- The tab: next-settings.md §5. Coverage: `spec/categories_spec.lua` ("Ignored Items"),
+  `spec/database_spec.lua`, `spec/refresh_pipeline_spec.lua` ("Ignored Items (search rules)"),
+  `spec/next/settings/categories_spec.lua` ("the Ignored Items tab"), `spec/next/settings/content_spec.lua`,
+  `spec/integration/next_settings_spec.lua`.
+
+## 9. Filing an item dropped on a BetterBags Next header
+
+Asked (2026-10-22): "if you drag and drop an item onto a category header, it becomes an Added Item in that
+category. if we ever drag an item away back to it's original category, handle the case where we drag it
+back to the category but we don't add it to Added Items if it would naturally fit there already, i.e.
+if it's a Blizzard defined category, and it would match into that category at that moment in time,
+don't add it to Added Items for that category, just strip it's manual assignment and let it land where
+it should." docs/next-batch-2.md §8.
+
+- **Where it lands naturally** (`items:NaturalCategory(ctx, data)`): `GetCategory` with Recent Items
+  left out and `withoutAdded` (`categories:GetCustomCategory(ctx, kind, data, true)` skips the category
+  the item was added to by hand): its rules as this sweep matched them, a plugin's categories, gear
+  sets, the built-in categories. Read from the item on the cursor as the bags last read it: its bag
+  slot (`C_Cursor.GetCursorItem`), else an item of its ID in the bags, else not known (an equipped
+  item).
+- **`categories:FileItem(ctx, itemID, name, natural)`**, a group by's sections counting as their
+  category on both sides:
+  - lands there naturally: the category it was added to by hand is forgotten (`RemoveItemFromCategory`),
+    nothing is added: `"natural"`;
+  - else a plugin's category: nothing: `"plugin"` (a plugin fills it; adding would make a category of
+    yours with its name, hiding the plugin's);
+  - else: added to the category's Added Items (`AddPermanentItemToCategory`, which takes it from the
+    category it was in), the category no longer ignoring it (§8): `"added"`. A built-in category's name
+    gets a category of yours with that name, which shows in the same section, as the classic title's
+    Shift drop always made one.
+- **The panel** (`panelProto:FileCursorItem`, `next/panel.lua`): a gear set's section ("Gear: ", no
+  category of that name) takes nothing ("Gear sets are made in the Equipment Manager."); a plugin's
+  says "A plugin fills X: items can't be added to it."; in both the item stays on the cursor.
+  Otherwise the item goes back to its slot (`ClearCursor`) and the bags are recalculated
+  (`bags/Rederive { resetLayout, buttons }`).
+- **Known limit:** an item in a gear set shows in its gear set whatever it is added to: gear sets come
+  first in `GetCategory`, before any category (as on the classic bags).
+- Coverage: `spec/categories_spec.lua` ("filing an item dropped on a category's header", "GetCustomCategory
+  without the item's Added Items"), `spec/refresh_pipeline_spec.lua` ("an item's natural category"),
+  `spec/next/drag_spec.lua` ("the header").

@@ -233,6 +233,24 @@ function DB:SetNextChain(layout)
   DB.data.profile.nextChain = layout
 end
 
+-- GetNextTabOrder returns the order the player moved a BetterBags Next tab rail's tabs to (tab ids; none
+-- until moved). key names the rail: "backpack", "bank", "bankTabs", "guild", "vendor".
+---@param key string
+---@return number[]
+function DB:GetNextTabOrder(key)
+  return DB.data.profile.nextTabOrder[key] or {}
+end
+
+---@param key string
+---@param ids number[]
+function DB:SetNextTabOrder(key, ids)
+  local copy = {}
+  for i, id in ipairs(ids) do
+    copy[i] = id
+  end
+  DB.data.profile.nextTabOrder[key] = copy
+end
+
 ---@alias NextSize "full"|"small"
 
 -- GetNextSize returns BetterBags Next's panel size: "full" height on the screen's edges, or "small"
@@ -903,14 +921,16 @@ function DB:CreateOrUpdateCategory(category)
       priority = saved and saved.priority,
       automation = saved and saved.automation,
       confirmSale = saved and saved.confirmSale,
+      skipRecent = saved and saved.skipRecent,
+      ignoredItems = saved and saved.ignoredItems,
     }
   end
 end
 
 -- UpdateEphemeralItemCategory saves what a player set for a plugin's category (its bags, color,
--- priority, automation, confirming).
+-- priority, automation, confirming, skipping Recent Items, its Ignored Items).
 ---@param name string
----@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean}
+---@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean, skipRecent?: boolean, ignoredItems?: table<number, boolean>}
 function DB:UpdateEphemeralItemCategory(name, fields)
   local saved = DB.data.profile.ephemeralCategoryFilters[name]
   if saved == nil then
@@ -922,6 +942,8 @@ function DB:UpdateEphemeralItemCategory(name, fields)
   saved.priority = fields.priority
   saved.automation = fields.automation
   saved.confirmSale = fields.confirmSale
+  saved.skipRecent = fields.skipRecent
+  saved.ignoredItems = fields.ignoredItems
 end
 
 ---@param category string

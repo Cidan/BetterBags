@@ -202,7 +202,8 @@ end
 ---@param src NextPanelFrame
 ---@return boolean
 function nextDrag:CanDropOnTab(panel, tab, src)
-  if tab.secure then
+  -- A purchase tab, and a bag slot (the backpack's Show Blizzard Bags), hold no group.
+  if tab.secure or tab.bag then
     return false
   end
   if panel == src then
@@ -237,6 +238,25 @@ function nextDrag:CanDropOnBody(panel, src)
     return false
   end
   return not isGuild(panel) or panel:DepositTab() ~= nil
+end
+
+-- ShownTab returns the tab a drop on a panel's items goes to: the one it shows, a group of the
+-- backpack or the bank while groups are on, or one of Blizzard's bank tabs in the bank's Bank Tabs mode;
+-- nil for the guild bank, a bag with groups off, or a purchase tab. A drop on the items is a drop on it
+-- (asked: "make drag + drop work for the item space and on a tab directly"; docs/next-batch-2.md §6):
+-- moving a category into another bag's items used to leave it in its old group, so its items went back
+-- to the default tab once they were no longer recent.
+---@param panel NextPanelFrame
+---@return NextTab?
+function nextDrag:ShownTab(panel)
+  if isGuild(panel) or not (database:GetGroupsEnabled(panel.kind) or panel:InTabMode()) then
+    return nil
+  end
+  local tab = panel.tabs:Tab(panel:GetCurrentTabID())
+  if tab == nil or tab.secure or tab.bag then
+    return nil
+  end
+  return tab
 end
 
 -- FindTarget returns what dropping the dragged section where the cursor is would do, or nil.
@@ -610,6 +630,10 @@ function nextDrag:Drop(ctx, noMoves)
 
   local list = self:SectionItems(state.section)
   local rederive
+  local tab = target.tab
+  if target.type == "bag" then
+    tab = self:ShownTab(target.panel)
+  end
   if (target.type == "bag" or target.type == "bagtab") and isGuild(target.panel) then
     -- Deposited into the tab dropped on, else the guild bank's deposit tab; docked there while the
     -- guild bank waits for a confirmation; back in its place when nothing in it can go in.
@@ -628,8 +652,8 @@ function nextDrag:Drop(ctx, noMoves)
     end
   elseif (target.type == "bag" or target.type == "bagtab") and isGuild(src) then
     src:Withdraw(list)
-    if target.type == "bagtab" then
-      groups:AssignCategoryToGroup(ctx, target.panel.kind, name, target.tab.id)
+    if tab then
+      groups:AssignCategoryToGroup(ctx, target.panel.kind, name, tab.id)
       rederive = { resetLayout = true }
     end
   elseif target.type == "sell" then
@@ -645,8 +669,8 @@ function nextDrag:Drop(ctx, noMoves)
   elseif target.type == "tab" then
     groups:AssignCategoryToGroup(ctx, kind, name, target.tab.id)
     rederive = { backpack = kind == const.BAG_KIND.BACKPACK, bank = kind == const.BAG_KIND.BANK, resetLayout = true }
-  elseif target.type == "bagtab" then
-    local panel, id = target.panel, target.tab.id
+  elseif tab and (target.type == "bagtab" or target.type == "bag") then
+    local panel, id = target.panel, tab.id
     if panel.kind == const.BAG_KIND.BANK and panel:InTabMode() then
       sectionFrame:MoveItems(list, panel:BankTypeOfTab(id))
     elseif panel.kind == const.BAG_KIND.BANK then

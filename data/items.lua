@@ -1306,12 +1306,13 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
         d = {}
         currentItem.derived = d
       end
-      -- The item's own category, without search categories: the search index holds it while Phase 8
-      -- matches search categories (data-loader.md §8).
-      local recent = self:IsNewItem(currentItem)
-      if d.category ~= stamp or d.recent ~= recent then
-        d.ownCategory = self:GetCategory(ctx, currentItem, true)
-        d.category, d.recent, d.final = stamp, recent, nil
+      -- The item's own category, without search categories or Recent Items: the search index holds it
+      -- while Phase 8 matches search categories (data-loader.md §8), so a rule's category field matches
+      -- what the item is, new or not (a rule taking junk by `category = "junk"` takes a new junk item,
+      -- and Skip Recent Items sees it).
+      if d.category ~= stamp then
+        d.ownCategory = self:GetCategory(ctx, currentItem, true, true)
+        d.category, d.base, d.final = stamp, nil, nil
         currentItem.itemInfo.category = d.ownCategory
         d.indexPending = true
       end
@@ -1550,6 +1551,27 @@ end
 ---@param itemData table<string, ItemData>
 ---@param emptySlotByBagAndSlot table
 ---@return table sectionLayouts
+-- SkipRecent unmarks a new item whose category (category: the item's own with its search categories,
+-- Recent Items left out) skips Recent Items (Skip Recent Items, a category setting, categories:SkipsRecentOf;
+-- docs/next-batch-2.md §1): its timer ends and the client's new-item mark goes, so it shows in its
+-- category at once, and a virtual stack it roots is no longer recent (every pile of a stack is the same
+-- item, in the same category). It returns whether it unmarked the item, for profiler traces.
+---@param ctx Context
+---@param item ItemData
+---@param category string
+---@return boolean
+function items:SkipRecent(ctx, item, category)
+  if not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category) then
+    return false
+  end
+  item.stackRecent = nil
+  if self:IsNewItem(item) then
+    self:ClearNewItemFromData(ctx, item)
+    return true
+  end
+  return false
+end
+
 function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlot)
   if search and search.SyncKind then
     -- The search index is a single, global structure shared by the backpack and the bank
@@ -1604,11 +1626,19 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
         currentItem.derived = d
       end
       local searchCategory, searchPriority = searchCache[slotkey], priorities[slotkey]
+      -- Its category without Recent Items (base), worked out again only when its own category (Phase 6
+      -- drops it) or its search categories changed; then whether it is recent, which only picks between
+      -- base and Recent Items, as GetCategory does (its Recent Items check comes first).
+      if d.base == nil or d.searchCategory ~= searchCategory or d.searchPriority ~= searchPriority then
+        d.base = self:GetCategory(ctx, currentItem, false, true)
+        d.searchCategory, d.searchPriority, d.final = searchCategory, searchPriority, nil
+      end
+      self:SkipRecent(ctx, currentItem, d.base)
       local recent = self:IsNewItem(currentItem) or currentItem.stackRecent == true
-      if d.final == nil or d.searchCategory ~= searchCategory or d.searchPriority ~= searchPriority
-        or d.finalRecent ~= recent then
-        d.final = self:GetCategory(ctx, currentItem)
-        d.searchCategory, d.searchPriority, d.finalRecent = searchCategory, searchPriority, recent
+      if d.final == nil or d.finalRecent ~= recent then
+        local shownRecent = recent and database:GetCategoryFilter(currentItem.kind, "RecentItems")
+        d.final = shownRecent and L:G("Recent Items") or d.base
+        d.finalRecent = recent
       end
       local shown = showBags and self:GetBagName(currentItem.bagid) or d.final
       if currentItem.itemInfo.category ~= shown then
@@ -2362,7 +2392,11 @@ function items:RefreshSearchCache(kind, itemData)
       local priority = categoryFilter.priority or 10
 
       for slotkey, match in pairs(results) do
-        if match then
+        -- A rule never takes an item its category ignores (Ignored Items): the next one does.
+        local matched = itemData[slotkey]
+        local ignored = categoryFilter.ignoredItems ~= nil and matched ~= nil and not matched.isItemEmpty
+          and categoryFilter.ignoredItems[matched.itemInfo.itemID] == true
+        if match and not ignored then
           local categoryName = categoryFilter.name
 
           -- A grouping category's match shows in its sub-category for the item.
@@ -3910,13 +3944,15 @@ end
 -- GetCategory returns the category data is shown in. With own, it leaves search categories out:
 -- the item's own category, which search categories are matched against (Phase6_EnrichData). With
 -- ignoreRecent, a recent item gets the category it has once it is no longer recent (category
--- automation acts by it, automation.md).
+-- automation acts by it, automation.md). With withoutAdded, the category it was added to by hand is
+-- left out (NaturalCategory).
 ---@param ctx Context
 ---@param data ItemData
 ---@param own? boolean
 ---@param ignoreRecent? boolean
+---@param withoutAdded? boolean
 ---@return string
-function items:GetCategory(ctx, data, own, ignoreRecent)
+function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
   if not data or data.isItemEmpty then
     return L:G("Empty Slot")
   end
@@ -3950,7 +3986,7 @@ function items:GetCategory(ctx, data, own, ignoreRecent)
     searchCategory = self.searchCache[data.kind] and self.searchCache[data.kind][data.slotkey]
     searchPriority = self.categoryPriorityCache[data.kind] and self.categoryPriorityCache[data.kind][data.slotkey]
   end
-  local customCategory, customPriority, customFilter = categories:GetCustomCategory(ctx, data.kind, data)
+  local customCategory, customPriority, customFilter = categories:GetCustomCategory(ctx, data.kind, data, withoutAdded)
 
   -- An item added by hand to a category of yours stays there, whatever the order (category-lifecycle.md
   -- §7). A plugin's item lists compete with rules by priority, the list winning a tie.
@@ -4052,6 +4088,16 @@ function items:GetCategory(ctx, data, own, ignoreRecent)
   end
 
   return category
+end
+
+-- NaturalCategory returns where an item lands without the category it was added to by hand, out of
+-- Recent Items: its rules (this sweep's), a plugin's categories, the built-in ones. An item dropped on
+-- the header of that category needs no Added Items there (Categories:FileItem, docs/next-batch-2.md §8).
+---@param ctx Context
+---@param data ItemData
+---@return string
+function items:NaturalCategory(ctx, data)
+  return self:GetCategory(ctx, data, false, true, true)
 end
 
 function items:ParseItemLink(link)

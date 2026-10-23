@@ -205,6 +205,7 @@ describe("NextSettingsCategories", function()
       elseif fields.confirmSale ~= nil then
         f.confirmSale = nil
       end
+      if fields.skipRecent ~= nil then f.skipRecent = fields.skipRecent == true or nil end
       for k, v in pairs(fields.enabled or {}) do f.enabled[k] = v end
       return true
     end)
@@ -230,6 +231,32 @@ describe("NextSettingsCategories", function()
     override(categories, "WipeCategory", function(_, _, name)
       table.insert(calls, { "WipeCategory", name })
       filters[name].itemList = {}
+    end)
+    -- Ignored Items, as the real ones: kept on the category.
+    override(categories, "IgnoresItem", function(_, name, id)
+      local f = filters[name]
+      return f ~= nil and f.ignoredItems ~= nil and f.ignoredItems[id] == true
+    end)
+    override(categories, "GetIgnoredItems", function(_, name)
+      local list = {}
+      for id in pairs(filters[name] and filters[name].ignoredItems or {}) do list[id] = true end
+      return list
+    end)
+    override(categories, "IgnoreItem", function(_, _, id, name)
+      table.insert(calls, { "IgnoreItem", id, name })
+      filters[name].ignoredItems = filters[name].ignoredItems or {}
+      filters[name].ignoredItems[id] = true
+      return true
+    end)
+    override(categories, "UnignoreItem", function(_, _, id, name)
+      table.insert(calls, { "UnignoreItem", id, name })
+      filters[name].ignoredItems[id] = nil
+      return true
+    end)
+    override(categories, "ClearIgnoredItems", function(_, _, name)
+      table.insert(calls, { "ClearIgnoredItems", name })
+      filters[name].ignoredItems = nil
+      return true
     end)
     override(categories, "GetMergedCategory", function(_, name)
       local list = {}
@@ -836,6 +863,48 @@ describe("NextSettingsCategories", function()
     end)
   end)
 
+  -- Asked: "'Skip Recent Items' ... 100% independent of autosell, etc. can apply to any category".
+  describe("the Skip Recent Items setting", function()
+    local option
+
+    before_each(function()
+      option = editor:RecentOptions()[1]
+    end)
+
+    it("is a switch, named and described, on with the category's setting", function()
+      assert.are.equal("toggle", option.kind)
+      assert.are.equal("Skip Recent Items", option.title)
+      assert.truthy(option.description:find("Recent Items", 1, true))
+      assert.truthy(#option.keywords > 0)
+      editor.selected = "Mats"
+      assert.is_false(option.get())
+      filters.Mats.skipRecent = true
+      assert.is_true(option.get())
+      assert.is_nil(option.disabled, "never needs Auto Sell")
+    end)
+
+    it("saves at once and shows the page's rows again, for a plugin's category too", function()
+      editor.selected = "Mats"
+      option.set(ctx(), true)
+      editor.selected = "Openable"
+      option.set(ctx(), true)
+      option.set(ctx(), false)
+      assert.are.same({
+        { "UpdateCategory", "Mats", { skipRecent = true } },
+        { "UpdateCategory", "Openable", { skipRecent = true } },
+        { "UpdateCategory", "Openable", { skipRecent = false } },
+      }, updates())
+      assert.are.equal(3, refreshed)
+    end)
+
+    it("changes nothing with no category chosen", function()
+      editor.selected = nil
+      assert.is_false(option.get())
+      option.set(ctx(), true)
+      assert.are.same({}, updates())
+    end)
+  end)
+
   describe("the Added Items tab", function()
     local tab
 
@@ -941,6 +1010,91 @@ describe("NextSettingsCategories", function()
     it("says, simply, how to add an item", function()
       assert.are.equal("Drag an item here to manually add it to this category.", tab.help:GetText())
       assert.are.equal("No items added yet.", tab.grid.empty:GetText())
+    end)
+
+    -- An item added and ignored lands elsewhere: ignoring wins (asked: "no matter if it's added in Added
+    -- Items").
+    it("fades an added item the category ignores, saying so", function()
+      filters.Mats.ignoredItems = { [12] = true }
+      tab:Refresh(ctx())
+      local dust = entryOf(tab.grid, 12)
+      assert.is_true(dust.dim)
+      assert.are.equal("Ignored in this category.", dust.note)
+    end)
+  end)
+
+  -- Asked: "a new tab next to 'Added Items' called 'Ignored Items', same interface/layout as Added Items,
+  -- but items in this are *ignored* from the category" (docs/next-batch-2.md §2).
+  describe("the Ignored Items tab", function()
+    local tab
+
+    before_each(function()
+      filters.Mats.ignoredItems = { [11] = true }
+      tab = editor:CreateItemsTab(CreateFrame("Frame"), owner, bagsFn, "ignored")
+      editor.selected = "Mats"
+      place(tab)
+    end)
+
+    it("shows the items ignored, how many, and where one in your bags shows", function()
+      assert.are.equal("1 ignored item", tab.count:GetText())
+      assert.are.same({ 11 }, ids(tab.grid))
+      local ore = entryOf(tab.grid, 11)
+      assert.are.equal(1100, ore.icon)
+      assert.is_falsy(ore.dim)
+      assert.are.equal("Shows in Junk.", ore.note)
+    end)
+
+    it("says how to ignore an item", function()
+      assert.are.equal("Drag an item here so it never shows in this category.", tab.help:GetText())
+      assert.are.equal("No items ignored.", tab.grid.empty:GetText())
+    end)
+
+    it("keeps only the items whose name has what is typed in its filter", function()
+      filters.Mats.ignoredItems[12] = true
+      tab:ShowItems()
+      tab.filter.frame:SetText("dust")
+      tab.filter.frame:GetScript("OnTextChanged")(tab.filter.frame, true)
+      assert.are.same({ 12 }, ids(tab.grid))
+      assert.are.equal("1 of 2 ignored items", tab.count:GetText())
+    end)
+
+    it("ignores an item dropped on it, for a plugin's category too", function()
+      _G._cursorType, _G._cursorItemID, _G._cursorHasItem = "item", 13, true
+      itemNames[13] = "Bolt"
+      tab.grid.frame:GetScript("OnReceiveDrag")(tab.grid.frame)
+      assert.are.same({ "IgnoreItem", 13, "Mats" }, calls[#calls])
+      assert.is_false(CursorHasItem())
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
+      assert.are.same({ 13, 11 }, ids(tab.grid))
+      editor.selected = "Openable"
+      tab:Refresh(ctx())
+      assert.is_true(tab.grid.frame:IsShown(), "editable")
+      assert.is_false(tab.readOnly.frame:IsShown())
+      assert.is_true(tab.removeAll.frame:IsShown())
+      assert.are.equal("Drag an item here so it never shows in this category.", tab.help:GetText())
+      _G._cursorType, _G._cursorItemID, _G._cursorHasItem = "item", 14, true
+      itemNames[14] = "Gear"
+      tab.grid.frame:GetScript("OnReceiveDrag")(tab.grid.frame)
+      assert.are.same({ "IgnoreItem", 14, "Openable" }, calls[#calls])
+    end)
+
+    it("stops ignoring an item from a right click on it", function()
+      local cell = tab.grid.cells[1]
+      cell.frame:GetScript("OnClick")(cell.frame, "RightButton")
+      nextMenu:Rows()[1].frame:GetScript("OnClick")(nextMenu:Rows()[1].frame, "LeftButton")
+      assert.are.same({ "UnignoreItem", 11, "Mats" }, calls[#calls])
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
+      assert.are.same({}, ids(tab.grid))
+    end)
+
+    it("stops ignoring every item after asking, with Remove All", function()
+      click(tab.removeAll)
+      assert.are.equal("Remove all 1 ignored item from 'Mats'? This cannot be undone.", nextDialog.text:GetText())
+      answer("Remove All")
+      assert.are.same({ "ClearIgnoredItems", "Mats" }, calls[#calls])
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
+      assert.are.same({}, ids(tab.grid))
+      assert.is_false(tab.removeAll.frame:IsEnabled())
     end)
   end)
 end)

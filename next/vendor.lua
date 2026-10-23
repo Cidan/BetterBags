@@ -239,7 +239,7 @@ function vendorProto:RefreshTabs()
   if CanMerchantRepair() then
     table.insert(entries, { id = TAB_REPAIR, name = L:G("Repair") })
   end
-  self.tabs:SetTabs(entries)
+  self.tabs:SetTabs(self:OrderedTabs(entries))
   self.tabs:Select(self.tab)
   self.tabs.frame:Show()
 end
@@ -255,6 +255,12 @@ function vendorProto:OnTabClicked(ctx, id, button)
   self.tabs:Select(id, true)
   self.tabChanged = true
   self:Draw(ctx)
+end
+
+-- TabOrderKey saves the order of the vendor's tabs.
+---@return string
+function vendorProto:TabOrderKey()
+  return "vendor"
 end
 
 ---@return number

@@ -8,11 +8,14 @@ ResetModuleStub("NextStyle", "next/style.lua")
 LoadBetterBagsModule("next/style.lua")
 ResetModuleStub("NextTween", "next/tween.lua")
 LoadBetterBagsModule("next/tween.lua")
+ResetModuleStub("NextLift", "next/lift.lua")
+LoadBetterBagsModule("next/lift.lua")
 ResetModuleStub("NextTabs", "next/tabs.lua")
 LoadBetterBagsModule("next/tabs.lua")
 local nextTabs = addon:GetModule("NextTabs")
 local tween = addon:GetModule("NextTween")
 local style = addon:GetModule("NextStyle")
+local lift = addon:GetModule("NextLift")
 
 describe("NextTabs", function()
   local body, rail, clicks
@@ -418,5 +421,327 @@ describe("NextTabs", function()
     rail:SetTabs(groups)
     assert.are.equal(3, #rail.tabs)
     assert.are.equal(0, #rail.pool, "the hidden tabs are used again")
+  end)
+
+  -- Asked: "all tabs in all Next windows should be reorderable by clicking and holding to slide. animate
+  -- the slide, but pin the X axis so you can't move it left and right, just drag it up and down. animate
+  -- this transition and make sure it saves." (docs/next-batch-2.md §5)
+  describe("moving a tab", function()
+    local orders, step, RAIL_TOP, RAIL_RIGHT
+
+    before_each(function()
+      UIParent:_SetRect(0, 0, 1920, 1200)
+      orders = {}
+      rail:SetReorderHandler(function(ctx, ids)
+        assert.is_not_nil(ctx)
+        table.insert(orders, ids)
+      end)
+      step = style.TAB_HEIGHT + style.TAB_SPACING
+      RAIL_TOP, RAIL_RIGHT = 800, 1020
+      _G._mouseButtonsDown = nil
+    end)
+
+    after_each(function()
+      rail:CancelMove()
+      _G._mouseButtonsDown = nil
+    end)
+
+    -- layOut gives the rail and its tabs the rects the client would (specs have no layout engine).
+    local function layOut()
+      rail.frame:_SetRect(RAIL_RIGHT - 120, RAIL_TOP - 600, 120, 600)
+      for _, tab in ipairs(rail.tabs) do
+        tab.button:_SetRect(RAIL_RIGHT - tab.width, RAIL_TOP - tab.y - style.TAB_HEIGHT, tab.width, style.TAB_HEIGHT)
+      end
+    end
+
+    local function press(tab)
+      local x, y = tab.button:GetLeft() + 10, tab.button:GetTop() - style.TAB_HEIGHT / 2
+      _G._cursorX, _G._cursorY = x, y
+      _G._mouseButtonsDown = { LeftButton = true }
+      tab.button:GetScript("OnDragStart")(tab.button)
+      return x, y
+    end
+
+    local function move(x, y)
+      _G._cursorX, _G._cursorY = x, y
+      lift.layer:GetScript("OnUpdate")(lift.layer, 0.016)
+    end
+
+    local function release(tab)
+      _G._mouseButtonsDown = nil
+      tab.button:GetScript("OnDragStop")(tab.button)
+    end
+
+    -- middleOf is the cursor's y over the middle of the place-th tab.
+    local function middleOf(place, gap)
+      return RAIL_TOP - (place - 1) * step - (gap or 0) - style.TAB_HEIGHT / 2
+    end
+
+    local function ids()
+      local out = {}
+      for _, t in ipairs(rail.tabs) do table.insert(out, t.id) end
+      return out
+    end
+
+    local function placed(id)
+      local tab = rail:Tab(id)
+      return { tab.button:GetPoint(1) }
+    end
+
+    local groupsAndPlus = { { id = 1, name = "Backpack" }, { id = 2, name = "Herbs" }, { id = 3, name = "Ore" },
+      { id = 0, name = "+", fixed = true } }
+
+    it("lifts a tab pressed and moved, which follows the cursor up and down but never sideways", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local tab = rail:Tab(1)
+      assert.are.same({ "LeftButton" }, tab.button._registeredDrags)
+      local x, y = press(tab)
+      assert.is_true(lift:IsHolding())
+      move(x - 80, y - 10)
+      local before = { tab.button:GetPoint(1) }
+      move(x + 120, y - 30)
+      local after = { tab.button:GetPoint(1) }
+      assert.are.equal("TOPLEFT", after[1])
+      assert.are.equal(UIParent, after[2])
+      assert.are.equal(before[4], after[4], "its X pinned")
+      assert.is_true(after[5] < before[5], "it went down with the cursor")
+      finishTweens()
+      local settled = { tab.button:GetPoint(1) }
+      move(x - 200, y - 40)
+      assert.are.equal(settled[4], ({ tab.button:GetPoint(1) })[4], "pinned once lifted too")
+    end)
+
+    it("stays with the cursor when the pointer leaves it, its hover slide never pulling it back", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local tab = rail:Tab(1)
+      local x, y = press(tab)
+      move(x, y - 15)
+      finishTweens()
+      local held = { tab.button:GetPoint(1) }
+      tab.button:GetScript("OnLeave")(tab.button)
+      finishTweens()
+      assert.are.equal(UIParent, ({ tab.button:GetPoint(1) })[2])
+      assert.are.equal(held[5], ({ tab.button:GetPoint(1) })[5])
+    end)
+
+    it("lands where its room is: the rail's edge, below the tabs above it", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local land, landTo = lift.Land, nil
+      lift.Land = function(self, held, to, ...)
+        landTo = to
+        return land(self, held, to, ...)
+      end
+      local tab = rail:Tab(1)
+      local x = press(tab)
+      move(x, middleOf(2) - 2)
+      release(tab)
+      lift.Land = land
+      local left, top = landTo(0, 0)
+      assert.are.equal(RAIL_RIGHT - tab.width, left)
+      assert.are.equal(RAIL_TOP - step, top)
+      finishTweens()
+    end)
+
+    -- Reported: "when i let go, it snaps to the mouse's position for a second before it slips over to the
+    -- correct point, no matter how far away the mouse is to the left or right".
+    it("lands from where it is, its x pinned, however far the cursor went sideways", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local tab = rail:Tab(1)
+      local x = press(tab)
+      move(x + 300, middleOf(2) - 2)
+      finishTweens()
+      local before = { tab.button:GetPoint(1) }
+      release(tab)
+      local after = { tab.button:GetPoint(1) }
+      assert.are.equal(before[4], after[4], "no jump to the cursor's x")
+      assert.are.equal(before[5], after[5])
+      finishTweens()
+    end)
+
+    it("slides the tabs in its way out of it, animated", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local x = press(rail:Tab(1))
+      move(x, middleOf(2) - 2)
+      assert.is_true(tween:IsPlaying(rail:Tab(2).yKey), "Herbs slides up into its place")
+      finishTweens()
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, 0 }, placed(2))
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -2 * step }, placed(3))
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -3 * step }, placed(0))
+    end)
+
+    it("lands it in its new place, telling its handler the new order, which it shows", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local tab = rail:Tab(1)
+      local x = press(tab)
+      move(x, middleOf(2) - 2)
+      release(tab)
+      assert.are.same({}, orders, "not before it landed")
+      finishTweens()
+      assert.are.same({ { 2, 1, 3, 0 } }, orders)
+      assert.are.same({ 2, 1, 3, 0 }, ids())
+      assert.is_false(lift:IsHolding())
+      assert.are.equal(rail.frame, tab.button:GetParent())
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -step }, placed(1))
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, 0 }, placed(2))
+    end)
+
+    it("lets it go when the button is up even without a drag stop, telling nothing for no move", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local x, y = press(rail:Tab(2))
+      _G._mouseButtonsDown = nil
+      move(x, y)
+      finishTweens()
+      assert.is_false(lift:IsHolding())
+      assert.are.same({}, orders)
+      assert.are.same({ 1, 2, 3, 0 }, ids())
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -step }, placed(2))
+    end)
+
+    it("keeps a tab its owner fixes, a purchase tab and a draggable one where they are", function()
+      local drags = {}
+      rail:SetDragHandler(function(_, id) table.insert(drags, id) end)
+      rail:SetTabs({ { id = 1, name = "Backpack" }, { id = 7, name = "Socket", draggable = true },
+        { id = 0, name = "+", fixed = true }, { id = -1, name = "+", secure = 1 } })
+      layOut()
+      press(rail:Tab(0))
+      assert.is_false(lift:IsHolding())
+      press(rail:Tab(7))
+      assert.is_false(lift:IsHolding())
+      assert.are.same({ 7 }, drags, "a draggable tab's drag is its own")
+      local x = press(rail:Tab(1))
+      move(x, middleOf(4) - 2)
+      release(rail:Tab(1))
+      finishTweens()
+      assert.are.same({}, orders, "nothing to move past: the others stay")
+      assert.are.same({ 1, 7, 0, -1 }, ids())
+    end)
+
+    it("moves nothing on a rail without a handler", function()
+      local other = nextTabs:Create(body)
+      other:SetTabs(groupsAndPlus)
+      other.frame:_SetRect(RAIL_RIGHT - 120, RAIL_TOP - 600, 120, 600)
+      local tab = other.tabs[1]
+      tab.button:_SetRect(RAIL_RIGHT - tab.width, RAIL_TOP - style.TAB_HEIGHT, tab.width, style.TAB_HEIGHT)
+      assert.is_nil(tab.button._registeredDrags)
+      tab.button:GetScript("OnDragStart")(tab.button)
+      assert.is_false(lift:IsHolding())
+    end)
+
+    -- The bank's own groups and its Warbank groups are two blocks, as its Blizzard tabs are.
+    it("moves a tab only among its block's tabs, the block's gap staying at its first", function()
+      rail:SetTabs({ { id = 1, name = "Bank", block = "bank" }, { id = 2, name = "Vault", block = "bank" },
+        { id = 3, name = "Warbank", block = "warbank", gap = 10 }, { id = 4, name = "Shared", block = "warbank" } })
+      layOut()
+      local x = press(rail:Tab(1))
+      move(x, middleOf(4, 10) - 2)
+      release(rail:Tab(1))
+      finishTweens()
+      assert.are.same({ { 2, 1, 3, 4 } }, orders, "kept in its block")
+      x = press(rail:Tab(3))
+      move(x, middleOf(4, 10) - 2)
+      release(rail:Tab(3))
+      finishTweens()
+      assert.are.same({ 2, 1, 4, 3 }, orders[2])
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(2 * step + 10) }, placed(4), "the gap above the block")
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(3 * step + 10) }, placed(3))
+      rail:SetTabs(rail.entries)
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -(2 * step + 10) }, placed(4), "and when listed again")
+    end)
+
+    it("keeps a tab dragged over another block's tabs at its own block's edge", function()
+      rail:SetTabs({ { id = 1, name = "Bank", block = "bank" }, { id = 2, name = "Vault", block = "bank" },
+        { id = 3, name = "Warbank", block = "warbank", gap = 10 }, { id = 4, name = "Shared", block = "warbank" } })
+      layOut()
+      local x = press(rail:Tab(3))
+      move(x, middleOf(1) - 2)
+      release(rail:Tab(3))
+      finishTweens()
+      assert.are.same({}, orders, "still first of its block")
+      assert.are.same({ 1, 2, 3, 4 }, ids())
+    end)
+
+    it("keeps the bar on the selected tab", function()
+      rail:SetTabs(groupsAndPlus)
+      rail:Select(1)
+      layOut()
+      local x = press(rail:Tab(1))
+      move(x, middleOf(2) - 2)
+      release(rail:Tab(1))
+      finishTweens()
+      assert.are.equal(-step, rail.indicatorY)
+      assert.are.equal(1, rail.selected)
+    end)
+
+    it("puts a tab back when its rail hides or its tabs are listed again mid-move, telling nothing", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local x = press(rail:Tab(1))
+      move(x, middleOf(3) - 2)
+      rail.frame:GetScript("OnHide")(rail.frame)
+      assert.is_false(lift:IsHolding())
+      assert.are.equal(rail.frame, rail:Tab(1).button:GetParent())
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, 0 }, placed(1))
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -step }, placed(2))
+      layOut()
+      x = press(rail:Tab(1))
+      move(x, middleOf(3) - 2)
+      rail:SetTabs(groupsAndPlus)
+      assert.is_false(lift:IsHolding())
+      finishTweens()
+      assert.are.same({}, orders)
+      assert.are.same({ "TOPRIGHT", rail.frame, "TOPRIGHT", 0, -step }, placed(2))
+    end)
+
+    it("starts no move while something else is lifted", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local other = CreateFrame("Frame", nil, UIParent)
+      other:_SetRect(0, 0, 10, 10)
+      local held = {}
+      assert.is_true(lift:Pick(held, other, function() end))
+      press(rail:Tab(1))
+      assert.are.equal(held, lift.held)
+      lift:Release(held)
+    end)
+  end)
+
+  -- How each panel lists its tabs in the order the player saved (Ordered).
+  describe("a saved order", function()
+    local function names(list)
+      local out = {}
+      for _, e in ipairs(list) do table.insert(out, e.id) end
+      return out
+    end
+
+    it("puts the saved tabs in their order, the others after them in theirs", function()
+      local entries = { { id = 1 }, { id = 2 }, { id = 3 }, { id = 4 } }
+      assert.are.same({ 3, 1, 2, 4 }, names(nextTabs:Ordered(entries, { 3, 1 })))
+      assert.are.same({ 1, 2, 3, 4 }, names(nextTabs:Ordered(entries, nil)))
+      assert.are.same({ 1, 2, 3, 4 }, names(entries), "the list given is left alone")
+    end)
+
+    it("never moves a fixed tab, nor a tab past one", function()
+      local entries = { { id = 1 }, { id = 0, fixed = true }, { id = 2 } }
+      assert.are.same({ 1, 0, 2 }, names(nextTabs:Ordered(entries, { 2, 1 })))
+    end)
+
+    it("orders each block apart, next to each other", function()
+      local entries = { { id = 1, block = "a" }, { id = 2, block = "a" }, { id = 3, block = "b" }, { id = 4, block = "b" } }
+      assert.are.same({ 1, 2, 3, 4 }, names(nextTabs:Ordered(entries, { 3, 1 })))
+      assert.are.same({ 2, 1, 4, 3 }, names(nextTabs:Ordered(entries, { 4, 2 })))
+    end)
+
+    it("keeps fixed and purchase tabs where they are, each block's tabs among themselves", function()
+      local entries = { { id = 1, block = "a" }, { id = 2, block = "a" }, { id = -1, secure = 1 },
+        { id = 3, block = "b" }, { id = 4, block = "b" }, { id = 0, fixed = true } }
+      assert.are.same({ 2, 1, -1, 4, 3, 0 }, names(nextTabs:Ordered(entries, { 4, 2, 3, 1 })))
+    end)
   end)
 end)

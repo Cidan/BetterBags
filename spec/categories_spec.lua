@@ -29,7 +29,11 @@ database.GetAllEphemeralItemCategories = function() return dbEphemeralCategories
 database.GetItemCategory = function(_, name) return dbCategories[name] end
 database.GetEphemeralItemCategory = function(_, name) return dbEphemeralCategories[name] end
 database.ItemCategoryExists = function(_, name) return dbCategories[name] ~= nil end
+-- As the real one (DB:SaveItemToCategory): an item has one home, so it leaves the category it was in.
 database.SaveItemToCategory = function(_, id, name)
+  for other, cat in pairs(dbCategories) do
+    if other ~= name and cat.itemList then cat.itemList[id] = nil end
+  end
   dbCategories[name] = dbCategories[name] or {name = name, itemList = {}}
   dbCategories[name].itemList[id] = true
 end
@@ -44,7 +48,8 @@ database.CreateOrUpdateCategory = function(_, category)
       name = category.name, enabled = category.enabled, dynamic = category.dynamic,
       isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
       color = saved and saved.color, priority = saved and saved.priority, automation = saved and saved.automation,
-      confirmSale = saved and saved.confirmSale,
+      confirmSale = saved and saved.confirmSale, skipRecent = saved and saved.skipRecent,
+      ignoredItems = saved and saved.ignoredItems,
     }
   end
 end
@@ -143,11 +148,14 @@ describe("Categories", function()
         RenameCategory = function() categories:RenameCategory(ctx, "Mats", "Metals") end,
         DeleteCategory = function() categories:DeleteCategory(ctx, "Metals") end,
         ReprocessAllItems = function() categories:ReprocessAllItems(ctx) end,
+        IgnoreItem = function() categories:IgnoreItem(ctx, 101, "Gems") end,
+        UnignoreItem = function() categories:UnignoreItem(ctx, 101, "Gems") end,
+        ClearIgnoredItems = function() categories:ClearIgnoredItems(ctx, "Gems") end,
       }
       for _, name in ipairs({ "CreateCategory", "AddItemToCategory", "AddPermanentItemToCategory",
         "RemoveItemFromCategory", "WipeCategory", "ToggleCategory", "EnableCategory", "DisableCategory",
-        "SetCategoryState", "RegisterCategoryFunction", "UpdateCategory", "RenameCategory", "DeleteCategory",
-        "ReprocessAllItems" }) do
+        "SetCategoryState", "RegisterCategoryFunction", "IgnoreItem", "UnignoreItem", "ClearIgnoredItems",
+        "UpdateCategory", "RenameCategory", "DeleteCategory", "ReprocessAllItems" }) do
         assert.is_true(bumps(changes[name]), name)
       end
     end)
@@ -538,6 +546,29 @@ describe("Categories", function()
       assert.is_false(categories:GetCategoryByName("Openable").confirmSale, "the player's choice wins")
     end)
 
+    -- Asked: "Skip Recent Items" (docs/next-batch-2.md §1). It changes which items show in Recent
+    -- Items, so the bags are recalculated.
+    it("turns skipping Recent Items on and off, keeping only on, and recalculates the bags", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      categories:UpdateCategory(context:New("Test"), "Mats", { skipRecent = true })
+      assert.is_true(dbCategories["Mats"].skipRecent)
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[2])
+      sent = {}
+      categories:UpdateCategory(context:New("Test"), "Mats", { skipRecent = false })
+      assert.is_nil(dbCategories["Mats"].skipRecent, "off is the default")
+      assert.are.equal(2, #sent)
+    end)
+
+    it("keeps a plugin's Skip Recent Items across its next creation", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:UpdateCategory(ctx, "Openable", { skipRecent = true })
+      assert.is_true(dbEphemeralCategories["Openable"].skipRecent)
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      assert.is_true(categories:GetCategoryByName("Openable").skipRecent)
+    end)
+
     it("says when there is no such category", function()
       assert.is_false(categories:UpdateCategory(context:New("Test"), "Nope", { priority = 1 }))
       assert.are.same({}, sent)
@@ -555,6 +586,19 @@ describe("Categories", function()
       assert.are.equal("sell", categories:AutomationOf("Mats - Cloth"))
       assert.is_nil(categories:AutomationOf("Plain"))
       assert.is_nil(categories:AutomationOf("Armor"), "a built-in category has none")
+    end)
+
+    it("skips Recent Items when turned on, a group by's sections as their category does", function()
+      local ctx = context:New("Test")
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, skipRecent = true }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      assert.is_true(categories:SkipsRecentOf("Ore"))
+      assert.is_true(categories:SkipsRecentOf("Ore - Copper"))
+      assert.is_false(categories:SkipsRecentOf("Mats"))
+      assert.is_false(categories:SkipsRecentOf("Armor"), "a built-in category has none")
+      assert.is_false(categories:SkipsRecentOf("Recent Items"))
     end)
 
     it("confirms a sale unless turned off, a group by's sections as their category does", function()
@@ -856,6 +900,186 @@ describe("Categories", function()
 
       -- Assert that itemsWithNoCategory cache is also cleared upon removal
       assert.is_nil(categories.itemsWithNoCategory[itemID])
+    end)
+  end)
+
+  -- Asked: "items in this are *ignored* from the category and never land in there under any
+  -- circumstance, no matter if it's added in Added Items, or in a Search Filter" (docs/next-batch-2.md §2).
+  describe("Ignored Items", function()
+    local ctx
+    before_each(function()
+      ctx = context:New("Test")
+    end)
+
+    it("keeps an item added by hand out of the category, until no longer ignored", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      local item = { itemInfo = { itemID = 101 } }
+      assert.is_true(categories:IgnoreItem(ctx, 101, "Mats"))
+      assert.is_true(categories:IgnoresItem("Mats", 101))
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      assert.is_true(dbCategories["Mats"].itemList[101], "still added: ignoring wins")
+      assert.is_true(dbCategories["Mats"].ignoredItems[101], "saved with the category")
+      categories:UnignoreItem(ctx, 101, "Mats")
+      assert.is_false(categories:IgnoresItem("Mats", 101))
+      assert.is_nil(dbCategories["Mats"].ignoredItems, "none left: nothing stored")
+      assert.are.equal("Mats", (categories:GetCustomCategory(ctx, 0, item)))
+    end)
+
+    it("keeps an item out of a plugin's list", function()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = { [202] = true } })
+      local item = { itemInfo = { itemID = 202 } }
+      assert.are.equal("Openable", (categories:GetCustomCategory(ctx, 0, item)))
+      categories:IgnoreItem(ctx, 202, "Openable")
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+    end)
+
+    it("keeps an item out of what a category function names, asking it once", function()
+      categories:CreateCategory(ctx, { name = "Fish", itemList = {} })
+      local asked = 0
+      categories:RegisterCategoryFunction("fish", function()
+        asked = asked + 1
+        return "Fish"
+      end)
+      categories:IgnoreItem(ctx, 303, "Fish")
+      local item = { itemInfo = { itemID = 303 } }
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      assert.is_nil(categories:GetMergedCategory("Fish").itemList[303], "not filed there")
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      assert.are.equal(1, asked, "remembered as having none")
+      categories:UnignoreItem(ctx, 303, "Fish")
+      assert.are.equal("Fish", (categories:GetCustomCategory(ctx, 0, item)))
+    end)
+
+    it("lets a category function name the items again once they are all no longer ignored", function()
+      categories:CreateCategory(ctx, { name = "Fish", itemList = {} })
+      categories:RegisterCategoryFunction("fish", function() return "Fish" end)
+      categories:IgnoreItem(ctx, 303, "Fish")
+      local item = { itemInfo = { itemID = 303 } }
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      categories:ClearIgnoredItems(ctx, "Fish")
+      assert.are.equal("Fish", (categories:GetCustomCategory(ctx, 0, item)))
+    end)
+
+    it("keeps a plugin's Ignored Items across its next creation", function()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:IgnoreItem(ctx, 202, "Openable")
+      assert.is_true(dbEphemeralCategories["Openable"].ignoredItems[202])
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      assert.is_true(categories:IgnoresItem("Openable", 202))
+    end)
+
+    it("ignores for a group by's sections what their category ignores", function()
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, ignoredItems = { [101] = true } }
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      assert.is_true(categories:IgnoresItem("Ore - Copper", 101))
+      assert.is_false(categories:IgnoresItem("Ore - Copper", 102))
+      assert.is_false(categories:IgnoresItem("Armor", 101), "a built-in category ignores nothing")
+    end)
+
+    it("lists a copy of what a category ignores, and stops ignoring them all", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:IgnoreItem(ctx, 101, "Mats")
+      categories:IgnoreItem(ctx, 102, "Mats")
+      local list = categories:GetIgnoredItems("Mats")
+      assert.are.same({ [101] = true, [102] = true }, list)
+      list[103] = true
+      assert.is_false(categories:IgnoresItem("Mats", 103))
+      categories:ClearIgnoredItems(ctx, "Mats")
+      assert.are.same({}, categories:GetIgnoredItems("Mats"))
+      assert.are.same({}, categories:GetIgnoredItems("Nope"))
+    end)
+
+    it("says when there is no such category", function()
+      assert.is_false(categories:IgnoreItem(ctx, 101, "Nope"))
+      assert.is_false(categories:UnignoreItem(ctx, 101, "Nope"))
+    end)
+  end)
+
+  -- Asked: "if you drag and drop an item onto a category header, it becomes an Added Item in that
+  -- category ... if it would naturally fit there already ... don't add it to Added Items for that
+  -- category, just strip it's manual assignment and let it land where it should" (docs/next-batch-2.md §8).
+  describe("filing an item dropped on a category's header (FileItem)", function()
+    local ctx
+    before_each(function()
+      ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:CreateCategory(ctx, { name = "Gems", itemList = {}, save = true })
+      categories:CreateCategory(ctx, { name = "Ore", itemList = {}, save = true })
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {} })
+    end)
+
+    local function homeOf(itemID)
+      return database:GetItemCategoryByItemID(itemID).name
+    end
+
+    it("strips an item's manual assignment where it lands anyway, adding nothing", function()
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      assert.are.equal("natural", categories:FileItem(ctx, 101, "Junk", "Junk"))
+      assert.is_nil(homeOf(101))
+      assert.is_nil(dbCategories["Junk"], "no category made")
+      categories:AddPermanentItemToCategory(ctx, 102, "Gems")
+      assert.are.equal("natural", categories:FileItem(ctx, 102, "Openable", "Openable"), "a plugin's too")
+      assert.is_nil(homeOf(102))
+      assert.are.equal("natural", categories:FileItem(ctx, 103, "Mats", "Mats"), "nothing to strip")
+      assert.is_nil(dbCategories["Mats"].itemList[103])
+    end)
+
+    it("takes a group by's sections as their category, either side", function()
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      assert.are.equal("natural", categories:FileItem(ctx, 101, "Ore - Copper", "Ore"))
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      assert.are.equal("natural", categories:FileItem(ctx, 101, "Ore", "Ore - Copper"))
+      assert.are.equal("added", categories:FileItem(ctx, 104, "Ore - Copper", "Junk"))
+      assert.is_true(dbCategories["Ore"].itemList[104], "added to the category, not its section")
+    end)
+
+    it("adds an item that lands elsewhere to the category's Added Items, moving it from its last one", function()
+      categories:AddPermanentItemToCategory(ctx, 101, "Gems")
+      assert.are.equal("added", categories:FileItem(ctx, 101, "Mats", "Armor"))
+      assert.are.equal("Mats", homeOf(101))
+      assert.is_nil(dbCategories["Gems"].itemList[101])
+      assert.are.equal("added", categories:FileItem(ctx, 105, "Mats", nil), "where it lands not known")
+      assert.is_true(dbCategories["Mats"].itemList[105])
+    end)
+
+    it("stops the category ignoring an item dropped on it", function()
+      categories:IgnoreItem(ctx, 106, "Mats")
+      assert.are.equal("added", categories:FileItem(ctx, 106, "Mats", "Junk"))
+      assert.is_false(categories:IgnoresItem("Mats", 106))
+    end)
+
+    -- The classic title's Shift drop did the same: a category of that name, which shows in its section.
+    it("makes a category of a built-in category's name for an item that does not land there", function()
+      assert.are.equal("added", categories:FileItem(ctx, 107, "Armor", "Junk"))
+      assert.is_true(dbCategories["Armor"].save)
+      assert.is_true(dbCategories["Armor"].itemList[107])
+    end)
+
+    it("adds nothing to a plugin's category the item does not land in", function()
+      categories:AddPermanentItemToCategory(ctx, 108, "Mats")
+      local before = categories:GetGeneration()
+      assert.are.equal("plugin", categories:FileItem(ctx, 108, "Openable", "Junk"))
+      assert.are.equal("Mats", homeOf(108), "left where it was")
+      assert.is_nil(dbCategories["Openable"])
+      assert.are.equal(before, categories:GetGeneration())
+    end)
+  end)
+
+  describe("GetCustomCategory without the item's Added Items", function()
+    it("passes over the category the item was added to by hand, a plugin's still counting", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      local item = { itemInfo = { itemID = 101 } }
+      assert.are.equal("Mats", (categories:GetCustomCategory(ctx, 0, item)))
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item, true)))
+      categories:CreateCategory(ctx, { name = "Openable", itemList = { [101] = true } })
+      assert.are.equal("Openable", (categories:GetCustomCategory(ctx, 0, item, true)))
     end)
   end)
 

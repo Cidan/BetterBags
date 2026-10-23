@@ -30,7 +30,9 @@ local stubs = {
   cursorPlacement = trackStub("CursorPlacement"),
   backpackBehavior = trackStub("BackpackBehavior"),
   sectionFrame = trackStub("SectionFrame"),
+  categories = trackStub("Categories"),
   bagSystem = trackStub("BagSystem"),
+  bagButton = trackStub("BagButton"),
 }
 
 -- Every function this spec replaces on a module, put back after each test and the file.
@@ -51,8 +53,8 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
-  { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
+  { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -68,6 +70,7 @@ local nextContent = addon:GetModule("NextContent")
 
 describe("NextBag", function()
   local buttons, sent, messages, buckets, groupsEnabled, activeGroup, allGroups, expired, inBagSearch
+  local views, previousView, bagTextures, bagNames, bagCalls, events, tabOrder
   local box, helper, placed, slotInfo
 
   -- fakeButton stands in for an item button, recording what is done to it.
@@ -124,12 +127,36 @@ describe("NextBag", function()
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
     override(stubs.database, "GetInBagSearch", function() return inBagSearch end)
+    tabOrder = {}
+    override(stubs.database, "GetNextTabOrder", function(_, key) return tabOrder[key] or {} end)
+    override(stubs.database, "SetNextTabOrder", function(_, key, ids) tabOrder[key] = ids end)
     override(stubs.groups, "GetAllGroups", function() return allGroups end)
     override(stubs.groups, "GetGroup", function(_, _, id) return allGroups[id] end)
     override(stubs.events, "SendMessage", function(_, _, name, opts) table.insert(sent, { name, opts }) end)
     override(stubs.events, "RegisterMessage", function(_, name, fn) messages[name] = fn end)
     override(stubs.events, "BucketEvent", function(_, name, fn, filter) buckets[name] = { fn, filter } end)
-    override(stubs.events, "RegisterEvent", function() end)
+    events = {}
+    override(stubs.events, "RegisterEvent", function(_, name, fn) events[name] = fn end)
+    -- The bag view (Show Blizzard Bags is the Show Bags view, SECTION_ALL_BAGS) and the bag slots.
+    views, previousView = { [BACKPACK] = 2 }, 2
+    override(const, "BAG_VIEW", { SECTION_GRID = 2, SECTION_ALL_BAGS = 4 })
+    override(stubs.database, "GetBagView", function(_, kind) return views[kind] end)
+    override(stubs.database, "SetBagView", function(_, kind, view) views[kind] = view end)
+    override(stubs.database, "GetPreviousView", function() return previousView end)
+    override(stubs.database, "SetPreviousView", function(_, _, view) previousView = view end)
+    override(const, "BACKPACK_ONLY_BAGS_LIST", { 1, 2, 3, 4, 5 })
+    override(const, "BACKPACK_ONLY_REAGENT_BAGS", { [5] = 5 })
+    -- Bag slot N is inventory slot N + 20 here (C_Container.ContainerIDToInventoryID).
+    override(C_Container, "ContainerIDToInventoryID", function(bag) return bag + 20 end)
+    bagTextures = { [21] = 1001, [23] = 1003 }
+    bagNames = { [1] = "Netherweave Bag", [3] = "Frostweave Bag" }
+    override(_G, "GetInventoryItemTexture", function(_, invID) return bagTextures[invID] end)
+    -- C_Container.GetBagName's name is not nilable (ContainerDocumentation.lua): "" for an empty slot.
+    override(C_Container, "GetBagName", function(bag) return bagNames[bag] or "" end)
+    bagCalls = {}
+    override(stubs.bagButton, "PickupBag", function(_, invID) table.insert(bagCalls, { "pickup", invID }) return true end)
+    override(stubs.bagButton, "PutInBag", function(_, invID) table.insert(bagCalls, { "put", invID }) return true end)
+    override(_G, "InCombatLockdown", function() return false end)
     -- As searchBox:CreateBox makes it (frames/search.lua): a BagSearchBoxTemplate edit box in a
     -- frame, its help text the template's Instructions, centered.
     override(stubs.searchBox, "CreateBox", function(_, kind, parent)
@@ -881,7 +908,134 @@ describe("NextBag", function()
     end)
   end)
 
+  -- Asked: "our left tabs replaced with the bag icons for the Blizzard Bags, so users can swap out their
+  -- bags -- the view of items switches to the full stack of bags, just like in our Original bags view".
+  describe("Show Blizzard Bags", function()
+    local function bagsShown()
+      local bag = opened()
+      bag:ToggleBlizzardBags(ctx())
+      return bag
+    end
+
+    local function tabOf(bag, id)
+      return bag.tabs:Tab(id)
+    end
+
+    it("lists each bag slot as a tab, its bag's icon and name, an empty one's art and name, none selected", function()
+      local bag = bagsShown()
+      local ids = {}
+      for _, tab in ipairs(bag.tabs.tabs) do table.insert(ids, tab.id) end
+      assert.are.same({ 1, 2, 3, 4, 5 }, ids, "the bag slots, the backpack itself having none")
+      assert.are.equal("Netherweave Bag", tabOf(bag, 1).text:GetText())
+      assert.are.equal(1001, tabOf(bag, 1).icon:GetTexture())
+      assert.are.equal("Empty Bag Slot", tabOf(bag, 2).text:GetText())
+      assert.are.equal("Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag", tabOf(bag, 2).icon:GetTexture())
+      assert.are.equal("Empty Reagent Bag Slot", tabOf(bag, 5).text:GetText())
+      assert.is_nil(bag.tabs.selected)
+      assert.is_true(bag.tabs.frame:IsShown())
+      assert.is_true(bag:ShowsBlizzardBags())
+    end)
+
+    it("shows its bags with groups off too", function()
+      groupsEnabled = false
+      local bag = bagsShown()
+      assert.is_true(bag.tabs.frame:IsShown())
+      assert.are.equal(5, #bag.tabs.tabs)
+    end)
+
+    it("opens on its bags after a reload: the view is the setting", function()
+      views[BACKPACK] = 4
+      local bag = opened()
+      assert.are.equal(5, #bag.tabs.tabs)
+      assert.is_true(bag:ShowsBlizzardBags())
+    end)
+
+    it("swaps bags from its tabs, as Blizzard's bag slots do", function()
+      local bag = bagsShown()
+      local slot2 = tabOf(bag, 2).button
+      _G._cursorHasItem, _G._cursorType = true, "item"
+      slot2:GetScript("OnReceiveDrag")(slot2)
+      slot2:GetScript("OnClick")(slot2, "LeftButton")
+      assert.are.same({ { "put", 22 }, { "put", 22 } }, bagCalls, "dropped or clicked holding one: it goes there")
+      _G._cursorHasItem, _G._cursorType = false, nil
+      bagCalls = {}
+      local slot1 = tabOf(bag, 1).button
+      slot1:GetScript("OnDragStart")(slot1)
+      _G._isShiftKeyDown = true
+      slot1:GetScript("OnClick")(slot1, "LeftButton")
+      _G._isShiftKeyDown = false
+      slot1:GetScript("OnClick")(slot1, "LeftButton")
+      slot1:GetScript("OnClick")(slot1, "RightButton")
+      _G._cursorHasItem, _G._cursorType = true, "item"
+      slot1:GetScript("OnClick")(slot1, "RightButton")
+      _G._cursorHasItem, _G._cursorType = false, nil
+      assert.are.same({ { "pickup", 21 }, { "pickup", 21 } }, bagCalls, "dragged or Shift-clicked: picked up")
+      assert.are.equal(1, activeGroup, "a click switches no group")
+      assert.are.same({}, helper.menus)
+    end)
+
+    it("shows a bag's own tooltip, or what an empty slot takes", function()
+      local bag = bagsShown()
+      local slot1 = tabOf(bag, 1).button
+      slot1:GetScript("OnEnter")(slot1)
+      assert.are.same({ unit = "player", slot = 21 }, GameTooltip._inventoryItem)
+      local slot2 = tabOf(bag, 2).button
+      slot2:GetScript("OnEnter")(slot2)
+      assert.are.equal("Empty Bag Slot", GameTooltip:GetText())
+    end)
+
+    it("swaps no bag from a group's tab", function()
+      local bag = opened()
+      bag:OnTabDragged(ctx(), 2)
+      assert.are.same({}, bagCalls)
+    end)
+
+    it("lists its bags again when they change", function()
+      local bag = bagsShown()
+      bagTextures[22] = 1002
+      bagNames[2] = "Runecloth Bag"
+      events.BAG_CONTAINER_UPDATE(ctx())
+      assert.are.equal("Runecloth Bag", tabOf(bag, 2).text:GetText())
+      assert.are.equal(1002, tabOf(bag, 2).icon:GetTexture())
+    end)
+
+    it("does not switch in combat", function()
+      local bag = opened()
+      override(_G, "InCombatLockdown", function() return true end)
+      local printed = {}
+      override(_G, "print", function(text) table.insert(printed, text) end)
+      bag:ToggleBlizzardBags(ctx())
+      assert.are.equal(2, views[BACKPACK])
+      assert.are.same({ "BetterBags: Cannot toggle bag slots in combat." }, printed)
+    end)
+  end)
+
   describe("tabs", function()
+    -- Asked: tabs reorderable, "make sure it saves" (docs/next-batch-2.md §5).
+    it("lists its groups in the order saved, + last, and saves the order they are moved to", function()
+      tabOrder.backpack = { 2, 1 }
+      local bag = opened()
+      local function ids()
+        local out = {}
+        for _, tab in ipairs(bag.tabs.tabs) do table.insert(out, tab.id) end
+        return out
+      end
+      assert.are.same({ 2, 1, 0 }, ids())
+      assert.is_true(bag.tabs:Tab(1).movable)
+      assert.is_false(bag.tabs:Tab(0).movable, "+ stays last")
+      bag.tabs.onReorder(ctx(), { 1, 2, 0 })
+      assert.are.same({ 1, 2, 0 }, tabOrder.backpack)
+      assert.are.same({ 1, 2, 0 }, ids())
+    end)
+
+    it("saves no order for its bag slots' tabs, whose drag swaps a bag", function()
+      local bag = opened()
+      bag:ToggleBlizzardBags(ctx())
+      assert.is_false(bag.tabs:Tab(1).movable)
+      bag:OnTabsReordered(ctx(), { 2, 1 })
+      assert.are.same({}, tabOrder, "saved nowhere")
+    end)
+
     it("lists the groups as tabs, with one to make a group, and selects the active one", function()
       local bag = opened()
       local ids = {}
@@ -952,36 +1106,48 @@ describe("NextBag", function()
   describe("buttons and search", function()
     -- BetterBags' own glyphs (tools/textures/next_icons.py, next-themes.md §3), the same on every
     -- client, filtered trilinearly so they stay smooth drawn smaller than their 64 pixels.
-    it("draws its header icons with BetterBags' glyphs, settings at the screen edge", function()
+    -- Asked: "an X at the top right of the backpack to close it".
+    it("draws its header icons with BetterBags' glyphs, the close button at the screen edge", function()
       local bag = opened()
+      assert.are.equal("close", NextIconName(bag.closeButton))
       assert.are.equal("settings", NextIconName(bag.settingsButton))
       assert.are.equal("sort", NextIconName(bag.sortButton))
       assert.are.equal("TRILINEAR", bag.sortButton.icon._filterMode)
       assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3) },
-        { bag.settingsButton:GetPoint(1) })
+        { bag.closeButton:GetPoint(1) })
+      assert.are.same({ "RIGHT", bag.closeButton, "LEFT", -8, 0 }, { bag.settingsButton:GetPoint(1) })
       assert.are.same({ "RIGHT", bag.settingsButton, "LEFT", -8, 0 }, { bag.sortButton:GetPoint(1) })
     end)
 
-    -- The way back from BetterBags Next without a reload (next.md §11): a backpack glyph, the same on
-    -- every client.
-    it("switches the bags to the classic design from a backpack button in its header", function()
-      local switched = {}
-      override(stubs.bagSystem, "Switch", function(_, c, design)
-        assert.is_not_nil(c)
-        table.insert(switched, design)
-        return true
-      end)
-      override(addon, "isRetail", true)
+    it("closes from its close button", function()
       local bag = opened()
-      assert.are.equal("bags", NextIconName(bag.classicButton))
-      assert.are.same({ "RIGHT", bag.sortButton, "LEFT", -8, 0 }, { bag.classicButton:GetPoint(1) })
-      bag.classicButton:GetScript("OnClick")(bag.classicButton, "LeftButton")
-      assert.are.same({ "classic" }, switched)
-      bag.classicButton:GetScript("OnEnter")(bag.classicButton)
-      assert.are.equal("Switch to Classic Bags", GameTooltip:GetText())
-      override(addon, "isRetail", false)
-      local classicClient = nextBag:Create(ctx())
-      assert.are.equal("bags", NextIconName(classicClient.classicButton))
+      bag.closeButton:GetScript("OnEnter")(bag.closeButton)
+      assert.are.equal("Close", GameTooltip:GetText())
+      bag.closeButton:GetScript("OnClick")(bag.closeButton, "LeftButton")
+      finishTweens()
+      assert.is_false(bag:IsShown())
+    end)
+
+    -- Asked: "the 'Switch to Classic Bags' icon now becomes 'Show Blizzard Bags'" (docs/next-batch-2.md §4).
+    it("switches to Show Blizzard Bags and back from a bag button in its header", function()
+      previousView = nil
+      local bag = opened()
+      assert.are.equal("bags", NextIconName(bag.bagsButton))
+      assert.are.same({ "RIGHT", bag.sortButton, "LEFT", -8, 0 }, { bag.bagsButton:GetPoint(1) })
+      assert.is_nil(bag.classicButton, "the way back to the classic bags is in the settings")
+      bag.bagsButton:GetScript("OnEnter")(bag.bagsButton)
+      assert.are.equal("Show Blizzard Bags", GameTooltip:GetText())
+      bag.bagsButton:GetScript("OnClick")(bag.bagsButton, "LeftButton")
+      assert.are.equal(4, views[BACKPACK], "the Show Bags view: every bag, its slots in order")
+      assert.are.equal(2, previousView)
+      assert.are.same({ "bags/Rederive", { backpack = true, bank = false, resetLayout = true } }, sent[#sent])
+      bag.bagsButton:GetScript("OnEnter")(bag.bagsButton)
+      assert.are.equal("Show Categories", GameTooltip:GetText())
+      bag.bagsButton:GetScript("OnClick")(bag.bagsButton, "LeftButton")
+      assert.are.equal(2, views[BACKPACK])
+      local ids = {}
+      for _, tab in ipairs(bag.tabs.tabs) do table.insert(ids, tab.id) end
+      assert.are.same({ 1, 2, 0 }, ids, "the groups again")
     end)
 
     it("sorts the backpack and opens the settings from its header", function()

@@ -123,6 +123,11 @@ out of the window, the way the sparkles drift, the header buttons (screen-edge s
 buttons, its tabs and what a click on one does, what opening and closing do, and sorting. The
 description below is the backpack's (the right side); the bank is its mirror image (§6).
 
+**The backpack's header buttons** (from the screen edge, so the first is at the top right): close
+(asked: "an X at the top right of the backpack to close it"; `closeButton`, the bank's, guild bank's and
+vendor's own button and icon, hiding the backpack), settings, sort, Show Blizzard Bags (below), size
+(§14).
+
 **Above the rest of the UI** (asked: "they need to be the top most frames ... so other UI elements
 can't overlap"): every panel is in the `HIGH` strata (was `MEDIUM`), toplevel, level 500. That puts
 it over unit and action bars, the objective tracker (`LOW`), Blizzard's character frame and other
@@ -207,6 +212,68 @@ section dragged out of a panel returns to the panel's strata (§7).
   glides to it; a hovered one slides out a little. Left click switches group (the same data, drawn
   for that tab), right click opens the group menu (rename, delete) and "+" creates a group, both
   through the classic backpack behavior's dialogs. Hidden when groups are off.
+- **Moving tabs** (every Next rail: the backpack, the bank's groups and its Blizzard tabs, the guild
+  bank, the vendor; asked: "all tabs in all Next windows should be reorderable by clicking and holding to
+  slide. animate the slide, but pin the X axis so you can't move it left and right, just drag it up and
+  down. animate this transition and make sure it saves"; docs/next-batch-2.md §5):
+  - **The drag** (`next/tabs.lua`, a rail with a reorder handler, `SetReorderHandler`): pressing a tab
+    and moving the cursor (`OnDragStart`, so a click is still a click) lifts it with `NextLift`, as
+    sections and settings rows are lifted (the shrink and shadow), with `pinX` (a NextLift field: `Place`
+    keeps the cursor's x of the pickup) so it follows the cursor only up and down. The room where it
+    would land follows the cursor (before the first tab of its block whose middle is below the cursor,
+    `moveIndexAt`), and the other tabs slide out of its way (`slideY`, `Time.Interaction`, the `Glide`
+    ease, apart from their hover slide). Let go (`OnDragStop`, or the left button found up), it lands
+    in its room (`NextLift:Land`, its flight starting from the pinned x: it started from the cursor's,
+    so the tab jumped to the cursor before flying back, reported), and the rail shows the new order and
+    tells its handler every tab's id
+    in it; nothing when it is back where it was. The bar follows the selected tab. A move ends with the
+    tab back in its place when the rail hides or its tabs are listed again, and none starts while
+    another frame is lifted. One at a time.
+  - **What moves where:** a tab moves among the movable tabs of its block (`NextTabEntry.block`, tabs
+    next to each other: the bank's own groups and its Warbank groups; its character tabs and its Warbank
+    tabs; the guild's tabs, apart from All Tabs); a block's gap stays above whichever of its tabs is
+    first. Fixed tabs (`fixed`: the "+" that makes a group or buys a guild tab), purchase tabs and tabs
+    whose drag is their own (`draggable`: the backpack's bag slots in Show Blizzard Bags, WoW: Forever's
+    bank sockets) never move, and no tab passes them.
+  - **Saving** (`panelProto:OnTabsReordered`): the order is saved per rail
+    (`database:SetNextTabOrder(key, ids)`, profile `nextTabOrder`) under the panel's `TabOrderKey`
+    (`backpack`, `bank` for the bank's groups, `bankTabs` for its Blizzard tabs, `guild`, `vendor`; none
+    for the bag slots), and the tabs are listed again. Every `RefreshTabs` lists each block in the saved
+    order (`panelProto:OrderedTabs`, `NextTabs:Ordered`: saved tabs in their order, new ones after them
+    in their own, fixed and purchase tabs where they are), then gives each block's first tab its gap.
+  - The settings window's tabs run across its top: pinning X there leaves nothing to drag, so they are
+    not moved.
+  - Coverage: `spec/next/tabs_spec.lua` ("moving a tab", "a saved order"), and each panel's spec
+    ("lists ... in the order saved"), `spec/database_spec.lua`.
+- **Show Blizzard Bags** (asked: "the 'Switch to Classic Bags' icon now becomes 'Show Blizzard Bags',
+  with our left tabs replaced with the bag icons for the Blizzard Bags, so users can swap out their bags
+  -- the view of items switches to the full stack of bags, just like in our Original bags view, same
+  functionality"; docs/next-batch-2.md §4). The header's `bagsButton` (the bags glyph; "Show Blizzard
+  Bags", "Show Categories" while on) calls `ToggleBlizzardBags`, which does what the classic backpack's
+  Show Bags does (`ContextMenu:ToggleBagSlots`): the view saved (`SetPreviousView`) and the Show Bags
+  view (`SECTION_ALL_BAGS`: every bag a section, its slots in order, empty slots in place), or the saved
+  view back; then the tabs listed again and `bags/Rederive { backpack, resetLayout }`; not in combat
+  ("Cannot toggle bag slots in combat."). The mode is the view (`ShowsBlizzardBags`), so it lasts across
+  sessions and is the classic bags' setting too.
+  - **The tabs are the bag slots** (`ListBags`, `const.BACKPACK_ONLY_BAGS_LIST`, as the classic Show Bags
+    panel lists them; the backpack itself has no slot): each its bag's icon (`GetInventoryItemTexture`,
+    whose nil is how Blizzard's bag slots tell an empty slot, `MainMenuBarBagButtons.lua`) and name
+    (`C_Container.GetBagName`), an empty one Blizzard's empty bag slot art and "Empty Bag Slot" ("Empty
+    Reagent Bag Slot" for the reagent bag); none selected; shown with groups off too. They are listed
+    again on `BAG_CONTAINER_UPDATE`.
+  - **Swapping, as Blizzard's bag slots do** (`BaseBagSlotButtonMixin`): a bag dropped on a tab, or a
+    left click holding one, goes in (`BagButtonFrame:PutInBag`, `PutItemInBag`, the one there coming onto
+    the cursor); dragging a tab or Shift-clicking it picks the bag up (`BagButtonFrame:PickupBag`,
+    `PickupBagFromSlot`). Both refuse in combat ("Cannot change bags in combat."), shared with the
+    classic bags' bag buttons. A plain click and a right click do nothing. The tooltip is the bag's own
+    (`SetInventoryItem`), or what the slot takes, then how to swap it.
+  - **No section goes on a bag slot** (`NextTab.bag`): `NextDrag:CanDropOnTab` refuses it (group IDs and
+    bag IDs overlap) and a drop on the backpack's items only moves them (`ShownTab`). Sections are not
+    picked up in the Show Bags view.
+  - The way back to the classic bags is the settings' BetterBags Next switch and `/bb next` (§11c).
+  - Coverage: `spec/next/bag_spec.lua` ("Show Blizzard Bags", "switches to Show Blizzard Bags and back
+    from a bag button in its header"), `spec/frames/bagbutton_spec.lua`, `spec/next/drag_spec.lua`
+    ("takes no section on a bag slot's tab").
 - **Opening:** the panel slides in from the right (0.45 s, a small overshoot), the sparkles start
   and the sections cascade in. `Show(ctx, slotInfo, onShown)` runs `onShown` once the panel has
   slid into place: at once when it is open, when a slide still playing ends (callbacks queued on
@@ -414,12 +481,12 @@ names the action ("Move to Herbs", "Move to the Warbank"...).
 |---|---|
 | its own panel's body | **Reorder**: the section moves to the gap; its new place is saved (below) |
 | a tab of its own panel | **Move to that tab**: the category is assigned to the tab's group (`Groups:AssignCategoryToGroup`, which removes the assignment for a default group) |
-| the other panel's body | **Move to the other bag**: every item of the section is moved there, as the classic header's right click does (`SectionFrame:MoveItems`, the movement flow: the bank type the bank shows) |
+| the other panel's body | **Move to the other bag, into the tab it shows**: what a drop on that tab does (`NextDrag:ShownTab`: the group shown while groups are on, or the Blizzard tab shown in Bank Tabs mode): the items move (`SectionFrame:MoveItems`, into the tab's bank type for the bank) and the category is assigned to that group (none assigned for a default group). With groups off the items only move. Reported: a category dragged into a non-default backpack group's items "shows up visually, but when you sort the bag, it snaps back": the body drop only moved the items, which showed in Recent Items until a sort and then went to their category's old group (docs/next-batch-2.md §6) |
 | a group tab of the other panel | **Move to the other bag, into that tab**: the items move (into the group's bank type when the target is the bank) and the category is assigned to that group in the other bag |
 | a Blizzard tab of the other panel (Bank Tabs mode) | **Move to the other bag**: the items move into that tab's bank type; where they land is up to the game (`C_Container.UseContainerItem` names a bank type, not a tab) |
 | the guild bank's body, from the backpack (at the guild bank) | **Deposit**: into the guild bank's deposit tab (the tab shown by itself, else Blizzard's current tab), asking first for a tab the player cannot withdraw from (guild-bank.md §5) |
 | a guild tab, from the backpack | **Deposit** into that tab, only a tab the player may deposit in |
-| the backpack's body or a group tab, from the guild bank | **Withdraw**, and on a group tab assign the category to that group |
+| the backpack's body or a group tab, from the guild bank | **Withdraw**, and assign the category to the group dropped on, or the one the backpack shows for its body |
 
 Not targets (the section lands back where it was): the tab already shown, "+", purchase tabs, a
 bank group of the other bank type than the section's (Character Bank categories cannot go to
@@ -538,10 +605,12 @@ effective scale), the canvas, tabs and scroll area (all at scale 1 under `UIPare
 reports a scaled frame's edges in its own scale, so the dragged section's position is always worked
 out from the cursor and the grabbed point, never read back from it.
 
-**The header also** passes an item dropped or clicked onto it to its panel (bag-drop-zone.md: Shift
-adds the item to the category, as the classic title does, `SectionFrame:OnTitleClickOrDrop`), and a
-right click moves the whole section to the open window (the classic header's Move Categories,
-`SectionFrame:MoveItems`).
+**The header also** files an item dropped or clicked onto a category's header in that category
+(`panelProto:FileCursorItem`, category-lifecycle.md §9; asked: "if you drag and drop an item onto a
+category header, it becomes an Added Item in that category"), no Shift needed, in the backpack, the bank
+and the guild bank; Recent Items, Free Space and a bag's section in the Show Bags view pass the item to
+the panel as before (bag-drop-zone.md, `SectionFrame:OnTitleClickOrDrop`). A right click moves the whole
+section to the open window (the classic header's Move Categories, `SectionFrame:MoveItems`).
 
 `SectionFrame:MoveItems(list, bankType?)` is the classic right click's move, taken out of
 `OnTitleRightClick` so both use it: the movement flow (or, with `bankType`, that bank while it is
@@ -974,8 +1043,8 @@ time. Not measured in game; capture a switch with the profiler (`BagSystem.Switc
 - **`/bb next`:** switches to the other design.
 - **The classic backpack's menu:** **Switch to Next**, above What's New (not the bank's: it is shown
   at the bank, where the bags cannot switch). bag-menu-button.md §3.
-- **Next's backpack header:** a button with a backpack glyph (next-themes.md §11), "Switch to Classic
-  Bags".
+- **Next's backpack header:** had a button with a backpack glyph, "Switch to Classic Bags"; it is now
+  Show Blizzard Bags (§3, asked), so the settings and `/bb next` switch from Next.
 
 ### 11d. Startup
 

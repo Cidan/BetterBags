@@ -52,7 +52,7 @@ Asked: "this also means redoing all our controls (including scrollbars ...) so t
 | `NextControls` | `base.lua` | `Paint(texture, fill, alpha?)`: a fill is a texture spec (`Color`, `Alpha`; or a `Texture`/`Atlas` tinted by `Color`), a palette color, a color, or `false` (hidden). `CreateEdge`/`PaintEdge(edge, spec, alpha?)`: four lines inside a frame's border, `Size` thick; a strength replaces the alpha (`Idle`/`Hover`/`Focus`). `Theme(name)`. The Escape stack (below). |
 | `NextScrollBar` | `scrollbar.lua` | A track and thumb in a scroll box's right edge (`Width`, `Inset`; `Size`, `HoverSize` under the pointer), the thumb the share shown (at least `MinThumb`), hidden while nothing scrolls. |
 | `NextButton` | `button.lua` | `Plain`, `Primary`, `Danger`, `Link`: fills and edges idle, under the pointer, pressed; a link is its text alone. As wide as its label and `Padding` (at least `MinWidth`) unless given a width; disabled at `DisabledAlpha`, calling nothing. A tooltip when given. |
-| `NextToggle` | `toggle.lua` | A switch: the knob slides (`Motion.Time.Toggle`), the on color fades in with it. A click flips it and calls back; `SetChecked` calls nothing back. |
+| `NextToggle` | `toggle.lua` | A switch: the knob slides (`Motion.Time.Toggle`), the on color fades in with it. A click flips it and calls back; `SetChecked` calls nothing back, and told the state it is already sliding to it keeps sliding (asked: "animate our toggle switches"; a row showing its value again right after a click saved it stopped the slide, so no switch ever looked animated). A settings row slides a switch whose value changed while it shows (one setting turning another off). |
 | `NextInput` | `input.lua` | A text field (an `EditBox`: its text `Padding` in, after an optional `icon` it draws and makes room for itself, help while empty and unfocused) and `CreateArea`, a text area (a multi-line edit box in a Blizzard scroll box with the scroll bar, the wheel taken only while focused, the cursor kept in sight). Only typed text is reported (`OnTextChanged`'s `userInput`); Enter reports and lets go of focus; Escape puts back the text it had when focused. |
 | `NextSlider` | `slider.lua` | A track filled up to a thumb, pressed or dragged with the left button, and a number box (`NextInput`); every value snapped to the step and kept in range; a change calls back once per value; the wheel is left to the page. |
 | `NextMenu` | `menu.lua` | One menu at a time, `FULLSCREEN_DIALOG`, below what opened it (`Gap`), a row per choice, the chosen one checked, scrolling past `MaxRows`; as wide as its widest choice needs, the list's `Padding` on both sides included (it was left out, and a menu opened from a 36-wide item cell read "Rem..."), at least its anchor. Closes on a pick, a click or the wheel outside it (a screen-sized catcher), Escape, a second open for the same frame, or that frame hiding. |
@@ -321,7 +321,15 @@ page's `Content.Top` and `Bottom`).
   category is faded, "Shows in X instead." An item dropped anywhere on the grid is added
   (`AddPermanentItemToCategory`, `ClearCursor`, the bags recalculated; asked: the items themselves
   are drop targets); a right click offers Remove. A plugin's items show read-only (no drop, no remove,
-  no Remove All).
+  no Remove All). An added item the category ignores is faded, "Ignored in this category."
+- **Ignored Items tab** (asked: "a new tab next to 'Added Items' called 'Ignored Items', same
+  interface/layout as Added Items"; category-lifecycle.md §8): the Added Items tab itself
+  (`CreateItemsTab(parent, owner, bags, "ignored")`), the same count ("1 ignored item"), filter, Remove
+  All (`ClearIgnoredItems`), names loading and grid, its line "Drag an item here so it never shows in this
+  category." and "No items ignored."; a drop ignores the item (`IgnoreItem`), a right click stops
+  ignoring it (`UnignoreItem`), the bags recalculated each time. Editable for a plugin's category too:
+  what it ignores is the player's choice. An ignored item in your bags says where it shows ("Shows in
+  X."), not faded.
 - **Automation tab** (automation.md §5): a section ("Merchants") of three settings rows, drawn as every
   page's settings (not controls of its own): Auto Sell, Confirm Auto Sell (on by default) and Destroy
   What Can't Be Sold, the last two disabled while Auto Sell is off, saved at once
@@ -401,7 +409,8 @@ Rename and Delete; the Settings tab: its height, none, fields, saving, a plugin'
 and reading them again; the Search Rule tab: its names, the count as typed, the results in full color,
 the box where the Settings tab's is, Apply Search Rule, typed text kept, a plugin's; the Added Items
 tab: order, icons, faded items, the filter, names loading once, drops, removing, Remove All, a plugin's,
-its line), `spec/next/controls/itemgrid_spec.lua` (columns, only the rows in view, scrolling to the
+its line, an ignored item; the Ignored Items tab: its count, line, filter, drops (a plugin's too),
+removing, Remove All), `spec/next/controls/itemgrid_spec.lua` (columns, only the rows in view, scrolling to the
 end, empty text, cells, tooltips, clicks, drops, the theme), `spec/next/settings/window_spec.lua` ("a
 page with its own list": sliding, Back, opening on it, the first Escape, closing and reopening on it, a
 fade-out, heading and buttons, tabs shown, tabs read after the list, Reselect, a search, nothing while

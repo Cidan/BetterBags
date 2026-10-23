@@ -33,6 +33,8 @@ local stubs = {
   bankSlots = trackStub("BankSlots"),
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
+  categories = trackStub("Categories"),
+  bagButton = trackStub("BagButton"),
   guildBank = trackStub("GuildBank"),
   question = trackStub("Question"),
   color = trackStub("Color"),
@@ -56,8 +58,8 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
-  { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
+  { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" },
   { "NextBank", "next/bank.lua" }, { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -84,6 +86,7 @@ local CANVAS_TOP = 1090
 
 describe("NextDrag", function()
   local buttons, sent, pins, db, backpackGroups, bankGroups, slots, calls, backpack, bank, guild
+  local fileResult, itemIDs
 
   -- An item button: a holder frame and, inside it, the button the player clicks. Like Blizzard's
   -- (ContainerFrameItemButtonMixin:OnReceiveDrag calls OnDragStart, which is a left click), a drag
@@ -243,7 +246,8 @@ describe("NextDrag", function()
       [12] = { id = 12, name = "Vault", bankType = CHAR },
     }
     slots = { [BACKPACK] = backpackData(), [BANK] = bankData() }
-    calls = { moved = {}, assigned = {}, scrolled = {}, titleDrops = {}, pickedUp = {}, deposited = {}, withdrawn = {} }
+    calls = { moved = {}, assigned = {}, scrolled = {}, titleDrops = {}, pickedUp = {}, deposited = {}, withdrawn = {},
+      filed = {} }
     guild = nil
 
     override(addon, "isRetail", true)
@@ -270,6 +274,8 @@ describe("NextDrag", function()
     override(stubs.database, "GetActiveGroup", function(_, kind) return db.active[kind] end)
     override(stubs.database, "SetActiveGroup", function(_, kind, id) db.active[kind] = id end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
+    -- No tab order saved (docs/next-batch-2.md §5).
+    override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetNextSize", function() return "full" end)
     override(stubs.database, "GetInBagSearch", function() return true end)
     override(stubs.database, "GetShowBankTabs", function() return db.showBankTabs end)
@@ -322,6 +328,22 @@ describe("NextDrag", function()
       for _, data in ipairs(list) do table.insert(keys, data.slotkey) end
       table.insert(calls.moved, { keys, bankType })
     end)
+    -- Filing an item dropped on a category's header (Categories:FileItem, docs/next-batch-2.md §8).
+    fileResult = "added"
+    override(stubs.categories, "FileItem", function(_, c, itemID, name, natural)
+      assert.is_not_nil(c)
+      table.insert(calls.filed, { itemID, name, natural })
+      return fileResult
+    end)
+    override(stubs.categories, "GetCategoryByName", function() return nil end)
+    override(stubs.items, "NaturalCategory", function(_, c, data)
+      assert.is_not_nil(c)
+      return "natural of " .. data.slotkey
+    end)
+    override(stubs.items, "GetItemDataFromSlotKey", function(_, slotkey)
+      return { slotkey = slotkey, itemInfo = { itemID = itemIDs[slotkey] } }
+    end)
+    itemIDs = { ["0_3"] = 501 }
     override(stubs.sectionFrame, "OnTitleClickOrDrop", function(_, c, adapter)
       assert.is_not_nil(c)
       table.insert(calls.titleDrops, { adapter:GetKind(), adapter:GetTitle() })
@@ -646,18 +668,97 @@ describe("NextDrag", function()
   end)
 
   describe("dropping on the other bag", function()
+    -- A drop on the other bag's items is a drop on the tab it shows (asked: "make drag + drop work for
+    -- the item space and on a tab directly"): the default group takes the category back.
     it("moves the section's items to the bank, the bank glowing and the move named", function()
       local herbs = pickUp(backpack, "Herbs")
       moveTo(300, 600)
       assert.is_true(bank.dropGlow:IsShown())
       assert.are.equal("Move to the Bank", nextDrag.hint:GetText())
       drop(herbs)
-      assert.are.same({ { { "0_3", "0_4" } } }, calls.moved)
-      assert.are.same({}, calls.assigned)
+      assert.are.same({ { { "0_3", "0_4" }, CHAR } }, calls.moved)
+      assert.are.same({ { BANK, "Herbs", 10, CHAR } }, calls.assigned)
       finishTweens()
       assert.is_false(bank.dropGlow:IsShown())
       assert.is_not_nil(backpack.content.leaving.Herbs)
       assert.is_false(herbs.frame:IsShown())
+    end)
+
+    -- Reported: "moving a category out of the bank and into the backpack (or vice versa) via a
+    -- non-default tab ... if you have the tab open and drag to the item space, it shows up visually, but
+    -- when you sort the bag, it snaps back to backpack" (docs/next-batch-2.md §6).
+    it("moves bank items into the backpack's items, assigning the category to the group it shows", function()
+      backpack:SwitchToGroup(ctx(), 2)
+      local leather = pickUp(bank, "Leather")
+      moveTo(1700, 600)
+      drop(leather)
+      assert.are.same({ { { "6_1" } } }, calls.moved)
+      assert.are.same({ { BACKPACK, "Leather", 2 } }, calls.assigned)
+      finishTweens()
+      assert.are.same({ { resetLayout = true } }, sentNamed("bags/Rederive"))
+    end)
+
+    it("moves backpack items into the bank's items, into the group it shows and its bank type", function()
+      bank:SwitchToGroup(ctx(), 12)
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      drop(herbs)
+      assert.are.same({ { { "0_3", "0_4" }, CHAR } }, calls.moved)
+      assert.are.same({ { BANK, "Herbs", 12, CHAR } }, calls.assigned)
+    end)
+
+    it("only moves the items into a bag whose groups are off", function()
+      override(stubs.database, "GetGroupsEnabled", function(_, kind) return kind ~= BACKPACK end)
+      local leather = pickUp(bank, "Leather")
+      moveTo(1700, 600)
+      drop(leather)
+      assert.are.same({ { { "6_1" } } }, calls.moved)
+      assert.are.same({}, calls.assigned)
+    end)
+
+    it("moves into the Blizzard bank tab shown in the bank's Bank Tabs mode, assigning nothing", function()
+      override(stubs.database, "GetGroupsEnabled", function(_, kind) return kind ~= BANK end)
+      bank:ToggleBankTabs(ctx())
+      bank:Draw(ctx(), slots[BANK], function() end)
+      flush()
+      bank:SwitchToBlizzardTab(ctx(), 12)
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      drop(herbs)
+      assert.are.same({ { { "0_3", "0_4" }, ACCOUNT } }, calls.moved)
+      assert.are.same({}, calls.assigned)
+    end)
+
+    -- A bank with no tab bought yet (WoW: Forever's first tab, camelot-forever.md §10) shows only a
+    -- purchase tab, which is no tab to move into.
+    it("only moves the items into a bank whose Bank Tabs mode shows only a tab to buy", function()
+      override(C_Bank, "FetchPurchasedBankTabData", function() return {} end)
+      override(C_Bank, "FetchNextPurchasableBankTabData", function() return { tabCost = 0 } end)
+      bank:ToggleBankTabs(ctx())
+      flush()
+      assert.is_true(bank.tabs:Tab(-1).secure)
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(300, 600)
+      drop(herbs)
+      assert.are.same({ { { "0_3", "0_4" } } }, calls.moved)
+      assert.are.same({}, calls.assigned)
+    end)
+
+    -- Show Blizzard Bags (docs/next-batch-2.md §4): the backpack's tabs are its bag slots, no groups.
+    it("takes no section on a bag slot's tab, and only moves the items into the backpack's items", function()
+      override(const, "BACKPACK_ONLY_BAGS_LIST", { 1, 2 })
+      override(const, "BACKPACK_ONLY_REAGENT_BAGS", {})
+      override(_G, "GetInventoryItemTexture", function() return nil end)
+      db.view[BACKPACK] = SECTION_ALL_BAGS
+      backpack:RefreshTabs()
+      assert.is_true(backpack.tabs:Tab(2).bag)
+      local leather = pickUp(bank, "Leather")
+      moveTo(centerOf(backpack.tabs:Tab(2).button))
+      assert.is_nil(backpack.tabs.dropTarget, "group 2 has the bag's ID: still no target")
+      moveTo(1700, 600)
+      drop(leather)
+      assert.are.same({ { { "6_1" } } }, calls.moved)
+      assert.are.same({}, calls.assigned)
     end)
 
     it("names the Warbank while the bank shows it", function()
@@ -879,6 +980,15 @@ describe("NextDrag", function()
       assert.are.same({ { "1002_4" } }, calls.withdrawn)
       finishTweens()
       assert.is_not_nil(guild.content.leaving.Ore)
+    end)
+
+    it("withdraws into the backpack's items, assigning the category to the group it shows", function()
+      backpack:SwitchToGroup(ctx(), 2)
+      local ore = pickUp(guild, "Ore")
+      moveTo(1700, 600)
+      drop(ore)
+      assert.are.same({ { "1002_4" } }, calls.withdrawn)
+      assert.are.same({ { BACKPACK, "Ore", 2 } }, calls.assigned)
     end)
 
     it("withdraws into a backpack group, assigning the category to it", function()
@@ -1248,7 +1358,7 @@ describe("NextDrag", function()
       moveTo(300, 600)
       release(herbs, buttons["0_3"].button)
       assert.are.same({}, calls.pickedUp)
-      assert.are.same({ { { "0_3", "0_4" } } }, calls.moved, "the move still happens")
+      assert.are.same({ { { "0_3", "0_4" }, CHAR } }, calls.moved, "the move still happens")
     end)
 
     it("covers the section, and a margin past its edges, above everything in it", function()
@@ -1354,12 +1464,96 @@ describe("NextDrag", function()
   end)
 
   describe("the header", function()
-    it("passes an item clicked or dropped on it to its panel, and moves the section on a right click", function()
+    local printed
+
+    local function hold(itemID, bag, slot)
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "item", itemID
+      _G._cursorItemLocation = bag and ItemLocation:CreateFromBagAndSlot(bag, slot) or nil
+    end
+
+    before_each(function()
+      printed = {}
+      override(_G, "print", function(text) table.insert(printed, text) end)
+    end)
+
+    -- Asked: "if you drag and drop an item onto a category header, it becomes an Added Item in that
+    -- category" (where it lands without being added decides, FileItem).
+    it("files an item dropped or clicked on a category's header in that category, the item going back", function()
       local herbs = section(backpack, "Herbs")
-      _G._cursorHasItem = true
-      herbs.header:GetScript("OnClick")(herbs.header, "LeftButton")
+      hold(501, 0, 3)
       herbs.header:GetScript("OnReceiveDrag")(herbs.header)
-      assert.are.same({ { BACKPACK, "Herbs" }, { BACKPACK, "Herbs" } }, calls.titleDrops)
+      assert.are.same({ { 501, "Herbs", "natural of 0_3" } }, calls.filed)
+      assert.is_false(CursorHasItem(), "back in its slot")
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
+      hold(501, 0, 3)
+      herbs.header:GetScript("OnClick")(herbs.header, "LeftButton")
+      assert.are.equal(2, #calls.filed)
+      assert.are.same({}, calls.titleDrops, "never into the bag")
+      assert.are.same({}, printed)
+    end)
+
+    it("files an item from outside the bags not knowing where it lands, or from an item of its kind", function()
+      local herbs = section(backpack, "Herbs")
+      hold(777)
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({ 777, "Herbs", nil }, calls.filed[1])
+      slots[BACKPACK].itemsBySlotKey = { ["0_8"] = { slotkey = "0_8", itemInfo = { itemID = 778 } } }
+      hold(778)
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({ 778, "Herbs", "natural of 0_8" }, calls.filed[2])
+    end)
+
+    -- bag-drop-zone.md: a merchant's item on the cursor (buying by drag) is no item of yours.
+    it("files nothing that is not an item of yours", function()
+      local herbs = section(backpack, "Herbs")
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "merchant", 3
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({}, calls.filed)
+      assert.is_true(CursorHasItem())
+    end)
+
+    it("files the same in the bank's sections", function()
+      itemIDs["6_1"] = 601
+      local leather = section(bank, "Leather")
+      hold(601, 6, 1)
+      leather.header:GetScript("OnReceiveDrag")(leather.header)
+      assert.are.same({ { 601, "Leather", "natural of 6_1" } }, calls.filed)
+    end)
+
+    it("says why a plugin's category takes nothing, the item staying on the cursor", function()
+      fileResult = "plugin"
+      local herbs = section(backpack, "Herbs")
+      hold(501, 0, 3)
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({ "BetterBags: A plugin fills Herbs: items can't be added to it." }, printed)
+      assert.is_true(CursorHasItem())
+    end)
+
+    it("files nothing in a gear set's section, which the Equipment Manager makes", function()
+      slots[BACKPACK].tabs[1] = tab({ "Gear: Tank" }, { item("0_3", "Gear: Tank") })
+      backpack:Draw(ctx(), slots[BACKPACK], function() end)
+      local gear = section(backpack, "Gear: Tank")
+      hold(501, 0, 3)
+      gear.header:GetScript("OnReceiveDrag")(gear.header)
+      assert.are.same({}, calls.filed)
+      assert.are.same({ "BetterBags: Gear sets are made in the Equipment Manager." }, printed)
+      assert.is_true(CursorHasItem())
+    end)
+
+    it("puts an item dropped on Recent Items, or on a bag in the Show Bags view, in the bag, as before", function()
+      hold(501, 0, 3)
+      local recent = section(backpack, "Recent Items")
+      recent.header:GetScript("OnReceiveDrag")(recent.header)
+      assert.are.same({ { BACKPACK, "Recent Items" } }, calls.titleDrops)
+      db.view[BACKPACK] = SECTION_ALL_BAGS
+      local herbs = section(backpack, "Herbs")
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({ { BACKPACK, "Recent Items" }, { BACKPACK, "Herbs" } }, calls.titleDrops)
+      assert.are.same({}, calls.filed)
+    end)
+
+    it("moves the section to the open window on a right click", function()
+      local herbs = section(backpack, "Herbs")
       _G._cursorHasItem = false
       herbs.header:GetScript("OnClick")(herbs.header, "RightButton")
       assert.are.same({ { { "0_3", "0_4" } } }, calls.moved)

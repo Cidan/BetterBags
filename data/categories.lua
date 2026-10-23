@@ -40,6 +40,8 @@ local context = addon:GetModule('Context')
 ---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
 ---@field automation? string What it does with its items on its own: "sell" or "destroy" (automation.md).
 ---@field confirmSale? boolean false when Auto Sell sells at once; confirmed in the vendor's dock otherwise (automation.md §3).
+---@field skipRecent? boolean Its items skip Recent Items (Skip Recent Items, docs/next-batch-2.md §1).
+---@field ignoredItems? table<number, boolean> Items that never land in it, by item ID (Ignored Items, docs/next-batch-2.md §2).
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -422,6 +424,12 @@ function categories:CreateCategory(ctx, category)
       if savedState.confirmSale ~= nil then
         category.confirmSale = savedState.confirmSale
       end
+      if savedState.skipRecent ~= nil then
+        category.skipRecent = savedState.skipRecent
+      end
+      if savedState.ignoredItems ~= nil then
+        category.ignoredItems = savedState.ignoredItems
+      end
     end
     self.ephemeralCategories[category.name] = category
     category.itemList = category.itemList or {}
@@ -473,7 +481,8 @@ end
 ---@param filter CustomCategoryFilter
 local function saveState(filter)
   database:UpdateEphemeralItemCategory(filter.name, { enabled = filter.enabled, color = filter.color,
-    priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale })
+    priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale,
+    skipRecent = filter.skipRecent, ignoredItems = filter.ignoredItems })
 end
 
 -- setPriority sets a category's place, saving a plugin's in its saved state as UpdateCategory does.
@@ -568,14 +577,15 @@ end
 
 -- UpdateCategory changes a category in place, keeping its items: fields may hold color (a color, or
 -- false for none), priority, enabled (the bags named are set, the others kept), rule (its search;
--- empty for none), groupBy, automation ("sell", "destroy", or false for none) and confirmSale (false:
--- Auto Sell sells at once; true, the default, is not stored). A plugin's category keeps its own rule and
+-- empty for none), groupBy, automation ("sell", "destroy", or false for none), confirmSale (false:
+-- Auto Sell sells at once; true, the default, is not stored) and skipRecent (true: its items skip Recent
+-- Items; false, the default, is not stored). A plugin's category keeps its own rule and
 -- group by; the bags, color, priority and automation set for it are saved, and win when the plugin makes
 -- it again. The bags are recalculated unless only the automation changed, which changes no item's
 -- category. It returns false for a name no category has.
 ---@param ctx Context
 ---@param name string
----@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false, confirmSale?: boolean}
+---@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false, confirmSale?: boolean, skipRecent?: boolean}
 ---@return boolean
 function categories:UpdateCategory(ctx, name, fields)
   local saved = database:GetItemCategory(name)
@@ -597,6 +607,9 @@ function categories:UpdateCategory(ctx, name, fields)
     filter.confirmSale = false
   elseif fields.confirmSale ~= nil then
     filter.confirmSale = nil
+  end
+  if fields.skipRecent ~= nil then
+    filter.skipRecent = fields.skipRecent == true or nil
   end
   if fields.enabled ~= nil then
     filter.enabled = filter.enabled or everyBag()
@@ -638,6 +651,155 @@ function categories:AutomationOf(name)
     filter = self:GetCategoryByName(filter.groupByParent)
   end
   return filter and filter.automation or nil
+end
+
+-- SkipsRecentOf says whether a category's items skip Recent Items (Skip Recent Items; a group by's
+-- sections as their category). A built-in category does not.
+---@param name string
+---@return boolean
+function categories:SkipsRecentOf(name)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    filter = self:GetCategoryByName(filter.groupByParent)
+  end
+  return filter ~= nil and filter.skipRecent == true
+end
+
+-- ignores says whether a category's own Ignored Items hold an item.
+---@param filter CustomCategoryFilter
+---@param itemID number
+---@return boolean
+local function ignores(filter, itemID)
+  return filter.ignoredItems ~= nil and filter.ignoredItems[itemID] == true
+end
+
+-- IgnoresItem says whether a category ignores an item (Ignored Items; docs/next-batch-2.md §2): it never
+-- lands in it, whether added by hand, in a plugin's list or matched by its rule. A group by's sections
+-- ignore what their category ignores; a built-in category ignores nothing.
+---@param name string
+---@param itemID number
+---@return boolean
+function categories:IgnoresItem(name, itemID)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    filter = self:GetCategoryByName(filter.groupByParent)
+  end
+  return filter ~= nil and ignores(filter, itemID)
+end
+
+-- GetIgnoredItems returns a copy of the items a category ignores.
+---@param name string
+---@return table<number, boolean>
+function categories:GetIgnoredItems(name)
+  local filter = self:GetCategoryByName(name)
+  local list = {}
+  for itemID in pairs(filter and filter.ignoredItems or {}) do
+    list[itemID] = true
+  end
+  return list
+end
+
+-- changeIgnored changes the items a category ignores (none left: none stored), saving a plugin's in its
+-- saved state, the player's choice as its color is. It returns false for a name no category has.
+---@private
+---@param name string
+---@param change fun(list: table<number, boolean>)
+---@return boolean
+function categories:changeIgnored(name, change)
+  local saved = database:GetItemCategory(name)
+  local filter = saved or self.ephemeralCategories[name]
+  if filter == nil then
+    return false
+  end
+  self:changed()
+  local list = filter.ignoredItems or {}
+  change(list)
+  filter.ignoredItems = next(list) ~= nil and list or nil
+  if not saved then
+    saveState(filter)
+  end
+  return true
+end
+
+-- IgnoreItem makes a category ignore an item. The bags are the caller's to recalculate, as for an item
+-- added by hand.
+---@param ctx Context
+---@param itemID number
+---@param name string
+---@return boolean
+function categories:IgnoreItem(ctx, itemID, name)
+  local _ = ctx
+  return self:changeIgnored(name, function(list) list[itemID] = true end)
+end
+
+-- UnignoreItem stops a category ignoring an item: a category function may name it again.
+---@param ctx Context
+---@param itemID number
+---@param name string
+---@return boolean
+function categories:UnignoreItem(ctx, itemID, name)
+  local _ = ctx
+  self.itemsWithNoCategory[itemID] = nil
+  return self:changeIgnored(name, function(list) list[itemID] = nil end)
+end
+
+-- ClearIgnoredItems stops a category ignoring anything.
+---@param ctx Context
+---@param name string
+---@return boolean
+function categories:ClearIgnoredItems(ctx, name)
+  local _ = ctx
+  for itemID in pairs(self:GetIgnoredItems(name)) do
+    self.itemsWithNoCategory[itemID] = nil
+  end
+  return self:changeIgnored(name, function(list) wipe(list) end)
+end
+
+-- parentOf returns the category a section belongs to: a group by's section's category, else itself.
+---@private
+---@param name string
+---@return string
+function categories:parentOf(name)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    return filter.groupByParent
+  end
+  return name
+end
+
+-- FileItem files an item dropped on a category's header in BetterBags Next (docs/next-batch-2.md §8).
+-- natural is where the item lands without the category it was added to by hand (Items:NaturalCategory),
+-- nil when not known; a group by's sections count as their category on both sides. It returns what it
+-- did:
+-- - "natural": the item lands in the category anyway, so the category it was added to by hand is
+--   forgotten and nothing is added (asked: "just strip it's manual assignment and let it land where it
+--   should");
+-- - "added": it is added to the category's Added Items (taken from the one it was in), and the
+--   category no longer ignores it; a name no category has (a built-in category's) gets a category of
+--   that name, which shows in the same section, as the classic title's Shift drop makes one;
+-- - "plugin": nothing: a plugin fills its own category.
+---@param ctx Context
+---@param itemID number
+---@param name string The header's section.
+---@param natural? string
+---@return "natural"|"added"|"plugin"
+function categories:FileItem(ctx, itemID, name, natural)
+  local target = self:parentOf(name)
+  if natural ~= nil and self:parentOf(natural) == target then
+    local home = database:GetItemCategoryByItemID(itemID).name
+    if home ~= nil then
+      self:RemoveItemFromCategory(itemID, home)
+    end
+    return "natural"
+  end
+  if database:GetItemCategory(target) == nil and self.ephemeralCategories[target] ~= nil then
+    return "plugin"
+  end
+  if self:IgnoresItem(target, itemID) then
+    self:UnignoreItem(ctx, itemID, target)
+  end
+  self:AddPermanentItemToCategory(ctx, itemID, target)
+  return "added"
 end
 
 -- ConfirmsSaleOf says whether Auto Sell waits for the player to confirm a category's sale in the
@@ -809,14 +971,18 @@ end
 
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
--- the custom category if one is found. If no custom category is found, nil is returned.
+-- the custom category if one is found. If no custom category is found, nil is returned. A category
+-- that ignores the item (Ignored Items) is passed over, whatever gave it the item: added by hand, a
+-- plugin's list, or a category function (which does not file the item there). withoutAdded leaves out
+-- the category the item was added to by hand: where it lands without it (FileItem).
 ---@param ctx Context
 ---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
+---@param withoutAdded? boolean
 ---@return string|nil categoryName
 ---@return number|nil priority
 ---@return CustomCategoryFilter|nil filter The category, for the bags to group its items (its groupBy).
-function categories:GetCustomCategory(ctx, kind, data)
+function categories:GetCustomCategory(ctx, kind, data, withoutAdded)
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
   if type(ctx) == "number" then
@@ -827,13 +993,13 @@ function categories:GetCustomCategory(ctx, kind, data)
   local itemID = data.itemInfo.itemID
   if not itemID then return nil, nil end
   local filter = database:GetItemCategoryByItemID(itemID)
-  if filter.enabled and filter.enabled[kind] then
+  if not withoutAdded and filter.enabled and filter.enabled[kind] and not ignores(filter, itemID) then
     return filter.name, filter.priority or 10, filter
   end
 
   filter = self.ephemeralCategoryByItemID[itemID]
 
-  if filter and filter.enabled[kind] then
+  if filter and filter.enabled[kind] and not ignores(filter, itemID) then
     return filter.name, filter.priority or 10, filter
   end
 
@@ -845,8 +1011,8 @@ function categories:GetCustomCategory(ctx, kind, data)
   local errorHandler = (_G.geterrorhandler and _G.geterrorhandler()) or error
   for _, func in pairs(self.categoryFunctions) do
     local success, args = xpcall(func, errorHandler, data)
-    if success and args ~= nil then
-      local category = select(1, args) --[[@as string]]
+    local category = success and args ~= nil and select(1, args) --[[@as string]]
+    if category and not self:IgnoresItem(category, itemID) then
       local found = self.ephemeralCategories[category] and true or false
       self:addItemToCategory(ctx, itemID, category)
       if not found then

@@ -32,6 +32,8 @@ local stubs = {
   bankSlots = trackStub("BankSlots"),
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
+  categories = trackStub("Categories"),
+  bagButton = trackStub("BagButton"),
   bagSystem = trackStub("BagSystem"),
 }
 
@@ -52,8 +54,8 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
-  { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" },
   { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -160,6 +162,8 @@ describe("BetterBags Next's small mode", function()
     override(stubs.database, "GetNextSmallChain", function() return db.smallChain end)
     override(stubs.database, "SetNextSmallChain", function(_, layout) db.smallChain = layout end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
+    -- No tab order saved (docs/next-batch-2.md §5).
+    override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
     override(stubs.database, "GetActiveGroup", function(_, kind) return db.active[kind] end)
     override(stubs.database, "SetActiveGroup", function(_, kind, id) db.active[kind] = id end)
@@ -1309,10 +1313,10 @@ describe("BetterBags Next's small mode", function()
       assert.are.equal("small", NextIconName(bag.sizeButton))
     end)
 
-    it("sits after the button back to the classic bags, saying what it does", function()
+    it("sits after the Show Blizzard Bags button, saying what it does", function()
       db.size = "full"
       local bag = nextBag:Create(ctx())
-      assert.are.same({ "RIGHT", bag.classicButton, "LEFT", -8, 0 }, { bag.sizeButton:GetPoint(1) })
+      assert.are.same({ "RIGHT", bag.bagsButton, "LEFT", -8, 0 }, { bag.sizeButton:GetPoint(1) })
       bag.sizeButton:GetScript("OnEnter")(bag.sizeButton)
       assert.are.equal("Small Bags", GameTooltip:GetText())
       click(bag)

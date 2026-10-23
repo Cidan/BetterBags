@@ -434,6 +434,7 @@ function content:Init()
   })
   -- Every category, defined once (category-lifecycle.md §6), for both designs.
   local automationOptions = categoryEditor:AutomationOptions()
+  local recentOptions = categoryEditor:RecentOptions()
   pages:Define({
     id = "categories", group = L:G("BetterBags"), title = L:G("Categories"),
     description = L:G("Your categories: a rule, items you add, or both. Each bag uses those you choose."),
@@ -451,11 +452,18 @@ function content:Init()
       { id = "items", title = L:G("Added Items"), shown = function() return categoryEditor:ItemsTabShown() end,
         sections = { tabSection(L:G("Added Items"), { "items", "added", "manual", "drag" },
           function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags) end) } },
+      -- Items the category never takes, whatever adds or matches them (docs/next-batch-2.md §2).
+      { id = "ignored", title = L:G("Ignored Items"), shown = function() return categoryEditor:ItemsTabShown() end,
+        sections = { tabSection(L:G("Ignored Items"), { "ignored", "ignore", "exclude", "never" },
+          function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags, "ignored") end) } },
       -- What the category does on its own (automation.md §5), drawn as settings rows like every page's.
       { id = "automation", title = L:G("Automation"), shown = function() return categoryEditor:AutomationTabShown() end,
-        sections = { { title = L:G("Merchants"), rows = {
-          { option = automationOptions[1] }, { option = automationOptions[2] }, { option = automationOptions[3] },
-        } } } },
+        sections = {
+          { title = L:G("Merchants"), rows = {
+            { option = automationOptions[1] }, { option = automationOptions[2] }, { option = automationOptions[3] },
+          } },
+          { title = L:G("Recent Items"), rows = { { option = recentOptions[1] } } },
+        } },
     },
   })
   -- The classic bags' currency icons (frames/currency.lua), on clients with currencies: retail, WoW:

@@ -79,6 +79,29 @@ describe("NextSettingsRows", function()
     assert.is_true(row.control:GetChecked(), "shows the value again when told")
   end)
 
+  -- Asked: "animate our toggle switches in the options screen".
+  it("slides a switch it shows again with another value, and keeps a click's slide going", function()
+    local tween = addon:GetModule("NextTween")
+    tween:Init()
+    value = false
+    local row = rows:Create(owner, option("toggle"), owner)
+    row.control.frame:GetScript("OnClick")(row.control.frame, "LeftButton")
+    row:Refresh(ctx())
+    assert.is_true(tween:IsPlaying(row.control), "the click's slide goes on")
+    tween:Step(1)
+    value = false
+    row:Refresh(ctx())
+    assert.is_true(tween:IsPlaying(row.control), "changed elsewhere (another switch): it slides")
+    tween:Step(1)
+    row:Refresh(ctx())
+    assert.is_false(tween:IsPlaying(row.control), "unchanged: nothing")
+    owner:Hide()
+    value = true
+    row:Refresh(ctx())
+    assert.is_false(tween:IsPlaying(row.control), "hidden: at once")
+    assert.is_true(row.control:GetChecked())
+  end)
+
   it("makes the control of each kind", function()
     value = "Quality"
     local d = rows:Create(owner, option("dropdown", { items = { "Alphabetically", "Quality" } }), owner)

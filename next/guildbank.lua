@@ -222,6 +222,12 @@ function guildProto:UpdateHeader()
 end
 
 ---@return number
+-- TabOrderKey saves the order of the guild's tabs.
+---@return string
+function guildProto:TabOrderKey()
+  return "guild"
+end
+
 function guildProto:GetCurrentTabID()
   return self.shownTab or const.GUILD_BANK_ALL_TAB
 end
@@ -272,27 +278,31 @@ end
 -- RefreshTabs lists All Tabs, then every tab the player can view, then "+" while the guild leader can
 -- buy one, and selects the one shown.
 function guildProto:RefreshTabs()
-  local entries = { { id = const.GUILD_BANK_ALL_TAB, name = L:G("All Tabs") } }
-  local first = true
+  local entries = { { id = const.GUILD_BANK_ALL_TAB, name = L:G("All Tabs"), block = "all" } }
+  local tabs = {}
   for _, info in ipairs(guildBank:Tabs()) do
     if info.viewable then
-      table.insert(entries, {
+      table.insert(tabs, {
         id = info.container,
         name = info.name,
         icon = info.icon,
         accent = "Guild",
-        gap = first and style.TAB_GROUP_GAP or nil,
+        block = "guild",
         tooltip = function()
           self:ShowTabTooltip(info)
         end,
       })
-      first = false
     end
+  end
+  for i, entry in ipairs(self:OrderedTabs(tabs)) do
+    entry.gap = i == 1 and style.TAB_GROUP_GAP or nil
+    table.insert(entries, entry)
   end
   if guildBank:CanBuyTab() then
     table.insert(entries, {
       id = 0,
       name = "+",
+      fixed = true,
       tooltip = { L:G("Buy a Guild Bank Tab"), L:G("Click to buy the guild's next tab") },
     })
   end

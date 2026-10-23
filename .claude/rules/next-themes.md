@@ -253,7 +253,8 @@ close button included.
   `filterMode`), as Blizzard draws its map tiles on every client, so a 64-pixel glyph drawn at 22 units
   (often 14 to 22 pixels) stays smooth, and stays sharp on large screens.
 - **The theme gives every icon** (`Header.Buttons.Icons`, by button key): `settingsButton`,
-  `closeButton`, `sortButton`, `classicButton`, `sizeButtonFull` and `sizeButtonSmall` (the size
+  `closeButton`, `sortButton`, `bagsButton` (Show Blizzard Bags; it was `classicButton`, the switch to the
+  classic bags it replaced), `sizeButtonFull` and `sizeButtonSmall` (the size
   button by state), `bankTabsButton`, `depositButton` (the Warbank), `depositGoldButton`,
   `withdrawGoldButton` (the guild bank's: renamed from `depositButton`/`withdrawButton`, which would
   have shared the Warbank's key), `filterButton`, `sellJunkButton`, `repairAllButton`,
