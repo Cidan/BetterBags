@@ -152,7 +152,13 @@ the default tab. A drop on a tab (`"bagtab"`) assigns the group. Not measured in
 - Tests through the real tab partition (`ItemBelongsToTab`) for both directions and both drop places:
   after the move and a sort, the category's items are in the tab it was dropped on.
 
-**Status:** planned.
+**Status:** done. The data side was already right: a test through the real database, groups and tab
+partition (`spec/bank_tab_category_routing_spec.lua`) shows an unassigned category in the default tab
+(where it snapped back) and an assigned one in its group. The drop on a tab directly already assigned
+the group; the drop on the items did not. `NextDrag:ShownTab` makes a drop on a panel's items a drop on
+the tab it shows (the group, or the Blizzard tab in Bank Tabs mode), the guild bank's withdrawals
+included; with groups off, or only a tab to buy, the items only move. `next/drag.lua`; next.md §7.
+6 mutations: two led to tests (Bank Tabs mode with groups off; a bank with only a tab to buy).
 
 ## 7. Animated switches in the settings
 

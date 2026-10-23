@@ -419,12 +419,12 @@ names the action ("Move to Herbs", "Move to the Warbank"...).
 |---|---|
 | its own panel's body | **Reorder**: the section moves to the gap; its new place is saved (below) |
 | a tab of its own panel | **Move to that tab**: the category is assigned to the tab's group (`Groups:AssignCategoryToGroup`, which removes the assignment for a default group) |
-| the other panel's body | **Move to the other bag**: every item of the section is moved there, as the classic header's right click does (`SectionFrame:MoveItems`, the movement flow: the bank type the bank shows) |
+| the other panel's body | **Move to the other bag, into the tab it shows**: what a drop on that tab does (`NextDrag:ShownTab`: the group shown while groups are on, or the Blizzard tab shown in Bank Tabs mode): the items move (`SectionFrame:MoveItems`, into the tab's bank type for the bank) and the category is assigned to that group (none assigned for a default group). With groups off the items only move. Reported: a category dragged into a non-default backpack group's items "shows up visually, but when you sort the bag, it snaps back": the body drop only moved the items, which showed in Recent Items until a sort and then went to their category's old group (docs/next-batch-2.md §6) |
 | a group tab of the other panel | **Move to the other bag, into that tab**: the items move (into the group's bank type when the target is the bank) and the category is assigned to that group in the other bag |
 | a Blizzard tab of the other panel (Bank Tabs mode) | **Move to the other bag**: the items move into that tab's bank type; where they land is up to the game (`C_Container.UseContainerItem` names a bank type, not a tab) |
 | the guild bank's body, from the backpack (at the guild bank) | **Deposit**: into the guild bank's deposit tab (the tab shown by itself, else Blizzard's current tab), asking first for a tab the player cannot withdraw from (guild-bank.md §5) |
 | a guild tab, from the backpack | **Deposit** into that tab, only a tab the player may deposit in |
-| the backpack's body or a group tab, from the guild bank | **Withdraw**, and on a group tab assign the category to that group |
+| the backpack's body or a group tab, from the guild bank | **Withdraw**, and assign the category to the group dropped on, or the one the backpack shows for its body |
 
 Not targets (the section lands back where it was): the tab already shown, "+", purchase tabs, a
 bank group of the other bank type than the section's (Character Bank categories cannot go to
