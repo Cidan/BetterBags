@@ -1,0 +1,89 @@
+{
+  "id": 1792798022,
+  "version": "v0.8.0",
+  "channel": "release",
+  "date": "2026-10-23",
+  "from": "v0.7.0",
+  "to": "v0.8.0",
+  "headline": "This release introduces visual themes, resizable minimized bags, and card-based vendor panels to BetterBags Next, alongside a unified settings window, category automation, and major performance optimizations across all bags.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Unified settings window and category management",
+      "details": "A redesigned settings window is now shared across both bag designs, featuring themable controls and live search. Categories are configured in a unified list where priority is set by dragging rows, and custom categories now work in the guild bank.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Visual themes for BetterBags Next",
+      "details": "BetterBags Next now supports declarative themes including Default, Ember, Parchment, and Quiet, restyling colors, fonts, panel art, and animations in real time. A dedicated Next Themes options page allows switching themes on the fly.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Category item automation",
+      "details": "Categories can now be configured to automatically sell matching items at merchants or destroy unsellable items. Automation operates in batched rounds, safely skipping gear sets and refundable items while holding confirmations in the vendor dock.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Expanded search query engine",
+      "details": "Search now supports advanced boolean operators, arithmetic, and dozens of new item properties such as stats, cosmetic status, appearance collection, toys, and scrap eligibility.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Category Ignored Items and Skip Recent options",
+      "details": "Categories can now maintain an Ignored Items list to permanently exclude specific items from matching rules. In addition, categories can be set to skip the Recent Items section so newly acquired items immediately appear in their own section.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Resizable minimized mode in Next",
+      "details": "Small bags in BetterBags Next now feature corner resize grips that appear on hover to freely adjust bag dimensions. Custom window sizes are saved per bag type, and Shift-clicking a grip smoothly resets the bag to default.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Card layout for Next vendor interface",
+      "details": "Vendor panels in BetterBags Next now present items as two-column cards with icons, item names, and coin prices clearly displayed side-by-side. Items can be dragged onto cards or clicked directly to buy and sell.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Blizzard bag slot view in Next",
+      "details": "A new button on the Next backpack header toggles Blizzard bag slots along the tab rail, allowing you to easily view, replace, and equip your bags.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Staggered bank loading and caching optimizations",
+      "details": "The bank now loads its contents tab by tab to eliminate large frame freezes upon opening. Item categorization, search indexing, and third-party upgrade checks are now cached and recalculated only when an item actually changes.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Direct item assignment onto category headers in Next",
+      "details": "Items can now be dropped directly onto category headers in BetterBags Next to assign them without holding Shift. Dropping an item back into a category where it naturally belongs automatically clears its manual assignment.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Unified header icons and backpack close button in Next",
+      "details": "Header buttons across BetterBags Next panels now share a consistent, sharp set of custom glyphs that scale and tint according to the theme. The backpack header also includes a dedicated close button at the top right.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Recent Items virtual stack bounce",
+      "details": "Fixed an issue where virtual stacks would repeatedly bounce in and out of Recent Items when looting items into partially existing stacks.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Cross-bag category drops on active tabs",
+      "details": "Fixed an issue where dragging a category into another bag's item display would revert upon sorting instead of remaining assigned to the active tab.",
+      "clients": []
+    }
+  ]
+}
