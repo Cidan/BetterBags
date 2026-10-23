@@ -33,6 +33,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextTween: AceModule
 local tween = addon:GetModule('NextTween')
 
+---@class NextDockCard: AceModule
+local dockCard = addon:GetModule('NextDockCard')
+
 -- NextDrag moves BetterBagsNext's sections by their headers (next.md §7). A section picked up
 -- leaves its canvas for the drag layer with its real item buttons and follows the cursor, the
 -- canvas keeping a gap where it would go; dropping it reorders it (saving its place), assigns its
@@ -88,6 +91,7 @@ local MAX_LEVEL = 10000
 ---@class NextDock
 ---@field frame Frame Over the target's scroll area, dimming it and taking its clicks.
 ---@field scrim Texture
+---@field box NextDockCardFrame The card (NextDockCard), whose parts the fields below name.
 ---@field card Frame
 ---@field halo Texture
 ---@field glow Texture[]
@@ -736,27 +740,9 @@ function nextDrag:buildDock()
   frame:Hide()
   local scrim = frame:CreateTexture(nil, "BACKGROUND")
   scrim:SetAllPoints(frame)
-  local card = CreateFrame("Frame", nil, frame)
-  local halo = card:CreateTexture(nil, "BACKGROUND", nil, -2)
-  local background = card:CreateTexture(nil, "BACKGROUND", nil, -1)
-  background:SetAllPoints(card)
-  local glow = {}
-  for _ = 1, 4 do
-    table.insert(glow, card:CreateTexture(nil, "BORDER"))
-  end
-  local title = card:CreateFontString(nil, "OVERLAY")
-  title:SetJustifyH("LEFT")
-  local warning = card:CreateFontString(nil, "OVERLAY")
-  warning:SetJustifyH("LEFT")
-  warning:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
-  warning:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -4)
-  local slot = CreateFrame("Frame", nil, card)
-  slot:SetPoint("TOPLEFT", warning, "BOTTOMLEFT", 0, -10)
-  local hint = card:CreateFontString(nil, "OVERLAY")
-  hint:SetJustifyH("LEFT")
-  hint:SetPoint("TOPLEFT", slot, "BOTTOMLEFT", 0, -8)
+  local box = dockCard:Create(frame)
   local catcher = CreateFrame("Button", nil, frame)
-  catcher:SetAllPoints(card)
+  catcher:SetAllPoints(box.frame)
   catcher:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   -- A double click is a mouse click, the hardware event selling and moving items need.
   addon.SetScript(catcher, "OnDoubleClick", function(ctx, _, button)
@@ -775,8 +761,9 @@ function nextDrag:buildDock()
     end
   end)
   self.dock = {
-    frame = frame, scrim = scrim, card = card, halo = halo, background = background, glow = glow, title = title,
-    warning = warning, hint = hint, slot = slot, catcher = catcher, elapsed = 0,
+    frame = frame, scrim = scrim, box = box, card = box.frame, halo = box.halo, background = box.background,
+    glow = box.glow, title = box.title, warning = box.warning, hint = box.hint, slot = box.slot, catcher = catcher,
+    elapsed = 0,
   }
   self:styleDock()
   sonataNext:RegisterWidget(self)
@@ -803,58 +790,15 @@ function nextDrag:styleLayer()
   style:SetFont(self.hint, D.HintFont)
 end
 
--- styleDock draws the dock from the theme (Dock): the scrim and the card (texture specs), the glowing
--- edge round the card (color, width, or none), the halo behind it (or none), its lines in their roles.
+-- styleDock draws the dock from the theme (Dock): the scrim (a texture spec) and the card
+-- (NextDockCard), at the top of the dock.
 ---@private
 function nextDrag:styleDock()
   local d, D = self.dock, style.Theme.Dock
   style:Paint(d.scrim, D.Scrim)
-  style:Paint(d.background, D.Card)
+  d.box:Style()
   d.card:ClearAllPoints()
   d.card:SetPoint("TOP", d.frame, "TOP", 0, -D.Top)
-  local G = D.Glow
-  local sides = { "TOP", "BOTTOM", "LEFT", "RIGHT" }
-  for i, edge in ipairs(d.glow) do
-    edge:ClearAllPoints()
-    if G then
-      local w, side = G.Width, sides[i]
-      edge:SetColorTexture(1, 1, 1, 1)
-      edge:SetVertexColor(style:RGBA(G.Color))
-      if side == "TOP" or side == "BOTTOM" then
-        local y = side == "TOP" and w or -w
-        edge:SetPoint(side .. "LEFT", d.card, side .. "LEFT", -w, y)
-        edge:SetPoint(side .. "RIGHT", d.card, side .. "RIGHT", w, y)
-        edge:SetHeight(w)
-      else
-        local x = side == "LEFT" and -w or w
-        edge:SetPoint("TOP" .. side, d.card, "TOP" .. side, x, 0)
-        edge:SetPoint("BOTTOM" .. side, d.card, "BOTTOM" .. side, x, 0)
-        edge:SetWidth(w)
-      end
-      edge:Show()
-    else
-      edge:Hide()
-    end
-  end
-  local H = D.Halo
-  d.halo:ClearAllPoints()
-  if H then
-    style:Paint(d.halo, { Texture = H.Texture, Color = H.Color, BlendMode = H.BlendMode or "ADD" })
-    d.halo:SetPoint("TOPLEFT", d.card, "TOPLEFT", -H.Spread, H.Spread)
-    d.halo:SetPoint("BOTTOMRIGHT", d.card, "BOTTOMRIGHT", H.Spread, -H.Spread)
-    d.halo:Show()
-  else
-    d.halo:Hide()
-  end
-  style:SetFont(d.title, D.TitleFont)
-  style:SetFont(d.warning, D.WarningFont)
-  style:SetFont(d.hint, D.HintFont)
-  d.title:SetHeight(D.TitleHeight)
-  d.title:ClearAllPoints()
-  d.title:SetPoint("TOPLEFT", d.card, "TOPLEFT", D.Pad, -D.Pad)
-  d.title:SetPoint("TOPRIGHT", d.card, "TOPRIGHT", -D.Pad, -D.Pad)
-  d.warning:SetHeight(D.LineHeight)
-  d.hint:SetHeight(D.LineHeight)
 end
 
 -- ApplyStyle restyles what the drag has made for the theme SonataNext applied: the drag layer, and the
@@ -892,9 +836,7 @@ function nextDrag:layoutDock()
   local D = style.Theme.Dock
   local width = section.frame:GetWidth()
   local height = section.height or section.frame:GetHeight()
-  d.slot:SetSize(width, height)
-  local cardHeight = D.Pad + D.TitleHeight + 4 + D.LineHeight + 10 + height + 8 + D.LineHeight + D.Pad
-  d.card:SetSize(width + D.Pad * 2, cardHeight)
+  local cardHeight = d.box:Size(width, height)
   local room = d.frame:GetHeight()
   local scale = 1
   if room ~= nil and room > D.Top * 2 then
@@ -911,20 +853,7 @@ end
 function nextDrag:pulse(elapsed)
   local d = self.dock
   d.elapsed = d.elapsed + elapsed
-  local D = style.Theme.Dock
-  local G, H = D.Glow, D.Halo
-  local function wave(period)
-    return 0.5 + 0.5 * math.sin(d.elapsed * 2 * math.pi / period)
-  end
-  if G then
-    local alpha = G.Low + (G.High - G.Low) * wave(G.Period)
-    for _, edge in ipairs(d.glow) do
-      edge:SetAlpha(alpha)
-    end
-  end
-  if H then
-    d.halo:SetAlpha(H.Low + (H.High - H.Low) * wave(H.Period))
-  end
+  d.box:Pulse(d.elapsed)
   local state = self.current
   if state and state.section.height ~= d.laidOut then
     self:layoutDock()

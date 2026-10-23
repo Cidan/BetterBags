@@ -197,7 +197,7 @@ describe("NextSettingsContent", function()
       override(editor, "RuleTabShown", function() return rule end)
       override(editor, "ItemsTabShown", function() return chosen end)
       override(editor, "AutomationTabShown", function() return chosen end)
-      for _, name in ipairs({ "CreateSettingsTab", "CreateRuleTab", "CreateItemsTab", "CreateAutomationTab" }) do
+      for _, name in ipairs({ "CreateSettingsTab", "CreateRuleTab", "CreateItemsTab" }) do
         override(editor, name, function(_, parent, owner, bags)
           made[name] = { owner = owner, bags = bags }
           return rows:CreateText(parent, name)
@@ -230,8 +230,19 @@ describe("NextSettingsContent", function()
       design = "next"
       settings:Select("categories", "rule")
       assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }, kinds("CreateRuleTab"))
-      settings:Select("categories", "automation")
-      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }, kinds("CreateAutomationTab"))
+      -- The Automation tab is a section of settings rows, as every other page draws its settings.
+      local automation
+      for _, t in ipairs(pages:Get("categories").tabs) do
+        if t.id == "automation" then automation = t end
+      end
+      local sections = pages:Sections(automation)
+      assert.are.equal(1, #sections)
+      assert.are.equal("Merchants", sections[1].title)
+      local automationRows = sections[1].rows
+      assert.are.equal(2, #automationRows)
+      assert.are.same({ "toggle", "Auto Sell", "toggle", "Destroy What Can't Be Sold" },
+        { automationRows[1].option.kind, automationRows[1].option.title, automationRows[2].option.kind,
+          automationRows[2].option.title })
       settings:Select("categories", "items")
       assert.are.equal(settings.frame, made.CreateItemsTab.owner)
       local titles = {}
@@ -304,7 +315,7 @@ describe("NextSettingsContent", function()
         { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton", "bagFading [classic]",
           "animateItemMovement [classic]" } },
         { "General", "Search", { "inBagSearch", "enterToMakeCategory [classic]" } },
-        { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell", "autoSellLimit" } },
+        { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell" } },
         { "General", "What's New", { "changelogOnLogin" } },
       }, idsOf(pages:Get("general")))
     end)
@@ -369,7 +380,7 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      assert.are.equal(12 + 3 * 29, named)
+      assert.are.equal(11 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()

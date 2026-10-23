@@ -377,8 +377,7 @@ function content:Init()
       } },
       -- Only the classic bags' search box makes a category on Enter (frames/search.lua).
       { title = L:G("Search"), rows = { { setting = 'inBagSearch' }, { setting = 'enterToMakeCategory', design = "classic" } } },
-      { title = L:G("Items"), rows = { { setting = 'upgradeProvider' }, { setting = 'newItemDuration' }, { setting = 'categorySell' },
-        { setting = 'autoSellLimit' } } },
+      { title = L:G("Items"), rows = { { setting = 'upgradeProvider' }, { setting = 'newItemDuration' }, { setting = 'categorySell' } } },
       { title = L:G("What's New"), rows = { { setting = 'changelogOnLogin' } } },
     } } },
   })
@@ -434,6 +433,7 @@ function content:Init()
     } } },
   })
   -- Every category, defined once (category-lifecycle.md §6), for both designs.
+  local automationOptions = categoryEditor:AutomationOptions()
   pages:Define({
     id = "categories", group = L:G("BetterBags"), title = L:G("Categories"),
     description = L:G("Your categories: a rule, items you add, or both. Each bag uses those you choose."),
@@ -451,10 +451,11 @@ function content:Init()
       { id = "items", title = L:G("Added Items"), shown = function() return categoryEditor:ItemsTabShown() end,
         sections = { tabSection(L:G("Added Items"), { "items", "added", "manual", "drag" },
           function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags) end) } },
-      -- What the category does on its own (automation.md).
+      -- What the category does on its own (automation.md §5), drawn as settings rows like every page's.
       { id = "automation", title = L:G("Automation"), shown = function() return categoryEditor:AutomationTabShown() end,
-        sections = { tabSection(L:G("Automation"), { "automation", "sell", "vendor", "merchant", "destroy", "junk" },
-          function(parent, window) return categoryEditor:CreateAutomationTab(parent, window, shownBags) end) } },
+        sections = { { title = L:G("Merchants"), rows = {
+          { option = automationOptions[1] }, { option = automationOptions[2] },
+        } } } },
     },
   })
   -- The classic bags' currency icons (frames/currency.lua), on clients with currencies: retail, WoW:

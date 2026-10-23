@@ -12,9 +12,6 @@ local context = addon:GetModule('Context')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -25,20 +22,21 @@ local items = addon:GetModule('Items')
 local L = addon:GetModule('Localization')
 
 -- Automation is what a category does with its items on its own, set in its Automation tab
--- (.claude/rules/automation.md): sell them all when a merchant opens, or destroy them one at a time on
--- a click (BetterBags Next's vendor card) or a key press. It acts on the backpack's items by their
--- category, a recent item by the category it has once it is no longer recent.
+-- (.claude/rules/automation.md): Auto Sell sells them when a merchant opens, and Destroy What Can't Be
+-- Sold (which needs Auto Sell) destroys, one at a time on a click (BetterBags Next's vendor card) or a
+-- key press, those no merchant buys. It acts on the backpack's items by their category, a recent item by
+-- the category it has once it is no longer recent.
 ---@class Automation: AceModule
 ---@field atMerchant boolean A merchant is open (MERCHANT_SHOW to MERCHANT_CLOSED).
 ---@field sale? AutomationSale The sale running.
----@field claimed table<string, boolean> The item GUIDs this merchant's sale holds or sold: never destroyed.
 local automation = addon:NewModule('Automation')
 
+-- What a category's automation holds: Auto Sell, or Auto Sell and Destroy What Can't Be Sold.
 automation.SELL = "sell"
 automation.DESTROY = "destroy"
--- How many items sold buyback keeps (Blizzard's BUYBACK_ITEMS_PER_PAGE): a sale stops there unless
--- the player turned the limit off.
-automation.BUYBACK_KEEPS = 12
+-- A sale sells this many items at once, then the next as many a moment later, until all are sold.
+automation.WAVE = 12
+automation.WAVE_DELAY = 0.2
 -- How long a sale waits to look again while the cursor holds an item.
 automation.CURSOR_WAIT = 0.2
 
@@ -53,13 +51,10 @@ automation.CURSOR_WAIT = 0.2
 ---@field index number The next entry to sell.
 ---@field sold number
 ---@field value number Copper.
----@field limit? number
----@field soldGUIDs table<string, boolean>
 
 function automation:Init()
   self.atMerchant = false
   self.sale = nil
-  self.claimed = {}
 end
 
 function automation:OnEnable()
@@ -73,8 +68,9 @@ local function locationOf(data)
   return ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
 end
 
--- refundable says whether a purchase can still be refunded: Blizzard asks before refunding one
--- (ContainerFrame_GetExtendedPriceString), which automation would skip.
+-- refundable says whether a purchase can still be refunded now: Blizzard asks before refunding one
+-- (ContainerFrame_GetExtendedPriceString), which automation would skip. Only for a location that holds
+-- an item (CanBeRefunded raises an error for an empty one): StillThere, acting, after the slot's info.
 ---@param location ItemLocationMixin
 ---@return boolean
 local function refundable(location)
@@ -99,7 +95,9 @@ end
 
 -- BlockedReason says why automation leaves an item alone, or nil: an item whose data has not
 -- loaded (its category may be wrong), one in an equipment set, a purchase that can still be
--- refunded, and, to sell, one merchants do not buy.
+-- refunded, and, to sell, one merchants do not buy. It reads only the item as the bags last read it:
+-- the client may have changed the slot since (a sale empties slots before the bags are read again),
+-- so what is still there is asked only when acting (StillThere).
 ---@param data ItemData
 ---@param action string
 ---@return string?
@@ -110,7 +108,7 @@ function automation:BlockedReason(data, action)
   if data.itemInfo.equipmentSets and data.itemInfo.equipmentSets[1] ~= nil then
     return L:G("It is in an equipment set.")
   end
-  if refundable(locationOf(data)) then
+  if data.itemInfo.refundable then
     return L:G("It can still be refunded.")
   end
   if action == self.SELL and data.containerInfo and data.containerInfo.hasNoValue then
@@ -145,8 +143,8 @@ function automation:Entries(ctx)
   return list
 end
 
--- SellList lists what a merchant is sold: the items sell and destroy categories hold that are not
--- left alone and that merchants buy (an item to destroy is worth more sold, and can be bought back).
+-- SellList lists what a merchant is sold: the items either action holds (both sell) that are not left
+-- alone and that merchants buy.
 ---@param ctx Context
 ---@return AutomationEntry[]
 function automation:SellList(ctx)
@@ -159,30 +157,17 @@ function automation:SellList(ctx)
   return list
 end
 
--- DestroyList lists what Destroy Next Item destroys, in order: the items destroy categories hold that
--- are not left alone.
----@param ctx Context
----@return AutomationEntry[]
-function automation:DestroyList(ctx)
-  local list = {}
-  for _, entry in ipairs(self:Entries(ctx)) do
-    if entry.action == self.DESTROY and not entry.blocked then
-      table.insert(list, entry)
-    end
-  end
-  return list
-end
-
 -- DestroyQueue lists what destroying takes, in order (BetterBags Next's vendor shows it on its destroy
--- card): what destroy categories hold that is still in its slot (StillThere), leaving out what this
--- merchant's sale holds or sold (the bags may not show a sale yet). An item the sale left unsold (past
--- the limit) is back in it.
+-- card): the items destroy categories hold, as the bags were last read, that are not left alone and that
+-- no merchant buys (hasNoValue). It never holds an item a sale would sell. Destroying skips an item no
+-- longer where the read had it (DestroyNext).
 ---@param ctx Context
 ---@return AutomationEntry[]
 function automation:DestroyQueue(ctx)
   local list = {}
-  for _, entry in ipairs(self:DestroyList(ctx)) do
-    if not self.claimed[entry.data.itemInfo.itemGUID] and self:StillThere(entry, false) then
+  for _, entry in ipairs(self:Entries(ctx)) do
+    if entry.action == self.DESTROY and not entry.blocked and entry.data.containerInfo
+      and entry.data.containerInfo.hasNoValue then
       table.insert(list, entry)
     end
   end
@@ -229,9 +214,10 @@ function automation:StillThere(entry, forSale)
   return info.stackCount or 1
 end
 
--- OnMerchantShow sells, when a merchant opens, what sell and destroy categories hold: all at once, the
--- frame after it opens, as a section dragged onto BetterBags Next's vendor sells. Holding Shift as it
--- opens sells nothing. It returns what it did, for profiler traces.
+-- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy: a wave at
+-- once from the frame after it opens (as a section dragged onto BetterBags Next's vendor sells), then the
+-- next a moment later, until all are sold. Holding Shift as it opens sells nothing. It returns what it
+-- did, for profiler traces.
 ---@param ctx Context
 ---@return string
 function automation:OnMerchantShow(ctx)
@@ -239,7 +225,6 @@ function automation:OnMerchantShow(ctx)
   if self.sale then
     self:FinishSale(self.sale, "replaced")
   end
-  self.claimed = {}
   if IsShiftKeyDown() then
     return "shift"
   end
@@ -251,14 +236,9 @@ function automation:OnMerchantShow(ctx)
     return "nothing"
   end
   ---@type AutomationSale
-  local sale = { list = list, index = 1, sold = 0, value = 0, soldGUIDs = {},
-    limit = database:GetAutoSellLimit() and self.BUYBACK_KEEPS or nil }
+  local sale = { list = list, index = 1, sold = 0, value = 0 }
   self.sale = sale
-  for _, entry in ipairs(list) do
-    self.claimed[entry.data.itemInfo.itemGUID] = true
-  end
   C_Timer.After(0, function() self:SellStep(sale) end)
-  changed(ctx)
   return "selling"
 end
 
@@ -268,8 +248,9 @@ function automation:OnMerchantClosed(ctx)
   self.atMerchant = false
 end
 
--- SellStep sells every item of the sale that is still there, at once, up to the limit. It waits while
--- the cursor holds an item, and sells nothing once the merchant closed. It returns what it did.
+-- SellStep sells the sale's next wave: up to WAVE items still there, at once, then the next wave
+-- WAVE_DELAY later. It waits while the cursor holds an item, and sells nothing once the merchant closed.
+-- It returns what it did.
 ---@param sale AutomationSale
 ---@return string
 function automation:SellStep(sale)
@@ -283,25 +264,26 @@ function automation:SellStep(sale)
     C_Timer.After(self.CURSOR_WAIT, function() self:SellStep(sale) end)
     return "waiting"
   end
+  local wave = 0
   while sale.index <= #sale.list do
     local entry = sale.list[sale.index]
     sale.index = sale.index + 1
     local count = self:StillThere(entry, true)
     if count then
       C_Container.UseContainerItem(entry.data.bagid, entry.data.slotid)
-      sale.soldGUIDs[entry.data.itemInfo.itemGUID] = true
       sale.sold = sale.sold + 1
       sale.value = sale.value + count * priceOf(entry.data)
-      if sale.limit and sale.sold >= sale.limit then
-        return self:FinishSale(sale, "limit")
+      wave = wave + 1
+      if wave >= self.WAVE and sale.index <= #sale.list then
+        C_Timer.After(self.WAVE_DELAY, function() self:SellStep(sale) end)
+        return "wave"
       end
     end
   end
   return self:FinishSale(sale, "done")
 end
 
--- FinishSale ends a sale, gives back to the destroy queue what it did not sell, and says what it sold
--- and, stopped at the limit with more to sell, how to sell the rest. It returns why it ended.
+-- FinishSale ends a sale and says what it sold. It returns why it ended.
 ---@param sale AutomationSale
 ---@param reason string
 ---@return string
@@ -309,27 +291,17 @@ function automation:FinishSale(sale, reason)
   if self.sale == sale then
     self.sale = nil
   end
-  for _, entry in ipairs(sale.list) do
-    local guid = entry.data.itemInfo.itemGUID
-    if not sale.soldGUIDs[guid] then
-      self.claimed[guid] = nil
-    end
-  end
   if sale.sold > 0 then
     local what = sale.sold == 1 and L:G("Sold %d item for %s.") or L:G("Sold %d items for %s.")
     print("BetterBags: " .. format(what, sale.sold, coins(sale.value)))
   end
-  if reason == "limit" and sale.index <= #sale.list then
-    print("BetterBags: " .. format(L:G("Stopped after %d items, so all of them can be bought back. Open the merchant again to sell the rest."), sale.limit))
-  end
-  changed()
   return reason
 end
 
--- DestroyNext destroys the first item of the destroy queue (DestroyQueue), the whole stack: one item
--- each time, since Blizzard lets an addon destroy only on a key press or a click (DeleteCursorItem has
--- restrictions, GameCursorDocumentation.lua). Not in combat, nor while the cursor holds an item. It
--- says what it destroyed, and returns what it did.
+-- DestroyNext destroys the first item of the destroy queue (DestroyQueue) still in its slot
+-- (StillThere), the whole stack: one item each time, since Blizzard lets an addon destroy only on a key
+-- press or a click (DeleteCursorItem has restrictions, GameCursorDocumentation.lua). Not in combat, nor
+-- while the cursor holds an item. It says what it destroyed, and returns what it did.
 ---@param ctx Context
 ---@return string
 function automation:DestroyNext(ctx)
@@ -341,7 +313,13 @@ function automation:DestroyNext(ctx)
     print("BetterBags: " .. L:G("Put down the item you are holding first."))
     return "cursor"
   end
-  local entry = self:DestroyQueue(ctx)[1]
+  local entry
+  for _, queued in ipairs(self:DestroyQueue(ctx)) do
+    if self:StillThere(queued, false) then
+      entry = queued
+      break
+    end
+  end
   if entry == nil then
     print("BetterBags: " .. L:G("There is nothing to destroy."))
     return "nothing"

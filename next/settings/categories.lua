@@ -69,8 +69,8 @@ local sonataNext = addon:GetModule('SonataNext')
 --   it now, as items.
 -- - Search Rule: its search, Apply Search Rule, and the Search Results (counted beside their name as it
 --   is typed) as items, those showing in another category saying where.
--- - Automation: what it does with your backpack's items on its own (automation.md): two switches, at
---   most one on, to sell them at merchants or destroy them on command.
+-- - Automation: what it does with your backpack's items on its own (automation.md): Auto Sell, and
+--   Destroy What Can't Be Sold, which needs Auto Sell on, as settings rows (AutomationOptions).
 -- - Added Items: the items added to it by hand, as a grid that holds thousands (NextItemGrid), filtered
 --   by name; an item dropped anywhere on it is added, a right click removes one, Remove All asks first.
 -- A plugin's category can be used in bags, colored, prioritized and automated; its rule (when it has one)
@@ -97,7 +97,7 @@ local NAME_OF_GROUP_BY = {
 }
 
 -- What a category does on its own (automation.md), in its list line.
-local DOES = { sell = L:G("Sells at merchants"), destroy = L:G("Destroys on command") }
+local DOES = { sell = L:G("Sells at merchants"), destroy = L:G("Sells, destroys the rest") }
 
 -- The messages a bag kind's committed sweep sends (data/items.lua Phase11): what the bags hold changed.
 local READ = { 'items/RefreshBackpack/Done', 'items/RefreshBank/Done', 'items/RefreshGuildBank/Done' }
@@ -266,6 +266,47 @@ end
 ---@return boolean
 function editor:AutomationTabShown()
   return self:Chosen() ~= nil
+end
+
+-- AutomationOptions returns the Automation tab's settings (automation.md §5), which the page draws as
+-- rows of a section, as every page draws its settings: Auto Sell ("sell"), and Destroy What Can't Be
+-- Sold ("destroy", which sells too), disabled while Auto Sell is off; Auto Sell turned off takes it with
+-- it. Each saves at once and shows the page's rows again, so the other one follows.
+---@return NextSettingsOption[]
+function editor:AutomationOptions()
+  local function automation()
+    local filter = self:Chosen()
+    return filter and filter.automation
+  end
+  local function sells()
+    local a = automation()
+    return a == "sell" or a == "destroy"
+  end
+  local function save(ctx, value)
+    if self.selected then
+      categories:UpdateCategory(ctx, self.selected, { automation = value })
+    end
+    settings:Refresh(ctx)
+  end
+  return {
+    {
+      kind = "toggle",
+      title = L:G("Auto Sell"),
+      description = L:G("Sell this category's items when you open a merchant. Hold Shift to keep them."),
+      keywords = { "automation", "sell", "vendor", "merchant", "junk" },
+      get = sells,
+      set = function(ctx, on) save(ctx, on and "sell" or false) end,
+    },
+    {
+      kind = "toggle",
+      title = L:G("Destroy What Can't Be Sold"),
+      description = L:G("Destroy this category's items no merchant buys, one per click. Needs Auto Sell."),
+      keywords = { "automation", "destroy", "delete", "junk" },
+      disabled = function() return not sells() end,
+      get = function() return automation() == "destroy" end,
+      set = function(ctx, on) save(ctx, on and "destroy" or "sell") end,
+    },
+  }
 end
 
 -- askName asks for a category name over owner; onName gets it trimmed, and is asked again while it is
@@ -1473,113 +1514,5 @@ function itemsTabProto:layout()
     grid.frame:ClearAllPoints()
     grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
     grid:Place(width, math.max(1, self.height - y - pad))
-  end
-end
-
--- The Automation tab (automation.md): what the category does with your backpack's items on its own,
--- as two switches, at most one on.
-
----@class NextCategoryAutomationTab
----@field frame Frame
----@field wide boolean
----@field bags fun(): SettingBag[]
----@field labels table<string, FontString>
----@field sell NextToggleFrame
----@field destroy NextToggleFrame
-local automationTabProto = {}
-addon:GetModule('Perf'):RegisterPrototype(automationTabProto, 'NextCategoryAutomationTab')
-
--- The switches, in their rows' order: what each turns on.
-local SWITCHES = { "sell", "destroy" }
-
----@param parent Frame
----@param owner Frame
----@param bags fun(): SettingBag[] The bags the settings show.
----@return NextCategoryAutomationTab
-function editor:CreateAutomationTab(parent, owner, bags)
-  local _ = owner
-  local tab = makeTab(parent, automationTabProto, { bags = bags, labels = {} })
-  local K = style.Theme.Settings.Categories
-  tab.none = style:CreateText(tab.frame, K.TextFont)
-  tab.none:SetText(L:G("You have no categories yet. Make one with New Category, under the list."))
-  label(tab, "sell", L:G("Sell at Merchants"))
-  label(tab, "destroy", L:G("Destroy"))
-  for _, action in ipairs(SWITCHES) do
-    tab[action] = nextToggle:Create(tab.frame, {
-      onChange = function(ctx, on) tab:Choose(ctx, action, on) end,
-    })
-  end
-  tab:Style()
-  return tab
-end
-
-function automationTabProto:Style()
-  local K = style.Theme.Settings.Categories
-  for _, l in pairs(self.labels) do
-    style:SetFont(l, K.LabelFont)
-  end
-  style:SetFont(self.none, K.TextFont)
-  if self.width then
-    self:layout()
-  end
-end
-
----@param width number
----@return number
-function automationTabProto:Measure(width)
-  local _ = width
-  return tabHeight()
-end
-
----@param x number
----@param y number
----@param width number
----@param height number
-function automationTabProto:Place(x, y, width, height)
-  placeTab(self, x, y, width, height)
-  self:layout()
-end
-
--- Choose saves a switch turned on (the other one goes off: a category does one thing) or off.
----@param ctx Context
----@param action string
----@param on boolean
-function automationTabProto:Choose(ctx, action, on)
-  if editor.selected then
-    categories:UpdateCategory(ctx, editor.selected, { automation = on and action or false })
-  end
-  self:Refresh(ctx)
-end
-
--- Refresh shows the chosen category's switches.
----@param ctx? Context
-function automationTabProto:Refresh(ctx)
-  local _ = ctx
-  local filter = editor:Chosen()
-  self.none:SetShown(filter == nil)
-  for _, action in ipairs(SWITCHES) do
-    self.labels[action]:SetShown(filter ~= nil)
-    self[action].frame:SetShown(filter ~= nil)
-    self[action]:SetChecked(filter ~= nil and filter.automation == action)
-  end
-  if self.width then
-    self:layout()
-  end
-end
-
--- layout puts each switch in its row, its name in the labels' column.
----@private
-function automationTabProto:layout()
-  local K = style.Theme.Settings.Categories
-  local B = controls:Theme("Button")
-  local frame, pad, gap = self.frame, K.Pad, K.FieldGap
-  self.none:ClearAllPoints()
-  self.none:SetPoint("CENTER", frame, "CENTER", 0, 0)
-  for i, action in ipairs(SWITCHES) do
-    local middle = pad + (i - 1) * (B.Height + gap) + B.Height / 2
-    self.labels[action]:ClearAllPoints()
-    self.labels[action]:SetPoint("LEFT", frame, "TOPLEFT", pad, -middle)
-    self[action].frame:ClearAllPoints()
-    self[action].frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -middle)
   end
 end

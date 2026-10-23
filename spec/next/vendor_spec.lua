@@ -51,7 +51,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
   { "NextVendor", "next/vendor.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -66,6 +66,7 @@ local tween = addon:GetModule("NextTween")
 local render = addon:GetModule("Render")
 local motion = addon:GetModule("Motion")
 local context = addon:GetModule("Context")
+local dockCard = addon:GetModule("NextDockCard")
 
 describe("NextVendor", function()
   local eventsRegistered, buckets, timers, calls, data, asked, messages
@@ -674,6 +675,8 @@ describe("NextVendor", function()
       override(C_Container, "GetContainerItemInfo", function(bag, slot)
         return infos[bag .. "_" .. slot] or { hasNoValue = false }
       end)
+      -- Every slot holds an item here, as its info says (C_Item.DoesItemExist reads the item ID).
+      override(C_Container, "GetContainerItemID", function() return 1 end)
     end)
 
     after_each(function()
@@ -732,8 +735,9 @@ describe("NextVendor", function()
     end)
   end)
 
-  -- What a category set to destroy holds, waiting at the bottom of the vendor (automation.md §4): a
-  -- card edged in crimson; one click destroys the next item. The engine (Automation) is stood in for.
+  -- What destroy categories hold that no merchant buys, waiting at the bottom of the vendor
+  -- (automation.md §4): the dock a dragged section waits in (NextDockCard), glowing in the theme's
+  -- destroy color; one click destroys the next item. The engine (Automation) is stood in for.
   describe("the destroy card", function()
     local function toDestroy(slot, itemID, count)
       return { category = "Trash", action = "destroy", data = { bagid = 0, slotid = slot, slotkey = "0_" .. slot,
@@ -745,11 +749,15 @@ describe("NextVendor", function()
       for _, fn in ipairs(messages[name] or {}) do fn(ctx()) end
     end
 
-    local function bottomOf(frame)
+    local function pointOf(frame, which)
       for i = 1, frame:GetNumPoints() do
         local point, relativeTo, relativePoint, x, y = frame:GetPoint(i)
-        if point == "BOTTOMRIGHT" then return relativeTo, relativePoint, x, y end
+        if point == which then return relativeTo, relativePoint, x, y end
       end
+    end
+
+    local function bottomOf(frame)
+      return pointOf(frame, "BOTTOMRIGHT")
     end
 
     local function shownIcons(card)
@@ -760,23 +768,65 @@ describe("NextVendor", function()
       return list
     end
 
-    it("shows at a merchant the items one click destroys, at the bottom, edged in crimson", function()
+    it("shows at a merchant what one click destroys, in the dock's card at the bottom of the vendor", function()
       data.destroy = { toDestroy(1, 11, 3), toDestroy(2, 12) }
       local v = open()
       local card = v.destroyCard
       assert.is_true(card.frame:IsShown())
-      assert.are.equal("Click to destroy next", card.hint:GetText())
+      assert.are.equal(card.box.frame, card.frame)
+      assert.are.same({ "Destroy 2 items", "No merchant buys these.", "Click to destroy next" },
+        { card.box.title:GetText(), card.box.warning:GetText(), card.box.hint:GetText() })
       assert.are.same({ 110, 120 }, shownIcons(card))
+      assert.are.equal(card.box.slot, card.icons[1].texture:GetParent())
       assert.are.equal("3", card.icons[1].count:GetText())
       assert.is_false(card.icons[2].count:IsShown(), "no count on one item")
-      local relativeTo, relativePoint, x, y = bottomOf(card.frame)
-      assert.are.same({ v.body, "BOTTOMRIGHT", -style.PAD, style.FOOTER }, { relativeTo, relativePoint, x, y })
-      local r, g, b = style:RGBA(style.Theme.Vendor.DestroyEdge.Color)
-      for _, edge in ipairs(card.edges) do
+      local relativeTo, relativePoint, x, y = pointOf(card.frame, "BOTTOMLEFT")
+      assert.are.same({ v.body, "BOTTOMLEFT", style.PAD, style.FOOTER }, { relativeTo, relativePoint, x, y })
+      assert.are.equal(v:BodyWidth() - 2 * style.PAD, card.frame:GetWidth(), "as wide as what the vendor sells")
+      assert.are.equal("Destroy 1 item", (function()
+        data.destroy = { toDestroy(1, 11) }
+        send("automation/Changed")
+        return card.box.title:GetText()
+      end)())
+    end)
+
+    -- Asked: "the crimson block isn't styled like the category drag sell box -- please make it match,
+    -- including the subtle color blink".
+    it("looks like the dock a dragged section waits in, glowing in the theme's destroy color", function()
+      data.destroy = { toDestroy(1, 11) }
+      local v = open()
+      local box, dock = v.destroyCard.box, dockCard:Create(CreateFrame("Frame"))
+      local D = style.Theme.Dock
+      assert.are.same({ style:RGBA("Crimson") }, { style:RGBA(D.DestroyColor) })
+      local r, g, b = style:RGBA(D.DestroyColor)
+      for _, edge in ipairs(box.glow) do
         local er, eg, eb = edge:GetVertexColor()
         assert.are.same({ r, g, b }, { er, eg, eb })
       end
-      assert.are.same({ style:RGBA("Crimson") }, { style:RGBA(style.Theme.Vendor.DestroyEdge.Color) })
+      local hr, hg, hb = box.halo:GetVertexColor()
+      assert.are.same({ r, g, b }, { hr, hg, hb })
+      assert.are.same(dock.background._colorTexture, box.background._colorTexture)
+      assert.are.equal(dock.glow[1]:GetHeight(), box.glow[1]:GetHeight())
+      assert.are.equal(dock.halo:GetTexture(), box.halo:GetTexture())
+      for _, line in ipairs({ "title", "warning", "hint" }) do
+        assert.are.equal(dock[line]:GetFontObject(), box[line]:GetFontObject(), line)
+      end
+    end)
+
+    it("pulses its glow as the dock does", function()
+      data.destroy = { toDestroy(1, 11) }
+      local v = open()
+      local frame, box = v.destroyCard.frame, v.destroyCard.box
+      local G = style.Theme.Dock.Glow
+      local update = frame:GetScript("OnUpdate")
+      local alphas = {}
+      for _ = 1, 6 do
+        update(frame, 0.2)
+        table.insert(alphas, box.glow[1]:GetAlpha())
+      end
+      local low, high = math.min(unpack(alphas)), math.max(unpack(alphas))
+      assert.is_true(high - low > 0.3, "it pulses: " .. table.concat(alphas, ", "))
+      assert.is_true(low >= G.Low - 1e-6 and high <= G.High + 1e-6)
     end)
 
     it("makes room for itself: what the vendor sells ends above it", function()
@@ -829,11 +879,11 @@ describe("NextVendor", function()
       data.destroy = { toDestroy(1, 11), toDestroy(2, 12) }
       local v = open()
       local card = v.destroyCard
-      assert.are.same({ "LeftButtonUp" }, card.frame._registeredClicks)
-      click(card.frame)
+      assert.are.same({ "LeftButtonUp" }, card.catcher._registeredClicks)
+      click(card.catcher)
       assert.are.equal(1, calls.destroyed)
       assert.are.same({ 120 }, shownIcons(card))
-      click(card.frame)
+      click(card.catcher)
       assert.are.equal(2, calls.destroyed)
       assert.is_false(card.frame:IsShown())
       assert.are.equal(style.FOOTER, v:ContentBottom())
@@ -842,12 +892,12 @@ describe("NextVendor", function()
     it("shows the next item's tooltip, saying a click destroys it", function()
       data.destroy = { toDestroy(4, 11), toDestroy(5, 12) }
       local v = open()
-      v.destroyCard.frame:GetScript("OnEnter")(v.destroyCard.frame)
+      v.destroyCard.catcher:GetScript("OnEnter")(v.destroyCard.catcher)
       assert.are.same({ bag = 0, slot = 4 }, GameTooltip._bagItem)
       local text = {}
       for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
       assert.are.same({ "Click to destroy it." }, text)
-      click(v.destroyCard.frame)
+      click(v.destroyCard.catcher)
       assert.are.same({ bag = 0, slot = 5 }, GameTooltip._bagItem, "the next one, once the first is gone")
     end)
 

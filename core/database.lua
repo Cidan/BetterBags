@@ -1003,16 +1003,6 @@ function DB:SetCategorySell(enabled)
   DB.data.profile.categorySell = enabled
 end
 
--- GetAutoSellLimit says whether category automation stops selling at what buyback keeps (automation.md).
----@return boolean
-function DB:GetAutoSellLimit()
-  return DB.data.profile.autoSellLimit
-end
-
----@param enabled boolean
-function DB:SetAutoSellLimit(enabled)
-  DB.data.profile.autoSellLimit = enabled
-end
 
 ---@return boolean
 function DB:GetCategorySell()
@@ -1583,6 +1573,12 @@ function DB:Migrate()
     Do not remove before Q3'27.
   ]]--
   DB.data.profile.collapsedSections = nil
+
+  --[[
+    Category automation sells everything in waves (automation.md §3): the 12-item limit setting
+    is gone. Do not remove before Q3'27.
+  ]]--
+  DB.data.profile.autoSellLimit = nil
 
   -- ============================================================
   -- Dynamic Item Level Coloring Migration (Q1'27)

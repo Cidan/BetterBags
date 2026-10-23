@@ -190,19 +190,6 @@ describe("The settings catalog", function()
     end
   end)
 
-  -- Category automation sells at most what buyback keeps unless this is off (automation.md).
-  it("turns the automatic selling limit on and off, sending nothing", function()
-    local on = true
-    override(db, "GetAutoSellLimit", function() return on end)
-    override(db, "SetAutoSellLimit", function(_, value) on = value end)
-    local setting = catalog:Get("autoSellLimit")
-    assert.are.equal("toggle", setting.kind)
-    assert.is_true(setting.get(ctx()))
-    setting.set(ctx(), false)
-    assert.is_false(on)
-    assert.truthy(setting.title:find("12", 1, true))
-  end)
-
   -- Before, only the changelog window's "Don't show me this again" checkbox set it (next-settings.md §7).
   it("turns What's New on login on and off, sending nothing", function()
     local auto = true

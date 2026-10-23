@@ -182,6 +182,7 @@ next\controls\itemgrid.lua
 next\sparkles.lua
 next\tabs.lua
 next\content.lua
+next\dockcard.lua
 next\drag.lua
 next\chain.lua
 next\panel.lua

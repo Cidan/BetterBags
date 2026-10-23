@@ -41,7 +41,7 @@ local GOLD = { 1, 0.82, 0 }
 local CONTENT_HEIGHT = 530
 
 describe("NextSettingsCategories", function()
-  local owner, filters, committed, sent, handlers, calls, saved, bags, matches, reselected, itemNames
+  local owner, filters, committed, sent, handlers, calls, saved, bags, matches, reselected, itemNames, refreshed
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -153,6 +153,8 @@ describe("NextSettingsCategories", function()
       table.insert(handlers[message], fn)
     end)
     override(settings, "Reselect", function() reselected = reselected + 1 end)
+    refreshed = 0
+    override(settings, "Refresh", function() refreshed = refreshed + 1 end)
     override(settings, "ContentHeight", function() return CONTENT_HEIGHT end)
     override(categories, "GetAllCategories", function()
       local all = {}
@@ -355,7 +357,7 @@ describe("NextSettingsCategories", function()
       editor.selected = "Mats"
       assert.are.same({ "Mats", "2 added items · Priority 5 · Sells at merchants" }, { editor:Heading() })
       filters.Mats.automation = "destroy"
-      assert.are.same({ "Mats", "2 added items · Priority 5 · Destroys on command" }, { editor:Heading() })
+      assert.are.same({ "Mats", "2 added items · Priority 5 · Sells, destroys the rest" }, { editor:Heading() })
     end)
 
     it("says which tabs show: Rule for yours and a plugin's with a rule; Added Items while one is chosen", function()
@@ -612,77 +614,69 @@ describe("NextSettingsCategories", function()
     end)
   end)
 
-  -- What a category does with its items on its own (automation.md): two switches, at most one on.
-  describe("the Automation tab", function()
-    local tab
+  -- What a category does with its items on its own (automation.md §5): Auto Sell, and Destroy What Can't
+  -- Be Sold, which needs Auto Sell on ("sell"; "destroy" is both). Asked: drawn as every other page's
+  -- settings, rows of a section (the window's rows, next/settings/rows.lua), not controls of its own.
+  describe("the Automation tab's settings", function()
+    local sellOption, destroyOption
 
     before_each(function()
-      tab = editor:CreateAutomationTab(CreateFrame("Frame"), owner, bagsFn)
+      sellOption, destroyOption = unpack(editor:AutomationOptions())
     end)
 
-    it("fills the page's content without scrolling, as a wide row", function()
-      local C = style.Theme.Settings.Content
-      assert.is_true(tab.wide)
-      assert.are.equal(CONTENT_HEIGHT - C.Top - C.Bottom, tab:Measure(700))
+    it("are two switches, named and described", function()
+      assert.are.same({ "toggle", "toggle" }, { sellOption.kind, destroyOption.kind })
+      assert.are.equal("Auto Sell", sellOption.title)
+      assert.are.equal("Destroy What Can't Be Sold", destroyOption.title)
+      assert.truthy(sellOption.description:find("merchant", 1, true))
+      assert.truthy(destroyOption.description:find("merchant", 1, true))
+      assert.truthy(#sellOption.keywords > 0 and #destroyOption.keywords > 0)
     end)
 
-    it("says to make a category while there is none", function()
-      place(tab)
-      assert.is_true(tab.none:IsShown())
-      assert.is_false(tab.sell.frame:IsShown())
-      assert.is_false(tab.destroy.frame:IsShown())
-    end)
-
-    it("shows what the category does as two switches", function()
+    it("show what the chosen category does, Destroy What Can't Be Sold only with Auto Sell", function()
       editor.selected = "Mats"
-      place(tab)
-      assert.is_false(tab.sell:GetChecked())
-      assert.is_false(tab.destroy:GetChecked())
+      assert.is_false(sellOption.get())
+      assert.is_false(destroyOption.get())
+      assert.is_true(destroyOption.disabled())
       filters.Mats.automation = "sell"
-      tab:Refresh(ctx())
-      assert.is_true(tab.sell:GetChecked())
-      assert.is_false(tab.destroy:GetChecked())
+      assert.is_true(sellOption.get())
+      assert.is_false(destroyOption.get())
+      assert.is_false(destroyOption.disabled())
       filters.Mats.automation = "destroy"
-      tab:Refresh(ctx())
-      assert.is_false(tab.sell:GetChecked())
-      assert.is_true(tab.destroy:GetChecked())
+      assert.is_true(sellOption.get())
+      assert.is_true(destroyOption.get())
+      assert.is_false(destroyOption.disabled())
     end)
 
-    it("turns one switch on and the other off, saving at once", function()
+    it("save at once, Auto Sell turned off taking Destroy with it, and show the page's rows again", function()
       editor.selected = "Mats"
-      place(tab)
-      click(tab.sell)
-      assert.is_true(tab.sell:GetChecked())
-      click(tab.destroy)
-      assert.is_false(tab.sell:GetChecked(), "only one is on")
-      assert.is_true(tab.destroy:GetChecked())
-      click(tab.destroy)
-      assert.is_false(tab.destroy:GetChecked())
+      sellOption.set(ctx(), true)
+      destroyOption.set(ctx(), true)
+      destroyOption.set(ctx(), false)
+      destroyOption.set(ctx(), true)
+      sellOption.set(ctx(), false)
       assert.are.same({
+        { "UpdateCategory", "Mats", { automation = "sell" } },
+        { "UpdateCategory", "Mats", { automation = "destroy" } },
         { "UpdateCategory", "Mats", { automation = "sell" } },
         { "UpdateCategory", "Mats", { automation = "destroy" } },
         { "UpdateCategory", "Mats", { automation = false } },
       }, updates())
+      assert.are.equal(5, refreshed, "the other switch's state follows")
+      assert.is_true(destroyOption.disabled())
     end)
 
-    it("lets a plugin's category be automated", function()
+    it("work for a plugin's category too", function()
       editor.selected = "Openable"
-      place(tab)
-      assert.is_true(tab.sell.frame:IsShown())
-      assert.is_true(tab.destroy.frame:IsShown())
+      sellOption.set(ctx(), true)
+      assert.are.same({ { "UpdateCategory", "Openable", { automation = "sell" } } }, updates())
     end)
 
-    it("shows nothing else", function()
-      editor.selected = "Mats"
-      place(tab)
-      assert.are.same({ "destroy", "sell" }, (function()
-        local keys = {}
-        for key in pairs(tab.labels) do table.insert(keys, key) end
-        table.sort(keys)
-        return keys
-      end)())
-      assert.is_nil(tab.grid)
-      assert.is_nil(tab.hint)
+    it("change nothing with no category chosen", function()
+      editor.selected = nil
+      assert.is_false(sellOption.get())
+      sellOption.set(ctx(), true)
+      assert.are.same({}, updates())
     end)
   end)
 

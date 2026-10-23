@@ -248,8 +248,15 @@ describe("Database Migration", function()
     end)
   end)
 
-  -- Section collapsing was removed; its saved state is dropped from every profile.
-  describe("removed section collapse state", function()
+  -- Removed settings: their saved state is dropped from every profile.
+  describe("removed settings", function()
+    -- Category automation sells everything in waves now (asked): the 12-item limit setting is gone.
+    it("drops the retired autoSellLimit setting", function()
+      DB.data.profile.autoSellLimit = false
+      DB:Migrate()
+      assert.is_nil(DB.data.profile.autoSellLimit)
+    end)
+
     it("drops the saved collapsedSections table", function()
       DB.data.profile.collapsedSections = { [const.BAG_KIND.BACKPACK] = { Junk = true }, [const.BAG_KIND.BANK] = {} }
       DB:Migrate()
