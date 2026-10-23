@@ -111,17 +111,21 @@ Vendor rule.
 - **`automation/Changed`** (no arguments): sent after a destroy, so whatever shows the queue updates
   (the vendor's card). A sale changes nothing the queue holds.
 
-## 5. The Automation tab (`next/settings/categories.lua`, `CreateAutomationTab`)
+## 5. The Automation tab (`next/settings/content.lua`, `NextSettingsCategories:AutomationOptions`)
 
 Fourth tab of the Categories page (next-settings.md §5), shown while a category is chosen, a plugin's
-too (what it does is the player's choice). Two switches and nothing else (asked: switches, not a
-dropdown; no explanations, no list of the items it acts on, no Destroy Next Item button; then: "auto
-sell, with another option 'Destroy what can't be sold' -- no longer mutually exclusive, but in fact
-Destroy requires Autosell to be on"):
+too (what it does is the player's choice). It is drawn as every page draws its settings: a section
+("Merchants") of settings rows (`next/settings/rows.lua`), two switches side by side, each its name on
+the left and its switch on the right, with its description as its tooltip. Asked: switches, not a
+dropdown; no explanations on the tab, no list of the items it acts on, no Destroy Next Item button; then
+Auto Sell, and Destroy What Can't Be Sold, which needs Auto Sell on; then, after a first version
+hand-placed bare switches ("bland ... unstyled ... compare to the other screenshot"): like the other
+pages. The options are page options (`NextSettingsOption`), from `AutomationOptions()`:
 - **Auto Sell**: on saves `"sell"`, off saves none (`false`), taking Destroy What Can't Be Sold with it.
-- **Destroy What Can't Be Sold**: enabled only while Auto Sell is on; on saves `"destroy"`, off `"sell"`.
-- Each switch sits before its name (the long name does not fit the label column), the second indented
-  (`Indent`) under the first, as it depends on it. Saved at once (`UpdateCategory { automation }`).
+- **Destroy What Can't Be Sold**: disabled while Auto Sell is off (the row's `disabled`); on saves
+  `"destroy"`, off `"sell"`.
+- Each saves at once (`UpdateCategory { automation }`) and then `NextSettings:Refresh`, so the other
+  row's state follows; `categories/Changed` also shows the page again.
 The category's list line ends "Sells at merchants" or "Sells, destroys the rest".
 
 ## 6. Coverage
@@ -143,14 +147,15 @@ The category's list line ends "Sells at merchants" or "Sells, destroys the rest"
   `AutomationOf` and sub-categories), `spec/database_spec.lua` (a plugin's saved state),
   `spec/items_spec.lua` (`GetCategory` ignoring Recent Items), `spec/database_migration_spec.lua` (the
   limit's saved value dropped), `spec/next/settings/content_spec.lua` (four tabs),
-  `spec/next/settings/categories_spec.lua` ("the Automation tab": the names, Destroy only with Auto
-  Sell, saving, Auto Sell off taking Destroy with it, the layout, a plugin's, nothing else; the list
-  line, which tabs show), `spec/next/dockcard_spec.lua` (the shared card), `spec/next/drag_spec.lua`
+  `spec/next/settings/categories_spec.lua` ("the Automation tab's settings": names, descriptions and
+  keywords, Destroy only with Auto Sell, saving and the page's rows shown again, Auto Sell off taking
+  Destroy with it, a plugin's, nothing chosen; the list line, which tabs show),
+  `spec/next/settings/content_spec.lua` (the tab is a section of two settings rows), `spec/next/dockcard_spec.lua` (the shared card), `spec/next/drag_spec.lua`
   (the dock on it, unchanged), `spec/core/init_spec.lua` (initialized and
   enabled), `spec/integration/next_settings_spec.lua` (built on the whole addon).
 - Mutation-tested: 72 mutations for the first version, 44 for the switches, the bulk sale and the card,
-  7 for reading refundability with the slot, and 32 for waves, the two switches, the shared card and
-  the destroy card on it. Of the last set three first survived: one led to a test (a sale of exactly one
+  7 for reading refundability with the slot, 32 for waves, the two switches, the shared card and
+  the destroy card on it, and 7 for the tab's settings rows (all caught). Of the last set three first survived: one led to a test (a sale of exactly one
   wave), one was dead code, removed (a color the card stored and never read), and one is equivalent
   (the destroy action check, §2).
 

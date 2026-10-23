@@ -315,10 +315,11 @@ page's `Content.Top` and `Bottom`).
   (`AddPermanentItemToCategory`, `ClearCursor`, the bags recalculated; asked: the items themselves
   are drop targets); a right click offers Remove. A plugin's items show read-only (no drop, no remove,
   no Remove All).
-- **Automation tab** (automation.md §5): two switches, Auto Sell and Destroy What Can't Be Sold, the
-  second enabled only while the first is on and indented under it, each before its name, saved at
-  once, and nothing else. Shown while a category is chosen, a plugin's too. The list line and the
-  heading end "Sells at merchants" or "Sells, destroys the rest".
+- **Automation tab** (automation.md §5): a section ("Merchants") of two settings rows, drawn as every
+  page's settings (not controls of its own): Auto Sell, and Destroy What Can't Be Sold, disabled while
+  Auto Sell is off, saved at once (`NextSettingsCategories:AutomationOptions`). Shown while a category
+  is chosen, a plugin's too. The list line and the heading end "Sells at merchants" or "Sells, destroys
+  the rest".
 - `NextSettingsCategories:Show(name)` chooses a category for the next time the page shows (a bag's tab
   links here); `NewFromSearch(query)` makes the list ask for a new category's name with the search as
   its rule (the search box's Enter to Make Category, through `config/NewCategoryFromSearch`, which

@@ -25,6 +25,17 @@ No implementation code should be modified or added without a corresponding test 
 
 Never make any changes without directly confirming that the functions, code, API's, and work you are implementing exists by directly observing it. You must either observe it as a WoW API, or as part of our addon. Never take any guesses or rely on internal memory -- always look at code and patterns in the code base and use a direct line of reference. Show your work in all your plans, and directly cite any API calls, both internal and external.
 
+## UI Consistency: Reuse the Existing Design
+
+Every UI element must reuse the design that already exists for that kind of element, and look like it belongs beside it. Consistent design is a requirement, not polish.
+
+1. **Find the existing component first.** Before building any UI, find where BetterBags already shows the same kind of thing (a setting, a section, a confirmation card, a dialog, a button, a list, an item grid) and use that component: settings go in a page's `sections` and `rows` (`next/settings/rows.lua`), confirmation cards are `NextDockCard`, questions are `NextDialog`, controls come from `next/controls/`, and the classic bags' parts are Sonata elements.
+2. **Never hand-place controls or rebuild a look a component already draws.** If no component fits as is, extend it, or move the existing one into a shared component that both uses go through. Never make a lookalike.
+3. **Take fonts, colors, spacing and art from the theme keys the existing element uses.** Add a theme key only for what is actually new (a different glow color), never new values for the same thing.
+4. **Compare before reporting.** Before calling UI work done, compare it with the closest existing screen (layout, fill, fonts, spacing, motion) and say how it matches. If you cannot see it in game, say so.
+
+Mistakes this rule comes from: the category Automation tab first hand-placed bare switches instead of the settings rows every other page uses, and the vendor's destroy card was first drawn with art of its own instead of the sell dock's card.
+
 ## Mocking and WoW API Mocks
 
 To ensure the reliability of the addon and prevent regressions, adhere to the following strict mocking and testing rules:
