@@ -1,0 +1,29 @@
+{
+  "id": 1792727716,
+  "version": "v0.7.0-11-g02966e3",
+  "channel": "alpha",
+  "date": "2026-10-23",
+  "from": "6ffc2c0eccc5d1a3146e23e03c448a5062df2dbe",
+  "to": "02966e36d1265f0d2663da1697a054f947fbc026",
+  "headline": "Categories are now prioritized by dragging them in the list, and Auto Sell gains safe vendor dock confirmations with latency-paced selling.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Drag-and-drop category priority",
+      "details": "Category priority is now set directly by dragging categories into your preferred order in the list, removing the need for priority numbers. Rows smoothly slide as you reorder them and display the number of matching items, while items added by hand always stay where you placed them.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Vendor dock confirmation for Auto Sell",
+      "details": "Categories set to auto-sell can now dock into the vendor window for confirmation instead of selling immediately. Double-click a docked section to sell it or right-click to return it to your bag, and items that cannot be sold seamlessly turn into an option to destroy them.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Reliable, latency-paced vendor selling",
+      "details": "Selling items now paces itself based on your network latency to prevent items getting stuck or triggering busy errors. Items that a merchant refuses to buy safely remain in your bags instead of visually vanishing from view.",
+      "clients": []
+    }
+  ]
+}
