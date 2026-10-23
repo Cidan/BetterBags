@@ -52,8 +52,8 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
-  { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
+  { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
   { "NextVendor", "next/vendor.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -172,6 +172,9 @@ describe("NextVendor", function()
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
     override(stubs.database, "GetInBagSearch", function() return true end)
+    data.tabOrder = {}
+    override(stubs.database, "GetNextTabOrder", function(_, key) return data.tabOrder[key] or {} end)
+    override(stubs.database, "SetNextTabOrder", function(_, key, ids) data.tabOrder[key] = ids end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
     override(stubs.events, "SendMessage", function() end)
     override(stubs.events, "RegisterMessage", function(_, name, fn)
@@ -454,6 +457,17 @@ describe("NextVendor", function()
       assert.are.equal(1, _G._merchantCalls.filterReset)
       assert.are.same({ "Armor", "Food" }, sectionNames(v))
       assert.are.equal("Item 3", v.content.order[2].entries[2].item.item.name)
+    end)
+
+    -- Asked: tabs reorderable, "make sure it saves" (docs/next-batch-2.md §5).
+    it("lists its tabs in the order saved, and saves the order they are moved to", function()
+      data.tabOrder.vendor = { 2, 1 }
+      local v = open()
+      assert.are.same({ 2, 1 }, tabIDs(v))
+      assert.is_true(v.tabs:Tab(1).movable)
+      v.tabs.onReorder(ctx(), { 1, 2 })
+      assert.are.same({ 1, 2 }, data.tabOrder.vendor)
+      assert.are.same({ 1, 2 }, tabIDs(v))
     end)
 
     it("lists Buy and Buyback, and Repair at a vendor that repairs", function()

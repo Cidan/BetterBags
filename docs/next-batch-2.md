@@ -141,7 +141,13 @@ Repair.
 - "All Next windows" means the vertical tab rails. The settings window's tabs are horizontal (the
   top tabs): pinning X would leave nothing to drag, so they are left as they are.
 
-**Status:** planned.
+**Status:** done. The settings lists' `NextListReorder` assumes a scroll box and top-left anchoring;
+the rails anchor their tabs at the rail's edge, so the rail has its own vertical move built on the same
+parts: `NextLift` for the lift, shadow and landing (with a new `pinX` keeping the x), tweens for the
+slides. `next/tabs.lua`, `next/lift.lua`, `next/panel.lua`, `next/bag.lua`, `next/bank.lua`,
+`next/guildbank.lua`, `next/vendor.lua`, `core/database.lua`, `core/constants.lua`; next.md §3. 41
+mutations: eight first survived; seven led to tests and one was dead code, removed (a second bar
+update after landing; the slide had already moved the bar).
 
 ## 6. Moving a category between the bank and a backpack tab (bug)
 

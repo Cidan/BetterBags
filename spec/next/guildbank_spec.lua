@@ -53,8 +53,8 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
-  { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" },
   { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -169,6 +169,9 @@ describe("NextGuildBank", function()
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
     override(stubs.database, "GetInBagSearch", function() return true end)
+    data.tabOrder = {}
+    override(stubs.database, "GetNextTabOrder", function(_, key) return data.tabOrder[key] or {} end)
+    override(stubs.database, "SetNextTabOrder", function(_, key, ids) data.tabOrder[key] = ids end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
     override(stubs.database, "GetShowGuildBankTabs", function() return data.showTabs end)
     override(stubs.database, "SetShowGuildBankTabs", function(_, shown) data.showTabs = shown end)
@@ -378,6 +381,20 @@ describe("NextGuildBank", function()
       assert.are.equal(101, tabNamed(g, "Gear").icon:GetTexture())
       data.canBuy = true
       g:RefreshTabs()
+      assert.are.same({ ALL, 1001, 1002, 1004, 0 }, tabIDs(g))
+    end)
+
+    -- Asked: tabs reorderable, "make sure it saves" (docs/next-batch-2.md §5): the guild's tabs among
+    -- themselves, All Tabs first and buying one last.
+    it("lists the guild's tabs in the order saved, and saves the order they are moved to", function()
+      data.tabOrder.guild = { 1004, 1001 }
+      data.canBuy = true
+      local g = open()
+      assert.are.same({ ALL, 1004, 1001, 1002, 0 }, tabIDs(g))
+      assert.are.equal(style.TAB_HEIGHT + style.TAB_SPACING + style.TAB_GROUP_GAP, g.tabs:Tab(1004).y)
+      assert.is_false(g.tabs:Tab(0).movable)
+      g.tabs.onReorder(ctx(), { ALL, 1001, 1002, 1004, 0 })
+      assert.are.same({ ALL, 1001, 1002, 1004, 0 }, data.tabOrder.guild)
       assert.are.same({ ALL, 1001, 1002, 1004, 0 }, tabIDs(g))
     end)
 

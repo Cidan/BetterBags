@@ -124,6 +124,15 @@ function bagProto:CreateMoney()
   return money:Create()
 end
 
+-- TabOrderKey saves the order of the backpack's group tabs; its bag slots keep theirs.
+---@return string?
+function bagProto:TabOrderKey()
+  if self:ShowsBlizzardBags() then
+    return nil
+  end
+  return "backpack"
+end
+
 -- ShowsBlizzardBags says whether the backpack shows Blizzard's bags (Show Blizzard Bags): its bag slots
 -- in the tabs, its items bag by bag in slot order. It is the Show Bags view (SECTION_ALL_BAGS), the
 -- classic bags' Show Bags, so it lasts across sessions and follows the classic bags' setting.
@@ -218,9 +227,11 @@ function bagProto:RefreshTabs()
     table.insert(entries, { id = id, name = group.name })
   end
   table.sort(entries, function(a, b) return a.id < b.id end)
+  entries = self:OrderedTabs(entries)
   table.insert(entries, {
     id = 0,
     name = "+",
+    fixed = true,
     tooltip = { L:G("New Group..."), L:G("Click to create a new group for organizing categories.") },
   })
   self.tabs:SetTabs(entries)

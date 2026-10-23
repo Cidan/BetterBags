@@ -154,6 +154,12 @@ function bankProto:UpdatePurchaseBankButton()
   end
 end
 
+-- TabOrderKey saves the order of the bank's group tabs and, apart, of Blizzard's bank tabs.
+---@return string
+function bankProto:TabOrderKey()
+  return self:InTabMode() and "bankTabs" or "bank"
+end
+
 -- InTabMode is whether the bank shows Blizzard's bank tabs (the classic bank's Show Bags) rather
 -- than its groups. Classic clients have no bank tabs.
 ---@return boolean
@@ -247,16 +253,16 @@ function bankProto:RefreshTabs()
   local bank, warbank = {}, {}
   for id, group in pairs(groups:GetAllGroups(self.kind)) do
     if isWarbankGroup(group) then
-      table.insert(warbank, { id = id, name = group.name, accent = "Warbank", atlas = "warbands-icon" })
+      table.insert(warbank, { id = id, name = group.name, accent = "Warbank", atlas = "warbands-icon", block = "warbank" })
     else
-      table.insert(bank, { id = id, name = group.name })
+      table.insert(bank, { id = id, name = group.name, block = "bank" })
     end
   end
   local byID = function(a, b) return a.id < b.id end
   table.sort(bank, byID)
   table.sort(warbank, byID)
-  local entries = bank
-  for i, entry in ipairs(warbank) do
+  local entries = self:OrderedTabs(bank)
+  for i, entry in ipairs(self:OrderedTabs(warbank)) do
     if i == 1 and #bank > 0 then
       entry.gap = style.TAB_GROUP_GAP
     end
@@ -265,6 +271,7 @@ function bankProto:RefreshTabs()
   table.insert(entries, {
     id = 0,
     name = "+",
+    fixed = true,
     tooltip = { L:G("Create New Group Tab"), L:G("Click to create a new group tab for organizing your items.") },
   })
   self.tabs:SetTabs(entries)
@@ -333,19 +340,24 @@ function bankProto:ListBankTabs()
   local entries = {}
   local slots = bankSlots()
   local function add(bankType, purchaseID, purchaseTitle, gap)
-    for i, t in ipairs(self:PurchasedTabs(bankType)) do
-      local warbank = bankType == Enum.BankType.Account
-      table.insert(entries, {
+    local warbank = bankType == Enum.BankType.Account
+    local tabs = {}
+    for _, t in ipairs(self:PurchasedTabs(bankType)) do
+      table.insert(tabs, {
         id = t.ID,
         name = t.name,
         icon = self:tabIcon(bankType, t),
         accent = warbank and "Warbank" or nil,
-        gap = i == 1 and gap or nil,
+        block = warbank and "warbank" or "bank",
         draggable = slots ~= nil and slots:GetBagSocketIndex(bankType, t.ID) ~= nil,
         tooltip = function()
           self:ShowTabTooltip(bankType, t)
         end,
       })
+    end
+    for i, entry in ipairs(self:OrderedTabs(tabs)) do
+      entry.gap = i == 1 and gap or nil
+      table.insert(entries, entry)
     end
     if C_Bank.FetchNextPurchasableBankTabData(bankType) ~= nil then
       table.insert(entries, {

@@ -2869,6 +2869,9 @@ function panelProto:BuildTabs()
   self.tabs:SetDragHandler(function(ctx, id)
     self:OnTabDragged(ctx, id)
   end)
+  self.tabs:SetReorderHandler(function(ctx, ids)
+    self:OnTabsReordered(ctx, ids)
+  end)
   -- Chained, the gap between the bags follows their tabs' widths (next.md §12).
   self.tabs:SetResizeHandler(function(ctx)
     chain:Update(ctx)
@@ -2878,6 +2881,36 @@ end
 
 -- RefreshTabs lists the kind's tabs.
 function panelProto:RefreshTabs()
+end
+
+-- TabOrderKey names the rail the order of the tabs shown is saved under (database:GetNextTabOrder), nil
+-- when they keep the order they come in.
+---@return string?
+function panelProto:TabOrderKey()
+  return nil
+end
+
+-- OrderedTabs returns the panel's tabs in the order the player moved them to (NextTabs:Ordered, under
+-- TabOrderKey).
+---@param entries NextTabEntry[]
+---@return NextTabEntry[]
+function panelProto:OrderedTabs(entries)
+  local key = self:TabOrderKey()
+  return nextTabs:Ordered(entries, key and database:GetNextTabOrder(key) or nil)
+end
+
+-- OnTabsReordered saves the order a tab was moved to (asked: "make sure it saves"; docs/next-batch-2.md
+-- §5) and lists the tabs again in it.
+---@param ctx Context
+---@param ids number[]
+function panelProto:OnTabsReordered(ctx, ids)
+  local _ = ctx
+  local key = self:TabOrderKey()
+  if key == nil then
+    return
+  end
+  database:SetNextTabOrder(key, ids)
+  self:RefreshTabs()
 end
 
 -- OnTabClicked runs a click on a tab.

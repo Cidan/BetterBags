@@ -212,6 +212,37 @@ section dragged out of a panel returns to the panel's strata (§7).
   glides to it; a hovered one slides out a little. Left click switches group (the same data, drawn
   for that tab), right click opens the group menu (rename, delete) and "+" creates a group, both
   through the classic backpack behavior's dialogs. Hidden when groups are off.
+- **Moving tabs** (every Next rail: the backpack, the bank's groups and its Blizzard tabs, the guild
+  bank, the vendor; asked: "all tabs in all Next windows should be reorderable by clicking and holding to
+  slide. animate the slide, but pin the X axis so you can't move it left and right, just drag it up and
+  down. animate this transition and make sure it saves"; docs/next-batch-2.md §5):
+  - **The drag** (`next/tabs.lua`, a rail with a reorder handler, `SetReorderHandler`): pressing a tab
+    and moving the cursor (`OnDragStart`, so a click is still a click) lifts it with `NextLift`, as
+    sections and settings rows are lifted (the shrink and shadow), with `pinX` (a NextLift field: `Place`
+    keeps the cursor's x of the pickup) so it follows the cursor only up and down. The room where it
+    would land follows the cursor (before the first tab of its block whose middle is below the cursor,
+    `moveIndexAt`), and the other tabs slide out of its way (`slideY`, `Time.Interaction`, the `Glide`
+    ease, apart from their hover slide). Let go (`OnDragStop`, or the left button found up), it lands
+    in its room (`NextLift:Land`), and the rail shows the new order and tells its handler every tab's id
+    in it; nothing when it is back where it was. The bar follows the selected tab. A move ends with the
+    tab back in its place when the rail hides or its tabs are listed again, and none starts while
+    another frame is lifted. One at a time.
+  - **What moves where:** a tab moves among the movable tabs of its block (`NextTabEntry.block`, tabs
+    next to each other: the bank's own groups and its Warbank groups; its character tabs and its Warbank
+    tabs; the guild's tabs, apart from All Tabs); a block's gap stays above whichever of its tabs is
+    first. Fixed tabs (`fixed`: the "+" that makes a group or buys a guild tab), purchase tabs and tabs
+    whose drag is their own (`draggable`: the backpack's bag slots in Show Blizzard Bags, WoW: Forever's
+    bank sockets) never move, and no tab passes them.
+  - **Saving** (`panelProto:OnTabsReordered`): the order is saved per rail
+    (`database:SetNextTabOrder(key, ids)`, profile `nextTabOrder`) under the panel's `TabOrderKey`
+    (`backpack`, `bank` for the bank's groups, `bankTabs` for its Blizzard tabs, `guild`, `vendor`; none
+    for the bag slots), and the tabs are listed again. Every `RefreshTabs` lists each block in the saved
+    order (`panelProto:OrderedTabs`, `NextTabs:Ordered`: saved tabs in their order, new ones after them
+    in their own, fixed and purchase tabs where they are), then gives each block's first tab its gap.
+  - The settings window's tabs run across its top: pinning X there leaves nothing to drag, so they are
+    not moved.
+  - Coverage: `spec/next/tabs_spec.lua` ("moving a tab", "a saved order"), and each panel's spec
+    ("lists ... in the order saved"), `spec/database_spec.lua`.
 - **Show Blizzard Bags** (asked: "the 'Switch to Classic Bags' icon now becomes 'Show Blizzard Bags',
   with our left tabs replaced with the bag icons for the Blizzard Bags, so users can swap out their bags
   -- the view of items switches to the full stack of bags, just like in our Original bags view, same

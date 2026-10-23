@@ -233,6 +233,24 @@ function DB:SetNextChain(layout)
   DB.data.profile.nextChain = layout
 end
 
+-- GetNextTabOrder returns the order the player moved a BetterBags Next tab rail's tabs to (tab ids; none
+-- until moved). key names the rail: "backpack", "bank", "bankTabs", "guild", "vendor".
+---@param key string
+---@return number[]
+function DB:GetNextTabOrder(key)
+  return DB.data.profile.nextTabOrder[key] or {}
+end
+
+---@param key string
+---@param ids number[]
+function DB:SetNextTabOrder(key, ids)
+  local copy = {}
+  for i, id in ipairs(ids) do
+    copy[i] = id
+  end
+  DB.data.profile.nextTabOrder[key] = copy
+end
+
 ---@alias NextSize "full"|"small"
 
 -- GetNextSize returns BetterBags Next's panel size: "full" height on the screen's edges, or "small"

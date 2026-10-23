@@ -94,6 +94,7 @@ const.DATABASE_DEFAULTS = {
     animateItemMovement = false,
     nextEnabled = false,
     nextChain = "apart",
+    nextTabOrder = {},
     nextSize = "full",
     nextSmallPlaces = {},
     nextSmallSizes = {},
@@ -328,6 +329,17 @@ describe("Database", function()
 
     -- BetterBags Next's size (docs/next-small-mode.md): full-height panels until switched to small,
     -- movable ones.
+    -- The order the player moved each Next tab rail's tabs to (docs/next-batch-2.md §5).
+    it("GetNextTabOrder / SetNextTabOrder, per rail, none until moved, kept as a copy", function()
+      assert.are.same({}, DB:GetNextTabOrder("backpack"))
+      local ids = { 2, 1, 0 }
+      DB:SetNextTabOrder("backpack", ids)
+      ids[1] = 9
+      assert.are.same({ 2, 1, 0 }, DB:GetNextTabOrder("backpack"))
+      assert.are.same({}, DB:GetNextTabOrder("bank"))
+      assert.are.same({ backpack = { 2, 1, 0 } }, DB.data.profile.nextTabOrder)
+    end)
+
     it("GetNextSize / SetNextSize, full until switched, and nothing but a size", function()
       assert.are.equal("full", DB:GetNextSize())
       DB:SetNextSize("small")

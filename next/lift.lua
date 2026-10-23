@@ -51,6 +51,7 @@ lift.detached = false
 ---@field grabY number From the frame's top down to the cursor at pickup.
 ---@field scale number
 ---@field landing boolean It was let go: it no longer follows the cursor.
+---@field pinX? number A cursor x it keeps to: it follows the cursor only up and down (a tab moved in its rail).
 
 -- NextDragPoint is where a flight starts from: a top left in UIParent's coordinates, at a scale (a
 -- frame leaving a dock, not the cursor).
@@ -182,12 +183,16 @@ function lift:Pick(held, frame, onFrame)
   return true
 end
 
--- Place puts the held frame so that the point grabbed is at x, y, at its scale.
+-- Place puts the held frame so that the point grabbed is at x, y (at its pinX when it has one), at its
+-- scale.
 ---@param held NextLifted
 ---@param x number
 ---@param y number
 function lift:Place(held, x, y)
   local frame, s = held.frame, held.scale
+  if held.pinX ~= nil then
+    x = held.pinX
+  end
   frame:SetScale(s)
   frame:ClearAllPoints()
   frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x - held.grabX * s) / s, (y + held.grabY * s) / s)

@@ -53,8 +53,8 @@ LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
-  { "NextSparkles", "next/sparkles.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
+  { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBag", "next/bag.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -70,7 +70,7 @@ local nextContent = addon:GetModule("NextContent")
 
 describe("NextBag", function()
   local buttons, sent, messages, buckets, groupsEnabled, activeGroup, allGroups, expired, inBagSearch
-  local views, previousView, bagTextures, bagNames, bagCalls, events
+  local views, previousView, bagTextures, bagNames, bagCalls, events, tabOrder
   local box, helper, placed, slotInfo
 
   -- fakeButton stands in for an item button, recording what is done to it.
@@ -127,6 +127,9 @@ describe("NextBag", function()
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
     override(stubs.database, "GetInBagSearch", function() return inBagSearch end)
+    tabOrder = {}
+    override(stubs.database, "GetNextTabOrder", function(_, key) return tabOrder[key] or {} end)
+    override(stubs.database, "SetNextTabOrder", function(_, key, ids) tabOrder[key] = ids end)
     override(stubs.groups, "GetAllGroups", function() return allGroups end)
     override(stubs.groups, "GetGroup", function(_, _, id) return allGroups[id] end)
     override(stubs.events, "SendMessage", function(_, _, name, opts) table.insert(sent, { name, opts }) end)
@@ -1008,6 +1011,31 @@ describe("NextBag", function()
   end)
 
   describe("tabs", function()
+    -- Asked: tabs reorderable, "make sure it saves" (docs/next-batch-2.md §5).
+    it("lists its groups in the order saved, + last, and saves the order they are moved to", function()
+      tabOrder.backpack = { 2, 1 }
+      local bag = opened()
+      local function ids()
+        local out = {}
+        for _, tab in ipairs(bag.tabs.tabs) do table.insert(out, tab.id) end
+        return out
+      end
+      assert.are.same({ 2, 1, 0 }, ids())
+      assert.is_true(bag.tabs:Tab(1).movable)
+      assert.is_false(bag.tabs:Tab(0).movable, "+ stays last")
+      bag.tabs.onReorder(ctx(), { 1, 2, 0 })
+      assert.are.same({ 1, 2, 0 }, tabOrder.backpack)
+      assert.are.same({ 1, 2, 0 }, ids())
+    end)
+
+    it("saves no order for its bag slots' tabs, whose drag swaps a bag", function()
+      local bag = opened()
+      bag:ToggleBlizzardBags(ctx())
+      assert.is_false(bag.tabs:Tab(1).movable)
+      bag:OnTabsReordered(ctx(), { 2, 1 })
+      assert.are.same({}, tabOrder, "saved nowhere")
+    end)
+
     it("lists the groups as tabs, with one to make a group, and selects the active one", function()
       local bag = opened()
       local ids = {}
