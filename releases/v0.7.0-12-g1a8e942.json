@@ -1,0 +1,59 @@
+{
+  "id": 1792733890,
+  "version": "v0.7.0-12-g1a8e942",
+  "channel": "alpha",
+  "date": "2026-10-23",
+  "from": "02966e36d1265f0d2663da1697a054f947fbc026",
+  "to": "1a8e942ebacae3da30693fa32a9c821925c79ae1",
+  "headline": "Adds Ignored Items and Skip Recent Items category options, reorderable tabs and bag slot swapping in Next, and various UI improvements.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Ignored Items list for categories",
+      "details": "A new Ignored Items tab in category settings lets you exclude specific items from a category. Ignored items will never be placed into that category, overriding search filters, plugins, and manual assignments.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Skip Recent Items category setting",
+      "details": "Categories now feature a Skip Recent Items option under their Automation settings. Items assigned to that category bypass the Recent Items section and new-item glow, going straight into their category.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Show Blizzard Bags view and bag slots in Next",
+      "details": "A new Show Blizzard Bags button in the Next backpack header switches the view to individual bags and replaces the tab rail with equipped bag slots, allowing you to swap and equip bags directly.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Reorderable tabs in Next windows",
+      "details": "Tabs along the side rail in Next windows can now be dragged up and down to reorder them. Your custom tab order is saved across sessions.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Drop items directly onto category headers in Next",
+      "details": "Dragging and dropping an item onto a category header in Next windows assigns the item to that category. Dropping an item onto the category it naturally belongs to clears any manual override instead.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Close button for the Next backpack",
+      "details": "The Next backpack window now features a close button in the top right corner.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Smoothly animated settings switches",
+      "details": "Toggle switches across settings and category options now smoothly slide between on and off states instead of abruptly snapping when refreshed.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Dragging categories between windows to specific tabs",
+      "details": "Dragging a category section into the item space of another bag window now assigns it to the currently displayed tab instead of snapping back to its original location upon sorting.",
+      "clients": []
+    }
+  ]
+}
