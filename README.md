@@ -525,6 +525,9 @@ To manually create custom categories that you can add items to, left-click on an
 	</tr>
 </table>
 
+### Ignored Items
+On the Categories page, a category's **Ignored Items** tab lists items it never takes, whatever would put them there: an item added to it by hand, a plugin's list, or its search. Drag an item onto the tab to ignore it, and right-click it to stop. An ignored item goes to the next category that wants it, or to its usual one. It works for a plugin's categories too.
+
 ### Search-based Custom Categories
 Any search you complete has the option to be turned into a custom category. These categories will dynamically update as new items are added to the bag that match the search criteria.  
 To create a Search Category, type in a search, then press `Enter`. Fill out the required information in the dialogue box and save.
@@ -560,6 +563,7 @@ A category can act on its items on its own. Pick it on the Categories page (`/bb
 
 Every sale, automatic or not, sells one item at a time, as fast as your connection allows (at least 0.2 seconds apart): selling everything at once makes the game answer "That object is busy." Anything a merchant won't buy stays in your bags, and isn't offered to that merchant again; the next merchant that buys it gets it. A merchant that buys nothing at all is sold nothing.
 - **Destroy What Can't Be Sold** (needs Auto Sell on): the category's items no merchant buys are destroyed. With BetterBags Next, its section waits at the vendor like a sale, glowing red: each click destroys the next item, a whole stack. Anywhere, **Destroy Next Item** (Key Bindings > BetterBags) does the same. The game only lets an addon destroy one item per key press or click.
+- **Skip Recent Items** (under Recent Items, for any category, apart from the merchant settings): items that land in the category skip Recent Items. They show in the category right away and are no longer marked new.
 
 Automation never sells or destroys an item in an equipment set or a purchase you can still refund. Selling at once acts on a newly looted item by its category even while it shows under Recent Items; a section waiting at the vendor holds only the items it shows, and a category that isn't on the backpack's current tab doesn't fly over. A rule like `rarity = poor`, `ilvl < player.ilvl - 50 AND binding = soulbound` or `toy = true AND known = true` makes a category worth automating.
 
@@ -628,11 +632,14 @@ An early look at a new design for your bags. Turn it on with **BetterBags Next (
 - Your groups become tabs down the inner side of each panel: click one to switch, right-click one to rename or delete it, and click **+** to make a new group.
 - Your categories are listed in one column, each its own row of large icons, with Recent Items first and Free Space last. The list scrolls.
 - Sections fade in as a panel opens, items glide to their new places when you sort or loot, and sparkles drift out of the window from the title.
-- Drag a category by its header to move it: the whole section comes with your cursor and the others slide out of its way. Drop it where you want it and it stays there. Drop it on a tab to move the category to that group, or (at the bank) on the other bag, or one of its tabs, to move everything in it there. Right-click a header to move the section to whatever window is open, as in the regular bags.
+- Drag a category by its header to move it: the whole section comes with your cursor and the others slide out of its way. Drop it where you want it and it stays there. Drop it on a tab to move the category to that group, or (at the bank) on the other bag, or one of its tabs, to move everything in it there; dropped on the other bag's items, it goes into the tab that bag shows. Right-click a header to move the section to whatever window is open, as in the regular bags.
+- Drop an item on a category's header to add it to that category. Dropped back on the category it would be in anyway, it simply goes back there, without being added.
+- Press a tab and drag it up or down to put your tabs in the order you like, in the backpack, the bank, the guild bank and at a vendor. The order is kept.
+- **Show Blizzard Bags** (the bag button at the top of the backpack) shows your bags themselves: each bag in a tab, to swap it (drop a bag on a tab, or drag a bag off it), and your items bag by bag in slot order. Click it again to see your categories. The **X** at the top right closes the backpack.
 - Searching, sorting, the settings button, dropping items onto the panel, cooldowns and tooltips work as they do in the regular bags.
 - In the bank, your Warbank groups are listed after your bank groups, in teal, and the top of the panel turns teal while one shows. The buttons at the top close the bank, deposit your Warbound items, sort the bank (or the Warbank, while it shows) and switch between your groups and the bank's own tabs, where you can see each tab on its own, buy tabs, and right-click a tab to change its name, icon and deposit settings. In WoW: Forever, drop a bag on a bank tab to use it.
 
-Not there yet: the backpack's Show Bags panel, currencies, the bag anchor, the bag menu, and the size and opacity settings (the panels have one size). It is an experiment and may change or go away; please report what you think.
+Not there yet: currencies, the bag anchor, the bag menu, and the size and opacity settings (the panels have one size). To go back to the regular bags, use the setting or `/bb next`. It is an experiment and may change or go away; please report what you think.
 
 ## Reporting Performance Problems
 If BetterBags makes your game stutter, you can record exactly what it was doing and send that along with your report.

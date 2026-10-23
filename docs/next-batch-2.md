@@ -232,3 +232,14 @@ mutations: one led to a test (a merchant's item on the cursor).
 7 (small, self-contained), 3, 1, 2, 8, 6, 4, 5: each with tests first, its rules file updated, lint,
 the full suite and its mutations, then one commit; one pull request for all of them, not merged until
 the author is back.
+
+## Where it ended
+
+All eight are done, one commit each, in the order above, on the branch `next-batch-2`. The full suite
+passes (4,285 tests), every spec passes on its own, and luacheck is clean. Each change was
+mutation-tested; the surviving mutations led to tests or to removing dead code (counts in each status).
+
+**Not seen in game** (nothing in this batch was): the tab move's feel (the lift, the pinned x, the
+slides), the switches' slide, the bag swaps from the backpack's tabs (`PutItemInBag`,
+`PickupBagFromSlot` from BetterBags Next's tabs), an item filed by dropping it on a header, and the
+bank-to-backpack move into a group's items.
