@@ -45,6 +45,7 @@ database.CreateOrUpdateCategory = function(_, category)
       isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
       color = saved and saved.color, priority = saved and saved.priority, automation = saved and saved.automation,
       confirmSale = saved and saved.confirmSale, skipRecent = saved and saved.skipRecent,
+      ignoredItems = saved and saved.ignoredItems,
     }
   end
 end
@@ -143,11 +144,14 @@ describe("Categories", function()
         RenameCategory = function() categories:RenameCategory(ctx, "Mats", "Metals") end,
         DeleteCategory = function() categories:DeleteCategory(ctx, "Metals") end,
         ReprocessAllItems = function() categories:ReprocessAllItems(ctx) end,
+        IgnoreItem = function() categories:IgnoreItem(ctx, 101, "Gems") end,
+        UnignoreItem = function() categories:UnignoreItem(ctx, 101, "Gems") end,
+        ClearIgnoredItems = function() categories:ClearIgnoredItems(ctx, "Gems") end,
       }
       for _, name in ipairs({ "CreateCategory", "AddItemToCategory", "AddPermanentItemToCategory",
         "RemoveItemFromCategory", "WipeCategory", "ToggleCategory", "EnableCategory", "DisableCategory",
-        "SetCategoryState", "RegisterCategoryFunction", "UpdateCategory", "RenameCategory", "DeleteCategory",
-        "ReprocessAllItems" }) do
+        "SetCategoryState", "RegisterCategoryFunction", "IgnoreItem", "UnignoreItem", "ClearIgnoredItems",
+        "UpdateCategory", "RenameCategory", "DeleteCategory", "ReprocessAllItems" }) do
         assert.is_true(bumps(changes[name]), name)
       end
     end)
@@ -892,6 +896,101 @@ describe("Categories", function()
 
       -- Assert that itemsWithNoCategory cache is also cleared upon removal
       assert.is_nil(categories.itemsWithNoCategory[itemID])
+    end)
+  end)
+
+  -- Asked: "items in this are *ignored* from the category and never land in there under any
+  -- circumstance, no matter if it's added in Added Items, or in a Search Filter" (docs/next-batch-2.md §2).
+  describe("Ignored Items", function()
+    local ctx
+    before_each(function()
+      ctx = context:New("Test")
+    end)
+
+    it("keeps an item added by hand out of the category, until no longer ignored", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      local item = { itemInfo = { itemID = 101 } }
+      assert.is_true(categories:IgnoreItem(ctx, 101, "Mats"))
+      assert.is_true(categories:IgnoresItem("Mats", 101))
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      assert.is_true(dbCategories["Mats"].itemList[101], "still added: ignoring wins")
+      assert.is_true(dbCategories["Mats"].ignoredItems[101], "saved with the category")
+      categories:UnignoreItem(ctx, 101, "Mats")
+      assert.is_false(categories:IgnoresItem("Mats", 101))
+      assert.is_nil(dbCategories["Mats"].ignoredItems, "none left: nothing stored")
+      assert.are.equal("Mats", (categories:GetCustomCategory(ctx, 0, item)))
+    end)
+
+    it("keeps an item out of a plugin's list", function()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = { [202] = true } })
+      local item = { itemInfo = { itemID = 202 } }
+      assert.are.equal("Openable", (categories:GetCustomCategory(ctx, 0, item)))
+      categories:IgnoreItem(ctx, 202, "Openable")
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+    end)
+
+    it("keeps an item out of what a category function names, asking it once", function()
+      categories:CreateCategory(ctx, { name = "Fish", itemList = {} })
+      local asked = 0
+      categories:RegisterCategoryFunction("fish", function()
+        asked = asked + 1
+        return "Fish"
+      end)
+      categories:IgnoreItem(ctx, 303, "Fish")
+      local item = { itemInfo = { itemID = 303 } }
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      assert.is_nil(categories:GetMergedCategory("Fish").itemList[303], "not filed there")
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      assert.are.equal(1, asked, "remembered as having none")
+      categories:UnignoreItem(ctx, 303, "Fish")
+      assert.are.equal("Fish", (categories:GetCustomCategory(ctx, 0, item)))
+    end)
+
+    it("lets a category function name the items again once they are all no longer ignored", function()
+      categories:CreateCategory(ctx, { name = "Fish", itemList = {} })
+      categories:RegisterCategoryFunction("fish", function() return "Fish" end)
+      categories:IgnoreItem(ctx, 303, "Fish")
+      local item = { itemInfo = { itemID = 303 } }
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item)))
+      categories:ClearIgnoredItems(ctx, "Fish")
+      assert.are.equal("Fish", (categories:GetCustomCategory(ctx, 0, item)))
+    end)
+
+    it("keeps a plugin's Ignored Items across its next creation", function()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:IgnoreItem(ctx, 202, "Openable")
+      assert.is_true(dbEphemeralCategories["Openable"].ignoredItems[202])
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      assert.is_true(categories:IgnoresItem("Openable", 202))
+    end)
+
+    it("ignores for a group by's sections what their category ignores", function()
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, ignoredItems = { [101] = true } }
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      assert.is_true(categories:IgnoresItem("Ore - Copper", 101))
+      assert.is_false(categories:IgnoresItem("Ore - Copper", 102))
+      assert.is_false(categories:IgnoresItem("Armor", 101), "a built-in category ignores nothing")
+    end)
+
+    it("lists a copy of what a category ignores, and stops ignoring them all", function()
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:IgnoreItem(ctx, 101, "Mats")
+      categories:IgnoreItem(ctx, 102, "Mats")
+      local list = categories:GetIgnoredItems("Mats")
+      assert.are.same({ [101] = true, [102] = true }, list)
+      list[103] = true
+      assert.is_false(categories:IgnoresItem("Mats", 103))
+      categories:ClearIgnoredItems(ctx, "Mats")
+      assert.are.same({}, categories:GetIgnoredItems("Mats"))
+      assert.are.same({}, categories:GetIgnoredItems("Nope"))
+    end)
+
+    it("says when there is no such category", function()
+      assert.is_false(categories:IgnoreItem(ctx, 101, "Nope"))
+      assert.is_false(categories:UnignoreItem(ctx, 101, "Nope"))
     end)
   end)
 

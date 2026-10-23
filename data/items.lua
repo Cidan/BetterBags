@@ -2387,7 +2387,11 @@ function items:RefreshSearchCache(kind, itemData)
       local priority = categoryFilter.priority or 10
 
       for slotkey, match in pairs(results) do
-        if match then
+        -- A rule never takes an item its category ignores (Ignored Items): the next one does.
+        local matched = itemData[slotkey]
+        local ignored = categoryFilter.ignoredItems ~= nil and matched ~= nil and not matched.isItemEmpty
+          and categoryFilter.ignoredItems[matched.itemInfo.itemID] == true
+        if match and not ignored then
           local categoryName = categoryFilter.name
 
           -- A grouping category's match shows in its sub-category for the item.

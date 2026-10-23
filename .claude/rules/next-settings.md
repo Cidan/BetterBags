@@ -321,7 +321,15 @@ page's `Content.Top` and `Bottom`).
   category is faded, "Shows in X instead." An item dropped anywhere on the grid is added
   (`AddPermanentItemToCategory`, `ClearCursor`, the bags recalculated; asked: the items themselves
   are drop targets); a right click offers Remove. A plugin's items show read-only (no drop, no remove,
-  no Remove All).
+  no Remove All). An added item the category ignores is faded, "Ignored in this category."
+- **Ignored Items tab** (asked: "a new tab next to 'Added Items' called 'Ignored Items', same
+  interface/layout as Added Items"; category-lifecycle.md §8): the Added Items tab itself
+  (`CreateItemsTab(parent, owner, bags, "ignored")`), the same count ("1 ignored item"), filter, Remove
+  All (`ClearIgnoredItems`), names loading and grid, its line "Drag an item here so it never shows in this
+  category." and "No items ignored."; a drop ignores the item (`IgnoreItem`), a right click stops
+  ignoring it (`UnignoreItem`), the bags recalculated each time. Editable for a plugin's category too:
+  what it ignores is the player's choice. An ignored item in your bags says where it shows ("Shows in
+  X."), not faded.
 - **Automation tab** (automation.md §5): a section ("Merchants") of three settings rows, drawn as every
   page's settings (not controls of its own): Auto Sell, Confirm Auto Sell (on by default) and Destroy
   What Can't Be Sold, the last two disabled while Auto Sell is off, saved at once
@@ -401,7 +409,8 @@ Rename and Delete; the Settings tab: its height, none, fields, saving, a plugin'
 and reading them again; the Search Rule tab: its names, the count as typed, the results in full color,
 the box where the Settings tab's is, Apply Search Rule, typed text kept, a plugin's; the Added Items
 tab: order, icons, faded items, the filter, names loading once, drops, removing, Remove All, a plugin's,
-its line), `spec/next/controls/itemgrid_spec.lua` (columns, only the rows in view, scrolling to the
+its line, an ignored item; the Ignored Items tab: its count, line, filter, drops (a plugin's too),
+removing, Remove All), `spec/next/controls/itemgrid_spec.lua` (columns, only the rows in view, scrolling to the
 end, empty text, cells, tooltips, clicks, drops, the theme), `spec/next/settings/window_spec.lua` ("a
 page with its own list": sliding, Back, opening on it, the first Escape, closing and reopening on it, a
 fade-out, heading and buttons, tabs shown, tabs read after the list, Reselect, a search, nothing while

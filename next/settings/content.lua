@@ -452,6 +452,10 @@ function content:Init()
       { id = "items", title = L:G("Added Items"), shown = function() return categoryEditor:ItemsTabShown() end,
         sections = { tabSection(L:G("Added Items"), { "items", "added", "manual", "drag" },
           function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags) end) } },
+      -- Items the category never takes, whatever adds or matches them (docs/next-batch-2.md §2).
+      { id = "ignored", title = L:G("Ignored Items"), shown = function() return categoryEditor:ItemsTabShown() end,
+        sections = { tabSection(L:G("Ignored Items"), { "ignored", "ignore", "exclude", "never" },
+          function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags, "ignored") end) } },
       -- What the category does on its own (automation.md §5), drawn as settings rows like every page's.
       { id = "automation", title = L:G("Automation"), shown = function() return categoryEditor:AutomationTabShown() end,
         sections = {

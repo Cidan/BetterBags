@@ -41,6 +41,7 @@ local context = addon:GetModule('Context')
 ---@field automation? string What it does with its items on its own: "sell" or "destroy" (automation.md).
 ---@field confirmSale? boolean false when Auto Sell sells at once; confirmed in the vendor's dock otherwise (automation.md §3).
 ---@field skipRecent? boolean Its items skip Recent Items (Skip Recent Items, docs/next-batch-2.md §1).
+---@field ignoredItems? table<number, boolean> Items that never land in it, by item ID (Ignored Items, docs/next-batch-2.md §2).
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -426,6 +427,9 @@ function categories:CreateCategory(ctx, category)
       if savedState.skipRecent ~= nil then
         category.skipRecent = savedState.skipRecent
       end
+      if savedState.ignoredItems ~= nil then
+        category.ignoredItems = savedState.ignoredItems
+      end
     end
     self.ephemeralCategories[category.name] = category
     category.itemList = category.itemList or {}
@@ -478,7 +482,7 @@ end
 local function saveState(filter)
   database:UpdateEphemeralItemCategory(filter.name, { enabled = filter.enabled, color = filter.color,
     priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale,
-    skipRecent = filter.skipRecent })
+    skipRecent = filter.skipRecent, ignoredItems = filter.ignoredItems })
 end
 
 -- setPriority sets a category's place, saving a plugin's in its saved state as UpdateCategory does.
@@ -661,6 +665,96 @@ function categories:SkipsRecentOf(name)
   return filter ~= nil and filter.skipRecent == true
 end
 
+-- ignores says whether a category's own Ignored Items hold an item.
+---@param filter CustomCategoryFilter
+---@param itemID number
+---@return boolean
+local function ignores(filter, itemID)
+  return filter.ignoredItems ~= nil and filter.ignoredItems[itemID] == true
+end
+
+-- IgnoresItem says whether a category ignores an item (Ignored Items; docs/next-batch-2.md §2): it never
+-- lands in it, whether added by hand, in a plugin's list or matched by its rule. A group by's sections
+-- ignore what their category ignores; a built-in category ignores nothing.
+---@param name string
+---@param itemID number
+---@return boolean
+function categories:IgnoresItem(name, itemID)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    filter = self:GetCategoryByName(filter.groupByParent)
+  end
+  return filter ~= nil and ignores(filter, itemID)
+end
+
+-- GetIgnoredItems returns a copy of the items a category ignores.
+---@param name string
+---@return table<number, boolean>
+function categories:GetIgnoredItems(name)
+  local filter = self:GetCategoryByName(name)
+  local list = {}
+  for itemID in pairs(filter and filter.ignoredItems or {}) do
+    list[itemID] = true
+  end
+  return list
+end
+
+-- changeIgnored changes the items a category ignores (none left: none stored), saving a plugin's in its
+-- saved state, the player's choice as its color is. It returns false for a name no category has.
+---@private
+---@param name string
+---@param change fun(list: table<number, boolean>)
+---@return boolean
+function categories:changeIgnored(name, change)
+  local saved = database:GetItemCategory(name)
+  local filter = saved or self.ephemeralCategories[name]
+  if filter == nil then
+    return false
+  end
+  self:changed()
+  local list = filter.ignoredItems or {}
+  change(list)
+  filter.ignoredItems = next(list) ~= nil and list or nil
+  if not saved then
+    saveState(filter)
+  end
+  return true
+end
+
+-- IgnoreItem makes a category ignore an item. The bags are the caller's to recalculate, as for an item
+-- added by hand.
+---@param ctx Context
+---@param itemID number
+---@param name string
+---@return boolean
+function categories:IgnoreItem(ctx, itemID, name)
+  local _ = ctx
+  return self:changeIgnored(name, function(list) list[itemID] = true end)
+end
+
+-- UnignoreItem stops a category ignoring an item: a category function may name it again.
+---@param ctx Context
+---@param itemID number
+---@param name string
+---@return boolean
+function categories:UnignoreItem(ctx, itemID, name)
+  local _ = ctx
+  self.itemsWithNoCategory[itemID] = nil
+  return self:changeIgnored(name, function(list) list[itemID] = nil end)
+end
+
+-- ClearIgnoredItems stops a category ignoring anything.
+---@param ctx Context
+---@param name string
+---@return boolean
+function categories:ClearIgnoredItems(ctx, name)
+  local _ = ctx
+  for itemID in pairs(self:GetIgnoredItems(name)) do
+    self.itemsWithNoCategory[itemID] = nil
+  end
+  return self:changeIgnored(name, function(list) wipe(list) end)
+end
+
 -- ConfirmsSaleOf says whether Auto Sell waits for the player to confirm a category's sale in the
 -- vendor's dock (true unless turned off; automation.md §3): a group by's sections as their category does.
 ---@param name string
@@ -830,7 +924,9 @@ end
 
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
--- the custom category if one is found. If no custom category is found, nil is returned.
+-- the custom category if one is found. If no custom category is found, nil is returned. A category
+-- that ignores the item (Ignored Items) is passed over, whatever gave it the item: added by hand, a
+-- plugin's list, or a category function (which does not file the item there).
 ---@param ctx Context
 ---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
@@ -848,13 +944,13 @@ function categories:GetCustomCategory(ctx, kind, data)
   local itemID = data.itemInfo.itemID
   if not itemID then return nil, nil end
   local filter = database:GetItemCategoryByItemID(itemID)
-  if filter.enabled and filter.enabled[kind] then
+  if filter.enabled and filter.enabled[kind] and not ignores(filter, itemID) then
     return filter.name, filter.priority or 10, filter
   end
 
   filter = self.ephemeralCategoryByItemID[itemID]
 
-  if filter and filter.enabled[kind] then
+  if filter and filter.enabled[kind] and not ignores(filter, itemID) then
     return filter.name, filter.priority or 10, filter
   end
 
@@ -866,8 +962,8 @@ function categories:GetCustomCategory(ctx, kind, data)
   local errorHandler = (_G.geterrorhandler and _G.geterrorhandler()) or error
   for _, func in pairs(self.categoryFunctions) do
     local success, args = xpcall(func, errorHandler, data)
-    if success and args ~= nil then
-      local category = select(1, args) --[[@as string]]
+    local category = success and args ~= nil and select(1, args) --[[@as string]]
+    if category and not self:IgnoresItem(category, itemID) then
       local found = self.ephemeralCategories[category] and true or false
       self:addItemToCategory(ctx, itemID, category)
       if not found then

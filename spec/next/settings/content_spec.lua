@@ -199,8 +199,8 @@ describe("NextSettingsContent", function()
       override(editor, "ItemsTabShown", function() return chosen end)
       override(editor, "AutomationTabShown", function() return chosen end)
       for _, name in ipairs({ "CreateSettingsTab", "CreateRuleTab", "CreateItemsTab" }) do
-        override(editor, name, function(_, parent, owner, bags)
-          made[name] = { owner = owner, bags = bags }
+        override(editor, name, function(_, parent, owner, bags, mode)
+          made[mode and (name .. ":" .. mode) or name] = { owner = owner, bags = bags }
           return rows:CreateText(parent, name)
         end)
       end
@@ -215,7 +215,8 @@ describe("NextSettingsContent", function()
         for _, t in ipairs(settings.tabs.list) do table.insert(list, t.text) end
         return list
       end
-      assert.are.same({ "Settings", "Search Rule", "Added Items", "Automation" }, tabs())
+      -- Asked: "a new tab next to 'Added Items' called 'Ignored Items'".
+      assert.are.same({ "Settings", "Search Rule", "Added Items", "Ignored Items", "Automation" }, tabs())
       assert.are.equal(settings.frame, made.CreateSettingsTab.owner)
       local function kinds(name)
         local list = {}
@@ -247,6 +248,10 @@ describe("NextSettingsContent", function()
       assert.are.equal("Recent Items", sections[2].title)
       assert.are.same({ "Skip Recent Items" }, { sections[2].rows[1].option.title })
       assert.are.equal(1, #sections[2].rows)
+      settings:Select("categories", "ignored")
+      assert.are.equal(settings.frame, made["CreateItemsTab:ignored"].owner)
+      assert.are.same({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD },
+        kinds("CreateItemsTab:ignored"))
       settings:Select("categories", "items")
       assert.are.equal(settings.frame, made.CreateItemsTab.owner)
       local titles = {}

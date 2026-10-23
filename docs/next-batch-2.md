@@ -60,7 +60,11 @@ has Remove All.
   category."), the item grid (drop to ignore, right-click to remove). Editable for a plugin's category
   too. An item in your bags says where it shows instead.
 
-**Status:** planned.
+**Status:** done. An item both added and ignored stays in Added Items (faded, "Ignored in this
+category."): ignoring wins, as asked. `data/categories.lua`, `core/database.lua`, `data/items.lua`
+(`RefreshSearchCache`), `next/settings/categories.lua` (`CreateItemsTab` with mode `"ignored"`),
+`next/settings/content.lua`; category-lifecycle.md §8, next-settings.md §5. 27 mutations: one led to a
+test (Remove All letting a plugin's function name the item again).
 
 ## 3. A close button on the backpack
 

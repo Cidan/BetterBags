@@ -907,6 +907,12 @@ describe("Database", function()
       assert.is_nil(DB.data.profile.ephemeralCategoryFilters["Openable"].automation, "turned off")
     end)
 
+    it("keeps a plugin's Ignored Items when the plugin makes it again", function()
+      DB:UpdateEphemeralItemCategory("Openable", { enabled = { [0] = true }, ignoredItems = { [202] = true } })
+      DB:CreateOrUpdateCategory({ name = "Openable", enabled = { [0] = true }, priority = 1 })
+      assert.are.same({ [202] = true }, DB.data.profile.ephemeralCategoryFilters["Openable"].ignoredItems)
+    end)
+
     it("keeps Skip Recent Items for a plugin's category when the plugin makes it again", function()
       DB:UpdateEphemeralItemCategory("Openable", { enabled = { [0] = true }, skipRecent = true })
       DB:CreateOrUpdateCategory({ name = "Openable", enabled = { [0] = true }, priority = 1 })

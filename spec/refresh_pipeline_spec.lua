@@ -3251,6 +3251,48 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
+  -- Asked: Ignored Items, "never land in there under any circumstance, no matter if it's added in Added
+  -- Items, or in a Search Filter" (docs/next-batch-2.md §2): a rule that ignores an item passes it on.
+  describe("Ignored Items (search rules)", function()
+    local function rules(list)
+      override(categories, "GetCustomCategory", function() return nil, nil end)
+      override(categories, "GetSortedSearchCategories", function()
+        local out = {}
+        for _, c in ipairs(list) do
+          table.insert(out, { name = c[1], priority = c[3] or 10, ignoredItems = c[4],
+            enabled = { [const.BAG_KIND.BACKPACK] = true, [const.BAG_KIND.BANK] = true },
+            searchCategory = { query = c[2], groupBy = c[5] or const.SEARCH_CATEGORY_GROUP_BY.NONE } })
+        end
+        return out
+      end)
+    end
+
+    local function categoryOf(slotInfo, slotkey)
+      return slotInfo.itemsBySlotKey[slotkey].itemInfo.category
+    end
+
+    it("gives an item a rule ignores to the next rule that matches it, else its own category", function()
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      rules({ { "Alpha Items", "alpha", 1, { [101] = true } } })
+      local slotInfo = refreshBackpack({ wipe = true })
+      local own = categoryOf(slotInfo, "0_1")
+      assert.are_not.equal("Alpha Items", own)
+      rules({ { "Alpha Items", "alpha", 1, { [101] = true } }, { "Also Alpha", "alpha", 5 } })
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Also Alpha", categoryOf(slotInfo, "0_1"))
+      rules({ { "Alpha Items", "alpha", 1, { [202] = true } }, { "Also Alpha", "alpha", 5 } })
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Alpha Items", categoryOf(slotInfo, "0_1"), "another item ignored: it matches again")
+    end)
+
+    it("keeps an ignored item out of a group by's sections", function()
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      rules({ { "Alpha Items", "alpha", 1, { [101] = true }, const.SEARCH_CATEGORY_GROUP_BY.TYPE } })
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.is_nil(categoryOf(slotInfo, "0_1"):find("Alpha Items", 1, true))
+    end)
+  end)
+
   -- Asked: "'Skip Recent Items', which makes items that get assigned that category skip the recent
   -- items list (it gets unmarked as a new item, goes right to the category) -- this is 100% independent
   -- of autosell". docs/next-batch-2.md §1.
