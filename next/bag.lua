@@ -39,6 +39,7 @@ local nextBag = addon:NewModule('NextBag')
 ---@class NextBackpack: NextPanelFrame
 ---@field sortButton Button
 ---@field sizeButton Button Switches every panel between full and small (UpdateSizeButton).
+---@field closeButton Button
 ---@field settingsButton Button
 ---@field behavior {SwitchToGroup: fun(self: any, ctx: Context, id: number)}
 ---@field helper BackpackBehaviorProto The classic behavior, for its group dialogs.
@@ -73,6 +74,8 @@ end
 ---@return NextHeaderButton[]
 function bagProto:GetHeaderButtons()
   return {
+    -- Asked: "an X at the top right of the backpack to close it" (first: the screen edge).
+    { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
     { key = "settingsButton", tooltip = L:G("Open Options Screen"),
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
     { key = "sortButton", tooltip = L:G("Sort Bags"),

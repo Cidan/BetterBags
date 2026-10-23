@@ -123,6 +123,11 @@ out of the window, the way the sparkles drift, the header buttons (screen-edge s
 buttons, its tabs and what a click on one does, what opening and closing do, and sorting. The
 description below is the backpack's (the right side); the bank is its mirror image (§6).
 
+**The backpack's header buttons** (from the screen edge, so the first is at the top right): close
+(asked: "an X at the top right of the backpack to close it"; `closeButton`, the bank's, guild bank's and
+vendor's own button and icon, hiding the backpack), settings, sort, the switch to the classic bags,
+size (§14).
+
 **Above the rest of the UI** (asked: "they need to be the top most frames ... so other UI elements
 can't overlap"): every panel is in the `HIGH` strata (was `MEDIUM`), toplevel, level 500. That puts
 it over unit and action bars, the objective tracker (`LOW`), Blizzard's character frame and other

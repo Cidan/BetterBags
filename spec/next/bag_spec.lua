@@ -952,14 +952,26 @@ describe("NextBag", function()
   describe("buttons and search", function()
     -- BetterBags' own glyphs (tools/textures/next_icons.py, next-themes.md §3), the same on every
     -- client, filtered trilinearly so they stay smooth drawn smaller than their 64 pixels.
-    it("draws its header icons with BetterBags' glyphs, settings at the screen edge", function()
+    -- Asked: "an X at the top right of the backpack to close it".
+    it("draws its header icons with BetterBags' glyphs, the close button at the screen edge", function()
       local bag = opened()
+      assert.are.equal("close", NextIconName(bag.closeButton))
       assert.are.equal("settings", NextIconName(bag.settingsButton))
       assert.are.equal("sort", NextIconName(bag.sortButton))
       assert.are.equal("TRILINEAR", bag.sortButton.icon._filterMode)
       assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3) },
-        { bag.settingsButton:GetPoint(1) })
+        { bag.closeButton:GetPoint(1) })
+      assert.are.same({ "RIGHT", bag.closeButton, "LEFT", -8, 0 }, { bag.settingsButton:GetPoint(1) })
       assert.are.same({ "RIGHT", bag.settingsButton, "LEFT", -8, 0 }, { bag.sortButton:GetPoint(1) })
+    end)
+
+    it("closes from its close button", function()
+      local bag = opened()
+      bag.closeButton:GetScript("OnEnter")(bag.closeButton)
+      assert.are.equal("Close", GameTooltip:GetText())
+      bag.closeButton:GetScript("OnClick")(bag.closeButton, "LeftButton")
+      finishTweens()
+      assert.is_false(bag:IsShown())
     end)
 
     -- The way back from BetterBags Next without a reload (next.md §11): a backpack glyph, the same on

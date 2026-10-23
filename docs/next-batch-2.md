@@ -69,7 +69,7 @@ switch and the size button.
 **Plan:** the backpack's header gets `closeButton` first (its panel is on the right, so first is the
 top right), hiding the backpack, the same button and icon as the other panels.
 
-**Status:** planned.
+**Status:** done. `next/bag.lua`; tests in `spec/next/bag_spec.lua` (its place and icon, closing).
 
 ## 4. Show Blizzard Bags (the backpack's bags in its tab rail)
 
