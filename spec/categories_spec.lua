@@ -44,7 +44,7 @@ database.CreateOrUpdateCategory = function(_, category)
       name = category.name, enabled = category.enabled, dynamic = category.dynamic,
       isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
       color = saved and saved.color, priority = saved and saved.priority, automation = saved and saved.automation,
-      confirmSale = saved and saved.confirmSale,
+      confirmSale = saved and saved.confirmSale, skipRecent = saved and saved.skipRecent,
     }
   end
 end
@@ -538,6 +538,29 @@ describe("Categories", function()
       assert.is_false(categories:GetCategoryByName("Openable").confirmSale, "the player's choice wins")
     end)
 
+    -- Asked: "Skip Recent Items" (docs/next-batch-2.md §1). It changes which items show in Recent
+    -- Items, so the bags are recalculated.
+    it("turns skipping Recent Items on and off, keeping only on, and recalculates the bags", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      categories:UpdateCategory(context:New("Test"), "Mats", { skipRecent = true })
+      assert.is_true(dbCategories["Mats"].skipRecent)
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[2])
+      sent = {}
+      categories:UpdateCategory(context:New("Test"), "Mats", { skipRecent = false })
+      assert.is_nil(dbCategories["Mats"].skipRecent, "off is the default")
+      assert.are.equal(2, #sent)
+    end)
+
+    it("keeps a plugin's Skip Recent Items across its next creation", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:UpdateCategory(ctx, "Openable", { skipRecent = true })
+      assert.is_true(dbEphemeralCategories["Openable"].skipRecent)
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      assert.is_true(categories:GetCategoryByName("Openable").skipRecent)
+    end)
+
     it("says when there is no such category", function()
       assert.is_false(categories:UpdateCategory(context:New("Test"), "Nope", { priority = 1 }))
       assert.are.same({}, sent)
@@ -555,6 +578,19 @@ describe("Categories", function()
       assert.are.equal("sell", categories:AutomationOf("Mats - Cloth"))
       assert.is_nil(categories:AutomationOf("Plain"))
       assert.is_nil(categories:AutomationOf("Armor"), "a built-in category has none")
+    end)
+
+    it("skips Recent Items when turned on, a group by's sections as their category does", function()
+      local ctx = context:New("Test")
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, skipRecent = true }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      assert.is_true(categories:SkipsRecentOf("Ore"))
+      assert.is_true(categories:SkipsRecentOf("Ore - Copper"))
+      assert.is_false(categories:SkipsRecentOf("Mats"))
+      assert.is_false(categories:SkipsRecentOf("Armor"), "a built-in category has none")
+      assert.is_false(categories:SkipsRecentOf("Recent Items"))
     end)
 
     it("confirms a sale unless turned off, a group by's sections as their category does", function()

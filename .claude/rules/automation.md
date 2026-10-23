@@ -173,6 +173,9 @@ hand-placed bare switches ("bland ... unstyled ... compare to the other screensh
 pages. The options are page options (`NextSettingsOption`), from `AutomationOptions()`:
 - **Auto Sell**: on saves `"sell"`, off saves none (`false`), taking Destroy What Can't Be Sold with it.
 - **Confirm Auto Sell**: on by default, disabled while Auto Sell is off; saves `confirmSale` (§1).
+- A second section, **Recent Items**, holds **Skip Recent Items** (`RecentOptions()`; asked: "under
+  automation for categories (not under 'merchant' though)", independent of the merchant switches, for
+  any category): recent-items.md §4.
 - **Destroy What Can't Be Sold**: disabled while Auto Sell is off (the row's `disabled`); on saves
   `"destroy"`, off `"sell"`.
 - Each saves at once (`UpdateCategory { automation }` or `{ confirmSale }`) and then

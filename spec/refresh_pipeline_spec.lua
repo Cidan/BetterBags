@@ -105,6 +105,7 @@ local function stubModules()
   categories = stubModule("Categories")
   override(categories, "GetSortedSearchCategories", function() return {} end)
   override(categories, "GetCustomCategory", function() return nil, nil end)
+  override(categories, "SkipsRecentOf", function() return false end)
   override(categories, "DoesCategoryExist", function() return false end)
   override(categories, "IsCategoryShown", function() return true end)
   override(categories, "CreateCategory", function() end)
@@ -3247,6 +3248,84 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       mockContainer[0][1].count = 15
       refreshBackpack({ bags = { [0] = true } })
       assert.equal(1000, items._newItemTimers[const.BAG_KIND.BACKPACK]["g-sharp"])
+    end)
+  end)
+
+  -- Asked: "'Skip Recent Items', which makes items that get assigned that category skip the recent
+  -- items list (it gets unmarked as a new item, goes right to the category) -- this is 100% independent
+  -- of autosell". docs/next-batch-2.md §1.
+  describe("Skip Recent Items (a category setting)", function()
+    local skips
+
+    before_each(function()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      override(database, "GetNewItemTime", function() return 300 end)
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        local name = ({ [101] = "Ore", [202] = "Mats" })[data.itemInfo.itemID]
+        if name then return name, 10 end
+        return nil, nil
+      end)
+      skips = { Ore = true }
+      override(categories, "SkipsRecentOf", function(_, name) return skips[name] == true end)
+    end)
+
+    local function categoryOf(slotInfo, slotkey)
+      return slotInfo.itemsBySlotKey[slotkey].itemInfo.category
+    end
+
+    it("shows a new item whose category skips Recent Items in that category at once, no longer new", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, { itemID = 202, guid = "g202", count = 1 } }
+      newSlots["0_1"], newSlots["0_2"] = true, true
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Ore", categoryOf(slotInfo, "0_1"))
+      assert.is_false(slotInfo.itemsBySlotKey["0_1"].itemInfo.isNewItem, "no glow")
+      assert.is_nil(newSlots["0_1"], "the client's mark removed")
+      assert.is_nil(items._newItemTimers[const.BAG_KIND.BACKPACK]["g101"])
+      assert.equal("Recent Items", categoryOf(slotInfo, "0_2"), "another category's item stays recent")
+      slotInfo = refreshBackpack()
+      assert.equal("Ore", categoryOf(slotInfo, "0_1"), "and on the next read")
+    end)
+
+    it("unmarks an item looted later, and follows the setting", function()
+      mockContainer[0] = { { itemID = 202, guid = "g202", count = 1 }, {}, {} }
+      refreshBackpack({ wipe = true })
+      mockContainer[0][2] = { itemID = 101, guid = "g101", count = 1 }
+      newSlots["0_2"] = true
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.equal("Ore", categoryOf(slotInfo, "0_2"))
+      skips = {}
+      mockContainer[0][3] = { itemID = 101, guid = "g101b", count = 1 }
+      newSlots["0_3"] = true
+      slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.equal("Recent Items", categoryOf(slotInfo, "0_3"), "turned off: recent again")
+    end)
+
+    it("skips by this read's search category, from an item's first read", function()
+      override(categories, "GetCustomCategory", function() return nil, nil end)
+      override(categories, "GetSortedSearchCategories", function()
+        return { { name = "Alpha Items", priority = 10, enabled = { [const.BAG_KIND.BACKPACK] = true },
+          searchCategory = { query = "alpha", groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } } }
+      end)
+      skips = { ["Alpha Items"] = true }
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Alpha Items", categoryOf(slotInfo, "0_1"))
+      assert.is_nil(newSlots["0_1"])
+    end)
+
+    it("takes a virtual stack out of Recent Items when its category skips them", function()
+      override(database, "GetStackingOptions", function()
+        return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false, dontMergePartial = false,
+          dontMergeTransmog = false }
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "old", count = 15 }, {}, {} }
+      refreshBackpack({ wipe = true })
+      mockContainer[0][2] = { itemID = 101, guid = "new", count = 3 }
+      newSlots["0_2"] = true
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.equal("Ore", categoryOf(slotInfo, "0_1"), "the stack shows in its category")
+      assert.is_nil(slotInfo.itemsBySlotKey["0_1"].stackRecent)
     end)
   end)
 

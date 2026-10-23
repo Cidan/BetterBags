@@ -903,14 +903,15 @@ function DB:CreateOrUpdateCategory(category)
       priority = saved and saved.priority,
       automation = saved and saved.automation,
       confirmSale = saved and saved.confirmSale,
+      skipRecent = saved and saved.skipRecent,
     }
   end
 end
 
 -- UpdateEphemeralItemCategory saves what a player set for a plugin's category (its bags, color,
--- priority, automation, confirming).
+-- priority, automation, confirming, skipping Recent Items).
 ---@param name string
----@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean}
+---@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean, skipRecent?: boolean}
 function DB:UpdateEphemeralItemCategory(name, fields)
   local saved = DB.data.profile.ephemeralCategoryFilters[name]
   if saved == nil then
@@ -922,6 +923,7 @@ function DB:UpdateEphemeralItemCategory(name, fields)
   saved.priority = fields.priority
   saved.automation = fields.automation
   saved.confirmSale = fields.confirmSale
+  saved.skipRecent = fields.skipRecent
 end
 
 ---@param category string

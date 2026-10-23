@@ -237,12 +237,16 @@ describe("NextSettingsContent", function()
         if t.id == "automation" then automation = t end
       end
       local sections = pages:Sections(automation)
-      assert.are.equal(1, #sections)
+      assert.are.equal(2, #sections)
       assert.are.equal("Merchants", sections[1].title)
       local automationRows = sections[1].rows
       local rowTitles = {}
       for i, row in ipairs(automationRows) do rowTitles[i] = row.option.title end
       assert.are.same({ "Auto Sell", "Confirm Auto Sell", "Destroy What Can't Be Sold" }, rowTitles)
+      -- Asked: Skip Recent Items "under automation for categories (not under 'merchant' though)".
+      assert.are.equal("Recent Items", sections[2].title)
+      assert.are.same({ "Skip Recent Items" }, { sections[2].rows[1].option.title })
+      assert.are.equal(1, #sections[2].rows)
       settings:Select("categories", "items")
       assert.are.equal(settings.frame, made.CreateItemsTab.owner)
       local titles = {}

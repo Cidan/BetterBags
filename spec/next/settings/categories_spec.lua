@@ -205,6 +205,7 @@ describe("NextSettingsCategories", function()
       elseif fields.confirmSale ~= nil then
         f.confirmSale = nil
       end
+      if fields.skipRecent ~= nil then f.skipRecent = fields.skipRecent == true or nil end
       for k, v in pairs(fields.enabled or {}) do f.enabled[k] = v end
       return true
     end)
@@ -832,6 +833,48 @@ describe("NextSettingsCategories", function()
       assert.is_false(sellOption.get())
       sellOption.set(ctx(), true)
       confirmOption.set(ctx(), false)
+      assert.are.same({}, updates())
+    end)
+  end)
+
+  -- Asked: "'Skip Recent Items' ... 100% independent of autosell, etc. can apply to any category".
+  describe("the Skip Recent Items setting", function()
+    local option
+
+    before_each(function()
+      option = editor:RecentOptions()[1]
+    end)
+
+    it("is a switch, named and described, on with the category's setting", function()
+      assert.are.equal("toggle", option.kind)
+      assert.are.equal("Skip Recent Items", option.title)
+      assert.truthy(option.description:find("Recent Items", 1, true))
+      assert.truthy(#option.keywords > 0)
+      editor.selected = "Mats"
+      assert.is_false(option.get())
+      filters.Mats.skipRecent = true
+      assert.is_true(option.get())
+      assert.is_nil(option.disabled, "never needs Auto Sell")
+    end)
+
+    it("saves at once and shows the page's rows again, for a plugin's category too", function()
+      editor.selected = "Mats"
+      option.set(ctx(), true)
+      editor.selected = "Openable"
+      option.set(ctx(), true)
+      option.set(ctx(), false)
+      assert.are.same({
+        { "UpdateCategory", "Mats", { skipRecent = true } },
+        { "UpdateCategory", "Openable", { skipRecent = true } },
+        { "UpdateCategory", "Openable", { skipRecent = false } },
+      }, updates())
+      assert.are.equal(3, refreshed)
+    end)
+
+    it("changes nothing with no category chosen", function()
+      editor.selected = nil
+      assert.is_false(option.get())
+      option.set(ctx(), true)
       assert.are.same({}, updates())
     end)
   end)

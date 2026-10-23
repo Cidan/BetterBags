@@ -334,6 +334,31 @@ function editor:AutomationOptions()
   }
 end
 
+-- RecentOptions returns the Automation tab's Recent Items settings (docs/next-batch-2.md §1), a section of
+-- its own (asked: "not under 'merchant'"): Skip Recent Items, independent of the merchant settings, for
+-- any category, a plugin's too. It saves at once and shows the page's rows again.
+---@return NextSettingsOption[]
+function editor:RecentOptions()
+  return {
+    {
+      kind = "toggle",
+      title = L:G("Skip Recent Items"),
+      description = L:G("Items that land in this category skip Recent Items: they are no longer marked new, and show here at once."),
+      keywords = { "automation", "recent", "new", "skip" },
+      get = function()
+        local filter = self:Chosen()
+        return filter ~= nil and filter.skipRecent == true
+      end,
+      set = function(ctx, on)
+        if self.selected then
+          categories:UpdateCategory(ctx, self.selected, { skipRecent = on })
+        end
+        settings:Refresh(ctx)
+      end,
+    },
+  }
+end
+
 -- askName asks for a category name over owner; onName gets it trimmed, and is asked again while it is
 -- empty or taken (taken: unless allowed, the category's own name).
 ---@param owner Frame

@@ -40,6 +40,7 @@ local context = addon:GetModule('Context')
 ---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
 ---@field automation? string What it does with its items on its own: "sell" or "destroy" (automation.md).
 ---@field confirmSale? boolean false when Auto Sell sells at once; confirmed in the vendor's dock otherwise (automation.md §3).
+---@field skipRecent? boolean Its items skip Recent Items (Skip Recent Items, docs/next-batch-2.md §1).
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -422,6 +423,9 @@ function categories:CreateCategory(ctx, category)
       if savedState.confirmSale ~= nil then
         category.confirmSale = savedState.confirmSale
       end
+      if savedState.skipRecent ~= nil then
+        category.skipRecent = savedState.skipRecent
+      end
     end
     self.ephemeralCategories[category.name] = category
     category.itemList = category.itemList or {}
@@ -473,7 +477,8 @@ end
 ---@param filter CustomCategoryFilter
 local function saveState(filter)
   database:UpdateEphemeralItemCategory(filter.name, { enabled = filter.enabled, color = filter.color,
-    priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale })
+    priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale,
+    skipRecent = filter.skipRecent })
 end
 
 -- setPriority sets a category's place, saving a plugin's in its saved state as UpdateCategory does.
@@ -568,14 +573,15 @@ end
 
 -- UpdateCategory changes a category in place, keeping its items: fields may hold color (a color, or
 -- false for none), priority, enabled (the bags named are set, the others kept), rule (its search;
--- empty for none), groupBy, automation ("sell", "destroy", or false for none) and confirmSale (false:
--- Auto Sell sells at once; true, the default, is not stored). A plugin's category keeps its own rule and
+-- empty for none), groupBy, automation ("sell", "destroy", or false for none), confirmSale (false:
+-- Auto Sell sells at once; true, the default, is not stored) and skipRecent (true: its items skip Recent
+-- Items; false, the default, is not stored). A plugin's category keeps its own rule and
 -- group by; the bags, color, priority and automation set for it are saved, and win when the plugin makes
 -- it again. The bags are recalculated unless only the automation changed, which changes no item's
 -- category. It returns false for a name no category has.
 ---@param ctx Context
 ---@param name string
----@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false, confirmSale?: boolean}
+---@param fields {color?: number[]|false, priority?: number, enabled?: table<BagKind, boolean>, rule?: string, groupBy?: number, automation?: string|false, confirmSale?: boolean, skipRecent?: boolean}
 ---@return boolean
 function categories:UpdateCategory(ctx, name, fields)
   local saved = database:GetItemCategory(name)
@@ -597,6 +603,9 @@ function categories:UpdateCategory(ctx, name, fields)
     filter.confirmSale = false
   elseif fields.confirmSale ~= nil then
     filter.confirmSale = nil
+  end
+  if fields.skipRecent ~= nil then
+    filter.skipRecent = fields.skipRecent == true or nil
   end
   if fields.enabled ~= nil then
     filter.enabled = filter.enabled or everyBag()
@@ -638,6 +647,18 @@ function categories:AutomationOf(name)
     filter = self:GetCategoryByName(filter.groupByParent)
   end
   return filter and filter.automation or nil
+end
+
+-- SkipsRecentOf says whether a category's items skip Recent Items (Skip Recent Items; a group by's
+-- sections as their category). A built-in category does not.
+---@param name string
+---@return boolean
+function categories:SkipsRecentOf(name)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    filter = self:GetCategoryByName(filter.groupByParent)
+  end
+  return filter ~= nil and filter.skipRecent == true
 end
 
 -- ConfirmsSaleOf says whether Auto Sell waits for the player to confirm a category's sale in the

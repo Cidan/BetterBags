@@ -29,7 +29,11 @@ Sold).
   unmarked: its timer ends and the client's new-item flag is removed (`ClearNewItemFromData`), so it
   shows in its category at once, with no glow. Virtual stack roots are recent only by piles still new.
 
-**Status:** planned.
+**Status:** done. `data/items.lua` (`SkipRecentItems`), `data/categories.lua`, `core/database.lua`,
+`next/settings/categories.lua` (`RecentOptions`), `next/settings/content.lua`; recent-items.md §4. 18
+mutations: one led to a test (a search category matched on the item's first read); two single-point
+mutations of the recalculation check are equivalent (both halves must change to skip it; the test
+catches them together).
 
 ## 2. Ignored Items (a category tab)
 

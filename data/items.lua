@@ -1550,6 +1550,30 @@ end
 ---@param itemData table<string, ItemData>
 ---@param emptySlotByBagAndSlot table
 ---@return table sectionLayouts
+-- SkipRecentItems unmarks every new item whose category skips Recent Items (Skip Recent Items, a
+-- category setting, categories:SkipsRecentOf; docs/next-batch-2.md §1): its timer ends and the client's
+-- new-item mark goes, so it shows in its category at once, and a virtual stack it is merged into is no
+-- longer recent (every pile of a stack is the same item, in the same category). The category is this
+-- sweep's (its search categories are matched by now), Recent Items left out. It returns how many it
+-- unmarked, for profiler traces.
+---@param ctx Context
+---@param itemData table<string, ItemData>
+---@return number
+function items:SkipRecentItems(ctx, itemData)
+  local skipped = 0
+  for _, item in pairs(itemData) do
+    if not item.isItemEmpty and (item.stackRecent or self:IsNewItem(item))
+      and categories:SkipsRecentOf(self:GetCategory(ctx, item, false, true)) then
+      if self:IsNewItem(item) then
+        self:ClearNewItemFromData(ctx, item)
+        skipped = skipped + 1
+      end
+      item.stackRecent = nil
+    end
+  end
+  return skipped
+end
+
 function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlot)
   if search and search.SyncKind then
     -- The search index is a single, global structure shared by the backpack and the bank
@@ -1588,6 +1612,7 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
     end
   end
   self:RefreshSearchCache(kind, itemData)
+  self:SkipRecentItems(ctx, itemData)
 
   -- Search categories compete with custom categories, gear sets and recent items by the priority
   -- rules in GetCategory. An item's shown category is worked out again when its own category was
