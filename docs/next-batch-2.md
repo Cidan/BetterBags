@@ -158,7 +158,8 @@ settings rows, a bag's Categories tab, a category's bags, currencies) does the s
 refreshing a switch whose state changed while it shows slides it (a switch turned off by another, as
 Auto Sell takes Destroy with it).
 
-**Status:** planned.
+**Status:** done. `next/controls/toggle.lua`, `next/settings/rows.lua`; tests in
+`spec/next/controls/button_spec.lua`, `spec/next/settings/page_spec.lua`; 5 mutations, all caught.
 
 ## 8. Dropping an item on a category header
 

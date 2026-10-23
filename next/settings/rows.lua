@@ -350,7 +350,9 @@ function rowProto:Refresh(ctx)
   end
   local kind = option.kind
   if kind == "toggle" then
-    control:SetChecked(option.get(ctx) == true)
+    -- A switch another setting changed (Auto Sell turning Destroy off) slides while it shows.
+    local on = option.get(ctx) == true
+    control:SetChecked(on, on ~= control:GetChecked() and control.frame:IsVisible())
   elseif kind == "dropdown" then
     control:Refresh(ctx)
   elseif kind == "slider" then

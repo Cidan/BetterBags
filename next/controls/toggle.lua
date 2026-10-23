@@ -110,10 +110,15 @@ function toggleProto:GetChecked()
   return self.checked
 end
 
--- SetChecked shows a state, at once or sliding (animate), calling nothing back.
+-- SetChecked shows a state, at once or sliding (animate), calling nothing back. Told the state it is
+-- already sliding to, it keeps sliding: a settings row shows its value again right after a click saved
+-- it.
 ---@param checked boolean
 ---@param animate? boolean
 function toggleProto:SetChecked(checked, animate)
+  if not animate and (checked == true) == self.checked and tween:IsPlaying(self) then
+    return
+  end
   self.checked = checked == true
   local target = self.checked and 1 or 0
   if not animate then
