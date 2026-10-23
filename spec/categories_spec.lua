@@ -29,7 +29,11 @@ database.GetAllEphemeralItemCategories = function() return dbEphemeralCategories
 database.GetItemCategory = function(_, name) return dbCategories[name] end
 database.GetEphemeralItemCategory = function(_, name) return dbEphemeralCategories[name] end
 database.ItemCategoryExists = function(_, name) return dbCategories[name] ~= nil end
+-- As the real one (DB:SaveItemToCategory): an item has one home, so it leaves the category it was in.
 database.SaveItemToCategory = function(_, id, name)
+  for other, cat in pairs(dbCategories) do
+    if other ~= name and cat.itemList then cat.itemList[id] = nil end
+  end
   dbCategories[name] = dbCategories[name] or {name = name, itemList = {}}
   dbCategories[name].itemList[id] = true
 end
@@ -991,6 +995,91 @@ describe("Categories", function()
     it("says when there is no such category", function()
       assert.is_false(categories:IgnoreItem(ctx, 101, "Nope"))
       assert.is_false(categories:UnignoreItem(ctx, 101, "Nope"))
+    end)
+  end)
+
+  -- Asked: "if you drag and drop an item onto a category header, it becomes an Added Item in that
+  -- category ... if it would naturally fit there already ... don't add it to Added Items for that
+  -- category, just strip it's manual assignment and let it land where it should" (docs/next-batch-2.md §8).
+  describe("filing an item dropped on a category's header (FileItem)", function()
+    local ctx
+    before_each(function()
+      ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:CreateCategory(ctx, { name = "Gems", itemList = {}, save = true })
+      categories:CreateCategory(ctx, { name = "Ore", itemList = {}, save = true })
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {} })
+    end)
+
+    local function homeOf(itemID)
+      return database:GetItemCategoryByItemID(itemID).name
+    end
+
+    it("strips an item's manual assignment where it lands anyway, adding nothing", function()
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      assert.are.equal("natural", categories:FileItem(ctx, 101, "Junk", "Junk"))
+      assert.is_nil(homeOf(101))
+      assert.is_nil(dbCategories["Junk"], "no category made")
+      categories:AddPermanentItemToCategory(ctx, 102, "Gems")
+      assert.are.equal("natural", categories:FileItem(ctx, 102, "Openable", "Openable"), "a plugin's too")
+      assert.is_nil(homeOf(102))
+      assert.are.equal("natural", categories:FileItem(ctx, 103, "Mats", "Mats"), "nothing to strip")
+      assert.is_nil(dbCategories["Mats"].itemList[103])
+    end)
+
+    it("takes a group by's sections as their category, either side", function()
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      assert.are.equal("natural", categories:FileItem(ctx, 101, "Ore - Copper", "Ore"))
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      assert.are.equal("natural", categories:FileItem(ctx, 101, "Ore", "Ore - Copper"))
+      assert.are.equal("added", categories:FileItem(ctx, 104, "Ore - Copper", "Junk"))
+      assert.is_true(dbCategories["Ore"].itemList[104], "added to the category, not its section")
+    end)
+
+    it("adds an item that lands elsewhere to the category's Added Items, moving it from its last one", function()
+      categories:AddPermanentItemToCategory(ctx, 101, "Gems")
+      assert.are.equal("added", categories:FileItem(ctx, 101, "Mats", "Armor"))
+      assert.are.equal("Mats", homeOf(101))
+      assert.is_nil(dbCategories["Gems"].itemList[101])
+      assert.are.equal("added", categories:FileItem(ctx, 105, "Mats", nil), "where it lands not known")
+      assert.is_true(dbCategories["Mats"].itemList[105])
+    end)
+
+    it("stops the category ignoring an item dropped on it", function()
+      categories:IgnoreItem(ctx, 106, "Mats")
+      assert.are.equal("added", categories:FileItem(ctx, 106, "Mats", "Junk"))
+      assert.is_false(categories:IgnoresItem("Mats", 106))
+    end)
+
+    -- The classic title's Shift drop did the same: a category of that name, which shows in its section.
+    it("makes a category of a built-in category's name for an item that does not land there", function()
+      assert.are.equal("added", categories:FileItem(ctx, 107, "Armor", "Junk"))
+      assert.is_true(dbCategories["Armor"].save)
+      assert.is_true(dbCategories["Armor"].itemList[107])
+    end)
+
+    it("adds nothing to a plugin's category the item does not land in", function()
+      categories:AddPermanentItemToCategory(ctx, 108, "Mats")
+      local before = categories:GetGeneration()
+      assert.are.equal("plugin", categories:FileItem(ctx, 108, "Openable", "Junk"))
+      assert.are.equal("Mats", homeOf(108), "left where it was")
+      assert.is_nil(dbCategories["Openable"])
+      assert.are.equal(before, categories:GetGeneration())
+    end)
+  end)
+
+  describe("GetCustomCategory without the item's Added Items", function()
+    it("passes over the category the item was added to by hand, a plugin's still counting", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Mats", itemList = {}, save = true })
+      categories:AddPermanentItemToCategory(ctx, 101, "Mats")
+      local item = { itemInfo = { itemID = 101 } }
+      assert.are.equal("Mats", (categories:GetCustomCategory(ctx, 0, item)))
+      assert.is_nil((categories:GetCustomCategory(ctx, 0, item, true)))
+      categories:CreateCategory(ctx, { name = "Openable", itemList = { [101] = true } })
+      assert.are.equal("Openable", (categories:GetCustomCategory(ctx, 0, item, true)))
     end)
   end)
 

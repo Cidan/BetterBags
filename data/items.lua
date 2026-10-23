@@ -3939,13 +3939,15 @@ end
 -- GetCategory returns the category data is shown in. With own, it leaves search categories out:
 -- the item's own category, which search categories are matched against (Phase6_EnrichData). With
 -- ignoreRecent, a recent item gets the category it has once it is no longer recent (category
--- automation acts by it, automation.md).
+-- automation acts by it, automation.md). With withoutAdded, the category it was added to by hand is
+-- left out (NaturalCategory).
 ---@param ctx Context
 ---@param data ItemData
 ---@param own? boolean
 ---@param ignoreRecent? boolean
+---@param withoutAdded? boolean
 ---@return string
-function items:GetCategory(ctx, data, own, ignoreRecent)
+function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
   if not data or data.isItemEmpty then
     return L:G("Empty Slot")
   end
@@ -3979,7 +3981,7 @@ function items:GetCategory(ctx, data, own, ignoreRecent)
     searchCategory = self.searchCache[data.kind] and self.searchCache[data.kind][data.slotkey]
     searchPriority = self.categoryPriorityCache[data.kind] and self.categoryPriorityCache[data.kind][data.slotkey]
   end
-  local customCategory, customPriority, customFilter = categories:GetCustomCategory(ctx, data.kind, data)
+  local customCategory, customPriority, customFilter = categories:GetCustomCategory(ctx, data.kind, data, withoutAdded)
 
   -- An item added by hand to a category of yours stays there, whatever the order (category-lifecycle.md
   -- §7). A plugin's item lists compete with rules by priority, the list winning a tie.
@@ -4081,6 +4083,16 @@ function items:GetCategory(ctx, data, own, ignoreRecent)
   end
 
   return category
+end
+
+-- NaturalCategory returns where an item lands without the category it was added to by hand, out of
+-- Recent Items: its rules (this sweep's), a plugin's categories, the built-in ones. An item dropped on
+-- the header of that category needs no Added Items there (Categories:FileItem, docs/next-batch-2.md §8).
+---@param ctx Context
+---@param data ItemData
+---@return string
+function items:NaturalCategory(ctx, data)
+  return self:GetCategory(ctx, data, false, true, true)
 end
 
 function items:ParseItemLink(link)

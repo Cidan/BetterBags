@@ -32,6 +32,7 @@ local stubs = {
   bankSlots = trackStub("BankSlots"),
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
+  categories = trackStub("Categories"),
 }
 
 -- Every value this spec replaces, put back after each test.

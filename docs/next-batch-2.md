@@ -188,12 +188,21 @@ with Shift, the item is added to the category; without, it goes into the bag (th
     is removed, and it lands there;
   - else, one of your categories (a group by's section: its category): the item is added to Added
     Items (moving it from the category it was added to), and taken off that category's Ignored Items;
-  - else (a built-in or a plugin's category it does not fit): nothing changes, and it says so.
+  - else (a plugin's category it does not fit): nothing changes, and it says so.
 - The item goes back to its slot. Recent Items and Free Space headers still put the item in the bag.
 - The classic bags' titles keep their behavior (Shift adds; issue #408's drop zone): this is BetterBags
   Next's header.
 
-**Status:** planned.
+**Status:** done, with two changes to the plan:
+- A built-in category the item does not fit gets a category of yours with its name, holding the item,
+  which shows in the same section (the classic title's Shift drop always did this). The request implies
+  it: "don't add it to Added Items for that category" is the exception for a Blizzard category the item
+  fits, so one it does not fit takes it in Added Items.
+- A gear set's section ("Gear: ...") takes nothing and says the Equipment Manager makes gear sets; a
+  plugin's category says a plugin fills it. In both the item stays on the cursor.
+`data/categories.lua` (`FileItem`, `GetCustomCategory` without Added Items), `data/items.lua`
+(`NaturalCategory`), `next/panel.lua` (`FileCursorItem`); category-lifecycle.md §9, next.md §7. 22
+mutations: one led to a test (a merchant's item on the cursor).
 
 ## Order of work
 

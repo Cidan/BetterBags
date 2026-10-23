@@ -33,6 +33,7 @@ local stubs = {
   bankSlots = trackStub("BankSlots"),
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
+  categories = trackStub("Categories"),
   guildBank = trackStub("GuildBank"),
   question = trackStub("Question"),
   color = trackStub("Color"),
@@ -84,6 +85,7 @@ local CANVAS_TOP = 1090
 
 describe("NextDrag", function()
   local buttons, sent, pins, db, backpackGroups, bankGroups, slots, calls, backpack, bank, guild
+  local fileResult, itemIDs
 
   -- An item button: a holder frame and, inside it, the button the player clicks. Like Blizzard's
   -- (ContainerFrameItemButtonMixin:OnReceiveDrag calls OnDragStart, which is a left click), a drag
@@ -243,7 +245,8 @@ describe("NextDrag", function()
       [12] = { id = 12, name = "Vault", bankType = CHAR },
     }
     slots = { [BACKPACK] = backpackData(), [BANK] = bankData() }
-    calls = { moved = {}, assigned = {}, scrolled = {}, titleDrops = {}, pickedUp = {}, deposited = {}, withdrawn = {} }
+    calls = { moved = {}, assigned = {}, scrolled = {}, titleDrops = {}, pickedUp = {}, deposited = {}, withdrawn = {},
+      filed = {} }
     guild = nil
 
     override(addon, "isRetail", true)
@@ -322,6 +325,22 @@ describe("NextDrag", function()
       for _, data in ipairs(list) do table.insert(keys, data.slotkey) end
       table.insert(calls.moved, { keys, bankType })
     end)
+    -- Filing an item dropped on a category's header (Categories:FileItem, docs/next-batch-2.md §8).
+    fileResult = "added"
+    override(stubs.categories, "FileItem", function(_, c, itemID, name, natural)
+      assert.is_not_nil(c)
+      table.insert(calls.filed, { itemID, name, natural })
+      return fileResult
+    end)
+    override(stubs.categories, "GetCategoryByName", function() return nil end)
+    override(stubs.items, "NaturalCategory", function(_, c, data)
+      assert.is_not_nil(c)
+      return "natural of " .. data.slotkey
+    end)
+    override(stubs.items, "GetItemDataFromSlotKey", function(_, slotkey)
+      return { slotkey = slotkey, itemInfo = { itemID = itemIDs[slotkey] } }
+    end)
+    itemIDs = { ["0_3"] = 501 }
     override(stubs.sectionFrame, "OnTitleClickOrDrop", function(_, c, adapter)
       assert.is_not_nil(c)
       table.insert(calls.titleDrops, { adapter:GetKind(), adapter:GetTitle() })
@@ -1354,12 +1373,96 @@ describe("NextDrag", function()
   end)
 
   describe("the header", function()
-    it("passes an item clicked or dropped on it to its panel, and moves the section on a right click", function()
+    local printed
+
+    local function hold(itemID, bag, slot)
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "item", itemID
+      _G._cursorItemLocation = bag and ItemLocation:CreateFromBagAndSlot(bag, slot) or nil
+    end
+
+    before_each(function()
+      printed = {}
+      override(_G, "print", function(text) table.insert(printed, text) end)
+    end)
+
+    -- Asked: "if you drag and drop an item onto a category header, it becomes an Added Item in that
+    -- category" (where it lands without being added decides, FileItem).
+    it("files an item dropped or clicked on a category's header in that category, the item going back", function()
       local herbs = section(backpack, "Herbs")
-      _G._cursorHasItem = true
-      herbs.header:GetScript("OnClick")(herbs.header, "LeftButton")
+      hold(501, 0, 3)
       herbs.header:GetScript("OnReceiveDrag")(herbs.header)
-      assert.are.same({ { BACKPACK, "Herbs" }, { BACKPACK, "Herbs" } }, calls.titleDrops)
+      assert.are.same({ { 501, "Herbs", "natural of 0_3" } }, calls.filed)
+      assert.is_false(CursorHasItem(), "back in its slot")
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
+      hold(501, 0, 3)
+      herbs.header:GetScript("OnClick")(herbs.header, "LeftButton")
+      assert.are.equal(2, #calls.filed)
+      assert.are.same({}, calls.titleDrops, "never into the bag")
+      assert.are.same({}, printed)
+    end)
+
+    it("files an item from outside the bags not knowing where it lands, or from an item of its kind", function()
+      local herbs = section(backpack, "Herbs")
+      hold(777)
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({ 777, "Herbs", nil }, calls.filed[1])
+      slots[BACKPACK].itemsBySlotKey = { ["0_8"] = { slotkey = "0_8", itemInfo = { itemID = 778 } } }
+      hold(778)
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({ 778, "Herbs", "natural of 0_8" }, calls.filed[2])
+    end)
+
+    -- bag-drop-zone.md: a merchant's item on the cursor (buying by drag) is no item of yours.
+    it("files nothing that is not an item of yours", function()
+      local herbs = section(backpack, "Herbs")
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "merchant", 3
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({}, calls.filed)
+      assert.is_true(CursorHasItem())
+    end)
+
+    it("files the same in the bank's sections", function()
+      itemIDs["6_1"] = 601
+      local leather = section(bank, "Leather")
+      hold(601, 6, 1)
+      leather.header:GetScript("OnReceiveDrag")(leather.header)
+      assert.are.same({ { 601, "Leather", "natural of 6_1" } }, calls.filed)
+    end)
+
+    it("says why a plugin's category takes nothing, the item staying on the cursor", function()
+      fileResult = "plugin"
+      local herbs = section(backpack, "Herbs")
+      hold(501, 0, 3)
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({ "BetterBags: A plugin fills Herbs: items can't be added to it." }, printed)
+      assert.is_true(CursorHasItem())
+    end)
+
+    it("files nothing in a gear set's section, which the Equipment Manager makes", function()
+      slots[BACKPACK].tabs[1] = tab({ "Gear: Tank" }, { item("0_3", "Gear: Tank") })
+      backpack:Draw(ctx(), slots[BACKPACK], function() end)
+      local gear = section(backpack, "Gear: Tank")
+      hold(501, 0, 3)
+      gear.header:GetScript("OnReceiveDrag")(gear.header)
+      assert.are.same({}, calls.filed)
+      assert.are.same({ "BetterBags: Gear sets are made in the Equipment Manager." }, printed)
+      assert.is_true(CursorHasItem())
+    end)
+
+    it("puts an item dropped on Recent Items, or on a bag in the Show Bags view, in the bag, as before", function()
+      hold(501, 0, 3)
+      local recent = section(backpack, "Recent Items")
+      recent.header:GetScript("OnReceiveDrag")(recent.header)
+      assert.are.same({ { BACKPACK, "Recent Items" } }, calls.titleDrops)
+      db.view[BACKPACK] = SECTION_ALL_BAGS
+      local herbs = section(backpack, "Herbs")
+      herbs.header:GetScript("OnReceiveDrag")(herbs.header)
+      assert.are.same({ { BACKPACK, "Recent Items" }, { BACKPACK, "Herbs" } }, calls.titleDrops)
+      assert.are.same({}, calls.filed)
+    end)
+
+    it("moves the section to the open window on a right click", function()
+      local herbs = section(backpack, "Herbs")
       _G._cursorHasItem = false
       herbs.header:GetScript("OnClick")(herbs.header, "RightButton")
       assert.are.same({ { { "0_3", "0_4" } } }, calls.moved)

@@ -246,3 +246,39 @@ circumstance, no matter if it's added in Added Items, or in a Search Filter." do
   `spec/database_spec.lua`, `spec/refresh_pipeline_spec.lua` ("Ignored Items (search rules)"),
   `spec/next/settings/categories_spec.lua` ("the Ignored Items tab"), `spec/next/settings/content_spec.lua`,
   `spec/integration/next_settings_spec.lua`.
+
+## 9. Filing an item dropped on a BetterBags Next header
+
+Asked (2026-10-22): "if you drag and drop an item onto a category header, it becomes an Added Item in that
+category. if we ever drag an item away back to it's original category, handle the case where we drag it
+back to the category but we don't add it to Added Items if it would naturally fit there already, i.e.
+if it's a Blizzard defined category, and it would match into that category at that moment in time,
+don't add it to Added Items for that category, just strip it's manual assignment and let it land where
+it should." docs/next-batch-2.md §8.
+
+- **Where it lands naturally** (`items:NaturalCategory(ctx, data)`): `GetCategory` with Recent Items
+  left out and `withoutAdded` (`categories:GetCustomCategory(ctx, kind, data, true)` skips the category
+  the item was added to by hand): its rules as this sweep matched them, a plugin's categories, gear
+  sets, the built-in categories. Read from the item on the cursor as the bags last read it: its bag
+  slot (`C_Cursor.GetCursorItem`), else an item of its ID in the bags, else not known (an equipped
+  item).
+- **`categories:FileItem(ctx, itemID, name, natural)`**, a group by's sections counting as their
+  category on both sides:
+  - lands there naturally: the category it was added to by hand is forgotten (`RemoveItemFromCategory`),
+    nothing is added: `"natural"`;
+  - else a plugin's category: nothing: `"plugin"` (a plugin fills it; adding would make a category of
+    yours with its name, hiding the plugin's);
+  - else: added to the category's Added Items (`AddPermanentItemToCategory`, which takes it from the
+    category it was in), the category no longer ignoring it (§8): `"added"`. A built-in category's name
+    gets a category of yours with that name, which shows in the same section, as the classic title's
+    Shift drop always made one.
+- **The panel** (`panelProto:FileCursorItem`, `next/panel.lua`): a gear set's section ("Gear: ", no
+  category of that name) takes nothing ("Gear sets are made in the Equipment Manager."); a plugin's
+  says "A plugin fills X: items can't be added to it."; in both the item stays on the cursor.
+  Otherwise the item goes back to its slot (`ClearCursor`) and the bags are recalculated
+  (`bags/Rederive { resetLayout, buttons }`).
+- **Known limit:** an item in a gear set shows in its gear set whatever it is added to: gear sets come
+  first in `GetCategory`, before any category (as on the classic bags).
+- Coverage: `spec/categories_spec.lua` ("filing an item dropped on a category's header", "GetCustomCategory
+  without the item's Added Items"), `spec/refresh_pipeline_spec.lua` ("an item's natural category"),
+  `spec/next/drag_spec.lua` ("the header").

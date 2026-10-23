@@ -26,6 +26,7 @@ local stubs = {
   sonata = trackStub("Sonata"),
   cursorPlacement = trackStub("CursorPlacement"),
   sectionFrame = trackStub("SectionFrame"),
+  categories = trackStub("Categories"),
   groups = trackStub("Groups"),
   merchant = trackStub("NextMerchant"),
   itemFrame = trackStub("ItemFrame"),

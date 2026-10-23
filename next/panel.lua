@@ -69,6 +69,12 @@ local chain = addon:GetModule('NextChain')
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 -- NextPanel is the panel BetterBagsNext's bags are made of (next.md §3): a full-height panel on a
 -- side of the screen that slides in from that edge, its inner edge feathered out to nothing, with
 -- the title and its sparkles, a search box, the tabs down its inner side, the content in one
@@ -1634,14 +1640,82 @@ function panelProto:OnHeaderDragStop(section)
   nextDrag:Drop(context:New('NextSectionDrop'))
 end
 
--- OnHeaderClick passes an item clicked onto a header to the panel (Shift: to the category), and
--- moves a section to the open window on a right click (Move Categories).
+-- cursorItemData returns what the bags last read of the item on the cursor: its bag slot's, else an item
+-- of its ID the bags hold; nil for one they do not hold (an equipped item).
+---@param itemID number
+---@return ItemData?
+local function cursorItemData(itemID)
+  local location = C_Cursor.GetCursorItem()
+  if location and location:IsBagAndSlot() then
+    local bag, slot = location:GetBagAndSlot()
+    local data = items:GetItemDataFromSlotKey(bag .. "_" .. slot)
+    if data and not data.isItemEmpty and data.itemInfo and data.itemInfo.itemID == itemID then
+      return data
+    end
+  end
+  for _, info in pairs(items:GetAllSlotInfo()) do
+    for _, data in pairs(info.itemsBySlotKey or {}) do
+      if not data.isItemEmpty and data.itemInfo and data.itemInfo.itemID == itemID then
+        return data
+      end
+    end
+  end
+  return nil
+end
+
+-- FileCursorItem files the item on the cursor in the category whose header it was dropped on or clicked
+-- with (asked: "if you drag and drop an item onto a category header, it becomes an Added Item in that
+-- category"; docs/next-batch-2.md §8). Where the item lands without being added (Items:NaturalCategory)
+-- decides what Categories:FileItem does; the item goes back to its slot and the bags are recalculated.
+-- A plugin's category and a gear set take nothing: it says why, the item staying on the cursor. It
+-- returns what it did.
+---@param ctx Context
+---@param section NextSection
+---@return string
+function panelProto:FileCursorItem(ctx, section)
+  local cursorType, itemID = GetCursorInfo()
+  if cursorType ~= "item" or not itemID then
+    return "ignored"
+  end
+  local name = section.name
+  if name:sub(1, 6) == "Gear: " and categories:GetCategoryByName(name) == nil then
+    print("BetterBags: " .. L:G("Gear sets are made in the Equipment Manager."))
+    return "gear set"
+  end
+  local data = cursorItemData(itemID)
+  local natural = data and items:NaturalCategory(ctx, data) or nil
+  local result = categories:FileItem(ctx, itemID, name, natural)
+  if result == "plugin" then
+    print("BetterBags: " .. format(L:G("A plugin fills %s: items can't be added to it."), name))
+    return result
+  end
+  ClearCursor()
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+  return result
+end
+
+-- onHeaderItem takes an item dropped or clicked onto a header: a category's files it (FileCursorItem);
+-- Recent Items, Free Space and a bag in the Show Bags view pass it to the panel as the classic title
+-- does (bag-drop-zone.md).
+---@private
+---@param ctx Context
+---@param section NextSection
+function panelProto:onHeaderItem(ctx, section)
+  if section.kind == "category" and database:GetBagView(self.kind) ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+    self:FileCursorItem(ctx, section)
+    return
+  end
+  sectionFrame:OnTitleClickOrDrop(ctx, self:titleAdapter(section))
+end
+
+-- OnHeaderClick takes an item clicked onto a header (onHeaderItem), and moves a section to the open
+-- window on a right click (Move Categories).
 ---@param ctx Context
 ---@param section NextSection
 ---@param button string
 function panelProto:OnHeaderClick(ctx, section, button)
   if CursorHasItem() then
-    sectionFrame:OnTitleClickOrDrop(ctx, self:titleAdapter(section))
+    self:onHeaderItem(ctx, section)
     return
   end
   if button == "RightButton" and section.kind ~= "free" then
@@ -1649,12 +1723,12 @@ function panelProto:OnHeaderClick(ctx, section, button)
   end
 end
 
--- OnHeaderReceiveDrag passes an item dropped on a header to the panel (Shift: to the category).
+-- OnHeaderReceiveDrag takes an item dropped on a header (onHeaderItem).
 ---@param ctx Context
 ---@param section NextSection
 function panelProto:OnHeaderReceiveDrag(ctx, section)
   if CursorHasItem() then
-    sectionFrame:OnTitleClickOrDrop(ctx, self:titleAdapter(section))
+    self:onHeaderItem(ctx, section)
   end
 end
 

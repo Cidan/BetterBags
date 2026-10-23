@@ -543,10 +543,12 @@ effective scale), the canvas, tabs and scroll area (all at scale 1 under `UIPare
 reports a scaled frame's edges in its own scale, so the dragged section's position is always worked
 out from the cursor and the grabbed point, never read back from it.
 
-**The header also** passes an item dropped or clicked onto it to its panel (bag-drop-zone.md: Shift
-adds the item to the category, as the classic title does, `SectionFrame:OnTitleClickOrDrop`), and a
-right click moves the whole section to the open window (the classic header's Move Categories,
-`SectionFrame:MoveItems`).
+**The header also** files an item dropped or clicked onto a category's header in that category
+(`panelProto:FileCursorItem`, category-lifecycle.md §9; asked: "if you drag and drop an item onto a
+category header, it becomes an Added Item in that category"), no Shift needed, in the backpack, the bank
+and the guild bank; Recent Items, Free Space and a bag's section in the Show Bags view pass the item to
+the panel as before (bag-drop-zone.md, `SectionFrame:OnTitleClickOrDrop`). A right click moves the whole
+section to the open window (the classic header's Move Categories, `SectionFrame:MoveItems`).
 
 `SectionFrame:MoveItems(list, bankType?)` is the classic right click's move, taken out of
 `OnTitleRightClick` so both use it: the movement flow (or, with `bankType`, that bank while it is

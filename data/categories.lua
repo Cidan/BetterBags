@@ -755,6 +755,53 @@ function categories:ClearIgnoredItems(ctx, name)
   return self:changeIgnored(name, function(list) wipe(list) end)
 end
 
+-- parentOf returns the category a section belongs to: a group by's section's category, else itself.
+---@private
+---@param name string
+---@return string
+function categories:parentOf(name)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    return filter.groupByParent
+  end
+  return name
+end
+
+-- FileItem files an item dropped on a category's header in BetterBags Next (docs/next-batch-2.md §8).
+-- natural is where the item lands without the category it was added to by hand (Items:NaturalCategory),
+-- nil when not known; a group by's sections count as their category on both sides. It returns what it
+-- did:
+-- - "natural": the item lands in the category anyway, so the category it was added to by hand is
+--   forgotten and nothing is added (asked: "just strip it's manual assignment and let it land where it
+--   should");
+-- - "added": it is added to the category's Added Items (taken from the one it was in), and the
+--   category no longer ignores it; a name no category has (a built-in category's) gets a category of
+--   that name, which shows in the same section, as the classic title's Shift drop makes one;
+-- - "plugin": nothing: a plugin fills its own category.
+---@param ctx Context
+---@param itemID number
+---@param name string The header's section.
+---@param natural? string
+---@return "natural"|"added"|"plugin"
+function categories:FileItem(ctx, itemID, name, natural)
+  local target = self:parentOf(name)
+  if natural ~= nil and self:parentOf(natural) == target then
+    local home = database:GetItemCategoryByItemID(itemID).name
+    if home ~= nil then
+      self:RemoveItemFromCategory(itemID, home)
+    end
+    return "natural"
+  end
+  if database:GetItemCategory(target) == nil and self.ephemeralCategories[target] ~= nil then
+    return "plugin"
+  end
+  if self:IgnoresItem(target, itemID) then
+    self:UnignoreItem(ctx, itemID, target)
+  end
+  self:AddPermanentItemToCategory(ctx, itemID, target)
+  return "added"
+end
+
 -- ConfirmsSaleOf says whether Auto Sell waits for the player to confirm a category's sale in the
 -- vendor's dock (true unless turned off; automation.md §3): a group by's sections as their category does.
 ---@param name string
@@ -926,14 +973,16 @@ end
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned. A category
 -- that ignores the item (Ignored Items) is passed over, whatever gave it the item: added by hand, a
--- plugin's list, or a category function (which does not file the item there).
+-- plugin's list, or a category function (which does not file the item there). withoutAdded leaves out
+-- the category the item was added to by hand: where it lands without it (FileItem).
 ---@param ctx Context
 ---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
+---@param withoutAdded? boolean
 ---@return string|nil categoryName
 ---@return number|nil priority
 ---@return CustomCategoryFilter|nil filter The category, for the bags to group its items (its groupBy).
-function categories:GetCustomCategory(ctx, kind, data)
+function categories:GetCustomCategory(ctx, kind, data, withoutAdded)
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
   if type(ctx) == "number" then
@@ -944,7 +993,7 @@ function categories:GetCustomCategory(ctx, kind, data)
   local itemID = data.itemInfo.itemID
   if not itemID then return nil, nil end
   local filter = database:GetItemCategoryByItemID(itemID)
-  if filter.enabled and filter.enabled[kind] and not ignores(filter, itemID) then
+  if not withoutAdded and filter.enabled and filter.enabled[kind] and not ignores(filter, itemID) then
     return filter.name, filter.priority or 10, filter
   end
 

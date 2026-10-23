@@ -3251,6 +3251,34 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
+  -- Where an item dropped on a header lands without the category it was added to by hand (FileItem,
+  -- docs/next-batch-2.md §8): its rules, a plugin's, the built-in categories; never Recent Items.
+  describe("an item's natural category (NaturalCategory)", function()
+    it("leaves out the category it was added to by hand and Recent Items, a rule still counting", function()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      override(categories, "GetCustomCategory", function(_, _, _, data, withoutAdded)
+        if data.itemInfo.itemID == 101 and not withoutAdded then return "Mats", 10, { save = true } end
+        return nil, nil
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ wipe = true })
+      local ore = slotInfo.itemsBySlotKey["0_1"]
+      assert.equal("Recent Items", ore.itemInfo.category)
+      local natural = items:NaturalCategory(context:New("spec"), ore)
+      assert.are_not.equal("Mats", natural)
+      assert.are_not.equal("Recent Items", natural)
+      assert.equal(items:GetCategory(context:New("spec"), slotInfo.itemsBySlotKey["0_2"], false, true), natural,
+        "the built-in category, as an item never added")
+      override(categories, "GetSortedSearchCategories", function()
+        return { { name = "Alpha Items", priority = 10, enabled = { [const.BAG_KIND.BACKPACK] = true },
+          searchCategory = { query = "alpha", groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } } }
+      end)
+      slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Alpha Items", items:NaturalCategory(context:New("spec"), slotInfo.itemsBySlotKey["0_1"]))
+    end)
+  end)
+
   -- Asked: Ignored Items, "never land in there under any circumstance, no matter if it's added in Added
   -- Items, or in a Search Filter" (docs/next-batch-2.md §2): a rule that ignores an item passes it on.
   describe("Ignored Items (search rules)", function()

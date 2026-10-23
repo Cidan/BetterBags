@@ -30,6 +30,7 @@ local stubs = {
   cursorPlacement = trackStub("CursorPlacement"),
   backpackBehavior = trackStub("BackpackBehavior"),
   sectionFrame = trackStub("SectionFrame"),
+  categories = trackStub("Categories"),
   bagSystem = trackStub("BagSystem"),
 }
 
