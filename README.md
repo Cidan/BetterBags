@@ -530,7 +530,7 @@ Any search you complete has the option to be turned into a custom category. Thes
 To create a Search Category, type in a search, then press `Enter`. Fill out the required information in the dialogue box and save.
 - Category Name (string) is what the new category will be named.
 - Search Query (string) is the search that will be run to determine which items will be in the category. Any search options (described above) will work in the query.
-- Priority (number) is the order in which search categories will "steal" items. Items can only be in 1 category at a time and higher priority will get items first.
+- The order of your categories decides which one gets an item that fits more than one: the higher one wins. Drag them in the list on the Categories page to change it. A new category starts at the top, and an item you add to a category by hand stays there.
 - Group By (string) allows you to create multiple categories from 1 string. Valid options are none, type, subtype, and expansion. This can be chosen as an option or included directly in the search string.  
 `exp = mid and not "housing decor" group by type` will create a category for every type of item from the Midnight expansion, eg. "Midnight - Armor", "Midnight - Weapon", etc.
 

@@ -1702,6 +1702,28 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.equal("Searchy", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
   end)
 
+  -- Asked: an item you add to a category by hand stays in it, whatever the order of the categories
+  -- (category-lifecycle.md §7). A plugin's item lists still compete with rules by the order.
+  it("keeps an item added by hand to a category of yours there, even with a rule's category above it", function()
+    local tools = { name = "Tools", save = true, priority = 5, enabled = { [const.BAG_KIND.BACKPACK] = true } }
+    local custom = tools
+    override(categories, "GetCustomCategory", function(_, _, _, data)
+      if data.itemInfo.itemID == 101 then return custom.name, custom.priority, custom end
+      return nil, nil
+    end)
+    override(categories, "GetSortedSearchCategories", function()
+      return { { name = "Sell", enabled = { [const.BAG_KIND.BACKPACK] = true }, priority = 1,
+        searchCategory = { query = "alpha", groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } } }
+    end)
+    mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+    local slotInfo = refreshBackpack()
+    assert.equal("Sell", items:GetSearchCategory(const.BAG_KIND.BACKPACK, "0_1"), "the rule matches it")
+    assert.equal("Tools", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    custom = { name = "Openable", priority = 5, enabled = { [const.BAG_KIND.BACKPACK] = true } }
+    slotInfo = refreshBackpack({ wipe = true })
+    assert.equal("Sell", slotInfo.itemsBySlotKey["0_1"].itemInfo.category, "a plugin's list loses to a rule above it")
+  end)
+
   -- Group by is the category's own: the items placed in it by hand are grouped as its rule's matches
   -- are, into sub-categories made for them (category-lifecycle.md §6).
   it("groups the items placed in a category by hand, making the sub-category", function()

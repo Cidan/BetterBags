@@ -54,6 +54,9 @@ local editor = addon:GetModule('NextSettingsCategories')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextListReorder: AceModule
+local reorder = addon:GetModule('NextListReorder')
+
 -- NextSettingsBagCategories is a bag's categories, on its Categories tab (next-settings.md §5,
 -- category-lifecycle.md §6): categories are defined once on the Categories page, and a bag arranges
 -- them. A wide row listing the pinned categories in their order (customSectionSort), then every other
@@ -90,7 +93,7 @@ local DONE = {
 ---@field bag SettingBag
 ---@field entries table[] { header = true, title } or { name }
 ---@field rows NextBagCategoryRow[]
----@field dragging? string
+---@field drag NextListReorderDrag Dragging a row to reorder the pins.
 local listProto = {}
 addon:GetModule('Perf'):RegisterPrototype(listProto, 'NextBagCategoryList')
 
@@ -138,8 +141,15 @@ function bagCategories:Create(parent, owner, bag)
   block.bar = nextScrollBar:Create(box)
   block.bar:Bind(box)
   block.listBox, block.listContent = box, content
-  block.marker = content:CreateTexture(nil, "OVERLAY")
-  block.marker:Hide()
+  block.drag = reorder:Create({
+    box = box, content = content,
+    entries = function() return block.entries end,
+    heightOf = function(entry)
+      local K = style.Theme.Settings.BagCategories
+      return entry.header and K.GroupHeight or K.RowHeight
+    end,
+    onDrop = function(name, after) block:Drop(name, after) end,
+  })
   table.insert(self.all, block)
   sonataNext:RegisterWidget(self)
   for _, message in ipairs({ DONE[bag.kind], 'categories/Changed' }) do
@@ -157,8 +167,7 @@ end
 function listProto:Style()
   local K = style.Theme.Settings.BagCategories
   controls:Paint(self.fill, K.Fill)
-  controls:Paint(self.marker, { Color = K.DropMarker.Color }, K.DropMarker.Alpha)
-  self.marker:SetHeight(K.DropMarker.Size or 2)
+  self.drag:Style()
   for _, row in ipairs(self.rows) do
     self:paintRow(row)
   end
@@ -318,7 +327,7 @@ function listProto:row(i)
   end)
   addon.SetScript(frame, "OnDragStart", function()
     if row.entry and row.entry.name then
-      self:StartDrag(row.entry.name)
+      self.drag:Start(row.entry.name)
     end
   end)
   self.rows[i] = row
@@ -498,62 +507,6 @@ function listProto:Drop(name, after)
   end
   rederive(context:New('NextSettingsBagCategories_Pin'))
   self:Refresh()
-end
-
--- gapAt returns the entry a row dropped where the pointer is would land after, and where its marker
--- goes.
----@private
----@return number?, number?
-function listProto:gapAt()
-  local top = self.listBox:GetTop()
-  if top == nil then
-    return nil
-  end
-  local K = style.Theme.Settings.BagCategories
-  local _, cursorY = GetCursorPosition()
-  local down = top - cursorY / self.listBox:GetEffectiveScale() + self.listBox:GetDerivedScrollOffset()
-  local y = 0
-  for i, entry in ipairs(self.entries) do
-    local height = entry.header and K.GroupHeight or K.RowHeight
-    if down < y + height then
-      if down - y < height / 2 then
-        return i - 1, y
-      end
-      return i, y + height
-    end
-    y = y + height
-  end
-  return #self.entries, y
-end
-
--- StartDrag drags a category until the left button is let go, a marker where it would land.
----@param name string
-function listProto:StartDrag(name)
-  self.dragging = name
-  addon.SetScript(self.listBox, "OnUpdate", function() self:FollowDrag() end)
-end
-
----@private
-function listProto:FollowDrag()
-  local after, y = self:gapAt()
-  if not IsMouseButtonDown("LeftButton") then
-    self.listBox:SetScript("OnUpdate", nil)
-    self.marker:Hide()
-    local name = self.dragging
-    self.dragging = nil
-    if name and after then
-      self:Drop(name, after)
-    end
-    return
-  end
-  if after == nil then
-    self.marker:Hide()
-    return
-  end
-  self.marker:ClearAllPoints()
-  self.marker:SetPoint("TOPLEFT", self.listContent, "TOPLEFT", 0, -y)
-  self.marker:SetPoint("TOPRIGHT", self.listContent, "TOPRIGHT", 0, -y)
-  self.marker:Show()
 end
 
 -- AskRemove removes a leftover after asking: categories:DeleteCategory scrubs what it left in every bag

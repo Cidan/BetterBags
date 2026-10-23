@@ -275,12 +275,19 @@ BetterBags group after Item Colors, both designs). It is a page with its own lis
 `CreateList`, its heading `Heading()`, its buttons `CreateActions`, and its tabs one wide block each,
 their section titles hidden, each filling the content without scrolling (`ContentHeight` less the
 page's `Content.Top` and `Bottom`).
-- **The list** (in the sidebar): a filter box where the settings search box is; "Your Categories"
-  (saved), then "From Plugins" (not saved), each by name, a group by's sub-categories left out; each
-  row a color dot, the name and a line of what is in it ("Search Rule", "2 added items", "Search Rule
-  and 1 added item", "Nothing in it yet") and its priority; New Category at the bottom where the version is
-  (`{ name, itemList = {}, save = true }`, chosen). The first category is chosen when none is
-  (`EnsureChosen`); clicking one chooses it (`Choose`, then `Reselect`). On `categories/Changed` while
+- **The list** (in the sidebar): a filter box where the settings search box is; every category, yours
+  and the plugins', in their order, which is their priority (category-lifecycle.md §7), a group by's
+  sub-categories left out; each row a color dot, the name and a line of what is in it ("Search Rule",
+  "2 added items", "Search Rule and 1 added item", "Nothing in it yet"), a plugin's starting "Made by a
+  plugin"; New Category at the bottom where the version is (`{ name, itemList = {}, save = true }`,
+  chosen, on top). Dragging a row moves its category (`listProto:Drop` → `categories:MoveCategory`):
+  after the row above where it is let go, or right before the first row shown when let go above them;
+  the categories a filter hides keep their places. The drag is the bag Categories tab's, moved into
+  `NextListReorder` (`next/settings/reorder.lua`), which both use: its marker
+  (`Settings.BagCategories.DropMarker`), the half-row rule, and the marker kept hidden outside a drag
+  (painting shows a texture: before, a theme applied after a drag brought the bag tab's marker back
+  where it was last let go). No tooltip (asked: no help text yet). The first category is chosen when
+  none is (`EnsureChosen`); clicking one chooses it (`Choose`, then `Reselect`). On `categories/Changed` while
   it shows, the page shows again, the first chosen for one that is gone.
 - **The header**: the chosen category's name, and its line (a plugin's starts "Made by a plugin");
   "Categories" and "Make a category to sort your items your way." for none. Rename and Delete for your
@@ -288,10 +295,9 @@ page's `Content.Top` and `Bottom`).
   room.
 - **The two item boxes stay put** (asked: boxes a few pixels apart made switching tabs messy): the
   Settings and Search Rule tabs put their box's name row and their box at the same place
-  (`boxRows`: under four rows of settings, a row for the name, the box down to the tab's bottom).
-- **Settings tab**: four rows, Used In (a switch per bag the settings show, the guild bank like any),
-  Priority (two digits; saved on Enter or when the field is left; nothing entered shows it again; the
-  same value saves nothing), Group By (yours only; the row stays empty for a plugin's), Color (and
+  (`boxRows`: under three rows of settings, a row for the name, the box down to the tab's bottom).
+- **Settings tab**: three rows, Used In (a switch per bag the settings show, the guild bank like any),
+  Group By (yours only; the row stays empty for a plugin's), Color (and
   Reset Color: none, drawn in gold); then **Current Items in this Group** (the player's wording): how
   many items each bag shows in it (its group by's sections too) and those items in a read-only grid,
   one cell per item with how many there are, by name, or "There are no current items in your

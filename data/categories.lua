@@ -34,7 +34,7 @@ local context = addon:GetModule('Context')
 ---@field groupBy? number Its members grouped into sub-categories (0=None, 1=Type, 2=Subtype, 3=Expansion).
 ---@field note? string A note about the category.
 ---@field color? number[] The RGB color of the category name.
----@field priority? number The priority of the category. Lower numbers have higher priority (e.g., 1 > 10). Default is 10.
+---@field priority? number Where it is in the order of the Categories list, which is the categories' priority: lower comes first and wins (category-lifecycle.md §7). Default is 10; ties go by name. Never shown.
 ---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
 ---@field isGroupBySubcategory? boolean If true, this category is a groupBy subcategory and should not be manually deleted.
 ---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
@@ -329,6 +329,24 @@ function categories:SetCategoryState(kind, category, enabled)
   end
 end
 
+-- before orders categories by priority (10 when unset), then by name ignoring case: the order of the
+-- Categories list, which is their priority (category-lifecycle.md §7). A tie between priorities saved
+-- before the list was ordered is alphabetical.
+---@param a CustomCategoryFilter
+---@param b CustomCategoryFilter
+---@return boolean
+local function before(a, b)
+  local pa, pb = a.priority or 10, b.priority or 10
+  if pa ~= pb then
+    return pa < pb
+  end
+  local la, lb = a.name:lower(), b.name:lower()
+  if la ~= lb then
+    return la < lb
+  end
+  return a.name < b.name
+end
+
 -- everyBag returns a category's bags with every bag on.
 ---@return table<BagKind, boolean>
 local function everyBag()
@@ -368,6 +386,13 @@ function categories:CreateCategory(ctx, category)
   self:changed()
   local existing = database:GetItemCategory(category.name) or self.ephemeralCategories[category.name]
   category.enabled = category.enabled or (existing and existing.enabled) or everyBag()
+  -- A new category goes on top of the order (asked: "newest on top"); a group by's section follows
+  -- its category.
+  local new = existing == nil and not category.isGroupBySubcategory
+    and (category.save or database:GetEphemeralItemCategory(category.name) == nil)
+  if new then
+    category.priority = self:topPriority()
+  end
   if category.groupBy == nil and type(category.searchCategory) == "table" then
     category.groupBy = category.searchCategory.groupBy
   end
@@ -400,8 +425,110 @@ function categories:CreateCategory(ctx, category)
       self.ephemeralCategoryByItemID[id] = category
     end
     database:CreateOrUpdateCategory(category)
+    if new then
+      -- Its place is the player's from now on: saved, so it stays there in the next session.
+      database:UpdateEphemeralItemCategory(category.name, { enabled = category.enabled, priority = category.priority })
+    end
   end
   events:SendMessage(ctx, 'categories/Changed')
+end
+
+-- topPriority returns the priority that puts a category on top of the order.
+---@private
+---@return number
+function categories:topPriority()
+  local top
+  for _, filter in pairs(self:GetAllCategories()) do
+    local priority = filter.priority or 10
+    if top == nil or priority < top then
+      top = priority
+    end
+  end
+  return top and top - 1 or 1
+end
+
+-- GetOrder returns every category's name but a group by's sections, in the order of the Categories
+-- list: their priority, the first winning an item that fits more than one (category-lifecycle.md §7).
+---@return string[]
+function categories:GetOrder()
+  local list = {}
+  for _, filter in pairs(self:GetAllCategories()) do
+    if not filter.isGroupBySubcategory then
+      table.insert(list, filter)
+    end
+  end
+  table.sort(list, before)
+  local names = {}
+  for i, filter in ipairs(list) do
+    names[i] = filter.name
+  end
+  return names
+end
+
+-- setPriority sets a category's place, saving a plugin's in its saved state as UpdateCategory does.
+---@private
+---@param name string
+---@param priority number
+function categories:setPriority(name, priority)
+  local filter = self:GetCategoryByName(name)
+  filter.priority = priority
+  if database:GetItemCategory(name) == nil then
+    database:UpdateEphemeralItemCategory(name, { enabled = filter.enabled, color = filter.color, priority = priority,
+      automation = filter.automation })
+  end
+end
+
+-- MoveCategory moves a category in the order right after another (after), or to the top without one,
+-- then numbers every category in the order from 1, so none ties; a group by's sections take their
+-- category's place. It returns false, changing nothing, for a name no category has, an anchor that is
+-- none, or a category that lands where it was.
+---@param ctx Context
+---@param name string
+---@param after? string
+---@return boolean
+function categories:MoveCategory(ctx, name, after)
+  local order = self:GetOrder()
+  local from
+  for i, n in ipairs(order) do
+    if n == name then
+      from = i
+    end
+  end
+  if from == nil then
+    return false
+  end
+  table.remove(order, from)
+  local to = 1
+  if after ~= nil then
+    to = nil
+    for i, n in ipairs(order) do
+      if n == after then
+        to = i + 1
+      end
+    end
+    if to == nil then
+      return false
+    end
+  end
+  if to == from then
+    return false
+  end
+  table.insert(order, to, name)
+  self:changed()
+  for i, n in ipairs(order) do
+    self:setPriority(n, i)
+  end
+  for _, filter in pairs(self:GetAllCategories()) do
+    if filter.isGroupBySubcategory and filter.groupByParent then
+      local parent = self:GetCategoryByName(filter.groupByParent)
+      if parent then
+        self:setPriority(filter.name, parent.priority)
+      end
+    end
+  end
+  events:SendMessage(ctx, 'categories/Changed')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+  return true
 end
 
 ---@param name string
@@ -498,8 +625,8 @@ function categories:AutomationOf(name)
   return filter and filter.automation or nil
 end
 
--- Returns a sorted list of search categories, by priority (ascending).
--- Lower priority numbers have higher priority (1 > 10).
+-- GetSortedSearchCategories returns the categories with a rule in the order (category-lifecycle.md §7):
+-- by priority, ties by name, the first winning an item more than one matches.
 ---@return CustomCategoryFilter[]
 function categories:GetSortedSearchCategories()
   ---@type CustomCategoryFilter[]
@@ -508,11 +635,7 @@ function categories:GetSortedSearchCategories()
   for _, searchCategory in pairs(savedCategories) do
     table.insert(results, searchCategory)
   end
-  table.sort(results, function(a, b)
-    local aPriority = a.priority or 10
-    local bPriority = b.priority or 10
-    return aPriority < bPriority
-  end)
+  table.sort(results, before)
   return results
 end
 

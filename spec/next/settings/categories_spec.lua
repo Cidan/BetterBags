@@ -24,7 +24,7 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextInput", "next/controls/input.lua" }, { "NextMenu", "next/controls/menu.lua" },
   { "NextDropdown", "next/controls/dropdown.lua" }, { "NextSwatch", "next/controls/swatch.lua" },
   { "NextDialog", "next/controls/dialog.lua" }, { "NextItemGrid", "next/controls/itemgrid.lua" },
-  { "NextSettingsCategories", "next/settings/categories.lua" } }) do
+  { "NextListReorder", "next/settings/reorder.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -162,6 +162,24 @@ describe("NextSettingsCategories", function()
       return all
     end)
     override(categories, "GetCategoryByName", function(_, name) return filters[name] end)
+    -- As the real one: every category but a group by's sections, by priority, then by name.
+    override(categories, "GetOrder", function()
+      local list = {}
+      for _, f in pairs(filters) do
+        if not f.isGroupBySubcategory then table.insert(list, f) end
+      end
+      table.sort(list, function(a, b)
+        if (a.priority or 10) ~= (b.priority or 10) then return (a.priority or 10) < (b.priority or 10) end
+        return a.name:lower() < b.name:lower()
+      end)
+      local names = {}
+      for i, f in ipairs(list) do names[i] = f.name end
+      return names
+    end)
+    override(categories, "MoveCategory", function(_, _, name, after)
+      table.insert(calls, { "MoveCategory", name, after })
+      return true
+    end)
     override(categories, "DoesCategoryExist", function(_, name) return filters[name] ~= nil end)
     override(categories, "RuleOf", function(_, f)
       local q = f and f.searchCategory and f.searchCategory.query
@@ -259,17 +277,53 @@ describe("NextSettingsCategories", function()
       list:Refresh(ctx())
     end)
 
-    it("lists your categories, then the plugins', each by name, with what is in it and its priority", function()
+    -- Asked: priority is the order of one list, yours and the plugins' together, a plugin's marked.
+    it("lists every category in their order, a plugin's marked, with what is in it", function()
       assert.are.same({
-        "# Your Categories",
-        "Empty | Nothing in it yet · Priority 10",
-        "Mats | 2 added items · Priority 5",
-        "Midnight | Search Rule and 1 added item · Priority 2",
-        "Potions | Search Rule · Priority 10",
-        "# From Plugins",
-        "Openable | 1 added item · Priority 1",
-        "Ores | Search Rule · Priority 3",
+        "Openable | Made by a plugin · 1 added item",
+        "Midnight | Search Rule and 1 added item",
+        "Ores | Made by a plugin · Search Rule",
+        "Mats | 2 added items",
+        "Empty | Nothing in it yet",
+        "Potions | Search Rule",
       }, listed(), "a group by's sub-categories are not listed")
+    end)
+
+    it("drags a category to a new place: after the one above where it is let go, or to the top", function()
+      local K = style.Theme.Settings.Categories
+      list.box:_SetRect(0, 0, 232, 600)
+      local row = list:RowFor("Potions")
+      -- A quarter of the way down the second row: in its top half, so after the first.
+      _G._cursorX, _G._cursorY = 20, 600 - (K.RowHeight + 0.25 * K.RowHeight)
+      _G._mouseButtonsDown = { LeftButton = true }
+      row.frame:GetScript("OnDragStart")(row.frame)
+      list.box:GetScript("OnUpdate")(list.box, 0.016)
+      assert.is_true(list.drag.marker:IsShown())
+      _G._mouseButtonsDown = {}
+      list.box:GetScript("OnUpdate")(list.box, 0.016)
+      _G._cursorX, _G._cursorY = 0, 0
+      assert.is_false(list.drag.marker:IsShown())
+      list:Drop("Potions", 0)
+      list:Drop("Openable", 2)
+      local moves = {}
+      for _, call in ipairs(calls) do
+        if call[1] == "MoveCategory" then table.insert(moves, call) end
+      end
+      assert.are.same({ { "MoveCategory", "Potions", "Openable" }, { "MoveCategory", "Potions", nil },
+        { "MoveCategory", "Openable", "Midnight" } }, moves)
+    end)
+
+    -- A filter shows some of the order: a category dropped among them lands next to them in the whole
+    -- order, the others keeping theirs.
+    it("drops among the categories a filter shows next to them in the whole order", function()
+      list.filter.frame:SetText("s")
+      list.filter.frame:GetScript("OnTextChanged")(list.filter.frame, true)
+      assert.are.same({ "Ores | Made by a plugin · Search Rule", "Mats | 2 added items", "Potions | Search Rule" },
+        listed())
+      list:Drop("Potions", 0)
+      list:Drop("Ores", 2)
+      assert.are.same({ "MoveCategory", "Potions", "Midnight" }, calls[#calls - 1], "before Ores: after Midnight")
+      assert.are.same({ "MoveCategory", "Ores", "Mats" }, calls[#calls])
     end)
 
     it("puts its filter where the window's search box is, and New Category at the bottom", function()
@@ -283,18 +337,18 @@ describe("NextSettingsCategories", function()
     it("keeps only the categories whose name has what is typed in its filter", function()
       list.filter.frame:SetText("MID")
       list.filter.frame:GetScript("OnTextChanged")(list.filter.frame, true)
-      assert.are.same({ "# Your Categories", "Midnight | Search Rule and 1 added item · Priority 2" }, listed())
+      assert.are.same({ "Midnight | Search Rule and 1 added item" }, listed())
     end)
 
     it("chooses the first category when none is, and the one clicked, marking it", function()
-      assert.are.equal("Empty", editor.selected)
+      assert.are.equal("Openable", editor.selected)
       local row = list:RowFor("Mats")
       row.frame:GetScript("OnClick")(row.frame, "LeftButton")
       assert.are.equal("Mats", editor.selected)
       assert.are.equal(1, reselected, "the page shows it")
       list:RefreshRows()
       assert.is_true(list:RowFor("Mats").indicator:IsShown())
-      assert.is_false(list:RowFor("Empty").indicator:IsShown())
+      assert.is_false(list:RowFor("Openable").indicator:IsShown())
     end)
 
     it("keeps a category chosen from elsewhere (a bag's tab opening it here)", function()
@@ -338,7 +392,7 @@ describe("NextSettingsCategories", function()
       editor.selected = "Mats"
       filters.Mats = nil
       handlers["categories/Changed"][1](ctx())
-      assert.are.equal("Empty", editor.selected)
+      assert.are.equal("Openable", editor.selected)
       assert.are.equal(1, reselected)
     end)
   end)
@@ -347,17 +401,17 @@ describe("NextSettingsCategories", function()
     it("names the chosen category and says what is in it, or asks for one", function()
       assert.are.same({ "Categories", "Make a category to sort your items your way." }, { editor:Heading() })
       editor.selected = "Midnight"
-      assert.are.same({ "Midnight", "Search Rule and 1 added item · Priority 2" }, { editor:Heading() })
+      assert.are.same({ "Midnight", "Search Rule and 1 added item" }, { editor:Heading() })
       editor.selected = "Openable"
-      assert.are.same({ "Openable", "Made by a plugin · 1 added item · Priority 1" }, { editor:Heading() })
+      assert.are.same({ "Openable", "Made by a plugin · 1 added item" }, { editor:Heading() })
     end)
 
     it("says what a category does on its own", function()
       filters.Mats.automation = "sell"
       editor.selected = "Mats"
-      assert.are.same({ "Mats", "2 added items · Priority 5 · Sells at merchants" }, { editor:Heading() })
+      assert.are.same({ "Mats", "2 added items · Sells at merchants" }, { editor:Heading() })
       filters.Mats.automation = "destroy"
-      assert.are.same({ "Mats", "2 added items · Priority 5 · Sells, destroys the rest" }, { editor:Heading() })
+      assert.are.same({ "Mats", "2 added items · Sells, destroys the rest" }, { editor:Heading() })
     end)
 
     it("says which tabs show: Rule for yours and a plugin's with a rule; Added Items while one is chosen", function()
@@ -413,7 +467,7 @@ describe("NextSettingsCategories", function()
       click(actions.delete)
       answer("Delete")
       assert.are.same({ "DeleteCategory", "Mats" }, calls[#calls])
-      assert.are.equal("Empty", editor.selected)
+      assert.are.equal("Openable", editor.selected, "the first in the order")
       assert.are.equal(1, reselected)
     end)
   end)
@@ -435,15 +489,17 @@ describe("NextSettingsCategories", function()
       place(tab)
       assert.is_true(tab.none:IsShown())
       assert.is_false(tab.toggles[BACKPACK].frame:IsShown())
-      assert.is_false(tab.priority.frame:IsShown())
+      assert.is_false(tab.groupBy.frame:IsShown())
       assert.is_false(tab.grid.frame:IsShown())
     end)
 
-    it("shows the bags it is used in (the guild bank like any), priority, group by and color", function()
+    -- Asked: no priority as a number; the order of the list is it.
+    it("shows the bags it is used in (the guild bank like any), group by and color, and no priority", function()
       editor.selected = "Potions"
       place(tab)
       assert.is_false(tab.none:IsShown())
-      assert.are.equal("10", tab.priority:GetText())
+      assert.is_nil(tab.priority)
+      assert.is_nil(tab.labels.priority)
       assert.are.equal("Type", tab.groupBy.text:GetText())
       assert.are.same({ 0.2, 0.4, 0.6, 1 }, tab.swatch:GetColor())
       editor.selected = "Mats"
@@ -457,17 +513,23 @@ describe("NextSettingsCategories", function()
       assert.is_false(tab.toggles[GUILD].frame:IsShown(), "only the bags the settings show")
     end)
 
-    it("saves each setting at once: bags, priority (entered or left), group by, color and its reset", function()
+    it("puts its three rows of settings, then the box of what shows in it under them", function()
+      editor.selected = "Mats"
+      place(tab)
+      local K = style.Theme.Settings.Categories
+      local B = controls:Theme("Button")
+      local function middleOf(i) return K.Pad + (i - 1) * (B.Height + K.FieldGap) + B.Height / 2 end
+      local _, _, _, _, colorY = tab.swatch.frame:GetPoint(1)
+      assert.are.equal(-middleOf(3), colorY, "color is the third row")
+      local box = K.Pad + 3 * (B.Height + K.FieldGap) + K.FieldGap + B.Height + K.FieldGap
+      local _, _, _, _, gridY = tab.grid.frame:GetPoint(1)
+      assert.are.equal(-box, gridY)
+    end)
+
+    it("saves each setting at once: bags, group by, color and its reset", function()
       editor.selected = "Mats"
       place(tab)
       click(tab.toggles[BANK])
-      tab.priority:SetText("5")
-      tab.priority:Commit(ctx())
-      tab.priority:SetText("3")
-      tab.priority:Commit(ctx())
-      tab.priority:SetText("")
-      tab.priority:Commit(ctx())
-      assert.are.equal("3", tab.priority:GetText(), "nothing entered: the priority again")
       click(tab.groupBy)
       nextMenu:Rows()[3].frame:GetScript("OnClick")(nextMenu:Rows()[3].frame, "LeftButton")
       tab.swatch:SetColor({ 0.5, 0.5, 0.5, 1 })
@@ -475,7 +537,6 @@ describe("NextSettingsCategories", function()
       click(tab.resetColor)
       assert.are.same({
         { "UpdateCategory", "Mats", { enabled = { [BANK] = true } } },
-        { "UpdateCategory", "Mats", { priority = 3 } },
         { "UpdateCategory", "Mats", { groupBy = 2 } },
         { "UpdateCategory", "Mats", { color = { 0.5, 0.5, 0.5 } } },
         { "UpdateCategory", "Mats", { color = false } },
@@ -487,7 +548,7 @@ describe("NextSettingsCategories", function()
       editor.selected = "Openable"
       place(tab)
       assert.is_false(tab.groupBy.frame:IsShown())
-      assert.is_true(tab.priority.frame:IsShown())
+      assert.is_true(tab.swatch.frame:IsShown())
     end)
 
     it("shows what of your bags shows in it now (its group by's sections too), an item a cell", function()

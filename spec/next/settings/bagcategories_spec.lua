@@ -22,7 +22,8 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextToggle", "next/controls/toggle.lua" },
   { "NextInput", "next/controls/input.lua" }, { "NextMenu", "next/controls/menu.lua" },
-  { "NextDialog", "next/controls/dialog.lua" }, { "NextSettingsBagCategories", "next/settings/bagcategories.lua" } }) do
+  { "NextDialog", "next/controls/dialog.lua" }, { "NextListReorder", "next/settings/reorder.lua" },
+  { "NextSettingsBagCategories", "next/settings/bagcategories.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -244,10 +245,10 @@ describe("NextSettingsBagCategories", function()
     _G._mouseButtonsDown = { LeftButton = true }
     row.frame:GetScript("OnDragStart")(row.frame)
     block.listBox:GetScript("OnUpdate")(block.listBox, 0.016)
-    assert.is_true(block.marker:IsShown())
+    assert.is_true(block.drag.marker:IsShown())
     _G._mouseButtonsDown = {}
     block.listBox:GetScript("OnUpdate")(block.listBox, 0.016)
-    assert.is_false(block.marker:IsShown())
+    assert.is_false(block.drag.marker:IsShown())
     assert.are.same({ "Tokens", "Potions", "Mats", "Ghost" }, pinned())
     _G._cursorX, _G._cursorY = 0, 0
     local _ = I
