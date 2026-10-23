@@ -157,14 +157,6 @@ describe("Constants Module Offsets", function()
     assert.are.equal("Default", const.DATABASE_DEFAULTS.profile.nextTheme)
   end)
 
-  -- Category automation sells at most what buyback keeps, unless the player turns the limit off
-  -- (automation.md; Vendor's own default).
-  it("limits automatic selling to what buyback keeps by default", function()
-    loadfile("core/constants.lua")("BetterBags")
-    local const = addon:GetModule("Constants")
-    assert.is_true(const.DATABASE_DEFAULTS.profile.autoSellLimit)
-  end)
-
   it("leaves animating item movement off by default", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")

@@ -452,7 +452,8 @@ the target's `Sell` or `Deposit` returns `"confirm"` and a `NextConfirmation` (t
 hint), and the drop docks the section in the target:
 - **The dock** (`buildDock`, one, reused): over the target's scroll area, a scrim (`Color.Scrim`)
   that dims the target's own items and takes their clicks, so nothing behind is bought; a card
-  (`Color.Card`) edged in an amber glow (`Color.Gold`, a 2-pixel edge and a soft halo) that pulses
+  (`NextDockCard`, `next/dockcard.lua`, shared with the vendor's destroy card so the two look alike;
+  `Color.Card`) edged in an amber glow (`Color.Gold`, a 2-pixel edge and a soft halo) that pulses
   (`PULSE_PERIOD`, 1.2 s), with the title (`ConfirmTitle`, 18, white), the warning (`ConfirmWarning`,
   gold) and the hint (`ConfirmHint`, lavender) around the section. The card is scaled down when it
   is taller than the scroll area, and laid out again when the section's height changes.
@@ -714,16 +715,19 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   header (Move Categories), it does not need Enable Category Sell and Deposit and is not cut to 10
   items: the drag is the deliberate act, and the confirmation covers what buyback cannot.
 - **The destroy card** (automation.md §4): while a merchant is open and Automation's destroy queue
-  holds anything, a card edged in crimson (`Vendor.DestroyEdge`, the dock's fill and line) sits along
-  the bottom of the body above the footer, the queue's icons in a row (the next first, counts above
-  one, "+N" in the last place when they do not fit) and "Click to destroy next" under them. The whole
-  card is one button: a left click destroys the next item (`Automation:DestroyNext`), hovering shows
-  that item's tooltip with "Click to destroy it.". The scroll area ends above it: the panel's
-  `ContentBottom()` (new, `style.FOOTER` by default; the root's constraints, the scroll frame's anchor
-  and `MinHeight` read it) adds the card's height and `DESTROY_GAP` while it shows. It follows the
-  queue on every draw, on `items/RefreshBackpack/Done`, `automation/Changed` and `categories/Changed`,
-  fades in when it appears, laying the panel out again when it appears or goes, and goes when the
-  merchant closes and when BetterBags Next is switched off (`Wipe`).
+  holds anything (what Destroy What Can't Be Sold categories hold that no merchant buys), the dock's
+  card (`NextDockCard`, the one a section waits in to be sold, §7: its fill, fonts, edge, halo and pulse)
+  sits along the bottom of the body above the footer, as wide as what the vendor sells, its edge and
+  halo in `Dock.DestroyColor`: "Destroy N items", "No merchant buys these.", the queue's icons in its
+  slot (the next first, counts above one, "+N" in the last place when they do not fit), "Click to
+  destroy next". A button over the card takes the clicks: a left click destroys the next item
+  (`Automation:DestroyNext`), hovering shows that item's tooltip with "Click to destroy it.". It pulses
+  from the moment it appears. The scroll area ends above it: the panel's `ContentBottom()`
+  (`style.FOOTER` by default; the root's constraints, the scroll frame's anchor and `MinHeight` read it)
+  adds the card's height and `DESTROY_GAP` (8, clear of the edge) while it shows. It follows the queue
+  on every draw, on `items/RefreshBackpack/Done`, `automation/Changed` and `categories/Changed`, fades
+  in when it appears, laying the panel out again when it appears or goes, and goes when the merchant
+  closes and when BetterBags Next is switched off (`Wipe`).
 - **Masque:** each button is a card the canvas places (`frame`, the icon with its name and price)
   holding the square button that takes the clicks (`button`), so Masque, which sizes a skin to the
   button it skins (Masque 12.1.0 `Core.lua` `UpdateScale`), skins the icon alone. The button carries

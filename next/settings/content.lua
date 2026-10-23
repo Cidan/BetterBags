@@ -377,8 +377,7 @@ function content:Init()
       } },
       -- Only the classic bags' search box makes a category on Enter (frames/search.lua).
       { title = L:G("Search"), rows = { { setting = 'inBagSearch' }, { setting = 'enterToMakeCategory', design = "classic" } } },
-      { title = L:G("Items"), rows = { { setting = 'upgradeProvider' }, { setting = 'newItemDuration' }, { setting = 'categorySell' },
-        { setting = 'autoSellLimit' } } },
+      { title = L:G("Items"), rows = { { setting = 'upgradeProvider' }, { setting = 'newItemDuration' }, { setting = 'categorySell' } } },
       { title = L:G("What's New"), rows = { { setting = 'changelogOnLogin' } } },
     } } },
   })

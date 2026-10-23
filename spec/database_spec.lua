@@ -106,7 +106,6 @@ const.DATABASE_DEFAULTS = {
     debug = false,
     inBagSearch = true,
     categorySell = false,
-    autoSellLimit = true,
     showKeybindWarning = true,
     enterToMakeCategory = true,
     upgradeIconProvider = 'None',
@@ -402,12 +401,6 @@ describe("Database", function()
     it("GetInBagSearch / SetInBagSearch", function()
       DB:SetInBagSearch(false)
       assert.is_false(DB:GetInBagSearch())
-    end)
-
-    it("GetAutoSellLimit / SetAutoSellLimit", function()
-      assert.is_true(DB:GetAutoSellLimit())
-      DB:SetAutoSellLimit(false)
-      assert.is_false(DB:GetAutoSellLimit())
     end)
 
     it("GetCategorySell / SetCategorySell", function()

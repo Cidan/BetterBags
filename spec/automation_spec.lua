@@ -14,7 +14,6 @@ local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 local items = StubBetterBagsModule("Items")
 local categories = StubBetterBagsModule("Categories")
-local database = StubBetterBagsModule("Database")
 local events = StubBetterBagsModule("Events")
 ResetModuleStub("Automation", "data/automation.lua")
 LoadBetterBagsModule("data/automation.lua")
@@ -24,7 +23,7 @@ local BACKPACK = 0
 
 describe("Automation", function()
   local saved, slots, actions, ofCategory, timers, printed, used, picked, deleted, cursor, shift, combat
-  local buys, refundable, limit, registered, asked, messages
+  local buys, refundable, registered, asked, messages
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -73,7 +72,7 @@ describe("Automation", function()
   before_each(function()
     saved, slots, ofCategory, timers, printed, used, picked, deleted, asked = {}, {}, {}, {}, {}, {}, {}, 0, {}
     actions = { Junk = "sell", Trash = "destroy", Mats = nil }
-    cursor, shift, combat, buys, refundable, limit, registered = false, false, false, true, {}, true, {}
+    cursor, shift, combat, buys, refundable, registered = false, false, false, true, {}, {}
     messages = {}
     automation:Init()
     -- The committed items: rebuilt from the slots each time they are read.
@@ -88,7 +87,6 @@ describe("Automation", function()
       return ofCategory[data.slotkey]
     end)
     override(categories, "AutomationOf", function(_, name) return actions[name] end)
-    override(database, "GetAutoSellLimit", function() return limit end)
     override(events, "RegisterEvent", function(_, name, fn) registered[name] = fn end)
     override(events, "SendMessage", function(_, _, name) table.insert(messages, name) end)
     override(const, "BACKPACK_BAGS", { [0] = 0, [1] = 1, [2] = 2 })
@@ -193,7 +191,7 @@ describe("Automation", function()
     it("decides from the bags' last read, asking the client nothing, and acts only on what is still there", function()
       put(0, 1, 11, "Junk")
       put(0, 2, 12, "Trash", { noValue = true })
-      put(0, 3, 13, "Trash", { refundable = true })
+      put(0, 3, 13, "Trash", { refundable = true, noValue = true })
       for _, key in ipairs({ "0_1", "0_2", "0_3" }) do
         slots[key].live, slots[key].guid = nil, nil
       end
@@ -209,20 +207,22 @@ describe("Automation", function()
       assert.are.same({}, picked)
     end)
 
-    -- An item a category destroys is sold instead when a merchant buys it, as Vendor does.
-    it("sells what sell and destroy categories hold, and destroys only what destroy categories hold", function()
+    -- Asked: Auto Sell, and Destroy What Can't Be Sold, which needs Auto Sell ("destroy" is both).
+    it("sells what either action holds that merchants buy, and destroys only what cannot be sold", function()
       put(0, 1, 11, "Junk")
       put(0, 2, 12, "Trash")
       put(0, 3, 13, "Trash", { noValue = true })
       put(0, 4, 14, "Junk", { sets = { "Tank" } })
-      put(0, 5, 15, "Trash", { sets = { "Tank" } })
+      put(0, 5, 15, "Trash", { sets = { "Tank" }, noValue = true })
+      put(0, 6, 16, "Junk", { noValue = true })
       local function keysOf(list)
         local keys = {}
         for i, e in ipairs(list) do keys[i] = e.data.slotkey end
         return keys
       end
       assert.are.same({ "0_1", "0_2" }, keysOf(automation:SellList(ctx())))
-      assert.are.same({ "0_2", "0_3" }, keysOf(automation:DestroyList(ctx())), "never what it leaves alone")
+      assert.are.same({ "0_3" }, keysOf(automation:DestroyQueue(ctx())),
+        "never what a merchant buys, what it leaves alone, or what a sell-only category holds")
     end)
   end)
 
@@ -239,7 +239,7 @@ describe("Automation", function()
     end)
 
     -- In bulk, as a backpack section dragged onto BetterBags Next's vendor sells (asked).
-    it("sells everything at once, the frame after the merchant opens, then says what it sold for", function()
+    it("sells a wave at once, the frame after the merchant opens, then says what it sold for", function()
       put(0, 1, 11, "Junk", { count = 3, price = 100 })
       put(0, 2, 12, "Trash", { price = 50 })
       put(0, 3, 13, "Mats")
@@ -276,13 +276,6 @@ describe("Automation", function()
       assert.are.same({ "0_1" }, used)
     end)
 
-    it("says nothing of the rest when the limit sold everything", function()
-      for slot = 1, 12 do put(1, slot, 100 + slot, "Junk") end
-      sell()
-      assert.are.equal(12, #used)
-      assert.are.equal(1, #printed)
-    end)
-
     it("never acts on an item without a GUID", function()
       put(0, 1, 11, "Junk")
       put(0, 2, 12, "Trash")
@@ -290,22 +283,60 @@ describe("Automation", function()
         slots[key].data.itemInfo.itemGUID = ""
         slots[key].guid = ""
       end
+      slots["0_2"].data.containerInfo.hasNoValue = true
       sell()
       assert.are.same({}, used)
       assert.are.equal("nothing", automation:DestroyNext(ctx()))
       assert.are.equal(0, deleted)
     end)
 
-    it("stops at what buyback keeps, and says how to sell the rest", function()
-      for slot = 1, 14 do put(1, slot, 100 + slot, "Junk") end
-      sell()
-      assert.are.equal(12, #used)
-      assert.are.equal(2, #printed)
-      assert.truthy(printed[2]:find("12", 1, true))
-      used, printed, limit = {}, {}, false
-      sell()
-      assert.are.equal(2, #used, "the limit turned off sells the rest")
+    -- Asked: keep selling past 12 in waves; stopping there was pointless.
+    it("sells everything in waves a moment apart, saying what it sold once done", function()
+      for slot = 1, 30 do put(1 + math.floor((slot - 1) / 20), (slot - 1) % 20 + 1, 100 + slot, "Junk") end
+      automation:OnMerchantShow(ctx())
+      run()
+      assert.are.equal(automation.WAVE, #used)
+      assert.are.same({}, printed, "nothing said mid-sale")
+      assert.are.equal(1, #timers)
+      assert.are.equal(automation.WAVE_DELAY, timers[1].delay)
+      run()
+      assert.are.equal(2 * automation.WAVE, #used)
+      run()
+      assert.are.equal(30, #used)
+      assert.are.same({}, timers)
+      assert.are.same({ "BetterBags: Sold 30 items for 3000c." }, printed)
+      assert.is_nil(automation.sale)
+    end)
+
+    it("finishes with the wave that sells the last item", function()
+      for slot = 1, automation.WAVE do put(1, slot, 100 + slot, "Junk") end
+      automation:OnMerchantShow(ctx())
+      run()
+      assert.are.equal(automation.WAVE, #used)
+      assert.are.same({}, timers, "no empty wave after it")
       assert.are.equal(1, #printed)
+    end)
+
+    it("stops between waves when the merchant closes, saying what it sold", function()
+      for slot = 1, 14 do put(1, slot, 100 + slot, "Junk") end
+      automation:OnMerchantShow(ctx())
+      run()
+      automation:OnMerchantClosed(ctx())
+      run()
+      assert.are.equal(automation.WAVE, #used)
+      assert.are.same({ "BetterBags: Sold 12 items for 1200c." }, printed)
+    end)
+
+    it("waits for the cursor between waves", function()
+      for slot = 1, 14 do put(1, slot, 100 + slot, "Junk") end
+      automation:OnMerchantShow(ctx())
+      run()
+      cursor = true
+      run()
+      assert.are.equal(automation.WAVE, #used)
+      cursor = false
+      run()
+      assert.are.equal(14, #used)
     end)
 
     it("sells nothing when the merchant closed before the sale", function()
@@ -355,7 +386,7 @@ describe("Automation", function()
   end)
 
   -- What BetterBags Next's vendor shows on its destroy card (automation.md §4), and what a click
-  -- destroys: never an item a sale holds.
+  -- destroys: what destroy categories hold that cannot be sold.
   describe("the destroy queue", function()
     local function keysOf(list)
       local keys = {}
@@ -363,70 +394,44 @@ describe("Automation", function()
       return keys
     end
 
-    it("lists what destroy categories hold, as the bags were last read", function()
+    it("lists what destroy categories hold that cannot be sold, as the bags were last read", function()
       put(0, 1, 11, "Trash", { noValue = true })
       put(0, 2, 12, "Trash", { noValue = true })
       put(0, 3, 13, "Junk", { noValue = true })
+      put(0, 4, 14, "Trash")
       slots["0_2"].guid = "another item"
       assert.are.same({ "0_1", "0_2" }, keysOf(automation:DestroyQueue(ctx())))
     end)
 
-    it("leaves out what a sale holds, until the sale is done with it", function()
+    it("never shares an item with a sale", function()
       put(0, 1, 11, "Trash")
       put(0, 2, 12, "Trash", { noValue = true })
       automation:OnMerchantShow(ctx())
-      assert.are.same({ "0_2" }, keysOf(automation:DestroyQueue(ctx())), "to be sold the next frame")
+      assert.are.same({ "0_2" }, keysOf(automation:DestroyQueue(ctx())))
       assert.are.equal("destroyed", automation:DestroyNext(ctx()))
-      assert.are.same({ "0_2" }, picked, "the click never destroys what the merchant buys")
-    end)
-
-    it("gives back what a sale left unsold", function()
-      for slot = 1, 13 do put(1, slot, 100 + slot, "Trash") end
-      automation:OnMerchantShow(ctx())
-      run()
-      assert.are.equal(12, #used)
-      assert.are.same({ "1_13" }, keysOf(automation:DestroyQueue(ctx())), "past the limit")
-    end)
-
-    it("keeps what a sale sold out of it while the bags catch up", function()
-      put(0, 1, 11, "Trash")
-      local read = slots["0_1"].data
-      automation:OnMerchantShow(ctx())
+      assert.are.same({ "0_2" }, picked)
       run()
       assert.are.same({ "0_1" }, used)
-      slots["0_1"] = { data = read }
-      assert.are.same({}, keysOf(automation:DestroyQueue(ctx())), "sold, though the last read still has it")
     end)
 
-    it("starts again at each merchant", function()
-      put(0, 1, 11, "Trash")
-      C_Container.UseContainerItem = function(bag, slot) table.insert(used, bag .. "_" .. slot) end
-      automation:OnMerchantShow(ctx())
-      run()
-      buys = false
-      automation:OnMerchantShow(ctx())
-      assert.are.same({ "0_1" }, keysOf(automation:DestroyQueue(ctx())))
-    end)
-
-    it("says when it may have changed: a sale starting and ending, and an item destroyed", function()
+    it("says when it may have changed: an item destroyed", function()
       put(0, 1, 11, "Trash")
       put(0, 2, 12, "Trash", { noValue = true })
       automation:OnMerchantShow(ctx())
-      assert.are.same({ "automation/Changed" }, messages)
       run()
-      assert.are.same({ "automation/Changed", "automation/Changed" }, messages)
+      assert.are.same({}, messages, "a sale changes nothing it holds")
       automation:DestroyNext(ctx())
-      assert.are.equal(3, #messages)
+      assert.are.same({ "automation/Changed" }, messages)
       automation:DestroyNext(ctx())
-      assert.are.equal(3, #messages, "nothing destroyed")
+      assert.are.equal(1, #messages, "nothing destroyed")
     end)
   end)
 
   describe("destroying", function()
-    it("destroys the next item a destroy category holds, one a press", function()
-      put(0, 1, 11, "Junk")
-      put(0, 2, 12, "Trash")
-      put(0, 3, 13, "Trash")
+    it("destroys the next item a destroy category holds that cannot be sold, one a press", function()
+      put(0, 1, 11, "Junk", { noValue = true })
+      put(0, 2, 12, "Trash", { noValue = true })
+      put(0, 3, 13, "Trash", { noValue = true })
       assert.are.equal("destroyed", automation:DestroyNext(ctx()))
       assert.are.same({ "0_2" }, picked)
       assert.are.equal(1, deleted)
@@ -434,7 +439,7 @@ describe("Automation", function()
     end)
 
     it("does nothing while the cursor holds an item, in combat, or with nothing to destroy", function()
-      put(0, 1, 11, "Trash")
+      put(0, 1, 11, "Trash", { noValue = true })
       cursor = true
       assert.are.equal("cursor", automation:DestroyNext(ctx()))
       cursor, combat = false, true
@@ -448,22 +453,28 @@ describe("Automation", function()
     end)
 
     it("skips an item that moved, and destroys the next one", function()
-      put(0, 1, 11, "Trash")
-      put(0, 2, 12, "Trash")
+      put(0, 1, 11, "Trash", { noValue = true })
+      put(0, 2, 12, "Trash", { noValue = true })
       slots["0_1"].guid = "another item"
       automation:DestroyNext(ctx())
       assert.are.same({ "0_2" }, picked)
     end)
 
-    it("destroys nothing it could not pick up", function()
+    it("never destroys what a merchant would buy, even away from one", function()
       put(0, 1, 11, "Trash")
+      assert.are.equal("nothing", automation:DestroyNext(ctx()))
+      assert.are.equal(0, deleted)
+    end)
+
+    it("destroys nothing it could not pick up", function()
+      put(0, 1, 11, "Trash", { noValue = true })
       _G.C_Container.PickupContainerItem = function() end
       assert.are.equal("not picked up", automation:DestroyNext(ctx()))
       assert.are.equal(0, deleted)
     end)
 
     it("is what the Destroy Next Item key does", function()
-      put(0, 1, 11, "Trash")
+      put(0, 1, 11, "Trash", { noValue = true })
       BetterBags_DestroyNextItem()
       assert.are.equal(1, deleted)
     end)

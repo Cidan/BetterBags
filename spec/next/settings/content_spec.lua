@@ -304,7 +304,7 @@ describe("NextSettingsContent", function()
         { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton", "bagFading [classic]",
           "animateItemMovement [classic]" } },
         { "General", "Search", { "inBagSearch", "enterToMakeCategory [classic]" } },
-        { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell", "autoSellLimit" } },
+        { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell" } },
         { "General", "What's New", { "changelogOnLogin" } },
       }, idsOf(pages:Get("general")))
     end)
@@ -369,7 +369,7 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      assert.are.equal(12 + 3 * 29, named)
+      assert.are.equal(11 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()

@@ -211,16 +211,6 @@ define('categorySell', {
   set = function(_, value) db:SetCategorySell(value) end,
 })
 
--- Category automation (automation.md): a sale stops at what buyback keeps.
-define('autoSellLimit', {
-  kind = "toggle",
-  title = 'Sell at Most 12 Items per Visit',
-  description = 'Categories set to sell stop after 12 items at each merchant, so everything they sold can be bought back.',
-  keywords = { 'vendor', 'merchant', 'sell', 'automation', 'buyback', 'limit' },
-  get = function() return db:GetAutoSellLimit() end,
-  set = function(_, value) db:SetAutoSellLimit(value) end,
-})
-
 define('showBagButton', {
   kind = "toggle",
   title = 'Show Blizzard Bag Button',

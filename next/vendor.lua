@@ -42,6 +42,9 @@ local tween = addon:GetModule('NextTween')
 ---@class Automation: AceModule
 local automation = addon:GetModule('Automation')
 
+---@class NextDockCard: AceModule
+local dockCard = addon:GetModule('NextDockCard')
+
 -- NextVendor is BetterBags Next's vendor (next.md §10): a panel on the left, as the bank's, that
 -- stands in for Blizzard's merchant frame while BetterBags Next is on. It shows what the vendor
 -- sells in the backpack's categories (Buy), what was sold to it (Buyback) and, at a vendor that
@@ -63,8 +66,8 @@ local SELL_DELAY = 0.2
 -- How many items sold buyback keeps (Blizzard's BUYBACK_ITEMS_PER_PAGE); a section sale of more
 -- asks first.
 local BUYBACK_KEEPS = 12
--- How far the destroy card sits under the scroll area.
-nextVendor.DESTROY_GAP = 6
+-- How far the destroy card sits under the scroll area: clear of its glowing edge.
+nextVendor.DESTROY_GAP = 8
 -- Blizzard's merchant purchase prompts, closed when the vendor closes (MerchantFrame_OnHide).
 local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED", "CONFIRM_REFUND_TOKEN_ITEM",
   "CONFIRM_REFUND_MAX_HONOR", "CONFIRM_REFUND_MAX_ARENA_POINTS" }
@@ -86,13 +89,14 @@ local vendorProto = nextPanel:Extend({}, 'NextVendorPanel')
 -- size (FitTitle).
 vendorProto.fitsTitle = true
 
--- NextDestroyCard is what destroy categories hold, waiting at the bottom of the vendor (automation.md
--- §4): their icons in a card edged in crimson; one click destroys the next.
+-- NextDestroyCard is what destroy categories hold that no merchant buys, waiting at the bottom of the
+-- vendor (automation.md §4): the card a dragged section waits in to be sold (NextDockCard), glowing in
+-- the theme's destroy color, their icons in its slot; one click destroys the next.
 ---@class (exact) NextDestroyCard
----@field frame Button
----@field fill Texture
----@field edges Texture[]
----@field hint FontString
+---@field box NextDockCardFrame
+---@field frame Frame The card (box.frame).
+---@field catcher Button Over the card and its icons, taking the clicks and the pointer.
+---@field elapsed number How long it has shown, for its pulse.
 ---@field more FontString How many more than the icons shown.
 ---@field icons {texture: Texture, count: FontString}[] Made as needed.
 ---@field queue AutomationEntry[] What a click destroys, the first first.
@@ -530,118 +534,108 @@ function vendorProto:ContentBottom()
   return bottom
 end
 
--- DestroyCardHeight is how tall the destroy card is: a row of icons and its line, in the dock's
--- padding.
+-- DestroyCardHeight is how tall the destroy card is: the dock's card holding a row of icons.
 ---@return number
 function vendorProto:DestroyCardHeight()
-  local D = style.Theme.Dock
-  return D.Pad + style.ICON + 6 + D.LineHeight + D.Pad
+  return dockCard:Height(style.ICON)
+end
+
+-- DestroyCardSlotWidth is how wide the destroy card's row of icons is: what the vendor sells is as wide,
+-- less the card's padding.
+---@return number
+function vendorProto:DestroyCardSlotWidth()
+  return self:BodyWidth() - 2 * style.PAD - 2 * style.Theme.Dock.Pad
 end
 
 -- DestroyCardFits is how many icons fit across the destroy card.
 ---@return number
 function vendorProto:DestroyCardFits()
-  local width = self:BodyWidth() - 2 * style.PAD - 2 * style.Theme.Dock.Pad
-  return math.max(1, math.floor((width + style.GAP) / (style.ICON + style.GAP)))
+  return math.max(1, math.floor((self:DestroyCardSlotWidth() + style.GAP) / (style.ICON + style.GAP)))
 end
 
--- buildDestroyCard makes the destroy card, hidden: a button over the bottom of the body, so one click
--- anywhere on it destroys the next item, and hovering it shows that item.
+-- buildDestroyCard makes the destroy card, hidden: a dock card (NextDockCard) along the bottom of the
+-- body, under a button, so one click anywhere on it destroys the next item and hovering it shows that
+-- item, pulsing while it shows.
 ---@private
 ---@return NextDestroyCard
 function vendorProto:buildDestroyCard()
   if self.destroyCard then
     return self.destroyCard
   end
-  local frame = CreateFrame("Button", nil, self.frame)
-  frame:RegisterForClicks("LeftButtonUp")
-  frame:Hide()
-  local fill = frame:CreateTexture(nil, "BACKGROUND")
-  fill:SetAllPoints(frame)
-  local edges = {}
-  for i = 1, 4 do
-    edges[i] = frame:CreateTexture(nil, "BORDER")
-  end
-  local D = style.Theme.Dock
-  local hint = style:CreateText(frame, D.HintFont)
-  hint:SetJustifyH("LEFT")
-  local more = style:CreateText(frame, D.HintFont)
-  more:Hide()
+  local box = dockCard:Create(self.frame)
+  box.frame:Hide()
+  local catcher = CreateFrame("Button", nil, box.frame)
+  catcher:SetAllPoints(box.frame)
+  catcher:RegisterForClicks("LeftButtonUp")
   -- A click is the hardware event DeleteCursorItem needs.
-  addon.SetScript(frame, "OnClick", function(ctx) self:DestroyNext(ctx) end)
-  addon.SetScript(frame, "OnEnter", function() self:ShowDestroyTooltip() end)
-  addon.SetScript(frame, "OnLeave", function()
-    if GameTooltip:IsOwned(frame) then
+  addon.SetScript(catcher, "OnClick", function(ctx) self:DestroyNext(ctx) end)
+  addon.SetScript(catcher, "OnEnter", function() self:ShowDestroyTooltip() end)
+  addon.SetScript(catcher, "OnLeave", function()
+    if GameTooltip:IsOwned(catcher) then
       GameTooltip:Hide()
     end
   end)
-  self.destroyCard = { frame = frame, fill = fill, edges = edges, hint = hint, more = more, icons = {},
-    queue = {}, shown = false }
+  local more = style:CreateText(box.slot, style.Theme.Dock.HintFont)
+  more:Hide()
+  local card = { box = box, frame = box.frame, catcher = catcher, more = more, icons = {}, queue = {},
+    shown = false, elapsed = 0 }
+  addon.SetScript(box.frame, "OnUpdate", function(_, _, elapsed)
+    card.elapsed = card.elapsed + elapsed
+    box:Pulse(card.elapsed)
+  end)
+  self.destroyCard = card
   self:styleDestroyCard()
-  return self.destroyCard
+  return card
 end
 
--- styleDestroyCard draws the destroy card from the theme: the dock's fill (Dock.Card) and line
--- (Dock.HintFont), edged inside in Vendor.DestroyEdge, along the bottom of the body above the footer.
+-- styleDestroyCard draws the destroy card from the theme: the dock's card (NextDockCard), its edge and
+-- halo in Dock.DestroyColor, along the bottom of the body above the footer.
 ---@private
 function vendorProto:styleDestroyCard()
-  local card, D, E = self.destroyCard, style.Theme.Dock, style.Theme.Vendor.DestroyEdge
-  style:Paint(card.fill, D.Card)
-  local w = E.Width
-  local sides = { "TOP", "BOTTOM", "LEFT", "RIGHT" }
-  for i, edge in ipairs(card.edges) do
-    local side = sides[i]
-    edge:ClearAllPoints()
-    edge:SetColorTexture(1, 1, 1, 1)
-    edge:SetVertexColor(style:RGBA(E.Color))
-    if side == "TOP" or side == "BOTTOM" then
-      edge:SetPoint(side .. "LEFT", card.frame, side .. "LEFT", 0, 0)
-      edge:SetPoint(side .. "RIGHT", card.frame, side .. "RIGHT", 0, 0)
-      edge:SetHeight(w)
-    else
-      edge:SetPoint("TOP" .. side, card.frame, "TOP" .. side, 0, 0)
-      edge:SetPoint("BOTTOM" .. side, card.frame, "BOTTOM" .. side, 0, 0)
-      edge:SetWidth(w)
-    end
-  end
-  style:SetFont(card.hint, D.HintFont)
-  style:SetFont(card.more, D.HintFont)
+  local card = self.destroyCard
+  card.box:Style(style.Theme.Dock.DestroyColor)
+  style:SetFont(card.more, style.Theme.Dock.HintFont)
   for _, icon in ipairs(card.icons) do
     style:SetFont(icon.count, style.Theme.Vendor.StackFont)
   end
   card.frame:SetFrameLevel(self.scroll.frame:GetFrameLevel() + 5)
+  card.catcher:SetFrameLevel(card.frame:GetFrameLevel() + 5)
   card.frame:ClearAllPoints()
   card.frame:SetPoint("BOTTOMLEFT", self.body, "BOTTOMLEFT", style.PAD, style.FOOTER)
-  card.frame:SetPoint("BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -style.PAD, style.FOOTER)
-  card.frame:SetHeight(self:DestroyCardHeight())
+  card.box:Size(self:DestroyCardSlotWidth(), style.ICON)
   if card.shown then
     self:layoutDestroyCard()
   end
 end
 
--- layoutDestroyCard puts the queue's items in a row, the next one first, each with its count above
--- one, as many as fit (the last place saying how many more when they do not), and the line under them.
+-- layoutDestroyCard puts the queue's items in a row in the card's slot, the next one first, each with
+-- its count above one, as many as fit (the last place saying how many more when they do not), under
+-- the card's title and warning and over its hint.
 ---@private
 function vendorProto:layoutDestroyCard()
-  local card, D = self.destroyCard, style.Theme.Dock
+  local card = self.destroyCard
   local queue, fit = card.queue, self:DestroyCardFits()
   local n = #queue
+  card.box:Size(self:DestroyCardSlotWidth(), style.ICON)
+  card.box:SetText(format(n == 1 and L:G("Destroy %d item") or L:G("Destroy %d items"), n),
+    L:G("No merchant buys these."), L:G("Click to destroy next"))
   local shown = math.min(n, fit)
   if n > fit and fit > 1 then
     shown = fit - 1
   end
   local step = style.ICON + style.GAP
+  local slot = card.box.slot
   for i = 1, shown do
     local icon = card.icons[i]
     if icon == nil then
-      icon = { texture = card.frame:CreateTexture(nil, "ARTWORK"),
-        count = style:CreateText(card.frame, style.Theme.Vendor.StackFont) }
+      icon = { texture = slot:CreateTexture(nil, "ARTWORK"),
+        count = style:CreateText(slot, style.Theme.Vendor.StackFont) }
       icon.count:SetJustifyH("RIGHT")
       card.icons[i] = icon
     end
     local info = queue[i].data.itemInfo
     icon.texture:ClearAllPoints()
-    icon.texture:SetPoint("TOPLEFT", card.frame, "TOPLEFT", D.Pad + (i - 1) * step, -D.Pad)
+    icon.texture:SetPoint("TOPLEFT", slot, "TOPLEFT", (i - 1) * step, 0)
     icon.texture:SetSize(style.ICON, style.ICON)
     icon.texture:SetTexture(info.itemIcon)
     icon.texture:Show()
@@ -656,19 +650,15 @@ function vendorProto:layoutDestroyCard()
     card.icons[i].count:Hide()
   end
   card.more:ClearAllPoints()
-  card.more:SetPoint("CENTER", card.frame, "TOPLEFT", D.Pad + shown * step + style.ICON / 2, -(D.Pad + style.ICON / 2))
+  card.more:SetPoint("CENTER", slot, "TOPLEFT", shown * step + style.ICON / 2, -style.ICON / 2)
   card.more:SetText("+" .. (n - shown))
   card.more:SetShown(n > shown)
-  card.hint:ClearAllPoints()
-  card.hint:SetPoint("TOPLEFT", card.frame, "TOPLEFT", D.Pad, -(D.Pad + style.ICON + 6))
-  card.hint:SetPoint("TOPRIGHT", card.frame, "TOPRIGHT", -D.Pad, -(D.Pad + style.ICON + 6))
-  card.hint:SetHeight(D.LineHeight)
-  card.hint:SetText(L:G("Click to destroy next"))
 end
 
--- UpdateDestroyCard shows what destroy categories hold while a merchant is open (Automation's destroy
--- queue), fading the card in when it appears, and hides it when nothing waits, or with hide. It
--- returns whether the card appeared or went (the scroll area changed: its owner renders again).
+-- UpdateDestroyCard shows what destroy categories hold that no merchant buys while a merchant is open
+-- (Automation's destroy queue), fading the card in and starting its pulse when it appears, and hides it
+-- when nothing waits, or with hide. It returns whether the card appeared or went (the scroll area
+-- changed: its owner renders again).
 ---@param ctx Context
 ---@param hide? boolean
 ---@return boolean
@@ -685,6 +675,8 @@ function vendorProto:UpdateDestroyCard(ctx, hide)
   if show then
     self:layoutDestroyCard()
     if changed then
+      card.elapsed = 0
+      card.box:Pulse(0)
       card.frame:Show()
       tween:Play(card, {
         duration = style.Time.Land, from = 0, to = 1, ease = style:Ease("Land"),
@@ -698,7 +690,7 @@ function vendorProto:UpdateDestroyCard(ctx, hide)
   if changed then
     self:styleContent()
   end
-  if GameTooltip:IsOwned(card.frame) then
+  if GameTooltip:IsOwned(card.catcher) then
     if show then
       self:ShowDestroyTooltip()
     else
@@ -731,9 +723,9 @@ function vendorProto:ShowDestroyTooltip()
   if entry == nil then
     return
   end
-  GameTooltip:SetOwner(card.frame, "ANCHOR_TOP")
+  GameTooltip:SetOwner(card.catcher, "ANCHOR_TOP")
   GameTooltip:SetBagItem(entry.data.bagid, entry.data.slotid)
-  GameTooltip:AddLine(L:G("Click to destroy it."), style:RGBA(style.Theme.Vendor.DestroyEdge.Color))
+  GameTooltip:AddLine(L:G("Click to destroy it."), style:RGBA(style.Theme.Dock.DestroyColor))
   GameTooltip:Show()
 end
 

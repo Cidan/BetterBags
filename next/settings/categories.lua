@@ -69,8 +69,8 @@ local sonataNext = addon:GetModule('SonataNext')
 --   it now, as items.
 -- - Search Rule: its search, Apply Search Rule, and the Search Results (counted beside their name as it
 --   is typed) as items, those showing in another category saying where.
--- - Automation: what it does with your backpack's items on its own (automation.md): two switches, at
---   most one on, to sell them at merchants or destroy them on command.
+-- - Automation: what it does with your backpack's items on its own (automation.md): Auto Sell, and
+--   Destroy What Can't Be Sold, which needs Auto Sell on.
 -- - Added Items: the items added to it by hand, as a grid that holds thousands (NextItemGrid), filtered
 --   by name; an item dropped anywhere on it is added, a right click removes one, Remove All asks first.
 -- A plugin's category can be used in bags, colored, prioritized and automated; its rule (when it has one)
@@ -97,7 +97,7 @@ local NAME_OF_GROUP_BY = {
 }
 
 -- What a category does on its own (automation.md), in its list line.
-local DOES = { sell = L:G("Sells at merchants"), destroy = L:G("Destroys on command") }
+local DOES = { sell = L:G("Sells at merchants"), destroy = L:G("Sells, destroys the rest") }
 
 -- The messages a bag kind's committed sweep sends (data/items.lua Phase11): what the bags hold changed.
 local READ = { 'items/RefreshBackpack/Done', 'items/RefreshBank/Done', 'items/RefreshGuildBank/Done' }
@@ -1476,8 +1476,8 @@ function itemsTabProto:layout()
   end
 end
 
--- The Automation tab (automation.md): what the category does with your backpack's items on its own,
--- as two switches, at most one on.
+-- The Automation tab (automation.md §5): what the category does with your backpack's items on its own.
+-- Auto Sell ("sell"), and Destroy What Can't Be Sold, which needs Auto Sell on ("destroy" is both).
 
 ---@class NextCategoryAutomationTab
 ---@field frame Frame
@@ -1489,9 +1489,6 @@ end
 local automationTabProto = {}
 addon:GetModule('Perf'):RegisterPrototype(automationTabProto, 'NextCategoryAutomationTab')
 
--- The switches, in their rows' order: what each turns on.
-local SWITCHES = { "sell", "destroy" }
-
 ---@param parent Frame
 ---@param owner Frame
 ---@param bags fun(): SettingBag[] The bags the settings show.
@@ -1502,13 +1499,14 @@ function editor:CreateAutomationTab(parent, owner, bags)
   local K = style.Theme.Settings.Categories
   tab.none = style:CreateText(tab.frame, K.TextFont)
   tab.none:SetText(L:G("You have no categories yet. Make one with New Category, under the list."))
-  label(tab, "sell", L:G("Sell at Merchants"))
-  label(tab, "destroy", L:G("Destroy"))
-  for _, action in ipairs(SWITCHES) do
-    tab[action] = nextToggle:Create(tab.frame, {
-      onChange = function(ctx, on) tab:Choose(ctx, action, on) end,
-    })
-  end
+  label(tab, "sell", L:G("Auto Sell"), K.TextFont)
+  label(tab, "destroy", L:G("Destroy What Can't Be Sold"), K.TextFont)
+  tab.sell = nextToggle:Create(tab.frame, {
+    onChange = function(ctx, on) tab:Save(ctx, on and "sell" or false) end,
+  })
+  tab.destroy = nextToggle:Create(tab.frame, {
+    onChange = function(ctx, on) tab:Save(ctx, on and "destroy" or "sell") end,
+  })
   tab:Style()
   return tab
 end
@@ -1516,7 +1514,7 @@ end
 function automationTabProto:Style()
   local K = style.Theme.Settings.Categories
   for _, l in pairs(self.labels) do
-    style:SetFont(l, K.LabelFont)
+    style:SetFont(l, K.TextFont)
   end
   style:SetFont(self.none, K.TextFont)
   if self.width then
@@ -1540,34 +1538,38 @@ function automationTabProto:Place(x, y, width, height)
   self:layout()
 end
 
--- Choose saves a switch turned on (the other one goes off: a category does one thing) or off.
+-- Save saves the category's automation: "sell", "destroy" (Auto Sell and Destroy What Can't Be Sold),
+-- or false for none (Auto Sell off takes Destroy with it).
 ---@param ctx Context
----@param action string
----@param on boolean
-function automationTabProto:Choose(ctx, action, on)
+---@param automation string|false
+function automationTabProto:Save(ctx, automation)
   if editor.selected then
-    categories:UpdateCategory(ctx, editor.selected, { automation = on and action or false })
+    categories:UpdateCategory(ctx, editor.selected, { automation = automation })
   end
   self:Refresh(ctx)
 end
 
--- Refresh shows the chosen category's switches.
+-- Refresh shows the chosen category's switches; Destroy What Can't Be Sold is on only with Auto Sell.
 ---@param ctx? Context
 function automationTabProto:Refresh(ctx)
   local _ = ctx
   local filter = editor:Chosen()
+  local automation = filter and filter.automation
   self.none:SetShown(filter == nil)
-  for _, action in ipairs(SWITCHES) do
-    self.labels[action]:SetShown(filter ~= nil)
-    self[action].frame:SetShown(filter ~= nil)
-    self[action]:SetChecked(filter ~= nil and filter.automation == action)
+  for _, key in ipairs({ "sell", "destroy" }) do
+    self.labels[key]:SetShown(filter ~= nil)
+    self[key].frame:SetShown(filter ~= nil)
   end
+  self.sell:SetChecked(automation == "sell" or automation == "destroy")
+  self.destroy:SetChecked(automation == "destroy")
+  self.destroy:SetEnabled(automation == "sell" or automation == "destroy")
   if self.width then
     self:layout()
   end
 end
 
--- layout puts each switch in its row, its name in the labels' column.
+-- layout puts each switch in its row before its name, Destroy What Can't Be Sold indented under Auto
+-- Sell, as it depends on it.
 ---@private
 function automationTabProto:layout()
   local K = style.Theme.Settings.Categories
@@ -1575,11 +1577,12 @@ function automationTabProto:layout()
   local frame, pad, gap = self.frame, K.Pad, K.FieldGap
   self.none:ClearAllPoints()
   self.none:SetPoint("CENTER", frame, "CENTER", 0, 0)
-  for i, action in ipairs(SWITCHES) do
+  for i, key in ipairs({ "sell", "destroy" }) do
     local middle = pad + (i - 1) * (B.Height + gap) + B.Height / 2
-    self.labels[action]:ClearAllPoints()
-    self.labels[action]:SetPoint("LEFT", frame, "TOPLEFT", pad, -middle)
-    self[action].frame:ClearAllPoints()
-    self[action].frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -middle)
+    local toggle = self[key]
+    toggle.frame:ClearAllPoints()
+    toggle.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + (i - 1) * K.Indent, -middle)
+    self.labels[key]:ClearAllPoints()
+    self.labels[key]:SetPoint("LEFT", toggle.frame, "RIGHT", 6, 0)
   end
 end

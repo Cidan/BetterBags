@@ -355,7 +355,7 @@ describe("NextSettingsCategories", function()
       editor.selected = "Mats"
       assert.are.same({ "Mats", "2 added items · Priority 5 · Sells at merchants" }, { editor:Heading() })
       filters.Mats.automation = "destroy"
-      assert.are.same({ "Mats", "2 added items · Priority 5 · Destroys on command" }, { editor:Heading() })
+      assert.are.same({ "Mats", "2 added items · Priority 5 · Sells, destroys the rest" }, { editor:Heading() })
     end)
 
     it("says which tabs show: Rule for yours and a plugin's with a rule; Added Items while one is chosen", function()
@@ -612,7 +612,8 @@ describe("NextSettingsCategories", function()
     end)
   end)
 
-  -- What a category does with its items on its own (automation.md): two switches, at most one on.
+  -- What a category does with its items on its own (automation.md §5). Asked: Auto Sell, and Destroy
+  -- What Can't Be Sold, which needs Auto Sell on ("sell"; "destroy" is both).
   describe("the Automation tab", function()
     local tab
 
@@ -633,36 +634,65 @@ describe("NextSettingsCategories", function()
       assert.is_false(tab.destroy.frame:IsShown())
     end)
 
-    it("shows what the category does as two switches", function()
+    it("names its two switches", function()
+      editor.selected = "Mats"
+      place(tab)
+      assert.are.equal("Auto Sell", tab.labels.sell:GetText())
+      assert.are.equal("Destroy What Can't Be Sold", tab.labels.destroy:GetText())
+    end)
+
+    it("shows what the category does, Destroy What Can't Be Sold only while Auto Sell is on", function()
       editor.selected = "Mats"
       place(tab)
       assert.is_false(tab.sell:GetChecked())
       assert.is_false(tab.destroy:GetChecked())
+      assert.is_false(tab.destroy.frame:IsEnabled())
       filters.Mats.automation = "sell"
       tab:Refresh(ctx())
       assert.is_true(tab.sell:GetChecked())
       assert.is_false(tab.destroy:GetChecked())
+      assert.is_true(tab.destroy.frame:IsEnabled())
       filters.Mats.automation = "destroy"
       tab:Refresh(ctx())
-      assert.is_false(tab.sell:GetChecked())
+      assert.is_true(tab.sell:GetChecked())
       assert.is_true(tab.destroy:GetChecked())
+      assert.is_true(tab.destroy.frame:IsEnabled())
     end)
 
-    it("turns one switch on and the other off, saving at once", function()
+    it("saves each switch at once, Auto Sell turned off taking Destroy with it", function()
       editor.selected = "Mats"
       place(tab)
       click(tab.sell)
-      assert.is_true(tab.sell:GetChecked())
       click(tab.destroy)
-      assert.is_false(tab.sell:GetChecked(), "only one is on")
+      assert.is_true(tab.sell:GetChecked())
       assert.is_true(tab.destroy:GetChecked())
       click(tab.destroy)
+      click(tab.destroy)
+      click(tab.sell)
+      assert.is_false(tab.sell:GetChecked())
       assert.is_false(tab.destroy:GetChecked())
+      assert.is_false(tab.destroy.frame:IsEnabled())
       assert.are.same({
+        { "UpdateCategory", "Mats", { automation = "sell" } },
+        { "UpdateCategory", "Mats", { automation = "destroy" } },
         { "UpdateCategory", "Mats", { automation = "sell" } },
         { "UpdateCategory", "Mats", { automation = "destroy" } },
         { "UpdateCategory", "Mats", { automation = false } },
       }, updates())
+    end)
+
+    it("puts each switch before its name, Destroy What Can't Be Sold indented under Auto Sell", function()
+      editor.selected = "Mats"
+      place(tab)
+      local K = style.Theme.Settings.Categories
+      local _, _, _, sellX = tab.sell.frame:GetPoint(1)
+      local _, _, _, destroyX = tab.destroy.frame:GetPoint(1)
+      assert.are.equal(K.Pad, sellX)
+      assert.are.equal(K.Pad + K.Indent, destroyX)
+      for _, key in ipairs({ "sell", "destroy" }) do
+        local point, relativeTo, relativePoint = tab.labels[key]:GetPoint(1)
+        assert.are.same({ "LEFT", tab[key].frame, "RIGHT" }, { point, relativeTo, relativePoint })
+      end
     end)
 
     it("lets a plugin's category be automated", function()
@@ -675,14 +705,10 @@ describe("NextSettingsCategories", function()
     it("shows nothing else", function()
       editor.selected = "Mats"
       place(tab)
-      assert.are.same({ "destroy", "sell" }, (function()
-        local keys = {}
-        for key in pairs(tab.labels) do table.insert(keys, key) end
-        table.sort(keys)
-        return keys
-      end)())
-      assert.is_nil(tab.grid)
-      assert.is_nil(tab.hint)
+      local keys = {}
+      for key in pairs(tab.labels) do table.insert(keys, key) end
+      table.sort(keys)
+      assert.are.same({ "destroy", "sell" }, keys)
     end)
   end)
 
