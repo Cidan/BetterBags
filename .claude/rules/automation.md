@@ -58,7 +58,7 @@ Vendor rule.
   item no merchant buys is already left alone, so `DestroyQueue`'s own check for the destroy action is
   one no mutation can catch; it is kept because it says what the queue is.)
 
-## 3. Selling (`OnMerchantShow`, `SellStep`, `FinishSale`)
+## 3. Selling (`OnMerchantShow`, `StartSale`, `SaleSlots`, `FinishSale`)
 
 - On `MERCHANT_SHOW` (registered in `OnEnable`; the module is enabled from `addon:OnEnable`), in both
   designs: BetterBags Next's merchant panel keeps Blizzard's merchant frame shown (next/vendor.lua), so a
@@ -67,23 +67,33 @@ Vendor rule.
   not buy (retail: `C_MerchantFrame.IsSellAllJunkEnabled`, the check Blizzard shows its Sell All Junk
   button by and Vendor reads; undocumented beyond that, and a wrong "no" only sells nothing; Classic:
   `GetMerchantNumItems() > 0`), or with nothing to sell.
-- **In waves** (asked: bulk, "just like we do when we drag a category"; then, past 12, "keep selling
-  ... in waves"): from the frame after the merchant opens (`C_Timer.After(0)`), `WAVE` (12) items at
-  once with `C_Container.UseContainerItem`, which Blizzard documents with no restriction
-  (ContainerDocumentation.lua; Vendor, BetterBags' category sell and BetterBags Next's section sale,
-  `NextMerchant:SellSlots`, use it), then the next wave `WAVE_DELAY` (0.2 s, the pause BetterBags Next's
-  Sell Junk rounds take) later, until all are sold; the wave that sells the last item ends the sale.
-  Before each item the slot is read again (`StillThere`): the same item GUID (never an empty one),
-  unlocked, still bought, not refundable now; anything else is skipped and does not count toward the
-  wave. The bags may have changed since they were read. Not measured: whether the server throttles 12
-  sales in one frame.
-- **Waits** (0.2 s at a time) while the cursor holds an item, as Vendor does; selling with something on
+- **Through the vendor's own sale, in rounds** (`NextMerchant:SellRounds`, shared with BetterBags
+  Next's Classic Sell Junk). Reported: "our yolo sell only sells 10 items, then stops ... look at our
+  autosell code we have already and see how it manages to autosell (or auto deposit in the case of
+  bank) unlimited items". Every path that moves many items at once calls `C_Container.UseContainerItem`
+  for all of them in one go (`NextMerchant:SellSlots` for a section dropped on the vendor,
+  `GuildBank:DepositSlots`, `SectionFrame:MoveItems` to the bank), and what may not all go through is
+  read again and sold again a moment later (the vendor's Classic Sell Junk; GW2_UI's auto sell, which
+  keeps going until a round finds nothing). The first version had its own loop instead: `WAVE` (12)
+  items a frame, `WAVE_DELAY` apart, walking the list taken when the merchant opened exactly once, so
+  an item the merchant did not take was never tried again. Now, from the frame after the merchant
+  opens (`C_Timer.After(0)`), each round sells at once every item still there (`SaleSlots`: the slot
+  read again, `StillThere`: the same item GUID, never an empty one, unlocked, still bought, not
+  refundable now), then `SELL_DELAY` (0.2 s) later the next round reads again what is left: an item
+  still selling is locked and skipped, one the merchant did not take is sold again. It ends on a round
+  that finds nothing left, when the merchant closes, or after `SELL_ROUNDS` (50, about 10 s) rounds of
+  a merchant that keeps refusing. **Not measured:** why the old loop stopped at 10 (no capture of a sale
+  yet). A profiler capture of a sale now shows each round in the call trace (`Automation.SaleSlots`
+  returns the slots it sells, `Automation.FinishSale` why it ended).
+- **Waits** (a round at a time, not counted) while the cursor holds an item, as Vendor does; selling with something on
   the cursor could sell or swap the wrong item. Blizzard's own question about an item still tradeable
   with your group (`CONFIRM_MERCHANT_TRADE_TIMER_REMOVAL`) puts the item on the cursor until answered,
   so the sale waits for the player's answer; BetterBags never answers it (Vendor does).
-- **Ends** when nothing is left, and sells nothing more once the merchant closed (between waves too);
-  reopening the merchant ends a waiting sale first. It prints, once at the end, what it sold and for how
-  much (`C_CurrencyInfo.GetCoinTextureString`).
+- **Ends** as above, and sells nothing more once the merchant closed (between rounds too); reopening the
+  merchant ends a waiting sale first. It prints, once at the end, what it sold and for how much
+  (`C_CurrencyInfo.GetCoinTextureString`): the items it sold that are no longer in their slot or are
+  still selling (locked); what the merchant did not take is left out (the first version counted every
+  item it tried).
 
 ## 4. Destroying (`DestroyQueue`, `DestroyNext`; the vendor's destroy card and the key binding)
 
@@ -132,13 +142,16 @@ The category's list line ends "Sells at merchants" or "Sells, destroys the rest"
 
 - `spec/automation_spec.lua`: which items (order, the backpack's bags, Recent Items ignored, every reason
   to leave one alone, what sell and destroy categories sell and destroy); selling (the events, all at
-  once the frame after the merchant opens, the summary and its money, Shift, a merchant that does not
-  buy on retail and Classic, the limit with and without more left, the limit off, the merchant closing
-  first, waiting for the cursor, items that moved, locked or became refundable, a reopened merchant,
-  items without a GUID); the destroy queue (still in its slot, what a sale holds, what it left unsold,
+  once the frame after the merchant opens, the summary and its money, 30 items in one round, a merchant
+  taking 10 a round with the rest sold the next, an item still selling counted once, the rounds' bound
+  with only what sold counted, the merchant closing between rounds, Shift, a merchant that does not buy
+  on retail and Classic, the merchant closing first, waiting for the cursor between rounds, items that
+  moved, locked or became refundable, a reopened merchant, items without a GUID); the destroy queue (still in its slot, what a sale holds, what it left unsold,
   what it sold while the bags catch up, a new merchant, `automation/Changed`); destroying (the next
   item, the cursor, combat, nothing left, an item that moved, one not picked up, the key binding).
-- `spec/next/vendor_spec.lua` ("the destroy card": the items, the line, the crimson edge and its place;
+- `spec/next/merchant_spec.lua` ("in rounds": all at once then again what is left, the bound, the
+  merchant closing, waiting without counting a round); `spec/next/vendor_spec.lua` (Classic Sell Junk
+  handing its three rounds to them); `spec/next/vendor_spec.lua` ("the destroy card": the items, the line, the crimson edge and its place;
   the scroll area's room and the root's height; nothing to destroy; one click, then what is left, then
   gone; the tooltip and its next item; following the queue on each message, fading in; the minimum
   height; laying out again only when it appears or goes; as many as fit and "+N"; the merchant closing
@@ -155,12 +168,17 @@ The category's list line ends "Sells at merchants" or "Sells, destroys the rest"
   enabled), `spec/integration/next_settings_spec.lua` (built on the whole addon).
 - Mutation-tested: 72 mutations for the first version, 44 for the switches, the bulk sale and the card,
   7 for reading refundability with the slot, 32 for waves, the two switches, the shared card and
-  the destroy card on it, and 7 for the tab's settings rows (all caught). Of the last set three first survived: one led to a test (a sale of exactly one
-  wave), one was dead code, removed (a color the card stored and never read), and one is equivalent
-  (the destroy action check, §2).
+  the destroy card on it, and 7 for the tab's settings rows (all caught). Of the waves' set three
+  first survived: one led to a test (a sale of exactly one wave), one was dead code, removed (a color
+  the card stored and never read), and one is equivalent (the destroy action check, §2). The waves
+  were later replaced by the vendor's rounds (§3): 20 mutations of the rounds, the sale on them and
+  Sell Junk on them; four first survived: three led to tests (a wait not counted over two rounds, the
+  merchant closing mid-round, a merchant reopened mid-sale saying each sale once) and one was a
+  redundant check, removed (`StartSale` returning for a replaced sale, which the open check already
+  stops at its first round).
 
-**Not verified in game:** a sale at a real merchant (retail, Classic, WoW: Forever), selling a wave of
-12 in one frame against the server, the trade-timer question during a sale, `IsSellAllJunkEnabled` at a
+**Not verified in game:** a sale at a real merchant (retail, Classic, WoW: Forever), selling every item
+in one round against the server, the trade-timer question during a sale, `IsSellAllJunkEnabled` at a
 repair-only merchant, whether a sold slot reads locked at once, and destroying from the card and the key
 binding. To check: make a category `rarity = poor` with Auto Sell on, open a merchant (once holding
 Shift), and a category with Destroy What Can't Be Sold on holding an item merchants do not buy; open a

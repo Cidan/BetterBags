@@ -517,42 +517,27 @@ describe("NextVendor", function()
       assert.is_nil(asked)
     end)
 
-    it("asks first on Classic, then sells the junk, again a moment later while junk is left", function()
+    -- The rounds themselves (NextMerchant:SellRounds) are the merchant spec's; category automation sells
+    -- through them too.
+    it("asks first on Classic, then sells the junk in three rounds, reading what junk is left each time", function()
       data.hasSellAll = false
+      local rounds
+      override(stubs.merchant, "SellRounds", function(_, slotsOf, stillOpen, n)
+        rounds = { slotsOf = slotsOf, stillOpen = stillOpen, n = n }
+      end)
       local v = open()
       click(v.sellJunkButton)
       assert.are.equal("Sell Junk", asked.title)
       assert.are.equal("Sell 2 junk items? Only the last 12 items sold can be bought back.", asked.text)
+      assert.is_nil(rounds, "nothing before the answer")
       asked.yes()
-      assert.are.same({ { slots = data.junkSlots, open = true } }, calls.sellSlots)
-      runTimers()
-      assert.are.equal(2, #calls.sellSlots)
+      assert.are.equal(3, rounds.n)
+      assert.are.equal(data.junkSlots, rounds.slotsOf())
       data.junkSlots = {}
-      runTimers()
-      assert.are.equal(2, #calls.sellSlots, "stops once none is left")
-      assert.are.same({}, timers)
-    end)
-
-    it("sells at most three rounds", function()
-      data.hasSellAll = false
-      local v = open()
-      click(v.sellJunkButton)
-      asked.yes()
-      runTimers()
-      runTimers()
-      runTimers()
-      assert.are.equal(3, #calls.sellSlots)
-      assert.are.same({}, timers)
-    end)
-
-    it("stops selling once the vendor has closed", function()
-      data.hasSellAll = false
-      local v = open()
-      click(v.sellJunkButton)
-      asked.yes()
+      assert.are.same({}, rounds.slotsOf(), "read again each round")
+      assert.is_true(rounds.stillOpen())
       eventsRegistered["MERCHANT_CLOSED"](ctx())
-      runTimers()
-      assert.are.equal(1, #calls.sellSlots)
+      assert.is_false(rounds.stillOpen(), "not once the vendor has closed")
     end)
   end)
 

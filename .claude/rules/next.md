@@ -813,7 +813,9 @@ asks it with its stack split frame (not a confirmation).
   BetterBags asks (its own dialog, saying only the last 12 sold can be bought back), then sells the
   poor items worth something (`UpdateJunkItem`'s rule) with `C_Container.UseContainerItem`, three
   rounds 0.2 s apart while junk is left and the vendor is open (items lock while they sell; GW2_UI
-  sells the same way), as Move Categories already sells.
+  sells the same way), as Move Categories already sells. The rounds are `NextMerchant:SellRounds`,
+  which category automation sells through too (automation.md §3): each round sells at once what is left
+  then (`SellSlots`), ending on a round that finds nothing.
 
 ### 10e. Taint, and what is not verified
 

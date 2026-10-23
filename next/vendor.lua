@@ -59,10 +59,8 @@ local dockCard = addon:GetModule('NextDockCard')
 local nextVendor = addon:NewModule('NextVendor')
 
 local TAB_BUY, TAB_BUYBACK, TAB_REPAIR = 1, 2, 3
--- How many times Classic's Sell Junk sells what junk is left, a moment apart (items lock while they
--- sell; GW2_UI sells the same way).
+-- How many times Classic's Sell Junk sells what junk is left, a moment apart (NextMerchant:SellRounds).
 local SELL_ROUNDS = 3
-local SELL_DELAY = 0.2
 -- How many items sold buyback keeps (Blizzard's BUYBACK_ITEMS_PER_PAGE); a section sale of more
 -- asks first.
 local BUYBACK_KEEPS = 12
@@ -820,7 +818,8 @@ function vendorProto:Sell(ctx, sale, confirmed)
 end
 
 -- SellJunk sells the junk in the bags: through Blizzard's own Sell All Junk where the client has
--- it (its confirmation included), else after asking, a few rounds a moment apart.
+-- it (its confirmation included), else after asking, a few rounds a moment apart (SellRounds), each
+-- selling the junk left then.
 function vendorProto:SellJunk()
   if merchant:HasSellAllJunk() then
     merchant:SellAllJunk()
@@ -832,25 +831,10 @@ function vendorProto:SellJunk()
   end
   question:YesNo(L:G("Sell Junk"),
     format(L:G("Sell %d junk items? Only the last 12 items sold can be bought back."), n),
-    function() self:sellJunkRound(SELL_ROUNDS) end, function() end)
-end
-
----@private
----@param rounds number
-function vendorProto:sellJunkRound(rounds)
-  if not self.atMerchant then
-    return
-  end
-  local slots = merchant:JunkSlots()
-  if #slots == 0 then
-    return
-  end
-  merchant:SellSlots(slots, function() return self.atMerchant end)
-  if rounds > 1 then
-    C_Timer.After(SELL_DELAY, function()
-      self:sellJunkRound(rounds - 1)
-    end)
-  end
+    function()
+      merchant:SellRounds(function() return merchant:JunkSlots() end, function() return self.atMerchant end,
+        SELL_ROUNDS)
+    end, function() end)
 end
 
 -- RepairAll repairs everything, from the guild bank with guild, as Blizzard's repair buttons do.

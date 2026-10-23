@@ -34,11 +34,9 @@ local automation = addon:NewModule('Automation')
 -- What a category's automation holds: Auto Sell, or Auto Sell and Destroy What Can't Be Sold.
 automation.SELL = "sell"
 automation.DESTROY = "destroy"
--- A sale sells this many items at once, then the next as many a moment later, until all are sold.
-automation.WAVE = 12
-automation.WAVE_DELAY = 0.2
--- How long a sale waits to look again while the cursor holds an item.
-automation.CURSOR_WAIT = 0.2
+-- How many rounds a sale sells at most (NextMerchant:SellRounds, a moment apart): it ends sooner, on a
+-- round with nothing left to sell; this bounds a merchant that keeps refusing.
+automation.SELL_ROUNDS = 50
 
 ---@class AutomationEntry
 ---@field data ItemData The item, as the bags last read it.
@@ -48,9 +46,8 @@ automation.CURSOR_WAIT = 0.2
 
 ---@class AutomationSale
 ---@field list AutomationEntry[]
----@field index number The next entry to sell.
----@field sold number
----@field value number Copper.
+---@field tried table<AutomationEntry, number> The items sold, with how many each slot held then.
+---@field finished? boolean
 
 function automation:Init()
   self.atMerchant = false
@@ -214,10 +211,9 @@ function automation:StillThere(entry, forSale)
   return info.stackCount or 1
 end
 
--- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy: a wave at
--- once from the frame after it opens (as a section dragged onto BetterBags Next's vendor sells), then the
--- next a moment later, until all are sold. Holding Shift as it opens sells nothing. It returns what it
--- did, for profiler traces.
+-- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy, from the
+-- frame after it opens (StartSale). Holding Shift as it opens sells nothing. It returns what it did, for
+-- profiler traces.
 ---@param ctx Context
 ---@return string
 function automation:OnMerchantShow(ctx)
@@ -236,9 +232,9 @@ function automation:OnMerchantShow(ctx)
     return "nothing"
   end
   ---@type AutomationSale
-  local sale = { list = list, index = 1, sold = 0, value = 0 }
+  local sale = { list = list, tried = {} }
   self.sale = sale
-  C_Timer.After(0, function() self:SellStep(sale) end)
+  C_Timer.After(0, function() self:StartSale(sale) end)
   return "selling"
 end
 
@@ -248,52 +244,63 @@ function automation:OnMerchantClosed(ctx)
   self.atMerchant = false
 end
 
--- SellStep sells the sale's next wave: up to WAVE items still there, at once, then the next wave
--- WAVE_DELAY later. It waits while the cursor holds an item, and sells nothing once the merchant closed.
--- It returns what it did.
+-- StartSale sells the sale through the vendor's own sale (NextMerchant:SellRounds), as a section dropped
+-- on BetterBags Next's vendor sells: every item still there at once, then, a moment later, what the
+-- merchant did not take, round after round until nothing is left, the merchant closes, a new sale
+-- replaces it (the merchant opened again) or SELL_ROUNDS ran. It returns what it did.
 ---@param sale AutomationSale
 ---@return string
-function automation:SellStep(sale)
-  if self.sale ~= sale then
-    return "replaced"
-  end
-  if not self.atMerchant then
-    return self:FinishSale(sale, "closed")
-  end
-  if CursorHasItem() then
-    C_Timer.After(self.CURSOR_WAIT, function() self:SellStep(sale) end)
-    return "waiting"
-  end
-  local wave = 0
-  while sale.index <= #sale.list do
-    local entry = sale.list[sale.index]
-    sale.index = sale.index + 1
-    local count = self:StillThere(entry, true)
-    if count then
-      C_Container.UseContainerItem(entry.data.bagid, entry.data.slotid)
-      sale.sold = sale.sold + 1
-      sale.value = sale.value + count * priceOf(entry.data)
-      wave = wave + 1
-      if wave >= self.WAVE and sale.index <= #sale.list then
-        C_Timer.After(self.WAVE_DELAY, function() self:SellStep(sale) end)
-        return "wave"
-      end
-    end
-  end
-  return self:FinishSale(sale, "done")
+function automation:StartSale(sale)
+  -- NextMerchant loads after this file (the TOC's order): it is looked up when a sale starts.
+  addon:GetModule('NextMerchant'):SellRounds(function() return self:SaleSlots(sale) end,
+    function() return self.atMerchant and self.sale == sale end, self.SELL_ROUNDS,
+    function(reason) self:FinishSale(sale, reason) end)
+  return "selling"
 end
 
--- FinishSale ends a sale and says what it sold. It returns why it ended.
+-- SaleSlots returns the slots of the sale's items still there to sell now (StillThere: not one sold
+-- and still locked, moved, or refundable now), remembering how many each held; nil while the cursor
+-- holds an item, to look again in a moment.
+---@param sale AutomationSale
+---@return {bag: number, slot: number}[]?
+function automation:SaleSlots(sale)
+  if CursorHasItem() then
+    return nil
+  end
+  local slots = {}
+  for _, entry in ipairs(sale.list) do
+    local count = self:StillThere(entry, true)
+    if count then
+      table.insert(slots, { bag = entry.data.bagid, slot = entry.data.slotid })
+      sale.tried[entry] = count
+    end
+  end
+  return slots
+end
+
+-- FinishSale ends a sale, once, and says what it sold: the items it sold that are no longer in their
+-- slot, or still selling (locked); what the merchant did not take is left out. It returns why it ended.
 ---@param sale AutomationSale
 ---@param reason string
 ---@return string
 function automation:FinishSale(sale, reason)
+  if sale.finished then
+    return reason
+  end
+  sale.finished = true
   if self.sale == sale then
     self.sale = nil
   end
-  if sale.sold > 0 then
-    local what = sale.sold == 1 and L:G("Sold %d item for %s.") or L:G("Sold %d items for %s.")
-    print("BetterBags: " .. format(what, sale.sold, coins(sale.value)))
+  local sold, value = 0, 0
+  for entry, count in pairs(sale.tried) do
+    if not self:StillThere(entry, true) then
+      sold = sold + 1
+      value = value + count * priceOf(entry.data)
+    end
+  end
+  if sold > 0 then
+    local what = sold == 1 and L:G("Sold %d item for %s.") or L:G("Sold %d items for %s.")
+    print("BetterBags: " .. format(what, sold, coins(value)))
   end
   return reason
 end

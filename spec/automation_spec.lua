@@ -18,6 +18,15 @@ local events = StubBetterBagsModule("Events")
 ResetModuleStub("Automation", "data/automation.lua")
 LoadBetterBagsModule("data/automation.lua")
 local automation = addon:GetModule("Automation")
+-- The vendor's sale (NextMerchant:SellRounds), which a sale goes through.
+StubBetterBagsModule("Sort")
+StubBetterBagsModule("Database")
+StubBetterBagsModule("TooltipScanner")
+local search = StubBetterBagsModule("Search")
+search.Init = search.Init or function() end
+ResetModuleStub("NextMerchant", "next/merchant.lua")
+LoadBetterBagsModule("next/merchant.lua")
+local merchant = addon:GetModule("NextMerchant")
 
 local BACKPACK = 0
 
@@ -238,18 +247,87 @@ describe("Automation", function()
       assert.are.same({}, used, "closed before the first sale")
     end)
 
-    -- In bulk, as a backpack section dragged onto BetterBags Next's vendor sells (asked).
-    it("sells a wave at once, the frame after the merchant opens, then says what it sold for", function()
+    -- Through the vendor's sale (NextMerchant:SellRounds; asked: "look at our autosell code we have
+    -- already"): everything still there at once, the frame after the merchant opens, as a section
+    -- dropped on BetterBags Next's vendor sells; then, a moment later, what the merchant did not take.
+    it("sells everything still there at once, the frame after the merchant opens, then says what it sold", function()
       put(0, 1, 11, "Junk", { count = 3, price = 100 })
       put(0, 2, 12, "Trash", { price = 50 })
       put(0, 3, 13, "Mats")
       assert.are.equal("selling", automation:OnMerchantShow(ctx()))
       assert.are.same({}, used, "nothing in the frame the merchant opens")
-      assert.are.equal(1, run())
+      run()
       assert.are.same({ "0_1", "0_2" }, used)
+      assert.are.same({ merchant.SELL_DELAY }, { timers[1].delay }, "it looks again a moment later")
+      run()
       assert.are.same({ "BetterBags: Sold 2 items for 350c." }, printed)
       assert.is_nil(automation.sale)
-      assert.are.same({}, timers, "done in one go")
+      assert.are.same({}, timers)
+    end)
+
+    -- Asked: "our yolo sell only sells 10 items, then stops".
+    it("sells every item in one round, however many", function()
+      for slot = 1, 30 do put(1 + math.floor((slot - 1) / 20), (slot - 1) % 20 + 1, 100 + slot, "Junk") end
+      automation:OnMerchantShow(ctx())
+      run()
+      assert.are.equal(30, #used)
+      run()
+      assert.are.same({ "BetterBags: Sold 30 items for 3000c." }, printed)
+    end)
+
+    -- takes makes the merchant take only that many items a round, leaving the others in their slots.
+    local function takes(n)
+      local taken = 0
+      C_Container.UseContainerItem = function(bag, slot)
+        table.insert(used, bag .. "_" .. slot)
+        if taken < n then
+          taken = taken + 1
+          slots[bag .. "_" .. slot] = nil
+        end
+      end
+      return function() taken = 0 end
+    end
+
+    it("sells again, a moment later, what the merchant did not take, until nothing is left", function()
+      for slot = 1, 14 do put(1, slot, 100 + slot, "Junk") end
+      local nextRound = takes(10)
+      automation:OnMerchantShow(ctx())
+      run()
+      assert.are.equal(14, #used)
+      nextRound()
+      run()
+      assert.are.equal(18, #used, "the 4 it did not take, again")
+      run()
+      assert.are.same({ "BetterBags: Sold 14 items for 1400c." }, printed)
+      assert.are.same({}, timers)
+    end)
+
+    it("counts an item still selling as sold", function()
+      put(0, 1, 11, "Junk")
+      put(0, 2, 12, "Junk")
+      C_Container.UseContainerItem = function(bag, slot)
+        table.insert(used, bag .. "_" .. slot)
+        slots[bag .. "_" .. slot].live.isLocked = true
+      end
+      sell()
+      assert.are.same({ "0_1", "0_2" }, used, "a locked item is not sold twice")
+      assert.are.same({ "BetterBags: Sold 2 items for 200c." }, printed)
+    end)
+
+    it("stops after its rounds when the merchant keeps refusing, saying only what it sold", function()
+      put(0, 1, 11, "Junk")
+      put(0, 2, 12, "Junk")
+      C_Container.UseContainerItem = function(bag, slot)
+        table.insert(used, bag .. "_" .. slot)
+        if slot == 1 then
+          slots["0_1"] = nil
+        end
+      end
+      sell()
+      assert.are.equal(1 + automation.SELL_ROUNDS, #used, "0_1 once, 0_2 every round")
+      assert.are.same({ "BetterBags: Sold 1 item for 100c." }, printed)
+      assert.are.same({}, timers)
+      assert.is_nil(automation.sale)
     end)
 
     it("sells nothing while Shift is held, at a merchant that does not buy, or with nothing to sell", function()
@@ -290,53 +368,31 @@ describe("Automation", function()
       assert.are.equal(0, deleted)
     end)
 
-    -- Asked: keep selling past 12 in waves; stopping there was pointless.
-    it("sells everything in waves a moment apart, saying what it sold once done", function()
-      for slot = 1, 30 do put(1 + math.floor((slot - 1) / 20), (slot - 1) % 20 + 1, 100 + slot, "Junk") end
-      automation:OnMerchantShow(ctx())
-      run()
-      assert.are.equal(automation.WAVE, #used)
-      assert.are.same({}, printed, "nothing said mid-sale")
-      assert.are.equal(1, #timers)
-      assert.are.equal(automation.WAVE_DELAY, timers[1].delay)
-      run()
-      assert.are.equal(2 * automation.WAVE, #used)
-      run()
-      assert.are.equal(30, #used)
-      assert.are.same({}, timers)
-      assert.are.same({ "BetterBags: Sold 30 items for 3000c." }, printed)
-      assert.is_nil(automation.sale)
-    end)
-
-    it("finishes with the wave that sells the last item", function()
-      for slot = 1, automation.WAVE do put(1, slot, 100 + slot, "Junk") end
-      automation:OnMerchantShow(ctx())
-      run()
-      assert.are.equal(automation.WAVE, #used)
-      assert.are.same({}, timers, "no empty wave after it")
-      assert.are.equal(1, #printed)
-    end)
-
-    it("stops between waves when the merchant closes, saying what it sold", function()
+    it("stops between rounds when the merchant closes, saying only what it sold", function()
       for slot = 1, 14 do put(1, slot, 100 + slot, "Junk") end
+      takes(10)
       automation:OnMerchantShow(ctx())
       run()
       automation:OnMerchantClosed(ctx())
       run()
-      assert.are.equal(automation.WAVE, #used)
-      assert.are.same({ "BetterBags: Sold 12 items for 1200c." }, printed)
+      assert.are.equal(14, #used)
+      assert.are.same({ "BetterBags: Sold 10 items for 1000c." }, printed)
+      assert.are.same({}, timers)
     end)
 
-    it("waits for the cursor between waves", function()
+    it("waits for the cursor between rounds", function()
       for slot = 1, 14 do put(1, slot, 100 + slot, "Junk") end
+      local nextRound = takes(10)
       automation:OnMerchantShow(ctx())
       run()
       cursor = true
-      run()
-      assert.are.equal(automation.WAVE, #used)
-      cursor = false
+      nextRound()
       run()
       assert.are.equal(14, #used)
+      assert.are.equal(1, #timers, "it looks again")
+      cursor = false
+      run()
+      assert.are.equal(18, #used)
     end)
 
     it("sells nothing when the merchant closed before the sale", function()
@@ -374,6 +430,18 @@ describe("Automation", function()
       assert.are.same({ "0_4" }, used)
     end)
 
+    it("says each sale once when the merchant reopens mid-sale", function()
+      for slot = 1, 14 do put(1, slot, 100 + slot, "Junk") end
+      local nextRound = takes(10)
+      automation:OnMerchantShow(ctx())
+      run()
+      automation:OnMerchantShow(ctx())
+      assert.are.same({ "BetterBags: Sold 10 items for 1000c." }, printed, "the first sale ends")
+      nextRound()
+      sell()
+      assert.are.same({ "BetterBags: Sold 10 items for 1000c.", "BetterBags: Sold 4 items for 400c." }, printed)
+    end)
+
     it("sells once when the merchant reopened before the sale", function()
       put(0, 1, 11, "Junk")
       put(0, 2, 12, "Junk")
@@ -381,7 +449,9 @@ describe("Automation", function()
       automation:OnMerchantShow(ctx())
       run()
       assert.are.same({ "0_1", "0_2" }, used)
+      run()
       assert.are.same({ "BetterBags: Sold 2 items for 200c." }, printed)
+      assert.are.same({}, timers)
     end)
   end)
 

@@ -542,5 +542,88 @@ describe("NextMerchant", function()
       merchant:SellSlots({ { bag = 0, slot = 1 } }, function() return false end)
       assert.are.equal(2, #used, "not once the merchant has closed")
     end)
+
+    -- Rounds: what a round sells is read again each round (items lock while they sell, and what the
+    -- merchant did not take is still there), as the vendor's Classic Sell Junk and GW2_UI sell. Shared by
+    -- Sell Junk and category automation (automation.md §3).
+    describe("in rounds", function()
+      local used, timers, ended, left
+
+      before_each(function()
+        used, timers, ended = {}, {}, {}
+        left = { { bag = 0, slot = 1 }, { bag = 0, slot = 2 }, { bag = 1, slot = 3 } }
+        override(C_Container, "UseContainerItem", function(bag, slot) table.insert(used, bag .. "_" .. slot) end)
+        override(_G, "C_Timer", { After = function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end })
+      end)
+
+      local function step()
+        local due = timers
+        timers = {}
+        for _, t in ipairs(due) do t.fn() end
+        return #due
+      end
+
+      local function sell(rounds, open)
+        merchant:SellRounds(function() return left end, open, rounds, function(why) table.insert(ended, why) end)
+      end
+
+      it("sells all a round finds at once, then looks again a moment later", function()
+        sell(5)
+        assert.are.same({ "0_1", "0_2", "1_3" }, used, "the first round at once")
+        assert.are.same({ merchant.SELL_DELAY }, { timers[1].delay })
+        left = { { bag = 0, slot = 2 } }
+        step()
+        assert.are.same({ "0_1", "0_2", "1_3", "0_2" }, used, "what was not taken, again")
+        left = {}
+        step()
+        assert.are.same({ "done" }, ended, "a round that finds nothing ends it")
+        assert.are.same({}, timers)
+      end)
+
+      it("stops after its rounds", function()
+        sell(2)
+        step()
+        assert.are.equal(6, #used)
+        assert.are.same({ "rounds" }, ended)
+        assert.are.same({}, timers)
+      end)
+
+      it("stops once the merchant has closed", function()
+        local open = true
+        sell(5, function() return open end)
+        open = false
+        step()
+        assert.are.equal(3, #used)
+        assert.are.same({ "closed" }, ended)
+        assert.are.same({}, timers)
+      end)
+
+      it("waits a moment, without counting a round, while nothing may be sold yet", function()
+        local wait = true
+        merchant:SellRounds(function()
+          if wait then return nil end
+          return left
+        end, nil, 2, function(why) table.insert(ended, why) end)
+        assert.are.same({}, used)
+        step()
+        assert.are.same({}, used)
+        wait = false
+        step()
+        assert.are.equal(3, #used)
+        step()
+        assert.are.equal(6, #used, "both rounds, the wait not counted")
+        assert.are.same({ "rounds" }, ended)
+      end)
+
+      it("stops mid-round once the merchant has closed", function()
+        local open = true
+        override(C_Container, "UseContainerItem", function(bag, slot)
+          table.insert(used, bag .. "_" .. slot)
+          open = false
+        end)
+        sell(5, function() return open end)
+        assert.are.same({ "0_1" }, used)
+      end)
+    end)
   end)
 end)

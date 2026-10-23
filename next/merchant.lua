@@ -568,4 +568,45 @@ function merchant:SellSlots(slots, stillOpen)
   end
 end
 
+-- How long a round of selling waits for the one before it (SellRounds).
+merchant.SELL_DELAY = 0.2
+
+-- SellRounds sells round after round, SELL_DELAY apart, every slot slotsOf returns at that moment
+-- (SellSlots, all at once), while stillOpen (when given) says the merchant is open: rounds at most,
+-- ending on a round that finds nothing. Each round reads again what is left: items lock while they
+-- sell, and what the merchant did not take is still there (as GW2_UI sells; the vendor's Classic Sell
+-- Junk and category automation, automation.md §3). slotsOf returns nil while nothing may be sold yet
+-- (the cursor holds an item): that round waits and does not count. The first round runs now. done is
+-- called once with why it ended: "done", "rounds" or "closed".
+---@param slotsOf fun(): {bag: number, slot: number}[]?
+---@param stillOpen? fun(): boolean
+---@param rounds number
+---@param done? fun(reason: string)
+function merchant:SellRounds(slotsOf, stillOpen, rounds, done)
+  local function finish(reason)
+    if done then
+      done(reason)
+    end
+  end
+  local function round(roundsLeft)
+    if stillOpen and not stillOpen() then
+      return finish("closed")
+    end
+    local slots = slotsOf()
+    if slots == nil then
+      C_Timer.After(self.SELL_DELAY, function() round(roundsLeft) end)
+      return
+    end
+    if #slots == 0 then
+      return finish("done")
+    end
+    self:SellSlots(slots, stillOpen)
+    if roundsLeft <= 1 then
+      return finish("rounds")
+    end
+    C_Timer.After(self.SELL_DELAY, function() round(roundsLeft - 1) end)
+  end
+  round(rounds)
+end
+
 merchant:Init()
