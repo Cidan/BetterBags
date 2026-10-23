@@ -390,6 +390,9 @@ section is being dragged or landing.
   From then on it follows the cursor, the grabbed point staying under it.
 - A section waiting in another panel's dock is held out of the column (`NextContent:HoldOut`, §7
   "Docked sections"): never placed, never in a drag's places, never faded in, kept bound.
+- A section moved away is left out while leaving (`MarkLeaving`) and comes back once its time is up with
+  its items still there; `MarkLeaving` lays the column out again then (`C_Timer.After`), since nothing
+  else may draw the bag (reported: a section the merchant did not take all of stayed hidden, "limbo").
 - The canvas keeps a gap the section's height where it was (`NextContent:BeginDrag`), so the other
   sections do not move until the cursor does.
 
@@ -491,6 +494,12 @@ kept a gap) and a separate destroy card along the vendor's bottom; both are gone
   (its buttons drawn and kept up to date), and it flies from where it is into its card (`NextLift:Land`,
   aimed at the card each frame, to its scale there). Its bag reading it again resizes it, and the card
   follows.
+- **Answering later:** an offer that acts on its own (a sale, sold one item at a time) is told it is
+  docked (`docked(entry)`), says how far it is with `NextDock:Refresh(entry)` and answers once done with
+  `NextDock:Answer(entry, answer)`; an answer for a section no longer docked does nothing (a sale that
+  ended as it started answers while its double click is still answering). Every way a section leaves the
+  dock (an answer, a right click, a panel closing, its bag dropping it) calls the offer's `cancel`, which
+  stops what it started.
 - **Answers:** a double click (`confirm`) and a left click (`click`) go to the offer: "moved" flies the
   section into the panel (the tab it came in by, else the scroll area's middle; `NextLift:FlyAway`),
   then it returns to its bag's column hidden and leaving (`MarkLeaving`, as a move's section does) and
@@ -749,14 +758,18 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   every pile its virtual stack hides (`sectionFrame:WithStacks`, shared with Move Categories), in
   the backpack's bags, each slot once, leaving out what the vendor does not buy (`hasNoValue`) and
   refundable purchases (`C_Item.CanBeRefunded`: Blizzard asks before refunding one, and
-  `UseContainerItem` would refund it without asking). `Sell` sells it at once (`SellSlots`, while
-  the vendor is open) when buyback can keep all of it (12, Blizzard's `BUYBACK_ITEMS_PER_PAGE`).
-  Past that, `Sell` sells nothing unless `confirmed` and returns `"confirm"` with the text to
-  confirm with ("Sell 13 items?", "Only the last 12 items sold can be bought back.", "Double-click
-  to sell · Right-click to cancel"): the section docks in the vendor until a double click confirms
-  it (§7, "Confirming in the target", "Docked sections"). The section flies into the vendor when it sold, and lands
-  back in its place when nothing sells. Selling needs a mouse click, as moves do: the drop's release,
-  or the double click; a drag ended without a release sells nothing. Unlike a right click on the
+  `UseContainerItem` would refund it without asking), and what this merchant refused (seller.md §3:
+  it stays in the bags until a merchant buys it). A section with something to sell docks in the vendor
+  (§7, "Docked sections") with the vendor's `SaleOffer` (`SectionOffer`, the offer a category Auto Sell
+  offers uses too, automation.md §4a): when buyback can keep all of it (12, Blizzard's
+  `BUYBACK_ITEMS_PER_PAGE`) it sells as it docks; past that it waits for a double click ("Sell 13
+  items?", "Only the last 12 items sold can be bought back.", "Double-click to sell · Right-click to
+  cancel"). The Seller (seller.md) sells it one item at a time while the card says how far it is
+  ("Selling N of M..."); then the section flies into the vendor, or goes back to its place with what
+  the merchant did not take. It lands back in its place at once when nothing sells. Until this change a
+  sale of up to 12 sold everything at once and flew straight into the vendor, which hit "That object
+  is busy." and could hide unsold items (reported). Selling needs a mouse click, as moves do: the drop's
+  release, or the double click; a drag ended without a release sells nothing. Unlike a right click on the
   header (Move Categories), it does not need Enable Category Sell and Deposit and is not cut to 10
   items: the drag is the deliberate act, and the confirmation covers what buyback cannot.
 - **Categories waiting at a merchant** (automation.md §4a): a backpack category whose sale Auto Sell
@@ -836,11 +849,8 @@ asks it with its stack split frame (not a confirmation).
 - **Sell Junk:** retail and Forever call `MerchantFrame_OnSellAllJunkButtonClicked`, Blizzard's own
   button handler (its confirmation, then `C_MerchantFrame.SellAllJunkItems`). Classic has neither:
   BetterBags asks (its own dialog, saying only the last 12 sold can be bought back), then sells the
-  poor items worth something (`UpdateJunkItem`'s rule) with `C_Container.UseContainerItem`, three
-  rounds 0.2 s apart while junk is left and the vendor is open (items lock while they sell; GW2_UI
-  sells the same way), as Move Categories already sells. The rounds are `NextMerchant:SellRounds`,
-  which category automation sells through too (automation.md §3): each round sells at once what is left
-  then (`SellSlots`), ending on a round that finds nothing.
+  poor items worth something (`UpdateJunkItem`'s rule) through the Seller (seller.md), one at a time
+  while the vendor is open, as every sale.
 
 ### 10e. Taint, and what is not verified
 

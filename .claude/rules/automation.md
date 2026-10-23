@@ -66,7 +66,7 @@ Vendor rule.
   item no merchant buys is already left alone, so `DestroyQueue`'s own check for the destroy action is
   one no mutation can catch; it is kept because it says what the queue is.)
 
-## 3. Selling (`OnMerchantShow`, `StartSale`, `SaleSlots`, `FinishSale`)
+## 3. Selling (`OnMerchantShow`, `StartSale`, `FinishSale`)
 
 - On `MERCHANT_SHOW` (registered in `OnEnable`; the module is enabled from `addon:OnEnable`), in both
   designs: BetterBags Next's merchant panel keeps Blizzard's merchant frame shown (next/vendor.lua), so a
@@ -80,33 +80,20 @@ Vendor rule.
   in the vendor (§4), the same box a dragged section's sale waits in; the classic design has no such box,
   so it is left to the player's usual Move Categories right click on its title (never a dialog of its
   own: one interface for one action, CLAUDE.md "UI Consistency" 5).
-- **Through the vendor's own sale, in rounds** (`NextMerchant:SellRounds`, shared with BetterBags
-  Next's Classic Sell Junk). Reported: "our yolo sell only sells 10 items, then stops ... look at our
-  autosell code we have already and see how it manages to autosell (or auto deposit in the case of
-  bank) unlimited items". Every path that moves many items at once calls `C_Container.UseContainerItem`
-  for all of them in one go (`NextMerchant:SellSlots` for a section dropped on the vendor,
-  `GuildBank:DepositSlots`, `SectionFrame:MoveItems` to the bank), and what may not all go through is
-  read again and sold again a moment later (the vendor's Classic Sell Junk; GW2_UI's auto sell, which
-  keeps going until a round finds nothing). The first version had its own loop instead: `WAVE` (12)
-  items a frame, `WAVE_DELAY` apart, walking the list taken when the merchant opened exactly once, so
-  an item the merchant did not take was never tried again. Now, from the frame after the merchant
-  opens (`C_Timer.After(0)`), each round sells at once every item still there (`SaleSlots`: the slot
-  read again, `StillThere`: the same item GUID, never an empty one, unlocked, still bought, not
-  refundable now), then `SELL_DELAY` (0.2 s) later the next round reads again what is left: an item
-  still selling is locked and skipped, one the merchant did not take is sold again. It ends on a round
-  that finds nothing left, when the merchant closes, or after `SELL_ROUNDS` (50, about 10 s) rounds of
-  a merchant that keeps refusing. **Not measured:** why the old loop stopped at 10 (no capture of a sale
-  yet). A profiler capture of a sale now shows each round in the call trace (`Automation.SaleSlots`
-  returns the slots it sells, `Automation.FinishSale` why it ended).
-- **Waits** (a round at a time, not counted) while the cursor holds an item, as Vendor does; selling with something on
-  the cursor could sell or swap the wrong item. Blizzard's own question about an item still tradeable
-  with your group (`CONFIRM_MERCHANT_TRADE_TIMER_REMOVAL`) puts the item on the cursor until answered,
-  so the sale waits for the player's answer; BetterBags never answers it (Vendor does).
-- **Ends** as above, and sells nothing more once the merchant closed (between rounds too); reopening the
-  merchant ends a waiting sale first. It prints, once at the end, what it sold and for how much
-  (`C_CurrencyInfo.GetCoinTextureString`): the items it sold that are no longer in their slot or are
-  still selling (locked); what the merchant did not take is left out (the first version counted every
-  item it tried).
+- **Through the Seller** (seller.md): one item at a time, the next one an interval later (the larger
+  of the home and world latency, at least 0.2 s; Dejunk's pace, asked: "dejunk's works fine"), from the
+  frame after the merchant opens (`C_Timer.After(0)`), each still there when its turn comes
+  (`Seller:StillThere`, which `Automation:StillThere` also is). Reported first: "our yolo sell only
+  sells 10 items, then stops"; the first version sold a wave of 12 a frame, then every item still there
+  in rounds 0.2 s apart (GW2_UI's way); both handed the client many items at once, and it answered "That
+  object is busy." (reported: "autosell (double click or otherwise) will hit 'That object is busy'").
+  Items this merchant refused are left out (`SellList`, `Seller:Refuses`): they stay in the bags until a
+  merchant buys them. A merchant that refused to buy anything (`Seller:BuysNothing`) does not buy
+  (`MerchantBuys`).
+- **Ends** when the Seller's sale ends: everything sold, the merchant closed (and sells nothing more),
+  or the merchant buys nothing; reopening the merchant ends the sale first (it is cancelled). It prints,
+  once at the end, what the merchant took and for how much (`C_CurrencyInfo.GetCoinTextureString`, each
+  stack's count when sent); the Seller says what the merchant would not buy.
 
 ## 4. Destroying (`DestroyQueue`, `DestroyNext`; the vendor's destroy card and the key binding)
 
@@ -154,10 +141,16 @@ room under the scroll area) is gone: a category's items wait in the vendor's doc
   "Destroy N items", "No merchant buys these.", "Click to destroy next · Right-click to cancel", its
   glow in `Dock.DestroyColor` (Default's `Crimson`), and as its tooltip the next item a click destroys
   ("Click to destroy it.").
-- **A double click on a sale** sells what it offers then, through `NextVendor:Sell`, the same call a
-  dragged section's confirmed sale makes. If the section holds items no merchant buys, the card stays and
-  turns into their destroy, red; otherwise it flies into the vendor. A double click that found nothing to
+- **A double click on a sale** sells what it offers then through the Seller (seller.md), one item at a
+  time, as a dragged section's sale is (both are `NextVendor:SectionOffer`). The card waits while it
+  sells: "Selling N of M...", "One item at a time, as the merchant takes them.", "Right-click to stop"
+  (a right click cancels what is left and sends the section back). Once the sale ends: if the section
+  holds items no merchant buys, the card stays and turns into their destroy, red; else, with anything
+  the merchant did not take (refused, never sent), it goes back to the backpack, where those items stay
+  until a merchant buys them (asked); else it flies into the vendor. A double click that found nothing to
   sell sends it back.
+- **No sale where the merchant buys nothing** (`Automation:MerchantBuys`: a repair-only merchant, or one
+  that refused to buy anything): only destroys are offered there.
 - **A click on a destroy** destroys the next item (`DestroyNext` with the section's items), one each
   click. A double click destroys one too: `OnDoubleClick` blocks the second click's `OnClick`
   (warcraft.wiki.gg `UIHANDLER_OnDoubleClick`: "Continuous button-mashing alternates between OnClick and
@@ -190,19 +183,21 @@ The category's heading line ends "Sells at merchants" or "Sells, destroys the re
 ## 6. Coverage
 
 - `spec/automation_spec.lua`: which items (order, the backpack's bags, Recent Items ignored, every reason
-  to leave one alone, what sell and destroy categories sell and destroy); selling (the events, all at
-  once the frame after the merchant opens, the summary and its money, 30 items in one round, a merchant
-  taking 10 a round with the rest sold the next, an item still selling counted once, the rounds' bound
-  with only what sold counted, the merchant closing between rounds, Shift, a merchant that does not buy
-  on retail and Classic, the merchant closing first, waiting for the cursor between rounds, items that
-  moved, locked or became refundable, a reopened merchant, items without a GUID); the destroy queue (still in its slot, what a sale holds, what it left unsold,
+  to leave one alone, what sell and destroy categories sell and destroy); selling through the real
+  Seller (the events, one item a beat from the frame after the merchant opens, the summary and its
+  money, 30 items, a refusal left out of what sold and of the next sale here, a merchant that buys
+  nothing, the merchant closing mid-sale, Shift, a merchant that does not buy on retail and Classic, the
+  merchant closing first, waiting for the cursor, items that moved, locked or became refundable, a
+  reopened merchant mid-sale and before it, items without a GUID); the destroy queue (still in its slot, what a sale holds, what it left unsold,
   what it sold while the bags catch up, a new merchant, `automation/Changed`); destroying (the next
   item, the cursor, combat, nothing left, an item that moved, one not picked up, the key binding).
-- `spec/next/merchant_spec.lua` ("in rounds": all at once then again what is left, the bound, the
-  merchant closing, waiting without counting a round); `spec/next/vendor_spec.lua` (Classic Sell Junk
-  handing its three rounds to them); `spec/next/vendor_spec.lua` ("offering categories at a merchant":
+- `spec/seller_spec.lua` (seller.md §4); `spec/next/vendor_spec.lua` (Classic Sell Junk through the
+  Seller; a dragged section's offer: selling as it docks and its progress, flying in or going back with
+  what was not taken, past 12 only once double-clicked, nothing to sell or closing, stopping its sale,
+  only while open; refused items left out of `SaleOf`); `spec/next/vendor_spec.lua` ("offering categories at a merchant":
   docked once both show, in the backpack's order; a sale's text and glow, the buyback warning; a destroy's
-  text and red glow; a double click selling through the vendor's sale, the next coming up; a sale turning
+  text and red glow; a double click selling through the Seller, waiting while it sells, the next coming up
+  once sold; back to the backpack with what was not taken; no sale where nothing is bought; a sale turning
   into a destroy; one item per click, double clicks included, gone when none is left; nothing on a
   single click of a sale; the tooltip and the next item; once a visit, every one back when the merchant
   closes, offered again next visit; offered later when automation changes; nothing away from a merchant,
@@ -234,8 +229,8 @@ The category's heading line ends "Sells at merchants" or "Sells, destroys the re
   stops at its first round). Confirm Auto Sell and the dock at the vendor: part of the 97 mutations in
   next.md §7 ("Docked sections"), every one caught after the tests and removals listed there.
 
-**Not verified in game:** a sale at a real merchant (retail, Classic, WoW: Forever), selling every item
-in one round against the server, the trade-timer question during a sale, `IsSellAllJunkEnabled` at a
+**Not verified in game:** a sale at a real merchant (retail, Classic, WoW: Forever), the Seller's pace
+against the server (seller.md), the trade-timer question during a sale, `IsSellAllJunkEnabled` at a
 repair-only merchant, whether a sold slot reads locked at once, the docked sections flying over and
 their double clicks, and destroying from the dock and the key binding. To check: make a category
 `rarity = poor` with Auto Sell on, open a merchant (once holding Shift; once with Confirm Auto Sell off),

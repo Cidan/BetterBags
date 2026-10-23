@@ -561,6 +561,42 @@ describe("NextContent", function()
       assert.are.equal(2 * ONE, y(s.C))
     end)
 
+    -- Reported: a section sold into the vendor that the merchant did not take all of stayed hidden in
+    -- the backpack ("limbo"): nothing drew the bag again once its time was up.
+    it("lays the column out again when a leaving section's time is up, showing it while its items are there", function()
+      local s = threeSections()
+      local now, timers = 100, {}
+      override(_G, "GetTime", function() return now end)
+      override(C_Timer, "After", function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end)
+      canvas:MarkLeaving("B")
+      local leavingTimer
+      for _, t in ipairs(timers) do
+        if t.delay == nextContent.LEAVING_SECONDS then leavingTimer = t end
+      end
+      assert.is_not_nil(leavingTimer)
+      render:Flush()
+      assert.is_false(s.B.frame:IsShown())
+      now = 100 + nextContent.LEAVING_SECONDS
+      leavingTimer.fn()
+      assert.is_true(render:IsDirty(canvas))
+      render:Flush()
+      assert.is_true(s.B.frame:IsShown())
+    end)
+
+    it("does not lay the column out for a leaving section already forgotten", function()
+      threeSections()
+      local timers = {}
+      override(C_Timer, "After", function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end)
+      canvas:MarkLeaving("B", 3)
+      render:Flush()
+      bind(data({ categories = { { name = "A" }, { name = "C" } }, items = { item("0_1", "A"), item("0_3", "C") } }))
+      render:Flush()
+      for _, t in ipairs(timers) do
+        if t.delay == 3 then t.fn() end
+      end
+      assert.is_false(render:IsDirty(canvas))
+    end)
+
     it("keeps hiding a leaving section with nothing but gaps, and forgets it once it is gone", function()
       local now = 100
       override(_G, "GetTime", function() return now end)

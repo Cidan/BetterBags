@@ -418,6 +418,86 @@ describe("NextDock", function()
     end)
   end)
 
+  -- A sale takes a while (the seller sends one item at a time): its card waits on, says what is left as
+  -- it goes, and answers once the sale ends.
+  describe("answering later", function()
+    it("tells its offer it is docked, with its entry", function()
+      local seen
+      local o = offer()
+      o.docked = function(entry) seen = entry end
+      local entry = dock("B", o)
+      assert.are.equal(entry, seen)
+    end)
+
+    it("takes an answer from its offer later, the next sliding up", function()
+      local b = dock("B", offer())
+      local a = dock("A")
+      settle()
+      nextDock:Answer(b, "moved")
+      assert.are.same({ a }, nextDock:Entries(target))
+      finishTweens()
+      assert.is_true(source.content:IsLeaving(section("B")))
+      nextDock:Answer(a, "back")
+      finishTweens()
+      assert.are.same({}, nextDock:Entries(target))
+      assert.is_false(source.content:IsAway(section("A")))
+      nextDock:Answer(a, "moved")
+      assert.is_false(source.content:IsLeaving(section("A")), "nothing for one no longer docked")
+    end)
+
+    -- A sale that ends as it starts (the merchant buys nothing) answers while its double click is still
+    -- answering.
+    it("does nothing with an answer for a section already gone", function()
+      local o = offer()
+      local reads = 0
+      local text = o.text
+      o.text = function() reads = reads + 1 return text() end
+      local entry
+      o.confirm = function()
+        nextDock:Answer(entry, "back")
+        return "moved"
+      end
+      entry = dock("B", o)
+      settle()
+      local before = reads
+      doubleClick(entry)
+      assert.are.equal(before, reads, "not read again")
+      assert.are.same({}, nextDock:Entries(target))
+      assert.are.equal(1, #nextDock:ListOf(target).free, "its card freed once")
+      finishTweens()
+      assert.is_false(source.content:IsLeaving(section("B")), "sent back, not moved")
+    end)
+
+    it("reads its card again when its offer asks", function()
+      local o = offer({ title = "Selling 3 items..." })
+      local entry = dock("B", o)
+      settle()
+      o.title = "Selling 2 items..."
+      nextDock:Refresh(entry)
+      assert.are.equal("Selling 2 items...", entry.box.title:GetText())
+    end)
+
+    it("tells its offer to stop when it leaves the dock, whichever way", function()
+      local stopped = {}
+      local function stopping(name)
+        local o = offer({ answer = "moved" })
+        o.cancel = function() table.insert(stopped, name) end
+        return o
+      end
+      local b = dock("B", stopping("B"))
+      local a = dock("A", stopping("A"))
+      local c = dock("C", stopping("C"))
+      settle()
+      click(b, "RightButton")
+      assert.are.same({ "B" }, stopped)
+      doubleClick(a)
+      assert.are.same({ "B", "A" }, stopped, "moved")
+      nextDock:PanelHidden(target)
+      assert.are.same({ "B", "A", "C" }, stopped, "the panel closed")
+      local _ = c
+    end)
+  end)
+
   describe("ending", function()
     it("goes when its section leaves its bag's data, giving the frame back first", function()
       local entry = dock("B")

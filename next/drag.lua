@@ -43,10 +43,10 @@ local lift = addon:GetModule('NextLift')
 -- leaves its canvas for the drag layer with its real item buttons and follows the cursor (NextLift,
 -- which the settings lists' rows are dragged with too), the canvas keeping a gap where it would go; dropping it reorders it (saving its place), assigns its
 -- category to a tab's group, moves its items to the other bag (and that bag's tab), or sells them
--- to a seller (the vendor). Drop targets are found from the cursor's position every frame. A move the
--- target confirms first (a sale past what buyback keeps, a deposit that cannot be taken back) ends the
--- drag and hands the section to the target's dock (NextDock, a list of sections waiting there), where
--- a double click confirms it and a right click sends it back to its place.
+-- to a seller (the vendor). Drop targets are found from the cursor's position every frame. A sale (sold
+-- one item at a time, waiting until it ends, or for a double click past what buyback keeps) and a deposit
+-- the target confirms first (one that cannot be taken back) end the drag and hand the section to the
+-- target's dock (NextDock, a list of sections waiting there); a right click sends it back to its place.
 ---@class NextDrag: AceModule
 local nextDrag = addon:NewModule('NextDrag')
 
@@ -64,7 +64,7 @@ local nextDrag = addon:NewModule('NextDrag')
 ---@field IsShown fun(self): boolean
 ---@field SetDropGlow fun(self, on: boolean)
 ---@field SaleOf fun(self, list: ItemData[]): ItemData[] What of the section's items it would sell.
----@field Sell fun(self, ctx: Context, sale: ItemData[], confirmed?: boolean): string, NextConfirmation? "sold", or "confirm" and what to confirm with.
+---@field SaleOffer fun(self, section: NextSection): NextDockOffer What the section waits in its dock for while it sells (NextVendor:SaleOffer).
 
 -- NextConfirmation is what a docked section's card says for a move its target confirms first.
 ---@class (exact) NextConfirmation
@@ -523,15 +523,31 @@ function nextDrag:ApplyStyle(ctx)
   end
 end
 
--- Pend hands the dropped section to its target's dock (NextDock) to wait for a confirmation, ending the
--- drag: it flies from where it was dropped into its card there, out of its bag's column, which closes
--- up. A double click confirms (confirm moves the section's items as they are then, and the section flies
--- into the target); it is sent back to its place when nothing moved (nothing in it left to move, the
--- target closing) or on a right click.
+-- Pend docks the dropped section in its target to wait for a confirmation (Dock): a double click
+-- confirms (confirm moves the section's items as they are then, and the section flies into the target);
+-- it is sent back to its place when nothing moved (nothing in it left to move, the target closing) or on
+-- a right click.
 ---@param target NextDropTarget
 ---@param confirmation NextConfirmation
 ---@param confirm fun(ctx: Context, items: ItemData[]): boolean
 function nextDrag:Pend(target, confirmation, confirm)
+  local section, panel = self.current.section, target.panel
+  self:Dock(target, {
+    text = function() return confirmation.title, confirmation.warning, confirmation.hint end,
+    confirm = function(ctx)
+      if panel:IsShown() and not panel.closing and confirm(ctx, self:SectionItems(section)) then
+        return "moved"
+      end
+      return "back"
+    end,
+  })
+end
+
+-- Dock hands the dropped section to its target's dock (NextDock) with what it waits there for, ending the
+-- drag: it flies from where it was dropped into its card there, out of its bag's column, which closes up.
+---@param target NextDropTarget
+---@param offer NextDockOffer
+function nextDrag:Dock(target, offer)
   local state = self.current
   local section, panel = state.section, target.panel
   local from = lift:ScreenPoint(section.frame)
@@ -543,18 +559,7 @@ function nextDrag:Pend(target, confirmation, confirm)
   lift:Release(state)
   state.panel.content:EndDrag(false)
   self:finish()
-  nextDock:Add(panel, {
-    section = section, source = state.panel, from = from, tab = target.tab,
-    offer = {
-      text = function() return confirmation.title, confirmation.warning, confirmation.hint end,
-      confirm = function(ctx)
-        if panel:IsShown() and not panel.closing and confirm(ctx, self:SectionItems(section)) then
-          return "moved"
-        end
-        return "back"
-      end,
-    },
-  })
+  nextDock:Add(panel, { section = section, source = state.panel, from = from, tab = target.tab, offer = offer })
 end
 
 -- Drop drops the dragged section where the cursor is (the header's OnDragStop: a mouse release,
@@ -628,23 +633,15 @@ function nextDrag:Drop(ctx, noMoves)
       rederive = { resetLayout = true }
     end
   elseif target.type == "sell" then
-    -- Back in its place when nothing sells; docked in the seller while it waits for a confirmation,
-    -- which sells what of the section's items sells then.
-    local sale = target.panel:SaleOf(list)
-    if #sale == 0 then
+    -- Back in its place when nothing sells; else docked in the seller with its sale (the seller's
+    -- offer), which sells one item at a time, at once or once confirmed.
+    if #target.panel:SaleOf(list) == 0 then
       canvas:SetDragIndex(state.startIndex)
       self:land(false)
       return
     end
-    local result, confirmation = target.panel:Sell(ctx, sale)
-    if result == "confirm" then
-      local seller = target.panel
-      self:Pend(target, confirmation, function(c, items)
-        local now = seller:SaleOf(items)
-        return #now > 0 and seller:Sell(c, now, true) == "sold"
-      end)
-      return
-    end
+    self:Dock(target, target.panel:SaleOffer(state.section))
+    return
   elseif target.type == "tab" then
     groups:AssignCategoryToGroup(ctx, kind, name, target.tab.id)
     rederive = { backpack = kind == const.BAG_KIND.BACKPACK, bank = kind == const.BAG_KIND.BANK, resetLayout = true }

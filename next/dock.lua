@@ -39,6 +39,8 @@ local nextDock = addon:NewModule('NextDock')
 ---@field confirm? fun(ctx: Context): string? A double click: "moved" (its items moved: it flies into the panel), "stay" (it waits on, its card read again), "back" (sent back), else nothing.
 ---@field click? fun(ctx: Context): string? A click (destroying one item): the same answers.
 ---@field tooltip? fun(owner: Frame) What hovering its card shows.
+---@field docked? fun(entry: NextDockEntry) Called once it is docked: an offer that acts on its own (a sale selling one item at a time) answers later, with NextDock:Answer.
+---@field cancel? fun() Called when it leaves the dock, whichever way: whatever it started stops.
 
 -- NextDockSpec is what Add docks.
 ---@class NextDockSpec
@@ -49,6 +51,7 @@ local nextDock = addon:NewModule('NextDock')
 ---@field tab? NextTab A tab it came in by: it flies into it when it moves, and the tab pulses.
 
 ---@class NextDockEntry
+---@field list NextDockList
 ---@field section NextSection
 ---@field source NextPanelFrame
 ---@field offer NextDockOffer
@@ -135,6 +138,22 @@ end
 function nextDock:EntryOf(panel, name)
   local list = self.lists[panel]
   return list and list:EntryOf(name)
+end
+
+-- Answer gives a docked section its offer's answer later ("moved", "stay", "back"), as a click would:
+-- a sale that sold one item at a time answers once it ends. Nothing for one no longer docked.
+---@param entry NextDockEntry
+---@param answer? string
+function nextDock:Answer(entry, answer)
+  entry.list:Answer(entry, answer)
+end
+
+-- Refresh reads a docked section's card again, for an offer whose text changed (a sale's progress; a
+-- card that leaves the dock stops its sale first, cancel).
+---@param entry NextDockEntry
+function nextDock:Refresh(entry)
+  entry.list:Read(entry)
+  entry.list:Invalidate()
 end
 
 -- PanelHidden sends back at once what waits in a panel that closed, and what came from it.
@@ -225,7 +244,7 @@ function listProto:Add(spec)
   local card = self:card()
   ---@type NextDockEntry
   local entry = {
-    section = spec.section, source = spec.source, offer = spec.offer, tab = spec.tab, card = card,
+    list = self, section = spec.section, source = spec.source, offer = spec.offer, tab = spec.tab, card = card,
     holder = card.holder, box = card.box, catcher = card.catcher, docked = true, seated = false, scale = 1,
   }
   card.entry = entry
@@ -241,6 +260,7 @@ function listProto:Add(spec)
   local from = spec.from or lift:ScreenPoint(frame)
   if from == nil then
     self:Seat(entry)
+    self:Docked(entry)
     return entry
   end
   lift:Raise(frame)
@@ -256,7 +276,16 @@ function listProto:Add(spec)
     entry.flight = nil
     self:Seat(entry)
   end, from)
+  self:Docked(entry)
   return entry
+end
+
+-- Docked tells an entry's offer it is docked (NextDockOffer.docked).
+---@param entry NextDockEntry
+function listProto:Docked(entry)
+  if entry.offer.docked then
+    entry.offer.docked(entry)
+  end
 end
 
 -- Seat puts a docked section in its card's slot, at its scale, under the catcher. Its level is only ever
@@ -400,10 +429,14 @@ function listProto:DoubleClick(ctx, entry)
   end
 end
 
--- Answer does what an offer answered.
+-- Answer does what an offer answered, for a section still docked: an offer may answer while a click on
+-- it is still answering (a sale that ended as it started).
 ---@param entry NextDockEntry
 ---@param answer? string
 function listProto:Answer(entry, answer)
+  if not entry.docked then
+    return
+  end
   if answer == "moved" then
     self:FlyAway(entry)
   elseif answer == "back" then
@@ -429,6 +462,9 @@ function listProto:remove(entry)
   end
   entry.docked = false
   entry.card.entry = nil
+  if entry.offer.cancel then
+    entry.offer.cancel()
+  end
   if GameTooltip:IsOwned(entry.catcher) then
     GameTooltip:Hide()
   end

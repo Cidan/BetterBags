@@ -108,6 +108,7 @@ data\stacks.lua
 data\slots.lua
 data\loader.lua
 data\refresh.lua
+data\seller.lua
 data\automation.lua
 data\changelogdata.lua
 data\changelog.lua

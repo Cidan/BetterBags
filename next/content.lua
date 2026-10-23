@@ -818,12 +818,20 @@ end
 
 -- MarkLeaving leaves a section that was moved away out of the column for seconds (LEAVING_SECONDS when
 -- not given): it stays out until its category is gone from the data, while it has nothing but gaps, or
--- until the time is up with its items still there (a move the game refused).
+-- until the time is up with its items still there (a move the game refused). The column is laid out
+-- again when the time is up: only a layout brings it back, and nothing else may draw the bag again
+-- (reported: a section the merchant did not take all of stayed hidden).
 ---@param name string
 ---@param seconds? number
 function canvasProto:MarkLeaving(name, seconds)
-  self.leaving[name] = GetTime() + (seconds or nextContent.LEAVING_SECONDS)
+  local untilTime = GetTime() + (seconds or nextContent.LEAVING_SECONDS)
+  self.leaving[name] = untilTime
   self:Invalidate()
+  C_Timer.After(seconds or nextContent.LEAVING_SECONDS, function()
+    if self.leaving[name] == untilTime then
+      self:Invalidate()
+    end
+  end)
 end
 
 -- IsLeaving says whether a section is left out of the column as moved away.

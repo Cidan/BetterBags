@@ -21,6 +21,9 @@ local items = addon:GetModule('Items')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Seller: AceModule
+local seller = addon:GetModule('Seller')
+
 -- Automation is what a category does with its items on its own, set in its Automation tab
 -- (.claude/rules/automation.md): Auto Sell sells them when a merchant opens, and Destroy What Can't Be
 -- Sold (which needs Auto Sell) destroys, one at a time on a click (BetterBags Next's vendor card) or a
@@ -34,9 +37,6 @@ local automation = addon:NewModule('Automation')
 -- What a category's automation holds: Auto Sell, or Auto Sell and Destroy What Can't Be Sold.
 automation.SELL = "sell"
 automation.DESTROY = "destroy"
--- How many rounds a sale sells at most (NextMerchant:SellRounds, a moment apart): it ends sooner, on a
--- round with nothing left to sell; this bounds a merchant that keeps refusing.
-automation.SELL_ROUNDS = 50
 
 ---@class AutomationEntry
 ---@field data ItemData The item, as the bags last read it.
@@ -46,7 +46,7 @@ automation.SELL_ROUNDS = 50
 
 ---@class AutomationSale
 ---@field list AutomationEntry[]
----@field tried table<AutomationEntry, number> The items sold, with how many each slot held then.
+---@field job? SellerJob Its sale, once started (Seller).
 ---@field finished? boolean
 
 function automation:Init()
@@ -57,21 +57,6 @@ end
 function automation:OnEnable()
   events:RegisterEvent('MERCHANT_SHOW', function(ctx) self:OnMerchantShow(ctx) end)
   events:RegisterEvent('MERCHANT_CLOSED', function(ctx) self:OnMerchantClosed(ctx) end)
-end
-
----@param data ItemData
----@return ItemLocationMixin
-local function locationOf(data)
-  return ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
-end
-
--- refundable says whether a purchase can still be refunded now: Blizzard asks before refunding one
--- (ContainerFrame_GetExtendedPriceString), which automation would skip. Only for a location that holds
--- an item (CanBeRefunded raises an error for an empty one): StillThere, acting, after the slot's info.
----@param location ItemLocationMixin
----@return boolean
-local function refundable(location)
-  return C_Item.CanBeRefunded ~= nil and C_Item.CanBeRefunded(location) == true
 end
 
 ---@param copper number
@@ -147,14 +132,16 @@ function automation:Entries(ctx, only)
 end
 
 -- SellList lists what a merchant is sold: the items either action holds (both sell) that are not left
--- alone and that merchants buy, of the items given (else of every item).
+-- alone, that merchants buy and that the merchant open has not refused (Seller:Refuses: back in the bags
+-- until a merchant buys them), of the items given (else of every item).
 ---@param ctx Context
 ---@param only? ItemData[]
 ---@return AutomationEntry[]
 function automation:SellList(ctx, only)
   local list = {}
   for _, entry in ipairs(self:Entries(ctx, only)) do
-    if not entry.blocked and not (entry.data.containerInfo and entry.data.containerInfo.hasNoValue) then
+    if not entry.blocked and not (entry.data.containerInfo and entry.data.containerInfo.hasNoValue)
+      and not seller:Refuses(entry.data) then
       table.insert(list, entry)
     end
   end
@@ -216,11 +203,15 @@ local function changed(ctx)
   events:SendMessage(ctx or context:New('Automation_Changed'), 'automation/Changed')
 end
 
--- MerchantBuys says whether the merchant open buys items: retail shows its Sell All Junk button
--- (C_MerchantFrame.IsSellAllJunkEnabled) only where it does, as Vendor reads it; a Classic merchant
--- buys when it sells anything. A repair-only merchant does not.
+-- MerchantBuys says whether the merchant open buys items: not one that refused to buy anything
+-- (Seller:BuysNothing); retail shows its Sell All Junk button (C_MerchantFrame.IsSellAllJunkEnabled)
+-- only where it does, as Vendor reads it; a Classic merchant buys when it sells anything. A repair-only
+-- merchant does not.
 ---@return boolean
 function automation:MerchantBuys()
+  if seller:BuysNothing() then
+    return false
+  end
   if C_MerchantFrame and C_MerchantFrame.IsSellAllJunkEnabled then
     return C_MerchantFrame.IsSellAllJunkEnabled() == true
   end
@@ -228,26 +219,14 @@ function automation:MerchantBuys()
 end
 
 -- StillThere returns how many items a slot holds when it still holds the entry's item (the same item
--- GUID), unlocked and not refundable, and, to sell, one merchants buy; else nil. The bags may have
--- changed since they were read.
+-- GUID, never an empty one), unlocked and not refundable, and, to sell, one merchants buy; else nil
+-- (Seller:StillThere, the check every sale makes before each item). The bags may have changed since
+-- they were read.
 ---@param entry AutomationEntry
 ---@param forSale boolean
 ---@return number?
 function automation:StillThere(entry, forSale)
-  local data = entry.data
-  local guid = data.itemInfo.itemGUID
-  if guid == nil or guid == "" then
-    return nil
-  end
-  local info = C_Container.GetContainerItemInfo(data.bagid, data.slotid)
-  if info == nil or info.isLocked or (forSale and info.hasNoValue) then
-    return nil
-  end
-  local location = locationOf(data)
-  if C_Item.GetItemGUID(location) ~= guid or refundable(location) then
-    return nil
-  end
-  return info.stackCount or 1
+  return seller:StillThere(entry.data, forSale)
 end
 
 -- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy in the
@@ -278,7 +257,7 @@ function automation:OnMerchantShow(ctx)
     return "nothing"
   end
   ---@type AutomationSale
-  local sale = { list = list, tried = {} }
+  local sale = { list = list }
   self.sale = sale
   C_Timer.After(0, function() self:StartSale(sale) end)
   return "selling"
@@ -290,42 +269,28 @@ function automation:OnMerchantClosed(ctx)
   self.atMerchant = false
 end
 
--- StartSale sells the sale through the vendor's own sale (NextMerchant:SellRounds), as a section dropped
--- on BetterBags Next's vendor sells: every item still there at once, then, a moment later, what the
--- merchant did not take, round after round until nothing is left, the merchant closes, a new sale
--- replaces it (the merchant opened again) or SELL_ROUNDS ran. It returns what it did.
+-- StartSale sells the sale through the seller (Seller:Sell): one item at a time, each still there when
+-- its turn comes, until all are sold, the merchant closes, or a new sale replaces it (the merchant
+-- opened again). It returns what it did.
 ---@param sale AutomationSale
 ---@return string
 function automation:StartSale(sale)
-  -- NextMerchant loads after this file (the TOC's order): it is looked up when a sale starts.
-  addon:GetModule('NextMerchant'):SellRounds(function() return self:SaleSlots(sale) end,
-    function() return self.atMerchant and self.sale == sale end, self.SELL_ROUNDS,
-    function(reason) self:FinishSale(sale, reason) end)
+  if self.sale ~= sale then
+    return "replaced"
+  end
+  local list = {}
+  for _, entry in ipairs(sale.list) do
+    table.insert(list, entry.data)
+  end
+  sale.job = seller:Sell(list, {
+    stillOpen = function() return self.atMerchant end,
+    onDone = function(_, reason) self:FinishSale(sale, reason) end,
+  })
   return "selling"
 end
 
--- SaleSlots returns the slots of the sale's items still there to sell now (StillThere: not one sold
--- and still locked, moved, or refundable now), remembering how many each held; nil while the cursor
--- holds an item, to look again in a moment.
----@param sale AutomationSale
----@return {bag: number, slot: number}[]?
-function automation:SaleSlots(sale)
-  if CursorHasItem() then
-    return nil
-  end
-  local slots = {}
-  for _, entry in ipairs(sale.list) do
-    local count = self:StillThere(entry, true)
-    if count then
-      table.insert(slots, { bag = entry.data.bagid, slot = entry.data.slotid })
-      sale.tried[entry] = count
-    end
-  end
-  return slots
-end
-
--- FinishSale ends a sale, once, and says what it sold: the items it sold that are no longer in their
--- slot, or still selling (locked); what the merchant did not take is left out. It returns why it ended.
+-- FinishSale ends a sale, once (a sale replaced stops selling), and says what it sold: the items the
+-- merchant took, each with how many its slot held. It returns why it ended.
 ---@param sale AutomationSale
 ---@param reason string
 ---@return string
@@ -337,12 +302,15 @@ function automation:FinishSale(sale, reason)
   if self.sale == sale then
     self.sale = nil
   end
+  local job = sale.job
+  if job == nil then
+    return reason
+  end
+  seller:Cancel(job)
   local sold, value = 0, 0
-  for entry, count in pairs(sale.tried) do
-    if not self:StillThere(entry, true) then
-      sold = sold + 1
-      value = value + count * priceOf(entry.data)
-    end
+  for _, item in ipairs(job.sold) do
+    sold = sold + 1
+    value = value + (item.count or 1) * priceOf(item.data)
   end
   if sold > 0 then
     local what = sold == 1 and L:G("Sold %d item for %s.") or L:G("Sold %d items for %s.")

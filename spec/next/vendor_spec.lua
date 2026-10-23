@@ -31,6 +31,7 @@ local stubs = {
   itemFrame = trackStub("ItemFrame"),
   question = trackStub("Question"),
   automation = trackStub("Automation"),
+  seller = trackStub("Seller"),
 }
 
 local replaced = {}
@@ -113,6 +114,19 @@ describe("NextVendor", function()
     button:GetScript("OnClick")(button, mouse or "LeftButton")
   end
 
+  -- slotsOfSale returns the slot keys a sale was handed.
+  local function slotsOfSale(job)
+    local out = {}
+    for _, d in ipairs(job.list) do table.insert(out, d.slotkey or (d.bag .. "_" .. d.slot)) end
+    return out
+  end
+
+  -- finishSale ends a sale as the seller does, unsold of its items left in the bags.
+  local function finishSale(job, reason, unsold)
+    job.unsold, job.left = unsold or 0, 0
+    if job.opts.onDone then job.opts.onDone(job, reason or "done") end
+  end
+
   -- open makes the vendor and opens it the way the client does: Blizzard shows its merchant frame,
   -- then MERCHANT_SHOW.
   local function open()
@@ -133,7 +147,7 @@ describe("NextVendor", function()
     ResetMockMerchant()
     ResetMockGuildBank()
     eventsRegistered, buckets, timers, messages = {}, {}, {}, {}
-    calls = { sellAll = 0, sellSlots = {}, repairAll = {}, purchase = {} }
+    calls = { sellAll = 0, sales = {}, cancelled = {}, repairAll = {}, purchase = {} }
     asked = nil
     data = {
       items = { forSale(1, "Food"), forSale(2, "Armor"), forSale(3, "Food") },
@@ -211,9 +225,17 @@ describe("NextVendor", function()
     override(stubs.merchant, "NumJunk", function() return data.junk end)
     override(stubs.merchant, "JunkSlots", function() return data.junkSlots end)
     override(stubs.merchant, "SellAllJunk", function() calls.sellAll = calls.sellAll + 1 end)
-    override(stubs.merchant, "SellSlots", function(_, slots, stillOpen)
-      table.insert(calls.sellSlots, { slots = slots, open = stillOpen() })
+    -- The seller, stood in for: each sale is recorded, and a test ends it (finishSale).
+    data.refused = {}
+    override(stubs.seller, "Sell", function(_, list, opts)
+      local job = { list = list, opts = opts or {}, sold = {}, unsold = 0, left = #list }
+      table.insert(calls.sales, job)
+      return job
     end)
+    override(stubs.seller, "Left", function(_, job) return job.left end)
+    override(stubs.seller, "Cancel", function(_, job) table.insert(calls.cancelled, job) end)
+    override(stubs.seller, "Refuses", function(_, d) return data.refused[d.slotkey] == true end)
+    override(stubs.automation, "MerchantBuys", function() return data.buys ~= false end)
     override(stubs.merchant, "RepairAll", function(_, guild) table.insert(calls.repairAll, guild) end)
     override(stubs.merchant, "Purchase", function(_, frame, i) table.insert(calls.purchase, i) end)
     override(stubs.question, "YesNo", function(_, title, text, yes, no) asked = { title = title, text = text, yes = yes, no = no } end)
@@ -535,27 +557,20 @@ describe("NextVendor", function()
       assert.is_nil(asked)
     end)
 
-    -- The rounds themselves (NextMerchant:SellRounds) are the merchant spec's; category automation sells
-    -- through them too.
-    it("asks first on Classic, then sells the junk in three rounds, reading what junk is left each time", function()
+    -- One item at a time, as every sale (the seller, data/seller.lua).
+    it("asks first on Classic, then sells the junk through the seller while the vendor is open", function()
       data.hasSellAll = false
-      local rounds
-      override(stubs.merchant, "SellRounds", function(_, slotsOf, stillOpen, n)
-        rounds = { slotsOf = slotsOf, stillOpen = stillOpen, n = n }
-      end)
       local v = open()
       click(v.sellJunkButton)
       assert.are.equal("Sell Junk", asked.title)
       assert.are.equal("Sell 2 junk items? Only the last 12 items sold can be bought back.", asked.text)
-      assert.is_nil(rounds, "nothing before the answer")
+      assert.are.same({}, calls.sales, "nothing before the answer")
       asked.yes()
-      assert.are.equal(3, rounds.n)
-      assert.are.equal(data.junkSlots, rounds.slotsOf())
-      data.junkSlots = {}
-      assert.are.same({}, rounds.slotsOf(), "read again each round")
-      assert.is_true(rounds.stillOpen())
+      assert.are.equal(1, #calls.sales)
+      assert.are.equal(data.junkSlots, calls.sales[1].list)
+      assert.is_true(calls.sales[1].opts.stillOpen())
       eventsRegistered["MERCHANT_CLOSED"](ctx())
-      assert.is_false(rounds.stillOpen(), "not once the vendor has closed")
+      assert.is_false(calls.sales[1].opts.stillOpen(), "not once the vendor has closed")
     end)
   end)
 
@@ -701,40 +716,104 @@ describe("NextVendor", function()
       assert.are.same({ "0_1", "0_2", "1_7" }, slotsOf(sale))
     end)
 
-    it("sells up to 12 at once, while the vendor is open", function()
+    it("leaves out what this merchant refused: back in the bags until a merchant buys it", function()
       local v = open()
-      local sale = {}
-      for i = 1, 12 do table.insert(sale, slotData(0, i)) end
-      assert.are.equal("sold", v:Sell(ctx(), sale))
-      assert.is_nil(asked)
-      assert.are.equal(12, #calls.sellSlots[1].slots)
-      assert.are.same({ bag = 0, slot = 3 }, calls.sellSlots[1].slots[3])
-      assert.is_true(calls.sellSlots[1].open)
+      data.refused["0_2"] = true
+      assert.are.same({ "0_1", "0_3" }, slotsOf(v:SaleOf({ slotData(0, 1), slotData(0, 2), slotData(0, 3) })))
     end)
 
-    -- Past 12 the sale is confirmed in the vendor itself (the section docks there with this text,
-    -- NextDrag): the dialog it asked with blended in, and the section snapped back to the backpack.
-    it("past 12, the last 12 sold being all buyback keeps, sells only once confirmed, with no dialog", function()
-      local v = open()
-      local sale = {}
-      for i = 1, 13 do table.insert(sale, slotData(0, i)) end
-      local result, confirmation = v:Sell(ctx(), sale)
-      assert.are.equal("confirm", result)
-      assert.are.same({ title = "Sell 13 items?", warning = "Only the last 12 items sold can be bought back.",
-        hint = "Double-click to sell · Right-click to cancel" }, confirmation)
-      assert.are.same({}, calls.sellSlots)
-      assert.is_nil(asked)
-      assert.are.equal("sold", v:Sell(ctx(), sale, true))
-      assert.are.equal(13, #calls.sellSlots[1].slots)
-    end)
+    -- A dragged section waits in the vendor's dock while it sells (NextDrag docks it with this offer):
+    -- the seller sells one item at a time.
+    describe("its offer", function()
+      local v, section, entry, sectionItems
 
-    it("sells nothing once the vendor has closed", function()
-      local v = open()
-      local sale = {}
-      for i = 1, 13 do table.insert(sale, slotData(0, i)) end
-      eventsRegistered["MERCHANT_CLOSED"](ctx())
-      v:Sell(ctx(), sale, true)
-      assert.is_false(calls.sellSlots[1].open)
+      before_each(function()
+        sectionItems = {}
+        override(nextDrag, "SectionItems", function() return sectionItems end)
+        v = open()
+        section = { name = "Junk", frame = CreateFrame("Frame"), entries = {}, height = 40 }
+        section.frame:SetSize(300, 40)
+        entry = { docked = true }
+        override(nextDock, "Answer", function(_, e, answer) table.insert(calls.answers, { e, answer }) end)
+        override(nextDock, "Refresh", function(_, e) calls.refreshed = (calls.refreshed or 0) + 1 end)
+        calls.answers = {}
+      end)
+
+      local function sellOf(n)
+        for i = 1, n do table.insert(sectionItems, slotData(0, i)) end
+        return v:SaleOffer(section)
+      end
+
+      it("sells at once, as it docks, when buyback can keep it all, saying how far it is", function()
+        local o = sellOf(12)
+        assert.is_nil(o.confirm and o.confirm(ctx()), "nothing to confirm")
+        o.docked(entry)
+        assert.are.equal(1, #calls.sales)
+        assert.are.same({ "0_1", "0_2", "0_3", "0_4", "0_5", "0_6", "0_7", "0_8", "0_9", "0_10", "0_11", "0_12" },
+          slotsOfSale(calls.sales[1]))
+        calls.sales[1].left = 9
+        calls.sales[1].opts.onProgress(calls.sales[1])
+        assert.are.equal(1, calls.refreshed)
+        assert.are.same({ "Selling 3 of 12...", "One item at a time, as the merchant takes them.", "Right-click to stop" },
+          { o.text() })
+        assert.is_nil(o.color())
+      end)
+
+      it("flies into the vendor once all sold, and goes back with what the merchant would not take", function()
+        local o = sellOf(2)
+        o.docked(entry)
+        finishSale(calls.sales[1], "done", 0)
+        assert.are.same({ { entry, "moved" } }, calls.answers)
+        local again = sellOf(0)
+        again.docked(entry)
+        finishSale(calls.sales[2], "done", 1)
+        assert.are.same({ entry, "back" }, calls.answers[2])
+        local closed = sellOf(0)
+        closed.docked(entry)
+        finishSale(calls.sales[3], "closed", 4)
+        assert.are.same({ entry, "back" }, calls.answers[3])
+      end)
+
+      -- Past 12 the sale is confirmed in the vendor itself: the dialog it asked with blended in.
+      it("past 12, the last 12 sold being all buyback keeps, sells only once double-clicked", function()
+        local o = sellOf(13)
+        o.docked(entry)
+        assert.are.same({}, calls.sales)
+        assert.are.same({ "Sell 13 items?", "Only the last 12 items sold can be bought back.",
+          "Double-click to sell · Right-click to cancel" }, { o.text() })
+        assert.is_nil(asked)
+        assert.are.equal("stay", o.confirm(ctx()))
+        assert.are.equal(13, #calls.sales[1].list)
+        assert.is_nil(o.confirm(ctx()), "nothing more while it sells")
+        assert.are.equal(1, #calls.sales)
+      end)
+
+      it("sends it back when nothing is left to sell at the double click, or the vendor is closing", function()
+        local o = sellOf(13)
+        v.closing = true
+        assert.are.equal("back", o.confirm(ctx()))
+        v.closing = false
+        sectionItems = {}
+        assert.are.equal("back", o.confirm(ctx()))
+        assert.are.same({}, calls.sales)
+      end)
+
+      it("stops its sale when it leaves the dock, whichever way", function()
+        local o = sellOf(3)
+        o.docked(entry)
+        o.cancel()
+        assert.are.same({ calls.sales[1] }, calls.cancelled)
+        o.cancel()
+        assert.are.equal(1, #calls.cancelled, "once")
+      end)
+
+      it("sells only while the vendor is open", function()
+        local o = sellOf(3)
+        o.docked(entry)
+        assert.is_true(calls.sales[1].opts.stillOpen())
+        eventsRegistered["MERCHANT_CLOSED"](ctx())
+        assert.is_false(calls.sales[1].opts.stillOpen())
+      end)
     end)
   end)
 
@@ -848,7 +927,7 @@ describe("NextVendor", function()
       assert.are.same({ "Sell 13 items?", "Only the last 12 items sold can be bought back.",
         "Double-click to sell · Right-click to cancel" }, textOf(entry(v, "Junk")))
       doubleClick(entry(v, "Junk"))
-      assert.are.equal(13, #calls.sellSlots[1].slots, "the double click is the confirmation")
+      assert.are.equal(13, #calls.sales[1].list, "the double click is the confirmation")
     end)
 
     -- Asked: "with a red outline like we have now, when it's destroying".
@@ -862,12 +941,36 @@ describe("NextVendor", function()
       assert.are.same({ r, g, b }, glowOf(trash))
     end)
 
-    it("sells on a double click through the vendor's own sale, the next coming up into its place", function()
+    it("sells on a double click through the seller, waiting while it sells, the next coming up once sold", function()
       local v = open()
       send("next/PanelShown", v)
       doubleClick(entry(v, "Junk"))
-      assert.are.same({ { slots = { { bag = 0, slot = 1 }, { bag = 0, slot = 2 } }, open = true } }, calls.sellSlots)
+      assert.are.same({ "0_1", "0_2" }, slotsOfSale(calls.sales[1]))
+      assert.are.same({ "Junk", "Trash", "Ore" }, docked(v), "it waits while it sells")
+      assert.are.equal("Selling 0 of 2...", entry(v, "Junk").box.title:GetText())
+      data.gone["0_1"], data.gone["0_2"] = true, true
+      finishSale(calls.sales[1], "done", 0)
       assert.are.same({ "Trash", "Ore" }, docked(v))
+    end)
+
+    -- Asked: "refused items go back to the backpack until we find a merchant that buys it".
+    it("goes back to the backpack with what the merchant would not take", function()
+      local v = open()
+      send("next/PanelShown", v)
+      doubleClick(entry(v, "Junk"))
+      data.gone["0_1"] = true
+      finishSale(calls.sales[1], "done", 1)
+      finishTweens()
+      assert.are.same({ "Trash", "Ore" }, docked(v))
+      assert.is_false(backpack.content:IsAway(backpack.content.byName.Junk))
+      assert.is_false(backpack.content:IsLeaving(backpack.content.byName.Junk))
+    end)
+
+    it("offers no sale where the merchant buys nothing, only what to destroy", function()
+      data.buys = false
+      local v = open()
+      send("next/PanelShown", v)
+      assert.are.same({ "Trash" }, docked(v))
     end)
 
     it("turns into a destroy, glowing red, when items no merchant buys are left after its sale", function()
@@ -878,7 +981,9 @@ describe("NextVendor", function()
       local trash = entry(v, "Trash")
       assert.are.equal("Sell 1 item?", trash.box.title:GetText())
       doubleClick(trash)
-      assert.are.equal(1, #calls.sellSlots)
+      assert.are.equal(1, #calls.sales)
+      data.gone["0_1"] = true
+      finishSale(calls.sales[1], "done", 0)
       assert.are.same({ "Trash" }, docked(v), "it waits on")
       assert.are.equal("Destroy 2 items", trash.box.title:GetText())
       local r, g, b = style:RGBA(style.Theme.Dock.DestroyColor)
@@ -906,7 +1011,7 @@ describe("NextVendor", function()
       local v = open()
       send("next/PanelShown", v)
       click(entry(v, "Junk").catcher)
-      assert.are.same({}, calls.sellSlots)
+      assert.are.same({}, calls.sales)
       assert.are.same({}, calls.destroyed)
       assert.is_not_nil(entry(v, "Junk"))
     end)
@@ -917,7 +1022,7 @@ describe("NextVendor", function()
       data.gone["0_1"], data.gone["0_2"] = true, true
       doubleClick(entry(v, "Junk"))
       finishTweens()
-      assert.are.same({}, calls.sellSlots)
+      assert.are.same({}, calls.sales)
       assert.is_nil(entry(v, "Junk"))
       assert.is_false(backpack.content:IsLeaving(backpack.content.byName.Junk), "back, not moved")
     end)

@@ -42,6 +42,9 @@ local style = addon:GetModule('NextStyle')
 ---@class Automation: AceModule
 local automation = addon:GetModule('Automation')
 
+---@class Seller: AceModule
+local seller = addon:GetModule('Seller')
+
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
@@ -59,8 +62,6 @@ local context = addon:GetModule('Context')
 local nextVendor = addon:NewModule('NextVendor')
 
 local TAB_BUY, TAB_BUYBACK, TAB_REPAIR = 1, 2, 3
--- How many times Classic's Sell Junk sells what junk is left, a moment apart (NextMerchant:SellRounds).
-local SELL_ROUNDS = 3
 -- How many items sold buyback keeps (Blizzard's BUYBACK_ITEMS_PER_PAGE); a section sale of more
 -- asks first.
 local BUYBACK_KEEPS = 12
@@ -506,7 +507,8 @@ end
 -- destroy. Its section flies over and waits there as a section dragged onto the vendor does (the same
 -- dock, CLAUDE.md "UI Consistency" 5), in the backpack's order, each once a visit (one sent back stays
 -- back). A category with no section in the backpack's view (on another tab, or only in Recent Items) is
--- not offered. It returns how many it docked.
+-- not offered, and no sale is where the merchant buys nothing (Automation:MerchantBuys). It returns how
+-- many it docked.
 ---@param ctx Context
 ---@return number
 function vendorProto:OfferAutomation(ctx)
@@ -516,19 +518,21 @@ function vendorProto:OfferAutomation(ctx)
     return 0
   end
   local canvas, docked = backpack.content, 0
+  local buys = automation:MerchantBuys()
   for _, section in ipairs(canvas.order) do
     if section.kind == "category" and not self.offered[section.name] and not canvas:IsAway(section)
       and not canvas:IsLeaving(section) then
       local items = nextDrag:SectionItems(section)
       local phase
-      if #automation:SaleOffer(ctx, items) > 0 then
-        phase = "sell"
+      if buys and #automation:SaleOffer(ctx, items) > 0 then
+        phase = "confirm"
       elseif #automation:DestroyLeft(ctx, items) > 0 then
         phase = "destroy"
       end
       if phase then
         self.offered[section.name] = true
-        nextDock:Add(self, { section = section, source = backpack, offer = self:AutomationOffer(section, phase) })
+        nextDock:Add(self, { section = section, source = backpack,
+          offer = self:SectionOffer(section, { automation = true, phase = phase }) })
         docked = docked + 1
       end
     end
@@ -536,23 +540,84 @@ function vendorProto:OfferAutomation(ctx)
   return docked
 end
 
--- AutomationOffer is what a backpack category waiting in the vendor's dock is for (NextDockOffer), read
--- from its section's items as they are each time: first its sale (a double click sells it through Sell,
--- as a dragged section's sale), then what is left to destroy, glowing in the theme's destroy color, one
--- item per click (Automation:DestroyNext; a double click is two clicks, OnDoubleClick blocking the second
--- OnClick, warcraft.wiki.gg). Once nothing is left it flies into the vendor; a sale that found nothing to
--- sell sends it back.
+-- SaleOffer is what a backpack section dragged onto the vendor waits in its dock for (NextDrag docks it,
+-- NextSeller): its sale (SectionOffer).
 ---@param section NextSection
----@param phase "sell"|"destroy"
 ---@return NextDockOffer
-function vendorProto:AutomationOffer(section, phase)
+function vendorProto:SaleOffer(section)
+  return self:SectionOffer(section, {})
+end
+
+-- SectionOffer is what a backpack section waiting in the vendor's dock is for (NextDockOffer), read from
+-- its section's items as they are each time. A sale: of a dragged section, what of it the vendor buys
+-- (SaleOf), sold as it docks when buyback keeps all of it, else once double-clicked; of a category Auto
+-- Sell offers (automation), what it sells (Automation:SaleOffer), once double-clicked. The seller sells
+-- it one item at a time while the card says how far it is; once it ends the section flies into the
+-- vendor, or goes back to the backpack with what the merchant did not take (refused items stay in the
+-- bags until a merchant buys them; asked). Then, for a category, what is left to destroy, glowing in the
+-- theme's destroy color, one item per click (Automation:DestroyNext; a double click is two clicks,
+-- OnDoubleClick blocking the second OnClick, warcraft.wiki.gg). A right click stops what is left of a
+-- sale (cancel).
+---@param section NextSection
+---@param opts {automation?: boolean, phase?: "confirm"|"destroy"}
+---@return NextDockOffer
+function vendorProto:SectionOffer(section, opts)
   local function items()
     return nextDrag:SectionItems(section)
   end
   local function ctxOf()
     return context:New('NextVendor_Offer')
   end
-  local offer = {}
+  local function saleOf(ctx)
+    if not opts.automation then
+      return self:SaleOf(items())
+    end
+    local sale = {}
+    for _, entry in ipairs(automation:SaleOffer(ctx, items())) do
+      table.insert(sale, entry.data)
+    end
+    return sale
+  end
+  local phase = opts.phase
+  if phase == nil then
+    phase = #saleOf(ctxOf()) > BUYBACK_KEEPS and "confirm" or "selling"
+  end
+  local offer, job, total, entry = {}, nil, 0, nil
+  local function destroyLeft(ctx)
+    return opts.automation and #automation:DestroyLeft(ctx, items()) > 0
+  end
+  -- after says what follows a sale: what is left to destroy, else the section goes.
+  local function after(sold)
+    if destroyLeft(ctxOf()) then
+      phase = "destroy"
+      return "stay"
+    end
+    if sold == nil or sold.unsold > 0 then
+      return "back"
+    end
+    return "moved"
+  end
+  local function start(ctx)
+    local sale = saleOf(ctx)
+    if #sale == 0 or self.closing or not self.atMerchant then
+      return false
+    end
+    phase, total = "selling", #sale
+    job = seller:Sell(sale, {
+      stillOpen = function() return self.atMerchant end,
+      onProgress = function()
+        if entry then
+          nextDock:Refresh(entry)
+        end
+      end,
+      onDone = function(done)
+        if entry then
+          nextDock:Answer(entry, after(done))
+        end
+      end,
+    })
+    return true
+  end
   local function destroyOne(ctx)
     automation:DestroyNext(ctx, items())
     if #automation:DestroyLeft(ctx, items()) > 0 then
@@ -560,10 +625,21 @@ function vendorProto:AutomationOffer(section, phase)
     end
     return "moved"
   end
+  offer.docked = function(e)
+    entry = e
+    if phase == "selling" and not start(ctxOf()) then
+      nextDock:Answer(e, "back")
+    end
+  end
   offer.text = function()
     local ctx = ctxOf()
-    if phase == "sell" then
-      local n = #automation:SaleOffer(ctx, items())
+    if phase == "selling" then
+      local left = job and seller:Left(job) or 0
+      return format(L:G("Selling %d of %d..."), total - left, total), L:G("One item at a time, as the merchant takes them."),
+        L:G("Right-click to stop")
+    end
+    if phase == "confirm" then
+      local n = #saleOf(ctx)
       return format(n == 1 and L:G("Sell %d item?") or L:G("Sell %d items?"), n),
         n > BUYBACK_KEEPS and format(L:G("Only the last %d items sold can be bought back."), BUYBACK_KEEPS)
           or L:G("You can buy them back."),
@@ -580,18 +656,13 @@ function vendorProto:AutomationOffer(section, phase)
     if phase == "destroy" then
       return destroyOne(ctx)
     end
-    local sale = {}
-    for _, entry in ipairs(automation:SaleOffer(ctx, items())) do
-      table.insert(sale, entry.data)
+    if phase ~= "confirm" then
+      return nil
     end
-    if #sale > 0 then
-      self:Sell(ctx, sale, true)
-    end
-    if #automation:DestroyLeft(ctx, items()) > 0 then
-      phase = "destroy"
+    if start(ctx) then
       return "stay"
     end
-    return #sale > 0 and "moved" or "back"
+    return after(nil)
   end
   offer.click = function(ctx)
     if phase == "destroy" then
@@ -599,16 +670,24 @@ function vendorProto:AutomationOffer(section, phase)
     end
     return nil
   end
+  -- A sale already ended is no longer selling: cancelling it does nothing (Seller:Cancel).
+  offer.cancel = function()
+    local running = job
+    job = nil
+    if running then
+      seller:Cancel(running)
+    end
+  end
   offer.tooltip = function(owner)
     if phase ~= "destroy" then
       return
     end
-    local entry = automation:DestroyLeft(ctxOf(), items())[1]
-    if entry == nil then
+    local next = automation:DestroyLeft(ctxOf(), items())[1]
+    if next == nil then
       return
     end
     GameTooltip:SetOwner(owner, "ANCHOR_TOP")
-    GameTooltip:SetBagItem(entry.data.bagid, entry.data.slotid)
+    GameTooltip:SetBagItem(next.data.bagid, next.data.slotid)
     GameTooltip:AddLine(L:G("Click to destroy it."), style:RGBA(style.Theme.Dock.DestroyColor))
     GameTooltip:Show()
   end
@@ -660,8 +739,9 @@ end
 
 -- SaleOf returns what of a backpack section dropped on the vendor sells: every item and every pile
 -- its virtual stack hides (sectionFrame:WithStacks, what Move Categories sells), in the backpack's
--- bags, once each, leaving out what the vendor does not buy (hasNoValue) and refundable purchases,
--- which Blizzard asks about before refunding them (ContainerFrame_GetExtendedPriceString).
+-- bags, once each, leaving out what the vendor does not buy (hasNoValue), refundable purchases,
+-- which Blizzard asks about before refunding them (ContainerFrame_GetExtendedPriceString), and what
+-- this merchant refused (Seller:Refuses: it stays in the bags until a merchant buys it).
 ---@param list ItemData[]
 ---@return ItemData[]
 function vendorProto:SaleOf(list)
@@ -672,7 +752,8 @@ function vendorProto:SaleOf(list)
     if not seen[key] and const.BACKPACK_BAGS[bag] ~= nil then
       seen[key] = true
       local info = C_Container.GetContainerItemInfo(bag, slot)
-      if info and not info.hasNoValue and not C_Item.CanBeRefunded(ItemLocation:CreateFromBagAndSlot(bag, slot)) then
+      if info and not info.hasNoValue and not C_Item.CanBeRefunded(ItemLocation:CreateFromBagAndSlot(bag, slot))
+        and not seller:Refuses(data) then
         table.insert(sale, data)
       end
     end
@@ -680,34 +761,9 @@ function vendorProto:SaleOf(list)
   return sale
 end
 
--- Sell sells a section's sale while the vendor is open: at once when buyback can keep all of it, or
--- once confirmed. Unconfirmed past that it sells nothing and returns "confirm" with what to confirm
--- with: NextDrag docks the section in the vendor with that text until a double click confirms it.
----@param ctx Context
----@param sale ItemData[]
----@param confirmed? boolean
----@return string result "sold" or "confirm"
----@return NextConfirmation? confirmation
-function vendorProto:Sell(ctx, sale, confirmed)
-  local _ = ctx
-  local slots = {}
-  for _, data in ipairs(sale) do
-    table.insert(slots, { bag = data.bagid, slot = data.slotid })
-  end
-  if not confirmed and #slots > BUYBACK_KEEPS then
-    return "confirm", {
-      title = format(L:G("Sell %d items?"), #slots),
-      warning = format(L:G("Only the last %d items sold can be bought back."), BUYBACK_KEEPS),
-      hint = L:G("Double-click to sell · Right-click to cancel"),
-    }
-  end
-  merchant:SellSlots(slots, function() return self.atMerchant end)
-  return "sold"
-end
-
 -- SellJunk sells the junk in the bags: through Blizzard's own Sell All Junk where the client has
--- it (its confirmation included), else after asking, a few rounds a moment apart (SellRounds), each
--- selling the junk left then.
+-- it (its confirmation included), else after asking, through the seller, one item at a time while the
+-- vendor is open.
 function vendorProto:SellJunk()
   if merchant:HasSellAllJunk() then
     merchant:SellAllJunk()
@@ -720,8 +776,7 @@ function vendorProto:SellJunk()
   question:YesNo(L:G("Sell Junk"),
     format(L:G("Sell %d junk items? Only the last 12 items sold can be bought back."), n),
     function()
-      merchant:SellRounds(function() return merchant:JunkSlots() end, function() return self.atMerchant end,
-        SELL_ROUNDS)
+      seller:Sell(merchant:JunkSlots(), { stillOpen = function() return self.atMerchant end })
     end, function() end)
 end
 

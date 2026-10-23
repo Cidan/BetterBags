@@ -854,6 +854,22 @@ describe("NextDrag", function()
       assert.is_nil(nextDock:EntryOf(guild, "Herbs"))
     end)
 
+    it("deposits nothing on the double click once the guild bank is closing, and sends it back", function()
+      local herbs = pickUp(backpack, "Herbs")
+      moveTo(centerOf(guild.tabs:Tab(1004).button))
+      drop(herbs)
+      finishTweens()
+      local e = nextDock:EntryOf(guild, "Herbs")
+      guild.closing = true
+      e.catcher:GetScript("OnDoubleClick")(e.catcher, "LeftButton")
+      finishTweens()
+      assert.are.same({}, calls.deposited)
+      assert.is_nil(nextDock:EntryOf(guild, "Herbs"))
+      assert.is_false(backpack.content:IsAway(herbs))
+      assert.is_nil(backpack.content.leaving.Herbs)
+      guild.closing = false
+    end)
+
     it("withdraws a guild section into the backpack", function()
       local ore = pickUp(guild, "Ore")
       moveTo(1700, 600)
@@ -939,16 +955,26 @@ describe("NextDrag", function()
       function seller:IsShown() return self.frame:IsShown() end
       function seller:SetDropGlow(on) table.insert(self.glows, on) end
       function seller:SaleOf(list) return self.sells or list end
-      -- As the vendor's: "sold", or "confirm" and the text to confirm with while unconfirmed.
-      function seller:Sell(c, sale, confirmed)
-        assert.is_not_nil(c)
-        if self.answer == "confirm" and not confirmed then
-          table.insert(self.asked, keys(sale))
-          return "confirm", { title = "Sell 2 items?", warning = "Only the last 12 items sold can be bought back.",
-            hint = "Double-click to sell · Right-click to cancel" }
+      -- As the vendor's (NextVendor:SaleOffer): a sale the dock confirms with a double click, or one that
+      -- sells as it docks and answers once sold.
+      function seller:SaleOffer(dropped)
+        local offer = {
+          text = function() return "Sell 2 items?", "Only the last 12 items sold can be bought back.",
+            "Double-click to sell · Right-click to cancel" end,
+        }
+        local function sell()
+          local now = self:SaleOf(nextDrag:SectionItems(dropped))
+          if #now == 0 or self.closing then return "back" end
+          table.insert(self.sales, keys(now))
+          return "moved"
         end
-        table.insert(self.sales, keys(sale))
-        return "sold"
+        if self.answer == "confirm" then
+          table.insert(self.asked, keys(self:SaleOf(nextDrag:SectionItems(dropped))))
+          offer.confirm = sell
+        else
+          offer.docked = function(entry) nextDock:Answer(entry, sell()) end
+        end
+        return offer
       end
       nextDrag:RegisterSeller(seller)
     end)

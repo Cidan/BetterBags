@@ -214,6 +214,7 @@ local function stubModules()
   override(groups, "GetGroupForCategory", function() return nil end)
   override(groups, "IsDefaultGroup", function() return true end)
 
+  stubModule("Seller")
   local movementFlow = stubModule("MovementFlow")
   override(movementFlow, "GetMovementFlow", function() return const.MOVEMENT_FLOW.UNDEFINED end)
 
