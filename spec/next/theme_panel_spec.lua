@@ -34,6 +34,7 @@ local stubs = {
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
   categories = trackStub("Categories"),
+  bagButton = trackStub("BagButton"),
   bagSystem = trackStub("BagSystem"),
 }
 
@@ -539,7 +540,7 @@ describe("BetterBags Next's panels and themes", function()
         Header = { Buttons = { Color = "Ink", ArtColor = "Plain", ArtHoverColor = "Gold",
           Icons = { sortButton = { Atlas = "my-art", Glyph = false },
             settingsButton = { Texture = "Interface\\MyGear" },
-            classicButton = { Texture = "Interface\\Sheet", TexCoords = { 0.5, 1, 0, 0.5 }, Glyph = false } } } } })
+            bagsButton = { Texture = "Interface\\Sheet", TexCoords = { 0.5, 1, 0, 0.5 }, Glyph = false } } } } })
       assert.are.equal("my-art", bag.sortButton.icon:GetAtlas())
       assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.sortButton))
       bag.sortButton:GetScript("OnEnter")(bag.sortButton)
@@ -547,12 +548,12 @@ describe("BetterBags Next's panels and themes", function()
       bag.sortButton:GetScript("OnLeave")(bag.sortButton)
       assert.are.equal("Interface\\MyGear", bag.settingsButton.icon:GetTexture())
       assert.are.same({ 0.2, 0.1, 0.05 }, color(bag.settingsButton), "a glyph unless it says otherwise")
-      assert.are.equal("Interface\\Sheet", bag.classicButton.icon:GetTexture())
-      assert.are.same({ 0.5, 1, 0, 0.5 }, bag.classicButton.icon._texCoords)
-      assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.classicButton))
+      assert.are.equal("Interface\\Sheet", bag.bagsButton.icon:GetTexture())
+      assert.are.same({ 0.5, 1, 0, 0.5 }, bag.bagsButton.icon._texCoords)
+      assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.bagsButton))
       backToDefault()
       assert.are.equal("sort", NextIconName(bag.sortButton))
-      assert.are.same({ 0, 1, 0, 1 }, bag.classicButton.icon._texCoords)
+      assert.are.same({ 0, 1, 0, 1 }, bag.bagsButton.icon._texCoords)
     end)
 
     it("colors one button its own way", function()

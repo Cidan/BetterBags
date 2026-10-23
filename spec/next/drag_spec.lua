@@ -34,6 +34,7 @@ local stubs = {
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
   categories = trackStub("Categories"),
+  bagButton = trackStub("BagButton"),
   guildBank = trackStub("GuildBank"),
   question = trackStub("Question"),
   color = trackStub("Color"),
@@ -738,6 +739,23 @@ describe("NextDrag", function()
       moveTo(300, 600)
       drop(herbs)
       assert.are.same({ { { "0_3", "0_4" } } }, calls.moved)
+      assert.are.same({}, calls.assigned)
+    end)
+
+    -- Show Blizzard Bags (docs/next-batch-2.md §4): the backpack's tabs are its bag slots, no groups.
+    it("takes no section on a bag slot's tab, and only moves the items into the backpack's items", function()
+      override(const, "BACKPACK_ONLY_BAGS_LIST", { 1, 2 })
+      override(const, "BACKPACK_ONLY_REAGENT_BAGS", {})
+      override(_G, "GetInventoryItemTexture", function() return nil end)
+      db.view[BACKPACK] = SECTION_ALL_BAGS
+      backpack:RefreshTabs()
+      assert.is_true(backpack.tabs:Tab(2).bag)
+      local leather = pickUp(bank, "Leather")
+      moveTo(centerOf(backpack.tabs:Tab(2).button))
+      assert.is_nil(backpack.tabs.dropTarget, "group 2 has the bag's ID: still no target")
+      moveTo(1700, 600)
+      drop(leather)
+      assert.are.same({ { { "6_1" } } }, calls.moved)
       assert.are.same({}, calls.assigned)
     end)
 

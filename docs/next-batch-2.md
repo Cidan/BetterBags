@@ -104,7 +104,18 @@ Show Bags (`ContextMenu:ToggleBagSlots`) shows the bag slots panel (classic bag 
   the classic one does.
 - The rail redraws when bags change (`BAG_CONTAINER_UPDATE`, `PLAYER_EQUIPMENT_CHANGED`).
 
-**Status:** planned.
+**Status:** done, with these choices:
+- The tabs are the bag slots the classic Show Bags panel lists (`BACKPACK_ONLY_BAGS_LIST`); the backpack
+  itself has no slot to swap, so no tab. Its items still show, as the first bag.
+- A tab shows its bag's icon and name (as the bank's Blizzard tabs show theirs); the art for an empty
+  slot is Blizzard's empty bag slot.
+- The rail redraws on `BAG_CONTAINER_UPDATE` only, as the classic slots panel does.
+- No section can be dropped on a bag slot's tab (group and bag IDs overlap), and a section dropped on the
+  backpack's items while it shows its bags only moves.
+- The icon key is now `bagsButton` (was `classicButton`); no theme outside BetterBags named it.
+`next/bag.lua`, `frames/bagbutton.lua` (`PickupBag`, `PutInBag`, shared with the classic bag buttons),
+`next/tabs.lua` (`bag`), `next/drag.lua`, `sonata/themes/next/default.lua`; next.md §3, next-themes.md.
+32 mutations: four led to tests (one with `GetBagName` mocked as documented, never nil).
 
 ## 5. Reorderable tabs in every Next window
 

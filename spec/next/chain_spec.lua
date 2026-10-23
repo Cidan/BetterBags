@@ -37,6 +37,7 @@ local stubs = {
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
   categories = trackStub("Categories"),
+  bagButton = trackStub("BagButton"),
 }
 
 local replaced = {}

@@ -66,7 +66,7 @@ describe("BetterBags Next's shipped themes", function()
   it("names a glyph BetterBags ships for every header button in Default", function()
     local theme = sonataNext:Resolve("Default")
     local icons = theme.Header.Buttons.Icons
-    local keys = { "settingsButton", "closeButton", "sortButton", "classicButton", "sizeButtonFull",
+    local keys = { "settingsButton", "closeButton", "sortButton", "bagsButton", "sizeButtonFull",
       "sizeButtonSmall", "bankTabsButton", "depositButton", "depositGoldButton", "withdrawGoldButton",
       "filterButton", "sellJunkButton", "repairAllButton", "guildRepairButton" }
     local files = {}

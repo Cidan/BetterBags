@@ -33,6 +33,7 @@ local stubs = {
   menuButton = trackStub("BagMenuButton"),
   sectionFrame = trackStub("SectionFrame"),
   categories = trackStub("Categories"),
+  bagButton = trackStub("BagButton"),
   bagSystem = trackStub("BagSystem"),
 }
 
@@ -1310,10 +1311,10 @@ describe("BetterBags Next's small mode", function()
       assert.are.equal("small", NextIconName(bag.sizeButton))
     end)
 
-    it("sits after the button back to the classic bags, saying what it does", function()
+    it("sits after the Show Blizzard Bags button, saying what it does", function()
       db.size = "full"
       local bag = nextBag:Create(ctx())
-      assert.are.same({ "RIGHT", bag.classicButton, "LEFT", -8, 0 }, { bag.sizeButton:GetPoint(1) })
+      assert.are.same({ "RIGHT", bag.bagsButton, "LEFT", -8, 0 }, { bag.sizeButton:GetPoint(1) })
       bag.sizeButton:GetScript("OnEnter")(bag.sizeButton)
       assert.are.equal("Small Bags", GameTooltip:GetText())
       click(bag)

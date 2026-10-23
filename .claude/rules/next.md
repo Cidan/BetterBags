@@ -125,8 +125,8 @@ description below is the backpack's (the right side); the bank is its mirror ima
 
 **The backpack's header buttons** (from the screen edge, so the first is at the top right): close
 (asked: "an X at the top right of the backpack to close it"; `closeButton`, the bank's, guild bank's and
-vendor's own button and icon, hiding the backpack), settings, sort, the switch to the classic bags,
-size (§14).
+vendor's own button and icon, hiding the backpack), settings, sort, Show Blizzard Bags (below), size
+(§14).
 
 **Above the rest of the UI** (asked: "they need to be the top most frames ... so other UI elements
 can't overlap"): every panel is in the `HIGH` strata (was `MEDIUM`), toplevel, level 500. That puts
@@ -212,6 +212,35 @@ section dragged out of a panel returns to the panel's strata (§7).
   glides to it; a hovered one slides out a little. Left click switches group (the same data, drawn
   for that tab), right click opens the group menu (rename, delete) and "+" creates a group, both
   through the classic backpack behavior's dialogs. Hidden when groups are off.
+- **Show Blizzard Bags** (asked: "the 'Switch to Classic Bags' icon now becomes 'Show Blizzard Bags',
+  with our left tabs replaced with the bag icons for the Blizzard Bags, so users can swap out their bags
+  -- the view of items switches to the full stack of bags, just like in our Original bags view, same
+  functionality"; docs/next-batch-2.md §4). The header's `bagsButton` (the bags glyph; "Show Blizzard
+  Bags", "Show Categories" while on) calls `ToggleBlizzardBags`, which does what the classic backpack's
+  Show Bags does (`ContextMenu:ToggleBagSlots`): the view saved (`SetPreviousView`) and the Show Bags
+  view (`SECTION_ALL_BAGS`: every bag a section, its slots in order, empty slots in place), or the saved
+  view back; then the tabs listed again and `bags/Rederive { backpack, resetLayout }`; not in combat
+  ("Cannot toggle bag slots in combat."). The mode is the view (`ShowsBlizzardBags`), so it lasts across
+  sessions and is the classic bags' setting too.
+  - **The tabs are the bag slots** (`ListBags`, `const.BACKPACK_ONLY_BAGS_LIST`, as the classic Show Bags
+    panel lists them; the backpack itself has no slot): each its bag's icon (`GetInventoryItemTexture`,
+    whose nil is how Blizzard's bag slots tell an empty slot, `MainMenuBarBagButtons.lua`) and name
+    (`C_Container.GetBagName`), an empty one Blizzard's empty bag slot art and "Empty Bag Slot" ("Empty
+    Reagent Bag Slot" for the reagent bag); none selected; shown with groups off too. They are listed
+    again on `BAG_CONTAINER_UPDATE`.
+  - **Swapping, as Blizzard's bag slots do** (`BaseBagSlotButtonMixin`): a bag dropped on a tab, or a
+    left click holding one, goes in (`BagButtonFrame:PutInBag`, `PutItemInBag`, the one there coming onto
+    the cursor); dragging a tab or Shift-clicking it picks the bag up (`BagButtonFrame:PickupBag`,
+    `PickupBagFromSlot`). Both refuse in combat ("Cannot change bags in combat."), shared with the
+    classic bags' bag buttons. A plain click and a right click do nothing. The tooltip is the bag's own
+    (`SetInventoryItem`), or what the slot takes, then how to swap it.
+  - **No section goes on a bag slot** (`NextTab.bag`): `NextDrag:CanDropOnTab` refuses it (group IDs and
+    bag IDs overlap) and a drop on the backpack's items only moves them (`ShownTab`). Sections are not
+    picked up in the Show Bags view.
+  - The way back to the classic bags is the settings' BetterBags Next switch and `/bb next` (§11c).
+  - Coverage: `spec/next/bag_spec.lua` ("Show Blizzard Bags", "switches to Show Blizzard Bags and back
+    from a bag button in its header"), `spec/frames/bagbutton_spec.lua`, `spec/next/drag_spec.lua`
+    ("takes no section on a bag slot's tab").
 - **Opening:** the panel slides in from the right (0.45 s, a small overshoot), the sparkles start
   and the sections cascade in. `Show(ctx, slotInfo, onShown)` runs `onShown` once the panel has
   slid into place: at once when it is open, when a slide still playing ends (callbacks queued on
@@ -981,8 +1010,8 @@ time. Not measured in game; capture a switch with the profiler (`BagSystem.Switc
 - **`/bb next`:** switches to the other design.
 - **The classic backpack's menu:** **Switch to Next**, above What's New (not the bank's: it is shown
   at the bank, where the bags cannot switch). bag-menu-button.md §3.
-- **Next's backpack header:** a button with a backpack glyph (next-themes.md §11), "Switch to Classic
-  Bags".
+- **Next's backpack header:** had a button with a backpack glyph, "Switch to Classic Bags"; it is now
+  Show Blizzard Bags (§3, asked), so the settings and `/bb next` switch from Next.
 
 ### 11d. Startup
 

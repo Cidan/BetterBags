@@ -360,7 +360,7 @@ sonataNext:RegisterTheme({
         settingsButton = { Texture = "IconSettings" },
         closeButton = { Texture = "IconClose" },
         sortButton = { Texture = "IconSort" },
-        classicButton = { Texture = "IconBags" },
+        bagsButton = { Texture = "IconBags" },
         sizeButtonFull = { Texture = "IconSmall" },
         sizeButtonSmall = { Texture = "IconFull" },
         bankTabsButton = { Texture = "IconBankTabs" },

@@ -31,6 +31,7 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field gap? number Extra room above the tab, in pixels.
 ---@field secure? number A purchase tab for this bank type (Blizzard's purchase template).
 ---@field draggable? boolean Dragging it, or dropping on it, calls the drag handler.
+---@field bag? boolean A bag slot (the backpack's Show Blizzard Bags): no section is dropped on it.
 
 ---@class (exact) NextTab
 ---@field id number
@@ -47,6 +48,7 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field accent? string|number[]
 ---@field tooltip? string[]|fun(owner: Button)
 ---@field draggable? boolean
+---@field bag? boolean
 
 ---@class NextTabRail
 ---@field frame Frame
@@ -353,6 +355,7 @@ function railProto:SetTabs(entries)
     tab.accent = entry.accent
     tab.tooltip = entry.tooltip
     tab.draggable = entry.draggable
+    tab.bag = entry.bag
     if entry.secure ~= nil then
       tab.button:SetAttribute("overrideBankType", entry.secure)
     elseif entry.draggable then

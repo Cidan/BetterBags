@@ -202,7 +202,8 @@ end
 ---@param src NextPanelFrame
 ---@return boolean
 function nextDrag:CanDropOnTab(panel, tab, src)
-  if tab.secure then
+  -- A purchase tab, and a bag slot (the backpack's Show Blizzard Bags), hold no group.
+  if tab.secure or tab.bag then
     return false
   end
   if panel == src then
@@ -252,7 +253,7 @@ function nextDrag:ShownTab(panel)
     return nil
   end
   local tab = panel.tabs:Tab(panel:GetCurrentTabID())
-  if tab == nil or tab.secure then
+  if tab == nil or tab.secure or tab.bag then
     return nil
   end
   return tab
