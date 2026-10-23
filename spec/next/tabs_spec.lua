@@ -545,6 +545,23 @@ describe("NextTabs", function()
       finishTweens()
     end)
 
+    -- Reported: "when i let go, it snaps to the mouse's position for a second before it slips over to the
+    -- correct point, no matter how far away the mouse is to the left or right".
+    it("lands from where it is, its x pinned, however far the cursor went sideways", function()
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local tab = rail:Tab(1)
+      local x = press(tab)
+      move(x + 300, middleOf(2) - 2)
+      finishTweens()
+      local before = { tab.button:GetPoint(1) }
+      release(tab)
+      local after = { tab.button:GetPoint(1) }
+      assert.are.equal(before[4], after[4], "no jump to the cursor's x")
+      assert.are.equal(before[5], after[5])
+      finishTweens()
+    end)
+
     it("slides the tabs in its way out of it, animated", function()
       rail:SetTabs(groupsAndPlus)
       layOut()

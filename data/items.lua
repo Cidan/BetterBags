@@ -1306,12 +1306,13 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
         d = {}
         currentItem.derived = d
       end
-      -- The item's own category, without search categories: the search index holds it while Phase 8
-      -- matches search categories (data-loader.md §8).
-      local recent = self:IsNewItem(currentItem)
-      if d.category ~= stamp or d.recent ~= recent then
-        d.ownCategory = self:GetCategory(ctx, currentItem, true)
-        d.category, d.recent, d.final = stamp, recent, nil
+      -- The item's own category, without search categories or Recent Items: the search index holds it
+      -- while Phase 8 matches search categories (data-loader.md §8), so a rule's category field matches
+      -- what the item is, new or not (a rule taking junk by `category = "junk"` takes a new junk item,
+      -- and Skip Recent Items sees it).
+      if d.category ~= stamp then
+        d.ownCategory = self:GetCategory(ctx, currentItem, true, true)
+        d.category, d.base, d.final = stamp, nil, nil
         currentItem.itemInfo.category = d.ownCategory
         d.indexPending = true
       end
@@ -1550,28 +1551,25 @@ end
 ---@param itemData table<string, ItemData>
 ---@param emptySlotByBagAndSlot table
 ---@return table sectionLayouts
--- SkipRecentItems unmarks every new item whose category skips Recent Items (Skip Recent Items, a
--- category setting, categories:SkipsRecentOf; docs/next-batch-2.md §1): its timer ends and the client's
--- new-item mark goes, so it shows in its category at once, and a virtual stack it is merged into is no
--- longer recent (every pile of a stack is the same item, in the same category). The category is this
--- sweep's (its search categories are matched by now), Recent Items left out. It returns how many it
--- unmarked, for profiler traces.
+-- SkipRecent unmarks a new item whose category (category: the item's own with its search categories,
+-- Recent Items left out) skips Recent Items (Skip Recent Items, a category setting, categories:SkipsRecentOf;
+-- docs/next-batch-2.md §1): its timer ends and the client's new-item mark goes, so it shows in its
+-- category at once, and a virtual stack it roots is no longer recent (every pile of a stack is the same
+-- item, in the same category). It returns whether it unmarked the item, for profiler traces.
 ---@param ctx Context
----@param itemData table<string, ItemData>
----@return number
-function items:SkipRecentItems(ctx, itemData)
-  local skipped = 0
-  for _, item in pairs(itemData) do
-    if not item.isItemEmpty and (item.stackRecent or self:IsNewItem(item))
-      and categories:SkipsRecentOf(self:GetCategory(ctx, item, false, true)) then
-      if self:IsNewItem(item) then
-        self:ClearNewItemFromData(ctx, item)
-        skipped = skipped + 1
-      end
-      item.stackRecent = nil
-    end
+---@param item ItemData
+---@param category string
+---@return boolean
+function items:SkipRecent(ctx, item, category)
+  if not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category) then
+    return false
   end
-  return skipped
+  item.stackRecent = nil
+  if self:IsNewItem(item) then
+    self:ClearNewItemFromData(ctx, item)
+    return true
+  end
+  return false
 end
 
 function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlot)
@@ -1612,7 +1610,6 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
     end
   end
   self:RefreshSearchCache(kind, itemData)
-  self:SkipRecentItems(ctx, itemData)
 
   -- Search categories compete with custom categories, gear sets and recent items by the priority
   -- rules in GetCategory. An item's shown category is worked out again when its own category was
@@ -1629,11 +1626,19 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
         currentItem.derived = d
       end
       local searchCategory, searchPriority = searchCache[slotkey], priorities[slotkey]
+      -- Its category without Recent Items (base), worked out again only when its own category (Phase 6
+      -- drops it) or its search categories changed; then whether it is recent, which only picks between
+      -- base and Recent Items, as GetCategory does (its Recent Items check comes first).
+      if d.base == nil or d.searchCategory ~= searchCategory or d.searchPriority ~= searchPriority then
+        d.base = self:GetCategory(ctx, currentItem, false, true)
+        d.searchCategory, d.searchPriority, d.final = searchCategory, searchPriority, nil
+      end
+      self:SkipRecent(ctx, currentItem, d.base)
       local recent = self:IsNewItem(currentItem) or currentItem.stackRecent == true
-      if d.final == nil or d.searchCategory ~= searchCategory or d.searchPriority ~= searchPriority
-        or d.finalRecent ~= recent then
-        d.final = self:GetCategory(ctx, currentItem)
-        d.searchCategory, d.searchPriority, d.finalRecent = searchCategory, searchPriority, recent
+      if d.final == nil or d.finalRecent ~= recent then
+        local shownRecent = recent and database:GetCategoryFilter(currentItem.kind, "RecentItems")
+        d.final = shownRecent and L:G("Recent Items") or d.base
+        d.finalRecent = recent
       end
       local shown = showBags and self:GetBagName(currentItem.bagid) or d.final
       if currentItem.itemInfo.category ~= shown then

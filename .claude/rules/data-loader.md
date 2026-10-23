@@ -69,7 +69,8 @@ To eliminate JIT (just-in-time) database and search engine queries during UI lay
 - **Mechanism:** Immediately after the search index is brought up to date for this sweep (`search:SyncKind`, search-indexing.md §1 and §4) in `items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlot)`:
   - Call `self:RefreshSearchCache(kind, itemData)` to update search-based category matches using the search engine.
   - Iterate over all non-empty items in `itemData` and resolve their final category by calling `items:GetCategory(ctx, item)` again. `GetCategory` is the single place where Recent Items, gear sets, the items placed in categories by hand and the categories' rules compete by priority (lower number wins; at a tie the item stays where it was placed, category-lifecycle.md §6). Never overwrite `item.itemInfo.category` with the raw search-cache entry: that bypasses the priority rules and lets a priority-10 search category beat a priority-1 custom category.
-  - **Search categories are matched against each item's own category.** Phase 6 gives each item its own category, the one it has without any search category (`items:GetCategory(ctx, item, true)`); `search:SyncKind` indexes that, `RefreshSearchCache` matches the search categories' queries against it, and only then does the pass above give each item its final category and move the index to it (`search:UpdateCategoryIndex`), so the search box and queries between sweeps see the category each item is shown in. A search category's `category` field therefore matches an item's own category (a custom category, a gear set, its type), never a search category's name: one search category cannot be built on another.
+  - **Search categories are matched against each item's own category.** Phase 6 gives each item its own category, the one it has without any search category and without Recent Items (`items:GetCategory(ctx, item, true, true)`); `search:SyncKind` indexes that, `RefreshSearchCache` matches the search categories' queries against it, and only then does the pass above give each item its final category and move the index to it (`search:UpdateCategoryIndex`), so the search box and queries between sweeps see the category each item is shown in. A search category's `category` field therefore matches an item's own category (a custom category, a gear set, its type), never a search category's name: one search category cannot be built on another, and never Recent Items.
+  - **Failure mode (fixed): a new item's own category was "Recent Items".** Reported on WoW: Forever: gray items looted into a category with Skip Recent Items stayed in Recent Items until a sort, then went to the category. The player's rule (their saved `Sell`: `usable = false or "Trade Goods" OR "Consumable" or category = "junk"`) takes junk by its category, and the own category of a new item, which rules are matched against, was "Recent Items", so `category = "junk"` never took a new item; Skip Recent Items and category automation (both by the category an item has once no longer recent) saw "Junk". Reproduced on the real pipeline with that rule before the fix. The own category now leaves Recent Items out, so a rule never sees it. A rule on `category = "recent items"` no longer takes anything; no rule relied on it (none in the player's saved rules), and it changed nothing shown: a recent item shows in Recent Items before any category. Coverage: `spec/refresh_pipeline_spec.lua` ("Skip Recent Items": "skips an item its category's rule takes by the item's category, while the item is new").
   - **Failure mode (fixed):** Phase 6 used to give categories from the *previous* sweep's search results, which are kept by bag slot (`searchCache[kind][slotkey]`), and the index held them while the queries ran. A bare word is matched against the category field too (`data/search.lua`, the default indices). Reported: a search category "Lucky Items" with the query `lucky` held Arcanoweave, whose name, type, subtype and tooltip say "lucky" nowhere. An item that landed in a slot a lucky item had held (a sort moves every item) took "Lucky Items" in Phase 6, was indexed with it, matched `lucky` through that name, and kept it on every sweep after; each sort passed it on to whatever landed in those slots, until a full re-read (`/reload`, a bag swapped) cleared the slot-kept results. It touched any search category whose name contains its own bare-word query, and kept an item that stopped matching such a category in it. Reproduced on the real pipeline before the fix: "Alpha Items" with the query `alpha` took an item that swapped into a matching item's slot, while "Swords" with the same query did not. Coverage: `spec/refresh_pipeline_spec.lua` ("search categories match each item's own category": the slot's old search category, letting go of an item that no longer matches, the category field, the search box; and "equals a clean rebuild after sweeps with a search category in play").
   - When the category changed, update `item.itemInfo.category` and refresh the search index's category with `search:UpdateCategoryIndex(currentItem, oldCategory)`.
   - **Live Search Results:** The active search box text is external input, in the same class as a `C_Container` read: it is consumed by the data phase and never by the draw phase. It is evaluated here (`data.isSearchResult`), never in Phase 6 and never in a view. Phase 6 runs before the index is updated, so evaluating there queries the previous sweep's index and newly looted or moved items never match until the following refresh. Views only read the pre-computed `data.isSearchResult` flag; they must not call `SearchBox:GetText()` or `search:Search()` themselves.
@@ -193,10 +194,14 @@ whatever an input every item shares (a setting, the gear, the open window) chang
   - `ownCategory` (Phase 6: `GetCategory` with `own`, no search categories), with `category` (the
     stamp it was worked out under: `items:categoryStamp(kind)`, the kind's category generation and
     the Categories module's) and `recent` (`IsNewItem`).
-  - `final` (Phase 8: the category the item is shown in outside Show Bags), with `searchCategory`
-    and `searchPriority` (its slot's entries in the search cache, rebuilt every sweep) and
-    `finalRecent` (its own or its stack's recency). Worked out again when its own category was
-    (Phase 6 drops `final`).
+  - `base` (Phase 8: its category without Recent Items, `GetCategory` with `ignoreRecent`), with
+    `searchCategory` and `searchPriority` (its slot's entries in the search cache, rebuilt every
+    sweep). Worked out again when its own category was (Phase 6 drops it) or its search entries
+    changed. Skip Recent Items reads it (recent-items.md §4).
+  - `final` (Phase 8: the category the item is shown in outside Show Bags): Recent Items while it is
+    recent (its own or its stack's recency, `finalRecent`) and the filter is on, else `base`,
+    exactly what `GetCategory` returns (its Recent Items check comes first). An item becoming recent
+    or no longer recent asks for no category.
   - `context` (Phase 6: grey-out, `itemContextMatchResult`), with the signature it was worked out
     under (`items:contextSignature()`: whether the bank is open and shows a Warbank tab). While an
     item context is active (`ItemButtonUtil.GetItemContext()` not nil) there is no signature and
@@ -210,7 +215,8 @@ whatever an input every item shares (a setting, the gear, the open window) chang
 - **What makes it be worked out again:**
   - An in-place change of the item's own inputs drops `derived`: quest state, tooltip text, gear
     sets (`RefreshKeptItem`, §16), a guild item's tooltip text (`RederiveGuildBank`).
-  - Recency is compared every sweep (a timer starting or expiring, a sort clearing them).
+  - Recency is compared every sweep (a timer starting or expiring, a sort clearing them); it only
+    picks between `base` and Recent Items.
   - The kind's category generation (`items._categoryGeneration[kind]`) changes on every wipe and on
     every recalculation that does not say `categoriesUnchanged`, or a read that absorbed one
     (`recategorize`, refresh-scheduler.md §10).
@@ -252,7 +258,8 @@ whatever an input every item shares (a setting, the gear, the open window) chang
   only about changed items; categories worked out again only for an item or input that changed;
   grey-out only on a context change, every sweep under an active context, the Warbank; the index
   touched only for changed items, after a sweep that failed before committing and one that failed
-  before indexing; an own category that follows recency, its own and its stack's; a pile's own
+  before indexing; an own category that follows recency, its own and its stack's (a rule never
+  seeing Recent Items); a pile's own
   category once stacking stops; a search category changing at the same priority; the randomized
   equivalence; "virtual stacks and Recent Items"; "merging derives"), `spec/categories_spec.lua`
   ("generation"), `spec/search_spec.lua` ("with the items that changed"), `spec/items_spec.lua`

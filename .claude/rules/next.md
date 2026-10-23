@@ -223,7 +223,9 @@ section dragged out of a panel returns to the panel's strata (§7).
     would land follows the cursor (before the first tab of its block whose middle is below the cursor,
     `moveIndexAt`), and the other tabs slide out of its way (`slideY`, `Time.Interaction`, the `Glide`
     ease, apart from their hover slide). Let go (`OnDragStop`, or the left button found up), it lands
-    in its room (`NextLift:Land`), and the rail shows the new order and tells its handler every tab's id
+    in its room (`NextLift:Land`, its flight starting from the pinned x: it started from the cursor's,
+    so the tab jumped to the cursor before flying back, reported), and the rail shows the new order and
+    tells its handler every tab's id
     in it; nothing when it is back where it was. The bar follows the selected tab. A move ends with the
     tab back in its place when the rail hides or its tabs are listed again, and none starts while
     another frame is lifted. One at a time.

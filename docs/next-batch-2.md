@@ -243,3 +243,16 @@ mutation-tested; the surviving mutations led to tests or to removing dead code (
 slides), the switches' slide, the bag swaps from the backpack's tabs (`PutItemInBag`,
 `PickupBagFromSlot` from BetterBags Next's tabs), an item filed by dropping it on a header, and the
 bank-to-backpack move into a group's items.
+
+## Found in game (2026-10-22, WoW: Forever)
+
+- **Skip Recent Items missed items taken by `category = "junk"`.** Gray items stayed in Recent Items
+  until a sort, then went to Sell. Sell's rule (from the player's saved variables) takes junk by its
+  category, and rules were matched against a new item's own category, "Recent Items". The own category
+  now leaves Recent Items out (data-loader.md §8). Fixing it showed Skip Recent Items worked out every
+  new item's category again on every sweep; items now keep their category without Recent Items
+  (`derived.base`, data-loader.md §18), and a test wrapper that dropped an argument, hiding both, was
+  fixed.
+- **A tab let go jumped to the cursor's x before landing.** `NextLift:Land` started the flight from the
+  cursor; it starts from the pinned x now.
+

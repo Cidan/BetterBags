@@ -2581,9 +2581,9 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         return add(self, it)
       end)
       local getCategory = items.GetCategory
-      override(items, "GetCategory", function(self, ctx, data, own)
+      override(items, "GetCategory", function(self, ctx, data, ...)
         if data and not data.isItemEmpty then categoryAsked[#categoryAsked + 1] = data.slotkey end
-        return getCategory(self, ctx, data, own)
+        return getCategory(self, ctx, data, ...)
       end)
     end)
 
@@ -2625,7 +2625,8 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are.same({}, customAsked, "nothing changed")
       newSlots["0_1"] = true
       refreshBackpack({ bags = { [0] = true } })
-      assert.are.same({ "0_1" }, distinct(categoryAsked), "the item that became recent")
+      -- Its category without Recent Items is unchanged (data-loader.md §18, base): only recency picks.
+      assert.are.same({}, distinct(categoryAsked), "nothing asked for the item that became recent")
       assert.equal("Recent Items", items.slotInfo[BACKPACK].itemsBySlotKey["0_1"].itemInfo.category)
       reset()
       tooltipOf["0_3"] = "shiny"
@@ -2689,9 +2690,9 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal(0, slot1())
     end)
 
-    -- An item's own category includes its recency (GetCategory with own), and search categories
-    -- match it (data-loader.md §8). A search category on "recent items" matches an item only while it
-    -- is recent, so the item's own category must follow its recency, its own and its stack's.
+    -- Search categories match an item's own category, which leaves Recent Items out (data-loader.md
+    -- §8): a rule on "recent items" never takes an item, and an item shows in Recent Items while it is
+    -- recent and in its category once it is not, its own recency and its stack's.
     describe("an own category that follows recency", function()
       before_each(function()
         searchCats = { { "Was Recent", 'category = "recent items"', 1 } }
@@ -3384,6 +3385,27 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.is_nil(newSlots["0_1"])
     end)
 
+    -- Reported on WoW: Forever: gray items stayed in Recent Items until a sort, then went to Sell. The
+    -- player's Sell (their saved rule) takes junk by its category; a new item's own category, which rules
+    -- are matched against, was "Recent Items", so `category = "junk"` never took a new item.
+    it("skips an item its category's rule takes by the item's category, while the item is new", function()
+      override(categories, "GetCustomCategory", function() return nil, nil end)
+      override(categories, "GetSortedSearchCategories", function()
+        return { { name = "Sell", priority = 1, enabled = { [const.BAG_KIND.BACKPACK] = true },
+          searchCategory = { query = 'usable = false or "Trade Goods" OR "Consumable" or category = "junk"',
+            groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } } }
+      end)
+      skips = { Sell = true }
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1, info = { quality = 0 } }, {} }
+      refreshBackpack({ wipe = true })
+      mockContainer[0][2] = { itemID = 7073, guid = "guid-fang", count = 1, info = { quality = 0 } }
+      newSlots["0_2"] = true
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.equal("Sell", categoryOf(slotInfo, "0_1"), "an old junk item: Sell")
+      assert.equal("Sell", categoryOf(slotInfo, "0_2"), "a new one too, not Recent Items")
+      assert.is_nil(newSlots["0_2"])
+    end)
+
     it("takes a virtual stack out of Recent Items when its category skips them", function()
       override(database, "GetStackingOptions", function()
         return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false, dontMergePartial = false,
@@ -3409,6 +3431,16 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       now = 1000000
       _G.time = function() return now end
     end
+
+    it("shows a new item in its category while the Recent Items category is turned off", function()
+      setupRecent()
+      override(database, "GetCategoryFilter", function() return false end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Everything", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+      assert.is_true(items:IsNewItem(slotInfo.itemsBySlotKey["0_1"]), "still new: only not shown there")
+    end)
 
     it("keeps an item in Recent Items while the bag is open, after it was hovered and its duration passed", function()
       setupRecent()

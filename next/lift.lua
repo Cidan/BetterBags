@@ -209,8 +209,12 @@ end
 function lift:Land(held, to, onDone, from)
   local frame = held.frame
   local s0 = from and from.scale or held.scale
-  -- Where Place put it: the client reports a scaled frame's edges in its own scale.
+  -- Where Place put it (at its pinX when it has one): the client reports a scaled frame's edges in its
+  -- own scale.
   local cx, cy = self:Cursor()
+  if held.pinX ~= nil then
+    cx = held.pinX
+  end
   local left0, top0 = cx - held.grabX * s0, cy + held.grabY * s0
   if from then
     left0, top0 = from.left, from.top

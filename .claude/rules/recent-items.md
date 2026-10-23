@@ -84,10 +84,13 @@ leaves on the following close once it is old enough.
   independent of autosell"; docs/next-batch-2.md §1): stored as `skipRecent = true` on the category (a
   plugin's in its saved state), read with `categories:SkipsRecentOf(name)` (a group by's sections as
   their category). In Phase 8, once this sweep's search categories are matched,
-  `items:SkipRecentItems` unmarks every new item whose category (this sweep's, Recent Items left out:
-  `GetCategory` with `ignoreRecent`) skips Recent Items: `ClearNewItemFromData` ends its timer and
-  removes the client's new-item mark (so the next read does not start a timer again), and its glow
-  goes. A virtual stack whose category skips them is no longer recent (`stackRecent`: every pile of a
+  `items:SkipRecent` unmarks each new item whose category without Recent Items (`derived.base`,
+  data-loader.md §18: its own category with its search categories, worked out only when one of those
+  changes) skips Recent Items: `ClearNewItemFromData` ends its timer and removes the client's new-item
+  mark (so the next read does not start a timer again), and its glow goes. Rules are matched against an
+  item's own category without Recent Items (data-loader.md §8), so a category whose rule takes items by
+  their category (`category = "junk"`) skips them while they are new too; it did not at first
+  (reported on WoW: Forever). A virtual stack whose category skips them is no longer recent (`stackRecent`: every pile of a
   stack is the same item). Turned on, the bags are recalculated, so items already in Recent Items leave
   it at once; turned off, it marks nothing new again (the items were unmarked). Coverage:
   `spec/refresh_pipeline_spec.lua` ("Skip Recent Items"), `spec/categories_spec.lua`,
