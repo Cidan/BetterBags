@@ -46,8 +46,8 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
   the box's own copy of that method with one that rounds the offset first. Any new Next scroll box must
   call it.
 - **Not snapped, by nature**: what moves (glides, slides, drags, lifts, flights, sparkles, the cloud's
-  breathing, the braid, the tab marker's glide, a toggle's knob sliding). Each lands on whole pixels when
-  it comes to rest.
+  breathing, the braid, the tab marker's glide, a toggle's knob sliding, a theme's swaying, spinning,
+  pulsing or bobbing ornaments, next-themes.md §12). Each lands on whole pixels when it comes to rest.
 
 ## 3. A new grid
 

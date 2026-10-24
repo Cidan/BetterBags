@@ -50,9 +50,10 @@ local function scriptable(obj)
   return obj
 end
 
--- An animation (SimpleAnimAPIDocumentation.lua and the Alpha, Translation and Scale
--- animation APIs): SetDuration, SetSmoothing, SetStartDelay, SetFromAlpha/SetToAlpha,
--- SetOffset, SetScaleFrom/SetScaleTo/SetOrigin, Play/Stop/IsPlaying.
+-- An animation (SimpleAnimAPIDocumentation.lua and the Alpha, Translation, Scale and Rotation
+-- animation APIs): SetDuration, SetSmoothing, SetStartDelay, SetOrder, SetFromAlpha/SetToAlpha,
+-- SetOffset, SetScaleFrom/SetScaleTo/SetOrigin, a rotation's SetDegrees/SetRadians (and their
+-- getters, SimpleAnimRotationAPIDocumentation.lua, every client), Play/Stop/IsPlaying.
 local function CreateMockAnimation(group, animationType, name)
   local anim = scriptable({ _type = animationType, _name = name, _group = group })
   function anim:GetParent() return self._group end
@@ -65,6 +66,16 @@ local function CreateMockAnimation(group, animationType, name)
   function anim:SetScaleFrom(x, y) self._scaleFrom = { x = x, y = y } end
   function anim:SetScaleTo(x, y) self._scaleTo = { x = x, y = y } end
   function anim:SetOrigin(point, x, y) self._origin = { point = point, x = x, y = y } end
+  function anim:GetOrigin()
+    local o = self._origin or { point = "CENTER", x = 0, y = 0 }
+    return o.point, o.x, o.y
+  end
+  function anim:SetOrder(order) self._order = order end
+  function anim:GetOrder() return self._order or 1 end
+  function anim:SetDegrees(angle) self._degrees = angle end
+  function anim:GetDegrees() return self._degrees or 0 end
+  function anim:SetRadians(angle) self._degrees = math.deg(angle) end
+  function anim:GetRadians() return math.rad(self._degrees or 0) end
   function anim:Play() self._playing = true self:fire("OnPlay") end
   function anim:Stop() self._playing = false self:fire("OnStop") end
   function anim:IsPlaying() return self._playing == true end
@@ -72,8 +83,8 @@ local function CreateMockAnimation(group, animationType, name)
 end
 
 -- An animation group (SimpleAnimGroupAPIDocumentation.lua): CreateAnimation(animationType?,
--- name?, templateName?), Play(reverse, offset), Stop(), Finish(), IsPlaying(), SetLooping,
--- SetToFinalAlpha. There is no time in specs:
+-- name?, templateName?), GetAnimations(), RemoveAnimations(), Play(reverse, offset), Stop(), Finish(),
+-- IsPlaying(), SetLooping/GetLooping, SetToFinalAlpha. There is no time in specs:
 -- * Play runs the OnPlay scripts of the group and its animations; on a group already playing
 --   it does nothing (the client has a separate Restart).
 -- * Stop runs OnStop(self, requested) on a playing group and stops its animations.
@@ -88,10 +99,13 @@ local function CreateMockAnimationGroup(region, name)
     table.insert(self._animations, anim)
     return anim
   end
-  function group:Play(reverse)
+  function group:GetAnimations() return unpack(self._animations) end
+  function group:RemoveAnimations() self._animations = {} end
+  function group:Play(reverse, offset)
     if self._playing then return end
     self._playing = true
     self._reverse = reverse == true
+    self._offset = offset or 0
     self._plays = (self._plays or 0) + 1
     for _, anim in ipairs(self._animations) do anim._playing = true end
     self:fire("OnPlay")
@@ -126,6 +140,7 @@ local function CreateMockAnimationGroup(region, name)
     self:Play(reverse)
   end
   function group:SetLooping(loopType) self._looping = loopType end
+  function group:GetLooping() return self._looping or "NONE" end
   function group:SetToFinalAlpha(setToFinalAlpha) self._toFinalAlpha = setToFinalAlpha end
   return group
 end

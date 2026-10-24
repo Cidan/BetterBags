@@ -249,6 +249,101 @@ describe("NextToggle", function()
     assert.is_true(t.frame:GetAlpha() < 1)
   end)
 
+  -- Asked: switches themable between two styles, the square one and "the round peg that sits over a smaller
+  -- track". Controls.Toggle.Style = "Round": a track TrackHeight tall with round ends, centered on the switch, and
+  -- a round knob KnobSize across over it, overhanging it, its middle over the middle of either end at rest.
+  describe("in the round style", function()
+    local function round(extra)
+      local toggle = { Style = "Round", Width = 34, Height = 20, TrackHeight = 12, KnobSize = 20, HoverSpread = 6,
+        KnobShadow = { Texture = "Glow", Color = "Black", Alpha = 0.5, Spread = 3 } }
+      for k, v in pairs(extra or {}) do toggle[k] = v end
+      UseNextTheme({ Controls = { Toggle = toggle } })
+    end
+
+    local function at(region)
+      local point, rel, relPoint, x, y = region:GetPoint(1)
+      return { point, rel, relPoint, x, y }
+    end
+
+    it("draws a round knob over a thinner track with round ends, sliding from end to end", function()
+      round()
+      local t = make(false)
+      assert.are.same({ 34, 20 }, { t.frame:GetSize() })
+      -- The track: 4 in from each end (half of what the knob is taller), 4 down, its ends half circles 6 wide.
+      local circle = style:TexturePath("Circle")
+      for _, pair in ipairs({ { t.offLeft, t.offRight }, { t.onLeft, t.onRight } }) do
+        local left, right = pair[1], pair[2]
+        assert.are.same({ "TOPLEFT", t.frame, "TOPLEFT", 4, -4 }, at(left))
+        assert.are.same({ 6, 12 }, { left:GetSize() })
+        -- GetTexCoord gives each corner's (upper left, lower left, upper right, lower right).
+        assert.are.same({ 0, 0, 0, 1, 0.5, 0, 0.5, 1 }, { left:GetTexCoord() }, "the circle's left half")
+        assert.are.same({ "TOPLEFT", t.frame, "TOPLEFT", 24, -4 }, at(right))
+        assert.are.same({ 0.5, 0, 0.5, 1, 1, 0, 1, 1 }, { right:GetTexCoord() }, "its right half")
+        assert.are.equal(circle, left:GetTexture())
+        assert.are.equal(circle, right:GetTexture())
+      end
+      assert.are.same({ "TOPLEFT", t.frame, "TOPLEFT", 10, -4 }, at(t.off))
+      assert.are.same({ 14, 12 }, { t.off:GetSize() }, "between the ends")
+      local r, g, b = t.offLeft:GetVertexColor()
+      assert.are.same(rgb("Track"), { r, g, b }, "the ends in the track's color")
+      -- The knob: round, its middle over the middle of the end it is at.
+      assert.are.same({ 20, 20 }, { t.knob:GetSize() })
+      assert.are.equal(circle, t.knob:GetTexture())
+      assert.are.same({ "TOPLEFT", t.frame, "TOPLEFT", 0, 0 }, at(t.knob))
+      assert.is_false(t.edge.Top:IsShown(), "no square edge")
+      local on = make(true)
+      assert.are.same({ "TOPLEFT", on.frame, "TOPLEFT", 14, 0 }, at(on.knob))
+      assert.are.equal(T().On.Alpha, on.onLeft:GetAlpha())
+      assert.are.equal(T().On.Alpha, on.onRight:GetAlpha())
+      assert.are.equal(0, t.onLeft:GetAlpha(), "the on color hidden while off, its ends too")
+    end)
+
+    it("lights a halo round its knob under the pointer, and puts a soft shadow under it, both following it", function()
+      round()
+      local t = make(false)
+      assert.are.same({ "TOPLEFT", t.knob, "TOPLEFT", -6, 6 }, at(t.hover))
+      assert.are.same({ 32, 32 }, { t.hover:GetSize() })
+      assert.are.equal(style:TexturePath("Circle"), t.hover:GetTexture())
+      t.frame:GetScript("OnEnter")(t.frame)
+      assert.is_true(t.hover:IsShown())
+      assert.are.same({ "TOPLEFT", t.knob, "TOPLEFT", -3, 3 }, at(t.shadow))
+      assert.are.same({ 26, 26 }, { t.shadow:GetSize() })
+      assert.is_true(t.shadow:IsShown())
+      assert.are.equal(0.5, t.shadow:GetAlpha())
+      round({ KnobShadow = false })
+      nextToggle:ApplyStyle()
+      assert.is_false(t.shadow:IsShown(), "a theme without a shadow")
+    end)
+
+    it("slides its knob, and the on color with it, as the square switch does", function()
+      round()
+      local t = make(false)
+      t.frame:GetScript("OnClick")(t.frame, "LeftButton")
+      tween:Step(style.Time.Toggle / 2)
+      local _, _, _, x = t.knob:GetPoint(1)
+      assert.is_true(x > 0 and x < 14, "between its ends")
+      assert.is_true(t.onLeft:GetAlpha() > 0 and t.onLeft:GetAlpha() < T().On.Alpha)
+      tween:Step(1)
+      assert.are.same({ "TOPLEFT", t.frame, "TOPLEFT", 14, 0 }, at(t.knob))
+    end)
+
+    it("goes back to the square style with a theme that sets none", function()
+      round()
+      local t = make(true)
+      UseNextTheme(nil)
+      nextToggle:ApplyStyle()
+      for _, cap in ipairs({ t.offLeft, t.offRight, t.onLeft, t.onRight, t.shadow }) do
+        assert.is_false(cap:IsShown())
+      end
+      assert.are.same({ T().Width, T().Height }, { t.frame:GetSize() })
+      assert.are.equal(t.frame, t.off._allPoints, "the track fills the switch again")
+      assert.are.equal(t.frame, t.hover._allPoints)
+      assert.is_nil(t.knob:GetTexture(), "a square knob in its color")
+      assert.is_true(t.edge.Top:IsShown())
+      assert.are.equal(T().Width - T().KnobInset - T().KnobSize, knobX(t))
+    end)
+  end)
+
   it("is restyled, every switch made, by a theme", function()
     local t = make(true)
     UseNextTheme({ Controls = { Toggle = { Width = 44, On = { Color = "Lavender", Alpha = 1 } } } })

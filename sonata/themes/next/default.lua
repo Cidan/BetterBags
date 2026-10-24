@@ -89,6 +89,8 @@ sonataNext:RegisterTheme({
     IconCheck = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\check.png",
     IconSearch = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\search.png",
     IconPlus = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\plus.png",
+    -- A disc: a round switch's knob and the round ends of its track (Controls.Toggle.Style = "Round").
+    Circle = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\circle.png",
   },
 
   -- Text roles: Size, Color, Shadow (true: FontShadow; a table: its own; unset: none), Flags, File (a
@@ -674,8 +676,16 @@ sonataNext:RegisterTheme({
     },
     -- A switch: its track off and on, its edge, its knob (KnobSize, KnobInset from the track's ends)
     -- off and on, and the light over it under the pointer.
+    -- A switch (Style): "Square", a track Width x Height and a knob KnobInset in from its ends; or "Round", a
+    -- track TrackHeight tall with round ends and a round knob KnobSize across over it (Height is the switch's,
+    -- at least the knob), a soft KnobShadow under the knob (or false) and, under the pointer, the Hover color in
+    -- a halo HoverSpread round it. A round knob, its track's ends and its halo are the Circle texture unless
+    -- their spec names art.
     Toggle = {
+      Style = "Square",
       Width = 36, Height = 18, KnobSize = 12, KnobInset = 3,
+      TrackHeight = 8, HoverSpread = 5,
+      KnobShadow = { Texture = "Glow", Color = "Black", Alpha = 0.45, Spread = 3 },
       Off = { Color = "Track" },
       On = { Color = "Gold", Alpha = 0.9 },
       Edge = { Color = "Lavender", Alpha = 0.2, Size = 1 },

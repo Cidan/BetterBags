@@ -201,7 +201,7 @@ def guildRepair():
     return union(cut(hammer(2.8, 15.4), fill(shield), 1.6), stroke(shield, True))
 
 # The controls' glyphs (next-settings.md): a dropdown's chevron, the settings window's Back, a menu's
-# check, a search box's magnifier, and the plus of a button that makes something new.
+# check, a search box's magnifier, the plus of a button that makes something new, and a round switch's disc.
 
 def chevronDown():
     return chevron(10, 13.2, 0, 1, 4.6)
@@ -219,11 +219,17 @@ def magnifier():
 def plus():
     return union(line(10, 4.2, 10, 15.8), line(4.2, 10, 15.8, 10))
 
+def circle():
+    # A switch's round knob and the round ends of its track (Controls.Toggle.Style = "Round"): a disc filling
+    # the texture, its edge one pixel in from the texture's, so it is round however it is cut in half.
+    return lambda x, y: math.hypot(x - 10, y - 10) - (10 - PX)
+
 GLYPHS = {
     "settings": gear, "close": close, "sort": sort, "bags": bag, "small": shrink, "full": expand,
     "banktabs": tabs, "deposit": deposit, "depositgold": depositGold, "withdrawgold": withdrawGold,
     "filter": filt, "selljunk": tag, "repair": repair, "guildrepair": guildRepair,
     "chevron": chevronDown, "back": chevronLeft, "check": check, "search": magnifier, "plus": plus,
+    "circle": circle,
 }
 
 if __name__ == "__main__":

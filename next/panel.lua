@@ -63,6 +63,9 @@ local pixel = addon:GetModule('NextPixel')
 ---@class PixelAudit: AceModule
 local pixelAudit = addon:GetModule('PixelAudit')
 
+---@class NextOrnaments: AceModule
+local nextOrnaments = addon:GetModule('NextOrnaments')
+
 ---@class NextCoins: AceModule
 local coins = addon:GetModule('NextCoins')
 
@@ -348,7 +351,7 @@ end
 
 -- MovingParts are the parts of a panel that move by nature, on the screen's pixels only by chance (next-pixel-
 -- perfect.md): its sparkles and the spark fly, the cloud's puffs breathe every frame, the braid's lights run
--- along it. The pixel checks leave them out (PixelAudit, the specs).
+-- along it, its ornaments that sway, spin, pulse or bob (NextOrnaments). The pixel checks leave them out (PixelAudit, the specs).
 ---@return table<table, boolean>
 function panelProto:MovingParts()
   local skip = {}
@@ -362,6 +365,7 @@ function panelProto:MovingParts()
   end
   skip[self.spark] = true
   skip[self.braid.layer] = true
+  self.ornaments:MovingParts(skip)
   return skip
 end
 
@@ -742,6 +746,8 @@ function panelProto:BuildPanel(name)
   glow:SetAlpha(0)
   glow:Hide()
   self.dropGlow = glow
+  -- The theme's ornaments (Panel.Ornaments, next-themes.md §12), anchored to the body.
+  self.ornaments = nextOrnaments:Create(self)
   self:styleBody()
 end
 
@@ -786,6 +792,7 @@ function panelProto:styleBody()
     self.dropGlow:SetAlpha(0)
     self.dropGlow:Hide()
   end
+  self.ornaments:Style()
 end
 
 -- paintEdges draws the border at a strength, 0 to 1, of the theme's alpha. A texture's alpha is its
@@ -1168,6 +1175,7 @@ function panelProto:ApplyGeometry()
     -- The fill and the wash reach past the screen edge while it rests there (SetDocked).
     self:SetDocked((self.offset or 0) == 0)
   end
+  self.ornaments:Layout()
   self:setOffset(self.offset or 0)
 end
 
@@ -3404,6 +3412,7 @@ function panelProto:Show(ctx, slotInfo, onShown)
   self.sparkles:Start()
   self.edgeSparkles:Start()
   self.cloudSparkles:Start()
+  self.ornaments:Start()
   self:playShimmer()
   addon.TriggerItemContextChanged()
   chain:Update(ctx)
@@ -3513,6 +3522,7 @@ function panelProto:OnHidden(ctx)
   self.edgeSparkles:Stop()
   self.cloudSparkles:Stop()
   self.knotSparkles:Stop()
+  self.ornaments:Stop()
   self.waiting = false
   self.frame:SetFrameLevel(PANEL_LEVEL)
   chain:Update(ctx)

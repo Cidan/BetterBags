@@ -71,12 +71,12 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 | Key | What |
 |---|---|
 | `Palette` | Every named color. The controls and the settings window (next-settings.md) add `ControlFill`, `ControlHover`, `ControlPressed` (a field idle, under the pointer, pressed), `Track` (a switch off, a slider's empty track), `Danger` (what deletes) and `Sidebar`; a theme whose body is not indigo sets the first four in its own colors. |
-| `Textures` | Named files (`Glow`, `Sparkle`; Parchment adds `Paper`), and the glyphs (`Icon...`; the controls' `IconChevron`, `IconCheck`, `IconSearch`, `IconPlus`, made by `tools/textures/next_icons.py`). |
+| `Textures` | Named files (`Glow`, `Sparkle`; Parchment adds `Paper`), and the glyphs (`Icon...`; the controls' `IconChevron`, `IconCheck`, `IconSearch`, `IconPlus`, and `Circle`, the round switch's disc, made by `tools/textures/next_icons.py`). |
 | `FontShadow` | The shadow `Shadow = true` means. |
 | `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`; or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
 | `Layout` | Sizes: Icon (an item button's size; the player's Icon Scale, the Size tab, multiplies it: `style.ICON`; the grid's width and the vendor's cards keep the theme's own, `style.CARD_ICON`, docs/next-appearance-size.md), VendorColumns, VendorTextGap, VendorPriceRaise (the vendor's cards, next.md §10b), Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
 | `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
-| `Panel` | `Fill` (texture spec), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false). |
+| `Panel` | `Fill` (texture spec), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none). |
 | `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button). |
 | `Search` | `Fill`, `FocusFill`, `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`), `HelpFont`, `TextFont`. |
 | `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Line` (`Color`, `From`, `To`, `Size`, or false), `Highlight` (`Color`, `From`, `To`, or false). |
@@ -297,6 +297,76 @@ mutations, each caught (the one that first survived, art hovered in the glyph co
 whose two hover colors differ).
 
 Not verified in game yet: how the glyphs look in each theme, and the trilinear filter on each client.
+
+## 12. Ornaments (`next/ornaments.lua`, `Panel.Ornaments`)
+
+Asked, for Next themes in the spirit of Sauravisus' race themes (BetterBags - Themes): "i still want some of
+those pretty borders, but, you know, smaller and less large, more tasteful, and animated feeling. so for
+example, i can see a green druid type one where the left side of the bag is gnarled roots and leaves". The
+classic themes' borders are nine-slice frames round the window; a Next panel has no frame to wrap (a full panel
+is a column at a screen edge, feathered on its inner side), so ornaments are art pieces anchored to the body.
+
+- **A theme draws for an inner side on the left**: the body's side away from its screen edge (a backpack, which
+  belongs to the right of the screen). A panel belonging to the left (the bank, the vendor, the guild bank) shows
+  every ornament mirrored: its points swap sides and its art is flipped (texture coordinates), motions too.
+- **An ornament** (one entry of the list, data only): its art (`Texture`, a `Textures` name or a file;
+  `Color`, `Alpha`, `BlendMode`, `Desaturated`, `Layer` and `SubLevel`, ARTWORK 0 when unset), loaded
+  `TRILINEAR` (art drawn smaller than it is stays smooth), and where it goes:
+  - `Point = "INNER"` or `"OUTER"`: a span down that side, `Width` wide, `Start` from the top and `End` from the
+    bottom, `X` toward the body's middle; `Point = "TOP"` or `"BOTTOM"`: a span along that edge, `Height` tall,
+    `Start` from the inner end and `End` from the outer, `Y` down. A span's art repeats every `Tile` along it
+    (its texture coordinates, loaded with the `REPEAT` wrap mode, so the art keeps its scale: the client's own
+    tiling would draw it at its file's size), and again as the body changes size (a resize, a size switch: the
+    body's `OnSizeChanged`); without `Tile` it is stretched.
+  - `Point = "TOPINNER"`, `"TOPOUTER"`, `"BOTTOMINNER"` or `"BOTTOMOUTER"`: a piece `Width` x `Height` at that
+    corner, by its own corner `Anchor` (the same one when unset), `X` toward the body's middle, `Y` down. Corners
+    only: Next never anchors by a middle point (docs/next-pixel-perfect.md), and a body is often an odd number of
+    pixels across.
+  - `Sizes = "Full"` or `"Small"`: shown at that size only (unset: both); a size switch shows and hides them.
+  - `Motion`: `Sway` (degrees either way of rest about `Origin`, `BOTTOM` when unset: a full swing every
+    `Period`), `Spin` (a turn every `Period` about its middle, 1 clockwise, -1 the other way), `Pulse`
+    (`{ from, to }` alpha and back every `Period`), `Bob` (up that far and back every `Period`), `Delay` (where in
+    its motion it starts, so pieces do not move in step). `Origin` names one of the piece's points, `INNER` and
+    `OUTER` included. `Period` defaults to 4.
+- **Whole pixels** (docs/next-pixel-perfect.md): offsets snapped and sizes rounded on the frame's grid, so a
+  piece at rest is on whole pixels. Moving pieces rest nowhere: `panelProto:MovingParts` names them (only those
+  shown at the panel's size), so the pixel checks leave them out.
+- **A sway eases only where it turns**: three rotations in a repeating group (out of rest to one side, across to
+  the other, back through rest), eased `OUT`, `IN_OUT` and `IN`, so the piece passes rest at full speed. **Failure
+  mode (fixed, reported in game: "very jerky"):** every step was eased `IN_OUT`, so the last stopped dead at rest
+  and the loop began again from a standstill, a halt mid-swing once a cycle (concluded from the animation's
+  definition; confirm in game). A pulse or a bob (one animation, `BOUNCE`) eases at its two turns, which is right.
+- **Motion runs on the client's animation groups** (`Rotation`, `Alpha`, `Translation`, every client): no Lua
+  runs while they loop, unlike the sparkles and the cloud. They play while the panel shows (`Show`, and a piece a
+  size switch shows while it does) and stop when it hides (`OnHidden`); each motion has one group per piece, made
+  once, emptied and rebuilt by every theme (`RemoveAnimations`, every client), started from its phase
+  (`Play(reverse, offset)`, every client). A theme applied while the panel shows keeps them moving.
+- **Drawn on the panel's frame**, under the body's content (the content is the body's child frames): ornaments sit
+  in the body's padding and outside it (over the feather), never over items.
+- **Restyled live** with the body (`styleBody`): pieces reused across themes, the ones a theme no longer has
+  hidden and stopped; laid out again with the geometry (`ApplyGeometry`).
+- **Checked** (`SonataNext:Check`): a `Point` that is no place, an `Anchor` that is no corner, a span or a piece
+  without its size, `Sizes` that is no size, a `Motion` key that is no motion, an `Origin` that is no point; the
+  art's texture and color through the usual walk.
+- **A pulsing piece takes its strength from its `Pulse` alone** (no `Alpha`): whether the client multiplies an
+  Alpha animation's alpha into the texture's own or replaces it is not verified (warcraft.wiki.gg's Alpha page lists
+  only the API), and a pulse with no `Alpha` beside it looks the same either way.
+- **A strip's art must repeat seamlessly**: its last row continues into its first, or the join shows every `Tile`
+  down the bag. Art made by drawing shapes should draw past both ends and crop (a drop shadow or a blur at an end
+  must see what lies beyond it), and any noise in it must repeat exactly over the tile.
+- **Who uses it.** BetterBags ships no ornamented theme. BetterBags - Themes (Sauravisus' addon) gets Next versions of
+  its race themes, with their art and its generator (`themes/next/`, `textures/next/`, `tools/next_ornaments.py` there,
+  registered with `Sonata:RegisterNextTheme`): Night Elf first, refined round by round toward a pull request; Blood
+  Elf, Nightborne and Pandaren parked. The work, the method and the lessons: `docs/next-race-themes.md`; checking them
+  against this engine: `tools/next_theme_check/`.
+
+Coverage: `spec/next/ornaments_spec.lua` (spans down a side and along an edge, their tiles, mirroring, corner
+pieces and anchors, art and layer, sizes, tiles following the body, whole pixels on both sides; restyling,
+reuse; sway, spin, pulse and bob, mirrored, phases, start and stop, a piece shown by a size switch, a motion
+dropped by a theme, moving parts), `spec/next/theme_panel_spec.lua` ("ornaments": on the real backpack and bank,
+mirrored, moving only while shown and through a theme, at their size through a real size switch, moving parts),
+`spec/sonata/next_engine_spec.lua` ("names what is wrong with an ornament"). 23 mutations, each caught (three
+first survived and led to tests).
 
 ## 9. Coverage
 

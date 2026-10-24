@@ -408,6 +408,47 @@ function sonataNext:Check(key)
     end
   end
   walk(theme, "")
+  -- Ornaments (Panel.Ornaments, next-themes.md §12): their places, anchors, sizes and motions are NextOrnaments'.
+  local ornaments = addon:GetModule('NextOrnaments', true)
+  local list = theme.Panel and theme.Panel.Ornaments
+  if ornaments ~= nil and type(list) == "table" then
+    for i, o in ipairs(list) do
+      local here = "Panel.Ornaments." .. i
+      local function problem(field, text)
+        table.insert(problems, here .. "." .. field .. ": " .. text)
+      end
+      if not ornaments.POINTS[o.Point] then
+        problem("Point", "no place named " .. tostring(o.Point))
+      elseif (o.Point == "INNER" or o.Point == "OUTER") and o.Width == nil then
+        problem("Width", "a span along a side needs one")
+      elseif (o.Point == "TOP" or o.Point == "BOTTOM") and o.Height == nil then
+        problem("Height", "a span along an edge needs one")
+      elseif ornaments.ANCHORS[o.Point] then
+        if o.Width == nil then
+          problem("Width", "a piece at a corner needs one")
+        end
+        if o.Height == nil then
+          problem("Height", "a piece at a corner needs one")
+        end
+      end
+      if o.Anchor ~= nil and not ornaments.ANCHORS[o.Anchor] then
+        problem("Anchor", "no corner named " .. tostring(o.Anchor))
+      end
+      if o.Sizes ~= nil and not ornaments.SIZES[o.Sizes] then
+        problem("Sizes", "no size named " .. tostring(o.Sizes))
+      end
+      if type(o.Motion) == "table" then
+        for k in pairs(o.Motion) do
+          if not ornaments.MOTIONS[k] then
+            problem("Motion." .. tostring(k), "no motion named " .. tostring(k))
+          end
+        end
+        if o.Motion.Origin ~= nil and not ornaments.ORIGINS[o.Motion.Origin] then
+          problem("Motion.Origin", "no point named " .. tostring(o.Motion.Origin))
+        end
+      end
+    end
+  end
   local tween = addon:GetModule('NextTween', true)
   local motion = theme.Motion
   if tween ~= nil and motion ~= nil and motion.Ease ~= nil then

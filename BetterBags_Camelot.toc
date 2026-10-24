@@ -193,6 +193,7 @@ next\dockcard.lua
 next\dock.lua
 next\drag.lua
 next\chain.lua
+next\ornaments.lua
 next\panel.lua
 next\bag.lua
 next\bank.lua
