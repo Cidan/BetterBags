@@ -1,24 +1,30 @@
 {
-  "id": 1792861033,
+  "id": 1792861044,
   "version": "v0.8.2",
-  "channel": "alpha",
+  "channel": "release",
   "date": "2026-10-24",
-  "from": "9ef5aeba1355645e02023d42e1aaef1bb0d7d64a",
-  "to": "f5bc01d1c4c852a87be0d58b84f0b131135f0856",
-  "headline": "Fixed errors when interacting with dungeon vendors and after emptying item slots.",
+  "from": "v0.8.1",
+  "to": "v0.8.2",
+  "headline": "This release adds support for animated theme ornaments and round switches, along with fixes for vendor interactions in instances and emptied item slots.",
   "entries": [
     {
+      "category": "New",
+      "title": "Theme ornaments and round switch style",
+      "details": "Themes can now feature animated decorative ornaments along bag edges with ambient swaying, pulsing, and spinning effects. Themes can also use an alternative round toggle switch style for settings controls.",
+      "clients": []
+    },
+    {
       "category": "Fixed",
-      "title": "Error when visiting merchants in dungeons or raids",
-      "details": "Interacting with vendors inside instances no longer causes an error when the game restricts merchant identity information.",
+      "title": "Error when interacting with vendors in instances",
+      "details": "Fixed an error when opening merchant windows inside dungeons and raids where NPC identity values are restricted.",
       "clients": [
         "Retail"
       ]
     },
     {
       "category": "Fixed",
-      "title": "Error after emptying an item slot",
-      "details": "Fixed an error that could occur when selling, consuming, or equipping an item that leaves a slot empty while bag data is recalculating.",
+      "title": "Error when recalculating bags after emptying a slot",
+      "details": "Fixed an error that could occur when bag contents recalculated immediately after a slot was emptied by selling, consuming, or equipping an item.",
       "clients": []
     }
   ]
