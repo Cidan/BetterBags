@@ -235,18 +235,23 @@ describe("Core Init and Enable flow", function()
 
   -- BetterBags Next's settings window (next-settings.md §3) starts its session after SonataNext, the
   -- look it is drawn in; it is built the first time it opens.
-  it("starts BetterBags Next's settings window after SonataNext", function()
+  -- NextPixel follows the screen's pixel grid after SonataNext applied the theme for it
+  -- (docs/next-pixel-perfect.md).
+  it("starts BetterBags Next's pixel grid and settings window after SonataNext", function()
     local nextSettings = addon:GetModule("NextSettings")
     local sonataNext = addon:GetModule("SonataNext")
+    local pixel = addon:GetModule("NextPixel")
     local order = {}
     local content = addon:GetModule("NextSettingsContent")
-    local savedSettings, savedNext, savedContent = nextSettings.Init, sonataNext.Init, content.Init
+    local savedSettings, savedNext, savedContent, savedPixel = nextSettings.Init, sonataNext.Init, content.Init,
+      pixel.Init
     nextSettings.Init = function() table.insert(order, "NextSettings") end
     sonataNext.Init = function() table.insert(order, "SonataNext") end
     content.Init = function() table.insert(order, "NextSettingsContent") end
+    pixel.Init = function() table.insert(order, "NextPixel") end
     addon:OnInitialize()
-    nextSettings.Init, sonataNext.Init, content.Init = savedSettings, savedNext, savedContent
-    assert.are.same({ "SonataNext", "NextSettings", "NextSettingsContent" }, order)
+    nextSettings.Init, sonataNext.Init, content.Init, pixel.Init = savedSettings, savedNext, savedContent, savedPixel
+    assert.are.same({ "SonataNext", "NextPixel", "NextSettings", "NextSettingsContent" }, order)
   end)
 
   -- Its pages listen for the highest item level seen (next-settings.md §4).

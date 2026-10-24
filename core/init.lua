@@ -199,6 +199,8 @@ function addon:OnInitialize()
   addon:GetModule('Sonata'):Init()
   -- BetterBags Next's look, from its saved theme, before any of its panels is made.
   addon:GetModule('SonataNext'):Init()
+  -- Its pixel grid (docs/next-pixel-perfect.md): the theme is applied again when the grid changes.
+  addon:GetModule('NextPixel'):Init()
   -- BetterBags Next's settings window (next-settings.md §3): built the first time it opens.
   addon:GetModule('NextSettings'):Init()
   addon:GetModule('NextSettingsContent'):Init()

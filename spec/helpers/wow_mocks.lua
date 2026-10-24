@@ -789,8 +789,11 @@ function WidgetMethods:DoesClipChildren()
   return self._clipsChildren == true
 end
 -- GetPhysicalScreenSize() -> sizeX, sizeY (ScreenDocumentation.lua; Blizzard's PixelUtil calls it on
--- every client).
-_G.GetPhysicalScreenSize = function() return 1920, 1080 end
+-- every client). By default a screen 768 pixels high: at a UI scale of 1 a UI unit is then exactly a
+-- screen pixel (PixelUtil.GetPixelToUIUnitFactor is 768 over the height), so specs of layouts in units
+-- see them unchanged by BetterBags Next's pixel grid (docs/next-pixel-perfect.md). Specs of the pixel
+-- grid set real screens (spec/helpers/layout.lua, UseScreen).
+_G.GetPhysicalScreenSize = function() return 1920, 768 end
 -- Round(value) (Blizzard_SharedXMLBase/MathUtil.lua: Classic's, half away from zero; live is math.round)
 -- and PixelUtil (Blizzard_SharedXML/PixelUtil.lua, every client), as Blizzard writes them.
 _G.Round = _G.Round or function(value)

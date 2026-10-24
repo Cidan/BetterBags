@@ -149,3 +149,37 @@ end
 function pixel:FontHeight(size)
   return self:Length(UIParent, size)
 end
+
+-- Init follows the screen's pixel grid (called once SonataNext has applied the saved theme, core/init.lua):
+-- the UI scale and the window's size set it (UI_SCALE_CHANGED, DISPLAY_SIZE_CHANGED, the events
+-- Blizzard's Edit Mode and the Window module follow too). Registered once however often it starts.
+function pixel:Init()
+  if self.watching then
+    return
+  end
+  self.watching = true
+  ---@class Events: AceModule
+  local events = addon:GetModule('Events')
+  for _, event in ipairs({ "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED" }) do
+    events:RegisterEvent(event, function(ctx)
+      self:OnGridChanged(ctx)
+    end)
+  end
+end
+
+-- OnGridChanged applies the current Next theme again, unsaved, when the grid is not the one its fonts were
+-- made for (NextStyle.gridKey): every font height and length in whole pixels again, everything laid out
+-- again. It returns whether it did, for profiler traces.
+---@param ctx Context
+---@return boolean
+function pixel:OnGridChanged(ctx)
+  local sonataNext = addon:GetModule('SonataNext')
+  local style = addon:GetModule('NextStyle')
+  local key = sonataNext.started and sonataNext:GetCurrentThemeKey() or nil
+  if key == nil or style.gridKey == self:Key() then
+    return false
+  end
+  sonataNext:ApplyTheme(ctx, key, false)
+  return true
+end
+

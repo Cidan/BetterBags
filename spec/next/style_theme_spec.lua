@@ -184,6 +184,65 @@ describe("NextStyle", function()
 
   -- Asked: "take care with text! remember our lessons from before (don't re-use text objects across
   -- themes, make whole new ones)" (sonata.md 3c).
+  -- BetterBags Next, pixel perfect (docs/next-pixel-perfect.md): a font's height is a whole number of
+  -- screen pixels for the screen and UI scale its text is drawn at.
+  describe("on the screen's pixels", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local undo
+
+    before_each(function()
+      -- The reporter's window (Logs/gx.log: 3396x1362, maximized) at the game's UI scale of 65%.
+      undo = layout.UseScreen(3396, 1362, 0.65)
+    end)
+
+    after_each(function()
+      undo()
+    end)
+
+    local function pixels(font)
+      local _, size = font:GetFont()
+      return size * layout.PixelsPerUnit() * UIParent:GetEffectiveScale()
+    end
+
+    local function whole(value)
+      return math.abs(value - math.floor(value + 0.5)) < 1e-6
+    end
+
+    it("draws every role of every shipped theme at a whole number of pixels, the nearest", function()
+      for _, key in ipairs({ "Default", "Ember", "Parchment", "Quiet" }) do
+        local theme = resolved(key)
+        style:Use(theme)
+        for role, spec in pairs(theme.Fonts) do
+          local font = style:Font(role)
+          assert.is_true(whole(pixels(font)), key .. " " .. role .. ": " .. pixels(font))
+          if spec.Size ~= nil then
+            local want = math.floor(spec.Size * layout.PixelsPerUnit() * 0.65 + 0.5)
+            assert.are.equal(want, math.floor(pixels(font) + 0.5), key .. " " .. role)
+          end
+        end
+      end
+    end)
+
+    it("rounds a copied client font's own height too, keeping its file and flags", function()
+      local theme = resolved("Default")
+      theme.Fonts.Plain = { Object = "NumberFontNormal" }
+      style:Use(theme)
+      local path, size, flags = NumberFontNormal:GetFont()
+      local file, height, f = style:Font("Plain"):GetFont()
+      assert.are.same({ path, flags }, { file, f })
+      assert.is_true(whole(pixels(style:Font("Plain"))))
+      assert.is_true(math.abs(height - size) * layout.PixelsPerUnit() * 0.65 <= 0.5 + 1e-9)
+    end)
+
+    it("draws a font as the theme says where a UI unit is a whole pixel", function()
+      undo()
+      undo = layout.UseScreen(1536, 768, 1)
+      style:Use(resolved("Default"))
+      local _, size = style:Font("Title"):GetFont()
+      assert.are.equal(resolved("Default").Fonts.Title.Size, size)
+    end)
+  end)
+
   describe("text", function()
     it("moves text to a new font object with every theme, never changing one it made", function()
       local parent = CreateFrame("Frame")

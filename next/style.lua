@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextStyle is BetterBags Next's look, read from the current Next theme (.claude/rules/next-themes.md):
 -- SonataNext hands it every theme it applies (Use). Its long-standing fields (ICON, PAD, Color,
 -- Time, Small, Chain, Cloud, ...) are views of the theme, so Next's code reads them as it always
@@ -118,6 +121,8 @@ function style:Use(theme)
   self.SPARKLE_TEXTURE = self:TexturePath(theme.Sparkles and theme.Sparkles.Texture or "Sparkle")
   self.CLOUD_GLOW = self:TexturePath("Glow")
 
+  -- The pixel grid the fonts are made for (NextPixel: a new one applies the theme again).
+  self.gridKey = pixel:Key()
   self:newFonts()
 end
 
@@ -194,7 +199,9 @@ end
 -- makeFont makes a font object for a role's spec: the client's own font file (the locale's) unless
 -- the spec names one, at its size and flags, in its color, with its shadow or none. A role naming one
 -- of the client's fonts (Object, a font object's global name) copies it (its file, size and flags,
--- in every locale, its color and shadow), changing only what the role also sets.
+-- in every locale, its color and shadow), changing only what the role also sets. Its height is a whole
+-- number of screen pixels where BetterBags Next's windows are drawn (NextPixel:FontHeight,
+-- docs/next-pixel-perfect.md): a new grid (the UI scale, the screen's size) applies the theme again.
 ---@param role string
 ---@param spec table
 ---@return Font
@@ -207,10 +214,8 @@ function style:makeFont(role, spec)
       error("BetterBags Next's font role " .. role .. " copies no client font named " .. tostring(spec.Object))
     end
     font:CopyFontObject(base)
-    if spec.File ~= nil or spec.Size ~= nil or spec.Flags ~= nil then
-      local path, size, flags = font:GetFont()
-      font:SetFont(spec.File or path, spec.Size or size, spec.Flags or flags)
-    end
+    local path, size, flags = font:GetFont()
+    font:SetFont(spec.File or path, pixel:FontHeight(spec.Size or size), spec.Flags or flags)
     if spec.Color ~= nil then
       font:SetTextColor(self:RGBA(spec.Color))
     end
@@ -218,7 +223,7 @@ function style:makeFont(role, spec)
       self:shadowFont(font, spec.Shadow)
     end
   else
-    font:SetFont(spec.File or GameFontNormal:GetFont(), spec.Size, spec.Flags or "")
+    font:SetFont(spec.File or GameFontNormal:GetFont(), pixel:FontHeight(spec.Size), spec.Flags or "")
     font:SetTextColor(self:RGBA(spec.Color or "White"))
     self:shadowFont(font, spec.Shadow)
   end

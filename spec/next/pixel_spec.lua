@@ -2,13 +2,23 @@
 -- (docs/next-pixel-perfect.md). One screen pixel in a region's units is 768 over the screen's height,
 -- over the region's effective scale; lengths and offsets are whole pixels of it.
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
+-- NextPixel follows the grid through BetterBags' Events module; the tests capture what it registers.
+local events, createdEvents = StubBetterBagsModule("Events")
 ResetModuleStub("NextPixel", "next/pixel.lua")
 LoadBetterBagsModule("next/pixel.lua")
+ResetModuleStub("NextStyle", "next/style.lua")
+LoadBetterBagsModule("next/style.lua")
 local pixel = addon:GetModule("NextPixel")
 local layout = dofile("spec/helpers/layout.lua")
 
 describe("NextPixel", function()
   local undo
+
+  teardown(function()
+    if createdEvents then
+      ResetModuleStub("Events")
+    end
+  end)
 
   before_each(function()
     -- The reporter's window (Logs/gx.log) at the game's UI scale of 65%: a unit is 1.153 pixels.
@@ -96,6 +106,78 @@ describe("NextPixel", function()
     assert.are.equal("0.650000@1362", pixel:Key())
     UIParent:SetScale(0.7)
     assert.are.equal("0.700000@1362", pixel:Key())
+  end)
+
+  -- A new grid (the UI scale, the window's size) changes every whole-pixel length and font height: the
+  -- current Next theme is applied again, unsaved, so fonts are made again and everything lays out again.
+  describe("a new grid", function()
+    local sonataNext, style, applied, saved, handlers
+
+    before_each(function()
+      sonataNext = addon:GetModule("SonataNext")
+      style = addon:GetModule("NextStyle")
+      saved = { apply = sonataNext.ApplyTheme, register = events.RegisterEvent, current = sonataNext.current,
+        started = sonataNext.started, watching = pixel.watching }
+      sonataNext.current, sonataNext.started = "Default", true
+      applied, handlers = {}, {}
+      sonataNext.ApplyTheme = function(_, ctx, key, save)
+        table.insert(applied, { ctx ~= nil, key, save })
+      end
+      events.RegisterEvent = function(_, event, fn)
+        handlers[event] = handlers[event] or {}
+        table.insert(handlers[event], fn)
+      end
+      pixel.watching = nil
+      pixel:Init()
+      style.gridKey = pixel:Key()
+    end)
+
+    after_each(function()
+      sonataNext.ApplyTheme, events.RegisterEvent = saved.apply, saved.register
+      sonataNext.current, sonataNext.started, pixel.watching = saved.current, saved.started, saved.watching
+    end)
+
+    local function fire(event)
+      for _, fn in ipairs(handlers[event] or {}) do
+        fn({})
+      end
+    end
+
+    it("applies the current theme again, unsaved, when the UI scale or the screen's size changes it", function()
+      assert.are.equal(1, #handlers.UI_SCALE_CHANGED)
+      assert.are.equal(1, #handlers.DISPLAY_SIZE_CHANGED)
+      UIParent:SetScale(0.7)
+      fire("UI_SCALE_CHANGED")
+      assert.are.same({ { true, "Default", false } }, applied)
+      undo()
+      undo = layout.UseScreen(3440, 1440, 0.7)
+      fire("DISPLAY_SIZE_CHANGED")
+      assert.are.equal(2, #applied)
+    end)
+
+    it("does nothing when the grid is the one the theme was applied for", function()
+      fire("UI_SCALE_CHANGED")
+      fire("DISPLAY_SIZE_CHANGED")
+      assert.are.same({}, applied)
+    end)
+
+    it("does nothing before BetterBags Next's look has started", function()
+      sonataNext.started = false
+      UIParent:SetScale(0.7)
+      fire("UI_SCALE_CHANGED")
+      assert.are.same({}, applied)
+    end)
+
+    it("registers once however often it starts", function()
+      pixel:Init()
+      assert.are.equal(1, #handlers.UI_SCALE_CHANGED)
+    end)
+  end)
+
+  it("remembers the grid each theme's fonts were made for", function()
+    local style = addon:GetModule("NextStyle")
+    style:Use(style.Theme)
+    assert.are.equal(pixel:Key(), style.gridKey)
   end)
 
   it("rounds a font's height to whole pixels at UIParent's grid", function()
