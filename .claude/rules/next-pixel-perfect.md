@@ -74,7 +74,12 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
   unsaved (`pixel:OnGridChanged`), when the grid differs from the one the fonts were made for
   (`NextStyle.gridKey`): new font objects at the new pixel heights, every widget restyled.
 - A panel that changes scale (`takeScale`: a Bag Scale, a size switch) styles its parts again when the
-  pixel's size in it changed.
+  pixel's size in it changed, and works its ribbon's length out again from its base and the braid's state
+  (`fitRibbon`, shared with `SetCoupling`). **Failure mode (fixed, found by the check in game):** a Bag Scale
+  changed from 90% to 95% with the backpack open left the ribbon and its glow lines as long as they were
+  rounded on the old grid (`chain:ScalesChanged` refits an open panel through `FitSmall`, which took the new
+  scale without setting the ribbon again): their left edges off by 0.111 pixel. Covered by "puts a small panel
+  back on whole pixels when its Bag Scale changes while it is open" (alone and chained).
 - **The settings window** takes its scale (`fitScale`: at most 95% of the screen) before anything in it
   is made, so every part is laid out on the grid it is drawn on. A later open at another scale (the screen
   changed while it was closed) restyles every Next widget (`SonataNext:RestyleWidgets(ctx)`, the loop a

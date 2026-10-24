@@ -298,6 +298,24 @@ describe("BetterBags Next, pixel perfect", function()
     end
   end
 
+  -- Found by the pixel check in game: a small backpack whose Bag Scale was changed from 90% to 95% while it was
+  -- open had its ribbon and its lines off the grid (their left edges), each still as long as it was rounded to
+  -- the old scale's grid. The slider redraws and refits every open panel (chain:ScalesChanged); everything is
+  -- on whole pixels of the new grid, alone and chained.
+  for _, chained in ipairs({ "apart", "chained" }) do
+    it("puts a small panel back on whole pixels when its Bag Scale changes while it is open, " .. chained, function()
+      db.size, db.bagScale, db.smallChain = "small", 90, chained
+      useScreen(3396, 1362, 0.65)
+      local bag, bank = bags()
+      for _, scale in ipairs({ 95, 85, 100, 115 }) do
+        db.bagScale = scale
+        chain:ScalesChanged(ctx())
+        assert.are.same({}, offGrid(bag), "the backpack at " .. scale .. "%")
+        assert.are.same({}, offGrid(bank), "the bank at " .. scale .. "%")
+      end
+    end)
+  end
+
   for _, scale in ipairs({ 50, 85, 115, 150 }) do
     it("puts a small panel on whole pixels at a Bag Scale of " .. scale .. "%", function()
       db.size, db.bagScale = "small", scale

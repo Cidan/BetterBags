@@ -810,6 +810,7 @@ end
 function panelProto:takeScale()
   self.frame:SetScale(self:Scale())
   if self.partsUnit ~= nil and math.abs(self.partsUnit - pixel:Unit(self.frame)) > 1e-9 then
+    self:fitRibbon()
     self:StyleParts()
   end
 end
@@ -2460,6 +2461,19 @@ function panelProto:styleBraid()
   self:applyBraid()
 end
 
+-- fitRibbon sets the ribbon's length for the braid's state (its base, shortened toward the middle of the gap as the
+-- bags couple: SetCoupling) in whole pixels on the panel's grid (docs/next-pixel-perfect.md): as the bags couple it
+-- shortens a pixel at a time, and on a new grid (a Bag Scale changed while the panel is open, takeScale) it is
+-- worked out again from its base, never a length rounded to the old grid.
+---@private
+function panelProto:fitRibbon()
+  local braid, base = self.braid, self:RibbonBase()
+  self.ribbonLength = pixel:Length(self.frame, base + (math.min(braid.half, base) - base) * braid.amount)
+  for _, line in ipairs(self.ribbonLines) do
+    line:SetWidth(self.ribbonLength)
+  end
+end
+
 -- SetCoupling draws this bag's half of the braid: amount from 0 (straight ribbon, no braid) to 1,
 -- half the gap's width, whether it is the chained bag (which shows the knot), and how far the braid
 -- has turned. Its ribbon reaches the middle of the gap as it couples, its ribbon sparkles stay on its
@@ -2474,12 +2488,7 @@ function panelProto:SetCoupling(amount, half, chained, phase, time, feather)
   local braid = self.braid
   braid.amount, braid.half, braid.chained, braid.phase, braid.time = amount, half, chained, phase, time
   self:growFeather((feather - style.FEATHER) * amount)
-  local base = self:RibbonBase()
-  -- In whole pixels (docs/next-pixel-perfect.md): as the bags couple it shortens a pixel at a time.
-  self.ribbonLength = pixel:Length(self.frame, base + (math.min(half, base) - base) * amount)
-  for _, line in ipairs(self.ribbonLines) do
-    line:SetWidth(self.ribbonLength)
-  end
+  self:fitRibbon()
   self.coupled = amount > 0
   local S = style.Theme.Sparkles or {}
   local o, ribbon = self.sparkles.options, S.Ribbon
