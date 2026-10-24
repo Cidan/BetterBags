@@ -3,6 +3,8 @@
 -- an edge of four lines round a frame.
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
+-- As in the TOCs: the controls' screen watcher sets its script through addon.SetScript.
+LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextControls", "next/controls/base.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -196,6 +198,63 @@ describe("NextControls", function()
       for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
         assert.is_false(edge[side]:IsShown(), side)
       end
+    end)
+
+    -- Reported: with the game's UI scale at 65% (0.914 screen pixels per unit at 1080 pixels high), the
+    -- selected theme card's top edge was missing, at no other scale: a line under a pixel thick draws
+    -- nothing where it falls between two pixels. One screen pixel is GetPixelToUIUnitFactor (768 / the
+    -- screen's height) over the frame's effective scale (Blizzard's PixelUtil).
+    describe("on the screen's pixels", function()
+      local parent
+
+      before_each(function()
+        parent = CreateFrame("Frame")
+        parent:SetScale(0.65)
+        frame:SetParent(parent)
+      end)
+
+      local function near(a, b)
+        return math.abs(a - b) < 1e-9
+      end
+
+      it("is never thinner than one screen pixel", function()
+        local pixel = (768 / 1080) / 0.65
+        controls:PaintEdge(edge, { Color = "Lavender", Size = 1 })
+        assert.is_true(near(pixel, edge.Top:GetHeight()), "one pixel: " .. edge.Top:GetHeight())
+        assert.is_true(near(pixel, edge.Bottom:GetHeight()))
+        assert.is_true(near(pixel, edge.Left:GetWidth()))
+        assert.is_true(near(pixel, edge.Right:GetWidth()))
+        local _, _, _, _, y = edge.Left:GetPoint(1)
+        assert.is_true(near(-pixel, y), "the sides start under the top")
+        _, _, _, _, y = edge.Right:GetPoint(2)
+        assert.is_true(near(pixel, y), "and end over the bottom")
+      end)
+
+      it("keeps its size where that is a pixel or more", function()
+        controls:PaintEdge(edge, { Color = "Lavender", Size = 2 })
+        assert.are.equal(2, edge.Top:GetHeight())
+        parent:SetScale(1)
+        controls:PaintEdge(edge, { Color = "Lavender", Size = 1 })
+        assert.are.equal(1, edge.Top:GetHeight(), "1.4 pixels at 1080 pixels high")
+      end)
+
+      it("is drawn again when the UI scale or the screen's size changes, as it was drawn", function()
+        parent:SetScale(1)
+        controls:PaintEdge(edge, { Color = "Lavender", Alpha = 0.3, Size = 1 }, 0.9)
+        local hidden = controls:CreateEdge(frame)
+        controls:PaintEdge(hidden, false)
+        parent:SetScale(0.65)
+        local watcher = controls.watcher
+        assert.is_true(watcher._events.UI_SCALE_CHANGED)
+        assert.is_true(watcher._events.DISPLAY_SIZE_CHANGED)
+        watcher:GetScript("OnEvent")(watcher, "UI_SCALE_CHANGED")
+        assert.is_true(near((768 / 1080) / 0.65, edge.Top:GetHeight()))
+        assert.are.equal(0.9, edge.Left._colorTexture.a, "its strength kept")
+        assert.is_false(hidden.Top:IsShown(), "an edge with none stays hidden")
+        parent:SetScale(1)
+        controls:RepaintEdges()
+        assert.are.equal(1, edge.Top:GetHeight())
+      end)
     end)
   end)
 end)

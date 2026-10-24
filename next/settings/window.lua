@@ -158,6 +158,8 @@ function settings:Open(pageId, tabId)
     local T = style.Theme.Settings
     local scale = math.min(1, UIParent:GetWidth() * SCREEN_SHARE / T.Width, UIParent:GetHeight() * SCREEN_SHARE / T.Height)
     frame:SetScale(scale)
+    -- A scale changes how big a screen pixel is in it, and no edge is thinner than one (NextControls).
+    controls:RepaintEdges()
     frame:ClearAllPoints()
     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     self:anchorSlide()
