@@ -149,7 +149,9 @@ describe("NextSettings", function()
       assert.are.same({ S().Width, S().Height }, { frame:GetSize() })
       assert.are.same({ 1000, 720 }, { S().Width, S().Height }, "asked: taller, for the Categories page")
       tween:Step(1)
-      assert.are.same({ "CENTER", UIParent, "CENTER", 0, 0 }, { frame:GetPoint(1) }, "once it has slid in")
+      -- In the middle of the screen by its top left, on whole pixels (docs/next-pixel-perfect.md).
+      assert.are.same({ "TOPLEFT", UIParent, "TOPLEFT", math.floor((UIParent:GetWidth() - S().Width) / 2),
+        -math.floor((UIParent:GetHeight() - S().Height) / 2) }, { frame:GetPoint(1) }, "once it has slid in")
     end)
 
     it("draws its body, the wash at its top and its edge from the theme", function()
@@ -200,9 +202,10 @@ describe("NextSettings", function()
     -- Asked: it comes and goes as a detached (small) bag does: sliding Small.Slide in from its side as
     -- it fades in, over Time.Open with the SmallOpen ease, and out over Time.Close with SmallClose.
     describe("coming and going", function()
+      -- x is how far right of where it rests the window is.
       local function x(frame)
         local _, _, _, ox = frame:GetPoint(1)
-        return ox
+        return ox - settings.slideFrom[4]
       end
 
       it("fades in sliding from the right, as a detached bag does", function()
@@ -214,7 +217,7 @@ describe("NextSettings", function()
         assert.is_true(x(frame) > 0 and x(frame) < style.Small.Slide)
         tween:Step(style.Time.Open)
         assert.are.equal(1, frame:GetAlpha())
-        assert.are.same({ "CENTER", UIParent, "CENTER", 0, 0 }, { frame:GetPoint(1) })
+        assert.are.equal(0, x(frame))
       end)
 
       it("fades out sliding right, then hides; it is closed from the start", function()
@@ -268,6 +271,31 @@ describe("NextSettings", function()
         assert.are.equal(1, frame:GetAlpha())
         assert.are.equal(0, x(frame))
         assert.is_true(frame._moving)
+      end)
+
+      -- The client leaves a moved frame wherever the pointer let go: it is put on whole pixels from there
+      -- (docs/next-pixel-perfect.md), on the reporter's window at 65%.
+      it("lands on whole pixels where it was dropped after a drag", function()
+        local layout = dofile("spec/helpers/layout.lua")
+        local pixel = addon:GetModule("NextPixel")
+        local undo = layout.UseScreen(3396, 1362, 0.65)
+        local frame = open()
+        finally(function()
+          frame._rect = nil
+          undo()
+        end)
+        tween:Step(1)
+        settings.header:GetScript("OnDragStart")(settings.header)
+        frame:_SetRect(301.37, 207.81, frame:GetWidth(), frame:GetHeight())
+        settings.header:GetScript("OnDragStop")(settings.header)
+        local point, relativeTo, relativePoint, ox, oy = frame:GetPoint(1)
+        assert.are.same({ "TOPLEFT", UIParent, "TOPLEFT" }, { point, relativeTo, relativePoint })
+        local unit = pixel:Unit(frame)
+        assert.is_true(math.abs(ox / unit - math.floor(ox / unit + 0.5)) < 1e-6, "whole pixels across")
+        assert.is_true(math.abs(oy / unit - math.floor(oy / unit + 0.5)) < 1e-6, "whole pixels down")
+        assert.is_true(math.abs(ox - 301.37) <= unit / 2, "where it was dropped")
+        local top = 207.81 + frame:GetHeight() - UIParent:GetTop()
+        assert.is_true(math.abs(oy - top) <= unit / 2)
       end)
 
       it("closes at once on Escape, as a bag does, and fades in again the next time", function()
@@ -730,7 +758,9 @@ describe("NextSettings", function()
       local H, X = S().Header, S().Header.Close
       assert.are.same({ "TOPRIGHT", settings.header, "TOPRIGHT", -(X.Inset + X.Size + H.Actions.Gap), -H.Actions.Top },
         { a.frame:GetPoint(1) })
-      assert.are.same({ "RIGHT", a.frame, "LEFT", -H.Actions.Gap, 0 }, { settings.title:GetPoint(2) })
+      -- Short of the buttons by their width rounded up, from the header's corner (docs/next-pixel-perfect.md).
+      local right = X.Inset + X.Size + H.Actions.Gap + math.ceil(a.frame:GetWidth()) + H.Actions.Gap
+      assert.are.same({ "TOPRIGHT", settings.header, "TOPRIGHT", -right, -H.TitleTop }, { settings.title:GetPoint(2) })
       settings:Select("general")
       assert.is_false(a.frame:IsShown())
       assert.are.equal("General", settings.title:GetText())

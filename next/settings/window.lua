@@ -63,6 +63,9 @@ local pages = addon:GetModule('NextSettingsPages')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextSettings is BetterBags Next's settings window (next-settings.md §3), drawn from the Next theme
 -- (Settings): the sidebar (the brand, a search box, the pages of NextSettingsPages under their
 -- headings, the version), a page's header (its title and description; the close button), its tabs
@@ -155,11 +158,13 @@ function settings:Open(pageId, tabId)
   self:build()
   local frame = self.frame
   if not frame:IsShown() then
-    local T = style.Theme.Settings
-    local scale = math.min(1, UIParent:GetWidth() * SCREEN_SHARE / T.Width, UIParent:GetHeight() * SCREEN_SHARE / T.Height)
-    frame:SetScale(scale)
+    -- Everything in it is placed in whole pixels of the grid it is drawn on (docs/next-pixel-perfect.md):
+    -- a new scale (the screen changed since) lays every widget out again, as a theme does.
+    if self:fitScale() then
+      sonataNext:RestyleWidgets(context:New('NextSettings_Scale'))
+    end
     frame:ClearAllPoints()
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    self:center()
     self:anchorSlide()
     self:setOffset(style.Small.Slide)
   end
@@ -182,6 +187,43 @@ function settings:Open(pageId, tabId)
       onUpdate = function(x) self:setOffset(x) end,
     })
   end
+end
+
+-- fitScale shrinks the window to fit a small screen (at most SCREEN_SHARE of it), and returns whether that
+-- changed its scale.
+---@private
+---@return boolean
+function settings:fitScale()
+  local T, frame = style.Theme.Settings, self.frame
+  local scale = math.min(1, UIParent:GetWidth() * SCREEN_SHARE / T.Width, UIParent:GetHeight() * SCREEN_SHARE / T.Height)
+  if math.abs(frame:GetScale() - scale) < 1e-9 then
+    return false
+  end
+  frame:SetScale(scale)
+  return true
+end
+
+-- center puts the window in the middle of the screen by its top left, on whole pixels: by its middle it
+-- would sit between two pixels whenever the screen and it differ by an odd number of them.
+---@private
+function settings:center()
+  local frame = self.frame
+  local s = UIParent:GetEffectiveScale() / frame:GetEffectiveScale()
+  pixel:Center(frame, UIParent, UIParent:GetWidth() * s, UIParent:GetHeight() * s, frame:GetWidth(), frame:GetHeight())
+end
+
+-- settle puts the window where it is on whole pixels, from UIParent's top left (the client leaves a moved
+-- frame wherever the pointer let go).
+---@private
+function settings:settle()
+  local frame = self.frame
+  local left, top = frame:GetLeft(), frame:GetTop()
+  if left == nil or top == nil then
+    return
+  end
+  local uiTop = UIParent:GetTop() * UIParent:GetEffectiveScale() / frame:GetEffectiveScale()
+  frame:ClearAllPoints()
+  pixel:Point(frame, "TOPLEFT", UIParent, "TOPLEFT", left, top - uiTop)
 end
 
 -- anchorSlide keeps where the window is (centered, or where it was moved) as the place it slides from.
@@ -276,6 +318,8 @@ function settings:build()
   frame:EnableMouse(true)
   frame:Hide()
   self.frame = frame
+  -- At its scale before anything in it is made: each part is laid out on the grid it is drawn on.
+  self:fitScale()
   self.fill = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
   self.fill:SetAllPoints(frame)
   self.wash = frame:CreateTexture(nil, "BACKGROUND", nil, -6)
@@ -362,8 +406,8 @@ function settings:buildListPanel()
   self.backLabel:SetText(L:G("All Settings"))
   self.backLine = panel:CreateTexture(nil, "ARTWORK")
   addon.SetScript(back, "OnClick", function(ctx) self:Back(ctx) end)
-  addon.SetScript(back, "OnEnter", function() style:SetFont(self.backLabel, style.Theme.Settings.Back.HoverFont) end)
-  addon.SetScript(back, "OnLeave", function() style:SetFont(self.backLabel, style.Theme.Settings.Back.Font) end)
+  addon.SetScript(back, "OnEnter", function() self:styleBackLabel(style.Theme.Settings.Back.HoverFont) end)
+  addon.SetScript(back, "OnLeave", function() self:styleBackLabel(style.Theme.Settings.Back.Font) end)
   self.listHost = CreateFrame("Frame", nil, panel)
   local key = CreateFrame("Frame", "BetterBagsNextSettingsBack", self.frame)
   key:Hide()
@@ -405,6 +449,7 @@ function settings:makeMover(part)
     self.frame:StopMovingOrSizing()
     -- It opens centered every time: the client is not to keep where it was moved.
     self.frame:SetUserPlaced(false)
+    self:settle()
   end)
 end
 
@@ -438,6 +483,7 @@ end
 function settings:buildContent()
   self.scroll = scrollbox:Create(self.frame, nil, {
     CreateBar = function(box, opts) return nextScrollBar:Create(box, opts) end,
+    Snap = function(region, units) return pixel:Length(region, units) end,
   })
   self.results = nextPage:Create(self.scroll.scrollChild)
 end
@@ -471,15 +517,32 @@ function settings:ApplyStyle(ctx)
   end
 end
 
--- Style draws the window from the theme and places its parts.
+-- Metrics are the window's lengths in whole pixels on its grid (docs/next-pixel-perfect.md): its size, the
+-- sidebar's width, the brand's row, the header, the footer, the tabs' row and the sidebar's padding.
+---@return {width: number, height: number, sidebar: number, brand: number, header: number, footer: number, tabs: number, pad: number}
+function settings:Metrics()
+  -- Not made yet, it would be drawn on UIParent's grid.
+  local T, frame = style.Theme.Settings, self.frame or UIParent
+  return {
+    width = pixel:Length(frame, T.Width), height = pixel:Length(frame, T.Height),
+    sidebar = pixel:Length(frame, T.Sidebar.Width), brand = pixel:Length(frame, T.Brand.Height),
+    header = pixel:Length(frame, T.Header.Height), footer = pixel:Length(frame, T.Footer.Height),
+    tabs = pixel:Length(frame, controls:Theme("TopTabs").Height), pad = pixel:Snap(frame, T.Sidebar.Pad),
+  }
+end
+
+-- Style draws the window from the theme and places its parts, all in whole pixels on the grid it is drawn
+-- on (docs/next-pixel-perfect.md): each part from a corner by whole pixels, an icon or a text centered on
+-- its row by its top.
 function settings:Style()
   local T = style.Theme.Settings
   local frame = self.frame
-  frame:SetSize(T.Width, T.Height)
+  local m = self:Metrics()
+  frame:SetSize(m.width, m.height)
   controls:Paint(self.fill, T.Fill)
   local W = T.Wash
   if W then
-    self.wash:SetHeight(W.Height)
+    pixel:Height(self.wash, W.Height)
     self.wash:SetBlendMode(W.BlendMode or "ADD")
     local r, g, b, a = style:RGBA(W.Color)
     self.wash:SetColorTexture(1, 1, 1, 1)
@@ -491,67 +554,75 @@ function settings:Style()
   controls:PaintEdge(self.edge, T.Edge)
 
   local SB, B = T.Sidebar, T.Brand
-  self.sidebar:SetWidth(SB.Width)
+  self.sidebar:SetWidth(m.sidebar)
   controls:Paint(self.sidebarFill, SB.Fill)
-  self.sidebarLine:SetWidth(SB.Line and SB.Line.Size or 1)
+  pixel:Width(self.sidebarLine, SB.Line and SB.Line.Size or 1)
   controls:Paint(self.sidebarLine, SB.Line)
-  self.brand:SetHeight(B.Height)
-  self.brandIcon:SetSize(B.IconSize, B.IconSize)
+  self.brand:SetHeight(m.brand)
+  pixel:Size(self.brandIcon, B.IconSize, B.IconSize)
   self.brandIcon:ClearAllPoints()
-  self.brandIcon:SetPoint("LEFT", self.navPanel, "TOPLEFT", SB.Pad, -B.Height / 2)
+  pixel:Row(self.brandIcon, "TOPLEFT", self.navPanel, m.pad, m.brand)
   controls:Paint(self.brandIcon, { Texture = B.Icon, Color = B.IconColor })
   style:SetFont(self.brandText, B.Font)
   self.brandText:ClearAllPoints()
-  self.brandText:SetPoint("LEFT", self.brandIcon, "RIGHT", B.Gap, 0)
+  pixel:Row(self.brandText, "TOPLEFT", self.navPanel, m.pad + self.brandIcon:GetWidth() + pixel:Snap(frame, B.Gap), m.brand)
   self:paintBrandLine(self.brandLine, self.navPanel)
 
   local search, SR = self.search, T.Search
+  local searchTop = m.brand + pixel:Snap(frame, SR.Gap)
   search.frame:ClearAllPoints()
-  search.frame:SetPoint("TOPLEFT", self.navPanel, "TOPLEFT", SB.Pad, -(B.Height + SR.Gap))
-  search.frame:SetPoint("TOPRIGHT", self.navPanel, "TOPRIGHT", -SB.Pad, -(B.Height + SR.Gap))
+  search.frame:SetPoint("TOPLEFT", self.navPanel, "TOPLEFT", m.pad, -searchTop)
+  search.frame:SetPoint("TOPRIGHT", self.navPanel, "TOPRIGHT", -m.pad, -searchTop)
   search:Style()
 
   local V = T.Version
   style:SetFont(self.version, V.Font)
   self.version:ClearAllPoints()
-  self.version:SetPoint("BOTTOMLEFT", self.navPanel, "BOTTOMLEFT", SB.Pad, V.Bottom)
+  local versionBottom = pixel:Snap(frame, V.Bottom)
+  self.version:SetPoint("BOTTOMLEFT", self.navPanel, "BOTTOMLEFT", m.pad, versionBottom)
   self.navBox:ClearAllPoints()
-  self.navBox:SetPoint("TOPLEFT", search.frame, "BOTTOMLEFT", -SB.Pad, -SR.Gap)
-  self.navBox:SetPoint("BOTTOMRIGHT", self.navPanel, "BOTTOMRIGHT", 0, V.Bottom * 2 + 12)
+  self.navBox:SetPoint("TOPLEFT", self.navPanel, "TOPLEFT", 0, -(searchTop + search.frame:GetHeight() + pixel:Snap(frame, SR.Gap)))
+  self.navBox:SetPoint("BOTTOMRIGHT", self.navPanel, "BOTTOMRIGHT", 0, 2 * versionBottom + pixel:Snap(frame, 12))
   self:styleListPanel()
 
   local H = T.Header
   self.header:ClearAllPoints()
-  self.header:SetPoint("TOPLEFT", frame, "TOPLEFT", SB.Width, 0)
+  self.header:SetPoint("TOPLEFT", frame, "TOPLEFT", m.sidebar, 0)
   self.header:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
-  self.header:SetHeight(H.Height)
+  self.header:SetHeight(m.header)
   style:SetFont(self.title, H.TitleFont)
-  self:placeHeading()
   style:SetFont(self.description, H.DescriptionFont)
-  self.description:ClearAllPoints()
-  self.description:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, -H.Gap)
-  self.description:SetPoint("RIGHT", self.header, "RIGHT", -H.Pad, 0)
+  self:placeHeading()
   local X = H.Close
-  self.closeButton:SetSize(X.Size, X.Size)
+  pixel:Size(self.closeButton, X.Size, X.Size)
   self.closeButton:ClearAllPoints()
-  self.closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -X.Inset, -X.Inset)
+  pixel:Point(self.closeButton, "TOPRIGHT", frame, "TOPRIGHT", -X.Inset, -X.Inset)
   self:paintClose(false)
 
   local F = T.Footer
   self.footer:ClearAllPoints()
-  self.footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", SB.Width, 0)
+  self.footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", m.sidebar, 0)
   self.footer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
-  self.footer:SetHeight(F.Height)
+  self.footer:SetHeight(m.footer)
   self.footerLine:ClearAllPoints()
   self.footerLine:SetPoint("TOPLEFT", self.footer, "TOPLEFT", 0, 0)
   self.footerLine:SetPoint("TOPRIGHT", self.footer, "TOPRIGHT", 0, 0)
-  self.footerLine:SetHeight(F.Line and F.Line.Size or 1)
+  pixel:Height(self.footerLine, F.Line and F.Line.Size or 1)
   controls:Paint(self.footerLine, F.Line)
-  self.whatsNew.frame:ClearAllPoints()
-  self.whatsNew.frame:SetPoint("LEFT", self.footer, "LEFT", F.Pad, 0)
-  self.done.frame:ClearAllPoints()
-  self.done.frame:SetPoint("RIGHT", self.footer, "RIGHT", -F.Pad, 0)
+  self:placeFooter()
   self:placeContent()
+end
+
+-- placeFooter puts What's New and Done the padding in from the footer's ends, centered on its height by
+-- their tops (their sizes follow their fonts, so a theme that changes those calls it again).
+---@private
+function settings:placeFooter()
+  local F, m = style.Theme.Settings.Footer, self:Metrics()
+  local pad = pixel:Snap(self.frame, F.Pad)
+  self.whatsNew.frame:ClearAllPoints()
+  pixel:Row(self.whatsNew.frame, "TOPLEFT", self.footer, pad, m.footer)
+  self.done.frame:ClearAllPoints()
+  pixel:Row(self.done.frame, "TOPRIGHT", self.footer, pad, m.footer)
 end
 
 -- paintBrandLine draws the gold line under the brand's row of a panel (the pages', a page's list's).
@@ -559,11 +630,12 @@ end
 ---@param line Texture
 ---@param panel Frame
 function settings:paintBrandLine(line, panel)
-  local SB, B = style.Theme.Settings.Sidebar, style.Theme.Settings.Brand
+  local B, m = style.Theme.Settings.Brand, self:Metrics()
+  local size = pixel:Length(self.frame, B.Line and B.Line.Size or 1)
   line:ClearAllPoints()
-  line:SetPoint("TOPLEFT", panel, "TOPLEFT", SB.Pad, -(B.Height - (B.Line and B.Line.Size or 1)))
-  line:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -SB.Pad, -(B.Height - (B.Line and B.Line.Size or 1)))
-  line:SetHeight(B.Line and B.Line.Size or 1)
+  line:SetPoint("TOPLEFT", panel, "TOPLEFT", m.pad, -(m.brand - size))
+  line:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -m.pad, -(m.brand - size))
+  line:SetHeight(size)
   if B.Line then
     local r, g, b = style:RGBA(B.Line.Color)
     line:SetColorTexture(1, 1, 1, 1)
@@ -578,27 +650,35 @@ end
 -- and the list under it; then both panels where the slide has them.
 ---@private
 function settings:styleListPanel()
-  local T = style.Theme.Settings
-  local SB, B, K = T.Sidebar, T.Brand, T.Back
+  local K, m = style.Theme.Settings.Back, self:Metrics()
   self.back:ClearAllPoints()
   self.back:SetPoint("TOPLEFT", self.listPanel, "TOPLEFT", 0, 0)
   self.back:SetPoint("TOPRIGHT", self.listPanel, "TOPRIGHT", 0, 0)
-  self.back:SetHeight(B.Height)
-  self.backIcon:SetSize(K.IconSize, K.IconSize)
+  self.back:SetHeight(m.brand)
+  pixel:Size(self.backIcon, K.IconSize, K.IconSize)
   self.backIcon:ClearAllPoints()
-  self.backIcon:SetPoint("LEFT", self.back, "LEFT", SB.Pad, 0)
+  pixel:Row(self.backIcon, "TOPLEFT", self.back, m.pad, m.brand)
   controls:Paint(self.backIcon, { Texture = K.Icon, Color = K.IconColor })
-  style:SetFont(self.backLabel, K.Font)
-  self.backLabel:ClearAllPoints()
-  self.backLabel:SetPoint("LEFT", self.backIcon, "RIGHT", K.Gap, 0)
+  self:styleBackLabel(K.Font)
   self:paintBrandLine(self.backLine, self.listPanel)
   self.listHost:ClearAllPoints()
-  self.listHost:SetPoint("TOPLEFT", self.listPanel, "TOPLEFT", 0, -B.Height)
-  self.listHost:SetSize(SB.Width, T.Height - B.Height)
+  self.listHost:SetPoint("TOPLEFT", self.listPanel, "TOPLEFT", 0, -m.brand)
+  self.listHost:SetSize(m.sidebar, m.height - m.brand)
   if self.sidebarPage ~= nil then
-    self:listOf(self.sidebarPage):Place(SB.Width, T.Height - B.Height)
+    self:listOf(self.sidebarPage):Place(m.sidebar, m.height - m.brand)
   end
   self:placeSidebar()
+end
+
+-- styleBackLabel writes Back in a font (its own, or its hover font) after its icon, centered on its row by
+-- its top.
+---@private
+---@param font string
+function settings:styleBackLabel(font)
+  local K, m = style.Theme.Settings.Back, self:Metrics()
+  style:SetFont(self.backLabel, font)
+  self.backLabel:ClearAllPoints()
+  pixel:Row(self.backLabel, "TOPLEFT", self.back, m.pad + self.backIcon:GetWidth() + pixel:Snap(self.frame, K.Gap), m.brand)
 end
 
 -- placeSidebar puts the pages and a page's list where the slide has them: the pages shift left out of
@@ -606,13 +686,13 @@ end
 -- hides.
 ---@private
 function settings:placeSidebar()
-  local T = style.Theme.Settings
-  local width, p = T.Sidebar.Width, self.shift
+  local m = self:Metrics()
+  local width, p = m.sidebar, self.shift
   for _, part in ipairs({ { self.navPanel, -p * width, 1 - p }, { self.listPanel, (1 - p) * width, p } }) do
     local panel = part[1]
     panel:ClearAllPoints()
     panel:SetPoint("TOPLEFT", self.sidebar, "TOPLEFT", part[2], 0)
-    panel:SetSize(width, T.Height)
+    panel:SetSize(width, m.height)
     panel:SetAlpha(part[3])
     panel:SetShown(part[3] > 0)
   end
@@ -651,8 +731,8 @@ function settings:listOf(page)
   if list == nil then
     list = page.sidebar(self.listHost, self.frame)
     self.lists[page] = list
-    local T = style.Theme.Settings
-    list:Place(T.Sidebar.Width, T.Height - T.Brand.Height)
+    local m = self:Metrics()
+    list:Place(m.sidebar, m.height - m.brand)
   end
   return list
 end
@@ -723,17 +803,33 @@ end
 -- placeHeading puts the page's buttons (when it has them) right of its title, left of the close
 -- button, the title stopping short of them.
 ---@private
+-- In whole pixels (docs/next-pixel-perfect.md): the title and the description from the header's corners,
+-- the description below the title's height rounded up, never from the title's far edge (the client's
+-- measure of it).
 function settings:placeHeading()
   local H = style.Theme.Settings.Header
-  self.title:ClearAllPoints()
-  self.title:SetPoint("TOPLEFT", self.header, "TOPLEFT", H.Pad, -H.TitleTop)
+  local header, frame = self.header, self.frame
+  local pad, top, gap = pixel:Snap(frame, H.Pad), pixel:Snap(frame, H.TitleTop), pixel:Snap(frame, H.Gap)
+  local right
   local actions = self.actions
   if actions ~= nil then
     local X = H.Close
+    local actionsGap = pixel:Snap(frame, H.Actions.Gap)
+    local beside = pixel:Snap(frame, X.Inset) + pixel:Length(frame, X.Size) + actionsGap
     actions.frame:ClearAllPoints()
-    actions.frame:SetPoint("TOPRIGHT", self.header, "TOPRIGHT", -(X.Inset + X.Size + H.Actions.Gap), -H.Actions.Top)
-    self.title:SetPoint("RIGHT", actions.frame, "LEFT", -H.Actions.Gap, 0)
+    actions.frame:SetPoint("TOPRIGHT", header, "TOPRIGHT", -beside, -pixel:Snap(frame, H.Actions.Top))
+    right = beside + pixel:Ceil(frame, actions.frame:GetWidth()) + actionsGap
   end
+  self.title:ClearAllPoints()
+  self.title:SetPoint("TOPLEFT", header, "TOPLEFT", pad, -top)
+  -- Short of the page's buttons; without them, as wide as it likes.
+  if right ~= nil then
+    self.title:SetPoint("TOPRIGHT", header, "TOPRIGHT", -right, -top)
+  end
+  local down = top + pixel:Ceil(frame, pixel:TextHeight(self.title)) + gap
+  self.description:ClearAllPoints()
+  self.description:SetPoint("TOPLEFT", header, "TOPLEFT", pad, -down)
+  self.description:SetPoint("TOPRIGHT", header, "TOPRIGHT", -pad, -down)
 end
 
 -- showActions shows a page's buttons in the header (none for a page without), read again.
@@ -761,35 +857,35 @@ end
 -- footer.
 ---@private
 function settings:placeContent()
-  local T = style.Theme.Settings
-  local SB, H, F = T.Sidebar, T.Header, T.Footer
+  local H, m = style.Theme.Settings.Header, self:Metrics()
+  local pad = pixel:Snap(self.frame, H.Pad)
   local tabs = self.tabs
   tabs.frame:ClearAllPoints()
-  tabs.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", SB.Width + H.Pad, -H.Height)
-  tabs.frame:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -H.Pad, -H.Height)
+  tabs.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", m.sidebar + pad, -m.header)
+  tabs.frame:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -pad, -m.header)
   local scroll = self.scroll.frame
   scroll:ClearAllPoints()
-  scroll:SetPoint("TOPLEFT", self.frame, "TOPLEFT", SB.Width, -self:ContentTop())
-  scroll:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, F.Height)
-  scroll:SetSize(T.Width - SB.Width, self:ContentHeight())
+  scroll:SetPoint("TOPLEFT", self.frame, "TOPLEFT", m.sidebar, -self:ContentTop())
+  scroll:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, m.footer)
+  scroll:SetSize(m.width - m.sidebar, self:ContentHeight())
 end
 
 -- ContentTop returns how far below the window's top the content starts: under the header, and the
--- tabs while they show.
+-- tabs while they show, in whole pixels.
 ---@return number
 function settings:ContentTop()
-  local H = style.Theme.Settings.Header
-  local top = H.Height
+  local m = self:Metrics()
+  local top = m.header
   if self.tabs.frame:IsShown() then
-    top = top + controls:Theme("TopTabs").Height
+    top = top + m.tabs
   end
   return top
 end
 
 ---@return number
 function settings:ContentHeight()
-  local T = style.Theme.Settings
-  return T.Height - self:ContentTop() - T.Footer.Height
+  local m = self:Metrics()
+  return m.height - self:ContentTop() - m.footer
 end
 
 ---@private
@@ -839,6 +935,9 @@ end
 ---@private
 function settings:buildNav()
   local N = style.Theme.Settings.Nav
+  -- Whole pixels apart (docs/next-pixel-perfect.md).
+  local groupGap, groupHeight, itemHeight = pixel:Snap(self.frame, N.GroupGap), pixel:Length(self.frame, N.GroupHeight),
+    pixel:Length(self.frame, N.ItemHeight)
   local groups, order = {}, {}
   for _, page in ipairs(pages:List()) do
     if groups[page.group] == nil then
@@ -850,7 +949,7 @@ function settings:buildNav()
   local i, y = 0, 0
   for g, group in ipairs(order) do
     if g > 1 then
-      y = y + N.GroupGap
+      y = y + groupGap
     end
     i = i + 1
     local heading = self:navRow(i)
@@ -860,10 +959,10 @@ function settings:buildNav()
     heading.frame:ClearAllPoints()
     heading.frame:SetPoint("TOPLEFT", self.navList, "TOPLEFT", 0, -y)
     heading.frame:SetPoint("TOPRIGHT", self.navList, "TOPRIGHT", 0, -y)
-    heading.frame:SetHeight(N.GroupHeight)
+    heading.frame:SetHeight(groupHeight)
     heading.frame:Show()
     self:paintNavRow(heading)
-    y = y + N.GroupHeight
+    y = y + groupHeight
     for _, page in ipairs(groups[group]) do
       i = i + 1
       local row = self:navRow(i)
@@ -873,10 +972,10 @@ function settings:buildNav()
       row.frame:ClearAllPoints()
       row.frame:SetPoint("TOPLEFT", self.navList, "TOPLEFT", 0, -y)
       row.frame:SetPoint("TOPRIGHT", self.navList, "TOPRIGHT", 0, -y)
-      row.frame:SetHeight(N.ItemHeight)
+      row.frame:SetHeight(itemHeight)
       row.frame:Show()
       self:paintNavRow(row)
-      y = y + N.ItemHeight
+      y = y + itemHeight
     end
   end
   for k = i + 1, #self.navRows do
@@ -892,12 +991,13 @@ end
 ---@private
 ---@param row table
 function settings:paintNavRow(row)
-  local SB, N = style.Theme.Settings.Sidebar, style.Theme.Settings.Nav
+  local N, frame = style.Theme.Settings.Nav, self.frame
+  local pad = pixel:Snap(frame, style.Theme.Settings.Sidebar.Pad)
   local chosen = row.page ~= nil and self.query == nil and row.page.id == self.pageId
   row.label:ClearAllPoints()
   if row.group then
     style:SetFont(row.label, N.GroupFont)
-    row.label:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", SB.Pad, 4)
+    row.label:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", pad, pixel:Snap(frame, 4))
     row.fill:Hide()
     row.hover:Hide()
     row.indicator:Hide()
@@ -910,14 +1010,16 @@ function settings:paintNavRow(row)
     font = N.HoverFont
   end
   style:SetFont(row.label, font)
-  row.label:SetPoint("LEFT", row.frame, "LEFT", SB.Pad + N.Indent, 0)
-  row.label:SetPoint("RIGHT", row.frame, "RIGHT", -SB.Pad, 0)
+  -- From the row's corners, centered on its height by the font's (its middle may be between pixels).
+  local height = pixel:Length(frame, N.ItemHeight)
+  pixel:Row(row.label, "TOPLEFT", row.frame, pad + pixel:Snap(frame, N.Indent), height)
+  pixel:Row(row.label, "TOPRIGHT", row.frame, pad, height)
   controls:Paint(row.fill, chosen and N.SelectedFill or false)
   controls:Paint(row.hover, (row.hovered and not chosen) and N.HoverFill or false)
   row.indicator:ClearAllPoints()
   row.indicator:SetPoint("TOPLEFT", row.frame, "TOPLEFT", 0, 0)
   row.indicator:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, 0)
-  row.indicator:SetWidth(N.Indicator.Width)
+  pixel:Width(row.indicator, N.Indicator.Width)
   controls:Paint(row.indicator, chosen and { Color = N.Indicator.Color } or false)
 end
 

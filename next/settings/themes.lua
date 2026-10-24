@@ -21,6 +21,9 @@ local nextButton = addon:GetModule('NextButton')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextSettingsThemes is the Appearance page's theme picker (next-settings.md §4), a wide row: a card
 -- per theme an engine lists (SonataNext, BetterBags Next's themes; or Sonata, the bags' themes, which
 -- draw Next's item buttons and dialogs unless the Next theme styles them), sorted by name, each with its
@@ -252,53 +255,69 @@ function blockProto:OnPageLeft(ctx)
   self:Paint()
 end
 
--- layout returns the cards' columns and width at a width.
+-- metrics are the cards' lengths in whole pixels (docs/next-pixel-perfect.md): the padding round them and
+-- its half above and below, their height, the gap between them, their own padding.
+---@private
+---@return {pad: number, half: number, height: number, gap: number, cardPad: number, minWidth: number}
+function blockProto:metrics()
+  local K, frame = style.Theme.Settings.Cards, self.frame
+  local pad = pixel:Snap(frame, style.Theme.Settings.Content.RowPad)
+  return { pad = pad, half = pixel:Floor(frame, pad / 2), height = pixel:Length(frame, K.Height),
+    gap = pixel:Snap(frame, K.Gap), cardPad = pixel:Snap(frame, K.Pad), minWidth = pixel:Length(frame, K.MinWidth) }
+end
+
+-- layout returns the cards' columns and width at a width, in whole pixels.
 ---@private
 ---@param width number
 ---@return number columns, number cardWidth
 function blockProto:layout(width)
-  local K, pad = style.Theme.Settings.Cards, style.Theme.Settings.Content.RowPad
-  local inner = width - 2 * pad
-  local columns = inner >= 2 * K.MinWidth + K.Gap and 2 or 1
-  return columns, (inner - (columns - 1) * K.Gap) / columns
+  local m = self:metrics()
+  local inner = width - 2 * m.pad
+  local columns = inner >= 2 * m.minWidth + m.gap and 2 or 1
+  return columns, pixel:Floor(self.frame, (inner - (columns - 1) * m.gap) / columns)
 end
 
 ---@param width number
 ---@return number
 function blockProto:Measure(width)
-  local K, pad = style.Theme.Settings.Cards, style.Theme.Settings.Content.RowPad
+  local m = self:metrics()
   local columns = self:layout(width)
   local lines = math.max(1, math.ceil(#self.entries / columns))
-  return pad / 2 + lines * K.Height + (lines - 1) * K.Gap + K.Gap + self.apply.frame:GetHeight() + pad / 2
+  return m.half + lines * m.height + (lines - 1) * m.gap + m.gap + self.apply.frame:GetHeight() + m.half
 end
 
 ---@param x number
 ---@param y number
 ---@param width number
 ---@param height number
+-- Place lays the cards out in whole pixels (docs/next-pixel-perfect.md), so each card's edge lands on whole
+-- pixels at any scale: a one-unit line between pixels drew two pixels thick or not at all (the reported
+-- missing top and bottom borders of the selected card at 65% and 70%). A card's description is below its
+-- name's font height rounded up, never its name's far edge.
 function blockProto:Place(x, y, width, height)
-  local K, pad = style.Theme.Settings.Cards, style.Theme.Settings.Content.RowPad
+  local m = self:metrics()
   local frame = self.frame
   frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
-  frame:SetSize(width, height)
-  local columns, cardWidth = self:layout(width)
+  pixel:Point(frame, "TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
+  pixel:Size(frame, width, height)
+  local columns, cardWidth = self:layout(frame:GetWidth())
   for i = 1, #self.entries do
     local card = self.cards[i]
     local column, line = (i - 1) % columns, math.floor((i - 1) / columns)
     card.frame:ClearAllPoints()
-    card.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad + column * (cardWidth + K.Gap), -(pad / 2 + line * (K.Height + K.Gap)))
-    card.frame:SetSize(cardWidth, K.Height)
+    card.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", m.pad + column * (cardWidth + m.gap), -(m.half + line * (m.height + m.gap)))
+    card.frame:SetSize(cardWidth, m.height)
     card.name:ClearAllPoints()
-    card.name:SetPoint("TOPLEFT", card.frame, "TOPLEFT", K.Pad, -K.Pad)
+    card.name:SetPoint("TOPLEFT", card.frame, "TOPLEFT", m.cardPad, -m.cardPad)
     card.status:ClearAllPoints()
-    card.status:SetPoint("TOPRIGHT", card.frame, "TOPRIGHT", -K.Pad, -K.Pad)
+    card.status:SetPoint("TOPRIGHT", card.frame, "TOPRIGHT", -m.cardPad, -m.cardPad)
     card.text:ClearAllPoints()
-    card.text:SetPoint("TOPLEFT", card.name, "BOTTOMLEFT", 0, -6)
-    card.text:SetWidth(math.max(1, cardWidth - 2 * K.Pad))
+    card.text:SetPoint("TOPLEFT", card.frame, "TOPLEFT", m.cardPad,
+      -(m.cardPad + pixel:Ceil(frame, pixel:TextHeight(card.name)) + pixel:Snap(frame, 6)))
+    card.text:SetWidth(math.max(pixel:Unit(frame), cardWidth - 2 * m.cardPad))
   end
   local lines = math.max(1, math.ceil(#self.entries / columns))
   self.apply.frame:ClearAllPoints()
-  self.apply.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -(pad / 2 + lines * (K.Height + K.Gap)))
+  self.apply.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", m.pad, -(m.half + lines * (m.height + m.gap)))
   frame:Show()
 end

@@ -178,4 +178,36 @@ describe("NextSettingsThemes", function()
     ember.frame:GetScript("OnLeave")(ember.frame)
     assert.are.equal(K().Fill.Alpha, ember.fill._colorTexture.a)
   end)
+
+  -- Reported (docs/next-pixel-perfect.md): in a maximized window of 3396x1362 the selected card lost its top
+  -- edge at a UI scale of 65% and its bottom edge at 70%. Each of its four edges is one screen pixel thick
+  -- and on whole pixels, wherever the page puts it.
+  describe("its selected card's edge on the reporter's screen", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local pixel = addon:GetModule("NextPixel")
+
+    for _, uiScale in ipairs({ 0.65, 0.70 }) do
+      it(string.format("is one pixel thick on every side at %d%%", uiScale * 100), function()
+        local undo = layout.UseScreen(3396, 1362, uiScale)
+        UseNextTheme(nil)
+        local parent = CreateFrame("Frame", nil, UIParent)
+        pixel:Point(parent, "TOPLEFT", UIParent, "TOPLEFT", 413, -97)
+        pixel:Size(parent, 700, 400)
+        local block = themes:Create(parent, engine)
+        block:Refresh(context:New("spec"))
+        for _, y in ipairs({ 13.3, 17.6, 31 }) do
+          block:Place(21.4, y, 618.7, block:Measure(618.7))
+          local selected = card(block, "Default")
+          local k = layout.PixelsPerUnit()
+          for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+            local r = layout.Rect(selected.edge[side])
+            local thick = (side == "Top" or side == "Bottom") and (r.top - r.bottom) or (r.right - r.left)
+            assert.is_true(math.abs(thick * k - 1) < 1e-3, side .. " is " .. thick * k .. " pixels")
+          end
+          assert.are.same({}, layout.PixelCheck(selected.frame), "at " .. y)
+        end
+        undo()
+      end)
+    end
+  end)
 end)

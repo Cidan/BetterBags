@@ -301,6 +301,16 @@ function sonataNext:ApplyTheme(ctx, key, save)
   end
   nextStyle():Use(resolved)
   self:syncItemButtons()
+  self:RestyleWidgets(ctx)
+  events():SendMessage(ctx, 'sonata/NextThemeChanged', key)
+end
+
+-- RestyleWidgets restyles every widget (its ApplyStyle) with the theme in effect, each in its own protected
+-- call: a window drawn at a new scale lays everything out again for its pixel grid (the settings window,
+-- docs/next-pixel-perfect.md). A widget gone before its turn (another one's restyle released it) is not
+-- styled.
+---@param ctx Context
+function sonataNext:RestyleWidgets(ctx)
   local list = {}
   for widget in pairs(self.widgets) do
     table.insert(list, widget)
@@ -313,7 +323,6 @@ function sonataNext:ApplyTheme(ctx, key, save)
       end
     end
   end
-  events():SendMessage(ctx, 'sonata/NextThemeChanged', key)
 end
 
 -- RestoreSavedTheme applies the theme the saved setting puts in effect, without saving, when
