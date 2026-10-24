@@ -1,0 +1,25 @@
+{
+  "id": 1792861033,
+  "version": "v0.8.2",
+  "channel": "alpha",
+  "date": "2026-10-24",
+  "from": "9ef5aeba1355645e02023d42e1aaef1bb0d7d64a",
+  "to": "f5bc01d1c4c852a87be0d58b84f0b131135f0856",
+  "headline": "Fixed errors when interacting with dungeon vendors and after emptying item slots.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Error when visiting merchants in dungeons or raids",
+      "details": "Interacting with vendors inside instances no longer causes an error when the game restricts merchant identity information.",
+      "clients": [
+        "Retail"
+      ]
+    },
+    {
+      "category": "Fixed",
+      "title": "Error after emptying an item slot",
+      "details": "Fixed an error that could occur when selling, consuming, or equipping an item that leaves a slot empty while bag data is recalculating.",
+      "clients": []
+    }
+  ]
+}
