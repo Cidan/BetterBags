@@ -126,8 +126,12 @@ describe("NextSettingsRows", function()
     assert.is_true(row:Measure(330) > C().RowHeight, "a name that wraps makes the row taller")
     row:Place(10, 40, 330, height)
     assert.are.same({ "TOPLEFT", owner, "TOPLEFT", 10, -40 }, { row.frame:GetPoint(1) })
-    assert.are.same({ "LEFT", row.frame, "LEFT", C().RowPad, 0 }, { row.label:GetPoint(1) })
-    assert.are.same({ "RIGHT", row.frame, "RIGHT", -C().RowPad, 0 }, { row.control.frame:GetPoint(1) })
+    -- From the row's corners, centered on its height by their tops (docs/next-pixel-perfect.md): the name by
+    -- its lines' height rounded up.
+    local labelTop = math.max(0, math.floor((height - math.ceil(row.label:GetStringHeight())) / 2))
+    assert.are.same({ "TOPLEFT", row.frame, "TOPLEFT", C().RowPad, -labelTop }, { row.label:GetPoint(1) })
+    assert.are.same({ "TOPRIGHT", row.frame, "TOPRIGHT", -C().RowPad, -math.floor((height - toggle.Height) / 2) },
+      { row.control.frame:GetPoint(1) })
   end)
 
   it("shows the setting again when its change was refused", function()

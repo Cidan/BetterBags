@@ -24,6 +24,9 @@ local nextToggle = addon:GetModule('NextToggle')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextSettingsCurrency is the classic bags' Currency page (next-settings.md §8), a wide row in place of
 -- the classic window's currency panes: every currency under its headings (the headings Blizzard keeps
 -- collapsed expanded, as the backpack's currency icons expand them, frames/currency.lua), each with its
@@ -264,18 +267,28 @@ end
 
 ---@param width number
 ---@return number
+-- In whole pixels (docs/next-pixel-perfect.md).
 function blockProto:Measure(width)
   local _ = width
-  local C = style.Theme.Settings.Currency
-  local pad = style.Theme.Settings.Content.RowPad
+  local frame = self.frame
+  local pad = pixel:Snap(frame, style.Theme.Settings.Content.RowPad)
   if #self.entries == 0 then
-    return math.ceil(self.empty:GetStringHeight()) + pad
+    return pixel:Ceil(frame, self.empty:GetStringHeight()) + pad
   end
   local height = 0
   for _, entry in ipairs(self.entries) do
-    height = height + (entry.isHeader and C.HeaderHeight or C.RowHeight)
+    height = height + self:heightOf(entry)
   end
   return height + pad
+end
+
+-- heightOf is a heading's or a currency's row's height in whole pixels.
+---@private
+---@param entry table
+---@return number
+function blockProto:heightOf(entry)
+  local C = style.Theme.Settings.Currency
+  return pixel:Length(self.frame, entry.isHeader and C.HeaderHeight or C.RowHeight)
 end
 
 -- Place lays the rows out: a heading's name, then each currency's icon, name, count and switch.
@@ -286,37 +299,41 @@ end
 function blockProto:Place(x, y, width, height)
   self.x, self.y, self.width, self.height = x, y, width, height
   local C = style.Theme.Settings.Currency
-  local pad = style.Theme.Settings.Content.RowPad
   local frame = self.frame
+  local pad, gap = pixel:Snap(frame, style.Theme.Settings.Content.RowPad), pixel:Snap(frame, C.Gap)
   frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
-  frame:SetSize(width, height)
+  pixel:Point(frame, "TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
+  pixel:Size(frame, width, height)
+  local half = pixel:Floor(frame, pad / 2)
   self.empty:ClearAllPoints()
-  self.empty:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad / 2)
-  local top = pad / 2
+  self.empty:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -half)
+  local top = half
+  -- Each part from its row's corners, centered on the row by its top (docs/next-pixel-perfect.md); the count
+  -- right of the switch, the name between the icon and the count by the count's width rounded up.
   for k, entry in ipairs(self.entries) do
     local row = self.rows[k]
-    local h = entry.isHeader and C.HeaderHeight or C.RowHeight
+    local h = self:heightOf(entry)
     row.frame:ClearAllPoints()
     row.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -top)
-    row.frame:SetSize(width - 2 * pad, h)
+    row.frame:SetSize(frame:GetWidth() - 2 * pad, h)
     row.name:ClearAllPoints()
     if entry.isHeader then
       row.icon:Hide()
       row.count:Hide()
-      row.name:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, 4)
+      row.name:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, pixel:Snap(frame, 4))
     else
       row.icon:Show()
       row.count:Show()
-      row.icon:SetSize(C.IconSize, C.IconSize)
+      pixel:Size(row.icon, C.IconSize, C.IconSize)
       row.icon:ClearAllPoints()
-      row.icon:SetPoint("LEFT", row.frame, "LEFT", C.Gap, 0)
+      pixel:Row(row.icon, "TOPLEFT", row.frame, gap, h)
       row.toggle.frame:ClearAllPoints()
-      row.toggle.frame:SetPoint("RIGHT", row.frame, "RIGHT", -C.Gap, 0)
+      pixel:Row(row.toggle.frame, "TOPRIGHT", row.frame, gap, h)
+      local countRight = gap + row.toggle.frame:GetWidth() + 2 * gap
       row.count:ClearAllPoints()
-      row.count:SetPoint("RIGHT", row.toggle.frame, "LEFT", -2 * C.Gap, 0)
-      row.name:SetPoint("LEFT", row.icon, "RIGHT", C.Gap, 0)
-      row.name:SetPoint("RIGHT", row.count, "LEFT", -C.Gap, 0)
+      pixel:Row(row.count, "TOPRIGHT", row.frame, countRight, h)
+      pixel:Row(row.name, "TOPLEFT", row.frame, gap + row.icon:GetWidth() + gap, h)
+      pixel:Row(row.name, "TOPRIGHT", row.frame, countRight + pixel:Ceil(frame, row.count:GetStringWidth()) + gap, h)
     end
     top = top + h
   end

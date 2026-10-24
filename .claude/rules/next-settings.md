@@ -195,7 +195,7 @@ same database calls, with the same effects, as the classic window did; every que
 | Group | Page (id) | What it shows |
 |---|---|---|
 | BetterBags | General (`general`) | *Bags:* BetterBags Next, Enable Bank Bags, Show Blizzard Bag Button, Enable Bag Fading (classic), Animate Item Movement (classic). *Search:* In-Bag Search, Enter to Make Category. *Items:* Upgrade Icon Provider, New Item Duration, Category Sell and Deposit. *What's New:* Show What's New on Login. |
-| | Appearance (`appearance`) | Theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext) while Next is in use; for the classic bags, their Bag Theme (Sonata), then Settings Window (SonataNext: Next's themes draw this window). |
+| | Appearance (`appearance`) | Two tabs (asked: "make 'Theme' here a tab, and add a tab for 'Size'", docs/next-appearance-size.md). **Theme**: the theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext) while Next is in use; for the classic bags, their Bag Theme (Sonata), then Settings Window (SonataNext: Next's themes draw this window). **Size** (Next only): Icon Scale (`nextIconScale`) and Bag Scale (`nextBagScale`), 50% to 150% in steps of 5, each sending `next/ScalesChanged` (next.md §3, §14h). The classic bags size themselves on each bag's page, so with them Appearance has the Theme tab alone, and no tab strip. |
 | | Item Colors (`itemcolors`) | The four item level colors as swatches, named with their ranges (61% and 86% of the highest item level seen, as the classic pane); a picked color is saved and sent as `itemLevel/MaxChanged` (Cancel saves the color back too); the highest level seen; Reset Colors, Reset Max Item Level. |
 | Bags | Backpack, Bank, Guild Bank (`backpack`, `bank`, `guild`) | Each bound to its bag. *Layout:* Order (Section, Item), Tabs (Enable Groups: the backpack only; the bank's Tabs section is left out), Slots (All Free Space, Gaps). *Items:* Item Level (two), Quality (Glow Intensity), Stacking (seven). *Categories:* Automatic (the seven filters). The guild bank's page shows on a client with one (`addon.hasGuildBank`). |
 | Profiles | Profiles (`profiles`) | Tab *Profiles:* the active profile (a pick asks, then switches and reloads), the characters on each, New, Copy, Rename, Delete, Reset to Defaults (the classic flows: Copy creates then copies; Delete switches to Default first; Default cannot be renamed or deleted; a name is asked again while empty). Tab *Import / Export* (`transfer`): Export Categories fills a text area and selects it; Import Categories asks, imports (`DB:ImportSettings`), clears the area and offers a reload, or says what is wrong. |
@@ -468,10 +468,11 @@ Not seen in game yet: the whole window, on every theme (phase 7 of docs/next-set
 Asked (2026-10-20): this window is the settings window of the classic bags too (the classic window is
 gone), it shows only what the bags in use read, and nothing the classic window had is missed.
 
-- **`design`** on a page, a section or a row (`"next"` or `"classic"`) shows it only while those bags
-  are in use (`NextSettingsPages:DesignInUse()`: `BagSystem:ActiveDesign() == "next"`, else classic).
-  The window filters pages (`IsShown`), sections and rows when it builds a tab (each tab is made once
-  per design: the cache key is `design:tab`) and when it searches.
+- **`design`** on a page, a tab, a section or a row (`"next"` or `"classic"`) shows it only while those
+  bags are in use (`NextSettingsPages:DesignInUse()`: `BagSystem:ActiveDesign() == "next"`, else
+  classic). The window filters pages (`IsShown`), tabs (`ShownTabs`, also used by the search, whose
+  results name a tab only when its page shows more than one), sections and rows when it builds a tab
+  (each tab is made once per design: the cache key is `design:tab`) and when it searches.
 - **A design switch while the window is open** (`NextSettings:OnDesignChanged`, from
   `bags/DesignChanged`): it lists its pages again and shows its page (the first page for one the new
   design does not have) or its search again, staying open. Closed, it does nothing; the next open
@@ -484,7 +485,8 @@ gone), it shows only what the bags in use read, and nothing the classic window h
     Appearance: Bag Theme (Sonata) and Settings Window (SonataNext: Next's themes draw this window);
     Currency (§8).
   - **Next only:** the Guild Bank page (the classic bags have no guild bank); Appearance: Theme
-    (SonataNext). The classic themes' picker (item buttons) is not shown in Next (asked).
+    (SonataNext) and the Size tab (Icon Scale, Bag Scale). The classic themes' picker (item buttons) is
+    not shown in Next (asked).
   - Everything else, both.
 - **Show What's New on Login** (General → What's New, `changelogOnLogin` in the catalog,
   `DB:Get/SetChangelogAutoOpen`): before, only the changelog window's "Don't show me this again"

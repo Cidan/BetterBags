@@ -247,6 +247,31 @@ describe("NextListReorder", function()
         "about at the room's top left on screen: " .. x * s .. ", " .. y * s)
     end)
 
+    -- The settings window scales itself down to fit a small screen (next-settings.md §3): the list is read
+    -- on screen, in UIParent's units, and the row keeps its size there.
+    it("moves its room under the cursor and lands in it in a window scaled down", function()
+      local window = CreateFrame("Frame", nil, UIParent)
+      window:SetScale(0.5)
+      box:SetParent(window)
+      drag:Arrange(280)
+      rows.B:_SetRect(0, 300 - yOf("B") - 40, 280, 40)
+      _G._cursorX, _G._cursorY = 10, (300 - yOf("B") - 10) * 0.5
+      assert.is_true(drag:Start("B"))
+      assert.are.equal(0.5, rows.B:GetScale(), "lifted at its size on screen")
+      _G._cursorY = (300 - 130) * 0.5
+      step()
+      assert.are.same({ 20, 60 }, { yOf("A"), yOf("C") }, "past C's middle, on screen")
+      release()
+      tween:Step(style.Time.Land - 0.00001)
+      local _, _, _, x, y = rows.B:GetPoint(1)
+      local s = rows.B:GetScale()
+      assert.is_true(math.abs(s - 0.5) < 0.01, "lands at the window's scale: " .. s)
+      assert.is_true(math.abs(x * s) < 0.5 and math.abs(y * s - (300 - 100) * 0.5) < 0.5,
+        "at the room's top left on screen: " .. x * s .. ", " .. y * s)
+      finishTweens()
+      assert.are.same({ { "B", 4 } }, drops)
+    end)
+
     it("aims at its room on screen as the list is scrolled", function()
       start("B")
       box._scrollRange, box._scrollPercentage = 100, 0.5

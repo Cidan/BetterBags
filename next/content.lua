@@ -24,6 +24,12 @@ local style = addon:GetModule('NextStyle')
 ---@class NextTween: AceModule
 local tween = addon:GetModule('NextTween')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
+---@class NextItemFit: AceModule
+local itemFit = addon:GetModule('NextItemFit')
+
 -- NextContent is BetterBagsNext's canvas (next.md §2), the drawable inside the panel's scroll
 -- box. Bind turns a tab's data into sections, in one column: Recent Items, the tab's categories
 -- in their order, then Free Space; it draws and claims the static item buttons. Render lays the
@@ -100,7 +106,7 @@ function nextContent:Create(parent)
   ---@type NextCanvas
   local canvas = drawable:Create(canvasProto)
   canvas.frame = CreateFrame("Frame", nil, parent)
-  canvas.frame:SetSize(style.GRID_WIDTH, 1)
+  pixel:Size(canvas.frame, style.GRID_WIDTH, 1)
   canvas.order = {}
   canvas.byName = {}
   canvas.stale = {}
@@ -157,34 +163,24 @@ local function titleRole(kind)
   return S.TitleFont
 end
 
--- styleSection draws a section's title row from the theme: the title and count in its roles and
--- places, the line after them (or none), the header's height and highlight (or none), the cells
--- below it.
+-- styleSection draws a section's title row from the theme: the title and count in its roles, the line
+-- after them (or none), the header's height and highlight (or none), the cells below it, in whole
+-- pixels. Where the title row's parts go depends on its text: placeTitleRow, every render.
 ---@private
 ---@param section NextSection
 function canvasProto:styleSection(section)
   local S = style.Theme.Sections
-  local inner, title, count, line = section.inner, section.title, section.count, section.line
+  local title, count, line = section.title, section.count, section.line
   style:SetFont(title, titleRole(section.kind))
   style:SetFont(count, S.CountFont)
-  title:ClearAllPoints()
-  title:SetPoint("TOPLEFT", inner, "TOPLEFT", S.Title.X, S.Title.Y)
-  count:ClearAllPoints()
-  count:SetPoint("LEFT", title, "RIGHT", S.CountGap, 0)
-  line:ClearAllPoints()
-  line:SetPoint("LEFT", count, "RIGHT", S.LineGap, 0)
-  line:SetPoint("RIGHT", inner, "RIGHT", 0, 0)
   local spec = S.Line
   if spec then
-    line:SetHeight(spec.Size)
     line:SetGradient("HORIZONTAL", style:CreateColor(spec.Color, spec.From), style:CreateColor(spec.Color, spec.To))
     line:Show()
   else
     line:Hide()
   end
-  section.cells:ClearAllPoints()
-  section.cells:SetPoint("TOPLEFT", inner, "TOPLEFT", 0, -style.SECTION_HEADER)
-  section.header:SetHeight(style.SECTION_HEADER)
+  self:placeHeader(section)
   local highlight, glow = section.highlight, S.Highlight
   if glow then
     highlight:SetGradient("HORIZONTAL", style:CreateColor(glow.Color, glow.From), style:CreateColor(glow.Color, glow.To))
@@ -192,6 +188,53 @@ function canvasProto:styleSection(section)
   else
     highlight:Hide()
   end
+end
+
+-- fontHeight is a text's font's height: a whole number of pixels (NextStyle makes every role's so).
+---@param text FontString
+---@return number
+local function fontHeight(text)
+  local _, height = text:GetFont()
+  return height or 0
+end
+
+-- placeTitleRow puts a section's title row on whole pixels (docs/next-pixel-perfect.md): the title at the
+-- theme's place, the count after the title's text and the line after the count's, each by its top left,
+-- the count and the line centered on the title by the fonts' heights. Anchored to a text's middle or its
+-- right edge they would follow the client's measure of the text, between pixels.
+---@private
+---@param section NextSection
+function canvasProto:placeTitleRow(section)
+  local S = style.Theme.Sections
+  local inner, title, count, line = section.inner, section.title, section.count, section.line
+  local x, y = pixel:Snap(inner, S.Title.X), pixel:Snap(inner, S.Title.Y)
+  title:ClearAllPoints()
+  title:SetPoint("TOPLEFT", inner, "TOPLEFT", x, y)
+  local titleHeight = fontHeight(title)
+  local countX = x + pixel:Ceil(inner, title:GetStringWidth()) + pixel:Snap(inner, S.CountGap)
+  count:ClearAllPoints()
+  count:SetPoint("TOPLEFT", inner, "TOPLEFT", countX, y - pixel:Floor(inner, (titleHeight - fontHeight(count)) / 2))
+  local lineX = countX + pixel:Ceil(inner, count:GetStringWidth()) + pixel:Snap(inner, S.LineGap)
+  local lineY = y - pixel:Floor(inner, (titleHeight - line:GetHeight()) / 2)
+  line:ClearAllPoints()
+  line:SetPoint("TOPLEFT", inner, "TOPLEFT", lineX, lineY)
+  line:SetPoint("TOPRIGHT", inner, "TOPRIGHT", 0, lineY)
+end
+
+-- placeHeader lays a section's header out on the grid it is drawn on (docs/next-pixel-perfect.md): the line's
+-- thickness, the title row, the header's height and the cells under it, all in whole pixels. Again when the
+-- section is laid out (LayoutSection): seated in a dock card it is drawn at the card's scale.
+---@private
+---@param section NextSection
+function canvasProto:placeHeader(section)
+  local spec = style.Theme.Sections.Line
+  if spec then
+    pixel:Height(section.line, spec.Size)
+  end
+  self:placeTitleRow(section)
+  section.cells:ClearAllPoints()
+  pixel:Point(section.cells, "TOPLEFT", section.inner, "TOPLEFT", 0, -style.SECTION_HEADER)
+  pixel:Height(section.header, style.SECTION_HEADER)
 end
 
 -- ApplyStyle restyles every section it holds (drawn, kept from the last pass, pooled) for the
@@ -253,7 +296,7 @@ end
 local function setRise(section, rise)
   section.rise = rise
   section.inner:ClearAllPoints()
-  section.inner:SetPoint("TOPLEFT", section.frame, "TOPLEFT", 0, -rise)
+  pixel:Point(section.inner, "TOPLEFT", section.frame, "TOPLEFT", 0, -rise)
 end
 
 -- section returns this pass's section of a name, reusing last pass's, else a pooled or new one.
@@ -322,8 +365,9 @@ end
 function canvasProto:claim(ctx, section, slotkey, claims)
   local button = self.buttonSource:GetButton(ctx, slotkey)
   claims[button] = true
-  if math.abs(button.frame:GetWidth() - style.ICON) > 0.01 then
-    button:SetSize(ctx, style.ICON, style.ICON)
+  local icon = pixel:Length(self.frame, style.ICON)
+  if math.abs(button.frame:GetWidth() - icon) > 0.001 then
+    button:SetSize(ctx, icon, icon)
   end
   if button.frame:GetParent() ~= section.cells then
     button.frame:SetParent(section.cells)
@@ -390,16 +434,18 @@ function canvasProto:SetCards(on)
   self:Invalidate()
 end
 
--- CellWidth is how wide a button is, without the gap, for the current theme: its icon, or a card.
+-- CellWidth is how wide a button is, without the gap, for the current theme: its icon, or a card; in
+-- whole pixels on the canvas's grid.
 ---@return number
 function canvasProto:CellWidth()
-  return self.cards and style.VENDOR_CARD_WIDTH or style.ICON
+  return pixel:Length(self.frame, self.cards and style.VENDOR_CARD_WIDTH or style.ICON)
 end
 
--- CellHeight is how tall a row of buttons is, without the gap, for the current theme.
+-- CellHeight is how tall a row of buttons is, without the gap, for the current theme: an item button
+-- (the theme's icon times the player's Icon Scale), or a card (the theme's icon); in whole pixels.
 ---@return number
 function canvasProto:CellHeight()
-  return style.ICON
+  return pixel:Length(self.frame, self.cards and style.CARD_ICON or style.ICON)
 end
 
 ---@class (exact) NextCanvasSection
@@ -523,9 +569,13 @@ end
 ---@param parentResult? RenderResult
 ---@return RenderResult
 function canvasProto:Render(parentResult)
-  local width = parentResult and parentResult.Width or style.GRID_WIDTH
-  local STEP = self:CellWidth() + style.GAP
-  local perRow = math.max(1, math.floor((width + style.GAP) / STEP))
+  -- Everything in whole pixels on its grid (docs/next-pixel-perfect.md): the width it may take rounded
+  -- down, and every step a sum of whole pixels, so its rows step evenly.
+  local frame = self.frame
+  local width = pixel:Floor(frame, parentResult and parentResult.Width or style.GRID_WIDTH)
+  -- The width its rows are decided on, in units (a panel's own, never rounded to its grid): LayoutSection.
+  local layoutWidth = parentResult and parentResult.LayoutWidth or width
+  local spacing = pixel:Length(frame, style.SECTION_SPACING)
   local animated = self.frame:IsVisible() and not self.instant
   if animated then
     motion:BeginPass(self, style.Time.Interaction)
@@ -537,38 +587,33 @@ function canvasProto:Render(parentResult)
   self.dragSlotY = nil
   for _, lead in ipairs(self.lead and self.lead(width) or {}) do
     if placed > 0 then
-      y = y + style.SECTION_SPACING
+      y = y + spacing
     end
-    motion:Place(lead.frame, self.frame, (width - lead.frame:GetWidth()) / 2, -y)
-    y = y + lead.height
+    motion:Place(lead.frame, frame, pixel:Floor(frame, (width - lead.frame:GetWidth()) / 2), -y)
+    y = y + pixel:Snap(frame, lead.height)
     placed = placed + 1
   end
-  -- gap keeps the dragged section's room in the column.
-  local function gap()
+  -- room keeps the dragged section's room in the column.
+  local function room()
     if placed > 0 then
-      y = y + style.SECTION_SPACING
+      y = y + spacing
     end
     self.dragSlotY = y
     y = y + drag.height
     placed = placed + 1
   end
-  local rowStep = self:CellHeight() + style.GAP
   for _, section in ipairs(self.order) do
-    local rows = math.max(1, math.ceil(#section.entries / perRow))
-    local height = style.SECTION_HEADER + rows * rowStep - style.GAP
-    section.height = height
-    section.frame:SetSize(width, height)
-    section.inner:SetSize(width, height)
-    section.cells:SetSize(width, rows * rowStep)
-    for j, entry in ipairs(section.entries) do
-      if entry.item ~= nil then
-        local column, row = (j - 1) % perRow, math.floor((j - 1) / perRow)
-        motion:Place(entry.item.frame, section.cells, column * STEP, -row * rowStep)
-        entry.item.frame:Show()
-      end
-    end
-    -- A section waiting in a dock is out of the column, its frame the dock's.
+    -- A section waiting in a dock is laid out by the dock, at the scale of its card (Lead).
     local away = self.away[section]
+    if away == nil or away.returning then
+      self:LayoutSection(section, width, layoutWidth)
+    end
+    local height = section.height
+    -- Held in a drag (drawn shrunk) or flying back from a dock, it is drawn on another grid than the column's: its
+    -- room is its height on the column's (MeasureSection).
+    if (drag ~= nil and section == drag.section) or (away ~= nil and away.returning) then
+      height = self:MeasureSection(section, frame, width, layoutWidth).height
+    end
     if drag ~= nil and section == drag.section then
       drag.height = height
     elseif self:IsLeaving(section) then
@@ -576,10 +621,10 @@ function canvasProto:Render(parentResult)
     elseif away == nil or away.returning then
       others = others + 1
       if drag ~= nil and others == drag.index then
-        gap()
+        room()
       end
       if placed > 0 then
-        y = y + style.SECTION_SPACING
+        y = y + spacing
       end
       section.y = y
       if away == nil then
@@ -591,7 +636,7 @@ function canvasProto:Render(parentResult)
     end
   end
   if drag ~= nil and drag.index > others then
-    gap()
+    room()
   end
   if animated then
     motion:EndPass()
@@ -599,6 +644,92 @@ function canvasProto:Render(parentResult)
   local height = math.max(1, y)
   self.frame:SetSize(width, height)
   return { Width = width, Height = height }
+end
+
+-- LayoutSection lays a section out width wide in its own units (the column's width), in whole pixels on its
+-- own grid (docs/next-pixel-perfect.md): its title row, its cells in rows, each a whole number of pixels apart,
+-- its size from them. Its own grid is its frame's: the column's, or a dock card's (a docked section is scaled
+-- down to fit its card), where its item buttons take its grid's icon size too. Its size times its scale is then
+-- whole on the grid it is drawn on. It returns its width and height.
+--
+-- How many cells go in a row is decided on layoutWidth (the width to lay out for, in units: a panel's own, never
+-- rounded to its grid) with the theme's lengths, never on lengths rounded to the grid: the grid changes with a
+-- panel's Bag Scale, and rounded lengths moved items between rows as it did (next-pixel-perfect.md §3). A
+-- section laid out again with none (in a dock card) keeps the rows it had.
+---@param section NextSection
+---@param width number
+---@param layoutWidth? number
+---@return number width, number height
+function canvasProto:LayoutSection(section, width, layoutWidth)
+  local f = section.frame
+  local ctx
+  layoutWidth = layoutWidth or section.layoutWidth or pixel:Floor(f, width)
+  section.layoutWidth = layoutWidth
+  local m = self:MeasureSection(section, f, width, layoutWidth)
+  width = m.width
+  local perRow, cellWidth, rows, height = m.perRow, m.cellWidth, m.rows, m.height
+  local step, rowStep = m.step, m.rowStep
+  self:placeHeader(section)
+  section.height = height
+  section.frame:SetSize(width, height)
+  section.inner:SetSize(width, height)
+  section.cells:SetSize(width, rows * rowStep)
+  for j, entry in ipairs(section.entries) do
+    local item = entry.item
+    if item ~= nil then
+      -- A card styles itself for the grid it is now on (it was made before it was placed).
+      if item.Fit ~= nil then
+        item:Fit()
+      end
+      if not self.cards and math.abs(item.frame:GetWidth() - cellWidth) > 0.001 then
+        ctx = ctx or addon:GetModule('Context'):New('NextCanvas_LayoutSection')
+        item:SetSize(ctx, cellWidth, cellWidth)
+      end
+      -- Its parts on whole pixels of its size and grid (NextItemFit): an item button's decoration and the
+      -- item level text on its interaction button, or the parts a button names (a guild bank button).
+      local decoration, extras
+      if item.GetDecoration ~= nil then
+        ctx = ctx or addon:GetModule('Context'):New('NextCanvas_LayoutSection')
+        decoration, extras = item:GetDecoration(ctx), { item.ilvlText }
+      elseif item.PixelParts ~= nil then
+        decoration, extras = item:PixelParts()
+      end
+      if decoration ~= nil then
+        ctx = ctx or addon:GetModule('Context'):New('NextCanvas_LayoutSection')
+        itemFit:Fit(ctx, decoration, extras, item)
+      end
+      local column, row = (j - 1) % perRow, math.floor((j - 1) / perRow)
+      motion:Place(item.frame, section.cells, column * step, -row * rowStep)
+      item.frame:Show()
+    end
+  end
+  return width, height
+end
+
+-- MeasureSection works out a section's layout in whole pixels on grid's pixel grid (a frame: the section's own,
+-- where it is drawn, or the column's, where it takes room), width wide, its cells per row decided on layoutWidth
+-- (LayoutSection). Nothing moves. A section drawn on another grid than the column's (held in a drag, drawn shrunk;
+-- flying back from a dock) takes room measured on the column's: its own grid's whole pixels are not the column's.
+---@param section NextSection
+---@param grid Region
+---@param width number
+---@param layoutWidth number
+---@return {width: number, perRow: number, cellWidth: number, cellHeight: number, step: number, rowStep: number, rows: number, height: number}
+function canvasProto:MeasureSection(section, grid, width, layoutWidth)
+  width = pixel:Floor(grid, width)
+  local cellWidth, cellHeight = pixel:Lengths(grid, self.cards and style.VENDOR_CARD_WIDTH or style.ICON,
+    self.cards and style.CARD_ICON or style.ICON)
+  local gap, header = pixel:Lengths(grid, style.GAP, style.SECTION_HEADER)
+  local designStep = (self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP
+  local perRow = math.max(1, math.floor((layoutWidth + style.GAP) / designStep + 1e-6))
+  -- The row fits the width it is drawn in: where the grid's rounded lengths would run past it (up to a pixel per
+  -- cell, over the scroll bar's room), the gap closes by the pixel or two the rounding added. Every gap the same.
+  if perRow > 1 then
+    gap = math.max(0, math.min(gap, pixel:Floor(grid, (width - perRow * cellWidth) / (perRow - 1))))
+  end
+  local rows = math.max(1, math.ceil(#section.entries / perRow))
+  return { width = width, perRow = perRow, cellWidth = cellWidth, cellHeight = cellHeight, step = cellWidth + gap,
+    rowStep = cellHeight + gap, rows = rows, height = header + rows * (cellHeight + gap) - gap }
 end
 
 -- Cascade fades sections in one after the other, rising into place: every section with all,
@@ -796,7 +927,7 @@ function canvasProto:Return(section)
   end
   self.away[section] = nil
   section.frame:ClearAllPoints()
-  section.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -(section.y or 0))
+  pixel:Point(section.frame, "TOPLEFT", self.frame, "TOPLEFT", 0, -(section.y or 0))
   section.frame:Show()
   self:Invalidate()
 end

@@ -12,6 +12,9 @@ local nextInput = addon:GetModule('NextInput')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextSlider is BetterBags Next's slider (next-settings.md §2), drawn from the theme
 -- (Controls.Slider): a track filled up to a thumb, pressed or dragged with the left button, and a
 -- number box after it to type a value; every value snapped to the step and kept in range. A change
@@ -58,7 +61,6 @@ end
 function nextSlider:Create(parent, opts)
   local frame = CreateFrame("Frame", nil, parent)
   local track = CreateFrame("Button", nil, frame)
-  track:SetPoint("LEFT", frame, "LEFT", 0, 0)
   local bar = track:CreateTexture(nil, "BACKGROUND")
   local fill = track:CreateTexture(nil, "ARTWORK")
   local thumb = track:CreateTexture(nil, "OVERLAY")
@@ -81,23 +83,31 @@ function nextSlider:Create(parent, opts)
   return s
 end
 
+-- Style lays the slider out in whole pixels (docs/next-pixel-perfect.md): the track and the value's box
+-- side by side, each centered on the slider's height by its top; the bar along the track's middle the
+-- same way.
 function sliderProto:Style()
   local S = controls:Theme("Slider")
   local input = controls:Theme("Input")
-  self.frame:SetSize(S.Width + S.ValueGap + S.ValueWidth, math.max(S.Height, input.Height))
-  self.track:SetSize(S.Width, S.Height)
+  local frame, track = self.frame, self.track
+  local width, gap, valueWidth = pixel:Lengths(frame, S.Width, S.ValueGap, S.ValueWidth)
+  pixel:Size(frame, width + gap + valueWidth, math.max(S.Height, input.Height))
+  pixel:Size(track, S.Width, S.Height)
+  track:ClearAllPoints()
+  pixel:Row(track, "TOPLEFT", frame, 0, frame:GetHeight())
+  pixel:Height(self.bar, S.TrackSize)
+  pixel:Height(self.fill, S.TrackSize)
+  pixel:Size(self.thumb, S.ThumbSize, S.ThumbSize)
+  local barTop = -pixel:Middle(track, track:GetHeight(), self.bar:GetHeight())
   self.bar:ClearAllPoints()
-  self.bar:SetPoint("LEFT", self.track, "LEFT", 0, 0)
-  self.bar:SetPoint("RIGHT", self.track, "RIGHT", 0, 0)
-  self.bar:SetHeight(S.TrackSize)
-  self.fill:SetHeight(S.TrackSize)
-  self.thumb:SetSize(S.ThumbSize, S.ThumbSize)
+  self.bar:SetPoint("TOPLEFT", track, "TOPLEFT", 0, barTop)
+  self.bar:SetPoint("TOPRIGHT", track, "TOPRIGHT", 0, barTop)
   controls:Paint(self.bar, S.Track)
   controls:Paint(self.fill, S.Fill)
   local box = self.value.frame
-  box:SetWidth(S.ValueWidth)
+  box:SetWidth(valueWidth)
   box:ClearAllPoints()
-  box:SetPoint("LEFT", self.track, "RIGHT", S.ValueGap, 0)
+  pixel:Row(box, "TOPLEFT", frame, width + gap, frame:GetHeight())
   self:Place()
 end
 
@@ -110,17 +120,19 @@ function sliderProto:snap(value)
   return math.max(o.min, math.min(o.max, snapped))
 end
 
--- Place puts the thumb at the value, the fill up to its middle, and the value in the box.
+-- Place puts the thumb at the value, the fill up to its middle, and the value in the box: the thumb's
+-- place rounded to whole pixels, centered on the track's height by its top.
 function sliderProto:Place()
   local S = controls:Theme("Slider")
   local o = self.opts
+  local track, thumb = self.track, self.thumb
   local share = o.max > o.min and (self.current - o.min) / (o.max - o.min) or 0
-  local x = (S.Width - S.ThumbSize) * share
-  self.thumb:ClearAllPoints()
-  self.thumb:SetPoint("LEFT", self.track, "LEFT", x, 0)
+  local x = pixel:Snap(track, (track:GetWidth() - thumb:GetWidth()) * share)
+  thumb:ClearAllPoints()
+  thumb:SetPoint("TOPLEFT", track, "TOPLEFT", x, -pixel:Middle(track, track:GetHeight(), thumb:GetHeight()))
   self.fill:ClearAllPoints()
-  self.fill:SetPoint("LEFT", self.track, "LEFT", 0, 0)
-  self.fill:SetWidth(math.max(1, x + S.ThumbSize / 2))
+  self.fill:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -pixel:Middle(track, track:GetHeight(), self.fill:GetHeight()))
+  pixel:Width(self.fill, math.max(1, x + pixel:Floor(track, thumb:GetWidth() / 2)))
   controls:Paint(self.thumb, (self.hovered or self.dragging) and S.ThumbHover or S.Thumb)
   self.value:SetText(self:Format(self.current))
 end

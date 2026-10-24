@@ -6,6 +6,13 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
+-- The room between the card's lines, from its title down: under the title, under the warning, under the
+-- slot.
+local UNDER_TITLE, UNDER_WARNING, UNDER_SLOT = 4, 10, 8
+
 -- NextDockCard is the card a dragged section waits in to be confirmed (NextDrag's dock, next.md §7)
 -- and the vendor's destroy card (automation.md §4): the theme's Dock fill, a glowing edge round it and
 -- a halo behind it, both pulsing, a title, a warning, a slot for what it holds and a hint under it.
@@ -42,25 +49,25 @@ function dockCard:Create(parent)
   title:SetJustifyH("LEFT")
   local warning = frame:CreateFontString(nil, "OVERLAY")
   warning:SetJustifyH("LEFT")
-  warning:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
-  warning:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -4)
   local slot = CreateFrame("Frame", nil, frame)
-  slot:SetPoint("TOPLEFT", warning, "BOTTOMLEFT", 0, -10)
   local hint = frame:CreateFontString(nil, "OVERLAY")
   hint:SetJustifyH("LEFT")
-  hint:SetPoint("TOPLEFT", slot, "BOTTOMLEFT", 0, -8)
   local card = setmetatable({ frame = frame, background = background, halo = halo, glow = glow, title = title,
     warning = warning, slot = slot, hint = hint }, { __index = cardProto })
   card:Style()
   return card
 end
 
--- Height is how tall a card holding something that tall is.
+-- Height is how tall a card on region's grid holding something that tall is: the sum of its parts, each
+-- in whole pixels (docs/next-pixel-perfect.md).
+---@param region ScriptRegion
 ---@param height number
 ---@return number
-function dockCard:Height(height)
+function dockCard:Height(region, height)
   local D = style.Theme.Dock
-  return D.Pad + D.TitleHeight + 4 + D.LineHeight + 10 + height + 8 + D.LineHeight + D.Pad
+  local pad, title, line = pixel:Lengths(region, D.Pad, D.TitleHeight, D.LineHeight)
+  local a, b, c = pixel:Lengths(region, UNDER_TITLE, UNDER_WARNING, UNDER_SLOT)
+  return pad + title + a + line + b + pixel:Length(region, height) + c + line + pad
 end
 
 -- Style draws the card from the theme (Dock): the fill (a texture spec), the edge round the card
@@ -78,6 +85,7 @@ function cardProto:Style(color)
       local w, side = G.Width, sides[i]
       edge:SetColorTexture(1, 1, 1, 1)
       edge:SetVertexColor(style:RGBA(color or G.Color))
+      w = pixel:Length(edge, w)
       if side == "TOP" or side == "BOTTOM" then
         local y = side == "TOP" and w or -w
         edge:SetPoint(side .. "LEFT", self.frame, side .. "LEFT", -w, y)
@@ -98,8 +106,9 @@ function cardProto:Style(color)
   self.halo:ClearAllPoints()
   if H then
     style:Paint(self.halo, { Texture = H.Texture, Color = color or H.Color, BlendMode = H.BlendMode or "ADD" })
-    self.halo:SetPoint("TOPLEFT", self.frame, "TOPLEFT", -H.Spread, H.Spread)
-    self.halo:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", H.Spread, -H.Spread)
+    local spread = pixel:Length(self.halo, H.Spread)
+    self.halo:SetPoint("TOPLEFT", self.frame, "TOPLEFT", -spread, spread)
+    self.halo:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", spread, -spread)
     self.halo:Show()
   else
     self.halo:Hide()
@@ -107,12 +116,23 @@ function cardProto:Style(color)
   style:SetFont(self.title, D.TitleFont)
   style:SetFont(self.warning, D.WarningFont)
   style:SetFont(self.hint, D.HintFont)
-  self.title:SetHeight(D.TitleHeight)
+  -- Each line under the one before by whole pixels: the title at the padding, the warning under it, the
+  -- slot under that and the hint under the slot (docs/next-pixel-perfect.md).
+  local frame = self.frame
+  local pad = pixel:Length(frame, D.Pad)
+  pixel:Height(self.title, D.TitleHeight)
   self.title:ClearAllPoints()
-  self.title:SetPoint("TOPLEFT", self.frame, "TOPLEFT", D.Pad, -D.Pad)
-  self.title:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -D.Pad, -D.Pad)
-  self.warning:SetHeight(D.LineHeight)
-  self.hint:SetHeight(D.LineHeight)
+  self.title:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad)
+  self.title:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -pad)
+  pixel:Height(self.warning, D.LineHeight)
+  pixel:Height(self.hint, D.LineHeight)
+  self.warning:ClearAllPoints()
+  pixel:Point(self.warning, "TOPLEFT", self.title, "BOTTOMLEFT", 0, -UNDER_TITLE)
+  pixel:Point(self.warning, "TOPRIGHT", self.title, "BOTTOMRIGHT", 0, -UNDER_TITLE)
+  self.slot:ClearAllPoints()
+  pixel:Point(self.slot, "TOPLEFT", self.warning, "BOTTOMLEFT", 0, -UNDER_WARNING)
+  self.hint:ClearAllPoints()
+  pixel:Point(self.hint, "TOPLEFT", self.slot, "BOTTOMLEFT", 0, -UNDER_SLOT)
 end
 
 -- SetText sets the card's title, warning and hint.
@@ -132,9 +152,10 @@ end
 ---@return number
 function cardProto:Size(width, height)
   local D = style.Theme.Dock
-  self.slot:SetSize(width, height)
-  local cardHeight = dockCard:Height(height)
-  self.frame:SetSize(width + D.Pad * 2, cardHeight)
+  local frame = self.frame
+  pixel:Size(self.slot, width, height)
+  local cardHeight = dockCard:Height(frame, height)
+  frame:SetSize(self.slot:GetWidth() + 2 * pixel:Length(frame, D.Pad), cardHeight)
   return cardHeight
 end
 

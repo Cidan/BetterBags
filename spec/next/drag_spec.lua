@@ -1576,4 +1576,99 @@ describe("NextDrag", function()
       assert.are.same({ { { "0_3" } } }, calls.moved)
     end)
   end)
+  -- BetterBags Next's small panels have a Bag Scale (docs/next-appearance-size.md): a drag reads where the
+  -- panel's frames are on screen, in UIParent's units, and the section keeps its size there.
+  describe("in a scaled panel", function()
+    local S = 0.5
+
+    before_each(function()
+      backpack.frame:SetScale(S)
+    end)
+
+    -- The panel's frames keep their rects in their own units (layout); on screen they are at S.
+    local function screen(frame, dx, dy)
+      return (frame:GetLeft() + (dx or 0)) * S, (frame:GetTop() - (dy or 0)) * S
+    end
+
+    local function centerOnScreen(frame)
+      local x, y = frame:GetCenter()
+      return x * S, y * S
+    end
+
+    local function pickUpScaled(name)
+      local s = section(backpack, name)
+      cursor(screen(s.frame, 20, 10))
+      _G._mouseButtonsDown = { LeftButton = true }
+      s.header:GetScript("OnDragStart")(s.header)
+      return s
+    end
+
+    it("lifts the section at its size on screen, the point grabbed under the cursor", function()
+      local herbs = pickUpScaled("Herbs")
+      assert.are.equal(S, herbs.frame:GetScale())
+      local cx, cy = _G._cursorX, _G._cursorY
+      finishTweens()
+      local s = herbs.frame:GetScale()
+      assert.is_true(math.abs(s - S * style.Theme.Drag.LiftScale) < 1e-9)
+      local _, _, _, ox, oy = herbs.frame:GetPoint(1)
+      assert.is_true(math.abs(ox * s + 20 * s - cx) < 1e-6, "x")
+      assert.is_true(math.abs(oy * s - 10 * s - cy) < 1e-6, "y")
+    end)
+
+    it("moves the gap under the cursor, read on screen", function()
+      local armor, cloth = section(backpack, "Armor"), section(backpack, "Cloth")
+      pickUpScaled("Herbs")
+      render:Flush()
+      moveTo(screen(armor.frame, 20, 5))
+      assert.are.equal(2, backpack.content.drag.index)
+      moveTo(screen(cloth.frame, 20, 5))
+      assert.are.equal(3, backpack.content.drag.index, "above Cloth's middle")
+    end)
+
+    it("lands in its gap at the panel's scale", function()
+      local armor = section(backpack, "Armor")
+      local herbs = pickUpScaled("Herbs")
+      moveTo(screen(armor.frame, 20, 5))
+      flush()
+      drop(herbs)
+      local canvas = backpack.content
+      local slotY = canvas:GetDragSlotY()
+      tween:Step(style.Time.Land - 0.001)
+      tween:Step(0.0005)
+      local s = herbs.frame:GetScale()
+      assert.is_true(math.abs(s - S) < 0.01, "back to the panel's scale: " .. s)
+      local _, _, _, ox, oy = herbs.frame:GetPoint(1)
+      assert.is_true(math.abs(ox * s - canvas.frame:GetLeft() * S) < 0.5)
+      assert.is_true(math.abs(oy * s - (canvas.frame:GetTop() - slotY) * S) < 0.5, "the gap's top: " .. oy * s)
+      finishTweens()
+      assert.are.same({ "Recent Items", "Herbs", "Armor", "Cloth", "Ore" }, sectionNames(backpack))
+    end)
+
+    it("flies into a tab, to its middle on screen", function()
+      local gems = backpack.tabs:Tab(2)
+      local herbs = pickUpScaled("Herbs")
+      local tx, ty = centerOnScreen(gems.button)
+      moveTo(tx, ty)
+      assert.are.equal(2, backpack.tabs.dropTarget)
+      drop(herbs)
+      tween:Step(style.Time.FlyAway - 0.0005)
+      local s = herbs.frame:GetScale()
+      local _, _, _, ox, oy = herbs.frame:GetPoint(1)
+      local state = nextDrag.current
+      assert.is_true(math.abs(ox * s + state.grabX * s - tx) < 1, "into the tab's middle")
+      assert.is_true(math.abs(oy * s - state.grabY * s - ty) < 1)
+      finishTweens()
+    end)
+
+    it("scrolls toward the edge it is held near, read on screen", function()
+      local box = backpack.scroll.scrollBox
+      local herbs = pickUpScaled("Herbs")
+      local x = screen(herbs.frame, 20)
+      moveTo(x, (style.FOOTER + 2) * S)
+      assert.is_true(box:GetDerivedScrollOffset() > 0, "near the bottom on screen")
+      local before = box:GetDerivedScrollOffset()
+      moveTo(x, 600 * S)
+      assert.are.equal(before, box:GetDerivedScrollOffset(), "the middle on screen")
+    end)
+  end)
 end)

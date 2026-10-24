@@ -114,6 +114,18 @@ function masque:OnEnable()
     skinVendor(b)
   end)
 
+  -- A card restyles itself on a grid it was not styled for (NextVendorButton:Fit), drawing its icon,
+  -- count and highlight over the skin: skinned again, so Masque's skin goes last, as after a theme.
+  events:RegisterMessage('vendor/Updated', function(_, b)
+    if not sonata:UsesMasque() then return end
+    local group = self.groups["Vendor"]
+    if self.added[b.button] == group then
+      group:ReSkin(b.button)
+    else
+      skinVendor(b)
+    end
+  end)
+
   -- A BetterBags Next theme can resize them (its icons and price row, next-themes.md §6), and Masque
   -- sizes a skin to the button when it skins it (Masque 12.1.0 Core.lua UpdateScale), so each Next
   -- theme applied skins them again. (Bag item buttons re-skin on item/Updated: a resized one draws in
@@ -205,6 +217,15 @@ function masque:OnEnable()
   end)
 
   print("BetterBags: Masque integration enabled.")
+end
+
+-- IsSkinned says whether Masque places a button's parts: the button is in one of BetterBags' Masque groups.
+-- A group turned off in Masque's options places them too, with Masque's base skin (Masque 12.1.0
+-- Core/Group.lua, __Disable). BetterBags Next's item fitter leaves those parts to Masque (next/itemfit.lua).
+---@param button Frame
+---@return boolean
+function masque:IsSkinned(button)
+  return self.added ~= nil and self.added[button] ~= nil
 end
 
 ---@param button Button|ItemButton

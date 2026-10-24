@@ -15,6 +15,9 @@ local controls = addon:GetModule('NextControls')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextTopTabs is the row of tabs across a settings page (next-settings.md §2), drawn from the theme
 -- (Controls.TopTabs): labels left to right, Gap apart, the chosen one in its font and underlined by a
 -- marker that glides to the tab chosen, over a line under them all.
@@ -87,7 +90,6 @@ function tabsProto:tab(i)
   local frame = CreateFrame("Button", nil, self.frame)
   frame:RegisterForClicks("LeftButtonUp")
   local label = frame:CreateFontString(nil, "OVERLAY")
-  label:SetPoint("CENTER", frame, "CENTER", 0, 0)
   tab = { frame = frame, label = label, hovered = false }
   style:SetFont(label, controls:Theme("TopTabs").Font)
   addon.SetScript(frame, "OnClick", function(ctx) self:Click(ctx, tab) end)
@@ -119,27 +121,30 @@ function tabsProto:GetSelected()
   return self.selected
 end
 
--- Style lays the tabs out and draws them, the marker under the chosen one.
+-- Style lays the tabs out and draws them, the marker under the chosen one, all in whole pixels
+-- (docs/next-pixel-perfect.md).
 function tabsProto:Style()
   local T = controls:Theme("TopTabs")
-  self.frame:SetHeight(T.Height)
+  local frame = self.frame
+  pixel:Height(frame, T.Height)
   self.line:ClearAllPoints()
-  self.line:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 0, 0)
-  self.line:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 0)
-  self.line:SetHeight(T.Line.Size or 1)
+  self.line:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+  self.line:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+  pixel:Height(self.line, T.Line.Size or 1)
   controls:Paint(self.line, T.Line)
-  self.marker:SetHeight(T.Indicator.Height)
+  pixel:Height(self.marker, T.Indicator.Height)
   controls:Paint(self.marker, { Color = T.Indicator.Color })
+  local gap = pixel:Snap(frame, T.Gap)
   local previous
   for i = 1, #self.list do
     local tab = self.tabs[i]
     tab.frame:ClearAllPoints()
     if previous == nil then
-      tab.frame:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 0, 0)
+      tab.frame:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
     else
-      tab.frame:SetPoint("BOTTOMLEFT", previous.frame, "BOTTOMRIGHT", T.Gap, 0)
+      tab.frame:SetPoint("BOTTOMLEFT", previous.frame, "BOTTOMRIGHT", gap, 0)
     end
-    tab.frame:SetHeight(T.Height)
+    tab.frame:SetHeight(frame:GetHeight())
     previous = tab
   end
   self:Paint()
@@ -160,7 +165,10 @@ function tabsProto:Paint()
       font = T.HoverFont
     end
     style:SetFont(tab.label, font)
-    tab.frame:SetWidth(math.ceil(tab.label:GetStringWidth()))
+    -- As wide as its label rounded up to whole pixels, the label by its top left, centered on its height.
+    tab.frame:SetWidth(pixel:Ceil(tab.frame, tab.label:GetStringWidth()))
+    tab.label:ClearAllPoints()
+    pixel:Row(tab.label, "TOPLEFT", tab.frame, 0, pixel:Length(tab.frame, T.Height))
   end
 end
 
@@ -170,14 +178,14 @@ end
 ---@return number x, number width
 function tabsProto:placeOf(id)
   local T = controls:Theme("TopTabs")
-  local x = 0
+  local x, gap = 0, pixel:Snap(self.frame, T.Gap)
   for i = 1, #self.list do
     local tab = self.tabs[i]
     local width = tab.frame:GetWidth()
     if tab.id == id then
       return x, width
     end
-    x = x + width + T.Gap
+    x = x + width + gap
   end
   return 0, 0
 end

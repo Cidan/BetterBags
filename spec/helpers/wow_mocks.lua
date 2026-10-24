@@ -172,6 +172,9 @@ local function rejectSecret(api, ...)
 end
 
 local WidgetMethods = {}
+-- For helpers that model more of the client while a spec asks (spec/helpers/layout.lua: sizes from
+-- anchors while a screen is set up).
+_G.__mockWidgetMethods = WidgetMethods
 local ItemButtonMethods = {}
 local CreateMockWidget
 
@@ -297,6 +300,27 @@ end
 function WidgetMethods:GetChildren()
   return unpack(self._children)
 end
+-- Frame:GetRegions() -> the frame's regions (SimpleFrameAPIDocumentation): its textures and lines, its font
+-- strings, and the state art and template textures the mock makes when first read (LAZY_TEXTURES; a button's
+-- normal, pushed, highlight, disabled and checked textures), each once.
+local STATE_TEXTURES = { "NormalTexture", "PushedTexture", "HighlightTexture", "DisabledTexture", "CheckedTexture",
+  "NewItemTexture", "BattlepayItemTexture", "ItemContextOverlay", "UpgradeIcon" }
+function WidgetMethods:GetRegions()
+  local list, seen = {}, {}
+  local function add(region)
+    if not seen[region] then
+      seen[region] = true
+      table.insert(list, region)
+    end
+  end
+  for _, t in ipairs(self._textures or {}) do add(t) end
+  for _, key in ipairs(STATE_TEXTURES) do
+    local t = rawget(self, key)
+    if type(t) == "table" and t._type ~= nil and t._parent == self then add(t) end
+  end
+  for _, f in ipairs(self._fontstrings or {}) do add(f) end
+  return unpack(list)
+end
 function WidgetMethods:GetParent()
   return self._parent
 end
@@ -355,6 +379,14 @@ function WidgetMethods:GetRect()
   if self._rect == nil then return end
   return self._rect.left, self._rect.bottom, self:GetWidth(), self:GetHeight()
 end
+-- ScriptRegion:GetScaledRect() -> GetRect times the effective scale (warcraft.wiki.gg GetRect; Blizzard's
+-- RegionUtil.GetRegionPoint divides it by GetEffectiveScale). spec/helpers/layout.lua works it out from
+-- anchors while a screen is set up.
+function WidgetMethods:GetScaledRect()
+  if self._rect == nil then return end
+  local s = self:GetEffectiveScale()
+  return self._rect.left * s, self._rect.bottom * s, self:GetWidth() * s, self:GetHeight() * s
+end
 -- ScriptRegion:IsMouseOver(offsetTop, offsetBottom, offsetLeft, offsetRight)
 -- (SimpleScriptRegionAPIDocumentation): whether the cursor (GetCursorPosition, in the region's
 -- scale) is inside the region's rect moved out by the offsets; Blizzard enlarges it with
@@ -409,6 +441,11 @@ end
 function WidgetMethods:SetPoint(point, relativeTo, relativePoint, x, y)
   if type(relativePoint) == "string" and (x == nil) ~= (y == nil) then
     error("SetPoint: offsetX and offsetY must be given together, got " .. tostring(x) .. ", " .. tostring(y), 2)
+  end
+  -- SetPoint(point, offsetX, offsetY): relative to the parent, at the same point (warcraft.wiki.gg
+  -- ScriptRegionResizing:SetPoint); GetPoint then names the parent and the point.
+  if type(relativeTo) == "number" then
+    relativeTo, relativePoint, x, y = self:GetParent(), point, relativeTo, relativePoint
   end
   -- A region has one anchor per point: setting a point again replaces it (warcraft.wiki.gg's
   -- SetPoint example sets the same point several times "with the same result").
@@ -534,6 +571,30 @@ function WidgetMethods:CreateTexture(textureName, drawLayer, inherits, subLevel)
   table.insert(self._textures, tex)
   return tex
 end
+-- Cooldown:GetCountdownFontString() -> the font string a cooldown draws its countdown numbers in
+-- (FrameAPICooldownDocumentation: never nil). The client makes it as one of the cooldown's regions, hung by its
+-- middle from the cooldown's middle: a pixel check report in game listed it as the cooldown's font string, its one
+-- point CENTER, its middle exactly at the middle of the frame Masque had centered on the button.
+function WidgetMethods:GetCountdownFontString()
+  local text = rawget(self, "_countdown")
+  if text == nil then
+    text = self:CreateFontString()
+    text:SetPoint("CENTER", self, "CENTER", 0, 0)
+    text:SetFontObject(GameFontNormal)
+    rawset(self, "_countdown", text)
+  end
+  return text
+end
+-- Frame:CreateMaskTexture(name, drawLayer, templateName, subLevel) (SimpleFrameAPIDocumentation) makes a
+-- MaskTexture, one of the frame's regions (Masque masks icons with them, Core/Regions/Mask.lua).
+function WidgetMethods:CreateMaskTexture(textureName, drawLayer, inherits, subLevel)
+  local mask = CreateMockWidget("MaskTexture", textureName, self)
+  mask._drawLayer = drawLayer
+  mask._sublevel = subLevel
+  mask._inherits = inherits
+  table.insert(self._textures, mask)
+  return mask
+end
 -- Frame:CreateLine(name, drawLayer, templateName, subLevel) (SimpleFrameAPIDocumentation) makes a
 -- Line: a texture drawn from a start point to an end point (SimpleLineAPIDocumentation, on the
 -- live, forever, classic, classic_era and classic_anniversary branches). SetStartPoint and
@@ -589,21 +650,30 @@ end
 function WidgetMethods:SetNormalTexture(texture)
   setStateTexture(self, "GetNormalTexture", "NormalTexture", texture, "SetNormalTexture")
 end
+-- A button's state region (its normal, pushed, highlight or disabled texture) fills the button unless
+-- anchored otherwise: Blizzard sets a button's state textures to an icon and never anchors them
+-- (Blizzard_CharacterCreate.lua CharacterCreateSpecButtonMixin:SetSpec), and an XML <NormalTexture>
+-- without anchors fills its button.
+local function stateRegion(button)
+  local tex = CreateMockWidget("Texture", nil, button)
+  tex:SetAllPoints(button)
+  return tex
+end
 function WidgetMethods:GetNormalTexture()
   if (not rawget(self, "NormalTexture") or type(rawget(self, "NormalTexture")) == "string") and self._type ~= "Texture" then
-    self.NormalTexture = CreateMockWidget("Texture", nil, self)
+    self.NormalTexture = stateRegion(self)
   end
   return self.NormalTexture
 end
 function WidgetMethods:GetPushedTexture()
   if not rawget(self, "PushedTexture") and self._type ~= "Texture" then
-    self.PushedTexture = CreateMockWidget("Texture", nil, self)
+    self.PushedTexture = stateRegion(self)
   end
   return self.PushedTexture
 end
 function WidgetMethods:GetHighlightTexture()
   if not rawget(self, "HighlightTexture") and self._type ~= "Texture" then
-    self.HighlightTexture = CreateMockWidget("Texture", nil, self)
+    self.HighlightTexture = stateRegion(self)
   end
   return self.HighlightTexture
 end
@@ -622,7 +692,7 @@ function WidgetMethods:SetPushedTexture(texture)
 end
 function WidgetMethods:GetDisabledTexture()
   if not self.DisabledTexture and self._type ~= "Texture" then
-    self.DisabledTexture = CreateMockWidget("Texture", nil, self)
+    self.DisabledTexture = stateRegion(self)
   end
   return self.DisabledTexture
 end
@@ -789,8 +859,43 @@ function WidgetMethods:DoesClipChildren()
   return self._clipsChildren == true
 end
 -- GetPhysicalScreenSize() -> sizeX, sizeY (ScreenDocumentation.lua; Blizzard's PixelUtil calls it on
--- every client).
-_G.GetPhysicalScreenSize = function() return 1920, 1080 end
+-- every client). By default a screen 768 pixels high: at a UI scale of 1 a UI unit is then exactly a
+-- screen pixel (PixelUtil.GetPixelToUIUnitFactor is 768 over the height), so specs of layouts in units
+-- see them unchanged by BetterBags Next's pixel grid (docs/next-pixel-perfect.md). Specs of the pixel
+-- grid set real screens (spec/helpers/layout.lua, UseScreen).
+_G.GetPhysicalScreenSize = function() return 1920, 768 end
+-- Round(value) (Blizzard_SharedXMLBase/MathUtil.lua: Classic's, half away from zero; live is math.round)
+-- and PixelUtil (Blizzard_SharedXML/PixelUtil.lua, every client), as Blizzard writes them.
+_G.Round = _G.Round or function(value)
+  if value < 0.0 then
+    return math.ceil(value - .5)
+  end
+  return math.floor(value + .5)
+end
+_G.PixelUtil = _G.PixelUtil or {}
+function _G.PixelUtil.GetPixelToUIUnitFactor()
+  local _, physicalHeight = GetPhysicalScreenSize()
+  return 768.0 / physicalHeight
+end
+function _G.PixelUtil.GetNearestPixelSize(uiUnitSize, layoutScale, minPixels)
+  if uiUnitSize == 0 and (not minPixels or minPixels == 0) then
+    return 0
+  end
+  local uiUnitFactor = PixelUtil.GetPixelToUIUnitFactor()
+  local numPixels = Round((uiUnitSize * layoutScale) / uiUnitFactor)
+  if minPixels then
+    if uiUnitSize < 0.0 then
+      if numPixels > -minPixels then
+        numPixels = -minPixels
+      end
+    else
+      if numPixels < minPixels then
+        numPixels = minPixels
+      end
+    end
+  end
+  return numPixels * uiUnitFactor / layoutScale
+end
 -- Region:GetEffectiveScale() -> the frame's scale times every parent's.
 function WidgetMethods:GetEffectiveScale()
   local scale = self:GetScale()
@@ -1399,18 +1504,36 @@ end
 -- ItemButtonMixin's SetMatchesSearch / GetMatchesSearch: a button that does not match shows its
 -- ItemContextOverlay (UpdateItemContextOverlay, the Standard mode: black at 0.8).
 function _G.__mockItemButtonParts(button, intrinsic)
+  -- Anchored as the XML anchors them (Shared/ItemButtonTemplate.xml): the icon, with no anchor and no size,
+  -- fills the button; the count at the bottom right, -5, 2; the stock at the top left, 0, -2; the search
+  -- overlay all over; the border and the overlays 37 x 37 at the middle.
   button.icon = button:CreateTexture(nil, "BORDER")
+  button.icon:SetAllPoints(button)
   button.Count = button:CreateFontString(nil, "ARTWORK", "NumberFontNormal")
+  button.Count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -5, 2)
   button.Count:Hide()
+  button.Stock = button:CreateFontString(nil, "ARTWORK", "NumberFontNormalYellow")
+  button.Stock:SetPoint("TOPLEFT", button, "TOPLEFT", 0, -2)
+  button.Stock:Hide()
   button.searchOverlay = button:CreateTexture(nil, "OVERLAY")
+  button.searchOverlay:SetAllPoints(button)
   button.searchOverlay:Hide()
   button.IconBorder = button:CreateTexture(nil, "OVERLAY")
   button.IconBorder:SetTexture("Interface\\Common\\WhiteIconFrame")
+  button.IconBorder:SetSize(37, 37)
+  button.IconBorder:SetPoint("CENTER", button, "CENTER", 0, 0)
   button.IconBorder:Hide()
   button.IconOverlay = button:CreateTexture(nil, "OVERLAY")
+  button.IconOverlay:SetSize(37, 37)
+  button.IconOverlay:SetPoint("CENTER", button, "CENTER", 0, 0)
   button.IconOverlay:Hide()
+  button.IconOverlay2 = button:CreateTexture(nil, "OVERLAY")
+  button.IconOverlay2:SetSize(37, 37)
+  button.IconOverlay2:SetPoint("CENTER", button, "CENTER", 0, 0)
+  button.IconOverlay2:Hide()
   if intrinsic then
     button.ItemContextOverlay = button:CreateTexture(nil, "OVERLAY")
+    button.ItemContextOverlay:SetAllPoints(button)
     button.ItemContextOverlay:Hide()
     function button:SetMatchesSearch(matchesSearch)
       self.matchesSearch = matchesSearch
@@ -1429,6 +1552,37 @@ _G.__mockTemplates = _G.__mockTemplates or {}
 
 _G.__mockTemplates.ItemButtonTemplate = function(frame)
   _G.__mockItemButtonParts(frame, false)
+end
+
+-- UIPanelButtonTemplate (Blizzard_SharedXML/SecureUIPanelTemplates.xml, UIPanelButtonNoTooltipTemplate,
+-- which it inherits): 40 x 22; its art in three pieces of UI-Panel-Button-Up, Left and Right 12 wide down
+-- its ends, Middle between them; its text (ButtonText, parentKey Text) in GameFontNormal at its middle (a
+-- ButtonText the XML gives no anchor is centered by the client); its highlight filling it.
+_G.__mockTemplates.UIPanelButtonTemplate = function(frame)
+  frame:SetSize(40, 22)
+  local function piece(key, coords)
+    local t = frame:CreateTexture(nil, "BACKGROUND")
+    t:SetTexture("Interface\\Buttons\\UI-Panel-Button-Up")
+    t:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+    t:SetSize(12, 22)
+    frame[key] = t
+    return t
+  end
+  local left = piece("Left", { 0, 0.09375, 0, 0.6875 })
+  left:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+  left:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+  local right = piece("Right", { 0.53125, 0.625, 0, 0.6875 })
+  right:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+  right:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+  local middle = piece("Middle", { 0.09375, 0.53125, 0, 0.6875 })
+  middle:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
+  middle:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT", 0, 0)
+  local text = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  text:SetPoint("CENTER", frame, "CENTER", 0, 0)
+  frame.Text = text
+  frame:SetFontString(text)
+  frame:SetHighlightTexture("Interface\\Buttons\\UI-Panel-Button-Highlight", "ADD")
+  frame:GetHighlightTexture():SetAllPoints(frame)
 end
 
 -- WowScrollBox (Blizzard_SharedXML/Shared/Scroll/ScrollBox.lua, ScrollBox.xml): a ScrollTarget
@@ -1529,10 +1683,20 @@ _G.__mockTemplates.WowScrollBox = function(frame)
     self:TriggerEvent(BaseScrollBoxEvents.OnScroll, self:GetScrollPercentage(), self:GetVisibleExtentPercentage(),
       self:CalculatePanExtentPercentage())
   end
+  -- ScrollBoxBaseMixin:SetScrollTargetOffset(offset): the scroll target TOPLEFT and TOPRIGHT of the box,
+  -- offset up (a linear view without padding), then OnScroll. ScrollBoxMixin:Update calls it with the
+  -- derived scroll offset (less the view's upper padding, none here) every time the box scrolls or lays
+  -- out (ScrollBox.lua).
+  function frame:SetScrollTargetOffset(offset)
+    local target = self:GetScrollTarget()
+    target:SetPoint("TOPLEFT", self, "TOPLEFT", 0, offset)
+    target:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, offset)
+    self:sendScroll()
+  end
   function frame:SetScrollPercentage(percentage, noInterpolation)
     self._noInterpolation = noInterpolation
     self._scrollPercentage = math.max(0, math.min(1, percentage))
-    self:sendScroll()
+    self:SetScrollTargetOffset(self:GetDerivedScrollOffset())
   end
   function frame:ScrollToOffset(offset, noInterpolation)
     local range = self:GetDerivedScrollRange()
@@ -1555,7 +1719,7 @@ _G.__mockTemplates.WowScrollBox = function(frame)
     self._fullUpdates = (self._fullUpdates or 0) + 1
     self._lastFullUpdateImmediate = immediately
     self:layoutScrollChildren()
-    self:sendScroll()
+    self:SetScrollTargetOffset(self:GetDerivedScrollOffset())
   end
 end
 
@@ -2082,8 +2246,9 @@ _G.issecurevariable = function()
 end
 _G.UIParent = CreateMockWidget("Frame", "UIParent")
 _G.UIParent:SetSize(1920, 1200)
+-- UIParent's effective scale is its own scale, the UI scale (it has no parent that scales it).
 function _G.UIParent:GetEffectiveScale()
-  return 1.0
+  return self:GetScale()
 end
 
 _G.C_Timer = {

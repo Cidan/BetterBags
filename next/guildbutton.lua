@@ -165,6 +165,14 @@ function buttonProto:SetSize(ctx, width, height)
   self.button.IconBorder:SetSize(width, height)
 end
 
+-- PixelParts names what BetterBags Next puts on whole screen pixels of the button (NextItemFit,
+-- docs/next-pixel-perfect.md): the button itself (Blizzard's item button), and its item level text and
+-- upgrade arrow from their corners.
+---@return Frame decoration, Region[] extras
+function buttonProto:PixelParts()
+  return self.button, { self.itemLevel, self.upgrade }
+end
+
 ---@return ItemData?
 function buttonProto:GetItemData()
   return self.data
@@ -232,6 +240,13 @@ function buttonProto:drawItemLevel(info)
     self.itemLevel:SetTextColor(1, 1, 1, 1)
   end
   self.itemLevel:Show()
+end
+
+-- Restyled says the theme styled the button again (NextItemFit, on a grid it was not styled on): guild/Updated,
+-- as after a draw, so Masque skins it again over the theme's parts.
+---@param ctx Context
+function buttonProto:Restyled(ctx)
+  events:SendMessage(ctx, 'guild/Updated', self)
 end
 
 -- SetFreeSlots draws a Free Space entry: an empty slot of a tab shown by itself (nocount), or a tab's

@@ -683,6 +683,40 @@ define('opacity', {
   end,
 })
 
+-- BetterBags Next's Size tab (docs/next-appearance-size.md). The panels size themselves on
+-- next/ScalesChanged: nothing is read or recalculated.
+define('nextIconScale', {
+  kind = "slider",
+  title = 'Icon Scale',
+  description = "How big item buttons are in BetterBags Next's bags, in percent of the theme's size. "
+    .. 'A row fits as many as its width allows.',
+  keywords = { 'size', 'icon', 'button', 'item', 'zoom', 'per row' },
+  min = 50,
+  max = 150,
+  step = 5,
+  get = function() return db:GetNextIconScale() end,
+  set = function(ctx, value)
+    db:SetNextIconScale(value)
+    events:SendMessage(ctx, 'next/ScalesChanged')
+  end,
+})
+
+define('nextBagScale', {
+  kind = "slider",
+  title = 'Bag Scale',
+  description = "The scale of BetterBags Next's small bags, in percent. Full-height bags on the edges of "
+    .. 'the screen keep their size.',
+  keywords = { 'size', 'scale', 'zoom', 'small', 'window' },
+  min = 50,
+  max = 150,
+  step = 5,
+  get = function() return db:GetNextBagScale() end,
+  set = function(ctx, value)
+    db:SetNextBagScale(value)
+    events:SendMessage(ctx, 'next/ScalesChanged')
+  end,
+})
+
 define('scale', {
   kind = "slider",
   bag = true,

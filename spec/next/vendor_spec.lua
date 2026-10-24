@@ -371,7 +371,7 @@ describe("NextVendor", function()
       eventsRegistered["MERCHANT_SHOW"](ctx())
       assert.is_true(v.repairAllButton:IsShown())
       assert.is_false(v.guildRepairButton:IsShown())
-      assert.are.same({ "LEFT", v.sellJunkButton, "RIGHT", 8, 0 }, { v.repairAllButton:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", v.sellJunkButton, "TOPRIGHT", 8, 0 }, { v.repairAllButton:GetPoint(1) })
     end)
 
     it("keeps the vendor's name to the room right of its shown buttons, on one line", function()
@@ -404,7 +404,7 @@ describe("NextVendor", function()
       _G._gameRules[Enum.GameRule.MerchantFilterDisabled] = true
       local v = open()
       assert.is_false(v.filterButton:IsShown())
-      assert.are.same({ "LEFT", v.settingsButton, "RIGHT", 8, 0 }, { v.sellJunkButton:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", v.settingsButton, "TOPRIGHT", 8, 0 }, { v.sellJunkButton:GetPoint(1) })
     end)
   end)
 
@@ -1267,5 +1267,59 @@ describe("NextVendor", function()
       MerchantFrame:Hide()
       assert.are.equal(before + 1, #timers, "one hook")
     end)
+  end)
+
+  -- BetterBags Next, pixel perfect (docs/next-pixel-perfect.md): every view of the vendor, at rest, on
+  -- whole screen pixels, full and small, on the reporter's window at 65% and on a common screen.
+  describe("on the screen's pixels", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local undo
+
+    after_each(function()
+      if undo then undo() undo = nil end
+    end)
+
+    -- What moves by nature lands on the grid only by chance (spec/next/pixel_perfect_spec.lua).
+    local function offGrid(v)
+      for _ = 1, 3 do
+        finishTweens()
+        render:Flush()
+        motion:Step(10)
+      end
+      local skip = { [v.spark] = true, [v.braid.layer] = true }
+      for _, key in ipairs({ "sparkles", "edgeSparkles", "cloudSparkles", "knotSparkles" }) do
+        if v[key] ~= nil then skip[v[key].frame] = true end
+      end
+      for _, puff in ipairs(v.cloud.puffs) do skip[puff.texture] = true end
+      return layout.PixelCheck(v.frame, { owners = { vendor = v }, skip = skip })
+    end
+
+    for _, size in ipairs({ "full", "small" }) do
+      for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 1920, 1080, 1 } }) do
+        local name = string.format("%s, on %dx%d at %d%%", size, screen[1], screen[2], screen[3] * 100)
+        it("draws its buy, buyback and repair views on whole pixels, " .. name, function()
+          override(stubs.database, "GetNextSize", function() return size end)
+          -- A small vendor's place, size and chain (docs/next-small-mode.md): the defaults.
+          override(stubs.database, "GetNextBagScale", function() return 100 end)
+          override(stubs.database, "GetNextSmallChain", function() return "apart" end)
+          override(stubs.database, "GetNextSmallPlace", function() return nil end)
+          override(stubs.database, "GetNextSmallSize", function() return nil end)
+          undo = layout.UseScreen(screen[1], screen[2], screen[3])
+          _G._merchant.canRepair = true
+          local v = open()
+          assert.is_true(#v.content.order > 0)
+          assert.are.same({}, offGrid(v), "buy")
+          click(v.tabs.tabs[2].button)
+          assert.are.same({}, offGrid(v), "buyback")
+          click(v.tabs.tabs[3].button)
+          assert.are.same({}, offGrid(v), "repair")
+          data.buyback = {}
+          click(v.tabs.tabs[2].button)
+          eventsRegistered["MERCHANT_UPDATE"](ctx())
+          assert.is_true(v.emptyText:IsShown())
+          assert.are.same({}, offGrid(v), "nothing sold")
+        end)
+      end
+    end
   end)
 end)

@@ -15,6 +15,12 @@ local nextScrollBar = addon:GetModule('NextScrollBar')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
+---@class PixelAudit: AceModule
+local pixelAudit = addon:GetModule('PixelAudit')
+
 -- NextMenu is BetterBags Next's menu of choices (next-settings.md §2): one at a time, drawn from the
 -- theme (Controls.Menu), below what opened it, over everything (FULLSCREEN_DIALOG), a row per
 -- choice, the chosen one checked, scrolling past MaxRows. A click picks a choice and closes it; a
@@ -79,6 +85,7 @@ function nextMenu:build()
   self.edge = controls:CreateEdge(frame)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
+  pixel:SnapScroll(box)
   local list = CreateFrame("Frame", nil, box)
   list.scrollable = true
   local view = CreateScrollBoxLinearView()
@@ -97,6 +104,7 @@ function nextMenu:build()
   addon.SetScript(frame, "OnHide", function() self:hidden() end)
   self.frame, self.box, self.list, self.catcher = frame, box, list, catcher
   sonataNext:RegisterWidget(self)
+  pixelAudit:Register(frame, { title = "Menu", owners = { menu = self } })
 end
 
 -- row returns the i-th row, made the first time it is needed.
@@ -232,16 +240,20 @@ end
 
 -- Style lays the rows out and draws the menu: as wide as the widest choice (at least its anchor and
 -- opts.width), MaxRows tall at most.
+-- All in whole pixels on its own grid (UIParent's: docs/next-pixel-perfect.md), its anchor's width in its
+-- units (the anchor may be in a window drawn smaller): its rows one ItemHeight apart, a check and a label
+-- on each centered by its top.
 function nextMenu:Style()
   local M = controls:Theme("Menu")
   local frame, items = self.frame, self.items
   frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", self.anchor, "BOTTOMLEFT", 0, -M.Gap)
+  pixel:Point(frame, "TOPLEFT", self.anchor, "BOTTOMLEFT", 0, -M.Gap)
   frame:SetFrameLevel(self.catcher:GetFrameLevel() + 2)
   controls:Paint(self.fill, M.Fill)
   controls:PaintEdge(self.edge, M.Edge)
   local check = M.Check
-  local textLeft = M.Padding + check.Size + M.Padding
+  local pad, itemHeight, checkSize = pixel:Lengths(frame, M.Padding, M.ItemHeight, check.Size)
+  local textLeft = pad + checkSize + pad
   local widest = 0
   for i, item in ipairs(items) do
     local row = self:row(i)
@@ -258,17 +270,17 @@ function nextMenu:Style()
     controls:Paint(row.hover, M.HoverFill)
     row.hover:Hide()
     controls:Paint(row.check, { Texture = check.Texture, Color = check.Color })
-    row.check:SetSize(check.Size, check.Size)
+    row.check:SetSize(checkSize, checkSize)
     row.check:ClearAllPoints()
-    row.check:SetPoint("LEFT", row.frame, "LEFT", M.Padding, 0)
+    pixel:Row(row.check, "TOPLEFT", row.frame, pad, itemHeight)
     row.check:SetShown(item.selected == true)
     row.label:ClearAllPoints()
-    row.label:SetPoint("LEFT", row.frame, "LEFT", textLeft, 0)
-    row.label:SetPoint("RIGHT", row.frame, "RIGHT", -M.Padding, 0)
+    pixel:Row(row.label, "TOPLEFT", row.frame, textLeft, itemHeight)
+    pixel:Row(row.label, "TOPRIGHT", row.frame, pad, itemHeight)
     row.frame:ClearAllPoints()
-    row.frame:SetPoint("TOPLEFT", self.list, "TOPLEFT", 0, -(i - 1) * M.ItemHeight)
-    row.frame:SetPoint("TOPRIGHT", self.list, "TOPRIGHT", 0, -(i - 1) * M.ItemHeight)
-    row.frame:SetHeight(M.ItemHeight)
+    row.frame:SetPoint("TOPLEFT", self.list, "TOPLEFT", 0, -(i - 1) * itemHeight)
+    row.frame:SetPoint("TOPRIGHT", self.list, "TOPRIGHT", 0, -(i - 1) * itemHeight)
+    row.frame:SetHeight(itemHeight)
     row.frame:Show()
   end
   for i = #items + 1, #self.rows do
@@ -280,13 +292,13 @@ function nextMenu:Style()
   local S = controls:Theme("ScrollBar")
   -- The rows sit in a list inset Padding on both sides: the menu holds that, the text's left, the
   -- widest text and the room right of it.
-  local width = math.ceil(2 * M.Padding + textLeft + widest + M.Padding + (scrolls and (S.Width + S.Inset) or 0))
-  width = math.max(width, self.anchor:GetWidth(), self.opts.width or 0)
-  frame:SetSize(width, shown * M.ItemHeight + 2 * M.Padding)
-  self.box:ClearAllPoints()
-  self.box:SetPoint("TOPLEFT", frame, "TOPLEFT", M.Padding, -M.Padding)
-  self.box:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -M.Padding, M.Padding)
-  self.list:SetHeight(#items * M.ItemHeight)
+  local bar = scrolls and (pixel:Length(frame, S.Width) + pixel:Length(frame, S.Inset)) or 0
+  local width = 2 * pad + textLeft + pixel:Ceil(frame, widest) + pad + bar
+  local anchorWidth = self.anchor:GetWidth() * self.anchor:GetEffectiveScale() / frame:GetEffectiveScale()
+  width = math.max(width, pixel:Ceil(frame, anchorWidth), pixel:Ceil(frame, self.opts.width or 0))
+  frame:SetSize(width, shown * itemHeight + 2 * pad)
+  pixel:Inset(self.box, frame, pad, pad, pad, pad)
+  self.list:SetHeight(#items * itemHeight)
   self.box:FullUpdate(true)
   self.box:SetScrollPercentage(0, true)
 end

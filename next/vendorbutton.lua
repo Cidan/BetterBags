@@ -27,6 +27,12 @@ local style = addon:GetModule('NextStyle')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
+-- How far in from the icon's corners the stack count and the stock sit.
+local COUNT_INSET = 2
+
 -- NextVendorButton is a button of BetterBags Next's vendor (next.md §10): an item for sale, a
 -- buyback, or an item to repair. It shows the icon, stack size, stock, quality, the quest mark, what
 -- makes it unusable or sold out (as Blizzard's MerchantFrame_UpdateMerchantInfo tints them), and, on
@@ -146,10 +152,8 @@ local function newButton()
   durability:SetColorTexture(1, 1, 1, 1)
   durability:Hide()
   local count = button:CreateFontString(nil, "OVERLAY")
-  count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
   button.Count = count
   local stock = button:CreateFontString(nil, "OVERLAY")
-  stock:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
   local name = frame:CreateFontString(nil, "OVERLAY")
   local price = frame:CreateFontString(nil, "OVERLAY")
   ---@type NextVendorButtonFrame
@@ -174,18 +178,30 @@ end
 -- price in their roles.
 function buttonProto:Style()
   local V = style.Theme.Vendor
-  self.frame:SetSize(style.VENDOR_CARD_WIDTH, style.ICON)
-  self.button:SetSize(style.ICON, style.ICON)
-  self.icon:SetSize(style.ICON, style.ICON)
-  local gap = style.VENDOR_TEXT_GAP
-  local textWidth = style.VENDOR_CARD_WIDTH - style.ICON - 2 * gap
+  -- In whole pixels on the grid it is drawn on (docs/next-pixel-perfect.md); Fit styles it again when
+  -- that changes (a card is made before the canvas it goes in).
+  local frame = self.frame
+  self.unit = pixel:Unit(frame)
+  -- A card keeps the theme's icon size (CARD_ICON): Icon Scale is the bags' item buttons'
+  -- (docs/next-appearance-size.md), and a smaller icon would not fit two lines of name beside it.
+  local icon, width = pixel:Lengths(frame, style.CARD_ICON, style.VENDOR_CARD_WIDTH)
+  frame:SetSize(width, icon)
+  self.button:SetSize(icon, icon)
+  self.icon:SetSize(icon, icon)
+  local gap = pixel:Snap(frame, style.VENDOR_TEXT_GAP)
+  local textWidth = width - icon - 2 * gap
   local name, price = self.name, self.price
   name:ClearAllPoints()
   name:SetPoint("TOPLEFT", self.button, "TOPRIGHT", gap, 0)
   name:SetWidth(textWidth)
   price:ClearAllPoints()
-  price:SetPoint("BOTTOMLEFT", self.button, "BOTTOMRIGHT", gap, style.VENDOR_PRICE_RAISE)
+  price:SetPoint("BOTTOMLEFT", self.button, "BOTTOMRIGHT", gap, pixel:Snap(frame, style.VENDOR_PRICE_RAISE))
   price:SetWidth(textWidth)
+  local inset = pixel:Snap(frame, COUNT_INSET)
+  self.count:ClearAllPoints()
+  self.count:SetPoint("BOTTOMRIGHT", self.icon, "BOTTOMRIGHT", -inset, inset)
+  self.stock:ClearAllPoints()
+  self.stock:SetPoint("TOPLEFT", self.icon, "TOPLEFT", inset, -inset)
   self.cardFill:SetShown(V.CardFill and true or false)
   if V.CardFill then
     self.cardFill:SetVertexColor(style:RGBA(V.CardFill))
@@ -202,11 +218,32 @@ function buttonProto:Style()
   else
     self.border:Hide()
   end
-  self.durability:SetHeight(V.DurabilityHeight)
+  pixel:Height(self.durability, V.DurabilityHeight)
+  self:sizeDurability()
   style:SetFont(self.count, V.StackFont)
   style:SetFont(self.stock, V.StackFont)
   self:setNameFont()
   self:setPriceFont()
+end
+
+-- sizeDurability makes the durability bar its share of the icon's width, in whole pixels.
+---@private
+function buttonProto:sizeDurability()
+  pixel:Width(self.durability, math.max(1, self.icon:GetWidth() * (self.durabilityFraction or 1)))
+end
+
+-- Fit styles the card again when the grid it is drawn on is not the one it was styled for: the canvas calls
+-- it as it places the card (docs/next-pixel-perfect.md).
+function buttonProto:Fit()
+  if self.unit == nil or math.abs(self.unit - pixel:Unit(self.frame)) > 1e-9 then
+    self:Style()
+    -- Styling drew its icon, count and highlight again, over Masque's skin: Masque's integration skins it
+    -- again on this, so its skin goes last, as after a theme.
+    events:SendMessage(context:New('NextVendorButton_Fit'), 'vendor/Updated', self)
+  else
+    -- Filled before it was placed (SetRepair), its bar was sized on the grid it had then.
+    self:sizeDurability()
+  end
 end
 
 -- setNameFont writes the name in the theme's role, left-aligned from the top, at most two lines (a
@@ -382,7 +419,8 @@ function buttonProto:SetRepair(entry)
   local quality = entry.link and select(3, C_Item.GetItemInfo(entry.link)) or nil
   self:reset(entry.texture, quality)
   local fraction = entry.maxDurability > 0 and entry.durability / entry.maxDurability or 0
-  self.durability:SetWidth(math.max(1, style.ICON * fraction))
+  self.durabilityFraction = fraction
+  self:sizeDurability()
   self.durability:SetVertexColor(1 - fraction, fraction, 0.1, 1)
   self.durability:Show()
   self:setName(entry.link and entry.link:match("%[(.-)%]"), quality)

@@ -15,6 +15,9 @@ local nextMenu = addon:GetModule('NextMenu')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextDropdown is BetterBags Next's dropdown (next-settings.md §2), drawn from the theme
 -- (Controls.Dropdown): a field showing the choice made and a chevron. A click opens a NextMenu of its
 -- choices, read each time it opens (itemsFunction: a provider that registers late shows,
@@ -79,19 +82,22 @@ function nextDropdown:Create(parent, opts)
   return d
 end
 
+-- Style lays the dropdown out in whole pixels (docs/next-pixel-perfect.md): the chevron the padding in
+-- from the right, the choice from the left up to it, each centered on its height by its top.
 function dropdownProto:Style()
   local D = controls:Theme("Dropdown")
   local frame = self.frame
-  frame:SetSize(self.opts.width or D.Width, D.Height)
+  pixel:Size(frame, self.opts.width or D.Width, D.Height)
   style:SetFont(self.text, D.Font)
   local chevron = D.Chevron
-  self.chevron:SetSize(chevron.Size, chevron.Size)
+  local height, pad = frame:GetHeight(), pixel:Length(frame, D.Padding)
+  pixel:Size(self.chevron, chevron.Size, chevron.Size)
   self.chevron:ClearAllPoints()
-  self.chevron:SetPoint("RIGHT", frame, "RIGHT", -D.Padding, 0)
+  pixel:Row(self.chevron, "TOPRIGHT", frame, pad, height)
   controls:Paint(self.chevron, { Texture = chevron.Texture, Color = chevron.Color })
   self.text:ClearAllPoints()
-  self.text:SetPoint("LEFT", frame, "LEFT", D.Padding, 0)
-  self.text:SetPoint("RIGHT", self.chevron, "LEFT", -D.Padding / 2, 0)
+  pixel:Row(self.text, "TOPLEFT", frame, pad, height)
+  pixel:Row(self.text, "TOPRIGHT", frame, pad + self.chevron:GetWidth() + pixel:Floor(frame, pad / 2), height)
   frame:SetAlpha(frame:IsEnabled() and 1 or controls:Theme("Button").DisabledAlpha)
   self:Paint()
 end

@@ -15,6 +15,9 @@ local controls = addon:GetModule('NextControls')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextToggle is BetterBags Next's switch (next-settings.md §2), drawn from the theme
 -- (Controls.Toggle): a track, colored as it turns on, and a knob that slides to the end it is at. A
 -- click flips it and calls back; a state given to it (SetChecked) calls nothing back.
@@ -83,8 +86,8 @@ end
 -- Style sizes the switch and draws it at how far it is on.
 function toggleProto:Style()
   local T = controls:Theme("Toggle")
-  self.frame:SetSize(T.Width, T.Height)
-  self.knob:SetSize(T.KnobSize, T.KnobSize)
+  pixel:Size(self.frame, T.Width, T.Height)
+  pixel:Size(self.knob, T.KnobSize, T.KnobSize)
   controls:Paint(self.off, T.Off)
   controls:PaintEdge(self.edge, T.Edge)
   controls:Paint(self.hover, T.Hover)
@@ -93,14 +96,19 @@ function toggleProto:Style()
   self:Place(self.amount)
 end
 
--- Place puts the knob amount of the way from the off end to the on end, the on color that strong.
+-- Place puts the knob amount of the way from the off end to the on end, the on color that strong. At
+-- either end (at rest) the knob is on whole pixels, centered on the track's height by its top
+-- (docs/next-pixel-perfect.md); sliding, it moves smoothly between them.
 ---@param amount number
 function toggleProto:Place(amount)
   local T = controls:Theme("Toggle")
   self.amount = amount
-  local travel = T.Width - 2 * T.KnobInset - T.KnobSize
-  self.knob:ClearAllPoints()
-  self.knob:SetPoint("LEFT", self.frame, "LEFT", T.KnobInset + travel * amount, 0)
+  local frame, knob = self.frame, self.knob
+  local inset = pixel:Snap(frame, T.KnobInset)
+  local travel = frame:GetWidth() - 2 * inset - knob:GetWidth()
+  knob:ClearAllPoints()
+  knob:SetPoint("TOPLEFT", frame, "TOPLEFT", inset + travel * amount,
+    -pixel:Middle(frame, frame:GetHeight(), knob:GetHeight()))
   controls:Paint(self.on, T.On, (T.On.Alpha or 1) * amount)
   controls:Paint(self.knob, amount >= 0.5 and T.KnobOn or T.Knob)
 end

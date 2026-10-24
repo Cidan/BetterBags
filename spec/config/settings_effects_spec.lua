@@ -231,6 +231,25 @@ describe("What each setting asks the bags for", function()
     assert.are.same({}, messages())
   end)
 
+  -- BetterBags Next's Size tab (docs/next-appearance-size.md): each saves its percentage and tells the
+  -- panels, which size themselves; the bags' items are neither read nor recalculated.
+  for _, case in ipairs({ { "Icon Scale", "GetNextIconScale", "SetNextIconScale" },
+    { "Bag Scale", "GetNextBagScale", "SetNextBagScale" } }) do
+    it("saves " .. case[1] .. " and tells BetterBags Next's panels, reading nothing", function()
+      local value = 100
+      override(db, case[2], function() return value end)
+      override(db, case[3], function(_, v) value = v end)
+      local found = settings(case[1])
+      assert.are.equal(1, #found)
+      assert.are.equal("slider", found[1].kind)
+      assert.are.same({ 50, 150, 5 }, { found[1].min, found[1].max, found[1].step })
+      assert.are.equal(100, found[1].get(ctx()))
+      found[1].set(ctx(), 125)
+      assert.are.equal(125, value)
+      assert.are.same({ "next/ScalesChanged" }, messages())
+    end)
+  end
+
   -- BetterBagsNext (next.md §11): turning it on or off switches the bags at once, no reload; a switch
   -- refused (combat, the bank, a vendor) says so, and the window shows the setting again.
   it("switches the bags without a reload, and says when the switch is refused", function()

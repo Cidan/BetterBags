@@ -19,6 +19,7 @@ L.G = function(_, key) return key end
 
 -- The item buttons: one per slot key, as itemFrame:GetButton keeps them.
 local itemFrame = trackStub("ItemFrame")
+local masque = trackStub("Masque")
 local originalGetButton = itemFrame.GetButton
 local buttons
 itemFrame.GetButton = function(_, _, slotkey)
@@ -223,6 +224,61 @@ describe("NextContent", function()
     assert.are.same({ canvas.order[1].cells, 0, -STEP }, { at(buttons["0_6"].frame) })
   end)
 
+  -- Reported: a panel's items moved between rows as its Bag Scale changed (next-pixel-perfect.md §3). How
+  -- many go in a row comes from the width to lay out for (LayoutWidth) in units, with the theme's icon and
+  -- gap, so it is the same on every grid; the items stand on the grid's whole-pixel step.
+  it("decides how many icons go in a row from the width to lay out for, the same on every grid", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local undo = layout.UseScreen(3396, 1362, 0.65)
+    -- Under UIParent, as a panel is: its grid is the UI scale times its own.
+    parent:SetParent(UIParent)
+    finally(function()
+      parent:SetParent(nil)
+      undo()
+    end)
+    local items = {}
+    for i = 1, 13 do table.insert(items, item("0_" .. i, "A")) end
+    bind(data({ categories = { { name = "A" } }, items = items }))
+    -- Placed at once: a canvas shown moves what changed place.
+    canvas:SetInstant(true)
+    local width = 7 * STEP - style.GAP + 0.5
+    for percent = 50, 150, 5 do
+      parent:SetScale(percent / 100)
+      render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = width, LayoutWidth = width })
+      local cells = canvas.order[1].cells
+      local _, _, _, x7, y7 = buttons["0_7"].frame:GetPoint(1)
+      local _, _, _, x8, y8 = buttons["0_8"].frame:GetPoint(1)
+      assert.is_true(y7 == 0 and x7 > 0, "seven in the first row at " .. percent .. "%")
+      assert.are.same({ cells, 0 }, { select(2, buttons["0_8"].frame:GetPoint(1)), x8 }, "the eighth starts the next row at " .. percent .. "%")
+      assert.is_true(y8 < 0)
+      -- The row fits the width it is drawn in, every gap the same: where the grid's rounded lengths would run
+      -- past it, the gap closes by the pixel or two the rounding added.
+      local section = canvas.order[1]
+      local _, _, _, x2 = buttons["0_2"].frame:GetPoint(1)
+      for i = 2, 7 do
+        local _, _, _, x = buttons["0_" .. i].frame:GetPoint(1)
+        assert.is_true(math.abs(x - (i - 1) * x2) < 1e-6, "even steps at " .. percent .. "%")
+      end
+      assert.is_true(x7 + buttons["0_7"].frame:GetWidth() <= section.frame:GetWidth() + 1e-6,
+        string.format("the row fits at %d%%: %.3f past", percent, x7 + buttons["0_7"].frame:GetWidth() - section.frame:GetWidth()))
+    end
+    parent:SetScale(1)
+    canvas:SetInstant(false)
+  end)
+
+  -- A section laid out again with no width to lay out for (in a dock card, at the card's scale) keeps the
+  -- rows it had.
+  it("keeps a section's rows when it is laid out again without a width to lay out for", function()
+    local items = {}
+    for i = 1, 13 do table.insert(items, item("0_" .. i, "A")) end
+    bind(data({ categories = { { name = "A" } }, items = items }))
+    render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = 7 * STEP, LayoutWidth = 6 * STEP - style.GAP })
+    local section = canvas.order[1]
+    assert.are.same({ section.cells, 0, -STEP }, { at(buttons["0_7"].frame) }, "six to a row")
+    canvas:LayoutSection(section, 9 * STEP)
+    assert.are.same({ section.cells, 0, -STEP }, { at(buttons["0_7"].frame) }, "still six")
+  end)
+
   it("keeps a gap's cell empty", function()
     bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A"), gap("0_2", "A"), item("0_3", "A") } }))
     draw()
@@ -405,6 +461,62 @@ describe("NextContent", function()
       canvas:SetInstant(false)
       canvas:SetCards(false)
       assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
+    end)
+
+    -- Icon Scale sizes the bags' item buttons, not the vendor's cards (docs/next-appearance-size.md).
+    it("steps down by the theme's icon size for cards, by the scaled one for item buttons", function()
+      style:SetIconScale(150)
+      canvas:SetCards(true)
+      assert.are.same({ style.VENDOR_CARD_WIDTH, style.CARD_ICON }, { canvas:CellWidth(), canvas:CellHeight() })
+      canvas:SetCards(false)
+      assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
+      assert.are_not.equal(style.ICON, style.CARD_ICON)
+      style:SetIconScale(100)
+    end)
+
+    -- BetterBags Next draws its item buttons on whole screen pixels (docs/next-pixel-perfect.md): each button
+    -- it lays out is fitted (NextItemFit), its decoration with the item level text on its interaction
+    -- button, or the parts a button names (a guild bank button); cards and plain frames are left alone.
+    it("fits each item button it lays out, by its decoration or the parts it names", function()
+      local fit = addon:GetModule("NextItemFit")
+      local fitted = {}
+      override(fit, "Fit", function(_, ctx, decoration, extras, fittedItem)
+        table.insert(fitted, { ctx ~= nil, decoration, extras, fittedItem })
+        return "placed"
+      end)
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A"), item("0_2", "A") } }))
+      local a, b = buttons["0_1"], buttons["0_2"]
+      local decoration, ilvl = CreateFrame("Frame"), {}
+      a.ilvlText = ilvl
+      function a:GetDecoration() return decoration end
+      local own, part = CreateFrame("Frame"), {}
+      function b:PixelParts() return own, { part } end
+      draw()
+      assert.are.same({ { true, decoration, { ilvl }, a }, { true, own, { part }, b } }, fitted)
+    end)
+
+    -- Reported: two borders round each item with a quality border, with Masque, after a /reload. Masque
+    -- skins an item button as it is announced and on every full draw (integrations/masque.lua), before the
+    -- canvas lays it out; the fitter then pulled Masque's quality border in to fill the button, inside the
+    -- skin's own frame (Caith's: 42 / 36 of the button, centered). Laid out, a button Masque skins keeps
+    -- Masque's border where Masque put it.
+    it("leaves the border Masque skinned where Masque put it as it lays a button out", function()
+      override(masque, "IsSkinned", function(_, button) return button.masqued == true end)
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+      local a = buttons["0_1"]
+      local decoration = CreateFrame("Button", nil, a.frame)
+      decoration:SetAllPoints(a.frame)
+      decoration.masqued = true
+      decoration.IconBorder = decoration:CreateTexture(nil, "OVERLAY")
+      decoration.IconBorder:SetSize(43, 43)
+      decoration.IconBorder:SetPoint("CENTER", decoration, "CENTER", 0, 0)
+      a.ilvlText = a.frame:CreateFontString(nil, "OVERLAY")
+      function a:GetDecoration() return decoration end
+      draw()
+      local border = decoration.IconBorder
+      assert.is_nil(border._allPoints, "not pulled in to fill the button")
+      assert.are.same({ 1, { "CENTER", decoration, "CENTER", 0, 0 }, 43, 43 },
+        { border:GetNumPoints(), { border:GetPoint(1) }, border:GetWidth(), border:GetHeight() })
     end)
 
     it("reuses a section of the same name and releases the rest", function()
@@ -690,6 +802,43 @@ describe("NextContent", function()
       assert.are.equal(ONE, y(s.B))
     end)
 
+    -- Found by the pixel check in game (next-pixel-perfect.md §3): a section held in a drag is drawn shrunk, and one
+    -- flying back from a dock at its card's scale, on other grids than the column's. The room either takes is its
+    -- height in the column, on the column's grid: the sections below stay on whole pixels.
+    for _, case in ipairs({ "held in a drag", "flying back from a dock" }) do
+      it("gives a section " .. case .. " its room on the column's grid, drawn on another", function()
+        local layout = dofile("spec/helpers/layout.lua")
+        local undo = layout.UseScreen(3396, 1362, 0.65)
+        parent:SetParent(UIParent)
+        parent:SetScale(0.55)
+        canvas:SetInstant(true)
+        finally(function()
+          canvas:SetInstant(false)
+          parent:SetScale(1)
+          parent:SetParent(nil)
+          undo()
+        end)
+        local s = threeSections()
+        local before = y(s.C)
+        -- Drawn on another grid: on a frame at another scale, as the lift draws a held section shrunk and a dock
+        -- card draws its section.
+        local away = CreateFrame("Frame", nil, UIParent)
+        away:SetScale(0.55 * 0.94)
+        if case == "held in a drag" then
+          canvas:BeginDrag(s.B)
+        else
+          canvas:HoldOut(s.B)
+          draw()
+          canvas:Returning(s.B)
+        end
+        s.B.frame:SetParent(away)
+        s.B.frame:ClearAllPoints()
+        s.B.frame:SetPoint("TOPLEFT", away, "TOPLEFT", 0, 0)
+        draw()
+        assert.is_true(math.abs(y(s.C) - before) < 1e-9, string.format("C at %.4f, %.4f before", y(s.C), before))
+      end)
+    end
+
     it("calls back when a held section leaves the data, before letting it go", function()
       local s = threeSections()
       local lost, shownWhenLost = 0, nil
@@ -858,14 +1007,24 @@ describe("NextContent", function()
       assert.are.equal(0.12, section.highlight._gradient.min.a)
     end)
 
+    -- Each by its top left, after the text before it (its width rounded up to a whole pixel), centered on
+    -- the title by the fonts' heights (docs/next-pixel-perfect.md): never by a text's middle or right edge.
     it("places a section's title, count and line where it says", function()
       sections()
       UseNextTheme({ Sections = { Title = { X = 9, Y = -2 }, CountGap = 3, LineGap = 7 } })
       canvas:ApplyStyle(context:New("spec"))
+      draw()
       local s = canvas.byName.A
+      local _, titleHeight = s.title:GetFont()
+      local _, countHeight = s.count:GetFont()
+      local countX = 9 + math.ceil(s.title:GetStringWidth()) + 3
       assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 9, -2 }, { s.title:GetPoint(1) })
-      assert.are.same({ "LEFT", s.title, "RIGHT", 3, 0 }, { s.count:GetPoint(1) })
-      assert.are.same({ "LEFT", s.count, "RIGHT", 7, 0 }, { s.line:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", countX, -2 - math.floor((titleHeight - countHeight) / 2) },
+        { s.count:GetPoint(1) })
+      local lineX = countX + math.ceil(s.count:GetStringWidth()) + 7
+      local lineY = -2 - math.floor((titleHeight - s.line:GetHeight()) / 2)
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", lineX, lineY }, { s.line:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", s.inner, "TOPRIGHT", 0, lineY }, { s.line:GetPoint(2) })
     end)
 
     it("restyles the sections it keeps for later too", function()

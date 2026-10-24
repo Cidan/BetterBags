@@ -15,6 +15,9 @@ local lift = addon:GetModule('NextLift')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextTabs is BetterBagsNext's tab rail (next.md §3): a tab per entry, stacked down the body's
 -- inner edge and sticking out over the feathered edge like bookmarks: to the left of the
 -- backpack's panel (the right side of the screen), to the right of the bank's (the left side).
@@ -89,10 +92,12 @@ local nextTabs = addon:NewModule('NextTabs')
 local railProto = {}
 addon:GetModule('Perf'):RegisterPrototype(railProto, 'NextTabRail')
 
--- step is the distance from one tab's top to the next's, for the current theme.
+-- step is the distance from one tab's top to the next's, for the current theme, in whole pixels on the
+-- rail's grid (docs/next-pixel-perfect.md).
+---@param rail NextTabRail
 ---@return number
-local function step()
-  return style.TAB_HEIGHT + style.TAB_SPACING
+local function step(rail)
+  return pixel:Length(rail.frame, style.TAB_HEIGHT) + pixel:Length(rail.frame, style.TAB_SPACING)
 end
 
 -- accentColor is the color of the bar beside a selected tab: its accent (an accent of the theme by
@@ -187,13 +192,13 @@ function railProto:styleRail()
   local frame, body = self.frame, self.body
   frame:ClearAllPoints()
   if self.side == "LEFT" then
-    frame:SetPoint("TOPLEFT", body, "TOPRIGHT", 0, -style.CONTENT_TOP)
+    pixel:Point(frame, "TOPLEFT", body, "TOPRIGHT", 0, -style.CONTENT_TOP)
   else
-    frame:SetPoint("TOPRIGHT", body, "TOPLEFT", 0, -style.CONTENT_TOP)
+    pixel:Point(frame, "TOPRIGHT", body, "TOPLEFT", 0, -style.CONTENT_TOP)
   end
-  frame:SetSize(style.TAB_MAX_WIDTH, 1)
+  pixel:Size(frame, style.TAB_MAX_WIDTH, 1)
   local bar = style.Theme.Tabs.Indicator
-  self.indicator:SetSize(bar and bar.Width or 0, style.TAB_HEIGHT)
+  pixel:Size(self.indicator, bar and bar.Width or 0, style.TAB_HEIGHT)
 end
 
 -- styleTab draws a tab's parts from the theme: its height, its glow's color, its name and icon where
@@ -202,7 +207,7 @@ end
 ---@param tab NextTab
 function railProto:styleTab(tab)
   local button, text, icon = tab.button, tab.text, tab.icon
-  button:SetHeight(style.TAB_HEIGHT)
+  pixel:Height(button, style.TAB_HEIGHT)
   local glow = style.Theme.Tabs.Glow
   if glow then
     -- A texture's alpha is its vertex color's (NextPanel:paintEdges): colored, it keeps what it shows.
@@ -215,17 +220,34 @@ function railProto:styleTab(tab)
     tween:Stop(tab.glow)
     tab.glow:Hide()
   end
-  icon:SetSize(style.TAB_ICON, style.TAB_ICON)
+  pixel:Size(icon, style.TAB_ICON, style.TAB_ICON)
+  text:SetJustifyH(self.side == "LEFT" and "LEFT" or "RIGHT")
+  self:placeContent(tab)
+end
+
+-- placeContent puts a tab's name and icon on whole pixels (docs/next-pixel-perfect.md): the name the padding
+-- in from its edge side, the icon after the name's text (its width rounded up), each by its corner,
+-- centered on the tab's height by its font's height and its own. Anchored by their middles they would
+-- sit between two pixels on a tab an odd number of pixels tall. Its name's width changes with its text
+-- and its state's font (paint), so it is placed again then.
+---@private
+---@param tab NextTab
+function railProto:placeContent(tab)
+  local button, text, icon = tab.button, tab.text, tab.icon
+  local height = button:GetHeight()
+  local pad, gap = pixel:Snap(button, style.TAB_PADDING), pixel:Snap(button, style.TAB_ICON_GAP)
+  local _, fontHeight = text:GetFont()
+  local textTop = -pixel:Floor(button, (height - (fontHeight or 0)) / 2)
+  local iconTop = -pixel:Floor(button, (height - icon:GetHeight()) / 2)
+  local iconX = pad + pixel:Ceil(button, text:GetStringWidth()) + gap
   text:ClearAllPoints()
   icon:ClearAllPoints()
   if self.side == "LEFT" then
-    text:SetPoint("LEFT", button, "LEFT", style.TAB_PADDING, 0)
-    text:SetJustifyH("LEFT")
-    icon:SetPoint("LEFT", text, "RIGHT", style.TAB_ICON_GAP, 0)
+    text:SetPoint("TOPLEFT", button, "TOPLEFT", pad, textTop)
+    icon:SetPoint("TOPLEFT", button, "TOPLEFT", iconX, iconTop)
   else
-    text:SetPoint("RIGHT", button, "RIGHT", -style.TAB_PADDING, 0)
-    text:SetJustifyH("RIGHT")
-    icon:SetPoint("RIGHT", text, "LEFT", -style.TAB_ICON_GAP, 0)
+    text:SetPoint("TOPRIGHT", button, "TOPRIGHT", -pad, textTop)
+    icon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -iconX, iconTop)
   end
 end
 
@@ -368,7 +390,8 @@ function railProto:place(tab)
     return
   end
   tab.button:ClearAllPoints()
-  tab.button:SetPoint(self:edge(), self.frame, self:edge(), self:outward() * tab.slide, -tab.y)
+  -- Whole pixels from the rail's edge (docs/next-pixel-perfect.md): sliding, it steps a pixel at a time.
+  pixel:Point(tab.button, self:edge(), self.frame, self:edge(), self:outward() * tab.slide, -tab.y)
 end
 
 ---@private
@@ -443,9 +466,9 @@ function railProto:SetTabs(entries)
   for i, entry in ipairs(entries) do
     local tab = self.tabs[i]
     if i > 1 then
-      y = y + step()
+      y = y + step(self)
     end
-    y = y + (entry.gap or 0)
+    y = y + pixel:Snap(self.frame, entry.gap or 0)
     if entry.block ~= nil and self.gaps[entry.block] == nil then
       self.gaps[entry.block] = entry.gap or 0
     end
@@ -473,18 +496,19 @@ function railProto:SetTabs(entries)
       else
         tab.icon:SetTexture(entry.icon)
       end
-      tab.icon:SetSize(style.TAB_ICON, style.TAB_ICON)
+      pixel:Size(tab.icon, style.TAB_ICON, style.TAB_ICON)
       tab.icon:Show()
       width = width + style.TAB_ICON + style.TAB_ICON_GAP
     else
       tab.icon:Hide()
     end
-    tab.width = math.min(style.TAB_MAX_WIDTH, math.max(style.TAB_MIN_WIDTH, width))
+    tab.width = pixel:Ceil(tab.button, math.min(style.TAB_MAX_WIDTH, math.max(style.TAB_MIN_WIDTH, width)))
     tab.button:SetWidth(tab.width)
+    self:placeContent(tab)
     self:place(tab)
     tab.button:Show()
   end
-  self.frame:SetHeight(#entries > 0 and (y + step()) or 1)
+  self.frame:SetHeight(#entries > 0 and (y + step(self)) or 1)
   self:Select(self.selected)
   if self.onResize then
     self.onResize(context:New("NextTabs_Resize"))
@@ -518,6 +542,7 @@ function railProto:paint(tab)
     tab.bg:SetGradient("HORIZONTAL", faint, solid)
   end
   style:SetFont(tab.text, selected and T.SelectedFont or T.Font)
+  self:placeContent(tab)
 end
 
 ---@private
@@ -525,7 +550,7 @@ end
 function railProto:moveIndicator(y)
   self.indicatorY = y
   self.indicator:ClearAllPoints()
-  self.indicator:SetPoint(self:edge(), self.frame, self:edge(), 0, y)
+  pixel:Point(self.indicator, self:edge(), self.frame, self:edge(), 0, y)
 end
 
 -- tab returns the tab of an id.
@@ -694,12 +719,12 @@ function railProto:layout(withRoom)
   local y, first, seen, others = 0, true, {}, 0
   local function put(block)
     if not first then
-      y = y + step()
+      y = y + step(self)
     end
     first = false
     if block ~= nil and not seen[block] then
       seen[block] = true
-      y = y + (self.gaps[block] or 0)
+      y = y + pixel:Snap(self.frame, self.gaps[block] or 0)
     end
     return y
   end
@@ -812,11 +837,12 @@ end
 ---@return number
 function railProto:moveIndexAt(y)
   local state = self.moving
-  local top = self.frame:GetTop()
-  if top == nil then
+  -- The cursor is on the screen; the rail is laid out in its own units (a small panel's Bag Scale).
+  local at = lift:ScreenPoint(self.frame)
+  if at == nil then
     return state.index
   end
-  local down = top - y
+  local down = (at.top - y) / at.scale
   local ys = self:layout(false)
   local index, others = nil, 0
   for _, tab in ipairs(self.tabs) do
@@ -861,14 +887,16 @@ function railProto:EndMove(ctx)
   state.landing = true
   local tab = state.tab
   lift:Land(state, function(left0, top0)
-    local top, left = self.frame:GetTop(), self.frame:GetLeft()
-    if top == nil or left == nil then
+    local at = lift:ScreenPoint(self.frame)
+    if at == nil then
       return left0, top0
     end
+    -- On the screen, at the rail's scale (a small panel's Bag Scale).
+    local left = at.left
     if self.side ~= "LEFT" then
-      left = self.frame:GetRight() - tab.width
+      left = at.left + (self.frame:GetWidth() - tab.width) * at.scale
     end
-    return left, top - state.roomY
+    return left, at.top - state.roomY * at.scale, at.scale
   end, function()
     self:landMove(ctx)
   end)

@@ -66,6 +66,9 @@ local reorder = addon:GetModule('NextListReorder')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextSettingsCategories is the Categories page (next-settings.md §5, category-lifecycle.md §6), where
 -- every category is defined once: one kind of category, a rule, items added by hand, or both. The page
 -- shows its own list in the window's sidebar (pages.lua sidebar): every category, yours and the plugins',
@@ -507,6 +510,7 @@ function editor:CreateList(parent, owner, bags)
   })
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
+  pixel:SnapScroll(box)
   local content = CreateFrame("Frame", nil, box)
   content.scrollable = true
   local view = CreateScrollBoxLinearView()
@@ -519,7 +523,7 @@ function editor:CreateList(parent, owner, bags)
     box = box, content = content,
     entries = function() return list.entries end,
     rowOf = function(entry) return list.byName[entry.name].frame end,
-    heightOf = function() return style.Theme.Settings.Categories.RowHeight end,
+    heightOf = function() return pixel:Length(frame, style.Theme.Settings.Categories.RowHeight) end,
     onDrop = function(name, after) list:Drop(name, after) end,
   })
   list.newCategory = nextButton:Create(frame, {
@@ -560,27 +564,30 @@ end
 -- under it, New Category at the bottom.
 ---@param width number
 ---@param height number
+-- All in whole pixels (docs/next-pixel-perfect.md).
 function listProto:Place(width, height)
   self.width, self.height = width, height
   local T = style.Theme.Settings
-  local SB, SR, V = T.Sidebar, T.Search, T.Version
   local B, I = controls:Theme("Button"), controls:Theme("Input")
   local frame = self.frame
+  local pad, gap, bottomGap = pixel:Snap(frame, T.Sidebar.Pad), pixel:Snap(frame, T.Search.Gap), pixel:Snap(frame, T.Version.Bottom)
   frame:ClearAllPoints()
   frame:SetPoint("TOPLEFT", frame:GetParent(), "TOPLEFT", 0, 0)
-  frame:SetSize(width, height)
+  pixel:Size(frame, width, height)
+  width, height = frame:GetWidth(), frame:GetHeight()
   self.filter.frame:ClearAllPoints()
-  self.filter.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", SB.Pad, -SR.Gap)
-  self.filter.frame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -SB.Pad, -SR.Gap)
+  self.filter.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -gap)
+  self.filter.frame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -gap)
+  self.filter:Style()
   self.newCategory.frame:ClearAllPoints()
-  self.newCategory.frame:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", SB.Pad, V.Bottom)
-  self.newCategory:SetWidth(width - 2 * SB.Pad)
-  local top = SR.Gap + I.Height + SR.Gap
-  local bottom = V.Bottom + B.Height + SR.Gap
+  self.newCategory.frame:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", pad, bottomGap)
+  self.newCategory:SetWidth(width - 2 * pad)
+  local top = gap + pixel:Length(frame, I.Height) + gap
+  local bottom = bottomGap + pixel:Length(frame, B.Height) + gap
   self.box:ClearAllPoints()
   self.box:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -top)
   self.box:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, bottom)
-  self.box:SetSize(width, math.max(1, height - top - bottom))
+  self.box:SetSize(width, math.max(pixel:Unit(frame), height - top - bottom))
   self.drag:Arrange(width)
 end
 
@@ -719,7 +726,7 @@ function listProto:layoutRows()
     listed[entry.name] = true
     self.rows[i] = row
     row.entry = entry
-    row.frame:SetHeight(K.RowHeight)
+    row.frame:SetHeight(pixel:Length(self.frame, K.RowHeight))
     local filter = categories:GetCategoryByName(entry.name)
     row.label:SetText(entry.name)
     row.detail:SetText(count(counts[entry.name] or 0, L:G("%d item matching"), L:G("%d items matching")))
@@ -758,22 +765,31 @@ function listProto:paintRow(row)
   local chosen = entry.name == editor.selected
   style:SetFont(row.label, K.Font)
   style:SetFont(row.detail, K.NoteFont)
-  local left = SB.Pad + K.Indent
+  -- The name and the count under it, the two lines centered on the row by their top in whole pixels
+  -- (docs/next-pixel-perfect.md); the dot left of the name, centered on its line.
+  local frame = row.frame
+  local pad = pixel:Snap(frame, SB.Pad)
+  local left = pad + pixel:Snap(frame, K.Indent)
+  local nameHeight, detailHeight = pixel:Ceil(frame, pixel:TextHeight(row.label)), pixel:Ceil(frame, pixel:TextHeight(row.detail))
+  local between = pixel:Snap(frame, 3)
+  local top = pixel:Middle(frame, frame:GetHeight(), nameHeight + between + detailHeight)
+  pixel:Size(row.dot, K.Dot, K.Dot)
   row.dot:ClearAllPoints()
-  row.dot:SetPoint("RIGHT", row.label, "LEFT", -6, 0)
-  row.dot:SetSize(K.Dot, K.Dot)
+  row.dot:SetPoint("TOPLEFT", frame, "TOPLEFT", left - pixel:Snap(frame, 6) - row.dot:GetWidth(),
+    -(top + pixel:Middle(frame, nameHeight, row.dot:GetHeight())))
   row.dot:Show()
-  row.label:SetPoint("BOTTOMLEFT", row.frame, "LEFT", left, 1)
-  row.label:SetPoint("RIGHT", row.frame, "RIGHT", -SB.Pad, 0)
-  row.detail:SetPoint("TOPLEFT", row.frame, "LEFT", left, -2)
-  row.detail:SetPoint("RIGHT", row.frame, "RIGHT", -SB.Pad, 0)
+  row.label:SetPoint("TOPLEFT", frame, "TOPLEFT", left, -top)
+  row.label:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -top)
+  local detailTop = top + nameHeight + between
+  row.detail:SetPoint("TOPLEFT", frame, "TOPLEFT", left, -detailTop)
+  row.detail:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -detailTop)
   row.detail:Show()
   controls:Paint(row.fill, chosen and K.SelectedFill or false)
   controls:Paint(row.hover, (row.hovered and not chosen) and K.HoverFill or false)
   row.indicator:ClearAllPoints()
   row.indicator:SetPoint("TOPLEFT", row.frame, "TOPLEFT", 0, 0)
   row.indicator:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, 0)
-  row.indicator:SetWidth(K.Indicator.Width)
+  pixel:Width(row.indicator, K.Indicator.Width)
   controls:Paint(row.indicator, chosen and { Color = K.Indicator.Color } or false)
 end
 
@@ -811,13 +827,14 @@ end
 function actionsProto:Style()
   local K = style.Theme.Settings.Categories
   local B = controls:Theme("Button")
+  local gap = pixel:Snap(self.frame, K.FieldGap)
   self.delete.frame:ClearAllPoints()
   self.delete.frame:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", 0, 0)
   self.rename.frame:ClearAllPoints()
-  self.rename.frame:SetPoint("RIGHT", self.delete.frame, "LEFT", -K.FieldGap, 0)
+  self.rename.frame:SetPoint("TOPRIGHT", self.delete.frame, "TOPLEFT", -gap, 0)
   local shown = self.rename.frame:IsShown()
-  local width = shown and (self.rename.frame:GetWidth() + K.FieldGap + self.delete.frame:GetWidth()) or 1
-  self.frame:SetSize(width, B.Height)
+  local width = shown and (self.rename.frame:GetWidth() + gap + self.delete.frame:GetWidth()) or pixel:Unit(self.frame)
+  self.frame:SetSize(width, pixel:Length(self.frame, B.Height))
 end
 
 -- Refresh shows the buttons for your category, and none for a plugin's or none.
@@ -877,10 +894,11 @@ end
 
 -- tabHeight returns the height a tab's row fills: the content's, less the page's own room above and
 -- below its section (the section's title is hidden).
+---@param frame Frame The tab's, on the window's grid.
 ---@return number
-local function tabHeight()
+local function tabHeight(frame)
   local C = style.Theme.Settings.Content
-  return math.max(1, settings:ContentHeight() - C.Top - C.Bottom)
+  return math.max(1, settings:ContentHeight() - pixel:Snap(frame, C.Top) - pixel:Snap(frame, C.Bottom))
 end
 
 -- makeTab makes a tab's frame and registers it, and has it shown again when the bags are read.
@@ -916,15 +934,25 @@ local function label(tab, key, text, font)
   tab.labels[key] = l
 end
 
+-- metricsOf returns a tab's lengths in whole pixels on its grid (docs/next-pixel-perfect.md): its padding,
+-- the gap between fields, a field row's height (a button's), a label's width.
+---@param frame Frame
+---@return {pad: number, gap: number, row: number, labelWidth: number}
+local function metricsOf(frame)
+  local K = style.Theme.Settings.Categories
+  return { pad = pixel:Snap(frame, K.Pad), gap = pixel:Snap(frame, K.FieldGap),
+    row = pixel:Length(frame, controls:Theme("Button").Height), labelWidth = pixel:Snap(frame, K.LabelWidth) }
+end
+
 -- boxRows returns where the Settings and Search Rule tabs put their item box's name row and the box,
 -- down from the tab's top: under three rows of settings, the same in both, so the box stays put as the
 -- tabs change (asked).
+---@param frame Frame
 ---@return number nameRow, number box
-local function boxRows()
-  local K = style.Theme.Settings.Categories
-  local B = controls:Theme("Button")
-  local row = K.Pad + 3 * (B.Height + K.FieldGap) + K.FieldGap
-  return row, row + B.Height + K.FieldGap
+local function boxRows(frame)
+  local m = metricsOf(frame)
+  local row = m.pad + 3 * (m.row + m.gap) + m.gap
+  return row, row + m.row + m.gap
 end
 
 -- placeTab anchors a tab's frame where the page put it.
@@ -934,11 +962,11 @@ end
 ---@param width number
 ---@param height number
 local function placeTab(tab, x, y, width, height)
-  tab.x, tab.y, tab.width, tab.height = x, y, width, height
   local frame = tab.frame
   frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
-  frame:SetSize(width, height)
+  pixel:Point(frame, "TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
+  pixel:Size(frame, width, height)
+  tab.x, tab.y, tab.width, tab.height = x, y, frame:GetWidth(), frame:GetHeight()
   frame:Show()
 end
 
@@ -1020,7 +1048,7 @@ end
 ---@return number
 function settingsTabProto:Measure(width)
   local _ = width
-  return tabHeight()
+  return tabHeight(self.frame)
 end
 
 ---@param x number
@@ -1137,49 +1165,51 @@ end
 -- layout puts the settings in three rows (the bags it is used in, group by, color; group by's row left
 -- empty for a plugin's), then the current items in their box, where the Search Rule tab puts its own.
 ---@private
+-- Each field by its top left in whole pixels (docs/next-pixel-perfect.md), centered on its row's height;
+-- what follows a text starts past its width rounded up.
 function settingsTabProto:layout()
-  local K = style.Theme.Settings.Categories
-  local B = controls:Theme("Button")
-  local frame, pad, gap = self.frame, K.Pad, K.FieldGap
+  local frame = self.frame
+  local m = metricsOf(frame)
+  local pad, gap = m.pad, m.gap
   local width = self.width - 2 * pad
+  -- Across the tab, centered by the client, at its middle line by its top.
   self.none:ClearAllPoints()
-  self.none:SetPoint("CENTER", frame, "CENTER", 0, 0)
-  -- row puts a setting's name in its row (1 to 3), and returns the middle of the row.
-  local function row(key, i)
-    local middle = pad + (i - 1) * (B.Height + gap) + B.Height / 2
-    local l = self.labels[key]
-    l:ClearAllPoints()
-    l:SetPoint("LEFT", frame, "TOPLEFT", pad, -middle)
-    return middle
+  self.none:SetJustifyH("CENTER")
+  local noneTop = pixel:Middle(frame, self.height, pixel:Ceil(frame, self.none:GetStringHeight()))
+  self.none:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -noneTop)
+  self.none:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, -noneTop)
+  -- rowTop is how far down a row (1 to 3) of settings starts.
+  local function rowTop(i)
+    return pad + (i - 1) * (m.row + gap)
   end
-  local middle = row("bags", 1)
-  local x = pad + K.LabelWidth
+  -- at puts a region x across in a row starting top down, centered on the row's height.
+  local function at(region, x, top)
+    region:ClearAllPoints()
+    pixel:Row(region, "TOPLEFT", frame, x, m.row, nil, top)
+  end
+  at(self.labels.bags, pad, rowTop(1))
+  local x = pad + m.labelWidth
   for _, bag in ipairs(self.bags()) do
     local toggle, text = self.toggles[bag.kind], self.toggleLabels[bag.kind]
     if toggle and toggle.frame:IsShown() then
-      toggle.frame:ClearAllPoints()
-      toggle.frame:SetPoint("LEFT", frame, "TOPLEFT", x, -middle)
-      text:ClearAllPoints()
-      text:SetPoint("LEFT", toggle.frame, "RIGHT", 6, 0)
-      x = x + toggle.frame:GetWidth() + 6 + math.ceil(text:GetStringWidth()) + 2 * gap
+      at(toggle.frame, x, rowTop(1))
+      local textX = x + toggle.frame:GetWidth() + pixel:Snap(frame, 6)
+      at(text, textX, rowTop(1))
+      x = textX + pixel:Ceil(frame, text:GetStringWidth()) + 2 * gap
     end
   end
-  self.groupBy.frame:ClearAllPoints()
-  self.groupBy.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("groupBy", 2))
-  self.groupByHint:ClearAllPoints()
-  self.groupByHint:SetPoint("LEFT", self.groupBy.frame, "RIGHT", gap, 0)
-  self.swatch.frame:ClearAllPoints()
-  self.swatch.frame:SetPoint("LEFT", frame, "TOPLEFT", pad + K.LabelWidth, -row("color", 3))
-  self.resetColor.frame:ClearAllPoints()
-  self.resetColor.frame:SetPoint("LEFT", self.swatch.frame, "RIGHT", gap, 0)
-  local nameRow, box = boxRows()
-  self.labels.inBags:ClearAllPoints()
-  self.labels.inBags:SetPoint("LEFT", frame, "TOPLEFT", pad, -(nameRow + B.Height / 2))
-  self.inBags:ClearAllPoints()
-  self.inBags:SetPoint("LEFT", self.labels.inBags, "RIGHT", gap, 0)
+  at(self.labels.groupBy, pad, rowTop(2))
+  at(self.groupBy.frame, pad + m.labelWidth, rowTop(2))
+  at(self.groupByHint, pad + m.labelWidth + self.groupBy.frame:GetWidth() + gap, rowTop(2))
+  at(self.labels.color, pad, rowTop(3))
+  at(self.swatch.frame, pad + m.labelWidth, rowTop(3))
+  at(self.resetColor.frame, pad + m.labelWidth + self.swatch.frame:GetWidth() + gap, rowTop(3))
+  local nameRow, box = boxRows(frame)
+  at(self.labels.inBags, pad, nameRow)
+  at(self.inBags, pad + pixel:Ceil(frame, self.labels.inBags:GetStringWidth()) + gap, nameRow)
   self.grid.frame:ClearAllPoints()
   self.grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -box)
-  self.grid:Place(width, math.max(1, self.height - box - pad))
+  self.grid:Place(width, math.max(pixel:Unit(frame), self.height - box - pad))
 end
 
 -- The Search Rule tab.
@@ -1233,7 +1263,7 @@ end
 ---@return number
 function ruleTabProto:Measure(width)
   local _ = width
-  return tabHeight()
+  return tabHeight(self.frame)
 end
 
 ---@param x number
@@ -1334,30 +1364,35 @@ end
 -- row (their name and count, Apply Search Rule on its right), and the results in their box, where the
 -- Settings tab puts its own.
 ---@private
+-- In whole pixels (docs/next-pixel-perfect.md): the help beside the rule's name, centered on its line by
+-- its top; the field below the name's height rounded up; Search Results and its button centered on their
+-- row by their tops.
 function ruleTabProto:layout()
-  local K = style.Theme.Settings.Categories
-  local B = controls:Theme("Button")
-  local frame, pad, gap = self.frame, K.Pad, K.FieldGap
+  local frame = self.frame
+  local m = metricsOf(frame)
+  local pad, gap = m.pad, m.gap
   local width = self.width - 2 * pad
-  local nameRow, box = boxRows()
+  local nameRow, box = boxRows(frame)
+  local nameHeight = pixel:Ceil(frame, pixel:TextHeight(self.labels.rule))
   self.labels.rule:ClearAllPoints()
   self.labels.rule:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad)
+  local helpX = pad + pixel:Ceil(frame, self.labels.rule:GetStringWidth()) + gap
   self.help:ClearAllPoints()
-  self.help:SetPoint("LEFT", self.labels.rule, "RIGHT", gap, 0)
-  self.help:SetPoint("RIGHT", frame, "RIGHT", -pad, 0)
-  local top = pad + math.ceil(self.labels.rule:GetStringHeight()) + gap
+  pixel:Row(self.help, "TOPLEFT", frame, helpX, nameHeight, nil, pad)
+  pixel:Row(self.help, "TOPRIGHT", frame, pad, nameHeight, nil, pad)
+  local top = pad + nameHeight + gap
   self.rule.frame:ClearAllPoints()
   self.rule.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -top)
-  self.rule.frame:SetSize(width, math.max(B.Height, nameRow - gap - top))
-  local middle = nameRow + B.Height / 2
+  self.rule.frame:SetSize(width, math.max(m.row, nameRow - gap - top))
+  self.rule:Style()
   self.apply.frame:ClearAllPoints()
-  self.apply.frame:SetPoint("RIGHT", frame, "TOPRIGHT", -pad, -middle)
+  pixel:Row(self.apply.frame, "TOPRIGHT", frame, pad, m.row, nil, nameRow)
   self.results:ClearAllPoints()
-  self.results:SetPoint("LEFT", frame, "TOPLEFT", pad, -middle)
-  self.results:SetPoint("RIGHT", self.apply.frame, "LEFT", -gap, 0)
+  pixel:Row(self.results, "TOPLEFT", frame, pad, m.row, nil, nameRow)
+  pixel:Row(self.results, "TOPRIGHT", frame, pad + self.apply.frame:GetWidth() + gap, m.row, nil, nameRow)
   self.grid.frame:ClearAllPoints()
   self.grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -box)
-  self.grid:Place(width, math.max(1, self.height - box - pad))
+  self.grid:Place(width, math.max(pixel:Unit(frame), self.height - box - pad))
 end
 
 -- The Added Items tab.
@@ -1427,7 +1462,7 @@ end
 ---@return number
 function itemsTabProto:Measure(width)
   local _ = width
-  return tabHeight()
+  return tabHeight(self.frame)
 end
 
 ---@param x number
@@ -1654,31 +1689,29 @@ end
 -- layout puts the count, the filter and Remove All on top, the help under them, and the items taking
 -- the room left.
 ---@private
+-- In whole pixels (docs/next-pixel-perfect.md): the top row's parts centered on it by their tops, from
+-- the tab's corners; the help's height rounded up.
 function itemsTabProto:layout()
-  local K = style.Theme.Settings.Categories
-  local B = controls:Theme("Button")
-  local frame, pad, gap = self.frame, K.Pad, K.FieldGap
+  local frame = self.frame
+  local m = metricsOf(frame)
+  local pad, gap = m.pad, m.gap
   local width = self.width - 2 * pad
   local y = pad
-  local middle = y + B.Height / 2
   self.removeAll.frame:ClearAllPoints()
-  self.removeAll.frame:SetPoint("RIGHT", frame, "TOPRIGHT", -pad, -middle)
+  pixel:Row(self.removeAll.frame, "TOPRIGHT", frame, pad, m.row, nil, y)
+  local filterRight = self.removeAll.frame:IsShown() and (pad + self.removeAll.frame:GetWidth() + gap) or pad
   self.filter.frame:ClearAllPoints()
-  if self.removeAll.frame:IsShown() then
-    self.filter.frame:SetPoint("RIGHT", self.removeAll.frame, "LEFT", -gap, 0)
-  else
-    self.filter.frame:SetPoint("RIGHT", frame, "TOPRIGHT", -pad, -middle)
-  end
+  pixel:Row(self.filter.frame, "TOPRIGHT", frame, filterRight, m.row, nil, y)
   self.count:ClearAllPoints()
-  self.count:SetPoint("LEFT", frame, "TOPLEFT", pad, -middle)
-  y = y + B.Height + gap
+  pixel:Row(self.count, "TOPLEFT", frame, pad, m.row, nil, y)
+  y = y + m.row + gap
   self.help:ClearAllPoints()
   self.help:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
   self.help:SetWidth(width)
-  y = y + math.ceil(self.help:GetStringHeight()) + gap
+  y = y + pixel:Ceil(frame, self.help:GetStringHeight()) + gap
   for _, grid in ipairs({ self.grid, self.readOnly }) do
     grid.frame:ClearAllPoints()
     grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
-    grid:Place(width, math.max(1, self.height - y - pad))
+    grid:Place(width, math.max(pixel:Unit(frame), self.height - y - pad))
   end
 end

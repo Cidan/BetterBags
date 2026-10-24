@@ -367,6 +367,7 @@ describe("NextSettingsContent", function()
     it("names only settings the catalog has, for the page's bag; the classic bags' own only for them", function()
       local classicOnly = { bagFading = true, animateItemMovement = true, fullSectionNames = true,
         resizableWindow = true, snapToContent = true, itemsPerRow = true, columns = true, opacity = true, scale = true }
+      local nextOnly = { nextIconScale = true, nextBagScale = true }
       addon.hasGuildBank = true
       content:Init()
       local named = 0
@@ -379,6 +380,9 @@ describe("NextSettingsContent", function()
                 if classicOnly[row.setting] then
                   assert.are.equal("classic", row.design or section.design, row.setting)
                 end
+                if nextOnly[row.setting] then
+                  assert.are.equal("next", row.design or section.design or tab.design, row.setting)
+                end
                 if catalog:Has(row.setting, page.bag) then
                   assert.has_no.errors(function() catalog:Get(row.setting, page.bag) end, row.setting)
                 else
@@ -389,7 +393,7 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      assert.are.equal(11 + 3 * 29, named)
+      assert.are.equal(13 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -438,9 +442,16 @@ describe("NextSettingsContent", function()
       override(sonata, "RestoreSavedTheme", function() end)
     end)
 
+    local function shownTabIds()
+      local ids = {}
+      for _, tab in ipairs(pages:ShownTabs(pages:Get("appearance"))) do table.insert(ids, tab.id) end
+      return ids
+    end
+
     -- Asked: no classic (item button) themes while BetterBags Next is in use.
     it("picks BetterBags Next's theme alone while Next is in use", function()
       settings:Open("appearance")
+      assert.are.equal("theme", settings.tabId)
       local rows = rowsShown()
       assert.are.equal(1, #rows)
       assert.are.equal(sonataNext, rows[1].engine)
@@ -455,6 +466,40 @@ describe("NextSettingsContent", function()
       assert.are.equal(sonata, rows[1].engine)
       assert.are.equal(sonataNext, rows[2].engine)
       assert.are.same({ "Bag Theme", "Settings Window" }, { settings.page.sections[1].title, settings.page.sections[2].title })
+    end)
+
+    -- Asked: "make 'Theme' here a tab, and add a tab for 'Size'; here we have a slider for 'icon scale' in
+    -- the bag, and another slider for 'bag scale'" (docs/next-appearance-size.md).
+    it("has a Theme tab and, with BetterBags Next, a Size tab with Icon Scale and Bag Scale", function()
+      override(db, "GetNextIconScale", function() return 120 end)
+      override(db, "GetNextBagScale", function() return 85 end)
+      assert.are.same({ "theme", "size" }, shownTabIds())
+      settings:Open("appearance", "size")
+      assert.are.equal("size", settings.tabId)
+      assert.is_true(settings.tabs.frame:IsShown())
+      assert.are.equal(120, rowTitled("Icon Scale").control:GetValue())
+      assert.are.equal(85, rowTitled("Bag Scale").control:GetValue())
+    end)
+
+    it("has only the Theme tab with the classic bags, which size themselves on each bag's page", function()
+      design = "classic"
+      assert.are.same({ "theme" }, shownTabIds())
+      settings:Open("appearance", "size")
+      assert.are.equal("theme", settings.tabId)
+      assert.is_false(settings.tabs.frame:IsShown())
+      override(db, "GetMaxItemLevel", function() return 100 end)
+      settings:Search(addon:GetModule("Context"):New("spec"), "icon scale")
+      assert.are.same({}, settings.page.sections, "no Size tab to find")
+    end)
+
+    it("finds Icon Scale with BetterBags Next", function()
+      override(db, "GetMaxItemLevel", function() return 100 end)
+      override(db, "GetNextIconScale", function() return 100 end)
+      override(db, "GetNextBagScale", function() return 100 end)
+      -- Its search box is in the window.
+      settings:Open("appearance")
+      settings:Search(addon:GetModule("Context"):New("spec"), "icon scale")
+      assert.are.equal("Appearance > Size", settings.page.sections[1].title)
     end)
   end)
 
@@ -918,5 +963,147 @@ describe("NextSettingsContent", function()
         assert.is_true(live.ran)
       end)
     end)
+  end)
+
+  -- BetterBags Next, pixel perfect (docs/next-pixel-perfect.md): every page and tab of the settings window,
+  -- at rest, on whole screen pixels, on the reporter's window at 65% and 70%, a common screen at 64% and a
+  -- large one at 115% (where the window scales itself down to fit), for both designs.
+  describe("on the screen's pixels", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local pixel = addon:GetModule("NextPixel")
+    local undo
+
+    after_each(function()
+      if undo then undo() undo = nil end
+      settings:Close()
+      for _ = 1, 3 do tween:Step(5) end
+    end)
+
+    local function settle()
+      for _ = 1, 3 do
+        tween:Step(5)
+        render:Flush()
+      end
+    end
+
+    local function offGrid()
+      settle()
+      return layout.PixelCheck(settings.frame, { owners = { settings = settings } })
+    end
+
+    -- Every setting the real catalog and panes read (config/catalog.lua, next/settings/*.lua), at
+    -- core/constants.lua's defaults, so every page opens with what a fresh profile shows.
+    before_each(function()
+      local function per(value)
+        return function() return value end
+      end
+      local stacking = { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = true, dontMergePartial = false,
+        dontMergeTransmog = false }
+      local size = { columnCount = 2, itemsPerRow = 7, scale = 100, width = 700, height = 500, opacity = 89,
+        sizeMode = "content", snapToContent = true }
+      local filters = { Type = true, Subtype = false, Expansion = false, TradeSkill = false, RecentItems = true,
+        GearSet = true, EquipmentLocation = true }
+      local colors = { low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 }, mid = { red = 1, green = 1, blue = 1, alpha = 1 },
+        high = { red = 0, green = 0.55, blue = 0.87, alpha = 1 }, max = { red = 1, green = 0.5, blue = 0, alpha = 1 } }
+      local profile = { newItemTime = 300 }
+      for name, value in pairs({
+        GetAnimateItemMovement = per(false), GetBagSizeInfo = per(size), GetBagSizeMode = per("content"),
+        GetBagSnapToContent = per(true), GetBagView = per(2), GetCategoryFilters = per(filters),
+        GetCategorySell = per(false), GetChangelogAutoOpen = per(true), GetCustomSectionSort = per({}),
+        GetData = per({ profile = profile }), GetEnableBagFading = per(false), GetEnableBankBag = per(true),
+        GetEnterToMakeCategory = per(true), GetGlowIntensity = per(60), GetGroupsEnabled = per(false),
+        GetInBagSearch = per(true), GetItemLevelColors = per(colors), GetItemLevelOptions = per({ enabled = true, color = true }),
+        GetItemSortType = per(1), GetMarkRecentItems = per(false), GetMaxItemLevel = per(1), GetNextBagScale = per(100),
+        GetNextEnabled = per(design == "next"), GetNextIconScale = per(100), GetPreserveItemGaps = per(true),
+        GetSectionSortType = per(1), GetShowAllFreeSpace = per(false), GetShowBagButton = per(true),
+        GetShowFullSectionNames = per(false), GetShowNewItemFlash = per(false), GetStackingOptions = per(stacking),
+        GetCurrentProfileName = per("Default"), GetAvailableProfiles = per({ "Default" }),
+        GetProfileCharacterCounts = per({ Default = 1 }),
+      }) do
+        override(db, name, value)
+      end
+      local items = addon:GetModule("Items")
+      override(items, "GetActiveUpgradeProvider", per("None"))
+      -- Two categories: one of added items, one by a search rule (data/categories.lua's shapes).
+      local cats = addon:GetModule("Categories")
+      local categoryFilters = {
+        Mats = { name = "Mats", itemList = { [2589] = true, [2592] = true }, enabled = { [0] = true, [1] = true },
+          priority = 10 },
+        Potions = { name = "Potions", itemList = {}, searchCategory = { query = "type = consumable" },
+          enabled = { [0] = true, [1] = true }, priority = 20 },
+      }
+      override(cats, "GetOrder", per({ "Mats", "Potions" }))
+      override(cats, "GetAllCategories", per(categoryFilters))
+      override(cats, "GetCategoryByName", function(_, name) return categoryFilters[name] end)
+      override(cats, "DoesCategoryExist", function(_, name) return categoryFilters[name] ~= nil end)
+      override(cats, "GetMergedCategory", function(_, name)
+        return { name = name, itemList = categoryFilters[name] and categoryFilters[name].itemList or {} }
+      end)
+      override(cats, "RuleOf", function(_, filter)
+        return filter and filter.searchCategory and filter.searchCategory.query or nil
+      end)
+      override(cats, "GetIgnoredItems", per({}))
+      override(cats, "IgnoresItem", per(false))
+      -- The classic bags' themes (Sonata), for their picker on Appearance.
+      local classicThemes = {
+        Default = { Name = "Default", DisplayName = "Default", Description = "Blizzard's look." },
+        SimpleDark = { Name = "SimpleDark", DisplayName = "Simple Dark", Description = "A dark, flat look." },
+      }
+      override(sonata, "GetThemes", per(classicThemes))
+      override(sonata, "IsAvailable", per(true))
+      override(sonata, "IsSelectable", per(true))
+      override(sonata, "GetCurrentThemeKey", per("Default"))
+      override(sonata, "GetSavedThemeKey", per("Default"))
+      override(sonata, "RestoreSavedTheme", function() end)
+      override(sonata, "ApplyTheme", function() end)
+      -- A client with currencies (retail), for the classic bags' Currency page: Blizzard's list, a heading
+      -- and two currencies (CurrencyConstantsDocumentation's CurrencyInfo fields).
+      override(addon, "isRetail", true)
+      local currencies = {
+        { name = "Dungeon and Raid", isHeader = true, isHeaderExpanded = true },
+        { name = "Valor", quantity = 1234, maxQuantity = 3000, iconFileID = 101, isShowInBackpack = true },
+        { name = "Honor", quantity = 50, maxQuantity = 0, iconFileID = 102, isShowInBackpack = false },
+      }
+      override(_G, "C_CurrencyInfo", setmetatable({
+        GetCurrencyListSize = function() return #currencies end,
+        GetCurrencyListInfo = function(i) return currencies[i] end,
+        ExpandCurrencyList = function() end,
+        SetCurrencyBackpack = function() end,
+      }, { __index = _G.C_CurrencyInfo }))
+    end)
+
+    for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 3396, 1362, 0.70 }, { 1920, 1080, 0.64 }, { 2560, 1440, 1.15 } }) do
+      for _, which in ipairs({ "next", "classic" }) do
+        local name = string.format("%dx%d at %d%%, %s", screen[1], screen[2], screen[3] * 100, which)
+        it("draws every page and tab on whole pixels, " .. name, function()
+          design = which
+          undo = layout.UseScreen(screen[1], screen[2], screen[3])
+          local problems = {}
+          local listed = {}
+          for _, page in ipairs(pages:List()) do listed[page.id] = true end
+          assert.are.equal(which == "classic", listed.currency == true, "the classic bags' Currency page")
+          for _, page in ipairs(pages:List()) do
+            for _, tab in ipairs(pages:ShownTabs(page)) do
+              settings:Open(page.id, tab.id)
+              for _, line in ipairs(offGrid()) do
+                table.insert(problems, page.id .. "/" .. tab.id .. ": " .. line)
+              end
+              -- Scrolled partway: its content, and the list of pages.
+              settings.scroll.scrollBox._scrollRange = pixel:Length(settings.frame, 517)
+              settings.scroll.scrollBox:SetScrollPercentage(0.37, true)
+              settings.navBox._scrollRange = pixel:Length(settings.frame, 83)
+              settings.navBox:SetScrollPercentage(0.61, true)
+              for _, line in ipairs(offGrid()) do
+                table.insert(problems, page.id .. "/" .. tab.id .. " scrolled: " .. line)
+              end
+              settings.scroll.scrollBox._scrollRange, settings.navBox._scrollRange = nil, nil
+              settings.scroll.scrollBox:SetScrollPercentage(0, true)
+              settings.navBox:SetScrollPercentage(0, true)
+            end
+          end
+          assert.are.same({}, problems)
+        end)
+      end
+    end
   end)
 end)

@@ -115,6 +115,20 @@ describe("NextVendorButton", function()
       assert.are_not.equal(b, vendorButton:Acquire())
     end)
 
+    -- Icon Scale is the bags' item buttons' (docs/next-appearance-size.md): a card keeps the theme's
+    -- size, its name's two lines beside the icon.
+    it("keeps the theme's icon size whatever the player's Icon Scale", function()
+      style:SetIconScale(150)
+      local b = vendorButton:Acquire()
+      b:Style()
+      assert.are.same({ style.VENDOR_CARD_WIDTH, style.CARD_ICON }, { b.frame:GetSize() })
+      assert.are.same({ style.CARD_ICON, style.CARD_ICON }, { b.button:GetSize() })
+      assert.are.equal(style.Theme.Layout.Icon, style.CARD_ICON)
+      assert.are_not.equal(style.ICON, style.CARD_ICON)
+      style:SetIconScale(100)
+      b:Release()
+    end)
+
     -- Masque skins a button against its own size (Core.lua UpdateScale), so the button it skins is
     -- the square icon; the name and price are labels beside it on the card the canvas places.
     it("holds a square button with Masque's parts, its name and price beside it", function()
@@ -153,6 +167,22 @@ describe("NextVendorButton", function()
       vendorButton:Acquire()
       assert.are.equal(1, #calls.messages)
       assert.are.same({ "vendor/NewButton", b }, { calls.messages[1].name, calls.messages[1].args[1] })
+    end)
+
+    -- A card is made before the canvas it goes in: placed on another grid (docs/next-pixel-perfect.md) it
+    -- styles itself again, which draws its icon, count and highlight again over Masque's skin, so it says
+    -- so (vendor/Updated: Masque's integration skins it again). On the grid it was styled for it does nothing.
+    it("announces that it styled itself again on a new grid, for Masque, and nothing on the same grid", function()
+      local b = vendorButton:Acquire()
+      local parent = CreateFrame("Frame")
+      parent:SetScale(0.8)
+      b.frame:SetParent(parent)
+      calls.messages = {}
+      b:Fit()
+      assert.are.same({ { name = "vendor/Updated", args = { b } } }, { calls.messages[1] })
+      assert.are.equal(1, #calls.messages)
+      b:Fit()
+      assert.are.equal(1, #calls.messages, "the same grid")
     end)
 
     -- Asked: "the count for items in vendor, that font size should match our item count in bags":

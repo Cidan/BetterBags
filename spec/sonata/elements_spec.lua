@@ -79,8 +79,118 @@ describe("SonataElements", function()
   end)
 
   describe("item buttons", function()
+    -- BetterBags Next puts its item buttons on whole screen pixels (docs/next-pixel-perfect.md): while it is
+    -- in use it gives the styler its rounding of offsets and lengths, and every part the styler places
+    -- goes through it. Here a stand-in rounding that is easy to see: offsets times 10, lengths times 100.
+    describe("with BetterBags Next's rounding", function()
+      local seen
+      local snap = {
+        Offset = function(region, units)
+          table.insert(seen, region)
+          return units * 10
+        end,
+        Length = function(_, units) return units * 100 end,
+        Unit = function() return 0.5 end,
+      }
+
+      before_each(function()
+        seen = {}
+        elements.itemSnap = snap
+      end)
+
+      after_each(function()
+        elements.itemSnap = nil
+      end)
+
+      it("rounds the icon's inset and the count's place", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { Icon = { Inset = 1 } })
+        assert.are.equal(0.5, b.sonataSnapUnit, "records the grid it rounded on")
+        local point, relativeTo, _, x, y = b.icon:GetPoint(1)
+        assert.are.same({ "TOPLEFT", b, 10, -10 }, { point, relativeTo, x, y })
+        assert.are.same({ "BOTTOMRIGHT", b, "BOTTOMRIGHT", -50, 20 }, { b.Count:GetPoint(1) })
+        assert.are.equal(b.Count, seen[#seen], "on the count's own grid")
+      end)
+
+      it("rounds a backdrop's inset and its edges' place and thickness", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { Backdrop = { Color = { 0, 0, 0, 1 }, Inset = 1, BorderColor = { 0, 0, 0, 1 },
+          EdgeSize = 1, BorderInset = 2 } })
+        local skin = b.sonataSkin
+        assert.are.same({ "TOPLEFT", b, "TOPLEFT", 10, -10 }, { skin.fill:GetPoint(1) })
+        assert.are.same({ "TOPLEFT", b, "TOPLEFT", 20, -20 }, { skin.edges[1]:GetPoint(1) })
+        assert.are.equal(100, skin.edges[1]:GetHeight())
+        assert.are.equal(100, skin.edges[3]:GetWidth())
+      end)
+
+      it("rounds the upgrade arrow's size on its own grid, its scale included", function()
+        local b = itemDecoration()
+        b.UpgradeIcon:SetSize(0.13, 0.15)
+        elements:StyleItemButton(b, { UpgradeIcon = { Scale = 1.2 } })
+        assert.are.same({ 13, 15 }, { b.UpgradeIcon:GetSize() })
+      end)
+    end)
+
+    -- With BetterBags Next's own rounding (NextPixel, as SonataNext gives it) on the reporter's window at 65%,
+    -- every part the styler places is on whole screen pixels.
+    it("puts every part it places on whole pixels with BetterBags Next's rounding", function()
+      local layout = dofile("spec/helpers/layout.lua")
+      local pixel = addon:GetModule("NextPixel")
+      local undo = layout.UseScreen(3396, 1362, 0.65)
+      elements.itemSnap = {
+        Offset = function(region, units) return pixel:Snap(region, units) end,
+        Length = function(region, units) return pixel:Length(region, units) end,
+        Unit = function(region) return pixel:Unit(region) end,
+      }
+      local window = CreateFrame("Frame", nil, UIParent)
+      window:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+      window:SetSize(300, 300)
+      local b = itemDecoration()
+      b:SetParent(window)
+      b:ClearAllPoints()
+      b:SetPoint("TOPLEFT", window, "TOPLEFT", pixel:Snap(window, 30), -pixel:Snap(window, 30))
+      local size = pixel:Length(window, 44)
+      b:SetSize(size, size)
+      b.UpgradeIcon:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
+      b.UpgradeIcon:SetSize(15.4, 14.2)
+      b.Count:SetFontObject(GameFontNormal)
+      b.Count:SetText("20")
+      b.Count:Show()
+      elements:StyleItemButton(b, { Icon = { Inset = 1.3 }, UpgradeIcon = { Scale = 1.2 },
+        Backdrop = { Color = { 0, 0, 0, 1 }, Inset = 0.7, BorderColor = { 0, 0, 0, 1 }, EdgeSize = 1,
+          BorderInset = { Left = -1, Right = -2, Top = -1, Bottom = -2 } },
+        Count = { Points = { { Point = "BOTTOMRIGHT", X = -3.4, Y = 2.2 } } } })
+      local problems = {}
+      for _, line in ipairs(layout.PixelCheck(window)) do
+        table.insert(problems, line)
+      end
+      elements.itemSnap = nil
+      undo()
+      -- Every region the styler placed is among those checked; none is off the grid.
+      assert.are.equal(4, #b.sonataSkin.edges)
+      assert.are.same({}, problems)
+    end)
+
+    it("sets and clears BetterBags Next's rounding, restyling every item button", function()
+      local restyled = {}
+      local saved = sonata.restyleKind
+      sonata.restyleKind = function(_, kind) table.insert(restyled, kind) end
+      local applied = sonata.applied
+      sonata.applied = true
+      local snap = { Offset = function(_, u) return u end, Length = function(_, u) return u end,
+        Unit = function() return 1 end }
+      elements:SetItemButtonSnap(snap)
+      assert.are.equal(snap, elements.itemSnap)
+      elements:SetItemButtonSnap(snap)
+      elements:SetItemButtonSnap(nil)
+      sonata.restyleKind, sonata.applied = saved, applied
+      assert.is_nil(elements.itemSnap)
+      assert.are.same({ "ItemButton", "ItemButton" }, restyled, "once per change")
+    end)
+
     it("insets and crops the icon", function()
       local b = itemDecoration()
+      b.sonataSnapUnit = 0.5
       elements:StyleItemButton(b, { Icon = { Inset = 1, TexCoords = { 0.08, 0.92, 0.08, 0.92 } } })
       local point, relativeTo, _, x, y = b.icon:GetPoint(1)
       assert.are.same({ "TOPLEFT", b, 1, -1 }, { point, relativeTo, x, y })
@@ -88,6 +198,7 @@ describe("SonataElements", function()
       elements:StyleItemButton(b, {})
       assert.are.equal(b, b.icon._allPoints)
       assert.are.same({ 0, 1, 0, 1 }, b.icon._texCoords)
+      assert.is_nil(b.sonataSnapUnit, "no grid without BetterBags Next's rounding")
     end)
 
     it("sets the highlight and pushed art, back to Blizzard's without a style", function()

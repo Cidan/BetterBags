@@ -57,6 +57,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextListReorder: AceModule
 local reorder = addon:GetModule('NextListReorder')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextSettingsBagCategories is a bag's categories, on its Categories tab (next-settings.md §5,
 -- category-lifecycle.md §6): categories are defined once on the Categories page, and a bag arranges
 -- them. A wide row listing the pinned categories in their order (customSectionSort), then every other
@@ -150,6 +153,7 @@ function bagCategories:Create(parent, owner, bag)
   })
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
+  pixel:SnapScroll(box)
   local content = CreateFrame("Frame", nil, box)
   content.scrollable = true
   local view = CreateScrollBoxLinearView()
@@ -163,10 +167,7 @@ function bagCategories:Create(parent, owner, bag)
     box = box, content = content, first = 2,
     entries = function() return block.entries end,
     rowOf = function(entry) return block.byKey[keyOf(entry)].frame end,
-    heightOf = function(entry)
-      local K = style.Theme.Settings.BagCategories
-      return entry.header and K.GroupHeight or K.RowHeight
-    end,
+    heightOf = function(entry) return block:heightOf(entry) end,
     onDrop = function(name, after) block:Drop(name, after) end,
   })
   table.insert(self.all, block)
@@ -180,6 +181,15 @@ function bagCategories:Create(parent, owner, bag)
   end
   block:Style()
   return block
+end
+
+-- heightOf is an entry's row's height in whole pixels (docs/next-pixel-perfect.md): a heading's or a
+-- category's.
+---@param entry table
+---@return number
+function listProto:heightOf(entry)
+  local K = style.Theme.Settings.BagCategories
+  return pixel:Length(self.frame, entry.header and K.GroupHeight or K.RowHeight)
 end
 
 -- Style draws the list from the theme and lays it out again.
@@ -361,7 +371,6 @@ end
 -- arrangement places them (NextListReorder: a row that moved slides).
 ---@private
 function listProto:layoutList()
-  local K = style.Theme.Settings.BagCategories
   local listed = {}
   self.rows = {}
   for i, entry in ipairs(self.entries) do
@@ -369,7 +378,7 @@ function listProto:layoutList()
     listed[keyOf(entry)] = true
     self.rows[i] = row
     row.entry = entry
-    row.frame:SetHeight(entry.header and K.GroupHeight or K.RowHeight)
+    row.frame:SetHeight(self:heightOf(entry))
     row.frame:EnableMouse(entry.header ~= true)
     row.toggle.frame:Hide()
     row.remove.frame:Hide()
@@ -410,24 +419,33 @@ end
 ---@param row NextBagCategoryRow
 function listProto:paintRow(row)
   local K = style.Theme.Settings.BagCategories
-  local entry = row.entry
+  local entry, frame = row.entry, row.frame
+  local indent = pixel:Snap(frame, K.Indent)
   row.label:ClearAllPoints()
   row.note:ClearAllPoints()
   if entry == nil or entry.header then
     style:SetFont(row.label, K.GroupFont)
-    row.label:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", K.Indent, 4)
+    row.label:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", indent, pixel:Snap(frame, 4))
     row.hover:Hide()
     return
   end
+  -- From the row's corners, each centered on its height by its top (docs/next-pixel-perfect.md); the name
+  -- stops short of the note by the note's width rounded up, never at the note's far edge.
   style:SetFont(row.label, K.Font)
   style:SetFont(row.note, K.NoteFont)
+  local height = self:heightOf(entry)
   row.toggle.frame:ClearAllPoints()
-  row.toggle.frame:SetPoint("RIGHT", row.frame, "RIGHT", -K.Indent, 0)
+  pixel:Row(row.toggle.frame, "TOPRIGHT", frame, indent, height)
   row.remove.frame:ClearAllPoints()
-  row.remove.frame:SetPoint("RIGHT", row.frame, "RIGHT", -K.Indent, 0)
-  row.note:SetPoint("RIGHT", row.frame, "RIGHT", -K.Indent, 0)
-  row.label:SetPoint("LEFT", row.frame, "LEFT", K.Indent, 0)
-  row.label:SetPoint("RIGHT", row.note, "LEFT", -6, 0)
+  pixel:Row(row.remove.frame, "TOPRIGHT", frame, indent, height)
+  pixel:Row(row.note, "TOPRIGHT", frame, indent, height)
+  local note = row.note:GetText()
+  local right = indent
+  if note ~= nil and note ~= "" then
+    right = indent + pixel:Ceil(frame, row.note:GetStringWidth()) + pixel:Snap(frame, 6)
+  end
+  pixel:Row(row.label, "TOPLEFT", frame, indent, height)
+  pixel:Row(row.label, "TOPRIGHT", frame, right, height)
   controls:Paint(row.hover, row.hovered and K.HoverFill or false)
 end
 
@@ -556,7 +574,7 @@ end
 ---@return number
 function listProto:Measure(width)
   local _ = width
-  return style.Theme.Settings.BagCategories.Height
+  return pixel:Length(self.frame, style.Theme.Settings.BagCategories.Height)
 end
 
 -- Place lays the list out: its filter at the top, the rows under it.
@@ -568,18 +586,20 @@ function listProto:Place(x, y, width, height)
   self.x, self.y, self.width, self.height = x, y, width, height
   local K = style.Theme.Settings.BagCategories
   local I = controls:Theme("Input")
-  local frame, pad = self.frame, K.Pad
+  local frame = self.frame
+  local pad = pixel:Snap(frame, K.Pad)
   frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
-  frame:SetSize(width, height)
+  pixel:Point(frame, "TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
+  pixel:Size(frame, width, height)
   self.fill:ClearAllPoints()
   self.fill:SetAllPoints(frame)
   self.filter.frame:ClearAllPoints()
   self.filter.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad)
   self.filter.frame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -pad)
+  self.filter:Style()
   self.listBox:ClearAllPoints()
-  self.listBox:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -(pad + I.Height + pad))
+  self.listBox:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -(pad + pixel:Length(frame, I.Height) + pad))
   self.listBox:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -pad, pad)
-  self.drag:Arrange(width - 2 * pad)
+  self.drag:Arrange(frame:GetWidth() - 2 * pad)
   frame:Show()
 end

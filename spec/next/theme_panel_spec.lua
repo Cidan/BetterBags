@@ -136,6 +136,8 @@ describe("BetterBags Next's panels and themes", function()
     override(stubs.items, "ExpireRecentItems", function() return false end)
     override(stubs.items, "ClearBankCache", function() end)
     override(stubs.database, "GetNextTheme", function() return db.theme end)
+    override(stubs.database, "GetNextIconScale", function() return 100 end)
+    override(stubs.database, "GetNextBagScale", function() return 100 end)
     override(stubs.database, "SetNextTheme", function(_, key) db.theme = key end)
     override(stubs.database, "GetNextSize", function() return db.size end)
     override(stubs.database, "SetNextSize", function(_, size) db.size = size end)
@@ -406,7 +408,12 @@ describe("BetterBags Next's panels and themes", function()
       local bag = nextBag:Create(ctx())
       apply({ Header = { TitleGlow = { Texture = "Glow", Color = "White", Alpha = 0.5, X = 10, Y = 5 } } })
       local glow = bag.titleGlow
-      assert.are.same({ "TOPLEFT", bag.title, "TOPLEFT", -10, 5 }, { glow:GetPoint(1) })
+      -- From the body's corner by whole pixels (docs/next-pixel-perfect.md): the title's place less the
+      -- spread, as wide as its text (rounded up) and as tall as its font, plus the spread on each side.
+      local inset = style.PAD + style.TITLE_INSET
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", inset - 10, -(style.TITLE_TOP - 5) }, { glow:GetPoint(1) })
+      local _, fontHeight = bag.title:GetFont()
+      assert.are.same({ math.ceil(bag.title:GetStringWidth()) + 20, fontHeight + 10 }, { glow:GetSize() })
       local r, g, b = glow:GetVertexColor()
       assert.are.same({ 1, 1, 1 }, { r, g, b })
       bag.titleButton:GetScript("OnEnter")(bag.titleButton)
@@ -483,7 +490,7 @@ describe("BetterBags Next's panels and themes", function()
       local first, second = bag.headerButtons[1], bag.headerButtons[2]
       assert.are.equal(30, first:GetWidth())
       assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -20 }, { first:GetPoint(1) })
-      assert.are.same({ "RIGHT", first, "LEFT", -4, 0 }, { second:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", first, "TOPLEFT", -4, 0 }, { second:GetPoint(1) })
       assert.are.same({ 1, 0.84, 0.5, 1 }, { first.icon:GetVertexColor() })
       first:GetScript("OnEnter")(first)
       assert.are.same({ 0.78, 0.72, 1.0, 1 }, { first.icon:GetVertexColor() })
@@ -604,7 +611,9 @@ describe("BetterBags Next's panels and themes", function()
 
     -- Asked: "we need to scale our icons as part of the quiet theme (icon scale should be part of
     -- theme spec in sonata)". An icon's size is a share of its button (Header.Buttons.Scale, times its
-    -- own Scale), centered in it; the button, its click area and its place stay the layout's.
+    -- own Scale), centered in it; the button, its click area and its place stay the layout's. Both in
+    -- whole pixels, the icon centered by its top left with the odd pixel to the right and bottom
+    -- (docs/next-pixel-perfect.md).
     local function iconSize(button)
       return { button.icon:GetWidth(), button.icon:GetHeight() }
     end
@@ -614,7 +623,7 @@ describe("BetterBags Next's panels and themes", function()
       for _, panel in ipairs({ bag, bank }) do
         every(panel, function(button)
           assert.are.same({ style.HEADER_BUTTON, style.HEADER_BUTTON }, iconSize(button), button.key)
-          assert.are.same({ "CENTER", button, "CENTER", 0, 0 }, { button.icon:GetPoint(1) }, button.key)
+          assert.are.same({ "TOPLEFT", button, "TOPLEFT", 0, 0 }, { button.icon:GetPoint(1) }, button.key)
         end)
       end
     end)
@@ -624,9 +633,10 @@ describe("BetterBags Next's panels and themes", function()
       apply({ Header = { Buttons = { Scale = 0.5, Icons = { closeButton = { Scale = 0.5 } } } } })
       assert.are.same({ 11, 11 }, iconSize(bag.settingsButton))
       assert.are.same({ 11, 11 }, iconSize(bag.sizeButton))
-      assert.are.same({ 5.5, 5.5 }, iconSize(bank.closeButton))
+      assert.are.same({ 6, 6 }, iconSize(bank.closeButton), "5.5 rounded to a whole pixel")
       assert.are.equal(22, bag.settingsButton:GetWidth(), "the button keeps its size")
-      assert.are.same({ "CENTER", bag.settingsButton, "CENTER", 0, 0 }, { bag.settingsButton.icon:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", bag.settingsButton, "TOPLEFT", 5, -5 }, { bag.settingsButton.icon:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", bank.closeButton, "TOPLEFT", 8, -8 }, { bank.closeButton.icon:GetPoint(1) })
       bag:UpdateSizeButton()
       assert.are.same({ 11, 11 }, iconSize(bag.sizeButton), "through a size switch")
       apply({ Layout = { HeaderButton = 30 }, Header = { Buttons = { Scale = 0.5 } } })

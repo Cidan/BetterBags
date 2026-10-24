@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextControls is what every BetterBags Next control draws with (next-settings.md §2): fills and
 -- edges read from the Next theme's Controls. A control is BetterBags' own, made of plain frames and
 -- textures, and restyled on every theme.
@@ -79,7 +82,10 @@ function controls:PaintEdge(edge, spec, alpha)
     end
     return
   end
-  local frame, size = edge.frame, spec.Size or 1
+  -- Whole pixels thick on the frame's grid, never thinner than one (docs/next-pixel-perfect.md): from the
+  -- frame's corners, so on whole pixels when the frame is.
+  local frame = edge.frame
+  local size = pixel:Length(frame, spec.Size or 1)
   local top, bottom, left, right = edge.Top, edge.Bottom, edge.Left, edge.Right
   top:ClearAllPoints()
   top:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)

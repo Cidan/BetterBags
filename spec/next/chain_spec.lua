@@ -1063,12 +1063,14 @@ describe("NextChain", function()
       local grown = math.max(style.FEATHER, style.Chain.CoupledFeather * gap())
       assert.is_true(grown > gap() / 2, "they overlap in the middle")
       assert.is_true(grown < gap(), "neither reaches the other bag")
+      -- In whole pixels (docs/next-pixel-perfect.md): the growth rounded.
+      local growth = math.floor(grown - style.FEATHER + 0.5)
       for _, panel in ipairs({ bank, backpack }) do
-        assert.is_true(math.abs(panel.feather:GetWidth() - grown) < 1e-6, panel:GetName() .. " grown")
+        assert.are.equal(style.FEATHER + growth, panel.feather:GetWidth(), panel:GetName() .. " grown")
       end
       -- Each still starts at its body edge: the grown part reaches past its frame into the gap.
-      assert.is_true(math.abs(select(4, bank.feather:GetPoint(1)) - (grown - style.FEATHER)) < 1e-6)
-      assert.is_true(math.abs(select(4, backpack.feather:GetPoint(1)) + (grown - style.FEATHER)) < 1e-6)
+      assert.are.equal(growth, select(4, bank.feather:GetPoint(1)))
+      assert.are.equal(-growth, select(4, backpack.feather:GetPoint(1)))
       click(backpack)
       step(style.Time.Uncouple / 2)
       local partway = bank.feather:GetWidth()

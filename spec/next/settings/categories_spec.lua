@@ -629,9 +629,12 @@ describe("NextSettingsCategories", function()
       place(tab)
       local K = style.Theme.Settings.Categories
       local B = controls:Theme("Button")
-      local function middleOf(i) return K.Pad + (i - 1) * (B.Height + K.FieldGap) + B.Height / 2 end
-      local _, _, _, _, colorY = tab.swatch.frame:GetPoint(1)
-      assert.are.equal(-middleOf(3), colorY, "color is the third row")
+      -- Each by its top left, centered on its row by whole pixels (docs/next-pixel-perfect.md).
+      local function topOf(i) return K.Pad + (i - 1) * (B.Height + K.FieldGap) end
+      local point, _, _, _, colorY = tab.swatch.frame:GetPoint(1)
+      assert.are.equal("TOPLEFT", point)
+      assert.are.equal(-(topOf(3) + math.floor((B.Height - tab.swatch.frame:GetHeight()) / 2)), colorY,
+        "color is the third row")
       local box = K.Pad + 3 * (B.Height + K.FieldGap) + K.FieldGap + B.Height + K.FieldGap
       local _, _, _, _, gridY = tab.grid.frame:GetPoint(1)
       assert.are.equal(-box, gridY)

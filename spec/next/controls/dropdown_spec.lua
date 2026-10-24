@@ -92,6 +92,16 @@ describe("NextMenu", function()
     end
   end)
 
+  -- The menu is drawn at UIParent's scale; what opened it may be in a window drawn smaller (the settings
+  -- window scales itself to fit a small screen): as wide as it on screen, not in its units.
+  it("is at least as wide on screen as what opened it, in a window drawn smaller", function()
+    anchor:GetParent():SetScale(0.5)
+    anchor:SetSize(300, 26)
+    local frame = open(items(2))
+    assert.are.equal(150, frame:GetWidth(), "300 of its units are 150 of the menu's")
+    anchor:GetParent():SetScale(1)
+  end)
+
   it("marks the chosen choice with its check and its font", function()
     open(items(3))
     local rows = nextMenu:Rows()
@@ -202,7 +212,9 @@ describe("NextDropdown", function()
     assert.are.equal(style:Font("ControlText"), d.text:GetFontObject())
     assert.are.equal(style.Theme.Textures.IconChevron, d.chevron:GetTexture())
     assert.are.same({ D().Chevron.Size, D().Chevron.Size }, { d.chevron:GetSize() })
-    assert.are.same({ "RIGHT", d.frame, "RIGHT", -D().Padding, 0 }, { d.chevron:GetPoint(1) })
+    -- By its top right, centered on its height by whole pixels (docs/next-pixel-perfect.md).
+    assert.are.same({ "TOPRIGHT", d.frame, "TOPRIGHT", -D().Padding, -math.floor((D().Height - D().Chevron.Size) / 2) },
+      { d.chevron:GetPoint(1) })
     assert.are.equal(D().Edge.Idle, alphaOf(d.edge.Top))
   end)
 

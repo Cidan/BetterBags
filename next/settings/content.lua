@@ -384,8 +384,9 @@ function content:Init()
   pages:Define({
     id = "appearance", group = L:G("BetterBags"), title = L:G("Appearance"),
     description = L:G("How BetterBags looks. A theme you pick shows at once; Apply Theme keeps it."),
-    -- BetterBags Next's themes draw its bags and this window; the classic bags' themes draw theirs.
-    tabs = { { id = "main", title = L:G("Appearance"), sections = {
+    -- BetterBags Next's themes draw its bags and this window; the classic bags' themes draw theirs. Size is
+    -- BetterBags Next's: the classic bags size themselves on each bag's page (docs/next-appearance-size.md).
+    tabs = { { id = "theme", title = L:G("Theme"), sections = {
       { title = L:G("Theme"), design = "next", rows = { {
         title = L:G("Theme"), keywords = { "theme", "look", "skin", "appearance", "style" },
         block = function(parent) return themes:Create(parent, sonataNext) end,
@@ -399,6 +400,8 @@ function content:Init()
           title = L:G("Settings Window Theme"), keywords = { "theme", "settings", "window" },
           block = function(parent) return themes:Create(parent, sonataNext) end,
         } } },
+    } }, { id = "size", title = L:G("Size"), design = "next", sections = {
+      { title = L:G("Size"), rows = { { setting = 'nextIconScale' }, { setting = 'nextBagScale' } } },
     } } },
   })
   pages:Define({

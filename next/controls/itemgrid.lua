@@ -18,6 +18,9 @@ local nextScrollBar = addon:GetModule('NextScrollBar')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextItemGrid is a scrolling grid of item icons for the settings window (next-settings.md §5), drawn
 -- from the theme (Controls.ItemGrid) in an input's fill and edge. Only the cells of the rows in view
 -- exist: they are placed for the rows the box shows and reused as it scrolls, so thousands of items
@@ -89,6 +92,7 @@ function itemGrid:Create(parent, opts)
   frame:EnableMouse(true)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
+  pixel:SnapScroll(box)
   local content = CreateFrame("Frame", nil, box)
   content.scrollable = true
   local view = CreateScrollBoxLinearView()
@@ -103,7 +107,7 @@ function itemGrid:Create(parent, opts)
   grid.bar = nextScrollBar:Create(box)
   grid.bar:Bind(box)
   grid.empty = style:CreateText(frame, controls:Theme("ItemGrid").EmptyFont)
-  grid.empty:SetPoint("CENTER", frame, "CENTER", 0, 0)
+  grid.empty:SetJustifyH("CENTER")
   box:RegisterCallback(BaseScrollBoxEvents.OnScroll, function() grid:ShowRows() end, grid)
   if opts.onDrop then
     local function drop(ctx, _, button)
@@ -135,16 +139,21 @@ function gridProto:Style()
   self:Layout()
 end
 
--- Place sizes the grid and lays it out.
+-- Place sizes the grid and lays it out, in whole pixels (docs/next-pixel-perfect.md): the box inside its
+-- edge, the empty text across it, centered on its height by its top.
 ---@param width number
 ---@param height number
 function gridProto:Place(width, height)
+  local frame = self.frame
+  width, height = pixel:Length(frame, width), pixel:Length(frame, height)
   self.width, self.height = width, height
-  self.frame:SetSize(width, height)
-  self.box:ClearAllPoints()
-  self.box:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 1, -1)
-  self.box:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -1, 1)
-  self.box:SetSize(math.max(1, width - 2), math.max(1, height - 2))
+  frame:SetSize(width, height)
+  local edge = pixel:Length(frame, 1)
+  pixel:Inset(self.box, frame, edge, edge, edge, edge)
+  self.box:SetSize(math.max(edge, width - 2 * edge), math.max(edge, height - 2 * edge))
+  self.empty:ClearAllPoints()
+  pixel:Row(self.empty, "TOPLEFT", frame, 0, height)
+  pixel:Row(self.empty, "TOPRIGHT", frame, 0, height)
   self:Layout()
 end
 
@@ -161,10 +170,11 @@ end
 -- Layout fits as many columns as the width takes and makes the content as tall as every row.
 function gridProto:Layout()
   local K = controls:Theme("ItemGrid")
-  local step = K.Size + K.Gap
-  self.columns = math.max(1, math.floor((self.width - 2 * K.Pad + K.Gap) / step))
+  local pad, size, gap = pixel:Lengths(self.frame, K.Pad, K.Size, K.Gap)
+  local step = size + gap
+  self.columns = math.max(1, math.floor((self.width - 2 * pad + gap) / step + 1e-6))
   local rows = math.ceil(#self.entries / self.columns)
-  local height = rows == 0 and 1 or 2 * K.Pad + rows * step - K.Gap
+  local height = rows == 0 and pixel:Unit(self.frame) or 2 * pad + rows * step - gap
   self.content:SetHeight(height)
   self.box:FullUpdate(true)
   self:ShowRows()
@@ -189,12 +199,13 @@ function gridProto:cell(i)
     count = style:CreateText(frame, K.CountFont),
     edge = controls:CreateEdge(frame, "OVERLAY"),
   }
-  cell.icon:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
-  cell.icon:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+  -- In whole pixels: the icon inside its one-pixel edge, the count in from its corner.
+  local edge, inset = pixel:Length(frame, 1), pixel:Snap(frame, 2)
+  pixel:Inset(cell.icon, frame, edge, edge, edge, edge)
   cell.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
   cell.hover:SetAllPoints(frame)
   controls:Paint(cell.hover, K.Hover)
-  cell.count:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -2, 2)
+  cell.count:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -inset, inset)
   cell.count:SetJustifyH("RIGHT")
   addon.SetScript(frame, "OnClick", function(ctx, _, button) self:Click(ctx, cell, button) end)
   addon.SetScript(frame, "OnReceiveDrag", function(ctx)
@@ -215,13 +226,14 @@ end
 -- ShowRows places a cell for each entry of the rows the box shows, and hides the rest.
 function gridProto:ShowRows()
   local K = controls:Theme("ItemGrid")
-  local step = K.Size + K.Gap
+  local pad, size, gap = pixel:Lengths(self.frame, K.Pad, K.Size, K.Gap)
+  local step = size + gap
   local n, columns = #self.entries, self.columns
   local offset = self.box:GetDerivedScrollOffset()
-  local view = math.max(0, self.height - 2)
+  local view = math.max(0, self.height - 2 * pixel:Length(self.frame, 1))
   local rows = math.ceil(n / columns)
-  local first = math.max(0, math.floor((offset - K.Pad) / step))
-  local last = math.min(rows - 1, math.floor((offset + view - K.Pad) / step))
+  local first = math.max(0, math.floor((offset - pad) / step))
+  local last = math.min(rows - 1, math.floor((offset + view - pad) / step))
   local used = 0
   for row = first, last do
     for column = 0, columns - 1 do
@@ -232,8 +244,8 @@ function gridProto:ShowRows()
       used = used + 1
       local cell = self:cell(used)
       cell.frame:ClearAllPoints()
-      cell.frame:SetPoint("TOPLEFT", self.content, "TOPLEFT", K.Pad + column * step, -(K.Pad + row * step))
-      cell.frame:SetSize(K.Size, K.Size)
+      cell.frame:SetPoint("TOPLEFT", self.content, "TOPLEFT", pad + column * step, -(pad + row * step))
+      cell.frame:SetSize(size, size)
       self:Draw(cell, self.entries[index])
       cell.frame:Show()
     end

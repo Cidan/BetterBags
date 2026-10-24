@@ -342,11 +342,15 @@ describe("NextBag", function()
         local t = box.textBox
         assert.are.equal(style:Font("Search"), box.helpText:GetFontObject())
         assert.are.equal("LEFT", box.helpText:GetJustifyH())
-        local point, rel, relPoint, x = box.helpText:GetPoint(1)
-        assert.are.same({ "LEFT", t.searchIcon, "RIGHT", style.SEARCH_GAP }, { point, rel, relPoint, x })
+        -- Each by its top left from the box's, centered in its height by whole pixels
+        -- (docs/next-pixel-perfect.md): the magnifier the gap in, the help text the gap past it.
+        local _, helpHeight = box.helpText:GetFont()
+        local helpTop = -math.floor((style.SEARCH_HEIGHT - helpHeight) / 2)
+        assert.are.same({ "TOPLEFT", t, "TOPLEFT", 2 * style.SEARCH_GAP + style.SEARCH_ICON, helpTop },
+          { box.helpText:GetPoint(1) })
         assert.are.same({ style.SEARCH_ICON, style.SEARCH_ICON }, { t.searchIcon:GetSize() })
-        point, rel, relPoint, x = t.searchIcon:GetPoint(1)
-        assert.are.same({ "LEFT", t, "LEFT", style.SEARCH_GAP }, { point, rel, relPoint, x })
+        assert.are.same({ "TOPLEFT", t, "TOPLEFT", style.SEARCH_GAP, -math.floor((style.SEARCH_HEIGHT - style.SEARCH_ICON) / 2) },
+          { t.searchIcon:GetPoint(1) })
         near(lavender(style.SearchIcon.Idle), color(t.searchIcon), "magnifier")
         assert.are.equal(style:Font("SearchText"), t:GetFontObject())
         assert.are.same({ style.SEARCH_GAP * 2 + style.SEARCH_ICON, 24, 0, 0 }, { t:GetTextInsets() })
@@ -440,7 +444,13 @@ describe("NextBag", function()
       end
       local join = bag.cloud.join
       assert.are.equal(style.CLOUD_GLOW, join:GetTexture())
-      assert.are.same({ "CENTER", bag.title, "LEFT", edge, 0 }, { join:GetPoint(1) })
+      -- Centered on the window's hard edge at the title's middle, by its top left in whole pixels
+      -- (docs/next-pixel-perfect.md).
+      local _, fontHeight = bag.title:GetFont()
+      local middle = style.TITLE_TOP + math.floor(fontHeight / 2)
+      local half = math.floor(join:GetWidth() / 2)
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", -half, -(middle - math.floor(join:GetHeight() / 2)) },
+        { join:GetPoint(1) })
       assert.are.equal(C.Join.A, join:GetAlpha())
       -- Back to front: the puffs, the ribbon, the join's puff.
       local function sub(t) return select(2, t:GetDrawLayer()) end
@@ -456,8 +466,9 @@ describe("NextBag", function()
       for _, t in ipairs(bag.frame._textures) do
         if t._width == 300 and t._height == 2 then
           lines = lines + 1
+          -- Its right edge at the body's left edge, the window's hard edge (docs/next-pixel-perfect.md).
           local point, to, relative, x = t:GetPoint(1)
-          assert.are.same({ "RIGHT", bag.title, "LEFT", edge }, { point, to, relative, x }, "every line of its glow")
+          assert.are.same({ "TOPRIGHT", bag.body, "TOPLEFT", 0 }, { point, to, relative, x }, "every line of its glow")
         end
       end
       assert.are.equal(7, lines)
@@ -1115,8 +1126,8 @@ describe("NextBag", function()
       assert.are.equal("TRILINEAR", bag.sortButton.icon._filterMode)
       assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -(style.TITLE_TOP + 3) },
         { bag.closeButton:GetPoint(1) })
-      assert.are.same({ "RIGHT", bag.closeButton, "LEFT", -8, 0 }, { bag.settingsButton:GetPoint(1) })
-      assert.are.same({ "RIGHT", bag.settingsButton, "LEFT", -8, 0 }, { bag.sortButton:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bag.closeButton, "TOPLEFT", -8, 0 }, { bag.settingsButton:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bag.settingsButton, "TOPLEFT", -8, 0 }, { bag.sortButton:GetPoint(1) })
     end)
 
     it("closes from its close button", function()
@@ -1133,7 +1144,7 @@ describe("NextBag", function()
       previousView = nil
       local bag = opened()
       assert.are.equal("bags", NextIconName(bag.bagsButton))
-      assert.are.same({ "RIGHT", bag.sortButton, "LEFT", -8, 0 }, { bag.bagsButton:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bag.sortButton, "TOPLEFT", -8, 0 }, { bag.bagsButton:GetPoint(1) })
       assert.is_nil(bag.classicButton, "the way back to the classic bags is in the settings")
       bag.bagsButton:GetScript("OnEnter")(bag.bagsButton)
       assert.are.equal("Show Blizzard Bags", GameTooltip:GetText())

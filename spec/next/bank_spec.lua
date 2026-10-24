@@ -352,13 +352,19 @@ describe("NextBank", function()
       local bank = nextBank:Create(ctx())
       local edge = style.PAD + 4
       local span = bank.title:GetStringWidth() + edge + C.Pad
-      assert.are.same({ "LEFT", bank.title, "RIGHT", edge, 0 }, { bank.ribbon:GetPoint(1) })
+      -- From the body's right edge, the window's hard edge, by whole pixels (docs/next-pixel-perfect.md).
+      local point, to, relative, x = bank.ribbon:GetPoint(1)
+      assert.are.same({ "TOPLEFT", bank.body, "TOPRIGHT", 0 }, { point, to, relative, x })
       assert.is_nil(bank.cloud.tail)
-      assert.are.same({ "CENTER", bank.title, "RIGHT", edge, 0 }, { bank.cloud.join:GetPoint(1) })
+      local _, fontHeight = bank.title:GetFont()
+      local join = bank.cloud.join
+      local middle = style.TITLE_TOP + math.floor(fontHeight / 2)
+      assert.are.same({ "TOPLEFT", bank.body, "TOPRIGHT", -math.floor(join:GetWidth() / 2),
+        -(middle - math.floor(join:GetHeight() / 2)) }, { join:GetPoint(1) })
       for i, puff in ipairs(bank.cloud.puffs) do
         assert.are.equal(edge - C.Puffs[i].F * span, puff.base.x)
-        local point, to, relative, x = puff.texture:GetPoint(1)
-        assert.are.same({ "CENTER", bank.title, "RIGHT", puff.base.x }, { point, to, relative, x })
+        local p, rel, relPoint, px = puff.texture:GetPoint(1)
+        assert.are.same({ "CENTER", bank.title, "RIGHT", puff.base.x }, { p, rel, relPoint, px })
       end
     end)
 
@@ -467,7 +473,7 @@ describe("NextBank", function()
       local bank = nextBank:Create(ctx())
       assert.are.same({ "close", "settings", "banktabs", "deposit", "sort" }, headerKinds(bank))
       assert.are.same({ "TOPLEFT", bank.body, "TOPLEFT", style.PAD, -(style.TITLE_TOP + 3) }, { bank.closeButton:GetPoint(1) })
-      assert.are.same({ "LEFT", bank.closeButton, "RIGHT", 8, 0 }, { bank.settingsButton:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", bank.closeButton, "TOPRIGHT", 8, 0 }, { bank.settingsButton:GetPoint(1) })
     end)
 
     it("has no deposit button without a Warbank, and no bank tabs or sort where the client lacks them", function()
@@ -988,7 +994,9 @@ describe("NextBank", function()
       assert.are.equal("BankPanelPurchaseButtonScriptTemplate, UIPanelButtonTemplate", b._template)
       assert.are.equal(CHAR, b:GetAttribute("overrideBankType"))
       assert.is_nil(b:GetScript("OnClick"))
-      assert.are.same({ "CENTER", bank.scroll.frame, "CENTER", 0, 0 }, { b:GetPoint(1) })
+      -- In the middle of the content by its top left, on whole pixels (docs/next-pixel-perfect.md).
+      local point, relativeTo, relativePoint = b:GetPoint(1)
+      assert.are.same({ "TOPLEFT", bank.scroll.frame, "TOPLEFT" }, { point, relativeTo, relativePoint })
       assert.is_false(b:IsShown())
     end)
 

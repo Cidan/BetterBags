@@ -50,6 +50,7 @@ debug\analytics.lua
 core\events.lua
 debug\perf\sessions.lua
 debug\renderrecorder.lua
+debug\pixelaudit.lua
 debug\simulator.lua
 core\localization.lua
 core\translations.lua
@@ -149,6 +150,7 @@ frames\flamegraph.lua
 frames\tracechart.lua
 frames\perfpane.lua
 frames\simulatepane.lua
+frames\pixelpane.lua
 frames\debug.lua
 
 views\views.lua
@@ -163,6 +165,9 @@ frames\menubutton.lua
 frames\bagactions.lua
 frames\bag.lua
 
+next\pixel.lua
+next\itemfit.lua
+next\coins.lua
 next\style.lua
 next\tween.lua
 next\lift.lua

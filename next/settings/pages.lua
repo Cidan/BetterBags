@@ -39,6 +39,7 @@ local pages = addon:NewModule('NextSettingsPages')
 ---@field id string
 ---@field title string
 ---@field shown? fun(): boolean Left out of the tabs while it says so.
+---@field design? BagDesign Only with the bags of this design, as a page, a section or a row.
 ---@field sections NextSettingsSectionDef[]|fun(): NextSettingsSectionDef[]
 
 -- A page's own list, shown in the sidebar in place of the pages while the page shows.
@@ -116,13 +117,13 @@ function pages:IsShown(page)
   return self:InDesign(page) and (page.shown == nil or page.shown() == true)
 end
 
--- ShownTabs returns a page's tabs shown now, in order.
+-- ShownTabs returns a page's tabs shown now, in order: for the bags in use (design) and shown.
 ---@param page NextSettingsPageDef
 ---@return NextSettingsTabDef[]
 function pages:ShownTabs(page)
   local list = {}
   for _, tab in ipairs(page.tabs) do
-    if tab.shown == nil or tab.shown() == true then
+    if self:InDesign(tab) and (tab.shown == nil or tab.shown() == true) then
       table.insert(list, tab)
     end
   end

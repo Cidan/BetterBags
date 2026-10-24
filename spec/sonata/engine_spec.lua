@@ -408,6 +408,29 @@ describe("Sonata engine", function()
       assert.are.equal(1, #styled)
     end)
 
+    -- BetterBags Next styles an item button again when it is drawn on a new pixel grid
+    -- (docs/next-pixel-perfect.md): the styler rounds to the grid the button is on.
+    it("styles one registered element again with the style in effect, once a theme was applied", function()
+      local font, other = {}, {}
+      sonata:RegisterElement("SectionHeader", font)
+      sonata:RestyleElement("SectionHeader", font)
+      assert.are.equal(0, #styled, "nothing before a theme")
+      sonata:ApplyTheme(context:New("test"), "Other")
+      styled = {}
+      assert.is_true(sonata:RestyleElement("SectionHeader", font))
+      assert.are.equal(1, #styled)
+      assert.are.equal(font, styled[1].element)
+      assert.are.equal("GameFontNormal", styled[1].style.Font.Object)
+      sonata:SetElementStyleOverride("SectionHeader", { Font = { Object = "Over" } })
+      styled = {}
+      sonata:RestyleElement("SectionHeader", font)
+      assert.are.equal("Over", styled[1].style.Font.Object, "the override first")
+      styled = {}
+      assert.is_false(sonata:RestyleElement("SectionHeader", other), "not one that is not registered")
+      assert.are.equal(0, #styled)
+      sonata:SetElementStyleOverride("SectionHeader", nil)
+    end)
+
     it("stops styling an element that was unregistered", function()
       local font = {}
       sonata:RegisterElement("SectionHeader", font)

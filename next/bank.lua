@@ -36,6 +36,9 @@ local style = addon:GetModule('NextStyle')
 ---@class NextPanel: AceModule
 local nextPanel = addon:GetModule('NextPanel')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextBank is BetterBagsNext's bank (next.md §6): the backpack's panel mirrored on the left of the
 -- screen (next/panel.lua). It does what the classic retail, WoW: Forever and Classic banks do,
 -- reusing their code wherever it is not drawing: the groups and the Warbank, Blizzard's bank tabs
@@ -139,18 +142,40 @@ function bankProto:BuildPurchaseBankButton()
     "BankPanelPurchaseButtonScriptTemplate, UIPanelButtonTemplate")
   button:SetAttribute("overrideBankType", Enum.BankType.Character)
   button:SetText(L:G("Purchase Bank"))
-  button:SetSize(button:GetTextWidth() + 40, 26)
-  button:SetPoint("CENTER", self.scroll.frame, "CENTER", 0, 0)
   button:SetFrameLevel(self.scroll.frame:GetFrameLevel() + 10)
   button:Hide()
   self.purchaseBankButton = button
+  addon.HookScript(self.scroll.frame, "OnSizeChanged", function() self:placePurchaseBankButton() end)
+  self:placePurchaseBankButton()
+end
+
+-- placePurchaseBankButton puts the Purchase Bank button in the middle of the content by its top left, in
+-- whole pixels (docs/next-pixel-perfect.md): its size, and the parts of its template (UIPanelButtonTemplate:
+-- its 12-unit end pieces, its text at its middle) rounded in place. It keeps its template, scripts and all.
+---@private
+function bankProto:placePurchaseBankButton()
+  local button, area = self.purchaseBankButton, self.scroll.frame
+  pixel:Size(button, pixel:Ceil(button, button:GetTextWidth()) + 40, 26)
+  local width, height = button:GetWidth(), button:GetHeight()
+  button:ClearAllPoints()
+  pixel:Center(button, area, area:GetWidth(), area:GetHeight(), width, height)
+  if button.Left ~= nil and button.Right ~= nil then
+    pixel:Width(button.Left, 12)
+    pixel:Width(button.Right, 12)
+  end
+  local text = button:GetFontString()
+  if text ~= nil then
+    text:ClearAllPoints()
+    pixel:Row(text, "TOPLEFT", button, pixel:Middle(button, width, pixel:Ceil(button, text:GetStringWidth())), height)
+  end
 end
 
 -- UpdatePurchaseBankButton shows the Purchase Bank button by the classic bank's rule
--- (bank.proto:NeedsBankPurchase).
+-- (bank.proto:NeedsBankPurchase), in the middle of the content as it is now.
 function bankProto:UpdatePurchaseBankButton()
   if self.purchaseBankButton then
     self.helper:UpdatePurchaseBankButton()
+    self:placePurchaseBankButton()
   end
 end
 

@@ -22,7 +22,7 @@ local context = addon:GetModule("Context")
 local FLAGS = { "isRetail", "isForever", "isClassic", "isBCC", "isMists", "isAnniversary", "isCata" }
 
 describe("SonataNext", function()
-  local saved, sent, used, savedFlags
+  local saved, sent, used, savedFlags, iconScale, scales
 
   local function default()
     return {
@@ -38,11 +38,14 @@ describe("SonataNext", function()
 
   before_each(function()
     sonataNext.themes = {}
-    saved, sent, used = "Default", {}, {}
+    saved, sent, used, iconScale = "Default", {}, {}, 120
     db.GetNextTheme = function() return saved end
     db.SetNextTheme = function(_, key) saved = key end
+    db.GetNextIconScale = function() return iconScale end
     events.SendMessage = function(_, _, name, key) table.insert(sent, { name, key }) end
     nextStyle.Use = function(_, theme) table.insert(used, theme) end
+    scales = {}
+    nextStyle.SetIconScale = function(_, percent) table.insert(scales, { percent, #used }) end
     savedFlags = {}
     for _, flag in ipairs(FLAGS) do savedFlags[flag] = addon[flag] end
     addon.isRetail, addon.isForever = true, false
@@ -62,6 +65,13 @@ describe("SonataNext", function()
   end)
 
   local function ctx() return context:New("spec") end
+
+  -- The Size tab's Icon Scale (docs/next-appearance-size.md) is the player's, kept across themes: Next's
+  -- style starts at the saved one, before the theme is handed to it.
+  it("starts Next's style at the saved Icon Scale, then the saved theme", function()
+    assert.are.same({ { 120, 0 } }, scales, "before any theme was handed over")
+    assert.are.equal("Default", used[1].Name)
+  end)
 
   describe("registering", function()
     it("registers a theme by its name, once", function()
@@ -234,6 +244,29 @@ describe("SonataNext", function()
       assert.are.same({}, sent)
     end)
 
+    -- A window drawn at a new scale (the settings window, docs/next-pixel-perfect.md): every widget laid out
+    -- again for the new pixel grid, with the theme in effect; nothing saved, nothing announced.
+    it("restyles every widget with the theme in effect, saving and announcing nothing", function()
+      sonataNext:RegisterTheme({ Name = "Ember" })
+      sonataNext:ApplyTheme(ctx(), "Ember")
+      local styled, errors = {}, {}
+      sonataNext:RegisterWidget({ ApplyStyle = function(_, c) assert.is_not_nil(c) table.insert(styled, 1) end })
+      sonataNext:RegisterWidget({ ApplyStyle = function() error("broken widget") end })
+      sonataNext:RegisterWidget({ ApplyStyle = function() table.insert(styled, 2) end })
+      local generation = sonataNext:GetGeneration()
+      sent, used, saved = {}, {}, "Default"
+      local original = _G.geterrorhandler
+      _G.geterrorhandler = function() return function(e) table.insert(errors, e) end end
+      sonataNext:RestyleWidgets(ctx())
+      _G.geterrorhandler = original
+      assert.are.equal(2, #styled)
+      assert.are.equal(1, #errors)
+      assert.are.equal(generation, sonataNext:GetGeneration())
+      assert.are.same({}, sent)
+      assert.are.same({}, used)
+      assert.are.equal("Default", saved)
+    end)
+
     it("styles every widget even when one fails, reporting the failure", function()
       sonataNext:RegisterTheme({ Name = "Ember" })
       local styled, errors = 0, {}
@@ -325,6 +358,31 @@ describe("SonataNext", function()
       sonataNext:SetActive(false)
       assert.are.same({ "ItemButton", nil }, overrides[2])
       assert.are.equal(2, restyled)
+    end)
+
+    -- BetterBags Next draws its item buttons on whole screen pixels (docs/next-pixel-perfect.md): while it is
+    -- in use Sonata's styler rounds with NextPixel, and the template parts Next placed go back before the
+    -- classic bags take the buttons over.
+    it("rounds item buttons to whole pixels while Next is in use, putting them back for the classic bags", function()
+      local elements = trackStub("SonataElements")
+      local fit = trackStub("NextItemFit")
+      local pixel = addon:GetModule("NextPixel")
+      local calls = {}
+      local savedSnap, savedRestore = elements.SetItemButtonSnap, fit.RestoreAll
+      elements.SetItemButtonSnap = function(_, snap) table.insert(calls, { "snap", snap }) end
+      fit.RestoreAll = function() table.insert(calls, { "restore" }) end
+      sonataNext:SetActive(true)
+      local snap = calls[1][2]
+      assert.are.equal("snap", calls[1][1])
+      local region = CreateFrame("Frame", nil, UIParent)
+      assert.are.equal(pixel:Snap(region, 2.4), snap.Offset(region, 2.4))
+      assert.are.equal(pixel:Length(region, 0.2), snap.Length(region, 0.2))
+      assert.are.equal(pixel:Unit(region), snap.Unit(region))
+      sonataNext:SetActive(false)
+      -- The stubs stay for the spec's other tests, doing nothing.
+      elements.SetItemButtonSnap = savedSnap or function() end
+      fit.RestoreAll = savedRestore or function() end
+      assert.are.same({ { "restore" }, { "snap", nil } }, { calls[2], calls[3] }, "put back, then the rounding off")
     end)
 
     it("follows the theme applied while Next is in use, back to the bags' theme with one without", function()

@@ -162,6 +162,10 @@ describe("BetterBags Next's small mode", function()
     override(stubs.database, "GetNextSmallChain", function() return db.smallChain end)
     override(stubs.database, "SetNextSmallChain", function(_, layout) db.smallChain = layout end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
+    -- The Size tab's scales (docs/next-appearance-size.md), in percent.
+    db.iconScale, db.bagScale = 100, 100
+    override(stubs.database, "GetNextIconScale", function() return db.iconScale end)
+    override(stubs.database, "GetNextBagScale", function() return db.bagScale end)
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
@@ -1316,7 +1320,7 @@ describe("BetterBags Next's small mode", function()
     it("sits after the Show Blizzard Bags button, saying what it does", function()
       db.size = "full"
       local bag = nextBag:Create(ctx())
-      assert.are.same({ "RIGHT", bag.bagsButton, "LEFT", -8, 0 }, { bag.sizeButton:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bag.bagsButton, "TOPLEFT", -8, 0 }, { bag.sizeButton:GetPoint(1) })
       bag.sizeButton:GetScript("OnEnter")(bag.sizeButton)
       assert.are.equal("Small Bags", GameTooltip:GetText())
       click(bag)
@@ -1974,6 +1978,360 @@ describe("BetterBags Next's small mode", function()
       finishTweens()
       assert.is_not_nil(chain.coupling)
       assert.are.same({ besideBag(bag, bank) }, { topLeft(bank) })
+    end)
+  end)
+
+  -- The Size tab (docs/next-appearance-size.md): its sliders send next/ScalesChanged, which the chain
+  -- listens to, once, for every panel.
+  describe("the Size tab's scales", function()
+    local handlers
+
+    before_each(function()
+      handlers = {}
+      override(stubs.events, "RegisterMessage", function(_, name, fn)
+        handlers[name] = handlers[name] or {}
+        table.insert(handlers[name], fn)
+      end)
+    end)
+
+    after_each(function()
+      style:SetIconScale(100)
+    end)
+
+    local function scalesChanged()
+      for _, fn in ipairs(handlers["next/ScalesChanged"] or {}) do fn(ctx()) end
+    end
+
+    local function opened(create)
+      local panel = create(ctx())
+      panel:Show(ctx())
+      finishTweens()
+      return panel
+    end
+
+    local function herbs(n)
+      local list = {}
+      for i = 1, n do table.insert(list, item("0_" .. i, "Herbs")) end
+      slots[BACKPACK].tabs[1].items = list
+    end
+
+    local function perRow(panel)
+      local width = panel.root:PreRender().Width - panel.scroll:GetGutterWidth()
+      return math.floor((width + style.GAP) / (style.ICON + style.GAP))
+    end
+
+    describe("Icon Scale", function()
+      -- Asked: "it can adjust based on scale, if buttons are huge, less fit per row naturally. if buttons
+      -- are small, more per row fit."
+      it("draws item buttons at the theme's size times Icon Scale, each row taking as many as fit", function()
+        db.size = "full"
+        herbs(10)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        bag:Draw(ctx(), slots[BACKPACK], function() end)
+        render:Flush()
+        assert.are.equal(1, #handlers["next/ScalesChanged"], "listened to once, by the chain")
+        assert.are.equal(8, perRow(bag))
+        db.iconScale = 150
+        scalesChanged()
+        render:Flush()
+        assert.are.equal(66, style.ICON)
+        assert.are.same({ 66, 66 }, { buttons["0_1"].frame:GetSize() })
+        assert.are.equal(5, perRow(bag), "fewer per row")
+        motion:Step(1)
+        local _, _, _, x, y = buttons["0_6"].frame:GetPoint(1)
+        assert.are.same({ 0, -(66 + style.GAP) }, { x, y }, "the 6th starts the second row")
+        assert.are.equal(style.WIDTH, bag.frame:GetWidth(), "the panel keeps its width")
+        db.iconScale = 50
+        scalesChanged()
+        render:Flush()
+        assert.are.same({ 22, 22 }, { buttons["0_1"].frame:GetSize() })
+        assert.is_true(perRow(bag) >= 10, "more per row")
+        motion:Step(1)
+        _, _, _, x, y = buttons["0_10"].frame:GetPoint(1)
+        assert.are.same({ 9 * (22 + style.GAP), 0 }, { x, y }, "all ten on one row")
+      end)
+
+      it("sizes the buttons of a closed bag when it opens", function()
+        herbs(3)
+        local bag = nextBag:Create(ctx())
+        bag:Draw(ctx(), slots[BACKPACK], function() end)
+        db.iconScale = 120
+        scalesChanged()
+        bag:Show(ctx())
+        finishTweens()
+        render:Flush()
+        assert.are.same({ 53, 53 }, { buttons["0_1"].frame:GetSize() })
+      end)
+
+      it("keeps a small panel at least one row of its icons tall, as they are now", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local before = bag:MinHeight()
+        db.iconScale = 150
+        scalesChanged()
+        assert.are.equal(before + (66 - 44), bag:MinHeight())
+      end)
+    end)
+
+    -- Asked: a "bag scale" slider; "bag scale should just not apply when docked to the side".
+    describe("Bag Scale", function()
+      local bodyWidth = function() return style.BODY_WIDTH end
+
+      -- Where a panel's top left is on the screen: its anchor's offsets are in its own units.
+      local function onScreen(panel)
+        local x, y = topLeft(panel)
+        local s = panel.frame:GetScale()
+        return x * s, y * s
+      end
+
+      local function near(a, b)
+        return math.abs(a - b) < 1e-6
+      end
+
+      -- The client moves a frame with the mouse: its rect in its own units.
+      local function dragTo(panel, x, y)
+        local s = panel.frame:GetScale()
+        panel.mover:GetScript("OnDragStart")(panel.mover, "LeftButton")
+        panel.frame:_SetRect(x / s, y / s - panel.frame:GetHeight(), panel.frame:GetWidth(), panel.frame:GetHeight())
+        local update = panel.mover:GetScript("OnUpdate")
+        if update then update(panel.mover, 0.016) end
+        panel.mover:GetScript("OnDragStop")(panel.mover)
+      end
+
+      it("scales a small panel: its size in its own units, its place on the screen", function()
+        db.bagScale = 50
+        local bag = nextBag:Create(ctx())
+        assert.are.equal(0.5, bag.frame:GetScale())
+        assert.are.same({ bodyWidth(), smallHeight() }, { bag.frame:GetSize() })
+        assert.are.same({ UIParent:GetWidth() - bodyWidth() * 0.5 - style.Small.Margin,
+          (UIParent:GetHeight() + smallHeight() * 0.5) / 2 }, { onScreen(bag) })
+        local bank = nextBank:Create(ctx())
+        assert.are.equal(0.5, bank.frame:GetScale())
+        assert.are.same({ style.Small.Margin, (UIParent:GetHeight() + smallHeight() * 0.5) / 2 }, { onScreen(bank) })
+      end)
+
+      it("leaves a full panel, docked to its screen edge, at its size", function()
+        db.size = "full"
+        db.bagScale = 50
+        local bag = nextBag:Create(ctx())
+        assert.are.equal(1, bag.frame:GetScale())
+        assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, 0 }, { bag.frame:GetPoint(1) })
+        assert.are.equal(style.WIDTH, bag.frame:GetWidth())
+      end)
+
+      it("keeps a scaled panel on the screen, and never bigger than it", function()
+        db.bagScale = 150
+        db.places[BACKPACK] = { 1900, 1200 }
+        db.sizes[BACKPACK] = { 2000, 2000 }
+        local bag = nextBag:Create(ctx())
+        assert.are.same({ 1920 / 1.5, 1200 / 1.5 }, { bag.frame:GetSize() }, "the screen, in its own units")
+        assert.are.same({ 0, 1200 }, { onScreen(bag) })
+      end)
+
+      it("saves where it is moved to, on the screen", function()
+        db.bagScale = 50
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        dragTo(bag, 300, 900)
+        assert.are.same({ 300, 900 }, db.places[BACKPACK])
+        assert.are.same({ 300, 900 }, { onScreen(bag) })
+        assert.are.same({ 300, 900 }, { bag:LivePlace() })
+      end)
+
+      it("sizes from a grip within the screen at its scale, its size saved in its own units", function()
+        db.bagScale = 50
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local grip = bag.grips.RIGHT
+        grip:GetScript("OnMouseDown")(grip, "LeftButton")
+        local bounds = bag.frame._resizeBounds
+        assert.are.same({ 1920 / 0.5, 1200 / 0.5 }, { bounds.maxWidth, bounds.maxHeight })
+        local x, y = topLeft(bag)
+        bag.frame:_SetRect(x, y - 600, 500, 600)
+        bag.frame:GetScript("OnSizeChanged")(bag.frame, 500, 600)
+        grip:GetScript("OnMouseUp")(grip, "LeftButton")
+        assert.are.same({ 500, 600 }, db.sizes[BACKPACK])
+        assert.are.same({ x * 0.5, y * 0.5 }, db.places[BACKPACK])
+        assert.are.same({ x * 0.5, y * 0.5 }, { onScreen(bag) })
+      end)
+
+      it("glides back to its default size from a grip, the corner across from it still", function()
+        db.bagScale = 50
+        db.sizes[BACKPACK] = { 600, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local x, y = onScreen(bag)
+        _G._isShiftKeyDown = true
+        local grip = bag.grips.LEFT
+        grip:GetScript("OnMouseUp")(grip, "LeftButton")
+        _G._isShiftKeyDown = false
+        tween:Step(style.Time.Resize / 2)
+        local mx = onScreen(bag)
+        assert.is_true(mx > x and mx < x + (600 - bodyWidth()) * 0.5, "on its way")
+        finishTweens()
+        assert.are.same({ bodyWidth(), smallHeight() }, { bag.frame:GetSize() })
+        assert.are.same({ x + (600 - bodyWidth()) * 0.5, y }, { onScreen(bag) }, "its top right kept")
+      end)
+
+      it("takes a new scale at once while open, placed and kept on the screen", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        db.bagScale = 150
+        scalesChanged()
+        assert.are.equal(1.5, bag.frame:GetScale())
+        assert.are.same({ UIParent:GetWidth() - bodyWidth() * 1.5 - style.Small.Margin,
+          (UIParent:GetHeight() + smallHeight() * 1.5) / 2 }, { onScreen(bag) })
+        db.places[BACKPACK] = { 1500, 1100 }
+        db.bagScale = 50
+        scalesChanged()
+        assert.are.same({ 1500, 1100 }, { onScreen(bag) })
+        db.bagScale = 150
+        scalesChanged()
+        assert.are.same({ UIParent:GetWidth() - bodyWidth() * 1.5, 1188 }, { onScreen(bag) }, "kept on the screen")
+      end)
+
+      it("chains small bags side by side on the screen, the gap and the braid at their scale", function()
+        db.bagScale = 50
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        assert.are.equal(style.Small.MinGap * 0.5, chain:SmallGap(bag, bank))
+        override(bag.tabs, "Width", function() return 120 end)
+        override(bank.tabs, "Width", function() return 90 end)
+        local gap = (120 + 90 + 2 * style.TAB_HOVER + style.Chain.TabMargin) * 0.5
+        assert.are.equal(gap, chain:SmallGap(bag, bank))
+        local bx, by = onScreen(bag)
+        local x, y = bx - gap - bodyWidth() * 0.5, by
+        dragTo(bank, x - 10, y + 10)
+        assert.are.equal("backpack", db.smallChain)
+        finishTweens()
+        local cx, cy = onScreen(bank)
+        assert.is_true(near(x, cx) and near(y, cy), "beside it")
+        assert.is_not_nil(chain.coupling)
+        chain:applyCoupling()
+        assert.is_true(near(gap / 2 / 0.5, bank.braid.half), "half the gap, in its own units")
+        assert.is_true(near(gap / 2 / 0.5, bag.braid.half))
+      end)
+
+      it("does not chain a bag whose spot beside its partner is off the screen at its scale", function()
+        db.bagScale = 150
+        db.places[BACKPACK] = { 500, 1100 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local x = 500 - chain:SmallGap(bag, bank) - bodyWidth() * 1.5
+        assert.is_true(x < 0)
+        dragTo(bank, 0, 1100)
+        assert.are.equal("apart", db.smallChain)
+      end)
+
+      it("glides its scale with its size when it switches, nothing jumping", function()
+        db.size = "full"
+        db.bagScale = 50
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        assert.are.equal(1, bag.frame:GetScale())
+        nextPanel:SetSize(ctx(), "small")
+        tween:Step(0.0001)
+        local x, y = onScreen(bag)
+        assert.is_true(math.abs(x - (UIParent:GetWidth() - bodyWidth())) < 1 and math.abs(y - UIParent:GetHeight()) < 1,
+          "from where the full panel's body was")
+        tween:Step(style.Time.Morph / 2)
+        local mid = bag.frame:GetScale()
+        assert.is_true(mid < 1 and mid > 0.5, "on its way: " .. mid)
+        finishTweens()
+        assert.are.equal(0.5, bag.frame:GetScale())
+        assert.are.same({ bodyWidth(), smallHeight() }, { bag.frame:GetSize() })
+        assert.are.same({ UIParent:GetWidth() - bodyWidth() * 0.5 - style.Small.Margin,
+          (UIParent:GetHeight() + smallHeight() * 0.5) / 2 }, { onScreen(bag) })
+        nextPanel:SetSize(ctx(), "full")
+        finishTweens()
+        assert.are.equal(1, bag.frame:GetScale())
+        assert.are.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 0, 0 }, { bag.frame:GetPoint(1) })
+      end)
+
+      it("glides a chained bag into its spot on the screen", function()
+        db.bagScale = 50
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local bx, by = onScreen(bag)
+        local x, y = bx - chain:SmallGap(bag, bank) - bodyWidth() * 0.5, by
+        dragTo(bank, x - 10, y + 10)
+        tween:Step(style.Time.Glide / 2)
+        local mx, my = onScreen(bank)
+        assert.is_true(mx > x - 10 and mx < x and my < y + 10 and my > y, "on its way: " .. mx .. ", " .. my)
+        finishTweens()
+      end)
+
+      it("brings a chained bag along beside its anchor as the anchor is dragged, the braid between them", function()
+        db.bagScale = 50
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local bx, by = onScreen(bag)
+        local gap = chain:SmallGap(bag, bank)
+        dragTo(bank, bx - gap - bodyWidth() * 0.5, by)
+        finishTweens()
+        assert.is_not_nil(chain.coupling)
+        bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+        -- The client moves the backpack: its rect in its own units.
+        bag.frame:_SetRect(1400 / 0.5, 1000 / 0.5 - bag.frame:GetHeight(), bag.frame:GetWidth(), bag.frame:GetHeight())
+        bag.mover:GetScript("OnUpdate")(bag.mover, 0.016)
+        local cx, cy = onScreen(bank)
+        assert.is_true(near(1400 - gap - bodyWidth() * 0.5, cx) and near(1000, cy), "beside it: " .. cx .. ", " .. cy)
+        chain:applyCoupling()
+        assert.is_true(near(gap / 2 / 0.5, bank.braid.half), "the braid across the gap as it is now")
+        bag.mover:GetScript("OnDragStop")(bag.mover)
+      end)
+
+      it("chains the backpack beside a companion on the screen, at their scale", function()
+        db.bagScale = 50
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local kx, ky = onScreen(bank)
+        local x = kx + bodyWidth() * 0.5 + chain:SmallGap(bag, bank)
+        dragTo(bag, x + 10, ky - 10)
+        assert.are.equal("companion", db.smallChain)
+        finishTweens()
+        local cx, cy = onScreen(bag)
+        assert.is_true(near(x, cx) and near(ky, cy), "beside it")
+      end)
+
+      it("does not chain the backpack whose spot beside a companion ends past the screen at its scale", function()
+        db.bagScale = 150
+        db.places[BANK] = { 500, 1200 }
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local wx = 500 + bodyWidth() * 1.5 + chain:SmallGap(bag, bank)
+        assert.is_true(wx + bodyWidth() * 1.5 > UIParent:GetWidth() and wx + bodyWidth() <= UIParent:GetWidth())
+        dragTo(bag, wx, 1200)
+        assert.are.equal("apart", db.smallChain)
+      end)
+
+      it("starts a switch to full size from where the small panel is on the screen, at its size there", function()
+        db.bagScale = 50
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local x, y = onScreen(bag)
+        nextPanel:SetSize(ctx(), "full")
+        tween:Step(0.0001)
+        local s = bag.frame:GetScale()
+        local fx, fy = onScreen(bag)
+        assert.is_true(math.abs(fx + style.FEATHER * s - x) < 1 and math.abs(fy - y) < 1, "its body where it was")
+        assert.is_true(math.abs((bag.frame:GetWidth() - style.FEATHER) * s - bodyWidth() * 0.5) < 1, "as wide")
+        assert.is_true(math.abs(bag.frame:GetHeight() * s - smallHeight() * 0.5) < 2, "as tall")
+        finishTweens()
+      end)
+
+      it("lays its content out at once when the switch narrows it in its own units", function()
+        db.bagScale = 50
+        db.sizes[BACKPACK] = { 600, 500 }
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        render:Flush()
+        assert.is_false(render:IsDirty(bag.root))
+        nextPanel:SetSize(ctx(), "full")
+        assert.is_true(render:IsDirty(bag.root), "laid out for the full body's width before the glide")
+        finishTweens()
+      end)
+
+      it("takes its size's scale when it switches while closed", function()
+        db.bagScale = 50
+        local bag = nextBag:Create(ctx())
+        nextPanel:SetSize(ctx(), "full")
+        assert.are.equal(1, bag.frame:GetScale())
+        nextPanel:SetSize(ctx(), "small")
+        assert.are.equal(0.5, bag.frame:GetScale())
+      end)
     end)
   end)
 end)

@@ -36,6 +36,9 @@ local nextDialog = addon:GetModule('NextDialog')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextSettingsRows makes the rows of BetterBags Next's settings window (next-settings.md §3). A
 -- setting's row is its name on the left and its control on the right, editing an option (a settings
 -- catalog option, config/catalog.lua, or one of a page's own: a color, a plugin's): it reads the
@@ -253,24 +256,27 @@ end
 -- is at least RowHeight tall; text wraps across it.
 ---@param width number
 ---@return number
+-- In whole pixels (docs/next-pixel-perfect.md): its padding rounded, the room its text has rounded down,
+-- the text's height rounded up.
 function rowProto:Measure(width)
   local C = style.Theme.Settings.Content
-  local pad = C.RowPad
+  local frame = self.frame
+  local pad = pixel:Snap(frame, C.RowPad)
   if self.control then
-    self.label:SetWidth(math.max(1, width - self.control.frame:GetWidth() - 3 * pad))
-    return math.max(C.RowHeight, math.ceil(self.label:GetStringHeight()) + pad)
+    self.label:SetWidth(pixel:Floor(frame, math.max(1, width - self.control.frame:GetWidth() - 3 * pad)))
+    return math.max(pixel:Length(frame, C.RowHeight), pixel:Ceil(frame, self.label:GetStringHeight()) + pad)
   end
   if self.buttons then
-    return controls:Theme("Button").Height + pad
+    return pixel:Length(frame, controls:Theme("Button").Height) + pad
   end
   if self.button then
     return self.button.frame:GetHeight() + pad
   end
   if self.area then
-    return self.areaHeight + pad
+    return pixel:Length(frame, self.areaHeight) + pad
   end
-  self.label:SetWidth(math.max(1, width - 2 * pad))
-  return math.ceil(self.label:GetStringHeight()) + pad
+  self.label:SetWidth(pixel:Floor(frame, math.max(1, width - 2 * pad)))
+  return pixel:Ceil(frame, self.label:GetStringHeight()) + pad
 end
 
 -- Place puts the row x across and y down its parent, width x height, its parts RowPad in.
@@ -278,40 +284,44 @@ end
 ---@param y number
 ---@param width number
 ---@param height number
+-- Everything in whole pixels (docs/next-pixel-perfect.md): the row where the page puts it, its parts from
+-- its corners, each centered on its height by its top (a text by its lines' height rounded up).
 function rowProto:Place(x, y, width, height)
   local C = style.Theme.Settings.Content
-  local pad, frame = C.RowPad, self.frame
+  local frame = self.frame
+  local pad = pixel:Snap(frame, C.RowPad)
   frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
-  frame:SetSize(width, height)
-  if self.control then
+  pixel:Point(frame, "TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
+  pixel:Size(frame, width, height)
+  height = frame:GetHeight()
+  local function placeLabel()
     self.label:ClearAllPoints()
-    self.label:SetPoint("LEFT", frame, "LEFT", pad, 0)
+    pixel:Row(self.label, "TOPLEFT", frame, pad, height, pixel:Ceil(frame, self.label:GetStringHeight()))
+  end
+  if self.control then
+    placeLabel()
     self.control.frame:ClearAllPoints()
-    self.control.frame:SetPoint("RIGHT", frame, "RIGHT", -pad, 0)
+    pixel:Row(self.control.frame, "TOPRIGHT", frame, pad, height)
   elseif self.buttons then
-    local previous
+    local across = pad
     for _, b in ipairs(self.buttons) do
       b.frame:ClearAllPoints()
-      if previous == nil then
-        b.frame:SetPoint("LEFT", frame, "LEFT", pad, 0)
-      else
-        b.frame:SetPoint("LEFT", previous.frame, "RIGHT", pad / 2, 0)
-      end
-      previous = b
+      pixel:Row(b.frame, "TOPLEFT", frame, across, height)
+      across = across + b.frame:GetWidth() + pixel:Floor(frame, pad / 2)
     end
   elseif self.button then
     self.button.frame:ClearAllPoints()
-    self.button.frame:SetPoint("LEFT", frame, "LEFT", pad, 0)
+    pixel:Row(self.button.frame, "TOPLEFT", frame, pad, height)
   elseif self.area then
     local area = self.area.frame
+    local top = pixel:Floor(frame, pad / 2)
     area:ClearAllPoints()
-    area:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad / 2)
-    area:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -pad / 2)
-    area:SetHeight(self.areaHeight)
+    area:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -top)
+    area:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -top)
+    pixel:Height(area, self.areaHeight)
+    self.area:Style()
   else
-    self.label:ClearAllPoints()
-    self.label:SetPoint("LEFT", frame, "LEFT", pad, 0)
+    placeLabel()
   end
   frame:Show()
 end

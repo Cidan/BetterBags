@@ -236,7 +236,9 @@ quality border Masque skins: Blizzard's `SetItemButtonQuality` sets its atlas or
 each draw ends with `guild/Updated`, and the integration skins the button again (`ReSkin`, or
 `AddButton` the first time) and gives its border a blend mode, exactly as `item/Updated` does for bag
 buttons. A theme applied also re-skins them: Sonata restyles them as `ItemButton` elements, and a
-theme change redraws only the backpack and the bank. A theme without Masque takes them out of the
+theme change redraws only the backpack and the bank. So does Sonata restyling one for a new pixel grid
+(BetterBags Next's item fitter, next-pixel-perfect.md §4): the fitter calls the button's `Restyled(ctx)`,
+which sends `guild/Updated`. A theme without Masque takes them out of the
 group. **Failure mode (fixed):** they were only added once, at creation, so after their first draw
 they showed Masque's frame with Blizzard's and BetterBags' quality border inside it, not the skin's.
 **Cost, not measured:** guild buttons have no draw record (item-drawing.md §7b), so every guild

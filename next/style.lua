@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextStyle is BetterBags Next's look, read from the current Next theme (.claude/rules/next-themes.md):
 -- SonataNext hands it every theme it applies (Use). Its long-standing fields (ICON, PAD, Color,
 -- Time, Small, Chain, Cloud, ...) are views of the theme, so Next's code reads them as it always
@@ -17,9 +20,28 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@field Color table<string, number[]> The theme's palette.
 local style = addon:NewModule('NextStyle')
 
+-- The player's Icon Scale (the Size tab, docs/next-appearance-size.md), in percent: SetIconScale.
+style.iconScale = 100
+
 -- How far past its end each ease swings (next/tween.lua): outBack about a tenth, outBackSoft a
 -- fiftieth. Opening with one, the body must reach that much past the screen edge (OVERREACH).
 local OVERSHOOT = { outBack = 0.1, outBackSoft = 0.02 }
+
+-- SetIconScale sets the player's Icon Scale (docs/next-appearance-size.md), in percent, and sizes the
+-- item buttons for it (sizeIcons). Nothing else changes, and no font object is made: a slider dragged
+-- through its steps calls it on every step.
+---@param percent number
+function style:SetIconScale(percent)
+  self.iconScale = percent
+  self:sizeIcons()
+end
+
+-- sizeIcons sizes the item buttons: the theme's icon size (Layout.Icon) times the Icon Scale, in whole
+-- pixels, as every other size is.
+---@private
+function style:sizeIcons()
+  self.ICON = math.max(1, math.floor(self.Theme.Layout.Icon * self.iconScale / 100 + 0.5))
+end
 
 -- Use makes theme the look: every field below is read from it, and every text drawn with a role
 -- moves to a new font object of its role.
@@ -29,13 +51,16 @@ function style:Use(theme)
   local L, M = theme.Layout, theme.Motion
   self.Color = theme.Palette
 
-  self.ICON = L.Icon
+  -- Item buttons are the theme's icon size times the player's Icon Scale (sizeIcons); the grid and the
+  -- vendor's cards keep the theme's own (CARD_ICON), so a row fits as many buttons as its width allows.
+  self.CARD_ICON = L.Icon
+  self:sizeIcons()
   self.GAP = L.Gap
   self.PER_ROW = L.PerRow
   self.GUTTER = L.Gutter
   self.PAD = L.Pad
   self.FEATHER = L.Feather
-  self.GRID_WIDTH = self.PER_ROW * self.ICON + (self.PER_ROW - 1) * self.GAP
+  self.GRID_WIDTH = self.PER_ROW * L.Icon + (self.PER_ROW - 1) * self.GAP
   -- The vendor's cards (next.md §10b): VendorColumns across the full grid; a small panel made wider
   -- fits more of them.
   self.VENDOR_COLUMNS = L.VendorColumns
@@ -96,6 +121,8 @@ function style:Use(theme)
   self.SPARKLE_TEXTURE = self:TexturePath(theme.Sparkles and theme.Sparkles.Texture or "Sparkle")
   self.CLOUD_GLOW = self:TexturePath("Glow")
 
+  -- The pixel grid the fonts are made for (NextPixel: a new one applies the theme again).
+  self.gridKey = pixel:Key()
   self:newFonts()
 end
 
@@ -172,7 +199,9 @@ end
 -- makeFont makes a font object for a role's spec: the client's own font file (the locale's) unless
 -- the spec names one, at its size and flags, in its color, with its shadow or none. A role naming one
 -- of the client's fonts (Object, a font object's global name) copies it (its file, size and flags,
--- in every locale, its color and shadow), changing only what the role also sets.
+-- in every locale, its color and shadow), changing only what the role also sets. Its height is a whole
+-- number of screen pixels where BetterBags Next's windows are drawn (NextPixel:FontHeight,
+-- docs/next-pixel-perfect.md): a new grid (the UI scale, the screen's size) applies the theme again.
 ---@param role string
 ---@param spec table
 ---@return Font
@@ -185,10 +214,8 @@ function style:makeFont(role, spec)
       error("BetterBags Next's font role " .. role .. " copies no client font named " .. tostring(spec.Object))
     end
     font:CopyFontObject(base)
-    if spec.File ~= nil or spec.Size ~= nil or spec.Flags ~= nil then
-      local path, size, flags = font:GetFont()
-      font:SetFont(spec.File or path, spec.Size or size, spec.Flags or flags)
-    end
+    local path, size, flags = font:GetFont()
+    font:SetFont(spec.File or path, pixel:FontHeight(spec.Size or size), spec.Flags or flags)
     if spec.Color ~= nil then
       font:SetTextColor(self:RGBA(spec.Color))
     end
@@ -196,7 +223,7 @@ function style:makeFont(role, spec)
       self:shadowFont(font, spec.Shadow)
     end
   else
-    font:SetFont(spec.File or GameFontNormal:GetFont(), spec.Size, spec.Flags or "")
+    font:SetFont(spec.File or GameFontNormal:GetFont(), pixel:FontHeight(spec.Size), spec.Flags or "")
     font:SetTextColor(self:RGBA(spec.Color or "White"))
     self:shadowFont(font, spec.Shadow)
   end

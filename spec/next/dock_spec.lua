@@ -27,6 +27,9 @@ itemFrame.GetButton = function(_, _, slotkey)
   if buttons[slotkey] == nil then
     local b = { slotkey = slotkey, frame = CreateFrame("Frame") }
     b.frame:SetSize(37, 37)
+    -- What a button draws, so the pixel check sees where it goes.
+    b.icon = b.frame:CreateTexture()
+    b.icon:SetAllPoints(b.frame)
     function b:SetItemFromData() end
     function b:SetSize(_, w, h) self.frame:SetSize(w, h) end
     buttons[slotkey] = b
@@ -203,7 +206,36 @@ describe("NextDock", function()
       assert.is_true(s < 1)
       assert.is_true(math.abs(section("B").frame:GetWidth() * s + 2 * D.Pad - entry.box.frame:GetWidth()) < 1e-6)
       assert.is_true(entry.box.frame:GetWidth() + 2 * D.Halo.Spread <= style.GRID_WIDTH + 1e-6)
-      assert.are.same({ "TOP", entry.holder, "TOP", 0, -D.Halo.Spread }, { entry.box.frame:GetPoint(1) })
+      -- Centered by its top left, a whole number of pixels in (docs/next-pixel-perfect.md).
+      local width = entry.holder:GetWidth()
+      local x = math.floor((width - entry.box.frame:GetWidth()) / 2)
+      assert.are.same({ "TOPLEFT", entry.holder, "TOPLEFT", x, -D.Halo.Spread }, { entry.box.frame:GetPoint(1) })
+    end)
+
+    -- Seated, the section is laid out on its card's grid and its card sized from it (docs/next-pixel-perfect.md):
+    -- the card, its edges, halo and lines, and the section with its items, all on whole pixels.
+    it("seats a section in its card on whole pixels, on the reporter's screen", function()
+      local layout = dofile("spec/helpers/layout.lua")
+      local pixel = addon:GetModule("NextPixel")
+      local undo = layout.UseScreen(3396, 1362, 0.65)
+      finally(undo)
+      UseNextTheme(nil)
+      for i, p in ipairs({ source, target }) do
+        p.frame:ClearAllPoints()
+        pixel:Point(p.frame, "TOPLEFT", UIParent, "TOPLEFT", 37 + (i - 1) * 600, -40)
+        pixel:Size(p.frame, 400, 600)
+        p.content.frame:ClearAllPoints()
+        p.content.frame:SetPoint("TOPLEFT", p.frame, "TOPLEFT", 0, 0)
+        p.scroll.frame._rect = nil
+        p.scroll.frame:SetAllPoints(p.frame)
+      end
+      bindSource({ "A", "B", "C" })
+      local entry = dock("B")
+      settle()
+      finishTweens()
+      settle()
+      assert.is_true(entry.seated)
+      assert.are.same({}, layout.PixelCheck(target.frame, { owners = { card = entry.box, section = section("B"), entry = entry } }))
     end)
 
     it("flies the section from where it was into its card", function()
@@ -394,6 +426,48 @@ describe("NextDock", function()
       local _, _, _, ox, oy = frame:GetPoint(1)
       assert.is_true(math.abs(ox * s - 20) < 0.5)
       assert.is_true(math.abs(oy * s - (1000 - section("B").y)) < 0.5, "its place: " .. oy * s)
+    end)
+
+    -- BetterBags Next's small panels have a Bag Scale (docs/next-appearance-size.md): a flight back to a
+    -- scaled bag aims at its place on screen and arrives at the bag's scale.
+    it("aims at its place in a scaled bag, on screen, arriving at the bag's scale", function()
+      source.frame:SetScale(0.5)
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      source.content.frame:_SetRect(20, 0, style.GRID_WIDTH, 1000)
+      local entry = dock("B")
+      settle()
+      finishTweens()
+      click(entry, "RightButton")
+      draw(source.content)
+      source.content.frame:_SetRect(20, 0, style.GRID_WIDTH, 1000)
+      tween:Step(style.Time.Land - 0.001)
+      tween:Step(0.0005)
+      local frame = section("B").frame
+      local s = frame:GetScale()
+      assert.is_true(math.abs(s - 0.5) < 0.01, "the bag's scale: " .. s)
+      local _, _, _, ox, oy = frame:GetPoint(1)
+      assert.is_true(math.abs(ox * s - 20 * 0.5) < 0.5)
+      assert.is_true(math.abs(oy * s - (1000 - section("B").y) * 0.5) < 0.5, "its place: " .. oy * s)
+    end)
+
+    it("flies into the middle of the tab it came in by in a scaled panel, on screen", function()
+      target.frame:SetScale(0.5)
+      local button = CreateFrame("Button", nil, target.frame)
+      button:_SetRect(800, 900, 100, 30)
+      local entry = nextDock:Add(target, { section = section("B"), source = source, offer = offer({ answer = "moved" }),
+        tab = { id = 4, button = button } })
+      settle()
+      finishTweens()
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      doubleClick(entry)
+      tween:Step(style.Time.FlyAway - 0.00001)
+      local frame = section("B").frame
+      local s = frame:GetScale()
+      local _, _, _, ox, oy = frame:GetPoint(1)
+      local w, h = frame:GetWidth(), section("B").height or frame:GetHeight()
+      assert.is_true(math.abs(ox * s + w / 2 * s - 850 * 0.5) < 1, "the tab's middle on screen")
+      assert.is_true(math.abs(oy * s - h / 2 * s - 915 * 0.5) < 1)
+      finishTweens()
     end)
 
     it("sends it back to its place in its bag on a right click", function()

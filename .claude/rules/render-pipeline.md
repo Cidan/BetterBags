@@ -99,8 +99,10 @@ one for its lifetime (no pool).
   (window.md §3b). Only the bag's box uses them; the changelog's keeps the old behavior.
 - **Widths for snapping**: a child's `FitWidth` (the narrowest width it lays out the same in)
   goes up with the room added, and the parent's `LayoutWidth` (the width to lay out for, when it
-  differs from the width shown: a window animating to its snapped width) goes down with the room
-  taken off (window.md §3b).
+  differs from the width shown: a window animating to its snapped width, or a BetterBags Next panel's
+  width in units, next-pixel-perfect.md §3) goes down with the room taken off, in units: never the room
+  rounded to the grid (`Snap`), so what a child is laid out for does not depend on the grid it is drawn on
+  (window.md §3b).
 - The scroll child is created with `.scrollable = true`, so initializing the box moves it under
   the box's scroll target and anchors it TOPLEFT and TOPRIGHT (Blizzard's
   `ReparentScrollChildren` and `ScrollBoxViewUtil.SetPoint`): its width follows the box.

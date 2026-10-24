@@ -42,13 +42,16 @@ describe("BetterBags Next's settings window on the whole addon", function()
     local pages = addon:GetModule("NextSettingsPages")
     local built = {}
     for _, page in ipairs(pages:List()) do
+      -- Every tab for the bags in use, those shown only once something is chosen included.
       for _, tab in ipairs(page.tabs) do
-        settings:Open(page.id, tab.id)
-        assert.are.same({}, handle.errors, page.id .. " > " .. tab.id)
-        assert.are.equal(page.id, settings.pageId)
-        assert.are.equal(tab.id, settings.tabId, page.id .. " > " .. tab.id .. " shows")
-        assert.is_true(#settings.page.sections > 0, page.id .. " > " .. tab.id .. " shows something")
-        table.insert(built, page.id .. " > " .. tab.id)
+        if pages:InDesign(tab) then
+          settings:Open(page.id, tab.id)
+          assert.are.same({}, handle.errors, page.id .. " > " .. tab.id)
+          assert.are.equal(page.id, settings.pageId)
+          assert.are.equal(tab.id, settings.tabId, page.id .. " > " .. tab.id .. " shows")
+          assert.is_true(#settings.page.sections > 0, page.id .. " > " .. tab.id .. " shows something")
+          table.insert(built, page.id .. " > " .. tab.id)
+        end
       end
     end
     return built
@@ -67,7 +70,8 @@ describe("BetterBags Next's settings window on the whole addon", function()
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
     assert.is_true(settings:IsShown())
     assert.is_nil(addon:GetModule("Config").configFrame, "no classic window")
-    assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "categories > settings",
+    assert.are.same({ "general > main", "appearance > theme", "appearance > size", "itemcolors > main",
+      "categories > settings",
       "categories > rule", "categories > items", "categories > ignored", "categories > automation", "backpack > layout",
       "backpack > items", "backpack > categories", "bank > layout", "bank > items", "bank > categories",
       "guild > layout", "guild > items", "guild > categories", "profiles > profiles", "profiles > transfer",
@@ -126,7 +130,7 @@ describe("BetterBags Next's settings window on the whole addon", function()
     local settings = addon:GetModule("NextSettings")
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
     assert.is_true(settings:IsShown())
-    assert.are.same({ "general > main", "appearance > main", "itemcolors > main", "categories > settings",
+    assert.are.same({ "general > main", "appearance > theme", "itemcolors > main", "categories > settings",
       "categories > rule", "categories > items", "categories > ignored", "categories > automation", "currency > main",
       "backpack > layout", "backpack > items", "backpack > categories", "bank > layout", "bank > items",
       "bank > categories", "profiles > profiles", "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))

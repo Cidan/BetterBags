@@ -36,12 +36,20 @@ dofile("spec/helpers/addon_loader.lua")
 -- The profiler engine loads right after core/boot.lua in every TOC, and files across the
 -- addon register their prototypes with it at load time, so every spec needs it present.
 LoadBetterBagsModule("debug/perf/engine.lua")
+-- The pixel check (debug/pixelaudit.lua): spec/helpers/layout.lua runs it, and BetterBags Next's windows
+-- register with it as they are made.
+LoadBetterBagsModule("debug/pixelaudit.lua")
 -- Flow is the pure packing every grid lays out with (render/flow.lua); the grid looks it up when
 -- it loads, so every spec that loads a grid needs it present.
 LoadBetterBagsModule("render/flow.lua")
 -- Motion positions the cells and sections of every grid (render/motion.lua); grids and sections
 -- look it up when they load.
 LoadBetterBagsModule("render/motion.lua")
+-- BetterBags Next's pixel grid (next/pixel.lua, docs/next-pixel-perfect.md): every Next file that places
+-- anything looks it up when it loads.
+LoadBetterBagsModule("next/pixel.lua")
+LoadBetterBagsModule("next/itemfit.lua")
+LoadBetterBagsModule("next/coins.lua")
 -- Sonata resolves its themes and BetterBags Next's with SonataResolve (sonata/resolve.lua), which
 -- the engine looks up when it loads.
 LoadBetterBagsModule("sonata/resolve.lua")

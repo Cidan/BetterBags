@@ -9,6 +9,9 @@ local controls = addon:GetModule('NextControls')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextScrollBar is BetterBags Next's scroll bar (next-settings.md §2), drawn from the theme
 -- (Controls.ScrollBar), in place of Blizzard's MinimalScrollBar on every Next scroll box (the bags'
 -- too, render/scrollbox.lua's CreateBar). It drives a Blizzard scroll box the way ScrollUtil binds a
@@ -95,29 +98,32 @@ function scrollBar:Create(parent, opts)
   return bar
 end
 
--- Style places the bar in its parent's right edge and draws it from the theme.
+-- Style places the bar in its parent's right edge and draws it from the theme, in whole pixels
+-- (docs/next-pixel-perfect.md): the track down its middle by its left edge, the odd pixel to the right.
 function barProto:Style()
   local S = controls:Theme("ScrollBar")
   local frame, parent = self.frame, self.frame:GetParent()
   frame:ClearAllPoints()
-  frame:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -S.Inset, 0)
-  frame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -S.Inset, 0)
-  frame:SetWidth(S.Width)
+  pixel:Point(frame, "TOPRIGHT", parent, "TOPRIGHT", -S.Inset, 0)
+  pixel:Point(frame, "BOTTOMRIGHT", parent, "BOTTOMRIGHT", -S.Inset, 0)
+  pixel:Width(frame, S.Width)
+  pixel:Width(self.track, S.Size)
+  local x = pixel:Middle(frame, frame:GetWidth(), self.track:GetWidth())
   self.track:ClearAllPoints()
-  self.track:SetPoint("TOP", frame, "TOP", 0, 0)
-  self.track:SetPoint("BOTTOM", frame, "BOTTOM", 0, 0)
-  self.track:SetWidth(S.Size)
+  self.track:SetPoint("TOPLEFT", frame, "TOPLEFT", x, 0)
+  self.track:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", x, 0)
   controls:Paint(self.track, S.Track)
   self:Paint()
   self:Layout()
 end
 
--- Paint draws the thumb as it is: dragged, under the pointer, or idle.
+-- Paint draws the thumb as it is: dragged, under the pointer, or idle (wider then).
 function barProto:Paint()
   local S = controls:Theme("ScrollBar")
   local active = self.hovered or self.dragging
-  self.thumb:SetWidth(active and S.HoverSize or S.Size)
+  pixel:Width(self.thumb, active and S.HoverSize or S.Size)
   controls:Paint(self.thumbTexture, self.dragging and S.ThumbDrag or (self.hovered and S.ThumbHover or S.Thumb))
+  self:Layout()
 end
 
 -- Bind makes the bar drive box and follow it: it listens to the box's scroll, size and scrolling
@@ -158,18 +164,22 @@ end
 -- MinThumb, at most the bar.
 ---@return number
 function barProto:thumbHeight()
-  local height = self.frame:GetHeight()
+  local frame = self.frame
+  local height = frame:GetHeight()
   local S = controls:Theme("ScrollBar")
-  return math.min(height, math.max(S.MinThumb, height * self.visible))
+  return math.min(height, math.max(pixel:Length(frame, S.MinThumb), pixel:Snap(frame, height * self.visible)))
 end
 
--- Layout sizes the thumb and places it the share of its room the box is scrolled.
+-- Layout sizes the thumb and places it the share of its room the box is scrolled, in whole pixels, down
+-- the bar's middle by its left edge.
 function barProto:Layout()
-  local height = self.frame:GetHeight()
+  local frame = self.frame
+  local height = frame:GetHeight()
   local thumb = self:thumbHeight()
   self.thumb:SetHeight(thumb)
   self.thumb:ClearAllPoints()
-  self.thumb:SetPoint("TOP", self.frame, "TOP", 0, -((height - thumb) * self.percentage))
+  self.thumb:SetPoint("TOPLEFT", frame, "TOPLEFT", pixel:Middle(frame, frame:GetWidth(), self.thumb:GetWidth()),
+    -pixel:Snap(frame, (height - thumb) * self.percentage))
 end
 
 -- cursorDown returns how far below the bar's top the pointer is, in the bar's units.

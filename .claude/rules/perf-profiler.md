@@ -40,7 +40,8 @@ the automatic `Bag.Draw` / `View.Bind` / `View.Layout` wrappers.
 TOC order (all five TOCs): `engine.lua` and `format.lua` right after `core\boot.lua`, so
 every later file can register prototypes at load; `sessions.lua` right after
 `core\events.lua`, and `debug\simulator.lua` right after it; `flamegraph.lua`,
-`tracechart.lua`, `perfpane.lua` and `simulatepane.lua` right before `frames\debug.lua`.
+`tracechart.lua`, `perfpane.lua`, `simulatepane.lua` and `pixelpane.lua` (the Pixels tab, the in-game pixel
+check, next-pixel-perfect.md §6a) right before `frames\debug.lua`.
 
 `format.lua` loads two ways: inside the addon it registers the `PerfFormat` module; run with
 `dofile` and no varargs (the offline tool) it returns a plain table of the same functions.

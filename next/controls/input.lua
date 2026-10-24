@@ -18,6 +18,9 @@ local nextScrollBar = addon:GetModule('NextScrollBar')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextInput is BetterBags Next's text field and text area (next-settings.md §2), drawn from the theme
 -- (Controls.Input): a fill (lighter while focused) and an edge (stronger under the pointer and while
 -- focused), the text Padding in, help text while empty. Only what the player types is reported
@@ -87,7 +90,7 @@ function nextInput:Create(parent, opts)
   opts = opts or {}
   local frame = CreateFrame("EditBox", nil, parent)
   frame:SetAutoFocus(false)
-  frame:SetWidth(opts.width or DEFAULT_WIDTH)
+  pixel:Width(frame, opts.width or DEFAULT_WIDTH)
   if opts.numeric then
     frame:SetNumeric(true)
   end
@@ -119,27 +122,37 @@ function nextInput:Create(parent, opts)
   return f
 end
 
+-- Style lays the field out in whole pixels (docs/next-pixel-perfect.md): its size; its icon after the
+-- padding, centered on its height by its top; its text's room after it, the insets above and below
+-- leaving exactly its font's height, so the line the client centers in it lands on a whole pixel; its
+-- help text in the same place.
 function inputProto:Style()
   local I = controls:Theme("Input")
   local frame = self.frame
-  frame:SetHeight(I.Height)
+  pixel:Height(frame, I.Height)
+  pixel:Width(frame, frame:GetWidth())
   -- Its text and help start after its icon, when it has one: it lays out its own room for it, so no
   -- restyle of another widget can put its text over the icon.
-  local left = I.Padding
+  local pad = pixel:Length(frame, I.Padding)
+  local left = pad
   if self.icon then
     local spec = self.opts.icon()
-    self.icon:SetSize(spec.Size, spec.Size)
+    pixel:Size(self.icon, spec.Size, spec.Size)
     self.icon:ClearAllPoints()
-    self.icon:SetPoint("LEFT", frame, "LEFT", I.Padding, 0)
+    pixel:Row(self.icon, "TOPLEFT", frame, pad, frame:GetHeight())
     controls:Paint(self.icon, { Texture = spec.Texture, Color = spec.Color })
-    left = I.Padding + spec.Size + I.Padding / 2
+    left = pad + self.icon:GetWidth() + pixel:Floor(frame, pad / 2)
   end
-  frame:SetTextInsets(left, I.Padding, 0, 0)
   style:SetFont(frame, I.Font)
   style:SetFont(self.help, I.HelpFont)
+  local height = frame:GetHeight()
+  local top = pixel:Middle(frame, height, pixel:TextHeight(frame))
+  local bottom = math.max(0, height - top - pixel:Ceil(frame, pixel:TextHeight(frame)))
+  frame:SetTextInsets(left, pad, top, bottom)
   self.help:ClearAllPoints()
-  self.help:SetPoint("LEFT", frame, "LEFT", left, 0)
-  self.help:SetPoint("RIGHT", frame, "RIGHT", -I.Padding, 0)
+  pixel:Row(self.help, "TOPLEFT", frame, left, height)
+  local helpTop = select(5, self.help:GetPoint(1))
+  self.help:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, helpTop)
   self.help:SetJustifyH("LEFT")
   self.help:SetWordWrap(false)
   frame:SetAlpha(frame:IsEnabled() and 1 or controls:Theme("Button").DisabledAlpha)
@@ -247,6 +260,7 @@ function nextInput:CreateArea(parent, opts)
   fill:SetAllPoints(frame)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
+  pixel:SnapScroll(box)
   box:EnableMouseWheel(false)
   local editBox = CreateFrame("EditBox", nil, box)
   editBox:SetMultiLine(true)
@@ -279,19 +293,21 @@ function nextInput:CreateArea(parent, opts)
   return area
 end
 
+-- Style lays the area out in whole pixels (docs/next-pixel-perfect.md): the box its padding in, the text
+-- short of the bar, the help where the text starts.
 function areaProto:Style()
   local I = controls:Theme("Input")
-  local pad = I.Padding
-  self.box:ClearAllPoints()
-  self.box:SetPoint("TOPLEFT", self.frame, "TOPLEFT", pad, -pad)
-  self.box:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -pad, pad)
+  local frame = self.frame
+  pixel:Height(frame, frame:GetHeight())
+  local pad = pixel:Length(frame, I.Padding)
+  pixel:Inset(self.box, frame, pad, pad, pad, pad)
   -- The text stops short of the bar in the box's right edge.
   local S = controls:Theme("ScrollBar")
-  self.editBox:SetTextInsets(0, S.Width + S.Inset, 0, 0)
+  self.editBox:SetTextInsets(0, pixel:Length(self.editBox, S.Width) + pixel:Length(self.editBox, S.Inset), 0, 0)
   style:SetFont(self.editBox, I.Font)
   style:SetFont(self.help, I.HelpFont)
   self.help:ClearAllPoints()
-  self.help:SetPoint("TOPLEFT", self.frame, "TOPLEFT", pad, -pad)
+  self.help:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad)
   self:Paint()
 end
 

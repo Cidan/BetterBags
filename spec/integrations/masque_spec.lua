@@ -175,6 +175,40 @@ describe("Masque integration", function()
     assert.is_true(groups["Backpack"].Buttons[backpackDecoration])
   end)
 
+  -- BetterBags Next's item fitter (next/itemfit.lua) leaves to Masque the parts of a button Masque places:
+  -- any button in one of BetterBags' Masque groups. A group turned off in Masque's options still places
+  -- them, with Masque's base skin (Masque 12.1.0 Core/Group.lua, __Disable: SkinButton(Button, Regions,
+  -- false)), so being in a group is what counts.
+  describe("IsSkinned", function()
+    it("is true for an item button once Masque has it, and false once a theme takes it out", function()
+      local item, decoration = newButton(const.BAG_KIND.BACKPACK)
+      assert.is_false(masque:IsSkinned(decoration))
+      send("item/Updated", item, decoration)
+      assert.is_true(masque:IsSkinned(decoration))
+      disableMasque = true
+      events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Flat")
+      assert.is_false(masque:IsSkinned(decoration))
+    end)
+
+    it("is false for an item button drawn under a theme without Masque", function()
+      disableMasque = true
+      local item, decoration = newButton(const.BAG_KIND.BACKPACK)
+      send("item/Updated", item, decoration)
+      assert.is_false(masque:IsSkinned(decoration))
+    end)
+
+    it("is true for a guild bank button and a vendor button once announced", function()
+      local guild = { button = CreateFrame("Button") }
+      guild.button.IconBorder = guild.button:CreateTexture()
+      events:SendMessage(context:New("test"), "guild/NewButton", guild)
+      assert.is_true(masque:IsSkinned(guild.button))
+      local vendor = { button = CreateFrame("Button") }
+      function vendor:MasqueRegions() return {} end
+      events:SendMessage(context:New("test"), "vendor/NewButton", vendor)
+      assert.is_true(masque:IsSkinned(vendor.button))
+    end)
+  end)
+
   -- BetterBags Next's guild bank buttons (next/guildbutton.lua, guild-bank.md §5): Blizzard's own item
   -- buttons, in a group of their own, made once and reused, so skinned when announced and when a theme
   -- with Masque applies.
@@ -286,6 +320,22 @@ describe("Masque integration", function()
     -- A BetterBags Next theme can resize them (its icons, next-themes.md §6), and Masque sizes a skin
     -- to the button when it skins it (Masque 12.1.0 Core.lua UpdateScale): each Next theme applied
     -- skins them again.
+    -- A vendor card restyles itself on a grid it was not styled for (NextVendorButton:Fit, the card's
+    -- icon, count and highlight drawn again, docs/next-pixel-perfect.md), and says so: Masque's skin goes
+    -- last, as after a theme.
+    it("skins a button again when it restyles itself, adding one not in the group yet", function()
+      local b = vendorButton()
+      events:SendMessage(context:New("test"), "vendor/NewButton", b)
+      events:SendMessage(context:New("test"), "vendor/Updated", b)
+      assert.are.same({ "skin", "skin" }, groups["Vendor"].log)
+      groups["Vendor"].Buttons, masque.added = {}, setmetatable({}, { __mode = "k" })
+      events:SendMessage(context:New("test"), "vendor/Updated", b)
+      assert.is_true(groups["Vendor"].Buttons[b.button])
+      disableMasque = true
+      events:SendMessage(context:New("test"), "vendor/Updated", b)
+      assert.are.same({ "skin", "skin", "skin" }, groups["Vendor"].log, "nothing under a theme without Masque")
+    end)
+
     it("skins them again when a Next theme applies", function()
       local b = vendorButton()
       announce(b)

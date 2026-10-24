@@ -54,6 +54,18 @@ local sparkles = addon:GetModule('NextSparkles')
 ---@class NextTabs: AceModule
 local nextTabs = addon:GetModule('NextTabs')
 
+---@class NextLift: AceModule
+local lift = addon:GetModule('NextLift')
+
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
+---@class PixelAudit: AceModule
+local pixelAudit = addon:GetModule('PixelAudit')
+
+---@class NextCoins: AceModule
+local coins = addon:GetModule('NextCoins')
+
 ---@class NextContent: AceModule
 local nextContent = addon:GetModule('NextContent')
 
@@ -246,7 +258,8 @@ nextPanel.proto = panelProto
 addon:GetModule('Perf'):RegisterPrototype(panelProto, 'NextPanelFrame')
 
 -- The panel's render root: it hands the scroll box the content's width and the height between
--- the header and what is under the scroll area (ContentBottom).
+-- the header and what is under the scroll area (ContentBottom), and the width the content's rows are decided
+-- on (LayoutWidth: in the panel's own units, never rounded to its grid, next-pixel-perfect.md §3).
 local rootProto = drawable:Extend({}, 'NextPanelRoot')
 
 ---@return RenderPlan
@@ -258,12 +271,17 @@ end
 function rootProto:PreRender()
   return {
     Width = self.bag:BodyWidth() - 2 * style.PAD,
+    LayoutWidth = self.bag:LayoutWidth() - 2 * style.PAD,
     Height = math.max(1, self.bag:Height() - style.CONTENT_TOP - self.bag:ContentBottom()),
   }
 end
 
 ---@return RenderResult
 function rootProto:Render()
+  -- The pixel check run in game from /bbdb (debug/pixelaudit.lua) checks the panel once it stays the same.
+  if pixelAudit.watching then
+    pixelAudit:Changed(self.bag.frame)
+  end
   return { Width = self.bag:Width(), Height = self.bag:Height() }
 end
 
@@ -319,7 +337,90 @@ function nextPanel:Create(proto, opts)
   end
   chain:Register(p, opts.chainRole)
   p:ApplyGeometry()
+  pixelAudit:Register(p.frame, {
+    title = opts.title, owners = { panel = p },
+    skip = function() return p:MovingParts() end,
+    describe = function() return p:PixelState() end,
+    layout = function() return p:PixelLayout() end,
+  })
   return p
+end
+
+-- MovingParts are the parts of a panel that move by nature, on the screen's pixels only by chance (next-pixel-
+-- perfect.md): its sparkles and the spark fly, the cloud's puffs breathe every frame, the braid's lights run
+-- along it. The pixel checks leave them out (PixelAudit, the specs).
+---@return table<table, boolean>
+function panelProto:MovingParts()
+  local skip = {}
+  for _, key in ipairs({ "sparkles", "edgeSparkles", "cloudSparkles", "knotSparkles" }) do
+    if self[key] ~= nil then
+      skip[self[key].frame] = true
+    end
+  end
+  for _, puff in ipairs(self.cloud.puffs) do
+    skip[puff.texture] = true
+  end
+  skip[self.spark] = true
+  skip[self.braid.layer] = true
+  return skip
+end
+
+-- PixelState says what a pixel check report needs to know of the panel's state: its size and its scales.
+---@return string
+function panelProto:PixelState()
+  return string.format("%s, Bag Scale %d%%, Icon Scale %d%%", self:IsSmall() and "small" or "full",
+    database:GetNextBagScale(), database:GetNextIconScale())
+end
+
+-- PixelLayout describes the panel's column for a pixel check report (data-driven.md): the canvas (its anchor, where
+-- it is in screen pixels, the scroll offset in pixels); a drag: the section the column keeps a room for (where and how
+-- tall), the drag in progress, what the lift holds, whether the left button is down; then each section in order:
+-- shown, docked (away) or leaving, its height, what it hangs from, where, in units and screen pixels, and where
+-- Motion moves it, if it does.
+---@return string[]
+function panelProto:PixelLayout()
+  local motion = addon:GetModule('Motion')
+  local canvas = self.content
+  local frame = canvas.frame
+  local k = 1 / pixel:Unit(frame)
+  local lines = {}
+  local function nameOf(f)
+    for _, section in ipairs(canvas.order) do
+      if section.frame == f then
+        return tostring(section.name)
+      end
+    end
+    return f ~= nil and "a frame" or "nothing"
+  end
+  local point, _, _, x, y = frame:GetPoint(1)
+  local left, top = frame:GetLeft(), frame:GetTop()
+  local box = self.scroll.scrollBox
+  table.insert(lines, string.format("canvas %s %.3f,%.3f | at %s,%s px | scroll %.3f px of %.3f",
+    tostring(point), x or 0, y or 0, left and string.format("%.3f", left * k) or "?",
+    top and string.format("%.3f", top * k) or "?", box:GetDerivedScrollOffset() * k, box:GetDerivedScrollRange() * k))
+  local drag, current, held = canvas.drag, nextDrag.current, lift.held
+  local column = "none"
+  if drag ~= nil then
+    column = string.format("%s index %d room %.3f (%.3f px) at %.3f px", tostring(drag.section.name), drag.index,
+      drag.height or 0, (drag.height or 0) * k, (canvas:GetDragSlotY() or 0) * k)
+  end
+  table.insert(lines, string.format("drag: column %s | dragging %s | lift holds %s | left button %s", column,
+    current ~= nil and tostring(current.name) or "none", held ~= nil and nameOf(held.frame) or "nothing",
+    IsMouseButtonDown("LeftButton") and "down" or "up"))
+  for i, section in ipairs(canvas.order) do
+    local f = section.frame
+    local sp, rel, _, sx, sy = f:GetPoint(1)
+    local x0, y0, x1, y1 = motion:GetMove(f)
+    local away = canvas.away[section]
+    local parent = f:GetParent()
+    local hangs = (parent == frame and rel == frame) and "canvas" or
+      ((parent and parent:GetName() or (parent == frame and "canvas" or "another frame")) .. (rel == frame and "" or ", anchored elsewhere"))
+    table.insert(lines, string.format("%d %s: shown=%s away=%s leaving=%s height %.3f (%.3f px) | hangs from %s | %s y %.3f (%.3f px), x %.3f | %s",
+      i, tostring(section.name), tostring(f:IsShown()), tostring(away ~= nil), tostring(canvas:IsLeaving(section)),
+      section.height or 0, (section.height or 0) * k, hangs, tostring(sp), sy or 0, (sy or 0) * k, sx or 0,
+      x0 ~= nil and string.format("moving %.3f,%.3f to %.3f,%.3f", x0, y0, x1, y1) or "still"))
+  end
+  return lines
 end
 
 -- SetSize switches every BetterBags Next panel to a size (docs/next-small-mode.md), saved: a chained
@@ -380,11 +481,18 @@ function panelProto:setOffset(x)
   self.offset = x
   local frame = self.frame
   frame:ClearAllPoints()
+  -- From UIParent's edges (whole pixels), whole pixels away (docs/next-pixel-perfect.md): sliding, it steps a
+  -- pixel at a time, and it rests on the grid.
+  local unit = self:PixelUnit()
   if self:IsSmall() then
-    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.placeX + x, self.placeY)
+    -- Its place is on the screen; its anchor's offsets are in its own units (its Bag Scale).
+    local s = self:Scale()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pixel:SnapIn(unit, (self.placeX + x) / s),
+      pixel:SnapIn(unit, self.placeY / s))
     frame:SetAlpha(1 - math.min(1, math.abs(x) / style.Small.Slide))
     return
   end
+  x = pixel:SnapIn(unit, x)
   if self.side == "LEFT" then
     frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, 0)
     frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, 0)
@@ -411,8 +519,8 @@ function panelProto:SetDocked(docked)
     return
   end
   self.docked = docked
-  local reach = docked and style.OVERREACH or 0
   local frame = self.frame
+  local reach = docked and pixel:Length(frame, style.OVERREACH) or 0
   if self.side == "LEFT" then
     self.fill:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, 0)
     self.wash:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, 0)
@@ -643,11 +751,11 @@ end
 function panelProto:styleBody()
   local P = style.Theme.Panel
   style:Paint(self.fill, P.Fill)
-  self.outerFeather:SetWidth(style.Chain.OuterFeather)
+  pixel:Width(self.outerFeather, style.Chain.OuterFeather)
   self:paintFeathers(1, 1)
   local wash = self.wash
   if P.Wash then
-    wash:SetHeight(P.Wash.Height)
+    pixel:Height(wash, P.Wash.Height)
     wash:SetBlendMode(P.Wash.BlendMode or "ADD")
     self:paintWash(self:WashColor(self.washKey))
     wash:Show()
@@ -658,9 +766,9 @@ function panelProto:styleBody()
   for i, edge in ipairs(self.edges) do
     if E then
       if i <= 2 then
-        edge:SetHeight(E.Size)
+        pixel:Height(edge, E.Size)
       else
-        edge:SetWidth(E.Size)
+        pixel:Width(edge, E.Size)
       end
     end
   end
@@ -740,16 +848,50 @@ function panelProto:IsSmall()
   return self.size == "small"
 end
 
--- SmallSize is the size a small panel takes on this screen while nothing sizes it (next.md §14g):
--- the size the player gave it with its grips (saved for its kind), else the full body's width and a
--- share of the screen's height in whole units; never below its minimum, nor past the screen.
+-- PixelUnit is one screen pixel in the panel's own units at its size's scale (docs/next-pixel-perfect.md):
+-- its sizes and places are whole pixels of it, worked out for the size it is taking even while it still
+-- switches.
+---@return number
+function panelProto:PixelUnit()
+  return pixel:UnitAt(UIParent:GetEffectiveScale() * self:Scale())
+end
+
+-- takeScale gives the frame its size's scale, and places its parts again for the new grid when that changed
+-- the screen pixel's size in it (docs/next-pixel-perfect.md): they were placed in whole pixels of the old.
+---@private
+function panelProto:takeScale()
+  self.frame:SetScale(self:Scale())
+  if self.partsUnit ~= nil and math.abs(self.partsUnit - pixel:Unit(self.frame)) > 1e-9 then
+    self:fitRibbon()
+    self:StyleParts()
+  end
+end
+
+-- Scale is the scale the panel is drawn at for its size (docs/next-appearance-size.md): a small panel's
+-- Bag Scale, 1 for a full panel docked to its screen edge (asked: "bag scale should just not apply when
+-- docked to the side"). A small panel's size is in its own units, as its content is laid out; its place
+-- is on the screen, in UIParent's: on screen it is its size times this.
+---@return number
+function panelProto:Scale()
+  if self:IsSmall() then
+    return database:GetNextBagScale() / 100
+  end
+  return 1
+end
+
+-- SmallSize is the size a small panel takes on this screen while nothing sizes it (next.md §14g), in its
+-- own units: the size the player gave it with its grips (saved for its kind), else the full body's width
+-- and a share of the screen's height in whole units; never below its minimum, nor past the screen at its
+-- scale.
 ---@return number width, number height
 function panelProto:SmallSize()
   local w, h = database:GetNextSmallSize(self.kind)
+  local s, unit = self:Scale(), self:PixelUnit()
   w = w or style.BODY_WIDTH
   h = h or math.floor(UIParent:GetHeight() * style.Small.Height)
-  return math.min(UIParent:GetWidth(), math.max(self:MinWidth(), w)),
-    math.min(UIParent:GetHeight(), math.max(self:MinHeight(), h))
+  -- In whole pixels at its scale, never past the screen.
+  return math.min(pixel:FloorIn(unit, UIParent:GetWidth() / s), pixel:LengthIn(unit, math.max(self:MinWidth(), w))),
+    math.min(pixel:FloorIn(unit, UIParent:GetHeight() / s), pixel:LengthIn(unit, math.max(self:MinHeight(), h)))
 end
 
 -- SmallWidth and SmallHeight are a small panel's size now: the frame's while a grip sizes it or it
@@ -836,6 +978,22 @@ function panelProto:BodyWidth()
   return style.BODY_WIDTH
 end
 
+-- LayoutWidth is the body's width its content's rows are decided on: a small panel's width as the player left it
+-- (or its default), in its own units, kept within its minimum and the screen as SmallSize keeps it but never
+-- rounded to its grid, so its items are laid out the same at every Bag Scale; the frame's while a grip sizes it
+-- or it glides back to its default size. A full panel's is the theme's.
+---@return number
+function panelProto:LayoutWidth()
+  if not self:IsSmall() then
+    return style.BODY_WIDTH
+  end
+  if self.sizing ~= nil or self.resetting then
+    return self.frame:GetWidth()
+  end
+  local w = database:GetNextSmallSize(self.kind) or style.BODY_WIDTH
+  return math.min(UIParent:GetWidth() / self:Scale(), math.max(self:MinWidth(), w))
+end
+
 -- BodyLeft is where the body starts, from the frame's left edge: past the feather on the full
 -- backpack (its feather is on its left), else at the frame's edge.
 ---@return number
@@ -859,14 +1017,17 @@ function panelProto:SparkSpreadBase()
   return self:IsSmall() and style.Small.SparkSpread or (R and R.Spread or 0)
 end
 
--- clampPlace keeps a small panel's place (its top left) on the screen.
+-- clampPlace keeps a small panel's place (its top left) on the screen, its size there its own times its
+-- scale, on whole pixels of the screen (docs/next-pixel-perfect.md: its size is whole pixels at its
+-- scale, so its far edges are too).
 ---@private
 ---@param x number
 ---@param y number
 ---@return number x, number y
 function panelProto:clampPlace(x, y)
-  x = math.max(0, math.min(UIParent:GetWidth() - self:SmallWidth(), x))
-  y = math.max(self:SmallHeight(), math.min(UIParent:GetHeight(), y))
+  local s = self:Scale()
+  x = pixel:Snap(UIParent, math.max(0, math.min(UIParent:GetWidth() - self:SmallWidth() * s, x)))
+  y = pixel:Snap(UIParent, math.max(self:SmallHeight() * s, math.min(UIParent:GetHeight(), y)))
   return x, y
 end
 
@@ -881,9 +1042,10 @@ function panelProto:SmallPlace()
   end
   local x, y = database:GetNextSmallPlace(self.kind)
   if x == nil then
-    y = (UIParent:GetHeight() + self:SmallHeight()) / 2
+    local s = self:Scale()
+    y = (UIParent:GetHeight() + self:SmallHeight() * s) / 2
     if self.side == "RIGHT" then
-      x = UIParent:GetWidth() - self:SmallWidth() - style.Small.Margin
+      x = UIParent:GetWidth() - self:SmallWidth() * s - style.Small.Margin
     else
       x = style.Small.Margin
     end
@@ -898,7 +1060,8 @@ function panelProto:LivePlace()
   if self.moving or self.sizing ~= nil or self.resetting then
     local x, y = self.frame:GetLeft(), self.frame:GetTop()
     if x ~= nil and y ~= nil then
-      return x, y
+      local s = lift:ScaleOf(self.frame)
+      return x * s, y * s
     end
   end
   return self:SmallPlace()
@@ -911,7 +1074,7 @@ function panelProto:SmallLeft()
   if self.moving or self.sizing ~= nil or self.resetting then
     local x = self.frame:GetLeft()
     if x ~= nil then
-      return x
+      return x * lift:ScaleOf(self.frame)
     end
   end
   return self.placeX + self.offset
@@ -923,10 +1086,11 @@ end
 ---@param y number
 function panelProto:GlideTo(x, y)
   local fromX, fromY = self.placeX + self.offset, self.placeY
+  x, y = pixel:Snap(UIParent, x), pixel:Snap(UIParent, y)
   self.placeX, self.placeY = x, y
   self.offset = 0
   self.target = 0
-  local frame = self.frame
+  local frame, s = self.frame, self:Scale()
   tween:Play(self, {
     duration = style.Time.Glide,
     from = 0,
@@ -934,7 +1098,9 @@ function panelProto:GlideTo(x, y)
     ease = style:Ease("Glide"),
     onUpdate = function(t)
       frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", fromX + (x - fromX) * t, fromY + (y - fromY) * t)
+      local unit = self:PixelUnit()
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pixel:SnapIn(unit, (fromX + (x - fromX) * t) / s),
+        pixel:SnapIn(unit, (fromY + (y - fromY) * t) / s))
       frame:SetAlpha(1)
     end,
     onDone = function()
@@ -952,13 +1118,15 @@ end
 function panelProto:ApplyGeometry()
   local small = self:IsSmall()
   local frame, body = self.frame, self.body
-  local bodyLeft = self:BodyLeft()
-  local bodyRight = (not small and self.side == "LEFT") and style.FEATHER or 0
+  local unit = self:PixelUnit()
+  local bodyLeft = pixel:SnapIn(unit, self:BodyLeft())
+  local bodyRight = pixel:SnapIn(unit, (not small and self.side == "LEFT") and style.FEATHER or 0)
+  self:takeScale()
   if small then
     self.smallWidth, self.smallHeight = self:SmallSize()
     frame:SetSize(self.smallWidth, self.smallHeight)
   else
-    frame:SetWidth(self:Width())
+    frame:SetWidth(pixel:LengthIn(unit, self:Width()))
   end
   frame:SetHitRectInsets(bodyLeft, bodyRight, 0, 0)
   body:ClearAllPoints()
@@ -980,7 +1148,7 @@ function panelProto:ApplyGeometry()
   for _, edge in ipairs(self.edges) do
     edge:SetShown(edgeShown)
   end
-  self.ribbonLength = self:RibbonBase()
+  self.ribbonLength = pixel:LengthIn(unit, self:RibbonBase())
   for _, line in ipairs(self.ribbonLines) do
     line:SetWidth(self.ribbonLength)
   end
@@ -1007,6 +1175,7 @@ end
 -- screen: on opening (the screen may have changed while it was closed) and when the screen changes.
 -- Its content is laid out again when its height changed.
 function panelProto:FitSmall()
+  self:takeScale()
   local width, height = self:SmallSize()
   local changed = self.frame:GetWidth() ~= width or self.frame:GetHeight() ~= height
   self.smallWidth, self.smallHeight = width, height
@@ -1019,18 +1188,20 @@ function panelProto:FitSmall()
   end
 end
 
--- BodyRect is where the body is on screen for the panel's size and offset now: its top left (in
--- UIParent's units), its height and its width (the full body's, or a small panel's own).
----@return number x, number y, number height, number width
+-- BodyRect is where the body is on screen for the panel's size and offset now, in UIParent's units: its
+-- top left, its height and its width (the full body's, or a small panel's own at its scale); and its
+-- scale.
+---@return number x, number y, number height, number width, number scale
 function panelProto:BodyRect()
   if self:IsSmall() then
-    return self.placeX + self.offset, self.placeY, self:SmallHeight(), self:SmallWidth()
+    local s = self:Scale()
+    return self.placeX + self.offset, self.placeY, self:SmallHeight() * s, self:SmallWidth() * s, s
   end
   local left = self.offset
   if self.side == "RIGHT" then
     left = UIParent:GetWidth() - style.WIDTH + self.offset
   end
-  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight(), style.BODY_WIDTH
+  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight(), style.BODY_WIDTH, 1
 end
 
 -- PrepareResize switches the panel's size (nextPanel:SetSize). Not shown (a closing one finishes
@@ -1060,10 +1231,10 @@ function panelProto:PrepareResize(size)
   else
     -- An opening slide or a flight ends where it was going: its end says the panel has shown.
     tween:Stop(self, true)
-    local x, y, h, w = self:BodyRect()
+    local x, y, h, w, scale = self:BodyRect()
     local small = self:IsSmall()
     self.morphFrom = {
-      x = x, y = y, h = h, w = w, ribbon = self.ribbonLength,
+      x = x, y = y, h = h, w = w, scale = scale, ribbon = self.ribbonLength,
       full = small and 0 or 1,
       outer = (not small and not self.docked) and 1 or 0,
       edge = self:EdgeAlphaFor(small),
@@ -1090,8 +1261,9 @@ function panelProto:Morph()
   self.offset = small and 0 or chain:RestOffset(self)
   self.target = self.offset
   self:ApplyGeometry()
-  local tx, ty, th, tw = self:BodyRect()
-  if tw < from.w - 0.5 then
+  local tx, ty, th, tw, ts = self:BodyRect()
+  -- The content is laid out in the panel's own units.
+  if tw / ts < from.w / from.scale - 0.5 then
     render:Invalidate(self.root)
   end
   local toRibbon = self.ribbonLength
@@ -1117,16 +1289,20 @@ function panelProto:Morph()
   end
   -- The frame is the body plus the feather at full size: only the body's width glides.
   local bodyLeft, extra = self:BodyLeft(), self:Width() - self:BodyWidth()
-  local at = { x = from.x, y = from.y, h = from.h, w = from.w, ribbon = from.ribbon, full = from.full,
-    outer = from.outer, edge = from.edge }
+  local at = { x = from.x, y = from.y, h = from.h, w = from.w, scale = from.scale, ribbon = from.ribbon,
+    full = from.full, outer = from.outer, edge = from.edge }
   ---@type NextMorph
   local morph = { at = at, finish = function() end }
   self.morph = morph
 
+  -- The body's place and size are on the screen and its scale glides with them (a small panel's Bag
+  -- Scale, 1 at full size); the frame's anchor and size are in its own units.
   local function draw()
+    local sc = at.scale
+    frame:SetScale(sc)
     frame:ClearAllPoints()
-    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x - bodyLeft, at.y)
-    frame:SetSize(at.w + extra, at.h)
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x / sc - bodyLeft, at.y / sc)
+    frame:SetSize(at.w / sc + extra, at.h / sc)
     self:paintFeathers(at.full, at.outer)
     self:paintEdges(at.edge)
     self.ribbonLength = at.ribbon
@@ -1146,7 +1322,8 @@ function panelProto:Morph()
 
   -- The glide: the body and the beam, with the feathers (shrinking) or the border (growing) fading out.
   local function glide(after)
-    local x0, y0, h0, w0, r0, f0, o0, e0 = at.x, at.y, at.h, at.w, at.ribbon, at.full, at.outer, at.edge
+    local x0, y0, h0, w0, s0, r0 = at.x, at.y, at.h, at.w, at.scale, at.ribbon
+    local f0, o0, e0 = at.full, at.outer, at.edge
     local f1, o1, e1 = f0, o0, e0
     if small then
       f1, o1 = 0, 0
@@ -1154,8 +1331,8 @@ function panelProto:Morph()
       e1 = self:EdgeAlphaFor(false)
     end
     if math.abs(tx - x0) < 0.01 and math.abs(ty - y0) < 0.01 and math.abs(th - h0) < 0.01
-      and math.abs(tw - w0) < 0.01 and math.abs(toRibbon - r0) < 0.01 and math.abs(f1 - f0) < 0.001 and math.abs(o1 - o0) < 0.001
-      and math.abs(e1 - e0) < 0.001 then
+      and math.abs(tw - w0) < 0.01 and math.abs(ts - s0) < 0.0001 and math.abs(toRibbon - r0) < 0.01
+      and math.abs(f1 - f0) < 0.001 and math.abs(o1 - o0) < 0.001 and math.abs(e1 - e0) < 0.001 then
       after()
       return
     end
@@ -1169,6 +1346,7 @@ function panelProto:Morph()
         at.y = y0 + (ty - y0) * t
         at.h = h0 + (th - h0) * t
         at.w = w0 + (tw - w0) * t
+        at.scale = s0 + (ts - s0) * t
         at.ribbon = r0 + (toRibbon - r0) * t
         at.full = f0 + (f1 - f0) * t
         at.outer = o0 + (o1 - o0) * t
@@ -1303,7 +1481,9 @@ function panelProto:StopMove()
   local x, y = frame:GetLeft(), frame:GetTop()
   self.moving = false
   if x ~= nil and y ~= nil then
-    x, y = self:clampPlace(x, y)
+    -- Where the client left it, on the screen (its edges are in its own units).
+    local s = lift:ScaleOf(frame)
+    x, y = self:clampPlace(x * s, y * s)
     -- Dropped beside its partner, it chains to it and glides into its spot.
     local sx, sy = chain:Dropped(self, x, y)
     self.placeX, self.placeY = x, y
@@ -1389,12 +1569,12 @@ end
 function panelProto:styleGrips()
   local G = style.Small.Grip
   for side, grip in pairs(self.grips) do
-    grip:SetSize(G.Size, G.Size)
+    pixel:Size(grip, G.Size, G.Size)
     grip:ClearAllPoints()
     if side == "LEFT" then
-      grip:SetPoint("BOTTOMLEFT", self.body, "BOTTOMLEFT", G.Inset, G.Inset)
+      pixel:Point(grip, "BOTTOMLEFT", self.body, "BOTTOMLEFT", G.Inset, G.Inset)
     else
-      grip:SetPoint("BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -G.Inset, G.Inset)
+      pixel:Point(grip, "BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -G.Inset, G.Inset)
     end
     for _, state in ipairs(GRIP_STATES) do
       local spec = G[state[1]]
@@ -1463,8 +1643,8 @@ function panelProto:StartSizing(side)
   self:endMorph()
   self:endReset()
   tween:Stop(self, true)
-  local frame = self.frame
-  frame:SetResizeBounds(self:MinWidth(), self:MinHeight(), UIParent:GetWidth(), UIParent:GetHeight())
+  local frame, s = self.frame, self:Scale()
+  frame:SetResizeBounds(self:MinWidth(), self:MinHeight(), UIParent:GetWidth() / s, UIParent:GetHeight() / s)
   self.sizingFrom = { frame:GetWidth(), frame:GetHeight() }
   self.sizing = side
   self.content:SetInstant(true)
@@ -1502,8 +1682,9 @@ function panelProto:StopSizing()
     database:SetNextSmallSize(self.kind, w, h)
     self.smallWidth, self.smallHeight = self:SmallSize()
     -- A chained bag's grip on its chained side is off (UpdateGrips), so its chained side stayed beside
-    -- its partner: where the frame is, is its spot.
-    self.placeX, self.placeY = self:clampPlace(x, y)
+    -- its partner: where the frame is, on the screen, is its spot.
+    local s = lift:ScaleOf(frame)
+    self.placeX, self.placeY = self:clampPlace(x * s, y * s)
     database:SetNextSmallPlace(self.kind, self.placeX, self.placeY)
   end
   frame:SetSize(self:SmallWidth(), self:SmallHeight())
@@ -1537,7 +1718,9 @@ function panelProto:ResetSize(side)
   database:SetNextSmallSize(self.kind, nil, nil)
   local w1, h1 = self:SmallSize()
   self.smallWidth, self.smallHeight = w1, h1
-  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + w0 - w1 or x0, y0)
+  -- Places on the screen, sizes in its own units.
+  local s = self:Scale()
+  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + (w0 - w1) * s or x0, y0)
   self.placeX, self.placeY = x1, y1
   self.offset = 0
   database:SetNextSmallPlace(self.kind, x1, y1)
@@ -1550,7 +1733,7 @@ function panelProto:ResetSize(side)
     ease = style:Ease("Resize"),
     onUpdate = function(t)
       frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x0 + (x1 - x0) * t) / s, (y0 + (y1 - y0) * t) / s)
       frame:SetSize(w0 + (w1 - w0) * t, h0 + (h1 - h0) * t)
       self:FitTitle()
       render:Invalidate(self.root)
@@ -1807,7 +1990,6 @@ function panelProto:headerButton(spec)
   -- Above a small panel's mover, which lies over the title row.
   button:SetFrameLevel(self.frame:GetFrameLevel() + 3)
   local icon = button:CreateTexture(nil, "ARTWORK")
-  icon:SetPoint("CENTER", button, "CENTER", 0, 0)
   button.icon = icon
   button.key = spec.key
   button.hover = false
@@ -1851,7 +2033,10 @@ function panelProto:SetHeaderIcon(button, iconKey)
   button.glyph = spec.Glyph ~= false
   local icon = button.icon
   local size = style.HEADER_BUTTON * style.Theme.Header.Buttons.Scale * (spec.Scale or 1)
-  icon:SetSize(size, size)
+  -- In the middle of its button by whole pixels (docs/next-pixel-perfect.md).
+  local buttonSize = pixel:Length(button, style.HEADER_BUTTON)
+  icon:ClearAllPoints()
+  pixel:Center(icon, button, buttonSize, buttonSize, size, size)
   icon:SetTexCoord(0, 1, 0, 1)
   if spec.Atlas then
     icon:SetAtlas(spec.Atlas)
@@ -1963,12 +2148,12 @@ function panelProto:applyCloud()
     return
   end
   local point = self:TitleJoin()
-  local lift = 1 + C.Swell * cloud.swell
+  local swell = 1 + C.Swell * cloud.swell
   for _, puff in ipairs(cloud.puffs) do
     local breath = 2 * math.pi * cloud.time / puff.period + puff.phase
     local base = puff.base
     puff.texture:SetPoint("CENTER", self.title, point, base.x, base.y + C.Drift * math.sin(breath))
-    puff.texture:SetAlpha(base.a * (1 + C.Depth * math.sin(breath * 0.77 + 1)) * lift)
+    puff.texture:SetAlpha(base.a * (1 + C.Depth * math.sin(breath * 0.77 + 1)) * swell)
   end
   cloud.join:SetAlpha(C.Join.A + C.JoinSwell * cloud.swell)
 end
@@ -2036,14 +2221,14 @@ function panelProto:styleHeader()
   title:ClearAllPoints()
   -- Justified toward its anchor: a small panel's title has a width (FitTitle), and text is centered in
   -- its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER).
+  local inset, top = pixel:Snap(body, style.PAD + style.TITLE_INSET), pixel:Snap(body, style.TITLE_TOP)
   if left then
-    title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(style.PAD + style.TITLE_INSET), -style.TITLE_TOP)
+    title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -inset, -top)
     title:SetJustifyH("RIGHT")
   else
-    title:SetPoint("TOPLEFT", body, "TOPLEFT", style.PAD + style.TITLE_INSET, -style.TITLE_TOP)
+    title:SetPoint("TOPLEFT", body, "TOPLEFT", inset, -top)
     title:SetJustifyH("LEFT")
   end
-  local point, joinX = self:TitleJoin()
 
   -- The cloud: a puff per entry, out of step (each breathes at its own pace, from its own point in
   -- the breath); the ones it no longer lists are hidden.
@@ -2061,9 +2246,7 @@ function panelProto:styleHeader()
       table.insert(cloud.puffs, { texture = t, period = 4 + (i % 4) * 0.9, phase = i * 1.7 })
     end
     style:Paint(cloud.join, { Texture = C.Texture, Color = C.Join.Color, BlendMode = C.BlendMode })
-    cloud.join:SetSize(C.Join.Size, C.Join.Size)
-    cloud.join:ClearAllPoints()
-    cloud.join:SetPoint("CENTER", title, point, joinX, 0)
+    pixel:Size(cloud.join, C.Join.Size, C.Join.Size)
     cloud.join:Show()
   else
     cloud.join:Hide()
@@ -2084,13 +2267,11 @@ function panelProto:styleHeader()
       self.ribbonPool[i] = line
     end
     table.insert(self.ribbonLines, line)
-    line:SetSize(self.ribbonLength, R.Thickness)
-    line:ClearAllPoints()
+    line:SetSize(self.ribbonLength, pixel:Length(line, R.Thickness))
+    line.raise = glow[1]
     if left then
-      line:SetPoint("LEFT", title, point, joinX, glow[1])
       line:SetGradient("HORIZONTAL", style:CreateColor(R.Color, glow[2]), style:CreateColor(R.Color, 0))
     else
-      line:SetPoint("RIGHT", title, point, joinX, glow[1])
       line:SetGradient("HORIZONTAL", style:CreateColor(R.Color, 0), style:CreateColor(R.Color, glow[2]))
     end
     line:SetBlendMode(R.BlendMode or "ADD")
@@ -2103,7 +2284,7 @@ function panelProto:styleHeader()
   if self.ribbonPool[1] == nil then
     local line = frame:CreateTexture(nil, "ARTWORK", nil, 0)
     line:SetColorTexture(1, 1, 1, 1)
-    line:SetPoint(left and "LEFT" or "RIGHT", title, point, joinX, 0)
+    line.raise = 0
     line:Hide()
     self.ribbonPool[1] = line
   end
@@ -2125,7 +2306,7 @@ function panelProto:styleHeader()
     local alpha = spark:GetAlpha()
     style:Paint(spark, { Texture = S.Texture, Color = S.Color, BlendMode = S.BlendMode or "ADD" })
     spark:SetAlpha(alpha)
-    spark:SetSize(S.Size, S.Size)
+    pixel:Size(spark, S.Size, S.Size)
     spark:Show()
   else
     tween:Stop(spark)
@@ -2141,8 +2322,6 @@ function panelProto:styleHeader()
     local alpha = glow:GetAlpha()
     style:Paint(glow, { Texture = G.Texture, Color = G.Color, BlendMode = G.BlendMode or "ADD" })
     glow:SetAlpha(alpha)
-    glow:SetPoint("TOPLEFT", title, "TOPLEFT", -G.X, G.Y)
-    glow:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", G.X, -G.Y)
     glow:Show()
   else
     tween:Stop(glow)
@@ -2152,11 +2331,69 @@ function panelProto:styleHeader()
 
   self:styleBraid()
   for _, button in ipairs(self.headerButtons) do
-    button:SetSize(style.HEADER_BUTTON, style.HEADER_BUTTON)
+    pixel:Size(button, style.HEADER_BUTTON, style.HEADER_BUTTON)
     self:SetHeaderIcon(button, button.iconKey)
   end
   self:LayoutCloud()
   self:LayoutHeader()
+end
+
+-- titleWidth is how wide the title's text is drawn: its measure, at most the width it is cut short to
+-- (FitTitle); a stand-in while it shows a secret (a vendor's name in an instance), which addon code may
+-- not measure (clients without secrets have no issecretvalue).
+---@private
+---@return number
+function panelProto:titleWidth()
+  local title = self.title
+  local width = title:GetStringWidth()
+  if issecretvalue ~= nil and issecretvalue(width) then
+    local C = style.Cloud
+    width = title:GetWidth() > 0 and title:GetWidth() or (C and C.SecretTitleWidth or 0)
+  elseif title:GetWidth() > 0 then
+    width = math.min(width, title:GetWidth())
+  end
+  return width
+end
+
+-- placeTitleRow puts what is drawn about the title on whole pixels (docs/next-pixel-perfect.md), from the
+-- body's corner on the title's side by whole-pixel offsets, never from the title text's middle or its far
+-- edge (the client's measure of the text, between pixels): the ribbon's lines out of the window from its
+-- hard edge, the cloud's join where they end, the glow behind the title. The title's middle is its top
+-- plus half its font's height (a whole number of pixels), rounded down.
+function panelProto:placeTitleRow()
+  local H = style.Theme.Header
+  local body, left = self.body, self.side == "LEFT"
+  local corner = left and "TOPRIGHT" or "TOPLEFT"
+  local _, fontHeight = self.title:GetFont()
+  local top = pixel:Snap(body, style.TITLE_TOP)
+  local middle = top + pixel:Floor(body, (fontHeight or 0) / 2)
+  for _, line in ipairs(self.ribbonPool) do
+    local thickness = line:GetHeight()
+    local lineTop = middle - pixel:Snap(body, line.raise or 0) - pixel:Floor(body, thickness / 2)
+    line:ClearAllPoints()
+    if left then
+      line:SetPoint("TOPLEFT", body, "TOPRIGHT", 0, -lineTop)
+    else
+      line:SetPoint("TOPRIGHT", body, "TOPLEFT", 0, -lineTop)
+    end
+  end
+  local join = self.cloud.join
+  local half = pixel:Floor(body, join:GetWidth() / 2)
+  join:ClearAllPoints()
+  join:SetPoint("TOPLEFT", body, corner, -half, -(middle - pixel:Floor(body, join:GetHeight() / 2)))
+  local glow, G = self.titleGlow, H.TitleGlow
+  if G then
+    local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
+    local inset = pixel:Snap(body, style.PAD + style.TITLE_INSET)
+    local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
+    glow:ClearAllPoints()
+    if left then
+      glow:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - gx), -(top - gy))
+    else
+      glow:SetPoint("TOPLEFT", body, "TOPLEFT", inset - gx, -(top - gy))
+    end
+    glow:SetSize(math.max(pixel:Unit(body), width), (fontHeight or 0) + 2 * gy)
+  end
 end
 
 -- BuildTitleButton makes the title a button (next.md §12): a click chains the bag to its partner,
@@ -2276,6 +2513,19 @@ function panelProto:styleBraid()
   self:applyBraid()
 end
 
+-- fitRibbon sets the ribbon's length for the braid's state (its base, shortened toward the middle of the gap as the
+-- bags couple: SetCoupling) in whole pixels on the panel's grid (docs/next-pixel-perfect.md): as the bags couple it
+-- shortens a pixel at a time, and on a new grid (a Bag Scale changed while the panel is open, takeScale) it is
+-- worked out again from its base, never a length rounded to the old grid.
+---@private
+function panelProto:fitRibbon()
+  local braid, base = self.braid, self:RibbonBase()
+  self.ribbonLength = pixel:Length(self.frame, base + (math.min(braid.half, base) - base) * braid.amount)
+  for _, line in ipairs(self.ribbonLines) do
+    line:SetWidth(self.ribbonLength)
+  end
+end
+
 -- SetCoupling draws this bag's half of the braid: amount from 0 (straight ribbon, no braid) to 1,
 -- half the gap's width, whether it is the chained bag (which shows the knot), and how far the braid
 -- has turned. Its ribbon reaches the middle of the gap as it couples, its ribbon sparkles stay on its
@@ -2290,11 +2540,7 @@ function panelProto:SetCoupling(amount, half, chained, phase, time, feather)
   local braid = self.braid
   braid.amount, braid.half, braid.chained, braid.phase, braid.time = amount, half, chained, phase, time
   self:growFeather((feather - style.FEATHER) * amount)
-  local base = self:RibbonBase()
-  self.ribbonLength = base + (math.min(half, base) - base) * amount
-  for _, line in ipairs(self.ribbonLines) do
-    line:SetWidth(self.ribbonLength)
-  end
+  self:fitRibbon()
   self.coupled = amount > 0
   local S = style.Theme.Sparkles or {}
   local o, ribbon = self.sparkles.options, S.Ribbon
@@ -2328,6 +2574,7 @@ end
 ---@param grow number
 function panelProto:growFeather(grow)
   local feather, frame = self.feather, self.frame
+  grow = pixel:Snap(frame, grow)
   if self.side == "LEFT" then
     feather:SetPoint("TOPRIGHT", frame, "TOPRIGHT", grow, 0)
     feather:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", grow, 0)
@@ -2335,7 +2582,7 @@ function panelProto:growFeather(grow)
     feather:SetPoint("TOPLEFT", frame, "TOPLEFT", -grow, 0)
     feather:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -grow, 0)
   end
-  feather:SetWidth(style.FEATHER + grow)
+  feather:SetWidth(pixel:Length(frame, style.FEATHER) + grow)
 end
 
 -- applyBraid lays this bag's half of the braid out. A strand's height above the ribbon at d pixels
@@ -2420,19 +2667,20 @@ function panelProto:LayoutHeader()
   local left = self.side == "LEFT"
   local body = self.body
   local previous
+  -- Corner to corner, whole pixels apart (docs/next-pixel-perfect.md).
   for _, button in ipairs(self.headerButtons) do
     button:ClearAllPoints()
     if button:IsShown() then
       if previous == nil then
         if left then
-          button:SetPoint("TOPLEFT", body, "TOPLEFT", style.PAD, -style.HEADER_BUTTON_TOP)
+          pixel:Point(button, "TOPLEFT", body, "TOPLEFT", style.PAD, -style.HEADER_BUTTON_TOP)
         else
-          button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -style.PAD, -style.HEADER_BUTTON_TOP)
+          pixel:Point(button, "TOPRIGHT", body, "TOPRIGHT", -style.PAD, -style.HEADER_BUTTON_TOP)
         end
       elseif left then
-        button:SetPoint("LEFT", previous, "RIGHT", style.HEADER_BUTTON_GAP, 0)
+        pixel:Point(button, "TOPLEFT", previous, "TOPRIGHT", style.HEADER_BUTTON_GAP, 0)
       else
-        button:SetPoint("RIGHT", previous, "LEFT", -style.HEADER_BUTTON_GAP, 0)
+        pixel:Point(button, "TOPRIGHT", previous, "TOPLEFT", -style.HEADER_BUTTON_GAP, 0)
       end
       previous = button
     end
@@ -2449,11 +2697,13 @@ function panelProto:FitTitle()
   if not (self.fitsTitle or self:IsSmall()) then
     title:SetWordWrap(true)
     title:SetWidth(0)
+    self:placeTitleRow()
     return
   end
   title:SetWordWrap(false)
-  title:SetWidth(math.max(1, self:BodyWidth() - (style.PAD + style.TITLE_INSET)
+  pixel:Width(title, math.max(1, self:BodyWidth() - (style.PAD + style.TITLE_INSET)
     - (style.PAD + self:headerButtonsWidth()) - 12))
+  self:placeTitleRow()
 end
 
 -- BuildSearch takes the panel's search box (the kind's in-bag box, whose query the data phase reads,
@@ -2516,17 +2766,18 @@ end
 function panelProto:styleSearch()
   local sf, S = self.searchBox, style.Theme.Search
   local t = sf.textBox
+  local body = self.body
   sf.frame:ClearAllPoints()
-  sf.frame:SetPoint("TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.SEARCH_TOP)
-  sf.frame:SetPoint("TOPRIGHT", self.body, "TOPRIGHT", -style.PAD, -style.SEARCH_TOP)
-  sf.frame:SetHeight(style.SEARCH_HEIGHT)
+  pixel:Point(sf.frame, "TOPLEFT", body, "TOPLEFT", style.PAD, -style.SEARCH_TOP)
+  pixel:Point(sf.frame, "TOPRIGHT", body, "TOPRIGHT", -style.PAD, -style.SEARCH_TOP)
+  pixel:Height(sf.frame, style.SEARCH_HEIGHT)
   local E = S.Edge
   for i, edge in ipairs(self.searchEdges) do
     if E then
       if i <= 2 then
-        edge:SetHeight(E.Size)
+        pixel:Height(edge, E.Size)
       else
-        edge:SetWidth(E.Size)
+        pixel:Width(edge, E.Size)
       end
       edge:Show()
     else
@@ -2534,18 +2785,45 @@ function panelProto:styleSearch()
     end
   end
   self.searchEdgeAlpha = E and E.Idle or 0
+  style:SetTemplateFont(t.Instructions, S.HelpFont)
+  style:SetFont(t, S.TextFont)
+  self:placeSearch()
+  self:UpdateSearchLook(true)
+end
+
+-- placeSearch lays the search box's insides out on whole pixels (docs/next-pixel-perfect.md), each by its
+-- top left, centered in the box's height by whole pixels (the odd one below): the magnifier, the help
+-- text after it (by its font's height) as wide as the box allows, what is typed from the same place, and
+-- the template's clear button at the far end.
+---@private
+function panelProto:placeSearch()
+  local t = self.searchBox.textBox
+  local height = pixel:Length(t, style.SEARCH_HEIGHT)
+  local gap, iconSize, right = pixel:Lengths(t, style.SEARCH_GAP, style.SEARCH_ICON, style.SEARCH_RIGHT)
   local icon = t.searchIcon
   icon:ClearAllPoints()
-  icon:SetPoint("LEFT", t, "LEFT", style.SEARCH_GAP, 0)
-  icon:SetSize(style.SEARCH_ICON, style.SEARCH_ICON)
+  icon:SetPoint("TOPLEFT", t, "TOPLEFT", gap, -pixel:Floor(t, (height - iconSize) / 2))
+  icon:SetSize(iconSize, iconSize)
   local help = t.Instructions
+  local _, helpHeight = help:GetFont()
+  local helpTop = -pixel:Floor(t, (height - (helpHeight or 0)) / 2)
   help:ClearAllPoints()
-  help:SetPoint("LEFT", icon, "RIGHT", style.SEARCH_GAP, 0)
-  help:SetPoint("RIGHT", t, "RIGHT", -style.SEARCH_RIGHT, 0)
-  style:SetTemplateFont(help, S.HelpFont)
-  style:SetFont(t, S.TextFont)
-  t:SetTextInsets(style.SEARCH_GAP * 2 + style.SEARCH_ICON, style.SEARCH_RIGHT, 0, 0)
-  self:UpdateSearchLook(true)
+  help:SetPoint("TOPLEFT", t, "TOPLEFT", 2 * gap + iconSize, helpTop)
+  help:SetPoint("TOPRIGHT", t, "TOPRIGHT", -right, helpTop)
+  t:SetTextInsets(2 * gap + iconSize, right, 0, 0)
+  local clear = t.clearButton
+  if clear ~= nil then
+    local size = clear:GetHeight()
+    clear:ClearAllPoints()
+    clear:SetPoint("TOPRIGHT", t, "TOPRIGHT", -pixel:Snap(t, 3), -pixel:Floor(t, (height - size) / 2))
+    pixel:Size(clear, clear:GetWidth(), size)
+    if clear.Icon ~= nil then
+      clear.Icon:ClearAllPoints()
+      local iconWidth = pixel:Length(clear, clear.Icon:GetWidth())
+      local box = clear:GetHeight()
+      pixel:Center(clear.Icon, clear, clear:GetWidth(), box, iconWidth, iconWidth)
+    end
+  end
 end
 
 -- SearchState is how the search box looks now: "focus" while typed in, "hover" under the pointer,
@@ -2627,6 +2905,8 @@ function panelProto:BuildContent(scrollName)
   local scroll = scrollbox:Create(self.frame, scrollName, {
     Symmetric = true,
     AutoHideBar = true,
+    Snap = function(region, units) return pixel:Length(region, units) end,
+    SnapScroll = function(box) pixel:SnapScroll(box) end,
     CreateBar = function(box, opts) return nextScrollBar:Create(box, opts) end,
   })
   self.scroll = scroll
@@ -2647,11 +2927,16 @@ end
 function panelProto:styleContent()
   local scroll = self.scroll
   scroll.frame:ClearAllPoints()
-  scroll.frame:SetPoint("TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.CONTENT_TOP)
-  scroll.frame:SetPoint("BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -style.PAD, self:ContentBottom())
+  pixel:Point(scroll.frame, "TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.CONTENT_TOP)
+  pixel:Point(scroll.frame, "BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -style.PAD, self:ContentBottom())
   style:SetFont(self.emptyText, style.Theme.Footer.EmptyFont)
-  self.emptyText:ClearAllPoints()
-  self.emptyText:SetPoint("TOP", scroll.frame, "TOP", 0, -style.EMPTY_TOP)
+  -- Across the scroll area, centered in it (by the client): anchored by its middle it would sit between
+  -- two pixels on an area an odd number of pixels wide (docs/next-pixel-perfect.md).
+  local empty = self.emptyText
+  empty:ClearAllPoints()
+  pixel:Point(empty, "TOPLEFT", scroll.frame, "TOPLEFT", 0, -style.EMPTY_TOP)
+  pixel:Point(empty, "TOPRIGHT", scroll.frame, "TOPRIGHT", 0, -style.EMPTY_TOP)
+  empty:SetJustifyH("CENTER")
 end
 
 -- CreateMoney returns the money frame the footer shows, or nil for none.
@@ -2670,6 +2955,10 @@ function panelProto:BuildFooter()
   local m = self:CreateMoney()
   if m ~= nil then
     m.frame:SetParent(self.frame)
+    -- The shared money frame (frames/money.lua), this panel's own instance, on whole pixels.
+    if m.copperButton ~= nil then
+      coins:Fit(m)
+    end
     self.moneyFrame = m
   end
   self:styleFooter()
@@ -2682,11 +2971,11 @@ function panelProto:styleFooter()
   local body, line, F = self.body, self.footerLine, style.Theme.Footer
   local left = self.side == "LEFT"
   line:ClearAllPoints()
-  line:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER - 4)
-  line:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER - 4)
+  pixel:Point(line, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER - 4)
+  pixel:Point(line, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER - 4)
   local spec = F.Line
   if spec then
-    line:SetHeight(spec.Size)
+    pixel:Height(line, spec.Size)
     local inner, outer = style:CreateColor(spec.Color, spec.Inner), style:CreateColor(spec.Color, spec.Outer)
     if left then
       line:SetGradient("HORIZONTAL", inner, outer)
@@ -2702,20 +2991,23 @@ function panelProto:styleFooter()
   style:SetFont(freeText, F.Font)
   freeText:ClearAllPoints()
   if left then
-    freeText:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -(style.PAD + style.TITLE_INSET), style.FOOTER_TEXT)
+    pixel:Point(freeText, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -(style.PAD + style.TITLE_INSET), style.FOOTER_TEXT)
   else
-    freeText:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD + style.TITLE_INSET, style.FOOTER_TEXT)
+    pixel:Point(freeText, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD + style.TITLE_INSET, style.FOOTER_TEXT)
   end
   local m = self.moneyFrame
   if m ~= nil then
     if m.text ~= nil then
       style:SetFont(m.text, F.MoneyFont)
     end
+    if m.Place ~= nil then
+      m.Place()
+    end
     m.frame:ClearAllPoints()
     if left then
-      m.frame:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_MONEY)
+      pixel:Point(m.frame, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_MONEY)
     else
-      m.frame:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_MONEY)
+      pixel:Point(m.frame, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_MONEY)
     end
   end
 end
@@ -2823,6 +3115,8 @@ end
 -- StyleParts draws every part of the panel from the current theme: its body, header, search box,
 -- content, footer, sparkles and tabs.
 function panelProto:StyleParts()
+  -- Its parts are placed in whole pixels of the grid it is drawn on now (docs/next-pixel-perfect.md).
+  self.partsUnit = pixel:Unit(self.frame)
   self:styleBody()
   self.mover:SetHeight(math.max(1, style.SEARCH_TOP - 4))
   self:styleSearch()
@@ -2855,6 +3149,17 @@ function panelProto:ApplyStyle(ctx)
       self:playShimmer()
     end
   end
+  if self.lastSlotInfo ~= nil then
+    self:Draw(ctx, self.lastSlotInfo)
+  end
+end
+
+-- ApplyScales sizes the panel for the Size tab's scales (docs/next-appearance-size.md): its content is drawn
+-- again at the item buttons' size (at once while it shows, else when it next shows), so each row fits as
+-- many as its width allows. A small panel takes its Bag Scale as it is refitted to the screen (FitSmall):
+-- the chain refits every open one after this (chain:ScalesChanged), and a closed one refits as it opens.
+---@param ctx Context
+function panelProto:ApplyScales(ctx)
   if self.lastSlotInfo ~= nil then
     self:Draw(ctx, self.lastSlotInfo)
   end
