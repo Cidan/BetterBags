@@ -1641,6 +1641,8 @@ just get it done with tests" (docs/next-appearance-size.md).
   `DB:Get/SetNextBagScale`), one value for every Next panel, so chained bags match. Its slider sends
   `next/ScalesChanged`; the chain (`chain:ScalesChanged`) has every panel draw again and refits every
   open small panel (`Update`, snapping: `FitSmall`); a closed one refits as it opens.
+- **The same layout at every scale:** items keep their rows and columns at every Bag Scale; a layout is
+  decided in units, never on lengths rounded to the panel's grid (`LayoutWidth`, next-pixel-perfect.md §3).
 - **Small panels only:** `panelProto:Scale()` is the Bag Scale for a small panel and 1 for a full one.
   `ApplyGeometry` and `FitSmall` give the frame that scale (`SetScale`); everything in it (art, text,
   item buttons, sparkles, the braid) scales with it.

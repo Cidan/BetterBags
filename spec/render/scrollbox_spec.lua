@@ -304,6 +304,24 @@ describe("Scrollbox", function()
       assert.are.same({ "TOPLEFT", sb.scrollChild, "TOPLEFT", 18, 0 }, { c.frame:GetPoint(1) })
     end)
 
+    -- BetterBags Next: what the child is laid out for does not depend on the grid it is drawn on, so a panel at
+    -- any Bag Scale lays its items out the same (next-pixel-perfect.md): the width to lay out for loses the
+    -- bar's room in units, the width shown its room rounded.
+    it("takes the bar's room off the width to lay out for in units, unrounded, when it rounds it", function()
+      local sb = scrollbox:Create(CreateFrame("Frame"), nil, { Symmetric = true,
+        Snap = function() return 16 end })
+      local c = child(300, 200)
+      local seen
+      function c:Render(parentResult)
+        seen = parentResult
+        return { Width = parentResult.Width, Height = 200 }
+      end
+      sb:SetChild(c)
+      render:NewRenderChain(root(sb, { Width = 640, Height = 480, LayoutWidth = 600.4 }), {})
+      assert.are.equal(608, seen.Width)
+      assert.is_true(math.abs(seen.LayoutWidth - 572.4) < 1e-9, tostring(seen.LayoutWidth))
+    end)
+
     -- BetterBags Next (docs/next-pixel-perfect.md): its own rounding of where the box scrolls to, given the box.
     it("hands its scroll box to the caller's SnapScroll, once", function()
       local given = {}

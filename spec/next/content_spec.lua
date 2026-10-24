@@ -224,6 +224,61 @@ describe("NextContent", function()
     assert.are.same({ canvas.order[1].cells, 0, -STEP }, { at(buttons["0_6"].frame) })
   end)
 
+  -- Reported: a panel's items moved between rows as its Bag Scale changed (next-pixel-perfect.md §3). How
+  -- many go in a row comes from the width to lay out for (LayoutWidth) in units, with the theme's icon and
+  -- gap, so it is the same on every grid; the items stand on the grid's whole-pixel step.
+  it("decides how many icons go in a row from the width to lay out for, the same on every grid", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local undo = layout.UseScreen(3396, 1362, 0.65)
+    -- Under UIParent, as a panel is: its grid is the UI scale times its own.
+    parent:SetParent(UIParent)
+    finally(function()
+      parent:SetParent(nil)
+      undo()
+    end)
+    local items = {}
+    for i = 1, 13 do table.insert(items, item("0_" .. i, "A")) end
+    bind(data({ categories = { { name = "A" } }, items = items }))
+    -- Placed at once: a canvas shown moves what changed place.
+    canvas:SetInstant(true)
+    local width = 7 * STEP - style.GAP + 0.5
+    for percent = 50, 150, 5 do
+      parent:SetScale(percent / 100)
+      render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = width, LayoutWidth = width })
+      local cells = canvas.order[1].cells
+      local _, _, _, x7, y7 = buttons["0_7"].frame:GetPoint(1)
+      local _, _, _, x8, y8 = buttons["0_8"].frame:GetPoint(1)
+      assert.is_true(y7 == 0 and x7 > 0, "seven in the first row at " .. percent .. "%")
+      assert.are.same({ cells, 0 }, { select(2, buttons["0_8"].frame:GetPoint(1)), x8 }, "the eighth starts the next row at " .. percent .. "%")
+      assert.is_true(y8 < 0)
+      -- The row fits the width it is drawn in, every gap the same: where the grid's rounded lengths would run
+      -- past it, the gap closes by the pixel or two the rounding added.
+      local section = canvas.order[1]
+      local _, _, _, x2 = buttons["0_2"].frame:GetPoint(1)
+      for i = 2, 7 do
+        local _, _, _, x = buttons["0_" .. i].frame:GetPoint(1)
+        assert.is_true(math.abs(x - (i - 1) * x2) < 1e-6, "even steps at " .. percent .. "%")
+      end
+      assert.is_true(x7 + buttons["0_7"].frame:GetWidth() <= section.frame:GetWidth() + 1e-6,
+        string.format("the row fits at %d%%: %.3f past", percent, x7 + buttons["0_7"].frame:GetWidth() - section.frame:GetWidth()))
+    end
+    parent:SetScale(1)
+    canvas:SetInstant(false)
+  end)
+
+  -- A section laid out again with no width to lay out for (in a dock card, at the card's scale) keeps the
+  -- rows it had.
+  it("keeps a section's rows when it is laid out again without a width to lay out for", function()
+    local items = {}
+    for i = 1, 13 do table.insert(items, item("0_" .. i, "A")) end
+    bind(data({ categories = { { name = "A" } }, items = items }))
+    render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = 7 * STEP, LayoutWidth = 6 * STEP - style.GAP })
+    local section = canvas.order[1]
+    assert.are.same({ section.cells, 0, -STEP }, { at(buttons["0_7"].frame) }, "six to a row")
+    canvas:LayoutSection(section, 9 * STEP)
+    assert.are.same({ section.cells, 0, -STEP }, { at(buttons["0_7"].frame) }, "still six")
+  end)
+
   it("keeps a gap's cell empty", function()
     bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A"), gap("0_2", "A"), item("0_3", "A") } }))
     draw()

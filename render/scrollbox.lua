@@ -139,9 +139,11 @@ function scrollboxProto:PreRender(parentResult)
   end
   local width = parentResult and parentResult.Width
   local layoutWidth = parentResult and parentResult.LayoutWidth
+  -- The width to lay out for loses the room in units, never rounded to the grid: what the child is laid out
+  -- for must not depend on the grid it is drawn on (BetterBags Next, next-pixel-perfect.md §3).
   return {
     Width = width and math.max(0, width - self:GetGutterWidth()) or nil,
-    LayoutWidth = layoutWidth and math.max(0, layoutWidth - self:GetGutterWidth()) or nil,
+    LayoutWidth = layoutWidth and math.max(0, layoutWidth - scrollbox:GutterWidthFor({ Symmetric = self.symmetric })) or nil,
   }
 end
 

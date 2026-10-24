@@ -51,6 +51,25 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
 
 ## 3. A new grid
 
+- **A layout never depends on the grid.** What is decided (how many cells go in a row) is decided in design
+  units, never on lengths rounded to the grid; only where things stand is rounded. Reported: scaling a small
+  bag up or down moved items between rows ("every item should technically render in exactly the same place,
+  no exception"; 13 Consumables in rows of 7 at a Bag Scale of 100%, of 8 at 105%). Items per row came from
+  the width, icon and gap each rounded to the panel's grid, which changes with its scale; a probe of the real
+  panel over widths 380 to 520 and Bag Scales 50% to 150% found 16 to 28 of 71 widths laid out differently on
+  the reporter's screen at 65% and 70%, 1920x1080 at 64% and 2560x1440 at 100%. Now:
+  - The panel hands its content `LayoutWidth` (`panelProto:LayoutWidth`): a small panel's width as the player
+    left it, in its own units, kept within its minimum and the screen but never rounded; the frame's while a
+    grip sizes it; a full panel's theme width. The scroll box takes its room off it in units, unrounded
+    (`render/scrollbox.lua`).
+  - `NextContent:LayoutSection(section, width, layoutWidth)` decides cells per row on `layoutWidth` with the
+    theme's icon (or card) and gap. A section laid out again without one (seated in a dock card) keeps the
+    rows it had (`section.layoutWidth`).
+  - Cells still stand on the grid's whole-pixel step, every gap the same. The rounded step can run up to a
+    pixel per cell past the width (measured: 9 pixels, over a scroll bar room as small as 6), so where a row
+    would run past the width it is drawn in, the gap closes by the pixel or two the rounding added.
+  - Measured after (the same probe): no width lays out differently on any of the four screens, no row runs past
+    the content, and the gap closes in 3% to 8% of layouts, by 1 pixel (2 at most).
 - `UI_SCALE_CHANGED` and `DISPLAY_SIZE_CHANGED` (`NextPixel:Init`) apply the current Next theme again,
   unsaved (`pixel:OnGridChanged`), when the grid differs from the one the fonts were made for
   (`NextStyle.gridKey`): new font objects at the new pixel heights, every widget restyled.
@@ -215,6 +234,12 @@ Real screens: the reporter's 3396x1362 at 65% and 70%, 3440x1440 at 65%, 1920x10
 - `spec/next/settings/content_spec.lua`: every page and tab of the settings window for both designs on
   four screens (the window shrunk to fit at 115%), scrolled partway; `themes_spec.lua` (the report);
   `window_spec.lua` (the drop after a drag).
+- Layouts at every Bag Scale: `spec/next/pixel_perfect_spec.lua` ("puts every item in the same row and column
+  at every Bag Scale": widths near a row's boundary, Bag Scales 50% to 150%, three screens; "hands its content
+  the width to lay out for"), `spec/next/content_spec.lua` (rows decided on the width to lay out for on every
+  grid, rows that fit their width with even gaps, a section laid out again keeping its rows),
+  `spec/render/scrollbox_spec.lua` (the room off the width to lay out for, in units). Undoing the decision or
+  the scroll box's part fails the first; removing the gap closing fails the canvas test.
 - Masque: `spec/next/itemfit_spec.lua` ("on a button Masque skins": Masque's parts left where a Caith-like
   skin put them, fitted again once Masque lets the button go, not put back over the skin; a button that
   announces its own restyles), `spec/next/content_spec.lua` (the canvas leaves Masque's border as Masque

@@ -573,6 +573,8 @@ function canvasProto:Render(parentResult)
   -- down, and every step a sum of whole pixels, so its rows step evenly.
   local frame = self.frame
   local width = pixel:Floor(frame, parentResult and parentResult.Width or style.GRID_WIDTH)
+  -- The width its rows are decided on, in units (a panel's own, never rounded to its grid): LayoutSection.
+  local layoutWidth = parentResult and parentResult.LayoutWidth or width
   local spacing = pixel:Length(frame, style.SECTION_SPACING)
   local animated = self.frame:IsVisible() and not self.instant
   if animated then
@@ -604,7 +606,7 @@ function canvasProto:Render(parentResult)
     -- A section waiting in a dock is laid out by the dock, at the scale of its card (Lead).
     local away = self.away[section]
     if away == nil or away.returning then
-      self:LayoutSection(section, width)
+      self:LayoutSection(section, width, layoutWidth)
     end
     local height = section.height
     if drag ~= nil and section == drag.section then
@@ -640,22 +642,36 @@ function canvasProto:Render(parentResult)
 end
 
 -- LayoutSection lays a section out width wide in its own units (the column's width), in whole pixels on its
--- own grid (docs/next-pixel-perfect.md): its title row, its cells in rows of as many as fit, each a whole
--- number of pixels apart, its size from them. Its own grid is its frame's: the column's, or a dock card's
--- (a docked section is scaled down to fit its card), where its item buttons take its grid's icon size too.
--- Its size times its scale is then whole on the grid it is drawn on. It returns its width and height.
+-- own grid (docs/next-pixel-perfect.md): its title row, its cells in rows, each a whole number of pixels apart,
+-- its size from them. Its own grid is its frame's: the column's, or a dock card's (a docked section is scaled
+-- down to fit its card), where its item buttons take its grid's icon size too. Its size times its scale is then
+-- whole on the grid it is drawn on. It returns its width and height.
+--
+-- How many cells go in a row is decided on layoutWidth (the width to lay out for, in units: a panel's own, never
+-- rounded to its grid) with the theme's lengths, never on lengths rounded to the grid: the grid changes with a
+-- panel's Bag Scale, and rounded lengths moved items between rows as it did (next-pixel-perfect.md §3). A
+-- section laid out again with none (in a dock card) keeps the rows it had.
 ---@param section NextSection
 ---@param width number
+---@param layoutWidth? number
 ---@return number width, number height
-function canvasProto:LayoutSection(section, width)
+function canvasProto:LayoutSection(section, width, layoutWidth)
   local f = section.frame
   local ctx
   width = pixel:Floor(f, width)
+  layoutWidth = layoutWidth or section.layoutWidth or width
+  section.layoutWidth = layoutWidth
   local cellWidth, cellHeight = pixel:Lengths(f, self.cards and style.VENDOR_CARD_WIDTH or style.ICON,
     self.cards and style.CARD_ICON or style.ICON)
   local gap, header = pixel:Lengths(f, style.GAP, style.SECTION_HEADER)
+  local designStep = (self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP
+  local perRow = math.max(1, math.floor((layoutWidth + style.GAP) / designStep + 1e-6))
+  -- The row fits the width it is drawn in: where the grid's rounded lengths would run past it (up to a pixel per
+  -- cell, over the scroll bar's room), the gap closes by the pixel or two the rounding added. Every gap the same.
+  if perRow > 1 then
+    gap = math.max(0, math.min(gap, pixel:Floor(f, (width - perRow * cellWidth) / (perRow - 1))))
+  end
   local step, rowStep = cellWidth + gap, cellHeight + gap
-  local perRow = math.max(1, math.floor((width + gap) / step + 1e-6))
   local rows = math.max(1, math.ceil(#section.entries / perRow))
   local height = header + rows * rowStep - gap
   self:placeHeader(section)

@@ -258,7 +258,8 @@ nextPanel.proto = panelProto
 addon:GetModule('Perf'):RegisterPrototype(panelProto, 'NextPanelFrame')
 
 -- The panel's render root: it hands the scroll box the content's width and the height between
--- the header and what is under the scroll area (ContentBottom).
+-- the header and what is under the scroll area (ContentBottom), and the width the content's rows are decided
+-- on (LayoutWidth: in the panel's own units, never rounded to its grid, next-pixel-perfect.md §3).
 local rootProto = drawable:Extend({}, 'NextPanelRoot')
 
 ---@return RenderPlan
@@ -270,6 +271,7 @@ end
 function rootProto:PreRender()
   return {
     Width = self.bag:BodyWidth() - 2 * style.PAD,
+    LayoutWidth = self.bag:LayoutWidth() - 2 * style.PAD,
     Height = math.max(1, self.bag:Height() - style.CONTENT_TOP - self.bag:ContentBottom()),
   }
 end
@@ -921,6 +923,22 @@ function panelProto:BodyWidth()
     return self:SmallWidth()
   end
   return style.BODY_WIDTH
+end
+
+-- LayoutWidth is the body's width its content's rows are decided on: a small panel's width as the player left it
+-- (or its default), in its own units, kept within its minimum and the screen as SmallSize keeps it but never
+-- rounded to its grid, so its items are laid out the same at every Bag Scale; the frame's while a grip sizes it
+-- or it glides back to its default size. A full panel's is the theme's.
+---@return number
+function panelProto:LayoutWidth()
+  if not self:IsSmall() then
+    return style.BODY_WIDTH
+  end
+  if self.sizing ~= nil or self.resetting then
+    return self.frame:GetWidth()
+  end
+  local w = database:GetNextSmallSize(self.kind) or style.BODY_WIDTH
+  return math.min(UIParent:GetWidth() / self:Scale(), math.max(self:MinWidth(), w))
 end
 
 -- BodyLeft is where the body starts, from the frame's left edge: past the feather on the full

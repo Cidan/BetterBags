@@ -584,6 +584,71 @@ describe("BetterBags Next, pixel perfect", function()
       assert.are.same({ bag.frame }, changed)
     end)
 
+    -- Reported: scaling the bags up or down moved items between rows ("every item should technically render
+    -- in exactly the same place, no exception"): 13 Consumables in rows of 7 at a Bag Scale of 100%, of 8 at
+    -- 105%. Items per row were decided on lengths rounded to the panel's pixel grid, which changes with its
+    -- scale; a probe over widths 380 to 520 found 16 to 28 of 71 widths laid out differently across Bag Scales
+    -- 50% to 150% on these screens. Widths near where a row takes one more item, on the reporter's screen at
+    -- 65% and 70% and a common one: every item in the same row and column at every Bag Scale.
+    -- What a panel's rows are decided on (NextContent:LayoutSection): its body's width in its own units, as the
+    -- player left it, never rounded to its grid; while a grip sizes it, the frame's.
+    it("hands its content the width to lay out for in its own units, not rounded to its grid", function()
+      useScreen(3396, 1362, 0.65)
+      db.size, db.bagScale = "small", 85
+      db.sizes[BACKPACK] = { 406.3, 600 }
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      assert.is_true(math.abs(bag.root:PreRender().LayoutWidth - (406.3 - 2 * style.PAD)) < 1e-9)
+      assert.is_true(math.abs(bag:SmallWidth() - 406.3) > 1e-6, "the frame is rounded to its grid")
+      bag.sizing = "RIGHT"
+      bag.frame:SetWidth(431.7)
+      assert.is_true(math.abs(bag.root:PreRender().LayoutWidth - (431.7 - 2 * style.PAD)) < 1e-9, "while sized")
+      bag.sizing = nil
+      nextPanel:SetSize(ctx(), "full")
+      finishTweens()
+      assert.is_false(bag:IsSmall())
+      assert.is_true(math.abs(bag.root:PreRender().LayoutWidth - (style.BODY_WIDTH - 2 * style.PAD)) < 1e-9)
+    end)
+
+    it("puts every item in the same row and column at every Bag Scale", function()
+      local list = {}
+      for i = 1, 13 do table.insert(list, item("0_" .. i, "Consumable")) end
+      slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = { { name = "Consumable" } }, items = list } } }
+      -- placesOf is each item's column and row: where its button is in the section's cells over the step
+      -- between buttons (the panel's grid's, which differs with its scale).
+      local function placesOf(bag)
+        local section = bag.content.byName["Consumable"]
+        local step = math.huge
+        for _, e in ipairs(section.entries) do
+          local _, _, _, x = e.item.frame:GetPoint(1)
+          if x > 0.5 then step = math.min(step, x) end
+        end
+        local out = {}
+        for _, e in ipairs(section.entries) do
+          local _, _, _, x, y = e.item.frame:GetPoint(1)
+          out[e.item.slotkey] = math.floor(x / step + 0.5) .. "," .. math.floor(-y / step + 0.5)
+        end
+        return out
+      end
+      for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 3396, 1362, 0.70 }, { 1920, 1080, 0.64 } }) do
+        useScreen(screen[1], screen[2], screen[3])
+        db.size, db.bagScale = "small", 100
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        for _, w in ipairs({ 402, 404, 406, 408, 410 }) do
+          local expected
+          for scale = 50, 150, 5 do
+            db.sizes[BACKPACK] = { w, 600 }
+            db.bagScale = scale
+            chain:ScalesChanged(ctx())
+            bag:FitSmall()
+            settle()
+            local places = placesOf(bag)
+            expected = expected or places
+            assert.are.same(expected, places, string.format("%s, width %d, Bag Scale %d%%", screenName(screen), w, scale))
+          end
+        end
+      end
+    end)
+
     it("shows a small panel's grips on whole pixels under the pointer", function()
       db.size = "small"
       for _, scale in ipairs({ 100, 85 }) do
