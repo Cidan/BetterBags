@@ -167,3 +167,32 @@ theme as the original's frame with every control in GW2_UI's art. Also:
   overlaps, once the side buttons start below the emblem's whole square (88).
 - **The frame mock** now has `SetVertexColor` replace a gradient, as the client does.
 - The full suite, luacheck and 56 mutations (each caught) pass. Not seen in game.
+
+## Round three (asked, 2026-10-24)
+
+From screenshots in game: (1) the side tabs' art made their names hard to read; (2) the header should be see-through
+like GW2_UI's character window; (3) the side buttons highlighted unevenly ("the show blizzard bags highlight one
+would be ideal"); (4) the settings window's Done button looked under the art; (5) its Delete button was hard to read;
+(6) one close button, the bags'; (7) the emblem placed as the character window places it; (8) the bank broke opening;
+(9) the size button beside the X, out of the side panel; (10) text cut with "..." after leaving Show Bags.
+
+- **(8) The bank**: a panel made under a theme without a wash never painted one, so `SetWash` faded from nothing.
+  Reproduced by a spec (the reported error, same line), fixed (next-themes.md §14).
+- **(4, 5) Done and Delete**: Sonata merges a theme's specs with Default's key by key, so the cream button art took
+  Default's faint fills' alpha: Primary 0.14 (Done), Danger 0.1 (Delete). Confirmed by resolving the theme; every art
+  spec now sets its alpha, and a spec checks every shipped theme on every client.
+- **(6) One close button**: the settings close takes art of its own under the pointer (`HoverIcon`), GW2_UI's.
+- **(3) Highlights**: GW2_UI's `-down` art is its `-up` art at 2.2 times its opacity (measured); GW2_UI highlights
+  buttons by drawing art over the icon (its bag window's `-down` art, its micro menu's icon over itself). Icons now
+  take a `Highlight` drawn over them, the same on every side button.
+- **(2, 7) The header**: as `GwFrameHeader` and `CreateFrameHeaderWithBody`: the painting starts below the band
+  (`Panel.Fill.Top`), so the band is drawn over the world; the emblem's middle on the window's top line, 21 in; the
+  title 64 in; the side panel from the top line (`Rail.Start`); no border.
+- **(9) The size button**: pinned left of the X; the title keeps clear of the farthest pin, not of both added up.
+- **(1) Tabs**: the art is one dark color whose outer 40% fades to nothing, under a name, and whose 1,024 rows were
+  squeezed into a 30-pixel tab (its ragged edge streaked). Now its solid columns (0 to 48 of 64) and 64 of its rows.
+- **(10) Truncated text**: not reproduced. Only the panel's title has a set width (a small panel's), the round trip
+  through Show Bags changes neither it nor what it depends on, and nothing in Next shortens text. Needs a screenshot
+  of the text that was cut.
+- 18 mutations, each caught; the full suite and luacheck pass; laid out on a 1920 x 1080 screen at both sizes with no
+  overlaps. Not seen in game.

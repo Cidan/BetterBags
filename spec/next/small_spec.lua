@@ -859,6 +859,21 @@ describe("BetterBags Next's small mode", function()
           assert.is_true(bank:MinWidth() >= math.ceil(header))
         end)
 
+        -- Asked: the size button beside the X at the top right. Two pins along the top keep the title clear of the
+        -- farther one, not of both added up; a pin at a bottom corner takes no room from it.
+        it("keeps the title clear of its farthest pin along the top", function()
+          UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 64 }, Pinned = {
+            closeButton = { Point = "TOPRIGHT", X = -4, Y = -4 },
+            sizeButton = { Point = "TOPRIGHT", X = -40, Y = -4 },
+            settingsButton = { Point = "BOTTOMRIGHT", X = -100, Y = 4 } } } } })
+          -- The backpack: it has a size button (the bank has none).
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          assert.is_true(bag.sizeButton:IsShown())
+          resize(bag, "RIGHT", 500, 500)
+          local room = 40 + style.HEADER_BUTTON
+          assert.are.equal(bag:BodyWidth() - 40 - (style.PAD + style.TITLE_INSET) - style.PAD - room - 12, bag.title:GetWidth())
+        end)
+
         -- A strip outside the body (Outside) is kept on the screen with it.
         it("keeps a strip outside its body on the screen", function()
           UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 64, Outside = true } } } })

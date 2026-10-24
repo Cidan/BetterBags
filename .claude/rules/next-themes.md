@@ -77,8 +77,8 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 | `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`; or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
 | `Layout` | Sizes: Icon (an item button's size; the player's Icon Scale, the Size tab, multiplies it: `style.ICON`; the grid's width and the vendor's cards keep the theme's own, `style.CARD_ICON`, docs/next-appearance-size.md), VendorColumns, VendorTextGap, VendorPriceRaise (the vendor's cards, next.md §10b), Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
 | `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
-| `Panel` | `Fill` (texture spec), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none). |
-| `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button; an icon's `Hover`, its own art under the pointer; `Rail`, the buttons down a strip along the inner side instead of across the header, inside the body or `Outside` it, §13, false in Default; `Pinned`, a button at a corner of the body apart from the row or the rail, §13). |
+| `Panel` | `Fill` (texture spec; `Top`: it starts that far below the body's top, the header drawn over what is behind the window), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none). |
+| `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button; an icon's `Highlight`, art drawn over it under the pointer; `Rail`, the buttons down a strip along the inner side instead of across the header, inside the body or `Outside` it, its art from `Start`, §13, false in Default; `Pinned`, a button at a corner of the body apart from the row or the rail, §13). |
 | `Search` | `Fill`, `FocusFill` (colors, or art: §14), `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`), `HelpFont`, `TextFont`. |
 | `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Header` (art behind the title row, across the section, `Layout.SectionHeader` tall; unset in Default), `Line` (`Color`, `From`, `To`, `Size`, or art, or false), `Highlight` (`Color`, `From`, `To`, or art, or false). |
 | `Tabs` | `Fill`, `SelectedFill` (colors fading by `Fade`, or art: drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels, no fade), `Font`, `SelectedFont`, `Glow` (`Color`, `BlendMode`, `Drop`, `Pulse`, or false), `Indicator` (`Color`, `Width`, or art tinted by the accent, or false), `Accents` (Warbank, Guild). A tab entry's `accent` is an accent name, a palette name or a color. |
@@ -90,7 +90,7 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 | `Dock` | `Card` (a texture spec: a card can be art), `Pad`, `TitleHeight`, `LineHeight`, `Glow` (`Color`, `Width`, `Low`, `High`, `Period`, or false), `Halo` (`Texture`, `Color`, `Spread`, `Low`, `High`, `Period`, `BlendMode`, or false; the panel's column leaves `Spread` round each card), its line roles, `DestroyColor` (a section waiting to be destroyed glows in it; Default's palette `Crimson`), `BuyColor` (a shopping list waiting to be bought glows in it; Default's palette `Emerald`, profession-shopping-list.md). Drawn by `NextDockCard` (`next/dockcard.lua`), for each section waiting in a panel's dock (`NextDock`, next.md §7). |
 | `Vendor` | `QualityBorder` (a file, or false), `QuestMark`, `SearchDim`, `Highlight` (a color), tints (`Unusable`, `SoldOutUnusable`, `SoldOut`), roles (`PriceFont`, `UnaffordableFont`, `NameFont`, `StackFont`), a card's `CoinSize`, `CardFill` and `CardHover` (colors or art, or false), `DurabilityHeight`. |
 | `ItemButton` | Optional: a Sonata `ItemButton` element style (sonata.md §3a) for item buttons while Next is in use (§6); its files are paths (Sonata's specs), its backdrop and quality border may be art. |
-| `Settings` | The settings window (next-settings.md §3): `Width`, `Height`, `Fill`, `Wash` (or false), `Edge`; `Sidebar` (`Width`, `Pad`, `Fill`, `Line`), `Brand` (`Height`, `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `Line`: `Color`, `From`, `To`, `Size`, or art), `Search` (`Icon`, `IconSize`, `IconColor`, `Gap`), `Back` (a page's own list: `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `HoverFont`, `Slide` seconds), `Nav` (`ItemHeight`, `Indent`, `GroupHeight`, `GroupGap`, `Indicator`, `SelectedFill`, `HoverFill`, its four fonts), `Version`, `Header` (`Height`, `Pad`, `TitleTop`, `Gap`, its fonts, `Close`: `Icon`, `Size`, `Inset`, `Color`, `HoverColor`; `Actions`: `Top`, `Gap`), `Content` (padding, `RowHeight`, `RowPad`, `MinColumn`, `Card`, `Divider`, `Hover`, its fonts), `Footer`, `Cards` (the theme pickers: sizes, fills, edges, status fonts), `Categories` (the Categories page, next-settings.md §5: its list's rows, `Dot`, `Indicator`, fills; its tabs' `Pad`, `FieldGap`, `LabelWidth`, `FilterWidth`; fonts), `BagCategories` (a bag's arrangement of them). |
+| `Settings` | The settings window (next-settings.md §3): `Width`, `Height`, `Fill`, `Wash` (or false), `Edge`; `Sidebar` (`Width`, `Pad`, `Fill`, `Line`), `Brand` (`Height`, `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `Line`: `Color`, `From`, `To`, `Size`, or art), `Search` (`Icon`, `IconSize`, `IconColor`, `Gap`), `Back` (a page's own list: `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `HoverFont`, `Slide` seconds), `Nav` (`ItemHeight`, `Indent`, `GroupHeight`, `GroupGap`, `Indicator`, `SelectedFill`, `HoverFill`, its four fonts), `Version`, `Header` (`Height`, `Pad`, `TitleTop`, `Gap`, its fonts, `Close`: `Icon`, `HoverIcon` (art of its own under the pointer), `Size`, `Inset`, `Color`, `HoverColor`; `Actions`: `Top`, `Gap`), `Content` (padding, `RowHeight`, `RowPad`, `MinColumn`, `Card`, `Divider`, `Hover`, its fonts), `Footer`, `Cards` (the theme pickers: sizes, fills, edges, status fonts), `Categories` (the Categories page, next-settings.md §5: its list's rows, `Dot`, `Indicator`, fills; its tabs' `Pad`, `FieldGap`, `LabelWidth`, `FilterWidth`; fonts), `BagCategories` (a bag's arrangement of them). |
 | `Controls` | Every control (next-settings.md §2): `ScrollBar` (the bags' too), `Toggle` (`Style`: `Square`, `Round` or `Check`, §14), `Button` (`Plain`, `Primary`, `Danger`, `Link`: fills, edges and fonts by state, and `DisabledFill`, §14), `Input`, `Slider`, `Dropdown`, `Menu`, `Swatch`, `TopTabs` (its `Indicator` a color or art), `Dialog`, `ItemGrid` (`Size`, `Gap`, `Pad`, `CommonEdge`, `DimAlpha`, `Hover`, `CountFont`, `EmptyFont`). A fill is a texture spec, a palette color or false; an edge a `Color`, `Alpha`, `Size` (and strengths `Idle`, `Hover`, `Focus`/`Open` for fields). `Motion.Time` adds `Toggle` and `TabMarker`. |
 
 **Default is the v0.7.0 design, value for value**: `spec/fixtures/next_style_v0_7_0.lua` freezes
@@ -206,37 +206,45 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
   the plan and what GW2_UI's source says: `docs/next-gw2-theme.md`): GW2_UI's look from its own files, calling
   nothing of it. Asked (round two): "we need to use those icons, that bag frame style, that icon" of the original
   BetterBags GW2 theme (`sonata/themes/gw2.lua`), "X button should still be top right", "tabs, i mean everything",
-  and no feather while docked. So:
-  - **The original's frame**: the world map painting for the body (an abstract wash, stretched whole as the
-    original stretched it); GW2's header band across the top (its painted rows, 45 tall, the right piece's painted
-    columns at the outer corner) with the title on it, 35 in, as the original's; the search bar 13 below it; GW2's
-    bag emblem (84) at the top inner corner over the side panel, its merchant's on the vendor (`Panels`, §12); the
-    footer band (its painted rows, 30 tall) with the free slots and money on it; `Panel.Feather = false`.
-  - **The side panel outside the window** (`Rail.Outside`, §13), 40 wide, the actions down it in the original's
-    micro icons (32, 5 apart, below the emblem's square): Show Bags (`bagmicrobutton`, its `-down` under the pointer),
-    Sort (`collectionsmicrobutton`), Settings (`questlogmicrobutton`); GW2_UI's own for the size button
-    (`minimize_button`, `maximize_button`), the bank tabs and deposit (`bankicons.png`'s character and Warbank
-    quarters, `Inventory/bank.xml`) and repair (`icons\repair.png`); BetterBags' glyphs in LightHeader where GW2_UI
-    has none.
-  - **The close button pinned at the top outer corner** (`Pinned`, §13), GW2_UI's close art, its hover art under the
-    pointer: top right on the backpack, as asked. A judgment call: Next mirrors the other panels, whose side panel,
-    emblem and title all start from the right, so there the close is top left; at the top right it would sit on the
-    title.
-  - **Every control in GW2_UI's art** (§14): its side tabs (`tab-tex-right-left.png`, dimmed until selected), its
-    bag search bar (no border), its bag section rows (`bag-sep.png`, `GwBagHeaderTemplate`) with `menu-hover.png`
-    under the pointer; cream buttons (`button.png`, darker under the pointer and pressed, `button_disable.png`
-    disabled, dark text, no edge), check boxes (`checkbox.png`, `checkboxchecked.png`, `checkbox-disabled.png`, the
-    mark gray while disabled), sliders (`sliderbg.png`, `sliderhandle.png`), scroll bars (`scrollbg.png`,
-    `scrollbarmiddle.png`), fields (`statusbar.png` at half, edged in black), dropdowns and menus (its backdrop,
-    `arrowdown_down.png`, `button_hover.png`, the check mark), dialogs and dock cards on its backdrop; the settings
-    window as GW2_UI's own (`settingspanelbg.png`, `236menubg.png`, `levelreward-sep.png`, `settingspanelsep.png`).
+  and no feather while docked; (round three) the header and emblem as GW2_UI's character window, one highlight for
+  every side button, the size button beside the X, one close button. So:
+  - **The header as GW2_UI's character window** (`GwFrameHeader`, `CreateFrameHeaderWithBody`): the band's painted
+    rows (45) from 29 below the body's top; the window's top line (the band's middle) at 42; the emblem (84) with its
+    middle on that line 21 in from the inner edge, from the body's top (a docked panel's top is the screen's); the
+    title 64 in, its bottom 22 below the line; the world map painting from the band's bottom (`Panel.Fill.Top`), so
+    the band is drawn over what is behind the window; no border (`Panel.Edge = false`); the search bar 13 below the
+    band; the footer band (its painted rows, 30 tall) with the free slots and money on it; `Panel.Feather = false`.
+  - **The side panel outside the window** (`Rail.Outside`, §13), 40 wide, its art from the window's top line
+    (`Rail.Start`), the actions down it below the emblem in the original's micro icons (32, 5 apart): Show Bags
+    (`bagmicrobutton`), Sort (`collectionsmicrobutton`), Settings (`questlogmicrobutton`); GW2_UI's own for the bank
+    tabs and deposit (`bankicons.png`'s character and Warbank quarters, `Inventory/bank.xml`) and repair
+    (`icons\repair.png`); BetterBags' glyphs in LightHeader where GW2_UI has none.
+  - **Every side button highlighted alike** (an icon's `Highlight`, §13; asked: as Show Blizzard Bags is): GW2_UI's
+    `-down` art over the bag, its hover art over the close, an icon's own art again over one without `-down` art
+    (added, for the half-opaque micro icons; drawn again, for the near-opaque ones), no tint. GW2_UI's `-down` art is
+    its `-up` art at 2.2 times its opacity (measured, 1.6 for the main menu's).
+  - **The close and size buttons side by side at the top outer corner** (`Pinned`, §13), centered on the band:
+    GW2_UI's close art (its hover art over it), the size button left of it (asked: out of the side panel). Top right
+    on the backpack, as asked. A judgment call: Next mirrors the other panels, whose side panel, emblem and title
+    start from the right, so there they are top left; at the top right they would sit on the title. The settings
+    window's close is the same art (`Settings.Header.Close.HoverIcon`).
+  - **Every control in GW2_UI's art** (§14): its side tabs (`tab-tex-right-left.png`, flipped, its solid columns 0 to
+    48 of 64 and 64 of its 1,024 rows: its outer 40% fades to nothing and left names over the world, and squeezed
+    whole it streaked; asked: "tough to read"), its bag search bar (no border), its bag section rows (`bag-sep.png`,
+    `GwBagHeaderTemplate`) with `menu-hover.png` under the pointer; cream buttons (`button.png`, darker under the
+    pointer and pressed, `button_disable.png` disabled, dark text, no edge), check boxes (`checkbox.png`,
+    `checkboxchecked.png`, `checkbox-disabled.png`, the mark gray while disabled), sliders (`sliderbg.png`,
+    `sliderhandle.png`), scroll bars (`scrollbg.png`, `scrollbarmiddle.png`), fields (`statusbar.png` at half, edged in
+    black), dropdowns and menus (its backdrop, `arrowdown_down.png`, `button_hover.png`, the check mark), dialogs and
+    dock cards on its backdrop; the settings window as GW2_UI's own (`settingspanelbg.png`, `236menubg.png`,
+    `levelreward-sep.png`, `settingspanelsep.png`). Every art spec sets its `Alpha` (§14, inherited alphas).
   - Text in GW2_UI's own fonts (copies of the client fonts it rewrites, §4), its colors (LightHeader titles, its
     wine accent, its skin colors); its item buttons (cropped icons on its backdrop, its border in the quality's
     color, its highlight and pushed art, the count at the top right). No sparkles, shimmer, cloud, ribbon, wash or
     braid. Painted rows and columns were measured from the files. Every GW2_UI file it names is checked against
     GW2_UI's source (`install-deps.sh` clones it).
-  - Laid out on a 1920 x 1080 screen at both sizes (a one-off dump through the specs' layout resolver): nothing
-    overlaps, after the side buttons moved below the emblem's whole square.
+  - Laid out on a 1920 x 1080 screen at both sizes (one-off dumps through the specs' layout resolver): nothing
+    overlaps, the header where `GwFrameHeader` puts it.
 
 Each draws the settings window and its controls in its own look (next-settings.md §6): Ember and Quiet
 their control colors in their own charcoal and grays (Quiet also smaller settings titles and quicker
@@ -457,15 +465,22 @@ left on backpack, and right on other bags" (docs/next-gw2-theme.md). GW2_UI's wi
   a corner of the body (`TOPRIGHT`, ...) or one named by its side (`TOPINNER`, `TOPOUTER`, `BOTTOMINNER`,
   `BOTTOMOUTER`, as ornaments name theirs): drawn for the backpack, whose inner side is on the left, mirrored (its
   `X` too) on a panel on the left of the screen. A pinned button is left out of the row's width and the rail, and
-  the title keeps its room clear of it (`pinnedRoom`, in `FitTitle` and a small panel's `MinWidth`). `Check` names
-  an unknown corner.
-- **An icon's own art under the pointer** (an icon's `Hover`: `Texture` or `Atlas`, with `TexCoords`; GW2_UI's
-  `-down` and close hover art): drawn while hovered and enabled, the icon's art otherwise (`PaintHeaderIcon`).
+  the title keeps clear of the farthest pin along the top (`pinnedRoom`, in `FitTitle` and a small panel's
+  `MinWidth`; pins side by side are not added up, a pin at a bottom corner takes no room). `Check` names an unknown
+  corner.
+- **An icon's highlight** (an icon's `Highlight`: `Texture` or `Atlas`, with `TexCoords`, `BlendMode` (BLEND unless
+  set), `Alpha`): art drawn over the icon while it is hovered and enabled, as a button's highlight texture is drawn
+  over its normal art; GW2_UI highlights its buttons so (its bag's `-down` art over the `-up`, its micro menu's icon
+  over itself, `Micromenu/micromenu.lua`). It replaced swapping the icon's art (`Hover`, round two): asked, the side
+  buttons highlighted unevenly, only the one with `-down` art brightening.
+- **The strip's art from `Start`** below the body's top (GW2_UI's side panel runs from its window's top line,
+  `GwWindowLeftPanel`); the buttons still from `Top`.
 - **Coverage**: `spec/next/theme_panel_spec.lua` ("a side rail (Header.Buttons.Rail)": both sides, centered, from
   its top; hidden buttons; the header's gap; the strip, its art, mirrored, none without art or a rail, back across
   the header; the room for every part; the title's glow, cloud and sparkles; tooltips; "outside the body
-  (Outside)"; "pinned buttons (Pinned)": a corner of the body, by its side, out of the row; "header icons": hover
-  art), `spec/next/small_spec.lua` (a pinned button's room, a strip outside kept on the screen),
+  (Outside)", its art's start; "pinned buttons (Pinned)": a corner of the body, by its side, out of the row; "header
+  icons": the highlight), `spec/next/small_spec.lua` (a pinned button's room, the farthest pin's, a strip outside kept
+  on the screen),
   ("with its header buttons down a side rail": minimum width and height, the title's room), `spec/next/vendor_spec.lua`
   and `spec/next/guildbank_spec.lua` (down their right), `spec/sonata/next_engine_spec.lua` ("names what a side rail
   lacks"), `spec/next/pixel_perfect_spec.lua` (every shipped theme, Guild Wars 2's rail included, on whole pixels).
@@ -492,6 +507,17 @@ expanding what sonata can do" (and keep it declarative). Parts that took only a 
 - **Buttons** (`DisabledFill`, per style): drawn while disabled, and the button is then not dimmed by
   `DisabledAlpha`, on a theme switch too.
 - **Vendor cards** (`Vendor.CardFill`, `CardHover`).
+- **Inherited alphas** (round three; reported in game: Guild Wars 2's Done and Delete buttons dark and unreadable):
+  a theme's spec merges with Default's key by key (§2), so art a theme draws over one of Default's faint colored fills
+  took that fill's `Alpha` (the Primary fill's 0.14, the Danger fill's 0.1; the scroll thumbs' and the settings
+  divider's too). Every art spec in Guild Wars 2 now sets its `Alpha`, and `spec/sonata/next_themes_spec.lua` ("draws
+  the art each theme sets at the alpha it sets") checks every shipped theme on every client.
+- **A wash a theme does not draw** (round three; reported in game: the bank broke opening, `next/panel.lua:2075:
+  attempt to index upvalue 'from'` in `SetWash`): a panel made under a theme without a wash (Guild Wars 2, Parchment,
+  Quiet) never painted one, so changing it (the bank's type, the guild bank) faded from nothing. `SetWash` now only
+  records the wash's key under such a theme, and a theme with a wash paints it in that key's color. Earlier specs made
+  the bank under Default before switching themes. Coverage: `spec/next/theme_panel_spec.lua` ("changes its wash under
+  a theme without one").
 - **The frame mock** follows the client: `SetVertexColor` replaces a gradient (warcraft.wiki.gg Region:SetVertexColor
   sets all four corners' colors, and TextureBase:SetGradient points to it; Blizzard's `MarchingAntsMixin` switches
   one texture between the two by orientation). It kept the gradient before, which hid a tab keeping its old
@@ -543,3 +569,5 @@ expanding what sonata can do" (and keep it declarative). Parts that took only a 
   buttons, cards, `Check`): 56 mutations, each caught; two first survived (a pinned button counted in the row's
   width, a theme switch on a disabled button) and led to tests, and two showed code that did nothing (a header
   icon's art forgotten when restyled, the check style hiding its knob twice), removed.
+- Round three (the wash under a theme without one, the settings close's hover art, icon highlights, the farthest
+  pin's room, the fill's top, the strip's start, `Check` of `HoverIcon`): 18 mutations, each caught.

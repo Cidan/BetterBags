@@ -9,11 +9,13 @@ local sonataNext = addon:GetModule('SonataNext')
 -- Guild Wars 2: BetterBags Next in GW2_UI's look, offered while GW2_UI is loaded (docs/next-gw2-theme.md). Data
 -- only, nothing of GW2_UI's called: its art drawn from its own files, read from its source (.libraries/GW2_UI).
 --   The frame is the original BetterBags GW2 theme's (sonata/themes/gw2.lua; asked: "we need to use those icons,
---     that bag frame style, that icon"): the world map painting for the body, GW2's header band across the top with
---     the title on it, GW2's bag emblem (84) at the top inner corner (its merchant's on the vendor, as GW2_UI does),
---     GW2's side panel standing outside the window along its inner side with the actions down it in the original's
---     micro icons (32, 5 apart), the footer band, the close button at the top outer corner (top right on the
---     backpack), no feather (asked: none while docked).
+--     that bag frame style, that icon"), its header laid out as GW2_UI's character window (GwFrameHeader,
+--     CreateFrameHeaderWithBody; asked): GW2's header band drawn over what is behind the window (the world map
+--     painting starts below it), GW2's bag emblem (84) with its middle on the window's top line 21 in from its edge
+--     (its merchant's on the vendor, as GW2_UI does), the title on the band 64 in; GW2's side panel standing outside
+--     the window along its inner side from the window's top line, the actions down it in the original's micro icons
+--     (32, 5 apart); the close button and the size button side by side at the top outer corner (top right on the
+--     backpack); the footer band; no feather (asked: none while docked) and no border.
 --   Every control in GW2_UI's art (asked: "tabs, i mean everything ... art of buttons, art of toggles"): its side
 --     tabs, its bag search bar, its bag section rows (GwBagHeaderTemplate), its cream buttons with dark text and
 --     their disabled art, its check boxes, sliders, scroll bars, fields, dropdowns and menus (Core/API/toolkit.lua,
@@ -28,9 +30,11 @@ local GW = "Interface\\AddOns\\GW2_UI\\Textures\\"
 
 -- The roles' client fonts, as GW2_UI rewrites them: its normal family, and its header family for titles.
 local NORMAL, HEADER = "GameFontHighlight", "SystemFont_Shadow_Large"
--- GW2_UI's side tab art for tabs sticking out to the left (Immersive/Skins/utils.lua, direction "left"); drawn for
--- the backpack's tabs and mirrored on the other panels.
-local TAB = { 1, 0, 0, 1 }
+-- GW2_UI's side tab art for tabs sticking out to the left (Immersive/Skins/utils.lua, direction "left"; drawn for the
+-- backpack's tabs and mirrored on the other panels): its solid columns, 0 to 48 of 64 (at least 56% opaque; its
+-- outer 40% fades to nothing, which left a name over the world behind the window), and 64 of its 1,024 rows (squeezed
+-- whole into a tab, its ragged edge drew as streaks). Asked: "the art on the left tabs makes the text tough to read".
+local TAB = { 48 / 64, 0, 0, 64 / 1024 }
 
 sonataNext:RegisterTheme({
   Name = "GW2",
@@ -175,13 +179,16 @@ sonataNext:RegisterTheme({
   },
 
   Layout = {
-    -- The header band is its file's painted rows (19 to 64 of 64) from the body's top, 45 tall: the title on it, as
-    -- the original's (35 in, 10 up from its bottom), the search bar 13 below it, as the original's.
-    TitleTop = 13,
-    TitleInset = 17,
-    SearchTop = 58,
+    -- GwFrameHeader: its band is 64 rows, its painted ones (19 to 64) 45 tall from 13 above the window's top line
+    -- (the band's middle) to 32 below it, where the painting starts; the emblem's middle on that line, 21 in; the title
+    -- 64 in, its bottom 22 below the line. Here the band's painted rows sit 29 below the body's top, so the emblem
+    -- (its middle on the line, at 42) starts at the top: a docked panel's top is the screen's. The search bar 13 below
+    -- the band, as the original's.
+    TitleTop = 44,
+    TitleInset = 46,
+    SearchTop = 87,
     SearchHeight = 24,
-    ContentTop = 92,
+    ContentTop = 121,
     -- The footer band, 30 tall (its painted rows), the free slots and the money on it.
     Footer = 34,
     FooterText = 9,
@@ -194,22 +201,26 @@ sonataNext:RegisterTheme({
   },
 
   Panel = {
-    Fill = { Texture = "Map", Color = "White" },
-    -- Asked: no feather while docked (a small panel has none).
+    -- From the band's bottom (29 + 45): the band is drawn over what is behind the window, as GW2_UI's headers are
+    -- (asked: "the top window border ... should be somewhat transparent").
+    Fill = { Texture = "Map", Color = "White", Top = 74 },
+    -- Asked: no feather while docked (a small panel has none). No border round the see-through header either: GW2_UI's
+    -- windows have none.
     Feather = false,
     Wash = false,
-    Edge = { Color = "Black", Alpha = 0.6, Size = 1 },
+    Edge = false,
     DropGlow = { Color = "LightHeader", Alpha = 0.1, BlendMode = "ADD" },
     -- Drawn for the backpack (its inner side on the left), mirrored on the other panels.
     Ornaments = {
-      -- The header band across the top, its right piece's painted columns (196 on) at the outer corner.
-      { Texture = "Header", Point = "TOP", Height = 45, TexCoords = { 0, 1, 19 / 64, 1 } },
-      { Texture = "HeaderEnd", Point = "TOPOUTER", Width = 316, Height = 45, TexCoords = { 196 / 512, 1, 19 / 64, 1 },
-        SubLevel = 1 },
-      -- The original's emblem, 84, at the top inner corner over the side panel; GW2_UI's merchant's on the vendor.
-      { Texture = "BagEmblem", Point = "TOPINNER", Width = 84, Height = 84, X = -66, SubLevel = 2,
+      -- The header band across the top (its painted rows), its right piece's painted columns (196 on) at the outer corner.
+      { Texture = "Header", Point = "TOP", Y = 29, Height = 45, TexCoords = { 0, 1, 19 / 64, 1 } },
+      { Texture = "HeaderEnd", Point = "TOPOUTER", Y = 29, Width = 316, Height = 45,
+        TexCoords = { 196 / 512, 1, 19 / 64, 1 }, SubLevel = 1 },
+      -- The emblem, 84, its middle on the window's top line (42) 21 in from the inner edge, as GwFrameHeader's; GW2_UI's
+      -- merchant's on the vendor.
+      { Texture = "BagEmblem", Point = "TOPINNER", Width = 84, Height = 84, X = -21, SubLevel = 2,
         Panels = { "Backpack", "Bank", "GuildBank" } },
-      { Texture = "VendorEmblem", Point = "TOPINNER", Width = 84, Height = 84, X = -66, SubLevel = 2, Panels = { "Vendor" } },
+      { Texture = "VendorEmblem", Point = "TOPINNER", Width = 84, Height = 84, X = -21, SubLevel = 2, Panels = { "Vendor" } },
       -- The footer band: the file's painted rows (0 to 34 of 64).
       { Texture = "Footer", Point = "BOTTOM", Height = 30, TexCoords = { 0, 1, 0, 34 / 64 } },
     },
@@ -221,27 +232,42 @@ sonataNext:RegisterTheme({
     Ribbon = false,
     Spark = false,
     Cloud = false,
-    -- Down GW2_UI's side panel, standing outside the window along its inner side (its art's painted rows 0 to 481 of
-    -- 512), below the emblem; the close button at the top outer corner. Glyphs where GW2_UI has no icon, in its
-    -- LightHeader; GW2's art at 32 (Scale over Buttons.Scale), its own art under the pointer where it has some.
+    -- Down GW2_UI's side panel, standing outside the window along its inner side from the window's top line (its art's
+    -- painted rows 0 to 481 of 512), below the emblem; the close and size buttons side by side at the top outer corner,
+    -- centered on the band. Glyphs where GW2_UI has no icon, in its LightHeader; GW2's art at 32 (Scale over
+    -- Buttons.Scale).
+    -- Every art icon is highlighted the same way under the pointer (asked: as Show Blizzard Bags is), as GW2_UI
+    -- highlights its buttons, with art over the icon and no tint: GW2_UI's -down art over the bag (its bag window), its
+    -- close hover art over the close, and an icon's own art again over one without -down art (its micro menu,
+    -- Micromenu/micromenu.lua). The -down art is the -up art at 2.2 times its opacity (measured); a half-opaque micro
+    -- icon over itself added (ADD) is fully bright too, a near-opaque one drawn again (BLEND) is.
     Buttons = {
-      Color = "LightHeader", HoverColor = "White", ArtColor = "White", ArtHoverColor = "LightHeader", Scale = 0.75,
-      -- The first button 4 below the emblem's square (84).
-      Rail = { Width = 40, Top = 88, Gap = 5, Outside = true,
+      Color = "LightHeader", HoverColor = "White", ArtColor = "White", ArtHoverColor = "White", Scale = 0.75,
+      -- The first button 4 below the emblem's square (0 to 84).
+      Rail = { Width = 40, Top = 88, Gap = 5, Outside = true, Start = 42,
         Fill = { Texture = "SidePanel", TexCoords = { 0, 1, 0, 481 / 512 }, Color = "White" } },
-      Pinned = { closeButton = { Point = "TOPOUTER", X = -6, Y = -6 } },
+      -- Centered on the band's painted rows (29 to 74), as GW2_UI's close sits on its header; the size button to its
+      -- left (asked: out of the side panel, left of the X).
+      Pinned = {
+        closeButton = { Point = "TOPOUTER", X = -4, Y = -36 },
+        sizeButton = { Point = "TOPOUTER", X = -36, Y = -36 },
+      },
       Icons = {
         -- Its X is 16 of its 26 pixels: drawn at 26.
-        closeButton = { Texture = "Close", Glyph = false, Scale = 1.1, Hover = { Texture = "CloseHover" } },
-        bagsButton = { Texture = "MicroBag", Glyph = false, Scale = 4 / 3, Hover = { Texture = "MicroBagDown" } },
-        sortButton = { Texture = "MicroCollections", Glyph = false, Scale = 4 / 3 },
-        settingsButton = { Texture = "MicroQuestLog", Glyph = false, Scale = 4 / 3 },
-        sizeButtonFull = { Texture = "Minimize", Glyph = false, Scale = 4 / 3 },
-        sizeButtonSmall = { Texture = "Maximize", Glyph = false, Scale = 4 / 3 },
+        closeButton = { Texture = "Close", Glyph = false, Scale = 1.1, Highlight = { Texture = "CloseHover" } },
+        bagsButton = { Texture = "MicroBag", Glyph = false, Scale = 4 / 3, Highlight = { Texture = "MicroBagDown" } },
+        sortButton = { Texture = "MicroCollections", Glyph = false, Scale = 4 / 3,
+          Highlight = { Texture = "MicroCollections", BlendMode = "ADD" } },
+        settingsButton = { Texture = "MicroQuestLog", Glyph = false, Scale = 4 / 3,
+          Highlight = { Texture = "MicroQuestLog", BlendMode = "ADD" } },
+        sizeButtonFull = { Texture = "Minimize", Glyph = false, Scale = 4 / 3, Highlight = { Texture = "Minimize" } },
+        sizeButtonSmall = { Texture = "Maximize", Glyph = false, Scale = 4 / 3, Highlight = { Texture = "Maximize" } },
         -- GW2_UI's bank tab icons (Inventory/bank.xml): the character bank's and the Warbank's.
-        bankTabsButton = { Texture = "BankIcons", TexCoords = { 0, 0.5, 0.5, 1 }, Glyph = false, Scale = 4 / 3 },
-        depositButton = { Texture = "BankIcons", TexCoords = { 0.5, 1, 0, 0.5 }, Glyph = false, Scale = 4 / 3 },
-        repairAllButton = { Texture = "Repair", Glyph = false, Scale = 4 / 3 },
+        bankTabsButton = { Texture = "BankIcons", TexCoords = { 0, 0.5, 0.5, 1 }, Glyph = false, Scale = 4 / 3,
+          Highlight = { Texture = "BankIcons", TexCoords = { 0, 0.5, 0.5, 1 } } },
+        depositButton = { Texture = "BankIcons", TexCoords = { 0.5, 1, 0, 0.5 }, Glyph = false, Scale = 4 / 3,
+          Highlight = { Texture = "BankIcons", TexCoords = { 0.5, 1, 0, 0.5 } } },
+        repairAllButton = { Texture = "Repair", Glyph = false, Scale = 4 / 3, Highlight = { Texture = "Repair" } },
       },
     },
   },
@@ -324,7 +350,7 @@ sonataNext:RegisterTheme({
     Edge = { Color = "Black", Alpha = 0.6 },
     Sidebar = {
       Fill = { Texture = "SettingsMenu", TexCoords = { 0, 226 / 256, 0, 484 / 512 }, Color = "White" },
-      Line = { Texture = "SettingsDivider", TexCoords = { 0, 0.5, 0, 434 / 512 }, Color = "White", Size = 4 },
+      Line = { Texture = "SettingsDivider", TexCoords = { 0, 0.5, 0, 434 / 512 }, Color = "White", Alpha = 1, Size = 4 },
     },
     Brand = {
       IconColor = "LightHeader",
@@ -338,7 +364,8 @@ sonataNext:RegisterTheme({
       SelectedFill = { Texture = "RowHover", Color = { 0.8, 0.8, 0.8, 1 }, Alpha = 1 },
       HoverFill = { Texture = "RowHover", Color = { 0.8, 0.8, 0.8, 1 }, Alpha = 0.8 },
     },
-    Header = { Close = { Color = "LightHeader", HoverColor = "White" } },
+    -- The bags' close button (GW2_UI's close art, its hover art under the pointer), at the bags' size.
+    Header = { Close = { Icon = "Close", HoverIcon = "CloseHover", Color = "White", HoverColor = "White", Size = 26 } },
     Content = {
       Card = { Color = "Black", Alpha = 0.22 },
       Divider = { Color = "Lavender", Alpha = 0.08 },
@@ -368,9 +395,9 @@ sonataNext:RegisterTheme({
     ScrollBar = {
       Size = 6, HoverSize = 8,
       Track = { Texture = "ScrollTrack", Color = "White", Alpha = 0.6 },
-      Thumb = { Texture = "ScrollThumb", Color = "White" },
-      ThumbHover = { Texture = "ScrollThumb", Color = "LightHeader" },
-      ThumbDrag = { Texture = "ScrollThumb", Color = "Gold" },
+      Thumb = { Texture = "ScrollThumb", Color = "White", Alpha = 1 },
+      ThumbHover = { Texture = "ScrollThumb", Color = "LightHeader", Alpha = 1 },
+      ThumbDrag = { Texture = "ScrollThumb", Color = "Gold", Alpha = 1 },
     },
     -- GW2_UI's check boxes (GwSkinCheckButton): the box, the mark over it while checked, the disabled box, the mark
     -- greyed while disabled.
@@ -384,26 +411,27 @@ sonataNext:RegisterTheme({
       Hover = { Color = "White", Alpha = 0.08 },
     },
     -- GW2_UI's cream buttons (GwSkinButton): button.png, darker under the pointer and pressed, button_disable.png
-    -- disabled, dark text, no edge.
+    -- disabled, dark text, no edge. Every art spec here sets its Alpha: themes merge with Default key by key, and
+    -- Default's Primary and Danger fills are faint colors (their Alpha would carry over to the art).
     Button = {
       Plain = {
-        Fill = { Texture = "Button", Color = "White" },
-        HoverFill = { Texture = "Button", Color = "ButtonHover" },
-        PressedFill = { Texture = "Button", Color = "ButtonPressed" },
+        Fill = { Texture = "Button", Color = "White", Alpha = 1 },
+        HoverFill = { Texture = "Button", Color = "ButtonHover", Alpha = 1 },
+        PressedFill = { Texture = "Button", Color = "ButtonPressed", Alpha = 1 },
         DisabledFill = { Texture = "ButtonOff", Color = "White" },
         Edge = false, HoverEdge = false,
       },
       Primary = {
-        Fill = { Texture = "Button", Color = "White" },
-        HoverFill = { Texture = "Button", Color = "ButtonHover" },
-        PressedFill = { Texture = "Button", Color = "ButtonPressed" },
+        Fill = { Texture = "Button", Color = "White", Alpha = 1 },
+        HoverFill = { Texture = "Button", Color = "ButtonHover", Alpha = 1 },
+        PressedFill = { Texture = "Button", Color = "ButtonPressed", Alpha = 1 },
         DisabledFill = { Texture = "ButtonOff", Color = "White" },
         Edge = false, HoverEdge = false,
       },
       Danger = {
-        Fill = { Texture = "Button", Color = "White" },
-        HoverFill = { Texture = "Button", Color = "ButtonHover" },
-        PressedFill = { Texture = "Button", Color = "ButtonPressed" },
+        Fill = { Texture = "Button", Color = "White", Alpha = 1 },
+        HoverFill = { Texture = "Button", Color = "ButtonHover", Alpha = 1 },
+        PressedFill = { Texture = "Button", Color = "ButtonPressed", Alpha = 1 },
         DisabledFill = { Texture = "ButtonOff", Color = "White" },
         Edge = false, HoverEdge = false,
       },

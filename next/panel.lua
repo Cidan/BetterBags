@@ -521,6 +521,15 @@ function panelProto:RestOffset()
   return chain:RestOffset(self)
 end
 
+-- fillTop is how far below the body's top its fill starts (Panel.Fill.Top): GW2_UI's windows start their painting
+-- below their header, drawn over what is behind the window. On whole pixels of the frame's grid.
+---@param frame Frame
+---@return number
+local function fillTop(frame)
+  local F = style.Theme.Panel.Fill
+  return pixel:Snap(frame, (F and F.Top) or 0)
+end
+
 -- SetDocked shapes the body's far edge: at its screen edge the fill and the wash reach OVERREACH past
 -- it, so the opening bounce never shows what is behind; away from it (beside its anchor, or flying)
 -- they stop at the frame and the far edge feathers out toward the middle of the screen.
@@ -535,7 +544,7 @@ function panelProto:SetDocked(docked)
   local frame = self.frame
   local reach = docked and pixel:Length(frame, style.OVERREACH) or 0
   if self.side == "LEFT" then
-    self.fill:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, 0)
+    self.fill:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, -fillTop(frame))
     self.wash:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, 0)
   else
     self.fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", reach, 0)
@@ -955,16 +964,16 @@ function panelProto:shownButtons()
   return shown
 end
 
--- pinnedRoom is the room the shown pinned buttons take from the title's row: each its size and its offset from
--- its corner across.
+-- pinnedRoom is the room the shown pinned buttons along the top take from the title's row: as far in as the
+-- farthest of them reaches (its offset from its corner and its size); a pin at a bottom corner takes none.
 ---@private
 ---@return number
 function panelProto:pinnedRoom()
   local room = 0
   for _, button in ipairs(self.headerButtons) do
     local pin = pinnedOf(button)
-    if pin ~= nil and button:IsShown() then
-      room = room + style.HEADER_BUTTON + math.abs(pin.X or 0)
+    if pin ~= nil and button:IsShown() and pin.Point:sub(1, 3) == "TOP" then
+      room = math.max(room, style.HEADER_BUTTON + math.abs(pin.X or 0))
     end
   end
   return room
@@ -1230,7 +1239,7 @@ function panelProto:ApplyGeometry()
   body:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -bodyRight, 0)
   local fill, wash = self.fill, self.wash
   fill:ClearAllPoints()
-  fill:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
+  fill:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, -fillTop(frame))
   fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -bodyRight, 0)
   wash:ClearAllPoints()
   wash:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
@@ -2052,11 +2061,16 @@ function panelProto:WashColor(key)
 end
 
 -- SetWash fades the wash at the top of the panel to its color for what it shows (WashColor), at once
--- with now; a theme applied later paints it in that theme's color for the same key.
+-- with now; a theme applied later paints it in that theme's color for the same key. Under a theme without a
+-- wash it only records the key: a panel made under one has no color to fade from (styleBody paints none).
 ---@param key string
 ---@param now? boolean
 function panelProto:SetWash(key, now)
   self.washKey = key
+  if not style.Theme.Panel.Wash then
+    tween:Stop(self.wash)
+    return
+  end
   local from = self.washColor
   local to = self:WashColor(key)
   if now then
@@ -2088,6 +2102,9 @@ function panelProto:headerButton(spec)
   button:SetFrameLevel(self.frame:GetFrameLevel() + 3)
   local icon = button:CreateTexture(nil, "ARTWORK")
   button.icon = icon
+  -- Drawn over the icon while hovered (an icon's Highlight).
+  button.highlight = button:CreateTexture(nil, "ARTWORK", nil, 1)
+  button.highlight:Hide()
   button.key = spec.key
   button.hover = false
   self:SetHeaderIcon(button, spec.iconKey or spec.key)
@@ -2120,6 +2137,22 @@ function panelProto:headerButton(spec)
   return button
 end
 
+-- drawIconArt draws a header icon's art: an Atlas, else a Texture (one of the theme's Textures, or a file) with its
+-- TexCoords, filtered trilinearly so a glyph drawn smaller than its file stays smooth.
+---@param icon Texture
+---@param art table
+local function drawIconArt(icon, art)
+  icon:SetTexCoord(0, 1, 0, 1)
+  if art.Atlas then
+    icon:SetAtlas(art.Atlas)
+  else
+    icon:SetTexture(style:TexturePath(art.Texture), nil, nil, "TRILINEAR")
+    if art.TexCoords then
+      icon:SetTexCoord(unpack(art.TexCoords))
+    end
+  end
+end
+
 -- SetHeaderIcon draws a header button's icon from the theme (Header.Buttons.Icons[iconKey],
 -- next-themes.md §11): an Atlas (it wins over a Texture the theme inherits), else a Texture (one of
 -- the theme's Textures, or a file) with its TexCoords, filtered trilinearly so a glyph drawn smaller
@@ -2141,23 +2174,15 @@ function panelProto:SetHeaderIcon(button, iconKey)
   local buttonSize = pixel:Length(button, style.HEADER_BUTTON)
   icon:ClearAllPoints()
   pixel:Center(icon, button, buttonSize, buttonSize, size, size)
-  self:PaintHeaderIcon(button)
-end
-
--- drawIconArt draws a header icon's art: an Atlas, else a Texture (one of the theme's Textures, or a file) with its
--- TexCoords, filtered trilinearly so a glyph drawn smaller than its file stays smooth.
----@param icon Texture
----@param art table
-local function drawIconArt(icon, art)
-  icon:SetTexCoord(0, 1, 0, 1)
-  if art.Atlas then
-    icon:SetAtlas(art.Atlas)
-  else
-    icon:SetTexture(style:TexturePath(art.Texture), nil, nil, "TRILINEAR")
-    if art.TexCoords then
-      icon:SetTexCoord(unpack(art.TexCoords))
-    end
+  drawIconArt(icon, spec)
+  local highlight = button.highlight
+  highlight:ClearAllPoints()
+  pixel:Center(highlight, button, buttonSize, buttonSize, size, size)
+  if spec.Highlight then
+    drawIconArt(highlight, spec.Highlight)
+    highlight:SetBlendMode(spec.Highlight.BlendMode or "BLEND")
   end
+  self:PaintHeaderIcon(button)
 end
 
 -- PaintHeaderIcon colors a header button's icon for how it is now: its own color (its icon's Color,
@@ -2165,7 +2190,8 @@ end
 -- brighter under the pointer. A tint suits a white glyph and darkens full-color art into a silhouette
 -- (asked with a Parchment screenshot), so the two are colored apart. A disabled button is not brighter
 -- under the pointer: it is drawn at DisabledAlpha of its color, and art desaturated too (a white glyph
--- looks the same desaturated).
+-- looks the same desaturated). Its Highlight shows over it while it is hovered and enabled, as a button's
+-- highlight texture does (GW2_UI's buttons).
 ---@param button Button
 function panelProto:PaintHeaderIcon(button)
   local B = style.Theme.Header.Buttons
@@ -2182,14 +2208,13 @@ function panelProto:PaintHeaderIcon(button)
     a = a * B.DisabledAlpha
   end
   local icon = button.icon
-  -- Its own art under the pointer (an icon's Hover: GW2_UI's -down and close hover art), never while disabled.
-  local art = (button.hover and enabled and own.Hover) or own
-  if button.iconArt ~= art then
-    drawIconArt(icon, art)
-    button.iconArt = art
-  end
   icon:SetDesaturated(not enabled and not button.glyph)
   icon:SetVertexColor(r, g, b, a)
+  local H = own.Highlight
+  button.highlight:SetShown(H ~= nil and button.hover and enabled)
+  if H ~= nil then
+    button.highlight:SetVertexColor(1, 1, 1, H.Alpha or 1)
+  end
 end
 
 -- SetHeaderButtonEnabled enables or disables a header button, its icon drawn for it (PaintHeaderIcon).
@@ -2479,7 +2504,8 @@ function panelProto:styleRail()
   if R.Outside then
     own = mirrored and "LEFT" or "RIGHT"
   end
-  rail:SetPoint("TOP" .. own, body, "TOP" .. side, 0, 0)
+  -- Its art from Start below the body's top (GW2_UI's side panel runs from its window's top line).
+  rail:SetPoint("TOP" .. own, body, "TOP" .. side, 0, -pixel:Snap(body, R.Start or 0))
   rail:SetPoint("BOTTOM" .. own, body, "BOTTOM" .. side, 0, 0)
   pixel:Width(rail, R.Width)
   style:Paint(rail, R.Fill)

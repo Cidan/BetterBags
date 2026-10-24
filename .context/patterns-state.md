@@ -234,3 +234,14 @@ nowhere: `spec/targeted_sweep_spec.lua` and `spec/window/window_spec.lua` failed
 **Rule**: Save what a spec replaces (`rawget`) and restore it in `after_each`, or use the spec's `override`
 helper where it has one. When a spec passes alone and fails in the full run, look for a method replaced on a
 shared module by an earlier file.
+
+## A Theme's Spec Inherits the Keys It Leaves Out
+**Problem**: Sonata and SonataNext resolve a theme by merging it with its parent key by key (only lists replace).
+A theme that draws art where its parent draws a faint color (`{ Texture = "Button", Color = "White" }` over Default's
+`{ Color = "Gold", Alpha = 0.14 }`) also gets the parent's `Alpha`: Guild Wars 2's cream buttons drew at 14%.
+
+**Rule**: A spec that replaces the look of a parent's spec sets every key the parent sets that would change it
+(`Alpha` above all), and a spec over every shipped theme compares what a theme sets with what it resolves to
+(`spec/sonata/next_themes_spec.lua`, "draws the art each theme sets at the alpha it sets"). `false` removes an
+inherited table entirely (it resolves to nil).
+

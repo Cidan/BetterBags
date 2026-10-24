@@ -399,7 +399,7 @@ local FONT_KEYS = {
   ActiveFont = true, PreviewFont = true, UnavailableFont = true,
 }
 -- Keys whose value names one of the theme's Textures, or is a file (a path or a file ID).
-local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true, Icon = true }
+local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true, Icon = true, HoverIcon = true }
 -- Parts that are not Next's widgets' specs: checked elsewhere or not at all.
 local UNCHECKED = { Palette = true, Variables = true, Textures = true, ItemButton = true }
 

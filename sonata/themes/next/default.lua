@@ -291,7 +291,7 @@ sonataNext:RegisterTheme({
   -- The panel itself.
   Panel = {
     -- The body (a texture spec: Color, Texture, Atlas, TexCoords, HorizTile, VertTile, BlendMode,
-    -- Alpha, VertexColor, Gradient).
+    -- Alpha, VertexColor, Gradient); Top (none here) starts it that far below the body's top.
     Fill = { Color = "Body" },
     -- The feathered edge beside the body: from Color's alpha at the body to nothing (Layout.Feather
     -- wide).
@@ -357,12 +357,13 @@ sonataNext:RegisterTheme({
     -- icon may have its own Color and HoverColor. A disabled button is drawn at DisabledAlpha of its
     -- color (a white glyph looks the same desaturated), art desaturated too. Scale is an icon's size
     -- as a share of its button (Layout.HeaderButton), centered in it; an icon's own Scale multiplies
-    -- it (art that needs fitting); an icon's Hover is its own art under the pointer (Texture or Atlas, with
-    -- TexCoords). The buttons keep their size and places. Rail (false here) puts them down a strip along the
+    -- it (art that needs fitting); an icon's Highlight is art drawn over it under the pointer (Texture or Atlas,
+    -- with TexCoords, BlendMode, Alpha), as a button's highlight texture is. The buttons keep their size and places. Rail (false here) puts them down a strip along the
     -- panel's inner side instead of across the header: Width wide (inside the body, which is that much wider;
     -- or standing outside it, Outside), the first Top from the body's top, Gap apart (Layout.HeaderButtonGap
     -- when unset), centered across it, over its Fill (a texture spec, mirrored on a panel whose inner side is
-    -- on the right; false: no art). Pinned puts a button by its key at a corner of the body ({ Point, X, Y }:
+    -- on the right, from Start below the body's top; false: no art). Pinned puts a button by its key at a corner
+    -- of the body ({ Point, X, Y }:
     -- TOPRIGHT and the rest, or TOPOUTER and the rest by side, mirrored as ornaments are), apart from the row
     -- or the rail (none here).
     Buttons = { Color = "ButtonIcon", HoverColor = "White", ArtColor = "ButtonIcon", ArtHoverColor = "White",
@@ -609,6 +610,7 @@ sonataNext:RegisterTheme({
     -- close button (a glyph, Size square, Inset from the window's top right corner).
     Header = {
       Height = 100, Pad = 32, TitleTop = 26, Gap = 6, TitleFont = "SettingsTitle", DescriptionFont = "SettingsDescription",
+      -- HoverIcon (none here): art of its own under the pointer.
       Close = { Icon = "IconClose", Size = 22, Inset = 14, Color = "ButtonIcon", HoverColor = "White" },
       -- A page's actions (Rename, Delete): their top Top down, Gap left of the close button and right of
       -- the title.

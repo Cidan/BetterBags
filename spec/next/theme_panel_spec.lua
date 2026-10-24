@@ -235,6 +235,43 @@ describe("BetterBags Next's panels and themes", function()
   local function rgba(c) return { c.r, c.g, c.b, c.a } end
 
   describe("the body", function()
+    -- Reported in game, opening the bank with Guild Wars 2 applied: "next/panel.lua:2075: attempt to index upvalue
+    -- 'from' (a nil value)" in SetWash, from bank.lua useBankType. A panel made under a theme without a wash
+    -- (Guild Wars 2, Parchment, Quiet) never painted one, so it had no wash color to fade from.
+    it("changes its wash under a theme without one, and shows it in that color once a theme has one", function()
+      apply({ Panel = { Wash = false } })
+      local bank = nextBank:Create(ctx())
+      bank:Show(ctx())
+      bank:SetWash("Warbank")
+      finishTweens()
+      assert.is_false(bank.wash:IsShown())
+      backToDefault()
+      assert.is_true(bank.wash:IsShown())
+      local r, g, b, a = style:RGBA(style.Theme.Panel.Washes.Warbank)
+      assert.are.same({ r, g, b, a }, bank.washColor, "the Warbank's, which it showed meanwhile")
+      bank:SetWash("Default")
+      finishTweens()
+      assert.are.same({ style:RGBA(style.Theme.Panel.Washes.Default) }, bank.washColor)
+    end)
+
+    -- GW2_UI's windows start their painting below their header (CreateFrameHeaderWithBody), so the header art is
+    -- drawn over whatever is behind the window. Asked: "the top window border ... should be somewhat transparent".
+    it("starts its fill Fill.Top below the body's top, docked or not, on both sides, and at the top after", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Panel = { Fill = { Color = "Body", Top = 74 } } })
+      local _, _, _, _, y = bag.fill:GetPoint(1)
+      assert.are.equal(-74, y)
+      _, _, _, _, y = bank.fill:GetPoint(1)
+      assert.are.equal(-74, y)
+      bank:SetDocked(true)
+      _, _, _, _, y = bank.fill:GetPoint(1)
+      assert.are.equal(-74, y, "docked")
+      bank:SetDocked(false)
+      backToDefault()
+      _, _, _, _, y = bag.fill:GetPoint(1)
+      assert.are.equal(0, y)
+    end)
+
     it("restyles every panel when a theme is applied", function()
       local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
       apply({ Palette = { Body = { 0.2, 0.1, 0.05, 0.9 } } })
@@ -647,28 +684,39 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.same({ 22, 22 }, iconSize(bank.closeButton))
     end)
 
-    -- GW2_UI's micro buttons and close button have art of their own under the pointer (`-down`, `-hover`).
-    it("swaps an icon to its own art under the pointer, and back, never while disabled", function()
+    -- GW2_UI highlights its buttons by drawing art over their icon while hovered (a button's highlight texture: its
+    -- bag's `-down` art, its micro menu's own icon again, Micromenu/micromenu.lua). Asked: one highlight for every
+    -- side button, as the Show Blizzard Bags one does.
+    it("draws an icon's highlight over it under the pointer, in its blend mode, never while disabled", function()
       local bag = nextBag:Create(ctx())
       apply({ Header = { Buttons = { Icons = {
         closeButton = { Texture = "Interface\\Spec\\close.png", Glyph = false,
-          Hover = { Texture = "Interface\\Spec\\close-hover.png" } },
-        sortButton = { Atlas = "spec-sort", Hover = { Atlas = "spec-sort-hover" } },
+          Highlight = { Texture = "Interface\\Spec\\close-hover.png" } },
+        sortButton = { Atlas = "spec-sort", Highlight = { Atlas = "spec-sort", BlendMode = "ADD" } },
       } } } })
-      local close = bag.closeButton
+      local close, sort = bag.closeButton, bag.sortButton
       assert.are.equal("Interface\\Spec\\close.png", close.icon:GetTexture())
+      assert.is_false(close.highlight:IsShown())
       close:GetScript("OnEnter")(close)
-      assert.are.equal("Interface\\Spec\\close-hover.png", close.icon:GetTexture())
+      assert.are.equal("Interface\\Spec\\close.png", close.icon:GetTexture(), "the icon stays")
+      assert.is_true(close.highlight:IsShown())
+      assert.are.equal("Interface\\Spec\\close-hover.png", close.highlight:GetTexture())
+      assert.are.equal("BLEND", close.highlight:GetBlendMode())
+      assert.are.same({ close.icon:GetPoint(1) }, { close.highlight:GetPoint(1) }, "over it")
+      assert.are.same({ close.icon:GetSize() }, { close.highlight:GetSize() })
       close:GetScript("OnLeave")(close)
-      assert.are.equal("Interface\\Spec\\close.png", close.icon:GetTexture())
-      local sort = bag.sortButton
+      assert.is_false(close.highlight:IsShown())
       sort:GetScript("OnEnter")(sort)
-      assert.are.equal("spec-sort-hover", sort.icon:GetAtlas())
+      assert.are.equal("spec-sort", sort.highlight:GetAtlas())
+      assert.are.equal("ADD", sort.highlight:GetBlendMode())
       sort:GetScript("OnLeave")(sort)
-      assert.are.equal("spec-sort", sort.icon:GetAtlas())
       bag:SetHeaderButtonEnabled(close, false)
       close:GetScript("OnEnter")(close)
-      assert.are.equal("Interface\\Spec\\close.png", close.icon:GetTexture(), "disabled")
+      assert.is_false(close.highlight:IsShown(), "disabled")
+      close:GetScript("OnLeave")(close)
+      backToDefault()
+      close:GetScript("OnEnter")(close)
+      assert.is_false(close.highlight:IsShown(), "a theme without one")
       close:GetScript("OnLeave")(close)
     end)
 
@@ -827,6 +875,14 @@ describe("BetterBags Next's panels and themes", function()
         for i, button in ipairs(shown(bank)) do
           assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", 40 - 9, -(64 + (i - 1) * step) }, { button:GetPoint(1) }, button.key)
         end
+      end)
+
+      -- GW2_UI's side panel runs from its window's top line (GwWindowLeftPanel), the middle of its header.
+      it("starts the strip's art Start below the body's top", function()
+        local bag = nextBag:Create(ctx())
+        apply({ Header = { Buttons = { Rail = { Width = 40, Top = 64, Outside = true, Start = 42, Fill = RAIL.Fill } } } })
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPLEFT", 0, -42 }, { bag.rail:GetPoint(1) })
+        assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMLEFT", 0, 0 }, { bag.rail:GetPoint(2) })
       end)
 
       it("hangs the tabs past the strip, and spaces a chained pair for both strips", function()

@@ -433,6 +433,7 @@ describe("SonataNext", function()
         Motion = { Ease = { Open = "wobbly" } },
         Fonts = { Title = { Color = "AlsoNope" } },
         Dock = { DestroyColor = "Blood", BuyColor = "Moss" },
+        Settings = { Header = { Close = { HoverIcon = "NoHover" } } },
       })
       local problems = sonataNext:Check("Broken")
       table.sort(problems)
@@ -445,6 +446,7 @@ describe("SonataNext", function()
         "Motion.Ease.Open: no ease named wobbly",
         "Panel.Fill.Color: no color named Nope",
         "Sections.TitleFont: no font named Missing",
+        "Settings.Header.Close.HoverIcon: no texture named NoHover",
         "Sparkles.Colors.2: no color named Ghost",
       }, problems)
     end)
