@@ -4,7 +4,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextInput", "next/controls/input.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -183,6 +183,17 @@ describe("NextInput", function()
     assert.are.equal(style.Theme.Controls.Button.DisabledAlpha, f.frame:GetAlpha())
     f:SetEnabled(true)
     assert.are.equal(1, f.frame:GetAlpha())
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md): InputBoxVisualTemplate's border, 20 tall, its left cap 5 past the box.
+  it("draws its fill in pieces, reaching past it where its theme says", function()
+    UseNextTheme({ Controls = { Input = { Fill = { Pieces = "Horizontal", Thickness = 20, Inset = { Left = -5 },
+      Color = "White", Alpha = 1, Begin = { Atlas = "common-search-border-left", Size = 8 },
+      Middle = { Atlas = "common-search-border-middle" }, End = { Atlas = "common-search-border-right", Size = 8 } } } } })
+    local f = make()
+    local fill = addon:GetModule("NextFill"):Of(f.fill)
+    assert.are.same({ "LEFT", f.frame, "LEFT", -5, 0 }, { fill.Begin:GetPoint(1) })
+    assert.are.same({ 8, 20 }, { fill.Begin:GetSize() })
   end)
 
   it("is restyled, every field made, by a theme", function()

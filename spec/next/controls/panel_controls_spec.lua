@@ -5,7 +5,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextInput", "next/controls/input.lua" },
   { "NextSwatch", "next/controls/swatch.lua" }, { "NextTopTabs", "next/controls/toptabs.lua" },
   { "NextDialog", "next/controls/dialog.lua" } }) do
@@ -222,6 +222,26 @@ describe("NextDialog", function()
     assert.are.equal(style:Font("DialogText"), d.text:GetFontObject())
     assert.are.equal(D.Width - 2 * D.Pad, d.text:GetWidth())
     assert.is_false(d.input.frame:IsShown())
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md): StaticPopup's look, Blizzard's Dialog nine-slice round the card over
+  -- UI-DialogBox-Background tiled, 7 in (DialogBorderTemplate).
+  it("draws its theme's frame round its card, its fill inset into it", function()
+    ResetMockAtlases()
+    MockAtlas("UI-Frame-DiamondMetal-CornerTopLeft", 32, 32)
+    UseNextTheme({ Controls = { Dialog = { Frame = { Layout = "Dialog" },
+      Card = { Texture = "Interface\\DialogFrame\\UI-DialogBox-Background", HorizTile = true, VertTile = true, Color = "White",
+        Alpha = 1, Inset = { Left = 7, Right = 7, Top = 7, Bottom = 7 } } } } })
+    local d = show()
+    local corner = d.frameArt.pieces.TopLeftCorner
+    assert.are.equal("UI-Frame-DiamondMetal-CornerTopLeft", corner:GetAtlas())
+    assert.are.same({ "TOPLEFT", d.card, "TOPLEFT", 0, 0 }, { corner:GetPoint(1) })
+    assert.are.same({ "TOPLEFT", d.card, "TOPLEFT", 7, -7 }, { d.cardFill:GetPoint(1) })
+    assert.is_true(d.cardFill:GetVertTile())
+    UseNextTheme(nil)
+    nextDialog:ApplyStyle()
+    assert.is_false(corner:IsShown())
+    ResetMockAtlases()
   end)
 
   it("lays its buttons out from the right, in the order given, and closes after one is clicked", function()

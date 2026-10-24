@@ -24,6 +24,12 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
+---@class NextFrameArt: AceModule
+local frameArt = addon:GetModule('NextFrameArt')
+
 ---@class PixelAudit: AceModule
 local pixelAudit = addon:GetModule('PixelAudit')
 
@@ -40,6 +46,7 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@field card Frame
 ---@field owner? Frame The window it covers.
 ---@field cardFill Texture
+---@field frameArt NextFrameArtSet The theme's frame round the card (Frame, next-themes.md §15).
 ---@field edge NextEdge
 ---@field title FontString
 ---@field text FontString
@@ -86,6 +93,8 @@ function nextDialog:build()
   card:EnableMouse(true)
   self.cardFill = card:CreateTexture(nil, "BACKGROUND")
   self.cardFill:SetAllPoints(card)
+  fills:Wrap(self.cardFill, card)
+  self.frameArt = frameArt:Create(card, card)
   self.edge = controls:CreateEdge(card)
   local D = controls:Theme("Dialog")
   self.title = style:CreateText(card, D.TitleFont)
@@ -215,6 +224,7 @@ function nextDialog:Style()
   card:ClearAllPoints()
   pixel:Center(card, frame, self.owner:GetWidth(), self.owner:GetHeight(), width, height)
   controls:PaintEdge(self.edge, D.Edge)
+  self.frameArt:Apply(D.Frame)
 end
 
 -- Press answers with the i-th button: called with the field's text, then closed unless it asks to

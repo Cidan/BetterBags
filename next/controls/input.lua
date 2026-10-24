@@ -21,6 +21,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
 -- NextInput is BetterBags Next's text field and text area (next-settings.md §2), drawn from the theme
 -- (Controls.Input): a fill (lighter while focused) and an edge (stronger under the pointer and while
 -- focused), the text Padding in, help text while empty. Only what the player types is reported
@@ -99,6 +102,7 @@ function nextInput:Create(parent, opts)
   end
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints(frame)
+  fills:Wrap(fill, frame)
   local help = frame:CreateFontString(nil, "ARTWORK")
   ---@type NextInputFrame
   local f = setmetatable({
@@ -258,6 +262,7 @@ function nextInput:CreateArea(parent, opts)
   frame:SetHeight(opts.height)
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints(frame)
+  fills:Wrap(fill, frame)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
   pixel:SnapScroll(box)

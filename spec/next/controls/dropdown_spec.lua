@@ -5,7 +5,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextMenu", "next/controls/menu.lua" }, { "NextDropdown", "next/controls/dropdown.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -177,6 +177,44 @@ describe("NextMenu", function()
   end)
 end)
 
+describe("NextMenu, themed", function()
+  local anchor, saved
+
+  before_each(function()
+    saved = { _G.UISpecialFrames, C_Timer.After }
+    _G.UISpecialFrames = {}
+    C_Timer.After = function(_, fn) fn() end
+    controls.escape = {}
+    anchor = CreateFrame("Button", nil, CreateFrame("Frame"))
+    anchor:SetSize(170, 26)
+    anchor:Show()
+  end)
+
+  after_each(function()
+    nextMenu:Close()
+    _G.UISpecialFrames, C_Timer.After = saved[1], saved[2]
+    UseNextTheme(nil)
+    nextMenu:ApplyStyle()
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md): Classic's menu, common-dropdown-classic-bg 3 past it, over black 3 in
+  -- (MenuStyle1Mixin, Blizzard_Menu/Classic/MenuTemplates.lua).
+  it("draws its border art over its fill, each inset or past it as its theme says", function()
+    UseNextTheme({ Controls = { Menu = {
+      Fill = { Color = { 0, 0, 0, 0.8 }, Inset = { Left = 3, Right = 3, Top = 3, Bottom = 2 } },
+      Border = { Atlas = "common-dropdown-classic-bg", Color = "White", Alpha = 1,
+        Inset = { Left = -3, Right = -3, Top = -3, Bottom = -4 } } } } })
+    nextMenu:Open(anchor, { items = { { text = "One", value = 1 } }, onPick = function() end })
+    assert.are.equal("common-dropdown-classic-bg", nextMenu.border:GetAtlas())
+    assert.are.same({ "TOPLEFT", nextMenu.frame, "TOPLEFT", -3, 3 }, { nextMenu.border:GetPoint(1) })
+    assert.are.same({ "BOTTOMRIGHT", nextMenu.frame, "BOTTOMRIGHT", 3, -4 }, { nextMenu.border:GetPoint(2) })
+    assert.are.same({ "TOPLEFT", nextMenu.frame, "TOPLEFT", 3, -3 }, { nextMenu.fill:GetPoint(1) })
+    UseNextTheme(nil)
+    nextMenu:ApplyStyle()
+    assert.is_false(nextMenu.border:IsShown(), "a theme without one")
+  end)
+end)
+
 describe("NextDropdown", function()
   local current, changes, savedSpecial
 
@@ -230,6 +268,16 @@ describe("NextDropdown", function()
     assert.are.same({ "Size Ascending" }, changes)
     assert.are.equal("Size Ascending", d.text:GetText())
     assert.are.equal(D().Edge.Idle, alphaOf(d.edge.Top))
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md): WowStyle1DropdownTemplate's background, 9 and 8 pixels past it.
+  it("draws its fill past it where its theme says", function()
+    UseNextTheme({ Controls = { Dropdown = { Fill = { Atlas = "common-dropdown-classic-textholder", Color = "White", Alpha = 1,
+      Inset = { Left = -9, Top = -8, Right = -8, Bottom = -9 } } } } })
+    local d = make()
+    assert.are.equal("common-dropdown-classic-textholder", d.fill:GetAtlas())
+    assert.are.same({ "TOPLEFT", d.frame, "TOPLEFT", -9, 8 }, { d.fill:GetPoint(1) })
+    assert.are.same({ "BOTTOMRIGHT", d.frame, "BOTTOMRIGHT", 8, -9 }, { d.fill:GetPoint(2) })
   end)
 
   it("calls nothing back for the choice already made", function()

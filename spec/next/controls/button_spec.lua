@@ -5,7 +5,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextButton", "next/controls/button.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextButton", "next/controls/button.lua" },
   { "NextToggle", "next/controls/toggle.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -162,6 +162,39 @@ describe("NextButton", function()
     UseNextTheme(nil)
     nextButton:ApplyStyle()
     assert.are.equal(B().DisabledAlpha, plain.frame:GetAlpha())
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md): Blizzard's UIPanelButtonNoTooltipTemplate, three pieces of
+  -- UI-Panel-Button-Up (its caps 12 wide), UI-Panel-Button-Highlight (ADD) over it under the pointer.
+  it("draws a fill in three pieces, and its style's highlight over it under the pointer while enabled", function()
+    local up = "Interface\\Buttons\\UI-Panel-Button-Up"
+    UseNextTheme({ Controls = { Button = { Plain = {
+      Fill = { Pieces = "Horizontal", Texture = up, Color = "White", Alpha = 1,
+        Begin = { TexCoords = { 0, 0.09375, 0, 0.6875 }, Size = 12 }, Middle = { TexCoords = { 0.09375, 0.53125, 0, 0.6875 } },
+        End = { TexCoords = { 0.53125, 0.625, 0, 0.6875 }, Size = 12 } },
+      Highlight = { Texture = "Interface\\Buttons\\UI-Panel-Button-Highlight", TexCoords = { 0, 0.625, 0, 0.6875 },
+        BlendMode = "ADD", Color = "White", Alpha = 1 },
+    } } } })
+    local b = make()
+    local fill = addon:GetModule("NextFill"):Of(b.fill)
+    assert.are.equal(up, fill.Begin:GetTexture())
+    assert.are.equal(12, fill.Begin:GetWidth())
+    assert.is_true(fill.End:IsShown())
+    assert.is_false(b.highlight:IsShown())
+    b.frame:GetScript("OnEnter")(b.frame)
+    assert.is_true(b.highlight:IsShown())
+    assert.are.equal("ADD", b.highlight:GetBlendMode())
+    b:SetEnabled(false)
+    assert.is_false(b.highlight:IsShown(), "not while disabled")
+    b:SetEnabled(true)
+    b.frame:GetScript("OnLeave")(b.frame)
+    assert.is_false(b.highlight:IsShown())
+    UseNextTheme(nil)
+    nextButton:ApplyStyle()
+    assert.is_false(fill.Begin:IsShown(), "one piece again")
+    b.frame:GetScript("OnEnter")(b.frame)
+    assert.is_false(b.highlight:IsShown(), "a style without a highlight")
+    b.frame:GetScript("OnLeave")(b.frame)
   end)
 
   it("is restyled, every button made, by a theme", function()

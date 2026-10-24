@@ -18,6 +18,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
 ---@class PixelAudit: AceModule
 local pixelAudit = addon:GetModule('PixelAudit')
 
@@ -29,6 +32,7 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@class NextMenu: AceModule
 ---@field frame Frame
 ---@field fill Texture
+---@field border Texture Art over the fill (the theme's Border: Classic's menu art reaching past the menu).
 ---@field edge NextEdge
 ---@field box WowScrollBox
 ---@field list Frame The rows, scrolled by box.
@@ -82,6 +86,10 @@ function nextMenu:build()
   frame:Hide()
   self.fill = frame:CreateTexture(nil, "BACKGROUND")
   self.fill:SetAllPoints(frame)
+  fills:Wrap(self.fill, frame)
+  self.border = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
+  self.border:Hide()
+  fills:Wrap(self.border, frame)
   self.edge = controls:CreateEdge(frame)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
@@ -250,6 +258,7 @@ function nextMenu:Style()
   pixel:Point(frame, "TOPLEFT", self.anchor, "BOTTOMLEFT", 0, -M.Gap)
   frame:SetFrameLevel(self.catcher:GetFrameLevel() + 2)
   controls:Paint(self.fill, M.Fill)
+  controls:Paint(self.border, M.Border)
   controls:PaintEdge(self.edge, M.Edge)
   local check = M.Check
   local pad, itemHeight, checkSize = pixel:Lengths(frame, M.Padding, M.ItemHeight, check.Size)

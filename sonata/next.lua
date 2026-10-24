@@ -400,6 +400,11 @@ local FONT_KEYS = {
 }
 -- Keys whose value names one of the theme's Textures, or is a file (a path or a file ID).
 local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true, Icon = true, HoverIcon = true }
+-- The pieces of a nine-slice frame (Frame, next-themes.md §15): Blizzard's names (Blizzard_SharedXML/NineSlice.lua).
+local FRAME_PIECES = {
+  TopLeftCorner = true, TopRightCorner = true, BottomLeftCorner = true, BottomRightCorner = true, TopEdge = true,
+  BottomEdge = true, LeftEdge = true, RightEdge = true, Center = true,
+}
 -- Parts that are not Next's widgets' specs: checked elsewhere or not at all.
 local UNCHECKED = { Palette = true, Variables = true, Textures = true, ItemButton = true }
 
@@ -411,14 +416,40 @@ function sonataNext:Check(key)
   local theme = self:Resolve(key)
   local problems = {}
   local palette, fonts, textures = theme.Palette or {}, theme.Fonts or {}, theme.Textures or {}
+  -- A palette color naming one of the client's named colors (NextStyle: Color.lua makes each a global ColorMixin).
+  for name, value in pairs(palette) do
+    if type(value) == "table" and value.Global ~= nil then
+      local color = _G[value.Global]
+      if type(color) ~= "table" or color.GetRGBA == nil then
+        table.insert(problems, "Palette." .. tostring(name) .. ".Global: no client color named " .. tostring(value.Global))
+      end
+    end
+  end
   local function color(value, path)
     if type(value) == "string" and palette[value] == nil then
       table.insert(problems, path .. ": no color named " .. value)
     end
   end
   local walk
+  -- A frame draws one of the client's layouts (NineSliceUtil, when the client has it) or its own pieces.
+  local function frame(v, here)
+    if v.Layout == nil and v.Pieces == nil then
+      table.insert(problems, here .. ": a Layout or Pieces")
+    end
+    if v.Layout ~= nil and NineSliceUtil ~= nil and NineSliceUtil.GetLayout(v.Layout) == nil then
+      table.insert(problems, here .. ".Layout: the client has no nine-slice layout named " .. tostring(v.Layout))
+    end
+    for name in pairs(type(v.Pieces) == "table" and v.Pieces or {}) do
+      if not FRAME_PIECES[name] then
+        table.insert(problems, here .. ".Pieces." .. tostring(name) .. ": no piece named " .. tostring(name))
+      end
+    end
+  end
   local function check(k, v, here)
-    if COLOR_MAPS[k] and type(v) == "table" then
+    if k == "Frame" and type(v) == "table" then
+      frame(v, here)
+      walk(v, here)
+    elseif COLOR_MAPS[k] and type(v) == "table" then
       for name, value in pairs(v) do
         color(value, here .. "." .. tostring(name))
       end

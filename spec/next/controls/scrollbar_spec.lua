@@ -8,7 +8,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" } }) do
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -68,6 +68,24 @@ describe("NextScrollBar", function()
       local r, g, b = style:RGBA("Lavender")
       assert.are.same({ r = r, g = g, b = b, a = S().Track.Alpha }, bar.track._colorTexture)
       assert.are.same({ r = r, g = g, b = b, a = S().Thumb.Alpha }, bar.thumbTexture._colorTexture)
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md): MinimalScrollBar's track and thumb, each a top, a middle and a bottom.
+    it("draws its track and thumb in pieces down them", function()
+      UseNextTheme({ Controls = { ScrollBar = {
+        Track = { Pieces = "Vertical", Color = "White", Alpha = 1, Begin = { Atlas = "minimal-scrollbar-track-top", Size = 4 },
+          Middle = { Atlas = "!minimal-scrollbar-track-middle" }, End = { Atlas = "minimal-scrollbar-track-bottom", Size = 4 } },
+        Thumb = { Pieces = "Vertical", Color = "White", Alpha = 1, Begin = { Atlas = "minimal-scrollbar-small-thumb-top", Size = 4 },
+          Middle = { Atlas = "minimal-scrollbar-small-thumb-middle" }, End = { Atlas = "minimal-scrollbar-small-thumb-bottom", Size = 4 } },
+      } } })
+      make()
+      local fills = addon:GetModule("NextFill")
+      local track, thumb = fills:Of(bar.track), fills:Of(bar.thumbTexture)
+      assert.are.equal("minimal-scrollbar-track-top", track.Begin:GetAtlas())
+      assert.are.same({ "TOPLEFT", bar.trackFrame, "TOPLEFT", 0, 0 }, { track.Begin:GetPoint(1) })
+      assert.are.equal(S().Size, bar.trackFrame:GetWidth(), "the track's place")
+      assert.are.equal("minimal-scrollbar-small-thumb-top", thumb.Begin:GetAtlas())
+      assert.are.same({ "TOPLEFT", bar.thumb, "TOPLEFT", 0, 0 }, { thumb.Begin:GetPoint(1) })
     end)
 
     it("is restyled, every bar made, by a theme", function()

@@ -186,7 +186,7 @@ would be ideal"); (4) the settings window's Done button looked under the art; (5
   buttons by drawing art over the icon (its bag window's `-down` art, its micro menu's icon over itself). Icons now
   take a `Highlight` drawn over them, the same on every side button.
 - **(2, 7) The header**: as `GwFrameHeader` and `CreateFrameHeaderWithBody`: the painting starts below the band
-  (`Panel.Fill.Top`), so the band is drawn over the world; the emblem's middle on the window's top line, 21 in; the
+  (`Panel.Fill.Top`, since `Panel.Fill.Inset.Top`), so the band is drawn over the world; the emblem's middle on the window's top line, 21 in; the
   title 64 in; the side panel from the top line (`Rail.Start`); no border.
 - **(9) The size button**: pinned left of the X; the title keeps clear of the farthest pin, not of both added up.
 - **(1) Tabs**: the art is one dark color whose outer 40% fades to nothing, under a name, and whose 1,024 rows were

@@ -66,6 +66,12 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
+---@class NextFrameArt: AceModule
+local frameArt = addon:GetModule('NextFrameArt')
+
 ---@class PixelAudit: AceModule
 local pixelAudit = addon:GetModule('PixelAudit')
 
@@ -325,6 +331,9 @@ function settings:build()
   self:fitScale()
   self.fill = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
   self.fill:SetAllPoints(frame)
+  fills:Wrap(self.fill, frame)
+  -- The theme's frame round the window (Settings.Frame, next-themes.md §15).
+  self.frameArt = frameArt:Create(frame, frame)
   self.wash = frame:CreateTexture(nil, "BACKGROUND", nil, -6)
   self.wash:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
   self.wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
@@ -558,6 +567,7 @@ function settings:Style()
     self.wash:Hide()
   end
   controls:PaintEdge(self.edge, T.Edge)
+  self.frameArt:Apply(T.Frame)
 
   local SB, B = T.Sidebar, T.Brand
   self.sidebar:SetWidth(m.sidebar)

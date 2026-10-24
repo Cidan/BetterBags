@@ -14,7 +14,7 @@ local events = StubBetterBagsModule("Events")
 StubBetterBagsModule("SettingsCatalog")
 local bagSystem = StubBetterBagsModule("BagSystem")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextToggle", "next/controls/toggle.lua" },
   { "NextInput", "next/controls/input.lua" }, { "NextSlider", "next/controls/slider.lua" },
   { "NextMenu", "next/controls/menu.lua" }, { "NextDropdown", "next/controls/dropdown.lua" },
@@ -1016,6 +1016,26 @@ describe("NextSettings", function()
 
     -- Asked: one close button, the bags' (GW2_UI's close art, its hover art under the pointer), on the settings
     -- window too.
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's settings window (SettingsFrameTemplate), its
+    -- ButtonFrameTemplateNoPortrait frame round the window over a fill 7, 18, 3 and 3 in.
+    it("draws its theme's frame round it, its fill inset into it", function()
+      ResetMockAtlases()
+      MockAtlas("UI-Frame-Metal-CornerTopLeft", 32, 32)
+      open()
+      UseNextTheme({ Settings = { Frame = { Layout = "ButtonFrameTemplateNoPortrait" },
+        Fill = { Color = "White", Inset = { Left = 7, Top = 18, Right = 3, Bottom = 3 } } } })
+      settings:ApplyStyle()
+      local corner = settings.frameArt.pieces.TopLeftCorner
+      assert.are.equal("UI-Frame-Metal-CornerTopLeft", corner:GetAtlas())
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", -8, 16 }, { corner:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 7, -18 }, { settings.fill:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", settings.frame, "BOTTOMRIGHT", -3, 3 }, { settings.fill:GetPoint(2) })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_false(corner:IsShown())
+      ResetMockAtlases()
+    end)
+
     it("draws its close in art, its hover art under the pointer, and a tinted glyph for a theme without", function()
       open()
       UseNextTheme({ Settings = { Header = { Close = { Icon = "Interface\\Spec\\close.png", HoverIcon = "Interface\\Spec\\close-hover.png",

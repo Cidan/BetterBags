@@ -1003,6 +1003,11 @@ end
 function WidgetMethods:SetAtlas(atlas, useAtlasSize, filterMode, _, wrapH, wrapV)
   self._atlas = atlas
   self._useAtlasSize = useAtlasSize
+  -- useAtlasSize sizes the texture to the atlas (C_Texture.GetAtlasInfo's width and height).
+  local info = useAtlasSize and C_Texture.GetAtlasInfo(atlas) or nil
+  if info ~= nil then
+    self:SetSize(info.width, info.height)
+  end
   self._wrapH, self._wrapV, self._filterMode = wrapH, wrapV, filterMode
   self._texturePath = nil
   self._colorTexture = nil
@@ -1011,6 +1016,51 @@ function WidgetMethods:SetAtlas(atlas, useAtlasSize, filterMode, _, wrapH, wrapV
   self._vertTile = nil
   self._sliceMargins = nil
   self._sliceMode = nil
+end
+-- Texture:AddMaskTexture(mask), RemoveMaskTexture(mask), GetNumMaskTextures(), GetMaskTexture(index)
+-- (SimpleTextureAPIDocumentation, every client): the masks that cut the texture's art.
+function WidgetMethods:AddMaskTexture(mask)
+  local masks = rawget(self, "_masks") or {}
+  rawset(self, "_masks", masks)
+  for _, m in ipairs(masks) do
+    if m == mask then
+      return
+    end
+  end
+  table.insert(masks, mask)
+end
+function WidgetMethods:RemoveMaskTexture(mask)
+  local masks = rawget(self, "_masks") or {}
+  for i = #masks, 1, -1 do
+    if masks[i] == mask then
+      table.remove(masks, i)
+    end
+  end
+end
+function WidgetMethods:GetNumMaskTextures()
+  return #(rawget(self, "_masks") or {})
+end
+function WidgetMethods:GetMaskTexture(index)
+  return (rawget(self, "_masks") or {})[index]
+end
+-- TextureBase:SetSnapToPixelGrid(snap), IsSnappingToPixelGrid(), SetTexelSnappingBias(bias),
+-- GetTexelSnappingBias() (SimpleTextureBaseAPIDocumentation, every client). Blizzard's nine-slice layouts with
+-- disableSharpening set them to false and 0 (NineSliceUtil.DisableSharpening); the mock starts textures snapping,
+-- at a bias of 0.5.
+function WidgetMethods:SetSnapToPixelGrid(snap)
+  self._snapToPixelGrid = snap == true
+end
+function WidgetMethods:IsSnappingToPixelGrid()
+  if self._snapToPixelGrid == nil then
+    return true
+  end
+  return self._snapToPixelGrid
+end
+function WidgetMethods:SetTexelSnappingBias(bias)
+  self._texelSnappingBias = bias
+end
+function WidgetMethods:GetTexelSnappingBias()
+  return self._texelSnappingBias or 0.5
 end
 -- TextureBase:SetColorTexture(r, g, b, a?) replaces a texture or atlas with a solid color.
 function WidgetMethods:SetColorTexture(r, g, b, a)
@@ -1965,6 +2015,53 @@ _G.CreateColor = _G.CreateColor or function(r, g, b, a)
   return color
 end
 
+-- Blizzard's named UI colors: Color.lua (Blizzard_SharedXMLBase, every client) makes each color of
+-- C_UIColor.GetColors() a Lua global ColorMixin by its name. Their values are game data, not in the UI source:
+-- these are stand-ins (NORMAL_FONT_COLOR is GameFontNormal's gold, as the font mock below draws it).
+_G.PANEL_BACKGROUND_COLOR = _G.PANEL_BACKGROUND_COLOR or CreateColor(0.1, 0.1, 0.1, 0.95)
+_G.NORMAL_FONT_COLOR = _G.NORMAL_FONT_COLOR or CreateColor(1, 0.82, 0, 1)
+_G.HIGHLIGHT_FONT_COLOR = _G.HIGHLIGHT_FONT_COLOR or CreateColor(1, 1, 1, 1)
+_G.DISABLED_FONT_COLOR = _G.DISABLED_FONT_COLOR or CreateColor(0.5, 0.5, 0.5, 1)
+
+-- C_Texture.GetAtlasInfo(atlas) -> AtlasInfo, or nothing for an atlas the client lacks (TextureUtilsDocumentation,
+-- every client): width, height, tilesHorizontally, tilesVertically, and more. Atlas data is the game's, not the UI
+-- source's: specs register the atlases they draw with MockAtlas(name, width, height, tilesHorizontally,
+-- tilesVertically); ResetMockAtlases forgets them.
+_G.MockAtlases = {}
+function _G.MockAtlas(name, width, height, tilesHorizontally, tilesVertically)
+  MockAtlases[name] = { width = width, height = height, tilesHorizontally = tilesHorizontally == true,
+    tilesVertically = tilesVertically == true }
+end
+function _G.ResetMockAtlases()
+  _G.MockAtlases = {}
+end
+_G.C_Texture = _G.C_Texture or {}
+C_Texture.GetAtlasInfo = function(atlas)
+  local a = MockAtlases[atlas]
+  if a == nil then
+    return nil
+  end
+  return { elementName = atlas, width = a.width, height = a.height, leftTexCoord = 0, rightTexCoord = 1,
+    topTexCoord = 0, bottomTexCoord = 1, tilesHorizontally = a.tilesHorizontally, tilesVertically = a.tilesVertically }
+end
+
+-- Blizzard's nine-slice layouts (Blizzard_SharedXML/NineSliceLayouts.lua) and NineSliceUtil.GetLayout(name), which
+-- returns NineSliceLayouts[name] (NineSlice.lua, every client). UseNineSliceLayouts(client) gives the layouts of
+-- "Retail" (the default), "Classic" or "Forever" (spec/fixtures/nineslice_layouts.lua).
+local nineSliceFixture = dofile("spec/fixtures/nineslice_layouts.lua")
+function _G.UseNineSliceLayouts(client)
+  local source = nineSliceFixture[client or "Retail"]
+  _G.NineSliceLayouts = {}
+  for name, layout in pairs(source) do
+    NineSliceLayouts[name] = layout
+  end
+end
+UseNineSliceLayouts("Retail")
+_G.NineSliceUtil = _G.NineSliceUtil or {}
+NineSliceUtil.GetLayout = function(layoutName)
+  return NineSliceLayouts[layoutName]
+end
+
 -- The font files of the default locale (Blizzard_Fonts_Shared/Shared/GameFonts.xml).
 _G.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
 _G.UNIT_NAME_FONT = "Fonts\\FRIZQT__.TTF"
@@ -2311,6 +2408,18 @@ _G.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
 _G.GetBuildInfo = function() return "10.0.0", "12345", "Jan 1 2024", 100000 end
 _G.GetRealmName = function() return "TestRealm" end
 _G.UnitName = function() return "TestChar", "TestRealm" end
+-- UnitExists(unit) (UnitDocumentation): "player" always; others when a spec says so (MockUnits[unit] = true).
+_G.MockUnits = {}
+_G.UnitExists = function(unit) return unit == "player" or MockUnits[unit] == true end
+-- SetPortraitTexture(texture, unitToken, disableMasking = false) (UnitDocumentation, every client) draws the unit's
+-- portrait into the texture, in place of what it drew.
+_G.SetPortraitTexture = function(texture, unit, disableMasking)
+  texture._portraitUnit = unit
+  texture._portraitUnmasked = disableMasking == true
+  texture._texturePath = nil
+  texture._atlas = nil
+  texture._colorTexture = nil
+end
 -- UnitDocumentation.lua: UnitNameUnmodified(unit) -> unitName, unitServer (read by AceDB-3.0 r1417+).
 _G.UnitNameUnmodified = function() return "TestChar", "TestRealm" end
 _G.UnitClass = function() return "Warrior", "WARRIOR" end

@@ -213,7 +213,7 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     window's top 62 below the body's top; the band's painted rows (45) above it, from over the side panel (40 out);
     the emblem (84) straddling the side panel, its bottom right corner 18 in and 22 below the window's top (so it
     starts at the body's top: a docked panel's top is the screen's); the title 31 in, its middle 18 above the window's
-    top; the world map painting from the window's top (`Panel.Fill.Top`), so the band is drawn over what is behind the
+    top; the world map painting from the window's top (`Panel.Fill.Inset.Top`), so the band is drawn over what is behind the
     window; no border (`Panel.Edge = false`); the search bar 13 below the window's top; the footer band (its painted
     rows, 30 tall) with the free slots and money on it; `Panel.Feather = false`.
   - **The side panel outside the window** (`Rail.Outside`, §13), 40 wide, its art from the window's top line

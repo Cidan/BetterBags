@@ -66,6 +66,9 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@class NextOrnaments: AceModule
 local nextOrnaments = addon:GetModule('NextOrnaments')
 
+---@class NextFrameArt: AceModule
+local nextFrameArt = addon:GetModule('NextFrameArt')
+
 ---@class NextCoins: AceModule
 local coins = addon:GetModule('NextCoins')
 
@@ -521,13 +524,21 @@ function panelProto:RestOffset()
   return chain:RestOffset(self)
 end
 
--- fillTop is how far below the body's top its fill starts (Panel.Fill.Top): GW2_UI's windows start their painting
--- below their header, drawn over what is behind the window. On whole pixels of the frame's grid.
----@param frame Frame
----@return number
-local function fillTop(frame)
+-- FillInsets returns how far into the body its fill is on each side (Panel.Fill.Inset: Left, Right, Top, Bottom,
+-- drawn for the backpack, whose inner side is on the left, mirrored on a panel whose inner side is on the right), on
+-- whole pixels of the frame's grid: Blizzard insets a window's fill into its frame (PortraitFrameFlatBaseTemplate),
+-- GW2_UI starts its painting below its header.
+---@return number left, number right, number top, number bottom
+function panelProto:FillInsets()
+  local frame = self.frame
   local F = style.Theme.Panel.Fill
-  return pixel:Snap(frame, (F and F.Top) or 0)
+  local inset = (F and F.Inset) or {}
+  local inner, outer = pixel:Snap(frame, inset.Left or 0), pixel:Snap(frame, inset.Right or 0)
+  local top, bottom = pixel:Snap(frame, inset.Top or 0), pixel:Snap(frame, inset.Bottom or 0)
+  if self.side == "LEFT" then
+    return outer, inner, top, bottom
+  end
+  return inner, outer, top, bottom
 end
 
 -- SetDocked shapes the body's far edge: at its screen edge the fill and the wash reach OVERREACH past
@@ -543,11 +554,13 @@ function panelProto:SetDocked(docked)
   self.docked = docked
   local frame = self.frame
   local reach = docked and pixel:Length(frame, style.OVERREACH) or 0
+  -- The side at the screen edge: past it while docked, else its inset (FillInsets).
+  local left, right, top, bottom = self:FillInsets()
   if self.side == "LEFT" then
-    self.fill:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, -fillTop(frame))
+    self.fill:SetPoint("TOPLEFT", frame, "TOPLEFT", docked and -reach or left, -top)
     self.wash:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, 0)
   else
-    self.fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", reach, 0)
+    self.fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", docked and reach or -right, bottom)
     self.wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", reach, 0)
   end
   self.outerFeather:SetShown(not docked)
@@ -766,6 +779,8 @@ function panelProto:BuildPanel(name)
   self.dropGlow = glow
   -- The theme's ornaments (Panel.Ornaments, next-themes.md §12), anchored to the body.
   self.ornaments = nextOrnaments:Create(self)
+  -- The theme's frame round the body (Panel.Frame, next-themes.md §15): Blizzard's nine-slice art.
+  self.frameArt = nextFrameArt:Create(frame, self.body)
   self:styleBody()
 end
 
@@ -811,6 +826,8 @@ function panelProto:styleBody()
     self.dropGlow:Hide()
   end
   self.ornaments:Style()
+  -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
+  self.frameArt:Apply(P.Frame, self.side == "LEFT")
 end
 
 -- paintEdges draws the border at a strength, 0 to 1, of the theme's alpha. A texture's alpha is its
@@ -1238,9 +1255,10 @@ function panelProto:ApplyGeometry()
   body:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
   body:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -bodyRight, 0)
   local fill, wash = self.fill, self.wash
+  local left, right, top, bottom = self:FillInsets()
   fill:ClearAllPoints()
-  fill:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, -fillTop(frame))
-  fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -bodyRight, 0)
+  fill:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft + left, -top)
+  fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -(bodyRight + right), bottom)
   wash:ClearAllPoints()
   wash:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
   wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -bodyRight, 0)

@@ -54,7 +54,7 @@ LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
   { "NextOrnaments", "next/ornaments.lua" }, { "NextPanel", "next/panel.lua" },
@@ -256,20 +256,54 @@ describe("BetterBags Next's panels and themes", function()
 
     -- GW2_UI's windows start their painting below their header (CreateFrameHeaderWithBody), so the header art is
     -- drawn over whatever is behind the window. Asked: "the top window border ... should be somewhat transparent".
-    it("starts its fill Fill.Top below the body's top, docked or not, on both sides, and at the top after", function()
+    -- Blizzard insets a window's fill into its frame (PortraitFrameFlatBaseTemplate: 2, 20, 2, 3); GW2_UI starts its
+    -- painting below its header. Fill.Inset is drawn for the backpack, whose inner side is on the left, mirrored on the
+    -- bank; while docked, the side at the screen edge reaches past it instead (the opening bounce, SetDocked).
+    it("insets its fill into its body, mirrored on the bank, past the screen edge while docked", function()
       local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
-      apply({ Panel = { Fill = { Color = "Body", Top = 74 } } })
-      local _, _, _, _, y = bag.fill:GetPoint(1)
-      assert.are.equal(-74, y)
-      _, _, _, _, y = bank.fill:GetPoint(1)
-      assert.are.equal(-74, y)
-      bank:SetDocked(true)
-      _, _, _, _, y = bank.fill:GetPoint(1)
-      assert.are.equal(-74, y, "docked")
+      apply({ Panel = { Fill = { Color = "Body", Inset = { Left = 2, Right = 3, Top = 20, Bottom = 4 } } } })
+      local function corners(panel)
+        local _, _, _, x1, y1 = panel.fill:GetPoint(1)
+        local _, _, _, x2, y2 = panel.fill:GetPoint(2)
+        return { x1, y1, x2, y2 }
+      end
+      local feather = style.FEATHER
+      bag:SetDocked(false)
       bank:SetDocked(false)
+      assert.are.same({ feather + 2, -20, -3, 4 }, corners(bag), "inner side left")
+      assert.are.same({ 3, -20, -(feather + 2), 4 }, corners(bank), "inner side right")
+      local reach = style.OVERREACH
+      bag:SetDocked(true)
+      bank:SetDocked(true)
+      assert.are.same({ feather + 2, -20, reach, 4 }, corners(bag))
+      assert.are.same({ -reach, -20, -(feather + 2), 4 }, corners(bank))
       backToDefault()
-      _, _, _, _, y = bag.fill:GetPoint(1)
-      assert.are.equal(0, y)
+      bag:SetDocked(false)
+      assert.are.same({ feather, 0, 0, 0 }, corners(bag), "a theme without")
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's own frame round the body, one of the client's nine-slice
+    -- layouts by name (NextFrameArt), mirrored on the bank as its ornaments are.
+    it("draws a frame round its body, mirrored on the bank, and none for a theme without", function()
+      ResetMockAtlases()
+      MockAtlas("ui-frame-portraitmetal-cornertopleftsmall", 64, 64)
+      MockAtlas("UI-Frame-Metal-CornerTopRight", 32, 32)
+      MockAtlas("UI-Frame-Metal-CornerBottomLeft", 16, 16)
+      MockAtlas("UI-Frame-Metal-CornerBottomRight", 16, 16)
+      MockAtlas("_UI-Frame-Metal-EdgeTop", 32, 32, true, false)
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Panel = { Frame = { Layout = "HeldBagLayout" } } })
+      local corner = bag.frameArt.pieces.TopLeftCorner
+      assert.are.equal("ui-frame-portraitmetal-cornertopleftsmall", corner:GetAtlas())
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", -13, 16 }, { corner:GetPoint(1) })
+      assert.is_true(corner:IsShown())
+      local mirrored = bank.frameArt.pieces.TopRightCorner
+      assert.are.equal("ui-frame-portraitmetal-cornertopleftsmall", mirrored:GetAtlas(), "the portrait corner at its inner side")
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", 13, 16 }, { mirrored:GetPoint(1) })
+      backToDefault()
+      assert.is_false(corner:IsShown())
+      assert.is_false(mirrored:IsShown())
+      ResetMockAtlases()
     end)
 
     it("restyles every panel when a theme is applied", function()

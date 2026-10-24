@@ -173,6 +173,8 @@ next\pixel.lua
 next\itemfit.lua
 next\coins.lua
 next\style.lua
+next\frameart.lua
+next\fill.lua
 next\tween.lua
 next\lift.lua
 next\controls\base.lua

@@ -5,7 +5,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextInput", "next/controls/input.lua" }, { "NextSlider", "next/controls/slider.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -128,6 +128,23 @@ describe("NextSlider", function()
     slider.track:GetScript("OnLeave")(slider.track)
     r, g, b = style:RGBA("Lavender")
     assert.are.same({ r = r, g = g, b = b, a = 1 }, slider.thumb._colorTexture)
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md): MinimalSliderTemplate's bar, Minimal_SliderBar_Left, a middle and
+  -- Minimal_SliderBar_Right, along the track where the bar is.
+  it("draws its bar in three pieces where the bar goes", function()
+    UseNextTheme({ Controls = { Slider = { Track = { Pieces = "Horizontal", Color = "White", Alpha = 1,
+      Begin = { Atlas = "Minimal_SliderBar_Left", Size = 6 }, Middle = { Atlas = "_Minimal_SliderBar_Middle" },
+      End = { Atlas = "Minimal_SliderBar_Right", Size = 6 } } } } })
+    local slider = make()
+    local bar = addon:GetModule("NextFill"):Of(slider.bar)
+    assert.are.equal("Minimal_SliderBar_Left", bar.Begin:GetAtlas())
+    assert.are.same({ "TOPLEFT", slider.barFrame, "TOPLEFT", 0, 0 }, { bar.Begin:GetPoint(1) })
+    assert.are.equal("_Minimal_SliderBar_Middle", slider.bar:GetAtlas())
+    -- The bar's place: along the track, TrackSize tall, centered on it.
+    assert.are.equal(S().TrackSize, slider.barFrame:GetHeight())
+    local _, rel, _, _, y = slider.barFrame:GetPoint(1)
+    assert.are.same({ slider.track, -math.floor((S().Height - S().TrackSize) / 2) }, { rel, y })
   end)
 
   it("is restyled, every slider made, by a theme", function()

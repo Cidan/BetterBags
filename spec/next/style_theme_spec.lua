@@ -180,6 +180,29 @@ describe("NextStyle", function()
       assert.are.same({ 0.9, 0.5, 0.1, 1 }, style.Color.Gold)
       assert.has_error(function() style:RGBA("NoSuchColor") end)
     end)
+
+    -- The Plain theme (docs/next-plain-theme.md) draws in the client's own colors: Color.lua (Blizzard_SharedXMLBase,
+    -- every client) makes each named UI color a Lua global. A palette entry naming one is its color when the theme
+    -- applies, its alpha replaced by the entry's Alpha.
+    it("takes a palette color from one of the client's named colors, read when the theme applies", function()
+      local was = _G.PANEL_BACKGROUND_COLOR
+      _G.PANEL_BACKGROUND_COLOR = CreateColor(0.1, 0.2, 0.3, 0.9)
+      local theme = register({ Palette = { Panel = { Global = "PANEL_BACKGROUND_COLOR" },
+        Faint = { Global = "PANEL_BACKGROUND_COLOR", Alpha = 0.5 } } })
+      style:Use(theme)
+      assert.are.same({ 0.1, 0.2, 0.3, 0.9 }, { style:RGBA("Panel") })
+      assert.are.same({ 0.1, 0.2, 0.3, 0.5 }, { style:RGBA("Faint") })
+      assert.are.same({ Global = "PANEL_BACKGROUND_COLOR" }, theme.Palette.Panel, "the theme itself unchanged")
+      -- Read again by the next application: the client can change its colors.
+      _G.PANEL_BACKGROUND_COLOR = CreateColor(0.4, 0.5, 0.6, nil)
+      style:Use(theme)
+      assert.are.same({ 0.4, 0.5, 0.6, 1 }, { style:RGBA("Panel") }, "no alpha is a whole one")
+      _G.PANEL_BACKGROUND_COLOR = was
+      sonataNext.themes.Spec = nil
+      local broken = register({ Palette = { Gone = { Global = "NO_SUCH_COLOR" } } })
+      assert.has_error(function() style:Use(broken) end,
+        "the Next theme's color Gone names no client color NO_SUCH_COLOR")
+    end)
   end)
 
   -- Asked: "take care with text! remember our lessons from before (don't re-use text objects across

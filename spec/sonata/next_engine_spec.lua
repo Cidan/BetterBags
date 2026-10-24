@@ -434,6 +434,7 @@ describe("SonataNext", function()
         Fonts = { Title = { Color = "AlsoNope" } },
         Dock = { DestroyColor = "Blood", BuyColor = "Moss" },
         Settings = { Header = { Close = { HoverIcon = "NoHover" } } },
+        Palette = { Client = { Global = "NO_SUCH_COLOR" }, Fine = { Global = "PANEL_BACKGROUND_COLOR" } },
       })
       local problems = sonataNext:Check("Broken")
       table.sort(problems)
@@ -444,12 +445,29 @@ describe("SonataNext", function()
         "Header.Buttons.ArtColor: no color named Pale",
         "Header.Cloud.Texture: no texture named NoArt",
         "Motion.Ease.Open: no ease named wobbly",
+        "Palette.Client.Global: no client color named NO_SUCH_COLOR",
         "Panel.Fill.Color: no color named Nope",
         "Sections.TitleFont: no font named Missing",
         "Settings.Header.Close.HoverIcon: no texture named NoHover",
         "Sparkles.Colors.2: no color named Ghost",
       }, problems)
     end)
+  end)
+
+  -- Frames (next-themes.md §15): a layout the client lacks, a piece no frame has, a frame with nothing to draw.
+  it("names what is wrong with a frame, by where it is", function()
+    sonataNext:RegisterTheme({ Name = "BadFrames",
+      Panel = { Frame = { Layout = "NoSuchLayout" } },
+      Settings = { Frame = { Pieces = { TopLeftCorner = { Atlas = "x" }, Middle = { Atlas = "y" } } } },
+      Controls = { Dialog = { Frame = { Alpha = 0.5 } }, Menu = { Frame = { Layout = "Dialog" } } },
+    })
+    local problems = sonataNext:Check("BadFrames")
+    table.sort(problems)
+    assert.are.same({
+      "Controls.Dialog.Frame: a Layout or Pieces",
+      "Panel.Frame.Layout: the client has no nine-slice layout named NoSuchLayout",
+      "Settings.Frame.Pieces.Middle: no piece named Middle",
+    }, problems)
   end)
 
   -- Ornaments (Panel.Ornaments, next-themes.md §12): a place, an anchor, a size or a motion no ornament has, a

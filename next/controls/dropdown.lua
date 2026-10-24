@@ -18,6 +18,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
 -- NextDropdown is BetterBags Next's dropdown (next-settings.md §2), drawn from the theme
 -- (Controls.Dropdown): a field showing the choice made and a chevron. A click opens a NextMenu of its
 -- choices, read each time it opens (itemsFunction: a provider that registers late shows,
@@ -62,6 +65,7 @@ function nextDropdown:Create(parent, opts)
   frame:RegisterForClicks("LeftButtonUp")
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints(frame)
+  fills:Wrap(fill, frame)
   local text = frame:CreateFontString(nil, "OVERLAY")
   text:SetJustifyH("LEFT")
   text:SetWordWrap(false)

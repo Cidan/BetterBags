@@ -15,6 +15,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
 -- NextSlider is BetterBags Next's slider (next-settings.md §2), drawn from the theme
 -- (Controls.Slider): a track filled up to a thumb, pressed or dragged with the left button, and a
 -- number box after it to type a value; every value snapped to the step and kept in range. A change
@@ -35,6 +38,7 @@ local nextSlider = addon:NewModule('NextSlider')
 ---@field frame Frame
 ---@field track Button The pressed and dragged area.
 ---@field bar Texture The empty track.
+---@field barFrame Frame Where the bar goes (its fill's region).
 ---@field fill Texture The track up to the thumb.
 ---@field thumb Texture
 ---@field value NextInputFrame
@@ -62,11 +66,14 @@ function nextSlider:Create(parent, opts)
   local frame = CreateFrame("Frame", nil, parent)
   local track = CreateFrame("Button", nil, frame)
   local bar = track:CreateTexture(nil, "BACKGROUND")
+  -- Where the bar goes: its fill (NextFill: one piece, or Blizzard's slider bar in three) fills it.
+  local barFrame = CreateFrame("Frame", nil, track)
+  fills:Wrap(bar, barFrame)
   local fill = track:CreateTexture(nil, "ARTWORK")
   local thumb = track:CreateTexture(nil, "OVERLAY")
   ---@type NextSliderFrame
   local s = setmetatable({
-    frame = frame, track = track, bar = bar, fill = fill, thumb = thumb, hovered = false, dragging = false,
+    frame = frame, track = track, bar = bar, barFrame = barFrame, fill = fill, thumb = thumb, hovered = false, dragging = false,
     current = opts.value, opts = opts,
   }, { __index = sliderProto })
   s.value = nextInput:Create(frame, {
@@ -99,9 +106,11 @@ function sliderProto:Style()
   pixel:Height(self.fill, S.TrackSize)
   pixel:Size(self.thumb, S.ThumbSize, S.ThumbSize)
   local barTop = -pixel:Middle(track, track:GetHeight(), self.bar:GetHeight())
-  self.bar:ClearAllPoints()
-  self.bar:SetPoint("TOPLEFT", track, "TOPLEFT", 0, barTop)
-  self.bar:SetPoint("TOPRIGHT", track, "TOPRIGHT", 0, barTop)
+  local barFrame = self.barFrame
+  barFrame:ClearAllPoints()
+  barFrame:SetPoint("TOPLEFT", track, "TOPLEFT", 0, barTop)
+  barFrame:SetPoint("TOPRIGHT", track, "TOPRIGHT", 0, barTop)
+  pixel:Height(barFrame, S.TrackSize)
   controls:Paint(self.bar, S.Track)
   controls:Paint(self.fill, S.Fill)
   local box = self.value.frame

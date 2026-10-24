@@ -291,7 +291,8 @@ sonataNext:RegisterTheme({
   -- The panel itself.
   Panel = {
     -- The body (a texture spec: Color, Texture, Atlas, TexCoords, HorizTile, VertTile, BlendMode,
-    -- Alpha, VertexColor, Gradient); Top (none here) starts it that far below the body's top.
+    -- Alpha, VertexColor, Gradient); Inset (none here: Left, Right, Top, Bottom, drawn for the backpack, mirrored on the
+    -- bank) insets it into the body.
     Fill = { Color = "Body" },
     -- The feathered edge beside the body: from Color's alpha at the body to nothing (Layout.Feather
     -- wide).

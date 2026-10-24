@@ -226,7 +226,7 @@ describe("BetterBags Next's shipped themes", function()
       local top = band.Y + band.Height
       assert.are.equal(-40, band.Start, "over the side panel")
       assert.are.same({ 18 - 84, top + 22 - 84 }, { emblem.X, emblem.Y or 0 }, "its corner 18 in, 22 down")
-      assert.are.equal(top, t.Panel.Fill.Top, "the painting from the window's top")
+      assert.are.equal(top, t.Panel.Fill.Inset.Top, "the painting from the window's top")
       assert.are.equal(top, t.Header.Buttons.Rail.Start)
       assert.are.equal(31, t.Layout.Pad + t.Layout.TitleInset)
       assert.are.equal(top - 18, t.Layout.TitleTop + t.Fonts.Title.Size / 2)

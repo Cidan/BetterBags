@@ -205,7 +205,7 @@ sonataNext:RegisterTheme({
     -- From the window's top (the band's bottom): the band is drawn over what is behind the window, as GW2_UI's headers
     -- are (asked: "the top window border ... should be somewhat transparent"). Its opaque columns, 0 to 1006 of 1024:
     -- the rest fade out, and showed the world through beside the bank's side panel (measured).
-    Fill = { Texture = "Map", TexCoords = { 0, 1007 / 1024, 0, 1 }, Color = "White", Top = 62 },
+    Fill = { Texture = "Map", TexCoords = { 0, 1007 / 1024, 0, 1 }, Color = "White", Inset = { Top = 62 } },
     -- Asked: no feather while docked (a small panel has none). No border round the see-through header either: GW2_UI's
     -- windows have none.
     Feather = false,
