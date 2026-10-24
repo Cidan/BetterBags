@@ -139,6 +139,25 @@ describe("BetterBags Next's controls on the screen's pixels", function()
         assert.are.same({}, offGrid(), "disabled")
       end)
 
+      -- The round style (Controls.Toggle.Style = "Round"): its ends cut on a whole pixel, an odd track too.
+      it("draws a round switch off, on and sliding to rest, under the pointer and disabled", function()
+        for _, track in ipairs({ 12, 11 }) do
+          UseNextTheme({ Controls = { Toggle = { Style = "Round", Width = 34, Height = 20, TrackHeight = track,
+            KnobSize = 20, HoverSpread = 6 } } })
+          nextToggle:ApplyStyle()
+          local t = nextToggle:Create(window, { checked = false, onChange = function() end })
+          at(t.frame, 10, 10)
+          assert.are.same({}, offGrid(), "off, a track " .. track .. " tall")
+          t:Click({})
+          assert.are.same({}, offGrid(), "on, at rest")
+          t:SetHovered(true)
+          assert.are.same({}, offGrid(), "under the pointer")
+          t:SetEnabled(false)
+          assert.are.same({}, offGrid(), "disabled")
+          t.frame:Hide()
+        end
+      end)
+
       it("draws a slider at every value, under the pointer", function()
         local s = nextSlider:Create(window, { min = 0, max = 100, step = 1, value = 37, onChange = function() end })
         at(s.frame, 10, 10)
