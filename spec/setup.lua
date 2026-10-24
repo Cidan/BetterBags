@@ -42,6 +42,9 @@ LoadBetterBagsModule("render/flow.lua")
 -- Motion positions the cells and sections of every grid (render/motion.lua); grids and sections
 -- look it up when they load.
 LoadBetterBagsModule("render/motion.lua")
+-- BetterBags Next's pixel grid (next/pixel.lua, docs/next-pixel-perfect.md): every Next file that places
+-- anything looks it up when it loads.
+LoadBetterBagsModule("next/pixel.lua")
 -- Sonata resolves its themes and BetterBags Next's with SonataResolve (sonata/resolve.lua), which
 -- the engine looks up when it loads.
 LoadBetterBagsModule("sonata/resolve.lua")

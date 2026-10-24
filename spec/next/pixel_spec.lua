@@ -1,0 +1,106 @@
+-- pixel_spec.lua -- NextPixel (next/pixel.lua): BetterBags Next on the screen's pixel grid
+-- (docs/next-pixel-perfect.md). One screen pixel in a region's units is 768 over the screen's height,
+-- over the region's effective scale; lengths and offsets are whole pixels of it.
+local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
+ResetModuleStub("NextPixel", "next/pixel.lua")
+LoadBetterBagsModule("next/pixel.lua")
+local pixel = addon:GetModule("NextPixel")
+local layout = dofile("spec/helpers/layout.lua")
+
+describe("NextPixel", function()
+  local undo
+
+  before_each(function()
+    -- The reporter's window (Logs/gx.log) at the game's UI scale of 65%: a unit is 1.153 pixels.
+    undo = layout.UseScreen(3396, 1362, 0.65)
+  end)
+
+  after_each(function()
+    undo()
+  end)
+
+  local function near(a, b)
+    return math.abs(a - b) < 1e-9
+  end
+
+  it("measures a screen pixel in a region's units, from the screen's height and its scale", function()
+    local unit = (768 / 1362) / 0.65
+    assert.is_true(near(unit, pixel:Unit(UIParent)))
+    local panel = CreateFrame("Frame", nil, UIParent)
+    panel:SetScale(0.5)
+    local inside = CreateFrame("Frame", nil, panel)
+    assert.is_true(near(unit / 0.5, pixel:Unit(inside)), "a scaled panel has its own grid")
+  end)
+
+  it("rounds offsets to whole pixels, half away from zero, none staying none", function()
+    local unit = pixel:Unit(UIParent)
+    assert.are.equal(9, pixel:Pixels(UIParent, 8), "8 units are 9.22 pixels")
+    assert.are.equal(-9, pixel:Pixels(UIParent, -8))
+    assert.is_true(near(9 * unit, pixel:Snap(UIParent, 8)))
+    assert.is_true(near(-9 * unit, pixel:Snap(UIParent, -8)))
+    assert.are.equal(0, pixel:Snap(UIParent, 0.2))
+    assert.are.equal(0, pixel:Snap(UIParent, 0))
+  end)
+
+  it("rounds lengths to whole pixels, never below one when not none", function()
+    local unit = pixel:Unit(UIParent)
+    assert.is_true(near(51 * unit, pixel:Length(UIParent, 44)), "44 units are 50.7 pixels")
+    assert.is_true(near(unit, pixel:Length(UIParent, 0.2)))
+    assert.is_true(near(-unit, pixel:Length(UIParent, -0.2)))
+    assert.are.equal(0, pixel:Length(UIParent, 0))
+  end)
+
+  it("anchors, insets and sizes regions on whole pixels", function()
+    local window = CreateFrame("Frame", nil, UIParent)
+    pixel:Size(window, 554, 700.3)
+    pixel:Point(window, "TOPRIGHT", UIParent, "TOPRIGHT", -13.7, -21.1)
+    local fill = window:CreateTexture()
+    pixel:Inset(fill, window, 96, 0, 1, 2.6)
+    local line = window:CreateTexture()
+    pixel:Point(line, "TOPLEFT", window, "TOPLEFT", 18.4, -40)
+    pixel:Size(line, 300, 1)
+    local text = window:CreateFontString()
+    text:SetFontObject(GameFontNormal)
+    text:SetText("Backpack")
+    pixel:Point(text, "TOPLEFT", window, "TOPLEFT", 22, -24.5)
+    assert.are.same({}, layout.PixelCheck(window))
+    local point, rel, relPoint = fill:GetPoint(2)
+    assert.are.equal("BOTTOMRIGHT", point)
+    assert.are.equal(window, rel)
+    assert.are.equal("BOTTOMRIGHT", relPoint)
+  end)
+
+  it("anchors by the same point when no relative point is named", function()
+    local window = CreateFrame("Frame", nil, UIParent)
+    pixel:Point(window, "BOTTOMLEFT", UIParent, nil, 3, 3)
+    assert.are.equal("BOTTOMLEFT", select(3, window:GetPoint(1)))
+  end)
+
+  it("centers a region on whole pixels, the odd pixel to the right and bottom", function()
+    local unit = pixel:Unit(UIParent)
+    local button = CreateFrame("Button", nil, UIParent)
+    button:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+    button:SetSize(25 * unit, 25 * unit)
+    local icon = button:CreateTexture()
+    pixel:Center(icon, button, 25 * unit, 25 * unit, 16 * unit, 16 * unit)
+    local _, _, _, x, y = icon:GetPoint(1)
+    assert.is_true(near(4 * unit, x) and near(-4 * unit, y), "9 pixels left over: 4 before, 5 after")
+    assert.is_true(near(16 * unit, icon:GetWidth()))
+    pixel:Center(icon, button, 25 * unit, 25 * unit, 16 * unit, 16 * unit, 2 * unit, 1 * unit)
+    _, _, _, x, y = icon:GetPoint(1)
+    assert.is_true(near(6 * unit, x) and near(-3 * unit, y), "moved off the middle by whole pixels")
+    assert.are.same({}, layout.PixelCheck(button))
+  end)
+
+  it("names the grid by UIParent's scale and the screen's height", function()
+    assert.are.equal("0.650000@1362", pixel:Key())
+    UIParent:SetScale(0.7)
+    assert.are.equal("0.700000@1362", pixel:Key())
+  end)
+
+  it("rounds a font's height to whole pixels at UIParent's grid", function()
+    local unit = pixel:Unit(UIParent)
+    assert.is_true(near(15 * unit, pixel:FontHeight(13)), "13 units are 14.99 pixels")
+    assert.is_true(near(14 * unit, pixel:FontHeight(12)), "12 units are 13.84 pixels")
+  end)
+end)
