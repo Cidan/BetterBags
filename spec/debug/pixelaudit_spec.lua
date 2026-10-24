@@ -227,6 +227,29 @@ describe("PixelAudit", function()
       assert.are.same({}, printed)
     end)
 
+    -- A report says what the window looked like (data-driven.md): a misplacement no test reproduced (sections off
+    -- by the same fraction after a drag) needs where everything was, not only what was off.
+    it("keeps the window's layout in a report", function()
+      watched("Backpack", { layout = function() return { "section 1", "section 2" } end })
+      audit:SetWatching(ctx(), true)
+      run(5)
+      assert.are.same({ "section 1", "section 2" }, audit:GetReports()[1].layout)
+    end)
+
+    -- A clean check is data too: the last layout of each window is kept (pixelAudit.lastLayouts), so a state the
+    -- check cannot see as pixels off (a drag that never ended, once its room is on whole pixels) still shows.
+    it("keeps each window's last layout, clean or not", function()
+      local root, tex = watched("Backpack", { layout = function() return { "one" } end })
+      tex:SetPoint("TOPLEFT", root, "TOPLEFT", 0, 0)
+      audit:SetWatching(ctx(), true)
+      run(5)
+      assert.are.same({}, audit:GetReports())
+      local last = _G.BetterBagsPerfDB.pixelAudit.lastLayouts.Backpack
+      assert.are.same({ "one" }, last.lines)
+      assert.are.equal(0, last.count)
+      assert.is_number(last.at)
+    end)
+
     it("checks a window once it has stayed the same, reports what is off, and pops up the log", function()
       local root = watched("Backpack", { describe = function() return "small, Bag Scale 85%" end })
       audit:SetWatching(ctx(), true)

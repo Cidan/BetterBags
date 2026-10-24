@@ -70,6 +70,17 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
     would run past the width it is drawn in, the gap closes by the pixel or two the rounding added.
   - Measured after (the same probe): no width lays out differently on any of the four screens, no row runs past
     the content, and the gap closes in 3% to 8% of layouts, by 1 pixel (2 at most).
+- **A room is measured on the column's grid.** The column keeps a room for a section held in a drag (drawn shrunk,
+  `Drag.LiftScale`, until its landing ends) and for one flying back from a dock (at its card's scale): its height
+  is `NextContent:MeasureSection(section, canvas.frame, ...)`, the section's layout on the column's grid, not the
+  one `LayoutSection` laid its frame out on (`MeasureSection` is that measure, shared). **Failure mode (fixed,
+  found by the check in game):** after a section was dragged up one place in a small backpack at Bag Scale 55%
+  (3396x1362 at 65%), sections 2 and 4 to 8 and their items stood 0.062 pixel off, section 3 (the dragged one)
+  took no room, and a room was open before section 2: the column of a drag in progress, its room laid out on the
+  held section's grid. Reproduced with the real drag at that scale, tweens running each frame as in game: the held
+  section at an effective scale of 0.3361 against the column's 0.3575, its room 42.553 pixels instead of 43, the
+  same sections off. **Not known yet:** why the check saw the room after the drop (a Check Now cannot fit both its
+  checks inside a 0.24 s landing); each check now keeps the drag state (§6a).
 - `UI_SCALE_CHANGED` and `DISPLAY_SIZE_CHANGED` (`NextPixel:Init`) apply the current Next theme again,
   unsaved (`pixel:OnGridChanged`), when the grid differs from the one the fonts were made for
   (`NextStyle.gridKey`): new font objects at the new pixel heights, every widget restyled.
@@ -192,6 +203,9 @@ In the specs:
   `_G.__mockWidgetMethods` for this).
 - `layout.Rect(region)` works a region's rect out from its anchors, sizes and parents' scales (a rect a
   spec sets with `_SetRect` stands for the client's).
+- While a screen is set up, `GetLeft`, `GetRight`, `GetTop`, `GetBottom`, `GetCenter` and `GetRect` also report
+  where a region's anchors put it, in its own units (a rect a spec set stands), so code that reads where a frame
+  is (a section drag reads a section's edges and the cursor) runs on the mock.
 - `layout.PixelCheck(root, { skip, owners })` runs `PixelAudit:Check` on the mock, its `GetScaledRect`
   answered by `layout.Rect` (`UseScreen` answers it that way too). The mock's `GetRegions` lists a frame's
   textures, lines and text and the state art it makes lazily; its own `GetScaledRect` is a rect a spec set,
@@ -224,6 +238,12 @@ actually opens, on the real client: real fonts, art, Blizzard's templates, other
   comes to rest is reported. A window hidden meanwhile is dropped, never said clean.
 - **Masque's parts** make no report and pop nothing up; a report lists them apart (`others`, `othersTotal`),
   and the last check says how many (`lastChecked.others`, the tab's status line).
+- **Layouts**: a window may describe itself (`Register`'s `layout`, lines of text): a report keeps it
+  (`layout`), and every check keeps each window's last one, clean or not (`pixelAudit.lastLayouts[title]` =
+  `{ at, count, others, lines }`). A panel's (`panelProto:PixelLayout`): the canvas (anchor, where in pixels,
+  the scroll offset), a drag line (the section the column keeps a room for, its index, the room's height and
+  where it starts; the drag in progress; what the lift holds; the left button), then each section (shown,
+  docked, leaving, height, what it hangs from, where in units and pixels, Motion's move).
 - **Reports**: one per new set of parts off the grid for a window (the same set again is not reported; a
   window found clean forgets it, so parts coming back are reported again). A report (`id`, `at`, `window`,
   `screen`, `uiScale`, `scale`, `theme`, `details`, `total`, up to `MAX_LINES` 200 `lines`) is kept in
@@ -254,6 +274,11 @@ Real screens: the reporter's 3396x1362 at 65% and 70%, 3440x1440 at 65%, 1920x10
 - `spec/next/settings/content_spec.lua`: every page and tab of the settings window for both designs on
   four screens (the window shrunk to fit at 115%), scrolled partway; `themes_spec.lua` (the report);
   `window_spec.lua` (the drop after a drag).
+- Drags and docks: `spec/next/pixel_perfect_spec.lua` ("keeps the column on whole pixels while a section is
+  dragged up one place / down, as it lands, and after": the real drag, tweens each frame; "describes its column
+  for a report"), `spec/next/content_spec.lua` ("gives a section held in a drag / flying back from a dock its
+  room on the column's grid, drawn on another"), `spec/debug/pixelaudit_spec.lua` (layouts in reports, the last
+  layout of each window). Removing the room's measure fails all four drag and dock tests.
 - Layouts at every Bag Scale: `spec/next/pixel_perfect_spec.lua` ("puts every item in the same row and column
   at every Bag Scale": widths near a row's boundary, Bag Scales 50% to 150%, three screens; "hands its content
   the width to lay out for"), `spec/next/content_spec.lua` (rows decided on the width to lay out for on every

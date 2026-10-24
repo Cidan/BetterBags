@@ -802,6 +802,43 @@ describe("NextContent", function()
       assert.are.equal(ONE, y(s.B))
     end)
 
+    -- Found by the pixel check in game (next-pixel-perfect.md §3): a section held in a drag is drawn shrunk, and one
+    -- flying back from a dock at its card's scale, on other grids than the column's. The room either takes is its
+    -- height in the column, on the column's grid: the sections below stay on whole pixels.
+    for _, case in ipairs({ "held in a drag", "flying back from a dock" }) do
+      it("gives a section " .. case .. " its room on the column's grid, drawn on another", function()
+        local layout = dofile("spec/helpers/layout.lua")
+        local undo = layout.UseScreen(3396, 1362, 0.65)
+        parent:SetParent(UIParent)
+        parent:SetScale(0.55)
+        canvas:SetInstant(true)
+        finally(function()
+          canvas:SetInstant(false)
+          parent:SetScale(1)
+          parent:SetParent(nil)
+          undo()
+        end)
+        local s = threeSections()
+        local before = y(s.C)
+        -- Drawn on another grid: on a frame at another scale, as the lift draws a held section shrunk and a dock
+        -- card draws its section.
+        local away = CreateFrame("Frame", nil, UIParent)
+        away:SetScale(0.55 * 0.94)
+        if case == "held in a drag" then
+          canvas:BeginDrag(s.B)
+        else
+          canvas:HoldOut(s.B)
+          draw()
+          canvas:Returning(s.B)
+        end
+        s.B.frame:SetParent(away)
+        s.B.frame:ClearAllPoints()
+        s.B.frame:SetPoint("TOPLEFT", away, "TOPLEFT", 0, 0)
+        draw()
+        assert.is_true(math.abs(y(s.C) - before) < 1e-9, string.format("C at %.4f, %.4f before", y(s.C), before))
+      end)
+    end
+
     it("calls back when a held section leaves the data, before letting it go", function()
       local s = threeSections()
       local lost, shownWhenLost = 0, nil

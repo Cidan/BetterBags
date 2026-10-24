@@ -341,6 +341,7 @@ function nextPanel:Create(proto, opts)
     title = opts.title, owners = { panel = p },
     skip = function() return p:MovingParts() end,
     describe = function() return p:PixelState() end,
+    layout = function() return p:PixelLayout() end,
   })
   return p
 end
@@ -369,6 +370,57 @@ end
 function panelProto:PixelState()
   return string.format("%s, Bag Scale %d%%, Icon Scale %d%%", self:IsSmall() and "small" or "full",
     database:GetNextBagScale(), database:GetNextIconScale())
+end
+
+-- PixelLayout describes the panel's column for a pixel check report (data-driven.md): the canvas (its anchor, where
+-- it is in screen pixels, the scroll offset in pixels); a drag: the section the column keeps a room for (where and how
+-- tall), the drag in progress, what the lift holds, whether the left button is down; then each section in order:
+-- shown, docked (away) or leaving, its height, what it hangs from, where, in units and screen pixels, and where
+-- Motion moves it, if it does.
+---@return string[]
+function panelProto:PixelLayout()
+  local motion = addon:GetModule('Motion')
+  local canvas = self.content
+  local frame = canvas.frame
+  local k = 1 / pixel:Unit(frame)
+  local lines = {}
+  local function nameOf(f)
+    for _, section in ipairs(canvas.order) do
+      if section.frame == f then
+        return tostring(section.name)
+      end
+    end
+    return f ~= nil and "a frame" or "nothing"
+  end
+  local point, _, _, x, y = frame:GetPoint(1)
+  local left, top = frame:GetLeft(), frame:GetTop()
+  local box = self.scroll.scrollBox
+  table.insert(lines, string.format("canvas %s %.3f,%.3f | at %s,%s px | scroll %.3f px of %.3f",
+    tostring(point), x or 0, y or 0, left and string.format("%.3f", left * k) or "?",
+    top and string.format("%.3f", top * k) or "?", box:GetDerivedScrollOffset() * k, box:GetDerivedScrollRange() * k))
+  local drag, current, held = canvas.drag, nextDrag.current, lift.held
+  local column = "none"
+  if drag ~= nil then
+    column = string.format("%s index %d room %.3f (%.3f px) at %.3f px", tostring(drag.section.name), drag.index,
+      drag.height or 0, (drag.height or 0) * k, (canvas:GetDragSlotY() or 0) * k)
+  end
+  table.insert(lines, string.format("drag: column %s | dragging %s | lift holds %s | left button %s", column,
+    current ~= nil and tostring(current.name) or "none", held ~= nil and nameOf(held.frame) or "nothing",
+    IsMouseButtonDown("LeftButton") and "down" or "up"))
+  for i, section in ipairs(canvas.order) do
+    local f = section.frame
+    local sp, rel, _, sx, sy = f:GetPoint(1)
+    local x0, y0, x1, y1 = motion:GetMove(f)
+    local away = canvas.away[section]
+    local parent = f:GetParent()
+    local hangs = (parent == frame and rel == frame) and "canvas" or
+      ((parent and parent:GetName() or (parent == frame and "canvas" or "another frame")) .. (rel == frame and "" or ", anchored elsewhere"))
+    table.insert(lines, string.format("%d %s: shown=%s away=%s leaving=%s height %.3f (%.3f px) | hangs from %s | %s y %.3f (%.3f px), x %.3f | %s",
+      i, tostring(section.name), tostring(f:IsShown()), tostring(away ~= nil), tostring(canvas:IsLeaving(section)),
+      section.height or 0, (section.height or 0) * k, hangs, tostring(sp), sy or 0, (sy or 0) * k, sx or 0,
+      x0 ~= nil and string.format("moving %.3f,%.3f to %.3f,%.3f", x0, y0, x1, y1) or "still"))
+  end
+  return lines
 end
 
 -- SetSize switches every BetterBags Next panel to a size (docs/next-small-mode.md), saved: a chained

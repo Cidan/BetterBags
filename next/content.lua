@@ -609,6 +609,11 @@ function canvasProto:Render(parentResult)
       self:LayoutSection(section, width, layoutWidth)
     end
     local height = section.height
+    -- Held in a drag (drawn shrunk) or flying back from a dock, it is drawn on another grid than the column's: its
+    -- room is its height on the column's (MeasureSection).
+    if (drag ~= nil and section == drag.section) or (away ~= nil and away.returning) then
+      height = self:MeasureSection(section, frame, width, layoutWidth).height
+    end
     if drag ~= nil and section == drag.section then
       drag.height = height
     elseif self:IsLeaving(section) then
@@ -658,22 +663,12 @@ end
 function canvasProto:LayoutSection(section, width, layoutWidth)
   local f = section.frame
   local ctx
-  width = pixel:Floor(f, width)
-  layoutWidth = layoutWidth or section.layoutWidth or width
+  layoutWidth = layoutWidth or section.layoutWidth or pixel:Floor(f, width)
   section.layoutWidth = layoutWidth
-  local cellWidth, cellHeight = pixel:Lengths(f, self.cards and style.VENDOR_CARD_WIDTH or style.ICON,
-    self.cards and style.CARD_ICON or style.ICON)
-  local gap, header = pixel:Lengths(f, style.GAP, style.SECTION_HEADER)
-  local designStep = (self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP
-  local perRow = math.max(1, math.floor((layoutWidth + style.GAP) / designStep + 1e-6))
-  -- The row fits the width it is drawn in: where the grid's rounded lengths would run past it (up to a pixel per
-  -- cell, over the scroll bar's room), the gap closes by the pixel or two the rounding added. Every gap the same.
-  if perRow > 1 then
-    gap = math.max(0, math.min(gap, pixel:Floor(f, (width - perRow * cellWidth) / (perRow - 1))))
-  end
-  local step, rowStep = cellWidth + gap, cellHeight + gap
-  local rows = math.max(1, math.ceil(#section.entries / perRow))
-  local height = header + rows * rowStep - gap
+  local m = self:MeasureSection(section, f, width, layoutWidth)
+  width = m.width
+  local perRow, cellWidth, rows, height = m.perRow, m.cellWidth, m.rows, m.height
+  local step, rowStep = m.step, m.rowStep
   self:placeHeader(section)
   section.height = height
   section.frame:SetSize(width, height)
@@ -709,6 +704,32 @@ function canvasProto:LayoutSection(section, width, layoutWidth)
     end
   end
   return width, height
+end
+
+-- MeasureSection works out a section's layout in whole pixels on grid's pixel grid (a frame: the section's own,
+-- where it is drawn, or the column's, where it takes room), width wide, its cells per row decided on layoutWidth
+-- (LayoutSection). Nothing moves. A section drawn on another grid than the column's (held in a drag, drawn shrunk;
+-- flying back from a dock) takes room measured on the column's: its own grid's whole pixels are not the column's.
+---@param section NextSection
+---@param grid Region
+---@param width number
+---@param layoutWidth number
+---@return {width: number, perRow: number, cellWidth: number, cellHeight: number, step: number, rowStep: number, rows: number, height: number}
+function canvasProto:MeasureSection(section, grid, width, layoutWidth)
+  width = pixel:Floor(grid, width)
+  local cellWidth, cellHeight = pixel:Lengths(grid, self.cards and style.VENDOR_CARD_WIDTH or style.ICON,
+    self.cards and style.CARD_ICON or style.ICON)
+  local gap, header = pixel:Lengths(grid, style.GAP, style.SECTION_HEADER)
+  local designStep = (self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP
+  local perRow = math.max(1, math.floor((layoutWidth + style.GAP) / designStep + 1e-6))
+  -- The row fits the width it is drawn in: where the grid's rounded lengths would run past it (up to a pixel per
+  -- cell, over the scroll bar's room), the gap closes by the pixel or two the rounding added. Every gap the same.
+  if perRow > 1 then
+    gap = math.max(0, math.min(gap, pixel:Floor(grid, (width - perRow * cellWidth) / (perRow - 1))))
+  end
+  local rows = math.max(1, math.ceil(#section.entries / perRow))
+  return { width = width, perRow = perRow, cellWidth = cellWidth, cellHeight = cellHeight, step = cellWidth + gap,
+    rowStep = cellHeight + gap, rows = rows, height = header + rows * (cellHeight + gap) - gap }
 end
 
 -- Cascade fades sections in one after the other, rising into place: every section with all,

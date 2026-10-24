@@ -158,8 +158,9 @@ end
 --
 -- While it is set up, a region with no size of its own on an axis reports the size its anchors give it
 -- (GetWidth, GetHeight, GetSize), as the client reports a region's resolved size (warcraft.wiki.gg
--- Region:GetWidth); a font string still reports its own (the mock measures its text). GetScaledRect reports
--- where its anchors put it.
+-- Region:GetWidth); a font string still reports its own (the mock measures its text). GetScaledRect, GetLeft,
+-- GetRight, GetTop, GetBottom, GetCenter and GetRect report where its anchors put it (the edges in its own
+-- units), unless a spec set its rect.
 function layout.UseScreen(width, height, uiScale)
   local getSize = _G.GetPhysicalScreenSize
   local scale, rect = UIParent._scale, UIParent._rect
@@ -181,6 +182,38 @@ function layout.UseScreen(width, height, uiScale)
   methods.GetHeight = function(region) return resolved(region, "_height", getHeight, "bottom", "top") end
   local getScaledRect = methods.GetScaledRect
   methods.GetScaledRect = scaledRect
+  -- A region's edges where its anchors put it, in its own units, as the client reports them (a rect a spec set
+  -- stands, as in the plain mock).
+  local edges = {}
+  for _, key in ipairs({ "GetLeft", "GetRight", "GetTop", "GetBottom", "GetCenter", "GetRect" }) do
+    edges[key] = methods[key]
+  end
+  local function own(region)
+    if region._rect ~= nil then
+      return nil
+    end
+    local r = layout.Rect(region)
+    if r == nil then
+      return nil
+    end
+    local sc = region:GetEffectiveScale()
+    return { left = r.left / sc, right = r.right / sc, top = r.top / sc, bottom = r.bottom / sc }
+  end
+  local function edge(key, read)
+    methods[key] = function(region)
+      local r = own(region)
+      if r == nil then
+        return edges[key](region)
+      end
+      return read(r)
+    end
+  end
+  edge("GetLeft", function(r) return r.left end)
+  edge("GetRight", function(r) return r.right end)
+  edge("GetTop", function(r) return r.top end)
+  edge("GetBottom", function(r) return r.bottom end)
+  edge("GetCenter", function(r) return (r.left + r.right) / 2, (r.top + r.bottom) / 2 end)
+  edge("GetRect", function(r) return r.left, r.bottom, r.right - r.left, r.top - r.bottom end)
   _G.GetPhysicalScreenSize = function() return width, height end
   UIParent:SetScale(uiScale)
   local units = 768 / uiScale
@@ -188,6 +221,9 @@ function layout.UseScreen(width, height, uiScale)
   return function()
     methods.GetWidth, methods.GetHeight = getWidth, getHeight
     methods.GetScaledRect = getScaledRect
+    for key, fn in pairs(edges) do
+      methods[key] = fn
+    end
     _G.GetPhysicalScreenSize = getSize
     UIParent._scale, UIParent._rect = scale, rect
     UIParent._width, UIParent._height = w, h

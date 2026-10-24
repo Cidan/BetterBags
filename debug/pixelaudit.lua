@@ -271,7 +271,8 @@ end
 -- and when shown) is checked once it has not changed for QUIET, then again every GAP until two checks agree:
 -- what moves (a slide, a glide, a sparkle) is left out, and what stays off the grid where the window comes to
 -- rest is reported, once per set of parts: a chat line, a report kept in BetterBagsPerfDB (pixelAudit.reports,
--- read offline too), and pixelAudit/Found, on which the debug window opens on the Pixels tab. Off, it costs
+-- read offline too), and pixelAudit/Found, on which the debug window opens on the Pixels tab. Each window's last
+-- layout is kept too (pixelAudit.lastLayouts), clean or not. Off, it costs
 -- nothing: windows check the watching field before saying they changed, and its frame has no update script.
 
 audit.watching = false
@@ -322,6 +323,9 @@ function audit:Init()
   if type(self.db.nextId) ~= 'number' then
     self.db.nextId = 1
   end
+  if type(self.db.lastLayouts) ~= 'table' then
+    self.db.lastLayouts = {}
+  end
   self.windows = setmetatable({}, { __mode = "k" })
   self.pending = {}
   self.reported = setmetatable({}, { __mode = "k" })
@@ -331,12 +335,14 @@ function audit:Init()
 end
 
 -- Register makes a window one the watcher checks: its root frame, its title for the reports, the tables that
--- name its parts (owners, Check), the parts that move by nature (skip, read at each check), and what to say
--- about its state in a report (describe: its size, its scale). It is checked again whenever it is shown.
+-- name its parts (owners, Check), the parts that move by nature (skip, read at each check), what to say about its
+-- state in a report (describe: its size, its scale), and how it is laid out (layout: lines a report keeps, so a
+-- misplacement can be read from where everything was, data-driven.md). It is checked again whenever it is shown.
 ---@param root Frame
----@param opts {title: string, owners?: table<string, table>, skip?: fun(): table<table, boolean>, describe?: fun(): string?}
+---@param opts {title: string, owners?: table<string, table>, skip?: fun(): table<table, boolean>, describe?: fun(): string?, layout?: fun(): string[]}
 function audit:Register(root, opts)
-  root[RECORD] = { title = opts.title, owners = opts.owners, skip = opts.skip, describe = opts.describe }
+  root[RECORD] = { title = opts.title, owners = opts.owners, skip = opts.skip, describe = opts.describe,
+    layout = opts.layout }
   self.windows[root] = true
   -- A plain hook: it must cost nothing while the check is off, and addon.HookScript makes a Context per call.
   root:HookScript("OnShow", function()
@@ -348,7 +354,7 @@ end
 
 -- WindowOf returns a registered window's record (Register's options), or nil.
 ---@param root Frame
----@return {title: string, owners?: table<string, table>, skip?: fun(): table<table, boolean>, describe?: fun(): string?}?
+---@return {title: string, owners?: table<string, table>, skip?: fun(): table<table, boolean>, describe?: fun(): string?, layout?: fun(): string[]}?
 function audit:WindowOf(root)
   return root[RECORD]
 end
@@ -488,6 +494,10 @@ function audit:settled(root, w, lines, others)
   local key = table.concat(labels, "\n")
   local ctx = newContext('PixelAudit_Settled')
   self.lastChecked = { window = w.title, count = #lines, others = #others, at = time() }
+  -- Each window's last layout, kept clean or not: a state that shows no pixels off can still be read from it.
+  if w.layout ~= nil then
+    self.db.lastLayouts[w.title] = { at = self.lastChecked.at, count = #lines, others = #others, lines = w.layout() }
+  end
   if #lines == 0 then
     self.reported[root] = nil
   elseif self.reported[root] ~= key then
@@ -517,6 +527,7 @@ function audit:report(ctx, root, w, lines, others)
     scale = root:GetEffectiveScale(),
     theme = sonataNext ~= nil and sonataNext.started and sonataNext:GetCurrentThemeKey() or nil,
     details = w.describe and w.describe() or nil,
+    layout = w.layout and w.layout() or nil,
     total = #lines,
     lines = {},
     othersTotal = #others,

@@ -588,6 +588,41 @@ describe("BetterBags Next, pixel perfect", function()
       assert.are.equal("Bank", audit:WindowOf(bank.frame).title)
     end)
 
+    -- For a report (PixelAudit): every section of the column with its state, where it hangs in units and pixels,
+    -- and whether Motion still moves it; the canvas and the scroll offset.
+    it("describes its column for a report", function()
+      useScreen(3396, 1362, 0.65)
+      local audit = addon:GetModule("PixelAudit")
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      local lines = audit:WindowOf(bag.frame).layout()
+      assert.is_truthy(lines[1]:find("^canvas "), lines[1])
+      assert.is_truthy(lines[1]:find("scroll ", 1, true), lines[1])
+      assert.are.equal("drag: column none | dragging none | lift holds nothing | left button up", lines[2])
+      local names = {}
+      for i = 3, #lines do
+        names[#names + 1] = lines[i]:match("^%d+ ([^:]+):")
+        assert.is_truthy(lines[i]:find("shown=true", 1, true), lines[i])
+        assert.is_truthy(lines[i]:find("hangs from canvas", 1, true), lines[i])
+        assert.is_truthy(lines[i]:find(" y ", 1, true), lines[i])
+        assert.is_truthy(lines[i]:find("still", 1, true), lines[i])
+      end
+      assert.are.same({ "Herbs", "Ore", "Cloth" }, names)
+      -- A drag in progress: which section the column keeps a room for, where, the drag, what the lift holds.
+      local ore = bag.content.byName["Ore"]
+      local sc = ore.frame:GetEffectiveScale()
+      _G._cursorX, _G._cursorY = (ore.frame:GetLeft() + 20) * sc, (ore.frame:GetTop() - 10) * sc
+      _G._mouseButtonsDown = { LeftButton = true }
+      ore.header:GetScript("OnDragStart")(ore.header)
+      finally(function()
+        _G._mouseButtonsDown = nil
+        nextDrag:Cancel()
+      end)
+      lines = audit:WindowOf(bag.frame).layout()
+      assert.is_truthy(lines[2]:find("^drag: column Ore index 2 room "), lines[2])
+      assert.is_truthy(lines[2]:find("| dragging Ore | lift holds Ore | left button down$"), lines[2])
+      assert.is_falsy(lines[4]:find("hangs from canvas", 1, true), lines[4])
+    end)
+
     it("says it changed as it renders, only while the check watches", function()
       local audit = addon:GetModule("PixelAudit")
       local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
@@ -666,6 +701,72 @@ describe("BetterBags Next, pixel perfect", function()
         end
       end
     end)
+
+    -- Found by the pixel check in game: after a section was dragged up one place in a small backpack at Bag Scale
+    -- 55% (3396x1362 at 65%), six of eight sections and their items stood 0.062 pixel off the grid, the dragged
+    -- section taking no room and a room open before the second: the column of a drag in progress. The column keeps
+    -- a room for the section while it is held and while it lands (NextContent:BeginDrag, nextDrag:land), and the
+    -- room is the section's height; the held section is drawn shrunk (Drag.LiftScale), on another grid. The column
+    -- stays on whole pixels throughout: held over its new place, landing, and settled.
+    for _, case in ipairs({ { name = "up one place", from = "S3", over = "S2", before = true },
+      { name = "down", from = "S3", over = "S6", before = false } }) do
+      it("keeps the column on whole pixels while a section is dragged " .. case.name .. ", as it lands, and after", function()
+        db.size, db.bagScale = "small", 55
+        useScreen(3396, 1362, 0.65)
+        local cats, list = {}, {}
+        for i = 1, 8 do
+          table.insert(cats, { name = "S" .. i })
+          for j = 1, 2 + i do table.insert(list, item(i .. "_" .. j, "S" .. i)) end
+        end
+        slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
+        -- The order a drop saves (nextDrag:SaveOrder).
+        local pins = {}
+        override(stubs.database, "GetCustomSectionSort", function() return pins end)
+        override(stubs.database, "SetCustomSectionSort", function(_, _, name, i) pins[name] = i end)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        assert.are.same({}, offGrid(bag), "before")
+        -- column checks the panel with every move of its column at rest, the held section's tweens left running.
+        local function column()
+          render:Flush()
+          motion:Step(10)
+          return layout.PixelCheck(bag.frame, { owners = { panel = bag }, skip = moving(bag) })
+        end
+        local dragged, over = bag.content.byName[case.from], bag.content.byName[case.over]
+        -- The cursor is in absolute units (GetCursorPosition); a section's edges in its own.
+        local sc = dragged.frame:GetEffectiveScale()
+        local x, top = dragged.frame:GetLeft() + 20, dragged.frame:GetTop() - 10
+        local to = case.before and (over.frame:GetTop() - 2) or (over.frame:GetBottom() - 5)
+        _G._cursorX, _G._cursorY = x * sc, top * sc
+        _G._mouseButtonsDown = { LeftButton = true }
+        dragged.header:GetScript("OnDragStart")(dragged.header)
+        -- frame runs one frame of the game: tweens (the lift's shrink), the drag, renders, the column's moves.
+        local function frame(elapsed)
+          local update = tween.driver:GetScript("OnUpdate")
+          if update ~= nil then update(tween.driver, elapsed) end
+          nextDrag:Update(elapsed)
+          render:Flush()
+          motion:Step(elapsed)
+        end
+        for step = 1, 30 do
+          _G._cursorY = (top + (to - top) * math.min(1, step / 12)) * sc
+          frame(0.016)
+        end
+        assert.is_true(math.abs(dragged.frame:GetEffectiveScale() - bag.content.frame:GetEffectiveScale()) > 1e-3,
+          "drawn shrunk while held")
+        assert.is_not_nil(bag.content.drag, "held")
+        assert.are.same({}, column(), "held over its new place")
+        _G._mouseButtonsDown = nil
+        dragged.header:GetScript("OnDragStop")(dragged.header)
+        assert.is_not_nil(bag.content.drag, "landing")
+        assert.are.same({}, column(), "as it lands")
+        settle()
+        assert.is_nil(bag.content.drag, "landed")
+        local order = {}
+        for _, section in ipairs(bag.content.order) do table.insert(order, section.name) end
+        assert.are_not.same({ "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8" }, order, "moved")
+        assert.are.same({}, offGrid(bag), "after")
+      end)
+    end
 
     it("shows a small panel's grips on whole pixels under the pointer", function()
       db.size = "small"
