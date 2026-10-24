@@ -62,15 +62,14 @@ checkout; the packaged v12.1.5-01 it replaced is in `_retail_/Interface/AddOns-b
 
 ## 4. The vendor (`next/vendor.lua`)
 
-- **The section.** On Buy, what `ToBuy` returns is the **Shopping List** section, first, on buttons of
-  its own (keys `list:<index>`); the items stay in their categories too (asked: "we can have duplicate
-  item buttons in the vendor frame, shopping list + regular vendor item frames"). Each list button
+- **The section.** On Buy, what `ToBuy` returns is the **Shopping List** section, first, out of its
+  items' categories (an item is in one place, as Recent Items takes an item out of its category; duplicate
+  buttons were tried and dropped, asked: "it's fine to not have duplicates"). Each button
   (`NextVendorButton:SetBuy(item, quantity)`) shows how many the list buys as its count and what they
   cost as its price; its tooltip adds "Your shopping list needs N". Its clicks are a vendor button's (a
-  right click buys one purchase), and the vendor's search dims it as its item (`vendor:<index>` in the
-  vendor's index). No section without PSL or with nothing to buy here. Shown in the column, it reads as
-  one more category of the shop (after a right click, or what a purchase left; asked to keep: "that's
-  SLICK").
+  right click buys one purchase). No section without PSL or with nothing to buy here. Shown in the
+  column, it reads as one more category of the shop (after a right click, or what a purchase left; asked
+  to keep: "that's SLICK").
 - **The card** (`OfferShoppingList`, `ShoppingListOffer`): the section docks in the vendor's own dock
   (`NextDock`, next.md §7, the dock sales and destroys wait in; source: the vendor) once a visit
   (`listOffered`, cleared on `MERCHANT_SHOW`), from the draw that first binds it, **between binding and
@@ -78,7 +77,8 @@ checkout; the packaged v12.1.5-01 it replaced is in `_retail_/Interface/AddOns-b
   dock seats it in its card at once, and the vendor opens with the card already there. **Failure mode
   (fixed, reported):** docked once the vendor had slid in (`next/PanelShown`, as sales are), the section
   showed in the vendor's list "for a split second then slides to the buy frame". Never as the vendor
-  closes. It reads "Buy N items?" (N: the different items),
+  closes. Its card lays it out as the vendor's column would (the dock, §5): a column never lays out a
+  section held out of it. It reads "Buy N items?" (N: the different items),
   "Total: <price>" (`TotalOf`, written as the vendor's prices, `NextVendorButton:PriceText`), "Double-click
   to buy · Right-click to cancel", and glows in `Dock.BuyColor` (Default: `Emerald`).
   - **A double click** buys through PSL (`Buy`) and answers "moved": the section flies into the
@@ -104,6 +104,11 @@ checkout; the packaged v12.1.5-01 it replaced is in `_retail_/Interface/AddOns-b
 - `NextDockOffer.destination?: fun(): Frame?`: where a section's items went when it moves, when that is
   not the panel it waited in. "moved" flies it into that frame's middle instead of the panel's tab or
   scroll area, or nowhere (it leaves at once) when the function returns nil. Sales and deposits give none.
+- **A panel's own section is laid out at its column's width** (`listProto:Lead`; `NextContent`'s lead
+  callback now gets the column's layout width too). A section from another panel keeps the width its own
+  column gave it and is scaled down to fit, as before. **Failure mode (fixed, reported with a
+  screenshot):** docked before its first layout, the Shopping List had no width yet, and the card laid it
+  out at that width: a narrow, tall, empty green strip at the top of the vendor.
 - `NextDock:SendBackBorrowed(panel)`: sends back at once what waits in a panel that came from other panels,
   leaving the panel's own sections in their cards (the vendor's `OnMerchantClosed`; it used `PanelHidden`,
   which also sent the vendor's own Shopping List back into its column as it slid out).
@@ -121,22 +126,26 @@ checked before).
   a late load, nothing to wait for. `spec/next/merchant_spec.lua` ("what a shopping list buys here").
   `spec/next/vendorbutton_spec.lua` (quantity count and price, the tooltip line, reset).
   `spec/next/dock_spec.lua` (flying into the destination; nowhere without one; sending back only what
-  came from other panels). `spec/next/vendor_spec.lua` ("the shopping list (Profession Shopping List)":
-  nothing without PSL, the section on its own buttons beside the categories and its counts, in its card
-  as the vendor opens and never placed in the column (`motion:Place` recorded), the card's text, total
-  and color, buying and flying into the backpack, nowhere with the backpack closed, nothing once closing
-  or closed, sent back and once a visit, the other tabs, gone when not needed, offered straight into its
-  card when the list changes, dimmed by a search, what cannot be bought, sliding out in its card, not
-  offered as the vendor closes).
+  came from other panels; a panel's own section laid out as its column lays out, rows per width, and
+  again after a resize; another panel's keeping its own column's layout). `spec/next/vendor_spec.lua`
+  ("the shopping list (Profession Shopping List)": nothing without PSL, the section out of the categories
+  and its counts, in its card as the vendor opens and never placed in the column (`motion:Place`
+  recorded), its items laid out in the card as in the column, the card's text, total and color, buying
+  and flying into the backpack, nowhere with the backpack closed, nothing once closing or closed, sent
+  back and once a visit, the other tabs, gone when not needed, offered straight into its card when the
+  list changes, dimmed by a search, what cannot be bought, sliding out in its card, not offered as the
+  vendor closes).
   `spec/sonata/next_engine_spec.lua`, `spec/sonata/next_themes_spec.lua` (the colors checked and set),
   `spec/core/init_spec.lua` (enabled).
-- Mutation-tested: 44 mutations, each failing at least one test (two first survived and led to sharper
-  tests: the closing guard, and docking before the layout, which the frame mock cannot tell from a
-  flight because it gives anchored frames no screen position). Guards no test could reach were removed
+- Mutation-tested: 45 mutations, each failing at least one test (four first survived and led to sharper
+  tests: the closing guard; docking before the layout, which the frame mock cannot tell from a flight
+  because it gives anchored frames no screen position; the column's layout width, which only shows when a
+  narrower column wraps more rows; another panel's section keeping its own width, which only shows with
+  columns of different widths). Guards no test could reach were removed
   instead (the tab check, held or leaving sections, PSL disappearing mid-visit, a missing backpack).
-- **Seen in game** (the player, before the last two changes): it worked; the section showed in the list
-  before sliding into its card (fixed above). Not seen yet: the card at open, the duplicate buttons, the
-  close. To check: track a recipe whose reagents a vendor sells, open that vendor with Next on, double-
+- **Seen in game** (the player): first, it worked but the section showed in the list before sliding into
+  its card; then, docked before the layout, the card was an empty strip (both fixed above). Not seen yet:
+  the card at open with its items, the close. To check: track a recipe whose reagents a vendor sells, open that vendor with Next on, double-
   click the card, check the purchases and PSL's window, right-click instead, switch tabs while it waits,
   close the vendor with the card waiting.
 - **Not measured:** `GetShoppingList` recomputes PSL's quantities on every Buy draw (several per sale or

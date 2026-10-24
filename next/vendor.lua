@@ -214,12 +214,11 @@ function vendorProto:ApplySearch()
   local text = self.searchBox.textBox:GetText() or ""
   local results = self.tab == TAB_BUY and merchant:Search(text) or nil
   local needle = text:lower()
-  for _, button in pairs(self.buttons) do
+  for key, button in pairs(self.buttons) do
     local match = true
     if text ~= "" then
       if button.mode == "buy" then
-        -- A Shopping List button matches as its item does (the index holds the vendor's slots).
-        match = results ~= nil and results["vendor:" .. button.item.index] == true
+        match = results ~= nil and results[key] == true
       else
         local entry = button.buyback or button.repair
         local name = entry and (entry.name or (entry.link and entry.link:match("%[(.-)%]"))) or ""
@@ -397,29 +396,31 @@ function vendorProto:button(key, previous)
 end
 
 -- shoppingListOf builds the Shopping List (profession-shopping-list.md): what Profession Shopping List's
--- list buys here (NextMerchant:ToBuy), on buttons of its own (asked: "we can have duplicate item buttons
--- in the vendor frame, shopping list + regular vendor item frames"), each showing how many and what they
--- cost; nil without Profession Shopping List or with nothing on the list here.
+-- list buys here (NextMerchant:ToBuy), each item showing how many and what they cost; nil without
+-- Profession Shopping List or with nothing on the list here. It also says which of the merchant's items
+-- it holds: they are in it, not in their categories.
 ---@private
 ---@param list NextVendorItem[]
 ---@param previous table<string, NextVendorButtonFrame>
----@return NextCanvasSection?
+---@return NextCanvasSection? section, table<number, boolean> listed
 function vendorProto:shoppingListOf(list, previous)
   self.toBuy = merchant:ToBuy(list, shoppingList():Needs())
+  local listed = {}
   if #self.toBuy == 0 then
-    return nil
+    return nil, listed
   end
   local buttons = {}
   for _, purchase in ipairs(self.toBuy) do
-    local b = self:button("list:" .. purchase.item.index, previous)
+    listed[purchase.item.index] = true
+    local b = self:button("vendor:" .. purchase.item.index, previous)
     b:SetBuy(purchase.item, purchase.quantity)
     table.insert(buttons, b)
   end
-  return { name = shoppingListName(), buttons = buttons }
+  return { name = shoppingListName(), buttons = buttons }, listed
 end
 
--- buildBuy builds the Buy tab: the Shopping List first, then the vendor's items in the backpack's
--- categories, and the player's gold and the vendor's currencies for the footer.
+-- buildBuy builds the Buy tab: the Shopping List first, then the rest of the vendor's items in the
+-- backpack's categories, and the player's gold and the vendor's currencies for the footer.
 ---@private
 ---@param ctx Context
 ---@param previous table<string, NextVendorButtonFrame>
@@ -427,11 +428,17 @@ end
 function vendorProto:buildBuy(ctx, previous)
   local sections = {}
   local list = merchant:ReadItems(ctx)
-  local shopping = self:shoppingListOf(list, previous)
+  local shopping, listed = self:shoppingListOf(list, previous)
   if shopping then
     table.insert(sections, shopping)
   end
-  for _, s in ipairs(merchant:BuildSections(list)) do
+  local rest = {}
+  for _, item in ipairs(list) do
+    if not listed[item.index] then
+      table.insert(rest, item)
+    end
+  end
+  for _, s in ipairs(merchant:BuildSections(rest)) do
     local buttons = {}
     for _, item in ipairs(s.items) do
       local b = self:button("vendor:" .. item.index, previous)

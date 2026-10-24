@@ -359,14 +359,13 @@ function buttonProto:setCount(n)
   end
 end
 
--- SetBuy shows an item for sale. With a quantity it is the item's button in the vendor's Shopping List
--- (profession-shopping-list.md), a button of its own beside the item's in its category: its count is how
--- many the list buys and its price what that many cost.
+-- SetBuy shows an item for sale. With a quantity (the vendor's Shopping List,
+-- profession-shopping-list.md), its count is how many the list buys and its price what that many cost.
 ---@param item NextVendorItem
 ---@param quantity? number
 function buttonProto:SetBuy(item, quantity)
   self.mode, self.item, self.quantity = "buy", item, quantity
-  self.key = (quantity and "list:" or "vendor:") .. item.index
+  self.key = "vendor:" .. item.index
   self:reset(item.texture, item.quality)
   self:setCount(quantity or item.stackCount)
   if item.numAvailable and item.numAvailable >= 0 then

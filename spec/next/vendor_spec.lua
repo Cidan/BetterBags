@@ -1220,19 +1220,14 @@ describe("NextVendor", function()
       assert.are.same({}, nextDock:Entries(v))
     end)
 
-    -- Asked: "we can have duplicate item buttons in the vendor frame, shopping list + regular vendor item
-    -- frames".
-    it("puts what the list buys here in a Shopping List of its own buttons, each with how many, leaving the vendor's categories whole", function()
+    it("puts what the list buys here above the vendor's categories, out of theirs, each with how many", function()
       data.listAvailable, data.needs = true, { [1] = 10, [4] = 3 }
       local v = open()
-      assert.are.same({ "Shopping List", "Armor", "Food", "Mats" }, sectionNames(v))
+      assert.are.same({ "Shopping List", "Armor", "Food" }, sectionNames(v))
       assert.are.same({ 1, 4 }, namesOf(v.content.byName["Shopping List"]))
-      assert.are.same({ 1, 3 }, namesOf(v.content.byName.Food))
-      assert.are.same({ 4 }, namesOf(v.content.byName.Mats))
-      assert.are.equal("10", v.buttons["list:1"].count:GetText())
-      assert.are.equal("3", v.buttons["list:4"].count:GetText())
-      assert.are.equal("5", v.buttons["vendor:1"].count:GetText(), "the vendor's own button shows its stack")
-      assert.are_not.equal(v.buttons["list:1"], v.buttons["vendor:1"])
+      assert.are.same({ 3 }, namesOf(v.content.byName.Food))
+      assert.are.equal("10", v.buttons["vendor:1"].count:GetText())
+      assert.are.equal("3", v.buttons["vendor:4"].count:GetText())
     end)
 
     -- Asked: "make the item frame appear directly in the buy screen at the start when we open it? right
@@ -1256,6 +1251,20 @@ describe("NextVendor", function()
       assert.is_true(e.seated)
       assert.are.equal(e.box.frame, v.content.byName["Shopping List"].frame:GetParent())
       assert.is_true(v.content:IsAway(v.content.byName["Shopping List"]))
+    end)
+
+    -- Reported: the card opened as a narrow empty strip, its section laid out at no width.
+    it("lays its items out in its card as the vendor's column lays them out", function()
+      data.listAvailable, data.needs = true, { [1] = 10, [3] = 3 }
+      local v = open()
+      local list, armor = v.content.byName["Shopping List"], v.content.byName.Armor
+      assert.is_true(armor.frame:GetWidth() > 0)
+      -- Laid out on its card's scaled grid (whole pixels there, docs/next-pixel-perfect.md).
+      assert.is_true(math.abs(armor.frame:GetWidth() - list.frame:GetWidth()) < 0.5)
+      local _, _, _, x1, y1 = v.buttons["vendor:1"].frame:GetPoint(1)
+      local _, _, _, x3, y3 = v.buttons["vendor:3"].frame:GetPoint(1)
+      assert.are.equal(y1, y3, "side by side, as the vendor's columns put them")
+      assert.is_true(x3 > x1)
     end)
 
     it("says in the theme's buy color what it buys and the total", function()
@@ -1284,7 +1293,8 @@ describe("NextVendor", function()
       assert.is_true(v.content:IsLeaving(v.content.byName["Shopping List"]))
       data.needs = {}
       eventsRegistered["BAG_UPDATE_DELAYED"](ctx())
-      assert.are.same({ "Armor", "Food", "Mats" }, sectionNames(v), "bought: the list is gone")
+      assert.are.same({ "Armor", "Food", "Mats" }, sectionNames(v))
+      assert.are.same({ 1, 3 }, namesOf(v.content.byName.Food), "bought: its items go back to their categories")
     end)
 
     it("flies nowhere when the backpack is not shown", function()
@@ -1397,8 +1407,7 @@ describe("NextVendor", function()
       data.search = { ["vendor:4"] = true }
       v.searchBox.textBox:SetText("mats")
       v.searchBox.textBox:GetScript("OnTextChanged")(v.searchBox.textBox, true)
-      assert.are.equal(0.25, v.buttons["list:1"].frame:GetAlpha())
-      assert.are.equal(1, v.buttons["list:4"].frame:GetAlpha())
+      assert.are.equal(0.25, v.buttons["vendor:1"].frame:GetAlpha())
       assert.are.equal(1, v.buttons["vendor:4"].frame:GetAlpha())
     end)
 

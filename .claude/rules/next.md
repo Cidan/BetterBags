@@ -571,7 +571,8 @@ kept a gap) and a separate destroy card along the vendor's bottom; both are gone
   frame later (`Reveal`, as the text area follows its cursor), once the scroll box has the column's new
   height.
 - **Each card** (`NextDockCard`: its fill, fonts, edge, halo and pulse) holds the section, scaled down
-  to fit the column with the halo's `Spread` round it, and a catcher above the section's item buttons
+  to fit the column with the halo's `Spread` round it (a section of the panel's own column laid out at
+  that column's width, as the column would: profession-shopping-list.md §5), and a catcher above the section's item buttons
   (levels only ever raised: lowering threw a descendant to the top level, warcraft.wiki.gg "Frame
   Strata"), so a click answers rather than picking an item up. Its offer (`NextDockOffer`) says its text
   and its glow color (the dock's, or `Dock.DestroyColor` while destroying), read again at every layout
@@ -868,8 +869,9 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   the vendor show (`OfferAutomation`), in the same dock a dragged section's sale waits in (§7), red while
   destroying. The vendor keeps no room of its own for it: its `ContentBottom` is the panel's.
 - **The Shopping List** (profession-shopping-list.md): with Profession Shopping List loaded, what its list
-  buys here is a section at the top of Buy on buttons of its own, docked once a visit in the same dock
-  (in its card from the vendor's first layout) glowing in `Dock.BuyColor`, bought with a double click (it
+  buys here is a section at the top of Buy (out of its items' categories), docked once a visit in the
+  same dock (in its card from the vendor's first layout, laid out at the vendor's column width) glowing
+  in `Dock.BuyColor`, bought with a double click (it
   flies into the backpack). The merchant closing sends back only other panels' sections
   (`NextDock:SendBackBorrowed`); the Shopping List leaves with the vendor in its card.
 - **Masque:** each button is a card the canvas places (`frame`, the icon with its name and price)

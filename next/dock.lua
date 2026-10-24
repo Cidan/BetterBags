@@ -107,7 +107,7 @@ function nextDock:ListOf(panel)
   if list == nil then
     list = setmetatable({ panel = panel, entries = {}, free = {}, driver = CreateFrame("Frame"), elapsed = 0 },
       { __index = listProto })
-    panel.content:SetLead(function(width) return list:Lead(width) end)
+    panel.content:SetLead(function(width, layoutWidth) return list:Lead(width, layoutWidth) end)
     self.lists[panel] = list
     sonataNext:RegisterWidget(self)
   end
@@ -327,12 +327,17 @@ function listProto:Seat(entry)
   entry.seated = true
 end
 
--- Lead lays the cards out for the panel's column (NextContent:SetLead), width wide: each card round its
--- section, the section scaled down to fit with the card's halo inside the column, its holder as tall as
--- the card and the halo above it; each card reads its offer again.
+-- Lead lays the cards out for the panel's column (NextContent:SetLead), width wide (its rows decided on
+-- layoutWidth): each card round its section, the section scaled down to fit with the card's halo inside
+-- the column, its holder as tall as the card and the halo above it; each card reads its offer again. A
+-- section from another panel keeps the width its own column gave it; one of this panel is laid out as this
+-- column lays out its sections: one docked as it was bound (the vendor's Shopping List) has never been laid
+-- out, since a column never lays out a section held out of it (reported: its card drew as a narrow empty
+-- strip, the section laid out at no width).
 ---@param width number
+---@param layoutWidth? number
 ---@return {frame: Frame, height: number}[]
-function listProto:Lead(width)
+function listProto:Lead(width, layoutWidth)
   local D = style.Theme.Dock
   local frame = self.panel.content.frame
   local spread = pixel:Length(frame, (D.Halo and D.Halo.Spread) or (D.Glow and D.Glow.Width) or 0)
@@ -340,14 +345,15 @@ function listProto:Lead(width)
   local leads, y = {}, 0
   for i, entry in ipairs(self.entries) do
     local section = entry.section
-    local w = section.frame:GetWidth()
+    local own = entry.source == self.panel
+    local w = own and width or section.frame:GetWidth()
     entry.scale = math.min(1, (width - 2 * spread - 2 * pad) / w)
     -- Seated, the section is laid out on the grid it is drawn on at its card's scale (whole pixels there,
     -- docs/next-pixel-perfect.md), and its card is sized from that: its size times its scale is whole.
     local h = section.height or section.frame:GetHeight()
     if entry.seated then
       section.frame:SetScale(entry.scale)
-      w, h = entry.source.content:LayoutSection(section, w)
+      w, h = entry.source.content:LayoutSection(section, w, own and (layoutWidth or width) or nil)
     end
     local cardHeight = entry.box:Size(w * entry.scale, h * entry.scale)
     self:Read(entry)

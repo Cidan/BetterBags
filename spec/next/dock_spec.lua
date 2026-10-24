@@ -633,6 +633,60 @@ describe("NextDock", function()
       end
     end)
 
+    -- A panel's own section docked as it is bound (the vendor's Shopping List, profession-shopping-list.md
+    -- §4) has never been laid out: its column never places a held section. Reported: its card drew as a
+    -- narrow empty strip, the section laid out at no width.
+    -- rowsOf says how a section's items are laid out: how many to a row, and how many rows.
+    local function rowsOf(s)
+      local rows, first = {}, nil
+      for _, e in ipairs(s.entries) do
+        local _, _, _, _, y = e.item.frame:GetPoint(1)
+        y = math.floor(y + 0.5)
+        rows[y] = (rows[y] or 0) + 1
+        first = first or y
+      end
+      local n = 0
+      for _ in pairs(rows) do n = n + 1 end
+      return { perRow = rows[first], rows = n }
+    end
+
+    it("lays a section of its own panel docked before its column laid it out at the column's width", function()
+      -- Enough items to take more rows in a narrower column.
+      local list = {}
+      for slot = 1, 12 do table.insert(list, item("1_" .. slot, "Own")) end
+      for slot = 13, 24 do table.insert(list, item("1_" .. slot, "Other")) end
+      target.content:Bind(ctx(), { sortedItems = {}, tabs = { [1] = { categories = { { name = "Own" }, { name = "Other" } },
+        items = list } } }, 1, {})
+      local entry = nextDock:Add(target, { section = target.content.byName.Own, source = target, offer = offer() })
+      assert.is_true(entry.seated)
+      draw(target.content)
+      local own, other = target.content.byName.Own, target.content.byName.Other
+      assert.is_true(other.frame:GetWidth() > 0)
+      -- Laid out on its card's scaled grid (whole pixels there, docs/next-pixel-perfect.md).
+      assert.is_true(math.abs(other.frame:GetWidth() - own.frame:GetWidth()) < 0.5, "as wide as it is in its column")
+      assert.are.same(rowsOf(other), rowsOf(own))
+      local spread = style.Theme.Dock.Halo.Spread
+      assert.is_true(entry.box.frame:GetWidth() > style.GRID_WIDTH - 2 * spread - 1, "the card spans the column")
+      -- A small panel resized while it waits: laid out again as its column now lays out.
+      local before = rowsOf(other)
+      render:NewRenderChain(target.content, { ctx = ctx() }, { Width = style.GRID_WIDTH - 150 })
+      motion:Step(1)
+      assert.is_true(rowsOf(other).rows > before.rows, "the narrower column takes more rows")
+      assert.is_true(math.abs(other.frame:GetWidth() - own.frame:GetWidth()) < 0.5, "as its column now is")
+      assert.are.same(rowsOf(other), rowsOf(own))
+    end)
+
+    it("keeps a section from another panel as its own column laid it out", function()
+      render:NewRenderChain(source.content, { ctx = ctx() }, { Width = style.GRID_WIDTH - 150 })
+      local width = section("B").frame:GetWidth()
+      local entry = dock("B")
+      draw(target.content)
+      finishTweens()
+      draw(target.content)
+      assert.is_true(entry.seated)
+      assert.is_true(math.abs(section("B").frame:GetWidth() - width) < 0.5, "not the panel's own column's width")
+    end)
+
     -- A vendor's own Shopping List leaves with the vendor in its card as it slides out; sections from other
     -- panels go home at once (profession-shopping-list.md §4).
     it("sends back at once only what came from other panels, a panel's own sections staying in their cards", function()
