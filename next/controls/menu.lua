@@ -18,6 +18,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class PixelAudit: AceModule
+local pixelAudit = addon:GetModule('PixelAudit')
+
 -- NextMenu is BetterBags Next's menu of choices (next-settings.md §2): one at a time, drawn from the
 -- theme (Controls.Menu), below what opened it, over everything (FULLSCREEN_DIALOG), a row per
 -- choice, the chosen one checked, scrolling past MaxRows. A click picks a choice and closes it; a
@@ -101,6 +104,7 @@ function nextMenu:build()
   addon.SetScript(frame, "OnHide", function() self:hidden() end)
   self.frame, self.box, self.list, self.catcher = frame, box, list, catcher
   sonataNext:RegisterWidget(self)
+  pixelAudit:Register(frame, { title = "Menu", owners = { menu = self } })
 end
 
 -- row returns the i-th row, made the first time it is needed.

@@ -24,6 +24,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class PixelAudit: AceModule
+local pixelAudit = addon:GetModule('PixelAudit')
+
 -- NextDialog is BetterBags Next's dialog (next-settings.md §2), in place of Blizzard's StaticPopup:
 -- one at a time, over the window it is shown in, drawn from the theme (Controls.Dialog): a scrim over
 -- the window that takes its clicks, and a card with a title, text, a text field when asked, and
@@ -96,6 +99,7 @@ function nextDialog:build()
   addon.SetScript(frame, "OnHide", function(ctx) self:hidden(ctx) end)
   self.frame, self.card = frame, card
   sonataNext:RegisterWidget(self)
+  pixelAudit:Register(frame, { title = "Dialog", owners = { dialog = self } })
 end
 
 -- button returns the i-th button, made the first time it is needed.

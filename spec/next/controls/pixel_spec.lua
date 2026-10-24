@@ -258,4 +258,26 @@ describe("BetterBags Next's controls on the screen's pixels", function()
       end)
     end)
   end
+
+  -- The check run in game from /bbdb (debug/pixelaudit.lua, next-pixel-perfect.md): the menu and the dialog
+  -- are windows of their own, registered as they are made, their parts named from them.
+  it("registers the menu and the dialog with the pixel check run in game", function()
+    local audit = addon:GetModule("PixelAudit")
+    -- Escape's list, and timers held, as for the other tests.
+    local saved = { _G.UISpecialFrames, C_Timer.After }
+    _G.UISpecialFrames, C_Timer.After = {}, function() end
+    controls.escape = {}
+    finally(function() _G.UISpecialFrames, C_Timer.After = saved[1], saved[2] end)
+    local owner = CreateFrame("Frame", nil, UIParent)
+    nextMenu:Open(owner, { items = { { text = "One" } }, onPick = function() end })
+    local menu = audit:WindowOf(nextMenu.frame)
+    assert.are.equal("Menu", menu.title)
+    assert.are.equal(nextMenu, menu.owners.menu)
+    nextMenu:Close()
+    nextDialog:Show(owner, { title = "Delete", text = "Delete it?", buttons = { { text = "OK", onClick = function() end } } })
+    local dialog = audit:WindowOf(nextDialog.frame)
+    assert.are.equal("Dialog", dialog.title)
+    assert.are.equal(nextDialog, dialog.owners.dialog)
+    nextDialog:Hide()
+  end)
 end)

@@ -237,17 +237,10 @@ describe("BetterBags Next, pixel perfect", function()
     return string.format("%dx%d at %d%%", screen[1], screen[2], math.floor(screen[3] * 100 + 0.5))
   end
 
-  -- What moves by nature (docs/next-pixel-perfect.md) lands on the grid only by chance: sparkles and the
-  -- spark fly, the cloud's puffs breathe every frame, the braid's lights run along it.
+  -- What moves by nature (docs/next-pixel-perfect.md) lands on the grid only by chance: the panel names it
+  -- (MovingParts), for these checks and the one run in game (PixelAudit).
   local function moving(panel)
-    local skip = {}
-    for _, key in ipairs({ "sparkles", "edgeSparkles", "cloudSparkles", "knotSparkles" }) do
-      if panel[key] ~= nil then skip[panel[key].frame] = true end
-    end
-    for _, puff in ipairs(panel.cloud.puffs) do skip[puff.texture] = true end
-    skip[panel.spark] = true
-    skip[panel.braid.layer] = true
-    return skip
+    return panel:MovingParts()
   end
 
   local function settle()
@@ -560,6 +553,35 @@ describe("BetterBags Next, pixel perfect", function()
       assert.are.same({}, offGrid(bag), "small")
       nextPanel:SetSize(ctx(), "full")
       assert.are.same({}, offGrid(bag), "full again")
+    end)
+
+    -- The check run in game from /bbdb (debug/pixelaudit.lua, next-pixel-perfect.md): every panel registers
+    -- as it is made, its parts named from the panel, its moving parts left out, its size and scales said.
+    it("registers each panel with the pixel check run in game", function()
+      local audit = addon:GetModule("PixelAudit")
+      db.size, db.bagScale, db.iconScale = "small", 85, 110
+      local bag, bank = bags()
+      local w = audit:WindowOf(bag.frame)
+      assert.are.equal("Backpack", w.title)
+      assert.are.equal(bag, w.owners.panel)
+      assert.are.same(bag:MovingParts(), w.skip())
+      assert.is_true(next(w.skip()) ~= nil)
+      assert.are.equal("small, Bag Scale 85%, Icon Scale 110%", w.describe())
+      assert.are.equal("Bank", audit:WindowOf(bank.frame).title)
+    end)
+
+    it("says it changed as it renders, only while the check watches", function()
+      local audit = addon:GetModule("PixelAudit")
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      local changed = {}
+      override(audit, "Changed", function(_, root) table.insert(changed, root) end)
+      render:Invalidate(bag.root)
+      render:Flush()
+      assert.are.same({}, changed, "off")
+      override(audit, "watching", true)
+      render:Invalidate(bag.root)
+      render:Flush()
+      assert.are.same({ bag.frame }, changed)
     end)
 
     it("shows a small panel's grips on whole pixels under the pointer", function()

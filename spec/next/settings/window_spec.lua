@@ -275,6 +275,24 @@ describe("NextSettings", function()
 
       -- The client leaves a moved frame wherever the pointer let go: it is put on whole pixels from there
       -- (docs/next-pixel-perfect.md), on the reporter's window at 65%.
+      -- The check run in game from /bbdb (debug/pixelaudit.lua, next-pixel-perfect.md).
+      it("registers with the pixel check run in game, and says it changed as it shows a page while it watches", function()
+        local audit = addon:GetModule("PixelAudit")
+        local frame = open()
+        local w = audit:WindowOf(frame)
+        assert.are.equal("Settings", w.title)
+        assert.are.equal(settings, w.owners.settings)
+        local changed = {}
+        local savedChanged, savedWatching = rawget(audit, "Changed"), rawget(audit, "watching")
+        finally(function() audit.Changed, audit.watching = savedChanged, savedWatching end)
+        audit.Changed = function(_, root) table.insert(changed, root) end
+        settings:Select("general")
+        assert.are.same({}, changed, "off")
+        audit.watching = true
+        settings:Select("general")
+        assert.are.same({ frame }, changed)
+      end)
+
       it("lands on whole pixels where it was dropped after a drag", function()
         local layout = dofile("spec/helpers/layout.lua")
         local pixel = addon:GetModule("NextPixel")

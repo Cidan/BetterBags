@@ -176,14 +176,22 @@ describe("Core Init and Enable flow", function()
     local eventsMod = addon:GetModule("Events")
     local db = addon:GetModule("Database")
     local simulatorMod = addon:GetModule("Simulator")
+    local recorder = addon:GetModule("RenderRecorder")
+    local pixelAudit = addon:GetModule("PixelAudit")
     local saved = {
       { perf, "Init", perf.Init },
       { perfSessions, "Init", perfSessions.Init },
       { perfSessions, "StartIfArmed", perfSessions.StartIfArmed },
+      { recorder, "Init", recorder.Init },
+      { pixelAudit, "Init", pixelAudit.Init },
       { simulatorMod, "Init", simulatorMod.Init },
       { eventsMod, "Init", eventsMod.Init },
       { db, "Init", db.Init },
     }
+    -- The render recorder and the pixel check (pixelaudit.lua) keep their data in BetterBagsPerfDB, which
+    -- PerfSessions makes, and are up before anything that makes a window.
+    recorder.Init = function() table.insert(order, "RenderRecorder") end
+    pixelAudit.Init = function() table.insert(order, "PixelAudit") end
     simulatorMod.Init = function() table.insert(order, "Simulator") end
     eventsMod.Init = function() table.insert(order, "Events") end
     perf.Init = function() table.insert(order, "Perf") end
@@ -197,7 +205,8 @@ describe("Core Init and Enable flow", function()
       s[1][s[2]] = s[3]
     end
     assert.is_true(ok, err)
-    assert.are.same({ "Events", "Perf", "PerfSessions", "StartIfArmed", "Simulator", "Database" }, order)
+    assert.are.same({ "Events", "Perf", "PerfSessions", "StartIfArmed", "RenderRecorder", "PixelAudit", "Simulator",
+      "Database" }, order)
   end)
 
   -- core/boot.lua turns Ace's automatic module enabling off (SetDefaultModuleState(false)), so

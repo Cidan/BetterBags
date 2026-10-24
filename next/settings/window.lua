@@ -66,6 +66,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class PixelAudit: AceModule
+local pixelAudit = addon:GetModule('PixelAudit')
+
 -- NextSettings is BetterBags Next's settings window (next-settings.md §3), drawn from the Next theme
 -- (Settings): the sidebar (the brand, a search box, the pages of NextSettingsPages under their
 -- headings, the version), a page's header (its title and description; the close button), its tabs
@@ -336,6 +339,7 @@ function settings:build()
   addon.SetScript(frame, "OnHide", function() self:hidden() end)
   sonataNext:RegisterWidget(self)
   self:Style()
+  pixelAudit:Register(frame, { title = "Settings", owners = { settings = self } })
 end
 
 ---@private
@@ -1144,12 +1148,16 @@ function settings:show(drawn, ctx)
   self:recordRender()
 end
 
--- recordRender gives the render recorder (render-recorder.md §2) the window as it is drawn now.
+-- recordRender gives the render recorder (render-recorder.md §2) the window as it is drawn now, and has the
+-- pixel check run in game from /bbdb (debug/pixelaudit.lua) check it once it stays the same.
 ---@private
 function settings:recordRender()
   local recorder = addon:GetModule('RenderRecorder', true)
   if recorder ~= nil and recorder.recording then
     recorder:SettingsRendered(self.frame)
+  end
+  if pixelAudit.watching then
+    pixelAudit:Changed(self.frame)
   end
 end
 

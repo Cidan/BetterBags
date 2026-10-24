@@ -60,6 +60,9 @@ local lift = addon:GetModule('NextLift')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class PixelAudit: AceModule
+local pixelAudit = addon:GetModule('PixelAudit')
+
 ---@class NextCoins: AceModule
 local coins = addon:GetModule('NextCoins')
 
@@ -273,6 +276,10 @@ end
 
 ---@return RenderResult
 function rootProto:Render()
+  -- The pixel check run in game from /bbdb (debug/pixelaudit.lua) checks the panel once it stays the same.
+  if pixelAudit.watching then
+    pixelAudit:Changed(self.bag.frame)
+  end
   return { Width = self.bag:Width(), Height = self.bag:Height() }
 end
 
@@ -328,7 +335,38 @@ function nextPanel:Create(proto, opts)
   end
   chain:Register(p, opts.chainRole)
   p:ApplyGeometry()
+  pixelAudit:Register(p.frame, {
+    title = opts.title, owners = { panel = p },
+    skip = function() return p:MovingParts() end,
+    describe = function() return p:PixelState() end,
+  })
   return p
+end
+
+-- MovingParts are the parts of a panel that move by nature, on the screen's pixels only by chance (next-pixel-
+-- perfect.md): its sparkles and the spark fly, the cloud's puffs breathe every frame, the braid's lights run
+-- along it. The pixel checks leave them out (PixelAudit, the specs).
+---@return table<table, boolean>
+function panelProto:MovingParts()
+  local skip = {}
+  for _, key in ipairs({ "sparkles", "edgeSparkles", "cloudSparkles", "knotSparkles" }) do
+    if self[key] ~= nil then
+      skip[self[key].frame] = true
+    end
+  end
+  for _, puff in ipairs(self.cloud.puffs) do
+    skip[puff.texture] = true
+  end
+  skip[self.spark] = true
+  skip[self.braid.layer] = true
+  return skip
+end
+
+-- PixelState says what a pixel check report needs to know of the panel's state: its size and its scales.
+---@return string
+function panelProto:PixelState()
+  return string.format("%s, Bag Scale %d%%, Icon Scale %d%%", self:IsSmall() and "small" or "full",
+    database:GetNextBagScale(), database:GetNextIconScale())
 end
 
 -- SetSize switches every BetterBags Next panel to a size (docs/next-small-mode.md), saved: a chained
