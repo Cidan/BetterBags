@@ -337,6 +337,31 @@ describe("SonataNext", function()
       assert.are.equal(2, restyled)
     end)
 
+    -- BetterBags Next draws its item buttons on whole screen pixels (docs/next-pixel-perfect.md): while it is
+    -- in use Sonata's styler rounds with NextPixel, and the template parts Next placed go back before the
+    -- classic bags take the buttons over.
+    it("rounds item buttons to whole pixels while Next is in use, putting them back for the classic bags", function()
+      local elements = trackStub("SonataElements")
+      local fit = trackStub("NextItemFit")
+      local pixel = addon:GetModule("NextPixel")
+      local calls = {}
+      local savedSnap, savedRestore = elements.SetItemButtonSnap, fit.RestoreAll
+      elements.SetItemButtonSnap = function(_, snap) table.insert(calls, { "snap", snap }) end
+      fit.RestoreAll = function() table.insert(calls, { "restore" }) end
+      sonataNext:SetActive(true)
+      local snap = calls[1][2]
+      assert.are.equal("snap", calls[1][1])
+      local region = CreateFrame("Frame", nil, UIParent)
+      assert.are.equal(pixel:Snap(region, 2.4), snap.Offset(region, 2.4))
+      assert.are.equal(pixel:Length(region, 0.2), snap.Length(region, 0.2))
+      assert.are.equal(pixel:Unit(region), snap.Unit(region))
+      sonataNext:SetActive(false)
+      -- The stubs stay for the spec's other tests, doing nothing.
+      elements.SetItemButtonSnap = savedSnap or function() end
+      fit.RestoreAll = savedRestore or function() end
+      assert.are.same({ { "restore" }, { "snap", nil } }, { calls[2], calls[3] }, "put back, then the rounding off")
+    end)
+
     it("follows the theme applied while Next is in use, back to the bags' theme with one without", function()
       sonataNext:SetActive(true)
       assert.are.same({}, overrides, "Default has none: nothing to change")

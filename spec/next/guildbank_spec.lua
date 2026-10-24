@@ -193,6 +193,9 @@ describe("NextGuildBank", function()
     end)
     override(stubs.sonata, "UnregisterElement", function() end)
     override(stubs.sonata, "RegisterElement", function() end)
+    -- What NextItemFit asks of it (docs/next-pixel-perfect.md): no theme applied here.
+    override(stubs.sonata, "GetGeneration", function() return 0 end)
+    override(stubs.sonata, "RestyleElement", function() return false end)
     override(stubs.elements, "DrawItemQuality", function() return false end)
     override(stubs.itemFrame, "DrawQualityGlowFor", function() end)
     override(stubs.guildBank, "Tabs", function() return data.tabs end)
@@ -800,5 +803,67 @@ describe("NextGuildBank", function()
       ShowUIPanel(other)
       assert.are.equal(UIParent, other:GetParent())
     end)
+  end)
+
+  -- BetterBags Next, pixel perfect (docs/next-pixel-perfect.md): the guild bank at rest, its buttons' parts
+  -- included, on whole screen pixels, full and small, on the reporter's window at 65% and a common screen.
+  describe("on the screen's pixels", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local undo
+
+    after_each(function()
+      if undo then undo() undo = nil end
+    end)
+
+    local function offGrid(g)
+      for _ = 1, 3 do
+        finishTweens()
+        render:Flush()
+        motion:Step(10)
+      end
+      local skip = { [g.spark] = true, [g.braid.layer] = true }
+      for _, key in ipairs({ "sparkles", "edgeSparkles", "cloudSparkles", "knotSparkles" }) do
+        if g[key] ~= nil then skip[g[key].frame] = true end
+      end
+      for _, puff in ipairs(g.cloud.puffs) do skip[puff.texture] = true end
+      -- Sonata's item button styler rounds the icon and the count itself (spec/sonata/elements_spec.lua);
+      -- here Sonata is a stand-in.
+      for _, b in pairs(g.content.buttons) do
+        skip[b.button.icon] = true
+        skip[b.button.Count] = true
+      end
+      return layout.PixelCheck(g.frame, { owners = { guild = g }, skip = skip })
+    end
+
+    for _, size in ipairs({ "full", "small" }) do
+      for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 1920, 1080, 1 } }) do
+        local name = string.format("%s, on %dx%d at %d%%", size, screen[1], screen[2], screen[3] * 100)
+        it("draws its tab, its buttons' counts, item levels, upgrade arrows and borders on whole pixels, " .. name, function()
+          override(stubs.database, "GetNextSize", function() return size end)
+          override(stubs.database, "GetNextBagScale", function() return 100 end)
+          override(stubs.database, "GetNextSmallChain", function() return "apart" end)
+          override(stubs.database, "GetNextSmallPlace", function() return nil end)
+          override(stubs.database, "GetNextSmallSize", function() return nil end)
+          override(stubs.database, "GetItemLevelOptions", function() return { enabled = true, color = false } end)
+          undo = layout.UseScreen(screen[1], screen[2], screen[3])
+          local g = open()
+          g:Draw(ctx(), {
+            sortedItems = {},
+            tabs = { [ALL] = { categories = { { name = "Ore" }, { name = "Armor" } }, items = {
+              { slotkey = "1002_4", bagid = 1002, slotid = 4, guildTab = 2, itemInfo = { category = "Ore", itemIcon = 5,
+                currentItemCount = 20, itemQuality = 1, classID = 7 } },
+              { slotkey = "1002_5", bagid = 1002, slotid = 5, guildTab = 2, isUpgrade = true, itemInfo = { category = "Armor",
+                itemIcon = 6, currentItemCount = 1, itemQuality = 3, classID = Enum.ItemClass.Armor, currentItemLevel = 600 } },
+            }, freeSpace = { showAll = false, buttons = { { slotkey = "1001_2", bagid = 1001, slotid = 2, count = 96,
+              key = "Gear", itemInfo = { emptySlotName = "Gear" } } } } } },
+          })
+          local armor = g.content.buttons["1002_5"]
+          armor.button.Count:Show()
+          armor.button.IconBorder:Show()
+          assert.is_true(armor.itemLevel:IsShown() and armor.upgrade:IsShown())
+          assert.are.same({}, offGrid(g))
+        end)
+      end
+    end
   end)
 end)

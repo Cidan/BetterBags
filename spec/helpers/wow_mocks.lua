@@ -410,6 +410,11 @@ function WidgetMethods:SetPoint(point, relativeTo, relativePoint, x, y)
   if type(relativePoint) == "string" and (x == nil) ~= (y == nil) then
     error("SetPoint: offsetX and offsetY must be given together, got " .. tostring(x) .. ", " .. tostring(y), 2)
   end
+  -- SetPoint(point, offsetX, offsetY): relative to the parent, at the same point (warcraft.wiki.gg
+  -- ScriptRegionResizing:SetPoint); GetPoint then names the parent and the point.
+  if type(relativeTo) == "number" then
+    relativeTo, relativePoint, x, y = self:GetParent(), point, relativeTo, relativePoint
+  end
   -- A region has one anchor per point: setting a point again replaces it (warcraft.wiki.gg's
   -- SetPoint example sets the same point several times "with the same result").
   local anchor = {
@@ -1443,18 +1448,36 @@ end
 -- ItemButtonMixin's SetMatchesSearch / GetMatchesSearch: a button that does not match shows its
 -- ItemContextOverlay (UpdateItemContextOverlay, the Standard mode: black at 0.8).
 function _G.__mockItemButtonParts(button, intrinsic)
+  -- Anchored as the XML anchors them (Shared/ItemButtonTemplate.xml): the icon, with no anchor and no size,
+  -- fills the button; the count at the bottom right, -5, 2; the stock at the top left, 0, -2; the search
+  -- overlay all over; the border and the overlays 37 x 37 at the middle.
   button.icon = button:CreateTexture(nil, "BORDER")
+  button.icon:SetAllPoints(button)
   button.Count = button:CreateFontString(nil, "ARTWORK", "NumberFontNormal")
+  button.Count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -5, 2)
   button.Count:Hide()
+  button.Stock = button:CreateFontString(nil, "ARTWORK", "NumberFontNormalYellow")
+  button.Stock:SetPoint("TOPLEFT", button, "TOPLEFT", 0, -2)
+  button.Stock:Hide()
   button.searchOverlay = button:CreateTexture(nil, "OVERLAY")
+  button.searchOverlay:SetAllPoints(button)
   button.searchOverlay:Hide()
   button.IconBorder = button:CreateTexture(nil, "OVERLAY")
   button.IconBorder:SetTexture("Interface\\Common\\WhiteIconFrame")
+  button.IconBorder:SetSize(37, 37)
+  button.IconBorder:SetPoint("CENTER", button, "CENTER", 0, 0)
   button.IconBorder:Hide()
   button.IconOverlay = button:CreateTexture(nil, "OVERLAY")
+  button.IconOverlay:SetSize(37, 37)
+  button.IconOverlay:SetPoint("CENTER", button, "CENTER", 0, 0)
   button.IconOverlay:Hide()
+  button.IconOverlay2 = button:CreateTexture(nil, "OVERLAY")
+  button.IconOverlay2:SetSize(37, 37)
+  button.IconOverlay2:SetPoint("CENTER", button, "CENTER", 0, 0)
+  button.IconOverlay2:Hide()
   if intrinsic then
     button.ItemContextOverlay = button:CreateTexture(nil, "OVERLAY")
+    button.ItemContextOverlay:SetAllPoints(button)
     button.ItemContextOverlay:Hide()
     function button:SetMatchesSearch(matchesSearch)
       self.matchesSearch = matchesSearch

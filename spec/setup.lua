@@ -45,6 +45,7 @@ LoadBetterBagsModule("render/motion.lua")
 -- BetterBags Next's pixel grid (next/pixel.lua, docs/next-pixel-perfect.md): every Next file that places
 -- anything looks it up when it loads.
 LoadBetterBagsModule("next/pixel.lua")
+LoadBetterBagsModule("next/itemfit.lua")
 -- Sonata resolves its themes and BetterBags Next's with SonataResolve (sonata/resolve.lua), which
 -- the engine looks up when it loads.
 LoadBetterBagsModule("sonata/resolve.lua")

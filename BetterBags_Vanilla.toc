@@ -166,6 +166,7 @@ frames\bagactions.lua
 frames\bag.lua
 
 next\pixel.lua
+next\itemfit.lua
 next\style.lua
 next\tween.lua
 next\lift.lua

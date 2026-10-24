@@ -27,6 +27,9 @@ local tween = addon:GetModule('NextTween')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextItemFit: AceModule
+local itemFit = addon:GetModule('NextItemFit')
+
 -- NextContent is BetterBagsNext's canvas (next.md §2), the drawable inside the panel's scroll
 -- box. Bind turns a tab's data into sections, in one column: Recent Items, the tab's categories
 -- in their order, then Free Space; it draws and claims the static item buttons. Render lays the
@@ -634,6 +637,7 @@ end
 ---@return number width, number height
 function canvasProto:LayoutSection(section, width)
   local f = section.frame
+  local ctx
   width = pixel:Floor(f, width)
   local cellWidth, cellHeight = pixel:Lengths(f, self.cards and style.VENDOR_CARD_WIDTH or style.ICON,
     self.cards and style.CARD_ICON or style.ICON)
@@ -650,8 +654,26 @@ function canvasProto:LayoutSection(section, width)
   for j, entry in ipairs(section.entries) do
     local item = entry.item
     if item ~= nil then
+      -- A card styles itself for the grid it is now on (it was made before it was placed).
+      if item.Fit ~= nil then
+        item:Fit()
+      end
       if not self.cards and math.abs(item.frame:GetWidth() - cellWidth) > 0.001 then
-        item:SetSize(addon:GetModule('Context'):New('NextCanvas_LayoutSection'), cellWidth, cellWidth)
+        ctx = ctx or addon:GetModule('Context'):New('NextCanvas_LayoutSection')
+        item:SetSize(ctx, cellWidth, cellWidth)
+      end
+      -- Its parts on whole pixels of its size and grid (NextItemFit): an item button's decoration and the
+      -- item level text on its interaction button, or the parts a button names (a guild bank button).
+      local decoration, extras
+      if item.GetDecoration ~= nil then
+        ctx = ctx or addon:GetModule('Context'):New('NextCanvas_LayoutSection')
+        decoration, extras = item:GetDecoration(ctx), { item.ilvlText }
+      elseif item.PixelParts ~= nil then
+        decoration, extras = item:PixelParts()
+      end
+      if decoration ~= nil then
+        ctx = ctx or addon:GetModule('Context'):New('NextCanvas_LayoutSection')
+        itemFit:Fit(ctx, decoration, extras, item)
       end
       local column, row = (j - 1) % perRow, math.floor((j - 1) / perRow)
       motion:Place(item.frame, section.cells, column * step, -row * rowStep)

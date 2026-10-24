@@ -393,4 +393,92 @@ describe("BetterBags Next, pixel perfect", function()
       chain:Init()
     end
   end)
+
+  -- Everything it can show besides its resting look, each on whole pixels.
+  describe("in every state it shows", function()
+    for _, size in ipairs({ "full", "small" }) do
+      it("puts its group tabs on whole pixels: their names, the selected one, one slid out under the pointer, " .. size, function()
+        db.size = size
+        override(stubs.database, "GetGroupsEnabled", function() return true end)
+        override(stubs.groups, "GetAllGroups", function(_, kind)
+          if kind == BACKPACK then
+            return { [1] = { name = "Backpack" }, [2] = { name = "Gems and Things" }, [3] = { name = "Odd" } }
+          end
+          return {}
+        end)
+        useScreen(3396, 1362, 0.65)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        bag:RefreshTabs()
+        assert.is_true(#bag.tabs.tabs >= 3)
+        assert.are.same({}, offGrid(bag))
+        local hovered = bag.tabs:Tab(2).button
+        hovered:GetScript("OnEnter")(hovered)
+        assert.are.same({}, offGrid(bag), "slid out")
+        bag.tabs:Select(3)
+        assert.are.same({}, offGrid(bag), "another selected")
+      end)
+
+      it("lights the title's glow and the drop glow on whole pixels, " .. size, function()
+        db.size = size
+        useScreen(3396, 1362, 0.65)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        bag.titleButton:GetScript("OnEnter")(bag.titleButton)
+        bag:SetDropGlow(true)
+        settle()
+        assert.is_true(bag.titleGlow:GetAlpha() > 0 and bag.dropGlow:GetAlpha() > 0, "lit")
+        assert.are.same({}, offGrid(bag))
+      end)
+
+      it("focuses its search box on whole pixels, its clear button showing, " .. size, function()
+        db.size = size
+        useScreen(3396, 1362, 0.65)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        local t = bag.searchBox.textBox
+        t:SetText("ore")
+        t:GetScript("OnEditFocusGained")(t)
+        t:GetScript("OnTextChanged")(t)
+        settle()
+        assert.is_true(t.clearButton:IsShown())
+        assert.are.same({}, offGrid(bag))
+      end)
+
+      it("draws Recent Items and Free Space on whole pixels, " .. size, function()
+        db.size = size
+        useScreen(3396, 1362, 0.65)
+        slots[BACKPACK].sortedItems = { { slotkey = "0_20", itemInfo = { category = "Recent Items" } } }
+        slots[BACKPACK].tabs[1].freeSpace = { showAll = false, buttons = { { slotkey = "free_0", count = 12 },
+          { slotkey = "free_5", count = 3 } } }
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        assert.is_not_nil(bag.content.byName["Recent Items"])
+        assert.is_not_nil(bag.content.byName["Free Space"])
+        assert.are.same({}, offGrid(bag))
+      end)
+
+      it("shows its empty text on whole pixels, " .. size, function()
+        db.size = size
+        useScreen(3396, 1362, 0.65)
+        slots[BACKPACK].tabs[1].items = {}
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        assert.is_true(bag.emptyText:IsShown())
+        assert.are.same({}, offGrid(bag))
+      end)
+    end
+
+    it("shows a small panel's grips on whole pixels under the pointer", function()
+      db.size = "small"
+      for _, scale in ipairs({ 100, 85 }) do
+        db.bagScale = scale
+        useScreen(3396, 1362, 0.65)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        for _, grip in pairs(bag.grips) do
+          grip:GetScript("OnEnter")(grip)
+        end
+        settle()
+        assert.are.same({}, offGrid(bag), scale .. "%")
+        bag:Hide(ctx())
+        finishTweens()
+        chain:Init()
+      end
+    end)
+  end)
 end)

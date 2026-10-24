@@ -494,6 +494,21 @@ function sonata:SetElementStyleOverride(kind, style)
   end
 end
 
+-- RestyleElement styles one registered element again with the style in effect (BetterBags Next: an item
+-- button drawn on a new pixel grid, whose parts the styler rounds to it, docs/next-pixel-perfect.md). It
+-- returns whether it did: not before a theme was applied, nor for an element not registered.
+---@param kind string
+---@param element table
+---@return boolean
+function sonata:RestyleElement(kind, element)
+  local set = self.elements[kind]
+  if not self.applied or set == nil or not set[element] then
+    return false
+  end
+  self:style(kind, element)
+  return true
+end
+
 -- GetGeneration changes every time a theme is applied: anything that records what it drew
 -- with a theme compares it to know it must draw again.
 ---@return number

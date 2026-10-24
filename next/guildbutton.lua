@@ -165,6 +165,14 @@ function buttonProto:SetSize(ctx, width, height)
   self.button.IconBorder:SetSize(width, height)
 end
 
+-- PixelParts names what BetterBags Next puts on whole screen pixels of the button (NextItemFit,
+-- docs/next-pixel-perfect.md): the button itself (Blizzard's item button), and its item level text and
+-- upgrade arrow from their corners.
+---@return Frame decoration, Region[] extras
+function buttonProto:PixelParts()
+  return self.button, { self.itemLevel, self.upgrade }
+end
+
 ---@return ItemData?
 function buttonProto:GetItemData()
   return self.data

@@ -39,6 +39,12 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class NextDrag: AceModule
 local nextDrag = addon:GetModule('NextDrag')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
+-- The footer's gold, 16 tall: its text centered in it by the font's height (docs/next-pixel-perfect.md).
+local MONEY_WIDTH, MONEY_HEIGHT = 200, 16
+
 -- NextGuildBank is BetterBags Next's guild bank (guild-bank.md §5): a panel on the left, as the
 -- bank's, that stands in for Blizzard's guild bank frame while BetterBags Next is on. It shows every
 -- tab's items in the categories the bags use (All Tabs), or a tab by itself, its slots in order (the
@@ -204,16 +210,22 @@ end
 ---@return table
 function guildProto:CreateMoney()
   local frame = CreateFrame("Frame")
-  frame:SetSize(200, 16)
   local text = style:CreateText(frame, style.Theme.Footer.MoneyFont)
-  text:SetPoint("LEFT", frame, "LEFT", 0, 0)
-  return {
+  local money = {
     frame = frame,
     text = text,
     Update = function()
       text:SetText(C_CurrencyInfo.GetCoinTextureString(GetGuildBankMoney() or 0))
     end,
   }
+  -- Placed by its owner (styleFooter, on the panel's grid): by its top left, in whole pixels.
+  money.Place = function()
+    pixel:Size(frame, MONEY_WIDTH, MONEY_HEIGHT)
+    local _, fontHeight = text:GetFont()
+    text:ClearAllPoints()
+    text:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -pixel:Floor(frame, (frame:GetHeight() - (fontHeight or 0)) / 2))
+  end
+  return money
 end
 
 -- UpdateHeader enables what the player may do: withdrawing gold only for a member who may.

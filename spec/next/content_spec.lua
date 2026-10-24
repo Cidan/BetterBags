@@ -418,6 +418,27 @@ describe("NextContent", function()
       style:SetIconScale(100)
     end)
 
+    -- BetterBags Next draws its item buttons on whole screen pixels (docs/next-pixel-perfect.md): each button
+    -- it lays out is fitted (NextItemFit), its decoration with the item level text on its interaction
+    -- button, or the parts a button names (a guild bank button); cards and plain frames are left alone.
+    it("fits each item button it lays out, by its decoration or the parts it names", function()
+      local fit = addon:GetModule("NextItemFit")
+      local fitted = {}
+      override(fit, "Fit", function(_, ctx, decoration, extras, item)
+        table.insert(fitted, { ctx ~= nil, decoration, extras, item })
+        return "placed"
+      end)
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A"), item("0_2", "A") } }))
+      local a, b = buttons["0_1"], buttons["0_2"]
+      local decoration, ilvl = CreateFrame("Frame"), {}
+      a.ilvlText = ilvl
+      function a:GetDecoration() return decoration end
+      local own, part = CreateFrame("Frame"), {}
+      function b:PixelParts() return own, { part } end
+      draw()
+      assert.are.same({ { true, decoration, { ilvl }, a }, { true, own, { part }, b } }, fitted)
+    end)
+
     it("reuses a section of the same name and releases the rest", function()
       canvas:BindSections({ { name = "Food", buttons = { vendorButton("a") } }, { name = "Gone", buttons = {} } })
       draw()

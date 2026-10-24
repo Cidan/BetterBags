@@ -81,11 +81,38 @@ function sonataNext:Init()
   self:use(self:GetSavedThemeKey())
 end
 
+-- itemSnap is BetterBags Next's rounding for Sonata's item button styler (SonataElements:SetItemButtonSnap):
+-- whole screen pixels on a region's grid (NextPixel, docs/next-pixel-perfect.md).
+local nextItemSnap
+---@return SonataItemSnap
+local function itemSnap()
+  if nextItemSnap == nil then
+    local pixel = addon:GetModule('NextPixel')
+    nextItemSnap = {
+      Offset = function(region, units) return pixel:Snap(region, units) end,
+      Length = function(region, units) return pixel:Length(region, units) end,
+      Unit = function(region) return pixel:Unit(region) end,
+    }
+  end
+  return nextItemSnap
+end
+
 -- SetActive says whether BetterBags Next is the design in use (BagSystem:Use): only then does a Next
--- theme style the item buttons.
+-- theme style the item buttons, and are their parts placed on whole screen pixels (Sonata's rounding,
+-- NextItemFit). Before the classic bags take the buttons over, the parts Next placed go back.
 ---@param active boolean
 function sonataNext:SetActive(active)
   self.active = active
+  if not active then
+    local fit = addon:GetModule('NextItemFit', true)
+    if fit ~= nil then
+      fit:RestoreAll()
+    end
+  end
+  local elements = addon:GetModule('SonataElements', true)
+  if elements ~= nil then
+    elements:SetItemButtonSnap(active and itemSnap() or nil)
+  end
   self:syncItemButtons()
 end
 

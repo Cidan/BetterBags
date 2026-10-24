@@ -266,8 +266,10 @@ function layout.PixelCheck(root, opts)
     for i, t in ipairs(region._textures or {}) do
       check(t, path .. ">t" .. i)
     end
-    -- A button's state textures, which the mock keeps apart from the regions it lists.
-    for _, key in ipairs({ "NormalTexture", "PushedTexture", "HighlightTexture", "DisabledTexture", "CheckedTexture" }) do
+    -- A button's state textures and the template textures the mock makes when first read (LAZY_TEXTURES),
+    -- which it keeps apart from the regions it lists.
+    for _, key in ipairs({ "NormalTexture", "PushedTexture", "HighlightTexture", "DisabledTexture", "CheckedTexture",
+      "NewItemTexture", "BattlepayItemTexture", "ItemContextOverlay", "UpgradeIcon" }) do
       local t = rawget(region, key)
       if type(t) == "table" and t._type ~= nil and t._parent == region then
         check(t, path .. ">" .. key)

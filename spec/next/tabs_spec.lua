@@ -337,7 +337,11 @@ describe("NextTabs", function()
         assert.are.equal(20, tab.button:GetHeight())
       end
       assert.are.equal(#"Consumables" * 6 + 10, rail.tabs[2].button:GetWidth())
-      assert.are.same({ "RIGHT", rail.tabs[2].button, "RIGHT", -5, 0 }, { rail.tabs[2].text:GetPoint(1) })
+      -- By its corner, centered on the tab's height by its font's (docs/next-pixel-perfect.md).
+      local text = rail.tabs[2].text
+      local _, fontHeight = text:GetFont()
+      assert.are.same({ "TOPRIGHT", rail.tabs[2].button, "TOPRIGHT", -5, -math.floor((20 - fontHeight) / 2) },
+        { text:GetPoint(1) })
     end)
 
     it("fills its tabs with its colors, fading by its share, the selected one in its own", function()
