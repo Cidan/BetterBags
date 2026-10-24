@@ -241,8 +241,12 @@ describe("NextOrnaments", function()
       assert.are.same({ 1, 2, 1 }, { list[1]._duration, list[2]._duration, list[3]._duration })
       for _, anim in ipairs(list) do
         assert.are.same({ "BOTTOMLEFT", 0, 0 }, { anim:GetOrigin() })
-        assert.are.equal("IN_OUT", anim._smoothing)
       end
+      -- Reported in game: "very jerky". Eased in and out on every step, the last step stopped dead at rest and the
+      -- loop started again from a standstill, a halt mid-swing once a cycle. It eases only where it turns: out of
+      -- rest at speed and slowing to its first turn, across between its turns, and from its last turn speeding back
+      -- through rest, so it passes rest at full speed every time.
+      assert.are.same({ "OUT", "IN_OUT", "IN" }, { list[1]._smoothing, list[2]._smoothing, list[3]._smoothing })
       local mirrored = panelOn("LEFT")
       mirrored.ornaments:Style()
       list = animations(mirrored.ornaments.pieces[1].groups.Sway)

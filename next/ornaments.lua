@@ -254,13 +254,16 @@ function setProto:move(piece)
   if M.Sway then
     local g = group(piece, "Sway")
     local turn = origin(M.Origin, "BOTTOM")
-    for order, step in ipairs({ { 1, 0.25 }, { -2, 0.5 }, { 1, 0.25 } }) do
+    -- Eased only where it turns, so it passes rest at full speed: out of rest slowing to its first turn, across
+    -- between its turns, from its last turn speeding back through rest. Eased in and out on every step, it stopped
+    -- dead at rest once a cycle (reported in game: "very jerky").
+    for order, step in ipairs({ { 1, 0.25, "OUT" }, { -2, 0.5, "IN_OUT" }, { 1, 0.25, "IN" } }) do
       local a = g:CreateAnimation("Rotation")
       a:SetDegrees(M.Sway * step[1] * mirror)
       a:SetDuration(period * step[2])
       a:SetOrder(order)
       a:SetOrigin(turn, 0, 0)
-      a:SetSmoothing("IN_OUT")
+      a:SetSmoothing(step[3])
     end
     g:SetLooping("REPEAT")
   end

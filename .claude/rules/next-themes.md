@@ -331,6 +331,11 @@ is a column at a screen edge, feathered on its inner side), so ornaments are art
 - **Whole pixels** (docs/next-pixel-perfect.md): offsets snapped and sizes rounded on the frame's grid, so a
   piece at rest is on whole pixels. Moving pieces rest nowhere: `panelProto:MovingParts` names them (only those
   shown at the panel's size), so the pixel checks leave them out.
+- **A sway eases only where it turns**: three rotations in a repeating group (out of rest to one side, across to
+  the other, back through rest), eased `OUT`, `IN_OUT` and `IN`, so the piece passes rest at full speed. **Failure
+  mode (fixed, reported in game: "very jerky"):** every step was eased `IN_OUT`, so the last stopped dead at rest
+  and the loop began again from a standstill, a halt mid-swing once a cycle (concluded from the animation's
+  definition; confirm in game). A pulse or a bob (one animation, `BOUNCE`) eases at its two turns, which is right.
 - **Motion runs on the client's animation groups** (`Rotation`, `Alpha`, `Translation`, every client): no Lua
   runs while they loop, unlike the sparkles and the cloud. They play while the panel shows (`Show`, and a piece a
   size switch shows while it does) and stop when it hides (`OnHidden`); each motion has one group per piece, made
