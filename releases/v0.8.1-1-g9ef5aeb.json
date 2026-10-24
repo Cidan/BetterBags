@@ -1,0 +1,23 @@
+{
+  "id": 1792858439,
+  "version": "v0.8.1-1-g9ef5aeb",
+  "channel": "alpha",
+  "date": "2026-10-24",
+  "from": "38f0f714f2475a0a868d86d5dcd6760d2eb2ed2f",
+  "to": "9ef5aeba1355645e02023d42e1aaef1bb0d7d64a",
+  "headline": "Introduces support for round toggle switches and animated decorative ornaments in BetterBags Next themes.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Custom switch styles for themes",
+      "details": "Themes can now style settings toggles as rounded switches with a sliding knob and hover glow alongside the traditional square style.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Animated panel ornaments for themes",
+      "details": "Themes can now display decorative artwork and borders anchored to bag panels, complete with smooth ambient animations like swaying, bobbing, and pulsing.",
+      "clients": []
+    }
+  ]
+}
