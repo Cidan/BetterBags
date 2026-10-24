@@ -353,13 +353,22 @@ describe("BetterBags Next, pixel perfect", function()
     assert.are.same({}, offGrid(bank))
   end)
 
+  -- startSonataNext starts BetterBags Next's look (SonataNext:Init), its state put back after the test: started,
+  -- a spec that registers a theme later would read the saved theme from a Database without one.
+  local function startSonataNext()
+    for _, key in ipairs({ "widgets", "current", "resolved", "generation", "started", "active", "itemButtonStyle" }) do
+      override(sonataNext, key, rawget(sonataNext, key))
+    end
+    sonataNext:Init()
+  end
+
   -- A new grid (the UI scale, the window's size) applies the theme again (NextPixel), which lays everything
   -- out again for it.
   it("puts open bags back on whole pixels when the grid changes under them", function()
     for _, size in ipairs({ "full", "small" }) do
       db.size = size
       useScreen(1920, 1080, 1)
-      sonataNext:Init()
+      startSonataNext()
       local bag, bank = bags()
       useScreen(3396, 1362, 0.65)
       assert.is_true(pixel:OnGridChanged(ctx()))
@@ -380,7 +389,7 @@ describe("BetterBags Next, pixel perfect", function()
     assert.is_true(#keys >= 4)
     for _, size in ipairs({ "full", "small" }) do
       db.size = size
-      sonataNext:Init()
+      startSonataNext()
       local bag, bank = bags()
       for _, key in ipairs(keys) do
         sonataNext:ApplyTheme(ctx(), key, false)
