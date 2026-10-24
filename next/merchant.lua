@@ -479,6 +479,70 @@ function merchant:Purchase(button, item, quantity)
   end
 end
 
+---@class (exact) NextVendorPurchase
+---@field item NextVendorItem
+---@field quantity number How many to buy.
+
+-- ToBuy is what a shopping list buys here, as Profession Shopping List's BuyFromMerchant buys it
+-- (profession-shopping-list.md): for each item the list needs (needs, by item ID), the merchant's first
+-- item of that ID, unless it cannot be bought, and how many; in the merchant's order.
+---@param list NextVendorItem[] The merchant's items (ReadItems), in its order.
+---@param needs table<number, number>
+---@return NextVendorPurchase[]
+function merchant:ToBuy(list, needs)
+  local purchases, seen = {}, {}
+  for _, item in ipairs(list) do
+    local id = item.itemID
+    if id ~= nil and needs[id] ~= nil and not seen[id] then
+      seen[id] = true
+      if item.isPurchasable then
+        table.insert(purchases, { item = item, quantity = needs[id] })
+      end
+    end
+  end
+  return purchases
+end
+
+-- PriceOf is what quantity of an item costs, as Blizzard prices a quantity (MerchantFrame.lua): the
+-- price of one purchase per unit it gives (MerchantItemButton_OnModifiedClick: price / stackCount), and
+-- each other cost scaled the same way (MerchantFrame_ConfirmExtendedItemCost); a fraction rounds up, so
+-- it never says less than the purchase costs.
+---@param item NextVendorItem
+---@param quantity number
+---@return number price, NextVendorCost[] costs
+function merchant:PriceOf(item, quantity)
+  local per = quantity / item.stackCount
+  local costs = {}
+  for _, cost in ipairs(item.costs) do
+    table.insert(costs, { texture = cost.texture, value = math.ceil(cost.value * per), link = cost.link,
+      currencyName = cost.currencyName })
+  end
+  return math.ceil(item.price * per), costs
+end
+
+-- TotalOf is what buying every purchase costs: the prices added up, and each thing paid (an item, a
+-- currency) once, in the order first met.
+---@param purchases NextVendorPurchase[]
+---@return number price, NextVendorCost[] costs
+function merchant:TotalOf(purchases)
+  local total, costs, byKey = 0, {}, {}
+  for _, purchase in ipairs(purchases) do
+    local price, each = self:PriceOf(purchase.item, purchase.quantity)
+    total = total + price
+    for _, cost in ipairs(each) do
+      local key = cost.link or cost.currencyName or cost.texture
+      local sum = byKey[key]
+      if sum == nil then
+        byKey[key] = cost
+        table.insert(costs, cost)
+      else
+        sum.value = sum.value + cost.value
+      end
+    end
+  end
+  return total, costs
+end
+
 -- MaxPurchasable is the most one quantity purchase can buy, as Blizzard's stack split works it out
 -- (MerchantItemButton_OnModifiedClick): the stack limit, what the money pays for, and what the
 -- items it costs pay for.

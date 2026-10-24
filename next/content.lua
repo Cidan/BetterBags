@@ -585,7 +585,7 @@ function canvasProto:Render(parentResult)
   local drag = self.drag
   local y, placed, others = 0, 0, 0
   self.dragSlotY = nil
-  for _, lead in ipairs(self.lead and self.lead(width) or {}) do
+  for _, lead in ipairs(self.lead and self.lead(width, layoutWidth) or {}) do
     if placed > 0 then
       y = y + spacing
     end
@@ -941,7 +941,7 @@ end
 
 -- SetLead lays frames out above the sections, centered, each as tall as it says (a dock's cards): lead
 -- is asked for them, with the column's width, at every render, and they move as sections do.
----@param lead? fun(width: number): {frame: Frame, height: number}[]
+---@param lead? fun(width: number, layoutWidth: number): {frame: Frame, height: number}[]
 function canvasProto:SetLead(lead)
   self.lead = lead
   self:Invalidate()

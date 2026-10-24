@@ -56,6 +56,9 @@ describe("BetterBags Next's shipped themes", function()
         assert.are.equal(key, theme.Name, client)
         assert.is_true(theme.DisplayName ~= "" and theme.Description ~= "", key .. " describes itself")
         assert.are.same({}, sonataNext:Check(key), key .. " on " .. client)
+        -- The cards waiting in a dock glow in these (automation.md §4, profession-shopping-list.md).
+        assert.is_not_nil(theme.Dock.DestroyColor, key .. " destroy color")
+        assert.is_not_nil(theme.Dock.BuyColor, key .. " buy color")
       end
     end
   end)

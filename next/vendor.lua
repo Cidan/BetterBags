@@ -81,10 +81,25 @@ local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED"
 ---@field closeRequested boolean It asked the vendor to close.
 ---@field buttons table<string, NextVendorButtonFrame> This draw's buttons, by key.
 ---@field offered table<string, boolean> The backpack categories docked in it this visit (OfferAutomation).
+---@field toBuy NextVendorPurchase[] What the shopping list buys here, as last drawn (profession-shopping-list.md).
+---@field listOffered boolean Its Shopping List was docked in it this visit (OfferShoppingList).
 local vendorProto = nextPanel:Extend({}, 'NextVendorPanel')
 -- A vendor's name can be any length: it is cut short to the room its header buttons leave at either
 -- size (FitTitle).
 vendorProto.fitsTitle = true
+
+-- shoppingList is the Profession Shopping List integration (integrations/professionshoppinglist.lua,
+-- which loads after this file).
+---@return ProfessionShoppingListIntegration
+local function shoppingList()
+  return addon:GetModule('ProfessionShoppingList')
+end
+
+-- shoppingListName names the section of what a shopping list buys here.
+---@return string
+local function shoppingListName()
+  return L:G("Shopping List")
+end
 
 -- mainline is whether the client runs Blizzard's retail merchant frame (retail and WoW: Forever).
 ---@return boolean
@@ -113,6 +128,8 @@ function nextVendor:Create(ctx)
   v.closeRequested = false
   v.buttons = {}
   v.offered = {}
+  v.toBuy = {}
+  v.listOffered = false
   v.content:SetCards(true)
   nextDrag:RegisterSeller(v)
   self.panel = v
@@ -288,6 +305,7 @@ function vendorProto:OnMerchantShow(ctx)
   self.atMerchant = true
   self.closeRequested = false
   self.offered = {}
+  self.listOffered = false
   if ResetSetMerchantFilter then
     ResetSetMerchantFilter()
   end
@@ -300,7 +318,7 @@ end
 function vendorProto:OnMerchantClosed(ctx)
   self.atMerchant = false
   self.closeRequested = false
-  nextDock:PanelHidden(self)
+  nextDock:SendBackBorrowed(self)
   ResetCursor()
   for _, which in ipairs(PROMPTS) do
     StaticPopup_Hide(which)
@@ -377,15 +395,50 @@ function vendorProto:button(key, previous)
   return b
 end
 
--- buildBuy builds the Buy tab: the vendor's items in the backpack's categories, and the player's
--- gold and the vendor's currencies for the footer.
+-- shoppingListOf builds the Shopping List (profession-shopping-list.md): what Profession Shopping List's
+-- list buys here (NextMerchant:ToBuy), each item showing how many and what they cost; nil without
+-- Profession Shopping List or with nothing on the list here. It also says which of the merchant's items
+-- it holds: they are in it, not in their categories.
+---@private
+---@param list NextVendorItem[]
+---@param previous table<string, NextVendorButtonFrame>
+---@return NextCanvasSection? section, table<number, boolean> listed
+function vendorProto:shoppingListOf(list, previous)
+  self.toBuy = merchant:ToBuy(list, shoppingList():Needs())
+  local listed = {}
+  if #self.toBuy == 0 then
+    return nil, listed
+  end
+  local buttons = {}
+  for _, purchase in ipairs(self.toBuy) do
+    listed[purchase.item.index] = true
+    local b = self:button("vendor:" .. purchase.item.index, previous)
+    b:SetBuy(purchase.item, purchase.quantity)
+    table.insert(buttons, b)
+  end
+  return { name = shoppingListName(), buttons = buttons }, listed
+end
+
+-- buildBuy builds the Buy tab: the Shopping List first, then the rest of the vendor's items in the
+-- backpack's categories, and the player's gold and the vendor's currencies for the footer.
 ---@private
 ---@param ctx Context
 ---@param previous table<string, NextVendorButtonFrame>
 ---@return NextCanvasSection[] sections, string footer, string empty
 function vendorProto:buildBuy(ctx, previous)
   local sections = {}
-  for _, s in ipairs(merchant:BuildSections(merchant:ReadItems(ctx))) do
+  local list = merchant:ReadItems(ctx)
+  local shopping, listed = self:shoppingListOf(list, previous)
+  if shopping then
+    table.insert(sections, shopping)
+  end
+  local rest = {}
+  for _, item in ipairs(list) do
+    if not listed[item.index] then
+      table.insert(rest, item)
+    end
+  end
+  for _, s in ipairs(merchant:BuildSections(rest)) do
     local buttons = {}
     for _, item in ipairs(s.items) do
       local b = self:button("vendor:" .. item.index, previous)
@@ -477,14 +530,26 @@ function vendorProto:Draw(ctx, _, callback)
   else
     sections, footer, empty = self:buildBuy(ctx, previous)
   end
+  local shown = #sections
+  -- The Shopping List waiting in the dock stays bound on the other tabs, held out of their columns, so
+  -- its card waits whichever tab shows, as a backpack section's does.
+  if self.tab ~= TAB_BUY and nextDock:EntryOf(self, shoppingListName()) ~= nil then
+    local shopping = self:shoppingListOf(merchant:ReadItems(ctx), previous)
+    if shopping then
+      table.insert(sections, 1, shopping)
+    end
+  end
   self.content:BindSections(sections)
+  -- Docked before the layout places it, the Shopping List is seated in its card at once, never shown in
+  -- the column first (asked: it showed in the list "for a split second then slides to the buy frame").
+  self:OfferShoppingList(ctx)
   for _, b in pairs(previous) do
     b:Release()
   end
   render:RenderNow(self.root, { ctx = ctx })
   self.freeText:SetText(footer)
   self.emptyText:SetText(empty)
-  self.emptyText:SetShown(#sections == 0)
+  self.emptyText:SetShown(shown == 0)
   if not self.opening then
     self.content:Cascade(self.tabChanged)
   end
@@ -544,6 +609,64 @@ function vendorProto:OfferAutomation(ctx)
     end
   end
   return docked
+end
+
+-- OfferShoppingList docks the Shopping List in the vendor (NextDock, profession-shopping-list.md), once a
+-- visit, from the draw that first binds it (on Buy), before it is laid out, so it is in its card from
+-- the start, the vendor opening or not; never as the vendor closes. It is bought with a double click. It
+-- returns whether it docked it.
+---@param ctx Context
+---@return boolean
+function vendorProto:OfferShoppingList(ctx)
+  local _ = ctx
+  if self.listOffered or self.closing then
+    return false
+  end
+  local section = self.content.byName[shoppingListName()]
+  if section == nil then
+    return false
+  end
+  self.listOffered = true
+  -- Seated at once: a section reused from the last visit is still anchored where its column left it, and
+  -- would fly from there (reported: "the items slide in from the background into the card").
+  nextDock:Add(self, { section = section, source = self, offer = self:ShoppingListOffer(), atOnce = true })
+  return true
+end
+
+-- ShoppingListOffer is what the Shopping List waits in the vendor's dock for (NextDockOffer): its card
+-- says how many items it buys and what they cost in all (NextMerchant:TotalOf), read from what was last
+-- drawn, and glows in the theme's buy color (Dock.BuyColor). A double click buys them through
+-- Profession Shopping List (BuyFromMerchant buys what the section shows, ToBuy), and the section flies
+-- into the backpack, where the items go (nowhere while the backpack is closed); once the vendor is
+-- closing it goes back. A right click sends it back to the top of Buy.
+---@return NextDockOffer
+function vendorProto:ShoppingListOffer()
+  local offer = {}
+  offer.text = function()
+    local n = #self.toBuy
+    local price, costs = merchant:TotalOf(self.toBuy)
+    return format(n == 1 and L:G("Buy %d item?") or L:G("Buy %d items?"), n),
+      format(L:G("Total: %s"), vendorButton:PriceText(price, costs)),
+      L:G("Double-click to buy · Right-click to cancel")
+  end
+  offer.color = function()
+    return style.Theme.Dock.BuyColor
+  end
+  offer.confirm = function()
+    if self.closing or not self.atMerchant then
+      return "back"
+    end
+    shoppingList():Buy()
+    return "moved"
+  end
+  offer.destination = function()
+    local backpack = addon.Bags.Backpack
+    if not backpack:IsShown() then
+      return nil
+    end
+    return backpack.scroll.frame
+  end
+  return offer
 end
 
 -- SaleOffer is what a backpack section dragged onto the vendor waits in its dock for (NextDrag docks it,
@@ -869,4 +992,6 @@ function vendorProto:WatchKind()
   for _, message in ipairs({ "next/PanelShown", "bags/Draw/Backpack/Done", "automation/Changed", "categories/Changed" }) do
     events:RegisterMessage(message, function(ctx) self:OfferAutomation(ctx) end)
   end
+  -- The Shopping List follows the list (it is offered as a draw binds it, OfferShoppingList).
+  events:RegisterMessage("shoppingList/Changed", function(ctx) self:Refresh(ctx) end)
 end

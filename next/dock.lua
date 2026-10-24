@@ -44,6 +44,7 @@ local nextDock = addon:NewModule('NextDock')
 ---@field tooltip? fun(owner: Frame) What hovering its card shows.
 ---@field docked? fun(entry: NextDockEntry) Called once it is docked: an offer that acts on its own (a sale selling one item at a time) answers later, with NextDock:Answer.
 ---@field cancel? fun() Called when it leaves the dock, whichever way: whatever it started stops.
+---@field destination? fun(): Frame? Where its items went when it moves, when that is not the panel (a purchase: the backpack). It flies into its middle, or nowhere when there is none.
 
 -- NextDockSpec is what Add docks.
 ---@class NextDockSpec
@@ -51,6 +52,7 @@ local nextDock = addon:NewModule('NextDock')
 ---@field source NextPanelFrame The panel whose column it leaves.
 ---@field offer NextDockOffer
 ---@field from? NextDragPoint Where its frame is on screen now (else read from it).
+---@field atOnce? boolean Seat it in its card at once, not flying in: a section docked as it is bound (the vendor's Shopping List), whose place on screen is none yet or a stale one (where its column left it).
 ---@field tab? NextTab A tab it came in by: it flies into it when it moves, and the tab pulses.
 
 ---@class NextDockEntry
@@ -106,7 +108,7 @@ function nextDock:ListOf(panel)
   if list == nil then
     list = setmetatable({ panel = panel, entries = {}, free = {}, driver = CreateFrame("Frame"), elapsed = 0 },
       { __index = listProto })
-    panel.content:SetLead(function(width) return list:Lead(width) end)
+    panel.content:SetLead(function(width, layoutWidth) return list:Lead(width, layoutWidth) end)
     self.lists[panel] = list
     sonataNext:RegisterWidget(self)
   end
@@ -168,6 +170,23 @@ function nextDock:PanelHidden(panel)
       if list.panel == panel or entry.source == panel then
         list:SendBackNow(entry)
       end
+    end
+  end
+end
+
+-- SendBackBorrowed sends back at once what waits in a panel that came from other panels, as it closes
+-- while they stay open (a vendor visit ending); its own sections stay in their cards and leave with it
+-- (its Shopping List, profession-shopping-list.md §4), until it has hidden (PanelHidden).
+---@param panel NextPanelFrame
+function nextDock:SendBackBorrowed(panel)
+  local list = self.lists[panel]
+  if list == nil then
+    return
+  end
+  for i = #list.entries, 1, -1 do
+    local entry = list.entries[i]
+    if entry.source ~= panel then
+      list:SendBackNow(entry)
     end
   end
 end
@@ -260,7 +279,10 @@ function listProto:Add(spec)
   self:Invalidate()
   self:start()
   local frame = spec.section.frame
-  local from = spec.from or lift:ScreenPoint(frame)
+  local from
+  if not spec.atOnce then
+    from = spec.from or lift:ScreenPoint(frame)
+  end
   if from == nil then
     self:Seat(entry)
     self:Docked(entry)
@@ -309,12 +331,17 @@ function listProto:Seat(entry)
   entry.seated = true
 end
 
--- Lead lays the cards out for the panel's column (NextContent:SetLead), width wide: each card round its
--- section, the section scaled down to fit with the card's halo inside the column, its holder as tall as
--- the card and the halo above it; each card reads its offer again.
+-- Lead lays the cards out for the panel's column (NextContent:SetLead), width wide (its rows decided on
+-- layoutWidth): each card round its section, the section scaled down to fit with the card's halo inside
+-- the column, its holder as tall as the card and the halo above it; each card reads its offer again. A
+-- section from another panel keeps the width its own column gave it; one of this panel is laid out as this
+-- column lays out its sections: one docked as it was bound (the vendor's Shopping List) has never been laid
+-- out, since a column never lays out a section held out of it (reported: its card drew as a narrow empty
+-- strip, the section laid out at no width).
 ---@param width number
+---@param layoutWidth? number
 ---@return {frame: Frame, height: number}[]
-function listProto:Lead(width)
+function listProto:Lead(width, layoutWidth)
   local D = style.Theme.Dock
   local frame = self.panel.content.frame
   local spread = pixel:Length(frame, (D.Halo and D.Halo.Spread) or (D.Glow and D.Glow.Width) or 0)
@@ -322,14 +349,15 @@ function listProto:Lead(width)
   local leads, y = {}, 0
   for i, entry in ipairs(self.entries) do
     local section = entry.section
-    local w = section.frame:GetWidth()
+    local own = entry.source == self.panel
+    local w = own and width or section.frame:GetWidth()
     entry.scale = math.min(1, (width - 2 * spread - 2 * pad) / w)
     -- Seated, the section is laid out on the grid it is drawn on at its card's scale (whole pixels there,
     -- docs/next-pixel-perfect.md), and its card is sized from that: its size times its scale is whole.
     local h = section.height or section.frame:GetHeight()
     if entry.seated then
       section.frame:SetScale(entry.scale)
-      w, h = entry.source.content:LayoutSection(section, w)
+      w, h = entry.source.content:LayoutSection(section, w, own and (layoutWidth or width) or nil)
     end
     local cardHeight = entry.box:Size(w * entry.scale, h * entry.scale)
     self:Read(entry)
@@ -486,15 +514,21 @@ function listProto:remove(entry)
 end
 
 -- FlyAway flies a section whose items moved into the panel (the tab it came in by, else the middle of
--- the panel's scroll area), shrinking and fading, then puts it back in its bag's column hidden and
--- leaving (until its category is gone from it), and pulses the tab.
+-- the panel's scroll area), or into where its offer says they went (destination; no flight when that is
+-- not there), shrinking and fading, then puts it back in its bag's column hidden and leaving (until its
+-- category is gone from it), and pulses the tab.
 ---@param entry NextDockEntry
 function listProto:FlyAway(entry)
   local section, canvas = entry.section, entry.source.content
   local frame = section.frame
   local from = lift:ScreenPoint(frame)
   local x, y
-  if entry.tab then
+  if entry.offer.destination then
+    local into = entry.offer.destination()
+    if into ~= nil then
+      x, y = lift:Center(into)
+    end
+  elseif entry.tab then
     x, y = lift:Center(entry.tab.button)
   else
     x, y = lift:Center(self.panel.scroll.frame)

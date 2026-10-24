@@ -217,6 +217,7 @@ next\settings\content.lua
 
 integrations\consoleport.lua
 integrations\pawn.lua
+integrations\professionshoppinglist.lua
 integrations\masque.lua
 integrations\simpleitemlevel.lua
 integrations\quickfind.lua

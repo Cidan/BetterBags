@@ -249,6 +249,17 @@ describe("NextDock", function()
       assert.are.equal(entry.scale, section("B").frame:GetScale(), "seated at the card's scale")
     end)
 
+    -- A section docked as it is bound (the vendor's Shopping List) has no place of its own on screen yet:
+    -- one it was left at (its column, the last visit) is stale. In the client an anchored frame has a
+    -- place on screen; the mock has one only when given (_SetRect).
+    it("seats a section at once when told to, wherever it was on screen", function()
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      local entry = nextDock:Add(target, { section = section("B"), source = source, offer = offer(), atOnce = true })
+      assert.is_nil(entry.flight)
+      assert.is_true(entry.seated)
+      assert.are.equal(entry.box.frame, section("B").frame:GetParent())
+    end)
+
     it("lays the column out again when its section's size changes", function()
       local entry = dock("B")
       settle()
@@ -470,6 +481,43 @@ describe("NextDock", function()
       finishTweens()
     end)
 
+    -- A purchase's items go to the backpack, not into the panel it waited in (profession-shopping-list.md).
+    it("flies into the middle of where its offer says its items went", function()
+      local into = CreateFrame("Frame", nil, UIParent)
+      into:_SetRect(900, 200, 300, 400)
+      local o = offer({ answer = "moved" })
+      o.destination = function() return into end
+      local entry = dock("B", o)
+      settle()
+      finishTweens()
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      doubleClick(entry)
+      tween:Step(style.Time.FlyAway - 0.00001)
+      local frame = section("B").frame
+      local s = frame:GetScale()
+      local _, _, _, ox, oy = frame:GetPoint(1)
+      local w, h = frame:GetWidth(), section("B").height or frame:GetHeight()
+      assert.is_true(math.abs(ox * s + w / 2 * s - 1050) < 1, "the destination's middle")
+      assert.is_true(math.abs(oy * s - h / 2 * s - 400) < 1)
+      finishTweens()
+      assert.is_true(source.content:IsLeaving(section("B")))
+      assert.is_false(section("B").frame:IsShown())
+    end)
+
+    it("leaves at once, flying nowhere, when where its items went is not there", function()
+      local o = offer({ answer = "moved" })
+      o.destination = function() return nil end
+      local entry = dock("B", o)
+      settle()
+      finishTweens()
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      doubleClick(entry)
+      assert.is_nil(entry.flight)
+      assert.are.equal(source.content.frame, section("B").frame:GetParent())
+      assert.is_false(section("B").frame:IsShown())
+      assert.is_true(source.content:IsLeaving(section("B")))
+    end)
+
     it("sends it back to its place in its bag on a right click", function()
       section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
       local o = offer()
@@ -594,6 +642,77 @@ describe("NextDock", function()
         assert.is_false(source.content:IsAway(section(name)))
         assert.are.equal(source.content.frame, section(name).frame:GetParent())
       end
+    end)
+
+    -- A panel's own section docked as it is bound (the vendor's Shopping List, profession-shopping-list.md
+    -- §4) has never been laid out: its column never places a held section. Reported: its card drew as a
+    -- narrow empty strip, the section laid out at no width.
+    -- rowsOf says how a section's items are laid out: how many to a row, and how many rows.
+    local function rowsOf(s)
+      local rows, first = {}, nil
+      for _, e in ipairs(s.entries) do
+        local _, _, _, _, y = e.item.frame:GetPoint(1)
+        y = math.floor(y + 0.5)
+        rows[y] = (rows[y] or 0) + 1
+        first = first or y
+      end
+      local n = 0
+      for _ in pairs(rows) do n = n + 1 end
+      return { perRow = rows[first], rows = n }
+    end
+
+    it("lays a section of its own panel docked before its column laid it out at the column's width", function()
+      -- Enough items to take more rows in a narrower column.
+      local list = {}
+      for slot = 1, 12 do table.insert(list, item("1_" .. slot, "Own")) end
+      for slot = 13, 24 do table.insert(list, item("1_" .. slot, "Other")) end
+      target.content:Bind(ctx(), { sortedItems = {}, tabs = { [1] = { categories = { { name = "Own" }, { name = "Other" } },
+        items = list } } }, 1, {})
+      local entry = nextDock:Add(target, { section = target.content.byName.Own, source = target, offer = offer() })
+      assert.is_true(entry.seated)
+      draw(target.content)
+      local own, other = target.content.byName.Own, target.content.byName.Other
+      assert.is_true(other.frame:GetWidth() > 0)
+      -- Laid out on its card's scaled grid (whole pixels there, docs/next-pixel-perfect.md).
+      assert.is_true(math.abs(other.frame:GetWidth() - own.frame:GetWidth()) < 0.5, "as wide as it is in its column")
+      assert.are.same(rowsOf(other), rowsOf(own))
+      local spread = style.Theme.Dock.Halo.Spread
+      assert.is_true(entry.box.frame:GetWidth() > style.GRID_WIDTH - 2 * spread - 1, "the card spans the column")
+      -- A small panel resized while it waits: laid out again as its column now lays out.
+      local before = rowsOf(other)
+      render:NewRenderChain(target.content, { ctx = ctx() }, { Width = style.GRID_WIDTH - 150 })
+      motion:Step(1)
+      assert.is_true(rowsOf(other).rows > before.rows, "the narrower column takes more rows")
+      assert.is_true(math.abs(other.frame:GetWidth() - own.frame:GetWidth()) < 0.5, "as its column now is")
+      assert.are.same(rowsOf(other), rowsOf(own))
+    end)
+
+    it("keeps a section from another panel as its own column laid it out", function()
+      render:NewRenderChain(source.content, { ctx = ctx() }, { Width = style.GRID_WIDTH - 150 })
+      local width = section("B").frame:GetWidth()
+      local entry = dock("B")
+      draw(target.content)
+      finishTweens()
+      draw(target.content)
+      assert.is_true(entry.seated)
+      assert.is_true(math.abs(section("B").frame:GetWidth() - width) < 0.5, "not the panel's own column's width")
+    end)
+
+    -- A vendor's own Shopping List leaves with the vendor in its card as it slides out; sections from other
+    -- panels go home at once (profession-shopping-list.md §4).
+    it("sends back at once only what came from other panels, a panel's own sections staying in their cards", function()
+      target.content:Bind(ctx(), { sortedItems = {}, tabs = { [1] = { categories = { { name = "Own" } },
+        items = { item("1_1", "Own") } } } }, 1, {})
+      draw(target.content)
+      local own = nextDock:Add(target, { section = target.content.byName.Own, source = target, offer = offer() })
+      dock("A")
+      settle()
+      nextDock:SendBackBorrowed(target)
+      assert.are.same({ own }, nextDock:Entries(target))
+      assert.is_false(source.content:IsAway(section("A")))
+      assert.is_true(target.content:IsAway(target.content.byName.Own))
+      nextDock:PanelHidden(target)
+      assert.are.same({}, nextDock:Entries(target))
     end)
 
     it("sends its sections back at once when their bag closes", function()

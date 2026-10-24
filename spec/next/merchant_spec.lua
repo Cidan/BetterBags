@@ -484,6 +484,64 @@ describe("NextMerchant", function()
     end)
   end)
 
+  -- What Profession Shopping List's BuyFromMerchant buys here (profession-shopping-list.md): for each
+  -- item its list needs, the merchant's first item of that ID, when it can be bought.
+  describe("what a shopping list buys here", function()
+    local function read(...)
+      _G._merchant.items = { ... }
+      return merchant:ReadItems(ctx())
+    end
+
+    local function bought(list)
+      local out = {}
+      for _, entry in ipairs(list) do table.insert(out, { entry.item.index, entry.quantity }) end
+      return out
+    end
+
+    it("takes the first item of each needed ID, with what the list needs, in the merchant's order", function()
+      local list = read(vendorItem(11), vendorItem(10), vendorItem(12), vendorItem(10), vendorItem(13))
+      assert.are.same({ { 2, 5 }, { 3, 1 } }, bought(merchant:ToBuy(list, { [10] = 5, [12] = 1, [99] = 4 })))
+    end)
+
+    -- As BuyFromMerchant: its first item of the ID decides, and it is not bought when it cannot be.
+    it("leaves out an item whose first one here cannot be bought, though a later one could", function()
+      local list = read(vendorItem(10, { isPurchasable = false }), vendorItem(10), vendorItem(12))
+      assert.are.same({ { 3, 2 } }, bought(merchant:ToBuy(list, { [10] = 5, [12] = 2 })))
+    end)
+
+    it("buys nothing for an empty list", function()
+      assert.are.same({}, merchant:ToBuy(read(vendorItem(10)), {}))
+    end)
+
+    -- MerchantFrame.lua: a quantity costs the price of one purchase per unit it gives
+    -- (MerchantItemButton_OnModifiedClick: price / stackCount) and its other costs scaled the same way
+    -- (MerchantFrame_ConfirmExtendedItemCost: "cost per stack times number of stacks").
+    it("prices a quantity per unit of what one purchase gives, never less than it costs", function()
+      local price, costs = merchant:PriceOf({ price = 100, stackCount = 5, costs = {} }, 7)
+      assert.are.equal(140, price)
+      assert.are.same({}, costs)
+      assert.are.equal(7, (merchant:PriceOf({ price = 10, stackCount = 3, costs = {} }, 2)))
+      local _, extended = merchant:PriceOf({ price = 0, stackCount = 5,
+        costs = { { texture = 7, value = 3, currencyName = "Marks" }, { texture = 8, value = 10, link = "|Hitem:12|h" } } }, 7)
+      assert.are.same({ { texture = 7, value = 5, currencyName = "Marks" }, { texture = 8, value = 14, link = "|Hitem:12|h" } },
+        extended)
+    end)
+
+    it("adds a list's prices up, each thing it costs once", function()
+      local marks = { texture = 7, value = 2, currencyName = "Marks" }
+      local price, costs = merchant:TotalOf({
+        { item = { price = 100, stackCount = 1, costs = { marks } }, quantity = 3 },
+        { item = { price = 250, stackCount = 5, costs = {} }, quantity = 10 },
+        { item = { price = 0, stackCount = 1, costs = { { texture = 7, value = 1, currencyName = "Marks" },
+          { texture = 8, value = 4, link = "|Hitem:12|h" } } }, quantity = 2 },
+      })
+      assert.are.equal(800, price)
+      assert.are.same({ { texture = 7, value = 8, currencyName = "Marks" }, { texture = 8, value = 8, link = "|Hitem:12|h" } },
+        costs)
+      assert.are.equal(2, marks.value, "the items' own costs are left as they are")
+    end)
+  end)
+
   -- As dropping an item on Blizzard's merchant frame, or on one of its item buttons, sells it.
   describe("selling what is on the cursor", function()
     it("sells it, and nothing without one", function()

@@ -417,6 +417,7 @@ function addon:OnEnable()
 
   consoleport:Enable()
   quickfind:Enable()
+  addon:GetModule('ProfessionShoppingList'):Enable()
 
   self:SecureHook('ToggleAllBags')
   self:SecureHook('CloseSpecialWindows')
