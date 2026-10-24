@@ -62,7 +62,13 @@ after this theme (but we'll take notes ...)".
   multiplies or replaces the texture's alpha is not verified).
 - **A glow fades out before its piece's edges** (`Canvas.add_glow`, `window`), never on a strip that repeats.
 - **Small bags' strips end inside the corner pieces.** A strip and the back roots that run past the corner roots show a
-  flat cut ("bottom edge of small is sloppy, top too. hard edge there."): end both in the middle of the border root.
+  flat cut ("bottom edge of small is sloppy, top too. hard edge there."): end both inside the border root.
+- **A small bag's corner art reaches its edges, past rather than short of them**: "the corners really, really need to
+  extend all the way down into the edge of the bag in small mode, i.e. the edge of the bag should not extend past the
+  art (and in fact, the other way around is better!)". The corner pieces are moved out (the theme's `Y`) so their
+  border roots lie along the top and bottom edges and hang past them.
+- **Cutting a function out of the generator by "to the next def"** also cuts whatever constants sit between: check
+  with a static pass (names used but not defined) after every removal.
 
 ## Night Elf
 
@@ -73,10 +79,11 @@ like it's a part of the frame"; "make it so it feels like it's really, really em
 are cutting into the backdrop and come from 'under' the bag"; the mushrooms "look funny" (redone: "shrooms look
 fantastic").
 
-Done: two great gnarled roots (one hugging the edge, one wandering out), a tendril, gaps, furrowed bark, burls, moss,
-leaf clusters, glowing mushrooms; full bags top to bottom; the front roots bend into the bag and sink into its backdrop;
-back roots on the background layer reach out from under the bag, darkened by its feather; a swaying bough; fronds; the
-moon; fireflies; small bags at two thirds, with roots gripping the corners.
+Done (in game from the addon's `next-themes`): two great gnarled roots (one hugging the edge and dipping into the bag,
+one wandering out), a tendril, gaps, glowing mushrooms; full bags top to bottom; the front roots bend into the bag and
+sink into its backdrop; back roots on the background layer reach out from under the bag, darkened by its feather,
+interlacing; a swaying bough; fronds; wisps; small bags at two thirds, their corner roots on the bag's edges. All of it in
+the Darnassus style below. The moon was removed (asked: "let's eliminate that moon icon").
 
 **Style direction (asked, with a screenshot just outside Darnassus: "this is what i think of when i think nightelf"):**
 violet dusk. Violet is the ambient light (bark, stone, shadow, air), set against saturated moss greens, one tree in
@@ -86,7 +93,10 @@ Blizzard's hand-painted look (broad soft shapes, strong rim light), not fine noi
 glowing. "most leaves in nightelf tend to be two toned as well." So: violet-plum bark with lavender rim light,
 teal-emerald moss and two-toned leaves (some violet), a twilight-violet body, painterly shading, flaring buttresses,
 an occasional carved spiral, magenta blossoms, soft cyan-blue wisps for fireflies, interlacing back roots; the
-mushrooms kept. A style study (the strip and a mockup) comes before redrawing every piece.
+mushrooms kept. A style study (the strip and a mockup) came first; its first round was "a bit too cartoony" (flat candy
+purple, smooth shapes, glossy leaves): the roots are now painted volumes (fused where they meet, crease shadows, a
+lavender rim) under real bark (furrows along them, cracks, broken grain, lichen) in dusky violet-mauve with warmer
+patches, and the leaves muted and mottled. Approved: "looks good".
 
 ## The parked themes (on `next-themes-all`)
 
