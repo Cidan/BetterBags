@@ -58,4 +58,23 @@ pixels, and every text its anchor point on one, at any screen size, UI scale, Ba
   reporter's 3396x1362 at 65% and 70%, 3440x1440 at 65%, 1920x1080 at 64% and 100%, 2560x1440 at 100%
   and 115%, and Bag Scales.
 
-**Status:** started.
+**Status:** done, not verified in game yet. Every Next window passes the check on every screen above;
+the architecture, the rules for new code, NextPixel's API and the coverage are in
+`.claude/rules/next-pixel-perfect.md`.
+
+## Decisions made along the way
+
+- **Item buttons are shared with the classic bags.** What Next rounds on them (Sonata's styler while Next
+  is in use, the template's own parts through `NextItemFit`) is put back before the classic bags take
+  them over (`SonataNext:SetActive(false)`).
+- **Blizzard's templates are kept, rounded in place.** The Purchase Bank button must keep
+  `BankPanelPurchaseButtonScriptTemplate` (its own `OnClick` opens the purchase dialog); its size, its
+  place, its end pieces and its text are rounded without touching its scripts.
+- **The settings window takes its scale before anything in it is made**, and a later open at another scale
+  restyles every Next widget, rather than each control restyling itself per window.
+- **Scroll offsets are rounded where Blizzard's box applies them** (`SetScrollTargetOffset`), so
+  interpolated scrolling steps a pixel at a time and rests on the grid.
+- **A section seated in a dock card** is laid out again on the card's grid, its header included.
+- **The mock follows the client further**, to make the check honest: sizes from anchors while a screen is
+  set up, item button parts and `UIPanelButtonTemplate` anchored as Blizzard's XML anchors them, the
+  scroll target moving with the scroll offset, `SetPoint(point, x, y)` relative to the parent.

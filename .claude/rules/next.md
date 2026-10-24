@@ -15,6 +15,9 @@ Off by default. **BetterBags Next (experimental)** in the general settings (righ
 Item Movement), `/bb next`, **Switch to Next** in the classic backpack's menu, and the backpack
 button in Next's own header switch between the two designs at once, without a reload (§11).
 
+Every Next window rests on whole screen pixels: the rules for placing and sizing anything in Next, and
+the check every window passes, are in next-pixel-perfect.md.
+
 ## 1. How it takes over
 
 - `database:GetNextEnabled()` (`nextEnabled` in the profile, `false` in `const.DATABASE_DEFAULTS`).
