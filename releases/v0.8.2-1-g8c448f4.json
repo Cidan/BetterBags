@@ -1,0 +1,17 @@
+{
+  "id": 1792867092,
+  "version": "v0.8.2-1-g8c448f4",
+  "channel": "alpha",
+  "date": "2026-10-24",
+  "from": "f5bc01d1c4c852a87be0d58b84f0b131135f0856",
+  "to": "8c448f45a2388f2166b2635735ea772ec82c372c",
+  "headline": "Added integration with Profession Shopping List to quickly purchase needed reagents at vendors.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Quick-buy Profession Shopping List items at vendors",
+      "details": "When visiting a merchant that sells items tracked by the Profession Shopping List addon, a dedicated card appears displaying the needed items and total cost. Double-click the card to purchase the items immediately, or right-click to dismiss it.",
+      "clients": []
+    }
+  ]
+}
