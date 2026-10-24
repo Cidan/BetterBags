@@ -1,0 +1,19 @@
+{
+  "id": 1792876504,
+  "version": "v0.8.2-3-ga5186b1",
+  "channel": "alpha",
+  "date": "2026-10-24",
+  "from": "17357ed727462bb8d4c3126deea157b78f719630",
+  "to": "a5186b12a47aded4107dd21ddc48366668cb09ed",
+  "headline": "Fix a Lua error when interacting with vendors inside instances.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Vendor window error in dungeons",
+      "details": "Opening a vendor inside an instance no longer causes an error when the game hides NPC identities behind secret values.",
+      "clients": [
+        "Retail"
+      ]
+    }
+  ]
+}
