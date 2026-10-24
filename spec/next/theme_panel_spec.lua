@@ -56,7 +56,8 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextPanel", "next/panel.lua" },
   { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -791,6 +792,70 @@ describe("BetterBags Next's panels and themes", function()
         for _, line in ipairs(strand) do assert.is_false(line:IsShown()) end
       end
       assert.is_false(bag.braid.knot:IsShown())
+    end)
+  end)
+
+  -- A theme's ornaments (Panel.Ornaments, next-themes.md §12) on the real panels: drawn for an inner side on the
+  -- left, mirrored on the bank (its inner side is on the right), at their size, moving only while the panel shows.
+  describe("ornaments", function()
+    local LEAF = "Interface\\AddOns\\BetterBags\\textures\\next\\themes\\spec\\leaf.png"
+    local function withOrnaments()
+      apply({ Textures = { Leaf = LEAF }, Panel = { Ornaments = {
+        { Texture = "Leaf", Point = "INNER", Width = 12, Tile = 40 },
+        { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Motion = { Sway = 4, Period = 3 } },
+        { Texture = "Leaf", Point = "TOPOUTER", Width = 10, Height = 10, Sizes = "Small" },
+      } } })
+    end
+
+    it("draws a theme's ornaments on every panel's body, mirrored on the bank, and none in Default", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      withOrnaments()
+      local roots = bag.ornaments.pieces[1].texture
+      assert.are.equal(LEAF, roots:GetTexture())
+      local point, rel, relPoint = roots:GetPoint(1)
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT" }, { point, rel, relPoint }, "the backpack's inner side: left")
+      point, rel, relPoint = bank.ornaments.pieces[1].texture:GetPoint(1)
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT" }, { point, rel, relPoint }, "the bank's: right")
+      assert.are.equal(bag.frame, roots:GetParent())
+      backToDefault()
+      assert.is_false(roots:IsShown())
+    end)
+
+    it("moves them only while the panel shows, through a theme applied meanwhile", function()
+      withOrnaments()
+      local bag = nextBag:Create(ctx())
+      local sway = bag.ornaments.pieces[2].groups.Sway
+      assert.is_false(sway:IsPlaying(), "hidden")
+      bag:Show(ctx())
+      finishTweens()
+      assert.is_true(sway:IsPlaying(), "shown")
+      withOrnaments()
+      assert.is_true(bag.ornaments.pieces[2].groups.Sway:IsPlaying(), "a theme applied while it shows")
+      bag:Hide(ctx())
+      finishTweens()
+      -- The client runs a frame's OnHide as it hides; the mock does not.
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.is_false(bag.ornaments.pieces[2].groups.Sway:IsPlaying(), "hidden again")
+    end)
+
+    it("shows each at its size, switching with the panel", function()
+      withOrnaments()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local smallOnly = bag.ornaments.pieces[3].texture
+      assert.is_false(smallOnly:IsShown())
+      addon:GetModule("NextPanel"):SetSize(ctx(), "small")
+      finishTweens()
+      assert.is_true(bag:IsSmall())
+      assert.is_true(smallOnly:IsShown())
+      assert.is_true(bag.ornaments.pieces[2].groups.Sway:IsPlaying(), "still moving")
+    end)
+
+    it("leaves its moving ones out of the pixel checks", function()
+      withOrnaments()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local skip = bag:MovingParts()
+      assert.is_true(skip[bag.ornaments.pieces[2].texture])
+      assert.is_nil(skip[bag.ornaments.pieces[1].texture])
     end)
   end)
 

@@ -404,6 +404,11 @@ describe("SonataNext", function()
         ResetModuleStub("NextTween", "next/tween.lua")
         LoadBetterBagsModule("next/tween.lua")
       end
+      -- The points, sizes and motions an ornament may name are NextOrnaments'.
+      if addon:GetModule("NextOrnaments", true) == nil then
+        ResetModuleStub("NextOrnaments", "next/ornaments.lua")
+        LoadBetterBagsModule("next/ornaments.lua")
+      end
       sonataNext.themes = {}
       FreshNextThemes()
       sonataNext = addon:GetModule("SonataNext")
@@ -437,6 +442,40 @@ describe("SonataNext", function()
         "Sparkles.Colors.2: no color named Ghost",
       }, problems)
     end)
+  end)
+
+  -- Ornaments (Panel.Ornaments, next-themes.md §12): a place, an anchor, a size or a motion no ornament has, a
+  -- missing size, an origin no motion turns about.
+  it("names what is wrong with an ornament, by where it is", function()
+    if addon:GetModule("NextOrnaments", true) == nil then
+      ResetModuleStub("NextOrnaments", "next/ornaments.lua")
+      LoadBetterBagsModule("next/ornaments.lua")
+    end
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadOrnaments", Panel = { Ornaments = {
+      { Texture = "Glow", Point = "MIDDLE", Width = 4, Height = 4 },
+      { Texture = "Glow", Point = "INNER", Tile = 20 },
+      { Texture = "Glow", Point = "TOP", Width = 20 },
+      { Texture = "Glow", Point = "TOPINNER", Anchor = "CENTER", Width = 4 },
+      { Texture = "Glow", Point = "BOTTOMOUTER", Width = 4, Height = 4, Sizes = "Huge",
+        Motion = { Wiggle = 3, Origin = "LEFTISH" } },
+      { Texture = "Glow", Point = "TOPOUTER", Width = 4, Height = 4, Motion = { Sway = 3, Origin = "OUTER" } },
+    } } })
+    local problems = sonataNext:Check("BadOrnaments")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Ornaments.1.Point: no place named MIDDLE",
+      "Panel.Ornaments.2.Width: a span along a side needs one",
+      "Panel.Ornaments.3.Height: a span along an edge needs one",
+      "Panel.Ornaments.4.Anchor: no corner named CENTER",
+      "Panel.Ornaments.4.Height: a piece at a corner needs one",
+      "Panel.Ornaments.5.Motion.Origin: no point named LEFTISH",
+      "Panel.Ornaments.5.Motion.Wiggle: no motion named Wiggle",
+      "Panel.Ornaments.5.Sizes: no size named Huge",
+    }, problems)
   end)
 
   -- The other registration path on Sonata itself (asked: "original themes, next themes").
