@@ -22,11 +22,50 @@ local function round(value)
   return math.floor(value + 0.5)
 end
 
+-- UnitAt is one screen pixel in the units of a region drawn at an effective scale (a panel's own, before
+-- it has taken it: it is worked out while the panel still switches size).
+---@param effectiveScale number
+---@return number
+function pixel:UnitAt(effectiveScale)
+  return PixelUtil.GetPixelToUIUnitFactor() / effectiveScale
+end
+
 -- Unit is one screen pixel in region's units.
 ---@param region ScriptRegion
 ---@return number
 function pixel:Unit(region)
-  return PixelUtil.GetPixelToUIUnitFactor() / region:GetEffectiveScale()
+  return self:UnitAt(region:GetEffectiveScale())
+end
+
+-- SnapIn is units rounded to whole pixels of a unit (UnitAt): an offset, which may be none.
+---@param unit number
+---@param units number
+---@return number
+function pixel:SnapIn(unit, units)
+  return round(units / unit) * unit
+end
+
+-- LengthIn is a length in whole pixels of a unit: rounded, never less than one pixel when it is not none.
+---@param unit number
+---@param units number
+---@return number
+function pixel:LengthIn(unit, units)
+  if units == 0 then
+    return 0
+  end
+  local n = round(units / unit)
+  if n == 0 then
+    n = units < 0 and -1 or 1
+  end
+  return n * unit
+end
+
+-- FloorIn is units rounded down to whole pixels of a unit.
+---@param unit number
+---@param units number
+---@return number
+function pixel:FloorIn(unit, units)
+  return math.floor(units / unit + 1e-6) * unit
 end
 
 -- Pixels is how many whole screen pixels units are on region's grid, rounded: an offset, which may be
@@ -43,8 +82,7 @@ end
 ---@param units number
 ---@return number
 function pixel:Snap(region, units)
-  local unit = self:Unit(region)
-  return round(units / unit) * unit
+  return self:SnapIn(self:Unit(region), units)
 end
 
 -- Length is a length (a size, a gap, a line's thickness) in whole screen pixels on region's grid:
@@ -53,15 +91,38 @@ end
 ---@param units number
 ---@return number
 function pixel:Length(region, units)
-  if units == 0 then
-    return 0
-  end
+  return self:LengthIn(self:Unit(region), units)
+end
+
+-- Floor is units rounded down to whole pixels on region's grid: the room something may take (a width it
+-- must not pass).
+---@param region ScriptRegion
+---@param units number
+---@return number
+function pixel:Floor(region, units)
+  return self:FloorIn(self:Unit(region), units)
+end
+
+-- Ceil is units rounded up to whole pixels on region's grid: the room something needs (a text's width,
+-- so what comes after it never overlaps it).
+---@param region ScriptRegion
+---@param units number
+---@return number
+function pixel:Ceil(region, units)
   local unit = self:Unit(region)
-  local n = round(units / unit)
-  if n == 0 then
-    n = units < 0 and -1 or 1
+  return math.ceil(units / unit - 1e-6) * unit
+end
+
+-- Lengths is Length of each value, on region's grid.
+---@param region ScriptRegion
+---@param ... number
+---@return number ...
+function pixel:Lengths(region, ...)
+  local out = { ... }
+  for i = 1, select("#", ...) do
+    out[i] = self:Length(region, out[i])
   end
-  return n * unit
+  return unpack(out, 1, select("#", ...))
 end
 
 -- Point anchors region by a point, its offsets in whole pixels on its own grid (SetPoint takes them in

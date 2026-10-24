@@ -589,21 +589,30 @@ end
 function WidgetMethods:SetNormalTexture(texture)
   setStateTexture(self, "GetNormalTexture", "NormalTexture", texture, "SetNormalTexture")
 end
+-- A button's state region (its normal, pushed, highlight or disabled texture) fills the button unless
+-- anchored otherwise: Blizzard sets a button's state textures to an icon and never anchors them
+-- (Blizzard_CharacterCreate.lua CharacterCreateSpecButtonMixin:SetSpec), and an XML <NormalTexture>
+-- without anchors fills its button.
+local function stateRegion(button)
+  local tex = CreateMockWidget("Texture", nil, button)
+  tex:SetAllPoints(button)
+  return tex
+end
 function WidgetMethods:GetNormalTexture()
   if (not rawget(self, "NormalTexture") or type(rawget(self, "NormalTexture")) == "string") and self._type ~= "Texture" then
-    self.NormalTexture = CreateMockWidget("Texture", nil, self)
+    self.NormalTexture = stateRegion(self)
   end
   return self.NormalTexture
 end
 function WidgetMethods:GetPushedTexture()
   if not rawget(self, "PushedTexture") and self._type ~= "Texture" then
-    self.PushedTexture = CreateMockWidget("Texture", nil, self)
+    self.PushedTexture = stateRegion(self)
   end
   return self.PushedTexture
 end
 function WidgetMethods:GetHighlightTexture()
   if not rawget(self, "HighlightTexture") and self._type ~= "Texture" then
-    self.HighlightTexture = CreateMockWidget("Texture", nil, self)
+    self.HighlightTexture = stateRegion(self)
   end
   return self.HighlightTexture
 end
@@ -622,7 +631,7 @@ function WidgetMethods:SetPushedTexture(texture)
 end
 function WidgetMethods:GetDisabledTexture()
   if not self.DisabledTexture and self._type ~= "Texture" then
-    self.DisabledTexture = CreateMockWidget("Texture", nil, self)
+    self.DisabledTexture = stateRegion(self)
   end
   return self.DisabledTexture
 end

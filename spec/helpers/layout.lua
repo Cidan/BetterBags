@@ -164,9 +164,13 @@ local function visible(region)
   if not region._shown then
     return false
   end
+  -- A region at alpha 0 draws nothing (a template's art hidden that way, a glow before it is lit).
+  if (region._alpha or 1) == 0 then
+    return false
+  end
   local parent = region._parent
   while parent ~= nil do
-    if parent._shown == false then
+    if parent._shown == false or (parent._alpha or 1) == 0 then
       return false
     end
     parent = parent._parent
@@ -204,10 +208,22 @@ local function onPixel(value)
   return math.abs(value - math.floor(value + 0.5)) < 1e-3
 end
 
--- PixelCheck lists every shown region under root that is not on whole screen pixels: a frame's or a
--- texture's four edges (and so its size), a font string's anchor points. A region its anchors do not
--- place is not drawn and is skipped, as is everything under a region in skip. owners (name -> table)
--- name the regions in the messages. It returns the problems, one string each.
+-- draws says whether a region draws anything itself, so its own edges must be on the grid: a texture, a
+-- line, text, an edit box, or a frame that clips its children (its edges cut what is inside). A frame
+-- that does neither draws nothing; its edges matter only through what is placed against them.
+local function draws(region)
+  local t = region._type
+  if t == "Texture" or t == "Line" or t == "MaskTexture" or t == "FontString" or t == "EditBox" then
+    return true
+  end
+  return region._clipsChildren == true
+end
+
+-- PixelCheck lists every shown region under root that draws (draws) and is not on whole screen pixels:
+-- a texture's, an edit box's or a clipping frame's four edges (and so its size), a font string's anchor
+-- points. A region its anchors do not place is not drawn and is skipped, as is everything under a region
+-- in skip. owners (name -> table) name the regions in the messages. It returns the problems, one string
+-- each.
 ---@param root table
 ---@param opts? { skip?: table<table, boolean>, owners?: table<string, table> }
 ---@return string[]
@@ -223,10 +239,10 @@ function layout.PixelCheck(root, opts)
     if skip[region] or not visible(region) then
       return
     end
-    local r = layout.Rect(region)
+    local r = draws(region) and layout.Rect(region) or nil
     if r ~= nil then
       local bad = {}
-      if isText(region) then
+      if region._type == "FontString" then
         for _, a in ipairs(region._points) do
           local x, y = pointOf(r, a.point)
           if not onPixel(x * k) then
@@ -249,6 +265,13 @@ function layout.PixelCheck(root, opts)
     end
     for i, t in ipairs(region._textures or {}) do
       check(t, path .. ">t" .. i)
+    end
+    -- A button's state textures, which the mock keeps apart from the regions it lists.
+    for _, key in ipairs({ "NormalTexture", "PushedTexture", "HighlightTexture", "DisabledTexture", "CheckedTexture" }) do
+      local t = rawget(region, key)
+      if type(t) == "table" and t._type ~= nil and t._parent == region then
+        check(t, path .. ">" .. key)
+      end
     end
     for i, f in ipairs(region._fontstrings or {}) do
       check(f, path .. ">s" .. i)

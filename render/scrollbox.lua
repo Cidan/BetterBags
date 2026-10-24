@@ -36,6 +36,7 @@ local LINGER = 1
 ---@field Symmetric? boolean Keep the bar's room on both sides, so the child is centered.
 ---@field AutoHideBar? boolean Show the bar only while the wheel scrolls or the pointer is over its room.
 ---@field CreateBar? fun(box: WowScrollBox, opts: {AutoHide: boolean}): ScrollboxBar A bar of the caller's in place of Blizzard's MinimalScrollBar (BetterBags Next's, next-settings.md §2), made once the box has its view; it hides itself when AutoHide.
+---@field Snap? fun(region: ScriptRegion, units: number): number Rounds the bar's room to whole screen pixels on a region's grid (BetterBags Next's NextPixel:Length, docs/next-pixel-perfect.md), so the child sits on them.
 
 -- A bar of the caller's: its frame, and Bind(box), which makes it follow and drive the box.
 ---@class (exact) ScrollboxBar
@@ -52,6 +53,7 @@ local LINGER = 1
 ---@field child? Drawable
 ---@field plan? RenderPlan
 ---@field symmetric boolean
+---@field snap? fun(region: ScriptRegion, units: number): number
 ---@field barDriver? Frame Updates the auto-hiding bar each frame while the bar is shown.
 ---@field barIdle number Seconds since the wheel last scrolled or the pointer left the bar's room.
 local scrollboxProto = drawable:Extend({}, 'ScrollboxFrame')
@@ -70,9 +72,7 @@ function scrollboxProto:SetChild(child)
   self.child = child
   child.renderParent = self
   child:SetParent(self.scrollChild)
-  child:ClearAllPoints()
-  child:SetPoint({ Point = "TOPLEFT", RelativeTo = self.scrollChild, RelativePoint = "TOPLEFT",
-    XOffset = self.symmetric and BAR_WIDTH or 0 })
+  self:placeChild()
   child:Hide()
   self.plan = {
     Plan = {
@@ -83,13 +83,26 @@ function scrollboxProto:SetChild(child)
   }
 end
 
+-- placeChild hangs the child from the scroll child's top left, past the bar's room on a symmetric box.
+---@private
+function scrollboxProto:placeChild()
+  local child = self.child
+  child:ClearAllPoints()
+  child:SetPoint({ Point = "TOPLEFT", RelativeTo = self.scrollChild, RelativePoint = "TOPLEFT",
+    XOffset = self.symmetric and self:GetBarWidth() or 0 })
+end
+
 ---@return Drawable?
 function scrollboxProto:GetChild()
   return self.child
 end
 
+-- GetBarWidth returns the bar's room, in whole pixels on the box's grid when it snaps (Snap).
 ---@return number
 function scrollboxProto:GetBarWidth()
+  if self.snap ~= nil then
+    return self.snap(self.frame, BAR_WIDTH)
+  end
   return BAR_WIDTH
 end
 
@@ -97,7 +110,7 @@ end
 -- right, or on both sides for a symmetric box.
 ---@return number
 function scrollboxProto:GetGutterWidth()
-  return scrollbox:GutterWidthFor({ Symmetric = self.symmetric })
+  return self.symmetric and 2 * self:GetBarWidth() or self:GetBarWidth()
 end
 
 -- GutterWidthFor returns the width a box made with opts keeps free beside its child, known before
@@ -119,6 +132,10 @@ end
 ---@param parentResult? RenderResult
 ---@return RenderResult
 function scrollboxProto:PreRender(parentResult)
+  -- Rounded to whole pixels, the bar's room follows the box's grid (a scale it took since).
+  if self.snap ~= nil then
+    self:placeChild()
+  end
   local width = parentResult and parentResult.Width
   local layoutWidth = parentResult and parentResult.LayoutWidth
   return {
@@ -163,7 +180,7 @@ end
 ---@param elapsed number
 function scrollboxProto:updateBar(elapsed)
   local frame = self.frame
-  if frame:IsMouseOver(0, 0, frame:GetWidth() - BAR_WIDTH, 0) then
+  if frame:IsMouseOver(0, 0, frame:GetWidth() - self:GetBarWidth(), 0) then
     self.barIdle = 0
   else
     self.barIdle = self.barIdle + elapsed
@@ -196,6 +213,7 @@ function scrollbox:Create(parent, name, opts)
   ---@type ScrollboxDrawable
   local sb = drawable:Create(scrollboxProto)
   sb.symmetric = opts ~= nil and opts.Symmetric == true
+  sb.snap = opts ~= nil and opts.Snap or nil
   local frame = CreateFrame("Frame", name, parent)
   local box = CreateFrame("Frame", name and (name .. "Box") or nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetAllPoints(frame)

@@ -371,7 +371,7 @@ describe("NextVendor", function()
       eventsRegistered["MERCHANT_SHOW"](ctx())
       assert.is_true(v.repairAllButton:IsShown())
       assert.is_false(v.guildRepairButton:IsShown())
-      assert.are.same({ "LEFT", v.sellJunkButton, "RIGHT", 8, 0 }, { v.repairAllButton:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", v.sellJunkButton, "TOPRIGHT", 8, 0 }, { v.repairAllButton:GetPoint(1) })
     end)
 
     it("keeps the vendor's name to the room right of its shown buttons, on one line", function()
@@ -404,7 +404,7 @@ describe("NextVendor", function()
       _G._gameRules[Enum.GameRule.MerchantFilterDisabled] = true
       local v = open()
       assert.is_false(v.filterButton:IsShown())
-      assert.are.same({ "LEFT", v.settingsButton, "RIGHT", 8, 0 }, { v.sellJunkButton:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", v.settingsButton, "TOPRIGHT", 8, 0 }, { v.sellJunkButton:GetPoint(1) })
     end)
   end)
 

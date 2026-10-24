@@ -203,7 +203,10 @@ describe("NextDock", function()
       assert.is_true(s < 1)
       assert.is_true(math.abs(section("B").frame:GetWidth() * s + 2 * D.Pad - entry.box.frame:GetWidth()) < 1e-6)
       assert.is_true(entry.box.frame:GetWidth() + 2 * D.Halo.Spread <= style.GRID_WIDTH + 1e-6)
-      assert.are.same({ "TOP", entry.holder, "TOP", 0, -D.Halo.Spread }, { entry.box.frame:GetPoint(1) })
+      -- Centered by its top left, a whole number of pixels in (docs/next-pixel-perfect.md).
+      local width = entry.holder:GetWidth()
+      local x = math.floor((width - entry.box.frame:GetWidth()) / 2)
+      assert.are.same({ "TOPLEFT", entry.holder, "TOPLEFT", x, -D.Halo.Spread }, { entry.box.frame:GetPoint(1) })
     end)
 
     it("flies the section from where it was into its card", function()

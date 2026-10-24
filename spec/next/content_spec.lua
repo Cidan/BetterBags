@@ -869,14 +869,24 @@ describe("NextContent", function()
       assert.are.equal(0.12, section.highlight._gradient.min.a)
     end)
 
+    -- Each by its top left, after the text before it (its width rounded up to a whole pixel), centered on
+    -- the title by the fonts' heights (docs/next-pixel-perfect.md): never by a text's middle or right edge.
     it("places a section's title, count and line where it says", function()
       sections()
       UseNextTheme({ Sections = { Title = { X = 9, Y = -2 }, CountGap = 3, LineGap = 7 } })
       canvas:ApplyStyle(context:New("spec"))
+      draw()
       local s = canvas.byName.A
+      local _, titleHeight = s.title:GetFont()
+      local _, countHeight = s.count:GetFont()
+      local countX = 9 + math.ceil(s.title:GetStringWidth()) + 3
       assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 9, -2 }, { s.title:GetPoint(1) })
-      assert.are.same({ "LEFT", s.title, "RIGHT", 3, 0 }, { s.count:GetPoint(1) })
-      assert.are.same({ "LEFT", s.count, "RIGHT", 7, 0 }, { s.line:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", countX, -2 - math.floor((titleHeight - countHeight) / 2) },
+        { s.count:GetPoint(1) })
+      local lineX = countX + math.ceil(s.count:GetStringWidth()) + 7
+      local lineY = -2 - math.floor((titleHeight - s.line:GetHeight()) / 2)
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", lineX, lineY }, { s.line:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", s.inner, "TOPRIGHT", 0, lineY }, { s.line:GetPoint(2) })
     end)
 
     it("restyles the sections it keeps for later too", function()

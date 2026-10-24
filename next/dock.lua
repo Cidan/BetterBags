@@ -15,6 +15,9 @@ local lift = addon:GetModule('NextLift')
 ---@class NextDockCard: AceModule
 local dockCard = addon:GetModule('NextDockCard')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
@@ -313,24 +316,30 @@ end
 ---@return {frame: Frame, height: number}[]
 function listProto:Lead(width)
   local D = style.Theme.Dock
-  local spread = (D.Halo and D.Halo.Spread) or (D.Glow and D.Glow.Width) or 0
+  local frame = self.panel.content.frame
+  local spread = pixel:Length(frame, (D.Halo and D.Halo.Spread) or (D.Glow and D.Glow.Width) or 0)
+  local pad, spacing = pixel:Lengths(frame, D.Pad, style.SECTION_SPACING)
   local leads, y = {}, 0
   for i, entry in ipairs(self.entries) do
     local section = entry.section
     local w = section.frame:GetWidth()
+    entry.scale = math.min(1, (width - 2 * spread - 2 * pad) / w)
+    -- Seated, the section is laid out on the grid it is drawn on at its card's scale (whole pixels there,
+    -- docs/next-pixel-perfect.md), and its card is sized from that: its size times its scale is whole.
     local h = section.height or section.frame:GetHeight()
-    entry.scale = math.min(1, (width - 2 * spread - 2 * D.Pad) / w)
-    local cardHeight = entry.box:Size(w * entry.scale, h * entry.scale)
     if entry.seated then
       section.frame:SetScale(entry.scale)
+      w, h = entry.source.content:LayoutSection(section, w)
     end
+    local cardHeight = entry.box:Size(w * entry.scale, h * entry.scale)
     self:Read(entry)
+    local cardWidth = entry.box.frame:GetWidth()
     entry.box.frame:ClearAllPoints()
-    entry.box.frame:SetPoint("TOP", entry.holder, "TOP", 0, -spread)
+    entry.box.frame:SetPoint("TOPLEFT", entry.holder, "TOPLEFT", pixel:Floor(frame, (width - cardWidth) / 2), -spread)
     entry.holder:SetSize(width, spread + cardHeight)
     table.insert(leads, { frame = entry.holder, height = spread + cardHeight })
     if i > 1 then
-      y = y + style.SECTION_SPACING
+      y = y + spacing
     end
     entry.top, entry.bottom = y, y + spread + cardHeight
     y = entry.bottom

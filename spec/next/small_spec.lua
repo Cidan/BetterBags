@@ -1320,7 +1320,7 @@ describe("BetterBags Next's small mode", function()
     it("sits after the Show Blizzard Bags button, saying what it does", function()
       db.size = "full"
       local bag = nextBag:Create(ctx())
-      assert.are.same({ "RIGHT", bag.bagsButton, "LEFT", -8, 0 }, { bag.sizeButton:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bag.bagsButton, "TOPLEFT", -8, 0 }, { bag.sizeButton:GetPoint(1) })
       bag.sizeButton:GetScript("OnEnter")(bag.sizeButton)
       assert.are.equal("Small Bags", GameTooltip:GetText())
       click(bag)

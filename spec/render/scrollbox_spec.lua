@@ -280,6 +280,30 @@ describe("Scrollbox", function()
       assert.are.same({ "TOPLEFT", sb.scrollChild, "TOPLEFT", 14, 0 }, { short.frame:GetPoint(1) })
     end)
 
+    -- BetterBags Next (docs/next-pixel-perfect.md): the bar's room rounded by the caller's Snap, on the
+    -- box's own grid, so the child it insets lands on whole screen pixels.
+    it("rounds the bar's room with the caller's Snap, on its own frame's grid", function()
+      local asked = {}
+      local sb = scrollbox:Create(CreateFrame("Frame"), nil, { Symmetric = true,
+        Snap = function(region, units)
+          table.insert(asked, { region, units })
+          return 16
+        end })
+      local c = child(300, 200)
+      sb:SetChild(c)
+      assert.are.same({ "TOPLEFT", sb.scrollChild, "TOPLEFT", 16, 0 }, { c.frame:GetPoint(1) })
+      assert.are.equal(16, sb:GetBarWidth())
+      assert.are.equal(32, sb:GetGutterWidth())
+      assert.are.equal(sb.frame, asked[1][1])
+      assert.are.equal(14, asked[1][2])
+      render:NewRenderChain(root(sb, { Width = 640, Height = 480 }), {})
+      assert.are.same({ 608 }, c.given)
+      -- Its grid changed (a scale): rounded again as it renders.
+      sb.snap = function() return 18 end
+      render:NewRenderChain(root(sb, { Width = 640, Height = 480 }), {})
+      assert.are.same({ "TOPLEFT", sb.scrollChild, "TOPLEFT", 18, 0 }, { c.frame:GetPoint(1) })
+    end)
+
     it("keeps the bar's room on the right only for other scroll boxes", function()
       local sb = scrollbox:Create(CreateFrame("Frame"))
       local c = child(300, 200)
