@@ -357,9 +357,13 @@ sonataNext:RegisterTheme({
     -- icon may have its own Color and HoverColor. A disabled button is drawn at DisabledAlpha of its
     -- color (a white glyph looks the same desaturated), art desaturated too. Scale is an icon's size
     -- as a share of its button (Layout.HeaderButton), centered in it; an icon's own Scale multiplies
-    -- it (art that needs fitting). The buttons keep their size and places.
+    -- it (art that needs fitting). The buttons keep their size and places. Rail (false here) puts them
+    -- down a strip along the panel's inner side instead of across the header: Width wide (the body that
+    -- much wider), the first Top from the body's top, Gap apart (Layout.HeaderButtonGap when unset),
+    -- centered across it, over its Fill (a texture spec, mirrored on a panel whose inner side is on the
+    -- right; false: no art).
     Buttons = { Color = "ButtonIcon", HoverColor = "White", ArtColor = "ButtonIcon", ArtHoverColor = "White",
-      DisabledAlpha = 0.3, Scale = 1,
+      DisabledAlpha = 0.3, Scale = 1, Rail = false,
       Icons = {
         settingsButton = { Texture = "IconSettings" },
         closeButton = { Texture = "IconClose" },

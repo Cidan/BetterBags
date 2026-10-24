@@ -1996,6 +1996,9 @@ clientFont("GameFontWhite", "Fonts\\FRIZQT__.TTF", 12, "", WHITE, false)
 -- Number12Font is ARIALN 12 with no color or shadow (GameFonts.xml); NumberFontNormalRight is
 -- NumberFontNormal justified right.
 clientFont("GameFontNormalLarge", "Fonts\\FRIZQT__.TTF", 16, "", NORMAL, true)
+-- SystemFont_Shadow_Large: FRIZQT__ 16, a black shadow 1 down and right, no color (Fonts.xml); GW2_UI rewrites it
+-- in its header family (Core/fonts.lua).
+clientFont("SystemFont_Shadow_Large", "Fonts\\FRIZQT__.TTF", 16, "", WHITE, true)
 -- GameFontBlack inherits SystemFont_Med1 (FRIZQT__ 12, no shadow) in black.
 clientFont("GameFontBlack", "Fonts\\FRIZQT__.TTF", 12, "", { 0, 0, 0 }, false)
 -- GameFontNormalHuge inherits SystemFont_Shadow_Huge1 (FRIZQT__ 20, black shadow) in gold.

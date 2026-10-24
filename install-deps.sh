@@ -51,6 +51,12 @@ if [ ! -d ".libraries/vscode-wow-api" ]; then
   cd ../..
 fi
 
+# Clone GW2_UI: the Guild Wars 2 themes draw its art from its own files (docs/next-gw2-theme.md), and a spec checks
+# every file a theme names is there.
+if [ ! -d ".libraries/GW2_UI" ]; then
+  git clone --depth 1 https://github.com/Mortalknight/GW2_UI .libraries/GW2_UI
+fi
+
 # Clone wow-ui-source for Blizzard UI source code
 if [ ! -d ".libraries/wow-ui-source" ]; then
   git clone https://github.com/Gethe/wow-ui-source .libraries/wow-ui-source

@@ -67,7 +67,11 @@ function style:Use(theme)
   self.VENDOR_TEXT_GAP = L.VendorTextGap
   self.VENDOR_PRICE_RAISE = L.VendorPriceRaise
   self.VENDOR_CARD_WIDTH = math.floor((self.GRID_WIDTH - (self.VENDOR_COLUMNS - 1) * self.GAP) / self.VENDOR_COLUMNS)
-  self.BODY_WIDTH = self.GRID_WIDTH + self.GUTTER + self.PAD * 2
+  -- The strip the header buttons go down, along the body's inner side (Header.Buttons.Rail,
+  -- next-themes.md §13); 0 when they go across the header. The body is that much wider, its content not.
+  local rail = theme.Header.Buttons.Rail
+  self.RAIL = rail and rail.Width or 0
+  self.BODY_WIDTH = self.GRID_WIDTH + self.GUTTER + self.PAD * 2 + self.RAIL
   self.WIDTH = self.FEATHER + self.BODY_WIDTH
   -- How far the body reaches past the screen edge, so the opening bounce never shows what is behind
   -- the panel: it slides in WIDTH + OVERREACH (HiddenOffset) and swings OPEN_OVERSHOOT of that past
@@ -196,6 +200,31 @@ function style:shadowFont(font, shadow)
   end
 end
 
+-- lookOf names what a font object draws: its file, size, flags, color and shadow.
+---@param font Font
+---@return string
+local function lookOf(font)
+  local path, size, flags = font:GetFont()
+  local r, g, b, a = font:GetTextColor()
+  local sr, sg, sb, sa = font:GetShadowColor()
+  local sx, sy = font:GetShadowOffset()
+  return table.concat({ tostring(path), tostring(size), tostring(flags), tostring(r), tostring(g), tostring(b),
+    tostring(a), tostring(sr), tostring(sg), tostring(sb), tostring(sa), tostring(sx), tostring(sy) }, "|")
+end
+
+-- CopiesStale says whether a client font one of the roles copied (Object) no longer draws what it drew when it
+-- was copied: UI addons rewrite the client's fonts once the game has loaded (GW2_UI at PLAYER_LOGIN,
+-- docs/next-gw2-theme.md), after BetterBags made its fonts. Only the copies made with the current fonts count.
+---@return boolean
+function style:CopiesStale()
+  for _, copy in pairs(self.copies) do
+    if lookOf(copy.base) ~= copy.look then
+      return true
+    end
+  end
+  return false
+end
+
 -- makeFont makes a font object for a role's spec: the client's own font file (the locale's) unless
 -- the spec names one, at its size and flags, in its color, with its shadow or none. A role naming one
 -- of the client's fonts (Object, a font object's global name) copies it (its file, size and flags,
@@ -214,6 +243,7 @@ function style:makeFont(role, spec)
       error("BetterBags Next's font role " .. role .. " copies no client font named " .. tostring(spec.Object))
     end
     font:CopyFontObject(base)
+    self.copies[role] = { base = base, look = lookOf(base) }
     local path, size, flags = font:GetFont()
     font:SetFont(spec.File or path, pixel:FontHeight(spec.Size or size), spec.Flags or flags)
     if spec.Color ~= nil then
@@ -337,6 +367,7 @@ end
 ---@private
 function style:newFonts()
   self.fonts = {}
+  self.copies = {}
   local roles = self.Theme.Fonts
   for text, role in pairs(self.texts) do
     if roles[role] ~= nil then

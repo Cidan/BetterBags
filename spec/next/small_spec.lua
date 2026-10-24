@@ -808,6 +808,53 @@ describe("BetterBags Next's small mode", function()
         assert.are.equal(0, bank.title:GetWidth(), "a full panel's title is as long as it is")
       end)
 
+      -- A theme that puts the header buttons down a side rail (Header.Buttons.Rail, docs/next-gw2-theme.md).
+      describe("with its header buttons down a side rail", function()
+        after_each(function()
+          UseNextTheme(nil)
+        end)
+
+        local function railed()
+          UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 64, Gap = 6 } } } })
+        end
+
+        local function column(panel)
+          local n = 0
+          for _, button in ipairs(panel.headerButtons) do
+            if button:IsShown() then n = n + 1 end
+          end
+          return n * style.HEADER_BUTTON + (n - 1) * 6
+        end
+
+        it("goes no narrower than the strip and its header, footer and column need", function()
+          railed()
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          local header = 2 * style.PAD + 40 + style.TITLE_INSET + 12 + style.Small.MinTitle
+          local cells = 2 * style.PAD + 40 + style.GUTTER + style.ICON
+          assert.are.equal(math.ceil(math.max(header, cells)), bag:MinWidth())
+          bag.freeText:SetText(string.rep("8", 60))
+          bag.moneyFrame.frame:SetWidth(128)
+          local footer = 2 * style.PAD + 40 + style.TITLE_INSET + bag.freeText:GetStringWidth() + 12 + 128
+          assert.are.equal(math.ceil(footer), bag:MinWidth())
+        end)
+
+        it("goes no shorter than its buttons down the strip need", function()
+          railed()
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          local content = style.CONTENT_TOP + style.FOOTER + style.SECTION_HEADER + style.ICON
+          assert.are.equal(math.max(content, 64 + column(bag) + style.PAD), bag:MinHeight())
+          UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 600, Gap = 6 } } } })
+          assert.are.equal(600 + column(bag) + style.PAD, bag:MinHeight(), "a strip whose buttons start low")
+        end)
+
+        it("leaves its title the whole header row, past the strip", function()
+          railed()
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          resize(bank, "LEFT", bank:MinWidth(), 500)
+          assert.are.equal(bank:MinWidth() - 40 - (style.PAD + style.TITLE_INSET) - style.PAD - 12, bank.title:GetWidth())
+        end)
+      end)
+
       it("does not resize with something on the cursor: pressing a grip is a drop", function()
         local bag = opened(function(c) return nextBag:Create(c) end)
         _G._cursorType = "item"

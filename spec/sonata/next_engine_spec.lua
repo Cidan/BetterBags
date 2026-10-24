@@ -15,6 +15,9 @@ end
 local db = trackStub("Database")
 local events = trackStub("Events")
 local nextStyle = trackStub("NextStyle")
+-- The panels an ornament may be on are named by their bag kinds (NextOrnaments, loaded by the checks).
+local const = trackStub("Constants")
+const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = 2 }
 
 local sonataNext = FreshNextThemes()
 local context = addon:GetModule("Context")
@@ -466,6 +469,9 @@ describe("SonataNext", function()
       { Texture = "Glow", Point = "BOTTOMOUTER", Width = 4, Height = 4, Sizes = "Huge",
         Motion = { Wiggle = 3, Origin = "LEFTISH" } },
       { Texture = "Glow", Point = "TOPOUTER", Width = 4, Height = 4, Motion = { Sway = 3, Origin = "OUTER" } },
+      { Texture = "Glow", Point = "INNER", Width = 4, Tile = 8, TexCoords = { 0, 1, 0, 0.5 } },
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, TexCoords = { 0, 1 }, Panels = { "Bank", "Mailbox" } },
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Panels = "Bank" },
     } } })
     local problems = sonataNext:Check("BadOrnaments")
     table.sort(problems)
@@ -478,7 +484,79 @@ describe("SonataNext", function()
       "Panel.Ornaments.5.Motion.Origin: no point named LEFTISH",
       "Panel.Ornaments.5.Motion.Wiggle: no motion named Wiggle",
       "Panel.Ornaments.5.Sizes: no size named Huge",
+      "Panel.Ornaments.7.TexCoords: not with Tile",
+      "Panel.Ornaments.8.Panels: no panel named Mailbox",
+      "Panel.Ornaments.8.TexCoords: four numbers, left, right, top and bottom",
+      "Panel.Ornaments.9.Panels: a list of panels",
     }, problems)
+  end)
+
+  -- The header buttons down a side rail (Header.Buttons.Rail, next-themes.md §13).
+  it("names what a side rail lacks", function()
+    sonataNext:RegisterTheme({ Name = "BadRail", Header = { Buttons = { Rail = { Gap = 4 } } } })
+    local problems = sonataNext:Check("BadRail")
+    table.sort(problems)
+    assert.are.same({
+      "Header.Buttons.Rail.Top: a side rail needs one",
+      "Header.Buttons.Rail.Width: a side rail needs one",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "GoodRail", Header = { Buttons = { Rail = { Width = 40, Top = 60 } } } })
+    assert.are.same({}, sonataNext:Check("GoodRail"))
+  end)
+
+  -- GW2_UI rewrites the client's fonts at PLAYER_LOGIN (docs/next-gw2-theme.md), after BetterBags copied some of
+  -- them for its roles: once the game has started, a theme whose copies are stale is applied again, unsaved.
+  describe("watching the client's fonts", function()
+    local handlers, stale, savedRegister, savedStale
+
+    before_each(function()
+      handlers, stale = {}, false
+      savedRegister, savedStale = rawget(events, "RegisterEvent"), rawget(nextStyle, "CopiesStale")
+      events.RegisterEvent = function(_, event, fn)
+        handlers[event] = handlers[event] or {}
+        table.insert(handlers[event], fn)
+      end
+      nextStyle.CopiesStale = function() return stale end
+      sonataNext.watchingFonts = nil
+      sonataNext:RegisterTheme({ Name = "Other" })
+    end)
+
+    after_each(function()
+      events.RegisterEvent, nextStyle.CopiesStale = savedRegister, savedStale
+      sonataNext.watchingFonts = nil
+    end)
+
+    it("applies the current theme again, unsaved, when the game starts with a copy stale", function()
+      sonataNext:ApplyTheme(ctx(), "Other", false)
+      sonataNext:WatchClientFonts()
+      assert.are.equal(1, #handlers.PLAYER_ENTERING_WORLD)
+      local applied = #used
+      stale = true
+      assert.is_true(sonataNext:OnClientFontsChanged(ctx()))
+      assert.are.equal(applied + 1, #used)
+      assert.are.equal("Other", used[#used].Name)
+      assert.are.equal("Other", sonataNext:GetCurrentThemeKey())
+      assert.are.equal("Default", saved, "not saved")
+      handlers.PLAYER_ENTERING_WORLD[1](ctx())
+      assert.are.equal(applied + 2, #used, "through the event")
+    end)
+
+    it("does nothing while every copy is current, or before it started", function()
+      sonataNext:WatchClientFonts()
+      local applied = #used
+      assert.is_false(sonataNext:OnClientFontsChanged(ctx()))
+      sonataNext.started = false
+      stale = true
+      assert.is_false(sonataNext:OnClientFontsChanged(ctx()))
+      assert.are.equal(applied, #used)
+      sonataNext.started = true
+    end)
+
+    it("listens once however often it starts", function()
+      sonataNext:WatchClientFonts()
+      sonataNext:WatchClientFonts()
+      assert.are.equal(1, #handlers.PLAYER_ENTERING_WORLD)
+    end)
   end)
 
   -- The other registration path on Sonata itself (asked: "original themes, next themes").

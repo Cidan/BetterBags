@@ -273,3 +273,19 @@ mock never showed it: it gives a frame a place on screen only when a test sets o
 
 **Rule**: A section docked before its first layout passes `atOnce` (`NextDockSpec`): seated at once,
 whatever place it has. Test any flight decision with a rect, as the client gives every anchored frame one.
+
+## Read Theme-Dependent Geometry When It Is Used, Never When Built
+**Problem**: A closure made when a Next panel is built captured a value a theme decides (the title's join, from
+`Pad`, `TitleInset` and now a side rail). A theme applied later moved the title but not the captured value: the
+ribbon's sparkles started 40 pixels inside the body (next-themes.md §13).
+
+**Rule**: Anything a theme can change is read where it is used (a `Spawn`, a layout pass), as `NextStyle`'s fields
+are; capture only what never changes for the panel (its side).
+
+## Copies of the Client's Fonts Go Stale When UI Addons Rewrite Them
+**Problem**: A Next role that copies a client font (`Object`) copies it when the theme applies, at BetterBags'
+load. UI addons rewrite the client's fonts later (GW2_UI at `PLAYER_LOGIN`), so the copy keeps Blizzard's font.
+
+**Rule**: Record what each copy was taken from and check it once the game has started (`PLAYER_ENTERING_WORLD`):
+`NextStyle:CopiesStale`, `SonataNext:WatchClientFonts` (next-themes.md §4). A copy is how a theme follows another
+addon's fonts, its locale files and its player's settings, with no locale logic of its own.

@@ -9,6 +9,9 @@ local style = addon:GetModule('NextStyle')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 -- NextOrnaments draws a Next theme's ornaments on a panel (Panel.Ornaments, next-themes.md §12): art anchored to
 -- the body's corners and edges, the roots along a druid bag's edge, a gem on a filigree, a lantern hanging by the
 -- title. Asked: borders in the spirit of the classic race themes, "smaller and less large, more tasteful, and
@@ -36,6 +39,8 @@ ornaments.POINTS = { INNER = true, OUTER = true, TOP = true, BOTTOM = true, TOPI
 ornaments.ANCHORS = CORNERS
 ornaments.ORIGINS = ORIGINS
 ornaments.SIZES = { Full = true, Small = true }
+-- The panels a piece may be shown on (Panels), by the name of the bag kind each panel shows (const.BAG_KIND).
+ornaments.PANELS = { Backpack = "BACKPACK", Bank = "BANK", Vendor = "UNDEFINED", GuildBank = "GUILD" }
 ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period = true, Delay = true, Origin = true }
 
 ---@class (exact) NextOrnamentPiece
@@ -120,9 +125,25 @@ function setProto:paint(piece)
   t:SetDrawLayer(o.Layer or "ARTWORK", o.SubLevel or 0)
 end
 
--- Layout places every piece for the panel's size and side: shown at the size it is for (Sizes), anchored to the
--- body in whole pixels of the frame's grid, its art mirrored for an inner side on the right. A panel's side never
--- changes, but a panel built mirrored before it styled takes it here too.
+-- OnPanel says whether a piece is for this panel: every panel, or those its Panels names.
+---@private
+---@param o table
+---@return boolean
+function setProto:OnPanel(o)
+  if o.Panels == nil then
+    return true
+  end
+  for _, name in ipairs(o.Panels) do
+    if const.BAG_KIND[ornaments.PANELS[name]] == self.panel.kind then
+      return true
+    end
+  end
+  return false
+end
+
+-- Layout places every piece for the panel's size and side: shown at the size it is for (Sizes) on the panels it
+-- is for (Panels), anchored to the body in whole pixels of the frame's grid, its art mirrored for an inner side on
+-- the right. A panel's side never changes, but a panel built mirrored before it styled takes it here too.
 function setProto:Layout()
   local panel = self.panel
   local small = panel:IsSmall()
@@ -135,7 +156,7 @@ function setProto:Layout()
   for i = 1, self.count do
     local piece = self.pieces[i]
     local o = piece.spec
-    piece.shown = o.Sizes == nil or (o.Sizes == "Small") == small
+    piece.shown = (o.Sizes == nil or (o.Sizes == "Small") == small) and self:OnPanel(o)
     if piece.shown then
       self:place(piece)
       piece.texture:Show()
@@ -188,7 +209,8 @@ function setProto:place(piece)
 end
 
 -- Tile repeats each span's art every Tile along its length, as long as the body is now, mirrored with the panel;
--- other pieces show their art once.
+-- other pieces show their art once, cropped to their TexCoords (left, right, top, bottom: art that is part of
+-- its file), mirrored with the panel too.
 function setProto:Tile()
   local body = self.panel.body
   for i = 1, self.count do
@@ -206,7 +228,12 @@ function setProto:Tile()
       local reach = math.max(0, length) / o.Tile
       t:SetTexCoord(self.mirrored and reach or 0, self.mirrored and 0 or reach, 0, 1)
     else
-      t:SetTexCoord(left, right, 0, 1)
+      local c = o.TexCoords or { 0, 1, 0, 1 }
+      if self.mirrored then
+        t:SetTexCoord(c[2], c[1], c[3], c[4])
+      else
+        t:SetTexCoord(c[1], c[2], c[3], c[4])
+      end
     end
   end
 end

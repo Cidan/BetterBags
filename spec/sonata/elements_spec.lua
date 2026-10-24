@@ -368,6 +368,72 @@ describe("SonataElements", function()
       assert.are.equal("BLEND", b:GetPushedTexture():GetBlendMode())
       assert.are.equal("ADD", b:GetHighlightTexture():GetBlendMode())
     end)
+
+    -- GW2_UI's item buttons (Inventory/inventory.lua, reskinItemButton): its backdrop art behind the icon, and its
+    -- border art in the quality's color (docs/next-gw2-theme.md).
+    describe("in art", function()
+      local BACKDROP = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagitembackdrop.png"
+      local BORDER = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagitemborder.png"
+
+      it("draws a backdrop of art behind the icon, tinted, and back to a color or none", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { Backdrop = { Texture = BACKDROP, VertexColor = { 1, 1, 1, 0.8 }, Inset = 1 } })
+        local fill = b.sonataSkin.fill
+        assert.are.equal(BACKDROP, fill:GetTexture())
+        assert.are.equal("BACKGROUND", fill._drawLayer)
+        assert.are.equal(0.8, fill:GetAlpha())
+        assert.are.same({ "TOPLEFT", b, "TOPLEFT", 1, -1 }, { fill:GetPoint(1) })
+        assert.is_true(fill:IsShown())
+        for _, edge in ipairs(b.sonataSkin.edges or {}) do
+          assert.is_false(edge:IsShown(), "art with no border")
+        end
+        elements:StyleItemButton(b, { Backdrop = { Color = { 0, 0, 0, 1 } } })
+        assert.are.same({ r = 0, g = 0, b = 0, a = 1 }, fill._colorTexture)
+        elements:StyleItemButton(b, {})
+        assert.is_false(fill:IsShown())
+      end)
+
+      it("draws quality on the icon's border in the style's art, the quality's color at its Alpha, none without one", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { QualityBorder = { Texture = BORDER, Alpha = 0.9 } })
+        b.IconBorder:SetBlendMode("ADD")
+        b.IconBorder:SetTexCoord(0.2, 0.8, 0.2, 0.8)
+        assert.is_true(elements:DrawItemQuality(b, { 0.12, 1, 0, 1 }, 2))
+        assert.are.equal(BORDER, b.IconBorder:GetTexture())
+        assert.are.equal("BLEND", b.IconBorder:GetBlendMode())
+        assert.are.same({ 0, 1, 0, 1 }, b.IconBorder._texCoords)
+        assert.are.same({ 0.12, 1, 0, 0.9 }, { b.IconBorder:GetVertexColor() })
+        assert.is_true(b.IconBorder:IsShown())
+        assert.is_true(elements:DrawItemQuality(b, nil, 1), "a common item: taken, and no border")
+        assert.is_false(b.IconBorder:IsShown())
+      end)
+
+      it("draws a quality the style overrides in its art, common items included, in its blend mode", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { QualityBorder = { Texture = BORDER, BlendMode = "ADD" },
+          QualityColors = { [1] = { 0.45, 0.45, 0.45, 1 } } })
+        assert.is_true(elements:DrawItemQuality(b, nil, 1))
+        assert.are.same({ 0.45, 0.45, 0.45, 1 }, { b.IconBorder:GetVertexColor() })
+        assert.are.equal("ADD", b.IconBorder:GetBlendMode())
+        assert.is_true(b.IconBorder:IsShown())
+      end)
+
+      it("frames a quest item in the style's art, in its quest color", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { QualityBorder = { Texture = BORDER, Alpha = 0.9 }, QuestBorderColor = { 1, 0.8, 0.1, 1 } })
+        elements:DrawItemQuest(b, { isQuestItem = true, isActive = false })
+        assert.are.equal(BORDER, b.IconBorder:GetTexture())
+        assert.are.same({ 1, 0.8, 0.1, 0.9 }, { b.IconBorder:GetVertexColor() })
+        assert.is_true(b.IconBorder:IsShown())
+      end)
+
+      it("leaves quality to BetterBags' glow again for a style without art", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { QualityBorder = { Texture = BORDER } })
+        elements:StyleItemButton(b, {})
+        assert.is_false(elements:DrawItemQuality(b, { 0.12, 1, 0, 1 }, 2))
+      end)
+    end)
   end)
 
   describe("tabs", function()

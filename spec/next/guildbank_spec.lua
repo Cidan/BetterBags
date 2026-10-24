@@ -330,6 +330,25 @@ describe("NextGuildBank", function()
       g:ApplyStyle(ctx())
     end)
 
+    -- GW2_UI's guild bank shows its bag's emblem (Inventory/guildBank.lua); the buttons go down its side panel.
+    it("shows GW2_UI's bag emblem in the Guild Wars 2 theme, its buttons down its right", function()
+      local g = open()
+      style:Use(addon:GetModule("SonataNext"):Resolve("GW2"))
+      g:ApplyStyle(ctx())
+      local shown = {}
+      for i = 1, g.ornaments.count do
+        local piece = g.ornaments.pieces[i]
+        shown[piece.spec.Texture] = piece.texture:IsShown()
+      end
+      assert.is_true(shown.BagEmblem)
+      assert.is_false(shown.VendorEmblem)
+      local point, relativeTo = g.closeButton:GetPoint(1)
+      assert.are.same({ "TOPRIGHT", g.body }, { point, relativeTo })
+      assert.is_true(g.rail:IsShown())
+      UseNextTheme(nil)
+      g:ApplyStyle(ctx())
+    end)
+
     it("has close, settings, deposit gold and withdraw gold in its header", function()
       local g = open()
       assert.are.same({ g.closeButton, g.settingsButton, g.depositGoldButton, g.withdrawGoldButton }, g.headerButtons)

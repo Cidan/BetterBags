@@ -273,8 +273,8 @@ end
 ---@return RenderResult
 function rootProto:PreRender()
   return {
-    Width = self.bag:BodyWidth() - 2 * style.PAD,
-    LayoutWidth = self.bag:LayoutWidth() - 2 * style.PAD,
+    Width = self.bag:BodyWidth() - 2 * style.PAD - style.RAIL,
+    LayoutWidth = self.bag:LayoutWidth() - 2 * style.PAD - style.RAIL,
     Height = math.max(1, self.bag:Height() - style.CONTENT_TOP - self.bag:ContentBottom()),
   }
 end
@@ -919,36 +919,81 @@ function panelProto:SmallHeight()
   return self.smallHeight or math.floor(UIParent:GetHeight() * style.Small.Height)
 end
 
--- headerButtonsWidth is how much of the header its shown buttons take, with the room between them.
+-- shownButtons is how many of the header's buttons show.
 ---@private
 ---@return number
-function panelProto:headerButtonsWidth()
+function panelProto:shownButtons()
   local shown = 0
   for _, button in ipairs(self.headerButtons) do
     if button:IsShown() then
       shown = shown + 1
     end
   end
+  return shown
+end
+
+-- headerButtonsWidth is how much of the header its shown buttons take, with the room between them: none
+-- while they go down the side rail (Header.Buttons.Rail).
+---@private
+---@return number
+function panelProto:headerButtonsWidth()
+  if style.Theme.Header.Buttons.Rail then
+    return 0
+  end
+  local shown = self:shownButtons()
   return shown * style.HEADER_BUTTON + math.max(0, shown - 1) * style.HEADER_BUTTON_GAP
+end
+
+-- RailGap is the room between the buttons down the side rail: its own Gap, else the header's.
+---@private
+---@return number
+function panelProto:RailGap()
+  local rail = style.Theme.Header.Buttons.Rail
+  return rail and rail.Gap or style.HEADER_BUTTON_GAP
+end
+
+-- InnerPad is the room inside the body on its inner side (away from its screen edge): Pad, and the side
+-- rail's width when the theme puts the header buttons down one (next-themes.md §13).
+---@return number
+function panelProto:InnerPad()
+  return style.PAD + style.RAIL
+end
+
+-- SidePads are the room inside the body on its left and on its right: InnerPad on its inner side (the
+-- backpack's left, the other panels' right), Pad on its screen edge side.
+---@return number left, number right
+function panelProto:SidePads()
+  if self.side == "LEFT" then
+    return style.PAD, self:InnerPad()
+  end
+  return self:InnerPad(), style.PAD
 end
 
 -- MinWidth is the narrowest a small panel goes (next.md §14g): room for its shown header buttons and
 -- Small.MinTitle of its title (cut short past that, FitTitle), for its footer's free slots and money,
--- and for one column of its cells (an icon, or a card in the vendor).
+-- and for one column of its cells (an icon, or a card in the vendor), each with the side rail beside it.
 ---@return number
 function panelProto:MinWidth()
-  local header = 2 * style.PAD + style.TITLE_INSET + self:headerButtonsWidth() + 12 + style.Small.MinTitle
+  local pads = style.PAD + self:InnerPad()
+  local header = pads + style.TITLE_INSET + self:headerButtonsWidth() + 12 + style.Small.MinTitle
   local money = self.moneyFrame ~= nil and self.moneyFrame.frame:GetWidth() or 0
-  local footer = 2 * style.PAD + style.TITLE_INSET + self.freeText:GetStringWidth() + 12 + money
-  local column = 2 * style.PAD + style.GUTTER + self.content:CellWidth()
+  local footer = pads + style.TITLE_INSET + self.freeText:GetStringWidth() + 12 + money
+  local column = pads + style.GUTTER + self.content:CellWidth()
   return math.ceil(math.max(header, footer, column))
 end
 
 -- MinHeight is the shortest a small panel goes: its header, what is under its scroll area, and one
--- row of a section.
+-- row of a section; and room for its buttons down the side rail, Pad below the last.
 ---@return number
 function panelProto:MinHeight()
-  return style.CONTENT_TOP + self:ContentBottom() + style.SECTION_HEADER + self.content:CellHeight()
+  local height = style.CONTENT_TOP + self:ContentBottom() + style.SECTION_HEADER + self.content:CellHeight()
+  local rail = style.Theme.Header.Buttons.Rail
+  if rail then
+    local shown = self:shownButtons()
+    local column = shown * style.HEADER_BUTTON + math.max(0, shown - 1) * self:RailGap()
+    height = math.max(height, rail.Top + column + style.PAD)
+  end
+  return height
 end
 
 -- ContentBottom is how far above the body's bottom the scroll area ends: the footer's height, and
@@ -2005,7 +2050,14 @@ function panelProto:headerButton(spec)
   button:SetScript("OnEnter", function()
     button.hover = true
     self:PaintHeaderIcon(button)
-    GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
+    -- Away from the panel: below the header, or out beside the side rail.
+    local anchor
+    if style.Theme.Header.Buttons.Rail then
+      anchor = self.side == "LEFT" and "ANCHOR_RIGHT" or "ANCHOR_LEFT"
+    else
+      anchor = self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT"
+    end
+    GameTooltip:SetOwner(button, anchor)
     if spec.tooltipFunc then
       spec.tooltipFunc(button)
     else
@@ -2103,7 +2155,7 @@ end
 -- into the window (asked: it should "stop flush with the hard edge of the window").
 ---@return string point, number x, number inward
 function panelProto:TitleJoin()
-  local edge = style.PAD + style.TITLE_INSET
+  local edge = self:InnerPad() + style.TITLE_INSET
   if self.side == "LEFT" then
     return "RIGHT", edge, -1
   end
@@ -2121,7 +2173,7 @@ function panelProto:CloudSpan()
   if issecretvalue ~= nil and issecretvalue(width) then
     width = C and C.SecretTitleWidth or 0
   end
-  return width + style.PAD + style.TITLE_INSET + (C and C.Pad or 0)
+  return width + self:InnerPad() + style.TITLE_INSET + (C and C.Pad or 0)
 end
 
 -- LayoutCloud spreads the cloud's puffs across the title as it is now (a share of the way across
@@ -2207,6 +2259,11 @@ function panelProto:BuildHeader(text)
   self:BuildBraid()
   self:BuildTitleButton()
 
+  -- The side rail's strip (Header.Buttons.Rail): over the body's fill and feather, under its edge and
+  -- ornaments.
+  self.rail = frame:CreateTexture(nil, "BACKGROUND", nil, 7)
+  self.rail:Hide()
+
   self.headerButtons = {}
   for _, spec in ipairs(self:GetHeaderButtons()) do
     local button = self:headerButton(spec)
@@ -2229,7 +2286,7 @@ function panelProto:styleHeader()
   title:ClearAllPoints()
   -- Justified toward its anchor: a small panel's title has a width (FitTitle), and text is centered in
   -- its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER).
-  local inset, top = pixel:Snap(body, style.PAD + style.TITLE_INSET), pixel:Snap(body, style.TITLE_TOP)
+  local inset, top = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET), pixel:Snap(body, style.TITLE_TOP)
   if left then
     title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -inset, -top)
     title:SetJustifyH("RIGHT")
@@ -2338,12 +2395,37 @@ function panelProto:styleHeader()
   end
 
   self:styleBraid()
+  self:styleRail()
   for _, button in ipairs(self.headerButtons) do
     pixel:Size(button, style.HEADER_BUTTON, style.HEADER_BUTTON)
     self:SetHeaderIcon(button, button.iconKey)
   end
   self:LayoutCloud()
   self:LayoutHeader()
+end
+
+-- styleRail draws the side rail's strip (Header.Buttons.Rail, next-themes.md §13) down the body's inner side,
+-- its width, in its art, mirrored on a panel whose inner side is on the right; none without a rail or art.
+---@private
+function panelProto:styleRail()
+  local rail, R = self.rail, style.Theme.Header.Buttons.Rail
+  rail:ClearAllPoints()
+  if not (R and R.Fill) then
+    rail:Hide()
+    return
+  end
+  local mirrored = self.side == "LEFT"
+  local side = mirrored and "RIGHT" or "LEFT"
+  local body = self.body
+  rail:SetPoint("TOP" .. side, body, "TOP" .. side, 0, 0)
+  rail:SetPoint("BOTTOM" .. side, body, "BOTTOM" .. side, 0, 0)
+  pixel:Width(rail, R.Width)
+  style:Paint(rail, R.Fill)
+  if mirrored then
+    local c = R.Fill.TexCoords or { 0, 1, 0, 1 }
+    rail:SetTexCoord(c[2], c[1], c[3], c[4])
+  end
+  rail:Show()
 end
 
 -- titleWidth is how wide the title's text is drawn: its measure, at most the width it is cut short to
@@ -2392,7 +2474,7 @@ function panelProto:placeTitleRow()
   local glow, G = self.titleGlow, H.TitleGlow
   if G then
     local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
-    local inset = pixel:Snap(body, style.PAD + style.TITLE_INSET)
+    local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET)
     local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
     glow:ClearAllPoints()
     if left then
@@ -2674,6 +2756,11 @@ end
 function panelProto:LayoutHeader()
   local left = self.side == "LEFT"
   local body = self.body
+  if style.Theme.Header.Buttons.Rail then
+    self:layoutRail()
+    self:FitTitle()
+    return
+  end
   local previous
   -- Corner to corner, whole pixels apart (docs/next-pixel-perfect.md).
   for _, button in ipairs(self.headerButtons) do
@@ -2696,6 +2783,29 @@ function panelProto:LayoutHeader()
   self:FitTitle()
 end
 
+-- layoutRail puts the shown header buttons down the side rail (next-themes.md §13), in order from its top, Top
+-- down and Gap apart, centered across it, each by its corner on the body's inner side in whole pixels
+-- (docs/next-pixel-perfect.md).
+---@private
+function panelProto:layoutRail()
+  local R = style.Theme.Header.Buttons.Rail
+  local body = self.body
+  local corner = self.side == "LEFT" and "TOPRIGHT" or "TOPLEFT"
+  local size = pixel:Length(body, style.HEADER_BUTTON)
+  local x = pixel:Floor(body, (pixel:Length(body, R.Width) - size) / 2)
+  if self.side == "LEFT" then
+    x = -x
+  end
+  local y, step = pixel:Snap(body, R.Top), size + pixel:Snap(body, self:RailGap())
+  for _, button in ipairs(self.headerButtons) do
+    button:ClearAllPoints()
+    if button:IsShown() then
+      button:SetPoint(corner, body, corner, x, -y)
+      y = y + step
+    end
+  end
+end
+
 -- FitTitle keeps the title on one line in the room the shown header buttons leave it, cut short
 -- rather than over them: on every small panel, whose width the player sets (next.md §14g), and at
 -- either size on a panel whose title can be any length (fitsTitle: a vendor's name). Else the title
@@ -2709,7 +2819,7 @@ function panelProto:FitTitle()
     return
   end
   title:SetWordWrap(false)
-  pixel:Width(title, math.max(1, self:BodyWidth() - (style.PAD + style.TITLE_INSET)
+  pixel:Width(title, math.max(1, self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
     - (style.PAD + self:headerButtonsWidth()) - 12))
   self:placeTitleRow()
 end
@@ -2775,9 +2885,10 @@ function panelProto:styleSearch()
   local sf, S = self.searchBox, style.Theme.Search
   local t = sf.textBox
   local body = self.body
+  local leftPad, rightPad = self:SidePads()
   sf.frame:ClearAllPoints()
-  pixel:Point(sf.frame, "TOPLEFT", body, "TOPLEFT", style.PAD, -style.SEARCH_TOP)
-  pixel:Point(sf.frame, "TOPRIGHT", body, "TOPRIGHT", -style.PAD, -style.SEARCH_TOP)
+  pixel:Point(sf.frame, "TOPLEFT", body, "TOPLEFT", leftPad, -style.SEARCH_TOP)
+  pixel:Point(sf.frame, "TOPRIGHT", body, "TOPRIGHT", -rightPad, -style.SEARCH_TOP)
   pixel:Height(sf.frame, style.SEARCH_HEIGHT)
   local E = S.Edge
   for i, edge in ipairs(self.searchEdges) do
@@ -2934,9 +3045,10 @@ end
 ---@private
 function panelProto:styleContent()
   local scroll = self.scroll
+  local leftPad, rightPad = self:SidePads()
   scroll.frame:ClearAllPoints()
-  pixel:Point(scroll.frame, "TOPLEFT", self.body, "TOPLEFT", style.PAD, -style.CONTENT_TOP)
-  pixel:Point(scroll.frame, "BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -style.PAD, self:ContentBottom())
+  pixel:Point(scroll.frame, "TOPLEFT", self.body, "TOPLEFT", leftPad, -style.CONTENT_TOP)
+  pixel:Point(scroll.frame, "BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -rightPad, self:ContentBottom())
   style:SetFont(self.emptyText, style.Theme.Footer.EmptyFont)
   -- Across the scroll area, centered in it (by the client): anchored by its middle it would sit between
   -- two pixels on an area an odd number of pixels wide (docs/next-pixel-perfect.md).
@@ -2978,9 +3090,10 @@ end
 function panelProto:styleFooter()
   local body, line, F = self.body, self.footerLine, style.Theme.Footer
   local left = self.side == "LEFT"
+  local leftPad, rightPad = self:SidePads()
   line:ClearAllPoints()
-  pixel:Point(line, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER - 4)
-  pixel:Point(line, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER - 4)
+  pixel:Point(line, "BOTTOMLEFT", body, "BOTTOMLEFT", leftPad, style.FOOTER - 4)
+  pixel:Point(line, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -rightPad, style.FOOTER - 4)
   local spec = F.Line
   if spec then
     pixel:Height(line, spec.Size)
@@ -2998,10 +3111,11 @@ function panelProto:styleFooter()
   local freeText = self.freeText
   style:SetFont(freeText, F.Font)
   freeText:ClearAllPoints()
+  local inset = self:InnerPad() + style.TITLE_INSET
   if left then
-    pixel:Point(freeText, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -(style.PAD + style.TITLE_INSET), style.FOOTER_TEXT)
+    pixel:Point(freeText, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -inset, style.FOOTER_TEXT)
   else
-    pixel:Point(freeText, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD + style.TITLE_INSET, style.FOOTER_TEXT)
+    pixel:Point(freeText, "BOTTOMLEFT", body, "BOTTOMLEFT", inset, style.FOOTER_TEXT)
   end
   local m = self.moneyFrame
   if m ~= nil then
@@ -3028,18 +3142,21 @@ function panelProto:BuildSparkles()
   fx:SetAllPoints(self.frame)
   fx:SetFrameLevel(self.frame:GetFrameLevel() + 50)
   local out = self:Outward()
-  -- Where the ribbon starts, from the panel's top left: 10 pixels outside the title.
-  local _, joinX, inward = self:TitleJoin()
+  -- Which way is in, across the cloud (the panel's side, which never changes).
+  local _, _, inward = self:TitleJoin()
   -- From the panel's top left, for its size now: the title's side the join is measured from (its
   -- left edge on the backpack, its right on the bank), where the ribbon starts, and the body's inner
   -- edge.
   local function titleEdge()
     if self.side == "LEFT" then
-      return self:BodyLeft() + self:BodyWidth() - (style.PAD + style.TITLE_INSET)
+      return self:BodyLeft() + self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
     end
-    return self:BodyLeft() + style.PAD + style.TITLE_INSET
+    return self:BodyLeft() + self:InnerPad() + style.TITLE_INSET
   end
+  -- Where the ribbon starts, from the panel's top left: the window's hard edge, the title's join read now (a theme
+  -- moves the title: its Pad and inset, a side rail).
   local function ribbonStart()
+    local _, joinX = self:TitleJoin()
     return titleEdge() + joinX
   end
   local function innerEdge()

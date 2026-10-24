@@ -217,7 +217,7 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 
 | Kind | Element | Style keys (defaults are Blizzard's) |
 |---|---|---|
-| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (`Color` fill, `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"`, `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
+| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (a `Color` fill, or art: `Texture` or `Atlas`, tinted by `VertexColor`, with `TexCoords`, `Alpha`, `BlendMode`; `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"` or art (`{ Texture or Atlas, Alpha, BlendMode }`: the icon's border drawn in it, tinted the quality's color at `Alpha`), `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
 | `Tab` | a bottom tab | `Art = "Flat"` (template art hidden; `Background`, `Border`, `Hover` (HIGHLIGHT layer), `Selected = { Background, Bar, Border }`: `Bar` is a texture spec with `Height` and `Points` (default along the top), `Border = { Color }` recolors the tab's border while it is selected or a drop target), `Height` (default 32), `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | a section title font string | `Font` (default `GameFontNormal`) |
 | `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
@@ -226,9 +226,14 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 | `EditBox` | `InputBoxTemplate` edit boxes | `Strip`, `Background`, `Border`, `Font` (the box's look before the first style that set one is put back by value; a box no style gave a font is never touched) |
 
 Details:
-- `DrawItemQuality(decoration, color, quality)` draws quality on the backdrop edge and returns
-  true only when the style takes quality (`QualityBorder = "Backdrop"`) and draws an edge;
-  otherwise BetterBags' quality glow draws it (item-drawing.md §5).
+- `DrawItemQuality(decoration, color, quality)` draws quality and returns true when the style takes
+  it: on the backdrop edge (`QualityBorder = "Backdrop"`, with an edge), or on the icon's border in the
+  style's art (`QualityBorder` a table: the art reset to its full coordinates in its blend mode,
+  tinted the quality's color or its `QualityColors` entry, Common included, at its `Alpha`; hidden for
+  no color); otherwise BetterBags' quality glow draws it (item-drawing.md §5). BetterBags' glow sets
+  its own art, blend, coordinates and color on every draw, so a theme switch away from an art border
+  needs no reset. `DrawItemQuest` frames a quest item in the same art, in `QuestBorderColor`. Added for
+  GW2_UI's item buttons (docs/next-gw2-theme.md); coverage `spec/sonata/elements_spec.lua` ("in art").
 - `DrawItemQuest(decoration, questInfo)` goes by the item's quest data (`isQuestItem`,
   `questID`, `isActive`, Blizzard's `UpdateQuestItem` arguments), never by whether the quest
   texture is shown: Classic's `IconQuestTexture` has no hidden attribute and is shown on every
