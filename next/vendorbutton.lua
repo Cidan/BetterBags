@@ -72,6 +72,7 @@ local COIN_ICONS = {
 ---@field durability Texture
 ---@field mode? NextVendorButtonMode
 ---@field item? NextVendorItem
+---@field quantity? number How many a shopping list buys of it, in the vendor's Shopping List.
 ---@field buyback? NextBuybackItem
 ---@field repair? NextRepairEntry
 local buttonProto = {}
@@ -358,13 +359,16 @@ function buttonProto:setCount(n)
   end
 end
 
--- SetBuy shows an item for sale.
+-- SetBuy shows an item for sale. With a quantity it is the item's button in the vendor's Shopping List
+-- (profession-shopping-list.md), a button of its own beside the item's in its category: its count is how
+-- many the list buys and its price what that many cost.
 ---@param item NextVendorItem
-function buttonProto:SetBuy(item)
-  self.mode, self.item = "buy", item
-  self.key = "vendor:" .. item.index
+---@param quantity? number
+function buttonProto:SetBuy(item, quantity)
+  self.mode, self.item, self.quantity = "buy", item, quantity
+  self.key = (quantity and "list:" or "vendor:") .. item.index
   self:reset(item.texture, item.quality)
-  self:setCount(item.stackCount)
+  self:setCount(quantity or item.stackCount)
   if item.numAvailable and item.numAvailable >= 0 then
     self.stock:SetText("(" .. item.numAvailable .. ")")
     self.stock:Show()
@@ -385,7 +389,11 @@ function buttonProto:SetBuy(item)
   self.icon:SetDesaturated(item.isKnownHeirloom)
   self:setAffordable(item.canAfford and true or false)
   self:setName(item.name, item.quality)
-  self.price:SetText(vendorButton:PriceText(item.price, item.costs))
+  if quantity then
+    self.price:SetText(vendorButton:PriceText(merchant:PriceOf(item, quantity)))
+  else
+    self.price:SetText(vendorButton:PriceText(item.price, item.costs))
+  end
 end
 
 -- setAffordable writes the price in the theme's role for whether the player can afford it.
@@ -458,6 +466,9 @@ function buttonProto:OnEnter()
     end
     GameTooltip:AddLine(" ")
     addCosts(item.price, item.costs)
+    if self.quantity then
+      GameTooltip:AddLine(format(L:G("Your shopping list needs %d"), self.quantity), 1, 1, 1)
+    end
     GameTooltip:AddLine(L:G("Right-click to buy"), 0.8, 0.8, 0.8)
     if item.maxStack > 1 then
       GameTooltip:AddLine(L:G("Shift-click to buy a quantity"), 0.8, 0.8, 0.8)

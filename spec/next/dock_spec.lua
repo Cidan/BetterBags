@@ -470,6 +470,43 @@ describe("NextDock", function()
       finishTweens()
     end)
 
+    -- A purchase's items go to the backpack, not into the panel it waited in (profession-shopping-list.md).
+    it("flies into the middle of where its offer says its items went", function()
+      local into = CreateFrame("Frame", nil, UIParent)
+      into:_SetRect(900, 200, 300, 400)
+      local o = offer({ answer = "moved" })
+      o.destination = function() return into end
+      local entry = dock("B", o)
+      settle()
+      finishTweens()
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      doubleClick(entry)
+      tween:Step(style.Time.FlyAway - 0.00001)
+      local frame = section("B").frame
+      local s = frame:GetScale()
+      local _, _, _, ox, oy = frame:GetPoint(1)
+      local w, h = frame:GetWidth(), section("B").height or frame:GetHeight()
+      assert.is_true(math.abs(ox * s + w / 2 * s - 1050) < 1, "the destination's middle")
+      assert.is_true(math.abs(oy * s - h / 2 * s - 400) < 1)
+      finishTweens()
+      assert.is_true(source.content:IsLeaving(section("B")))
+      assert.is_false(section("B").frame:IsShown())
+    end)
+
+    it("leaves at once, flying nowhere, when where its items went is not there", function()
+      local o = offer({ answer = "moved" })
+      o.destination = function() return nil end
+      local entry = dock("B", o)
+      settle()
+      finishTweens()
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      doubleClick(entry)
+      assert.is_nil(entry.flight)
+      assert.are.equal(source.content.frame, section("B").frame:GetParent())
+      assert.is_false(section("B").frame:IsShown())
+      assert.is_true(source.content:IsLeaving(section("B")))
+    end)
+
     it("sends it back to its place in its bag on a right click", function()
       section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
       local o = offer()
@@ -594,6 +631,23 @@ describe("NextDock", function()
         assert.is_false(source.content:IsAway(section(name)))
         assert.are.equal(source.content.frame, section(name).frame:GetParent())
       end
+    end)
+
+    -- A vendor's own Shopping List leaves with the vendor in its card as it slides out; sections from other
+    -- panels go home at once (profession-shopping-list.md §4).
+    it("sends back at once only what came from other panels, a panel's own sections staying in their cards", function()
+      target.content:Bind(ctx(), { sortedItems = {}, tabs = { [1] = { categories = { { name = "Own" } },
+        items = { item("1_1", "Own") } } } }, 1, {})
+      draw(target.content)
+      local own = nextDock:Add(target, { section = target.content.byName.Own, source = target, offer = offer() })
+      dock("A")
+      settle()
+      nextDock:SendBackBorrowed(target)
+      assert.are.same({ own }, nextDock:Entries(target))
+      assert.is_false(source.content:IsAway(section("A")))
+      assert.is_true(target.content:IsAway(target.content.byName.Own))
+      nextDock:PanelHidden(target)
+      assert.are.same({}, nextDock:Entries(target))
     end)
 
     it("sends its sections back at once when their bag closes", function()

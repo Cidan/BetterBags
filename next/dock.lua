@@ -44,6 +44,7 @@ local nextDock = addon:NewModule('NextDock')
 ---@field tooltip? fun(owner: Frame) What hovering its card shows.
 ---@field docked? fun(entry: NextDockEntry) Called once it is docked: an offer that acts on its own (a sale selling one item at a time) answers later, with NextDock:Answer.
 ---@field cancel? fun() Called when it leaves the dock, whichever way: whatever it started stops.
+---@field destination? fun(): Frame? Where its items went when it moves, when that is not the panel (a purchase: the backpack). It flies into its middle, or nowhere when there is none.
 
 -- NextDockSpec is what Add docks.
 ---@class NextDockSpec
@@ -168,6 +169,23 @@ function nextDock:PanelHidden(panel)
       if list.panel == panel or entry.source == panel then
         list:SendBackNow(entry)
       end
+    end
+  end
+end
+
+-- SendBackBorrowed sends back at once what waits in a panel that came from other panels, as it closes
+-- while they stay open (a vendor visit ending); its own sections stay in their cards and leave with it
+-- (its Shopping List, profession-shopping-list.md §4), until it has hidden (PanelHidden).
+---@param panel NextPanelFrame
+function nextDock:SendBackBorrowed(panel)
+  local list = self.lists[panel]
+  if list == nil then
+    return
+  end
+  for i = #list.entries, 1, -1 do
+    local entry = list.entries[i]
+    if entry.source ~= panel then
+      list:SendBackNow(entry)
     end
   end
 end
@@ -486,15 +504,21 @@ function listProto:remove(entry)
 end
 
 -- FlyAway flies a section whose items moved into the panel (the tab it came in by, else the middle of
--- the panel's scroll area), shrinking and fading, then puts it back in its bag's column hidden and
--- leaving (until its category is gone from it), and pulses the tab.
+-- the panel's scroll area), or into where its offer says they went (destination; no flight when that is
+-- not there), shrinking and fading, then puts it back in its bag's column hidden and leaving (until its
+-- category is gone from it), and pulses the tab.
 ---@param entry NextDockEntry
 function listProto:FlyAway(entry)
   local section, canvas = entry.section, entry.source.content
   local frame = section.frame
   local from = lift:ScreenPoint(frame)
   local x, y
-  if entry.tab then
+  if entry.offer.destination then
+    local into = entry.offer.destination()
+    if into ~= nil then
+      x, y = lift:Center(into)
+    end
+  elseif entry.tab then
     x, y = lift:Center(entry.tab.button)
   else
     x, y = lift:Center(self.panel.scroll.frame)

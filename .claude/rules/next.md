@@ -587,8 +587,9 @@ kept a gap) and a separate destroy card along the vendor's bottom; both are gone
   dock (an answer, a right click, a panel closing, its bag dropping it) calls the offer's `cancel`, which
   stops what it started.
 - **Answers:** a double click (`confirm`) and a left click (`click`) go to the offer: "moved" flies the
-  section into the panel (the tab it came in by, else the scroll area's middle; `NextLift:FlyAway`),
-  then it returns to its bag's column hidden and leaving (`MarkLeaving`, as a move's section does) and
+  section into the panel (the tab it came in by, else the scroll area's middle; `NextLift:FlyAway`), or
+  into where the offer says its items went (`destination`: a purchase into the backpack, nowhere when
+  that is not there; profession-shopping-list.md §5), then it returns to its bag's column hidden and leaving (`MarkLeaving`, as a move's section does) and
   the tab pulses; "stay" keeps it, reading its card again (its hovered tooltip too); "back" sends it
   back. A right click sends it back: it flies to its place in its bag's column, which makes room for it
   (`NextContent:Returning`), and takes it (`Return`). Clicks are the hardware event selling, moving and
@@ -866,6 +867,11 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   confirms, or that holds items no merchant buys to destroy, docks in the vendor once the backpack and
   the vendor show (`OfferAutomation`), in the same dock a dragged section's sale waits in (§7), red while
   destroying. The vendor keeps no room of its own for it: its `ContentBottom` is the panel's.
+- **The Shopping List** (profession-shopping-list.md): with Profession Shopping List loaded, what its list
+  buys here is a section at the top of Buy on buttons of its own, docked once a visit in the same dock
+  (in its card from the vendor's first layout) glowing in `Dock.BuyColor`, bought with a double click (it
+  flies into the backpack). The merchant closing sends back only other panels' sections
+  (`NextDock:SendBackBorrowed`); the Shopping List leaves with the vendor in its card.
 - **Masque:** each button is a card the canvas places (`frame`, the icon with its name and price)
   holding the square button that takes the clicks (`button`), so Masque, which sizes a skin to the
   button it skins (Masque 12.1.0 `Core.lua` `UpdateScale`), skins the icon alone. The button carries

@@ -248,6 +248,24 @@ describe("NextVendorButton", function()
       return amount .. "|T" .. texture .. ":" .. size .. ":" .. size .. ":2:0|t"
     end
 
+    -- In the vendor's Shopping List (profession-shopping-list.md): how many the list buys, and what that
+    -- many costs (NextMerchant:PriceOf).
+    it("shows how many a shopping list buys of it and what they cost, and its own count again after", function()
+      override(stubs.merchant, "PriceOf", function(_, i, quantity)
+        return i.price * quantity / i.stackCount, { { texture = 77, value = quantity } }
+      end)
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ price = 100, stackCount = 5 }), 7)
+      assert.are.equal("list:4", b.key, "a button of its own beside the vendor's")
+      assert.are.equal("7", b.count:GetText())
+      assert.is_true(b.count:IsShown())
+      assert.are.equal(vendorButton:PriceText(140, { { texture = 77, value = 7 } }), b.price:GetText())
+      b:SetBuy(item({ price = 100, stackCount = 5 }))
+      assert.are.equal("vendor:4", b.key)
+      assert.are.equal("5", b.count:GetText())
+      assert.are.equal(vendorButton:PriceText(100, {}), b.price:GetText())
+    end)
+
     it("prices it on one line: each coin it has, then each other cost", function()
       assert.are.equal(coin(12, GOLD) .. " " .. coin(34, SILVER) .. " " .. coin(56, COPPER),
         vendorButton:PriceText(123456, {}))
@@ -435,6 +453,22 @@ describe("NextVendorButton", function()
       b:SetBuy(item({ canAfford = false }))
       enter(b)
       assert.are.equal("BUY_ERROR_CURSOR", _G._cursor)
+    end)
+
+    it("says how many a shopping list needs, then only as long as it shows them", function()
+      override(stubs.merchant, "PriceOf", function(_, i) return i.price, {} end)
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ price = 1500 }), 7)
+      enter(b)
+      local text = {}
+      for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
+      assert.are.same({ " ", "Price: 15s", "Your shopping list needs 7", "Right-click to buy",
+        "Shift-click to buy a quantity" }, text)
+      b:SetBuy(item({ price = 1500 }))
+      enter(b)
+      text = {}
+      for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
+      assert.are.same({ " ", "Price: 15s", "Right-click to buy", "Shift-click to buy a quantity" }, text)
     end)
 
     it("shows a buyback's and a repair's", function()

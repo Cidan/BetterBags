@@ -49,7 +49,7 @@ describe("Core Init and Enable flow", function()
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
-      "GuildBank", "NextGuildBank", "Automation", "Seller"
+      "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList"
     }
 
     for _, name in ipairs(modules) do
@@ -232,6 +232,16 @@ describe("Core Init and Enable flow", function()
     addon:OnEnable()
     assert.spy(s.Init).was.called(1)
     assert.spy(s.Enable).was.called(1)
+  end)
+
+  -- The Profession Shopping List integration listens to its list, or waits for it to load, from its
+  -- OnEnable (profession-shopping-list.md).
+  it("enables the Profession Shopping List integration", function()
+    local shoppingList = addon:GetModule("ProfessionShoppingList")
+    shoppingList.Enable = spy.new(function() end)
+    addon:OnInitialize()
+    addon:OnEnable()
+    assert.spy(shoppingList.Enable).was.called(1)
   end)
 
   it("enables the changelog window", function()

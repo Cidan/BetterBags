@@ -429,10 +429,13 @@ describe("SonataNext", function()
         Sparkles = { Colors = { "Gold", "Ghost" } },
         Motion = { Ease = { Open = "wobbly" } },
         Fonts = { Title = { Color = "AlsoNope" } },
+        Dock = { DestroyColor = "Blood", BuyColor = "Moss" },
       })
       local problems = sonataNext:Check("Broken")
       table.sort(problems)
       assert.are.same({
+        "Dock.BuyColor: no color named Moss",
+        "Dock.DestroyColor: no color named Blood",
         "Fonts.Title.Color: no color named AlsoNope",
         "Header.Buttons.ArtColor: no color named Pale",
         "Header.Cloud.Texture: no texture named NoArt",

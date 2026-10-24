@@ -33,6 +33,7 @@ local stubs = {
   question = trackStub("Question"),
   automation = trackStub("Automation"),
   seller = trackStub("Seller"),
+  shoppingList = trackStub("ProfessionShoppingList"),
 }
 
 local replaced = {}
@@ -242,6 +243,34 @@ describe("NextVendor", function()
     override(stubs.automation, "MerchantBuys", function() return data.buys ~= false end)
     override(stubs.merchant, "RepairAll", function(_, guild) table.insert(calls.repairAll, guild) end)
     override(stubs.merchant, "Purchase", function(_, frame, i) table.insert(calls.purchase, i) end)
+    -- Profession Shopping List (integrations/professionshoppinglist.lua), stood in for: not there unless a
+    -- test says so; what its list needs (data.needs, by item ID); its purchases counted.
+    data.listAvailable, data.needs, calls.bought = false, {}, 0
+    override(stubs.shoppingList, "Available", function() return data.listAvailable end)
+    override(stubs.shoppingList, "Needs", function() return data.listAvailable and data.needs or {} end)
+    override(stubs.shoppingList, "Buy", function()
+      if not data.listAvailable then return false end
+      calls.bought = calls.bought + 1
+      return true
+    end)
+    -- NextMerchant's purchases, stood in for as it works them out (spec/next/merchant_spec.lua): the first
+    -- item of each needed ID that can be bought; a quantity's price per unit of a purchase.
+    override(stubs.merchant, "ToBuy", function(_, list, needs)
+      local out, seen = {}, {}
+      for _, i in ipairs(list) do
+        if needs[i.itemID] and not seen[i.itemID] then
+          seen[i.itemID] = true
+          if i.isPurchasable then table.insert(out, { item = i, quantity = needs[i.itemID] }) end
+        end
+      end
+      return out
+    end)
+    override(stubs.merchant, "PriceOf", function(_, i, quantity) return i.price * quantity / i.stackCount, {} end)
+    override(stubs.merchant, "TotalOf", function(_, purchases)
+      local total = 0
+      for _, p in ipairs(purchases) do total = total + p.item.price * p.quantity / p.item.stackCount end
+      return total, {}
+    end)
     override(stubs.question, "YesNo", function(_, title, text, yes, no) asked = { title = title, text = text, yes = yes, no = no } end)
     override(C_Timer, "After", function(_, fn) table.insert(timers, fn) end)
     override(_G, "PlaySound", function() end)
@@ -1140,6 +1169,249 @@ describe("NextVendor", function()
 
   -- Switching between the classic design and BetterBags Next without a reload (next.md §11): the
   -- vendor is switched only away from a vendor, and catches up when the next one opens.
+  -- Profession Shopping List (profession-shopping-list.md). Asked: "if a vendor has items the user has on
+  -- their list, just like we have the sell or destroy, let's add a 'double click to buy' in the same exact
+  -- style, but, with a glowing green outline instead", "with the items in it to buy, and total price to
+  -- buy", and nothing of it without Profession Shopping List and its new function.
+  describe("the shopping list (Profession Shopping List)", function()
+    local backpack
+
+    local function send(name, ...)
+      for _, fn in ipairs(messages[name] or {}) do fn(ctx(), ...) end
+    end
+
+    local function listEntry(v)
+      return nextDock:EntryOf(v, "Shopping List")
+    end
+
+    local function namesOf(section)
+      local out = {}
+      for _, e in ipairs(section.entries) do table.insert(out, e.item.item.index) end
+      return out
+    end
+
+    local function textOf(e)
+      return { e.box.title:GetText(), e.box.warning:GetText(), e.box.hint:GetText() }
+    end
+
+    local function doubleClick(e)
+      e.catcher:GetScript("OnDoubleClick")(e.catcher, "LeftButton")
+    end
+
+    local function rightClick(e)
+      e.catcher:GetScript("OnClick")(e.catcher, "RightButton")
+    end
+
+    before_each(function()
+      local frame = CreateFrame("Frame", nil, UIParent)
+      frame:Show()
+      backpack = { frame = frame, scroll = { frame = CreateFrame("Frame", nil, frame) }, closing = false }
+      function backpack:IsShown() return self.frame:IsShown() end
+      override(addon, "Bags", { Backpack = backpack })
+      data.items = { forSale(1, "Food", { price = 200, stackCount = 5 }), forSale(2, "Armor"), forSale(3, "Food"),
+        forSale(4, "Mats") }
+    end)
+
+    it("shows nothing of it without Profession Shopping List", function()
+      data.needs = { [1] = 10 }
+      local v = open()
+      send("next/PanelShown", v)
+      assert.are.same({ "Armor", "Food", "Mats" }, sectionNames(v))
+      assert.are.same({}, nextDock:Entries(v))
+    end)
+
+    -- Asked: "we can have duplicate item buttons in the vendor frame, shopping list + regular vendor item
+    -- frames".
+    it("puts what the list buys here in a Shopping List of its own buttons, each with how many, leaving the vendor's categories whole", function()
+      data.listAvailable, data.needs = true, { [1] = 10, [4] = 3 }
+      local v = open()
+      assert.are.same({ "Shopping List", "Armor", "Food", "Mats" }, sectionNames(v))
+      assert.are.same({ 1, 4 }, namesOf(v.content.byName["Shopping List"]))
+      assert.are.same({ 1, 3 }, namesOf(v.content.byName.Food))
+      assert.are.same({ 4 }, namesOf(v.content.byName.Mats))
+      assert.are.equal("10", v.buttons["list:1"].count:GetText())
+      assert.are.equal("3", v.buttons["list:4"].count:GetText())
+      assert.are.equal("5", v.buttons["vendor:1"].count:GetText(), "the vendor's own button shows its stack")
+      assert.are_not.equal(v.buttons["list:1"], v.buttons["vendor:1"])
+    end)
+
+    -- Asked: "make the item frame appear directly in the buy screen at the start when we open it? right
+    -- now it's on the list for a split second then slides to the buy frame".
+    it("is in its card as the vendor opens, never shown in the vendor's column first", function()
+      data.listAvailable, data.needs = true, { [1] = 10, [4] = 3 }
+      local placed = {}
+      local place = motion.Place
+      override(motion, "Place", function(self, frame, relativeTo, ...)
+        table.insert(placed, { frame = frame, relativeTo = relativeTo })
+        return place(self, frame, relativeTo, ...)
+      end)
+      local v = open()
+      local e = listEntry(v)
+      local frame = v.content.byName["Shopping List"].frame
+      for _, p in ipairs(placed) do
+        assert.is_false(p.frame == frame and p.relativeTo == v.content.frame, "never placed in the column")
+      end
+      assert.is_not_nil(e)
+      assert.is_nil(e.flight, "seated at once, not flown in from a place in the column")
+      assert.is_true(e.seated)
+      assert.are.equal(e.box.frame, v.content.byName["Shopping List"].frame:GetParent())
+      assert.is_true(v.content:IsAway(v.content.byName["Shopping List"]))
+    end)
+
+    it("says in the theme's buy color what it buys and the total", function()
+      data.listAvailable, data.needs = true, { [1] = 10, [4] = 3 }
+      local v = open()
+      local e = listEntry(v)
+      assert.are.same({ "Buy 2 items?", "Total: " .. vendorButton:PriceText(700, {}),
+        "Double-click to buy · Right-click to cancel" }, textOf(e))
+      local r, g, b = e.box.glow[1]:GetVertexColor()
+      local er, eg, eb = style:RGBA(style.Theme.Dock.BuyColor)
+      assert.are.same({ er, eg, eb }, { r, g, b })
+      data.needs = { [4] = 1 }
+      eventsRegistered["MERCHANT_UPDATE"](ctx())
+      assert.are.equal("Buy 1 item?", e.box.title:GetText())
+    end)
+
+    it("buys on a double click through Profession Shopping List, flying into the backpack", function()
+      data.listAvailable, data.needs = true, { [1] = 10 }
+      local v = open()
+      local e = listEntry(v)
+      assert.are.equal(backpack.scroll.frame, e.offer.destination())
+      doubleClick(e)
+      assert.are.equal(1, calls.bought)
+      assert.are.same({}, nextDock:Entries(v))
+      finishTweens()
+      assert.is_true(v.content:IsLeaving(v.content.byName["Shopping List"]))
+      data.needs = {}
+      eventsRegistered["BAG_UPDATE_DELAYED"](ctx())
+      assert.are.same({ "Armor", "Food", "Mats" }, sectionNames(v), "bought: the list is gone")
+    end)
+
+    it("flies nowhere when the backpack is not shown", function()
+      data.listAvailable, data.needs = true, { [1] = 10 }
+      local v = open()
+      send("next/PanelShown", v)
+      backpack.frame:Hide()
+      assert.is_nil(listEntry(v).offer.destination())
+    end)
+
+    it("buys nothing, and goes back, once the vendor is closing or the merchant has closed", function()
+      data.listAvailable, data.needs = true, { [1] = 10 }
+      local v = open()
+      send("next/PanelShown", v)
+      local e = listEntry(v)
+      v.closing = true
+      assert.are.equal("back", e.offer.confirm(ctx()))
+      v.closing = false
+      v.atMerchant = false
+      assert.are.equal("back", e.offer.confirm(ctx()))
+      assert.are.equal(0, calls.bought)
+    end)
+
+    -- As at the start: never shown in the vendor's column on the way out.
+    it("slides out with the vendor in its card when the merchant closes, going back once the vendor has gone", function()
+      data.listAvailable, data.needs = true, { [1] = 10 }
+      local v = open()
+      local e = listEntry(v)
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      assert.are.equal(e, listEntry(v))
+      assert.is_true(v.content:IsAway(v.content.byName["Shopping List"]))
+      finishTweens()
+      assert.is_false(v.frame:IsShown())
+      v.frame:GetScript("OnHide")(v.frame)
+      assert.is_nil(listEntry(v))
+    end)
+
+    it("is not offered as the vendor closes, nor once it has", function()
+      data.listAvailable = true
+      local v = open()
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      assert.is_true(v.closing)
+      data.needs = { [1] = 10 }
+      eventsRegistered["BAG_UPDATE_DELAYED"](ctx())
+      assert.is_nil(listEntry(v), "not while it slides out")
+      finishTweens()
+      send("next/PanelShown", backpack)
+      assert.is_nil(listEntry(v), "not once it has gone")
+    end)
+
+    it("goes back to the top of Buy on a right click, and is not offered again this visit", function()
+      data.listAvailable, data.needs = true, { [1] = 10 }
+      local v = open()
+      send("next/PanelShown", v)
+      rightClick(listEntry(v))
+      finishTweens()
+      assert.is_false(v.content:IsAway(v.content.byName["Shopping List"]))
+      assert.are.equal("Shopping List", sectionNames(v)[1])
+      send("next/PanelShown", v)
+      eventsRegistered["MERCHANT_UPDATE"](ctx())
+      assert.is_nil(listEntry(v))
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      finishTweens()
+      eventsRegistered["MERCHANT_SHOW"](ctx())
+      finishTweens()
+      send("next/PanelShown", v)
+      assert.is_not_nil(listEntry(v), "offered again at the next visit")
+    end)
+
+    it("waits in the dock on the other tabs, out of their columns", function()
+      data.listAvailable, data.needs = true, { [1] = 10 }
+      local v = open()
+      send("next/PanelShown", v)
+      local e = listEntry(v)
+      data.buyback = {}
+      click(v.tabs.tabs[2].button)
+      finishTweens()
+      assert.are.equal(e, listEntry(v))
+      assert.is_true(v.content:IsAway(v.content.byName["Shopping List"]))
+      assert.is_true(v.emptyText:IsShown(), "Buyback says nothing was sold")
+      click(v.tabs.tabs[1].button)
+      finishTweens()
+      assert.are.equal(e, listEntry(v))
+    end)
+
+    it("goes when the list needs nothing more from this vendor", function()
+      data.listAvailable, data.needs = true, { [1] = 10 }
+      local v = open()
+      send("next/PanelShown", v)
+      data.needs = { [99] = 4 }
+      eventsRegistered["MERCHANT_UPDATE"](ctx())
+      assert.is_nil(listEntry(v))
+      assert.are.same({ "Armor", "Food", "Mats" }, sectionNames(v))
+    end)
+
+    it("is offered straight into its card when the list changes during a visit", function()
+      data.listAvailable = true
+      local v = open()
+      send("next/PanelShown", v)
+      assert.is_nil(listEntry(v))
+      data.needs = { [4] = 2 }
+      send("shoppingList/Changed")
+      assert.is_not_nil(listEntry(v))
+      assert.is_nil(listEntry(v).flight)
+    end)
+
+    it("dims the Shopping List's buttons as a search dims their items", function()
+      data.listAvailable, data.needs = true, { [1] = 10, [4] = 3 }
+      local v = open()
+      data.search = { ["vendor:4"] = true }
+      v.searchBox.textBox:SetText("mats")
+      v.searchBox.textBox:GetScript("OnTextChanged")(v.searchBox.textBox, true)
+      assert.are.equal(0.25, v.buttons["list:1"].frame:GetAlpha())
+      assert.are.equal(1, v.buttons["list:4"].frame:GetAlpha())
+      assert.are.equal(1, v.buttons["vendor:4"].frame:GetAlpha())
+    end)
+
+    it("leaves out what cannot be bought, as Profession Shopping List would", function()
+      data.listAvailable, data.needs = true, { [2] = 1 }
+      data.items[2].isPurchasable = false
+      local v = open()
+      send("next/PanelShown", v)
+      assert.is_nil(listEntry(v))
+      assert.are.same({ "Armor", "Food", "Mats" }, sectionNames(v))
+    end)
+  end)
+
   describe("switching designs (Deactivate, Activate)", function()
     it("hides at once and lets go of every button", function()
       local v = open()

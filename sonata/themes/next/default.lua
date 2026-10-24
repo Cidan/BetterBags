@@ -57,6 +57,8 @@ sonataNext:RegisterTheme({
     Danger = { 1, 0.45, 0.45, 1 },
     -- The vendor's destroy card's glow (Dock.DestroyColor, automation.md §4).
     Crimson = { 0.86, 0.08, 0.24, 1 },
+    -- The vendor's buy card's glow (Dock.BuyColor, profession-shopping-list.md).
+    Emerald = { 0.2, 0.86, 0.42, 1 },
     -- The settings window's sidebar, over its body: darker.
     Sidebar = { 0, 0, 0, 0.28 },
   },
@@ -528,6 +530,8 @@ sonataNext:RegisterTheme({
     HintFont = "ConfirmHint",
     -- A section waiting to be destroyed (automation.md §4) glows in this color.
     DestroyColor = "Crimson",
+    -- A shopping list waiting to be bought (profession-shopping-list.md) glows in this color.
+    BuyColor = "Emerald",
   },
 
   -- The vendor's buttons: dimmed when a search leaves them out; lit under the pointer; tinted when

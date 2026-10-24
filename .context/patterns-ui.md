@@ -255,3 +255,12 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 ## Whole UI Units Are Not Whole Screen Pixels
 **Problem**: a UI unit is a whole screen pixel only when the screen is 768 pixels high at a UI scale of 1. At 65% in a 3396x1362 window it is 1.153 pixels, so frames and lines placed in whole units land between pixels, and the client snaps each texture to the grid on its own: a 1-unit edge drew one pixel thick, two, or not at all (the theme card that lost its top edge at 65% and its bottom edge at 70%). Anchoring by a middle point (`CENTER`, `LEFT`, `RIGHT`) puts a region between two pixels whenever the region it is anchored to is an odd number of pixels across, and anchoring after a text's far edge follows the client's fractional measure of the text.
 **Solution**: round every length and offset to whole screen pixels on the grid of the region it is used in (`NextPixel`: one pixel is `PixelUtil.GetPixelToUIUnitFactor()` over the region's effective scale), anchor by corners from aligned regions, center by a corner offset with the odd pixel after (`pixel:Middle`, `pixel:Row`, `pixel:Center`), place what follows a text by the text's width or height rounded up, and lay everything out again when the grid changes (UI scale, window size, a frame's own scale). Check it with the spec layout resolver (`spec/helpers/layout.lua`, `PixelCheck`) on real screen sizes. next-pixel-perfect.md.
+
+## A Docked Section Flies to Where Its Items Went
+**Problem**: Every move waiting for the player waits in `NextDock`, and a "moved" answer flew the section
+into the panel it waited in: right for a sale or a deposit (the items went there), wrong for a purchase,
+whose section is the vendor's own items, going to the backpack.
+
+**Rule**: Extend the dock, never build a second card: an offer may give `destination()`, the frame its
+items went to; the section flies into its middle, or nowhere when it returns nil (that place is not
+shown). The vendor's Shopping List gives the backpack's scroll area (profession-shopping-list.md §5).

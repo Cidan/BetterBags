@@ -353,7 +353,7 @@ end
 local COLOR_KEYS = {
   Color = true, Fill = true, SelectedFill = true, FocusFill = true, HoverColor = true, FocusColor = true,
   BeadColor = true, KnotColor = true, Unusable = true, SoldOut = true, SoldOutUnusable = true,
-  ArtColor = true, ArtHoverColor = true, IconColor = true,
+  ArtColor = true, ArtHoverColor = true, IconColor = true, DestroyColor = true, BuyColor = true,
 }
 -- The controls' fills and edges are texture specs whose Color is checked as any Color is.
 -- Tables whose values name palette colors.
