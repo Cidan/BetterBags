@@ -154,6 +154,29 @@ describe("render pipeline and Sonata load order", function()
     pipe:close()
   end)
 
+  -- The Guild Wars 2 themes need GW2_UI loaded when BetterBags starts its themes (SonataNext's Requires, Sonata's
+  -- Available); GW2_UI supports every client (docs/next-gw2-theme.md).
+  it("loads GW2_UI before BetterBags on every client", function()
+    local pipe = io.popen("ls *.toc")
+    local count = 0
+    for path in pipe:lines() do
+      local f = assert(io.open(path, "r"))
+      local deps
+      for line in f:lines() do
+        deps = deps or line:match("^## OptionalDeps:%s*(.-)%s*$")
+      end
+      f:close()
+      local listed = false
+      for name in (deps or ""):gmatch("[^,%s]+") do
+        listed = listed or name == "GW2_UI"
+      end
+      assert.is_true(listed, path)
+      count = count + 1
+    end
+    pipe:close()
+    assert.are.equal(5, count)
+  end)
+
   -- BetterBags Next's theme engine and themes (next-themes.md): the resolver before both engines,
   -- the Next engine after Sonata's, and every Next theme after it and before next\style.lua, which
   -- reads Default when it loads.

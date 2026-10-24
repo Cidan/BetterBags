@@ -7,6 +7,17 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 local layout = dofile("spec/helpers/layout.lua")
 
 LoadBetterBagsModule("core/context.lua")
+-- The panels a piece may be on are named by their bag kinds (core/constants.lua), the kinds another spec's
+-- Constants stub leaves out added for this one.
+local const, createdConstants = StubBetterBagsModule("Constants")
+const.BAG_KIND = const.BAG_KIND or {}
+local addedKinds = {}
+for name, kind in pairs({ UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = 2 }) do
+  if const.BAG_KIND[name] == nil then
+    const.BAG_KIND[name] = kind
+    table.insert(addedKinds, name)
+  end
+end
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextOrnaments", "next/ornaments.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -22,13 +33,13 @@ describe("NextOrnaments", function()
 
   -- panelOn makes what the ornaments read of a panel: its frame, its body (filling it here), the screen side it
   -- belongs to, and its size.
-  local function panelOn(side, small)
+  local function panelOn(side, small, kind)
     local frame = CreateFrame("Frame", nil, UIParent)
     frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", pixel:Snap(UIParent, 100), -pixel:Snap(UIParent, 50))
     pixel:Size(frame, 400, 600)
     local body = CreateFrame("Frame", nil, frame)
     body:SetAllPoints(frame)
-    local panel = { frame = frame, body = body, side = side, small = small == true }
+    local panel = { frame = frame, body = body, side = side, small = small == true, kind = kind or 0 }
     function panel:IsSmall() return self.small end
     panel.ornaments = ornaments:Create(panel)
     return panel
@@ -159,6 +170,47 @@ describe("NextOrnaments", function()
       panel.small = true
       panel.ornaments:Layout()
       assert.are.same({ false, true, true }, { texture(panel, 1):IsShown(), texture(panel, 2):IsShown(), texture(panel, 3):IsShown() })
+    end)
+
+    -- Art that is part of its file (GW2_UI's header and footer bands, docs/next-gw2-theme.md).
+    it("crops a piece's art to its TexCoords, mirrored on the other side, through a resize", function()
+      theme({
+        { Texture = "Leaf", Point = "TOPOUTER", Width = 32, Height = 16, TexCoords = { 0.25, 1, 0.3, 0.9 } },
+        { Texture = "Roots", Point = "BOTTOM", Height = 34, TexCoords = { 0, 1, 0, 0.53 } },
+      })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local function coords(t)
+        local ulx, uly, _, lly, urx = t:GetTexCoord()
+        return { ulx, urx, uly, lly }
+      end
+      assert.are.same({ 0.25, 1, 0.3, 0.9 }, coords(texture(panel, 1)))
+      assert.are.same({ 0, 1, 0, 0.53 }, coords(texture(panel, 2)))
+      pixel:Size(panel.frame, 500, 700)
+      panel.body:GetScript("OnSizeChanged")(panel.body, 500, 700)
+      assert.are.same({ 0.25, 1, 0.3, 0.9 }, coords(texture(panel, 1)), "kept as the body changes size")
+      local mirrored = panelOn("LEFT")
+      mirrored.ornaments:Style()
+      assert.are.same({ 1, 0.25, 0.3, 0.9 }, coords(texture(mirrored, 1)))
+      assert.are.same({ 1, 0, 0, 0.53 }, coords(texture(mirrored, 2)))
+    end)
+
+    -- GW2_UI puts its bag's emblem on its bag, bank and guild bank, and another on its merchant.
+    it("shows a piece only on the panels it names, and everywhere without Panels", function()
+      theme({
+        { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Panels = { "Backpack", "Bank", "GuildBank" } },
+        { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Panels = { "Vendor" } },
+        { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10 },
+      })
+      local function shown(kind)
+        local panel = panelOn("RIGHT", false, kind)
+        panel.ornaments:Style()
+        return { texture(panel, 1):IsShown(), texture(panel, 2):IsShown(), texture(panel, 3):IsShown() }
+      end
+      assert.are.same({ true, false, true }, shown(0), "the backpack")
+      assert.are.same({ true, false, true }, shown(1), "the bank")
+      assert.are.same({ true, false, true }, shown(2), "the guild bank")
+      assert.are.same({ false, true, true }, shown(-1), "the vendor")
     end)
 
     it("repeats its art down the body's height as the body changes size", function()
@@ -333,5 +385,10 @@ describe("NextOrnaments", function()
       assert.is_false(groups.Sway:IsPlaying())
       assert.is_true(groups.Pulse:IsPlaying())
     end)
+  end)
+
+  teardown(function()
+    for _, name in ipairs(addedKinds) do const.BAG_KIND[name] = nil end
+    if createdConstants then ResetModuleStub("Constants") end
   end)
 end)

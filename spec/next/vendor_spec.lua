@@ -429,6 +429,41 @@ describe("NextVendor", function()
       v:ApplyStyle(ctx())
     end)
 
+    -- A theme that puts the header buttons down a side rail (Header.Buttons.Rail, docs/next-gw2-theme.md): down the
+    -- vendor's right, its inner side, the name taking the whole header row.
+    it("puts its buttons down a side rail on its right, its name the whole header row", function()
+      _G._merchant.canRepair, _G._merchant.canGuildRepair = true, true
+      local v = open()
+      UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 66, Gap = 8 } } } })
+      v:ApplyStyle(ctx())
+      local y = 66
+      for _, button in ipairs(v.headerButtons) do
+        if button:IsShown() then
+          assert.are.same({ "TOPRIGHT", v.body, "TOPRIGHT", -9, -y }, { button:GetPoint(1) }, button.key)
+          y = y + style.HEADER_BUTTON + 8
+        end
+      end
+      assert.are.equal(style.BODY_WIDTH - 40 - (style.PAD + 4) - style.PAD - 12, v.title:GetWidth())
+      UseNextTheme(nil)
+      v:ApplyStyle(ctx())
+    end)
+
+    -- GW2_UI's merchant frame shows its own emblem (Immersive/Skins/merchant.lua), its bags another.
+    it("shows GW2_UI's merchant emblem in the Guild Wars 2 theme, not its bag's", function()
+      local v = open()
+      style:Use(addon:GetModule("SonataNext"):Resolve("GW2"))
+      v:ApplyStyle(ctx())
+      local shown = {}
+      for i = 1, v.ornaments.count do
+        local piece = v.ornaments.pieces[i]
+        shown[piece.spec.Texture] = piece.texture:IsShown()
+      end
+      assert.is_true(shown.VendorEmblem)
+      assert.is_false(shown.BagEmblem)
+      UseNextTheme(nil)
+      v:ApplyStyle(ctx())
+    end)
+
     it("hides the filter where a game rule turns it off", function()
       _G._gameRules[Enum.GameRule.MerchantFilterDisabled] = true
       local v = open()

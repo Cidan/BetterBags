@@ -9,7 +9,7 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags, WagoAnalytics, ElvUI
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags, WagoAnalytics, GW2_UI, ElvUI
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -89,6 +89,7 @@ sonata\themes\elvui.lua
 sonata\themes\gw2.lua
 sonata\themes\next\default.lua
 sonata\themes\next\ember.lua
+sonata\themes\next\gw2.lua
 sonata\themes\next\parchment.lua
 sonata\themes\next\quiet.lua
 

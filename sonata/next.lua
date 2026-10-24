@@ -335,6 +335,32 @@ function sonataNext:RestoreSavedTheme(ctx)
   end
 end
 
+-- WatchClientFonts follows the client's fonts once the game has started (core/init.lua, after NextPixel):
+-- every PLAYER_ENTERING_WORLD checks them (OnClientFontsChanged). Registered once however often it starts.
+function sonataNext:WatchClientFonts()
+  if self.watchingFonts then
+    return
+  end
+  self.watchingFonts = true
+  events():RegisterEvent("PLAYER_ENTERING_WORLD", function(ctx)
+    self:OnClientFontsChanged(ctx)
+  end)
+end
+
+-- OnClientFontsChanged applies the current theme again, unsaved, when a client font one of its roles copies is
+-- no longer what it was copied from (NextStyle:CopiesStale): every role made again from the fonts as they are,
+-- everything restyled, as a new pixel grid does (NextPixel). It returns whether it did, for profiler traces.
+---@param ctx Context
+---@return boolean
+function sonataNext:OnClientFontsChanged(ctx)
+  local key = self.started and self:GetCurrentThemeKey() or nil
+  if key == nil or not nextStyle():CopiesStale() then
+    return false
+  end
+  self:ApplyTheme(ctx, key, false)
+  return true
+end
+
 ---@return string?
 function sonataNext:GetCurrentThemeKey()
   return self.current
@@ -437,6 +463,24 @@ function sonataNext:Check(key)
       if o.Sizes ~= nil and not ornaments.SIZES[o.Sizes] then
         problem("Sizes", "no size named " .. tostring(o.Sizes))
       end
+      if o.TexCoords ~= nil then
+        if o.Tile ~= nil then
+          problem("TexCoords", "not with Tile")
+        elseif type(o.TexCoords) ~= "table" or #o.TexCoords ~= 4 then
+          problem("TexCoords", "four numbers, left, right, top and bottom")
+        end
+      end
+      if o.Panels ~= nil then
+        if type(o.Panels) ~= "table" then
+          problem("Panels", "a list of panels")
+        else
+          for _, name in ipairs(o.Panels) do
+            if ornaments.PANELS[name] == nil then
+              problem("Panels", "no panel named " .. tostring(name))
+            end
+          end
+        end
+      end
       if type(o.Motion) == "table" then
         for k in pairs(o.Motion) do
           if not ornaments.MOTIONS[k] then
@@ -446,6 +490,15 @@ function sonataNext:Check(key)
         if o.Motion.Origin ~= nil and not ornaments.ORIGINS[o.Motion.Origin] then
           problem("Motion.Origin", "no point named " .. tostring(o.Motion.Origin))
         end
+      end
+    end
+  end
+  -- The side rail (Header.Buttons.Rail, next-themes.md §13): how wide, and where its buttons start.
+  local rail = theme.Header and theme.Header.Buttons and theme.Header.Buttons.Rail
+  if type(rail) == "table" then
+    for _, field in ipairs({ "Width", "Top" }) do
+      if type(rail[field]) ~= "number" then
+        table.insert(problems, "Header.Buttons.Rail." .. field .. ": a side rail needs one")
       end
     end
   end

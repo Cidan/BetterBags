@@ -312,4 +312,62 @@ describe("NextStyle", function()
       assert.has_error(function() style:Font("NoSuchRole") end)
     end)
   end)
+
+  -- UI addons rewrite the client's fonts once the game has loaded (GW2_UI at PLAYER_LOGIN, docs/next-gw2-theme.md),
+  -- after BetterBags made its copies of them: a copy is stale once what it copied changed.
+  describe("copies of the client's fonts", function()
+    local client
+
+    before_each(function()
+      client = CreateFont("SpecClientFont")
+      client:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+      client:SetTextColor(1, 1, 1, 1)
+      sonataNext:RegisterTheme({ Name = "Spec", Fonts = { Copy = { Object = "SpecClientFont", Size = 14 },
+        Unused = { Object = "SpecClientFont" } } })
+      style:Use(resolved("Spec"))
+    end)
+
+    after_each(function()
+      _G.SpecClientFont = nil
+    end)
+
+    it("says none is stale while what each copied is unchanged", function()
+      style:Font("Copy")
+      assert.is_false(style:CopiesStale())
+    end)
+
+    it("says one is stale once its client font's file, size, flags, color or shadow changed", function()
+      local changes = {
+        function() client:SetFont("Interface\\AddOns\\GW2_UI\\fonts\\menomonia.ttf", 12, "") end,
+        function() client:SetFont("Fonts\\FRIZQT__.TTF", 13, "") end,
+        function() client:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE") end,
+        function() client:SetTextColor(1, 0.9, 0.8, 1) end,
+        function() client:SetShadowColor(0, 0, 0, 1) end,
+        function() client:SetShadowOffset(1, -1) end,
+      }
+      for i, change in ipairs(changes) do
+        client:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+        client:SetTextColor(1, 1, 1, 1)
+        client:SetShadowColor(0, 0, 0, 0)
+        client:SetShadowOffset(0, 0)
+        style:Use(resolved("Spec"))
+        style:Font("Copy")
+        assert.is_false(style:CopiesStale(), i)
+        change()
+        assert.is_true(style:CopiesStale(), i)
+      end
+    end)
+
+    it("checks only copies it made, and none once a theme makes new ones", function()
+      client:SetFont("Interface\\AddOns\\GW2_UI\\fonts\\menomonia.ttf", 12, "")
+      assert.is_false(style:CopiesStale(), "no role made yet")
+      style:Font("Copy")
+      client:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+      assert.is_true(style:CopiesStale())
+      style:Use(resolved("Spec"))
+      assert.is_false(style:CopiesStale())
+      style:Font("Copy")
+      assert.are.same({ "Fonts\\FRIZQT__.TTF", 14, "" }, { style:Font("Copy"):GetFont() }, "the new copy is of the font now")
+    end)
+  end)
 end)

@@ -45,7 +45,7 @@ describe("BetterBags Next's shipped themes", function()
   end
 
   it("ships Default and at least three others", function()
-    assert.are.same({ "Default", "Ember", "Parchment", "Quiet" }, shipped())
+    assert.are.same({ "Default", "Ember", "GW2", "Parchment", "Quiet" }, shipped())
   end)
 
   it("resolves every one on every client and finds nothing it does not define", function()
@@ -119,10 +119,122 @@ describe("BetterBags Next's shipped themes", function()
     end
   end)
 
-  it("needs no other addon", function()
+  it("needs no other addon, but Guild Wars 2, which needs GW2_UI", function()
     for _, key in ipairs(shipped()) do
-      assert.is_true(sonataNext:IsSelectable(key), key)
+      if key ~= "GW2" then
+        assert.is_true(sonataNext:IsSelectable(key), key)
+      end
     end
+    assert.is_false(sonataNext:IsSelectable("GW2"))
+    _G._loadedAddOns = { GW2_UI = true }
+    assert.is_true(sonataNext:IsSelectable("GW2"))
+    _G._loadedAddOns = nil
+  end)
+
+  -- Asked: "guild wars 2 theme! we need to use the guild wars 2 assets when it's installed ... don't use their draw
+  -- functions" (docs/next-gw2-theme.md).
+  describe("Guild Wars 2", function()
+    local GW = "Interface\\AddOns\\GW2_UI\\Textures\\"
+
+    -- every GW2_UI file a table names, at any depth.
+    local function gw2Files(node, out)
+      for _, v in pairs(node) do
+        if type(v) == "string" and v:sub(1, #GW) == GW then
+          out[v] = true
+        elseif type(v) == "table" then
+          gw2Files(v, out)
+        end
+      end
+      return out
+    end
+
+    it("draws from GW2_UI's own files, every one there in GW2_UI", function()
+      local t = sonataNext:Resolve("GW2")
+      assert.are.same({ "GW2_UI" }, sonataNext.themes.GW2.Requires)
+      local files = gw2Files(t, {})
+      local count = 0
+      for path in pairs(files) do
+        count = count + 1
+        local file = ".libraries/GW2_UI/" .. path:sub(#"Interface\\AddOns\\GW2_UI\\" + 1):gsub("\\", "/")
+        local f = io.open(file, "rb")
+        assert.is_not_nil(f, file .. " (install-deps.sh clones GW2_UI)")
+        f:close()
+      end
+      assert.is_true(count >= 15, "its art is GW2_UI's: " .. count)
+    end)
+
+    it("puts its header buttons down GW2's side panel, its emblems on their panels, its bands across the top and bottom", function()
+      local t = sonataNext:Resolve("GW2")
+      local rail = t.Header.Buttons.Rail
+      assert.are.equal(40, rail.Width, "GW2_UI's side panel is 40 wide")
+      assert.are.equal(GW .. "bag\\bagleftpanel.png", t.Textures[rail.Fill.Texture])
+      local byTexture = {}
+      for _, o in ipairs(t.Panel.Ornaments) do byTexture[t.Textures[o.Texture]] = o end
+      local bag = byTexture[GW .. "bag\\bagicon.png"]
+      assert.are.same({ "Backpack", "Bank", "GuildBank" }, bag.Panels, "GW2_UI's bag, bank and guild bank emblem")
+      assert.are.same({ "Vendor" }, byTexture[GW .. "character\\macro-window-icon.png"].Panels, "its merchant's")
+      assert.are.equal("TOP", byTexture[GW .. "bag\\bagheader.png"].Point)
+      assert.are.equal(rail.Width, byTexture[GW .. "bag\\bagheader.png"].Start, "the header starts past the side panel")
+      assert.are.equal("TOPOUTER", byTexture[GW .. "bag\\bagheader-right.png"].Point)
+      local footer = byTexture[GW .. "bag\\bagfooter.png"]
+      assert.are.equal("BOTTOM", footer.Point)
+      assert.are.same({ 0, 1, 0, 34 / 64 }, footer.TexCoords, "the band is the file's top 34 rows")
+      assert.are.equal("BOTTOMOUTER", byTexture[GW .. "bag\\bottom-right.png"].Point)
+      assert.are.equal(GW .. "bag\\bagbg.png", t.Textures[t.Panel.Fill.Texture], "GW2_UI's bag painting")
+    end)
+
+    it("draws every text role in GW2_UI's fonts: its normal family, or its header family for titles", function()
+      local t = sonataNext:Resolve("GW2")
+      local default = sonataNext:Resolve("Default")
+      local headers = { Title = true, ConfirmTitle = true, DialogTitle = true, SettingsBrand = true, SettingsTitle = true }
+      for role in pairs(default.Fonts) do
+        local spec = t.Fonts[role]
+        if role == "Stack" then
+          assert.are.equal("NumberFontNormal", spec.Object, "the bags' count font, which GW2_UI rewrites too")
+        elseif headers[role] then
+          assert.are.equal("SystemFont_Shadow_Large", spec.Object, role)
+        else
+          assert.are.equal("GameFontHighlight", spec.Object, role)
+        end
+        assert.is_nil(spec.File, role .. " follows GW2_UI's font for the locale")
+      end
+    end)
+
+    it("is GW2_UI's colors: LightHeader titles, its wine accent, nothing starry", function()
+      local t = sonataNext:Resolve("GW2")
+      assert.are.same({ 1, 0.9450, 0.8196, 1 }, t.Palette.LightHeader)
+      assert.are.same({ 150 / 255, 50 / 255, 50 / 255, 1 }, t.Palette.Accent)
+      assert.are.equal("LightHeader", t.Fonts.Title.Color)
+      assert.are.equal("Accent", t.Tabs.Indicator.Color)
+      assert.is_nil(t.Sparkles)
+      for _, part in ipairs({ "Ribbon", "Cloud", "Spark" }) do
+        assert.is_nil(t.Header[part], part)
+      end
+      assert.is_nil(t.Panel.Wash)
+      assert.is_false(t.Chain.Braid)
+    end)
+
+    it("skins item buttons as GW2_UI does: cropped icons on its backdrop, its border in the quality's color", function()
+      local b = sonataNext:Resolve("GW2").ItemButton
+      assert.are.same({ 0.07, 0.93, 0.07, 0.93 }, b.Icon.TexCoords)
+      assert.are.equal(GW .. "bag\\bagitembackdrop.png", b.Backdrop.Texture)
+      assert.are.same({ Texture = GW .. "bag\\bagitemborder.png", Alpha = 0.9 }, b.QualityBorder)
+      assert.are.same({ Texture = GW .. "bag\\bagitemborder.png", BlendMode = "ADD", Alpha = 0.33 }, b.Highlight)
+      assert.are.equal(GW .. "uistuff\\ui-quickslot-depress.png", b.Pushed.Texture)
+      assert.are.same({ { Point = "TOPRIGHT", X = 0, Y = -3 } }, b.Count.Points)
+    end)
+
+    it("draws the settings window on GW2's window painting, its rows in GW2's list art, its primary buttons GW2's", function()
+      local t = sonataNext:Resolve("GW2")
+      assert.are.equal(GW .. "character\\windowbg.png", t.Textures[t.Settings.Fill.Texture])
+      assert.are.equal(GW .. "character\\menu-hover.png", t.Textures[t.Settings.Nav.HoverFill.Texture])
+      assert.are.equal(GW .. "character\\menu-hover.png", t.Textures[t.Settings.Nav.SelectedFill.Texture])
+      assert.are.equal(GW .. "uistuff\\button.png", t.Textures[t.Controls.Button.Primary.Fill.Texture])
+      local ink = t.Palette[t.Fonts.ButtonPrimary.Color]
+      assert.is_true(ink[1] < 0.2 and ink[2] < 0.2 and ink[3] < 0.2, "dark text on GW2's cream button")
+      assert.are.equal(GW .. "character\\windowbg.png", t.Textures[t.Controls.Dialog.Card.Texture])
+      assert.are.equal(GW .. "character\\windowbg.png", t.Textures[t.Dock.Card.Texture])
+    end)
   end)
 
   describe("Ember", function()

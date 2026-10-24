@@ -394,6 +394,8 @@ describe("BetterBags Next, pixel perfect", function()
 
   it("puts every part on whole pixels in every shipped theme, at both sizes", function()
     useScreen(3396, 1362, 0.65)
+    -- Guild Wars 2 is offered while GW2_UI is loaded.
+    _G._loadedAddOns = { GW2_UI = true }
     local keys = {}
     for key in pairs(sonataNext:GetThemes()) do table.insert(keys, key) end
     table.sort(keys)
@@ -413,6 +415,7 @@ describe("BetterBags Next, pixel perfect", function()
       finishTweens()
       chain:Init()
     end
+    _G._loadedAddOns = nil
   end)
 
   -- Everything it can show besides its resting look, each on whole pixels.

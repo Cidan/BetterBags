@@ -654,6 +654,145 @@ describe("BetterBags Next's panels and themes", function()
     end)
   end)
 
+  -- Asked, for the Guild Wars 2 theme: "you can move the top icon buttons to be side buttons, and side buttons
+  -- can be left on backpack, and right on other bags" (docs/next-gw2-theme.md).
+  describe("a side rail (Header.Buttons.Rail)", function()
+    local RAIL = { Width = 40, Top = 64, Gap = 6,
+      Fill = { Texture = "Interface\\AddOns\\Spec\\rail.png", TexCoords = { 0, 1, 0, 0.5 } } }
+
+    local function shown(panel)
+      local out = {}
+      for _, button in ipairs(panel.headerButtons) do
+        if button:IsShown() then table.insert(out, button) end
+      end
+      return out
+    end
+
+    local function coords(texture)
+      local ulx, uly, _, lly, urx = texture:GetTexCoord()
+      return { ulx, urx, uly, lly }
+    end
+
+    it("puts the header buttons down the backpack's left and the bank's right, from its top, centered across it", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Header = { Buttons = { Rail = RAIL } } })
+      local x, step = math.floor((40 - style.HEADER_BUTTON) / 2), style.HEADER_BUTTON + 6
+      assert.is_true(#shown(bag) > 1 and #shown(bank) > 1)
+      for i, button in ipairs(shown(bag)) do
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", x, -(64 + (i - 1) * step) }, { button:GetPoint(1) }, button.key)
+      end
+      for i, button in ipairs(shown(bank)) do
+        assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -x, -(64 + (i - 1) * step) }, { button:GetPoint(1) }, button.key)
+      end
+    end)
+
+    it("closes the gap a hidden button leaves, and takes the header's gap without its own", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Header = { Buttons = { Rail = { Width = 40, Top = 64 } } } })
+      local list = shown(bag)
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 9, -(64 + style.HEADER_BUTTON + style.HEADER_BUTTON_GAP) },
+        { list[2]:GetPoint(1) })
+      list[1]:Hide()
+      bag:LayoutHeader()
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 9, -64 }, { list[2]:GetPoint(1) })
+    end)
+
+    it("draws its strip down the inner side in its art, mirrored on the bank, and none without art or a rail", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      assert.is_false(bag.rail:IsShown(), "Default has no rail")
+      apply({ Header = { Buttons = { Rail = RAIL } } })
+      assert.is_true(bag.rail:IsShown())
+      assert.are.equal("Interface\\AddOns\\Spec\\rail.png", bag.rail:GetTexture())
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 0, 0 }, { bag.rail:GetPoint(1) })
+      assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", 0, 0 }, { bag.rail:GetPoint(2) })
+      assert.are.equal(40, bag.rail:GetWidth())
+      assert.are.same({ 0, 1, 0, 0.5 }, coords(bag.rail))
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", 0, 0 }, { bank.rail:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", 0, 0 }, { bank.rail:GetPoint(2) })
+      assert.are.same({ 1, 0, 0, 0.5 }, coords(bank.rail), "mirrored")
+      apply({ Header = { Buttons = { Rail = { Width = 40, Top = 64, Fill = false } } } })
+      assert.is_false(bag.rail:IsShown(), "room for the buttons, no art")
+      backToDefault()
+      assert.is_false(bag.rail:IsShown())
+      assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -style.HEADER_BUTTON_TOP }, { shown(bag)[1]:GetPoint(1) },
+        "back across the header")
+    end)
+
+    it("widens the body by the strip, everything inside keeping its room on the inner side", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      local width = style.BODY_WIDTH
+      apply({ Header = { Buttons = { Rail = RAIL } } })
+      assert.are.equal(width + 40, style.BODY_WIDTH)
+      assert.are.equal(style.FEATHER + style.BODY_WIDTH, bag.frame:GetWidth())
+      assert.are.equal(width - 2 * style.PAD, bag.root:PreRender().Width, "the content as wide as without one")
+      assert.are.equal(width - 2 * style.PAD, bag.root:PreRender().LayoutWidth)
+      local inner, pad = style.PAD + 40, style.PAD
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", inner, -style.CONTENT_TOP }, { bag.scroll.frame:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", -pad, bag:ContentBottom() }, { bag.scroll.frame:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", bank.body, "TOPLEFT", pad, -style.CONTENT_TOP }, { bank.scroll.frame:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -inner, bank:ContentBottom() }, { bank.scroll.frame:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", inner + style.TITLE_INSET, -style.TITLE_TOP }, { bag.title:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -(inner + style.TITLE_INSET), -style.TITLE_TOP }, { bank.title:GetPoint(1) })
+      local search = bag.searchBox.frame
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", inner, -style.SEARCH_TOP }, { search:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -pad, -style.SEARCH_TOP }, { search:GetPoint(2) })
+      local bankSearch = bank.searchBox.frame
+      assert.are.same({ "TOPLEFT", bank.body, "TOPLEFT", pad, -style.SEARCH_TOP }, { bankSearch:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -inner, -style.SEARCH_TOP }, { bankSearch:GetPoint(2) })
+      assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", inner, style.FOOTER - 4 }, { bag.footerLine:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", -pad, style.FOOTER - 4 }, { bag.footerLine:GetPoint(2) })
+      assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -inner, style.FOOTER - 4 }, { bank.footerLine:GetPoint(2) })
+      assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", inner + style.TITLE_INSET, style.FOOTER_TEXT }, { bag.freeText:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -(inner + style.TITLE_INSET), style.FOOTER_TEXT },
+        { bank.freeText:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", -pad, style.FOOTER_MONEY }, { bag.moneyFrame.frame:GetPoint(1) },
+        "the money stays on the outer side")
+      assert.are.same({ "LEFT", -(inner + style.TITLE_INSET), 1 }, { bag:TitleJoin() })
+      assert.are.same({ "RIGHT", inner + style.TITLE_INSET, -1 }, { bank:TitleJoin() })
+      backToDefault()
+      assert.are.equal(width, style.BODY_WIDTH)
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", pad, -style.CONTENT_TOP }, { bag.scroll.frame:GetPoint(1) })
+    end)
+
+    it("keeps what is drawn about the title with it: its glow behind it, its cloud across it", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      local span = bag:CloudSpan()
+      apply({ Header = { Buttons = { Rail = RAIL } } })
+      local G = style.Theme.Header.TitleGlow
+      local inset = style.PAD + 40 + style.TITLE_INSET
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", inset - G.X, -(style.TITLE_TOP - G.Y) }, { bag.titleGlow:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -(inset - G.X), -(style.TITLE_TOP - G.Y) }, { bank.titleGlow:GetPoint(1) })
+      assert.are.equal(span + 40, bag:CloudSpan(), "from the window's edge, past the strip")
+    end)
+
+    -- The ribbon starts at the window's hard edge, the strip or not, a theme applied after the panel was made too.
+    it("starts its sparkles where the ribbon starts, at the window's edge", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      override(math, "random", function() return 0 end)
+      local function starts(panel)
+        local x = panel.sparkles.options.Spawn()
+        return x
+      end
+      assert.are.equal(bag:BodyLeft(), starts(bag))
+      assert.are.equal(bank:BodyLeft() + bank:BodyWidth(), starts(bank))
+      apply({ Header = { Buttons = { Rail = RAIL } } })
+      assert.are.equal(bag:BodyLeft(), starts(bag))
+      assert.are.equal(bank:BodyLeft() + bank:BodyWidth(), starts(bank))
+    end)
+
+    it("shows a button's tooltip away from the panel, beside the strip", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Header = { Buttons = { Rail = RAIL } } })
+      bag.settingsButton:GetScript("OnEnter")(bag.settingsButton)
+      assert.are.equal("ANCHOR_LEFT", GameTooltip._anchor)
+      bank.closeButton:GetScript("OnEnter")(bank.closeButton)
+      assert.are.equal("ANCHOR_RIGHT", GameTooltip._anchor)
+      backToDefault()
+      bag.settingsButton:GetScript("OnEnter")(bag.settingsButton)
+      assert.are.equal("ANCHOR_BOTTOMLEFT", GameTooltip._anchor)
+    end)
+  end)
+
   describe("the search box", function()
     it("sits where its layout says, in its fill, border and magnifier colors", function()
       local bag = nextBag:Create(ctx())
@@ -865,6 +1004,8 @@ describe("BetterBags Next's panels and themes", function()
     it("applies to open, drawn bags at both sizes, in turn, and back to Default", function()
       local errors = {}
       override(_G, "geterrorhandler", function() return function(e) table.insert(errors, tostring(e)) end end)
+      -- Guild Wars 2 is offered while GW2_UI is loaded.
+      override(_G, "_loadedAddOns", { GW2_UI = true })
       for _, size in ipairs({ "full", "small" }) do
         db.size = size
         sonataNext:Init()

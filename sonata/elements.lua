@@ -430,8 +430,11 @@ function elements:StyleItemButton(decoration, style)
   })
 
   local backdrop = type(style.Backdrop) == "table" and style.Backdrop or nil
-  fill(decoration, backdrop and backdrop.Color and { Color = backdrop.Color, Inset = backdrop.Inset } or nil,
-    "fill", "BACKGROUND", -8)
+  -- A fill of a color, or of art (an atlas or a file, tinted by VertexColor).
+  local drawn = backdrop ~= nil and (backdrop.Color ~= nil or backdrop.Texture ~= nil or backdrop.Atlas ~= nil)
+  fill(decoration, drawn and { Color = backdrop.Color, Texture = backdrop.Texture, Atlas = backdrop.Atlas,
+    TexCoords = backdrop.TexCoords, VertexColor = backdrop.VertexColor, Alpha = backdrop.Alpha,
+    BlendMode = backdrop.BlendMode, Inset = backdrop.Inset } or nil, "fill", "BACKGROUND", -8)
   local bordered = backdrop ~= nil and (backdrop.BorderColor ~= nil or backdrop.EdgeSize ~= nil)
   edges(decoration, bordered and { Color = backdrop.BorderColor, EdgeSize = backdrop.EdgeSize, Inset = backdrop.BorderInset } or nil)
   local skin = decoration.sonataSkin
@@ -477,21 +480,55 @@ function elements:StyleItemButton(decoration, style)
   end
 end
 
+-- artBorder draws the icon's border in a style's border art (QualityBorder given as art), in a color at the
+-- art's Alpha.
+---@param border Texture
+---@param spec table
+---@param color SonataColor
+local function artBorder(border, spec, color)
+  if spec.Atlas ~= nil then
+    border:SetAtlas(spec.Atlas)
+  else
+    border:SetTexture(spec.Texture)
+  end
+  border:SetBlendMode(spec.BlendMode or "BLEND")
+  border:SetTexCoord(0, 1, 0, 1)
+  local r, g, b, a = apply:Color(color)
+  border:SetVertexColor(r, g, b, a * (spec.Alpha or 1))
+  border:Show()
+end
+
 -- DrawItemQuality shows an item's quality on a decoration whose style draws it (on its
--- backdrop border) and returns true; it returns false for BetterBags' own quality glow.
+-- backdrop border, or on the icon's border in the style's art) and returns true; it returns false for
+-- BetterBags' own quality glow.
 ---@param decoration ItemButton
 ---@param color? SonataColor The quality color, nil for none.
 ---@param quality? number The item's quality, for colors the style overrides.
 ---@return boolean
 function elements:DrawItemQuality(decoration, color, quality)
   local style = decoration.sonataItemStyle
-  if style == nil or style.QualityBorder ~= "Backdrop" or not hasEdges(decoration) then
+  if style == nil then
+    return false
+  end
+  local override = quality ~= nil and style.QualityColors ~= nil and style.QualityColors[quality] or nil
+  if type(style.QualityBorder) == "table" then
+    local border = decoration.IconBorder
+    if border == nil then
+      return false
+    end
+    if override or color then
+      artBorder(border, style.QualityBorder, override or color)
+    else
+      border:Hide()
+    end
+    return true
+  end
+  if style.QualityBorder ~= "Backdrop" or not hasEdges(decoration) then
     return false
   end
   if decoration.IconBorder ~= nil then
     decoration.IconBorder:Hide()
   end
-  local override = quality ~= nil and style.QualityColors ~= nil and style.QualityColors[quality] or nil
   local backdrop = type(style.Backdrop) == "table" and style.Backdrop or {}
   setEdgeColor(decoration, override or color or backdrop.BorderColor)
   return true
@@ -522,7 +559,9 @@ function elements:DrawItemQuest(decoration, questInfo)
     end
   end
   if style.QuestBorderColor ~= nil then
-    if style.QualityBorder == "Backdrop" and hasEdges(decoration) then
+    if type(style.QualityBorder) == "table" and decoration.IconBorder ~= nil then
+      artBorder(decoration.IconBorder, style.QualityBorder, style.QuestBorderColor)
+    elseif style.QualityBorder == "Backdrop" and hasEdges(decoration) then
       setEdgeColor(decoration, style.QuestBorderColor)
     elseif decoration.IconBorder ~= nil then
       local border = decoration.IconBorder
