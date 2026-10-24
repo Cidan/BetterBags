@@ -1,0 +1,17 @@
+{
+  "id": 1792825115,
+  "version": "v0.8.1",
+  "channel": "alpha",
+  "date": "2026-10-24",
+  "from": "7417a810e5783d1721c8e7055096774b67fee043",
+  "to": "38f0f714f2475a0a868d86d5dcd6760d2eb2ed2f",
+  "headline": "This build fixes an issue where clicking a scroll bar could interact with content underneath it.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Clicking scroll bars no longer grabs rows behind them",
+      "details": "Fixed an issue where clicking or dragging a scroll bar thumb in settings lists or other scrollable views could accidentally grab and drag the content beneath it.",
+      "clients": []
+    }
+  ]
+}
