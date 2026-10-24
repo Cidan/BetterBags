@@ -1,0 +1,37 @@
+{
+  "id": 1792882332,
+  "version": "v0.8.3",
+  "channel": "release",
+  "date": "2026-10-24",
+  "from": "v0.8.2",
+  "to": "v0.8.3",
+  "headline": "Adds Profession Shopping List purchases at vendors and a Guild Wars 2 theme for Next, alongside instance vendor fixes.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Profession Shopping List buying at vendors",
+      "details": "When visiting a merchant that sells items from your Profession Shopping List, a dedicated card appears in the vendor window. You can purchase all needed reagents at once with a double-click, or right-click the card to dismiss it.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Guild Wars 2 theme for Next",
+      "details": "When the GW2_UI addon is active, BetterBags Next now includes a Guild Wars 2 theme with authentic window frames, side-rail buttons, emblems, and matching controls.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Error opening vendors in dungeons and raids",
+      "details": "Fixed a Lua error caused by restricted NPC names when speaking to a vendor inside an instance.",
+      "clients": [
+        "Retail"
+      ]
+    },
+    {
+      "category": "Fixed",
+      "title": "Bank error with Parchment and Quiet themes",
+      "details": "Fixed an error in Next when opening the bank or guild bank while using themes that do not use a background color wash.",
+      "clients": []
+    }
+  ]
+}
