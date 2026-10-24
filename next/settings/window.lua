@@ -377,6 +377,7 @@ function settings:buildSidebar()
   addon.HookScript(self.search.frame, "OnEscapePressed", function(ctx) self:Search(ctx, "") end)
   local navBox = CreateFrame("Frame", nil, navPanel, "WowScrollBox") --[[@as WowScrollBox]]
   navBox:SetInterpolateScroll(true)
+  pixel:SnapScroll(navBox)
   local navList = CreateFrame("Frame", nil, navBox)
   navList.scrollable = true
   local view = CreateScrollBoxLinearView()
@@ -484,6 +485,7 @@ function settings:buildContent()
   self.scroll = scrollbox:Create(self.frame, nil, {
     CreateBar = function(box, opts) return nextScrollBar:Create(box, opts) end,
     Snap = function(region, units) return pixel:Length(region, units) end,
+    SnapScroll = function(box) pixel:SnapScroll(box) end,
   })
   self.results = nextPage:Create(self.scroll.scrollChild)
 end

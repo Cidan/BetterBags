@@ -82,6 +82,7 @@ function nextMenu:build()
   self.edge = controls:CreateEdge(frame)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
+  pixel:SnapScroll(box)
   local list = CreateFrame("Frame", nil, box)
   list.scrollable = true
   local view = CreateScrollBoxLinearView()

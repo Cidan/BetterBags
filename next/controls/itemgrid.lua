@@ -92,6 +92,7 @@ function itemGrid:Create(parent, opts)
   frame:EnableMouse(true)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
+  pixel:SnapScroll(box)
   local content = CreateFrame("Frame", nil, box)
   content.scrollable = true
   local view = CreateScrollBoxLinearView()

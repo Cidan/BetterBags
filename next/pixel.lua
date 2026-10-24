@@ -214,6 +214,22 @@ function pixel:Row(region, corner, relativeTo, x, rowHeight, height, top)
   region:SetPoint(corner, relativeTo, corner, corner == "TOPRIGHT" and -across or across, -down)
 end
 
+-- SnapScroll keeps what a scroll box holds on whole pixels wherever it is scrolled: Blizzard's box anchors its
+-- scroll target at the scroll offset in UI units (ScrollBoxBaseMixin:SetScrollTargetOffset, called by its
+-- Update each time it scrolls or lays out), between pixels at rest unless rounded. For BetterBags' own boxes
+-- (it replaces the box's own method, which the box's mixin copied onto it); once per box.
+---@param box WowScrollBox
+function pixel:SnapScroll(box)
+  if box.nextSnapsScroll then
+    return
+  end
+  box.nextSnapsScroll = true
+  local set = box.SetScrollTargetOffset
+  box.SetScrollTargetOffset = function(b, offset)
+    return set(b, self:Snap(b, offset))
+  end
+end
+
 -- Center anchors region by its top left so that it sits in the middle of relativeTo, both widthxheight
 -- sized as given (in units), on whole pixels: the middle of a frame an odd number of pixels across is
 -- between two pixels, so the room left over is split with the extra pixel on the right and bottom.

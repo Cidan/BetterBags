@@ -464,6 +464,21 @@ describe("BetterBags Next, pixel perfect", function()
       end)
     end
 
+    for _, size in ipairs({ "full", "small" }) do
+      it("keeps its content on whole pixels scrolled partway, " .. size, function()
+        db.size = size
+        useScreen(3396, 1362, 0.65)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        local box = bag.scroll.scrollBox
+        box._scrollRange = pixel:Length(bag.frame, 413)
+        for _, share in ipairs({ 0.13, 0.37, 0.88 }) do
+          box:SetScrollPercentage(share, true)
+          assert.are.same({}, offGrid(bag), "at " .. share)
+        end
+        box._scrollRange = nil
+      end)
+    end
+
     it("shows a small panel's grips on whole pixels under the pointer", function()
       db.size = "small"
       for _, scale in ipairs({ 100, 85 }) do

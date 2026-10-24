@@ -304,6 +304,14 @@ describe("Scrollbox", function()
       assert.are.same({ "TOPLEFT", sb.scrollChild, "TOPLEFT", 18, 0 }, { c.frame:GetPoint(1) })
     end)
 
+    -- BetterBags Next (docs/next-pixel-perfect.md): its own rounding of where the box scrolls to, given the box.
+    it("hands its scroll box to the caller's SnapScroll, once", function()
+      local given = {}
+      local sb = scrollbox:Create(CreateFrame("Frame"), nil, { SnapScroll = function(box) table.insert(given, box) end })
+      assert.are.same({ sb.scrollBox }, given)
+      assert.is_nil(scrollbox:Create(CreateFrame("Frame")).scrollBox.nextSnapsScroll, "not without one")
+    end)
+
     it("keeps the bar's room on the right only for other scroll boxes", function()
       local sb = scrollbox:Create(CreateFrame("Frame"))
       local c = child(300, 200)

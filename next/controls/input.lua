@@ -260,6 +260,7 @@ function nextInput:CreateArea(parent, opts)
   fill:SetAllPoints(frame)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
+  pixel:SnapScroll(box)
   box:EnableMouseWheel(false)
   local editBox = CreateFrame("EditBox", nil, box)
   editBox:SetMultiLine(true)

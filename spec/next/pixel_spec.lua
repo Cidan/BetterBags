@@ -157,6 +157,48 @@ describe("NextPixel", function()
     assert.are.same({}, layout.PixelCheck(button))
   end)
 
+  -- A scroll box anchors its scroll target at the scroll offset, in UI units (ScrollBoxBaseMixin:
+  -- SetScrollTargetOffset): scrolled to rest, what it holds lands between pixels unless that offset is
+  -- rounded.
+  describe("a scroll box", function()
+    local box, row
+
+    before_each(function()
+      local window = CreateFrame("Frame", nil, UIParent)
+      pixel:Point(window, "TOPLEFT", UIParent, "TOPLEFT", 40, -40)
+      pixel:Size(window, 300, 200)
+      box = CreateFrame("Frame", nil, window, "WowScrollBox")
+      box:SetAllPoints(window)
+      local content = CreateFrame("Frame", nil, box)
+      content.scrollable = true
+      content:SetHeight(pixel:Length(window, 700))
+      box:Init(CreateScrollBoxLinearView())
+      row = content:CreateTexture()
+      pixel:Point(row, "TOPLEFT", content, "TOPLEFT", 6, -30)
+      pixel:Size(row, 100, 1)
+    end)
+
+    it("puts what it holds between pixels where it is left scrolled", function()
+      box:SetScrollPercentage(0.37, true)
+      assert.is_true(#layout.PixelCheck(row) > 0)
+    end)
+
+    it("keeps what it holds on whole pixels wherever it is scrolled to, once its offset is rounded", function()
+      pixel:SnapScroll(box)
+      for _, share in ipairs({ 0, 0.1, 0.37, 0.5, 0.999, 1 }) do
+        box:SetScrollPercentage(share, true)
+        assert.are.same({}, layout.PixelCheck(row), "at " .. share)
+      end
+      box:FullUpdate(true)
+      assert.are.same({}, layout.PixelCheck(row), "laid out again")
+      pixel:SnapScroll(box)
+      box:SetScrollPercentage(0.42, true)
+      assert.are.same({}, layout.PixelCheck(row), "rounded once, however often asked")
+      local _, _, _, _, y = box:GetScrollTarget():GetPoint(1)
+      assert.is_true(math.abs(y - pixel:Snap(box, box:GetDerivedScrollOffset())) < 1e-9)
+    end)
+  end)
+
   it("names the grid by UIParent's scale and the screen's height", function()
     assert.are.equal("0.650000@1362", pixel:Key())
     UIParent:SetScale(0.7)

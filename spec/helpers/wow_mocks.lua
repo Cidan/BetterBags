@@ -1599,10 +1599,20 @@ _G.__mockTemplates.WowScrollBox = function(frame)
     self:TriggerEvent(BaseScrollBoxEvents.OnScroll, self:GetScrollPercentage(), self:GetVisibleExtentPercentage(),
       self:CalculatePanExtentPercentage())
   end
+  -- ScrollBoxBaseMixin:SetScrollTargetOffset(offset): the scroll target TOPLEFT and TOPRIGHT of the box,
+  -- offset up (a linear view without padding), then OnScroll. ScrollBoxMixin:Update calls it with the
+  -- derived scroll offset (less the view's upper padding, none here) every time the box scrolls or lays
+  -- out (ScrollBox.lua).
+  function frame:SetScrollTargetOffset(offset)
+    local target = self:GetScrollTarget()
+    target:SetPoint("TOPLEFT", self, "TOPLEFT", 0, offset)
+    target:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, offset)
+    self:sendScroll()
+  end
   function frame:SetScrollPercentage(percentage, noInterpolation)
     self._noInterpolation = noInterpolation
     self._scrollPercentage = math.max(0, math.min(1, percentage))
-    self:sendScroll()
+    self:SetScrollTargetOffset(self:GetDerivedScrollOffset())
   end
   function frame:ScrollToOffset(offset, noInterpolation)
     local range = self:GetDerivedScrollRange()
@@ -1625,7 +1635,7 @@ _G.__mockTemplates.WowScrollBox = function(frame)
     self._fullUpdates = (self._fullUpdates or 0) + 1
     self._lastFullUpdateImmediate = immediately
     self:layoutScrollChildren()
-    self:sendScroll()
+    self:SetScrollTargetOffset(self:GetDerivedScrollOffset())
   end
 end
 

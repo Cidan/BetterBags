@@ -2789,6 +2789,7 @@ function panelProto:BuildContent(scrollName)
     Symmetric = true,
     AutoHideBar = true,
     Snap = function(region, units) return pixel:Length(region, units) end,
+    SnapScroll = function(box) pixel:SnapScroll(box) end,
     CreateBar = function(box, opts) return nextScrollBar:Create(box, opts) end,
   })
   self.scroll = scroll

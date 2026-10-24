@@ -970,6 +970,7 @@ describe("NextSettingsContent", function()
   -- large one at 115% (where the window scales itself down to fit), for both designs.
   describe("on the screen's pixels", function()
     local layout = dofile("spec/helpers/layout.lua")
+    local pixel = addon:GetModule("NextPixel")
     local undo
 
     after_each(function()
@@ -1087,6 +1088,17 @@ describe("NextSettingsContent", function()
               for _, line in ipairs(offGrid()) do
                 table.insert(problems, page.id .. "/" .. tab.id .. ": " .. line)
               end
+              -- Scrolled partway: its content, and the list of pages.
+              settings.scroll.scrollBox._scrollRange = pixel:Length(settings.frame, 517)
+              settings.scroll.scrollBox:SetScrollPercentage(0.37, true)
+              settings.navBox._scrollRange = pixel:Length(settings.frame, 83)
+              settings.navBox:SetScrollPercentage(0.61, true)
+              for _, line in ipairs(offGrid()) do
+                table.insert(problems, page.id .. "/" .. tab.id .. " scrolled: " .. line)
+              end
+              settings.scroll.scrollBox._scrollRange, settings.navBox._scrollRange = nil, nil
+              settings.scroll.scrollBox:SetScrollPercentage(0, true)
+              settings.navBox:SetScrollPercentage(0, true)
             end
           end
           assert.are.same({}, problems)

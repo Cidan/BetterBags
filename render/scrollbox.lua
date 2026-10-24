@@ -37,6 +37,7 @@ local LINGER = 1
 ---@field AutoHideBar? boolean Show the bar only while the wheel scrolls or the pointer is over its room.
 ---@field CreateBar? fun(box: WowScrollBox, opts: {AutoHide: boolean}): ScrollboxBar A bar of the caller's in place of Blizzard's MinimalScrollBar (BetterBags Next's, next-settings.md §2), made once the box has its view; it hides itself when AutoHide.
 ---@field Snap? fun(region: ScriptRegion, units: number): number Rounds the bar's room to whole screen pixels on a region's grid (BetterBags Next's NextPixel:Length, docs/next-pixel-perfect.md), so the child sits on them.
+---@field SnapScroll? fun(box: WowScrollBox) Makes the box scroll by whole screen pixels (BetterBags Next's NextPixel:SnapScroll), called once with it.
 
 -- A bar of the caller's: its frame, and Bind(box), which makes it follow and drive the box.
 ---@class (exact) ScrollboxBar
@@ -218,6 +219,9 @@ function scrollbox:Create(parent, name, opts)
   local box = CreateFrame("Frame", name and (name .. "Box") or nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetAllPoints(frame)
   box:SetInterpolateScroll(true)
+  if opts ~= nil and opts.SnapScroll then
+    opts.SnapScroll(box)
+  end
 
   -- Initializing the box moves every child marked scrollable under its scroll target and
   -- anchors it there, stretched to the box's width.
