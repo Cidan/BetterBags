@@ -617,9 +617,10 @@ kept a gap) and a separate destroy card along the vendor's bottom; both are gone
   card's catcher has no entry; the vendor's `atMerchant` check: it shows only at a merchant).
 
 **Positions** are in `UIParent`'s coordinates: the cursor (`GetCursorPosition` over `UIParent`'s
-effective scale), the canvas, tabs and scroll area (all at scale 1 under `UIParent`). The client
-reports a scaled frame's edges in its own scale, so the dragged section's position is always worked
-out from the cursor and the grabbed point, never read back from it.
+effective scale), and the canvas, tabs and scroll area read through `NextLift` (`ScreenPoint`, `Center`,
+`ScaleOf`): a small panel has a Bag Scale (§14h), and the client reports a scaled frame's edges in its
+own units. The dragged section keeps its size on screen, and its position is always worked out from
+the cursor and the grabbed point, never read back from it.
 
 **The header also** files an item dropped or clicked onto a category's header in that category
 (`panelProto:FileCursorItem`, category-lifecycle.md §9; asked: "if you drag and drop an item onto a
@@ -1624,3 +1625,47 @@ moves); the same branch in `ResetSize` went for the same reason.
 Not verified in game yet: the hover fade, the glide back, chained bags' grips, and how the grips look
 on the other Next themes (Parchment's light paper). A render recording of a resize (render-recorder.md)
 would show the reflow and the room left on the right.
+
+### 14h. Bag Scale (Appearance → Size)
+
+Asked: a "bag scale" slider on Appearance's Size tab; "bag scale should just not apply when docked to
+the side"; and, on the risk of drags and chaining in a scaled panel: "it's not risk, it's just work ...
+just get it done with tests" (docs/next-appearance-size.md).
+
+- **The setting:** `nextBagScale` (profile, a whole percentage in 50 to 150, 100 by default;
+  `DB:Get/SetNextBagScale`), one value for every Next panel, so chained bags match. Its slider sends
+  `next/ScalesChanged`; the chain (`chain:ScalesChanged`) has every panel draw again and refits every
+  open small panel (`Update`, snapping: `FitSmall`); a closed one refits as it opens.
+- **Small panels only:** `panelProto:Scale()` is the Bag Scale for a small panel and 1 for a full one.
+  `ApplyGeometry` and `FitSmall` give the frame that scale (`SetScale`); everything in it (art, text,
+  item buttons, sparkles, the braid) scales with it.
+- **Units:** a small panel's place (`placeX`, `placeY`, `nextSmallPlaces`) stays on the screen, in
+  UIParent's units; its size (`smallWidth`, `smallHeight`, `nextSmallSizes`, `MinWidth`, `MinHeight`) is
+  in its own units, as its content is laid out. On the screen it is its size times its scale. A scaled
+  frame's anchor offsets are in its own units (`setOffset`, `GlideTo`, the reset glide divide by the
+  scale), and its edges are read in its own units (`LivePlace`, `SmallLeft`, `StopMove`, `StopSizing`
+  multiply by `NextLift:ScaleOf`). The default size is the full body's width and the theme's share of the
+  screen in its own units, so the whole default panel scales; the screen bounds its size at its scale
+  (`SmallSize`, the grips' `SetResizeBounds`), and `clampPlace` and the default place use its size on
+  the screen.
+- **The small chain** works on the screen: `SmallGap` is each rail's widest tab plus the hover slide at
+  its bag's scale, the margin and `Small.MinGap` at the larger scale; `ChainedPlace` and `Dropped` use
+  each bag's width on the screen; the braid's half gap is measured on the screen and handed to each bag
+  in its own units (`SetCoupling`).
+- **Switching sizes** glides the scale with the body's place and size on the screen (`BodyRect` returns
+  them and the scale; `Morph`'s `draw` sets the scale and anchors and sizes the frame in its own
+  units); the content is laid out at once when the body ends narrower in its own units.
+- **Everything read on the screen goes through NextLift** (`ScaleOf`, `Center`, `ScreenPoint`): a
+  lifted frame keeps its size on screen (`Pick` starts from its scale there, `base`, shrinks from it,
+  lands back at it unless its owner names another, flies away from it); the section drag's gap under the
+  cursor and its landing, the flight into a tab or a panel, scrolling near the edges (`AutoScroll`), the
+  dock's flights, a tab moved in its rail, and the settings lists' reordering (the settings window
+  scales itself down to fit a small screen, which had the same mismatch). Before, these read a frame's
+  edges as if every Next frame were at scale 1.
+- Coverage: `spec/next/small_spec.lua` ("the Size tab's scales" → "Bag Scale": scale and default place,
+  full panels untouched, kept on the screen and never bigger, moving, sizing, the reset glide, a live
+  change, the chain both ways, the screen's edges, the braid, the glide into a spot, an anchor dragged
+  with its chained bag, switching sizes both ways and while closed, the early layout),
+  `spec/next/lift_spec.lua` ("a frame in a scaled panel"), `spec/next/drag_spec.lua` ("in a scaled
+  panel"), `spec/next/dock_spec.lua`, `spec/next/tabs_spec.lua`, `spec/next/settings/reorder_spec.lua`.
+  58 mutations: 11 first survived; 10 led to tests, one showed a refit already done by the chain, removed.

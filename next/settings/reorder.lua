@@ -165,12 +165,14 @@ end
 ---@return number?
 function listProto:IndexAt()
   local box = self.opts.box
-  local top = box:GetTop()
-  if top == nil then
+  -- The cursor is on the screen; the list in its own units (the settings window scales down to fit a
+  -- small screen).
+  local at = lift:ScreenPoint(box)
+  if at == nil then
     return nil
   end
   local _, cursorY = lift:Cursor()
-  local down = top - cursorY + box:GetDerivedScrollOffset()
+  local down = (at.top - cursorY) / at.scale + box:GetDerivedScrollOffset()
   local y, index, others = 0, nil, 0
   for _, entry in ipairs(self.opts.entries()) do
     if entry.name ~= self.state.name then
@@ -219,11 +221,11 @@ function listProto:Drop()
   state.landing = true
   local box = self.opts.box
   lift:Land(state, function(left0, top0)
-    local left, top = box:GetLeft(), box:GetTop()
-    if left == nil or top == nil then
+    local at = lift:ScreenPoint(box)
+    if at == nil then
       return left0, top0
     end
-    return left, top + box:GetDerivedScrollOffset() - (self.roomY or 0)
+    return at.left, at.top + (box:GetDerivedScrollOffset() - (self.roomY or 0)) * at.scale, at.scale
   end, function()
     self:land()
   end)

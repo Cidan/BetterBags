@@ -812,11 +812,12 @@ end
 ---@return number
 function railProto:moveIndexAt(y)
   local state = self.moving
-  local top = self.frame:GetTop()
-  if top == nil then
+  -- The cursor is on the screen; the rail is laid out in its own units (a small panel's Bag Scale).
+  local at = lift:ScreenPoint(self.frame)
+  if at == nil then
     return state.index
   end
-  local down = top - y
+  local down = (at.top - y) / at.scale
   local ys = self:layout(false)
   local index, others = nil, 0
   for _, tab in ipairs(self.tabs) do
@@ -861,14 +862,16 @@ function railProto:EndMove(ctx)
   state.landing = true
   local tab = state.tab
   lift:Land(state, function(left0, top0)
-    local top, left = self.frame:GetTop(), self.frame:GetLeft()
-    if top == nil or left == nil then
+    local at = lift:ScreenPoint(self.frame)
+    if at == nil then
       return left0, top0
     end
+    -- On the screen, at the rail's scale (a small panel's Bag Scale).
+    local left = at.left
     if self.side ~= "LEFT" then
-      left = self.frame:GetRight() - tab.width
+      left = at.left + (self.frame:GetWidth() - tab.width) * at.scale
     end
-    return left, top - state.roomY
+    return left, at.top - state.roomY * at.scale, at.scale
   end, function()
     self:landMove(ctx)
   end)

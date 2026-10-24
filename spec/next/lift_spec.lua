@@ -317,6 +317,76 @@ describe("NextLift", function()
     assert.are.equal(lift.layer, frame:GetParent())
   end)
 
+  -- BetterBags Next's small panels have a Bag Scale (docs/next-appearance-size.md): a frame in one is
+  -- drawn at that scale, and everything on screen is read in UIParent's units.
+  describe("a frame in a scaled panel", function()
+    before_each(function()
+      parent:SetScale(0.5)
+      -- In its own units: on screen 50 to 150 across, its top at 270.
+      _G._cursorX, _G._cursorY = 60, 265
+    end)
+
+    it("says where it is and how big on screen", function()
+      assert.are.equal(0.5, lift:ScaleOf(frame))
+      assert.are.same({ 100, 260 }, { lift:Center(frame) })
+      assert.are.same({ left = 50, top = 270, scale = 0.5 }, lift:ScreenPoint(frame))
+      frame._rect = nil
+      assert.is_nil(lift:Center(frame))
+    end)
+
+    it("lifts it at its size on screen, the point grabbed under the cursor", function()
+      assert.is_true(pick())
+      assert.are.same({ 20, 10, 0.5 }, { held.grabX, held.grabY, held.scale })
+      assert.are.equal(0.5, frame:GetScale())
+      assert.are.same({ "TOPLEFT", UIParent, "BOTTOMLEFT", 100, 540 }, { frame:GetPoint(1) })
+      finishTweens()
+      local s = style.Theme.Drag.LiftScale * 0.5
+      assert.is_true(math.abs(held.scale - s) < 1e-9, "shrinks from its size on screen")
+      local _, _, _, ox, oy = frame:GetPoint(1)
+      assert.is_true(math.abs((ox * s + 20 * s) - 60) < 1e-6, "the grabbed point's x")
+      assert.is_true(math.abs((oy * s - 10 * s) - 265) < 1e-6, "the grabbed point's y")
+    end)
+
+    it("lands back at its size on screen, or at the scale its owner says", function()
+      pick()
+      finishTweens()
+      lift:Land(held, function() return 50, 270 end, function() end)
+      finishTweens()
+      assert.are.equal(0.5, frame:GetScale())
+      assert.are.same({ "TOPLEFT", UIParent, "BOTTOMLEFT", 100, 540 }, { frame:GetPoint(1) })
+      lift:Release(held)
+      held = {}
+      pick()
+      lift:Land(held, function() return 50, 270, 1.5 end, function() end)
+      finishTweens()
+      assert.are.equal(1.5, frame:GetScale())
+    end)
+
+    it("flies away shrinking from its size on screen", function()
+      pick()
+      finishTweens()
+      lift:FlyAway(held, 600, 300, function() end)
+      finishTweens()
+      assert.is_true(math.abs(style.Theme.Drag.FlyScale * 0.5 - frame:GetScale()) < 1e-9)
+    end)
+
+    it("scrolls an area by where it is on screen", function()
+      local area = CreateFrame("Frame", nil, parent)
+      -- On screen: its top at 250, its bottom at 50.
+      area:_SetRect(0, 100, 300, 400)
+      local box = CreateFrame("Frame", nil, area, "WowScrollBox")
+      box._scrollRange, box._scrollPercentage = 1000, 0.5
+      box.ScrollToOffset = function(self, offset) self._scrolledTo = offset end
+      lift:AutoScroll(area, box, 250 - lift.SCROLL_EDGE / 2, 0.1)
+      assert.are.equal(500 - 0.5 * lift.SCROLL_SPEED * 0.1, box._scrolledTo, "up, halfway into the edge")
+      lift:AutoScroll(area, box, 50, 0.1)
+      assert.are.equal(500 + lift.SCROLL_SPEED * 0.1, box._scrolledTo, "down, at the bottom")
+      box._scrolledTo = nil
+      lift:AutoScroll(area, box, 150, 0.1)
+      assert.is_nil(box._scrolledTo, "in the middle on screen")
+    end)
+  end)
+
   describe("scrolling near the edges", function()
     local area, box
 

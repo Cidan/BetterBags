@@ -64,4 +64,15 @@ Then, on the plan:
 - A change applies at once to open small panels: they take the scale, refit to the screen and lay out
   again; the chain places its pair again.
 
-**Status:** planned.
+**Status:** done, with these choices:
+- Both sliders run 50% to 150% in steps of 5.
+- A small panel's default size scales with it (the full body's width and the theme's share of the
+  screen, in its own units), so the whole panel is a smaller or larger version of itself; the screen
+  still bounds it.
+- The settings lists' reordering was fixed on the way: the settings window scales itself down to fit a
+  small screen, and its rows had the same mismatch.
+- Commits: the tabs and Icon Scale (21 mutations, one led to a test), then Bag Scale (58 mutations, 11
+  first survived: 10 led to tests, one showed a refit the chain already does, removed). Rules: next.md
+  §3 (Icon Scale) and §14h (Bag Scale), next-settings.md, next-themes.md, `.context/patterns-ui.md`.
+- Not seen in game: how a scaled small panel looks (art, text, sparkles), dragging sections and tabs in
+  one, and the switch's scale glide.

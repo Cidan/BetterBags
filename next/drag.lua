@@ -395,9 +395,10 @@ function nextDrag:Update(elapsed)
   self:showTarget(target)
   if target and target.type == "reorder" then
     local canvas = state.panel.content
-    local top = canvas.frame:GetTop()
-    if top then
-      canvas:SetDragIndex(canvas:DragIndexAt(top - y))
+    -- The cursor is on the screen; the canvas lays out in its own units (a small panel's Bag Scale).
+    local at = lift:ScreenPoint(canvas.frame)
+    if at then
+      canvas:SetDragIndex(canvas:DragIndexAt((at.top - y) / at.scale))
     end
     local scroll = state.panel.scroll
     lift:AutoScroll(scroll.frame, scroll.scrollBox, y, elapsed)
@@ -496,7 +497,11 @@ function nextDrag:land(commit, after, from)
   local state = self.current
   local canvas = state.panel.content
   lift:Land(state, function(left0, top0)
-    return canvas.frame:GetLeft() or left0, (canvas.frame:GetTop() or top0) - (canvas:GetDragSlotY() or 0)
+    local at = lift:ScreenPoint(canvas.frame)
+    if at == nil then
+      return left0, top0
+    end
+    return at.left, at.top - (canvas:GetDragSlotY() or 0) * at.scale, at.scale
   end, function()
     self:reattach(false)
     canvas:EndDrag(commit)
@@ -700,9 +705,9 @@ end
 function nextDrag:moveDone(ctx, target, rederive, from)
   local x, y
   if target.tab then
-    x, y = target.tab.button:GetCenter()
+    x, y = lift:Center(target.tab.button)
   else
-    x, y = target.panel.scroll.frame:GetCenter()
+    x, y = lift:Center(target.panel.scroll.frame)
   end
   if x == nil then
     x, y = lift:Cursor()

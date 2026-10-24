@@ -187,14 +187,18 @@ function chain:SmallLayout()
   return database:GetNextSmallChain()
 end
 
--- SmallGap is the room between two small bags side by side: both tab rails hang into it, each its
--- widest tab plus the hover slide, with a margin between them; never less than Small.MinGap.
+-- SmallGap is the room between two small bags side by side, on the screen: both tab rails hang into it,
+-- each its widest tab plus the hover slide at its bag's scale (docs/next-appearance-size.md), with a
+-- margin between them; never less than Small.MinGap, both at the larger scale.
 ---@param a NextPanelFrame
 ---@param b NextPanelFrame
 ---@return number
 function chain:SmallGap(a, b)
-  local tabs = a.tabs:Width() + b.tabs:Width() + 2 * style.TAB_HOVER + style.Chain.TabMargin
-  return math.max(style.Small.MinGap, tabs)
+  local sa, sb = a:Scale(), b:Scale()
+  local s = math.max(sa, sb)
+  local tabs = (a.tabs:Width() + style.TAB_HOVER) * sa + (b.tabs:Width() + style.TAB_HOVER) * sb
+    + style.Chain.TabMargin * s
+  return math.max(style.Small.MinGap * s, tabs)
 end
 
 -- SmallAnchorOf returns the bag a small panel sits beside, when the small chain makes it the chained
@@ -224,9 +228,9 @@ end
 function chain:ChainedPlace(panel, anchor, ax, ay)
   local gap = self:SmallGap(panel, anchor)
   if panel.chainRole == "companion" then
-    return ax - gap - panel:BodyWidth(), ay
+    return ax - gap - panel:BodyWidth() * panel:Scale(), ay
   end
-  return ax + anchor:BodyWidth() + gap, ay
+  return ax + anchor:BodyWidth() * anchor:Scale() + gap, ay
 end
 
 -- ChainedSide is the side of a small panel its chained partner is on, where a grip would push the
@@ -322,7 +326,7 @@ function chain:Dropped(panel, x, y)
   end
   local px, py = partner:SmallPlace()
   local wx, wy = self:ChainedPlace(panel, partner, px, py)
-  if wx < 0 or wx + panel:BodyWidth() > UIParent:GetWidth() then
+  if wx < 0 or wx + panel:BodyWidth() * panel:Scale() > UIParent:GetWidth() then
     return nil, nil
   end
   if math.abs(x - wx) > style.Small.SnapReach or math.abs(y - wy) > style.Small.SnapRise then
@@ -696,10 +700,11 @@ function chain:applyCoupling()
     if backpack.chainRole ~= "backpack" then
       backpack, companion = companion, backpack
     end
-    local gap = backpack:SmallLeft() - (companion:SmallLeft() + companion:BodyWidth())
+    local gap = backpack:SmallLeft() - (companion:SmallLeft() + companion:BodyWidth() * companion:Scale())
     local half = math.max(0, gap / 2)
-    c.anchor:SetCoupling(c.amount, half, false, c.phase, c.time, style.FEATHER)
-    c.chained:SetCoupling(c.amount, half, true, c.phase, c.time, style.FEATHER)
+    -- The braid is drawn in each bag, in its own units (its Bag Scale).
+    c.anchor:SetCoupling(c.amount, half / c.anchor:Scale(), false, c.phase, c.time, style.FEATHER)
+    c.chained:SetCoupling(c.amount, half / c.chained:Scale(), true, c.phase, c.time, style.FEATHER)
     return
   end
   local gap = UIParent:GetWidth() - 2 * (style.WIDTH - style.FEATHER) - math.abs(c.anchor.offset)

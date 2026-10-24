@@ -486,9 +486,9 @@ function listProto:FlyAway(entry)
   local from = lift:ScreenPoint(frame)
   local x, y
   if entry.tab then
-    x, y = entry.tab.button:GetCenter()
+    x, y = lift:Center(entry.tab.button)
   else
-    x, y = self.panel.scroll.frame:GetCenter()
+    x, y = lift:Center(self.panel.scroll.frame)
   end
   if entry.flight then
     tween:Stop(entry.flight)
@@ -544,11 +544,11 @@ function listProto:SendBack(entry)
     return
   end
   lift:Land(flight, function(left0, top0)
-    local left, top = canvas.frame:GetLeft(), canvas.frame:GetTop()
-    if left == nil or top == nil then
+    local at = lift:ScreenPoint(canvas.frame)
+    if at == nil then
       return left0, top0
     end
-    return left, top - (section.y or 0)
+    return at.left, at.top - (section.y or 0) * at.scale, at.scale
   end, home, from)
 end
 

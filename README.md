@@ -638,8 +638,9 @@ An early look at a new design for your bags. Turn it on with **BetterBags Next (
 - **Show Blizzard Bags** (the bag button at the top of the backpack) shows your bags themselves: each bag in a tab, to swap it (drop a bag on a tab, or drag a bag off it), and your items bag by bag in slot order. Click it again to see your categories. The **X** at the top right closes the backpack.
 - Searching, sorting, the settings button, dropping items onto the panel, cooldowns and tooltips work as they do in the regular bags.
 - In the bank, your Warbank groups are listed after your bank groups, in teal, and the top of the panel turns teal while one shows. The buttons at the top close the bank, deposit your Warbound items, sort the bank (or the Warbank, while it shows) and switch between your groups and the bank's own tabs, where you can see each tab on its own, buy tabs, and right-click a tab to change its name, icon and deposit settings. In WoW: Forever, drop a bag on a bank tab to use it.
+- **Appearance > Size** sets **Icon Scale**, how big item buttons are (each row fits as many as it can), on top of the theme's own size, and **Bag Scale**, the size of the small, movable bags (the full-height bags on the screen's edges keep theirs).
 
-Not there yet: currencies, the bag anchor, the bag menu, and the size and opacity settings (the panels have one size). To go back to the regular bags, use the setting or `/bb next`. It is an experiment and may change or go away; please report what you think.
+Not there yet: currencies, the bag anchor, the bag menu, and an opacity setting. To go back to the regular bags, use the setting or `/bb next`. It is an experiment and may change or go away; please report what you think.
 
 ## Reporting Performance Problems
 If BetterBags makes your game stutter, you can record exactly what it was doing and send that along with your report.

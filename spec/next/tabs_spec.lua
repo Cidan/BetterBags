@@ -562,6 +562,32 @@ describe("NextTabs", function()
       finishTweens()
     end)
 
+    -- BetterBags Next's small panels have a Bag Scale (docs/next-appearance-size.md): the rail is read on
+    -- screen, in UIParent's units, and the tab keeps its size there.
+    it("moves a tab in a scaled panel's rail, reading the rail on screen", function()
+      body:SetScale(0.5)
+      rail:SetTabs(groupsAndPlus)
+      layOut()
+      local tab = rail:Tab(1)
+      local x, y = (tab.button:GetLeft() + 10) * 0.5, (tab.button:GetTop() - style.TAB_HEIGHT / 2) * 0.5
+      _G._cursorX, _G._cursorY = x, y
+      _G._mouseButtonsDown = { LeftButton = true }
+      tab.button:GetScript("OnDragStart")(tab.button)
+      assert.are.equal(0.5, tab.button:GetScale(), "lifted at its size on screen")
+      move(x, middleOf(2) * 0.5 - 1)
+      assert.are.equal(2, rail.moving.index)
+      release(tab)
+      tween:Step(style.Time.Land - 0.00001)
+      local s = tab.button:GetScale()
+      assert.is_true(math.abs(s - 0.5) < 0.01, "lands at the rail's scale: " .. s)
+      local _, _, _, ox, oy = tab.button:GetPoint(1)
+      assert.is_true(math.abs(ox * s - (RAIL_RIGHT - tab.width) * 0.5) < 0.5, "at the rail's edge")
+      assert.is_true(math.abs(oy * s - (RAIL_TOP - step) * 0.5) < 0.5, "in its room")
+      finishTweens()
+      assert.are.same({ { 2, 1, 3, 0 } }, orders)
+      body:SetScale(1)
+    end)
+
     it("slides the tabs in its way out of it, animated", function()
       rail:SetTabs(groupsAndPlus)
       layOut()

@@ -52,6 +52,8 @@ lift.detached = false
 ---@field scale number
 ---@field landing boolean It was let go: it no longer follows the cursor.
 ---@field pinX? number A cursor x it keeps to: it follows the cursor only up and down (a tab moved in its rail).
+---@field base? number Its scale on screen when it was picked up (a small panel's Bag Scale): it shrinks from
+--- it, and lands back at it unless its owner says otherwise.
 
 -- NextDragPoint is where a flight starts from: a top left in UIParent's coordinates, at a scale (a
 -- frame leaving a dock, not the cursor).
@@ -89,8 +91,29 @@ function lift:ScreenPoint(frame)
   if left == nil or top == nil then
     return nil
   end
-  local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+  local scale = self:ScaleOf(frame)
   return { left = left * scale, top = top * scale, scale = scale }
+end
+
+-- ScaleOf is how big a frame is drawn on screen, in UIParent's units: 1 under UIParent, a small panel's
+-- Bag Scale inside one (docs/next-appearance-size.md). A frame's own edges are in its own units; times
+-- this, they are UIParent's, which the cursor (Cursor) and every place on screen are in.
+---@param frame Frame
+---@return number
+function lift:ScaleOf(frame)
+  return frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+end
+
+-- Center is where a frame's middle is on screen, in UIParent's units (nothing before the client placed it).
+---@param frame Frame
+---@return number? x, number? y
+function lift:Center(frame)
+  local x, y = frame:GetCenter()
+  if x == nil or y == nil then
+    return nil, nil
+  end
+  local scale = self:ScaleOf(frame)
+  return x * scale, y * scale
 end
 
 -- Layer makes the drag layer the first time (with the shadow a lifted frame casts and the cover over
@@ -144,13 +167,17 @@ end
 ---@param onFrame fun(elapsed: number)
 ---@return boolean
 function lift:Pick(held, frame, onFrame)
-  local left, top = frame:GetLeft(), frame:GetTop()
-  if left == nil or top == nil then
+  local at = self:ScreenPoint(frame)
+  if at == nil then
     return false
   end
   self:Layer()
   local x, y = self:Cursor()
-  held.frame, held.grabX, held.grabY, held.scale, held.landing = frame, x - left, top - y, 1, false
+  -- Where it was grabbed, in its own units; it keeps its size on screen (a scaled small panel's frame).
+  local base = at.scale
+  held.frame, held.grabX, held.grabY, held.scale, held.landing = frame, (x - at.left) / base, (at.top - y) / base,
+    base, false
+  held.base = base
   self.held, self.detached = held, false
   GameTooltip:Hide()
   raise(frame)
@@ -170,7 +197,7 @@ function lift:Pick(held, frame, onFrame)
     to = 1,
     ease = style:Ease("Lift"),
     onUpdate = function(t)
-      held.scale = 1 - (1 - D.LiftScale) * t
+      held.scale = base * (1 - (1 - D.LiftScale) * t)
       self.shadow:SetAlpha(self:ShadowAlpha() * t)
       if not held.landing then
         self:Place(held, self:Cursor())
@@ -200,8 +227,9 @@ end
 
 -- Land flies a frame from where it is (the cursor's place, or from) to the top left to(left0, top0)
 -- returns (UIParent's coordinates, asked every frame: the place may still be moving; left0, top0 is
--- where the flight started) and to the scale it returns third (full size when it returns none), the held
--- frame's shadow fading, then calls onDone, which puts it back (Put).
+-- where the flight started) and to the scale it returns third (its size on screen when it was picked up,
+-- base, when it returns none: full size under UIParent), the held frame's shadow fading, then calls
+-- onDone, which puts it back (Put).
 ---@param held NextLifted
 ---@param to fun(left0: number, top0: number): number, number, number?
 ---@param onDone fun()
@@ -227,7 +255,7 @@ function lift:Land(held, to, onDone, from)
     ease = style:Ease("Land"),
     onUpdate = function(t)
       local left, top, s1 = to(left0, top0)
-      local s = s0 + ((s1 or 1) - s0) * t
+      local s = s0 + ((s1 or held.base or 1) - s0) * t
       local x, y = left0 + (left - left0) * t, top0 + (top - top0) * t
       frame:SetScale(s)
       frame:ClearAllPoints()
@@ -241,7 +269,8 @@ function lift:Land(held, to, onDone, from)
 end
 
 -- FlyAway flies a frame from where it is (the cursor's place, or from) into a point (UIParent's
--- coordinates), its grabbed point travelling there, shrinking to the theme's Drag.FlyScale and fading
+-- coordinates), its grabbed point travelling there, shrinking to the theme's Drag.FlyScale (of its size
+-- on screen when it was picked up) and fading
 -- over Time.FlyAway (the held frame's shadow too), then calls onDone (a section moved into a tab, the
 -- other bag, a vendor).
 ---@param held NextLifted
@@ -257,7 +286,7 @@ function lift:FlyAway(held, x, y, onDone, from)
     held.scale = s0
     x0, y0 = from.left + held.grabX * s0, from.top - held.grabY * s0
   end
-  local flyScale, shadow = style.Theme.Drag.FlyScale, self:ShadowAlpha()
+  local flyScale, shadow = style.Theme.Drag.FlyScale * (held.base or 1), self:ShadowAlpha()
   tween:Play(held, {
     duration = style.Time.FlyAway,
     from = 0,
@@ -350,6 +379,8 @@ function lift:AutoScroll(area, box, y, elapsed)
   if top == nil or bottom == nil then
     return
   end
+  local scale = self:ScaleOf(area)
+  top, bottom = top * scale, bottom * scale
   local edge = self.SCROLL_EDGE
   local closeness = 0
   if y > top - edge then

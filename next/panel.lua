@@ -54,6 +54,9 @@ local sparkles = addon:GetModule('NextSparkles')
 ---@class NextTabs: AceModule
 local nextTabs = addon:GetModule('NextTabs')
 
+---@class NextLift: AceModule
+local lift = addon:GetModule('NextLift')
+
 ---@class NextContent: AceModule
 local nextContent = addon:GetModule('NextContent')
 
@@ -381,7 +384,9 @@ function panelProto:setOffset(x)
   local frame = self.frame
   frame:ClearAllPoints()
   if self:IsSmall() then
-    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.placeX + x, self.placeY)
+    -- Its place is on the screen; its anchor's offsets are in its own units (its Bag Scale).
+    local s = self:Scale()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (self.placeX + x) / s, self.placeY / s)
     frame:SetAlpha(1 - math.min(1, math.abs(x) / style.Small.Slide))
     return
   end
@@ -740,16 +745,30 @@ function panelProto:IsSmall()
   return self.size == "small"
 end
 
--- SmallSize is the size a small panel takes on this screen while nothing sizes it (next.md §14g):
--- the size the player gave it with its grips (saved for its kind), else the full body's width and a
--- share of the screen's height in whole units; never below its minimum, nor past the screen.
+-- Scale is the scale the panel is drawn at for its size (docs/next-appearance-size.md): a small panel's
+-- Bag Scale, 1 for a full panel docked to its screen edge (asked: "bag scale should just not apply when
+-- docked to the side"). A small panel's size is in its own units, as its content is laid out; its place
+-- is on the screen, in UIParent's: on screen it is its size times this.
+---@return number
+function panelProto:Scale()
+  if self:IsSmall() then
+    return database:GetNextBagScale() / 100
+  end
+  return 1
+end
+
+-- SmallSize is the size a small panel takes on this screen while nothing sizes it (next.md §14g), in its
+-- own units: the size the player gave it with its grips (saved for its kind), else the full body's width
+-- and a share of the screen's height in whole units; never below its minimum, nor past the screen at its
+-- scale.
 ---@return number width, number height
 function panelProto:SmallSize()
   local w, h = database:GetNextSmallSize(self.kind)
+  local s = self:Scale()
   w = w or style.BODY_WIDTH
   h = h or math.floor(UIParent:GetHeight() * style.Small.Height)
-  return math.min(UIParent:GetWidth(), math.max(self:MinWidth(), w)),
-    math.min(UIParent:GetHeight(), math.max(self:MinHeight(), h))
+  return math.min(UIParent:GetWidth() / s, math.max(self:MinWidth(), w)),
+    math.min(UIParent:GetHeight() / s, math.max(self:MinHeight(), h))
 end
 
 -- SmallWidth and SmallHeight are a small panel's size now: the frame's while a grip sizes it or it
@@ -859,14 +878,16 @@ function panelProto:SparkSpreadBase()
   return self:IsSmall() and style.Small.SparkSpread or (R and R.Spread or 0)
 end
 
--- clampPlace keeps a small panel's place (its top left) on the screen.
+-- clampPlace keeps a small panel's place (its top left) on the screen, its size there its own times its
+-- scale.
 ---@private
 ---@param x number
 ---@param y number
 ---@return number x, number y
 function panelProto:clampPlace(x, y)
-  x = math.max(0, math.min(UIParent:GetWidth() - self:SmallWidth(), x))
-  y = math.max(self:SmallHeight(), math.min(UIParent:GetHeight(), y))
+  local s = self:Scale()
+  x = math.max(0, math.min(UIParent:GetWidth() - self:SmallWidth() * s, x))
+  y = math.max(self:SmallHeight() * s, math.min(UIParent:GetHeight(), y))
   return x, y
 end
 
@@ -881,9 +902,10 @@ function panelProto:SmallPlace()
   end
   local x, y = database:GetNextSmallPlace(self.kind)
   if x == nil then
-    y = (UIParent:GetHeight() + self:SmallHeight()) / 2
+    local s = self:Scale()
+    y = (UIParent:GetHeight() + self:SmallHeight() * s) / 2
     if self.side == "RIGHT" then
-      x = UIParent:GetWidth() - self:SmallWidth() - style.Small.Margin
+      x = UIParent:GetWidth() - self:SmallWidth() * s - style.Small.Margin
     else
       x = style.Small.Margin
     end
@@ -898,7 +920,8 @@ function panelProto:LivePlace()
   if self.moving or self.sizing ~= nil or self.resetting then
     local x, y = self.frame:GetLeft(), self.frame:GetTop()
     if x ~= nil and y ~= nil then
-      return x, y
+      local s = lift:ScaleOf(self.frame)
+      return x * s, y * s
     end
   end
   return self:SmallPlace()
@@ -911,7 +934,7 @@ function panelProto:SmallLeft()
   if self.moving or self.sizing ~= nil or self.resetting then
     local x = self.frame:GetLeft()
     if x ~= nil then
-      return x
+      return x * lift:ScaleOf(self.frame)
     end
   end
   return self.placeX + self.offset
@@ -926,7 +949,7 @@ function panelProto:GlideTo(x, y)
   self.placeX, self.placeY = x, y
   self.offset = 0
   self.target = 0
-  local frame = self.frame
+  local frame, s = self.frame, self:Scale()
   tween:Play(self, {
     duration = style.Time.Glide,
     from = 0,
@@ -934,7 +957,7 @@ function panelProto:GlideTo(x, y)
     ease = style:Ease("Glide"),
     onUpdate = function(t)
       frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", fromX + (x - fromX) * t, fromY + (y - fromY) * t)
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (fromX + (x - fromX) * t) / s, (fromY + (y - fromY) * t) / s)
       frame:SetAlpha(1)
     end,
     onDone = function()
@@ -954,6 +977,7 @@ function panelProto:ApplyGeometry()
   local frame, body = self.frame, self.body
   local bodyLeft = self:BodyLeft()
   local bodyRight = (not small and self.side == "LEFT") and style.FEATHER or 0
+  frame:SetScale(self:Scale())
   if small then
     self.smallWidth, self.smallHeight = self:SmallSize()
     frame:SetSize(self.smallWidth, self.smallHeight)
@@ -1007,6 +1031,7 @@ end
 -- screen: on opening (the screen may have changed while it was closed) and when the screen changes.
 -- Its content is laid out again when its height changed.
 function panelProto:FitSmall()
+  self.frame:SetScale(self:Scale())
   local width, height = self:SmallSize()
   local changed = self.frame:GetWidth() ~= width or self.frame:GetHeight() ~= height
   self.smallWidth, self.smallHeight = width, height
@@ -1019,18 +1044,20 @@ function panelProto:FitSmall()
   end
 end
 
--- BodyRect is where the body is on screen for the panel's size and offset now: its top left (in
--- UIParent's units), its height and its width (the full body's, or a small panel's own).
----@return number x, number y, number height, number width
+-- BodyRect is where the body is on screen for the panel's size and offset now, in UIParent's units: its
+-- top left, its height and its width (the full body's, or a small panel's own at its scale); and its
+-- scale.
+---@return number x, number y, number height, number width, number scale
 function panelProto:BodyRect()
   if self:IsSmall() then
-    return self.placeX + self.offset, self.placeY, self:SmallHeight(), self:SmallWidth()
+    local s = self:Scale()
+    return self.placeX + self.offset, self.placeY, self:SmallHeight() * s, self:SmallWidth() * s, s
   end
   local left = self.offset
   if self.side == "RIGHT" then
     left = UIParent:GetWidth() - style.WIDTH + self.offset
   end
-  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight(), style.BODY_WIDTH
+  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight(), style.BODY_WIDTH, 1
 end
 
 -- PrepareResize switches the panel's size (nextPanel:SetSize). Not shown (a closing one finishes
@@ -1060,10 +1087,10 @@ function panelProto:PrepareResize(size)
   else
     -- An opening slide or a flight ends where it was going: its end says the panel has shown.
     tween:Stop(self, true)
-    local x, y, h, w = self:BodyRect()
+    local x, y, h, w, scale = self:BodyRect()
     local small = self:IsSmall()
     self.morphFrom = {
-      x = x, y = y, h = h, w = w, ribbon = self.ribbonLength,
+      x = x, y = y, h = h, w = w, scale = scale, ribbon = self.ribbonLength,
       full = small and 0 or 1,
       outer = (not small and not self.docked) and 1 or 0,
       edge = self:EdgeAlphaFor(small),
@@ -1090,8 +1117,9 @@ function panelProto:Morph()
   self.offset = small and 0 or chain:RestOffset(self)
   self.target = self.offset
   self:ApplyGeometry()
-  local tx, ty, th, tw = self:BodyRect()
-  if tw < from.w - 0.5 then
+  local tx, ty, th, tw, ts = self:BodyRect()
+  -- The content is laid out in the panel's own units.
+  if tw / ts < from.w / from.scale - 0.5 then
     render:Invalidate(self.root)
   end
   local toRibbon = self.ribbonLength
@@ -1117,16 +1145,20 @@ function panelProto:Morph()
   end
   -- The frame is the body plus the feather at full size: only the body's width glides.
   local bodyLeft, extra = self:BodyLeft(), self:Width() - self:BodyWidth()
-  local at = { x = from.x, y = from.y, h = from.h, w = from.w, ribbon = from.ribbon, full = from.full,
-    outer = from.outer, edge = from.edge }
+  local at = { x = from.x, y = from.y, h = from.h, w = from.w, scale = from.scale, ribbon = from.ribbon,
+    full = from.full, outer = from.outer, edge = from.edge }
   ---@type NextMorph
   local morph = { at = at, finish = function() end }
   self.morph = morph
 
+  -- The body's place and size are on the screen and its scale glides with them (a small panel's Bag
+  -- Scale, 1 at full size); the frame's anchor and size are in its own units.
   local function draw()
+    local sc = at.scale
+    frame:SetScale(sc)
     frame:ClearAllPoints()
-    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x - bodyLeft, at.y)
-    frame:SetSize(at.w + extra, at.h)
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x / sc - bodyLeft, at.y / sc)
+    frame:SetSize(at.w / sc + extra, at.h / sc)
     self:paintFeathers(at.full, at.outer)
     self:paintEdges(at.edge)
     self.ribbonLength = at.ribbon
@@ -1146,7 +1178,8 @@ function panelProto:Morph()
 
   -- The glide: the body and the beam, with the feathers (shrinking) or the border (growing) fading out.
   local function glide(after)
-    local x0, y0, h0, w0, r0, f0, o0, e0 = at.x, at.y, at.h, at.w, at.ribbon, at.full, at.outer, at.edge
+    local x0, y0, h0, w0, s0, r0 = at.x, at.y, at.h, at.w, at.scale, at.ribbon
+    local f0, o0, e0 = at.full, at.outer, at.edge
     local f1, o1, e1 = f0, o0, e0
     if small then
       f1, o1 = 0, 0
@@ -1154,8 +1187,8 @@ function panelProto:Morph()
       e1 = self:EdgeAlphaFor(false)
     end
     if math.abs(tx - x0) < 0.01 and math.abs(ty - y0) < 0.01 and math.abs(th - h0) < 0.01
-      and math.abs(tw - w0) < 0.01 and math.abs(toRibbon - r0) < 0.01 and math.abs(f1 - f0) < 0.001 and math.abs(o1 - o0) < 0.001
-      and math.abs(e1 - e0) < 0.001 then
+      and math.abs(tw - w0) < 0.01 and math.abs(ts - s0) < 0.0001 and math.abs(toRibbon - r0) < 0.01
+      and math.abs(f1 - f0) < 0.001 and math.abs(o1 - o0) < 0.001 and math.abs(e1 - e0) < 0.001 then
       after()
       return
     end
@@ -1169,6 +1202,7 @@ function panelProto:Morph()
         at.y = y0 + (ty - y0) * t
         at.h = h0 + (th - h0) * t
         at.w = w0 + (tw - w0) * t
+        at.scale = s0 + (ts - s0) * t
         at.ribbon = r0 + (toRibbon - r0) * t
         at.full = f0 + (f1 - f0) * t
         at.outer = o0 + (o1 - o0) * t
@@ -1303,7 +1337,9 @@ function panelProto:StopMove()
   local x, y = frame:GetLeft(), frame:GetTop()
   self.moving = false
   if x ~= nil and y ~= nil then
-    x, y = self:clampPlace(x, y)
+    -- Where the client left it, on the screen (its edges are in its own units).
+    local s = lift:ScaleOf(frame)
+    x, y = self:clampPlace(x * s, y * s)
     -- Dropped beside its partner, it chains to it and glides into its spot.
     local sx, sy = chain:Dropped(self, x, y)
     self.placeX, self.placeY = x, y
@@ -1463,8 +1499,8 @@ function panelProto:StartSizing(side)
   self:endMorph()
   self:endReset()
   tween:Stop(self, true)
-  local frame = self.frame
-  frame:SetResizeBounds(self:MinWidth(), self:MinHeight(), UIParent:GetWidth(), UIParent:GetHeight())
+  local frame, s = self.frame, self:Scale()
+  frame:SetResizeBounds(self:MinWidth(), self:MinHeight(), UIParent:GetWidth() / s, UIParent:GetHeight() / s)
   self.sizingFrom = { frame:GetWidth(), frame:GetHeight() }
   self.sizing = side
   self.content:SetInstant(true)
@@ -1502,8 +1538,9 @@ function panelProto:StopSizing()
     database:SetNextSmallSize(self.kind, w, h)
     self.smallWidth, self.smallHeight = self:SmallSize()
     -- A chained bag's grip on its chained side is off (UpdateGrips), so its chained side stayed beside
-    -- its partner: where the frame is, is its spot.
-    self.placeX, self.placeY = self:clampPlace(x, y)
+    -- its partner: where the frame is, on the screen, is its spot.
+    local s = lift:ScaleOf(frame)
+    self.placeX, self.placeY = self:clampPlace(x * s, y * s)
     database:SetNextSmallPlace(self.kind, self.placeX, self.placeY)
   end
   frame:SetSize(self:SmallWidth(), self:SmallHeight())
@@ -1537,7 +1574,9 @@ function panelProto:ResetSize(side)
   database:SetNextSmallSize(self.kind, nil, nil)
   local w1, h1 = self:SmallSize()
   self.smallWidth, self.smallHeight = w1, h1
-  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + w0 - w1 or x0, y0)
+  -- Places on the screen, sizes in its own units.
+  local s = self:Scale()
+  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + (w0 - w1) * s or x0, y0)
   self.placeX, self.placeY = x1, y1
   self.offset = 0
   database:SetNextSmallPlace(self.kind, x1, y1)
@@ -1550,7 +1589,7 @@ function panelProto:ResetSize(side)
     ease = style:Ease("Resize"),
     onUpdate = function(t)
       frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x0 + (x1 - x0) * t) / s, (y0 + (y1 - y0) * t) / s)
       frame:SetSize(w0 + (w1 - w0) * t, h0 + (h1 - h0) * t)
       self:FitTitle()
       render:Invalidate(self.root)
@@ -1963,12 +2002,12 @@ function panelProto:applyCloud()
     return
   end
   local point = self:TitleJoin()
-  local lift = 1 + C.Swell * cloud.swell
+  local swell = 1 + C.Swell * cloud.swell
   for _, puff in ipairs(cloud.puffs) do
     local breath = 2 * math.pi * cloud.time / puff.period + puff.phase
     local base = puff.base
     puff.texture:SetPoint("CENTER", self.title, point, base.x, base.y + C.Drift * math.sin(breath))
-    puff.texture:SetAlpha(base.a * (1 + C.Depth * math.sin(breath * 0.77 + 1)) * lift)
+    puff.texture:SetAlpha(base.a * (1 + C.Depth * math.sin(breath * 0.77 + 1)) * swell)
   end
   cloud.join:SetAlpha(C.Join.A + C.JoinSwell * cloud.swell)
 end
@@ -2860,9 +2899,10 @@ function panelProto:ApplyStyle(ctx)
   end
 end
 
--- ApplyScales sizes the panel for the Size tab's scales (docs/next-appearance-size.md): its content drawn
--- again at the item buttons' size (at once while it shows, else when it next shows), so each row fits
--- as many as its width allows.
+-- ApplyScales sizes the panel for the Size tab's scales (docs/next-appearance-size.md): its content is drawn
+-- again at the item buttons' size (at once while it shows, else when it next shows), so each row fits as
+-- many as its width allows. A small panel takes its Bag Scale as it is refitted to the screen (FitSmall):
+-- the chain refits every open one after this (chain:ScalesChanged), and a closed one refits as it opens.
 ---@param ctx Context
 function panelProto:ApplyScales(ctx)
   if self.lastSlotInfo ~= nil then
