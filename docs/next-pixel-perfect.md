@@ -75,6 +75,10 @@ the architecture, the rules for new code, NextPixel's API and the coverage are i
 - **Scroll offsets are rounded where Blizzard's box applies them** (`SetScrollTargetOffset`), so
   interpolated scrolling steps a pixel at a time and rests on the grid.
 - **A section seated in a dock card** is laid out again on the card's grid, its header included.
+- **The check runs in game too** (asked, after shipping): a toggle in `/bbdb`'s Pixels tab, off by
+  default, checks BetterBags Next's windows as they are used and pops up a log of what is off the grid, so
+  what the specs miss (states nobody thought of, real fonts and templates, other addons) is found on the
+  real client. The specs and the game run one check (`PixelAudit:Check`), which reads only client calls.
 - **The mock follows the client further**, to make the check honest: sizes from anchors while a screen is
   set up, item button parts and `UIPanelButtonTemplate` anchored as Blizzard's XML anchors them, the
   scroll target moving with the scroll offset, `SetPoint(point, x, y)` relative to the parent.

@@ -23,7 +23,7 @@ The deterministic loading order is rigorously divided into 5 distinct phases:
 
 ```
 ADDON_LOADED (core/init.lua: OnInitialize)
-  ├── 1. Core & Utilities (events, perf + perfSessions + StartIfArmed, simulator, debug, async, bucket)
+  ├── 1. Core & Utilities (events, perf + perfSessions + StartIfArmed, render recorder, pixel audit, simulator, debug, async, bucket)
   ├── 2. Database (DB - loaded before downstream queries)
   ├── 3. Data Models & Scanners (tooltipScanner, itemLoader, guildBank, categories, groups, equipmentSets, search, items, refresh)
   ├── 4. Render, Themes & Presentation Frames (render, sonata, tabs, itemFrame, sectionFrame, contextMenu, bagButton, itemRowFrame)
@@ -42,6 +42,8 @@ the session. See `.claude/rules/perf-profiler.md`.
   perf:Init()
   perfSessions:Init()
   perfSessions:StartIfArmed()
+  addon:GetModule('RenderRecorder'):Init()
+  addon:GetModule('PixelAudit'):Init()
   addon:GetModule('Simulator'):Init()
   debug:Init()
   async:Init()
