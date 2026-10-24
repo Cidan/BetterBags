@@ -2370,7 +2370,16 @@ _G.C_Item.IsEquippableItem = _G.C_Item.IsEquippableItem or function() return tru
 _G.C_Item.GetItemQuality = _G.C_Item.GetItemQuality or function() return 1 end
 _G.C_Item.GetDetailedItemLevelInfo = _G.C_Item.GetDetailedItemLevelInfo or function() return 1, false, 1 end
 _G.C_Item.GetCurrentItemLevel = _G.C_Item.GetCurrentItemLevel or function() return 1 end
-_G.C_Item.GetItemGUID = _G.C_Item.GetItemGUID or function() return "mock-guid" end
+-- C_Item.GetItemGUID(itemLocation) -> itemGUID. Its argument is an ItemLocation that holds an item, not an
+-- EmptiableItemLocation (ItemDocumentation.lua): a bag slot with no item is an error, as seen in game ("bad
+-- argument #1 to 'GetItemGUID' (Usage: local itemGUID = C_Item.GetItemGUID(itemLocation))"). Equipped
+-- items are not modeled here.
+_G.C_Item.GetItemGUID = _G.C_Item.GetItemGUID or function(itemLocation)
+  if itemLocation.IsBagAndSlot and itemLocation:IsBagAndSlot() and not _G.C_Item.DoesItemExist(itemLocation) then
+    error("bad argument #1 to 'GetItemGUID' (Usage: local itemGUID = C_Item.GetItemGUID(itemLocation))", 2)
+  end
+  return "mock-guid"
+end
 _G.C_Item.GetStackCount = _G.C_Item.GetStackCount or function() return 1 end
 _G.C_Item.GetItemInfo = _G.C_Item.GetItemInfo or function()
   return "Mock Item", "[Mock Item Link]", 1, 1, 0, "Weapon", "One-Handed Swords", 1, "INVTYPE_WEAPON", 12345, 100, 2, 0, 0, 0, 0

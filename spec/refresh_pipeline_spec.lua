@@ -214,10 +214,20 @@ local function stubClientAPIs()
     return name, "|cffffffff|Hitem:" .. id .. "|h[" .. name .. "]|h|r",
       1, 100, 1, "Misc", "Junk", 20, "INVTYPE_NON_EQUIP", 134400, 10, 1, 0, 1, 0, 0, false
   end
+  -- C_Item.GetItemGUID(itemLocation) takes an ItemLocation that holds an item, not an
+  -- EmptiableItemLocation (ItemDocumentation.lua): the client raises an error for an empty slot, as
+  -- seen in game ("bad argument #1 to 'GetItemGUID' (Usage: local itemGUID =
+  -- C_Item.GetItemGUID(itemLocation))"). Equipped items are not modeled here.
   _G.C_Item.GetItemGUID = function(location)
     local bagid, slotid = location:GetBagAndSlot()
-    local slot = bagid and mockContainer[bagid] and mockContainer[bagid][slotid]
-    return slot and slot.guid or ""
+    if bagid == nil then
+      return ""
+    end
+    local slot = mockContainer[bagid] and mockContainer[bagid][slotid]
+    if not (slot and slot.itemID) then
+      error("bad argument #1 to 'GetItemGUID' (Usage: local itemGUID = C_Item.GetItemGUID(itemLocation))", 2)
+    end
+    return slot.guid or ""
   end
   _G.C_Item.GetItemStats = function(link) return mockStats[link] end
   _G.C_Item.GetItemSubClassInfo = function() return "Bag" end
@@ -4447,7 +4457,8 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.is_true(slotInfo.itemsBySlotKey["0_1"].itemInfo.isNewItem)
     end)
 
-    -- The slot changed and its read has not run yet: what the client reports for the slot
+    -- The slot changed and its read has not run yet, with no change reported for its bag
+    -- (MarkBagUnread): the item's GUID still tells it. What the client reports for the slot
     -- belongs to another item, so none of it is written to the committed one.
     it("leaves an item whose slot now holds something else as it was", function()
       override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
@@ -4488,6 +4499,168 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.is_false(item.harvestIncomplete)
       assert.equal("Warm Name", item.itemInfo.itemName)
       assert.is_true(search:Search("zephyrium")["0_1"] == true)
+    end)
+
+    describe("a bag the client changed after its read (MarkBagUnread)", function()
+      local asked
+
+      before_each(function()
+        asked = {}
+        local getItemGUID = _G.C_Item.GetItemGUID
+        override(_G.C_Item, "GetItemGUID", function(location)
+          local bagid, slotid = location:GetBagAndSlot()
+          table.insert(asked, bagid .. "_" .. slotid)
+          return getItemGUID(location)
+        end)
+        mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, { itemID = 202, guid = "g202", count = 1 } }
+        mockContainer[1] = { { itemID = 303, guid = "g303", count = 1 } }
+        refreshBackpack()
+        asked = {}
+      end)
+
+      it("is left as the last read committed it, and the client is asked nothing about it", function()
+        local before = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey
+        mockContainer[0][1] = {}
+        newSlots["0_2"] = true
+        items:MarkBagUnread(0)
+        newSlots["1_1"] = true
+        local committed = refreshBackpack({ derive = true }).itemsBySlotKey
+        assert.same({ "1_1" }, asked)
+        assert.equal(before["0_1"], committed["0_1"])
+        assert.is_false(committed["0_1"].isItemEmpty)
+        assert.is_false(committed["0_2"].itemInfo.isNewItem, "nothing the client says of the bag is taken")
+        assert.is_true(committed["1_1"].itemInfo.isNewItem, "an unchanged bag is refreshed")
+      end)
+
+      it("is read again by the read the change leads to, which ends it", function()
+        mockContainer[0][1] = {}
+        items:MarkBagUnread(0)
+        local committed = refreshBackpack({ bags = { [0] = true } }).itemsBySlotKey
+        assert.is_true(committed["0_1"].isItemEmpty)
+        assert.is_nil(items._unreadBags[0])
+        asked = {}
+        refreshBackpack({ derive = true })
+        table.sort(asked)
+        assert.same({ "0_2", "1_1" }, asked)
+      end)
+
+      it("stays unread through a recalculation and a read of another bag", function()
+        items:MarkBagUnread(0)
+        refreshBackpack({ derive = true })
+        assert.is_not_nil(items._unreadBags[0])
+        refreshBackpack({ bags = { [1] = true } })
+        assert.is_not_nil(items._unreadBags[0])
+        assert.is_nil(items._unreadBags[1])
+      end)
+
+      it("is ended for every bag by a read of every bag", function()
+        items:MarkBagUnread(0)
+        items:MarkBagUnread(1)
+        refreshBackpack({ wipe = true })
+        assert.is_nil(items._unreadBags[0])
+        assert.is_nil(items._unreadBags[1])
+      end)
+
+      -- The read harvests in one frame and commits in a later one; a change in between is not in
+      -- what it committed.
+      it("stays unread when it changes again while a read of it is under way", function()
+        async.Yield = function() coroutine.yield() end
+        items:MarkBagUnread(0)
+        local ctx = context:New("refresh")
+        ctx:Set("targetedBags", { [0] = true })
+        local sweep = coroutine.create(function() items:RunRefresh(ctx, const.BAG_KIND.BACKPACK) end)
+        assert.is_true(coroutine.resume(sweep))
+        mockContainer[0][2] = {}
+        items:MarkBagUnread(0)
+        assert.is_true(coroutine.resume(sweep))
+        assert.equal("dead", coroutine.status(sweep))
+        assert.is_not_nil(items._unreadBags[0])
+      end)
+
+      it("stays unread when the read of it fails before committing", function()
+        items:MarkBagUnread(0)
+        override(items, "Phase11_CommitAndDispatch", function() error("commit failed") end)
+        local ctx = context:New("refresh")
+        ctx:Set("targetedBags", { [0] = true })
+        assert.is_false(pcall(items.RunRefresh, items, ctx, const.BAG_KIND.BACKPACK))
+        assert.is_not_nil(items._unreadBags[0])
+      end)
+    end)
+
+    -- Reported in game, twice: data/items.lua:1190: bad argument #1 to 'GetItemGUID' (Usage: local
+    -- itemGUID = C_Item.GetItemGUID(itemLocation)), from a recalculation the queue ran (refresh.lua:250,
+    -- its frame step). A slot the player emptied (a sale, the last of a stack used) is read only once the
+    -- loader has the bag's item data, then waits its turn behind the units already queued, which never
+    -- carry it (a read never rides on a recalculation). A recalculation that ran first worked from the
+    -- items the last read committed and asked the client about the emptied slot.
+    describe("while a changed bag's read waits", function()
+      local advance, loaderCallback, errors
+
+      local function resetEvents()
+        if events._eventHandler then
+          events._eventHandler:UnregisterAllEvents()
+          events._eventHandler:UnregisterAllMessages()
+        end
+        events:Init()
+      end
+
+      local function fire(name, ...)
+        local entry = events._eventMap[name]
+        if entry then entry.fn(name, ...) end
+      end
+
+      local function drain()
+        for _ = 1, 100 do
+          if advance() == 0 then return end
+        end
+        error("the refresh queue never went idle")
+      end
+
+      before_each(function()
+        resetEvents()
+        async.Yield = function() coroutine.yield() end
+        local frames = {}
+        saveGlobal(_G.C_Timer, "After")
+        _G.C_Timer.After = function(_, fn) table.insert(frames, fn) end
+        advance = function()
+          local due = frames
+          frames = {}
+          for _, fn in ipairs(due) do fn() end
+          return #due
+        end
+        errors = {}
+        saveGlobal(_G, "geterrorhandler")
+        _G.geterrorhandler = function() return function(err) table.insert(errors, err) end end
+        local loader = addon:GetModule("ItemLoader")
+        override(loader, "TellMeWhenABagIsUpdated", function(_, cb) loaderCallback = cb end)
+        override(loader, "Hold", function() end)
+        override(loader, "Release", function() end)
+        mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, { itemID = 202, guid = "g202", count = 1 } }
+        refresh:OnEnable()
+        refresh:_StartupRead("primed")
+        drain()
+      end)
+
+      after_each(function()
+        resetEvents()
+      end)
+
+      it("recalculates from the last read without asking the client about the emptied slot", function()
+        -- A read is under way when a tooltip finishes loading; the recalculation it asks for waits.
+        refresh:RequestUpdate({ backpack = true })
+        events:SendMessage(context:New("TooltipDataResolved"), "bags/Rederive",
+          { backpack = true, bank = false, categoriesUnchanged = true })
+        -- The player sells the first slot's item: the client empties the slot and says so; the bag's
+        -- read comes once the loader has its item data, behind the recalculation.
+        mockContainer[0][1] = {}
+        fire("BAG_UPDATE", 0)
+        loaderCallback({ [0] = true })
+        drain()
+        assert.same({}, errors)
+        local committed = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey
+        assert.is_true(committed["0_1"].isItemEmpty)
+        assert.equal("g202", committed["0_2"].itemInfo.itemGUID)
+      end)
     end)
 
     it("leaves an item read without its data whose slot now holds something else", function()

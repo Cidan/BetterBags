@@ -21,7 +21,8 @@ reads must add the matching invalidation here and a test that fails without it.*
 - **Recalculations read no bag slot.** A `derive` sweep (refresh-scheduler.md §10: most settings,
   categories, gear sets, tooltips resolving, upgrade inputs) runs every phase after the harvest on
   the committed items, refreshing a kept item's volatile fields (cache 1) only while its slot
-  still holds it. Settings and category recalculations also bump the draw generation and reset
+  still holds it, and only in bags the client has not changed since their read
+  (`items:MarkBagUnread`, refresh-scheduler.md §10). Settings and category recalculations also bump the draw generation and reset
   the layout, as their old wipes did. Anything a derive cannot see (a slot's own contents, the
   item level scaling changes) must still request a read.
 - **An event that changes an input invalidates and refreshes.** Invalidation alone would leave
