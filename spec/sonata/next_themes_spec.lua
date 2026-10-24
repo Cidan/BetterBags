@@ -202,7 +202,7 @@ describe("BetterBags Next's shipped themes", function()
       local byTexture = {}
       for _, o in ipairs(t.Panel.Ornaments) do byTexture[art(t, o)] = o end
       local band = byTexture[GW .. "bag\\bagheader.png"]
-      assert.are.same({ "TOP", 0 }, { band.Point, band.Start or 0 }, "across the top")
+      assert.are.equal("TOP", band.Point, "across the top")
       assert.are.same({ 0, 1, 19 / 64, 1 }, band.TexCoords, "its painted rows (measured)")
       local finish = byTexture[GW .. "bag\\bagheader-right.png"]
       assert.are.equal("TOPOUTER", finish.Point)
@@ -211,18 +211,24 @@ describe("BetterBags Next's shipped themes", function()
       assert.are.same({ "BOTTOM", { 0, 1, 0, 34 / 64 } }, { footer.Point, footer.TexCoords })
       local emblem = byTexture[GW .. "bag\\bagicon.png"]
       assert.are.same({ 84, 84, "TOPINNER" }, { emblem.Width, emblem.Height, emblem.Point }, "the original's 84 at the top inner corner")
-      -- Asked: the emblem, the header band and the painting as GW2_UI's character window has them (GwFrameHeader,
-      -- CreateFrameHeaderWithBody): the emblem's middle 21 in from the window's edge, on the window's top line (the
-      -- band's middle, 13 below its painted top); the painting from the band's bottom, so the band is drawn over what
-      -- is behind the window; the side panel from the window's top line; the title 64 in, 22 below that line.
-      local line = band.Y + 13
-      assert.are.same({ -21, line - 42 }, { emblem.X, emblem.Y or 0 }, "its middle 21 in, on the line")
-      assert.are.equal(band.Y + band.Height, t.Panel.Fill.Top, "the painting from the band's bottom")
-      assert.are.equal(line, t.Header.Buttons.Rail.Start)
-      assert.are.equal(64, t.Layout.Pad + t.Layout.TitleInset)
-      assert.are.equal(line + 22, t.Layout.TitleTop + t.Fonts.Title.Size)
+      -- Asked: the emblem, the header band and the painting as GW2_UI's character window has them
+      -- (GwCharacterWindowTemplate, Character/windowBase.xml): the band above the window's top (the painting starts
+      -- there, so the band is drawn over what is behind the window), starting over the side panel (40 out); the
+      -- emblem's bottom right corner 18 in and 22 below the window's top, so it straddles the side panel; the title 31
+      -- in, its middle 18 above the window's top; the side panel from the window's top; the close 10 in, 10 to 30
+      -- above the window's top.
+      local top = band.Y + band.Height
+      assert.are.equal(-40, band.Start, "over the side panel")
+      assert.are.same({ 18 - 84, top + 22 - 84 }, { emblem.X, emblem.Y or 0 }, "its corner 18 in, 22 down")
+      assert.are.equal(top, t.Panel.Fill.Top, "the painting from the window's top")
+      assert.are.equal(top, t.Header.Buttons.Rail.Start)
+      assert.are.equal(31, t.Layout.Pad + t.Layout.TitleInset)
+      assert.are.equal(top - 18, t.Layout.TitleTop + t.Fonts.Title.Size / 2)
+      local close = t.Header.Buttons.Pinned.closeButton
+      assert.are.equal(top - 20, -close.Y + t.Layout.HeaderButton / 2, "the close's middle 20 above the top")
+      assert.are.equal(-20, close.X - t.Layout.HeaderButton / 2, "and 20 in")
       assert.is_true(t.Header.Buttons.Rail.Top >= (emblem.Y or 0) + emblem.Height, "the side buttons below the emblem")
-      assert.is_true(t.Layout.SearchTop >= band.Y + band.Height, "the search bar below the band")
+      assert.is_true(t.Layout.SearchTop >= top, "the search bar below the band")
       assert.is_nil(t.Panel.Edge, "no border round the see-through header")
       assert.are.same({ "Backpack", "Bank", "GuildBank" }, emblem.Panels)
       assert.are.same({ "Vendor" }, byTexture[GW .. "character\\macro-window-icon.png"].Panels, "GW2_UI's merchant's")
@@ -257,9 +263,23 @@ describe("BetterBags Next's shipped themes", function()
       assert.are.equal("White", B.ArtHoverColor)
       assert.are.equal(GW .. "icons\\microicons\\collectionsmicrobutton-up.png", art(t, icons.sortButton))
       assert.are.equal(GW .. "icons\\microicons\\questlogmicrobutton-up.png", art(t, icons.settingsButton))
+      -- Asked: GW2_UI's size art (its only, 32 x 32) drew blurry; BetterBags' own glyphs instead, an underscore and a
+      -- box, in the theme's glyph color.
+      local BB = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\"
+      assert.are.same({ BB .. "minimize.png", true }, { art(t, icons.sizeButtonFull), icons.sizeButtonFull.Glyph ~= false })
+      assert.are.same({ BB .. "maximize.png", true }, { art(t, icons.sizeButtonSmall), icons.sizeButtonSmall.Glyph ~= false })
+      for _, name in ipairs({ "minimize", "maximize" }) do
+        local f = io.open("textures/next/icons/" .. name .. ".png", "rb")
+        assert.is_not_nil(f, name .. " (tools/textures/next_icons.py)")
+        local data = f:read("*a")
+        f:close()
+        local function u32(i)
+          local a, b, c, d = data:byte(i, i + 3)
+          return ((a * 256 + b) * 256 + c) * 256 + d
+        end
+        assert.are.same({ 64, 64, 8, 6 }, { u32(17), u32(21), data:byte(25), data:byte(26) }, name .. ": 64 x 64 RGBA")
+      end
       -- And GW2_UI's own where it has one (Inventory/bank.xml: the character and Warbank tab icons).
-      assert.are.equal(GW .. "uistuff\\minimize_button.png", art(t, icons.sizeButtonFull))
-      assert.are.equal(GW .. "uistuff\\maximize_button.png", art(t, icons.sizeButtonSmall))
       assert.are.same({ 0, 0.5, 0.5, 1 }, icons.bankTabsButton.TexCoords)
       assert.are.same({ 0.5, 1, 0, 0.5 }, icons.depositButton.TexCoords)
       assert.are.equal(GW .. "icons\\repair.png", art(t, icons.repairAllButton))

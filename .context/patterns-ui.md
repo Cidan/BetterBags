@@ -308,3 +308,15 @@ old gradient after switching to tinted art.
 The mock's `SetVertexColor` clears `_gradient`. When moving a texture from a gradient to art, `Paint` (which tints)
 is enough; from art to a gradient, set a white color texture first.
 
+## A Font String Keeps Its Width Through a Font Change
+**Problem**: In the client a font string anchored at one point takes its text's width when its text is set, and keeps
+it when its font changes afterwards; text wider than that is cut with "..." (or wraps). Seen twice: the classic
+settings window's entries (sonata.md 3c) and BetterBags Next's selected tab ("Backpa...": its font has a shadow).
+Blizzard documents the reset in `QuestLogTitleButton_Resize` ("HACK").
+
+**Rule**: After changing the font of single-anchored text that is not given a width, reset it as Blizzard does and
+size it explicitly: `SetWidth(0)`, `SetText(GetText())`, `SetWidth(math.ceil(GetStringWidth()) + 1)` (`fitNavText`
+in `forms/layouts/stacked.lua`, `railProto:placeContent` in `next/tabs.lua`). Text anchored at both ends takes its
+width from the anchors and does not need it. The specs' mock measures text the same in every font: a test makes the
+text measure wider in the new font to show the code re-measures.
+

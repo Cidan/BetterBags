@@ -393,6 +393,28 @@ describe("NextTabs", function()
       assert.is_nil(rail.indicator:GetTexture())
     end)
 
+    -- Reported in game: a selected tab's name cut short ("Backpa..."). The client keeps the width a font string took
+    -- when its text was set through a later font change, and cuts text past it (Blizzard resets it by setting the
+    -- width to 0 and the text again: QuestLogTitleButton_Resize, "HACK"; measured on the classic settings window,
+    -- sonata.md 3c: 110.0 kept for a 110.8 string). Guild Wars 2's selected tab font has a shadow, wider by about that.
+    it("keeps a tab's name as wide as its text in the font it has now, selected or not", function()
+      restyle({ Fonts = { Wide = { Size = 12, Shadow = true } }, Tabs = { SelectedFont = "Wide" } })
+      rail:SetTabs(groups)
+      local wide = style:Font("Wide")
+      for _, tab in ipairs(rail.tabs) do
+        local base = tab.text.GetStringWidth
+        tab.text.GetStringWidth = function(self) return base(self) + (self:GetFontObject() == wide and 0.8 or 0) end
+      end
+      rail:Select(1)
+      for _, tab in ipairs(rail.tabs) do
+        local text = tab.text
+        assert.are.equal(math.ceil(text:GetStringWidth()) + 1, text:GetWidth(), text:GetText())
+      end
+      rail:Select(2)
+      local text = rail.tabs[1].text
+      assert.are.equal(math.ceil(text:GetStringWidth()) + 1, text:GetWidth(), "back in its idle font")
+    end)
+
     it("writes its tabs in its roles, moving them to its new fonts", function()
       rail:SetTabs(groups)
       rail:Select(2)

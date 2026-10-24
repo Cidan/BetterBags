@@ -196,3 +196,16 @@ would be ideal"); (4) the settings window's Done button looked under the art; (5
   of the text that was cut.
 - 18 mutations, each caught; the full suite and luacheck pass; laid out on a 1920 x 1080 screen at both sizes with no
   overlaps. Not seen in game.
+
+## Round four (asked, 2026-10-24)
+
+- **Tab names cut short** ("Backpack" as "Backpa..."): the client keeps the width a font string took when its text
+  was set through a later font change; the selected tab's font (its shadow) is slightly wider. Fixed by resetting the
+  name's width and setting it to its text's after every name and font change (next-themes.md §14). This was also
+  round three's unreproduced "text cut with ...".
+- **The emblem over the side panel, as the character window's**: round three followed `GwFrameHeader`, but the
+  character window is `GwCharacterWindowTemplate` (`Character/windowBase.xml`): its band above the window from 40 out,
+  its icon's bottom right corner 18 in and 22 below the top, its title 31 in, its close 10 in and 10 to 30 above the
+  top. The theme now follows it; laid out at both sizes with no overlaps.
+- **The size button's art**: GW2_UI's minimize and maximize art (32 x 32, its only) drew blurry; BetterBags' own
+  glyphs instead, an underscore and a box with a heavier top, drawn by `tools/textures/next_icons.py`.

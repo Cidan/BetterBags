@@ -9,13 +9,14 @@ local sonataNext = addon:GetModule('SonataNext')
 -- Guild Wars 2: BetterBags Next in GW2_UI's look, offered while GW2_UI is loaded (docs/next-gw2-theme.md). Data
 -- only, nothing of GW2_UI's called: its art drawn from its own files, read from its source (.libraries/GW2_UI).
 --   The frame is the original BetterBags GW2 theme's (sonata/themes/gw2.lua; asked: "we need to use those icons,
---     that bag frame style, that icon"), its header laid out as GW2_UI's character window (GwFrameHeader,
---     CreateFrameHeaderWithBody; asked): GW2's header band drawn over what is behind the window (the world map
---     painting starts below it), GW2's bag emblem (84) with its middle on the window's top line 21 in from its edge
---     (its merchant's on the vendor, as GW2_UI does), the title on the band 64 in; GW2's side panel standing outside
---     the window along its inner side from the window's top line, the actions down it in the original's micro icons
---     (32, 5 apart); the close button and the size button side by side at the top outer corner (top right on the
---     backpack); the footer band; no feather (asked: none while docked) and no border.
+--     that bag frame style, that icon"), its header laid out as GW2_UI's character window (GwCharacterWindowTemplate,
+--     Character/windowBase.xml; asked): GW2's header band above the window's top, drawn over what is behind the
+--     window (the world map painting starts at the window's top), starting over the side panel; GW2's bag emblem
+--     (84) straddling the side panel, its bottom right corner 18 in and 22 below the window's top (its merchant's on
+--     the vendor, as GW2_UI does); the title on the band 31 in; GW2's side panel standing outside the window along
+--     its inner side from the window's top, the actions down it in the original's micro icons (32, 5 apart); the
+--     close button and the size button side by side at the top outer corner (top right on the backpack); the
+--     footer band; no feather (asked: none while docked) and no border.
 --   Every control in GW2_UI's art (asked: "tabs, i mean everything ... art of buttons, art of toggles"): its side
 --     tabs, its bag search bar, its bag section rows (GwBagHeaderTemplate), its cream buttons with dark text and
 --     their disabled art, its check boxes, sliders, scroll bars, fields, dropdowns and menus (Core/API/toolkit.lua,
@@ -80,8 +81,9 @@ sonataNext:RegisterTheme({
     MicroBagDown = GW .. "icons\\bagmicrobutton-down.png",
     MicroCollections = GW .. "icons\\microicons\\collectionsmicrobutton-up.png",
     MicroQuestLog = GW .. "icons\\microicons\\questlogmicrobutton-up.png",
-    Minimize = GW .. "uistuff\\minimize_button.png",
-    Maximize = GW .. "uistuff\\maximize_button.png",
+    -- BetterBags' own size glyphs (asked: GW2_UI's minimize and maximize art, its only, 32 x 32, drew blurry).
+    Minimize = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\minimize.png",
+    Maximize = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\maximize.png",
     BankIcons = GW .. "bag\\bankicons.png",
     Repair = GW .. "icons\\repair.png",
   },
@@ -179,16 +181,15 @@ sonataNext:RegisterTheme({
   },
 
   Layout = {
-    -- GwFrameHeader: its band is 64 rows, its painted ones (19 to 64) 45 tall from 13 above the window's top line
-    -- (the band's middle) to 32 below it, where the painting starts; the emblem's middle on that line, 21 in; the title
-    -- 64 in, its bottom 22 below the line. Here the band's painted rows sit 29 below the body's top, so the emblem
-    -- (its middle on the line, at 42) starts at the top: a docked panel's top is the screen's. The search bar 13 below
-    -- the band, as the original's.
-    TitleTop = 44,
-    TitleInset = 46,
-    SearchTop = 87,
+    -- GwCharacterWindowTemplate: the band (64 rows, its painted ones 19 to 64, 45 tall) above the window's top; the
+    -- emblem from 62 above that top to 22 below it; the title 31 in, its middle 18 above the top; the close 10 in, 10 to
+    -- 30 above the top. Here the window's top is 62 below the body's top, so the emblem starts at the body's top (a
+    -- docked panel's top is the screen's): the band's painted rows 17 to 62. The search bar 13 below the top.
+    TitleTop = 34,
+    TitleInset = 13,
+    SearchTop = 75,
     SearchHeight = 24,
-    ContentTop = 121,
+    ContentTop = 109,
     -- The footer band, 30 tall (its painted rows), the free slots and the money on it.
     Footer = 34,
     FooterText = 9,
@@ -201,9 +202,9 @@ sonataNext:RegisterTheme({
   },
 
   Panel = {
-    -- From the band's bottom (29 + 45): the band is drawn over what is behind the window, as GW2_UI's headers are
-    -- (asked: "the top window border ... should be somewhat transparent").
-    Fill = { Texture = "Map", Color = "White", Top = 74 },
+    -- From the window's top (the band's bottom): the band is drawn over what is behind the window, as GW2_UI's headers
+    -- are (asked: "the top window border ... should be somewhat transparent").
+    Fill = { Texture = "Map", Color = "White", Top = 62 },
     -- Asked: no feather while docked (a small panel has none). No border round the see-through header either: GW2_UI's
     -- windows have none.
     Feather = false,
@@ -212,15 +213,16 @@ sonataNext:RegisterTheme({
     DropGlow = { Color = "LightHeader", Alpha = 0.1, BlendMode = "ADD" },
     -- Drawn for the backpack (its inner side on the left), mirrored on the other panels.
     Ornaments = {
-      -- The header band across the top (its painted rows), its right piece's painted columns (196 on) at the outer corner.
-      { Texture = "Header", Point = "TOP", Y = 29, Height = 45, TexCoords = { 0, 1, 19 / 64, 1 } },
-      { Texture = "HeaderEnd", Point = "TOPOUTER", Y = 29, Width = 316, Height = 45,
+      -- The header band above the window's top (its painted rows), from over the side panel (40 out); its right piece's
+      -- painted columns (196 on) at the outer corner.
+      { Texture = "Header", Point = "TOP", Y = 17, Height = 45, Start = -40, TexCoords = { 0, 1, 19 / 64, 1 } },
+      { Texture = "HeaderEnd", Point = "TOPOUTER", Y = 17, Width = 316, Height = 45,
         TexCoords = { 196 / 512, 1, 19 / 64, 1 }, SubLevel = 1 },
-      -- The emblem, 84, its middle on the window's top line (42) 21 in from the inner edge, as GwFrameHeader's; GW2_UI's
-      -- merchant's on the vendor.
-      { Texture = "BagEmblem", Point = "TOPINNER", Width = 84, Height = 84, X = -21, SubLevel = 2,
+      -- The emblem, 84, straddling the side panel: its bottom right corner 18 in and 22 below the window's top, as the
+      -- character window's; GW2_UI's merchant's on the vendor.
+      { Texture = "BagEmblem", Point = "TOPINNER", Width = 84, Height = 84, X = -66, SubLevel = 2,
         Panels = { "Backpack", "Bank", "GuildBank" } },
-      { Texture = "VendorEmblem", Point = "TOPINNER", Width = 84, Height = 84, X = -21, SubLevel = 2, Panels = { "Vendor" } },
+      { Texture = "VendorEmblem", Point = "TOPINNER", Width = 84, Height = 84, X = -66, SubLevel = 2, Panels = { "Vendor" } },
       -- The footer band: the file's painted rows (0 to 34 of 64).
       { Texture = "Footer", Point = "BOTTOM", Height = 30, TexCoords = { 0, 1, 0, 34 / 64 } },
     },
@@ -243,14 +245,14 @@ sonataNext:RegisterTheme({
     -- icon over itself added (ADD) is fully bright too, a near-opaque one drawn again (BLEND) is.
     Buttons = {
       Color = "LightHeader", HoverColor = "White", ArtColor = "White", ArtHoverColor = "White", Scale = 0.75,
-      -- The first button 4 below the emblem's square (0 to 84).
-      Rail = { Width = 40, Top = 88, Gap = 5, Outside = true, Start = 42,
+      -- From the window's top; the first button 4 below the emblem's square (0 to 84).
+      Rail = { Width = 40, Top = 88, Gap = 5, Outside = true, Start = 62,
         Fill = { Texture = "SidePanel", TexCoords = { 0, 1, 0, 481 / 512 }, Color = "White" } },
-      -- Centered on the band's painted rows (29 to 74), as GW2_UI's close sits on its header; the size button to its
-      -- left (asked: out of the side panel, left of the X).
+      -- The close's middle 20 in and 20 above the window's top, as the character window's; the size button to its left
+      -- (asked: out of the side panel, left of the X).
       Pinned = {
-        closeButton = { Point = "TOPOUTER", X = -4, Y = -36 },
-        sizeButton = { Point = "TOPOUTER", X = -36, Y = -36 },
+        closeButton = { Point = "TOPOUTER", X = -4, Y = -26 },
+        sizeButton = { Point = "TOPOUTER", X = -36, Y = -26 },
       },
       Icons = {
         -- Its X is 16 of its 26 pixels: drawn at 26.
@@ -260,8 +262,9 @@ sonataNext:RegisterTheme({
           Highlight = { Texture = "MicroCollections", BlendMode = "ADD" } },
         settingsButton = { Texture = "MicroQuestLog", Glyph = false, Scale = 4 / 3,
           Highlight = { Texture = "MicroQuestLog", BlendMode = "ADD" } },
-        sizeButtonFull = { Texture = "Minimize", Glyph = false, Scale = 4 / 3, Highlight = { Texture = "Minimize" } },
-        sizeButtonSmall = { Texture = "Maximize", Glyph = false, Scale = 4 / 3, Highlight = { Texture = "Maximize" } },
+        -- Glyphs, in the theme's glyph color, white under the pointer.
+        sizeButtonFull = { Texture = "Minimize" },
+        sizeButtonSmall = { Texture = "Maximize" },
         -- GW2_UI's bank tab icons (Inventory/bank.xml): the character bank's and the Warbank's.
         bankTabsButton = { Texture = "BankIcons", TexCoords = { 0, 0.5, 0.5, 1 }, Glyph = false, Scale = 4 / 3,
           Highlight = { Texture = "BankIcons", TexCoords = { 0, 0.5, 0.5, 1 } } },

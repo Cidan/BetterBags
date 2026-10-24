@@ -242,6 +242,13 @@ end
 ---@param tab NextTab
 function railProto:placeContent(tab)
   local button, text, icon = tab.button, tab.text, tab.icon
+  -- As wide as its text in the font it has now. The client keeps the width a font string took when its text was set
+  -- through a later font change and cuts text past it (Blizzard sets the width to 0 and the text again,
+  -- QuestLogTitleButton_Resize; sonata.md 3c): a selected tab's font, wider by its shadow, cut "Backpack" short
+  -- (reported in game).
+  text:SetWidth(0)
+  text:SetText(text:GetText())
+  text:SetWidth(math.ceil(text:GetStringWidth()) + 1)
   local height = button:GetHeight()
   local pad, gap = pixel:Snap(button, style.TAB_PADDING), pixel:Snap(button, style.TAB_ICON_GAP)
   local _, fontHeight = text:GetFont()

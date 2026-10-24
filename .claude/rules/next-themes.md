@@ -72,7 +72,7 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 | Key | What |
 |---|---|
 | `Palette` | Every named color. The controls and the settings window (next-settings.md) add `ControlFill`, `ControlHover`, `ControlPressed` (a field idle, under the pointer, pressed), `Track` (a switch off, a slider's empty track), `Danger` (what deletes) and `Sidebar`; a theme whose body is not indigo sets the first four in its own colors. |
-| `Textures` | Named files (`Glow`, `Sparkle`; Parchment adds `Paper`), and the glyphs (`Icon...`; the controls' `IconChevron`, `IconCheck`, `IconSearch`, `IconPlus`, and `Circle`, the round switch's disc, made by `tools/textures/next_icons.py`). |
+| `Textures` | Named files (`Glow`, `Sparkle`; Parchment adds `Paper`), and the glyphs (`Icon...`; `minimize.png` and `maximize.png` are shipped for themes that want window marks, Guild Wars 2's size button; the controls' `IconChevron`, `IconCheck`, `IconSearch`, `IconPlus`, and `Circle`, the round switch's disc, made by `tools/textures/next_icons.py`). |
 | `FontShadow` | The shadow `Shadow = true` means. |
 | `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`; or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
 | `Layout` | Sizes: Icon (an item button's size; the player's Icon Scale, the Size tab, multiplies it: `style.ICON`; the grid's width and the vendor's cards keep the theme's own, `style.CARD_ICON`, docs/next-appearance-size.md), VendorColumns, VendorTextGap, VendorPriceRaise (the vendor's cards, next.md §10b), Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
@@ -208,12 +208,14 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
   BetterBags GW2 theme (`sonata/themes/gw2.lua`), "X button should still be top right", "tabs, i mean everything",
   and no feather while docked; (round three) the header and emblem as GW2_UI's character window, one highlight for
   every side button, the size button beside the X, one close button. So:
-  - **The header as GW2_UI's character window** (`GwFrameHeader`, `CreateFrameHeaderWithBody`): the band's painted
-    rows (45) from 29 below the body's top; the window's top line (the band's middle) at 42; the emblem (84) with its
-    middle on that line 21 in from the inner edge, from the body's top (a docked panel's top is the screen's); the
-    title 64 in, its bottom 22 below the line; the world map painting from the band's bottom (`Panel.Fill.Top`), so
-    the band is drawn over what is behind the window; no border (`Panel.Edge = false`); the search bar 13 below the
-    band; the footer band (its painted rows, 30 tall) with the free slots and money on it; `Panel.Feather = false`.
+  - **The header as GW2_UI's character window** (`GwCharacterWindowTemplate`, `Character/windowBase.xml`; a first try
+    followed `GwFrameHeader`, which the character window does not use, and its emblem sat inside the window): the
+    window's top 62 below the body's top; the band's painted rows (45) above it, from over the side panel (40 out);
+    the emblem (84) straddling the side panel, its bottom right corner 18 in and 22 below the window's top (so it
+    starts at the body's top: a docked panel's top is the screen's); the title 31 in, its middle 18 above the window's
+    top; the world map painting from the window's top (`Panel.Fill.Top`), so the band is drawn over what is behind the
+    window; no border (`Panel.Edge = false`); the search bar 13 below the window's top; the footer band (its painted
+    rows, 30 tall) with the free slots and money on it; `Panel.Feather = false`.
   - **The side panel outside the window** (`Rail.Outside`, §13), 40 wide, its art from the window's top line
     (`Rail.Start`), the actions down it below the emblem in the original's micro icons (32, 5 apart): Show Bags
     (`bagmicrobutton`), Sort (`collectionsmicrobutton`), Settings (`questlogmicrobutton`); GW2_UI's own for the bank
@@ -223,8 +225,11 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     `-down` art over the bag, its hover art over the close, an icon's own art again over one without `-down` art
     (added, for the half-opaque micro icons; drawn again, for the near-opaque ones), no tint. GW2_UI's `-down` art is
     its `-up` art at 2.2 times its opacity (measured, 1.6 for the main menu's).
-  - **The close and size buttons side by side at the top outer corner** (`Pinned`, §13), centered on the band:
-    GW2_UI's close art (its hover art over it), the size button left of it (asked: out of the side panel). Top right
+  - **The close and size buttons side by side at the top outer corner** (`Pinned`, §13), the close's middle 20 in and
+    20 above the window's top, as the character window's: GW2_UI's close art (its hover art over it), the size button
+    left of it (asked: out of the side panel) in BetterBags' own glyphs, an underscore and a box with a heavier top
+    (`minimize.png`, `maximize.png`, `tools/textures/next_icons.py`; asked: GW2_UI's own, its only, 32 x 32, drew
+    blurry). Top right
     on the backpack, as asked. A judgment call: Next mirrors the other panels, whose side panel, emblem and title
     start from the right, so there they are top left; at the top right they would sit on the title. The settings
     window's close is the same art (`Settings.Header.Close.HoverIcon`).
@@ -512,6 +517,16 @@ expanding what sonata can do" (and keep it declarative). Parts that took only a 
   took that fill's `Alpha` (the Primary fill's 0.14, the Danger fill's 0.1; the scroll thumbs' and the settings
   divider's too). Every art spec in Guild Wars 2 now sets its `Alpha`, and `spec/sonata/next_themes_spec.lua` ("draws
   the art each theme sets at the alpha it sets") checks every shipped theme on every client.
+- **Tab names cut short** (round four; reported in game: "Backpa..." on the selected tab): the client keeps the width
+  a font string took when its text was set through a later font change, and cuts text past it with "..." (Blizzard
+  resets it by setting the width to 0 and the text again, `QuestLogTitleButton_Resize`; sonata.md 3c measured it on
+  the classic settings window). A tab's name is set in its idle font and switched to its selected font when chosen;
+  Guild Wars 2's selected font has a shadow, slightly wider. `NextTabs` now resets a name's width that way and sets it
+  to its text's in the font it has now, after every name and font change (`placeContent`), as the classic settings
+  navigation does (`fitNavText`). The specs' mock measures text the same in every font, so the test makes a tab's
+  text measure 0.8 wider in the selected font, as measured in game. The settings sidebar's labels are anchored at both
+  ends, so their width is the row's and this cannot happen to them. Coverage: `spec/next/tabs_spec.lua` ("keeps a
+  tab's name as wide as its text in the font it has now").
 - **A wash a theme does not draw** (round three; reported in game: the bank broke opening, `next/panel.lua:2075:
   attempt to index upvalue 'from'` in `SetWash`): a panel made under a theme without a wash (Guild Wars 2, Parchment,
   Quiet) never painted one, so changing it (the bank's type, the guild bank) faded from nothing. `SetWash` now only
@@ -571,3 +586,6 @@ expanding what sonata can do" (and keep it declarative). Parts that took only a 
   icon's art forgotten when restyled, the check style hiding its knob twice), removed.
 - Round three (the wash under a theme without one, the settings close's hover art, icon highlights, the farthest
   pin's room, the fill's top, the strip's start, `Check` of `HoverIcon`): 18 mutations, each caught.
+- Round four: the tab name's width (removing it fails the test; the reset before it, width 0 and the text again, is
+  Blizzard's documented sequence and cannot be told apart in the mock), the character window's numbers and the size
+  glyphs (`spec/sonata/next_themes_spec.lua`).
