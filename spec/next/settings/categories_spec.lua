@@ -327,6 +327,22 @@ describe("NextSettingsCategories", function()
       return -y
     end
 
+    -- Reported: with a long list, pressing on the scroll bar's thumb grabbed the category row under it (the rows reach
+    -- under the bar, deeper in the box than the bar was). The bar and its thumb are above every row.
+    it("keeps its scroll bar above its rows, so the thumb takes the mouse", function()
+      list:Place(232, 120)
+      list:RefreshRows()
+      list.box._extent = 1000
+      list.box:FullUpdate(true)
+      assert.is_true(list.bar.frame:IsShown(), "it scrolls")
+      for _, row in ipairs(list.rows) do
+        assert.is_true(list.bar.thumb:GetFrameLevel() > row.frame:GetFrameLevel(), row.name or "a row")
+        for _, child in ipairs({ row.frame:GetChildren() }) do
+          assert.is_true(list.bar.thumb:GetFrameLevel() > child:GetFrameLevel(), "in a row")
+        end
+      end
+    end)
+
     -- Asked: priority is the order of one list, yours and the plugins' together; then: "can you just
     -- have the subtext to categories say 'x items matching' please?"
     it("lists every category in their order, each saying how many of your items it holds", function()

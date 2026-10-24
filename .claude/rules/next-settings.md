@@ -79,6 +79,20 @@ scrolls or the pointer is over it, `Linger` seconds, `FadeIn`/`FadeOut`). The ba
 interpolating, the track paging by the box's height, the wheel by its pan extent). The classic bags
 keep Blizzard's bar.
 
+**The bar sits above its box's content.** `NextScrollBar` is a child of its box, in the box's right edge
+over the content, so the content reaches under it (a list's rows, an item grid's buttons). The client gives
+the mouse to, and draws on top, the highest frame under the pointer, and the content hangs deeper (the box's
+scroll target, a list's content frame, the rows, what is in them) than the bar, one level above the box.
+**Failure mode (fixed, reported):** in a long category list, pressing on the thumb grabbed the row under it
+and dragged the row. `barProto:Raise` puts the bar one level above the deepest frame in its box, its own
+frames left out (or it would climb each time): when it is bound and each time it shows, never as it scrolls
+(a bag holds hundreds of buttons). Rows made while it shows sit as deep as the rows before them. A level
+that high only matters within the box's strata, next to the box's own frames, unlike a fixed jump, which
+could draw the bar over another window in that strata. Coverage: `spec/next/controls/scrollbar_spec.lua`
+("above its box's content": above every frame, again when it shows over rows made while hidden, no climbing)
+and `spec/next/settings/categories_spec.lua` ("keeps its scroll bar above its rows"); each part
+mutation-checked.
+
 **Mocks added from Blizzard's source** (`spec/helpers/wow_mocks.lua`): the scroll box's callback
 registry, extents, percentages, scrolling allowed and `OnScroll` (`ScrollBox.lua`,
 `ScrollController.lua`, `CallbackRegistry.lua`; `BaseScrollBoxEvents`,

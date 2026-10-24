@@ -129,6 +129,69 @@ describe("NextScrollBar", function()
     end)
   end)
 
+  -- Reported: in a long category list (the settings window), pressing on the thumb grabbed the row under it and
+  -- dragged the row. The bar sits in its box's right edge over the box's content (Style), a child of the box, one
+  -- level above it; a list's rows hang from the box's scroll target, deeper. The client gives the mouse to the
+  -- highest frame under it, and draws it on top.
+  describe("above its box's content", function()
+    -- deepRows hangs rows from the box's scroll target as a list does (its content, a row, a button in the row) and
+    -- returns the deepest frame made.
+    local function deepRows(n, depth)
+      local parent = CreateFrame("Frame", nil, box:GetScrollTarget())
+      local deepest
+      for _ = 1, n do
+        deepest = CreateFrame("Button", nil, parent)
+        for _ = 2, depth or 2 do
+          deepest = CreateFrame("Button", nil, deepest)
+        end
+      end
+      return deepest
+    end
+
+    it("sits above every frame in its box, its thumb too", function()
+      local parent = CreateFrame("Frame")
+      box = CreateFrame("Frame", nil, parent, "WowScrollBox")
+      box:SetSize(300, 250)
+      box:Init(CreateScrollBoxLinearView())
+      box._extent = 1000
+      local deepest = deepRows(3)
+      bar = scrollBar:Create(box)
+      bar:Bind(box)
+      assert.is_true(bar.frame:IsShown())
+      assert.is_true(bar.frame:GetFrameLevel() > deepest:GetFrameLevel(), "the bar")
+      assert.is_true(bar.thumb:GetFrameLevel() > deepest:GetFrameLevel(), "the thumb")
+    end)
+
+    it("rises again when it shows, above rows made while it was hidden", function()
+      make()
+      box._extent = 200
+      box:FullUpdate(true)
+      assert.is_false(bar.frame:IsShown())
+      local deepest = deepRows(2, 5)
+      box._extent = 1000
+      box:FullUpdate(true)
+      assert.is_true(bar.frame:IsShown())
+      assert.is_true(bar.thumb:GetFrameLevel() > deepest:GetFrameLevel())
+    end)
+
+    it("keeps its level showing again with nothing new in its box", function()
+      make()
+      deepRows(2)
+      box._extent = 200
+      box:FullUpdate(true)
+      box._extent = 1000
+      box:FullUpdate(true)
+      local level = bar.frame:GetFrameLevel()
+      for _ = 1, 3 do
+        box._extent = 200
+        box:FullUpdate(true)
+        box._extent = 1000
+        box:FullUpdate(true)
+      end
+      assert.are.equal(level, bar.frame:GetFrameLevel())
+    end)
+  end)
+
   describe("driving its box", function()
     it("scrolls the box as its thumb is dragged, at once, and stops when the button is let go", function()
       make()
