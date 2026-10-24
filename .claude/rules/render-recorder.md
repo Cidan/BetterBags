@@ -76,10 +76,7 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   a pixel thick that can draw nothing). Added for a settings button whose bottom edge was missing in
   game while the others showed, at about 0.91 screen pixels per unit (read from a screenshot: 909
   pixels for the 1,000-unit window); the snapshot is to show whether that side collapses before the
-  edges are changed (data-driven.md). The edges were changed after a second report of the same kind
-  (the selected theme card's top edge, only at the UI scale of 65%, 0.914 pixels per unit): no line is
-  thinner than one screen pixel now (next-settings.md, `NextControls`). A recording is still the way to
-  confirm a missing edge.
+  edges are changed (data-driven.md).
 
 ## 3. Storage
 

@@ -183,23 +183,6 @@ describe("NextSettings", function()
       assert.are.equal(1, frame:GetScale())
     end)
 
-    -- A scale changes how big a screen pixel is, and an edge is never thinner than one (NextControls).
-    it("draws its edges again for the scale it opens at", function()
-      local scales = {}
-      local repaint = controls.RepaintEdges
-      controls.RepaintEdges = function(self)
-        table.insert(scales, settings.frame and settings.frame:GetScale())
-        return repaint(self)
-      end
-      local savedH = UIParent:GetHeight()
-      UIParent:SetHeight(600)
-      local frame = open()
-      UIParent:SetHeight(savedH)
-      controls.RepaintEdges = repaint
-      assert.is_true(frame:GetScale() < 1)
-      assert.are.same({ frame:GetScale() }, scales, "once, after it took its scale")
-    end)
-
     it("closes with its close button and with Done, and Escape closes it", function()
       local frame = open()
       assert.are.same({ "BetterBagsNextSettings" }, UISpecialFrames)

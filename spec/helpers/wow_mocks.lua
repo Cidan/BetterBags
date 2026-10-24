@@ -791,38 +791,6 @@ end
 -- GetPhysicalScreenSize() -> sizeX, sizeY (ScreenDocumentation.lua; Blizzard's PixelUtil calls it on
 -- every client).
 _G.GetPhysicalScreenSize = function() return 1920, 1080 end
--- Round(value) (Blizzard_SharedXMLBase/MathUtil.lua: Classic's, half away from zero; live is math.round)
--- and PixelUtil (Blizzard_SharedXML/PixelUtil.lua, every client), as Blizzard writes them.
-_G.Round = _G.Round or function(value)
-  if value < 0.0 then
-    return math.ceil(value - .5)
-  end
-  return math.floor(value + .5)
-end
-_G.PixelUtil = _G.PixelUtil or {}
-function _G.PixelUtil.GetPixelToUIUnitFactor()
-  local _, physicalHeight = GetPhysicalScreenSize()
-  return 768.0 / physicalHeight
-end
-function _G.PixelUtil.GetNearestPixelSize(uiUnitSize, layoutScale, minPixels)
-  if uiUnitSize == 0 and (not minPixels or minPixels == 0) then
-    return 0
-  end
-  local uiUnitFactor = PixelUtil.GetPixelToUIUnitFactor()
-  local numPixels = Round((uiUnitSize * layoutScale) / uiUnitFactor)
-  if minPixels then
-    if uiUnitSize < 0.0 then
-      if numPixels > -minPixels then
-        numPixels = -minPixels
-      end
-    else
-      if numPixels < minPixels then
-        numPixels = minPixels
-      end
-    end
-  end
-  return numPixels * uiUnitFactor / layoutScale
-end
 -- Region:GetEffectiveScale() -> the frame's scale times every parent's.
 function WidgetMethods:GetEffectiveScale()
   local scale = self:GetScale()

@@ -76,16 +76,3 @@ Then, on the plan:
   §3 (Icon Scale) and §14h (Bag Scale), next-settings.md, next-themes.md, `.context/patterns-ui.md`.
 - Not seen in game: how a scaled small panel looks (art, text, sparkles), dragging sections and tabs in
   one, and the switch's scale glide.
-
-## Found in game (2026-10-23)
-
-- **The Theme tab's first row lost its top edge** (the selected card's gold edge), only with the game's
-  UI scale at 65% (0.914 screen pixels per unit on a screen 1080 pixels high), at any other scale fine.
-  The new tab strip moved the page down to where a 1-unit line, under a pixel thick, fell between two
-  pixels and drew nothing. Control edges are now never thinner than one screen pixel and are drawn again
-  when a pixel's size changes (`NextControls:PaintEdge`, `RepaintEdges`). Not seen in game yet.
-- **Text looked a little bigger than in older videos.** Not BetterBags: the client's `Config.wtf` had
-  `useUiScale "1"` (UI scaling on, at 65%, the slider's smallest) at 18:14 and no `useUiScale` line (off,
-  the default: the game picks 768 / 1080, about 71%) at 18:27, after trying other UI scales for the
-  report above. The `main` branch, checked in game the same evening, looked the same as this one.
-

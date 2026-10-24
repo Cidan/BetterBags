@@ -237,8 +237,6 @@ globals = {
 	"GetRealmName",
 	"GetScreenHeight",
 	"GetPhysicalScreenSize",
-	"PixelUtil",
-	"Round",
 	"GetScreenWidth",
 	"GetTalentTabInfo",
 	"GetTime",

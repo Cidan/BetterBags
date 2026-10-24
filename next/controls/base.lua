@@ -20,8 +20,6 @@ local controls = addon:NewModule('NextControls')
 ---@field Left Texture
 ---@field Right Texture
 ---@field label? FontString The text of its control, for the render recorder.
----@field spec? table|false What it was last drawn with (PaintEdge), to draw it again (RepaintEdges).
----@field alpha? number
 
 local SIDES = { "Top", "Bottom", "Left", "Right" }
 
@@ -70,24 +68,18 @@ function controls:CreateEdge(frame, layer, subLevel)
 end
 
 -- PaintEdge draws an edge from its spec (Color, Alpha, Size: the lines' thickness), alpha replacing
--- the spec's when given (an edge stronger under the pointer). False or nil hides it. A line is never
--- thinner than one screen pixel: under a pixel thick it draws nothing where it falls between two (a
--- selected theme card's top edge at the game's UI scale of 65%, 0.914 screen pixels per unit on a screen
--- 1080 pixels high, reported). One pixel is Blizzard's GetPixelToUIUnitFactor over the frame's effective
--- scale (PixelUtil), so the edge is drawn again when that changes (RepaintEdges).
+-- the spec's when given (an edge stronger under the pointer). False or nil hides it.
 ---@param edge NextEdge
 ---@param spec? table|false
 ---@param alpha? number
 function controls:PaintEdge(edge, spec, alpha)
-  edge.spec, edge.alpha = spec, alpha
   if not spec then
     for _, side in ipairs(SIDES) do
       edge[side]:Hide()
     end
     return
   end
-  local frame = edge.frame
-  local size = math.max(spec.Size or 1, PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale())
+  local frame, size = edge.frame, spec.Size or 1
   local top, bottom, left, right = edge.Top, edge.Bottom, edge.Left, edge.Right
   top:ClearAllPoints()
   top:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
@@ -110,25 +102,6 @@ function controls:PaintEdge(edge, spec, alpha)
     self:Paint(edge[side], color, alpha or spec.Alpha)
   end
 end
-
--- RepaintEdges draws every edge again as it was last drawn, for the screen's pixels as they are now: the
--- UI scale or the screen's size changed, or a window changed its scale (the settings window, scaled
--- down to fit a small screen).
-function controls:RepaintEdges()
-  for edge in pairs(self.edges) do
-    if edge.spec ~= nil then
-      self:PaintEdge(edge, edge.spec, edge.alpha)
-    end
-  end
-end
-
--- The game's UI scale and the screen's size set how big a screen pixel is (PaintEdge).
-controls.watcher = CreateFrame("Frame")
-controls.watcher:RegisterEvent("UI_SCALE_CHANGED")
-controls.watcher:RegisterEvent("DISPLAY_SIZE_CHANGED")
-addon.SetScript(controls.watcher, "OnEvent", function()
-  controls:RepaintEdges()
-end)
 
 -- Escape closes the innermost thing open: a menu, then a dialog, then the window. Each takes the
 -- place of the one under it in UISpecialFrames while it is open (Blizzard's CloseSpecialWindows
