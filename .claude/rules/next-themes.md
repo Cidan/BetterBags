@@ -517,6 +517,18 @@ expanding what sonata can do" (and keep it declarative). Parts that took only a 
   took that fill's `Alpha` (the Primary fill's 0.14, the Danger fill's 0.1; the scroll thumbs' and the settings
   divider's too). Every art spec in Guild Wars 2 now sets its `Alpha`, and `spec/sonata/next_themes_spec.lua` ("draws
   the art each theme sets at the alpha it sets") checks every shipped theme on every client.
+- **Light edges in art** (round five; reported in game: a thin white line between Guild Wars 2's side panel and the
+  bag): GW2_UI's side panel art's last column, the one against the window, is white at 55% (every other column
+  black), and the world map painting's last 17 columns fade out (opaque 0 to 1006 of 1024), which shows the world
+  through beside the bank's side panel. Both are cropped to their solid part (`TexCoords`). Measure a file's edge
+  columns and rows before drawing it against something (`docs/next-gw2-theme.md`); GW2_UI's header and footer bands
+  are dark to their edges. Coverage: `spec/sonata/next_themes_spec.lua` ("is the original's frame").
+- **A border a theme does not draw** (round five; reported in game with Guild Wars 2: a white border round the bag
+  on a size switch either way): a size switch (`Morph`) showed the border's four lines whatever the theme, to fade the
+  border across the switch, and a theme without one (`Panel.Edge = false`) never colors them (`paintEdges` returns),
+  so they showed as created, white, until the switch's end hid them. The switch now shows them only when the theme
+  has a border. Coverage: `spec/next/small_spec.lua` ("shows no border on a switch either way under a theme without
+  one").
 - **Tab names cut short** (round four; reported in game: "Backpa..." on the selected tab): the client keeps the width
   a font string took when its text was set through a later font change, and cuts text past it with "..." (Blizzard
   resets it by setting the width to 0 and the text again, `QuestLogTitleButton_Resize`; sonata.md 3c measured it on

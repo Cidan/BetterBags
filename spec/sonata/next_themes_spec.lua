@@ -198,6 +198,12 @@ describe("BetterBags Next's shipped themes", function()
     it("is the original's frame: the world map painting, the header band, the footer band, the emblem, no feather", function()
       local t = sonataNext:Resolve("GW2")
       assert.are.equal(GW .. "character\\worldmap-background.png", art(t, t.Panel.Fill))
+      -- Reported in game: a thin white line between the side panel and the bag. The side panel art's last column (31
+      -- of 32, the one against the window) is white at 55%, every other one black; the painting's last 17 columns
+      -- (from 1007 of 1024) fade out, which shows the world through on the bank's side panel side (measured). Both
+      -- are cropped to what is solid.
+      assert.are.same({ 0, 1007 / 1024, 0, 1 }, t.Panel.Fill.TexCoords)
+      assert.are.same({ 0, 31 / 32, 0, 481 / 512 }, t.Header.Buttons.Rail.Fill.TexCoords)
       assert.is_nil(t.Panel.Feather, "asked: no feather while docked (false removes the inherited one)")
       local byTexture = {}
       for _, o in ipairs(t.Panel.Ornaments) do byTexture[art(t, o)] = o end

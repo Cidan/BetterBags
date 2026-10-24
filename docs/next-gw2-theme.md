@@ -209,3 +209,15 @@ would be ideal"); (4) the settings window's Done button looked under the art; (5
   top. The theme now follows it; laid out at both sizes with no overlaps.
 - **The size button's art**: GW2_UI's minimize and maximize art (32 x 32, its only) drew blurry; BetterBags' own
   glyphs instead, an underscore and a box with a heavier top, drawn by `tools/textures/next_icons.py`.
+
+## Round five (asked, 2026-10-24)
+
+- **A white border on a size switch** (either way, full and small): a switch showed the border's lines whatever the
+  theme, and Guild Wars 2 has no border, so they were never colored and showed white. Reproduced in the specs (the
+  lines shown at full white through the switch), fixed: a switch shows the border only when the theme has one. In the
+  specs the switch's end hides them again; if the border stays after a switch has finished in game, a capture of it
+  would show what ended the switch early.
+- **A thin white line between the side panel and the bag**: measured, `bag\bagleftpanel.png`'s last column (31 of 32,
+  against the window) is white at 55% while every other column is black, and `character\worldmap-background.png`
+  fades out over its last 17 columns (opaque 0 to 1006 of 1024), on the bank's side panel side. Both are cropped to
+  their solid part. GW2_UI's header and footer bands are dark to their edges.

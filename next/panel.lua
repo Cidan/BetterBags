@@ -1390,8 +1390,11 @@ function panelProto:Morph()
     end
     feather:SetWidth(style.FEATHER)
   end
+  -- The border fades across the switch, when the theme has one: a theme without one never colors its lines, which
+  -- showed white (reported in game with Guild Wars 2).
+  local bordered = style.Theme.Panel.Edge and true or false
   for _, edge in ipairs(edges) do
-    edge:Show()
+    edge:SetShown(bordered)
   end
   -- The frame is the body plus the feather at full size: only the body's width glides.
   local bodyLeft, extra = self:BodyLeft(), self:Width() - self:BodyWidth()

@@ -203,8 +203,9 @@ sonataNext:RegisterTheme({
 
   Panel = {
     -- From the window's top (the band's bottom): the band is drawn over what is behind the window, as GW2_UI's headers
-    -- are (asked: "the top window border ... should be somewhat transparent").
-    Fill = { Texture = "Map", Color = "White", Top = 62 },
+    -- are (asked: "the top window border ... should be somewhat transparent"). Its opaque columns, 0 to 1006 of 1024:
+    -- the rest fade out, and showed the world through beside the bank's side panel (measured).
+    Fill = { Texture = "Map", TexCoords = { 0, 1007 / 1024, 0, 1 }, Color = "White", Top = 62 },
     -- Asked: no feather while docked (a small panel has none). No border round the see-through header either: GW2_UI's
     -- windows have none.
     Feather = false,
@@ -247,7 +248,9 @@ sonataNext:RegisterTheme({
       Color = "LightHeader", HoverColor = "White", ArtColor = "White", ArtHoverColor = "White", Scale = 0.75,
       -- From the window's top; the first button 4 below the emblem's square (0 to 84).
       Rail = { Width = 40, Top = 88, Gap = 5, Outside = true, Start = 62,
-        Fill = { Texture = "SidePanel", TexCoords = { 0, 1, 0, 481 / 512 }, Color = "White" } },
+        -- Its black columns, 0 to 30 of 32: the last, against the window, is white at 55% (measured), a thin white line
+        -- between the side panel and the bag (reported in game).
+        Fill = { Texture = "SidePanel", TexCoords = { 0, 31 / 32, 0, 481 / 512 }, Color = "White" } },
       -- The close's middle 20 in and 20 above the window's top, as the character window's; the size button to its left
       -- (asked: out of the side panel, left of the X).
       Pinned = {

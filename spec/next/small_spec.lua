@@ -1016,6 +1016,30 @@ describe("BetterBags Next's small mode", function()
         assert.are.same({ 640, 500 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
       end)
 
+      -- Reported in game, with Guild Wars 2: a white border round the bag on a switch either way. A size switch showed
+      -- the border's four lines whatever the theme, and a theme without a border never colors them, so they showed as
+      -- created, white.
+      it("shows no border on a switch either way under a theme without one, part way or after", function()
+        UseNextTheme({ Panel = { Edge = false } })
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local seen = {}
+        for _, size in ipairs({ "full", "small" }) do
+          nextPanel:SetSize(ctx(), size)
+          local function look(when)
+            for _, edge in ipairs(bag.edges) do
+              if edge:IsShown() then table.insert(seen, size .. " " .. when) return end
+            end
+          end
+          look("as it starts")
+          step(style.Time.Morph / 2)
+          look("part way")
+          finishTweens()
+          look("after")
+        end
+        UseNextTheme(nil)
+        assert.are.same({}, seen)
+      end)
+
       it("glides its width as it switches to and from a small size of its own", function()
         db.sizes[BACKPACK] = { 640, 500 }
         local bag = opened(function(c) return nextBag:Create(c) end)
