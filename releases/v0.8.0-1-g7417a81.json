@@ -1,0 +1,23 @@
+{
+  "id": 1792824397,
+  "version": "v0.8.0-1-g7417a81",
+  "channel": "alpha",
+  "date": "2026-10-24",
+  "from": "1a8e942ebacae3da30693fa32a9c821925c79ae1",
+  "to": "7417a810e5783d1721c8e7055096774b67fee043",
+  "headline": "This build introduces bag and icon scaling options in Appearance settings and delivers a pixel-perfect rendering overhaul across BetterBags Next.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Icon and bag scaling in Appearance settings",
+      "details": "Added a Size tab to Appearance settings for BetterBags Next with Icon Scale and Bag Scale sliders (50% to 150%), allowing independent resizing of item buttons and floating bag panels while maintaining consistent row layouts.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Pixel-perfect rendering across BetterBags Next",
+      "details": "All panels, tabs, text, interface controls, and item buttons now snap cleanly to whole screen pixels across all resolutions and UI scales, preventing missing one-pixel borders and visual artifacts while seamlessly supporting Masque skins.",
+      "clients": []
+    }
+  ]
+}
