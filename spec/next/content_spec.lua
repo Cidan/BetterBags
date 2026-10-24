@@ -19,6 +19,7 @@ L.G = function(_, key) return key end
 
 -- The item buttons: one per slot key, as itemFrame:GetButton keeps them.
 local itemFrame = trackStub("ItemFrame")
+local masque = trackStub("Masque")
 local originalGetButton = itemFrame.GetButton
 local buttons
 itemFrame.GetButton = function(_, _, slotkey)
@@ -437,6 +438,30 @@ describe("NextContent", function()
       function b:PixelParts() return own, { part } end
       draw()
       assert.are.same({ { true, decoration, { ilvl }, a }, { true, own, { part }, b } }, fitted)
+    end)
+
+    -- Reported: two borders round each item with a quality border, with Masque, after a /reload. Masque
+    -- skins an item button as it is announced and on every full draw (integrations/masque.lua), before the
+    -- canvas lays it out; the fitter then pulled Masque's quality border in to fill the button, inside the
+    -- skin's own frame (Caith's: 42 / 36 of the button, centered). Laid out, a button Masque skins keeps
+    -- Masque's border where Masque put it.
+    it("leaves the border Masque skinned where Masque put it as it lays a button out", function()
+      override(masque, "IsSkinned", function(_, button) return button.masqued == true end)
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+      local a = buttons["0_1"]
+      local decoration = CreateFrame("Button", nil, a.frame)
+      decoration:SetAllPoints(a.frame)
+      decoration.masqued = true
+      decoration.IconBorder = decoration:CreateTexture(nil, "OVERLAY")
+      decoration.IconBorder:SetSize(43, 43)
+      decoration.IconBorder:SetPoint("CENTER", decoration, "CENTER", 0, 0)
+      a.ilvlText = a.frame:CreateFontString(nil, "OVERLAY")
+      function a:GetDecoration() return decoration end
+      draw()
+      local border = decoration.IconBorder
+      assert.is_nil(border._allPoints, "not pulled in to fill the button")
+      assert.are.same({ 1, { "CENTER", decoration, "CENTER", 0, 0 }, 43, 43 },
+        { border:GetNumPoints(), { border:GetPoint(1) }, border:GetWidth(), border:GetHeight() })
     end)
 
     it("reuses a section of the same name and releases the rest", function()

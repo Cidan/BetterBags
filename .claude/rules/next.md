@@ -874,7 +874,9 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   `Item` button, takes it out under a theme with `Masque = false`, and adds it back when a theme
   that uses Masque applies (vendor buttons are reused, not drawn again on a theme change). A draw
   needs no re-skin: it sets the icon's file (Masque keeps its crop) and the border's color, and
-  Masque re-skins the border itself when its texture is set (its `IconBorder` hook).
+  Masque re-skins the border itself when its texture is set (its `IconBorder` hook). Styling itself
+  again for a new pixel grid does (`Fit` redraws the icon, count and highlight): it sends
+  `vendor/Updated`, and the integration re-skins it (next-pixel-perfect.md §4).
 - **Keeping up:** `MERCHANT_UPDATE`, `MERCHANT_FILTER_ITEM_UPDATE`, `CURRENCY_DISPLAY_UPDATE` redraw;
   `UPDATE_INVENTORY_DURABILITY`, `PLAYER_MONEY`, `BAG_UPDATE_DELAYED` update the header and redraw;
   `GET_ITEM_INFO_RECEIVED` is bucketed, only while it is shown. A draw keeps the button of every key

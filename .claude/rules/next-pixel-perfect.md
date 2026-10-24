@@ -83,10 +83,24 @@ bags take over:
   extended slot and the empty slot's family glyph centered at their size; the Blizzard Store highlight
   in the new-item glow's box (no API reads its image's size). It remembers where each part was;
   `Restore` / `RestoreAll` put them back (before the classic bags take the buttons). On a grid the button
-  was not styled on, Sonata styles it again (`Sonata:RestyleElement`) and `item/Updated` tells Masque.
-  Once per grid, size and Sonata theme generation.
+  was not styled on, Sonata styles it again (`Sonata:RestyleElement`) and the item says so for Masque:
+  `item/Updated`, or the item's own `Restyled(ctx)` (a guild bank button: `guild/Updated`). Once per grid,
+  size, Sonata theme generation and whether Masque skins the button.
+- **Masque's parts are Masque's.** On a button in one of BetterBags' Masque groups
+  (`Masque:IsSkinned(button)`, integrations/masque.lua; a group turned off in Masque's options still places
+  its buttons' parts, with Masque's base skin), the fitter leaves the parts Masque places where Masque put
+  them, and forgets where they were, so `Restore` does not put them back over the skin: the quality
+  border, both icon overlays, the quest art, the new-item glow (and the Store highlight that takes its
+  box) and the junk coin (Masque 12.1.0 `Skins/Regions.lua`, the `Item` type's keys). A skin's sizes are
+  the skin's, on whole pixels or not. **Failure mode (fixed):** Masque skins a button as it is announced
+  and on every full draw, before the canvas lays it out; the fitter then pulled the quality border in to
+  fill the button, inside the skin's own frame (Caith sizes it 42 / 36 of the button, centered): two
+  borders round each item with a quality border, after a /reload, until the item was drawn again.
+- **Vendor cards** style themselves again on a grid they were not styled for (`NextVendorButton:Fit`),
+  which draws their icon, count and highlight over Masque's skin, so `Fit` then sends `vendor/Updated` and
+  the Masque integration skins the card again (Masque's skin last, as after a theme).
 - **Guild bank buttons** name their parts (`PixelParts`): the button, its item level text and upgrade
-  arrow.
+  arrow (BetterBags' own texture, not Masque's `UpgradeIcon`).
 - **The money** in the backpack's and bank's footers is the shared money frame (`frames/money.lua`),
   each its own instance; `NextCoins:Fit` lays it out by corners in whole pixels, again after every
   update. The classic bags' instances are untouched.
@@ -150,6 +164,12 @@ Real screens: the reporter's 3396x1362 at 65% and 70%, 3440x1440 at 65%, 1920x10
 - `spec/next/settings/content_spec.lua`: every page and tab of the settings window for both designs on
   four screens (the window shrunk to fit at 115%), scrolled partway; `themes_spec.lua` (the report);
   `window_spec.lua` (the drop after a drag).
+- Masque: `spec/next/itemfit_spec.lua` ("on a button Masque skins": Masque's parts left where a Caith-like
+  skin put them, fitted again once Masque lets the button go, not put back over the skin; a button that
+  announces its own restyles), `spec/next/content_spec.lua` (the canvas leaves Masque's border as Masque
+  put it, the reported double border), `spec/integrations/masque_spec.lua` (`IsSkinned`, `vendor/Updated`),
+  `spec/next/vendorbutton_spec.lua` (a card announces its restyle on a new grid), `spec/next/guildbutton_spec.lua`
+  (`Restyled`). Each guard mutation-checked.
 - Units: `spec/next/pixel_spec.lua`, `spec/next/itemfit_spec.lua`, `spec/next/coins_spec.lua`,
   `spec/sonata/elements_spec.lua` (the styler's rounding), `spec/sonata/engine_spec.lua`
   (`RestyleElement`), `spec/sonata/next_engine_spec.lua` (`SetActive`, `RestyleWidgets`),

@@ -10,6 +10,7 @@ local function trackStub(name)
 end
 local sonata = trackStub("Sonata")
 local events = trackStub("Events")
+local masque = trackStub("Masque")
 
 ResetModuleStub("NextItemFit", "next/itemfit.lua")
 LoadBetterBagsModule("next/itemfit.lua")
@@ -113,6 +114,8 @@ describe("NextItemFit", function()
     override(events, "SendMessage", function(_, ctx, name, item, d)
       table.insert(sent, { ctx ~= nil, name, item, d })
     end)
+    -- Masque skins no button unless a test says so (integrations/masque.lua, IsSkinned).
+    override(masque, "IsSkinned", function() return false end)
   end)
 
   after_each(function()
@@ -189,6 +192,83 @@ describe("NextItemFit", function()
     generation = 6
     itemFit:Fit({}, decoration, { ilvl }, item)
     assert.are.equal(2, #restyled, "styled on another")
+  end)
+
+  -- A guild bank button is not an item button of the bags: it says itself that it was drawn again
+  -- (guild/Updated, NextGuildButton:Restyled), which Masque's integration skins it again on.
+  it("has a button that announces its own restyles announce it, not item/Updated", function()
+    local announced = {}
+    local item = { Restyled = function(self, ctx) table.insert(announced, { self, ctx ~= nil }) end }
+    itemFit:Fit({}, decoration, { ilvl }, item)
+    assert.are.same({ { "ItemButton", decoration } }, restyled)
+    assert.are.same({ { item, true } }, announced)
+    assert.are.same({}, sent)
+  end)
+
+  -- Masque skins an item button's parts its own way (Masque 12.1.0 Skins/Regions.lua, the Item type):
+  -- Caith sizes the quality border, the overlays, the quest border and the new-item glow 42 / 36 of the
+  -- button, centered, so its border art reaches past the button's edge round its own 42 frame. Pulled in
+  -- to fill the button, the quality border drew inside Caith's frame: two borders (seen after a /reload).
+  describe("on a button Masque skins", function()
+    local MASQUE_PARTS = { "IconBorder", "IconOverlay", "IconOverlay2", "IconQuestTexture", "NewItemTexture", "JunkIcon" }
+    local skinned
+
+    -- skin does what Masque's skin pass does to the parts it owns: sized from the skin, centered.
+    local function skin(d)
+      local size = d:GetWidth() * 42 / 36
+      for _, key in ipairs(MASQUE_PARTS) do
+        d[key]:ClearAllPoints()
+        d[key]:SetSize(size, size)
+        d[key]:SetPoint("CENTER", d, "CENTER", 0, 0)
+      end
+    end
+
+    local function placeOf(region)
+      return { region:GetNumPoints(), { region:GetPoint(1) }, region:GetWidth(), region:GetHeight() }
+    end
+
+    before_each(function()
+      skinned = {}
+      override(masque, "IsSkinned", function(_, button) return skinned[button] == true end)
+    end)
+
+    it("leaves every part Masque skinned where Masque put it, and fits the rest", function()
+      skinned[decoration] = true
+      skin(decoration)
+      local before = {}
+      for _, key in ipairs(MASQUE_PARTS) do before[key] = placeOf(decoration[key]) end
+      local store = placeOf(decoration.BattlepayItemTexture)
+      itemFit:Fit({}, decoration, { ilvl })
+      for _, key in ipairs(MASQUE_PARTS) do
+        assert.are.same(before[key], placeOf(decoration[key]), key)
+      end
+      assert.are.same(store, placeOf(decoration.BattlepayItemTexture), "the Store highlight goes with its glow")
+      local skip = sonataParts(decoration)
+      for _, key in ipairs(MASQUE_PARTS) do skip[decoration[key]] = true end
+      skip[decoration.BattlepayItemTexture] = true
+      assert.are.same({}, layout.PixelCheck(window, { owners = { decoration = decoration }, skip = skip }),
+        "what Masque does not skin")
+    end)
+
+    it("fits Masque's parts again once Masque lets the button go", function()
+      skinned[decoration] = true
+      skin(decoration)
+      itemFit:Fit({}, decoration, { ilvl })
+      skinned[decoration] = nil
+      assert.are.equal("placed", itemFit:Fit({}, decoration, { ilvl }))
+      assert.are.equal(decoration, decoration.IconBorder._allPoints)
+    end)
+
+    it("does not put back a part Masque skinned after it was fitted, when the classic bags take the button", function()
+      itemFit:Fit({}, decoration, { ilvl })
+      skinned[decoration] = true
+      skin(decoration)
+      generation = 9
+      itemFit:Fit({}, decoration, { ilvl })
+      local masqued = placeOf(decoration.IconBorder)
+      itemFit:RestoreAll()
+      assert.are.same(masqued, placeOf(decoration.IconBorder), "Masque's, not the template's")
+    end)
   end)
 
   it("puts every part back where it was for the classic bags", function()

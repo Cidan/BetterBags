@@ -169,6 +169,22 @@ describe("NextVendorButton", function()
       assert.are.same({ "vendor/NewButton", b }, { calls.messages[1].name, calls.messages[1].args[1] })
     end)
 
+    -- A card is made before the canvas it goes in: placed on another grid (docs/next-pixel-perfect.md) it
+    -- styles itself again, which draws its icon, count and highlight again over Masque's skin, so it says
+    -- so (vendor/Updated: Masque's integration skins it again). On the grid it was styled for it does nothing.
+    it("announces that it styled itself again on a new grid, for Masque, and nothing on the same grid", function()
+      local b = vendorButton:Acquire()
+      local parent = CreateFrame("Frame")
+      parent:SetScale(0.8)
+      b.frame:SetParent(parent)
+      calls.messages = {}
+      b:Fit()
+      assert.are.same({ { name = "vendor/Updated", args = { b } } }, { calls.messages[1] })
+      assert.are.equal(1, #calls.messages)
+      b:Fit()
+      assert.are.equal(1, #calls.messages, "the same grid")
+    end)
+
     -- Asked: "the count for items in vendor, that font size should match our item count in bags":
     -- the bags' item buttons write their count in NumberFontNormal (ItemButtonTemplate.xml's Count),
     -- which the Stack role copies (its file, size and outline, in every locale).

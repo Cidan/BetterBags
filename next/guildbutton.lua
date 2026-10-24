@@ -242,6 +242,13 @@ function buttonProto:drawItemLevel(info)
   self.itemLevel:Show()
 end
 
+-- Restyled says the theme styled the button again (NextItemFit, on a grid it was not styled on): guild/Updated,
+-- as after a draw, so Masque skins it again over the theme's parts.
+---@param ctx Context
+function buttonProto:Restyled(ctx)
+  events:SendMessage(ctx, 'guild/Updated', self)
+end
+
 -- SetFreeSlots draws a Free Space entry: an empty slot of a tab shown by itself (nocount), or a tab's
 -- free slots with their count in the combined view, in the bags' empty slot art. It ends with
 -- guild/Updated, as an item draw does.

@@ -237,6 +237,9 @@ end
 function buttonProto:Fit()
   if self.unit == nil or math.abs(self.unit - pixel:Unit(self.frame)) > 1e-9 then
     self:Style()
+    -- Styling drew its icon, count and highlight again, over Masque's skin: Masque's integration skins it
+    -- again on this, so its skin goes last, as after a theme.
+    events:SendMessage(context:New('NextVendorButton_Fit'), 'vendor/Updated', self)
   else
     -- Filled before it was placed (SetRepair), its bar was sized on the grid it had then.
     self:sizeDurability()

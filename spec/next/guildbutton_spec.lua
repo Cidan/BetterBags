@@ -352,6 +352,15 @@ describe("NextGuildButton", function()
       assert.are.equal(2, updates(b))
     end)
 
+    -- NextItemFit has Sonata style it again on a new grid (docs/next-pixel-perfect.md), over Masque's skin:
+    -- the button says so as it does after a draw.
+    it("announces that the theme styled it again", function()
+      local b = guildButton:GetButton(ctx, "1002_7")
+      calls.messages = {}
+      b:Restyled(ctx)
+      assert.are.equal(1, updates(b))
+    end)
+
     it("announces every free slot draw", function()
       local b = guildButton:GetButton(ctx, "1002_9")
       b:SetFreeSlots(ctx, free({ individual = true }), 1, true)

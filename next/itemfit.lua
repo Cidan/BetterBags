@@ -24,6 +24,12 @@ local FILLING = { "IconBorder", "IconOverlay", "IconQuestTexture" }
 -- Parts centered on the button at their own size: the template's second overlay and glows, the empty slot's
 -- family glyph (frames/item.lua), the extended slot's frame.
 local CENTERED = { "IconOverlay2", "flash", "NewItemTexture", "ExtendedSlot", "BetterBagsFamilyIcon" }
+-- Of those, the parts Masque places on a button it skins (Masque 12.1.0 Skins/Regions.lua, the Item type's
+-- keys): left where Masque put them. A skin sizes them its own way (Caith: 42 / 36 of the button, centered,
+-- its quality border round its own frame); filling the button, the border drew inside the skin's frame, a
+-- second border.
+local MASQUE_PARTS = { IconBorder = true, IconOverlay = true, IconOverlay2 = true, IconQuestTexture = true,
+  NewItemTexture = true, JunkIcon = true }
 
 -- The buttons Fit placed parts of, and where those parts were: Restore puts them back.
 itemFit.saved = setmetatable({}, { __mode = "k" }) ---@type table<Frame, table<Region, table>>
@@ -78,22 +84,26 @@ local function center(saved, region, button, width, height)
 end
 
 -- Fit places the parts of an item button BetterBags Next draws in whole pixels on its grid, once per grid,
--- size and Sonata theme generation (the styler may have placed them again). decoration is what draws the
--- item (frames/item.lua's decoration, or a guild bank button); extras are parts of other frames placed
--- from a corner (the item level text, on the interaction button). On a grid it was not styled on (it waits
--- unparented until drawn; a Bag Scale; a dock card's scale), Sonata styles it again, rounding its parts to
--- this one, and item/Updated says so (Masque skins it again on it, as after every theme). It returns what it
--- did, for profiler traces: "kept" or "placed".
+-- size, Sonata theme generation (the styler may have placed them again) and whether Masque skins it.
+-- decoration is what draws the item (frames/item.lua's decoration, or a guild bank button); extras are parts
+-- of other frames placed from a corner (the item level text, on the interaction button). On a button Masque
+-- skins, the parts Masque places are Masque's (MASQUE_PARTS): not moved, and forgotten, so Restore does not
+-- put them back over the skin either. On a grid it was not styled on (it waits unparented until drawn; a Bag
+-- Scale; a dock card's scale), Sonata styles it again, rounding its parts to this one, and the item says so:
+-- item/Updated, or its own Restyled (a guild bank button: guild/Updated); Masque's integration skins it again
+-- on either, as after every theme. It returns what it did, for profiler traces: "kept" or "placed".
 ---@param ctx Context
 ---@param decoration Frame
 ---@param extras? Region[]
----@param item? table The item button the decoration draws, for item/Updated.
+---@param item? table The item button the decoration draws, for item/Updated, or one with a Restyled(ctx).
 ---@return string
 function itemFit:Fit(ctx, decoration, extras, item)
   local sonata = addon:GetModule('Sonata', true)
+  local masque = addon:GetModule('Masque', true)
+  local skinned = masque ~= nil and masque:IsSkinned(decoration)
   local unit = pixel:Unit(decoration)
-  local key = string.format("%.9f:%.4f:%.4f:%s", unit, decoration:GetWidth(), decoration:GetHeight(),
-    tostring(sonata and sonata:GetGeneration() or 0))
+  local key = string.format("%.9f:%.4f:%.4f:%s:%s", unit, decoration:GetWidth(), decoration:GetHeight(),
+    tostring(sonata and sonata:GetGeneration() or 0), tostring(skinned))
   if self.keys[decoration] == key then
     return "kept"
   end
@@ -101,14 +111,26 @@ function itemFit:Fit(ctx, decoration, extras, item)
   local styled = decoration.sonataSnapUnit
   if sonata ~= nil and (styled == nil or math.abs(styled - unit) > 1e-9) then
     if sonata:RestyleElement("ItemButton", decoration) and item ~= nil then
-      addon:GetModule('Events'):SendMessage(ctx, "item/Updated", item, decoration)
+      if item.Restyled ~= nil then
+        item:Restyled(ctx)
+      else
+        addon:GetModule('Events'):SendMessage(ctx, "item/Updated", item, decoration)
+      end
     end
   end
   local saved = self.saved[decoration] or {}
   self.saved[decoration] = saved
+  -- ours says whether Next places a part of the decoration: on a button Masque skins, Masque's parts are not.
+  local function ours(name, region)
+    if skinned and MASQUE_PARTS[name] then
+      saved[region] = nil
+      return false
+    end
+    return true
+  end
   for _, name in ipairs(FROM_CORNER) do
     local region = decoration[name]
-    if region ~= nil then
+    if region ~= nil and ours(name, region) then
       fromCorner(saved, region)
     end
   end
@@ -117,7 +139,7 @@ function itemFit:Fit(ctx, decoration, extras, item)
   end
   for _, name in ipairs(FILLING) do
     local region = decoration[name]
-    if region ~= nil then
+    if region ~= nil and ours(name, region) then
       remember(saved, region)
       region:ClearAllPoints()
       region:SetAllPoints(decoration)
@@ -125,17 +147,21 @@ function itemFit:Fit(ctx, decoration, extras, item)
   end
   for _, name in ipairs(CENTERED) do
     local region = decoration[name]
-    if region ~= nil then
+    if region ~= nil and ours(name, region) then
       local was = remember(saved, region)
       center(saved, region, decoration, was.width, was.height)
     end
   end
   -- The Blizzard Store's highlight has no size of its own (Blizzard draws it at its image's size, which no
-  -- API can read): it takes the new-item glow's box, the glow it shows in place of.
+  -- API can read): it takes the new-item glow's box, the glow it shows in place of, so it goes with the glow.
   local store, glow = decoration.BattlepayItemTexture, decoration.NewItemTexture
   if store ~= nil and glow ~= nil then
-    local was = remember(saved, glow)
-    center(saved, store, decoration, was.width, was.height)
+    if skinned then
+      saved[store] = nil
+    else
+      local was = remember(saved, glow)
+      center(saved, store, decoration, was.width, was.height)
+    end
   end
   self.keys[decoration] = key
   return "placed"

@@ -80,6 +80,10 @@ Integrates with Masque for custom button skinning.
 - `bagbutton/Clearing` - Remove bag slot buttons
 - `vendor/NewButton` - Register a new vendor button (sent once per button; vendor buttons are reused,
   and a theme that uses Masque adds back the ones a theme without it took out)
+- `vendor/Updated` - Re-skin a vendor button that styled itself again for a new pixel grid (its icon,
+  count and highlight drawn over the skin; `NextVendorButton:Fit`), adding it when it is not in the group
+- `guild/NewButton`, `guild/Updated` - Register a guild bank button, and re-skin it after every draw or
+  restyle
 
 **Methods:**
 | Method | Description | Parameters | Returns |
@@ -88,6 +92,7 @@ Integrates with Masque for custom button skinning.
 | `RemoveButtonFromGroup(group, button)` | Remove button from group | `string`, `Button` | - |
 | `IsGroupEnabled(group)` | Check if group is enabled | `string` | `boolean` |
 | `ReapplyBlend(button)` | Fix blend mode | `Button` | - |
+| `IsSkinned(button)` | Whether the button is in one of BetterBags' Masque groups (Masque places its parts; BetterBags Next's item fitter leaves them alone) | `Button` | `boolean` |
 
 ### Pawn (`pawn.lua`)
 
