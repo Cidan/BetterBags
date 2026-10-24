@@ -126,6 +126,30 @@ function barProto:Paint()
   self:Layout()
 end
 
+-- deepest returns the highest frame level in frame and every frame below it, skip and its frames left out.
+---@param frame Frame
+---@param skip Frame
+---@return number
+local function deepest(frame, skip)
+  local level = frame:GetFrameLevel()
+  for _, child in ipairs({ frame:GetChildren() }) do
+    if child ~= skip then
+      level = math.max(level, deepest(child, skip))
+    end
+  end
+  return level
+end
+
+-- Raise puts the bar one level above the deepest frame in its box, its own frames left out: it sits over the
+-- box's content (Style), and the client gives the mouse to, and draws on top, the highest frame under it, so
+-- below a list's rows (deeper in the box's scroll target) pressing on the thumb took the row. Done when the bar
+-- is bound and each time it shows, not as it scrolls (a bag holds hundreds of buttons); rows made later sit
+-- as deep as the rows before them.
+function barProto:Raise()
+  local frame = self.frame
+  frame:SetFrameLevel(deepest(frame:GetParent(), frame) + 1)
+end
+
 -- Bind makes the bar drive box and follow it: it listens to the box's scroll, size and scrolling
 -- being allowed, as ScrollUtil's registration does (the box keeps one callback per owner: binding
 -- again replaces them).
@@ -142,6 +166,7 @@ function barProto:Bind(box)
     self.frame:EnableMouse(allowScroll)
   end, self)
   self:OnScroll(box:GetScrollPercentage(), box:GetVisibleExtentPercentage())
+  self:Raise()
 end
 
 -- OnScroll follows the box: how far it is scrolled and how much of its content it shows. The bar
@@ -153,7 +178,11 @@ function barProto:OnScroll(percentage, visible)
   self.percentage = percentage or 0
   self.visible = visible or 0
   local scrollable = self.visible > 0.0001 and self.visible < 0.9999
+  local shown = self.frame:IsShown()
   self.frame:SetShown(scrollable)
+  if scrollable and not shown then
+    self:Raise()
+  end
   if moved then
     self.idle = 0
   end
