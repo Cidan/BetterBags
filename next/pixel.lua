@@ -173,6 +173,47 @@ function pixel:Height(region, height)
   region:SetHeight(self:Length(region, height))
 end
 
+-- Middle is the offset that puts a length in the middle of another on region's grid, in whole pixels (both
+-- rounded first): the room left over split, the odd pixel after (below, or to the right); never negative.
+-- A text or an icon is centered on a row by its top this far down, never by its middle, which lies between
+-- two pixels on a row an odd number of pixels tall.
+---@param region ScriptRegion
+---@param outer number
+---@param inner number
+---@return number
+function pixel:Middle(region, outer, inner)
+  local left = self:Pixels(region, outer) - self:Pixels(region, inner)
+  return math.max(0, math.floor(left / 2)) * self:Unit(region)
+end
+
+-- TextHeight is a font string's (or edit box's) font height in its own units: what it is centered by.
+---@param text FontString|EditBox
+---@return number
+function pixel:TextHeight(text)
+  local _, height = text:GetFont()
+  return height or 0
+end
+
+-- Row anchors region by a top corner (TOPLEFT or TOPRIGHT) of relativeTo, x in from that corner's side,
+-- centered on a row rowHeight tall that starts top down from relativeTo's top (none: its top), all in whole
+-- pixels on region's grid. height is what is centered: region's own height when not given, a text's font
+-- height (TextHeight) for a font string.
+---@param region ScriptRegion
+---@param corner "TOPLEFT"|"TOPRIGHT"
+---@param relativeTo ScriptRegion
+---@param x number
+---@param rowHeight number
+---@param height? number
+---@param top? number
+function pixel:Row(region, corner, relativeTo, x, rowHeight, height, top)
+  if height == nil then
+    height = region:GetObjectType() == "FontString" and self:TextHeight(region) or region:GetHeight()
+  end
+  local across = self:Snap(region, x)
+  local down = self:Snap(region, top or 0) + self:Middle(region, rowHeight, height)
+  region:SetPoint(corner, relativeTo, corner, corner == "TOPRIGHT" and -across or across, -down)
+end
+
 -- Center anchors region by its top left so that it sits in the middle of relativeTo, both widthxheight
 -- sized as given (in units), on whole pixels: the middle of a frame an odd number of pixels across is
 -- between two pixels, so the room left over is split with the extra pixel on the right and bottom.

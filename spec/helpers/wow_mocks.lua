@@ -172,6 +172,9 @@ local function rejectSecret(api, ...)
 end
 
 local WidgetMethods = {}
+-- For helpers that model more of the client while a spec asks (spec/helpers/layout.lua: sizes from
+-- anchors while a screen is set up).
+_G.__mockWidgetMethods = WidgetMethods
 local ItemButtonMethods = {}
 local CreateMockWidget
 

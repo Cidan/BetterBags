@@ -12,6 +12,9 @@ local controls = addon:GetModule('NextControls')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextButton is BetterBags Next's button (next-settings.md §2), drawn from the theme
 -- (Controls.Button): Plain, Primary (the accent: Done, Apply), Danger (Delete) or Link (its text
 -- alone). Its fill and edge light up under the pointer and when pressed; disabled, it is drawn at
@@ -64,7 +67,6 @@ function nextButton:Create(parent, opts)
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints(frame)
   local label = frame:CreateFontString(nil, "OVERLAY")
-  label:SetPoint("CENTER", frame, "CENTER", 0, 0)
   ---@type NextButtonFrame
   local b = setmetatable({
     frame = frame, fill = fill, edge = controls:CreateEdge(frame), label = label,
@@ -96,22 +98,26 @@ end
 function buttonProto:Style()
   local B, look = controls:Theme("Button"), nextButton:Look(self.style)
   style:SetFont(self.label, look.Font)
-  self.frame:SetHeight(B.Height)
+  pixel:Height(self.frame, B.Height)
   self:Fit()
   self.frame:SetAlpha(self.frame:IsEnabled() and 1 or B.DisabledAlpha)
   self:Paint()
 end
 
 -- Fit sizes the button to its label: a link is its text, a button its label and Padding either
--- side, at least MinWidth; a fixed width wins.
+-- side, at least MinWidth; a fixed width wins. All in whole pixels, its label centered in it by its top
+-- left (docs/next-pixel-perfect.md): its width and font height rounded up and split, the odd pixel after.
 function buttonProto:Fit()
   local B = controls:Theme("Button")
-  local text = math.ceil(self.label:GetStringWidth())
+  local frame, label = self.frame, self.label
+  local text = pixel:Ceil(frame, label:GetStringWidth())
   local width = self.width
   if width == nil then
-    width = self.style == "Link" and text or math.max(B.MinWidth, text + 2 * B.Padding)
+    width = self.style == "Link" and text or math.max(pixel:Length(frame, B.MinWidth), text + 2 * pixel:Length(frame, B.Padding))
   end
-  self.frame:SetWidth(width)
+  frame:SetWidth(pixel:Length(frame, width))
+  label:ClearAllPoints()
+  pixel:Row(label, "TOPLEFT", frame, pixel:Middle(frame, frame:GetWidth(), text), frame:GetHeight())
 end
 
 -- SetWidth gives the button a fixed width, or (nil) sizes it to its label again.
@@ -134,6 +140,8 @@ function buttonProto:Paint()
   controls:Paint(self.fill, fill)
   controls:PaintEdge(self.edge, lit and look.HoverEdge or look.Edge)
   style:SetFont(self.label, (lit and look.HoverFont) or look.Font)
+  -- The hover font can be another size: centered again.
+  self:Fit()
 end
 
 ---@param text string

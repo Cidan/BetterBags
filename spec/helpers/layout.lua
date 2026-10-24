@@ -55,10 +55,11 @@ function layout.Rect(region)
     return nil
   end
   local scale = region:GetEffectiveScale()
+  -- The size set (SetSize), not GetWidth: while a screen is set up GetWidth asks this.
+  local setWidth, setHeight = region._width or 0, region._height or 0
   if region._rect ~= nil then
     local l, b = region._rect.left, region._rect.bottom
-    return { left = l * scale, bottom = b * scale, right = (l + region:GetWidth()) * scale,
-      top = (b + region:GetHeight()) * scale }
+    return { left = l * scale, bottom = b * scale, right = (l + setWidth) * scale, top = (b + setHeight) * scale }
   end
   if resolving[region] then
     error("layout: anchor cycle")
@@ -96,7 +97,7 @@ function layout.Rect(region)
   if not ok then
     return nil
   end
-  local w, ht = region:GetWidth() * scale, region:GetHeight() * scale
+  local w, ht = setWidth * scale, setHeight * scale
   if isText(region) then
     if region._width == nil or region._width == 0 then
       w = (region.GetStringWidth and region:GetStringWidth() or 0) * scale
@@ -144,15 +145,35 @@ end
 ---@param height number
 ---@param uiScale number
 ---@return fun()
+--
+-- While it is set up, a region with no size of its own on an axis reports the size its anchors give it
+-- (GetWidth, GetHeight, GetSize), as the client reports a region's resolved size (warcraft.wiki.gg
+-- Region:GetWidth); a font string still reports its own (the mock measures its text).
 function layout.UseScreen(width, height, uiScale)
   local getSize = _G.GetPhysicalScreenSize
   local scale, rect = UIParent._scale, UIParent._rect
   local w, h = UIParent._width, UIParent._height
+  local methods = _G.__mockWidgetMethods
+  local getWidth, getHeight = methods.GetWidth, methods.GetHeight
+  local function resolved(region, key, get, low, high)
+    local size = get(region)
+    if size ~= 0 or isText(region) or #(region._points or {}) < 2 then
+      return size
+    end
+    local r = layout.Rect(region)
+    if r == nil then
+      return size
+    end
+    return (r[high] - r[low]) / region:GetEffectiveScale()
+  end
+  methods.GetWidth = function(region) return resolved(region, "_width", getWidth, "left", "right") end
+  methods.GetHeight = function(region) return resolved(region, "_height", getHeight, "bottom", "top") end
   _G.GetPhysicalScreenSize = function() return width, height end
   UIParent:SetScale(uiScale)
   local units = 768 / uiScale
   UIParent:_SetRect(0, 0, units * width / height, units)
   return function()
+    methods.GetWidth, methods.GetHeight = getWidth, getHeight
     _G.GetPhysicalScreenSize = getSize
     UIParent._scale, UIParent._rect = scale, rect
     UIParent._width, UIParent._height = w, h
@@ -256,6 +277,16 @@ function layout.PixelCheck(root, opts)
         for _, side in ipairs({ "left", "right", "top", "bottom" }) do
           if not onPixel(r[side] * k) then
             table.insert(bad, string.format("%s %.3f", side, r[side] * k))
+          end
+        end
+      end
+      -- An edit box draws its text inside its insets, in its own units (SetTextInsets).
+      if region._type == "EditBox" then
+        local s = region:GetEffectiveScale()
+        local insets = { region:GetTextInsets() }
+        for i, side in ipairs({ "left", "right", "top", "bottom" }) do
+          if not onPixel(insets[i] * s * k) then
+            table.insert(bad, string.format("text inset %s %.3f", side, insets[i] * s * k))
           end
         end
       end

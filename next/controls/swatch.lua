@@ -12,6 +12,9 @@ local controls = addon:GetModule('NextControls')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextSwatch is BetterBags Next's color swatch (next-settings.md §2), drawn from the theme
 -- (Controls.Swatch): a square of its color, edged. A click opens Blizzard's color picker with it
 -- (ColorPickerFrame:SetupColorPickerAndShow, on every client): each color picked is shown and called
@@ -69,7 +72,7 @@ end
 
 function swatchProto:Style()
   local S = controls:Theme("Swatch")
-  self.frame:SetSize(S.Size, S.Size)
+  pixel:Size(self.frame, S.Size, S.Size)
   controls:PaintEdge(self.edge, self.hovered and S.HoverEdge or S.Edge)
   local c = self.current
   self.color:SetColorTexture(c[1], c[2], c[3], c[4])

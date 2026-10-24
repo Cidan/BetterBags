@@ -333,11 +333,19 @@ describe("NextSettings", function()
       open()
       local I, SR = style.Theme.Controls.Input, style.Theme.Settings.Search
       local left = I.Padding + SR.IconSize + I.Padding / 2
+      -- By their top left, centered on the field's height by whole pixels (docs/next-pixel-perfect.md).
+      local function down(height)
+        return -math.floor((I.Height - height) / 2)
+      end
       local function check()
-        assert.are.same({ left, I.Padding, 0, 0 }, { settings.search.frame:GetTextInsets() })
-        assert.are.same({ "LEFT", settings.search.frame, "LEFT", left, 0 }, { settings.search.help:GetPoint(1) })
+        local insetLeft, insetRight = settings.search.frame:GetTextInsets()
+        assert.are.same({ left, I.Padding }, { insetLeft, insetRight })
+        local _, helpHeight = settings.search.help:GetFont()
+        assert.are.same({ "TOPLEFT", settings.search.frame, "TOPLEFT", left, down(helpHeight) },
+          { settings.search.help:GetPoint(1) })
         assert.are.equal(style.Theme.Textures[SR.Icon], settings.search.icon:GetTexture())
-        assert.are.same({ "LEFT", settings.search.frame, "LEFT", I.Padding, 0 }, { settings.search.icon:GetPoint(1) })
+        assert.are.same({ "TOPLEFT", settings.search.frame, "TOPLEFT", I.Padding, down(SR.IconSize) },
+          { settings.search.icon:GetPoint(1) })
       end
       check()
       settings:ApplyStyle()

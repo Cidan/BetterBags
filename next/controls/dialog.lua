@@ -21,6 +21,9 @@ local nextInput = addon:GetModule('NextInput')
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 -- NextDialog is BetterBags Next's dialog (next-settings.md §2), in place of Blizzard's StaticPopup:
 -- one at a time, over the window it is shown in, drawn from the theme (Controls.Dialog): a scrim over
 -- the window that takes its clicks, and a card with a title, text, a text field when asked, and
@@ -32,6 +35,7 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@field frame Frame
 ---@field scrim Texture
 ---@field card Frame
+---@field owner? Frame The window it covers.
 ---@field cardFill Texture
 ---@field edge NextEdge
 ---@field title FontString
@@ -76,7 +80,6 @@ function nextDialog:build()
   self.scrim = frame:CreateTexture(nil, "BACKGROUND")
   self.scrim:SetAllPoints(frame)
   local card = CreateFrame("Frame", nil, frame)
-  card:SetPoint("CENTER", frame, "CENTER", 0, 0)
   card:EnableMouse(true)
   self.cardFill = card:CreateTexture(nil, "BACKGROUND")
   self.cardFill:SetAllPoints(card)
@@ -116,6 +119,7 @@ function nextDialog:Show(owner, opts)
   self.answered = true
   self.opts = opts
   local frame = self.frame
+  self.owner = owner
   frame:SetParent(owner)
   frame:ClearAllPoints()
   frame:SetAllPoints(owner)
@@ -160,29 +164,34 @@ function nextDialog:ApplyStyle(ctx)
 end
 
 -- Style lays the card out: the title, the text wrapped to the card, the field, the buttons from the
--- right; the card as tall as they are.
+-- right; the card as tall as they are, in the middle of the window. All in whole pixels
+-- (docs/next-pixel-perfect.md): each part down from the card's top by the heights above it rounded up,
+-- never from a text's far edge (the client's measure of it), the buttons corner to corner.
 function nextDialog:Style()
   local D = controls:Theme("Dialog")
-  local card, pad, gap = self.card, D.Pad, D.Gap
+  local frame, card = self.frame, self.card
+  local pad, gap, buttonGap = pixel:Snap(card, D.Pad), pixel:Snap(card, D.Gap), pixel:Snap(card, D.ButtonGap)
   controls:Paint(self.scrim, D.Scrim)
   controls:Paint(self.cardFill, D.Card)
-  controls:PaintEdge(self.edge, D.Edge)
   style:SetFont(self.title, D.TitleFont)
   style:SetFont(self.text, D.TextFont)
-  card:SetWidth(D.Width)
-  local inner = D.Width - 2 * pad
+  local width = pixel:Length(card, D.Width)
+  card:SetWidth(width)
+  local inner = width - 2 * pad
+  self.title:SetWidth(inner)
+  self.text:SetWidth(inner)
   self.title:ClearAllPoints()
   self.title:SetPoint("TOPLEFT", card, "TOPLEFT", pad, -pad)
-  self.title:SetWidth(inner)
+  local down = pad + pixel:Ceil(card, self.title:GetStringHeight()) + gap
   self.text:ClearAllPoints()
-  self.text:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, -gap)
-  self.text:SetWidth(inner)
-  local height = pad + self.title:GetStringHeight() + gap + self.text:GetStringHeight()
+  self.text:SetPoint("TOPLEFT", card, "TOPLEFT", pad, -down)
+  down = down + pixel:Ceil(card, self.text:GetStringHeight())
   if self.input.frame:IsShown() then
     self.input.frame:ClearAllPoints()
-    self.input.frame:SetPoint("TOPLEFT", self.text, "BOTTOMLEFT", 0, -gap)
+    self.input.frame:SetPoint("TOPLEFT", card, "TOPLEFT", pad, -(down + gap))
     self.input.frame:SetWidth(inner)
-    height = height + gap + self.input.frame:GetHeight()
+    self.input:Style()
+    down = down + gap + self.input.frame:GetHeight()
   end
   local count = self.opts and #self.opts.buttons or 0
   local right
@@ -193,12 +202,15 @@ function nextDialog:Style()
     if right == nil then
       b.frame:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -pad, pad)
     else
-      b.frame:SetPoint("RIGHT", right.frame, "LEFT", -D.ButtonGap, 0)
+      b.frame:SetPoint("TOPRIGHT", right.frame, "TOPLEFT", -buttonGap, 0)
     end
     right = b
   end
-  height = height + gap + controls:Theme("Button").Height + pad
-  card:SetHeight(height)
+  local height = down + gap + pixel:Length(card, controls:Theme("Button").Height) + pad
+  -- It covers its window, at its scale: centered by the window's size.
+  card:ClearAllPoints()
+  pixel:Center(card, frame, self.owner:GetWidth(), self.owner:GetHeight(), width, height)
+  controls:PaintEdge(self.edge, D.Edge)
 end
 
 -- Press answers with the i-th button: called with the field's text, then closed unless it asks to

@@ -54,7 +54,11 @@ describe("NextInput", function()
     local f = make({ width = 200 })
     assert.are.equal("EditBox", f.frame:GetObjectType())
     assert.are.same({ 200, I().Height }, { f.frame:GetSize() })
-    assert.are.same({ I().Padding, I().Padding, 0, 0 }, { f.frame:GetTextInsets() })
+    -- Above and below, the room left over by its font's height, split (docs/next-pixel-perfect.md): the
+    -- line the client centers in what is left lands on a whole pixel.
+    local _, fontHeight = f.frame:GetFont()
+    local above = math.floor((I().Height - fontHeight) / 2)
+    assert.are.same({ I().Padding, I().Padding, above, I().Height - fontHeight - above }, { f.frame:GetTextInsets() })
     assert.are.equal(style:Font("ControlText"), f.frame:GetFontObject())
     assert.are.same(rgb("ControlFill"), colorOf(f.fill))
     assert.are.equal(I().Edge.Idle, alphaOf(f.edge.Top))
@@ -120,9 +124,14 @@ describe("NextInput", function()
     local left = I().Padding + 14 + I().Padding / 2
     assert.are.equal(style.Theme.Textures.IconSearch, f.icon:GetTexture())
     assert.are.same({ 14, 14 }, { f.icon:GetSize() })
-    assert.are.same({ "LEFT", f.frame, "LEFT", I().Padding, 0 }, { f.icon:GetPoint(1) })
-    assert.are.same({ left, I().Padding, 0, 0 }, { f.frame:GetTextInsets() })
-    assert.are.same({ "LEFT", f.frame, "LEFT", left, 0 }, { f.help:GetPoint(1) })
+    -- By their top left, centered on its height by whole pixels (docs/next-pixel-perfect.md).
+    assert.are.same({ "TOPLEFT", f.frame, "TOPLEFT", I().Padding, -math.floor((I().Height - 14) / 2) },
+      { f.icon:GetPoint(1) })
+    local insetLeft, insetRight = f.frame:GetTextInsets()
+    assert.are.same({ left, I().Padding }, { insetLeft, insetRight })
+    local _, helpHeight = f.help:GetFont()
+    assert.are.same({ "TOPLEFT", f.frame, "TOPLEFT", left, -math.floor((I().Height - helpHeight) / 2) },
+      { f.help:GetPoint(1) })
     spec = { Texture = "IconSearch", Size = 20, Color = "Gold" }
     nextInput:ApplyStyle()
     assert.are.same({ 20, 20 }, { f.icon:GetSize() })
