@@ -300,6 +300,27 @@ end
 function WidgetMethods:GetChildren()
   return unpack(self._children)
 end
+-- Frame:GetRegions() -> the frame's regions (SimpleFrameAPIDocumentation): its textures and lines, its font
+-- strings, and the state art and template textures the mock makes when first read (LAZY_TEXTURES; a button's
+-- normal, pushed, highlight, disabled and checked textures), each once.
+local STATE_TEXTURES = { "NormalTexture", "PushedTexture", "HighlightTexture", "DisabledTexture", "CheckedTexture",
+  "NewItemTexture", "BattlepayItemTexture", "ItemContextOverlay", "UpgradeIcon" }
+function WidgetMethods:GetRegions()
+  local list, seen = {}, {}
+  local function add(region)
+    if not seen[region] then
+      seen[region] = true
+      table.insert(list, region)
+    end
+  end
+  for _, t in ipairs(self._textures or {}) do add(t) end
+  for _, key in ipairs(STATE_TEXTURES) do
+    local t = rawget(self, key)
+    if type(t) == "table" and t._type ~= nil and t._parent == self then add(t) end
+  end
+  for _, f in ipairs(self._fontstrings or {}) do add(f) end
+  return unpack(list)
+end
 function WidgetMethods:GetParent()
   return self._parent
 end
@@ -357,6 +378,14 @@ end
 function WidgetMethods:GetRect()
   if self._rect == nil then return end
   return self._rect.left, self._rect.bottom, self:GetWidth(), self:GetHeight()
+end
+-- ScriptRegion:GetScaledRect() -> GetRect times the effective scale (warcraft.wiki.gg GetRect; Blizzard's
+-- RegionUtil.GetRegionPoint divides it by GetEffectiveScale). spec/helpers/layout.lua works it out from
+-- anchors while a screen is set up.
+function WidgetMethods:GetScaledRect()
+  if self._rect == nil then return end
+  local s = self:GetEffectiveScale()
+  return self._rect.left * s, self._rect.bottom * s, self:GetWidth() * s, self:GetHeight() * s
 end
 -- ScriptRegion:IsMouseOver(offsetTop, offsetBottom, offsetLeft, offsetRight)
 -- (SimpleScriptRegionAPIDocumentation): whether the cursor (GetCursorPosition, in the region's

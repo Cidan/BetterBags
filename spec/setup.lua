@@ -36,6 +36,9 @@ dofile("spec/helpers/addon_loader.lua")
 -- The profiler engine loads right after core/boot.lua in every TOC, and files across the
 -- addon register their prototypes with it at load time, so every spec needs it present.
 LoadBetterBagsModule("debug/perf/engine.lua")
+-- The pixel check (debug/pixelaudit.lua): spec/helpers/layout.lua runs it, and BetterBags Next's windows
+-- register with it as they are made.
+LoadBetterBagsModule("debug/pixelaudit.lua")
 -- Flow is the pure packing every grid lays out with (render/flow.lua); the grid looks it up when
 -- it loads, so every spec that loads a grid needs it present.
 LoadBetterBagsModule("render/flow.lua")

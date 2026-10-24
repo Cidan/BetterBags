@@ -53,6 +53,7 @@ debug\analytics.lua
 core\events.lua
 debug\perf\sessions.lua
 debug\renderrecorder.lua
+debug\pixelaudit.lua
 debug\simulator.lua
 core\localization.lua
 core\translations.lua

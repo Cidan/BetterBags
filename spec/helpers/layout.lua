@@ -130,6 +130,16 @@ function layout.Rect(region)
   return { left = left, right = right, top = top, bottom = bottom }
 end
 
+-- scaledRect answers GetScaledRect from the resolver: the rect in absolute units (own units times the
+-- effective scale, what the client's GetScaledRect returns), or nothing when the anchors do not place it.
+local function scaledRect(region)
+  local r = layout.Rect(region)
+  if r == nil then
+    return
+  end
+  return r.left, r.bottom, r.right - r.left, r.top - r.bottom
+end
+
 -- PixelsPerUnit is how many screen pixels one absolute unit is (Blizzard's GetPixelToUIUnitFactor is
 -- its inverse).
 ---@return number
@@ -148,7 +158,8 @@ end
 --
 -- While it is set up, a region with no size of its own on an axis reports the size its anchors give it
 -- (GetWidth, GetHeight, GetSize), as the client reports a region's resolved size (warcraft.wiki.gg
--- Region:GetWidth); a font string still reports its own (the mock measures its text).
+-- Region:GetWidth); a font string still reports its own (the mock measures its text). GetScaledRect reports
+-- where its anchors put it.
 function layout.UseScreen(width, height, uiScale)
   local getSize = _G.GetPhysicalScreenSize
   local scale, rect = UIParent._scale, UIParent._rect
@@ -168,152 +179,38 @@ function layout.UseScreen(width, height, uiScale)
   end
   methods.GetWidth = function(region) return resolved(region, "_width", getWidth, "left", "right") end
   methods.GetHeight = function(region) return resolved(region, "_height", getHeight, "bottom", "top") end
+  local getScaledRect = methods.GetScaledRect
+  methods.GetScaledRect = scaledRect
   _G.GetPhysicalScreenSize = function() return width, height end
   UIParent:SetScale(uiScale)
   local units = 768 / uiScale
   UIParent:_SetRect(0, 0, units * width / height, units)
   return function()
     methods.GetWidth, methods.GetHeight = getWidth, getHeight
+    methods.GetScaledRect = getScaledRect
     _G.GetPhysicalScreenSize = getSize
     UIParent._scale, UIParent._rect = scale, rect
     UIParent._width, UIParent._height = w, h
   end
 end
 
--- visible says whether a region would draw: shown, and every parent shown.
-local function visible(region)
-  if not region._shown then
-    return false
-  end
-  -- A region at alpha 0 draws nothing (a template's art hidden that way, a glow before it is lit).
-  if (region._alpha or 1) == 0 then
-    return false
-  end
-  local parent = region._parent
-  while parent ~= nil do
-    if parent._shown == false or (parent._alpha or 1) == 0 then
-      return false
-    end
-    parent = parent._parent
-  end
-  return true
-end
-
--- names maps regions to the field paths an owner table reaches them by (for messages).
-local function names(owners)
-  local map, seen = {}, {}
-  local function walk(t, path, depth)
-    if type(t) ~= "table" or seen[t] or depth > 4 then
-      return
-    end
-    seen[t] = true
-    for k, v in pairs(t) do
-      if type(v) == "table" and type(k) == "string" and k:sub(1, 1) ~= "_" then
-        local p = path .. "." .. k
-        if v._type ~= nil and map[v] == nil then
-          map[v] = p
-        end
-        walk(v, p, depth + 1)
-      elseif type(v) == "table" and type(k) == "number" then
-        walk(v, path .. "[" .. k .. "]", depth + 1)
-      end
-    end
-  end
-  for name, owner in pairs(owners or {}) do
-    walk(owner, name, 0)
-  end
-  return map
-end
-
-local function onPixel(value)
-  return math.abs(value - math.floor(value + 0.5)) < 1e-3
-end
-
--- draws says whether a region draws anything itself, so its own edges must be on the grid: a texture, a
--- line, text, an edit box, or a frame that clips its children (its edges cut what is inside). A frame
--- that does neither draws nothing; its edges matter only through what is placed against them.
-local function draws(region)
-  local t = region._type
-  if t == "Texture" or t == "Line" or t == "MaskTexture" or t == "FontString" or t == "EditBox" then
-    return true
-  end
-  return region._clipsChildren == true
-end
-
--- PixelCheck lists every shown region under root that draws (draws) and is not on whole screen pixels:
--- a texture's, an edit box's or a clipping frame's four edges (and so its size), a font string's anchor
--- points. A region its anchors do not place is not drawn and is skipped, as is everything under a region
--- in skip. owners (name -> table) name the regions in the messages. It returns the problems, one string
--- each.
+-- PixelCheck runs BetterBags' pixel check (PixelAudit:Check, debug/pixelaudit.lua: the same check the game
+-- runs from the /bbdb debug window) on the mock, the client's GetScaledRect answered by the resolver. It lists
+-- every shown region under root that draws and is not on whole screen pixels, one string each; opts.skip and
+-- opts.owners are PixelAudit's.
 ---@param root table
 ---@param opts? { skip?: table<table, boolean>, owners?: table<string, table> }
 ---@return string[]
 function layout.PixelCheck(root, opts)
-  opts = opts or {}
-  local skip, named = opts.skip or {}, names(opts.owners)
-  local k = layout.PixelsPerUnit()
-  local problems = {}
-  local function label(region, path)
-    return named[region] or ((region._name or region._type) .. " " .. path)
+  local methods = _G.__mockWidgetMethods
+  local get = methods.GetScaledRect
+  methods.GetScaledRect = scaledRect
+  local audit = LibStub("AceAddon-3.0"):GetAddon("BetterBags"):GetModule("PixelAudit")
+  local ok, problems = pcall(audit.Check, audit, root, opts)
+  methods.GetScaledRect = get
+  if not ok then
+    error(problems, 0)
   end
-  local function check(region, path)
-    if skip[region] or not visible(region) then
-      return
-    end
-    local r = draws(region) and layout.Rect(region) or nil
-    if r ~= nil then
-      local bad = {}
-      if region._type == "FontString" then
-        for _, a in ipairs(region._points) do
-          local x, y = pointOf(r, a.point)
-          if not onPixel(x * k) then
-            table.insert(bad, string.format("%s x %.3f", a.point, x * k))
-          end
-          if not onPixel(y * k) then
-            table.insert(bad, string.format("%s y %.3f", a.point, y * k))
-          end
-        end
-      else
-        for _, side in ipairs({ "left", "right", "top", "bottom" }) do
-          if not onPixel(r[side] * k) then
-            table.insert(bad, string.format("%s %.3f", side, r[side] * k))
-          end
-        end
-      end
-      -- An edit box draws its text inside its insets, in its own units (SetTextInsets).
-      if region._type == "EditBox" then
-        local s = region:GetEffectiveScale()
-        local insets = { region:GetTextInsets() }
-        for i, side in ipairs({ "left", "right", "top", "bottom" }) do
-          if not onPixel(insets[i] * s * k) then
-            table.insert(bad, string.format("text inset %s %.3f", side, insets[i] * s * k))
-          end
-        end
-      end
-      if #bad > 0 then
-        table.insert(problems, label(region, path) .. ": " .. table.concat(bad, ", "))
-      end
-    end
-    for i, t in ipairs(region._textures or {}) do
-      check(t, path .. ">t" .. i)
-    end
-    -- A button's state textures and the template textures the mock makes when first read (LAZY_TEXTURES),
-    -- which it keeps apart from the regions it lists.
-    for _, key in ipairs({ "NormalTexture", "PushedTexture", "HighlightTexture", "DisabledTexture", "CheckedTexture",
-      "NewItemTexture", "BattlepayItemTexture", "ItemContextOverlay", "UpgradeIcon" }) do
-      local t = rawget(region, key)
-      if type(t) == "table" and t._type ~= nil and t._parent == region then
-        check(t, path .. ">" .. key)
-      end
-    end
-    for i, f in ipairs(region._fontstrings or {}) do
-      check(f, path .. ">s" .. i)
-    end
-    for i, c in ipairs(region._children or {}) do
-      check(c, path .. ">" .. i)
-    end
-  end
-  check(root, "")
   return problems
 end
 
