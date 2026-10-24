@@ -642,8 +642,12 @@ function settings:paintBrandLine(line, panel)
   line:SetPoint("TOPLEFT", panel, "TOPLEFT", m.pad, -(m.brand - size))
   line:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -m.pad, -(m.brand - size))
   line:SetHeight(size)
-  if B.Line then
+  if B.Line and style:IsArt(B.Line) then
+    style:Paint(line, B.Line, B.Line.Alpha)
+    line:Show()
+  elseif B.Line then
     local r, g, b = style:RGBA(B.Line.Color)
+    line:SetTexCoord(0, 1, 0, 1)
     line:SetColorTexture(1, 1, 1, 1)
     line:SetGradient("HORIZONTAL", CreateColor(r, g, b, B.Line.From), CreateColor(r, g, b, B.Line.To))
     line:Show()
@@ -898,7 +902,9 @@ end
 ---@param hovered boolean
 function settings:paintClose(hovered)
   local X = style.Theme.Settings.Header.Close
-  controls:Paint(self.closeIcon, { Texture = X.Icon, Color = hovered and X.HoverColor or X.Color })
+  -- Its own art under the pointer when the theme has some (HoverIcon: GW2_UI's close hover art).
+  local icon = (hovered and X.HoverIcon) or X.Icon
+  controls:Paint(self.closeIcon, { Texture = icon, Color = hovered and X.HoverColor or X.Color })
 end
 
 -- navRow returns the i-th row of the sidebar's list, made the first time it is needed.

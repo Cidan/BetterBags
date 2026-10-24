@@ -139,13 +139,13 @@ function chain:Partner(panel)
 end
 
 -- Gap is the room between the bodies of two bags side by side: both tab rails hang into it from
--- their bodies, each its widest tab plus the hover slide, with a margin between them; never less
--- than the two feathers.
+-- their bodies (past a side rail standing outside each, Header.Buttons.Rail.Outside), each its widest
+-- tab plus the hover slide, with a margin between them; never less than the two feathers.
 ---@param a NextPanelFrame
 ---@param b NextPanelFrame
 ---@return number
 function chain:Gap(a, b)
-  local tabs = a.tabs:Width() + b.tabs:Width() + 2 * style.TAB_HOVER + style.Chain.TabMargin
+  local tabs = a.tabs:Width() + b.tabs:Width() + 2 * (style.TAB_HOVER + style.RAIL_OUT) + style.Chain.TabMargin
   return math.max(2 * style.FEATHER, tabs)
 end
 
@@ -196,8 +196,8 @@ end
 function chain:SmallGap(a, b)
   local sa, sb = a:Scale(), b:Scale()
   local s = math.max(sa, sb)
-  local tabs = (a.tabs:Width() + style.TAB_HOVER) * sa + (b.tabs:Width() + style.TAB_HOVER) * sb
-    + style.Chain.TabMargin * s
+  local tabs = (a.tabs:Width() + style.TAB_HOVER + style.RAIL_OUT) * sa
+    + (b.tabs:Width() + style.TAB_HOVER + style.RAIL_OUT) * sb + style.Chain.TabMargin * s
   return math.max(style.Small.MinGap * s, tabs)
 end
 

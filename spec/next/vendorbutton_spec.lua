@@ -396,6 +396,21 @@ describe("NextVendorButton", function()
         end
       end)
 
+      it("fills its cards with art when its fills are art, and colors after", function()
+        local b = vendorButton:Acquire()
+        UseNextTheme({ Vendor = { CardFill = { Texture = "Interface\\Spec\\card.png", Color = "White", Alpha = 0.8 },
+          CardHover = { Texture = "Interface\\Spec\\card-lit.png", Color = "White" } } })
+        vendorButton:ApplyStyle()
+        assert.are.equal("Interface\\Spec\\card.png", b.cardFill:GetTexture())
+        assert.are.equal(0.8, b.cardFill:GetAlpha())
+        assert.are.equal("Interface\\Spec\\card-lit.png", b.cardHover:GetTexture())
+        UseNextTheme({ Palette = { Fog = { 0.5, 0.5, 0.5, 0.2 } }, Vendor = { CardFill = "Fog" } })
+        vendorButton:ApplyStyle()
+        assert.is_nil(b.cardFill:GetTexture())
+        assert.are.same({ 0.5, 0.5, 0.5, 0.2 }, { b.cardFill:GetVertexColor() })
+        b:Release()
+      end)
+
       it("tints with its colors, lights in its highlight, and dims by its share", function()
         UseNextTheme({ Palette = { Blood = { 0.6, 0.1, 0.1, 1 }, Ash = { 0.3, 0.3, 0.3, 1 } },
           Vendor = { Unusable = "Blood", SoldOut = "Ash", Highlight = { 1, 0.9, 0.6, 0.3 }, SearchDim = 0.5 } })

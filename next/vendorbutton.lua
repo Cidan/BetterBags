@@ -51,6 +51,18 @@ local COIN_ICONS = {
   "Interface\\MoneyFrame\\UI-CopperIcon",
 }
 
+-- paintCard fills a card's background or its hover light: art (a texture spec with a Texture or an Atlas) or a color.
+---@param texture Texture
+---@param fill table|string
+local function paintCard(texture, fill)
+  if style:IsArt(fill) then
+    style:Paint(texture, fill, fill.Alpha)
+  else
+    texture:SetTexCoord(0, 1, 0, 1)
+    texture:SetColorTexture(1, 1, 1, 1)
+    texture:SetVertexColor(style:RGBA(fill))
+  end
+end
 
 ---@alias NextVendorButtonMode "buy"|"buyback"|"repair"
 
@@ -205,10 +217,10 @@ function buttonProto:Style()
   self.stock:SetPoint("TOPLEFT", self.icon, "TOPLEFT", inset, -inset)
   self.cardFill:SetShown(V.CardFill and true or false)
   if V.CardFill then
-    self.cardFill:SetVertexColor(style:RGBA(V.CardFill))
+    paintCard(self.cardFill, V.CardFill)
   end
   if V.CardHover then
-    self.cardHover:SetVertexColor(style:RGBA(V.CardHover))
+    paintCard(self.cardHover, V.CardHover)
   else
     self.cardHover:Hide()
   end

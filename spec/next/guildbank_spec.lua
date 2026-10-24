@@ -330,8 +330,9 @@ describe("NextGuildBank", function()
       g:ApplyStyle(ctx())
     end)
 
-    -- GW2_UI's guild bank shows its bag's emblem (Inventory/guildBank.lua); the buttons go down its side panel.
-    it("shows GW2_UI's bag emblem in the Guild Wars 2 theme, its buttons down its right", function()
+    -- GW2_UI's guild bank shows its bag's emblem (Inventory/guildBank.lua); the buttons go down its side panel, which
+    -- stands outside its right edge, and the close button is at its top outer corner (its left).
+    it("shows GW2_UI's bag emblem in the Guild Wars 2 theme, its buttons down its right, its X at its top outer corner", function()
       local g = open()
       style:Use(addon:GetModule("SonataNext"):Resolve("GW2"))
       g:ApplyStyle(ctx())
@@ -340,13 +341,19 @@ describe("NextGuildBank", function()
         local piece = g.ornaments.pieces[i]
         shown[piece.spec.Texture] = piece.texture:IsShown()
       end
-      assert.is_true(shown.BagEmblem)
-      assert.is_false(shown.VendorEmblem)
-      local point, relativeTo = g.closeButton:GetPoint(1)
-      assert.are.same({ "TOPRIGHT", g.body }, { point, relativeTo })
-      assert.is_true(g.rail:IsShown())
+      local close = { g.closeButton:GetPoint(1) }
+      local settingsPoint, settingsTo = g.settingsButton:GetPoint(1)
+      local railPoint = g.rail:GetPoint(1)
+      local railShown = g.rail:IsShown()
       UseNextTheme(nil)
       g:ApplyStyle(ctx())
+      assert.is_true(shown.BagEmblem)
+      assert.is_false(shown.VendorEmblem)
+      local pin = addon:GetModule("SonataNext"):Resolve("GW2").Header.Buttons.Pinned.closeButton
+      assert.are.same({ "TOPLEFT", g.body, "TOPLEFT", -pin.X, pin.Y }, close, "mirrored: its left")
+      assert.are.same({ "TOPRIGHT", g.body }, { settingsPoint, settingsTo })
+      assert.are.equal("TOPLEFT", railPoint, "outside its right edge")
+      assert.is_true(railShown)
     end)
 
     it("has close, settings, deposit gold and withdraw gold in its header", function()

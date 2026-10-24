@@ -100,8 +100,16 @@ function buttonProto:Style()
   style:SetFont(self.label, look.Font)
   pixel:Height(self.frame, B.Height)
   self:Fit()
-  self.frame:SetAlpha(self.frame:IsEnabled() and 1 or B.DisabledAlpha)
+  self:fade()
   self:Paint()
+end
+
+-- fade dims a disabled button by DisabledAlpha, unless its style draws it disabled itself (DisabledFill).
+---@private
+function buttonProto:fade()
+  local enabled = self.frame:IsEnabled()
+  local own = nextButton:Look(self.style).DisabledFill
+  self.frame:SetAlpha((enabled or own) and 1 or controls:Theme("Button").DisabledAlpha)
 end
 
 -- Fit sizes the button to its label: a link is its text, a button its label and Padding either
@@ -132,7 +140,9 @@ function buttonProto:Paint()
   local look = nextButton:Look(self.style)
   local lit = self.hovered and self.frame:IsEnabled()
   local fill = look.Fill
-  if lit and self.pressed then
+  if not self.frame:IsEnabled() and look.DisabledFill then
+    fill = look.DisabledFill
+  elseif lit and self.pressed then
     fill = look.PressedFill
   elseif lit then
     fill = look.HoverFill
@@ -153,7 +163,7 @@ end
 ---@param enabled boolean
 function buttonProto:SetEnabled(enabled)
   self.frame:SetEnabled(enabled)
-  self.frame:SetAlpha(enabled and 1 or controls:Theme("Button").DisabledAlpha)
+  self:fade()
   self:Paint()
 end
 

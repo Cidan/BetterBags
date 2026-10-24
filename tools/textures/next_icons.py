@@ -151,6 +151,14 @@ def expand():
     return union(line(11.4, 8.6, 16.4, 3.6), chevron(16.9, 3.1, 1, -1, 3.6),
                  line(8.6, 11.4, 3.6, 16.4), chevron(3.1, 16.9, -1, 1, 3.6))
 
+def minimize():
+    # A window's minimize mark, an underscore along the bottom (asked: GW2_UI's own was blurry).
+    return line(4.5, 15.0, 15.5, 15.0, 2.0)
+
+def maximize():
+    # A window's maximize mark, a box with a heavier top edge, its title bar.
+    return union(stroke([(4.5, 4.5), (15.5, 4.5), (15.5, 15.5), (4.5, 15.5)], True), line(4.5, 5.2, 15.5, 5.2, 2.6))
+
 def tabs():
     # A panel with two tabs on its top, the left one open onto it.
     panel = stroke([(2.8, 3.6), (9.4, 3.6), (9.4, 8.4), (17.2, 8.4), (17.2, 17.0), (2.8, 17.0)], True)
@@ -229,7 +237,7 @@ GLYPHS = {
     "banktabs": tabs, "deposit": deposit, "depositgold": depositGold, "withdrawgold": withdrawGold,
     "filter": filt, "selljunk": tag, "repair": repair, "guildrepair": guildRepair,
     "chevron": chevronDown, "back": chevronLeft, "check": check, "search": magnifier, "plus": plus,
-    "circle": circle,
+    "circle": circle, "minimize": minimize, "maximize": maximize,
 }
 
 if __name__ == "__main__":

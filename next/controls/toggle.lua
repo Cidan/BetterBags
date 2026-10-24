@@ -20,9 +20,11 @@ local pixel = addon:GetModule('NextPixel')
 
 -- NextToggle is BetterBags Next's switch (next-settings.md §2), drawn from the theme
 -- (Controls.Toggle): a track, colored as it turns on, and a knob that slides to the end it is at. A
--- click flips it and calls back; a state given to it (SetChecked) calls nothing back. Two styles (Style):
+-- click flips it and calls back; a state given to it (SetChecked) calls nothing back. Three styles (Style):
 -- "Square", a track filling the switch with a square knob in it; "Round", a thinner track with round ends
--- and a round knob over it, overhanging it (asked: "the round peg that sits over a smaller track").
+-- and a round knob over it, overhanging it (asked: "the round peg that sits over a smaller track"); "Check",
+-- a check box: its box (Off) with the mark (On) over it as it turns on, and its own art while disabled
+-- (Disabled, DisabledOn), as GW2_UI's check boxes are drawn (docs/next-gw2-theme.md).
 ---@class NextToggle: AceModule
 ---@field all NextToggleFrame[]
 local nextToggle = addon:NewModule('NextToggle')
@@ -44,6 +46,7 @@ local nextToggle = addon:NewModule('NextToggle')
 ---@field shadow Texture The round style's soft shadow under the knob.
 ---@field hover Texture
 ---@field round boolean Drawn in the round style.
+---@field check boolean Drawn as a check box.
 ---@field share? number How much of the circle each round end shows across.
 ---@field checked boolean
 ---@field amount number How far it is on, from 0 to 1, as the knob slides.
@@ -122,6 +125,7 @@ end
 function toggleProto:Style()
   local T = controls:Theme("Toggle")
   self.round = T.Style == "Round"
+  self.check = T.Style == "Check"
   if self.round then
     pixel:Size(self.frame, T.Width, math.max(T.Height, T.KnobSize))
   else
@@ -130,12 +134,34 @@ function toggleProto:Style()
   pixel:Size(self.knob, T.KnobSize, T.KnobSize)
   if self.round then
     self:styleRound(T)
+  elseif self.check then
+    self:styleCheck(T)
   else
     self:styleSquare(T)
   end
   self.hover:SetShown(self.hovered == true and self.frame:IsEnabled())
-  self.frame:SetAlpha(self.frame:IsEnabled() and 1 or controls:Theme("Button").DisabledAlpha)
+  -- A check box with disabled art shows itself disabled; anything else is dimmed.
+  local ownArt = self.check and T.Disabled
+  self.frame:SetAlpha((self.frame:IsEnabled() or ownArt) and 1 or controls:Theme("Button").DisabledAlpha)
   self:Place(self.amount)
+end
+
+-- styleCheck draws the check style: the box (its disabled art while disabled) and the hover fill the switch; the
+-- mark over them is drawn as it turns on (Place). No knob, no edge.
+---@private
+---@param T table The theme's Controls.Toggle.
+function toggleProto:styleCheck(T)
+  local frame = self.frame
+  for _, texture in ipairs({ self.off, self.on, self.hover }) do
+    texture:ClearAllPoints()
+    texture:SetAllPoints(frame)
+  end
+  for _, texture in ipairs({ self.offLeft, self.offRight, self.onLeft, self.onRight, self.shadow, self.knob }) do
+    texture:Hide()
+  end
+  controls:Paint(self.off, (not frame:IsEnabled() and T.Disabled) or T.Off)
+  controls:PaintEdge(self.edge, false)
+  controls:Paint(self.hover, T.Hover)
 end
 
 -- styleSquare draws the square style: the track, its on color and the hover fill the switch, an edge round it.
@@ -218,6 +244,12 @@ function toggleProto:Place(amount)
   local T = controls:Theme("Toggle")
   self.amount = amount
   local frame, knob = self.frame, self.knob
+  if self.check then
+    -- The mark, as strong as the box is on; tinted its own way while disabled.
+    local mark = (not frame:IsEnabled() and T.DisabledOn) or T.On
+    controls:Paint(self.on, mark, (mark.Alpha or 1) * amount)
+    return
+  end
   local inset = self.round and 0 or pixel:Snap(frame, T.KnobInset)
   local travel = frame:GetWidth() - 2 * inset - knob:GetWidth()
   knob:ClearAllPoints()

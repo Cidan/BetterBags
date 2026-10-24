@@ -289,3 +289,34 @@ load. UI addons rewrite the client's fonts later (GW2_UI at `PLAYER_LOGIN`), so 
 **Rule**: Record what each copy was taken from and check it once the game has started (`PLAYER_ENTERING_WORLD`):
 `NextStyle:CopiesStale`, `SonataNext:WatchClientFonts` (next-themes.md §4). A copy is how a theme follows another
 addon's fonts, its locale files and its player's settings, with no locale logic of its own.
+
+## A Part That Took a Color Takes Art Too, Through One Check
+**Problem**: BetterBags Next drew tabs, search boxes, section lines and other parts as colors or gradients only, so
+a theme matching another UI's art (Guild Wars 2) could not draw them (next-themes.md §14).
+
+**Rule**: A themed part accepts a fill that is either a color or a texture spec with a `Texture`/`Atlas`
+(`NextStyle:IsArt`). Draw art with `NextStyle:Paint`; draw a color its own way, after resetting what art left (the
+texture's coordinates, and a plain white texture under the color). Art for a panel is drawn for the backpack
+(inner side on the left) and mirrored on panels on the left of the screen, as ornaments are.
+
+## A Gradient and a Vertex Color Are the Same Four Corners
+**Problem**: The frame mock kept a gradient after `SetVertexColor`, so a test could not see a texture keeping an
+old gradient after switching to tinted art.
+
+**Rule**: In the client both write the texture's four corner colors, the last call winning
+(warcraft.wiki.gg Region:SetVertexColor; Blizzard's `MarchingAntsMixin` switches between them on one texture).
+The mock's `SetVertexColor` clears `_gradient`. When moving a texture from a gradient to art, `Paint` (which tints)
+is enough; from art to a gradient, set a white color texture first.
+
+## A Font String Keeps Its Width Through a Font Change
+**Problem**: In the client a font string anchored at one point takes its text's width when its text is set, and keeps
+it when its font changes afterwards; text wider than that is cut with "..." (or wraps). Seen twice: the classic
+settings window's entries (sonata.md 3c) and BetterBags Next's selected tab ("Backpa...": its font has a shadow).
+Blizzard documents the reset in `QuestLogTitleButton_Resize` ("HACK").
+
+**Rule**: After changing the font of single-anchored text that is not given a width, reset it as Blizzard does and
+size it explicitly: `SetWidth(0)`, `SetText(GetText())`, `SetWidth(math.ceil(GetStringWidth()) + 1)` (`fitNavText`
+in `forms/layouts/stacked.lua`, `railProto:placeContent` in `next/tabs.lua`). Text anchored at both ends takes its
+width from the anchors and does not need it. The specs' mock measures text the same in every font: a test makes the
+text measure wider in the new font to show the code re-measures.
+

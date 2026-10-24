@@ -63,6 +63,32 @@ describe("BetterBags Next's shipped themes", function()
     end
   end)
 
+  -- Themes merge with Default key by key (next-themes.md §2), so art a theme draws over one of Default's colored
+  -- fills took that fill's Alpha. Reported in game: Guild Wars 2's cream Done and Delete buttons drew at 14% and 10%
+  -- (Default's Primary and Danger fills), dark and unreadable. Art a theme sets resolves with the alpha it set.
+  it("draws the art each theme sets at the alpha it sets, never one inherited from Default", function()
+    local found = {}
+    local function walk(raw, resolved, path)
+      for k, v in pairs(raw) do
+        local r = type(resolved) == "table" and resolved[k] or nil
+        if type(v) == "table" and type(r) == "table" then
+          if (v.Texture ~= nil or v.Atlas ~= nil) and r.Alpha ~= v.Alpha then
+            table.insert(found, path .. "." .. tostring(k) .. " " .. tostring(r.Alpha))
+          end
+          walk(v, r, path .. "." .. tostring(k))
+        end
+      end
+    end
+    for client, flags in pairs(CLIENTS) do
+      for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+      for _, key in ipairs(shipped()) do
+        walk(sonataNext.themes[key], sonataNext:Resolve(key), key .. " on " .. client)
+      end
+    end
+    table.sort(found)
+    assert.are.same({}, found)
+  end)
+
   -- Every header button's glyph (next-themes.md §3, tools/textures/next_icons.py): one per key, each
   -- its own file, shipped with BetterBags as a 64 x 64 PNG with an alpha channel (the shape is in the
   -- alpha, white, so the theme tints it).
@@ -148,6 +174,10 @@ describe("BetterBags Next's shipped themes", function()
       return out
     end
 
+    local function art(t, spec)
+      return t.Textures[spec.Texture] or spec.Texture
+    end
+
     it("draws from GW2_UI's own files, every one there in GW2_UI", function()
       local t = sonataNext:Resolve("GW2")
       assert.are.same({ "GW2_UI" }, sonataNext.themes.GW2.Requires)
@@ -160,27 +190,110 @@ describe("BetterBags Next's shipped themes", function()
         assert.is_not_nil(f, file .. " (install-deps.sh clones GW2_UI)")
         f:close()
       end
-      assert.is_true(count >= 15, "its art is GW2_UI's: " .. count)
+      assert.is_true(count >= 30, "its art is GW2_UI's: " .. count)
     end)
 
-    it("puts its header buttons down GW2's side panel, its emblems on their panels, its bands across the top and bottom", function()
+    -- Asked: "this is how betterbags original looks like (non-next), we need to use those icons, that bag frame
+    -- style, that icon ... X button should still be top right" (sonata/themes/gw2.lua, docs/next-gw2-theme.md).
+    it("is the original's frame: the world map painting, the header band, the footer band, the emblem, no feather", function()
       local t = sonataNext:Resolve("GW2")
-      local rail = t.Header.Buttons.Rail
-      assert.are.equal(40, rail.Width, "GW2_UI's side panel is 40 wide")
-      assert.are.equal(GW .. "bag\\bagleftpanel.png", t.Textures[rail.Fill.Texture])
+      assert.are.equal(GW .. "character\\worldmap-background.png", art(t, t.Panel.Fill))
+      -- Reported in game: a thin white line between the side panel and the bag. The side panel art's last column (31
+      -- of 32, the one against the window) is white at 55%, every other one black; the painting's last 17 columns
+      -- (from 1007 of 1024) fade out, which shows the world through on the bank's side panel side (measured). Both
+      -- are cropped to what is solid.
+      assert.are.same({ 0, 1007 / 1024, 0, 1 }, t.Panel.Fill.TexCoords)
+      assert.are.same({ 0, 31 / 32, 0, 481 / 512 }, t.Header.Buttons.Rail.Fill.TexCoords)
+      assert.is_nil(t.Panel.Feather, "asked: no feather while docked (false removes the inherited one)")
       local byTexture = {}
-      for _, o in ipairs(t.Panel.Ornaments) do byTexture[t.Textures[o.Texture]] = o end
-      local bag = byTexture[GW .. "bag\\bagicon.png"]
-      assert.are.same({ "Backpack", "Bank", "GuildBank" }, bag.Panels, "GW2_UI's bag, bank and guild bank emblem")
-      assert.are.same({ "Vendor" }, byTexture[GW .. "character\\macro-window-icon.png"].Panels, "its merchant's")
-      assert.are.equal("TOP", byTexture[GW .. "bag\\bagheader.png"].Point)
-      assert.are.equal(rail.Width, byTexture[GW .. "bag\\bagheader.png"].Start, "the header starts past the side panel")
-      assert.are.equal("TOPOUTER", byTexture[GW .. "bag\\bagheader-right.png"].Point)
+      for _, o in ipairs(t.Panel.Ornaments) do byTexture[art(t, o)] = o end
+      local band = byTexture[GW .. "bag\\bagheader.png"]
+      assert.are.equal("TOP", band.Point, "across the top")
+      assert.are.same({ 0, 1, 19 / 64, 1 }, band.TexCoords, "its painted rows (measured)")
+      local finish = byTexture[GW .. "bag\\bagheader-right.png"]
+      assert.are.equal("TOPOUTER", finish.Point)
+      assert.are.same({ 196 / 512, 1, 19 / 64, 1 }, finish.TexCoords)
       local footer = byTexture[GW .. "bag\\bagfooter.png"]
-      assert.are.equal("BOTTOM", footer.Point)
-      assert.are.same({ 0, 1, 0, 34 / 64 }, footer.TexCoords, "the band is the file's top 34 rows")
-      assert.are.equal("BOTTOMOUTER", byTexture[GW .. "bag\\bottom-right.png"].Point)
-      assert.are.equal(GW .. "bag\\bagbg.png", t.Textures[t.Panel.Fill.Texture], "GW2_UI's bag painting")
+      assert.are.same({ "BOTTOM", { 0, 1, 0, 34 / 64 } }, { footer.Point, footer.TexCoords })
+      local emblem = byTexture[GW .. "bag\\bagicon.png"]
+      assert.are.same({ 84, 84, "TOPINNER" }, { emblem.Width, emblem.Height, emblem.Point }, "the original's 84 at the top inner corner")
+      -- Asked: the emblem, the header band and the painting as GW2_UI's character window has them
+      -- (GwCharacterWindowTemplate, Character/windowBase.xml): the band above the window's top (the painting starts
+      -- there, so the band is drawn over what is behind the window), starting over the side panel (40 out); the
+      -- emblem's bottom right corner 18 in and 22 below the window's top, so it straddles the side panel; the title 31
+      -- in, its middle 18 above the window's top; the side panel from the window's top; the close 10 in, 10 to 30
+      -- above the window's top.
+      local top = band.Y + band.Height
+      assert.are.equal(-40, band.Start, "over the side panel")
+      assert.are.same({ 18 - 84, top + 22 - 84 }, { emblem.X, emblem.Y or 0 }, "its corner 18 in, 22 down")
+      assert.are.equal(top, t.Panel.Fill.Top, "the painting from the window's top")
+      assert.are.equal(top, t.Header.Buttons.Rail.Start)
+      assert.are.equal(31, t.Layout.Pad + t.Layout.TitleInset)
+      assert.are.equal(top - 18, t.Layout.TitleTop + t.Fonts.Title.Size / 2)
+      local close = t.Header.Buttons.Pinned.closeButton
+      assert.are.equal(top - 20, -close.Y + t.Layout.HeaderButton / 2, "the close's middle 20 above the top")
+      assert.are.equal(-20, close.X - t.Layout.HeaderButton / 2, "and 20 in")
+      assert.is_true(t.Header.Buttons.Rail.Top >= (emblem.Y or 0) + emblem.Height, "the side buttons below the emblem")
+      assert.is_true(t.Layout.SearchTop >= top, "the search bar below the band")
+      assert.is_nil(t.Panel.Edge, "no border round the see-through header")
+      assert.are.same({ "Backpack", "Bank", "GuildBank" }, emblem.Panels)
+      assert.are.same({ "Vendor" }, byTexture[GW .. "character\\macro-window-icon.png"].Panels, "GW2_UI's merchant's")
+      assert.is_nil(t.Footer.Line, "the band is the footer's line")
+    end)
+
+    it("puts the actions down GW2's side panel outside the window, in the original's icons, the X at the top right", function()
+      local t = sonataNext:Resolve("GW2")
+      local B = t.Header.Buttons
+      assert.are.same({ 40, true }, { B.Rail.Width, B.Rail.Outside }, "GW2_UI's side panel stands beside its windows")
+      assert.are.equal(GW .. "bag\\bagleftpanel.png", art(t, B.Rail.Fill))
+      assert.are.equal(32, t.Layout.HeaderButton, "the original's actions are 32")
+      assert.are.equal(5, B.Rail.Gap, "and 5 apart")
+      assert.are.equal("TOPOUTER", B.Pinned.closeButton.Point, "top right on the backpack")
+      -- Asked: the size button beside the X, out of the side panel.
+      local close, size = B.Pinned.closeButton, B.Pinned.sizeButton
+      assert.are.same({ "TOPOUTER", close.Y }, { size.Point, size.Y })
+      assert.are.equal(close.X - t.Layout.HeaderButton, size.X, "its left, side by side")
+      local icons = B.Icons
+      assert.are.equal(GW .. "uistuff\\window-close-button-normal.png", art(t, icons.closeButton))
+      assert.are.equal(GW .. "uistuff\\window-close-button-hover.png", art(t, icons.closeButton.Highlight))
+      -- The original's actions: Show Bags, Sort, Settings (sonata/themes/gw2.lua).
+      assert.are.equal(GW .. "icons\\bagmicrobutton-up.png", art(t, icons.bagsButton))
+      assert.are.equal(GW .. "icons\\bagmicrobutton-down.png", art(t, icons.bagsButton.Highlight))
+      -- Asked: one highlight for every button, as Show Blizzard Bags has: art over the icon (GW2_UI's -down art, or
+      -- its own icon again as its micro menu draws it), no tint.
+      for key, icon in pairs(icons) do
+        if icon.Glyph == false then
+          assert.is_not_nil(icon.Highlight, key .. " has a highlight")
+        end
+      end
+      assert.are.equal("White", B.ArtHoverColor)
+      assert.are.equal(GW .. "icons\\microicons\\collectionsmicrobutton-up.png", art(t, icons.sortButton))
+      assert.are.equal(GW .. "icons\\microicons\\questlogmicrobutton-up.png", art(t, icons.settingsButton))
+      -- Asked: GW2_UI's size art (its only, 32 x 32) drew blurry; BetterBags' own glyphs instead, an underscore and a
+      -- box, in the theme's glyph color.
+      local BB = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\"
+      assert.are.same({ BB .. "minimize.png", true }, { art(t, icons.sizeButtonFull), icons.sizeButtonFull.Glyph ~= false })
+      assert.are.same({ BB .. "maximize.png", true }, { art(t, icons.sizeButtonSmall), icons.sizeButtonSmall.Glyph ~= false })
+      for _, name in ipairs({ "minimize", "maximize" }) do
+        local f = io.open("textures/next/icons/" .. name .. ".png", "rb")
+        assert.is_not_nil(f, name .. " (tools/textures/next_icons.py)")
+        local data = f:read("*a")
+        f:close()
+        local function u32(i)
+          local a, b, c, d = data:byte(i, i + 3)
+          return ((a * 256 + b) * 256 + c) * 256 + d
+        end
+        assert.are.same({ 64, 64, 8, 6 }, { u32(17), u32(21), data:byte(25), data:byte(26) }, name .. ": 64 x 64 RGBA")
+      end
+      -- And GW2_UI's own where it has one (Inventory/bank.xml: the character and Warbank tab icons).
+      assert.are.same({ 0, 0.5, 0.5, 1 }, icons.bankTabsButton.TexCoords)
+      assert.are.same({ 0.5, 1, 0, 0.5 }, icons.depositButton.TexCoords)
+      assert.are.equal(GW .. "icons\\repair.png", art(t, icons.repairAllButton))
+      for key, icon in pairs(icons) do
+        if gw2Files(icon, {})[art(t, icon)] then
+          assert.is_false(icon.Glyph, key .. " is art")
+        end
+      end
     end)
 
     it("draws every text role in GW2_UI's fonts: its normal family, or its header family for titles", function()
@@ -214,6 +327,49 @@ describe("BetterBags Next's shipped themes", function()
       assert.is_false(t.Chain.Braid)
     end)
 
+    -- Asked: "when i say theme for gw2, i also mean tabs, i mean everything ... art of buttons, art of toggles".
+    it("draws its tabs, search box and sections in GW2_UI's art", function()
+      local t = sonataNext:Resolve("GW2")
+      assert.are.equal(GW .. "uistuff\\tab-tex-right-left.png", art(t, t.Tabs.Fill))
+      -- GW2_UI's left tab (flipped, for tabs out to the left), its solid columns (0 to 48 of 64, at least 56% opaque:
+      -- its outer 40% fades to nothing, under a name) and 64 of its 1,024 rows (squeezed whole into a tab, its ragged
+      -- edge streaked). Asked: "the art on the left tabs makes the text tough to read".
+      assert.are.same({ 48 / 64, 0, 0, 64 / 1024 }, t.Tabs.Fill.TexCoords)
+      assert.are.same(t.Tabs.Fill.TexCoords, t.Tabs.SelectedFill.TexCoords)
+      assert.are.equal(GW .. "uistuff\\tab-tex-right-left.png", art(t, t.Tabs.SelectedFill))
+      assert.are.equal(GW .. "bag\\bagsearchbg.png", art(t, t.Search.Fill))
+      assert.are.equal(GW .. "bag\\bagsearchbg.png", art(t, t.Search.FocusFill))
+      assert.is_nil(t.Search.Edge, "GW2_UI's search bar has no border")
+      assert.are.equal(GW .. "bag\\bag-sep.png", art(t, t.Sections.Header), "GwBagHeaderTemplate's row")
+      assert.are.equal(GW .. "character\\menu-hover.png", art(t, t.Sections.Highlight))
+    end)
+
+    it("draws every control in GW2_UI's art: buttons, check boxes, sliders, scroll bars, fields, dropdowns, menus", function()
+      local C = sonataNext:Resolve("GW2").Controls
+      local t = sonataNext:Resolve("GW2")
+      for _, kind in ipairs({ "Plain", "Primary" }) do
+        assert.are.equal(GW .. "uistuff\\button.png", art(t, C.Button[kind].Fill), kind)
+        assert.are.equal(GW .. "uistuff\\button_disable.png", art(t, C.Button[kind].DisabledFill), kind)
+      end
+      local ink = t.Palette[t.Fonts.Button.Color]
+      assert.is_true(ink[1] < 0.2 and ink[2] < 0.2 and ink[3] < 0.2, "dark text on GW2's cream buttons")
+      assert.are.equal("Check", C.Toggle.Style)
+      assert.are.equal(GW .. "uistuff\\checkbox.png", art(t, C.Toggle.Off))
+      assert.are.equal(GW .. "uistuff\\checkboxchecked.png", art(t, C.Toggle.On))
+      assert.are.equal(GW .. "uistuff\\checkbox-disabled.png", art(t, C.Toggle.Disabled))
+      assert.are.same({ 0.6, 0.6, 0.6, 1 }, t.Palette[C.Toggle.DisabledOn.Color], "SkinColors.Disabled")
+      assert.are.equal(GW .. "uistuff\\sliderbg.png", art(t, C.Slider.Track))
+      assert.are.equal(GW .. "uistuff\\sliderhandle.png", art(t, C.Slider.Thumb))
+      assert.are.equal(GW .. "uistuff\\scrollbg.png", art(t, C.ScrollBar.Track))
+      assert.are.equal(GW .. "uistuff\\scrollbarmiddle.png", art(t, C.ScrollBar.Thumb))
+      assert.are.equal(GW .. "uistuff\\statusbar.png", art(t, C.Input.Fill))
+      assert.are.equal(GW .. "uistuff\\ui-tooltip-background.png", art(t, C.Dropdown.Fill))
+      assert.are.equal(GW .. "uistuff\\arrowdown_down.png", art(t, C.Dropdown.Chevron))
+      assert.are.equal(GW .. "uistuff\\ui-tooltip-background.png", art(t, C.Menu.Fill))
+      assert.are.equal(GW .. "uistuff\\checkboxchecked.png", art(t, C.Menu.Check))
+      assert.are.equal(GW .. "uistuff\\ui-tooltip-background.png", art(t, C.Dialog.Card))
+    end)
+
     it("skins item buttons as GW2_UI does: cropped icons on its backdrop, its border in the quality's color", function()
       local b = sonataNext:Resolve("GW2").ItemButton
       assert.are.same({ 0.07, 0.93, 0.07, 0.93 }, b.Icon.TexCoords)
@@ -224,16 +380,19 @@ describe("BetterBags Next's shipped themes", function()
       assert.are.same({ { Point = "TOPRIGHT", X = 0, Y = -3 } }, b.Count.Points)
     end)
 
-    it("draws the settings window on GW2's window painting, its rows in GW2's list art, its primary buttons GW2's", function()
+    it("draws the settings window as GW2_UI's: its panel painting, menu backing, brand separator and divider", function()
       local t = sonataNext:Resolve("GW2")
-      assert.are.equal(GW .. "character\\windowbg.png", t.Textures[t.Settings.Fill.Texture])
-      assert.are.equal(GW .. "character\\menu-hover.png", t.Textures[t.Settings.Nav.HoverFill.Texture])
-      assert.are.equal(GW .. "character\\menu-hover.png", t.Textures[t.Settings.Nav.SelectedFill.Texture])
-      assert.are.equal(GW .. "uistuff\\button.png", t.Textures[t.Controls.Button.Primary.Fill.Texture])
-      local ink = t.Palette[t.Fonts.ButtonPrimary.Color]
-      assert.is_true(ink[1] < 0.2 and ink[2] < 0.2 and ink[3] < 0.2, "dark text on GW2's cream button")
-      assert.are.equal(GW .. "character\\windowbg.png", t.Textures[t.Controls.Dialog.Card.Texture])
-      assert.are.equal(GW .. "character\\windowbg.png", t.Textures[t.Dock.Card.Texture])
+      local S = t.Settings
+      assert.are.equal(GW .. "uistuff\\settingspanelbg.png", art(t, S.Fill))
+      assert.are.same({ 0, 1, 0, 754 / 1024 }, S.Fill.TexCoords, "its painted rows (measured)")
+      assert.are.equal(GW .. "uistuff\\236menubg.png", art(t, S.Sidebar.Fill))
+      assert.are.equal(GW .. "uistuff\\settingspanelsep.png", art(t, S.Sidebar.Line))
+      assert.are.equal(GW .. "hud\\levelreward-sep.png", art(t, S.Brand.Line))
+      assert.are.equal(GW .. "character\\menu-hover.png", art(t, S.Nav.HoverFill))
+      -- Asked: one close button, the bags'.
+      assert.are.equal(art(t, t.Header.Buttons.Icons.closeButton), t.Textures[S.Header.Close.Icon])
+      assert.are.equal(GW .. "uistuff\\window-close-button-hover.png", t.Textures[S.Header.Close.HoverIcon])
+      assert.are.equal(GW .. "character\\menu-hover.png", art(t, S.Nav.SelectedFill))
     end)
   end)
 

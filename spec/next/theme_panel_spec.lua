@@ -235,6 +235,43 @@ describe("BetterBags Next's panels and themes", function()
   local function rgba(c) return { c.r, c.g, c.b, c.a } end
 
   describe("the body", function()
+    -- Reported in game, opening the bank with Guild Wars 2 applied: "next/panel.lua:2075: attempt to index upvalue
+    -- 'from' (a nil value)" in SetWash, from bank.lua useBankType. A panel made under a theme without a wash
+    -- (Guild Wars 2, Parchment, Quiet) never painted one, so it had no wash color to fade from.
+    it("changes its wash under a theme without one, and shows it in that color once a theme has one", function()
+      apply({ Panel = { Wash = false } })
+      local bank = nextBank:Create(ctx())
+      bank:Show(ctx())
+      bank:SetWash("Warbank")
+      finishTweens()
+      assert.is_false(bank.wash:IsShown())
+      backToDefault()
+      assert.is_true(bank.wash:IsShown())
+      local r, g, b, a = style:RGBA(style.Theme.Panel.Washes.Warbank)
+      assert.are.same({ r, g, b, a }, bank.washColor, "the Warbank's, which it showed meanwhile")
+      bank:SetWash("Default")
+      finishTweens()
+      assert.are.same({ style:RGBA(style.Theme.Panel.Washes.Default) }, bank.washColor)
+    end)
+
+    -- GW2_UI's windows start their painting below their header (CreateFrameHeaderWithBody), so the header art is
+    -- drawn over whatever is behind the window. Asked: "the top window border ... should be somewhat transparent".
+    it("starts its fill Fill.Top below the body's top, docked or not, on both sides, and at the top after", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Panel = { Fill = { Color = "Body", Top = 74 } } })
+      local _, _, _, _, y = bag.fill:GetPoint(1)
+      assert.are.equal(-74, y)
+      _, _, _, _, y = bank.fill:GetPoint(1)
+      assert.are.equal(-74, y)
+      bank:SetDocked(true)
+      _, _, _, _, y = bank.fill:GetPoint(1)
+      assert.are.equal(-74, y, "docked")
+      bank:SetDocked(false)
+      backToDefault()
+      _, _, _, _, y = bag.fill:GetPoint(1)
+      assert.are.equal(0, y)
+    end)
+
     it("restyles every panel when a theme is applied", function()
       local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
       apply({ Palette = { Body = { 0.2, 0.1, 0.05, 0.9 } } })
@@ -647,6 +684,42 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.same({ 22, 22 }, iconSize(bank.closeButton))
     end)
 
+    -- GW2_UI highlights its buttons by drawing art over their icon while hovered (a button's highlight texture: its
+    -- bag's `-down` art, its micro menu's own icon again, Micromenu/micromenu.lua). Asked: one highlight for every
+    -- side button, as the Show Blizzard Bags one does.
+    it("draws an icon's highlight over it under the pointer, in its blend mode, never while disabled", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Header = { Buttons = { Icons = {
+        closeButton = { Texture = "Interface\\Spec\\close.png", Glyph = false,
+          Highlight = { Texture = "Interface\\Spec\\close-hover.png" } },
+        sortButton = { Atlas = "spec-sort", Highlight = { Atlas = "spec-sort", BlendMode = "ADD" } },
+      } } } })
+      local close, sort = bag.closeButton, bag.sortButton
+      assert.are.equal("Interface\\Spec\\close.png", close.icon:GetTexture())
+      assert.is_false(close.highlight:IsShown())
+      close:GetScript("OnEnter")(close)
+      assert.are.equal("Interface\\Spec\\close.png", close.icon:GetTexture(), "the icon stays")
+      assert.is_true(close.highlight:IsShown())
+      assert.are.equal("Interface\\Spec\\close-hover.png", close.highlight:GetTexture())
+      assert.are.equal("BLEND", close.highlight:GetBlendMode())
+      assert.are.same({ close.icon:GetPoint(1) }, { close.highlight:GetPoint(1) }, "over it")
+      assert.are.same({ close.icon:GetSize() }, { close.highlight:GetSize() })
+      close:GetScript("OnLeave")(close)
+      assert.is_false(close.highlight:IsShown())
+      sort:GetScript("OnEnter")(sort)
+      assert.are.equal("spec-sort", sort.highlight:GetAtlas())
+      assert.are.equal("ADD", sort.highlight:GetBlendMode())
+      sort:GetScript("OnLeave")(sort)
+      bag:SetHeaderButtonEnabled(close, false)
+      close:GetScript("OnEnter")(close)
+      assert.is_false(close.highlight:IsShown(), "disabled")
+      close:GetScript("OnLeave")(close)
+      backToDefault()
+      close:GetScript("OnEnter")(close)
+      assert.is_false(close.highlight:IsShown(), "a theme without one")
+      close:GetScript("OnLeave")(close)
+    end)
+
     it("names the button whose icon the theme does not give", function()
       local bag = nextBag:Create(ctx())
       assert.has_error(function() bag:SetHeaderIcon(bag.sortButton, "nopeButton") end,
@@ -780,6 +853,102 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal(bank:BodyLeft() + bank:BodyWidth(), starts(bank))
     end)
 
+    -- GW2_UI's side panel stands beside its windows, outside them (docs/next-gw2-theme.md, round two).
+    describe("outside the body (Outside)", function()
+      local OUTSIDE = { Width = 40, Top = 64, Gap = 6, Outside = true, Fill = RAIL.Fill }
+
+      it("stands the strip beside the body's inner edge, the body and its content keeping their room", function()
+        local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+        local width = style.BODY_WIDTH
+        apply({ Header = { Buttons = { Rail = OUTSIDE } } })
+        assert.are.equal(width, style.BODY_WIDTH)
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPLEFT", 0, 0 }, { bag.rail:GetPoint(1) })
+        assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMLEFT", 0, 0 }, { bag.rail:GetPoint(2) })
+        assert.are.same({ "TOPLEFT", bank.body, "TOPRIGHT", 0, 0 }, { bank.rail:GetPoint(1) })
+        assert.are.same({ "BOTTOMLEFT", bank.body, "BOTTOMRIGHT", 0, 0 }, { bank.rail:GetPoint(2) })
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD, -style.CONTENT_TOP }, { bag.scroll.frame:GetPoint(1) })
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + style.TITLE_INSET, -style.TITLE_TOP }, { bag.title:GetPoint(1) })
+        local step = style.HEADER_BUTTON + 6
+        for i, button in ipairs(shown(bag)) do
+          assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", -(40 - 9), -(64 + (i - 1) * step) }, { button:GetPoint(1) }, button.key)
+        end
+        for i, button in ipairs(shown(bank)) do
+          assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", 40 - 9, -(64 + (i - 1) * step) }, { button:GetPoint(1) }, button.key)
+        end
+      end)
+
+      -- GW2_UI's side panel runs from its window's top line (GwWindowLeftPanel), the middle of its header.
+      it("starts the strip's art Start below the body's top", function()
+        local bag = nextBag:Create(ctx())
+        apply({ Header = { Buttons = { Rail = { Width = 40, Top = 64, Outside = true, Start = 42, Fill = RAIL.Fill } } } })
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPLEFT", 0, -42 }, { bag.rail:GetPoint(1) })
+        assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMLEFT", 0, 0 }, { bag.rail:GetPoint(2) })
+      end)
+
+      it("hangs the tabs past the strip, and spaces a chained pair for both strips", function()
+        local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+        -- A narrow feather and no small minimum, so the tab rails (not the feathers) set the gaps.
+        apply({ Layout = { Feather = 10 }, Small = { MinGap = 0 } })
+        local gap, small = chain:Gap(bag, bank), chain:SmallGap(bag, bank)
+        apply({ Layout = { Feather = 10 }, Small = { MinGap = 0 }, Header = { Buttons = { Rail = OUTSIDE } } })
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPLEFT", -40, -style.CONTENT_TOP }, { bag.tabs.frame:GetPoint(1) })
+        assert.are.same({ "TOPLEFT", bank.body, "TOPRIGHT", 40, -style.CONTENT_TOP }, { bank.tabs.frame:GetPoint(1) })
+        assert.are.equal(gap + 80, chain:Gap(bag, bank))
+        assert.are.equal(small + 80, chain:SmallGap(bag, bank))
+        backToDefault()
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPLEFT", 0, -style.CONTENT_TOP }, { bag.tabs.frame:GetPoint(1) })
+      end)
+    end)
+
+    -- Asked: "X button should still be top right" (docs/next-gw2-theme.md, round two).
+    describe("pinned buttons (Pinned)", function()
+      local PINNED = { closeButton = { Point = "TOPRIGHT", X = -5, Y = -4 } }
+
+      it("puts a pinned button at its corner of the body on every panel, by WoW offsets, apart from the rail", function()
+        local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+        apply({ Header = { Buttons = { Rail = RAIL, Pinned = PINNED } } })
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -5, -4 }, { bag.closeButton:GetPoint(1) })
+        assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -5, -4 }, { bank.closeButton:GetPoint(1) })
+        local first = shown(bag)[1] == bag.closeButton and shown(bag)[2] or shown(bag)[1]
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 9, -64 }, { first:GetPoint(1) }, "the rail starts past it")
+        local step = style.HEADER_BUTTON + 6
+        local y = 64
+        for _, button in ipairs(shown(bank)) do
+          if button ~= bank.closeButton then
+            assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -9, -y }, { button:GetPoint(1) }, button.key)
+            y = y + step
+          end
+        end
+      end)
+
+      -- A corner named by its side (as ornaments name theirs, next-themes.md §12): drawn for the backpack, whose inner
+      -- side is on the left, mirrored on the panels whose inner side is on the right.
+      it("pins a button to its top outer corner, top right on the backpack and top left mirrored", function()
+        local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+        apply({ Header = { Buttons = { Rail = RAIL, Pinned = { closeButton = { Point = "TOPOUTER", X = -6, Y = -6 } } } } })
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -6, -6 }, { bag.closeButton:GetPoint(1) })
+        assert.are.same({ "TOPLEFT", bank.body, "TOPLEFT", 6, -6 }, { bank.closeButton:GetPoint(1) })
+        apply({ Header = { Buttons = { Pinned = { closeButton = { Point = "BOTTOMINNER", X = 3, Y = 4 } } } } })
+        assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", 3, 4 }, { bag.closeButton:GetPoint(1) })
+        assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -3, 4 }, { bank.closeButton:GetPoint(1) })
+      end)
+
+      it("pins a button out of the header row too, and the row closes up without it", function()
+        local bag = nextBag:Create(ctx())
+        apply({ Header = { Buttons = { Pinned = PINNED } } })
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -5, -4 }, { bag.closeButton:GetPoint(1) })
+        local rest = {}
+        for _, button in ipairs(shown(bag)) do
+          if button ~= bag.closeButton then table.insert(rest, button) end
+        end
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -style.HEADER_BUTTON_TOP }, { rest[1]:GetPoint(1) })
+        assert.are.same({ "TOPRIGHT", rest[1], "TOPLEFT", -style.HEADER_BUTTON_GAP, 0 }, { rest[2]:GetPoint(1) })
+        -- The row is as wide as its own buttons, the pinned one not among them.
+        local row = #rest * style.HEADER_BUTTON + (#rest - 1) * style.HEADER_BUTTON_GAP
+        assert.are.equal(row, bag:headerButtonsWidth())
+      end)
+    end)
+
     it("shows a button's tooltip away from the panel, beside the strip", function()
       local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
       apply({ Header = { Buttons = { Rail = RAIL } } })
@@ -812,6 +981,22 @@ describe("BetterBags Next's panels and themes", function()
 
     -- Blizzard's search template gives its help text a color of its own (InputBoxInstructionsTemplate's
     -- XML <Color>, 0.35 gray), so the help's role color is set on it too, with every theme.
+    -- GW2_UI's search bar art (bag\\bagsearchbg.png).
+    it("fills the box with art when its fills are art, focused too, and with a color after", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Search = { Fill = { Texture = "Interface\\Spec\\search.png", Color = "White" },
+        FocusFill = { Texture = "Interface\\Spec\\search-focus.png", Color = "White" } } })
+      assert.are.equal("Interface\\Spec\\search.png", bag.searchFill:GetTexture())
+      bag.searchBox.textBox:SetFocus()
+      bag:UpdateSearchLook(true)
+      assert.are.equal("Interface\\Spec\\search-focus.png", bag.searchFill:GetTexture())
+      bag.searchBox.textBox:ClearFocus()
+      backToDefault()
+      bag:UpdateSearchLook(true)
+      assert.is_nil(bag.searchFill:GetTexture())
+      assert.are.same(style.Color.SearchFill, { bag.searchFill:GetVertexColor() })
+    end)
+
     it("writes what is typed and its help in its roles' colors, the help's over the template's", function()
       local bag = nextBag:Create(ctx())
       local t = bag.searchBox.textBox
@@ -858,6 +1043,21 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal(style:Font("Small"), bag.emptyText:GetFontObject())
       apply({ Footer = { Line = false } })
       assert.is_false(bag.footerLine:IsShown())
+    end)
+
+    it("draws its line in art when it names some, mirrored on the panels on the right, and a color after", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Footer = { Line = { Texture = "Interface\\Spec\\sep.png", TexCoords = { 0, 1, 0, 0.5 }, Size = 3 } } })
+      assert.are.equal("Interface\\Spec\\sep.png", bag.footerLine:GetTexture())
+      assert.is_nil(bag.footerLine._gradient)
+      assert.are.equal(3, bag.footerLine:GetHeight())
+      local ulx, uly, _, lly, urx = bag.footerLine:GetTexCoord()
+      assert.are.same({ 0, 1, 0, 0.5 }, { ulx, urx, uly, lly })
+      ulx, uly, _, lly, urx = bank.footerLine:GetTexCoord()
+      assert.are.same({ 1, 0, 0, 0.5 }, { ulx, urx, uly, lly })
+      backToDefault()
+      assert.is_nil(bag.footerLine:GetTexture())
+      assert.is_not_nil(bag.footerLine._gradient)
     end)
 
     it("lays its content out between its header and footer, by its layout", function()

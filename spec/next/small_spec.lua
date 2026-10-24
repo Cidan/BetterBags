@@ -847,6 +847,43 @@ describe("BetterBags Next's small mode", function()
           assert.are.equal(600 + column(bag) + style.PAD, bag:MinHeight(), "a strip whose buttons start low")
         end)
 
+        -- A button pinned to a corner (Pinned) keeps its room in the title's row.
+        it("keeps the title clear of a pinned button", function()
+          UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 64 },
+            Pinned = { closeButton = { Point = "TOPRIGHT", X = -5, Y = -4 } } } } })
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          resize(bank, "LEFT", bank:MinWidth(), 500)
+          local pinned = style.HEADER_BUTTON + 5
+          assert.are.equal(bank:MinWidth() - 40 - (style.PAD + style.TITLE_INSET) - style.PAD - pinned - 12, bank.title:GetWidth())
+          local header = 2 * style.PAD + 40 + style.TITLE_INSET + pinned + 12 + style.Small.MinTitle
+          assert.is_true(bank:MinWidth() >= math.ceil(header))
+        end)
+
+        -- Asked: the size button beside the X at the top right. Two pins along the top keep the title clear of the
+        -- farther one, not of both added up; a pin at a bottom corner takes no room from it.
+        it("keeps the title clear of its farthest pin along the top", function()
+          UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 64 }, Pinned = {
+            closeButton = { Point = "TOPRIGHT", X = -4, Y = -4 },
+            sizeButton = { Point = "TOPRIGHT", X = -40, Y = -4 },
+            settingsButton = { Point = "BOTTOMRIGHT", X = -100, Y = 4 } } } } })
+          -- The backpack: it has a size button (the bank has none).
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          assert.is_true(bag.sizeButton:IsShown())
+          resize(bag, "RIGHT", 500, 500)
+          local room = 40 + style.HEADER_BUTTON
+          assert.are.equal(bag:BodyWidth() - 40 - (style.PAD + style.TITLE_INSET) - style.PAD - room - 12, bag.title:GetWidth())
+        end)
+
+        -- A strip outside the body (Outside) is kept on the screen with it.
+        it("keeps a strip outside its body on the screen", function()
+          UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 64, Outside = true } } } })
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          assert.are.equal(40, select(1, bag:clampPlace(0, 500)), "the backpack's strip is on its left")
+          local right = UIParent:GetWidth() - bank:SmallWidth() * bank:Scale()
+          assert.are.equal(right - 40, select(1, bank:clampPlace(right, 500)), "the bank's on its right")
+        end)
+
         it("leaves its title the whole header row, past the strip", function()
           railed()
           local bank = opened(function(c) return nextBank:Create(c) end)
@@ -977,6 +1014,30 @@ describe("BetterBags Next's small mode", function()
         nextPanel:SetSize(ctx(), "small")
         finishTweens()
         assert.are.same({ 640, 500 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+      end)
+
+      -- Reported in game, with Guild Wars 2: a white border round the bag on a switch either way. A size switch showed
+      -- the border's four lines whatever the theme, and a theme without a border never colors them, so they showed as
+      -- created, white.
+      it("shows no border on a switch either way under a theme without one, part way or after", function()
+        UseNextTheme({ Panel = { Edge = false } })
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local seen = {}
+        for _, size in ipairs({ "full", "small" }) do
+          nextPanel:SetSize(ctx(), size)
+          local function look(when)
+            for _, edge in ipairs(bag.edges) do
+              if edge:IsShown() then table.insert(seen, size .. " " .. when) return end
+            end
+          end
+          look("as it starts")
+          step(style.Time.Morph / 2)
+          look("part way")
+          finishTweens()
+          look("after")
+        end
+        UseNextTheme(nil)
+        assert.are.same({}, seen)
       end)
 
       it("glides its width as it switches to and from a small size of its own", function()

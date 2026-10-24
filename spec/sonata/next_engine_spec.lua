@@ -433,6 +433,7 @@ describe("SonataNext", function()
         Motion = { Ease = { Open = "wobbly" } },
         Fonts = { Title = { Color = "AlsoNope" } },
         Dock = { DestroyColor = "Blood", BuyColor = "Moss" },
+        Settings = { Header = { Close = { HoverIcon = "NoHover" } } },
       })
       local problems = sonataNext:Check("Broken")
       table.sort(problems)
@@ -445,6 +446,7 @@ describe("SonataNext", function()
         "Motion.Ease.Open: no ease named wobbly",
         "Panel.Fill.Color: no color named Nope",
         "Sections.TitleFont: no font named Missing",
+        "Settings.Header.Close.HoverIcon: no texture named NoHover",
         "Sparkles.Colors.2: no color named Ghost",
       }, problems)
     end)
@@ -502,6 +504,14 @@ describe("SonataNext", function()
     }, problems)
     sonataNext:RegisterTheme({ Name = "GoodRail", Header = { Buttons = { Rail = { Width = 40, Top = 60 } } } })
     assert.are.same({}, sonataNext:Check("GoodRail"))
+    sonataNext:RegisterTheme({ Name = "BadToggle", Controls = { Toggle = { Style = "Checkbox" } } })
+    assert.are.same({ "Controls.Toggle.Style: no style named Checkbox" }, sonataNext:Check("BadToggle"))
+    sonataNext:RegisterTheme({ Name = "GoodCheck", Controls = { Toggle = { Style = "Check" } } })
+    assert.are.same({}, sonataNext:Check("GoodCheck"))
+    sonataNext:RegisterTheme({ Name = "BadPin", Header = { Buttons = { Pinned = { closeButton = { Point = "MIDDLE" } } } } })
+    assert.are.same({ "Header.Buttons.Pinned.closeButton.Point: no corner named MIDDLE" }, sonataNext:Check("BadPin"))
+    sonataNext:RegisterTheme({ Name = "SidePin", Header = { Buttons = { Pinned = { closeButton = { Point = "TOPOUTER" } } } } })
+    assert.are.same({}, sonataNext:Check("SidePin"))
   end)
 
   -- GW2_UI rewrites the client's fonts at PLAYER_LOGIN (docs/next-gw2-theme.md), after BetterBags copied some of

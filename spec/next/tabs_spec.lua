@@ -355,6 +355,66 @@ describe("NextTabs", function()
       assert.are.equal(1, rail.tabs[1].bg._gradient.max.a)
     end)
 
+    -- GW2_UI's side tab art (docs/next-gw2-theme.md, round two): drawn for the backpack's tabs, sticking out to the
+    -- left, mirrored on the other panels; no fade, which is for colors.
+    it("fills its tabs with art when its fills are art, mirrored on the left of the screen, and colors after", function()
+      local ART = "Interface\\Spec\\tab.png"
+      rail:SetTabs(groups)
+      rail:Select(1)
+      restyle({ Palette = { Lit = { 1, 0.9, 0.8, 1 } }, Tabs = {
+        Fill = { Texture = ART, TexCoords = { 0.86, 0, 0, 0.06 }, Color = "White" },
+        SelectedFill = { Texture = ART, TexCoords = { 0.86, 0, 0, 0.06 }, Color = "Lit" } } })
+      local bg = rail.tabs[2].bg
+      assert.are.equal(ART, bg:GetTexture())
+      assert.is_nil(bg._gradient)
+      local ulx, uly, _, lly, urx = bg:GetTexCoord()
+      assert.are.same({ 0.86, 0, 0, 0.06 }, { ulx, urx, uly, lly })
+      assert.are.same({ 1, 0.9, 0.8, 1 }, { rail.tabs[1].bg:GetVertexColor() }, "the selected one in its own")
+      local left = nextTabs:Create(CreateFrame("Frame"), "LEFT")
+      left:SetTabs(groups)
+      left:Select(1)
+      ulx, uly, _, lly, urx = left.tabs[2].bg:GetTexCoord()
+      assert.are.same({ 0, 0.86, 0, 0.06 }, { ulx, urx, uly, lly }, "mirrored")
+      restyle({ Palette = { A = { 0.1, 0.2, 0.3, 0.8 } }, Tabs = { Fill = "A", Fade = 0.5 } })
+      assert.is_nil(bg:GetTexture(), "a color again")
+      assert.are.same({ 0.1, 0.2, 0.3, 0.8 }, { bg._gradient.max.r, bg._gradient.max.g, bg._gradient.max.b, bg._gradient.max.a })
+      ulx, uly, _, lly, urx = bg:GetTexCoord()
+      assert.are.same({ 0, 1, 0, 1 }, { ulx, urx, uly, lly })
+    end)
+
+    it("draws the bar in art when it names some, tinted by the tab's accent", function()
+      rail:SetTabs({ { id = 1, name = "Bank" } })
+      rail:Select(1)
+      restyle({ Palette = { Sky = { 0.3, 0.6, 1, 1 } }, Tabs = { Indicator = { Texture = "Interface\\Spec\\bar.png", Color = "Sky", Width = 4 } } })
+      rail:Select(1)
+      assert.are.equal("Interface\\Spec\\bar.png", rail.indicator:GetTexture())
+      assert.are.same({ 0.3, 0.6, 1, 1 }, { rail.indicator:GetVertexColor() })
+      restyle({ Tabs = { Indicator = { Color = "Gold", Width = 3 } } })
+      assert.is_nil(rail.indicator:GetTexture())
+    end)
+
+    -- Reported in game: a selected tab's name cut short ("Backpa..."). The client keeps the width a font string took
+    -- when its text was set through a later font change, and cuts text past it (Blizzard resets it by setting the
+    -- width to 0 and the text again: QuestLogTitleButton_Resize, "HACK"; measured on the classic settings window,
+    -- sonata.md 3c: 110.0 kept for a 110.8 string). Guild Wars 2's selected tab font has a shadow, wider by about that.
+    it("keeps a tab's name as wide as its text in the font it has now, selected or not", function()
+      restyle({ Fonts = { Wide = { Size = 12, Shadow = true } }, Tabs = { SelectedFont = "Wide" } })
+      rail:SetTabs(groups)
+      local wide = style:Font("Wide")
+      for _, tab in ipairs(rail.tabs) do
+        local base = tab.text.GetStringWidth
+        tab.text.GetStringWidth = function(self) return base(self) + (self:GetFontObject() == wide and 0.8 or 0) end
+      end
+      rail:Select(1)
+      for _, tab in ipairs(rail.tabs) do
+        local text = tab.text
+        assert.are.equal(math.ceil(text:GetStringWidth()) + 1, text:GetWidth(), text:GetText())
+      end
+      rail:Select(2)
+      local text = rail.tabs[1].text
+      assert.are.equal(math.ceil(text:GetStringWidth()) + 1, text:GetWidth(), "back in its idle font")
+    end)
+
     it("writes its tabs in its roles, moving them to its new fonts", function()
       rail:SetTabs(groups)
       rail:Select(2)
