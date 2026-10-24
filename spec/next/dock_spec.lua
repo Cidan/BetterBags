@@ -249,6 +249,17 @@ describe("NextDock", function()
       assert.are.equal(entry.scale, section("B").frame:GetScale(), "seated at the card's scale")
     end)
 
+    -- A section docked as it is bound (the vendor's Shopping List) has no place of its own on screen yet:
+    -- one it was left at (its column, the last visit) is stale. In the client an anchored frame has a
+    -- place on screen; the mock has one only when given (_SetRect).
+    it("seats a section at once when told to, wherever it was on screen", function()
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      local entry = nextDock:Add(target, { section = section("B"), source = source, offer = offer(), atOnce = true })
+      assert.is_nil(entry.flight)
+      assert.is_true(entry.seated)
+      assert.are.equal(entry.box.frame, section("B").frame:GetParent())
+    end)
+
     it("lays the column out again when its section's size changes", function()
       local entry = dock("B")
       settle()

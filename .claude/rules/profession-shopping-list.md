@@ -78,7 +78,14 @@ checkout; the packaged v12.1.5-01 it replaced is in `_retail_/Interface/AddOns-b
   (fixed, reported):** docked once the vendor had slid in (`next/PanelShown`, as sales are), the section
   showed in the vendor's list "for a split second then slides to the buy frame". Never as the vendor
   closes. Its card lays it out as the vendor's column would (the dock, §5): a column never lays out a
-  section held out of it. It reads "Buy N items?" (N: the different items),
+  section held out of it. It is seated **at once** (`atOnce`, §5), never flown in: **failure mode
+  (fixed, reported: "the items slide in from the background into the card"):** the vendor keeps its
+  sections while hidden (only switching Next off wipes it), closing puts the Shopping List back in its
+  column, anchored there (the panel's `OnHidden`, `PanelHidden`), and the next visit's draw reused that
+  section; docked with a place on screen, it flew from its old place in the list into the card. A first
+  open after a reload made a new section, with no place on screen, so it did not fly. Motion does not
+  move its buttons at an open: the canvas forgets its moves when it hides (its `OnHide`, `Settle`), so
+  a visit's first layout places everything at once. It reads "Buy N items?" (N: the different items),
   "Total: <price>" (`TotalOf`, written as the vendor's prices, `NextVendorButton:PriceText`), "Double-click
   to buy · Right-click to cancel", and glows in `Dock.BuyColor` (Default: `Emerald`).
   - **A double click** buys through PSL (`Buy`) and answers "moved": the section flies into the
@@ -109,6 +116,9 @@ checkout; the packaged v12.1.5-01 it replaced is in `_retail_/Interface/AddOns-b
   column gave it and is scaled down to fit, as before. **Failure mode (fixed, reported with a
   screenshot):** docked before its first layout, the Shopping List had no width yet, and the card laid it
   out at that width: a narrow, tall, empty green strip at the top of the vendor.
+- `NextDockSpec.atOnce`: the section is seated in its card at once, whatever place on screen it has (none
+  yet, or a stale one where its column left it). The vendor's Shopping List docks with it; a dragged or
+  offered section still flies in from where it is.
 - `NextDock:SendBackBorrowed(panel)`: sends back at once what waits in a panel that came from other panels,
   leaving the panel's own sections in their cards (the vendor's `OnMerchantClosed`; it used `PanelHidden`,
   which also sent the vendor's own Shopping List back into its column as it slid out).
@@ -125,27 +135,34 @@ checked before).
   calls asserted): absent, without either function, needs, buying, listening once and saying so once,
   a late load, nothing to wait for. `spec/next/merchant_spec.lua` ("what a shopping list buys here").
   `spec/next/vendorbutton_spec.lua` (quantity count and price, the tooltip line, reset).
-  `spec/next/dock_spec.lua` (flying into the destination; nowhere without one; sending back only what
+  `spec/next/dock_spec.lua` (seated at once when told, though it has a place on screen; flying into the
+  destination; nowhere without one; sending back only what
   came from other panels; a panel's own section laid out as its column lays out, rows per width, and
   again after a resize; another panel's keeping its own column's layout). `spec/next/vendor_spec.lua`
   ("the shopping list (Profession Shopping List)": nothing without PSL, the section out of the categories
   and its counts, in its card as the vendor opens and never placed in the column (`motion:Place`
-  recorded), its items laid out in the card as in the column, the card's text, total and color, buying
+  recorded), in its card again at the next visit though its section was left anchored in the column,
+  its items laid out in the card as in the column, the card's text, total and color, buying
   and flying into the backpack, nowhere with the backpack closed, nothing once closing or closed, sent
   back and once a visit, the other tabs, gone when not needed, offered straight into its card when the
   list changes, dimmed by a search, what cannot be bought, sliding out in its card, not offered as the
   vendor closes).
   `spec/sonata/next_engine_spec.lua`, `spec/sonata/next_themes_spec.lua` (the colors checked and set),
   `spec/core/init_spec.lua` (enabled).
-- Mutation-tested: 45 mutations, each failing at least one test (four first survived and led to sharper
+- Mutation-tested: 47 mutations, each failing at least one test (four first survived and led to sharper
   tests: the closing guard; docking before the layout, which the frame mock cannot tell from a flight
   because it gives anchored frames no screen position; the column's layout width, which only shows when a
   narrower column wraps more rows; another panel's section keeping its own width, which only shows with
   columns of different widths). Guards no test could reach were removed
   instead (the tab check, held or leaving sections, PSL disappearing mid-visit, a missing backpack).
 - **Seen in game** (the player): first, it worked but the section showed in the list before sliding into
-  its card; then, docked before the layout, the card was an empty strip (both fixed above). Not seen yet:
-  the card at open with its items, the close. To check: track a recipe whose reagents a vendor sells, open that vendor with Next on, double-
+  its card; then, docked before the layout, the card was an empty strip; then the card was in place but
+  its section flew in from the list at a later visit (all fixed above). Not seen yet: an open after the
+  last fix, the close.
+- **The frame mock and the client differ in two ways that hid these:** the mock gives a frame a place on
+  screen (`GetLeft`) only when a test sets one (`_SetRect`), where the client gives every anchored frame
+  one, so a dock flight decided from `lift:ScreenPoint` must be tested with a rect; and its `Hide` fires no
+  `OnHide`, so work done there (the panel's `PanelHidden`, the canvas's `Settle`) must be fired by hand. To check: track a recipe whose reagents a vendor sells, open that vendor with Next on, double-
   click the card, check the purchases and PSL's window, right-click instead, switch tabs while it waits,
   close the vendor with the card waiting.
 - **Not measured:** `GetShoppingList` recomputes PSL's quantities on every Buy draw (several per sale or

@@ -52,6 +52,7 @@ local nextDock = addon:NewModule('NextDock')
 ---@field source NextPanelFrame The panel whose column it leaves.
 ---@field offer NextDockOffer
 ---@field from? NextDragPoint Where its frame is on screen now (else read from it).
+---@field atOnce? boolean Seat it in its card at once, not flying in: a section docked as it is bound (the vendor's Shopping List), whose place on screen is none yet or a stale one (where its column left it).
 ---@field tab? NextTab A tab it came in by: it flies into it when it moves, and the tab pulses.
 
 ---@class NextDockEntry
@@ -278,7 +279,10 @@ function listProto:Add(spec)
   self:Invalidate()
   self:start()
   local frame = spec.section.frame
-  local from = spec.from or lift:ScreenPoint(frame)
+  local from
+  if not spec.atOnce then
+    from = spec.from or lift:ScreenPoint(frame)
+  end
   if from == nil then
     self:Seat(entry)
     self:Docked(entry)

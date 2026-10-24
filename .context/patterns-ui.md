@@ -264,3 +264,12 @@ whose section is the vendor's own items, going to the backpack.
 **Rule**: Extend the dock, never build a second card: an offer may give `destination()`, the frame its
 items went to; the section flies into its middle, or nowhere when it returns nil (that place is not
 shown). The vendor's Shopping List gives the backpack's scroll area (profession-shopping-list.md §5).
+
+## A Section Docked as It Is Bound Is Seated, Never Flown
+**Problem**: The dock flies a section into its card from where it is on screen (`lift:ScreenPoint`). A
+panel that keeps its sections while hidden (the vendor) reuses a section still anchored where its column
+left it last time, so a section docked as the draw binds it flew in from that stale place. The spec frame
+mock never showed it: it gives a frame a place on screen only when a test sets one (`_SetRect`).
+
+**Rule**: A section docked before its first layout passes `atOnce` (`NextDockSpec`): seated at once,
+whatever place it has. Test any flight decision with a rect, as the client gives every anchored frame one.

@@ -1267,6 +1267,28 @@ describe("NextVendor", function()
       assert.is_true(x3 > x1)
     end)
 
+    -- Reported: on opening, the card was in place but its items slid in. The vendor keeps its sections
+    -- while hidden; closing put the Shopping List back in its column, anchored there, and the next visit
+    -- reused it: docked with a place on screen, it flew from there into its card. In the client an
+    -- anchored frame has a place on screen; the mock has one only when given (_SetRect).
+    it("opens in its card again at the next visit, though its section was left in the vendor's column", function()
+      data.listAvailable, data.needs = true, { [1] = 10 }
+      local v = open()
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      finishTweens()
+      v.frame:GetScript("OnHide")(v.frame)
+      local section = v.content.byName["Shopping List"]
+      assert.is_false(v.content:IsAway(section), "back in its column while the vendor is away")
+      section.frame:_SetRect(40, 500, 394, 120)
+      MerchantFrame:Show()
+      eventsRegistered["MERCHANT_SHOW"](ctx())
+      local e = listEntry(v)
+      assert.is_not_nil(e)
+      assert.is_nil(e.flight, "seated at once, not flown in from its old place")
+      assert.is_true(e.seated)
+      finishTweens()
+    end)
+
     it("says in the theme's buy color what it buys and the total", function()
       data.listAvailable, data.needs = true, { [1] = 10, [4] = 3 }
       local v = open()

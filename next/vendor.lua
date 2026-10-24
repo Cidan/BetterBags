@@ -627,7 +627,9 @@ function vendorProto:OfferShoppingList(ctx)
     return false
   end
   self.listOffered = true
-  nextDock:Add(self, { section = section, source = self, offer = self:ShoppingListOffer() })
+  -- Seated at once: a section reused from the last visit is still anchored where its column left it, and
+  -- would fly from there (reported: "the items slide in from the background into the card").
+  nextDock:Add(self, { section = section, source = self, offer = self:ShoppingListOffer(), atOnce = true })
   return true
 end
 
