@@ -1,0 +1,17 @@
+{
+  "id": 1792875476,
+  "version": "v0.8.2-2-g17357ed",
+  "channel": "alpha",
+  "date": "2026-10-24",
+  "from": "8c448f45a2388f2166b2635735ea772ec82c372c",
+  "to": "17357ed727462bb8d4c3126deea157b78f719630",
+  "headline": "This build adds a Guild Wars 2 theme for BetterBags Next when the GW2_UI addon is installed.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Guild Wars 2 theme",
+      "details": "Adds a Guild Wars 2 theme for BetterBags Next, available whenever the GW2_UI addon is installed. It uses GW2_UI window artwork, custom item button borders, client fonts, and places header action buttons on a vertical side panel.",
+      "clients": []
+    }
+  ]
+}
