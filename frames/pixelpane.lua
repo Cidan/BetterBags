@@ -127,11 +127,16 @@ local function parts(n)
   return string.format('%d %s', n, n == 1 and 'part' or 'parts')
 end
 
--- head is a report's first line: when, which window, how many parts were off, and the state it was in.
+-- head is a report's first line: when, which window, how many parts were off (and how many Masque places, its
+-- skin, left to it), and the state it was in.
 ---@param r table
 ---@return string
 local function head(r)
-  local fields = { string.format('%s  %s: %s off', date('%H:%M:%S', r.at), r.window, parts(r.total)),
+  local off = string.format('%s  %s: %s off', date('%H:%M:%S', r.at), r.window, parts(r.total))
+  if (r.othersTotal or 0) > 0 then
+    off = string.format('%s, %d more Masque places', off, r.othersTotal)
+  end
+  local fields = { off,
     string.format('%s at %d%%', r.screen, math.floor(r.uiScale * 100 + 0.5)) }
   if r.details then
     table.insert(fields, r.details)
@@ -151,8 +156,11 @@ function paneProto:Update()
     or 'Not checking. Check Now checks the windows shown once.'
   local last = audit.lastChecked
   if last ~= nil then
-    status = string.format('%s Last checked: %s, %s, %s.', status, last.window,
-      last.count == 0 and 'nothing off' or (parts(last.count) .. ' off'), date('%H:%M:%S', last.at))
+    local off = last.count == 0 and 'nothing off' or (parts(last.count) .. ' off')
+    if (last.others or 0) > 0 then
+      off = string.format('%s (%s Masque places)', off, parts(last.others))
+    end
+    status = string.format('%s Last checked: %s, %s, %s.', status, last.window, off, date('%H:%M:%S', last.at))
   end
   self.status:SetText(status)
   local entries = {}

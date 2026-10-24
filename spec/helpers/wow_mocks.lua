@@ -571,6 +571,16 @@ function WidgetMethods:CreateTexture(textureName, drawLayer, inherits, subLevel)
   table.insert(self._textures, tex)
   return tex
 end
+-- Frame:CreateMaskTexture(name, drawLayer, templateName, subLevel) (SimpleFrameAPIDocumentation) makes a
+-- MaskTexture, one of the frame's regions (Masque masks icons with them, Core/Regions/Mask.lua).
+function WidgetMethods:CreateMaskTexture(textureName, drawLayer, inherits, subLevel)
+  local mask = CreateMockWidget("MaskTexture", textureName, self)
+  mask._drawLayer = drawLayer
+  mask._sublevel = subLevel
+  mask._inherits = inherits
+  table.insert(self._textures, mask)
+  return mask
+end
 -- Frame:CreateLine(name, drawLayer, templateName, subLevel) (SimpleFrameAPIDocumentation) makes a
 -- Line: a texture drawn from a start point to an end point (SimpleLineAPIDocumentation, on the
 -- live, forever, classic, classic_era and classic_anniversary branches). SetStartPoint and

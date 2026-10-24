@@ -24,6 +24,11 @@ local FILLING = { "IconBorder", "IconOverlay", "IconQuestTexture" }
 -- Parts centered on the button at their own size: the template's second overlay and glows, the empty slot's
 -- family glyph (frames/item.lua), the extended slot's frame.
 local CENTERED = { "IconOverlay2", "flash", "NewItemTexture", "ExtendedSlot", "BetterBagsFamilyIcon" }
+-- Parts a draw sizes to their atlas, placed from their template corner at their size every time the button is
+-- laid out, not once per grid: Blizzard makes the crafting quality pip the first time a button draws a crafting
+-- item, at TOPLEFT (-3, 2), and sizes it to its atlas on every draw (SetupCraftingQualityOverlay,
+-- Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua).
+local DRAWN = { "ProfessionQualityOverlay" }
 -- Of those, the parts Masque places on a button it skins (Masque 12.1.0 Skins/Regions.lua, the Item type's
 -- keys): left where Masque put them. A skin sizes them its own way (Caith: 42 / 36 of the button, centered,
 -- its quality border round its own frame); filling the button, the border drew inside the skin's frame, a
@@ -69,6 +74,20 @@ local function fromCorner(saved, region)
   end
 end
 
+-- atItsSize anchors a region by its template point at its template offset rounded to whole pixels, at the size a
+-- draw gave it, rounded.
+---@param saved table<Region, table>
+---@param region Region
+local function atItsSize(saved, region)
+  local p = remember(saved, region).points[1]
+  if p == nil then
+    return
+  end
+  region:ClearAllPoints()
+  region:SetPoint(p[1], p[2], p[3], pixel:Snap(region, p[4] or 0), pixel:Snap(region, p[5] or 0))
+  pixel:Size(region, region:GetWidth(), region:GetHeight())
+end
+
 -- center anchors a region by its top left so it sits in the middle of the button at its own size (its
 -- template offset from the middle kept), on whole pixels.
 ---@param saved table<Region, table>
@@ -104,6 +123,14 @@ function itemFit:Fit(ctx, decoration, extras, item)
   local unit = pixel:Unit(decoration)
   local key = string.format("%.9f:%.4f:%.4f:%s:%s", unit, decoration:GetWidth(), decoration:GetHeight(),
     tostring(sonata and sonata:GetGeneration() or 0), tostring(skinned))
+  local saved = self.saved[decoration] or {}
+  self.saved[decoration] = saved
+  for _, name in ipairs(DRAWN) do
+    local region = decoration[name]
+    if region ~= nil then
+      atItsSize(saved, region)
+    end
+  end
   if self.keys[decoration] == key then
     return "kept"
   end
@@ -118,8 +145,6 @@ function itemFit:Fit(ctx, decoration, extras, item)
       end
     end
   end
-  local saved = self.saved[decoration] or {}
-  self.saved[decoration] = saved
   -- ours says whether Next places a part of the decoration: on a button Masque skins, Masque's parts are not.
   local function ours(name, region)
     if skinned and MASQUE_PARTS[name] then

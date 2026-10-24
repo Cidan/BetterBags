@@ -68,7 +68,8 @@ describe("PixelPane", function()
   local function report(id, window, lines, opts)
     opts = opts or {}
     return { id = id, at = 1000 + id, window = window, screen = "3396x1362", uiScale = 0.65, scale = 0.65,
-      theme = opts.theme, details = opts.details, total = opts.total or #lines, lines = lines }
+      theme = opts.theme, details = opts.details, total = opts.total or #lines, lines = lines,
+      othersTotal = opts.others or 0, others = {} }
   end
 
   before_each(function()
@@ -124,10 +125,10 @@ describe("PixelPane", function()
     local reports = audit:GetReports()
     table.insert(reports, report(1, "Backpack", { "panel.title: TOPLEFT x 10.500" }))
     table.insert(reports, report(2, "Bank", { "panel.edges[1]: left 3.250", "panel.footer: top 7.500" },
-      { details = "small, Bag Scale 85%, Icon Scale 100%", theme = "Default", total = 5 }))
+      { details = "small, Bag Scale 85%, Icon Scale 100%", theme = "Default", total = 5, others = 113 }))
     local pane = newPane()
     assert.are.same({
-      "t1002  Bank: 5 parts off · 3396x1362 at 65% · small, Bag Scale 85%, Icon Scale 100% · theme Default",
+      "t1002  Bank: 5 parts off, 113 more Masque places · 3396x1362 at 65% · small, Bag Scale 85%, Icon Scale 100% · theme Default",
       "    panel.edges[1]: left 3.250",
       "    panel.footer: top 7.500",
       "    and 3 more",
@@ -146,6 +147,11 @@ describe("PixelPane", function()
     audit.lastChecked = { window = "Bank", count = 2, at = 1240 }
     pane:Update()
     assert.is_truthy(pane.status:GetText():find("Last checked: Bank, 2 parts off, t1240", 1, true))
+    -- Masque's parts are its skin, left to it: said, not counted as off.
+    audit.lastChecked = { window = "Backpack", count = 0, others = 113, at = 1250 }
+    pane:Update()
+    assert.is_truthy(pane.status:GetText():find("Last checked: Backpack, nothing off (113 parts Masque places), t1250",
+      1, true), pane.status:GetText())
   end)
 
   it("shows what the check does as it happens, while it is shown", function()

@@ -194,6 +194,27 @@ describe("NextItemFit", function()
     assert.are.equal(2, #restyled, "styled on another")
   end)
 
+  -- Seen in game (the Pixels tab, 3396x1362 at 65%, Bag Scale 90%): a crafting reagent's quality pip 34.2 x 29.0
+  -- pixels at 3.1 pixels left of the button. Blizzard makes it the first time a button draws a crafting item, at
+  -- TOPLEFT (-3, 2), and sizes it to its atlas on every draw (SetupCraftingQualityOverlay,
+  -- Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua): it is placed every time the button is laid out.
+  it("places a crafting quality pip on whole pixels every time, as each draw sizes it to its atlas", function()
+    itemFit:Fit({}, decoration, { ilvl })
+    local pip = decoration:CreateTexture(nil, "OVERLAY")
+    pip:SetPoint("TOPLEFT", -3, 2)
+    pip:SetSize(33, 28)
+    decoration.ProfessionQualityOverlay = pip
+    assert.are.equal("kept", itemFit:Fit({}, decoration, { ilvl }), "nothing else changed")
+    assert.are.same({}, offGrid(decoration))
+    pip:SetSize(30, 26)
+    itemFit:Fit({}, decoration, { ilvl })
+    assert.are.same({}, offGrid(decoration), "a new atlas")
+    local _, _, _, x, y = pip:GetPoint(1)
+    assert.is_true(math.abs(x - pixel:Snap(decoration, -3)) < 1e-9 and math.abs(y - pixel:Snap(decoration, 2)) < 1e-9)
+    itemFit:RestoreAll()
+    assert.are.same({ "TOPLEFT", decoration, "TOPLEFT", -3, 2 }, { pip:GetPoint(1) }, "its own place for the classic bags")
+  end)
+
   -- A guild bank button is not an item button of the bags: it says itself that it was drawn again
   -- (guild/Updated, NextGuildButton:Restyled), which Masque's integration skins it again on.
   it("has a button that announces its own restyles announce it, not item/Updated", function()

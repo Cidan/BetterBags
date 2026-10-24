@@ -118,6 +118,11 @@ bags take over:
 - **Vendor cards** style themselves again on a grid they were not styled for (`NextVendorButton:Fit`),
   which draws their icon, count and highlight over Masque's skin, so `Fit` then sends `vendor/Updated` and
   the Masque integration skins the card again (Masque's skin last, as after a theme).
+- **Parts a draw sizes** are placed every time the button is laid out, not once per grid: Blizzard makes the
+  crafting quality pip (`ProfessionQualityOverlay`) the first time a button draws a crafting item, at
+  `TOPLEFT (-3, 2)`, and sizes it to its atlas on every draw (`SetupCraftingQualityOverlay`,
+  `Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua`). Found by the check in game: 34.2 x 29.0 pixels, 3.1
+  pixels left of the button (its atlas's 33 x 28 units at 1.0374 pixels a unit).
 - **Guild bank buttons** name their parts (`PixelParts`): the button, its item level text and upgrade
   arrow (BetterBags' own texture, not Masque's `UpgradeIcon`).
 - **The money** in the backpack's and bank's footers is the shared money frame (`frames/money.lua`),
@@ -161,8 +166,16 @@ scale, as Blizzard's `RegionUtil.GetRegionPoint` reads it), `GetPoint`, `GetRegi
 - A region the client will not measure (warcraft.wiki.gg: `GetRect` is not allowed on restricted frames; the
   call is protected) or has not placed is skipped; what is in it is still judged.
 - A part is named by the field path an owner table reaches it by (`owners = { panel = p }`:
-  `panel.content.byName.Consumable.title`), else by the field its parent keeps it in (a parentKey, a
-  button's state art), else by its place in the tree (`>3>t2`). **It never reads a key of a table it walks**:
+  `panel.content.byName.Consumable.title`), else from its nearest named frame by the fields that keep each
+  part in its parent (`BetterBagsItemButton186Decoration>IconBorder`; a parentKey, a button's state art),
+  else by its place in the tree (`>3>t2`).
+- **Masque's parts are listed apart** (`Check` returns ours, then Masque's): its skin, left to it on purpose
+  (§4). They are found from what Masque writes, by identity: the regions it makes and skins are kept in the
+  button's `_MSQ_CFG` (`Gloss`, `Backdrop`, `Shadow`, `Normal`, `ButtonMask`) and `_MSQ_CFG.Regions` (Masque
+  12.1.0 `Core/Group.lua`, `Core/Regions/*.lua`), and every region it skins carries `_MSQ_` fields (an icon's
+  mask in `_MSQ_Mask`). Found in game: a Check Now of a small backpack at Bag Scale 90% (3396x1362 at 65%,
+  Masque's Caith skin) listed 116 parts, 113 of them Caith's (sized 42 / 36 of a 46-pixel button: 53.667
+  pixels; its count 2 units, 2.075 pixels, in from the corner) and 3 ours (below). **It never reads a key of a table it walks**:
   it collects the parts off the grid first and finds their names by identity, only iterating tables. In
   game a window's tables reach saved settings, and reading a key AceDB's wildcard defaults cover writes it.
 
@@ -204,6 +217,8 @@ actually opens, on the real client: real fonts, art, Blizzard's templates, other
   every `GAP` (0.25 s) until two checks agree (at most `MAX_PASSES`, 8). What moves (slides, glides, a
   toggle's knob, sparkles) differs between checks and is left out; what stays off the grid where the window
   comes to rest is reported. A window hidden meanwhile is dropped, never said clean.
+- **Masque's parts** make no report and pop nothing up; a report lists them apart (`others`, `othersTotal`),
+  and the last check says how many (`lastChecked.others`, the tab's status line).
 - **Reports**: one per new set of parts off the grid for a window (the same set again is not reported; a
   window found clean forgets it, so parts coming back are reported again). A report (`id`, `at`, `window`,
   `screen`, `uiScale`, `scale`, `theme`, `details`, `total`, up to `MAX_LINES` 200 `lines`) is kept in

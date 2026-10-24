@@ -126,22 +126,65 @@ local function fieldsOf(frame, own)
   return map
 end
 
+-- masqueParts lists what Masque places among a frame's own regions and children (own): the regions it makes and
+-- the ones it skins, which it keeps in the frame's _MSQ_CFG and its Regions table (Masque 12.1.0 Core/Regions,
+-- Group.lua), and every region it wrote an _MSQ_ field on, with the regions those fields hold (an icon's mask in
+-- _MSQ_Mask). It only iterates tables and compares by identity.
+---@param frame table
+---@param own table<table, boolean>
+---@return table<table, boolean>
+local function masqueParts(frame, own)
+  local parts = {}
+  local function take(t)
+    for _, v in pairs(t) do
+      if own[v] then
+        parts[v] = true
+      end
+    end
+  end
+  local cfg = rawget(frame, "_MSQ_CFG")
+  if type(cfg) == "table" then
+    take(cfg)
+    local regions = rawget(cfg, "Regions")
+    if type(regions) == "table" then
+      take(regions)
+    end
+  end
+  for region in pairs(own) do
+    for key, v in pairs(region) do
+      if type(key) == "string" and key:sub(1, 5) == "_MSQ_" then
+        parts[region] = true
+        if own[v] then
+          parts[v] = true
+        end
+      end
+    end
+  end
+  return parts
+end
+
 -- Check lists every shown part under root that draws and is not on whole screen pixels: a texture's, an edit
 -- box's or a clipping frame's four edges, an edit box's text insets, a font string's anchor points (its far
 -- edges are its text's measure). A part the client does not place is skipped, as is everything under a region
--- in skip. owners (name -> table) name the parts in the messages; a part no owner reaches is named by the field
--- its parent keeps it in, else by its place in the tree. It returns one string per part.
+-- in skip. owners (name -> table) name the parts in the messages; a part no owner reaches is named from its
+-- nearest named frame by the fields that keep each part in its parent (a parentKey, a button's state art), else
+-- by its place in the tree. It returns one string per part off the grid; the parts Masque places (its skin,
+-- left to it, next-pixel-perfect.md §4) are listed apart, second.
 ---@param root ScriptRegion
 ---@param opts? { skip?: table<table, boolean>, owners?: table<string, table> }
----@return string[]
+---@return string[] problems, string[] others
 function audit:Check(root, opts)
   opts = opts or {}
   local skip = opts.skip or {}
   local k = 1 / PixelUtil.GetPixelToUIUnitFactor()
   local found = {}
-  local function check(region, path)
+  local function check(region, path, fromName, masque)
     if skip[region] or not visible(region) then
       return
+    end
+    local name = region:GetName()
+    if name ~= nil then
+      path, fromName = name, true
     end
     local frame = isFrame(region)
     local r = (DRAWS[region:GetObjectType()] or (frame and region:DoesClipChildren())) and rectOf(region) or nil
@@ -176,7 +219,8 @@ function audit:Check(root, opts)
         end
       end
       if #bad > 0 then
-        table.insert(found, { region = region, path = path, bad = table.concat(bad, ", ") })
+        table.insert(found, { region = region, path = path, fromName = fromName, masque = masque,
+          bad = table.concat(bad, ", ") })
       end
     end
     if not frame then
@@ -187,6 +231,7 @@ function audit:Check(root, opts)
     for _, part in ipairs(regions) do own[part] = true end
     for _, part in ipairs(children) do own[part] = true end
     local keys = fieldsOf(region, own)
+    local masqued = masqueParts(region, own)
     local textures, texts = 0, 0
     for _, child in ipairs(regions) do
       local segment
@@ -197,16 +242,16 @@ function audit:Check(root, opts)
         textures = textures + 1
         segment = "t" .. textures
       end
-      check(child, path .. ">" .. (keys[child] or segment))
+      check(child, path .. ">" .. (keys[child] or segment), fromName, masqued[child] == true)
     end
     for i, child in ipairs(children) do
-      check(child, path .. ">" .. (keys[child] or i))
+      check(child, path .. ">" .. (keys[child] or i), fromName, masqued[child] == true)
     end
   end
-  check(root, "")
-  local problems = {}
+  check(root, "", false, false)
+  local problems, others = {}, {}
   if #found == 0 then
-    return problems
+    return problems, others
   end
   local wanted = {}
   for _, f in ipairs(found) do
@@ -214,10 +259,10 @@ function audit:Check(root, opts)
   end
   local named = names(opts.owners, wanted)
   for _, f in ipairs(found) do
-    local label = named[f.region] or ((f.region:GetName() or f.region:GetObjectType()) .. " " .. f.path)
-    table.insert(problems, label .. ": " .. f.bad)
+    local label = named[f.region] or (f.fromName and f.path or (f.region:GetObjectType() .. " " .. f.path))
+    table.insert(f.masque and others or problems, label .. ": " .. f.bad)
   end
-  return problems
+  return problems, others
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -408,13 +453,14 @@ function audit:Step(elapsed)
       p.wait = p.wait - elapsed
       if p.wait <= 0 then
         local w = root[RECORD]
-        local lines = self:Check(root, { owners = w.owners, skip = w.skip and w.skip() or nil })
+        local lines, others = self:Check(root, { owners = w.owners, skip = w.skip and w.skip() or nil })
         p.passes = p.passes + 1
-        if p.last ~= nil and (sameLines(p.last, lines) or p.passes >= self.MAX_PASSES) then
+        if p.last ~= nil and ((sameLines(p.last, lines) and sameLines(p.lastOthers, others))
+            or p.passes >= self.MAX_PASSES) then
           self.pending[root] = nil
-          self:settled(root, w, stayed(p.last, lines))
+          self:settled(root, w, stayed(p.last, lines), stayed(p.lastOthers, others))
         else
-          p.last, p.wait = lines, self.GAP
+          p.last, p.lastOthers, p.wait = lines, others, self.GAP
         end
       end
     end
@@ -424,13 +470,16 @@ function audit:Step(elapsed)
   end
 end
 
--- settled takes a window's result: a report when it found parts off the grid that it did not report last time
--- for this window (one with nothing off forgets what it reported, so the parts coming back are reported again).
+-- settled takes a window's result: a report when it found parts of ours off the grid that it did not report last
+-- time for this window (one with nothing of ours off forgets what it reported, so the parts coming back are
+-- reported again). The parts Masque places (others) are no miss of ours: they make no report, but a report says
+-- them, and so does the last check.
 ---@private
 ---@param root Frame
 ---@param w table The window's record.
 ---@param lines string[]
-function audit:settled(root, w, lines)
+---@param others string[]
+function audit:settled(root, w, lines, others)
   local labels = {}
   for _, line in ipairs(lines) do
     table.insert(labels, line:match("^(.-): ") or line)
@@ -438,23 +487,25 @@ function audit:settled(root, w, lines)
   table.sort(labels)
   local key = table.concat(labels, "\n")
   local ctx = newContext('PixelAudit_Settled')
-  self.lastChecked = { window = w.title, count = #lines, at = time() }
+  self.lastChecked = { window = w.title, count = #lines, others = #others, at = time() }
   if #lines == 0 then
     self.reported[root] = nil
   elseif self.reported[root] ~= key then
     self.reported[root] = key
-    self:report(ctx, root, w, lines)
+    self:report(ctx, root, w, lines, others)
   end
-  events():SendMessage(ctx, 'pixelAudit/Checked', w.title, #lines)
+  events():SendMessage(ctx, 'pixelAudit/Checked', w.title, #lines, #others)
 end
 
--- report keeps a report of a window's parts off the grid, with the state it was in, and says so.
+-- report keeps a report of a window's parts off the grid, with the state it was in and the parts Masque places
+-- apart, and says so.
 ---@private
 ---@param ctx Context
 ---@param root Frame
 ---@param w table
 ---@param lines string[]
-function audit:report(ctx, root, w, lines)
+---@param others string[]
+function audit:report(ctx, root, w, lines, others)
   local width, height = GetPhysicalScreenSize()
   local sonataNext = addon:GetModule('SonataNext', true)
   local r = {
@@ -468,9 +519,14 @@ function audit:report(ctx, root, w, lines)
     details = w.describe and w.describe() or nil,
     total = #lines,
     lines = {},
+    othersTotal = #others,
+    others = {},
   }
   for i = 1, math.min(#lines, self.MAX_LINES) do
     r.lines[i] = lines[i]
+  end
+  for i = 1, math.min(#others, self.MAX_LINES) do
+    r.others[i] = others[i]
   end
   self.db.nextId = self.db.nextId + 1
   local list = self.db.reports

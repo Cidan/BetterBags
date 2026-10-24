@@ -78,6 +78,55 @@ describe("PixelAudit", function()
       assert.is_truthy(problems[1]:find("^window.tex: "), problems[1])
     end)
 
+    -- Seen in game with Masque's Caith skin: 113 of 116 parts off the grid were Masque's, sized 42 / 36 of the
+    -- button (Masque 12.1.0). What Masque places is its skin, left to it on purpose (next-pixel-perfect.md §4):
+    -- listed apart, found from what Masque writes. It keeps the regions it makes in the button's _MSQ_CFG
+    -- (Backdrop, Normal, Shadow, ButtonMask: Core/Regions/*.lua), the regions it skins in _MSQ_CFG.Regions, and
+    -- writes _MSQ_ fields on each region it skins (an icon's mask in _MSQ_Mask: Core/Regions/Mask.lua).
+    it("sets apart the parts Masque places, from what Masque writes", function()
+      local button = CreateFrame("Button", nil, window)
+      button:SetPoint("TOPLEFT", window, "TOPLEFT", 0, 0)
+      button:SetSize(46 * unit, 46 * unit)
+      local function skinPart(region)
+        region:ClearAllPoints()
+        region:SetSize(46 * unit * 42 / 36, 46 * unit * 42 / 36)
+        region:SetPoint("CENTER", button, "CENTER", 0, 0)
+        return region
+      end
+      local icon = button:CreateTexture()
+      icon:SetAllPoints(button)
+      local border = skinPart(button:CreateTexture())
+      border._MSQ_Skin = {}
+      local count = button:CreateFontString()
+      count:SetFontObject(GameFontNormal)
+      count:SetText("5")
+      count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+      local normal = skinPart(button:CreateTexture())
+      local mask = skinPart(button:CreateMaskTexture())
+      icon._MSQ_Mask = mask
+      button._MSQ_CFG = { Normal = normal, Regions = { Icon = icon, IconBorder = border, Count = count } }
+      local ours = button:CreateTexture()
+      ours:SetPoint("TOPLEFT", button, "TOPLEFT", 0.3, 0)
+      ours:SetSize(4 * unit, unit)
+      local problems, others = audit:Check(window)
+      assert.are.equal(1, #problems, table.concat(problems, "\n"))
+      assert.are.equal(4, #others, "the border, the count, the normal art, the mask")
+      for _, line in ipairs(others) do
+        assert.is_falsy(line:find("t5"), "ours is not Masque's: " .. line)
+      end
+    end)
+
+    it("names a part from its nearest named frame", function()
+      local decoration = CreateFrame("Button", "BetterBagsItemButton7Decoration", window)
+      decoration:SetPoint("TOPLEFT", window, "TOPLEFT", 0.4, 0)
+      decoration:SetSize(10 * unit, 10 * unit)
+      decoration.IconBorder = decoration:CreateTexture()
+      decoration.IconBorder:SetAllPoints(decoration)
+      local problems = audit:Check(window)
+      assert.are.same({ "BetterBagsItemButton7Decoration>IconBorder: left 10.461, right 20.461" },
+        { problems[1] }, table.concat(problems, "\n"))
+    end)
+
     it("skips a region the client has not placed", function()
       window:SetClipsChildren(true)
       function window:GetScaledRect() end
@@ -215,6 +264,44 @@ describe("PixelAudit", function()
       audit:Changed(root)
       run(5)
       assert.are.equal(0, audit.lastChecked.count)
+    end)
+
+    -- Masque's parts are its skin (the check lists them apart): they are no miss of ours. A report is kept, and the
+    -- log pops up, for ours; the report also says what Masque places, and so does the last check.
+    describe("with Masque's parts", function()
+      local function masqued(root)
+        local part = root:CreateTexture()
+        part:SetPoint("TOPLEFT", root, "TOPLEFT", 1.3, 0)
+        part:SetSize(4 * unit, unit)
+        root._MSQ_CFG = { Normal = part }
+        return part
+      end
+
+      it("keeps no report and says nothing when only Masque's parts are off, saying how many it left to it", function()
+        local root, tex = watched("Backpack")
+        tex:SetPoint("TOPLEFT", root, "TOPLEFT", 0, 0)
+        masqued(root)
+        audit:SetWatching(ctx(), true)
+        run(5)
+        assert.are.same({}, audit:GetReports())
+        assert.are.same({}, printed)
+        assert.are.same({}, found())
+        assert.are.equal(0, audit.lastChecked.count)
+        assert.are.equal(1, audit.lastChecked.others)
+      end)
+
+      it("says in a report what Masque places, apart from what is ours", function()
+        local root = watched("Backpack")
+        masqued(root)
+        audit:SetWatching(ctx(), true)
+        run(5)
+        local r = audit:GetReports()[1]
+        assert.are.equal(1, r.total)
+        assert.are.equal(1, #r.lines)
+        assert.are.equal(1, r.othersTotal)
+        assert.are.equal(1, #r.others)
+        assert.is_truthy(printed[1]:find("1 part of Backpack", 1, true), printed[1])
+      end)
     end)
 
     it("leaves out what moves between its checks, and reports where it comes to rest", function()
