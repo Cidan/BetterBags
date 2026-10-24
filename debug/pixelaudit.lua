@@ -232,7 +232,11 @@ function audit:Check(root, opts)
       path, fromName = name, true
     end
     local frame = isFrame(region)
-    local r = (DRAWS[region:GetObjectType()] or (frame and region:DoesClipChildren())) and rectOf(region) or nil
+    -- A region with secret anchoring answers its position queries in secrets (a vendor's name in a dungeon, and
+    -- what hangs from it; warcraft.wiki.gg Secret Values, "Secret anchors"): nothing of it can be judged.
+    local secret = region.IsAnchoringSecret ~= nil and region:IsAnchoringSecret()
+    local r = not secret and (DRAWS[region:GetObjectType()] or (frame and region:DoesClipChildren())) and rectOf(region)
+      or nil
     if r ~= nil then
       local bad = {}
       if region:GetObjectType() == "FontString" then
