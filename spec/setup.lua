@@ -46,6 +46,7 @@ LoadBetterBagsModule("render/motion.lua")
 -- anything looks it up when it loads.
 LoadBetterBagsModule("next/pixel.lua")
 LoadBetterBagsModule("next/itemfit.lua")
+LoadBetterBagsModule("next/coins.lua")
 -- Sonata resolves its themes and BetterBags Next's with SonataResolve (sonata/resolve.lua), which
 -- the engine looks up when it loads.
 LoadBetterBagsModule("sonata/resolve.lua")

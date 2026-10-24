@@ -60,6 +60,9 @@ local lift = addon:GetModule('NextLift')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextCoins: AceModule
+local coins = addon:GetModule('NextCoins')
+
 ---@class NextContent: AceModule
 local nextContent = addon:GetModule('NextContent')
 
@@ -2834,6 +2837,10 @@ function panelProto:BuildFooter()
   local m = self:CreateMoney()
   if m ~= nil then
     m.frame:SetParent(self.frame)
+    -- The shared money frame (frames/money.lua), this panel's own instance, on whole pixels.
+    if m.copperButton ~= nil then
+      coins:Fit(m)
+    end
     self.moneyFrame = m
   end
   self:styleFooter()

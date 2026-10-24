@@ -112,7 +112,7 @@ describe("render pipeline and Sonata load order", function()
   -- box, the money frame, the backpack behavior) and before core/init.lua, in dependency order.
   it("lists BetterBags Next's files in every TOC, in order, after the bag frames and before init", function()
     -- NextPixel first: the style rounds fonts with it (docs/next-pixel-perfect.md).
-    local files = { "next\\pixel.lua", "next\\itemfit.lua", "next\\style.lua", "next\\tween.lua", "next\\sparkles.lua", "next\\tabs.lua",
+    local files = { "next\\pixel.lua", "next\\itemfit.lua", "next\\coins.lua", "next\\style.lua", "next\\tween.lua", "next\\sparkles.lua", "next\\tabs.lua",
       "next\\content.lua", "next\\drag.lua", "next\\panel.lua", "next\\bag.lua", "next\\bank.lua",
       "next\\merchant.lua", "next\\vendorbutton.lua", "next\\vendor.lua" }
     local pipe = io.popen("ls *.toc")
