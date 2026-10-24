@@ -396,10 +396,11 @@ function canvasProto:CellWidth()
   return self.cards and style.VENDOR_CARD_WIDTH or style.ICON
 end
 
--- CellHeight is how tall a row of buttons is, without the gap, for the current theme.
+-- CellHeight is how tall a row of buttons is, without the gap, for the current theme: an item button
+-- (the theme's icon times the player's Icon Scale), or a card (the theme's icon).
 ---@return number
 function canvasProto:CellHeight()
-  return style.ICON
+  return self.cards and style.CARD_ICON or style.ICON
 end
 
 ---@class (exact) NextCanvasSection

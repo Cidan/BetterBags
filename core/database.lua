@@ -251,6 +251,42 @@ function DB:SetNextTabOrder(key, ids)
   DB.data.profile.nextTabOrder[key] = copy
 end
 
+-- A BetterBags Next scale (docs/next-appearance-size.md): a whole percentage in 50 to 150, 100 for
+-- anything but a number.
+---@param value any
+---@return number
+local function nextScale(value)
+  value = tonumber(value)
+  if value == nil then
+    return 100
+  end
+  return math.max(50, math.min(150, math.floor(value + 0.5)))
+end
+
+-- GetNextIconScale returns how big BetterBags Next's item buttons are, in percent of the Next theme's
+-- icon size.
+---@return number
+function DB:GetNextIconScale()
+  return DB.data.profile.nextIconScale
+end
+
+---@param value number
+function DB:SetNextIconScale(value)
+  DB.data.profile.nextIconScale = nextScale(value)
+end
+
+-- GetNextBagScale returns the scale of BetterBags Next's small panels, in percent; full panels are
+-- always at their size.
+---@return number
+function DB:GetNextBagScale()
+  return DB.data.profile.nextBagScale
+end
+
+---@param value number
+function DB:SetNextBagScale(value)
+  DB.data.profile.nextBagScale = nextScale(value)
+end
+
 ---@alias NextSize "full"|"small"
 
 -- GetNextSize returns BetterBags Next's panel size: "full" height on the screen's edges, or "small"

@@ -17,9 +17,28 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@field Color table<string, number[]> The theme's palette.
 local style = addon:NewModule('NextStyle')
 
+-- The player's Icon Scale (the Size tab, docs/next-appearance-size.md), in percent: SetIconScale.
+style.iconScale = 100
+
 -- How far past its end each ease swings (next/tween.lua): outBack about a tenth, outBackSoft a
 -- fiftieth. Opening with one, the body must reach that much past the screen edge (OVERREACH).
 local OVERSHOOT = { outBack = 0.1, outBackSoft = 0.02 }
+
+-- SetIconScale sets the player's Icon Scale (docs/next-appearance-size.md), in percent, and sizes the
+-- item buttons for it (sizeIcons). Nothing else changes, and no font object is made: a slider dragged
+-- through its steps calls it on every step.
+---@param percent number
+function style:SetIconScale(percent)
+  self.iconScale = percent
+  self:sizeIcons()
+end
+
+-- sizeIcons sizes the item buttons: the theme's icon size (Layout.Icon) times the Icon Scale, in whole
+-- pixels, as every other size is.
+---@private
+function style:sizeIcons()
+  self.ICON = math.max(1, math.floor(self.Theme.Layout.Icon * self.iconScale / 100 + 0.5))
+end
 
 -- Use makes theme the look: every field below is read from it, and every text drawn with a role
 -- moves to a new font object of its role.
@@ -29,13 +48,16 @@ function style:Use(theme)
   local L, M = theme.Layout, theme.Motion
   self.Color = theme.Palette
 
-  self.ICON = L.Icon
+  -- Item buttons are the theme's icon size times the player's Icon Scale (sizeIcons); the grid and the
+  -- vendor's cards keep the theme's own (CARD_ICON), so a row fits as many buttons as its width allows.
+  self.CARD_ICON = L.Icon
+  self:sizeIcons()
   self.GAP = L.Gap
   self.PER_ROW = L.PerRow
   self.GUTTER = L.Gutter
   self.PAD = L.Pad
   self.FEATHER = L.Feather
-  self.GRID_WIDTH = self.PER_ROW * self.ICON + (self.PER_ROW - 1) * self.GAP
+  self.GRID_WIDTH = self.PER_ROW * L.Icon + (self.PER_ROW - 1) * self.GAP
   -- The vendor's cards (next.md §10b): VendorColumns across the full grid; a small panel made wider
   -- fits more of them.
   self.VENDOR_COLUMNS = L.VendorColumns

@@ -162,6 +162,10 @@ describe("BetterBags Next's small mode", function()
     override(stubs.database, "GetNextSmallChain", function() return db.smallChain end)
     override(stubs.database, "SetNextSmallChain", function(_, layout) db.smallChain = layout end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
+    -- The Size tab's scales (docs/next-appearance-size.md), in percent.
+    db.iconScale, db.bagScale = 100, 100
+    override(stubs.database, "GetNextIconScale", function() return db.iconScale end)
+    override(stubs.database, "GetNextBagScale", function() return db.bagScale end)
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
@@ -1974,6 +1978,98 @@ describe("BetterBags Next's small mode", function()
       finishTweens()
       assert.is_not_nil(chain.coupling)
       assert.are.same({ besideBag(bag, bank) }, { topLeft(bank) })
+    end)
+  end)
+
+  -- The Size tab (docs/next-appearance-size.md): its sliders send next/ScalesChanged, which the chain
+  -- listens to, once, for every panel.
+  describe("the Size tab's scales", function()
+    local handlers
+
+    before_each(function()
+      handlers = {}
+      override(stubs.events, "RegisterMessage", function(_, name, fn)
+        handlers[name] = handlers[name] or {}
+        table.insert(handlers[name], fn)
+      end)
+    end)
+
+    after_each(function()
+      style:SetIconScale(100)
+    end)
+
+    local function scalesChanged()
+      for _, fn in ipairs(handlers["next/ScalesChanged"] or {}) do fn(ctx()) end
+    end
+
+    local function opened(create)
+      local panel = create(ctx())
+      panel:Show(ctx())
+      finishTweens()
+      return panel
+    end
+
+    local function herbs(n)
+      local list = {}
+      for i = 1, n do table.insert(list, item("0_" .. i, "Herbs")) end
+      slots[BACKPACK].tabs[1].items = list
+    end
+
+    local function perRow(panel)
+      local width = panel.root:PreRender().Width - panel.scroll:GetGutterWidth()
+      return math.floor((width + style.GAP) / (style.ICON + style.GAP))
+    end
+
+    describe("Icon Scale", function()
+      -- Asked: "it can adjust based on scale, if buttons are huge, less fit per row naturally. if buttons
+      -- are small, more per row fit."
+      it("draws item buttons at the theme's size times Icon Scale, each row taking as many as fit", function()
+        db.size = "full"
+        herbs(10)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        bag:Draw(ctx(), slots[BACKPACK], function() end)
+        render:Flush()
+        assert.are.equal(1, #handlers["next/ScalesChanged"], "listened to once, by the chain")
+        assert.are.equal(8, perRow(bag))
+        db.iconScale = 150
+        scalesChanged()
+        render:Flush()
+        assert.are.equal(66, style.ICON)
+        assert.are.same({ 66, 66 }, { buttons["0_1"].frame:GetSize() })
+        assert.are.equal(5, perRow(bag), "fewer per row")
+        motion:Step(1)
+        local _, _, _, x, y = buttons["0_6"].frame:GetPoint(1)
+        assert.are.same({ 0, -(66 + style.GAP) }, { x, y }, "the 6th starts the second row")
+        assert.are.equal(style.WIDTH, bag.frame:GetWidth(), "the panel keeps its width")
+        db.iconScale = 50
+        scalesChanged()
+        render:Flush()
+        assert.are.same({ 22, 22 }, { buttons["0_1"].frame:GetSize() })
+        assert.is_true(perRow(bag) >= 10, "more per row")
+        motion:Step(1)
+        _, _, _, x, y = buttons["0_10"].frame:GetPoint(1)
+        assert.are.same({ 9 * (22 + style.GAP), 0 }, { x, y }, "all ten on one row")
+      end)
+
+      it("sizes the buttons of a closed bag when it opens", function()
+        herbs(3)
+        local bag = nextBag:Create(ctx())
+        bag:Draw(ctx(), slots[BACKPACK], function() end)
+        db.iconScale = 120
+        scalesChanged()
+        bag:Show(ctx())
+        finishTweens()
+        render:Flush()
+        assert.are.same({ 53, 53 }, { buttons["0_1"].frame:GetSize() })
+      end)
+
+      it("keeps a small panel at least one row of its icons tall, as they are now", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local before = bag:MinHeight()
+        db.iconScale = 150
+        scalesChanged()
+        assert.are.equal(before + (66 - 44), bag:MinHeight())
+      end)
     end)
   end)
 end)

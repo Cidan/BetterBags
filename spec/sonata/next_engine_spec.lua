@@ -22,7 +22,7 @@ local context = addon:GetModule("Context")
 local FLAGS = { "isRetail", "isForever", "isClassic", "isBCC", "isMists", "isAnniversary", "isCata" }
 
 describe("SonataNext", function()
-  local saved, sent, used, savedFlags
+  local saved, sent, used, savedFlags, iconScale, scales
 
   local function default()
     return {
@@ -38,11 +38,14 @@ describe("SonataNext", function()
 
   before_each(function()
     sonataNext.themes = {}
-    saved, sent, used = "Default", {}, {}
+    saved, sent, used, iconScale = "Default", {}, {}, 120
     db.GetNextTheme = function() return saved end
     db.SetNextTheme = function(_, key) saved = key end
+    db.GetNextIconScale = function() return iconScale end
     events.SendMessage = function(_, _, name, key) table.insert(sent, { name, key }) end
     nextStyle.Use = function(_, theme) table.insert(used, theme) end
+    scales = {}
+    nextStyle.SetIconScale = function(_, percent) table.insert(scales, { percent, #used }) end
     savedFlags = {}
     for _, flag in ipairs(FLAGS) do savedFlags[flag] = addon[flag] end
     addon.isRetail, addon.isForever = true, false
@@ -62,6 +65,13 @@ describe("SonataNext", function()
   end)
 
   local function ctx() return context:New("spec") end
+
+  -- The Size tab's Icon Scale (docs/next-appearance-size.md) is the player's, kept across themes: Next's
+  -- style starts at the saved one, before the theme is handed to it.
+  it("starts Next's style at the saved Icon Scale, then the saved theme", function()
+    assert.are.same({ { 120, 0 } }, scales, "before any theme was handed over")
+    assert.are.equal("Default", used[1].Name)
+  end)
 
   describe("registering", function()
     it("registers a theme by its name, once", function()

@@ -78,7 +78,20 @@ function chain:Register(panel, role)
     self.watching = true
     events:RegisterEvent("UI_SCALE_CHANGED", function(ctx) self:Update(ctx, true) end)
     events:RegisterEvent("DISPLAY_SIZE_CHANGED", function(ctx) self:Update(ctx, true) end)
+    events:RegisterMessage("next/ScalesChanged", function(ctx) self:ScalesChanged(ctx) end)
   end
+end
+
+-- ScalesChanged applies the Size tab's scales (docs/next-appearance-size.md, next/ScalesChanged from its
+-- sliders): the item buttons' size, then every panel (ApplyScales), then where the panels rest, a small
+-- one refitted to the screen (Update, snapping).
+---@param ctx Context
+function chain:ScalesChanged(ctx)
+  style:SetIconScale(database:GetNextIconScale())
+  for _, panel in ipairs(self:Panels()) do
+    panel:ApplyScales(ctx)
+  end
+  self:Update(ctx, true)
 end
 
 ---@return NextChainLayout

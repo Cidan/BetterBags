@@ -1224,7 +1224,8 @@ function settings:Search(ctx, text)
   local needle = string.lower(text)
   local sections = {}
   for _, page in ipairs(pages:List()) do
-    for _, tab in ipairs(page.tabs) do
+    local tabs = pages:ShownTabs(page)
+    for _, tab in ipairs(tabs) do
       local found = {}
       for s, section in ipairs(pages:Sections(tab)) do
         for r, def in ipairs(section.rows) do
@@ -1239,7 +1240,7 @@ function settings:Search(ctx, text)
         end
       end
       if #found > 0 then
-        local title = #page.tabs > 1 and (page.title .. " > " .. tab.title) or page.title
+        local title = #tabs > 1 and (page.title .. " > " .. tab.title) or page.title
         local list = { self:resultLink(page, tab, title) }
         for _, row in ipairs(found) do
           if row then

@@ -407,6 +407,17 @@ describe("NextContent", function()
       assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
     end)
 
+    -- Icon Scale sizes the bags' item buttons, not the vendor's cards (docs/next-appearance-size.md).
+    it("steps down by the theme's icon size for cards, by the scaled one for item buttons", function()
+      style:SetIconScale(150)
+      canvas:SetCards(true)
+      assert.are.same({ style.VENDOR_CARD_WIDTH, style.CARD_ICON }, { canvas:CellWidth(), canvas:CellHeight() })
+      canvas:SetCards(false)
+      assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
+      assert.are_not.equal(style.ICON, style.CARD_ICON)
+      style:SetIconScale(100)
+    end)
+
     it("reuses a section of the same name and releases the rest", function()
       canvas:BindSections({ { name = "Food", buttons = { vendorButton("a") } }, { name = "Gone", buttons = {} } })
       draw()

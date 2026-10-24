@@ -367,6 +367,7 @@ describe("NextSettingsContent", function()
     it("names only settings the catalog has, for the page's bag; the classic bags' own only for them", function()
       local classicOnly = { bagFading = true, animateItemMovement = true, fullSectionNames = true,
         resizableWindow = true, snapToContent = true, itemsPerRow = true, columns = true, opacity = true, scale = true }
+      local nextOnly = { nextIconScale = true, nextBagScale = true }
       addon.hasGuildBank = true
       content:Init()
       local named = 0
@@ -379,6 +380,9 @@ describe("NextSettingsContent", function()
                 if classicOnly[row.setting] then
                   assert.are.equal("classic", row.design or section.design, row.setting)
                 end
+                if nextOnly[row.setting] then
+                  assert.are.equal("next", row.design or section.design or tab.design, row.setting)
+                end
                 if catalog:Has(row.setting, page.bag) then
                   assert.has_no.errors(function() catalog:Get(row.setting, page.bag) end, row.setting)
                 else
@@ -389,7 +393,7 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      assert.are.equal(11 + 3 * 29, named)
+      assert.are.equal(13 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -438,9 +442,16 @@ describe("NextSettingsContent", function()
       override(sonata, "RestoreSavedTheme", function() end)
     end)
 
+    local function shownTabIds()
+      local ids = {}
+      for _, tab in ipairs(pages:ShownTabs(pages:Get("appearance"))) do table.insert(ids, tab.id) end
+      return ids
+    end
+
     -- Asked: no classic (item button) themes while BetterBags Next is in use.
     it("picks BetterBags Next's theme alone while Next is in use", function()
       settings:Open("appearance")
+      assert.are.equal("theme", settings.tabId)
       local rows = rowsShown()
       assert.are.equal(1, #rows)
       assert.are.equal(sonataNext, rows[1].engine)
@@ -455,6 +466,38 @@ describe("NextSettingsContent", function()
       assert.are.equal(sonata, rows[1].engine)
       assert.are.equal(sonataNext, rows[2].engine)
       assert.are.same({ "Bag Theme", "Settings Window" }, { settings.page.sections[1].title, settings.page.sections[2].title })
+    end)
+
+    -- Asked: "make 'Theme' here a tab, and add a tab for 'Size'; here we have a slider for 'icon scale' in
+    -- the bag, and another slider for 'bag scale'" (docs/next-appearance-size.md).
+    it("has a Theme tab and, with BetterBags Next, a Size tab with Icon Scale and Bag Scale", function()
+      override(db, "GetNextIconScale", function() return 120 end)
+      override(db, "GetNextBagScale", function() return 85 end)
+      assert.are.same({ "theme", "size" }, shownTabIds())
+      settings:Open("appearance", "size")
+      assert.are.equal("size", settings.tabId)
+      assert.is_true(settings.tabs.frame:IsShown())
+      assert.are.equal(120, rowTitled("Icon Scale").control:GetValue())
+      assert.are.equal(85, rowTitled("Bag Scale").control:GetValue())
+    end)
+
+    it("has only the Theme tab with the classic bags, which size themselves on each bag's page", function()
+      design = "classic"
+      assert.are.same({ "theme" }, shownTabIds())
+      settings:Open("appearance", "size")
+      assert.are.equal("theme", settings.tabId)
+      assert.is_false(settings.tabs.frame:IsShown())
+      override(db, "GetMaxItemLevel", function() return 100 end)
+      settings:Search(addon:GetModule("Context"):New("spec"), "icon scale")
+      assert.are.same({}, settings.page.sections, "no Size tab to find")
+    end)
+
+    it("finds Icon Scale with BetterBags Next", function()
+      override(db, "GetMaxItemLevel", function() return 100 end)
+      override(db, "GetNextIconScale", function() return 100 end)
+      override(db, "GetNextBagScale", function() return 100 end)
+      settings:Search(addon:GetModule("Context"):New("spec"), "icon scale")
+      assert.are.equal("Appearance > Size", settings.page.sections[1].title)
     end)
   end)
 

@@ -115,6 +115,20 @@ describe("NextVendorButton", function()
       assert.are_not.equal(b, vendorButton:Acquire())
     end)
 
+    -- Icon Scale is the bags' item buttons' (docs/next-appearance-size.md): a card keeps the theme's
+    -- size, its name's two lines beside the icon.
+    it("keeps the theme's icon size whatever the player's Icon Scale", function()
+      style:SetIconScale(150)
+      local b = vendorButton:Acquire()
+      b:Style()
+      assert.are.same({ style.VENDOR_CARD_WIDTH, style.CARD_ICON }, { b.frame:GetSize() })
+      assert.are.same({ style.CARD_ICON, style.CARD_ICON }, { b.button:GetSize() })
+      assert.are.equal(style.Theme.Layout.Icon, style.CARD_ICON)
+      assert.are_not.equal(style.ICON, style.CARD_ICON)
+      style:SetIconScale(100)
+      b:Release()
+    end)
+
     -- Masque skins a button against its own size (Core.lua UpdateScale), so the button it skins is
     -- the square icon; the name and price are labels beside it on the card the canvas places.
     it("holds a square button with Masque's parts, its name and price beside it", function()

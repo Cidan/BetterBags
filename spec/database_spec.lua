@@ -95,6 +95,8 @@ const.DATABASE_DEFAULTS = {
     nextEnabled = false,
     nextChain = "apart",
     nextTabOrder = {},
+    nextIconScale = 100,
+    nextBagScale = 100,
     nextSize = "full",
     nextSmallPlaces = {},
     nextSmallSizes = {},
@@ -339,6 +341,25 @@ describe("Database", function()
       assert.are.same({}, DB:GetNextTabOrder("bank"))
       assert.are.same({ backpack = { 2, 1, 0 } }, DB.data.profile.nextTabOrder)
     end)
+
+    -- BetterBags Next's Size tab (docs/next-appearance-size.md): percentages, whole, kept in 50 to 150.
+    for _, case in ipairs({ { "GetNextIconScale", "SetNextIconScale", "nextIconScale" },
+      { "GetNextBagScale", "SetNextBagScale", "nextBagScale" } }) do
+      it(case[1] .. " / " .. case[2] .. ", 100 until set, whole and kept in 50 to 150", function()
+        assert.are.equal(100, DB[case[1]](DB))
+        DB[case[2]](DB, 120)
+        assert.are.equal(120, DB[case[1]](DB))
+        assert.are.equal(120, DB.data.profile[case[3]])
+        DB[case[2]](DB, 87.6)
+        assert.are.equal(88, DB[case[1]](DB))
+        DB[case[2]](DB, 10)
+        assert.are.equal(50, DB[case[1]](DB))
+        DB[case[2]](DB, 400)
+        assert.are.equal(150, DB[case[1]](DB))
+        DB[case[2]](DB, "nonsense")
+        assert.are.equal(100, DB[case[1]](DB))
+      end)
+    end
 
     it("GetNextSize / SetNextSize, full until switched, and nothing but a size", function()
       assert.are.equal("full", DB:GetNextSize())

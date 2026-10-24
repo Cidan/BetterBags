@@ -174,11 +174,14 @@ end
 -- price in their roles.
 function buttonProto:Style()
   local V = style.Theme.Vendor
-  self.frame:SetSize(style.VENDOR_CARD_WIDTH, style.ICON)
-  self.button:SetSize(style.ICON, style.ICON)
-  self.icon:SetSize(style.ICON, style.ICON)
+  -- A card keeps the theme's icon size (CARD_ICON): Icon Scale is the bags' item buttons'
+  -- (docs/next-appearance-size.md), and a smaller icon would not fit two lines of name beside it.
+  local icon = style.CARD_ICON
+  self.frame:SetSize(style.VENDOR_CARD_WIDTH, icon)
+  self.button:SetSize(icon, icon)
+  self.icon:SetSize(icon, icon)
   local gap = style.VENDOR_TEXT_GAP
-  local textWidth = style.VENDOR_CARD_WIDTH - style.ICON - 2 * gap
+  local textWidth = style.VENDOR_CARD_WIDTH - icon - 2 * gap
   local name, price = self.name, self.price
   name:ClearAllPoints()
   name:SetPoint("TOPLEFT", self.button, "TOPRIGHT", gap, 0)
@@ -382,7 +385,7 @@ function buttonProto:SetRepair(entry)
   local quality = entry.link and select(3, C_Item.GetItemInfo(entry.link)) or nil
   self:reset(entry.texture, quality)
   local fraction = entry.maxDurability > 0 and entry.durability / entry.maxDurability or 0
-  self.durability:SetWidth(math.max(1, style.ICON * fraction))
+  self.durability:SetWidth(math.max(1, style.CARD_ICON * fraction))
   self.durability:SetVertexColor(1 - fraction, fraction, 0.1, 1)
   self.durability:Show()
   self:setName(entry.link and entry.link:match("%[(.-)%]"), quality)

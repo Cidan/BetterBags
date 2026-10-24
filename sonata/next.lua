@@ -76,6 +76,8 @@ function sonataNext:Init()
   self.started = true
   self.active = false
   self.itemButtonStyle = nil
+  -- The player's Icon Scale (docs/next-appearance-size.md), kept across themes.
+  nextStyle():SetIconScale(db():GetNextIconScale())
   self:use(self:GetSavedThemeKey())
 end
 

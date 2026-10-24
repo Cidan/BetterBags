@@ -728,6 +728,10 @@ const.DATABASE_DEFAULTS = {
     -- The order the player moved each BetterBags Next tab rail's tabs to, by rail ("backpack", "bank",
     -- "bankTabs", "guild", "vendor"): tab ids, those not in it after them (docs/next-batch-2.md §5).
     nextTabOrder = {},
+    -- BetterBags Next's Size tab (docs/next-appearance-size.md), in percent: item buttons at the theme's
+    -- icon size times nextIconScale; small panels at nextBagScale (full panels are always at 100).
+    nextIconScale = 100,
+    nextBagScale = 100,
     -- BetterBags Next's panels: "full" height on the screen's edges, or "small" movable ones
     -- (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
     -- size the player gave it with its grips (next.md §14g).

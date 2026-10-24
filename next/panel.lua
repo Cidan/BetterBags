@@ -2860,6 +2860,16 @@ function panelProto:ApplyStyle(ctx)
   end
 end
 
+-- ApplyScales sizes the panel for the Size tab's scales (docs/next-appearance-size.md): its content drawn
+-- again at the item buttons' size (at once while it shows, else when it next shows), so each row fits
+-- as many as its width allows.
+---@param ctx Context
+function panelProto:ApplyScales(ctx)
+  if self.lastSlotInfo ~= nil then
+    self:Draw(ctx, self.lastSlotInfo)
+  end
+end
+
 -- BuildTabs makes the tab rail down the body's inner edge and lists the kind's tabs.
 function panelProto:BuildTabs()
   self.tabs = nextTabs:Create(self.body, self.side)

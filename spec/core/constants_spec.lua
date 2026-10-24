@@ -157,6 +157,14 @@ describe("Constants Module Offsets", function()
     assert.are.equal("Default", const.DATABASE_DEFAULTS.profile.nextTheme)
   end)
 
+  -- BetterBags Next's Size tab (docs/next-appearance-size.md): the theme's icons, the bag at its size.
+  it("keeps BetterBags Next's icons and bags at 100% by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    assert.are.equal(100, const.DATABASE_DEFAULTS.profile.nextIconScale)
+    assert.are.equal(100, const.DATABASE_DEFAULTS.profile.nextBagScale)
+  end)
+
   it("leaves animating item movement off by default", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")

@@ -206,6 +206,22 @@ section dragged out of a panel returns to the panel's strata (§7).
     its help text while something is typed"); the spec mock's `SearchBoxTemplate` runs Blizzard's
     template scripts, and `EditBox:GetText` is "" for an empty box, as in the client.
 - **Content:** a scroll box (`render/scrollbox.lua`, its bar hidden until used) holding the canvas.
+- **Icon Scale** (Appearance → Size, `nextIconScale`; asked: an "icon scale" slider, "do not touch items
+  per row ... just item button scale (also account for the fact that themes can set icon scale!)",
+  then "if buttons are huge, less fit per row naturally"; docs/next-appearance-size.md): an item button
+  is the theme's icon size (`Layout.Icon`) times the scale, in whole pixels (`style.ICON`,
+  `NextStyle:SetIconScale`). The grid keeps the theme's width (`GRID_WIDTH` from `Layout.Icon`), so the
+  panels keep theirs and a row fits as many buttons as its width allows (`canvas:Render` already packs
+  by width). The vendor's cards keep the theme's icon size (`style.CARD_ICON`): they are not item
+  buttons, and a smaller icon would not fit two lines of name beside it. SonataNext's `Init` gives the
+  style the saved scale before the theme; a theme change keeps it. The slider sends
+  `next/ScalesChanged`; the chain (`chain:ScalesChanged`, registered once with the first panel, in
+  BetterBags Next's event scope) sets the style's scale, has every panel draw again (`ApplyScales`:
+  at once while shown, else when it opens), then places the panels (`Update`, snapping). It never
+  re-applies the theme: that makes new font objects, which cannot be freed, one set per slider step.
+  Coverage: `spec/next/style_spec.lua` ("NextStyle Icon Scale"), `spec/next/small_spec.lua` ("the Size
+  tab's scales" → "Icon Scale"), `spec/next/content_spec.lua`, `spec/next/vendorbutton_spec.lua`,
+  `spec/sonata/next_engine_spec.lua`.
 - **Footer:** free slots on the left, money on the right (`MoneyFrame`).
 - **Tabs** (`next/tabs.lua`): the backpack's groups as tabs stacked down the body's left edge,
   sticking out over the feather like bookmarks. The selected one is brighter, with a gold bar that
