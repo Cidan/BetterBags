@@ -424,8 +424,8 @@ describe("NextContent", function()
     it("fits each item button it lays out, by its decoration or the parts it names", function()
       local fit = addon:GetModule("NextItemFit")
       local fitted = {}
-      override(fit, "Fit", function(_, ctx, decoration, extras, item)
-        table.insert(fitted, { ctx ~= nil, decoration, extras, item })
+      override(fit, "Fit", function(_, ctx, decoration, extras, fittedItem)
+        table.insert(fitted, { ctx ~= nil, decoration, extras, fittedItem })
         return "placed"
       end)
       bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A"), item("0_2", "A") } }))
