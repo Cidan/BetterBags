@@ -821,6 +821,33 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
     the tooltip's `SetText`/`AddLine` reject one. Coverage: `spec/next/vendor_spec.lua` ("with a
     secret vendor name (an instance)"), `spec/next/chain_spec.lua` ("names bags by their labels in
     tooltips"). Not seen in game yet.
+  - **Secret anchoring, every measure of the title.** Reported by a player: `next/panel.lua:2359: attempt to
+    compare a secret number value (execution tainted by 'BetterBags')` in `titleWidth`, from `SetTitle` in
+    `OnShowing`. The earlier fix checked only `GetStringWidth`; while the title shows a secret its anchoring is
+    secret (`IsAnchoringSecret`), so every size and position query on it is secret (`GetWidth`, `GetHeight`,
+    `GetSize`, `GetLeft` and the other edges, `GetCenter`, `GetRect`, `GetScaledRect`, `GetStringHeight`,
+    `GetNumLines`, `IsTruncated`, `IsMouseOver`: all `SecretWhenAnchoringSecret`), its width too, though
+    `FitTitle` set it. And the secrecy "propagates downwards to dependent anchored regions" (warcraft.wiki.gg
+    Secret Values, "Secret anchors"): everything anchored to the title has it, and so would a tooltip anchored to
+    one of those. Now:
+    - `titleWidth` reads neither measure while either is secret: it is the width `FitTitle` cut the title to
+      (`panel.titleCut`, kept as it sets it; only a title cut short, the vendor's at both sizes, ever shows a
+      secret), else `Cloud.SecretTitleWidth`.
+    - The title's button (it owns the title's tooltip) hangs from the body by the title's own numbers, 8 past its
+      text across and 6 above and below (`placeTitleRow`), no longer anchored to the title.
+    - What still hangs from the title (the cloud's puffs, the braid) is only ever placed, never read.
+    - The pixel check (`/bbdb`, `debug/pixelaudit.lua`) skips a region whose anchoring is secret.
+  - **What else can be secret** (checked against `Blizzard_APIDocumentationGenerated`, every function and event
+    BetterBags calls or registers): the unit APIs only for a unit that is not player-controlled or in the group
+    (`SecretWhenUnitIdentityRestricted`), so only `UnitName("npc")` and `UnitGUID("npc")` (the Seller, seller.md
+    §3); no event BetterBags registers has a secret payload; widget queries only once a secret was given to that
+    widget or something it hangs from, which only the vendor's title is. The frame mock now models secret
+    anchoring (`IsAnchoringSecret`, the queries above answering secrets, down every anchor chain, lines'
+    start and end points included). Coverage: `spec/next/vendor_spec.lua` ("with a secret vendor name": the
+    title cut short and its glow, the button and its tooltip off the title's anchoring, either measure secret,
+    every shipped theme at both sizes hovered with its cloud and sparkles; a long name laid out to its cut),
+    `spec/next/chain_spec.lua` ("takes clicks over the title"), `spec/debug/pixelaudit_spec.lua` ("skips a region
+    whose anchoring is secret"). Nine mutations, each caught. Not seen in game.
 - **Header buttons** (from the screen edge): close; settings; the filter (retail and Forever, unless
   `Enum.GameRule.MerchantFilterDisabled`: Blizzard's own radio list, each spec, the class, Bind on
   Equip, everything, through `MenuUtil.CreateContextMenu`, `SetMerchantFilter`); Sell Junk; Repair

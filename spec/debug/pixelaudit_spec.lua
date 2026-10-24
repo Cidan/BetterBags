@@ -65,6 +65,25 @@ describe("PixelAudit", function()
       assert.are.equal(1, #problems, "the texture, not the frame")
     end)
 
+    -- A region with secret anchoring answers its position queries in secrets (a vendor's name in a dungeon, and what
+    -- hangs from it; warcraft.wiki.gg Secret Values, "Secret anchors"): nothing of it can be judged.
+    it("skips a region whose anchoring is secret, still judging the rest", function()
+      local saved = _G.issecretvalue
+      _G.issecretvalue = IsMockSecret
+      local text = window:CreateFontString()
+      text:SetFontObject(GameFontNormal)
+      text:SetPoint("TOPLEFT", window, "TOPLEFT", 0, 0)
+      text:SetText(MockSecret("Mira the Smith"))
+      function text:GetScaledRect() return MockSecret(nil), MockSecret(nil), MockSecret(nil), MockSecret(nil) end
+      local tex = window:CreateTexture()
+      tex:SetPoint("TOPLEFT", window, "TOPLEFT", 0.3, 0)
+      tex:SetSize(4 * unit, unit)
+      local ok, problems = pcall(audit.Check, audit, window)
+      _G.issecretvalue = saved
+      assert.is_true(ok, tostring(problems))
+      assert.are.equal(1, #problems, "the texture, not the secret text")
+    end)
+
     -- In game an owner table reaches saved settings: reading a key AceDB's defaults do not hold can write it
     -- (wildcard defaults). The check only iterates the tables it walks and compares what it finds by identity.
     it("names parts without reading a key of any table it walks", function()

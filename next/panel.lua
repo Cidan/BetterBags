@@ -105,6 +105,15 @@ local nextPanel = addon:NewModule('NextPanel')
 -- lowered below it for the way, and put back here once in place.
 local PANEL_LEVEL = 500
 
+-- isSecret says whether addon code may not compare or do arithmetic on a value: a secret, as a vendor's name in a
+-- dungeon is (UnitName, SecretWhenUnitNameIdentityRestricted), and every size and position of the title showing it
+-- (SecretWhenAnchoringSecret). Clients without secrets have no issecretvalue.
+---@param value any
+---@return boolean
+local function isSecret(value)
+  return issecretvalue ~= nil and issecretvalue(value)
+end
+
 -- sparkSize is the spark's size (the theme's Header.Spark), 0 with none.
 ---@return number
 local function sparkSize()
@@ -2170,7 +2179,7 @@ function panelProto:CloudSpan()
   -- Secret while the title shows a secret (a vendor's name in an instance): addon code may not do
   -- arithmetic on it. Clients without secrets have no issecretvalue.
   local C = style.Cloud
-  if issecretvalue ~= nil and issecretvalue(width) then
+  if isSecret(width) then
     width = C and C.SecretTitleWidth or 0
   end
   return width + self:InnerPad() + style.TITLE_INSET + (C and C.Pad or 0)
@@ -2429,18 +2438,20 @@ function panelProto:styleRail()
 end
 
 -- titleWidth is how wide the title's text is drawn: its measure, at most the width it is cut short to
--- (FitTitle); a stand-in while it shows a secret (a vendor's name in an instance), which addon code may
--- not measure (clients without secrets have no issecretvalue).
+-- (FitTitle). While it shows a secret (a vendor's name in an instance) every measure of it is secret, its width
+-- too (its anchoring is secret: warcraft.wiki.gg Secret Values, "Secret anchors"; reported in game: "attempt to
+-- compare a secret number value" here), so it is the width FitTitle cut it to, else a stand-in.
 ---@private
 ---@return number
 function panelProto:titleWidth()
   local title = self.title
-  local width = title:GetStringWidth()
-  if issecretvalue ~= nil and issecretvalue(width) then
+  local width, cut = title:GetStringWidth(), title:GetWidth()
+  if isSecret(width) or isSecret(cut) then
     local C = style.Cloud
-    width = title:GetWidth() > 0 and title:GetWidth() or (C and C.SecretTitleWidth or 0)
-  elseif title:GetWidth() > 0 then
-    width = math.min(width, title:GetWidth())
+    return self.titleCut or (C and C.SecretTitleWidth or 0)
+  end
+  if cut > 0 then
+    width = math.min(width, cut)
   end
   return width
 end
@@ -2484,20 +2495,31 @@ function panelProto:placeTitleRow()
     end
     glow:SetSize(math.max(pixel:Unit(body), width), (fontHeight or 0) + 2 * gy)
   end
+  -- The title's button covers its text, 8 past it across and 6 above and below, hung from the body by the title's
+  -- own numbers, never from the title: a title showing a secret has secret anchoring, and so would every region
+  -- anchored to it, the tooltip the button owns included (warcraft.wiki.gg Secret Values, "Secret anchors").
+  local button = self.titleButton
+  local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET)
+  button:ClearAllPoints()
+  if left then
+    button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - 8), -(top - 6))
+  else
+    button:SetPoint("TOPLEFT", body, "TOPLEFT", inset - 8, -(top - 6))
+  end
+  button:SetSize(pixel:Ceil(body, self:titleWidth()) + 16, (fontHeight or 0) + 12)
 end
 
 -- BuildTitleButton makes the title a button (next.md §12): a click chains the bag to its partner,
 -- puts it back, or moves both across; the pointer over it lights a soft glow behind the title and
 -- says what a click does.
 function panelProto:BuildTitleButton()
-  local frame, title = self.frame, self.title
+  local frame = self.frame
   local glow = frame:CreateTexture(nil, "ARTWORK", nil, -3)
   glow:SetAlpha(0)
   self.titleGlow = glow
 
+  -- Placed with the title (placeTitleRow).
   local button = CreateFrame("Button", nil, frame)
-  button:SetPoint("TOPLEFT", title, "TOPLEFT", -8, 6)
-  button:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", 8, -6)
   button:SetFrameLevel(frame:GetFrameLevel() + 55)
   button:RegisterForClicks("LeftButtonUp")
   addon.SetScript(button, "OnClick", function(ctx)
@@ -2819,8 +2841,11 @@ function panelProto:FitTitle()
     return
   end
   title:SetWordWrap(false)
-  pixel:Width(title, math.max(1, self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
+  -- Kept: the title's own width cannot be read back while it shows a secret (titleWidth), and only a title cut
+  -- short (the vendor's, at both sizes) ever shows one.
+  self.titleCut = pixel:Length(title, math.max(1, self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
     - (style.PAD + self:headerButtonsWidth()) - 12))
+  title:SetWidth(self.titleCut)
   self:placeTitleRow()
 end
 

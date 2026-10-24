@@ -1100,8 +1100,12 @@ describe("NextChain", function()
 
   describe("the title", function()
     it("takes clicks over the title and says what a click does", function()
+      -- Over the title, 8 past it across and 6 above and below, hung from the body (never from the title, whose
+      -- anchoring is secret while it shows a secret: next-themes.md).
       local b = backpack.titleButton
-      assert.are.equal(backpack.title, select(2, b:GetPoint(1)))
+      local inset = backpack:InnerPad() + style.TITLE_INSET
+      assert.are.same({ "TOPLEFT", backpack.body, "TOPLEFT", inset - 8, -(style.TITLE_TOP - 6) }, { b:GetPoint(1) })
+      assert.are.equal(math.ceil(backpack.title:GetStringWidth()) + 16, b:GetWidth())
       local function tip(panel)
         panel.titleButton:GetScript("OnEnter")(panel.titleButton)
         return GameTooltip.lines[1] and GameTooltip.lines[1].text

@@ -3654,3 +3654,56 @@ function _G.ColorPickerFrame:_Cancel()
   self:Hide()
   if self.cancelFunc then self.cancelFunc(self.previousValues) end
 end
+
+-- Secret anchors (warcraft.wiki.gg Secret Values, "Secret anchors"; SecretPredicatesDocumentation.lua
+-- SecretWhenAnchoringSecret): a region with secret anchoring answers its position and measurement queries with
+-- secrets. A font string showing a secret has it (in game, a vendor's name in a dungeon made its GetWidth secret:
+-- "attempt to compare a secret number value" in NextPanel:titleWidth), and the secrecy "propagates downwards to
+-- dependent anchored regions": a region anchored to one, directly or through others, has it too. Clearing the
+-- anchor points resets it. ScriptRegion:IsAnchoringSecret() -> isSecret (SimpleScriptRegionAPIDocumentation).
+function WidgetMethods:IsAnchoringSecret(seen)
+  if self._secretText ~= nil then
+    return true
+  end
+  seen = seen or {}
+  if seen[self] then
+    return false
+  end
+  seen[self] = true
+  local function secret(relativeTo)
+    return type(relativeTo) == "table" and relativeTo.IsAnchoringSecret ~= nil and relativeTo:IsAnchoringSecret(seen)
+  end
+  for _, p in ipairs(self._points or {}) do
+    if secret(p.relativeTo) then
+      return true
+    end
+  end
+  for _, p in ipairs({ self._startPoint or false, self._endPoint or false }) do
+    if p and secret(p[2]) then
+      return true
+    end
+  end
+  return false
+end
+-- The queries the API documentation marks SecretWhenAnchoringSecret, by how many values each returns
+-- (SimpleScriptRegionAPIDocumentation, SimpleFontStringAPIDocumentation).
+do
+  local SECRET_WHEN_ANCHORING_SECRET = {
+    GetWidth = 1, GetHeight = 1, GetSize = 2, GetLeft = 1, GetRight = 1, GetTop = 1, GetBottom = 1, GetCenter = 2,
+    GetRect = 4, GetScaledRect = 4, IsMouseOver = 1, GetStringWidth = 1, GetStringHeight = 1, GetNumLines = 1,
+    IsTruncated = 1,
+  }
+  for name, count in pairs(SECRET_WHEN_ANCHORING_SECRET) do
+    local base = WidgetMethods[name]
+    if base ~= nil then
+      WidgetMethods[name] = function(self, ...)
+        if self:IsAnchoringSecret() then
+          if count == 1 then return _G.MockSecret(nil) end
+          if count == 2 then return _G.MockSecret(nil), _G.MockSecret(nil) end
+          return _G.MockSecret(nil), _G.MockSecret(nil), _G.MockSecret(nil), _G.MockSecret(nil)
+        end
+        return base(self, ...)
+      end
+    end
+  end
+end

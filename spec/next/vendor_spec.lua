@@ -495,6 +495,78 @@ describe("NextVendor", function()
       end
     end)
 
+    -- Reported by a player: "next/panel.lua:2359: attempt to compare a secret number value (execution tainted by
+    -- 'BetterBags')" in titleWidth, from SetTitle: the title showing the secret has secret anchoring, so its GetWidth
+    -- is secret too, not only its GetStringWidth (SecretWhenAnchoringSecret; warcraft.wiki.gg Secret Values, "Secret
+    -- anchors").
+    it("cuts its title short, its glow the width it gave the title, never measuring the title", function()
+      local v = open()
+      assert.is_true(v.title:IsAnchoringSecret(), "the mock as the client: the title's anchoring is secret")
+      local cut = v:BodyWidth() - (v:InnerPad() + style.TITLE_INSET) - (style.PAD + v:headerButtonsWidth()) - 12
+      assert.are.equal(cut, v.titleCut)
+      local G = style.Theme.Header.TitleGlow
+      assert.are.equal(cut + 2 * G.X, v.titleGlow._width)
+      v:ApplyStyle(ctx())
+      v:SetTitle(name)
+    end)
+
+    -- Everything anchored to a region with secret anchoring has it too, and a tooltip anchored to that: the title's
+    -- button, which owns its tooltip, hangs from the body by the title's own numbers instead.
+    it("keeps its title button, and the tooltip it owns, off the title's secret anchoring", function()
+      local v = open()
+      local button = v.titleButton
+      assert.is_false(button:IsAnchoringSecret())
+      local point, relativeTo, _, x, y = button:GetPoint(1)
+      assert.are.same({ "TOPRIGHT", v.body }, { point, relativeTo })
+      assert.are.same({ -(v:InnerPad() + style.TITLE_INSET - 8), -(style.TITLE_TOP - 6) }, { x, y })
+      assert.are.equal(v.titleCut + 16, button:GetWidth())
+      button:GetScript("OnEnter")(button)
+      assert.are.equal(button, GameTooltip._owner)
+      button:GetScript("OnLeave")(button)
+    end)
+
+    -- What it does about its title, with the name secret throughout: laid out in every shipped theme (Guild Wars 2's
+    -- side rail included), hovered, its cloud breathing and its sparkles born, at both sizes.
+    for _, size in ipairs({ "full", "small" }) do
+      it("does everything it does about its title while the name is secret, " .. size, function()
+        override(stubs.database, "GetNextSize", function() return size end)
+        override(stubs.database, "GetNextBagScale", function() return 100 end)
+        override(stubs.database, "GetNextSmallChain", function() return "apart" end)
+        override(stubs.database, "GetNextSmallPlace", function() return nil end)
+        override(stubs.database, "GetNextSmallSize", function() return nil end)
+        local v = open()
+        assert.are.equal(size == "small", v:IsSmall())
+        local sonataNext = addon:GetModule("SonataNext")
+        for _, key in ipairs({ "GW2", "Quiet", "Ember", "Parchment", "Default" }) do
+          style:Use(sonataNext:Resolve(key))
+          v:ApplyStyle(ctx())
+          assert.is_false(v.titleButton:IsAnchoringSecret(), key)
+          v.titleButton:GetScript("OnEnter")(v.titleButton)
+          v.titleButton:GetScript("OnLeave")(v.titleButton)
+          v.cloud.driver:GetScript("OnUpdate")(v.cloud.driver, 0.1)
+          for _ = 1, 5 do
+            v.cloudSparkles.options.Spawn()
+            v.sparkles.options.Spawn()
+          end
+        end
+        UseNextTheme(nil)
+        v:ApplyStyle(ctx())
+        -- The chain keeps the panels it is given; later tests chain their own vendor, at full size.
+        addon:GetModule("NextChain"):Init()
+      end)
+    end
+
+    -- Each of the title's measures is documented as secret on its own (SecretWhenAnchoringSecret on GetWidth and on
+    -- GetStringWidth): a client that reports only the width secret is not compared either.
+    it("reads neither measure of its title while either is secret", function()
+      local v = open()
+      v:SetTitle("Mira the Smith")
+      override(v.title, "GetWidth", function() return MockSecret(nil) end)
+      v:SetTitle("Mira the Smith")
+      local G = style.Theme.Header.TitleGlow
+      assert.are.equal(v.titleCut + 2 * G.X, v.titleGlow._width)
+    end)
+
     it("calls itself Vendor in its title's tooltip, never by the secret name", function()
       local v = open()
       v.titleButton:GetScript("OnEnter")(v.titleButton)
@@ -511,6 +583,17 @@ describe("NextVendor", function()
       finishTweens()
       assert.are.equal(#"Mira the Smith" * 6 + style.PAD + 4 + style.Cloud.Pad, v:CloudSpan())
     end)
+  end)
+
+  -- A name longer than the room its title is cut to: what is drawn about it (its glow, its button) is as wide as
+  -- that room, not the name's whole measure.
+  it("lays what is drawn about a long name out to the width the title is cut to", function()
+    override(_G, "UnitName", function(unit) if unit == "npc" then return string.rep("Mira the Smith ", 6) end end)
+    local v = open()
+    assert.is_true(v.title:GetStringWidth() > v.titleCut)
+    local G = style.Theme.Header.TitleGlow
+    assert.are.equal(v.titleCut + 2 * G.X, v.titleGlow._width)
+    assert.are.equal(v.titleCut + 16, v.titleButton:GetWidth())
   end)
 
   describe("opening", function()
