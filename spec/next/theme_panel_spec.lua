@@ -582,6 +582,33 @@ describe("BetterBags Next's panels and themes", function()
   -- in the same style"; "these buttons should be colorable via themes, and even replacable with custom
   -- art"). A tint suits a white glyph and darkens full-color art into a silhouette (asked with a
   -- Parchment screenshot), so a theme's own art says which it is (Glyph = false: art).
+  -- The Plain theme (docs/next-plain-theme.md): Blizzard centers a window's title in the room its buttons leave
+  -- (PortraitFrameBaseTemplate's TitleContainer). Its click area and glow follow the text where it is drawn.
+  describe("a centered title", function()
+    it("centers the title in the room the header buttons leave, its button over the text, mirrored on the bank", function()
+      local bag, bank = opened(function(c) return nextBag:Create(c) end), opened(function(c) return nextBank:Create(c) end)
+      apply({ Header = { Title = { Font = "Title", Justify = "CENTER" } } })
+      for _, panel in ipairs({ bag, bank }) do
+        local title = panel.title
+        assert.are.equal("CENTER", title:GetJustifyH())
+        assert.is_false(title:CanWordWrap())
+        local inset = panel:InnerPad() + style.TITLE_INSET
+        local room = panel:BodyWidth() - inset - (style.PAD + panel:headerButtonsWidth()) - panel:pinnedRoom() - 12
+        assert.are.equal(room, title:GetWidth())
+        local shift = math.floor((room - math.ceil(title:GetStringWidth())) / 2)
+        local point, rel, relPoint, x = panel.titleButton:GetPoint(1)
+        if panel.side == "LEFT" then
+          assert.are.same({ "TOPRIGHT", panel.body, "TOPRIGHT", -(inset + shift - 8) }, { point, rel, relPoint, x })
+        else
+          assert.are.same({ "TOPLEFT", panel.body, "TOPLEFT", inset + shift - 8 }, { point, rel, relPoint, x })
+        end
+      end
+      backToDefault()
+      assert.are.equal("LEFT", bag.title:GetJustifyH())
+      assert.are.equal(0, bag.title:GetWidth(), "as long as it is again")
+    end)
+  end)
+
   describe("header icons", function()
     local function color(button)
       local r, g, b = button.icon:GetVertexColor()
@@ -752,6 +779,38 @@ describe("BetterBags Next's panels and themes", function()
       close:GetScript("OnEnter")(close)
       assert.is_false(close.highlight:IsShown(), "a theme without one")
       close:GetScript("OnLeave")(close)
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's close button has art of its own pressed and disabled
+    -- (UIPanelCloseButtonNoScripts: RedButton-exit-pressed, RedButton-Exit-Disabled).
+    it("draws an icon's own art while pressed and while disabled, its disabled art neither dimmed nor grayed", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Header = { Buttons = { Icons = { closeButton = { Atlas = "RedButton-Exit", Glyph = false,
+        Pushed = { Atlas = "RedButton-exit-pressed" }, Disabled = { Atlas = "RedButton-Exit-Disabled" } } } } } })
+      local close = bag.closeButton
+      assert.are.equal("RedButton-Exit", close.icon:GetAtlas())
+      close:GetScript("OnMouseDown")(close, "LeftButton")
+      assert.are.equal("RedButton-exit-pressed", close.icon:GetAtlas())
+      close:GetScript("OnMouseUp")(close, "LeftButton")
+      assert.are.equal("RedButton-Exit", close.icon:GetAtlas())
+      close:GetScript("OnMouseDown")(close, "LeftButton")
+      close:GetScript("OnLeave")(close)
+      assert.are.equal("RedButton-Exit", close.icon:GetAtlas(), "not once the pointer leaves")
+      bag:SetHeaderButtonEnabled(close, false)
+      assert.are.equal("RedButton-Exit-Disabled", close.icon:GetAtlas())
+      assert.is_false(close.icon:IsDesaturated())
+      local _, _, _, a = close.icon:GetVertexColor()
+      assert.are.equal(select(4, style:RGBA(style.Theme.Header.Buttons.ArtColor)), a, "not dimmed")
+      close:GetScript("OnMouseDown")(close, "LeftButton")
+      assert.are.equal("RedButton-Exit-Disabled", close.icon:GetAtlas(), "not pressed while disabled")
+      close:GetScript("OnMouseUp")(close, "LeftButton")
+      bag:SetHeaderButtonEnabled(close, true)
+      assert.are.equal("RedButton-Exit", close.icon:GetAtlas())
+      backToDefault()
+      bag:SetHeaderButtonEnabled(close, false)
+      assert.are.equal(style:TexturePath(style.Theme.Header.Buttons.Icons.closeButton.Texture), close.icon:GetTexture(),
+        "a theme without: its icon, dimmed")
+      bag:SetHeaderButtonEnabled(close, true)
     end)
 
     it("names the button whose icon the theme does not give", function()
@@ -997,6 +1056,30 @@ describe("BetterBags Next's panels and themes", function()
   end)
 
   describe("the search box", function()
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's own bag search box (BagSearchBoxTemplate's border,
+    -- InputBoxVisualTemplate), not Next's fill and edges.
+    it("keeps its template's own border for a theme that says so, and Next's look for one that does not", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Search = { Template = true } })
+      local t = bag.searchBox.textBox
+      for _, key in ipairs({ "Left", "Middle", "Right" }) do
+        assert.are.equal(1, t[key]:GetAlpha(), key)
+      end
+      assert.is_false(bag.searchFill:IsShown())
+      for _, edge in ipairs(bag.searchEdges) do
+        assert.is_false(edge:IsShown())
+      end
+      t:GetScript("OnEditFocusGained")(t)
+      assert.is_false(bag.searchFill:IsShown(), "focused too")
+      t:GetScript("OnEditFocusLost")(t)
+      backToDefault()
+      for _, key in ipairs({ "Left", "Middle", "Right" }) do
+        assert.are.equal(0, t[key]:GetAlpha(), key)
+      end
+      assert.is_true(bag.searchFill:IsShown())
+      assert.is_true(bag.searchEdges[1]:IsShown())
+    end)
+
     it("sits where its layout says, in its fill, border and magnifier colors", function()
       local bag = nextBag:Create(ctx())
       apply({ Layout = { SearchTop = 80, SearchHeight = 30 }, Palette = { Field = { 0.3, 0.3, 0.3, 1 } },

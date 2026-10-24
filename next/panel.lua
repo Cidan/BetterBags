@@ -2149,8 +2149,18 @@ function panelProto:headerButton(spec)
   end)
   button:SetScript("OnLeave", function()
     button.hover = false
+    button.pressed = false
     self:PaintHeaderIcon(button)
     GameTooltip:Hide()
+  end)
+  -- Pressed: its icon's Pushed art, as a button's pushed texture is.
+  button:SetScript("OnMouseDown", function()
+    button.pressed = true
+    self:PaintHeaderIcon(button)
+  end)
+  button:SetScript("OnMouseUp", function()
+    button.pressed = false
+    self:PaintHeaderIcon(button)
   end)
   addon.SetScript(button, "OnClick", function(ctx)
     spec.onClick(ctx)
@@ -2195,7 +2205,6 @@ function panelProto:SetHeaderIcon(button, iconKey)
   local buttonSize = pixel:Length(button, style.HEADER_BUTTON)
   icon:ClearAllPoints()
   pixel:Center(icon, button, buttonSize, buttonSize, size, size)
-  drawIconArt(icon, spec)
   local highlight = button.highlight
   highlight:ClearAllPoints()
   pixel:Center(highlight, button, buttonSize, buttonSize, size, size)
@@ -2212,7 +2221,9 @@ end
 -- (asked with a Parchment screenshot), so the two are colored apart. A disabled button is not brighter
 -- under the pointer: it is drawn at DisabledAlpha of its color, and art desaturated too (a white glyph
 -- looks the same desaturated). Its Highlight shows over it while it is hovered and enabled, as a button's
--- highlight texture does (GW2_UI's buttons).
+-- highlight texture does (GW2_UI's buttons). An icon with art of its own while pressed (Pushed) or disabled
+-- (Disabled: neither dimmed nor grayed, the art shows it) draws that art then, as a button's pushed and disabled
+-- textures do (Blizzard's close button).
 ---@param button Button
 function panelProto:PaintHeaderIcon(button)
   local B = style.Theme.Header.Buttons
@@ -2225,11 +2236,19 @@ function panelProto:PaintHeaderIcon(button)
     color = own.Color or (button.glyph and B.Color or B.ArtColor)
   end
   local r, g, b, a = style:RGBA(color)
-  if not enabled then
+  local art = own
+  if not enabled and own.Disabled then
+    art = own.Disabled
+  elseif enabled and button.pressed and own.Pushed then
+    art = own.Pushed
+  end
+  local drawnDisabled = art == own.Disabled
+  if not enabled and not drawnDisabled then
     a = a * B.DisabledAlpha
   end
   local icon = button.icon
-  icon:SetDesaturated(not enabled and not button.glyph)
+  drawIconArt(icon, art)
+  icon:SetDesaturated(not enabled and not button.glyph and not drawnDisabled)
   icon:SetVertexColor(r, g, b, a)
   local H = own.Highlight
   button.highlight:SetShown(H ~= nil and button.hover and enabled)
@@ -2388,14 +2407,16 @@ function panelProto:styleHeader()
   style:SetFont(title, H.Title.Font)
   title:ClearAllPoints()
   -- Justified toward its anchor: a small panel's title has a width (FitTitle), and text is centered in
-  -- its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER).
+  -- its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER). A theme may center it in the room
+  -- the header buttons leave (Title.Justify = "CENTER"), as Blizzard centers a window's title.
   local inset, top = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET), pixel:Snap(body, style.TITLE_TOP)
+  local centered = H.Title.Justify == "CENTER"
   if left then
     title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -inset, -top)
-    title:SetJustifyH("RIGHT")
+    title:SetJustifyH(centered and "CENTER" or "RIGHT")
   else
     title:SetPoint("TOPLEFT", body, "TOPLEFT", inset, -top)
-    title:SetJustifyH("LEFT")
+    title:SetJustifyH(centered and "CENTER" or "LEFT")
   end
 
   -- The cloud: a puff per entry, out of step (each breathes at its own pace, from its own point in
@@ -2556,6 +2577,19 @@ function panelProto:titleWidth()
   return width
 end
 
+-- titleShift is how far in from the title's anchor its text starts: half the room it leaves, rounded down, when its
+-- theme centers it (Title.Justify = "CENTER", FitTitle), else none.
+---@private
+---@return number
+function panelProto:titleShift()
+  local cut = self.titleCut
+  if style.Theme.Header.Title.Justify ~= "CENTER" or cut == nil then
+    return 0
+  end
+  local body = self.body
+  return math.max(0, pixel:Floor(body, (cut - pixel:Ceil(body, self:titleWidth())) / 2))
+end
+
 -- placeTitleRow puts what is drawn about the title on whole pixels (docs/next-pixel-perfect.md), from the
 -- body's corner on the title's side by whole-pixel offsets, never from the title text's middle or its far
 -- edge (the client's measure of the text, between pixels): the ribbon's lines out of the window from its
@@ -2585,7 +2619,7 @@ function panelProto:placeTitleRow()
   local glow, G = self.titleGlow, H.TitleGlow
   if G then
     local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
-    local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET)
+    local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET) + self:titleShift()
     local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
     glow:ClearAllPoints()
     if left then
@@ -2599,7 +2633,7 @@ function panelProto:placeTitleRow()
   -- own numbers, never from the title: a title showing a secret has secret anchoring, and so would every region
   -- anchored to it, the tooltip the button owns included (warcraft.wiki.gg Secret Values, "Secret anchors").
   local button = self.titleButton
-  local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET)
+  local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET) + self:titleShift()
   button:ClearAllPoints()
   if left then
     button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - 8), -(top - 6))
@@ -2952,12 +2986,12 @@ function panelProto:layoutRail()
 end
 
 -- FitTitle keeps the title on one line in the room the shown header buttons leave it, cut short
--- rather than over them: on every small panel, whose width the player sets (next.md §14g), and at
--- either size on a panel whose title can be any length (fitsTitle: a vendor's name). Else the title
--- is as long as it is.
+-- rather than over them: on every small panel, whose width the player sets (next.md §14g), at
+-- either size on a panel whose title can be any length (fitsTitle: a vendor's name), and on every panel whose
+-- theme centers its title (Title.Justify = "CENTER": in that room). Else the title is as long as it is.
 function panelProto:FitTitle()
   local title = self.title
-  if not (self.fitsTitle or self:IsSmall()) then
+  if not (self.fitsTitle or self:IsSmall() or style.Theme.Header.Title.Justify == "CENTER") then
     title:SetWordWrap(true)
     title:SetWidth(0)
     self:placeTitleRow()
@@ -2980,9 +3014,6 @@ end
 function panelProto:BuildSearch()
   local sf = self:CreateSearchBox()
   local t = sf.textBox
-  for _, key in ipairs({ "Left", "Middle", "Right" }) do
-    t[key]:SetAlpha(0)
-  end
   local fill = sf.frame:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints()
   fill:SetColorTexture(1, 1, 1, 1)
@@ -3027,7 +3058,8 @@ end
 -- styleSearch places and draws the search box from the theme (Layout, Search): where it sits, its
 -- border's size (or none), its magnifier, its help text and what is typed in their roles (the
 -- template gives the help text a color of its own, so its role's color is set on it too), then its
--- look for its state.
+-- look for its state. A theme that keeps the template's look (Search.Template: Blizzard's own bag search box,
+-- InputBoxVisualTemplate's border) draws neither Next's fill nor its edge.
 ---@private
 function panelProto:styleSearch()
   local sf, S = self.searchBox, style.Theme.Search
@@ -3038,7 +3070,12 @@ function panelProto:styleSearch()
   pixel:Point(sf.frame, "TOPLEFT", body, "TOPLEFT", leftPad, -style.SEARCH_TOP)
   pixel:Point(sf.frame, "TOPRIGHT", body, "TOPRIGHT", -rightPad, -style.SEARCH_TOP)
   pixel:Height(sf.frame, style.SEARCH_HEIGHT)
-  local E = S.Edge
+  local template = S.Template == true
+  for _, key in ipairs({ "Left", "Middle", "Right" }) do
+    t[key]:SetAlpha(template and 1 or 0)
+  end
+  self.searchFill:SetShown(not template)
+  local E = not template and S.Edge
   for i, edge in ipairs(self.searchEdges) do
     if E then
       if i <= 2 then
@@ -3118,12 +3155,15 @@ function panelProto:UpdateSearchLook(now)
   local state = self:SearchState()
   local focused = state == "focus"
   local fill = focused and S.FocusFill or S.Fill
-  if style:IsArt(fill) then
-    style:Paint(self.searchFill, fill)
-  else
-    self.searchFill:SetTexCoord(0, 1, 0, 1)
-    self.searchFill:SetColorTexture(1, 1, 1, 1)
-    self.searchFill:SetVertexColor(style:RGBA(fill))
+  -- Under a theme that keeps the template's own border (styleSearch), the fill is not drawn.
+  if S.Template ~= true then
+    if style:IsArt(fill) then
+      style:Paint(self.searchFill, fill)
+    else
+      self.searchFill:SetTexCoord(0, 1, 0, 1)
+      self.searchFill:SetColorTexture(1, 1, 1, 1)
+      self.searchFill:SetVertexColor(style:RGBA(fill))
+    end
   end
   local icon, I = self.searchBox.textBox.searchIcon, S.Icon
   if focused then
@@ -3131,7 +3171,7 @@ function panelProto:UpdateSearchLook(now)
   else
     icon:SetVertexColor(style:RGBA(I.Color, state == "idle" and I.Idle or I.Active))
   end
-  local E = S.Edge
+  local E = S.Template ~= true and S.Edge
   if not E then
     tween:Stop(self.searchEdges)
     return

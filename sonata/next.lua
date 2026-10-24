@@ -500,6 +500,15 @@ function sonataNext:Check(key)
       if o.Sizes ~= nil and not ornaments.SIZES[o.Sizes] then
         problem("Sizes", "no size named " .. tostring(o.Sizes))
       end
+      if o.Texture == nil and o.Atlas == nil then
+        problem("Texture", "a Texture or an Atlas")
+      end
+      if o.Atlas ~= nil and o.Tile ~= nil then
+        problem("Atlas", "not with Tile")
+      end
+      if type(o.Mask) == "table" and o.Mask.Texture == nil then
+        problem("Mask.Texture", "a mask needs one")
+      end
       if o.TexCoords ~= nil then
         if o.Tile ~= nil then
           problem("TexCoords", "not with Tile")

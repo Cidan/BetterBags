@@ -382,6 +382,31 @@ describe("NextTabs", function()
       assert.are.same({ 0, 1, 0, 1 }, { ulx, urx, uly, lly })
     end)
 
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's list rows (Blizzard_CategoryList.lua): Options_List_Hover
+    -- under the pointer, Options_List_Active when selected, over the tab's fill, mirrored on the left of the screen.
+    it("draws its highlight over a tab under the pointer and its selected highlight over the selected one", function()
+      rail:SetTabs(groups)
+      rail:Select(1)
+      restyle({ Tabs = { Highlight = { Atlas = "Options_List_Hover", Color = "White", Alpha = 1 },
+        SelectedHighlight = { Atlas = "Options_List_Active", Color = "White", Alpha = 1 } } })
+      local selected, other = rail.tabs[1], rail.tabs[2]
+      assert.are.equal("Options_List_Active", selected.highlight:GetAtlas())
+      assert.is_true(selected.highlight:IsShown())
+      assert.is_false(other.highlight:IsShown())
+      other.button:GetScript("OnEnter")(other.button)
+      assert.are.equal("Options_List_Hover", other.highlight:GetAtlas())
+      assert.is_true(other.highlight:IsShown())
+      other.button:GetScript("OnLeave")(other.button)
+      assert.is_false(other.highlight:IsShown())
+      local left = nextTabs:Create(CreateFrame("Frame"), "LEFT")
+      left:SetTabs(groups)
+      left:Select(1)
+      local ulx, _, _, _, urx = left.tabs[1].highlight:GetTexCoord()
+      assert.are.same({ 1, 0 }, { ulx, urx }, "mirrored")
+      restyle({})
+      assert.is_false(selected.highlight:IsShown(), "a theme without")
+    end)
+
     it("draws the bar in art when it names some, tinted by the tab's accent", function()
       rail:SetTabs({ { id = 1, name = "Bank" } })
       rail:Select(1)

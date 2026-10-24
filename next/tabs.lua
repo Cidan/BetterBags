@@ -49,6 +49,8 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field icon Texture
 ---@field bg Texture
 ---@field glow Texture Lit while the tab is a drop target, and when it pulses.
+---@field highlight Texture Art over its fill under the pointer or selected (Tabs.Highlight, SelectedHighlight).
+---@field hovered? boolean Under the pointer.
 ---@field slide number How far it is slid out, in pixels.
 ---@field width number The width it was given (never read back from the client, which returns it with
 --- float error at a UI scale).
@@ -339,12 +341,15 @@ function railProto:newTab(secure)
   glow:SetAllPoints()
   glow:SetColorTexture(1, 1, 1, 1)
   glow:Hide()
+  local highlight = button:CreateTexture(nil, "BACKGROUND", nil, 1)
+  highlight:SetAllPoints()
+  highlight:Hide()
   local text = style:CreateText(button, style.Theme.Tabs.Font)
   local icon = button:CreateTexture(nil, "ARTWORK")
   icon:Hide()
   ---@type NextTab
-  local tab = { id = 0, button = button, text = text, icon = icon, bg = bg, glow = glow, slide = 0, y = 0, secure = secure,
-    movable = false, yKey = {} }
+  local tab = { id = 0, button = button, text = text, icon = icon, bg = bg, glow = glow, highlight = highlight, slide = 0,
+    y = 0, secure = secure, movable = false, yKey = {} }
   self:styleTab(tab)
   if not secure then
     addon.SetScript(button, "OnClick", function(ctx, _, mouseButton)
@@ -373,6 +378,8 @@ function railProto:newTab(secure)
     end)
   end
   button:SetScript("OnEnter", function()
+    tab.hovered = true
+    self:paint(tab)
     self:slideTo(tab, style.TAB_HOVER)
     if tab.tooltip then
       GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_RIGHT" or "ANCHOR_LEFT")
@@ -388,6 +395,8 @@ function railProto:newTab(secure)
     end
   end)
   button:SetScript("OnLeave", function()
+    tab.hovered = false
+    self:paint(tab)
     if tab.id ~= self.dropTarget then
       self:slideTo(tab, 0)
     end
@@ -431,6 +440,8 @@ function railProto:release(tab)
   tween:Stop(tab)
   tween:Stop(tab.glow)
   tab.glow:Hide()
+  tab.hovered = false
+  tab.highlight:Hide()
   tab.slide = 0
   tab.button:Hide()
   table.insert(tab.secure and self.securePool or self.pool, tab)
@@ -567,6 +578,19 @@ function railProto:paint(tab)
     else
       tab.bg:SetGradient("HORIZONTAL", faint, solid)
     end
+  end
+  -- Art over the fill: selected, or under the pointer (Blizzard's list rows: Options_List_Active, Options_List_Hover),
+  -- drawn for the backpack's tabs and mirrored on the other panels, as tab art is.
+  local lit = (selected and T.SelectedHighlight) or (tab.hovered and T.Highlight) or nil
+  if lit then
+    style:Paint(tab.highlight, lit, lit.Alpha)
+    if self.side == "LEFT" then
+      local c = lit.TexCoords or { 0, 1, 0, 1 }
+      tab.highlight:SetTexCoord(c[2], c[1], c[3], c[4])
+    end
+    tab.highlight:Show()
+  else
+    tab.highlight:Hide()
   end
   style:SetFont(tab.text, selected and T.SelectedFont or T.Font)
   self:placeContent(tab)

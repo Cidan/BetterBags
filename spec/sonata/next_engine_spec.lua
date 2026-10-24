@@ -492,11 +492,17 @@ describe("SonataNext", function()
       { Texture = "Glow", Point = "INNER", Width = 4, Tile = 8, TexCoords = { 0, 1, 0, 0.5 } },
       { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, TexCoords = { 0, 1 }, Panels = { "Bank", "Mailbox" } },
       { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Panels = "Bank" },
+      { Point = "TOPINNER", Width = 4, Height = 4 },
+      { Atlas = "spec-corner", Point = "INNER", Width = 4, Tile = 8 },
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Mask = { Inset = { Left = 2 } } },
     } } })
     local problems = sonataNext:Check("BadOrnaments")
     table.sort(problems)
     assert.are.same({
       "Panel.Ornaments.1.Point: no place named MIDDLE",
+      "Panel.Ornaments.10.Texture: a Texture or an Atlas",
+      "Panel.Ornaments.11.Atlas: not with Tile",
+      "Panel.Ornaments.12.Mask.Texture: a mask needs one",
       "Panel.Ornaments.2.Width: a span along a side needs one",
       "Panel.Ornaments.3.Height: a span along an edge needs one",
       "Panel.Ornaments.4.Anchor: no corner named CENTER",

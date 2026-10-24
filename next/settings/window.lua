@@ -975,7 +975,7 @@ function settings:buildNav()
     end
     i = i + 1
     local heading = self:navRow(i)
-    heading.group, heading.page = group, nil
+    heading.group, heading.page, heading.groupIndex = group, nil, g
     heading.label:SetText(string.upper(group))
     heading.frame:EnableMouse(false)
     heading.frame:ClearAllPoints()
@@ -1019,8 +1019,15 @@ function settings:paintNavRow(row)
   row.label:ClearAllPoints()
   if row.group then
     style:SetFont(row.label, N.GroupFont)
-    row.label:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", pad, pixel:Snap(frame, 4))
-    row.fill:Hide()
+    -- A heading's art, the theme's fills cycled through the headings (Blizzard's settings list cycles
+    -- Options_CategoryHeader_1 to 3), and its label where the theme says, else above its bottom.
+    local headings, at = N.GroupFills, N.GroupLabel
+    if at then
+      row.label:SetPoint(at.Point, row.frame, at.Point, pixel:Snap(frame, at.X or 0), pixel:Snap(frame, at.Y or 0))
+    else
+      row.label:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", pad, pixel:Snap(frame, 4))
+    end
+    controls:Paint(row.fill, (headings and #headings > 0) and headings[((row.groupIndex or 1) - 1) % #headings + 1] or false)
     row.hover:Hide()
     row.indicator:Hide()
     return

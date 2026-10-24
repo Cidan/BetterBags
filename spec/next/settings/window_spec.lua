@@ -1018,6 +1018,32 @@ describe("NextSettings", function()
     -- window too.
     -- The Plain theme (docs/next-plain-theme.md): Blizzard's settings window (SettingsFrameTemplate), its
     -- ButtonFrameTemplateNoPortrait frame round the window over a fill 7, 18, 3 and 3 in.
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's settings list draws its group headers in
+    -- Options_CategoryHeader_1, 2, 3, cycled, the label 20 in and centered (Blizzard_CategoryList.lua).
+    it("draws its group headings in its theme's fills, cycled, their labels where it says", function()
+      open()
+      UseNextTheme({ Settings = { Nav = {
+        GroupFills = { { Atlas = "Options_CategoryHeader_1", Color = "White", Alpha = 1 },
+          { Atlas = "Options_CategoryHeader_2", Color = "White", Alpha = 1 } },
+        GroupLabel = { Point = "LEFT", X = 20, Y = -1 } } } })
+      settings:ApplyStyle()
+      local headings = {}
+      for _, row in ipairs(settings.navRows) do
+        if row.frame:IsShown() and row.group then
+          table.insert(headings, row)
+        end
+      end
+      assert.are.same({ "Options_CategoryHeader_1", "Options_CategoryHeader_2", "Options_CategoryHeader_1" },
+        { headings[1].fill:GetAtlas(), headings[2].fill:GetAtlas(), headings[3].fill:GetAtlas() })
+      assert.is_true(headings[1].fill:IsShown())
+      assert.are.same({ "LEFT", headings[1].frame, "LEFT", 20, -1 }, { headings[1].label:GetPoint(1) })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_false(headings[1].fill:IsShown(), "a theme without")
+      local point = headings[1].label:GetPoint(1)
+      assert.are.equal("BOTTOMLEFT", point)
+    end)
+
     it("draws its theme's frame round it, its fill inset into it", function()
       ResetMockAtlases()
       MockAtlas("UI-Frame-Metal-CornerTopLeft", 32, 32)
