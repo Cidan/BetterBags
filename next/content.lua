@@ -170,21 +170,17 @@ end
 ---@param section NextSection
 function canvasProto:styleSection(section)
   local S = style.Theme.Sections
-  local inner, title, count, line = section.inner, section.title, section.count, section.line
+  local title, count, line = section.title, section.count, section.line
   style:SetFont(title, titleRole(section.kind))
   style:SetFont(count, S.CountFont)
   local spec = S.Line
   if spec then
-    pixel:Height(line, spec.Size)
     line:SetGradient("HORIZONTAL", style:CreateColor(spec.Color, spec.From), style:CreateColor(spec.Color, spec.To))
     line:Show()
   else
     line:Hide()
   end
-  self:placeTitleRow(section)
-  section.cells:ClearAllPoints()
-  pixel:Point(section.cells, "TOPLEFT", inner, "TOPLEFT", 0, -style.SECTION_HEADER)
-  pixel:Height(section.header, style.SECTION_HEADER)
+  self:placeHeader(section)
   local highlight, glow = section.highlight, S.Highlight
   if glow then
     highlight:SetGradient("HORIZONTAL", style:CreateColor(glow.Color, glow.From), style:CreateColor(glow.Color, glow.To))
@@ -223,6 +219,22 @@ function canvasProto:placeTitleRow(section)
   line:ClearAllPoints()
   line:SetPoint("TOPLEFT", inner, "TOPLEFT", lineX, lineY)
   line:SetPoint("TOPRIGHT", inner, "TOPRIGHT", 0, lineY)
+end
+
+-- placeHeader lays a section's header out on the grid it is drawn on (docs/next-pixel-perfect.md): the line's
+-- thickness, the title row, the header's height and the cells under it, all in whole pixels. Again when the
+-- section is laid out (LayoutSection): seated in a dock card it is drawn at the card's scale.
+---@private
+---@param section NextSection
+function canvasProto:placeHeader(section)
+  local spec = style.Theme.Sections.Line
+  if spec then
+    pixel:Height(section.line, spec.Size)
+  end
+  self:placeTitleRow(section)
+  section.cells:ClearAllPoints()
+  pixel:Point(section.cells, "TOPLEFT", section.inner, "TOPLEFT", 0, -style.SECTION_HEADER)
+  pixel:Height(section.header, style.SECTION_HEADER)
 end
 
 -- ApplyStyle restyles every section it holds (drawn, kept from the last pass, pooled) for the
@@ -646,7 +658,7 @@ function canvasProto:LayoutSection(section, width)
   local perRow = math.max(1, math.floor((width + gap) / step + 1e-6))
   local rows = math.max(1, math.ceil(#section.entries / perRow))
   local height = header + rows * rowStep - gap
-  self:placeTitleRow(section)
+  self:placeHeader(section)
   section.height = height
   section.frame:SetSize(width, height)
   section.inner:SetSize(width, height)

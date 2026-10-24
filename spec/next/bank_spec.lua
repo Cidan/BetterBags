@@ -994,7 +994,9 @@ describe("NextBank", function()
       assert.are.equal("BankPanelPurchaseButtonScriptTemplate, UIPanelButtonTemplate", b._template)
       assert.are.equal(CHAR, b:GetAttribute("overrideBankType"))
       assert.is_nil(b:GetScript("OnClick"))
-      assert.are.same({ "CENTER", bank.scroll.frame, "CENTER", 0, 0 }, { b:GetPoint(1) })
+      -- In the middle of the content by its top left, on whole pixels (docs/next-pixel-perfect.md).
+      local point, relativeTo, relativePoint = b:GetPoint(1)
+      assert.are.same({ "TOPLEFT", bank.scroll.frame, "TOPLEFT" }, { point, relativeTo, relativePoint })
       assert.is_false(b:IsShown())
     end)
 

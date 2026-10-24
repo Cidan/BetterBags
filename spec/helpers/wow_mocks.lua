@@ -1501,6 +1501,37 @@ _G.__mockTemplates.ItemButtonTemplate = function(frame)
   _G.__mockItemButtonParts(frame, false)
 end
 
+-- UIPanelButtonTemplate (Blizzard_SharedXML/SecureUIPanelTemplates.xml, UIPanelButtonNoTooltipTemplate,
+-- which it inherits): 40 x 22; its art in three pieces of UI-Panel-Button-Up, Left and Right 12 wide down
+-- its ends, Middle between them; its text (ButtonText, parentKey Text) in GameFontNormal at its middle (a
+-- ButtonText the XML gives no anchor is centered by the client); its highlight filling it.
+_G.__mockTemplates.UIPanelButtonTemplate = function(frame)
+  frame:SetSize(40, 22)
+  local function piece(key, coords)
+    local t = frame:CreateTexture(nil, "BACKGROUND")
+    t:SetTexture("Interface\\Buttons\\UI-Panel-Button-Up")
+    t:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+    t:SetSize(12, 22)
+    frame[key] = t
+    return t
+  end
+  local left = piece("Left", { 0, 0.09375, 0, 0.6875 })
+  left:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+  left:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+  local right = piece("Right", { 0.53125, 0.625, 0, 0.6875 })
+  right:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+  right:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+  local middle = piece("Middle", { 0.09375, 0.53125, 0, 0.6875 })
+  middle:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
+  middle:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT", 0, 0)
+  local text = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  text:SetPoint("CENTER", frame, "CENTER", 0, 0)
+  frame.Text = text
+  frame:SetFontString(text)
+  frame:SetHighlightTexture("Interface\\Buttons\\UI-Panel-Button-Highlight", "ADD")
+  frame:GetHighlightTexture():SetAllPoints(frame)
+end
+
 -- WowScrollBox (Blizzard_SharedXML/Shared/Scroll/ScrollBox.lua, ScrollBox.xml): a ScrollTarget
 -- child frame; Init(view) sets the view and scrolls to the beginning; SetView(view) binds the
 -- view (ScrollBoxViewMixin:SetScrollBox anchors the scroll target), reparents every child

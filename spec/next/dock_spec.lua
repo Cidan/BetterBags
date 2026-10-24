@@ -27,6 +27,9 @@ itemFrame.GetButton = function(_, _, slotkey)
   if buttons[slotkey] == nil then
     local b = { slotkey = slotkey, frame = CreateFrame("Frame") }
     b.frame:SetSize(37, 37)
+    -- What a button draws, so the pixel check sees where it goes.
+    b.icon = b.frame:CreateTexture()
+    b.icon:SetAllPoints(b.frame)
     function b:SetItemFromData() end
     function b:SetSize(_, w, h) self.frame:SetSize(w, h) end
     buttons[slotkey] = b
@@ -207,6 +210,32 @@ describe("NextDock", function()
       local width = entry.holder:GetWidth()
       local x = math.floor((width - entry.box.frame:GetWidth()) / 2)
       assert.are.same({ "TOPLEFT", entry.holder, "TOPLEFT", x, -D.Halo.Spread }, { entry.box.frame:GetPoint(1) })
+    end)
+
+    -- Seated, the section is laid out on its card's grid and its card sized from it (docs/next-pixel-perfect.md):
+    -- the card, its edges, halo and lines, and the section with its items, all on whole pixels.
+    it("seats a section in its card on whole pixels, on the reporter's screen", function()
+      local layout = dofile("spec/helpers/layout.lua")
+      local pixel = addon:GetModule("NextPixel")
+      local undo = layout.UseScreen(3396, 1362, 0.65)
+      finally(undo)
+      UseNextTheme(nil)
+      for i, p in ipairs({ source, target }) do
+        p.frame:ClearAllPoints()
+        pixel:Point(p.frame, "TOPLEFT", UIParent, "TOPLEFT", 37 + (i - 1) * 600, -40)
+        pixel:Size(p.frame, 400, 600)
+        p.content.frame:ClearAllPoints()
+        p.content.frame:SetPoint("TOPLEFT", p.frame, "TOPLEFT", 0, 0)
+        p.scroll.frame._rect = nil
+        p.scroll.frame:SetAllPoints(p.frame)
+      end
+      bindSource({ "A", "B", "C" })
+      local entry = dock("B")
+      settle()
+      finishTweens()
+      settle()
+      assert.is_true(entry.seated)
+      assert.are.same({}, layout.PixelCheck(target.frame, { owners = { card = entry.box, section = section("B"), entry = entry } }))
     end)
 
     it("flies the section from where it was into its card", function()

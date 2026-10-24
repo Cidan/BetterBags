@@ -74,6 +74,7 @@ local motion = addon:GetModule("Motion")
 local context = addon:GetModule("Context")
 local sonataNext = addon:GetModule("SonataNext")
 local pixel = addon:GetModule("NextPixel")
+local nextPanel = addon:GetModule("NextPanel")
 
 local SECTION_GRID = 2
 
@@ -478,6 +479,79 @@ describe("BetterBags Next, pixel perfect", function()
         box._scrollRange = nil
       end)
     end
+
+    -- Blizzard's own button (it must keep its template: its OnClick opens Blizzard's purchase dialog,
+    -- camelot-forever.md §10), its art and its text rounded in place.
+    for _, screen in ipairs(SCREENS) do
+      for _, size in ipairs({ "full", "small" }) do
+        it("shows the bank's Purchase Bank button on whole pixels, " .. size .. ", on " .. screenName(screen), function()
+          db.size = size
+          useScreen(screen[1], screen[2], screen[3])
+          stubs.bankBehavior.proto.UpdatePurchaseBankButton = function(helper)
+            helper.bag.purchaseBankButton:Show()
+          end
+          local bank = open(function(c) return nextBank:Create(c) end, BANK)
+          bank:UpdatePurchaseBankButton()
+          assert.is_true(bank.purchaseBankButton:IsShown())
+          -- Its highlight (drawn under the pointer) is judged with the rest.
+          assert.are.same({}, offGrid(bank))
+        end)
+      end
+    end
+
+    -- Show Blizzard Bags lists the bag slots as tabs with their bags' icons (ListBags); the bank's Blizzard
+    -- tabs come in two blocks a gap apart, the Warbank's in its accent, each block followed by a purchase
+    -- tab (ListBankTabs).
+    for _, size in ipairs({ "full", "small" }) do
+      it("puts tabs with icons, in blocks a gap apart, with a purchase tab, on whole pixels, " .. size, function()
+        db.size = size
+        useScreen(3396, 1362, 0.65)
+        local bank = open(function(c) return nextBank:Create(c) end, BANK)
+        bank.tabs:SetTabs({
+          { id = 6, name = "Tab One", icon = 133633, block = "bank" },
+          { id = 7, name = "Second", icon = 133634, block = "bank" },
+          { id = -101, name = "+", secure = 1, fixed = true },
+          { id = 12, name = "Warband Things", icon = 133635, accent = "Warbank", block = "warbank", gap = 13.7 },
+          { id = -102, name = "+", secure = 2, fixed = true },
+        })
+        bank.tabs:Select(12)
+        assert.are.same({}, offGrid(bank))
+      end)
+    end
+
+    -- The client moves and sizes a frame with the mouse wherever the pointer goes; let go, a small panel
+    -- rests on whole pixels again (a rect set here stands for the client's until the panel anchors itself
+    -- again: then the anchors decide, as in the client).
+    for _, scale in ipairs({ 100, 85 }) do
+      it("rests on whole pixels after a drag and after a grip resize, at a Bag Scale of " .. scale .. "%", function()
+        db.size, db.bagScale = "small", scale
+        useScreen(3396, 1362, 0.65)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        local f = bag.frame
+        bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+        f:_SetRect(733.37, 211.61, f:GetWidth(), f:GetHeight())
+        bag.mover:GetScript("OnDragStop")(bag.mover)
+        f._rect = nil
+        assert.are.same({}, offGrid(bag), "dropped")
+        local grip = bag.grips.RIGHT
+        grip:GetScript("OnMouseDown")(grip, "LeftButton")
+        f:_SetRect(733.37, 101.23, 517.81, 611.43)
+        f:GetScript("OnSizeChanged")(f, 517.81, 611.43)
+        grip:GetScript("OnMouseUp")(grip, "LeftButton")
+        f._rect = nil
+        assert.are.same({}, offGrid(bag), "resized")
+      end)
+    end
+
+    it("rests on whole pixels once it has switched between sizes", function()
+      db.size = "full"
+      useScreen(3396, 1362, 0.65)
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      nextPanel:SetSize(ctx(), "small")
+      assert.are.same({}, offGrid(bag), "small")
+      nextPanel:SetSize(ctx(), "full")
+      assert.are.same({}, offGrid(bag), "full again")
+    end)
 
     it("shows a small panel's grips on whole pixels under the pointer", function()
       db.size = "small"
