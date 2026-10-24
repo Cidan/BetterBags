@@ -1,0 +1,23 @@
+{
+  "id": 1792882158,
+  "version": "v0.8.2-4-g430b623",
+  "channel": "alpha",
+  "date": "2026-10-24",
+  "from": "a5186b12a47aded4107dd21ddc48366668cb09ed",
+  "to": "430b62349b6e7e90b97f6f569a48da2282895769",
+  "headline": "Adds the Guild Wars 2 theme to the Next interface and fixes a bank crash with certain themes.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Guild Wars 2 theme for Next",
+      "details": "Adds the Guild Wars 2 theme to the Next interface, featuring the authentic world map frame, custom header and footer bands, an external side panel for actions, and themed buttons, tabs, and controls.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Crash when opening the bank",
+      "details": "Fixed an error when opening the bank or guild bank while using themes without a background color wash, such as Parchment or Quiet.",
+      "clients": []
+    }
+  ]
+}
