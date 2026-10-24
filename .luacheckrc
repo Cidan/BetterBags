@@ -374,6 +374,16 @@ globals = {
 	"issecretvalue",
 }
 
+-- The theme addon check (tools/next_theme_check): busted specs run on demand, outside spec/.
+files["tools/next_theme_check/**/*.lua"] = {
+	std = "+busted",
+	globals = {
+		"LoadBetterBagsModule",
+		"ResetModuleStub",
+		"FreshNextThemes",
+	},
+}
+
 files["spec/**/*.lua"] = {
 	globals = {
 		"LoadBetterBagsModule",

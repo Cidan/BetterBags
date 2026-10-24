@@ -354,12 +354,11 @@ is a column at a screen edge, feathered on its inner side), so ornaments are art
 - **A strip's art must repeat seamlessly**: its last row continues into its first, or the join shows every `Tile`
   down the bag. Art made by drawing shapes should draw past both ends and crop (a drop shadow or a blur at an end
   must see what lies beyond it), and any noise in it must repeat exactly over the tile.
-- **Who uses it.** BetterBags ships no ornamented theme. BetterBags - Themes (Sauravisus' addon) ships Next versions
-  of four of its race themes with their own art and its generator (`themes/next/`, `textures/next/`,
-  `tools/next_ornaments.py` there, registered with `Sonata:RegisterNextTheme`): Night Elf (roots, swaying leaves, a
-  crescent, fireflies), Blood Elf (gold filigree wound with silk, bobbing verdant spheres), Nightborne (a ley line drawn
-  added, a turning rune circle, square switches) and Pandaren (bamboo, a swaying lantern, petals
-  falling as sparkles with a theme texture).
+- **Who uses it.** BetterBags ships no ornamented theme. BetterBags - Themes (Sauravisus' addon) gets Next versions of
+  its race themes, with their art and its generator (`themes/next/`, `textures/next/`, `tools/next_ornaments.py` there,
+  registered with `Sonata:RegisterNextTheme`): Night Elf first, refined round by round toward a pull request; Blood
+  Elf, Nightborne and Pandaren parked. The work, the method and the lessons: `docs/next-race-themes.md`; checking them
+  against this engine: `tools/next_theme_check/`.
 
 Coverage: `spec/next/ornaments_spec.lua` (spans down a side and along an edge, their tiles, mirroring, corner
 pieces and anchors, art and layer, sizes, tiles following the body, whole pixels on both sides; restyling,
