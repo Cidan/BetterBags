@@ -65,6 +65,19 @@ describe("PixelAudit", function()
       assert.are.equal(1, #problems, "the texture, not the frame")
     end)
 
+    -- In game an owner table reaches saved settings: reading a key AceDB's defaults do not hold can write it
+    -- (wildcard defaults). The check only iterates the tables it walks and compares what it finds by identity.
+    it("names parts without reading a key of any table it walks", function()
+      local trap = setmetatable({}, { __index = function(_, key) error("read " .. tostring(key)) end })
+      local tex = window:CreateTexture()
+      tex:SetPoint("TOPLEFT", window, "TOPLEFT", 0.3, 0)
+      tex:SetSize(4 * unit, unit)
+      window.settings = trap
+      local problems = audit:Check(window, { owners = { window = { db = { profile = trap }, tex = tex } } })
+      assert.are.equal(1, #problems)
+      assert.is_truthy(problems[1]:find("^window.tex: "), problems[1])
+    end)
+
     it("skips a region the client has not placed", function()
       window:SetClipsChildren(true)
       function window:GetScaledRect() end
@@ -188,6 +201,20 @@ describe("PixelAudit", function()
       assert.are.equal(1, #printed)
       assert.is_truthy(printed[1]:find("1 part of Backpack", 1, true), printed[1])
       assert.is_nil(audit.driver:GetScript("OnUpdate"), "done")
+    end)
+
+    -- For the Pixels tab's status: the last window it checked, and how many parts were off.
+    it("remembers what it checked last, clean or not", function()
+      local root, tex = watched("Backpack")
+      audit:SetWatching(ctx(), true)
+      run(5)
+      assert.are.equal("Backpack", audit.lastChecked.window)
+      assert.are.equal(1, audit.lastChecked.count)
+      assert.is_number(audit.lastChecked.at)
+      tex:SetPoint("TOPLEFT", root, "TOPLEFT", 0, 0)
+      audit:Changed(root)
+      run(5)
+      assert.are.equal(0, audit.lastChecked.count)
     end)
 
     it("leaves out what moves between its checks, and reports where it comes to rest", function()

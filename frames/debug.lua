@@ -30,6 +30,9 @@ local perfPane = addon:GetModule('PerfPane')
 ---@class SimulatePane: AceModule
 local simulatePane = addon:GetModule('SimulatePane')
 
+---@class PixelPane: AceModule
+local pixelPane = addon:GetModule('PixelPane')
+
 ---@class ItemProbe: AceModule
 local itemProbe = addon:GetModule('ItemProbe')
 
@@ -154,12 +157,13 @@ function debugWindow:Create(ctx)
     return false
   end)
 
-  -- Add default "Debug Log", "Items", "Dump", "Performance" and "Simulate" tabs
+  -- Add default "Debug Log", "Items", "Dump", "Performance", "Simulate" and "Pixels" tabs
   self.tabFrame:AddTab(ctx, "Debug Log")
   self.tabFrame:AddTab(ctx, "Items")
   self.tabFrame:AddTab(ctx, "Dump")
   self.tabFrame:AddTab(ctx, "Performance")
   self.tabFrame:AddTab(ctx, "Simulate")
+  self.tabFrame:AddTab(ctx, "Pixels")
   self.tabFrame:SetTabByIndex(ctx, 1)
 
   -- Create content frames for each tab
@@ -169,6 +173,7 @@ function debugWindow:Create(ctx)
   self.contentFrames[3] = self:CreateDumpFrame()
   self.contentFrames[4] = self:CreatePerformanceFrame()
   self.contentFrames[5] = self:CreateSimulateFrame()
+  self.contentFrames[6] = self:CreatePixelsFrame()
 
   events:GroupBucketEvent({}, {'debug/LogAdded'}, function()
     self.contentFrames[1]:InsertTable(self.cells)
@@ -182,6 +187,11 @@ function debugWindow:Create(ctx)
     else
       self.window:Hide(ectx)
     end
+  end)
+
+  -- The pixel check run in game (debug/pixelaudit.lua) found parts off the grid: its log pops up.
+  events:RegisterMessage('pixelAudit/Found', function(ectx)
+    self:ShowPixels(ectx)
   end)
 
   events:RegisterMessage('debug/ClearLog', function()
@@ -366,6 +376,28 @@ function debugWindow:CreateSimulateFrame()
   pane.frame:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
   pane:Hide()
   return pane
+end
+
+---CreatePixelsFrame creates the pixel check's Pixels tab.
+---@return PixelPaneFrame
+function debugWindow:CreatePixelsFrame()
+  local box = self.window.content
+  local pane = pixelPane:Create(box)
+  pane.frame:SetPoint("TOPLEFT", box, "TOPLEFT", 0, 0)
+  pane.frame:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
+  pane:Hide()
+  return pane
+end
+
+---ShowPixels opens the window on the Pixels tab, turning debug mode on as /bbdb does when it is off.
+---@param ctx Context
+function debugWindow:ShowPixels(ctx)
+  if not database:GetDebugMode() then
+    database:SetDebugMode(true)
+    events:SendMessage(ctx, 'config/DebugMode', true)
+  end
+  self.tabFrame:SetTabByIndex(ctx, 6)
+  self:SwitchTab(6)
 end
 
 ---SwitchTab switches to the specified tab.

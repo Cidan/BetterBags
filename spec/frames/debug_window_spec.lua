@@ -27,6 +27,7 @@ local list = stubModule("List")
 local itemBrowser = stubModule("ItemBrowser")
 local perfPane = stubModule("PerfPane")
 local simulatePane = stubModule("SimulatePane")
+local pixelPane = stubModule("PixelPane")
 local itemsModule = stubModule("Items")
 local perfSessions = stubModule("PerfSessions")
 perfSessions.GetArmedLoads = perfSessions.GetArmedLoads or function() return 0 end
@@ -56,7 +57,7 @@ local render = addon:GetModule("Render")
 describe("DebugWindow", function()
   local saved
   local tabNames
-  local pane, simPane
+  local pane, simPane, pixPane, selected
   local debugMode, originalThemes
 
   local function override(tbl, key, value)
@@ -105,12 +106,12 @@ describe("DebugWindow", function()
       return f
     end)
     override(_G, "CreateDataProvider", function() return {} end)
-    override(database, "GetDebugMode", function() return false end)
+    override(database, "GetDebugMode", function() return debugMode end)
     override(tabs, "Create", function(_, parent)
       local t = { frame = CreateFrame("Frame", nil, parent) }
       function t:SetClickHandler(fn) self.click = fn end
       function t:AddTab(_, name) table.insert(tabNames, name) end
-      function t:SetTabByIndex() end
+      function t:SetTabByIndex(_, index) selected = index end
       return t
     end)
     override(list, "Create", function() return content() end)
@@ -122,6 +123,10 @@ describe("DebugWindow", function()
     override(simulatePane, "Create", function()
       simPane = content()
       return simPane
+    end)
+    override(pixelPane, "Create", function()
+      pixPane = content()
+      return pixPane
     end)
     debugWindow:Create(context:New("Test"))
   end)
@@ -158,7 +163,7 @@ describe("DebugWindow", function()
 
   it("puts every tab's content in the window's content box", function()
     local box = debugWindow.window.content
-    for i = 1, 5 do
+    for i = 1, 6 do
       local frame = debugWindow.contentFrames[i].frame or debugWindow.contentFrames[i]
       assert.are.same({ "TOPLEFT", box, "TOPLEFT", 0, 0 }, { frame:GetPoint(1) }, "tab " .. i)
       assert.are.same({ "BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0 }, { frame:GetPoint(2) }, "tab " .. i)
@@ -274,8 +279,26 @@ describe("DebugWindow", function()
     assert.is_truthy(dump.diagnosticsStatus:GetText():find("2 loads", 1, true))
   end)
 
-  it("has a Performance tab after the existing ones, then the Simulate tab", function()
-    assert.are.same({ "Debug Log", "Items", "Dump", "Performance", "Simulate" }, tabNames)
+  it("has a Performance tab after the existing ones, then the Simulate and Pixels tabs", function()
+    assert.are.same({ "Debug Log", "Items", "Dump", "Performance", "Simulate", "Pixels" }, tabNames)
+  end)
+
+  -- Asked: the pixel check run in game pops up its log when it finds something (debug/pixelaudit.lua).
+  it("opens on the Pixels tab when the pixel check finds parts off the grid", function()
+    local modes = {}
+    events:RegisterMessage("config/DebugMode", function(_, enabled) table.insert(modes, enabled) end)
+    assert.is_false(debugWindow.frame:IsShown())
+    events:SendMessage(context:New("Test"), "pixelAudit/Found", { window = "Backpack" })
+    assert.is_true(debugMode, "debug mode on, as /bbdb turns it on")
+    assert.are.same({ true }, modes)
+    assert.is_true(debugWindow.frame:IsShown())
+    assert.are.equal(6, selected)
+    assert.is_true(pixPane:IsShown())
+    assert.are.equal(1, pixPane.updates)
+    assert.is_false(debugWindow.contentFrames[1]:IsShown())
+    events:SendMessage(context:New("Test"), "pixelAudit/Found", { window = "Bank" })
+    assert.are.same({ true }, modes, "already open")
+    assert.are.equal(2, pixPane.updates)
   end)
 
   it("keeps the Simulate pane hidden until its tab is chosen, then lists the events again", function()

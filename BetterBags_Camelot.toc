@@ -153,6 +153,7 @@ frames\flamegraph.lua
 frames\tracechart.lua
 frames\perfpane.lua
 frames\simulatepane.lua
+frames\pixelpane.lua
 frames\debug.lua
 
 views\views.lua

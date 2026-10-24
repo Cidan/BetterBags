@@ -67,12 +67,6 @@ local function isFrame(region)
   return region:IsObjectType("Frame")
 end
 
----@param value any
----@return boolean
-local function isRegion(value)
-  return type(value) == "table" and type(value.IsObjectType) == "function"
-end
-
 -- rectOf is where the client puts a region, in UI units at scale 1 (GetScaledRect: its own units times its
 -- effective scale, Blizzard's RegionUtil.GetRegionPoint), or nil while it is not placed. warcraft.wiki.gg
 -- ScriptRegion:GetRect: not allowed on restricted frames, so a refusal is nil too.
@@ -86,10 +80,13 @@ local function rectOf(region)
   return { left = left, right = left + width, bottom = bottom, top = bottom + height }
 end
 
--- names maps regions to the field paths owner tables reach them by (for messages).
+-- names maps the regions wanted to the field paths owner tables reach them by (for messages). It only
+-- iterates tables and compares what it finds with the regions wanted: reading a key of a table it does not know
+-- could run its __index (AceDB's defaults write a saved table when a wildcard key is read).
 ---@param owners? table<string, table>
+---@param wanted table<table, boolean>
 ---@return table<table, string>
-local function names(owners)
+local function names(owners, wanted)
   local map, seen = {}, {}
   local function walk(t, path, depth)
     if type(t) ~= "table" or seen[t] or depth > 4 then
@@ -99,7 +96,7 @@ local function names(owners)
     for k, v in pairs(t) do
       if type(v) == "table" and type(k) == "string" and k:sub(1, 1) ~= "_" then
         local p = path .. "." .. k
-        if map[v] == nil and isRegion(v) then
+        if wanted[v] and map[v] == nil then
           map[v] = p
         end
         walk(v, p, depth + 1)
@@ -114,14 +111,15 @@ local function names(owners)
   return map
 end
 
--- fieldsOf maps the regions a frame keeps in its own fields (a template's parentKeys, a button's state art)
--- to their keys.
+-- fieldsOf maps a frame's own regions and children (own) that it keeps in its fields (a template's parentKeys, a
+-- button's state art) to their keys.
 ---@param frame table
+---@param own table<table, boolean>
 ---@return table<table, string>
-local function fieldsOf(frame)
+local function fieldsOf(frame, own)
   local map = {}
   for k, v in pairs(frame) do
-    if type(k) == "string" and k:sub(1, 1) ~= "_" and isRegion(v) and map[v] == nil then
+    if type(k) == "string" and k:sub(1, 1) ~= "_" and own[v] and map[v] == nil then
       map[v] = k
     end
   end
@@ -138,9 +136,9 @@ end
 ---@return string[]
 function audit:Check(root, opts)
   opts = opts or {}
-  local skip, named = opts.skip or {}, names(opts.owners)
+  local skip = opts.skip or {}
   local k = 1 / PixelUtil.GetPixelToUIUnitFactor()
-  local problems = {}
+  local found = {}
   local function check(region, path)
     if skip[region] or not visible(region) then
       return
@@ -178,16 +176,19 @@ function audit:Check(root, opts)
         end
       end
       if #bad > 0 then
-        local label = named[region] or ((region:GetName() or region:GetObjectType()) .. " " .. path)
-        table.insert(problems, label .. ": " .. table.concat(bad, ", "))
+        table.insert(found, { region = region, path = path, bad = table.concat(bad, ", ") })
       end
     end
     if not frame then
       return
     end
-    local keys = fieldsOf(region)
+    local regions, children = { region:GetRegions() }, { region:GetChildren() }
+    local own = {}
+    for _, part in ipairs(regions) do own[part] = true end
+    for _, part in ipairs(children) do own[part] = true end
+    local keys = fieldsOf(region, own)
     local textures, texts = 0, 0
-    for _, child in ipairs({ region:GetRegions() }) do
+    for _, child in ipairs(regions) do
       local segment
       if child:GetObjectType() == "FontString" then
         texts = texts + 1
@@ -198,11 +199,24 @@ function audit:Check(root, opts)
       end
       check(child, path .. ">" .. (keys[child] or segment))
     end
-    for i, child in ipairs({ region:GetChildren() }) do
+    for i, child in ipairs(children) do
       check(child, path .. ">" .. (keys[child] or i))
     end
   end
   check(root, "")
+  local problems = {}
+  if #found == 0 then
+    return problems
+  end
+  local wanted = {}
+  for _, f in ipairs(found) do
+    wanted[f.region] = true
+  end
+  local named = names(opts.owners, wanted)
+  for _, f in ipairs(found) do
+    local label = named[f.region] or ((f.region:GetName() or f.region:GetObjectType()) .. " " .. f.path)
+    table.insert(problems, label .. ": " .. f.bad)
+  end
   return problems
 end
 
@@ -424,6 +438,7 @@ function audit:settled(root, w, lines)
   table.sort(labels)
   local key = table.concat(labels, "\n")
   local ctx = newContext('PixelAudit_Settled')
+  self.lastChecked = { window = w.title, count = #lines, at = time() }
   if #lines == 0 then
     self.reported[root] = nil
   elseif self.reported[root] ~= key then

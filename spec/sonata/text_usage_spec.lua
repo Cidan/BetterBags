@@ -9,6 +9,7 @@ local FILES = {
   "frames/debug.lua",
   "frames/perfpane.lua",
   "frames/simulatepane.lua",
+  "frames/pixelpane.lua",
   "frames/money.lua",
   "frames/currency.lua",
   "views/gridview.lua",
