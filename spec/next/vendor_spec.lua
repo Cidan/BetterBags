@@ -458,10 +458,10 @@ describe("NextVendor", function()
         local piece = v.ornaments.pieces[i]
         shown[piece.spec.Texture] = piece.texture:IsShown()
       end
-      assert.is_true(shown.VendorEmblem)
-      assert.is_false(shown.BagEmblem)
       UseNextTheme(nil)
       v:ApplyStyle(ctx())
+      assert.is_true(shown.VendorEmblem)
+      assert.is_false(shown.BagEmblem)
     end)
 
     it("hides the filter where a game rule turns it off", function()

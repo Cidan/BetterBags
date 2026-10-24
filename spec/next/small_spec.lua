@@ -847,6 +847,28 @@ describe("BetterBags Next's small mode", function()
           assert.are.equal(600 + column(bag) + style.PAD, bag:MinHeight(), "a strip whose buttons start low")
         end)
 
+        -- A button pinned to a corner (Pinned) keeps its room in the title's row.
+        it("keeps the title clear of a pinned button", function()
+          UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 64 },
+            Pinned = { closeButton = { Point = "TOPRIGHT", X = -5, Y = -4 } } } } })
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          resize(bank, "LEFT", bank:MinWidth(), 500)
+          local pinned = style.HEADER_BUTTON + 5
+          assert.are.equal(bank:MinWidth() - 40 - (style.PAD + style.TITLE_INSET) - style.PAD - pinned - 12, bank.title:GetWidth())
+          local header = 2 * style.PAD + 40 + style.TITLE_INSET + pinned + 12 + style.Small.MinTitle
+          assert.is_true(bank:MinWidth() >= math.ceil(header))
+        end)
+
+        -- A strip outside the body (Outside) is kept on the screen with it.
+        it("keeps a strip outside its body on the screen", function()
+          UseNextTheme({ Header = { Buttons = { Rail = { Width = 40, Top = 64, Outside = true } } } })
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          assert.are.equal(40, select(1, bag:clampPlace(0, 500)), "the backpack's strip is on its left")
+          local right = UIParent:GetWidth() - bank:SmallWidth() * bank:Scale()
+          assert.are.equal(right - 40, select(1, bank:clampPlace(right, 500)), "the bank's on its right")
+        end)
+
         it("leaves its title the whole header row, past the strip", function()
           railed()
           local bank = opened(function(c) return nextBank:Create(c) end)

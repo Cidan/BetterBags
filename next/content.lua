@@ -53,6 +53,7 @@ nextContent.LEAVING_SECONDS = 3
 ---@field title FontString
 ---@field count FontString
 ---@field line Texture
+---@field row Texture The theme's art behind the title row (Sections.Header), across the section.
 ---@field highlight Texture Lit under the title row while the pointer is over it.
 ---@field cells Frame The item buttons hang from it.
 ---@field header Button Across the title row: dragging it moves the section (next.md §7).
@@ -139,11 +140,15 @@ function canvasProto:newSection()
   local count = inner:CreateFontString(nil, "OVERLAY")
   local line = inner:CreateTexture(nil, "ARTWORK")
   line:SetColorTexture(1, 1, 1, 1)
+  local row = inner:CreateTexture(nil, "BACKGROUND")
+  row:SetPoint("TOPLEFT", inner, "TOPLEFT", 0, 0)
+  row:SetPoint("TOPRIGHT", inner, "TOPRIGHT", 0, 0)
+  row:Hide()
   local cells = CreateFrame("Frame", nil, inner)
   ---@type NextSection
   local section = {
     name = "", kind = "category", frame = frame, inner = inner, title = title, count = count,
-    line = line, cells = cells, entries = {}, isNew = true, rise = 0, y = 0, height = 0,
+    line = line, row = row, cells = cells, entries = {}, isNew = true, rise = 0, y = 0, height = 0,
   }
   section.header = self:newHeader(section)
   self:styleSection(section)
@@ -163,9 +168,25 @@ local function titleRole(kind)
   return S.TitleFont
 end
 
+-- paintFading draws a section's line or highlight: art (a texture spec with a Texture or an Atlas, painted), or a
+-- color fading across from its From alpha to its To.
+---@param texture Texture
+---@param spec table
+local function paintFading(texture, spec)
+  if style:IsArt(spec) then
+    style:Paint(texture, spec, spec.Alpha)
+  else
+    texture:SetTexCoord(0, 1, 0, 1)
+    texture:SetColorTexture(1, 1, 1, 1)
+    texture:SetGradient("HORIZONTAL", style:CreateColor(spec.Color, spec.From), style:CreateColor(spec.Color, spec.To))
+  end
+  texture:Show()
+end
+
 -- styleSection draws a section's title row from the theme: the title and count in its roles, the line
--- after them (or none), the header's height and highlight (or none), the cells below it, in whole
--- pixels. Where the title row's parts go depends on its text: placeTitleRow, every render.
+-- after them (or none), the art behind the row (or none), the header's height and highlight (or none),
+-- the cells below it, in whole pixels. Where the title row's parts go depends on its text:
+-- placeTitleRow, every render.
 ---@private
 ---@param section NextSection
 function canvasProto:styleSection(section)
@@ -173,20 +194,22 @@ function canvasProto:styleSection(section)
   local title, count, line = section.title, section.count, section.line
   style:SetFont(title, titleRole(section.kind))
   style:SetFont(count, S.CountFont)
-  local spec = S.Line
-  if spec then
-    line:SetGradient("HORIZONTAL", style:CreateColor(spec.Color, spec.From), style:CreateColor(spec.Color, spec.To))
-    line:Show()
+  if S.Line then
+    paintFading(line, S.Line)
   else
     line:Hide()
   end
-  self:placeHeader(section)
-  local highlight, glow = section.highlight, S.Highlight
-  if glow then
-    highlight:SetGradient("HORIZONTAL", style:CreateColor(glow.Color, glow.From), style:CreateColor(glow.Color, glow.To))
-    highlight:Show()
+  if S.Header then
+    style:Paint(section.row, S.Header, S.Header.Alpha)
+    section.row:Show()
   else
-    highlight:Hide()
+    section.row:Hide()
+  end
+  self:placeHeader(section)
+  if S.Highlight then
+    paintFading(section.highlight, S.Highlight)
+  else
+    section.highlight:Hide()
   end
 end
 
@@ -235,6 +258,7 @@ function canvasProto:placeHeader(section)
   section.cells:ClearAllPoints()
   pixel:Point(section.cells, "TOPLEFT", section.inner, "TOPLEFT", 0, -style.SECTION_HEADER)
   pixel:Height(section.header, style.SECTION_HEADER)
+  pixel:Height(section.row, style.SECTION_HEADER)
 end
 
 -- ApplyStyle restyles every section it holds (drawn, kept from the last pass, pooled) for the

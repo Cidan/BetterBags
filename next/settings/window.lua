@@ -642,8 +642,12 @@ function settings:paintBrandLine(line, panel)
   line:SetPoint("TOPLEFT", panel, "TOPLEFT", m.pad, -(m.brand - size))
   line:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -m.pad, -(m.brand - size))
   line:SetHeight(size)
-  if B.Line then
+  if B.Line and style:IsArt(B.Line) then
+    style:Paint(line, B.Line, B.Line.Alpha)
+    line:Show()
+  elseif B.Line then
     local r, g, b = style:RGBA(B.Line.Color)
+    line:SetTexCoord(0, 1, 0, 1)
     line:SetColorTexture(1, 1, 1, 1)
     line:SetGradient("HORIZONTAL", CreateColor(r, g, b, B.Line.From), CreateColor(r, g, b, B.Line.To))
     line:Show()

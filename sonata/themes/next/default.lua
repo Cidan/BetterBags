@@ -357,11 +357,14 @@ sonataNext:RegisterTheme({
     -- icon may have its own Color and HoverColor. A disabled button is drawn at DisabledAlpha of its
     -- color (a white glyph looks the same desaturated), art desaturated too. Scale is an icon's size
     -- as a share of its button (Layout.HeaderButton), centered in it; an icon's own Scale multiplies
-    -- it (art that needs fitting). The buttons keep their size and places. Rail (false here) puts them
-    -- down a strip along the panel's inner side instead of across the header: Width wide (the body that
-    -- much wider), the first Top from the body's top, Gap apart (Layout.HeaderButtonGap when unset),
-    -- centered across it, over its Fill (a texture spec, mirrored on a panel whose inner side is on the
-    -- right; false: no art).
+    -- it (art that needs fitting); an icon's Hover is its own art under the pointer (Texture or Atlas, with
+    -- TexCoords). The buttons keep their size and places. Rail (false here) puts them down a strip along the
+    -- panel's inner side instead of across the header: Width wide (inside the body, which is that much wider;
+    -- or standing outside it, Outside), the first Top from the body's top, Gap apart (Layout.HeaderButtonGap
+    -- when unset), centered across it, over its Fill (a texture spec, mirrored on a panel whose inner side is
+    -- on the right; false: no art). Pinned puts a button by its key at a corner of the body ({ Point, X, Y }:
+    -- TOPRIGHT and the rest, or TOPOUTER and the rest by side, mirrored as ornaments are), apart from the row
+    -- or the rail (none here).
     Buttons = { Color = "ButtonIcon", HoverColor = "White", ArtColor = "ButtonIcon", ArtHoverColor = "White",
       DisabledAlpha = 0.3, Scale = 1, Rail = false,
       Icons = {
@@ -383,6 +386,7 @@ sonataNext:RegisterTheme({
   },
 
   Search = {
+    -- Its fill, idle and focused: colors, or art (a texture spec with a Texture or an Atlas).
     Fill = "SearchFill",
     FocusFill = "SearchFillFocus",
     -- Its border, and how strong: idle, under the pointer or holding a search, focused.
@@ -402,29 +406,31 @@ sonataNext:RegisterTheme({
     RecentFont = "SectionRecent",
     FreeFont = "SectionFree",
     CountFont = "Count",
-    -- The line after a section's title and count, fading out (From and To are alphas of Color).
+    -- The line after a section's title and count, fading out (From and To are alphas of Color); or art.
+    -- Header (none here) is art behind the title row, across the section, Layout.SectionHeader tall.
     Line = { Color = "Lavender", From = 0.35, To = 0, Size = 1 },
-    -- Lit under a section's title row while the pointer is over it.
+    -- Lit under a section's title row while the pointer is over it; or art.
     Highlight = { Color = "Lavender", From = 0.12, To = 0 },
   },
 
   Tabs = {
+    -- Colors, or art (drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels).
     Fill = "Tab",
     SelectedFill = "TabSelected",
-    -- A tab fades out toward its far end, to this share of its alpha.
+    -- A colored tab fades out toward its far end, to this share of its alpha.
     Fade = 0.35,
     Font = "Tab",
     SelectedFont = "TabSelected",
     -- Lit on a tab a dragged section would drop on (Drop), and flashing on one that received one
     -- (Pulse, fading from).
     Glow = { Color = "Lavender", BlendMode = "ADD", Drop = 0.3, Pulse = 0.8 },
-    -- The bar beside the selected tab, in its accent (a Warbank or guild tab's), else Color.
+    -- The bar beside the selected tab, in its accent (a Warbank or guild tab's), else Color; may be art.
     Indicator = { Color = "Gold", Width = 3 },
     Accents = { Warbank = "Warbank", Guild = "Guild" },
   },
 
   Footer = {
-    -- Fading from Inner at the inner side to Outer at the screen-edge side.
+    -- Fading from Inner at the inner side to Outer at the screen-edge side; or art, mirrored with the panel.
     Line = { Color = "Lavender", Inner = 0.05, Outer = 0.35, Size = 1 },
     Font = "Footer",
     EmptyFont = "Empty",
@@ -553,7 +559,7 @@ sonataNext:RegisterTheme({
     PriceFont = "Price",
     UnaffordableFont = "PriceUnaffordable",
     -- A card's name (two lines of it and a line of the price fit beside the icon), the coin icons in
-    -- its price, its fill and the light over it under the pointer (false: none).
+    -- its price, its fill and the light over it under the pointer (colors or art; false: none).
     NameFont = "VendorName",
     CoinSize = 13,
     CardFill = { 0.78, 0.72, 1, 0.05 },
@@ -688,7 +694,8 @@ sonataNext:RegisterTheme({
     -- track TrackHeight tall with round ends and a round knob KnobSize across over it (Height is the switch's,
     -- at least the knob), a soft KnobShadow under the knob (or false) and, under the pointer, the Hover color in
     -- a halo HoverSpread round it. A round knob, its track's ends and its halo are the Circle texture unless
-    -- their spec names art.
+    -- their spec names art. Or "Check", a check box Width x Height: the box (Off) and the mark over it (On) as
+    -- it turns on; while disabled, Disabled and DisabledOn (and no dimming with Disabled); no knob or edge.
     Toggle = {
       Style = "Square",
       Width = 36, Height = 18, KnobSize = 12, KnobInset = 3,
@@ -703,7 +710,8 @@ sonataNext:RegisterTheme({
     },
     -- Buttons: Height tall, Padding either side of the label, at least MinWidth; each style's fills
     -- idle, under the pointer and pressed, its edges idle and under the pointer, its font (HoverFont
-    -- under the pointer, when set). A disabled button is drawn at DisabledAlpha.
+    -- under the pointer, when set). A disabled button is drawn at DisabledAlpha, or in its style's
+    -- DisabledFill (none here), undimmed.
     Button = {
       Height = 26, Padding = 16, MinWidth = 72, DisabledAlpha = 0.4,
       Plain = {
@@ -783,7 +791,7 @@ sonataNext:RegisterTheme({
       HoverEdge = { Color = "White", Alpha = 0.9, Size = 1 },
     },
     -- Tabs across a page: Height tall, Gap between labels, their fonts, the marker under the chosen
-    -- one (Height thick), and the line under them all.
+    -- one (Height thick; a color, or art), and the line under them all.
     TopTabs = {
       Height = 34, Gap = 28,
       Font = "TopTab", HoverFont = "TopTabHover", SelectedFont = "TopTabSelected",

@@ -355,6 +355,44 @@ describe("NextTabs", function()
       assert.are.equal(1, rail.tabs[1].bg._gradient.max.a)
     end)
 
+    -- GW2_UI's side tab art (docs/next-gw2-theme.md, round two): drawn for the backpack's tabs, sticking out to the
+    -- left, mirrored on the other panels; no fade, which is for colors.
+    it("fills its tabs with art when its fills are art, mirrored on the left of the screen, and colors after", function()
+      local ART = "Interface\\Spec\\tab.png"
+      rail:SetTabs(groups)
+      rail:Select(1)
+      restyle({ Palette = { Lit = { 1, 0.9, 0.8, 1 } }, Tabs = {
+        Fill = { Texture = ART, TexCoords = { 0.86, 0, 0, 0.06 }, Color = "White" },
+        SelectedFill = { Texture = ART, TexCoords = { 0.86, 0, 0, 0.06 }, Color = "Lit" } } })
+      local bg = rail.tabs[2].bg
+      assert.are.equal(ART, bg:GetTexture())
+      assert.is_nil(bg._gradient)
+      local ulx, uly, _, lly, urx = bg:GetTexCoord()
+      assert.are.same({ 0.86, 0, 0, 0.06 }, { ulx, urx, uly, lly })
+      assert.are.same({ 1, 0.9, 0.8, 1 }, { rail.tabs[1].bg:GetVertexColor() }, "the selected one in its own")
+      local left = nextTabs:Create(CreateFrame("Frame"), "LEFT")
+      left:SetTabs(groups)
+      left:Select(1)
+      ulx, uly, _, lly, urx = left.tabs[2].bg:GetTexCoord()
+      assert.are.same({ 0, 0.86, 0, 0.06 }, { ulx, urx, uly, lly }, "mirrored")
+      restyle({ Palette = { A = { 0.1, 0.2, 0.3, 0.8 } }, Tabs = { Fill = "A", Fade = 0.5 } })
+      assert.is_nil(bg:GetTexture(), "a color again")
+      assert.are.same({ 0.1, 0.2, 0.3, 0.8 }, { bg._gradient.max.r, bg._gradient.max.g, bg._gradient.max.b, bg._gradient.max.a })
+      ulx, uly, _, lly, urx = bg:GetTexCoord()
+      assert.are.same({ 0, 1, 0, 1 }, { ulx, urx, uly, lly })
+    end)
+
+    it("draws the bar in art when it names some, tinted by the tab's accent", function()
+      rail:SetTabs({ { id = 1, name = "Bank" } })
+      rail:Select(1)
+      restyle({ Palette = { Sky = { 0.3, 0.6, 1, 1 } }, Tabs = { Indicator = { Texture = "Interface\\Spec\\bar.png", Color = "Sky", Width = 4 } } })
+      rail:Select(1)
+      assert.are.equal("Interface\\Spec\\bar.png", rail.indicator:GetTexture())
+      assert.are.same({ 0.3, 0.6, 1, 1 }, { rail.indicator:GetVertexColor() })
+      restyle({ Tabs = { Indicator = { Color = "Gold", Width = 3 } } })
+      assert.is_nil(rail.indicator:GetTexture())
+    end)
+
     it("writes its tabs in its roles, moving them to its new fonts", function()
       rail:SetTabs(groups)
       rail:Select(2)

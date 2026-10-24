@@ -1007,6 +1007,48 @@ describe("NextContent", function()
       assert.are.equal(0.12, section.highlight._gradient.min.a)
     end)
 
+    -- GW2_UI's bag section headers (GwBagHeaderTemplate, Inventory/SharedTemplates.xml): a 32-high row of
+    -- bag\bag-sep.png behind the name, across the section (docs/next-gw2-theme.md, round two).
+    it("draws a row of art behind the title row, across the section, and none after", function()
+      sections()
+      UseNextTheme({ Layout = { SectionHeader = 32 },
+        Sections = { Header = { Texture = "Interface\\Spec\\sep.png", Color = "White", Alpha = 0.9 } } })
+      canvas:ApplyStyle(context:New("spec"))
+      draw()
+      local s = canvas.byName.A
+      assert.are.equal("Interface\\Spec\\sep.png", s.row:GetTexture())
+      assert.are.equal(0.9, s.row:GetAlpha())
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 0, 0 }, { s.row:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", s.inner, "TOPRIGHT", 0, 0 }, { s.row:GetPoint(2) })
+      assert.are.equal(32, s.row:GetHeight())
+      assert.are.equal("BACKGROUND", s.row:GetDrawLayer(), "behind the title, the count and the line")
+      assert.is_true(s.row:IsShown())
+      UseNextTheme(nil)
+      canvas:ApplyStyle(context:New("spec"))
+      assert.is_false(s.row:IsShown())
+    end)
+
+    it("draws the line and the highlight in art when they name some, and colors after", function()
+      sections()
+      UseNextTheme({ Sections = {
+        Line = { Texture = "Interface\\Spec\\line.png", Color = "White", Size = 4 },
+        Highlight = { Texture = "Interface\\Spec\\glow.png", Color = "White", Alpha = 0.5 } } })
+      canvas:ApplyStyle(context:New("spec"))
+      local s = canvas.byName.A
+      assert.are.equal("Interface\\Spec\\line.png", s.line:GetTexture())
+      assert.is_nil(s.line._gradient)
+      assert.are.equal(4, s.line:GetHeight())
+      assert.are.equal("Interface\\Spec\\glow.png", s.highlight:GetTexture())
+      assert.is_nil(s.highlight._gradient)
+      assert.are.equal(0.5, s.highlight:GetAlpha())
+      UseNextTheme(nil)
+      canvas:ApplyStyle(context:New("spec"))
+      assert.is_nil(s.line:GetTexture())
+      assert.is_not_nil(s.line._gradient)
+      assert.is_nil(s.highlight:GetTexture())
+      assert.is_not_nil(s.highlight._gradient)
+    end)
+
     -- Each by its top left, after the text before it (its width rounded up to a whole pixel), centered on
     -- the title by the fonts' heights (docs/next-pixel-perfect.md): never by a text's middle or right edge.
     it("places a section's title, count and line where it says", function()

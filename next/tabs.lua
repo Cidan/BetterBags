@@ -186,19 +186,27 @@ function nextTabs:Ordered(entries, saved)
   return out
 end
 
--- styleRail hangs the rail below the header and sizes the bar from the theme.
+-- styleRail hangs the rail below the header, past a side rail standing outside the body
+-- (Header.Buttons.Rail.Outside), and sizes the bar from the theme.
 ---@private
 function railProto:styleRail()
   local frame, body = self.frame, self.body
   frame:ClearAllPoints()
   if self.side == "LEFT" then
-    pixel:Point(frame, "TOPLEFT", body, "TOPRIGHT", 0, -style.CONTENT_TOP)
+    pixel:Point(frame, "TOPLEFT", body, "TOPRIGHT", style.RAIL_OUT, -style.CONTENT_TOP)
   else
-    pixel:Point(frame, "TOPRIGHT", body, "TOPLEFT", 0, -style.CONTENT_TOP)
+    pixel:Point(frame, "TOPRIGHT", body, "TOPLEFT", -style.RAIL_OUT, -style.CONTENT_TOP)
   end
   pixel:Size(frame, style.TAB_MAX_WIDTH, 1)
   local bar = style.Theme.Tabs.Indicator
   pixel:Size(self.indicator, bar and bar.Width or 0, style.TAB_HEIGHT)
+  -- A bar of art or of a color, tinted by the selected tab's accent as it is selected (Select).
+  if style:IsArt(bar) then
+    style:Paint(self.indicator, bar)
+  else
+    self.indicator:SetTexCoord(0, 1, 0, 1)
+    self.indicator:SetColorTexture(1, 1, 1, 1)
+  end
 end
 
 -- styleTab draws a tab's parts from the theme: its height, its glow's color, its name and icon where
@@ -533,13 +541,25 @@ end
 function railProto:paint(tab)
   local T = style.Theme.Tabs
   local selected = tab.id == self.selected or tab.id == self.dropTarget
-  local r, g, b, a = style:RGBA(selected and T.SelectedFill or T.Fill)
-  local faint = CreateColor(r, g, b, a * T.Fade)
-  local solid = CreateColor(r, g, b, a)
-  if self.side == "LEFT" then
-    tab.bg:SetGradient("HORIZONTAL", solid, faint)
+  local fill = selected and T.SelectedFill or T.Fill
+  if style:IsArt(fill) then
+    -- Art is drawn for the backpack's tabs, sticking out to the left, and mirrored on the other panels.
+    style:Paint(tab.bg, fill)
+    if self.side == "LEFT" then
+      local c = fill.TexCoords or { 0, 1, 0, 1 }
+      tab.bg:SetTexCoord(c[2], c[1], c[3], c[4])
+    end
   else
-    tab.bg:SetGradient("HORIZONTAL", faint, solid)
+    tab.bg:SetTexCoord(0, 1, 0, 1)
+    tab.bg:SetColorTexture(1, 1, 1, 1)
+    local r, g, b, a = style:RGBA(fill)
+    local faint = CreateColor(r, g, b, a * T.Fade)
+    local solid = CreateColor(r, g, b, a)
+    if self.side == "LEFT" then
+      tab.bg:SetGradient("HORIZONTAL", solid, faint)
+    else
+      tab.bg:SetGradient("HORIZONTAL", faint, solid)
+    end
   end
   style:SetFont(tab.text, selected and T.SelectedFont or T.Font)
   self:placeContent(tab)

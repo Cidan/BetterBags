@@ -102,3 +102,68 @@ Seeing it: no game client here. Every look is checked by specs against the sourc
 looks in game is for the player to judge. In particular, not measured: how GW2_UI's painted art reads stretched over
 a full-height panel, the emblem's place over the header's start, and whether GW2_UI's fonts at Next's sizes need
 other sizes.
+
+## Round two (asked, 2026-10-24)
+
+> also for the gw2 theme, get rid of the feather texture when the bags are docked to the side of the screen.
+> undocked/small bags looks good.
+
+> this is how betterbags original looks like (non-next), we need to use those icons, that bag frame style, that
+> icon. don't try to squeeze themes to sonata's restrictions -- expand sonata and what's possible (except still make
+> sure it's declarative please) to fit this style, for next. X button should still be top right, etc.
+
+> and to be clear, when i say theme for gw2, i also mean tabs, i mean everything. be more comprehensive and match not
+> just colors in sonata, but art of buttons, arg of toggles, all of it. go deeper here in expanding what sonata can do.
+
+The screenshot of the original did not come through; the original is its source, `sonata/themes/gw2.lua`: the world
+map painting for the body; GW2's header band at the top with the title in its header font on it; GW2's bag emblem
+(84 pixels) centered on the top inner corner; GW2's side panel standing *outside* the window along its inner side,
+holding the actions as GW2's micro icons (32 pixels, 5 apart); the footer band; GW2's close button at the top right.
+
+GW2_UI's own controls (read from `Core/API/toolkit.lua`, `editBox.lua`, `Immersive/Skins/menu.lua`): buttons
+`uistuff\button.png` with dark text, `button_hover.png` darkening them under the pointer, `button_disable.png`;
+check boxes `checkbox.png`, `checkboxchecked.png`, `checkbox-disabled.png` (disabled in `SkinColors.Disabled`);
+sliders `sliderbg.png` and `sliderhandle.png`; scroll bars `scrollbg.png` and `scrollbarmiddle.png`; dropdowns'
+arrow `arrowdown_down.png`; menus `button_hover.png` under the pointer and `checkboxchecked.png` for the chosen row;
+side tabs `uistuff\tab-tex-right-left.png` (a tall dark strip with a painted ragged edge, measured: 55 of its 64
+columns painted).
+
+### The engine (declarative, each test first, documented in `.claude/rules/next-themes.md`)
+
+1. **A side rail outside the body** (`Rail.Outside`): the strip stands beside the body's inner edge, as GW2_UI's side
+   panel stands beside its windows; the body keeps its width; the tab rail hangs past the strip; a chained pair is
+   spaced for both strips.
+2. **Pinned header buttons** (`Header.Buttons.Pinned`): a button placed at a corner of the body by WoW offsets,
+   apart from the rail or the header row (the close button at the top right on every panel, as asked).
+3. **Header button art**: an icon may name its art under the pointer (`Hover`: GW2's `-down` and close hover art).
+4. **Tabs in art**: `Tabs.Fill` and `SelectedFill` may be art (drawn for the backpack's tabs, sticking out to the
+   left, mirrored on the other panels), the selected bar too.
+5. **The search box in art**: `Search.Fill` and `FocusFill` may be art.
+6. **Sections in art**: a row of art behind a section's title (`Sections.Header`), and art for its line and highlight.
+7. **Lines in art**: the footer's line, the settings window's brand line, the top tabs' marker.
+8. **Check box toggles** (`Controls.Toggle.Style = "Check"`): a box drawn off, on and disabled from art.
+9. **Buttons disabled in art** (`DisabledFill`), and vendor cards in art (`Vendor.CardFill`, `CardHover`).
+
+### The theme
+
+The original's frame: the world map painting, the header band with the title on it, the emblem at the top inner
+corner (centered on it while small, inside the top while docked), the side panel outside the window with the actions
+in GW2's micro icons (and BetterBags' glyphs in GW2's icon color where GW2 has none), the close button at the top
+right, the footer band, no feather while docked. Everything else in GW2_UI's art: tabs, the search box, section rows,
+buttons, check boxes, sliders, scroll bars, dropdowns, menus, dialogs, the settings window.
+
+### Done (round two, branch `next-gw2-theme-2`)
+
+Every engine piece above, each test first, documented in `.claude/rules/next-themes.md` (§3, §8, §13, §14), and the
+theme as the original's frame with every control in GW2_UI's art. Also:
+
+- **The close button**: pinned at the top outer corner (a pinned button can name a corner by its side, mirrored as
+  ornaments are). Top right on the backpack, as asked; top left on the bank, vendor and guild bank, which Next
+  mirrors so their side panel, emblem and title start from the right, where a close at the top right would sit on
+  the title. A judgment call, easy to change.
+- **The world map painting** is an abstract wash (amber top left, near black, teal right), so it is stretched whole
+  over the body as the original stretched it.
+- **Laid out and checked** on a 1920 x 1080 screen at both sizes through the specs' layout resolver: nothing
+  overlaps, once the side buttons start below the emblem's whole square (88).
+- **The frame mock** now has `SetVertexColor` replace a gradient, as the client does.
+- The full suite, luacheck and 56 mutations (each caught) pass. Not seen in game.

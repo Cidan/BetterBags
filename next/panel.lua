@@ -928,17 +928,46 @@ function panelProto:SmallHeight()
   return self.smallHeight or math.floor(UIParent:GetHeight() * style.Small.Height)
 end
 
--- shownButtons is how many of the header's buttons show.
+-- A pinned button's corners named by their side (as ornaments name theirs), for a panel whose inner side is on the
+-- left (the backpack's), and the corner across.
+local PIN_CORNERS = { TOPINNER = "TOPLEFT", TOPOUTER = "TOPRIGHT", BOTTOMINNER = "BOTTOMLEFT", BOTTOMOUTER = "BOTTOMRIGHT" }
+local MIRRORED_CORNERS = { TOPLEFT = "TOPRIGHT", TOPRIGHT = "TOPLEFT", BOTTOMLEFT = "BOTTOMRIGHT", BOTTOMRIGHT = "BOTTOMLEFT" }
+
+-- pinnedOf is where the theme pins a header button (Header.Buttons.Pinned, next-themes.md §13): a corner of the body
+-- and WoW offsets from it, or nil for one laid out with the others.
+---@param button Button
+---@return table?
+local function pinnedOf(button)
+  local pinned = style.Theme.Header.Buttons.Pinned
+  return pinned and pinned[button.key] or nil
+end
+
+-- shownButtons is how many of the header's buttons show and are laid out with the others (not pinned).
 ---@private
 ---@return number
 function panelProto:shownButtons()
   local shown = 0
   for _, button in ipairs(self.headerButtons) do
-    if button:IsShown() then
+    if button:IsShown() and pinnedOf(button) == nil then
       shown = shown + 1
     end
   end
   return shown
+end
+
+-- pinnedRoom is the room the shown pinned buttons take from the title's row: each its size and its offset from
+-- its corner across.
+---@private
+---@return number
+function panelProto:pinnedRoom()
+  local room = 0
+  for _, button in ipairs(self.headerButtons) do
+    local pin = pinnedOf(button)
+    if pin ~= nil and button:IsShown() then
+      room = room + style.HEADER_BUTTON + math.abs(pin.X or 0)
+    end
+  end
+  return room
 end
 
 -- headerButtonsWidth is how much of the header its shown buttons take, with the room between them: none
@@ -984,7 +1013,7 @@ end
 ---@return number
 function panelProto:MinWidth()
   local pads = style.PAD + self:InnerPad()
-  local header = pads + style.TITLE_INSET + self:headerButtonsWidth() + 12 + style.Small.MinTitle
+  local header = pads + style.TITLE_INSET + self:headerButtonsWidth() + self:pinnedRoom() + 12 + style.Small.MinTitle
   local money = self.moneyFrame ~= nil and self.moneyFrame.frame:GetWidth() or 0
   local footer = pads + style.TITLE_INSET + self.freeText:GetStringWidth() + 12 + money
   local column = pads + style.GUTTER + self.content:CellWidth()
@@ -1087,7 +1116,13 @@ end
 ---@return number x, number y
 function panelProto:clampPlace(x, y)
   local s = self:Scale()
-  x = pixel:Snap(UIParent, math.max(0, math.min(UIParent:GetWidth() - self:SmallWidth() * s, x)))
+  -- A side rail outside the body (Header.Buttons.Rail.Outside) stays on the screen too, on the inner side.
+  local strip = style.RAIL_OUT * s
+  local left, right = strip, 0
+  if self.side == "LEFT" then
+    left, right = 0, strip
+  end
+  x = pixel:Snap(UIParent, math.max(left, math.min(UIParent:GetWidth() - self:SmallWidth() * s - right, x)))
   y = pixel:Snap(UIParent, math.max(self:SmallHeight() * s, math.min(UIParent:GetHeight(), y)))
   return x, y
 end
@@ -2106,16 +2141,23 @@ function panelProto:SetHeaderIcon(button, iconKey)
   local buttonSize = pixel:Length(button, style.HEADER_BUTTON)
   icon:ClearAllPoints()
   pixel:Center(icon, button, buttonSize, buttonSize, size, size)
+  self:PaintHeaderIcon(button)
+end
+
+-- drawIconArt draws a header icon's art: an Atlas, else a Texture (one of the theme's Textures, or a file) with its
+-- TexCoords, filtered trilinearly so a glyph drawn smaller than its file stays smooth.
+---@param icon Texture
+---@param art table
+local function drawIconArt(icon, art)
   icon:SetTexCoord(0, 1, 0, 1)
-  if spec.Atlas then
-    icon:SetAtlas(spec.Atlas)
+  if art.Atlas then
+    icon:SetAtlas(art.Atlas)
   else
-    icon:SetTexture(style:TexturePath(spec.Texture), nil, nil, "TRILINEAR")
-    if spec.TexCoords then
-      icon:SetTexCoord(unpack(spec.TexCoords))
+    icon:SetTexture(style:TexturePath(art.Texture), nil, nil, "TRILINEAR")
+    if art.TexCoords then
+      icon:SetTexCoord(unpack(art.TexCoords))
     end
   end
-  self:PaintHeaderIcon(button)
 end
 
 -- PaintHeaderIcon colors a header button's icon for how it is now: its own color (its icon's Color,
@@ -2140,6 +2182,12 @@ function panelProto:PaintHeaderIcon(button)
     a = a * B.DisabledAlpha
   end
   local icon = button.icon
+  -- Its own art under the pointer (an icon's Hover: GW2_UI's -down and close hover art), never while disabled.
+  local art = (button.hover and enabled and own.Hover) or own
+  if button.iconArt ~= art then
+    drawIconArt(icon, art)
+    button.iconArt = art
+  end
   icon:SetDesaturated(not enabled and not button.glyph)
   icon:SetVertexColor(r, g, b, a)
 end
@@ -2426,8 +2474,13 @@ function panelProto:styleRail()
   local mirrored = self.side == "LEFT"
   local side = mirrored and "RIGHT" or "LEFT"
   local body = self.body
-  rail:SetPoint("TOP" .. side, body, "TOP" .. side, 0, 0)
-  rail:SetPoint("BOTTOM" .. side, body, "BOTTOM" .. side, 0, 0)
+  -- Outside, its edge against the body's inner edge.
+  local own = side
+  if R.Outside then
+    own = mirrored and "LEFT" or "RIGHT"
+  end
+  rail:SetPoint("TOP" .. own, body, "TOP" .. side, 0, 0)
+  rail:SetPoint("BOTTOM" .. own, body, "BOTTOM" .. side, 0, 0)
   pixel:Width(rail, R.Width)
   style:Paint(rail, R.Fill)
   if mirrored then
@@ -2778,6 +2831,21 @@ end
 function panelProto:LayoutHeader()
   local left = self.side == "LEFT"
   local body = self.body
+  for _, button in ipairs(self.headerButtons) do
+    local pin = pinnedOf(button)
+    if pin ~= nil then
+      button:ClearAllPoints()
+      local point, x = PIN_CORNERS[pin.Point], pin.X or 0
+      if point == nil then
+        point = pin.Point
+      elseif left then
+        -- Named by its side: drawn for the backpack (inner side on the left), mirrored on a panel on the left of
+        -- the screen, whose inner side is on the right.
+        point, x = MIRRORED_CORNERS[point], -x
+      end
+      pixel:Point(button, point, body, point, x, pin.Y or 0)
+    end
+  end
   if style.Theme.Header.Buttons.Rail then
     self:layoutRail()
     self:FitTitle()
@@ -2786,8 +2854,10 @@ function panelProto:LayoutHeader()
   local previous
   -- Corner to corner, whole pixels apart (docs/next-pixel-perfect.md).
   for _, button in ipairs(self.headerButtons) do
-    button:ClearAllPoints()
-    if button:IsShown() then
+    if pinnedOf(button) == nil then
+      button:ClearAllPoints()
+    end
+    if button:IsShown() and pinnedOf(button) == nil then
       if previous == nil then
         if left then
           pixel:Point(button, "TOPLEFT", body, "TOPLEFT", style.PAD, -style.HEADER_BUTTON_TOP)
@@ -2806,24 +2876,30 @@ function panelProto:LayoutHeader()
 end
 
 -- layoutRail puts the shown header buttons down the side rail (next-themes.md §13), in order from its top, Top
--- down and Gap apart, centered across it, each by its corner on the body's inner side in whole pixels
--- (docs/next-pixel-perfect.md).
+-- down and Gap apart, centered across it (inside the body or outside it), each by its corner on the body's inner
+-- side in whole pixels (docs/next-pixel-perfect.md).
 ---@private
 function panelProto:layoutRail()
   local R = style.Theme.Header.Buttons.Rail
   local body = self.body
   local corner = self.side == "LEFT" and "TOPRIGHT" or "TOPLEFT"
   local size = pixel:Length(body, style.HEADER_BUTTON)
-  local x = pixel:Floor(body, (pixel:Length(body, R.Width) - size) / 2)
+  local width = pixel:Length(body, R.Width)
+  local x = pixel:Floor(body, (width - size) / 2)
+  if R.Outside then
+    x = x - width
+  end
   if self.side == "LEFT" then
     x = -x
   end
   local y, step = pixel:Snap(body, R.Top), size + pixel:Snap(body, self:RailGap())
   for _, button in ipairs(self.headerButtons) do
-    button:ClearAllPoints()
-    if button:IsShown() then
-      button:SetPoint(corner, body, corner, x, -y)
-      y = y + step
+    if pinnedOf(button) == nil then
+      button:ClearAllPoints()
+      if button:IsShown() then
+        button:SetPoint(corner, body, corner, x, -y)
+        y = y + step
+      end
     end
   end
 end
@@ -2844,7 +2920,7 @@ function panelProto:FitTitle()
   -- Kept: the title's own width cannot be read back while it shows a secret (titleWidth), and only a title cut
   -- short (the vendor's, at both sizes) ever shows one.
   self.titleCut = pixel:Length(title, math.max(1, self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
-    - (style.PAD + self:headerButtonsWidth()) - 12))
+    - (style.PAD + self:headerButtonsWidth()) - self:pinnedRoom() - 12))
   title:SetWidth(self.titleCut)
   self:placeTitleRow()
 end
@@ -2994,7 +3070,14 @@ function panelProto:UpdateSearchLook(now)
   local S = style.Theme.Search
   local state = self:SearchState()
   local focused = state == "focus"
-  self.searchFill:SetVertexColor(style:RGBA(focused and S.FocusFill or S.Fill))
+  local fill = focused and S.FocusFill or S.Fill
+  if style:IsArt(fill) then
+    style:Paint(self.searchFill, fill)
+  else
+    self.searchFill:SetTexCoord(0, 1, 0, 1)
+    self.searchFill:SetColorTexture(1, 1, 1, 1)
+    self.searchFill:SetVertexColor(style:RGBA(fill))
+  end
   local icon, I = self.searchBox.textBox.searchIcon, S.Icon
   if focused then
     icon:SetVertexColor(style:RGBA(I.FocusColor))
@@ -3120,8 +3203,19 @@ function panelProto:styleFooter()
   pixel:Point(line, "BOTTOMLEFT", body, "BOTTOMLEFT", leftPad, style.FOOTER - 4)
   pixel:Point(line, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -rightPad, style.FOOTER - 4)
   local spec = F.Line
-  if spec then
+  if spec and style:IsArt(spec) then
+    -- Art, drawn for the backpack and mirrored on the panels on the other side of the screen.
+    pixel:Height(line, spec.Size or 1)
+    style:Paint(line, spec, spec.Alpha)
+    if left then
+      local c = spec.TexCoords or { 0, 1, 0, 1 }
+      line:SetTexCoord(c[2], c[1], c[3], c[4])
+    end
+    line:Show()
+  elseif spec then
     pixel:Height(line, spec.Size)
+    line:SetTexCoord(0, 1, 0, 1)
+    line:SetColorTexture(1, 1, 1, 1)
     local inner, outer = style:CreateColor(spec.Color, spec.Inner), style:CreateColor(spec.Color, spec.Outer)
     if left then
       line:SetGradient("HORIZONTAL", inner, outer)

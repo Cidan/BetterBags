@@ -1309,7 +1309,11 @@ function WidgetMethods:GetFontObject()
     end
   }
 end
+-- Region:SetVertexColor sets all four corners of the texture to one color (warcraft.wiki.gg Region:SetVertexColor);
+-- a gradient is those same corners' colors (TextureBase:SetGradient: "see Region:SetVertexColor"), so it replaces
+-- one. Blizzard's MarchingAntsMixin switches one texture between the two by orientation, relying on it.
 function WidgetMethods:SetVertexColor(r, g, b, a)
+  self._gradient = nil
   self._vertexColor = {r = r, g = g, b = b, a = a or 1}
   if isTextureType(self) then
     self._alpha = a or 1

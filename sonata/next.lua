@@ -54,6 +54,12 @@ sonataNext.generation = 0
 
 -- The theme every Next theme inherits from, and the one used while the saved one cannot be.
 local BASE = "Default"
+-- The corners a pinned header button may name (Header.Buttons.Pinned): the body's, or by their side (mirrored
+-- with the panel, as ornaments' are).
+local CORNERS = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true, TOPINNER = true, TOPOUTER = true,
+  BOTTOMINNER = true, BOTTOMOUTER = true }
+-- The styles a switch is drawn in (Controls.Toggle.Style, next/controls/toggle.lua).
+local TOGGLE_STYLES = { Square = true, Round = true, Check = true }
 
 ---@class NextTheme
 ---@field Name string The key the theme is saved and registered under.
@@ -494,7 +500,17 @@ function sonataNext:Check(key)
     end
   end
   -- The side rail (Header.Buttons.Rail, next-themes.md §13): how wide, and where its buttons start.
-  local rail = theme.Header and theme.Header.Buttons and theme.Header.Buttons.Rail
+  local toggle = theme.Controls and theme.Controls.Toggle
+  if type(toggle) == "table" and not TOGGLE_STYLES[toggle.Style] then
+    table.insert(problems, "Controls.Toggle.Style: no style named " .. tostring(toggle.Style))
+  end
+  local buttons = theme.Header and theme.Header.Buttons
+  for name, pin in pairs(type(buttons) == "table" and type(buttons.Pinned) == "table" and buttons.Pinned or {}) do
+    if not CORNERS[pin.Point] then
+      table.insert(problems, "Header.Buttons.Pinned." .. tostring(name) .. ".Point: no corner named " .. tostring(pin.Point))
+    end
+  end
+  local rail = buttons and buttons.Rail
   if type(rail) == "table" then
     for _, field in ipairs({ "Width", "Top" }) do
       if type(rail[field]) ~= "number" then

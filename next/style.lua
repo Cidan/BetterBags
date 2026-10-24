@@ -68,9 +68,12 @@ function style:Use(theme)
   self.VENDOR_PRICE_RAISE = L.VendorPriceRaise
   self.VENDOR_CARD_WIDTH = math.floor((self.GRID_WIDTH - (self.VENDOR_COLUMNS - 1) * self.GAP) / self.VENDOR_COLUMNS)
   -- The strip the header buttons go down, along the body's inner side (Header.Buttons.Rail,
-  -- next-themes.md §13); 0 when they go across the header. The body is that much wider, its content not.
+  -- next-themes.md §13); 0 when they go across the header. Inside the body (RAIL) the body is that much
+  -- wider, its content not; outside it (RAIL_OUT, Outside) the strip stands beside the body, and the tabs and
+  -- a chained bag beyond it.
   local rail = theme.Header.Buttons.Rail
-  self.RAIL = rail and rail.Width or 0
+  self.RAIL = (rail and not rail.Outside) and rail.Width or 0
+  self.RAIL_OUT = (rail and rail.Outside) and rail.Width or 0
   self.BODY_WIDTH = self.GRID_WIDTH + self.GUTTER + self.PAD * 2 + self.RAIL
   self.WIDTH = self.FEATHER + self.BODY_WIDTH
   -- How far the body reaches past the screen edge, so the opening bounce never shows what is behind
@@ -348,6 +351,14 @@ function style:Paint(texture, spec, alpha)
   end
   texture:SetBlendMode(spec.BlendMode or "BLEND")
   texture:SetDesaturated(spec.Desaturated == true)
+end
+
+-- IsArt says whether a fill names art (a texture spec with a Texture or an Atlas) rather than a color (a palette
+-- name or { r, g, b, a }): a part that takes either draws art with Paint and a color its own way.
+---@param fill any
+---@return boolean
+function style:IsArt(fill)
+  return type(fill) == "table" and (fill.Texture ~= nil or fill.Atlas ~= nil)
 end
 
 -- CreateText makes a font string drawn with a role.

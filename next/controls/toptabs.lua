@@ -133,7 +133,8 @@ function tabsProto:Style()
   pixel:Height(self.line, T.Line.Size or 1)
   controls:Paint(self.line, T.Line)
   pixel:Height(self.marker, T.Indicator.Height)
-  controls:Paint(self.marker, { Color = T.Indicator.Color })
+  -- Art when the indicator names some, else its color.
+  controls:Paint(self.marker, style:IsArt(T.Indicator) and T.Indicator or { Color = T.Indicator.Color })
   local gap = pixel:Snap(frame, T.Gap)
   local previous
   for i = 1, #self.list do
