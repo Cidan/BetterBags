@@ -1,16 +1,28 @@
 {
-  "id": 1792825115,
+  "id": 1792825124,
   "version": "v0.8.1",
-  "channel": "alpha",
+  "channel": "release",
   "date": "2026-10-24",
-  "from": "7417a810e5783d1721c8e7055096774b67fee043",
-  "to": "38f0f714f2475a0a868d86d5dcd6760d2eb2ed2f",
-  "headline": "This build fixes an issue where clicking a scroll bar could interact with content underneath it.",
+  "from": "v0.8.0",
+  "to": "v0.8.1",
+  "headline": "Introduces bag and icon scale options, pixel-perfect alignment, and scroll bar fixes for BetterBags Next.",
   "entries": [
     {
+      "category": "New",
+      "title": "Bag and icon scale options in Next appearance settings",
+      "details": "The Appearance settings window now includes a Size tab for BetterBags Next with Icon Scale and Bag Scale sliders. Icon Scale lets you resize item buttons to fit more or fewer items per row, while Bag Scale resizes small bag panels while preserving docking, dragging, and chaining.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Pixel-perfect rendering in BetterBags Next",
+      "details": "BetterBags Next panels, borders, fonts, and icons now align to whole screen pixels. This prevents thin borders from disappearing or appearing blurry across different screen resolutions and UI scales.",
+      "clients": []
+    },
+    {
       "category": "Fixed",
-      "title": "Clicking scroll bars no longer grabs rows behind them",
-      "details": "Fixed an issue where clicking or dragging a scroll bar thumb in settings lists or other scrollable views could accidentally grab and drag the content beneath it.",
+      "title": "Scroll bar thumb clicks grabbing list rows in Next",
+      "details": "Fixed an issue in BetterBags Next scrollable views, including the category list in settings, where clicking or dragging the scroll bar thumb would mistakenly click or drag the content row underneath it.",
       "clients": []
     }
   ]
