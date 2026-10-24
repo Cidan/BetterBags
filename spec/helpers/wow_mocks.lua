@@ -571,6 +571,20 @@ function WidgetMethods:CreateTexture(textureName, drawLayer, inherits, subLevel)
   table.insert(self._textures, tex)
   return tex
 end
+-- Cooldown:GetCountdownFontString() -> the font string a cooldown draws its countdown numbers in
+-- (FrameAPICooldownDocumentation: never nil). The client makes it as one of the cooldown's regions, hung by its
+-- middle from the cooldown's middle: a pixel check report in game listed it as the cooldown's font string, its one
+-- point CENTER, its middle exactly at the middle of the frame Masque had centered on the button.
+function WidgetMethods:GetCountdownFontString()
+  local text = rawget(self, "_countdown")
+  if text == nil then
+    text = self:CreateFontString()
+    text:SetPoint("CENTER", self, "CENTER", 0, 0)
+    text:SetFontObject(GameFontNormal)
+    rawset(self, "_countdown", text)
+  end
+  return text
+end
 -- Frame:CreateMaskTexture(name, drawLayer, templateName, subLevel) (SimpleFrameAPIDocumentation) makes a
 -- MaskTexture, one of the frame's regions (Masque masks icons with them, Core/Regions/Mask.lua).
 function WidgetMethods:CreateMaskTexture(textureName, drawLayer, inherits, subLevel)

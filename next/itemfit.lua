@@ -34,7 +34,7 @@ local DRAWN = { "ProfessionQualityOverlay" }
 -- its quality border round its own frame); filling the button, the border drew inside the skin's frame, a
 -- second border.
 local MASQUE_PARTS = { IconBorder = true, IconOverlay = true, IconOverlay2 = true, IconQuestTexture = true,
-  NewItemTexture = true, JunkIcon = true }
+  NewItemTexture = true, JunkIcon = true, Cooldown = true }
 
 -- The buttons Fit placed parts of, and where those parts were: Restore puts them back.
 itemFit.saved = setmetatable({}, { __mode = "k" }) ---@type table<Frame, table<Region, table>>
@@ -86,6 +86,22 @@ local function atItsSize(saved, region)
   region:ClearAllPoints()
   region:SetPoint(p[1], p[2], p[3], pixel:Snap(region, p[4] or 0), pixel:Snap(region, p[5] or 0))
   pixel:Size(region, region:GetWidth(), region:GetHeight())
+end
+
+-- across lays a cooldown's countdown across the cooldown from its top corners, centered by the client, on the row
+-- its font height is centered on, in whole pixels. The client hangs it by its middle from the cooldown's middle,
+-- between two pixels on a button an odd number of pixels across (the cooldown fills the button,
+-- CooldownFrameTemplate's setAllPoints), and sets its numbers every second, unmeasured.
+---@param saved table<Region, table>
+---@param text FontString
+---@param cooldown Frame
+local function across(saved, text, cooldown)
+  remember(saved, text)
+  local down = pixel:Middle(text, cooldown:GetHeight(), pixel:TextHeight(text))
+  text:ClearAllPoints()
+  text:SetPoint("TOPLEFT", cooldown, "TOPLEFT", 0, -down)
+  text:SetPoint("TOPRIGHT", cooldown, "TOPRIGHT", 0, -down)
+  text:SetJustifyH("CENTER")
 end
 
 -- center anchors a region by its top left so it sits in the middle of the button at its own size (its
@@ -175,6 +191,15 @@ function itemFit:Fit(ctx, decoration, extras, item)
     if region ~= nil and ours(name, region) then
       local was = remember(saved, region)
       center(saved, region, decoration, was.width, was.height)
+    end
+  end
+  -- The cooldown's countdown, in the cooldown frame: on a button Masque skins, Masque places the cooldown (its Item
+  -- type has it, Skins/Regions.lua), and the countdown is the client's place in it.
+  local cooldown = decoration.Cooldown
+  if cooldown ~= nil and cooldown.GetCountdownFontString ~= nil then
+    local text = cooldown:GetCountdownFontString()
+    if ours("Cooldown", text) then
+      across(saved, text, cooldown)
     end
   end
   -- The Blizzard Store's highlight has no size of its own (Blizzard draws it at its image's size, which no

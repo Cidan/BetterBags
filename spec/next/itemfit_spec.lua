@@ -72,6 +72,12 @@ describe("NextItemFit", function()
     d.BetterBagsFamilyIcon = d:CreateTexture(nil, "OVERLAY")
     d.BetterBagsFamilyIcon:SetPoint("CENTER", d, "CENTER", 0, 0)
     d.BetterBagsFamilyIcon:SetSize(24, 24)
+    -- ContainerFrame.xml's Cooldown, a CooldownFrameTemplate (setAllPoints: it fills the button), cooling down,
+    -- its countdown showing.
+    d.Cooldown = CreateFrame("Cooldown", nil, d, "CooldownFrameTemplate")
+    d.Cooldown:SetAllPoints(d)
+    d.Cooldown:Show()
+    d.Cooldown:GetCountdownFontString():SetText("5")
     for _, key in ipairs({ "Count", "Stock", "IconBorder", "IconOverlay", "IconOverlay2", "flash", "NewItemTexture",
       "BattlepayItemTexture", "ExtendedSlot", "JunkIcon", "BetterBagsFamilyIcon", "searchOverlay", "ItemContextOverlay" }) do
       d[key]:Show()
@@ -155,6 +161,27 @@ describe("NextItemFit", function()
     assert.are.equal(decoration, decoration.IconQuestTexture._allPoints, "the quest art too")
   end)
 
+  -- Found by the pixel check in game (next-pixel-perfect.md §4): the client draws a cooldown's countdown in a font
+  -- string hung by its middle from the cooldown's middle, and the cooldown fills the button (CooldownFrameTemplate,
+  -- setAllPoints): on a button an odd number of pixels across, between two pixels. Its numbers change every
+  -- second, set by the client, so they are not measured: it spans the cooldown from its top corners, the client
+  -- centering the numbers, on the row its font's height is centered on.
+  it("places a cooldown's countdown across it, on the row its font height is centered on, from whole pixels", function()
+    local cooldown = decoration.Cooldown
+    local text = cooldown:GetCountdownFontString()
+    assert.are.equal(1, #layout.PixelCheck(cooldown), "the client's: between two pixels")
+    itemFit:Fit({}, decoration, { ilvl })
+    assert.are.same({}, offGrid(decoration))
+    local down = pixel:Middle(text, cooldown:GetHeight(), pixel:TextHeight(text))
+    assert.are.equal(2, text:GetNumPoints())
+    assert.are.same({ "TOPLEFT", cooldown, "TOPLEFT", 0, -down }, { text:GetPoint(1) })
+    assert.are.same({ "TOPRIGHT", cooldown, "TOPRIGHT", 0, -down }, { text:GetPoint(2) })
+    assert.are.equal("CENTER", text:GetJustifyH())
+    itemFit:RestoreAll()
+    assert.are.equal(1, text:GetNumPoints(), "the client's place back for the classic bags")
+    assert.are.same({ "CENTER", cooldown, "CENTER", 0, 0 }, { text:GetPoint(1) })
+  end)
+
   it("does the work once per grid, size and Sonata theme", function()
     itemFit:Fit({}, decoration, { ilvl })
     assert.are.equal("kept", itemFit:Fit({}, decoration, { ilvl }))
@@ -234,7 +261,8 @@ describe("NextItemFit", function()
     local MASQUE_PARTS = { "IconBorder", "IconOverlay", "IconOverlay2", "IconQuestTexture", "NewItemTexture", "JunkIcon" }
     local skinned
 
-    -- skin does what Masque's skin pass does to the parts it owns: sized from the skin, centered.
+    -- skin does what Masque's skin pass does to the parts it owns: sized from the skin, centered. Caith's cooldown
+    -- is 32 / 36 of the button, centered (Masque_Caith Skins.lua; Core/Regions/Cooldown.lua sizes and anchors it).
     local function skin(d)
       local size = d:GetWidth() * 42 / 36
       for _, key in ipairs(MASQUE_PARTS) do
@@ -242,6 +270,9 @@ describe("NextItemFit", function()
         d[key]:SetSize(size, size)
         d[key]:SetPoint("CENTER", d, "CENTER", 0, 0)
       end
+      d.Cooldown:ClearAllPoints()
+      d.Cooldown:SetSize(d:GetWidth() * 32 / 36, d:GetHeight() * 32 / 36)
+      d.Cooldown:SetPoint("CENTER", d, "CENTER", 0, 0)
     end
 
     local function placeOf(region)
@@ -264,9 +295,14 @@ describe("NextItemFit", function()
         assert.are.same(before[key], placeOf(decoration[key]), key)
       end
       assert.are.same(store, placeOf(decoration.BattlepayItemTexture), "the Store highlight goes with its glow")
+      -- Masque's cooldown (Masque's Item type has it, Skins/Regions.lua): its countdown is the client's place in it.
+      local countdown = decoration.Cooldown:GetCountdownFontString()
+      assert.are.same({ 1, { "CENTER", decoration.Cooldown, "CENTER", 0, 0 } },
+        { countdown:GetNumPoints(), { countdown:GetPoint(1) } }, "the countdown of Masque's cooldown")
       local skip = sonataParts(decoration)
       for _, key in ipairs(MASQUE_PARTS) do skip[decoration[key]] = true end
       skip[decoration.BattlepayItemTexture] = true
+      skip[decoration.Cooldown] = true
       assert.are.same({}, layout.PixelCheck(window, { owners = { decoration = decoration }, skip = skip }),
         "what Masque does not skin")
     end)

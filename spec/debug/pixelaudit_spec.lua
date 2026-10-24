@@ -116,6 +116,67 @@ describe("PixelAudit", function()
       end
     end)
 
+    -- Seen in game: 14 cooldown countdowns listed as ours, the text the client hangs in a cooldown frame Masque
+    -- places (Masque's Item type has the cooldown, Skins/Regions.lua; Core/Regions/Cooldown.lua sizes and anchors
+    -- it). What is in a part Masque places goes where Masque put that part.
+    it("sets apart what is inside a part Masque places", function()
+      -- 51 pixels, as a 44-unit icon is at 65% on that screen: its middle between two pixels.
+      local button = CreateFrame("Button", nil, window)
+      button:SetPoint("TOPLEFT", window, "TOPLEFT", 0, 0)
+      button:SetSize(51 * unit, 51 * unit)
+      local cooldown = CreateFrame("Cooldown", nil, button)
+      cooldown:SetSize(51 * unit * 32 / 36, 51 * unit * 32 / 36)
+      cooldown:SetPoint("CENTER", button, "CENTER", 0, 0)
+      cooldown:SetClipsChildren(true)
+      local text = cooldown:GetCountdownFontString()
+      text:SetText("5")
+      -- A frame inside it too, with art of its own.
+      local inner = CreateFrame("Frame", nil, cooldown)
+      inner:SetAllPoints(cooldown)
+      local art = inner:CreateTexture()
+      art:SetAllPoints(inner)
+      cooldown._MSQ_Color = {}
+      button._MSQ_CFG = { Regions = { Cooldown = cooldown } }
+      local problems, others = audit:Check(window)
+      assert.are.same({}, problems)
+      assert.are.equal(3, #others, "the cooldown that clips, its countdown, the art of the frame inside it")
+    end)
+
+    -- A report says what each part draws, and where a text's anchor is against where the client draws it: whether
+    -- a texture shown draws anything, and whether a text is off because of its anchor or because of the client.
+    it("notes what a part draws, and where a text's anchor lands against where it is drawn", function()
+      local tex = window:CreateTexture()
+      tex:SetPoint("TOPLEFT", window, "TOPLEFT", 0.3, 0)
+      tex:SetSize(4 * unit, unit)
+      tex:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+      local empty = window:CreateTexture()
+      empty:SetPoint("TOPLEFT", window, "TOPLEFT", 10.3, 0)
+      empty:SetSize(4 * unit, unit)
+      local atlas = window:CreateTexture()
+      atlas:SetPoint("TOPLEFT", window, "TOPLEFT", 20.3, 0)
+      atlas:SetAtlas("bags-greenarrow")
+      atlas:SetSize(4 * unit, unit)
+      local text = window:CreateFontString("SpecCountdown", "OVERLAY")
+      text:SetFontObject(GameFontNormal)
+      text:SetText("5")
+      text:SetPoint("CENTER", window, "CENTER", 0.2, 0)
+      local factor = 768 / 1362
+      local problems, _, notes = audit:Check(window, { owners = { window = { tex = tex, empty = empty, atlas = atlas } } })
+      assert.are.equal(4, #problems)
+      local byLabel = {}
+      for _, line in ipairs(problems) do byLabel[line:match("^(.-): ")] = notes[line] end
+      assert.are.equal("draws Interface\\Buttons\\UI-Quickslot2", byLabel["window.tex"])
+      assert.are.equal("draws nothing", byLabel["window.empty"])
+      assert.are.equal("draws atlas bags-greenarrow", byLabel["window.atlas"])
+      local note = byLabel["SpecCountdown"]
+      assert.is_truthy(note:find('^text "5" | CENTER to its parent CENTER %+0%.200,%+0%.000'), note)
+      -- The window's middle, plus 0.2 of the text's own units.
+      local l, _, w = window:GetScaledRect()
+      local x = (l + w / 2 + 0.2 * text:GetEffectiveScale()) / factor
+      assert.is_truthy(note:find(string.format("anchor at %.3f,", x), 1, true), note .. " / " .. x)
+      assert.is_truthy(note:find("drawn at ", 1, true), note)
+    end)
+
     it("names a part from its nearest named frame", function()
       local decoration = CreateFrame("Button", "BetterBagsItemButton7Decoration", window)
       decoration:SetPoint("TOPLEFT", window, "TOPLEFT", 0.4, 0)
@@ -229,6 +290,20 @@ describe("PixelAudit", function()
 
     -- A report says what the window looked like (data-driven.md): a misplacement no test reproduced (sections off
     -- by the same fraction after a drag) needs where everything was, not only what was off.
+    it("keeps each part's note in a report, line by line", function()
+      local root = watched("Backpack")
+      local masqued = root:CreateTexture()
+      masqued:SetPoint("TOPLEFT", root, "TOPLEFT", 1.3, 0)
+      masqued:SetSize(4 * unit, unit)
+      masqued:SetTexture("Interface\\Buttons\\WHITE8X8")
+      root._MSQ_CFG = { Normal = masqued }
+      audit:SetWatching(ctx(), true)
+      run(5)
+      local r = audit:GetReports()[1]
+      assert.are.same({ "draws nothing" }, r.notes, "ours, line by line")
+      assert.are.same({ "draws Interface\\Buttons\\WHITE8X8" }, r.otherNotes, "Masque's")
+    end)
+
     it("keeps the window's layout in a report", function()
       watched("Backpack", { layout = function() return { "section 1", "section 2" } end })
       audit:SetWatching(ctx(), true)

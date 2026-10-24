@@ -139,6 +139,16 @@ bags take over:
   `TOPLEFT (-3, 2)`, and sizes it to its atlas on every draw (`SetupCraftingQualityOverlay`,
   `Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua`). Found by the check in game: 34.2 x 29.0 pixels, 3.1
   pixels left of the button (its atlas's 33 x 28 units at 1.0374 pixels a unit).
+- **A cooldown's countdown** (`Cooldown:GetCountdownFontString()`, every client) is a font string the client hangs
+  by its middle from the cooldown's middle, and the cooldown fills the button (`CooldownFrameTemplate`,
+  `setAllPoints`): between two pixels on a button an odd number of pixels across (a 44-unit icon is 51 pixels at
+  65% on 3396x1362). Its numbers change every second, set by the client, so they are not measured: the fitter
+  spans it across the cooldown from its top corners, the client centering the numbers (as the panel's empty text,
+  `next/panel.lua`), on the row its font height is centered on (`pixel:Middle` by `pixel:TextHeight`). On a button
+  Masque skins, the cooldown is Masque's (its `Item` type has it, `Skins/Regions.lua`; `Core/Regions/Cooldown.lua`
+  sizes and anchors it: Caith 32 / 36 of the button, centered), and the countdown is left where the client put it
+  in it. **Not verified yet:** whether the client re-anchors the countdown when a cooldown starts; a check with the
+  countdown's note (§6) will show it.
 - **Guild bank buttons** name their parts (`PixelParts`): the button, its item level text and upgrade
   arrow (BetterBags' own texture, not Masque's `UpgradeIcon`).
 - **The money** in the backpack's and bank's footers is the shared money frame (`frames/money.lua`),
@@ -189,7 +199,16 @@ scale, as Blizzard's `RegionUtil.GetRegionPoint` reads it), `GetPoint`, `GetRegi
   (§4). They are found from what Masque writes, by identity: the regions it makes and skins are kept in the
   button's `_MSQ_CFG` (`Gloss`, `Backdrop`, `Shadow`, `Normal`, `ButtonMask`) and `_MSQ_CFG.Regions` (Masque
   12.1.0 `Core/Group.lua`, `Core/Regions/*.lua`), and every region it skins carries `_MSQ_` fields (an icon's
-  mask in `_MSQ_Mask`). Found in game: a Check Now of a small backpack at Bag Scale 90% (3396x1362 at 65%,
+  mask in `_MSQ_Mask`). `_MSQ_CFG` itself marks a button Masque skins, not a part it places: the only field Masque
+  writes on the button (`Core/Core.lua`), so it does not make the button Masque's. **Everything inside a part
+  Masque places is Masque's too** (its regions and frames, all the way down): seen in game, 14 cooldown
+  countdowns listed as ours, the client's text inside the cooldown Masque places.
+- **Notes**: `Check`'s third return is a note per line: what a texture draws (its file or atlas, "draws nothing"
+  with neither, as for an emptied state texture), and for a text its text, its anchors, and where its first
+  anchor lands (its relative region's point plus its offset in its own units) against where the client draws that
+  point, in screen pixels. Added when two shown click-button `NormalTexture`s (64 units, Blizzard's quickslot art
+  size) were listed with no way to tell whether they drew anything, and a countdown sat 0.153 pixel from its
+  frame's middle. Found in game: a Check Now of a small backpack at Bag Scale 90% (3396x1362 at 65%,
   Masque's Caith skin) listed 116 parts, 113 of them Caith's (sized 42 / 36 of a 46-pixel button: 53.667
   pixels; its count 2 units, 2.075 pixels, in from the corner) and 3 ours (below). **It never reads a key of a table it walks**:
   it collects the parts off the grid first and finds their names by identity, only iterating tables. In
@@ -236,6 +255,7 @@ actually opens, on the real client: real fonts, art, Blizzard's templates, other
   every `GAP` (0.25 s) until two checks agree (at most `MAX_PASSES`, 8). What moves (slides, glides, a
   toggle's knob, sparkles) differs between checks and is left out; what stays off the grid where the window
   comes to rest is reported. A window hidden meanwhile is dropped, never said clean.
+- **Notes** are kept with each report's lines (`notes`, `otherNotes`, line by line).
 - **Masque's parts** make no report and pop nothing up; a report lists them apart (`others`, `othersTotal`),
   and the last check says how many (`lastChecked.others`, the tab's status line).
 - **Layouts**: a window may describe itself (`Register`'s `layout`, lines of text): a report keeps it
