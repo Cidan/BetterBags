@@ -343,6 +343,18 @@ is a column at a screen edge, feathered on its inner side), so ornaments are art
 - **Checked** (`SonataNext:Check`): a `Point` that is no place, an `Anchor` that is no corner, a span or a piece
   without its size, `Sizes` that is no size, a `Motion` key that is no motion, an `Origin` that is no point; the
   art's texture and color through the usual walk.
+- **A pulsing piece takes its strength from its `Pulse` alone** (no `Alpha`): whether the client multiplies an
+  Alpha animation's alpha into the texture's own or replaces it is not verified (warcraft.wiki.gg's Alpha page lists
+  only the API), and a pulse with no `Alpha` beside it looks the same either way.
+- **A strip's art must repeat seamlessly**: its last row continues into its first, or the join shows every `Tile`
+  down the bag. Art made by drawing shapes should draw past both ends and crop (a drop shadow or a blur at an end
+  must see what lies beyond it), and any noise in it must repeat exactly over the tile.
+- **Who uses it.** BetterBags ships no ornamented theme. BetterBags - Themes (Sauravisus' addon) ships Next versions
+  of four of its race themes with their own art and its generator (`themes/next/`, `textures/next/`,
+  `tools/next_ornaments.py` there, registered with `Sonata:RegisterNextTheme`): Night Elf (roots, swaying leaves, a
+  crescent, fireflies), Blood Elf (gold filigree wound with silk, bobbing verdant spheres), Nightborne (a ley line drawn
+  added, a turning rune circle, square switches) and Pandaren (bamboo, a swaying lantern, petals
+  falling as sparkles with a theme texture).
 
 Coverage: `spec/next/ornaments_spec.lua` (spans down a side and along an edge, their tiles, mirroring, corner
 pieces and anchors, art and layer, sizes, tiles following the body, whole pixels on both sides; restyling,
