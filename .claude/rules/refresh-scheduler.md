@@ -353,6 +353,28 @@ the last read committed.
   keeps its values: what the client reports for the slot belongs to the other item (writing its
   new-item flag would put the moved item in Recent Items), and the slot's `BAG_UPDATE` read
   is on its way.
+- **A bag the client changed after its read keeps its committed items, and the client is asked
+  nothing about them.** `items:MarkBagUnread(bagID)` records each change the client reports:
+  `BAG_UPDATE` (its bag), `BAG_CONTAINER_UPDATE` (every backpack, bank and Warbank bag),
+  `PLAYERBANKSLOTS_CHANGED` (bag -1 on Classic, every bank bag on WoW: Forever), registered next to
+  the reads they lead to (`refresh:OnEnable`). A committed read clears, for each bag it harvested,
+  the changes made before its harvest (`items:MarkBagsRead`; changes are numbered, so one made
+  while the read was parked at its yield still marks the bag after it commits, and a read that
+  fails before committing clears nothing). A derive never clears a mark. `Phase2_Rederive` asks
+  `GetItemGUID` only about items of unmarked bags, which hold what they committed.
+  **Failure mode (fixed, reported twice in game):** `data/items.lua:1190: bad argument #1 to
+  'GetItemGUID' (Usage: local itemGUID = C_Item.GetItemGUID(itemLocation))`, from a unit the queue
+  stepped (`refresh.lua:250`). `GetItemGUID` takes an `ItemLocation` that holds an item, not an
+  `EmptiableItemLocation` (`ItemDocumentation.lua`). A slot the player empties (a sale, the last of
+  a stack used, gear equipped into an empty slot) is read only once the loader has the bag's item
+  data (`BAG_UPDATE_DELAYED`, then its `ContinuableContainer`), and that read then waits behind
+  the units already queued: a read never rides on a waiting derive (§7). A derive that ran first
+  asked about the emptied slot. Reading the bag in the derive instead would read item data before
+  its load (data-loader.md §19).
+  **Not verified:** a derive the scheduler starts synchronously (idle, inside the event handler
+  that asked for it) runs before any `BAG_UPDATE` later in the same frame, and the client's order
+  of events within a frame is not documented. The reported error came from a stepped unit (its
+  stack starts at `_Arm`'s timer), where every earlier event had fired.
 - A backpack derive reads the equipped gear (`HarvestEquipment`), as a backpack read does,
   so upgrade arrows compare with the gear worn now.
 - Phases 3-11 then run exactly as for a read, against a copy of the committed table (so the
@@ -424,12 +446,16 @@ absorbs derives like any request.
 Coverage: `spec/refresh_pipeline_spec.lua` ("recalculating without reading (derive)": no slot
 read and the same committed items; the same state as a read when nothing changed; category,
 tooltip, gear set and new-item changes applied; a moved item left alone; never-read and
-emptied kinds; a pending sort; the draw generation; the equipped gear. "merging derives";
+emptied kinds; a pending sort; the draw generation; the equipped gear; "a bag the client changed
+after its read": left as committed and nothing asked about it, ended by its read, kept through a
+derive and a read of another bag, ended for every bag by a wipe, kept through a change during its
+read and a read that fails; "while a changed bag's read waits": the reported error replayed through
+the queue (a sale while a recalculation waits behind a read). "merging derives";
 "the startup read" → "recalculates, without reading the bags again, what changes after the
 read"; "upgrade verdict cache": which events read and which recalculate; "merging derives":
 `categoriesUnchanged` and `recategorize`; "deriving only what changed"),
 `spec/refresh_spec.lua` (routing of `bags/Rederive`, `categoriesUnchanged` included, and
-`EQUIPMENT_SETS_CHANGED`),
+`EQUIPMENT_SETS_CHANGED`; the bags each change event marks unread),
 `spec/config/settings_effects_spec.lua` (every data setting; Split Transmogged still reads),
 `spec/categories_spec.lua` ("refreshes"), `spec/core/interaction_refresh_spec.lua`,
 `spec/frames/contextmenu_spec.lua`, `spec/tooltip_spec.lua`,

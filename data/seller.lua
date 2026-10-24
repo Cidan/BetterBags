@@ -20,7 +20,8 @@ local L = addon:GetModule('Localization')
 -- Each item has its interval to be answered: an error the client raises meanwhile (UI_ERROR_MESSAGE) is
 -- about it. Busy: it is tried again later, after a beat with nothing sent, three times at most. Not
 -- wanted (ERR_VENDOR_NOT_INTERESTED, or the Azerite one): this merchant refuses it, remembered by the
--- merchant's GUID for the session, so it goes back to the bags and is tried at another merchant (asked:
+-- merchant's GUID for the session (by the visit alone where the GUID is secret, merchant), so it goes back
+-- to the bags and is tried at another merchant (asked:
 -- "refused items go back to the backpack until we find a merchant that buys it"). The merchant buys
 -- nothing (ERR_VENDOR_DOESNT_BUY, ERR_VENDOR_HATES_YOU): every sale stops, and this merchant is sold
 -- nothing again. Too far (ERR_VENDOR_TOO_FAR): every sale stops.
@@ -32,6 +33,7 @@ local L = addon:GetModule('Localization')
 ---@field skipBeat boolean The client was busy: the next beat sends nothing.
 ---@field refused table<string, table<string, boolean>> Item GUIDs each merchant (by its GUID) refused.
 ---@field buysNothing table<string, boolean> The merchants that buy nothing.
+---@field visit number Counts merchant visits (MERCHANT_SHOW): a merchant whose GUID is secret is known by its visit.
 local seller = addon:NewModule('Seller')
 
 seller.MIN_INTERVAL = 0.2
@@ -69,10 +71,14 @@ function seller:Init()
   self.skipBeat = false
   self.refused = {}
   self.buysNothing = {}
+  self.visit = 0
 end
 
 function seller:OnEnable()
-  events:RegisterEvent('MERCHANT_SHOW', function() self.atMerchant = true end)
+  events:RegisterEvent('MERCHANT_SHOW', function()
+    self.atMerchant = true
+    self.visit = self.visit + 1
+  end)
   events:RegisterEvent('MERCHANT_CLOSED', function()
     self.atMerchant = false
     self:StopAll("closed")
@@ -88,10 +94,19 @@ function seller:Interval()
   return math.max((math.max(home or 0, world or 0)) / 1000, self.MIN_INTERVAL)
 end
 
--- merchant is the open merchant's GUID (the "npc" unit while a merchant is open).
+-- merchant is how the open merchant is known: its GUID (the "npc" unit while a merchant is open). In a dungeon or
+-- raid an NPC's GUID is a secret (UnitGUID is SecretWhenUnitIdentityRestricted, UnitDocumentation.lua), and addon
+-- code may not use a secret as a table key, nor compare it, even with nil (warcraft.wiki.gg Secret Values; reported:
+-- "attempted to index a table that cannot be indexed with secret keys"). Such a merchant is known by this visit
+-- alone, so what it refused is remembered until it closes. issecretvalue is asked first, and is nil on clients
+-- without secrets.
 ---@return string
 local function merchant()
-  return UnitGUID("npc") or "?"
+  local guid = UnitGUID("npc")
+  if issecretvalue ~= nil and issecretvalue(guid) then
+    return "visit " .. seller.visit
+  end
+  return guid or "?"
 end
 
 ---@param data ItemData|{bag: number, slot: number}

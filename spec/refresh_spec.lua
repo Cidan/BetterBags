@@ -39,6 +39,9 @@ items.ClearNewItems = function() end
 local sortSweepPending = {}
 items.MarkSortSweepPending = function(_, kind) sortSweepPending[kind] = true end
 items.IsSortSweepPending = function(_, kind) return sortSweepPending[kind] == true end
+-- The bags marked changed since their read (the real Items records them, data/items.lua).
+local unreadBags = {}
+items.MarkBagUnread = function(_, bagID) unreadBags[bagID] = true end
 
 -- Mock ItemLoader
 local loader = StubBetterBagsModule("ItemLoader")
@@ -65,6 +68,7 @@ describe("Refresh Module", function()
     addon.atBank = false
     addon.Bags = {}
     for k in pairs(sortSweepPending) do sortSweepPending[k] = nil end
+    for k in pairs(unreadBags) do unreadBags[k] = nil end
     -- Drive the scheduler's frame clock synchronously so a RequestUpdate drains its unit
     -- within the call, preserving these tests' "processed synchronously" expectations.
     -- Timers with a real delay (the sort fallback) are held for the test to fire.
@@ -224,6 +228,25 @@ describe("Refresh Module", function()
     _G.C_Container.SortBags, _G.SortBags = savedSortBags, savedGlobalSortBags
     assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
     assert.are.equal(0, #delayed)
+  end)
+
+  -- A bag's read follows BAG_UPDATE only once the loader has the bag's item data, and then waits
+  -- its turn; a recalculation that runs in between must know the bag changed.
+  it("marks a bag changed when the client reports it (BAG_UPDATE)", function()
+    events:Init()
+    refresh:OnEnable()
+    events._eventMap["BAG_UPDATE"].fn("BAG_UPDATE", 1)
+    assert.same({ [1] = true }, unreadBags)
+  end)
+
+  it("marks every bag changed on BAG_CONTAINER_UPDATE", function()
+    events:Init()
+    local savedAccount = const.ACCOUNT_BANK_BAGS
+    const.ACCOUNT_BANK_BAGS = { [13] = 13 }
+    refresh:OnEnable()
+    events._eventMap["BAG_CONTAINER_UPDATE"].fn("BAG_CONTAINER_UPDATE")
+    const.ACCOUNT_BANK_BAGS = savedAccount
+    assert.same({ [0] = true, [1] = true, [6] = true, [7] = true, [13] = true }, unreadBags)
   end)
 
   it("should trigger a full update on BAG_CONTAINER_UPDATE", function()
@@ -696,6 +719,7 @@ describe("Refresh Module", function()
     assert.is_not_nil(eventMap["PLAYERBANKSLOTS_CHANGED"])
     eventMap["PLAYERBANKSLOTS_CHANGED"].fn("PLAYERBANKSLOTS_CHANGED")
     assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true, bags = { [-1] = true } })
+    assert.same({ [-1] = true }, unreadBags)
     addon.isRetail = true -- reset
   end)
 
@@ -713,6 +737,7 @@ describe("Refresh Module", function()
     eventMap["PLAYERBANKSLOTS_CHANGED"].fn("PLAYERBANKSLOTS_CHANGED")
     assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true })
     assert.spy(refresh.RequestUpdate).was_not.called_with(match._, { bank = true, bags = { [-1] = true } })
+    assert.same({ [6] = true, [7] = true }, unreadBags)
     addon.isForever = nil -- reset
   end)
 

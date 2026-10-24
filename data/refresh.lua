@@ -157,6 +157,15 @@ local function isSortRequest(request)
   return (request.sort or request.sortBank or request.sortWarbank or request.onlyIfSortPending) and true or false
 end
 
+-- markUnread marks every bag of a bag table (bag ID -> bag ID) unread (items:MarkBagUnread). A
+-- client without a table's bags (no Warbank) has none to mark.
+---@param bags? table<number, number>
+local function markUnread(bags)
+  for bagID in pairs(bags or {}) do
+    items:MarkBagUnread(bagID)
+  end
+end
+
 -- canMerge says whether incoming can ride on waiting, a request that has not started.
 -- waiting reads the client when it runs, after incoming was made, so it sees everything
 -- incoming is about; running incoming afterwards would find nothing new. A wipe covers
@@ -550,7 +559,20 @@ function refresh:OnEnable()
     self:RequestUpdate({ sortWarbank = true })
   end)
 
+  -- A bag the client changed is unread until a read of it commits (items:MarkBagUnread): a
+  -- recalculation leaves its committed items as they were. BAG_UPDATE's read waits for the bag's
+  -- item data (the loader's batch above), so the bag is marked when the change is reported.
+  events:RegisterEvent('BAG_UPDATE', function(_, _, bagID)
+    if bagID then
+      items:MarkBagUnread(bagID)
+    end
+  end)
+
+  -- Bags were added, removed or swapped: every bag is read again.
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function()
+    markUnread(const.BACKPACK_BAGS)
+    markUnread(const.BANK_BAGS)
+    markUnread(const.ACCOUNT_BANK_BAGS)
     self:RequestUpdate({ wipe = true, backpack = true, bank = true })
   end)
 
@@ -583,12 +605,14 @@ function refresh:OnEnable()
 
   if not addon.isRetail then
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
+      items:MarkBagUnread(-1)
       self:RequestUpdate({ bank = true, bags = { [-1] = true } })
     end)
   elseif addon.isForever then
     -- A bag placed in or removed from a bank tab's bag socket resizes that tab's
     -- container, so sweep every bank bag. Bag -1 is the keyring on Forever.
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
+      markUnread(const.BANK_BAGS)
       self:RequestUpdate({ bank = true })
     end)
   end

@@ -150,10 +150,24 @@ is. The client is asked only at the moment of acting, after `C_Container.GetCont
 the slot still holds the item (its GUID), because location functions documented with an `ItemLocation`
 argument (not an `EmptiableItemLocation`) raise an error for an empty slot. Mocks raise it too.
 
-**Not yet verified**: `C_Item.GetItemGUID` is documented with an `ItemLocation` argument as well, and
-`items:Phase2_Rederive` asks it about every committed item's slot before knowing the slot holds
-anything. No error from it has been seen; Blizzard checks `DoesItemExist` before it (the WoW Token sell
-frame).
+**Seen since**: `C_Item.GetItemGUID` is documented with an `ItemLocation` argument as well, and
+`items:Phase2_Rederive` asked it about every committed item's slot. It raised in game for a slot a sale
+had emptied (next section).
+
+## Know Which Committed Bags the Client Has Changed
+**Problem**: A recalculation (`derive`) works from the committed items and refreshes a few fields of each
+from the client. The read a client change leads to comes late: `BAG_UPDATE`'s read waits for the bag's
+item data, then for its turn in the queue, where it never rides on a waiting recalculation. A
+recalculation that ran first asked `GetItemGUID` about a slot the player had just emptied, which raises
+("bad argument #1 to 'GetItemGUID'", reported twice in game).
+
+**Rule**: The data layer records which bags the client changed after their last committed read
+(`items:MarkBagUnread`, set from the same events that lead to reads; cleared by a committed read for the
+changes before its harvest). A recalculation leaves such a bag's items exactly as committed and asks
+the client nothing about them; their read is on its way. Never answer this with a check in front of the
+client call: the committed items of that bag are known to be stale, and nothing else about them should
+be refreshed either. Never read the bag in the recalculation instead: its item data may not have loaded
+(data-loader.md §19).
 
 ## Dual-Bank Tab Routing (Retail Character Bank vs Warbank)
 **Problem**: In Retail, Character Bank (`bankType = Character`) and Account Bank (`bankType = Account`) share `const.BAG_KIND.BANK`. If `categoryToGroup[BANK]` is stored as a flat dictionary, assigning a category to a Warbank tab overwrites the Character Bank assignment. `ItemBelongsToTab` strictly filters items by `itemIsAccountBank == tabIsAccountBank`, so Character Bank items of that category cannot show in the Warbank tab, cannot show in any Character Bank tab (since `assignedGroup` points to the Warbank tab), and are rejected by default Tab 1 (which only accepts unassigned categories). The items completely vanish from all bank tabs.

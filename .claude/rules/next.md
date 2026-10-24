@@ -813,7 +813,8 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
     them as taking secrets from addon code. Every other `UnitName` call in BetterBags asks for
     `"player"`, which is never secret. Of the documented APIs the vendor calls, only `UnitName` can
     return a secret; the older global merchant functions (`GetMerchantItemInfo` and the rest) are
-    not in the generated documentation. The frame mock's `MockSecret` (`spec/helpers/wow_mocks.lua`)
+    not in the generated documentation. The Seller (every sale, `data/seller.lua`) also asks
+    `UnitGUID("npc")`, secret in the same places: it keyed tables with it, which errored (seller.md §3). The frame mock's `MockSecret` (`spec/helpers/wow_mocks.lua`)
     models secrets: arithmetic and comparisons error, a font string given one returns a secret width,
     the tooltip's `SetText`/`AddLine` reject one. Coverage: `spec/next/vendor_spec.lua` ("with a
     secret vendor name (an instance)"), `spec/next/chain_spec.lua` ("names bags by their labels in

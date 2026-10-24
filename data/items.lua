@@ -539,6 +539,10 @@ function items:Init()
   -- result comes later (the item moves' refresh, or Refresh's fallback when nothing moved).
   -- The flag stays set until a sweep of that kind has committed.
   self._sortSweepPending = {}
+  -- The bags the client changed after BetterBags last read them, each with the number of its last
+  -- change (MarkBagUnread), and the count of changes reported so far.
+  self._unreadBags = {}
+  self._bagChanges = 0
   -- The interaction state (addon.atInteracting) each kind's committed stacks were built
   -- under (see NeedsInteractionRecalculation).
   self._stackedInteracting = {}
@@ -1167,8 +1171,11 @@ function items:Phase2_Harvest(kind, bagList, previousItems, rereadEquipment)
 end
 
 -- Phase2_Rederive gives a derive (refresh-scheduler.md §10) the items the last read
--- committed, reading no bag slot. An item still in its slot (same GUID) gets the fields a
--- read refreshes on a kept slot (refreshKeptItem): quest state, tooltip text, gear sets and
+-- committed, reading no bag slot. A bag the client changed after that read (MarkBagUnread) keeps
+-- its committed items as they were, and the client is asked nothing about them: what it reports
+-- for their slots belongs to the change (an emptied slot has no item to ask about), and the read the
+-- change led to is on its way. In every other bag, an item still in its slot (same GUID) gets the
+-- fields a read refreshes on a kept slot (refreshKeptItem): quest state, tooltip text, gear sets and
 -- the new-item flag; one read while the client had no data for it (harvestIncomplete) is
 -- read again, as every read does with such a slot. An item whose slot now holds something else keeps its values: what the
 -- client reports for the slot belongs to the other item, and the slot's read is on its way.
@@ -1185,7 +1192,7 @@ function items:Phase2_Rederive(kind, committedItems)
   local itemData = {}
   local itemLoader = addon:GetModule("ItemLoader", true)
   for slotkey, item in pairs(committedItems) do
-    if not item.isItemEmpty then
+    if not item.isItemEmpty and self._unreadBags[item.bagid] == nil then
       local itemMixin = itemLoader and itemLoader:GetItemMixinFromSlotKey(slotkey) or Item:CreateFromBagAndSlot(item.bagid, item.slotid) --[[@as ItemMixin]]
       local itemGUID = C_Item.GetItemGUID(itemMixin:GetItemLocation()) or ""
       if itemGUID == item.itemInfo.itemGUID then
@@ -2221,6 +2228,8 @@ function items:RunRefresh(ectx, kind)
   -- A wipe re-reads every slot; any other read keeps the committed item of each slot whose
   -- contents have not changed (ReuseHarvestedSlot); a derive reads no slot.
   local itemData, equipmentData
+  -- The changes the client had reported when this read harvested: those its commit shows.
+  local readAt = self._bagChanges
   if derive then
     itemData, equipmentData = self:Phase2_Rederive(kind, committedItems)
   else
@@ -2295,6 +2304,36 @@ function items:RunRefresh(ectx, kind)
   -- the flag set for the next sweep or the fallback.
   if sortSweep then
     self._sortSweepPending[kind] = false
+  end
+  -- Likewise only a committed read shows the changes its harvest read.
+  if not derive then
+    self:MarkBagsRead(bagList, readAt)
+  end
+end
+
+-- MarkBagUnread records that the client reported a change to a bag's contents (BAG_UPDATE, and the
+-- other events a read of the bag follows: refresh:OnEnable). From then until a read that harvested
+-- the bag after the change has committed, the bag's committed items are not what it holds: a
+-- recalculation leaves them as they were and asks the client nothing about them
+-- (Phase2_Rederive). That read waits for the bag's item data (the loader) and then for its turn
+-- in the queue, and a recalculation can run in between. Changes are numbered, so one made while a
+-- read was under way (after its harvest) still marks the bag when that read commits.
+---@param bagID number
+function items:MarkBagUnread(bagID)
+  self._bagChanges = self._bagChanges + 1
+  self._unreadBags[bagID] = self._bagChanges
+end
+
+-- MarkBagsRead clears, for each bag a committed read harvested, the changes made before its
+-- harvest (readAt: the number of changes reported by then).
+---@param bagList table<number, number>
+---@param readAt number
+function items:MarkBagsRead(bagList, readAt)
+  for bagID in pairs(bagList) do
+    local changedAt = self._unreadBags[bagID]
+    if changedAt ~= nil and changedAt <= readAt then
+      self._unreadBags[bagID] = nil
+    end
   end
 end
 
