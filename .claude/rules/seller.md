@@ -69,13 +69,28 @@ section) and the Seller itself. Another merchant (another GUID) is offered them 
 not, for the session. A sale that ends with refusals says once "This merchant would not buy N items."
 
 `MERCHANT_SHOW` and `MERCHANT_CLOSED` keep `atMerchant`; closing stops every sale (`"closed"`).
+`MERCHANT_SHOW` also counts visits (`visit`).
+
+**A merchant whose GUID is secret is known by its visit.** `UnitGUID` is
+`SecretWhenUnitIdentityRestricted` (`UnitDocumentation.lua`): in a dungeon or raid an NPC's GUID is a
+secret, and addon code may not use a secret as a table key, nor compare it (even with `nil`), though a
+boolean test is allowed (warcraft.wiki.gg Secret Values). **Failure mode (fixed, reported):**
+`data/seller.lua:115: attempted to index a table that cannot be indexed with secret keys`, in
+`BuysNothing` from `Automation:MerchantBuys` on `MERCHANT_SHOW`, a `<secret string>` key in the report's
+locals. `merchant()` now asks `issecretvalue` first (nil on Classic, where nothing is secret) and keys
+such a merchant by `"visit N"`: what it refused, and that it buys nothing, are remembered until it
+closes; the next visit may be another merchant. A plain GUID is used as before, for the session.
+`C_Item.GetItemGUID` (the refused items' keys) carries no secret flags.
 
 ## 4. Coverage
 
 `spec/seller_spec.lua`: the interval from the latency and its floor; one item a beat, never two; sales
 in order on one pace; waiting for the cursor; skipping items gone, moved, locked, refundable or not
 bought; slots without an item; busy retried after a skipped beat, given up after three; a refusal
-remembered per merchant (not tried again here, tried at another, still refused back at the first); the
+remembered per merchant (not tried again here, tried at another, still refused back at the first); a
+merchant whose GUID is secret (buys nothing and refusals remembered for the visit, forgotten on the next; a
+plain GUID still remembered across visits; the tables guarded with the mock's `SecretKeyGuard`, which
+raises the client's error for a secret key, so the reported error is reproduced first); the
 Azerite refusal; a merchant that buys nothing stopping every sale, said once, nothing sold again; one
 that dislikes the player; walking away; errors with nothing waiting, and other errors, ignored; the
 refusal line; what sold, with each stack's count, once the last item had its interval; progress; the

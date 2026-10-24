@@ -175,6 +175,28 @@ end
 _G.IsMockSecret = function(value)
   return type(value) == "table" and getmetatable(value) == secretMeta
 end
+-- SecretKeyGuard(t) makes t index as the client's tables do for addon code: a secret key, read or written, raises
+-- the client's error (warcraft.wiki.gg Secret Values: tainted code "is not allowed to store secret values as keys in
+-- tables"; the error reported in game: "attempted to index a table that cannot be indexed with secret keys"). Plain
+-- Lua tables take any value as a key, so a spec guards the tables its code indexes. Plain keys work as before.
+-- Returns t.
+_G.SecretKeyGuard = function(t)
+  local function reject(key)
+    if _G.IsMockSecret(key) then
+      error("attempted to index a table that cannot be indexed with secret keys", 3)
+    end
+  end
+  return setmetatable(t, {
+    __index = function(_, key)
+      reject(key)
+      return nil
+    end,
+    __newindex = function(tbl, key, value)
+      reject(key)
+      rawset(tbl, key, value)
+    end,
+  })
+end
 -- rejectSecret raises the error a C function not marked up to take secrets from tainted callers
 -- raises (warcraft.wiki.gg Secret Values: "an API must be explicitly marked up as accepting
 -- secrets from tainted callers").

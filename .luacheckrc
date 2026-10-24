@@ -399,6 +399,7 @@ files["spec/**/*.lua"] = {
 		"ResetMockGuildBank",
 		"MockSecret",
 		"IsMockSecret",
+		"SecretKeyGuard",
 	},
 	ignore = {
 		"212", -- unused argument (common in mock functions)
