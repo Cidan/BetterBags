@@ -489,6 +489,21 @@ function canvasProto:RowWidth(perRow)
   return perRow * ((self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP) - style.GAP
 end
 
+-- Widest is how many cells the largest section the column lays out holds (its gaps included: each takes a cell): not
+-- one waiting in a dock (one flying back is laid out again), nor one leaving; 0 while it lays out none. A small panel
+-- let go snaps to its widest row of icons (next.md §14g).
+---@return number
+function canvasProto:Widest()
+  local widest = 0
+  for _, section in ipairs(self.order) do
+    local away = self.away[section]
+    if (away == nil or away.returning) and not self:IsLeaving(section) then
+      widest = math.max(widest, #section.entries)
+    end
+  end
+  return widest
+end
+
 ---@class (exact) NextCanvasSection
 ---@field name string
 ---@field buttons {key: string, frame: Frame}[] Drawn already, in order.

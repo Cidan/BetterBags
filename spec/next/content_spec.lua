@@ -216,8 +216,28 @@ describe("NextContent", function()
     assert.are.same({ style.GRID_WIDTH, aHeight + style.SECTION_SPACING + bHeight }, { result.Width, result.Height })
   end)
 
-  -- A small panel snaps to the width of the columns it shows (next.md §14g): the canvas says how many cells a width
-  -- holds and how wide they are, in units, as it decides its rows (MeasureSection).
+  -- A small panel let go snaps to its widest row of icons (next.md §14g): the canvas says how many cells a width
+  -- holds and how wide they are, in units, as it decides its rows (MeasureSection), and how many its largest section
+  -- in the column holds.
+  it("says how many cells its largest section in the column holds", function()
+    assert.are.equal(0, canvas:Widest(), "none while it shows nothing")
+    local items = {}
+    for i = 1, 10 do table.insert(items, item("0_" .. i, "A")) end
+    for i = 1, 3 do table.insert(items, item("1_" .. i, "B")) end
+    table.insert(items, gap("1_4", "B"))
+    bind(data({ categories = { { name = "A" }, { name = "B" } }, items = items }))
+    draw()
+    assert.are.equal(10, canvas:Widest())
+    local a = canvas.byName.A
+    canvas:HoldOut(a)
+    assert.are.equal(4, canvas:Widest(), "a section waiting in a dock is out of the column; a gap takes a cell")
+    canvas:Returning(a)
+    assert.are.equal(10, canvas:Widest(), "one flying back has its room again")
+    canvas:Return(a)
+    canvas:MarkLeaving("A")
+    assert.are.equal(4, canvas:Widest(), "one leaving is out of the column")
+  end)
+
   it("says how many cells a width to lay out for holds, and how wide they are", function()
     assert.are.equal(8, canvas:PerRow(style.GRID_WIDTH))
     assert.are.equal(7, canvas:PerRow(style.GRID_WIDTH - 1))

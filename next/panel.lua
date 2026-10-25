@@ -962,21 +962,37 @@ function panelProto:ContentRoom()
   return 2 * style.PAD + style.RAIL + scrollbox:GutterWidthFor(SCROLL_OPTIONS)
 end
 
--- SnapWidth is the width of the columns a small panel width wide shows (next.md §14g), in units: as many cells as its
--- rows hold at that width, and the room beside them; never below its minimum. Never more columns: asked, "never
--- normalize such that the column count changes away from the user".
+-- ColumnsWidth is the width of the columns a small panel width wide holds, in units: as many cells as its rows hold at
+-- that width, and the room beside them (what reads it keeps it within its minimum: SmallSize, LayoutWidth).
+---@param width number
+---@return number
+function panelProto:ColumnsWidth(width)
+  local room = self:ContentRoom()
+  return self.content:RowWidth(self.content:PerRow(width - room)) + room
+end
+
+-- SnapWidth is the width a small panel let go width wide snaps to (next.md §14g), in units: its widest row of icons
+-- as laid out at that width (as many cells as a row holds there, or as its largest section holds when that is fewer,
+-- NextCanvas:Widest) and the room beside it; the columns it holds while it lays out no section; never below its
+-- minimum. Every row stays as it is. Asked: "if i drag the window to be too big ... it should shrink back down to
+-- where the icon is", and "never normalize such that the column count changes away from the user".
 ---@param width number
 ---@return number
 function panelProto:SnapWidth(width)
   local room = self:ContentRoom()
-  return math.max(self:MinWidth(), self.content:RowWidth(self.content:PerRow(width - room)) + room)
+  local perRow = self.content:PerRow(width - room)
+  local widest = self.content:Widest()
+  if widest > 0 then
+    perRow = math.min(perRow, widest)
+  end
+  return math.max(self:MinWidth(), self.content:RowWidth(perRow) + room)
 end
 
 -- DefaultWidth is a small panel's width before the player sizes it: the columns the full body's width holds, so no
 -- room is left past its last column at any Icon Scale (asked: "default should probably be exact too").
 ---@return number
 function panelProto:DefaultWidth()
-  return self:SnapWidth(style.BODY_WIDTH)
+  return self:ColumnsWidth(style.BODY_WIDTH)
 end
 
 -- SmallSize is the size a small panel takes on this screen while nothing sizes it (next.md §14g), in its

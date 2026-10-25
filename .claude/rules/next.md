@@ -1578,6 +1578,9 @@ trying them in game, "auto-hide the handles so they only show on hover". Then (2
 will size down (or up) to the nearest exact width needed to fit the columns the user released it at"; "normalize to
 the nearest column that keeps the same column count on screen as the user selected, never normalize such that the
 column count changes away from the user"; the height snap "on hold, only X"; "default should probably be exact too".
+A first version snapped to the columns a row holds at the width let go at, which left a panel dragged far wider than
+its icons as wide as it was (reported with a screenshot: its widest row 14 icons, 25 columns wide): "if i drag the
+window to be too big like in that screenshot, it should shrink back down to where the icon is".
 
 - **The grips** (`BuildGrips`, `styleGrips`, the theme's `Small.Grip`): a button on each bottom corner
   of a small panel's body, `Inset` (2) in, `Size` (16) square, drawn with Blizzard's chat size grabber
@@ -1609,13 +1612,16 @@ column count changes away from the user"; the height snap "on hold, only X"; "de
     frame at the new width, as many icons per row as fit; the canvas places everything at once
     meanwhile (`canvas:SetInstant`), so nothing glides behind the moving edge. A size change of its
     own (a switch) lays nothing out from there.
-  - **Let go, it snaps to its columns' width** (`StopSizing`, `SnapWidth`): the width of the columns it shows
+  - **Let go, it shrinks to its widest row of icons** (`StopSizing`, `SnapWidth`): its widest row as laid out
     where it was let go, in units: as many cells as a row holds there (`NextCanvas:PerRow`, the canvas's own row
-    rule, icons or the vendor's cards), their width with the gaps between them (`RowWidth`), and the room beside
-    them (`ContentRoom`: the padding, the side rail, the scroll box's room for its bar on both sides, read from the
-    scroll box's options, `SCROLL_OPTIONS`); never below its minimum. Never another column count: the columns shown
-    fit, so it only ever narrows to them (a fraction of a pixel aside). The height stays where it was let go (a
-    height snap is on hold). Saved for its kind with its place (its top left, which the left grip moves: the side
+    rule, icons or the vendor's cards), or as its largest section in the column holds when that is fewer
+    (`NextCanvas:Widest`: a gap takes a cell; a section waiting in a dock or leaving is not in the column, one flying
+    back is), their width with the gaps between them (`RowWidth`), and the room beside them (`ContentRoom`: the
+    padding, the side rail, the scroll box's room for its bar on both sides, read from the scroll box's options,
+    `SCROLL_OPTIONS`); the columns a row holds while it lays out no section; never below its minimum. Every row
+    stays as it was: a section wider than the panel keeps wrapping where it wrapped, and no column is added, so it
+    only ever narrows (a fraction of a pixel aside). The width saved stays when items come and go (a section that
+    grows past it wraps). The height stays where it was let go (a height snap is on hold). Saved for its kind with its place (its top left, which the left grip moves: the side
     across from the grip stays still). A press whose snapped width and height are within half a unit of the size
     it had saves nothing (a default-sized panel dragged a little wider snaps back to the default and saves
     nothing), so the default size keeps following the screen. Hiding it (Escape) ends the sizing, snapped
@@ -1630,7 +1636,8 @@ column count changes away from the user"; the height snap "on hold, only X"; "de
     partner's spot and the braid), and anything that places, moves, sizes, switches or hides it ends the snap at
     its width (`endSizeGlide`).
 - **Its size** (`SmallSize`): the saved size, else its default width (`DefaultWidth`: the columns the full
-  body's width holds, `SnapWidth(BODY_WIDTH)`, so it leaves no room past its last column at any Icon Scale;
+  body's width holds, `ColumnsWidth(BODY_WIDTH)`, whatever it shows, so it leaves no room past its last column at
+  any Icon Scale and does not change as items come and go;
   exactly `BODY_WIDTH` at 100%) and `Small.Height` of the screen tall; never below its minimum nor past the
   screen, without changing what was saved. An open panel at its default size takes its new default when Icon
   Scale changes (`FitSmall`); a saved size keeps its width. While it is built (its header fits its title before
@@ -1642,8 +1649,9 @@ column count changes away from the user"; the height snap "on hold, only X"; "de
   - `SmallWidth`/`SmallHeight` read the frame while a grip sizes it or its size glides, else the size it
     took last (`smallWidth`, `smallHeight`, from `ApplyGeometry` and `FitSmall`).
   - The room past the last column of icons is left on the right, as a web page's (asked: no centering
-    in Next's design); a grip let go snaps it away, so only a panel held wider by its minimum (its header,
-    its footer) or a size saved before snapping keeps any.
+    in Next's design); a grip let go snaps it to its widest row, so only a panel held wider by its minimum (its
+    header, its footer), at its default width with fewer icons than a row holds, or at a size saved before snapping
+    keeps any.
   - It comes back at its saved size after a switch to full size and back. When the screen changes
     (`FitSmall`) it is refitted to it and laid out again if its width or height changed; what was
     saved is kept.
@@ -1692,14 +1700,16 @@ cache, warcraft.wiki.gg Frame:SetUserPlaced, not from sizing) and the chained-ba
 `StopSizing`, which the grip turned off on the chained side made pointless (its chained side never
 moves); the same branch in `ResetSize` went for the same reason.
 
-Snapping (2026-10-24): `spec/next/small_spec.lua` ("snapping to its columns": never adding a column, exactly a
-column count's width kept, a default-sized panel dragged a little wider snapping back and saving nothing, a new
-height alone saved, its minimum (and nothing less saved), the bounce and its height still, its columns through the
-bounce, the left grip's edge, ended by a grip, a move and a hide, a chained bag's chained side still, cards, dragged
-again after a snap; with a side rail; hiding mid-drag snapped; "Icon Scale": the default at the columns it holds,
-refitted when Icon Scale changes, a saved size kept), `spec/next/content_spec.lua` (`PerRow`, `RowWidth`),
-`spec/render/motion_spec.lua` ("a size snapping"). 30 mutations, each caught; three first survived and led to
-tests (the minimum saved, the rail's room, the snap record cleared).
+Snapping (2026-10-24): `spec/next/small_spec.lua` ("snapping to its icons": shrinking to the widest row with every
+row as it was, a wider section wrapping where it wrapped and no column added, exactly a column count's width kept, a
+default-sized panel dragged a little wider snapping back and saving nothing, a new height alone saved, hugging fewer
+icons than the default holds, the default width the same whatever it shows, its minimum (and nothing less saved),
+the columns with no icons, the bounce and its height still, its rows through the bounce, the left grip's edge, ended
+by a grip, a move and a hide, a chained bag's chained side still, a section in a dock left out, cards, dragged again
+after a snap; with a side rail; hiding mid-drag snapped; "Icon Scale": the default at the columns it holds, refitted
+when Icon Scale changes, a saved size kept), `spec/next/content_spec.lua` (`PerRow`, `RowWidth`, `Widest`),
+`spec/render/motion_spec.lua` ("a size snapping"). 38 mutations, each caught; four first survived and led to tests
+(the minimum saved, the rail's room, the snap record cleared) or to removing a minimum `ColumnsWidth` repeated.
 
 Not verified in game yet: the hover fade, the glide back, the snap and its bounce, chained bags' grips, and how the
 grips look on the other Next themes (Parchment's light paper). A render recording of a resize (render-recorder.md)

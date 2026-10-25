@@ -899,10 +899,15 @@ describe("BetterBags Next's small mode", function()
           assert.are.equal(bank:MinWidth() - 40 - (style.PAD + style.TITLE_INSET) - style.PAD - 12, bank.title:GetWidth())
         end)
 
-        it("snaps to its columns' width with the strip beside them", function()
+        it("snaps to its widest row of icons with the strip beside them", function()
           railed()
           local bag = opened(function(c) return nextBag:Create(c) end)
-          resize(bag, "RIGHT", columnsWidth(9) + 40 + 30, 500)
+          local list = {}
+          for i = 1, 9 do table.insert(list, item("0_" .. i, "Herbs")) end
+          slots[BACKPACK].tabs[1].items = list
+          bag:Draw(ctx(), slots[BACKPACK], function() end)
+          render:Flush()
+          resize(bag, "RIGHT", columnsWidth(15) + 40, 500)
           finishTweens()
           assert.are.equal(columnsWidth(9) + 40, bag.frame:GetWidth())
         end)
@@ -982,28 +987,58 @@ describe("BetterBags Next's small mode", function()
       end)
     end)
 
-    -- Asked: let go, a panel "will size down (or up) to the nearest exact width needed to fit the columns the user
-    -- released it at", "normalize to the nearest column that keeps the same column count on screen as the user
-    -- selected, never normalize such that the column count changes away from the user"; the height stays where it is
-    -- let go ("let's hold on the Y resize, only X").
-    describe("snapping to its columns", function()
-      it("snaps to the width of the columns it shows when let go, never adding one", function()
-        local bag = opened(function(c) return nextBag:Create(c) end)
-        resize(bag, "RIGHT", columnsWidth(7) - 1, 600)
+    -- Asked: let go, a panel snaps "to the nearest exact width needed to fit the columns the user released it at",
+    -- "never normalize such that the column count changes away from the user"; then, shown a panel let go far wider
+    -- than its icons (its widest row 14 of 25 columns): "if i drag the window to be too big like in that screenshot,
+    -- it should shrink back down to where the icon is". The height stays where it is let go ("only X").
+    describe("snapping to its icons", function()
+      -- filled draws the tab a panel shows with a section of each size (tab 1: groups are off).
+      local function filled(panel, sizes)
+        local kind = panel.kind
+        local tab = panel:GetCurrentTabID()
+        local categories, list = {}, {}
+        for s, n in ipairs(sizes) do
+          local name = "S" .. s
+          table.insert(categories, { name = name })
+          for i = 1, n do table.insert(list, item(((kind == BANK and 6 or 0) + s) .. "_" .. i, name)) end
+        end
+        slots[kind].tabs[tab] = { categories = categories, items = list }
+        panel:Draw(ctx(), slots[kind], function() end)
+        render:Flush()
+        return panel
+      end
+
+      local function backpack(sizes)
+        return filled(opened(function(c) return nextBag:Create(c) end), sizes)
+      end
+
+      it("shrinks to its widest row of icons when let go, every row as it was", function()
+        local bag = backpack({ 14, 4, 7 })
+        resize(bag, "RIGHT", columnsWidth(25) + 20, 600)
         finishTweens()
-        assert.are.equal(columnsWidth(6), bag.frame:GetWidth(), "a unit short of seven columns shows six")
-        resize(bag, "RIGHT", columnsWidth(7), 600)
+        render:Flush()
+        assert.are.same({ columnsWidth(14), 600 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        assert.are.equal(14, perRow(bag), "the widest section still on one row")
+        assert.are.same({ columnsWidth(14), 600 }, db.sizes[BACKPACK])
+      end)
+
+      it("keeps a section wider than it wrapping where it wrapped, never adding a column", function()
+        local bag = backpack({ 20, 3 })
+        resize(bag, "RIGHT", columnsWidth(12) + 30, 600)
         finishTweens()
-        assert.are.equal(columnsWidth(7), bag.frame:GetWidth(), "exactly seven columns' width stays")
-        resize(bag, "RIGHT", columnsWidth(7) + 49, 610)
+        assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+        resize(bag, "RIGHT", columnsWidth(13) - 1, 600)
         finishTweens()
-        assert.are.same({ columnsWidth(7), 610 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        assert.are.equal(columnsWidth(12), bag.frame:GetWidth(), "a unit short of thirteen columns shows twelve")
+        resize(bag, "RIGHT", columnsWidth(13), 600)
+        finishTweens()
+        assert.are.equal(columnsWidth(13), bag.frame:GetWidth(), "exactly thirteen stays")
       end)
 
       -- Asked: "if we have a default sized bag, if we drag just a bit bigger, but not big enough so icons move, and
       -- then let go, it will snap back to default size."
       it("snaps a default-sized panel dragged a little wider back to its default size, saving nothing", function()
-        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bag = backpack({ 10 })
         local w, h = bag.frame:GetWidth(), bag.frame:GetHeight()
         assert.are.equal(columnsWidth(8), w, "the default is eight columns' width")
         resize(bag, "RIGHT", w + 30, h)
@@ -1015,16 +1050,39 @@ describe("BetterBags Next's small mode", function()
         assert.are.same({ w, h - 100 }, db.sizes[BACKPACK], "a new height alone is saved")
       end)
 
+      it("hugs fewer icons than its default holds", function()
+        local bag = backpack({ 5, 2 })
+        resize(bag, "RIGHT", bag.frame:GetWidth() + 30, 600)
+        finishTweens()
+        assert.are.equal(math.max(bag:MinWidth(), columnsWidth(5)), bag.frame:GetWidth())
+      end)
+
+      -- Only a grip let go hugs its icons: its default width is the columns it holds, whatever it shows, so it does not
+      -- change as items come and go.
+      it("keeps its default width at its columns whatever it shows", function()
+        local bag = backpack({ 3 })
+        bag:FitSmall()
+        assert.are.equal(columnsWidth(8), bag.frame:GetWidth())
+        assert.are.equal(columnsWidth(8) - 2 * style.PAD, bag.root:PreRender().LayoutWidth)
+      end)
+
       it("never goes narrower than its minimum, nor saves less", function()
-        local bank = opened(function(c) return nextBank:Create(c) end)
-        resize(bank, "LEFT", bank:MinWidth(), 500)
+        local bank = filled(opened(function(c) return nextBank:Create(c) end), { 1 })
+        resize(bank, "LEFT", columnsWidth(12), 500)
         finishTweens()
         assert.are.equal(bank:MinWidth(), bank.frame:GetWidth())
         assert.are.same({ bank:MinWidth(), 500 }, db.sizes[BANK])
       end)
 
-      it("reflows as it is dragged again once a snap has ended", function()
+      it("snaps to the columns it shows while it shows no icons", function()
         local bag = opened(function(c) return nextBag:Create(c) end)
+        resize(bag, "RIGHT", columnsWidth(7) + 20, 600)
+        finishTweens()
+        assert.are.equal(columnsWidth(7), bag.frame:GetWidth())
+      end)
+
+      it("reflows as it is dragged again once a snap has ended", function()
+        local bag = backpack({ 20 })
         resize(bag, "RIGHT", columnsWidth(7) + 20, 600)
         finishTweens()
         press(bag.grips.RIGHT)
@@ -1034,37 +1092,37 @@ describe("BetterBags Next's small mode", function()
         release(bag.grips.RIGHT)
       end)
 
-      -- The original bags' bounce (window.md §3b): past the target by a tenth of the distance, then back.
-      it("bounces past its columns' width and settles, as the original bags do", function()
-        local bag = opened(function(c) return nextBag:Create(c) end)
-        local from, to = columnsWidth(12) + 40, columnsWidth(12)
+      -- The original bags' bounce (window.md §3b): past the target by a tenth of the distance (at most 10), then back.
+      it("bounces past its icons' width and settles, as the original bags do", function()
+        local bag = backpack({ 14 })
+        local from, to = columnsWidth(25), columnsWidth(14)
         resize(bag, "RIGHT", from, 600)
         assert.is_true(bag.sizeGliding)
         step(style.Time.Snap * 0.65)
-        assert.is_true(math.abs(bag.frame:GetWidth() - (to - (from - to) * 0.1)) < 0.01, "width " .. bag.frame:GetWidth())
+        assert.is_true(math.abs(bag.frame:GetWidth() - (to - 10)) < 0.01, "width " .. bag.frame:GetWidth())
         assert.are.equal(600, bag.frame:GetHeight(), "its height stays")
         finishTweens()
         assert.are.equal(to, bag.frame:GetWidth())
         assert.is_false(bag.sizeGliding)
       end)
 
-      it("keeps its columns through the bounce, nothing reflowing", function()
-        local bag = opened(function(c) return nextBag:Create(c) end)
-        local from, to = columnsWidth(12) + 40, columnsWidth(12)
-        resize(bag, "RIGHT", from, 600)
+      it("keeps its rows through the bounce, nothing reflowing", function()
+        local bag = backpack({ 14 })
+        local to = columnsWidth(14)
+        resize(bag, "RIGHT", columnsWidth(25), 600)
         step(style.Time.Snap * 0.65)
         assert.is_true(bag.frame:GetWidth() < to, "past its width")
         assert.are.equal(to - 2 * style.PAD, bag.root:PreRender().Width)
         assert.are.equal(to - 2 * style.PAD, bag.root:PreRender().LayoutWidth)
-        assert.are.equal(12, perRow(bag))
+        assert.are.equal(14, perRow(bag))
       end)
 
       it("moves the edge its grip moved: the left grip's left edge, its right edge still", function()
-        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bag = backpack({ 14 })
         local x0, y0 = topLeft(bag)
         local right = x0 + bag.frame:GetWidth()
-        local from, to = columnsWidth(12) + 40, columnsWidth(12)
-        resize(bag, "LEFT", from, 600)
+        local to = columnsWidth(14)
+        resize(bag, "LEFT", columnsWidth(25), 600)
         step(style.Time.Snap * 0.65)
         assert.is_true(math.abs(select(1, topLeft(bag)) + bag.frame:GetWidth() - right) < 0.01, "the right edge still")
         assert.are.equal(y0, select(2, topLeft(bag)))
@@ -1074,10 +1132,10 @@ describe("BetterBags Next's small mode", function()
       end)
 
       it("ends its snap at its width when anything else places or sizes it", function()
-        local to = columnsWidth(12)
+        local to = columnsWidth(14)
         local function snapping()
-          local bag = opened(function(c) return nextBag:Create(c) end)
-          resize(bag, "RIGHT", to + 40, 600)
+          local bag = backpack({ 14 })
+          resize(bag, "RIGHT", columnsWidth(20), 600)
           step(0.05)
           assert.is_true(bag.sizeGliding)
           return bag
@@ -1102,14 +1160,14 @@ describe("BetterBags Next's small mode", function()
       end)
 
       it("keeps a chained bag's chained side still as it snaps", function()
-        local bag = opened(function(c) return nextBag:Create(c) end)
-        local bank = opened(function(c) return nextBank:Create(c) end)
+        local bag = backpack({ 8 })
+        local bank = filled(opened(function(c) return nextBank:Create(c) end), { 9 })
         db.smallChain = "backpack"
         chain:Update(ctx())
         finishTweens()
         local bagLeft = topLeft(bag)
         local bankRight = select(1, topLeft(bank)) + bank.frame:GetWidth()
-        resize(bank, "LEFT", columnsWidth(9) + 30, 480)
+        resize(bank, "LEFT", columnsWidth(15), 480)
         step(style.Time.Snap * 0.5)
         assert.is_true(math.abs(select(1, topLeft(bank)) + bank.frame:GetWidth() - bankRight) < 0.01, "on its way")
         finishTweens()
@@ -1119,13 +1177,22 @@ describe("BetterBags Next's small mode", function()
         assert.are.same({ chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY) }, { topLeft(bank) })
       end)
 
+      it("leaves a section waiting in a dock out of its widest row", function()
+        local bag = backpack({ 14, 6 })
+        bag.content:HoldOut(bag.content.byName.S1)
+        resize(bag, "RIGHT", columnsWidth(20), 600)
+        finishTweens()
+        assert.are.equal(columnsWidth(6), bag.frame:GetWidth())
+      end)
+
       -- The vendor lays its items out as cards (NextCanvas:SetCards).
-      it("snaps a panel of cards to its cards' width", function()
+      it("snaps a panel of cards to its widest row of cards", function()
         local bag = opened(function(c) return nextBag:Create(c) end)
         bag.content:SetCards(true)
+        filled(bag, { 3 })
         local card = style.VENDOR_CARD_WIDTH + style.GAP
         local room = 2 * style.PAD + scrollbox:GutterWidthFor({ Symmetric = true })
-        resize(bag, "LEFT", room + 3 * card - style.GAP + 120, 500)
+        resize(bag, "LEFT", room + 5 * card - style.GAP + 20, 500)
         finishTweens()
         assert.are.equal(room + 3 * card - style.GAP, bag.frame:GetWidth())
       end)
