@@ -305,7 +305,7 @@ function pageProto:Render(parentResult)
       end
       local titled = section.titleHidden == nil or section.titleHidden() ~= true
       local title = self:part(self.titles, i, function() return style:CreateText(f, C.TitleFont) end)
-      title:SetText(string.upper(section.title or ""))
+      title:SetText(C.TitleUpper == false and (section.title or "") or string.upper(section.title or ""))
       title:ClearAllPoints()
       local bottom = y + titleHeight - pixel:Snap(f, 6)
       title:SetPoint("BOTTOMLEFT", f, "TOPLEFT", pad, -bottom)

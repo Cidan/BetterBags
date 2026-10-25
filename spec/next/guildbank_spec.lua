@@ -54,7 +54,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" },
   { "NextGuildButton", "next/guildbutton.lua" }, { "NextGuildBank", "next/guildbank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -379,6 +379,27 @@ describe("NextGuildBank", function()
       handlers["guildbank/MoneyChanged"](ctx())
       assert.is_true(g.withdrawGoldButton:IsEnabled())
       assert.are.equal(1, g.withdrawGoldButton.icon:GetAlpha())
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md, round three): its gold in its bag button's menu, saying what the player
+    -- may withdraw, disabled for a member who may not.
+    it("lists its gold in its bag button's menu for a theme that puts it there, saying what may be withdrawn", function()
+      local list
+      override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+      local g = open()
+      UseNextTheme({ Header = { Buttons = { Menu = { Point = "TOPINNER", Width = 40, Height = 40, Layers = {} },
+        Pinned = { closeButton = { Point = "TOPOUTER" } } } } })
+      g:ApplyStyle(ctx())
+      g.menuButton:Open(ctx())
+      assert.are.same({ "Deposit Gold", "Withdraw Gold", "Open Options Screen" }, { list[2].text, list[3].text, list[4].text })
+      assert.is_truthy(list[3].tooltipText:find("You may withdraw up to ", 1, true))
+      data.canWithdraw = false
+      handlers["guildbank/MoneyChanged"](ctx())
+      g.menuButton:Open(ctx())
+      assert.is_true(list[3].disabled)
+      assert.is_truthy(list[3].tooltipText:find("You may not withdraw gold", 1, true))
+      UseNextTheme(nil)
+      g:ApplyStyle(ctx())
     end)
 
     it("updates the gold when the guild bank's money changes", function()

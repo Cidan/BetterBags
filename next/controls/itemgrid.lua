@@ -21,8 +21,15 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
--- NextItemGrid is a scrolling grid of item icons for the settings window (next-settings.md §5), drawn
--- from the theme (Controls.ItemGrid) in an input's fill and edge. Only the cells of the rows in view
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
+---@class NextFrameArt: AceModule
+local frameArt = addon:GetModule('NextFrameArt')
+
+-- NextItemGrid is a scrolling grid of item icons for the settings window (next-settings.md §2), drawn
+-- from the theme (Controls.ItemGrid): its box in its own fill, edge and frame, the input's fill and edge when it has
+-- none of its own. Only the cells of the rows in view
 -- exist: they are placed for the rows the box shows and reused as it scrolls, so thousands of items
 -- cost what a screenful does. A cell shows an item's icon, its count above one, its quality on its
 -- edge, and a faded look for an item that shows in another category; its tooltip is the item's (its
@@ -104,6 +111,9 @@ function itemGrid:Create(parent, opts)
     box = box, content = content, cells = {}, entries = {}, columns = 1, width = 0, height = 0, opts = opts,
   }, { __index = gridProto })
   grid.fill:SetAllPoints(frame)
+  fills:Wrap(grid.fill, frame)
+  -- Under its cells, which are in its child frames.
+  grid.frameArt = frameArt:Create(frame, frame)
   grid.bar = nextScrollBar:Create(box)
   grid.bar:Bind(box)
   grid.empty = style:CreateText(frame, controls:Theme("ItemGrid").EmptyFont)
@@ -126,11 +136,20 @@ function itemGrid:Create(parent, opts)
   return grid
 end
 
--- Style draws the grid and its cells from the theme, and lays them out again.
+-- Style draws the grid and its cells from the theme, and lays them out again: its box in its own Fill, Edge and Frame,
+-- the input's Fill and Edge when the theme gives it none (false: none).
 function gridProto:Style()
   local K, I = controls:Theme("ItemGrid"), controls:Theme("Input")
-  controls:Paint(self.fill, I.Fill)
-  controls:PaintEdge(self.edge, I.Edge, I.Edge and I.Edge.Idle or nil)
+  local fill, edge = K.Fill, K.Edge
+  if fill == nil then
+    fill = I.Fill
+  end
+  if edge == nil then
+    edge = I.Edge
+  end
+  controls:Paint(self.fill, fill)
+  controls:PaintEdge(self.edge, edge, edge and edge.Idle or nil)
+  self.frameArt:Apply(K.Frame)
   style:SetFont(self.empty, K.EmptyFont)
   for _, cell in ipairs(self.cells) do
     style:SetFont(cell.count, K.CountFont)

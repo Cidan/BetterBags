@@ -229,6 +229,43 @@ describe("NextTextArea", function()
     assert.are.equal(style:Font("ControlText"), area.editBox:GetFontObject())
   end)
 
+  -- Its box (docs/next-plain-theme.md, round three): the area drew the input's fill, which for a fill in pieces at its
+  -- own thickness (Plain's 20-pixel search border) covered a strip of what takes its clicks. It draws its own fill, edge
+  -- and frame (Controls.TextArea), the input's when the theme gives it none.
+  describe("its box", function()
+    after_each(function()
+      UseNextTheme(nil)
+      nextInput:ApplyStyle()
+    end)
+
+    it("is drawn in the input's fill and edge when the theme gives it none of its own", function()
+      UseNextTheme({ Controls = { Input = { Fill = { Color = { 0.1, 0.2, 0.3, 1 } } } } })
+      local area = make()
+      local c = area.fill._colorTexture
+      assert.are.same({ 0.1, 0.2, 0.3, 1 }, { c.r, c.g, c.b, c.a })
+      assert.is_true(area.edge.Top:IsShown())
+      assert.is_false(area.frameArt.pieces.TopLeftCorner:IsShown())
+    end)
+
+    it("is drawn in its own fill, edge and frame round the whole box when the theme gives them", function()
+      UseNextTheme({ Controls = { TextArea = { Fill = false, FocusFill = false, Edge = false, Frame = { Pieces = {
+        TopLeftCorner = { Texture = "Interface\\Common\\Common-Input-Border-TL", Width = 8, Height = 8, X = -5, Y = 5 },
+        BottomRightCorner = { Texture = "Interface\\Common\\Common-Input-Border-BR", Width = 8, Height = 8, X = 5, Y = -5 },
+      } } } } })
+      local area = make()
+      assert.is_false(area.fill:IsShown())
+      assert.is_false(area.edge.Top:IsShown())
+      local tl, br = area.frameArt.pieces.TopLeftCorner, area.frameArt.pieces.BottomRightCorner
+      assert.is_true(tl:IsShown() and br:IsShown())
+      assert.are.same({ "TOPLEFT", area.frame, "TOPLEFT", -5, 5 }, { tl:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", area.frame, "BOTTOMRIGHT", 5, -5 }, { br:GetPoint(1) })
+      -- Focused, still its own: no fill.
+      area.editBox:SetFocus()
+      area:OnFocus(true)
+      assert.is_false(area.fill:IsShown())
+    end)
+  end)
+
   it("takes no typing while disabled, faded, and lets go of focus", function()
     local area = make()
     area.editBox:SetFocus()

@@ -254,7 +254,7 @@ end
 -- the spec names one, at its size and flags, in its color, with its shadow or none. A role naming one
 -- of the client's fonts (Object, a font object's global name) copies it (its file, size and flags,
 -- in every locale, its color and shadow), changing only what the role also sets; one that copies it
--- outright (Copy) changes nothing, whatever the role it inherits sets. Its height is a whole
+-- outright (Copy) takes nothing the role inherits but its Size (false: the client font's own). Its height is a whole
 -- number of screen pixels where BetterBags Next's windows are drawn (NextPixel:FontHeight,
 -- docs/next-pixel-perfect.md): a new grid (the UI scale, the screen's size) applies the theme again.
 ---@param role string
@@ -263,8 +263,8 @@ end
 function style:makeFont(role, spec)
   fontCount = fontCount + 1
   local font = CreateFont("BetterBagsNextFont" .. role .. fontCount)
-  -- Copy: a client font as it is (the Plain theme), nothing the role inherits changing it but its height on whole
-  -- pixels and its own Justify.
+  -- Copy: a client font as it is (the Plain theme), nothing the role inherits changing it but its Size (Default's, unless
+  -- the role says false: the client's own), its height on whole pixels and its own Justify.
   local copy = spec.Copy
   if copy ~= nil then
     local base = _G[copy]
@@ -274,7 +274,7 @@ function style:makeFont(role, spec)
     font:CopyFontObject(base)
     self.copies[role] = { base = base, look = lookOf(base) }
     local path, size, flags = font:GetFont()
-    font:SetFont(path, pixel:FontHeight(size), flags)
+    font:SetFont(path, pixel:FontHeight(spec.Size or size), flags)
   elseif spec.Object ~= nil then
     local base = _G[spec.Object]
     if type(base) ~= "table" or base.GetFont == nil then

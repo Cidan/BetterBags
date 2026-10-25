@@ -30,6 +30,9 @@ local style = addon:GetModule('NextStyle')
 ---@class NextPanel: AceModule
 local nextPanel = addon:GetModule('NextPanel')
 
+---@class NextMenuButtonModule: AceModule
+local nextMenuButton = addon:GetModule('NextMenuButton')
+
 ---@class NextGuildButton: AceModule
 local guildButton = addon:GetModule('NextGuildButton')
 
@@ -181,21 +184,22 @@ end
 function guildProto:GetHeaderButtons()
   return {
     { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", tooltip = L:G("Open Options Screen"), menuLast = true,
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
     { key = "depositGoldButton", tooltip = L:G("Deposit Gold"), onClick = function() guildBank:DepositMoney() end },
-    { key = "withdrawGoldButton", tooltipFunc = function() self:WithdrawTooltip() end,
+    { key = "withdrawGoldButton", tooltipFunc = function() self:WithdrawTooltip() end, label = L:G("Withdraw Gold"),
+      menuTooltip = function() return self:WithdrawText() end,
       onClick = function() guildBank:WithdrawMoney() end },
   }
 end
 
--- WithdrawTooltip tells how much gold the player may take today: what the guild allows them, at most
--- what the guild has (GetGuildBankWithdrawMoney is -1 for the guild leader: the whole balance).
-function guildProto:WithdrawTooltip()
-  GameTooltip:SetText(L:G("Withdraw Gold"), 1, 1, 1, 1, true)
+-- WithdrawLines tells how much gold the player may take today: what the guild allows them, at most what the guild has
+-- (GetGuildBankWithdrawMoney is -1 for the guild leader: the whole balance), or that they may take none; each line
+-- { text, r, g, b }.
+---@return table[]
+function guildProto:WithdrawLines()
   if not CanWithdrawGuildBankMoney() then
-    GameTooltip:AddLine(L:G("You may not withdraw gold from this guild bank"), 1, 0.25, 0.25, true)
-    return
+    return { { L:G("You may not withdraw gold from this guild bank"), 1, 0.25, 0.25 } }
   end
   local amount, funds = GetGuildBankWithdrawMoney(), GetGuildBankMoney()
   if amount == -1 then
@@ -203,7 +207,21 @@ function guildProto:WithdrawTooltip()
   else
     amount = math.min(amount, funds)
   end
-  GameTooltip:AddLine(L:G("You may withdraw up to ") .. C_CurrencyInfo.GetCoinTextureString(amount), 0.8, 0.8, 0.8, true)
+  return { { L:G("You may withdraw up to ") .. C_CurrencyInfo.GetCoinTextureString(amount), 0.8, 0.8, 0.8 } }
+end
+
+-- WithdrawTooltip is the withdraw gold button's tooltip: its name, then WithdrawLines.
+function guildProto:WithdrawTooltip()
+  GameTooltip:SetText(L:G("Withdraw Gold"), 1, 1, 1, 1, true)
+  for _, line in ipairs(self:WithdrawLines()) do
+    GameTooltip:AddLine(line[1], line[2], line[3], line[4], true)
+  end
+end
+
+-- WithdrawText is WithdrawLines as the bag button's menu entry's tooltip (Header.Buttons.Menu).
+---@return string
+function guildProto:WithdrawText()
+  return nextMenuButton:Text(self:WithdrawLines())
 end
 
 -- CreateMoney makes the footer's gold: the guild's.

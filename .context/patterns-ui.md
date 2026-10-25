@@ -372,3 +372,22 @@ ships; a layout dump through the specs' resolver (`spec/helpers/layout.lua`) giv
 
 **Rule**: Test a removable part as a table (`local on = B and true or false`), never against `false`; and never read a
 removable part's keys at build time: give the region a role there and set the theme's at style time.
+
+## A Control's Art Covers What Takes Its Clicks, and Each Control Has Its Own Look
+**Problem**: The Plain theme's item boxes were white and its Search Rule box drew a 20-pixel strip in a box several times
+taller. Both borrowed the single-line input's fill: Plain's is three pieces of the search border at their own thickness,
+which on a plain texture (the item grid's) paints the whole box white, and on the text area covers a strip of what takes
+its clicks.
+
+**Rule**: A control draws its box from its own theme keys (`Controls.ItemGrid`, `Controls.TextArea`), falling back to
+another control's only when the theme gives none, and its art covers exactly the area that takes its clicks (art at a
+fixed thickness belongs to a control that is that tall). Blizzard has a frame for each: the single-line field's border,
+the multi-line edit box's frame (InputScrollFrameTemplate), the inset (InsetFrameTemplate).
+
+## Matching Default's Scale Means Matching Default's Numbers
+**Problem**: Plain copied Blizzard's fonts and sizes (37-pixel item buttons, 10 to 12 point text), which made it look
+smaller than the theme it sits beside; asked: "scale for Plain should be the same as our Default".
+
+**Rule**: A skin theme takes Default's sizes (layout, fonts, controls) and replaces only the look; keep a Blizzard size
+only where Blizzard's art fixes it (a title bar, a check box, a close button) or where Blizzard's is larger. `Copy` font
+roles take the role's `Size` for exactly this (`Size = false` keeps the client's).

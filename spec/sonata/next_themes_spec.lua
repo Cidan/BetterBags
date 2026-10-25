@@ -134,10 +134,10 @@ describe("BetterBags Next's shipped themes", function()
       for _, key in ipairs(shipped()) do
         local t = sonataNext:Resolve(key)
         local L, V = t.Layout, t.Vendor
-        -- A role's size: a client font's own when it copies one outright (Copy), else its Size.
+        -- A role's size: its Size; a role copying a client font outright (Copy) without one (Size = false), the font's.
         local function sizeOf(role)
           local spec = t.Fonts[role]
-          if spec.Copy ~= nil then
+          if spec.Copy ~= nil and not spec.Size then
             local _, size = _G[spec.Copy]:GetFont()
             return size
           end
@@ -512,6 +512,81 @@ describe("BetterBags Next's shipped themes", function()
       -- Asked: its header icons scaled down, with its smaller title (next-themes.md §11).
       assert.is_true(t.Header.Buttons.Scale < 1)
       assert.are.equal(1, sonataNext:Resolve("Default").Header.Buttons.Scale)
+    end)
+  end)
+
+  -- Round three of the Plain theme (docs/next-plain-theme.md; asked: "scale for Plain should be the same as our Default",
+  -- of the settings window "keep it like we do in default, just, pass over with skin a bit", the header's actions in the
+  -- bag button's menu, the vendor's portrait on its button).
+  describe("Plain", function()
+    it("draws everything at Default's scale, but what Blizzard's frame fixes", function()
+      for client, flags in pairs(CLIENTS) do
+        for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+        local t, default = sonataNext:Resolve("Plain"), sonataNext:Resolve("Default")
+        for _, key in ipairs({ "Icon", "Gap", "Pad", "SectionHeader", "SectionSpacing", "Footer", "TabHeight", "TabSpacing" }) do
+          assert.are.equal(default.Layout[key], t.Layout[key], key .. " on " .. client)
+        end
+        for role, spec in pairs(t.Fonts) do
+          if spec.Copy ~= nil and default.Fonts[role] ~= nil and spec.Size ~= false then
+            assert.are.equal(default.Fonts[role].Size, spec.Size, role .. " on " .. client)
+          end
+        end
+        -- The title bar holds the client's own GameFontNormal; Blizzard's list headers and sections are larger than
+        -- Default's roles.
+        for _, role in ipairs({ "Title", "SettingsNavGroup", "SettingsSection" }) do
+          assert.is_false(t.Fonts[role].Size, role)
+        end
+        assert.are.same({ default.Settings.Width, default.Settings.Height }, { t.Settings.Width, t.Settings.Height })
+        assert.are.equal(default.Settings.Sidebar.Width, t.Settings.Sidebar.Width)
+        assert.are.equal(default.Settings.Sidebar.Pad, t.Settings.Sidebar.Pad, "the category list lined up again")
+        assert.is_nil(t.Settings.Content.Layout, "Default's rows, not Blizzard's list")
+        assert.is_nil(t.Settings.Tabs, "the page tabs under the header")
+        assert.is_nil(t.Settings.InnerFrame)
+        assert.are.same({ default.Controls.Dropdown.Width, default.Controls.Slider.Width },
+          { t.Controls.Dropdown.Width, t.Controls.Slider.Width })
+        assert.is_nil(t.Controls.Dropdown.Steppers)
+        assert.is_nil(t.Controls.Slider.Steppers)
+        assert.are.equal(default.Controls.Input.Height, t.Controls.Input.Height)
+        assert.is_nil(t.Controls.Input.Fill.Thickness, "the field's art over all of what takes its clicks")
+      end
+    end)
+
+    it("frames its settings sidebar as Blizzard's inset, its text areas and item boxes as Blizzard's edit box", function()
+      local t = sonataNext:Resolve("Plain")
+      local S = t.Settings.Sidebar
+      assert.are.same({ 4, 24, 4 }, { S.Left, S.Top, S.Bottom })
+      assert.are.equal("InsetFrameTemplate", S.Frame.Layout)
+      assert.are.equal("Interface\\FrameGeneral\\UI-Background-Marble", S.Fill.Texture)
+      for _, box in ipairs({ t.Controls.TextArea, t.Controls.ItemGrid }) do
+        assert.is_false(box.Fill)
+        assert.is_false(box.Edge)
+        local tl = box.Frame.Pieces.TopLeftCorner
+        assert.are.same({ "Interface\\Common\\Common-Input-Border-TL", 8, 8, -5, 5 }, { tl.Texture, tl.Width, tl.Height, tl.X, tl.Y })
+        assert.are.equal("Interface\\Common\\Common-Input-Border-M", box.Frame.Pieces.Center.Texture)
+      end
+      local line = t.Controls.TopTabs.Line
+      assert.is_true(line.Open)
+      assert.are.same({ 32, 32 }, { line.Outset.Left, line.Outset.Right })
+      assert.are.equal(6, t.Settings.Header.Right, "the content clear of the frame's right edge")
+      assert.is_false(t.Settings.Content.TitleUpper, "section titles as written, as Blizzard's")
+    end)
+
+    it("puts the header's actions in the original bags' bag button, the vendor's portrait on the vendor's", function()
+      for client, flags in pairs(CLIENTS) do
+        for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+        local t = sonataNext:Resolve("Plain")
+        local M = t.Header.Buttons.Menu
+        assert.are.same({ "TOPINNER", -12, -15, 40, 40 }, { M.Point, M.X, M.Y, M.Width, M.Height }, client)
+        assert.are.equal("Interface\\Containerframe\\Bagslots2x", M.Layers[1].Texture)
+        assert.are.same({ 0, 0.2, 0, 1 }, M.Layers[1].TexCoords)
+        assert.are.same({ 0.2, 0.3992, 0, 1 }, M.Highlight.TexCoords)
+        local vendor = M.Panels.Vendor.Layers
+        assert.are.equal("npc", vendor[2].Unit)
+        assert.are.equal("Interface\\CharacterFrame\\TempPortraitAlphaMask", vendor[2].Mask.Texture)
+        assert.are.same({ 0.578125, 0.689453125, 0.0234375, 0.46875 }, vendor[3].TexCoords, "Bagslots2x's empty gold ring")
+        assert.is_not_nil(t.Header.Buttons.Pinned.closeButton, "the close stays in the header")
+        assert.is_nil(t.Panel.Ornaments, "the bag is the button now, not an ornament")
+      end
     end)
   end)
 end)

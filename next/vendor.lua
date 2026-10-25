@@ -21,6 +21,9 @@ local render = addon:GetModule('Render')
 ---@class NextPanel: AceModule
 local nextPanel = addon:GetModule('NextPanel')
 
+---@class NextMenuButtonModule: AceModule
+local nextMenuButton = addon:GetModule('NextMenuButton')
+
 ---@class NextMerchant: AceModule
 local merchant = addon:GetModule('NextMerchant')
 
@@ -171,17 +174,20 @@ end
 function vendorProto:GetHeaderButtons()
   local buttons = {
     { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", tooltip = L:G("Open Options Screen"), menuLast = true,
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
   }
   if mainline() and SetMerchantFilter ~= nil and MenuUtil ~= nil then
-    table.insert(buttons, { key = "filterButton", tooltip = L:G("Filter what the vendor shows"),
+    table.insert(buttons, { key = "filterButton", tooltip = L:G("Filter what the vendor shows"), label = L:G("Filter"),
       onClick = function() self:OpenFilter() end })
   end
-  table.insert(buttons, { key = "sellJunkButton", tooltip = L:G("Sell all junk"), onClick = function() self:SellJunk() end })
+  table.insert(buttons, { key = "sellJunkButton", tooltip = L:G("Sell all junk"), label = L:G("Sell Junk"),
+    onClick = function() self:SellJunk() end })
   table.insert(buttons, { key = "repairAllButton", tooltipFunc = function() self:RepairTooltip(false) end,
+    label = L:G("Repair All"), menuTooltip = function() return self:RepairText(false) end,
     onClick = function() self:RepairAll(false) end })
   table.insert(buttons, { key = "guildRepairButton", tooltipFunc = function() self:RepairTooltip(true) end,
+    label = L:G("Repair With Guild Funds"), menuTooltip = function() return self:RepairText(true) end,
     onClick = function() self:RepairAll(true) end })
   return buttons
 end
@@ -920,16 +926,16 @@ function vendorProto:RepairAll(guild)
   GameTooltip:Hide()
 end
 
--- RepairTooltip tells what repairing everything costs, and who pays: the player's money, or the
--- guild's up to what the player may withdraw (Blizzard's repair buttons' tooltips).
+-- RepairLines tells what repairing everything costs, and who pays: the player's money, or the guild's up to what the
+-- player may withdraw (Blizzard's repair buttons' tooltips); each line { text, r, g, b }.
 ---@param guild boolean
-function vendorProto:RepairTooltip(guild)
+---@return table[]
+function vendorProto:RepairLines(guild)
   local cost, canRepair = GetRepairAllCost()
   if not canRepair or cost <= 0 then
-    GameTooltip:AddLine(L:G("Nothing needs repair"), 1, 1, 1)
-    return
+    return { { L:G("Nothing needs repair"), 1, 1, 1 } }
   end
-  GameTooltip:AddLine(L:G("Repair all: ") .. C_CurrencyInfo.GetCoinTextureString(cost), 1, 1, 1)
+  local lines = { { L:G("Repair all: ") .. C_CurrencyInfo.GetCoinTextureString(cost), 1, 1, 1 } }
   if guild then
     local amount = GetGuildBankWithdrawMoney()
     local funds = GetGuildBankMoney()
@@ -938,14 +944,31 @@ function vendorProto:RepairTooltip(guild)
     else
       amount = math.min(amount, funds)
     end
-    GameTooltip:AddLine(L:G("The guild pays up to ") .. C_CurrencyInfo.GetCoinTextureString(amount), 0.8, 0.8, 0.8)
+    table.insert(lines, { L:G("The guild pays up to ") .. C_CurrencyInfo.GetCoinTextureString(amount), 0.8, 0.8, 0.8 })
   elseif cost > GetMoney() then
-    GameTooltip:AddLine(L:G("You do not have enough money"), 1, 0.25, 0.25)
+    table.insert(lines, { L:G("You do not have enough money"), 1, 0.25, 0.25 })
+  end
+  return lines
+end
+
+-- RepairTooltip is a repair button's tooltip: RepairLines.
+---@param guild boolean
+function vendorProto:RepairTooltip(guild)
+  for _, line in ipairs(self:RepairLines(guild)) do
+    GameTooltip:AddLine(line[1], line[2], line[3], line[4])
   end
 end
 
+-- RepairText is RepairLines as the bag button's menu entry's tooltip (Header.Buttons.Menu).
+---@param guild boolean
+---@return string
+function vendorProto:RepairText(guild)
+  return nextMenuButton:Text(self:RepairLines(guild))
+end
+
 -- OpenFilter opens Blizzard's merchant filters as a menu (MerchantFrame_OnLoad's): each spec, the
--- class, Bind on Equip, everything.
+-- class, Bind on Equip, everything; from the filter button, or from the bag button when the theme puts the header's
+-- row in its menu (the filter button is not seen then).
 function vendorProto:OpenFilter()
   local function isSelected(filter)
     return GetMerchantFilter() == filter
@@ -953,7 +976,8 @@ function vendorProto:OpenFilter()
   local function setSelected(filter)
     SetMerchantFilter(filter)
   end
-  MenuUtil.CreateContextMenu(self.filterButton, function(_, root)
+  local owner = self.filterButton:IsVisible() and self.filterButton or self.menuButton.frame
+  MenuUtil.CreateContextMenu(owner, function(_, root)
     root:SetTag("MENU_MERCHANT_FRAME")
     for index = 1, GetNumSpecializations() do
       local _, name = C_SpecializationInfo.GetSpecializationInfo(index)

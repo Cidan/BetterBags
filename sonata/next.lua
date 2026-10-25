@@ -58,6 +58,9 @@ local BASE = "Default"
 -- with the panel, as ornaments' are).
 local CORNERS = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true, TOPINNER = true, TOPOUTER = true,
   BOTTOMINNER = true, BOTTOMOUTER = true }
+-- The corners a bag button may name (Header.Buttons.Menu, next/menubutton.lua): by their side, as ornaments' corner
+-- pieces.
+local MENU_CORNERS = { TOPINNER = true, TOPOUTER = true, BOTTOMINNER = true, BOTTOMOUTER = true }
 -- The styles a switch is drawn in (Controls.Toggle.Style, next/controls/toggle.lua).
 local TOGGLE_STYLES = { Square = true, Round = true, Check = true }
 
@@ -553,6 +556,37 @@ function sonataNext:Check(key)
     for _, field in ipairs({ "Width", "Top" }) do
       if type(rail[field]) ~= "number" then
         table.insert(problems, "Header.Buttons.Rail." .. field .. ": a side rail needs one")
+      end
+    end
+  end
+  -- A bag button holding the header's row (Header.Buttons.Menu, next-themes.md §19): a corner of the body by its side,
+  -- its size, art in each layer (a file, an atlas, a unit's portrait, a color), the panels it names.
+  local menu = buttons and buttons.Menu
+  if type(menu) == "table" then
+    local where = "Header.Buttons.Menu."
+    for _, field in ipairs({ "Point", "Anchor" }) do
+      if (field == "Point" or menu[field] ~= nil) and not MENU_CORNERS[menu[field]] then
+        table.insert(problems, where .. field .. ": no corner named " .. tostring(menu[field]))
+      end
+    end
+    for _, field in ipairs({ "Width", "Height" }) do
+      if type(menu[field]) ~= "number" then
+        table.insert(problems, where .. field .. ": a bag button needs one")
+      end
+    end
+    local function layers(path, given)
+      for i, layer in ipairs(type(given) == "table" and given or {}) do
+        if layer.Texture == nil and layer.Atlas == nil and layer.Unit == nil and layer.Color == nil then
+          table.insert(problems, path .. "Layers[" .. i .. "]: draws nothing")
+        end
+      end
+    end
+    layers(where, menu.Layers)
+    for name, own in pairs(type(menu.Panels) == "table" and menu.Panels or {}) do
+      if ornaments ~= nil and ornaments.PANELS[name] == nil then
+        table.insert(problems, where .. "Panels." .. tostring(name) .. ": no panel named " .. tostring(name))
+      elseif type(own) == "table" then
+        layers(where .. "Panels." .. tostring(name) .. ".", own.Layers)
       end
     end
   end

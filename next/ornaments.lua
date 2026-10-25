@@ -33,6 +33,9 @@ local MIRRORED = {
   TOPLEFT = "TOPRIGHT", TOPRIGHT = "TOPLEFT", BOTTOMLEFT = "BOTTOMRIGHT", BOTTOMRIGHT = "BOTTOMLEFT",
   LEFT = "RIGHT", RIGHT = "LEFT", TOP = "TOP", BOTTOM = "BOTTOM", CENTER = "CENTER",
 }
+-- The corners by their sides, and their mirror images, for what else is placed as a corner piece is (NextMenuButton).
+ornaments.CORNERS = CORNERS
+ornaments.MIRRORED = MIRRORED
 -- The values a theme may give, for SonataNext:Check.
 ornaments.POINTS = { INNER = true, OUTER = true, TOP = true, BOTTOM = true, TOPINNER = true, TOPOUTER = true,
   BOTTOMINNER = true, BOTTOMOUTER = true }
@@ -161,47 +164,51 @@ function setProto:paint(piece)
   self:cut(piece)
 end
 
--- art draws a piece's picture: the portrait of its Unit while the client has that unit (SetPortraitTexture, as
--- Blizzard's windows show the NPC they belong to: SetPortraitToUnit("npc")), else its Atlas or its file.
----@private
----@param piece NextOrnamentPiece
-function setProto:art(piece)
-  local o, t = piece.spec, piece.texture
+-- DrawArt draws a piece's picture on a texture: the portrait of its Unit while the client has that unit
+-- (SetPortraitTexture, as Blizzard's windows show the NPC they belong to: SetPortraitToUnit("npc")), else its Atlas or
+-- its file (repeating along a span with a Tile), else nothing.
+---@param t Texture
+---@param o table
+function ornaments:DrawArt(t, o)
   if o.Unit ~= nil and UnitExists(o.Unit) then
     SetPortraitTexture(t, o.Unit)
   elseif o.Atlas ~= nil then
     t:SetAtlas(o.Atlas)
-  else
+  elseif o.Texture ~= nil then
     local tiled = o.Tile ~= nil
     local across = o.Point == "TOP" or o.Point == "BOTTOM"
     t:SetTexture(style:TexturePath(o.Texture), (tiled and across) and "REPEAT" or nil,
       (tiled and not across) and "REPEAT" or nil, "TRILINEAR")
+  else
+    t:SetTexture(nil)
   end
 end
 
--- cut masks a piece's art with its Mask (Texture: a mask file, such as Blizzard's round portrait mask; Inset: Left,
--- Right, Top, Bottom into the piece, mirrored with the panel), or takes the mask off a piece that has none now.
----@private
----@param piece NextOrnamentPiece
-function setProto:cut(piece)
-  local M, t = piece.spec.Mask, piece.texture
-  local mask = piece.mask
+-- Cut masks a texture's art with M (Texture: a mask file, such as Blizzard's round portrait mask; Inset: Left, Right,
+-- Top, Bottom into it, mirrored when asked), the mask made on host the first time (mask, when it has one), or takes
+-- the mask off for no M. Returns the texture's mask.
+---@param t Texture
+---@param M? table|false
+---@param host Frame
+---@param mask? MaskTexture
+---@param mirrored? boolean
+---@return MaskTexture?
+function ornaments:Cut(t, M, host, mask, mirrored)
   if not M then
     if mask ~= nil then
       t:RemoveMaskTexture(mask)
       mask:Hide()
     end
-    return
+    return mask
   end
   if mask == nil then
-    -- On the piece's own frame, as its texture.
-    mask = piece.host:CreateMaskTexture()
-    piece.mask = mask
+    -- On the texture's own frame.
+    mask = host:CreateMaskTexture()
   end
   mask:SetTexture(style:TexturePath(M.Texture), "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
   local inset = M.Inset or {}
   local left, right = inset.Left or 0, inset.Right or 0
-  if self:Mirrored() then
+  if mirrored then
     left, right = right, left
   end
   mask:ClearAllPoints()
@@ -209,6 +216,21 @@ function setProto:cut(piece)
   mask:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", -pixel:Snap(t, right), pixel:Snap(t, inset.Bottom or 0))
   mask:Show()
   t:AddMaskTexture(mask)
+  return mask
+end
+
+-- art draws a piece's picture (DrawArt).
+---@private
+---@param piece NextOrnamentPiece
+function setProto:art(piece)
+  ornaments:DrawArt(piece.texture, piece.spec)
+end
+
+-- cut masks a piece's art with its Mask, mirrored with the panel, or takes the mask off a piece that has none now (Cut).
+---@private
+---@param piece NextOrnamentPiece
+function setProto:cut(piece)
+  piece.mask = ornaments:Cut(piece.texture, piece.spec.Mask, piece.host, piece.mask, self:Mirrored())
 end
 
 -- OnPanel says whether a piece is for this panel: every panel, or those its Panels names.

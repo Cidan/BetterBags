@@ -23,7 +23,9 @@ local fills = addon:GetModule('NextFill')
 
 -- NextTopTabs is the row of tabs across a settings page (next-settings.md §2), drawn from the theme
 -- (Controls.TopTabs): labels left to right, Gap apart, the chosen one in its font and underlined by a
--- marker that glides to the tab chosen, over a line under them all.
+-- marker that glides to the tab chosen, over a line under them all (reaching past them by Line.Outset, and stopping
+-- under the chosen tab with Line.Open, so it opens onto the page as a tab on a pane). Tabs too wide for their row give
+-- up half their padding, then half their gaps, then cut their names short, the longest first.
 ---@class NextTopTabs: AceModule
 ---@field all NextTopTabsFrame[]
 local nextTopTabs = addon:NewModule('NextTopTabs')
@@ -43,7 +45,9 @@ local nextTopTabs = addon:NewModule('NextTopTabs')
 
 ---@class NextTopTabsFrame
 ---@field frame Frame
----@field line Texture
+---@field line Texture The line under the tabs, or its part left of the chosen tab (Line.Open).
+---@field lineRight Texture The line's part right of the chosen tab (Line.Open).
+---@field gap number The room between tabs, as fitted to the row (Paint).
 ---@field marker Texture
 ---@field tabs NextTopTabButton[] Every tab made; the first #list are shown.
 ---@field list NextTopTab[]
@@ -70,11 +74,17 @@ end
 function nextTopTabs:Create(parent, opts)
   local frame = CreateFrame("Frame", nil, parent)
   local line = frame:CreateTexture(nil, "BACKGROUND")
+  local lineRight = frame:CreateTexture(nil, "BACKGROUND")
   local marker = frame:CreateTexture(nil, "ARTWORK")
   ---@type NextTopTabsFrame
   local t = setmetatable({
-    frame = frame, line = line, marker = marker, tabs = {}, list = {}, markerX = 0, markerWidth = 0, opts = opts,
+    frame = frame, line = line, lineRight = lineRight, marker = marker, tabs = {}, list = {}, markerX = 0,
+    markerWidth = 0, gap = 0, opts = opts,
   }, { __index = tabsProto })
+  -- Fitted to the row again when its width changes (a plain hook: only on size changes).
+  frame:HookScript("OnSizeChanged", function()
+    t:Fit()
+  end)
   table.insert(self.all, t)
   sonataNext:RegisterWidget(self)
   t:Style()
@@ -135,39 +145,84 @@ function tabsProto:Style()
   local T = controls:Theme("TopTabs")
   local frame = self.frame
   pixel:Height(frame, T.Height)
-  self.line:ClearAllPoints()
-  self.line:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
-  self.line:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
   -- A theme may draw no line under the tabs and no marker under the chosen one (false: Blizzard's tabs, MinimalTab,
   -- show the chosen one in their own art).
-  pixel:Height(self.line, T.Line and T.Line.Size or 1)
-  controls:Paint(self.line, T.Line)
+  for _, line in ipairs({ self.line, self.lineRight }) do
+    pixel:Height(line, T.Line and T.Line.Size or 1)
+    controls:Paint(line, T.Line)
+  end
   local marker = T.Indicator
   pixel:Height(self.marker, marker and marker.Height or 1)
   -- Art when the indicator names some, else its color.
   controls:Paint(self.marker, marker and (style:IsArt(marker) and marker or { Color = marker.Color }) or false)
-  local gap = pixel:Snap(frame, T.Gap)
-  local previous
-  for i = 1, #self.list do
-    local tab = self.tabs[i]
-    tab.frame:ClearAllPoints()
-    if previous == nil then
-      tab.frame:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
-    else
-      tab.frame:SetPoint("BOTTOMLEFT", previous.frame, "BOTTOMRIGHT", gap, 0)
-    end
-    tab.frame:SetHeight(frame:GetHeight())
-    previous = tab
-  end
+  self:Fit()
+end
+
+-- Fit lays the tabs out in the row's width again and puts the marker and the line under the chosen one.
+function tabsProto:Fit()
   self:Paint()
   local x, width = self:placeOf(self.selected)
   self:Mark(x, width)
 end
 
--- Paint gives each tab its font (and its width, the label's, which the font sets) and its art: chosen, under the
--- pointer, or neither.
+-- fitted works out the room the tabs take: their Padding and Gap, while every name fits the row; else half the padding,
+-- then half the gaps, then the names cut to the widest each may keep (those shorter keep theirs). A row with no width
+-- yet (not laid out) takes every tab whole. In whole pixels: the room a tab may take rounded down
+-- (docs/next-pixel-perfect.md).
+---@private
+---@param names number[] Each tab's name's width.
+---@return number pad, number gap, number? cap
+function tabsProto:fitted(names)
+  local T, frame = controls:Theme("TopTabs"), self.frame
+  local n = #names
+  local pad, gap = pixel:Snap(frame, T.Padding or 0), pixel:Snap(frame, T.Gap)
+  local room = frame:GetWidth()
+  local text = 0
+  for _, width in ipairs(names) do
+    text = text + width
+  end
+  local function total(p, g)
+    return text + 2 * n * p + math.max(0, n - 1) * g
+  end
+  if n == 0 or room <= 0 or total(pad, gap) <= room then
+    return pad, gap, nil
+  end
+  pad = math.max(pixel:Floor(frame, pad / 2), pixel:Floor(frame, (room - text - math.max(0, n - 1) * gap) / (2 * n)))
+  if total(pad, gap) <= room then
+    return pad, gap, nil
+  end
+  if n > 1 then
+    gap = math.max(pixel:Floor(frame, gap / 2), pixel:Floor(frame, (room - text - 2 * n * pad) / (n - 1)))
+  end
+  if total(pad, gap) <= room then
+    return pad, gap, nil
+  end
+  -- The names' room shared out: each name its share, a shorter one keeping its own and leaving the rest to the others.
+  local budget = room - 2 * n * pad - math.max(0, n - 1) * gap
+  local sorted = {}
+  for i, width in ipairs(names) do
+    sorted[i] = width
+  end
+  table.sort(sorted)
+  local cap = 0
+  for i, width in ipairs(sorted) do
+    local share = budget / (n - i + 1)
+    if width > share then
+      cap = share
+      break
+    end
+    budget = budget - width
+    cap = width
+  end
+  return pad, gap, math.max(0, pixel:Floor(frame, cap))
+end
+
+-- Paint gives each tab its font (and its width, the label's, which the font sets, fitted to the row) and its art:
+-- chosen, under the pointer, or neither; and lays the tabs out left to right, the fitted gap apart.
 function tabsProto:Paint()
   local T = controls:Theme("TopTabs")
+  local frame = self.frame
+  local names = {}
   for i = 1, #self.list do
     local tab = self.tabs[i]
     local chosen = tab.id == self.selected
@@ -179,10 +234,34 @@ function tabsProto:Paint()
     end
     style:SetFont(tab.label, font)
     controls:Paint(tab.fill, art or false)
-    -- As wide as its label rounded up to whole pixels and Padding either side; the label by its top left, centered on
-    -- its height, or by its bottom TextBottom above the tab's (SelectedTextBottom when chosen: Blizzard's MinimalTab).
-    local pad = pixel:Snap(tab.frame, T.Padding or 0)
-    tab.frame:SetWidth(pixel:Ceil(tab.frame, tab.label:GetStringWidth()) + 2 * pad)
+    -- Its whole name's width: the width a font string keeps is reset (Blizzard's QuestLogTitleButton_Resize).
+    tab.label:SetWidth(0)
+    tab.label:SetWordWrap(false)
+    names[i] = pixel:Ceil(tab.frame, tab.label:GetStringWidth())
+  end
+  local pad, gap, cap = self:fitted(names)
+  self.gap = gap
+  local previous
+  for i = 1, #self.list do
+    local tab = self.tabs[i]
+    local chosen = tab.id == self.selected
+    tab.frame:ClearAllPoints()
+    if previous == nil then
+      tab.frame:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+    else
+      tab.frame:SetPoint("BOTTOMLEFT", previous.frame, "BOTTOMRIGHT", gap, 0)
+    end
+    tab.frame:SetHeight(frame:GetHeight())
+    previous = tab
+    -- As wide as its label rounded up to whole pixels (cut to the row's room, cap) and Padding either side; the label by
+    -- its top left, centered on its height, or by its bottom TextBottom above the tab's (SelectedTextBottom when chosen:
+    -- Blizzard's MinimalTab).
+    local name = names[i]
+    if cap ~= nil and name > cap then
+      name = cap
+      tab.label:SetWidth(cap)
+    end
+    tab.frame:SetWidth(name + 2 * pad)
     tab.label:ClearAllPoints()
     local raise = chosen and (T.SelectedTextBottom or T.TextBottom) or T.TextBottom
     if raise ~= nil then
@@ -198,8 +277,7 @@ end
 ---@param id any
 ---@return number x, number width
 function tabsProto:placeOf(id)
-  local T = controls:Theme("TopTabs")
-  local x, gap = 0, pixel:Snap(self.frame, T.Gap)
+  local x, gap = 0, self.gap
   for i = 1, #self.list do
     local tab = self.tabs[i]
     local width = tab.frame:GetWidth()
@@ -211,16 +289,35 @@ function tabsProto:placeOf(id)
   return 0, 0
 end
 
--- Mark puts the marker under x, width wide (hidden at no width).
+-- Mark puts the marker under x, width wide (hidden at no width), and the line under the tabs: past them by its
+-- Outset on either side, and, for a line that opens (Line.Open), in two parts that stop under the chosen tab, keeping
+-- its sides on the line, so it glides with the marker.
 ---@param x number
 ---@param width number
 function tabsProto:Mark(x, width)
+  local T, frame = controls:Theme("TopTabs"), self.frame
   self.markerX, self.markerWidth = x, width
   self.marker:ClearAllPoints()
-  self.marker:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", x, 0)
+  self.marker:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", x, 0)
   self.marker:SetWidth(math.max(1, width))
-  local marker = controls:Theme("TopTabs").Indicator
+  local marker = T.Indicator
   self.marker:SetShown(width > 0 and marker ~= nil and marker ~= false)
+  local L = T.Line
+  local out = L and L.Outset or {}
+  local left, right = pixel:Snap(frame, out.Left or 0), pixel:Snap(frame, out.Right or 0)
+  self.line:ClearAllPoints()
+  self.line:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -left, 0)
+  if L and L.Open and width > 0 then
+    local size = self.line:GetHeight()
+    self.line:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", x + size, 0)
+    self.lineRight:ClearAllPoints()
+    self.lineRight:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", x + width - size, 0)
+    self.lineRight:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", right, 0)
+    self.lineRight:Show()
+  else
+    self.line:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", right, 0)
+    self.lineRight:Hide()
+  end
 end
 
 -- Select chooses a tab, its marker gliding there with animate, calling nothing back.

@@ -370,6 +370,8 @@ function settings:buildSidebar()
   self.sidebarLine = sidebar:CreateTexture(nil, "BORDER")
   self.sidebarLine:SetPoint("TOPRIGHT", sidebar, "TOPRIGHT", 0, 0)
   self.sidebarLine:SetPoint("BOTTOMRIGHT", sidebar, "BOTTOMRIGHT", 0, 0)
+  -- The theme's frame round the sidebar (Sidebar.Frame: Blizzard's inset), under its pages and list (child frames).
+  self.sidebarArt = frameArt:Create(sidebar, sidebar)
   -- The brand's row: dragging it moves the window, as the header does. It stays as the panels slide.
   local brand = CreateFrame("Frame", nil, sidebar)
   brand:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 0, 0)
@@ -613,6 +615,7 @@ function settings:Style()
   controls:Paint(self.sidebarFill, SB.Fill)
   pixel:Width(self.sidebarLine, SB.Line and SB.Line.Size or 1)
   controls:Paint(self.sidebarLine, SB.Line)
+  self.sidebarArt:Apply(SB.Frame)
   -- The brand (its icon, BetterBags and the line under them), or none (Brand = false: Blizzard's settings window names
   -- itself in its title bar instead, Settings.Title).
   local branded = B and true or false

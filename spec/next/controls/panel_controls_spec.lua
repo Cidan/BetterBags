@@ -201,6 +201,84 @@ describe("NextTopTabs", function()
     assert.are.equal(style:Font("TopTab"), tabs.tabs[3].label:GetFontObject())
   end)
 
+  -- The Plain theme (docs/next-plain-theme.md, round three; asked: "a line across the bottom of them edge to edge
+  -- probably, so it looks like a tab sitting on top of a pane"): the line reaches past the row of tabs (Outset: the
+  -- content column's edges), and stops under the chosen tab (Open), which then opens onto the page below it.
+  describe("its line", function()
+    local function line()
+      return { Color = "White", Alpha = 0.3, Size = 1, Open = true, Outset = { Left = 32, Right = 26 } }
+    end
+
+    after_each(function()
+      UseNextTheme(nil)
+    end)
+
+    it("reaches past its tabs by Outset on either side", function()
+      UseNextTheme({ Controls = { TopTabs = { Line = { Color = "White", Size = 1, Outset = { Left = 32, Right = 26 } } } } })
+      local tabs = make()
+      assert.are.same({ "BOTTOMLEFT", tabs.frame, "BOTTOMLEFT", -32, 0 }, { tabs.line:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMRIGHT", 26, 0 }, { tabs.line:GetPoint(2) })
+      assert.is_false(tabs.lineRight:IsShown(), "one line while it does not open")
+    end)
+
+    it("stops under the chosen tab, keeping its sides on the line, and the gap glides with the tab chosen", function()
+      UseNextTheme({ Controls = { TopTabs = { Gap = 5, Line = line() } } })
+      local tabs = make()
+      -- Layout is 36 wide at 0: the line runs to its left side, and on from its right side.
+      assert.are.same({ "BOTTOMLEFT", tabs.frame, "BOTTOMLEFT", -32, 0 }, { tabs.line:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMLEFT", 1, 0 }, { tabs.line:GetPoint(2) })
+      assert.is_true(tabs.lineRight:IsShown())
+      assert.are.same({ "BOTTOMLEFT", tabs.frame, "BOTTOMLEFT", 35, 0 }, { tabs.lineRight:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMRIGHT", 26, 0 }, { tabs.lineRight:GetPoint(2) })
+      assert.are.equal(0.3, alphaOf(tabs.lineRight))
+      tabs.tabs[2].frame:GetScript("OnClick")(tabs.tabs[2].frame, "LeftButton")
+      tween:Step(1)
+      -- Items is 30 wide at 41.
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMLEFT", 42, 0 }, { tabs.line:GetPoint(2) })
+      assert.are.same({ "BOTTOMLEFT", tabs.frame, "BOTTOMLEFT", 70, 0 }, { tabs.lineRight:GetPoint(1) })
+      UseNextTheme(nil)
+      tabs:Style()
+      assert.is_false(tabs.lineRight:IsShown(), "closed again for a theme whose line does not open")
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMRIGHT", 0, 0 }, { tabs.line:GetPoint(2) })
+    end)
+  end)
+
+  -- Asked: "tabs at the top run off if too long." Tabs too wide for their row give up half their padding, then half
+  -- their gaps, then cut their names short, the longest first.
+  describe("tabs that do not fit their row", function()
+    after_each(function()
+      UseNextTheme(nil)
+    end)
+
+    it("give up padding first", function()
+      UseNextTheme({ Controls = { TopTabs = { Padding = 20, Gap = 5 } } })
+      local tabs = make()
+      assert.are.equal(36 + 40, tabs.tabs[1].frame:GetWidth(), "room enough while it has no width")
+      tabs.frame:SetWidth(216)
+      tabs:Fit()
+      -- 126 of text and 10 of gaps leave 80 for six paddings: 13 each.
+      assert.are.same({ 36 + 26, 30 + 26, 60 + 26 }, { tabs.tabs[1].frame:GetWidth(), tabs.tabs[2].frame:GetWidth(),
+        tabs.tabs[3].frame:GetWidth() })
+    end)
+
+    it("then their gaps, then cut their names, the longest first", function()
+      UseNextTheme({ Controls = { TopTabs = { Padding = 20, Gap = 5 } } })
+      local tabs = make()
+      tabs.frame:SetWidth(170)
+      tabs:Fit()
+      -- Padding 10, gaps 2: 106 for names of 36, 30 and 60: Categories is cut to 40.
+      assert.are.same({ "BOTTOMLEFT", tabs.tabs[1].frame, "BOTTOMRIGHT", 2, 0 }, { tabs.tabs[2].frame:GetPoint(1) })
+      assert.are.same({ 36 + 20, 30 + 20, 40 + 20 }, { tabs.tabs[1].frame:GetWidth(), tabs.tabs[2].frame:GetWidth(),
+        tabs.tabs[3].frame:GetWidth() })
+      assert.are.equal(40, tabs.tabs[3].label:GetWidth())
+      assert.is_false(tabs.tabs[3].label:CanWordWrap())
+      tabs.frame:SetWidth(600)
+      tabs:Fit()
+      assert.are.equal(60 + 40, tabs.tabs[3].frame:GetWidth(), "whole again with room")
+      assert.are.equal(0, tabs.tabs[3].label:GetWidth(), "its name its whole width again")
+    end)
+  end)
+
   it("hides the tabs it no longer has", function()
     local tabs = make()
     tabs:SetTabs({ { id = "only", text = "Only" } })

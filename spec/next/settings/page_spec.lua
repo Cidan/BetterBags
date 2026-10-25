@@ -411,6 +411,17 @@ describe("NextSettingsPage", function()
     assert.are.same({ 760 - 2 * C().Pad, 44 }, { card:GetSize() })
   end)
 
+  -- The Plain theme on Default's layout (docs/next-plain-theme.md, round three): Blizzard writes its section titles as
+  -- they are, in cards too.
+  it("writes its section titles as they are for a theme that says so, in cards too", function()
+    UseNextTheme({ Settings = { Content = { TitleUpper = false } } })
+    local page = nextPage:Create(parent)
+    page:SetSections({ { title = "Slots", rows = { fakeRow(44) } } })
+    layout(page, 760)
+    assert.are.equal("Slots", page.titles[1]:GetText())
+    UseNextTheme(nil)
+  end)
+
   it("draws a line between the rows of a card and between its columns", function()
     local page = nextPage:Create(parent)
     page:SetSections({ { title = "Order", rows = { fakeRow(44), fakeRow(44), fakeRow(44) } } })

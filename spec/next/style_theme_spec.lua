@@ -155,12 +155,18 @@ describe("NextStyle", function()
       assert.has_error(function() style:Font("Odd") end, "BetterBags Next's font role Odd copies no client font named NoSuchFont")
     end)
 
-    -- The Plain theme (docs/next-plain-theme.md) draws the client's own fonts as they are: a role that copies one
-    -- outright (Copy) takes nothing from the role it inherits (Default's Size, Color and Shadow), only its own Justify.
-    it("copies a client font outright for a role that says Copy, whatever the role it inherits sets", function()
-      style:Use(register({ Fonts = { Price = { Copy = "GameFontHighlightSmall" }, Tab = { Copy = "GameFontNormal", Justify = "RIGHT" } } }))
+    -- The Plain theme (docs/next-plain-theme.md) draws the client's own fonts at Default's sizes (asked: "scale for Plain
+    -- should be the same as our Default"): a role that copies one outright (Copy) takes its file, flags, color and shadow,
+    -- nothing of the role it inherits (Default's Color and Shadow) but its Size and its own Justify; Size = false keeps
+    -- the client font's own size (Blizzard's title bar holds GameFontNormal).
+    it("copies a client font outright for a role that says Copy, at the role's size", function()
+      style:Use(register({ Fonts = { Price = { Copy = "GameFontHighlightSmall" }, Tab = { Copy = "GameFontNormal", Justify = "RIGHT" },
+        Title = { Copy = "GameFontNormal", Size = false } } }))
       local price = style:Font("Price")
-      assert.are.same({ GameFontHighlightSmall:GetFont() }, { price:GetFont() })
+      local path, _, flags = GameFontHighlightSmall:GetFont()
+      -- Default's Price is 13.
+      assert.are.same({ path, addon:GetModule("NextPixel"):FontHeight(13), flags }, { price:GetFont() })
+      assert.are.same({ GameFontNormal:GetFont() }, { style:Font("Title"):GetFont() })
       assert.are.same({ GameFontHighlightSmall:GetTextColor() }, { price:GetTextColor() })
       assert.are.same({ GameFontHighlightSmall:GetShadowOffset() }, { price:GetShadowOffset() })
       assert.are.same({ GameFontHighlightSmall:GetShadowColor() }, { price:GetShadowColor() })

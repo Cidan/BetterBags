@@ -66,6 +66,9 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@class NextOrnaments: AceModule
 local nextOrnaments = addon:GetModule('NextOrnaments')
 
+---@class NextMenuButtonModule: AceModule
+local nextMenuButton = addon:GetModule('NextMenuButton')
+
 ---@class NextFrameArt: AceModule
 local nextFrameArt = addon:GetModule('NextFrameArt')
 
@@ -194,6 +197,10 @@ end
 ---@field tooltip string
 ---@field tooltipFunc? fun(button: Button) Fills the tooltip instead of tooltip.
 ---@field onClick fun(ctx: Context)
+---@field label? string|fun(): string Its name in the bag button's menu (Header.Buttons.Menu), else its tooltip.
+---@field checked? fun(): boolean In the menu, a toggle checked while this says so.
+---@field menuTooltip? fun(): string? Its tooltip in the menu, read as the menu opens (else its tooltip, when not its name).
+---@field menuLast? boolean Last in the menu (Open Options Screen, as in the original bags' menu).
 
 ---@class NextPanelFrame
 ---@field kind BagKind
@@ -993,7 +1000,8 @@ function panelProto:shownButtons()
 end
 
 -- pinnedRoom is the room the shown pinned buttons along the top take from the title's row: as far in as the
--- farthest of them reaches (its offset from its corner and its size); a pin at a bottom corner takes none.
+-- farthest of them reaches from its side (its size, and its offset toward the body's middle: an offset out past the
+-- edge takes less); a pin at a bottom corner takes none.
 ---@private
 ---@return number
 function panelProto:pinnedRoom()
@@ -1001,10 +1009,48 @@ function panelProto:pinnedRoom()
   for _, button in ipairs(self.headerButtons) do
     local pin = pinnedOf(button)
     if pin ~= nil and button:IsShown() and pin.Point:sub(1, 3) == "TOP" then
-      room = math.max(room, style.HEADER_BUTTON + math.abs(pin.X or 0))
+      local point, x = PIN_CORNERS[pin.Point], pin.X or 0
+      if point == nil then
+        point = pin.Point
+      elseif self.side == "LEFT" then
+        point, x = MIRRORED_CORNERS[point], -x
+      end
+      room = math.max(room, style.HEADER_BUTTON + (point:find("RIGHT") and -x or x))
     end
   end
   return room
+end
+
+-- RowInMenu says whether the theme puts the header's row in the bag button's menu (Header.Buttons.Menu,
+-- NextMenuButton): its buttons not pinned leave the header.
+---@return boolean
+function panelProto:RowInMenu()
+  return type(style.Theme.Header.Buttons.Menu) == "table"
+end
+
+-- TitleStart is how far in from the body's inner side the title's row starts: past the theme's bag button at the top
+-- inner corner (NextMenuButton:Room), else InnerPad and TitleInset in.
+---@return number
+function panelProto:TitleStart()
+  local inner = self.menuButton ~= nil and self.menuButton:Room() or 0
+  if inner > 0 then
+    return inner
+  end
+  return self:InnerPad() + style.TITLE_INSET
+end
+
+-- titleEnd is how much of the title's row the header takes from its outer side, and the room the title leaves beside
+-- it: the header's buttons and pins (headerRoom) and 12; with the row in the bag button's menu, the pins (or the bag
+-- button at a top outer corner) exactly, so a centered title is centered between them, else Pad.
+---@private
+---@return number room, number slack
+function panelProto:titleEnd()
+  if self:RowInMenu() then
+    local _, outer = self.menuButton:Room()
+    local room = math.max(self:pinnedRoom(), outer)
+    return room > 0 and room or style.PAD, 0
+  end
+  return self:headerRoom(), 12
 end
 
 -- headerButtonsWidth is how much of the header its shown buttons take, with the room between them: none
@@ -1064,7 +1110,8 @@ end
 ---@return number
 function panelProto:MinWidth()
   local pads = style.PAD + self:InnerPad()
-  local header = self:InnerPad() + style.TITLE_INSET + self:headerRoom() + 12 + style.Small.MinTitle
+  local room, slack = self:titleEnd()
+  local header = self:TitleStart() + room + slack + style.Small.MinTitle
   local money = self.moneyFrame ~= nil and self.moneyFrame.frame:GetWidth() or 0
   local footer = pads + style.TITLE_INSET + self.freeText:GetStringWidth() + 12 + money
   local column = pads + style.GUTTER + self.content:CellWidth()
@@ -2152,6 +2199,7 @@ function panelProto:headerButton(spec)
   button.highlight = button:CreateTexture(nil, "ARTWORK", nil, 1)
   button.highlight:Hide()
   button.key = spec.key
+  button.spec = spec
   button.hover = false
   self:SetHeaderIcon(button, spec.iconKey or spec.key)
   button:SetScript("OnEnter", function()
@@ -2302,7 +2350,7 @@ end
 -- into the window (asked: it should "stop flush with the hard edge of the window").
 ---@return string point, number x, number inward
 function panelProto:TitleJoin()
-  local edge = self:InnerPad() + style.TITLE_INSET
+  local edge = self:TitleStart()
   if self.side == "LEFT" then
     return "RIGHT", edge, -1
   end
@@ -2320,7 +2368,7 @@ function panelProto:CloudSpan()
   if isSecret(width) then
     width = C and C.SecretTitleWidth or 0
   end
-  return width + self:InnerPad() + style.TITLE_INSET + (C and C.Pad or 0)
+  return width + self:TitleStart() + (C and C.Pad or 0)
 end
 
 -- LayoutCloud spreads the cloud's puffs across the title as it is now (a share of the way across
@@ -2418,6 +2466,11 @@ function panelProto:BuildHeader(text)
     self[spec.key] = button
     table.insert(self.headerButtons, button)
   end
+  -- Where the header's row waits while the theme puts it in the bag button's menu: hidden, so its buttons keep whether
+  -- the panel shows them (the menu lists those it shows) without being seen.
+  self.menuHolder = CreateFrame("Frame", nil, frame)
+  self.menuHolder:Hide()
+  self.menuButton = nextMenuButton:Create(self)
   self:styleHeader()
 end
 
@@ -2435,7 +2488,7 @@ function panelProto:styleHeader()
   -- Justified toward its anchor: a small panel's title has a width (FitTitle), and text is centered in
   -- its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER). A theme may center it in the room
   -- the header buttons leave (Title.Justify = "CENTER"), as Blizzard centers a window's title.
-  local inset, top = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET), pixel:Snap(body, style.TITLE_TOP)
+  local inset, top = pixel:Snap(body, self:TitleStart()), pixel:Snap(body, style.TITLE_TOP)
   local centered = H.Title.Justify == "CENTER"
   if left then
     title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -inset, -top)
@@ -2550,6 +2603,7 @@ function panelProto:styleHeader()
     pixel:Size(button, style.HEADER_BUTTON, style.HEADER_BUTTON)
     self:SetHeaderIcon(button, button.iconKey)
   end
+  self.menuButton:Style()
   self:LayoutCloud()
   self:LayoutHeader()
 end
@@ -2645,7 +2699,7 @@ function panelProto:placeTitleRow()
   local glow, G = self.titleGlow, H.TitleGlow
   if G then
     local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
-    local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET) + self:titleShift()
+    local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
     local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
     glow:ClearAllPoints()
     if left then
@@ -2659,7 +2713,7 @@ function panelProto:placeTitleRow()
   -- own numbers, never from the title: a title showing a secret has secret anchoring, and so would every region
   -- anchored to it, the tooltip the button owns included (warcraft.wiki.gg Secret Values, "Secret anchors").
   local button = self.titleButton
-  local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET) + self:titleShift()
+  local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
   button:ClearAllPoints()
   if left then
     button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - 8), -(top - 6))
@@ -2953,6 +3007,8 @@ function panelProto:LayoutHeader()
       pixel:Point(button, point, body, point, x, pin.Y or 0)
     end
   end
+  -- With the row in the bag button's menu, its buttons are laid out under the hidden holder, unseen.
+  self:holdRow()
   if style.Theme.Header.Buttons.Rail then
     self:layoutRail()
     self:FitTitle()
@@ -2982,6 +3038,22 @@ function panelProto:LayoutHeader()
     end
   end
   self:FitTitle()
+end
+
+-- holdRow puts the header's row under the hidden holder while the theme puts it in the bag button's menu, and back on
+-- the panel's frame after; pinned buttons stay on the panel's frame. A frame's level stays what it was set to across a
+-- new parent (warcraft.wiki.gg Frame Strata: since 7.0.3 "always stay what you set them to"), over the overlay.
+---@private
+function panelProto:holdRow()
+  local inMenu = self:RowInMenu()
+  for _, button in ipairs(self.headerButtons) do
+    local held = inMenu and pinnedOf(button) == nil
+    if held and button:GetParent() ~= self.menuHolder then
+      button:SetParent(self.menuHolder)
+    elseif not held and button:GetParent() == self.menuHolder then
+      button:SetParent(self.frame)
+    end
+  end
 end
 
 -- layoutRail puts the shown header buttons down the side rail (next-themes.md §13), in order from its top, Top
@@ -3028,8 +3100,8 @@ function panelProto:FitTitle()
   title:SetWordWrap(false)
   -- Kept: the title's own width cannot be read back while it shows a secret (titleWidth), and only a title cut
   -- short (the vendor's, at both sizes) ever shows one.
-  self.titleCut = pixel:Length(title, math.max(1, self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
-    - self:headerRoom() - 12))
+  local room, slack = self:titleEnd()
+  self.titleCut = pixel:Length(title, math.max(1, self:BodyWidth() - self:TitleStart() - room - slack))
   title:SetWidth(self.titleCut)
   self:placeTitleRow()
 end
@@ -3429,9 +3501,9 @@ function panelProto:BuildSparkles()
   -- edge.
   local function titleEdge()
     if self.side == "LEFT" then
-      return self:BodyLeft() + self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
+      return self:BodyLeft() + self:BodyWidth() - self:TitleStart()
     end
-    return self:BodyLeft() + self:InnerPad() + style.TITLE_INSET
+    return self:BodyLeft() + self:TitleStart()
   end
   -- Where the ribbon starts, from the panel's top left: the window's hard edge, the title's join read now (a theme
   -- moves the title: its Pad and inset, a side rail).
@@ -3810,6 +3882,7 @@ function panelProto:Show(ctx, slotInfo, onShown)
   self.edgeSparkles:Start()
   self.cloudSparkles:Start()
   self.ornaments:Start()
+  self.menuButton:Paint()
   self:playShimmer()
   addon.TriggerItemContextChanged()
   chain:Update(ctx)

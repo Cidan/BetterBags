@@ -1124,6 +1124,32 @@ describe("NextSettings", function()
     end)
   end)
 
+  -- The Plain theme on Default's layout (docs/next-plain-theme.md, round three): its sidebar is Blizzard's inset
+  -- (ButtonFrameTemplate's Inset: InsetFrameTemplate's nine-slice over its marble, 4 in, 24 down, 4 above the bottom).
+  describe("a sidebar framed as an inset", function()
+    after_each(function()
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+    end)
+
+    it("draws its theme's frame round its sidebar, under the sidebar's pages and list", function()
+      open()
+      UseNextTheme({ Settings = { Sidebar = { Left = 4, Top = 24, Bottom = 4, Line = false, Frame = { Pieces = {
+        TopLeftCorner = { Texture = "Interface\\Spec\\tl.png", Width = 6, Height = 6 },
+        BottomRightCorner = { Texture = "Interface\\Spec\\br.png", Width = 6, Height = 6, Y = -1 },
+      } } } } })
+      settings:ApplyStyle()
+      local tl, br = settings.sidebarArt.pieces.TopLeftCorner, settings.sidebarArt.pieces.BottomRightCorner
+      assert.is_true(tl:IsShown() and br:IsShown())
+      assert.are.same({ "TOPLEFT", settings.sidebar, "TOPLEFT", 0, 0 }, { tl:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", settings.sidebar, "BOTTOMRIGHT", 0, -1 }, { br:GetPoint(1) })
+      assert.are.equal(settings.sidebar, tl:GetParent())
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_false(tl:IsShown(), "none for a theme without")
+    end)
+  end)
+
   describe("a theme", function()
     -- The shipped Parchment, applied through SonataNext as the Appearance page applies it.
     it("is restyled by a theme SonataNext applies, controls and all", function()

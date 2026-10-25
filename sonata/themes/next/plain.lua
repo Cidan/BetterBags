@@ -7,22 +7,24 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local sonataNext = addon:GetModule('SonataNext')
 
 -- Plain is the default UI of the game played (asked: "the Plain theme looks like the default UI for the version of WoW
--- we're playing on"; docs/next-plain-theme.md). Every piece is Blizzard's own, named as Blizzard's UI source names it
--- (.libraries/wow-ui-source, one branch per client), and drawn by BetterBags Next from data:
---   Retail and WoW: Forever (Clients.Retail): the bag window (ContainerFrameCombinedBags: PortraitFrameFlatTemplate,
---     HeldBagLayout's metal with the portrait corner, the flat fill in PANEL_BACKGROUND_COLOR, the round portrait, the
---     title centered, the red close button), Blizzard's dropdowns and menus (Blizzard_Menu/Mainline).
---   Classic, Era, TBC, Anniversary, Mists and Cata (Clients.Classic): the settings window's frame (SettingsFrameTemplate:
---     ButtonFrameTemplateNoPortrait's Classic art, its title band, the flat fill), Classic's close button, the Classic
---     dropdowns and menus (Blizzard_Menu/Classic). Classic's own bag art comes in fixed sizes per bag and cannot stretch
---     to a window of any size.
---   Every client: the settings controls (SettingsCheckboxTemplate, MinimalSliderTemplate, MinimalScrollBar), the input
---     border (InputBoxVisualTemplate), the panel button (UIPanelButtonNoTooltipTemplate), the bag sort button, the
---     settings list's rows and headers (Blizzard_CategoryList.lua), the dialog (StaticPopup: the Dialog layout over
---     UI-DialogBox-Background), and the client's own fonts (FontStyles.xml), copied.
--- The tabs are Blizzard's list rows: Blizzard has no sideways text tabs. Header buttons Blizzard has no art for are
--- BetterBags' glyphs in Blizzard's gold, white under the pointer. No sparkles, feather, wash, ribbon, cloud, glow or
--- braid. Data only.
+-- we're playing on"; docs/next-plain-theme.md), at Default's scale and in Default's layout (asked, round three: "scale for
+-- Plain should be the same as our Default", and of the settings window, "keep it like we do in default, just, pass over
+-- with skin a bit"). Every piece is Blizzard's own, named as Blizzard's UI source names it (.libraries/wow-ui-source,
+-- one branch per client), drawn by BetterBags Next from data:
+--   The bags, every client: the original BetterBags bag window (DefaultPanelTemplate: ButtonFrameTemplateNoPortrait in
+--     the client's art over the content, the rock, the streaks; Classic's title band), its menu button's bag in the
+--     corner holding the header's actions in the original bags' menu (the vendor's portrait on the vendor's), the
+--     close button, the search box where the original bags put it.
+--   The settings window, every client: Default's, in the same frame and rock, its sidebar Blizzard's inset
+--     (InsetFrameTemplate over its marble), the settings list's art for its pages, the page tabs on a line across their
+--     column.
+--   The controls: the panel button (UIPanelButtonNoTooltipTemplate), the input border (InputBoxVisualTemplate), the
+--     multi-line edit box's frame (InputScrollFrameTemplate) round text areas and item boxes, the settings check box,
+--     slider and dropdown art, MinimalTab tabs, Blizzard_Menu's menus, today's popup; Retail and WoW: Forever
+--     (Clients.Retail) and every Classic client (Clients.Classic) each their own close button, menus and popup border.
+--   The client's own fonts, copied (their file, flags, color and shadow) at Default's sizes.
+-- The bags' side tabs are Blizzard's list rows: Blizzard has no sideways text tabs. No sparkles, feather, wash, ribbon,
+-- cloud, glow or braid. Data only.
 
 -- UIPanelButtonNoTooltipTemplate: one file in three pieces, its caps 12 wide (TexCoords measured by Blizzard's XML);
 -- UIPanelButton_OnMouseDown and OnDisable draw the Down and Disabled files the same way.
@@ -76,19 +78,59 @@ local CLASSIC_STREAKS = { Texture = "Interface\\FrameGeneral\\_UI-Frame", TexCoo
 local TITLE_BAND = { Texture = "Interface\\FrameGeneral\\_UI-Frame", TexCoords = { 0, 1, 0.2890625, 0.421875 },
   HorizTile = true, Color = "White", Alpha = 1, Height = 17, Left = 7, Right = 24, Top = 4 }
 
--- The original bags' menu button (frames/menubutton.lua): Bagslots2x's first fifth, 48 x 60, centered on a 40-square
--- button at TOPLEFT -10, 7, so 14 out from the corner and 17 above it; over the border and the search box (the button is
--- strata HIGH); never flipped. On every bag, as the original's backpack and bank both had it.
-local BAG_ICON = { Texture = "Interface\\Containerframe\\Bagslots2x", TexCoords = { 0, 0.2, 0, 1 }, Point = "TOPINNER",
-  Width = 48, Height = 60, X = -14, Y = -17, Mirror = false, Above = true, Layer = "OVERLAY", SubLevel = 7 }
+-- The original bags' menu button (frames/menubutton.lua), Next's bag button holding the header's actions (asked, round
+-- three: "remove all top bar buttons ... bring back the drop down menu with these options, just like the original
+-- bags"): Bagslots2x's first fifth (the bag in its gold ring), 48 x 60, its ring in a 40-square button 12 out from the
+-- corner and 15 above it (the art 2 left of and above the button, 14 out and 17 above the corner as before); its gold
+-- glow (the file's second fifth, 2 to the right, as the original's) over it under the pointer. On the vendor, the
+-- vendor's portrait (asked: "vendors should have their portrait for the bag button, not the bag texture"), round
+-- (TempPortraitAlphaMask, as Blizzard rounds its portraits) over a dark disc for while there is none, in the file's
+-- empty gold ring (x 296 to 352, y 3 to 59 of its 512 x 128), drawn as large across as the bag's ring.
+local BAGSLOTS = "Interface\\Containerframe\\Bagslots2x"
+local PORTRAIT_MASK = { Texture = "Interface\\CharacterFrame\\TempPortraitAlphaMask" }
+local PORTRAIT = { Left = 4, Top = 4, Right = 4, Bottom = 4 }
+local BAG_BUTTON = {
+  Point = "TOPINNER", X = -12, Y = -15, Width = 40, Height = 40,
+  Layers = { { Texture = BAGSLOTS, TexCoords = { 0, 0.2, 0, 1 }, Inset = { Left = -2, Top = -2, Right = -6, Bottom = -18 } } },
+  Highlight = { Texture = BAGSLOTS, TexCoords = { 0.2, 0.3992, 0, 1 }, Inset = { Left = 0, Top = -2, Right = -8, Bottom = -18 } },
+  Panels = { Vendor = { Layers = {
+    { Color = { 0, 0, 0, 1 }, Inset = PORTRAIT, Mask = PORTRAIT_MASK },
+    { Unit = "npc", Inset = PORTRAIT, Mask = PORTRAIT_MASK },
+    { Texture = BAGSLOTS, TexCoords = { 0.578125, 0.689453125, 0.0234375, 0.46875 },
+      Inset = { Left = 0, Top = 1, Right = -3, Bottom = -4 } },
+  } } },
+}
+
+-- InsetFrameTemplate's Bg (Blizzard_SharedXML/<Family>/SharedUIPanelTemplates.xml): Interface\FrameGeneral\
+-- UI-Background-Marble tiled both ways, under its nine-slice.
+local MARBLE = { Texture = "Interface\\FrameGeneral\\UI-Background-Marble", HorizTile = true, VertTile = true, Color = "White",
+  Alpha = 1 }
+
+-- InputScrollFrameTemplate's frame (every client: Interface\Common\Common-Input-Border-TL to -BR and -M, its 8 x 8
+-- corners 5 outside the box, its edges between them, its middle filling them): Blizzard's multi-line edit box, round text
+-- areas and item boxes.
+local EDIT_BOX = { Pieces = {
+  TopLeftCorner = { Texture = "Interface\\Common\\Common-Input-Border-TL", Width = 8, Height = 8, X = -5, Y = 5 },
+  TopRightCorner = { Texture = "Interface\\Common\\Common-Input-Border-TR", Width = 8, Height = 8, X = 5, Y = 5 },
+  BottomLeftCorner = { Texture = "Interface\\Common\\Common-Input-Border-BL", Width = 8, Height = 8, X = -5, Y = -5 },
+  BottomRightCorner = { Texture = "Interface\\Common\\Common-Input-Border-BR", Width = 8, Height = 8, X = 5, Y = -5 },
+  TopEdge = { Texture = "Interface\\Common\\Common-Input-Border-T", Height = 8 },
+  BottomEdge = { Texture = "Interface\\Common\\Common-Input-Border-B", Height = 8 },
+  LeftEdge = { Texture = "Interface\\Common\\Common-Input-Border-L", Width = 8 },
+  RightEdge = { Texture = "Interface\\Common\\Common-Input-Border-R", Width = 8 },
+  Center = { Texture = "Interface\\Common\\Common-Input-Border-M" },
+} }
+
+-- The settings page tabs' line (asked: "a line across the bottom of them edge to edge probably, so it looks like a tab
+-- sitting on top of a pane"): the tabs' outline (the Options_Tab art's top, two rows of #dbdbdb at about a quarter
+-- strength, measured), across the content column (32 past the tabs, the header's padding, either side: from the sidebar's edge to
+-- the frame's), open under the chosen tab.
+local TAB_LINE = { Color = { 0.86, 0.86, 0.86, 1 }, Alpha = 0.25, Size = 2, Open = true, Outset = { Left = 32, Right = 32 } }
 
 -- WowStyle2DropdownTemplate's Background: its atlas 7 past the dropdown on every side (sliced 12 either side, so it
--- stretches across); a stepper's (WowStyle2IconButtonTemplate) at the atlas's own size centered on the button.
+-- stretches across).
 local function cButton(atlas)
   return { Atlas = atlas, Color = "White", Alpha = 1, Inset = { Left = -7, Top = -7, Right = -7, Bottom = -7 } }
-end
-local function stepperArt(atlas)
-  return { Atlas = atlas, Color = "White", Alpha = 1, AtlasSize = true }
 end
 
 -- The settings list's rows (Blizzard_CategoryList.lua): lit under the pointer, chosen.
@@ -115,10 +157,12 @@ sonataNext:RegisterTheme({
     Lit = { 1, 1, 1, 0.08 },
   },
 
-  -- The client's own font objects, copied outright (Copy, next-themes.md §4): their file, size, color and shadow in every
-  -- locale, nothing of Default's roles changing them.
+  -- The client's own font objects, copied outright (Copy, next-themes.md §4): their file, flags, color and shadow in every
+  -- locale, at Default's size for each role (asked: "scale for Plain should be the same as our Default"). Size = false
+  -- keeps the client's own: the title in Blizzard's title bar (20 tall), and the two Blizzard fonts larger than Default's
+  -- (the settings list's headers, the settings sections).
   Fonts = {
-    Title = { Copy = "GameFontNormal" },
+    Title = { Copy = "GameFontNormal", Size = false },
     Section = { Copy = "GameFontNormal" },
     SectionRecent = { Copy = "GameFontHighlight" },
     SectionFree = { Copy = "GameFontDisable" },
@@ -154,9 +198,6 @@ sonataNext:RegisterTheme({
     -- WowStyle2DropdownTemplate's text (the settings dropdowns, every client), gray while disabled (DISABLED_FONT_COLOR).
     DropdownText = { Copy = "GameFontNormal" },
     DropdownDisabled = { Copy = "GameFontDisable" },
-    -- MinimalSliderWithSteppersTemplate's RightText, gray while disabled (GRAY_FONT_COLOR).
-    SliderValue = { Copy = "GameFontNormal" },
-    SliderValueDisabled = { Copy = "GameFontDisable" },
     DialogTitle = { Copy = "GameFontNormal" },
     DialogText = { Copy = "GameFontHighlight" },
     TopTab = { Copy = "GameFontNormalSmall" },
@@ -165,7 +206,7 @@ sonataNext:RegisterTheme({
     SettingsBrand = { Copy = "GameFontNormalLarge" },
     -- The settings list's headers (SettingsCategoryListHeaderTemplate: GameFontHighlightMedium) and rows
     -- (GameFontNormal, GameFontHighlight chosen).
-    SettingsNavGroup = { Copy = "GameFontHighlightMedium" },
+    SettingsNavGroup = { Copy = "GameFontHighlightMedium", Size = false },
     SettingsNav = { Copy = "GameFontNormal" },
     -- Under the pointer a row keeps its font, its art lights (SettingsCategoryListButtonMixin:UpdateStateInternal).
     SettingsNavHover = { Copy = "GameFontNormal" },
@@ -173,21 +214,17 @@ sonataNext:RegisterTheme({
     SettingsVersion = { Copy = "GameFontDisableSmall" },
     SettingsTitle = { Copy = "GameFontHighlightHuge" },
     SettingsDescription = { Copy = "GameFontHighlightSmall" },
-    SettingsSection = { Copy = "GameFontHighlightLarge" },
+    SettingsSection = { Copy = "GameFontHighlightLarge", Size = false },
     SettingsSectionNote = { Copy = "GameFontDisableSmall" },
     SettingsLabel = { Copy = "GameFontNormal" },
     SettingsText = { Copy = "GameFontHighlightSmall" },
     SettingsLink = { Copy = "GameFontNormal" },
   },
 
+  -- Default's sizes (asked: "scale for Plain should be the same as our Default"), but what the frame's art fixes.
   Layout = {
-    -- ContainerFrameItemButtonTemplate's 37, ITEM_SPACING_X and Y 5 (ContainerFrame.lua).
-    Icon = 37,
-    Gap = 5,
-    -- Clear of the frame's edges: Blizzard insets its fill 2 to 7 from the sides.
-    Pad = 10,
-    -- The title's top 6 below the frame's (TitleContainer at -1, its text at -5 in it), in the title bar, centered from 30
-    -- in (the TitleContainer's left: Pad in plus TitleInset) to the buttons.
+    -- The title's top 6 below the frame's (TitleContainer at -1, its text at -5 in it), in the title bar, centered between
+    -- the bag button and the close button.
     TitleTop = 6,
     TitleInset = 20,
     -- The search box where the original bags put it (sonata/themes/base.lua: 30 down, 20 tall), and their content from
@@ -198,17 +235,7 @@ sonataNext:RegisterTheme({
     SearchGap = 6,
     SearchRight = 20,
     ContentTop = 62,
-    Footer = 28,
-    FooterText = 9,
-    FooterMoney = 8,
-    SectionHeader = 22,
-    SectionSpacing = 12,
-    TabHeight = 26,
-    TabSpacing = 2,
-    TabMinWidth = 70,
-    TabPadding = 12,
-    TabHover = 4,
-    -- UIPanelCloseButton's 24, the header's buttons in the title bar beside it.
+    -- UIPanelCloseButton's 24, in the title bar's corner.
     HeaderButton = 24,
     HeaderButtonGap = 2,
     HeaderButtonTop = 0,
@@ -222,7 +249,6 @@ sonataNext:RegisterTheme({
   Panel = {
     Fill = ROCK,
     Frame = { Layout = "ButtonFrameTemplateNoPortrait", Above = true, Bands = { STREAKS } },
-    Ornaments = { BAG_ICON },
     Feather = false,
     Wash = false,
     Edge = false,
@@ -237,15 +263,8 @@ sonataNext:RegisterTheme({
     Cloud = false,
     Buttons = {
       Color = "ButtonIcon", HoverColor = "White", ArtColor = "White", ArtHoverColor = "White", DisabledAlpha = 0.4,
-      Scale = 0.7,
-      -- The row in the title bar, past the close button in the corner.
-      RowStart = 26,
-      Icons = {
-        -- BagItemAutoSortButton: bags-button-autosort-up, -down pressed, ButtonHilight-Square added under the pointer.
-        sortButton = { Atlas = "bags-button-autosort-up", Glyph = false, Scale = 1 / 0.7,
-          Pushed = { Atlas = "bags-button-autosort-down" },
-          Highlight = { Texture = "Interface\\Buttons\\ButtonHilight-Square", BlendMode = "ADD" } },
-      },
+      -- The header's actions in the bag button's menu; only the close button (pinned, in Clients) stays in the header.
+      Menu = BAG_BUTTON,
     },
   },
 
@@ -298,71 +317,51 @@ sonataNext:RegisterTheme({
   Vendor = {
     CardFill = "Shade",
     CardHover = "Lit",
-    -- No taller than the price (GameFontHighlightSmall).
-    CoinSize = 11,
   },
 
-  -- Blizzard's settings window (Blizzard_SettingsPanel.xml, the same on every client: 920 x 724), in the original bags'
-  -- stone as the What's New window (asked); its frame at its own level, its content placed inside it
-  -- (SettingsFrameTemplate: NineSlice useParentLevel).
+  -- Default's settings window, skinned (asked, round three: "don't change the proportions or layout of settings here --
+  -- keep it like we do in default, just, pass over with skin a bit"): its size, sidebar, header, rows and footer
+  -- Default's; in the original bags' frame and stone, as the What's New window; its name in the title bar.
   Settings = {
-    Width = 920, Height = 724,
     Fill = ROCK,
     Frame = { Layout = "ButtonFrameTemplateNoPortrait", Bands = { STREAKS } },
     Wash = false,
     Edge = false,
-    -- Its name in the title bar (DefaultPanelBaseTemplate's TitleContainer, 30 in to 24 from the right, its text 5 below
-    -- its top 1 down), the bar moving the window.
+    -- DefaultPanelBaseTemplate's TitleContainer, 30 in to 24 from the right, its text 5 below its top 1 down; the bar
+    -- moves the window.
     Title = { Font = "Title", Top = 6, Left = 30, Right = 24, Height = 22 },
-    -- Options_InnerFrame at its size (886 x 618) at 17, -64: the list's column and the content inside a soft frame.
-    InnerFrame = { Atlas = "Options_InnerFrame", AtlasSize = true, Point = "TOPLEFT", X = 17, Y = -64, Color = "White", Alpha = 1 },
-    -- The category list (SettingsCategoryListTemplate) at 18, 76, 199 wide, down to 46 above the bottom.
-    Sidebar = { Width = 199, Pad = 0, Left = 18, Top = 76, Bottom = 46, Fill = false, Line = false },
+    -- Default's sidebar as Blizzard's inset (ButtonFrameTemplate's Inset: InsetFrameTemplate's nine-slice over its marble),
+    -- PANEL_INSET_LEFT_OFFSET 4 in, PANEL_INSET_TOP_OFFSET 24 down (below the title bar), PANEL_INSET_BOTTOM_OFFSET 4 above
+    -- the bottom (SharedUIPanelTemplates.lua, every client).
+    Sidebar = { Left = 4, Top = 24, Bottom = 4, Fill = MARBLE, Line = false, Frame = { Layout = "InsetFrameTemplate" } },
+    -- The window names itself in its title bar.
     Brand = false,
-    -- Its search box (SearchBoxTemplate) 350 wide, its bottom right 4 right of and 20 above the content's top right: 18 from
-    -- the window's right, 34 down; the template's magnifier.
-    Search = { Place = "Top", Width = 350, Right = 18, Top = 34, Atlas = "common-search-magnifyingglass", IconSize = 10,
-      IconColor = "SearchIcon" },
+    -- SearchBoxTemplate's magnifier, gray.
+    Search = { Atlas = "common-search-magnifyingglass", IconSize = 10, IconColor = "SearchIcon" },
     Back = { IconColor = "Gold", Height = 30 },
-    Version = { Window = true, Left = 18, Bottom = 22 },
-    -- Blizzard's settings list (Blizzard_CategoryList.lua): rows 175 x 20, their label 36 in and 1 above the middle, their
-    -- art at its own size, centered; headers 175 x 30 in Options_CategoryHeader_1 to 3, cycled, at their top left, their
-    -- labels 20 in and 1 down, as written (SettingsCategoryListHeaderTemplate); 2 between every one (its view's spacing).
+    -- The pages as Blizzard's settings list draws them (Blizzard_CategoryList.lua) at Default's row height: a heading on
+    -- Options_CategoryHeader_1 to 3, cycled, at its own size (199 wide, its bar 28 tall), 16 in (the sidebar's padding,
+    -- in line with the search box), its label 20 in from the art and 1 down, as written; a row's label 16 deeper (Blizzard
+    -- puts rows at 36 against headings at 20), 1 above its middle; Options_List_Active and _Hover across the row.
     Nav = {
-      ItemWidth = 175, ItemHeight = 20, GroupHeight = 30, GroupGap = 0, Spacing = 2, TextRaise = 1, Indent = 36,
-      GroupUpper = false,
+      GroupHeight = 30, Indent = 36, TextRaise = 1, GroupUpper = false,
       Indicator = false,
-      SelectedFill = { Atlas = "Options_List_Active", Color = "White", Alpha = 1, AtlasSize = true },
-      HoverFill = { Atlas = "Options_List_Hover", Color = "White", Alpha = 1, AtlasSize = true },
+      SelectedFill = LIST_ACTIVE,
+      HoverFill = LIST_HOVER,
       GroupFills = {
-        { Atlas = "Options_CategoryHeader_1", Color = "White", Alpha = 1, AtlasSize = true, Point = "TOPLEFT" },
-        { Atlas = "Options_CategoryHeader_2", Color = "White", Alpha = 1, AtlasSize = true, Point = "TOPLEFT" },
-        { Atlas = "Options_CategoryHeader_3", Color = "White", Alpha = 1, AtlasSize = true, Point = "TOPLEFT" },
+        { Atlas = "Options_CategoryHeader_1", Color = "White", Alpha = 1, AtlasSize = true, Point = "TOPLEFT", X = 16 },
+        { Atlas = "Options_CategoryHeader_2", Color = "White", Alpha = 1, AtlasSize = true, Point = "TOPLEFT", X = 16 },
+        { Atlas = "Options_CategoryHeader_3", Color = "White", Alpha = 1, AtlasSize = true, Point = "TOPLEFT", X = 16 },
       },
-      GroupLabel = { Point = "LEFT", X = 20, Y = -1 },
+      GroupLabel = { Point = "LEFT", X = 36, Y = -1 },
     },
-    -- The content (its Container) from 16 right of the list to 22 from the window's right; its header (SettingsListTemplate)
-    -- 50 tall at its top, the page's name 7 in and 22 down, Options_HorizontalDivider centered 50 down, no description;
-    -- a page's buttons where its Defaults button is (36 from the header's right, 16 down).
-    Header = { Left = 16, Right = 22, Top = 76, Height = 50, Pad = 7, TitleTop = 22, DescriptionFont = false,
-      Divider = { Atlas = "Options_HorizontalDivider", AtlasSize = true, Point = "TOP", Y = -50, Color = "White", Alpha = 1 },
-      Actions = { Top = 16, Right = 36, Gap = 8 } },
-    -- A page's tabs on the inner frame's top edge, 27 down (MinimalTabTemplate's place in Blizzard's window).
-    Tabs = { Top = 27, Left = 0 },
-    -- The list (SettingsListTemplate) from 15 left of the content and 2 below its header to 20 in from its right, 25 in
-    -- and 10 from its top, 9 between every element; a section's title 45 tall, 7 in and 16 down, as written
-    -- (SettingsListSectionHeaderTemplate); rows 26 tall, one column, the name 37 in up to 85 left of the middle, each
-    -- control placed from the middle as SettingControls places it; a row lit white at 0.1 under the pointer, 10 past its
-    -- left to 5 short of its right (HoverBackgroundTemplate); no cards or lines. The dropdown 46.5 left of the middle: 220
-    -- wide, centered in Blizzard's 223-wide control placed 48 left of it (SettingsDropdownControlMixin).
-    Content = { Layout = "List", ScrollLeft = -15, ScrollRight = 20, ScrollTop = 2, Pad = 25, PadRight = 0, Top = 10,
-      Bottom = 10, RowGap = 9, SectionHeight = 45, TitleX = 7, TitleTop = 16, TitleUpper = false, RowHeight = 26,
-      LabelX = 37, LabelRight = -85,
-      Controls = { toggle = { X = -80 }, slider = { X = -80, Y = 3 }, dropdown = { X = -46.5, Y = 3 }, color = { X = -73 },
-        input = { X = -80 }, buttons = { X = -40 } },
-      HoverInset = { Left = -10, Right = 5 }, Card = false, Divider = false, Hover = { Color = "White", Alpha = 0.1 } },
-    -- Done (its Close) 96 x 22 at 16, 16 from the bottom right, What's New in its Apply button's place, 2 left of it.
-    Footer = { Height = 45, Left = 0, Line = false, Buttons = { Width = 96, Right = 16, Bottom = 16, Gap = 2 }, WhatsNew = "Plain" },
+    -- Default's header, its content column clear of the frame's right edge (6 in, PANEL_INSET_RIGHT_OFFSET).
+    Header = { Right = 6 },
+    -- Default's rows on a soft shade, lit white at 0.1 under the pointer (HoverBackgroundTemplate); section titles as
+    -- written, as Blizzard's (SettingsListSectionHeaderTemplate).
+    Content = { TitleUpper = false, Card = { Color = "Shade" }, Divider = { Color = "White", Alpha = 0.08, Size = 1 },
+      Hover = { Color = "White", Alpha = 0.1 } },
+    Footer = { Line = false },
     Categories = { Indicator = false, SelectedFill = LIST_ACTIVE, HoverFill = LIST_HOVER },
     BagCategories = { Fill = { Color = "Shade" }, HoverFill = LIST_HOVER },
     Currency = { Hover = LIST_HOVER },
@@ -391,50 +390,47 @@ sonataNext:RegisterTheme({
       DisabledOn = { Atlas = "checkmark-minimal-disabled", Color = "White", Alpha = 1 },
       Hover = false,
     },
-    -- UIPanelButtonNoTooltipTemplate: 22 tall, 20 either side of its label (fitTextWidthPadding 40), at least 40.
+    -- UIPanelButtonNoTooltipTemplate, 20 either side of its label (fitTextWidthPadding 40), at Default's height.
     Button = {
-      Height = 22, Padding = 20, MinWidth = 40, DisabledAlpha = 1,
+      Padding = 20, DisabledAlpha = 1,
       Plain = BUTTON, Primary = BUTTON, Danger = BUTTON,
       Link = { Font = "Link", HoverFont = "LinkHover" },
     },
-    -- InputBoxVisualTemplate: common-search-border, 20 tall, its left cap 8 wide and 5 past the field.
+    -- InputBoxVisualTemplate: common-search-border, its left cap 8 wide and 5 past the field, at Default's height (the
+    -- art drawn over all of what takes the field's clicks).
     Input = {
-      Height = 20, Padding = 6,
-      Fill = { Pieces = "Horizontal", Thickness = 20, Inset = { Left = -5 }, Color = "White", Alpha = 1,
+      Fill = { Pieces = "Horizontal", Inset = { Left = -5 }, Color = "White", Alpha = 1,
         Begin = { Atlas = "common-search-border-left", Size = 8 }, Middle = { Atlas = "common-search-border-middle" },
         End = { Atlas = "common-search-border-right", Size = 8 } },
-      FocusFill = { Pieces = "Horizontal", Thickness = 20, Inset = { Left = -5 }, Color = "White", Alpha = 1,
+      FocusFill = { Pieces = "Horizontal", Inset = { Left = -5 }, Color = "White", Alpha = 1,
         Begin = { Atlas = "common-search-border-left", Size = 8 }, Middle = { Atlas = "common-search-border-middle" },
         End = { Atlas = "common-search-border-right", Size = 8 } },
       Edge = false,
     },
+    -- A text area (the Search Rule) and an item box in Blizzard's multi-line edit box's frame, round the whole box.
+    TextArea = { Fill = false, FocusFill = false, Edge = false, Frame = EDIT_BOX },
     ItemGrid = {
+      Fill = false, Edge = false, Frame = EDIT_BOX,
       CommonEdge = { Color = "White", Alpha = 0.25 },
       Hover = { Color = "White", Alpha = 0.15 },
     },
-    -- The settings slider (MinimalSliderWithSteppersTemplate, 250 wide): its bar (MinimalSliderTemplate, 19 tall, in three
-    -- pieces at their atlas sizes centered on it, its thumb Minimal_SliderBar_Button at its atlas size) 19 in from each
-    -- side, the back and forward steppers (Minimal_SliderBar_Button_Left 11 x 19, _Right 9 x 18) 4 out from its ends, at
-    -- 0.5 and desaturated where the value can go no further; the value in GameFontNormal 25 right of it, gray and the
-    -- slider at 0.7 while disabled (MinimalSlider.lua).
+    -- The settings slider's bar (MinimalSliderTemplate, 19 tall, in three pieces at their atlas sizes centered on it, its
+    -- thumb Minimal_SliderBar_Button at its atlas size), at 0.7 while disabled (MinimalSlider.lua), at Default's width with
+    -- Default's number box.
     Slider = {
-      Width = 212, Height = 19, TrackSize = 19, ThumbSize = "Atlas",
+      Height = 19, TrackSize = 19, ThumbSize = "Atlas",
       Track = { Pieces = "Horizontal", Thickness = "Atlas", Color = "White", Alpha = 1, Begin = { Atlas = "Minimal_SliderBar_Left" },
         Middle = { Atlas = "_Minimal_SliderBar_Middle" }, End = { Atlas = "Minimal_SliderBar_Right" } },
       Fill = false,
       Thumb = { Atlas = "Minimal_SliderBar_Button", Color = "White", Alpha = 1 },
       ThumbHover = { Atlas = "Minimal_SliderBar_Button", Color = "White", Alpha = 1 },
-      Steppers = { Back = { Atlas = "Minimal_SliderBar_Button_Left", Width = 11, Height = 19 },
-        Forward = { Atlas = "Minimal_SliderBar_Button_Right", Width = 9, Height = 18 }, Gap = 4, Room = 19, DisabledAlpha = 0.5 },
-      Value = "Text", ValueGap = 25, ValueFont = "SliderValue", ValueDisabledFont = "SliderValueDisabled", DisabledAlpha = 0.7,
+      DisabledAlpha = 0.7,
     },
-    -- The settings dropdown (WowStyle2DropdownTemplate, every client): 220 x 25, common-dropdown-c-button 7 past it in its
-    -- art for each state (WowStyle2DropdownMixin:GetBackgroundAtlas), the choice centered 13 in from each side in gold
-    -- (gray disabled), the arrow (common-dropdown-c-button-hover-arrow) 5 below its bottom under the pointer; the back and
-    -- next steppers (WowStyle2IconButtonTemplate, 26 x 25: common-dropdown-c-button at its size and the arrow icons) 5
-    -- left and 4 right of it (DropdownWithSteppersTemplate).
+    -- The settings dropdown's art (WowStyle2DropdownTemplate, every client), at Default's size: common-dropdown-c-button 7
+    -- past it in its art for each state (WowStyle2DropdownMixin:GetBackgroundAtlas), the choice centered 13 in from each
+    -- side in gold (gray disabled), the arrow (common-dropdown-c-button-hover-arrow) 5 below its bottom under the pointer.
     Dropdown = {
-      Width = 220, Height = 25, Padding = 13, Justify = "CENTER",
+      Padding = 13, Justify = "CENTER",
       Fill = cButton("common-dropdown-c-button"), HoverFill = cButton("common-dropdown-c-button-hover-1"),
       PressedFill = cButton("common-dropdown-c-button-pressedhover-1"), OpenFill = cButton("common-dropdown-c-button-open"),
       DisabledFill = cButton("common-dropdown-c-button-disabled"),
@@ -442,25 +438,19 @@ sonataNext:RegisterTheme({
       Font = "DropdownText", DisabledFont = "DropdownDisabled", DisabledAlpha = 1,
       Chevron = { Atlas = "common-dropdown-c-button-hover-arrow", Color = "White", Size = "Atlas", Anchor = "BOTTOM",
         Point = { X = 0, Y = -5 }, HoverOnly = true },
-      Steppers = { Width = 26, Height = 25, BackGap = 5, NextGap = 4,
-        Back = { Atlas = "common-dropdown-icon-back", Disabled = { Atlas = "common-dropdown-icon-back-disabled" } },
-        Next = { Atlas = "common-dropdown-icon-next", Disabled = { Atlas = "common-dropdown-icon-next-disabled" } },
-        Fill = stepperArt("common-dropdown-c-button"), HoverFill = stepperArt("common-dropdown-c-button-hover-2"),
-        PressedFill = stepperArt("common-dropdown-c-button-pressedhover-2"), DisabledFill = stepperArt("common-dropdown-c-button-disabled") },
     },
     -- Blizzard_Menu's menu rows: Interface\QuestFrame\UI-QuestTitleHighlight added under the pointer (MenuVariants.lua).
     Menu = {
-      Gap = 2, Padding = 4, ItemHeight = 20,
       Edge = false,
       HoverFill = { Texture = "Interface\\QuestFrame\\UI-QuestTitleHighlight", BlendMode = "ADD", Color = "White", Alpha = 1 },
     },
     Swatch = { Edge = { Color = "White", Alpha = 0.45 }, HoverEdge = { Color = "White", Alpha = 0.9 } },
-    -- MinimalTabTemplate (the settings window's tabs): 37 tall, 5 apart, as wide as their text and 40, each in three
-    -- pieces at their atlas sizes by their bottoms (Options_Tab_*, Options_Tab_Active_* chosen), the text 4 above the
-    -- bottom (6 chosen); no marker, no line.
+    -- MinimalTabTemplate (the settings window's tabs): 5 apart, as wide as their text and 40, each in three pieces at their
+    -- atlas sizes by their bottoms (Options_Tab_*, Options_Tab_Active_* chosen), the text 4 above the bottom (6 chosen);
+    -- no marker; on a line across their column, open under the chosen tab.
     TopTabs = {
-      Height = 37, Gap = 5, Padding = 20, TextBottom = 4, SelectedTextBottom = 6,
-      Indicator = false, Line = false,
+      Gap = 5, Padding = 20, TextBottom = 4, SelectedTextBottom = 6,
+      Indicator = false, Line = TAB_LINE,
       Fill = tab(""), HoverFill = tab(""), SelectedFill = tab("Active_"),
     },
     -- Today's popup (GameDialogBaseMixin:OnLoad, GameDialog.lua): UI-DialogBox-Background-Dark 7 in, its diamond border
@@ -481,7 +471,7 @@ sonataNext:RegisterTheme({
           Pinned = { closeButton = { Point = "TOPOUTER", X = 1, Y = 0 } },
           Icons = {
             -- UIPanelCloseButtonNoScripts: RedButton-Exit, -pressed, -Disabled, RedButton-Highlight added.
-            closeButton = { Atlas = "RedButton-Exit", Glyph = false, Scale = 1 / 0.7,
+            closeButton = { Atlas = "RedButton-Exit", Glyph = false,
               Pushed = { Atlas = "RedButton-exit-pressed" }, Disabled = { Atlas = "RedButton-Exit-Disabled" },
               Highlight = { Atlas = "RedButton-Highlight", BlendMode = "ADD" } },
           },
@@ -521,10 +511,9 @@ sonataNext:RegisterTheme({
         Buttons = {
           -- UIPanelCloseButtonDefaultAnchors: a 32-square button at TOPRIGHT 4, 4; here its 32-square art centered on a
           -- button in the corner, drawn where Blizzard's is.
-          RowStart = 30,
           Pinned = { closeButton = { Point = "TOPOUTER", X = 0, Y = 0 } },
           Icons = {
-            closeButton = { Texture = "Interface\\Buttons\\UI-Panel-MinimizeButton-Up", Glyph = false, Scale = 32 / 24 / 0.7,
+            closeButton = { Texture = "Interface\\Buttons\\UI-Panel-MinimizeButton-Up", Glyph = false, Scale = 32 / 24,
               Pushed = { Texture = "Interface\\Buttons\\UI-Panel-MinimizeButton-Down" },
               Disabled = { Texture = "Interface\\Buttons\\UI-Panel-MinimizeButton-Disabled" },
               Highlight = { Texture = "Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight", BlendMode = "ADD" } },

@@ -24,6 +24,9 @@ local pixel = addon:GetModule('NextPixel')
 ---@class NextFill: AceModule
 local fills = addon:GetModule('NextFill')
 
+---@class NextFrameArt: AceModule
+local frameArt = addon:GetModule('NextFrameArt')
+
 -- NextInput is BetterBags Next's text field and text area (next-settings.md §2), drawn from the theme
 -- (Controls.Input): a fill (lighter while focused) and an edge (stronger under the pointer and while
 -- focused), the text Padding in, help text while empty. Only what the player types is reported
@@ -282,6 +285,8 @@ function nextInput:CreateArea(parent, opts)
   local area = setmetatable({
     frame = frame, fill = fill, edge = controls:CreateEdge(frame), box = box, bar = bar, editBox = editBox,
     help = help, opts = opts,
+    -- Round the whole box, under its edit box (a child frame).
+    frameArt = frameArt:Create(frame, frame),
   }, { __index = areaProto })
   style:SetFont(editBox, controls:Theme("Input").Font)
   style:SetFont(help, controls:Theme("Input").HelpFont)
@@ -316,12 +321,31 @@ function areaProto:Style()
   self:Paint()
 end
 
+-- Paint draws the area's box from its own look (Controls.TextArea: Fill, FocusFill, Edge, Frame), each the input's when
+-- the theme gives it none (false: none): Blizzard draws a multi-line edit box in a frame of its own
+-- (InputScrollFrameTemplate), not the single-line field's art.
 function areaProto:Paint()
-  local I = controls:Theme("Input")
+  local A, I = controls:Theme("TextArea"), controls:Theme("Input")
   local focused = self.editBox:HasFocus()
-  controls:Paint(self.fill, focused and I.FocusFill or I.Fill)
-  local E = I.Edge
+  local fill
+  if focused then
+    fill = A.FocusFill
+    if fill == nil then
+      fill = I.FocusFill
+    end
+  else
+    fill = A.Fill
+    if fill == nil then
+      fill = I.Fill
+    end
+  end
+  controls:Paint(self.fill, fill)
+  local E = A.Edge
+  if E == nil then
+    E = I.Edge
+  end
   controls:PaintEdge(self.edge, E, E and (focused and E.Focus or E.Idle) or nil)
+  self.frameArt:Apply(A.Frame)
   self.help:SetShown(not focused and self:GetText() == "")
 end
 

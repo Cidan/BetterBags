@@ -57,7 +57,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
-  { "NextOrnaments", "next/ornaments.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" },
   { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -300,25 +300,38 @@ describe("BetterBags Next's panels and themes", function()
         end
       end)
 
-      it("draws the original bags' icon on " .. name .. ": Bagslots2x, 48 x 60, 14 out and 17 above the corner, over the frame", function()
+      -- Round three (asked: "remove all top bar buttons ... bring back the drop down menu with these options, just like the
+      -- original bags"): the bag is a button holding the header's actions; only the close stays in the header.
+      it("draws the original bags' bag button on " .. name .. ", holding the header's actions, the close alone in the header", function()
         plain(client)
         local bag = opened(function(c) return nextBag:Create(c) end)
-        local icon = bag.ornaments.pieces[1].texture
+        local button = bag.menuButton.frame
+        assert.is_true(button:IsShown())
+        local p, rel, rp, x, y = button:GetPoint(1)
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT" }, { p, rel, rp })
+        assert.is_true(near(x, -12) and near(y, 15), x .. "," .. y)
+        assert.is_true(near(button:GetWidth(), 40) and near(button:GetHeight(), 40))
+        assert.is_true(button:GetFrameLevel() > bag.overlay:GetFrameLevel(), "over the frame and the search box")
+        local icon = bag.menuButton.layers[1]
         assert.are.equal("Interface\\Containerframe\\Bagslots2x", icon:GetTexture())
         local ulx, uly, _, lly, urx = icon:GetTexCoord()
         assert.are.same({ 0, 0.2, 0, 1 }, { ulx, urx, uly, lly })
-        assert.is_true(near(icon:GetWidth(), 48) and near(icon:GetHeight(), 60))
-        local p, rel, rp, x, y = icon:GetPoint(1)
-        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT" }, { p, rel, rp })
-        assert.is_true(near(x, -14) and near(y, 17), x .. "," .. y)
-        assert.are.equal(bag.overlay, icon:GetParent(), "over the content and the search box")
-        assert.are.same({ "OVERLAY", 7 }, { icon:GetDrawLayer() }, "over the frame's pieces")
-        assert.are.equal(0, icon:GetNumMaskTextures(), "its own round art, uncut")
-        assert.is_nil(bag.ornaments.pieces[2] and bag.ornaments.pieces[2].spec, "one icon, no portrait")
+        -- 48 x 60, 14 out and 17 above the corner, as the original's art.
+        p, rel, rp, x, y = icon:GetPoint(1)
+        assert.are.same({ "TOPLEFT", button, "TOPLEFT" }, { p, rel, rp })
+        assert.is_true(near(x, -2) and near(y, 2), x .. "," .. y)
+        local glow = bag.menuButton.highlight
+        assert.are.equal("Interface\\Containerframe\\Bagslots2x", glow:GetTexture())
+        ulx, _, _, _, urx = glow:GetTexCoord()
+        assert.are.same({ 0.2, 0.3992 }, { ulx, urx }, "its gold glow")
+        for _, b in ipairs(bag.headerButtons) do
+          assert.are.equal(b == bag.closeButton, b:IsVisible(), b.key)
+        end
         local bank = opened(function(c) return nextBank:Create(c) end)
-        local mirrored = bank.ornaments.pieces[1].texture
-        assert.are.equal("Interface\\Containerframe\\Bagslots2x", mirrored:GetTexture(), "the bank's too, as the original's")
-        ulx, _, _, _, urx = mirrored:GetTexCoord()
+        p, rel, rp, x, y = bank.menuButton.frame:GetPoint(1)
+        assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT" }, { p, rel, rp })
+        assert.is_true(near(x, 12) and near(y, 15), "the bank's too, as the original's: " .. x .. "," .. y)
+        ulx, _, _, _, urx = bank.menuButton.layers[1]:GetTexCoord()
         assert.are.same({ 0, 0.2 }, { ulx, urx }, "never flipped")
       end)
     end
@@ -712,6 +725,81 @@ describe("BetterBags Next's panels and themes", function()
       local inset = bag:InnerPad() + style.TITLE_INSET
       local room = 30 + bag:headerButtonsWidth()
       assert.are.equal(bag:BodyWidth() - inset - room - 12, bag.title:GetWidth())
+    end)
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md, round three; asked: "remove all top bar buttons, make sure our bag title
+  -- is always correctly centered from the right of the bag button, to the left of the close button", and "bring back
+  -- the drop down menu with these options, just like the original bags"): a theme can put its header's row in a menu
+  -- on a bag button at a corner (Header.Buttons.Menu, NextMenuButton).
+  describe("a header row in a menu (Header.Buttons.Menu)", function()
+    local BAGSLOTS = "Interface\\Containerframe\\Bagslots2x"
+    local function menuTheme()
+      apply({ Header = { Title = { Font = "Title", Justify = "CENTER" }, Buttons = {
+        Menu = { Point = "TOPINNER", X = -12, Y = -15, Width = 40, Height = 40,
+          Layers = { { Texture = BAGSLOTS, TexCoords = { 0, 0.2, 0, 1 } } } },
+        Pinned = { closeButton = { Point = "TOPOUTER", X = 1, Y = 0 } } } } })
+    end
+
+    after_each(function()
+      backToDefault()
+    end)
+
+    it("takes its row's buttons out of the header, keeping whether the panel shows them, and puts them back after", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      menuTheme()
+      assert.is_true(bag.menuButton.frame:IsShown())
+      assert.are.equal(bag.menuHolder, bag.sortButton:GetParent())
+      assert.is_true(bag.sortButton:IsShown(), "still shown by the panel, for the menu")
+      assert.is_false(bag.sortButton:IsVisible())
+      assert.are.equal(bag.frame, bag.closeButton:GetParent(), "a pinned button stays")
+      assert.is_true(bag.closeButton:IsVisible())
+      backToDefault()
+      assert.is_false(bag.menuButton.frame:IsShown())
+      assert.are.equal(bag.frame, bag.sortButton:GetParent())
+      assert.is_true(bag.sortButton:IsVisible())
+      assert.is_true(bag.sortButton:GetFrameLevel() > bag.overlay:GetFrameLevel(), "over the frame above the content again")
+    end)
+
+    it("centers its title between the bag button and the close button, on either side", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      menuTheme()
+      -- The bag button reaches 28 in (12 out, 40 wide); the close takes its width less the pixel it sits past the edge.
+      local close = style.HEADER_BUTTON - 1
+      local p, rel, rp, x = bag.title:GetPoint(1)
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 28 }, { p, rel, rp, x })
+      assert.are.equal(bag:BodyWidth() - 28 - close, bag.title:GetWidth())
+      assert.are.equal("CENTER", bag.title:GetJustifyH())
+      p, rel, rp, x = bank.title:GetPoint(1)
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -28 }, { p, rel, rp, x })
+      assert.are.equal(bank:BodyWidth() - 28 - close, bank.title:GetWidth())
+    end)
+
+    it("lists the backpack's actions in its menu, Open Options Screen last, its toggles checked as they are", function()
+      local list
+      override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      menuTheme()
+      bag.menuButton:Open(ctx())
+      local names = {}
+      for i = 2, #list do
+        names[i - 1] = list[i].text
+      end
+      assert.are.same({ "Sort Bags", "Show Blizzard Bags", "Small Bags", "Open Options Screen" }, names)
+      assert.is_false(list[3].checked())
+      assert.are.equal(bag:IsSmall(), list[4].checked())
+    end)
+
+    it("draws its bag button again each time it shows (a vendor's portrait)", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      menuTheme()
+      local painted = 0
+      override(bag.menuButton, "Paint", function() painted = painted + 1 end)
+      bag:Hide(ctx())
+      finishTweens()
+      bag:Show(ctx())
+      assert.are.equal(1, painted)
     end)
   end)
 

@@ -539,6 +539,34 @@ describe("SonataNext", function()
     assert.are.same({}, sonataNext:Check("SidePin"))
   end)
 
+  -- A bag button holding the header's row (Header.Buttons.Menu, next-themes.md §19; docs/next-plain-theme.md, round
+  -- three): a corner of the body named by its side, its size, art in each layer, the panels it names.
+  it("names what is wrong with a bag button, by where it is", function()
+    if addon:GetModule("NextOrnaments", true) == nil then
+      ResetModuleStub("NextOrnaments", "next/ornaments.lua")
+      LoadBetterBagsModule("next/ornaments.lua")
+    end
+    sonataNext:RegisterTheme({ Name = "BadMenu", Header = { Buttons = { Menu = { Point = "MIDDLE", Anchor = "CENTER",
+      Layers = { { Alpha = 1 }, { Texture = "Interface\\Spec\\bag.png" } }, Panels = { Shop = { Layers = {} } } } } } })
+    local problems = sonataNext:Check("BadMenu")
+    table.sort(problems)
+    assert.are.same({
+      "Header.Buttons.Menu.Anchor: no corner named CENTER",
+      "Header.Buttons.Menu.Height: a bag button needs one",
+      "Header.Buttons.Menu.Layers[1]: draws nothing",
+      "Header.Buttons.Menu.Panels.Shop: no panel named Shop",
+      "Header.Buttons.Menu.Point: no corner named MIDDLE",
+      "Header.Buttons.Menu.Width: a bag button needs one",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "GoodMenu", Header = { Buttons = { Menu = { Point = "TOPINNER", Width = 40, Height = 40,
+      Layers = { { Texture = "Interface\\Spec\\bag.png" }, { Unit = "npc" } },
+      Panels = { Vendor = { Layers = { { Atlas = "x" }, { Alpha = 1 } } } } } } } })
+    assert.are.same({ "Header.Buttons.Menu.Panels.Vendor.Layers[2]: draws nothing" }, sonataNext:Check("GoodMenu"),
+      "a panel's own layers too")
+    sonataNext:RegisterTheme({ Name = "NowhereMenu", Header = { Buttons = { Menu = { Width = 40, Height = 40 } } } })
+    assert.are.same({ "Header.Buttons.Menu.Point: no corner named nil" }, sonataNext:Check("NowhereMenu"))
+  end)
+
   -- GW2_UI rewrites the client's fonts at PLAYER_LOGIN (docs/next-gw2-theme.md), after BetterBags copied some of
   -- them for its roles: once the game has started, a theme whose copies are stale is applied again, unsaved.
   describe("watching the client's fonts", function()

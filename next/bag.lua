@@ -81,17 +81,21 @@ function bagProto:GetHeaderButtons()
   return {
     -- Asked: "an X at the top right of the backpack to close it" (first: the screen edge).
     { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", tooltip = L:G("Open Options Screen"), menuLast = true,
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
     { key = "sortButton", tooltip = L:G("Sort Bags"),
       onClick = function(ctx) self:Sort(ctx) end },
     -- Show Blizzard Bags (asked: "the 'Switch to Classic Bags' icon now becomes 'Show Blizzard Bags'";
     -- docs/next-batch-2.md §4). The way back to the classic bags is in the settings and /bb next.
-    { key = "bagsButton", tooltipFunc = function() self:BagsTooltip() end,
+    { key = "bagsButton", tooltipFunc = function() self:BagsTooltip() end, label = L:G("Show Blizzard Bags"),
+      checked = function() return self:ShowsBlizzardBags() end,
+      menuTooltip = function() return L:G("Your bags in the tabs, to swap them, and your items bag by bag.") end,
       onClick = function(ctx) self:ToggleBlizzardBags(ctx) end },
     -- Small mode (docs/next-small-mode.md): every BetterBags Next panel full height or small and
     -- movable. Its icon is its state's (SizeIconKey).
     { key = "sizeButton", iconKey = self:SizeIconKey(), tooltipFunc = function() self:SizeTooltip() end,
+      label = L:G("Small Bags"), checked = function() return self:IsSmall() end,
+      menuTooltip = function() return L:G("Smaller bags you can move anywhere: drag a bag by its title.") end,
       onClick = function(ctx) nextPanel:SetSize(ctx, self:IsSmall() and "full" or "small") end },
   }
 end

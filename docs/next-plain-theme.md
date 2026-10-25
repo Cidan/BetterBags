@@ -310,3 +310,88 @@ icon, the search box) and the settings window (the General page, the Appearance 
 things the specs had not: the divider stretched across the header (the atlas fixture was stale, now checked by a spec),
 and the content's top measured on a window not built yet when a page restyled (`ContentTop`, now measured on UIParent's
 grid as `Metrics` is).
+
+## Round three: what testing in game found (2026-10-24, second pass)
+
+Asked, after round two ("this works well, we need to make a few tweaks here and there, but this is a much better base"):
+Plain at Default's scale; the category list misaligned; the page tabs running off; every item box white; no buttons in the
+bags' header but the close, their actions in a drop-down menu on the bag button in the corner as the original bags had,
+on the bank and the vendor too; the vendor's portrait on its button; the Search Rule box the wrong size and its art not
+where its clicks are. And: "don't change the proportions or layout of settings here -- keep it like we do in default,
+just, pass over with skin a bit."
+
+Read as: Plain draws Default's windows at Default's sizes, in Blizzard's art. The settings window goes back to Default's
+proportions and layout (1000 x 720, the sidebar, the header, two columns of rows, the footer) and is skinned; round two's
+keys for laying it out as Blizzard's settings window stay in the engine (§18 of next-themes.md), unused by Plain.
+
+### 1. Default's scale
+
+- **Fonts.** Plain copies the client's fonts outright (`Copy`), which kept their sizes: 10 to 12 where Default's roles are
+  11 to 26. `Copy` now takes the role's `Size` (its own, or inherited from Default), so every role is Blizzard's font
+  (file, flags, color, shadow) at Default's size. A role keeps the client's size with `Size = false`: the bag's title and
+  the settings window's name, which sit in Blizzard's title bar (20 tall), and the two roles whose Blizzard font is larger
+  than Default's (the settings list's headers, GameFontHighlightMedium; the settings sections, GameFontHighlightLarge).
+- **The bags.** Item buttons 44 (were 37, ContainerFrameItemButtonTemplate's), the gaps, padding, section headers and
+  spacing, the side tabs and the footer at Default's; what the frame's art fixes stays: the title in the title bar, the
+  search box (BagSearchBoxTemplate, 20 tall) and the content under it where the original bags put them, the close button.
+- **The controls.** Buttons, inputs, dropdowns, menus and tabs at Default's heights and widths, their art stretched to
+  them; the check box keeps its art's 30 x 29 (Default's switch is 36 x 18). The dropdown's and slider's steppers and the
+  slider's written value were Blizzard's settings layout and go with it: the dropdown is Default's 170 wide, the slider
+  Default's 120 with its number box.
+
+### 2. The category list
+
+Its rows ran from the sidebar's edge with their dots and the filter box flush against it: round two set the sidebar's
+`Pad` to 0 for Blizzard's list, and the Categories page's list takes its room from `Pad`. Default's 16 lines the filter,
+the dots and the names up again.
+
+### 3. The page tabs
+
+They hung on the window's top beside the search box (Blizzard's place) and ran under it. They go back under the header,
+as in Default, sitting on a line across the content column from the sidebar's edge to the frame's (edge to edge), in the
+tab outline's own color (the Options_Tab art: #dbdbdb at about a quarter strength, measured). The line stops under the
+chosen tab (`Controls.TopTabs.Line.Open`), so that tab opens onto the page below it as a tab on a pane, and the gap glides
+with the chosen tab. Tabs that do not fit their row give up padding, then cut their names short (any theme).
+
+### 4. The item boxes
+
+NextItemGrid painted the input's fill as its box. Plain's input fill is three pieces of the search border at its 20-pixel
+thickness, which on a plain texture painted the whole box white. The grid now reads its own `Fill`, `Edge` and `Frame`
+(`Controls.ItemGrid`, the input's when unset), and Plain frames it as Blizzard frames a multi-line edit box
+(InputScrollFrameTemplate: the Common-Input-Border pieces, 8 x 8 corners 5 outside the box, every client).
+
+### 5. The Search Rule box
+
+The text area painted the same 20-pixel strip in a box several times taller, so its art covered a strip of what takes its
+clicks. It reads `Controls.TextArea` (`Fill`, `FocusFill`, `Edge`, `Frame`; the input's when unset), and Plain frames it
+as InputScrollFrameTemplate, around the whole box.
+
+### 6. The bag button and its menu
+
+A theme can put its header's row in a menu (`Header.Buttons.Menu`): a button at a corner of the body, drawn from data
+(layers of art, a unit's portrait, a mask), whose left click opens the original bags' menu (`ContextMenu`, the same
+drop-down) listing the header buttons that are not pinned, in their order with Open Options Screen last: their names,
+check marks for the toggles, disabled as their buttons are, and their tooltips. Those buttons leave the header (they wait
+under a hidden frame, keeping whether the panel shows them), so the title is centered between the bag button and the
+close button. Plain's button is the original's (Bagslots2x, its gold glow under the pointer); on the vendor, the vendor's
+portrait in Bagslots2x's empty gold ring.
+
+### What was done, and how it was checked
+
+Every change above, each test first; the bank's and guild bank's menu entries and a name's width given back were found
+untested while listing mutations and got their tests. 58 mutations of the new guards: 53 were caught at once; of the five
+that survived, two led to tests (a bag button needs a corner; Plain's section titles as written), and three showed code
+that changed nothing and was removed (restoring the row's frame level after a new parent, which the client keeps since
+7.0.3, warcraft.wiki.gg Frame Strata; the row's width and its layout while it waits in the menu, which nothing reads).
+The 55 left are all caught.
+
+Drawn with the client's own textures from the specs' layout (the scratch preview tool) and looked at: the settings
+window's General page (the inset sidebar, Default's header, rows and footer, section titles as written) and a page with
+five tabs, a Search Rule box and an item box (the tabs on their line, open under the chosen one; both boxes in the edit
+box's frame); the backpack (the bag button in the corner, only the close in the header, the title centered between).
+
+Changed meaning: `Copy` font roles now take the role's `Size` (only Plain uses `Copy`); a pinned button's room counts its
+offset by its direction (no shipped theme pins one outward but Plain).
+
+Not yet seen in game: all of it. The vendor's portrait in its ring was only checked in the specs (the preview cannot draw
+a unit's portrait).
