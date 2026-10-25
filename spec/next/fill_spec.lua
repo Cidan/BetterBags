@@ -61,6 +61,19 @@ describe("NextFill", function()
       assert.is_false(texture:IsShown())
     end)
 
+    -- Blizzard's settings list (Blizzard_CategoryList.lua) draws its rows' art at the atlas's own size, centered
+    -- (Options_List_Active, useAtlasSize, anchored CENTER), and its headers' at their top left.
+    it("draws an atlas at its own size by its Point, and fills its region again after", function()
+      MockAtlas("Options_List_Active", 175, 20)
+      fill:Paint({ Atlas = "Options_List_Active", AtlasSize = true })
+      assert.are.same({ { "CENTER", frame, "CENTER", 0, 0 } }, points(texture))
+      assert.are.same({ 175, 20 }, { texture:GetSize() })
+      fill:Paint({ Atlas = "Options_List_Active", AtlasSize = true, Point = "TOPLEFT" })
+      assert.are.same({ { "TOPLEFT", frame, "TOPLEFT", 0, 0 } }, points(texture))
+      fill:Paint({ Atlas = "Options_List_Active" })
+      assert.are.same({ { "TOPLEFT", frame, "TOPLEFT", 0, 0 }, { "BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0 } }, points(texture))
+    end)
+
     -- Blizzard's dropdown background reaches 9 and 8 pixels past its button (WowStyle1DropdownTemplate).
     it("insets itself into its region, or reaches past it", function()
       fill:Paint({ Atlas = "common-dropdown-classic-textholder", Inset = { Left = -9, Top = -8, Right = -8, Bottom = -9 } })
@@ -122,6 +135,47 @@ describe("NextFill", function()
       assert.is_true(texture:GetHorizTile())
       assert.are.same({ { "TOPLEFT", fill.Begin, "TOPRIGHT", 0, 0 }, { "BOTTOMRIGHT", fill.End, "BOTTOMLEFT", 0, 0 } },
         points(texture))
+    end)
+
+    -- MinimalSliderTemplate exactly: every piece at its atlas's own height (useAtlasSize), the caps by LEFT and RIGHT,
+    -- the middle hung from the caps' tops.
+    it("draws each piece at its atlas's own thickness, the middle hung from the caps' tops", function()
+      MockAtlas("Minimal_SliderBar_Left", 11, 9)
+      MockAtlas("Minimal_SliderBar_Right", 11, 9)
+      MockAtlas("_Minimal_SliderBar_Middle", 32, 8, true, false)
+      fill:Paint({ Pieces = "Horizontal", Thickness = "Atlas", Begin = { Atlas = "Minimal_SliderBar_Left" },
+        Middle = { Atlas = "_Minimal_SliderBar_Middle" }, End = { Atlas = "Minimal_SliderBar_Right" } })
+      assert.are.same({ { "LEFT", frame, "LEFT", 0, 0 } }, points(fill.Begin))
+      assert.are.same({ 11, 9 }, { fill.Begin:GetSize() })
+      assert.are.same({ { "RIGHT", frame, "RIGHT", 0, 0 } }, points(fill.End))
+      assert.are.same({ { "TOPLEFT", fill.Begin, "TOPRIGHT", 0, 0 }, { "TOPRIGHT", fill.End, "TOPLEFT", 0, 0 } }, points(texture))
+      assert.are.equal(8, texture:GetHeight())
+    end)
+
+    -- MinimalTabTemplate: the caps by their bottom corners (BOTTOMLEFT, BOTTOMRIGHT), the middle hung from their tops.
+    it("aligns atlas-thick pieces by their bottoms when told", function()
+      MockAtlas("Options_Tab_Left", 10, 30)
+      MockAtlas("Options_Tab_Right", 10, 30)
+      MockAtlas("Options_Tab_Middle", 20, 30, true, false)
+      fill:Paint({ Pieces = "Horizontal", Thickness = "Atlas", Align = "BOTTOM", Begin = { Atlas = "Options_Tab_Left" },
+        Middle = { Atlas = "Options_Tab_Middle" }, End = { Atlas = "Options_Tab_Right" } })
+      assert.are.same({ { "BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0 } }, points(fill.Begin))
+      assert.are.same({ { "BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0 } }, points(fill.End))
+      assert.are.same({ { "TOPLEFT", fill.Begin, "TOPRIGHT", 0, 0 }, { "TOPRIGHT", fill.End, "TOPLEFT", 0, 0 } }, points(texture))
+    end)
+
+    it("draws each piece down at its atlas's own thickness too", function()
+      MockAtlas("top", 8, 4)
+      MockAtlas("bottom", 8, 4)
+      MockAtlas("middle", 6, 16, false, true)
+      fill:Paint({ Pieces = "Vertical", Thickness = "Atlas", Begin = { Atlas = "top" }, Middle = { Atlas = "middle" },
+        End = { Atlas = "bottom" } })
+      assert.are.same({ { "TOP", frame, "TOP", 0, 0 } }, points(fill.Begin))
+      assert.are.same({ 8, 4 }, { fill.Begin:GetSize() })
+      assert.are.same({ { "BOTTOM", frame, "BOTTOM", 0, 0 } }, points(fill.End))
+      assert.are.same({ { "TOPLEFT", fill.Begin, "BOTTOMLEFT", 0, 0 }, { "BOTTOMLEFT", fill.End, "TOPLEFT", 0, 0 } },
+        points(texture))
+      assert.are.equal(6, texture:GetWidth())
     end)
 
     -- MinimalScrollBar's track: top, a middle tiled down, bottom.

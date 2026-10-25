@@ -336,6 +336,18 @@ describe("NextSettingsPage", function()
     assert.are.equal(2, shown, "one between the two lines, one between the columns of the pair")
   end)
 
+  -- The Plain theme (docs/next-plain-theme.md): Blizzard's settings rows have no lines between them.
+  it("draws no line for a theme without a divider", function()
+    UseNextTheme({ Settings = { Content = { Divider = false } } })
+    local page = nextPage:Create(parent)
+    page:SetSections({ { title = "Order", rows = { fakeRow(44), fakeRow(44), fakeRow(44) } } })
+    layout(page, 760)
+    for _, line in ipairs(page.lines) do
+      assert.is_false(line:IsShown())
+    end
+    UseNextTheme(nil)
+  end)
+
   it("tells its rows when the page is left (a theme preview ends)", function()
     local page = nextPage:Create(parent)
     local a = fakeRow(44)

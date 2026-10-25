@@ -130,7 +130,7 @@ end
 function gridProto:Style()
   local K, I = controls:Theme("ItemGrid"), controls:Theme("Input")
   controls:Paint(self.fill, I.Fill)
-  controls:PaintEdge(self.edge, I.Edge, I.Edge.Idle)
+  controls:PaintEdge(self.edge, I.Edge, I.Edge and I.Edge.Idle or nil)
   style:SetFont(self.empty, K.EmptyFont)
   for _, cell in ipairs(self.cells) do
     style:SetFont(cell.count, K.CountFont)

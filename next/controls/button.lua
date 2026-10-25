@@ -160,7 +160,9 @@ function buttonProto:Paint()
   controls:Paint(self.fill, fill)
   controls:Paint(self.highlight, lit and look.Highlight or false)
   controls:PaintEdge(self.edge, lit and look.HoverEdge or look.Edge)
-  style:SetFont(self.label, (lit and look.HoverFont) or look.Font)
+  -- Disabled: its style's DisabledFont (Blizzard's buttons: GameFontDisable).
+  local enabled = self.frame:IsEnabled()
+  style:SetFont(self.label, (not enabled and look.DisabledFont) or (lit and look.HoverFont) or look.Font)
   -- The hover font can be another size: centered again.
   self:Fit()
 end

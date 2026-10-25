@@ -2105,6 +2105,15 @@ clientFont("GameFontBlack", "Fonts\\FRIZQT__.TTF", 12, "", { 0, 0, 0 }, false)
 -- GameFontNormalHuge inherits SystemFont_Shadow_Huge1 (FRIZQT__ 20, black shadow) in gold.
 clientFont("GameFontNormalHuge", "Fonts\\FRIZQT__.TTF", 20, "", NORMAL, true)
 clientFont("Number12Font", "Fonts\\ARIALN.TTF", 12, "", WHITE, false)
+-- The Plain theme's (docs/next-plain-theme.md), from Blizzard_Fonts_Shared/Shared/FontStyles.xml (every client):
+-- GameFontHighlightMedium inherits SystemFont_Shadow_Med3 (FRIZQT__ 14, black shadow 1 down and right, Fonts.xml) in
+-- white; GameFontHighlightLarge and GameFontHighlightHuge are GameFontNormalLarge and GameFontNormalHuge in white;
+-- GameFontRed and GameFontRedSmall are GameFontNormal and GameFontNormalSmall in red (1, 0.1, 0.1).
+clientFont("GameFontHighlightMedium", "Fonts\\FRIZQT__.TTF", 14, "", WHITE, true)
+clientFont("GameFontHighlightLarge", "Fonts\\FRIZQT__.TTF", 16, "", WHITE, true)
+clientFont("GameFontHighlightHuge", "Fonts\\FRIZQT__.TTF", 20, "", WHITE, true)
+clientFont("GameFontRed", "Fonts\\FRIZQT__.TTF", 12, "", { 1, 0.1, 0.1 }, true)
+clientFont("GameFontRedSmall", "Fonts\\FRIZQT__.TTF", 10, "", { 1, 0.1, 0.1 }, true)
 clientFont("NumberFontNormalRight", "Fonts\\ARIALN.TTF", 14, "OUTLINE", WHITE, false):SetJustifyH("RIGHT")
 
 -- Mixin(object, ...) copies every key of each mixin into object (Blizzard_SharedXMLBase).

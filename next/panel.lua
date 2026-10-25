@@ -1008,6 +1008,20 @@ function panelProto:headerButtonsWidth()
   return shown * style.HEADER_BUTTON + math.max(0, shown - 1) * style.HEADER_BUTTON_GAP
 end
 
+-- headerRoom is how much of the title's row the header buttons take from its outer side: Pad, the row and the pinned
+-- buttons; or, for a theme whose row starts past its pinned buttons (Header.Buttons.RowStart: Blizzard's close in the
+-- corner, the others beside it), the row from there or the pinned buttons, whichever reaches further in.
+---@private
+---@return number
+function panelProto:headerRoom()
+  local start = style.Theme.Header.Buttons.RowStart
+  local row = self:headerButtonsWidth()
+  if start ~= nil then
+    return math.max(row > 0 and (start + row) or 0, self:pinnedRoom(), style.PAD)
+  end
+  return style.PAD + row + self:pinnedRoom()
+end
+
 -- RailGap is the room between the buttons down the side rail: its own Gap, else the header's.
 ---@private
 ---@return number
@@ -1039,7 +1053,7 @@ end
 ---@return number
 function panelProto:MinWidth()
   local pads = style.PAD + self:InnerPad()
-  local header = pads + style.TITLE_INSET + self:headerButtonsWidth() + self:pinnedRoom() + 12 + style.Small.MinTitle
+  local header = self:InnerPad() + style.TITLE_INSET + self:headerRoom() + 12 + style.Small.MinTitle
   local money = self.moneyFrame ~= nil and self.moneyFrame.frame:GetWidth() or 0
   local footer = pads + style.TITLE_INSET + self.freeText:GetStringWidth() + 12 + money
   local column = pads + style.GUTTER + self.content:CellWidth()
@@ -2940,10 +2954,12 @@ function panelProto:LayoutHeader()
     end
     if button:IsShown() and pinnedOf(button) == nil then
       if previous == nil then
+        -- From the outer side: Pad in, or RowStart (past the pinned buttons, headerRoom).
+        local start = style.Theme.Header.Buttons.RowStart or style.PAD
         if left then
-          pixel:Point(button, "TOPLEFT", body, "TOPLEFT", style.PAD, -style.HEADER_BUTTON_TOP)
+          pixel:Point(button, "TOPLEFT", body, "TOPLEFT", start, -style.HEADER_BUTTON_TOP)
         else
-          pixel:Point(button, "TOPRIGHT", body, "TOPRIGHT", -style.PAD, -style.HEADER_BUTTON_TOP)
+          pixel:Point(button, "TOPRIGHT", body, "TOPRIGHT", -start, -style.HEADER_BUTTON_TOP)
         end
       elseif left then
         pixel:Point(button, "TOPLEFT", previous, "TOPRIGHT", style.HEADER_BUTTON_GAP, 0)
@@ -3001,7 +3017,7 @@ function panelProto:FitTitle()
   -- Kept: the title's own width cannot be read back while it shows a secret (titleWidth), and only a title cut
   -- short (the vendor's, at both sizes) ever shows one.
   self.titleCut = pixel:Length(title, math.max(1, self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
-    - (style.PAD + self:headerButtonsWidth()) - self:pinnedRoom() - 12))
+    - self:headerRoom() - 12))
   title:SetWidth(self.titleCut)
   self:placeTitleRow()
 end
@@ -3165,9 +3181,12 @@ function panelProto:UpdateSearchLook(now)
       self.searchFill:SetVertexColor(style:RGBA(fill))
     end
   end
+  -- Holding a search: its ActiveColor when it has one (Blizzard's magnifier is white then, SearchBoxTemplate).
   local icon, I = self.searchBox.textBox.searchIcon, S.Icon
   if focused then
     icon:SetVertexColor(style:RGBA(I.FocusColor))
+  elseif I.ActiveColor and self.searchBox.textBox:GetText() ~= "" then
+    icon:SetVertexColor(style:RGBA(I.ActiveColor))
   else
     icon:SetVertexColor(style:RGBA(I.Color, state == "idle" and I.Idle or I.Active))
   end

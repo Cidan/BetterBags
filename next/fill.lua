@@ -71,13 +71,13 @@ end
 
 -- piece draws one piece of a pieced fill: its own art (Atlas, or Texture with TexCoords), else the fill's, tinted by
 -- the fill's Color at alpha, tiled as its atlas says (C_Texture.GetAtlasInfo) or as told (HorizTile, VertTile). It
--- returns the piece's own size along the fill (Size, else its atlas's).
+-- returns the piece's own size along the fill (Size, else its atlas's) and its atlas's thickness across it.
 ---@param texture Texture
 ---@param spec table The fill.
 ---@param own table The piece.
 ---@param alpha? number
 ---@param across boolean
----@return number?
+---@return number? length, number? thickness
 local function piece(texture, spec, own, alpha, across)
   local art = { Color = spec.Color, BlendMode = spec.BlendMode, Desaturated = spec.Desaturated, TexCoords = own.TexCoords,
     HorizTile = own.HorizTile, VertTile = own.VertTile }
@@ -89,23 +89,59 @@ local function piece(texture, spec, own, alpha, across)
     art.Atlas, art.Texture = spec.Atlas, spec.Texture
   end
   style:Paint(texture, art, alpha or spec.Alpha)
-  local size = own.Size
+  local size, thickness = own.Size, nil
   if art.Atlas ~= nil then
     local info = C_Texture.GetAtlasInfo(art.Atlas)
     if info ~= nil then
       texture:SetHorizTile(info.tilesHorizontally == true)
       texture:SetVertTile(info.tilesVertically == true)
       size = size or (across and info.width or info.height)
+      thickness = across and info.height or info.width
     end
   end
   texture:Show()
-  return size
+  return size, thickness
+end
+
+-- atlasPieces places a pieced fill whose pieces are each as thick as their atlas (Thickness = "Atlas"), as
+-- MinimalSliderTemplate does: the caps by their middles (LEFT and RIGHT, or TOP and BOTTOM), centered between the
+-- insets, the middle hung from the caps' tops (or left edges) at its own thickness. Align = "BOTTOM" puts a horizontal
+-- fill's caps by their bottom corners instead (MinimalTabTemplate).
+---@private
+function fillProto:atlasPieces(begin, finish, beginSize, endSize, beginThick, endThick, middleThick, across, left,
+                               right, top, bottom, align)
+  local texture, region = self.texture, self.region
+  if across then
+    if align == "BOTTOM" then
+      begin:SetPoint("BOTTOMLEFT", region, "BOTTOMLEFT", left, bottom)
+      finish:SetPoint("BOTTOMRIGHT", region, "BOTTOMRIGHT", -right, bottom)
+    else
+      local y = (bottom - top) / 2
+      begin:SetPoint("LEFT", region, "LEFT", left, y)
+      finish:SetPoint("RIGHT", region, "RIGHT", -right, y)
+    end
+    pixel:Size(begin, beginSize or 0, beginThick or 0)
+    pixel:Size(finish, endSize or 0, endThick or 0)
+    texture:SetPoint("TOPLEFT", begin, "TOPRIGHT", 0, 0)
+    texture:SetPoint("TOPRIGHT", finish, "TOPLEFT", 0, 0)
+    pixel:Height(texture, middleThick or 0)
+  else
+    local x = (left - right) / 2
+    begin:SetPoint("TOP", region, "TOP", x, -top)
+    finish:SetPoint("BOTTOM", region, "BOTTOM", x, bottom)
+    pixel:Size(begin, beginThick or 0, beginSize or 0)
+    pixel:Size(finish, endThick or 0, endSize or 0)
+    texture:SetPoint("TOPLEFT", begin, "BOTTOMLEFT", 0, 0)
+    texture:SetPoint("BOTTOMLEFT", finish, "TOPLEFT", 0, 0)
+    pixel:Width(texture, middleThick or 0)
+  end
 end
 
 -- Paint draws spec (false or nil: nothing): a color or texture spec filling the region (NextStyle:Paint), inset into
--- it (Inset: Left, Right, Top, Bottom; negative reaches past it); or pieced (Pieces = "Horizontal" or "Vertical"):
--- Begin, Middle and End, each its own Atlas or Texture with TexCoords (else the fill's), the caps Size long (else
--- their atlas's), all Thickness thick and centered (else the region's), tinted by the fill's Color and alpha.
+-- it (Inset: Left, Right, Top, Bottom; negative reaches past it), or at its atlas's own size by its Point (AtlasSize,
+-- Point: CENTER when unset, X, Y); or pieced (Pieces = "Horizontal" or "Vertical"): Begin, Middle and End, each its own
+-- Atlas or Texture with TexCoords (else the fill's), the caps Size long (else their atlas's), all Thickness thick and
+-- centered (else the region's; "Atlas": each piece its atlas's, atlasPieces), tinted by the fill's Color and alpha.
 ---@param spec? table|false
 ---@param alpha? number
 function fillProto:Paint(spec, alpha)
@@ -127,8 +163,19 @@ function fillProto:Paint(spec, alpha)
     end
     style:Paint(texture, spec, alpha or spec.Alpha)
     texture:ClearAllPoints()
-    texture:SetPoint("TOPLEFT", region, "TOPLEFT", left, -top)
-    texture:SetPoint("BOTTOMRIGHT", region, "BOTTOMRIGHT", -right, bottom)
+    -- AtlasSize: the atlas at its own size by its Point (Blizzard's useAtlasSize), else filling the region.
+    local width, height = nil, nil
+    if spec.AtlasSize then
+      width, height = style:AtlasSize(spec.Atlas)
+    end
+    if width ~= nil then
+      local point = spec.Point or "CENTER"
+      pixel:Point(texture, point, region, point, spec.X or 0, spec.Y or 0)
+      pixel:Size(texture, width, height)
+    else
+      texture:SetPoint("TOPLEFT", region, "TOPLEFT", left, -top)
+      texture:SetPoint("BOTTOMRIGHT", region, "BOTTOMRIGHT", -right, bottom)
+    end
     texture:Show()
     return
   end
@@ -137,13 +184,18 @@ function fillProto:Paint(spec, alpha)
   end
   local across = spec.Pieces == "Horizontal"
   local begin, finish = self:caps()
-  local beginSize = piece(begin, spec, spec.Begin or {}, alpha, across)
-  local endSize = piece(finish, spec, spec.End or {}, alpha, across)
-  piece(texture, spec, spec.Middle or {}, alpha, across)
+  local beginSize, beginThick = piece(begin, spec, spec.Begin or {}, alpha, across)
+  local endSize, endThick = piece(finish, spec, spec.End or {}, alpha, across)
+  local _, middleThick = piece(texture, spec, spec.Middle or {}, alpha, across)
   begin:ClearAllPoints()
   finish:ClearAllPoints()
   texture:ClearAllPoints()
   local thickness = spec.Thickness
+  if thickness == "Atlas" then
+    self:atlasPieces(begin, finish, beginSize, endSize, beginThick, endThick, middleThick, across, left, right, top,
+      bottom, spec.Align)
+    return
+  end
   if across then
     if thickness ~= nil then
       -- Centered on the region's height inside its insets, as Blizzard anchors its caps by LEFT and RIGHT.

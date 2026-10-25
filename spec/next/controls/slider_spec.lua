@@ -147,6 +147,19 @@ describe("NextSlider", function()
     assert.are.same({ slider.track, -math.floor((S().Height - S().TrackSize) / 2) }, { rel, y })
   end)
 
+  -- MinimalSliderTemplate's thumb: Minimal_SliderBar_Button at its atlas size (useAtlasSize).
+  it("draws its thumb at its atlas's size", function()
+    ResetMockAtlases()
+    MockAtlas("Minimal_SliderBar_Button", 20, 19)
+    UseNextTheme({ Controls = { Slider = { ThumbSize = "Atlas",
+      Thumb = { Atlas = "Minimal_SliderBar_Button", Color = "White", Alpha = 1 },
+      ThumbHover = { Atlas = "Minimal_SliderBar_Button", Color = "White", Alpha = 1 } } } })
+    local slider = make()
+    assert.are.same({ 20, 19 }, { slider.thumb:GetSize() })
+    assert.are.equal(math.floor((S().Width - 20) * 0.6 + 0.5), thumbX(slider))
+    ResetMockAtlases()
+  end)
+
   it("is restyled, every slider made, by a theme", function()
     local slider = make()
     UseNextTheme({ Controls = { Slider = { Width = 200, Fill = { Color = "Lavender", Alpha = 1 } } } })

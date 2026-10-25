@@ -582,6 +582,27 @@ describe("BetterBags Next's panels and themes", function()
   -- in the same style"; "these buttons should be colorable via themes, and even replacable with custom
   -- art"). A tint suits a white glyph and darkens full-color art into a silhouette (asked with a
   -- Parchment screenshot), so a theme's own art says which it is (Glyph = false: art).
+  -- The Plain theme (docs/next-plain-theme.md): Blizzard's close button sits in the window's top corner; the other
+  -- header buttons go in the title bar beside it, the row starting RowStart in from the outer edge.
+  describe("a header row starting past a pinned button (RowStart)", function()
+    it("starts the row RowStart in, and leaves the title the room the row and the pins take, once", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      apply({ Header = { Title = { Font = "Title", Justify = "CENTER" }, Buttons = { RowStart = 30,
+        Pinned = { closeButton = { Point = "TOPOUTER", X = 1, Y = 0 } } } } })
+      local first
+      for _, button in ipairs(bag.headerButtons) do
+        if button:IsShown() and button ~= bag.closeButton then
+          first = first or button
+        end
+      end
+      local point, rel, relPoint, x = first:GetPoint(1)
+      assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -30 }, { point, rel, relPoint, x })
+      local inset = bag:InnerPad() + style.TITLE_INSET
+      local room = 30 + bag:headerButtonsWidth()
+      assert.are.equal(bag:BodyWidth() - inset - room - 12, bag.title:GetWidth())
+    end)
+  end)
+
   -- The Plain theme (docs/next-plain-theme.md): Blizzard centers a window's title in the room its buttons leave
   -- (PortraitFrameBaseTemplate's TitleContainer). Its click area and glow follow the text where it is drawn.
   describe("a centered title", function()
@@ -1056,6 +1077,29 @@ describe("BetterBags Next's panels and themes", function()
   end)
 
   describe("the search box", function()
+    -- Blizzard's magnifier is gray only while the box is empty and not typed in, white while it holds a search or is
+    -- typed in (SearchBoxTemplate_OnEditFocusLost and OnEditFocusGained, InputBoxTemplates.lua).
+    it("draws its magnifier in ActiveColor while it holds a search", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Palette = { Gray = { 0.6, 0.6, 0.6, 1 } },
+        Search = { Icon = { Color = "Gray", Idle = 1, Active = 1, FocusColor = "White", ActiveColor = "White" } } })
+      local t = bag.searchBox.textBox
+      local icon = t.searchIcon
+      assert.are.same({ 0.6, 0.6, 0.6, 1 }, { icon:GetVertexColor() }, "idle")
+      t:GetScript("OnEnter")(t)
+      assert.are.same({ 0.6, 0.6, 0.6, 1 }, { icon:GetVertexColor() }, "under the pointer, empty")
+      t:GetScript("OnLeave")(t)
+      t:SetText("potion")
+      t:GetScript("OnTextChanged")(t)
+      assert.are.same({ 1, 1, 1, 1 }, { icon:GetVertexColor() }, "holding a search")
+      t:GetScript("OnEnter")(t)
+      assert.are.same({ 1, 1, 1, 1 }, { icon:GetVertexColor() }, "holding a search, under the pointer")
+      t:GetScript("OnLeave")(t)
+      t:SetText("")
+      t:GetScript("OnTextChanged")(t)
+      assert.are.same({ 0.6, 0.6, 0.6, 1 }, { icon:GetVertexColor() }, "empty again")
+    end)
+
     -- The Plain theme (docs/next-plain-theme.md): Blizzard's own bag search box (BagSearchBoxTemplate's border,
     -- InputBoxVisualTemplate), not Next's fill and edges.
     it("keeps its template's own border for a theme that says so, and Next's look for one that does not", function()

@@ -45,7 +45,7 @@ describe("BetterBags Next's shipped themes", function()
   end
 
   it("ships Default and at least three others", function()
-    assert.are.same({ "Default", "Ember", "GW2", "Parchment", "Quiet" }, shipped())
+    assert.are.same({ "Default", "Ember", "GW2", "Parchment", "Plain", "Quiet" }, shipped())
   end)
 
   it("resolves every one on every client and finds nothing it does not define", function()
@@ -134,9 +134,18 @@ describe("BetterBags Next's shipped themes", function()
       for _, key in ipairs(shipped()) do
         local t = sonataNext:Resolve(key)
         local L, V = t.Layout, t.Vendor
-        local name = t.Fonts[V.NameFont].Size
+        -- A role's size: a client font's own when it copies one outright (Copy), else its Size.
+        local function sizeOf(role)
+          local spec = t.Fonts[role]
+          if spec.Copy ~= nil then
+            local _, size = _G[spec.Copy]:GetFont()
+            return size
+          end
+          return spec.Size
+        end
+        local name = sizeOf(V.NameFont)
         for _, role in ipairs({ V.PriceFont, V.UnaffordableFont }) do
-          local size = t.Fonts[role].Size
+          local size = sizeOf(role)
           assert.is_true(2 * name + size + L.VendorPriceRaise <= L.Icon, key .. " " .. role .. " on " .. client)
           assert.is_true(V.CoinSize <= size + 1, key .. " coins no taller than the price")
         end

@@ -43,6 +43,7 @@ local nextDropdown = addon:NewModule('NextDropdown')
 ---@field text FontString
 ---@field chevron Texture
 ---@field hovered boolean
+---@field pressed? boolean Pressed under the pointer (its arrow's Pressed art).
 ---@field opts NextDropdownOptions
 local dropdownProto = {}
 addon:GetModule('Perf'):RegisterPrototype(dropdownProto, 'NextDropdownFrame')
@@ -79,6 +80,9 @@ function nextDropdown:Create(parent, opts)
   addon.SetScript(frame, "OnClick", function(ctx) d:Click(ctx) end)
   addon.SetScript(frame, "OnEnter", function() d:SetHovered(true) end)
   addon.SetScript(frame, "OnLeave", function() d:SetHovered(false) end)
+  -- Pressed: its arrow's Pressed art (Blizzard's pressedhover).
+  addon.SetScript(frame, "OnMouseDown", function() d.pressed = true d:Paint() end)
+  addon.SetScript(frame, "OnMouseUp", function() d.pressed = false d:Paint() end)
   table.insert(self.all, d)
   sonataNext:RegisterWidget(self)
   d:Style()
@@ -87,38 +91,86 @@ function nextDropdown:Create(parent, opts)
 end
 
 -- Style lays the dropdown out in whole pixels (docs/next-pixel-perfect.md): the chevron the padding in
--- from the right, the choice from the left up to it, each centered on its height by its top.
+-- from the right (or by its right at its Point, Blizzard's arrow), the choice from the left up to it, justified as
+-- the theme says, each centered on its height by its top. Disabled, it is drawn at DisabledAlpha (the buttons'
+-- when unset).
 function dropdownProto:Style()
   local D = controls:Theme("Dropdown")
   local frame = self.frame
   pixel:Size(frame, self.opts.width or D.Width, D.Height)
-  style:SetFont(self.text, D.Font)
-  local chevron = D.Chevron
+  self.text:SetJustifyH(D.Justify or "LEFT")
   local height, pad = frame:GetHeight(), pixel:Length(frame, D.Padding)
-  pixel:Size(self.chevron, chevron.Size, chevron.Size)
-  self.chevron:ClearAllPoints()
-  pixel:Row(self.chevron, "TOPRIGHT", frame, pad, height)
-  controls:Paint(self.chevron, { Texture = chevron.Texture, Color = chevron.Color })
+  self:paintChevron()
   self.text:ClearAllPoints()
   pixel:Row(self.text, "TOPLEFT", frame, pad, height)
-  pixel:Row(self.text, "TOPRIGHT", frame, pad + self.chevron:GetWidth() + pixel:Floor(frame, pad / 2), height)
-  frame:SetAlpha(frame:IsEnabled() and 1 or controls:Theme("Button").DisabledAlpha)
+  local point = D.Chevron.Point
+  local right = point and (self.chevron:GetWidth() - pixel:Snap(frame, point.X or 0)) or (pad + self.chevron:GetWidth())
+  pixel:Row(self.text, "TOPRIGHT", frame, right + pixel:Floor(frame, pad / 2), height)
+  local disabledAlpha = D.DisabledAlpha or controls:Theme("Button").DisabledAlpha
+  frame:SetAlpha(frame:IsEnabled() and 1 or disabledAlpha)
   self:Paint()
 end
 
--- Paint draws the fill and edge: open, under the pointer, or idle.
+-- chevronArt returns the art the chevron draws now: its Disabled art while disabled, Open while its menu is open,
+-- Pressed while pressed under the pointer, Hover under the pointer, else its own (Blizzard's dropdown arrow:
+-- GetWowStyle1ArrowButtonState). A state without art draws the chevron's own.
+---@private
+---@return table
+function dropdownProto:chevronArt()
+  local C = controls:Theme("Dropdown").Chevron
+  local frame = self.frame
+  if not frame:IsEnabled() then
+    return C.Disabled or C
+  end
+  if nextMenu:IsOpenFor(frame) and C.Open then
+    return C.Open
+  end
+  if self.hovered and self.pressed and C.Pressed then
+    return C.Pressed
+  end
+  if self.hovered and C.Hover then
+    return C.Hover
+  end
+  return C
+end
+
+-- paintChevron draws the chevron for its state, at its Size (or its art's atlas size, Size = "Atlas"), placed by its
+-- right at Point from the dropdown's right edge, or the padding in from the right and centered by its top.
+---@private
+function dropdownProto:paintChevron()
+  local D = controls:Theme("Dropdown")
+  local C, frame = D.Chevron, self.frame
+  local art = self:chevronArt()
+  local width, height = style:SizeOf(C, art, 12)
+  pixel:Size(self.chevron, width, height)
+  self.chevron:ClearAllPoints()
+  if C.Point then
+    pixel:Point(self.chevron, "RIGHT", frame, "RIGHT", C.Point.X or 0, C.Point.Y or 0)
+  else
+    pixel:Row(self.chevron, "TOPRIGHT", frame, pixel:Length(frame, D.Padding), frame:GetHeight())
+  end
+  -- A glyph, or an atlas (Blizzard's dropdown arrow).
+  controls:Paint(self.chevron, { Texture = art.Texture or (not art.Atlas and C.Texture) or nil, Atlas = art.Atlas,
+    Color = art.Color or C.Color })
+end
+
+-- Paint draws the fill and edge: open, under the pointer, or idle; at NarrowWidth or less its NarrowFill in every
+-- state (Classic's narrow dropdown art). Its chevron for its state, and its text in its DisabledFont while
+-- disabled.
 function dropdownProto:Paint()
   local D = controls:Theme("Dropdown")
   local open = nextMenu:IsOpenFor(self.frame)
   local lit = self.hovered and self.frame:IsEnabled()
-  controls:Paint(self.fill, (open and D.OpenFill) or (lit and D.HoverFill) or D.Fill)
-  local strength = D.Edge.Idle
-  if open then
-    strength = D.Edge.Open
-  elseif lit then
-    strength = D.Edge.Hover
+  local narrow = D.NarrowFill and D.NarrowWidth and self.frame:GetWidth() <= D.NarrowWidth
+  controls:Paint(self.fill, (narrow and D.NarrowFill) or (open and D.OpenFill) or (lit and D.HoverFill) or D.Fill)
+  self:paintChevron()
+  style:SetFont(self.text, (not self.frame:IsEnabled() and D.DisabledFont) or D.Font)
+  -- A theme may draw no edge (Edge = false: Blizzard's dropdown border is its fill).
+  local E, strength = D.Edge, nil
+  if E then
+    strength = (open and E.Open) or (lit and E.Hover) or E.Idle
   end
-  controls:PaintEdge(self.edge, D.Edge, strength)
+  controls:PaintEdge(self.edge, E, strength)
 end
 
 -- Refresh shows the choice made, nothing for none.
@@ -181,5 +233,8 @@ end
 ---@param hovered boolean
 function dropdownProto:SetHovered(hovered)
   self.hovered = hovered
+  if not hovered then
+    self.pressed = false
+  end
   self:Paint()
 end

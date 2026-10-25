@@ -18,6 +18,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
 -- NextTopTabs is the row of tabs across a settings page (next-settings.md §2), drawn from the theme
 -- (Controls.TopTabs): labels left to right, Gap apart, the chosen one in its font and underlined by a
 -- marker that glides to the tab chosen, over a line under them all.
@@ -90,7 +93,12 @@ function tabsProto:tab(i)
   local frame = CreateFrame("Button", nil, self.frame)
   frame:RegisterForClicks("LeftButtonUp")
   local label = frame:CreateFontString(nil, "OVERLAY")
-  tab = { frame = frame, label = label, hovered = false }
+  -- The tab's own art (Fill, HoverFill, SelectedFill: Blizzard's MinimalTab), behind its label.
+  local fill = frame:CreateTexture(nil, "BACKGROUND")
+  fill:SetAllPoints(frame)
+  fill:Hide()
+  fills:Wrap(fill, frame)
+  tab = { frame = frame, label = label, fill = fill, hovered = false }
   style:SetFont(label, controls:Theme("TopTabs").Font)
   addon.SetScript(frame, "OnClick", function(ctx) self:Click(ctx, tab) end)
   addon.SetScript(frame, "OnEnter", function() tab.hovered = true self:Paint() end)
@@ -130,11 +138,14 @@ function tabsProto:Style()
   self.line:ClearAllPoints()
   self.line:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
   self.line:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
-  pixel:Height(self.line, T.Line.Size or 1)
+  -- A theme may draw no line under the tabs and no marker under the chosen one (false: Blizzard's tabs, MinimalTab,
+  -- show the chosen one in their own art).
+  pixel:Height(self.line, T.Line and T.Line.Size or 1)
   controls:Paint(self.line, T.Line)
-  pixel:Height(self.marker, T.Indicator.Height)
+  local marker = T.Indicator
+  pixel:Height(self.marker, marker and marker.Height or 1)
   -- Art when the indicator names some, else its color.
-  controls:Paint(self.marker, style:IsArt(T.Indicator) and T.Indicator or { Color = T.Indicator.Color })
+  controls:Paint(self.marker, marker and (style:IsArt(marker) and marker or { Color = marker.Color }) or false)
   local gap = pixel:Snap(frame, T.Gap)
   local previous
   for i = 1, #self.list do
@@ -153,23 +164,32 @@ function tabsProto:Style()
   self:Mark(x, width)
 end
 
--- Paint gives each tab its font (and its width, the label's, which the font sets): chosen, under the
+-- Paint gives each tab its font (and its width, the label's, which the font sets) and its art: chosen, under the
 -- pointer, or neither.
 function tabsProto:Paint()
   local T = controls:Theme("TopTabs")
   for i = 1, #self.list do
     local tab = self.tabs[i]
-    local font = T.Font
-    if tab.id == self.selected then
-      font = T.SelectedFont
+    local chosen = tab.id == self.selected
+    local font, art = T.Font, T.Fill
+    if chosen then
+      font, art = T.SelectedFont, T.SelectedFill or T.Fill
     elseif tab.hovered then
-      font = T.HoverFont
+      font, art = T.HoverFont, T.HoverFill or T.Fill
     end
     style:SetFont(tab.label, font)
-    -- As wide as its label rounded up to whole pixels, the label by its top left, centered on its height.
-    tab.frame:SetWidth(pixel:Ceil(tab.frame, tab.label:GetStringWidth()))
+    controls:Paint(tab.fill, art or false)
+    -- As wide as its label rounded up to whole pixels and Padding either side; the label by its top left, centered on
+    -- its height, or by its bottom TextBottom above the tab's (SelectedTextBottom when chosen: Blizzard's MinimalTab).
+    local pad = pixel:Snap(tab.frame, T.Padding or 0)
+    tab.frame:SetWidth(pixel:Ceil(tab.frame, tab.label:GetStringWidth()) + 2 * pad)
     tab.label:ClearAllPoints()
-    pixel:Row(tab.label, "TOPLEFT", tab.frame, 0, pixel:Length(tab.frame, T.Height))
+    local raise = chosen and (T.SelectedTextBottom or T.TextBottom) or T.TextBottom
+    if raise ~= nil then
+      pixel:Point(tab.label, "BOTTOM", tab.frame, "BOTTOM", 0, raise)
+    else
+      pixel:Row(tab.label, "TOPLEFT", tab.frame, pad, pixel:Length(tab.frame, T.Height))
+    end
   end
 end
 
@@ -199,7 +219,8 @@ function tabsProto:Mark(x, width)
   self.marker:ClearAllPoints()
   self.marker:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", x, 0)
   self.marker:SetWidth(math.max(1, width))
-  self.marker:SetShown(width > 0)
+  local marker = controls:Theme("TopTabs").Indicator
+  self.marker:SetShown(width > 0 and marker ~= nil and marker ~= false)
 end
 
 -- Select chooses a tab, its marker gliding there with animate, calling nothing back.

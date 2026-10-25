@@ -213,6 +213,86 @@ describe("NextMenu, themed", function()
     nextMenu:ApplyStyle()
     assert.is_false(nextMenu.border:IsShown(), "a theme without one")
   end)
+
+  -- Blizzard's menus inset their list unevenly (MenuStyle1Mixin:GetInset: 8, 8, 8 and 15 on retail).
+  it("insets its list by its Inset on each side, sized round it", function()
+    UseNextTheme({ Controls = { Menu = { Padding = 4, ItemHeight = 20, Inset = { Left = 8, Top = 8, Right = 9, Bottom = 15 } } } })
+    nextMenu:Open(anchor, { items = { { text = "One", value = 1 }, { text = "Two", value = 2 } }, onPick = function() end })
+    local frame, box = nextMenu.frame, nextMenu.box
+    assert.are.same({ "TOPLEFT", frame, "TOPLEFT", 8, -8 }, { box:GetPoint(1) })
+    assert.are.same({ "BOTTOMRIGHT", frame, "BOTTOMRIGHT", -9, 15 }, { box:GetPoint(2) })
+    assert.are.equal(2 * 20 + 8 + 15, frame:GetHeight())
+    local list = box:GetWidth()
+    nextMenu:Close()
+    UseNextTheme({ Controls = { Menu = { Padding = 4, ItemHeight = 20 } } })
+    nextMenu:ApplyStyle()
+    nextMenu:Open(anchor, { items = { { text = "One", value = 1 }, { text = "Two", value = 2 } }, onPick = function() end })
+    assert.are.same({ "TOPLEFT", nextMenu.frame, "TOPLEFT", 4, -4 }, { nextMenu.box:GetPoint(1) })
+    assert.are.equal(2 * 20 + 2 * 4, nextMenu.frame:GetHeight())
+    assert.is_number(list)
+  end)
+
+  -- Blizzard's radio menus (MenuVariants.CreateRadio) draw an empty ring on every choice: retail draws the yellow tick
+  -- over the ring on the chosen one (two textures, the tick at the ring's top left), Classic draws the tick in its
+  -- place (one texture). Each at its atlas size.
+  describe("radio rings", function()
+    local function open3()
+      nextMenu:Open(anchor, { items = { { text = "One", value = 1 }, { text = "Two", value = 2, selected = true } },
+        onPick = function() end })
+      return nextMenu.rows[1], nextMenu.rows[2]
+    end
+
+    before_each(function()
+      ResetMockAtlases()
+      MockAtlas("ring", 16, 16)
+      MockAtlas("tick", 12, 12)
+    end)
+
+    after_each(function()
+      ResetMockAtlases()
+    end)
+
+    it("draws its Off ring on the rows not chosen and its Under ring under the chosen row's tick", function()
+      UseNextTheme({ Controls = { Menu = { Check = { Atlas = "tick", Color = "White", Size = "Atlas",
+        Off = { Atlas = "ring" }, Under = { Atlas = "ring" } } } } })
+      nextMenu:ApplyStyle()
+      local other, chosen = open3()
+      assert.is_false(other.check:IsShown())
+      assert.is_true(other.ring:IsShown())
+      assert.are.equal("ring", other.ring:GetAtlas())
+      assert.are.same({ 16, 16 }, { other.ring:GetSize() })
+      assert.is_true(chosen.check:IsShown())
+      assert.are.equal("tick", chosen.check:GetAtlas())
+      assert.are.same({ 12, 12 }, { chosen.check:GetSize() })
+      assert.is_true(chosen.ring:IsShown())
+      assert.are.same({ "TOPLEFT", chosen.ring, "TOPLEFT", 0, 0 }, { chosen.check:GetPoint(1) }, "the tick over the ring")
+    end)
+
+    it("draws only the tick on the chosen row without an Under ring", function()
+      UseNextTheme({ Controls = { Menu = { Check = { Atlas = "tick", Color = "White", Size = "Atlas", Off = { Atlas = "ring" } } } } })
+      nextMenu:ApplyStyle()
+      local other, chosen = open3()
+      assert.is_true(other.ring:IsShown())
+      assert.is_false(chosen.ring:IsShown())
+      assert.is_true(chosen.check:IsShown())
+    end)
+
+    it("draws no ring for a theme without one", function()
+      local other, chosen = open3()
+      assert.is_false(other.ring:IsShown())
+      assert.is_false(chosen.ring:IsShown())
+      assert.is_true(chosen.check:IsShown())
+    end)
+  end)
+
+  -- Blizzard's menus mark the chosen choice with an atlas (common-dropdown-icon-radialtick-yellow, MenuVariants.lua).
+  it("marks the chosen row with an atlas when its theme names one", function()
+    UseNextTheme({ Controls = { Menu = { Check = { Atlas = "common-dropdown-icon-radialtick-yellow", Color = "White", Size = 16 } } } })
+    nextMenu:Open(anchor, { items = { { text = "One", value = 1, selected = true } }, onPick = function() end })
+    local row = nextMenu.rows[1]
+    assert.are.equal("common-dropdown-icon-radialtick-yellow", row.check:GetAtlas())
+    assert.is_true(row.check:IsShown())
+  end)
 end)
 
 describe("NextDropdown", function()
@@ -271,6 +351,14 @@ describe("NextDropdown", function()
   end)
 
   -- The Plain theme (docs/next-plain-theme.md): WowStyle1DropdownTemplate's background, 9 and 8 pixels past it.
+  -- WowStyle1DropdownTemplate's arrow is an atlas (common-dropdown-classic-a-buttonDown).
+  it("draws its chevron as an atlas when its theme names one", function()
+    UseNextTheme({ Controls = { Dropdown = { Chevron = { Atlas = "common-dropdown-classic-a-buttonDown", Color = "White", Size = 20 } } } })
+    local d = make()
+    assert.are.equal("common-dropdown-classic-a-buttonDown", d.chevron:GetAtlas())
+    assert.are.same({ 20, 20 }, { d.chevron:GetSize() })
+  end)
+
   it("draws its fill past it where its theme says", function()
     UseNextTheme({ Controls = { Dropdown = { Fill = { Atlas = "common-dropdown-classic-textholder", Color = "White", Alpha = 1,
       Inset = { Left = -9, Top = -8, Right = -8, Bottom = -9 } } } } })
@@ -316,5 +404,87 @@ describe("NextDropdown", function()
     d:SetEnabled(false)
     d.frame:GetScript("OnClick")(d.frame, "LeftButton")
     assert.is_false(nextMenu:IsOpenFor(d.frame))
+  end)
+
+  -- Blizzard's dropdown arrow (WowStyle1DropdownTemplate, GetWowStyle1ArrowButtonState): its own art idle, under the
+  -- pointer, pressed, while its menu is open and disabled, each at its atlas size (useAtlasSize), anchored by its
+  -- right at RIGHT 1, -3; disabled, its text gray (DISABLED_FONT_COLOR) and nothing dimmed.
+  describe("Blizzard's arrow", function()
+    before_each(function()
+      ResetMockAtlases()
+      MockAtlas("arrow", 18, 17)
+      MockAtlas("arrow-hover", 18, 17)
+      MockAtlas("arrow-pressedhover", 18, 17)
+      MockAtlas("arrow-open", 18, 17)
+      MockAtlas("arrow-disabled", 18, 17)
+      MockAtlas("holder-small", 60, 30)
+      UseNextTheme({ Fonts = { Gray = { Size = 12, Color = "Muted" } }, Controls = { Dropdown = {
+        DisabledFont = "Gray", DisabledAlpha = 1,
+        Chevron = { Atlas = "arrow", Color = "White", Size = "Atlas", Point = { X = 1, Y = -3 },
+          Hover = { Atlas = "arrow-hover" }, Pressed = { Atlas = "arrow-pressedhover" }, Open = { Atlas = "arrow-open" },
+          Disabled = { Atlas = "arrow-disabled" } },
+      } } })
+      nextDropdown:ApplyStyle()
+    end)
+
+    after_each(function()
+      ResetMockAtlases()
+    end)
+
+    it("draws its arrow at its atlas size, by its right at its Point", function()
+      local d = make()
+      assert.are.equal("arrow", d.chevron:GetAtlas())
+      assert.are.same({ 18, 17 }, { d.chevron:GetSize() })
+      assert.are.same({ "RIGHT", d.frame, "RIGHT", 1, -3 }, { d.chevron:GetPoint(1) })
+    end)
+
+    it("draws its arrow's art under the pointer, pressed and while its menu is open", function()
+      local d = make()
+      d.frame:GetScript("OnEnter")(d.frame)
+      assert.are.equal("arrow-hover", d.chevron:GetAtlas())
+      d.frame:GetScript("OnMouseDown")(d.frame, "LeftButton")
+      assert.are.equal("arrow-pressedhover", d.chevron:GetAtlas())
+      d.frame:GetScript("OnMouseUp")(d.frame, "LeftButton")
+      assert.are.equal("arrow-hover", d.chevron:GetAtlas())
+      d.frame:GetScript("OnClick")(d.frame, "LeftButton")
+      assert.is_true(nextMenu:IsOpenFor(d.frame))
+      assert.are.equal("arrow-open", d.chevron:GetAtlas())
+      nextMenu:Close()
+      d.frame:GetScript("OnLeave")(d.frame)
+      assert.are.equal("arrow", d.chevron:GetAtlas())
+    end)
+
+    it("draws its disabled arrow and text while disabled, dimming nothing", function()
+      local d = make()
+      d:SetEnabled(false)
+      assert.are.equal("arrow-disabled", d.chevron:GetAtlas())
+      assert.are.equal(style:Font("Gray"), d.text:GetFontObject())
+      assert.are.equal(1, d.frame:GetAlpha())
+      d.frame:GetScript("OnEnter")(d.frame)
+      assert.are.equal("arrow-disabled", d.chevron:GetAtlas(), "not lit")
+      d.frame:GetScript("OnLeave")(d.frame)
+      d:SetEnabled(true)
+      assert.are.equal("arrow", d.chevron:GetAtlas())
+      assert.are.equal(style:Font(D().Font), d.text:GetFontObject())
+    end)
+
+    -- Classic's dropdown: its choice written right, against the arrow (justifyH RIGHT), and its narrow background at
+    -- 100 wide or less (common-dropdown-classic-textholder-small, OnSizeChanged).
+    it("writes its choice where its theme justifies it, and draws its narrow fill when narrow", function()
+      UseNextTheme({ Controls = { Dropdown = { Justify = "RIGHT", NarrowWidth = 100,
+        NarrowFill = { Atlas = "holder-small", Color = "White", Alpha = 1 } } } })
+      nextDropdown:ApplyStyle()
+      local narrow = make({ width = 90 })
+      assert.are.equal("RIGHT", narrow.text:GetJustifyH())
+      assert.are.equal("holder-small", narrow.fill:GetAtlas())
+      narrow.frame:GetScript("OnEnter")(narrow.frame)
+      assert.are.equal("holder-small", narrow.fill:GetAtlas(), "in every state")
+      narrow.frame:GetScript("OnLeave")(narrow.frame)
+      local wide = make({ width = 170 })
+      assert.are_not.equal("holder-small", wide.fill:GetAtlas())
+      UseNextTheme(nil)
+      nextDropdown:ApplyStyle()
+      assert.are.equal("LEFT", narrow.text:GetJustifyH())
+    end)
   end)
 end)

@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class NextStyle: AceModule
+local style = addon:GetModule('NextStyle')
+
 ---@class NextControls: AceModule
 local controls = addon:GetModule('NextControls')
 
@@ -59,6 +62,21 @@ function nextSlider:ApplyStyle(ctx)
   end
 end
 
+-- thumbSize returns the thumb's width and height: ThumbSize square, or its art's atlas size for ThumbSize = "Atlas"
+-- (MinimalSliderTemplate's ThumbTexture, useAtlasSize).
+---@param S table
+---@return number width, number height
+local function thumbSize(S)
+  if S.ThumbSize == "Atlas" then
+    local width, height = style:AtlasSize(S.Thumb and S.Thumb.Atlas)
+    if width ~= nil then
+      return width, height
+    end
+    return 12, 12
+  end
+  return S.ThumbSize, S.ThumbSize
+end
+
 ---@param parent Frame
 ---@param opts NextSliderOptions
 ---@return NextSliderFrame
@@ -104,7 +122,7 @@ function sliderProto:Style()
   pixel:Row(track, "TOPLEFT", frame, 0, frame:GetHeight())
   pixel:Height(self.bar, S.TrackSize)
   pixel:Height(self.fill, S.TrackSize)
-  pixel:Size(self.thumb, S.ThumbSize, S.ThumbSize)
+  pixel:Size(self.thumb, thumbSize(S))
   local barTop = -pixel:Middle(track, track:GetHeight(), self.bar:GetHeight())
   local barFrame = self.barFrame
   barFrame:ClearAllPoints()
@@ -191,7 +209,8 @@ function sliderProto:cursorValue()
   end
   local S = controls:Theme("Slider")
   local x = GetCursorPosition() / self.track:GetEffectiveScale() - left
-  local share = (x - S.ThumbSize / 2) / (S.Width - S.ThumbSize)
+  local thumb = thumbSize(S)
+  local share = (x - thumb / 2) / (S.Width - thumb)
   local o = self.opts
   return o.min + share * (o.max - o.min)
 end

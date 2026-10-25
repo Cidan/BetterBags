@@ -789,8 +789,10 @@ function listProto:paintRow(row)
   row.indicator:ClearAllPoints()
   row.indicator:SetPoint("TOPLEFT", row.frame, "TOPLEFT", 0, 0)
   row.indicator:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, 0)
-  pixel:Width(row.indicator, K.Indicator.Width)
-  controls:Paint(row.indicator, chosen and { Color = K.Indicator.Color } or false)
+  -- A theme may draw no bar (Indicator = false: Blizzard's list marks the chosen row with its fill).
+  local bar = K.Indicator
+  pixel:Width(row.indicator, bar and bar.Width or 1)
+  controls:Paint(row.indicator, (chosen and bar) and { Color = bar.Color } or false)
 end
 
 ---------------------------------------------------------------------------------------------------

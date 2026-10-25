@@ -140,6 +140,45 @@ describe("NextTopTabs", function()
     assert.is_nil(tabs.marker:GetTexture())
   end)
 
+  -- Blizzard's tabs (MinimalTabTemplate) show the chosen one in their own art: no marker, no line under them.
+  it("draws no marker and no line for a theme without them, whichever tab is chosen", function()
+    UseNextTheme({ Controls = { TopTabs = { Indicator = false, Line = false } } })
+    local tabs = make()
+    assert.is_false(tabs.marker:IsShown())
+    assert.is_false(tabs.line:IsShown())
+    tabs.tabs[2].frame:GetScript("OnClick")(tabs.tabs[2].frame, "LeftButton")
+    tween:Step(1)
+    assert.is_false(tabs.marker:IsShown(), "not after a glide")
+    UseNextTheme(nil)
+    tabs:Style()
+    assert.is_true(tabs.marker:IsShown())
+    assert.is_true(tabs.line:IsShown())
+  end)
+
+  -- Blizzard's settings tabs (MinimalTabTemplate, MinimalTabMixin): each tab its own art, idle, under the pointer and
+  -- selected (Options_Tab_*, Options_Tab_Active_*), as wide as its text and 40, the text by its bottom 4 above the tab's
+  -- bottom, 6 when selected.
+  it("draws each tab in its theme's art for its state, Padding either side of its label, raised as it says", function()
+    UseNextTheme({ Controls = { TopTabs = { Padding = 20, TextBottom = 4, SelectedTextBottom = 6, Indicator = false, Line = false,
+      Fill = { Atlas = "tab", Color = "White", Alpha = 1 }, HoverFill = { Atlas = "tab-over", Color = "White", Alpha = 1 },
+      SelectedFill = { Atlas = "tab-active", Color = "White", Alpha = 1 } } } })
+    local tabs = make()
+    local first, second = tabs.tabs[1], tabs.tabs[2]
+    assert.are.equal(#"Layout" * 6 + 40, first.frame:GetWidth())
+    assert.are.equal("tab-active", first.fill:GetAtlas())
+    assert.are.equal("tab", second.fill:GetAtlas())
+    assert.are.same({ "BOTTOM", first.frame, "BOTTOM", 0, 6 }, { first.label:GetPoint(1) })
+    assert.are.same({ "BOTTOM", second.frame, "BOTTOM", 0, 4 }, { second.label:GetPoint(1) })
+    second.frame:GetScript("OnEnter")(second.frame)
+    assert.are.equal("tab-over", second.fill:GetAtlas())
+    second.frame:GetScript("OnLeave")(second.frame)
+    assert.are.equal("tab", second.fill:GetAtlas())
+    UseNextTheme(nil)
+    tabs:Style()
+    assert.is_false(first.fill:IsShown(), "no art for a theme without")
+    assert.are.equal(#"Layout" * 6, first.frame:GetWidth())
+  end)
+
   it("selects a tab on a click, gliding its marker there, and says which", function()
     local tabs = make()
     tabs.tabs[2].frame:GetScript("OnClick")(tabs.tabs[2].frame, "LeftButton")
@@ -242,6 +281,26 @@ describe("NextDialog", function()
     nextDialog:ApplyStyle()
     assert.is_false(corner:IsShown())
     ResetMockAtlases()
+  end)
+
+  -- Today's popup (GameDialogBaseMixin:OnLoad, GameDialog.lua): the diamond border atlas over the whole popup, the dark
+  -- background 7 in under it.
+  it("draws its theme's border over its card's fill", function()
+    UseNextTheme({ Controls = { Dialog = {
+      Card = { Atlas = "UI-DialogBox-Background-Dark", Color = "White", Alpha = 1, Inset = { Left = 7, Right = 7, Top = 7, Bottom = 7 } },
+      Border = { Atlas = "UI-DiamondDialogBox-Border", Color = "White", Alpha = 1 } } } })
+    local d = show()
+    assert.are.equal("UI-DiamondDialogBox-Border", d.cardBorder:GetAtlas())
+    assert.is_true(d.cardBorder:IsShown())
+    assert.are.same({ "TOPLEFT", d.card, "TOPLEFT", 0, 0 }, { d.cardBorder:GetPoint(1) })
+    assert.are.same({ "BOTTOMRIGHT", d.card, "BOTTOMRIGHT", 0, 0 }, { d.cardBorder:GetPoint(2) })
+    local fillLayer, fillLevel = d.cardFill:GetDrawLayer()
+    local borderLayer, borderLevel = d.cardBorder:GetDrawLayer()
+    assert.are.equal(fillLayer, borderLayer)
+    assert.is_true(borderLevel > fillLevel, "over the fill")
+    UseNextTheme(nil)
+    nextDialog:ApplyStyle()
+    assert.is_false(d.cardBorder:IsShown())
   end)
 
   it("lays its buttons out from the right, in the order given, and closes after one is clicked", function()

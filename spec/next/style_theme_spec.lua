@@ -155,6 +155,21 @@ describe("NextStyle", function()
       assert.has_error(function() style:Font("Odd") end, "BetterBags Next's font role Odd copies no client font named NoSuchFont")
     end)
 
+    -- The Plain theme (docs/next-plain-theme.md) draws the client's own fonts as they are: a role that copies one
+    -- outright (Copy) takes nothing from the role it inherits (Default's Size, Color and Shadow), only its own Justify.
+    it("copies a client font outright for a role that says Copy, whatever the role it inherits sets", function()
+      style:Use(register({ Fonts = { Price = { Copy = "GameFontHighlightSmall" }, Tab = { Copy = "GameFontNormal", Justify = "RIGHT" } } }))
+      local price = style:Font("Price")
+      assert.are.same({ GameFontHighlightSmall:GetFont() }, { price:GetFont() })
+      assert.are.same({ GameFontHighlightSmall:GetTextColor() }, { price:GetTextColor() })
+      assert.are.same({ GameFontHighlightSmall:GetShadowOffset() }, { price:GetShadowOffset() })
+      assert.are.same({ GameFontHighlightSmall:GetShadowColor() }, { price:GetShadowColor() })
+      assert.are.equal("RIGHT", style:Font("Tab"):GetJustifyH())
+      sonataNext.themes.Spec = nil
+      style:Use(register({ Fonts = { Odd = { Copy = "NoSuchFont" } } }))
+      assert.has_error(function() style:Font("Odd") end, "BetterBags Next's font role Odd copies no client font named NoSuchFont")
+    end)
+
     it("lays everything out from its own sizes, the reach past the screen edge from its open ease", function()
       style:Use(register({ Layout = { Icon = 36, Gap = 4, PerRow = 9, Pad = 10, Feather = 64 },
         Motion = { Ease = { Open = "outBackSoft" } } }))

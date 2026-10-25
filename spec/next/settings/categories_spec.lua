@@ -478,6 +478,18 @@ describe("NextSettingsCategories", function()
       assert.is_false(list:RowFor("Openable").indicator:IsShown())
     end)
 
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's lists mark the chosen row with its fill, no bar.
+    it("marks the chosen category with no bar for a theme without one", function()
+      UseNextTheme({ Settings = { Categories = { Indicator = false } } })
+      list:RefreshRows()
+      for _, row in ipairs(list.rows) do
+        assert.is_false(row.indicator:IsShown())
+      end
+      UseNextTheme(nil)
+      list:RefreshRows()
+      assert.is_true(list:RowFor(editor.selected).indicator:IsShown())
+    end)
+
     it("keeps a category chosen from elsewhere (a bag's tab opening it here)", function()
       editor:Show("Midnight")
       list:Refresh(ctx())

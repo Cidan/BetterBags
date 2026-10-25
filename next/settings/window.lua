@@ -484,6 +484,10 @@ function settings:buildHeader()
   close:SetFrameLevel(header:GetFrameLevel() + 5)
   self.closeIcon = close:CreateTexture(nil, "ARTWORK")
   self.closeIcon:SetAllPoints(close)
+  -- Over the icon under the pointer (Close.Highlight: Blizzard's close button's highlight).
+  self.closeHighlight = close:CreateTexture(nil, "ARTWORK", nil, 1)
+  self.closeHighlight:SetAllPoints(close)
+  self.closeHighlight:Hide()
   addon.SetScript(close, "OnClick", function() self:Close() end)
   addon.SetScript(close, "OnEnter", function() self:paintClose(true) end)
   addon.SetScript(close, "OnLeave", function() self:paintClose(false) end)
@@ -612,7 +616,9 @@ function settings:Style()
   local X = H.Close
   pixel:Size(self.closeButton, X.Size, X.Size)
   self.closeButton:ClearAllPoints()
-  pixel:Point(self.closeButton, "TOPRIGHT", frame, "TOPRIGHT", -X.Inset, -X.Inset)
+  -- Offset: anchor offsets from the top right (Blizzard's close anchors), else Inset in both ways.
+  local offset = X.Offset
+  pixel:Point(self.closeButton, "TOPRIGHT", frame, "TOPRIGHT", offset and offset.X or -X.Inset, offset and offset.Y or -X.Inset)
   self:paintClose(false)
 
   local F = T.Footer
@@ -912,9 +918,11 @@ end
 ---@param hovered boolean
 function settings:paintClose(hovered)
   local X = style.Theme.Settings.Header.Close
-  -- Its own art under the pointer when the theme has some (HoverIcon: GW2_UI's close hover art).
+  -- Its own art under the pointer when the theme has some (HoverIcon: GW2_UI's close hover art); or an atlas
+  -- (Blizzard's close button), with its Highlight over it under the pointer.
   local icon = (hovered and X.HoverIcon) or X.Icon
-  controls:Paint(self.closeIcon, { Texture = icon, Color = hovered and X.HoverColor or X.Color })
+  controls:Paint(self.closeIcon, { Texture = icon, Atlas = X.Atlas or nil, Color = hovered and X.HoverColor or X.Color })
+  controls:Paint(self.closeHighlight, hovered and X.Highlight or false)
 end
 
 -- navRow returns the i-th row of the sidebar's list, made the first time it is needed.
@@ -939,6 +947,9 @@ function settings:navRow(i)
   }
   row.fill:SetAllPoints(frame)
   row.hover:SetAllPoints(frame)
+  -- Fills (NextFill): filling the row, or an atlas at its own size (Blizzard's settings list).
+  fills:Wrap(row.fill, frame)
+  fills:Wrap(row.hover, frame)
   row.label:SetJustifyH("LEFT")
   row.label:SetWordWrap(false)
   addon.SetScript(frame, "OnClick", function(ctx)
@@ -960,6 +971,8 @@ function settings:buildNav()
   -- Whole pixels apart (docs/next-pixel-perfect.md).
   local groupGap, groupHeight, itemHeight = pixel:Snap(self.frame, N.GroupGap), pixel:Length(self.frame, N.GroupHeight),
     pixel:Length(self.frame, N.ItemHeight)
+  -- Between every heading and row (Blizzard's settings list: its view's spacing).
+  local spacing = pixel:Snap(self.frame, N.Spacing or 0)
   local groups, order = {}, {}
   for _, page in ipairs(pages:List()) do
     if groups[page.group] == nil then
@@ -971,7 +984,7 @@ function settings:buildNav()
   local i, y = 0, 0
   for g, group in ipairs(order) do
     if g > 1 then
-      y = y + groupGap
+      y = y + groupGap + spacing
     end
     i = i + 1
     local heading = self:navRow(i)
@@ -986,6 +999,7 @@ function settings:buildNav()
     self:paintNavRow(heading)
     y = y + groupHeight
     for _, page in ipairs(groups[group]) do
+      y = y + spacing
       i = i + 1
       local row = self:navRow(i)
       row.group, row.page = nil, page
@@ -1039,17 +1053,21 @@ function settings:paintNavRow(row)
     font = N.HoverFont
   end
   style:SetFont(row.label, font)
-  -- From the row's corners, centered on its height by the font's (its middle may be between pixels).
+  -- From the row's corners, centered on its height by the font's (its middle may be between pixels), TextRaise above
+  -- it (Blizzard's settings list raises its rows' text by 1).
   local height = pixel:Length(frame, N.ItemHeight)
-  pixel:Row(row.label, "TOPLEFT", row.frame, pad + pixel:Snap(frame, N.Indent), height)
-  pixel:Row(row.label, "TOPRIGHT", row.frame, pad, height)
+  local raise = -(N.TextRaise or 0)
+  pixel:Row(row.label, "TOPLEFT", row.frame, pad + pixel:Snap(frame, N.Indent), height, nil, raise)
+  pixel:Row(row.label, "TOPRIGHT", row.frame, pad, height, nil, raise)
   controls:Paint(row.fill, chosen and N.SelectedFill or false)
   controls:Paint(row.hover, (row.hovered and not chosen) and N.HoverFill or false)
   row.indicator:ClearAllPoints()
   row.indicator:SetPoint("TOPLEFT", row.frame, "TOPLEFT", 0, 0)
   row.indicator:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, 0)
-  pixel:Width(row.indicator, N.Indicator.Width)
-  controls:Paint(row.indicator, chosen and { Color = N.Indicator.Color } or false)
+  -- A theme may draw no bar (Indicator = false: Blizzard's list marks the chosen row with its fill).
+  local bar = N.Indicator
+  pixel:Width(row.indicator, bar and bar.Width or 1)
+  controls:Paint(row.indicator, (chosen and bar) and { Color = bar.Color } or false)
 end
 
 ---@private

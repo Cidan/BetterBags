@@ -396,7 +396,7 @@ local FONT_KEYS = {
   HelpFont = true, TextFont = true, EmptyFont = true, MoneyFont = true, HintFont = true, WarningFont = true,
   PriceFont = true, UnaffordableFont = true, StackFont = true, NameFont = true, HoverFont = true,
   DescriptionFont = true, NoteFont = true, LabelFont = true, LinkFont = true, GroupFont = true,
-  ActiveFont = true, PreviewFont = true, UnavailableFont = true,
+  ActiveFont = true, PreviewFont = true, UnavailableFont = true, DisabledFont = true,
 }
 -- Keys whose value names one of the theme's Textures, or is a file (a path or a file ID).
 local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true, Icon = true, HoverIcon = true }
@@ -510,9 +510,7 @@ function sonataNext:Check(key)
         problem("Mask.Texture", "a mask needs one")
       end
       if o.TexCoords ~= nil then
-        if o.Tile ~= nil then
-          problem("TexCoords", "not with Tile")
-        elseif type(o.TexCoords) ~= "table" or #o.TexCoords ~= 4 then
+        if type(o.TexCoords) ~= "table" or #o.TexCoords ~= 4 then
           problem("TexCoords", "four numbers, left, right, top and bottom")
         end
       end

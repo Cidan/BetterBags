@@ -1044,6 +1044,90 @@ describe("NextSettings", function()
       assert.are.equal("BOTTOMLEFT", point)
     end)
 
+    -- Blizzard's close button: an atlas (RedButton-Exit), its highlight added over it under the pointer
+    -- (RedButton-Highlight, ADD; UIPanelCloseButtonNoScripts).
+    -- Blizzard's retail settings close sits at TOPRIGHT 1, 0 (UIPanelCloseButtonDefaultAnchors): Offset, as anchor
+    -- offsets from the window's top right, in place of the Inset both ways.
+    it("puts its close at its Offset from the top right corner when it has one", function()
+      open()
+      UseNextTheme({ Settings = { Header = { Close = { Offset = { X = 1, Y = 0 } } } } })
+      settings:ApplyStyle()
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", 1, 0 }, { settings.closeButton:GetPoint(1) })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      local inset = S().Header.Close.Inset
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -inset, -inset }, { settings.closeButton:GetPoint(1) })
+    end)
+
+    it("draws its close as an atlas with a highlight over it under the pointer", function()
+      open()
+      UseNextTheme({ Settings = { Header = { Close = { Atlas = "RedButton-Exit", Color = "White", HoverColor = "White", Size = 24,
+        Highlight = { Atlas = "RedButton-Highlight", BlendMode = "ADD", Color = "White", Alpha = 1 } } } } })
+      settings:ApplyStyle()
+      local close = settings.closeButton
+      assert.are.equal("RedButton-Exit", settings.closeIcon:GetAtlas())
+      assert.is_false(settings.closeHighlight:IsShown())
+      close:GetScript("OnEnter")(close)
+      assert.are.equal("RedButton-Exit", settings.closeIcon:GetAtlas(), "the icon stays")
+      assert.is_true(settings.closeHighlight:IsShown())
+      assert.are.equal("RedButton-Highlight", settings.closeHighlight:GetAtlas())
+      assert.are.equal("ADD", settings.closeHighlight:GetBlendMode())
+      close:GetScript("OnLeave")(close)
+      assert.is_false(settings.closeHighlight:IsShown())
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.are.equal(style:TexturePath(S().Header.Close.Icon), settings.closeIcon:GetTexture())
+    end)
+
+    -- Blizzard's settings list draws a row's art at the atlas's own size, centered (Options_List_Active and
+    -- Options_List_Hover, useAtlasSize, anchored CENTER), and a heading's at its top left (Options_CategoryHeader).
+    it("draws its rows' and headings' art at the atlas's own size where its fills say", function()
+      ResetMockAtlases()
+      MockAtlas("Options_List_Active", 175, 20)
+      MockAtlas("Options_CategoryHeader_1", 175, 30)
+      open()
+      UseNextTheme({ Settings = { Nav = {
+        SelectedFill = { Atlas = "Options_List_Active", Color = "White", Alpha = 1, AtlasSize = true },
+        GroupFills = { { Atlas = "Options_CategoryHeader_1", Color = "White", Alpha = 1, AtlasSize = true, Point = "TOPLEFT" } } } } })
+      settings:ApplyStyle()
+      local general = navRow("General")
+      assert.are.same({ 175, 20 }, { general.fill:GetSize() })
+      assert.are.same({ "CENTER", general.frame, "CENTER", 0, 0 }, { general.fill:GetPoint(1) })
+      local heading
+      for _, row in ipairs(settings.navRows) do
+        if row.frame:IsShown() and row.group then
+          heading = heading or row
+        end
+      end
+      assert.are.same({ 175, 30 }, { heading.fill:GetSize() })
+      assert.are.same({ "TOPLEFT", heading.frame, "TOPLEFT", 0, 0 }, { heading.fill:GetPoint(1) })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.are.same({ "TOPLEFT", general.frame, "TOPLEFT", 0, 0 }, { general.fill:GetPoint(1) }, "filling its row again")
+      ResetMockAtlases()
+    end)
+
+    -- Blizzard's settings list (Blizzard_CategoryList.lua): 2 between every element, headings and rows alike
+    -- (CreateScrollBoxListLinearView's spacing), a row's text 1 above its middle (its Label at y 1).
+    it("puts Spacing between every heading and row and raises a row's text by TextRaise", function()
+      open()
+      UseNextTheme({ Settings = { Nav = { ItemHeight = 20, GroupHeight = 30, GroupGap = 0, Spacing = 2, TextRaise = 1 } } })
+      settings:ApplyStyle()
+      local tops = {}
+      for _, row in ipairs(settings.navRows) do
+        if row.frame:IsShown() then
+          local _, _, _, _, y = row.frame:GetPoint(1)
+          table.insert(tops, -y)
+        end
+      end
+      -- BetterBags (30), General (20), Bags (30), Backpack (20), Profiles (30), Profiles (20), 2 apart.
+      assert.are.same({ 0, 32, 54, 86, 108, 140 }, tops)
+      local general = navRow("General")
+      local _, fontHeight = general.label:GetFont()
+      local _, _, _, _, y = general.label:GetPoint(1)
+      assert.are.equal(-(math.floor((20 - fontHeight) / 2) - 1), y)
+    end)
+
     it("draws its theme's frame round it, its fill inset into it", function()
       ResetMockAtlases()
       MockAtlas("UI-Frame-Metal-CornerTopLeft", 32, 32)

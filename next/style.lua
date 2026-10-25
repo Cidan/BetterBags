@@ -253,7 +253,8 @@ end
 -- makeFont makes a font object for a role's spec: the client's own font file (the locale's) unless
 -- the spec names one, at its size and flags, in its color, with its shadow or none. A role naming one
 -- of the client's fonts (Object, a font object's global name) copies it (its file, size and flags,
--- in every locale, its color and shadow), changing only what the role also sets. Its height is a whole
+-- in every locale, its color and shadow), changing only what the role also sets; one that copies it
+-- outright (Copy) changes nothing, whatever the role it inherits sets. Its height is a whole
 -- number of screen pixels where BetterBags Next's windows are drawn (NextPixel:FontHeight,
 -- docs/next-pixel-perfect.md): a new grid (the UI scale, the screen's size) applies the theme again.
 ---@param role string
@@ -262,7 +263,19 @@ end
 function style:makeFont(role, spec)
   fontCount = fontCount + 1
   local font = CreateFont("BetterBagsNextFont" .. role .. fontCount)
-  if spec.Object ~= nil then
+  -- Copy: a client font as it is (the Plain theme), nothing the role inherits changing it but its height on whole
+  -- pixels and its own Justify.
+  local copy = spec.Copy
+  if copy ~= nil then
+    local base = _G[copy]
+    if type(base) ~= "table" or base.GetFont == nil then
+      error("BetterBags Next's font role " .. role .. " copies no client font named " .. tostring(copy))
+    end
+    font:CopyFontObject(base)
+    self.copies[role] = { base = base, look = lookOf(base) }
+    local path, size, flags = font:GetFont()
+    font:SetFont(path, pixel:FontHeight(size), flags)
+  elseif spec.Object ~= nil then
     local base = _G[spec.Object]
     if type(base) ~= "table" or base.GetFont == nil then
       error("BetterBags Next's font role " .. role .. " copies no client font named " .. tostring(spec.Object))
@@ -373,6 +386,32 @@ function style:Paint(texture, spec, alpha)
   end
   texture:SetBlendMode(spec.BlendMode or "BLEND")
   texture:SetDesaturated(spec.Desaturated == true)
+end
+
+-- AtlasSize returns an atlas's own size as the client has it (C_Texture.GetAtlasInfo, every client), or nil for no
+-- atlas or one the client lacks: what Blizzard's useAtlasSize draws a texture at.
+---@param atlas? string
+---@return number? width, number? height
+function style:AtlasSize(atlas)
+  local info = atlas ~= nil and C_Texture.GetAtlasInfo(atlas) or nil
+  if info == nil then
+    return nil, nil
+  end
+  return info.width, info.height
+end
+
+-- SizeOf returns the size a spec draws at: its Size (a number, square), or the size of its art's atlas for
+-- Size = "Atlas" (Blizzard's useAtlasSize), or fallback when its atlas is not one the client has.
+---@param spec table
+---@param art? table The art drawn now (a state's), whose Atlas is measured; spec's own when nil.
+---@param fallback? number
+---@return number width, number height
+function style:SizeOf(spec, art, fallback)
+  if spec.Size ~= "Atlas" then
+    return spec.Size or fallback, spec.Size or fallback
+  end
+  local width, height = self:AtlasSize((art or spec).Atlas or spec.Atlas)
+  return width or fallback, height or fallback
 end
 
 -- IsArt says whether a fill names art (a texture spec with a Texture or an Atlas) rather than a color (a palette

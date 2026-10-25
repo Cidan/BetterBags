@@ -169,13 +169,12 @@ function inputProto:Paint()
   local I = controls:Theme("Input")
   local focused = self.frame:HasFocus()
   controls:Paint(self.fill, focused and I.FocusFill or I.Fill)
-  local strength = I.Edge.Idle
-  if focused then
-    strength = I.Edge.Focus
-  elseif self.hovered then
-    strength = I.Edge.Hover
+  -- A theme may draw no edge (Edge = false: Blizzard's input border is its fill).
+  local E, strength = I.Edge, nil
+  if E then
+    strength = (focused and E.Focus) or (self.hovered and E.Hover) or E.Idle
   end
-  controls:PaintEdge(self.edge, I.Edge, strength)
+  controls:PaintEdge(self.edge, E, strength)
   self.help:SetShown(not focused and (self.frame:GetText() or "") == "")
 end
 
@@ -320,7 +319,8 @@ function areaProto:Paint()
   local I = controls:Theme("Input")
   local focused = self.editBox:HasFocus()
   controls:Paint(self.fill, focused and I.FocusFill or I.Fill)
-  controls:PaintEdge(self.edge, I.Edge, focused and I.Edge.Focus or I.Edge.Idle)
+  local E = I.Edge
+  controls:PaintEdge(self.edge, E, E and (focused and E.Focus or E.Idle) or nil)
   self.help:SetShown(not focused and self:GetText() == "")
 end
 

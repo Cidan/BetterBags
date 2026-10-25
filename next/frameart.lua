@@ -55,6 +55,7 @@ end
 ---@field owner Frame The frame whose textures the pieces are.
 ---@field region ScriptRegion What the frame is drawn round.
 ---@field pieces table<string, Texture> Each piece's texture, by the place it is drawn in.
+---@field titleBg Texture The frame's title band (TitleBg), under its pieces.
 ---@field own table<Texture, table> Each texture's own pixel snapping, given back when a layout turned it off.
 local setProto = {}
 addon:GetModule('Perf'):RegisterPrototype(setProto, 'NextFrameArtSet')
@@ -64,7 +65,12 @@ addon:GetModule('Perf'):RegisterPrototype(setProto, 'NextFrameArtSet')
 ---@param region ScriptRegion
 ---@return NextFrameArtSet
 function frameArt:Create(owner, region)
-  local set = setmetatable({ owner = owner, region = region, pieces = {}, own = {} }, { __index = setProto })
+  -- The title band in the owner's BACKGROUND layer, as Blizzard's is in its frame's (Classic's SettingsFrameTemplate):
+  -- over the owner's fills, under the frame's pieces and everything in the owner's child frames.
+  local titleBg = owner:CreateTexture(nil, "BACKGROUND", nil, 1)
+  titleBg:Hide()
+  local set = setmetatable({ owner = owner, region = region, pieces = {}, own = {}, titleBg = titleBg },
+    { __index = setProto })
   for _, setup in ipairs(SETUP) do
     local texture = owner:CreateTexture(nil, "ARTWORK", nil, 5)
     texture:Hide()
@@ -107,7 +113,8 @@ end
 
 -- Apply draws spec round the region (false or nil: nothing), mirrored for a panel whose inner side is on the right.
 -- spec: Layout (a client layout's name) or Pieces; Color and Alpha tint every piece (white when unset); Layer and
--- SubLevel are where they draw (ARTWORK 5 when unset: above the theme's ornaments, below the title).
+-- SubLevel are where they draw (ARTWORK 5 when unset: above the theme's ornaments, below the title); TitleBg, a band
+-- across the region's top (a texture spec, Height tall, Left and Right in from its sides, Top down from its top).
 ---@param spec? table|false
 ---@param mirrored? boolean
 function setProto:Apply(spec, mirrored)
@@ -115,8 +122,10 @@ function setProto:Apply(spec, mirrored)
     for _, texture in pairs(self.pieces) do
       texture:Hide()
     end
+    self.titleBg:Hide()
     return
   end
+  self:band(spec.TitleBg, mirrored)
   local layout = layoutOf(spec)
   local r, g, b, a = style:RGBA(spec.Color or "White", spec.Alpha)
   local layer, subLevel = spec.Layer or "ARTWORK", spec.SubLevel or 5
@@ -139,6 +148,30 @@ function setProto:Apply(spec, mirrored)
     texture:SetVertexColor(r, g, b, a)
     texture:SetShown(drawn == true)
   end
+end
+
+-- band draws the frame's title band (Classic's _UI-Frame-TitleTileBg: a strip of a file, tiled across), its sides
+-- swapped on a mirrored frame, or hides it for none.
+---@private
+---@param spec? table
+---@param mirrored? boolean
+function setProto:band(spec, mirrored)
+  local band, region = self.titleBg, self.region
+  if not spec then
+    band:Hide()
+    return
+  end
+  style:Paint(band, spec, spec.Alpha)
+  local left, right = spec.Left or 0, spec.Right or 0
+  if mirrored then
+    left, right = right, left
+  end
+  local top = spec.Top or 0
+  band:ClearAllPoints()
+  pixel:Point(band, "TOPLEFT", region, "TOPLEFT", left, -top)
+  pixel:Point(band, "TOPRIGHT", region, "TOPRIGHT", -right, -top)
+  pixel:Height(band, spec.Height or 0)
+  band:Show()
 end
 
 -- sharpen turns a texture's pixel snapping off for a layout that says so (NineSliceUtil.DisableSharpening), or gives

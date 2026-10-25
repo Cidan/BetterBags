@@ -265,19 +265,20 @@ function setProto:Tile()
   for i = 1, self.count do
     local piece = self.pieces[i]
     local o, t = piece.spec, piece.texture
-    local left, right = 0, 1
-    if self.mirrored then
-      left, right = 1, 0
-    end
+    -- A tiled span's TexCoords crop it across (its strip of the file: Classic's title band, _UI-Frame-TitleTileBg).
+    local c = o.TexCoords or { 0, 1, 0, 1 }
     if o.Tile ~= nil and (o.Point == "INNER" or o.Point == "OUTER") then
       local length = body:GetHeight() - pixel:Snap(t, o.Start or 0) - pixel:Snap(t, o.End or 0)
-      t:SetTexCoord(left, right, 0, math.max(0, length) / o.Tile)
+      if self.mirrored then
+        t:SetTexCoord(c[2], c[1], 0, math.max(0, length) / o.Tile)
+      else
+        t:SetTexCoord(c[1], c[2], 0, math.max(0, length) / o.Tile)
+      end
     elseif o.Tile ~= nil then
       local length = body:GetWidth() - pixel:Snap(t, o.Start or 0) - pixel:Snap(t, o.End or 0)
       local reach = math.max(0, length) / o.Tile
-      t:SetTexCoord(self.mirrored and reach or 0, self.mirrored and 0 or reach, 0, 1)
+      t:SetTexCoord(self.mirrored and reach or 0, self.mirrored and 0 or reach, c[3], c[4])
     else
-      local c = o.TexCoords or { 0, 1, 0, 1 }
       -- Mirror = false: art that must not be flipped (a portrait, an icon), placed mirrored all the same.
       if self.mirrored and o.Mirror ~= false then
         t:SetTexCoord(c[2], c[1], c[3], c[4])

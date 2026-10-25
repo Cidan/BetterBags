@@ -46,6 +46,7 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@field card Frame
 ---@field owner? Frame The window it covers.
 ---@field cardFill Texture
+---@field cardBorder Texture Over the card's fill (Border: today's popup's diamond border).
 ---@field frameArt NextFrameArtSet The theme's frame round the card (Frame, next-themes.md §15).
 ---@field edge NextEdge
 ---@field title FontString
@@ -94,6 +95,10 @@ function nextDialog:build()
   self.cardFill = card:CreateTexture(nil, "BACKGROUND")
   self.cardFill:SetAllPoints(card)
   fills:Wrap(self.cardFill, card)
+  self.cardBorder = card:CreateTexture(nil, "BACKGROUND", nil, 1)
+  self.cardBorder:SetAllPoints(card)
+  self.cardBorder:Hide()
+  fills:Wrap(self.cardBorder, card)
   self.frameArt = frameArt:Create(card, card)
   self.edge = controls:CreateEdge(card)
   local D = controls:Theme("Dialog")
@@ -186,6 +191,7 @@ function nextDialog:Style()
   local pad, gap, buttonGap = pixel:Snap(card, D.Pad), pixel:Snap(card, D.Gap), pixel:Snap(card, D.ButtonGap)
   controls:Paint(self.scrim, D.Scrim)
   controls:Paint(self.cardFill, D.Card)
+  controls:Paint(self.cardBorder, D.Border)
   style:SetFont(self.title, D.TitleFont)
   style:SetFont(self.text, D.TextFont)
   local width = pixel:Length(card, D.Width)

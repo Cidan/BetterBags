@@ -434,11 +434,13 @@ describe("SonataNext", function()
         Fonts = { Title = { Color = "AlsoNope" } },
         Dock = { DestroyColor = "Blood", BuyColor = "Moss" },
         Settings = { Header = { Close = { HoverIcon = "NoHover" } } },
+        Controls = { Button = { Plain = { DisabledFont = "NoGray" } } },
         Palette = { Client = { Global = "NO_SUCH_COLOR" }, Fine = { Global = "PANEL_BACKGROUND_COLOR" } },
       })
       local problems = sonataNext:Check("Broken")
       table.sort(problems)
       assert.are.same({
+        "Controls.Button.Plain.DisabledFont: no font named NoGray",
         "Dock.BuyColor: no color named Moss",
         "Dock.DestroyColor: no color named Blood",
         "Fonts.Title.Color: no color named AlsoNope",
@@ -510,7 +512,6 @@ describe("SonataNext", function()
       "Panel.Ornaments.5.Motion.Origin: no point named LEFTISH",
       "Panel.Ornaments.5.Motion.Wiggle: no motion named Wiggle",
       "Panel.Ornaments.5.Sizes: no size named Huge",
-      "Panel.Ornaments.7.TexCoords: not with Tile",
       "Panel.Ornaments.8.Panels: no panel named Mailbox",
       "Panel.Ornaments.8.TexCoords: four numbers, left, right, top and bottom",
       "Panel.Ornaments.9.Panels: a list of panels",

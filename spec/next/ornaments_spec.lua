@@ -249,6 +249,19 @@ describe("NextOrnaments", function()
       MockUnits.npc = nil
     end)
 
+    -- Classic's title band (_UI-Frame-TitleTileBg: Interface\FrameGeneral\_UI-Frame, a 17-pixel strip of it, tiled
+    -- across): a span tiled along it, cropped across it by its TexCoords.
+    it("tiles a span along it and crops it across by its TexCoords", function()
+      theme({ { Texture = "Interface\\FrameGeneral\\_UI-Frame", TexCoords = { 0, 1, 0.2890625, 0.421875 }, Point = "TOP",
+        Height = 17, Tile = 256 } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      local ulx, uly, _, lly, urx = t:GetTexCoord()
+      assert.are.same({ 0, 0.2890625, 0.421875 }, { ulx, uly, lly })
+      assert.is_true(near(panel.body:GetWidth() / 256, urx), "repeats every 256 across")
+    end)
+
     it("draws an atlas, flipped on a mirrored panel unless told not to", function()
       theme({ { Atlas = "spec-corner", Point = "TOPINNER", Width = 20, Height = 20 },
         { Atlas = "spec-corner", Point = "TOPOUTER", Width = 20, Height = 20, Mirror = false } })

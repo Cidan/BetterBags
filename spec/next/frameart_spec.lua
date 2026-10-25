@@ -232,6 +232,37 @@ describe("NextFrameArt", function()
     end)
   end)
 
+  -- Classic's settings window (Classic/Blizzard_SettingsPanelTemplates.xml): its title band, _UI-Frame-TitleTileBg (a
+  -- 17-pixel strip of Interface\FrameGeneral\_UI-Frame, tiled across: horizTile), in the frame's own BACKGROUND layer,
+  -- 8 in and 3 down to the right edge.
+  describe("a title band", function()
+    local BAND = { Texture = "Interface\\FrameGeneral\\_UI-Frame", TexCoords = { 0, 1, 0.2890625, 0.421875 }, HorizTile = true,
+      Color = "White", Height = 17, Left = 8, Right = 0, Top = 3 }
+
+    it("draws its band across the region's top, Left and Right in and Top down, tiled and cropped", function()
+      art:Apply({ Layout = "HeldBagLayout", TitleBg = BAND })
+      local band = art.titleBg
+      assert.is_true(band:IsShown())
+      assert.are.equal("Interface\\FrameGeneral\\_UI-Frame", band:GetTexture())
+      assert.are.same({ { "TOPLEFT", region, "TOPLEFT", 8, -3 }, { "TOPRIGHT", region, "TOPRIGHT", 0, -3 } }, points(band))
+      assert.are.equal(17, band:GetHeight())
+      assert.is_true(band:GetHorizTile())
+      assert.are.same({ 0, 1, 0.2890625, 0.421875 }, coords(band))
+      local layer = band:GetDrawLayer()
+      assert.are.equal("BACKGROUND", layer, "under the frame's pieces")
+    end)
+
+    it("mirrors its sides on a mirrored frame, and hides for a frame without one", function()
+      art:Apply({ Layout = "HeldBagLayout", TitleBg = BAND }, true)
+      assert.are.same({ { "TOPLEFT", region, "TOPLEFT", 0, -3 }, { "TOPRIGHT", region, "TOPRIGHT", -8, -3 } }, points(art.titleBg))
+      art:Apply({ Layout = "HeldBagLayout" })
+      assert.is_false(art.titleBg:IsShown())
+      art:Apply({ Layout = "HeldBagLayout", TitleBg = BAND })
+      art:Apply(false)
+      assert.is_false(art.titleBg:IsShown())
+    end)
+  end)
+
   it("tints its pieces, draws them where the theme says, and hides them all for none", function()
     art:Apply({ Layout = "HeldBagLayout", Color = { 1, 0.5, 0, 1 }, Alpha = 0.5, Layer = "BORDER", SubLevel = 3 })
     local corner = art.pieces.TopLeftCorner

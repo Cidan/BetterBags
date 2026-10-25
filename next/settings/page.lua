@@ -126,7 +126,7 @@ function pageProto:Style()
   for _, t in ipairs(self.titles) do style:SetFont(t, C.TitleFont) end
   for _, n in ipairs(self.notes) do style:SetFont(n, C.NoteFont) end
   for _, card in ipairs(self.cards) do controls:Paint(card, C.Card) end
-  for _, line in ipairs(self.lines) do controls:Paint(line, { Color = C.Divider.Color }, C.Divider.Alpha) end
+  for _, line in ipairs(self.lines) do controls:Paint(line, C.Divider and { Color = C.Divider.Color } or false, C.Divider and C.Divider.Alpha) end
   style:SetFont(self.empty, C.TextFont)
 end
 
@@ -159,11 +159,12 @@ function pageProto:line(n, x, y, width, height)
   local line = self:part(self.lines, n, function()
     return self.frame:CreateTexture(nil, "BORDER")
   end)
-  controls:Paint(line, { Color = C.Divider.Color }, C.Divider.Alpha)
+  -- A theme may draw no lines between rows (Divider = false).
+  controls:Paint(line, C.Divider and { Color = C.Divider.Color } or false, C.Divider and C.Divider.Alpha)
   line:ClearAllPoints()
   pixel:Point(line, "TOPLEFT", self.frame, "TOPLEFT", x, -y)
   pixel:Size(line, width, height)
-  line:Show()
+  line:SetShown(C.Divider ~= nil and C.Divider ~= false)
   return n
 end
 
@@ -196,7 +197,7 @@ function pageProto:Render(parentResult)
   local inner = width - 2 * pad
   local columns = inner >= 2 * minColumn and 2 or 1
   local column = columns == 2 and pixel:Floor(f, inner / 2) or inner
-  local divider = pixel:Length(f, C.Divider.Size or 1)
+  local divider = pixel:Length(f, C.Divider and C.Divider.Size or 1)
   local sectionGap, titleHeight = pixel:Snap(f, C.SectionGap), pixel:Snap(f, C.TitleHeight)
   local placed = {}
   local hidden = {}
