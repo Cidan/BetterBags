@@ -95,7 +95,8 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   Its `regions` (`sizingRegions`): what changed on screen in the panel since its last step in this recording, from
   `PixelAudit:Regions(panel.frame, { skip = panel:MovingParts() })` (next-pixel-perfect.md §6): every region that draws
   in it (named as the pixel check names parts), with its kind and draw layer, where it is in screen pixels, its alpha
-  with its parents', and what it draws (file or atlas, color, texture coordinates when not the whole image, a text's
+  with its parents', and what it draws (file or atlas, color, texture coordinates when not the whole image, whether the
+  client snaps it to the pixel grid and its texel snapping bias, a text's
   text). The first step of a panel lists all of them (`= path | what`); each later step only `+ path | what` (drawn now
   and not then), `- path` (no longer drawn) and `~ path | what` (drawn differently), sorted; nil for nothing. Added when
   the first sizing recording showed every recorded icon on the same whole pixels at all 247 steps while the player

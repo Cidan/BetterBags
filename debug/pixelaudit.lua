@@ -344,7 +344,9 @@ end
 local FULL_COORDS = { 0, 0, 0, 1, 1, 0, 1, 1 }
 
 -- drawnBy says what a region draws, for Regions: a texture's (or line's, or mask's) draw layer, file or atlas ("nothing"
--- with neither), color and, when it is not the whole image, its texture coordinates; a text's or edit box's text.
+-- with neither), color and, when it is not the whole image, its texture coordinates, then how the client snaps it: to
+-- the pixel grid or not, and its texel snapping bias (how much it picks a texel rather than blending them; a Blizzard
+-- developer on warcraft.wiki.gg TextureBase:SetTexelSnappingBias); a text's or edit box's text.
 ---@param region ScriptRegion
 ---@return string head, string tail
 local function drawnBy(region)
@@ -369,6 +371,10 @@ local function drawnBy(region)
       tail = tail .. " | coords " .. table.concat(parts, ",")
       break
     end
+  end
+  if region.IsSnappingToPixelGrid ~= nil then
+    tail = string.format("%s | snap %s bias %.3f", tail, tostring(region:IsSnappingToPixelGrid()),
+      region:GetTexelSnappingBias())
   end
   return string.format("%s %s %d", kind, tostring(layer), sublevel or 0), tail
 end
