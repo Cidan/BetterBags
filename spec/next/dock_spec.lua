@@ -277,6 +277,16 @@ describe("NextDock", function()
       assert.is_true(entry.box.frame:GetHeight() > before)
     end)
 
+    -- A new parent changes a frame's level (Blizzard's FrameUtil.SetParentMaintainRenderLayering puts it back after
+    -- SetParent), so the level never lowered is the one the section had before it went into its card.
+    it("never lowers a section already above its card", function()
+      local high = section("B").frame
+      high:SetFrameLevel(target.frame:GetFrameLevel() + 400)
+      local entry = nextDock:Add(target, { section = section("B"), source = source, offer = offer(), atOnce = true })
+      assert.is_true(entry.seated)
+      assert.are.equal(target.frame:GetFrameLevel() + 400, high:GetFrameLevel())
+    end)
+
     it("keeps the clicks from the section's item buttons", function()
       local entry = dock("B")
       settle()

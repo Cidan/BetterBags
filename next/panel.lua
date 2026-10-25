@@ -3041,17 +3041,24 @@ function panelProto:LayoutHeader()
 end
 
 -- holdRow puts the header's row under the hidden holder while the theme puts it in the bag button's menu, and back on
--- the panel's frame after; pinned buttons stay on the panel's frame. A frame's level stays what it was set to across a
--- new parent (warcraft.wiki.gg Frame Strata: since 7.0.3 "always stay what you set them to"), over the overlay.
+-- the panel's frame after; pinned buttons stay on the panel's frame. A new parent changes a frame's level (Blizzard's
+-- LFDFrame.lua: "Setting a new parent changes the frame level"), so each button gets back the level it had, over the
+-- overlay and a small panel's mover, as Blizzard's FrameUtil.SetParentMaintainRenderLayering puts one back.
 ---@private
 function panelProto:holdRow()
   local inMenu = self:RowInMenu()
   for _, button in ipairs(self.headerButtons) do
     local held = inMenu and pinnedOf(button) == nil
+    local parent
     if held and button:GetParent() ~= self.menuHolder then
-      button:SetParent(self.menuHolder)
+      parent = self.menuHolder
     elseif not held and button:GetParent() == self.menuHolder then
-      button:SetParent(self.frame)
+      parent = self.frame
+    end
+    if parent ~= nil then
+      local level = button:GetFrameLevel()
+      button:SetParent(parent)
+      button:SetFrameLevel(level)
     end
   end
 end

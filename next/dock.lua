@@ -315,15 +315,17 @@ end
 
 -- Seat puts a docked section in its card's slot, at its scale, under the catcher. Its level is only ever
 -- raised: lowering a frame lowers every frame in it, and one that would go below 0 jumps to the top level
--- (warcraft.wiki.gg "Frame Strata"), above the catcher.
+-- (warcraft.wiki.gg "Frame Strata"), above the catcher. The level never lowered is the one it had before: a new
+-- parent changes a frame's level (Blizzard's FrameUtil.SetParentMaintainRenderLayering puts it back after SetParent).
 ---@param entry NextDockEntry
 function listProto:Seat(entry)
   local frame, box = entry.section.frame, entry.box
+  local level = frame:GetFrameLevel()
   frame:SetParent(box.frame)
   frame:SetScale(entry.scale)
   frame:SetAlpha(1)
   frame:SetFrameStrata(box.frame:GetFrameStrata())
-  frame:SetFrameLevel(math.max(frame:GetFrameLevel(), box.frame:GetFrameLevel() + 1))
+  frame:SetFrameLevel(math.max(level, box.frame:GetFrameLevel() + 1))
   frame:ClearAllPoints()
   frame:SetPoint("TOPLEFT", box.slot, "TOPLEFT", 0, 0)
   frame:Show()

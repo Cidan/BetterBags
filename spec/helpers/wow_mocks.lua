@@ -332,6 +332,12 @@ function WidgetMethods:SetParent(parentFrame)
     end
   end
   self._parent = parentFrame
+  -- A new parent changes the frame's level (Blizzard's LFDFrame.lua: "Setting a new parent changes the frame level,
+  -- so we need to move it back to what we set in OnLoad"; FrameUtil.SetParentMaintainRenderLayering puts the level
+  -- back after SetParent): to one above the parent, the level a new child gets.
+  if not isRegionType(self._type) and previous ~= parentFrame and parentFrame ~= nil and parentFrame.GetFrameLevel ~= nil then
+    self:SetFrameLevel(parentFrame:GetFrameLevel() + 1)
+  end
 end
 -- Frame:GetChildren() -> the frame's child frames.
 function WidgetMethods:GetChildren()

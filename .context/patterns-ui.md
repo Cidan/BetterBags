@@ -391,3 +391,14 @@ smaller than the theme it sits beside; asked: "scale for Plain should be the sam
 **Rule**: A skin theme takes Default's sizes (layout, fonts, controls) and replaces only the look; keep a Blizzard size
 only where Blizzard's art fixes it (a title bar, a check box, a close button) or where Blizzard's is larger. `Copy` font
 roles take the role's `Size` for exactly this (`Size = false` keeps the client's).
+
+## A New Parent Changes a Frame's Level
+**Problem**: Plain moves the bag's header buttons under a hidden frame and Default moves them back; the code assumed a
+frame keeps its level across `SetParent` (its comment cited 7.0.3's "frame levels no longer change automatically"),
+and the buttons came back at one above the panel, under a small panel's mover, which took their clicks. The spec mock
+kept levels across `SetParent`, so a test that checked the level passed.
+
+**Rule**: `SetParent` changes a frame's level (Blizzard's LFDFrame.lua: "Setting a new parent changes the frame level,
+so we need to move it back"). Read the level before `SetParent` and set it after, as Blizzard's
+`FrameUtil.SetParentMaintainRenderLayering` does; a "never lower it" check compares with the level read before. The
+mock now gives a reparented frame one above its new parent.
