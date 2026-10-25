@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- tabs_spec.lua -- NextTabs (next/tabs.lua): the backpack's groups as tabs down the body's left
 -- edge, sticking out like bookmarks; the selected one is brighter, with a gold bar that glides to
 -- it, and a hovered one slides out (next.md §3).
@@ -340,7 +342,7 @@ describe("NextTabs", function()
       -- By its corner, centered on the tab's height by its font's (docs/next-pixel-perfect.md).
       local text = rail.tabs[2].text
       local _, fontHeight = text:GetFont()
-      assert.are.same({ "TOPRIGHT", rail.tabs[2].button, "TOPRIGHT", -5, -math.floor((20 - fontHeight) / 2) },
+      assert.are.same({ "TOPRIGHT", rail.tabs[2].button, "TOPRIGHT", -5 + TEXT, -math.floor((20 - fontHeight) / 2) + TEXT },
         { text:GetPoint(1) })
     end)
 

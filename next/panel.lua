@@ -2665,10 +2665,10 @@ function panelProto:styleHeader()
   local inset, top = pixel:Snap(body, self:TitleStart()), pixel:Snap(body, style.TITLE_TOP)
   local centered = H.Title.Justify == "CENTER"
   if left then
-    title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -inset, -top)
+    pixel:Point(title, "TOPRIGHT", body, "TOPRIGHT", -inset, -top)
     title:SetJustifyH(centered and "CENTER" or "RIGHT")
   else
-    title:SetPoint("TOPLEFT", body, "TOPLEFT", inset, -top)
+    pixel:Point(title, "TOPLEFT", body, "TOPLEFT", inset, -top)
     title:SetJustifyH(centered and "CENTER" or "LEFT")
   end
 
@@ -3410,9 +3410,9 @@ function panelProto:placeSearch()
   local _, helpHeight = help:GetFont()
   local helpTop = -pixel:Floor(t, (height - (helpHeight or 0)) / 2)
   help:ClearAllPoints()
-  help:SetPoint("TOPLEFT", t, "TOPLEFT", 2 * gap + iconSize, helpTop)
-  help:SetPoint("TOPRIGHT", t, "TOPRIGHT", -right, helpTop)
-  t:SetTextInsets(2 * gap + iconSize, right, 0, 0)
+  pixel:Point(help, "TOPLEFT", t, "TOPLEFT", 2 * gap + iconSize, helpTop)
+  pixel:Point(help, "TOPRIGHT", t, "TOPRIGHT", -right, helpTop)
+  pixel:TextInsets(t, 2 * gap + iconSize, right, 0, 0)
   local clear = t.clearButton
   if clear ~= nil then
     local size = clear:GetHeight()
@@ -3443,10 +3443,10 @@ function panelProto:placeSearchInner(I)
   local left, right = pixel:Snap(t, I.TextLeft or 0), pixel:Snap(t, I.TextRight or 0)
   local help = t.Instructions
   help:ClearAllPoints()
-  help:SetPoint("TOPLEFT", t, "TOPLEFT", left, 0)
-  help:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", -right, 0)
+  pixel:Point(help, "TOPLEFT", t, "TOPLEFT", left, 0)
+  pixel:Point(help, "BOTTOMRIGHT", t, "BOTTOMRIGHT", -right, 0)
   help:SetJustifyV("MIDDLE")
-  t:SetTextInsets(left, right, 0, 0)
+  pixel:TextInsets(t, left, right, 0, 0)
   local clear = t.clearButton
   if clear ~= nil then
     clear:ClearAllPoints()

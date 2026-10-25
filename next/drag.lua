@@ -27,6 +27,9 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
@@ -362,7 +365,7 @@ function nextDrag:showTarget(target)
   if text then
     self.hint:SetText(text)
     self.hint:ClearAllPoints()
-    self.hint:SetPoint("TOP", state.section.frame, "BOTTOM", 0, -style.Theme.Drag.HintGap)
+    pixel:Point(self.hint, "TOP", state.section.frame, "BOTTOM", 0, -style.Theme.Drag.HintGap)
     self.hint:Show()
   else
     self.hint:Hide()

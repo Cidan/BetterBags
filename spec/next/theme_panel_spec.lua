@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- theme_panel_spec.lua -- BetterBags Next's panels drawn from a Next theme (next-themes.md): the
 -- body, feathers, wash, edge, title, cloud, ribbon, spark, header buttons, search box, footer,
 -- sparkles, braid, sizes and animations, all restyled live when SonataNext applies a theme. Run on
@@ -597,8 +599,8 @@ describe("BetterBags Next's panels and themes", function()
       apply({ Fonts = { Big = { Size = 30, Color = "Gold" } }, Header = { Title = { Font = "Big" } },
         Layout = { TitleInset = 10, TitleTop = 30 } })
       assert.are.equal(style:Font("Big"), bag.title:GetFontObject())
-      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + 10, -30 }, { bag.title:GetPoint(1) })
-      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -(style.PAD + 10), -30 }, { bank.title:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + 10 + TEXT, -30 + TEXT }, { bag.title:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -(style.PAD + 10) + TEXT, -30 + TEXT }, { bank.title:GetPoint(1) })
     end)
 
     it("lights the title's glow on hover, by its alpha and spread, or not at all", function()
@@ -784,11 +786,11 @@ describe("BetterBags Next's panels and themes", function()
       -- The bag button reaches 28 in (12 out, 40 wide); the close takes its width less the pixel it sits past the edge.
       local close = style.HEADER_BUTTON - 1
       local p, rel, rp, x = bag.title:GetPoint(1)
-      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 28 }, { p, rel, rp, x })
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 28 + TEXT }, { p, rel, rp, x })
       assert.are.equal(bag:BodyWidth() - 28 - close, bag.title:GetWidth())
       assert.are.equal("CENTER", bag.title:GetJustifyH())
       p, rel, rp, x = bank.title:GetPoint(1)
-      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -28 }, { p, rel, rp, x })
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -28 + TEXT }, { p, rel, rp, x })
       assert.are.equal(bank:BodyWidth() - 28 - close, bank.title:GetWidth())
     end)
 
@@ -1134,8 +1136,8 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", -pad, bag:ContentBottom() }, { bag.scroll.frame:GetPoint(2) })
       assert.are.same({ "TOPLEFT", bank.body, "TOPLEFT", pad, -style.CONTENT_TOP }, { bank.scroll.frame:GetPoint(1) })
       assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -inner, bank:ContentBottom() }, { bank.scroll.frame:GetPoint(2) })
-      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", inner + style.TITLE_INSET, -style.TITLE_TOP }, { bag.title:GetPoint(1) })
-      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -(inner + style.TITLE_INSET), -style.TITLE_TOP }, { bank.title:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", inner + style.TITLE_INSET + TEXT, -style.TITLE_TOP + TEXT }, { bag.title:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -(inner + style.TITLE_INSET) + TEXT, -style.TITLE_TOP + TEXT }, { bank.title:GetPoint(1) })
       local search = bag.searchBox.frame
       assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", inner, -style.SEARCH_TOP }, { search:GetPoint(1) })
       assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -pad, -style.SEARCH_TOP }, { search:GetPoint(2) })
@@ -1145,8 +1147,8 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", inner, style.FOOTER - 4 }, { bag.footerLine:GetPoint(1) })
       assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", -pad, style.FOOTER - 4 }, { bag.footerLine:GetPoint(2) })
       assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -inner, style.FOOTER - 4 }, { bank.footerLine:GetPoint(2) })
-      assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", inner + style.TITLE_INSET, style.FOOTER_TEXT }, { bag.freeText:GetPoint(1) })
-      assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -(inner + style.TITLE_INSET), style.FOOTER_TEXT },
+      assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", inner + style.TITLE_INSET + TEXT, style.FOOTER_TEXT + TEXT }, { bag.freeText:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -(inner + style.TITLE_INSET) + TEXT, style.FOOTER_TEXT + TEXT },
         { bank.freeText:GetPoint(1) })
       assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", -pad, style.FOOTER_MONEY }, { bag.moneyFrame.frame:GetPoint(1) },
         "the money stays on the outer side")
@@ -1197,7 +1199,7 @@ describe("BetterBags Next's panels and themes", function()
         assert.are.same({ "TOPLEFT", bank.body, "TOPRIGHT", 0, 0 }, { bank.rail:GetPoint(1) })
         assert.are.same({ "BOTTOMLEFT", bank.body, "BOTTOMRIGHT", 0, 0 }, { bank.rail:GetPoint(2) })
         assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD, -style.CONTENT_TOP }, { bag.scroll.frame:GetPoint(1) })
-        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + style.TITLE_INSET, -style.TITLE_TOP }, { bag.title:GetPoint(1) })
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + style.TITLE_INSET + TEXT, -style.TITLE_TOP + TEXT }, { bag.title:GetPoint(1) })
         local step = style.HEADER_BUTTON + 6
         for i, button in ipairs(shown(bag)) do
           assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", -(40 - 9), -(64 + (i - 1) * step) }, { button:GetPoint(1) }, button.key)
@@ -1356,9 +1358,9 @@ describe("BetterBags Next's panels and themes", function()
       local t = bag.searchBox.textBox
       assert.are.same({ 10, 10 }, { t.searchIcon:GetSize() })
       assert.are.same({ "LEFT", t, "LEFT", 1, -1 }, { t.searchIcon:GetPoint(1) })
-      assert.are.same({ 16, 20, 0, 0 }, { t:GetTextInsets() })
-      assert.are.same({ "TOPLEFT", t, "TOPLEFT", 16, 0 }, { t.Instructions:GetPoint(1) })
-      assert.are.same({ "BOTTOMRIGHT", t, "BOTTOMRIGHT", -20, 0 }, { t.Instructions:GetPoint(2) })
+      assert.are.same({ 16 + TEXT, 20 - TEXT, -TEXT, TEXT }, { t:GetTextInsets() })
+      assert.are.same({ "TOPLEFT", t, "TOPLEFT", 16 + TEXT, TEXT }, { t.Instructions:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", t, "BOTTOMRIGHT", -20 + TEXT, TEXT }, { t.Instructions:GetPoint(2) })
       assert.are.same("MIDDLE", t.Instructions:GetJustifyV())
       assert.are.same({ "RIGHT", t, "RIGHT", -3, 0 }, { t.clearButton:GetPoint(1) })
       -- InputBoxInstructionsTemplate's own color for its help (its XML <Color>), over the role's.
@@ -1472,7 +1474,7 @@ describe("BetterBags Next's panels and themes", function()
       local scroll = bag.scroll.frame
       assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 10, -120 }, { scroll:GetPoint(1) })
       assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", -10, 50 }, { scroll:GetPoint(2) })
-      assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", 10 + style.TITLE_INSET, 20 }, { bag.freeText:GetPoint(1) })
+      assert.are.same({ "BOTTOMLEFT", bag.body, "BOTTOMLEFT", 10 + style.TITLE_INSET + TEXT, 20 + TEXT }, { bag.freeText:GetPoint(1) })
     end)
 
     it("takes its sizes at once: the body, the feather, and its buttons drawn again at its icon size", function()

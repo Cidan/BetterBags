@@ -260,10 +260,10 @@ function railProto:placeContent(tab)
   text:ClearAllPoints()
   icon:ClearAllPoints()
   if self.side == "LEFT" then
-    text:SetPoint("TOPLEFT", button, "TOPLEFT", pad, textTop)
+    pixel:Point(text, "TOPLEFT", button, "TOPLEFT", pad, textTop)
     icon:SetPoint("TOPLEFT", button, "TOPLEFT", iconX, iconTop)
   else
-    text:SetPoint("TOPRIGHT", button, "TOPRIGHT", -pad, textTop)
+    pixel:Point(text, "TOPRIGHT", button, "TOPRIGHT", -pad, textTop)
     icon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -iconX, iconTop)
   end
 end

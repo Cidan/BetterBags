@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- small_spec.lua -- BetterBags Next's small mode (docs/next-small-mode.md): smaller, movable panels
 -- that keep Next's look, for smaller screens, switched to and from the full panels with a button,
 -- animated. Run on the real backpack and bank panels.
@@ -307,7 +309,7 @@ describe("BetterBags Next's small mode", function()
       local bag = nextBag:Create(ctx())
       assert.is_true(bag.title:GetWidth() > 0, "a small panel's title has a width")
       assert.are.equal("LEFT", bag.title:GetJustifyH())
-      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + style.TITLE_INSET, -style.TITLE_TOP },
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + style.TITLE_INSET + TEXT, -style.TITLE_TOP + TEXT },
         { bag.title:GetPoint(1) })
       bag.title:SetJustifyH("CENTER")
       bag:StyleParts()

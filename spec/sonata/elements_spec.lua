@@ -91,6 +91,7 @@ describe("SonataElements", function()
         end,
         Length = function(_, units) return units * 100 end,
         Unit = function() return 0.5 end,
+        Text = function() return 0 end,
       }
 
       before_each(function()
@@ -141,6 +142,7 @@ describe("SonataElements", function()
         Offset = function(region, units) return pixel:Snap(region, units) end,
         Length = function(region, units) return pixel:Length(region, units) end,
         Unit = function(region) return pixel:Unit(region) end,
+        Text = function(region) return pixel:TextOffset(region) end,
       }
       local window = CreateFrame("Frame", nil, UIParent)
       window:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
@@ -178,7 +180,7 @@ describe("SonataElements", function()
       local applied = sonata.applied
       sonata.applied = true
       local snap = { Offset = function(_, u) return u end, Length = function(_, u) return u end,
-        Unit = function() return 1 end }
+        Unit = function() return 1 end, Text = function() return 0 end }
       elements:SetItemButtonSnap(snap)
       assert.are.equal(snap, elements.itemSnap)
       elements:SetItemButtonSnap(snap)

@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- window_spec.lua -- NextSettings and NextSettingsPages (next/settings/window.lua, pages.lua): BetterBags
 -- Next's settings window (next-settings.md §3), on pages registered for the spec: the sidebar of
 -- pages under their headings with its search box, a page's header and tabs, its sections scrolling
@@ -385,9 +387,9 @@ describe("NextSettings", function()
       end
       local function check()
         local insetLeft, insetRight = settings.search.frame:GetTextInsets()
-        assert.are.same({ left, I.Padding }, { insetLeft, insetRight })
+        assert.are.same({ left + TEXT, I.Padding - TEXT }, { insetLeft, insetRight })
         local _, helpHeight = settings.search.help:GetFont()
-        assert.are.same({ "TOPLEFT", settings.search.frame, "TOPLEFT", left, down(helpHeight) },
+        assert.are.same({ "TOPLEFT", settings.search.frame, "TOPLEFT", left + TEXT, down(helpHeight) + TEXT },
           { settings.search.help:GetPoint(1) })
         assert.are.equal(style.Theme.Textures[SR.Icon], settings.search.icon:GetTexture())
         assert.are.same({ "TOPLEFT", settings.search.frame, "TOPLEFT", I.Padding, down(SR.IconSize) },
@@ -778,7 +780,7 @@ describe("NextSettings", function()
         { a.frame:GetPoint(1) })
       -- Short of the buttons by their width rounded up, from the header's corner (docs/next-pixel-perfect.md).
       local right = X.Inset + X.Size + H.Actions.Gap + math.ceil(a.frame:GetWidth()) + H.Actions.Gap
-      assert.are.same({ "TOPRIGHT", settings.header, "TOPRIGHT", -right, -H.TitleTop }, { settings.title:GetPoint(2) })
+      assert.are.same({ "TOPRIGHT", settings.header, "TOPRIGHT", -right + TEXT, -H.TitleTop + TEXT }, { settings.title:GetPoint(2) })
       settings:Select("general")
       assert.is_false(a.frame:IsShown())
       assert.are.equal("General", settings.title:GetText())
@@ -1042,8 +1044,8 @@ describe("NextSettings", function()
       assert.are.same({ 920, 724 }, { settings.frame:GetSize() })
       assert.is_true(settings.windowTitle:IsShown())
       assert.are.equal("BetterBags", settings.windowTitle:GetText())
-      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 30, -6 }, { settings.windowTitle:GetPoint(1) })
-      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -24, -6 }, { settings.windowTitle:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 30 + TEXT, -6 + TEXT }, { settings.windowTitle:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -24 + TEXT, -6 + TEXT }, { settings.windowTitle:GetPoint(2) })
       assert.are.equal("CENTER", settings.windowTitle:GetJustifyH())
       assert.are.equal("Options_InnerFrame", settings.innerFrame:GetAtlas())
       assert.are.same({ 886, 618 }, { settings.innerFrame:GetSize() })
@@ -1088,7 +1090,7 @@ describe("NextSettings", function()
       assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 233, -76 }, rect(settings.header))
       assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -22, -76 }, { settings.header:GetPoint(2) })
       assert.are.equal(50, settings.header:GetHeight())
-      assert.are.same({ "TOPLEFT", settings.header, "TOPLEFT", 7, -22 }, rect(settings.title))
+      assert.are.same({ "TOPLEFT", settings.header, "TOPLEFT", 7 + TEXT, -22 + TEXT }, rect(settings.title))
       assert.is_false(settings.description:IsShown())
       assert.is_true(settings.divider:IsShown())
       assert.are.equal("Options_HorizontalDivider", settings.divider:GetAtlas())
@@ -1194,7 +1196,7 @@ describe("NextSettings", function()
       assert.are.same({ "Options_CategoryHeader_1", "Options_CategoryHeader_2", "Options_CategoryHeader_1" },
         { headings[1].fill:GetAtlas(), headings[2].fill:GetAtlas(), headings[3].fill:GetAtlas() })
       assert.is_true(headings[1].fill:IsShown())
-      assert.are.same({ "LEFT", headings[1].frame, "LEFT", 20, -1 }, { headings[1].label:GetPoint(1) })
+      assert.are.same({ "LEFT", headings[1].frame, "LEFT", 20 + TEXT, -1 + TEXT }, { headings[1].label:GetPoint(1) })
       UseNextTheme(nil)
       settings:ApplyStyle()
       assert.is_false(headings[1].fill:IsShown(), "a theme without")
@@ -1283,7 +1285,7 @@ describe("NextSettings", function()
       local general = navRow("General")
       local _, fontHeight = general.label:GetFont()
       local _, _, _, _, y = general.label:GetPoint(1)
-      assert.are.equal(-(math.floor((20 - fontHeight) / 2) - 1), y)
+      assert.are.equal(-(math.floor((20 - fontHeight) / 2) - 1) + TEXT, y)
     end)
 
     it("draws its theme's frame round it, its fill inset into it", function()

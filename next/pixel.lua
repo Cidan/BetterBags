@@ -5,12 +5,21 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 -- NextPixel puts BetterBags Next on the screen's pixel grid (docs/next-pixel-perfect.md): every length
 -- and offset Next gives a region is a whole number of screen pixels on that region's grid, so at rest
--- every frame and texture has its edges on whole pixels and every text its anchor on one, at any
--- screen size, UI scale and Bag Scale. A region's grid is its effective scale: one screen pixel in its
+-- every frame and texture has its edges on whole pixels and every text its anchor a quarter pixel right of
+-- and above one (TEXT_OFFSET), at any screen size, UI scale and Bag Scale. A region's grid is its effective scale: one screen pixel in its
 -- units is Blizzard's GetPixelToUIUnitFactor (768 over the screen's height in pixels) over it, as
 -- Blizzard's PixelUtil and GW2_UI (GW.mult) work it out.
 ---@class NextPixel: AceModule
 local pixel = addon:NewModule('NextPixel')
+
+-- How far a text sits from the whole pixel it is drawn in, right and up, in pixels. The client draws text in whole
+-- pixels; a text placed exactly on one (as every length and offset here is) was drawn in that pixel or the next as
+-- float error of a thousandth of a pixel crossed it. Measured in game: tab names and an item count drawn a pixel
+-- right as a panel's snap ended, their left edges read at 2758.999 during it and 2759.000 after; moved a quarter
+-- pixel right and up (the player's test), they stayed. A quarter pixel in, a text is drawn in the same pixel whether
+-- the client rounds or truncates (next-pixel-perfect.md §2). Textures stay on whole pixels: the client draws them
+-- without snapping (texture-sharpening.md), so a fraction would blend them.
+local TEXT_OFFSET = 0.25
 
 -- Round is half away from zero, as Blizzard's (Blizzard_SharedXMLBase/MathUtil.lua).
 ---@param value number
@@ -125,9 +134,21 @@ function pixel:Lengths(region, ...)
   return unpack(out, 1, select("#", ...))
 end
 
+-- TextOffset is how far a text sits right of and above the whole pixel it is drawn in, in its own units
+-- (TEXT_OFFSET); none for anything else, which stays on whole pixels.
+---@param region ScriptRegion
+---@return number
+function pixel:TextOffset(region)
+  if region:GetObjectType() ~= "FontString" then
+    return 0
+  end
+  return TEXT_OFFSET * self:Unit(region)
+end
+
 -- Point anchors region by a point, its offsets in whole pixels on its own grid (SetPoint takes them in
--- the anchored region's units). The relative point must itself be on a whole pixel: a corner or edge of
--- a region on the grid, or the middle of one an even number of pixels across.
+-- the anchored region's units), a text a quarter pixel right and up of them (TextOffset). The relative point
+-- must itself be on a whole pixel: a corner or edge of a region on the grid, or the middle of one an even
+-- number of pixels across.
 ---@param region ScriptRegion
 ---@param point FramePoint
 ---@param relativeTo? ScriptRegion|string
@@ -135,7 +156,9 @@ end
 ---@param x? number
 ---@param y? number
 function pixel:Point(region, point, relativeTo, relativePoint, x, y)
-  region:SetPoint(point, relativeTo, relativePoint or point, self:Snap(region, x or 0), self:Snap(region, y or 0))
+  local q = self:TextOffset(region)
+  region:SetPoint(point, relativeTo, relativePoint or point, self:Snap(region, x or 0) + q,
+    self:Snap(region, y or 0) + q)
 end
 
 -- Inset anchors region inside relativeTo (its parent by default), its edges in from relativeTo's by left,
@@ -211,7 +234,8 @@ function pixel:Row(region, corner, relativeTo, x, rowHeight, height, top)
   end
   local across = self:Snap(region, x)
   local down = self:Snap(region, top or 0) + self:Middle(region, rowHeight, height)
-  region:SetPoint(corner, relativeTo, corner, corner == "TOPRIGHT" and -across or across, -down)
+  local q = self:TextOffset(region)
+  region:SetPoint(corner, relativeTo, corner, (corner == "TOPRIGHT" and -across or across) + q, -down + q)
 end
 
 -- SnapScroll keeps what a scroll box holds on whole pixels wherever it is scrolled: Blizzard's box anchors its
@@ -249,6 +273,19 @@ function pixel:Center(region, relativeTo, outerWidth, outerHeight, width, height
   local y = math.floor((oh - h) / 2) - self:Pixels(region, dy or 0)
   region:SetPoint("TOPLEFT", relativeTo, "TOPLEFT", x * unit, -y * unit)
   region:SetSize(w * unit, h * unit)
+end
+
+-- TextInsets sets an edit box's text insets in whole pixels on its grid, its text a quarter pixel right and up of
+-- them (TEXT_OFFSET), as a font string's: the box itself stays on whole pixels.
+---@param box EditBox
+---@param left number
+---@param right number
+---@param top number
+---@param bottom number
+function pixel:TextInsets(box, left, right, top, bottom)
+  local q = TEXT_OFFSET * self:Unit(box)
+  box:SetTextInsets(self:Snap(box, left) + q, self:Snap(box, right) - q, self:Snap(box, top) - q,
+    self:Snap(box, bottom) + q)
 end
 
 -- Key names the screen's pixel grid at UIParent: its scale and the screen's height. It changes with the

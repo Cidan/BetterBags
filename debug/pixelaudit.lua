@@ -43,6 +43,21 @@ local function onPixel(value)
   return math.abs(value - math.floor(value + 0.5)) < 1e-3
 end
 
+-- A text's place: a quarter pixel right of and above a whole pixel (next-pixel-perfect.md §2, TEXT_OFFSET in
+-- next/pixel.lua). The client draws text in whole pixels: one placed exactly on a whole pixel was drawn in one or the
+-- next as float error of a thousandth of a pixel crossed it; a quarter pixel in, it is drawn in the same one whether
+-- the client rounds or truncates. offset is that quarter where the value grows the way text was moved (x right, y up;
+-- an edit box's left and bottom insets), else three quarters (its right and top insets, which shrink as it moves).
+---@param value number
+---@param offset number
+---@return boolean
+local function onTextPixel(value, offset)
+  return math.abs(value - math.floor(value) - offset) < 1e-3
+end
+
+-- Where an edit box's insets put its text, a quarter pixel right and up: the fraction of a pixel each must leave.
+local INSET_OFFSET = { left = 0.25, right = 0.75, top = 0.75, bottom = 0.25 }
+
 -- visible says whether a region draws: shown with every parent, and neither it nor a parent at alpha 0 (a
 -- template's art hidden that way, a glow before it is lit).
 ---@param region ScriptRegion
@@ -271,8 +286,8 @@ local function drawRect(region, frame)
 end
 
 -- Check lists every shown part under root that draws and is not on whole screen pixels: a texture's, an edit
--- box's or a clipping frame's four edges, an edit box's text insets, a font string's anchor points (its far
--- edges are its text's measure). A part the client does not place is skipped, as is everything under a region
+-- box's or a clipping frame's four edges; and every text not a quarter pixel right of and above one (onTextPixel): a
+-- font string's anchor points (its far edges are its text's measure), an edit box's text insets. A part the client does not place is skipped, as is everything under a region
 -- in skip. owners (name -> table) name the parts in the messages; a part no owner reaches is named as walk names
 -- it. It returns one string per part off the grid; the parts Masque places (its skin, left to it,
 -- next-pixel-perfect.md §4), and everything inside them, are listed apart, second. Third, a note per line: what a
@@ -294,10 +309,10 @@ function audit:Check(root, opts)
       for i = 1, region:GetNumPoints() do
         local point = region:GetPoint(i)
         local x, y = pointOf(r, point)
-        if not onPixel(x * k) then
+        if not onTextPixel(x * k, 0.25) then
           table.insert(bad, string.format("%s x %.3f", point, x * k))
         end
-        if not onPixel(y * k) then
+        if not onTextPixel(y * k, 0.25) then
           table.insert(bad, string.format("%s y %.3f", point, y * k))
         end
       end
@@ -308,12 +323,12 @@ function audit:Check(root, opts)
         end
       end
     end
-    -- An edit box draws its text inside its insets, in its own units (SetTextInsets).
+    -- An edit box draws its text inside its insets, in its own units (SetTextInsets): a quarter pixel in, as text.
     if region:GetObjectType() == "EditBox" then
       local s = region:GetEffectiveScale()
       local insets = { region:GetTextInsets() }
       for i, side in ipairs(SIDES) do
-        if not onPixel(insets[i] * s * k) then
+        if not onTextPixel(insets[i] * s * k, INSET_OFFSET[side]) then
           table.insert(bad, string.format("text inset %s %.3f", side, insets[i] * s * k))
         end
       end

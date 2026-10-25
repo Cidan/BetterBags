@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- bank_spec.lua -- NextBank (next/bank.lua): BetterBagsNext's bank. The backpack's panel mirrored on
 -- the left of the screen, doing everything the classic retail, WoW: Forever and Classic banks do:
 -- groups and the Warbank, Blizzard's bank tabs, bag sockets, purchases, deposits, sorting, money,
@@ -340,7 +342,7 @@ describe("NextBank", function()
     it("titles itself on its inner side, its ribbon running right out of the window", function()
       local bank = nextBank:Create(ctx())
       assert.are.equal("Bank", bank.title:GetText())
-      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -(style.PAD + 4), -style.TITLE_TOP }, { bank.title:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -(style.PAD + 4) + TEXT, -style.TITLE_TOP + TEXT }, { bank.title:GetPoint(1) })
       local g = bank.ribbon._gradient
       assert.is_true(g.min.a > g.max.a, "bright at the title, gone at its far end")
     end)
@@ -543,7 +545,7 @@ describe("NextBank", function()
       assert.are.equal(true, moneyMade[1].warbank)
       assert.are.equal(moneyMade[1], bank.moneyFrame)
       assert.are.same({ "BOTTOMLEFT", bank.body, "BOTTOMLEFT", style.PAD, 12 }, { bank.moneyFrame.frame:GetPoint(1) })
-      assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -(style.PAD + 4), 14 }, { bank.freeText:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bank.body, "BOTTOMRIGHT", -(style.PAD + 4) + TEXT, 14 + TEXT }, { bank.freeText:GetPoint(1) })
       client("forever")
       moneyMade = {}
       override(stubs.money, "Create", function(_, warbank)

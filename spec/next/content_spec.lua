@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- content_spec.lua -- NextContent (next/content.lua): BetterBagsNext's canvas. It binds a tab's
 -- data as sections in one column (Recent Items, the tab's categories in order, Free Space),
 -- drawing and claiming the static item buttons, lays them out in rows of as many 44-pixel icons
@@ -1138,8 +1140,8 @@ describe("NextContent", function()
       local _, titleHeight = s.title:GetFont()
       local _, countHeight = s.count:GetFont()
       local countX = 9 + math.ceil(s.title:GetStringWidth()) + 3
-      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 9, -2 }, { s.title:GetPoint(1) })
-      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", countX, -2 - math.floor((titleHeight - countHeight) / 2) },
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 9 + TEXT, -2 + TEXT }, { s.title:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", countX + TEXT, -2 - math.floor((titleHeight - countHeight) / 2) + TEXT },
         { s.count:GetPoint(1) })
       local lineX = countX + math.ceil(s.count:GetStringWidth()) + 7
       local lineY = -2 - math.floor((titleHeight - s.line:GetHeight()) / 2)

@@ -98,6 +98,11 @@ describe("NextPixel", function()
     text:SetText("Backpack")
     pixel:Point(text, "TOPLEFT", window, "TOPLEFT", 22, -24.5)
     assert.are.same({}, layout.PixelCheck(window))
+    local unit = pixel:Unit(window)
+    local _, _, _, tx, ty = text:GetPoint(1)
+    assert.is_true(near(25.25 * unit, tx) and near(-27.75 * unit, ty), "a text a quarter pixel right and up")
+    local _, _, _, lx, ly = line:GetPoint(1)
+    assert.is_true(near(21 * unit, lx) and near(-46 * unit, ly), "a texture on whole pixels")
     local point, rel, relPoint = fill:GetPoint(2)
     assert.are.equal("BOTTOMRIGHT", point)
     assert.are.equal(window, rel)
@@ -153,8 +158,67 @@ describe("NextPixel", function()
     pixel:Row(text, "TOPRIGHT", button, 6.3 * unit, 25 * unit, nil, 10 * unit)
     point, rel, relPoint, x, y = text:GetPoint(1)
     assert.are.same({ "TOPRIGHT", button, "TOPRIGHT" }, { point, rel, relPoint })
-    assert.is_true(near(-6 * unit, x) and near(-16 * unit, y), "by its font's height, below a row 10 down")
+    assert.is_true(near(-5.75 * unit, x) and near(-15.75 * unit, y),
+      "by its font's height, below a row 10 down, a quarter pixel right and up")
     assert.are.same({}, layout.PixelCheck(button))
+  end)
+
+  -- Measured in game (next-pixel-perfect.md §2): the client draws text in whole pixels, and a text exactly on a
+  -- whole pixel was drawn in one or the next as float error of a thousandth of a pixel crossed it (tab names and an
+  -- item count a pixel right as a panel's snap ended, their left edges at 2758.999, then 2759.000). A quarter pixel
+  -- right of and above it, it is drawn in the same one whether the client rounds or truncates.
+  describe("text, a quarter pixel in", function()
+    local unit, frame
+    before_each(function()
+      unit = pixel:Unit(UIParent)
+      frame = CreateFrame("Frame", nil, UIParent)
+      frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+      frame:SetSize(100 * unit, 40 * unit)
+    end)
+
+    local function text()
+      local t = frame:CreateFontString()
+      t:SetFont("Fonts\\FRIZQT__.TTF", 12 * unit, "")
+      t:SetText("13")
+      return t
+    end
+
+    it("is the quarter pixel of a region's grid", function()
+      assert.is_true(near(0.25 * unit, pixel:TextOffset(text())))
+      local scaled = CreateFrame("Frame", nil, UIParent)
+      scaled:SetScale(0.5)
+      assert.is_true(near(0.5 * unit, pixel:TextOffset(scaled:CreateFontString())), "on its own grid")
+    end)
+
+    it("insets a text a quarter pixel right and up, keeping its size", function()
+      local t = text()
+      pixel:Inset(t, frame, 2 * unit, 3 * unit, 4 * unit, 5 * unit)
+      local _, _, _, x1, y1 = t:GetPoint(1)
+      local _, _, _, x2, y2 = t:GetPoint(2)
+      assert.is_true(near(2.25 * unit, x1) and near(-3.75 * unit, y1))
+      assert.is_true(near(-2.75 * unit, x2) and near(5.25 * unit, y2))
+      assert.are.same({}, layout.PixelCheck(frame))
+    end)
+
+    it("sets an edit box's text insets in whole pixels, its text a quarter pixel right and up", function()
+      local box = CreateFrame("EditBox", nil, frame)
+      box:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+      box:SetSize(80 * unit, 20 * unit)
+      pixel:TextInsets(box, 6.2 * unit, 4 * unit, 3.9 * unit, 4 * unit)
+      local left, right, top, bottom = box:GetTextInsets()
+      assert.is_true(near(6.25 * unit, left) and near(3.75 * unit, right), "6 and 4 pixels, a quarter right")
+      assert.is_true(near(3.75 * unit, top) and near(4.25 * unit, bottom), "4 and 4 pixels, a quarter up")
+      assert.are.same({}, layout.PixelCheck(frame))
+    end)
+
+    it("leaves textures and frames on whole pixels", function()
+      local tex = frame:CreateTexture()
+      pixel:Inset(tex, frame, 2 * unit, 3 * unit, 4 * unit, 5 * unit)
+      pixel:Center(CreateFrame("Frame", nil, frame), frame, 100 * unit, 40 * unit, 15 * unit, 12 * unit)
+      local _, _, _, x, y = tex:GetPoint(1)
+      assert.is_true(near(2 * unit, x) and near(-4 * unit, y))
+      assert.are.same({}, layout.PixelCheck(frame))
+    end)
   end)
 
   -- A scroll box anchors its scroll target at the scroll offset, in UI units (ScrollBoxBaseMixin:

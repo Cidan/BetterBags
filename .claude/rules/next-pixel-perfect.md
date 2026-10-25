@@ -31,11 +31,28 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
   they follow the client's measure of the text, between pixels. Place what follows a text from the
   shared corner by the text's width or height rounded up (`pixel:Ceil(region, text:GetStringWidth())`,
   `pixel:TextHeight`).
-- **Text** is placed by a corner on a whole pixel, centered on a row by its font's height
-  (`pixel:Row(text, "TOPLEFT", row, x, rowHeight)`); the glyphs are the client's. Every Next text role's
-  font height is a whole number of pixels at UIParent's grid (`NextStyle`, `pixel:FontHeight`).
-- **Edit boxes**: text insets in whole pixels; the insets above and below leave exactly the font's
-  height, so the line the client centers lands on a whole pixel (`next/controls/input.lua`).
+- **Text** is placed by a corner a quarter pixel right of and above a whole pixel (`TEXT_OFFSET`, `pixel:TextOffset`),
+  centered on a row by its font's height (`pixel:Row(text, "TOPLEFT", row, x, rowHeight)`); the glyphs are the
+  client's. `pixel:Point`, `pixel:Inset` and `pixel:Row` add the quarter pixel to a font string's offsets themselves
+  (after rounding), and anything else they place stays on whole pixels; so do the item fitter (`fromCorner`, the
+  countdown) and Sonata's item button styler (`SonataItemSnap.Text`). Every Next text role's font height is a whole
+  number of pixels at UIParent's grid (`NextStyle`, `pixel:FontHeight`).
+  - **Why** (measured in game, a render recorder snapshot and a video of a small backpack's snap): the client draws a
+    text's glyphs in whole pixels, and a text placed exactly on a whole pixel sits on the boundary. Float error of a
+    thousandth of a pixel then decides which pixel it is drawn in: tab names and an item count drawn a pixel right as
+    the snap ended, their left edges read at 2758.999 during the snap and 2759.000 after, while texts whose edges were
+    not on a boundary never moved. A quarter pixel in, a text is drawn in the same pixel whether the client rounds or
+    truncates; the player's test (every text of the backpack moved a quarter pixel right and up) stopped the jump.
+    How the client rounds text is not documented; this is inferred from those measurements. Textures stay on whole
+    pixels: they are drawn without sharpening (texture-sharpening.md), so a fraction would blend them.
+  - **Never hang anything from a text** (its corners included): it carries the quarter pixel, and a text hung from a
+    text sits half a pixel off. Hang it from the frame the text hangs from, by the sum of the offsets
+    (`NextDockCard:Style`: the warning and the slot from the card, no longer from the title and the warning; the
+    pixel check found the half pixel).
+  - Classic bags are not changed: they never place text on whole pixels, so their text sits off the boundary already.
+- **Edit boxes**: text insets in whole pixels, a quarter pixel right and up (`pixel:TextInsets`: left and bottom a
+  quarter more, right and top a quarter less); the insets above and below leave exactly the font's height, so the line
+  the client centers lands a quarter pixel above a whole pixel (`next/controls/input.lua`, the panels' search boxes).
 - **Room a text may take** is rounded down (`pixel:Floor`), **room a text needs** rounded up
   (`pixel:Ceil`).
 - **Windows** start from UIParent's corners (always whole pixels). The settings window is centered by its
@@ -191,11 +208,13 @@ bags take over:
 | `Length(region, units)`, `LengthIn(unit, units)`, `Lengths(region, ...)` | a length rounded, at least a pixel when not none |
 | `Floor`, `Ceil`, `FloorIn` | rounded down (room it may take) or up (room it needs) |
 | `Pixels(region, units)` | how many whole pixels |
-| `Point(region, point, relativeTo, relativePoint, x, y)` | anchor with rounded offsets |
-| `Inset(region, relativeTo, l, r, t, b)` | inside another, rounded insets |
+| `Point(region, point, relativeTo, relativePoint, x, y)` | anchor with rounded offsets (a text a quarter pixel right and up of them) |
+| `Inset(region, relativeTo, l, r, t, b)` | inside another, rounded insets (a text a quarter pixel right and up) |
+| `TextOffset(region)` | a text's quarter pixel on its grid; none for anything else |
+| `TextInsets(box, l, r, t, b)` | an edit box's text insets, rounded, its text a quarter pixel right and up |
 | `Size`, `Width`, `Height` | rounded sizes |
 | `Middle(region, outer, inner)` | the offset centering a length in another, odd pixel after |
-| `Row(region, corner, relativeTo, x, rowHeight, height?, top?)` | by a top corner, centered on a row (a text by its font's height) |
+| `Row(region, corner, relativeTo, x, rowHeight, height?, top?)` | by a top corner, centered on a row (a text by its font's height, a quarter pixel right and up) |
 | `Center(region, relativeTo, ow, oh, w, h, dx?, dy?)` | in the middle by its top left, sized |
 | `TextHeight(text)` | a font string's or edit box's font height |
 | `SnapScroll(box)` | a scroll box scrolls by whole pixels (once per box) |
@@ -205,8 +224,9 @@ bags take over:
 
 One check, run by the specs and in game: **`PixelAudit:Check(root, { skip, owners })`** lists every shown
 region under root that draws and is not on whole screen pixels: textures', lines', edit boxes' and clipping
-frames' four edges, an edit box's text insets, a font string's anchor points (its far edges are its text's
-measure). Nothing hidden or at alpha 0 (its own or a parent's). It reads only what the client gives an
+frames' four edges; and every text not a quarter pixel right of and above one (§2): a font string's anchor points
+(its far edges are its text's measure), an edit box's text insets (left and bottom a quarter past a whole pixel,
+right and top three quarters). Nothing hidden or at alpha 0 (its own or a parent's). It reads only what the client gives an
 addon, available on every client (live, Forever, Mists, TBC Anniversary, Era, Titan API docs):
 `GetScaledRect` (where the client puts a region, in UI units at scale 1: its own units times its effective
 scale, as Blizzard's `RegionUtil.GetRegionPoint` reads it), `GetPoint`, `GetRegions`, `GetChildren`,
@@ -354,6 +374,15 @@ Real screens: the reporter's 3396x1362 at 65% and 70%, 3440x1440 at 65%, 1920x10
 - Mutation-checked: the theme card (old edge, old layout), the drop's anchor rounding, the scroll
   rounding (every scrolled check fails without it), the menu's width conversion, the settings window's
   settle, Sonata's rounding.
+- Text a quarter pixel in (§2): `spec/next/pixel_spec.lua` ("text, a quarter pixel in": the offset on each grid,
+  insets, edit box insets, textures and frames left on whole pixels), `spec/helpers_layout_spec.lua` and
+  `spec/debug/pixelaudit_spec.lua` (the check's text rule both ways), `spec/sonata/next_engine_spec.lua` (the item
+  snap's `Text`), and every pixel test of every Next window and control, which now fails on a text on a whole pixel.
+  24 mutations (the offset, each axis of `Point` and `Row`, the offset on non-text, each inset and its sign, the
+  check's rules, the dock card's lines hung from text, the item fitter, Sonata's snap and Next's, the money, the
+  search boxes' and inputs' insets): each caught; the one that first survived (Next's item snap giving no offset)
+  led to the engine test, and two offsets that could only ever apply to textures (`pixel:Center`, the fitter's
+  `atItsSize`) were removed as dead code.
 
 **Not verified in game yet.** To check: in a maximized window at UI scales of 65% and 70%, the selected
 theme card's four edges, a docked section, scrolled settings pages, a small panel after a drag; the render

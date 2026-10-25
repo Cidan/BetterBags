@@ -381,6 +381,10 @@ describe("SonataNext", function()
       assert.are.equal(pixel:Snap(region, 2.4), snap.Offset(region, 2.4))
       assert.are.equal(pixel:Length(region, 0.2), snap.Length(region, 0.2))
       assert.are.equal(pixel:Unit(region), snap.Unit(region))
+      local count = region:CreateFontString()
+      assert.are.equal(pixel:TextOffset(count), snap.Text(count), "a count a quarter pixel right and up")
+      assert.is_true(snap.Text(count) > 0)
+      assert.are.equal(0, snap.Text(region), "anything else on whole pixels")
       sonataNext:SetActive(false)
       -- The stubs stay for the spec's other tests, doing nothing.
       elements.SetItemButtonSnap = savedSnap or function() end

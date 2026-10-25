@@ -435,3 +435,14 @@ screen, diffed frame by frame, did.
 on textures that resize and ElvUI on every texture (`Texels:Unsharpen`, texture-sharpening.md). When something drawn
 changes with no rect changing, compare video frames before reading more of the layout.
 
+
+## Text Exactly on a Whole Pixel Jumps a Pixel
+**Problem**: in a pixel-perfect layout, tab names and an item count jumped one pixel right as a panel's snap ended,
+and nothing else moved. Every text was placed exactly on a whole pixel, and the client draws text in whole pixels:
+float error of a thousandth of a pixel (their left edges read 2758.999 during the snap, 2759.000 after) decided which
+pixel the glyphs landed in. Texts whose edges were not on a boundary never moved.
+
+**Rule**: place text a quarter pixel right of and above a whole pixel (`NextPixel:TextOffset`, added by `Point`,
+`Inset`, `Row` and `TextInsets`), so it is drawn in the same pixel whether the client rounds or truncates; keep
+textures on whole pixels. Never hang anything from a text: the offset carries, and a text hung from a text sits half a
+pixel off. When a text moves by exactly one pixel with no layout change, look for an anchor exactly on a boundary.

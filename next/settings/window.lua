@@ -658,10 +658,10 @@ function settings:Style()
   local versionBottom = pixel:Snap(frame, V.Bottom)
   if V.Window then
     self.version:SetParent(frame)
-    self.version:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", pixel:Snap(frame, V.Left or 0), versionBottom)
+    pixel:Point(self.version, "BOTTOMLEFT", frame, "BOTTOMLEFT", pixel:Snap(frame, V.Left or 0), versionBottom)
   else
     self.version:SetParent(self.navPanel)
-    self.version:SetPoint("BOTTOMLEFT", self.navPanel, "BOTTOMLEFT", m.pad, versionBottom)
+    pixel:Point(self.version, "BOTTOMLEFT", self.navPanel, "BOTTOMLEFT", m.pad, versionBottom)
   end
   -- The pages between what the sidebar holds above and below them: from its top when it holds neither.
   self.navBox:ClearAllPoints()
@@ -966,15 +966,15 @@ function settings:placeHeading()
     right = beside + pixel:Ceil(frame, actions.frame:GetWidth()) + actionsGap
   end
   self.title:ClearAllPoints()
-  self.title:SetPoint("TOPLEFT", header, "TOPLEFT", pad, -top)
+  pixel:Point(self.title, "TOPLEFT", header, "TOPLEFT", pad, -top)
   -- Short of the page's buttons; without them, as wide as it likes.
   if right ~= nil then
-    self.title:SetPoint("TOPRIGHT", header, "TOPRIGHT", -right, -top)
+    pixel:Point(self.title, "TOPRIGHT", header, "TOPRIGHT", -right, -top)
   end
   local down = top + pixel:Ceil(frame, pixel:TextHeight(self.title)) + gap
   self.description:ClearAllPoints()
-  self.description:SetPoint("TOPLEFT", header, "TOPLEFT", pad, -down)
-  self.description:SetPoint("TOPRIGHT", header, "TOPRIGHT", -pad, -down)
+  pixel:Point(self.description, "TOPLEFT", header, "TOPLEFT", pad, -down)
+  pixel:Point(self.description, "TOPRIGHT", header, "TOPRIGHT", -pad, -down)
 end
 
 -- showActions shows a page's buttons in the header (none for a page without), read again.
@@ -1183,9 +1183,9 @@ function settings:paintNavRow(row)
     -- Options_CategoryHeader_1 to 3), and its label where the theme says, else above its bottom.
     local headings, at = N.GroupFills, N.GroupLabel
     if at then
-      row.label:SetPoint(at.Point, row.frame, at.Point, pixel:Snap(frame, at.X or 0), pixel:Snap(frame, at.Y or 0))
+      pixel:Point(row.label, at.Point, row.frame, at.Point, pixel:Snap(frame, at.X or 0), pixel:Snap(frame, at.Y or 0))
     else
-      row.label:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", pad, pixel:Snap(frame, 4))
+      pixel:Point(row.label, "BOTTOMLEFT", row.frame, "BOTTOMLEFT", pad, pixel:Snap(frame, 4))
     end
     controls:Paint(row.fill, (headings and #headings > 0) and headings[((row.groupIndex or 1) - 1) % #headings + 1] or false)
     row.hover:Hide()

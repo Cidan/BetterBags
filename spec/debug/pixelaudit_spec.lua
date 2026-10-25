@@ -41,6 +41,9 @@ describe("PixelAudit", function()
         audit:Check(window, { owners = { window = { tex = tex } } }))
     end)
 
+    -- A text's anchor points a quarter pixel right of and above a whole pixel (next-pixel-perfect.md §2): the client
+    -- draws text in whole pixels, and one exactly on a whole pixel was drawn in one or the next as float error of a
+    -- thousandth of a pixel crossed it (measured in game: tab names and counts a pixel right as a snap ended).
     it("judges a font string by its anchor points, from where the client puts its text", function()
       local text = window:CreateFontString()
       text:SetFontObject(GameFontNormal)
@@ -48,10 +51,29 @@ describe("PixelAudit", function()
       text:SetPoint("TOPLEFT", window, "TOPLEFT", 0, 0)
       local factor = 768 / 1362
       -- Its right edge is the text's measure, between pixels: not judged.
+      function text:GetScaledRect() return 7.25 * factor, 39.25 * factor, 19.37 * factor, 13 * factor end
+      assert.are.same({}, audit:Check(window), "a quarter pixel right of and above a whole pixel")
       function text:GetScaledRect() return 7 * factor, 40 * factor, 19.37 * factor, 12 * factor end
+      assert.are.same({ "FontString >s1: TOPLEFT x 7.000, TOPLEFT y 52.000" }, audit:Check(window), "on whole pixels")
+      function text:GetScaledRect() return 7.75 * factor, 39.75 * factor, 19.37 * factor, 13 * factor end
+      assert.are.equal(1, #audit:Check(window), "a quarter pixel the other way")
+      function text:GetScaledRect() return 7.5 * factor, 39.25 * factor, 19.37 * factor, 13 * factor end
+      assert.are.equal(1, #audit:Check(window), "half a pixel")
+    end)
+
+    -- An edit box draws its text inside its insets: its text a quarter pixel right of and above a whole pixel too, its
+    -- box on whole pixels.
+    it("judges an edit box's text insets by where they put its text", function()
+      local box = CreateFrame("EditBox", nil, window)
+      box:SetPoint("TOPLEFT", window, "TOPLEFT", 0, 0)
+      box:SetSize(40 * unit, 20 * unit)
+      box:SetTextInsets(4.25 * unit, 3.75 * unit, 2.75 * unit, 3.25 * unit)
       assert.are.same({}, audit:Check(window))
-      function text:GetScaledRect() return 7.25 * factor, 40 * factor, 19.37 * factor, 12 * factor end
-      assert.are.equal(1, #audit:Check(window))
+      box:SetTextInsets(4 * unit, 4 * unit, 3 * unit, 3 * unit)
+      local problems = audit:Check(window)
+      assert.are.equal(1, #problems)
+      assert.is_truthy(problems[1]:find("text inset left 4.000, text inset right 4.000, text inset top 3.000, "
+        .. "text inset bottom 3.000", 1, true), problems[1])
     end)
 
     -- warcraft.wiki.gg ScriptRegion:GetRect (and GetScaledRect): "Not allowed on restricted frames".
