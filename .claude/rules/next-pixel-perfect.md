@@ -45,6 +45,9 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
   in UI units (`ScrollBoxBaseMixin:SetScrollTargetOffset`, called by its `Update`); `SnapScroll` replaces
   the box's own copy of that method with one that rounds the offset first. Any new Next scroll box must
   call it.
+- **A frame that clips stays on whole pixels, even while its size glides**: a panel's snap and its glide back to its
+  default size step its size a pixel at a time (texture-sharpening.md §5); a scroll box's edge between two pixels drew
+  what it clips stretched across the fraction.
 - **Not snapped, by nature**: what moves (glides, slides, drags, lifts, flights, sparkles, the cloud's
   breathing, the braid, the tab marker's glide, a toggle's knob sliding, a theme's swaying, spinning,
   pulsing or bobbing ornaments, next-themes.md §12). Each lands on whole pixels when it comes to rest.

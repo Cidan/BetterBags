@@ -78,6 +78,36 @@ Where it runs:
   SetupPiece`), so `SetAtlas` likely keeps it. A sizing recording now shows each texture's snapping and bias
   (`PixelAudit:Regions`).
 
+## 5. A clipping frame between two pixels (fixed)
+
+Reported after §2: "when i drag to resize a window, no shimmer. but let's say i drag a bag really wide and let go, when
+it snaps back, the icons shimmer ... unclear ... if it's the texture shimmer, or actual movement". Measured:
+- **A 60 fps video of the release** (1378x450, the Consumable row of 13 icons): each icon's horizontal shift, matched
+  frame by frame against a frame before the release, was 0.00 for the first icon and grew with distance from the
+  panel's left edge, up to 0.34 pixel at the thirteenth. Its sign flipped from frame to frame. It died out as the snap
+  settled, every icon back where it was. That is a stretch from the left edge, not icons moving apart: the layout keeps
+  the gaps for a column count (`MeasureSection`, from `PerRow(layoutWidth)`), and the snap keeps its layout width.
+  With the sharpening off, the stretch shows as blending across two pixels.
+- **A sizing recording of a snap** (render-recorder.md §2) showed the client sizes a panel in whole pixels while a grip
+  is dragged: every `resized` step had the scroll box's edges on whole pixels (`r 2985.000`, `b 337.000`). Every
+  `snap` step had its right edge between two pixels (`r 3025.847`, `3004.432`, `2988.494`, ...) until it came to
+  rest (`r 2985.000`). The snap set the frame's width from its bounce each frame, unrounded.
+- **Inferred, not seen in Blizzard's code:** the client draws what a clipping frame holds stretched across its rect
+  when that rect's edge is between two pixels. The scroll box clips (`ScrollBoxBaseTemplate`, `clipChildren="true"`).
+  The shimmer appeared exactly while its edge was fractional and never while it was whole: a grip dragged, at rest.
+
+The fix: the snap (`snapTo`) and Shift-click's glide back to the default size (`ResetSize`) size the panel in whole
+pixels of its grid every frame (`pixel:LengthIn(self:PixelUnit(), ...)`). The reset glide also places the corner it
+moves on whole pixels: the corner across from the grip, and the moving side from the size. The bounce then steps a
+pixel at a time, as a grip dragged does. Not changed: the switch between full and small (`Morph`), which changes the
+panel's scale as it glides, so what it holds is drawn at another scale through it anyway.
+
+Coverage: `spec/next/small_spec.lua` ("sizes itself in whole pixels at every step of its snap, as a grip dragged
+does"; "glides in whole pixels, its far corner still on a whole pixel, from either grip"; "glides its corner in whole
+pixels when the screen's edge moves it"), on 3396x1362. Six mutations, each caught. Two first survived: rounding the
+top, and the right grip's left edge, which only glide when the screen's edge puts the panel back. They led to the
+last test.
+
 ## 4. Coverage
 
 - `spec/render/texels_spec.lua`: textures, lines and masks, shown and hidden, deep and under hidden frames; text left

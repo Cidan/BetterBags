@@ -2030,7 +2030,9 @@ function panelProto:snapTo(side, x, y, w, layout)
     to = 1,
     ease = "linear",
     onUpdate = function(p)
-      local current = motion.SnapSizeAt(w, width, overshoot, p)
+      -- In whole pixels, as a grip dragged sizes it: its scroll box clips what it holds, and a clipping frame's edge
+      -- between two pixels drew what it holds stretched across the fraction (texture-sharpening.md §5).
+      local current = pixel:LengthIn(self:PixelUnit(), motion.SnapSizeAt(w, width, overshoot, p))
       frame:ClearAllPoints()
       frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", side == "LEFT" and x + w - current or x, y)
       frame:SetSize(current, height)
@@ -2089,9 +2091,21 @@ function panelProto:ResetSize(side)
     to = 1,
     ease = style:Ease("Resize"),
     onUpdate = function(t)
+      -- In whole pixels, size and corner, as a grip dragged sizes it (texture-sharpening.md §5): the corner across from
+      -- the grip glides on whole pixels and the moving side follows the size.
+      local unit = self:PixelUnit()
+      local w, h = pixel:LengthIn(unit, w0 + (w1 - w0) * t), pixel:LengthIn(unit, h0 + (h1 - h0) * t)
+      local top = pixel:SnapIn(unit, (y0 + (y1 - y0) * t) / s)
+      local left
+      if side == "LEFT" then
+        local r0, r1 = x0 / s + w0, x1 / s + w1
+        left = pixel:SnapIn(unit, r0 + (r1 - r0) * t) - w
+      else
+        left = pixel:SnapIn(unit, (x0 + (x1 - x0) * t) / s)
+      end
       frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x0 + (x1 - x0) * t) / s, (y0 + (y1 - y0) * t) / s)
-      frame:SetSize(w0 + (w1 - w0) * t, h0 + (h1 - h0) * t)
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+      frame:SetSize(w, h)
       self:FitTitle()
       render:Invalidate(self.root)
       self:recordSizing("reset")

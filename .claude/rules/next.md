@@ -1646,7 +1646,8 @@ window to be too big like in that screenshot, it should shrink back down to wher
     glide Shift-click uses (`sizeGliding`, `sizeGlideKey`; they were `resetting`, `resetKey`), so everything that
     follows a panel while its size glides follows a snap too (`LivePlace`, `SmallLeft`, `chain:Update`, a
     partner's spot and the braid), and anything that places, moves, sizes, switches or hides it ends the snap at
-    its width (`endSizeGlide`).
+    its width (`endSizeGlide`). Both glides size it in whole pixels each frame, as a grip dragged does: its scroll
+    box's edge between two pixels drew the icons it clips stretched (texture-sharpening.md §5).
 - **Its size** (`SmallSize`): the saved size, else its default width (`DefaultWidth`: the columns the full
   body's width holds, `ColumnsWidth(BODY_WIDTH)`, whatever it shows, so it leaves no room past its last column at
   any Icon Scale and does not change as items come and go;

@@ -69,6 +69,7 @@ local nextDrag = addon:GetModule("NextDrag")
 local chain = addon:GetModule("NextChain")
 local style = addon:GetModule("NextStyle")
 local tween = addon:GetModule("NextTween")
+local pixel = addon:GetModule("NextPixel")
 local render = addon:GetModule("Render")
 local motion = addon:GetModule("Motion")
 local context = addon:GetModule("Context")
@@ -1110,6 +1111,43 @@ describe("BetterBags Next's small mode", function()
         assert.are.same({ "start", "resized", "rendered", "let go", "snap", "snapped" }, names)
       end)
 
+      -- onScreen runs fn on the reporter's screen (3396x1362: a unit is 0.564 pixels at scale 1), then puts the
+      -- screen back, whatever fn does.
+      local function onScreen(fn)
+        local saved = _G.GetPhysicalScreenSize
+        _G.GetPhysicalScreenSize = function() return 3396, 1362 end
+        local ok, err = pcall(fn)
+        _G.GetPhysicalScreenSize = saved
+        assert(ok, err)
+      end
+
+      local function wholePixels(frame, what)
+        local unit = pixel:Unit(frame)
+        for _, length in ipairs({ frame:GetWidth(), frame:GetHeight() }) do
+          local px = length / unit
+          assert.is_true(math.abs(px - math.floor(px + 0.5)) < 1e-6, what .. ": " .. px .. " pixels")
+        end
+      end
+
+      -- Measured in game (texture-sharpening.md §5): while it snapped its scroll box's edge stood a fraction of a pixel
+      -- off the grid each frame, and what the box clips was drawn stretched across that fraction (icons toward the far
+      -- side moved up to a third of a pixel, the near side none), until it came to rest; a grip dragged sizes it in
+      -- whole pixels, and showed none.
+      it("sizes itself in whole pixels at every step of its snap, as a grip dragged does", function()
+        onScreen(function()
+          local bag = backpack({ 14, 4, 7 })
+          resize(bag, "RIGHT", columnsWidth(25) + 20, 600)
+          local steps = 0
+          while bag.sizeGliding do
+            step(1 / 60)
+            wholePixels(bag.frame, "step " .. steps)
+            steps = steps + 1
+          end
+          assert.is_true(steps > 10, "it snapped")
+          assert.are.equal(pixel:Length(bag.frame, columnsWidth(14)), bag.frame:GetWidth())
+        end)
+      end)
+
       it("reflows as it is dragged again once a snap has ended", function()
         local bag = backpack({ 20 })
         resize(bag, "RIGHT", columnsWidth(7) + 20, 600)
@@ -1391,6 +1429,60 @@ describe("BetterBags Next's small mode", function()
         assert.is_nil(db.sizes[BACKPACK], "the default follows the screen again")
         assert.are.same({ x0, y0 }, { topLeft(bag) })
         assert.are.same({ x0, y0 }, db.places[BACKPACK])
+      end)
+
+      -- texture-sharpening.md §5: its scroll box clips what it holds, which a fractional size drew stretched.
+      it("glides in whole pixels, its far corner still on a whole pixel, from either grip", function()
+        for _, side in ipairs({ "RIGHT", "LEFT" }) do
+          local saved = _G.GetPhysicalScreenSize
+          _G.GetPhysicalScreenSize = function() return 3396, 1362 end
+          local ok, err = pcall(function()
+            db.sizes[BACKPACK] = { 700, 500 }
+            local bag = opened(function(c) return nextBag:Create(c) end)
+            shiftClick(bag.grips[side])
+            local unit = pixel:Unit(bag.frame)
+            local steps = 0
+            while bag.sizeGliding do
+              step(1 / 60)
+              local x, y = topLeft(bag)
+              for _, v in ipairs({ bag.frame:GetWidth(), bag.frame:GetHeight(), x, y }) do
+                local px = v / unit
+                assert.is_true(math.abs(px - math.floor(px + 0.5)) < 1e-6, side .. " step " .. steps .. ": " .. px)
+              end
+              steps = steps + 1
+            end
+            assert.is_true(steps > 10, "it glided")
+          end)
+          _G.GetPhysicalScreenSize = saved
+          assert(ok, err)
+        end
+      end)
+
+      -- Its corner glides too when the default size would not fit where it is, put back on the screen (clampPlace).
+      it("glides its corner in whole pixels when the screen's edge moves it", function()
+        local saved = _G.GetPhysicalScreenSize
+        _G.GetPhysicalScreenSize = function() return 3396, 1362 end
+        local ok, err = pcall(function()
+          db.sizes[BACKPACK] = { 300, 300 }
+          db.places[BACKPACK] = { UIParent:GetWidth() - 301.3, 300.7 }
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          local x0, y0 = topLeft(bag)
+          shiftClick(bag.grips.RIGHT)
+          local unit = pixel:Unit(bag.frame)
+          local moved = false
+          while bag.sizeGliding do
+            step(1 / 60)
+            local x, y = topLeft(bag)
+            moved = moved or math.abs(x - x0) > unit or math.abs(y - y0) > unit
+            for _, v in ipairs({ x, y }) do
+              local px = v / unit
+              assert.is_true(math.abs(px - math.floor(px + 0.5)) < 1e-6, px .. " pixels")
+            end
+          end
+          assert.is_true(moved, "the screen's edge moved its corner")
+        end)
+        _G.GetPhysicalScreenSize = saved
+        assert(ok, err)
       end)
 
       it("keeps its right edge still from the left grip", function()
