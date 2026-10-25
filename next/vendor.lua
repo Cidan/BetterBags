@@ -18,6 +18,9 @@ local question = addon:GetModule('Question')
 ---@class Render: AceModule
 local render = addon:GetModule('Render')
 
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
 ---@class NextPanel: AceModule
 local nextPanel = addon:GetModule('NextPanel')
 
@@ -553,6 +556,8 @@ function vendorProto:Draw(ctx, _, callback)
     b:Release()
   end
   render:RenderNow(self.root, { ctx = ctx })
+  -- Its cards too, styled and skinned as they are laid out (texture-sharpening.md).
+  texels:Unsharpen(self.frame)
   self.freeText:SetText(footer)
   self.emptyText:SetText(empty)
   self.emptyText:SetShown(shown == 0)

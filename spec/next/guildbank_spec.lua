@@ -587,6 +587,25 @@ describe("NextGuildBank", function()
       assert.are.equal("96 free slots", g.freeText:GetText())
       assert.is_false(g.emptyText:IsShown())
     end)
+
+    -- texture-sharpening.md: guild bank buttons draw again with every draw of the panel, whose walk takes them in.
+    it("draws its buttons' textures without the client's sharpening", function()
+      local g = open()
+      local ore = guildButton:GetButton(ctx(), "1002_4")
+      local art = ore.button:CreateTexture()
+      art:SetSnapToPixelGrid(true)
+      art:SetTexelSnappingBias(1)
+      g:Draw(ctx(), {
+        sortedItems = {},
+        tabs = { [ALL] = { categories = { { name = "Ore" } }, items = {
+          { slotkey = "1002_4", bagid = 1002, slotid = 4, guildTab = 2, itemInfo = { category = "Ore", itemIcon = 5,
+            currentItemCount = 20, itemQuality = 1, classID = 7 } },
+        } } },
+      })
+      assert.are.equal(ore, g.content.buttons["1002_4"])
+      assert.is_false(art:IsSnappingToPixelGrid())
+      assert.are.equal(0, art:GetTexelSnappingBias())
+    end)
   end)
 
   describe("closing", function()

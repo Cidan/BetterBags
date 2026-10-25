@@ -30,6 +30,9 @@ local cursorPlacement = addon:GetModule('CursorPlacement')
 ---@class Render: AceModule
 local render = addon:GetModule('Render')
 
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
 ---@class DrawableModule: AceModule
 local drawable = addon:GetModule('Drawable')
 
@@ -4235,6 +4238,9 @@ function panelProto:Draw(ctx, slotInfo, callback)
   self.claims = nil
   self.lastSlotInfo = slotInfo
   render:RenderNow(self.root, { ctx = ctx })
+  -- After the render, which styles what it lays out (the item fitter, vendor cards) and Masque skins
+  -- (texture-sharpening.md).
+  texels:Unsharpen(self.frame)
   self.freeText:SetText(format(L:G("%d free slots"), self.content.freeTotal))
   -- Data that was never read (the bank before its first read after it opens) has no tabs.
   self.emptyText:SetText(slotInfo.tabs == nil and L:G("Loading...") or L:G("Nothing here yet"))

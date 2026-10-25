@@ -15,6 +15,9 @@ local const = addon:GetModule('Constants')
 ---@class Sonata: AceModule
 local sonata = addon:GetModule('Sonata')
 
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
 ---@class MasqueTheme: AceModule
 ---@field groups table<string, MasqueGroup>
 local masque = addon:NewModule('Masque')
@@ -85,6 +88,8 @@ function masque:OnEnable()
       self.added[decoration] = group
     end
     self:ReapplyBlend(decoration)
+    -- Masque makes and draws a skin's textures as it skins a button (texture-sharpening.md).
+    texels:Unsharpen(decoration)
   end
 
   events:RegisterMessage('item/NewButton', function(_, item, decoration)
@@ -107,6 +112,7 @@ function masque:OnEnable()
     local group = self.groups["Vendor"]
     group:AddButton(b.button, b:MasqueRegions(), "Item")
     self.added[b.button] = group
+    texels:Unsharpen(b.button)
   end
 
   events:RegisterMessage('vendor/NewButton', function(_, b)
@@ -121,6 +127,7 @@ function masque:OnEnable()
     local group = self.groups["Vendor"]
     if self.added[b.button] == group then
       group:ReSkin(b.button)
+      texels:Unsharpen(b.button)
     else
       skinVendor(b)
     end
@@ -136,6 +143,7 @@ function masque:OnEnable()
     for b in pairs(self.vendorButtons) do
       if self.added[b.button] == group then
         group:ReSkin(b.button)
+        texels:Unsharpen(b.button)
       else
         skinVendor(b)
       end
@@ -161,6 +169,7 @@ function masque:OnEnable()
       self.added[b.button] = group
     end
     self:ReapplyBlend(b.button)
+    texels:Unsharpen(b.button)
   end
 
   events:RegisterMessage('guild/NewButton', function(_, b)
@@ -207,6 +216,7 @@ function masque:OnEnable()
     local group = bag.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:AddButton(bag.frame)
     bag.frame.IconBorder:SetBlendMode("BLEND")
+    texels:Unsharpen(bag.frame)
   end)
 
   events:RegisterMessage('bagbutton/Clearing', function(_, bag)
@@ -238,9 +248,14 @@ function masque:ReapplyBlend(button)
   end
 end
 
+-- OnSkinChange is Masque's callback once it has skinned a group again for an option changed (a skin chosen, the
+-- group turned off or on, reset: Core/Group.lua __FireCB). Its Buttons map each button to its regions.
 ---@param group MasqueGroup
 function masque:OnSkinChange(group)
   for _, button in pairs(group.Buttons) do
     self:ReapplyBlend(button)
+  end
+  for button in pairs(group.Buttons) do
+    texels:Unsharpen(button)
   end
 end

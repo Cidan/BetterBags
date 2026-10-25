@@ -423,3 +423,15 @@ spec mock kept the percentage on `FullUpdate` instead (Blizzard keeps the offset
 **Rule**: To keep content still while a scroll box changes size, hook the box's own `OnSizeChanged` (a hook runs after
 Blizzard's handler, before the frame is drawn) and put the offset back in pixels (`ScrollToOffset(offset, true)`).
 Restoring from a later render is a frame late and still flickers.
+
+## Turn the Client's Texture Sharpening Off in Windows That Resize
+**Problem**: while a BetterBags Next bag was resized, its icons' art shimmered (their top borders and horizontal
+lines), though a recording showed every icon's rect on the same whole pixels at every step. By default the client
+rounds a texture's corners to pixels and "sharpens" it, picking a texel rather than blending two; which texels it
+picked changed with the window's height. Positions and rects read through the API cannot show it; a video of the
+screen, diffed frame by frame, did.
+
+**Rule**: draw a window's textures with `SetSnapToPixelGrid(false)` and `SetTexelSnappingBias(0)`, as Blizzard does
+on textures that resize and ElvUI on every texture (`Texels:Unsharpen`, texture-sharpening.md). When something drawn
+changes with no rect changing, compare video frames before reading more of the layout.
+

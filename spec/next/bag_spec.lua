@@ -917,6 +917,26 @@ describe("NextBag", function()
       bag.frame:GetScript("OnReceiveDrag")(bag.frame)
       assert.are.same({ BACKPACK }, placed)
     end)
+
+    -- texture-sharpening.md: the client's sharpening drew each texture of a bag a fraction of a pixel differently
+    -- from frame to frame while it was resized, though nothing moved.
+    it("draws its textures without the client's sharpening, those its sections and header made included", function()
+      local bag = opened()
+      local function sharpened(texture)
+        return texture:IsSnappingToPixelGrid() or texture:GetTexelSnappingBias() > 0
+      end
+      local section = bag.content.order[1]
+      local parts = { bag.footerLine, bag.spark, section.frame:CreateTexture(), bag.titleButton:CreateTexture(),
+        bag.headerButtons[1]:CreateTexture() }
+      for _, t in ipairs(parts) do
+        t:SetSnapToPixelGrid(true)
+        t:SetTexelSnappingBias(1)
+      end
+      bag:Draw(ctx(), slotInfo, function() end)
+      for i, t in ipairs(parts) do
+        assert.is_false(sharpened(t), "part " .. i)
+      end
+    end)
   end)
 
   -- Asked: "our left tabs replaced with the bag icons for the Blizzard Bags, so users can swap out their

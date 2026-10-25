@@ -1758,6 +1758,23 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.are.same({ "forget", "render" }, order)
     end)
 
+    -- texture-sharpening.md: the client's sharpening drew each texture of a bag a fraction of a pixel differently from
+    -- frame to frame while it was resized, though nothing moved; the classic bags too (asked: "literally all bags").
+    it("draws its window's textures without the client's sharpening, after laying it out", function()
+      local bag = newBag()
+      local parts = { bag.frame:CreateTexture(), bag.window.content:CreateTexture(),
+        CreateFrame("Frame", nil, bag.frame):CreateTexture() }
+      for _, t in ipairs(parts) do
+        t:SetSnapToPixelGrid(true)
+        t:SetTexelSnappingBias(1)
+      end
+      bag:Draw(context:New("spec"), slotInfoWith({}, {}), function() end)
+      for i, t in ipairs(parts) do
+        assert.is_false(t:IsSnappingToPixelGrid(), "part " .. i)
+        assert.are.equal(0, t:GetTexelSnappingBias(), "part " .. i)
+      end
+    end)
+
     it("asks its bag to close when its close button is clicked", function()
       local bag = newBag()
       local hidden

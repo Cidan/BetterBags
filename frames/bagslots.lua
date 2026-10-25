@@ -29,6 +29,9 @@ local database = addon:GetModule('Database')
 ---@class Render: AceModule
 local render = addon:GetModule('Render')
 
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
 ---@class DrawableModule: AceModule
 local drawable = addon:GetModule('Drawable')
 
@@ -81,6 +84,8 @@ function BagSlots.bagSlotProto:Draw(ctx)
   else
     self.window:Invalidate()
   end
+  -- Its bag and tab buttons' art (texture-sharpening.md).
+  texels:Unsharpen(self.window.frame)
 end
 
 -- OnRendered lays the panel's bag out again: the bag is never narrower than the panel.

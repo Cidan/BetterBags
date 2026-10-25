@@ -172,24 +172,12 @@ bags take over:
   sized in whole pixels and centered in the content by its top left (again on the content's
   `OnSizeChanged`), its 12-unit end pieces and its centered text rounded in place
   (`placePurchaseBankButton`).
-- **Shading that changes while nothing moves (open).** Reported: "you can see the shadowing changes just by slight
-  resize of the window up and down (no icons shifted their actual position)", Masque off. Measured on retail 12.1.5
-  (3396x1362 at 65%, a small backpack at Bag Scale 150%):
-  - A sizing recording (render-recorder.md §2) had every region in the panel, icon art and borders included, at the
-    same whole pixels (`t 825.000 b 749.000`) at all 337 steps; only the scroll box's clip edge moved, 1 to 2 pixels a
-    step.
-  - A 60 fps video of the same drag, diffed frame by frame, changed only along horizontal edges inside the icons (their
-    top borders, horizontal lines in their art), never at the section's title, its line or any vertical edge. One pixel
-    column through an icon's top border shows the bright band's centre moving up and down by up to 0.3 pixel (row 1)
-    and 0.45 pixel (row 2), the two rows not in step, while the quad's edge stays on the same pixel row.
-  - So the client picks the texels inside an icon's quad differently from frame to frame, though its rect is the same.
-    A texture snaps to the pixel grid and sharpens by default; Blizzard on warcraft.wiki.gg (TextureBase
-    SetTexelSnappingBias): "the texture's verts will be rounded to the nearest pixel during the rendering phase ... the
-    stronger the texelSnappingBias the more aggressive the renderer will be in selecting a texel instead of blending
-    texels". Blizzard turns both off on textures that resize (`PlayerFrame.lua`, `TargetFrame.lua`,
-    `NineSliceUtil.DisableSharpening`); ElvUI on every texture it touches (`Toolkit.lua`, `DisablePixelSnap`).
-  - Not known yet: whether turning them off on the item buttons' textures keeps them still (a test in game first), and
-    what the client's defaults are (the sizing recording's regions now say each texture's snapping and bias).
+- **Shading that changed while nothing moved (fixed).** Reported: "you can see the shadowing changes just by slight
+  resize of the window up and down (no icons shifted their actual position)", Masque off. A sizing recording had every
+  icon on the same whole pixels at every step, while a 60 fps video showed the texels inside each icon re-picked by
+  up to half a pixel as the window's height changed: the client's texture sharpening (`SetTexelSnappingBias`,
+  `SetSnapToPixelGrid`). Every bag texture, in both designs and Masque's skins, is now drawn without it:
+  texture-sharpening.md.
 
 ## 5. NextPixel's API (`next/pixel.lua`)
 

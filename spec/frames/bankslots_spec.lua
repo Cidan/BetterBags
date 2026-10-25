@@ -506,6 +506,21 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       return panel, bagFrame
     end
 
+    -- texture-sharpening.md: its tab buttons' art, without the client's sharpening.
+    it("draws its textures without the client's sharpening", function()
+      local panel = newPanel({ retail = true, forever = false })
+      local parts = { panel.frame:CreateTexture(), CreateFrame("Button", nil, panel.window.content):CreateTexture() }
+      for _, t in ipairs(parts) do
+        t:SetSnapToPixelGrid(true)
+        t:SetTexelSnappingBias(1)
+      end
+      panel:Draw(ctx:New("test"))
+      for i, t in ipairs(parts) do
+        assert.is_false(t:IsSnappingToPixelGrid(), "part " .. i)
+        assert.are.equal(0, t:GetTexelSnappingBias(), "part " .. i)
+      end
+    end)
+
     it("is a Slots window hanging below the bank, sized to its tab buttons plus the theme's room", function()
       local panel, bagFrame = newPanel({ retail = true, forever = false })
       assert.are.equal("Slots", panel.window.kind)

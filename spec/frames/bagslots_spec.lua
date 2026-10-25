@@ -150,6 +150,21 @@ describe("BagSlots panel", function()
     if panel.window.showAnimation then panel.window.showAnimation:_complete() end
   end
 
+  -- texture-sharpening.md: its bag buttons' art, without the client's sharpening.
+  it("draws its textures without the client's sharpening", function()
+    local panel = newPanel()
+    local parts = { panel.frame:CreateTexture(), CreateFrame("Button", nil, panel.window.content):CreateTexture() }
+    for _, t in ipairs(parts) do
+      t:SetSnapToPixelGrid(true)
+      t:SetTexelSnappingBias(1)
+    end
+    panel:Draw(context:New("spec"))
+    for i, t in ipairs(parts) do
+      assert.is_false(t:IsSnappingToPixelGrid(), "part " .. i)
+      assert.are.equal(0, t:GetTexelSnappingBias(), "part " .. i)
+    end
+  end)
+
   it("is a Slots window hanging below its bag, hidden until shown", function()
     local panel, bagFrame = newPanel()
     assert.are.equal("Slots", panel.window.kind)
