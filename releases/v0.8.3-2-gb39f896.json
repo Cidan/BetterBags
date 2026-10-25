@@ -1,0 +1,17 @@
+{
+  "id": 1792942920,
+  "version": "v0.8.3-2-gb39f896",
+  "channel": "alpha",
+  "date": "2026-10-25",
+  "from": "558398c3a43a28205c7af3c05f49ea9625704426",
+  "to": "b39f896e11b15c137680bdc12dc8d0f903b41fb6",
+  "headline": "Fixes an issue where header buttons became unresponsive after changing themes.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Header buttons unresponsive after changing themes",
+      "details": "Fixed an issue where switching from the Plain theme back to the Default theme caused the top-right header buttons to stop responding to clicks until reloading the interface.",
+      "clients": []
+    }
+  ]
+}
