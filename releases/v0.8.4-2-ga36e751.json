@@ -1,0 +1,17 @@
+{
+  "id": 1792960456,
+  "version": "v0.8.4-2-ga36e751",
+  "channel": "alpha",
+  "date": "2026-10-25",
+  "from": "7501d2cf53d916a1806468520b48482b580c9478",
+  "to": "a36e75137034d9b4be90b8d68ea8a5ebb2686941",
+  "headline": "BetterBags Next adds an Animation settings tab to customize or turn off visual effects on any theme.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Animation settings tab for BetterBags Next",
+      "details": "A new Animation tab under Appearance settings lets you customize or disable visual effects across any theme. You can independently toggle sparkles, title shimmer, the title cloud, the title ribbon, chained bag braids, and moving ornaments.",
+      "clients": []
+    }
+  ]
+}
