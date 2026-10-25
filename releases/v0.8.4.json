@@ -1,0 +1,23 @@
+{
+  "id": 1792949128,
+  "version": "v0.8.4",
+  "channel": "release",
+  "date": "2026-10-25",
+  "from": "v0.8.3",
+  "to": "v0.8.4",
+  "headline": "Introduces the Plain theme matching your game version's default interface, alongside smoother panel resizing and icon snapping in Next.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Plain theme for Next",
+      "details": "Adds the Plain theme, which styles your bags using the default Blizzard interface of whichever game version you are playing. It features authentic window borders, portraits, title bars, buttons, dropdowns, and fonts tailored to Retail, Classic, and Forever.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Smoother panel resizing and snapping in Next",
+      "details": "Small panels now cleanly snap to fit their rows of icons when you release the resize grip. Resizing panels is also much smoother, eliminating icon jitter, jumpy columns, and texture shimmering while dragging.",
+      "clients": []
+    }
+  ]
+}
