@@ -320,3 +320,33 @@ in `forms/layouts/stacked.lua`, `railProto:placeContent` in `next/tabs.lua`). Te
 width from the anchors and does not need it. The specs' mock measures text the same in every font: a test makes the
 text measure wider in the new font to show the code re-measures.
 
+
+## A Theme Part Set to False Arrives as Nothing
+**Problem**: A Next theme turns a part off with `false` (`Edge = false`, `Indicator = false`), and resolution removes a
+table set to `false` (`SonataResolve.Merge`), so the widget reads `nil`. Seven places read such a part unguarded
+(`I.Edge.Idle`, `N.Indicator.Width`, `C.Divider.Size`): the Plain theme, the first to turn those parts off, broke the
+settings window on every client. A second form: a part hidden when styled but shown again later (`marker:SetShown(width
+> 0)`, a divider's `Show()` after placing) draws anyway.
+
+**Rule**: Read every theme part as possibly absent (`local E = I.Edge; ... E and E.Idle`), and every later `Show` of a
+part checks the part is still on. `spec/next/shipped_themes_spec.lua` draws every Next window with every shipped theme
+on every client; a new part, or a theme turning one off, is covered by it.
+
+## Protected Restyles Hide Errors From Specs
+**Problem**: `SonataNext:RestyleWidgets` styles each widget in a `pcall` and hands a failure to `geterrorhandler()`,
+as the client would show it, and the specs' mock handler returns the error and drops it. A theme that broke a widget
+passed every spec that applied it (the pixel spec applied Plain to the bags and checked their pixels, not errors).
+
+**Rule**: A spec that applies themes captures the handler (`_G.geterrorhandler = function() return function(err)
+table.insert(errors, tostring(err)) end end`) and asserts nothing was sent. It restyles only the widgets it made (its own
+`sonataNext.widgets` table for the run): other spec files' widgets were made against their own stubs.
+
+## A Branch of Blizzard's UI Source Holds Every Client's Files
+**Problem**: Since the UIs were unified, each branch of `wow-ui-source` carries every game type's folders
+(`Mainline\`, `Classic\`, `Vanilla\`, `Camelot\`), loaded only by their own client (`[AllowLoadGameType]`, `[Family]`,
+`[Game]`), and a whole addon can be one game type's (the damage meter is `## AllowLoadGameType: standard`, its art in an
+unflavored file). Grepping a branch for an atlas proved nothing: retail's menu art passed as present on Classic.
+
+**Rule**: To know what a client has, read the files its TOCs load (`spec/helpers/ui_source.lua`), and search those.
+Read a template from the loaded file, not the first match in the branch. Use `origin/<branch>`: a local branch can lag
+(the local `live` was a build behind).

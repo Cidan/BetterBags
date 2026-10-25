@@ -57,11 +57,12 @@ if [ ! -d ".libraries/GW2_UI" ]; then
   git clone --depth 1 https://github.com/Mortalknight/GW2_UI .libraries/GW2_UI
 fi
 
-# Clone wow-ui-source for Blizzard UI source code
+# Clone wow-ui-source for Blizzard UI source code: every branch (one per client: live, forever, classic_era,
+# classic_anniversary, classic), shallow, kept a git clone, so a spec reads the files each client loads
+# (spec/helpers/ui_source.lua, docs/next-plain-theme.md). A copy this script made before, without .git, is cloned again.
+if [ -d ".libraries/wow-ui-source" ] && [ ! -d ".libraries/wow-ui-source/.git" ]; then
+  rm -rf .libraries/wow-ui-source
+fi
 if [ ! -d ".libraries/wow-ui-source" ]; then
-  git clone https://github.com/Gethe/wow-ui-source .libraries/wow-ui-source
-  cd .libraries/wow-ui-source
-  rm -rf .git
-  find . -mindepth 1 -maxdepth 1 ! -name 'Interface' -exec rm -rf {} +
-  cd ../..
+  git clone --depth 1 --no-single-branch https://github.com/Gethe/wow-ui-source .libraries/wow-ui-source
 fi
