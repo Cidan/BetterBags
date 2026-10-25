@@ -1,0 +1,17 @@
+{
+  "id": 1792904302,
+  "version": "v0.8.3-1-g558398c",
+  "channel": "alpha",
+  "date": "2026-10-25",
+  "from": "430b62349b6e7e90b97f6f569a48da2282895769",
+  "to": "558398c3a43a28205c7af3c05f49ea9625704426",
+  "headline": "Added the Plain theme for Next, matching your bags and settings to Blizzard's default interface art.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Plain theme for Next",
+      "details": "Introduces the Plain theme, giving bag windows and the settings panel the authentic look and feel of Blizzard's default interface on each game version. It features classic stone backgrounds, Blizzard-styled controls, and a corner bag icon with a menu for panel actions.",
+      "clients": []
+    }
+  ]
+}
