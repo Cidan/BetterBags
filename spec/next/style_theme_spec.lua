@@ -155,6 +155,27 @@ describe("NextStyle", function()
       assert.has_error(function() style:Font("Odd") end, "BetterBags Next's font role Odd copies no client font named NoSuchFont")
     end)
 
+    -- The Plain theme (docs/next-plain-theme.md) draws the client's own fonts at Default's sizes (asked: "scale for Plain
+    -- should be the same as our Default"): a role that copies one outright (Copy) takes its file, flags, color and shadow,
+    -- nothing of the role it inherits (Default's Color and Shadow) but its Size and its own Justify; Size = false keeps
+    -- the client font's own size (Blizzard's title bar holds GameFontNormal).
+    it("copies a client font outright for a role that says Copy, at the role's size", function()
+      style:Use(register({ Fonts = { Price = { Copy = "GameFontHighlightSmall" }, Tab = { Copy = "GameFontNormal", Justify = "RIGHT" },
+        Title = { Copy = "GameFontNormal", Size = false } } }))
+      local price = style:Font("Price")
+      local path, _, flags = GameFontHighlightSmall:GetFont()
+      -- Default's Price is 13.
+      assert.are.same({ path, addon:GetModule("NextPixel"):FontHeight(13), flags }, { price:GetFont() })
+      assert.are.same({ GameFontNormal:GetFont() }, { style:Font("Title"):GetFont() })
+      assert.are.same({ GameFontHighlightSmall:GetTextColor() }, { price:GetTextColor() })
+      assert.are.same({ GameFontHighlightSmall:GetShadowOffset() }, { price:GetShadowOffset() })
+      assert.are.same({ GameFontHighlightSmall:GetShadowColor() }, { price:GetShadowColor() })
+      assert.are.equal("RIGHT", style:Font("Tab"):GetJustifyH())
+      sonataNext.themes.Spec = nil
+      style:Use(register({ Fonts = { Odd = { Copy = "NoSuchFont" } } }))
+      assert.has_error(function() style:Font("Odd") end, "BetterBags Next's font role Odd copies no client font named NoSuchFont")
+    end)
+
     it("lays everything out from its own sizes, the reach past the screen edge from its open ease", function()
       style:Use(register({ Layout = { Icon = 36, Gap = 4, PerRow = 9, Pad = 10, Feather = 64 },
         Motion = { Ease = { Open = "outBackSoft" } } }))
@@ -179,6 +200,29 @@ describe("NextStyle", function()
       assert.are.same({ 0.2, 0.3, 0.4, 1 }, { style:RGBA({ 0.2, 0.3, 0.4 }) })
       assert.are.same({ 0.9, 0.5, 0.1, 1 }, style.Color.Gold)
       assert.has_error(function() style:RGBA("NoSuchColor") end)
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md) draws in the client's own colors: Color.lua (Blizzard_SharedXMLBase,
+    -- every client) makes each named UI color a Lua global. A palette entry naming one is its color when the theme
+    -- applies, its alpha replaced by the entry's Alpha.
+    it("takes a palette color from one of the client's named colors, read when the theme applies", function()
+      local was = _G.PANEL_BACKGROUND_COLOR
+      _G.PANEL_BACKGROUND_COLOR = CreateColor(0.1, 0.2, 0.3, 0.9)
+      local theme = register({ Palette = { Panel = { Global = "PANEL_BACKGROUND_COLOR" },
+        Faint = { Global = "PANEL_BACKGROUND_COLOR", Alpha = 0.5 } } })
+      style:Use(theme)
+      assert.are.same({ 0.1, 0.2, 0.3, 0.9 }, { style:RGBA("Panel") })
+      assert.are.same({ 0.1, 0.2, 0.3, 0.5 }, { style:RGBA("Faint") })
+      assert.are.same({ Global = "PANEL_BACKGROUND_COLOR" }, theme.Palette.Panel, "the theme itself unchanged")
+      -- Read again by the next application: the client can change its colors.
+      _G.PANEL_BACKGROUND_COLOR = CreateColor(0.4, 0.5, 0.6, nil)
+      style:Use(theme)
+      assert.are.same({ 0.4, 0.5, 0.6, 1 }, { style:RGBA("Panel") }, "no alpha is a whole one")
+      _G.PANEL_BACKGROUND_COLOR = was
+      sonataNext.themes.Spec = nil
+      local broken = register({ Palette = { Gone = { Global = "NO_SUCH_COLOR" } } })
+      assert.has_error(function() style:Use(broken) end,
+        "the Next theme's color Gone names no client color NO_SUCH_COLOR")
     end)
   end)
 

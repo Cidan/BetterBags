@@ -66,6 +66,12 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@class NextOrnaments: AceModule
 local nextOrnaments = addon:GetModule('NextOrnaments')
 
+---@class NextMenuButtonModule: AceModule
+local nextMenuButton = addon:GetModule('NextMenuButton')
+
+---@class NextFrameArt: AceModule
+local nextFrameArt = addon:GetModule('NextFrameArt')
+
 ---@class NextCoins: AceModule
 local coins = addon:GetModule('NextCoins')
 
@@ -104,6 +110,9 @@ local nextPanel = addon:NewModule('NextPanel')
 -- The panel's frame level in the HIGH strata; a chained bag coming in from beneath its anchor is
 -- lowered below it for the way, and put back here once in place.
 local PANEL_LEVEL = 500
+-- The overlay's place over the panel's frame: above the content and its sections and item buttons (about 10 levels
+-- deep), below the braid and the sparkles.
+local OVERLAY_LEVEL = 20
 
 -- isSecret says whether addon code may not compare or do arithmetic on a value: a secret, as a vendor's name in a
 -- dungeon is (UnitName, SecretWhenUnitNameIdentityRestricted), and every size and position of the title showing it
@@ -188,6 +197,10 @@ end
 ---@field tooltip string
 ---@field tooltipFunc? fun(button: Button) Fills the tooltip instead of tooltip.
 ---@field onClick fun(ctx: Context)
+---@field label? string|fun(): string Its name in the bag button's menu (Header.Buttons.Menu), else its tooltip.
+---@field checked? fun(): boolean In the menu, a toggle checked while this says so.
+---@field menuTooltip? fun(): string? Its tooltip in the menu, read as the menu opens (else its tooltip, when not its name).
+---@field menuLast? boolean Last in the menu (Open Options Screen, as in the original bags' menu).
 
 ---@class NextPanelFrame
 ---@field kind BagKind
@@ -521,13 +534,21 @@ function panelProto:RestOffset()
   return chain:RestOffset(self)
 end
 
--- fillTop is how far below the body's top its fill starts (Panel.Fill.Top): GW2_UI's windows start their painting
--- below their header, drawn over what is behind the window. On whole pixels of the frame's grid.
----@param frame Frame
----@return number
-local function fillTop(frame)
+-- FillInsets returns how far into the body its fill is on each side (Panel.Fill.Inset: Left, Right, Top, Bottom,
+-- drawn for the backpack, whose inner side is on the left, mirrored on a panel whose inner side is on the right), on
+-- whole pixels of the frame's grid: Blizzard insets a window's fill into its frame (PortraitFrameFlatBaseTemplate),
+-- GW2_UI starts its painting below its header.
+---@return number left, number right, number top, number bottom
+function panelProto:FillInsets()
+  local frame = self.frame
   local F = style.Theme.Panel.Fill
-  return pixel:Snap(frame, (F and F.Top) or 0)
+  local inset = (F and F.Inset) or {}
+  local inner, outer = pixel:Snap(frame, inset.Left or 0), pixel:Snap(frame, inset.Right or 0)
+  local top, bottom = pixel:Snap(frame, inset.Top or 0), pixel:Snap(frame, inset.Bottom or 0)
+  if self.side == "LEFT" then
+    return outer, inner, top, bottom
+  end
+  return inner, outer, top, bottom
 end
 
 -- SetDocked shapes the body's far edge: at its screen edge the fill and the wash reach OVERREACH past
@@ -543,11 +564,13 @@ function panelProto:SetDocked(docked)
   self.docked = docked
   local frame = self.frame
   local reach = docked and pixel:Length(frame, style.OVERREACH) or 0
+  -- The side at the screen edge: past it while docked, else its inset (FillInsets).
+  local left, right, top, bottom = self:FillInsets()
   if self.side == "LEFT" then
-    self.fill:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, -fillTop(frame))
+    self.fill:SetPoint("TOPLEFT", frame, "TOPLEFT", docked and -reach or left, -top)
     self.wash:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, 0)
   else
-    self.fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", reach, 0)
+    self.fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", docked and reach or -right, bottom)
     self.wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", reach, 0)
   end
   self.outerFeather:SetShown(not docked)
@@ -713,6 +736,14 @@ function panelProto:BuildPanel(name)
   -- Its geometry (the frame's size and place, the body, the fill, the feather) is its size's
   -- (ApplyGeometry).
   self.body = CreateFrame("Frame", nil, frame)
+  -- A frame over the content, under the title and the header's buttons (which are drawn on and over it): a theme's frame
+  -- drawn above the content (Panel.Frame.Above: the original bags' border, over their content) and its ornaments that
+  -- say Above are drawn on it. It never takes the mouse: the window stays the drop target (bag-drop-zone.md).
+  local overlay = CreateFrame("Frame", nil, frame)
+  overlay:SetAllPoints(frame)
+  overlay:EnableMouse(false)
+  overlay:SetFrameLevel(frame:GetFrameLevel() + OVERLAY_LEVEL)
+  self.overlay = overlay
 
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   local feather = frame:CreateTexture(nil, "BACKGROUND")
@@ -766,6 +797,8 @@ function panelProto:BuildPanel(name)
   self.dropGlow = glow
   -- The theme's ornaments (Panel.Ornaments, next-themes.md §12), anchored to the body.
   self.ornaments = nextOrnaments:Create(self)
+  -- The theme's frame round the body (Panel.Frame, next-themes.md §15): Blizzard's nine-slice art.
+  self.frameArt = nextFrameArt:Create(frame, self.body, self.overlay)
   self:styleBody()
 end
 
@@ -811,6 +844,8 @@ function panelProto:styleBody()
     self.dropGlow:Hide()
   end
   self.ornaments:Style()
+  -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
+  self.frameArt:Apply(P.Frame, self.side == "LEFT")
 end
 
 -- paintEdges draws the border at a strength, 0 to 1, of the theme's alpha. A texture's alpha is its
@@ -965,7 +1000,8 @@ function panelProto:shownButtons()
 end
 
 -- pinnedRoom is the room the shown pinned buttons along the top take from the title's row: as far in as the
--- farthest of them reaches (its offset from its corner and its size); a pin at a bottom corner takes none.
+-- farthest of them reaches from its side (its size, and its offset toward the body's middle: an offset out past the
+-- edge takes less); a pin at a bottom corner takes none.
 ---@private
 ---@return number
 function panelProto:pinnedRoom()
@@ -973,10 +1009,48 @@ function panelProto:pinnedRoom()
   for _, button in ipairs(self.headerButtons) do
     local pin = pinnedOf(button)
     if pin ~= nil and button:IsShown() and pin.Point:sub(1, 3) == "TOP" then
-      room = math.max(room, style.HEADER_BUTTON + math.abs(pin.X or 0))
+      local point, x = PIN_CORNERS[pin.Point], pin.X or 0
+      if point == nil then
+        point = pin.Point
+      elseif self.side == "LEFT" then
+        point, x = MIRRORED_CORNERS[point], -x
+      end
+      room = math.max(room, style.HEADER_BUTTON + (point:find("RIGHT") and -x or x))
     end
   end
   return room
+end
+
+-- RowInMenu says whether the theme puts the header's row in the bag button's menu (Header.Buttons.Menu,
+-- NextMenuButton): its buttons not pinned leave the header.
+---@return boolean
+function panelProto:RowInMenu()
+  return type(style.Theme.Header.Buttons.Menu) == "table"
+end
+
+-- TitleStart is how far in from the body's inner side the title's row starts: past the theme's bag button at the top
+-- inner corner (NextMenuButton:Room), else InnerPad and TitleInset in.
+---@return number
+function panelProto:TitleStart()
+  local inner = self.menuButton ~= nil and self.menuButton:Room() or 0
+  if inner > 0 then
+    return inner
+  end
+  return self:InnerPad() + style.TITLE_INSET
+end
+
+-- titleEnd is how much of the title's row the header takes from its outer side, and the room the title leaves beside
+-- it: the header's buttons and pins (headerRoom) and 12; with the row in the bag button's menu, the pins (or the bag
+-- button at a top outer corner) exactly, so a centered title is centered between them, else Pad.
+---@private
+---@return number room, number slack
+function panelProto:titleEnd()
+  if self:RowInMenu() then
+    local _, outer = self.menuButton:Room()
+    local room = math.max(self:pinnedRoom(), outer)
+    return room > 0 and room or style.PAD, 0
+  end
+  return self:headerRoom(), 12
 end
 
 -- headerButtonsWidth is how much of the header its shown buttons take, with the room between them: none
@@ -989,6 +1063,20 @@ function panelProto:headerButtonsWidth()
   end
   local shown = self:shownButtons()
   return shown * style.HEADER_BUTTON + math.max(0, shown - 1) * style.HEADER_BUTTON_GAP
+end
+
+-- headerRoom is how much of the title's row the header buttons take from its outer side: Pad, the row and the pinned
+-- buttons; or, for a theme whose row starts past its pinned buttons (Header.Buttons.RowStart: Blizzard's close in the
+-- corner, the others beside it), the row from there or the pinned buttons, whichever reaches further in.
+---@private
+---@return number
+function panelProto:headerRoom()
+  local start = style.Theme.Header.Buttons.RowStart
+  local row = self:headerButtonsWidth()
+  if start ~= nil then
+    return math.max(row > 0 and (start + row) or 0, self:pinnedRoom(), style.PAD)
+  end
+  return style.PAD + row + self:pinnedRoom()
 end
 
 -- RailGap is the room between the buttons down the side rail: its own Gap, else the header's.
@@ -1022,7 +1110,8 @@ end
 ---@return number
 function panelProto:MinWidth()
   local pads = style.PAD + self:InnerPad()
-  local header = pads + style.TITLE_INSET + self:headerButtonsWidth() + self:pinnedRoom() + 12 + style.Small.MinTitle
+  local room, slack = self:titleEnd()
+  local header = self:TitleStart() + room + slack + style.Small.MinTitle
   local money = self.moneyFrame ~= nil and self.moneyFrame.frame:GetWidth() or 0
   local footer = pads + style.TITLE_INSET + self.freeText:GetStringWidth() + 12 + money
   local column = pads + style.GUTTER + self.content:CellWidth()
@@ -1238,9 +1327,10 @@ function panelProto:ApplyGeometry()
   body:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
   body:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -bodyRight, 0)
   local fill, wash = self.fill, self.wash
+  local left, right, top, bottom = self:FillInsets()
   fill:ClearAllPoints()
-  fill:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, -fillTop(frame))
-  fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -bodyRight, 0)
+  fill:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft + left, -top)
+  fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -(bodyRight + right), bottom)
   wash:ClearAllPoints()
   wash:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
   wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -bodyRight, 0)
@@ -2101,14 +2191,15 @@ end
 ---@return Button
 function panelProto:headerButton(spec)
   local button = CreateFrame("Button", nil, self.frame)
-  -- Above a small panel's mover, which lies over the title row.
-  button:SetFrameLevel(self.frame:GetFrameLevel() + 3)
+  -- Above a small panel's mover, which lies over the title row, and the overlay, whose frame art they sit on.
+  button:SetFrameLevel(self.overlay:GetFrameLevel() + 3)
   local icon = button:CreateTexture(nil, "ARTWORK")
   button.icon = icon
   -- Drawn over the icon while hovered (an icon's Highlight).
   button.highlight = button:CreateTexture(nil, "ARTWORK", nil, 1)
   button.highlight:Hide()
   button.key = spec.key
+  button.spec = spec
   button.hover = false
   self:SetHeaderIcon(button, spec.iconKey or spec.key)
   button:SetScript("OnEnter", function()
@@ -2131,8 +2222,18 @@ function panelProto:headerButton(spec)
   end)
   button:SetScript("OnLeave", function()
     button.hover = false
+    button.pressed = false
     self:PaintHeaderIcon(button)
     GameTooltip:Hide()
+  end)
+  -- Pressed: its icon's Pushed art, as a button's pushed texture is.
+  button:SetScript("OnMouseDown", function()
+    button.pressed = true
+    self:PaintHeaderIcon(button)
+  end)
+  button:SetScript("OnMouseUp", function()
+    button.pressed = false
+    self:PaintHeaderIcon(button)
   end)
   addon.SetScript(button, "OnClick", function(ctx)
     spec.onClick(ctx)
@@ -2177,7 +2278,6 @@ function panelProto:SetHeaderIcon(button, iconKey)
   local buttonSize = pixel:Length(button, style.HEADER_BUTTON)
   icon:ClearAllPoints()
   pixel:Center(icon, button, buttonSize, buttonSize, size, size)
-  drawIconArt(icon, spec)
   local highlight = button.highlight
   highlight:ClearAllPoints()
   pixel:Center(highlight, button, buttonSize, buttonSize, size, size)
@@ -2194,7 +2294,9 @@ end
 -- (asked with a Parchment screenshot), so the two are colored apart. A disabled button is not brighter
 -- under the pointer: it is drawn at DisabledAlpha of its color, and art desaturated too (a white glyph
 -- looks the same desaturated). Its Highlight shows over it while it is hovered and enabled, as a button's
--- highlight texture does (GW2_UI's buttons).
+-- highlight texture does (GW2_UI's buttons). An icon with art of its own while pressed (Pushed) or disabled
+-- (Disabled: neither dimmed nor grayed, the art shows it) draws that art then, as a button's pushed and disabled
+-- textures do (Blizzard's close button).
 ---@param button Button
 function panelProto:PaintHeaderIcon(button)
   local B = style.Theme.Header.Buttons
@@ -2207,11 +2309,19 @@ function panelProto:PaintHeaderIcon(button)
     color = own.Color or (button.glyph and B.Color or B.ArtColor)
   end
   local r, g, b, a = style:RGBA(color)
-  if not enabled then
+  local art = own
+  if not enabled and own.Disabled then
+    art = own.Disabled
+  elseif enabled and button.pressed and own.Pushed then
+    art = own.Pushed
+  end
+  local drawnDisabled = art == own.Disabled
+  if not enabled and not drawnDisabled then
     a = a * B.DisabledAlpha
   end
   local icon = button.icon
-  icon:SetDesaturated(not enabled and not button.glyph)
+  drawIconArt(icon, art)
+  icon:SetDesaturated(not enabled and not button.glyph and not drawnDisabled)
   icon:SetVertexColor(r, g, b, a)
   local H = own.Highlight
   button.highlight:SetShown(H ~= nil and button.hover and enabled)
@@ -2240,7 +2350,7 @@ end
 -- into the window (asked: it should "stop flush with the hard edge of the window").
 ---@return string point, number x, number inward
 function panelProto:TitleJoin()
-  local edge = self:InnerPad() + style.TITLE_INSET
+  local edge = self:TitleStart()
   if self.side == "LEFT" then
     return "RIGHT", edge, -1
   end
@@ -2258,7 +2368,7 @@ function panelProto:CloudSpan()
   if isSecret(width) then
     width = C and C.SecretTitleWidth or 0
   end
-  return width + self:InnerPad() + style.TITLE_INSET + (C and C.Pad or 0)
+  return width + self:TitleStart() + (C and C.Pad or 0)
 end
 
 -- LayoutCloud spreads the cloud's puffs across the title as it is now (a share of the way across
@@ -2318,7 +2428,8 @@ end
 ---@param text string
 function panelProto:BuildHeader(text)
   local frame = self.frame
-  local title = frame:CreateFontString(nil, "OVERLAY")
+  -- On the overlay, over a theme's frame drawn above the content.
+  local title = self.overlay:CreateFontString(nil, "OVERLAY")
   style:SetFont(title, style.Theme.Header.Title.Font)
   title:SetText(text)
   self.title = title
@@ -2355,6 +2466,11 @@ function panelProto:BuildHeader(text)
     self[spec.key] = button
     table.insert(self.headerButtons, button)
   end
+  -- Where the header's row waits while the theme puts it in the bag button's menu: hidden, so its buttons keep whether
+  -- the panel shows them (the menu lists those it shows) without being seen.
+  self.menuHolder = CreateFrame("Frame", nil, frame)
+  self.menuHolder:Hide()
+  self.menuButton = nextMenuButton:Create(self)
   self:styleHeader()
 end
 
@@ -2370,14 +2486,16 @@ function panelProto:styleHeader()
   style:SetFont(title, H.Title.Font)
   title:ClearAllPoints()
   -- Justified toward its anchor: a small panel's title has a width (FitTitle), and text is centered in
-  -- its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER).
-  local inset, top = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET), pixel:Snap(body, style.TITLE_TOP)
+  -- its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER). A theme may center it in the room
+  -- the header buttons leave (Title.Justify = "CENTER"), as Blizzard centers a window's title.
+  local inset, top = pixel:Snap(body, self:TitleStart()), pixel:Snap(body, style.TITLE_TOP)
+  local centered = H.Title.Justify == "CENTER"
   if left then
     title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -inset, -top)
-    title:SetJustifyH("RIGHT")
+    title:SetJustifyH(centered and "CENTER" or "RIGHT")
   else
     title:SetPoint("TOPLEFT", body, "TOPLEFT", inset, -top)
-    title:SetJustifyH("LEFT")
+    title:SetJustifyH(centered and "CENTER" or "LEFT")
   end
 
   -- The cloud: a puff per entry, out of step (each breathes at its own pace, from its own point in
@@ -2485,6 +2603,7 @@ function panelProto:styleHeader()
     pixel:Size(button, style.HEADER_BUTTON, style.HEADER_BUTTON)
     self:SetHeaderIcon(button, button.iconKey)
   end
+  self.menuButton:Style()
   self:LayoutCloud()
   self:LayoutHeader()
 end
@@ -2538,6 +2657,19 @@ function panelProto:titleWidth()
   return width
 end
 
+-- titleShift is how far in from the title's anchor its text starts: half the room it leaves, rounded down, when its
+-- theme centers it (Title.Justify = "CENTER", FitTitle), else none.
+---@private
+---@return number
+function panelProto:titleShift()
+  local cut = self.titleCut
+  if style.Theme.Header.Title.Justify ~= "CENTER" or cut == nil then
+    return 0
+  end
+  local body = self.body
+  return math.max(0, pixel:Floor(body, (cut - pixel:Ceil(body, self:titleWidth())) / 2))
+end
+
 -- placeTitleRow puts what is drawn about the title on whole pixels (docs/next-pixel-perfect.md), from the
 -- body's corner on the title's side by whole-pixel offsets, never from the title text's middle or its far
 -- edge (the client's measure of the text, between pixels): the ribbon's lines out of the window from its
@@ -2567,7 +2699,7 @@ function panelProto:placeTitleRow()
   local glow, G = self.titleGlow, H.TitleGlow
   if G then
     local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
-    local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET)
+    local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
     local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
     glow:ClearAllPoints()
     if left then
@@ -2581,7 +2713,7 @@ function panelProto:placeTitleRow()
   -- own numbers, never from the title: a title showing a secret has secret anchoring, and so would every region
   -- anchored to it, the tooltip the button owns included (warcraft.wiki.gg Secret Values, "Secret anchors").
   local button = self.titleButton
-  local inset = pixel:Snap(body, self:InnerPad() + style.TITLE_INSET)
+  local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
   button:ClearAllPoints()
   if left then
     button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - 8), -(top - 6))
@@ -2875,6 +3007,8 @@ function panelProto:LayoutHeader()
       pixel:Point(button, point, body, point, x, pin.Y or 0)
     end
   end
+  -- With the row in the bag button's menu, its buttons are laid out under the hidden holder, unseen.
+  self:holdRow()
   if style.Theme.Header.Buttons.Rail then
     self:layoutRail()
     self:FitTitle()
@@ -2888,10 +3022,12 @@ function panelProto:LayoutHeader()
     end
     if button:IsShown() and pinnedOf(button) == nil then
       if previous == nil then
+        -- From the outer side: Pad in, or RowStart (past the pinned buttons, headerRoom).
+        local start = style.Theme.Header.Buttons.RowStart or style.PAD
         if left then
-          pixel:Point(button, "TOPLEFT", body, "TOPLEFT", style.PAD, -style.HEADER_BUTTON_TOP)
+          pixel:Point(button, "TOPLEFT", body, "TOPLEFT", start, -style.HEADER_BUTTON_TOP)
         else
-          pixel:Point(button, "TOPRIGHT", body, "TOPRIGHT", -style.PAD, -style.HEADER_BUTTON_TOP)
+          pixel:Point(button, "TOPRIGHT", body, "TOPRIGHT", -start, -style.HEADER_BUTTON_TOP)
         end
       elseif left then
         pixel:Point(button, "TOPLEFT", previous, "TOPRIGHT", style.HEADER_BUTTON_GAP, 0)
@@ -2902,6 +3038,22 @@ function panelProto:LayoutHeader()
     end
   end
   self:FitTitle()
+end
+
+-- holdRow puts the header's row under the hidden holder while the theme puts it in the bag button's menu, and back on
+-- the panel's frame after; pinned buttons stay on the panel's frame. A frame's level stays what it was set to across a
+-- new parent (warcraft.wiki.gg Frame Strata: since 7.0.3 "always stay what you set them to"), over the overlay.
+---@private
+function panelProto:holdRow()
+  local inMenu = self:RowInMenu()
+  for _, button in ipairs(self.headerButtons) do
+    local held = inMenu and pinnedOf(button) == nil
+    if held and button:GetParent() ~= self.menuHolder then
+      button:SetParent(self.menuHolder)
+    elseif not held and button:GetParent() == self.menuHolder then
+      button:SetParent(self.frame)
+    end
+  end
 end
 
 -- layoutRail puts the shown header buttons down the side rail (next-themes.md §13), in order from its top, Top
@@ -2934,12 +3086,12 @@ function panelProto:layoutRail()
 end
 
 -- FitTitle keeps the title on one line in the room the shown header buttons leave it, cut short
--- rather than over them: on every small panel, whose width the player sets (next.md §14g), and at
--- either size on a panel whose title can be any length (fitsTitle: a vendor's name). Else the title
--- is as long as it is.
+-- rather than over them: on every small panel, whose width the player sets (next.md §14g), at
+-- either size on a panel whose title can be any length (fitsTitle: a vendor's name), and on every panel whose
+-- theme centers its title (Title.Justify = "CENTER": in that room). Else the title is as long as it is.
 function panelProto:FitTitle()
   local title = self.title
-  if not (self.fitsTitle or self:IsSmall()) then
+  if not (self.fitsTitle or self:IsSmall() or style.Theme.Header.Title.Justify == "CENTER") then
     title:SetWordWrap(true)
     title:SetWidth(0)
     self:placeTitleRow()
@@ -2948,8 +3100,8 @@ function panelProto:FitTitle()
   title:SetWordWrap(false)
   -- Kept: the title's own width cannot be read back while it shows a secret (titleWidth), and only a title cut
   -- short (the vendor's, at both sizes) ever shows one.
-  self.titleCut = pixel:Length(title, math.max(1, self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
-    - (style.PAD + self:headerButtonsWidth()) - self:pinnedRoom() - 12))
+  local room, slack = self:titleEnd()
+  self.titleCut = pixel:Length(title, math.max(1, self:BodyWidth() - self:TitleStart() - room - slack))
   title:SetWidth(self.titleCut)
   self:placeTitleRow()
 end
@@ -2962,9 +3114,6 @@ end
 function panelProto:BuildSearch()
   local sf = self:CreateSearchBox()
   local t = sf.textBox
-  for _, key in ipairs({ "Left", "Middle", "Right" }) do
-    t[key]:SetAlpha(0)
-  end
   local fill = sf.frame:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints()
   fill:SetColorTexture(1, 1, 1, 1)
@@ -3009,18 +3158,33 @@ end
 -- styleSearch places and draws the search box from the theme (Layout, Search): where it sits, its
 -- border's size (or none), its magnifier, its help text and what is typed in their roles (the
 -- template gives the help text a color of its own, so its role's color is set on it too), then its
--- look for its state.
+-- look for its state. A theme that keeps the template's look (Search.Template: Blizzard's own bag search box,
+-- InputBoxVisualTemplate's border) draws neither Next's fill nor its edge.
 ---@private
 function panelProto:styleSearch()
   local sf, S = self.searchBox, style.Theme.Search
   local t = sf.textBox
   local body = self.body
   local leftPad, rightPad = self:SidePads()
+  -- In from the body's sides by the theme's Inset (the original bags' box: 20 in, 10 from the right), its inner side's
+  -- on the inner side; else the side pads.
+  local inset = S.Inset
+  if inset then
+    leftPad, rightPad = inset.Left or 0, inset.Right or 0
+    if self.side == "LEFT" then
+      leftPad, rightPad = rightPad, leftPad
+    end
+  end
   sf.frame:ClearAllPoints()
   pixel:Point(sf.frame, "TOPLEFT", body, "TOPLEFT", leftPad, -style.SEARCH_TOP)
   pixel:Point(sf.frame, "TOPRIGHT", body, "TOPRIGHT", -rightPad, -style.SEARCH_TOP)
   pixel:Height(sf.frame, style.SEARCH_HEIGHT)
-  local E = S.Edge
+  local template = S.Template == true
+  for _, key in ipairs({ "Left", "Middle", "Right" }) do
+    t[key]:SetAlpha(template and 1 or 0)
+  end
+  self.searchFill:SetShown(not template)
+  local E = not template and S.Edge
   for i, edge in ipairs(self.searchEdges) do
     if E then
       if i <= 2 then
@@ -3035,6 +3199,10 @@ function panelProto:styleSearch()
   end
   self.searchEdgeAlpha = E and E.Idle or 0
   style:SetTemplateFont(t.Instructions, S.HelpFont)
+  -- A theme may keep the template's own color for its help (HelpColor: InputBoxInstructionsTemplate's 0.35 gray).
+  if S.HelpColor then
+    t.Instructions:SetTextColor(style:RGBA(S.HelpColor))
+  end
   style:SetFont(t, S.TextFont)
   self:placeSearch()
   self:UpdateSearchLook(true)
@@ -3047,6 +3215,10 @@ end
 ---@private
 function panelProto:placeSearch()
   local t = self.searchBox.textBox
+  if style.Theme.Search.Inner then
+    self:placeSearchInner(style.Theme.Search.Inner)
+    return
+  end
   local height = pixel:Length(t, style.SEARCH_HEIGHT)
   local gap, iconSize, right = pixel:Lengths(t, style.SEARCH_GAP, style.SEARCH_ICON, style.SEARCH_RIGHT)
   local icon = t.searchIcon
@@ -3075,6 +3247,32 @@ function panelProto:placeSearch()
   end
 end
 
+-- placeSearchInner lays the search box's insides out as a theme's Inner says, anchored as SearchBoxTemplate anchors them
+-- (InputBoxTemplates.xml, every client): the magnifier IconSize square by its LEFT, IconX in and IconY from the box's
+-- middle; the help from TextLeft in to TextRight from the right, centered on the box's height, and what is typed in the
+-- same room (TextInsets); the clear button by its RIGHT, ClearRight from the box's.
+---@private
+---@param I table
+function panelProto:placeSearchInner(I)
+  local t = self.searchBox.textBox
+  local icon = t.searchIcon
+  icon:ClearAllPoints()
+  pixel:Size(icon, I.IconSize, I.IconSize)
+  pixel:Point(icon, "LEFT", t, "LEFT", I.IconX or 0, I.IconY or 0)
+  local left, right = pixel:Snap(t, I.TextLeft or 0), pixel:Snap(t, I.TextRight or 0)
+  local help = t.Instructions
+  help:ClearAllPoints()
+  help:SetPoint("TOPLEFT", t, "TOPLEFT", left, 0)
+  help:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", -right, 0)
+  help:SetJustifyV("MIDDLE")
+  t:SetTextInsets(left, right, 0, 0)
+  local clear = t.clearButton
+  if clear ~= nil then
+    clear:ClearAllPoints()
+    pixel:Point(clear, "RIGHT", t, "RIGHT", -(I.ClearRight or 0), 0)
+  end
+end
+
 -- SearchState is how the search box looks now: "focus" while typed in, "hover" under the pointer,
 -- "active" while it holds a search, else "idle".
 ---@return string
@@ -3100,20 +3298,26 @@ function panelProto:UpdateSearchLook(now)
   local state = self:SearchState()
   local focused = state == "focus"
   local fill = focused and S.FocusFill or S.Fill
-  if style:IsArt(fill) then
-    style:Paint(self.searchFill, fill)
-  else
-    self.searchFill:SetTexCoord(0, 1, 0, 1)
-    self.searchFill:SetColorTexture(1, 1, 1, 1)
-    self.searchFill:SetVertexColor(style:RGBA(fill))
+  -- Under a theme that keeps the template's own border (styleSearch), the fill is not drawn.
+  if S.Template ~= true then
+    if style:IsArt(fill) then
+      style:Paint(self.searchFill, fill)
+    else
+      self.searchFill:SetTexCoord(0, 1, 0, 1)
+      self.searchFill:SetColorTexture(1, 1, 1, 1)
+      self.searchFill:SetVertexColor(style:RGBA(fill))
+    end
   end
+  -- Holding a search: its ActiveColor when it has one (Blizzard's magnifier is white then, SearchBoxTemplate).
   local icon, I = self.searchBox.textBox.searchIcon, S.Icon
   if focused then
     icon:SetVertexColor(style:RGBA(I.FocusColor))
+  elseif I.ActiveColor and self.searchBox.textBox:GetText() ~= "" then
+    icon:SetVertexColor(style:RGBA(I.ActiveColor))
   else
     icon:SetVertexColor(style:RGBA(I.Color, state == "idle" and I.Idle or I.Active))
   end
-  local E = S.Edge
+  local E = S.Template ~= true and S.Edge
   if not E then
     tween:Stop(self.searchEdges)
     return
@@ -3297,9 +3501,9 @@ function panelProto:BuildSparkles()
   -- edge.
   local function titleEdge()
     if self.side == "LEFT" then
-      return self:BodyLeft() + self:BodyWidth() - (self:InnerPad() + style.TITLE_INSET)
+      return self:BodyLeft() + self:BodyWidth() - self:TitleStart()
     end
-    return self:BodyLeft() + self:InnerPad() + style.TITLE_INSET
+    return self:BodyLeft() + self:TitleStart()
   end
   -- Where the ribbon starts, from the panel's top left: the window's hard edge, the title's join read now (a theme
   -- moves the title: its Pad and inset, a side rail).
@@ -3678,6 +3882,7 @@ function panelProto:Show(ctx, slotInfo, onShown)
   self.edgeSparkles:Start()
   self.cloudSparkles:Start()
   self.ornaments:Start()
+  self.menuButton:Paint()
   self:playShimmer()
   addon.TriggerItemContextChanged()
   chain:Update(ctx)

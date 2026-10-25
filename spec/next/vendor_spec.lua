@@ -52,9 +52,9 @@ LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
   { "NextVendor", "next/vendor.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -469,6 +469,66 @@ describe("NextVendor", function()
       local v = open()
       assert.is_false(v.filterButton:IsShown())
       assert.are.same({ "TOPLEFT", v.settingsButton, "TOPRIGHT", 8, 0 }, { v.sellJunkButton:GetPoint(1) })
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md, round three; asked: "same for vendors and bank, move it all to the
+    -- button in the corner of their window as a drop down"): its actions in its bag button's menu (Header.Buttons.Menu),
+    -- as its buttons stand: only what the vendor offers, disabled with nothing to do, saying what repairs cost.
+    describe("in a bag button's menu", function()
+      local function menuTheme()
+        UseNextTheme({ Header = { Buttons = { Menu = { Point = "TOPINNER", Width = 40, Height = 40, Layers = {} },
+          Pinned = { closeButton = { Point = "TOPOUTER" } } } } })
+      end
+
+      after_each(function()
+        UseNextTheme(nil)
+      end)
+
+      it("lists what the vendor offers, as its buttons stand, Open Options Screen last", function()
+        _G._merchant.canRepair, _G._merchant.canGuildRepair, _G._merchant.repairCost = true, false, 0
+        local list
+        override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+        local v = open()
+        menuTheme()
+        v:ApplyStyle(ctx())
+        v.menuButton:Open(ctx())
+        local names = {}
+        for i = 2, #list do
+          names[i - 1] = list[i].text
+        end
+        assert.are.same({ "Filter", "Sell Junk", "Repair All", "Open Options Screen" }, names)
+        assert.is_true(list[4].disabled, "nothing to repair")
+        assert.is_truthy(list[4].tooltipText:find("Nothing needs repair", 1, true))
+        v:ApplyStyle(ctx())
+      end)
+
+      it("says what repairing costs and who pays, the guild's repair where the guild pays", function()
+        _G._merchant.canRepair, _G._merchant.canGuildRepair, _G._merchant.repairCost = true, true, 12345
+        local list
+        override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+        local v = open()
+        menuTheme()
+        v:ApplyStyle(ctx())
+        v.menuButton:Open(ctx())
+        local repair, guild = list[4], list[5]
+        assert.are.equal("Repair All", repair.text)
+        assert.is_false(repair.disabled)
+        assert.is_truthy(repair.tooltipText:find("Repair all: ", 1, true))
+        assert.are.equal("Repair With Guild Funds", guild.text)
+        assert.is_truthy(guild.tooltipText:find("The guild pays up to ", 1, true))
+      end)
+
+      it("opens Blizzard's filter from the bag button while the filter is in its menu", function()
+        local v = open()
+        menuTheme()
+        v:ApplyStyle(ctx())
+        v:OpenFilter()
+        assert.are.equal(v.menuButton.frame, _G._lastContextMenu.owner)
+        UseNextTheme(nil)
+        v:ApplyStyle(ctx())
+        v:OpenFilter()
+        assert.are.equal(v.filterButton, _G._lastContextMenu.owner)
+      end)
     end)
   end)
 

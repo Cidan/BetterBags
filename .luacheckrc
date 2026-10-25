@@ -15,6 +15,17 @@ ignore = {
     "212/self",
 }
 globals = {
+	-- Blizzard's own art for BetterBags Next's Plain theme (docs/next-plain-theme.md): its nine-slice layouts, atlas
+	-- data, named UI colors (Color.lua), unit portraits.
+	"NineSliceUtil",
+	"NineSliceLayouts",
+	"C_Texture",
+	"PANEL_BACKGROUND_COLOR",
+	"NORMAL_FONT_COLOR",
+	"HIGHLIGHT_FONT_COLOR",
+	"DISABLED_FONT_COLOR",
+	"SetPortraitTexture",
+	"UnitExists",
 	-- The guild bank (data/guildbank.lua, BetterBags Next's guild bank)
 	"GuildBankFrame",
 	"GuildBankPopupFrame",
@@ -401,6 +412,12 @@ files["spec/**/*.lua"] = {
 		"MockSecret",
 		"IsMockSecret",
 		"SecretKeyGuard",
+		"MockAtlases",
+		"MockAtlas",
+		"ResetMockAtlases",
+		"UseNineSliceLayouts",
+		"UseRealAtlasSizes",
+		"MockUnits",
 	},
 	ignore = {
 		"212", -- unused argument (common in mock functions)

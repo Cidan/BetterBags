@@ -66,6 +66,12 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
+---@class NextFrameArt: AceModule
+local frameArt = addon:GetModule('NextFrameArt')
+
 ---@class PixelAudit: AceModule
 local pixelAudit = addon:GetModule('PixelAudit')
 
@@ -325,6 +331,14 @@ function settings:build()
   self:fitScale()
   self.fill = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
   self.fill:SetAllPoints(frame)
+  fills:Wrap(self.fill, frame)
+  -- The theme's frame round the window (Settings.Frame, next-themes.md §15), at the window's own level (Blizzard's
+  -- settings window: SettingsFrameTemplate's NineSlice useParentLevel), its content placed inside it.
+  self.frameArt = frameArt:Create(frame, frame)
+  -- Art over the fill framing the list and the content (Settings.InnerFrame: Blizzard's Options_InnerFrame).
+  self.innerFrame = frame:CreateTexture(nil, "ARTWORK")
+  self.innerFrame:SetAllPoints(frame)
+  fills:Wrap(self.innerFrame, frame)
   self.wash = frame:CreateTexture(nil, "BACKGROUND", nil, -6)
   self.wash:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
   self.wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
@@ -356,6 +370,8 @@ function settings:buildSidebar()
   self.sidebarLine = sidebar:CreateTexture(nil, "BORDER")
   self.sidebarLine:SetPoint("TOPRIGHT", sidebar, "TOPRIGHT", 0, 0)
   self.sidebarLine:SetPoint("BOTTOMRIGHT", sidebar, "BOTTOMRIGHT", 0, 0)
+  -- The theme's frame round the sidebar (Sidebar.Frame: Blizzard's inset), under its pages and list (child frames).
+  self.sidebarArt = frameArt:Create(sidebar, sidebar)
   -- The brand's row: dragging it moves the window, as the header does. It stays as the panels slide.
   local brand = CreateFrame("Frame", nil, sidebar)
   brand:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 0, 0)
@@ -366,7 +382,8 @@ function settings:buildSidebar()
   local navPanel = CreateFrame("Frame", nil, sidebar)
   self.navPanel = navPanel
   self.brandIcon = navPanel:CreateTexture(nil, "ARTWORK")
-  self.brandText = style:CreateText(navPanel, style.Theme.Settings.Brand.Font)
+  -- Its role is set when styled; a theme may have no brand.
+  self.brandText = style:CreateText(navPanel, "SettingsBrand")
   self.brandText:SetText(L:G("BetterBags"))
   self.brandLine = navPanel:CreateTexture(nil, "ARTWORK")
   self:buildListPanel()
@@ -375,7 +392,7 @@ function settings:buildSidebar()
     onChange = function(ctx, text) self:Search(ctx, text) end,
     icon = function()
       local SR = style.Theme.Settings.Search
-      return { Texture = SR.Icon, Size = SR.IconSize, Color = SR.IconColor }
+      return { Texture = SR.Icon, Atlas = SR.Atlas, Size = SR.IconSize, Color = SR.IconColor }
     end,
   })
   addon.HookScript(self.search.frame, "OnEscapePressed", function(ctx) self:Search(ctx, "") end)
@@ -461,13 +478,24 @@ end
 ---@private
 function settings:buildHeader()
   local frame = self.frame
+  -- The window's name in its title bar (Settings.Title), and the title bar moving the window as Blizzard's does.
+  self.windowTitle = style:CreateText(frame, "SettingsBrand")
+  self.windowTitle:SetText(L:G("BetterBags"))
+  self.windowTitle:SetWordWrap(false)
+  self.titleBar = CreateFrame("Frame", nil, frame)
+  self:makeMover(self.titleBar)
   local header = CreateFrame("Frame", nil, frame)
   self:makeMover(header)
   self.header = header
+  -- A line under the page's title (Header.Divider: Blizzard's Options_HorizontalDivider).
+  self.divider = header:CreateTexture(nil, "ARTWORK")
+  self.divider:SetAllPoints(header)
+  fills:Wrap(self.divider, header)
   self.title = style:CreateText(header, style.Theme.Settings.Header.TitleFont)
   self.title:SetJustifyH("LEFT")
   self.title:SetWordWrap(false)
-  self.description = style:CreateText(header, style.Theme.Settings.Header.DescriptionFont)
+  -- Its role is set when styled; a theme may show no description.
+  self.description = style:CreateText(header, "SettingsDescription")
   self.description:SetJustifyH("LEFT")
   self.description:SetWordWrap(false)
   local close = CreateFrame("Button", nil, frame)
@@ -475,6 +503,10 @@ function settings:buildHeader()
   close:SetFrameLevel(header:GetFrameLevel() + 5)
   self.closeIcon = close:CreateTexture(nil, "ARTWORK")
   self.closeIcon:SetAllPoints(close)
+  -- Over the icon under the pointer (Close.Highlight: Blizzard's close button's highlight).
+  self.closeHighlight = close:CreateTexture(nil, "ARTWORK", nil, 1)
+  self.closeHighlight:SetAllPoints(close)
+  self.closeHighlight:Hide()
   addon.SetScript(close, "OnClick", function() self:Close() end)
   addon.SetScript(close, "OnEnter", function() self:paintClose(true) end)
   addon.SetScript(close, "OnLeave", function() self:paintClose(false) end)
@@ -525,16 +557,31 @@ end
 
 -- Metrics are the window's lengths in whole pixels on its grid (docs/next-pixel-perfect.md): its size, the
 -- sidebar's width, the brand's row, the header, the footer, the tabs' row and the sidebar's padding.
----@return {width: number, height: number, sidebar: number, brand: number, header: number, footer: number, tabs: number, pad: number}
+-- Where things go (each 0 unless the theme says, Blizzard's settings window's for the Plain theme): the sidebar Left in
+-- and Top down to Bottom above the window's bottom (sideHeight tall); the brand's row (none for Brand = false) and
+-- the row Back sits in (Back.Height, else the brand's); the content from Header.Left right of the sidebar to
+-- Header.Right from the window's right (contentLeft, contentRight), its header Header.Top down; the footer from
+-- Footer.Left (else the sidebar's right).
+---@return {width: number, height: number, sidebar: number, brand: number, header: number, footer: number, tabs: number, pad: number, sideLeft: number, sideTop: number, sideBottom: number, sideHeight: number, back: number, contentLeft: number, contentRight: number, headerTop: number, footerLeft: number}
 function settings:Metrics()
   -- Not made yet, it would be drawn on UIParent's grid.
   local T, frame = style.Theme.Settings, self.frame or UIParent
-  return {
+  local SB, B, H, F = T.Sidebar, T.Brand, T.Header, T.Footer
+  local m = {
     width = pixel:Length(frame, T.Width), height = pixel:Length(frame, T.Height),
-    sidebar = pixel:Length(frame, T.Sidebar.Width), brand = pixel:Length(frame, T.Brand.Height),
-    header = pixel:Length(frame, T.Header.Height), footer = pixel:Length(frame, T.Footer.Height),
-    tabs = pixel:Length(frame, controls:Theme("TopTabs").Height), pad = pixel:Snap(frame, T.Sidebar.Pad),
+    sidebar = pixel:Length(frame, SB.Width), brand = B and pixel:Length(frame, B.Height) or 0,
+    header = pixel:Length(frame, H.Height), footer = pixel:Length(frame, F.Height),
+    tabs = pixel:Length(frame, controls:Theme("TopTabs").Height), pad = pixel:Snap(frame, SB.Pad),
+    sideLeft = pixel:Snap(frame, SB.Left or 0), sideTop = pixel:Snap(frame, SB.Top or 0),
+    sideBottom = pixel:Snap(frame, SB.Bottom or 0), headerTop = pixel:Snap(frame, H.Top or 0),
+    contentRight = pixel:Snap(frame, H.Right or 0),
   }
+  m.sideHeight = m.height - m.sideTop - m.sideBottom
+  local back = T.Back.Height or (B and B.Height)
+  m.back = back and pixel:Length(frame, back) or 0
+  m.contentLeft = m.sideLeft + m.sidebar + pixel:Snap(frame, H.Left or 0)
+  m.footerLeft = F.Left ~= nil and pixel:Snap(frame, F.Left) or m.sideLeft + m.sidebar
+  return m
 end
 
 -- Style draws the window from the theme and places its parts, all in whole pixels on the grid it is drawn
@@ -558,56 +605,97 @@ function settings:Style()
     self.wash:Hide()
   end
   controls:PaintEdge(self.edge, T.Edge)
+  self.frameArt:Apply(T.Frame)
 
   local SB, B = T.Sidebar, T.Brand
+  self.sidebar:ClearAllPoints()
+  self.sidebar:SetPoint("TOPLEFT", frame, "TOPLEFT", m.sideLeft, -m.sideTop)
+  self.sidebar:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", m.sideLeft, m.sideBottom)
   self.sidebar:SetWidth(m.sidebar)
   controls:Paint(self.sidebarFill, SB.Fill)
   pixel:Width(self.sidebarLine, SB.Line and SB.Line.Size or 1)
   controls:Paint(self.sidebarLine, SB.Line)
-  self.brand:SetHeight(m.brand)
-  pixel:Size(self.brandIcon, B.IconSize, B.IconSize)
-  self.brandIcon:ClearAllPoints()
-  pixel:Row(self.brandIcon, "TOPLEFT", self.navPanel, m.pad, m.brand)
-  controls:Paint(self.brandIcon, { Texture = B.Icon, Color = B.IconColor })
-  style:SetFont(self.brandText, B.Font)
-  self.brandText:ClearAllPoints()
-  pixel:Row(self.brandText, "TOPLEFT", self.navPanel, m.pad + self.brandIcon:GetWidth() + pixel:Snap(frame, B.Gap), m.brand)
-  self:paintBrandLine(self.brandLine, self.navPanel)
+  self.sidebarArt:Apply(SB.Frame)
+  -- The brand (its icon, BetterBags and the line under them), or none (Brand = false: Blizzard's settings window names
+  -- itself in its title bar instead, Settings.Title).
+  local branded = B and true or false
+  self.brand:SetShown(branded)
+  self.brandIcon:SetShown(branded)
+  self.brandText:SetShown(branded)
+  if B then
+    self.brand:SetHeight(m.brand)
+    pixel:Size(self.brandIcon, B.IconSize, B.IconSize)
+    self.brandIcon:ClearAllPoints()
+    pixel:Row(self.brandIcon, "TOPLEFT", self.navPanel, m.pad, m.brand)
+    controls:Paint(self.brandIcon, { Texture = B.Icon, Color = B.IconColor })
+    style:SetFont(self.brandText, B.Font)
+    self.brandText:ClearAllPoints()
+    pixel:Row(self.brandText, "TOPLEFT", self.navPanel, m.pad + self.brandIcon:GetWidth() + pixel:Snap(frame, B.Gap), m.brand)
+  end
+  self:paintBrandLine(self.brandLine, self.navPanel, m.brand, B and B.Line)
+  self:styleTitle()
 
+  -- The search box under the brand, or at the window's top right (Search.Place = "Top": Blizzard's, 350 wide).
   local search, SR = self.search, T.Search
-  local searchTop = m.brand + pixel:Snap(frame, SR.Gap)
+  local top = SR.Place == "Top"
+  local searchTop = m.brand + pixel:Snap(frame, SR.Gap or 0)
   search.frame:ClearAllPoints()
-  search.frame:SetPoint("TOPLEFT", self.navPanel, "TOPLEFT", m.pad, -searchTop)
-  search.frame:SetPoint("TOPRIGHT", self.navPanel, "TOPRIGHT", -m.pad, -searchTop)
+  if top then
+    search.frame:SetParent(frame)
+    search.frame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pixel:Snap(frame, SR.Right or 0), -pixel:Snap(frame, SR.Top or 0))
+    pixel:Width(search.frame, SR.Width)
+  else
+    search.frame:SetParent(self.navPanel)
+    search.frame:SetPoint("TOPLEFT", self.navPanel, "TOPLEFT", m.pad, -searchTop)
+    search.frame:SetPoint("TOPRIGHT", self.navPanel, "TOPRIGHT", -m.pad, -searchTop)
+  end
   search:Style()
 
+  -- The version at the sidebar's bottom, or at the window's bottom left (Version.Window).
   local V = T.Version
   style:SetFont(self.version, V.Font)
   self.version:ClearAllPoints()
   local versionBottom = pixel:Snap(frame, V.Bottom)
-  self.version:SetPoint("BOTTOMLEFT", self.navPanel, "BOTTOMLEFT", m.pad, versionBottom)
+  if V.Window then
+    self.version:SetParent(frame)
+    self.version:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", pixel:Snap(frame, V.Left or 0), versionBottom)
+  else
+    self.version:SetParent(self.navPanel)
+    self.version:SetPoint("BOTTOMLEFT", self.navPanel, "BOTTOMLEFT", m.pad, versionBottom)
+  end
+  -- The pages between what the sidebar holds above and below them: from its top when it holds neither.
   self.navBox:ClearAllPoints()
-  self.navBox:SetPoint("TOPLEFT", self.navPanel, "TOPLEFT", 0, -(searchTop + search.frame:GetHeight() + pixel:Snap(frame, SR.Gap)))
-  self.navBox:SetPoint("BOTTOMRIGHT", self.navPanel, "BOTTOMRIGHT", 0, 2 * versionBottom + pixel:Snap(frame, 12))
+  self.navBox:SetPoint("TOPLEFT", self.navPanel, "TOPLEFT", 0,
+    top and -m.brand or -(searchTop + search.frame:GetHeight() + pixel:Snap(frame, SR.Gap or 0)))
+  self.navBox:SetPoint("BOTTOMRIGHT", self.navPanel, "BOTTOMRIGHT", 0,
+    V.Window and 0 or 2 * versionBottom + pixel:Snap(frame, 12))
   self:styleListPanel()
 
   local H = T.Header
   self.header:ClearAllPoints()
-  self.header:SetPoint("TOPLEFT", frame, "TOPLEFT", m.sidebar, 0)
-  self.header:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+  self.header:SetPoint("TOPLEFT", frame, "TOPLEFT", m.contentLeft, -m.headerTop)
+  self.header:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -m.contentRight, -m.headerTop)
   self.header:SetHeight(m.header)
   style:SetFont(self.title, H.TitleFont)
-  style:SetFont(self.description, H.DescriptionFont)
+  -- A theme without a description's font shows none (Blizzard's pages have none).
+  self.description:SetShown(H.DescriptionFont ~= false)
+  if H.DescriptionFont then
+    style:SetFont(self.description, H.DescriptionFont)
+  end
+  controls:Paint(self.divider, H.Divider or false)
   self:placeHeading()
   local X = H.Close
   pixel:Size(self.closeButton, X.Size, X.Size)
   self.closeButton:ClearAllPoints()
-  pixel:Point(self.closeButton, "TOPRIGHT", frame, "TOPRIGHT", -X.Inset, -X.Inset)
+  -- Offset: anchor offsets from the top right (Blizzard's close anchors), else Inset in both ways.
+  local offset = X.Offset
+  pixel:Point(self.closeButton, "TOPRIGHT", frame, "TOPRIGHT", offset and offset.X or -X.Inset, offset and offset.Y or -X.Inset)
   self:paintClose(false)
+  controls:Paint(self.innerFrame, T.InnerFrame or false)
 
   local F = T.Footer
   self.footer:ClearAllPoints()
-  self.footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", m.sidebar, 0)
+  self.footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", m.footerLeft, 0)
   self.footer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
   self.footer:SetHeight(m.footer)
   self.footerLine:ClearAllPoints()
@@ -624,36 +712,79 @@ end
 ---@private
 function settings:placeFooter()
   local F, m = style.Theme.Settings.Footer, self:Metrics()
-  local pad = pixel:Snap(self.frame, F.Pad)
+  local frame = self.frame
+  local buttons = F.Buttons
+  self.whatsNew:SetStyle(F.WhatsNew or "Link")
   self.whatsNew.frame:ClearAllPoints()
-  pixel:Row(self.whatsNew.frame, "TOPLEFT", self.footer, pad, m.footer)
   self.done.frame:ClearAllPoints()
+  if buttons then
+    -- Blizzard's settings window: Done (its Close) Width wide, Right and Bottom from the bottom right, What's New in its
+    -- Apply button's place, Gap left of it, as wide.
+    self.done:SetWidth(buttons.Width)
+    self.whatsNew:SetWidth(buttons.Width)
+    pixel:Point(self.done.frame, "BOTTOMRIGHT", frame, "BOTTOMRIGHT", -(buttons.Right or 0), buttons.Bottom or 0)
+    pixel:Point(self.whatsNew.frame, "RIGHT", self.done.frame, "LEFT", -(buttons.Gap or 0), 0)
+    return
+  end
+  self.done:SetWidth(nil)
+  self.whatsNew:SetWidth(nil)
+  local pad = pixel:Snap(frame, F.Pad)
+  pixel:Row(self.whatsNew.frame, "TOPLEFT", self.footer, pad, m.footer)
   pixel:Row(self.done.frame, "TOPRIGHT", self.footer, pad, m.footer)
 end
 
--- paintBrandLine draws the gold line under the brand's row of a panel (the pages', a page's list's).
+-- paintBrandLine draws a line under a row height tall at the top of a panel (the brand's row of the pages, Back's of a
+-- page's list): Brand.Line, or none.
 ---@private
 ---@param line Texture
 ---@param panel Frame
-function settings:paintBrandLine(line, panel)
-  local B, m = style.Theme.Settings.Brand, self:Metrics()
-  local size = pixel:Length(self.frame, B.Line and B.Line.Size or 1)
+---@param height number
+---@param spec? table|false
+function settings:paintBrandLine(line, panel, height, spec)
+  local m = self:Metrics()
+  if not spec or height <= 0 then
+    line:Hide()
+    return
+  end
+  local size = pixel:Length(self.frame, spec.Size or 1)
   line:ClearAllPoints()
-  line:SetPoint("TOPLEFT", panel, "TOPLEFT", m.pad, -(m.brand - size))
-  line:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -m.pad, -(m.brand - size))
+  line:SetPoint("TOPLEFT", panel, "TOPLEFT", m.pad, -(height - size))
+  line:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -m.pad, -(height - size))
   line:SetHeight(size)
-  if B.Line and style:IsArt(B.Line) then
-    style:Paint(line, B.Line, B.Line.Alpha)
-    line:Show()
-  elseif B.Line then
-    local r, g, b = style:RGBA(B.Line.Color)
+  if style:IsArt(spec) then
+    style:Paint(line, spec, spec.Alpha)
+  else
+    local r, g, b = style:RGBA(spec.Color)
     line:SetTexCoord(0, 1, 0, 1)
     line:SetColorTexture(1, 1, 1, 1)
-    line:SetGradient("HORIZONTAL", CreateColor(r, g, b, B.Line.From), CreateColor(r, g, b, B.Line.To))
-    line:Show()
-  else
-    line:Hide()
+    line:SetGradient("HORIZONTAL", CreateColor(r, g, b, spec.From), CreateColor(r, g, b, spec.To))
   end
+  line:Show()
+end
+
+-- styleTitle writes the window's name in its title bar (Settings.Title: Font, Top down, centered from Left to Right in;
+-- Height, the bar that moves the window), or hides it.
+---@private
+function settings:styleTitle()
+  local T, frame = style.Theme.Settings.Title, self.frame
+  local title, bar = self.windowTitle, self.titleBar
+  title:ClearAllPoints()
+  bar:ClearAllPoints()
+  if not T then
+    title:Hide()
+    bar:Hide()
+    return
+  end
+  style:SetFont(title, T.Font)
+  title:SetJustifyH("CENTER")
+  local top = pixel:Snap(frame, T.Top or 0)
+  pixel:Point(title, "TOPLEFT", frame, "TOPLEFT", T.Left or 0, -top)
+  pixel:Point(title, "TOPRIGHT", frame, "TOPRIGHT", -(T.Right or 0), -top)
+  title:Show()
+  bar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+  bar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+  pixel:Height(bar, T.Height or 20)
+  bar:Show()
 end
 
 -- styleListPanel lays out the panel a page's own list slides in on: Back in the brand's row, its line,
@@ -661,21 +792,22 @@ end
 ---@private
 function settings:styleListPanel()
   local K, m = style.Theme.Settings.Back, self:Metrics()
+  local B = style.Theme.Settings.Brand
   self.back:ClearAllPoints()
   self.back:SetPoint("TOPLEFT", self.listPanel, "TOPLEFT", 0, 0)
   self.back:SetPoint("TOPRIGHT", self.listPanel, "TOPRIGHT", 0, 0)
-  self.back:SetHeight(m.brand)
+  self.back:SetHeight(m.back)
   pixel:Size(self.backIcon, K.IconSize, K.IconSize)
   self.backIcon:ClearAllPoints()
-  pixel:Row(self.backIcon, "TOPLEFT", self.back, m.pad, m.brand)
+  pixel:Row(self.backIcon, "TOPLEFT", self.back, m.pad, m.back)
   controls:Paint(self.backIcon, { Texture = K.Icon, Color = K.IconColor })
   self:styleBackLabel(K.Font)
-  self:paintBrandLine(self.backLine, self.listPanel)
+  self:paintBrandLine(self.backLine, self.listPanel, m.back, B and B.Line)
   self.listHost:ClearAllPoints()
-  self.listHost:SetPoint("TOPLEFT", self.listPanel, "TOPLEFT", 0, -m.brand)
-  self.listHost:SetSize(m.sidebar, m.height - m.brand)
+  self.listHost:SetPoint("TOPLEFT", self.listPanel, "TOPLEFT", 0, -m.back)
+  self.listHost:SetSize(m.sidebar, m.sideHeight - m.back)
   if self.sidebarPage ~= nil then
-    self:listOf(self.sidebarPage):Place(m.sidebar, m.height - m.brand)
+    self:listOf(self.sidebarPage):Place(m.sidebar, m.sideHeight - m.back)
   end
   self:placeSidebar()
 end
@@ -688,7 +820,7 @@ function settings:styleBackLabel(font)
   local K, m = style.Theme.Settings.Back, self:Metrics()
   style:SetFont(self.backLabel, font)
   self.backLabel:ClearAllPoints()
-  pixel:Row(self.backLabel, "TOPLEFT", self.back, m.pad + self.backIcon:GetWidth() + pixel:Snap(self.frame, K.Gap), m.brand)
+  pixel:Row(self.backLabel, "TOPLEFT", self.back, m.pad + self.backIcon:GetWidth() + pixel:Snap(self.frame, K.Gap), m.back)
 end
 
 -- placeSidebar puts the pages and a page's list where the slide has them: the pages shift left out of
@@ -702,7 +834,7 @@ function settings:placeSidebar()
     local panel = part[1]
     panel:ClearAllPoints()
     panel:SetPoint("TOPLEFT", self.sidebar, "TOPLEFT", part[2], 0)
-    panel:SetSize(width, m.height)
+    panel:SetSize(width, m.sideHeight)
     panel:SetAlpha(part[3])
     panel:SetShown(part[3] > 0)
   end
@@ -742,7 +874,7 @@ function settings:listOf(page)
     list = page.sidebar(self.listHost, self.frame)
     self.lists[page] = list
     local m = self:Metrics()
-    list:Place(m.sidebar, m.height - m.brand)
+    list:Place(m.sidebar, m.sideHeight - m.back)
   end
   return list
 end
@@ -825,7 +957,10 @@ function settings:placeHeading()
   if actions ~= nil then
     local X = H.Close
     local actionsGap = pixel:Snap(frame, H.Actions.Gap)
-    local beside = pixel:Snap(frame, X.Inset) + pixel:Length(frame, X.Size) + actionsGap
+    -- Right of the header (Actions.Right: Blizzard's Defaults button, 36 from the header's right), else clear of a close
+    -- button in the header's corner.
+    local beside = H.Actions.Right ~= nil and pixel:Snap(frame, H.Actions.Right)
+      or pixel:Snap(frame, X.Inset or 0) + pixel:Length(frame, X.Size) + actionsGap
     actions.frame:ClearAllPoints()
     actions.frame:SetPoint("TOPRIGHT", header, "TOPRIGHT", -beside, -pixel:Snap(frame, H.Actions.Top))
     right = beside + pixel:Ceil(frame, actions.frame:GetWidth()) + actionsGap
@@ -867,26 +1002,40 @@ end
 -- footer.
 ---@private
 function settings:placeContent()
-  local H, m = style.Theme.Settings.Header, self:Metrics()
-  local pad = pixel:Snap(self.frame, H.Pad)
+  local T, m = style.Theme.Settings, self:Metrics()
+  local frame = self.frame
+  local pad = pixel:Snap(frame, T.Header.Pad)
   local tabs = self.tabs
   tabs.frame:ClearAllPoints()
-  tabs.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", m.sidebar + pad, -m.header)
-  tabs.frame:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -pad, -m.header)
+  local TB = T.Tabs
+  if TB and TB.Top then
+    -- Above the header, on the inner frame's top edge (Blizzard's settings window hangs its tabs there).
+    tabs.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", m.contentLeft + pixel:Snap(frame, TB.Left or 0), -pixel:Snap(frame, TB.Top))
+    tabs.frame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -m.contentRight, -pixel:Snap(frame, TB.Top))
+  else
+    tabs.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", m.contentLeft + pad, -(m.headerTop + m.header))
+    tabs.frame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -(m.contentRight + pad), -(m.headerTop + m.header))
+  end
+  -- From ScrollLeft beside the content's left to ScrollRight in from its right (Blizzard's list: 15 left, 20 in).
+  local C = T.Content
+  local left = m.contentLeft + pixel:Snap(frame, C.ScrollLeft or 0)
+  local right = m.contentRight + pixel:Snap(frame, C.ScrollRight or 0)
   local scroll = self.scroll.frame
   scroll:ClearAllPoints()
-  scroll:SetPoint("TOPLEFT", self.frame, "TOPLEFT", m.sidebar, -self:ContentTop())
-  scroll:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, m.footer)
-  scroll:SetSize(m.width - m.sidebar, self:ContentHeight())
+  scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", left, -self:ContentTop())
+  scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -right, m.footer)
+  scroll:SetSize(m.width - left - right, self:ContentHeight())
 end
 
 -- ContentTop returns how far below the window's top the content starts: under the header, and the
 -- tabs while they show, in whole pixels.
 ---@return number
 function settings:ContentTop()
-  local m = self:Metrics()
-  local top = m.header
-  if self.tabs.frame:IsShown() then
+  local T, m = style.Theme.Settings, self:Metrics()
+  -- Not made yet, measured on UIParent's grid, as Metrics does.
+  local top = m.headerTop + m.header + pixel:Snap(self.frame or UIParent, T.Content.ScrollTop or 0)
+  -- Tabs under the header take their row; tabs above it (Tabs.Top) take none.
+  if self.tabs.frame:IsShown() and not (T.Tabs and T.Tabs.Top) then
     top = top + m.tabs
   end
   return top
@@ -902,9 +1051,11 @@ end
 ---@param hovered boolean
 function settings:paintClose(hovered)
   local X = style.Theme.Settings.Header.Close
-  -- Its own art under the pointer when the theme has some (HoverIcon: GW2_UI's close hover art).
+  -- Its own art under the pointer when the theme has some (HoverIcon: GW2_UI's close hover art); or an atlas
+  -- (Blizzard's close button), with its Highlight over it under the pointer.
   local icon = (hovered and X.HoverIcon) or X.Icon
-  controls:Paint(self.closeIcon, { Texture = icon, Color = hovered and X.HoverColor or X.Color })
+  controls:Paint(self.closeIcon, { Texture = icon, Atlas = X.Atlas or nil, Color = hovered and X.HoverColor or X.Color })
+  controls:Paint(self.closeHighlight, hovered and X.Highlight or false)
 end
 
 -- navRow returns the i-th row of the sidebar's list, made the first time it is needed.
@@ -929,6 +1080,9 @@ function settings:navRow(i)
   }
   row.fill:SetAllPoints(frame)
   row.hover:SetAllPoints(frame)
+  -- Fills (NextFill): filling the row, or an atlas at its own size (Blizzard's settings list).
+  fills:Wrap(row.fill, frame)
+  fills:Wrap(row.hover, frame)
   row.label:SetJustifyH("LEFT")
   row.label:SetWordWrap(false)
   addon.SetScript(frame, "OnClick", function(ctx)
@@ -950,6 +1104,8 @@ function settings:buildNav()
   -- Whole pixels apart (docs/next-pixel-perfect.md).
   local groupGap, groupHeight, itemHeight = pixel:Snap(self.frame, N.GroupGap), pixel:Length(self.frame, N.GroupHeight),
     pixel:Length(self.frame, N.ItemHeight)
+  -- Between every heading and row (Blizzard's settings list: its view's spacing).
+  local spacing = pixel:Snap(self.frame, N.Spacing or 0)
   local groups, order = {}, {}
   for _, page in ipairs(pages:List()) do
     if groups[page.group] == nil then
@@ -961,29 +1117,27 @@ function settings:buildNav()
   local i, y = 0, 0
   for g, group in ipairs(order) do
     if g > 1 then
-      y = y + groupGap
+      y = y + groupGap + spacing
     end
     i = i + 1
     local heading = self:navRow(i)
-    heading.group, heading.page = group, nil
-    heading.label:SetText(string.upper(group))
+    heading.group, heading.page, heading.groupIndex = group, nil, g
+    -- In capitals, unless the theme writes them as they are (Nav.GroupUpper = false: Blizzard's list).
+    heading.label:SetText(N.GroupUpper == false and group or string.upper(group))
     heading.frame:EnableMouse(false)
-    heading.frame:ClearAllPoints()
-    heading.frame:SetPoint("TOPLEFT", self.navList, "TOPLEFT", 0, -y)
-    heading.frame:SetPoint("TOPRIGHT", self.navList, "TOPRIGHT", 0, -y)
+    self:placeNavRow(heading, y)
     heading.frame:SetHeight(groupHeight)
     heading.frame:Show()
     self:paintNavRow(heading)
     y = y + groupHeight
     for _, page in ipairs(groups[group]) do
+      y = y + spacing
       i = i + 1
       local row = self:navRow(i)
       row.group, row.page = nil, page
       row.label:SetText(page.title)
       row.frame:EnableMouse(true)
-      row.frame:ClearAllPoints()
-      row.frame:SetPoint("TOPLEFT", self.navList, "TOPLEFT", 0, -y)
-      row.frame:SetPoint("TOPRIGHT", self.navList, "TOPRIGHT", 0, -y)
+      self:placeNavRow(row, y)
       row.frame:SetHeight(itemHeight)
       row.frame:Show()
       self:paintNavRow(row)
@@ -999,6 +1153,22 @@ function settings:buildNav()
   self.navBox:FullUpdate(true)
 end
 
+-- placeNavRow puts an entry y down the list: across it, or ItemWidth wide from its left (Nav.ItemWidth: Blizzard's rows
+-- and headings, 175 wide in a list 199 wide).
+---@private
+---@param row table
+---@param y number
+function settings:placeNavRow(row, y)
+  local width = style.Theme.Settings.Nav.ItemWidth
+  row.frame:ClearAllPoints()
+  row.frame:SetPoint("TOPLEFT", self.navList, "TOPLEFT", 0, -y)
+  if width then
+    pixel:Width(row.frame, width)
+  else
+    row.frame:SetPoint("TOPRIGHT", self.navList, "TOPRIGHT", 0, -y)
+  end
+end
+
 -- paintNavRow draws an entry: a heading, or a page chosen, under the pointer, or neither.
 ---@private
 ---@param row table
@@ -1009,8 +1179,15 @@ function settings:paintNavRow(row)
   row.label:ClearAllPoints()
   if row.group then
     style:SetFont(row.label, N.GroupFont)
-    row.label:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", pad, pixel:Snap(frame, 4))
-    row.fill:Hide()
+    -- A heading's art, the theme's fills cycled through the headings (Blizzard's settings list cycles
+    -- Options_CategoryHeader_1 to 3), and its label where the theme says, else above its bottom.
+    local headings, at = N.GroupFills, N.GroupLabel
+    if at then
+      row.label:SetPoint(at.Point, row.frame, at.Point, pixel:Snap(frame, at.X or 0), pixel:Snap(frame, at.Y or 0))
+    else
+      row.label:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", pad, pixel:Snap(frame, 4))
+    end
+    controls:Paint(row.fill, (headings and #headings > 0) and headings[((row.groupIndex or 1) - 1) % #headings + 1] or false)
     row.hover:Hide()
     row.indicator:Hide()
     return
@@ -1022,17 +1199,21 @@ function settings:paintNavRow(row)
     font = N.HoverFont
   end
   style:SetFont(row.label, font)
-  -- From the row's corners, centered on its height by the font's (its middle may be between pixels).
+  -- From the row's corners, centered on its height by the font's (its middle may be between pixels), TextRaise above
+  -- it (Blizzard's settings list raises its rows' text by 1).
   local height = pixel:Length(frame, N.ItemHeight)
-  pixel:Row(row.label, "TOPLEFT", row.frame, pad + pixel:Snap(frame, N.Indent), height)
-  pixel:Row(row.label, "TOPRIGHT", row.frame, pad, height)
+  local raise = -(N.TextRaise or 0)
+  pixel:Row(row.label, "TOPLEFT", row.frame, pad + pixel:Snap(frame, N.Indent), height, nil, raise)
+  pixel:Row(row.label, "TOPRIGHT", row.frame, pad, height, nil, raise)
   controls:Paint(row.fill, chosen and N.SelectedFill or false)
   controls:Paint(row.hover, (row.hovered and not chosen) and N.HoverFill or false)
   row.indicator:ClearAllPoints()
   row.indicator:SetPoint("TOPLEFT", row.frame, "TOPLEFT", 0, 0)
   row.indicator:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, 0)
-  pixel:Width(row.indicator, N.Indicator.Width)
-  controls:Paint(row.indicator, chosen and { Color = N.Indicator.Color } or false)
+  -- A theme may draw no bar (Indicator = false: Blizzard's list marks the chosen row with its fill).
+  local bar = N.Indicator
+  pixel:Width(row.indicator, bar and bar.Width or 1)
+  controls:Paint(row.indicator, (chosen and bar) and { Color = bar.Color } or false)
 end
 
 ---@private

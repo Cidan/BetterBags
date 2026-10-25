@@ -12,6 +12,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
 -- NextScrollBar is BetterBags Next's scroll bar (next-settings.md §2), drawn from the theme
 -- (Controls.ScrollBar), in place of Blizzard's MinimalScrollBar on every Next scroll box (the bags'
 -- too, render/scrollbox.lua's CreateBar). It drives a Blizzard scroll box the way ScrollUtil binds a
@@ -28,6 +31,7 @@ local scrollBar = addon:NewModule('NextScrollBar')
 ---@class NextScrollBarFrame
 ---@field frame Button Takes the clicks on the track and the wheel.
 ---@field track Texture
+---@field trackFrame Frame Where the track goes (its fill's region).
 ---@field thumb Frame Dragged.
 ---@field thumbTexture Texture
 ---@field box? WowScrollBox
@@ -62,13 +66,18 @@ function scrollBar:Create(parent, opts)
   frame:EnableMouse(true)
   frame:EnableMouseWheel(true)
   local track = frame:CreateTexture(nil, "BACKGROUND")
+  -- Where the track goes: its fill (NextFill: one piece, or Blizzard's track in three) fills it; the thumb's fills
+  -- the thumb.
+  local trackFrame = CreateFrame("Frame", nil, frame)
+  fills:Wrap(track, trackFrame)
   local thumb = CreateFrame("Frame", nil, frame)
   thumb:EnableMouse(true)
   local thumbTexture = thumb:CreateTexture(nil, "ARTWORK")
   thumbTexture:SetAllPoints(thumb)
+  fills:Wrap(thumbTexture, thumb)
   ---@type NextScrollBarFrame
   local bar = setmetatable({
-    frame = frame, track = track, thumb = thumb, thumbTexture = thumbTexture,
+    frame = frame, track = track, trackFrame = trackFrame, thumb = thumb, thumbTexture = thumbTexture,
     visible = 0, percentage = 0, hovered = false, dragging = false, grab = 0,
     autoHide = opts ~= nil and opts.AutoHide == true, idle = 0,
   }, { __index = barProto })
@@ -109,9 +118,11 @@ function barProto:Style()
   pixel:Width(frame, S.Width)
   pixel:Width(self.track, S.Size)
   local x = pixel:Middle(frame, frame:GetWidth(), self.track:GetWidth())
-  self.track:ClearAllPoints()
-  self.track:SetPoint("TOPLEFT", frame, "TOPLEFT", x, 0)
-  self.track:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", x, 0)
+  local trackFrame = self.trackFrame
+  trackFrame:ClearAllPoints()
+  trackFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", x, 0)
+  trackFrame:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", x, 0)
+  pixel:Width(trackFrame, S.Size)
   controls:Paint(self.track, S.Track)
   self:Paint()
   self:Layout()

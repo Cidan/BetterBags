@@ -9,7 +9,7 @@ local L = StubBetterBagsModule("Localization")
 L.G = L.G or function(_, key) return key end
 local events = StubBetterBagsModule("Events")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextToggle", "next/controls/toggle.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextToggle", "next/controls/toggle.lua" },
   { "NextSettingsCurrency", "next/settings/currency.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])

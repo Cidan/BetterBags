@@ -14,7 +14,7 @@ local QUALITY_COLOR = {
 }
 LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextItemGrid", "next/controls/itemgrid.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -214,6 +214,41 @@ describe("NextItemGrid", function()
       assert.is_nil(plain.frame:GetScript("OnReceiveDrag"))
       local c = plain.cells[1]
       assert.has_no.errors(function() c.frame:GetScript("OnReceiveDrag")(c.frame) end)
+    end)
+  end)
+
+  -- Its box (docs/next-plain-theme.md, round three): the grid drew the input's fill, which for a fill in pieces (Plain's
+  -- search border) painted the whole box white. It draws its own fill, edge and frame, the input's when the theme gives
+  -- it none.
+  describe("its box", function()
+    after_each(function()
+      UseNextTheme(nil)
+      itemGrid:ApplyStyle()
+    end)
+
+    it("is drawn in the input's fill and edge when the theme gives it none of its own", function()
+      UseNextTheme({ Controls = { Input = { Fill = { Color = { 0.1, 0.2, 0.3, 1 } } } } })
+      itemGrid:ApplyStyle()
+      local c = grid.fill._colorTexture
+      assert.is_true(grid.fill:IsShown())
+      assert.are.same({ 0.1, 0.2, 0.3, 1 }, { c.r, c.g, c.b, c.a })
+      assert.is_true(grid.edge.Top:IsShown())
+      assert.is_false(grid.frameArt.pieces.TopLeftCorner:IsShown())
+    end)
+
+    it("is drawn in its own fill, edge and frame when the theme gives them", function()
+      UseNextTheme({ Controls = { ItemGrid = { Fill = false, Edge = false, Frame = { Pieces = {
+        TopLeftCorner = { Texture = "Interface\\Common\\Common-Input-Border-TL", Width = 8, Height = 8, X = -5, Y = 5 },
+      } } } } })
+      itemGrid:ApplyStyle()
+      assert.is_false(grid.fill:IsShown())
+      assert.is_false(grid.edge.Top:IsShown())
+      local corner = grid.frameArt.pieces.TopLeftCorner
+      assert.is_true(corner:IsShown())
+      assert.are.equal("Interface\\Common\\Common-Input-Border-TL", corner:GetTexture())
+      assert.are.same({ "TOPLEFT", grid.frame, "TOPLEFT", -5, 5 }, { corner:GetPoint(1) })
+      -- Under its cells.
+      assert.are.equal(grid.frame, corner:GetParent())
     end)
   end)
 

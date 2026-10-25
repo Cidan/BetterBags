@@ -52,9 +52,9 @@ LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBank", "next/bank.lua" } }) do
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBank", "next/bank.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -486,6 +486,31 @@ describe("NextBank", function()
       override(_G, "SortBankBags", function() end)
       local sorting = nextBank:Create(ctx())
       assert.are.same({ "close", "settings", "sort" }, headerKinds(sorting))
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md, round three; asked: "same for vendors and bank, move it all to the
+    -- button in the corner of their window as a drop down"): its actions in its bag button's menu.
+    it("lists its actions in its bag button's menu for a theme that puts them there, Show Bank Tabs checked as saved", function()
+      local list
+      override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+      local bank = opened()
+      UseNextTheme({ Header = { Buttons = { Menu = { Point = "TOPINNER", Width = 40, Height = 40, Layers = {} },
+        Pinned = { closeButton = { Point = "TOPOUTER" } } } } })
+      bank:ApplyStyle(ctx())
+      db.showBankTabs = true
+      bank.menuButton:Open(ctx())
+      local names = {}
+      for i = 2, #list do
+        names[i - 1] = list[i].text
+      end
+      assert.are.same({ "Show Bank Tabs", "Deposit Warbank Items", "Sort Bank", "Open Options Screen" }, names)
+      assert.is_true(list[2].checked())
+      db.showBankTabs = false
+      assert.is_false(list[2].checked())
+      list[3].func()
+      assert.are.same({ ACCOUNT }, calls.deposits)
+      UseNextTheme(nil)
+      bank:ApplyStyle(ctx())
     end)
 
     it("closes the bank, opens the settings and deposits Warbound items", function()

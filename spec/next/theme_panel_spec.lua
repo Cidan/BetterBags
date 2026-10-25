@@ -54,10 +54,10 @@ LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
-  { "NextOrnaments", "next/ornaments.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" },
   { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -234,6 +234,109 @@ describe("BetterBags Next's panels and themes", function()
 
   local function rgba(c) return { c.r, c.g, c.b, c.a } end
 
+  -- The Plain theme draws the original bags' window (asked: "the stone window background ... same texture please. just
+  -- like the What's New window", and "the bag icon we use in our original bags"; docs/next-plain-theme.md, round two):
+  -- Sonata's Default bag window, DefaultPanelTemplate (Blizzard_SharedXML/<Family>/SharedUIPanelTemplates.xml) with its
+  -- NineSlice raised over the content, and the menu button's art (frames/menubutton.lua), on every client.
+  describe("the Plain theme", function()
+    local FLAGS = { "isRetail", "isForever", "isClassic", "isBCC", "isMists", "isAnniversary", "isCata" }
+    local CLIENTS = {
+      Retail = { flags = { isRetail = true }, layouts = "Retail", sizes = "Retail", corner = "UI-Frame-Metal-CornerTopLeft" },
+      Era = { flags = { isClassic = true }, layouts = "Classic", sizes = "Era", corner = "UI-Frame-TopLeftCornerNoPortrait" },
+    }
+    local function plain(client)
+      for _, flag in ipairs(FLAGS) do override(addon, flag, client.flags[flag] == true) end
+      UseNineSliceLayouts(client.layouts)
+      ResetMockAtlases()
+      UseRealAtlasSizes(client.sizes)
+      db.size = "small"
+      sonataNext:ApplyTheme(ctx(), "Plain", false)
+    end
+    after_each(function()
+      UseNineSliceLayouts("Retail")
+      ResetMockAtlases()
+      backToDefault()
+    end)
+    local function near(a, b) return math.abs(a - b) < 0.01 end
+
+    for _, name in ipairs({ "Retail", "Era" }) do
+      local client = CLIENTS[name]
+      it("draws the original bags' window on " .. name .. ": the stone 6, 21, 2 and 2 in, the frame over the content, the streaks", function()
+        plain(client)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        assert.are.equal("Interface\\FrameGeneral\\UI-Background-Rock", bag.fill:GetTexture())
+        assert.is_true(bag.fill:GetHorizTile() and bag.fill:GetVertTile(), "tiled both ways")
+        assert.are.same({ 1, 1, 1, 1 }, { bag.fill:GetVertexColor() }, "untinted and solid")
+        local p, rel, rp, x, y = bag.fill:GetPoint(1)
+        assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT" }, { p, rel, rp })
+        assert.is_true(near(x, 6) and near(y, -21), x .. "," .. y)
+        p, rel, rp, x, y = bag.fill:GetPoint(2)
+        assert.are.same({ "BOTTOMRIGHT", bag.frame, "BOTTOMRIGHT" }, { p, rel, rp })
+        assert.is_true(near(x, -2) and near(y, 2), x .. "," .. y)
+        local corner = bag.frameArt.pieces.TopLeftCorner
+        assert.are.equal(client.corner, corner:GetAtlas(), "ButtonFrameTemplateNoPortrait, the client's own")
+        assert.is_true(corner:IsShown())
+        assert.are.equal(bag.overlay, corner:GetParent(), "over the content")
+        local streaks = bag.frameArt.bands[1]
+        assert.is_true(streaks:IsShown())
+        assert.is_true(streaks:GetHorizTile())
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 6, -21 }, { streaks:GetPoint(1) })
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -2, -21 }, { streaks:GetPoint(2) })
+        if name == "Retail" then
+          assert.are.equal("_UI-Frame-TopTileStreaks", streaks:GetAtlas())
+          assert.are.equal(43, streaks:GetHeight())
+          assert.is_false(bag.frameArt.bands[2] ~= nil and bag.frameArt.bands[2]:IsShown(), "retail draws no title band")
+        else
+          assert.are.equal("Interface\\FrameGeneral\\_UI-Frame", streaks:GetTexture())
+          local _, top, _, bottom = streaks:GetTexCoord()
+          assert.are.same({ 0.671875, 0.9609375 }, { top, bottom })
+          assert.are.equal(37, streaks:GetHeight())
+          local band = bag.frameArt.bands[2]
+          assert.is_true(band:IsShown())
+          assert.are.equal("Interface\\FrameGeneral\\_UI-Frame", band:GetTexture())
+          assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 7, -4 }, { band:GetPoint(1) })
+          assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -24, -4 }, { band:GetPoint(2) })
+          assert.are.equal(17, band:GetHeight())
+        end
+      end)
+
+      -- Round three (asked: "remove all top bar buttons ... bring back the drop down menu with these options, just like the
+      -- original bags"): the bag is a button holding the header's actions; only the close stays in the header.
+      it("draws the original bags' bag button on " .. name .. ", holding the header's actions, the close alone in the header", function()
+        plain(client)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local button = bag.menuButton.frame
+        assert.is_true(button:IsShown())
+        local p, rel, rp, x, y = button:GetPoint(1)
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT" }, { p, rel, rp })
+        assert.is_true(near(x, -12) and near(y, 15), x .. "," .. y)
+        assert.is_true(near(button:GetWidth(), 40) and near(button:GetHeight(), 40))
+        assert.is_true(button:GetFrameLevel() > bag.overlay:GetFrameLevel(), "over the frame and the search box")
+        local icon = bag.menuButton.layers[1]
+        assert.are.equal("Interface\\Containerframe\\Bagslots2x", icon:GetTexture())
+        local ulx, uly, _, lly, urx = icon:GetTexCoord()
+        assert.are.same({ 0, 0.2, 0, 1 }, { ulx, urx, uly, lly })
+        -- 48 x 60, 14 out and 17 above the corner, as the original's art.
+        p, rel, rp, x, y = icon:GetPoint(1)
+        assert.are.same({ "TOPLEFT", button, "TOPLEFT" }, { p, rel, rp })
+        assert.is_true(near(x, -2) and near(y, 2), x .. "," .. y)
+        local glow = bag.menuButton.highlight
+        assert.are.equal("Interface\\Containerframe\\Bagslots2x", glow:GetTexture())
+        ulx, _, _, _, urx = glow:GetTexCoord()
+        assert.are.same({ 0.2, 0.3992 }, { ulx, urx }, "its gold glow")
+        for _, b in ipairs(bag.headerButtons) do
+          assert.are.equal(b == bag.closeButton, b:IsVisible(), b.key)
+        end
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        p, rel, rp, x, y = bank.menuButton.frame:GetPoint(1)
+        assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT" }, { p, rel, rp })
+        assert.is_true(near(x, 12) and near(y, 15), "the bank's too, as the original's: " .. x .. "," .. y)
+        ulx, _, _, _, urx = bank.menuButton.layers[1]:GetTexCoord()
+        assert.are.same({ 0, 0.2 }, { ulx, urx }, "never flipped")
+      end)
+    end
+  end)
+
   describe("the body", function()
     -- Reported in game, opening the bank with Guild Wars 2 applied: "next/panel.lua:2075: attempt to index upvalue
     -- 'from' (a nil value)" in SetWash, from bank.lua useBankType. A panel made under a theme without a wash
@@ -256,20 +359,76 @@ describe("BetterBags Next's panels and themes", function()
 
     -- GW2_UI's windows start their painting below their header (CreateFrameHeaderWithBody), so the header art is
     -- drawn over whatever is behind the window. Asked: "the top window border ... should be somewhat transparent".
-    it("starts its fill Fill.Top below the body's top, docked or not, on both sides, and at the top after", function()
+    -- Blizzard insets a window's fill into its frame (PortraitFrameFlatBaseTemplate: 2, 20, 2, 3); GW2_UI starts its
+    -- painting below its header. Fill.Inset is drawn for the backpack, whose inner side is on the left, mirrored on the
+    -- bank; while docked, the side at the screen edge reaches past it instead (the opening bounce, SetDocked).
+    it("insets its fill into its body, mirrored on the bank, past the screen edge while docked", function()
       local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
-      apply({ Panel = { Fill = { Color = "Body", Top = 74 } } })
-      local _, _, _, _, y = bag.fill:GetPoint(1)
-      assert.are.equal(-74, y)
-      _, _, _, _, y = bank.fill:GetPoint(1)
-      assert.are.equal(-74, y)
-      bank:SetDocked(true)
-      _, _, _, _, y = bank.fill:GetPoint(1)
-      assert.are.equal(-74, y, "docked")
+      apply({ Panel = { Fill = { Color = "Body", Inset = { Left = 2, Right = 3, Top = 20, Bottom = 4 } } } })
+      local function corners(panel)
+        local _, _, _, x1, y1 = panel.fill:GetPoint(1)
+        local _, _, _, x2, y2 = panel.fill:GetPoint(2)
+        return { x1, y1, x2, y2 }
+      end
+      local feather = style.FEATHER
+      bag:SetDocked(false)
       bank:SetDocked(false)
+      assert.are.same({ feather + 2, -20, -3, 4 }, corners(bag), "inner side left")
+      assert.are.same({ 3, -20, -(feather + 2), 4 }, corners(bank), "inner side right")
+      local reach = style.OVERREACH
+      bag:SetDocked(true)
+      bank:SetDocked(true)
+      assert.are.same({ feather + 2, -20, reach, 4 }, corners(bag))
+      assert.are.same({ -reach, -20, -(feather + 2), 4 }, corners(bank))
       backToDefault()
-      _, _, _, _, y = bag.fill:GetPoint(1)
-      assert.are.equal(0, y)
+      bag:SetDocked(false)
+      assert.are.same({ feather, 0, 0, 0 }, corners(bag), "a theme without")
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's own frame round the body, one of the client's nine-slice
+    -- layouts by name (NextFrameArt), mirrored on the bank as its ornaments are.
+    it("draws a frame round its body, mirrored on the bank, and none for a theme without", function()
+      ResetMockAtlases()
+      MockAtlas("ui-frame-portraitmetal-cornertopleftsmall", 64, 64)
+      MockAtlas("UI-Frame-Metal-CornerTopRight", 32, 32)
+      MockAtlas("UI-Frame-Metal-CornerBottomLeft", 16, 16)
+      MockAtlas("UI-Frame-Metal-CornerBottomRight", 16, 16)
+      MockAtlas("_UI-Frame-Metal-EdgeTop", 32, 32, true, false)
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Panel = { Frame = { Layout = "HeldBagLayout" } } })
+      local corner = bag.frameArt.pieces.TopLeftCorner
+      assert.are.equal("ui-frame-portraitmetal-cornertopleftsmall", corner:GetAtlas())
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", -13, 16 }, { corner:GetPoint(1) })
+      assert.is_true(corner:IsShown())
+      local mirrored = bank.frameArt.pieces.TopRightCorner
+      assert.are.equal("ui-frame-portraitmetal-cornertopleftsmall", mirrored:GetAtlas(), "the portrait corner at its inner side")
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", 13, 16 }, { mirrored:GetPoint(1) })
+      backToDefault()
+      assert.is_false(corner:IsShown())
+      assert.is_false(mirrored:IsShown())
+      ResetMockAtlases()
+    end)
+
+    -- The original bags' border is above their content (Sonata's Default: NineSlice at +500), their title and close
+    -- button above it (TitleContainer and the close at +510): a frame that says Above is drawn on the panel's overlay, a
+    -- frame over the content, and the title and the header's buttons sit above that.
+    it("draws a frame that says Above over its content, its title and header buttons over the frame", function()
+      ResetMockAtlases()
+      MockAtlas("UI-Frame-Metal-CornerTopLeft", 75, 75)
+      local bag = nextBag:Create(ctx())
+      apply({ Panel = { Frame = { Layout = "ButtonFrameTemplateNoPortrait", Above = true } } })
+      local corner = bag.frameArt.pieces.TopLeftCorner
+      assert.are.equal(bag.overlay, corner:GetParent())
+      assert.is_true(corner:IsShown())
+      assert.is_false(bag.overlay:IsMouseEnabled(), "the window stays the drop target")
+      assert.is_true(bag.overlay:GetFrameLevel() > bag.content.frame:GetFrameLevel() + 10, "over the content and its sections")
+      assert.are.equal(bag.overlay, bag.title:GetParent(), "the title on it, drawn over its art")
+      assert.are.same("OVERLAY", (bag.title:GetDrawLayer()))
+      assert.is_true(bag.closeButton:GetFrameLevel() > bag.overlay:GetFrameLevel())
+      assert.is_true(bag.sortButton:GetFrameLevel() > bag.overlay:GetFrameLevel())
+      backToDefault()
+      assert.is_false(corner:IsShown())
+      ResetMockAtlases()
     end)
 
     it("restyles every panel when a theme is applied", function()
@@ -548,6 +707,129 @@ describe("BetterBags Next's panels and themes", function()
   -- in the same style"; "these buttons should be colorable via themes, and even replacable with custom
   -- art"). A tint suits a white glyph and darkens full-color art into a silhouette (asked with a
   -- Parchment screenshot), so a theme's own art says which it is (Glyph = false: art).
+  -- The Plain theme (docs/next-plain-theme.md): Blizzard's close button sits in the window's top corner; the other
+  -- header buttons go in the title bar beside it, the row starting RowStart in from the outer edge.
+  describe("a header row starting past a pinned button (RowStart)", function()
+    it("starts the row RowStart in, and leaves the title the room the row and the pins take, once", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      apply({ Header = { Title = { Font = "Title", Justify = "CENTER" }, Buttons = { RowStart = 30,
+        Pinned = { closeButton = { Point = "TOPOUTER", X = 1, Y = 0 } } } } })
+      local first
+      for _, button in ipairs(bag.headerButtons) do
+        if button:IsShown() and button ~= bag.closeButton then
+          first = first or button
+        end
+      end
+      local point, rel, relPoint, x = first:GetPoint(1)
+      assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -30 }, { point, rel, relPoint, x })
+      local inset = bag:InnerPad() + style.TITLE_INSET
+      local room = 30 + bag:headerButtonsWidth()
+      assert.are.equal(bag:BodyWidth() - inset - room - 12, bag.title:GetWidth())
+    end)
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md, round three; asked: "remove all top bar buttons, make sure our bag title
+  -- is always correctly centered from the right of the bag button, to the left of the close button", and "bring back
+  -- the drop down menu with these options, just like the original bags"): a theme can put its header's row in a menu
+  -- on a bag button at a corner (Header.Buttons.Menu, NextMenuButton).
+  describe("a header row in a menu (Header.Buttons.Menu)", function()
+    local BAGSLOTS = "Interface\\Containerframe\\Bagslots2x"
+    local function menuTheme()
+      apply({ Header = { Title = { Font = "Title", Justify = "CENTER" }, Buttons = {
+        Menu = { Point = "TOPINNER", X = -12, Y = -15, Width = 40, Height = 40,
+          Layers = { { Texture = BAGSLOTS, TexCoords = { 0, 0.2, 0, 1 } } } },
+        Pinned = { closeButton = { Point = "TOPOUTER", X = 1, Y = 0 } } } } })
+    end
+
+    after_each(function()
+      backToDefault()
+    end)
+
+    it("takes its row's buttons out of the header, keeping whether the panel shows them, and puts them back after", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      menuTheme()
+      assert.is_true(bag.menuButton.frame:IsShown())
+      assert.are.equal(bag.menuHolder, bag.sortButton:GetParent())
+      assert.is_true(bag.sortButton:IsShown(), "still shown by the panel, for the menu")
+      assert.is_false(bag.sortButton:IsVisible())
+      assert.are.equal(bag.frame, bag.closeButton:GetParent(), "a pinned button stays")
+      assert.is_true(bag.closeButton:IsVisible())
+      backToDefault()
+      assert.is_false(bag.menuButton.frame:IsShown())
+      assert.are.equal(bag.frame, bag.sortButton:GetParent())
+      assert.is_true(bag.sortButton:IsVisible())
+      assert.is_true(bag.sortButton:GetFrameLevel() > bag.overlay:GetFrameLevel(), "over the frame above the content again")
+    end)
+
+    it("centers its title between the bag button and the close button, on either side", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      menuTheme()
+      -- The bag button reaches 28 in (12 out, 40 wide); the close takes its width less the pixel it sits past the edge.
+      local close = style.HEADER_BUTTON - 1
+      local p, rel, rp, x = bag.title:GetPoint(1)
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 28 }, { p, rel, rp, x })
+      assert.are.equal(bag:BodyWidth() - 28 - close, bag.title:GetWidth())
+      assert.are.equal("CENTER", bag.title:GetJustifyH())
+      p, rel, rp, x = bank.title:GetPoint(1)
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", -28 }, { p, rel, rp, x })
+      assert.are.equal(bank:BodyWidth() - 28 - close, bank.title:GetWidth())
+    end)
+
+    it("lists the backpack's actions in its menu, Open Options Screen last, its toggles checked as they are", function()
+      local list
+      override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      menuTheme()
+      bag.menuButton:Open(ctx())
+      local names = {}
+      for i = 2, #list do
+        names[i - 1] = list[i].text
+      end
+      assert.are.same({ "Sort Bags", "Show Blizzard Bags", "Small Bags", "Open Options Screen" }, names)
+      assert.is_false(list[3].checked())
+      assert.are.equal(bag:IsSmall(), list[4].checked())
+    end)
+
+    it("draws its bag button again each time it shows (a vendor's portrait)", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      menuTheme()
+      local painted = 0
+      override(bag.menuButton, "Paint", function() painted = painted + 1 end)
+      bag:Hide(ctx())
+      finishTweens()
+      bag:Show(ctx())
+      assert.are.equal(1, painted)
+    end)
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md): Blizzard centers a window's title in the room its buttons leave
+  -- (PortraitFrameBaseTemplate's TitleContainer). Its click area and glow follow the text where it is drawn.
+  describe("a centered title", function()
+    it("centers the title in the room the header buttons leave, its button over the text, mirrored on the bank", function()
+      local bag, bank = opened(function(c) return nextBag:Create(c) end), opened(function(c) return nextBank:Create(c) end)
+      apply({ Header = { Title = { Font = "Title", Justify = "CENTER" } } })
+      for _, panel in ipairs({ bag, bank }) do
+        local title = panel.title
+        assert.are.equal("CENTER", title:GetJustifyH())
+        assert.is_false(title:CanWordWrap())
+        local inset = panel:InnerPad() + style.TITLE_INSET
+        local room = panel:BodyWidth() - inset - (style.PAD + panel:headerButtonsWidth()) - panel:pinnedRoom() - 12
+        assert.are.equal(room, title:GetWidth())
+        local shift = math.floor((room - math.ceil(title:GetStringWidth())) / 2)
+        local point, rel, relPoint, x = panel.titleButton:GetPoint(1)
+        if panel.side == "LEFT" then
+          assert.are.same({ "TOPRIGHT", panel.body, "TOPRIGHT", -(inset + shift - 8) }, { point, rel, relPoint, x })
+        else
+          assert.are.same({ "TOPLEFT", panel.body, "TOPLEFT", inset + shift - 8 }, { point, rel, relPoint, x })
+        end
+      end
+      backToDefault()
+      assert.are.equal("LEFT", bag.title:GetJustifyH())
+      assert.are.equal(0, bag.title:GetWidth(), "as long as it is again")
+    end)
+  end)
+
   describe("header icons", function()
     local function color(button)
       local r, g, b = button.icon:GetVertexColor()
@@ -718,6 +1000,38 @@ describe("BetterBags Next's panels and themes", function()
       close:GetScript("OnEnter")(close)
       assert.is_false(close.highlight:IsShown(), "a theme without one")
       close:GetScript("OnLeave")(close)
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's close button has art of its own pressed and disabled
+    -- (UIPanelCloseButtonNoScripts: RedButton-exit-pressed, RedButton-Exit-Disabled).
+    it("draws an icon's own art while pressed and while disabled, its disabled art neither dimmed nor grayed", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Header = { Buttons = { Icons = { closeButton = { Atlas = "RedButton-Exit", Glyph = false,
+        Pushed = { Atlas = "RedButton-exit-pressed" }, Disabled = { Atlas = "RedButton-Exit-Disabled" } } } } } })
+      local close = bag.closeButton
+      assert.are.equal("RedButton-Exit", close.icon:GetAtlas())
+      close:GetScript("OnMouseDown")(close, "LeftButton")
+      assert.are.equal("RedButton-exit-pressed", close.icon:GetAtlas())
+      close:GetScript("OnMouseUp")(close, "LeftButton")
+      assert.are.equal("RedButton-Exit", close.icon:GetAtlas())
+      close:GetScript("OnMouseDown")(close, "LeftButton")
+      close:GetScript("OnLeave")(close)
+      assert.are.equal("RedButton-Exit", close.icon:GetAtlas(), "not once the pointer leaves")
+      bag:SetHeaderButtonEnabled(close, false)
+      assert.are.equal("RedButton-Exit-Disabled", close.icon:GetAtlas())
+      assert.is_false(close.icon:IsDesaturated())
+      local _, _, _, a = close.icon:GetVertexColor()
+      assert.are.equal(select(4, style:RGBA(style.Theme.Header.Buttons.ArtColor)), a, "not dimmed")
+      close:GetScript("OnMouseDown")(close, "LeftButton")
+      assert.are.equal("RedButton-Exit-Disabled", close.icon:GetAtlas(), "not pressed while disabled")
+      close:GetScript("OnMouseUp")(close, "LeftButton")
+      bag:SetHeaderButtonEnabled(close, true)
+      assert.are.equal("RedButton-Exit", close.icon:GetAtlas())
+      backToDefault()
+      bag:SetHeaderButtonEnabled(close, false)
+      assert.are.equal(style:TexturePath(style.Theme.Header.Buttons.Icons.closeButton.Texture), close.icon:GetTexture(),
+        "a theme without: its icon, dimmed")
+      bag:SetHeaderButtonEnabled(close, true)
     end)
 
     it("names the button whose icon the theme does not give", function()
@@ -963,6 +1277,82 @@ describe("BetterBags Next's panels and themes", function()
   end)
 
   describe("the search box", function()
+    -- Blizzard's magnifier is gray only while the box is empty and not typed in, white while it holds a search or is
+    -- typed in (SearchBoxTemplate_OnEditFocusLost and OnEditFocusGained, InputBoxTemplates.lua).
+    it("draws its magnifier in ActiveColor while it holds a search", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Palette = { Gray = { 0.6, 0.6, 0.6, 1 } },
+        Search = { Icon = { Color = "Gray", Idle = 1, Active = 1, FocusColor = "White", ActiveColor = "White" } } })
+      local t = bag.searchBox.textBox
+      local icon = t.searchIcon
+      assert.are.same({ 0.6, 0.6, 0.6, 1 }, { icon:GetVertexColor() }, "idle")
+      t:GetScript("OnEnter")(t)
+      assert.are.same({ 0.6, 0.6, 0.6, 1 }, { icon:GetVertexColor() }, "under the pointer, empty")
+      t:GetScript("OnLeave")(t)
+      t:SetText("potion")
+      t:GetScript("OnTextChanged")(t)
+      assert.are.same({ 1, 1, 1, 1 }, { icon:GetVertexColor() }, "holding a search")
+      t:GetScript("OnEnter")(t)
+      assert.are.same({ 1, 1, 1, 1 }, { icon:GetVertexColor() }, "holding a search, under the pointer")
+      t:GetScript("OnLeave")(t)
+      t:SetText("")
+      t:GetScript("OnTextChanged")(t)
+      assert.are.same({ 0.6, 0.6, 0.6, 1 }, { icon:GetVertexColor() }, "empty again")
+    end)
+
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's own bag search box (BagSearchBoxTemplate's border,
+    -- InputBoxVisualTemplate), not Next's fill and edges.
+    it("keeps its template's own border for a theme that says so, and Next's look for one that does not", function()
+      local bag = nextBag:Create(ctx())
+      apply({ Search = { Template = true } })
+      local t = bag.searchBox.textBox
+      for _, key in ipairs({ "Left", "Middle", "Right" }) do
+        assert.are.equal(1, t[key]:GetAlpha(), key)
+      end
+      assert.is_false(bag.searchFill:IsShown())
+      for _, edge in ipairs(bag.searchEdges) do
+        assert.is_false(edge:IsShown())
+      end
+      t:GetScript("OnEditFocusGained")(t)
+      assert.is_false(bag.searchFill:IsShown(), "focused too")
+      t:GetScript("OnEditFocusLost")(t)
+      backToDefault()
+      for _, key in ipairs({ "Left", "Middle", "Right" }) do
+        assert.are.equal(0, t[key]:GetAlpha(), key)
+      end
+      assert.is_true(bag.searchFill:IsShown())
+      assert.is_true(bag.searchEdges[1]:IsShown())
+    end)
+
+    -- SearchBoxTemplate's insides (InputBoxTemplates.xml, every client): the magnifier 10 x 10 at LEFT 1, -1, the help and
+    -- what is typed 16 in and 20 from the right (TextInsets; Instructions at 16, 0 to -20, 0), the clear button at
+    -- RIGHT -3; and the box where the original BetterBags put it (sonata/themes/base.lua: 20 in, 10 from the right),
+    -- mirrored on the bank. Reported in game: "search box is completely off" (docs/next-plain-theme.md, round two).
+    it("sits Inset in from its body's sides and lays its insides out as its theme says", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Layout = { SearchTop = 30, SearchHeight = 20 }, Search = { Template = true, Inset = { Left = 20, Right = 10 },
+        Inner = { IconX = 1, IconY = -1, IconSize = 10, TextLeft = 16, TextRight = 20, ClearRight = 3 },
+        HelpColor = { 0.35, 0.35, 0.35, 1 } } })
+      local frame = bag.searchBox.frame
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 20, -30 }, { frame:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -10, -30 }, { frame:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", bank.body, "TOPLEFT", 10, -30 }, { bank.searchBox.frame:GetPoint(1) }, "its sides swapped on the bank")
+      local t = bag.searchBox.textBox
+      assert.are.same({ 10, 10 }, { t.searchIcon:GetSize() })
+      assert.are.same({ "LEFT", t, "LEFT", 1, -1 }, { t.searchIcon:GetPoint(1) })
+      assert.are.same({ 16, 20, 0, 0 }, { t:GetTextInsets() })
+      assert.are.same({ "TOPLEFT", t, "TOPLEFT", 16, 0 }, { t.Instructions:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", t, "BOTTOMRIGHT", -20, 0 }, { t.Instructions:GetPoint(2) })
+      assert.are.same("MIDDLE", t.Instructions:GetJustifyV())
+      assert.are.same({ "RIGHT", t, "RIGHT", -3, 0 }, { t.clearButton:GetPoint(1) })
+      -- InputBoxInstructionsTemplate's own color for its help (its XML <Color>), over the role's.
+      assert.are.same({ 0.35, 0.35, 0.35, 1 }, { t.Instructions:GetTextColor() })
+      backToDefault()
+      assert.are.same(style.Color.Muted, { t.Instructions:GetTextColor() }, "the role's again")
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD, -style.SEARCH_TOP }, { frame:GetPoint(1) }, "back to its pads")
+      assert.are.equal("TOPLEFT", (t.searchIcon:GetPoint(1)), "Next's own layout again")
+    end)
+
     it("sits where its layout says, in its fill, border and magnifier colors", function()
       local bag = nextBag:Create(ctx())
       apply({ Layout = { SearchTop = 80, SearchHeight = 30 }, Palette = { Field = { 0.3, 0.3, 0.3, 1 } },

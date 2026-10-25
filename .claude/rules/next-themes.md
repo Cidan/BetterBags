@@ -64,24 +64,28 @@ Load order (every TOC, `spec/render/toc_spec.lua`): `sonata\resolve.lua` before 
 
 ## 3. The schema (Default, `sonata/themes/next/default.lua`)
 
-Colors are palette names or `{ r, g, b, a }`. A part set to `false` is turned off. A **texture spec**
+Colors are palette names or `{ r, g, b, a }`. A part set to `false` is turned off: resolution removes a table a
+theme sets to `false` (`SonataResolve.Merge`), so code reads every part as possibly absent (`local E = I.Edge; ...
+E and E.Idle`); `spec/next/shipped_themes_spec.lua` draws every Next window with every theme on every client and
+fails on anything sent to the error handler, which is where a restyle's error goes (§9). A **texture spec**
 is `{ Color, Texture (a Textures name or a file), Atlas, TexCoords, HorizTile, VertTile, BlendMode,
 Desaturated }`, drawn by `NextStyle:Paint` (a solid color without art; art tinted by `Color`; tiling
-loads with the `REPEAT` wrap mode; everything it does not set is reset).
+loads with the `REPEAT` wrap mode; everything it does not set is reset). Where a control paints a **fill**, the fill
+may also be inset, drawn at its atlas's size or pieced (§16); a **frame** is Blizzard's nine-slice art (§15).
 
 | Key | What |
 |---|---|
-| `Palette` | Every named color. The controls and the settings window (next-settings.md) add `ControlFill`, `ControlHover`, `ControlPressed` (a field idle, under the pointer, pressed), `Track` (a switch off, a slider's empty track), `Danger` (what deletes) and `Sidebar`; a theme whose body is not indigo sets the first four in its own colors. |
+| `Palette` | Every named color, or one of the client's named colors (`{ Global = "PANEL_BACKGROUND_COLOR", Alpha? }`: Color.lua makes each `C_UIColor` color a global on every client; read when the theme applies; `Check` names a missing one). The controls and the settings window (next-settings.md) add `ControlFill`, `ControlHover`, `ControlPressed` (a field idle, under the pointer, pressed), `Track` (a switch off, a slider's empty track), `Danger` (what deletes) and `Sidebar`; a theme whose body is not indigo sets the first four in its own colors. |
 | `Textures` | Named files (`Glow`, `Sparkle`; Parchment adds `Paper`), and the glyphs (`Icon...`; `minimize.png` and `maximize.png` are shipped for themes that want window marks, Guild Wars 2's size button; the controls' `IconChevron`, `IconCheck`, `IconSearch`, `IconPlus`, and `Circle`, the round switch's disc, made by `tools/textures/next_icons.py`). |
 | `FontShadow` | The shadow `Shadow = true` means. |
-| `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`; or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
+| `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`; or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font); or `Copy`, a client font copied outright (its file, flags, color and shadow) at the role's `Size` (its own, or the one it inherits from Default; `false`: the client font's own), nothing else the role inherits changing it but its height on whole pixels and its own `Justify` (the Plain theme, at Default's sizes). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
 | `Layout` | Sizes: Icon (an item button's size; the player's Icon Scale, the Size tab, multiplies it: `style.ICON`; the grid's width and the vendor's cards keep the theme's own, `style.CARD_ICON`, docs/next-appearance-size.md), VendorColumns, VendorTextGap, VendorPriceRaise (the vendor's cards, next.md §10b), Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
 | `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
-| `Panel` | `Fill` (texture spec; `Top`: it starts that far below the body's top, the header drawn over what is behind the window), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none). |
-| `Header` | `Title.Font`; `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button; an icon's `Highlight`, art drawn over it under the pointer; `Rail`, the buttons down a strip along the inner side instead of across the header, inside the body or `Outside` it, its art from `Start`, §13, false in Default; `Pinned`, a button at a corner of the body apart from the row or the rail, §13). |
-| `Search` | `Fill`, `FocusFill` (colors, or art: §14), `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`), `HelpFont`, `TextFont`. |
+| `Panel` | `Fill` (texture spec; `Inset`: `Left`, `Right`, `Top`, `Bottom` into the body, drawn for the backpack and mirrored on the bank, the screen-edge side still reaching past the edge while docked; `Panel:FillInsets()`), `Frame` (Blizzard's frame round the body, §15, mirrored on the bank; `Above` over the content, `Bands` across its top), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none). |
+| `Header` | `Title.Font`, `Title.Justify` (`"CENTER"`: centered in the room the header buttons leave, as Blizzard centers a window's title; its button and glow over the text where it is drawn); `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button; an icon's `Highlight`, art drawn over it under the pointer; an icon's `Pushed` art while pressed and `Disabled` art while disabled, drawn whole (neither dimmed nor grayed), as a button's pushed and disabled textures are; `RowStart`, where the row starts from the outer side when the pinned buttons hold the corner (the title's room counts the row from there or the pins, whichever reaches further); `Rail`, the buttons down a strip along the inner side instead of across the header, inside the body or `Outside` it, its art from `Start`, §13, false in Default; `Pinned`, a button at a corner of the body apart from the row or the rail, §13; `Menu`, the row in a bag button's menu, §19). |
+| `Search` | `Fill`, `FocusFill` (colors, or art: §14), `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`, `ActiveColor`: while it holds a search, under the pointer or not, as Blizzard's magnifier stays white), `HelpFont`, `TextFont`; `Template = true` keeps the bag search box's own border (`BagSearchBoxTemplate`) and draws neither the fill nor the edge. |
 | `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Header` (art behind the title row, across the section, `Layout.SectionHeader` tall; unset in Default), `Line` (`Color`, `From`, `To`, `Size`, or art, or false), `Highlight` (`Color`, `From`, `To`, or art, or false). |
-| `Tabs` | `Fill`, `SelectedFill` (colors fading by `Fade`, or art: drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels, no fade), `Font`, `SelectedFont`, `Glow` (`Color`, `BlendMode`, `Drop`, `Pulse`, or false), `Indicator` (`Color`, `Width`, or art tinted by the accent, or false), `Accents` (Warbank, Guild). A tab entry's `accent` is an accent name, a palette name or a color. |
+| `Tabs` | `Fill`, `SelectedFill` (colors fading by `Fade`, or art: drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels, no fade), `Font`, `SelectedFont`, `Glow` (`Color`, `BlendMode`, `Drop`, `Pulse`, or false), `Indicator` (`Color`, `Width`, or art tinted by the accent, or false), `Highlight` and `SelectedHighlight` (art over the tab's fill under the pointer and when selected: Blizzard's list rows; mirrored with the panel), `Accents` (Warbank, Guild). A tab entry's `accent` is an accent name, a palette name or a color. |
 | `Footer` | `Line` (`Color`, `Inner`, `Outer`, `Size`, or art mirrored with the panel, or false), `Font`, `EmptyFont`, `MoneyFont` (the guild's gold). |
 | `Sparkles` | `Texture`, `BlendMode`, `Colors`, `FadeIn`, `FadeOut`, `TwinkleSpeed`, `TwinkleDepth`, `Shrink`, `WobbleSpeed`; emitters `Cloud`, `Ribbon` (+`Spread`), `Edge` (+`Reach`), `Knot` (+`Burst`), each `Rate`, `Max`, `Life`, `Size`, `Speed`, `Rise`, `Wobble`, `Spin`, `Alpha`, or false; `Sparkles = false` turns them all off. A coupled bag keeps its shorter ribbon and edge sparkle lives (next.md §12, §14e). |
 | `Chain` | Chaining (next.md §12) and the braid: `Braid` (false: none), `Segments`, `Beads`, colors (`Color`, `BeadColor`, `KnotColor`), sizes and timing. |
@@ -90,8 +94,8 @@ loads with the `REPEAT` wrap mode; everything it does not set is reset).
 | `Dock` | `Card` (a texture spec: a card can be art), `Pad`, `TitleHeight`, `LineHeight`, `Glow` (`Color`, `Width`, `Low`, `High`, `Period`, or false), `Halo` (`Texture`, `Color`, `Spread`, `Low`, `High`, `Period`, `BlendMode`, or false; the panel's column leaves `Spread` round each card), its line roles, `DestroyColor` (a section waiting to be destroyed glows in it; Default's palette `Crimson`), `BuyColor` (a shopping list waiting to be bought glows in it; Default's palette `Emerald`, profession-shopping-list.md). Drawn by `NextDockCard` (`next/dockcard.lua`), for each section waiting in a panel's dock (`NextDock`, next.md §7). |
 | `Vendor` | `QualityBorder` (a file, or false), `QuestMark`, `SearchDim`, `Highlight` (a color), tints (`Unusable`, `SoldOutUnusable`, `SoldOut`), roles (`PriceFont`, `UnaffordableFont`, `NameFont`, `StackFont`), a card's `CoinSize`, `CardFill` and `CardHover` (colors or art, or false), `DurabilityHeight`. |
 | `ItemButton` | Optional: a Sonata `ItemButton` element style (sonata.md §3a) for item buttons while Next is in use (§6); its files are paths (Sonata's specs), its backdrop and quality border may be art. |
-| `Settings` | The settings window (next-settings.md §3): `Width`, `Height`, `Fill`, `Wash` (or false), `Edge`; `Sidebar` (`Width`, `Pad`, `Fill`, `Line`), `Brand` (`Height`, `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `Line`: `Color`, `From`, `To`, `Size`, or art), `Search` (`Icon`, `IconSize`, `IconColor`, `Gap`), `Back` (a page's own list: `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `HoverFont`, `Slide` seconds), `Nav` (`ItemHeight`, `Indent`, `GroupHeight`, `GroupGap`, `Indicator`, `SelectedFill`, `HoverFill`, its four fonts), `Version`, `Header` (`Height`, `Pad`, `TitleTop`, `Gap`, its fonts, `Close`: `Icon`, `HoverIcon` (art of its own under the pointer), `Size`, `Inset`, `Color`, `HoverColor`; `Actions`: `Top`, `Gap`), `Content` (padding, `RowHeight`, `RowPad`, `MinColumn`, `Card`, `Divider`, `Hover`, its fonts), `Footer`, `Cards` (the theme pickers: sizes, fills, edges, status fonts), `Categories` (the Categories page, next-settings.md §5: its list's rows, `Dot`, `Indicator`, fills; its tabs' `Pad`, `FieldGap`, `LabelWidth`, `FilterWidth`; fonts), `BagCategories` (a bag's arrangement of them). |
-| `Controls` | Every control (next-settings.md §2): `ScrollBar` (the bags' too), `Toggle` (`Style`: `Square`, `Round` or `Check`, §14), `Button` (`Plain`, `Primary`, `Danger`, `Link`: fills, edges and fonts by state, and `DisabledFill`, §14), `Input`, `Slider`, `Dropdown`, `Menu`, `Swatch`, `TopTabs` (its `Indicator` a color or art), `Dialog`, `ItemGrid` (`Size`, `Gap`, `Pad`, `CommonEdge`, `DimAlpha`, `Hover`, `CountFont`, `EmptyFont`). A fill is a texture spec, a palette color or false; an edge a `Color`, `Alpha`, `Size` (and strengths `Idle`, `Hover`, `Focus`/`Open` for fields). `Motion.Time` adds `Toggle` and `TabMarker`. |
+| `Settings` | The settings window (next-settings.md §3): `Width`, `Height`, `Fill` (a fill, §16), `Frame` (§15), `Wash` (or false), `Edge`; laid out as Blizzard's with `Title`, `InnerFrame`, `Tabs`, `Brand = false` and the placement keys of §18; `Sidebar` (`Width`, `Pad`, `Fill`, `Line`, `Frame`: Blizzard's frame round it, §15, drawn under its pages and list), `Brand` (`Height`, `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `Line`: `Color`, `From`, `To`, `Size`, or art), `Search` (`Icon`, `IconSize`, `IconColor`, `Gap`), `Back` (a page's own list: `Icon`, `IconSize`, `IconColor`, `Gap`, `Font`, `HoverFont`, `Slide` seconds), `Nav` (`ItemHeight`, `Indent`, `GroupHeight`, `GroupGap`, `Spacing` (between every heading and row), `TextRaise` (a row's text above its middle), `Indicator` (or false), `SelectedFill`, `HoverFill` (fills: at their atlas's size with `AtlasSize`), `GroupFills` (cycled through the headings, as Blizzard cycles `Options_CategoryHeader_1` to 3), `GroupLabel` (`Point`, `X`, `Y`: where a heading's label goes), its four fonts), `Version`, `Header` (`Height`, `Pad`, `TitleTop`, `Gap`, its fonts, `Close`: `Icon` or `Atlas`, `HoverIcon` (art of its own under the pointer), `Highlight` (a fill over it under the pointer), `Size`, `Inset`, or `Offset` (`X`, `Y`: anchor offsets from the top right, Blizzard's close anchors), `Color`, `HoverColor`; `Actions`: `Top`, `Gap`), `Content` (padding, `RowHeight`, `RowPad`, `MinColumn`, `Card`, `Divider` (or false: no lines), `Hover`, `TitleUpper` (false: section titles as written), its fonts), `Footer`, `Cards` (the theme pickers: sizes, fills, edges, status fonts), `Categories` (the Categories page, next-settings.md §5: its list's rows, `Dot`, `Indicator`, fills; its tabs' `Pad`, `FieldGap`, `LabelWidth`, `FilterWidth`; fonts), `BagCategories` (a bag's arrangement of them). |
+| `Controls` | Every control (next-settings.md §2): `ScrollBar` (the bags' too; its track and thumb fills), `Toggle` (`Style`: `Square`, `Round` or `Check`, §14), `Button` (`Plain`, `Primary`, `Danger`, `Link`: fills, edges and fonts by state, `DisabledFill`, §14, `Highlight` (a fill over it under the pointer while enabled), `DisabledFont`), `Input` (`Edge` or false), `TextArea` (a text area's own `Fill`, `FocusFill`, `Edge` and `Frame`, §15; each the input's when unset), `Slider` (`Track` a fill; `ThumbSize = "Atlas"`, §17), `Dropdown` (§17: `Justify`, `Chevron` art per state at `Size = "Atlas"` by `Point`, `DisabledFont`, `DisabledAlpha`, `NarrowWidth`, `NarrowFill`; `Edge` or false), `Menu` (`Inset` per side; `Border`, a fill over its fill; `Check` (`Size = "Atlas"`, `Off`, `Under`: the radio ring, §17)), `Swatch`, `TopTabs` (its `Indicator` a color or art, or false; `Line` or false, reaching past the tabs by `Outset` (`Left`, `Right`) and stopping under the chosen tab with `Open`; tabs too wide for their row give up half their padding, then half their gaps, then cut their names, the longest first; `Fill`, `HoverFill`, `SelectedFill` per tab, `Padding`, `TextBottom`, `SelectedTextBottom`: Blizzard's `MinimalTabTemplate`, §17), `Dialog` (`Card` a fill, `Border` over it, `Frame`, §15), `ItemGrid` (`Size`, `Gap`, `Pad`, `CommonEdge`, `DimAlpha`, `Hover`, `CountFont`, `EmptyFont`; its box's own `Fill`, `Edge` and `Frame`, the input's fill and edge when unset). A fill is a texture spec, a palette color or false; an edge a `Color`, `Alpha`, `Size` (and strengths `Idle`, `Hover`, `Focus`/`Open` for fields). `Motion.Time` adds `Toggle` and `TabMarker`. |
 
 **Default is the v0.7.0 design, value for value**: `spec/fixtures/next_style_v0_7_0.lua` freezes
 v0.7.0's `next/style.lua`, and `spec/next/style_theme_spec.lua` checks every value and every font
@@ -213,7 +217,7 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     window's top 62 below the body's top; the band's painted rows (45) above it, from over the side panel (40 out);
     the emblem (84) straddling the side panel, its bottom right corner 18 in and 22 below the window's top (so it
     starts at the body's top: a docked panel's top is the screen's); the title 31 in, its middle 18 above the window's
-    top; the world map painting from the window's top (`Panel.Fill.Top`), so the band is drawn over what is behind the
+    top; the world map painting from the window's top (`Panel.Fill.Inset.Top`), so the band is drawn over what is behind the
     window; no border (`Panel.Edge = false`); the search bar 13 below the window's top; the footer band (its painted
     rows, 30 tall) with the free slots and money on it; `Panel.Feather = false`.
   - **The side panel outside the window** (`Rail.Outside`, §13), 40 wide, its art from the window's top line
@@ -250,6 +254,30 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     GW2_UI's source (`install-deps.sh` clones it).
   - Laid out on a 1920 x 1080 screen at both sizes (one-off dumps through the specs' layout resolver): nothing
     overlaps, the header where `GwFrameHeader` puts it.
+
+- **Plain** (`sonata/themes/next/plain.lua`; asked: "the Plain theme looks like the default UI for the version of WoW
+  we're playing on"; the plan, what Blizzard draws and how it was checked: `docs/next-plain-theme.md`): Blizzard's own
+  art, every name and number read from the files each client loads, at Default's scale and in Default's layout (asked,
+  round three: "scale for Plain should be the same as our Default", and of the settings window, "keep it like we do in
+  default, just, pass over with skin a bit"). The bags are the original BetterBags bag windows (asked, round two):
+  `DefaultPanelTemplate`'s look on every client (`ButtonFrameTemplateNoPortrait`, the client's own art, drawn above the
+  content; `UI-Background-Rock` 6, 21, 2 and 2 in and its `TopTileStreaks`; Classic's title band), the search box where
+  the original put it with `SearchBoxTemplate`'s insides, the original menu button's `Bagslots2x` bag as the bag button
+  holding the header's actions in the original bags' menu (§19; the vendor's portrait in Bagslots2x's empty gold ring on
+  the vendor's), only the close button in the header, the title centered between them. The settings window is Default's
+  in the same frame and stone, its name in the title bar, its sidebar Blizzard's inset (`InsetFrameTemplate` over its
+  marble, 4 in, 24 down, 4 above the bottom), its pages in the settings list's art (`Options_CategoryHeader_*`,
+  `Options_List_*`), its page tabs (`MinimalTab`) on a line across their column open under the chosen tab, its section
+  titles as written, its text areas and item boxes in Blizzard's multi-line edit box's frame (`InputScrollFrameTemplate`).
+  Retail and WoW: Forever (`Clients.Retail`): the red close button, the retail menus (`MenuStyle1`, and `MenuStyle2` for
+  the settings dropdowns), today's popup's retail border. Every Classic client (`Clients.Classic`): Classic's 32-square
+  close, Classic's menus (its own `MenuStyle2`), the popup's Classic border. Every client: the panel button in three
+  pieces with its highlight, the input border, the settings check box, slider, dropdown and scroll bar art at Default's
+  sizes, today's popup, the client's fonts copied at Default's sizes (the title bar's and the two larger Blizzard fonts
+  at their own). Its side tabs are the list rows: Blizzard has no sideways text tabs. No sparkles, feather, wash, ribbon,
+  cloud, glow or braid. Round one drew the dialog in the old `Dialog` nine-slice and the retail bags as Blizzard's
+  combined bags; round two the bag windows above and the settings window as Blizzard's (§18); round three Default's
+  scale and layout, the bag button (docs/next-plain-theme.md).
 
 Each draws the settings window and its controls in its own look (next-settings.md §6): Ember and Quiet
 their control colors in their own charcoal and grays (Quiet also smaller settings titles and quicker
@@ -414,8 +442,20 @@ is a column at a screen edge, feathered on its inner side), so ornaments are art
 - **A strip's art must repeat seamlessly**: its last row continues into its first, or the join shows every `Tile`
   down the bag. Art made by drawing shapes should draw past both ends and crop (a drop shadow or a blur at an end
   must see what lies beyond it), and any noise in it must repeat exactly over the tile.
-- **`TexCoords`** (left, right, top, bottom) crops a piece's art to part of its file, mirrored with the panel; not
-  with `Tile` (a tiled span's coordinates are its tiles). GW2_UI's header and footer bands are part of their files.
+- **`TexCoords`** (left, right, top, bottom) crops a piece's art to part of its file, mirrored with the panel; on a
+  tiled span it crops across it (its strip of the file) while the tiles run along it. GW2_UI's header and footer bands
+  are part of their files.
+- **`Atlas`** draws one of the client's atlases instead of a file (not with `Tile`: an atlas tiles as its own data
+  says). **`Mirror = false`** keeps a piece's art unflipped on a mirrored panel, placed mirrored all the same (a
+  portrait, an icon). **`Mask`** (`Texture`, a mask file; `Inset`: `Left`, `Right`, `Top`, `Bottom`, mirrored with the
+  panel) cuts its art, as Blizzard rounds its portraits (`TempPortraitAlphaMask`); a piece whose theme drops its mask
+  loses it. **`Unit`** draws that unit's portrait (`SetPortraitTexture`) while the client has the unit (`UnitExists`),
+  its own art otherwise, drawn again each time the panel shows (Blizzard's bank and merchant show their NPC:
+  `SetPortraitToUnit("npc")`). `Check` names an ornament with no art, an atlas with `Tile`, a mask with no file.
+- **`Above = true`** draws a piece on the panel's overlay (§15: over the content and a frame drawn above it), as the
+  original bags' menu button sat over their border and search box (the Plain theme's bag icon); give it a `Layer` over
+  the frame's pieces (`OVERLAY`). A piece keeps its texture, mask and motions on each frame it has been drawn on and
+  hides the one it leaves; its mask is made on its own frame.
 - **`Panels`** lists the panels a piece shows on (`Backpack`, `Bank`, `Vendor`, `GuildBank`, by the bag kind each
   shows, `const.BAG_KIND`, looked up as the panel lays out); unset, every panel. GW2_UI shows its bag's emblem on
   its bag, bank and guild bank and another on its merchant.
@@ -430,7 +470,8 @@ pieces and anchors, art and layer, sizes, tiles following the body, whole pixels
 reuse; sway, spin, pulse and bob, mirrored, phases, start and stop, a piece shown by a size switch, a motion
 dropped by a theme, moving parts), `spec/next/theme_panel_spec.lua` ("ornaments": on the real backpack and bank,
 mirrored, moving only while shown and through a theme, at their size through a real size switch, moving parts),
-`spec/sonata/next_engine_spec.lua` ("names what is wrong with an ornament"). 23 mutations, each caught (three
+`spec/sonata/next_engine_spec.lua` ("names what is wrong with an ornament"); atlases, masks, units and crops:
+`spec/next/ornaments_spec.lua` ("portraits", "tiles a span along it and crops it across"). 23 mutations, each caught (three
 first survived and led to tests).
 
 ## 13. The side rail (`Header.Buttons.Rail`)
@@ -555,6 +596,196 @@ expanding what sonata can do" (and keep it declarative). Parts that took only a 
   `spec/next/controls/button_spec.lua` ("in the check style"; disabled art, on a theme switch),
   `spec/next/vendorbutton_spec.lua` (card art), `spec/sonata/next_engine_spec.lua` (toggle styles, pinned corners).
 
+## 15. Frames (`next/frameart.lua`, `Panel.Frame`, `Settings.Frame`, `Controls.Dialog.Frame`)
+
+**Why.** Blizzard builds its windows from nine-slice layouts (`Blizzard_SharedXML/<Family>/NineSliceLayouts.lua`): the
+retail bags' `HeldBagLayout`, the settings window's `ButtonFrameTemplateNoPortrait`. Next cannot host Blizzard's frame
+templates (its panels draw themselves, mirror, slide, morph and chain), so `NextFrameArt` draws the same art from data.
+
+- **A layout by name**: `Frame = { Layout = "HeldBagLayout" }` reads `NineSliceUtil.GetLayout(name)` at apply: the
+  client's own art and offsets, Forever's load-time adjustments included (`Camelot/NineSliceLayoutOverrides.lua`).
+  A layout that sets its pieces up itself (`setupPieceVisualsFunction`) or needs a texture kit (`%s` atlases) is an
+  error; `Check` names a layout the client lacks.
+- **Or pieces**: `Frame = { Pieces = { TopLeftCorner = { Atlas | Texture, TexCoords, Width, Height, HorizTile,
+  VertTile, X, Y, X1, Y1 }, ... } }`, named as Blizzard names them (`Check` names an unknown piece).
+- **Placed by Blizzard's rules** (`NineSliceUtil.ApplyLayout`, `NineSlice.lua`, every client): corners at their corner
+  by their offsets at their atlas size (`C_Texture.GetAtlasInfo`); edges between their two corners, as thick as their
+  atlas, tiled as it says; the center between the top left and bottom right corners; three-slice layouts against the
+  region; `mirrorLayout` flips the mirrored pieces; `disableSharpening` turns pixel snapping off (each texture's own
+  snapping given back for a layout without it). An atlas the client lacks draws nothing, as Blizzard's does.
+- **Mirrored** on a panel whose inner side is on the right (the bank), as ornaments are: each piece in the opposite
+  place, flipped, offsets negated.
+- **`Bands`**: strips across the region's top (texture specs with `Height`, `Left`, `Right`, `Top`; mirrored), each over
+  the one before, in the owner's `BACKGROUND` layer over its fills and under the frame's pieces, as Blizzard's are in its
+  frames': `DefaultPanelTemplate`'s `TopTileStreaks`, Classic's `_UI-Frame-TitleTileBg`. (It replaced a single
+  `TitleBg`.)
+- **Where**: on the owner frame's `ARTWORK` 5 (`Layer`, `SubLevel`), tinted by `Color` and `Alpha`, under everything in
+  the owner's child frames (Blizzard's settings window: `SettingsFrameTemplate`'s NineSlice `useParentLevel`, its
+  content placed inside it); the panel frames its body, the settings window itself, a dialog its card.
+- **`Above = true`**: on the frame `Create` was given to draw above the content (the panel's overlay, `next/panel.lua`:
+  20 levels over its frame, over the content's sections and item buttons, never taking the mouse), as the original bags
+  raised their border over their content (Sonata's Default: NineSlice at +500). The panel's title is on the overlay
+  (`OVERLAY`, over the art) and its header buttons above it, as Blizzard's title and close sit over its NineSlice (510
+  over 500). A set drawn on another frame keeps its pieces there and hides them; a set given no such frame refuses
+  `Above`. Ornaments that say `Above` are drawn on the overlay too (§12).
+- **Coverage**: `spec/next/frameart_spec.lua` (with Blizzard's layouts per client, `spec/fixtures/nineslice_layouts.lua`,
+  copied from each branch, Forever's adjustments applied by a copy of Blizzard's code), `spec/next/theme_panel_spec.lua`
+  ("draws a frame round its body, mirrored on the bank", "draws a frame that says Above over its content"),
+  `spec/next/settings/window_spec.lua`,
+  `spec/next/controls/panel_controls_spec.lua`, `spec/sonata/next_engine_spec.lua` ("names what is wrong with a frame").
+
+## 16. Fills (`next/fill.lua`)
+
+**Why.** Blizzard draws its buttons, sliders, scroll bars and inputs in three pieces, a begin cap, a stretched middle
+and an end cap, and many of its fills reach past their frame (a dropdown's background) or sit inside it (a window's).
+
+- `NextFill:Wrap(texture, region)` makes a widget's own texture a fill: the texture stays the fill (its middle when
+  pieced), so the widget and its specs keep using it, and the fill adds its caps beside it. `NextControls:Paint` paints a
+  wrapped texture through its fill.
+- **One piece**: a texture spec filling the region, `Inset` into it (`Left`, `Right`, `Top`, `Bottom`; negative reaches
+  past), or at its atlas's own size (`AtlasSize = true`) by its `Point` (CENTER when unset, `X`, `Y`).
+- **Pieced**: `Pieces = "Horizontal"` or `"Vertical"`; `Begin`, `Middle`, `End`, each its own `Atlas` or `Texture` with
+  `TexCoords` (else the fill's); the caps `Size` long (else their atlas's); `Thickness` thick and centered (else the
+  region's), or `"Atlas"`: each piece its atlas's own thickness, the caps by their middles (or by their bottom corners
+  with `Align = "BOTTOM"`), the middle hung from the caps' tops (MinimalSliderTemplate, MinimalTabTemplate); tinted by
+  the fill's `Color` and alpha.
+- **Wrapped**: buttons (and their `Highlight`), slider bars and scroll bar tracks (each in a frame of its own where the
+  strip goes: `barFrame`, `trackFrame`), scroll thumbs, inputs and text areas, dropdowns, menus (and their `Border`),
+  dialog cards (and their `Border`), the settings window's fill, the settings list's rows, page tabs.
+- **Coverage**: `spec/next/fill_spec.lua`, and each widget's spec ("in three pieces", "past it", "at its atlas's size").
+
+## 17. Blizzard's look in controls (for the Plain theme)
+
+Each of these is how Blizzard draws a control, read from its template (docs/next-plain-theme.md), and generally
+available to themes:
+
+- **Atlases at their own size** (`useAtlasSize`): `NextStyle:AtlasSize(atlas)` and `SizeOf(spec, art, fallback)`
+  (`Size = "Atlas"`); the slider's `ThumbSize = "Atlas"`; fills above.
+- **The dropdown's arrow in its art for each state** (`GetWowStyle1ArrowButtonState`): `Chevron.Hover`, `Pressed`
+  (pressed under the pointer), `Open`, `Disabled`, at `Size = "Atlas"`, by its right at `Point` from the dropdown's right
+  edge; `Justify` (Classic writes the choice right, against the arrow); `DisabledFont` and `DisabledAlpha` (Blizzard
+  grays the text and swaps the arrow, dimming nothing); `NarrowWidth` and `NarrowFill` (Classic's `-small` background at
+  100 wide or less).
+- **Radio menus** (`MenuVariants.CreateRadio`): `Check.Off`, the empty ring on every row not chosen, and `Check.Under`,
+  the ring under the chosen row's tick at its top left (retail draws two textures; Classic swaps one, so no `Under`);
+  `Menu.Inset` per side (`MenuStyle1Mixin:GetInset`), `Menu.Border` over its fill (Classic's art).
+- **The dialog**: `Border` over its `Card` (today's popup: the diamond border over the dark background).
+- **Page tabs** (`MinimalTabTemplate`): each tab's `Fill`, `HoverFill`, `SelectedFill`, `Padding` either side of its
+  label, the label by its bottom `TextBottom` above the tab's (`SelectedTextBottom` chosen); `Indicator = false` and
+  `Line = false` hide the marker and line for good.
+- **The settings list** (`Blizzard_CategoryList.lua`): `Spacing`, `TextRaise`, `GroupFills`, `GroupLabel`, atlas-sized
+  row fills; `Close.Atlas`, `Close.Highlight`, `Close.Offset`.
+- **The settings slider** (`MinimalSliderWithSteppersTemplate`, `MinimalSlider.lua`): `Slider.Steppers` (`Back`,
+  `Forward`: `Atlas` or `Texture`, `Width`, `Height`; `Gap` out from the bar's ends; `Room` left either side of the bar;
+  `DisabledAlpha` for a stepper whose way the value can go no further, desaturated too), each stepping the value by its
+  step; `Slider.Value = "Text"` writes the value `ValueGap` right of the bar in `ValueFont` (`ValueDisabledFont`
+  disabled) instead of the box to type in; `Slider.DisabledAlpha` dims the bar alone while disabled (Blizzard's 0.7).
+- **The settings dropdown** (`WowStyle2DropdownTemplate`, `DropdownWithSteppersTemplate`): `PressedFill` and
+  `DisabledFill` (its art for each state, `GetBackgroundAtlas`); `Chevron.Anchor` (the point it hangs by, `BOTTOM` for
+  WowStyle2's arrow) and `Chevron.HoverOnly` (shown only under the pointer); `Steppers` (`Back`, `Next`: an atlas and its
+  `Disabled` art; `Width`, `Height`; `BackGap`, `NextGap` out from the dropdown; `Fill` and its states for the buttons,
+  at their atlas size centered with `AtlasSize`), stepping to the choice before or after, off at the ends and while the
+  dropdown is; `Dropdown.Menu`, what the menu a dropdown opens changes in `Controls.Menu` (`NextMenuOptions.style`,
+  merged key by key: Blizzard's settings dropdowns open `MenuStyle2`).
+- **The bag search box**: `Search.Inset` (`Left`, `Right`: the box in from the body's sides, mirrored on the bank, else
+  the side pads), `Search.Inner` (`IconX`, `IconY`, `IconSize`, `TextLeft`, `TextRight`, `ClearRight`: its insides as
+  `SearchBoxTemplate` anchors them, else Next's own layout), `Search.HelpColor` (the template's own color for its help).
+- **Smaller ones**: a button's `Highlight`, `DisabledFont` and `SetStyle` (a button changing looks), the magnifier's
+  `ActiveColor`, `Search.Template`, a header icon's `Pushed` and `Disabled`, a centered title, `RowStart`, tab
+  `Highlight`s, ornaments' `Atlas`, `Mask`, `Unit` and `Above` (§12), palette `Global` colors, `Copy` fonts, an input's
+  icon `Atlas`.
+
+## 18. The settings window as Blizzard's (`next/settings/window.lua`, `page.lua`, `rows.lua`)
+
+**Why.** Reported in game (round two, docs/next-plain-theme.md): Plain's settings window was Next's own layout in
+Blizzard's art (a full-height sidebar from the window's edge, its fill and list art over the border, the brand, two
+columns of cards, controls at the far right, tabs floating under the header). Blizzard's settings window
+(`Blizzard_SettingsPanel.xml`, the same on every client) is laid out differently; these keys let a theme lay Next's
+window out as Blizzard's. Each defaults to Next's own layout, so Default and the other themes do not move (the window
+specs that predate them pass unchanged).
+Plain laid its settings window out with them in round two; round three went back to Default's layout, skinned (asked: "keep
+it like we do in default, just, pass over with skin a bit"; docs/next-plain-theme.md). They stay for a theme that wants
+Blizzard's window, covered by their own specs.
+
+- **The window**: `Settings.Title` (`Font`, `Top`, `Left`, `Right`, `Height`: the window's name in its title bar, centered
+  between `Left` and `Right`, the bar `Height` tall moving the window), `Settings.InnerFrame` (a fill on the window under
+  its content: `Options_InnerFrame` at its size at 17, -64), `Brand = false` (no brand: its icon, name and line hide).
+- **The sidebar**: `Sidebar.Left`, `Top`, `Bottom` (the sidebar inside the window, `Left` in and `Top` down to `Bottom`
+  above its bottom; its height everything a page's list and the slide measure from), `Back.Height` (the row Back sits in,
+  else the brand's); `Nav.ItemWidth` (rows and headings that wide from the list's left), `Nav.GroupUpper = false`
+  (headings as written).
+- **The search box**: `Search.Place = "Top"` with `Width`, `Right`, `Top` (on the window at its top right), `Search.Atlas`
+  (its magnifier an atlas). The pages' list then starts at the sidebar's top.
+- **The version**: `Version.Window` with `Left`, `Bottom` (at the window's bottom left).
+- **The header and content**: `Header.Left`, `Right`, `Top` (the content from `Left` right of the sidebar to `Right` from
+  the window's right, its header `Top` down), `Header.DescriptionFont = false` (no description), `Header.Divider` (a fill
+  on the header: `Options_HorizontalDivider` centered 50 down), `Header.Actions.Right` (a page's buttons from the header's
+  right; else clear of a close button in its corner); `Settings.Tabs.Top`, `Left` (a page's tabs on the window, `Top`
+  down from the content's left, taking no room under the header); `Content.ScrollLeft`, `ScrollRight`, `ScrollTop` (the
+  scroll area beside the content's left, in from its right, below the header).
+- **The footer**: `Footer.Left` (from the window's left), `Footer.Buttons` (`Width`, `Right`, `Bottom`, `Gap`: Done that
+  wide at the bottom right, What's New left of it), `Footer.WhatsNew` (What's New's look: a link, or a button).
+- **The page as Blizzard's list** (`Content.Layout = "List"`, `SettingsListTemplate`, `SettingControls`): one column `Pad`
+  in and `PadRight` from the right, `Top` and `Bottom` padding, `RowGap` between every element; a section's title element
+  `SectionHeight` tall, its title `TitleX` in and `TitleTop` down, as written unless `TitleUpper`; rows at least
+  `RowHeight` tall, a setting's name `LabelX` in up to `LabelRight` from the row's middle (wrapping there), each control
+  from the middle by its kind's `Content.Controls[kind]` (`X`, `Y` up: `toggle`, `slider`, `dropdown`, `color`, `input`,
+  `buttons`), a row lit across it from `HoverInset.Left` past its left to `HoverInset.Right` short of its right; no cards
+  or lines.
+- **Coverage**: `spec/next/settings/window_spec.lua` ("laid out as Blizzard's settings window"),
+  `spec/next/settings/page_spec.lua` (both "laid out as Blizzard's list" blocks), `spec/next/controls/slider_spec.lua`
+  ("with steppers and its value written"), `spec/next/controls/dropdown_spec.lua` ("as Blizzard's settings dropdown"),
+  `spec/next/theme_panel_spec.lua` ("sits Inset in from its body's sides…", "the Plain theme").
+
+## 19. The bag button (`next/menubutton.lua`, `Header.Buttons.Menu`)
+
+**Why.** Asked, of the Plain theme: "remove all top bar buttons, make sure our bag title is always correctly centered from
+the right of the bag button, to the left of the close button", "bring back the drop down menu with these options, just
+like the original bags ... just the options we are removing from the bar", "same for vendors and bank", and "vendors
+should have their portrait for the bag button, not the bag texture" (docs/next-plain-theme.md, round three).
+
+- **The schema**: `Header.Buttons.Menu = { Point, Anchor, X, Y, Width, Height, Layers, Highlight, Panels }`, or nothing
+  (Default). `Point` is a corner of the body by its side (`TOPINNER`, `TOPOUTER`, `BOTTOMINNER`, `BOTTOMOUTER`), the
+  button placed by its own `Anchor` (the same corner when unset), `X` toward the body's middle and `Y` down, as an
+  ornament's corner piece (§12), mirrored on a panel whose inner side is on the right. Each of its `Layers` (in order,
+  each over the one before; `Layer`, `SubLevel`) is a file (`Texture`, `TexCoords`), an atlas, a unit's portrait (`Unit`:
+  while the client has the unit, `SetPortraitTexture`; nothing while it has none) or only a `Color` (filled with it),
+  inset into the button (`Inset`: `Left`, `Right`, `Top`, `Bottom`; negative reaches past), cut by a `Mask`, never
+  flipped; `Highlight` the same over them, faded in under the pointer (`Time.Hover`) to its `Alpha`. `Panels` gives a
+  panel its own keys over the rest (`Backpack`, `Bank`, `Vendor`, `GuildBank`, as ornaments name them): the vendor's
+  portrait. The art and masks are drawn with the ornaments' own functions (`NextOrnaments:DrawArt`, `Cut`).
+- **The row goes in its menu**: while a theme has one, every header button that is not pinned (§13) goes under a hidden
+  frame (`panel.menuHolder`), so the panel's own showing and hiding of it (a vendor that repairs, a game rule) still
+  decides whether the menu lists it, and back on the panel's frame (over its overlay) for a theme without one. The title
+  then starts at the button's far edge (`panel:TitleStart`, `NextMenuButton:Room`) and ends at the pinned buttons
+  (`pinnedRoom`, now counting a pin's offset by its direction: one out past the edge takes less room), with no slack, so a
+  centered title is centered between the two.
+- **The menu** (a left click; its tooltip says so): the original bags' menu, `ContextMenu` (LibUIDropDownMenu's
+  `EasyMenu`, frames/contextmenu.lua), the same drop-down: the title line (`BetterBags` and the version), then the header
+  buttons the panel shows that are not pinned, in their order, those saying `menuLast` (Open Options Screen, last in the
+  original menu too) at the end. Each entry is its button's `label` (else its `tooltip`), checked for a toggle
+  (`checked`), disabled as its button is (`IsEnabled`), with its tooltip (`menuTooltip`, else its `tooltip` when that is
+  not its name), read as the menu opens (the library calls back on entering an entry only on retail); a click runs its
+  `onClick`. Each panel's buttons say so (`NextHeaderButton`): the backpack's Sort Bags, Show Blizzard Bags and Small Bags
+  (checked), the bank's Show Bank Tabs (checked), Deposit Warbank Items and Sort Bank, the vendor's Filter, Sell Junk,
+  Repair All and Repair With Guild Funds (their costs: `RepairLines`, shared with the header's tooltips), the guild bank's
+  Deposit Gold and Withdraw Gold (`WithdrawLines`), Open Options Screen last on each. The vendor's filter opens from the
+  bag button while the filter button is in the menu (`OpenFilter`).
+- **Drawn again on each show** (`Paint`), so a vendor's portrait is the vendor now.
+- **Checked** (`SonataNext:Check`): a corner by its side, the size, art in every layer (its own and each panel's), the
+  panels it names.
+- **Coverage**: `spec/next/menubutton_spec.lua` (hidden without one; its corner, mirrored, above the overlay; its room;
+  layers inset and never flipped; a panel's own layers: a color, a portrait while there is a unit, a mask, a ring; layers
+  put away; the highlight; the menu: the title, the order, Open Options Screen last, checked, disabled, tooltips, a click,
+  buttons not shown), `spec/next/theme_panel_spec.lua` ("a header row in a menu": the row out and back, the title centered
+  on either side, the backpack's entries, drawn on show; Plain's bag button on Retail and Era),
+  `spec/next/vendor_spec.lua` ("in a bag button's menu": what the vendor offers, repair costs and the guild's repair, the
+  filter's owner), `spec/next/bank_spec.lua` and `spec/next/guildbank_spec.lua` (their entries), `spec/sonata/next_engine_spec.lua`
+  ("names what is wrong with a bag button"). Mutation-tested with the rest of round three: 58 mutations, 53 caught at once;
+  two survivors led to tests, three showed code that changed nothing, removed (restoring the row's frame level after its
+  new parent: levels stay what they were set to since 7.0.3, warcraft.wiki.gg Frame Strata; the row's width and layout
+  while it waits in the menu).
+
 ## 9. Coverage
 
 - Engine: `spec/sonata/next_engine_spec.lua` (registration and data-only refusal by path, objects,
@@ -601,3 +832,32 @@ expanding what sonata can do" (and keep it declarative). Parts that took only a 
 - Round four: the tab name's width (removing it fails the test; the reset before it, width 0 and the text again, is
   Blizzard's documented sequence and cannot be told apart in the mock), the character window's numbers and the size
   glyphs (`spec/sonata/next_themes_spec.lua`).
+- **Every theme draws every window** (`spec/next/shipped_themes_spec.lua`): the settings window (built once, under
+  Plain), a page with a row of every kind, every control under the pointer, pressed, disabled and enabled, the
+  dropdown's menu, a dialog, the other tab and page, with every shipped theme as every client resolves it; and
+  `spec/next/pixel_perfect_spec.lua` ("in every shipped theme, on every client") the bags. Both fail on anything sent to
+  the error handler: SonataNext restyles each widget in a protected call and the mock handler drops errors, which hid
+  seven places that read a part Plain turns off.
+- **Round three** (Default's scale and layout, the bag button): `spec/sonata/next_themes_spec.lua` ("Plain": Default's sizes
+  but what the frame fixes, fonts at Default's sizes, the settings window Default's, the inset and the edit box frames, the
+  bag button and the vendor's portrait), `spec/next/style_theme_spec.lua` (`Copy` at the role's size, `Size = false`),
+  `spec/next/controls/itemgrid_spec.lua` and `input_spec.lua` ("its box"), `spec/next/controls/panel_controls_spec.lua`
+  (the tabs' line, open and reaching past them; tabs that do not fit), `spec/next/settings/window_spec.lua` ("a sidebar
+  framed as an inset"), `spec/next/settings/page_spec.lua` (titles as written in cards), and §19.
+- **Plain's art exists on each client** (`spec/sonata/plain_art_spec.lua`): every atlas, Blizzard file, nine-slice
+  layout, font and named color Plain resolves to on a client is used by code that client loads, read from its branch of
+  Blizzard's UI source by the files its TOCs load (`spec/helpers/ui_source.lua`; `install-deps.sh` clones every branch).
+- **The client's atlas sizes** (`spec/fixtures/atlas_sizes.lua`, written by `tools/atlas_sizes/generate.py` from the
+  client's `UiTextureAtlasElement` and `UiTextureAtlasMember` tables through wago.tools; `UseRealAtlasSizes(family)` in
+  the mocks): specs that draw a theme's art at its atlas's size use them, and `spec/sonata/plain_art_spec.lua` fails when
+  Plain names an atlas the fixture lacks. Without them, art "at its atlas's size" collapsed in the specs and round one's
+  settings list headers (199 x 144) shipped stretched. Files the client's loaded code never names but its game data has
+  (`Bagslots2x`) are listed in the art spec with the evidence.
+- Round two (52 mutations of its guards: frame art above and its bands, the overlay, ornaments above, the search box's
+  inset, insides and help color, every settings window key, the list page and rows, the slider's steppers and value, the
+  dropdown's art, arrow, steppers and menu style, the art spec's game-data list): each caught.
+- The Plain work: 22 mutations of its new guards (list spacing and raise, atlas-sized fills and pieces, the dropdown's
+  narrow fill, justify, arrow states and disabled font, the menu's ring and insets, the title band's mirroring, the
+  dialog's border, the page tabs' marker and padding, the page's dividers, the magnifier, the thumb), each caught; the
+  error capture and the art spec were mutation-tested too (a layout the client lacks, a retail atlas on Classic, a
+  misspelled atlas).

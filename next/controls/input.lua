@@ -21,6 +21,12 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
+---@class NextFrameArt: AceModule
+local frameArt = addon:GetModule('NextFrameArt')
+
 -- NextInput is BetterBags Next's text field and text area (next-settings.md §2), drawn from the theme
 -- (Controls.Input): a fill (lighter while focused) and an edge (stronger under the pointer and while
 -- focused), the text Padding in, help text while empty. Only what the player types is reported
@@ -99,6 +105,7 @@ function nextInput:Create(parent, opts)
   end
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints(frame)
+  fills:Wrap(fill, frame)
   local help = frame:CreateFontString(nil, "ARTWORK")
   ---@type NextInputFrame
   local f = setmetatable({
@@ -140,7 +147,8 @@ function inputProto:Style()
     pixel:Size(self.icon, spec.Size, spec.Size)
     self.icon:ClearAllPoints()
     pixel:Row(self.icon, "TOPLEFT", frame, pad, frame:GetHeight())
-    controls:Paint(self.icon, { Texture = spec.Texture, Color = spec.Color })
+    -- A glyph, or an atlas (the Plain theme's: Blizzard's common-search-magnifyingglass).
+    controls:Paint(self.icon, { Texture = not spec.Atlas and spec.Texture or nil, Atlas = spec.Atlas, Color = spec.Color })
     left = pad + self.icon:GetWidth() + pixel:Floor(frame, pad / 2)
   end
   style:SetFont(frame, I.Font)
@@ -165,13 +173,12 @@ function inputProto:Paint()
   local I = controls:Theme("Input")
   local focused = self.frame:HasFocus()
   controls:Paint(self.fill, focused and I.FocusFill or I.Fill)
-  local strength = I.Edge.Idle
-  if focused then
-    strength = I.Edge.Focus
-  elseif self.hovered then
-    strength = I.Edge.Hover
+  -- A theme may draw no edge (Edge = false: Blizzard's input border is its fill).
+  local E, strength = I.Edge, nil
+  if E then
+    strength = (focused and E.Focus) or (self.hovered and E.Hover) or E.Idle
   end
-  controls:PaintEdge(self.edge, I.Edge, strength)
+  controls:PaintEdge(self.edge, E, strength)
   self.help:SetShown(not focused and (self.frame:GetText() or "") == "")
 end
 
@@ -258,6 +265,7 @@ function nextInput:CreateArea(parent, opts)
   frame:SetHeight(opts.height)
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints(frame)
+  fills:Wrap(fill, frame)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
   pixel:SnapScroll(box)
@@ -277,6 +285,8 @@ function nextInput:CreateArea(parent, opts)
   local area = setmetatable({
     frame = frame, fill = fill, edge = controls:CreateEdge(frame), box = box, bar = bar, editBox = editBox,
     help = help, opts = opts,
+    -- Round the whole box, under its edit box (a child frame).
+    frameArt = frameArt:Create(frame, frame),
   }, { __index = areaProto })
   style:SetFont(editBox, controls:Theme("Input").Font)
   style:SetFont(help, controls:Theme("Input").HelpFont)
@@ -311,11 +321,31 @@ function areaProto:Style()
   self:Paint()
 end
 
+-- Paint draws the area's box from its own look (Controls.TextArea: Fill, FocusFill, Edge, Frame), each the input's when
+-- the theme gives it none (false: none): Blizzard draws a multi-line edit box in a frame of its own
+-- (InputScrollFrameTemplate), not the single-line field's art.
 function areaProto:Paint()
-  local I = controls:Theme("Input")
+  local A, I = controls:Theme("TextArea"), controls:Theme("Input")
   local focused = self.editBox:HasFocus()
-  controls:Paint(self.fill, focused and I.FocusFill or I.Fill)
-  controls:PaintEdge(self.edge, I.Edge, focused and I.Edge.Focus or I.Edge.Idle)
+  local fill
+  if focused then
+    fill = A.FocusFill
+    if fill == nil then
+      fill = I.FocusFill
+    end
+  else
+    fill = A.Fill
+    if fill == nil then
+      fill = I.Fill
+    end
+  end
+  controls:Paint(self.fill, fill)
+  local E = A.Edge
+  if E == nil then
+    E = I.Edge
+  end
+  controls:PaintEdge(self.edge, E, E and (focused and E.Focus or E.Idle) or nil)
+  self.frameArt:Apply(A.Frame)
   self.help:SetShown(not focused and self:GetText() == "")
 end
 

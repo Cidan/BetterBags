@@ -320,3 +320,74 @@ in `forms/layouts/stacked.lua`, `railProto:placeContent` in `next/tabs.lua`). Te
 width from the anchors and does not need it. The specs' mock measures text the same in every font: a test makes the
 text measure wider in the new font to show the code re-measures.
 
+
+## A Theme Part Set to False Arrives as Nothing
+**Problem**: A Next theme turns a part off with `false` (`Edge = false`, `Indicator = false`), and resolution removes a
+table set to `false` (`SonataResolve.Merge`), so the widget reads `nil`. Seven places read such a part unguarded
+(`I.Edge.Idle`, `N.Indicator.Width`, `C.Divider.Size`): the Plain theme, the first to turn those parts off, broke the
+settings window on every client. A second form: a part hidden when styled but shown again later (`marker:SetShown(width
+> 0)`, a divider's `Show()` after placing) draws anyway.
+
+**Rule**: Read every theme part as possibly absent (`local E = I.Edge; ... E and E.Idle`), and every later `Show` of a
+part checks the part is still on. `spec/next/shipped_themes_spec.lua` draws every Next window with every shipped theme
+on every client; a new part, or a theme turning one off, is covered by it.
+
+## Protected Restyles Hide Errors From Specs
+**Problem**: `SonataNext:RestyleWidgets` styles each widget in a `pcall` and hands a failure to `geterrorhandler()`,
+as the client would show it, and the specs' mock handler returns the error and drops it. A theme that broke a widget
+passed every spec that applied it (the pixel spec applied Plain to the bags and checked their pixels, not errors).
+
+**Rule**: A spec that applies themes captures the handler (`_G.geterrorhandler = function() return function(err)
+table.insert(errors, tostring(err)) end end`) and asserts nothing was sent. It restyles only the widgets it made (its own
+`sonataNext.widgets` table for the run): other spec files' widgets were made against their own stubs.
+
+## A Branch of Blizzard's UI Source Holds Every Client's Files
+**Problem**: Since the UIs were unified, each branch of `wow-ui-source` carries every game type's folders
+(`Mainline\`, `Classic\`, `Vanilla\`, `Camelot\`), loaded only by their own client (`[AllowLoadGameType]`, `[Family]`,
+`[Game]`), and a whole addon can be one game type's (the damage meter is `## AllowLoadGameType: standard`, its art in an
+unflavored file). Grepping a branch for an atlas proved nothing: retail's menu art passed as present on Classic.
+
+**Rule**: To know what a client has, read the files its TOCs load (`spec/helpers/ui_source.lua`), and search those.
+Read a template from the loaded file, not the first match in the branch. Use `origin/<branch>`: a local branch can lag
+(the local `live` was a build behind).
+
+## Copying Blizzard's Art Names Is Not Copying Its Look
+**Problem**: The Plain theme's first version named only Blizzard's atlases, files and fonts, each checked to exist on
+every client, yet in game the settings window was wrong in nearly every way: the list's header art (199 x 144) stretched
+across a sidebar that started at the window's outer edge, its fill and art over the border, tabs floating with nothing
+under them (their art is a hollow outline meant to sit on `Options_InnerFrame`'s edge), two columns of cards where
+Blizzard draws one list. The specs had no atlas sizes, so art drawn at its atlas's size collapsed to nothing in them,
+and nothing compared a placement with Blizzard's.
+
+**Rule**: To match a Blizzard window, take its layout from its template (every anchor and size), its art's sizes from
+the client's own atlas table (`spec/fixtures/atlas_sizes.lua`, `tools/atlas_sizes/generate.py`), and test placements
+against those numbers. Look at the art before deciding where it goes (decode it from the client's files: hollow tab
+outlines, a header bar with lines down its column), and look at the result drawn with the client's textures before it
+ships; a layout dump through the specs' resolver (`spec/helpers/layout.lua`) gives exact rects to draw from.
+
+## A Theme Key Set to False Is Nil By the Time Code Reads It
+**Problem**: Plain sets `Brand = false`; resolution removes a table set to `false`, so the window read `nil`, and
+`SetShown(B ~= false)` showed the brand. A window built before its theme applies (the settings window) also read
+`Brand.Font` and `Header.DescriptionFont` at build time and failed under Plain.
+
+**Rule**: Test a removable part as a table (`local on = B and true or false`), never against `false`; and never read a
+removable part's keys at build time: give the region a role there and set the theme's at style time.
+
+## A Control's Art Covers What Takes Its Clicks, and Each Control Has Its Own Look
+**Problem**: The Plain theme's item boxes were white and its Search Rule box drew a 20-pixel strip in a box several times
+taller. Both borrowed the single-line input's fill: Plain's is three pieces of the search border at their own thickness,
+which on a plain texture (the item grid's) paints the whole box white, and on the text area covers a strip of what takes
+its clicks.
+
+**Rule**: A control draws its box from its own theme keys (`Controls.ItemGrid`, `Controls.TextArea`), falling back to
+another control's only when the theme gives none, and its art covers exactly the area that takes its clicks (art at a
+fixed thickness belongs to a control that is that tall). Blizzard has a frame for each: the single-line field's border,
+the multi-line edit box's frame (InputScrollFrameTemplate), the inset (InsetFrameTemplate).
+
+## Matching Default's Scale Means Matching Default's Numbers
+**Problem**: Plain copied Blizzard's fonts and sizes (37-pixel item buttons, 10 to 12 point text), which made it look
+smaller than the theme it sits beside; asked: "scale for Plain should be the same as our Default".
+
+**Rule**: A skin theme takes Default's sizes (layout, fonts, controls) and replaces only the look; keep a Blizzard size
+only where Blizzard's art fixes it (a title bar, a check box, a close button) or where Blizzard's is larger. `Copy` font
+roles take the role's `Size` for exactly this (`Size = false` keeps the client's).

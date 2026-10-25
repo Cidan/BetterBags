@@ -5,7 +5,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextInput", "next/controls/input.lua" },
   { "NextSwatch", "next/controls/swatch.lua" }, { "NextTopTabs", "next/controls/toptabs.lua" },
   { "NextDialog", "next/controls/dialog.lua" } }) do
@@ -140,6 +140,45 @@ describe("NextTopTabs", function()
     assert.is_nil(tabs.marker:GetTexture())
   end)
 
+  -- Blizzard's tabs (MinimalTabTemplate) show the chosen one in their own art: no marker, no line under them.
+  it("draws no marker and no line for a theme without them, whichever tab is chosen", function()
+    UseNextTheme({ Controls = { TopTabs = { Indicator = false, Line = false } } })
+    local tabs = make()
+    assert.is_false(tabs.marker:IsShown())
+    assert.is_false(tabs.line:IsShown())
+    tabs.tabs[2].frame:GetScript("OnClick")(tabs.tabs[2].frame, "LeftButton")
+    tween:Step(1)
+    assert.is_false(tabs.marker:IsShown(), "not after a glide")
+    UseNextTheme(nil)
+    tabs:Style()
+    assert.is_true(tabs.marker:IsShown())
+    assert.is_true(tabs.line:IsShown())
+  end)
+
+  -- Blizzard's settings tabs (MinimalTabTemplate, MinimalTabMixin): each tab its own art, idle, under the pointer and
+  -- selected (Options_Tab_*, Options_Tab_Active_*), as wide as its text and 40, the text by its bottom 4 above the tab's
+  -- bottom, 6 when selected.
+  it("draws each tab in its theme's art for its state, Padding either side of its label, raised as it says", function()
+    UseNextTheme({ Controls = { TopTabs = { Padding = 20, TextBottom = 4, SelectedTextBottom = 6, Indicator = false, Line = false,
+      Fill = { Atlas = "tab", Color = "White", Alpha = 1 }, HoverFill = { Atlas = "tab-over", Color = "White", Alpha = 1 },
+      SelectedFill = { Atlas = "tab-active", Color = "White", Alpha = 1 } } } })
+    local tabs = make()
+    local first, second = tabs.tabs[1], tabs.tabs[2]
+    assert.are.equal(#"Layout" * 6 + 40, first.frame:GetWidth())
+    assert.are.equal("tab-active", first.fill:GetAtlas())
+    assert.are.equal("tab", second.fill:GetAtlas())
+    assert.are.same({ "BOTTOM", first.frame, "BOTTOM", 0, 6 }, { first.label:GetPoint(1) })
+    assert.are.same({ "BOTTOM", second.frame, "BOTTOM", 0, 4 }, { second.label:GetPoint(1) })
+    second.frame:GetScript("OnEnter")(second.frame)
+    assert.are.equal("tab-over", second.fill:GetAtlas())
+    second.frame:GetScript("OnLeave")(second.frame)
+    assert.are.equal("tab", second.fill:GetAtlas())
+    UseNextTheme(nil)
+    tabs:Style()
+    assert.is_false(first.fill:IsShown(), "no art for a theme without")
+    assert.are.equal(#"Layout" * 6, first.frame:GetWidth())
+  end)
+
   it("selects a tab on a click, gliding its marker there, and says which", function()
     local tabs = make()
     tabs.tabs[2].frame:GetScript("OnClick")(tabs.tabs[2].frame, "LeftButton")
@@ -160,6 +199,84 @@ describe("NextTopTabs", function()
     assert.are.equal(style:Font("TopTabHover"), tabs.tabs[3].label:GetFontObject())
     tabs.tabs[3].frame:GetScript("OnLeave")(tabs.tabs[3].frame)
     assert.are.equal(style:Font("TopTab"), tabs.tabs[3].label:GetFontObject())
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md, round three; asked: "a line across the bottom of them edge to edge
+  -- probably, so it looks like a tab sitting on top of a pane"): the line reaches past the row of tabs (Outset: the
+  -- content column's edges), and stops under the chosen tab (Open), which then opens onto the page below it.
+  describe("its line", function()
+    local function line()
+      return { Color = "White", Alpha = 0.3, Size = 1, Open = true, Outset = { Left = 32, Right = 26 } }
+    end
+
+    after_each(function()
+      UseNextTheme(nil)
+    end)
+
+    it("reaches past its tabs by Outset on either side", function()
+      UseNextTheme({ Controls = { TopTabs = { Line = { Color = "White", Size = 1, Outset = { Left = 32, Right = 26 } } } } })
+      local tabs = make()
+      assert.are.same({ "BOTTOMLEFT", tabs.frame, "BOTTOMLEFT", -32, 0 }, { tabs.line:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMRIGHT", 26, 0 }, { tabs.line:GetPoint(2) })
+      assert.is_false(tabs.lineRight:IsShown(), "one line while it does not open")
+    end)
+
+    it("stops under the chosen tab, keeping its sides on the line, and the gap glides with the tab chosen", function()
+      UseNextTheme({ Controls = { TopTabs = { Gap = 5, Line = line() } } })
+      local tabs = make()
+      -- Layout is 36 wide at 0: the line runs to its left side, and on from its right side.
+      assert.are.same({ "BOTTOMLEFT", tabs.frame, "BOTTOMLEFT", -32, 0 }, { tabs.line:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMLEFT", 1, 0 }, { tabs.line:GetPoint(2) })
+      assert.is_true(tabs.lineRight:IsShown())
+      assert.are.same({ "BOTTOMLEFT", tabs.frame, "BOTTOMLEFT", 35, 0 }, { tabs.lineRight:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMRIGHT", 26, 0 }, { tabs.lineRight:GetPoint(2) })
+      assert.are.equal(0.3, alphaOf(tabs.lineRight))
+      tabs.tabs[2].frame:GetScript("OnClick")(tabs.tabs[2].frame, "LeftButton")
+      tween:Step(1)
+      -- Items is 30 wide at 41.
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMLEFT", 42, 0 }, { tabs.line:GetPoint(2) })
+      assert.are.same({ "BOTTOMLEFT", tabs.frame, "BOTTOMLEFT", 70, 0 }, { tabs.lineRight:GetPoint(1) })
+      UseNextTheme(nil)
+      tabs:Style()
+      assert.is_false(tabs.lineRight:IsShown(), "closed again for a theme whose line does not open")
+      assert.are.same({ "BOTTOMRIGHT", tabs.frame, "BOTTOMRIGHT", 0, 0 }, { tabs.line:GetPoint(2) })
+    end)
+  end)
+
+  -- Asked: "tabs at the top run off if too long." Tabs too wide for their row give up half their padding, then half
+  -- their gaps, then cut their names short, the longest first.
+  describe("tabs that do not fit their row", function()
+    after_each(function()
+      UseNextTheme(nil)
+    end)
+
+    it("give up padding first", function()
+      UseNextTheme({ Controls = { TopTabs = { Padding = 20, Gap = 5 } } })
+      local tabs = make()
+      assert.are.equal(36 + 40, tabs.tabs[1].frame:GetWidth(), "room enough while it has no width")
+      tabs.frame:SetWidth(216)
+      tabs:Fit()
+      -- 126 of text and 10 of gaps leave 80 for six paddings: 13 each.
+      assert.are.same({ 36 + 26, 30 + 26, 60 + 26 }, { tabs.tabs[1].frame:GetWidth(), tabs.tabs[2].frame:GetWidth(),
+        tabs.tabs[3].frame:GetWidth() })
+    end)
+
+    it("then their gaps, then cut their names, the longest first", function()
+      UseNextTheme({ Controls = { TopTabs = { Padding = 20, Gap = 5 } } })
+      local tabs = make()
+      tabs.frame:SetWidth(170)
+      tabs:Fit()
+      -- Padding 10, gaps 2: 106 for names of 36, 30 and 60: Categories is cut to 40.
+      assert.are.same({ "BOTTOMLEFT", tabs.tabs[1].frame, "BOTTOMRIGHT", 2, 0 }, { tabs.tabs[2].frame:GetPoint(1) })
+      assert.are.same({ 36 + 20, 30 + 20, 40 + 20 }, { tabs.tabs[1].frame:GetWidth(), tabs.tabs[2].frame:GetWidth(),
+        tabs.tabs[3].frame:GetWidth() })
+      assert.are.equal(40, tabs.tabs[3].label:GetWidth())
+      assert.is_false(tabs.tabs[3].label:CanWordWrap())
+      tabs.frame:SetWidth(600)
+      tabs:Fit()
+      assert.are.equal(60 + 40, tabs.tabs[3].frame:GetWidth(), "whole again with room")
+      assert.are.equal(0, tabs.tabs[3].label:GetWidth(), "its name its whole width again")
+    end)
   end)
 
   it("hides the tabs it no longer has", function()
@@ -222,6 +339,46 @@ describe("NextDialog", function()
     assert.are.equal(style:Font("DialogText"), d.text:GetFontObject())
     assert.are.equal(D.Width - 2 * D.Pad, d.text:GetWidth())
     assert.is_false(d.input.frame:IsShown())
+  end)
+
+  -- The Plain theme (docs/next-plain-theme.md): StaticPopup's look, Blizzard's Dialog nine-slice round the card over
+  -- UI-DialogBox-Background tiled, 7 in (DialogBorderTemplate).
+  it("draws its theme's frame round its card, its fill inset into it", function()
+    ResetMockAtlases()
+    MockAtlas("UI-Frame-DiamondMetal-CornerTopLeft", 32, 32)
+    UseNextTheme({ Controls = { Dialog = { Frame = { Layout = "Dialog" },
+      Card = { Texture = "Interface\\DialogFrame\\UI-DialogBox-Background", HorizTile = true, VertTile = true, Color = "White",
+        Alpha = 1, Inset = { Left = 7, Right = 7, Top = 7, Bottom = 7 } } } } })
+    local d = show()
+    local corner = d.frameArt.pieces.TopLeftCorner
+    assert.are.equal("UI-Frame-DiamondMetal-CornerTopLeft", corner:GetAtlas())
+    assert.are.same({ "TOPLEFT", d.card, "TOPLEFT", 0, 0 }, { corner:GetPoint(1) })
+    assert.are.same({ "TOPLEFT", d.card, "TOPLEFT", 7, -7 }, { d.cardFill:GetPoint(1) })
+    assert.is_true(d.cardFill:GetVertTile())
+    UseNextTheme(nil)
+    nextDialog:ApplyStyle()
+    assert.is_false(corner:IsShown())
+    ResetMockAtlases()
+  end)
+
+  -- Today's popup (GameDialogBaseMixin:OnLoad, GameDialog.lua): the diamond border atlas over the whole popup, the dark
+  -- background 7 in under it.
+  it("draws its theme's border over its card's fill", function()
+    UseNextTheme({ Controls = { Dialog = {
+      Card = { Atlas = "UI-DialogBox-Background-Dark", Color = "White", Alpha = 1, Inset = { Left = 7, Right = 7, Top = 7, Bottom = 7 } },
+      Border = { Atlas = "UI-DiamondDialogBox-Border", Color = "White", Alpha = 1 } } } })
+    local d = show()
+    assert.are.equal("UI-DiamondDialogBox-Border", d.cardBorder:GetAtlas())
+    assert.is_true(d.cardBorder:IsShown())
+    assert.are.same({ "TOPLEFT", d.card, "TOPLEFT", 0, 0 }, { d.cardBorder:GetPoint(1) })
+    assert.are.same({ "BOTTOMRIGHT", d.card, "BOTTOMRIGHT", 0, 0 }, { d.cardBorder:GetPoint(2) })
+    local fillLayer, fillLevel = d.cardFill:GetDrawLayer()
+    local borderLayer, borderLevel = d.cardBorder:GetDrawLayer()
+    assert.are.equal(fillLayer, borderLayer)
+    assert.is_true(borderLevel > fillLevel, "over the fill")
+    UseNextTheme(nil)
+    nextDialog:ApplyStyle()
+    assert.is_false(d.cardBorder:IsShown())
   end)
 
   it("lays its buttons out from the right, in the order given, and closes after one is clicked", function()

@@ -238,6 +238,103 @@ describe("NextOrnaments", function()
     end)
   end)
 
+  -- The Plain theme (docs/next-plain-theme.md): the retail bag window's portrait, its art round
+  -- (PortraitFrameBaseTemplate's CircleMask, TempPortraitAlphaMask, 2, 0, 2 and 4 in), the bag's icon or the NPC
+  -- (SetPortraitToUnit("npc")), never flipped.
+  describe("portraits", function()
+    local MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+    local BAG = "Interface\\Icons\\Inv_misc_bag_08"
+
+    after_each(function()
+      MockUnits.npc = nil
+    end)
+
+    -- Classic's title band (_UI-Frame-TitleTileBg: Interface\FrameGeneral\_UI-Frame, a 17-pixel strip of it, tiled
+    -- across): a span tiled along it, cropped across it by its TexCoords.
+    it("tiles a span along it and crops it across by its TexCoords", function()
+      theme({ { Texture = "Interface\\FrameGeneral\\_UI-Frame", TexCoords = { 0, 1, 0.2890625, 0.421875 }, Point = "TOP",
+        Height = 17, Tile = 256 } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      local ulx, uly, _, lly, urx = t:GetTexCoord()
+      assert.are.same({ 0, 0.2890625, 0.421875 }, { ulx, uly, lly })
+      assert.is_true(near(panel.body:GetWidth() / 256, urx), "repeats every 256 across")
+    end)
+
+    it("draws an atlas, flipped on a mirrored panel unless told not to", function()
+      theme({ { Atlas = "spec-corner", Point = "TOPINNER", Width = 20, Height = 20 },
+        { Atlas = "spec-corner", Point = "TOPOUTER", Width = 20, Height = 20, Mirror = false } })
+      local panel = panelOn("LEFT")
+      panel.ornaments:Style()
+      local t, kept = texture(panel, 1), texture(panel, 2)
+      assert.are.equal("spec-corner", t:GetAtlas())
+      local ulx, _, _, _, urx = t:GetTexCoord()
+      assert.are.same({ 1, 0 }, { ulx, urx })
+      ulx, _, _, _, urx = kept:GetTexCoord()
+      assert.are.same({ 0, 1 }, { ulx, urx }, "Mirror = false")
+      local point, rel, relPoint = kept:GetPoint(1)
+      assert.are.same({ "TOPLEFT", panel.body, "TOPLEFT" }, { point, rel, relPoint }, "placed mirrored all the same")
+    end)
+
+    it("cuts a piece round by its mask, inset into it and mirrored with the panel, and stops when it has none", function()
+      theme({ { Texture = BAG, Point = "TOPINNER", Width = 36, Height = 36,
+        Mask = { Texture = MASK, Inset = { Left = 2, Right = 3, Top = 0, Bottom = 4 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      assert.are.equal(1, t:GetNumMaskTextures())
+      local mask = t:GetMaskTexture(1)
+      assert.are.equal(MASK, mask:GetTexture())
+      assert.are.same({ { "TOPLEFT", t, "TOPLEFT", pixel:Snap(t, 2), 0 }, { "BOTTOMRIGHT", t, "BOTTOMRIGHT", -pixel:Snap(t, 3), pixel:Snap(t, 4) } },
+        points(mask))
+      local mirrored = panelOn("LEFT")
+      mirrored.ornaments:Style()
+      local m = texture(mirrored, 1):GetMaskTexture(1)
+      assert.are.same({ "TOPLEFT", texture(mirrored, 1), "TOPLEFT", pixel:Snap(t, 3), 0 }, { m:GetPoint(1) }, "its sides swapped")
+      theme({ { Texture = BAG, Point = "TOPINNER", Width = 36, Height = 36 } })
+      panel.ornaments:Style()
+      assert.are.equal(0, t:GetNumMaskTextures())
+    end)
+
+    -- The original bags' menu button (frames/menubutton.lua) is over their border and their search box (strata HIGH): a
+    -- piece that says Above is drawn on the panel's overlay, over the content and a frame drawn above it; its mask with it.
+    it("draws a piece that says Above on the panel's overlay, its mask with it, and back on the frame without", function()
+      theme({ { Texture = BAG, Point = "TOPINNER", Width = 48, Height = 60, Above = true, Layer = "OVERLAY", SubLevel = 7,
+        Mask = { Texture = MASK } } })
+      local panel = panelOn("RIGHT")
+      panel.overlay = CreateFrame("Frame", nil, panel.frame)
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      assert.are.equal(panel.overlay, t:GetParent())
+      assert.are.equal(panel.overlay, t:GetMaskTexture(1):GetParent())
+      assert.are.same({ "OVERLAY", 7 }, { t:GetDrawLayer() })
+      assert.is_true(t:IsShown())
+      theme({ { Texture = BAG, Point = "TOPINNER", Width = 48, Height = 60 } })
+      panel.ornaments:Style()
+      assert.is_false(t:IsShown(), "the one above hidden")
+      assert.are.equal(panel.frame, texture(panel, 1):GetParent())
+      assert.is_true(texture(panel, 1):IsShown())
+      theme({ { Texture = BAG, Point = "TOPINNER", Width = 48, Height = 60, Above = true } })
+      panel.ornaments:Style()
+      assert.are.equal(t, texture(panel, 1), "the same texture above again")
+    end)
+
+    it("draws a unit's portrait while there is one, its own art otherwise, as the panel shows", function()
+      theme({ { Texture = BAG, Point = "TOPINNER", Width = 36, Height = 36, Unit = "npc" } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      assert.are.equal(BAG, t:GetTexture(), "no NPC")
+      MockUnits.npc = true
+      panel.ornaments:Start()
+      assert.are.equal("npc", t._portraitUnit)
+      MockUnits.npc = nil
+      panel.ornaments:Start()
+      assert.are.equal(BAG, t:GetTexture(), "gone again")
+    end)
+  end)
+
   describe("restyling", function()
     it("hides pieces a new theme no longer has, and every piece for a theme without ornaments", function()
       theme({

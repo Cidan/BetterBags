@@ -33,7 +33,7 @@ local sonata = StubBetterBagsModule("Sonata")
 local debugModule = StubBetterBagsModule("Debug")
 debugModule.Log = debugModule.Log or function() end
 for _, m in ipairs({ { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle", "next/style.lua" },
-  { "NextTween", "next/tween.lua" }, { "NextControls", "next/controls/base.lua" },
+  { "NextTween", "next/tween.lua" }, { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" },
   { "NextScrollBar", "next/controls/scrollbar.lua" }, { "NextButton", "next/controls/button.lua" },
   { "NextToggle", "next/controls/toggle.lua" }, { "NextInput", "next/controls/input.lua" },
   { "NextSlider", "next/controls/slider.lua" }, { "NextMenu", "next/controls/menu.lua" },

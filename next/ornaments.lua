@@ -33,6 +33,9 @@ local MIRRORED = {
   TOPLEFT = "TOPRIGHT", TOPRIGHT = "TOPLEFT", BOTTOMLEFT = "BOTTOMRIGHT", BOTTOMRIGHT = "BOTTOMLEFT",
   LEFT = "RIGHT", RIGHT = "LEFT", TOP = "TOP", BOTTOM = "BOTTOM", CENTER = "CENTER",
 }
+-- The corners by their sides, and their mirror images, for what else is placed as a corner piece is (NextMenuButton).
+ornaments.CORNERS = CORNERS
+ornaments.MIRRORED = MIRRORED
 -- The values a theme may give, for SonataNext:Check.
 ornaments.POINTS = { INNER = true, OUTER = true, TOP = true, BOTTOM = true, TOPINNER = true, TOPOUTER = true,
   BOTTOMINNER = true, BOTTOMOUTER = true }
@@ -44,7 +47,10 @@ ornaments.PANELS = { Backpack = "BACKPACK", Bank = "BANK", Vendor = "UNDEFINED",
 ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period = true, Delay = true, Origin = true }
 
 ---@class (exact) NextOrnamentPiece
----@field texture Texture
+---@field texture Texture Its texture on the frame it is drawn on.
+---@field host Frame The frame it is drawn on: the panel's, or its overlay for a piece that says Above.
+---@field hosts table<Frame, table> Its texture, mask and motions on each frame it has been drawn on.
+---@field mask? MaskTexture What cuts its art (Mask), made the first time one does.
 ---@field spec table The theme's entry it draws.
 ---@field shown boolean Shown at the panel's size.
 ---@field groups? table<string, AnimationGroup> Its motions' groups, made the first time it moves.
@@ -83,10 +89,11 @@ function setProto:Style()
   for i, spec in ipairs(list) do
     local piece = self.pieces[i]
     if piece == nil then
-      piece = { texture = self.panel.frame:CreateTexture(nil, "ARTWORK"), shown = false, phase = 0 }
+      piece = { shown = false, phase = 0, hosts = {} }
       self.pieces[i] = piece
     end
     piece.spec = spec
+    self:onHost(piece, spec.Above and self:overlay() or self.panel.frame)
     self:paint(piece)
     self:move(piece)
   end
@@ -102,6 +109,39 @@ function setProto:Style()
   end
 end
 
+-- overlay returns the panel's frame over its content (next/panel.lua), for pieces that say Above.
+---@private
+---@return Frame
+function setProto:overlay()
+  if self.panel.overlay == nil then
+    error("this panel has no overlay to draw an ornament above its content on")
+  end
+  return self.panel.overlay
+end
+
+-- onHost puts a piece on host: the panel's frame, or its overlay for a piece that says Above (the original bags' menu
+-- button, over their border and search box). A piece keeps its texture, mask and motions on each frame it has been on,
+-- and hides the one it leaves.
+---@private
+---@param piece NextOrnamentPiece
+---@param host Frame
+function setProto:onHost(piece, host)
+  if piece.host == host then
+    return
+  end
+  local old = piece.host and piece.hosts[piece.host]
+  if old ~= nil then
+    old.mask, old.groups = piece.mask, piece.groups
+    piece.texture:Hide()
+  end
+  local own = piece.hosts[host]
+  if own == nil then
+    own = { texture = host:CreateTexture(nil, "ARTWORK") }
+    piece.hosts[host] = own
+  end
+  piece.host, piece.texture, piece.mask, piece.groups = host, own.texture, own.mask, own.groups
+end
+
 -- Mirrored says whether the panel's inner side is on the right: it belongs to the left of the screen.
 ---@return boolean
 function setProto:Mirrored()
@@ -109,20 +149,88 @@ function setProto:Mirrored()
 end
 
 -- paint draws a piece's art: its file (a Textures name), loaded repeating along a span with a Tile and smooth
--- (TRILINEAR: art drawn smaller than it is), in its color and alpha, blend mode and layer.
+-- (TRILINEAR: art drawn smaller than it is), or its Atlas; or a unit's portrait (Unit) while there is one; in its
+-- color and alpha, blend mode and layer, cut by its Mask.
 ---@private
 ---@param piece NextOrnamentPiece
 function setProto:paint(piece)
   local o, t = piece.spec, piece.texture
-  local tiled = o.Tile ~= nil
-  local across = o.Point == "TOP" or o.Point == "BOTTOM"
-  t:SetTexture(style:TexturePath(o.Texture), (tiled and across) and "REPEAT" or nil,
-    (tiled and not across) and "REPEAT" or nil, "TRILINEAR")
+  self:art(piece)
   local r, g, b, a = style:RGBA(o.Color or "White", o.Alpha)
   t:SetVertexColor(r, g, b, a)
   t:SetBlendMode(o.BlendMode or "BLEND")
   t:SetDesaturated(o.Desaturated == true)
   t:SetDrawLayer(o.Layer or "ARTWORK", o.SubLevel or 0)
+  self:cut(piece)
+end
+
+-- DrawArt draws a piece's picture on a texture: the portrait of its Unit while the client has that unit
+-- (SetPortraitTexture, as Blizzard's windows show the NPC they belong to: SetPortraitToUnit("npc")), else its Atlas or
+-- its file (repeating along a span with a Tile), else nothing.
+---@param t Texture
+---@param o table
+function ornaments:DrawArt(t, o)
+  if o.Unit ~= nil and UnitExists(o.Unit) then
+    SetPortraitTexture(t, o.Unit)
+  elseif o.Atlas ~= nil then
+    t:SetAtlas(o.Atlas)
+  elseif o.Texture ~= nil then
+    local tiled = o.Tile ~= nil
+    local across = o.Point == "TOP" or o.Point == "BOTTOM"
+    t:SetTexture(style:TexturePath(o.Texture), (tiled and across) and "REPEAT" or nil,
+      (tiled and not across) and "REPEAT" or nil, "TRILINEAR")
+  else
+    t:SetTexture(nil)
+  end
+end
+
+-- Cut masks a texture's art with M (Texture: a mask file, such as Blizzard's round portrait mask; Inset: Left, Right,
+-- Top, Bottom into it, mirrored when asked), the mask made on host the first time (mask, when it has one), or takes
+-- the mask off for no M. Returns the texture's mask.
+---@param t Texture
+---@param M? table|false
+---@param host Frame
+---@param mask? MaskTexture
+---@param mirrored? boolean
+---@return MaskTexture?
+function ornaments:Cut(t, M, host, mask, mirrored)
+  if not M then
+    if mask ~= nil then
+      t:RemoveMaskTexture(mask)
+      mask:Hide()
+    end
+    return mask
+  end
+  if mask == nil then
+    -- On the texture's own frame.
+    mask = host:CreateMaskTexture()
+  end
+  mask:SetTexture(style:TexturePath(M.Texture), "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+  local inset = M.Inset or {}
+  local left, right = inset.Left or 0, inset.Right or 0
+  if mirrored then
+    left, right = right, left
+  end
+  mask:ClearAllPoints()
+  mask:SetPoint("TOPLEFT", t, "TOPLEFT", pixel:Snap(t, left), -pixel:Snap(t, inset.Top or 0))
+  mask:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", -pixel:Snap(t, right), pixel:Snap(t, inset.Bottom or 0))
+  mask:Show()
+  t:AddMaskTexture(mask)
+  return mask
+end
+
+-- art draws a piece's picture (DrawArt).
+---@private
+---@param piece NextOrnamentPiece
+function setProto:art(piece)
+  ornaments:DrawArt(piece.texture, piece.spec)
+end
+
+-- cut masks a piece's art with its Mask, mirrored with the panel, or takes the mask off a piece that has none now (Cut).
+---@private
+---@param piece NextOrnamentPiece
+function setProto:cut(piece)
+  piece.mask = ornaments:Cut(piece.texture, piece.spec.Mask, piece.host, piece.mask, self:Mirrored())
 end
 
 -- OnPanel says whether a piece is for this panel: every panel, or those its Panels names.
@@ -216,20 +324,22 @@ function setProto:Tile()
   for i = 1, self.count do
     local piece = self.pieces[i]
     local o, t = piece.spec, piece.texture
-    local left, right = 0, 1
-    if self.mirrored then
-      left, right = 1, 0
-    end
+    -- A tiled span's TexCoords crop it across (its strip of the file: Classic's title band, _UI-Frame-TitleTileBg).
+    local c = o.TexCoords or { 0, 1, 0, 1 }
     if o.Tile ~= nil and (o.Point == "INNER" or o.Point == "OUTER") then
       local length = body:GetHeight() - pixel:Snap(t, o.Start or 0) - pixel:Snap(t, o.End or 0)
-      t:SetTexCoord(left, right, 0, math.max(0, length) / o.Tile)
+      if self.mirrored then
+        t:SetTexCoord(c[2], c[1], 0, math.max(0, length) / o.Tile)
+      else
+        t:SetTexCoord(c[1], c[2], 0, math.max(0, length) / o.Tile)
+      end
     elseif o.Tile ~= nil then
       local length = body:GetWidth() - pixel:Snap(t, o.Start or 0) - pixel:Snap(t, o.End or 0)
       local reach = math.max(0, length) / o.Tile
-      t:SetTexCoord(self.mirrored and reach or 0, self.mirrored and 0 or reach, 0, 1)
+      t:SetTexCoord(self.mirrored and reach or 0, self.mirrored and 0 or reach, c[3], c[4])
     else
-      local c = o.TexCoords or { 0, 1, 0, 1 }
-      if self.mirrored then
+      -- Mirror = false: art that must not be flipped (a portrait, an icon), placed mirrored all the same.
+      if self.mirrored and o.Mirror ~= false then
         t:SetTexCoord(c[2], c[1], c[3], c[4])
       else
         t:SetTexCoord(c[1], c[2], c[3], c[4])
@@ -351,15 +461,20 @@ function setProto:play(piece)
   end
 end
 
--- Start plays the motion of every piece shown at the panel's size; one a size switch shows later moves at once.
+-- Start plays the motion of every piece shown at the panel's size; one a size switch shows later moves at once. As
+-- the panel shows, a unit's portrait is drawn again: the NPC it belongs to may be another one, or none.
 function setProto:Start()
   self.running = true
   for i = 1, self.count do
     local piece = self.pieces[i]
+    if piece.spec.Unit ~= nil then
+      self:art(piece)
+    end
     if piece.shown then
       self:play(piece)
     end
   end
+  self:Tile()
 end
 
 ---@private

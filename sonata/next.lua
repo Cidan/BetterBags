@@ -58,6 +58,9 @@ local BASE = "Default"
 -- with the panel, as ornaments' are).
 local CORNERS = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true, TOPINNER = true, TOPOUTER = true,
   BOTTOMINNER = true, BOTTOMOUTER = true }
+-- The corners a bag button may name (Header.Buttons.Menu, next/menubutton.lua): by their side, as ornaments' corner
+-- pieces.
+local MENU_CORNERS = { TOPINNER = true, TOPOUTER = true, BOTTOMINNER = true, BOTTOMOUTER = true }
 -- The styles a switch is drawn in (Controls.Toggle.Style, next/controls/toggle.lua).
 local TOGGLE_STYLES = { Square = true, Round = true, Check = true }
 
@@ -396,10 +399,15 @@ local FONT_KEYS = {
   HelpFont = true, TextFont = true, EmptyFont = true, MoneyFont = true, HintFont = true, WarningFont = true,
   PriceFont = true, UnaffordableFont = true, StackFont = true, NameFont = true, HoverFont = true,
   DescriptionFont = true, NoteFont = true, LabelFont = true, LinkFont = true, GroupFont = true,
-  ActiveFont = true, PreviewFont = true, UnavailableFont = true,
+  ActiveFont = true, PreviewFont = true, UnavailableFont = true, DisabledFont = true,
 }
 -- Keys whose value names one of the theme's Textures, or is a file (a path or a file ID).
 local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true, Icon = true, HoverIcon = true }
+-- The pieces of a nine-slice frame (Frame, next-themes.md §15): Blizzard's names (Blizzard_SharedXML/NineSlice.lua).
+local FRAME_PIECES = {
+  TopLeftCorner = true, TopRightCorner = true, BottomLeftCorner = true, BottomRightCorner = true, TopEdge = true,
+  BottomEdge = true, LeftEdge = true, RightEdge = true, Center = true,
+}
 -- Parts that are not Next's widgets' specs: checked elsewhere or not at all.
 local UNCHECKED = { Palette = true, Variables = true, Textures = true, ItemButton = true }
 
@@ -411,14 +419,40 @@ function sonataNext:Check(key)
   local theme = self:Resolve(key)
   local problems = {}
   local palette, fonts, textures = theme.Palette or {}, theme.Fonts or {}, theme.Textures or {}
+  -- A palette color naming one of the client's named colors (NextStyle: Color.lua makes each a global ColorMixin).
+  for name, value in pairs(palette) do
+    if type(value) == "table" and value.Global ~= nil then
+      local color = _G[value.Global]
+      if type(color) ~= "table" or color.GetRGBA == nil then
+        table.insert(problems, "Palette." .. tostring(name) .. ".Global: no client color named " .. tostring(value.Global))
+      end
+    end
+  end
   local function color(value, path)
     if type(value) == "string" and palette[value] == nil then
       table.insert(problems, path .. ": no color named " .. value)
     end
   end
   local walk
+  -- A frame draws one of the client's layouts (NineSliceUtil, when the client has it) or its own pieces.
+  local function frame(v, here)
+    if v.Layout == nil and v.Pieces == nil then
+      table.insert(problems, here .. ": a Layout or Pieces")
+    end
+    if v.Layout ~= nil and NineSliceUtil ~= nil and NineSliceUtil.GetLayout(v.Layout) == nil then
+      table.insert(problems, here .. ".Layout: the client has no nine-slice layout named " .. tostring(v.Layout))
+    end
+    for name in pairs(type(v.Pieces) == "table" and v.Pieces or {}) do
+      if not FRAME_PIECES[name] then
+        table.insert(problems, here .. ".Pieces." .. tostring(name) .. ": no piece named " .. tostring(name))
+      end
+    end
+  end
   local function check(k, v, here)
-    if COLOR_MAPS[k] and type(v) == "table" then
+    if k == "Frame" and type(v) == "table" then
+      frame(v, here)
+      walk(v, here)
+    elseif COLOR_MAPS[k] and type(v) == "table" then
       for name, value in pairs(v) do
         color(value, here .. "." .. tostring(name))
       end
@@ -469,10 +503,17 @@ function sonataNext:Check(key)
       if o.Sizes ~= nil and not ornaments.SIZES[o.Sizes] then
         problem("Sizes", "no size named " .. tostring(o.Sizes))
       end
+      if o.Texture == nil and o.Atlas == nil then
+        problem("Texture", "a Texture or an Atlas")
+      end
+      if o.Atlas ~= nil and o.Tile ~= nil then
+        problem("Atlas", "not with Tile")
+      end
+      if type(o.Mask) == "table" and o.Mask.Texture == nil then
+        problem("Mask.Texture", "a mask needs one")
+      end
       if o.TexCoords ~= nil then
-        if o.Tile ~= nil then
-          problem("TexCoords", "not with Tile")
-        elseif type(o.TexCoords) ~= "table" or #o.TexCoords ~= 4 then
+        if type(o.TexCoords) ~= "table" or #o.TexCoords ~= 4 then
           problem("TexCoords", "four numbers, left, right, top and bottom")
         end
       end
@@ -515,6 +556,37 @@ function sonataNext:Check(key)
     for _, field in ipairs({ "Width", "Top" }) do
       if type(rail[field]) ~= "number" then
         table.insert(problems, "Header.Buttons.Rail." .. field .. ": a side rail needs one")
+      end
+    end
+  end
+  -- A bag button holding the header's row (Header.Buttons.Menu, next-themes.md §19): a corner of the body by its side,
+  -- its size, art in each layer (a file, an atlas, a unit's portrait, a color), the panels it names.
+  local menu = buttons and buttons.Menu
+  if type(menu) == "table" then
+    local where = "Header.Buttons.Menu."
+    for _, field in ipairs({ "Point", "Anchor" }) do
+      if (field == "Point" or menu[field] ~= nil) and not MENU_CORNERS[menu[field]] then
+        table.insert(problems, where .. field .. ": no corner named " .. tostring(menu[field]))
+      end
+    end
+    for _, field in ipairs({ "Width", "Height" }) do
+      if type(menu[field]) ~= "number" then
+        table.insert(problems, where .. field .. ": a bag button needs one")
+      end
+    end
+    local function layers(path, given)
+      for i, layer in ipairs(type(given) == "table" and given or {}) do
+        if layer.Texture == nil and layer.Atlas == nil and layer.Unit == nil and layer.Color == nil then
+          table.insert(problems, path .. "Layers[" .. i .. "]: draws nothing")
+        end
+      end
+    end
+    layers(where, menu.Layers)
+    for name, own in pairs(type(menu.Panels) == "table" and menu.Panels or {}) do
+      if ornaments ~= nil and ornaments.PANELS[name] == nil then
+        table.insert(problems, where .. "Panels." .. tostring(name) .. ": no panel named " .. tostring(name))
+      elseif type(own) == "table" then
+        layers(where .. "Panels." .. tostring(name) .. ".", own.Layers)
       end
     end
   end

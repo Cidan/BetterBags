@@ -131,6 +131,10 @@ description below is the backpack's (the right side); the bank is its mirror ima
 vendor's own button and icon, hiding the backpack), settings, sort, Show Blizzard Bags (below), size
 (§14).
 
+**A theme can hold the header's buttons in a bag button's menu** (next-themes.md §19; the Plain theme): every button
+not pinned leaves the header for the original bags' drop-down on a button at a corner of the body (the vendor's
+portrait on the vendor), and the title is centered between that button and the close.
+
 **Above the rest of the UI** (asked: "they need to be the top most frames ... so other UI elements
 can't overlap"): every panel is in the `HIGH` strata (was `MEDIUM`), toplevel, level 500. That puts
 it over unit and action bars, the objective tracker (`LOW`), Blizzard's character frame and other

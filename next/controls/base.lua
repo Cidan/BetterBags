@@ -9,6 +9,9 @@ local style = addon:GetModule('NextStyle')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
 -- NextControls is what every BetterBags Next control draws with (next-settings.md §2): fills and
 -- edges read from the Next theme's Controls. A control is BetterBags' own, made of plain frames and
 -- textures, and restyled on every theme.
@@ -39,11 +42,17 @@ end
 
 -- Paint draws a fill on a texture and shows it: a texture spec (Color and Alpha; or a Texture or
 -- Atlas tinted by Color, NextStyle:Paint), a palette color, or a color. alpha, when given, replaces
--- the fill's. False or nil hides the texture.
+-- the fill's. False or nil hides the texture. A texture wrapped as a NextFill is drawn by its fill: inset
+-- or past its region, or in three pieces (next-themes.md §16).
 ---@param texture Texture
 ---@param fill? string|number[]|table|false
 ---@param alpha? number
 function controls:Paint(texture, fill, alpha)
+  local wrapped = fills:Of(texture)
+  if wrapped ~= nil then
+    wrapped:Paint(fill and specOf(fill), alpha)
+    return
+  end
   if not fill then
     texture:Hide()
     return

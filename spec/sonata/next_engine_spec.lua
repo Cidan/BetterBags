@@ -434,22 +434,42 @@ describe("SonataNext", function()
         Fonts = { Title = { Color = "AlsoNope" } },
         Dock = { DestroyColor = "Blood", BuyColor = "Moss" },
         Settings = { Header = { Close = { HoverIcon = "NoHover" } } },
+        Controls = { Button = { Plain = { DisabledFont = "NoGray" } } },
+        Palette = { Client = { Global = "NO_SUCH_COLOR" }, Fine = { Global = "PANEL_BACKGROUND_COLOR" } },
       })
       local problems = sonataNext:Check("Broken")
       table.sort(problems)
       assert.are.same({
+        "Controls.Button.Plain.DisabledFont: no font named NoGray",
         "Dock.BuyColor: no color named Moss",
         "Dock.DestroyColor: no color named Blood",
         "Fonts.Title.Color: no color named AlsoNope",
         "Header.Buttons.ArtColor: no color named Pale",
         "Header.Cloud.Texture: no texture named NoArt",
         "Motion.Ease.Open: no ease named wobbly",
+        "Palette.Client.Global: no client color named NO_SUCH_COLOR",
         "Panel.Fill.Color: no color named Nope",
         "Sections.TitleFont: no font named Missing",
         "Settings.Header.Close.HoverIcon: no texture named NoHover",
         "Sparkles.Colors.2: no color named Ghost",
       }, problems)
     end)
+  end)
+
+  -- Frames (next-themes.md §15): a layout the client lacks, a piece no frame has, a frame with nothing to draw.
+  it("names what is wrong with a frame, by where it is", function()
+    sonataNext:RegisterTheme({ Name = "BadFrames",
+      Panel = { Frame = { Layout = "NoSuchLayout" } },
+      Settings = { Frame = { Pieces = { TopLeftCorner = { Atlas = "x" }, Middle = { Atlas = "y" } } } },
+      Controls = { Dialog = { Frame = { Alpha = 0.5 } }, Menu = { Frame = { Layout = "Dialog" } } },
+    })
+    local problems = sonataNext:Check("BadFrames")
+    table.sort(problems)
+    assert.are.same({
+      "Controls.Dialog.Frame: a Layout or Pieces",
+      "Panel.Frame.Layout: the client has no nine-slice layout named NoSuchLayout",
+      "Settings.Frame.Pieces.Middle: no piece named Middle",
+    }, problems)
   end)
 
   -- Ornaments (Panel.Ornaments, next-themes.md §12): a place, an anchor, a size or a motion no ornament has, a
@@ -474,11 +494,17 @@ describe("SonataNext", function()
       { Texture = "Glow", Point = "INNER", Width = 4, Tile = 8, TexCoords = { 0, 1, 0, 0.5 } },
       { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, TexCoords = { 0, 1 }, Panels = { "Bank", "Mailbox" } },
       { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Panels = "Bank" },
+      { Point = "TOPINNER", Width = 4, Height = 4 },
+      { Atlas = "spec-corner", Point = "INNER", Width = 4, Tile = 8 },
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Mask = { Inset = { Left = 2 } } },
     } } })
     local problems = sonataNext:Check("BadOrnaments")
     table.sort(problems)
     assert.are.same({
       "Panel.Ornaments.1.Point: no place named MIDDLE",
+      "Panel.Ornaments.10.Texture: a Texture or an Atlas",
+      "Panel.Ornaments.11.Atlas: not with Tile",
+      "Panel.Ornaments.12.Mask.Texture: a mask needs one",
       "Panel.Ornaments.2.Width: a span along a side needs one",
       "Panel.Ornaments.3.Height: a span along an edge needs one",
       "Panel.Ornaments.4.Anchor: no corner named CENTER",
@@ -486,7 +512,6 @@ describe("SonataNext", function()
       "Panel.Ornaments.5.Motion.Origin: no point named LEFTISH",
       "Panel.Ornaments.5.Motion.Wiggle: no motion named Wiggle",
       "Panel.Ornaments.5.Sizes: no size named Huge",
-      "Panel.Ornaments.7.TexCoords: not with Tile",
       "Panel.Ornaments.8.Panels: no panel named Mailbox",
       "Panel.Ornaments.8.TexCoords: four numbers, left, right, top and bottom",
       "Panel.Ornaments.9.Panels: a list of panels",
@@ -512,6 +537,34 @@ describe("SonataNext", function()
     assert.are.same({ "Header.Buttons.Pinned.closeButton.Point: no corner named MIDDLE" }, sonataNext:Check("BadPin"))
     sonataNext:RegisterTheme({ Name = "SidePin", Header = { Buttons = { Pinned = { closeButton = { Point = "TOPOUTER" } } } } })
     assert.are.same({}, sonataNext:Check("SidePin"))
+  end)
+
+  -- A bag button holding the header's row (Header.Buttons.Menu, next-themes.md §19; docs/next-plain-theme.md, round
+  -- three): a corner of the body named by its side, its size, art in each layer, the panels it names.
+  it("names what is wrong with a bag button, by where it is", function()
+    if addon:GetModule("NextOrnaments", true) == nil then
+      ResetModuleStub("NextOrnaments", "next/ornaments.lua")
+      LoadBetterBagsModule("next/ornaments.lua")
+    end
+    sonataNext:RegisterTheme({ Name = "BadMenu", Header = { Buttons = { Menu = { Point = "MIDDLE", Anchor = "CENTER",
+      Layers = { { Alpha = 1 }, { Texture = "Interface\\Spec\\bag.png" } }, Panels = { Shop = { Layers = {} } } } } } })
+    local problems = sonataNext:Check("BadMenu")
+    table.sort(problems)
+    assert.are.same({
+      "Header.Buttons.Menu.Anchor: no corner named CENTER",
+      "Header.Buttons.Menu.Height: a bag button needs one",
+      "Header.Buttons.Menu.Layers[1]: draws nothing",
+      "Header.Buttons.Menu.Panels.Shop: no panel named Shop",
+      "Header.Buttons.Menu.Point: no corner named MIDDLE",
+      "Header.Buttons.Menu.Width: a bag button needs one",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "GoodMenu", Header = { Buttons = { Menu = { Point = "TOPINNER", Width = 40, Height = 40,
+      Layers = { { Texture = "Interface\\Spec\\bag.png" }, { Unit = "npc" } },
+      Panels = { Vendor = { Layers = { { Atlas = "x" }, { Alpha = 1 } } } } } } } })
+    assert.are.same({ "Header.Buttons.Menu.Panels.Vendor.Layers[2]: draws nothing" }, sonataNext:Check("GoodMenu"),
+      "a panel's own layers too")
+    sonataNext:RegisterTheme({ Name = "NowhereMenu", Header = { Buttons = { Menu = { Width = 40, Height = 40 } } } })
+    assert.are.same({ "Header.Buttons.Menu.Point: no corner named nil" }, sonataNext:Check("NowhereMenu"))
   end)
 
   -- GW2_UI rewrites the client's fonts at PLAYER_LOGIN (docs/next-gw2-theme.md), after BetterBags copied some of

@@ -104,11 +104,12 @@ end
 function bankProto:GetHeaderButtons()
   local buttons = {
     { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
-    { key = "settingsButton", tooltip = L:G("Open Options Screen"),
+    { key = "settingsButton", tooltip = L:G("Open Options Screen"), menuLast = true,
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
   }
   if addon.isRetail then
     table.insert(buttons, { key = "bankTabsButton", tooltip = L:G("Switch between your groups and the bank's own tabs"),
+      label = L:G("Show Bank Tabs"), checked = function() return database:GetShowBankTabs() and true or false end,
       onClick = function(ctx) self:ToggleBankTabs(ctx) end })
   end
   if addon.hasWarbank then

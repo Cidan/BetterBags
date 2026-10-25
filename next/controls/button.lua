@@ -15,10 +15,14 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
 -- NextButton is BetterBags Next's button (next-settings.md §2), drawn from the theme
 -- (Controls.Button): Plain, Primary (the accent: Done, Apply), Danger (Delete) or Link (its text
 -- alone). Its fill and edge light up under the pointer and when pressed; disabled, it is drawn at
--- DisabledAlpha and does nothing.
+-- DisabledAlpha and does nothing. Its fill may be pieced (NextFill), and its style's Highlight is drawn over it
+-- under the pointer, as Blizzard's buttons draw theirs (UIPanelButtonNoTooltipTemplate).
 ---@class NextButton: AceModule
 ---@field all NextButtonFrame[]
 local nextButton = addon:NewModule('NextButton')
@@ -35,6 +39,7 @@ local nextButton = addon:NewModule('NextButton')
 ---@class NextButtonFrame
 ---@field frame Button
 ---@field fill Texture
+---@field highlight Texture Drawn over the fill under the pointer (its style's Highlight).
 ---@field edge NextEdge
 ---@field label FontString
 ---@field style NextButtonStyle
@@ -66,10 +71,15 @@ function nextButton:Create(parent, opts)
   frame:SetMotionScriptsWhileDisabled(true)
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints(frame)
+  fills:Wrap(fill, frame)
+  local highlight = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
+  highlight:SetAllPoints(frame)
+  highlight:Hide()
+  fills:Wrap(highlight, frame)
   local label = frame:CreateFontString(nil, "OVERLAY")
   ---@type NextButtonFrame
   local b = setmetatable({
-    frame = frame, fill = fill, edge = controls:CreateEdge(frame), label = label,
+    frame = frame, fill = fill, highlight = highlight, edge = controls:CreateEdge(frame), label = label,
     style = opts.style or "Plain", width = opts.width, hovered = false, pressed = false,
     onClick = opts.onClick, tooltip = opts.tooltip,
   }, { __index = buttonProto })
@@ -128,6 +138,16 @@ function buttonProto:Fit()
   pixel:Row(label, "TOPLEFT", frame, pixel:Middle(frame, frame:GetWidth(), text), frame:GetHeight())
 end
 
+-- SetStyle draws the button in another of its looks (Plain, Primary, Danger, Link): the settings window's What's New is a
+-- link, or a button in Blizzard's Apply button's place for a theme that says so.
+---@param name NextButtonStyle
+function buttonProto:SetStyle(name)
+  if self.style ~= name then
+    self.style = name
+    self:Style()
+  end
+end
+
 -- SetWidth gives the button a fixed width, or (nil) sizes it to its label again.
 ---@param width? number
 function buttonProto:SetWidth(width)
@@ -148,8 +168,11 @@ function buttonProto:Paint()
     fill = look.HoverFill
   end
   controls:Paint(self.fill, fill)
+  controls:Paint(self.highlight, lit and look.Highlight or false)
   controls:PaintEdge(self.edge, lit and look.HoverEdge or look.Edge)
-  style:SetFont(self.label, (lit and look.HoverFont) or look.Font)
+  -- Disabled: its style's DisabledFont (Blizzard's buttons: GameFontDisable).
+  local enabled = self.frame:IsEnabled()
+  style:SetFont(self.label, (not enabled and look.DisabledFont) or (lit and look.HoverFont) or look.Font)
   -- The hover font can be another size: centered again.
   self:Fit()
 end

@@ -291,7 +291,8 @@ sonataNext:RegisterTheme({
   -- The panel itself.
   Panel = {
     -- The body (a texture spec: Color, Texture, Atlas, TexCoords, HorizTile, VertTile, BlendMode,
-    -- Alpha, VertexColor, Gradient); Top (none here) starts it that far below the body's top.
+    -- Alpha, VertexColor, Gradient); Inset (none here: Left, Right, Top, Bottom, drawn for the backpack, mirrored on the
+    -- bank) insets it into the body.
     Fill = { Color = "Body" },
     -- The feathered edge beside the body: from Color's alpha at the body to nothing (Layout.Feather
     -- wide).
@@ -746,8 +747,11 @@ sonataNext:RegisterTheme({
       Edge = { Color = "Lavender", Size = 1, Idle = 0.25, Hover = 0.5, Focus = 0.9 },
       Font = "ControlText", HelpFont = "ControlHelp",
     },
+    -- A text area (NextInput:CreateArea): its box in the input's fill and edge; a theme may give it its own Fill,
+    -- FocusFill, Edge and Frame (Blizzard draws a multi-line edit box in a frame of its own, InputScrollFrameTemplate).
+    TextArea = {},
     -- A grid of item icons (next/controls/itemgrid.lua): cells Size square, Gap apart, Pad inside its
-    -- fill and edge (an input's); an item's quality on its cell's edge, Common and Poor items the
+    -- box (an input's fill and edge; a theme may give it its own Fill, Edge and Frame); an item's quality on its cell's edge, Common and Poor items the
     -- CommonEdge; an item showing in another category at DimAlpha; the light under the pointer; the
     -- count's font, and the text it shows when empty.
     ItemGrid = {

@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class NextStyle: AceModule
+local style = addon:GetModule('NextStyle')
+
 ---@class NextControls: AceModule
 local controls = addon:GetModule('NextControls')
 
@@ -14,6 +17,9 @@ local sonataNext = addon:GetModule('SonataNext')
 
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
+
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
 
 -- NextSlider is BetterBags Next's slider (next-settings.md §2), drawn from the theme
 -- (Controls.Slider): a track filled up to a thumb, pressed or dragged with the left button, and a
@@ -35,6 +41,7 @@ local nextSlider = addon:NewModule('NextSlider')
 ---@field frame Frame
 ---@field track Button The pressed and dragged area.
 ---@field bar Texture The empty track.
+---@field barFrame Frame Where the bar goes (its fill's region).
 ---@field fill Texture The track up to the thumb.
 ---@field thumb Texture
 ---@field value NextInputFrame
@@ -55,6 +62,21 @@ function nextSlider:ApplyStyle(ctx)
   end
 end
 
+-- thumbSize returns the thumb's width and height: ThumbSize square, or its art's atlas size for ThumbSize = "Atlas"
+-- (MinimalSliderTemplate's ThumbTexture, useAtlasSize).
+---@param S table
+---@return number width, number height
+local function thumbSize(S)
+  if S.ThumbSize == "Atlas" then
+    local width, height = style:AtlasSize(S.Thumb and S.Thumb.Atlas)
+    if width ~= nil then
+      return width, height
+    end
+    return 12, 12
+  end
+  return S.ThumbSize, S.ThumbSize
+end
+
 ---@param parent Frame
 ---@param opts NextSliderOptions
 ---@return NextSliderFrame
@@ -62,17 +84,26 @@ function nextSlider:Create(parent, opts)
   local frame = CreateFrame("Frame", nil, parent)
   local track = CreateFrame("Button", nil, frame)
   local bar = track:CreateTexture(nil, "BACKGROUND")
+  -- Where the bar goes: its fill (NextFill: one piece, or Blizzard's slider bar in three) fills it.
+  local barFrame = CreateFrame("Frame", nil, track)
+  fills:Wrap(bar, barFrame)
   local fill = track:CreateTexture(nil, "ARTWORK")
   local thumb = track:CreateTexture(nil, "OVERLAY")
   ---@type NextSliderFrame
   local s = setmetatable({
-    frame = frame, track = track, bar = bar, fill = fill, thumb = thumb, hovered = false, dragging = false,
+    frame = frame, track = track, bar = bar, barFrame = barFrame, fill = fill, thumb = thumb, hovered = false, dragging = false,
     current = opts.value, opts = opts,
   }, { __index = sliderProto })
   s.value = nextInput:Create(frame, {
     numeric = opts.min >= 0 and opts.step >= 1,
     onEnter = function(ctx, text) s:Type(ctx, text) end,
   })
+  -- The value written beside the bar (Slider.Value = "Text": Blizzard's settings slider's RightText), and the steppers
+  -- either side of it (Slider.Steppers), for a theme that draws them.
+  s.valueText = style:CreateText(frame, "ControlText")
+  s.valueText:Hide()
+  s.back = s:stepper(-1)
+  s.forward = s:stepper(1)
   addon.SetScript(track, "OnMouseDown", function(ctx, _, button) s:Press(ctx, button) end)
   addon.SetScript(track, "OnEnter", function() s:SetHovered(true) end)
   addon.SetScript(track, "OnLeave", function() s:SetHovered(false) end)
@@ -83,31 +114,78 @@ function nextSlider:Create(parent, opts)
   return s
 end
 
+-- stepper makes a button stepping the value by its step in a direction (-1 back, 1 forward).
+---@private
+---@param direction number
+---@return table
+function sliderProto:stepper(direction)
+  local button = CreateFrame("Button", nil, self.frame)
+  button:RegisterForClicks("LeftButtonUp")
+  local icon = button:CreateTexture(nil, "BACKGROUND")
+  icon:SetAllPoints(button)
+  button:Hide()
+  addon.SetScript(button, "OnClick", function(ctx) self:change(ctx, self.current + direction * self.opts.step) end)
+  return { frame = button, icon = icon, direction = direction }
+end
+
 -- Style lays the slider out in whole pixels (docs/next-pixel-perfect.md): the track and the value's box
 -- side by side, each centered on the slider's height by its top; the bar along the track's middle the
--- same way.
+-- same way. A theme with Steppers leaves Room either side of the track for them, Gap out from its ends; one whose Value
+-- is "Text" writes the value ValueGap right of the track instead of the box (Blizzard's settings slider,
+-- MinimalSliderWithSteppersTemplate).
 function sliderProto:Style()
   local S = controls:Theme("Slider")
   local input = controls:Theme("Input")
   local frame, track = self.frame, self.track
+  local St, written = S.Steppers, S.Value == "Text"
+  local room = St and pixel:Snap(frame, St.Room or 0) or 0
   local width, gap, valueWidth = pixel:Lengths(frame, S.Width, S.ValueGap, S.ValueWidth)
-  pixel:Size(frame, width + gap + valueWidth, math.max(S.Height, input.Height))
+  if written then
+    pixel:Size(frame, room + width + room, S.Height)
+  else
+    pixel:Size(frame, room + width + room + gap + valueWidth, math.max(S.Height, input.Height))
+  end
   pixel:Size(track, S.Width, S.Height)
   track:ClearAllPoints()
-  pixel:Row(track, "TOPLEFT", frame, 0, frame:GetHeight())
+  pixel:Row(track, "TOPLEFT", frame, room, frame:GetHeight())
+  for _, step in ipairs({ self.back, self.forward }) do
+    local spec = St and (step.direction < 0 and St.Back or St.Forward)
+    step.frame:SetShown(spec ~= nil)
+    if spec then
+      pixel:Size(step.frame, spec.Width, spec.Height)
+      step.frame:ClearAllPoints()
+      local g = pixel:Snap(frame, St.Gap or 0)
+      if step.direction < 0 then
+        pixel:Point(step.frame, "RIGHT", track, "LEFT", -g, 0)
+      else
+        pixel:Point(step.frame, "LEFT", track, "RIGHT", g, 0)
+      end
+      controls:Paint(step.icon, { Atlas = spec.Atlas, Texture = spec.Texture, Color = "White", Alpha = 1 })
+    end
+  end
   pixel:Height(self.bar, S.TrackSize)
   pixel:Height(self.fill, S.TrackSize)
-  pixel:Size(self.thumb, S.ThumbSize, S.ThumbSize)
+  pixel:Size(self.thumb, thumbSize(S))
   local barTop = -pixel:Middle(track, track:GetHeight(), self.bar:GetHeight())
-  self.bar:ClearAllPoints()
-  self.bar:SetPoint("TOPLEFT", track, "TOPLEFT", 0, barTop)
-  self.bar:SetPoint("TOPRIGHT", track, "TOPRIGHT", 0, barTop)
+  local barFrame = self.barFrame
+  barFrame:ClearAllPoints()
+  barFrame:SetPoint("TOPLEFT", track, "TOPLEFT", 0, barTop)
+  barFrame:SetPoint("TOPRIGHT", track, "TOPRIGHT", 0, barTop)
+  pixel:Height(barFrame, S.TrackSize)
   controls:Paint(self.bar, S.Track)
   controls:Paint(self.fill, S.Fill)
   local box = self.value.frame
-  box:SetWidth(valueWidth)
-  box:ClearAllPoints()
-  pixel:Row(box, "TOPLEFT", frame, width + gap, frame:GetHeight())
+  box:SetShown(not written)
+  self.valueText:SetShown(written)
+  self.valueText:ClearAllPoints()
+  if written then
+    pixel:Point(self.valueText, "LEFT", track, "RIGHT", gap, 0)
+  else
+    box:SetWidth(valueWidth)
+    box:ClearAllPoints()
+    pixel:Row(box, "TOPLEFT", frame, room + width + room + gap, frame:GetHeight())
+  end
+  self:SetEnabled(track:IsEnabled())
   self:Place()
 end
 
@@ -135,6 +213,25 @@ function sliderProto:Place()
   pixel:Width(self.fill, math.max(1, x + pixel:Floor(track, thumb:GetWidth() / 2)))
   controls:Paint(self.thumb, (self.hovered or self.dragging) and S.ThumbHover or S.Thumb)
   self.value:SetText(self:Format(self.current))
+  self.valueText:SetText(self:Format(self.current))
+  self:updateSteppers()
+end
+
+-- updateSteppers turns off a stepper whose way the value can go no further, or both while the slider is: at the
+-- theme's DisabledAlpha and desaturated (MinimalSliderWithSteppersMixin:UpdateStepperStates).
+---@private
+function sliderProto:updateSteppers()
+  local St = controls:Theme("Slider").Steppers
+  if not St then
+    return
+  end
+  local o, enabled = self.opts, self.track:IsEnabled()
+  for _, step in ipairs({ self.back, self.forward }) do
+    local on = enabled and (step.direction < 0 and self.current > o.min or step.direction > 0 and self.current < o.max)
+    step.frame:SetEnabled(on)
+    step.frame:SetAlpha(on and 1 or (St.DisabledAlpha or 1))
+    step.icon:SetDesaturated(not on)
+  end
 end
 
 -- Format writes a value as the box shows it: whole for a whole step, else to two places.
@@ -182,7 +279,8 @@ function sliderProto:cursorValue()
   end
   local S = controls:Theme("Slider")
   local x = GetCursorPosition() / self.track:GetEffectiveScale() - left
-  local share = (x - S.ThumbSize / 2) / (S.Width - S.ThumbSize)
+  local thumb = thumbSize(S)
+  local share = (x - thumb / 2) / (S.Width - thumb)
   local o = self.opts
   return o.min + share * (o.max - o.min)
 end
@@ -229,12 +327,23 @@ function sliderProto:Type(ctx, text)
   self:change(ctx, value)
 end
 
--- SetEnabled takes or refuses the pointer and the box, drawn at DisabledAlpha while refusing.
+-- SetEnabled takes or refuses the pointer and the box, drawn at DisabledAlpha while refusing; a theme with its own
+-- Slider.DisabledAlpha dims the track alone and writes its value in ValueDisabledFont (Blizzard's settings slider: the
+-- slider at 0.7, its labels gray).
 ---@param enabled boolean
 function sliderProto:SetEnabled(enabled)
+  local S = controls:Theme("Slider")
   self.track:SetEnabled(enabled)
   self.value:SetEnabled(enabled)
-  self.frame:SetAlpha(enabled and 1 or controls:Theme("Button").DisabledAlpha)
+  if S.DisabledAlpha then
+    self.frame:SetAlpha(1)
+    self.track:SetAlpha(enabled and 1 or S.DisabledAlpha)
+  else
+    self.track:SetAlpha(1)
+    self.frame:SetAlpha(enabled and 1 or controls:Theme("Button").DisabledAlpha)
+  end
+  style:SetFont(self.valueText, (not enabled and S.ValueDisabledFont) or S.ValueFont or "ControlText")
+  self:updateSteppers()
 end
 
 ---@param hovered boolean

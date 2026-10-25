@@ -93,6 +93,7 @@ sonata\themes\next\default.lua
 sonata\themes\next\ember.lua
 sonata\themes\next\gw2.lua
 sonata\themes\next\parchment.lua
+sonata\themes\next\plain.lua
 sonata\themes\next\quiet.lua
 
 # The Theme API loads earlier than actual themes.
@@ -173,6 +174,8 @@ next\pixel.lua
 next\itemfit.lua
 next\coins.lua
 next\style.lua
+next\frameart.lua
+next\fill.lua
 next\tween.lua
 next\lift.lua
 next\controls\base.lua
@@ -195,6 +198,7 @@ next\dock.lua
 next\drag.lua
 next\chain.lua
 next\ornaments.lua
+next\menubutton.lua
 next\panel.lua
 next\bag.lua
 next\bank.lua

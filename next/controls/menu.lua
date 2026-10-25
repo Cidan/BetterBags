@@ -18,6 +18,9 @@ local sonataNext = addon:GetModule('SonataNext')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextFill: AceModule
+local fills = addon:GetModule('NextFill')
+
 ---@class PixelAudit: AceModule
 local pixelAudit = addon:GetModule('PixelAudit')
 
@@ -29,6 +32,7 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@class NextMenu: AceModule
 ---@field frame Frame
 ---@field fill Texture
+---@field border Texture Art over the fill (the theme's Border: Classic's menu art reaching past the menu).
 ---@field edge NextEdge
 ---@field box WowScrollBox
 ---@field list Frame The rows, scrolled by box.
@@ -59,6 +63,7 @@ local nextMenu = addon:NewModule('NextMenu')
 ---@field hover Texture
 ---@field label FontString
 ---@field check Texture
+---@field ring Texture Under the check: the empty radio ring (Check.Off, Check.Under), Blizzard's radio menus.
 ---@field item? NextMenuItem
 local rowProto = {}
 addon:GetModule('Perf'):RegisterPrototype(rowProto, 'NextMenuRow')
@@ -82,6 +87,10 @@ function nextMenu:build()
   frame:Hide()
   self.fill = frame:CreateTexture(nil, "BACKGROUND")
   self.fill:SetAllPoints(frame)
+  fills:Wrap(self.fill, frame)
+  self.border = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
+  self.border:Hide()
+  fills:Wrap(self.border, frame)
   self.edge = controls:CreateEdge(frame)
   local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetInterpolateScroll(true)
@@ -124,8 +133,10 @@ function nextMenu:row(i)
   local label = frame:CreateFontString(nil, "OVERLAY")
   label:SetJustifyH("LEFT")
   label:SetWordWrap(false)
-  local check = frame:CreateTexture(nil, "ARTWORK")
-  row = setmetatable({ frame = frame, hover = hover, label = label, check = check }, { __index = rowProto })
+  local check = frame:CreateTexture(nil, "ARTWORK", nil, 1)
+  local ring = frame:CreateTexture(nil, "ARTWORK")
+  ring:Hide()
+  row = setmetatable({ frame = frame, hover = hover, label = label, check = check, ring = ring }, { __index = rowProto })
   style:SetFont(label, controls:Theme("Menu").Font)
   addon.SetScript(frame, "OnClick", function(ctx) self:Pick(ctx, row) end)
   addon.SetScript(frame, "OnEnter", function() row:SetHovered(true) end)
@@ -243,17 +254,40 @@ end
 -- All in whole pixels on its own grid (UIParent's: docs/next-pixel-perfect.md), its anchor's width in its
 -- units (the anchor may be in a window drawn smaller): its rows one ItemHeight apart, a check and a label
 -- on each centered by its top.
-function nextMenu:Style()
+-- look returns the menu's look: the theme's Menu, with what the open menu's style changes (NextMenuOptions.style: a
+-- dropdown's own menu, Blizzard's MenuStyle2 for its settings dropdowns).
+---@private
+---@return table
+function nextMenu:look()
   local M = controls:Theme("Menu")
+  local own = self.opts and self.opts.style
+  if not own then
+    return M
+  end
+  local merged = {}
+  for k, v in pairs(M) do merged[k] = v end
+  for k, v in pairs(own) do merged[k] = v end
+  return merged
+end
+
+function nextMenu:Style()
+  local M = self:look()
   local frame, items = self.frame, self.items
   frame:ClearAllPoints()
   pixel:Point(frame, "TOPLEFT", self.anchor, "BOTTOMLEFT", 0, -M.Gap)
   frame:SetFrameLevel(self.catcher:GetFrameLevel() + 2)
   controls:Paint(self.fill, M.Fill)
+  controls:Paint(self.border, M.Border)
   controls:PaintEdge(self.edge, M.Edge)
   local check = M.Check
-  local pad, itemHeight, checkSize = pixel:Lengths(frame, M.Padding, M.ItemHeight, check.Size)
-  local textLeft = pad + checkSize + pad
+  -- The check's size, or its atlas's (Size = "Atlas"), and the ring's the same way; the text after the wider.
+  local checkWidth, checkHeight = style:SizeOf(check, nil, 12)
+  local ringWidth, ringHeight = 0, 0
+  if check.Off or check.Under then
+    ringWidth, ringHeight = style:SizeOf(check, check.Off or check.Under, checkWidth)
+  end
+  local pad, itemHeight = pixel:Lengths(frame, M.Padding, M.ItemHeight)
+  local textLeft = pad + pixel:Length(frame, math.max(checkWidth, ringWidth)) + pad
   local widest = 0
   for i, item in ipairs(items) do
     local row = self:row(i)
@@ -269,11 +303,27 @@ function nextMenu:Style()
     widest = math.max(widest, row.label:GetStringWidth())
     controls:Paint(row.hover, M.HoverFill)
     row.hover:Hide()
-    controls:Paint(row.check, { Texture = check.Texture, Color = check.Color })
-    row.check:SetSize(checkSize, checkSize)
+    -- A glyph, or an atlas (Blizzard's radio tick); the empty ring under it (Off on rows not chosen, Under on the
+    -- chosen one), the tick at the ring's top left as Blizzard's retail radios draw it.
+    local chosen = item.selected == true
+    local ring = chosen and check.Under or (not chosen and check.Off) or nil
+    if ring then
+      controls:Paint(row.ring, { Texture = ring.Texture, Atlas = ring.Atlas, Color = ring.Color or check.Color })
+      pixel:Size(row.ring, ringWidth, ringHeight)
+      row.ring:ClearAllPoints()
+      pixel:Row(row.ring, "TOPLEFT", row.frame, pad, itemHeight)
+    else
+      row.ring:Hide()
+    end
+    controls:Paint(row.check, { Texture = check.Texture, Atlas = check.Atlas, Color = check.Color })
+    pixel:Size(row.check, checkWidth, checkHeight)
     row.check:ClearAllPoints()
-    pixel:Row(row.check, "TOPLEFT", row.frame, pad, itemHeight)
-    row.check:SetShown(item.selected == true)
+    if ring then
+      row.check:SetPoint("TOPLEFT", row.ring, "TOPLEFT", 0, 0)
+    else
+      pixel:Row(row.check, "TOPLEFT", row.frame, pad, itemHeight)
+    end
+    row.check:SetShown(chosen)
     row.label:ClearAllPoints()
     pixel:Row(row.label, "TOPLEFT", row.frame, textLeft, itemHeight)
     pixel:Row(row.label, "TOPRIGHT", row.frame, pad, itemHeight)
@@ -293,11 +343,16 @@ function nextMenu:Style()
   -- The rows sit in a list inset Padding on both sides: the menu holds that, the text's left, the
   -- widest text and the room right of it.
   local bar = scrolls and (pixel:Length(frame, S.Width) + pixel:Length(frame, S.Inset)) or 0
-  local width = 2 * pad + textLeft + pixel:Ceil(frame, widest) + pad + bar
+  -- The list's inset: Inset on each side when the theme gives one (Blizzard's menus: MenuStyle1Mixin:GetInset), else
+  -- Padding all round.
+  local inset = M.Inset or {}
+  local left, right = pixel:Snap(frame, inset.Left or M.Padding), pixel:Snap(frame, inset.Right or M.Padding)
+  local top, bottom = pixel:Snap(frame, inset.Top or M.Padding), pixel:Snap(frame, inset.Bottom or M.Padding)
+  local width = left + right + textLeft + pixel:Ceil(frame, widest) + pad + bar
   local anchorWidth = self.anchor:GetWidth() * self.anchor:GetEffectiveScale() / frame:GetEffectiveScale()
   width = math.max(width, pixel:Ceil(frame, anchorWidth), pixel:Ceil(frame, self.opts.width or 0))
-  frame:SetSize(width, shown * itemHeight + 2 * pad)
-  pixel:Inset(self.box, frame, pad, pad, pad, pad)
+  frame:SetSize(width, shown * itemHeight + top + bottom)
+  pixel:Inset(self.box, frame, left, right, top, bottom)
   self.list:SetHeight(#items * itemHeight)
   self.box:FullUpdate(true)
   self.box:SetScrollPercentage(0, true)

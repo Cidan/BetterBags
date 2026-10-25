@@ -54,9 +54,9 @@ LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" },
   { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -392,22 +392,41 @@ describe("BetterBags Next, pixel perfect", function()
     end
   end)
 
-  it("puts every part on whole pixels in every shipped theme, at both sizes", function()
+  -- Each theme as every client resolves it (its Clients overrides: the Plain theme draws Classic's frame there), and
+  -- nothing sent to the error handler: SonataNext restyles each widget in a protected call (RestyleWidgets).
+  it("puts every part on whole pixels in every shipped theme, on every client, at both sizes", function()
     useScreen(3396, 1362, 0.65)
     -- Guild Wars 2 is offered while GW2_UI is loaded.
     _G._loadedAddOns = { GW2_UI = true }
+    local errors = {}
+    local savedHandler = _G.geterrorhandler
+    _G.geterrorhandler = function() return function(err) table.insert(errors, tostring(err)) end end
     local keys = {}
     for key in pairs(sonataNext:GetThemes()) do table.insert(keys, key) end
     table.sort(keys)
     assert.is_true(#keys >= 4)
+    local flags = { "isRetail", "isForever", "isClassic", "isBCC", "isMists", "isAnniversary", "isCata" }
+    local clients = {
+      { name = "Retail", isRetail = true }, { name = "Forever", isRetail = true, isForever = true },
+      { name = "Era", isClassic = true }, { name = "TBC", isBCC = true }, { name = "Anniversary", isAnniversary = true, isBCC = true },
+      { name = "Mists", isMists = true }, { name = "Cata", isCata = true },
+    }
+    local savedFlags = {}
+    for _, flag in ipairs(flags) do savedFlags[flag] = addon[flag] end
     for _, size in ipairs({ "full", "small" }) do
       db.size = size
       startSonataNext()
       local bag, bank = bags()
-      for _, key in ipairs(keys) do
-        sonataNext:ApplyTheme(ctx(), key, false)
-        assert.are.same({}, offGrid(bag), key .. " " .. size)
-        assert.are.same({}, offGrid(bank), key .. " " .. size)
+      for _, client in ipairs(clients) do
+        for _, key in ipairs(keys) do
+          for _, flag in ipairs(flags) do addon[flag] = client[flag] == true end
+          sonataNext:ApplyTheme(ctx(), key, false)
+          for _, flag in ipairs(flags) do addon[flag] = savedFlags[flag] end
+          local where = key .. " on " .. client.name .. " " .. size
+          assert.are.same({}, offGrid(bag), where)
+          assert.are.same({}, offGrid(bank), where)
+          assert.are.same({}, errors, where)
+        end
       end
       sonataNext:ApplyTheme(ctx(), "Default", false)
       bag:Hide(ctx())
@@ -415,6 +434,7 @@ describe("BetterBags Next, pixel perfect", function()
       finishTweens()
       chain:Init()
     end
+    _G.geterrorhandler = savedHandler
     _G._loadedAddOns = nil
   end)
 

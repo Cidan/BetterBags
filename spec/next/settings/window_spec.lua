@@ -14,7 +14,7 @@ local events = StubBetterBagsModule("Events")
 StubBetterBagsModule("SettingsCatalog")
 local bagSystem = StubBetterBagsModule("BagSystem")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
+  { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextToggle", "next/controls/toggle.lua" },
   { "NextInput", "next/controls/input.lua" }, { "NextSlider", "next/controls/slider.lua" },
   { "NextMenu", "next/controls/menu.lua" }, { "NextDropdown", "next/controls/dropdown.lua" },
@@ -992,6 +992,164 @@ describe("NextSettings", function()
     end)
   end)
 
+  -- Blizzard's settings window (Blizzard_SettingsPanel.xml, the same on every client), the Plain theme's (asked: the
+  -- window was wrong "in every way it can be"; docs/next-plain-theme.md, round two): 920 x 724, its name in the title
+  -- bar, Options_InnerFrame at 17, -64, the category list at 18, 76, 199 wide down to 46 above the bottom, rows 175 wide;
+  -- the content from 16 right of the list to 22 from the right, its header 50 tall at its top with
+  -- Options_HorizontalDivider centered 50 down; the tabs at 27 down on the inner frame's top edge; the search box 350
+  -- wide, 18 from the right and 34 down; Done 96 x 22 at 16, 16 from the bottom right and Apply's place for What's New.
+  describe("laid out as Blizzard's settings window", function()
+    local BLIZZARD = {
+      Settings = {
+        Width = 920, Height = 724,
+        Title = { Font = "SettingsBrand", Top = 6, Left = 30, Right = 24 },
+        InnerFrame = { Atlas = "Options_InnerFrame", AtlasSize = true, Point = "TOPLEFT", X = 17, Y = -64, Color = "White", Alpha = 1 },
+        Sidebar = { Width = 199, Pad = 0, Left = 18, Top = 76, Bottom = 46, Fill = false, Line = false },
+        Brand = false,
+        Search = { Place = "Top", Width = 350, Right = 18, Top = 34, Atlas = "common-search-magnifyingglass", IconSize = 10 },
+        Back = { Height = 30 },
+        Nav = { ItemWidth = 175, GroupUpper = false },
+        Version = { Window = true, Left = 18, Bottom = 22 },
+        Header = { Left = 16, Right = 22, Top = 76, Height = 50, Pad = 7, TitleTop = 22, DescriptionFont = false,
+          Divider = { Atlas = "Options_HorizontalDivider", AtlasSize = true, Point = "TOP", Y = -50, Color = "White", Alpha = 1 } },
+        Tabs = { Top = 27, Left = 0 },
+        Content = { ScrollLeft = -15, ScrollRight = 20, ScrollTop = 2 },
+        Footer = { Height = 45, Left = 0, Line = false, Buttons = { Width = 96, Right = 16, Bottom = 16, Gap = 2 }, WhatsNew = "Plain" },
+      },
+    }
+
+    local function rect(region)
+      local p, rel, rp, x, y = region:GetPoint(1)
+      return { p, rel, rp, x, y }
+    end
+    local function ctx() return addon:GetModule("Context"):New("spec") end
+
+    before_each(function()
+      ResetMockAtlases()
+      MockAtlas("Options_InnerFrame", 886, 618)
+      MockAtlas("Options_HorizontalDivider", 630, 1)
+      MockAtlas("common-search-magnifyingglass", 24, 24)
+      open()
+      UseNextTheme(BLIZZARD)
+      settings:ApplyStyle()
+    end)
+
+    after_each(function()
+      ResetMockAtlases()
+    end)
+
+    it("is 920 x 724, writes its name in its title bar, and draws its inner frame at its size at 17, -64", function()
+      assert.are.same({ 920, 724 }, { settings.frame:GetSize() })
+      assert.is_true(settings.windowTitle:IsShown())
+      assert.are.equal("BetterBags", settings.windowTitle:GetText())
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 30, -6 }, { settings.windowTitle:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -24, -6 }, { settings.windowTitle:GetPoint(2) })
+      assert.are.equal("CENTER", settings.windowTitle:GetJustifyH())
+      assert.are.equal("Options_InnerFrame", settings.innerFrame:GetAtlas())
+      assert.are.same({ 886, 618 }, { settings.innerFrame:GetSize() })
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 17, -64 }, rect(settings.innerFrame))
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_false(settings.windowTitle:IsShown(), "Default writes none")
+      assert.is_false(settings.innerFrame:IsShown())
+    end)
+
+    it("keeps its list inside the window: Left in, Top down to Bottom above the bottom, rows ItemWidth wide, headings as written", function()
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 18, -76 }, rect(settings.sidebar))
+      assert.are.same({ "BOTTOMLEFT", settings.frame, "BOTTOMLEFT", 18, 46 }, { settings.sidebar:GetPoint(2) })
+      assert.are.equal(199, settings.sidebar:GetWidth())
+      assert.is_false(settings.brandText:IsShown())
+      assert.is_false(settings.brandIcon:IsShown())
+      assert.is_false(settings.brandLine:IsShown())
+      assert.are.same({ "TOPLEFT", settings.navPanel, "TOPLEFT", 0, 0 }, rect(settings.navBox), "the list from the top")
+      local general, heading = navRow("General"), nil
+      for _, row in ipairs(settings.navRows) do
+        if row.frame:IsShown() and row.group then heading = heading or row end
+      end
+      assert.are.equal(175, general.frame:GetWidth())
+      assert.are.equal(1, general.frame:GetNumPoints(), "by its top left only")
+      assert.are.equal(175, heading.frame:GetWidth())
+      assert.are.equal("BetterBags", heading.label:GetText(), "not in capitals")
+    end)
+
+    it("puts its search box 350 wide at the top right, its magnifier the theme's atlas", function()
+      local search = settings.search.frame
+      assert.are.equal(settings.frame, search:GetParent())
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -18, -34 }, rect(search))
+      assert.are.equal(350, search:GetWidth())
+      assert.are.equal("common-search-magnifyingglass", settings.search.icon:GetAtlas())
+      assert.are.same({ 10, 10 }, { settings.search.icon:GetSize() })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.are.equal(settings.navPanel, settings.search.frame:GetParent(), "back in the sidebar")
+    end)
+
+    it("puts its header at the content's top, its title 7 in and 22 down, the divider under it, and no description", function()
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 233, -76 }, rect(settings.header))
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -22, -76 }, { settings.header:GetPoint(2) })
+      assert.are.equal(50, settings.header:GetHeight())
+      assert.are.same({ "TOPLEFT", settings.header, "TOPLEFT", 7, -22 }, rect(settings.title))
+      assert.is_false(settings.description:IsShown())
+      assert.is_true(settings.divider:IsShown())
+      assert.are.equal("Options_HorizontalDivider", settings.divider:GetAtlas())
+      assert.are.same({ "TOP", settings.header, "TOP", 0, -50 }, rect(settings.divider))
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_true(settings.description:IsShown())
+      assert.is_false(settings.divider:IsShown())
+    end)
+
+    it("hangs its page's tabs on the inner frame's edge and its content from 15 left of the content and 2 below the header", function()
+      settings:Select("backpack", nil, ctx())
+      assert.is_true(settings.tabs.frame:IsShown())
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 233, -27 }, rect(settings.tabs.frame))
+      local scroll = settings.scroll.frame
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 218, -128 }, rect(scroll), "the tabs above the header take no room")
+      assert.are.same({ "BOTTOMRIGHT", settings.frame, "BOTTOMRIGHT", -42, 45 }, { scroll:GetPoint(2) })
+    end)
+
+    it("puts Done and What's New at the bottom right, What's New a button, the version at the bottom left", function()
+      local done, whatsNew = settings.done.frame, settings.whatsNew.frame
+      assert.are.same({ "BOTTOMRIGHT", settings.frame, "BOTTOMRIGHT", -16, 16 }, rect(done))
+      assert.are.same({ 96, 96 }, { done:GetWidth(), whatsNew:GetWidth() })
+      assert.are.same({ "RIGHT", done, "LEFT", -2, 0 }, rect(whatsNew))
+      assert.are.equal("Plain", settings.whatsNew.style)
+      assert.is_false(settings.footerLine:IsShown())
+      assert.are.equal(settings.frame, settings.version:GetParent())
+      assert.are.equal("BOTTOMLEFT", (settings.version:GetPoint(1)))
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.are.equal("Link", settings.whatsNew.style, "a link again")
+      assert.are.equal(settings.navPanel, settings.version:GetParent())
+    end)
+  end)
+
+  -- The Plain theme on Default's layout (docs/next-plain-theme.md, round three): its sidebar is Blizzard's inset
+  -- (ButtonFrameTemplate's Inset: InsetFrameTemplate's nine-slice over its marble, 4 in, 24 down, 4 above the bottom).
+  describe("a sidebar framed as an inset", function()
+    after_each(function()
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+    end)
+
+    it("draws its theme's frame round its sidebar, under the sidebar's pages and list", function()
+      open()
+      UseNextTheme({ Settings = { Sidebar = { Left = 4, Top = 24, Bottom = 4, Line = false, Frame = { Pieces = {
+        TopLeftCorner = { Texture = "Interface\\Spec\\tl.png", Width = 6, Height = 6 },
+        BottomRightCorner = { Texture = "Interface\\Spec\\br.png", Width = 6, Height = 6, Y = -1 },
+      } } } } })
+      settings:ApplyStyle()
+      local tl, br = settings.sidebarArt.pieces.TopLeftCorner, settings.sidebarArt.pieces.BottomRightCorner
+      assert.is_true(tl:IsShown() and br:IsShown())
+      assert.are.same({ "TOPLEFT", settings.sidebar, "TOPLEFT", 0, 0 }, { tl:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", settings.sidebar, "BOTTOMRIGHT", 0, -1 }, { br:GetPoint(1) })
+      assert.are.equal(settings.sidebar, tl:GetParent())
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_false(tl:IsShown(), "none for a theme without")
+    end)
+  end)
+
   describe("a theme", function()
     -- The shipped Parchment, applied through SonataNext as the Appearance page applies it.
     it("is restyled by a theme SonataNext applies, controls and all", function()
@@ -1016,6 +1174,136 @@ describe("NextSettings", function()
 
     -- Asked: one close button, the bags' (GW2_UI's close art, its hover art under the pointer), on the settings
     -- window too.
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's settings window (SettingsFrameTemplate), its
+    -- ButtonFrameTemplateNoPortrait frame round the window over a fill 7, 18, 3 and 3 in.
+    -- The Plain theme (docs/next-plain-theme.md): Blizzard's settings list draws its group headers in
+    -- Options_CategoryHeader_1, 2, 3, cycled, the label 20 in and centered (Blizzard_CategoryList.lua).
+    it("draws its group headings in its theme's fills, cycled, their labels where it says", function()
+      open()
+      UseNextTheme({ Settings = { Nav = {
+        GroupFills = { { Atlas = "Options_CategoryHeader_1", Color = "White", Alpha = 1 },
+          { Atlas = "Options_CategoryHeader_2", Color = "White", Alpha = 1 } },
+        GroupLabel = { Point = "LEFT", X = 20, Y = -1 } } } })
+      settings:ApplyStyle()
+      local headings = {}
+      for _, row in ipairs(settings.navRows) do
+        if row.frame:IsShown() and row.group then
+          table.insert(headings, row)
+        end
+      end
+      assert.are.same({ "Options_CategoryHeader_1", "Options_CategoryHeader_2", "Options_CategoryHeader_1" },
+        { headings[1].fill:GetAtlas(), headings[2].fill:GetAtlas(), headings[3].fill:GetAtlas() })
+      assert.is_true(headings[1].fill:IsShown())
+      assert.are.same({ "LEFT", headings[1].frame, "LEFT", 20, -1 }, { headings[1].label:GetPoint(1) })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_false(headings[1].fill:IsShown(), "a theme without")
+      local point = headings[1].label:GetPoint(1)
+      assert.are.equal("BOTTOMLEFT", point)
+    end)
+
+    -- Blizzard's close button: an atlas (RedButton-Exit), its highlight added over it under the pointer
+    -- (RedButton-Highlight, ADD; UIPanelCloseButtonNoScripts).
+    -- Blizzard's retail settings close sits at TOPRIGHT 1, 0 (UIPanelCloseButtonDefaultAnchors): Offset, as anchor
+    -- offsets from the window's top right, in place of the Inset both ways.
+    it("puts its close at its Offset from the top right corner when it has one", function()
+      open()
+      UseNextTheme({ Settings = { Header = { Close = { Offset = { X = 1, Y = 0 } } } } })
+      settings:ApplyStyle()
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", 1, 0 }, { settings.closeButton:GetPoint(1) })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      local inset = S().Header.Close.Inset
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -inset, -inset }, { settings.closeButton:GetPoint(1) })
+    end)
+
+    it("draws its close as an atlas with a highlight over it under the pointer", function()
+      open()
+      UseNextTheme({ Settings = { Header = { Close = { Atlas = "RedButton-Exit", Color = "White", HoverColor = "White", Size = 24,
+        Highlight = { Atlas = "RedButton-Highlight", BlendMode = "ADD", Color = "White", Alpha = 1 } } } } })
+      settings:ApplyStyle()
+      local close = settings.closeButton
+      assert.are.equal("RedButton-Exit", settings.closeIcon:GetAtlas())
+      assert.is_false(settings.closeHighlight:IsShown())
+      close:GetScript("OnEnter")(close)
+      assert.are.equal("RedButton-Exit", settings.closeIcon:GetAtlas(), "the icon stays")
+      assert.is_true(settings.closeHighlight:IsShown())
+      assert.are.equal("RedButton-Highlight", settings.closeHighlight:GetAtlas())
+      assert.are.equal("ADD", settings.closeHighlight:GetBlendMode())
+      close:GetScript("OnLeave")(close)
+      assert.is_false(settings.closeHighlight:IsShown())
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.are.equal(style:TexturePath(S().Header.Close.Icon), settings.closeIcon:GetTexture())
+    end)
+
+    -- Blizzard's settings list draws a row's art at the atlas's own size, centered (Options_List_Active and
+    -- Options_List_Hover, useAtlasSize, anchored CENTER), and a heading's at its top left (Options_CategoryHeader).
+    it("draws its rows' and headings' art at the atlas's own size where its fills say", function()
+      ResetMockAtlases()
+      MockAtlas("Options_List_Active", 175, 20)
+      MockAtlas("Options_CategoryHeader_1", 175, 30)
+      open()
+      UseNextTheme({ Settings = { Nav = {
+        SelectedFill = { Atlas = "Options_List_Active", Color = "White", Alpha = 1, AtlasSize = true },
+        GroupFills = { { Atlas = "Options_CategoryHeader_1", Color = "White", Alpha = 1, AtlasSize = true, Point = "TOPLEFT" } } } } })
+      settings:ApplyStyle()
+      local general = navRow("General")
+      assert.are.same({ 175, 20 }, { general.fill:GetSize() })
+      assert.are.same({ "CENTER", general.frame, "CENTER", 0, 0 }, { general.fill:GetPoint(1) })
+      local heading
+      for _, row in ipairs(settings.navRows) do
+        if row.frame:IsShown() and row.group then
+          heading = heading or row
+        end
+      end
+      assert.are.same({ 175, 30 }, { heading.fill:GetSize() })
+      assert.are.same({ "TOPLEFT", heading.frame, "TOPLEFT", 0, 0 }, { heading.fill:GetPoint(1) })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.are.same({ "TOPLEFT", general.frame, "TOPLEFT", 0, 0 }, { general.fill:GetPoint(1) }, "filling its row again")
+      ResetMockAtlases()
+    end)
+
+    -- Blizzard's settings list (Blizzard_CategoryList.lua): 2 between every element, headings and rows alike
+    -- (CreateScrollBoxListLinearView's spacing), a row's text 1 above its middle (its Label at y 1).
+    it("puts Spacing between every heading and row and raises a row's text by TextRaise", function()
+      open()
+      UseNextTheme({ Settings = { Nav = { ItemHeight = 20, GroupHeight = 30, GroupGap = 0, Spacing = 2, TextRaise = 1 } } })
+      settings:ApplyStyle()
+      local tops = {}
+      for _, row in ipairs(settings.navRows) do
+        if row.frame:IsShown() then
+          local _, _, _, _, y = row.frame:GetPoint(1)
+          table.insert(tops, -y)
+        end
+      end
+      -- BetterBags (30), General (20), Bags (30), Backpack (20), Profiles (30), Profiles (20), 2 apart.
+      assert.are.same({ 0, 32, 54, 86, 108, 140 }, tops)
+      local general = navRow("General")
+      local _, fontHeight = general.label:GetFont()
+      local _, _, _, _, y = general.label:GetPoint(1)
+      assert.are.equal(-(math.floor((20 - fontHeight) / 2) - 1), y)
+    end)
+
+    it("draws its theme's frame round it, its fill inset into it", function()
+      ResetMockAtlases()
+      MockAtlas("UI-Frame-Metal-CornerTopLeft", 32, 32)
+      open()
+      UseNextTheme({ Settings = { Frame = { Layout = "ButtonFrameTemplateNoPortrait" },
+        Fill = { Color = "White", Inset = { Left = 7, Top = 18, Right = 3, Bottom = 3 } } } })
+      settings:ApplyStyle()
+      local corner = settings.frameArt.pieces.TopLeftCorner
+      assert.are.equal("UI-Frame-Metal-CornerTopLeft", corner:GetAtlas())
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", -8, 16 }, { corner:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 7, -18 }, { settings.fill:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", settings.frame, "BOTTOMRIGHT", -3, 3 }, { settings.fill:GetPoint(2) })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_false(corner:IsShown())
+      ResetMockAtlases()
+    end)
+
     it("draws its close in art, its hover art under the pointer, and a tinted glyph for a theme without", function()
       open()
       UseNextTheme({ Settings = { Header = { Close = { Icon = "Interface\\Spec\\close.png", HoverIcon = "Interface\\Spec\\close-hover.png",

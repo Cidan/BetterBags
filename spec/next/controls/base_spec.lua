@@ -3,7 +3,7 @@
 -- an edge of four lines round a frame.
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
-for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextControls", "next/controls/base.lua" } }) do
+for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
