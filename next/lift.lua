@@ -146,12 +146,14 @@ end
 
 -- raise takes a frame onto the layer, above it. Never lower it: every frame in it moves with it, and one
 -- that would go below 0 jumps to the top level (warcraft.wiki.gg "Frame Strata"), where the cover could
--- not be above it.
+-- not be above it. The level never lowered is the one it had before: a new parent changes a frame's level
+-- (Blizzard's FrameUtil.SetParentMaintainRenderLayering puts it back after SetParent).
 ---@param frame Frame
 local function raise(frame)
+  local level = frame:GetFrameLevel()
   frame:SetParent(lift.layer)
   frame:SetFrameStrata("TOOLTIP")
-  frame:SetFrameLevel(math.max(frame:GetFrameLevel(), lift.layer:GetFrameLevel() + 2))
+  frame:SetFrameLevel(math.max(level, lift.layer:GetFrameLevel() + 2))
 end
 
 -- IsHolding says whether a frame is lifted.

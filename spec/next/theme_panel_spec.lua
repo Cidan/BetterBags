@@ -747,6 +747,7 @@ describe("BetterBags Next's panels and themes", function()
 
     it("takes its row's buttons out of the header, keeping whether the panel shows them, and puts them back after", function()
       local bag = opened(function(c) return nextBag:Create(c) end)
+      local level = bag.sortButton:GetFrameLevel()
       menuTheme()
       assert.is_true(bag.menuButton.frame:IsShown())
       assert.are.equal(bag.menuHolder, bag.sortButton:GetParent())
@@ -759,6 +760,21 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal(bag.frame, bag.sortButton:GetParent())
       assert.is_true(bag.sortButton:IsVisible())
       assert.is_true(bag.sortButton:GetFrameLevel() > bag.overlay:GetFrameLevel(), "over the frame above the content again")
+      assert.are.equal(level, bag.sortButton:GetFrameLevel(), "at the level it was made at")
+    end)
+
+    -- A new parent changes a frame's level (Blizzard's LFDFrame.lua, FrameUtil.SetParentMaintainRenderLayering), and a
+    -- button back from the holder at one above the panel sat under a small panel's mover, which lies over the title row
+    -- and took its clicks (reported: after the Plain theme and back, the header buttons did nothing until a reload).
+    it("gives its row's buttons back their clicks over a small panel's mover", function()
+      db.size = "small"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      menuTheme()
+      backToDefault()
+      for _, key in ipairs({ "settingsButton", "sortButton", "bagsButton", "sizeButton" }) do
+        assert.is_true(bag[key]:GetFrameLevel() > bag.mover:GetFrameLevel(), key)
+        assert.is_true(bag[key]:GetFrameLevel() > bag.overlay:GetFrameLevel(), key)
+      end
     end)
 
     it("centers its title between the bag button and the close button, on either side", function()

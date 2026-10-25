@@ -756,7 +756,13 @@ should have their portrait for the bag button, not the bag texture" (docs/next-p
   portrait. The art and masks are drawn with the ornaments' own functions (`NextOrnaments:DrawArt`, `Cut`).
 - **The row goes in its menu**: while a theme has one, every header button that is not pinned (§13) goes under a hidden
   frame (`panel.menuHolder`), so the panel's own showing and hiding of it (a vendor that repairs, a game rule) still
-  decides whether the menu lists it, and back on the panel's frame (over its overlay) for a theme without one. The title
+  decides whether the menu lists it, and back on the panel's frame (over its overlay) for a theme without one, at the
+  level it had: a new parent changes a frame's level (Blizzard's LFDFrame.lua: "Setting a new parent changes the frame
+  level"), so `holdRow` reads each button's level before `SetParent` and sets it back after, as Blizzard's
+  `FrameUtil.SetParentMaintainRenderLayering` does. **Failure mode (fixed, reported):** after Plain and back to Default,
+  the header buttons did nothing until a reload: back at one above the panel, they sat under a small panel's mover (over
+  the title row, taking the mouse to move it). The specs' frame mock kept a frame's level across `SetParent`, which hid
+  it; it now gives a reparented frame one above its new parent, the level a new child gets. The title
   then starts at the button's far edge (`panel:TitleStart`, `NextMenuButton:Room`) and ends at the pinned buttons
   (`pinnedRoom`, now counting a pin's offset by its direction: one out past the edge takes less room), with no slack, so a
   centered title is centered between the two.
