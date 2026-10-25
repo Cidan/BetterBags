@@ -565,8 +565,15 @@ function recorder:SizingSnapshot(panel)
         local decoration = rawget(item, "_decoration")
         local art = decoration and decoration.icon or item.icon
         local border = decoration and decoration.IconBorder or item.IconBorder
-        table.insert(lines, string.format("%s %s frame %s | art %s | border %s", tostring(section.name),
-          tostring(item.slotkey), pixelRect(item.frame, k), pixelRect(art, k), pixelRect(border, k)))
+        local line = string.format("%s %s frame %s | art %s | border %s", tostring(section.name),
+          tostring(item.slotkey), pixelRect(item.frame, k), pixelRect(art, k), pixelRect(border, k))
+        -- A Masque skin draws its shadow and border a fraction of a pixel off the grid (Caith's: 42/36 of the button).
+        local skin = decoration and rawget(decoration, "_MSQ_CFG")
+        if skin ~= nil then
+          line = string.format("%s | masque shadow %s | masque normal %s", line, pixelRect(skin.Shadow, k),
+            pixelRect(skin.Normal, k))
+        end
+        table.insert(lines, line)
       end
     end
   end

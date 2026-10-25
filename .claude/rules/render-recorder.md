@@ -86,7 +86,12 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   Its lines (`SizingSnapshot`): `screen WxH uiScale scale effective cursor x,y`; `frame <every anchor: point, relative
   frame, relative point, x,y to four decimals> | l t r b`; `scroll offset <offset> of <range> (<percentage>) | target
   <its anchor>`; then each shown section's first and last icons: `<section> <slotkey> frame l t r b | art l t r b |
-  border l t r b` (the button's holder, its decoration's `icon` and `IconBorder`, read without making a decoration).
+  border l t r b` (the button's holder, its decoration's `icon` and `IconBorder`, read without making a decoration),
+  and, for a button a Masque skin draws, `| masque shadow l t r b | masque normal l t r b` (the shadow and border
+  Masque keeps in the decoration's `_MSQ_CFG`). Added when the reported change turned out to be shading at an icon's
+  bottom edge with the icon itself not moving ("you can see the shadowing changes just by slight resize of the window
+  up and down"): Caith draws its shadow and border 42/36 of the button, so on a 46-pixel button their edges sit a third
+  of a pixel off the grid, and a move of the button too small to move its whole-pixel icon can move them a pixel.
   Every `l t r b` is where the client put the region (`GetScaledRect`), in screen pixels with three decimals: a
   fraction is a region off whole pixels, and a value that changes between `rendered` steps with nothing reflowing is
   what moved. Added for icons that jittered "ever so slight" in game while a panel was sized, in every direction,

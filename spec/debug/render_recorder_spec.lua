@@ -565,6 +565,23 @@ describe("RenderRecorder", function()
       }, entry.lines)
     end)
 
+    it("records the shadow and border Masque skins an icon with", function()
+      local panel = panelAt()
+      local decoration = panel.content.order[1].entries[1].item._decoration
+      local shadow, normal = decoration:CreateTexture(), decoration:CreateTexture()
+      shadow:_SetRect(116.1667, 551.8333, 51.6667, 51.6667)
+      normal:_SetRect(116.1667, 552.1667, 51.6667, 51.6667)
+      decoration._MSQ_CFG = { Shadow = shadow, Normal = normal }
+      recorder:Start()
+      recorder:PanelSizing(panel, "resized")
+      local lines = recorder:Stop().entries[1].lines
+      assert.are.equal("Consumable 0_1 frame " .. px(120, 556, 44, 44, 0.5) .. " | art " .. px(120, 556, 44, 44, 0.5)
+        .. " | border " .. px(120, 555.7, 44, 44, 0.5) .. " | masque shadow " .. px(116.1667, 551.8333, 51.6667, 51.6667, 0.5)
+        .. " | masque normal " .. px(116.1667, 552.1667, 51.6667, 51.6667, 0.5), lines[4])
+      assert.are.equal("Consumable 0_3 frame " .. px(170, 556, 44, 44, 0.5) .. " | art " .. px(170, 556, 44, 44, 0.5)
+        .. " | border " .. px(170, 555.7, 44, 44, 0.5), lines[5])
+    end)
+
     it("records nothing while stopped", function()
       recorder:PanelSizing(panelAt(), "resized")
       recorder:Start()
