@@ -60,7 +60,9 @@ pixels, and every text its anchor point on one, at any screen size, UI scale, Ba
 
 **Status:** done, not verified in game yet. Every Next window passes the check on every screen above;
 the architecture, the rules for new code, NextPixel's API and the coverage are in
-`.claude/rules/next-pixel-perfect.md`.
+`.claude/rules/next-pixel-perfect.md`. The whole story of this work and what followed (the jitter while resizing, the
+client's texture sharpening, text on pixel boundaries, fonts, animation), written up with code for a blog post:
+`docs/pixel-perfect-notes.md`.
 
 ## Decisions made along the way
 
