@@ -1651,6 +1651,62 @@ describe("BetterBags Next's panels and themes", function()
       assert.is_true(tween:IsPlaying(bag.spark), "gliding again")
     end)
 
+    -- Reported: "turning off title shimmer causes the background behind the word Backpack to BLIND ME". Turned off,
+    -- the shimmer settled the cloud's swell before the cloud's new puffs were laid out: drawing them failed (each
+    -- widget restyles in a protected call, so silently), and the cloud's driver failed every frame after, leaving the
+    -- puffs at full strength, added as light. No shipped theme has a cloud without a spark.
+    it("leaves the title's cloud breathing at its own strength when the shimmer is turned off", function()
+      local errors = {}
+      override(_G, "geterrorhandler", function() return function(e) table.insert(errors, tostring(e)) end end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      switch("shimmer", false)
+      bag.cloud.driver:GetScript("OnUpdate")(bag.cloud.driver, 0.1)
+      assert.are.same({}, errors)
+      local C = style.Cloud
+      assert.is_true(#bag.cloud.puffs > 0)
+      for i, puff in ipairs(bag.cloud.puffs) do
+        assert.is_true(puff.texture:GetAlpha() <= C.Puffs[i].A * (1 + C.Depth) + 1e-6, "puff " .. i .. " as it breathes")
+      end
+    end)
+
+    it("settles a cloud the shimmer was swelling when the shimmer is turned off", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:SetCloudSwell(1)
+      switch("shimmer", false)
+      assert.are.equal(0, bag.cloud.swell)
+      assert.are.equal(style.Cloud.Join.A, bag.cloud.join:GetAlpha(), "the join's puff at its own strength")
+    end)
+
+    -- Every combination of the switches on an open bag draws without an error, every frame: each switch takes a
+    -- part away that some theme leaves out, but not every theme leaves out the same ones together.
+    it("draws an open bag under every combination of the switches, without an error", function()
+      local errors = {}
+      override(_G, "geterrorhandler", function() return function(e) table.insert(errors, tostring(e)) end end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local names = { "sparkles", "shimmer", "titleCloud", "ribbon", "braid", "ornaments" }
+      for mask = 0, 2 ^ #names - 1 do
+        for i, name in ipairs(names) do
+          db.animation[name] = math.floor(mask / 2 ^ (i - 1)) % 2 == 0
+        end
+        sonataNext:ApplyAnimation(ctx())
+        bag.cloud.driver:GetScript("OnUpdate")(bag.cloud.driver, 0.1)
+        assert.are.same({}, errors, "mask " .. mask)
+      end
+    end)
+
+    -- Asked: "can we have another option to turn off the spike that comes off of the bag?" (the ribbon).
+    it("takes the title's ribbon away and brings it back", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.is_true(#bag.ribbonLines > 0)
+      switch("ribbon", false)
+      assert.are.equal(0, #bag.ribbonLines)
+      for _, line in ipairs(bag.ribbonPool) do assert.is_false(line:IsShown()) end
+      assert.is_true(#bag.cloud.puffs > 0, "the cloud stays")
+      switch("ribbon", true)
+      assert.is_true(#bag.ribbonLines > 0)
+      assert.is_true(bag.ribbonLines[1]:IsShown())
+    end)
+
     it("takes the title's cloud away and brings it back", function()
       local bag = opened(function(c) return nextBag:Create(c) end)
       assert.is_true(#bag.cloud.puffs > 0)

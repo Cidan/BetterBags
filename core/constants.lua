@@ -745,7 +745,7 @@ const.DATABASE_DEFAULTS = {
     nextTheme = "Default",
     -- BetterBags Next's Animation switches (Appearance > Animation, next-themes.md §20): each effect on until the player
     -- turns it off, on any theme. These are the only names there are.
-    nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, braid = true, ornaments = true },
+    nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, ribbon = true, braid = true, ornaments = true },
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,

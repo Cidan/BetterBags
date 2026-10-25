@@ -358,7 +358,7 @@ function DB:SetNextTheme(key)
   DB.data.profile.nextTheme = key
 end
 
----@alias NextAnimation "sparkles"|"shimmer"|"titleCloud"|"braid"|"ornaments"
+---@alias NextAnimation "sparkles"|"shimmer"|"titleCloud"|"ribbon"|"braid"|"ornaments"
 
 -- nextAnimationName checks an Animation switch's name: one of the defaults' (const.DATABASE_DEFAULTS), nothing else.
 ---@param name string

@@ -370,7 +370,7 @@ describe("NextSettingsContent", function()
       local classicOnly = { bagFading = true, animateItemMovement = true, fullSectionNames = true,
         resizableWindow = true, snapToContent = true, itemsPerRow = true, columns = true, opacity = true, scale = true }
       local nextOnly = { nextIconScale = true, nextBagScale = true, nextSparkles = true, nextShimmer = true,
-        nextTitleCloud = true, nextBraid = true, nextOrnamentMotion = true }
+        nextTitleCloud = true, nextTitleRibbon = true, nextBraid = true, nextOrnamentMotion = true }
       addon.hasGuildBank = true
       content:Init()
       local named = 0
@@ -396,7 +396,7 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      assert.are.equal(18 + 3 * 29, named)
+      assert.are.equal(19 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -498,16 +498,17 @@ describe("NextSettingsContent", function()
     -- Asked: "we need a way to disable sparkles etc on any theme ... a new option under appearance with a new tab",
     -- then: "title it 'Animation'". A switch per effect, each on until turned off (next-themes.md §20).
     it("has an Animation tab with BetterBags Next, a switch per effect showing whether it is on", function()
-      local on = { sparkles = true, shimmer = false, titleCloud = true, braid = true, ornaments = false }
+      local on = { sparkles = true, shimmer = false, titleCloud = true, ribbon = false, braid = true, ornaments = false }
       override(db, "GetNextAnimation", function(_, name) return on[name] end)
       settings:Open("appearance", "animation")
       assert.are.equal("animation", settings.tabId)
       assert.are.equal("Effects", settings.page.sections[1].title)
       local titles = {}
       for _, row in ipairs(rowsShown()) do table.insert(titles, row.label:GetText()) end
-      assert.are.same({ "Sparkles", "Title Shimmer", "Title Cloud", "Braid", "Moving Ornaments" }, titles)
+      assert.are.same({ "Sparkles", "Title Shimmer", "Title Cloud", "Title Ribbon", "Braid", "Moving Ornaments" }, titles)
       assert.is_true(rowTitled("Sparkles").control:GetChecked())
       assert.is_false(rowTitled("Title Shimmer").control:GetChecked())
+      assert.is_false(rowTitled("Title Ribbon").control:GetChecked())
       assert.is_false(rowTitled("Moving Ornaments").control:GetChecked())
     end)
 

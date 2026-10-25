@@ -731,6 +731,10 @@ for _, effect in ipairs({
   { id = 'nextTitleCloud', name = 'titleCloud', title = 'Title Cloud',
     description = "The soft glow that breathes behind a bag's title.",
     keywords = { 'cloud', 'glow', 'title', 'breathe' } },
+  -- Asked: "another option to turn off the spike that comes off of the bag".
+  { id = 'nextTitleRibbon', name = 'ribbon', title = 'Title Ribbon',
+    description = "The gold line running from a bag's title out past the window's edge.",
+    keywords = { 'ribbon', 'spike', 'line', 'beam', 'title' } },
   { id = 'nextBraid', name = 'braid', title = 'Braid',
     description = 'The ribbons twisting together between two chained bags.',
     keywords = { 'braid', 'ribbon', 'chain', 'chained', 'couple' } },

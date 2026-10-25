@@ -102,6 +102,7 @@ describe("SonataNext", function()
       sparkles = function(t) return t.Sparkles end,
       shimmer = function(t) return t.Header.Spark end,
       titleCloud = function(t) return t.Header.Cloud end,
+      ribbon = function(t) return t.Header.Ribbon end,
       braid = function(t) return t.Chain.Braid or nil end,
       ornaments = function(t) return t.Panel.Ornaments[1].Motion end,
     }
@@ -125,7 +126,6 @@ describe("SonataNext", function()
         end
         assert.are.equal(theme, sonataNext:GetCurrentTheme())
         assert.are.equal(0.6, theme.Header.TitleGlow.Alpha, "the title's glow is no animation")
-        assert.are.equal(300, theme.Header.Ribbon.Length, "nor is the ribbon")
         assert.are.equal("Leaf", theme.Panel.Ornaments[2].Texture)
         assert.are.equal("Roots", theme.Panel.Ornaments[1].Texture, "a still ornament keeps its art")
       end
@@ -151,7 +151,7 @@ describe("SonataNext", function()
     end)
 
     it("keeps a theme as it is written for its authors (Resolve, Check)", function()
-      animation = { sparkles = false, shimmer = false, titleCloud = false, braid = false, ornaments = false }
+      animation = { sparkles = false, shimmer = false, titleCloud = false, ribbon = false, braid = false, ornaments = false }
       sonataNext:Init()
       local raw = sonataNext:Resolve("Default")
       for name, part in pairs(PARTS) do

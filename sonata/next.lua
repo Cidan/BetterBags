@@ -272,6 +272,7 @@ local ANIMATION_OFF = {
   sparkles = function(theme) theme.Sparkles = nil end,
   shimmer = function(theme) theme.Header.Spark = nil end,
   titleCloud = function(theme) theme.Header.Cloud = nil end,
+  ribbon = function(theme) theme.Header.Ribbon = nil end,
   braid = function(theme) theme.Chain.Braid = false end,
   ornaments = function(theme)
     for _, piece in ipairs(theme.Panel.Ornaments or {}) do
