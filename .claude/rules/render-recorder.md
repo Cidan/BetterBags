@@ -78,18 +78,35 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   pixels for the 1,000-unit window); the snapshot is to show whether that side collapses before the
   edges are changed (data-driven.md).
 
+- **A BetterBags Next panel sized** (`recorder:PanelSizing(panel, step)`, from `panelProto:recordSizing`): every step
+  of a grip sizing a small panel and of its size gliding adds a `sizing` entry, `panel` its label and `step` one of
+  `start` (the grip pressed), `resized` (each size change the client makes), `rendered` (each layout while sized or
+  gliding), `scroll kept` (`KeepScroll` put the scroll back, next.md §14g), `let go`, `placed` (let go with nothing to
+  snap), `snap` and `snapped` (each frame of the snap and its end), `reset` and `reset done` (Shift-click's glide).
+  Its lines (`SizingSnapshot`): `screen WxH uiScale scale effective cursor x,y`; `frame <every anchor: point, relative
+  frame, relative point, x,y to four decimals> | l t r b`; `scroll offset <offset> of <range> (<percentage>) | target
+  <its anchor>`; then each shown section's first and last icons: `<section> <slotkey> frame l t r b | art l t r b |
+  border l t r b` (the button's holder, its decoration's `icon` and `IconBorder`, read without making a decoration).
+  Every `l t r b` is where the client put the region (`GetScaledRect`), in screen pixels with three decimals: a
+  fraction is a region off whole pixels, and a value that changes between `rendered` steps with nothing reflowing is
+  what moved. Added for icons that jittered "ever so slight" in game while a panel was sized, in every direction,
+  while the specs' model of the layout kept every icon and every frame it hangs from on the same whole pixels
+  (data-driven.md: the client's own sizing, `StartSizing`, is not documented and cannot be modeled). To capture:
+  start Record Rendering on the Performance tab of `/bbdb`, drag a grip for a second or two, stop, `/reload`.
+
 ## 3. Storage
 
 `BetterBagsPerfDB.renderRecordings`: the newest last, at most `MAX_RECORDINGS` (5). A recording is
 `{ id, startedAt, stoppedAt, character, realm, gameVersion, gameBuild, full?, entries }`; an entry
 is `{ t = "<ms since start>", kind = "render", window, lines = { ... } }`,
-`{ t, kind = "step", window, step, geometry }`, `{ t, kind = "text", step, role, line }` or
-`{ t, kind = "settings", lines = { ... } }`. A recording takes at most `MAX_ENTRIES` (20000)
+`{ t, kind = "step", window, step, geometry }`, `{ t, kind = "text", step, role, line }`,
+`{ t, kind = "settings", lines = { ... } }` or `{ t, kind = "sizing", panel, step, lines = { ... } }`. A recording takes at most `MAX_ENTRIES` (20000)
 entries and then sets `full`. `BetterBagsPerfDB` is separate from the AceDB profile, like the
 profiler's sessions; the recorder's `Init` runs right after `PerfSessions:Init` (initialization.md).
 Read offline from `WTF/Account/<ACCOUNT>/SavedVariables/BetterBags.lua`.
 
-Coverage: `spec/debug/render_recorder_spec.lua` (records on render and only on change, a bag's
+Coverage: `spec/debug/render_recorder_spec.lua` ("a BetterBags Next panel sized": the panel, its scroll box and each
+shown section's first and last icons in screen pixels, nothing while stopped; records on render and only on change, a bag's
 snapshot down to its item buttons, resize steps, nothing while stopped, recording limits, the
 state message, logout; the settings window's scale and edges in pixels, a collapsing side, only
 edges shown in it, only on change), `spec/next/settings/window_spec.lua` ("gives the render recorder

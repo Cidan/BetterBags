@@ -288,6 +288,7 @@ end
 ---@field sizingFrom? number[] Its width and height when the sizing started.
 ---@field sizeGliding boolean Its size glides: back to its default (ResetSize), or onto its columns' width once a grip lets go (StopSizing).
 ---@field sizeGlideKey table Its size glide's tween key.
+---@field keptScroll? number The scroll offset, in pixels of its scroll box, it keeps while a grip sizes it or its size glides (KeepScroll).
 ---@field snap? {layout: number, body: number} While its size glides onto its columns' width (StopSizing): the width its rows are decided on, and the body's width it ends at, which its content keeps through the bounce.
 ---@field smallWidth? number A small panel's size, as it last took it (SmallSize).
 ---@field smallHeight? number
@@ -323,6 +324,9 @@ function rootProto:Render()
   -- The pixel check run in game from /bbdb (debug/pixelaudit.lua) checks the panel once it stays the same.
   if pixelAudit.watching then
     pixelAudit:Changed(self.bag.frame)
+  end
+  if self.bag.sizing ~= nil or self.bag.sizeGliding then
+    self.bag:recordSizing("rendered")
   end
   return { Width = self.bag:Width(), Height = self.bag:Height() }
 end
@@ -1908,8 +1912,42 @@ function panelProto:StartSizing(side)
   frame:SetResizeBounds(self:MinWidth(), self:MinHeight(), UIParent:GetWidth() / s, UIParent:GetHeight() / s)
   self.sizingFrom = { frame:GetWidth(), frame:GetHeight() }
   self.sizing = side
+  self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
   self.content:SetInstant(true)
   frame:StartSizing(side == "LEFT" and "BOTTOMLEFT" or "BOTTOMRIGHT", true)
+  self:recordSizing("start")
+  return true
+end
+
+-- recordSizing gives the render recorder (render-recorder.md §2) a step of a grip sizing the panel or of its size
+-- gliding: where the client puts it and a few of its icons, in screen pixels. Nothing while it does not record.
+---@private
+---@param step string
+function panelProto:recordSizing(step)
+  local recorder = addon:GetModule('RenderRecorder', true)
+  if recorder ~= nil and recorder.recording then
+    recorder:PanelSizing(self, step)
+  end
+end
+
+-- KeepScroll puts what the panel shows back where it was while a grip sizes it, or while its size glides back to its
+-- default: Blizzard's scroll box keeps its scroll percentage as its height changes (ScrollBoxBaseMixin:OnSizeChanged
+-- updates; the offset is the scroll range times the percentage), which moved everything shown a pixel every few frames
+-- (reported: the jitter "on Y, it's ever so slight"). It keeps the scroll offset in pixels, as a browser keeps the top
+-- of a page where it was; past the end, the end. It runs after Blizzard's handler (BuildContent), so nothing is drawn
+-- moved. It returns whether it scrolled, for profiler traces.
+---@return boolean
+function panelProto:KeepScroll()
+  local kept = self.keptScroll
+  if kept == nil or (self.sizing == nil and not self.sizeGliding) then
+    return false
+  end
+  local box = self.scroll.scrollBox
+  if math.abs(box:GetDerivedScrollOffset() - kept) < 0.001 then
+    return false
+  end
+  box:ScrollToOffset(kept, true)
+  self:recordSizing("scroll kept")
   return true
 end
 
@@ -1921,6 +1959,7 @@ function panelProto:Resized()
   end
   self:FitTitle()
   render:Invalidate(self.root)
+  self:recordSizing("resized")
 end
 
 -- StopSizing ends a grip's sizing: the panel keeps the height it was let go at and snaps to the width of the
@@ -1935,6 +1974,7 @@ function panelProto:StopSizing()
   frame:StopMovingOrSizing()
   local x, y, w, h = frame:GetLeft(), frame:GetTop(), frame:GetWidth(), frame:GetHeight()
   local from, side = self.sizingFrom, self.sizing
+  self:recordSizing("let go")
   self.sizing = nil
   -- Let go away from the pointer, it fades now.
   self:fadeGrip(side)
@@ -1960,6 +2000,7 @@ function panelProto:StopSizing()
   self:setOffset(0)
   self:FitTitle()
   render:Invalidate(self.root)
+  self:recordSizing("placed")
 end
 
 -- snapTo glides a small panel let go w wide, its top left at x, y in its own units, to the width its columns take
@@ -1992,6 +2033,7 @@ function panelProto:snapTo(side, x, y, w, layout)
       frame:SetSize(current, height)
       self:FitTitle()
       render:Invalidate(self.root)
+      self:recordSizing("snap")
     end,
     onDone = function()
       self.sizeGliding = false
@@ -2000,6 +2042,7 @@ function panelProto:snapTo(side, x, y, w, layout)
       self:setOffset(0)
       self:FitTitle()
       render:Invalidate(self.root)
+      self:recordSizing("snapped")
     end,
   })
 end
@@ -2034,6 +2077,7 @@ function panelProto:ResetSize(side)
   self.placeX, self.placeY = x1, y1
   self.offset = 0
   database:SetNextSmallPlace(self.kind, x1, y1)
+  self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
   self.sizeGliding = true
   self.content:SetInstant(true)
   tween:Play(self.sizeGlideKey, {
@@ -2047,6 +2091,7 @@ function panelProto:ResetSize(side)
       frame:SetSize(w0 + (w1 - w0) * t, h0 + (h1 - h0) * t)
       self:FitTitle()
       render:Invalidate(self.root)
+      self:recordSizing("reset")
     end,
     onDone = function()
       self.sizeGliding = false
@@ -2055,6 +2100,7 @@ function panelProto:ResetSize(side)
       self:setOffset(0)
       self:FitTitle()
       render:Invalidate(self.root)
+      self:recordSizing("reset done")
     end,
   })
   return "resetting"
@@ -3485,6 +3531,10 @@ function panelProto:BuildContent(scrollName)
   self.content = nextContent:Create(scroll.scrollChild)
   scroll:SetChild(self.content)
   self.root = drawable:Create(rootProto, { frame = self.frame, bag = self })
+  -- After Blizzard's own handler (ScrollBoxBaseMixin:OnSizeChanged), which moves what it shows as its height changes.
+  addon.HookScript(scroll.scrollBox, "OnSizeChanged", function()
+    self:KeepScroll()
+  end)
 
   local emptyText = style:CreateText(self.frame, style.Theme.Footer.EmptyFont)
   emptyText:SetText(L:G("Nothing here yet"))

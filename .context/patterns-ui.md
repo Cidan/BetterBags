@@ -413,3 +413,13 @@ column count, in design units), not of the width drawn now; a layout keeps one l
 Let the few pixels of rounding fall in room kept for them (the scroll bar's) rather than re-fit them every frame. To
 find such jitter, drive a resize a pixel a frame through the real layout and compare each element's pixel place
 between frames with the same decision.
+
+## Blizzard's Scroll Box Keeps Its Percentage When Its Height Changes
+**Problem**: BetterBags Next's panels scroll in Blizzard's `WowScrollBox`. While a grip changed a panel's height, a
+panel scrolled partway moved everything it shows a pixel every few frames: `ScrollBoxBaseMixin:OnSizeChanged` updates
+the box with its scroll percentage kept, and the offset is the scroll range (which follows the height) times it. The
+spec mock kept the percentage on `FullUpdate` instead (Blizzard keeps the offset there) and had no `OnSizeChanged`.
+
+**Rule**: To keep content still while a scroll box changes size, hook the box's own `OnSizeChanged` (a hook runs after
+Blizzard's handler, before the frame is drawn) and put the offset back in pixels (`ScrollToOffset(offset, true)`).
+Restoring from a later render is a frame late and still flickers.

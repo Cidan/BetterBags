@@ -503,3 +503,85 @@ function recorder:WindowStep(window, step)
   end
   self:add({ kind = "step", window = tostring(window.frame:GetName()), step = step, geometry = window:Geometry(step) })
 end
+
+-- pixelRect describes where the client put a region, in screen pixels (k of them per unit at scale 1) with their
+-- fractions: its left, top, right and bottom edges.
+---@param region? ScriptRegion
+---@param k number
+---@return string
+local function pixelRect(region, k)
+  if region == nil then
+    return "none"
+  end
+  local left, bottom, width, height = region:GetScaledRect()
+  if left == nil then
+    return "unplaced"
+  end
+  return string.format("l %.3f t %.3f r %.3f b %.3f", left * k, (bottom + height) * k, (left + width) * k, bottom * k)
+end
+
+---@param region ScriptRegion
+---@return string
+local function anchorsOf(region)
+  local parts = {}
+  for i = 1, region:GetNumPoints() do
+    local point, relativeTo, relativePoint, x, y = region:GetPoint(i)
+    local name = relativeTo and relativeTo.GetName and relativeTo:GetName() or tostring(relativeTo)
+    table.insert(parts, string.format("%s %s %s %.4f,%.4f", point, tostring(name), tostring(relativePoint), x or 0, y or 0))
+  end
+  return table.concat(parts, "; ")
+end
+
+-- SizingSnapshot describes a BetterBags Next panel as the client draws it now: the screen and its scales and the
+-- cursor; the panel's anchors and where it is; its scroll box's offset and its scroll target's anchor; then each shown
+-- section's first and last icons: the button's frame, its art and its quality border (render-recorder.md §2).
+---@param panel table
+---@return string[]
+function recorder:SizingSnapshot(panel)
+  local width, height = GetPhysicalScreenSize()
+  local k = height / 768
+  local frame = panel.frame
+  local x, y = GetCursorPosition()
+  local lines = {
+    string.format("screen %dx%d uiScale %.4f scale %.4f effective %.4f cursor %.3f,%.3f", width, height,
+      UIParent:GetScale(), frame:GetScale(), frame:GetEffectiveScale(), x, y),
+    string.format("frame %s | %s", anchorsOf(frame), pixelRect(frame, k)),
+  }
+  local box = panel.scroll and panel.scroll.scrollBox
+  if box ~= nil then
+    table.insert(lines, string.format("scroll offset %.3f of %.3f (%.5f) | target %s", box:GetDerivedScrollOffset(),
+      box:GetDerivedScrollRange(), box:GetScrollPercentage(), anchorsOf(box:GetScrollTarget())))
+  end
+  for _, section in ipairs(panel.content and panel.content.order or {}) do
+    if section.frame:IsShown() then
+      local first, last
+      for _, entry in ipairs(section.entries) do
+        if entry.item ~= nil then
+          first = first or entry.item
+          last = entry.item
+        end
+      end
+      for _, item in ipairs({ first, last ~= first and last or nil }) do
+        local decoration = rawget(item, "_decoration")
+        local art = decoration and decoration.icon or item.icon
+        local border = decoration and decoration.IconBorder or item.IconBorder
+        table.insert(lines, string.format("%s %s frame %s | art %s | border %s", tostring(section.name),
+          tostring(item.slotkey), pixelRect(item.frame, k), pixelRect(art, k), pixelRect(border, k)))
+      end
+    end
+  end
+  return lines
+end
+
+-- PanelSizing adds a step of a BetterBags Next panel being sized by a grip or gliding to a size, with where the client
+-- put it and a few of its icons (SizingSnapshot). Added for icons that jittered "ever so slight" in game while the
+-- specs' model kept every one on the same whole pixels.
+---@param panel table
+---@param step string
+function recorder:PanelSizing(panel, step)
+  if not self.recording then
+    return
+  end
+  self:add({ kind = "sizing", panel = tostring(panel.label or panel.frame:GetName()), step = step,
+    lines = self:SizingSnapshot(panel) })
+end

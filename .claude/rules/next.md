@@ -1612,6 +1612,18 @@ window to be too big like in that screenshot, it should shrink back down to wher
     frame at the new width, as many icons per row as fit; the canvas places everything at once
     meanwhile (`canvas:SetInstant`), so nothing glides behind the moving edge. A size change of its
     own (a switch) lays nothing out from there.
+  - **What it shows stays where it was scrolled** (`KeepScroll`): Blizzard's scroll box keeps its scroll percentage
+    as its height changes (`ScrollBoxBaseMixin:OnSizeChanged` updates it; the offset is the scroll range times the
+    percentage), so a panel scrolled partway moved everything it shows a pixel every few frames as a grip sized it
+    (simulated: 15 or 16 frames of 150, on every screen tried; reported: the jitter "on Y, it's ever so slight").
+    While a grip sizes it or its size glides, the scroll box's own `OnSizeChanged` (hooked, so after Blizzard's
+    handler, before anything is drawn) puts the scroll offset back in pixels (`keptScroll`, read as the grip is
+    pressed and as Shift-click's glide starts), as a browser keeps the top of a page where it was; past the end, the
+    end. Once nothing sizes it, the scroll box is left to itself. Blizzard's full update keeps the offset when the
+    content's height changes (`FullUpdateInternal`), so a reflow keeps it too. The specs' mock of the scroll box now
+    does both, as Blizzard's does: it kept the percentage on a full update and had no `OnSizeChanged`.
+  - **Recorded** while the render recorder records (`recordSizing`, render-recorder.md §2): each step of the sizing and
+    of its glide, with where the client put the panel and a few icons in screen pixels with their fractions.
   - **Let go, it shrinks to its widest row of icons** (`StopSizing`, `SnapWidth`): its widest row as laid out
     where it was let go, in units: as many cells as a row holds there (`NextCanvas:PerRow`, the canvas's own row
     rule, icons or the vendor's cards), or as its largest section in the column holds when that is fewer

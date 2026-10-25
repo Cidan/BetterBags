@@ -1081,6 +1081,35 @@ describe("BetterBags Next's small mode", function()
         assert.are.equal(columnsWidth(7), bag.frame:GetWidth())
       end)
 
+      -- The render recorder (render-recorder.md §2) gets each step of a grip sizing a panel and of its snap, to show in
+      -- game where the client puts it and its icons while it is sized.
+      it("gives the render recorder each step of a grip sizing it and of its snap, only while it records", function()
+        local recorder, created = StubBetterBagsModule("RenderRecorder")
+        local steps = {}
+        override(recorder, "recording", false)
+        override(recorder, "PanelSizing", function(_, panel, name) table.insert(steps, { panel, name }) end)
+        finally(function()
+          if created then ResetModuleStub("RenderRecorder") end
+        end)
+        local bag = backpack({ 14 })
+        resize(bag, "RIGHT", columnsWidth(20), 600)
+        finishTweens()
+        assert.are.same({}, steps, "nothing while it does not record")
+        recorder.recording = true
+        press(bag.grips.RIGHT)
+        sizeTo(bag, "RIGHT", columnsWidth(20), 600)
+        render:Flush()
+        release(bag.grips.RIGHT)
+        step(style.Time.Snap / 2)
+        finishTweens()
+        local names = {}
+        for _, s in ipairs(steps) do
+          assert.are.equal(bag, s[1])
+          if names[#names] ~= s[2] then table.insert(names, s[2]) end
+        end
+        assert.are.same({ "start", "resized", "rendered", "let go", "snap", "snapped" }, names)
+      end)
+
       it("reflows as it is dragged again once a snap has ended", function()
         local bag = backpack({ 20 })
         resize(bag, "RIGHT", columnsWidth(7) + 20, 600)
