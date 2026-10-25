@@ -1,0 +1,23 @@
+{
+  "id": 1792948919,
+  "version": "v0.8.3-3-g3f12ffb",
+  "channel": "alpha",
+  "date": "2026-10-25",
+  "from": "b39f896e11b15c137680bdc12dc8d0f903b41fb6",
+  "to": "3f12ffb1f2e385223246a1e076fd6675eb97d983",
+  "headline": "Next panels now snap cleanly to their icon columns, and bag resizing is completely smooth without icon jitter or texture shimmering.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Small Next panels snap to icons when resized",
+      "details": "Releasing a resize grip on a small Next panel now smoothly snaps the window width to fit its widest row of icons. Dragging a panel only slightly wider than its default size will snap it back without saving an unwanted width.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Icon jitter and texture shimmering when resizing",
+      "details": "Resizing bag panels no longer causes icons or scrolled content to jump and jitter. In addition, bag textures and Masque skins are now rendered without client sharpening, preventing icon borders from flickering or shifting shade as windows resize.",
+      "clients": []
+    }
+  ]
+}
