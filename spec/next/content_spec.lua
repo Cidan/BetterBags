@@ -301,6 +301,49 @@ describe("NextContent", function()
     canvas:SetInstant(false)
   end)
 
+  -- Reported: "resizing the window in general ... causes a ton of item icon jitter all over". Simulated with a grip
+  -- dragged a pixel a frame: a pixel or two after each column was added, every icon jumped again, up to 19 pixels
+  -- across and a pixel or three down, the gaps closed for the width drawn opening again. A column count keeps one
+  -- layout whatever the width it is drawn in.
+  it("keeps one layout for a column count whatever the width it is drawn in, on every grid", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local undo = layout.UseScreen(3396, 1362, 0.65)
+    parent:SetParent(UIParent)
+    finally(function()
+      parent:SetParent(nil)
+      undo()
+    end)
+    local items = {}
+    for i = 1, 20 do table.insert(items, item("0_" .. i, "A")) end
+    bind(data({ categories = { { name = "A" } }, items = items }))
+    canvas:SetInstant(true)
+    local function places()
+      local out = {}
+      for i = 1, 20 do
+        local _, _, _, x, y = buttons["0_" .. i].frame:GetPoint(1)
+        out[i] = x .. "," .. y
+      end
+      return out
+    end
+    for percent = 50, 150, 5 do
+      parent:SetScale(percent / 100)
+      local expected
+      local from = canvas:RowWidth(7)
+      for width = from, canvas:RowWidth(8) - 0.25, 0.25 do
+        render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = width, LayoutWidth = width })
+        expected = expected or places()
+        assert.are.same(expected, places(), string.format("seven to a row at %d%%, %.2f wide", percent, width))
+      end
+      local section = canvas.order[1]
+      local _, _, _, x7 = buttons["0_7"].frame:GetPoint(1)
+      render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = from, LayoutWidth = from })
+      assert.is_true(x7 + buttons["0_7"].frame:GetWidth() <= section.frame:GetWidth() + 1e-6,
+        string.format("the row fits its own width at %d%%", percent))
+    end
+    parent:SetScale(1)
+    canvas:SetInstant(false)
+  end)
+
   -- A section laid out again with no width to lay out for (in a dock card, at the card's scale) keeps the
   -- rows it had.
   it("keeps a section's rows when it is laid out again without a width to lay out for", function()

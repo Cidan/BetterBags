@@ -402,3 +402,14 @@ kept levels across `SetParent`, so a test that checked the level passed.
 so we need to move it back"). Read the level before `SetParent` and set it after, as Blizzard's
 `FrameUtil.SetParentMaintainRenderLayering` does; a "never lower it" check compares with the level read before. The
 mock now gives a reparented frame one above its new parent.
+
+## Decide Spacing From the Layout, Never From the Width Drawn This Frame
+**Problem**: BetterBags Next closed a row's gaps by a pixel where the grid's rounded icons ran past the width the
+canvas was drawn in. While a grip sized a panel, that width moved a pixel a frame, so right after each column was
+added the gaps closed and a pixel or two later opened: every icon jumped twice per column (up to 19 pixels).
+
+**Rule**: Anything that sets where cells stand (gaps, steps, offsets) is a function of the layout decision (the
+column count, in design units), not of the width drawn now; a layout keeps one look for as long as its decision holds.
+Let the few pixels of rounding fall in room kept for them (the scroll bar's) rather than re-fit them every frame. To
+find such jitter, drive a resize a pixel a frame through the real layout and compare each element's pixel place
+between frames with the same decision.

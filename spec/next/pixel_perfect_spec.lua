@@ -685,6 +685,53 @@ describe("BetterBags Next, pixel perfect", function()
       assert.is_true(math.abs(bag.root:PreRender().LayoutWidth - (style.BODY_WIDTH - 2 * style.PAD)) < 1e-9)
     end)
 
+    -- Reported: "resizing the window in general ... causes a ton of item icon jitter all over". A grip dragged a pixel
+    -- a frame, as the client sizes a frame following the mouse: an icon moves only where a column is added or taken
+    -- away. A pixel or two after each column was added, every icon used to jump again (up to 19 pixels across on the
+    -- reporter's screen, rows a pixel or three down): the gaps closed for the width drawn, then opened.
+    it("moves no icon while a grip sizes it, but where a column is added", function()
+      local cats, list = {}, {}
+      for s, n in ipairs({ 1, 14, 4, 7, 20 }) do
+        table.insert(cats, { name = "S" .. s })
+        for i = 1, n do table.insert(list, item(s .. "_" .. i, "S" .. s)) end
+      end
+      slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
+      for _, case in ipairs({ { 3396, 1362, 0.65, 100 }, { 1920, 1080, 1, 85 } }) do
+        useScreen(case[1], case[2], case[3])
+        db.size, db.bagScale = "small", case[4]
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        settle()
+        local ppu, s = layout.PixelsPerUnit(), bag.frame:GetEffectiveScale()
+        local h = bag.frame:GetHeight()
+        local r0 = layout.Rect(bag.frame)
+        local start = math.floor((r0.right - r0.left) * ppu + 0.5)
+        bag:StartSizing("RIGHT")
+        local previous
+        for px = start, start + 130 do
+          bag.frame:SetSize(px / ppu / s, h)
+          bag.frame:GetScript("OnSizeChanged")(bag.frame, px / ppu / s, h)
+          render:Flush()
+          local frame = layout.Rect(bag.frame)
+          local now = { perRow = bag.content:PerRow(bag:LayoutWidth() - bag:ContentRoom()), places = {} }
+          for key, b in pairs(buttons) do
+            local r = layout.Rect(b.frame)
+            if r ~= nil and b.frame:IsVisible() then
+              now.places[key] = math.floor((r.left - frame.left) * ppu + 0.5) .. "," .. math.floor((frame.top - r.top) * ppu + 0.5)
+            end
+          end
+          if previous ~= nil and previous.perRow == now.perRow then
+            assert.are.same(previous.places, now.places,
+              string.format("%s at Bag Scale %d%%, %d to %d pixels wide", screenName(case), case[4], px - 1, px))
+          end
+          previous = now
+        end
+        bag:StopSizing()
+        bag:Hide(ctx())
+        finishTweens()
+        chain:Init()
+      end
+    end)
+
     it("puts every item in the same row and column at every Bag Scale", function()
       local list = {}
       for i = 1, 13 do table.insert(list, item("0_" .. i, "Consumable")) end

@@ -67,9 +67,22 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
     rows it had (`section.layoutWidth`).
   - Cells still stand on the grid's whole-pixel step, every gap the same. The rounded step can run up to a
     pixel per cell past the width (measured: 9 pixels, over a scroll bar room as small as 6), so where a row
-    would run past the width it is drawn in, the gap closes by the pixel or two the rounding added.
+    would run past its own width (`NextCanvas:RowWidth`: its cells and gaps in units, the least width that holds
+    them), the gap closes by the pixel or two the rounding added. Read from the row's own width, the gap is one
+    for a column count, whatever width the row is drawn in.
   - Measured after (the same probe): no width lays out differently on any of the four screens, no row runs past
     the content, and the gap closes in 3% to 8% of layouts, by 1 pixel (2 at most).
+  - **Failure mode (fixed, reported: "resizing the window in general ... causes a ton of item icon jitter all
+    over"):** the gap closed for the width drawn. While a grip sized a panel, a column was added once the width to
+    lay out for held it, but the width drawn (the scroll box's room rounded to the grid) was still a pixel or two
+    short of the rounded row, so the gaps closed, and opened again a pixel or two later: every icon jumped a second
+    time, up to 19 pixels across at the far end, and every row a pixel or three down (a row steps by the same gap).
+    Simulated on the real panel and canvas with a grip dragged a pixel a frame over 700 pixels (six screens, Bag
+    Scales 100%, 85% and 55%, both grips): before, 8 to 18 such frames per drag; after, none. A row now runs past
+    the width drawn by at most a pixel (measured: 1, on 3396x1362 at 65% at 85%), into the scroll box's room for its
+    bar, never past the scroll box. Covered by `spec/next/content_spec.lua` ("keeps one layout for a column count
+    whatever the width it is drawn in, on every grid") and `spec/next/pixel_perfect_spec.lua` ("moves no icon while
+    a grip sizes it, but where a column is added").
 - **A room is measured on the column's grid.** The column keeps a room for a section held in a drag (drawn shrunk,
   `Drag.LiftScale`, until its landing ends) and for one flying back from a dock (at its card's scale): its height
   is `NextContent:MeasureSection(section, canvas.frame, ...)`, the section's layout on the column's grid, not the

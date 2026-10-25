@@ -777,10 +777,14 @@ function canvasProto:MeasureSection(section, grid, width, layoutWidth)
     self.cards and style.CARD_ICON or style.ICON)
   local gap, header = pixel:Lengths(grid, style.GAP, style.SECTION_HEADER)
   local perRow = self:PerRow(layoutWidth)
-  -- The row fits the width it is drawn in: where the grid's rounded lengths would run past it (up to a pixel per
-  -- cell, over the scroll bar's room), the gap closes by the pixel or two the rounding added. Every gap the same.
+  -- The row fits its own width (RowWidth: its cells and gaps in units, the least width that holds them): where the
+  -- grid's rounded lengths would run past it (up to a pixel per cell, over the scroll bar's room), the gap closes by the
+  -- pixel or two the rounding added. Every gap the same, and the same for a column count whatever the width it is
+  -- drawn in. Reported: "resizing the window ... causes a ton of item icon jitter all over"; closed for the width
+  -- drawn, the gaps opened again a pixel or two after each column was added while a grip sized a panel, every icon
+  -- jumping a second time (up to 19 pixels across, rows a pixel or three down).
   if perRow > 1 then
-    gap = math.max(0, math.min(gap, pixel:Floor(grid, (width - perRow * cellWidth) / (perRow - 1))))
+    gap = math.max(0, math.min(gap, pixel:Floor(grid, (self:RowWidth(perRow) - perRow * cellWidth) / (perRow - 1))))
   end
   local rows = math.max(1, math.ceil(#section.entries / perRow))
   return { width = width, perRow = perRow, cellWidth = cellWidth, cellHeight = cellHeight, step = cellWidth + gap,
