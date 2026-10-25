@@ -216,6 +216,21 @@ describe("NextContent", function()
     assert.are.same({ style.GRID_WIDTH, aHeight + style.SECTION_SPACING + bHeight }, { result.Width, result.Height })
   end)
 
+  -- A small panel snaps to the width of the columns it shows (next.md §14g): the canvas says how many cells a width
+  -- holds and how wide they are, in units, as it decides its rows (MeasureSection).
+  it("says how many cells a width to lay out for holds, and how wide they are", function()
+    assert.are.equal(8, canvas:PerRow(style.GRID_WIDTH))
+    assert.are.equal(7, canvas:PerRow(style.GRID_WIDTH - 1))
+    assert.are.equal(1, canvas:PerRow(1), "one, however narrow")
+    assert.are.equal(style.GRID_WIDTH, canvas:RowWidth(8))
+    assert.are.equal(7 * STEP - style.GAP, canvas:RowWidth(7))
+    canvas:SetCards(true)
+    local card = style.VENDOR_CARD_WIDTH + style.GAP
+    assert.are.equal(3, canvas:PerRow(3 * card - style.GAP))
+    assert.are.equal(3 * card - style.GAP, canvas:RowWidth(3))
+    canvas:SetCards(false)
+  end)
+
   it("fits fewer icons to a row in a narrower width", function()
     local items = {}
     for i = 1, 6 do table.insert(items, item("0_" .. i, "A")) end

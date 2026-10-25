@@ -31,6 +31,46 @@ local CLOSE = 0.5
 -- How close a frame's anchor must be to its place for it to be left alone.
 local EXACT = 0.01
 
+-- A size snapping to what it holds (a window to its content, window.md §3b; a BetterBags Next panel to its columns,
+-- next.md §14g): the share of the snap spent reaching the bounce, and how far past the size the bounce goes (a share
+-- of the distance, at most SNAP_OVERSHOOT). The bounce stays inside the room a scroll box keeps beside its content.
+local SNAP_TURN = 0.65
+local SNAP_OVERSHOOT = 10
+local SNAP_OVERSHOOT_SHARE = 0.1
+
+-- SnapSizeAt returns a width or height of a snap from from to to at progress p (0 to 1): it eases out to overshoot
+-- past to by SNAP_TURN of the way, then settles back on to.
+---@param from number
+---@param to number
+---@param overshoot number
+---@param p number
+---@return number
+function motion.SnapSizeAt(from, to, overshoot, p)
+  if p <= 0 then
+    return from
+  end
+  if p >= 1 then
+    return to
+  end
+  local low = to - overshoot
+  if p <= SNAP_TURN then
+    local q = p / SNAP_TURN
+    return from + (low - from) * (1 - (1 - q) ^ 3)
+  end
+  local q = (p - SNAP_TURN) / (1 - SNAP_TURN)
+  return low + overshoot * q * q * (3 - 2 * q)
+end
+
+-- SnapOvershoot returns how far a snap from from to to bounces past to: a share of the distance, at most
+-- SNAP_OVERSHOOT, never below floor (the size's minimum); none for a size that grows.
+---@param from number
+---@param to number
+---@param floor number
+---@return number
+function motion.SnapOvershoot(from, to, floor)
+  return math.max(0, math.min(SNAP_OVERSHOOT, (from - to) * SNAP_OVERSHOOT_SHARE, to - floor))
+end
+
 ---@class (exact) Move
 ---@field root any The root whose pass started it.
 ---@field relativeTo Frame

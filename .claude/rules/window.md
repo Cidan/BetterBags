@@ -173,7 +173,8 @@ canvas pinned the content to its left edge whatever width it was given.
   checks this over 300 bags). The top left is pinned (re-anchored `TOPLEFT` to `UIParent`), so the
   edge the player dragged moves. The width eases out (cubic) to 10 % of the distance past the
   target (at most 10 px, never below the minimum) in 65 % of 0.35 s, then settles back
-  (smoothstep): the bounce. While it runs the window hands the content a `LayoutWidth` (the
+  (smoothstep): the bounce (Motion's `SnapSizeAt` and `SnapOvershoot`, render-pipeline.md §4c, which
+  BetterBags Next's small panels snap with too, next.md §14g). While it runs the window hands the content a `LayoutWidth` (the
   target) with its real `Width`, so the layout never changes mid-bounce and the content stays
   centered in the moving width; the bounce stays inside the 14 px room. Each step lays the window
   out (`Invalidate`). At the end it saves the position and size (`OnResized`). Grabbing the grip,

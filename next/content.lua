@@ -472,6 +472,23 @@ function canvasProto:CellHeight()
   return pixel:Length(self.frame, self.cards and style.CARD_ICON or style.ICON)
 end
 
+-- PerRow is how many cells a row holds in layoutWidth (the width to lay out for, in units: a panel's own, never rounded
+-- to its grid, next-pixel-perfect.md §3): its icons, or cards, with the theme's gap between them; at least one.
+---@param layoutWidth number
+---@return number
+function canvasProto:PerRow(layoutWidth)
+  local step = (self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP
+  return math.max(1, math.floor((layoutWidth + style.GAP) / step + 1e-6))
+end
+
+-- RowWidth is how wide perRow cells are with the gaps between them, in units: the width a small panel snaps its
+-- content to (next.md §14g).
+---@param perRow number
+---@return number
+function canvasProto:RowWidth(perRow)
+  return perRow * ((self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP) - style.GAP
+end
+
 ---@class (exact) NextCanvasSection
 ---@field name string
 ---@field buttons {key: string, frame: Frame}[] Drawn already, in order.
@@ -744,8 +761,7 @@ function canvasProto:MeasureSection(section, grid, width, layoutWidth)
   local cellWidth, cellHeight = pixel:Lengths(grid, self.cards and style.VENDOR_CARD_WIDTH or style.ICON,
     self.cards and style.CARD_ICON or style.ICON)
   local gap, header = pixel:Lengths(grid, style.GAP, style.SECTION_HEADER)
-  local designStep = (self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP
-  local perRow = math.max(1, math.floor((layoutWidth + style.GAP) / designStep + 1e-6))
+  local perRow = self:PerRow(layoutWidth)
   -- The row fits the width it is drawn in: where the grid's rounded lengths would run past it (up to a pixel per
   -- cell, over the scroll bar's room), the gap closes by the pixel or two the rounding added. Every gap the same.
   if perRow > 1 then

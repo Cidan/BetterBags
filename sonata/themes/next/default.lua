@@ -255,6 +255,9 @@ sonataNext:RegisterTheme({
       MorphFade = 0.2,
       -- A small panel gliding back to its default size (Shift-click on a grip).
       Resize = 0.4,
+      -- A small panel snapping to the width of the columns it shows once a grip lets go, with the original bags'
+      -- bounce (Motion's SnapSizeAt; window.md §3b snaps in the same time).
+      Snap = 0.35,
       -- A switch's knob sliding; a page's tab marker gliding to the tab chosen.
       Toggle = 0.18,
       TabMarker = 0.22,

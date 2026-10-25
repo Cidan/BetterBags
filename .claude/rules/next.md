@@ -1573,7 +1573,11 @@ the original bags ... make this resize static though, i.e. no snapping"; then gr
 but disable it on the side it's chained on, if it's chained"; the room left past the last icon "all on
 the right ... let's not center in the next design"; "remember what the custom window sizing is"; a
 tooltip; "shift + left click the grip to reset to default size (animated, of course)"; and, after
-trying them in game, "auto-hide the handles so they only show on hover".
+trying them in game, "auto-hide the handles so they only show on hover". Then (2026-10-24) snapping, always on:
+"let's bring our snapping windows logic from original bags to next, but make it always on ... when we let go, it
+will size down (or up) to the nearest exact width needed to fit the columns the user released it at"; "normalize to
+the nearest column that keeps the same column count on screen as the user selected, never normalize such that the
+column count changes away from the user"; the height snap "on hold, only X"; "default should probably be exact too".
 
 - **The grips** (`BuildGrips`, `styleGrips`, the theme's `Small.Grip`): a button on each bottom corner
   of a small panel's body, `Inset` (2) in, `Size` (16) square, drawn with Blizzard's chat size grabber
@@ -1605,20 +1609,41 @@ trying them in game, "auto-hide the handles so they only show on hover".
     frame at the new width, as many icons per row as fit; the canvas places everything at once
     meanwhile (`canvas:SetInstant`), so nothing glides behind the moving edge. A size change of its
     own (a switch) lays nothing out from there.
-  - **Let go, it stays exactly the size it is** (no snapping), saved for its kind with its place (its
-    top left, which the left grip moves). A press that changes the size by less than half a unit saves
-    nothing, so the default size keeps following the screen. Hiding it (Escape) ends the sizing,
-    keeping the size reached (`OnHidden`).
-- **Its size** (`SmallSize`): the saved size, else `BODY_WIDTH` wide and `Small.Height` of the screen
-  tall; never below its minimum nor past the screen, without changing what was saved.
+  - **Let go, it snaps to its columns' width** (`StopSizing`, `SnapWidth`): the width of the columns it shows
+    where it was let go, in units: as many cells as a row holds there (`NextCanvas:PerRow`, the canvas's own row
+    rule, icons or the vendor's cards), their width with the gaps between them (`RowWidth`), and the room beside
+    them (`ContentRoom`: the padding, the side rail, the scroll box's room for its bar on both sides, read from the
+    scroll box's options, `SCROLL_OPTIONS`); never below its minimum. Never another column count: the columns shown
+    fit, so it only ever narrows to them (a fraction of a pixel aside). The height stays where it was let go (a
+    height snap is on hold). Saved for its kind with its place (its top left, which the left grip moves: the side
+    across from the grip stays still). A press whose snapped width and height are within half a unit of the size
+    it had saves nothing (a default-sized panel dragged a little wider snaps back to the default and saves
+    nothing), so the default size keeps following the screen. Hiding it (Escape) ends the sizing, snapped
+    (`OnHidden`).
+  - **The snap glides with the original bags' bounce** (`snapTo`): past its width by Motion's overshoot (a tenth
+    of the distance, at most 10, never below its minimum; render-pipeline.md §4c) and back, over `Time.Snap`
+    (Default 0.35, the original bags' time, window.md §3b), the edge the grip moved moving. Its content keeps the
+    rows and the width it ends at all the way (`panel.snap`: the root hands it `snap.body`, `LayoutWidth` is
+    `snap.layout`), so the bounce, inside the scroll box's room, moves no item and closes no gap. It is the size
+    glide Shift-click uses (`sizeGliding`, `sizeGlideKey`; they were `resetting`, `resetKey`), so everything that
+    follows a panel while its size glides follows a snap too (`LivePlace`, `SmallLeft`, `chain:Update`, a
+    partner's spot and the braid), and anything that places, moves, sizes, switches or hides it ends the snap at
+    its width (`endSizeGlide`).
+- **Its size** (`SmallSize`): the saved size, else its default width (`DefaultWidth`: the columns the full
+  body's width holds, `SnapWidth(BODY_WIDTH)`, so it leaves no room past its last column at any Icon Scale;
+  exactly `BODY_WIDTH` at 100%) and `Small.Height` of the screen tall; never below its minimum nor past the
+  screen, without changing what was saved. An open panel at its default size takes its new default when Icon
+  Scale changes (`FitSmall`); a saved size keeps its width. While it is built (its header fits its title before
+  its footer and content exist) `SmallWidth` reads the full body's width; `ApplyGeometry` gives it its size.
   - `MinWidth`: room for the shown header buttons, 12, and `Small.MinTitle` of the title (cut short
     past that); for the footer's free slots, 12 and the money (`frames/money.lua`: 128 wide); and for
     one column of icons with the scroll box's room and the padding. `MinHeight`: the header, the
     footer, a section's title and one row of icons (`CellHeight`).
-  - `SmallWidth`/`SmallHeight` read the frame while a grip sizes it or it glides back, else the size it
+  - `SmallWidth`/`SmallHeight` read the frame while a grip sizes it or its size glides, else the size it
     took last (`smallWidth`, `smallHeight`, from `ApplyGeometry` and `FitSmall`).
   - The room past the last column of icons is left on the right, as a web page's (asked: no centering
-    in Next's design).
+    in Next's design); a grip let go snaps it away, so only a panel held wider by its minimum (its header,
+    its footer) or a size saved before snapping keeps any.
   - It comes back at its saved size after a switch to full size and back. When the screen changes
     (`FitSmall`) it is refitted to it and laid out again if its width or height changed; what was
     saved is kept.
@@ -1638,7 +1663,7 @@ trying them in game, "auto-hide the handles so they only show on hover".
   top right), its content reflowing at once on the way as while dragging; the saved size is cleared,
   so the default follows the screen again, and the place saved. It returns `"resetting"`, `"default"`
   (nothing was saved) or `"closing"`. Anything that places, moves, sizes, switches or hides the panel
-  ends the glide where it was going first (`endReset`, from `setOffset`, `StartMove`, `StartSizing`,
+  ends the glide where it was going first (`endSizeGlide`, from `setOffset`, `StartMove`, `StartSizing`,
   `PrepareResize`, `OnHidden`).
 - **Everything that read one width reads each panel's own:** `ChainedPlace`, `Dropped` (a bag too wide
   to sit beside its partner on the screen does not chain), the braid's gap (`applyCoupling`),
@@ -1667,8 +1692,17 @@ cache, warcraft.wiki.gg Frame:SetUserPlaced, not from sizing) and the chained-ba
 `StopSizing`, which the grip turned off on the chained side made pointless (its chained side never
 moves); the same branch in `ResetSize` went for the same reason.
 
-Not verified in game yet: the hover fade, the glide back, chained bags' grips, and how the grips look
-on the other Next themes (Parchment's light paper). A render recording of a resize (render-recorder.md)
+Snapping (2026-10-24): `spec/next/small_spec.lua` ("snapping to its columns": never adding a column, exactly a
+column count's width kept, a default-sized panel dragged a little wider snapping back and saving nothing, a new
+height alone saved, its minimum (and nothing less saved), the bounce and its height still, its columns through the
+bounce, the left grip's edge, ended by a grip, a move and a hide, a chained bag's chained side still, cards, dragged
+again after a snap; with a side rail; hiding mid-drag snapped; "Icon Scale": the default at the columns it holds,
+refitted when Icon Scale changes, a saved size kept), `spec/next/content_spec.lua` (`PerRow`, `RowWidth`),
+`spec/render/motion_spec.lua` ("a size snapping"). 30 mutations, each caught; three first survived and led to
+tests (the minimum saved, the rail's room, the snap record cleared).
+
+Not verified in game yet: the hover fade, the glide back, the snap and its bounce, chained bags' grips, and how the
+grips look on the other Next themes (Parchment's light paper). A render recording of a resize (render-recorder.md)
 would show the reflow and the room left on the right.
 
 ### 14h. Bag Scale (Appearance → Size)

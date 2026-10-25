@@ -737,18 +737,6 @@ describe("Window", function()
         assert.is_nil(w.snapDriver:GetScript("OnUpdate"))
       end)
 
-      it("follows a bounce curve: from the start, past the end, back to the end", function()
-        assert.are.equal(700, window.SnapSizeAt(700, 412, 10, 0))
-        assert.are.equal(412, window.SnapSizeAt(700, 412, 10, 1))
-        assert.are.equal(402, window.SnapSizeAt(700, 412, 10, 0.65))
-        local previous = 700
-        for i = 1, 100 do
-          local width = window.SnapSizeAt(700, 412, 10, i / 100)
-          assert.is_true(math.abs(width - previous) < 40, "no jumps")
-          previous = width
-        end
-      end)
-
       -- The same snap for the height: dead space below the content goes, so the content's bottom
       -- meets the bottom of the content box as its top meets the top (the theme's insets around
       -- both). The top stays where it is, so the bottom edge moves.

@@ -29,6 +29,29 @@ describe("Motion", function()
     end
   end
 
+  -- A window snapping to its content (window.md §3b) and a BetterBags Next panel snapping to its columns (next.md §14g)
+  -- bounce the same way.
+  describe("a size snapping", function()
+    it("follows a bounce curve: from the start, past the end, back to the end", function()
+      assert.are.equal(700, motion.SnapSizeAt(700, 412, 10, 0))
+      assert.are.equal(412, motion.SnapSizeAt(700, 412, 10, 1))
+      assert.are.equal(402, motion.SnapSizeAt(700, 412, 10, 0.65))
+      local previous = 700
+      for i = 1, 100 do
+        local width = motion.SnapSizeAt(700, 412, 10, i / 100)
+        assert.is_true(math.abs(width - previous) < 40, "no jumps")
+        previous = width
+      end
+    end)
+
+    it("bounces a tenth of the way past, at most 10, never below a floor nor for a size that grows", function()
+      assert.are.equal(4, motion.SnapOvershoot(500, 460, 100))
+      assert.are.equal(10, motion.SnapOvershoot(700, 412, 100))
+      assert.are.equal(3, motion.SnapOvershoot(700, 412, 409), "no lower than the floor")
+      assert.are.equal(0, motion.SnapOvershoot(460, 500, 100), "growing, it does not bounce")
+    end)
+  end)
+
   local function pass(passKey, fn)
     motion:BeginPass(passKey)
     fn()

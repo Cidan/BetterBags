@@ -21,6 +21,9 @@ local context = addon:GetModule('Context')
 ---@class Perf: AceModule
 local perf = addon:GetModule('Perf')
 
+---@class Motion: AceModule
+local motion = addon:GetModule('Motion')
+
 ---@class LibWindow-1.1: AceAddon
 local LibWindow = LibStub('LibWindow-1.1')
 
@@ -40,13 +43,8 @@ local window = addon:NewModule('Window')
 -- How much of the screen's height a window sized to its content may take.
 local SCREEN_FRACTION = 0.9
 
--- Snapping to the content after a resize: how long it takes, the share of it spent reaching the
--- bounce, and how far past the content's width the bounce goes (a share of the distance, at
--- most SNAP_OVERSHOOT). The bounce stays inside the room a bag's scroll box keeps on each side.
+-- How long snapping to the content after a resize takes; its bounce is Motion's (SnapSizeAt, SnapOvershoot).
 local SNAP_DURATION = 0.35
-local SNAP_TURN = 0.65
-local SNAP_OVERSHOOT = 10
-local SNAP_OVERSHOOT_SHARE = 0.1
 
 -- At a UI scale the client reads a frame's size back with float error (a window set to 466 reads
 -- a hair under it), and content compares the size it is given with layouts that are whole
@@ -133,29 +131,6 @@ local DEFAULT_GRIP = {
 ---@field snapDriver? Frame Steps a snap each frame.
 ---@field opts WindowOptions
 local windowProto = drawable:Extend({}, 'WindowFrame')
-
--- SnapSizeAt returns a width or height of a snap from from to to at progress p (0 to 1): it eases
--- out to overshoot past to by SNAP_TURN of the way, then settles back on to.
----@param from number
----@param to number
----@param overshoot number
----@param p number
----@return number
-function window.SnapSizeAt(from, to, overshoot, p)
-  if p <= 0 then
-    return from
-  end
-  if p >= 1 then
-    return to
-  end
-  local low = to - overshoot
-  if p <= SNAP_TURN then
-    local q = p / SNAP_TURN
-    return from + (low - from) * (1 - (1 - q) ^ 3)
-  end
-  local q = (p - SNAP_TURN) / (1 - SNAP_TURN)
-  return low + overshoot * q * q * (3 - 2 * q)
-end
 
 ---@param value number|false|nil|fun(): number
 ---@return number?
@@ -944,10 +919,10 @@ function windowProto:startSnap(ctx)
   self.snap = {
     from = from,
     to = to,
-    overshoot = math.max(0, math.min(SNAP_OVERSHOOT, (from - to) * SNAP_OVERSHOOT_SHARE, to - minWidth)),
+    overshoot = motion.SnapOvershoot(from, to, minWidth),
     fromHeight = fromHeight,
     toHeight = toHeight,
-    overshootHeight = math.max(0, math.min(SNAP_OVERSHOOT, (fromHeight - toHeight) * SNAP_OVERSHOOT_SHARE, toHeight - minHeight)),
+    overshootHeight = motion.SnapOvershoot(fromHeight, toHeight, minHeight),
     elapsed = 0,
     contentWidth = to - insets.Left - insets.Right,
   }
@@ -975,8 +950,8 @@ function windowProto:stepSnap(elapsed)
   end
   snap.elapsed = snap.elapsed + elapsed
   local p = math.min(1, snap.elapsed / SNAP_DURATION)
-  self.frame:SetSize(window.SnapSizeAt(snap.from, snap.to, snap.overshoot, p),
-    window.SnapSizeAt(snap.fromHeight, snap.toHeight, snap.overshootHeight, p))
+  self.frame:SetSize(motion.SnapSizeAt(snap.from, snap.to, snap.overshoot, p),
+    motion.SnapSizeAt(snap.fromHeight, snap.toHeight, snap.overshootHeight, p))
   self:Invalidate()
   if p >= 1 then
     self:FinishSnap()
