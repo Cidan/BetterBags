@@ -260,6 +260,9 @@ end
 -- the text's height rounded up.
 function rowProto:Measure(width)
   local C = style.Theme.Settings.Content
+  if C.Layout == "List" then
+    return self:measureList(width)
+  end
   local frame = self.frame
   local pad = pixel:Snap(frame, C.RowPad)
   if self.control then
@@ -294,6 +297,11 @@ function rowProto:Place(x, y, width, height)
   pixel:Point(frame, "TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
   pixel:Size(frame, width, height)
   height = frame:GetHeight()
+  if C.Layout == "List" then
+    self:placeList(width, height)
+    frame:Show()
+    return
+  end
   local function placeLabel()
     self.label:ClearAllPoints()
     pixel:Row(self.label, "TOPLEFT", frame, pad, height, pixel:Ceil(frame, self.label:GetStringHeight()))
@@ -324,6 +332,96 @@ function rowProto:Place(x, y, width, height)
     placeLabel()
   end
   frame:Show()
+end
+
+-- The kind of a row's control, for where Blizzard's list puts it (Content.Controls).
+---@param row NextSettingsRow
+---@return string
+local function kindOf(row)
+  if row.option ~= nil then
+    return row.option.kind
+  end
+  return row.buttons ~= nil and "buttons" or "text"
+end
+
+-- listMiddle returns the row's middle in whole pixels, which Blizzard's list places controls from.
+---@param frame Frame
+---@param width number
+---@return number
+local function listMiddle(frame, width)
+  return pixel:Floor(frame, width / 2)
+end
+
+-- measureList returns a row's height in Blizzard's list (Content.Layout = "List"): at least RowHeight; a setting's name
+-- from LabelX in to LabelRight from the middle, wrapping there; text from LabelX to the right edge.
+---@private
+---@param width number
+---@return number
+function rowProto:measureList(width)
+  local C = style.Theme.Settings.Content
+  local frame = self.frame
+  local rowHeight = pixel:Length(frame, C.RowHeight)
+  local labelX = pixel:Snap(frame, C.LabelX or 0)
+  if self.control then
+    self.label:SetWidth(math.max(1, listMiddle(frame, width) + pixel:Snap(frame, C.LabelRight or 0) - labelX))
+    return math.max(rowHeight, pixel:Ceil(frame, self.label:GetStringHeight()))
+  end
+  if self.buttons or self.button then
+    return rowHeight
+  end
+  if self.area then
+    return pixel:Length(frame, self.areaHeight)
+  end
+  self.label:SetWidth(pixel:Floor(frame, math.max(1, width - labelX)))
+  return pixel:Ceil(frame, self.label:GetStringHeight())
+end
+
+-- placeList lays a row out as Blizzard's list does (Blizzard_SettingControls.lua): the name LabelX in, centered on the
+-- row; the control from the row's middle by its kind's X, Y up (Content.Controls: the check box 80 left of the middle,
+-- the dropdown 48 left and 3 up, ...), centered on the row; buttons from their X left to right; text and areas from
+-- LabelX; lit under the pointer from HoverInset.Left past its left to HoverInset.Right short of its right.
+---@private
+---@param width number
+---@param height number
+function rowProto:placeList(width, height)
+  local C = style.Theme.Settings.Content
+  local frame = self.frame
+  local labelX = pixel:Snap(frame, C.LabelX or 0)
+  local middle = listMiddle(frame, width)
+  local spot = (C.Controls or {})[kindOf(self)] or {}
+  local controlX = middle + pixel:Snap(frame, spot.X or 0)
+  local raise = pixel:Snap(frame, spot.Y or 0)
+  if self.hover then
+    local H = C.HoverInset or {}
+    self.hover:ClearAllPoints()
+    self.hover:SetPoint("TOPLEFT", frame, "TOPLEFT", pixel:Snap(frame, H.Left or 0), 0)
+    self.hover:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -pixel:Snap(frame, H.Right or 0), 0)
+  end
+  if self.label then
+    self.label:ClearAllPoints()
+    pixel:Row(self.label, "TOPLEFT", frame, labelX, height, pixel:Ceil(frame, self.label:GetStringHeight()))
+  end
+  if self.control then
+    self.control.frame:ClearAllPoints()
+    pixel:Row(self.control.frame, "TOPLEFT", frame, controlX, height, nil, -raise)
+  elseif self.buttons then
+    local across = controlX
+    for _, b in ipairs(self.buttons) do
+      b.frame:ClearAllPoints()
+      pixel:Row(b.frame, "TOPLEFT", frame, across, height)
+      across = across + b.frame:GetWidth() + pixel:Snap(frame, C.ButtonGap or 4)
+    end
+  elseif self.button then
+    self.button.frame:ClearAllPoints()
+    pixel:Row(self.button.frame, "TOPLEFT", frame, labelX, height)
+  elseif self.area then
+    local area = self.area.frame
+    area:ClearAllPoints()
+    area:SetPoint("TOPLEFT", frame, "TOPLEFT", labelX, 0)
+    area:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    pixel:Height(area, self.areaHeight)
+    self.area:Style()
+  end
 end
 
 -- Refresh shows the option's value again (it may have changed elsewhere).

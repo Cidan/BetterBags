@@ -416,6 +416,7 @@ files["spec/**/*.lua"] = {
 		"MockAtlas",
 		"ResetMockAtlases",
 		"UseNineSliceLayouts",
+		"UseRealAtlasSizes",
 		"MockUnits",
 	},
 	ignore = {

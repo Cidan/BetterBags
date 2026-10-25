@@ -144,7 +144,8 @@ function inputProto:Style()
     pixel:Size(self.icon, spec.Size, spec.Size)
     self.icon:ClearAllPoints()
     pixel:Row(self.icon, "TOPLEFT", frame, pad, frame:GetHeight())
-    controls:Paint(self.icon, { Texture = spec.Texture, Color = spec.Color })
+    -- A glyph, or an atlas (the Plain theme's: Blizzard's common-search-magnifyingglass).
+    controls:Paint(self.icon, { Texture = not spec.Atlas and spec.Texture or nil, Atlas = spec.Atlas, Color = spec.Color })
     left = pad + self.icon:GetWidth() + pixel:Floor(frame, pad / 2)
   end
   style:SetFont(frame, I.Font)

@@ -992,6 +992,138 @@ describe("NextSettings", function()
     end)
   end)
 
+  -- Blizzard's settings window (Blizzard_SettingsPanel.xml, the same on every client), the Plain theme's (asked: the
+  -- window was wrong "in every way it can be"; docs/next-plain-theme.md, round two): 920 x 724, its name in the title
+  -- bar, Options_InnerFrame at 17, -64, the category list at 18, 76, 199 wide down to 46 above the bottom, rows 175 wide;
+  -- the content from 16 right of the list to 22 from the right, its header 50 tall at its top with
+  -- Options_HorizontalDivider centered 50 down; the tabs at 27 down on the inner frame's top edge; the search box 350
+  -- wide, 18 from the right and 34 down; Done 96 x 22 at 16, 16 from the bottom right and Apply's place for What's New.
+  describe("laid out as Blizzard's settings window", function()
+    local BLIZZARD = {
+      Settings = {
+        Width = 920, Height = 724,
+        Title = { Font = "SettingsBrand", Top = 6, Left = 30, Right = 24 },
+        InnerFrame = { Atlas = "Options_InnerFrame", AtlasSize = true, Point = "TOPLEFT", X = 17, Y = -64, Color = "White", Alpha = 1 },
+        Sidebar = { Width = 199, Pad = 0, Left = 18, Top = 76, Bottom = 46, Fill = false, Line = false },
+        Brand = false,
+        Search = { Place = "Top", Width = 350, Right = 18, Top = 34, Atlas = "common-search-magnifyingglass", IconSize = 10 },
+        Back = { Height = 30 },
+        Nav = { ItemWidth = 175, GroupUpper = false },
+        Version = { Window = true, Left = 18, Bottom = 22 },
+        Header = { Left = 16, Right = 22, Top = 76, Height = 50, Pad = 7, TitleTop = 22, DescriptionFont = false,
+          Divider = { Atlas = "Options_HorizontalDivider", AtlasSize = true, Point = "TOP", Y = -50, Color = "White", Alpha = 1 } },
+        Tabs = { Top = 27, Left = 0 },
+        Content = { ScrollLeft = -15, ScrollRight = 20, ScrollTop = 2 },
+        Footer = { Height = 45, Left = 0, Line = false, Buttons = { Width = 96, Right = 16, Bottom = 16, Gap = 2 }, WhatsNew = "Plain" },
+      },
+    }
+
+    local function rect(region)
+      local p, rel, rp, x, y = region:GetPoint(1)
+      return { p, rel, rp, x, y }
+    end
+    local function ctx() return addon:GetModule("Context"):New("spec") end
+
+    before_each(function()
+      ResetMockAtlases()
+      MockAtlas("Options_InnerFrame", 886, 618)
+      MockAtlas("Options_HorizontalDivider", 630, 1)
+      MockAtlas("common-search-magnifyingglass", 24, 24)
+      open()
+      UseNextTheme(BLIZZARD)
+      settings:ApplyStyle()
+    end)
+
+    after_each(function()
+      ResetMockAtlases()
+    end)
+
+    it("is 920 x 724, writes its name in its title bar, and draws its inner frame at its size at 17, -64", function()
+      assert.are.same({ 920, 724 }, { settings.frame:GetSize() })
+      assert.is_true(settings.windowTitle:IsShown())
+      assert.are.equal("BetterBags", settings.windowTitle:GetText())
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 30, -6 }, { settings.windowTitle:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -24, -6 }, { settings.windowTitle:GetPoint(2) })
+      assert.are.equal("CENTER", settings.windowTitle:GetJustifyH())
+      assert.are.equal("Options_InnerFrame", settings.innerFrame:GetAtlas())
+      assert.are.same({ 886, 618 }, { settings.innerFrame:GetSize() })
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 17, -64 }, rect(settings.innerFrame))
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_false(settings.windowTitle:IsShown(), "Default writes none")
+      assert.is_false(settings.innerFrame:IsShown())
+    end)
+
+    it("keeps its list inside the window: Left in, Top down to Bottom above the bottom, rows ItemWidth wide, headings as written", function()
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 18, -76 }, rect(settings.sidebar))
+      assert.are.same({ "BOTTOMLEFT", settings.frame, "BOTTOMLEFT", 18, 46 }, { settings.sidebar:GetPoint(2) })
+      assert.are.equal(199, settings.sidebar:GetWidth())
+      assert.is_false(settings.brandText:IsShown())
+      assert.is_false(settings.brandIcon:IsShown())
+      assert.is_false(settings.brandLine:IsShown())
+      assert.are.same({ "TOPLEFT", settings.navPanel, "TOPLEFT", 0, 0 }, rect(settings.navBox), "the list from the top")
+      local general, heading = navRow("General"), nil
+      for _, row in ipairs(settings.navRows) do
+        if row.frame:IsShown() and row.group then heading = heading or row end
+      end
+      assert.are.equal(175, general.frame:GetWidth())
+      assert.are.equal(1, general.frame:GetNumPoints(), "by its top left only")
+      assert.are.equal(175, heading.frame:GetWidth())
+      assert.are.equal("BetterBags", heading.label:GetText(), "not in capitals")
+    end)
+
+    it("puts its search box 350 wide at the top right, its magnifier the theme's atlas", function()
+      local search = settings.search.frame
+      assert.are.equal(settings.frame, search:GetParent())
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -18, -34 }, rect(search))
+      assert.are.equal(350, search:GetWidth())
+      assert.are.equal("common-search-magnifyingglass", settings.search.icon:GetAtlas())
+      assert.are.same({ 10, 10 }, { settings.search.icon:GetSize() })
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.are.equal(settings.navPanel, settings.search.frame:GetParent(), "back in the sidebar")
+    end)
+
+    it("puts its header at the content's top, its title 7 in and 22 down, the divider under it, and no description", function()
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 233, -76 }, rect(settings.header))
+      assert.are.same({ "TOPRIGHT", settings.frame, "TOPRIGHT", -22, -76 }, { settings.header:GetPoint(2) })
+      assert.are.equal(50, settings.header:GetHeight())
+      assert.are.same({ "TOPLEFT", settings.header, "TOPLEFT", 7, -22 }, rect(settings.title))
+      assert.is_false(settings.description:IsShown())
+      assert.is_true(settings.divider:IsShown())
+      assert.are.equal("Options_HorizontalDivider", settings.divider:GetAtlas())
+      assert.are.same({ "TOP", settings.header, "TOP", 0, -50 }, rect(settings.divider))
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.is_true(settings.description:IsShown())
+      assert.is_false(settings.divider:IsShown())
+    end)
+
+    it("hangs its page's tabs on the inner frame's edge and its content from 15 left of the content and 2 below the header", function()
+      settings:Select("backpack", nil, ctx())
+      assert.is_true(settings.tabs.frame:IsShown())
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 233, -27 }, rect(settings.tabs.frame))
+      local scroll = settings.scroll.frame
+      assert.are.same({ "TOPLEFT", settings.frame, "TOPLEFT", 218, -128 }, rect(scroll), "the tabs above the header take no room")
+      assert.are.same({ "BOTTOMRIGHT", settings.frame, "BOTTOMRIGHT", -42, 45 }, { scroll:GetPoint(2) })
+    end)
+
+    it("puts Done and What's New at the bottom right, What's New a button, the version at the bottom left", function()
+      local done, whatsNew = settings.done.frame, settings.whatsNew.frame
+      assert.are.same({ "BOTTOMRIGHT", settings.frame, "BOTTOMRIGHT", -16, 16 }, rect(done))
+      assert.are.same({ 96, 96 }, { done:GetWidth(), whatsNew:GetWidth() })
+      assert.are.same({ "RIGHT", done, "LEFT", -2, 0 }, rect(whatsNew))
+      assert.are.equal("Plain", settings.whatsNew.style)
+      assert.is_false(settings.footerLine:IsShown())
+      assert.are.equal(settings.frame, settings.version:GetParent())
+      assert.are.equal("BOTTOMLEFT", (settings.version:GetPoint(1)))
+      UseNextTheme(nil)
+      settings:ApplyStyle()
+      assert.are.equal("Link", settings.whatsNew.style, "a link again")
+      assert.are.equal(settings.navPanel, settings.version:GetParent())
+    end)
+  end)
+
   describe("a theme", function()
     -- The shipped Parchment, applied through SonataNext as the Appearance page applies it.
     it("is restyled by a theme SonataNext applies, controls and all", function()

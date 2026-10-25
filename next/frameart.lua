@@ -52,32 +52,48 @@ for _, setup in ipairs(SETUP) do
 end
 
 ---@class (exact) NextFrameArtSet
----@field owner Frame The frame whose textures the pieces are.
+---@field owner Frame The frame whose textures the pieces are, unless drawn above its content.
 ---@field region ScriptRegion What the frame is drawn round.
----@field pieces table<string, Texture> Each piece's texture, by the place it is drawn in.
----@field titleBg Texture The frame's title band (TitleBg), under its pieces.
+---@field above? Frame The frame over the owner's content the pieces are drawn on for Above.
+---@field hosts table<Frame, table<string, Texture>> The pieces on each frame they have been drawn on.
+---@field pieces table<string, Texture> Each piece's texture, by the place it is drawn in, on the frame drawn on last.
+---@field bands Texture[] The bands across the top (Bands), under the pieces.
 ---@field own table<Texture, table> Each texture's own pixel snapping, given back when a layout turned it off.
 local setProto = {}
 addon:GetModule('Perf'):RegisterPrototype(setProto, 'NextFrameArtSet')
 
--- Create gives owner the textures of a frame round region, drawn nowhere until Apply.
+-- Create gives owner the textures of a frame round region, drawn nowhere until Apply. above, when given, is a frame over
+-- the owner's content the pieces are drawn on for a frame that says Above (the original bags' border, over their
+-- content); without Above they are the owner's own, under everything in its child frames (Blizzard's settings window:
+-- its NineSlice at the window's own level).
 ---@param owner Frame
 ---@param region ScriptRegion
+---@param above? Frame
 ---@return NextFrameArtSet
-function frameArt:Create(owner, region)
-  -- The title band in the owner's BACKGROUND layer, as Blizzard's is in its frame's (Classic's SettingsFrameTemplate):
-  -- over the owner's fills, under the frame's pieces and everything in the owner's child frames.
-  local titleBg = owner:CreateTexture(nil, "BACKGROUND", nil, 1)
-  titleBg:Hide()
-  local set = setmetatable({ owner = owner, region = region, pieces = {}, own = {}, titleBg = titleBg },
+function frameArt:Create(owner, region, above)
+  local set = setmetatable({ owner = owner, region = region, above = above, hosts = {}, own = {}, bands = {} },
     { __index = setProto })
-  for _, setup in ipairs(SETUP) do
-    local texture = owner:CreateTexture(nil, "ARTWORK", nil, 5)
-    texture:Hide()
-    set.pieces[setup.name] = texture
-    set.own[texture] = { snap = texture:IsSnappingToPixelGrid(), bias = texture:GetTexelSnappingBias() }
-  end
+  set.pieces = set:piecesOn(owner)
   return set
+end
+
+-- piecesOn returns the frame's pieces drawn on host, made the first time.
+---@private
+---@param host Frame
+---@return table<string, Texture>
+function setProto:piecesOn(host)
+  local pieces = self.hosts[host]
+  if pieces == nil then
+    pieces = {}
+    for _, setup in ipairs(SETUP) do
+      local texture = host:CreateTexture(nil, "ARTWORK", nil, 5)
+      texture:Hide()
+      pieces[setup.name] = texture
+      self.own[texture] = { snap = texture:IsSnappingToPixelGrid(), bias = texture:GetTexelSnappingBias() }
+    end
+    self.hosts[host] = pieces
+  end
+  return pieces
 end
 
 -- layoutOf returns what a theme's Frame draws as Blizzard's layout format: one of the client's layouts by name
@@ -113,19 +129,26 @@ end
 
 -- Apply draws spec round the region (false or nil: nothing), mirrored for a panel whose inner side is on the right.
 -- spec: Layout (a client layout's name) or Pieces; Color and Alpha tint every piece (white when unset); Layer and
--- SubLevel are where they draw (ARTWORK 5 when unset: above the theme's ornaments, below the title); TitleBg, a band
--- across the region's top (a texture spec, Height tall, Left and Right in from its sides, Top down from its top).
+-- SubLevel are where they draw (ARTWORK 5 when unset: above the theme's ornaments, below the title); Above, on the frame
+-- over the owner's content (Create's above); Bands, strips across the region's top (texture specs, each Height tall,
+-- Left and Right in from its sides, Top down from its top), in the owner's BACKGROUND layer over its fills.
 ---@param spec? table|false
 ---@param mirrored? boolean
 function setProto:Apply(spec, mirrored)
-  if not spec then
-    for _, texture in pairs(self.pieces) do
+  if spec and spec.Above and self.above == nil then
+    error("this frame cannot be drawn above its content")
+  end
+  for _, pieces in pairs(self.hosts) do
+    for _, texture in pairs(pieces) do
       texture:Hide()
     end
-    self.titleBg:Hide()
+  end
+  if not spec then
+    self:drawBands(nil, mirrored)
     return
   end
-  self:band(spec.TitleBg, mirrored)
+  self:drawBands(spec.Bands, mirrored)
+  self.pieces = self:piecesOn(spec.Above and self.above or self.owner)
   local layout = layoutOf(spec)
   local r, g, b, a = style:RGBA(spec.Color or "White", spec.Alpha)
   local layer, subLevel = spec.Layer or "ARTWORK", spec.SubLevel or 5
@@ -150,17 +173,34 @@ function setProto:Apply(spec, mirrored)
   end
 end
 
--- band draws the frame's title band (Classic's _UI-Frame-TitleTileBg: a strip of a file, tiled across), its sides
--- swapped on a mirrored frame, or hides it for none.
+-- drawBands draws the frame's bands across the top (DefaultPanelTemplate's TopTileStreaks, Classic's
+-- _UI-Frame-TitleTileBg), each over the one before, in the owner's BACKGROUND layer as Blizzard's are in its frame's: over
+-- the owner's fills, under the frame's pieces and everything in the owner's child frames. Those it no longer has hide.
 ---@private
----@param spec? table
+---@param list? table[]
 ---@param mirrored? boolean
-function setProto:band(spec, mirrored)
-  local band, region = self.titleBg, self.region
-  if not spec then
-    band:Hide()
-    return
+function setProto:drawBands(list, mirrored)
+  list = list or {}
+  for i, spec in ipairs(list) do
+    local band = self.bands[i]
+    if band == nil then
+      band = self.owner:CreateTexture(nil, "BACKGROUND", nil, i)
+      self.bands[i] = band
+    end
+    self:band(band, spec, mirrored)
   end
+  for i = #list + 1, #self.bands do
+    self.bands[i]:Hide()
+  end
+end
+
+-- band draws one band, its sides swapped on a mirrored frame.
+---@private
+---@param band Texture
+---@param spec table
+---@param mirrored? boolean
+function setProto:band(band, spec, mirrored)
+  local region = self.region
   style:Paint(band, spec, spec.Alpha)
   local left, right = spec.Left or 0, spec.Right or 0
   if mirrored then

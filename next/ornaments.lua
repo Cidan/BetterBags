@@ -44,7 +44,9 @@ ornaments.PANELS = { Backpack = "BACKPACK", Bank = "BANK", Vendor = "UNDEFINED",
 ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period = true, Delay = true, Origin = true }
 
 ---@class (exact) NextOrnamentPiece
----@field texture Texture
+---@field texture Texture Its texture on the frame it is drawn on.
+---@field host Frame The frame it is drawn on: the panel's, or its overlay for a piece that says Above.
+---@field hosts table<Frame, table> Its texture, mask and motions on each frame it has been drawn on.
 ---@field mask? MaskTexture What cuts its art (Mask), made the first time one does.
 ---@field spec table The theme's entry it draws.
 ---@field shown boolean Shown at the panel's size.
@@ -84,10 +86,11 @@ function setProto:Style()
   for i, spec in ipairs(list) do
     local piece = self.pieces[i]
     if piece == nil then
-      piece = { texture = self.panel.frame:CreateTexture(nil, "ARTWORK"), shown = false, phase = 0 }
+      piece = { shown = false, phase = 0, hosts = {} }
       self.pieces[i] = piece
     end
     piece.spec = spec
+    self:onHost(piece, spec.Above and self:overlay() or self.panel.frame)
     self:paint(piece)
     self:move(piece)
   end
@@ -101,6 +104,39 @@ function setProto:Style()
   if running then
     self:Start()
   end
+end
+
+-- overlay returns the panel's frame over its content (next/panel.lua), for pieces that say Above.
+---@private
+---@return Frame
+function setProto:overlay()
+  if self.panel.overlay == nil then
+    error("this panel has no overlay to draw an ornament above its content on")
+  end
+  return self.panel.overlay
+end
+
+-- onHost puts a piece on host: the panel's frame, or its overlay for a piece that says Above (the original bags' menu
+-- button, over their border and search box). A piece keeps its texture, mask and motions on each frame it has been on,
+-- and hides the one it leaves.
+---@private
+---@param piece NextOrnamentPiece
+---@param host Frame
+function setProto:onHost(piece, host)
+  if piece.host == host then
+    return
+  end
+  local old = piece.host and piece.hosts[piece.host]
+  if old ~= nil then
+    old.mask, old.groups = piece.mask, piece.groups
+    piece.texture:Hide()
+  end
+  local own = piece.hosts[host]
+  if own == nil then
+    own = { texture = host:CreateTexture(nil, "ARTWORK") }
+    piece.hosts[host] = own
+  end
+  piece.host, piece.texture, piece.mask, piece.groups = host, own.texture, own.mask, own.groups
 end
 
 -- Mirrored says whether the panel's inner side is on the right: it belongs to the left of the screen.
@@ -158,7 +194,8 @@ function setProto:cut(piece)
     return
   end
   if mask == nil then
-    mask = self.panel.frame:CreateMaskTexture()
+    -- On the piece's own frame, as its texture.
+    mask = piece.host:CreateMaskTexture()
     piece.mask = mask
   end
   mask:SetTexture(style:TexturePath(M.Texture), "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")

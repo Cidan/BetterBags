@@ -234,6 +234,96 @@ describe("BetterBags Next's panels and themes", function()
 
   local function rgba(c) return { c.r, c.g, c.b, c.a } end
 
+  -- The Plain theme draws the original bags' window (asked: "the stone window background ... same texture please. just
+  -- like the What's New window", and "the bag icon we use in our original bags"; docs/next-plain-theme.md, round two):
+  -- Sonata's Default bag window, DefaultPanelTemplate (Blizzard_SharedXML/<Family>/SharedUIPanelTemplates.xml) with its
+  -- NineSlice raised over the content, and the menu button's art (frames/menubutton.lua), on every client.
+  describe("the Plain theme", function()
+    local FLAGS = { "isRetail", "isForever", "isClassic", "isBCC", "isMists", "isAnniversary", "isCata" }
+    local CLIENTS = {
+      Retail = { flags = { isRetail = true }, layouts = "Retail", sizes = "Retail", corner = "UI-Frame-Metal-CornerTopLeft" },
+      Era = { flags = { isClassic = true }, layouts = "Classic", sizes = "Era", corner = "UI-Frame-TopLeftCornerNoPortrait" },
+    }
+    local function plain(client)
+      for _, flag in ipairs(FLAGS) do override(addon, flag, client.flags[flag] == true) end
+      UseNineSliceLayouts(client.layouts)
+      ResetMockAtlases()
+      UseRealAtlasSizes(client.sizes)
+      db.size = "small"
+      sonataNext:ApplyTheme(ctx(), "Plain", false)
+    end
+    after_each(function()
+      UseNineSliceLayouts("Retail")
+      ResetMockAtlases()
+      backToDefault()
+    end)
+    local function near(a, b) return math.abs(a - b) < 0.01 end
+
+    for _, name in ipairs({ "Retail", "Era" }) do
+      local client = CLIENTS[name]
+      it("draws the original bags' window on " .. name .. ": the stone 6, 21, 2 and 2 in, the frame over the content, the streaks", function()
+        plain(client)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        assert.are.equal("Interface\\FrameGeneral\\UI-Background-Rock", bag.fill:GetTexture())
+        assert.is_true(bag.fill:GetHorizTile() and bag.fill:GetVertTile(), "tiled both ways")
+        assert.are.same({ 1, 1, 1, 1 }, { bag.fill:GetVertexColor() }, "untinted and solid")
+        local p, rel, rp, x, y = bag.fill:GetPoint(1)
+        assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT" }, { p, rel, rp })
+        assert.is_true(near(x, 6) and near(y, -21), x .. "," .. y)
+        p, rel, rp, x, y = bag.fill:GetPoint(2)
+        assert.are.same({ "BOTTOMRIGHT", bag.frame, "BOTTOMRIGHT" }, { p, rel, rp })
+        assert.is_true(near(x, -2) and near(y, 2), x .. "," .. y)
+        local corner = bag.frameArt.pieces.TopLeftCorner
+        assert.are.equal(client.corner, corner:GetAtlas(), "ButtonFrameTemplateNoPortrait, the client's own")
+        assert.is_true(corner:IsShown())
+        assert.are.equal(bag.overlay, corner:GetParent(), "over the content")
+        local streaks = bag.frameArt.bands[1]
+        assert.is_true(streaks:IsShown())
+        assert.is_true(streaks:GetHorizTile())
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 6, -21 }, { streaks:GetPoint(1) })
+        assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -2, -21 }, { streaks:GetPoint(2) })
+        if name == "Retail" then
+          assert.are.equal("_UI-Frame-TopTileStreaks", streaks:GetAtlas())
+          assert.are.equal(43, streaks:GetHeight())
+          assert.is_false(bag.frameArt.bands[2] ~= nil and bag.frameArt.bands[2]:IsShown(), "retail draws no title band")
+        else
+          assert.are.equal("Interface\\FrameGeneral\\_UI-Frame", streaks:GetTexture())
+          local _, top, _, bottom = streaks:GetTexCoord()
+          assert.are.same({ 0.671875, 0.9609375 }, { top, bottom })
+          assert.are.equal(37, streaks:GetHeight())
+          local band = bag.frameArt.bands[2]
+          assert.is_true(band:IsShown())
+          assert.are.equal("Interface\\FrameGeneral\\_UI-Frame", band:GetTexture())
+          assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 7, -4 }, { band:GetPoint(1) })
+          assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -24, -4 }, { band:GetPoint(2) })
+          assert.are.equal(17, band:GetHeight())
+        end
+      end)
+
+      it("draws the original bags' icon on " .. name .. ": Bagslots2x, 48 x 60, 14 out and 17 above the corner, over the frame", function()
+        plain(client)
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local icon = bag.ornaments.pieces[1].texture
+        assert.are.equal("Interface\\Containerframe\\Bagslots2x", icon:GetTexture())
+        local ulx, uly, _, lly, urx = icon:GetTexCoord()
+        assert.are.same({ 0, 0.2, 0, 1 }, { ulx, urx, uly, lly })
+        assert.is_true(near(icon:GetWidth(), 48) and near(icon:GetHeight(), 60))
+        local p, rel, rp, x, y = icon:GetPoint(1)
+        assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT" }, { p, rel, rp })
+        assert.is_true(near(x, -14) and near(y, 17), x .. "," .. y)
+        assert.are.equal(bag.overlay, icon:GetParent(), "over the content and the search box")
+        assert.are.same({ "OVERLAY", 7 }, { icon:GetDrawLayer() }, "over the frame's pieces")
+        assert.are.equal(0, icon:GetNumMaskTextures(), "its own round art, uncut")
+        assert.is_nil(bag.ornaments.pieces[2] and bag.ornaments.pieces[2].spec, "one icon, no portrait")
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        local mirrored = bank.ornaments.pieces[1].texture
+        assert.are.equal("Interface\\Containerframe\\Bagslots2x", mirrored:GetTexture(), "the bank's too, as the original's")
+        ulx, _, _, _, urx = mirrored:GetTexCoord()
+        assert.are.same({ 0, 0.2 }, { ulx, urx }, "never flipped")
+      end)
+    end
+  end)
+
   describe("the body", function()
     -- Reported in game, opening the bank with Guild Wars 2 applied: "next/panel.lua:2075: attempt to index upvalue
     -- 'from' (a nil value)" in SetWash, from bank.lua useBankType. A panel made under a theme without a wash
@@ -303,6 +393,28 @@ describe("BetterBags Next's panels and themes", function()
       backToDefault()
       assert.is_false(corner:IsShown())
       assert.is_false(mirrored:IsShown())
+      ResetMockAtlases()
+    end)
+
+    -- The original bags' border is above their content (Sonata's Default: NineSlice at +500), their title and close
+    -- button above it (TitleContainer and the close at +510): a frame that says Above is drawn on the panel's overlay, a
+    -- frame over the content, and the title and the header's buttons sit above that.
+    it("draws a frame that says Above over its content, its title and header buttons over the frame", function()
+      ResetMockAtlases()
+      MockAtlas("UI-Frame-Metal-CornerTopLeft", 75, 75)
+      local bag = nextBag:Create(ctx())
+      apply({ Panel = { Frame = { Layout = "ButtonFrameTemplateNoPortrait", Above = true } } })
+      local corner = bag.frameArt.pieces.TopLeftCorner
+      assert.are.equal(bag.overlay, corner:GetParent())
+      assert.is_true(corner:IsShown())
+      assert.is_false(bag.overlay:IsMouseEnabled(), "the window stays the drop target")
+      assert.is_true(bag.overlay:GetFrameLevel() > bag.content.frame:GetFrameLevel() + 10, "over the content and its sections")
+      assert.are.equal(bag.overlay, bag.title:GetParent(), "the title on it, drawn over its art")
+      assert.are.same("OVERLAY", (bag.title:GetDrawLayer()))
+      assert.is_true(bag.closeButton:GetFrameLevel() > bag.overlay:GetFrameLevel())
+      assert.is_true(bag.sortButton:GetFrameLevel() > bag.overlay:GetFrameLevel())
+      backToDefault()
+      assert.is_false(corner:IsShown())
       ResetMockAtlases()
     end)
 
@@ -1122,6 +1234,35 @@ describe("BetterBags Next's panels and themes", function()
       end
       assert.is_true(bag.searchFill:IsShown())
       assert.is_true(bag.searchEdges[1]:IsShown())
+    end)
+
+    -- SearchBoxTemplate's insides (InputBoxTemplates.xml, every client): the magnifier 10 x 10 at LEFT 1, -1, the help and
+    -- what is typed 16 in and 20 from the right (TextInsets; Instructions at 16, 0 to -20, 0), the clear button at
+    -- RIGHT -3; and the box where the original BetterBags put it (sonata/themes/base.lua: 20 in, 10 from the right),
+    -- mirrored on the bank. Reported in game: "search box is completely off" (docs/next-plain-theme.md, round two).
+    it("sits Inset in from its body's sides and lays its insides out as its theme says", function()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      apply({ Layout = { SearchTop = 30, SearchHeight = 20 }, Search = { Template = true, Inset = { Left = 20, Right = 10 },
+        Inner = { IconX = 1, IconY = -1, IconSize = 10, TextLeft = 16, TextRight = 20, ClearRight = 3 },
+        HelpColor = { 0.35, 0.35, 0.35, 1 } } })
+      local frame = bag.searchBox.frame
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 20, -30 }, { frame:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -10, -30 }, { frame:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", bank.body, "TOPLEFT", 10, -30 }, { bank.searchBox.frame:GetPoint(1) }, "its sides swapped on the bank")
+      local t = bag.searchBox.textBox
+      assert.are.same({ 10, 10 }, { t.searchIcon:GetSize() })
+      assert.are.same({ "LEFT", t, "LEFT", 1, -1 }, { t.searchIcon:GetPoint(1) })
+      assert.are.same({ 16, 20, 0, 0 }, { t:GetTextInsets() })
+      assert.are.same({ "TOPLEFT", t, "TOPLEFT", 16, 0 }, { t.Instructions:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", t, "BOTTOMRIGHT", -20, 0 }, { t.Instructions:GetPoint(2) })
+      assert.are.same("MIDDLE", t.Instructions:GetJustifyV())
+      assert.are.same({ "RIGHT", t, "RIGHT", -3, 0 }, { t.clearButton:GetPoint(1) })
+      -- InputBoxInstructionsTemplate's own color for its help (its XML <Color>), over the role's.
+      assert.are.same({ 0.35, 0.35, 0.35, 1 }, { t.Instructions:GetTextColor() })
+      backToDefault()
+      assert.are.same(style.Color.Muted, { t.Instructions:GetTextColor() }, "the role's again")
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD, -style.SEARCH_TOP }, { frame:GetPoint(1) }, "back to its pads")
+      assert.are.equal("TOPLEFT", (t.searchIcon:GetPoint(1)), "Next's own layout again")
     end)
 
     it("sits where its layout says, in its fill, border and magnifier colors", function()

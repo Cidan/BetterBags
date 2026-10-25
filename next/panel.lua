@@ -107,6 +107,9 @@ local nextPanel = addon:NewModule('NextPanel')
 -- The panel's frame level in the HIGH strata; a chained bag coming in from beneath its anchor is
 -- lowered below it for the way, and put back here once in place.
 local PANEL_LEVEL = 500
+-- The overlay's place over the panel's frame: above the content and its sections and item buttons (about 10 levels
+-- deep), below the braid and the sparkles.
+local OVERLAY_LEVEL = 20
 
 -- isSecret says whether addon code may not compare or do arithmetic on a value: a secret, as a vendor's name in a
 -- dungeon is (UnitName, SecretWhenUnitNameIdentityRestricted), and every size and position of the title showing it
@@ -726,6 +729,14 @@ function panelProto:BuildPanel(name)
   -- Its geometry (the frame's size and place, the body, the fill, the feather) is its size's
   -- (ApplyGeometry).
   self.body = CreateFrame("Frame", nil, frame)
+  -- A frame over the content, under the title and the header's buttons (which are drawn on and over it): a theme's frame
+  -- drawn above the content (Panel.Frame.Above: the original bags' border, over their content) and its ornaments that
+  -- say Above are drawn on it. It never takes the mouse: the window stays the drop target (bag-drop-zone.md).
+  local overlay = CreateFrame("Frame", nil, frame)
+  overlay:SetAllPoints(frame)
+  overlay:EnableMouse(false)
+  overlay:SetFrameLevel(frame:GetFrameLevel() + OVERLAY_LEVEL)
+  self.overlay = overlay
 
   local fill = frame:CreateTexture(nil, "BACKGROUND")
   local feather = frame:CreateTexture(nil, "BACKGROUND")
@@ -780,7 +791,7 @@ function panelProto:BuildPanel(name)
   -- The theme's ornaments (Panel.Ornaments, next-themes.md §12), anchored to the body.
   self.ornaments = nextOrnaments:Create(self)
   -- The theme's frame round the body (Panel.Frame, next-themes.md §15): Blizzard's nine-slice art.
-  self.frameArt = nextFrameArt:Create(frame, self.body)
+  self.frameArt = nextFrameArt:Create(frame, self.body, self.overlay)
   self:styleBody()
 end
 
@@ -2133,8 +2144,8 @@ end
 ---@return Button
 function panelProto:headerButton(spec)
   local button = CreateFrame("Button", nil, self.frame)
-  -- Above a small panel's mover, which lies over the title row.
-  button:SetFrameLevel(self.frame:GetFrameLevel() + 3)
+  -- Above a small panel's mover, which lies over the title row, and the overlay, whose frame art they sit on.
+  button:SetFrameLevel(self.overlay:GetFrameLevel() + 3)
   local icon = button:CreateTexture(nil, "ARTWORK")
   button.icon = icon
   -- Drawn over the icon while hovered (an icon's Highlight).
@@ -2369,7 +2380,8 @@ end
 ---@param text string
 function panelProto:BuildHeader(text)
   local frame = self.frame
-  local title = frame:CreateFontString(nil, "OVERLAY")
+  -- On the overlay, over a theme's frame drawn above the content.
+  local title = self.overlay:CreateFontString(nil, "OVERLAY")
   style:SetFont(title, style.Theme.Header.Title.Font)
   title:SetText(text)
   self.title = title
@@ -3082,6 +3094,15 @@ function panelProto:styleSearch()
   local t = sf.textBox
   local body = self.body
   local leftPad, rightPad = self:SidePads()
+  -- In from the body's sides by the theme's Inset (the original bags' box: 20 in, 10 from the right), its inner side's
+  -- on the inner side; else the side pads.
+  local inset = S.Inset
+  if inset then
+    leftPad, rightPad = inset.Left or 0, inset.Right or 0
+    if self.side == "LEFT" then
+      leftPad, rightPad = rightPad, leftPad
+    end
+  end
   sf.frame:ClearAllPoints()
   pixel:Point(sf.frame, "TOPLEFT", body, "TOPLEFT", leftPad, -style.SEARCH_TOP)
   pixel:Point(sf.frame, "TOPRIGHT", body, "TOPRIGHT", -rightPad, -style.SEARCH_TOP)
@@ -3106,6 +3127,10 @@ function panelProto:styleSearch()
   end
   self.searchEdgeAlpha = E and E.Idle or 0
   style:SetTemplateFont(t.Instructions, S.HelpFont)
+  -- A theme may keep the template's own color for its help (HelpColor: InputBoxInstructionsTemplate's 0.35 gray).
+  if S.HelpColor then
+    t.Instructions:SetTextColor(style:RGBA(S.HelpColor))
+  end
   style:SetFont(t, S.TextFont)
   self:placeSearch()
   self:UpdateSearchLook(true)
@@ -3118,6 +3143,10 @@ end
 ---@private
 function panelProto:placeSearch()
   local t = self.searchBox.textBox
+  if style.Theme.Search.Inner then
+    self:placeSearchInner(style.Theme.Search.Inner)
+    return
+  end
   local height = pixel:Length(t, style.SEARCH_HEIGHT)
   local gap, iconSize, right = pixel:Lengths(t, style.SEARCH_GAP, style.SEARCH_ICON, style.SEARCH_RIGHT)
   local icon = t.searchIcon
@@ -3143,6 +3172,32 @@ function panelProto:placeSearch()
       local box = clear:GetHeight()
       pixel:Center(clear.Icon, clear, clear:GetWidth(), box, iconWidth, iconWidth)
     end
+  end
+end
+
+-- placeSearchInner lays the search box's insides out as a theme's Inner says, anchored as SearchBoxTemplate anchors them
+-- (InputBoxTemplates.xml, every client): the magnifier IconSize square by its LEFT, IconX in and IconY from the box's
+-- middle; the help from TextLeft in to TextRight from the right, centered on the box's height, and what is typed in the
+-- same room (TextInsets); the clear button by its RIGHT, ClearRight from the box's.
+---@private
+---@param I table
+function panelProto:placeSearchInner(I)
+  local t = self.searchBox.textBox
+  local icon = t.searchIcon
+  icon:ClearAllPoints()
+  pixel:Size(icon, I.IconSize, I.IconSize)
+  pixel:Point(icon, "LEFT", t, "LEFT", I.IconX or 0, I.IconY or 0)
+  local left, right = pixel:Snap(t, I.TextLeft or 0), pixel:Snap(t, I.TextRight or 0)
+  local help = t.Instructions
+  help:ClearAllPoints()
+  help:SetPoint("TOPLEFT", t, "TOPLEFT", left, 0)
+  help:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", -right, 0)
+  help:SetJustifyV("MIDDLE")
+  t:SetTextInsets(left, right, 0, 0)
+  local clear = t.clearButton
+  if clear ~= nil then
+    clear:ClearAllPoints()
+    pixel:Point(clear, "RIGHT", t, "RIGHT", -(I.ClearRight or 0), 0)
   end
 end
 

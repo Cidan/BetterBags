@@ -232,34 +232,70 @@ describe("NextFrameArt", function()
     end)
   end)
 
-  -- Classic's settings window (Classic/Blizzard_SettingsPanelTemplates.xml): its title band, _UI-Frame-TitleTileBg (a
-  -- 17-pixel strip of Interface\FrameGeneral\_UI-Frame, tiled across: horizTile), in the frame's own BACKGROUND layer,
-  -- 8 in and 3 down to the right edge.
-  describe("a title band", function()
+  -- Bands across the top, each a texture spec Height tall, Left and Right in, Top down, in the owner's BACKGROUND layer
+  -- over its fills, the later ones over the earlier: DefaultPanelTemplate's TopTileStreaks (21 down, 6 in to 2 from the
+  -- right) and Classic's _UI-Frame-TitleTileBg (a 17-pixel strip of Interface\FrameGeneral\_UI-Frame, tiled across).
+  describe("bands across the top", function()
+    local STREAKS = { Atlas = "_UI-Frame-TopTileStreaks", HorizTile = true, Color = "White", Height = 43, Left = 6, Right = 2,
+      Top = 21 }
     local BAND = { Texture = "Interface\\FrameGeneral\\_UI-Frame", TexCoords = { 0, 1, 0.2890625, 0.421875 }, HorizTile = true,
-      Color = "White", Height = 17, Left = 8, Right = 0, Top = 3 }
+      Color = "White", Height = 17, Left = 7, Right = 24, Top = 4 }
 
-    it("draws its band across the region's top, Left and Right in and Top down, tiled and cropped", function()
-      art:Apply({ Layout = "HeldBagLayout", TitleBg = BAND })
-      local band = art.titleBg
-      assert.is_true(band:IsShown())
+    it("draws each band across the region's top, Left and Right in and Top down, the later over the earlier", function()
+      art:Apply({ Layout = "HeldBagLayout", Bands = { STREAKS, BAND } })
+      local streaks, band = art.bands[1], art.bands[2]
+      assert.is_true(streaks:IsShown())
+      assert.are.equal("_UI-Frame-TopTileStreaks", streaks:GetAtlas())
+      assert.are.same({ { "TOPLEFT", region, "TOPLEFT", 6, -21 }, { "TOPRIGHT", region, "TOPRIGHT", -2, -21 } }, points(streaks))
+      assert.are.equal(43, streaks:GetHeight())
+      assert.is_true(streaks:GetHorizTile())
       assert.are.equal("Interface\\FrameGeneral\\_UI-Frame", band:GetTexture())
-      assert.are.same({ { "TOPLEFT", region, "TOPLEFT", 8, -3 }, { "TOPRIGHT", region, "TOPRIGHT", 0, -3 } }, points(band))
+      assert.are.same({ { "TOPLEFT", region, "TOPLEFT", 7, -4 }, { "TOPRIGHT", region, "TOPRIGHT", -24, -4 } }, points(band))
       assert.are.equal(17, band:GetHeight())
-      assert.is_true(band:GetHorizTile())
       assert.are.same({ 0, 1, 0.2890625, 0.421875 }, coords(band))
-      local layer = band:GetDrawLayer()
-      assert.are.equal("BACKGROUND", layer, "under the frame's pieces")
+      assert.are.same({ "BACKGROUND", 1 }, { streaks:GetDrawLayer() }, "over the owner's fills, under the frame's pieces")
+      assert.are.same({ "BACKGROUND", 2 }, { band:GetDrawLayer() })
+      assert.are.equal(owner, band:GetParent())
     end)
 
-    it("mirrors its sides on a mirrored frame, and hides for a frame without one", function()
-      art:Apply({ Layout = "HeldBagLayout", TitleBg = BAND }, true)
-      assert.are.same({ { "TOPLEFT", region, "TOPLEFT", 0, -3 }, { "TOPRIGHT", region, "TOPRIGHT", -8, -3 } }, points(art.titleBg))
+    it("mirrors their sides on a mirrored frame, and hides those the frame no longer has", function()
+      art:Apply({ Layout = "HeldBagLayout", Bands = { STREAKS, BAND } }, true)
+      assert.are.same({ { "TOPLEFT", region, "TOPLEFT", 24, -4 }, { "TOPRIGHT", region, "TOPRIGHT", -7, -4 } }, points(art.bands[2]))
+      art:Apply({ Layout = "HeldBagLayout", Bands = { STREAKS } })
+      assert.is_true(art.bands[1]:IsShown())
+      assert.is_false(art.bands[2]:IsShown())
       art:Apply({ Layout = "HeldBagLayout" })
-      assert.is_false(art.titleBg:IsShown())
-      art:Apply({ Layout = "HeldBagLayout", TitleBg = BAND })
+      assert.is_false(art.bands[1]:IsShown())
+      art:Apply({ Layout = "HeldBagLayout", Bands = { STREAKS, BAND } })
       art:Apply(false)
-      assert.is_false(art.titleBg:IsShown())
+      assert.is_false(art.bands[1]:IsShown())
+      assert.is_false(art.bands[2]:IsShown())
+    end)
+  end)
+
+  -- The original bags raised their border above their content (Sonata's Default: NineSlice at +500); Blizzard's settings
+  -- window keeps it at the window's own level (SettingsFrameTemplate: useParentLevel), its content placed inside it.
+  describe("above the content", function()
+    it("draws its pieces on the frame it was given to draw above the content, for a frame that says Above", function()
+      local above = CreateFrame("Frame", nil, owner)
+      art = frameArt:Create(owner, region, above)
+      art:Apply({ Layout = "HeldBagLayout", Above = true })
+      local corner = art.pieces.TopLeftCorner
+      assert.are.equal(above, corner:GetParent())
+      assert.is_true(corner:IsShown())
+      art:Apply({ Layout = "HeldBagLayout" })
+      assert.is_false(corner:IsShown(), "the pieces above hidden")
+      assert.are.equal(owner, art.pieces.TopLeftCorner:GetParent(), "drawn on the owner again")
+      assert.is_true(art.pieces.TopLeftCorner:IsShown())
+      art:Apply({ Layout = "HeldBagLayout", Above = true })
+      assert.are.equal(corner, art.pieces.TopLeftCorner, "the same pieces again")
+      art:Apply(false)
+      assert.is_false(corner:IsShown())
+    end)
+
+    it("refuses Above when it was given nothing to draw above the content on", function()
+      assert.has_error(function() art:Apply({ Layout = "HeldBagLayout", Above = true }) end,
+        "this frame cannot be drawn above its content")
     end)
   end)
 

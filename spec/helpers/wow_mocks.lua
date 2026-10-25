@@ -2035,6 +2035,20 @@ end
 function _G.ResetMockAtlases()
   _G.MockAtlases = {}
 end
+-- UseRealAtlasSizes registers the client's own sizes of the atlases BetterBags' themes name, for a client family
+-- ("Retail", "Forever", "Era", "Anniversary", "Mists"; spec/fixtures/atlas_sizes.lua, generated from the client's
+-- tables by tools/atlas_sizes/generate.py), so art drawn at its atlas's size is as big as in game.
+local atlasSizes
+function _G.UseRealAtlasSizes(family)
+  atlasSizes = atlasSizes or dofile("spec/fixtures/atlas_sizes.lua")
+  local sizes = atlasSizes[family or "Retail"]
+  if sizes == nil then
+    error("no atlas sizes for " .. tostring(family))
+  end
+  for name, s in pairs(sizes) do
+    MockAtlas(name, s[1], s[2], s[3], s[4])
+  end
+end
 _G.C_Texture = _G.C_Texture or {}
 C_Texture.GetAtlasInfo = function(atlas)
   local a = MockAtlases[atlas]
@@ -2263,13 +2277,26 @@ end
 -- SetFontObject() with that object overflowed the client's stack inside the call. The mock's box
 -- reports an unnamed font of its own (with the look of the font it was given) and raises a stack
 -- overflow when it is handed back. Blizzard's code never hands an edit box its own font object.
-_G.__mockTemplates.InputBoxTemplate = function(frame)
+-- inputBoxBorder makes InputBoxVisualTemplate's border (InputBoxTemplates.xml; Classic's SecureUIPanelTemplates.xml, the
+-- same): Left 8 x 20 at LEFT -5, 0; Right 8 x 20 at RIGHT; Middle 10 x 20 between them, each its common-search-border atlas.
+local function inputBoxBorder(frame)
   frame.Left = frame:CreateTexture(nil, "BACKGROUND")
   frame.Left:SetAtlas("common-search-border-left")
+  frame.Left:SetSize(8, 20)
+  frame.Left:SetPoint("LEFT", frame, "LEFT", -5, 0)
   frame.Right = frame:CreateTexture(nil, "BACKGROUND")
   frame.Right:SetAtlas("common-search-border-right")
+  frame.Right:SetSize(8, 20)
+  frame.Right:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
   frame.Middle = frame:CreateTexture(nil, "BACKGROUND")
   frame.Middle:SetAtlas("common-search-border-middle")
+  frame.Middle:SetSize(10, 20)
+  frame.Middle:SetPoint("LEFT", frame.Left, "RIGHT", 0, 0)
+  frame.Middle:SetPoint("RIGHT", frame.Right, "LEFT", 0, 0)
+end
+
+_G.__mockTemplates.InputBoxTemplate = function(frame)
+  inputBoxBorder(frame)
   frame._fontObject = _G.ChatFontNormal
   local function parent()
     local fo = frame._fontObject
@@ -2693,12 +2720,7 @@ end
 -- 20, 0, 0. BagSearchBoxTemplate (Blizzard_UIPanelTemplates/Mainline/UIPanelTemplates.xml)
 -- inherits it.
 _G.__mockTemplates.SearchBoxTemplate = function(box)
-  box.Left = box:CreateTexture(nil, "BACKGROUND")
-  box.Left:SetAtlas("common-search-border-left")
-  box.Right = box:CreateTexture(nil, "BACKGROUND")
-  box.Right:SetAtlas("common-search-border-right")
-  box.Middle = box:CreateTexture(nil, "BACKGROUND")
-  box.Middle:SetAtlas("common-search-border-middle")
+  inputBoxBorder(box)
   box.Instructions = box:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
   -- Its XML <Color r="0.35" g="0.35" b="0.35"/> (InputBoxInstructionsTemplate): the font string's own
   -- color, over its font object's.

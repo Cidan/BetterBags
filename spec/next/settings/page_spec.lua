@@ -65,6 +65,56 @@ describe("NextSettingsRows", function()
     _G.ReloadUI = savedReload
   end)
 
+  -- Blizzard's settings rows (Blizzard_SettingControls.*), the Plain theme's: 26 tall; the name 37 in, up to 85 left of
+  -- the row's middle; the check box from 80 left of the middle, the dropdown 48 left and 3 up, the slider 80 left and 3
+  -- up, the swatch 73 left, a button 40 left; lit under the pointer from 10 past its left to 5 short of its right
+  -- (HoverBackgroundTemplate).
+  describe("laid out as Blizzard's list", function()
+    local LIST = { Settings = { Content = { Layout = "List", RowHeight = 26, LabelX = 37, LabelRight = -85,
+      Controls = { toggle = { X = -80 }, dropdown = { X = -48, Y = 3 }, slider = { X = -80, Y = 3 }, color = { X = -73 },
+        input = { X = -80 }, buttons = { X = -40 } },
+      HoverInset = { Left = -10, Right = 5 } } } }
+
+    before_each(function() UseNextTheme(LIST) end)
+    after_each(function() UseNextTheme(nil) end)
+
+    local function x(region) local _, _, _, px = region:GetPoint(1) return px end
+    local function y(region) local _, _, _, _, py = region:GetPoint(1) return py end
+
+    it("puts a setting's name 37 in and its control from the row's middle, the row 26 tall", function()
+      value = true
+      local row = rows:Create(owner, option("toggle"), owner)
+      assert.are.equal(26, row:Measure(635))
+      row:Place(25, 64, 635, 26)
+      assert.are.equal(37, x(row.label))
+      assert.are.equal(317 - 85 - 37, row.label:GetWidth(), "up to 85 left of the middle")
+      assert.are.equal(317 - 80, x(row.control.frame))
+      assert.are.same({ "TOPLEFT", row.frame, "TOPLEFT", -10, 0 }, { row.hover:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", row.frame, "BOTTOMRIGHT", -5, 0 }, { row.hover:GetPoint(2) })
+    end)
+
+    it("puts each kind's control where Blizzard's is, 3 up for the dropdown and the slider", function()
+      value = 5
+      local toggle = rows:Create(owner, option("toggle"), owner)
+      local dropdown = rows:Create(owner, option("dropdown", { items = { "One", "Two" } }), owner)
+      local slider = rows:Create(owner, option("slider", { min = 0, max = 10, step = 1 }), owner)
+      local swatch = rows:Create(owner, option("color", { get = function() return { r = 1, g = 1, b = 1, a = 1 } end }), owner)
+      for _, row in ipairs({ toggle, dropdown, slider, swatch }) do row:Place(25, 0, 635, 26) end
+      assert.are.equal(317 - 48, x(dropdown.control.frame))
+      assert.are.equal(317 - 80, x(slider.control.frame))
+      assert.are.equal(317 - 73, x(swatch.control.frame))
+      local centered = -math.floor((26 - dropdown.control.frame:GetHeight()) / 2)
+      assert.are.equal(centered + 3, y(dropdown.control.frame), "3 up")
+    end)
+
+    it("puts a row of buttons from 40 left of its middle", function()
+      local row = rows:CreateButtons(owner, { { text = "Export", onClick = function() end }, { text = "Delete", onClick = function() end } })
+      row:Place(25, 0, 635, 26)
+      assert.are.equal(317 - 40, x(row.buttons[1].frame))
+      assert.is_true(x(row.buttons[2].frame) > x(row.buttons[1].frame) + row.buttons[1].frame:GetWidth() - 1)
+    end)
+  end)
+
   it("draws a toggle's name on the left and its switch on the right, showing and writing its value", function()
     value = true
     local row = rows:Create(owner, option("toggle"), owner)
@@ -266,6 +316,42 @@ describe("NextSettingsPage", function()
   before_each(function()
     render:Init()
     parent = CreateFrame("Frame")
+  end)
+
+  -- Blizzard's settings list (Blizzard_SettingsList.*, Blizzard_SettingControls.*), the Plain theme's: one column, 25 in,
+  -- 10 from the top; a section's title element 45 tall, its title 7 in and 16 down, as written; rows 26 tall; 9 between
+  -- every element; no cards or lines.
+  describe("laid out as Blizzard's list", function()
+    local LIST = { Settings = { Content = { Layout = "List", Pad = 25, PadRight = 0, Top = 10, Bottom = 10, RowGap = 9,
+      SectionHeight = 45, TitleX = 7, TitleTop = 16, TitleUpper = false, RowHeight = 26, Card = false, Divider = false } } }
+
+    before_each(function() UseNextTheme(LIST) end)
+    after_each(function() UseNextTheme(nil) end)
+
+    it("puts each row on a line of its own, 9 apart, under a 45-pixel title written as it is", function()
+      local page = nextPage:Create(parent)
+      local a, b, c = fakeRow(26), fakeRow(26), fakeRow(26, true)
+      page:SetSections({ { title = "Bags", rows = { a, b } }, { title = "Search", rows = { c } } })
+      local result = layout(page, 660)
+      assert.are.same({ 25, 10 + 45 + 9, 635, 26 }, a.placed, "one column, 25 in, under the title")
+      assert.are.same({ 25, 10 + 45 + 9 + 26 + 9, 635, 26 }, b.placed)
+      local second = 10 + 45 + 9 + 26 + 9 + 26 + 9
+      assert.are.same({ 25, second + 45 + 9, 635, 26 }, c.placed)
+      assert.are.equal(second + 45 + 9 + 26 + 10, result.Height)
+      assert.are.equal("Bags", page.titles[1]:GetText(), "as written")
+      assert.are.same({ "TOPLEFT", page.frame, "TOPLEFT", 25 + 7, -(10 + 16) }, { page.titles[1]:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", page.frame, "TOPLEFT", 25 + 7, -(second + 16) }, { page.titles[2]:GetPoint(1) })
+      for _, card in ipairs(page.cards) do assert.is_false(card:IsShown()) end
+      for _, line in ipairs(page.lines) do assert.is_false(line:IsShown()) end
+    end)
+
+    it("starts a section without a shown title with its first row", function()
+      local page = nextPage:Create(parent)
+      local a = fakeRow(26)
+      page:SetSections({ { title = "Hidden", titleHidden = function() return true end, rows = { a } } })
+      layout(page, 660)
+      assert.are.same({ 25, 10, 635, 26 }, a.placed)
+    end)
   end)
 
   it("lays a section's rows out in two columns, a pair as tall as its taller row", function()

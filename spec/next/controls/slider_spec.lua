@@ -160,6 +160,68 @@ describe("NextSlider", function()
     ResetMockAtlases()
   end)
 
+  -- Blizzard's settings slider (MinimalSliderWithSteppersTemplate, MinimalSlider.lua): 250 wide, the bar 19 in from each
+  -- side; back and forward steppers 4 out from the bar's ends, each its atlas at its size, stepping the value by its
+  -- step, at 0.5 and desaturated where the value can go no further; the value written 25 right of the bar in its font
+  -- (gray, and the slider at 0.7, while disabled); no box to type in.
+  describe("with steppers and its value written", function()
+    local STEPPERS = { Controls = { Slider = { Width = 212, Height = 19,
+      Steppers = { Back = { Atlas = "Minimal_SliderBar_Button_Left", Width = 11, Height = 19 },
+        Forward = { Atlas = "Minimal_SliderBar_Button_Right", Width = 9, Height = 18 }, Gap = 4, Room = 19, DisabledAlpha = 0.5 },
+      Value = "Text", ValueGap = 25, ValueFont = "ControlText", ValueDisabledFont = "ControlMuted", DisabledAlpha = 0.7 } } }
+
+    before_each(function()
+      UseNextTheme(STEPPERS)
+      nextSlider:ApplyStyle()
+    end)
+
+    it("is its bar with room either side for its steppers, the steppers 4 out from the bar's ends", function()
+      local slider = make()
+      assert.are.equal(250, slider.frame:GetWidth() - 0, "19 + 212 + 19")
+      local point, relativeTo, _, x = slider.track:GetPoint(1)
+      assert.are.same({ "TOPLEFT", slider.frame, 19 }, { point, relativeTo, x })
+      assert.are.equal(212, slider.track:GetWidth())
+      assert.are.same({ "RIGHT", slider.track, "LEFT", -4, 0 }, { slider.back.frame:GetPoint(1) })
+      assert.are.same({ "LEFT", slider.track, "RIGHT", 4, 0 }, { slider.forward.frame:GetPoint(1) })
+      assert.are.equal("Minimal_SliderBar_Button_Left", slider.back.icon:GetAtlas())
+      assert.are.same({ 11, 19 }, { slider.back.frame:GetSize() })
+      assert.are.same({ 9, 18 }, { slider.forward.frame:GetSize() })
+    end)
+
+    it("steps its value by its step, each stepper off where the value can go no further", function()
+      local slider = make({ value = 99 })
+      slider.forward.frame:GetScript("OnClick")(slider.forward.frame, "LeftButton")
+      assert.are.same({ 100 }, changes)
+      assert.is_false(slider.forward.frame:IsEnabled())
+      assert.are.equal(0.5, slider.forward.frame:GetAlpha())
+      assert.is_true(slider.forward.icon:IsDesaturated())
+      assert.is_true(slider.back.frame:IsEnabled())
+      slider.back.frame:GetScript("OnClick")(slider.back.frame, "LeftButton")
+      assert.are.same({ 100, 99 }, changes)
+      assert.is_true(slider.forward.frame:IsEnabled())
+      assert.are.equal(1, slider.forward.frame:GetAlpha())
+    end)
+
+    it("writes its value 25 right of its bar instead of a box, gray and the slider dimmed while disabled", function()
+      local slider = make({ value = 40 })
+      assert.is_false(slider.value.frame:IsShown(), "no box")
+      assert.is_true(slider.valueText:IsShown())
+      assert.are.equal("40", slider.valueText:GetText())
+      assert.are.same({ "LEFT", slider.track, "RIGHT", 25, 0 }, { slider.valueText:GetPoint(1) })
+      assert.are.equal(style:Font("ControlText"), slider.valueText:GetFontObject())
+      slider:SetEnabled(false)
+      assert.are.equal(0.7, slider.track:GetAlpha())
+      assert.are.equal(style:Font("ControlMuted"), slider.valueText:GetFontObject())
+      assert.is_false(slider.back.frame:IsEnabled())
+      slider:SetEnabled(true)
+      UseNextTheme(nil)
+      nextSlider:ApplyStyle()
+      assert.is_true(slider.value.frame:IsShown(), "the box again")
+      assert.is_false(slider.valueText:IsShown())
+      assert.is_false(slider.back.frame:IsShown())
+    end)
+  end)
+
   it("is restyled, every slider made, by a theme", function()
     local slider = make()
     UseNextTheme({ Controls = { Slider = { Width = 200, Fill = { Color = "Lavender", Alpha = 1 } } } })

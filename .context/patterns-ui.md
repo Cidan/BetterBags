@@ -350,3 +350,25 @@ unflavored file). Grepping a branch for an atlas proved nothing: retail's menu a
 **Rule**: To know what a client has, read the files its TOCs load (`spec/helpers/ui_source.lua`), and search those.
 Read a template from the loaded file, not the first match in the branch. Use `origin/<branch>`: a local branch can lag
 (the local `live` was a build behind).
+
+## Copying Blizzard's Art Names Is Not Copying Its Look
+**Problem**: The Plain theme's first version named only Blizzard's atlases, files and fonts, each checked to exist on
+every client, yet in game the settings window was wrong in nearly every way: the list's header art (199 x 144) stretched
+across a sidebar that started at the window's outer edge, its fill and art over the border, tabs floating with nothing
+under them (their art is a hollow outline meant to sit on `Options_InnerFrame`'s edge), two columns of cards where
+Blizzard draws one list. The specs had no atlas sizes, so art drawn at its atlas's size collapsed to nothing in them,
+and nothing compared a placement with Blizzard's.
+
+**Rule**: To match a Blizzard window, take its layout from its template (every anchor and size), its art's sizes from
+the client's own atlas table (`spec/fixtures/atlas_sizes.lua`, `tools/atlas_sizes/generate.py`), and test placements
+against those numbers. Look at the art before deciding where it goes (decode it from the client's files: hollow tab
+outlines, a header bar with lines down its column), and look at the result drawn with the client's textures before it
+ships; a layout dump through the specs' resolver (`spec/helpers/layout.lua`) gives exact rects to draw from.
+
+## A Theme Key Set to False Is Nil By the Time Code Reads It
+**Problem**: Plain sets `Brand = false`; resolution removes a table set to `false`, so the window read `nil`, and
+`SetShown(B ~= false)` showed the brand. A window built before its theme applies (the settings window) also read
+`Brand.Font` and `Header.DescriptionFont` at build time and failed under Plain.
+
+**Rule**: Test a removable part as a table (`local on = B and true or false`), never against `false`; and never read a
+removable part's keys at build time: give the region a role there and set the theme's at style time.

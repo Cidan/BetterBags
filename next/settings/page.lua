@@ -184,6 +184,94 @@ local function visibleRows(section, hidden)
   return visible
 end
 
+-- renderList lays the page out as Blizzard's settings list (Content.Layout = "List": Blizzard_SettingsList.lua,
+-- SettingsListSectionHeaderTemplate): one column Pad in from the left and PadRight from the right, Top down; a section's
+-- title element SectionHeight tall, its title TitleX in and TitleTop down, as written unless TitleUpper; each row on a
+-- line of its own; RowGap between every element; no cards or lines. In whole pixels (docs/next-pixel-perfect.md).
+---@private
+---@param parentResult? RenderResult
+---@return RenderResult
+function pageProto:renderList(parentResult)
+  local C = style.Theme.Settings.Content
+  local f = self.frame
+  local pad, padRight = pixel:Snap(f, C.Pad), pixel:Snap(f, C.PadRight or C.Pad)
+  local width = pixel:Floor(f, parentResult and parentResult.Width or pixel:Length(f, C.MinColumn) + pad + padRight)
+  local inner = width - pad - padRight
+  local gap, sectionHeight = pixel:Snap(f, C.RowGap or 0), pixel:Snap(f, C.SectionHeight or C.TitleHeight)
+  local titleX, titleTop = pixel:Snap(f, C.TitleX or 0), pixel:Snap(f, C.TitleTop or 0)
+  local placed, hidden = {}, {}
+  local y = pixel:Snap(f, C.Top)
+  local shown, first = 0, true
+  for _, section in ipairs(self.sections) do
+    local visible = visibleRows(section, hidden)
+    if #visible > 0 then
+      shown = shown + 1
+      local titled = section.titleHidden == nil or section.titleHidden() ~= true
+      local title = self:part(self.titles, shown, function() return style:CreateText(f, C.TitleFont) end)
+      local text = section.title or ""
+      title:SetText(C.TitleUpper == false and text or string.upper(text))
+      title:ClearAllPoints()
+      local note = self:part(self.notes, shown, function() return style:CreateText(f, C.NoteFont) end)
+      note:SetText(section.note or "")
+      note:ClearAllPoints()
+      if titled then
+        if not first then
+          y = y + gap
+        end
+        first = false
+        title:SetPoint("TOPLEFT", f, "TOPLEFT", pad + titleX, -(y + titleTop))
+        -- Beside the title, centered on its line by its top.
+        local titleFont = pixel:Ceil(f, pixel:TextHeight(title))
+        local noteTop = y + titleTop + pixel:Middle(f, titleFont, pixel:TextHeight(note))
+        note:SetPoint("TOPLEFT", f, "TOPLEFT", pad + titleX + pixel:Ceil(f, title:GetStringWidth()) + pixel:Snap(f, 6), -noteTop)
+        y = y + sectionHeight
+      end
+      title:SetShown(titled)
+      note:SetShown(titled and section.note ~= nil and section.note ~= "")
+      for _, row in ipairs(visible) do
+        if not first then
+          y = y + gap
+        end
+        first = false
+        local height = pixel:Ceil(f, row:Measure(inner))
+        row:Place(pad, y, inner, height)
+        placed[row] = true
+        y = y + height
+      end
+      local card = self:part(self.cards, shown, function() return self.frame:CreateTexture(nil, "BACKGROUND") end)
+      card:Hide()
+    end
+  end
+  for i = shown + 1, #self.titles do
+    self.titles[i]:Hide()
+    self.notes[i]:Hide()
+    self.cards[i]:Hide()
+  end
+  for _, line in ipairs(self.lines) do
+    line:Hide()
+  end
+  for row in pairs(self.shownRows) do
+    if not placed[row] then
+      row.frame:Hide()
+    end
+  end
+  for row in pairs(hidden) do
+    row.frame:Hide()
+  end
+  self.shownRows = placed
+  self.empty:SetShown(shown == 0)
+  if shown == 0 then
+    self.empty:ClearAllPoints()
+    self.empty:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
+    self.empty:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -y)
+    self.empty:SetJustifyH("CENTER")
+    y = y + pixel:Ceil(f, self.empty:GetStringHeight())
+  end
+  local height = y + pixel:Snap(f, C.Bottom)
+  f:SetSize(width, height)
+  return { Width = width, Height = height }
+end
+
 ---@param parentResult? RenderResult
 ---@return RenderResult
 -- It lays everything out in whole pixels (docs/next-pixel-perfect.md): its width rounded down, every
@@ -191,6 +279,9 @@ end
 -- rounded up; so every row and line starts on a whole pixel.
 function pageProto:Render(parentResult)
   local C = style.Theme.Settings.Content
+  if C.Layout == "List" then
+    return self:renderList(parentResult)
+  end
   local f = self.frame
   local pad, minColumn = pixel:Snap(f, C.Pad), pixel:Length(f, C.MinColumn)
   local width = pixel:Floor(f, parentResult and parentResult.Width or 2 * (minColumn + pad))

@@ -124,15 +124,22 @@ restyles widgets in protected calls and the mock error handler drops errors. Eac
 
 ## The theme (`sonata/themes/next/plain.lua`)
 
-- **Retail and Forever**: the retail bags window: `HeldBagLayout`, the panel's color inset as Blizzard insets it, the
-  round portrait (the bag's icon, the NPC on the bank and vendor), a centered gold title, the red close button, the
-  sort button's own art; the settings window in `ButtonFrameTemplateNoPortrait`; the retail dropdowns, menus and popup.
-- **Classic, Era, TBC, Anniversary, Mists, Cata** (`Clients.Classic`): Classic's settings window frame
-  (`ButtonFrameTemplateNoPortrait`, Classic's art) and title band for the bags and the settings window, no portrait,
-  Classic's close button, the Classic dropdowns, menus and popup.
-- **Everywhere**: the controls above, the list rows for tabs and the settings sidebar, `MinimalTab` page tabs,
-  `GameFontNormal`, `GameFontHighlight` and the client's small fonts, copied outright; no sparkles, feather, wash,
-  ribbon, cloud, glow or braid.
+As of round two (below):
+
+- **The bags, every client**: the original BetterBags bag window (`DefaultPanelTemplate`'s look:
+  `ButtonFrameTemplateNoPortrait` in the client's art, drawn above the content; the rock and its streaks; Classic's title
+  band), the original menu button's bag icon (`Bagslots2x`) over the top inner corner on every bag, a centered gold title,
+  the search box where the original put it with `SearchBoxTemplate`'s insides, the sort button's own art.
+- **The settings window, every client**: Blizzard's settings window (920 x 724) in the same stone: its name in the title
+  bar, `Options_InnerFrame`, the category list, the search box at the top right, page tabs on the inner frame's edge, the
+  page as Blizzard's settings list, `WowStyle2` dropdowns and `MinimalSliderWithSteppers` sliders with their steppers,
+  Done and What's New at the bottom right.
+- **Retail and Forever** (`Clients.Retail`): the red close button, the retail menus, the popup's retail border.
+- **Classic, Era, TBC, Anniversary, Mists, Cata** (`Clients.Classic`): Classic's close button, Classic's menus, the
+  popup's Classic border.
+- **Everywhere**: the panel button, the input border, the settings check box and scroll bar, the list rows for the bags'
+  side tabs, `MinimalTab` page tabs, the client's fonts copied outright; no sparkles, feather, wash, ribbon, cloud, glow or
+  braid.
 
 ## How it was checked
 
@@ -156,14 +163,150 @@ restyles widgets in protected calls and the mock error handler drops errors. Eac
 
 ## Not matched, or left for testing in game
 
-- **Classic's bags** use the settings window's frame, as planned. Classic's own portrait window (above) would give
-  them Classic's portrait and rock background instead; a choice to make in game.
-- **Next's own layouts** stay Next's: the settings window's sidebar (brand, search, version), a page's header and
-  sections, the bag's header row and footer. Blizzard has no equivalent window.
+- **The bag's header row and footer** stay Next's (its buttons in the title bar, the free slots and money below): the
+  original bags put their sort and size buttons elsewhere, and Blizzard's bags differ again.
 - **Header buttons are square**: the sort button is 24 square, Blizzard's 28 x 26.
+- **The bag icon has no glow under the pointer**: the original's glow belongs to its menu button, and the icon here is
+  art, not a button.
 - **The scroll thumb's middle** is stretched; Blizzard crops it to the thumb's height (`OnSizeChanged`).
 - **The check box's art** fills its 30 x 29 box; whether the client sizes a button's state textures to their atlas
   (`useAtlasSize` on `NormalTexture`) is not known from the source.
-- **The settings slider** is 140 wide; Blizzard's is 212 inside a 250-wide control.
-- Checked against Blizzard's source and the specs; testing in game began on 2026-10-24, and refinements are expected
-  from it.
+- **The settings search box** is Next's field with Blizzard's border and magnifier: its magnifier 6 in and its text after
+  it, where Blizzard's are 1 and 16 in (the bags' search box has the template's numbers).
+- **Classic's frame's right edge**: Blizzard's own layout gives its right tile two different x offsets (−8 at its top
+  anchor, +8 at its bottom); Next sets the same anchors, so it draws as Blizzard's Classic windows do, but which the
+  client honors is not known from the source, and the preview could not show it.
+- Checked against Blizzard's source, the client's atlas data and the specs, and looked at drawn with the client's own
+  textures; not yet seen in game after round two.
+
+## Round two: what testing in game found (2026-10-24)
+
+Reported with screenshots: the window background is "this transparent thing", not the stone of the original bag
+windows and the What's New window; the search box is "completely off"; the bag icon should be the original bags'; the
+settings window is wrong "in every way it can be" (the left menu's headers misaligned, sidebar textures spilling out
+of the window, things on the wrong layers, the BetterBags text misaligned, no control spaced right, the tabs
+hideous). Each cause below was confirmed from a geometry dump of the Plain windows through the specs' layout resolver
+(`spec/helpers/layout.lua`), from Blizzard's templates in the files each client loads, and from the client's own atlas
+sizes (`UiTextureAtlasMember`, read through wago.tools for builds 12.1.5.70575, 1.60.1.70532, 1.15.9.70003,
+2.5.6.70006 and 5.5.4.70579: the sizes below are the same on all five).
+
+### Why round one shipped like this
+
+- **Nothing checked Plain's layout against Blizzard's.** The specs checked that Plain's names exist on each client and
+  that every part lands on whole pixels, not that a part is where Blizzard puts it.
+- **The specs had no atlas sizes.** Art drawn "at its atlas's size" (the list rows and headers, the tabs, the slider)
+  collapsed to nothing in the mock, so no test could see how big it really is. The header art is 199 x 144; it was
+  drawn across the whole sidebar.
+- **No one looked at it.** The art names were Blizzard's, but where each piece goes was not.
+
+Round two adds the client's atlas sizes to the specs (`spec/fixtures/atlas_sizes.lua`), tests every placement
+against Blizzard's numbers, and checks each window as a picture made from Blizzard's own textures before it ships
+(a scratch tool outside the repository: the specs' layout, drawn with the client's files read through wago.tools).
+
+### 1. The window background: the stone of the original bags
+
+- **Asked**: the stone background of the original bag windows and the What's New window.
+- **Cause**: Plain filled its windows with `PANEL_BACKGROUND_COLOR` (`FlatPanelBackgroundTemplate`, the retail bags'
+  fill), which is translucent.
+- **Blizzard**: the original bags and What's New are `DefaultPanelTemplate` windows (`sonata/themes/default.lua`):
+  `Bg` is `Interface\FrameGeneral\UI-Background-Rock`, tiled both ways, 6 in from the left, 21 from the top, 2 from the
+  right and the bottom (`BACKGROUND` -6); `TopTileStreaks` over it, 6 in to 2 from the right, 21 down
+  (`_UI-Frame-TopTileStreaks`: retail an atlas, 256 x 43, tiled across; Classic the file `Interface\FrameGeneral\_UI-Frame`,
+  coordinates 0-1 x 0.671875-0.9609375, 37 tall). Classic's `DefaultPanelBaseTemplate` also draws `TitleBg`
+  (`_UI-Frame-TitleTileBg`, 17 tall) 7 in and 4 down, to 24 from the right; retail's has none. The original fades
+  `Bg` with the bags' opacity setting.
+- **Fix**: the bags and the settings window draw the rock, the streaks and (Classic) the title band, faded by the
+  opacity setting. The frame art draws a list of bands across the top (`Bands`, replacing the single `TitleBg`).
+
+### 2. The bag window: the original's frame and its bag icon
+
+- **Asked**: the bag icon of the original bags.
+- **The original** (`frames/menubutton.lua`, `sonata/themes/default.lua`): a `DefaultPanelTemplate` window
+  (`ButtonFrameTemplateNoPortrait`, on every client), its border raised above the content (`NineSlice` at +500), and the
+  round menu button at the top left: 40 x 40 at `TOPLEFT -10, 7`, its art `Interface\ContainerFrame\Bagslots2x`
+  (coordinates 0-0.2 x 0-1) 48 x 60 centered on it, above everything (strata HIGH), a gold glow (0.2-0.3992) fading in
+  under the pointer. Plain drew retail's combined bags instead (`HeldBagLayout` with a 36-pixel bag icon portrait).
+- **Fix**: Plain's bags take the original's frame and icon on every client: `ButtonFrameTemplateNoPortrait` drawn above
+  the content (new: `Frame.Above`, the frame on a frame of its own above the panel's content, with the title and the
+  header buttons above it), the `Bagslots2x` art where the original draws it, above the frame (new: `Above` ornaments),
+  on every panel (the original showed it on the backpack and the bank alike; the NPC portraits go). The glow under the
+  pointer is the menu button's, and Next has no menu button there: not drawn.
+
+### 3. The search box
+
+- **Cause** (geometry dump, retail): the box ran from 10 in, 28 down, under the portrait's corner (36 x 36 from -4,
+  -1); its magnifier was 14 square 6 in, its text 26 in, Next's own layout, not the template's.
+- **Blizzard** (`SearchBoxTemplate`, every client): the magnifier 10 x 10 at `LEFT 1, -1`, the text and help 16 in and
+  20 from the right (`TextInsets`), help in `GameFontDisableSmall` at 0.35 gray, the clear button 17 x 17 at
+  `RIGHT -3, 0`, its icon 10 x 10 at 3, -3; 20 tall with its border caps 8 wide, the left one 5 past the box.
+  The original BetterBags placed the box at `TOPLEFT 20, -30` to `-10, -50` (`sonata/themes/base.lua`), its content
+  from 62 down (insets 42 plus the search's 20).
+- **Fix**: Plain places the box where the original did, and the theme gives its insides the template's numbers (new:
+  `Search.Inner`: `IconX`, `IconY`, `IconSize`, `TextLeft`, `TextRight`, `ClearRight`).
+
+### 4. The settings window
+
+Blizzard's settings window (`Blizzard_SettingsPanel.xml`, the same on every client): 920 x 724;
+`Options_InnerFrame` (886 x 618: a soft inset shadow, a thin gray outline, a divider 199 in) at `TOPLEFT 17, -64`;
+the category list at 18, 76, 199 wide, down to 46 above the bottom; the content from 16 right of the list to 22 from
+the window's right; the search box 350 x 22, its bottom right 4 right of and 20 above the content's top right; tabs
+(`MinimalTabTemplate`) at `TOPLEFT 32, -27`, 37 tall, 5 apart; Close 96 x 22 at `BOTTOMRIGHT -16, 16`, Apply left of it,
+2 apart. `SettingsFrameTemplate` keeps its border at the window's own level (`useParentLevel`): content draws over it,
+and is never placed under it.
+
+- **4a. Spilling and layers.** The sidebar ran from the window's outer edge (x 0, the whole height), its fill and the
+  list's art over the border. **Fix**: the list where Blizzard puts it; no sidebar fill or line.
+- **4b. The list.** Rows were 232 wide, 20 tall from x 0, labels 30 in; headers stretched to the row (their art is
+  199 x 144) and in capitals. **Blizzard** (`Blizzard_CategoryList.*`): rows 175 x 20, the label 36 in and 1 up
+  (`GameFontNormal`, `GameFontHighlight` chosen), `Options_List_Active` / `Options_List_Hover` at their size (187 x 21)
+  centered on the row; headers 175 x 30, `Options_CategoryHeader_1` to 3 at their size from the header's top left
+  (their tails are faint lines down the column), the label 20 in and 1 down (`GameFontHighlightMedium`), as written;
+  2 between every element. **Fix**: those numbers (new: `Nav.ItemWidth`, `Nav.GroupUpper`).
+- **4c. The BetterBags text.** Next's brand (icon and name) sat in the sidebar's top 72 pixels. Blizzard's window has
+  no brand: its name ("Options") is centered in the title bar (`GameFontNormal`, 5 down). **Fix**: the brand off
+  (new: `Brand = false`) and the window's name in its title bar (new: `Settings.Title`).
+- **4d. The tabs.** Blizzard's tab art is a hollow outlined top with no bottom (seen in the client's texture), drawn to
+  sit on `Options_InnerFrame`'s top edge. Plain drew no inner frame and hung the tabs under the page header, so they
+  floated. **Fix**: the inner frame (new: `Settings.InnerFrame`) and the tabs on its top edge, 27 down, from the
+  content's left (new: `Settings.Tabs`), the search box at Blizzard's place (new: `Search.Place = "Top"`).
+- **4e. The page.** Plain kept Next's page: two columns of cards, rows 44 tall, the control at the far right, section
+  titles in capitals. **Blizzard** (`Blizzard_SettingsList.*`, `Blizzard_SettingControls.*`): a header 50 tall with
+  the title (`GameFontHighlightHuge`) 7 in and 22 down and `Options_HorizontalDivider` (630 x 1) centered 50 down; the
+  list from 2 below it and 15 left of the content, 25 in, 10 from the top, 9 between rows; section titles 45 tall,
+  `GameFontHighlightLarge` 7 in and 16 down, as written; rows 26 tall, one column, the name 37 in (plus 15 per indent)
+  up to 85 left of the row's middle; the check box from 80 left of the middle, the slider (250 wide with its steppers)
+  80 left and 3 up, the dropdown (220) 48 left and 3 up, the color swatch 73 left, a button (200) 40 left; under the
+  pointer the row is lit white at 0.1, 10 past its left to 5 short of its right. **Fix**: a list layout for pages (new:
+  `Content.Layout = "List"` and its numbers).
+- **4f. The controls Blizzard draws differently in this window.** The slider is `MinimalSliderWithSteppersTemplate`:
+  back and forward steppers (`Minimal_SliderBar_Button_Left`, 11 x 19, and `_Right`, 9 x 18, 4 out from the bar), the
+  value in `GameFontNormal` 25 right of it, gray and the slider at 0.7 while disabled; no box to type in. The dropdown
+  is `WowStyle2DropdownTemplate` (`common-dropdown-c-button` 7 past it, the choice centered in `GameFontNormal`, an
+  arrow `common-dropdown-c-button-hover-arrow` 5 below its bottom) between back and next steppers
+  (`common-dropdown-icon-back`, `-next`). **Fix**: both, as Plain's settings controls.
+- **4g. The footer.** Done sat 24 from the right of a 56-pixel band with a line, What's New a link at its left.
+  **Fix**: Done 96 x 22 at 16, 16 from the bottom right, What's New the same size left of it, 2 apart (Blizzard's Apply
+  button's place), no band or line; the version at the bottom left.
+- **4h. The size.** 1000 x 720 (Default's). **Fix**: 920 x 724, so `Options_InnerFrame` fits as it does in Blizzard's.
+
+  The dropdown's art follows its state (`WowStyle2DropdownMixin:GetBackgroundAtlas`: `-hover-1`, `-pressed-1`,
+  `-pressedhover-1`, `-open`, `-disabled`), the arrow shows only under the pointer, the text is gold (gray disabled).
+  Its menu is `MenuStyle2`: retail `common-dropdown-c-bg` 17 past its sides, 12 above and 22 below, the list 3, 6, 3, 7
+  in; Classic loads its own after the shared one (`Blizzard_Menu.toc`: `MenuTemplates.lua`, then
+  `[Family]\MenuTemplates.lua`), `common-dropdown-classic-b-bg` 3 past the sides, 1 above and 4 below, over black at
+  0.8 from 7, 4 to 8, 8 inside it, the list 14 in. The art is on every client (`common-dropdown-c-button` is sliced 12
+  either side, `UiTextureAtlasElementSliceData`: it stretches across).
+
+### 5. The other windows
+
+Dialogs and the bags' menus already followed Blizzard's (today's popup, `MenuStyle1`).
+
+### What was done, and how it was checked
+
+Every fix above, each test first: 4,886 specs pass, luacheck is clean, and 52 mutations of the new guards were each
+caught. Each window was then drawn from the specs' layout with the client's own textures (decoded from the game files
+through wago.tools; text in a stand-in font) and looked at on retail and Classic Era: the bag (the stone, the frame, the
+icon, the search box) and the settings window (the General page, the Appearance page's tabs). The drawing found two
+things the specs had not: the divider stretched across the header (the atlas fixture was stale, now checked by a spec),
+and the content's top measured on a window not built yet when a page restyled (`ContentTop`, now measured on UIParent's
+grid as `Metrics` is).

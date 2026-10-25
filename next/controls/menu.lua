@@ -254,8 +254,24 @@ end
 -- All in whole pixels on its own grid (UIParent's: docs/next-pixel-perfect.md), its anchor's width in its
 -- units (the anchor may be in a window drawn smaller): its rows one ItemHeight apart, a check and a label
 -- on each centered by its top.
-function nextMenu:Style()
+-- look returns the menu's look: the theme's Menu, with what the open menu's style changes (NextMenuOptions.style: a
+-- dropdown's own menu, Blizzard's MenuStyle2 for its settings dropdowns).
+---@private
+---@return table
+function nextMenu:look()
   local M = controls:Theme("Menu")
+  local own = self.opts and self.opts.style
+  if not own then
+    return M
+  end
+  local merged = {}
+  for k, v in pairs(M) do merged[k] = v end
+  for k, v in pairs(own) do merged[k] = v end
+  return merged
+end
+
+function nextMenu:Style()
+  local M = self:look()
   local frame, items = self.frame, self.items
   frame:ClearAllPoints()
   pixel:Point(frame, "TOPLEFT", self.anchor, "BOTTOMLEFT", 0, -M.Gap)

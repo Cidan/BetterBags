@@ -7,6 +7,14 @@ local uiSource = dofile("spec/helpers/ui_source.lua")
 
 local FLAGS = { "isRetail", "isForever", "isClassic", "isBCC", "isMists", "isAnniversary", "isCata" }
 -- The flags each client BetterBags ships a TOC for sets (core/constants.lua).
+-- Files no code a client loads names, shown to be in each client's own game data instead: their FileDataID read from
+-- every client's build through wago.tools (/api/casc/<id>?download&build=..., 2026-10-24: 12.1.5.70575, 1.60.1.70532,
+-- 1.15.9.70003, 2.5.6.70006, 5.5.4.70579). BetterBags' original bags draw them on every client.
+local IN_GAME_DATA = {
+  -- The original bags' menu button (frames/menubutton.lua), FileDataID 4691255, 512 x 128 on every client.
+  ["Interface\\Containerframe\\Bagslots2x"] = true,
+}
+
 local FLAGS_OF = {
   Retail = { isRetail = true },
   Forever = { isRetail = true, isForever = true },
@@ -94,7 +102,9 @@ describe("the Plain theme's art", function()
         want("atlas", atlas, { quoted })
       end
       for _, file in ipairs(sorted(found.file)) do
-        want("file", file, { file, (file:gsub("\\", "\\\\")), (file:gsub("\\", "/")) })
+        if not IN_GAME_DATA[file] then
+          want("file", file, { file, (file:gsub("\\", "\\\\")), (file:gsub("\\", "/")) })
+        end
       end
       for _, layout in ipairs(sorted(found.layout)) do
         want("layout", layout, { layout .. " =", layout .. "=" })
@@ -118,6 +128,24 @@ describe("the Plain theme's art", function()
       end
       assert.are.same({}, missing, name)
       assert.is_true(#wanted >= 40, name .. " checks " .. #wanted .. " names")
+    end)
+
+    -- The specs draw Plain at the client's own atlas sizes (spec/fixtures/atlas_sizes.lua): every atlas it names has one,
+    -- or art drawn at its atlas's size collapses in the specs (tools/atlas_sizes/generate.py writes them).
+    it("has the size of every atlas it draws on " .. name .. " in the specs' atlas fixture", function()
+      local sizes = dofile("spec/fixtures/atlas_sizes.lua")[name]
+      local saved = {}
+      for _, flag in ipairs(FLAGS) do saved[flag] = addon[flag] end
+      for _, flag in ipairs(FLAGS) do addon[flag] = FLAGS_OF[name][flag] == true end
+      local theme = sonataNext:Resolve("Plain")
+      for _, flag in ipairs(FLAGS) do addon[flag] = saved[flag] end
+      local missing = {}
+      for _, atlas in ipairs(sorted(names(theme).atlas)) do
+        if sizes[atlas] == nil then
+          table.insert(missing, atlas)
+        end
+      end
+      assert.are.same({}, missing, "run tools/atlas_sizes/generate.py")
     end)
   end
 end)

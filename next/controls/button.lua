@@ -138,6 +138,16 @@ function buttonProto:Fit()
   pixel:Row(label, "TOPLEFT", frame, pixel:Middle(frame, frame:GetWidth(), text), frame:GetHeight())
 end
 
+-- SetStyle draws the button in another of its looks (Plain, Primary, Danger, Link): the settings window's What's New is a
+-- link, or a button in Blizzard's Apply button's place for a theme that says so.
+---@param name NextButtonStyle
+function buttonProto:SetStyle(name)
+  if self.style ~= name then
+    self.style = name
+    self:Style()
+  end
+end
+
 -- SetWidth gives the button a fixed width, or (nil) sizes it to its label again.
 ---@param width? number
 function buttonProto:SetWidth(width)

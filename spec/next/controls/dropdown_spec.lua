@@ -323,6 +323,86 @@ describe("NextDropdown", function()
     nextDropdown:ApplyStyle()
   end)
 
+  -- Blizzard's settings dropdown (WowStyle2DropdownTemplate, WowStyle2DropdownMixin; DropdownWithSteppersTemplate): its
+  -- art for each state, the arrow hung 5 below its bottom and shown only under the pointer, the back and next steppers
+  -- 5 left and 4 right of it stepping through the choices, and its menu in MenuStyle2.
+  describe("as Blizzard's settings dropdown", function()
+    local function art(atlas) return { Atlas = atlas, Color = "White", Alpha = 1 } end
+    local STYLE2 = { Controls = { Dropdown = {
+      Fill = art("common-dropdown-c-button"), HoverFill = art("common-dropdown-c-button-hover-1"),
+      PressedFill = art("common-dropdown-c-button-pressedhover-1"), OpenFill = art("common-dropdown-c-button-open"),
+      DisabledFill = art("common-dropdown-c-button-disabled"), Edge = false, Justify = "CENTER",
+      Chevron = { Atlas = "common-dropdown-c-button-hover-arrow", Color = "White", Size = 12, Anchor = "BOTTOM",
+        Point = { X = 0, Y = -5 }, HoverOnly = true },
+      Steppers = { Width = 26, Height = 25, BackGap = 5, NextGap = 4,
+        Back = { Atlas = "common-dropdown-icon-back", Disabled = { Atlas = "common-dropdown-icon-back-disabled" } },
+        Next = { Atlas = "common-dropdown-icon-next", Disabled = { Atlas = "common-dropdown-icon-next-disabled" } },
+        Fill = art("common-dropdown-c-button"), HoverFill = art("common-dropdown-c-button-hover-2"),
+        PressedFill = art("common-dropdown-c-button-pressedhover-2"), DisabledFill = art("common-dropdown-c-button-disabled") },
+      Menu = { Fill = art("common-dropdown-c-bg"), Border = false },
+    } } }
+
+    before_each(function()
+      UseNextTheme(STYLE2)
+      nextDropdown:ApplyStyle()
+    end)
+
+    it("draws its art for its state: pressed under the pointer and disabled too", function()
+      local d = make()
+      assert.are.equal("common-dropdown-c-button", d.fill:GetAtlas())
+      d.frame:GetScript("OnEnter")(d.frame)
+      assert.are.equal("common-dropdown-c-button-hover-1", d.fill:GetAtlas())
+      d.frame:GetScript("OnMouseDown")(d.frame, "LeftButton")
+      assert.are.equal("common-dropdown-c-button-pressedhover-1", d.fill:GetAtlas())
+      d.frame:GetScript("OnMouseUp")(d.frame, "LeftButton")
+      d.frame:GetScript("OnLeave")(d.frame)
+      d:SetEnabled(false)
+      assert.are.equal("common-dropdown-c-button-disabled", d.fill:GetAtlas())
+    end)
+
+    it("hangs its arrow by its bottom, 5 below the dropdown's, and shows it only under the pointer", function()
+      local d = make()
+      assert.are.same({ "BOTTOM", d.frame, "BOTTOM", 0, -5 }, { d.chevron:GetPoint(1) })
+      assert.is_false(d.chevron:IsShown())
+      d.frame:GetScript("OnEnter")(d.frame)
+      assert.is_true(d.chevron:IsShown())
+      d.frame:GetScript("OnLeave")(d.frame)
+      assert.is_false(d.chevron:IsShown())
+      assert.are.equal("CENTER", d.text:GetJustifyH(), "the choice centered")
+    end)
+
+    it("steps to the choice before and after with its steppers, 5 left and 4 right of it, off at the ends", function()
+      local d = make()
+      assert.are.same({ "RIGHT", d.frame, "LEFT", -5, 0 }, { d.back.frame:GetPoint(1) })
+      assert.are.same({ "LEFT", d.frame, "RIGHT", 4, 0 }, { d.next.frame:GetPoint(1) })
+      assert.are.same({ 26, 25 }, { d.back.frame:GetSize() })
+      assert.are.equal("common-dropdown-icon-back", d.back.icon:GetAtlas())
+      d.next.frame:GetScript("OnClick")(d.next.frame, "LeftButton")
+      assert.are.same({ "Size Ascending" }, changes)
+      assert.is_false(d.next.frame:IsEnabled(), "the last choice")
+      assert.are.equal("common-dropdown-icon-next-disabled", d.next.icon:GetAtlas())
+      assert.are.equal("common-dropdown-c-button-disabled", d.next.fill:GetAtlas())
+      d.back.frame:GetScript("OnClick")(d.back.frame, "LeftButton")
+      d.back.frame:GetScript("OnClick")(d.back.frame, "LeftButton")
+      assert.are.same({ "Size Ascending", "Size Descending", "Alphabetically" }, changes)
+      assert.is_false(d.back.frame:IsEnabled(), "the first choice")
+      d:SetEnabled(false)
+      assert.is_false(d.next.frame:IsEnabled(), "both off while it is")
+      UseNextTheme(nil)
+      nextDropdown:ApplyStyle()
+      assert.is_false(d.back.frame:IsShown(), "none for a theme without")
+    end)
+
+    it("opens its menu in its own style, other menus keeping theirs", function()
+      local d = make()
+      d:Click(addon:GetModule("Context"):New("spec"))
+      assert.are.equal("common-dropdown-c-bg", nextMenu.fill:GetAtlas())
+      nextMenu:Close()
+      nextMenu:Open(CreateFrame("Button"), { items = { { text = "A", value = 1 } }, onPick = function() end })
+      assert.are_not.equal("common-dropdown-c-bg", nextMenu.fill:GetAtlas())
+    end)
+  end)
+
   it("shows the choice made, its chevron on the right, over its fill and edge", function()
     local d = make()
     assert.are.same({ D().Width, D().Height }, { d.frame:GetSize() })
