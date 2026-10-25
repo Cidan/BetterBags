@@ -45,9 +45,12 @@ for _, m in ipairs({ { "SettingsCatalog", "config/catalog.lua" }, { "NextStyle",
   { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
   { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" },
   { "NextSettingsThemes", "next/settings/themes.lua" }, { "NextLift", "next/lift.lua" }, { "NextListReorder", "next/settings/reorder.lua" },
+  { "NextSettingsItemsTab", "next/settings/itemstab.lua" },
   { "NextSettingsCategories", "next/settings/categories.lua" },
   { "NextSettingsBagCategories", "next/settings/bagcategories.lua" },
+  { "Currencies", "data/currencies.lua" },
   { "NextSettingsCurrency", "next/settings/currency.lua" },
+  { "NextSettingsCurrencies", "next/settings/currencies.lua" },
   { "NextSettingsContent", "next/settings/content.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -150,6 +153,7 @@ describe("NextSettingsContent", function()
     controls.escape = {}
     render:Init()
     tween:Init()
+    UseNextCurrencies(db, override)
     pages:Clear()
     settings:Init()
     content:Init()
@@ -171,7 +175,8 @@ describe("NextSettingsContent", function()
         table.insert(list, page.group .. ": " .. page.title)
       end
       assert.are.same({ "BetterBags: General", "BetterBags: Appearance", "BetterBags: Item Colors",
-        "BetterBags: Categories", "Bags: Backpack", "Bags: Bank", "Profiles: Profiles", "Integrations: QuickFind" }, list)
+        "BetterBags: Categories", "BetterBags: Currencies", "Bags: Backpack", "Bags: Bank", "Profiles: Profiles",
+        "Integrations: QuickFind" }, list)
     end)
 
     -- Categories are defined once, on their own page (category-lifecycle.md §6), for both designs; a
@@ -292,7 +297,12 @@ describe("NextSettingsContent", function()
       assert.are.equal("Backpack", listed()[5], "none on Era")
       addon.isClassic, addon.isRetail = false, true
       design = "next"
-      assert.are.equal("Backpack", listed()[5], "BetterBags Next shows no currencies")
+      assert.are.equal("Currencies", listed()[5], "BetterBags Next has its own Currencies page (currency.md §6)")
+      for _, title in ipairs(listed()) do
+        assert.are_not.equal("Currency", title, "not the classic bags'")
+      end
+      addon.isRetail, addon.isClassic = false, true
+      assert.are.equal("Currencies", listed()[5], "items are tracked on every client")
     end)
 
     it("shows every currency on the Currency page, and finds it by name", function()
@@ -370,7 +380,10 @@ describe("NextSettingsContent", function()
       local classicOnly = { bagFading = true, animateItemMovement = true, fullSectionNames = true,
         resizableWindow = true, snapToContent = true, itemsPerRow = true, columns = true, opacity = true, scale = true }
       local nextOnly = { nextIconScale = true, nextBagScale = true, nextSparkles = true, nextShimmer = true,
-        nextTitleCloud = true, nextTitleRibbon = true, nextBraid = true, nextOrnamentMotion = true }
+        nextTitleCloud = true, nextTitleRibbon = true, nextBraid = true, nextOrnamentMotion = true,
+        nextCurrencyCapBars = true, nextCurrencyGains = true, nextCurrencyHideEmpty = true,
+        nextCurrencyItemsEverywhere = true, nextCurrencyTracker = true, nextCurrencyLayout = true,
+        nextCurrencyScale = true, nextCurrencyBackground = true, nextCurrencyHideInCombat = true }
       addon.hasGuildBank = true
       content:Init()
       local named = 0
@@ -384,7 +397,7 @@ describe("NextSettingsContent", function()
                   assert.are.equal("classic", row.design or section.design, row.setting)
                 end
                 if nextOnly[row.setting] then
-                  assert.are.equal("next", row.design or section.design or tab.design, row.setting)
+                  assert.are.equal("next", row.design or section.design or tab.design or page.design, row.setting)
                 end
                 if catalog:Has(row.setting, page.bag) then
                   assert.has_no.errors(function() catalog:Get(row.setting, page.bag) end, row.setting)
@@ -396,7 +409,8 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      assert.are.equal(19 + 3 * 29, named)
+      -- The general pages' 19, the Currencies page's 9 (currency.md §6), and each bag's 29.
+      assert.are.equal(19 + 9 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()

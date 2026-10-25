@@ -114,6 +114,7 @@ data\loader.lua
 data\refresh.lua
 data\seller.lua
 data\automation.lua
+data\currencies.lua
 data\changelogdata.lua
 data\changelog.lua
 
@@ -198,6 +199,9 @@ next\chain.lua
 next\ornaments.lua
 next\menubutton.lua
 next\panel.lua
+next\currencyentry.lua
+next\currencytracker.lua
+next\currencystrip.lua
 next\bag.lua
 next\bank.lua
 next\merchant.lua
@@ -216,9 +220,11 @@ next\settings\pages.lua
 next\settings\window.lua
 next\settings\themes.lua
 next\settings\reorder.lua
+next\settings\itemstab.lua
 next\settings\categories.lua
 next\settings\bagcategories.lua
 next\settings\currency.lua
+next\settings\currencies.lua
 next\settings\content.lua
 
 integrations\consoleport.lua

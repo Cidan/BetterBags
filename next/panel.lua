@@ -1170,7 +1170,7 @@ function panelProto:SidePads()
 end
 
 -- MinWidth is the narrowest a small panel goes (next.md §14g): room for its shown header buttons and
--- Small.MinTitle of its title (cut short past that, FitTitle), for its footer's free slots and money,
+-- Small.MinTitle of its title (cut short past that, FitTitle), for its footer's free slots (FooterWidth) and money,
 -- and for one column of its cells (an icon, or a card in the vendor), each with the side rail beside it.
 ---@return number
 function panelProto:MinWidth()
@@ -1178,9 +1178,16 @@ function panelProto:MinWidth()
   local room, slack = self:titleEnd()
   local header = self:TitleStart() + room + slack + style.Small.MinTitle
   local money = self.moneyFrame ~= nil and self.moneyFrame.frame:GetWidth() or 0
-  local footer = pads + style.TITLE_INSET + self.freeText:GetStringWidth() + 12 + money
+  local footer = pads + style.TITLE_INSET + self:FooterWidth() + 12 + money
   local column = pads + style.GUTTER + self.content:CellWidth()
   return math.ceil(math.max(header, footer, column))
+end
+
+-- FooterWidth is the least room the footer's inner side needs: its free slots (the backpack's currencies, which
+-- took their place: currency.md).
+---@return number
+function panelProto:FooterWidth()
+  return self.freeText:GetStringWidth()
 end
 
 -- MinHeight is the shortest a small panel goes: its header, what is under its scroll area, and one
@@ -3587,6 +3594,11 @@ function panelProto:CreateMoney()
   return nil
 end
 
+-- BuildFooterParts makes what a kind shows in its footer besides its free slots and money (the backpack's
+-- currencies, which take the free slots' place: currency.md), with the footer, before the panel is first laid out.
+function panelProto:BuildFooterParts()
+end
+
 -- BuildFooter puts the free slots on the inner side and the money on the screen-edge side, under
 -- a fading line.
 function panelProto:BuildFooter()
@@ -3603,6 +3615,7 @@ function panelProto:BuildFooter()
     end
     self.moneyFrame = m
   end
+  self:BuildFooterParts()
   self:styleFooter()
 end
 
@@ -3905,6 +3918,7 @@ function panelProto:Watch()
   local frame = self.frame
   addon.SetScript(frame, "OnShow", function(ctx)
     self:OnCooldown(ctx)
+    self:OnFrameShown(ctx)
   end)
   addon.SetScript(frame, "OnHide", function(ctx)
     self:OnHidden(ctx)
@@ -3936,6 +3950,13 @@ end
 
 -- WatchKind registers the kind's own events and messages.
 function panelProto:WatchKind()
+end
+
+-- OnFrameShown runs whenever the panel's frame shows, every way it does (its OnShow): what a kind draws only while it
+-- shows (the backpack's currencies, currency.md).
+---@param ctx Context
+function panelProto:OnFrameShown(ctx)
+  local _ = ctx
 end
 
 -- playShimmer glides the spark in along the ribbon from its far end, easing to rest where the

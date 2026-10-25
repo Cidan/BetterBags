@@ -211,6 +211,7 @@ same database calls, with the same effects, as the classic window did; every que
 | BetterBags | General (`general`) | *Bags:* BetterBags Next, Enable Bank Bags, Show Blizzard Bag Button, Enable Bag Fading (classic), Animate Item Movement (classic). *Search:* In-Bag Search, Enter to Make Category. *Items:* Upgrade Icon Provider, New Item Duration, Category Sell and Deposit. *What's New:* Show What's New on Login. |
 | | Appearance (`appearance`) | Three tabs (asked: "make 'Theme' here a tab, and add a tab for 'Size'", docs/next-appearance-size.md; then an Animation tab). **Theme**: the theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext) while Next is in use; for the classic bags, their Bag Theme (Sonata), then Settings Window (SonataNext: Next's themes draw this window). **Size** (Next only): Icon Scale (`nextIconScale`) and Bag Scale (`nextBagScale`), 50% to 150% in steps of 5, each sending `next/ScalesChanged` (next.md §3, §14h). **Animation** (Next only): an Effects section of six switches, Sparkles, Title Shimmer, Title Cloud, Title Ribbon, Braid and Moving Ornaments (`nextSparkles`, `nextShimmer`, `nextTitleCloud`, `nextTitleRibbon`, `nextBraid`, `nextOrnamentMotion`), each turning its effect off on any theme and sending `next/AnimationChanged` (next-themes.md §20). The classic bags size themselves on each bag's page and have none of those effects, so with them Appearance has the Theme tab alone, and no tab strip. |
 | | Item Colors (`itemcolors`) | The four item level colors as swatches, named with their ranges (61% and 86% of the highest item level seen, as the classic pane); a picked color is saved and sent as `itemLevel/MaxChanged` (Cancel saves the color back too); the highest level seen; Reset Colors, Reset Max Item Level. |
+| | Currencies (`currencies`, Next only) | BetterBags Next's currencies (currency.md §6): *Tracked* (what is tracked, in order, dragged to move, each with Remove), *Currencies* (on clients with currencies: every currency with a switch that tracks it), *Items* (the shared items tab over the items tracked), *Display* (Backpack and Tracker; Tracker). |
 | Bags | Backpack, Bank, Guild Bank (`backpack`, `bank`, `guild`) | Each bound to its bag. *Layout:* Order (Section, Item), Tabs (Enable Groups: the backpack only; the bank's Tabs section is left out), Slots (All Free Space, Gaps). *Items:* Item Level (two), Quality (Glow Intensity), Stacking (seven). *Categories:* Automatic (the seven filters). The guild bank's page shows on a client with one (`addon.hasGuildBank`). |
 | Profiles | Profiles (`profiles`) | Tab *Profiles:* the active profile (a pick asks, then switches and reloads), the characters on each, New, Copy, Rename, Delete, Reset to Defaults (the classic flows: Copy creates then copies; Delete switches to Default first; Default cannot be renamed or deleted; a name is asked again while empty). Tab *Import / Export* (`transfer`): Export Categories fills a text area and selects it; Import Categories asks, imports (`DB:ImportSettings`), clears the area and offers a reload, or says what is wrong. |
 | Integrations | QuickFind (`quickfind`) | What the integration does. |
@@ -344,6 +345,12 @@ page's `Content.Top` and `Bottom`).
   ignoring it (`UnignoreItem`), the bags recalculated each time. Editable for a plugin's category too:
   what it ignores is the player's choice. An ignored item in your bags says where it shows ("Shows in
   X."), not faded.
+- **One items tab** (`NextSettingsItemsTab`, `next/settings/itemstab.lua`): Added Items and Ignored Items are two
+  sources of the shared items tab (`CreateItemsTab` makes it with the chosen category's lists), which the Currencies
+  page's Items tab uses too (currency.md §6). What differs between them is the source's (`NextItemsSource`: the list,
+  read-only, help, words, notes, add, remove, clear, Remove All's question); the tab's look, its filter, names loading,
+  drops, right click and Remove All are one. The page's tabs share its frame helpers (`TabHeight`, `Metrics`,
+  `PlaceTab`).
 - **Automation tab** (automation.md §5): a section ("Merchants") of three settings rows, drawn as every
   page's settings (not controls of its own): Auto Sell, Confirm Auto Sell (on by default) and Destroy
   What Can't Be Sold, the last two disabled while Auto Sell is off, saved at once
@@ -371,7 +378,8 @@ sections from its committed items (not empty slots, Recent Items, Free Space, or
   after the ones it shows) and the bags recalculated (`bags/Rederive { resetLayout, buttons }`). Read
   again on the bag's `items/Refresh<Kind>/Done` and on `categories/Changed` while it shows.
 
-**Dragging a row** (`NextListReorder`, `next/settings/reorder.lua`), shared by both lists. Asked:
+**Dragging a row** (`NextListReorder`, `next/settings/reorder.lua`), shared by both lists (and the Currencies page's
+Tracked list, currency.md §6). Asked:
 "instead of a line on drag, let's animate the move like we do categories (again, re-inventing drag
 handling, we do this amazingly in the bags today, look how it's done, be careful)". The first version
 drew a gold line where the row would land, a drag of its own; now a row moves exactly as a bag's
@@ -499,8 +507,9 @@ gone), it shows only what the bags in use read, and nothing the classic window h
     Appearance: Bag Theme (Sonata) and Settings Window (SonataNext: Next's themes draw this window);
     Currency (§8).
   - **Next only:** the Guild Bank page (the classic bags have no guild bank); Appearance: Theme
-    (SonataNext), the Size tab (Icon Scale, Bag Scale) and the Animation tab (next-themes.md §20). The classic themes'
-    picker (item buttons) is not shown in Next (asked).
+    (SonataNext), the Size tab (Icon Scale, Bag Scale) and the Animation tab (next-themes.md §20); the Currencies page
+    (currency.md §6: the classic bags keep their Currency page). The classic themes' picker (item buttons) is not shown
+    in Next (asked).
   - Everything else, both.
 - **Show What's New on Login** (General → What's New, `changelogOnLogin` in the catalog,
   `DB:Get/SetChangelogAutoOpen`): before, only the changelog window's "Don't show me this again"
@@ -538,6 +547,11 @@ backpack's icons. `C_CurrencyInfo` where the client has it, else the legacy glob
 whose expand and show flags are numbers (`ExpandCurrencyList(i, 1)`, `SetCurrencyBackpack(i, 1|0)`,
 Blizzard_TokenUI). No cap on how many are shown: the classic pane had none (Blizzard's token frame caps
 its own display, `MAX_WATCHED_TOKENS`).
+
+The list is read through the Currencies module's `ListSize`, `ListEntry` and `ExpandListHeading`
+(currency.md §2). The same block, made with `track`, is BetterBags Next's Currencies tab: there each switch
+tracks the currency in BetterBags' own list, by ID, and Blizzard's list is read with the headings the player
+keeps collapsed opened and closed again (`Currencies:List`), never written (currency.md §6).
 
 Coverage: `spec/next/settings/currency_spec.lua` (the list and its expansion, a row's icon, count and
 switch, headings without one, writing and the message after the game took it, the legacy API, height

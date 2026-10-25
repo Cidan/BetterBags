@@ -58,7 +58,8 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" },
-  { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
+  { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
+  { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -121,6 +122,7 @@ describe("BetterBags Next's small mode", function()
   end
 
   before_each(function()
+    UseNextCurrencies(stubs.database, override)
     render:Init()
     tween:Init()
     motion:Init()
@@ -751,11 +753,12 @@ describe("BetterBags Next's small mode", function()
         assert.are.equal(style.CONTENT_TOP + style.FOOTER + style.SECTION_HEADER + style.ICON, bag:MinHeight())
       end)
 
-      it("leaves room for the footer's free slots and money", function()
+      -- The backpack's currencies took the free slots' place (currency.md).
+      it("leaves room for the footer's currencies and money", function()
         local bag = nextBag:Create(ctx())
-        bag.freeText:SetText(string.rep("8", 60))
-        bag.moneyFrame.frame:SetWidth(128)
-        local footer = 2 * style.PAD + style.TITLE_INSET + bag.freeText:GetStringWidth() + 12 + 128
+        bag.moneyFrame.frame:SetWidth(400)
+        local footer = 2 * style.PAD + style.TITLE_INSET + bag.currencyStrip:MinWidth() + 12 + 400
+        assert.is_true(bag.currencyStrip:MinWidth() > 0)
         assert.are.equal(math.ceil(footer), bag:MinWidth())
       end)
 
@@ -842,10 +845,11 @@ describe("BetterBags Next's small mode", function()
           local bag = opened(function(c) return nextBag:Create(c) end)
           local header = 2 * style.PAD + 40 + style.TITLE_INSET + 12 + style.Small.MinTitle
           local cells = 2 * style.PAD + 40 + style.GUTTER + style.ICON
-          assert.are.equal(math.ceil(math.max(header, cells)), bag:MinWidth())
-          bag.freeText:SetText(string.rep("8", 60))
-          bag.moneyFrame.frame:SetWidth(128)
-          local footer = 2 * style.PAD + 40 + style.TITLE_INSET + bag.freeText:GetStringWidth() + 12 + 128
+          local currencies = 2 * style.PAD + 40 + style.TITLE_INSET + bag.currencyStrip:MinWidth() + 12
+            + bag.moneyFrame.frame:GetWidth()
+          assert.are.equal(math.ceil(math.max(header, cells, currencies)), bag:MinWidth())
+          bag.moneyFrame.frame:SetWidth(400)
+          local footer = 2 * style.PAD + 40 + style.TITLE_INSET + bag.currencyStrip:MinWidth() + 12 + 400
           assert.are.equal(math.ceil(footer), bag:MinWidth())
         end)
 

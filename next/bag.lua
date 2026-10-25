@@ -33,6 +33,9 @@ local nextPanel = addon:GetModule('NextPanel')
 ---@class BagButtonFrame: AceModule
 local bagButton = addon:GetModule('BagButton')
 
+---@class NextCurrencyStrip: AceModule
+local currencyStrip = addon:GetModule('NextCurrencyStrip')
+
 local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 
 -- NextBag is BetterBagsNext's backpack (next.md): the panel on the right of the screen
@@ -48,6 +51,7 @@ local nextBag = addon:NewModule('NextBag')
 ---@field settingsButton Button
 ---@field behavior {SwitchToGroup: fun(self: any, ctx: Context, id: number)}
 ---@field helper BackpackBehaviorProto The classic behavior, for its group dialogs.
+---@field currencyStrip NextCurrencyStripFrame The currencies at the bottom, where the free slots were (currency.md).
 local bagProto = nextPanel:Extend({}, 'NextBackpack')
 bagProto.watchesCooldowns = true
 
@@ -74,6 +78,47 @@ function nextBag:Create(ctx)
     end,
   }
   return b
+end
+
+-- BuildFooterParts puts its currencies where the free slots were (asked: "replace our 'xx slots free' text"; the free
+-- slots show in Free Space's header).
+function bagProto:BuildFooterParts()
+  self.freeText:Hide()
+  self.currencyStrip = currencyStrip:Create(self)
+end
+
+-- OnFrameShown draws its currencies, which draw only while it shows.
+---@param ctx Context
+function bagProto:OnFrameShown(ctx)
+  self.currencyStrip:Draw(ctx)
+end
+
+-- OnHidden ends what plays on its currencies as it hides.
+---@param ctx Context
+function bagProto:OnHidden(ctx)
+  nextPanel.proto.OnHidden(self, ctx)
+  self.currencyStrip:Settle()
+end
+
+-- FooterWidth is the least room its currencies need in the footer.
+---@return number
+function bagProto:FooterWidth()
+  return self.currencyStrip:MinWidth()
+end
+
+-- Deactivate switches the backpack off with BetterBags Next (next.md §11): its currency tracker hides with it.
+---@param ctx Context
+function bagProto:Deactivate(ctx)
+  self.currencyStrip.tracker:SetActive(ctx, false)
+  nextPanel.proto.Deactivate(self, ctx)
+end
+
+-- Activate catches the backpack up when BetterBags Next is switched back on: its currency tracker shows again where
+-- it was left, when it was out.
+---@param ctx Context
+function bagProto:Activate(ctx)
+  nextPanel.proto.Activate(self, ctx)
+  self.currencyStrip.tracker:SetActive(ctx, true)
 end
 
 ---@return NextHeaderButton[]

@@ -73,10 +73,11 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.are.same({ "general > main", "appearance > theme", "appearance > size", "appearance > animation",
       "itemcolors > main",
       "categories > settings",
-      "categories > rule", "categories > items", "categories > ignored", "categories > automation", "backpack > layout",
-      "backpack > items", "backpack > categories", "bank > layout", "bank > items", "bank > categories",
-      "guild > layout", "guild > items", "guild > categories", "profiles > profiles", "profiles > transfer",
-      "quickfind > main" }, builtEveryTab(addon))
+      "categories > rule", "categories > items", "categories > ignored", "categories > automation",
+      "currencies > tracked", "currencies > currencies", "currencies > items", "currencies > display",
+      "backpack > layout", "backpack > items", "backpack > categories", "bank > layout", "bank > items",
+      "bank > categories", "guild > layout", "guild > items", "guild > categories", "profiles > profiles",
+      "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
     settings:Close()
     assert.are.same({}, handle.errors, "closing")
   end)

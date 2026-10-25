@@ -24,7 +24,8 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextInput", "next/controls/input.lua" }, { "NextMenu", "next/controls/menu.lua" },
   { "NextDropdown", "next/controls/dropdown.lua" }, { "NextSwatch", "next/controls/swatch.lua" },
   { "NextDialog", "next/controls/dialog.lua" }, { "NextItemGrid", "next/controls/itemgrid.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextListReorder", "next/settings/reorder.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" } }) do
+  { "NextLift", "next/lift.lua" }, { "NextListReorder", "next/settings/reorder.lua" },
+  { "NextSettingsItemsTab", "next/settings/itemstab.lua" }, { "NextSettingsCategories", "next/settings/categories.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -960,6 +961,18 @@ describe("NextSettingsCategories", function()
       assert.is_true(ore.dim)
       assert.are.equal("Shows in Junk instead.", ore.note)
       assert.is_falsy(entryOf(tab.grid, 12).dim)
+    end)
+
+    it("is shown again when a bag is read while it shows, not while it is hidden", function()
+      tab.frame:GetParent():Show()
+      tab.frame:Show()
+      committed[BACKPACK]["0_4"].itemInfo.category = "Mats"
+      for _, fn in ipairs(handlers["items/RefreshBackpack/Done"]) do fn(ctx()) end
+      assert.is_falsy(entryOf(tab.grid, 11).dim, "it shows in Mats now")
+      tab.frame:Hide()
+      committed[BACKPACK]["0_4"].itemInfo.category = "Junk"
+      for _, fn in ipairs(handlers["items/RefreshBackpack/Done"]) do fn(ctx()) end
+      assert.is_falsy(entryOf(tab.grid, 11).dim, "hidden: read again when shown")
     end)
 
     it("keeps only the items whose name has what is typed in its filter", function()

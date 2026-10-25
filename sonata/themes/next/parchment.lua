@@ -47,6 +47,10 @@ sonataNext:RegisterTheme({
     ControlPressed = { 0.78, 0.72, 0.63, 1 },
     Track = { 0.7, 0.63, 0.53, 1 },
     Danger = { 172 / 255, 3 / 255, 3 / 255, 1 },
+    -- A tracked currency's gain and its count at a cap (currency.md): Blizzard's parchment green
+    -- (PARCHMENT_ACCESSIBILITY_GREEN, as the bags' Parchment theme's good text) and the sealing wax.
+    Gain = { 19 / 255, 68 / 255, 4 / 255, 1 },
+    Capped = { 0.55, 0.12, 0.06, 1 },
   },
 
   -- No shadow on the paper; the numbers drawn over item icons keep one of their own.
@@ -69,6 +73,11 @@ sonataNext:RegisterTheme({
     Price = { Color = "Ink" },
     PriceUnaffordable = { Color = "Seal" },
     VendorName = { Color = "Ink", Shadow = false },
+    CurrencyCount = { Color = "Ink" },
+    CurrencyNone = { Color = "InkMuted" },
+    CurrencyName = { Color = "Ink" },
+    CurrencyLoss = { Color = "InkMuted" },
+    CurrencyMore = { Color = "InkSoft" },
     Stack = { Shadow = { Color = "Black", X = 1, Y = -1 } },
     DragHint = { Shadow = { Color = "Black", X = 1, Y = -1 } },
     -- The settings window and its controls, in ink; sealing wax for what leads (a primary button, a
@@ -151,6 +160,20 @@ sonataNext:RegisterTheme({
     Card = { Texture = "Paper", TexCoords = { 0.25, 0.75, 0.3, 0.5 }, Color = "White" },
     Glow = { Color = "Seal" },
     Halo = false,
+  },
+
+  -- Tracked currencies in ink on the paper, their caps in sealing wax; no light: no glow round a gain, the strip lit
+  -- in wax while a tracker would be put away; the tracker a slip of the paper (currency.md).
+  Currency = {
+    Bar = { Track = { Color = "Ink", Alpha = 0.15 }, Fill = { Color = "Ink", Alpha = 0.75 }, Capped = { Color = "Seal" } },
+    Hover = { Color = "Ink", Alpha = 0.06 },
+    Flash = false,
+    Drop = { BlendMode = "BLEND", Color = "Seal", Alpha = 0.22 },
+    Slot = { Color = "Seal" },
+    Tracker = {
+      Fill = { Texture = "Paper", TexCoords = { 0.25, 0.75, 0.3, 0.5 }, Color = "White" },
+      Edge = { Color = "Ink", Alpha = 0.35 },
+    },
   },
 
   -- The settings window on the paper art, its lines and lights in ink, its marks in sealing wax.

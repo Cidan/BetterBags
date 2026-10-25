@@ -1158,8 +1158,10 @@ describe("NextSettings", function()
       local sonataNext = addon:GetModule("SonataNext")
       LoadBetterBagsModule("sonata/themes/next/parchment.lua")
       local db = StubBetterBagsModule("Database")
-      local savedGet = db.GetNextTheme
+      local savedGet, savedAnimation = db.GetNextTheme, db.GetNextAnimation
       db.GetNextTheme = function() return "Default" end
+      -- Applying a theme lays the player's Animation switches over it (next-themes.md §20): all on.
+      db.GetNextAnimation = function() return true end
       open()
       sonataNext:ApplyTheme(addon:GetModule("Context"):New("spec"), "Parchment", false)
       local paper = "Interface\\AddOns\\BetterBags\\textures\\moonlight\\parchment.png"
@@ -1170,7 +1172,7 @@ describe("NextSettings", function()
       assert.are.equal("Seal", edge.Color)
       assert.are.same({ r = r, g = g, b = b, a = edge.Alpha }, settings.done.edge.Top._colorTexture, "its Done button sealed")
       sonataNext:ApplyTheme(addon:GetModule("Context"):New("spec"), "Default", false)
-      db.GetNextTheme = savedGet
+      db.GetNextTheme, db.GetNextAnimation = savedGet, savedAnimation
       assert.is_true(settings.wash:IsShown())
     end)
 

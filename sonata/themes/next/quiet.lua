@@ -89,4 +89,7 @@ sonataNext:RegisterTheme({
   Vendor = { CoinSize = 12 },
 
   Dock = { Halo = false },
+
+  -- Calm currencies (currency.md): a smaller pop on a gain, no glow round it.
+  Currency = { Bump = 0.15, Flash = false },
 })

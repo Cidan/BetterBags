@@ -103,6 +103,10 @@ const.DATABASE_DEFAULTS = {
     nextSmallChain = "apart",
     nextTheme = "Default",
     nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, ribbon = true, braid = true, ornaments = true },
+    nextCurrencies = {},
+    nextCurrency = { capBars = true, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
+      scale = 100, background = true, hideInCombat = false },
+    nextCurrencyTracker = { out = false },
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
@@ -426,6 +430,66 @@ describe("Database", function()
       end
       assert.has_error(function() DB:GetNextAnimation("cascade") end)
       assert.has_error(function() DB:SetNextAnimation("cascade", false) end)
+    end)
+
+    -- BetterBags Next's currencies (currency.md): what is tracked, in order, per profile; how they show;
+    -- where the tracker dragged out of the backpack was left.
+    describe("currencies", function()
+      it("tracks nothing until something is tracked, and keeps a copy of the list it is given", function()
+        assert.are.same({}, DB:GetNextCurrencies())
+        local list = { { kind = "currency", id = 3008 }, { kind = "item", id = 210796 } }
+        DB:SetNextCurrencies(list)
+        table.insert(list, { kind = "item", id = 1 })
+        list[1].id = 9
+        assert.are.same({ { kind = "currency", id = 3008 }, { kind = "item", id = 210796 } }, DB:GetNextCurrencies())
+      end)
+
+      it("hands out a copy, so a caller cannot change what is saved", function()
+        DB:SetNextCurrencies({ { kind = "currency", id = 3008 } })
+        local got = DB:GetNextCurrencies()
+        got[1].id = 1
+        table.insert(got, { kind = "item", id = 2 })
+        assert.are.same({ { kind = "currency", id = 3008 } }, DB:GetNextCurrencies())
+      end)
+
+      it("refuses an entry that is no currency or item", function()
+        assert.has_error(function() DB:SetNextCurrencies({ { kind = "spell", id = 1 } }) end)
+        assert.has_error(function() DB:SetNextCurrencies({ { kind = "item" } }) end)
+      end)
+
+      it("shows cap bars and gains, hides what you have none of, and counts items everywhere until told",
+        function()
+          for _, name in ipairs({ "capBars", "gains", "hideEmpty", "itemsEverywhere", "background" }) do
+            assert.is_true(DB:GetNextCurrencyOption(name), name)
+            DB:SetNextCurrencyOption(name, false)
+            assert.is_false(DB:GetNextCurrencyOption(name), name)
+          end
+          assert.is_false(DB:GetNextCurrencyOption("hideInCombat"))
+          assert.are.equal("row", DB:GetNextCurrencyOption("layout"))
+          assert.are.equal(100, DB:GetNextCurrencyOption("scale"))
+          DB:SetNextCurrencyOption("layout", "list")
+          assert.are.equal("list", DB:GetNextCurrencyOption("layout"))
+          assert.has_error(function() DB:GetNextCurrencyOption("sparkles") end)
+          assert.has_error(function() DB:SetNextCurrencyOption("sparkles", true) end)
+          assert.has_error(function() DB:SetNextCurrencyOption("layout", "grid") end)
+        end)
+
+      it("keeps whether the tracker is out and where it was left", function()
+        local out, x, y = DB:GetNextCurrencyTracker()
+        assert.is_false(out)
+        assert.is_nil(x)
+        assert.is_nil(y)
+        DB:SetNextCurrencyTracker(true, 120, 340)
+        out, x, y = DB:GetNextCurrencyTracker()
+        assert.is_true(out)
+        assert.are.equal(120, x)
+        assert.are.equal(340, y)
+        DB:SetNextCurrencyTracker(false)
+        out, x, y = DB:GetNextCurrencyTracker()
+        assert.is_false(out)
+        assert.are.equal(120, x, "put away, it remembers where it was")
+        assert.are.equal(340, y)
+      end)
     end)
 
     it("GetAnimateItemMovement / SetAnimateItemMovement, off until turned on", function()

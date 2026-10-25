@@ -746,6 +746,13 @@ const.DATABASE_DEFAULTS = {
     -- BetterBags Next's Animation switches (Appearance > Animation, next-themes.md §20): each effect on until the player
     -- turns it off, on any theme. These are the only names there are.
     nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, ribbon = true, braid = true, ornaments = true },
+    -- BetterBags Next's currencies (.claude/rules/currency.md): what is tracked, in order ({ kind, id }, a currency
+    -- or an item); how the strip at the bottom of the backpack and the tracker dragged out of it show (these are the
+    -- only names there are); whether the tracker is out, and where it was left (its top left in UIParent's units).
+    nextCurrencies = {},
+    nextCurrency = { capBars = true, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
+      scale = 100, background = true, hideInCombat = false },
+    nextCurrencyTracker = { out = false },
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,

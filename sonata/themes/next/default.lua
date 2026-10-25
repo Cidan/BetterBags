@@ -61,6 +61,9 @@ sonataNext:RegisterTheme({
     Emerald = { 0.2, 0.86, 0.42, 1 },
     -- The settings window's sidebar, over its body: darker.
     Sidebar = { 0, 0, 0, 0.28 },
+    -- A tracked currency's gain rising off it, and its count at a cap (more is wasted: currency.md).
+    Gain = { 0.56, 1.0, 0.62, 1 },
+    Capped = { 1.0, 0.6, 0.32, 1 },
   },
 
   -- Files the theme draws with, named.
@@ -162,6 +165,16 @@ sonataNext:RegisterTheme({
     SettingsLabel = { Size = 13, Color = "Text" },
     SettingsText = { Size = 12, Color = "Muted" },
     SettingsLink = { Size = 12, Color = "Gold" },
+    -- The currencies at the bottom of the backpack and on the tracker dragged out of it (currency.md): a count, one at a
+    -- cap, one you have none of; a name (the tracker's list); a gain rising off it and a loss sinking; "+N" (what does
+    -- not fit).
+    CurrencyCount = { Size = 12, Color = "Text", Shadow = true },
+    CurrencyCapped = { Size = 12, Color = "Capped", Shadow = true },
+    CurrencyNone = { Size = 12, Color = "Muted" },
+    CurrencyName = { Size = 12, Color = "Text" },
+    CurrencyGain = { Size = 13, Color = "Gain", Shadow = true },
+    CurrencyLoss = { Size = 12, Color = "Muted", Shadow = true },
+    CurrencyMore = { Size = 11, Color = "Lavender" },
   },
 
   -- Sizes, in UI units.
@@ -261,6 +274,13 @@ sonataNext:RegisterTheme({
       -- A switch's knob sliding; a page's tab marker gliding to the tab chosen.
       Toggle = 0.18,
       TabMarker = 0.22,
+      -- A tracked currency (currency.md): its count rolling to a new number, its icon popping, a gain rising off it,
+      -- an entry fading in; the tracker popping out of the backpack.
+      CurrencyCount = 0.45,
+      CurrencyBump = 0.36,
+      CurrencyGain = 1.3,
+      CurrencyEnter = 0.28,
+      CurrencyPop = 0.38,
     },
     Ease = {
       -- Opening's overshoot sets how far the body reaches past the screen edge, so the bounce never
@@ -286,6 +306,9 @@ sonataNext:RegisterTheme({
       Resize = "inOutCubic",
       Toggle = "outCubic",
       TabMarker = "outCubic",
+      CurrencyCount = "outCubic",
+      CurrencyGain = "outCubic",
+      CurrencyEnter = "outCubic",
     },
     -- How far sections rise as they cascade in.
     Rise = 12,
@@ -466,6 +489,12 @@ sonataNext:RegisterTheme({
       Wobble = 3, Spin = 1, Alpha = 0.6, Reach = 24 },
     Knot = { Rate = 0, Max = 16, Life = { 0.5, 1.1 }, Size = { 4, 10 }, Speed = { 12, 40 }, Rise = { -16, 16 },
       Wobble = 2, Spin = 2, Alpha = 0.9, Burst = 12 },
+    -- A tracked currency's gain (a few, drifting up off its icon), and the tracker popping out of the backpack
+    -- (currency.md).
+    Gain = { Rate = 0, Max = 12, Life = { 0.5, 0.9 }, Size = { 3, 7 }, Speed = { 2, 12 }, Rise = { 12, 30 },
+      Wobble = 1.5, Spin = 2, Alpha = 0.85, Burst = 4 },
+    Pop = { Rate = 0, Max = 16, Life = { 0.45, 0.95 }, Size = { 4, 10 }, Speed = { 16, 54 }, Rise = { -28, 28 },
+      Wobble = 2, Spin = 2.4, Alpha = 0.95, Burst = 14 },
   },
 
   -- Chaining the backpack and its companion (next.md §12): a chained bag comes in Stagger after an
@@ -547,6 +576,53 @@ sonataNext:RegisterTheme({
     DestroyColor = "Crimson",
     -- A shopping list waiting to be bought (profession-shopping-list.md) glows in this color.
     BuyColor = "Emerald",
+  },
+
+  -- What BetterBags Next tracks as currencies (currency.md): the strip at the bottom of the backpack (MoneyGap from the
+  -- gold) and the tracker dragged out of it. An entry is its icon (cropped by Crop on each side), its count CountGap
+  -- beside it, Gap to the next (a list's name NameGap past its icon), and under them its cap Bar (Gap below the icon,
+  -- Height tall: its Track, its Fill, and its fill at a cap); its Hover HoverPad round it. A gain pops its icon by Bump
+  -- and lights its Flash (Size times the icon) and rises Rise; Drop lights the strip while a tracker held over the
+  -- backpack would be put away, and the Slot (its Icon) opens at its end while an item that can be tracked is held.
+  -- The Tracker is a card, Pad round its entries (RowGap apart in a column or a list, a list ListWidth wide): its Fill,
+  -- Edge and Frame (Blizzard's nine-slice art, next-themes.md §15; false: none).
+  Currency = {
+    Icon = 16,
+    Crop = 0.08,
+    CountGap = 4,
+    Gap = 14,
+    NameGap = 8,
+    MoneyGap = 16,
+    Font = "CurrencyCount",
+    CappedFont = "CurrencyCapped",
+    NoneFont = "CurrencyNone",
+    NameFont = "CurrencyName",
+    GainFont = "CurrencyGain",
+    LossFont = "CurrencyLoss",
+    MoreFont = "CurrencyMore",
+    HintFont = "Footer",
+    Bar = {
+      Gap = 3,
+      Height = 2,
+      Track = { Color = "White", Alpha = 0.1 },
+      Fill = { Color = "Lavender", Alpha = 0.9 },
+      Capped = { Color = "Capped" },
+    },
+    Hover = { Color = "White", Alpha = 0.07 },
+    HoverPad = 3,
+    Flash = { Texture = "Glow", Color = "Gold", BlendMode = "ADD", Alpha = 0.85, Size = 2.6 },
+    Bump = 0.3,
+    Rise = 22,
+    Drop = { Texture = "Glow", Color = "Gold", BlendMode = "ADD", Alpha = 0.5 },
+    Slot = { Icon = "IconPlus", Color = "Gold", Alpha = 0.9 },
+    Tracker = {
+      Pad = 10,
+      RowGap = 6,
+      ListWidth = 200,
+      Fill = { Color = "Card" },
+      Edge = { Color = "Lavender", Alpha = 0.3, Size = 1 },
+      Frame = false,
+    },
   },
 
   -- The vendor's buttons: dimmed when a search leaves them out; lit under the pointer; tinted when
