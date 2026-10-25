@@ -25,7 +25,7 @@ local context = addon:GetModule("Context")
 local FLAGS = { "isRetail", "isForever", "isClassic", "isBCC", "isMists", "isAnniversary", "isCata" }
 
 describe("SonataNext", function()
-  local saved, sent, used, savedFlags, iconScale, scales
+  local saved, sent, used, savedFlags, iconScale, scales, animation, keeps
 
   local function default()
     return {
@@ -42,11 +42,16 @@ describe("SonataNext", function()
   before_each(function()
     sonataNext.themes = {}
     saved, sent, used, iconScale = "Default", {}, {}, 120
+    animation, keeps = {}, {}
+    db.GetNextAnimation = function(_, name) return animation[name] ~= false end
     db.GetNextTheme = function() return saved end
     db.SetNextTheme = function(_, key) saved = key end
     db.GetNextIconScale = function() return iconScale end
     events.SendMessage = function(_, _, name, key) table.insert(sent, { name, key }) end
-    nextStyle.Use = function(_, theme) table.insert(used, theme) end
+    nextStyle.Use = function(_, theme, keepFonts)
+      table.insert(used, theme)
+      keeps[#used] = keepFonts == true
+    end
     scales = {}
     nextStyle.SetIconScale = function(_, percent) table.insert(scales, { percent, #used }) end
     savedFlags = {}
@@ -74,6 +79,134 @@ describe("SonataNext", function()
   it("starts Next's style at the saved Icon Scale, then the saved theme", function()
     assert.are.same({ { 120, 0 } }, scales, "before any theme was handed over")
     assert.are.equal("Default", used[1].Name)
+  end)
+
+  -- Asked: "we need a way to disable sparkles etc on any theme, not just switching to a theme without them", on
+  -- Appearance's Animation tab. Each switch turned off takes its parts out of whatever theme is in use, as a theme
+  -- without them leaves them out (next-themes.md §20).
+  describe("the player's Animation switches", function()
+    local function full()
+      local t = default()
+      t.Header = { Ribbon = { Length = 300 }, Spark = { Size = 26 }, Cloud = { Join = 4 }, TitleGlow = { Alpha = 0.6 } }
+      t.Sparkles = { Ribbon = { Rate = 8 } }
+      t.Chain = { Braid = true, Color = "Gold" }
+      t.Panel = { Ornaments = {
+        { Texture = "Roots", Point = "INNER", Width = 20, Motion = { Sway = 4, Period = 6 } },
+        { Texture = "Leaf", Point = "TOPINNER", Width = 8, Height = 8 },
+      } }
+      return t
+    end
+
+    -- What each switch takes out, read from a resolved theme.
+    local PARTS = {
+      sparkles = function(t) return t.Sparkles end,
+      shimmer = function(t) return t.Header.Spark end,
+      titleCloud = function(t) return t.Header.Cloud end,
+      braid = function(t) return t.Chain.Braid or nil end,
+      ornaments = function(t) return t.Panel.Ornaments[1].Motion end,
+    }
+
+    before_each(function()
+      sonataNext.themes = {}
+      sonataNext:RegisterTheme(full())
+    end)
+
+    it("takes each part a switch turns off out of the theme in use, and leaves the rest as the theme has it", function()
+      for name in pairs(PARTS) do
+        animation = { [name] = false }
+        sonataNext:Init()
+        local theme = used[#used]
+        for other, part in pairs(PARTS) do
+          if other == name then
+            assert.is_nil(part(theme), name .. " off takes it out")
+          else
+            assert.is_not_nil(part(theme), name .. " off leaves " .. other)
+          end
+        end
+        assert.are.equal(theme, sonataNext:GetCurrentTheme())
+        assert.are.equal(0.6, theme.Header.TitleGlow.Alpha, "the title's glow is no animation")
+        assert.are.equal(300, theme.Header.Ribbon.Length, "nor is the ribbon")
+        assert.are.equal("Leaf", theme.Panel.Ornaments[2].Texture)
+        assert.are.equal("Roots", theme.Panel.Ornaments[1].Texture, "a still ornament keeps its art")
+      end
+    end)
+
+    it("takes nothing out while every switch is on", function()
+      sonataNext:Init()
+      for name, part in pairs(PARTS) do
+        assert.is_not_nil(part(used[#used]), name)
+      end
+    end)
+
+    it("lays them over every theme applied, previews included, saving nothing more", function()
+      sonataNext:RegisterTheme({ Name = "Ember", Palette = { Gold = { 1, 0.5, 0, 1 } } })
+      animation = { sparkles = false, braid = false }
+      sonataNext:ApplyTheme(ctx(), "Ember", false)
+      assert.is_nil(used[#used].Sparkles)
+      assert.is_false(used[#used].Chain.Braid)
+      assert.are.equal("Default", saved, "a preview")
+      sonataNext:ApplyTheme(ctx(), "Ember")
+      assert.is_nil(used[#used].Sparkles)
+      assert.are.equal("Ember", saved)
+    end)
+
+    it("keeps a theme as it is written for its authors (Resolve, Check)", function()
+      animation = { sparkles = false, shimmer = false, titleCloud = false, braid = false, ornaments = false }
+      sonataNext:Init()
+      local raw = sonataNext:Resolve("Default")
+      for name, part in pairs(PARTS) do
+        assert.is_not_nil(part(raw), name)
+      end
+    end)
+
+    it("lays the switches over the current theme again, keeping its font objects and restyling every widget", function()
+      sonataNext:Init()
+      local restyled = 0
+      local widget = { ApplyStyle = function() restyled = restyled + 1 end }
+      sonataNext:RegisterWidget(widget)
+      local before = #used
+      animation = { shimmer = false }
+      assert.is_true(sonataNext:ApplyAnimation(ctx()))
+      assert.are.equal(before + 1, #used)
+      assert.is_nil(used[#used].Header.Spark)
+      assert.is_not_nil(used[#used].Sparkles)
+      assert.is_true(keeps[#used], "no new font objects: the switches touch no font, and font objects are never freed")
+      assert.is_false(keeps[before], "a theme applied makes new ones")
+      assert.are.equal(used[#used], sonataNext:GetCurrentTheme())
+      assert.are.equal(1, restyled)
+      assert.are.same({}, sent, "no theme changed")
+      assert.are.equal("Default", sonataNext:GetCurrentThemeKey())
+    end)
+
+    it("does nothing before Next starts", function()
+      sonataNext.started = false
+      assert.is_false(sonataNext:ApplyAnimation(ctx()))
+    end)
+
+    it("lays them over the theme it hands out before any theme is in use too", function()
+      sonataNext.resolved, sonataNext.current = nil, nil
+      animation = { sparkles = false }
+      local theme = sonataNext:GetCurrentTheme()
+      assert.is_nil(theme.Sparkles)
+      assert.is_not_nil(theme.Header.Spark)
+    end)
+
+    -- Each switch sends next/AnimationChanged (the settings catalog); SonataNext follows it, registered once.
+    it("follows next/AnimationChanged, registered once however often it starts watching", function()
+      local handlers = {}
+      local savedRegister = events.RegisterMessage
+      events.RegisterMessage = function(_, name, fn) table.insert(handlers, { name, fn }) end
+      sonataNext.watchingAnimation = nil
+      sonataNext:WatchAnimation()
+      sonataNext:WatchAnimation()
+      events.RegisterMessage = savedRegister
+      assert.are.equal(1, #handlers)
+      assert.are.equal("next/AnimationChanged", handlers[1][1])
+      sonataNext:Init()
+      animation = { titleCloud = false }
+      handlers[1][2](ctx())
+      assert.is_nil(used[#used].Header.Cloud)
+    end)
   end)
 
   describe("registering", function()

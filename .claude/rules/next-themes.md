@@ -48,6 +48,8 @@ Load order (every TOC, `spec/render/toc_spec.lua`): `sonata\resolve.lua` before 
   in its own protected call (a failure goes to `geterrorhandler()` and the rest are still styled; one
   unregistered by another during the apply is skipped); sends `sonata/NextThemeChanged`.
 - **`RestoreSavedTheme(ctx)`**: applies the saved choice, unsaved, when another is in use (previews).
+- **`ApplyAnimation(ctx)`**, **`WatchAnimation()`**: the player's Animation switches, laid over the theme in use (every
+  theme applied is the effective one) and again when one changes, keeping the font objects (§20).
 - **`RegisterWidget(widget)` / `UnregisterWidget`**: weak; registered by every panel when made
   (`nextPanel:Create`), by `NextDrag` once it builds its layer or dock, by `NextVendorButton` when it
   makes its first button.
@@ -791,6 +793,52 @@ should have their portrait for the bag button, not the bag texture" (docs/next-p
   two survivors led to tests, three showed code that changed nothing, removed (restoring the row's frame level after its
   new parent: levels stay what they were set to since 7.0.3, warcraft.wiki.gg Frame Strata; the row's width and layout
   while it waits in the menu).
+
+## 20. The player's Animation switches (Appearance > Animation)
+
+Asked: "we need a way to disable sparkles etc on any theme, not just switching to a theme without them", on a new tab of
+Appearance, then "title it 'Animation'". Each switch turns one of BetterBags Next's effects off on whatever theme is in
+use, and back on.
+
+- **The switches** (the settings catalog, `config/catalog.lua`; the Animation tab's Effects section,
+  next-settings.md §4), each on until turned off:
+
+  | Setting | Saved as | Takes out of the theme in use |
+  |---|---|---|
+  | Sparkles (`nextSparkles`) | `sparkles` | `Sparkles`: every emitter (title cloud, ribbon, edge, the knot's burst) |
+  | Title Shimmer (`nextShimmer`) | `shimmer` | `Header.Spark`: the spark gliding along the ribbon into the cloud |
+  | Title Cloud (`nextTitleCloud`) | `titleCloud` | `Header.Cloud`: the puffs breathing behind the title, and the join |
+  | Braid (`nextBraid`) | `braid` | `Chain.Braid` (false): the ribbons twisting between chained bags |
+  | Moving Ornaments (`nextOrnamentMotion`) | `ornaments` | each ornament's `Motion` (§12): it stands still, its art kept |
+
+  Saved per profile in `nextAnimation` (`DB:GetNextAnimation(name)`, `DB:SetNextAnimation(name, on)`; any other name is
+  an error, the names being the defaults' in `const.DATABASE_DEFAULTS`). Each switch sends `next/AnimationChanged`.
+- **How:** `SonataNext:effective(key)` resolves a theme (a new table) and runs, for each switch turned off, what it
+  takes out (`ANIMATION_OFF`, `sonata/next.lua`): a table set to nil, as resolution removes a table a theme sets to
+  `false`, and `Chain.Braid` set to false (a boolean). The theme in use is always the effective one: Next starting
+  (`use`), a theme applied or previewed (`ApplyTheme`), the theme handed out (`GetCurrentTheme`). `Resolve` and `Check`
+  keep a theme as it is written, for theme authors. No widget checks a switch: every part a switch removes is one a
+  shipped theme already leaves out (Quiet, Parchment, Guild Wars 2, Plain), and `spec/next/shipped_themes_spec.lua`
+  draws every window with them absent. The title's glow, the ribbon and the wash are left alone: they are no animation.
+- **A switch changed** (`next/AnimationChanged`, followed by `SonataNext:WatchAnimation`, registered once, started by
+  `core/init.lua` after `WatchClientFonts`): `SonataNext:ApplyAnimation(ctx)` lays the switches over the current theme
+  again, hands it to Next's style keeping the font objects (`NextStyle:Use(theme, true)`: the switches touch no font,
+  and font objects can never be freed, so a theme applied on every click would leave a set behind each time), and
+  restyles every widget: an open bag stops its emitters (`SetEnabled(false)` clears every sparkle) or starts them
+  again, hides its spark or glides it again, and so on, at once. Nothing is saved or announced
+  (`sonata/NextThemeChanged` is not sent: no theme changed). Nothing before Next starts.
+- **Not done:** the motion of the layout itself (items gliding, the sections' fade-in cascade, slides): a "reduce
+  motion" setting is a different kind, for later.
+- **Coverage:** `spec/sonata/next_engine_spec.lua` ("the player's Animation switches": each part out and the rest left,
+  nothing out while on, over every theme applied and previewed, `Resolve` untouched, `ApplyAnimation` keeping the font
+  objects and restyling, nothing before the start, the theme handed out before any is in use, the message followed and
+  registered once), `spec/next/style_theme_spec.lua` (keeping font objects), `spec/next/theme_panel_spec.lua` ("the
+  Animation switches": on real panels, every sparkle stopped and started, through a theme applied and a bag made later,
+  the shimmer, the cloud with the ribbon kept, a coupled pair's braid, a moving ornament stilled with its art kept),
+  `spec/database_spec.lua`, `spec/config/settings_effects_spec.lua` (each switch saves and sends the message),
+  `spec/next/settings/content_spec.lua` (the tab, its switches, Next only, search),
+  `spec/integration/next_settings_spec.lua` (the tab built on the whole addon), `spec/core/init_spec.lua` (the order).
+  20 mutations, each caught; the one that first survived (the theme handed out before any is in use) led to a test.
 
 ## 9. Coverage
 

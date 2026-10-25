@@ -309,6 +309,20 @@ describe("NextStyle", function()
       assert.are_not.equal(before, text:GetFontObject())
     end)
 
+    -- The Animation switches (next-themes.md §20) lay themselves over the theme in use again without a new theme: they
+    -- touch no font, and font objects can never be freed, so the text keeps the ones it has.
+    it("keeps every font object when told the fonts have not changed, taking the theme's other values", function()
+      local text = style:CreateText(CreateFrame("Frame"), "Section")
+      local before, key = text:GetFontObject(), style.gridKey
+      local theme = resolved("Default")
+      theme.Sparkles = nil
+      style:Use(theme, true)
+      assert.are.equal(before, text:GetFontObject())
+      assert.are.equal(before, style:Font("Section"))
+      assert.are.equal(theme, style.Theme)
+      assert.are.equal(key, style.gridKey, "made for the same grid as before")
+    end)
+
     it("moves edit boxes and text switched between roles too, by the role they have now", function()
       local box = CreateFrame("EditBox")
       style:SetFont(box, "SearchText")

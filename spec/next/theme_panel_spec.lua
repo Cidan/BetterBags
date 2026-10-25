@@ -116,7 +116,7 @@ describe("BetterBags Next's panels and themes", function()
     nextDrag:Init()
     chain:Init()
     sent, buttons, placed = {}, {}, {}
-    db = { size = "full", theme = "Default", places = {}, smallChain = "apart", view = { [BACKPACK] = SECTION_GRID, [BANK] = SECTION_GRID },
+    db = { size = "full", theme = "Default", animation = {}, places = {}, smallChain = "apart", view = { [BACKPACK] = SECTION_GRID, [BANK] = SECTION_GRID },
       active = { [BACKPACK] = 1, [BANK] = 10 } }
     slots = {
       [BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = { { name = "Herbs" } }, items = { item("0_1", "Herbs") } } } },
@@ -139,6 +139,7 @@ describe("BetterBags Next's panels and themes", function()
     override(stubs.items, "ExpireRecentItems", function() return false end)
     override(stubs.items, "ClearBankCache", function() end)
     override(stubs.database, "GetNextTheme", function() return db.theme end)
+    override(stubs.database, "GetNextAnimation", function(_, name) return db.animation[name] ~= false end)
     override(stubs.database, "GetNextIconScale", function() return 100 end)
     override(stubs.database, "GetNextBagScale", function() return 100 end)
     override(stubs.database, "SetNextTheme", function(_, key) db.theme = key end)
@@ -1603,6 +1604,92 @@ describe("BetterBags Next's panels and themes", function()
       local skip = bag:MovingParts()
       assert.is_true(skip[bag.ornaments.pieces[2].texture])
       assert.is_nil(skip[bag.ornaments.pieces[1].texture])
+    end)
+  end)
+
+  -- Appearance > Animation (next-themes.md §20): each switch turned off takes its effect away on an open bag at once,
+  -- whatever the theme, and turned on brings it back; no font object is made anew.
+  describe("the Animation switches", function()
+    local function switch(name, on)
+      db.animation[name] = on
+      sonataNext:ApplyAnimation(ctx())
+    end
+
+    it("stops every sparkle on an open bag, and starts them again", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local font = bag.title:GetFontObject()
+      assert.is_not_nil(bag.sparkles.frame:GetScript("OnUpdate"))
+      switch("sparkles", false)
+      for _, key in ipairs({ "sparkles", "edgeSparkles", "cloudSparkles", "knotSparkles" }) do
+        assert.is_nil(bag[key].frame:GetScript("OnUpdate"), key)
+        assert.are.equal(0, #bag[key].alive, key)
+      end
+      bag.knotSparkles:Burst(5)
+      assert.are.equal(0, #bag.knotSparkles.alive, "nor from the knot")
+      assert.are.equal(font, bag.title:GetFontObject(), "the same font objects")
+      switch("sparkles", true)
+      for _, key in ipairs({ "sparkles", "edgeSparkles", "cloudSparkles" }) do
+        assert.is_not_nil(bag[key].frame:GetScript("OnUpdate"), key .. " again")
+      end
+    end)
+
+    it("keeps them off through a theme applied, and on a bag made later", function()
+      switch("sparkles", false)
+      apply({ Palette = { Gold = { 1, 0.5, 0, 1 } } })
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.is_nil(bag.sparkles.frame:GetScript("OnUpdate"))
+    end)
+
+    it("stops the title's shimmer and brings it back", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.is_true(bag.spark:IsShown())
+      switch("shimmer", false)
+      assert.is_false(bag.spark:IsShown())
+      assert.is_false(tween:IsPlaying(bag.spark))
+      switch("shimmer", true)
+      assert.is_true(bag.spark:IsShown())
+      assert.is_true(tween:IsPlaying(bag.spark), "gliding again")
+    end)
+
+    it("takes the title's cloud away and brings it back", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.is_true(#bag.cloud.puffs > 0)
+      switch("titleCloud", false)
+      assert.are.equal(0, #bag.cloud.puffs)
+      for _, puff in ipairs(bag.cloud.pool) do assert.is_false(puff:IsShown()) end
+      assert.is_false(bag.cloud.join:IsShown())
+      assert.is_true(bag.ribbon:IsShown(), "the ribbon stays")
+      switch("titleCloud", true)
+      assert.is_true(#bag.cloud.puffs > 0)
+    end)
+
+    it("leaves a coupled pair's ribbons apart, and twists them again", function()
+      local bag = nextBag:Create(ctx())
+      bag:SetCoupling(1, 100, true, 0, 0, 120)
+      assert.is_true(bag.braid.strands[1][1]:IsShown())
+      switch("braid", false)
+      bag:SetCoupling(1, 100, true, 0, 0, 120)
+      for _, strand in ipairs(bag.braid.strands) do
+        for _, line in ipairs(strand) do assert.is_false(line:IsShown()) end
+      end
+      switch("braid", true)
+      bag:SetCoupling(1, 100, true, 0, 0, 120)
+      assert.is_true(bag.braid.strands[1][1]:IsShown())
+    end)
+
+    it("stills a theme's moving ornaments, keeping their art, and moves them again", function()
+      apply({ Textures = { Leaf = "Interface\\AddOns\\BetterBags\\textures\\next\\themes\\spec\\leaf.png" },
+        Panel = { Ornaments = { { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Motion = { Sway = 4 } } } } })
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local piece = bag.ornaments.pieces[1]
+      assert.is_true(piece.groups.Sway:IsPlaying())
+      switch("ornaments", false)
+      piece = bag.ornaments.pieces[1]
+      assert.is_true(piece.groups.Sway == nil or not piece.groups.Sway:IsPlaying(), "still")
+      assert.is_true(piece.texture:IsShown(), "its art stays")
+      assert.is_nil(bag:MovingParts()[piece.texture], "no longer left out of the pixel checks")
+      switch("ornaments", true)
+      assert.is_true(bag.ornaments.pieces[1].groups.Sway:IsPlaying(), "moving again")
     end)
   end)
 

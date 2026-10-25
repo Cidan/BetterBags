@@ -358,6 +358,32 @@ function DB:SetNextTheme(key)
   DB.data.profile.nextTheme = key
 end
 
+---@alias NextAnimation "sparkles"|"shimmer"|"titleCloud"|"braid"|"ornaments"
+
+-- nextAnimationName checks an Animation switch's name: one of the defaults' (const.DATABASE_DEFAULTS), nothing else.
+---@param name string
+local function nextAnimationName(name)
+  if const.DATABASE_DEFAULTS.profile.nextAnimation[name] == nil then
+    error("unknown BetterBags Next animation: " .. tostring(name))
+  end
+end
+
+-- GetNextAnimation says whether one of BetterBags Next's effects is on (Appearance > Animation, next-themes.md §20):
+-- every one until the player turns it off.
+---@param name NextAnimation
+---@return boolean
+function DB:GetNextAnimation(name)
+  nextAnimationName(name)
+  return DB.data.profile.nextAnimation[name]
+end
+
+---@param name NextAnimation
+---@param on boolean
+function DB:SetNextAnimation(name, on)
+  nextAnimationName(name)
+  DB.data.profile.nextAnimation[name] = on
+end
+
 ---@alias NextSmallChain "apart"|"backpack"|"companion"
 
 -- GetNextSmallChain returns which small panel anchors a chained pair (docs/next-small-mode.md):

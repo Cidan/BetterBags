@@ -446,3 +446,15 @@ pixel the glyphs landed in. Texts whose edges were not on a boundary never moved
 `Inset`, `Row` and `TextInsets`), so it is drawn in the same pixel whether the client rounds or truncates; keep
 textures on whole pixels. Never hang anything from a text: the offset carries, and a text hung from a text sits half a
 pixel off. When a text moves by exactly one pixel with no layout change, look for an anchor exactly on a boundary.
+
+## A Player's Choice Over a Declarative Theme Removes Parts After Resolution
+**Problem**: players wanted BetterBags Next's sparkles and other effects off on any theme, not only on themes that
+leave them out. Checking a setting in every widget that draws an effect would spread one choice across the panels,
+and every new widget would have to remember it.
+
+**Rule**: lay the player's choice over the resolved theme, in the engine, by removing the parts it turns off exactly
+as resolution removes a part a theme sets to `false` (`SonataNext:effective`, next-themes.md §20). Widgets already
+handle every part being absent (shipped themes leave them out, and a spec draws every window with every theme), so
+nothing else changes. Keep `Resolve` and `Check` raw for theme authors, and when the choice changes, re-lay it and
+restyle without new font objects, which can never be freed.
+

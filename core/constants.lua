@@ -743,6 +743,9 @@ const.DATABASE_DEFAULTS = {
     nextSmallChain = "apart",
     -- BetterBags Next's theme (SonataNext, .claude/rules/next-themes.md).
     nextTheme = "Default",
+    -- BetterBags Next's Animation switches (Appearance > Animation, next-themes.md §20): each effect on until the player
+    -- turns it off, on any theme. These are the only names there are.
+    nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, braid = true, ornaments = true },
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,

@@ -717,6 +717,44 @@ define('nextBagScale', {
   end,
 })
 
+-- BetterBags Next's Animation tab (Appearance > Animation, next-themes.md §20): each effect on or off, on any theme.
+-- Asked: "we need a way to disable sparkles etc on any theme, not just switching to a theme without them". Each one
+-- saves its choice and tells BetterBags Next, which lays the switches over the theme in use again (SonataNext).
+for _, effect in ipairs({
+  { id = 'nextSparkles', name = 'sparkles', title = 'Sparkles',
+    description = "The sparkles drifting out of BetterBags Next's titles and feathered edges, and from the knot "
+      .. 'when two bags couple.',
+    keywords = { 'sparkle', 'particles', 'stars', 'glitter' } },
+  { id = 'nextShimmer', name = 'shimmer', title = 'Title Shimmer',
+    description = "The spark that glides along a bag's ribbon into its title every few seconds.",
+    keywords = { 'shimmer', 'spark', 'ribbon', 'title' } },
+  { id = 'nextTitleCloud', name = 'titleCloud', title = 'Title Cloud',
+    description = "The soft glow that breathes behind a bag's title.",
+    keywords = { 'cloud', 'glow', 'title', 'breathe' } },
+  { id = 'nextBraid', name = 'braid', title = 'Braid',
+    description = 'The ribbons twisting together between two chained bags.',
+    keywords = { 'braid', 'ribbon', 'chain', 'chained', 'couple' } },
+  { id = 'nextOrnamentMotion', name = 'ornaments', title = 'Moving Ornaments',
+    description = "A theme's swaying, spinning or pulsing pieces. Off, they stand still and keep their art.",
+    keywords = { 'ornament', 'sway', 'spin', 'pulse', 'theme' } },
+}) do
+  local keywords = { 'animation', 'effects', 'motion' }
+  for _, word in ipairs(effect.keywords) do
+    table.insert(keywords, word)
+  end
+  define(effect.id, {
+    kind = "toggle",
+    title = effect.title,
+    description = effect.description,
+    keywords = keywords,
+    get = function() return db:GetNextAnimation(effect.name) end,
+    set = function(ctx, value)
+      db:SetNextAnimation(effect.name, value)
+      events:SendMessage(ctx, 'next/AnimationChanged')
+    end,
+  })
+end
+
 define('scale', {
   kind = "slider",
   bag = true,

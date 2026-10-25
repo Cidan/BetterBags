@@ -23,6 +23,8 @@ local events = StubBetterBagsModule("Events")
 local db = StubBetterBagsModule("Database")
 -- The saved BetterBags Next theme (DB:GetNextTheme), which SonataNext reads.
 db.GetNextTheme = db.GetNextTheme or function() return "Default" end
+-- The Animation switches (next-themes.md §20), all on, which SonataNext lays over the theme it uses.
+db.GetNextAnimation = db.GetNextAnimation or function() return true end
 StubBetterBagsModule("Bucket")
 local bagSystem = StubBetterBagsModule("BagSystem")
 StubBetterBagsModule("Items")
@@ -367,7 +369,8 @@ describe("NextSettingsContent", function()
     it("names only settings the catalog has, for the page's bag; the classic bags' own only for them", function()
       local classicOnly = { bagFading = true, animateItemMovement = true, fullSectionNames = true,
         resizableWindow = true, snapToContent = true, itemsPerRow = true, columns = true, opacity = true, scale = true }
-      local nextOnly = { nextIconScale = true, nextBagScale = true }
+      local nextOnly = { nextIconScale = true, nextBagScale = true, nextSparkles = true, nextShimmer = true,
+        nextTitleCloud = true, nextBraid = true, nextOrnamentMotion = true }
       addon.hasGuildBank = true
       content:Init()
       local named = 0
@@ -393,7 +396,7 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      assert.are.equal(13 + 3 * 29, named)
+      assert.are.equal(18 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -473,7 +476,7 @@ describe("NextSettingsContent", function()
     it("has a Theme tab and, with BetterBags Next, a Size tab with Icon Scale and Bag Scale", function()
       override(db, "GetNextIconScale", function() return 120 end)
       override(db, "GetNextBagScale", function() return 85 end)
-      assert.are.same({ "theme", "size" }, shownTabIds())
+      assert.are.same({ "theme", "size", "animation" }, shownTabIds())
       settings:Open("appearance", "size")
       assert.are.equal("size", settings.tabId)
       assert.is_true(settings.tabs.frame:IsShown())
@@ -490,6 +493,35 @@ describe("NextSettingsContent", function()
       override(db, "GetMaxItemLevel", function() return 100 end)
       settings:Search(addon:GetModule("Context"):New("spec"), "icon scale")
       assert.are.same({}, settings.page.sections, "no Size tab to find")
+    end)
+
+    -- Asked: "we need a way to disable sparkles etc on any theme ... a new option under appearance with a new tab",
+    -- then: "title it 'Animation'". A switch per effect, each on until turned off (next-themes.md §20).
+    it("has an Animation tab with BetterBags Next, a switch per effect showing whether it is on", function()
+      local on = { sparkles = true, shimmer = false, titleCloud = true, braid = true, ornaments = false }
+      override(db, "GetNextAnimation", function(_, name) return on[name] end)
+      settings:Open("appearance", "animation")
+      assert.are.equal("animation", settings.tabId)
+      assert.are.equal("Effects", settings.page.sections[1].title)
+      local titles = {}
+      for _, row in ipairs(rowsShown()) do table.insert(titles, row.label:GetText()) end
+      assert.are.same({ "Sparkles", "Title Shimmer", "Title Cloud", "Braid", "Moving Ornaments" }, titles)
+      assert.is_true(rowTitled("Sparkles").control:GetChecked())
+      assert.is_false(rowTitled("Title Shimmer").control:GetChecked())
+      assert.is_false(rowTitled("Moving Ornaments").control:GetChecked())
+    end)
+
+    it("has no Animation tab with the classic bags, and finds the switches with BetterBags Next", function()
+      override(db, "GetMaxItemLevel", function() return 100 end)
+      override(db, "GetNextAnimation", function() return true end)
+      design = "classic"
+      settings:Open("appearance")
+      settings:Search(addon:GetModule("Context"):New("spec"), "sparkles")
+      assert.are.same({}, settings.page.sections, "nothing to find for the classic bags")
+      design = "next"
+      settings:Open("appearance")
+      settings:Search(addon:GetModule("Context"):New("spec"), "sparkles")
+      assert.are.equal("Appearance > Animation", settings.page.sections[1].title)
     end)
 
     it("finds Icon Scale with BetterBags Next", function()

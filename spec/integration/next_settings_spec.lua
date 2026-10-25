@@ -70,7 +70,8 @@ describe("BetterBags Next's settings window on the whole addon", function()
     addon:GetModule("Events"):SendMessage(ctx(addon), "config/Open")
     assert.is_true(settings:IsShown())
     assert.is_nil(addon:GetModule("Config").configFrame, "no classic window")
-    assert.are.same({ "general > main", "appearance > theme", "appearance > size", "itemcolors > main",
+    assert.are.same({ "general > main", "appearance > theme", "appearance > size", "appearance > animation",
+      "itemcolors > main",
       "categories > settings",
       "categories > rule", "categories > items", "categories > ignored", "categories > automation", "backpack > layout",
       "backpack > items", "backpack > categories", "bank > layout", "bank > items", "bank > categories",

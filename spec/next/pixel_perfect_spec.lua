@@ -165,6 +165,7 @@ describe("BetterBags Next, pixel perfect", function()
     -- The Size tab's scales (docs/next-appearance-size.md), in percent.
     db.iconScale, db.bagScale, db.theme = 100, 100, "Default"
     override(stubs.database, "GetNextTheme", function() return db.theme end)
+    override(stubs.database, "GetNextAnimation", function() return true end)
     override(stubs.database, "SetNextTheme", function(_, key) db.theme = key end)
     override(stubs.database, "GetNextIconScale", function() return db.iconScale end)
     override(stubs.database, "GetNextBagScale", function() return db.bagScale end)

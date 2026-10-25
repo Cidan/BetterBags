@@ -66,9 +66,10 @@ local function palette(theme)
 end
 
 -- Use makes theme the look: every field below is read from it, and every text drawn with a role
--- moves to a new font object of its role.
+-- moves to a new font object of its role, unless keepFonts says the theme's fonts have not changed.
 ---@param theme table A resolved Next theme (SonataNext:Resolve).
-function style:Use(theme)
+---@param keepFonts? boolean
+function style:Use(theme, keepFonts)
   self.Theme = theme
   local L, M = theme.Layout, theme.Motion
   self.Color = palette(theme)
@@ -150,6 +151,11 @@ function style:Use(theme)
   self.SPARKLE_TEXTURE = self:TexturePath(theme.Sparkles and theme.Sparkles.Texture or "Sparkle")
   self.CLOUD_GLOW = self:TexturePath("Glow")
 
+  -- The font objects stay as they are when the theme's fonts have not changed (the Animation switches laid over the
+  -- theme in use again, SonataNext:ApplyAnimation): font objects can never be freed.
+  if keepFonts then
+    return
+  end
   -- The pixel grid the fonts are made for (NextPixel: a new one applies the theme again).
   self.gridKey = pixel:Key()
   self:newFonts()
