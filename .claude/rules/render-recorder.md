@@ -86,18 +86,25 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   Its lines (`SizingSnapshot`): `screen WxH uiScale scale effective cursor x,y`; `frame <every anchor: point, relative
   frame, relative point, x,y to four decimals> | l t r b`; `scroll offset <offset> of <range> (<percentage>) | target
   <its anchor>`; then each shown section's first and last icons: `<section> <slotkey> frame l t r b | art l t r b |
-  border l t r b` (the button's holder, its decoration's `icon` and `IconBorder`, read without making a decoration),
-  and, for a button a Masque skin draws, `| masque shadow l t r b | masque normal l t r b` (the shadow and border
-  Masque keeps in the decoration's `_MSQ_CFG`). Added when the reported change turned out to be shading at an icon's
-  bottom edge with the icon itself not moving ("you can see the shadowing changes just by slight resize of the window
-  up and down"): Caith draws its shadow and border 42/36 of the button, so on a 46-pixel button their edges sit a third
-  of a pixel off the grid, and a move of the button too small to move its whole-pixel icon can move them a pixel.
+  border l t r b` (the button's holder, its decoration's `icon` and `IconBorder`, read without making a decoration).
   Every `l t r b` is where the client put the region (`GetScaledRect`), in screen pixels with three decimals: a
   fraction is a region off whole pixels, and a value that changes between `rendered` steps with nothing reflowing is
   what moved. Added for icons that jittered "ever so slight" in game while a panel was sized, in every direction,
   while the specs' model of the layout kept every icon and every frame it hangs from on the same whole pixels
-  (data-driven.md: the client's own sizing, `StartSizing`, is not documented and cannot be modeled). To capture:
-  start Record Rendering on the Performance tab of `/bbdb`, drag a grip for a second or two, stop, `/reload`.
+  (data-driven.md: the client's own sizing, `StartSizing`, is not documented and cannot be modeled).
+  Its `regions` (`sizingRegions`): what changed on screen in the panel since its last step in this recording, from
+  `PixelAudit:Regions(panel.frame, { skip = panel:MovingParts() })` (next-pixel-perfect.md §6): every region that draws
+  in it (named as the pixel check names parts), with its kind and draw layer, where it is in screen pixels, its alpha
+  with its parents', and what it draws (file or atlas, color, texture coordinates when not the whole image, a text's
+  text). The first step of a panel lists all of them (`= path | what`); each later step only `+ path | what` (drawn now
+  and not then), `- path` (no longer drawn) and `~ path | what` (drawn differently), sorted; nil for nothing. Added when
+  the first sizing recording showed every recorded icon on the same whole pixels at all 247 steps while the player
+  still saw shading change at an icon's bottom edge ("you can see the shadowing changes just by slight resize of the
+  window up and down (no icons shifted their actual position)"), with Masque off: whatever changes is a region the
+  first and last icons' holder, art and border do not cover. A region a clipping frame (the scroll box) cuts keeps its
+  rect; the clipping frame's own rect is listed (`Frame clips`), so a cut shows as that frame's edge moving across it.
+  Costs a walk of the panel per step, only while recording. To capture: start Record Rendering on the Performance tab
+  of `/bbdb`, drag a grip for a second or two, stop, `/reload`.
 
 ## 3. Storage
 
@@ -105,13 +112,15 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
 `{ id, startedAt, stoppedAt, character, realm, gameVersion, gameBuild, full?, entries }`; an entry
 is `{ t = "<ms since start>", kind = "render", window, lines = { ... } }`,
 `{ t, kind = "step", window, step, geometry }`, `{ t, kind = "text", step, role, line }`,
-`{ t, kind = "settings", lines = { ... } }` or `{ t, kind = "sizing", panel, step, lines = { ... } }`. A recording takes at most `MAX_ENTRIES` (20000)
+`{ t, kind = "settings", lines = { ... } }` or `{ t, kind = "sizing", panel, step, lines = { ... }, regions = { ... }? }`. A recording takes at most `MAX_ENTRIES` (20000)
 entries and then sets `full`. `BetterBagsPerfDB` is separate from the AceDB profile, like the
 profiler's sessions; the recorder's `Init` runs right after `PerfSessions:Init` (initialization.md).
 Read offline from `WTF/Account/<ACCOUNT>/SavedVariables/BetterBags.lua`.
 
 Coverage: `spec/debug/render_recorder_spec.lua` ("a BetterBags Next panel sized": the panel, its scroll box and each
-shown section's first and last icons in screen pixels, nothing while stopped; records on render and only on change, a bag's
+shown section's first and last icons in screen pixels; every region that draws at the first step, then only what was
+drawn, no longer drawn or drawn differently, moving parts left out, nothing for no change, everything again in a new
+recording; nothing while stopped; records on render and only on change, a bag's
 snapshot down to its item buttons, resize steps, nothing while stopped, recording limits, the
 state message, logout; the settings window's scale and edges in pixels, a collapsing side, only
 edges shown in it, only on change), `spec/next/settings/window_spec.lua` ("gives the render recorder

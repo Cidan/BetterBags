@@ -226,6 +226,11 @@ scale, as Blizzard's `RegionUtil.GetRegionPoint` reads it), `GetPoint`, `GetRegi
   pixels; its count 2 units, 2.075 pixels, in from the corner) and 3 ours (below). **It never reads a key of a table it walks**:
   it collects the parts off the grid first and finds their names by identity, only iterating tables. In
   game a window's tables reach saved settings, and reading a key AceDB's wildcard defaults cover writes it.
+- **`PixelAudit:Regions(root, { skip })`** walks the same tree the same way (`walk`, shared with `Check`, so parts are
+  named alike) and describes every shown region that draws, on the grid or not: path -> kind and draw layer (or a frame
+  that clips), rect in screen pixels, alpha with its parents', what it draws (file or atlas, color, texture coordinates
+  when not the whole image; a text's text). Two taken a frame apart show what changed on screen (the render recorder's
+  record of a panel sized, render-recorder.md §2). Coverage: `spec/debug/pixelaudit_spec.lua` ("listing what draws").
 
 In the specs:
 - `layout.UseScreen(width, height, uiScale)` sets a screen up as the client would (GetPhysicalScreenSize,

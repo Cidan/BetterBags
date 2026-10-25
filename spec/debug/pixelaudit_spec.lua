@@ -231,6 +231,52 @@ describe("PixelAudit", function()
     end)
   end)
 
+  -- For the render recorder's record of a panel sized (render-recorder.md §2): what each region draws and where, so
+  -- what changes between two frames shows, on whole pixels or not.
+  describe("listing what draws", function()
+    it("lists every region that draws under a root, by the paths the check names parts by, with what it draws", function()
+      local factor = 768 / 1362
+      local function at(region, left, bottom, width, height)
+        function region:GetScaledRect() return left * factor, bottom * factor, width * factor, height * factor end
+      end
+      local root = CreateFrame("Frame", "SpecRegionsRoot", UIParent)
+      root:Show()
+      root:SetAlpha(0.5)
+      root.glow = root:CreateTexture(nil, "OVERLAY", nil, 2)
+      root.glow:SetAtlas("bags-glow-white")
+      root.glow:SetVertexColor(1, 0.5, 0.25, 0.8)
+      at(root.glow, 10.5, 20, 4, 1)
+      local plain = root:CreateTexture()
+      plain:SetTexture(123)
+      plain:SetTexCoord(0, 0.5, 0, 1)
+      at(plain, 10, 20, 4, 1)
+      local hidden = root:CreateTexture()
+      hidden:SetTexture(456)
+      hidden:Hide()
+      at(hidden, 10, 20, 4, 1)
+      local text = root:CreateFontString()
+      text:SetFontObject(GameFontNormal)
+      text:SetText("Hi")
+      at(text, 12, 22, 9.5, 12)
+      local clip = CreateFrame("Frame", nil, root)
+      clip:SetClipsChildren(true)
+      at(clip, 0, 0, 100, 50)
+      local moving = clip:CreateTexture()
+      moving:SetTexture(789)
+      at(moving, 1, 1, 2, 2)
+      local unplaced = root:CreateTexture()
+      unplaced:SetTexture(321)
+      assert.are.same({
+        ["SpecRegionsRoot>glow"] = "Texture OVERLAY 2 | l 10.500 t 21.000 r 14.500 b 20.000 | alpha 0.400"
+          .. " | atlas bags-glow-white | color 1.000,0.500,0.250",
+        ["SpecRegionsRoot>t2"] = "Texture ARTWORK 0 | l 10.000 t 21.000 r 14.000 b 20.000 | alpha 0.500"
+          .. " | file 123 | color 1.000,1.000,1.000 | coords 0.000,0.000,0.000,1.000,0.500,0.000,0.500,1.000",
+        ["SpecRegionsRoot>s1"] = 'FontString | l 12.000 t 34.000 r 21.500 b 22.000 | alpha 0.500 | text "Hi"',
+        ["SpecRegionsRoot>1"] = "Frame clips | l 0.000 t 50.000 r 100.000 b 0.000 | alpha 0.500",
+      }, audit:Regions(root, { skip = { [moving] = true } }))
+    end)
+  end)
+
   -- Asked: a toggle in /bbdb, off by default, that checks BetterBags Next's windows as they are used and pops
   -- up a log of what is off the grid.
   describe("watching", function()

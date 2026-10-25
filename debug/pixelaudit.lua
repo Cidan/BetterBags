@@ -207,23 +207,16 @@ local function masqueParts(frame, own)
   return parts
 end
 
--- Check lists every shown part under root that draws and is not on whole screen pixels: a texture's, an edit
--- box's or a clipping frame's four edges, an edit box's text insets, a font string's anchor points (its far
--- edges are its text's measure). A part the client does not place is skipped, as is everything under a region
--- in skip. owners (name -> table) name the parts in the messages; a part no owner reaches is named from its
--- nearest named frame by the fields that keep each part in its parent (a parentKey, a button's state art), else
--- by its place in the tree. It returns one string per part off the grid; the parts Masque places (its skin,
--- left to it, next-pixel-perfect.md §4), and everything inside them, are listed apart, second. Third, a note per
--- line: what a texture draws, and for a text, its anchors and where the first lands against where it is drawn.
+-- walk calls visit(region, path, fromName, masque, frame) for every shown region under root (root included) but those
+-- under a region in skip, named as Check names them: a named region by its name; else from its nearest named frame (fromName)
+-- by the fields that keep each part in its parent (a parentKey, a button's state art), else by its place in the tree
+-- (">t2" its second texture, ">s1" its first text, ">3" its third child frame). masque says it is a part Masque places
+-- or is inside one; frame, that it is a frame. It only iterates tables and compares by identity.
 ---@param root ScriptRegion
----@param opts? { skip?: table<table, boolean>, owners?: table<string, table> }
----@return string[] problems, string[] others, table<string, string> notes
-function audit:Check(root, opts)
-  opts = opts or {}
-  local skip = opts.skip or {}
-  local k = 1 / PixelUtil.GetPixelToUIUnitFactor()
-  local found = {}
-  local function check(region, path, fromName, masque)
+---@param skip table<table, boolean>
+---@param visit fun(region: ScriptRegion, path: string, fromName: boolean, masque: boolean, frame: boolean)
+local function walk(root, skip, visit)
+  local function step(region, path, fromName, masque)
     if skip[region] or not visible(region) then
       return
     end
@@ -232,46 +225,7 @@ function audit:Check(root, opts)
       path, fromName = name, true
     end
     local frame = isFrame(region)
-    -- A region with secret anchoring answers its position queries in secrets (a vendor's name in a dungeon, and
-    -- what hangs from it; warcraft.wiki.gg Secret Values, "Secret anchors"): nothing of it can be judged.
-    local secret = region.IsAnchoringSecret ~= nil and region:IsAnchoringSecret()
-    local r = not secret and (DRAWS[region:GetObjectType()] or (frame and region:DoesClipChildren())) and rectOf(region)
-      or nil
-    if r ~= nil then
-      local bad = {}
-      if region:GetObjectType() == "FontString" then
-        for i = 1, region:GetNumPoints() do
-          local point = region:GetPoint(i)
-          local x, y = pointOf(r, point)
-          if not onPixel(x * k) then
-            table.insert(bad, string.format("%s x %.3f", point, x * k))
-          end
-          if not onPixel(y * k) then
-            table.insert(bad, string.format("%s y %.3f", point, y * k))
-          end
-        end
-      else
-        for _, side in ipairs(SIDES) do
-          if not onPixel(r[side] * k) then
-            table.insert(bad, string.format("%s %.3f", side, r[side] * k))
-          end
-        end
-      end
-      -- An edit box draws its text inside its insets, in its own units (SetTextInsets).
-      if region:GetObjectType() == "EditBox" then
-        local s = region:GetEffectiveScale()
-        local insets = { region:GetTextInsets() }
-        for i, side in ipairs(SIDES) do
-          if not onPixel(insets[i] * s * k) then
-            table.insert(bad, string.format("text inset %s %.3f", side, insets[i] * s * k))
-          end
-        end
-      end
-      if #bad > 0 then
-        table.insert(found, { region = region, path = path, fromName = fromName, masque = masque,
-          bad = table.concat(bad, ", ") })
-      end
-    end
+    visit(region, path, fromName, masque, frame)
     if not frame then
       return
     end
@@ -291,13 +245,84 @@ function audit:Check(root, opts)
         textures = textures + 1
         segment = "t" .. textures
       end
-      check(child, path .. ">" .. (keys[child] or segment), fromName, masque or masqued[child] == true)
+      step(child, path .. ">" .. (keys[child] or segment), fromName, masque or masqued[child] == true)
     end
     for i, child in ipairs(children) do
-      check(child, path .. ">" .. (keys[child] or i), fromName, masque or masqued[child] == true)
+      step(child, path .. ">" .. (keys[child] or i), fromName, masque or masqued[child] == true)
     end
   end
-  check(root, "", false, false)
+  step(root, "", false, false)
+end
+
+-- drawRect is where a region that draws is (a texture, a line, a mask, a text, an edit box, or a frame that clips what
+-- is in it), or nil for one that does not, has secret anchoring (a vendor's name in a dungeon, and what hangs from it,
+-- answers its position queries in secrets; warcraft.wiki.gg Secret Values, "Secret anchors"), or is not placed.
+---@param region ScriptRegion
+---@param frame boolean
+---@return table?
+local function drawRect(region, frame)
+  if region.IsAnchoringSecret ~= nil and region:IsAnchoringSecret() then
+    return nil
+  end
+  if DRAWS[region:GetObjectType()] or (frame and region:DoesClipChildren()) then
+    return rectOf(region)
+  end
+  return nil
+end
+
+-- Check lists every shown part under root that draws and is not on whole screen pixels: a texture's, an edit
+-- box's or a clipping frame's four edges, an edit box's text insets, a font string's anchor points (its far
+-- edges are its text's measure). A part the client does not place is skipped, as is everything under a region
+-- in skip. owners (name -> table) name the parts in the messages; a part no owner reaches is named as walk names
+-- it. It returns one string per part off the grid; the parts Masque places (its skin, left to it,
+-- next-pixel-perfect.md §4), and everything inside them, are listed apart, second. Third, a note per line: what a
+-- texture draws, and for a text, its anchors and where the first lands against where it is drawn.
+---@param root ScriptRegion
+---@param opts? { skip?: table<table, boolean>, owners?: table<string, table> }
+---@return string[] problems, string[] others, table<string, string> notes
+function audit:Check(root, opts)
+  opts = opts or {}
+  local k = 1 / PixelUtil.GetPixelToUIUnitFactor()
+  local found = {}
+  walk(root, opts.skip or {}, function(region, path, fromName, masque, frame)
+    local r = drawRect(region, frame)
+    if r == nil then
+      return
+    end
+    local bad = {}
+    if region:GetObjectType() == "FontString" then
+      for i = 1, region:GetNumPoints() do
+        local point = region:GetPoint(i)
+        local x, y = pointOf(r, point)
+        if not onPixel(x * k) then
+          table.insert(bad, string.format("%s x %.3f", point, x * k))
+        end
+        if not onPixel(y * k) then
+          table.insert(bad, string.format("%s y %.3f", point, y * k))
+        end
+      end
+    else
+      for _, side in ipairs(SIDES) do
+        if not onPixel(r[side] * k) then
+          table.insert(bad, string.format("%s %.3f", side, r[side] * k))
+        end
+      end
+    end
+    -- An edit box draws its text inside its insets, in its own units (SetTextInsets).
+    if region:GetObjectType() == "EditBox" then
+      local s = region:GetEffectiveScale()
+      local insets = { region:GetTextInsets() }
+      for i, side in ipairs(SIDES) do
+        if not onPixel(insets[i] * s * k) then
+          table.insert(bad, string.format("text inset %s %.3f", side, insets[i] * s * k))
+        end
+      end
+    end
+    if #bad > 0 then
+      table.insert(found, { region = region, path = path, fromName = fromName, masque = masque,
+        bad = table.concat(bad, ", ") })
+    end
+  end)
   local problems, others, notes = {}, {}, {}
   if #found == 0 then
     return problems, others, notes
@@ -314,6 +339,73 @@ function audit:Check(root, opts)
     notes[line] = noteOf(f.region, k)
   end
   return problems, others, notes
+end
+
+local FULL_COORDS = { 0, 0, 0, 1, 1, 0, 1, 1 }
+
+-- drawnBy says what a region draws, for Regions: a texture's (or line's, or mask's) draw layer, file or atlas ("nothing"
+-- with neither), color and, when it is not the whole image, its texture coordinates; a text's or edit box's text.
+---@param region ScriptRegion
+---@return string head, string tail
+local function drawnBy(region)
+  local kind = region:GetObjectType()
+  if kind == "FontString" or kind == "EditBox" then
+    return kind, string.format('text "%s"', tostring(region:GetText()))
+  end
+  local layer, sublevel = region:GetDrawLayer()
+  local atlas = region.GetAtlas and region:GetAtlas()
+  local file = region:GetTexture()
+  local what = (atlas ~= nil and atlas ~= "") and ("atlas " .. tostring(atlas))
+    or ((file ~= nil and file ~= "") and ("file " .. tostring(file)) or "nothing")
+  local r, g, b = region:GetVertexColor()
+  local tail = string.format("%s | color %.3f,%.3f,%.3f", what, r, g, b)
+  local coords = { region:GetTexCoord() }
+  for i, full in ipairs(FULL_COORDS) do
+    if math.abs((coords[i] or full) - full) > 0.0005 then
+      local parts = {}
+      for j = 1, 8 do
+        parts[j] = string.format("%.3f", coords[j] or FULL_COORDS[j])
+      end
+      tail = tail .. " | coords " .. table.concat(parts, ",")
+      break
+    end
+  end
+  return string.format("%s %s %d", kind, tostring(layer), sublevel or 0), tail
+end
+
+-- Regions describes every shown region under root that draws, as the client draws it now: path (named as Check names
+-- parts) -> what it is (its kind and draw layer, or a frame that clips), where it is in screen pixels, its alpha with
+-- its parents', and what it draws. Nothing under a region in skip, nor a region the client has not placed. Two of them
+-- taken a frame apart show everything that changed on screen between the two (the render recorder's record of a panel
+-- sized, render-recorder.md §2). Read only.
+---@param root ScriptRegion
+---@param opts? { skip?: table<table, boolean> }
+---@return table<string, string>
+function audit:Regions(root, opts)
+  opts = opts or {}
+  local k = 1 / PixelUtil.GetPixelToUIUnitFactor()
+  local list = {}
+  walk(root, opts.skip or {}, function(region, path, _, _, frame)
+    local r = drawRect(region, frame)
+    if r == nil then
+      return
+    end
+    local alpha, up = 1, region
+    while up ~= nil do
+      alpha = alpha * up:GetAlpha()
+      up = up:GetParent()
+    end
+    local head, tail
+    if frame and not DRAWS[region:GetObjectType()] then
+      head = region:GetObjectType() .. " clips"
+    else
+      head, tail = drawnBy(region)
+    end
+    local line = string.format("%s | l %.3f t %.3f r %.3f b %.3f | alpha %.3f", head, r.left * k, r.top * k, r.right * k,
+      r.bottom * k, alpha)
+    list[path] = tail ~= nil and (line .. " | " .. tail) or line
+  end)
+  return list
 end
 
 ---------------------------------------------------------------------------------------------------

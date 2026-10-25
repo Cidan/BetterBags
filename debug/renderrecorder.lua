@@ -79,6 +79,7 @@ function recorder:Start()
   self.db.nextRenderRecordingId = self.db.nextRenderRecordingId + 1
   self.started = debugprofilestop()
   self.last = {}
+  self.lastRegions = setmetatable({}, { __mode = "k" })
   self.recording = true
   events:SendMessage(context:New('RenderRecorder_Start'), 'renderRecorder/StateChanged', true)
   return true
@@ -94,6 +95,7 @@ function recorder:Stop()
   local recording = self.current
   self.current = nil
   self.last = nil
+  self.lastRegions = nil
   recording.stoppedAt = time()
   local list = self.db.renderRecordings
   table.insert(list, recording)
@@ -565,24 +567,47 @@ function recorder:SizingSnapshot(panel)
         local decoration = rawget(item, "_decoration")
         local art = decoration and decoration.icon or item.icon
         local border = decoration and decoration.IconBorder or item.IconBorder
-        local line = string.format("%s %s frame %s | art %s | border %s", tostring(section.name),
-          tostring(item.slotkey), pixelRect(item.frame, k), pixelRect(art, k), pixelRect(border, k))
-        -- A Masque skin draws its shadow and border a fraction of a pixel off the grid (Caith's: 42/36 of the button).
-        local skin = decoration and rawget(decoration, "_MSQ_CFG")
-        if skin ~= nil then
-          line = string.format("%s | masque shadow %s | masque normal %s", line, pixelRect(skin.Shadow, k),
-            pixelRect(skin.Normal, k))
-        end
-        table.insert(lines, line)
+        table.insert(lines, string.format("%s %s frame %s | art %s | border %s", tostring(section.name),
+          tostring(item.slotkey), pixelRect(item.frame, k), pixelRect(art, k), pixelRect(border, k)))
       end
     end
   end
   return lines
 end
 
+-- sizingRegions is what changed in a panel since the last step recorded of it (PixelAudit:Regions, every region that
+-- draws in it but its moving parts): "+ path | what" for a region drawn now and not then, "- path" for one no longer
+-- drawn, "~ path | what" for one drawn differently, sorted; nil for nothing. The first step of a panel in a recording
+-- lists every region ("= path | what").
+---@param panel table
+---@return string[]?
+function recorder:sizingRegions(panel)
+  local now = addon:GetModule('PixelAudit'):Regions(panel.frame, { skip = panel.MovingParts and panel:MovingParts() })
+  local before = self.lastRegions[panel]
+  self.lastRegions[panel] = now
+  local lines = {}
+  for path, what in pairs(now) do
+    if before == nil then
+      table.insert(lines, "= " .. path .. " | " .. what)
+    elseif before[path] == nil then
+      table.insert(lines, "+ " .. path .. " | " .. what)
+    elseif before[path] ~= what then
+      table.insert(lines, "~ " .. path .. " | " .. what)
+    end
+  end
+  for path in pairs(before or {}) do
+    if now[path] == nil then
+      table.insert(lines, "- " .. path)
+    end
+  end
+  table.sort(lines)
+  return #lines > 0 and lines or nil
+end
+
 -- PanelSizing adds a step of a BetterBags Next panel being sized by a grip or gliding to a size, with where the client
--- put it and a few of its icons (SizingSnapshot). Added for icons that jittered "ever so slight" in game while the
--- specs' model kept every one on the same whole pixels.
+-- put it and a few of its icons (SizingSnapshot), and what changed on screen in it (sizingRegions). Added for icons that
+-- jittered "ever so slight" in game while the specs' model kept every one on the same whole pixels; the regions for a
+-- change reported at an icon's bottom edge while every icon recorded stayed on the same whole pixels.
 ---@param panel table
 ---@param step string
 function recorder:PanelSizing(panel, step)
@@ -590,5 +615,5 @@ function recorder:PanelSizing(panel, step)
     return
   end
   self:add({ kind = "sizing", panel = tostring(panel.label or panel.frame:GetName()), step = step,
-    lines = self:SizingSnapshot(panel) })
+    lines = self:SizingSnapshot(panel), regions = self:sizingRegions(panel) })
 end

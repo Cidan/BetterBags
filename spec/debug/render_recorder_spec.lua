@@ -565,21 +565,59 @@ describe("RenderRecorder", function()
       }, entry.lines)
     end)
 
-    it("records the shadow and border Masque skins an icon with", function()
+    it("records every region that draws in the panel at its first step, then what changed at each step", function()
+      local audit = addon:GetModule("PixelAudit")
       local panel = panelAt()
+      local frame = panel.frame
+      local sparkle = frame:CreateTexture()
+      sparkle:SetTexture(111)
+      sparkle:_SetRect(300, 300, 4, 4)
+      function panel:MovingParts() return { [sparkle] = true } end
       local decoration = panel.content.order[1].entries[1].item._decoration
-      local shadow, normal = decoration:CreateTexture(), decoration:CreateTexture()
-      shadow:_SetRect(116.1667, 551.8333, 51.6667, 51.6667)
-      normal:_SetRect(116.1667, 552.1667, 51.6667, 51.6667)
-      decoration._MSQ_CFG = { Shadow = shadow, Normal = normal }
+      local glow = decoration:CreateTexture()
+      glow:SetTexture(222)
+      glow:_SetRect(120, 556, 44, 44)
+      glow:Hide()
       recorder:Start()
+      recorder:PanelSizing(panel, "start")
+      local before = audit:Regions(frame, { skip = { [sparkle] = true } })
+      decoration.icon:SetAlpha(0.5)
+      decoration.IconBorder:Hide()
+      glow:Show()
+      sparkle:SetAlpha(0.25)
       recorder:PanelSizing(panel, "resized")
-      local lines = recorder:Stop().entries[1].lines
-      assert.are.equal("Consumable 0_1 frame " .. px(120, 556, 44, 44, 0.5) .. " | art " .. px(120, 556, 44, 44, 0.5)
-        .. " | border " .. px(120, 555.7, 44, 44, 0.5) .. " | masque shadow " .. px(116.1667, 551.8333, 51.6667, 51.6667, 0.5)
-        .. " | masque normal " .. px(116.1667, 552.1667, 51.6667, 51.6667, 0.5), lines[4])
-      assert.are.equal("Consumable 0_3 frame " .. px(170, 556, 44, 44, 0.5) .. " | art " .. px(170, 556, 44, 44, 0.5)
-        .. " | border " .. px(170, 555.7, 44, 44, 0.5), lines[5])
+      local after = audit:Regions(frame, { skip = { [sparkle] = true } })
+      recorder:PanelSizing(panel, "rendered")
+      local entries = recorder:Stop().entries
+      local first = {}
+      for path, line in pairs(before) do
+        table.insert(first, "= " .. path .. " | " .. line)
+      end
+      table.sort(first)
+      assert.is_true(#first > 3)
+      assert.are.same(first, entries[1].regions)
+      local iconPath, borderPath, glowPath
+      for path in pairs(after) do
+        if before[path] == nil then
+          glowPath = path
+        elseif after[path] ~= before[path] then
+          iconPath = path
+        end
+      end
+      for path in pairs(before) do
+        if after[path] == nil then borderPath = path end
+      end
+      assert.are.same({ "+ " .. glowPath .. " | " .. after[glowPath], "- " .. borderPath,
+        "~ " .. iconPath .. " | " .. after[iconPath] }, entries[2].regions)
+      assert.is_nil(entries[3].regions, "nothing changed")
+      recorder:Start()
+      recorder:PanelSizing(panel, "start")
+      local again = {}
+      for path, line in pairs(after) do
+        table.insert(again, "= " .. path .. " | " .. line)
+      end
+      table.sort(again)
+      assert.are.same(again, recorder:Stop().entries[1].regions, "a new recording lists everything again")
     end)
 
     it("records nothing while stopped", function()
