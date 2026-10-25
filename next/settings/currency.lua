@@ -49,7 +49,7 @@ local currency = addon:NewModule('NextSettingsCurrency')
 local SETTLE = 0.1
 
 ---@class NextCurrencyRow
----@field frame Frame
+---@field frame Frame A currency's is a button: a click anywhere on it flips its switch.
 ---@field hover Texture
 ---@field icon Texture
 ---@field name FontString
@@ -198,7 +198,7 @@ function blockProto:row(k, header)
     row.frame:Hide()
   end
   local C = style.Theme.Settings.Currency
-  local frame = CreateFrame("Frame", nil, self.frame)
+  local frame = CreateFrame(header and "Frame" or "Button", nil, self.frame)
   frame:EnableMouse(not header)
   row = {
     frame = frame, header = header,
@@ -221,6 +221,9 @@ function blockProto:row(k, header)
         end
       end,
     })
+    -- Asked: a click anywhere on a currency's row flips it, as its switch does.
+    frame:RegisterForClicks("LeftButtonUp")
+    addon.SetScript(frame, "OnClick", function(ctx) row.toggle:Click(ctx) end)
     addon.SetScript(frame, "OnEnter", function() row.hover:Show() end)
     addon.SetScript(frame, "OnLeave", function()
       if not frame:IsMouseOver() then

@@ -581,9 +581,9 @@ sonataNext:RegisterTheme({
   -- What BetterBags Next tracks as currencies (currency.md): the strip at the bottom of the backpack (MoneyGap from the
   -- gold) and the tracker dragged out of it. An entry is its icon (cropped by Crop on each side), its count CountGap
   -- beside it, Gap to the next (a list's name NameGap past its icon), and under them its cap Bar (Gap below the icon,
-  -- Height tall: its Track, its Fill, and its fill at a cap); its Hover HoverPad round it. A gain pops its icon by Bump
-  -- and lights its Flash (Size times the icon) and rises Rise; Drop lights the strip while a tracker held over the
-  -- backpack would be put away, and the Slot (its Icon) opens at its end while an item that can be tracked is held.
+  -- Height tall: its Track, its Fill, and its fill at a cap). A gain pops its icon by Bump and lights its Flash (Size
+  -- times the icon) and rises Rise; Drop lights the strip while a tracker held over the backpack would be put away, and
+  -- the Slot (its Icon) opens at its end while an item that can be tracked is held.
   -- The Tracker is a card, Pad round its entries (RowGap apart in a column or a list, a list ListWidth wide): its Fill,
   -- Edge and Frame (Blizzard's nine-slice art, next-themes.md §15; false: none).
   Currency = {
@@ -608,8 +608,6 @@ sonataNext:RegisterTheme({
       Fill = { Color = "Lavender", Alpha = 0.9 },
       Capped = { Color = "Capped" },
     },
-    Hover = { Color = "White", Alpha = 0.07 },
-    HoverPad = 3,
     Flash = { Texture = "Glow", Color = "Gold", BlendMode = "ADD", Alpha = 0.85, Size = 2.6 },
     Bump = 0.3,
     Rise = 22,

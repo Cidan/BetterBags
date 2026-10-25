@@ -70,6 +70,12 @@ tracker's list its name. Drawn from the theme's `Currency` (§7), on whole pixel
   gain while the last still rises adds to it. A loss rolls and "-N" sinks. The bar glides to its new fill. Nothing
   plays while the entry is not shown. What moves while it plays is left out of the pixel checks (`MovingParts`).
 - **Measured** for its final count's width, so a rolling count never pushes the entries beside it.
+- **Nothing lights behind it** (asked, after a first version had a hover light: "get rid of that entirely", in the
+  strip and the tracker). The pointer over it shows its tooltip, nothing else. **Failure mode (fixed):** the light was
+  made at alpha 0 and then painted with the theme's color; `NextStyle:Paint` ends a solid color with
+  `SetVertexColor(1, 1, 1, 1)`, and a texture's alpha is its vertex color's (next-themes.md §10), so painting turned it
+  on at the color's 0.07 until the pointer passed over the entry and away. Coverage: `spec/next/currency_spec.lua`
+  ("draws nothing behind its entries", strip and tracker; it failed before the fix).
 - **Its tooltip** (`currencyEntry:Tooltip`): Blizzard's own for the currency or item, then how far it is from its caps
   (at a cap, "more is wasted"; near one, the room left), where an item is (bags, bank, reagent bank, Warband bank: each
   that has some), what it gained this session, the Warband's amounts for a currency that moves between characters
@@ -151,7 +157,10 @@ classic bags keep their Currency page, next-settings.md §7, §8). Four tabs:
   `Currencies:Move`). It follows `currencies/Changed` and `currencies/Updated` while it shows. "Nothing tracked yet."
 - **Currencies** (on clients with currencies): every currency under its headings with a switch that tracks it, the
   classic Currency page's block (`NextSettingsCurrency`) made with `track` (§2's `List`, by currency ID, nothing written
-  to Blizzard); the switches follow `currencies/Changed` while it shows.
+  to Blizzard); the switches follow `currencies/Changed` while it shows. A click anywhere on a currency's row flips its
+  switch, as the switch does (asked: "clicking on any currency on the currency list in the settings menu should toggle
+  it, not just by pressing the switch"); a heading takes no click. The classic Currency page's rows, the same block, do
+  the same.
 - **Items**: the shared items tab (`NextSettingsItemsTab`, below) over the items tracked: an item dropped on it that
   stacks is tracked (one that does not is refused, "Only items that stack can be tracked.", and stays on the cursor);
   each shows how many you have and where ("4 in your bags, 20 in your bank"), faded with "You have none."; a right click
@@ -170,7 +179,7 @@ used (`TabHeight`, `Metrics`, `PlaceTab`, `Count`, `ByName`).
 
 `Currency`: `Icon`, `Crop`, `CountGap`, `Gap`, `NameGap`, `MoneyGap`; fonts `Font` (`CurrencyCount`), `CappedFont`,
 `NoneFont`, `NameFont`, `GainFont`, `LossFont`, `MoreFont`, `HintFont`; `Bar` (`Gap`, `Height`, `Track`, `Fill`,
-`Capped`); `Hover`, `HoverPad`; `Flash` (`Size` times the icon), `Bump`, `Rise`; `Drop`; `Slot` (`Icon`); `Tracker`
+`Capped`); `Flash` (`Size` times the icon), `Bump`, `Rise`; `Drop`; `Slot` (`Icon`); `Tracker`
 (`Pad`, `RowGap`, `ListWidth`, `Fill`, `Edge`, `Frame`). Palette `Gain`, `Capped`. `Motion.Time`: `CurrencyCount`,
 `CurrencyBump`, `CurrencyGain`, `CurrencyEnter`, `CurrencyPop`, with eases. `Sparkles.Gain` and `Sparkles.Pop`
 (bursts; a theme without sparkles, or the Animation tab's Sparkles off, has none). `SonataNext:Check` checks the font

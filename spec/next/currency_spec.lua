@@ -133,6 +133,29 @@ describe("BetterBags Next's currencies", function()
     return out
   end
 
+  -- lit returns what an entry draws besides its icon and its cap bar: textures shown and not faded out (their alpha
+  -- with their parents', as the client draws them). Nothing but those may show behind an entry (asked: no light
+  -- behind them, before or after the pointer passes).
+  local function lit(e)
+    local out = {}
+    for _, r in ipairs({ e.frame:GetRegions() }) do
+      if r:IsObjectType("Texture") and r:IsShown() and r:GetAlpha() > 0 and r ~= e.icon and r ~= e.track
+        and r ~= e.fill then
+        table.insert(out, r)
+      end
+    end
+    return out
+  end
+
+  -- hover runs the pointer over an entry and away, its fades to their end.
+  local function hover(e)
+    e.frame:GetScript("OnEnter")(e.frame)
+    finishTweens()
+    assert.are.same({}, lit(e), "nothing lit behind it under the pointer")
+    e.frame:GetScript("OnLeave")(e.frame)
+    finishTweens()
+  end
+
   -- x of an entry from the strip's left (Motion places each by its top left).
   local function xOf(e)
     local _, _, _, x = e.frame:GetPoint(1)
@@ -268,6 +291,22 @@ describe("BetterBags Next's currencies", function()
       assert.are.equal(0, xOf(c))
       assert.is_true(xOf(i) >= c.width + pixel:Length(s.frame, style.Theme.Currency.Gap))
       assert.is_false(s.hint:IsShown())
+    end)
+
+    -- Reported: a light behind each entry once tracked, gone only after the pointer passed over it.
+    it("draws nothing behind its entries, as they are tracked and after the pointer passes over them", function()
+      currency(1, { quantity = 5 })
+      local s = strip(backpack())
+      currencies:Track(ctx(), "currency", 1)
+      currency(2, { quantity = 6216 })
+      currencies:Track(ctx(), "currency", 2)
+      finishTweens()
+      for _, key in ipairs({ "currency:1", "currency:2" }) do
+        local e = s.entries[key]
+        assert.are.same({}, lit(e), key .. " as it is tracked")
+        hover(e)
+        assert.are.same({}, lit(e), key .. " after the pointer passed")
+      end
     end)
 
     it("draws a cap bar for a currency with a cap, its fill its progress, and none for one without", function()
@@ -732,6 +771,21 @@ describe("BetterBags Next's currencies", function()
       assert.is_false(t.frame:IsShown(), "not while the classic bags are in use")
       bag:Activate(ctx())
       assert.is_true(t.frame:IsShown())
+    end)
+
+    it("draws nothing behind its entries, as it comes out and after the pointer passes over them", function()
+      tracked()
+      backpack()
+      stubs.database:SetNextCurrencyTracker(true, 100, 100)
+      local t = tracker.instance
+      t:Draw(ctx())
+      finishTweens()
+      for _, key in ipairs(t.order) do
+        local e = t.entries[key]
+        assert.are.same({}, lit(e), key)
+        hover(e)
+        assert.are.same({}, lit(e), key .. " after the pointer passed")
+      end
     end)
 
     it("lays its entries out in a row, a column, or a list with their names", function()

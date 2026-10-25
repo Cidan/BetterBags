@@ -6,9 +6,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
----@class NextControls: AceModule
-local controls = addon:GetModule('NextControls')
-
 ---@class NextTween: AceModule
 local tween = addon:GetModule('NextTween')
 
@@ -46,7 +43,6 @@ local currencyEntry = addon:NewModule('NextCurrencyEntry')
 
 ---@class NextCurrencyEntryFrame
 ---@field frame Button
----@field hover Texture
 ---@field flash Texture
 ---@field icon Texture
 ---@field count FontString
@@ -65,7 +61,6 @@ local currencyEntry = addon:NewModule('NextCurrencyEntry')
 ---@field bumpKey table
 ---@field flashKey table
 ---@field barKey table
----@field hoverKey table
 ---@field float? NextCurrencyFloat
 local entryProto = {}
 addon:GetModule('Perf'):RegisterPrototype(entryProto, 'NextCurrencyEntryFrame')
@@ -91,10 +86,8 @@ function currencyEntry:Create(parent, owner)
   ---@type NextCurrencyEntryFrame
   local e = setmetatable({
     frame = frame, owner = owner, layout = "row", bars = true, width = 0, height = 0,
-    rollKey = {}, bumpKey = {}, flashKey = {}, barKey = {}, hoverKey = {},
+    rollKey = {}, bumpKey = {}, flashKey = {}, barKey = {},
   }, { __index = entryProto })
-  e.hover = frame:CreateTexture(nil, "BACKGROUND")
-  e.hover:SetAlpha(0)
   e.flash = frame:CreateTexture(nil, "BORDER")
   e.flash:SetAlpha(0)
   e.icon = frame:CreateTexture(nil, "ARTWORK")
@@ -108,11 +101,9 @@ function currencyEntry:Create(parent, owner)
   e.name:SetWordWrap(false)
   e.name:Hide()
   addon.SetScript(frame, "OnEnter", function()
-    e:SetHovered(true)
     owner:EntryTooltip(e)
   end)
   addon.SetScript(frame, "OnLeave", function()
-    e:SetHovered(false)
     GameTooltip:Hide()
   end)
   addon.SetScript(frame, "OnClick", function(ctx, _, button)
@@ -152,7 +143,7 @@ local function countFont(state)
   return C.Font
 end
 
--- Style draws the entry's parts from the theme (Currency): its fonts, its hover, glow and bar, its icon's crop.
+-- Style draws the entry's parts from the theme (Currency): its fonts, its glow and bar, its icon's crop.
 function entryProto:Style()
   local C = style.Theme.Currency
   style:SetFont(self.name, C.NameFont)
@@ -161,7 +152,6 @@ function entryProto:Style()
   else
     style:SetFont(self.count, C.Font)
   end
-  controls:Paint(self.hover, C.Hover)
   local flash = C.Flash
   if flash then
     style:Paint(self.flash, flash)
@@ -180,21 +170,6 @@ function entryProto:paintFill()
   local B = style.Theme.Currency.Bar
   local spec = (self.state and self.state.capped and B.Capped) or B.Fill
   style:Paint(self.fill, spec, spec.Alpha)
-end
-
--- SetHovered fades the hover in or out.
----@param on boolean
-function entryProto:SetHovered(on)
-  local from = self.hover:GetAlpha()
-  local C = style.Theme.Currency
-  local to = on and ((C.Hover and C.Hover.Alpha) or 1) or 0
-  if not C.Hover then
-    to = 0
-  end
-  tween:Play(self.hoverKey, {
-    duration = style.Time.Hover, from = from, to = to, ease = style:Ease("Hover"),
-    onUpdate = function(v) self.hover:SetAlpha(v) end,
-  })
 end
 
 -- Draw shows a state: its icon (desaturated and faded with none of it), its count in its role, its bar's fill. It
@@ -268,9 +243,6 @@ function entryProto:Place(width, height)
   local inset = pixel:Snap(frame, (glow - icon) / 2)
   pixel:Point(self.flash, "TOPLEFT", frame, "TOPLEFT", -inset, inset)
   pixel:Size(self.flash, glow, glow)
-  local pad = pixel:Snap(frame, C.HoverPad or 0)
-  self.hover:ClearAllPoints()
-  pixel:Inset(self.hover, frame, -pad, -pad, -pad, -pad)
   self.count:ClearAllPoints()
   if self.layout == "list" then
     pixel:Row(self.count, "TOPRIGHT", frame, 0, icon)

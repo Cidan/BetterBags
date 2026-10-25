@@ -541,7 +541,8 @@ Blizzard's own "show in backpack" flag. The Currency page (BetterBags group, aft
 Era have none, where the classic window said "not available") replaces the classic window's currency
 panes with a wide row: every currency under its headings (the headings Blizzard keeps collapsed are
 expanded, as the backpack's icons expand them), each with its icon, how many you have (of its most)
-and a switch. The switch writes `SetCurrencyBackpack`; once the game has taken it (0.1 s, as the
+and a switch, which a click anywhere on the row flips too (asked, of BetterBags Next's list, which is this
+block: a heading takes no click). The switch writes `SetCurrencyBackpack`; once the game has taken it (0.1 s, as the
 classic pane waited) the page reads the list again and sends `currency/Updated`, which redraws the
 backpack's icons. `C_CurrencyInfo` where the client has it, else the legacy globals (Mists Classic),
 whose expand and show flags are numbers (`ExpandCurrencyList(i, 1)`, `SetCurrencyBackpack(i, 1|0)`,
