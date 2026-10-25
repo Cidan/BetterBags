@@ -306,7 +306,7 @@ function blockProto:Place(x, y, width, height)
   pixel:Size(frame, width, height)
   local half = pixel:Floor(frame, pad / 2)
   self.empty:ClearAllPoints()
-  self.empty:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -half)
+  pixel:Point(self.empty, "TOPLEFT", frame, "TOPLEFT", pad, -half)
   local top = half
   -- Each part from its row's corners, centered on the row by its top (docs/next-pixel-perfect.md); the count
   -- right of the switch, the name between the icon and the count by the count's width rounded up.
@@ -320,7 +320,7 @@ function blockProto:Place(x, y, width, height)
     if entry.isHeader then
       row.icon:Hide()
       row.count:Hide()
-      row.name:SetPoint("BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, pixel:Snap(frame, 4))
+      pixel:Point(row.name, "BOTTOMLEFT", row.frame, "BOTTOMLEFT", 0, pixel:Snap(frame, 4))
     else
       row.icon:Show()
       row.count:Show()

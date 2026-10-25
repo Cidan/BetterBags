@@ -31,11 +31,28 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
   they follow the client's measure of the text, between pixels. Place what follows a text from the
   shared corner by the text's width or height rounded up (`pixel:Ceil(region, text:GetStringWidth())`,
   `pixel:TextHeight`).
-- **Text** is placed by a corner on a whole pixel, centered on a row by its font's height
-  (`pixel:Row(text, "TOPLEFT", row, x, rowHeight)`); the glyphs are the client's. Every Next text role's
-  font height is a whole number of pixels at UIParent's grid (`NextStyle`, `pixel:FontHeight`).
-- **Edit boxes**: text insets in whole pixels; the insets above and below leave exactly the font's
-  height, so the line the client centers lands on a whole pixel (`next/controls/input.lua`).
+- **Text** is placed by a corner a quarter pixel right of and above a whole pixel (`TEXT_OFFSET`, `pixel:TextOffset`),
+  centered on a row by its font's height (`pixel:Row(text, "TOPLEFT", row, x, rowHeight)`); the glyphs are the
+  client's. `pixel:Point`, `pixel:Inset` and `pixel:Row` add the quarter pixel to a font string's offsets themselves
+  (after rounding), and anything else they place stays on whole pixels; so do the item fitter (`fromCorner`, the
+  countdown) and Sonata's item button styler (`SonataItemSnap.Text`). Every Next text role's font height is a whole
+  number of pixels at UIParent's grid (`NextStyle`, `pixel:FontHeight`).
+  - **Why** (measured in game, a render recorder snapshot and a video of a small backpack's snap): the client draws a
+    text's glyphs in whole pixels, and a text placed exactly on a whole pixel sits on the boundary. Float error of a
+    thousandth of a pixel then decides which pixel it is drawn in: tab names and an item count drawn a pixel right as
+    the snap ended, their left edges read at 2758.999 during the snap and 2759.000 after, while texts whose edges were
+    not on a boundary never moved. A quarter pixel in, a text is drawn in the same pixel whether the client rounds or
+    truncates; the player's test (every text of the backpack moved a quarter pixel right and up) stopped the jump.
+    How the client rounds text is not documented; this is inferred from those measurements. Textures stay on whole
+    pixels: they are drawn without sharpening (texture-sharpening.md), so a fraction would blend them.
+  - **Never hang anything from a text** (its corners included): it carries the quarter pixel, and a text hung from a
+    text sits half a pixel off. Hang it from the frame the text hangs from, by the sum of the offsets
+    (`NextDockCard:Style`: the warning and the slot from the card, no longer from the title and the warning; the
+    pixel check found the half pixel).
+  - Classic bags are not changed: they never place text on whole pixels, so their text sits off the boundary already.
+- **Edit boxes**: text insets in whole pixels, a quarter pixel right and up (`pixel:TextInsets`: left and bottom a
+  quarter more, right and top a quarter less); the insets above and below leave exactly the font's height, so the line
+  the client centers lands a quarter pixel above a whole pixel (`next/controls/input.lua`, the panels' search boxes).
 - **Room a text may take** is rounded down (`pixel:Floor`), **room a text needs** rounded up
   (`pixel:Ceil`).
 - **Windows** start from UIParent's corners (always whole pixels). The settings window is centered by its
@@ -45,6 +62,9 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
   in UI units (`ScrollBoxBaseMixin:SetScrollTargetOffset`, called by its `Update`); `SnapScroll` replaces
   the box's own copy of that method with one that rounds the offset first. Any new Next scroll box must
   call it.
+- **A frame that clips stays on whole pixels, even while its size glides**: a panel's snap and its glide back to its
+  default size step its size a pixel at a time (texture-sharpening.md §5); a scroll box's edge between two pixels drew
+  what it clips stretched across the fraction.
 - **Not snapped, by nature**: what moves (glides, slides, drags, lifts, flights, sparkles, the cloud's
   breathing, the braid, the tab marker's glide, a toggle's knob sliding, a theme's swaying, spinning,
   pulsing or bobbing ornaments, next-themes.md §12). Each lands on whole pixels when it comes to rest.
@@ -67,9 +87,22 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
     rows it had (`section.layoutWidth`).
   - Cells still stand on the grid's whole-pixel step, every gap the same. The rounded step can run up to a
     pixel per cell past the width (measured: 9 pixels, over a scroll bar room as small as 6), so where a row
-    would run past the width it is drawn in, the gap closes by the pixel or two the rounding added.
+    would run past its own width (`NextCanvas:RowWidth`: its cells and gaps in units, the least width that holds
+    them), the gap closes by the pixel or two the rounding added. Read from the row's own width, the gap is one
+    for a column count, whatever width the row is drawn in.
   - Measured after (the same probe): no width lays out differently on any of the four screens, no row runs past
     the content, and the gap closes in 3% to 8% of layouts, by 1 pixel (2 at most).
+  - **Failure mode (fixed, reported: "resizing the window in general ... causes a ton of item icon jitter all
+    over"):** the gap closed for the width drawn. While a grip sized a panel, a column was added once the width to
+    lay out for held it, but the width drawn (the scroll box's room rounded to the grid) was still a pixel or two
+    short of the rounded row, so the gaps closed, and opened again a pixel or two later: every icon jumped a second
+    time, up to 19 pixels across at the far end, and every row a pixel or three down (a row steps by the same gap).
+    Simulated on the real panel and canvas with a grip dragged a pixel a frame over 700 pixels (six screens, Bag
+    Scales 100%, 85% and 55%, both grips): before, 8 to 18 such frames per drag; after, none. A row now runs past
+    the width drawn by at most a pixel (measured: 1, on 3396x1362 at 65% at 85%), into the scroll box's room for its
+    bar, never past the scroll box. Covered by `spec/next/content_spec.lua` ("keeps one layout for a column count
+    whatever the width it is drawn in, on every grid") and `spec/next/pixel_perfect_spec.lua` ("moves no icon while
+    a grip sizes it, but where a column is added").
 - **A room is measured on the column's grid.** The column keeps a room for a section held in a drag (drawn shrunk,
   `Drag.LiftScale`, until its landing ends) and for one flying back from a dock (at its card's scale): its height
   is `NextContent:MeasureSection(section, canvas.frame, ...)`, the section's layout on the column's grid, not the
@@ -159,6 +192,12 @@ bags take over:
   sized in whole pixels and centered in the content by its top left (again on the content's
   `OnSizeChanged`), its 12-unit end pieces and its centered text rounded in place
   (`placePurchaseBankButton`).
+- **Shading that changed while nothing moved (fixed).** Reported: "you can see the shadowing changes just by slight
+  resize of the window up and down (no icons shifted their actual position)", Masque off. A sizing recording had every
+  icon on the same whole pixels at every step, while a 60 fps video showed the texels inside each icon re-picked by
+  up to half a pixel as the window's height changed: the client's texture sharpening (`SetTexelSnappingBias`,
+  `SetSnapToPixelGrid`). Every bag texture, in both designs and Masque's skins, is now drawn without it:
+  texture-sharpening.md.
 
 ## 5. NextPixel's API (`next/pixel.lua`)
 
@@ -169,11 +208,13 @@ bags take over:
 | `Length(region, units)`, `LengthIn(unit, units)`, `Lengths(region, ...)` | a length rounded, at least a pixel when not none |
 | `Floor`, `Ceil`, `FloorIn` | rounded down (room it may take) or up (room it needs) |
 | `Pixels(region, units)` | how many whole pixels |
-| `Point(region, point, relativeTo, relativePoint, x, y)` | anchor with rounded offsets |
-| `Inset(region, relativeTo, l, r, t, b)` | inside another, rounded insets |
+| `Point(region, point, relativeTo, relativePoint, x, y)` | anchor with rounded offsets (a text a quarter pixel right and up of them) |
+| `Inset(region, relativeTo, l, r, t, b)` | inside another, rounded insets (a text a quarter pixel right and up) |
+| `TextOffset(region)` | a text's quarter pixel on its grid; none for anything else |
+| `TextInsets(box, l, r, t, b)` | an edit box's text insets, rounded, its text a quarter pixel right and up |
 | `Size`, `Width`, `Height` | rounded sizes |
 | `Middle(region, outer, inner)` | the offset centering a length in another, odd pixel after |
-| `Row(region, corner, relativeTo, x, rowHeight, height?, top?)` | by a top corner, centered on a row (a text by its font's height) |
+| `Row(region, corner, relativeTo, x, rowHeight, height?, top?)` | by a top corner, centered on a row (a text by its font's height, a quarter pixel right and up) |
 | `Center(region, relativeTo, ow, oh, w, h, dx?, dy?)` | in the middle by its top left, sized |
 | `TextHeight(text)` | a font string's or edit box's font height |
 | `SnapScroll(box)` | a scroll box scrolls by whole pixels (once per box) |
@@ -183,8 +224,9 @@ bags take over:
 
 One check, run by the specs and in game: **`PixelAudit:Check(root, { skip, owners })`** lists every shown
 region under root that draws and is not on whole screen pixels: textures', lines', edit boxes' and clipping
-frames' four edges, an edit box's text insets, a font string's anchor points (its far edges are its text's
-measure). Nothing hidden or at alpha 0 (its own or a parent's). It reads only what the client gives an
+frames' four edges; and every text not a quarter pixel right of and above one (§2): a font string's anchor points
+(its far edges are its text's measure), an edit box's text insets (left and bottom a quarter past a whole pixel,
+right and top three quarters). Nothing hidden or at alpha 0 (its own or a parent's). It reads only what the client gives an
 addon, available on every client (live, Forever, Mists, TBC Anniversary, Era, Titan API docs):
 `GetScaledRect` (where the client puts a region, in UI units at scale 1: its own units times its effective
 scale, as Blizzard's `RegionUtil.GetRegionPoint` reads it), `GetPoint`, `GetRegions`, `GetChildren`,
@@ -213,6 +255,12 @@ scale, as Blizzard's `RegionUtil.GetRegionPoint` reads it), `GetPoint`, `GetRegi
   pixels; its count 2 units, 2.075 pixels, in from the corner) and 3 ours (below). **It never reads a key of a table it walks**:
   it collects the parts off the grid first and finds their names by identity, only iterating tables. In
   game a window's tables reach saved settings, and reading a key AceDB's wildcard defaults cover writes it.
+- **`PixelAudit:Regions(root, { skip })`** walks the same tree the same way (`walk`, shared with `Check`, so parts are
+  named alike) and describes every shown region that draws, on the grid or not: path -> kind and draw layer (or a frame
+  that clips), rect in screen pixels, alpha with its parents', what it draws (file or atlas, color, texture coordinates
+  when not the whole image, whether the client snaps it to the pixel grid and its texel snapping bias; a text's
+  text). Two taken a frame apart show what changed on screen (the render recorder's
+  record of a panel sized, render-recorder.md §2). Coverage: `spec/debug/pixelaudit_spec.lua` ("listing what draws").
 
 In the specs:
 - `layout.UseScreen(width, height, uiScale)` sets a screen up as the client would (GetPhysicalScreenSize,
@@ -326,6 +374,15 @@ Real screens: the reporter's 3396x1362 at 65% and 70%, 3440x1440 at 65%, 1920x10
 - Mutation-checked: the theme card (old edge, old layout), the drop's anchor rounding, the scroll
   rounding (every scrolled check fails without it), the menu's width conversion, the settings window's
   settle, Sonata's rounding.
+- Text a quarter pixel in (§2): `spec/next/pixel_spec.lua` ("text, a quarter pixel in": the offset on each grid,
+  insets, edit box insets, textures and frames left on whole pixels), `spec/helpers_layout_spec.lua` and
+  `spec/debug/pixelaudit_spec.lua` (the check's text rule both ways), `spec/sonata/next_engine_spec.lua` (the item
+  snap's `Text`), and every pixel test of every Next window and control, which now fails on a text on a whole pixel.
+  24 mutations (the offset, each axis of `Point` and `Row`, the offset on non-text, each inset and its sign, the
+  check's rules, the dock card's lines hung from text, the item fitter, Sonata's snap and Next's, the money, the
+  search boxes' and inputs' insets): each caught; the one that first survived (Next's item snap giving no offset)
+  led to the engine test, and two offsets that could only ever apply to textures (`pixel:Center`, the fitter's
+  `atItsSize`) were removed as dead code.
 
 **Not verified in game yet.** To check: in a maximized window at UI scales of 65% and 70%, the selected
 theme card's four edges, a docked section, scrolled settings pages, a small panel after a drag; the render

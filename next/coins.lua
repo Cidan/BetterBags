@@ -42,7 +42,7 @@ function coins:Fit(m)
       local text = button:GetFontString()
       local _, fontHeight = text:GetFont()
       text:ClearAllPoints()
-      text:SetPoint("TOPRIGHT", button, "TOPRIGHT", -coin, -pixel:Floor(button, (coin - (fontHeight or 0)) / 2))
+      pixel:Point(text, "TOPRIGHT", button, "TOPRIGHT", -coin, -pixel:Floor(button, (coin - (fontHeight or 0)) / 2))
       previous = button
     end
   end

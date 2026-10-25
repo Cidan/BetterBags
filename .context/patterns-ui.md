@@ -402,3 +402,47 @@ kept levels across `SetParent`, so a test that checked the level passed.
 so we need to move it back"). Read the level before `SetParent` and set it after, as Blizzard's
 `FrameUtil.SetParentMaintainRenderLayering` does; a "never lower it" check compares with the level read before. The
 mock now gives a reparented frame one above its new parent.
+
+## Decide Spacing From the Layout, Never From the Width Drawn This Frame
+**Problem**: BetterBags Next closed a row's gaps by a pixel where the grid's rounded icons ran past the width the
+canvas was drawn in. While a grip sized a panel, that width moved a pixel a frame, so right after each column was
+added the gaps closed and a pixel or two later opened: every icon jumped twice per column (up to 19 pixels).
+
+**Rule**: Anything that sets where cells stand (gaps, steps, offsets) is a function of the layout decision (the
+column count, in design units), not of the width drawn now; a layout keeps one look for as long as its decision holds.
+Let the few pixels of rounding fall in room kept for them (the scroll bar's) rather than re-fit them every frame. To
+find such jitter, drive a resize a pixel a frame through the real layout and compare each element's pixel place
+between frames with the same decision.
+
+## Blizzard's Scroll Box Keeps Its Percentage When Its Height Changes
+**Problem**: BetterBags Next's panels scroll in Blizzard's `WowScrollBox`. While a grip changed a panel's height, a
+panel scrolled partway moved everything it shows a pixel every few frames: `ScrollBoxBaseMixin:OnSizeChanged` updates
+the box with its scroll percentage kept, and the offset is the scroll range (which follows the height) times it. The
+spec mock kept the percentage on `FullUpdate` instead (Blizzard keeps the offset there) and had no `OnSizeChanged`.
+
+**Rule**: To keep content still while a scroll box changes size, hook the box's own `OnSizeChanged` (a hook runs after
+Blizzard's handler, before the frame is drawn) and put the offset back in pixels (`ScrollToOffset(offset, true)`).
+Restoring from a later render is a frame late and still flickers.
+
+## Turn the Client's Texture Sharpening Off in Windows That Resize
+**Problem**: while a BetterBags Next bag was resized, its icons' art shimmered (their top borders and horizontal
+lines), though a recording showed every icon's rect on the same whole pixels at every step. By default the client
+rounds a texture's corners to pixels and "sharpens" it, picking a texel rather than blending two; which texels it
+picked changed with the window's height. Positions and rects read through the API cannot show it; a video of the
+screen, diffed frame by frame, did.
+
+**Rule**: draw a window's textures with `SetSnapToPixelGrid(false)` and `SetTexelSnappingBias(0)`, as Blizzard does
+on textures that resize and ElvUI on every texture (`Texels:Unsharpen`, texture-sharpening.md). When something drawn
+changes with no rect changing, compare video frames before reading more of the layout.
+
+
+## Text Exactly on a Whole Pixel Jumps a Pixel
+**Problem**: in a pixel-perfect layout, tab names and an item count jumped one pixel right as a panel's snap ended,
+and nothing else moved. Every text was placed exactly on a whole pixel, and the client draws text in whole pixels:
+float error of a thousandth of a pixel (their left edges read 2758.999 during the snap, 2759.000 after) decided which
+pixel the glyphs landed in. Texts whose edges were not on a boundary never moved.
+
+**Rule**: place text a quarter pixel right of and above a whole pixel (`NextPixel:TextOffset`, added by `Point`,
+`Inset`, `Row` and `TextInsets`), so it is drawn in the same pixel whether the client rounds or truncates; keep
+textures on whole pixels. Never hang anything from a text: the offset carries, and a text hung from a text sits half a
+pixel off. When a text moves by exactly one pixel with no layout change, look for an anchor exactly on a boundary.

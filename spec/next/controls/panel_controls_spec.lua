@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- panel_controls_spec.lua -- NextSwatch, NextTopTabs and NextDialog (next/controls/swatch.lua,
 -- toptabs.lua, dialog.lua): a color swatch that opens Blizzard's color picker, the tabs across a page
 -- and a dialog over a window (next-settings.md §2), drawn from the theme's Controls.
@@ -167,8 +169,8 @@ describe("NextTopTabs", function()
     assert.are.equal(#"Layout" * 6 + 40, first.frame:GetWidth())
     assert.are.equal("tab-active", first.fill:GetAtlas())
     assert.are.equal("tab", second.fill:GetAtlas())
-    assert.are.same({ "BOTTOM", first.frame, "BOTTOM", 0, 6 }, { first.label:GetPoint(1) })
-    assert.are.same({ "BOTTOM", second.frame, "BOTTOM", 0, 4 }, { second.label:GetPoint(1) })
+    assert.are.same({ "BOTTOM", first.frame, "BOTTOM", TEXT, 6 + TEXT }, { first.label:GetPoint(1) })
+    assert.are.same({ "BOTTOM", second.frame, "BOTTOM", TEXT, 4 + TEXT }, { second.label:GetPoint(1) })
     second.frame:GetScript("OnEnter")(second.frame)
     assert.are.equal("tab-over", second.fill:GetAtlas())
     second.frame:GetScript("OnLeave")(second.frame)

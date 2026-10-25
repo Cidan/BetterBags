@@ -57,8 +57,8 @@ local function remember(saved, region)
   return was
 end
 
--- fromCorner anchors a region by its template point, at its template offset rounded to whole pixels, its
--- size (when it has one) in whole pixels.
+-- fromCorner anchors a region by its template point, at its template offset rounded to whole pixels (a text a
+-- quarter pixel right and up of them, NextPixel:TextOffset), its size (when it has one) in whole pixels.
 ---@param saved table<Region, table>
 ---@param region Region
 local function fromCorner(saved, region)
@@ -68,7 +68,8 @@ local function fromCorner(saved, region)
     return
   end
   region:ClearAllPoints()
-  region:SetPoint(p[1], p[2], p[3], pixel:Snap(region, p[4] or 0), pixel:Snap(region, p[5] or 0))
+  local q = pixel:TextOffset(region)
+  region:SetPoint(p[1], p[2], p[3], pixel:Snap(region, p[4] or 0) + q, pixel:Snap(region, p[5] or 0) + q)
   if was.width > 0 and was.height > 0 then
     pixel:Size(region, was.width, was.height)
   end
@@ -99,8 +100,8 @@ local function across(saved, text, cooldown)
   remember(saved, text)
   local down = pixel:Middle(text, cooldown:GetHeight(), pixel:TextHeight(text))
   text:ClearAllPoints()
-  text:SetPoint("TOPLEFT", cooldown, "TOPLEFT", 0, -down)
-  text:SetPoint("TOPRIGHT", cooldown, "TOPRIGHT", 0, -down)
+  pixel:Point(text, "TOPLEFT", cooldown, "TOPLEFT", 0, -down)
+  pixel:Point(text, "TOPRIGHT", cooldown, "TOPRIGHT", 0, -down)
   text:SetJustifyH("CENTER")
 end
 

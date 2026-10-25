@@ -205,7 +205,8 @@ describe("the spec layout resolver", function()
     end)
 
     -- An edit box draws its text inside its insets (SimpleEditBoxAPIDocumentation, SetTextInsets): the text
-    -- area's edges must be on whole pixels too.
+    -- area's edges must be a quarter pixel right of and above whole pixels, as a font string's anchors
+    -- (next-pixel-perfect.md §2): its left and bottom insets a quarter past one, its right and top three quarters.
     it("checks an edit box's text insets, in its own units, scaled", function()
       local undo = layout.UseScreen(3396, 1362, 0.65)
       local unit = (768 / 1362) / 0.65
@@ -215,16 +216,20 @@ describe("the spec layout resolver", function()
       local box = CreateFrame("EditBox", nil, window)
       box:SetPoint("TOPLEFT", window, "TOPLEFT", 0, 0)
       box:SetSize(40 * unit, 10 * unit)
-      box:SetTextInsets(6 * unit, 2 * unit, 0, 0)
+      box:SetTextInsets(6.25 * unit, 1.75 * unit, -0.25 * unit, 0.25 * unit)
       assert.are.same({}, layout.PixelCheck(window))
-      box:SetTextInsets(6, 2 * unit, 0, 0)
+      box:SetTextInsets(6 * unit, 2 * unit, 0, 0)
+      assert.are.same({ "window.box: text inset left 6.000, text inset right 2.000, text inset top 0.000, "
+        .. "text inset bottom 0.000" }, layout.PixelCheck(window, { owners = { window = { box = box } } }),
+        "whole pixels are not where text is drawn")
+      box:SetTextInsets(6, 1.75 * unit, -0.25 * unit, 0.25 * unit)
       local problems = layout.PixelCheck(window, { owners = { window = { box = box } } })
       -- 6 units are 6.916 pixels.
       assert.are.same({ "window.box: text inset left 6.916" }, problems)
       box:SetScale(2)
       box:SetSize(20 * unit, 5 * unit)
-      box:SetTextInsets(3 * unit, unit, 0, 0)
-      assert.are.same({}, layout.PixelCheck(window), "3 own units at a scale of 2 are 6 pixels")
+      box:SetTextInsets(3.125 * unit, 0.875 * unit, -0.125 * unit, 0.125 * unit)
+      assert.are.same({}, layout.PixelCheck(window), "3.125 own units at a scale of 2 are 6.25 pixels")
       undo()
     end)
 
@@ -237,8 +242,10 @@ describe("the spec layout resolver", function()
       local text = window:CreateFontString()
       text:SetFontObject(GameFontNormal)
       text:SetText("odd")
-      text:SetPoint("TOPLEFT", 3 * unit, -3 * unit)
+      text:SetPoint("TOPLEFT", 3.25 * unit, -2.75 * unit)
       assert.are.same({}, layout.PixelCheck(window), "its right edge is the text's")
+      text:SetPoint("TOPLEFT", 3 * unit, -3 * unit)
+      assert.are.equal(1, #layout.PixelCheck(window), "a whole pixel is not where text is drawn")
       text:SetPoint("TOPLEFT", 3.5 * unit, -3 * unit)
       assert.are.equal(1, #layout.PixelCheck(window))
       text:Hide()

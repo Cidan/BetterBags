@@ -365,6 +365,22 @@ describe("NextVendor", function()
       v.searchBox.textBox:GetScript("OnTextChanged")(v.searchBox.textBox, true)
       assert.are.equal(1, v.buttons["vendor:1"].frame:GetAlpha())
     end)
+
+    -- texture-sharpening.md.
+    it("draws its cards' textures without the client's sharpening", function()
+      local v = open()
+      local card = v.buttons["vendor:1"]
+      local parts = { card.icon, card.button:CreateTexture() }
+      for _, t in ipairs(parts) do
+        t:SetSnapToPixelGrid(true)
+        t:SetTexelSnappingBias(1)
+      end
+      v:Draw(ctx())
+      for i, t in ipairs(parts) do
+        assert.is_false(t:IsSnappingToPixelGrid(), "part " .. i)
+        assert.are.equal(0, t:GetTexelSnappingBias(), "part " .. i)
+      end
+    end)
   end)
 
   describe("its header", function()

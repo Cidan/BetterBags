@@ -1741,11 +1741,17 @@ _G.__mockTemplates.WowScrollBox = function(frame)
   -- _scrollRange), GetDerivedScrollOffset() range * scroll percentage; GetVisibleExtentPercentage()
   -- visible / extent (0 without an extent); HasScrollableExtent() that percentage strictly between
   -- 0 and 1; GetPanExtent() the view's pan extent, CalculatePanExtentPercentage() it over the range.
-  function frame:GetDerivedExtent()
-    if self._extent ~= nil then return self._extent end
+  -- The extent is the one worked out at the last full update (ScrollBoxBaseMixin:FullUpdateInternal calls the view's
+  -- RecalculateExtent; GetDerivedExtent reads it back), the children's heights before any.
+  function frame:liveExtent()
     local extent = 0
     for _, child in ipairs(self.view and self.view.frames or {}) do extent = extent + (child:GetHeight() or 0) end
     return extent
+  end
+  function frame:GetDerivedExtent()
+    if self._extent ~= nil then return self._extent end
+    if self._recalculatedExtent ~= nil then return self._recalculatedExtent end
+    return self:liveExtent()
   end
   function frame:GetVisibleExtent() return math.floor((self:GetHeight() or 0) + 0.5) end
   function frame:GetDerivedScrollRange()
@@ -1811,11 +1817,28 @@ _G.__mockTemplates.WowScrollBox = function(frame)
     if not self:IsScrollAllowed() then return end
     self:SetScrollPercentage(self:GetScrollPercentage() + percentage * direction)
   end
-  -- FullUpdate lays the children out again, which places the scroll target (OnScroll).
+  -- Update places the scroll target at the derived scroll offset (ScrollBoxMixin:Update), which follows the scroll
+  -- percentage: the box's height changing moves what it shows (OnSizeChanged updates, ScrollBoxBaseMixin:OnSizeChanged
+  -- for a view that is not biaxial; the client sends it whenever the box's size changes).
+  function frame:Update()
+    self:SetScrollTargetOffset(self:GetDerivedScrollOffset())
+  end
+  frame:SetScript("OnSizeChanged", function(self) self:Update(true) end)
+  -- FullUpdate lays the children out again and works the extent out again, keeping the scroll offset the content had
+  -- (ScrollBoxBaseMixin:FullUpdateInternal: "correct the scroll position to undo the displacement"; the beginning
+  -- with nothing to scroll), which places the scroll target (OnScroll).
   function frame:FullUpdate(immediately)
     self._fullUpdates = (self._fullUpdates or 0) + 1
     self._lastFullUpdateImmediate = immediately
     self:layoutScrollChildren()
+    local old = self:GetDerivedScrollOffset()
+    self._recalculatedExtent = self:liveExtent()
+    local range = self:GetDerivedScrollRange()
+    if range > 0 then
+      self._scrollPercentage = math.max(0, math.min(1, old / range))
+    else
+      self._scrollPercentage = 0
+    end
     self:SetScrollTargetOffset(self:GetDerivedScrollOffset())
   end
 end

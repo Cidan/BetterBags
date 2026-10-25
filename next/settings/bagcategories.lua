@@ -425,7 +425,7 @@ function listProto:paintRow(row)
   row.note:ClearAllPoints()
   if entry == nil or entry.header then
     style:SetFont(row.label, K.GroupFont)
-    row.label:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", indent, pixel:Snap(frame, 4))
+    pixel:Point(row.label, "BOTTOMLEFT", frame, "BOTTOMLEFT", indent, pixel:Snap(frame, 4))
     row.hover:Hide()
     return
   end

@@ -30,6 +30,9 @@ local cursorPlacement = addon:GetModule('CursorPlacement')
 ---@class Render: AceModule
 local render = addon:GetModule('Render')
 
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
 ---@class DrawableModule: AceModule
 local drawable = addon:GetModule('Drawable')
 
@@ -96,6 +99,9 @@ local categories = addon:GetModule('Categories')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Motion: AceModule
+local motion = addon:GetModule('Motion')
+
 -- NextPanel is the panel BetterBagsNext's bags are made of (next.md §3): a full-height panel on a
 -- side of the screen that slides in from that edge, its inner edge feathered out to nothing, with
 -- the title and its sparkles, a search box, the tabs down its inner side, the content in one
@@ -113,6 +119,16 @@ local PANEL_LEVEL = 500
 -- The overlay's place over the panel's frame: above the content and its sections and item buttons (about 10 levels
 -- deep), below the braid and the sparkles.
 local OVERLAY_LEVEL = 20
+
+-- The scroll box every panel holds its content in (BuildContent), with BetterBags Next's own bar (next-settings.md §2),
+-- hidden until it is used. A small panel's columns' width counts the room it keeps for its bar (ContentRoom).
+local SCROLL_OPTIONS = {
+  Symmetric = true,
+  AutoHideBar = true,
+  Snap = function(region, units) return pixel:Length(region, units) end,
+  SnapScroll = function(box) pixel:SnapScroll(box) end,
+  CreateBar = function(box, opts) return nextScrollBar:Create(box, opts) end,
+}
 
 -- isSecret says whether addon code may not compare or do arithmetic on a value: a secret, as a vendor's name in a
 -- dungeon is (UnitName, SecretWhenUnitNameIdentityRestricted), and every size and position of the title showing it
@@ -273,8 +289,10 @@ end
 ---@field gripHover table<"LEFT"|"RIGHT", boolean> The pointer is over the grip.
 ---@field sizing? "LEFT"|"RIGHT" The grip the player is sizing the small panel with.
 ---@field sizingFrom? number[] Its width and height when the sizing started.
----@field resetting boolean It glides back to its default size (ResetSize).
----@field resetKey table The reset glide's tween key.
+---@field sizeGliding boolean Its size glides: back to its default (ResetSize), or onto its columns' width once a grip lets go (StopSizing).
+---@field sizeGlideKey table Its size glide's tween key.
+---@field keptScroll? number The scroll offset, in pixels of its scroll box, it keeps while a grip sizes it or its size glides (KeepScroll).
+---@field snap? {layout: number, body: number} While its size glides onto its columns' width (StopSizing): the width its rows are decided on, and the body's width it ends at, which its content keeps through the bounce.
 ---@field smallWidth? number A small panel's size, as it last took it (SmallSize).
 ---@field smallHeight? number
 ---@field fitsTitle? boolean Its title is cut short to the room its header buttons leave at full size too (the vendor's).
@@ -284,7 +302,9 @@ addon:GetModule('Perf'):RegisterPrototype(panelProto, 'NextPanelFrame')
 
 -- The panel's render root: it hands the scroll box the content's width and the height between
 -- the header and what is under the scroll area (ContentBottom), and the width the content's rows are decided
--- on (LayoutWidth: in the panel's own units, never rounded to its grid, next-pixel-perfect.md §3).
+-- on (LayoutWidth: in the panel's own units, never rounded to its grid, next-pixel-perfect.md §3). While the panel
+-- snaps to its columns' width, the content keeps the width it ends at: the bounce past it, inside the scroll box's
+-- room, closes no gap.
 local rootProto = drawable:Extend({}, 'NextPanelRoot')
 
 ---@return RenderPlan
@@ -294,8 +314,9 @@ end
 
 ---@return RenderResult
 function rootProto:PreRender()
+  local snap = self.bag.snap
   return {
-    Width = self.bag:BodyWidth() - 2 * style.PAD - style.RAIL,
+    Width = (snap and snap.body or self.bag:BodyWidth()) - 2 * style.PAD - style.RAIL,
     LayoutWidth = self.bag:LayoutWidth() - 2 * style.PAD - style.RAIL,
     Height = math.max(1, self.bag:Height() - style.CONTENT_TOP - self.bag:ContentBottom()),
   }
@@ -306,6 +327,9 @@ function rootProto:Render()
   -- The pixel check run in game from /bbdb (debug/pixelaudit.lua) checks the panel once it stays the same.
   if pixelAudit.watching then
     pixelAudit:Changed(self.bag.frame)
+  end
+  if self.bag.sizing ~= nil or self.bag.sizeGliding then
+    self.bag:recordSizing("rendered")
   end
   return { Width = self.bag:Width(), Height = self.bag:Height() }
 end
@@ -341,8 +365,8 @@ function nextPanel:Create(proto, opts)
   p.drawOnClose = false
   p.drawPendingOnShow = false
   p.drawnButtons = {}
-  p.resetting = false
-  p.resetKey = {}
+  p.sizeGliding = false
+  p.sizeGlideKey = {}
   p.size = database:GetNextSize()
   p:BuildPanel(opts.name)
   p:BuildMover()
@@ -405,7 +429,6 @@ end
 -- Motion moves it, if it does.
 ---@return string[]
 function panelProto:PixelLayout()
-  local motion = addon:GetModule('Motion')
   local canvas = self.content
   local frame = canvas.frame
   local k = 1 / pixel:Unit(frame)
@@ -503,7 +526,7 @@ function panelProto:setOffset(x)
   -- Anything that places the panel while it glides to a new size, or back to its default size, ends
   -- the glide first.
   self:endMorph()
-  self:endReset()
+  self:endSizeGlide()
   self.offset = x
   local frame = self.frame
   frame:ClearAllPoints()
@@ -939,26 +962,68 @@ function panelProto:Scale()
   return 1
 end
 
+-- ContentRoom is the room a panel keeps beside its content across, in units: its padding, its side rail, and the
+-- scroll box's room for its bar on both sides (the room the render root and the scroll box take off its width).
+---@return number
+function panelProto:ContentRoom()
+  return 2 * style.PAD + style.RAIL + scrollbox:GutterWidthFor(SCROLL_OPTIONS)
+end
+
+-- ColumnsWidth is the width of the columns a small panel width wide holds, in units: as many cells as its rows hold at
+-- that width, and the room beside them (what reads it keeps it within its minimum: SmallSize, LayoutWidth).
+---@param width number
+---@return number
+function panelProto:ColumnsWidth(width)
+  local room = self:ContentRoom()
+  return self.content:RowWidth(self.content:PerRow(width - room)) + room
+end
+
+-- SnapWidth is the width a small panel let go width wide snaps to (next.md §14g), in units: its widest row of icons
+-- as laid out at that width (as many cells as a row holds there, or as its largest section holds when that is fewer,
+-- NextCanvas:Widest) and the room beside it; the columns it holds while it lays out no section; never below its
+-- minimum. Every row stays as it is. Asked: "if i drag the window to be too big ... it should shrink back down to
+-- where the icon is", and "never normalize such that the column count changes away from the user".
+---@param width number
+---@return number
+function panelProto:SnapWidth(width)
+  local room = self:ContentRoom()
+  local perRow = self.content:PerRow(width - room)
+  local widest = self.content:Widest()
+  if widest > 0 then
+    perRow = math.min(perRow, widest)
+  end
+  return math.max(self:MinWidth(), self.content:RowWidth(perRow) + room)
+end
+
+-- DefaultWidth is a small panel's width before the player sizes it: the columns the full body's width holds, so no
+-- room is left past its last column at any Icon Scale (asked: "default should probably be exact too").
+---@return number
+function panelProto:DefaultWidth()
+  return self:ColumnsWidth(style.BODY_WIDTH)
+end
+
 -- SmallSize is the size a small panel takes on this screen while nothing sizes it (next.md §14g), in its
--- own units: the size the player gave it with its grips (saved for its kind), else the full body's width
+-- own units: the size the player gave it with its grips (saved for its kind), else its default width
 -- and a share of the screen's height in whole units; never below its minimum, nor past the screen at its
 -- scale.
 ---@return number width, number height
 function panelProto:SmallSize()
   local w, h = database:GetNextSmallSize(self.kind)
   local s, unit = self:Scale(), self:PixelUnit()
-  w = w or style.BODY_WIDTH
+  w = w or self:DefaultWidth()
   h = h or math.floor(UIParent:GetHeight() * style.Small.Height)
   -- In whole pixels at its scale, never past the screen.
   return math.min(pixel:FloorIn(unit, UIParent:GetWidth() / s), pixel:LengthIn(unit, math.max(self:MinWidth(), w))),
     math.min(pixel:FloorIn(unit, UIParent:GetHeight() / s), pixel:LengthIn(unit, math.max(self:MinHeight(), h)))
 end
 
--- SmallWidth and SmallHeight are a small panel's size now: the frame's while a grip sizes it or it
--- glides back to its default size, else the size it took last (ApplyGeometry, FitSmall).
+-- SmallWidth and SmallHeight are a small panel's size now: the frame's while a grip sizes it or its size
+-- glides (back to its default, or onto its columns' width), else the size it took last (ApplyGeometry, FitSmall);
+-- the full body's while it is built, before it first takes its size (its header fits its title before its footer
+-- and content, which its default width reads, exist).
 ---@return number
 function panelProto:SmallWidth()
-  if self.sizing ~= nil or self.resetting then
+  if self.sizing ~= nil or self.sizeGliding then
     return self.frame:GetWidth()
   end
   return self.smallWidth or style.BODY_WIDTH
@@ -966,7 +1031,7 @@ end
 
 ---@return number
 function panelProto:SmallHeight()
-  if self.sizing ~= nil or self.resetting then
+  if self.sizing ~= nil or self.sizeGliding then
     return self.frame:GetHeight()
   end
   return self.smallHeight or math.floor(UIParent:GetHeight() * style.Small.Height)
@@ -1168,17 +1233,21 @@ end
 
 -- LayoutWidth is the body's width its content's rows are decided on: a small panel's width as the player left it
 -- (or its default), in its own units, kept within its minimum and the screen as SmallSize keeps it but never
--- rounded to its grid, so its items are laid out the same at every Bag Scale; the frame's while a grip sizes it
--- or it glides back to its default size. A full panel's is the theme's.
+-- rounded to its grid, so its items are laid out the same at every Bag Scale; the width it snaps to while it snaps
+-- onto its columns (its rows the same through the bounce); the frame's while a grip sizes it or it glides back to its
+-- default size. A full panel's is the theme's.
 ---@return number
 function panelProto:LayoutWidth()
   if not self:IsSmall() then
     return style.BODY_WIDTH
   end
-  if self.sizing ~= nil or self.resetting then
+  if self.snap ~= nil then
+    return self.snap.layout
+  end
+  if self.sizing ~= nil or self.sizeGliding then
     return self.frame:GetWidth()
   end
-  local w = database:GetNextSmallSize(self.kind) or style.BODY_WIDTH
+  local w = database:GetNextSmallSize(self.kind) or self:DefaultWidth()
   return math.min(UIParent:GetWidth() / self:Scale(), math.max(self:MinWidth(), w))
 end
 
@@ -1248,10 +1317,10 @@ function panelProto:SmallPlace()
 end
 
 -- LivePlace is where a small panel's top left is now: under the mouse while the player drags it, or
--- where the frame is while it is sized or glides back to its default size, else its place.
+-- where the frame is while it is sized or its size glides, else its place.
 ---@return number x, number y
 function panelProto:LivePlace()
-  if self.moving or self.sizing ~= nil or self.resetting then
+  if self.moving or self.sizing ~= nil or self.sizeGliding then
     local x, y = self.frame:GetLeft(), self.frame:GetTop()
     if x ~= nil and y ~= nil then
       local s = lift:ScaleOf(self.frame)
@@ -1262,10 +1331,10 @@ function panelProto:LivePlace()
 end
 
 -- SmallLeft is where a shown small panel's left edge is now: under the mouse while dragged, the
--- frame's while sized or gliding back to its default size, else its place plus its slide.
+-- frame's while sized or while its size glides, else its place plus its slide.
 ---@return number
 function panelProto:SmallLeft()
-  if self.moving or self.sizing ~= nil or self.resetting then
+  if self.moving or self.sizing ~= nil or self.sizeGliding then
     local x = self.frame:GetLeft()
     if x ~= nil then
       return x * lift:ScaleOf(self.frame)
@@ -1407,7 +1476,7 @@ end
 ---@param size NextSize
 ---@return boolean
 function panelProto:PrepareResize(size)
-  self:endReset()
+  self:endSizeGlide()
   if self.closing then
     tween:Stop(self, true)
   end
@@ -1646,7 +1715,7 @@ function panelProto:StartMove()
     return false
   end
   self:endMorph()
-  self:endReset()
+  self:endSizeGlide()
   tween:Stop(self, true)
   self.frame:StartMoving()
   -- StartMoving flags the frame user-placed, and the client then restores a named frame's place
@@ -1840,14 +1909,48 @@ function panelProto:StartSizing(side)
     return false
   end
   self:endMorph()
-  self:endReset()
+  self:endSizeGlide()
   tween:Stop(self, true)
   local frame, s = self.frame, self:Scale()
   frame:SetResizeBounds(self:MinWidth(), self:MinHeight(), UIParent:GetWidth() / s, UIParent:GetHeight() / s)
   self.sizingFrom = { frame:GetWidth(), frame:GetHeight() }
   self.sizing = side
+  self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
   self.content:SetInstant(true)
   frame:StartSizing(side == "LEFT" and "BOTTOMLEFT" or "BOTTOMRIGHT", true)
+  self:recordSizing("start")
+  return true
+end
+
+-- recordSizing gives the render recorder (render-recorder.md §2) a step of a grip sizing the panel or of its size
+-- gliding: where the client puts it and a few of its icons, in screen pixels. Nothing while it does not record.
+---@private
+---@param step string
+function panelProto:recordSizing(step)
+  local recorder = addon:GetModule('RenderRecorder', true)
+  if recorder ~= nil and recorder.recording then
+    recorder:PanelSizing(self, step)
+  end
+end
+
+-- KeepScroll puts what the panel shows back where it was while a grip sizes it, or while its size glides back to its
+-- default: Blizzard's scroll box keeps its scroll percentage as its height changes (ScrollBoxBaseMixin:OnSizeChanged
+-- updates; the offset is the scroll range times the percentage), which moved everything shown a pixel every few frames
+-- (reported: the jitter "on Y, it's ever so slight"). It keeps the scroll offset in pixels, as a browser keeps the top
+-- of a page where it was; past the end, the end. It runs after Blizzard's handler (BuildContent), so nothing is drawn
+-- moved. It returns whether it scrolled, for profiler traces.
+---@return boolean
+function panelProto:KeepScroll()
+  local kept = self.keptScroll
+  if kept == nil or (self.sizing == nil and not self.sizeGliding) then
+    return false
+  end
+  local box = self.scroll.scrollBox
+  if math.abs(box:GetDerivedScrollOffset() - kept) < 0.001 then
+    return false
+  end
+  box:ScrollToOffset(kept, true)
+  self:recordSizing("scroll kept")
   return true
 end
 
@@ -1859,11 +1962,13 @@ function panelProto:Resized()
   end
   self:FitTitle()
   render:Invalidate(self.root)
+  self:recordSizing("resized")
 end
 
--- StopSizing ends a grip's sizing: the panel keeps the size it was let go at (asked: "static ... no
--- snapping"), saved for its kind with its place, on the screen. A press let go without sizing it saves
--- nothing, so the default size still follows the screen.
+-- StopSizing ends a grip's sizing: the panel keeps the height it was let go at and snaps to the width of the
+-- columns it shows there (SnapWidth; asked: "never normalize such that the column count changes away from the
+-- user"), saved for its kind with its place, on the screen. A press let go at the size it had, or that snaps back
+-- to it, saves nothing, so the default size still follows the screen.
 function panelProto:StopSizing()
   if self.sizing == nil then
     return
@@ -1872,25 +1977,79 @@ function panelProto:StopSizing()
   frame:StopMovingOrSizing()
   local x, y, w, h = frame:GetLeft(), frame:GetTop(), frame:GetWidth(), frame:GetHeight()
   local from, side = self.sizingFrom, self.sizing
+  self:recordSizing("let go")
   self.sizing = nil
   -- Let go away from the pointer, it fades now.
   self:fadeGrip(side)
   self.sizingFrom = nil
   self.content:SetInstant(false)
-  if x ~= nil and y ~= nil and (math.abs(w - from[1]) >= 0.5 or math.abs(h - from[2]) >= 0.5) then
-    database:SetNextSmallSize(self.kind, w, h)
+  local to = self:SnapWidth(w)
+  if x ~= nil and y ~= nil and (math.abs(to - from[1]) >= 0.5 or math.abs(h - from[2]) >= 0.5) then
+    database:SetNextSmallSize(self.kind, to, h)
     self.smallWidth, self.smallHeight = self:SmallSize()
     -- A chained bag's grip on its chained side is off (UpdateGrips), so its chained side stayed beside
-    -- its partner: where the frame is, on the screen, is its spot.
+    -- its partner: the side across from the grip stays where it is, on the screen, and is its spot.
     local s = lift:ScaleOf(frame)
-    self.placeX, self.placeY = self:clampPlace(x * s, y * s)
+    local left = side == "LEFT" and x + w - self.smallWidth or x
+    self.placeX, self.placeY = self:clampPlace(left * s, y * s)
     database:SetNextSmallPlace(self.kind, self.placeX, self.placeY)
+  end
+  self:UpdateGrips()
+  if x ~= nil and y ~= nil and math.abs(w - self:SmallWidth()) >= 0.5 then
+    self:snapTo(side, x, y, w, to)
+    return
   end
   frame:SetSize(self:SmallWidth(), self:SmallHeight())
   self:setOffset(0)
   self:FitTitle()
-  self:UpdateGrips()
   render:Invalidate(self.root)
+  self:recordSizing("placed")
+end
+
+-- snapTo glides a small panel let go w wide, its top left at x, y in its own units, to the width its columns take
+-- (its SmallWidth now), as the original bags snap to their content (window.md §3b): past it by Motion's overshoot, then
+-- back. The edge its grip moved moves, the side across stays (the left grip's left edge, the right grip's right). Its
+-- content keeps the rows of layout (the width it snapped to, unrounded) and the width it ends at all the way, so the
+-- bounce, inside the scroll box's room, moves no item. Anything that places, sizes, switches or hides it ends the snap
+-- at its width (endSizeGlide).
+---@private
+---@param side "LEFT"|"RIGHT"
+---@param x number
+---@param y number
+---@param w number
+---@param layout number
+function panelProto:snapTo(side, x, y, w, layout)
+  local frame = self.frame
+  local width, height = self:SmallWidth(), self:SmallHeight()
+  local overshoot = motion.SnapOvershoot(w, width, self:MinWidth())
+  self.snap = { layout = layout, body = width }
+  self.sizeGliding = true
+  tween:Play(self.sizeGlideKey, {
+    duration = style.Time.Snap,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      -- In whole pixels, as a grip dragged sizes it: its scroll box clips what it holds, and a clipping frame's edge
+      -- between two pixels drew what it holds stretched across the fraction (texture-sharpening.md §5).
+      local current = pixel:LengthIn(self:PixelUnit(), motion.SnapSizeAt(w, width, overshoot, p))
+      frame:ClearAllPoints()
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", side == "LEFT" and x + w - current or x, y)
+      frame:SetSize(current, height)
+      self:FitTitle()
+      render:Invalidate(self.root)
+      self:recordSizing("snap")
+    end,
+    onDone = function()
+      self.sizeGliding = false
+      self.snap = nil
+      frame:SetSize(width, height)
+      self:setOffset(0)
+      self:FitTitle()
+      render:Invalidate(self.root)
+      self:recordSizing("snapped")
+    end,
+  })
 end
 
 -- ResetSize glides a small panel back to its default size (asked: "shift + left click the grip to
@@ -1909,7 +2068,7 @@ function panelProto:ResetSize(side)
     return "default"
   end
   self:endMorph()
-  self:endReset()
+  self:endSizeGlide()
   tween:Stop(self, true)
   local frame = self.frame
   local x0, y0 = self.placeX + self.offset, self.placeY
@@ -1923,38 +2082,53 @@ function panelProto:ResetSize(side)
   self.placeX, self.placeY = x1, y1
   self.offset = 0
   database:SetNextSmallPlace(self.kind, x1, y1)
-  self.resetting = true
+  self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
+  self.sizeGliding = true
   self.content:SetInstant(true)
-  tween:Play(self.resetKey, {
+  tween:Play(self.sizeGlideKey, {
     duration = style.Time.Resize,
     from = 0,
     to = 1,
     ease = style:Ease("Resize"),
     onUpdate = function(t)
+      -- In whole pixels, size and corner, as a grip dragged sizes it (texture-sharpening.md §5): the corner across from
+      -- the grip glides on whole pixels and the moving side follows the size.
+      local unit = self:PixelUnit()
+      local w, h = pixel:LengthIn(unit, w0 + (w1 - w0) * t), pixel:LengthIn(unit, h0 + (h1 - h0) * t)
+      local top = pixel:SnapIn(unit, (y0 + (y1 - y0) * t) / s)
+      local left
+      if side == "LEFT" then
+        local r0, r1 = x0 / s + w0, x1 / s + w1
+        left = pixel:SnapIn(unit, r0 + (r1 - r0) * t) - w
+      else
+        left = pixel:SnapIn(unit, (x0 + (x1 - x0) * t) / s)
+      end
       frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x0 + (x1 - x0) * t) / s, (y0 + (y1 - y0) * t) / s)
-      frame:SetSize(w0 + (w1 - w0) * t, h0 + (h1 - h0) * t)
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+      frame:SetSize(w, h)
       self:FitTitle()
       render:Invalidate(self.root)
+      self:recordSizing("reset")
     end,
     onDone = function()
-      self.resetting = false
+      self.sizeGliding = false
       self.content:SetInstant(false)
       frame:SetSize(w1, h1)
       self:setOffset(0)
       self:FitTitle()
       render:Invalidate(self.root)
+      self:recordSizing("reset done")
     end,
   })
   return "resetting"
 end
 
--- endReset puts a panel gliding back to its default size at its end at once (anything else that
--- places or sizes it).
+-- endSizeGlide puts a panel whose size glides (back to its default, or onto its columns' width) at its end at once
+-- (anything else that places or sizes it).
 ---@private
-function panelProto:endReset()
-  if self.resetting then
-    tween:Stop(self.resetKey, true)
+function panelProto:endSizeGlide()
+  if self.sizeGliding then
+    tween:Stop(self.sizeGlideKey, true)
   end
 end
 
@@ -2491,10 +2665,10 @@ function panelProto:styleHeader()
   local inset, top = pixel:Snap(body, self:TitleStart()), pixel:Snap(body, style.TITLE_TOP)
   local centered = H.Title.Justify == "CENTER"
   if left then
-    title:SetPoint("TOPRIGHT", body, "TOPRIGHT", -inset, -top)
+    pixel:Point(title, "TOPRIGHT", body, "TOPRIGHT", -inset, -top)
     title:SetJustifyH(centered and "CENTER" or "RIGHT")
   else
-    title:SetPoint("TOPLEFT", body, "TOPLEFT", inset, -top)
+    pixel:Point(title, "TOPLEFT", body, "TOPLEFT", inset, -top)
     title:SetJustifyH(centered and "CENTER" or "LEFT")
   end
 
@@ -3236,9 +3410,9 @@ function panelProto:placeSearch()
   local _, helpHeight = help:GetFont()
   local helpTop = -pixel:Floor(t, (height - (helpHeight or 0)) / 2)
   help:ClearAllPoints()
-  help:SetPoint("TOPLEFT", t, "TOPLEFT", 2 * gap + iconSize, helpTop)
-  help:SetPoint("TOPRIGHT", t, "TOPRIGHT", -right, helpTop)
-  t:SetTextInsets(2 * gap + iconSize, right, 0, 0)
+  pixel:Point(help, "TOPLEFT", t, "TOPLEFT", 2 * gap + iconSize, helpTop)
+  pixel:Point(help, "TOPRIGHT", t, "TOPRIGHT", -right, helpTop)
+  pixel:TextInsets(t, 2 * gap + iconSize, right, 0, 0)
   local clear = t.clearButton
   if clear ~= nil then
     local size = clear:GetHeight()
@@ -3269,10 +3443,10 @@ function panelProto:placeSearchInner(I)
   local left, right = pixel:Snap(t, I.TextLeft or 0), pixel:Snap(t, I.TextRight or 0)
   local help = t.Instructions
   help:ClearAllPoints()
-  help:SetPoint("TOPLEFT", t, "TOPLEFT", left, 0)
-  help:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", -right, 0)
+  pixel:Point(help, "TOPLEFT", t, "TOPLEFT", left, 0)
+  pixel:Point(help, "BOTTOMRIGHT", t, "BOTTOMRIGHT", -right, 0)
   help:SetJustifyV("MIDDLE")
-  t:SetTextInsets(left, right, 0, 0)
+  pixel:TextInsets(t, left, right, 0, 0)
   local clear = t.clearButton
   if clear ~= nil then
     clear:ClearAllPoints()
@@ -3369,17 +3543,15 @@ end
 -- scrolls with BetterBags Next's own bar (next-settings.md §2), hidden until it is used.
 ---@param scrollName string
 function panelProto:BuildContent(scrollName)
-  local scroll = scrollbox:Create(self.frame, scrollName, {
-    Symmetric = true,
-    AutoHideBar = true,
-    Snap = function(region, units) return pixel:Length(region, units) end,
-    SnapScroll = function(box) pixel:SnapScroll(box) end,
-    CreateBar = function(box, opts) return nextScrollBar:Create(box, opts) end,
-  })
+  local scroll = scrollbox:Create(self.frame, scrollName, SCROLL_OPTIONS)
   self.scroll = scroll
   self.content = nextContent:Create(scroll.scrollChild)
   scroll:SetChild(self.content)
   self.root = drawable:Create(rootProto, { frame = self.frame, bag = self })
+  -- After Blizzard's own handler (ScrollBoxBaseMixin:OnSizeChanged), which moves what it shows as its height changes.
+  addon.HookScript(scroll.scrollBox, "OnSizeChanged", function()
+    self:KeepScroll()
+  end)
 
   local emptyText = style:CreateText(self.frame, style.Theme.Footer.EmptyFont)
   emptyText:SetText(L:G("Nothing here yet"))
@@ -3988,7 +4160,7 @@ function panelProto:OnHidden(ctx)
   nextDock:PanelHidden(self)
   self:StopMove()
   self:StopSizing()
-  self:endReset()
+  self:endSizeGlide()
   self.closing = false
   tween:Stop(self)
   tween:Stop(self.spark)
@@ -4080,6 +4252,9 @@ function panelProto:Draw(ctx, slotInfo, callback)
   self.claims = nil
   self.lastSlotInfo = slotInfo
   render:RenderNow(self.root, { ctx = ctx })
+  -- After the render, which styles what it lays out (the item fitter, vendor cards) and Masque skins
+  -- (texture-sharpening.md).
+  texels:Unsharpen(self.frame)
   self.freeText:SetText(format(L:G("%d free slots"), self.content.freeTotal))
   -- Data that was never read (the bank before its first read after it opens) has no tabs.
   self.emptyText:SetText(slotInfo.tabs == nil and L:G("Loading...") or L:G("Nothing here yet"))

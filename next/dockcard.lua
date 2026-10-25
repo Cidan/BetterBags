@@ -116,21 +116,24 @@ function cardProto:Style(color)
   style:SetFont(self.title, D.TitleFont)
   style:SetFont(self.warning, D.WarningFont)
   style:SetFont(self.hint, D.HintFont)
-  -- Each line under the one before by whole pixels: the title at the padding, the warning under it, the
-  -- slot under that and the hint under the slot (docs/next-pixel-perfect.md).
+  -- Each line under the one before by whole pixels, each hung from the card or the slot, never from a text
+  -- (a text sits a quarter pixel off its whole pixel, and what hangs from it would too): the title at the
+  -- padding, the warning under it, the slot under that and the hint under the slot (docs/next-pixel-perfect.md).
   local frame = self.frame
-  local pad = pixel:Length(frame, D.Pad)
+  local pad, title, line = pixel:Lengths(frame, D.Pad, D.TitleHeight, D.LineHeight)
+  local a, b = pixel:Lengths(frame, UNDER_TITLE, UNDER_WARNING)
   pixel:Height(self.title, D.TitleHeight)
   self.title:ClearAllPoints()
-  self.title:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad)
-  self.title:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -pad)
+  pixel:Point(self.title, "TOPLEFT", frame, "TOPLEFT", pad, -pad)
+  pixel:Point(self.title, "TOPRIGHT", frame, "TOPRIGHT", -pad, -pad)
   pixel:Height(self.warning, D.LineHeight)
   pixel:Height(self.hint, D.LineHeight)
+  local warningTop = pad + title + a
   self.warning:ClearAllPoints()
-  pixel:Point(self.warning, "TOPLEFT", self.title, "BOTTOMLEFT", 0, -UNDER_TITLE)
-  pixel:Point(self.warning, "TOPRIGHT", self.title, "BOTTOMRIGHT", 0, -UNDER_TITLE)
+  pixel:Point(self.warning, "TOPLEFT", frame, "TOPLEFT", pad, -warningTop)
+  pixel:Point(self.warning, "TOPRIGHT", frame, "TOPRIGHT", -pad, -warningTop)
   self.slot:ClearAllPoints()
-  pixel:Point(self.slot, "TOPLEFT", self.warning, "BOTTOMLEFT", 0, -UNDER_WARNING)
+  pixel:Point(self.slot, "TOPLEFT", frame, "TOPLEFT", pad, -(warningTop + line + b))
   self.hint:ClearAllPoints()
   pixel:Point(self.hint, "TOPLEFT", self.slot, "BOTTOMLEFT", 0, -UNDER_SLOT)
 end

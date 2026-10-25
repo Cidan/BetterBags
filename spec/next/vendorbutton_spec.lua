@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- vendorbutton_spec.lua -- NextVendorButton (next/vendorbutton.lua): the buttons of BetterBags Next's
 -- vendor (next.md §10). A button shows an item for sale, a buyback or an item to repair: its icon,
 -- stack, stock, quality, what makes it unusable or sold out, and its price under it; its tooltip is
@@ -145,14 +147,14 @@ describe("NextVendorButton", function()
         b:MasqueRegions())
       assert.are.equal("HIGHLIGHT", b.highlight:GetDrawLayer())
       local textWidth = style.VENDOR_CARD_WIDTH - style.ICON - 2 * style.VENDOR_TEXT_GAP
-      assert.are.same({ "TOPLEFT", b.button, "TOPRIGHT", style.VENDOR_TEXT_GAP, 0 }, { b.name:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", b.button, "TOPRIGHT", style.VENDOR_TEXT_GAP + TEXT, TEXT }, { b.name:GetPoint(1) })
       assert.are.equal(textWidth, b.name:GetWidth())
       assert.are.same({ "LEFT", "TOP" }, { b.name:GetJustifyH(), b.name:GetJustifyV() })
       assert.is_true(b.name:CanWordWrap())
       assert.are.equal(2, b.name:GetMaxLines())
       -- Raised a little off the card's bottom edge (asked: "2-3 pixels up from the border").
       assert.is_true(style.VENDOR_PRICE_RAISE >= 2 and style.VENDOR_PRICE_RAISE <= 3)
-      assert.are.same({ "BOTTOMLEFT", b.button, "BOTTOMRIGHT", style.VENDOR_TEXT_GAP, style.VENDOR_PRICE_RAISE },
+      assert.are.same({ "BOTTOMLEFT", b.button, "BOTTOMRIGHT", style.VENDOR_TEXT_GAP + TEXT, style.VENDOR_PRICE_RAISE + TEXT },
         { b.price:GetPoint(1) })
       assert.are.equal(textWidth, b.price:GetWidth())
       assert.are.equal("LEFT", b.price:GetJustifyH())
@@ -375,7 +377,7 @@ describe("NextVendorButton", function()
         local width = math.floor((style.GRID_WIDTH - 2 * style.GAP) / 3)
         for _, b in ipairs({ live, pooled }) do
           assert.are.same({ width, 32 }, { b.frame:GetSize() })
-          assert.are.same({ "BOTTOMLEFT", b.button, "BOTTOMRIGHT", 5, 4 }, { b.price:GetPoint(1) })
+          assert.are.same({ "BOTTOMLEFT", b.button, "BOTTOMRIGHT", 5 + TEXT, 4 + TEXT }, { b.price:GetPoint(1) })
           assert.are.equal(width - 32 - 10, b.name:GetWidth())
           assert.are.equal(style:Font("Tiny"), b.name:GetFontObject())
           assert.are.same({ 0.5, 0.5, 0.5, 0.2 }, { b.cardFill:GetVertexColor() })

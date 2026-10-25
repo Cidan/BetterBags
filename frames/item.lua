@@ -38,6 +38,9 @@ local context = addon:GetModule("Context")
 ---@class Debug: AceModule
 local debug = addon:GetModule("Debug")
 
+---@class Texels: AceModule
+local texels = addon:GetModule("Texels")
+
 -- Alpha floor for the additive quality halo the instant it turns on, just above
 -- the halo threshold. The halo ramps from this value at (threshold + 1) up to a
 -- blinding 1.0 at intensity 100, so it is already clearly visible the moment it
@@ -668,6 +671,8 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 		events:SendMessage(ctx, "item/Updated", self, decoration)
 	end
 	self:UpdateUpgrade(ctx, data)
+	-- After item/Updated: Masque makes its textures as it skins the button (texture-sharpening.md).
+	texels:Unsharpen(self.frame)
 	recordItemDraw(self, decoration, data)
 	self:FinishItemDraw(ctx, decoration)
 end
@@ -996,6 +1001,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	self.frame:SetAlpha(1)
 	recordFreeDraw(self, decoration, data, count, nocount)
 	events:SendMessage(ctx, "item/Updated", self, decoration)
+	texels:Unsharpen(self.frame)
 	self.frame:Show()
 	self.button:Show()
 end
@@ -1241,6 +1247,8 @@ function itemFrame:_DoCreate(_, bagID)
 	-- shows the buttons themselves; this holder keeps them from being visible.
 	local parent = CreateFrame("Frame", name .. "parent")
 	parent:Hide()
+	-- Its full draws draw it without the client's sharpening; the bag it is drawn in leaves it out of its walk.
+	texels:DrawsItself(parent)
 	parent:SetID(bagID)
 	parent.IsCombinedBagContainer = function() return false end
 

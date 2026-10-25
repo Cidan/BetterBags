@@ -219,11 +219,11 @@ function pageProto:renderList(parentResult)
           y = y + gap
         end
         first = false
-        title:SetPoint("TOPLEFT", f, "TOPLEFT", pad + titleX, -(y + titleTop))
+        pixel:Point(title, "TOPLEFT", f, "TOPLEFT", pad + titleX, -(y + titleTop))
         -- Beside the title, centered on its line by its top.
         local titleFont = pixel:Ceil(f, pixel:TextHeight(title))
         local noteTop = y + titleTop + pixel:Middle(f, titleFont, pixel:TextHeight(note))
-        note:SetPoint("TOPLEFT", f, "TOPLEFT", pad + titleX + pixel:Ceil(f, title:GetStringWidth()) + pixel:Snap(f, 6), -noteTop)
+        pixel:Point(note, "TOPLEFT", f, "TOPLEFT", pad + titleX + pixel:Ceil(f, title:GetStringWidth()) + pixel:Snap(f, 6), -noteTop)
         y = y + sectionHeight
       end
       title:SetShown(titled)
@@ -262,8 +262,8 @@ function pageProto:renderList(parentResult)
   self.empty:SetShown(shown == 0)
   if shown == 0 then
     self.empty:ClearAllPoints()
-    self.empty:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
-    self.empty:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -y)
+    pixel:Point(self.empty, "TOPLEFT", f, "TOPLEFT", 0, -y)
+    pixel:Point(self.empty, "TOPRIGHT", f, "TOPRIGHT", 0, -y)
     self.empty:SetJustifyH("CENTER")
     y = y + pixel:Ceil(f, self.empty:GetStringHeight())
   end
@@ -308,7 +308,7 @@ function pageProto:Render(parentResult)
       title:SetText(C.TitleUpper == false and (section.title or "") or string.upper(section.title or ""))
       title:ClearAllPoints()
       local bottom = y + titleHeight - pixel:Snap(f, 6)
-      title:SetPoint("BOTTOMLEFT", f, "TOPLEFT", pad, -bottom)
+      pixel:Point(title, "BOTTOMLEFT", f, "TOPLEFT", pad, -bottom)
       title:SetShown(titled)
       local note = self:part(self.notes, i, function() return style:CreateText(f, C.NoteFont) end)
       note:SetText(section.note or "")
@@ -316,7 +316,7 @@ function pageProto:Render(parentResult)
       -- Beside the title, centered on its line by its top (never by the title's middle or far edge).
       local titleFont = pixel:Ceil(f, pixel:TextHeight(title))
       local noteTop = bottom - titleFont + pixel:Middle(f, titleFont, pixel:TextHeight(note))
-      note:SetPoint("TOPLEFT", f, "TOPLEFT", pad + pixel:Ceil(f, title:GetStringWidth()) + pixel:Snap(f, 6), -noteTop)
+      pixel:Point(note, "TOPLEFT", f, "TOPLEFT", pad + pixel:Ceil(f, title:GetStringWidth()) + pixel:Snap(f, 6), -noteTop)
       note:SetShown(titled and section.note ~= nil and section.note ~= "")
       if titled then
         y = y + titleHeight
@@ -398,8 +398,8 @@ function pageProto:Render(parentResult)
     -- Across the page, centered by the client: by its middle it would sit between two pixels.
     local top = pixel:Snap(f, C.Top) + titleHeight
     self.empty:ClearAllPoints()
-    self.empty:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -top)
-    self.empty:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -top)
+    pixel:Point(self.empty, "TOPLEFT", f, "TOPLEFT", 0, -top)
+    pixel:Point(self.empty, "TOPRIGHT", f, "TOPRIGHT", 0, -top)
     self.empty:SetJustifyH("CENTER")
     y = top + pixel:Ceil(f, self.empty:GetStringHeight())
   end

@@ -45,6 +45,9 @@ LoadBetterBagsModule("render/flow.lua")
 -- Motion positions the cells and sections of every grid (render/motion.lua); grids and sections
 -- look it up when they load.
 LoadBetterBagsModule("render/motion.lua")
+-- Texels draws the bags' textures without the client's sharpening (render/texels.lua); item buttons and windows
+-- look it up when they load.
+LoadBetterBagsModule("render/texels.lua")
 -- BetterBags Next's pixel grid (next/pixel.lua, docs/next-pixel-perfect.md): every Next file that places
 -- anything looks it up when it loads.
 LoadBetterBagsModule("next/pixel.lua")

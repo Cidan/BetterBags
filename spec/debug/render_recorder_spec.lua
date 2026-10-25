@@ -491,6 +491,142 @@ describe("RenderRecorder", function()
     end)
   end)
 
+  -- Reported: icons jitter "ever so slight" while a BetterBags Next panel is sized, and the specs' model of the layout
+  -- keeps every icon on the same whole pixels. Each step of a sizing records where the client put the panel, the scroll
+  -- box and a few icons, in screen pixels with their fractions, so a drag in game shows what moves.
+  describe("a BetterBags Next panel sized", function()
+    local savedScreen, savedCursor
+    -- 1080 / 768 screen pixels per unit at scale 1.
+    local K = 1080 / 768
+
+    before_each(function()
+      savedScreen, savedCursor = _G.GetPhysicalScreenSize, _G.GetCursorPosition
+      _G.GetPhysicalScreenSize = function() return 1920, 1080 end
+      _G.GetCursorPosition = function() return 1001.5, 600.25 end
+    end)
+
+    after_each(function()
+      _G.GetPhysicalScreenSize, _G.GetCursorPosition = savedScreen, savedCursor
+    end)
+
+    -- px is how the recorder writes a rect given in a region's units at an effective scale s.
+    local function px(left, bottom, width, height, s)
+      return string.format("l %.3f t %.3f r %.3f b %.3f", left * s * K, (bottom + height) * s * K, (left + width) * s * K,
+        bottom * s * K)
+    end
+
+    -- panelAt makes a panel's parts: its frame at 100, 200 (its units) 458 x 500 at 0.5, anchored by its top left; its
+    -- scroll box scrolled 73.25 of 400; one section of two icons, each border 0.3 of a unit below its art.
+    local function panelAt()
+      local frame = CreateFrame("Frame", "SpecNextBag", UIParent)
+      frame:Show()
+      frame:SetScale(0.5)
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", 100, 700)
+      frame:_SetRect(100, 200, 458, 500)
+      local target = CreateFrame("Frame", nil, frame)
+      target:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 73.25)
+      local box = { GetDerivedScrollOffset = function() return 73.25 end, GetScrollPercentage = function() return 0.183125 end,
+        GetDerivedScrollRange = function() return 400 end, GetScrollTarget = function() return target end }
+      local function icon(key, left, top)
+        local holder = CreateFrame("Frame", nil, frame)
+        holder:Show()
+        holder:_SetRect(left, top - 44, 44, 44)
+        local decoration = CreateFrame("Button", nil, holder)
+        decoration.icon = decoration:CreateTexture()
+        decoration.icon:_SetRect(left, top - 44, 44, 44)
+        decoration.IconBorder = decoration:CreateTexture()
+        decoration.IconBorder:_SetRect(left, top - 44.3, 44, 44)
+        return { item = { slotkey = key, frame = holder, _decoration = decoration } }
+      end
+      local section = { name = "Consumable", frame = CreateFrame("Frame"),
+        entries = { icon("0_1", 120, 600), { gap = true }, icon("0_3", 170, 600) } }
+      section.frame:Show()
+      local hidden = { name = "Hidden", frame = CreateFrame("Frame"), entries = { icon("9_1", 0, 100) } }
+      hidden.frame:Hide()
+      return { label = "Backpack", frame = frame, scroll = { scrollBox = box }, content = { order = { section, hidden } } }
+    end
+
+    it("records the panel, its scroll box and each shown section's first and last icons, in screen pixels", function()
+      local panel = panelAt()
+      recorder:Start()
+      recorder:PanelSizing(panel, "resized")
+      local recording = recorder:Stop()
+      assert.are.equal(1, #recording.entries)
+      local entry = recording.entries[1]
+      assert.are.same({ "sizing", "Backpack", "resized" }, { entry.kind, entry.panel, entry.step })
+      assert.are.same({
+        "screen 1920x1080 uiScale 1.0000 scale 0.5000 effective 0.5000 cursor 1001.500,600.250",
+        "frame TOPLEFT UIParent BOTTOMLEFT 100.0000,700.0000 | " .. px(100, 200, 458, 500, 0.5),
+        "scroll offset 73.250 of 400.000 (0.18313) | target TOPLEFT SpecNextBag TOPLEFT 0.0000,73.2500",
+        "Consumable 0_1 frame " .. px(120, 556, 44, 44, 0.5) .. " | art " .. px(120, 556, 44, 44, 0.5)
+          .. " | border " .. px(120, 555.7, 44, 44, 0.5),
+        "Consumable 0_3 frame " .. px(170, 556, 44, 44, 0.5) .. " | art " .. px(170, 556, 44, 44, 0.5)
+          .. " | border " .. px(170, 555.7, 44, 44, 0.5),
+      }, entry.lines)
+    end)
+
+    it("records every region that draws in the panel at its first step, then what changed at each step", function()
+      local audit = addon:GetModule("PixelAudit")
+      local panel = panelAt()
+      local frame = panel.frame
+      local sparkle = frame:CreateTexture()
+      sparkle:SetTexture(111)
+      sparkle:_SetRect(300, 300, 4, 4)
+      function panel:MovingParts() return { [sparkle] = true } end
+      local decoration = panel.content.order[1].entries[1].item._decoration
+      local glow = decoration:CreateTexture()
+      glow:SetTexture(222)
+      glow:_SetRect(120, 556, 44, 44)
+      glow:Hide()
+      recorder:Start()
+      recorder:PanelSizing(panel, "start")
+      local before = audit:Regions(frame, { skip = { [sparkle] = true } })
+      decoration.icon:SetAlpha(0.5)
+      decoration.IconBorder:Hide()
+      glow:Show()
+      sparkle:SetAlpha(0.25)
+      recorder:PanelSizing(panel, "resized")
+      local after = audit:Regions(frame, { skip = { [sparkle] = true } })
+      recorder:PanelSizing(panel, "rendered")
+      local entries = recorder:Stop().entries
+      local first = {}
+      for path, line in pairs(before) do
+        table.insert(first, "= " .. path .. " | " .. line)
+      end
+      table.sort(first)
+      assert.is_true(#first > 3)
+      assert.are.same(first, entries[1].regions)
+      local iconPath, borderPath, glowPath
+      for path in pairs(after) do
+        if before[path] == nil then
+          glowPath = path
+        elseif after[path] ~= before[path] then
+          iconPath = path
+        end
+      end
+      for path in pairs(before) do
+        if after[path] == nil then borderPath = path end
+      end
+      assert.are.same({ "+ " .. glowPath .. " | " .. after[glowPath], "- " .. borderPath,
+        "~ " .. iconPath .. " | " .. after[iconPath] }, entries[2].regions)
+      assert.is_nil(entries[3].regions, "nothing changed")
+      recorder:Start()
+      recorder:PanelSizing(panel, "start")
+      local again = {}
+      for path, line in pairs(after) do
+        table.insert(again, "= " .. path .. " | " .. line)
+      end
+      table.sort(again)
+      assert.are.same(again, recorder:Stop().entries[1].regions, "a new recording lists everything again")
+    end)
+
+    it("records nothing while stopped", function()
+      recorder:PanelSizing(panelAt(), "resized")
+      recorder:Start()
+      assert.are.same({}, recorder:Stop().entries)
+    end)
+  end)
+
   it("records nothing while stopped", function()
     local w = newWindow({ 640, 480 })
     render:NewRenderChain(w, {})

@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- content_spec.lua -- NextContent (next/content.lua): BetterBagsNext's canvas. It binds a tab's
 -- data as sections in one column (Recent Items, the tab's categories in order, Free Space),
 -- drawing and claiming the static item buttons, lays them out in rows of as many 44-pixel icons
@@ -216,6 +218,41 @@ describe("NextContent", function()
     assert.are.same({ style.GRID_WIDTH, aHeight + style.SECTION_SPACING + bHeight }, { result.Width, result.Height })
   end)
 
+  -- A small panel let go snaps to its widest row of icons (next.md §14g): the canvas says how many cells a width
+  -- holds and how wide they are, in units, as it decides its rows (MeasureSection), and how many its largest section
+  -- in the column holds.
+  it("says how many cells its largest section in the column holds", function()
+    assert.are.equal(0, canvas:Widest(), "none while it shows nothing")
+    local items = {}
+    for i = 1, 10 do table.insert(items, item("0_" .. i, "A")) end
+    for i = 1, 3 do table.insert(items, item("1_" .. i, "B")) end
+    table.insert(items, gap("1_4", "B"))
+    bind(data({ categories = { { name = "A" }, { name = "B" } }, items = items }))
+    draw()
+    assert.are.equal(10, canvas:Widest())
+    local a = canvas.byName.A
+    canvas:HoldOut(a)
+    assert.are.equal(4, canvas:Widest(), "a section waiting in a dock is out of the column; a gap takes a cell")
+    canvas:Returning(a)
+    assert.are.equal(10, canvas:Widest(), "one flying back has its room again")
+    canvas:Return(a)
+    canvas:MarkLeaving("A")
+    assert.are.equal(4, canvas:Widest(), "one leaving is out of the column")
+  end)
+
+  it("says how many cells a width to lay out for holds, and how wide they are", function()
+    assert.are.equal(8, canvas:PerRow(style.GRID_WIDTH))
+    assert.are.equal(7, canvas:PerRow(style.GRID_WIDTH - 1))
+    assert.are.equal(1, canvas:PerRow(1), "one, however narrow")
+    assert.are.equal(style.GRID_WIDTH, canvas:RowWidth(8))
+    assert.are.equal(7 * STEP - style.GAP, canvas:RowWidth(7))
+    canvas:SetCards(true)
+    local card = style.VENDOR_CARD_WIDTH + style.GAP
+    assert.are.equal(3, canvas:PerRow(3 * card - style.GAP))
+    assert.are.equal(3 * card - style.GAP, canvas:RowWidth(3))
+    canvas:SetCards(false)
+  end)
+
   it("fits fewer icons to a row in a narrower width", function()
     local items = {}
     for i = 1, 6 do table.insert(items, item("0_" .. i, "A")) end
@@ -261,6 +298,49 @@ describe("NextContent", function()
       end
       assert.is_true(x7 + buttons["0_7"].frame:GetWidth() <= section.frame:GetWidth() + 1e-6,
         string.format("the row fits at %d%%: %.3f past", percent, x7 + buttons["0_7"].frame:GetWidth() - section.frame:GetWidth()))
+    end
+    parent:SetScale(1)
+    canvas:SetInstant(false)
+  end)
+
+  -- Reported: "resizing the window in general ... causes a ton of item icon jitter all over". Simulated with a grip
+  -- dragged a pixel a frame: a pixel or two after each column was added, every icon jumped again, up to 19 pixels
+  -- across and a pixel or three down, the gaps closed for the width drawn opening again. A column count keeps one
+  -- layout whatever the width it is drawn in.
+  it("keeps one layout for a column count whatever the width it is drawn in, on every grid", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local undo = layout.UseScreen(3396, 1362, 0.65)
+    parent:SetParent(UIParent)
+    finally(function()
+      parent:SetParent(nil)
+      undo()
+    end)
+    local items = {}
+    for i = 1, 20 do table.insert(items, item("0_" .. i, "A")) end
+    bind(data({ categories = { { name = "A" } }, items = items }))
+    canvas:SetInstant(true)
+    local function places()
+      local out = {}
+      for i = 1, 20 do
+        local _, _, _, x, y = buttons["0_" .. i].frame:GetPoint(1)
+        out[i] = x .. "," .. y
+      end
+      return out
+    end
+    for percent = 50, 150, 5 do
+      parent:SetScale(percent / 100)
+      local expected
+      local from = canvas:RowWidth(7)
+      for width = from, canvas:RowWidth(8) - 0.25, 0.25 do
+        render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = width, LayoutWidth = width })
+        expected = expected or places()
+        assert.are.same(expected, places(), string.format("seven to a row at %d%%, %.2f wide", percent, width))
+      end
+      local section = canvas.order[1]
+      local _, _, _, x7 = buttons["0_7"].frame:GetPoint(1)
+      render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = from, LayoutWidth = from })
+      assert.is_true(x7 + buttons["0_7"].frame:GetWidth() <= section.frame:GetWidth() + 1e-6,
+        string.format("the row fits its own width at %d%%", percent))
     end
     parent:SetScale(1)
     canvas:SetInstant(false)
@@ -1060,8 +1140,8 @@ describe("NextContent", function()
       local _, titleHeight = s.title:GetFont()
       local _, countHeight = s.count:GetFont()
       local countX = 9 + math.ceil(s.title:GetStringWidth()) + 3
-      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 9, -2 }, { s.title:GetPoint(1) })
-      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", countX, -2 - math.floor((titleHeight - countHeight) / 2) },
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 9 + TEXT, -2 + TEXT }, { s.title:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", countX + TEXT, -2 - math.floor((titleHeight - countHeight) / 2) + TEXT },
         { s.count:GetPoint(1) })
       local lineX = countX + math.ceil(s.count:GetStringWidth()) + 7
       local lineY = -2 - math.floor((titleHeight - s.line:GetHeight()) / 2)

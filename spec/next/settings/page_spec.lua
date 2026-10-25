@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- page_spec.lua -- NextSettingsRows and NextSettingsPage (next/settings/rows.lua, page.lua): the rows
 -- of BetterBags Next's settings window and the page that lays them out (next-settings.md §3): a
 -- setting's name and its control, read and written through the settings catalog's options; text,
@@ -86,7 +88,7 @@ describe("NextSettingsRows", function()
       local row = rows:Create(owner, option("toggle"), owner)
       assert.are.equal(26, row:Measure(635))
       row:Place(25, 64, 635, 26)
-      assert.are.equal(37, x(row.label))
+      assert.are.equal(37 + TEXT, x(row.label))
       assert.are.equal(317 - 85 - 37, row.label:GetWidth(), "up to 85 left of the middle")
       assert.are.equal(317 - 80, x(row.control.frame))
       assert.are.same({ "TOPLEFT", row.frame, "TOPLEFT", -10, 0 }, { row.hover:GetPoint(1) })
@@ -179,7 +181,7 @@ describe("NextSettingsRows", function()
     -- From the row's corners, centered on its height by their tops (docs/next-pixel-perfect.md): the name by
     -- its lines' height rounded up.
     local labelTop = math.max(0, math.floor((height - math.ceil(row.label:GetStringHeight())) / 2))
-    assert.are.same({ "TOPLEFT", row.frame, "TOPLEFT", C().RowPad, -labelTop }, { row.label:GetPoint(1) })
+    assert.are.same({ "TOPLEFT", row.frame, "TOPLEFT", C().RowPad + TEXT, -labelTop + TEXT }, { row.label:GetPoint(1) })
     assert.are.same({ "TOPRIGHT", row.frame, "TOPRIGHT", -C().RowPad, -math.floor((height - toggle.Height) / 2) },
       { row.control.frame:GetPoint(1) })
   end)
@@ -339,8 +341,8 @@ describe("NextSettingsPage", function()
       assert.are.same({ 25, second + 45 + 9, 635, 26 }, c.placed)
       assert.are.equal(second + 45 + 9 + 26 + 10, result.Height)
       assert.are.equal("Bags", page.titles[1]:GetText(), "as written")
-      assert.are.same({ "TOPLEFT", page.frame, "TOPLEFT", 25 + 7, -(10 + 16) }, { page.titles[1]:GetPoint(1) })
-      assert.are.same({ "TOPLEFT", page.frame, "TOPLEFT", 25 + 7, -(second + 16) }, { page.titles[2]:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", page.frame, "TOPLEFT", 25 + 7 + TEXT, -(10 + 16) + TEXT }, { page.titles[1]:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", page.frame, "TOPLEFT", 25 + 7 + TEXT, -(second + 16) + TEXT }, { page.titles[2]:GetPoint(1) })
       for _, card in ipairs(page.cards) do assert.is_false(card:IsShown()) end
       for _, line in ipairs(page.lines) do assert.is_false(line:IsShown()) end
     end)

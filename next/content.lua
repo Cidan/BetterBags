@@ -232,11 +232,11 @@ function canvasProto:placeTitleRow(section)
   local inner, title, count, line = section.inner, section.title, section.count, section.line
   local x, y = pixel:Snap(inner, S.Title.X), pixel:Snap(inner, S.Title.Y)
   title:ClearAllPoints()
-  title:SetPoint("TOPLEFT", inner, "TOPLEFT", x, y)
+  pixel:Point(title, "TOPLEFT", inner, "TOPLEFT", x, y)
   local titleHeight = fontHeight(title)
   local countX = x + pixel:Ceil(inner, title:GetStringWidth()) + pixel:Snap(inner, S.CountGap)
   count:ClearAllPoints()
-  count:SetPoint("TOPLEFT", inner, "TOPLEFT", countX, y - pixel:Floor(inner, (titleHeight - fontHeight(count)) / 2))
+  pixel:Point(count, "TOPLEFT", inner, "TOPLEFT", countX, y - pixel:Floor(inner, (titleHeight - fontHeight(count)) / 2))
   local lineX = countX + pixel:Ceil(inner, count:GetStringWidth()) + pixel:Snap(inner, S.LineGap)
   local lineY = y - pixel:Floor(inner, (titleHeight - line:GetHeight()) / 2)
   line:ClearAllPoints()
@@ -470,6 +470,38 @@ end
 ---@return number
 function canvasProto:CellHeight()
   return pixel:Length(self.frame, self.cards and style.CARD_ICON or style.ICON)
+end
+
+-- PerRow is how many cells a row holds in layoutWidth (the width to lay out for, in units: a panel's own, never rounded
+-- to its grid, next-pixel-perfect.md §3): its icons, or cards, with the theme's gap between them; at least one.
+---@param layoutWidth number
+---@return number
+function canvasProto:PerRow(layoutWidth)
+  local step = (self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP
+  return math.max(1, math.floor((layoutWidth + style.GAP) / step + 1e-6))
+end
+
+-- RowWidth is how wide perRow cells are with the gaps between them, in units: the width a small panel snaps its
+-- content to (next.md §14g).
+---@param perRow number
+---@return number
+function canvasProto:RowWidth(perRow)
+  return perRow * ((self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP) - style.GAP
+end
+
+-- Widest is how many cells the largest section the column lays out holds (its gaps included: each takes a cell): not
+-- one waiting in a dock (one flying back is laid out again), nor one leaving; 0 while it lays out none. A small panel
+-- let go snaps to its widest row of icons (next.md §14g).
+---@return number
+function canvasProto:Widest()
+  local widest = 0
+  for _, section in ipairs(self.order) do
+    local away = self.away[section]
+    if (away == nil or away.returning) and not self:IsLeaving(section) then
+      widest = math.max(widest, #section.entries)
+    end
+  end
+  return widest
 end
 
 ---@class (exact) NextCanvasSection
@@ -744,12 +776,15 @@ function canvasProto:MeasureSection(section, grid, width, layoutWidth)
   local cellWidth, cellHeight = pixel:Lengths(grid, self.cards and style.VENDOR_CARD_WIDTH or style.ICON,
     self.cards and style.CARD_ICON or style.ICON)
   local gap, header = pixel:Lengths(grid, style.GAP, style.SECTION_HEADER)
-  local designStep = (self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP
-  local perRow = math.max(1, math.floor((layoutWidth + style.GAP) / designStep + 1e-6))
-  -- The row fits the width it is drawn in: where the grid's rounded lengths would run past it (up to a pixel per
-  -- cell, over the scroll bar's room), the gap closes by the pixel or two the rounding added. Every gap the same.
+  local perRow = self:PerRow(layoutWidth)
+  -- The row fits its own width (RowWidth: its cells and gaps in units, the least width that holds them): where the
+  -- grid's rounded lengths would run past it (up to a pixel per cell, over the scroll bar's room), the gap closes by the
+  -- pixel or two the rounding added. Every gap the same, and the same for a column count whatever the width it is
+  -- drawn in. Reported: "resizing the window ... causes a ton of item icon jitter all over"; closed for the width
+  -- drawn, the gaps opened again a pixel or two after each column was added while a grip sized a panel, every icon
+  -- jumping a second time (up to 19 pixels across, rows a pixel or three down).
   if perRow > 1 then
-    gap = math.max(0, math.min(gap, pixel:Floor(grid, (width - perRow * cellWidth) / (perRow - 1))))
+    gap = math.max(0, math.min(gap, pixel:Floor(grid, (self:RowWidth(perRow) - perRow * cellWidth) / (perRow - 1))))
   end
   local rows = math.max(1, math.ceil(#section.entries / perRow))
   return { width = width, perRow = perRow, cellWidth = cellWidth, cellHeight = cellHeight, step = cellWidth + gap,

@@ -39,6 +39,9 @@ local function newGroup(name)
     self.Buttons[button] = true
     self.regions[button], self.types[button] = regions, bType
     table.insert(self.log, "skin")
+    -- With make, it makes a texture on the button as it skins it, as Masque makes a skin's shadow or gloss
+    -- (Core/Regions/Shadow.lua: Button:CreateTexture()).
+    if self.make then table.insert(self.made, button:CreateTexture()) end
   end
   function group:RemoveButton(button)
     self.Buttons[button] = nil
@@ -47,6 +50,7 @@ local function newGroup(name)
   function group:ReSkin(button)
     if self.Buttons[button] then
       table.insert(self.log, "skin")
+      if self.make then table.insert(self.made, button:CreateTexture()) end
     end
   end
   function group:RegisterCallback() end
@@ -92,6 +96,8 @@ describe("Masque integration", function()
       group.log = {}
       group.regions = {}
       group.types = {}
+      group.make = false
+      group.made = {}
     end
     masque.added = setmetatable({}, { __mode = "k" })
     masque.vendorButtons = setmetatable({}, { __mode = "k" })
@@ -104,6 +110,72 @@ describe("Masque integration", function()
     for i = #createdStubs, 1, -1 do
       ResetModuleStub(createdStubs[i])
     end
+  end)
+
+  -- texture-sharpening.md: the client's sharpening drew a bag's textures a fraction of a pixel differently from frame
+  -- to frame while it was resized; asked: "be sure to also do it for masque skins". Masque makes and draws a skin's
+  -- textures as it skins a button, and again when its options change, with no draw of BetterBags'.
+  describe("skins drawn without the client's sharpening", function()
+    local function sharpened(texture)
+      return texture:IsSnappingToPixelGrid() or texture:GetTexelSnappingBias() > 0
+    end
+
+    local function allUnsharpened(group)
+      assert.is_true(#group.made > 0)
+      for i, t in ipairs(group.made) do
+        assert.is_false(sharpened(t), "texture " .. i)
+      end
+    end
+
+    it("draws an item button's skin without it, as it adds it and as it skins it again", function()
+      local item, decoration = newButton(const.BAG_KIND.BACKPACK)
+      groups["Backpack"].make = true
+      for i, message in ipairs({ "item/NewButton", "item/Updated" }) do
+        send(message, item, decoration)
+        assert.are.equal(i, #groups["Backpack"].made, message)
+        allUnsharpened(groups["Backpack"])
+      end
+    end)
+
+    it("draws a vendor button's skin without it, as it adds it, skins it again, and after a theme", function()
+      local button = CreateFrame("Button")
+      button.IconBorder = button:CreateTexture()
+      local b = { button = button, MasqueRegions = function() return { IconBorder = button.IconBorder } end }
+      groups["Vendor"].make = true
+      for i, message in ipairs({ "vendor/NewButton", "vendor/Updated", "sonata/NextThemeChanged" }) do
+        events:SendMessage(context:New("test"), message, b)
+        assert.are.equal(i, #groups["Vendor"].made, message)
+        allUnsharpened(groups["Vendor"])
+      end
+    end)
+
+    it("draws a guild bank button's skin without it", function()
+      local button = CreateFrame("ItemButton")
+      button.IconBorder = button:CreateTexture()
+      groups["Guild Bank"].make = true
+      events:SendMessage(context:New("test"), "guild/Updated", { button = button, frame = button })
+      allUnsharpened(groups["Guild Bank"])
+    end)
+
+    it("draws a bag button's skin without it", function()
+      local frame = CreateFrame("Button")
+      frame.IconBorder = frame:CreateTexture()
+      groups["Backpack"].make = true
+      events:SendMessage(context:New("test"), "bagbutton/Updated", { kind = const.BAG_KIND.BACKPACK, frame = frame })
+      allUnsharpened(groups["Backpack"])
+    end)
+
+    -- Masque calls back once it has skinned the group again for an option changed (Core/Group.lua __FireCB after
+    -- ReSkin: a skin chosen, Disabled, Reset): its Buttons map each button to its regions.
+    it("draws every button of a group without it when Masque's options skin the group again", function()
+      local a, b = CreateFrame("Button"), CreateFrame("Button")
+      a.IconBorder, b.IconBorder = a:CreateTexture(), b:CreateTexture()
+      local gloss = b:CreateTexture()
+      masque:OnSkinChange({ Buttons = { [a] = { IconBorder = a.IconBorder }, [b] = { IconBorder = b.IconBorder } } })
+      for _, t in ipairs({ a.IconBorder, b.IconBorder, gloss }) do
+        assert.is_false(sharpened(t))
+      end
+    end)
   end)
 
   it("skins a button again on every redraw, not just the first", function()

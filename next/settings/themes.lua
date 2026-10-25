@@ -308,11 +308,11 @@ function blockProto:Place(x, y, width, height)
     card.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", m.pad + column * (cardWidth + m.gap), -(m.half + line * (m.height + m.gap)))
     card.frame:SetSize(cardWidth, m.height)
     card.name:ClearAllPoints()
-    card.name:SetPoint("TOPLEFT", card.frame, "TOPLEFT", m.cardPad, -m.cardPad)
+    pixel:Point(card.name, "TOPLEFT", card.frame, "TOPLEFT", m.cardPad, -m.cardPad)
     card.status:ClearAllPoints()
-    card.status:SetPoint("TOPRIGHT", card.frame, "TOPRIGHT", -m.cardPad, -m.cardPad)
+    pixel:Point(card.status, "TOPRIGHT", card.frame, "TOPRIGHT", -m.cardPad, -m.cardPad)
     card.text:ClearAllPoints()
-    card.text:SetPoint("TOPLEFT", card.frame, "TOPLEFT", m.cardPad,
+    pixel:Point(card.text, "TOPLEFT", card.frame, "TOPLEFT", m.cardPad,
       -(m.cardPad + pixel:Ceil(frame, pixel:TextHeight(card.name)) + pixel:Snap(frame, 6)))
     card.text:SetWidth(math.max(pixel:Unit(frame), cardWidth - 2 * m.cardPad))
   end

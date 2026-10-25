@@ -241,7 +241,7 @@ function guildProto:CreateMoney()
     pixel:Size(frame, MONEY_WIDTH, MONEY_HEIGHT)
     local _, fontHeight = text:GetFont()
     text:ClearAllPoints()
-    text:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -pixel:Floor(frame, (frame:GetHeight() - (fontHeight or 0)) / 2))
+    pixel:Point(text, "TOPLEFT", frame, "TOPLEFT", 0, -pixel:Floor(frame, (frame:GetHeight() - (fontHeight or 0)) / 2))
   end
   return money
 end

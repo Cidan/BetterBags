@@ -246,6 +246,13 @@ slow. It is an option, off by default (asked).
   `Motion` is a module, so profiler captures measure `Motion.Place` (every placement) and
   `Motion.Step` (each frame of moves). Not yet measured in game: the cost of many frames moving at
   once (a sort of a large bank); capture one.
+- **A size snapping** (`motion.SnapSizeAt(from, to, overshoot, p)`, `motion.SnapOvershoot(from, to, floor)`): the
+  bounce a window snapping to its content (window.md §3b) and a BetterBags Next small panel snapping to its columns
+  (next.md §14g) both size with. It eases out (cubic) to `overshoot` past `to` in 65% of the way, then settles back
+  (smoothstep); the overshoot is a tenth of the distance, at most 10, never below `floor`, none for a size that grows.
+  Each caller drives its own time (the window 0.35 s, Next its theme's `Time.Snap`). It was the window's own
+  (`window.SnapSizeAt`); it moved here when Next's panels took the same snap. Coverage: `spec/render/motion_spec.lua`
+  ("a size snapping").
 - **Diagnostics.** The render recorder adds `moving from x0,y0 to x1,y1` to each moving item and
   section line and `| tab moving ...` / `| footer moving ...` to the canvas line
   (render-recorder.md); a snapshot is taken as the render that starts the moves ends, so its

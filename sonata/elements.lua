@@ -365,10 +365,11 @@ local function fontObjectFor(spec)
 end
 
 -- BetterBags Next's rounding while it is in use (docs/next-pixel-perfect.md, SetItemButtonSnap): Offset rounds
--- an offset and Length a length to whole screen pixels on a region's grid, Unit names that grid (a button
+-- an offset and Length a length to whole screen pixels on a region's grid, Text is how far a text sits past its whole
+-- pixel (a quarter pixel right and up, none for anything else), Unit names that grid (a button
 -- styled on it records it, sonataSnapUnit, so Next knows to style it again on another). Unset, every item
 -- button part is placed as its style says.
----@alias SonataItemSnap {Offset: fun(region: ScriptRegion, units: number): number, Length: fun(region: ScriptRegion, units: number): number, Unit: fun(region: ScriptRegion): number}
+---@alias SonataItemSnap {Offset: fun(region: ScriptRegion, units: number): number, Length: fun(region: ScriptRegion, units: number): number, Unit: fun(region: ScriptRegion): number, Text: fun(region: ScriptRegion): number}
 ---@type SonataItemSnap?
 elements.itemSnap = nil
 
@@ -395,8 +396,9 @@ local function snapAnchors(region)
     points[i] = { region:GetPoint(i) }
   end
   region:ClearAllPoints()
+  local q = snap.Text(region)
   for _, p in ipairs(points) do
-    region:SetPoint(p[1], p[2], p[3], snap.Offset(region, p[4] or 0), snap.Offset(region, p[5] or 0))
+    region:SetPoint(p[1], p[2], p[3], snap.Offset(region, p[4] or 0) + q, snap.Offset(region, p[5] or 0) + q)
   end
 end
 

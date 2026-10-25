@@ -101,6 +101,7 @@ local function itemSnap()
       Offset = function(region, units) return pixel:Snap(region, units) end,
       Length = function(region, units) return pixel:Length(region, units) end,
       Unit = function(region) return pixel:Unit(region) end,
+      Text = function(region) return pixel:TextOffset(region) end,
     }
   end
   return nextItemSnap

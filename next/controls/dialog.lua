@@ -200,10 +200,10 @@ function nextDialog:Style()
   self.title:SetWidth(inner)
   self.text:SetWidth(inner)
   self.title:ClearAllPoints()
-  self.title:SetPoint("TOPLEFT", card, "TOPLEFT", pad, -pad)
+  pixel:Point(self.title, "TOPLEFT", card, "TOPLEFT", pad, -pad)
   local down = pad + pixel:Ceil(card, self.title:GetStringHeight()) + gap
   self.text:ClearAllPoints()
-  self.text:SetPoint("TOPLEFT", card, "TOPLEFT", pad, -down)
+  pixel:Point(self.text, "TOPLEFT", card, "TOPLEFT", pad, -down)
   down = down + pixel:Ceil(card, self.text:GetStringHeight())
   if self.input.frame:IsShown() then
     self.input.frame:ClearAllPoints()

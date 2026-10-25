@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- input_spec.lua -- NextInput and NextTextArea (next/controls/input.lua): BetterBags Next's text
 -- field and text area (next-settings.md §2), drawn from the theme's Controls.Input.
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
@@ -58,7 +60,8 @@ describe("NextInput", function()
     -- line the client centers in what is left lands on a whole pixel.
     local _, fontHeight = f.frame:GetFont()
     local above = math.floor((I().Height - fontHeight) / 2)
-    assert.are.same({ I().Padding, I().Padding, above, I().Height - fontHeight - above }, { f.frame:GetTextInsets() })
+    assert.are.same({ I().Padding + TEXT, I().Padding - TEXT, above - TEXT, I().Height - fontHeight - above + TEXT },
+      { f.frame:GetTextInsets() })
     assert.are.equal(style:Font("ControlText"), f.frame:GetFontObject())
     assert.are.same(rgb("ControlFill"), colorOf(f.fill))
     assert.are.equal(I().Edge.Idle, alphaOf(f.edge.Top))
@@ -128,14 +131,14 @@ describe("NextInput", function()
     assert.are.same({ "TOPLEFT", f.frame, "TOPLEFT", I().Padding, -math.floor((I().Height - 14) / 2) },
       { f.icon:GetPoint(1) })
     local insetLeft, insetRight = f.frame:GetTextInsets()
-    assert.are.same({ left, I().Padding }, { insetLeft, insetRight })
+    assert.are.same({ left + TEXT, I().Padding - TEXT }, { insetLeft, insetRight })
     local _, helpHeight = f.help:GetFont()
-    assert.are.same({ "TOPLEFT", f.frame, "TOPLEFT", left, -math.floor((I().Height - helpHeight) / 2) },
+    assert.are.same({ "TOPLEFT", f.frame, "TOPLEFT", left + TEXT, -math.floor((I().Height - helpHeight) / 2) + TEXT },
       { f.help:GetPoint(1) })
     spec = { Texture = "IconSearch", Size = 20, Color = "Gold" }
     nextInput:ApplyStyle()
     assert.are.same({ 20, 20 }, { f.icon:GetSize() })
-    assert.are.equal(I().Padding + 20 + I().Padding / 2, (f.frame:GetTextInsets()))
+    assert.are.equal(I().Padding + 20 + I().Padding / 2 + TEXT, (f.frame:GetTextInsets()))
     local plain = make()
     assert.is_nil(plain.icon)
   end)

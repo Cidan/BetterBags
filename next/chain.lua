@@ -525,8 +525,9 @@ function chain:Update(ctx, snap)
     if isOpen(panel) and isSmall(panel) then
       -- Where the player put it; the screen changed: still on it, its height the screen's share. A
       -- chained bag whose spot beside its open anchor moved (the gap changed) glides there. One the
-      -- player sizes, or that glides back to its default size, is left alone: it places itself after.
-      local sizing = panel.sizing ~= nil or panel.resetting
+      -- player sizes, or whose size glides (back to its default, or onto its columns' width), is left alone: it
+      -- places itself after.
+      local sizing = panel.sizing ~= nil or panel.sizeGliding
       if snap and not sizing then
         panel:FitSmall()
       elseif not snap and not sizing and panel.morph == nil and not tween:IsPlaying(panel) then

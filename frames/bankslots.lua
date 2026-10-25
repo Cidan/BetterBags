@@ -29,6 +29,9 @@ local debug = addon:GetModule('Debug')
 ---@class Render: AceModule
 local render = addon:GetModule('Render')
 
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
 ---@class DrawableModule: AceModule
 local drawable = addon:GetModule('Drawable')
 
@@ -220,6 +223,8 @@ function BankSlots.bankSlotsPanelProto:Draw(ctx)
   else
     self.window:Invalidate()
   end
+  -- Its bag and tab buttons' art (texture-sharpening.md).
+  texels:Unsharpen(self.window.frame)
 end
 
 -- OnRendered lays the bank out again: the bank window is never narrower than the panel.

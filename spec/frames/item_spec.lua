@@ -630,6 +630,65 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       end
     end)
 
+    -- texture-sharpening.md: the client's sharpening drew each icon's art a fraction of a pixel differently from frame
+    -- to frame while a bag was resized, though the icon never moved.
+    describe("drawing without the client's sharpening", function()
+      local texels = addon:GetModule("Texels")
+      local made
+      events:RegisterMessage("item/Updated", function(_, button)
+        if made ~= nil and button == item then
+          table.insert(made, item.button:CreateTexture())
+        end
+      end)
+
+      local function sharpened(texture)
+        return texture:IsSnappingToPixelGrid() or texture:GetTexelSnappingBias() > 0
+      end
+
+      local function potion(count)
+        return {
+          slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = false,
+          questInfo = { isQuestItem = false },
+          containerInfo = { isReadable = false, isFiltered = false, hasNoValue = false },
+          itemInfo = { isBound = false, itemID = 5512, itemIcon = 135230, itemQuality = 1,
+            itemLink = "item:5512", currentItemCount = count or 3, classID = 0, currentItemLevel = 1 },
+        }
+      end
+
+      before_each(function()
+        made = {}
+      end)
+
+      after_each(function()
+        made = nil
+      end)
+
+      it("draws an item's textures without it, those made as Masque skins it (item/Updated) included", function()
+        local art = item.button:CreateTexture()
+        item:SetItemFromData(btnCtx, potion(4))
+        assert.are.equal(1, #made)
+        assert.is_false(sharpened(art))
+        assert.is_false(sharpened(made[1]))
+      end)
+
+      it("draws a free slot's textures without it", function()
+        local art = item.button:CreateTexture()
+        item:SetFreeSlots(btnCtx, { bagid = 0, slotid = 6, slotkey = "0_6", itemInfo = { emptySlotName = "Bag" } }, 7)
+        assert.are.equal(1, #made)
+        assert.is_false(sharpened(art))
+        assert.is_false(sharpened(made[1]))
+      end)
+
+      it("draws itself: the window it is drawn in leaves it out of its own walk", function()
+        local window = CreateFrame("Frame")
+        item.frame:SetParent(window)
+        local art = item.button:CreateTexture()
+        texels:Unsharpen(window)
+        assert.is_true(sharpened(art))
+        item.frame:SetParent(nil)
+      end)
+    end)
+
     it("SetItemFromData should pass pre-computed isSearchResult to SetMatchesSearch", function()
       local itemData = {
         slotkey = "0_6",

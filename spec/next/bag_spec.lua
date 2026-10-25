@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- bag_spec.lua -- NextBag (next/bag.lua): BetterBagsNext's backpack. A full-height panel that slides
 -- in from the right, with a feathered left edge, the title and its sparkles, a search box, the
 -- group tabs down its left side and the content in one column; it stands in for the backpack
@@ -346,14 +348,14 @@ describe("NextBag", function()
         -- (docs/next-pixel-perfect.md): the magnifier the gap in, the help text the gap past it.
         local _, helpHeight = box.helpText:GetFont()
         local helpTop = -math.floor((style.SEARCH_HEIGHT - helpHeight) / 2)
-        assert.are.same({ "TOPLEFT", t, "TOPLEFT", 2 * style.SEARCH_GAP + style.SEARCH_ICON, helpTop },
+        assert.are.same({ "TOPLEFT", t, "TOPLEFT", 2 * style.SEARCH_GAP + style.SEARCH_ICON + TEXT, helpTop + TEXT },
           { box.helpText:GetPoint(1) })
         assert.are.same({ style.SEARCH_ICON, style.SEARCH_ICON }, { t.searchIcon:GetSize() })
         assert.are.same({ "TOPLEFT", t, "TOPLEFT", style.SEARCH_GAP, -math.floor((style.SEARCH_HEIGHT - style.SEARCH_ICON) / 2) },
           { t.searchIcon:GetPoint(1) })
         near(lavender(style.SearchIcon.Idle), color(t.searchIcon), "magnifier")
         assert.are.equal(style:Font("SearchText"), t:GetFontObject())
-        assert.are.same({ style.SEARCH_GAP * 2 + style.SEARCH_ICON, 24, 0, 0 }, { t:GetTextInsets() })
+        assert.are.same({ style.SEARCH_GAP * 2 + style.SEARCH_ICON + TEXT, 24 - TEXT, -TEXT, TEXT }, { t:GetTextInsets() })
       end)
 
       it("brightens its edge while the pointer is over it, and settles back", function()
@@ -916,6 +918,26 @@ describe("NextBag", function()
       local bag = opened()
       bag.frame:GetScript("OnReceiveDrag")(bag.frame)
       assert.are.same({ BACKPACK }, placed)
+    end)
+
+    -- texture-sharpening.md: the client's sharpening drew each texture of a bag a fraction of a pixel differently
+    -- from frame to frame while it was resized, though nothing moved.
+    it("draws its textures without the client's sharpening, those its sections and header made included", function()
+      local bag = opened()
+      local function sharpened(texture)
+        return texture:IsSnappingToPixelGrid() or texture:GetTexelSnappingBias() > 0
+      end
+      local section = bag.content.order[1]
+      local parts = { bag.footerLine, bag.spark, section.frame:CreateTexture(), bag.titleButton:CreateTexture(),
+        bag.headerButtons[1]:CreateTexture() }
+      for _, t in ipairs(parts) do
+        t:SetSnapToPixelGrid(true)
+        t:SetTexelSnappingBias(1)
+      end
+      bag:Draw(ctx(), slotInfo, function() end)
+      for i, t in ipairs(parts) do
+        assert.is_false(sharpened(t), "part " .. i)
+      end
     end)
   end)
 

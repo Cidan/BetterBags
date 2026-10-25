@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- slider_spec.lua -- NextSlider (next/controls/slider.lua): BetterBags Next's slider (next-settings.md
 -- §2), drawn from the theme's Controls.Slider: a track filled up to a thumb, dragged or clicked,
 -- snapped to its step, and a number box beside it to type a value.
@@ -207,7 +209,7 @@ describe("NextSlider", function()
       assert.is_false(slider.value.frame:IsShown(), "no box")
       assert.is_true(slider.valueText:IsShown())
       assert.are.equal("40", slider.valueText:GetText())
-      assert.are.same({ "LEFT", slider.track, "RIGHT", 25, 0 }, { slider.valueText:GetPoint(1) })
+      assert.are.same({ "LEFT", slider.track, "RIGHT", 25 + TEXT, TEXT }, { slider.valueText:GetPoint(1) })
       assert.are.equal(style:Font("ControlText"), slider.valueText:GetFontObject())
       slider:SetEnabled(false)
       assert.are.equal(0.7, slider.track:GetAlpha())

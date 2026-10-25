@@ -1,3 +1,5 @@
+-- A text sits a quarter pixel right of and above its whole pixel (next-pixel-perfect.md §2); one pixel is one unit here.
+local TEXT = 0.25
 -- small_spec.lua -- BetterBags Next's small mode (docs/next-small-mode.md): smaller, movable panels
 -- that keep Next's look, for smaller screens, switched to and from the full panels with a button,
 -- animated. Run on the real backpack and bank panels.
@@ -69,9 +71,11 @@ local nextDrag = addon:GetModule("NextDrag")
 local chain = addon:GetModule("NextChain")
 local style = addon:GetModule("NextStyle")
 local tween = addon:GetModule("NextTween")
+local pixel = addon:GetModule("NextPixel")
 local render = addon:GetModule("Render")
 local motion = addon:GetModule("Motion")
 local context = addon:GetModule("Context")
+local scrollbox = addon:GetModule("Scrollbox")
 
 local SECTION_GRID = 2
 
@@ -305,7 +309,7 @@ describe("BetterBags Next's small mode", function()
       local bag = nextBag:Create(ctx())
       assert.is_true(bag.title:GetWidth() > 0, "a small panel's title has a width")
       assert.are.equal("LEFT", bag.title:GetJustifyH())
-      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + style.TITLE_INSET, -style.TITLE_TOP },
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", style.PAD + style.TITLE_INSET + TEXT, -style.TITLE_TOP + TEXT },
         { bag.title:GetPoint(1) })
       bag.title:SetJustifyH("CENTER")
       bag:StyleParts()
@@ -571,6 +575,12 @@ describe("BetterBags Next's small mode", function()
       return math.floor((width + style.GAP) / STEP)
     end
 
+    -- The width a panel needs for n columns of icons: its padding, the scroll box's room for its bar on both
+    -- sides, and the icons with the gaps between them.
+    local function columnsWidth(n)
+      return 2 * style.PAD + scrollbox:GutterWidthFor({ Symmetric = true }) + n * (style.ICON + style.GAP) - style.GAP
+    end
+
     describe("the grips", function()
       it("sits on both bottom corners of a small panel, there but unseen until the pointer is over it", function()
         local bag = nextBag:Create(ctx())
@@ -770,17 +780,16 @@ describe("BetterBags Next's small mode", function()
         assert.is_false(bag.content.instant)
       end)
 
-      it("keeps the size it is let go at, without snapping, saved for its kind with its place", function()
+      it("keeps the height it is let go at and its columns' width, saved for its kind with its place", function()
         local bag = opened(function(c) return nextBag:Create(c) end)
         local x0, y0 = topLeft(bag)
         resize(bag, "RIGHT", 377, 640)
-        assert.are.same({ 377, 640 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
-        assert.are.same({ 377, 640 }, db.sizes[BACKPACK])
+        assert.are.same({ columnsWidth(6), 640 }, db.sizes[BACKPACK])
+        finishTweens()
+        assert.are.same({ columnsWidth(6), 640 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
         assert.are.same({ x0, y0 }, { topLeft(bag) })
         assert.are.same({ x0, y0 }, db.places[BACKPACK])
         assert.is_nil(db.sizes[BANK])
-        finishTweens()
-        assert.are.same({ 377, 640 }, { bag.frame:GetWidth(), bag.frame:GetHeight() }, "no snap")
       end)
 
       it("moves its left edge from the left grip, its right edge still", function()
@@ -788,9 +797,11 @@ describe("BetterBags Next's small mode", function()
         local x0, y0 = topLeft(bag)
         local right = x0 + bag.frame:GetWidth()
         resize(bag, "LEFT", 600, 500)
-        assert.are.same({ right - 600, y0 }, { topLeft(bag) })
-        assert.are.same({ right - 600, y0 }, db.places[BACKPACK])
-        assert.are.equal(600, bag.frame:GetWidth())
+        local w = columnsWidth(10)
+        assert.are.same({ right - w, y0 }, db.places[BACKPACK])
+        finishTweens()
+        assert.are.same({ right - w, y0 }, { topLeft(bag) })
+        assert.are.equal(w, bag.frame:GetWidth())
       end)
 
       it("cuts its title short in the room its header buttons leave", function()
@@ -890,6 +901,19 @@ describe("BetterBags Next's small mode", function()
           resize(bank, "LEFT", bank:MinWidth(), 500)
           assert.are.equal(bank:MinWidth() - 40 - (style.PAD + style.TITLE_INSET) - style.PAD - 12, bank.title:GetWidth())
         end)
+
+        it("snaps to its widest row of icons with the strip beside them", function()
+          railed()
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          local list = {}
+          for i = 1, 9 do table.insert(list, item("0_" .. i, "Herbs")) end
+          slots[BACKPACK].tabs[1].items = list
+          bag:Draw(ctx(), slots[BACKPACK], function() end)
+          render:Flush()
+          resize(bag, "RIGHT", columnsWidth(15) + 40, 500)
+          finishTweens()
+          assert.are.equal(columnsWidth(9) + 40, bag.frame:GetWidth())
+        end)
       end)
 
       it("does not resize with something on the cursor: pressing a grip is a drop", function()
@@ -952,7 +976,7 @@ describe("BetterBags Next's small mode", function()
         assert.are.same({ w, h }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
       end)
 
-      it("stops resizing when it hides, keeping the size it had", function()
+      it("stops resizing when it hides, keeping the height it had and its columns' width", function()
         local bag = opened(function(c) return nextBag:Create(c) end)
         press(bag.grips.RIGHT)
         sizeTo(bag, "RIGHT", 400, 500)
@@ -960,7 +984,286 @@ describe("BetterBags Next's small mode", function()
         bag.frame:GetScript("OnHide")(bag.frame)
         assert.is_nil(bag.frame._sizing)
         assert.is_nil(bag.sizing)
-        assert.are.same({ 400, 500 }, db.sizes[BACKPACK])
+        assert.are.same({ columnsWidth(6), 500 }, db.sizes[BACKPACK])
+        assert.are.equal(columnsWidth(6), bag.frame:GetWidth(), "no glide while hidden")
+        assert.is_false(bag.sizeGliding)
+      end)
+    end)
+
+    -- Asked: let go, a panel snaps "to the nearest exact width needed to fit the columns the user released it at",
+    -- "never normalize such that the column count changes away from the user"; then, shown a panel let go far wider
+    -- than its icons (its widest row 14 of 25 columns): "if i drag the window to be too big like in that screenshot,
+    -- it should shrink back down to where the icon is". The height stays where it is let go ("only X").
+    describe("snapping to its icons", function()
+      -- filled draws the tab a panel shows with a section of each size (tab 1: groups are off).
+      local function filled(panel, sizes)
+        local kind = panel.kind
+        local tab = panel:GetCurrentTabID()
+        local categories, list = {}, {}
+        for s, n in ipairs(sizes) do
+          local name = "S" .. s
+          table.insert(categories, { name = name })
+          for i = 1, n do table.insert(list, item(((kind == BANK and 6 or 0) + s) .. "_" .. i, name)) end
+        end
+        slots[kind].tabs[tab] = { categories = categories, items = list }
+        panel:Draw(ctx(), slots[kind], function() end)
+        render:Flush()
+        return panel
+      end
+
+      local function backpack(sizes)
+        return filled(opened(function(c) return nextBag:Create(c) end), sizes)
+      end
+
+      it("shrinks to its widest row of icons when let go, every row as it was", function()
+        local bag = backpack({ 14, 4, 7 })
+        resize(bag, "RIGHT", columnsWidth(25) + 20, 600)
+        finishTweens()
+        render:Flush()
+        assert.are.same({ columnsWidth(14), 600 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        assert.are.equal(14, perRow(bag), "the widest section still on one row")
+        assert.are.same({ columnsWidth(14), 600 }, db.sizes[BACKPACK])
+      end)
+
+      it("keeps a section wider than it wrapping where it wrapped, never adding a column", function()
+        local bag = backpack({ 20, 3 })
+        resize(bag, "RIGHT", columnsWidth(12) + 30, 600)
+        finishTweens()
+        assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+        resize(bag, "RIGHT", columnsWidth(13) - 1, 600)
+        finishTweens()
+        assert.are.equal(columnsWidth(12), bag.frame:GetWidth(), "a unit short of thirteen columns shows twelve")
+        resize(bag, "RIGHT", columnsWidth(13), 600)
+        finishTweens()
+        assert.are.equal(columnsWidth(13), bag.frame:GetWidth(), "exactly thirteen stays")
+      end)
+
+      -- Asked: "if we have a default sized bag, if we drag just a bit bigger, but not big enough so icons move, and
+      -- then let go, it will snap back to default size."
+      it("snaps a default-sized panel dragged a little wider back to its default size, saving nothing", function()
+        local bag = backpack({ 10 })
+        local w, h = bag.frame:GetWidth(), bag.frame:GetHeight()
+        assert.are.equal(columnsWidth(8), w, "the default is eight columns' width")
+        resize(bag, "RIGHT", w + 30, h)
+        finishTweens()
+        assert.are.same({ w, h }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+        assert.is_nil(db.sizes[BACKPACK], "the default size still follows the screen")
+        assert.is_nil(db.places[BACKPACK])
+        resize(bag, "RIGHT", w + 30, h - 100)
+        assert.are.same({ w, h - 100 }, db.sizes[BACKPACK], "a new height alone is saved")
+      end)
+
+      it("hugs fewer icons than its default holds", function()
+        local bag = backpack({ 5, 2 })
+        resize(bag, "RIGHT", bag.frame:GetWidth() + 30, 600)
+        finishTweens()
+        assert.are.equal(math.max(bag:MinWidth(), columnsWidth(5)), bag.frame:GetWidth())
+      end)
+
+      -- Only a grip let go hugs its icons: its default width is the columns it holds, whatever it shows, so it does not
+      -- change as items come and go.
+      it("keeps its default width at its columns whatever it shows", function()
+        local bag = backpack({ 3 })
+        bag:FitSmall()
+        assert.are.equal(columnsWidth(8), bag.frame:GetWidth())
+        assert.are.equal(columnsWidth(8) - 2 * style.PAD, bag.root:PreRender().LayoutWidth)
+      end)
+
+      it("never goes narrower than its minimum, nor saves less", function()
+        local bank = filled(opened(function(c) return nextBank:Create(c) end), { 1 })
+        resize(bank, "LEFT", columnsWidth(12), 500)
+        finishTweens()
+        assert.are.equal(bank:MinWidth(), bank.frame:GetWidth())
+        assert.are.same({ bank:MinWidth(), 500 }, db.sizes[BANK])
+      end)
+
+      it("snaps to the columns it shows while it shows no icons", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        resize(bag, "RIGHT", columnsWidth(7) + 20, 600)
+        finishTweens()
+        assert.are.equal(columnsWidth(7), bag.frame:GetWidth())
+      end)
+
+      -- The render recorder (render-recorder.md §2) gets each step of a grip sizing a panel and of its snap, to show in
+      -- game where the client puts it and its icons while it is sized.
+      it("gives the render recorder each step of a grip sizing it and of its snap, only while it records", function()
+        local recorder, created = StubBetterBagsModule("RenderRecorder")
+        local steps = {}
+        override(recorder, "recording", false)
+        override(recorder, "PanelSizing", function(_, panel, name) table.insert(steps, { panel, name }) end)
+        finally(function()
+          if created then ResetModuleStub("RenderRecorder") end
+        end)
+        local bag = backpack({ 14 })
+        resize(bag, "RIGHT", columnsWidth(20), 600)
+        finishTweens()
+        assert.are.same({}, steps, "nothing while it does not record")
+        recorder.recording = true
+        press(bag.grips.RIGHT)
+        sizeTo(bag, "RIGHT", columnsWidth(20), 600)
+        render:Flush()
+        release(bag.grips.RIGHT)
+        step(style.Time.Snap / 2)
+        finishTweens()
+        local names = {}
+        for _, s in ipairs(steps) do
+          assert.are.equal(bag, s[1])
+          if names[#names] ~= s[2] then table.insert(names, s[2]) end
+        end
+        assert.are.same({ "start", "resized", "rendered", "let go", "snap", "snapped" }, names)
+      end)
+
+      -- onScreen runs fn on the reporter's screen (3396x1362: a unit is 0.564 pixels at scale 1), then puts the
+      -- screen back, whatever fn does.
+      local function onScreen(fn)
+        local saved = _G.GetPhysicalScreenSize
+        _G.GetPhysicalScreenSize = function() return 3396, 1362 end
+        local ok, err = pcall(fn)
+        _G.GetPhysicalScreenSize = saved
+        assert(ok, err)
+      end
+
+      local function wholePixels(frame, what)
+        local unit = pixel:Unit(frame)
+        for _, length in ipairs({ frame:GetWidth(), frame:GetHeight() }) do
+          local px = length / unit
+          assert.is_true(math.abs(px - math.floor(px + 0.5)) < 1e-6, what .. ": " .. px .. " pixels")
+        end
+      end
+
+      -- Measured in game (texture-sharpening.md §5): while it snapped its scroll box's edge stood a fraction of a pixel
+      -- off the grid each frame, and what the box clips was drawn stretched across that fraction (icons toward the far
+      -- side moved up to a third of a pixel, the near side none), until it came to rest; a grip dragged sizes it in
+      -- whole pixels, and showed none.
+      it("sizes itself in whole pixels at every step of its snap, as a grip dragged does", function()
+        onScreen(function()
+          local bag = backpack({ 14, 4, 7 })
+          resize(bag, "RIGHT", columnsWidth(25) + 20, 600)
+          local steps = 0
+          while bag.sizeGliding do
+            step(1 / 60)
+            wholePixels(bag.frame, "step " .. steps)
+            steps = steps + 1
+          end
+          assert.is_true(steps > 10, "it snapped")
+          assert.are.equal(pixel:Length(bag.frame, columnsWidth(14)), bag.frame:GetWidth())
+        end)
+      end)
+
+      it("reflows as it is dragged again once a snap has ended", function()
+        local bag = backpack({ 20 })
+        resize(bag, "RIGHT", columnsWidth(7) + 20, 600)
+        finishTweens()
+        press(bag.grips.RIGHT)
+        sizeTo(bag, "RIGHT", columnsWidth(10), 600)
+        assert.are.equal(columnsWidth(10) - 2 * style.PAD, bag.root:PreRender().LayoutWidth)
+        assert.are.equal(columnsWidth(10) - 2 * style.PAD, bag.root:PreRender().Width)
+        release(bag.grips.RIGHT)
+      end)
+
+      -- The original bags' bounce (window.md §3b): past the target by a tenth of the distance (at most 10), then back.
+      it("bounces past its icons' width and settles, as the original bags do", function()
+        local bag = backpack({ 14 })
+        local from, to = columnsWidth(25), columnsWidth(14)
+        resize(bag, "RIGHT", from, 600)
+        assert.is_true(bag.sizeGliding)
+        step(style.Time.Snap * 0.65)
+        assert.is_true(math.abs(bag.frame:GetWidth() - (to - 10)) < 0.01, "width " .. bag.frame:GetWidth())
+        assert.are.equal(600, bag.frame:GetHeight(), "its height stays")
+        finishTweens()
+        assert.are.equal(to, bag.frame:GetWidth())
+        assert.is_false(bag.sizeGliding)
+      end)
+
+      it("keeps its rows through the bounce, nothing reflowing", function()
+        local bag = backpack({ 14 })
+        local to = columnsWidth(14)
+        resize(bag, "RIGHT", columnsWidth(25), 600)
+        step(style.Time.Snap * 0.65)
+        assert.is_true(bag.frame:GetWidth() < to, "past its width")
+        assert.are.equal(to - 2 * style.PAD, bag.root:PreRender().Width)
+        assert.are.equal(to - 2 * style.PAD, bag.root:PreRender().LayoutWidth)
+        assert.are.equal(14, perRow(bag))
+      end)
+
+      it("moves the edge its grip moved: the left grip's left edge, its right edge still", function()
+        local bag = backpack({ 14 })
+        local x0, y0 = topLeft(bag)
+        local right = x0 + bag.frame:GetWidth()
+        local to = columnsWidth(14)
+        resize(bag, "LEFT", columnsWidth(25), 600)
+        step(style.Time.Snap * 0.65)
+        assert.is_true(math.abs(select(1, topLeft(bag)) + bag.frame:GetWidth() - right) < 0.01, "the right edge still")
+        assert.are.equal(y0, select(2, topLeft(bag)))
+        finishTweens()
+        assert.are.same({ right - to, y0 }, { topLeft(bag) })
+        assert.are.same({ right - to, y0 }, db.places[BACKPACK])
+      end)
+
+      it("ends its snap at its width when anything else places or sizes it", function()
+        local to = columnsWidth(14)
+        local function snapping()
+          local bag = backpack({ 14 })
+          resize(bag, "RIGHT", columnsWidth(20), 600)
+          step(0.05)
+          assert.is_true(bag.sizeGliding)
+          return bag
+        end
+        local bag = snapping()
+        press(bag.grips.RIGHT)
+        assert.are.equal(to, bag.frame:GetWidth(), "a grip pressed")
+        assert.is_false(bag.sizeGliding)
+        release(bag.grips.RIGHT)
+        bag:Hide(ctx())
+        finishTweens()
+        bag = snapping()
+        bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+        assert.are.equal(to, bag.frame:GetWidth(), "moved")
+        bag.mover:GetScript("OnDragStop")(bag.mover)
+        bag:Hide(ctx())
+        finishTweens()
+        bag = snapping()
+        bag.frame:Hide()
+        bag.frame:GetScript("OnHide")(bag.frame)
+        assert.are.equal(to, bag.frame:GetWidth(), "hidden")
+      end)
+
+      it("keeps a chained bag's chained side still as it snaps", function()
+        local bag = backpack({ 8 })
+        local bank = filled(opened(function(c) return nextBank:Create(c) end), { 9 })
+        db.smallChain = "backpack"
+        chain:Update(ctx())
+        finishTweens()
+        local bagLeft = topLeft(bag)
+        local bankRight = select(1, topLeft(bank)) + bank.frame:GetWidth()
+        resize(bank, "LEFT", columnsWidth(15), 480)
+        step(style.Time.Snap * 0.5)
+        assert.is_true(math.abs(select(1, topLeft(bank)) + bank.frame:GetWidth() - bankRight) < 0.01, "on its way")
+        finishTweens()
+        assert.are.equal(columnsWidth(9), bank.frame:GetWidth())
+        assert.are.equal(bankRight, select(1, topLeft(bank)) + columnsWidth(9))
+        assert.are.equal(bagLeft, select(1, topLeft(bag)))
+        assert.are.same({ chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY) }, { topLeft(bank) })
+      end)
+
+      it("leaves a section waiting in a dock out of its widest row", function()
+        local bag = backpack({ 14, 6 })
+        bag.content:HoldOut(bag.content.byName.S1)
+        resize(bag, "RIGHT", columnsWidth(20), 600)
+        finishTweens()
+        assert.are.equal(columnsWidth(6), bag.frame:GetWidth())
+      end)
+
+      -- The vendor lays its items out as cards (NextCanvas:SetCards).
+      it("snaps a panel of cards to its widest row of cards", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        bag.content:SetCards(true)
+        filled(bag, { 3 })
+        local card = style.VENDOR_CARD_WIDTH + style.GAP
+        local room = 2 * style.PAD + scrollbox:GutterWidthFor({ Symmetric = true })
+        resize(bag, "LEFT", room + 5 * card - style.GAP + 20, 500)
+        finishTweens()
+        assert.are.equal(room + 3 * card - style.GAP, bag.frame:GetWidth())
       end)
     end)
 
@@ -1130,6 +1433,60 @@ describe("BetterBags Next's small mode", function()
         assert.are.same({ x0, y0 }, db.places[BACKPACK])
       end)
 
+      -- texture-sharpening.md §5: its scroll box clips what it holds, which a fractional size drew stretched.
+      it("glides in whole pixels, its far corner still on a whole pixel, from either grip", function()
+        for _, side in ipairs({ "RIGHT", "LEFT" }) do
+          local saved = _G.GetPhysicalScreenSize
+          _G.GetPhysicalScreenSize = function() return 3396, 1362 end
+          local ok, err = pcall(function()
+            db.sizes[BACKPACK] = { 700, 500 }
+            local bag = opened(function(c) return nextBag:Create(c) end)
+            shiftClick(bag.grips[side])
+            local unit = pixel:Unit(bag.frame)
+            local steps = 0
+            while bag.sizeGliding do
+              step(1 / 60)
+              local x, y = topLeft(bag)
+              for _, v in ipairs({ bag.frame:GetWidth(), bag.frame:GetHeight(), x, y }) do
+                local px = v / unit
+                assert.is_true(math.abs(px - math.floor(px + 0.5)) < 1e-6, side .. " step " .. steps .. ": " .. px)
+              end
+              steps = steps + 1
+            end
+            assert.is_true(steps > 10, "it glided")
+          end)
+          _G.GetPhysicalScreenSize = saved
+          assert(ok, err)
+        end
+      end)
+
+      -- Its corner glides too when the default size would not fit where it is, put back on the screen (clampPlace).
+      it("glides its corner in whole pixels when the screen's edge moves it", function()
+        local saved = _G.GetPhysicalScreenSize
+        _G.GetPhysicalScreenSize = function() return 3396, 1362 end
+        local ok, err = pcall(function()
+          db.sizes[BACKPACK] = { 300, 300 }
+          db.places[BACKPACK] = { UIParent:GetWidth() - 301.3, 300.7 }
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          local x0, y0 = topLeft(bag)
+          shiftClick(bag.grips.RIGHT)
+          local unit = pixel:Unit(bag.frame)
+          local moved = false
+          while bag.sizeGliding do
+            step(1 / 60)
+            local x, y = topLeft(bag)
+            moved = moved or math.abs(x - x0) > unit or math.abs(y - y0) > unit
+            for _, v in ipairs({ x, y }) do
+              local px = v / unit
+              assert.is_true(math.abs(px - math.floor(px + 0.5)) < 1e-6, px .. " pixels")
+            end
+          end
+          assert.is_true(moved, "the screen's edge moved its corner")
+        end)
+        _G.GetPhysicalScreenSize = saved
+        assert(ok, err)
+      end)
+
       it("keeps its right edge still from the left grip", function()
         db.sizes[BACKPACK] = { 700, 500 }
         local bag = opened(function(c) return nextBag:Create(c) end)
@@ -1166,7 +1523,7 @@ describe("BetterBags Next's small mode", function()
       it("does nothing at its default size", function()
         local bag = opened(function(c) return nextBag:Create(c) end)
         assert.are.equal("default", bag:ResetSize("RIGHT"))
-        assert.is_false(tween:IsPlaying(bag.resetKey))
+        assert.is_false(tween:IsPlaying(bag.sizeGlideKey))
       end)
 
       it("ends the glide where it was going when it is moved, sized or closed", function()
@@ -1283,16 +1640,17 @@ describe("BetterBags Next's small mode", function()
         chainBank(bag, bank)
         local bagLeft = topLeft(bag)
         local bankRight = select(1, topLeft(bank)) + bank.frame:GetWidth()
-        resize(bank, "LEFT", 620, 480)
+        local wide = columnsWidth(11)
+        resize(bank, "LEFT", wide, 480)
         finishTweens()
-        assert.are.equal(bankRight, select(1, topLeft(bank)) + 620, "the bank's chained side is still")
+        assert.are.equal(bankRight, select(1, topLeft(bank)) + wide, "the bank's chained side is still")
         assert.are.equal(bagLeft, select(1, topLeft(bag)))
         assert.are.same({ chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY) }, { topLeft(bank) })
         -- The backpack's right edge is 40 from the screen's; the client keeps a sized frame on it.
         resize(bag, "RIGHT", 490, 480)
         finishTweens()
         assert.are.equal(bagLeft, select(1, topLeft(bag)))
-        assert.are.equal(bankRight, select(1, topLeft(bank)) + 620)
+        assert.are.equal(bankRight, select(1, topLeft(bank)) + wide)
       end)
 
       it("keeps the grip it is dragged by while a chain forms, until it is let go", function()
@@ -2178,6 +2536,34 @@ describe("BetterBags Next's small mode", function()
         scalesChanged()
         assert.are.equal(before + (66 - 44), bag:MinHeight())
       end)
+
+      -- The default small width is the width of the columns the full body's width holds (asked: "default should
+      -- probably be exact too"), so it leaves no room past its last column at any Icon Scale.
+      local function defaultWidth()
+        local step = style.ICON + style.GAP
+        local columns = math.floor((style.GRID_WIDTH + style.GAP) / step)
+        return 2 * style.PAD + scrollbox:GutterWidthFor({ Symmetric = true }) + columns * step - style.GAP
+      end
+
+      it("opens a small panel at the width of the columns its default holds, at any Icon Scale", function()
+        style:SetIconScale(120)
+        assert.is_true(defaultWidth() < style.BODY_WIDTH, "the full body's width leaves room past its columns")
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        assert.are.equal(defaultWidth(), bag.frame:GetWidth())
+        assert.are.equal(defaultWidth() - 2 * style.PAD, bag.root:PreRender().LayoutWidth)
+      end)
+
+      it("fits an open panel at its default size to its columns when Icon Scale changes, keeping a saved size", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        assert.are.equal(style.BODY_WIDTH, bag.frame:GetWidth(), "exact at 100%")
+        db.iconScale = 120
+        scalesChanged()
+        assert.are.equal(defaultWidth(), bag.frame:GetWidth())
+        db.sizes[BACKPACK] = { 700, 500 }
+        db.iconScale = 150
+        scalesChanged()
+        assert.are.equal(700, bag.frame:GetWidth(), "the size the player gave it")
+      end)
     end)
 
     -- Asked: a "bag scale" slider; "bag scale should just not apply when docked to the side".
@@ -2252,10 +2638,12 @@ describe("BetterBags Next's small mode", function()
         local bounds = bag.frame._resizeBounds
         assert.are.same({ 1920 / 0.5, 1200 / 0.5 }, { bounds.maxWidth, bounds.maxHeight })
         local x, y = topLeft(bag)
-        bag.frame:_SetRect(x, y - 600, 500, 600)
-        bag.frame:GetScript("OnSizeChanged")(bag.frame, 500, 600)
+        -- Nine columns' width (next.md §14g: it snaps to its columns' width).
+        local w = 2 * style.PAD + scrollbox:GutterWidthFor({ Symmetric = true }) + 9 * (style.ICON + style.GAP) - style.GAP
+        bag.frame:_SetRect(x, y - 600, w, 600)
+        bag.frame:GetScript("OnSizeChanged")(bag.frame, w, 600)
         grip:GetScript("OnMouseUp")(grip, "LeftButton")
-        assert.are.same({ 500, 600 }, db.sizes[BACKPACK])
+        assert.are.same({ w, 600 }, db.sizes[BACKPACK])
         assert.are.same({ x * 0.5, y * 0.5 }, db.places[BACKPACK])
         assert.are.same({ x * 0.5, y * 0.5 }, { onScreen(bag) })
       end)

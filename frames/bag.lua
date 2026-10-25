@@ -43,6 +43,9 @@ local itemFrame = addon:GetModule("ItemFrame")
 ---@class Render: AceModule
 local render = addon:GetModule("Render")
 
+---@class Texels: AceModule
+local texels = addon:GetModule("Texels")
+
 ---@class WindowModule: AceModule
 local windowModule = addon:GetModule("Window")
 
@@ -715,6 +718,8 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 	-- canvas measures them again.
 	self.canvas:ForgetMeasures()
 	render:RenderNow(self.window, { ctx = ctx })
+	-- Its window, sections and theme art; each item button draws its own (texture-sharpening.md).
+	texels:Unsharpen(self.frame)
 
 	if
 		database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS

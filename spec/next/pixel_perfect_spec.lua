@@ -685,6 +685,149 @@ describe("BetterBags Next, pixel perfect", function()
       assert.is_true(math.abs(bag.root:PreRender().LayoutWidth - (style.BODY_WIDTH - 2 * style.PAD)) < 1e-9)
     end)
 
+    -- Reported: "resizing the window in general ... causes a ton of item icon jitter all over". A grip dragged a pixel
+    -- a frame, as the client sizes a frame following the mouse: an icon moves only where a column is added or taken
+    -- away. A pixel or two after each column was added, every icon used to jump again (up to 19 pixels across on the
+    -- reporter's screen, rows a pixel or three down): the gaps closed for the width drawn, then opened.
+    it("moves no icon while a grip sizes it, but where a column is added", function()
+      local cats, list = {}, {}
+      for s, n in ipairs({ 1, 14, 4, 7, 20 }) do
+        table.insert(cats, { name = "S" .. s })
+        for i = 1, n do table.insert(list, item(s .. "_" .. i, "S" .. s)) end
+      end
+      slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
+      for _, case in ipairs({ { 3396, 1362, 0.65, 100 }, { 1920, 1080, 1, 85 } }) do
+        useScreen(case[1], case[2], case[3])
+        db.size, db.bagScale = "small", case[4]
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        settle()
+        local ppu, s = layout.PixelsPerUnit(), bag.frame:GetEffectiveScale()
+        local h = bag.frame:GetHeight()
+        local r0 = layout.Rect(bag.frame)
+        local start = math.floor((r0.right - r0.left) * ppu + 0.5)
+        bag:StartSizing("RIGHT")
+        local previous
+        for px = start, start + 130 do
+          bag.frame:SetSize(px / ppu / s, h)
+          bag.frame:GetScript("OnSizeChanged")(bag.frame, px / ppu / s, h)
+          render:Flush()
+          local frame = layout.Rect(bag.frame)
+          local now = { perRow = bag.content:PerRow(bag:LayoutWidth() - bag:ContentRoom()), places = {} }
+          for key, b in pairs(buttons) do
+            local r = layout.Rect(b.frame)
+            if r ~= nil and b.frame:IsVisible() then
+              now.places[key] = math.floor((r.left - frame.left) * ppu + 0.5) .. "," .. math.floor((frame.top - r.top) * ppu + 0.5)
+            end
+          end
+          if previous ~= nil and previous.perRow == now.perRow then
+            assert.are.same(previous.places, now.places,
+              string.format("%s at Bag Scale %d%%, %d to %d pixels wide", screenName(case), case[4], px - 1, px))
+          end
+          previous = now
+        end
+        bag:StopSizing()
+        bag:Hide(ctx())
+        finishTweens()
+        chain:Init()
+      end
+    end)
+
+    -- Reported: the jitter "on Y, it's ever so slight, but it does jitter". Blizzard's scroll box keeps its scroll
+    -- percentage as its height changes (ScrollBoxBaseMixin:OnSizeChanged updates; the offset is the range times the
+    -- percentage), so a panel scrolled partway moved everything it shows a pixel every few frames as a grip sized it.
+    -- It keeps the scroll offset in pixels instead, as a browser keeps the top of a page where it was.
+    it("keeps scrolled content still while a grip sizes it", function()
+      local cats, list = {}, {}
+      for s, n in ipairs({ 1, 14, 4, 7, 20, 30, 12, 25 }) do
+        table.insert(cats, { name = "S" .. s })
+        for i = 1, n do table.insert(list, item(s .. "_" .. i, "S" .. s)) end
+      end
+      slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
+      for _, case in ipairs({ { 3396, 1362, 0.65, 100, 1 }, { 1920, 1080, 1, 85, -1 }, { 1920, 1080, 1, 100, 1 } }) do
+        useScreen(case[1], case[2], case[3])
+        db.size, db.bagScale, db.sizes[BACKPACK] = "small", case[4], { 700, 420 }
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        settle()
+        local box = bag.scroll.scrollBox
+        box:ScrollToOffset(73, true)
+        local ppu, s = layout.PixelsPerUnit(), bag.frame:GetEffectiveScale()
+        local r0 = layout.Rect(bag.frame)
+        local w0, h0 = (r0.right - r0.left) * ppu, (r0.top - r0.bottom) * ppu
+        bag:StartSizing("RIGHT")
+        local previous
+        for i = 0, 60 do
+          local w, h = w0 / ppu / s, (h0 + i * case[5]) / ppu / s
+          bag.frame:SetSize(w, h)
+          bag.frame:GetScript("OnSizeChanged")(bag.frame, w, h)
+          -- The client tells the scroll box its size changed too: it is anchored to the panel.
+          box:GetScript("OnSizeChanged")(box, box:GetWidth(), box:GetHeight())
+          render:Flush()
+          local frame = layout.Rect(bag.frame)
+          local places = {}
+          for key, b in pairs(buttons) do
+            local r = layout.Rect(b.frame)
+            if r ~= nil and b.frame:IsVisible() then
+              places[key] = math.floor((frame.top - r.top) * ppu + 0.5)
+            end
+          end
+          if previous ~= nil then
+            assert.are.same(previous, places, string.format("%s at Bag Scale %d%%, frame %d", screenName(case), case[4], i))
+          end
+          previous = places
+        end
+        assert.is_false(bag:KeepScroll(), "nothing to put back once it is where it was")
+        bag:StopSizing()
+        bag:Hide(ctx())
+        finishTweens()
+        chain:Init()
+      end
+    end)
+
+    it("leaves its scroll to the scroll box once nothing sizes it", function()
+      local cats, list = {}, {}
+      for s, n in ipairs({ 14, 20, 30, 12, 25 }) do
+        table.insert(cats, { name = "S" .. s })
+        for i = 1, n do table.insert(list, item(s .. "_" .. i, "S" .. s)) end
+      end
+      slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
+      useScreen(3396, 1362, 0.65)
+      db.size, db.sizes[BACKPACK] = "small", { 700, 420 }
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      settle()
+      local box = bag.scroll.scrollBox
+      box:ScrollToOffset(73, true)
+      bag:StartSizing("RIGHT")
+      bag:StopSizing()
+      finishTweens()
+      -- Scrolled with the wheel after the grip let go.
+      box:ScrollToOffset(40, true)
+      box:GetScript("OnSizeChanged")(box, box:GetWidth(), box:GetHeight())
+      assert.is_true(math.abs(box:GetDerivedScrollOffset() - 40) < 0.001, "offset " .. box:GetDerivedScrollOffset())
+      assert.is_false(bag:KeepScroll())
+    end)
+
+    it("keeps what it shows scrolled where it was as Shift-click glides it back to its default size", function()
+      local cats, list = {}, {}
+      for s, n in ipairs({ 14, 20, 30, 12, 25 }) do
+        table.insert(cats, { name = "S" .. s })
+        for i = 1, n do table.insert(list, item(s .. "_" .. i, "S" .. s)) end
+      end
+      slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
+      useScreen(3396, 1362, 0.65)
+      db.size, db.sizes[BACKPACK] = "small", { 700, 420 }
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      settle()
+      local box = bag.scroll.scrollBox
+      box:ScrollToOffset(73, true)
+      assert.are.equal("resetting", bag:ResetSize("RIGHT"))
+      for _ = 1, 10 do
+        tween.driver:GetScript("OnUpdate")(tween.driver, style.Time.Resize / 10)
+        box:GetScript("OnSizeChanged")(box, box:GetWidth(), box:GetHeight())
+        render:Flush()
+        assert.is_true(math.abs(box:GetDerivedScrollOffset() - 73) < 0.001, "offset " .. box:GetDerivedScrollOffset())
+      end
+    end)
+
     it("puts every item in the same row and column at every Bag Scale", function()
       local list = {}
       for i = 1, 13 do table.insert(list, item("0_" .. i, "Consumable")) end
