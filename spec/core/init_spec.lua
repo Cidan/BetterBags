@@ -255,8 +255,9 @@ describe("Core Init and Enable flow", function()
   -- BetterBags Next's settings window (next-settings.md §3) starts its session after SonataNext, the
   -- look it is drawn in; it is built the first time it opens.
   -- NextPixel follows the screen's pixel grid after SonataNext applied the theme for it
-  -- (docs/next-pixel-perfect.md), and SonataNext the client's fonts its roles copy (docs/next-gw2-theme.md).
-  it("starts BetterBags Next's pixel grid, font watch and settings window after SonataNext", function()
+  -- (docs/next-pixel-perfect.md), SonataNext the client's fonts its roles copy (docs/next-gw2-theme.md) and the
+  -- player's Animation switches (next-themes.md §20).
+  it("starts BetterBags Next's pixel grid, font and animation watches and settings window after SonataNext", function()
     local nextSettings = addon:GetModule("NextSettings")
     local sonataNext = addon:GetModule("SonataNext")
     local pixel = addon:GetModule("NextPixel")
@@ -264,7 +265,8 @@ describe("Core Init and Enable flow", function()
     local content = addon:GetModule("NextSettingsContent")
     local savedSettings, savedNext, savedContent, savedPixel = nextSettings.Init, sonataNext.Init, content.Init,
       pixel.Init
-    local savedWatch = sonataNext.WatchClientFonts
+    local savedWatch, savedAnimation = sonataNext.WatchClientFonts, sonataNext.WatchAnimation
+    sonataNext.WatchAnimation = function() table.insert(order, "WatchAnimation") end
     nextSettings.Init = function() table.insert(order, "NextSettings") end
     sonataNext.Init = function() table.insert(order, "SonataNext") end
     sonataNext.WatchClientFonts = function() table.insert(order, "WatchClientFonts") end
@@ -272,8 +274,9 @@ describe("Core Init and Enable flow", function()
     pixel.Init = function() table.insert(order, "NextPixel") end
     addon:OnInitialize()
     nextSettings.Init, sonataNext.Init, content.Init, pixel.Init = savedSettings, savedNext, savedContent, savedPixel
-    sonataNext.WatchClientFonts = savedWatch
-    assert.are.same({ "SonataNext", "NextPixel", "WatchClientFonts", "NextSettings", "NextSettingsContent" }, order)
+    sonataNext.WatchClientFonts, sonataNext.WatchAnimation = savedWatch, savedAnimation
+    assert.are.same({ "SonataNext", "NextPixel", "WatchClientFonts", "WatchAnimation", "NextSettings",
+      "NextSettingsContent" }, order)
   end)
 
   -- Its pages listen for the highest item level seen (next-settings.md §4).

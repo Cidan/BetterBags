@@ -332,7 +332,8 @@ the window (left from the
 backpack, right from the bank: the emitter's `Direction`) while they twinkle, spin and fade, in
 starlight gold, white and moon lavender. At most 28 alive, about
 8 a second; textures are pooled. It runs only while the panel is shown, and spawns nothing in
-combat (those already alive finish).
+combat (those already alive finish). The player can turn them off on any theme, with the title's shimmer, cloud and
+ribbon, the braid and moving ornaments (Appearance > Animation, next-themes.md §20).
 
 ## 5. Motion helpers (`next/tween.lua`)
 

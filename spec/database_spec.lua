@@ -102,6 +102,7 @@ const.DATABASE_DEFAULTS = {
     nextSmallSizes = {},
     nextSmallChain = "apart",
     nextTheme = "Default",
+    nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, ribbon = true, braid = true, ornaments = true },
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
@@ -411,6 +412,20 @@ describe("Database", function()
       assert.are.equal("Default", DB:GetNextTheme())
       DB:SetNextTheme("Ember")
       assert.are.equal("Ember", DB:GetNextTheme())
+    end)
+
+    -- BetterBags Next's Animation switches (Appearance > Animation, next-themes.md §20): every effect on until the
+    -- player turns it off, on any theme; nothing but an effect.
+    it("GetNextAnimation / SetNextAnimation, every effect on until turned off, and nothing but an effect", function()
+      for _, name in ipairs({ "sparkles", "shimmer", "titleCloud", "ribbon", "braid", "ornaments" }) do
+        assert.is_true(DB:GetNextAnimation(name), name)
+        DB:SetNextAnimation(name, false)
+        assert.is_false(DB:GetNextAnimation(name), name)
+        DB:SetNextAnimation(name, true)
+        assert.is_true(DB:GetNextAnimation(name), name)
+      end
+      assert.has_error(function() DB:GetNextAnimation("cascade") end)
+      assert.has_error(function() DB:SetNextAnimation("cascade", false) end)
     end)
 
     it("GetAnimateItemMovement / SetAnimateItemMovement, off until turned on", function()

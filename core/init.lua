@@ -204,6 +204,8 @@ function addon:OnInitialize()
   addon:GetModule('NextPixel'):Init()
   -- The client's fonts its roles copy, rewritten by UI addons once the game has loaded (docs/next-gw2-theme.md).
   addon:GetModule('SonataNext'):WatchClientFonts()
+  -- The player's Animation switches, laid over the theme in use as they change (next-themes.md §20).
+  addon:GetModule('SonataNext'):WatchAnimation()
   -- BetterBags Next's settings window (next-settings.md §3): built the first time it opens.
   addon:GetModule('NextSettings'):Init()
   addon:GetModule('NextSettingsContent'):Init()

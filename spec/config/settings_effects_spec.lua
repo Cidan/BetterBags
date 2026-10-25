@@ -250,6 +250,26 @@ describe("What each setting asks the bags for", function()
     end)
   end
 
+  -- BetterBags Next's Animation tab (next-themes.md §20): each switch saves its effect on or off and tells BetterBags
+  -- Next, which lays the switches over the theme in use again; the bags' items are neither read nor recalculated.
+  for _, case in ipairs({ { "Sparkles", "sparkles" }, { "Title Shimmer", "shimmer" }, { "Title Cloud", "titleCloud" },
+    { "Title Ribbon", "ribbon" }, { "Braid", "braid" }, { "Moving Ornaments", "ornaments" } }) do
+    it("saves " .. case[1] .. " on or off and tells BetterBags Next, reading nothing", function()
+      local on = { [case[2]] = true }
+      override(db, "GetNextAnimation", function(_, name) return on[name] end)
+      override(db, "SetNextAnimation", function(_, name, value) on[name] = value end)
+      local found = settings(case[1])
+      assert.are.equal(1, #found)
+      assert.are.equal("toggle", found[1].kind)
+      assert.is_true(found[1].get(ctx()))
+      found[1].set(ctx(), false)
+      assert.is_false(on[case[2]])
+      assert.are.same({ "next/AnimationChanged" }, messages())
+      found[1].set(ctx(), true)
+      assert.is_true(on[case[2]])
+    end)
+  end
+
   -- BetterBagsNext (next.md §11): turning it on or off switches the bags at once, no reload; a switch
   -- refused (combat, the bank, a vendor) says so, and the window shows the setting again.
   it("switches the bags without a reload, and says when the switch is refused", function()

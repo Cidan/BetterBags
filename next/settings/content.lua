@@ -384,8 +384,9 @@ function content:Init()
   pages:Define({
     id = "appearance", group = L:G("BetterBags"), title = L:G("Appearance"),
     description = L:G("How BetterBags looks. A theme you pick shows at once; Apply Theme keeps it."),
-    -- BetterBags Next's themes draw its bags and this window; the classic bags' themes draw theirs. Size is
-    -- BetterBags Next's: the classic bags size themselves on each bag's page (docs/next-appearance-size.md).
+    -- BetterBags Next's themes draw its bags and this window; the classic bags' themes draw theirs. Size and Animation
+    -- are BetterBags Next's: the classic bags size themselves on each bag's page (docs/next-appearance-size.md), and
+    -- have none of its effects.
     tabs = { { id = "theme", title = L:G("Theme"), sections = {
       { title = L:G("Theme"), design = "next", rows = { {
         title = L:G("Theme"), keywords = { "theme", "look", "skin", "appearance", "style" },
@@ -402,6 +403,11 @@ function content:Init()
         } } },
     } }, { id = "size", title = L:G("Size"), design = "next", sections = {
       { title = L:G("Size"), rows = { { setting = 'nextIconScale' }, { setting = 'nextBagScale' } } },
+    } }, { id = "animation", title = L:G("Animation"), design = "next", sections = {
+      -- Each effect on or off on any theme (next-themes.md §20); the classic bags have none of them.
+      { title = L:G("Effects"), rows = { { setting = 'nextSparkles' }, { setting = 'nextShimmer' },
+        { setting = 'nextTitleCloud' }, { setting = 'nextTitleRibbon' }, { setting = 'nextBraid' },
+        { setting = 'nextOrnamentMotion' } } },
     } } },
   })
   pages:Define({

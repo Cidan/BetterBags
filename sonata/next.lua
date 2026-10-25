@@ -264,11 +264,44 @@ function sonataNext:GetSavedThemeKey()
   return BASE
 end
 
+-- The player's Animation switches (Appearance > Animation, next-themes.md §20): what each one turned off takes out of
+-- the theme in use once it is resolved, as a theme without it leaves it out (resolution removes a table a theme sets to
+-- false; Chain.Braid is a boolean). Asked: "we need a way to disable sparkles etc on any theme, not just switching to a
+-- theme without them". An ornament stilled keeps its art.
+local ANIMATION_OFF = {
+  sparkles = function(theme) theme.Sparkles = nil end,
+  shimmer = function(theme) theme.Header.Spark = nil end,
+  titleCloud = function(theme) theme.Header.Cloud = nil end,
+  ribbon = function(theme) theme.Header.Ribbon = nil end,
+  braid = function(theme) theme.Chain.Braid = false end,
+  ornaments = function(theme)
+    for _, piece in ipairs(theme.Panel.Ornaments or {}) do
+      piece.Motion = nil
+    end
+  end,
+}
+
+-- effective returns a theme as the player sees it: resolved (a new table), the Animation switches they turned off laid
+-- over it. Resolve and Check keep a theme as it is written.
+---@private
+---@param key string
+---@return NextTheme
+function sonataNext:effective(key)
+  local theme = self:Resolve(key)
+  local saved = db()
+  for name, off in pairs(ANIMATION_OFF) do
+    if not saved:GetNextAnimation(name) then
+      off(theme)
+    end
+  end
+  return theme
+end
+
 -- use makes key the current theme and hands it to Next's style.
 ---@private
 ---@param key string
 function sonataNext:use(key)
-  self.resolved = self:Resolve(key)
+  self.resolved = self:effective(key)
   self.current = key
   nextStyle():Use(self.resolved)
 end
@@ -302,7 +335,7 @@ function sonataNext:ApplyTheme(ctx, key, save)
   if not self:IsAvailable(key) then
     error("attempted to apply a Next theme that is not available: " .. tostring(key))
   end
-  local resolved = self:Resolve(key)
+  local resolved = self:effective(key)
   self.resolved = resolved
   self.current = key
   self.generation = self.generation + 1
@@ -371,6 +404,34 @@ function sonataNext:OnClientFontsChanged(ctx)
   return true
 end
 
+-- ApplyAnimation lays the Animation switches over the current theme again (a switch changed: next/AnimationChanged)
+-- and restyles every widget, as a theme applied does, keeping the font objects: the switches touch no font, and font
+-- objects can never be freed (a theme applied on every click would leave a set behind each time). Nothing is saved
+-- or announced. It returns whether it did, for profiler traces.
+---@param ctx Context
+---@return boolean
+function sonataNext:ApplyAnimation(ctx)
+  if not self.started then
+    return false
+  end
+  self.resolved = self:effective(self.current)
+  nextStyle():Use(self.resolved, true)
+  self:RestyleWidgets(ctx)
+  return true
+end
+
+-- WatchAnimation follows the player's Animation switches (core/init.lua, after WatchClientFonts): each one sends
+-- next/AnimationChanged (config/catalog.lua). Registered once however often it starts.
+function sonataNext:WatchAnimation()
+  if self.watchingAnimation then
+    return
+  end
+  self.watchingAnimation = true
+  events():RegisterMessage('next/AnimationChanged', function(ctx)
+    self:ApplyAnimation(ctx)
+  end)
+end
+
 ---@return string?
 function sonataNext:GetCurrentThemeKey()
   return self.current
@@ -380,7 +441,7 @@ end
 ---@return NextTheme
 function sonataNext:GetCurrentTheme()
   if self.resolved == nil then
-    self.resolved = self:Resolve(self.current or self:GetSavedThemeKey())
+    self.resolved = self:effective(self.current or self:GetSavedThemeKey())
   end
   return self.resolved
 end

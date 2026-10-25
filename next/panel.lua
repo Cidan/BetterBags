@@ -2754,8 +2754,10 @@ function panelProto:styleHeader()
     tween:Stop(spark)
     spark:SetAlpha(0)
     spark:Hide()
-    -- Its shimmer swelled the cloud; with no spark, nothing would settle it.
-    self:SetCloudSwell(0)
+    -- Its shimmer swelled the cloud; with no spark, nothing would settle it. Not drawn here: the cloud's puffs, made
+    -- again above, are laid out and drawn below (LayoutCloud). Drawn here they had no place yet, which failed, and
+    -- the cloud stayed at full strength, added as light (reported with the shimmer turned off, next-themes.md §20).
+    self.cloud.swell = 0
   end
 
   local glow, G = self.titleGlow, H.TitleGlow
