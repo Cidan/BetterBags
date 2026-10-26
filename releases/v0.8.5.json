@@ -1,0 +1,17 @@
+{
+  "id": 1792979512,
+  "version": "v0.8.5",
+  "channel": "alpha",
+  "date": "2026-10-26",
+  "from": "b55bf899a7e88799bef475454c13f44d552fe5f0",
+  "to": "e57661f8eff0ab306ca1bb0f11d55f10ee27eb60",
+  "headline": "Fixes a Lua error that could occur when entering dungeons or transitioning through loading screens.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Lua error when entering dungeons or loading screens",
+      "details": "Bag updates are now paused through all zone transitions and loading screens, not just initial login. This prevents an error where the game client cleared inventory slots before the transition finished.",
+      "clients": []
+    }
+  ]
+}
