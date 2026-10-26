@@ -1,0 +1,23 @@
+{
+  "id": 1792988584,
+  "version": "v0.8.5-1-gcae2085",
+  "channel": "alpha",
+  "date": "2026-10-26",
+  "from": "e57661f8eff0ab306ca1bb0f11d55f10ee27eb60",
+  "to": "cae20851f18c716470654d7477e0ad6cb9177a5b",
+  "headline": "Introduces the retro Glitch theme for BetterBags Next and fixes bag animations pausing permanently after hiding the interface.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Glitch theme for BetterBags Next",
+      "details": "Introduces a retro terminal theme featuring phosphor green styling, CRT flicker transitions, scanlines, HUD brackets, and falling data rain. New animation settings let you independently toggle Glitch Effects and Data Rain on or off.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Animations resuming after hiding the interface",
+      "details": "Animated effects on Next bags, such as sparkles, shimmers, and ornaments, now properly resume when restoring the interface after hiding it with Alt+Z.",
+      "clients": []
+    }
+  ]
+}
