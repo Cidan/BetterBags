@@ -58,6 +58,42 @@ describe("NextTween", function()
     assert.is_true(overshoots, "back passes its end and returns")
   end)
 
+  -- The Glitch theme's sections flicker into place (next-themes.md §21): in eight steps, each dim or lit, lit more
+  -- often as it goes, the same value for the same time (a hash of the step, not a random draw), lit from 0.75 on. In
+  -- steps, so a cascade of 0.6 s changes at most every 75 ms.
+  it("flickers: dim or lit by steps, lit more often as it goes, lit from 0.75 on", function()
+    local flicker = tween.Ease.flicker
+    for _, t in ipairs({ 0.75, 0.9, 1 }) do
+      assert.are.equal(1, flicker(t))
+    end
+    local lit, dim = { early = 0, late = 0 }, { early = 0, late = 0 }
+    for i = 0, 74 do
+      local t = i / 100
+      local v = flicker(t)
+      assert.is_true(v <= 0.3 or v >= 0.75, "two bands: " .. v)
+      assert.are.equal(v, flicker(t), "the same time, the same value")
+      local half = t < 0.375 and "early" or "late"
+      if v >= 0.75 then lit[half] = lit[half] + 1 else dim[half] = dim[half] + 1 end
+    end
+    assert.is_true(lit.late > lit.early, "lit more often as it goes")
+    assert.is_true(dim.early > 0 and lit.early > 0, "it flickers from the start")
+    assert.is_true(flicker(0) <= 0.3, "from nothing")
+    -- Each step its own strength in its band: lit short of full until the end, dim never nothing.
+    for step = 0, 5 do
+      local v = flicker((step + 0.5) / 8)
+      if v >= 0.75 then
+        assert.is_true(v < 1, "lit short of full: " .. v)
+      else
+        assert.is_true(v > 0, "dim, not nothing: " .. v)
+      end
+    end
+    local changes = 0
+    for i = 1, 999 do
+      if flicker(i / 1000) ~= flicker((i - 1) / 1000) then changes = changes + 1 end
+    end
+    assert.is_true(changes <= 7, "at most once a step: " .. changes)
+  end)
+
   it("starts at its start value at once, reaches its end on time, and calls back once", function()
     local values, done = {}, 0
     tween:Play("a", { duration = 0.2, from = 10, to = 20, ease = "linear",
@@ -117,6 +153,29 @@ describe("NextTween", function()
     near(1, last)
     assert.are.equal(1, done)
     assert.is_nil(tween.driver:GetScript("OnUpdate"))
+  end)
+
+  -- onStop runs when a tween ends without reaching its end: stopped without finishing, or replaced by another of its key
+  -- (a panel's glitching open cut short cleans up after itself, next-themes.md §21). Not when it finishes.
+  it("calls onStop when a tween ends without reaching its end, and only then", function()
+    local stopped = 0
+    local function play(key)
+      tween:Play(key, { duration = 1, from = 0, to = 1, onUpdate = function() end,
+        onStop = function() stopped = stopped + 1 end })
+    end
+    play("a")
+    tween:Stop("a")
+    assert.are.equal(1, stopped, "stopped")
+    play("a")
+    play("a")
+    assert.are.equal(2, stopped, "replaced")
+    tween:Stop("a", true)
+    assert.are.equal(2, stopped, "finished when stopped")
+    play("a")
+    tween:Step(2)
+    assert.are.equal(2, stopped, "finished on its own")
+    tween:Stop("a")
+    assert.are.equal(2, stopped, "nothing left to stop")
   end)
 
   it("skips a tween stopped by another one's callback in the same frame", function()

@@ -38,13 +38,20 @@ ornaments.CORNERS = CORNERS
 ornaments.MIRRORED = MIRRORED
 -- The values a theme may give, for SonataNext:Check.
 ornaments.POINTS = { INNER = true, OUTER = true, TOP = true, BOTTOM = true, TOPINNER = true, TOPOUTER = true,
-  BOTTOMINNER = true, BOTTOMOUTER = true }
+  BOTTOMINNER = true, BOTTOMOUTER = true, BODY = true }
 ornaments.ANCHORS = CORNERS
 ornaments.ORIGINS = ORIGINS
 ornaments.SIZES = { Full = true, Small = true }
 -- The panels a piece may be shown on (Panels), by the name of the bag kind each panel shows (const.BAG_KIND).
 ornaments.PANELS = { Backpack = "BACKPACK", Bank = "BANK", Vendor = "UNDEFINED", GuildBank = "GUILD" }
-ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period = true, Delay = true, Origin = true }
+ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period = true, Delay = true, Origin = true,
+  Scroll = true, Glitch = true }
+-- The keys of a Glitch motion.
+ornaments.GLITCH = { Every = true, Hold = true, Jump = true, Blink = true, Slip = true }
+-- Seconds between a glitch's rolls while it lasts: each roll jumps, blinks and slips the piece anew.
+ornaments.GLITCH_STEP = 0.06
+-- Where Scroll and Glitch take their randomness (a source of numbers in [0, 1)): replaced by the specs.
+ornaments.Random = math.random
 
 ---@class (exact) NextOrnamentPiece
 ---@field texture Texture Its texture on the frame it is drawn on.
@@ -55,6 +62,13 @@ ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period
 ---@field shown boolean Shown at the panel's size.
 ---@field groups? table<string, AnimationGroup> Its motions' groups, made the first time it moves.
 ---@field phase number Where its motions start (Motion.Delay).
+---@field scrollU? number How far its art has scrolled across, in tiles (Motion.Scroll), within a tile.
+---@field scrollV? number And down.
+---@field glitch? table Its Glitch motion's state: wait (seconds to its next glitch), left (of the one under way), roll.
+---@field jx? number A glitch's jump across (units, on whole pixels).
+---@field jy? number And up.
+---@field blink? number A glitch's share of its alpha.
+---@field slip? number A glitch's slip of its art across, in tiles.
 
 ---@class (exact) NextOrnamentSet
 ---@field panel table The panel: its frame, its body, its side, IsSmall.
@@ -62,6 +76,7 @@ ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period
 ---@field count number
 ---@field mirrored boolean Drawn for an inner side on the right.
 ---@field running boolean Moving (the panel shows).
+---@field driver? Frame Runs the pieces' Scroll and Glitch motions while they move, made the first time one does.
 local setProto = {}
 addon:GetModule('Perf'):RegisterPrototype(setProto, 'NextOrnamentSet')
 
@@ -176,9 +191,10 @@ function ornaments:DrawArt(t, o)
     t:SetAtlas(o.Atlas)
   elseif o.Texture ~= nil then
     local tiled = o.Tile ~= nil
-    local across = o.Point == "TOP" or o.Point == "BOTTOM"
+    local across = o.Point == "TOP" or o.Point == "BOTTOM" or o.Point == "BODY"
+    local down = o.Point ~= "TOP" and o.Point ~= "BOTTOM"
     t:SetTexture(style:TexturePath(o.Texture), (tiled and across) and "REPEAT" or nil,
-      (tiled and not across) and "REPEAT" or nil, "TRILINEAR")
+      (tiled and down) and "REPEAT" or nil, "TRILINEAR")
   else
     t:SetTexture(nil)
   end
@@ -277,6 +293,9 @@ function setProto:Layout()
     end
   end
   self:Tile()
+  if self.running then
+    self:drive()
+  end
 end
 
 -- place anchors a piece: a span between two of the body's corners (along its INNER or OUTER side, Start from
@@ -290,18 +309,29 @@ function setProto:place(piece)
   local mirrored = self.mirrored
   local x, y = pixel:Snap(t, o.X or 0), pixel:Snap(t, o.Y or 0)
   local start, finish = pixel:Snap(t, o.Start or 0), pixel:Snap(t, o.End or 0)
+  -- A glitch's jump (Motion.Glitch), on whole pixels: right and up.
+  local jx, jy = piece.jx or 0, piece.jy or 0
   t:ClearAllPoints()
-  if o.Point == "INNER" or o.Point == "OUTER" then
+  if o.Point == "BODY" then
+    -- Over the whole body, Inset into it (Left on its inner side), mirrored.
+    local inset = o.Inset or {}
+    local left, right = pixel:Snap(t, inset.Left or 0), pixel:Snap(t, inset.Right or 0)
+    if mirrored then
+      left, right = right, left
+    end
+    t:SetPoint("TOPLEFT", body, "TOPLEFT", left + jx, -pixel:Snap(t, inset.Top or 0) + jy)
+    t:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -right + jx, pixel:Snap(t, inset.Bottom or 0) + jy)
+  elseif o.Point == "INNER" or o.Point == "OUTER" then
     local left = (o.Point == "INNER") ~= mirrored
     local side = left and "LEFT" or "RIGHT"
     local dx = left and x or -x
-    t:SetPoint("TOP" .. side, body, "TOP" .. side, dx, -start)
-    t:SetPoint("BOTTOM" .. side, body, "BOTTOM" .. side, dx, finish)
+    t:SetPoint("TOP" .. side, body, "TOP" .. side, dx + jx, -start + jy)
+    t:SetPoint("BOTTOM" .. side, body, "BOTTOM" .. side, dx + jx, finish + jy)
     pixel:Width(t, o.Width)
   elseif o.Point == "TOP" or o.Point == "BOTTOM" then
     local inner, outer = mirrored and "RIGHT" or "LEFT", mirrored and "LEFT" or "RIGHT"
-    t:SetPoint(o.Point .. inner, body, o.Point .. inner, mirrored and -start or start, -y)
-    t:SetPoint(o.Point .. outer, body, o.Point .. outer, mirrored and finish or -finish, -y)
+    t:SetPoint(o.Point .. inner, body, o.Point .. inner, (mirrored and -start or start) + jx, -y + jy)
+    t:SetPoint(o.Point .. outer, body, o.Point .. outer, (mirrored and finish or -finish) + jx, -y + jy)
     pixel:Height(t, o.Height)
   else
     local point = CORNERS[o.Point]
@@ -311,7 +341,7 @@ function setProto:place(piece)
     end
     -- Toward the middle: right from a left corner, left from a right one.
     local dx = point:find("LEFT") and x or -x
-    t:SetPoint(anchor, body, point, dx, -y)
+    t:SetPoint(anchor, body, point, dx + jx, -y + jy)
     pixel:Size(t, o.Width, o.Height)
   end
 end
@@ -320,32 +350,49 @@ end
 -- other pieces show their art once, cropped to their TexCoords (left, right, top, bottom: art that is part of
 -- its file), mirrored with the panel too.
 function setProto:Tile()
-  local body = self.panel.body
   for i = 1, self.count do
-    local piece = self.pieces[i]
-    local o, t = piece.spec, piece.texture
-    -- A tiled span's TexCoords crop it across (its strip of the file: Classic's title band, _UI-Frame-TitleTileBg).
-    local c = o.TexCoords or { 0, 1, 0, 1 }
-    if o.Tile ~= nil and (o.Point == "INNER" or o.Point == "OUTER") then
-      local length = body:GetHeight() - pixel:Snap(t, o.Start or 0) - pixel:Snap(t, o.End or 0)
-      if self.mirrored then
-        t:SetTexCoord(c[2], c[1], 0, math.max(0, length) / o.Tile)
-      else
-        t:SetTexCoord(c[1], c[2], 0, math.max(0, length) / o.Tile)
-      end
-    elseif o.Tile ~= nil then
-      local length = body:GetWidth() - pixel:Snap(t, o.Start or 0) - pixel:Snap(t, o.End or 0)
-      local reach = math.max(0, length) / o.Tile
-      t:SetTexCoord(self.mirrored and reach or 0, self.mirrored and 0 or reach, c[3], c[4])
-    else
-      -- Mirror = false: art that must not be flipped (a portrait, an icon), placed mirrored all the same.
-      if self.mirrored and o.Mirror ~= false then
-        t:SetTexCoord(c[2], c[1], c[3], c[4])
-      else
-        t:SetTexCoord(c[1], c[2], c[3], c[4])
-      end
-    end
+    self:tilePiece(self.pieces[i])
   end
+end
+
+-- tilePiece sets a piece's texture coordinates (Tile), moved by how far its art has scrolled (Motion.Scroll) and a
+-- glitch's slip (Motion.Glitch). A piece over the whole body with a Tile repeats it both ways.
+---@private
+---@param piece NextOrnamentPiece
+function setProto:tilePiece(piece)
+  local body = self.panel.body
+  local o, t = piece.spec, piece.texture
+  -- A tiled span's TexCoords crop it across (its strip of the file: Classic's title band, _UI-Frame-TitleTileBg).
+  local c = o.TexCoords or { 0, 1, 0, 1 }
+  local u0, u1, v0, v1
+  if o.Tile ~= nil and o.Point == "BODY" then
+    local w, h = t:GetWidth() / o.Tile, t:GetHeight() / o.Tile
+    if self.mirrored then
+      u0, u1 = w, 0
+    else
+      u0, u1 = 0, w
+    end
+    v0, v1 = 0, h
+  elseif o.Tile ~= nil and (o.Point == "INNER" or o.Point == "OUTER") then
+    local length = body:GetHeight() - pixel:Snap(t, o.Start or 0) - pixel:Snap(t, o.End or 0)
+    if self.mirrored then
+      u0, u1 = c[2], c[1]
+    else
+      u0, u1 = c[1], c[2]
+    end
+    v0, v1 = 0, math.max(0, length) / o.Tile
+  elseif o.Tile ~= nil then
+    local length = body:GetWidth() - pixel:Snap(t, o.Start or 0) - pixel:Snap(t, o.End or 0)
+    local reach = math.max(0, length) / o.Tile
+    u0, u1, v0, v1 = self.mirrored and reach or 0, self.mirrored and 0 or reach, c[3], c[4]
+  elseif self.mirrored and o.Mirror ~= false then
+    -- Mirror = false: art that must not be flipped (a portrait, an icon), placed mirrored all the same.
+    u0, u1, v0, v1 = c[2], c[1], c[3], c[4]
+  else
+    u0, u1, v0, v1 = c[1], c[2], c[3], c[4]
+  end
+  local du, dv = (piece.scrollU or 0) + (piece.slip or 0), piece.scrollV or 0
+  t:SetTexCoord(u0 + du, u1 + du, v0 + dv, v1 + dv)
 end
 
 -- group returns a piece's animation group for a motion, emptied: made once and kept, so a theme's motion is
@@ -436,6 +483,10 @@ end
 ---@param piece NextOrnamentPiece
 ---@return boolean
 local function moving(piece)
+  local M = piece.spec and piece.spec.Motion
+  if M and (M.Glitch or (M.Scroll and piece.spec.Tile)) then
+    return true
+  end
   if piece.groups == nil then
     return false
   end
@@ -451,10 +502,7 @@ end
 ---@private
 ---@param piece NextOrnamentPiece
 function setProto:play(piece)
-  if not moving(piece) then
-    return
-  end
-  for _, g in pairs(piece.groups) do
+  for _, g in pairs(piece.groups or {}) do
     if g:GetAnimations() ~= nil then
       g:Play(false, piece.phase)
     end
@@ -475,6 +523,134 @@ function setProto:Start()
     end
   end
   self:Tile()
+  self:drive()
+end
+
+-- luaMotion says whether a piece moves on the set's driver: art that scrolls (a tiled piece's Scroll) or glitches.
+---@param piece NextOrnamentPiece
+---@return boolean
+local function luaMotion(piece)
+  local M = piece.spec and piece.spec.Motion
+  return M ~= nil and (M.Glitch ~= nil or (M.Scroll ~= nil and piece.spec.Tile ~= nil))
+end
+
+-- drive runs the set's driver while a piece shown moves on it (Scroll, Glitch), and stops it when none does. A child
+-- of the panel's frame: it stops while the panel hides.
+---@private
+function setProto:drive()
+  local any = false
+  for i = 1, self.count do
+    local piece = self.pieces[i]
+    if piece.shown and luaMotion(piece) then
+      any = true
+    end
+  end
+  if not any then
+    if self.driver ~= nil then
+      self.driver:SetScript("OnUpdate", nil)
+    end
+    return
+  end
+  if self.driver == nil then
+    self.driver = CreateFrame("Frame", nil, self.panel.frame)
+  end
+  self.driver:SetScript("OnUpdate", function(_, elapsed)
+    self:Step(elapsed)
+  end)
+end
+
+-- Step moves the pieces on the driver elapsed seconds along: art that scrolls moves on (Motion.Scroll: X units a second
+-- toward the outer side, Y down; kept within a tile), and a piece that glitches waits for its next glitch, or rolls a
+-- glitch under way anew every GLITCH_STEP until it ends, back at rest (Motion.Glitch).
+---@param elapsed number
+function setProto:Step(elapsed)
+  for i = 1, self.count do
+    local piece = self.pieces[i]
+    local o = piece.spec
+    local M = o.Motion
+    if piece.shown and M ~= nil then
+      if M.Scroll ~= nil and o.Tile ~= nil then
+        piece.scrollU = ((piece.scrollU or 0) - (M.Scroll.X or 0) * elapsed / o.Tile) % 1
+        piece.scrollV = ((piece.scrollV or 0) - (M.Scroll.Y or 0) * elapsed / o.Tile) % 1
+        self:tilePiece(piece)
+      end
+      if M.Glitch ~= nil then
+        self:glitchStep(piece, M.Glitch, elapsed)
+      end
+    end
+  end
+end
+
+-- nextWait is how long a piece waits for its next glitch: Every on average, from 0.3 to 1.7 of it.
+---@param G table
+---@return number
+local function nextWait(G)
+  return (G.Every or 5) * (0.3 + 1.4 * ornaments.Random())
+end
+
+---@private
+---@param piece NextOrnamentPiece
+---@param G table
+---@param elapsed number
+function setProto:glitchStep(piece, G, elapsed)
+  local st = piece.glitch
+  if st == nil then
+    st = { wait = nextWait(G) }
+    piece.glitch = st
+  end
+  if st.left ~= nil then
+    st.left = st.left - elapsed
+    if st.left <= 0 then
+      st.left = nil
+      st.wait = nextWait(G)
+      self:rest(piece)
+      return
+    end
+    st.roll = st.roll - elapsed
+    if st.roll <= 0 then
+      self:roll(piece, G)
+    end
+    return
+  end
+  st.wait = st.wait - elapsed
+  if st.wait <= 0 then
+    st.left = G.Hold or 0.12
+    self:roll(piece, G)
+  end
+end
+
+-- roll jumps a piece up to Jump units either way across and up or down (on whole pixels), blinks it to Blink of its
+-- alpha half the time, and slips its art up to Slip of a tile either way.
+---@private
+---@param piece NextOrnamentPiece
+---@param G table
+function setProto:roll(piece, G)
+  local random, t = ornaments.Random, piece.texture
+  local jump = G.Jump or 0
+  piece.jx = pixel:Snap(t, (2 * random() - 1) * jump)
+  piece.jy = pixel:Snap(t, (2 * random() - 1) * jump)
+  piece.blink = random() < 0.5 and (G.Blink or 1) or 1
+  piece.slip = (2 * random() - 1) * (G.Slip or 0)
+  piece.glitch.roll = ornaments.GLITCH_STEP
+  self:show(piece)
+end
+
+-- rest puts a glitched piece back: no jump, blink or slip.
+---@private
+---@param piece NextOrnamentPiece
+function setProto:rest(piece)
+  piece.jx, piece.jy, piece.blink, piece.slip = nil, nil, nil, nil
+  self:show(piece)
+end
+
+-- show draws a piece as its glitch state says: placed, its art's coordinates, its alpha (its own times a blink).
+---@private
+---@param piece NextOrnamentPiece
+function setProto:show(piece)
+  self:place(piece)
+  self:tilePiece(piece)
+  local _, _, _, a = style:RGBA(piece.spec.Color or "White", piece.spec.Alpha)
+  piece.texture:SetAlpha(a * (piece.blink or 1))
 end
 
 ---@private
@@ -485,11 +661,20 @@ function setProto:stopPiece(piece)
   end
 end
 
--- Stop ends every piece's motion, back at rest (the panel hid).
+-- Stop ends every piece's motion, back at rest (the panel hid): a glitch under way ends.
 function setProto:Stop()
   self.running = false
+  if self.driver ~= nil then
+    self.driver:SetScript("OnUpdate", nil)
+  end
   for _, piece in ipairs(self.pieces) do
     self:stopPiece(piece)
+    if piece.glitch ~= nil then
+      piece.glitch = nil
+      if piece.spec ~= nil then
+        self:rest(piece)
+      end
+    end
   end
 end
 

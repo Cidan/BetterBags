@@ -77,6 +77,22 @@ describe("NextSparkles", function()
     assert.is_true(p.angle ~= angle0, "spins")
   end)
 
+  -- The Glitch theme's sparkles are square pixels (next-themes.md §21): a theme saying Upright keeps every sprite
+  -- unturned, never spinning.
+  it("keeps its sprites upright and still for a theme that says so", function()
+    local S = addon:GetModule("NextStyle").Theme.Sparkles
+    S.Upright = true
+    finally(function() S.Upright = nil end)
+    local e = emitter({ Rate = 1 })
+    e:Start()
+    step(e, 1)
+    local p = e.alive[1]
+    assert.are.equal(0, p.angle)
+    step(e, 0.5)
+    assert.are.equal(0, p.angle, "no spin")
+    assert.are.equal(0, p.texture:GetRotation())
+  end)
+
   -- The bank's panel is on the left of the screen: its sparkles drift right, out of its window.
   it("drifts its sparkles right when its direction says so", function()
     local e = emitter({ Rate = 1, Direction = 1 })

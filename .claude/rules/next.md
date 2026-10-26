@@ -317,7 +317,9 @@ section dragged out of a panel returns to the panel's strata (§7).
   window bigger out the edge so it just covers it up, remove the glow").
 - **Closing:** it slides out to the right (0.24 s) and hides. Escape hides it at once
   (`UISpecialFrames`). Every way it hides runs `OnClosed` (Recent Items expiry, held gaps;
-  recent-items.md §3) and stops the sparkles and moves.
+  recent-items.md §3) and stops the sparkles and moves. A parent hiding it (Alt+Z hides UIParent) runs its OnHide
+  too, with its own flag still set (`hiddenByParent`): when the parent shows it again, its sparkles, ornaments, data
+  rain, shimmer and glitch bursts start again (`startEffects`; before, they stayed still until it was opened again).
 - Coverage of the reach: `spec/next/bag_spec.lua` ("keeps its fill over the screen edge through the
   whole bounce": the real slide in 2 ms steps, the fill's outer edge never inside the screen, and
   the bounce still at least 9% of the run) and `spec/next/bank_spec.lua` (mirrored on the left
@@ -825,7 +827,9 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
     not in the generated documentation. The Seller (every sale, `data/seller.lua`) also asks
     `UnitGUID("npc")`, secret in the same places: it keyed tables with it, which errored (seller.md §3). The frame mock's `MockSecret` (`spec/helpers/wow_mocks.lua`)
     models secrets: arithmetic and comparisons error, a font string given one returns a secret width,
-    the tooltip's `SetText`/`AddLine` reject one. Coverage: `spec/next/vendor_spec.lua` ("with a
+    the tooltip's `SetText`/`AddLine` reject one, and so do `SetWidth`, `SetHeight`, `SetSize` and `SetPoint`
+    (`SecretArguments = "AllowedWhenUntainted"`: addon code is always tainted; added when the Glitch theme's title
+    ghosts were given the title's secret width, next-themes.md §21). Coverage: `spec/next/vendor_spec.lua` ("with a
     secret vendor name (an instance)"), `spec/next/chain_spec.lua` ("names bags by their labels in
     tooltips"). Not seen in game yet.
   - **Secret anchoring, every measure of the title.** Reported by a player: `next/panel.lua:2359: attempt to

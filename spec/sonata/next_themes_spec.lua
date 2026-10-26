@@ -7,6 +7,18 @@ if addon:GetModule("NextTween", true) == nil then
   ResetModuleStub("NextTween", "next/tween.lua")
   LoadBetterBagsModule("next/tween.lua")
 end
+-- SonataNext:Check reads a glitch's and a rain's parts from their modules (and an ornament's): loaded, every theme's are
+-- checked too. The panels an ornament may be on are named by their bag kinds: a Constants stub when none is loaded,
+-- taken away again after.
+local constants, createdConstants = StubBetterBagsModule("Constants")
+constants.BAG_KIND = constants.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = 2 }
+for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextOrnaments", "next/ornaments.lua" },
+  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" } }) do
+  if addon:GetModule(m[1], true) == nil then
+    ResetModuleStub(m[1], m[2])
+    LoadBetterBagsModule(m[2])
+  end
+end
 
 local FLAGS = { "isRetail", "isForever", "isClassic", "isBCC", "isMists", "isAnniversary", "isCata" }
 -- Every client SonataResolve knows, by the flags that pick its override keys.
@@ -35,6 +47,9 @@ describe("BetterBags Next's shipped themes", function()
 
   teardown(function()
     FreshNextThemes()
+    if createdConstants then
+      ResetModuleStub("Constants")
+    end
   end)
 
   local function shipped()
@@ -45,7 +60,7 @@ describe("BetterBags Next's shipped themes", function()
   end
 
   it("ships Default and at least three others", function()
-    assert.are.same({ "Default", "Ember", "GW2", "Parchment", "Plain", "Quiet" }, shipped())
+    assert.are.same({ "Default", "Ember", "GW2", "Glitch", "Parchment", "Plain", "Quiet" }, shipped())
   end)
 
   it("resolves every one on every client and finds nothing it does not define", function()
@@ -128,6 +143,24 @@ describe("BetterBags Next's shipped themes", function()
   -- The vendor's cards (next.md §10b): two lines of an item's name and a line of its price (raised off
   -- the card's edge) fit beside its icon, the coins no taller than the price, in every theme on every
   -- client.
+  -- A dock card's lines are as tall as the theme says (Dock.TitleHeight, LineHeight; next/dockcard.lua), whatever their
+  -- font: a font taller than its line may be cut or not drawn. Found by the adversarial review: Glitch's 24 title in 22.
+  it("fits a dock card's title and lines in their heights", function()
+    for client, flags in pairs(CLIENTS) do
+      for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+      for _, key in ipairs(shipped()) do
+        local t = sonataNext:Resolve(key)
+        local D = t.Dock
+        for _, pair in ipairs({ { D.TitleFont, D.TitleHeight }, { D.WarningFont, D.LineHeight }, { D.HintFont, D.LineHeight } }) do
+          local size = t.Fonts[pair[1]].Size
+          if size then
+            assert.is_true(size <= pair[2], key .. " on " .. client .. ": " .. pair[1] .. " " .. size .. " in " .. pair[2])
+          end
+        end
+      end
+    end
+  end)
+
   it("fits a vendor card's name and price beside its icon", function()
     for client, flags in pairs(CLIENTS) do
       for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
@@ -586,6 +619,118 @@ describe("BetterBags Next's shipped themes", function()
         assert.are.same({ 0.578125, 0.689453125, 0.0234375, 0.46875 }, vendor[3].TexCoords, "Bagslots2x's empty gold ring")
         assert.is_not_nil(t.Header.Buttons.Pinned.closeButton, "the close stays in the header")
         assert.is_nil(t.Panel.Ornaments, "the bag is the button now, not an ornament")
+      end
+    end)
+  end)
+  -- Glitch (next-themes.md §21): asked for "flickers, glitched blinking textures that wobble suddenly and harshly, think
+  -- green mesh".
+  describe("Glitch", function()
+    -- readFile returns a file shipped with BetterBags, by its game path.
+    local function readFile(path)
+      local file = path:gsub("^Interface\\AddOns\\BetterBags\\", ""):gsub("\\", "/")
+      local f = io.open(file, "rb")
+      assert.is_not_nil(f, file)
+      local data = f:read("*a")
+      f:close()
+      return data, file
+    end
+
+    it("draws its text in two terminal fonts it ships, with their licenses, in the locales they cover", function()
+      local t = sonataNext:Resolve("Glitch")
+      local files = {}
+      for role, spec in pairs(t.Fonts) do
+        if spec.File ~= nil then
+          files[spec.File] = true
+          assert.are.same({ "enUS", "enGB", "deDE", "frFR", "esES", "esMX", "itIT", "ptBR" }, spec.Locales, role)
+        end
+      end
+      local count = 0
+      for path in pairs(files) do
+        count = count + 1
+        local data, file = readFile(path)
+        assert.are.equal("\0\1\0\0", data:sub(1, 4), file .. " is a TrueType font")
+        local license = readFile((path:gsub("%-Regular%.ttf$", "-OFL.txt")))
+        assert.is_truthy(license:find("SIL Open Font License", 1, true))
+      end
+      assert.are.equal(2, count)
+      assert.is_not_nil(t.Fonts.Title.File, "the title")
+      assert.is_not_nil(t.Fonts.Section.File, "sections")
+      assert.is_not_nil(t.Fonts.Count.File, "counts")
+    end)
+
+    it("ships every texture it names, as a PNG", function()
+      local t = sonataNext:Resolve("Glitch")
+      for name, path in pairs(t.Textures) do
+        if path:find("textures\\next\\glitch\\", 1, true) then
+          local data, file = readFile(path)
+          assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), name .. ": " .. file)
+        end
+      end
+      assert.is_not_nil(t.Textures.Mesh, "the green mesh")
+    end)
+
+    it("glitches open, closed and now and then, its title split and corrupted", function()
+      local t = sonataNext:Resolve("Glitch")
+      local G = t.Panel.Glitch
+      assert.is_true(G.Open.Time > 0 and G.Open.PowerOn > 0, "a CRT warming up, then flickering in")
+      assert.is_true(G.Close.Time > 0 and G.Close.PowerOff > 0, "flickering out, then a CRT turning off")
+      assert.is_true(G.Bursts.Every >= 10, "now and then, not often")
+      assert.is_true(G.Flicker[1] >= 0.3, "never flickering to nothing")
+      assert.is_true(G.Step >= 0.05)
+      local ghosts = t.Header.Title.Ghosts
+      assert.are.same({ "TitleCyan", "TitleMagenta" }, { ghosts[1].Font, ghosts[2].Font })
+      assert.are.equal("Cyan", t.Fonts.TitleCyan.Color)
+      assert.are.equal("Magenta", t.Fonts.TitleMagenta.Color)
+      for c in G.Corrupt.Glyphs:gmatch(".") do
+        assert.is_true(c:byte() < 128, "ASCII, which every client's fonts have")
+      end
+      assert.are.equal("flicker", t.Motion.Ease.Cascade, "sections flicker into place")
+    end)
+
+    it("rains data down the feather and faintly behind the items, in ASCII", function()
+      local t = sonataNext:Resolve("Glitch")
+      local wheres = {}
+      for _, entry in ipairs(t.Panel.Rain) do
+        wheres[entry.Where] = entry.Alpha
+        for c in entry.Glyphs:gmatch(".") do
+          assert.is_true(c:byte() < 128)
+        end
+        assert.is_not_nil(t.Fonts[entry.Font])
+        assert.is_not_nil(t.Fonts[entry.HeadFont])
+      end
+      assert.is_true(wheres.Feather > wheres.Body, "faint behind the items")
+      assert.is_true(wheres.Body <= 0.15)
+    end)
+
+    it("draws a CRT round its content: a grid, the mesh floor, a vignette, scanlines, a rolling bar, HUD brackets", function()
+      local t = sonataNext:Resolve("Glitch")
+      local by, corners = {}, {}
+      for _, o in ipairs(t.Panel.Ornaments) do
+        by[o.Texture] = o
+        if o.Texture == "Bracket" then
+          corners[o.Point] = o.TexCoords
+          assert.is_not_nil(o.Motion.Glitch, "twitching now and then")
+          assert.is_true(o.Above, "over the frame's edge")
+        end
+      end
+      assert.are.same({ TOPINNER = { 0, 1, 0, 1 }, TOPOUTER = { 1, 0, 0, 1 }, BOTTOMINNER = { 0, 1, 1, 0 },
+        BOTTOMOUTER = { 1, 0, 1, 0 } }, corners, "the L flipped for each corner")
+      assert.are.equal("BOTTOM", by.Mesh.Point)
+      assert.are.equal("BODY", by.Grid.Point)
+      assert.is_nil(by.Grid.Above, "behind the content")
+      assert.is_true(by.Scanlines.Above, "over the items")
+      assert.is_not_nil(by.Bar.Motion.Scroll, "rolling")
+      assert.is_true(t.Sparkles.Upright, "square pixel sparks")
+      assert.is_nil(t.Tabs.Indicator, "no bar: the selected tab is lit")
+      assert.is_not_nil(t.Tabs.Edge, "tabs as HUD boxes")
+      assert.are.equal("Dash", t.Sections.Line.Texture)
+    end)
+
+    it("draws in phosphor where Default draws gold and lavender", function()
+      local t = sonataNext:Resolve("Glitch")
+      for _, name in ipairs({ "Gold", "Lavender", "Text", "Muted" }) do
+        local c = t.Palette[name]
+        assert.is_true(c[2] > c[1] and c[2] > c[3], name .. " is green")
       end
     end)
   end)

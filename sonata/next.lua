@@ -279,6 +279,18 @@ local ANIMATION_OFF = {
       piece.Motion = nil
     end
   end,
+  -- The Glitch theme's (next-themes.md §21): its bags glitch in and out and now and then while they show; off, they
+  -- slide in and out as any theme's. And its data rain.
+  -- An ornament's glitch (a blinking twitch) is a glitch too: it goes, its other motion left to Moving Ornaments.
+  glitch = function(theme)
+    theme.Panel.Glitch = nil
+    for _, piece in ipairs(theme.Panel.Ornaments or {}) do
+      if piece.Motion then
+        piece.Motion.Glitch = nil
+      end
+    end
+  end,
+  rain = function(theme) theme.Panel.Rain = nil end,
 }
 
 -- effective returns a theme as the player sees it: resolved (a new table), the Animation switches they turned off laid
@@ -462,7 +474,7 @@ local FONT_KEYS = {
   PriceFont = true, UnaffordableFont = true, StackFont = true, NameFont = true, HoverFont = true,
   DescriptionFont = true, NoteFont = true, LabelFont = true, LinkFont = true, GroupFont = true,
   ActiveFont = true, PreviewFont = true, UnavailableFont = true, DisabledFont = true,
-  CappedFont = true, NoneFont = true, GainFont = true, LossFont = true, MoreFont = true,
+  CappedFont = true, NoneFont = true, GainFont = true, LossFont = true, MoreFont = true, HeadFont = true,
 }
 -- Keys whose value names one of the theme's Textures, or is a file (a path or a file ID).
 local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true, Icon = true, HoverIcon = true }
@@ -600,6 +612,100 @@ function sonataNext:Check(key)
         if o.Motion.Origin ~= nil and not ornaments.ORIGINS[o.Motion.Origin] then
           problem("Motion.Origin", "no point named " .. tostring(o.Motion.Origin))
         end
+        for _, motion in ipairs({ "Glitch", "Scroll" }) do
+          local spec = o.Motion[motion]
+          if spec ~= nil and type(spec) ~= "table" then
+            problem("Motion." .. motion, "a table")
+          end
+        end
+        for k in pairs(type(o.Motion.Glitch) == "table" and o.Motion.Glitch or {}) do
+          if not ornaments.GLITCH[k] then
+            problem("Motion.Glitch." .. tostring(k), "no glitch part named " .. tostring(k))
+          end
+        end
+        for k in pairs(type(o.Motion.Scroll) == "table" and o.Motion.Scroll or {}) do
+          if k ~= "X" and k ~= "Y" then
+            problem("Motion.Scroll." .. tostring(k), "X or Y")
+          end
+        end
+      end
+    end
+  end
+  -- A range: two numbers, none below 0, the least first.
+  local function range(v)
+    return type(v) == "table" and type(v[1]) == "number" and type(v[2]) == "number" and v[1] >= 0 and v[1] <= v[2]
+  end
+  -- A glitch (Panel.Glitch, next-themes.md §21): its parts are NextGlitch's; opening, closing and bursts need their time.
+  local glitch = addon:GetModule('NextGlitch', true)
+  local G = theme.Panel and theme.Panel.Glitch
+  if glitch ~= nil and type(G) == "table" then
+    local function problem(field, text)
+      table.insert(problems, "Panel.Glitch." .. field .. ": " .. text)
+    end
+    for k in pairs(G) do
+      if not glitch.KEYS[k] then
+        problem(tostring(k), "no part named " .. tostring(k))
+      end
+    end
+    local moments = false
+    for _, part in ipairs({ { "Open", "a glitch opening needs one" }, { "Close", "a glitch closing needs one" },
+      { "Bursts", "bursts need one" } }) do
+      local spec = G[part[1]]
+      if spec ~= nil then
+        moments = true
+        if type(spec) ~= "table" then
+          problem(part[1], "a table")
+        elseif type(spec.Time) ~= "number" then
+          problem(part[1] .. ".Time", part[2])
+        end
+      end
+    end
+    if moments and not (type(G.Step) == "number" and G.Step > 0) then
+      problem("Step", "a glitch needs one")
+    end
+    if type(G.Bursts) == "table" and not (type(G.Bursts.Every) == "number" and G.Bursts.Every > 0) then
+      problem("Bursts.Every", "bursts need one")
+    end
+    if G.Flicker ~= nil and not range(G.Flicker) then
+      problem("Flicker", "two numbers, dark and lit")
+    end
+    if type(G.Corrupt) == "table" and (type(G.Corrupt.Glyphs) ~= "string" or G.Corrupt.Glyphs == "") then
+      problem("Corrupt.Glyphs", "some glyphs")
+    end
+  end
+  -- A data rain (Panel.Rain, next-themes.md §21): each entry's parts are NextRain's, where it falls, its glyphs and its
+  -- ranges.
+  local rain = addon:GetModule('NextRain', true)
+  local drops = theme.Panel and theme.Panel.Rain
+  if rain ~= nil and type(drops) == "table" then
+    for i, entry in ipairs(drops) do
+      local function problem(field, text)
+        table.insert(problems, "Panel.Rain." .. i .. "." .. field .. ": " .. text)
+      end
+      for k in pairs(entry) do
+        if not rain.KEYS[k] then
+          problem(tostring(k), "no part named " .. tostring(k))
+        end
+      end
+      if not rain.WHERE[entry.Where] then
+        problem("Where", "no place named " .. tostring(entry.Where))
+      end
+      if type(entry.Glyphs) ~= "string" or entry.Glyphs == "" then
+        problem("Glyphs", "some glyphs")
+      end
+      for _, field in ipairs({ "Font", "HeadFont" }) do
+        if entry[field] == nil then
+          problem(field, "a text role")
+        end
+      end
+      if entry.Spacing ~= nil and not (type(entry.Spacing) == "number" and entry.Spacing > 0) then
+        problem("Spacing", "more than nothing")
+      end
+      if not range(entry.Speed) then
+        problem("Speed", "two numbers, slowest and fastest")
+      end
+      if not range(entry.Trail) then
+        problem("Trail", "two numbers, shortest and longest")
       end
     end
   end

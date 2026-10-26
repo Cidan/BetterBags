@@ -90,6 +90,7 @@ sonata\themes\elvui.lua
 sonata\themes\gw2.lua
 sonata\themes\next\default.lua
 sonata\themes\next\ember.lua
+sonata\themes\next\glitch.lua
 sonata\themes\next\gw2.lua
 sonata\themes\next\parchment.lua
 sonata\themes\next\plain.lua
@@ -200,6 +201,8 @@ next\drag.lua
 next\chain.lua
 next\ornaments.lua
 next\menubutton.lua
+next\glitch.lua
+next\rain.lua
 next\panel.lua
 next\currencydrag.lua
 next\currencyentry.lua

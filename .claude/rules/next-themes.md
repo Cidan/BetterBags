@@ -18,9 +18,11 @@ Before this, Next's whole look was constants in `next/style.lua` and literals ac
 |---|---|---|
 | `SonataResolve` | `sonata/resolve.lua` | Theme resolution shared by both engines: inheritance (`Parent`, else the registry's base), per-client overrides (`Clients`), variables (`"$Name"`), the merge rules (tables merge, lists replace, `false` removes). Moved out of `sonata/engine.lua`; the classic engine delegates (`Resolve`, `chainOf`, `GetClientKeys`) and every Sonata spec passes unchanged. |
 | `SonataNext` | `sonata/next.lua` | Next's engine: registry, data-only validation, availability (`Requires`), the saved choice (`nextTheme`), applying, previews, widgets, item buttons, `Check`. |
-| Next themes | `sonata/themes/next/*.lua` | `Default` (complete: every other theme inherits what it does not set from it), `Ember`, `Parchment`, `Quiet`. |
+| Next themes | `sonata/themes/next/*.lua` | `Default` (complete: every other theme inherits what it does not set from it), `Ember`, `Glitch`, `GW2`, `Parchment`, `Plain`, `Quiet`. |
 | `NextStyle` | `next/style.lua` | A view of the current theme (`Use`): the old constant fields (`ICON`, `PAD`, `Color`, `Time`, `Small`, `Chain`, `Cloud`, ...) keep their names and are read from the theme, so Next's code reads them as before; `style.Theme` is the resolved theme for widget specs. Fonts, `Paint`, `RGBA`, `Ease`, `TexturePath`. |
 | Widgets | `next/*.lua` | Each draws from the theme and has an `ApplyStyle(ctx)` that restyles it live. |
+| `NextGlitch` | `next/glitch.lua` | A panel's glitches (`Panel.Glitch`, §21): the CRT's beam, a glitch's moments (tears, datamosh blocks, static, the title's colours split and its letters corrupted, sections shoved), drawn on the panel's glitch layer; the panel drives them. |
+| `NextRain` | `next/rain.lua` | A panel's data rain (`Panel.Rain`, §21): columns of glyphs falling down the feather or behind the content. |
 
 Load order (every TOC, `spec/render/toc_spec.lua`): `sonata\resolve.lua` before `sonata\engine.lua`,
 `sonata\next.lua` right after it, the Next theme files after the classic themes and before
@@ -80,16 +82,16 @@ may also be inset, drawn at its atlas's size or pieced (§16); a **frame** is Bl
 | `Palette` | Every named color, or one of the client's named colors (`{ Global = "PANEL_BACKGROUND_COLOR", Alpha? }`: Color.lua makes each `C_UIColor` color a global on every client; read when the theme applies; `Check` names a missing one). The controls and the settings window (next-settings.md) add `ControlFill`, `ControlHover`, `ControlPressed` (a field idle, under the pointer, pressed), `Track` (a switch off, a slider's empty track), `Danger` (what deletes) and `Sidebar`; a theme whose body is not indigo sets the first four in its own colors. |
 | `Textures` | Named files (`Glow`, `Sparkle`; Parchment adds `Paper`), and the glyphs (`Icon...`; `minimize.png` and `maximize.png` are shipped for themes that want window marks, Guild Wars 2's size button; the controls' `IconChevron`, `IconCheck`, `IconSearch`, `IconPlus`, and `Circle`, the round switch's disc, made by `tools/textures/next_icons.py`). |
 | `FontShadow` | The shadow `Shadow = true` means. |
-| `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`; or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font); or `Copy`, a client font copied outright (its file, flags, color and shadow) at the role's `Size` (its own, or the one it inherits from Default; `false`: the client font's own), nothing else the role inherits changing it but its height on whole pixels and its own `Justify` (the Plain theme, at Default's sizes). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
+| `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`, `Locales` (the client locales `File` is drawn in; elsewhere the client's own font: a font covers some alphabets, §21); or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font); or `Copy`, a client font copied outright (its file, flags, color and shadow) at the role's `Size` (its own, or the one it inherits from Default; `false`: the client font's own), nothing else the role inherits changing it but its height on whole pixels and its own `Justify` (the Plain theme, at Default's sizes). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
 | `Layout` | Sizes: Icon (an item button's size; the player's Icon Scale, the Size tab, multiplies it: `style.ICON`; the grid's width and the vendor's cards keep the theme's own, `style.CARD_ICON`, docs/next-appearance-size.md), VendorColumns, VendorTextGap, VendorPriceRaise (the vendor's cards, next.md §10b), Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
-| `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
-| `Panel` | `Fill` (texture spec; `Inset`: `Left`, `Right`, `Top`, `Bottom` into the body, drawn for the backpack and mirrored on the bank, the screen-edge side still reaching past the edge while docked; `Panel:FillInsets()`), `Frame` (Blizzard's frame round the body, §15, mirrored on the bank; `Above` over the content, `Bands` across its top), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none). |
-| `Header` | `Title.Font`, `Title.Justify` (`"CENTER"`: centered in the room the header buttons leave, as Blizzard centers a window's title; its button and glow over the text where it is drawn); `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button; an icon's `Highlight`, art drawn over it under the pointer; an icon's `Pushed` art while pressed and `Disabled` art while disabled, drawn whole (neither dimmed nor grayed), as a button's pushed and disabled textures are; `RowStart`, where the row starts from the outer side when the pinned buttons hold the corner (the title's room counts the row from there or the pins, whichever reaches further); `Rail`, the buttons down a strip along the inner side instead of across the header, inside the body or `Outside` it, its art from `Start`, §13, false in Default; `Pinned`, a button at a corner of the body apart from the row or the rail, §13; `Menu`, the row in a bag button's menu, §19). |
+| `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize; any of `NextTween.Ease`, `flicker` included, §21), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
+| `Panel` | `Fill` (texture spec; `Inset`: `Left`, `Right`, `Top`, `Bottom` into the body, drawn for the backpack and mirrored on the bank, the screen-edge side still reaching past the edge while docked; `Panel:FillInsets()`), `Frame` (Blizzard's frame round the body, §15, mirrored on the bank; `Above` over the content, `Bands` across its top), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none), `Glitch` (glitching in, out and now and then, §21; Default has none), `Rain` (data rain, §21; Default has none). |
+| `Header` | `Title.Font`, `Title.Ghosts` (copies of the title under it, each `{ Font, X, Y, Alpha }`: a colour split, §21), `Title.Justify` (`"CENTER"`: centered in the room the header buttons leave, as Blizzard centers a window's title; its button and glow over the text where it is drawn); `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button; an icon's `Highlight`, art drawn over it under the pointer; an icon's `Pushed` art while pressed and `Disabled` art while disabled, drawn whole (neither dimmed nor grayed), as a button's pushed and disabled textures are; `RowStart`, where the row starts from the outer side when the pinned buttons hold the corner (the title's room counts the row from there or the pins, whichever reaches further); `Rail`, the buttons down a strip along the inner side instead of across the header, inside the body or `Outside` it, its art from `Start`, §13, false in Default; `Pinned`, a button at a corner of the body apart from the row or the rail, §13; `Menu`, the row in a bag button's menu, §19). |
 | `Search` | `Fill`, `FocusFill` (colors, or art: §14), `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`, `ActiveColor`: while it holds a search, under the pointer or not, as Blizzard's magnifier stays white), `HelpFont`, `TextFont`; `Template = true` keeps the bag search box's own border (`BagSearchBoxTemplate`) and draws neither the fill nor the edge. |
 | `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Header` (art behind the title row, across the section, `Layout.SectionHeader` tall; unset in Default), `Line` (`Color`, `From`, `To`, `Size`, or art, or false), `Highlight` (`Color`, `From`, `To`, or art, or false). |
-| `Tabs` | `Fill`, `SelectedFill` (colors fading by `Fade`, or art: drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels, no fade), `Font`, `SelectedFont`, `Glow` (`Color`, `BlendMode`, `Drop`, `Pulse`, or false), `Indicator` (`Color`, `Width`, or art tinted by the accent, or false), `Highlight` and `SelectedHighlight` (art over the tab's fill under the pointer and when selected: Blizzard's list rows; mirrored with the panel), `Accents` (Warbank, Guild). A tab entry's `accent` is an accent name, a palette name or a color. |
+| `Tabs` | `Fill`, `SelectedFill` (colors fading by `Fade`, or art: drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels, no fade), `Font`, `SelectedFont`, `Glow` (`Color`, `BlendMode`, `Drop`, `Pulse`, or false), `Indicator` (`Color`, `Width`, or art tinted by the accent, or false), `Highlight` and `SelectedHighlight` (art over the tab's fill under the pointer and when selected: Blizzard's list rows; mirrored with the panel), `Edge` and `SelectedEdge` (an edge round each tab, NextControls' edge: `Color`, `Alpha`, `Size`; the selected tab's and a drop target's in `SelectedEdge`, else `Edge`; §21), `Accents` (Warbank, Guild). A tab entry's `accent` is an accent name, a palette name or a color. |
 | `Footer` | `Line` (`Color`, `Inner`, `Outer`, `Size`, or art mirrored with the panel, or false), `Font`, `EmptyFont`, `MoneyFont` (the guild's gold). |
-| `Sparkles` | `Texture`, `BlendMode`, `Colors`, `FadeIn`, `FadeOut`, `TwinkleSpeed`, `TwinkleDepth`, `Shrink`, `WobbleSpeed`; emitters `Cloud`, `Ribbon` (+`Spread`), `Edge` (+`Reach`), `Knot` (+`Burst`), each `Rate`, `Max`, `Life`, `Size`, `Speed`, `Rise`, `Wobble`, `Spin`, `Alpha`, or false; `Sparkles = false` turns them all off. A coupled bag keeps its shorter ribbon and edge sparkle lives (next.md §12, §14e). |
+| `Sparkles` | `Texture`, `BlendMode`, `Colors`, `FadeIn`, `FadeOut`, `TwinkleSpeed`, `TwinkleDepth`, `Shrink`, `WobbleSpeed`, `Upright` (never turned: square pixels, §21); emitters `Cloud`, `Ribbon` (+`Spread`), `Edge` (+`Reach`), `Knot` (+`Burst`), each `Rate`, `Max`, `Life`, `Size`, `Speed`, `Rise`, `Wobble`, `Spin`, `Alpha`, or false; `Sparkles = false` turns them all off. A coupled bag keeps its shorter ribbon and edge sparkle lives (next.md §12, §14e). |
 | `Chain` | Chaining (next.md §12) and the braid: `Braid` (false: none), `Segments`, `Beads`, colors (`Color`, `BeadColor`, `KnotColor`), sizes and timing. |
 | `Small` | Small mode (next.md §14). The border's alpha is `Panel.Edge.Alpha`. `Grip` (next.md §14g): `Size`, `Inset`, `ShowOnHover` (false: always seen), and `Normal`, `Highlight`, `Pushed` texture specs (mirrored on the left corner); `MinTitle`, the least room a narrowed panel keeps for its title. |
 | `Drag` | `LiftScale`, `FlyScale`, `Shadow` (`Color`, `Alpha`, `Spread`, or false), `HintFont`, `HintGap`. |
@@ -281,6 +283,19 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
   combined bags; round two the bag windows above and the settings window as Blizzard's (§18); round three Default's
   scale and layout, the bag button (docs/next-plain-theme.md).
 
+- **Glitch** (`sonata/themes/next/glitch.lua`; asked: "a 'glitch' theme, where the bag sort of 'glitches' into existance
+  when opening, glitches out when closing. think flickers, glitched blinking textures that wobble suddenly and harshly,
+  think green mesh ... push the limits of what's possible here", and to keep it off GitHub until it is shown): a
+  terminal that will not hold still. Opening, a CRT warming up, then the panel flickering into view through tears,
+  datamosh blocks and static, its sections shoved and its title split and corrupted; closing, the same backwards into a
+  CRT turning off; a short burst now and then while it shows. At rest: phosphor green on near black, a faint grid, a
+  wireframe floor breathing along the bottom, a CRT vignette, scanlines and a rolling bar over the items, HUD brackets
+  at the corners that twitch now and then, the title's cyan and magenta ghosts, data raining down the feather and
+  faintly behind the items, tabs as HUD boxes (the selected one lit with dark text), dashed section lines, square pixel
+  sparks, item buttons as terminal cells. Text in VT323 and Share Tech Mono (`fonts/glitch`, SIL OFL, their licenses
+  beside them), Latin locales only. Its palette redefines Default's names in greens, so what it leaves to Default
+  follows. The engine it added: §21.
+
 Each draws the settings window and its controls in its own look (next-settings.md §6): Ember and Quiet
 their control colors in their own charcoal and grays (Quiet also smaller settings titles and quicker
 switches and tab markers); Parchment the window, its menus and dialogs on the paper art, ink text and
@@ -412,12 +427,20 @@ is a column at a screen edge, feathered on its inner side), so ornaments are art
     corner, by its own corner `Anchor` (the same one when unset), `X` toward the body's middle, `Y` down. Corners
     only: Next never anchors by a middle point (docs/next-pixel-perfect.md), and a body is often an odd number of
     pixels across.
+  - `Point = "BODY"`: over the whole body, `Inset` into it (`Left`, `Right`, `Top`, `Bottom`; `Left` on the inner
+    side, mirrored), its art repeating every `Tile` both ways (the Glitch theme's grid and scanlines), else stretched.
   - `Sizes = "Full"` or `"Small"`: shown at that size only (unset: both); a size switch shows and hides them.
   - `Motion`: `Sway` (degrees either way of rest about `Origin`, `BOTTOM` when unset: a full swing every
     `Period`), `Spin` (a turn every `Period` about its middle, 1 clockwise, -1 the other way), `Pulse`
     (`{ from, to }` alpha and back every `Period`), `Bob` (up that far and back every `Period`), `Delay` (where in
     its motion it starts, so pieces do not move in step). `Origin` names one of the piece's points, `INNER` and
-    `OUTER` included. `Period` defaults to 4.
+    `OUTER` included. `Period` defaults to 4. Two motions run on the set's driver (Lua, a child of the panel's frame,
+    only while one shown needs it), added for the Glitch theme (§21): `Scroll` (`X` units a second toward the outer
+    side, `Y` down: a tiled piece's art moving within its tile; the rolling bar), and `Glitch` (`Every` seconds on
+    average, from 0.3 to 1.7 of it, the piece glitches for `Hold` seconds, rolled anew every `GLITCH_STEP`, 0.06: a jump
+    up to `Jump` units either way across and up or down on whole pixels, half the time a blink to `Blink` of its alpha,
+    its art slipped up to `Slip` of a tile; then back at rest; `ornaments.Random` its randomness). A panel hiding mid-
+    glitch puts the piece back at rest. The Animation switch Moving Ornaments stills both (§20).
 - **Whole pixels** (docs/next-pixel-perfect.md): offsets snapped and sizes rounded on the frame's grid, so a
   piece at rest is on whole pixels. Moving pieces rest nowhere: `panelProto:MovingParts` names them (only those
   shown at the panel's size), so the pixel checks leave them out.
@@ -811,6 +834,8 @@ use, and back on.
   | Title Ribbon (`nextTitleRibbon`) | `ribbon` | `Header.Ribbon`: the gold line from the title out past the window's edge (asked: "the spike that comes off of the bag"); the shimmer, left on, flares where it began |
   | Braid (`nextBraid`) | `braid` | `Chain.Braid` (false): the ribbons twisting between chained bags |
   | Moving Ornaments (`nextOrnamentMotion`) | `ornaments` | each ornament's `Motion` (§12): it stands still, its art kept |
+  | Glitch Effects (`nextGlitch`) | `glitch` | `Panel.Glitch` (§21): no flicker, tears or bursts; the bags slide in and out as any theme's. Flicker can be hard on some players' eyes |
+  | Data Rain (`nextRain`) | `rain` | `Panel.Rain` (§21): no glyphs falling |
 
   Saved per profile in `nextAnimation` (`DB:GetNextAnimation(name)`, `DB:SetNextAnimation(name, on)`; any other name is
   an error, the names being the defaults' in `const.DATABASE_DEFAULTS`). Each switch sends `next/AnimationChanged`.
@@ -852,6 +877,132 @@ use, and back on.
   20 mutations, each caught; the one that first survived (the theme handed out before any is in use) led to a test.
   Then 4 for the ribbon and the cloud's fix, each caught (drawing the cloud early, not settling its swell, the ribbon
   left in, its row left out).
+
+## 21. The Glitch theme's engine (`next/glitch.lua`, `next/rain.lua`, and smaller pieces)
+
+Asked: "a 'glitch' theme, where the bag sort of 'glitches' into existance when opening, glitches out when closing. think
+flickers, glitched blinking textures that wobble suddenly and harshly, think green mesh. i want to push the limits of
+what's possible here ... you can expand sonata if needed", kept local until it is shown. The theme is §8's; what it
+needed of the engine is here, all of it data a theme gives, none of it the Glitch theme's alone.
+
+- **Glitching in and out, and now and then** (`Panel.Glitch`, NextGlitch, driven by the panel: `glitchIn`, `glitchOut`,
+  `burst`, `endGlitch`). With `Open`, a panel opens where it rests instead of sliding in: `PowerOn` seconds of a CRT
+  warming up (the `Beam`, `{ Color, Alpha, Height, BlendMode }`, a line across the body's middle opening to its height,
+  the panel unseen), then `Time` seconds of moments, one every `Step`, each at a strength falling from 1 to 0: the panel
+  jumping up to `Jitter` units sideways (whole pixels) and flickering between `Flicker[1]` and `Flicker[2]` of its alpha
+  (lit more often as the strength falls), bands of a frame tearing across the body (`Tears`: `Count` at full strength,
+  `Texture`, `Height` range, `Alpha`, `BlendMode`, their art slipped), datamosh blocks (`Blocks`: `Count`, `Texture`,
+  `Size` range, `Colors`), static over the body (`Noise`), the title's colour ghosts split up to `Ghosts` units either
+  way, its letters corrupted (`Corrupt`: each swapped for one of `Glyphs` at `Chance` times the strength; a letter and a
+  glyph are UTF-8 characters; never a title the panel may not read, a secret: a vendor's name in an instance), and a
+  third of its sections shoved up to `Sections` units sideways (a Translation animation on the client, which moves what
+  is drawn, not where the frame is laid out, so the canvas keeps its layout). With `Close`, it closes where it is:
+  `Time` seconds of moments rising in strength, then `PowerOff` of the CRT turning off (squashed to a line, the line
+  shrinking to a point), then hidden. With `Bursts` (`Every`, `Time`), a burst now and then while it shows (`Every` on
+  average, 0.4 to 1.6 of it): moments rising and falling over `Time`; never in combat, nor while the panel moves, is
+  moved or sized, or a section is held (it waits for the next); with the pointer over the panel nothing that takes a
+  click moves (no jump, no shove). A chained bag waiting out its entrance delay waits unseen, then glitches in.
+  - **The glitch layer**: a frame over the body, 100 levels above the panel's frame (over its content, overlay and
+    sparkles), drawn at its own alpha (`SetIgnoreParentAlpha`), so a glitch shows while the panel flickers to nothing;
+    it takes no mouse. Everything a moment draws is on it; `NextGlitch:Rest` hides it and puts the panel back (sections,
+    ghosts, letters).
+  - **Cut short or its theme gone**: whatever replaces or stops the panel's tween (a flight, Escape, a hide) ends the
+    glitch at rest (the tween's new `onStop`), back at full strength and in the place it was glitching in or out from
+    (`endGlitch(base)`: each glitch its own base), unless another tween has taken the panel over, which places it; every
+    hide drops a burst scheduled or under way (a token per schedule). A
+    theme applied without a glitch (another theme, Glitch Effects off) mid-glitch: the opening shows the panel plainly
+    and finishes (it still says it has shown), a burst or a closing goes on at rest (`Roll` and `Beam` rest the panel
+    and do nothing without `Panel.Glitch`), and a theme with bursts applied while it shows schedules them (its
+    `ApplyStyle`). **Failure mode (fixed before it shipped, found by reading the burst's code):** every moment read
+    `Panel.Glitch` anew, so a theme applied mid-glitch errored every frame of the rest of it (`attempt to index local
+    'G' (a nil value)`); the spec reproduced it before the fix.
+  - **Bursts yield** to whatever else places the panel: none starts, and one under way stops at rest, while the
+    player moves or sizes it, it switches size or glides to one (`placedElsewhere`), or once something else has placed
+    it (its offset is no longer the one the burst wrote); a burst never changes a panel's alpha (setOffset fades a small
+    panel by its distance). A theme with fewer ghosts in use when a glitch ends (before the panel restyled) is no error
+    (`PlaceGhosts`).
+  - **No dot before the beam**: the beam draws nothing while it is no line yet (a chained bag waiting out its delay).
+  - **Its art repeats**: tears, blocks and static are loaded with the `REPEAT` wrap mode both ways, their coordinates
+    running past their art (loaded clamped, the client stretches the art's edge texels over the rest); and every
+    texture of the layer is drawn without the client's sharpening as it is made (texture-sharpening.md).
+  - **A parent hiding the panel** (Alt+Z hides UIParent) runs its OnHide, which stops everything that moves: when the
+    parent shows it again (its own flag still set at the hide, `hiddenByParent`), its sparkles, ornaments, rain,
+    shimmer and bursts start again (`startEffects`, shared with `Show`).
+  - **Photosensitivity**: a glitch flickers the whole panel (every `Step`, 0.06 s in the theme, for well under a second;
+    bursts every 14 s on average, never below 0.3 of its alpha). That is above the 3 flashes a second WCAG 2.3.1 allows
+    for a large area. Appearance > Animation > Glitch Effects (§20) turns it off, and with it every ornament's glitch (the
+    HUD brackets' blinking twitch; their other motion is Moving Ornaments').
+- **Title ghosts** (`Header.Title.Ghosts`): copies of the title in other font roles (cyan and magenta), under it on the
+  overlay, `X` and `Y` from it at `Alpha`, hung from the body by the title's own numbers (never from the title, a
+  text), given the title's text and the width and wrapping `FitTitle` gave it (`titleCut`, none when it is not cut
+  short); a glitch spreads them. Corrupted letters leave a title with escape sequences (`|`) as it is.
+  - **Failure mode (fixed before it shipped, found by the adversarial review):** the ghosts were given the title's width
+    read back from the title. A vendor's name in an instance is a secret, its width then too, and `SetWidth` takes no
+    secret from addon code (`SecretArguments = "AllowedWhenUntainted"`, SimpleScriptRegionResizingAPIDocumentation):
+    with the Glitch theme the vendor never opened in a dungeon. The specs' mock took secrets in `SetWidth`, `SetHeight`,
+    `SetSize` and `SetPoint`; it now refuses them as the client does, and the vendor's secret-name test runs every
+    shipped theme (it named five).
+- **The data rain** (`Panel.Rain`, NextRain, `next/rain.lua`): a list of entries, each `Where` (`"Feather"`: down the
+  feather beside the body's inner side, a full panel's only, `Layout.Feather` wide; `"Body"`: across the body, behind
+  the content), `Font` (the trail's role) and `HeadFont` (the head's), `Glyphs` (a string, read as UTF-8 characters),
+  `Spacing` (units between columns; as many as fit, centered), `Speed` (rows a second) and `Trail` (glyphs behind the
+  head) as `{ least, most }`, each column's own at random, `Alpha` (the head's; the trail fades from it), `Swap`
+  (glyphs changed a second in each column). A cell is its font's height square, on whole pixels of the panel's grid.
+  - Each column is a ring of font strings as long as its longest trail: the head writes a new glyph in every row it
+    reaches, the glyph at the end of the trail becoming the new head, so the glyphs written stay in their cells and a
+    column costs its trail, never the panel's height. A slow frame writes every row it passed. Once its trail has
+    fallen past the bottom it starts again above the top (up to half the panel's height above), with a new speed and
+    trail; in combat none starts again (the rain thins out and stops, as sparkles do).
+  - **Only what changed**: a column's glyphs are drawn again only when it passed a row; a layout places again only
+    columns whose cells moved and draws again only those whose rows changed (a resize lays it out on each of its
+    frames). Found by the adversarial review: every frame redrew every glyph (about 440 calls a frame on a full backpack
+    for the two glyphs that moved). Not measured in game.
+  - On the panel's own frame (`BORDER` 2: over the fill, feather, wash and a small panel's edge; under every child
+    frame: tabs, content). Laid out by the panel's geometry and the frame's `OnSizeChanged` (a grip, a size switch);
+    falls only while the panel shows (its driver is a child of the panel's frame, started on show, stopped as it
+    hides); a theme restyles it (`Style`), falling on through a theme with rain. Its glyphs are moving parts: the
+    pixel checks leave them out.
+- **Smaller pieces**: the `flicker` ease (`NextTween.Ease`: eight steps, each dim, below 0.3, or lit, 0.75 and up, lit
+  more often as it goes, lit from 0.75 on; a hash of the step, so the same time gives the same value; the theme's
+  sections flicker into place with it); a tween's `onStop` (it ends without reaching its end: stopped, or replaced by
+  another of its key); a font role's `Locales` (§3: the fonts cover Latin alphabets only, so the other locales draw the
+  client's own); `Sparkles.Upright` (never turned: square pixels); tab edges (§3, `Tabs.Edge`, `SelectedEdge`); the
+  ornaments' `BODY` point and `Scroll` and `Glitch` motions (§12).
+- **Check** (`SonataNext:Check`): a glitch's parts (`NextGlitch.KEYS`), `Open`, `Close` and `Bursts` tables with their
+  `Time`, a `Step` with any of them, `Bursts.Every`, `Flicker` two numbers, `Corrupt.Glyphs` some glyphs; a rain
+  entry's parts (`NextRain.KEYS`), `Where`, its `Glyphs`, its `Font` and `HeadFont` roles, a `Spacing` above nothing,
+  `Speed` and `Trail` two numbers, none below 0, the least first; an ornament's `Motion.Glitch` and `Motion.Scroll`
+  tables, their parts and keys. The adversarial review found data Check took that the runtime cannot run (no `Step`:
+  an error every moment; no `Bursts.Every`: an error as the panel finished showing, so a bank never loaded until its
+  timeout; a `Spacing` of 0: columns without end).
+- **Art and fonts**: `tools/textures/next_glitch.py` (standard-library Python, like `next_glow.py`) makes
+  `textures/next/glitch/*.png`: a grid, the wireframe floor, scanlines, a rolling bar, a vignette, static, datamosh
+  blocks, colour-split tears, a HUD bracket, a dash. `fonts/glitch`: VT323 and Share Tech Mono with their SIL Open Font
+  License files (measured with fontTools: VT323 has all of basic Latin and Latin-1 and 127 of Latin Extended-A's 128;
+  Share Tech Mono basic Latin and Latin-1; neither has Cyrillic, Hangul or CJK). What the rain writes and the title is corrupted with is ASCII, which every
+  client's fonts have.
+- **Coverage**: `spec/next/rain_spec.lua` (columns down the feather on either side and across the body, centered, a
+  small panel's feather dry, the head's and the trail's fonts and fading, glyphs kept in their cells, a slow frame,
+  trails shorter than the longest, starting again from above and not in combat, swaps, characters, size changes,
+  started and stopped, a theme with and without, moving parts), `spec/next/theme_panel_spec.lua` ("glitching
+  (Panel.Glitch)": opening, flicker and jumps, tears, static, ghosts and corruption by strength, secrets, characters,
+  shoves, closing, cut short, bursts and their rules, its theme gone mid-glitch three ways and coming back; the Glitch
+  theme's four brackets inside the body, as far in from each corner: a bottom corner's piece goes in with a Y up, as
+  `Y` is down whatever the corner, §12; reported in game, the bottom two sat outside; "data rain
+  (Panel.Rain)" on the real panels), `spec/next/ornaments_spec.lua` (BODY, Scroll, Glitch), `spec/next/tween_spec.lua`
+  (flicker, onStop), `spec/next/style_theme_spec.lua` (Locales), `spec/next/sparkles_spec.lua` (Upright),
+  `spec/next/tabs_spec.lua` (edges), `spec/sonata/next_engine_spec.lua` (Check; the two switches; an ornament's glitch
+  off with Glitch Effects), `spec/next/vendor_spec.lua` (a secret name in every shipped theme),
+  `spec/sonata/next_themes_spec.lua` ("Glitch": its fonts, licenses and art on disk, its glitch, rain, ghosts and CRT
+  pieces, its palette; every theme's dock card title fitting its line), and every shipped-theme spec (`shipped_themes_spec`, `pixel_perfect_spec`, `theme_panel_spec`)
+  with it. Mutation-tested: 56 mutations of the rain, tab edges, checks and switches (seven first survived: four led to
+  tests, three were dead code, removed), and 49 of the glitch engine, ease, onStop, Locales, Upright and ornaments
+  (twelve first survived: nine led to tests, three were dead code, removed); then 46 of the fixes after the adversarial
+  review (eight first survived: four led to tests, four were dead code, removed); every one now caught.
+- **Not seen in game yet**: any of it. To check: the theme's look at rest and mid-glitch against the mockups (the plan
+  drew them), the custom fonts at the UI scales the pixel rules cover, the rain's cost (a profiler capture of an open
+  panel: `NextRainSet.Step`), the client's draw order of the BORDER-layer glyphs under the vignette and over the wash,
+  and whether a section's shove animation and the glitch layer's own alpha behave as the specs' mock says.
 
 ## 9. Coverage
 

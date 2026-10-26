@@ -256,8 +256,25 @@ function style:CopiesStale()
   return false
 end
 
+-- fileOf returns the font file a role's spec names, if it is drawn in this client's locale: a file covers some
+-- alphabets, and Locales names the locales it is drawn in (the Glitch theme's terminal fonts are Latin only).
+---@param spec table
+---@return string?
+local function fileOf(spec)
+  if spec.File == nil or spec.Locales == nil then
+    return spec.File
+  end
+  local locale = GetLocale()
+  for _, name in ipairs(spec.Locales) do
+    if name == locale then
+      return spec.File
+    end
+  end
+  return nil
+end
+
 -- makeFont makes a font object for a role's spec: the client's own font file (the locale's) unless
--- the spec names one, at its size and flags, in its color, with its shadow or none. A role naming one
+-- the spec names one for this locale (Locales), at its size and flags, in its color, with its shadow or none. A role naming one
 -- of the client's fonts (Object, a font object's global name) copies it (its file, size and flags,
 -- in every locale, its color and shadow), changing only what the role also sets; one that copies it
 -- outright (Copy) takes nothing the role inherits but its Size (false: the client font's own). Its height is a whole
@@ -289,7 +306,7 @@ function style:makeFont(role, spec)
     font:CopyFontObject(base)
     self.copies[role] = { base = base, look = lookOf(base) }
     local path, size, flags = font:GetFont()
-    font:SetFont(spec.File or path, pixel:FontHeight(spec.Size or size), spec.Flags or flags)
+    font:SetFont(fileOf(spec) or path, pixel:FontHeight(spec.Size or size), spec.Flags or flags)
     if spec.Color ~= nil then
       font:SetTextColor(self:RGBA(spec.Color))
     end
@@ -297,7 +314,7 @@ function style:makeFont(role, spec)
       self:shadowFont(font, spec.Shadow)
     end
   else
-    font:SetFont(spec.File or GameFontNormal:GetFont(), pixel:FontHeight(spec.Size), spec.Flags or "")
+    font:SetFont(fileOf(spec) or GameFontNormal:GetFont(), pixel:FontHeight(spec.Size), spec.Flags or "")
     font:SetTextColor(self:RGBA(spec.Color or "White"))
     self:shadowFont(font, spec.Shadow)
   end

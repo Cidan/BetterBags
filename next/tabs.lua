@@ -18,6 +18,9 @@ local context = addon:GetModule('Context')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextControls: AceModule
+local controls = addon:GetModule('NextControls')
+
 -- NextTabs is BetterBagsNext's tab rail (next.md §3): a tab per entry, stacked down the body's
 -- inner edge and sticking out over the feathered edge like bookmarks: to the left of the
 -- backpack's panel (the right side of the screen), to the right of the bank's (the left side).
@@ -50,6 +53,7 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field bg Texture
 ---@field glow Texture Lit while the tab is a drop target, and when it pulses.
 ---@field highlight Texture Art over its fill under the pointer or selected (Tabs.Highlight, SelectedHighlight).
+---@field edge NextEdge Its edge (Tabs.Edge; selected or a drop target, SelectedEdge), round the tab.
 ---@field hovered? boolean Under the pointer.
 ---@field slide number How far it is slid out, in pixels.
 ---@field width number The width it was given (never read back from the client, which returns it with
@@ -344,12 +348,14 @@ function railProto:newTab(secure)
   local highlight = button:CreateTexture(nil, "BACKGROUND", nil, 1)
   highlight:SetAllPoints()
   highlight:Hide()
+  -- Over the fill and its highlight, under the name and the glow.
+  local edge = controls:CreateEdge(button, "BORDER")
   local text = style:CreateText(button, style.Theme.Tabs.Font)
   local icon = button:CreateTexture(nil, "ARTWORK")
   icon:Hide()
   ---@type NextTab
-  local tab = { id = 0, button = button, text = text, icon = icon, bg = bg, glow = glow, highlight = highlight, slide = 0,
-    y = 0, secure = secure, movable = false, yKey = {} }
+  local tab = { id = 0, button = button, text = text, icon = icon, bg = bg, glow = glow, highlight = highlight,
+    edge = edge, slide = 0, y = 0, secure = secure, movable = false, yKey = {} }
   self:styleTab(tab)
   if not secure then
     addon.SetScript(button, "OnClick", function(ctx, _, mouseButton)
@@ -592,6 +598,8 @@ function railProto:paint(tab)
   else
     tab.highlight:Hide()
   end
+  -- A box round it (a HUD's: the Glitch theme), the selected one's in its own (the others' when it has none).
+  controls:PaintEdge(tab.edge, selected and T.SelectedEdge or T.Edge)
   style:SetFont(tab.text, selected and T.SelectedFont or T.Font)
   self:placeContent(tab)
 end

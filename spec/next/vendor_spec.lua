@@ -54,7 +54,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
   { "NextVendor", "next/vendor.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -613,7 +613,11 @@ describe("NextVendor", function()
         local v = open()
         assert.are.equal(size == "small", v:IsSmall())
         local sonataNext = addon:GetModule("SonataNext")
-        for _, key in ipairs({ "GW2", "Quiet", "Ember", "Parchment", "Default" }) do
+        -- Every shipped theme (one of them, Glitch, measured the title for its colour ghosts).
+        local keys = {}
+        for key in pairs(sonataNext:GetThemes()) do table.insert(keys, key) end
+        table.sort(keys)
+        for _, key in ipairs(keys) do
           style:Use(sonataNext:Resolve(key))
           v:ApplyStyle(ctx())
           assert.is_false(v.titleButton:IsAnchoringSecret(), key)

@@ -10,7 +10,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class NextTween: AceModule
 local tween = addon:NewModule('NextTween')
 
----@alias NextEase "linear"|"outCubic"|"inCubic"|"inOutSine"|"inOutCubic"|"outBack"|"outBackSoft"
+---@alias NextEase "linear"|"outCubic"|"inCubic"|"inOutSine"|"inOutCubic"|"outBack"|"outBackSoft"|"flicker"
 
 -- The overshoot of outBack: about a tenth past the end at its furthest. For an overshoot s, the
 -- furthest past the end is 4 s^3 / (27 (s + 1)^2).
@@ -42,6 +42,22 @@ tween.Ease = {
     local u = t - 1
     return 1 + (BACK_SOFT + 1) * u * u * u + BACK_SOFT * u * u
   end,
+  -- A bad signal (the Glitch theme's sections flickering into place): in eight steps, each dim (below 0.3) or lit
+  -- (0.75 and up), lit more often as it goes, then lit from 0.75 on. A hash of the step, not a random draw: the same
+  -- time gives the same value. In steps, so it changes at most every eighth of its time.
+  flicker = function(t)
+    if t >= 0.75 then
+      return 1
+    elseif t <= 0 then
+      return 0
+    end
+    local step = math.floor(t * 8)
+    local n = (math.sin(step * 12.9898 + 1.7) * 43758.5453) % 1
+    if n < 0.25 + t then
+      return 0.75 + 0.25 * n
+    end
+    return 0.3 * n
+  end,
 }
 
 ---@class (exact) NextTweenOptions
@@ -52,6 +68,7 @@ tween.Ease = {
 ---@field delay? number Seconds before it starts moving, holding its start value.
 ---@field onUpdate fun(value: number)
 ---@field onDone? fun()
+---@field onStop? fun() When it ends without reaching its end: stopped without finishing, or replaced by another of its key.
 
 ---@class (exact) NextTweenState
 ---@field options NextTweenOptions
@@ -66,11 +83,15 @@ end
 
 tween:Init()
 
--- Play starts a tween for key, replacing the one it had.
+-- Play starts a tween for key, replacing the one it had (its onStop runs, after the new one is in place).
 ---@param key any
 ---@param options NextTweenOptions
 function tween:Play(key, options)
+  local replaced = self.tweens[key]
   self.tweens[key] = { options = options, elapsed = 0 }
+  if replaced ~= nil and replaced.options.onStop then
+    replaced.options.onStop()
+  end
   options.onUpdate(options.from)
   if self.driver == nil then
     self.driver = CreateFrame("Frame")
@@ -88,7 +109,7 @@ function tween:IsPlaying(key)
   return self.tweens[key] ~= nil
 end
 
--- Stop ends key's tween where it is, or at its end (calling it back) with finish.
+-- Stop ends key's tween where it is (its onStop runs), or at its end (calling it back) with finish.
 ---@param key any
 ---@param finish? boolean
 function tween:Stop(key, finish)
@@ -102,6 +123,8 @@ function tween:Stop(key, finish)
     if state.options.onDone then
       state.options.onDone()
     end
+  elseif state.options.onStop then
+    state.options.onStop()
   end
   self:stopIfIdle()
 end
