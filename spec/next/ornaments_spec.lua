@@ -484,6 +484,172 @@ describe("NextOrnaments", function()
     end)
   end)
 
+  -- The Glitch theme (next-themes.md §21): art over the whole body (a grid, scanlines, a CRT's vignette), art that
+  -- scrolls (scanlines rolling, a grid drifting) and art that glitches now and then (a HUD bracket jumping, blinking,
+  -- its art slipping). Scroll and Glitch run on a driver of the set's own, only while the panel shows.
+  describe("glitch art", function()
+    local savedRandom
+
+    before_each(function()
+      savedRandom = ornaments.Random
+    end)
+
+    after_each(function()
+      ornaments.Random = savedRandom
+    end)
+
+    local function driver(panel)
+      return panel.ornaments.driver
+    end
+
+    local function step(panel, dt)
+      local d = driver(panel)
+      d:GetScript("OnUpdate")(d, dt)
+    end
+
+    local function coords(t)
+      local ulx, uly, _, lly, urx = t:GetTexCoord()
+      return ulx, urx, uly, lly
+    end
+
+    it("fills the body, inset, its art repeating every Tile both ways, mirrored on the other side", function()
+      theme({ { Texture = "Roots", Point = "BODY", Inset = { Left = 4, Right = 6, Top = 10, Bottom = 12 }, Tile = 50 } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      local l, r, top, bottom = pixel:Snap(t, 4), pixel:Snap(t, 6), pixel:Snap(t, 10), pixel:Snap(t, 12)
+      assert.are.same({ { "TOPLEFT", panel.body, "TOPLEFT", l, -top }, { "BOTTOMRIGHT", panel.body, "BOTTOMRIGHT", -r, bottom } },
+        points(t))
+      assert.are.same({ "REPEAT", "REPEAT", "TRILINEAR" }, { t._wrapH, t._wrapV, t._filterMode })
+      local w, h = panel.body:GetWidth() - l - r, panel.body:GetHeight() - top - bottom
+      local u0, u1, v0, v1 = coords(t)
+      assert.is_true(near(0, u0) and near(w / 50, u1) and near(0, v0) and near(h / 50, v1))
+      local mirrored = panelOn("LEFT")
+      mirrored.ornaments:Style()
+      t = texture(mirrored, 1)
+      assert.are.same({ { "TOPLEFT", mirrored.body, "TOPLEFT", r, -top },
+        { "BOTTOMRIGHT", mirrored.body, "BOTTOMRIGHT", -l, bottom } }, points(t), "its inner side on the right")
+      u0, u1 = coords(t)
+      assert.is_true(near(w / 50, u0) and near(0, u1), "flipped")
+    end)
+
+    it("stretches its art over the body without a Tile", function()
+      theme({ { Texture = "Roots", Point = "BODY" } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      assert.are.same({ nil, nil }, { t._wrapH, t._wrapV })
+      assert.are.same({ 0, 1, 0, 1 }, { coords(t) })
+      assert.are.same({ { "TOPLEFT", panel.body, "TOPLEFT", 0, 0 }, { "BOTTOMRIGHT", panel.body, "BOTTOMRIGHT", 0, 0 } }, points(t))
+    end)
+
+    it("scrolls a tiled piece's art Y units a second down and X across, only while it moves", function()
+      theme({ { Texture = "Roots", Point = "BODY", Tile = 50, Motion = { Scroll = { X = 10, Y = 10 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      assert.is_nil(driver(panel) and driver(panel):GetScript("OnUpdate"), "still until the panel shows")
+      panel.ornaments:Start()
+      step(panel, 1)
+      local t = texture(panel, 1)
+      local w, h = panel.body:GetWidth(), panel.body:GetHeight()
+      local u0, u1, v0, v1 = coords(t)
+      -- Moved 10 right and 10 down: the art starts that far back in it, kept within a tile.
+      assert.is_true(near(0.8, u0) and near(0.8 + w / 50, u1), "across: " .. u0)
+      assert.is_true(near(0.8, v0) and near(0.8 + h / 50, v1), "down: " .. v0)
+      local skip = {}
+      panel.ornaments:MovingParts(skip)
+      assert.is_true(skip[t], "it rests nowhere")
+      panel.ornaments:Stop()
+      assert.is_nil(driver(panel):GetScript("OnUpdate"))
+    end)
+
+    it("scrolls a span along its length", function()
+      theme({ { Texture = "Roots", Point = "INNER", Width = 20, Tile = 100, Motion = { Scroll = { Y = 25 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      panel.ornaments:Start()
+      step(panel, 1)
+      local _, _, v0 = coords(texture(panel, 1))
+      assert.is_true(near(0.75, v0), "a quarter of a tile down: " .. v0)
+    end)
+
+    it("glitches now and then: jumps by whole pixels, blinks and slips its art, then is back at rest", function()
+      ornaments.Random = function() return 0.1 end
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, X = 8, Y = 8, Alpha = 0.8,
+        Motion = { Glitch = { Every = 2, Hold = 0.2, Jump = 5, Blink = 0.25, Slip = 0.5 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      local rest = points(t)
+      panel.ornaments:Start()
+      -- Its first glitch after 2 * (0.3 + 1.4 * 0.1) = 0.88 seconds.
+      step(panel, 0.5)
+      assert.are.same(rest, points(t))
+      step(panel, 0.5)
+      local now = points(t)[1]
+      -- (2 * 0.1 - 1) * 5 = -4: four units left and down, on whole pixels.
+      assert.are.equal(rest[1][4] + pixel:Snap(t, -4), now[4])
+      assert.are.equal(rest[1][5] + pixel:Snap(t, -4), now[5])
+      assert.is_true(near(0.2, t:GetAlpha()), "blinked to a quarter")
+      local u0, u1 = coords(t)
+      assert.is_true(near(-0.4, u0) and near(0.6, u1), "its art slipped")
+      local skip = {}
+      panel.ornaments:MovingParts(skip)
+      assert.is_true(skip[t])
+      -- Rolled anew every GLITCH_STEP while it lasts, held in between.
+      ornaments.Random = function() return 0.9 end
+      step(panel, ornaments.GLITCH_STEP / 2)
+      assert.are.equal(rest[1][4] + pixel:Snap(t, -4), points(t)[1][4], "held until its next roll")
+      step(panel, ornaments.GLITCH_STEP * 0.75)
+      assert.are.equal(rest[1][4] + pixel:Snap(t, 4), points(t)[1][4], "rolled anew")
+      step(panel, 0.25)
+      assert.are.same(rest, points(t), "back at rest after Hold")
+      assert.is_true(near(0.8, t:GetAlpha()))
+      assert.are.same({ 0, 1, 0, 1 }, { coords(t) })
+    end)
+
+    it("jumps a piece over the whole body as it glitches, by whole pixels", function()
+      ornaments.Random = function() return 0.1 end
+      theme({ { Texture = "Roots", Point = "BODY", Tile = 50,
+        Motion = { Glitch = { Every = 1, Hold = 1, Jump = 5 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      local rest = points(t)
+      panel.ornaments:Start()
+      step(panel, 0.5)
+      for i = 1, 2 do
+        assert.are.equal(rest[i][4] + pixel:Snap(t, -4), points(t)[i][4], "across")
+        assert.are.equal(rest[i][5] + pixel:Snap(t, -4), points(t)[i][5], "down")
+      end
+    end)
+
+    it("is back at rest when the panel hides mid-glitch", function()
+      ornaments.Random = function() return 0.1 end
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, Alpha = 0.8,
+        Motion = { Glitch = { Every = 1, Hold = 1, Jump = 5, Blink = 0.25, Slip = 0.5 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      local rest = points(t)
+      panel.ornaments:Start()
+      step(panel, 0.5)
+      assert.are_not.same(rest, points(t))
+      panel.ornaments:Stop()
+      assert.are.same(rest, points(t))
+      assert.is_true(near(0.8, t:GetAlpha()))
+      assert.are.same({ 0, 1, 0, 1 }, { coords(t) })
+    end)
+
+    it("runs no driver for pieces that only move on the client's animations", function()
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Motion = { Sway = 4 } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      panel.ornaments:Start()
+      assert.is_nil(driver(panel) and driver(panel):GetScript("OnUpdate"))
+    end)
+  end)
+
   teardown(function()
     for _, name in ipairs(addedKinds) do const.BAG_KIND[name] = nil end
     if createdConstants then ResetModuleStub("Constants") end

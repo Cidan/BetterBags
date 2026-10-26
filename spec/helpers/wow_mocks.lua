@@ -462,6 +462,14 @@ end
 function WidgetMethods:GetAlpha()
   return self._alpha or 1
 end
+-- SetIgnoreParentAlpha(ignore) / IsIgnoringParentAlpha(): a region or frame drawn at its own alpha, not its parents'
+-- (SimpleRegionAPIDocumentation.lua, SimpleFrameAPIDocumentation.lua; every client branch).
+function WidgetMethods:SetIgnoreParentAlpha(ignore)
+  self._ignoreParentAlpha = ignore == true
+end
+function WidgetMethods:IsIgnoringParentAlpha()
+  return self._ignoreParentAlpha == true
+end
 -- ScriptRegionResizing:SetAllPoints([relativeTo, doResize]): only the TOPLEFT and BOTTOMRIGHT
 -- points are set, after clearing the others (warcraft.wiki.gg); relativeTo defaults to the
 -- parent.

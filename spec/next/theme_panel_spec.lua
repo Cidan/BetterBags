@@ -59,7 +59,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
-  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -1610,6 +1610,112 @@ describe("BetterBags Next's panels and themes", function()
     end)
   end)
 
+  -- Panel.Rain (next-themes.md §21): the data rain on real panels.
+  describe("data rain (Panel.Rain)", function()
+    local rainModule = addon:GetModule("NextRain")
+    local layout = dofile("spec/helpers/layout.lua")
+    local savedRandom, undoScreen
+
+    local function rainy()
+      apply({
+        Fonts = { RainGlyph = { Size = 14, Color = "Gold" }, RainHead = { Size = 14, Color = "White" } },
+        Panel = { Rain = {
+          { Where = "Feather", Font = "RainGlyph", HeadFont = "RainHead", Glyphs = "01", Spacing = 24, Speed = { 10, 10 },
+            Trail = { 6, 6 }, Alpha = 0.7, Swap = 4 },
+          { Where = "Body", Font = "RainGlyph", HeadFont = "RainHead", Glyphs = "01", Spacing = 60, Speed = { 8, 8 },
+            Trail = { 4, 4 }, Alpha = 0.2, Swap = 0 },
+        } },
+      })
+    end
+
+    local function fall(bag, dt)
+      local d = bag.rain.driver
+      d:GetScript("OnUpdate")(d, dt)
+    end
+
+    local function wheres(bag)
+      local out = {}
+      for _, column in ipairs(bag.rain.columns) do
+        out[column.rain.Where] = (out[column.rain.Where] or 0) + 1
+      end
+      return out
+    end
+
+    before_each(function()
+      savedRandom = rainModule.Random
+      rainModule.Random = function() return 0.5 end
+      -- Frames sized by their anchors report the size the anchors give them, as in the client: a full panel's height.
+      undoScreen = layout.UseScreen(1920, 1200, 1)
+    end)
+
+    after_each(function()
+      rainModule.Random = savedRandom
+      undoScreen()
+    end)
+
+    it("falls down the feather beside the body's inner side and behind the content, on the panel's frame", function()
+      rainy()
+      local bag, bank = nextBag:Create(ctx()), nextBank:Create(ctx())
+      assert.are.same({ Feather = 4, Body = math.floor(bag:BodyWidth() / 60) }, wheres(bag))
+      local feather = bag.rain.columns[1]
+      assert.is_true(feather.x >= 0 and feather.x + feather.cell <= bag:BodyLeft(), "left of the backpack's body")
+      local bankFeather = bank.rain.columns[1]
+      assert.is_true(bankFeather.x >= bank:BodyLeft() + bank:BodyWidth(), "right of the bank's body")
+      assert.are.equal(bag.frame, feather.glyphs[1]:GetParent())
+      backToDefault()
+      assert.are.equal(0, #bag.rain.columns)
+    end)
+
+    it("falls only while the panel shows, through a theme applied meanwhile", function()
+      rainy()
+      local bag = nextBag:Create(ctx())
+      assert.is_nil(bag.rain.driver:GetScript("OnUpdate"), "hidden")
+      bag:Show(ctx())
+      finishTweens()
+      assert.is_not_nil(bag.rain.driver:GetScript("OnUpdate"), "shown")
+      local column = bag.rain.columns[1]
+      assert.is_true(column.rows > 50, "the screen's height in rows: " .. column.rows)
+      fall(bag, 3)
+      local lit = 0
+      for _, g in ipairs(bag.rain.columns[1].glyphs) do
+        if g:IsShown() then lit = lit + 1 end
+      end
+      assert.is_true(lit > 0, "falling")
+      rainy()
+      assert.is_not_nil(bag.rain.driver:GetScript("OnUpdate"), "a theme applied while it shows")
+      bag:Hide(ctx())
+      finishTweens()
+      -- The client runs a frame's OnHide as it hides; the mock does not.
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.is_nil(bag.rain.driver:GetScript("OnUpdate"), "hidden again")
+      for _, each in ipairs(bag.rain.columns) do
+        for _, g in ipairs(each.glyphs) do
+          assert.is_false(g:IsShown())
+        end
+      end
+    end)
+
+    it("leaves the feather dry on a small panel, and rains on it again once full", function()
+      rainy()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      addon:GetModule("NextPanel"):SetSize(ctx(), "small")
+      finishTweens()
+      assert.is_true(bag:IsSmall())
+      assert.is_nil(wheres(bag).Feather)
+      assert.is_true((wheres(bag).Body or 0) > 0)
+      addon:GetModule("NextPanel"):SetSize(ctx(), "full")
+      finishTweens()
+      assert.are.equal(4, wheres(bag).Feather)
+    end)
+
+    it("leaves its glyphs out of the pixel checks", function()
+      rainy()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local skip = bag:MovingParts()
+      assert.is_true(skip[bag.rain.columns[1].glyphs[1]])
+    end)
+  end)
+
   -- Appearance > Animation (next-themes.md §20): each switch turned off takes its effect away on an open bag at once,
   -- whatever the theme, and turned on brings it back; no font object is made anew.
   describe("the Animation switches", function()
@@ -1782,6 +1888,388 @@ describe("BetterBags Next's panels and themes", function()
         assert.are.same({}, errors, size)
         assert.are.same(style.Color.Body, rgba(bag.fill._colorTexture))
       end
+    end)
+  end)
+
+  -- The Glitch theme (next-themes.md §21): a panel glitches into place instead of sliding (a CRT's beam opening, then
+  -- flickering into view while it tears, jumps and splits) and glitches out (flickering, then a CRT turning off), and
+  -- now and then glitches while open. Panel.Glitch; none in Default, which slides.
+  describe("glitching (Panel.Glitch)", function()
+    local glitch = addon:GetModule("NextGlitch")
+    local layout = dofile("spec/helpers/layout.lua")
+    local savedRandom, timers, undoScreen
+
+    local GLITCH = {
+      Open = { Time = 0.4, PowerOn = 0.2 },
+      Close = { Time = 0.2, PowerOff = 0.2 },
+      Bursts = { Every = 10, Time = 0.2 },
+      Step = 0.05,
+      Jitter = 10,
+      Flicker = { 0.2, 1 },
+      Sections = 20,
+      Ghosts = 6,
+      Tears = { Count = 3, Texture = "Glow", Height = { 2, 10 }, Alpha = 0.8, BlendMode = "ADD" },
+      Blocks = { Count = 2, Texture = "Glow", Size = { 20, 60 }, Colors = { "Gold", "Lavender" }, Alpha = 0.5, BlendMode = "ADD" },
+      Noise = { Texture = "Glow", Color = "White", Alpha = 0.3, BlendMode = "ADD" },
+      Corrupt = { Glyphs = "#@", Chance = 0.4 },
+      Beam = { Color = "White", Alpha = 1, Height = 2, BlendMode = "ADD" },
+    }
+
+    local function glitchy()
+      apply({
+        Fonts = { GhostA = { Size = 26, Color = "Gold" }, GhostB = { Size = 26, Color = "Lavender" } },
+        Header = { Title = { Font = "Title", Ghosts = { { Font = "GhostA", X = -2, Alpha = 0.5 }, { Font = "GhostB", X = 2, Alpha = 0.5 } } } },
+        Panel = { Glitch = GLITCH },
+      })
+    end
+
+    local function step(dt)
+      tween.driver:GetScript("OnUpdate")(tween.driver, dt)
+    end
+
+    local function fire(delay)
+      for i, t in ipairs(timers) do
+        if math.abs(t.delay - delay) < 1e-9 then
+          table.remove(timers, i)
+          t.fn()
+          return true
+        end
+      end
+      return false
+    end
+
+    local function shown(list)
+      local n = 0
+      for _, t in ipairs(list) do
+        if t:IsShown() then n = n + 1 end
+      end
+      return n
+    end
+
+    local function ghostX(bag, i)
+      return select(4, bag.ghosts[i]:GetPoint(1))
+    end
+
+    before_each(function()
+      savedRandom = glitch.Random
+      glitch.Random = function() return 0.5 end
+      -- Frames sized by their anchors report the size the anchors give them, as in the client.
+      undoScreen = layout.UseScreen(1920, 1200, 1)
+      timers = {}
+      override(C_Timer, "After", function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end)
+      glitchy()
+    end)
+
+    after_each(function()
+      glitch.Random = savedRandom
+      undoScreen()
+    end)
+
+    it("opens where it rests: a beam across its body opening to its height, then flickering into view", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      assert.are.equal(0, bag.offset, "in place, not sliding in")
+      assert.are.equal(0, bag.frame:GetAlpha(), "nothing yet but the beam")
+      local layer, beam = bag.glitch.frame, bag.glitch.beam
+      assert.is_true(layer:IsShown())
+      assert.is_true(layer:IsIgnoringParentAlpha(), "seen while the panel is not")
+      local w, h = bag.body:GetWidth(), bag.body:GetHeight()
+      step(0.04)
+      assert.is_true(beam:IsShown())
+      assert.is_true(beam:GetWidth() > 0 and beam:GetWidth() < w, "a line growing across")
+      assert.are.equal(addon:GetModule("NextPixel"):Length(beam, 2), beam:GetHeight())
+      step(0.1)
+      assert.is_true(beam:GetHeight() > 2 and beam:GetHeight() < h, "opening to its height")
+      assert.is_nil(shownAt)
+      step(0.1)
+      assert.is_false(beam:IsShown(), "warmed up")
+      -- 0.04 into its flicker, at 0.9 of its strength: seen at a chance of 1 - 0.7 * 0.9, under the roll of 0.5.
+      assert.are.equal(GLITCH.Flicker[1], bag.frame:GetAlpha(), "mostly dark as it starts")
+      assert.is_true(shown(bag.glitch.tears) > 0, "tearing")
+      step(0.26)
+      assert.are.equal(1, bag.frame:GetAlpha(), "mostly lit as it settles (0.25 of its strength)")
+      finishTweens()
+      assert.is_true(shownAt, "says it has shown once in place")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.is_false(layer:IsShown(), "at rest")
+      assert.are.equal(0, bag.offset)
+    end)
+
+    it("flickers within its range and jumps sideways on whole pixels while it opens", function()
+      glitch.Random = function() return 0.95 end
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(0.25)
+      assert.are.equal(GLITCH.Flicker[1], bag.frame:GetAlpha(), "dark at 0.95 (above the chance of being seen)")
+      local unit = addon:GetModule("NextPixel"):Unit(bag.frame)
+      assert.is_true(bag.offset ~= 0, "jumped")
+      assert.is_true(math.abs(bag.offset) <= GLITCH.Jitter + unit)
+      assert.is_true(math.abs(bag.offset / unit - math.floor(bag.offset / unit + 0.5)) < 1e-6, "on whole pixels")
+      finishTweens()
+      assert.are.equal(0, bag.offset, "back in place")
+    end)
+
+    it("tears, statics, splits its title's colours and corrupts its letters while it glitches, all gone at rest", function()
+      glitch.Random = function() return 0.1 end
+      local bag = nextBag:Create(ctx())
+      bag:SetTitle("Backpack")
+      local rest = { ghostX(bag, 1), ghostX(bag, 2) }
+      bag:Show(ctx())
+      step(0.25)
+      -- A moment 0.05 into its 0.4 of glitching: at 0.875 of its strength.
+      local strength = 0.875
+      assert.are.equal("########", bag.title:GetText(), "every letter swapped at 0.1, under the chance")
+      assert.are.equal("########", bag.ghosts[1]:GetText(), "its ghosts with it")
+      assert.are_not.equal(rest[1], ghostX(bag, 1), "the ghosts split")
+      assert.is_true(bag.glitch.noise:IsShown() and bag.glitch.noise:GetAlpha() > 0)
+      assert.are.equal(math.floor(GLITCH.Tears.Count * strength + 0.1), shown(bag.glitch.tears))
+      assert.is_true(shown(bag.glitch.blocks) > 0)
+      finishTweens()
+      assert.are.equal("Backpack", bag.title:GetText())
+      assert.are.equal("Backpack", bag.ghosts[1]:GetText())
+      assert.are.same(rest, { ghostX(bag, 1), ghostX(bag, 2) })
+      assert.are.equal(0, shown(bag.glitch.tears))
+      assert.is_false(bag.glitch.noise:IsShown())
+    end)
+
+    it("corrupts letters and shoves sections as much as its moment is strong", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:Draw(ctx(), slots[BACKPACK], function() end)
+      bag:SetTitle("Backpack")
+      local section = bag.content.order[1]
+      glitch.Random = function() return 0.3 end
+      glitch:Roll(bag, 0.5, true, false)
+      assert.are.equal("Backpack", bag.title:GetText(), "0.3 is past the chance at half strength")
+      assert.is_nil(bag.glitch.sections[section.frame], "nor shoved")
+      glitch:Roll(bag, 1, true, false)
+      assert.are.equal("########", bag.title:GetText(), "under it at full strength")
+      assert.is_true(bag.glitch.sections[section.frame]:IsPlaying(), "and shoved")
+      glitch:Rest(bag)
+    end)
+
+    it("corrupts a title with whole characters, its glyphs read as characters, not bytes", function()
+      local picks = { 0.1, 0.9, 0.1, 0.4 }
+      local n = 0
+      glitch.Random = function()
+        n = n + 1
+        return picks[(n - 1) % #picks + 1]
+      end
+      -- Two letters, each swapped (0.1, under the chance): the first for the second glyph (0.9), the second for the
+      -- first (0.4).
+      assert.are.equal("ｲｱ", glitch:Corrupt("AB", "ｱｲ", 0.5))
+    end)
+
+    it("never corrupts a title it may not read: a secret, as a vendor's name in a dungeon", function()
+      glitch.Random = function() return 0.1 end
+      override(_G, "issecretvalue", function(v) return v == "Merchant" end)
+      local bag = nextBag:Create(ctx())
+      bag:SetTitle("Merchant")
+      bag:Show(ctx())
+      step(0.25)
+      assert.are.equal("Merchant", bag.title:GetText())
+      finishTweens()
+    end)
+
+    it("shoves its sections sideways while it opens, and puts them back", function()
+      glitch.Random = function() return 0.1 end
+      local bag = nextBag:Create(ctx())
+      bag:Draw(ctx(), slots[BACKPACK], function() end)
+      bag:Show(ctx())
+      step(0.25)
+      local section = bag.content.order[1]
+      local group = bag.glitch.sections[section.frame]
+      assert.is_not_nil(group)
+      assert.is_true(group:IsPlaying(), "shoved")
+      local jump = group.jump._offset
+      assert.are.equal(addon:GetModule("NextPixel"):Snap(section.frame, -0.8 * GLITCH.Sections * 0.875), jump.x)
+      finishTweens()
+      assert.is_false(group:IsPlaying(), "back in its place")
+    end)
+
+    it("closes where it is: flickering out, then a CRT turning off to a point, then hidden", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:Hide(ctx())
+      assert.is_true(bag:IsClosing())
+      assert.are.equal(0, bag.offset, "not sliding out")
+      step(0.1)
+      assert.is_true(shown(bag.glitch.tears) > 0)
+      step(0.12)
+      local beam = bag.glitch.beam
+      local w, h = bag.body:GetWidth(), bag.body:GetHeight()
+      assert.are.equal(0, bag.frame:GetAlpha(), "off")
+      assert.is_true(beam:IsShown())
+      assert.is_true(beam:GetHeight() < h and beam:GetWidth() == w, "squashing to a line")
+      step(0.12)
+      assert.is_true(beam:GetWidth() < w, "the line shrinking to a point")
+      finishTweens()
+      assert.is_false(bag.frame:IsShown())
+      assert.is_false(bag:IsClosing())
+      assert.are.equal(1, bag.frame:GetAlpha(), "ready to open again")
+      assert.is_false(bag.glitch.frame:IsShown())
+    end)
+
+    it("cleans up a glitch cut short: hidden at once mid-open", function()
+      glitch.Random = function() return 0.1 end
+      local bag = nextBag:Create(ctx())
+      bag:SetTitle("Backpack")
+      bag:Draw(ctx(), slots[BACKPACK], function() end)
+      local rest = { ghostX(bag, 1), ghostX(bag, 2) }
+      bag:Show(ctx())
+      step(0.25)
+      local group = bag.glitch.sections[bag.content.order[1].frame]
+      assert.is_true(group:IsPlaying(), "shoved")
+      assert.are_not.same(rest, { ghostX(bag, 1), ghostX(bag, 2) }, "split")
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.is_false(group:IsPlaying(), "its sections back")
+      assert.are.same(rest, { ghostX(bag, 1), ghostX(bag, 2) }, "its ghosts back")
+      assert.are.equal("Backpack", bag.title:GetText())
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.is_false(bag.glitch.frame:IsShown())
+      assert.are.equal(0, bag.offset)
+    end)
+
+    it("glitches now and then while open: tears and a jump, never in combat, never moving what is under the pointer", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      -- Its first burst Every * (0.4 + 1.2 * 0.5) seconds after it has shown.
+      local wait = GLITCH.Bursts.Every
+      glitch.Random = function() return 0.9 end
+      assert.is_true(fire(wait))
+      step(0.1)
+      assert.is_true(shown(bag.glitch.tears) > 0, "tearing")
+      assert.is_true(bag.offset ~= 0, "a jump")
+      finishTweens()
+      assert.are.equal(0, bag.offset)
+      assert.are.equal(0, shown(bag.glitch.tears))
+      -- The next is scheduled; under the pointer, nothing that takes a click moves.
+      local next = timers[#timers]
+      assert.is_not_nil(next)
+      override(bag.frame, "IsMouseOver", function() return true end)
+      table.remove(timers)
+      next.fn()
+      step(0.1)
+      assert.is_true(shown(bag.glitch.tears) > 0)
+      assert.are.equal(0, bag.offset, "still under the pointer")
+      finishTweens()
+      -- In combat, it waits for the next.
+      override(_G, "InCombatLockdown", function() return true end)
+      next = table.remove(timers)
+      next.fn()
+      assert.is_false(tween:IsPlaying(bag.glitch), "none in combat")
+      assert.is_not_nil(timers[#timers], "the next scheduled")
+    end)
+
+    it("stops glitching when it closes", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local pending = timers[#timers]
+      bag:Hide(ctx())
+      finishTweens()
+      pending.fn()
+      assert.is_false(tween:IsPlaying(bag.glitch), "a burst scheduled before it closed does nothing")
+    end)
+
+    -- A glitch under way when its theme goes (another theme applied, Appearance > Animation > Glitch Effects off):
+    -- found by reading the burst's code, every frame of it would have read a glitch the theme no longer has.
+    it("finishes opening without a glitch when its theme goes mid-glitch, shown and at rest", function()
+      local bag = nextBag:Create(ctx())
+      bag:SetTitle("Backpack")
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      step(0.1)
+      backToDefault()
+      bag:ApplyStyle(ctx())
+      step(0.01)
+      assert.are.equal(1, bag.frame:GetAlpha(), "shown plainly at once")
+      finishTweens()
+      assert.is_true(shownAt, "it says it has shown")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(0, bag.offset)
+      assert.is_false(bag.glitch.frame:IsShown())
+      assert.are.equal("Backpack", bag.title:GetText())
+    end)
+
+    it("ends a burst under way when its theme goes, and bursts no more", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:SetTitle("Backpack")
+      glitch.Random = function() return 0.1 end
+      assert.is_true(fire(GLITCH.Bursts.Every * (0.4 + 1.2 * 0.5)))
+      step(0.05)
+      assert.is_true(bag.glitch.frame:IsShown(), "glitching")
+      backToDefault()
+      bag:ApplyStyle(ctx())
+      step(0.05)
+      assert.is_false(bag.glitch.frame:IsShown(), "at rest at once")
+      assert.are.equal(0, shown(bag.glitch.tears))
+      finishTweens()
+      assert.is_false(bag.glitch.frame:IsShown())
+      assert.are.equal("Backpack", bag.title:GetText(), "its letters back")
+      assert.are.equal(0, bag.offset)
+      for _, t in ipairs(timers) do
+        t.fn()
+      end
+      assert.is_false(tween:IsPlaying(bag.glitch), "no burst once its theme has none")
+    end)
+
+    it("closes without a glitch when its theme goes mid-glitch, hidden at the end", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:Hide(ctx())
+      step(0.1)
+      backToDefault()
+      bag:ApplyStyle(ctx())
+      finishTweens()
+      assert.is_false(bag.frame:IsShown())
+      assert.is_false(bag.glitch.frame:IsShown())
+    end)
+
+    it("bursts again once its theme glitches again while it shows", function()
+      backToDefault()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      timers = {}
+      glitchy()
+      bag:ApplyStyle(ctx())
+      -- The burst scheduled last (an earlier one is dropped by the one after it).
+      local last = table.remove(timers)
+      assert.are.equal(GLITCH.Bursts.Every * (0.4 + 1.2 * 0.5), last.delay, "a burst scheduled")
+      last.fn()
+      step(0.05)
+      assert.is_true(tween:IsPlaying(bag.glitch))
+    end)
+
+    it("draws its title's colour ghosts at rest: in their roles, beside the title, with its text", function()
+      local bag = nextBag:Create(ctx())
+      bag:SetTitle("Backpack")
+      assert.are.equal(2, #bag.ghosts)
+      local font = style:Font("GhostA")
+      assert.are.equal(font, bag.ghosts[1]:GetFontObject())
+      assert.are.equal("Backpack", bag.ghosts[1]:GetText())
+      assert.are.equal(0.5, bag.ghosts[1]:GetAlpha())
+      local tx = select(4, bag.title:GetPoint(1))
+      local pixel = addon:GetModule("NextPixel")
+      assert.is_true(math.abs((ghostX(bag, 1) - tx) - pixel:Snap(bag.body, -2)) < 1e-6, "2 left")
+      assert.is_true(math.abs((ghostX(bag, 2) - tx) - pixel:Snap(bag.body, 2)) < 1e-6, "2 right")
+      backToDefault()
+      assert.are.equal(0, #bag.ghosts)
+      assert.is_false(bag.ghostPool[1]:IsShown(), "a theme without ghosts hides them")
+    end)
+
+    it("waits out a chained bag's delay unseen, then glitches in", function()
+      local bag = nextBag:Create(ctx())
+      bag:SetDocked(false)
+      bag:moveIn(bag:HiddenOffset(), 0, 0.5, "linear", 0.3)
+      assert.are.equal(0, bag.frame:GetAlpha())
+      step(0.2)
+      assert.are.equal(0, bag.frame:GetAlpha(), "still waiting")
+      assert.are.equal(0, bag.offset, "in place already")
+      finishTweens()
+      assert.are.equal(1, bag.frame:GetAlpha())
+    end)
+
+    it("slides as before without Panel.Glitch", function()
+      backToDefault()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      assert.are.equal(bag:HiddenOffset(), bag.offset)
     end)
   end)
 

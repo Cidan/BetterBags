@@ -93,7 +93,10 @@ describe("SonataNext", function()
       t.Panel = { Ornaments = {
         { Texture = "Roots", Point = "INNER", Width = 20, Motion = { Sway = 4, Period = 6 } },
         { Texture = "Leaf", Point = "TOPINNER", Width = 8, Height = 8 },
-      } }
+      },
+        Glitch = { Open = { Time = 0.4 }, Close = { Time = 0.2 }, Bursts = { Every = 10, Time = 0.2 } },
+        Rain = { { Where = "Feather", Font = "Title", HeadFont = "Title", Glyphs = "01", Speed = { 4, 8 }, Trail = { 4, 8 } } },
+      }
       return t
     end
 
@@ -105,6 +108,9 @@ describe("SonataNext", function()
       ribbon = function(t) return t.Header.Ribbon end,
       braid = function(t) return t.Chain.Braid or nil end,
       ornaments = function(t) return t.Panel.Ornaments[1].Motion end,
+      -- The Glitch theme's (next-themes.md §21): glitching in, out and now and then; the data rain.
+      glitch = function(t) return t.Panel.Glitch end,
+      rain = function(t) return t.Panel.Rain end,
     }
 
     before_each(function()
@@ -151,7 +157,8 @@ describe("SonataNext", function()
     end)
 
     it("keeps a theme as it is written for its authors (Resolve, Check)", function()
-      animation = { sparkles = false, shimmer = false, titleCloud = false, ribbon = false, braid = false, ornaments = false }
+      animation = { sparkles = false, shimmer = false, titleCloud = false, ribbon = false, braid = false, ornaments = false,
+        glitch = false, rain = false }
       sonataNext:Init()
       local raw = sonataNext:Resolve("Default")
       for name, part in pairs(PARTS) do
@@ -653,6 +660,60 @@ describe("SonataNext", function()
       "Panel.Ornaments.8.TexCoords: four numbers, left, right, top and bottom",
       "Panel.Ornaments.9.Panels: a list of panels",
     }, problems)
+  end)
+
+  -- The Glitch theme's parts (next-themes.md §21): a glitch's keys and the times it needs, a data rain's entries, an
+  -- ornament's glitch and scroll, and the fonts they name.
+  it("names what is wrong with a glitch, a data rain and an ornament's glitch, by where it is", function()
+    for _, m in ipairs({ { "NextOrnaments", "next/ornaments.lua" }, { "NextGlitch", "next/glitch.lua" },
+      { "NextRain", "next/rain.lua" } }) do
+      if addon:GetModule(m[1], true) == nil then
+        ResetModuleStub(m[1], m[2])
+        LoadBetterBagsModule(m[2])
+      end
+    end
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadGlitch", Panel = {
+      Glitch = { Open = { PowerOn = 0.2 }, Close = {}, Bursts = { Every = 4 }, Wobble = 3, Flicker = { 0.2 },
+        Corrupt = { Glyphs = "", Chance = 0.5 }, Tears = { Texture = "Nope" } },
+      Rain = {
+        { Where = "Sky", Font = "Nope", HeadFont = "Nada", Glyphs = "01", Speed = { 4 }, Trail = { 4, 8 }, Drizzle = 1 },
+        { Where = "Body", Font = "Title", HeadFont = "Title", Glyphs = "", Speed = { 4, 8 }, Trail = "long" },
+      },
+      Ornaments = {
+        { Texture = "Glow", Point = "BODY", Motion = { Glitch = { Every = 3, Twitch = 1 }, Scroll = { Z = 4 } } },
+      },
+    } })
+    local problems = sonataNext:Check("BadGlitch")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Glitch.Bursts.Time: bursts need one",
+      "Panel.Glitch.Close.Time: a glitch closing needs one",
+      "Panel.Glitch.Corrupt.Glyphs: some glyphs",
+      "Panel.Glitch.Flicker: two numbers, dark and lit",
+      "Panel.Glitch.Open.Time: a glitch opening needs one",
+      "Panel.Glitch.Tears.Texture: no texture named Nope",
+      "Panel.Glitch.Wobble: no part named Wobble",
+      "Panel.Ornaments.1.Motion.Glitch.Twitch: no glitch part named Twitch",
+      "Panel.Ornaments.1.Motion.Scroll.Z: X or Y",
+      "Panel.Rain.1.Drizzle: no part named Drizzle",
+      "Panel.Rain.1.Font: no font named Nope",
+      "Panel.Rain.1.HeadFont: no font named Nada",
+      "Panel.Rain.1.Speed: two numbers, slowest and fastest",
+      "Panel.Rain.1.Where: no place named Sky",
+      "Panel.Rain.2.Glyphs: some glyphs",
+      "Panel.Rain.2.Trail: two numbers, shortest and longest",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "GoodGlitch", Panel = {
+      Glitch = { Open = { Time = 0.4, PowerOn = 0.2 }, Close = { Time = 0.2 }, Bursts = { Every = 4, Time = 0.3 },
+        Flicker = { 0.2, 1 }, Corrupt = { Glyphs = "#@", Chance = 0.5 }, Tears = { Texture = "Glow" } },
+      Rain = { { Where = "Feather", Font = "Title", HeadFont = "Title", Glyphs = "01", Speed = { 4, 8 }, Trail = { 4, 8 } } },
+      Ornaments = { { Texture = "Glow", Point = "BODY", Tile = 64, Motion = { Glitch = { Every = 3, Jump = 2 }, Scroll = { Y = 4 } } } },
+    } })
+    assert.are.same({}, sonataNext:Check("GoodGlitch"))
   end)
 
   -- The header buttons down a side rail (Header.Buttons.Rail, next-themes.md §13).

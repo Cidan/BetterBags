@@ -155,6 +155,30 @@ describe("NextStyle", function()
       assert.has_error(function() style:Font("Odd") end, "BetterBags Next's font role Odd copies no client font named NoSuchFont")
     end)
 
+    -- A font file covers some alphabets: Locales names the client's locales it is drawn in; elsewhere the role draws the
+    -- client's own font, as a role without a file does (the Glitch theme's terminal fonts are Latin only).
+    it("draws a role's font file only in the locales it names", function()
+      local locale = "enUS"
+      local savedLocale = _G.GetLocale
+      _G.GetLocale = function() return locale end
+      finally(function() _G.GetLocale = savedLocale end)
+      local function fonts()
+        sonataNext.themes.Spec = nil
+        style:Use(register({ Fonts = { Term = { File = "Fonts\\Term.ttf", Locales = { "enUS", "deDE" }, Size = 18 },
+          TermCopy = { Object = "NumberFontNormal", File = "Fonts\\Term.ttf", Locales = { "enUS" } },
+          Anywhere = { File = "Fonts\\Term.ttf", Size = 18 } } }))
+      end
+      fonts()
+      assert.are.equal("Fonts\\Term.ttf", (style:Font("Term"):GetFont()))
+      assert.are.equal("Fonts\\Term.ttf", (style:Font("TermCopy"):GetFont()))
+      locale = "ruRU"
+      fonts()
+      assert.are.equal((GameFontNormal:GetFont()), (style:Font("Term"):GetFont()))
+      assert.are.equal((NumberFontNormal:GetFont()), (style:Font("TermCopy"):GetFont()))
+      assert.are.equal("Fonts\\Term.ttf", (style:Font("Anywhere"):GetFont()), "a file without Locales, everywhere")
+      sonataNext.themes.Spec = nil
+    end)
+
     -- The Plain theme (docs/next-plain-theme.md) draws the client's own fonts at Default's sizes (asked: "scale for Plain
     -- should be the same as our Default"): a role that copies one outright (Copy) takes its file, flags, color and shadow,
     -- nothing of the role it inherits (Default's Color and Shadow) but its Size and its own Justify; Size = false keeps

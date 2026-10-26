@@ -741,6 +741,15 @@ for _, effect in ipairs({
   { id = 'nextOrnamentMotion', name = 'ornaments', title = 'Moving Ornaments',
     description = "A theme's swaying, spinning or pulsing pieces. Off, they stand still and keep their art.",
     keywords = { 'ornament', 'sway', 'spin', 'pulse', 'theme' } },
+  -- The Glitch theme's (next-themes.md §21). Flicker can be hard on some players' eyes: off, its bags slide in and out
+  -- as any theme's and never glitch while they show.
+  { id = 'nextGlitch', name = 'glitch', title = 'Glitch Effects',
+    description = "A theme's bags flickering and tearing as they open and close, and now and then while they show. "
+      .. 'Off, they slide in and out.',
+    keywords = { 'glitch', 'flicker', 'flash', 'tear', 'static', 'theme' } },
+  { id = 'nextRain', name = 'rain', title = 'Data Rain',
+    description = "A theme's columns of glyphs falling down a bag's feathered edge and behind its items.",
+    keywords = { 'rain', 'data', 'glyphs', 'matrix', 'theme' } },
 }) do
   local keywords = { 'animation', 'effects', 'motion' }
   for _, word in ipairs(effect.keywords) do

@@ -12,6 +12,10 @@ ResetModuleStub("NextTween", "next/tween.lua")
 LoadBetterBagsModule("next/tween.lua")
 ResetModuleStub("NextLift", "next/lift.lua")
 LoadBetterBagsModule("next/lift.lua")
+ResetModuleStub("NextFill", "next/fill.lua")
+LoadBetterBagsModule("next/fill.lua")
+ResetModuleStub("NextControls", "next/controls/base.lua")
+LoadBetterBagsModule("next/controls/base.lua")
 ResetModuleStub("NextTabs", "next/tabs.lua")
 LoadBetterBagsModule("next/tabs.lua")
 local nextTabs = addon:GetModule("NextTabs")
@@ -418,6 +422,37 @@ describe("NextTabs", function()
       assert.are.same({ 0.3, 0.6, 1, 1 }, { rail.indicator:GetVertexColor() })
       restyle({ Tabs = { Indicator = { Color = "Gold", Width = 3 } } })
       assert.is_nil(rail.indicator:GetTexture())
+    end)
+
+    -- The Glitch theme (next-themes.md §21): a HUD's boxes. An edge round every tab (NextControls' edge), the selected
+    -- one's, or one a section would drop on, in its own; none for a theme without.
+    it("draws an edge round each tab, the selected one's and a drop target's in its own", function()
+      rail:SetTabs(groups)
+      rail:Select(1)
+      restyle({ Palette = { A = { 0.1, 1, 0.3, 1 } }, Tabs = { Edge = { Color = "A", Alpha = 0.5, Size = 1 },
+        SelectedEdge = { Color = "White", Alpha = 1, Size = 2 } } })
+      local selected, other = rail.tabs[1], rail.tabs[2]
+      local c = other.edge.Top._colorTexture
+      assert.are.same({ 0.1, 1, 0.3, 0.5 }, { c.r, c.g, c.b, c.a })
+      assert.is_true(other.edge.Left:IsShown())
+      assert.are.equal(other.button, other.edge.Top:GetParent(), "round the tab, sliding with it")
+      assert.are.equal(1, other.edge.Left:GetWidth())
+      assert.are.equal(2, selected.edge.Left:GetWidth(), "the selected one's")
+      assert.are.equal(1, selected.edge.Top._colorTexture.a)
+      rail:SetDropTarget(2)
+      assert.are.equal(2, other.edge.Left:GetWidth(), "a drop target's")
+      rail:SetDropTarget(nil)
+      assert.are.equal(1, other.edge.Left:GetWidth())
+      restyle({})
+      assert.is_false(other.edge.Top:IsShown(), "a theme without")
+      assert.is_false(selected.edge.Bottom:IsShown())
+    end)
+
+    it("draws the selected tab's edge as the others' when it has none of its own", function()
+      rail:SetTabs(groups)
+      rail:Select(1)
+      restyle({ Tabs = { Edge = { Color = "Gold", Alpha = 0.4, Size = 1 } } })
+      assert.are.equal(0.4, rail.tabs[1].edge.Top._colorTexture.a)
     end)
 
     -- Reported in game: a selected tab's name cut short ("Backpa..."). The client keeps the width a font string took

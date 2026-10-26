@@ -10,7 +10,7 @@ local style = addon:GetModule('NextStyle')
 -- drifting left (or right) while they twinkle, spin, shrink and fade. Sprites are pooled. An emitter runs
 -- only while started, and its driver is a child of the frame it draws on, so it also stops while
 -- that frame is hidden. It spawns nothing in combat; sparkles already out finish their lives. How a
--- sparkle looks and fades, twinkles, shrinks and wobbles is the Next theme's (Sparkles,
+-- sparkle looks and fades, twinkles, shrinks and wobbles, and whether it turns (Upright: never), is the Next theme's (Sparkles,
 -- next-themes.md), read as sparkles are born and drawn; an emitter a theme turns off (SetEnabled)
 -- never starts.
 ---@class NextSparkles: AceModule
@@ -145,6 +145,8 @@ function emitterProto:spawn()
   texture:SetVertexColor(r, g, b, 1)
   local x, y = o.Spawn()
   local spinDirection = random() < 0.5 and -1 or 1
+  -- Upright (square pixels): never turned.
+  local upright = S.Upright == true
   ---@type NextSparkle
   local p = {
     texture = texture,
@@ -155,8 +157,8 @@ function emitterProto:spawn()
     age = 0,
     life = between(random, o.Life),
     size = between(random, o.Size),
-    angle = random() * math.pi * 2,
-    spin = o.Spin * (0.5 + random()) * spinDirection,
+    angle = upright and 0 or random() * math.pi * 2,
+    spin = upright and 0 or o.Spin * (0.5 + random()) * spinDirection,
     phase = random() * math.pi * 2,
   }
   texture:ClearAllPoints()

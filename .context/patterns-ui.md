@@ -458,3 +458,19 @@ handle every part being absent (shipped themes leave them out, and a spec draws 
 nothing else changes. Keep `Resolve` and `Check` raw for theme authors, and when the choice changes, re-lay it and
 restyle without new font objects, which can never be freed.
 
+
+## An Animation That Reads Its Theme Every Frame Must Survive the Theme Going
+
+A tween that runs for a while and reads the theme on each update (BetterBags Next's glitches read `Panel.Glitch` on every
+moment) outlives the theme it started under: a theme applied meanwhile, or an Animation switch that takes the part out,
+leaves it reading nothing. Make the per-frame work do nothing (and put the widget at rest) when the part is gone, let the
+animation finish so whatever waits for its end (a panel saying it has shown, which loads the bank) still hears it, and
+have the widget's `ApplyStyle` start what the new theme has. Test it by applying a theme without the part mid-animation
+and stepping the tween: the Glitch theme's code errored every frame of the rest of a glitch before it did
+(next-themes.md §21).
+
+## Count Every Flash a Theme Can Make
+
+Flicker across a whole window is a flash in WCAG 2.3.1's sense (more than three a second over a large area can trigger
+seizures). An effect that flickers a window's alpha or flashes large textures needs an Animation switch that takes it
+out on any theme (next-themes.md §20), and its rate written down where it is defined.
