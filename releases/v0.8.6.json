@@ -1,0 +1,23 @@
+{
+  "id": 1792988804,
+  "version": "v0.8.6",
+  "channel": "release",
+  "date": "2026-10-26",
+  "from": "v0.8.5",
+  "to": "v0.8.6",
+  "headline": "This release introduces the retro-terminal Glitch theme for BetterBags Next along with new animation settings and effect fixes.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Glitch theme for BetterBags Next",
+      "details": "Adds the Glitch theme, styled as a retro terminal with CRT warm-up animations, phosphor green scanlines, HUD brackets, and falling digital rain. Includes new animation settings to toggle glitch effects and data rain.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Visual effects freezing after hiding the UI",
+      "details": "Fixed an issue where BetterBags Next visual effects stopped animating after toggling the interface with Alt+Z.",
+      "clients": []
+    }
+  ]
+}
