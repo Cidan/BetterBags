@@ -4637,7 +4637,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         override(loader, "Release", function() end)
         mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, { itemID = 202, guid = "g202", count = 1 } }
         refresh:OnEnable()
-        refresh:_StartupRead("primed")
+        refresh:_WorldRead(refresh._world, "primed")
         drain()
       end)
 
@@ -5157,7 +5157,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       local primed, held, released, loaderCallback
 
       local function gateEvent(name, ...)
-        local frame = refresh._startupFrame
+        local frame = refresh._worldFrame
         if frame and frame._events[name] then
           frame:GetScript("OnEvent")(frame, name, ...)
         end
@@ -5172,7 +5172,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       end
 
       local function frame()
-        local f = refresh._startupFrame
+        local f = refresh._worldFrame
         local onUpdate = f and f:GetScript("OnUpdate")
         if onUpdate then onUpdate(f, 0.016) end
         advance()
@@ -5243,7 +5243,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         fire("LOADING_SCREEN_DISABLED")
         frame()
         assert.is_function(primed)
-        assert.is_true(fireDelayed(refresh.STARTUP_PRIME_TIMEOUT))
+        assert.is_true(fireDelayed(refresh.WORLD_PRIME_TIMEOUT))
         drain()
         assert.equal(1, harvests)
         assert.is_true(sweeps[1].wipe)
@@ -5261,7 +5261,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         frame()
         primed()
         drain()
-        fireDelayed(refresh.STARTUP_PRIME_TIMEOUT)
+        fireDelayed(refresh.WORLD_PRIME_TIMEOUT)
         drain()
         assert.equal(1, harvests)
       end)
@@ -5277,7 +5277,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
           frame()
         end
         assert.is_nil(primed)
-        now = 100 + refresh.STARTUP_SETTLE_TIMEOUT
+        now = 100 + refresh.WORLD_SETTLE_TIMEOUT
         fire("BAG_UPDATE", 0)
         frame()
         assert.is_function(primed)
@@ -5301,6 +5301,22 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         frame()
         drain()
         assert.equal(2, harvests, "the startup wait is over")
+      end)
+
+      it("loads the item data once when the backpack opens while it loads", function()
+        override(addon, "Bags", { Backpack = { frame = CreateFrame("Frame") } })
+        local primes = 0
+        local loader = addon:GetModule("ItemLoader")
+        override(loader, "PrimeAll", function(_, cb) primes = primes + 1 primed = cb end)
+        refresh:OnEnable()
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        assert.equal(1, primes)
+        local bagFrame = addon.Bags.Backpack.frame
+        bagFrame:GetScript("OnShow")(bagFrame)
+        drain()
+        assert.equal(1, harvests, "read at once")
+        assert.equal(1, primes, "the item data already loading is not loaded again")
       end)
 
       it("reads once when the backpack opens and the item data is already loaded", function()
@@ -5328,7 +5344,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         fire("PLAYER_ENTERING_WORLD", true, false)
         frame()
         assert.is_nil(primed)
-        assert.is_true(fireDelayed(refresh.STARTUP_LOADING_TIMEOUT))
+        assert.is_true(fireDelayed(refresh.WORLD_LOADING_TIMEOUT))
         frame()
         assert.is_function(primed)
       end)
@@ -5624,7 +5640,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
       it("lets go of every startup event once the read has run", function()
         refresh:OnEnable()
-        local startupFrame = refresh._startupFrame
+        local startupFrame = refresh._worldFrame
         fire("LOADING_SCREEN_DISABLED")
         frame()
         primed()
@@ -5701,6 +5717,324 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
             assert.are_not.equal("Recent Items", item.itemInfo.category, slotkey .. " was in the bags at login")
           end
         end
+      end)
+    end)
+
+    -- Entering a dungeon is a world transfer: the client takes the player's items away for the
+    -- loading screen and gives them back after, with no BAG_UPDATE on the way out (BAG_UPDATE fires
+    -- the moment a bag's contents change: SynchronousEvent, ContainerDocumentation.lua). Reported:
+    -- "4x data/items.lua:1197: bad argument #1 to 'GetItemGUID' (Usage: local itemGUID =
+    -- C_Item.GetItemGUID(itemLocation))" as a player went into a dungeon, from a window closing
+    -- (CloseInteractionWindow, core/hooks.lua): its recalculation ran in the event and asked the client
+    -- about slots the transfer had emptied. Every loading screen is now held as the login is
+    -- (refresh-scheduler.md §8).
+    describe("leaving the world (every loading screen)", function()
+      local primed, held, released, errors, asked
+
+      local function worldEvent(name, ...)
+        local f = refresh._worldFrame
+        if f and f._events[name] then
+          f:GetScript("OnEvent")(f, name, ...)
+        end
+      end
+
+      -- A WoW event reaches every listener: the events module's handlers and the world frame.
+      local function fire(name, ...)
+        local entry = events._eventMap[name]
+        if entry then entry.fn(name, ...) end
+        worldEvent(name, ...)
+      end
+
+      local function frame()
+        local f = refresh._worldFrame
+        local onUpdate = f and f:GetScript("OnUpdate")
+        if onUpdate then onUpdate(f, 0.016) end
+        advance()
+      end
+
+      -- The player's items, as the client holds them in the world.
+      local function giveBack()
+        mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, {} }
+        mockContainer[1] = { { itemID = 201, guid = "g201", count = 1 } }
+      end
+      -- The transfer takes them away, with no BAG_UPDATE.
+      local function takeAway()
+        mockContainer[0] = { {}, {} }
+        mockContainer[1] = { {} }
+      end
+
+      -- A window closing asks for this recalculation (CloseInteractionWindow, interactionRecalculation).
+      local function closeWindow()
+        events:SendMessage(context:New("PLAYER_INTERACTION_MANAGER_FRAME_HIDE"), "bags/Rederive",
+          { resetLayout = true, backpack = true, bank = false, categoriesUnchanged = true })
+      end
+
+      -- Logged in: the login's read has run.
+      local function login()
+        refresh:OnEnable()
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+        primed = nil
+      end
+
+      local function committed()
+        return items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey
+      end
+
+      before_each(function()
+        primed, held, released = nil, 0, 0
+        local loader = addon:GetModule("ItemLoader")
+        override(loader, "TellMeWhenABagIsUpdated", function() end)
+        override(loader, "Hold", function() held = held + 1 end)
+        override(loader, "Release", function() released = released + 1 end)
+        override(loader, "PrimeAll", function(_, cb) primed = cb end)
+        errors = {}
+        saveGlobal(_G, "geterrorhandler")
+        _G.geterrorhandler = function() return function(err) table.insert(errors, tostring(err)) end end
+        -- Every slot the client is asked an item's GUID about.
+        asked = {}
+        local guid = _G.C_Item.GetItemGUID
+        override(_G.C_Item, "GetItemGUID", function(location)
+          local bagid, slotid = location:GetBagAndSlot()
+          if bagid ~= nil then table.insert(asked, bagid .. "_" .. slotid) end
+          return guid(location)
+        end)
+        giveBack()
+      end)
+
+      it("recalculates nothing while out of the world, then reads the bags once: the reported dungeon entry", function()
+        login()
+        local before = #sweeps
+        fire("PLAYER_LEAVING_WORLD")
+        takeAway()
+        -- Windows close as the transfer starts (the report's 4x: as many as closed).
+        closeWindow()
+        closeWindow()
+        drain()
+        assert.same({}, errors)
+        assert.equal(before, #sweeps, "nothing swept while out of the world")
+
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        giveBack()
+        fire("BAG_UPDATE", 0)
+        fire("BAG_UPDATE", 1)
+        frame() -- the items arriving
+        assert.is_nil(primed)
+        frame() -- quiet
+        assert.is_function(primed)
+        primed()
+        drain()
+
+        assert.same({}, errors)
+        assert.equal(before + 1, #sweeps, "one read takes in both windows' recalculations")
+        assert.is_true(sweeps[#sweeps].wipe)
+        assert.equal("g101", committed()["0_1"].itemInfo.itemGUID)
+        assert.equal("g201", committed()["1_1"].itemInfo.itemGUID)
+        assert.is_nil(next(items._newItemTimers[const.BAG_KIND.BACKPACK] or {}), "nothing came in as new")
+        assert.equal(2, held)
+        assert.equal(2, released)
+      end)
+
+      it("asks the client about no bag while out of the world", function()
+        login()
+        asked = {}
+        fire("PLAYER_LEAVING_WORLD")
+        takeAway()
+        closeWindow()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        drain()
+        assert.same({}, asked)
+        assert.same({}, errors)
+      end)
+
+      it("goes on with a unit parked when the player left only once the world is back", function()
+        login()
+        override(addon, "atBank", true)
+        override(addon, "Bags", { Bank = {} })
+        mockContainer[6] = { { itemID = 301, guid = "bank1", count = 1 } }
+        -- The bank is read and the unit parks; the backpack's read is its next step.
+        refresh:RequestUpdate({ bank = true, backpack = true })
+        local harvested = harvests
+        fire("PLAYER_LEAVING_WORLD")
+        takeAway()
+        drain()
+        assert.equal(harvested, harvests, "the backpack is not read while out of the world")
+        assert.equal("g101", committed()["0_1"].itemInfo.itemGUID)
+
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        giveBack()
+        frame()
+        primed()
+        drain()
+        assert.same({}, errors)
+        assert.equal("g101", committed()["0_1"].itemInfo.itemGUID)
+        assert.equal("bank1", items.slotInfo[const.BAG_KIND.BANK].itemsBySlotKey["6_1"].itemInfo.itemGUID)
+      end)
+
+      -- Leaving the world marks every bag unread: until a read of them, a recalculation asks the client
+      -- nothing about them, even one that runs before the world's read (a unit parked when the player
+      -- left) and even when the items are not back yet.
+      it("asks nothing about the bags in a recalculation that runs before the world's read", function()
+        login()
+        override(addon, "atBank", true)
+        override(addon, "Bags", { Bank = {} })
+        mockContainer[6] = { { itemID = 301, guid = "bank1", count = 1 } }
+        refresh:RequestUpdate({ bank = true, backpack = true })
+        drain()
+        -- The bank is recalculated and the unit parks; the backpack's recalculation is its next step.
+        refresh:RequestUpdate({ derive = true, bank = true, backpack = true })
+        asked = {}
+        fire("PLAYER_LEAVING_WORLD")
+        takeAway()
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+        assert.same({}, errors)
+        for _, key in ipairs(asked) do
+          assert.is_nil(key:match("^[01]_"), "asked about " .. key)
+        end
+      end)
+
+      it("ends each loading screen's wait on its own: an earlier wait's timers and item data end nothing", function()
+        refresh:OnEnable()
+        fire("PLAYER_ENTERING_WORLD", true, false) -- arms the login's loading timeout
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        local loginPrimed = primed
+        assert.is_true(fireDelayed(refresh.WORLD_PRIME_TIMEOUT)) -- the login's read runs without the item data
+        drain()
+        local before = #sweeps
+        primed = nil
+        fire("PLAYER_LEAVING_WORLD")
+        takeAway()
+        loginPrimed() -- the login's item data arrives during the loading screen
+        assert.is_true(fireDelayed(refresh.WORLD_LOADING_TIMEOUT)) -- the login's loading timeout
+        frame()
+        drain()
+        assert.equal(before, #sweeps, "nothing read while out of the world")
+        assert.is_nil(primed, "still waiting for the loading screen")
+        assert.same({}, errors)
+
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        giveBack()
+        frame()
+        primed()
+        drain()
+        assert.equal(before + 1, #sweeps, "the login's late item data asked for a read, taken in by the world's")
+      end)
+
+      it("ends nothing with the timeout or item data of a wait the player left before it read", function()
+        refresh:OnEnable()
+        fire("LOADING_SCREEN_DISABLED")
+        frame() -- the login's wait loads the item data
+        local loginPrimed = primed
+        primed = nil
+        fire("PLAYER_LEAVING_WORLD")
+        takeAway()
+        assert.is_true(fireDelayed(refresh.WORLD_PRIME_TIMEOUT)) -- the login's
+        loginPrimed() -- the login's item data
+        drain()
+        assert.equal(0, #sweeps, "nothing read while out of the world")
+        assert.is_nil(primed)
+
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        giveBack()
+        frame()
+        primed()
+        drain()
+        assert.equal(1, #sweeps)
+        loginPrimed() -- the login's item data, late
+        drain()
+        assert.equal(1, #sweeps, "the login's wait never read, so its item data asks for nothing")
+      end)
+
+      it("ends nothing with the timers of a wait the player left while it was still loading", function()
+        login()
+        fire("PLAYER_LEAVING_WORLD")
+        fire("PLAYER_ENTERING_WORLD", false, false) -- arms the first wait's loading timeout
+        fire("PLAYER_LEAVING_WORLD") -- before its loading screen ended
+        assert.is_true(fireDelayed(refresh.WORLD_LOADING_TIMEOUT))
+        frame()
+        assert.is_nil(primed, "the second wait still waits for its loading screen")
+      end)
+
+      it("counts the settle timeout from the loading screen's end, whatever fires after", function()
+        local now = 100
+        saveGlobal(_G, "GetTime")
+        _G.GetTime = function() return now end
+        login()
+        fire("PLAYER_LEAVING_WORLD")
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        fire("BAG_UPDATE", 0)
+        frame() -- the items arriving
+        now = 101
+        assert.is_true(fireDelayed(refresh.WORLD_LOADING_TIMEOUT)) -- the loading timeout, after the end
+        fire("BAG_UPDATE", 0)
+        frame()
+        assert.is_nil(primed)
+        now = 100 + refresh.WORLD_SETTLE_TIMEOUT
+        fire("BAG_UPDATE", 0)
+        frame()
+        assert.is_function(primed, "two seconds after the loading screen ended")
+      end)
+
+      it("stops waiting for the world after a while when the client never says it is back", function()
+        login()
+        fire("PLAYER_LEAVING_WORLD")
+        frame()
+        assert.is_nil(primed)
+        -- The login's wait set one too: it ends nothing now.
+        assert.is_true(fireDelayed(refresh.WORLD_RETURN_TIMEOUT))
+        frame()
+        assert.is_nil(primed)
+        assert.is_true(fireDelayed(refresh.WORLD_RETURN_TIMEOUT))
+        frame()
+        assert.is_function(primed)
+      end)
+
+      it("reads nothing early when the backpack shows while out of the world: only the login does", function()
+        override(addon, "Bags", { Backpack = { frame = CreateFrame("Frame") } })
+        login()
+        local before = #sweeps
+        local hooks = 0
+        local hookScript = addon.HookScript
+        override(addon, "HookScript", function(...) hooks = hooks + 1 return hookScript(...) end)
+        fire("PLAYER_LEAVING_WORLD")
+        assert.equal(0, hooks, "the backpack is hooked once, at login")
+        local bagFrame = addon.Bags.Backpack.frame
+        bagFrame:GetScript("OnShow")(bagFrame)
+        drain()
+        assert.equal(before, #sweeps)
+        assert.is_nil(primed)
+      end)
+
+      it("starts a new wait when the player leaves again before the world's read", function()
+        login()
+        fire("PLAYER_LEAVING_WORLD")
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        fire("PLAYER_LEAVING_WORLD")
+        local before = #sweeps
+        frame()
+        drain()
+        assert.equal(before, #sweeps)
+        assert.is_nil(primed, "waiting for the second loading screen")
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+        assert.equal(before + 1, #sweeps)
       end)
     end)
   end)

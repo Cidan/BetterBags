@@ -327,7 +327,7 @@ describe("Refresh Module", function()
       refresh:OnEnable()
       -- The startup read OnEnable holds every sweep for (refresh-scheduler.md §8): a bank open
       -- reads one tab per read, the next once the read before it has run, so reads must run.
-      refresh:_StartupRead("primed")
+      refresh:_WorldRead(refresh._world, "primed")
       savedRequest = refresh.RequestUpdate
       -- Each request as it was made: merging folds later requests into a waiting one.
       refresh.RequestUpdate = function(self, r)
@@ -851,7 +851,7 @@ describe("Refresh Module", function()
         onShown = cb
       end } }
       refresh:OnEnable()
-      refresh:_StartupRead("primed")
+      refresh:_WorldRead(refresh._world, "primed")
       spy.on(refresh, "RequestUpdate")
     end)
 
@@ -1227,7 +1227,8 @@ describe("Refresh Module", function()
     -- captured glow-intensity drag asked for 22 in one frame, each restyling every button).
     it("draws once on the next frame for every redraw asked for in a frame", function()
       local frame = {}
-      _G.C_Timer.After = function(_, fn) table.insert(frame, fn) end
+      -- Next-frame timers only: OnEnable's wait for the world keeps a timer of its own.
+      _G.C_Timer.After = function(delay, fn) if delay == 0 then table.insert(frame, fn) end end
       refresh:OnEnable()
       -- Only the scheduling is checked here; drawing and restyling are covered above.
       stub(refresh, "Redraw")

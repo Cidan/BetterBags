@@ -25,11 +25,11 @@ local refresh = addon:NewModule('Refresh')
 -- finished" event, and a sort that moves nothing fires no BAG_UPDATE at all.
 refresh.SORT_FALLBACK_SECONDS = 0.5
 
--- The startup read (.claude/rules/refresh-scheduler.md §8). How long the bags may keep
--- changing after the loading screen before the read runs anyway:
-refresh.STARTUP_SETTLE_TIMEOUT = 2
+-- The world's read, at login and after every loading screen (.claude/rules/refresh-scheduler.md §8).
+-- How long the bags may keep changing after the loading screen before the read runs anyway:
+refresh.WORLD_SETTLE_TIMEOUT = 2
 -- How long to wait for the item data before reading anyway (the late data is read again):
-refresh.STARTUP_PRIME_TIMEOUT = 2
+refresh.WORLD_PRIME_TIMEOUT = 2
 -- Seconds a bank open waits for a bank tab's item data before reading the tab anyway (the captured
 -- opens received the whole bank's 1.2 s after BANKFRAME_OPENED); the late data is read again.
 refresh.BANK_PRIME_TIMEOUT = 2
@@ -38,7 +38,10 @@ refresh.BANK_PRIME_TIMEOUT = 2
 -- show animation is BetterBags Next's 0.45 s slide.
 refresh.BANK_SHOW_TIMEOUT = 1
 -- How long after PLAYER_ENTERING_WORLD to stop waiting for the end of the loading screen:
-refresh.STARTUP_LOADING_TIMEOUT = 10
+refresh.WORLD_LOADING_TIMEOUT = 10
+-- How long after a wait starts to stop waiting for the client to say the world is back. A safety net:
+-- PLAYER_ENTERING_WORLD follows every loading screen.
+refresh.WORLD_RETURN_TIMEOUT = 60
 -- The guild bank (guild-bank.md §3). Seconds it waits for its window to say it has finished
 -- showing before loading its tabs anyway, as the bank does (BANK_SHOW_TIMEOUT):
 refresh.GUILD_SHOW_TIMEOUT = 1
@@ -46,9 +49,9 @@ refresh.GUILD_SHOW_TIMEOUT = 1
 -- read again), as a bank open does (BANK_PRIME_TIMEOUT):
 refresh.GUILD_PRIME_TIMEOUT = 2
 
--- The events the startup frame listens to. The bag events mean the client is still
+-- The events the world frame listens to while it waits. The bag events mean the client is still
 -- delivering the bags.
-local STARTUP_EVENTS = { 'PLAYER_ENTERING_WORLD', 'LOADING_SCREEN_DISABLED', 'BAG_UPDATE', 'BAG_CONTAINER_UPDATE' }
+local WORLD_EVENTS = { 'PLAYER_ENTERING_WORLD', 'LOADING_SCREEN_DISABLED', 'BAG_UPDATE', 'BAG_CONTAINER_UPDATE' }
 
 ---@param name string
 ---@return boolean
@@ -71,9 +74,11 @@ function refresh:Init()
   self._activeRequest = nil
   self._idlePending = false
   self._running = false
-  -- While held (from OnEnable until the startup read), requests wait in the queue.
+  -- While held (out of the world: from OnEnable, and from leaving the world, until the world's read),
+  -- no unit starts or goes on, and requests wait in the queue.
   self._held = false
-  self._startup = nil
+  -- The wait for the world under way (HoldForWorld), if any.
+  self._world = nil
   -- The redraw asked for this frame (RequestRedraw), if any.
   self._redrawPending = nil
   -- The guild bank visit under way (_OpenGuildBank), if any.
@@ -144,7 +149,8 @@ end
 ---@field recategorize? boolean Work every item's category out again (a read that absorbed a derive without categoriesUnchanged)
 ---@field restyle? boolean Every button of the swept kinds draws in full (a new draw generation)
 ---@field merged? number How many requests this one carries (set by merging, for profiler traces)
----@field startup? string Why the startup read ran (set on the startup read, for profiler traces)
+---@field world? string Why the world's read ran: "primed", "timeout" or "bagShown" (set on it, for profiler traces)
+---@field worldCause? string What the world's read follows: "login" or "transfer" (a loading screen)
 ---@field bankOpen? string Why a bank open's read ran: "primed", "timeout", or "empty" with no tab (for profiler traces)
 ---@field bankWave? number The bank open read this is (_LoadNextBankTab); the next tab loads once it has run
 ---@field bankWaveTab? number The bank tab that read added (for profiler traces)
@@ -235,8 +241,8 @@ end
 -- in-flight sweep. A request that another request still waiting in the queue already
 -- covers is merged into it (canMerge). If the scheduler is idle, the first step runs
 -- synchronously in this call (harvesting this frame's client state); every subsequent step
--- is handed off to the next frame via _Arm. While the scheduler is held for the startup
--- read, requests only wait.
+-- is handed off to the next frame via _Arm. While the scheduler is held for the world's read
+-- (at login, and after leaving the world), requests only wait.
 ---@param request RefreshRequest
 function refresh:RequestUpdate(request)
   local waiting = self._queue[#self._queue]
@@ -293,8 +299,16 @@ function refresh:_UnitDone()
 end
 
 -- _Step is one frame of the pump: advance the active unit, else burn the idle hand-off
--- frame, else start the next queued unit. When the queue drains it stops the clock.
+-- frame, else start the next queued unit. When the queue drains it stops the clock. While held
+-- (out of the world, §8) it stops the clock too: no unit starts, and a unit parked when the player
+-- left the world waits, since the bags it would read next are not there; the world's read starts
+-- the clock again.
 function refresh:_Step()
+  if self._held then
+    self._running = false
+    return
+  end
+
   if self._active then
     self:_Resume()
     self:_Arm()
@@ -307,7 +321,7 @@ function refresh:_Step()
     return
   end
 
-  local request = not self._held and table.remove(self._queue, 1) or nil
+  local request = table.remove(self._queue, 1)
   if not request then
     self._running = false
     return
@@ -635,7 +649,18 @@ function refresh:OnEnable()
     items:ClearGuildBankCache(ctx)
   end)
 
-  self:HoldForStartup()
+  -- Leaving the world (a loading screen: a dungeon, a portal, a hearthstone) takes the player's items
+  -- out of the client until it delivers them again, with no BAG_UPDATE on the way out: what was read is
+  -- not what the client holds until a read of it commits, so every bag is unread (a recalculation asks
+  -- the client nothing about it), and nothing is read until the world is back (§8).
+  events:RegisterEvent('PLAYER_LEAVING_WORLD', function()
+    markUnread(const.BACKPACK_BAGS)
+    markUnread(const.BANK_BAGS)
+    markUnread(const.ACCOUNT_BANK_BAGS)
+    self:HoldForWorld('transfer')
+  end)
+
+  self:HoldForWorld('login')
 end
 
 -- _OpenGuildBank shows the guild bank's window at once and loads its tabs only once the window has
@@ -724,85 +749,99 @@ function refresh:_GuildBankChanged()
   self:_PrimeGuildAndRead(tabs)
 end
 
--- HoldForStartup holds every sweep until the client has delivered the bags, then reads
--- them once (.claude/rules/refresh-scheduler.md §8). At PLAYER_LOGIN, when OnEnable runs,
--- the client has not attached the bags or sent their contents yet: a captured login read a
--- backpack of 20 empty slots here, and the bags then arrived over five seconds, each step
--- requesting another sweep. Requests made meanwhile wait in the queue; the startup read
--- absorbs them. The read runs:
---   1. after the loading screen ends (LOADING_SCREEN_DISABLED, or PLAYER_ENTERING_WORLD
---      where the client lacks it, or STARTUP_LOADING_TIMEOUT after PLAYER_ENTERING_WORLD),
---   2. at the first frame without bag events (or after STARTUP_SETTLE_TIMEOUT),
+-- HoldForWorld holds every sweep until the client has delivered the bags, then reads them once
+-- (.claude/rules/refresh-scheduler.md §8): at login (cause "login", from OnEnable) and after every
+-- loading screen (cause "transfer", from PLAYER_LEAVING_WORLD). At PLAYER_LOGIN the client has not
+-- attached the bags or sent their contents yet: a captured login read a backpack of 20 empty slots
+-- here, and the bags then arrived over five seconds, each step requesting another sweep. A loading
+-- screen (a dungeon, a portal) takes the player's items out of the client in the same way: a window
+-- closing as a player went into a dungeon recalculated the bags and asked the client about slots it had
+-- emptied ("bad argument #1 to 'GetItemGUID'"). While held, no unit starts or goes on, and requests made
+-- meanwhile wait in the queue; the world's read absorbs them. The read runs:
+--   1. after the loading screen ends (LOADING_SCREEN_DISABLED, or PLAYER_ENTERING_WORLD where the
+--      client lacks it, or WORLD_LOADING_TIMEOUT after PLAYER_ENTERING_WORLD, or WORLD_RETURN_TIMEOUT
+--      after the wait started),
+--   2. at the first frame without bag events (or after WORLD_SETTLE_TIMEOUT),
 --   3. once the item data of every bag slot and equipped slot has loaded (or after
---      STARTUP_PRIME_TIMEOUT; the late data is read again when it arrives).
--- Opening the backpack before then reads at once.
-function refresh:HoldForStartup()
+--      WORLD_PRIME_TIMEOUT; the late data is read again when it arrives).
+-- At login, opening the backpack before then reads at once. Each wait is its own: a new one (the player
+-- leaving the world again) replaces the last, whose timers and item data then end nothing. The world
+-- frame's scripts are the current wait's (set here and by _WorldSettle, cleared by _WorldPrime and
+-- _WorldRead); only timers and the item data's callback can outlive their wait, and they check it.
+---@param cause "login"|"transfer"
+function refresh:HoldForWorld(cause)
   self._held = true
-  self._startup = { phase = 'loading', bagActivity = false }
+  ---@type table
+  local hold = { cause = cause, phase = 'loading', bagActivity = false }
+  self._world = hold
   addon:GetModule('ItemLoader'):Hold()
 
-  local frame = self._startupFrame
+  local frame = self._worldFrame
   if not frame then
     frame = CreateFrame('Frame')
-    self._startupFrame = frame
+    self._worldFrame = frame
   end
-  for _, event in ipairs(STARTUP_EVENTS) do
+  frame:SetScript('OnUpdate', nil)
+  for _, event in ipairs(WORLD_EVENTS) do
     if isEventValid(event) then
       frame:RegisterEvent(event)
     end
   end
   frame:SetScript('OnEvent', function(_, event)
-    self:_OnStartupEvent(event)
+    self:_OnWorldEvent(hold, event)
+  end)
+  C_Timer.After(self.WORLD_RETURN_TIMEOUT, function()
+    self:_WorldSettle(hold)
   end)
 
-  local backpack = addon.Bags and addon.Bags.Backpack
-  if backpack and backpack.frame then
-    addon.HookScript(backpack.frame, 'OnShow', function()
-      self:_OnStartupBagShown()
-    end)
-  end
-end
-
----@param event string
-function refresh:_OnStartupEvent(event)
-  local startup = self._startup
-  if not startup then return end
-  if event == 'BAG_UPDATE' or event == 'BAG_CONTAINER_UPDATE' then
-    startup.bagActivity = true
-  elseif event == 'LOADING_SCREEN_DISABLED' then
-    self:_StartupSettle()
-  elseif event == 'PLAYER_ENTERING_WORLD' then
-    if not isEventValid('LOADING_SCREEN_DISABLED') then
-      self:_StartupSettle()
-    else
-      C_Timer.After(self.STARTUP_LOADING_TIMEOUT, function()
-        self:_StartupSettle()
+  if cause == 'login' then
+    local backpack = addon.Bags and addon.Bags.Backpack
+    if backpack and backpack.frame then
+      addon.HookScript(backpack.frame, 'OnShow', function()
+        self:_OnLoginBagShown()
       end)
     end
   end
 end
 
--- _StartupSettle starts waiting for a frame without bag events. Frames do not run during
--- the loading screen, so the first one comes after it.
-function refresh:_StartupSettle()
-  local startup = self._startup
-  if not startup or startup.phase ~= 'loading' then return end
-  startup.phase = 'settling'
-  startup.bagActivity = false
-  startup.settleStart = GetTime()
-  self._startupFrame:SetScript('OnUpdate', function()
-    self:_OnStartupFrame()
+---@param hold table
+---@param event string
+function refresh:_OnWorldEvent(hold, event)
+  if event == 'BAG_UPDATE' or event == 'BAG_CONTAINER_UPDATE' then
+    hold.bagActivity = true
+  elseif event == 'LOADING_SCREEN_DISABLED' then
+    self:_WorldSettle(hold)
+  elseif event == 'PLAYER_ENTERING_WORLD' then
+    if not isEventValid('LOADING_SCREEN_DISABLED') then
+      self:_WorldSettle(hold)
+    else
+      C_Timer.After(self.WORLD_LOADING_TIMEOUT, function()
+        self:_WorldSettle(hold)
+      end)
+    end
+  end
+end
+
+-- _WorldSettle starts waiting for a frame without bag events. Frames do not run during the
+-- loading screen, so the first one comes after it.
+---@param hold table
+function refresh:_WorldSettle(hold)
+  if self._world ~= hold or hold.phase ~= 'loading' then return end
+  hold.phase = 'settling'
+  hold.bagActivity = false
+  hold.settleStart = GetTime()
+  self._worldFrame:SetScript('OnUpdate', function()
+    self:_OnWorldFrame(hold)
   end)
 end
 
-function refresh:_OnStartupFrame()
-  local startup = self._startup
-  if not startup or startup.phase ~= 'settling' then return end
-  if startup.bagActivity and GetTime() - startup.settleStart < self.STARTUP_SETTLE_TIMEOUT then
-    startup.bagActivity = false
+---@param hold table
+function refresh:_OnWorldFrame(hold)
+  if hold.bagActivity and GetTime() - hold.settleStart < self.WORLD_SETTLE_TIMEOUT then
+    hold.bagActivity = false
     return
   end
-  self:_StartupPrime()
+  self:_WorldPrime(hold)
 end
 
 -- _OpenBank shows the bank window at once (with the bank's committed items: none after a close)
@@ -1013,57 +1052,64 @@ function refresh:_BankWaveDone(wave)
   self:_LoadNextBankTab(open)
 end
 
--- _StartupPrime loads the item data of every bag slot and every equipped slot, then reads.
-function refresh:_StartupPrime()
-  local startup = self._startup
-  if not startup or startup.priming then return end
-  startup.phase = 'priming'
-  startup.priming = true
-  self._startupFrame:SetScript('OnUpdate', nil)
-  C_Timer.After(self.STARTUP_PRIME_TIMEOUT, function()
-    self:_StartupRead('timeout')
+-- _WorldPrime loads the item data of every bag slot and every equipped slot, then reads. Once a wait:
+-- its callers are the settling frame, which it stops, and the login's backpack showing before it.
+---@param hold table
+function refresh:_WorldPrime(hold)
+  hold.phase = 'priming'
+  hold.priming = true
+  self._worldFrame:SetScript('OnUpdate', nil)
+  C_Timer.After(self.WORLD_PRIME_TIMEOUT, function()
+    self:_WorldRead(hold, 'timeout')
   end)
   addon:GetModule('ItemLoader'):PrimeAll(function()
-    self:_OnStartupPrimed()
+    self:_OnWorldPrimed(hold)
   end)
 end
 
-function refresh:_OnStartupPrimed()
-  if self._startup then
-    self:_StartupRead('primed')
+---@param hold table
+function refresh:_OnWorldPrimed(hold)
+  if self._world == hold then
+    self:_WorldRead(hold, 'primed')
     return
   end
-  -- The read ran before the item data arrived (timeout, or the backpack opened), so the
-  -- items it read cold are read again.
-  self:RequestUpdate({ backpack = true, bank = true })
-end
-
-function refresh:_OnStartupBagShown()
-  local startup = self._startup
-  if not startup then return end
-  if not startup.priming then
-    -- Reads at once when the item data is already loaded.
-    self:_StartupPrime()
+  -- The read ran before the item data arrived (timeout, or the backpack opened at login), so the
+  -- items it read cold are read again. A wait replaced before it read has nothing to read again:
+  -- the next wait's read reads everything.
+  if hold.read then
+    self:RequestUpdate({ backpack = true, bank = true })
   end
-  self:_StartupRead('bagShown')
 end
 
--- _StartupRead ends the hold: one wipe of both kinds absorbs every request made while
--- held, and sorts asked for meanwhile run after it.
+function refresh:_OnLoginBagShown()
+  local hold = self._world
+  if not hold or hold.cause ~= 'login' then return end
+  if not hold.priming then
+    -- Reads at once when the item data is already loaded.
+    self:_WorldPrime(hold)
+  end
+  self:_WorldRead(hold, 'bagShown')
+end
+
+-- _WorldRead ends the hold: one wipe of both kinds absorbs every request made while held, and
+-- sorts asked for meanwhile run after it. A unit parked when the player left the world goes on
+-- first (one unit at a time).
+---@param hold table
 ---@param reason string
-function refresh:_StartupRead(reason)
-  if not self._startup then return end
-  self._startup = nil
-  local frame = self._startupFrame
+function refresh:_WorldRead(hold, reason)
+  if self._world ~= hold then return end
+  self._world = nil
+  hold.read = true
+  local frame = self._worldFrame
   frame:SetScript('OnUpdate', nil)
   frame:SetScript('OnEvent', nil)
-  for _, event in ipairs(STARTUP_EVENTS) do
+  for _, event in ipairs(WORLD_EVENTS) do
     frame:UnregisterEvent(event)
   end
   addon:GetModule('ItemLoader'):Release()
 
   ---@type RefreshRequest
-  local read = { wipe = true, backpack = true, bank = true, startup = reason, merged = 0 }
+  local read = { wipe = true, backpack = true, bank = true, world = reason, worldCause = hold.cause, merged = 0 }
   local queue = { read }
   for _, request in ipairs(self._queue) do
     if isSortRequest(request) then
