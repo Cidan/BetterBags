@@ -487,6 +487,131 @@ describe("PerfSessions", function()
       assert.are.equal(0, asked)
     end)
 
+    -- Leaving the world and coming back (a loading screen: a dungeon, a portal), against the bag events
+    -- and BetterBags' reads (refresh-scheduler.md §8): each world event in the trace with what the bags
+    -- hold at that moment, by kind: slots, items by ID, and items that exist at their location (what
+    -- C_Item.GetItemGUID needs). Added when a window closing as a player went into a dungeon asked the
+    -- client about slots it had emptied, and no capture could show when the items leave and come back.
+    describe("the world", function()
+      local saved, bags, exist, slotsAsked
+
+      local const, createdConst
+
+      before_each(function()
+        const, createdConst = StubBetterBagsModule("Constants")
+        saved = { _G.C_Container, _G.C_Item.DoesItemExist, const.BACKPACK_BAGS, const.BANK_BAGS, const.ACCOUNT_BANK_BAGS }
+        const.BACKPACK_BAGS, const.BANK_BAGS, const.ACCOUNT_BANK_BAGS = { [0] = 0, [1] = 1 }, { [6] = 6 }, { [13] = 13 }
+        -- bag -> slot -> itemID; exist: bag -> slot -> whether the item is at its location.
+        bags = { [0] = { 101, nil, 102 }, [1] = { 201 }, [6] = {}, [13] = { 301 } }
+        exist = { [0] = { true, false, true }, [1] = { true }, [13] = { true } }
+        slotsAsked = 0
+        _G.C_Container = setmetatable({
+          GetContainerNumSlots = function(bag)
+            slotsAsked = slotsAsked + 1
+            return ({ [0] = 3, [1] = 1, [6] = 0, [13] = 2 })[bag] or 0
+          end,
+          GetContainerItemID = function(bag, slot) return bags[bag] and bags[bag][slot] end,
+        }, { __index = saved[1] })
+        _G.C_Item.DoesItemExist = function(location)
+          local bag, slot = location:GetBagAndSlot()
+          return exist[bag] ~= nil and exist[bag][slot] == true
+        end
+      end)
+
+      after_each(function()
+        _G.C_Container, _G.C_Item.DoesItemExist = saved[1], saved[2]
+        const.BACKPACK_BAGS, const.BANK_BAGS, const.ACCOUNT_BANK_BAGS = saved[3], saved[4], saved[5]
+        if createdConst then ResetModuleStub("Constants") end
+      end)
+
+      -- Every handler of an event, called as the events module calls them: (ctx, event, ...).
+      local handlers
+
+      local function hook(valid)
+        local savedUtils = _G.C_EventUtils
+        _G.C_EventUtils = { IsEventValid = valid or function() return true end }
+        handlers = {}
+        events.RegisterEvent = function(_, event, fn)
+          handlers[event] = handlers[event] or {}
+          table.insert(handlers[event], fn)
+        end
+        perfSessions._eventsHooked = nil
+        perfSessions:Init()
+        _G.C_EventUtils = savedUtils
+      end
+
+      local function fire(name, ...)
+        for _, fn in ipairs(handlers[name] or {}) do
+          fn({}, name, ...)
+        end
+      end
+
+      local function bagCalls(session)
+        local trace = addon:GetModule("PerfFormat"):OpenTrace(session)
+        local list = {}
+        for i = 1, trace:Count() do
+          local call = trace:Get(i)
+          if call.name == "[bags]" then table.insert(list, trace:Text(call.args)) end
+        end
+        return list
+      end
+
+      it("counts what each kind of bag holds: slots, items, and items at their location", function()
+        assert.are.same({
+          backpack = { slots = 4, items = 3, exist = 3 },
+          bank = { slots = 2, items = 1, exist = 1 },
+        }, perfSessions:BagCounts())
+        exist[0][1] = false
+        assert.are.same({ bag = 0, slots = 3, items = 2, exist = 1 }, perfSessions:BagCounts(0))
+      end)
+
+      it("traces leaving the world, the loading screen and windows closing with what the bags hold", function()
+        hook()
+        for _, name in ipairs(perfSessions.WORLD_EVENTS) do
+          assert.is_not_nil(handlers[name], name)
+        end
+        perfSessions:StartCapture("manual")
+        fire("PLAYER_LEAVING_WORLD")
+        -- The client takes the items away: their IDs read, their objects gone.
+        exist[0] = { false, false, false }
+        exist[1] = { false }
+        fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", 5)
+        fire("LOADING_SCREEN_ENABLED")
+        fire("LOADING_SCREEN_DISABLED")
+        fire("BAG_CONTAINER_UPDATE")
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        local calls = bagCalls(perfSessions:StopCapture())
+        assert.are.equal(6, #calls)
+        assert.is_truthy(calls[1]:find("exist=3", 1, true), calls[1])
+        assert.is_truthy(calls[2]:find("exist=0", 1, true), calls[2])
+        assert.is_truthy(calls[2]:find("items=3", 1, true), calls[2])
+      end)
+
+      it("traces each bag event with what its bag holds", function()
+        hook()
+        perfSessions:StartCapture("manual")
+        fire("BAG_UPDATE", 1)
+        local calls = bagCalls(perfSessions:StopCapture())
+        assert.are.equal(1, #calls)
+        assert.is_truthy(calls[1]:find("bag=1", 1, true), calls[1])
+        assert.is_truthy(calls[1]:find("slots=1", 1, true), calls[1])
+      end)
+
+      it("reads nothing while no capture runs", function()
+        hook()
+        fire("PLAYER_LEAVING_WORLD")
+        fire("BAG_UPDATE", 0)
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        assert.are.equal(0, slotsAsked)
+      end)
+
+      it("listens to no world event the client does not have", function()
+        hook(function(name) return name ~= "LOADING_SCREEN_ENABLED" end)
+        assert.is_nil(handlers.LOADING_SCREEN_ENABLED)
+        assert.is_not_nil(handlers.PLAYER_LEAVING_WORLD)
+      end)
+    end)
+
     -- One play session answers every open in-game question (docs/vendor-compat.md): a diagnostics
     -- run captures the next two loads (a fresh login, then a /reload), each stopping on its own a
     -- minute after entering the world, sampling what follows the character and the account.

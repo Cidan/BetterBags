@@ -164,6 +164,17 @@ perfSessions.COLLECTION_EVENTS = {
   'NEW_TOY_ADDED', 'TOYS_UPDATED',
 }
 
+-- WORLD_EVENTS are the player leaving the world and coming back (a loading screen: a dungeon, a
+-- portal) and what happens on the way (a window closing, the bags attached again): recorded during a
+-- capture with what the bags hold at that moment (BagCounts), so a capture shows when the client takes
+-- the player's items away and gives them back, against the bag events and BetterBags' reads
+-- (refresh-scheduler.md §8). PLAYER_ENTERING_WORLD's own handler records them too, and each
+-- BAG_UPDATE what its bag holds.
+perfSessions.WORLD_EVENTS = {
+  'PLAYER_LEAVING_WORLD', 'LOADING_SCREEN_ENABLED', 'LOADING_SCREEN_DISABLED',
+  'PLAYER_INTERACTION_MANAGER_FRAME_HIDE', 'BAG_CONTAINER_UPDATE',
+}
+
 -- DIAGNOSTICS is a diagnostics run (ArmDiagnostics): the loads it captures, how long after entering
 -- the world each capture stops, and how often it samples (TakeSample).
 perfSessions.DIAGNOSTICS = { loads = 2, stopAfterSec = 60, sampleEverySec = 0.25 }
@@ -225,6 +236,60 @@ function perfSessions:CollectionCounts()
   return out
 end
 
+-- countBag reads what a bag holds: its slots, the slots with an item by ID
+-- (C_Container.GetContainerItemID), and the slots whose item exists at its location
+-- (C_Item.DoesItemExist, which takes an empty location: what C_Item.GetItemGUID needs).
+---@param bag number
+---@return number slots, number items, number exist
+local function countBag(bag)
+  local slots = C_Container.GetContainerNumSlots(bag) or 0
+  local items, exist = 0, 0
+  for slot = 1, slots do
+    if C_Container.GetContainerItemID(bag, slot) ~= nil then
+      items = items + 1
+    end
+    if C_Item.DoesItemExist(ItemLocation:CreateFromBagAndSlot(bag, slot)) then
+      exist = exist + 1
+    end
+  end
+  return slots, items, exist
+end
+
+-- BagCounts reads what the bags hold now: with a bag, that bag's counts (bag, slots, items, exist);
+-- without one, each kind's totals (backpack, bank: slots, items, exist), the bags of each as BetterBags
+-- reads them (Constants). The trace keeps a table's first 8 fields and two levels, so kinds, not bags.
+---@param bag? number
+---@return table?
+function perfSessions:BagCounts(bag)
+  if bag ~= nil then
+    local slots, items, exist = countBag(bag)
+    return { bag = bag, slots = slots, items = items, exist = exist }
+  end
+  local const = addon:GetModule('Constants', true)
+  if const == nil then return nil end
+  local out = {}
+  for kind, list in pairs({ backpack = { const.BACKPACK_BAGS }, bank = { const.BANK_BAGS, const.ACCOUNT_BANK_BAGS } }) do
+    local total = { slots = 0, items = 0, exist = 0 }
+    for _, bags in pairs(list) do
+      for id in pairs(bags) do
+        local slots, items, exist = countBag(id)
+        total.slots, total.items, total.exist = total.slots + slots, total.items + items, total.exist + exist
+      end
+    end
+    out[kind] = total
+  end
+  return out
+end
+
+-- recordBags puts a "[bags]" call with what the bags hold (BagCounts) in the trace, only while a
+-- capture runs.
+---@param bag? number
+local function recordBags(bag)
+  if perf:IsActive() then
+    perf:Exit(perf:Enter('[bags]', perfSessions:BagCounts(bag)))
+  end
+end
+
 -- instanceInfo says where the player is (GetInstanceInfo).
 local function instanceInfo()
   if GetInstanceInfo == nil then return nil end
@@ -277,8 +342,21 @@ function perfSessions:Init()
       self:OnLogout()
     end)
     events:RegisterEvent('PLAYER_ENTERING_WORLD', function(_, _, isInitialLogin, isReloadingUi)
+      recordBags()
       self:OnEnteringWorld(isInitialLogin, isReloadingUi)
       self:TakeSample('PLAYER_ENTERING_WORLD')
+    end)
+    -- The dispatcher records each as an "[event]" call; inside it, a "[bags]" call carries what the
+    -- bags hold, read only while a capture runs.
+    for _, name in ipairs(self.WORLD_EVENTS) do
+      if _G.C_EventUtils == nil or _G.C_EventUtils.IsEventValid == nil or _G.C_EventUtils.IsEventValid(name) then
+        events:RegisterEvent(name, function()
+          recordBags()
+        end)
+      end
+    end
+    events:RegisterEvent('BAG_UPDATE', function(_, _, bag)
+      recordBags(bag)
     end)
     -- Listening is enough: the event dispatcher records each change, with its type and
     -- state, as an "[event] ADDON_RESTRICTION_STATE_CHANGED" call in a capture's trace.

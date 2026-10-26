@@ -127,7 +127,7 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   thrown in a message or event handler").
 - **Driving time:** pass `globals = { C_Timer = ... }` with an `After`/`NewTimer` that keep their
   timers for the spec to run (`spec/integration/bank_open_spec.lua`); the startup read runs once
-  the spec fires `LOADING_SCREEN_DISABLED` and runs one quiet frame on `refresh._startupFrame`.
+  the spec fires `LOADING_SCREEN_DISABLED` and runs one quiet frame on `refresh._worldFrame`.
 - **Restore** puts back everything changed in place (insulation restores only globals): first
   the loaded addon's events, messages and hooks and Sonata's text-size callback (unhooking reads
   the libraries' registries, put back next), then the table fields of every library (AceHook's

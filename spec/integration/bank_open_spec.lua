@@ -74,8 +74,8 @@ describe("opening the bank on the whole addon", function()
     local addon = handle.addon
     -- The startup read: the loading screen ends, a quiet frame passes, the item data has loaded.
     local refresh = addon:GetModule("Refresh")
-    refresh._startupFrame:GetScript("OnEvent")(refresh._startupFrame, "LOADING_SCREEN_DISABLED")
-    refresh._startupFrame:GetScript("OnUpdate")(refresh._startupFrame, 0.016)
+    refresh._worldFrame:GetScript("OnEvent")(refresh._worldFrame, "LOADING_SCREEN_DISABLED")
+    refresh._worldFrame:GetScript("OnUpdate")(refresh._worldFrame, 0.016)
     frames()
     assert.is_false(refresh._held, "past the startup read")
     return addon

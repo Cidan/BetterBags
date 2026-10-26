@@ -123,7 +123,7 @@ exists. The current path can still lose a bag's update, though:
   Classic Era `Blizzard_ObjectAPI/Classic/Item.lua`, `ItemEventListener`). The container then
   never completes, and the bag is not refreshed until a later batch for it completes.
 - The startup read and the bank open read already guard against exactly this with
-  `STARTUP_PRIME_TIMEOUT` and `BANK_PRIME_TIMEOUT` (`data/refresh.lua:32`, `:35`;
+  `WORLD_PRIME_TIMEOUT` and `BANK_PRIME_TIMEOUT` (`data/refresh.lua:32`, `:35`;
   refresh-scheduler.md §8, §11). Ordinary bag updates have no such guard.
 - On Classic Era, Blizzard's `ContinuableContainer:RecheckEvictableContinuables`
   (`Blizzard_ObjectAPI/Classic/ContinuableContainer.lua`, `classic_era` branch) indexes an

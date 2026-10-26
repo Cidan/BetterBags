@@ -38,11 +38,12 @@ harvest.
   still waiting in `self._queue` when that one covers it (§7), else appends it, and, if the
   pump is not already running and not held for the startup read (§8), flips
   `self._running = true` and calls `_Step()` once. It performs **no** side effects itself.
-- **`_Step()` is one frame of the pump.** In priority order it: (a) advances the active
-  unit's coroutine one step (`_Resume`) if one exists; else (b) burns the idle hand-off
-  frame if `_idlePending`; else (c) dequeues and starts the next unit; else (d) stops the
-  clock (`self._running = false`) when the queue is empty or held. After (a), (b), and (c)
-  it calls `_Arm()` to schedule the next step.
+- **`_Step()` is one frame of the pump.** While held (out of the world, §8) it stops the
+  clock (`self._running = false`) and does nothing else: no unit starts, and the active one
+  waits. Otherwise, in priority order it: (a) advances the active unit's coroutine one step
+  (`_Resume`) if one exists; else (b) burns the idle hand-off frame if `_idlePending`; else
+  (c) dequeues and starts the next unit; else (d) stops the clock when the queue is empty.
+  After (a), (b), and (c) it calls `_Arm()` to schedule the next step.
 - **`_Arm()` is the ONLY clock that steps the pump.** A single `C_Timer.After(0)` chain,
   never one-per-refresh, so step ordering is fully deterministic. The sort fallback timer
   (§6) and the startup timers (§8) are the other timers in the refresh path; they never step
@@ -99,15 +100,17 @@ handed to the next frame by `_Arm`.
 - `refresh:RequestUpdate(request)` — enqueue only; never call `items:Refresh*` directly from
   production code, always go through `RequestUpdate` so serialization holds.
 - Scheduler state (`refresh._queue`, `_active`, `_idlePending`, `_running`, `_held`,
-  `_startup`) is initialized in `refresh:Init()` and reset there; tests re-init per case.
-  `refresh:OnEnable()` holds the queue for the startup read (§8); tests that call it and then
-  expect sweeps open the hold through the startup events, or assert on the requests made.
+  `_world`) is initialized in `refresh:Init()` and reset there; tests re-init per case.
+  `refresh:OnEnable()` holds the queue for the login's read (§8); tests that call it and then
+  expect sweeps open the hold through the world frame's events (`refresh._worldFrame`), call
+  `refresh:_WorldRead(refresh._world, "primed")`, or assert on the requests made.
 - `RefreshRequest.derive` recalculates the named kinds from their committed items without
   reading a bag slot, and `RefreshRequest.restyle` makes every button of the swept kinds draw
   in full (§10). Production code asks for them with `bags/Rederive`.
-- `RefreshRequest.merged` (how many requests a merged one carries) and
-  `RefreshRequest.startup` (why the startup read ran: `primed`, `timeout` or `bagShown`) are
-  only informational; they show up in profiler call traces as `Refresh._RunUnit`'s argument.
+- `RefreshRequest.merged` (how many requests a merged one carries), `RefreshRequest.world` (why
+  the world's read ran: `primed`, `timeout` or `bagShown`) and `RefreshRequest.worldCause` (what it
+  follows: `login` or `transfer`) are only informational; they show up in profiler call traces as
+  `Refresh._RunUnit`'s argument.
 - `RefreshRequest.onlyIfSortPending` — set only by the sort fallback (§6). The unit drops each
   requested kind whose sort sweep is no longer pending (`items:IsSortSweepPending`) before
   doing anything else. This is not coalescing: the request literally means "sweep this kind
@@ -216,7 +219,7 @@ resets; and two equivalence tests (plain then wipe, wipe then plain, with a loot
 while they wait) that compare the committed bags and Recent Items timers with running the
 same requests one at a time.
 
-## 8. The Startup Read: One Read of the Bags at Login
+## 8. The World's Read: One Read of the Bags at Login and After Every Loading Screen
 
 At PLAYER_LOGIN, when `refresh:OnEnable()` runs, the client has not delivered the bags. A
 captured cold login (game build 12.1.0) showed it: the login sweep inside `OnEnable`
@@ -228,32 +231,69 @@ loading screen. The empty first commit is also a Recent Items hazard: a plain sw
 lands between it and the next full read treats every item delivered in between as newly
 looted.
 
-`refresh:HoldForStartup()` (called at the end of `OnEnable`) holds the queue
-(`self._held`) and the loader (`itemLoader:Hold()`, so bag batches only mark bags dirty)
-and listens on its own frame (`self._startupFrame`) to `PLAYER_ENTERING_WORLD`,
-`LOADING_SCREEN_DISABLED`, `BAG_UPDATE` and `BAG_CONTAINER_UPDATE`. Requests made meanwhile
-wait (and merge). Then:
+**Every loading screen is the same.** Reported: "4x data/items.lua:1197: bad argument #1 to
+'GetItemGUID' (Usage: local itemGUID = C_Item.GetItemGUID(itemLocation))" as a player went into
+a dungeon. The stack: `CloseInteractionWindow` (core/hooks.lua, `PLAYER_INTERACTION_MANAGER_FRAME_HIDE`)
+asked for a recalculation (`bags/Rederive`), the idle queue ran its first step in that event, and
+`Phase2_Rederive` asked the client the GUID of a committed item in a bag not marked unread (§10),
+whose slot the client said was empty. `BAG_UPDATE` is a `SynchronousEvent`
+(ContainerDocumentation.lua): it fires the moment a bag's contents change, so a real change marks
+its bag before any later event can recalculate. A dungeon is a world transfer, and the client takes
+the player's items away for its loading screen and gives them back after, without a `BAG_UPDATE`
+on the way out. **Inferred**, not captured: no capture covers a world transfer; this rests on the
+stack, the synchronous `BAG_UPDATE`, the captured login above, and Blizzard forum advice that the
+client resets its bag cache between `PLAYER_ENTERING_WORLD` and the first `BAG_UPDATE`. The capture
+tooling now records it (perf-profiler.md §10d), so a capture of a dungeon entry with a window open
+will show when the items leave and come back. Reproduced on the real pipeline: a replay of the
+entry (items read, the player leaves, the slots go empty, two windows close) raises the reported
+error once per window without the fix.
+
+**The wait** (`refresh:HoldForWorld(cause)`): at the end of `OnEnable` (cause `login`), and on every
+`PLAYER_LEAVING_WORLD` (cause `transfer`; a `SynchronousEvent` too, SystemDocumentation.lua, so it
+fires before the transfer), which also marks every backpack, bank and Warbank bag unread (§10:
+until a read of them commits, a recalculation asks the client nothing about them). It holds the
+queue (`self._held`) and the loader (`itemLoader:Hold()`, so bag batches only mark bags dirty) and
+listens on its own frame (`self._worldFrame`) to `PLAYER_ENTERING_WORLD`,
+`LOADING_SCREEN_DISABLED`, `BAG_UPDATE` and `BAG_CONTAINER_UPDATE`. **While held, no unit starts
+or goes on** (`_Step` stops the clock): requests made meanwhile wait (and merge), and a unit
+parked at its yield when the player left waits too, since the bags it would read next are not
+there. Then:
 
 1. **Loading** until `LOADING_SCREEN_DISABLED` (verified in the API documentation of every
    client branch: live, classic, classic_era, classic_anniversary, classic_beta,
    classic_titan). On a client without it, `PLAYER_ENTERING_WORLD` starts the next phase;
-   with it, `PLAYER_ENTERING_WORLD` arms `STARTUP_LOADING_TIMEOUT` (10 s) as a safety net.
+   with it, `PLAYER_ENTERING_WORLD` arms `WORLD_LOADING_TIMEOUT` (10 s) as a safety net.
+   `WORLD_RETURN_TIMEOUT` (60 s from the wait's start) is a second one, for a client that never
+   says the world is back (`PLAYER_ENTERING_WORLD` follows every loading screen).
 2. **Settling**: the frame's `OnUpdate` waits for the first frame in which no bag event
-   fired (frames do not run during the loading screen). After `STARTUP_SETTLE_TIMEOUT`
-   (2 s) of bag events it stops waiting. In the capture, the client still sent a burst of
-   92 `BAG_UPDATE`s one frame after the loading screen; the next frame was quiet.
+   fired (frames do not run during the loading screen). After `WORLD_SETTLE_TIMEOUT`
+   (2 s from the loading screen's end) of bag events it stops waiting. In the captured login,
+   the client still sent a burst of 92 `BAG_UPDATE`s one frame after the loading screen; the
+   next frame was quiet.
 3. **Priming**: `itemLoader:PrimeAll(callback)` loads the item data of every managed bag
    slot and every equipped slot in one `ContinuableContainer`; when it completes, the read
-   runs. After `STARTUP_PRIME_TIMEOUT` (2 s) the read runs anyway, and when the data
+   runs. After `WORLD_PRIME_TIMEOUT` (2 s) the read runs anyway, and when the data
    arrives later, one plain read of both kinds follows (the items read cold are read warm).
-4. **The read** (`_StartupRead`): the startup frame unregisters everything, the loader is
+4. **The read** (`_WorldRead`): the world frame unregisters everything, the loader is
    released (its marked bags are dropped: the read covers them), and one request
-   `{ wipe, backpack, bank, startup = reason }` replaces every waiting non-sort request;
-   sorts asked for meanwhile run after it.
+   `{ wipe, backpack, bank, world = reason, worldCause = cause }` replaces every waiting non-sort
+   request; sorts asked for meanwhile run after it, and a unit parked when the player left goes on
+   first (one unit at a time). A wipe trusts nothing read before the transfer; it costs a full
+   read of the backpack once per loading screen (the bank and guild bank close with the
+   transfer). Not measured after a loading screen yet.
 
-Opening the backpack before the read reads at once (`_OnStartupBagShown`, hooked on the
-backpack frame's `OnShow`): priming starts, and if the item data is already loaded the read
-is the primed one; otherwise it reads now and reads again when the data arrives.
+**Each wait is its own** (a table, `self._world`). A new wait (the player leaving the world again)
+replaces the last. The world frame's scripts are the current wait's (set by `HoldForWorld` and
+`_WorldSettle`, cleared by `_WorldPrime` and `_WorldRead`); only the timers and the item data's
+callback outlive their wait, and each checks it: a replaced wait's loading or return timeout
+settles nothing, its prime timeout reads nothing, and its item data asks for a read only if that
+wait had read (its read ran cold); a replaced wait that never read leaves everything to the next.
+
+At login, opening the backpack before the read reads at once (`_OnLoginBagShown`, hooked once on
+the backpack frame's `OnShow`): priming starts unless it has, and if the item data is already
+loaded the read is the primed one; otherwise it reads now and reads again when the data arrives.
+After a loading screen the committed items are still there to show, so a backpack shown then reads
+nothing early.
 
 What else this needed:
 - **The first gear read no longer queues a second read.** `HarvestEquipment` reported every
@@ -272,13 +312,31 @@ Coverage: `spec/refresh_pipeline_spec.lua` ("one bag read on login" → "the sta
 nothing is read before the read; it waits for a quiet frame after the loading screen and for
 the item data; a sort asked for meanwhile runs after it; the prime timeout reads and the late
 data reads again; no second read when the timeout fires after the data; the settle timeout;
-the backpack opening early (with and without loaded data); the `PLAYER_ENTERING_WORLD`
-fallback and the loading timeout; every startup event released after the read; and a replay
-of the captured login (empty backpack at `OnEnable`, the Themes refresh, skill-line
-invalidations, 14 `BAG_CONTAINER_UPDATE`s, item bursts, an item-load batch, the config
-sliders' refreshes, then the loading screen ending) that asserts exactly one read and that no
-item lands in Recent Items. `spec/loader_spec.lua` covers the loader's hold and
-`PrimeAll`; `spec/refresh_spec.lua` that `OnEnable` reads nothing.
+the backpack opening early (with and without loaded data, the item data loaded once); the
+`PLAYER_ENTERING_WORLD` fallback and the loading timeout; every world event released after the
+read; and a replay of the captured login (empty backpack at `OnEnable`, the Themes refresh,
+skill-line invalidations, 14 `BAG_CONTAINER_UPDATE`s, item bursts, an item-load batch, the
+config sliders' refreshes, then the loading screen ending) that asserts exactly one read and that
+no item lands in Recent Items. "leaving the world (every loading screen)": the reported dungeon
+entry replayed (no error, nothing swept while out of the world, one read taking in both windows'
+recalculations, nothing new in Recent Items, the loader held and released), no bag asked about
+while out of the world, a unit parked when the player left going on only once the world is back,
+a recalculation before the world's read asking nothing about the bags (the items not back yet),
+an earlier wait's timers and item data ending nothing (read or not, still loading or not), the
+settle timeout counted from the loading screen's end, the return timeout, no early read for a
+backpack shown after a loading screen and no second hook, a second loading screen before the
+read. `spec/loader_spec.lua` covers the loader's hold and `PrimeAll`; `spec/refresh_spec.lua`
+that `OnEnable` reads nothing. Mutation-tested: 27 mutations of the wait, the marks and the
+capture tooling, each caught; six first survived and led to five tests (a wait replaced while
+still loading, the settle timeout, a never-read wait's late item data, the bag shown mid-prime,
+the Warbank's count) and to removing a check its callers already made (priming twice). Three
+identity checks in the world frame's scripts were removed first: the scripts are set per wait.
+
+**Not verified in game:** that the items leave the client during a world transfer and how they
+come back (the capture tooling is there to show it), and the wipe's cost after a loading screen.
+To check: start a capture (Performance tab of `/bbdb`), stand at a vendor or mailbox with it
+open, enter a dungeon, stop once in; the trace shows `[event] PLAYER_LEAVING_WORLD`, the window
+closing, the loading screen and each `[bags]` count (perf-profiler.md §10d).
 
 ## 9. Redraw-Only Settings
 
@@ -371,10 +429,12 @@ the last read committed.
   the units already queued: a read never rides on a waiting derive (§7). A derive that ran first
   asked about the emptied slot. Reading the bag in the derive instead would read item data before
   its load (data-loader.md §19).
-  **Not verified:** a derive the scheduler starts synchronously (idle, inside the event handler
-  that asked for it) runs before any `BAG_UPDATE` later in the same frame, and the client's order
-  of events within a frame is not documented. The reported error came from a stepped unit (its
-  stack starts at `_Arm`'s timer), where every earlier event had fired.
+  A derive the scheduler starts synchronously (idle, inside the event handler that asked for it)
+  sees every change the client made before it marked: `BAG_UPDATE` is a `SynchronousEvent`
+  (ContainerDocumentation.lua), fired the moment a bag's contents change. The reported error above
+  came from a stepped unit (its stack starts at `_Arm`'s timer). A second report came from a
+  synchronous one during a world transfer, which takes the items away with no `BAG_UPDATE`: leaving
+  the world marks every bag unread and holds the queue (§8).
 - A backpack derive reads the equipped gear (`HarvestEquipment`), as a backpack read does,
   so upgrade arrows compare with the gear worn now.
 - Phases 3-11 then run exactly as for a read, against a copy of the committed table (so the

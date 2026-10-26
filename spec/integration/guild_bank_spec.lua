@@ -110,8 +110,8 @@ describe("a guild bank visit on the whole addon", function()
     assert.are.same({}, handle.errors, "starting")
     local addon = handle.addon
     local refresh = addon:GetModule("Refresh")
-    refresh._startupFrame:GetScript("OnEvent")(refresh._startupFrame, "LOADING_SCREEN_DISABLED")
-    refresh._startupFrame:GetScript("OnUpdate")(refresh._startupFrame, 0.016)
+    refresh._worldFrame:GetScript("OnEvent")(refresh._worldFrame, "LOADING_SCREEN_DISABLED")
+    refresh._worldFrame:GetScript("OnUpdate")(refresh._worldFrame, 0.016)
     frames()
     assert.is_false(refresh._held, "past the startup read")
     return addon

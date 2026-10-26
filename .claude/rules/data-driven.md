@@ -59,6 +59,11 @@ reasoning about it can suggest a cause; it does not establish one.
   and returns what it did ("loading", "already", "ended"), so a capture of a bank open shows whether
   the bank loaded after the show animation or on the timeout. Added with the change that loads the
   bank once its window has shown, so the capture asked for before and after can show it.
+- **Leaving the world** (perf-profiler.md §10d): captures record leaving the world, the loading
+  screen, windows closing and each bag event, each with what the bags hold then (slots, items by ID,
+  items that exist at their location). Added for a `GetItemGUID` error on entering a dungeon, which
+  no capture could explain: none showed when a world transfer takes the items away and gives them
+  back (refresh-scheduler.md §8).
 - **What the client answered about an item** (`debug/itemprobe.lua`, `ItemProbe`): the Dump tab of
   `/bbdb` stores, beside each dumped backpack item (`apiProbe`), every value each Blizzard API
   returned about it: `GetItemInfo` by item ID and by link (`n` is how many values, so "returned

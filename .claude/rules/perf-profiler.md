@@ -595,6 +595,26 @@ probe), `spec/debug/itemprobe_spec.lua` (`Sample`), `spec/frames/debug_window_sp
 and its status), `spec/frames/perfpane_spec.lua` (the status). 34 mutations: five first survived; four
 led to tests and one to removing a guard that could not change anything.
 
+## 10d. Leaving the world in captures
+
+A window closing as a player went into a dungeon asked the client about bag slots it had emptied
+(the `GetItemGUID` error, refresh-scheduler.md §8), and no capture could show when a world transfer
+takes the player's items away and gives them back. PerfSessions now listens, where the client has
+them (`C_EventUtils.IsEventValid`), to `PerfSessions.WORLD_EVENTS`: `PLAYER_LEAVING_WORLD`,
+`LOADING_SCREEN_ENABLED`, `LOADING_SCREEN_DISABLED`, `PLAYER_INTERACTION_MANAGER_FRAME_HIDE` and
+`BAG_CONTAINER_UPDATE` (and `PLAYER_ENTERING_WORLD` in its own handler). Each fire is an `[event]`
+call in the trace, holding, while a capture runs, a `[bags]` call whose argument is
+`perfSessions:BagCounts()`: each kind's totals (`backpack`, `bank` with the Warbank), `slots`
+(`C_Container.GetContainerNumSlots`), `items` (slots with an item ID, `GetContainerItemID`) and
+`exist` (slots whose item exists at its location, `C_Item.DoesItemExist`, which takes an empty
+location: what `GetItemGUID` needs). Each `BAG_UPDATE` holds its bag's own (`BagCounts(bag)`: `bag`,
+`slots`, `items`, `exist`). Kinds, not bags: the trace keeps a table's first 8 fields. Nothing is
+read while no capture runs. `items` and `exist` are counted apart because they may differ during a
+transfer (an item ID read for a slot whose item object is gone); a capture will tell.
+
+Coverage: `spec/debug/perf_sessions_spec.lua` ("the world": the counts by kind and for a bag, every
+world event traced with them, each bag event, nothing read while idle, no event a client lacks).
+
 ## 10. Testing
 
 - Engine (`spec/debug/perf_engine_spec.lua`): a fake clock (`perf:SetClock`) makes timings
