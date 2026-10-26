@@ -76,6 +76,7 @@ local rows = addon:NewModule('NextSettingsRows')
 ---@field control? table
 ---@field option? NextSettingsOption
 ---@field owner? Frame The window a dialog shows over.
+---@field onChanged? fun(ctx: Context) Called after a change the option took: its window shows every value again.
 ---@field hovered boolean
 ---@field buttons? NextButtonFrame[]
 ---@field buttonSpecs? table[] What its buttons were made from: their text and disabled, read again on refresh.
@@ -472,8 +473,9 @@ function rowProto:Refresh(ctx)
   end
 end
 
--- Write writes what the player changed. A change refused shows the option again; one that needs a
--- reload asks for one.
+-- Write writes what the player changed. A change refused shows the option again; one taken has the row's
+-- owner show every value again (`onChanged`: another setting may follow this one); one that needs a reload
+-- asks for one.
 ---@param ctx Context
 ---@param value any
 function rowProto:Write(ctx, value)
@@ -481,6 +483,9 @@ function rowProto:Write(ctx, value)
   if applied == false then
     self:Refresh(ctx)
     return
+  end
+  if self.onChanged ~= nil then
+    self.onChanged(ctx)
   end
   if self.option.reload then
     nextDialog:Show(self.owner, {

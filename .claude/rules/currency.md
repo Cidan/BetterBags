@@ -205,7 +205,8 @@ classic bags keep their Currency page, next-settings.md §7, §8). Four tabs:
 - **Display**: Backpack and Tracker (Cap Bars, Show Gains, Hide What You Have None Of, Count Items Everywhere), Tracker
   (Show Tracker, Tracker Layout, Tracker Grows, Tracker Scale, Tracker Background, Hide Tracker in Combat). Tracker Grows
   offers the choice for the layout shown, its choices read each time its menu opens (form-dropdowns.md); the tracker
-  keeps both.
+  keeps both. Its row shows the choice for the new layout as soon as Tracker Layout changes (the window shows every
+  value again after a change, next-settings.md §3; reported: it kept "Left" after the layout became Column).
 
 **The shared items tab** (`next/settings/itemstab.lua`): the Categories page's Added Items tab moved into a module of
 its own so the Items tab is the same one (CLAUDE.md, "UI Consistency" 2: never a lookalike). It takes a source
