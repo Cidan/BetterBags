@@ -1,16 +1,28 @@
 {
-  "id": 1792979512,
+  "id": 1792979522,
   "version": "v0.8.5",
-  "channel": "alpha",
+  "channel": "release",
   "date": "2026-10-26",
-  "from": "b55bf899a7e88799bef475454c13f44d552fe5f0",
-  "to": "e57661f8eff0ab306ca1bb0f11d55f10ee27eb60",
-  "headline": "Fixes a Lua error that could occur when entering dungeons or transitioning through loading screens.",
+  "from": "v0.8.4",
+  "to": "v0.8.5",
+  "headline": "BetterBags Next introduces currency tracking with a detachable screen tracker and animation settings, along with stability fixes for zone loading screens.",
   "entries": [
     {
+      "category": "New",
+      "title": "Currency tracking and floating tracker in BetterBags Next",
+      "details": "Track currencies and stackable items along the bottom of the backpack footer. You can drag the strip out into a customizable on-screen tracker widget, Shift-drag entries to reorder or remove them, and manage tracked items in the new Currencies settings tab.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Toggle visual effects on any BetterBags Next theme",
+      "details": "A new Animation tab under Appearance lets you independently toggle individual visual effects such as sparkles, title shimmer, clouds, ribbons, and moving ornaments across any theme.",
+      "clients": []
+    },
+    {
       "category": "Fixed",
-      "title": "Lua error when entering dungeons or loading screens",
-      "details": "Bag updates are now paused through all zone transitions and loading screens, not just initial login. This prevents an error where the game client cleared inventory slots before the transition finished.",
+      "title": "Bag errors during dungeon transitions and loading screens",
+      "details": "Fixed an error that could occur when entering dungeons or crossing loading screens while item data temporarily unloads. Bag updates are now paused through every zone transfer rather than only during initial login.",
       "clients": []
     }
   ]
