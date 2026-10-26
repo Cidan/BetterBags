@@ -986,7 +986,9 @@ needed of the engine is here, all of it data a theme gives, none of it the Glitc
   trails shorter than the longest, starting again from above and not in combat, swaps, characters, size changes,
   started and stopped, a theme with and without, moving parts), `spec/next/theme_panel_spec.lua` ("glitching
   (Panel.Glitch)": opening, flicker and jumps, tears, static, ghosts and corruption by strength, secrets, characters,
-  shoves, closing, cut short, bursts and their rules, its theme gone mid-glitch three ways and coming back; "data rain
+  shoves, closing, cut short, bursts and their rules, its theme gone mid-glitch three ways and coming back; the Glitch
+  theme's four brackets inside the body, as far in from each corner: a bottom corner's piece goes in with a Y up, as
+  `Y` is down whatever the corner, §12; reported in game, the bottom two sat outside; "data rain
   (Panel.Rain)" on the real panels), `spec/next/ornaments_spec.lua` (BODY, Scroll, Glitch), `spec/next/tween_spec.lua`
   (flicker, onStop), `spec/next/style_theme_spec.lua` (Locales), `spec/next/sparkles_spec.lua` (Upright),
   `spec/next/tabs_spec.lua` (edges), `spec/sonata/next_engine_spec.lua` (Check; the two switches; an ornament's glitch

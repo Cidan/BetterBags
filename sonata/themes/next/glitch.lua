@@ -39,9 +39,12 @@ end
 local RAIN = "0123456789ABCDEF<>/\\|=+*#$%&@?!"
 local CORRUPT = "#@%&$*!?/\\<>=+_01"
 
--- A HUD bracket at each corner of the body: one L (the art's top left), flipped for the others, twitching now and then.
+-- A HUD bracket at each corner of the body, 5 in from it: one L (the art's top left), flipped for the others, twitching now
+-- and then. A corner piece's X is toward the body's middle and its Y down whatever its corner (next-themes.md §12), so a
+-- bottom corner's goes in with a Y up.
 local function bracket(point, coords)
-  return { Texture = "Bracket", Point = point, Width = 22, Height = 22, X = 5, Y = 5, TexCoords = coords, Color = "Gold",
+  local y = point:find("^BOTTOM") and -5 or 5
+  return { Texture = "Bracket", Point = point, Width = 22, Height = 22, X = 5, Y = y, TexCoords = coords, Color = "Gold",
     Alpha = 0.9, Above = true, Layer = "OVERLAY",
     Motion = { Glitch = { Every = 7, Hold = 0.14, Jump = 4, Blink = 0.15 } } }
 end

@@ -2041,6 +2041,29 @@ describe("BetterBags Next's panels and themes", function()
 
     -- Drawn after the panel's draw turned the client's sharpening off on its textures (texture-sharpening.md): each new
     -- texture of a glitch is drawn without it too.
+    -- The Glitch theme's HUD brackets (reported in game: the bottom two sat outside the bag, below its corners, while the
+    -- top two sat inside): a corner piece's Y is down whatever its corner (next-themes.md §12), so a bottom corner's
+    -- piece goes in with a Y up. Each the same way in from its corner, on the backpack and the mirrored bank.
+    it("sets the Glitch theme's four brackets inside the body, each as far in from its corner", function()
+      style:Use(addon:GetModule("SonataNext"):Resolve("Glitch"))
+      for _, panel in ipairs({ nextBag:Create(ctx()), nextBank:Create(ctx()) }) do
+        local body = layout.Rect(panel.body)
+        local seen = 0
+        for _, piece in ipairs(panel.ornaments.pieces) do
+          if piece.spec and piece.spec.Texture == "Bracket" then
+            seen = seen + 1
+            local r = layout.Rect(piece.texture)
+            local inX = math.min(r.left - body.left, body.right - r.right)
+            local inY = math.min(body.top - r.top, r.bottom - body.bottom)
+            assert.is_true(inX > 0 and inY > 0, piece.spec.Point .. " inside the body")
+            assert.is_true(math.abs(inX - inY) < 1e-6, piece.spec.Point .. " as far in both ways")
+          end
+        end
+        assert.are.equal(4, seen)
+      end
+      backToDefault()
+    end)
+
     it("draws its CRT's beam without the client's sharpening, before any moment", function()
       local bag = nextBag:Create(ctx())
       assert.is_nil(bag.glitch, "never glitched")
