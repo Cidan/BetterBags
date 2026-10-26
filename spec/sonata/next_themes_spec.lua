@@ -143,6 +143,24 @@ describe("BetterBags Next's shipped themes", function()
   -- The vendor's cards (next.md §10b): two lines of an item's name and a line of its price (raised off
   -- the card's edge) fit beside its icon, the coins no taller than the price, in every theme on every
   -- client.
+  -- A dock card's lines are as tall as the theme says (Dock.TitleHeight, LineHeight; next/dockcard.lua), whatever their
+  -- font: a font taller than its line may be cut or not drawn. Found by the adversarial review: Glitch's 24 title in 22.
+  it("fits a dock card's title and lines in their heights", function()
+    for client, flags in pairs(CLIENTS) do
+      for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+      for _, key in ipairs(shipped()) do
+        local t = sonataNext:Resolve(key)
+        local D = t.Dock
+        for _, pair in ipairs({ { D.TitleFont, D.TitleHeight }, { D.WarningFont, D.LineHeight }, { D.HintFont, D.LineHeight } }) do
+          local size = t.Fonts[pair[1]].Size
+          if size then
+            assert.is_true(size <= pair[2], key .. " on " .. client .. ": " .. pair[1] .. " " .. size .. " in " .. pair[2])
+          end
+        end
+      end
+    end
+  end)
+
   it("fits a vendor card's name and price beside its icon", function()
     for client, flags in pairs(CLIENTS) do
       for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end

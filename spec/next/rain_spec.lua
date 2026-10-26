@@ -318,6 +318,45 @@ describe("NextRain", function()
     assert.is_true(text == "ｱ" or text == "ｲ", "a whole character: " .. tostring(text))
   end)
 
+  -- Found by the adversarial review: every frame redrew every glyph of every column (about 440 calls a frame on a full
+  -- backpack for the two glyphs that moved), and a resize laid every glyph out again on each of its frames.
+  local function counting(panel, names)
+    local calls = 0
+    for _, column in ipairs(panel.rain.columns) do
+      for _, g in ipairs(column.glyphs) do
+        for _, name in ipairs(names) do
+          local base = g[name]
+          g[name] = function(self, ...)
+            calls = calls + 1
+            return base(self, ...)
+          end
+        end
+      end
+    end
+    return function() return calls end
+  end
+
+  it("touches no glyph in a frame in which its columns pass no row", function()
+    local panel = started({ with({ Swap = 0 }) })
+    toRow(panel, 5)
+    local calls = counting(panel, { "SetAlpha", "Show", "Hide", "SetPoint", "SetFontObject", "SetText" })
+    step(panel, 0.04)
+    assert.are.equal(0, calls())
+    step(panel, 0.1)
+    assert.is_true(calls() > 0, "a row passed")
+  end)
+
+  it("lays out again only what changed", function()
+    local panel = started({ with() })
+    toRow(panel, 5)
+    local calls = counting(panel, { "SetPoint", "SetSize", "SetAlpha", "Show", "Hide" })
+    panel.rain:Layout()
+    assert.are.equal(0, calls(), "nothing changed")
+    panel.frame:SetHeight(300)
+    panel.rain:Layout()
+    assert.is_true(calls() > 0, "fewer rows")
+  end)
+
   it("falls only while started, and clears every glyph when it stops", function()
     theme({ with() })
     local panel = panelOn("RIGHT")

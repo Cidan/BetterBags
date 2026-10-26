@@ -9,6 +9,9 @@ local style = addon:GetModule('NextStyle')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
 -- NextGlitch draws a panel's glitches (the Glitch theme, next-themes.md §21; asked: "the bag sort of glitches into
 -- existence when opening, glitches out when closing. think flickers, glitched blinking textures that wobble suddenly and
 -- harshly"): a CRT's beam (opening to the panel's size as it warms up, squashing to a line and a point as it turns
@@ -88,8 +91,22 @@ function glitch:Layer(panel)
   }
   L.beam:Hide()
   L.noise:Hide()
+  -- Made after the panel's draw turned the client's sharpening off on its textures (texture-sharpening.md).
+  texels:Unsharpen(frame)
   panel.glitch = L
   return L
+end
+
+-- paint draws a spec's art loaded with the REPEAT wrap mode both ways: a moment's coordinates run past its art, which
+-- must repeat there (loaded clamped, the client stretches its edge texels over the rest: sonata.md §3, Slate's marble).
+-- Not Paint's tiling (HorizTile, VertTile), with which the client sizes the tiles itself, over the coordinates.
+---@param t Texture
+---@param spec table
+local function paint(t, spec)
+  style:Paint(t, spec)
+  if spec.Texture ~= nil then
+    t:SetTexture(style:TexturePath(spec.Texture), "REPEAT", "REPEAT")
+  end
 end
 
 -- between is a number in a { least, most } range.
@@ -112,10 +129,15 @@ end
 ---@param layer DrawLayer
 ---@return Texture[]
 local function texturesOf(L, pool, n, layer)
+  local made = false
   for i = 1, n do
     if pool[i] == nil then
       pool[i] = L.frame:CreateTexture(nil, layer)
+      made = true
     end
+  end
+  if made then
+    texels:Unsharpen(L.frame)
   end
   for i = n + 1, #pool do
     pool[i]:Hide()
@@ -144,7 +166,7 @@ function glitch:tear(L, T, strength)
   local w, h = body:GetWidth(), body:GetHeight()
   for i, t in ipairs(texturesOf(L, L.tears, n, "OVERLAY")) do
     if i <= n then
-      style:Paint(t, { Texture = T.Texture, Color = T.Color or "White", BlendMode = T.BlendMode })
+      paint(t, { Texture = T.Texture, Color = T.Color or "White", BlendMode = T.BlendMode })
       local width = w * (0.35 + 0.9 * self.Random())
       local height = between(T.Height or { 2, 8 })
       t:ClearAllPoints()
@@ -172,7 +194,7 @@ function glitch:block(L, B, strength)
   for i, t in ipairs(texturesOf(L, L.blocks, n, "ARTWORK")) do
     if i <= n then
       local color = colors[math.min(#colors, math.floor(self.Random() * #colors) + 1)]
-      style:Paint(t, { Texture = B.Texture, Color = color, BlendMode = B.BlendMode })
+      paint(t, { Texture = B.Texture, Color = color, BlendMode = B.BlendMode })
       local size = between(B.Size or { 16, 64 })
       t:ClearAllPoints()
       t:SetPoint("TOPLEFT", body, "TOPLEFT", pixel:Snap(t, (w - size) * self.Random()), -pixel:Snap(t, (h - size) * self.Random()))
@@ -192,7 +214,7 @@ end
 ---@param strength number
 function glitch:static(L, N, strength)
   local t = L.noise
-  style:Paint(t, { Texture = N.Texture, Color = N.Color or "White", BlendMode = N.BlendMode })
+  paint(t, { Texture = N.Texture, Color = N.Color or "White", BlendMode = N.BlendMode })
   t:SetAllPoints(L.frame)
   local u, v = self.Random(), self.Random()
   local scale = 0.75 + 0.5 * self.Random()
@@ -202,12 +224,17 @@ function glitch:static(L, N, strength)
 end
 
 -- corrupt swaps the letters of a text for Glyphs, each at chance, keeping spaces and the text's length (a letter, and a
--- glyph, is one UTF-8 character).
+-- glyph, is one UTF-8 character); a text with escape sequences stays as it is.
 ---@param text string
 ---@param glyphs string
 ---@param chance number
 ---@return string
 function glitch:Corrupt(text, glyphs, chance)
+  -- The client's escape sequences (a colour, a texture, a link) begin with "|": swapping their letters would show the
+  -- raw codes, so such a title stays as it is.
+  if text:find("|", 1, true) then
+    return text
+  end
   local swaps = {}
   for ch in glyphs:gmatch(CHARACTER) do
     swaps[#swaps + 1] = ch
@@ -332,8 +359,14 @@ function glitch:Beam(panel, across, down, alpha)
   end
   local L = self:Layer(panel)
   local B = G.Beam or {}
-  L.frame:Show()
   self:quiet(L)
+  if across <= 0 or alpha <= 0 then
+    -- Nothing to see yet (waiting out a delay) or any more: no dot of it either.
+    L.beam:Hide()
+    L.frame:Hide()
+    return
+  end
+  L.frame:Show()
   local beam = L.beam
   style:Paint(beam, { Color = B.Color or "White", BlendMode = B.BlendMode })
   local w, h = L.frame:GetWidth(), L.frame:GetHeight()

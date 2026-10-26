@@ -373,14 +373,19 @@ end
 function WidgetMethods:GetID()
   return self._id or 0
 end
+-- SetSize, SetWidth, SetHeight and SetPoint take secrets only from untainted callers (SecretArguments =
+-- "AllowedWhenUntainted", SimpleScriptRegionResizingAPIDocumentation), and addon code is always tainted.
 function WidgetMethods:SetSize(w, h)
+  rejectSecret("SetSize", w, h)
   self._width = w
   self._height = h
 end
 function WidgetMethods:SetWidth(w)
+  rejectSecret("SetWidth", w)
   self._width = w
 end
 function WidgetMethods:SetHeight(h)
+  rejectSecret("SetHeight", h)
   self._height = h
 end
 function WidgetMethods:GetWidth()
@@ -490,6 +495,7 @@ end
 -- x offset given with a nil y offset was dropped (a render recording: a scroll box's child
 -- anchored 14 in sat at 0), so the mock rejects one offset without the other.
 function WidgetMethods:SetPoint(point, relativeTo, relativePoint, x, y)
+  rejectSecret("SetPoint", relativeTo, x, y)
   if type(relativePoint) == "string" and (x == nil) ~= (y == nil) then
     error("SetPoint: offsetX and offsetY must be given together, got " .. tostring(x) .. ", " .. tostring(y), 2)
   end

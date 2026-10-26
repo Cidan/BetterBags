@@ -728,7 +728,6 @@ function panelProto:glitchIn(to, delay)
   local powerOn = O.PowerOn or 0
   local total = powerOn + O.Time
   local nextMoment = 0
-  self.glitchBase = to
   self:setOffset(to)
   self.frame:SetAlpha(0)
   tween:Play(self, {
@@ -762,10 +761,10 @@ function panelProto:glitchIn(to, delay)
       end
     end,
     onStop = function()
-      self:endGlitch()
+      self:endGlitch(to)
     end,
     onDone = function()
-      self:endGlitch()
+      self:endGlitch(to)
       self.frame:SetFrameLevel(PANEL_LEVEL)
       self:finishShowing()
       chain:Arrived(self)
@@ -786,7 +785,6 @@ function panelProto:glitchOut(from, to, done)
   local powerOff = C.PowerOff or 0
   local total = C.Time + powerOff
   local nextMoment = 0
-  self.glitchBase = from
   tween:Play(self, {
     duration = total,
     from = 0,
@@ -813,26 +811,27 @@ function panelProto:glitchOut(from, to, done)
       end
     end,
     onStop = function()
-      self:endGlitch()
+      self:endGlitch(from)
     end,
     onDone = function()
-      self:endGlitch()
+      self:endGlitch(from)
       self:setOffset(to)
       done()
     end,
   })
 end
 
--- endGlitch puts the panel back as it is without a glitch (NextGlitch:Rest): where the glitch had it, at full strength.
+-- endGlitch puts the panel back as it is without a glitch (NextGlitch:Rest), at full strength, and where its glitch had
+-- it (base, each glitch its own): unless another tween has taken the panel over (a glitch replacing this one, a flight),
+-- which places it.
 ---@private
-function panelProto:endGlitch()
+---@param base number
+function panelProto:endGlitch(base)
   glitch:Rest(self)
-  if self.glitchBase ~= nil then
-    local base = self.glitchBase
-    self.glitchBase = nil
+  self.frame:SetAlpha(1)
+  if not tween:IsPlaying(self) then
     self:setOffset(base)
   end
-  self.frame:SetAlpha(1)
 end
 
 -- scheduleBurst glitches the panel now and then while it shows (the theme's Panel.Glitch.Bursts): its next burst Every
@@ -872,11 +871,13 @@ function panelProto:burst()
   if not B then
     return
   end
-  if InCombatLockdown() or tween:IsPlaying(self) or self.moving or self.sizing or self.morph or lift:IsHolding() then
+  if InCombatLockdown() or tween:IsPlaying(self) or self:placedElsewhere() or lift:IsHolding() then
     self:scheduleBurst()
     return
   end
   local base = self.offset
+  -- Where it last put the panel: anything else that places it (a flight, a placement) leaves it elsewhere.
+  local written = base
   local displace = not self.frame:IsMouseOver()
   local layer = glitch:Layer(self)
   local nextMoment = 0
@@ -889,12 +890,21 @@ function panelProto:burst()
       if tween:IsPlaying(self) then
         return
       end
+      -- Something else took the panel over while it bursts (it is moved, sized, switches size or glides to one, or is
+      -- placed): it stops, at rest, and leaves the panel to it.
+      if self:placedElsewhere() or self.offset ~= written then
+        tween:Stop(layer)
+        return
+      end
       local t = p * B.Time
       if t >= nextMoment or p >= 1 then
         nextMoment = t + G.Step
         local dx = glitch:Roll(self, math.sin(math.pi * p), displace, false)
         if displace then
-          self:setOffset(base + dx)
+          written = base + dx
+          self:setOffset(written)
+          -- A burst never flickers: setOffset fades a small panel by its distance from its place.
+          self.frame:SetAlpha(1)
         end
       end
     end,
@@ -907,6 +917,14 @@ function panelProto:burst()
       self:scheduleBurst()
     end,
   })
+end
+
+-- placedElsewhere says something else places or sizes the panel now: the player moving it or sizing it with a grip,
+-- a size switch, or its size gliding (a snap, back to its default). A burst waits for it, and stops for it.
+---@private
+---@return boolean
+function panelProto:placedElsewhere()
+  return self.moving or self.sizing ~= nil or self.morph ~= nil or self.sizeGliding or false
 end
 
 -- Enter brings a chained bag in beside its anchor (next.md §12): from out of sight beyond the
@@ -3059,10 +3077,6 @@ function panelProto:titleWidth()
   return width
 end
 
--- titleShift is how far in from the title's anchor its text starts: half the room it leaves, rounded down, when its
--- theme centers it (Title.Justify = "CENTER", FitTitle), else none.
----@private
----@return number
 -- styleGhosts draws the title's colour ghosts (Header.Title.Ghosts: each in its font role, X across and Y up from the
 -- title, at its Alpha): copies of the title in other colours, under it, hung from the body by the title's own numbers
 -- (never from the title, a text: next-pixel-perfect.md §2); the ones a theme no longer lists hide.
@@ -3098,7 +3112,9 @@ function panelProto:PlaceGhosts(spread)
   local left = self.side == "LEFT"
   local inset, top = pixel:Snap(body, self:TitleStart()), pixel:Snap(body, style.TITLE_TOP)
   for i, ghost in ipairs(self.ghosts) do
-    local spec = list[i]
+    -- The theme's own list: a glitch can end (at rest) after a theme with fewer ghosts is in use and before this panel
+    -- restyled.
+    local spec = list[i] or {}
     local x = pixel:Snap(body, spec.X or 0) + pixel:Snap(body, spread and spread[i] or 0)
     local y = pixel:Snap(body, spec.Y or 0)
     if left then
@@ -3110,6 +3126,10 @@ function panelProto:PlaceGhosts(spread)
   end
 end
 
+-- titleShift is how far in from the title's anchor its text starts: half the room it leaves, rounded down, when its
+-- theme centers it (Title.Justify = "CENTER", FitTitle), else none.
+---@private
+---@return number
 function panelProto:titleShift()
   local cut = self.titleCut
   if style.Theme.Header.Title.Justify ~= "CENTER" or cut == nil then
@@ -3550,6 +3570,7 @@ function panelProto:FitTitle()
   if not (self.fitsTitle or self:IsSmall() or style.Theme.Header.Title.Justify == "CENTER") then
     title:SetWordWrap(true)
     title:SetWidth(0)
+    self.titleCut = nil
     self:fitGhosts()
     self:placeTitleRow()
     return
@@ -3564,13 +3585,15 @@ function panelProto:FitTitle()
   self:placeTitleRow()
 end
 
--- fitGhosts gives the title's colour ghosts the title's width and wrapping (as FitTitle sets them).
+-- fitGhosts gives the title's colour ghosts the width and wrapping FitTitle gave the title: cut short to titleCut, or
+-- as long as it is. Never read back from the title: while it shows a secret (a vendor's name in an instance) its width
+-- is secret too, and SetWidth takes no secret from addon code (SecretArguments = "AllowedWhenUntainted").
 ---@private
 function panelProto:fitGhosts()
-  local title = self.title
+  local cut = self.titleCut
   for _, ghost in ipairs(self.ghosts or {}) do
-    ghost:SetWordWrap(title:CanWordWrap())
-    ghost:SetWidth(title:GetWidth())
+    ghost:SetWordWrap(cut == nil)
+    ghost:SetWidth(cut or 0)
   end
 end
 
@@ -4198,6 +4221,12 @@ function panelProto:Watch()
   local frame = self.frame
   addon.SetScript(frame, "OnShow", function(ctx)
     self:OnCooldown(ctx)
+    -- Shown again by a parent that hid it (Alt+Z hides UIParent), its OnHide having stopped what moves (OnHidden):
+    -- started again. A panel opening starts them itself (Show).
+    if self.hiddenByParent then
+      self:startEffects()
+      self:scheduleBurst()
+    end
     self:OnFrameShown(ctx)
   end)
   addon.SetScript(frame, "OnHide", function(ctx)
@@ -4230,6 +4259,17 @@ end
 
 -- WatchKind registers the kind's own events and messages.
 function panelProto:WatchKind()
+end
+
+-- startEffects starts what moves while the panel shows: its sparkles, ornaments, rain and shimmer.
+---@private
+function panelProto:startEffects()
+  self.sparkles:Start()
+  self.edgeSparkles:Start()
+  self.cloudSparkles:Start()
+  self.ornaments:Start()
+  self.rain:Start()
+  self:playShimmer()
 end
 
 -- OnFrameShown runs whenever the panel's frame shows, every way it does (its OnShow): what a kind draws only while it
@@ -4360,13 +4400,8 @@ function panelProto:Show(ctx, slotInfo, onShown)
     self:SetDocked(true)
     self:moveIn(self:HiddenOffset(), 0, style.Time.Open, style:Ease("Open"), 0)
   end
-  self.sparkles:Start()
-  self.edgeSparkles:Start()
-  self.cloudSparkles:Start()
-  self.ornaments:Start()
-  self.rain:Start()
+  self:startEffects()
   self.menuButton:Paint()
-  self:playShimmer()
   addon.TriggerItemContextChanged()
   chain:Update(ctx)
   return drew
@@ -4480,6 +4515,8 @@ end
 -- spark stop, and OnClosed runs.
 ---@param ctx Context
 function panelProto:OnHidden(ctx)
+  -- Its own flag still set: a parent hid it, and shows it again with it (its OnShow).
+  self.hiddenByParent = self.frame:IsShown()
   nextDrag:PanelHidden(self)
   nextDock:PanelHidden(self)
   self:StopMove()

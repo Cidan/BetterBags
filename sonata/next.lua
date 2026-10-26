@@ -281,7 +281,15 @@ local ANIMATION_OFF = {
   end,
   -- The Glitch theme's (next-themes.md §21): its bags glitch in and out and now and then while they show; off, they
   -- slide in and out as any theme's. And its data rain.
-  glitch = function(theme) theme.Panel.Glitch = nil end,
+  -- An ornament's glitch (a blinking twitch) is a glitch too: it goes, its other motion left to Moving Ornaments.
+  glitch = function(theme)
+    theme.Panel.Glitch = nil
+    for _, piece in ipairs(theme.Panel.Ornaments or {}) do
+      if piece.Motion then
+        piece.Motion.Glitch = nil
+      end
+    end
+  end,
   rain = function(theme) theme.Panel.Rain = nil end,
 }
 
@@ -604,6 +612,12 @@ function sonataNext:Check(key)
         if o.Motion.Origin ~= nil and not ornaments.ORIGINS[o.Motion.Origin] then
           problem("Motion.Origin", "no point named " .. tostring(o.Motion.Origin))
         end
+        for _, motion in ipairs({ "Glitch", "Scroll" }) do
+          local spec = o.Motion[motion]
+          if spec ~= nil and type(spec) ~= "table" then
+            problem("Motion." .. motion, "a table")
+          end
+        end
         for k in pairs(type(o.Motion.Glitch) == "table" and o.Motion.Glitch or {}) do
           if not ornaments.GLITCH[k] then
             problem("Motion.Glitch." .. tostring(k), "no glitch part named " .. tostring(k))
@@ -617,9 +631,9 @@ function sonataNext:Check(key)
       end
     end
   end
-  -- A range: two numbers.
+  -- A range: two numbers, none below 0, the least first.
   local function range(v)
-    return type(v) == "table" and type(v[1]) == "number" and type(v[2]) == "number"
+    return type(v) == "table" and type(v[1]) == "number" and type(v[2]) == "number" and v[1] >= 0 and v[1] <= v[2]
   end
   -- A glitch (Panel.Glitch, next-themes.md §21): its parts are NextGlitch's; opening, closing and bursts need their time.
   local glitch = addon:GetModule('NextGlitch', true)
@@ -633,12 +647,24 @@ function sonataNext:Check(key)
         problem(tostring(k), "no part named " .. tostring(k))
       end
     end
+    local moments = false
     for _, part in ipairs({ { "Open", "a glitch opening needs one" }, { "Close", "a glitch closing needs one" },
       { "Bursts", "bursts need one" } }) do
       local spec = G[part[1]]
-      if type(spec) == "table" and type(spec.Time) ~= "number" then
-        problem(part[1] .. ".Time", part[2])
+      if spec ~= nil then
+        moments = true
+        if type(spec) ~= "table" then
+          problem(part[1], "a table")
+        elseif type(spec.Time) ~= "number" then
+          problem(part[1] .. ".Time", part[2])
+        end
       end
+    end
+    if moments and not (type(G.Step) == "number" and G.Step > 0) then
+      problem("Step", "a glitch needs one")
+    end
+    if type(G.Bursts) == "table" and not (type(G.Bursts.Every) == "number" and G.Bursts.Every > 0) then
+      problem("Bursts.Every", "bursts need one")
     end
     if G.Flicker ~= nil and not range(G.Flicker) then
       problem("Flicker", "two numbers, dark and lit")
@@ -666,6 +692,14 @@ function sonataNext:Check(key)
       end
       if type(entry.Glyphs) ~= "string" or entry.Glyphs == "" then
         problem("Glyphs", "some glyphs")
+      end
+      for _, field in ipairs({ "Font", "HeadFont" }) do
+        if entry[field] == nil then
+          problem(field, "a text role")
+        end
+      end
+      if entry.Spacing ~= nil and not (type(entry.Spacing) == "number" and entry.Spacing > 0) then
+        problem("Spacing", "more than nothing")
       end
       if not range(entry.Speed) then
         problem("Speed", "two numbers, slowest and fastest")

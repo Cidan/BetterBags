@@ -137,6 +137,20 @@ describe("SonataNext", function()
       end
     end)
 
+    -- Glitch Effects off is for players flicker is hard on: an ornament's glitch (its blinking twitch) goes with it, its
+    -- other motion left to Moving Ornaments. Found by the adversarial review.
+    it("takes an ornament's glitch out with Glitch Effects, leaving its other motion", function()
+      local t = full()
+      t.Panel.Ornaments[1].Motion.Glitch = { Every = 3, Blink = 0.2 }
+      sonataNext.themes = {}
+      sonataNext:RegisterTheme(t)
+      animation = { glitch = false }
+      sonataNext:Init()
+      local motion = used[#used].Panel.Ornaments[1].Motion
+      assert.is_nil(motion.Glitch)
+      assert.are.equal(4, motion.Sway)
+    end)
+
     it("takes nothing out while every switch is on", function()
       sonataNext:Init()
       for name, part in pairs(PARTS) do
@@ -695,6 +709,7 @@ describe("SonataNext", function()
       "Panel.Glitch.Corrupt.Glyphs: some glyphs",
       "Panel.Glitch.Flicker: two numbers, dark and lit",
       "Panel.Glitch.Open.Time: a glitch opening needs one",
+      "Panel.Glitch.Step: a glitch needs one",
       "Panel.Glitch.Tears.Texture: no texture named Nope",
       "Panel.Glitch.Wobble: no part named Wobble",
       "Panel.Ornaments.1.Motion.Glitch.Twitch: no glitch part named Twitch",
@@ -709,11 +724,36 @@ describe("SonataNext", function()
     }, problems)
     sonataNext:RegisterTheme({ Name = "GoodGlitch", Panel = {
       Glitch = { Open = { Time = 0.4, PowerOn = 0.2 }, Close = { Time = 0.2 }, Bursts = { Every = 4, Time = 0.3 },
-        Flicker = { 0.2, 1 }, Corrupt = { Glyphs = "#@", Chance = 0.5 }, Tears = { Texture = "Glow" } },
+        Step = 0.05, Flicker = { 0.2, 1 }, Corrupt = { Glyphs = "#@", Chance = 0.5 }, Tears = { Texture = "Glow" } },
       Rain = { { Where = "Feather", Font = "Title", HeadFont = "Title", Glyphs = "01", Speed = { 4, 8 }, Trail = { 4, 8 } } },
       Ornaments = { { Texture = "Glow", Point = "BODY", Tile = 64, Motion = { Glitch = { Every = 3, Jump = 2 }, Scroll = { Y = 4 } } } },
     } })
     assert.are.same({}, sonataNext:Check("GoodGlitch"))
+    -- Found by the adversarial review: data Check took that the runtime cannot run (an error on every moment, a burst
+    -- that never schedules, a rain laying out columns without end).
+    sonataNext:RegisterTheme({ Name = "WorseGlitch", Panel = {
+      Glitch = { Open = true, Close = { Time = 0.2 }, Bursts = { Time = 0.3 } },
+      Rain = {
+        { Where = "Body", Glyphs = "01", Spacing = 0, Speed = { 8, 4 }, Trail = { -2, 4 } },
+      },
+      Ornaments = {
+        { Texture = "Glow", Point = "BODY", Motion = { Glitch = true, Scroll = 4 } },
+      },
+    } })
+    problems = sonataNext:Check("WorseGlitch")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Glitch.Bursts.Every: bursts need one",
+      "Panel.Glitch.Open: a table",
+      "Panel.Glitch.Step: a glitch needs one",
+      "Panel.Ornaments.1.Motion.Glitch: a table",
+      "Panel.Ornaments.1.Motion.Scroll: a table",
+      "Panel.Rain.1.Font: a text role",
+      "Panel.Rain.1.HeadFont: a text role",
+      "Panel.Rain.1.Spacing: more than nothing",
+      "Panel.Rain.1.Speed: two numbers, slowest and fastest",
+      "Panel.Rain.1.Trail: two numbers, shortest and longest",
+    }, problems)
   end)
 
   -- The header buttons down a side rail (Header.Buttons.Rail, next-themes.md §13).

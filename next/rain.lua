@@ -32,7 +32,7 @@ rain.WHERE = { Feather = true, Body = true }
 ---@class (exact) NextRainColumn
 ---@field rain table The theme's entry it falls for.
 ---@field glyphs FontString[] Its ring: the head first, then its trail, a row above each other.
----@field x number Its cells' left edge, from the panel's top left.
+---@field x? number Its cells' left edge, from the panel's top left (nil until placed).
 ---@field cell number A cell's size, in units: its font's height, on whole pixels of the panel's grid.
 ---@field rows number The rows the panel's frame holds.
 ---@field head number Where its head is, in rows from the top (fractional; negative above the top).
@@ -44,6 +44,7 @@ rain.WHERE = { Feather = true, Body = true }
 ---@class (exact) NextRainSet
 ---@field panel table The panel: its frame, its side, IsSmall, BodyLeft, BodyWidth.
 ---@field driver Frame Runs the rain while it falls; a child of the panel's frame.
+---@field onUpdate fun(frame: Frame, elapsed: number) The driver's script, made once.
 ---@field entries table[] The theme's entries.
 ---@field columns NextRainColumn[]
 ---@field glyphs table<table, string[]> Each entry's glyphs, read as characters.
@@ -60,6 +61,9 @@ function rain:Create(panel)
   local set = setmetatable({ panel = panel, entries = {}, columns = {}, glyphs = {}, pool = {}, running = false },
     { __index = setProto })
   set.driver = CreateFrame("Frame", nil, panel.frame)
+  set.onUpdate = function(_, elapsed)
+    set:Step(elapsed)
+  end
   -- A plain hook: it runs on every frame of a resize, and addon.HookScript makes a Context per call.
   panel.frame:HookScript("OnSizeChanged", function()
     if #set.entries > 0 then
@@ -159,19 +163,28 @@ function setProto:Layout()
         if column ~= nil then
           self:release(column)
         end
-        column = { rain = entry, glyphs = {}, x = 0, cell = cell, rows = rows, head = 0, row = 0, speed = 0, trail = 0,
-          swap = 0 }
+        column = { rain = entry, glyphs = {}, cell = 0, rows = rows, head = 0, row = 0, speed = 0, trail = 0, swap = 0 }
         columns[n] = column
         self:fill(column)
         self:drop(column)
       end
-      column.x = x0 + (i - 1) * spacing
-      column.cell, column.rows = cell, rows
-      for _, g in ipairs(column.glyphs) do
-        g:SetSize(cell, cell)
+      -- Only what changed: a resize lays the rain out on each of its frames.
+      local x = x0 + (i - 1) * spacing
+      -- A new cell moves its cells' left edge too (x), so its glyphs are placed again below.
+      if cell ~= column.cell then
+        column.cell = cell
+        for _, g in ipairs(column.glyphs) do
+          g:SetSize(cell, cell)
+        end
       end
-      self:placeAll(column)
-      self:draw(column)
+      if x ~= column.x then
+        column.x = x
+        self:placeAll(column)
+      end
+      if rows ~= column.rows then
+        column.rows = rows
+        self:draw(column)
+      end
     end
   end
   for i = #columns, n + 1, -1 do
@@ -288,6 +301,8 @@ end
 function setProto:Step(elapsed)
   local combat = InCombatLockdown()
   for _, column in ipairs(self.columns) do
+    -- Its glyphs are drawn again only when it passed a row or started again: nothing else changes what shows.
+    local moved = false
     if column.row - column.trail < column.rows then
       column.head = column.head + column.speed * elapsed
       local target = math.floor(column.head)
@@ -297,13 +312,17 @@ function setProto:Step(elapsed)
       end
       while column.row < target do
         self:advance(column)
+        moved = true
       end
       self:swap(column, elapsed)
     end
+    -- Its trail is past the bottom, nothing of it shows: it starts again above the top, out of sight.
     if column.row - column.trail >= column.rows and not combat then
       self:drop(column)
     end
-    self:draw(column)
+    if moved then
+      self:draw(column)
+    end
   end
 end
 
@@ -332,9 +351,7 @@ function setProto:drive()
     self.driver:SetScript("OnUpdate", nil)
     return
   end
-  self.driver:SetScript("OnUpdate", function(_, elapsed)
-    self:Step(elapsed)
-  end)
+  self.driver:SetScript("OnUpdate", self.onUpdate)
 end
 
 -- Start lets the rain fall (the panel shows), every column from above.

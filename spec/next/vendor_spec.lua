@@ -613,7 +613,11 @@ describe("NextVendor", function()
         local v = open()
         assert.are.equal(size == "small", v:IsSmall())
         local sonataNext = addon:GetModule("SonataNext")
-        for _, key in ipairs({ "GW2", "Quiet", "Ember", "Parchment", "Default" }) do
+        -- Every shipped theme (one of them, Glitch, measured the title for its colour ghosts).
+        local keys = {}
+        for key in pairs(sonataNext:GetThemes()) do table.insert(keys, key) end
+        table.sort(keys)
+        for _, key in ipairs(keys) do
           style:Use(sonataNext:Resolve(key))
           v:ApplyStyle(ctx())
           assert.is_false(v.titleButton:IsAnchoringSecret(), key)

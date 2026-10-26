@@ -302,6 +302,8 @@ sonataNext:RegisterTheme({
   },
 
   Dock = {
+    -- A card's title line as tall as its font (ConfirmTitle).
+    TitleHeight = 26,
     Glow = { Color = "Gold", Width = 1, Low = 0.3, High = 1, Period = 0.7 },
     Halo = { Texture = "Glow", Color = "Gold", Spread = 24, Low = 0.08, High = 0.3, Period = 0.7, BlendMode = "ADD" },
   },

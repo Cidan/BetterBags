@@ -1972,10 +1972,11 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal(0, bag.offset, "in place, not sliding in")
       assert.are.equal(0, bag.frame:GetAlpha(), "nothing yet but the beam")
       local layer, beam = bag.glitch.frame, bag.glitch.beam
-      assert.is_true(layer:IsShown())
+      assert.is_false(layer:IsShown(), "the line starts from nothing: no dot of it")
       assert.is_true(layer:IsIgnoringParentAlpha(), "seen while the panel is not")
       local w, h = bag.body:GetWidth(), bag.body:GetHeight()
       step(0.04)
+      assert.is_true(layer:IsShown())
       assert.is_true(beam:IsShown())
       assert.is_true(beam:GetWidth() > 0 and beam:GetWidth() < w, "a line growing across")
       assert.are.equal(addon:GetModule("NextPixel"):Length(beam, 2), beam:GetHeight())
@@ -2025,12 +2026,62 @@ describe("BetterBags Next's panels and themes", function()
       assert.is_true(bag.glitch.noise:IsShown() and bag.glitch.noise:GetAlpha() > 0)
       assert.are.equal(math.floor(GLITCH.Tears.Count * strength + 0.1), shown(bag.glitch.tears))
       assert.is_true(shown(bag.glitch.blocks) > 0)
+      -- Their art repeats where their coordinates run past it (found by the adversarial review: loaded clamped, the
+      -- client stretches the art's edge texels over the rest, as Slate's marble did, sonata.md §3).
+      for _, t in ipairs({ bag.glitch.noise, bag.glitch.tears[1], bag.glitch.blocks[1] }) do
+        assert.are.same({ "REPEAT", "REPEAT" }, { t._wrapH, t._wrapV })
+      end
       finishTweens()
       assert.are.equal("Backpack", bag.title:GetText())
       assert.are.equal("Backpack", bag.ghosts[1]:GetText())
       assert.are.same(rest, { ghostX(bag, 1), ghostX(bag, 2) })
       assert.are.equal(0, shown(bag.glitch.tears))
       assert.is_false(bag.glitch.noise:IsShown())
+    end)
+
+    -- Drawn after the panel's draw turned the client's sharpening off on its textures (texture-sharpening.md): each new
+    -- texture of a glitch is drawn without it too.
+    it("draws its CRT's beam without the client's sharpening, before any moment", function()
+      local bag = nextBag:Create(ctx())
+      assert.is_nil(bag.glitch, "never glitched")
+      glitch:Beam(bag, 0.5, 0.5, 1)
+      assert.is_false(bag.glitch.beam:IsSnappingToPixelGrid())
+      glitch:Rest(bag)
+    end)
+
+    it("draws its glitch without the client's sharpening", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      glitch.Random = function() return 0.1 end
+      glitch:Roll(bag, 1, false, false)
+      for _, t in ipairs({ bag.glitch.noise, bag.glitch.beam, bag.glitch.tears[1], bag.glitch.blocks[1] }) do
+        assert.is_false(t:IsSnappingToPixelGrid())
+        assert.are.equal(0, t:GetTexelSnappingBias())
+      end
+      glitch:Rest(bag)
+    end)
+
+    -- Found by the adversarial review: a parent hiding (Alt+Z hides UIParent) runs the panel's OnHide, which stops
+    -- everything that moves, and nothing started it again when the parent showed.
+    it("starts its rain, sparkles and bursts again when a parent that hid it shows it again", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.is_false(bag.rain.running)
+      assert.is_nil(bag.sparkles.frame:GetScript("OnUpdate"))
+      timers = {}
+      bag.frame:GetScript("OnShow")(bag.frame)
+      assert.is_true(bag.rain.running, "raining")
+      assert.is_not_nil(bag.sparkles.frame:GetScript("OnUpdate"), "sparkling")
+      assert.is_not_nil(timers[#timers], "a burst scheduled")
+    end)
+
+    it("draws a moment's static in its color when it names no art", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      apply({ Panel = { Glitch = { Open = GLITCH.Open, Step = 0.05, Noise = { Color = "Gold", Alpha = 0.3 } } } })
+      glitch:Roll(bag, 1, false, false)
+      local noise = bag.glitch.noise
+      assert.is_not_nil(noise._colorTexture, "a color, not a cleared texture")
+      assert.is_true(noise:IsShown())
+      glitch:Rest(bag)
     end)
 
     it("corrupts letters and shoves sections as much as its moment is strong", function()
@@ -2046,6 +2097,14 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal("########", bag.title:GetText(), "under it at full strength")
       assert.is_true(bag.glitch.sections[section.frame]:IsPlaying(), "and shoved")
       glitch:Rest(bag)
+    end)
+
+    -- A title with the client's escape sequences (a colour, |cAARRGGBB ... |r; a texture, |T...|t) is shown as it is:
+    -- swapping their letters would show the raw codes. Found by the adversarial review.
+    it("leaves a title with escape sequences as it is", function()
+      glitch.Random = function() return 0.1 end
+      assert.are.equal("|cffff0000Red|r", glitch:Corrupt("|cffff0000Red|r", "#", 1))
+      assert.are.equal("###", glitch:Corrupt("Red", "#", 1))
     end)
 
     it("corrupts a title with whole characters, its glyphs read as characters, not bytes", function()
@@ -2069,6 +2128,24 @@ describe("BetterBags Next's panels and themes", function()
       step(0.25)
       assert.are.equal("Merchant", bag.title:GetText())
       finishTweens()
+    end)
+
+    -- Found by the adversarial review: a vendor's name in an instance is a secret, and its ghosts were given the title's
+    -- width read back from the title, a secret too, which SetWidth refuses from addon code: the vendor never opened.
+    it("glitches in and out with a secret title, its ghosts as wide as the title was cut, never measuring it", function()
+      override(_G, "issecretvalue", IsMockSecret)
+      local bag = nextBag:Create(ctx())
+      bag.fitsTitle = true
+      bag:SetTitle(MockSecret("Mira the Smith"))
+      bag:Show(ctx())
+      finishTweens()
+      -- What it was given (its width reads back secret while it shows the secret, as the title's does).
+      assert.are.equal(bag.titleCut, bag.ghosts[1]._width)
+      assert.is_false(bag.ghosts[1]:CanWordWrap(), "on one line, as the title")
+      assert.is_true(IsMockSecret(bag.ghosts[1]:GetText()), "the ghosts show the name, uncorrupted")
+      bag:Hide(ctx())
+      finishTweens()
+      assert.is_false(bag.frame:IsShown())
     end)
 
     it("shoves its sections sideways while it opens, and puts them back", function()
@@ -2107,6 +2184,67 @@ describe("BetterBags Next's panels and themes", function()
       assert.is_false(bag:IsClosing())
       assert.are.equal(1, bag.frame:GetAlpha(), "ready to open again")
       assert.is_false(bag.glitch.frame:IsShown())
+    end)
+
+    -- Found by the adversarial review: a glitch replacing another (opened again while it glitches out, or closed while
+    -- it glitches in) lost its place to the one it replaced, and came to rest where its last moment had jumped it.
+    it("comes to rest in its place when opened again while it glitches out", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      glitch.Random = function() return 0.95 end
+      bag:Hide(ctx())
+      step(0.1)
+      bag:Show(ctx())
+      step(0.21)
+      step(0.35)
+      step(0.1)
+      finishTweens()
+      assert.are.equal(0, bag.offset, "at its edge")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.is_true(bag.frame:IsShown())
+    end)
+
+    it("gives its ghosts the title's width again once the title is no longer cut short", function()
+      db.size = "small"
+      local bag = nextBag:Create(ctx())
+      bag:SetTitle("Backpack")
+      assert.is_not_nil(bag.titleCut, "a small panel's title is cut short")
+      assert.are.equal(bag.titleCut, bag.ghosts[1]._width)
+      addon:GetModule("NextPanel"):SetSize(ctx(), "full")
+      finishTweens()
+      assert.is_false(bag:IsSmall())
+      assert.is_nil(bag.titleCut)
+      assert.are.equal(0, bag.ghosts[1]._width, "as long as it is")
+      assert.is_true(bag.ghosts[1]:CanWordWrap())
+    end)
+
+    it("is put back in the place it was glitching in to when it is hidden mid-glitch", function()
+      local bag = nextBag:Create(ctx())
+      bag:SetDocked(false)
+      bag:moveIn(bag:HiddenOffset(), -300, 0.5, "linear", 0)
+      step(0.25)
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.are.equal(-300, bag.offset)
+    end)
+
+    it("stays where the glitch that replaced its closing put it, not where the closing began", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:PlaceAt(-40)
+      bag:Hide(ctx())
+      step(0.1)
+      bag:Show(ctx())
+      assert.are.equal(0, bag.offset, "where it opens, at once")
+    end)
+
+    it("ends in its hidden place when closed while it glitches in", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      glitch.Random = function() return 0.95 end
+      step(0.25)
+      bag:Hide(ctx())
+      finishTweens()
+      assert.is_false(bag.frame:IsShown())
+      assert.are.equal(bag:HiddenOffset(), bag.offset)
     end)
 
     it("cleans up a glitch cut short: hidden at once mid-open", function()
@@ -2158,6 +2296,75 @@ describe("BetterBags Next's panels and themes", function()
       next.fn()
       assert.is_false(tween:IsPlaying(bag.glitch), "none in combat")
       assert.is_not_nil(timers[#timers], "the next scheduled")
+    end)
+
+    -- Found by the adversarial review: a burst moved a small panel through setOffset, which fades a small panel by its
+    -- distance and ends a size glide or switch; and it put back a panel something else had placed meanwhile.
+    local function burstNow(bag)
+      local last = table.remove(timers)
+      assert.is_not_nil(last, "a burst scheduled")
+      last.fn()
+      assert.is_true(tween:IsPlaying(bag.glitch), "bursting")
+    end
+
+    it("never fades a small panel as it bursts", function()
+      db.size = "small"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.is_true(bag:IsSmall())
+      glitch.Random = function() return 0.95 end
+      burstNow(bag)
+      step(0.05)
+      step(0.05)
+      assert.are.equal(1, bag.frame:GetAlpha())
+      finishTweens()
+      assert.are.equal(1, bag.frame:GetAlpha())
+    end)
+
+    it("waits for a size glide, and stops for one that starts while it bursts, leaving it gliding", function()
+      db.size = "small"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag.sizeGliding = true
+      local last = table.remove(timers)
+      last.fn()
+      assert.is_false(tween:IsPlaying(bag.glitch), "not while it glides")
+      bag.sizeGliding = false
+      burstNow(bag)
+      for _, flag in ipairs({ "sizeGliding", "moving", "morph" }) do
+        bag[flag] = true
+        step(0.05)
+        assert.is_false(tween:IsPlaying(bag.glitch), "stopped for " .. flag)
+        assert.is_true(bag[flag] and true, flag .. " left alone")
+        assert.is_false(bag.glitch.frame:IsShown())
+        bag[flag] = nil
+        if flag == "sizeGliding" then bag.sizeGliding = false end
+        timers = {}
+        bag:ApplyStyle(ctx())
+        burstNow(bag)
+      end
+    end)
+
+    it("stops for a panel something else placed while it bursts, and leaves it there", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      glitch.Random = function() return 0.95 end
+      burstNow(bag)
+      step(0.05)
+      bag:PlaceAt(-40)
+      step(0.05)
+      finishTweens()
+      assert.are.equal(-40, bag.offset)
+      assert.is_false(bag.glitch.frame:IsShown())
+    end)
+
+    it("ends a glitch at rest after its theme changed under it, ghosts and all", function()
+      local bag = nextBag:Create(ctx())
+      bag:SetTitle("Backpack")
+      bag:Show(ctx())
+      step(0.25)
+      style:Use(addon:GetModule("SonataNext"):Resolve("Default"))
+      bag:FlyTo(0)
+      finishTweens()
+      assert.is_false(bag.glitch.frame:IsShown())
+      backToDefault()
     end)
 
     it("stops glitching when it closes", function()
@@ -2258,8 +2465,11 @@ describe("BetterBags Next's panels and themes", function()
       bag:SetDocked(false)
       bag:moveIn(bag:HiddenOffset(), 0, 0.5, "linear", 0.3)
       assert.are.equal(0, bag.frame:GetAlpha())
+      -- Nothing of the beam either (found by the adversarial review: a dot of it showed through the delay).
+      assert.is_false(bag.glitch.frame:IsShown(), "no beam yet")
       step(0.2)
       assert.are.equal(0, bag.frame:GetAlpha(), "still waiting")
+      assert.is_false(bag.glitch.frame:IsShown(), "no beam yet")
       assert.are.equal(0, bag.offset, "in place already")
       finishTweens()
       assert.are.equal(1, bag.frame:GetAlpha())
