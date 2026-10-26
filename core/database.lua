@@ -417,10 +417,14 @@ function DB:SetNextCurrencies(list)
   DB.data.profile.nextCurrencies = saved
 end
 
----@alias NextCurrencyOption "capBars"|"gains"|"hideEmpty"|"itemsEverywhere"|"layout"|"scale"|"background"|"hideInCombat"
+---@alias NextCurrencyOption "capBars"|"gains"|"hideEmpty"|"itemsEverywhere"|"layout"|"scale"|"background"|"hideInCombat"|"growX"|"growY"
 
--- The tracker's layouts (currency.md §5).
-local CURRENCY_LAYOUTS = { row = true, column = true, list = true }
+-- The values an option is checked against: the tracker's layouts and the ways it grows (currency.md §5).
+local CURRENCY_CHOICES = {
+  layout = { row = true, column = true, list = true },
+  growX = { left = true, right = true },
+  growY = { up = true, down = true },
+}
 
 -- nextCurrencyOption checks a currency option's name: one of the defaults' (const.DATABASE_DEFAULTS), nothing else.
 ---@param name string
@@ -431,8 +435,8 @@ local function nextCurrencyOption(name)
 end
 
 -- GetNextCurrencyOption returns how BetterBags Next's currencies show (currency.md §6): cap bars, gains, what you
--- have none of hidden, items counted everywhere, and the tracker's layout, scale (percent), background and whether
--- it hides in combat.
+-- have none of hidden, items counted everywhere, and the tracker's layout, scale (percent), background, whether it
+-- hides in combat, and which way it grows (growX "left" or "right", growY "down" or "up").
 ---@param name NextCurrencyOption
 ---@return any
 function DB:GetNextCurrencyOption(name)
@@ -444,14 +448,16 @@ end
 ---@param value any
 function DB:SetNextCurrencyOption(name, value)
   nextCurrencyOption(name)
-  if name == "layout" and not CURRENCY_LAYOUTS[value] then
-    error("unknown currency tracker layout: " .. tostring(value))
+  local choices = CURRENCY_CHOICES[name]
+  if choices ~= nil and not choices[value] then
+    error("not a currency tracker " .. name .. ": " .. tostring(value))
   end
   DB.data.profile.nextCurrency[name] = value
 end
 
--- GetNextCurrencyTracker returns whether the currency tracker is out of the backpack, and where it was left (its top
--- left in UIParent's units; nothing before it was first placed). Put away, it remembers where it was.
+-- GetNextCurrencyTracker returns whether the currency tracker is out of the backpack, and where it was left: the corner
+-- it grows from (growX, growY), in UIParent's units from the screen's top left; nothing before it was first placed.
+-- Put away, it remembers where it was.
 ---@return boolean out, number? x, number? y
 function DB:GetNextCurrencyTracker()
   local t = DB.data.profile.nextCurrencyTracker

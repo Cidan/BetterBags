@@ -101,7 +101,8 @@ tracker's list its name. Drawn from the theme's `Currency` (§7), on whole pixel
 - **Clicks**: Shift-click on an item searches the backpack for it (again: clears the search); a right click opens the
   Currencies page on what is tracked; "Track Currencies" opens it where currencies are picked (items, without
   currencies).
-- **Dragged** (the strip or one of its entries), a copy pops out as the tracker (§5).
+- **Dragged** (the strip or one of its entries), a copy pops out as the tracker (§5). With Shift, one entry is dragged
+  on its own instead (§5a), and Shift on the strip's own background drags nothing.
 - Gains burst sparkles off the entry (`Sparkles.Gain`).
 
 ## 5. The tracker (`NextCurrencyTracker`, `next/currencytracker.lua`)
@@ -115,18 +116,53 @@ tracker's list its name. Drawn from the theme's `Currency` (§7), on whole pixel
   open backpack "Put Away" (the strip lights, `Drop`, and the card fades a little). A release the client missed drops it,
   as section drags do.
 - **Dropped away from the backpack** it lands there (on the screen, on whole pixels of its own grid) and stays, bags
-  closed or not; where it was left is saved (`nextCurrencyTracker`, `DB:Get/SetNextCurrencyTracker`: out, x, y in
-  UIParent's units from its top left). It shows again there after a reload, kept on the screen when the screen changes
-  (`UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED`). Dragging it moves it.
+  closed or not; where it was left is saved (`nextCurrencyTracker`, `DB:Get/SetNextCurrencyTracker`: out, and x, y,
+  the corner it grows from, in UIParent's units from the screen's top left). It shows again there after a reload, kept
+  on the screen when the screen changes (`UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED`); before it was ever placed, in the
+  middle of the screen's top third. Dragging it moves it; with Shift, its own background drags nothing.
+- **Grows from a corner** (Tracker Grows, §6; asked: "a grow direction for the tracker ... grow direction should
+  probably be left (anchor point is right, frame grows out left) ... for list view we need up and down as options"): it
+  is anchored by that corner (`Corner`: its right edge growing left, the default, or its left growing right; in a
+  column or a list its top growing down, the default, or its bottom growing up; a row by its top), so as what it shows
+  gets longer, that corner stays and the rest grows away from it. Changing which way it grows, its layout or its scale
+  keeps it where it is on screen and remembers its new corner (`Reanchor`, on `currencies/OptionsChanged`).
 - **Dropped back on the backpack** it flies into the strip and is put away; the strip's entries pop one after the other
   (`Welcome`). Put away, it remembers where it was.
 - **Shown** while it is out, BetterBags Next is in use (`SetActive`, from the backpack's `Deactivate`/`Activate`),
   something shows in it, no pet battle, and not in combat with Hide Tracker in Combat; it fades in and out.
 - **Its layout** (§6): a row, a column, or a list with names (`ListWidth` wide); entries `RowGap` apart in a column or
   list, the card `Pad` round them, its `Fill`, `Edge` and `Frame` (Blizzard's nine-slice art, next-themes.md §15); with
-  the background off, the card shows faintly only under the pointer, to grab it by. At its scale. Gains play on it as
-  on the strip.
+  the background off, the card shows faintly only under the pointer, to grab it by (the pointer coming onto the card or
+  straight onto one of its entries, `EntryHovered`), and while it does, the pointer is watched every frame and the card
+  fades once the pointer is off the tracker. At its scale. Gains play on it as on the strip.
+  **Failure mode (fixed, reported):** the faint card stayed after the pointer left. Its entries are buttons over the
+  card: moving onto one, the card's `OnLeave` fires with the pointer still over it (kept), and leaving the entry
+  straight off the tracker, the card is told nothing.
 - **Clicks**: a right click opens the Currencies page's Display tab; Shift-click on an item finds it in the backpack.
+
+## 5a. Dragging one entry on its own (`NextCurrencyDrag`, `next/currencydrag.lua`)
+
+Asked: "for the items in the tracker, we should be able to shift click -> drag them off the tracker individually (this
+means shift click -> drag doesn't move the bar, or create the popout)", as an action is pulled off a locked action bar.
+
+- **Shift-drag** a currency or item in the strip or the tracker: that entry alone is lifted (`NextLift`, the sections'
+  lift and shadow); nothing pops out of the strip and the tracker does not move. Not while something else is held or
+  dragged, nor with an item on the cursor. A Shift-click without a drag still finds an item in the backpack.
+- **The strip and the tracker are views of one list** (containers, `NextCurrencyContainer`: `IsOver`, `IndexAt`,
+  `RoomPoint`, `Keys`, `Relayout`, each registered as it is made). While an entry is held, both leave it out (the other
+  view's copy of it hides: one on screen at a time); over one of them (or within an icon of it, shown), a room its size
+  opens where it would land and the others slide out of its way (Motion); elsewhere they close up behind it. The room
+  starts at the entry's own place, and where it goes is worked out from where the others stand with the room among
+  them (a row by x, a column or list by y), so it never flickers between two places. A tracker held empty by its only
+  entry stays shown, to drop it back.
+- **Let go over the strip or the tracker**, it lands in its room and moves there in the tracked order
+  (`Currencies:Move`: after the entry before the room, counted as `NextListReorder` counts); where it was, nothing
+  changes. A drop on the other view moves it in that view's order, and the entry goes back to its own.
+- **Let go anywhere else**, it stops being tracked at once (the others close up) and shrinks away where it was let go
+  in a puff of sparkles (`Sparkles.Pop`, on the drag layer).
+- Under it while held, what letting go does: "Move Here" or "Stop Tracking" (`Drag.HintFont`). A release the client
+  missed lets it go, as section drags do. The backpack closing, or BetterBags Next switched off, puts it straight back.
+- Its tooltips say so: "Shift-drag to move it, or off to stop tracking it."
 
 ## 6. The options and the Currencies page
 
@@ -136,12 +172,13 @@ tracker's list its name. Drawn from the theme's `Currency` (§7), on whole pixel
 
 | Setting | Option | Default |
 |---|---|---|
-| Cap Bars (`nextCurrencyCapBars`) | `capBars` | on |
+| Cap Bars (`nextCurrencyCapBars`) | `capBars` | off (asked) |
 | Show Gains (`nextCurrencyGains`) | `gains` | on |
 | Hide What You Have None Of (`nextCurrencyHideEmpty`) | `hideEmpty` | on |
 | Count Items Everywhere (`nextCurrencyItemsEverywhere`) | `itemsEverywhere` | on |
 | Show Tracker (`nextCurrencyTracker`) | the tracker's `out` | off |
 | Tracker Layout (`nextCurrencyLayout`, Row / Column / List) | `layout` | row |
+| Tracker Grows (`nextCurrencyGrow`: Left / Right in a row, Up / Down in a column or list) | `growX`, `growY` | left, down |
 | Tracker Scale (`nextCurrencyScale`, 50% to 200%, steps of 5) | `scale` | 100 |
 | Tracker Background (`nextCurrencyBackground`) | `background` | on |
 | Hide Tracker in Combat (`nextCurrencyHideInCombat`) | `hideInCombat` | off |
@@ -166,7 +203,9 @@ classic bags keep their Currency page, next-settings.md §7, §8). Four tabs:
   each shows how many you have and where ("4 in your bags, 20 in your bank"), faded with "You have none."; a right click
   removes one; Remove All asks first and keeps the currencies.
 - **Display**: Backpack and Tracker (Cap Bars, Show Gains, Hide What You Have None Of, Count Items Everywhere), Tracker
-  (Show Tracker, Tracker Layout, Tracker Scale, Tracker Background, Hide Tracker in Combat).
+  (Show Tracker, Tracker Layout, Tracker Grows, Tracker Scale, Tracker Background, Hide Tracker in Combat). Tracker Grows
+  offers the choice for the layout shown, its choices read each time its menu opens (form-dropdowns.md); the tracker
+  keeps both.
 
 **The shared items tab** (`next/settings/itemstab.lua`): the Categories page's Added Items tab moved into a module of
 its own so the Items tab is the same one (CLAUDE.md, "UI Consistency" 2: never a lookalike). It takes a source
@@ -197,7 +236,9 @@ row) set what their look needs.
   its menu, what you have none of, waiting for the backpack, the gold's width, right clicks, Shift-click), dropping an
   item, gains, tooltips (caps, places, the Warband), the tracker (popping out with what is tracked, its pop, landing on
   whole pixels and remembered, putting away, one at a time, design switches, layouts, scale and background, combat,
-  pet battles), themes.
+  pet battles; its faint card under the pointer; growing from its corner each way, kept on screen and where it was
+  dropped), dragging one entry with Shift (from the strip and the tracker: lifted alone, rooms, moving, removing, the
+  hint, a missed release, put back on a close, nothing on a background), themes.
 - `spec/next/settings/currencies_spec.lua` (the Tracked tab and the Items tab), `spec/next/settings/currency_spec.lua`
   ("tracking (BetterBags Next)"), `spec/config/settings_effects_spec.lua` ("BetterBags Next's currencies"),
   `spec/next/settings/content_spec.lua` (the page per design and client, every setting checked as Next's, every page
@@ -211,6 +252,16 @@ hides) and to the Items tab's Remove All untracking by each entry's own kind. Th
 (§2) was skipped whenever the count equaled the bags' count, meant for items counted in the bags alone but also true
 whenever the bank's count fell to none, so 3 used while the bank's 20 left the count read as a loss of 23. The check
 was not needed (counted in the bags alone, the total and the bags change alike) and was removed.
+
+Then (asked in game): cap bars off by default, the Shift-drag (§5a), Tracker Grows, and the tracker's faint card: 48
+mutations. Ten first survived: eight led to tests (a tracker put away taking no drop where it was, the tracker showing
+the entry again when a drag out of the strip is put back, a drop within an icon of the strip, the room at the strip's
+end and landing there, the column's room its size, the lifted entry left shown by the tracker, the release missed for
+one frame only, the tracker landing where it was let go); two were code that could not matter, removed (the room's
+check for an entry being removed: once untracked it is in no list; the card's watch skipping a held tracker: one held
+is under the pointer); one is equivalent (the room's count at a cursor exactly on an entry's middle). A test of the room
+found a bug: picked up, the room's place was worked out from the layout that still held the entry, so it could open a
+place off; it now starts at the entry's own place.
 
 **Not verified in game yet**: any of it. To check: track a few currencies and an item, earn some (gains), reach a
 weekly cap, drag the strip out and back, reload with it out, enter combat with Hide Tracker in Combat, a pet battle,

@@ -383,7 +383,8 @@ describe("NextSettingsContent", function()
         nextTitleCloud = true, nextTitleRibbon = true, nextBraid = true, nextOrnamentMotion = true,
         nextCurrencyCapBars = true, nextCurrencyGains = true, nextCurrencyHideEmpty = true,
         nextCurrencyItemsEverywhere = true, nextCurrencyTracker = true, nextCurrencyLayout = true,
-        nextCurrencyScale = true, nextCurrencyBackground = true, nextCurrencyHideInCombat = true }
+        nextCurrencyScale = true, nextCurrencyBackground = true, nextCurrencyHideInCombat = true,
+        nextCurrencyGrow = true }
       addon.hasGuildBank = true
       content:Init()
       local named = 0
@@ -409,8 +410,8 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 19, the Currencies page's 9 (currency.md §6), and each bag's 29.
-      assert.are.equal(19 + 9 + 3 * 29, named)
+      -- The general pages' 19, the Currencies page's 10 (currency.md §6), and each bag's 29.
+      assert.are.equal(19 + 10 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()

@@ -201,6 +201,7 @@ next\chain.lua
 next\ornaments.lua
 next\menubutton.lua
 next\panel.lua
+next\currencydrag.lua
 next\currencyentry.lua
 next\currencytracker.lua
 next\currencystrip.lua

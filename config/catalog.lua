@@ -825,6 +825,36 @@ currencyOption('nextCurrencyLayout', {
   write = function(value) db:SetNextCurrencyOption('layout', currencyLayouts[value]) end,
 })
 
+-- Asked: "a grow direction for the tracker ... grow direction should probably be left (anchor point is right, frame
+-- grows out left) ... for list view we need up and down as options". One choice for the layout shown: Left or Right in
+-- a row, Up or Down in a column or a list (the tracker keeps both).
+local currencyGrowth = { ["Left"] = { "growX", "left" }, ["Right"] = { "growX", "right" },
+  ["Up"] = { "growY", "up" }, ["Down"] = { "growY", "down" } }
+
+currencyOption('nextCurrencyGrow', {
+  kind = "dropdown",
+  title = 'Tracker Grows',
+  description = 'Which way the tracker grows as what it tracks gets longer: left from its right edge or right from its '
+    .. 'left edge in a row; down from its top or up from its bottom in a column or a list.',
+  keywords = { 'currency', 'tracker', 'grow', 'direction', 'anchor', 'left', 'right', 'up', 'down' },
+  itemsFunction = function()
+    if db:GetNextCurrencyOption('layout') == 'row' then
+      return { 'Left', 'Right' }
+    end
+    return { 'Up', 'Down' }
+  end,
+  get = function()
+    if db:GetNextCurrencyOption('layout') == 'row' then
+      return db:GetNextCurrencyOption('growX') == 'right' and 'Right' or 'Left'
+    end
+    return db:GetNextCurrencyOption('growY') == 'up' and 'Up' or 'Down'
+  end,
+  write = function(value)
+    local growth = currencyGrowth[value]
+    db:SetNextCurrencyOption(growth[1], growth[2])
+  end,
+})
+
 currencyOption('nextCurrencyScale', {
   option = 'scale',
   kind = "slider",

@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -33,6 +36,12 @@ local currencyEntry = addon:GetModule('NextCurrencyEntry')
 ---@class NextCurrencyTracker: AceModule
 local tracker = addon:GetModule('NextCurrencyTracker')
 
+---@class NextCurrencyDrag: AceModule
+local currencyDrag = addon:GetModule('NextCurrencyDrag')
+
+---@class NextLift: AceModule
+local lift = addon:GetModule('NextLift')
+
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
@@ -47,11 +56,12 @@ local texels = addon:GetModule('Texels')
 -- as many as fit beside the gold, the rest (and, unless told, what you have none of) behind "+N", a menu. Gains play
 -- on it as they happen. An item picked up that can be tracked makes a slot open at its end: drop it there (or
 -- anywhere on the strip) to track it. Dragged, a copy of it pops out of the backpack to stay on screen (the
--- tracker, NextCurrencyTracker), and dropped back on the backpack, that copy flies back in.
+-- tracker, NextCurrencyTracker), and dropped back on the backpack, that copy flies back in. With Shift, one entry is
+-- dragged on its own instead (NextCurrencyDrag): to another place, or off to stop tracking it.
 ---@class NextCurrencyStrip: AceModule
 local currencyStrip = addon:NewModule('NextCurrencyStrip')
 
----@class NextCurrencyStripFrame: NextCurrencyOwner
+---@class NextCurrencyStripFrame: NextCurrencyOwner, NextCurrencyContainer
 ---@field panel NextBackpack
 ---@field frame Frame
 ---@field glow Texture Lit while a tracker held over the backpack would be put away, and while the slot is hovered.
@@ -73,6 +83,8 @@ local currencyStrip = addon:NewModule('NextCurrencyStrip')
 ---@field glowKey table
 ---@field slotKey table
 ---@field tracker NextCurrencyTrackerFrame
+---@field centers number[] Each shown entry's middle along the strip, from its left (a room where one is held).
+---@field roomX? number Where the room for an entry held is, from the strip's left.
 local stripProto = {}
 addon:GetModule('Perf'):RegisterPrototype(stripProto, 'NextCurrencyStripFrame')
 
@@ -89,7 +101,7 @@ function currencyStrip:Create(panel)
   ---@type NextCurrencyStripFrame
   local s = setmetatable({
     panel = panel, frame = frame, entries = {}, order = {}, hidden = {}, slotShown = false, dirty = true,
-    laidOut = false, glowKey = {}, slotKey = {},
+    laidOut = false, glowKey = {}, slotKey = {}, centers = {},
   }, { __index = stripProto })
   s.glow = frame:CreateTexture(nil, "BACKGROUND")
   s.glow:SetAlpha(0)
@@ -156,7 +168,7 @@ function currencyStrip:Create(panel)
     GameTooltip:Hide()
   end)
 
-  addon.SetScript(frame, "OnDragStart", function(ctx) s:PopOut(ctx) end)
+  addon.SetScript(frame, "OnDragStart", function(ctx) s:DragStart(ctx) end)
   addon.SetScript(frame, "OnDragStop", function(ctx) s:DragStop(ctx) end)
   addon.SetScript(frame, "OnReceiveDrag", function(ctx) s:ReceiveItem(ctx) end)
   addon.SetScript(frame, "OnMouseUp", function(ctx, _, button)
@@ -173,6 +185,7 @@ function currencyStrip:Create(panel)
   end)
   s:Watch()
   currencyEntry:Watch()
+  currencyDrag:Register(s)
   sonataNext:RegisterWidget(s)
   s:Style()
   -- Made with the backpack, in BetterBags Next's event scope (next.md §11): it shows once something is drawn, when it
@@ -305,13 +318,24 @@ function stripProto:Layout(animate)
     height = height + pixel:Length(frame, C.Bar.Gap) + pixel:Length(frame, C.Bar.Height)
   end
   local states = currencies:States()
-  local candidates, hidden = {}, {}
+  -- An entry dragged on its own is left out (NextCurrencyDrag), a room its size where it would land.
+  local heldKey = currencyDrag:HeldKey()
+  local candidates, hidden, heldState = {}, {}, nil
   for _, state in ipairs(states) do
-    if hideEmpty and state.none then
+    if state.key == heldKey then
+      heldState = state
+    elseif hideEmpty and state.none then
       table.insert(hidden, state)
     else
       table.insert(candidates, state)
     end
+  end
+  local roomIndex = heldState and currencyDrag:RoomIn(self)
+  local roomWidth = 0
+  if roomIndex ~= nil then
+    local held = self:entryFor(heldKey)
+    held:Draw(heldState, "row", bars)
+    roomWidth = (held:Measure())
   end
   -- Each candidate's width, and what fits: "+N" (and the slot) need their room too.
   local widths = {}
@@ -333,6 +357,9 @@ function stripProto:Layout(animate)
     local w = 0
     for i = 1, k do
       w = w + widths[i] + (i > 1 and gap or 0)
+    end
+    if roomWidth > 0 then
+      w = w + (k > 0 and gap or 0) + roomWidth
     end
     return w + moreWidth(#candidates - k + #hidden) + (slot > 0 and (k > 0 and gap or 0) + slot or 0)
   end
@@ -362,7 +389,15 @@ function stripProto:Layout(animate)
     motion:BeginPass(frame, style.Time.Interaction)
   end
   local x = 0
+  local centers, roomX = {}, nil
+  if roomIndex ~= nil then
+    roomIndex = math.min(roomIndex, #order)
+  end
   for i, key in ipairs(order) do
+    if roomIndex == i - 1 then
+      roomX = x
+      x = x + roomWidth + gap
+    end
     local e = self.entries[key]
     shown[key] = true
     e:Place(widths[i], height)
@@ -372,11 +407,17 @@ function stripProto:Layout(animate)
     if appearing and animate then
       e:FadeIn()
     end
+    centers[i] = x + widths[i] / 2
     x = x + widths[i] + gap
   end
+  if roomIndex ~= nil and roomX == nil then
+    roomX = x
+    x = x + roomWidth + gap
+  end
+  self.centers, self.roomX = centers, roomX
   motion:EndPass()
   for key, e in pairs(self.entries) do
-    if not shown[key] then
+    if not shown[key] and not currencyDrag:Lifts(e.frame) then
       e.frame:Hide()
     end
   end
@@ -429,8 +470,12 @@ function stripProto:MinWidth()
   return self.hintText:GetStringWidth() + style.Theme.Currency.MoneyGap
 end
 
--- Settle ends whatever plays on the strip and forgets where its entries were: the backpack hid.
+-- Settle ends whatever plays on the strip and forgets where its entries were: the backpack hid. An entry dragged on
+-- its own out of it goes back where it was.
 function stripProto:Settle()
+  if currencyDrag:IsFrom(self) then
+    currencyDrag:Cancel(context:New('NextCurrencyStrip_Settle'))
+  end
   for _, e in pairs(self.entries) do
     e:Settle()
   end
@@ -546,6 +591,15 @@ function stripProto:ReceiveItem(ctx)
   end
 end
 
+-- DragStart pulls the tracker out of the strip; with Shift held, nothing (Shift drags one entry on its own).
+---@param ctx Context
+function stripProto:DragStart(ctx)
+  if IsShiftKeyDown() then
+    return
+  end
+  self:PopOut(ctx)
+end
+
 -- PopOut pulls the tracker out of the strip (NextCurrencyTracker:PopOut).
 ---@param ctx Context
 function stripProto:PopOut(ctx)
@@ -620,17 +674,29 @@ function stripProto:EntryClicked(ctx, e, button)
   end
 end
 
+---@param e NextCurrencyEntryFrame
+function stripProto:EntryHovered(e)
+  local _ = e
+end
+
+-- EntryDragStart pulls the tracker out of the strip, or with Shift, drags the entry on its own.
 ---@param ctx Context
 ---@param e NextCurrencyEntryFrame
 function stripProto:EntryDragStart(ctx, e)
-  local _ = e
+  if IsShiftKeyDown() then
+    currencyDrag:Start(ctx, self, e)
+    return
+  end
   self:PopOut(ctx)
 end
 
 ---@param ctx Context
 ---@param e NextCurrencyEntryFrame
 function stripProto:EntryDragStop(ctx, e)
-  local _ = e
+  if currencyDrag:Lifts(e.frame) then
+    currencyDrag:Drop(ctx)
+    return
+  end
   self:DragStop(ctx)
 end
 
@@ -643,7 +709,8 @@ end
 
 ---@param e NextCurrencyEntryFrame
 function stripProto:EntryTooltip(e)
-  local hints = { L:G("Drag it out to keep it on screen."), L:G("Right-click for options.") }
+  local hints = { L:G("Drag it out to keep it on screen."), L:G("Shift-drag to move it, or off to stop tracking it."),
+    L:G("Right-click for options.") }
   if e.state and e.state.kind == "item" then
     table.insert(hints, 1, L:G("Shift-click to find it in your bags."))
   end
@@ -653,6 +720,48 @@ end
 ---@return Frame
 function stripProto:FloatLayer()
   return self.panel.overlay
+end
+
+-- The strip as a container of an entry dragged on its own (NextCurrencyContainer): a row.
+
+---@param x number
+---@param y number
+---@return boolean
+function stripProto:IsOver(x, y)
+  local lx, ly = currencyDrag:Local(self.frame, x, y)
+  return currencyDrag:Near(self.frame, lx, ly)
+end
+
+---@param x number
+---@param y number
+---@return number
+function stripProto:IndexAt(x, y)
+  local lx = currencyDrag:Local(self.frame, x, y)
+  return lx and currencyDrag.Count(self.centers, lx) or #self.centers
+end
+
+---@return number? left, number? top, number? scale
+function stripProto:RoomPoint()
+  local at = lift:ScreenPoint(self.frame)
+  if at == nil or self.roomX == nil then
+    return nil, nil, nil
+  end
+  return at.left + self.roomX * at.scale, at.top, at.scale
+end
+
+---@return string[]
+function stripProto:Keys()
+  return self.order
+end
+
+---@param ctx Context
+function stripProto:Relayout(ctx)
+  local _ = ctx
+  if self.panel.frame:IsShown() and self.laidOut then
+    self:Layout(true)
+  else
+    self.dirty = true
+  end
 end
 
 -- MovingParts are what moves by nature (next-pixel-perfect.md): gains playing, sparkles, the glow and slot fading.

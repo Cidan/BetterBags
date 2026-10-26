@@ -58,6 +58,7 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
   { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
+  { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" },
   { "NextBag", "next/bag.lua" } }) do
   ResetModuleStub(m[1], m[2])
@@ -75,6 +76,7 @@ local lift = addon:GetModule("NextLift")
 local currencies = addon:GetModule("Currencies")
 local tracker = addon:GetModule("NextCurrencyTracker")
 local entryModule = addon:GetModule("NextCurrencyEntry")
+local currencyDrag = addon:GetModule("NextCurrencyDrag")
 local pixel = addon:GetModule("NextPixel")
 
 describe("BetterBags Next's currencies", function()
@@ -174,6 +176,8 @@ describe("BetterBags Next's currencies", function()
     tracker.instance = nil
     -- The entries' tooltips follow the Warband's amounts once a session (each test has its own messages).
     entryModule.watching = nil
+    -- Each test makes its own backpack and tracker, which register with the entry drag as they are made.
+    currencyDrag.held, currencyDrag.containers = nil, {}
     override(stubs.L, "G", function(_, key) return key end)
     override(stubs.items, "GetAllSlotInfo", function() return { [BACKPACK] = slotInfo } end)
     override(stubs.items, "ExpireRecentItems", function() return false end)
@@ -314,6 +318,7 @@ describe("BetterBags Next's currencies", function()
       currency(2, { quantity = 5 })
       currencies:Track(ctx(), "currency", 1)
       currencies:Track(ctx(), "currency", 2)
+      stubs.database:SetNextCurrencyOption("capBars", true)
       local s = strip(backpack())
       local capped, plain = s.entries["currency:1"], s.entries["currency:2"]
       assert.is_true(capped.track:IsShown())
@@ -322,12 +327,15 @@ describe("BetterBags Next's currencies", function()
       assert.is_false(plain.track:IsShown())
     end)
 
-    it("draws no bars when told", function()
+    -- Asked: cap bars off by default.
+    it("draws no bars until told, and every entry no taller than its icon then", function()
       currency(1, { quantity = 300, maxQuantity = 1200 })
       currencies:Track(ctx(), "currency", 1)
-      stubs.database:SetNextCurrencyOption("capBars", false)
       local s = strip(backpack())
-      assert.is_false(s.entries["currency:1"].track:IsShown())
+      local e = s.entries["currency:1"]
+      assert.is_false(e.track:IsShown())
+      assert.is_false(e.fill:IsShown())
+      assert.are.equal(pixel:Length(e.frame, style.Theme.Currency.Icon), e.height)
     end)
 
     it("writes a count at a cap in the capped role, and one you have none of faded", function()
@@ -532,6 +540,7 @@ describe("BetterBags Next's currencies", function()
       currency(1, { quantity = 0, maxQuantity = 100 })
       currencies:Track(ctx(), "currency", 1)
       stubs.database:SetNextCurrencyOption("hideEmpty", false)
+      stubs.database:SetNextCurrencyOption("capBars", true)
       local bag = backpack()
       local e = gained(bag, 1, 50)
       step(style.Time.Interaction / 3)
@@ -835,6 +844,210 @@ describe("BetterBags Next's currencies", function()
       assert.is_false(t.edge.Top:IsShown())
     end)
 
+    -- Reported: with no background, the faint card under the pointer stayed after the pointer left. Its entries are
+    -- buttons over the card: leaving one straight off the tracker, the card is told nothing.
+    it("fades its faint card out once the pointer leaves it, from one of its entries too, without a background",
+      function()
+        tracked()
+        backpack()
+        stubs.database:SetNextCurrencyOption("background", false)
+        stubs.database:SetNextCurrencyTracker(true, 300, 300)
+        local t = tracker.instance
+        fire("currencies/OptionsChanged")
+        finishTweens()
+        assert.are.equal(0, t.fill:GetAlpha())
+        local e = t.entries["currency:1"]
+        local s = UIParent:GetEffectiveScale()
+        local x, y = lift:Center(e.frame)
+        _G._cursorX, _G._cursorY = x * s, y * s
+        -- Onto the card, then onto an entry: the card's OnLeave fires with the pointer still over it.
+        t.frame:GetScript("OnEnter")(t.frame)
+        finishTweens()
+        assert.is_true(t.fill:GetAlpha() > 0, "faint under the pointer")
+        t.frame:GetScript("OnLeave")(t.frame)
+        e.frame:GetScript("OnEnter")(e.frame)
+        finishTweens()
+        assert.is_true(t.fill:GetAlpha() > 0, "still over it")
+        -- Straight off the entry and the tracker: only the entry's OnLeave fires.
+        _G._cursorX, _G._cursorY = 5, 5
+        e.frame:GetScript("OnLeave")(e.frame)
+        for _ = 1, 3 do
+          local update = t.watch and t.watch:GetScript("OnUpdate")
+          if update then update(t.watch, 0.016) end
+        end
+        finishTweens()
+        assert.are.equal(0, t.fill:GetAlpha(), "gone once the pointer left")
+      end)
+
+    it("stops watching the pointer when it hides under it", function()
+      tracked()
+      backpack()
+      stubs.database:SetNextCurrencyOption("background", false)
+      stubs.database:SetNextCurrencyTracker(true, 300, 300)
+      local t = tracker.instance
+      fire("currencies/OptionsChanged")
+      finishTweens()
+      t.frame:GetScript("OnEnter")(t.frame)
+      assert.is_not_nil(t.watch:GetScript("OnUpdate"))
+      t.frame:Hide()
+      t.frame:GetScript("OnHide")(t.frame)
+      assert.is_nil(t.watch:GetScript("OnUpdate"))
+      assert.is_false(t.hovered)
+    end)
+
+    it("fades its faint card in under the pointer coming straight onto one of its entries", function()
+      tracked()
+      backpack()
+      stubs.database:SetNextCurrencyOption("background", false)
+      stubs.database:SetNextCurrencyTracker(true, 300, 300)
+      local t = tracker.instance
+      fire("currencies/OptionsChanged")
+      finishTweens()
+      local e = t.entries["currency:1"]
+      e.frame:GetScript("OnEnter")(e.frame)
+      finishTweens()
+      assert.is_true(t.fill:GetAlpha() > 0)
+    end)
+
+    -- Asked: "a grow direction for the tracker ... grow direction should probably be left (anchor point is right, frame
+    -- grows out left) ... for list view we need up and down as options". Its edges on screen, in UIParent's units.
+    describe("growing", function()
+      local function edges(t)
+        local at = lift:ScreenPoint(t.frame)
+        local w, h = t.frame:GetWidth() * at.scale, t.frame:GetHeight() * at.scale
+        return { left = at.left, right = at.left + w, top = at.top, bottom = at.top - h }
+      end
+
+      local function out(shape)
+        tracked()
+        backpack()
+        stubs.database:SetNextCurrencyOption("layout", shape or "row")
+        stubs.database:SetNextCurrencyTracker(true, 900, 300)
+        local t = tracker.instance
+        t:Draw(ctx())
+        finishTweens()
+        return t
+      end
+
+      local function more()
+        currency(3, { quantity = 123456 })
+        currencies:Track(ctx(), "currency", 3)
+        finishTweens()
+      end
+
+      it("grows to the left from its right edge by default, its place that edge", function()
+        local t = out()
+        local before = edges(t)
+        -- Where it was left, on the nearest whole pixel: its right edge.
+        local half = pixel:Unit(UIParent) / 2
+        assert.is_true(math.abs(before.right - 900) <= half)
+        assert.is_true(math.abs(before.top - (UIParent:GetHeight() - 300)) <= half)
+        more()
+        local after = edges(t)
+        assert.are.equal(before.right, after.right)
+        assert.is_true(after.left < before.left, "grown to the left")
+      end)
+
+      it("grows to the right from its left edge when told", function()
+        stubs.database:SetNextCurrencyOption("growX", "right")
+        local t = out()
+        local before = edges(t)
+        assert.is_true(math.abs(before.left - 900) <= pixel:Unit(UIParent) / 2)
+        more()
+        local after = edges(t)
+        assert.are.equal(before.left, after.left)
+        assert.is_true(after.right > before.right)
+      end)
+
+      for _, shape in ipairs({ "column", "list" }) do
+        it("grows down from its top in a " .. shape .. " by default, and up from its bottom when told", function()
+          local t = out(shape)
+          local before = edges(t)
+          more()
+          local after = edges(t)
+          assert.are.equal(before.top, after.top)
+          assert.is_true(after.bottom < before.bottom, "grown down")
+          currencies:Untrack(ctx(), "currency", 3)
+          stubs.database:SetNextCurrencyOption("growY", "up")
+          fire("currencies/OptionsChanged")
+          finishTweens()
+          before = edges(t)
+          more()
+          after = edges(t)
+          assert.are.equal(before.bottom, after.bottom)
+          assert.is_true(after.top > before.top, "grown up")
+        end)
+      end
+
+      it("stays where it is when its grow direction changes, remembering its new corner", function()
+        local t = out("column")
+        local before = edges(t)
+        stubs.database:SetNextCurrencyOption("growX", "right")
+        stubs.database:SetNextCurrencyOption("growY", "up")
+        fire("currencies/OptionsChanged")
+        finishTweens()
+        local after = edges(t)
+        assert.are.same(before, after)
+        local _, x, y = stubs.database:GetNextCurrencyTracker()
+        assert.are.equal(before.left, x)
+        assert.are.equal(UIParent:GetHeight() - before.bottom, y)
+      end)
+
+      it("remembers the corner it grows from where it is dropped", function()
+        local t = out()
+        _G._mouseButtonsDown = { LeftButton = true }
+        t.frame:GetScript("OnDragStart")(t.frame)
+        finishTweens()
+        _G._cursorX, _G._cursorY = 500, 300
+        t:Update(0.01)
+        local cx, cy = lift:Cursor()
+        -- Its top left as held (at the lift's scale) is where it lands.
+        local left, top = cx - t.held.grabX * t.held.scale, cy + t.held.grabY * t.held.scale
+        release(t)
+        finishTweens()
+        local now = edges(t)
+        local unit = pixel:Unit(UIParent)
+        assert.is_true(math.abs(now.left - left) <= unit and math.abs(now.top - top) <= unit, "where it was let go")
+        local _, x, y = stubs.database:GetNextCurrencyTracker()
+        assert.are.equal(now.right, x)
+        assert.are.equal(UIParent:GetHeight() - now.top, y)
+      end)
+
+      it("keeps a row's top where it is whichever way a column would grow: up and down are a column's and a list's",
+        function()
+          stubs.database:SetNextCurrencyOption("growY", "up")
+          local t = out()
+          local before = edges(t)
+          stubs.database:SetNextCurrencyOption("capBars", true)
+          fire("currencies/OptionsChanged")
+          finishTweens()
+          local after = edges(t)
+          assert.are.equal(before.top, after.top)
+          assert.is_true(after.bottom < before.bottom, "its bars under it")
+        end)
+
+      it("first shows in the middle of the screen's top third, whichever corner it grows from", function()
+        tracked()
+        backpack()
+        stubs.database:SetNextCurrencyTracker(true)
+        local t = tracker.instance
+        t:Draw(ctx())
+        finishTweens()
+        local e = edges(t)
+        local half = pixel:Unit(UIParent)
+        assert.is_true(math.abs((e.left + e.right) / 2 - UIParent:GetWidth() / 2) <= half)
+        assert.is_true(math.abs(e.top - UIParent:GetHeight() * 2 / 3) <= half)
+      end)
+
+      it("is kept on the screen from the corner it grows from", function()
+        local t = out()
+        stubs.database:SetNextCurrencyTracker(true, 5, 300)
+        t:PlaceSaved()
+        local e = edges(t)
+        assert.are.equal(0, e.left, "its right edge no closer to the screen's left than its width")
+      end)
+    end)
+
     it("fades out in combat when told, and back after; and hides in a pet battle", function()
       tracked()
       backpack()
@@ -909,6 +1122,355 @@ describe("BetterBags Next's currencies", function()
       local e = t.entries["currency:1"]
       e.frame:GetScript("OnClick")(e.frame, "RightButton")
       assert.are.same({ "currencies > display", "currencies > display" }, opened, "the tracker's options")
+    end)
+  end)
+
+  -- Asked: "for the items in the tracker, we should be able to shift click -> drag them off the tracker individually
+  -- (this means shift click -> drag doesn't move the bar, or create the popout)" (currency.md §5a).
+  describe("dragging one entry with Shift", function()
+    -- cursorAt puts the cursor at a point in UIParent's coordinates.
+    local function cursorAt(x, y)
+      local s = UIParent:GetEffectiveScale()
+      _G._cursorX, _G._cursorY = x * s, y * s
+    end
+
+    -- shiftDrag starts dragging an entry with Shift held, the cursor on its middle.
+    local function shiftDrag(e)
+      override(_G, "IsShiftKeyDown", function() return true end)
+      cursorAt(lift:Center(e.frame))
+      e.frame:GetScript("OnDragStart")(e.frame)
+    end
+
+    -- moveTo moves the cursor and lets a frame pass.
+    local function moveTo(x, y)
+      cursorAt(x, y)
+      currencyDrag:Update(0.016)
+    end
+
+    -- letGo is the client's release, on the frame the drag started from.
+    local function letGo(e)
+      e.frame:GetScript("OnDragStop")(e.frame)
+      finishTweens()
+    end
+
+    local function keys()
+      local out = {}
+      for _, e in ipairs(currencies:Tracked()) do table.insert(out, currencies:Key(e.kind, e.id)) end
+      return out
+    end
+
+    local function three()
+      for id = 1, 3 do
+        currency(id, { quantity = 100 * id })
+        currencies:Track(ctx(), "currency", id)
+      end
+    end
+
+    -- Far from the backpack and the tracker.
+    local AWAY = { 200, 700 }
+
+    it("lifts one entry alone from the strip; no tracker comes out", function()
+      three()
+      local s = strip(backpack())
+      local e = s.entries["currency:1"]
+      shiftDrag(e)
+      assert.are.equal("currency:1", currencyDrag:HeldKey())
+      assert.are.equal(e.frame, lift.held.frame)
+      assert.are.equal(lift.layer, e.frame:GetParent())
+      assert.is_true(e.frame:IsShown())
+      finishTweens()
+      local x0 = select(4, e.frame:GetPoint(1))
+      moveTo(AWAY[1], AWAY[2])
+      assert.is_true(e.frame:IsShown(), "the strip leaves it alone")
+      assert.are_not.equal(x0, select(4, e.frame:GetPoint(1)), "it follows the cursor")
+      assert.is_false(tracker.instance.frame:IsShown(), "no tracker")
+      assert.is_nil(tracker.instance.held)
+    end)
+
+    it("keeps a room where it was while over the strip, and closes up behind it when it leaves", function()
+      three()
+      local s = strip(backpack())
+      local one, two = s.entries["currency:1"], s.entries["currency:2"]
+      local x2 = xOf(two)
+      shiftDrag(one)
+      motion:Step(1)
+      assert.are.equal(0, currencyDrag:RoomIn(s), "its own place")
+      assert.are.equal(x2, xOf(two), "the others stay")
+      assert.are.same({ "currency:2", "currency:3" }, shownKeys(s))
+      moveTo(AWAY[1], AWAY[2])
+      motion:Step(1)
+      assert.is_nil(currencyDrag:RoomIn(s))
+      assert.are.equal(0, xOf(two), "closed up")
+    end)
+
+    it("moves it where it is let go over the strip, the others making room as it goes", function()
+      three()
+      local s = strip(backpack())
+      local one, three_ = s.entries["currency:1"], s.entries["currency:3"]
+      shiftDrag(one)
+      local x, y = lift:Center(three_.frame)
+      moveTo(x + three_.width, y)
+      assert.are.equal(2, currencyDrag:RoomIn(s), "after the last")
+      motion:Step(1)
+      assert.are.equal(0, xOf(s.entries["currency:2"]), "the others moved out of its way")
+      local roomLeft = s:RoomPoint()
+      assert.is_not_nil(roomLeft, "a room at the end too")
+      letGo(one)
+      motion:Step(1)
+      assert.are.equal(roomLeft, lift:ScreenPoint(one.frame).left, "landed in its room")
+      assert.is_nil(currencyDrag:HeldKey())
+      assert.is_nil(lift.held)
+      assert.are.same({ "currency:2", "currency:3", "currency:1" }, keys())
+      assert.are.same({ "currency:2", "currency:3", "currency:1" }, shownKeys(s))
+      assert.are.equal(s.frame, one.frame:GetParent())
+      assert.is_true(one.frame:IsShown())
+    end)
+
+    it("changes nothing when let go where it was", function()
+      three()
+      local s = strip(backpack())
+      local one = s.entries["currency:1"]
+      shiftDrag(one)
+      letGo(one)
+      assert.are.same({ "currency:1", "currency:2", "currency:3" }, keys())
+      assert.are.same({ "currency:1", "currency:2", "currency:3" }, shownKeys(s))
+      assert.are.equal(0, xOf(one))
+    end)
+
+    it("stops tracking it when let go away from the strip and the tracker, in a puff", function()
+      three()
+      local s = strip(backpack())
+      local one = s.entries["currency:1"]
+      shiftDrag(one)
+      moveTo(AWAY[1], AWAY[2])
+      one.frame:GetScript("OnDragStop")(one.frame)
+      assert.are.same({ "currency:2", "currency:3" }, keys(), "at once")
+      assert.is_true(#currencyDrag.burst.alive > 0, "a puff")
+      finishTweens()
+      assert.is_nil(lift.held)
+      assert.are.equal(s.frame, one.frame:GetParent())
+      assert.is_false(one.frame:IsShown())
+      assert.are.same({ "currency:2", "currency:3" }, shownKeys(s))
+    end)
+
+    it("takes it a little outside the strip too: within an icon of it", function()
+      three()
+      local s = strip(backpack())
+      local one = s.entries["currency:1"]
+      shiftDrag(one)
+      local at = lift:ScreenPoint(s.frame)
+      local below = at.top - s.frame:GetHeight() * at.scale - style.Theme.Currency.Icon / 2
+      moveTo(at.left + 1, below)
+      assert.are.equal("Move Here", currencyDrag.hint:GetText())
+      moveTo(at.left + 1, below - style.Theme.Currency.Icon)
+      assert.are.equal("Stop Tracking", currencyDrag.hint:GetText())
+    end)
+
+    it("says what letting go does under the entry held", function()
+      three()
+      local s = strip(backpack())
+      local one = s.entries["currency:1"]
+      shiftDrag(one)
+      assert.is_true(currencyDrag.hint:IsShown())
+      assert.are.equal("Move Here", currencyDrag.hint:GetText())
+      moveTo(AWAY[1], AWAY[2])
+      assert.are.equal("Stop Tracking", currencyDrag.hint:GetText())
+      letGo(one)
+      assert.is_false(currencyDrag.hint:IsShown())
+    end)
+
+    it("lets it go when the client misses the release", function()
+      three()
+      local s = strip(backpack())
+      local one = s.entries["currency:1"]
+      shiftDrag(one)
+      moveTo(AWAY[1], AWAY[2])
+      _G._mouseButtonsDown = {}
+      currencyDrag:Update(0.016)
+      assert.is_falsy(currencyDrag.held.landing, "one frame up may be the release on its way")
+      currencyDrag:Update(0.016)
+      finishTweens()
+      assert.is_nil(currencyDrag:HeldKey())
+      assert.are.same({ "currency:2", "currency:3" }, keys())
+    end)
+
+    it("puts it back where it was when the backpack closes", function()
+      three()
+      local bag = backpack()
+      local s = strip(bag)
+      local one = s.entries["currency:1"]
+      shiftDrag(one)
+      moveTo(AWAY[1], AWAY[2])
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.is_nil(currencyDrag:HeldKey())
+      assert.is_nil(lift.held)
+      assert.are.equal(s.frame, one.frame:GetParent())
+      assert.are.same({ "currency:1", "currency:2", "currency:3" }, keys())
+    end)
+
+    it("takes nothing where a tracker put away was: it is not there", function()
+      three()
+      local bag = backpack()
+      stubs.database:SetNextCurrencyTracker(true, 900, 300)
+      local t = tracker.instance
+      t:Draw(ctx())
+      finishTweens()
+      local x, y = lift:Center(t.frame)
+      stubs.database:SetNextCurrencyTracker(false)
+      t:Draw(ctx())
+      finishTweens()
+      assert.is_false(t.frame:IsShown())
+      local one = strip(bag).entries["currency:1"]
+      shiftDrag(one)
+      moveTo(x, y)
+      assert.are.equal("Stop Tracking", currencyDrag.hint:GetText())
+    end)
+
+    it("shows it again in the tracker when the backpack closes during its drag out of the strip", function()
+      three()
+      local bag = backpack()
+      stubs.database:SetNextCurrencyTracker(true, 900, 300)
+      local t = tracker.instance
+      t:Draw(ctx())
+      finishTweens()
+      shiftDrag(strip(bag).entries["currency:2"])
+      assert.is_false(t.entries["currency:2"].frame:IsShown(), "one at a time on screen")
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.is_true(t.entries["currency:2"].frame:IsShown())
+      assert.are.same({ "currency:1", "currency:2", "currency:3" }, t.order)
+    end)
+
+    it("does not drag anything with Shift on the strip's own background: no tracker comes out", function()
+      three()
+      local s = strip(backpack())
+      override(_G, "IsShiftKeyDown", function() return true end)
+      s.frame:GetScript("OnDragStart")(s.frame)
+      assert.is_nil(lift.held)
+      assert.is_false(tracker.instance.frame:IsShown())
+    end)
+
+    it("lifts nothing while an item is on the cursor or something else is held", function()
+      three()
+      local s = strip(backpack())
+      _G._cursorType, _G._cursorItemID, _G._cursorHasItem = "item", 5, true
+      shiftDrag(s.entries["currency:1"])
+      assert.is_nil(currencyDrag:HeldKey())
+      _G._cursorType, _G._cursorItemID, _G._cursorHasItem = nil, nil, false
+      lift.held = { frame = CreateFrame("Frame") }
+      shiftDrag(s.entries["currency:1"])
+      assert.is_nil(currencyDrag:HeldKey())
+    end)
+
+    describe("from the tracker", function()
+      local function out(shape)
+        three()
+        local bag = backpack()
+        stubs.database:SetNextCurrencyOption("layout", shape or "row")
+        stubs.database:SetNextCurrencyTracker(true, 300, 300)
+        local t = tracker.instance
+        t:Draw(ctx())
+        finishTweens()
+        return t, bag
+      end
+
+      it("lifts one entry alone; the tracker stays where it is", function()
+        local t = out()
+        local point = { t.frame:GetPoint(1) }
+        local e = t.entries["currency:2"]
+        shiftDrag(e)
+        assert.are.equal(e.frame, lift.held.frame)
+        assert.is_nil(t.held, "the tracker is not picked up")
+        assert.are.same(point, { t.frame:GetPoint(1) })
+        assert.are.same({ "currency:1", "currency:3" }, t.order)
+        t:Draw(ctx())
+        assert.is_true(e.frame:IsShown(), "the tracker leaves it alone")
+      end)
+
+      it("does not move with Shift on its own background", function()
+        local t = out()
+        override(_G, "IsShiftKeyDown", function() return true end)
+        t.frame:GetScript("OnDragStart")(t.frame)
+        assert.is_nil(t.held)
+        assert.is_nil(lift.held)
+      end)
+
+      it("moves it down a column where it is let go", function()
+        local t = out("column")
+        local one, two, three_ = t.entries["currency:1"], t.entries["currency:2"], t.entries["currency:3"]
+        local function yOf(e) return select(5, e.frame:GetPoint(1)) end
+        local twoAt = yOf(two)
+        shiftDrag(one)
+        motion:Step(1)
+        assert.are.equal(0, currencyDrag:RoomIn(t))
+        assert.are.equal(twoAt, yOf(two), "its own place, its room its size: the others stay")
+        local x, y = lift:Center(three_.frame)
+        moveTo(x, y - three_.height)
+        assert.are.equal(2, currencyDrag:RoomIn(t))
+        motion:Step(1)
+        assert.is_true(yOf(two) > twoAt, "moved up into its place")
+        letGo(one)
+        assert.are.same({ "currency:2", "currency:3", "currency:1" }, keys())
+        assert.are.same({ "currency:2", "currency:3", "currency:1" }, t.order)
+        assert.are.equal(t.frame, one.frame:GetParent())
+      end)
+
+      it("stays shown while its only entry is held, and goes once that entry is let go away from it", function()
+        currency(1, { quantity = 5 })
+        currencies:Track(ctx(), "currency", 1)
+        backpack()
+        stubs.database:SetNextCurrencyTracker(true, 300, 300)
+        local t = tracker.instance
+        t:Draw(ctx())
+        finishTweens()
+        local e = t.entries["currency:1"]
+        shiftDrag(e)
+        moveTo(AWAY[1], AWAY[2])
+        finishTweens()
+        assert.is_true(t.frame:IsShown(), "to drop it back")
+        letGo(e)
+        assert.are.same({}, keys())
+        assert.is_false(t.frame:IsShown())
+      end)
+
+      it("moves it into the strip's order when let go over the strip, which hid its own while it was held", function()
+        local t, bag = out()
+        local e = t.entries["currency:3"]
+        shiftDrag(e)
+        assert.is_false(strip(bag).entries["currency:3"].frame:IsShown(), "one at a time on screen")
+        local first = strip(bag).entries["currency:1"]
+        local x, y = lift:Center(first.frame)
+        moveTo(x - 1, y)
+        assert.are.equal(0, currencyDrag:RoomIn(strip(bag)), "before the first")
+        letGo(e)
+        assert.are.same({ "currency:3", "currency:1", "currency:2" }, keys())
+        assert.are.same({ "currency:3", "currency:1", "currency:2" }, shownKeys(strip(bag)))
+        assert.are.equal(t.frame, e.frame:GetParent(), "back in its own tracker")
+      end)
+
+      it("puts it back when BetterBags Next is switched off", function()
+        local t, bag = out()
+        local e = t.entries["currency:2"]
+        shiftDrag(e)
+        moveTo(AWAY[1], AWAY[2])
+        bag:Deactivate(ctx())
+        assert.is_nil(currencyDrag:HeldKey())
+        assert.are.equal(t.frame, e.frame:GetParent())
+        assert.are.same({ "currency:1", "currency:2", "currency:3" }, keys())
+      end)
+    end)
+
+    it("says how in the entries' tooltips", function()
+      three()
+      local s = strip(backpack())
+      local e = s.entries["currency:1"]
+      e.frame:GetScript("OnEnter")(e.frame)
+      local found = false
+      for _, line in ipairs(GameTooltip.lines) do
+        if line.text == "Shift-drag to move it, or off to stop tracking it." then found = true end
+      end
+      assert.is_true(found)
     end)
   end)
 

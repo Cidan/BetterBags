@@ -517,7 +517,7 @@ function content:Init()
           { setting = 'nextCurrencyGains' }, { setting = 'nextCurrencyHideEmpty' },
           { setting = 'nextCurrencyItemsEverywhere' } } },
         { title = L:G("Tracker"), rows = { { setting = 'nextCurrencyTracker' }, { setting = 'nextCurrencyLayout' },
-          { setting = 'nextCurrencyScale' }, { setting = 'nextCurrencyBackground' },
+          { setting = 'nextCurrencyGrow' }, { setting = 'nextCurrencyScale' }, { setting = 'nextCurrencyBackground' },
           { setting = 'nextCurrencyHideInCombat' } } },
       } },
     },

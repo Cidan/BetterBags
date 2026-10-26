@@ -39,6 +39,9 @@ local nextDrag = addon:GetModule('NextDrag')
 ---@class NextSparkles: AceModule
 local sparkles = addon:GetModule('NextSparkles')
 
+---@class NextCurrencyDrag: AceModule
+local currencyDrag = addon:GetModule('NextCurrencyDrag')
+
 ---@class NextFrameArt: AceModule
 local frameArt = addon:GetModule('NextFrameArt')
 
@@ -70,7 +73,7 @@ local tracker = addon:NewModule('NextCurrencyTracker')
 -- Drag.LiftScale), as a share of that size.
 tracker.POP = 0.12
 
----@class NextCurrencyTrackerFrame: NextCurrencyOwner
+---@class NextCurrencyTrackerFrame: NextCurrencyOwner, NextCurrencyContainer
 ---@field frame Frame
 ---@field fill Texture
 ---@field edge NextEdge
@@ -89,6 +92,11 @@ tracker.POP = 0.12
 ---@field hovered boolean
 ---@field alphaKey table
 ---@field fillKey table
+---@field watch Frame Its OnUpdate watches the pointer while it is over the tracker.
+---@field heldState? NextCurrencyState What an entry dragged on its own (NextCurrencyDrag) reads, while one is.
+---@field centers number[] Each shown entry's middle along its layout (x in a row, y down otherwise), from the top left.
+---@field roomX? number Where the room for an entry held is.
+---@field roomY? number
 local trackerProto = {}
 addon:GetModule('Perf'):RegisterPrototype(trackerProto, 'NextCurrencyTrackerFrame')
 
@@ -115,7 +123,7 @@ function tracker:Create(strip)
   ---@type NextCurrencyTrackerFrame
   local t = setmetatable({
     frame = frame, entries = {}, order = {}, strip = strip, active = true, combat = false, petBattle = false,
-    hovered = false, alphaKey = {}, fillKey = {},
+    hovered = false, alphaKey = {}, fillKey = {}, centers = {},
   }, { __index = trackerProto })
   t.fill = frame:CreateTexture(nil, "BACKGROUND")
   t.fill:SetAllPoints(frame)
@@ -133,7 +141,9 @@ function tracker:Create(strip)
   })
   t.hint = lift:Layer():CreateFontString(nil, "OVERLAY")
   t.hint:Hide()
-  addon.SetScript(frame, "OnDragStart", function() t:PickUp() end)
+  -- Watches the pointer while it is over the tracker (SetHovered).
+  t.watch = CreateFrame("Frame", nil, frame)
+  addon.SetScript(frame, "OnDragStart", function() t:DragStart() end)
   addon.SetScript(frame, "OnDragStop", function(ctx) t:Drop(ctx) end)
   addon.SetScript(frame, "OnMouseUp", function(_, _, button)
     if button == "RightButton" then
@@ -151,8 +161,12 @@ function tracker:Create(strip)
       e:Settle()
     end
     motion:Forget(t.frame)
+    if t.hovered then
+      t:SetHovered(false)
+    end
   end)
   self.instance = t
+  currencyDrag:Register(t)
   sonataNext:RegisterWidget(t)
   t:Watch()
   t:Style()
@@ -173,6 +187,7 @@ function trackerProto:Watch()
     self:Draw(ctx)
   end)
   events:RegisterMessage('currencies/OptionsChanged', function(ctx)
+    self:Reanchor()
     self:Style()
     self:Draw(ctx)
     self:UpdateShown(ctx)
@@ -255,10 +270,17 @@ function trackerProto:ApplyStyle(ctx)
   self:Draw(ctx)
 end
 
--- SetHovered shows the fill faintly while the pointer is over a tracker without a background.
+-- SetHovered shows the fill faintly while the pointer is over a tracker without a background. While it is, the
+-- pointer is watched every frame and the fill fades once it is off the tracker: its entries are buttons over the card,
+-- so leaving one straight off the tracker, the card is told nothing (reported: the fill stayed).
 ---@param on boolean
 function trackerProto:SetHovered(on)
   self.hovered = on
+  self.watch:SetScript("OnUpdate", on and function()
+    if not self.frame:IsMouseOver() then
+      self:SetHovered(false)
+    end
+  end or nil)
   if database:GetNextCurrencyOption("background") then
     return
   end
@@ -291,8 +313,14 @@ function trackerProto:Draw(ctx, gains)
   local layout = self:Layout()
   local order = {}
   local shown = {}
+  -- An entry dragged on its own is left out (NextCurrencyDrag), a room its size where it would land.
+  local heldKey = currencyDrag:HeldKey()
+  self.heldState = nil
   for _, state in ipairs(currencies:States()) do
-    if not (hideEmpty and state.none) then
+    if state.key == heldKey then
+      self.heldState = state
+      self:entryFor(state.key):Draw(state, layout, bars)
+    elseif not (hideEmpty and state.none) then
       local e = self:entryFor(state.key)
       e:Draw(state, layout, bars)
       table.insert(order, state.key)
@@ -300,7 +328,7 @@ function trackerProto:Draw(ctx, gains)
     end
   end
   for key, e in pairs(self.entries) do
-    if not shown[key] then
+    if not shown[key] and not currencyDrag:Lifts(e.frame) then
       e.frame:Hide()
     end
   end
@@ -339,12 +367,36 @@ function trackerProto:LayOut()
     sizes[i] = { w, h }
     widest = math.max(widest, w)
   end
+  -- The room for an entry dragged on its own (NextCurrencyDrag), its size, after roomIndex of the others.
+  local roomIndex = self.heldState and currencyDrag:RoomIn(self)
+  local roomW, roomH = 0, 0
+  if roomIndex ~= nil then
+    roomIndex = math.min(roomIndex, #self.order)
+    roomW, roomH = self.entries[self.heldState.key]:Measure(layout == "list" and T.ListWidth or nil)
+    widest = math.max(widest, roomW)
+  end
   local visible = frame:IsVisible()
   if visible then
     motion:BeginPass(frame, style.Time.Interaction)
   end
   local x, y, width, height = pad, pad, 0, 0
+  local centers, roomX, roomY = {}, nil, nil
+  -- room steps past the room before the n-th entry (or at the end), its size counted as an entry's.
+  local function room(n)
+    if roomIndex ~= n then
+      return
+    end
+    roomX, roomY = x, y
+    if layout == "row" then
+      x = x + roomW + gap
+      width, height = x - gap + pad, math.max(height, roomH)
+    else
+      y = y + roomH + gap
+      width, height = pad + widest + pad, y - gap - pad
+    end
+  end
   for i, key in ipairs(self.order) do
+    room(i - 1)
     local e = self.entries[key]
     local w, h = sizes[i][1], sizes[i][2]
     if layout ~= "row" then
@@ -354,13 +406,19 @@ function trackerProto:LayOut()
     motion:Place(e.frame, frame, x, -y)
     e.frame:Show()
     if layout == "row" then
+      centers[i] = x - pad + w / 2
       x = x + w + gap
       width, height = x - gap + pad, math.max(height, h)
     else
+      centers[i] = y - pad + h / 2
       y = y + h + gap
       width, height = pad + w + pad, y - gap - pad
     end
   end
+  if roomX == nil then
+    room(#self.order)
+  end
+  self.centers, self.roomX, self.roomY = centers, roomX, roomY
   if visible then
     motion:EndPass()
   end
@@ -376,7 +434,8 @@ function trackerProto:UpdateShown(ctx)
   if self.held ~= nil then
     return
   end
-  local show = self.active and self:IsOut() and #self.order > 0 and not self.petBattle
+  -- An entry of its own dragged on its own keeps it shown, to drop it back.
+  local show = self.active and self:IsOut() and (#self.order > 0 or currencyDrag:IsFrom(self)) and not self.petBattle
     and not (self.combat and database:GetNextCurrencyOption("hideInCombat"))
   local frame = self.frame
   if show then
@@ -420,6 +479,9 @@ end
 function trackerProto:SetActive(ctx, on)
   self.active = on
   if not on then
+    if currencyDrag:IsFrom(self) then
+      currencyDrag:Cancel(ctx)
+    end
     self:Cancel()
     tween:Stop(self.alphaKey)
     self.frame:Hide()
@@ -428,15 +490,48 @@ function trackerProto:SetActive(ctx, on)
   self:Draw(ctx)
 end
 
--- clamp keeps a top left (UIParent's units, x from the left and y down from the top) for a tracker w x h on screen.
+-- Corner is the corner the tracker grows from (the Display tab's Tracker Grows; asked: "grow direction should probably
+-- be left (anchor point is right, frame grows out left) ... for list view we need up and down as options"): its right
+-- edge growing left, or its left growing right; in a column or a list, its top growing down, or its bottom growing up
+-- (a row's height does not grow: its top). Its point, and whether that is its right and its bottom.
+---@return FramePoint point, boolean right, boolean bottom
+function trackerProto:Corner()
+  local right = database:GetNextCurrencyOption("growX") ~= "right"
+  local bottom = self:Layout() ~= "row" and database:GetNextCurrencyOption("growY") == "up"
+  return (bottom and "BOTTOM" or "TOP") .. (right and "RIGHT" or "LEFT"), right, bottom
+end
+
+-- span is how big the tracker is on screen at a scale (UIParent's units).
+---@private
+---@param s number
+---@return number width, number height
+function trackerProto:span(s)
+  return self.frame:GetWidth() * s, self.frame:GetHeight() * s
+end
+
+-- cornerOf turns a top left (UIParent's units, x from the left, y down from the top) into the corner the tracker grows
+-- from, at a scale.
+---@param left number
+---@param top number
+---@param s number
+---@return number x, number y
+function trackerProto:cornerOf(left, top, s)
+  local _, right, bottom = self:Corner()
+  local w, h = self:span(s)
+  return left + (right and w or 0), top + (bottom and h or 0)
+end
+
+-- clamp keeps the corner the tracker grows from (as cornerOf) where the whole tracker is on screen.
 ---@param x number
 ---@param y number
 ---@return number x, number y
 function trackerProto:clamp(x, y)
-  local s = self:Scale()
-  local w, h = self.frame:GetWidth() * s, self.frame:GetHeight() * s
-  local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
-  return math.max(0, math.min(x, sw - w)), math.max(0, math.min(y, sh - h))
+  local _, right, bottom = self:Corner()
+  local w, h = self:span(self:Scale())
+  local left, top = x - (right and w or 0), y - (bottom and h or 0)
+  left = math.max(0, math.min(left, UIParent:GetWidth() - w))
+  top = math.max(0, math.min(top, UIParent:GetHeight() - h))
+  return left + (right and w or 0), top + (bottom and h or 0)
 end
 
 -- PlaceSaved puts the tracker where it was left, on the screen and on whole pixels (the middle of the screen's top
@@ -445,14 +540,14 @@ function trackerProto:PlaceSaved()
   local _, x, y = database:GetNextCurrencyTracker()
   if x == nil then
     local s = self:Scale()
-    x = (UIParent:GetWidth() - self.frame:GetWidth() * s) / 2
-    y = UIParent:GetHeight() / 3
+    local w = self:span(s)
+    x, y = self:cornerOf((UIParent:GetWidth() - w) / 2, UIParent:GetHeight() / 3, s)
   end
   self:PlaceAt(x, y)
 end
 
--- PlaceAt puts the tracker's top left at x, y (UIParent's units, y down from the top), kept on screen, on whole pixels
--- of its own grid.
+-- PlaceAt puts the corner the tracker grows from at x, y (UIParent's units from the screen's top left), kept on
+-- screen, on whole pixels of its own grid: it grows from there.
 ---@param x number
 ---@param y number
 function trackerProto:PlaceAt(x, y)
@@ -461,18 +556,22 @@ function trackerProto:PlaceAt(x, y)
   x, y = self:clamp(x, y)
   frame:SetScale(s)
   frame:ClearAllPoints()
-  pixel:Point(frame, "TOPLEFT", UIParent, "TOPLEFT", x / s, -y / s)
+  pixel:Point(frame, (self:Corner()), UIParent, "TOPLEFT", x / s, -y / s)
 end
 
--- where returns the tracker's top left as it is on screen (UIParent's units, y down from the top).
----@private
----@return number? x, number? y
-function trackerProto:where()
+-- Reanchor keeps the tracker where it is on screen, now growing from the corner its options name (they changed:
+-- which way it grows, its layout, its scale), and remembers that corner.
+function trackerProto:Reanchor()
+  if self.held ~= nil or not self:IsOut() or not self.frame:IsShown() then
+    return
+  end
   local at = lift:ScreenPoint(self.frame)
   if at == nil then
-    return nil, nil
+    return
   end
-  return at.left, UIParent:GetHeight() - at.top
+  local x, y = self:cornerOf(at.left, UIParent:GetHeight() - at.top, at.scale)
+  database:SetNextCurrencyTracker(true, x, y)
+  self:PlaceAt(x, y)
 end
 
 -- CanPick says whether the tracker can be picked up now: nothing else is held or dragged.
@@ -645,8 +744,11 @@ function trackerProto:Drop(ctx)
   local s = self:Scale()
   local cx, cy = lift:Cursor()
   local left, top = cx - held.grabX * held.scale, cy + held.grabY * held.scale
-  local x, y = self:clamp(left, UIParent:GetHeight() - top)
-  -- On whole pixels of its own grid where it comes to rest.
+  -- Its top left, kept on the screen and on whole pixels of its own grid where it comes to rest.
+  local x, y = self:clamp(self:cornerOf(left, UIParent:GetHeight() - top, s))
+  local _, right, bottom = self:Corner()
+  local w, h = self:span(s)
+  x, y = x - (right and w or 0), y - (bottom and h or 0)
   local unit = pixel:UnitAt(UIParent:GetEffectiveScale() * s) * s
   x, y = pixel:SnapIn(unit, x), pixel:SnapIn(unit, y)
   self.frame:SetAlpha(1)
@@ -654,8 +756,10 @@ function trackerProto:Drop(ctx)
     lift:Put(held, UIParent)
     self.frame:SetFrameStrata("MEDIUM")
     self.held = nil
-    database:SetNextCurrencyTracker(true, x, y)
-    self:PlaceAt(x, y)
+    -- Remembered by the corner it grows from.
+    local px, py = self:cornerOf(x, y, s)
+    database:SetNextCurrencyTracker(true, px, py)
+    self:PlaceAt(px, py)
     self:UpdateShown(ctx)
   end)
 end
@@ -753,17 +857,39 @@ function trackerProto:EntryClicked(ctx, e, button)
   end
 end
 
+-- DragStart picks the tracker up; with Shift held, nothing (Shift drags one entry on its own).
+function trackerProto:DragStart()
+  if IsShiftKeyDown() then
+    return
+  end
+  self:PickUp()
+end
+
+-- EntryHovered fades the faint card in: the pointer came onto one of its entries (maybe straight from outside).
+---@param e NextCurrencyEntryFrame
+function trackerProto:EntryHovered(e)
+  local _ = e
+  self:SetHovered(true)
+end
+
+-- EntryDragStart picks the tracker up, or with Shift, drags the entry on its own.
 ---@param ctx Context
 ---@param e NextCurrencyEntryFrame
 function trackerProto:EntryDragStart(ctx, e)
-  local _, _ = ctx, e
+  if IsShiftKeyDown() then
+    currencyDrag:Start(ctx, self, e)
+    return
+  end
   self:PickUp()
 end
 
 ---@param ctx Context
 ---@param e NextCurrencyEntryFrame
 function trackerProto:EntryDragStop(ctx, e)
-  local _ = e
+  if currencyDrag:Lifts(e.frame) then
+    currencyDrag:Drop(ctx)
+    return
+  end
   self:Drop(ctx)
 end
 
@@ -778,12 +904,54 @@ end
 
 ---@param e NextCurrencyEntryFrame
 function trackerProto:EntryTooltip(e)
-  currencyEntry:Tooltip(e, { L:G("Drag it onto your backpack to put it away."), L:G("Right-click for options.") })
+  currencyEntry:Tooltip(e, { L:G("Drag it onto your backpack to put it away."),
+    L:G("Shift-drag to move it, or off to stop tracking it."), L:G("Right-click for options.") })
 end
 
 ---@return Frame
 function trackerProto:FloatLayer()
   return self.floats
+end
+
+-- The tracker as a container of an entry dragged on its own (NextCurrencyContainer): a row, or a column.
+
+---@param x number
+---@param y number
+---@return boolean
+function trackerProto:IsOver(x, y)
+  local lx, ly = currencyDrag:Local(self.frame, x, y)
+  return currencyDrag:Near(self.frame, lx, ly)
+end
+
+---@param x number
+---@param y number
+---@return number
+function trackerProto:IndexAt(x, y)
+  local lx, ly = currencyDrag:Local(self.frame, x, y)
+  if lx == nil then
+    return #self.centers
+  end
+  local pad = pixel:Length(self.frame, style.Theme.Currency.Tracker.Pad)
+  return currencyDrag.Count(self.centers, (self:Layout() == "row" and lx or ly) - pad)
+end
+
+---@return number? left, number? top, number? scale
+function trackerProto:RoomPoint()
+  local at = lift:ScreenPoint(self.frame)
+  if at == nil or self.roomX == nil then
+    return nil, nil, nil
+  end
+  return at.left + self.roomX * at.scale, at.top - self.roomY * at.scale, at.scale
+end
+
+---@return string[]
+function trackerProto:Keys()
+  return self.order
+end
+
+---@param ctx Context
+function trackerProto:Relayout(ctx)
+  self:Draw(ctx)
 end
 
 -- MovingParts are what moves by nature (next-pixel-perfect.md): gains playing, sparkles.

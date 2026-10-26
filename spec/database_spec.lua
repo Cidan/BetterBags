@@ -104,8 +104,8 @@ const.DATABASE_DEFAULTS = {
     nextTheme = "Default",
     nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, ribbon = true, braid = true, ornaments = true },
     nextCurrencies = {},
-    nextCurrency = { capBars = true, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
-      scale = 100, background = true, hideInCombat = false },
+    nextCurrency = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
+      scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" },
     nextCurrencyTracker = { out = false },
     showBagButton = true,
     enableBankBag = true,
@@ -457,13 +457,15 @@ describe("Database", function()
         assert.has_error(function() DB:SetNextCurrencies({ { kind = "item" } }) end)
       end)
 
-      it("shows cap bars and gains, hides what you have none of, and counts items everywhere until told",
-        function()
-          for _, name in ipairs({ "capBars", "gains", "hideEmpty", "itemsEverywhere", "background" }) do
+      it("shows gains, hides what you have none of, and counts items everywhere until told; no cap bars", function()
+          for _, name in ipairs({ "gains", "hideEmpty", "itemsEverywhere", "background" }) do
             assert.is_true(DB:GetNextCurrencyOption(name), name)
             DB:SetNextCurrencyOption(name, false)
             assert.is_false(DB:GetNextCurrencyOption(name), name)
           end
+          assert.is_false(DB:GetNextCurrencyOption("capBars"))
+          DB:SetNextCurrencyOption("capBars", true)
+          assert.is_true(DB:GetNextCurrencyOption("capBars"))
           assert.is_false(DB:GetNextCurrencyOption("hideInCombat"))
           assert.are.equal("row", DB:GetNextCurrencyOption("layout"))
           assert.are.equal(100, DB:GetNextCurrencyOption("scale"))
@@ -472,6 +474,14 @@ describe("Database", function()
           assert.has_error(function() DB:GetNextCurrencyOption("sparkles") end)
           assert.has_error(function() DB:SetNextCurrencyOption("sparkles", true) end)
           assert.has_error(function() DB:SetNextCurrencyOption("layout", "grid") end)
+          assert.are.equal("left", DB:GetNextCurrencyOption("growX"))
+          assert.are.equal("down", DB:GetNextCurrencyOption("growY"))
+          DB:SetNextCurrencyOption("growX", "right")
+          DB:SetNextCurrencyOption("growY", "up")
+          assert.are.equal("right", DB:GetNextCurrencyOption("growX"))
+          assert.are.equal("up", DB:GetNextCurrencyOption("growY"))
+          assert.has_error(function() DB:SetNextCurrencyOption("growX", "up") end)
+          assert.has_error(function() DB:SetNextCurrencyOption("growY", "left") end)
         end)
 
       it("keeps whether the tracker is out and where it was left", function()

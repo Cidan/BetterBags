@@ -38,6 +38,7 @@ local currencyEntry = addon:NewModule('NextCurrencyEntry')
 ---@field EntryDragStart fun(self: any, ctx: Context, entry: NextCurrencyEntryFrame)
 ---@field EntryDragStop fun(self: any, ctx: Context, entry: NextCurrencyEntryFrame)
 ---@field EntryReceiveDrag fun(self: any, ctx: Context, entry: NextCurrencyEntryFrame)
+---@field EntryHovered fun(self: any, entry: NextCurrencyEntryFrame) The pointer came onto it.
 ---@field EntryTooltip fun(self: any, entry: NextCurrencyEntryFrame)
 ---@field FloatLayer fun(self: any): Frame Where gains rise: over whatever is around the entry.
 
@@ -101,6 +102,7 @@ function currencyEntry:Create(parent, owner)
   e.name:SetWordWrap(false)
   e.name:Hide()
   addon.SetScript(frame, "OnEnter", function()
+    owner:EntryHovered(e)
     owner:EntryTooltip(e)
   end)
   addon.SetScript(frame, "OnLeave", function()

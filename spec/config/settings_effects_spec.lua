@@ -276,8 +276,8 @@ describe("What each setting asks the bags for", function()
     local options, tracker
 
     before_each(function()
-      options = { capBars = true, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row", scale = 100,
-        background = true, hideInCombat = false }
+      options = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row", scale = 100,
+        background = true, hideInCombat = false, growX = "left", growY = "down" }
       tracker = { out = false }
       override(db, "GetNextCurrencyOption", function(_, name) return options[name] end)
       override(db, "SetNextCurrencyOption", function(_, name, value) options[name] = value end)
@@ -312,6 +312,29 @@ describe("What each setting asks the bags for", function()
       assert.are.equal("list", options.layout)
       assert.are.equal("List", found[1].get(ctx()))
       assert.are.same({ "currencies/OptionsChanged" }, messages())
+    end)
+
+    -- Asked: a grow direction for the tracker, left by default; up and down for a list.
+    it("saves which way the tracker grows: left or right in a row, up or down in a column or a list", function()
+      local found = settings("Tracker Grows")
+      assert.are.equal(1, #found)
+      local grow = found[1]
+      assert.are.equal("dropdown", grow.kind)
+      assert.are.same({ "Left", "Right" }, grow.itemsFunction())
+      assert.are.equal("Left", grow.get(ctx()))
+      grow.set(ctx(), "Right")
+      assert.are.equal("right", options.growX)
+      assert.are.equal("Right", grow.get(ctx()))
+      assert.are.same({ "currencies/OptionsChanged" }, messages())
+      for _, layout in ipairs({ "column", "list" }) do
+        options.layout = layout
+        assert.are.same({ "Up", "Down" }, grow.itemsFunction())
+        assert.are.equal(options.growY == "up" and "Up" or "Down", grow.get(ctx()))
+      end
+      grow.set(ctx(), "Up")
+      assert.are.equal("up", options.growY)
+      assert.are.equal("Up", grow.get(ctx()))
+      assert.are.equal("right", options.growX, "the other way kept")
     end)
 
     it("saves the tracker's scale, 50% to 200% in steps of 5", function()

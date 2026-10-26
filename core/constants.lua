@@ -750,8 +750,8 @@ const.DATABASE_DEFAULTS = {
     -- or an item); how the strip at the bottom of the backpack and the tracker dragged out of it show (these are the
     -- only names there are); whether the tracker is out, and where it was left (its top left in UIParent's units).
     nextCurrencies = {},
-    nextCurrency = { capBars = true, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
-      scale = 100, background = true, hideInCombat = false },
+    nextCurrency = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
+      scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" },
     nextCurrencyTracker = { out = false },
     showBagButton = true,
     enableBankBag = true,

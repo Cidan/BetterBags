@@ -165,6 +165,25 @@ describe("Constants Module Offsets", function()
     assert.are.equal(100, const.DATABASE_DEFAULTS.profile.nextBagScale)
   end)
 
+  -- BetterBags Next's currencies (currency.md §6). Asked: cap bars off by default.
+  it("shows BetterBags Next's currencies without cap bars, with gains, until told", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    local options = const.DATABASE_DEFAULTS.profile.nextCurrency
+    assert.is_false(options.capBars)
+    assert.is_true(options.gains)
+    assert.is_true(options.hideEmpty)
+    assert.is_true(options.itemsEverywhere)
+    assert.are.equal("row", options.layout)
+    assert.are.equal(100, options.scale)
+    assert.is_true(options.background)
+    assert.is_false(options.hideInCombat)
+    -- Asked: the tracker grows left from its right edge ("most people tend to be right handed"); in a column or a
+    -- list, down from its top.
+    assert.are.equal("left", options.growX)
+    assert.are.equal("down", options.growY)
+  end)
+
   it("leaves animating item movement off by default", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")

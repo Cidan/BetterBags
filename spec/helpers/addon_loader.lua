@@ -139,8 +139,8 @@ end
 ---@param override fun(tbl: table, key: string, value: any)
 _G.UseNextCurrencies = function(database, override)
   local tracked, tracker = {}, { out = false }
-  local options = { capBars = true, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
-    scale = 100, background = true, hideInCombat = false }
+  local options = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
+    scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" }
   override(database, "GetNextCurrencies", function()
     local out = {}
     for _, e in ipairs(tracked) do table.insert(out, { kind = e.kind, id = e.id }) end
