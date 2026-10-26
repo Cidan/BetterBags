@@ -1,0 +1,23 @@
+{
+  "id": 1792975004,
+  "version": "v0.8.4-3-gb55bf89",
+  "channel": "alpha",
+  "date": "2026-10-26",
+  "from": "a36e75137034d9b4be90b8d68ea8a5ebb2686941",
+  "to": "b55bf899a7e88799bef475454c13f44d552fe5f0",
+  "headline": "BetterBags Next adds currency and item tracking in the backpack, a draggable floating tracker, and new currency settings.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Currency strip and floating tracker in Next",
+      "details": "BetterBags Next now tracks currencies and stacking items in the backpack footer, complete with gain animations and cap indicators. Drag the strip out to create a floating on-screen tracker that stays visible with bags closed, Shift-drag items to reorder or untrack them, or drop stacking items directly onto the strip. A new Currencies settings section lets you customize layout, grow direction, scale, and visibility.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Click currency rows to toggle tracking",
+      "details": "In the currency settings, clicking anywhere on a currency row now flips its switch on or off instead of requiring a click directly on the toggle.",
+      "clients": []
+    }
+  ]
+}
