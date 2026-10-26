@@ -8,14 +8,16 @@ LoadBetterBagsModule("core/context.lua")
 local L = StubBetterBagsModule("Localization")
 L.G = L.G or function(_, key) return key end
 local events = StubBetterBagsModule("Events")
+local db = StubBetterBagsModule("Database")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextToggle", "next/controls/toggle.lua" },
-  { "NextSettingsCurrency", "next/settings/currency.lua" } }) do
+  { "Currencies", "data/currencies.lua" }, { "NextSettingsCurrency", "next/settings/currency.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
 
 local currency = addon:GetModule("NextSettingsCurrency")
+local currencies = addon:GetModule("Currencies")
 local context = addon:GetModule("Context")
 local style = addon:GetModule("NextStyle")
 
@@ -142,6 +144,20 @@ describe("NextSettingsCurrency", function()
     assert.is_true(rowNamed(block, "Honor").toggle:GetChecked())
   end)
 
+  -- Asked: "clicking on any currency on the currency list in the settings menu should toggle it, not just by pressing
+  -- the switch".
+  it("flips a currency's switch with a click anywhere on its row, as the switch does; a heading takes none", function()
+    modern()
+    local block = currency:Create(CreateFrame("Frame"))
+    block:Refresh(ctx())
+    local honor = rowNamed(block, "Honor")
+    honor.frame:GetScript("OnClick")(honor.frame, "LeftButton")
+    assert.are.same({ "SetCurrencyBackpack", 4, true }, calls[#calls])
+    assert.is_true(honor.toggle:GetChecked())
+    assert.is_nil(rowNamed(block, "Dungeon and Raid").frame:GetScript("OnClick"))
+    assert.is_false(rowNamed(block, "Dungeon and Raid").frame:IsMouseEnabled())
+  end)
+
   it("uses the legacy globals where there is no C_CurrencyInfo (Mists Classic)", function()
     override(_G, "C_CurrencyInfo", nil)
     override(_G, "GetCurrencyListSize", function() return #visible() end)
@@ -179,5 +195,95 @@ describe("NextSettingsCurrency", function()
     block:Refresh(ctx())
     assert.are.same({}, names(block))
     assert.is_true(block.empty:IsShown())
+  end)
+
+  -- BetterBags Next's Currencies tab (currency.md §6): the same block, its switches tracking currencies in BetterBags'
+  -- own list, by ID; Blizzard's list read as the player keeps it (Currencies:List), on the shared list mock.
+  describe("tracking (BetterBags Next)", function()
+    local handlers, backpackFlags
+
+    before_each(function()
+      ResetMockCurrencies()
+      UseNextCurrencies(db, override)
+      handlers, backpackFlags = {}, {}
+      override(events, "RegisterMessage", function(_, message, fn) handlers[message] = fn end)
+      override(C_CurrencyInfo, "SetCurrencyBackpack", function(i, on) table.insert(backpackFlags, { i, on }) end)
+      _G._currencies[1] = { name = "Valor", currencyID = 1, quantity = 1234, maxQuantity = 3000, iconFileID = 101 }
+      _G._currencies[2] = { name = "Honor", currencyID = 2, quantity = 50, iconFileID = 102 }
+      _G._currencyList = {
+        { name = "Dungeon and Raid", isHeader = true, isHeaderExpanded = true, children = { { currencyID = 1 } } },
+        { name = "Player vs. Player", isHeader = true, isHeaderExpanded = false, children = { { currencyID = 2 } } },
+      }
+    end)
+
+    local function tracked()
+      local out = {}
+      for _, e in ipairs(currencies:Tracked()) do table.insert(out, e.kind .. ":" .. e.id) end
+      return out
+    end
+
+    it("lists every currency, leaving the headings the player keeps collapsed as they were", function()
+      local block = currency:Create(CreateFrame("Frame"), { track = true })
+      block:Refresh(ctx())
+      assert.are.same({ "# Dungeon and Raid", "Valor", "# Player vs. Player", "Honor" }, names(block))
+      assert.is_false(_G._currencyList[2].isHeaderExpanded, "closed again")
+    end)
+
+    it("tracks a currency with its switch, by its ID, and stops tracking it, never touching Blizzard's flag", function()
+      local block = currency:Create(CreateFrame("Frame"), { track = true })
+      block:Refresh(ctx())
+      local honor = rowNamed(block, "Honor")
+      assert.is_false(honor.toggle:GetChecked())
+      honor.toggle.frame:GetScript("OnClick")(honor.toggle.frame, "LeftButton")
+      assert.are.same({ "currency:2" }, tracked())
+      assert.are.same("currencies/Changed", sent[1])
+      honor.toggle.frame:GetScript("OnClick")(honor.toggle.frame, "LeftButton")
+      assert.are.same({}, tracked())
+      assert.are.same({}, backpackFlags)
+      assert.are.same({}, timers, "nothing to wait for")
+    end)
+
+    it("tracks a currency with a click anywhere on its row, and stops with another", function()
+      local block = currency:Create(CreateFrame("Frame"), { track = true })
+      block:Refresh(ctx())
+      local honor = rowNamed(block, "Honor")
+      honor.frame:GetScript("OnClick")(honor.frame, "LeftButton")
+      assert.are.same({ "currency:2" }, tracked())
+      assert.is_true(honor.toggle:GetChecked())
+      honor.frame:GetScript("OnClick")(honor.frame, "LeftButton")
+      assert.are.same({}, tracked())
+      assert.is_false(honor.toggle:GetChecked())
+    end)
+
+    it("shows a currency tracked already with its switch on", function()
+      currencies:Track(ctx(), "currency", 1)
+      local block = currency:Create(CreateFrame("Frame"), { track = true })
+      block:Refresh(ctx())
+      assert.is_true(rowNamed(block, "Valor").toggle:GetChecked())
+      assert.is_false(rowNamed(block, "Honor").toggle:GetChecked())
+    end)
+
+    it("follows what is tracked elsewhere while it shows", function()
+      local block = currency:Create(CreateFrame("Frame", nil, UIParent), { track = true })
+      block:Refresh(ctx())
+      block.frame:Show()
+      currencies:Track(ctx(), "currency", 2)
+      handlers["currencies/Changed"](ctx())
+      assert.is_true(rowNamed(block, "Honor").toggle:GetChecked())
+      block.frame:Hide()
+      currencies:Untrack(ctx(), "currency", 2)
+      handlers["currencies/Changed"](ctx())
+      assert.is_true(rowNamed(block, "Honor").toggle:GetChecked(), "not while hidden: it is read again when shown")
+    end)
+
+    it("keeps the classic bags' switches on Blizzard's flag", function()
+      local block = currency:Create(CreateFrame("Frame"))
+      block:Refresh(ctx())
+      assert.is_nil(handlers["currencies/Changed"], "nothing tracked to follow")
+      local honor = rowNamed(block, "Honor")
+      honor.toggle.frame:GetScript("OnClick")(honor.toggle.frame, "LeftButton")
+      assert.are.same({ { 4, true } }, backpackFlags)
+      assert.are.same({}, tracked())
+    end)
   end)
 end)

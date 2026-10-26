@@ -409,6 +409,8 @@ files["spec/**/*.lua"] = {
 		"MockData",
 		"ResetMockMerchant",
 		"ResetMockGuildBank",
+		"ResetMockCurrencies",
+		"UseNextCurrencies",
 		"MockSecret",
 		"IsMockSecret",
 		"SecretKeyGuard",

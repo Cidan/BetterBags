@@ -109,7 +109,7 @@ survived led to two tests and to removing a redundant guard).
 | Module | File | What it is |
 |---|---|---|
 | `NextSettingsPages` | `pages.lua` | The pages, in the order defined (`Define`, replacing one with the same id in its place): each in a `group` (the sidebar's headings, in the order their first page was defined), with a `title`, a `description`, an optional `bag` its settings are bound to, `shown()` (a page shown only sometimes: the guild bank), and `tabs` (a tab's `shown()` leaves it out while false; `ShownTabs`). A page may have its own list in the sidebar (`sidebar(parent, owner)`), a `heading()` read in place of its title and description, and buttons in the header (`actions(parent, owner)`): below, "A page's own list". A tab's `sections` (a list, or a function read when the tab is built) hold row definitions: `setting` (a catalog id, bound to the page's bag; one the bag does not have is left out), `option` (a page's own), `text`, `buttons`, or `block` (a function making a wide row, with a `title` and `keywords` for search). Pages are data. |
-| `NextSettingsRows` | `rows.lua` | A setting's row: its name (wrapping) on the left and its control on the right (`toggle`, `dropdown`, `slider`, `color`), at least `RowHeight` tall. It reads the option into the control (`Refresh`), writes what the player changes, shows the option again when the change was refused (`set` returns false), and asks in a `NextDialog` over the window to reload after a change that needs one (`reload`). Its description is its tooltip, which stays while the pointer is over its control (`IsMouseOver` on leaving). Rows across the page: `CreateText`, `CreateButtons`, `CreateLink`. Every row answers `Measure(width)`, `Place(x, y, width, height)`, `Refresh(ctx)`, and `wide`. |
+| `NextSettingsRows` | `rows.lua` | A setting's row: its name (wrapping) on the left and its control on the right (`toggle`, `dropdown`, `slider`, `color`), at least `RowHeight` tall. It reads the option into the control (`Refresh`), writes what the player changes, shows the option again when the change was refused (`set` returns false), after a change it took has the window show every row's value again (`onChanged`, set by the window on every setting and option row: a setting may follow another, as Tracker Grows follows Tracker Layout, currency.md §6; reported: it kept "Left" after the layout became Column), and asks in a `NextDialog` over the window to reload after a change that needs one (`reload`). Its description is its tooltip, which stays while the pointer is over its control (`IsMouseOver` on leaving). Rows across the page: `CreateText`, `CreateButtons`, `CreateLink`. Every row answers `Measure(width)`, `Place(x, y, width, height)`, `Refresh(ctx)`, and `wide`. |
 | `NextSettingsPage` | `page.lua` | A drawable (render-pipeline.md) laying sections out at the width it is given: a title in capitals and a note, a card of rows in two columns when the page is at least twice `MinColumn` wide (one otherwise), a pair as tall as its taller row, a wide row on a line of its own across both; lines between the card's lines and between a pair's columns; rows of an earlier layout not placed again are hidden; empty text when there are no sections. |
 | `NextSettings` | `window.lua` | The window, below. |
 
@@ -188,7 +188,7 @@ catalog).
 Coverage: `spec/next/settings/page_spec.lua` (rows: each control kind, layout, refusals, the reload
 dialog, the light and tooltip over the control, text, buttons, links; the page: two columns, one
 column, wide rows, sections and notes and cards, lines, refresh, rows of an earlier layout hidden,
-empty text), `spec/next/settings/window_spec.lua` (built on first open, centered, sized, body, moving,
+empty text), `spec/next/settings/window_spec.lua` (every value shown again after a change, not after a refused one; built on first open, centered, sized, body, moving,
 fitting a small screen, closing three ways, the menu and dialog closing with it, What's New, the
 sidebar and its pages, navigation, hover, pages defined later, tabs, content and its scroll bar,
 remembering the page, values read again on open, a page not shown, search: matching, live rows,
@@ -211,6 +211,7 @@ same database calls, with the same effects, as the classic window did; every que
 | BetterBags | General (`general`) | *Bags:* BetterBags Next, Enable Bank Bags, Show Blizzard Bag Button, Enable Bag Fading (classic), Animate Item Movement (classic). *Search:* In-Bag Search, Enter to Make Category. *Items:* Upgrade Icon Provider, New Item Duration, Category Sell and Deposit. *What's New:* Show What's New on Login. |
 | | Appearance (`appearance`) | Three tabs (asked: "make 'Theme' here a tab, and add a tab for 'Size'", docs/next-appearance-size.md; then an Animation tab). **Theme**: the theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext) while Next is in use; for the classic bags, their Bag Theme (Sonata), then Settings Window (SonataNext: Next's themes draw this window). **Size** (Next only): Icon Scale (`nextIconScale`) and Bag Scale (`nextBagScale`), 50% to 150% in steps of 5, each sending `next/ScalesChanged` (next.md §3, §14h). **Animation** (Next only): an Effects section of six switches, Sparkles, Title Shimmer, Title Cloud, Title Ribbon, Braid and Moving Ornaments (`nextSparkles`, `nextShimmer`, `nextTitleCloud`, `nextTitleRibbon`, `nextBraid`, `nextOrnamentMotion`), each turning its effect off on any theme and sending `next/AnimationChanged` (next-themes.md §20). The classic bags size themselves on each bag's page and have none of those effects, so with them Appearance has the Theme tab alone, and no tab strip. |
 | | Item Colors (`itemcolors`) | The four item level colors as swatches, named with their ranges (61% and 86% of the highest item level seen, as the classic pane); a picked color is saved and sent as `itemLevel/MaxChanged` (Cancel saves the color back too); the highest level seen; Reset Colors, Reset Max Item Level. |
+| | Currencies (`currencies`, Next only) | BetterBags Next's currencies (currency.md §6): *Tracked* (what is tracked, in order, dragged to move, each with Remove), *Currencies* (on clients with currencies: every currency with a switch that tracks it), *Items* (the shared items tab over the items tracked), *Display* (Backpack and Tracker; Tracker). |
 | Bags | Backpack, Bank, Guild Bank (`backpack`, `bank`, `guild`) | Each bound to its bag. *Layout:* Order (Section, Item), Tabs (Enable Groups: the backpack only; the bank's Tabs section is left out), Slots (All Free Space, Gaps). *Items:* Item Level (two), Quality (Glow Intensity), Stacking (seven). *Categories:* Automatic (the seven filters). The guild bank's page shows on a client with one (`addon.hasGuildBank`). |
 | Profiles | Profiles (`profiles`) | Tab *Profiles:* the active profile (a pick asks, then switches and reloads), the characters on each, New, Copy, Rename, Delete, Reset to Defaults (the classic flows: Copy creates then copies; Delete switches to Default first; Default cannot be renamed or deleted; a name is asked again while empty). Tab *Import / Export* (`transfer`): Export Categories fills a text area and selects it; Import Categories asks, imports (`DB:ImportSettings`), clears the area and offers a reload, or says what is wrong. |
 | Integrations | QuickFind (`quickfind`) | What the integration does. |
@@ -344,6 +345,12 @@ page's `Content.Top` and `Bottom`).
   ignoring it (`UnignoreItem`), the bags recalculated each time. Editable for a plugin's category too:
   what it ignores is the player's choice. An ignored item in your bags says where it shows ("Shows in
   X."), not faded.
+- **One items tab** (`NextSettingsItemsTab`, `next/settings/itemstab.lua`): Added Items and Ignored Items are two
+  sources of the shared items tab (`CreateItemsTab` makes it with the chosen category's lists), which the Currencies
+  page's Items tab uses too (currency.md §6). What differs between them is the source's (`NextItemsSource`: the list,
+  read-only, help, words, notes, add, remove, clear, Remove All's question); the tab's look, its filter, names loading,
+  drops, right click and Remove All are one. The page's tabs share its frame helpers (`TabHeight`, `Metrics`,
+  `PlaceTab`).
 - **Automation tab** (automation.md §5): a section ("Merchants") of three settings rows, drawn as every
   page's settings (not controls of its own): Auto Sell, Confirm Auto Sell (on by default) and Destroy
   What Can't Be Sold, the last two disabled while Auto Sell is off, saved at once
@@ -371,7 +378,8 @@ sections from its committed items (not empty slots, Recent Items, Free Space, or
   after the ones it shows) and the bags recalculated (`bags/Rederive { resetLayout, buttons }`). Read
   again on the bag's `items/Refresh<Kind>/Done` and on `categories/Changed` while it shows.
 
-**Dragging a row** (`NextListReorder`, `next/settings/reorder.lua`), shared by both lists. Asked:
+**Dragging a row** (`NextListReorder`, `next/settings/reorder.lua`), shared by both lists (and the Currencies page's
+Tracked list, currency.md §6). Asked:
 "instead of a line on drag, let's animate the move like we do categories (again, re-inventing drag
 handling, we do this amazingly in the bags today, look how it's done, be careful)". The first version
 drew a gold line where the row would land, a drag of its own; now a row moves exactly as a bag's
@@ -499,8 +507,9 @@ gone), it shows only what the bags in use read, and nothing the classic window h
     Appearance: Bag Theme (Sonata) and Settings Window (SonataNext: Next's themes draw this window);
     Currency (§8).
   - **Next only:** the Guild Bank page (the classic bags have no guild bank); Appearance: Theme
-    (SonataNext), the Size tab (Icon Scale, Bag Scale) and the Animation tab (next-themes.md §20). The classic themes'
-    picker (item buttons) is not shown in Next (asked).
+    (SonataNext), the Size tab (Icon Scale, Bag Scale) and the Animation tab (next-themes.md §20); the Currencies page
+    (currency.md §6: the classic bags keep their Currency page). The classic themes' picker (item buttons) is not shown
+    in Next (asked).
   - Everything else, both.
 - **Show What's New on Login** (General → What's New, `changelogOnLogin` in the catalog,
   `DB:Get/SetChangelogAutoOpen`): before, only the changelog window's "Don't show me this again"
@@ -532,12 +541,18 @@ Blizzard's own "show in backpack" flag. The Currency page (BetterBags group, aft
 Era have none, where the classic window said "not available") replaces the classic window's currency
 panes with a wide row: every currency under its headings (the headings Blizzard keeps collapsed are
 expanded, as the backpack's icons expand them), each with its icon, how many you have (of its most)
-and a switch. The switch writes `SetCurrencyBackpack`; once the game has taken it (0.1 s, as the
+and a switch, which a click anywhere on the row flips too (asked, of BetterBags Next's list, which is this
+block: a heading takes no click). The switch writes `SetCurrencyBackpack`; once the game has taken it (0.1 s, as the
 classic pane waited) the page reads the list again and sends `currency/Updated`, which redraws the
 backpack's icons. `C_CurrencyInfo` where the client has it, else the legacy globals (Mists Classic),
 whose expand and show flags are numbers (`ExpandCurrencyList(i, 1)`, `SetCurrencyBackpack(i, 1|0)`,
 Blizzard_TokenUI). No cap on how many are shown: the classic pane had none (Blizzard's token frame caps
 its own display, `MAX_WATCHED_TOKENS`).
+
+The list is read through the Currencies module's `ListSize`, `ListEntry` and `ExpandListHeading`
+(currency.md §2). The same block, made with `track`, is BetterBags Next's Currencies tab: there each switch
+tracks the currency in BetterBags' own list, by ID, and Blizzard's list is read with the headings the player
+keeps collapsed opened and closed again (`Currencies:List`), never written (currency.md §6).
 
 Coverage: `spec/next/settings/currency_spec.lua` (the list and its expansion, a row's icon, count and
 switch, headings without one, writing and the message after the game took it, the legacy API, height

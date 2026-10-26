@@ -48,6 +48,12 @@ local bagCategories = addon:GetModule('NextSettingsBagCategories')
 ---@class NextSettingsCurrency: AceModule
 local currencyList = addon:GetModule('NextSettingsCurrency')
 
+---@class NextSettingsCurrencies: AceModule
+local nextCurrencies = addon:GetModule('NextSettingsCurrencies')
+
+---@class Currencies: AceModule
+local currencies = addon:GetModule('Currencies')
+
 -- NextSettingsContent is what BetterBags Next's settings window shows (next-settings.md §4): its pages,
 -- defined in Init in the order of the sidebar (General, Appearance, Item Colors; a page per bag;
 -- Profiles; QuickFind), and a page per plugin (AddPlugin, from Config:AddPluginConfig). Settings of the
@@ -487,6 +493,34 @@ function content:Init()
         block = function(parent) return currencyList:Create(parent) end,
       } } },
     } } },
+  })
+  -- BetterBags Next's currencies (currency.md §6): what the strip at the bottom of the backpack and the tracker dragged
+  -- out of it show, in what order, and how. Currencies on clients with them; items everywhere.
+  pages:Define({
+    id = "currencies", group = L:G("BetterBags"), title = L:G("Currencies"), design = "next",
+    description = L:G("The currencies and items you keep an eye on, at the bottom of your backpack and in its tracker."),
+    tabs = {
+      { id = "tracked", title = L:G("Tracked"), sections = { tabSection(L:G("Tracked"),
+        { "currency", "currencies", "tracked", "order", "tokens", "items" },
+        function(parent, window) return nextCurrencies:CreateTracked(parent, window) end) } },
+      { id = "currencies", title = L:G("Currencies"), shown = function() return currencies:Available() end, sections = {
+        { title = L:G("Currencies"), note = L:G("(switch one on to track it)"), rows = { {
+          title = L:G("Currencies"), keywords = { "currency", "currencies", "tokens", "track" },
+          block = function(parent) return currencyList:Create(parent, { track = true }) end,
+        } } },
+      } },
+      { id = "items", title = L:G("Items"), sections = { tabSection(L:G("Tracked Items"),
+        { "items", "tracked items", "reagents", "track", "drag" },
+        function(parent, window) return nextCurrencies:CreateItems(parent, window) end) } },
+      { id = "display", title = L:G("Display"), sections = {
+        { title = L:G("Backpack and Tracker"), rows = { { setting = 'nextCurrencyCapBars' },
+          { setting = 'nextCurrencyGains' }, { setting = 'nextCurrencyHideEmpty' },
+          { setting = 'nextCurrencyItemsEverywhere' } } },
+        { title = L:G("Tracker"), rows = { { setting = 'nextCurrencyTracker' }, { setting = 'nextCurrencyLayout' },
+          { setting = 'nextCurrencyGrow' }, { setting = 'nextCurrencyScale' }, { setting = 'nextCurrencyBackground' },
+          { setting = 'nextCurrencyHideInCombat' } } },
+      } },
+    },
   })
   bagPage("backpack", { name = 'Backpack', kind = const.BAG_KIND.BACKPACK })
   bagPage("bank", { name = 'Bank', kind = const.BAG_KIND.BANK })

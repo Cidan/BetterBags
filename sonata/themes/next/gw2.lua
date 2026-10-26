@@ -150,6 +150,13 @@ sonataNext:RegisterTheme({
     Price = { Object = NORMAL, Size = 13, Color = "White", Shadow = true },
     PriceUnaffordable = { Object = NORMAL, Size = 13, Color = "Unaffordable", Shadow = true },
     VendorName = { Object = NORMAL, Size = 13, Color = "Text", Shadow = true },
+    CurrencyCount = { Object = NORMAL, Size = 12, Color = "White", Shadow = true },
+    CurrencyCapped = { Object = NORMAL, Size = 12, Color = "Capped", Shadow = true },
+    CurrencyNone = { Object = NORMAL, Size = 12, Color = "Muted" },
+    CurrencyName = { Object = NORMAL, Size = 12, Color = "Text" },
+    CurrencyGain = { Object = NORMAL, Size = 13, Color = "Gain", Shadow = true },
+    CurrencyLoss = { Object = NORMAL, Size = 12, Color = "Muted", Shadow = true },
+    CurrencyMore = { Object = NORMAL, Size = 11, Color = "LightHeader" },
     ControlText = { Object = NORMAL, Size = 12, Color = "Text" },
     ControlMuted = { Object = NORMAL, Size = 12, Color = "Muted" },
     ControlHelp = { Object = NORMAL, Size = 12, Color = "Placeholder" },
@@ -325,6 +332,11 @@ sonataNext:RegisterTheme({
     Card = { Texture = "Backdrop", Color = "White" },
     Glow = { Color = "LightHeader" },
     Halo = false,
+  },
+
+  -- The currency tracker on GW2_UI's backdrop, as a waiting section's card is (currency.md).
+  Currency = {
+    Tracker = { Fill = { Texture = "Backdrop", Color = "White" }, Edge = false },
   },
 
   Vendor = {

@@ -49,7 +49,7 @@ describe("Core Init and Enable flow", function()
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
-      "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList"
+      "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies"
     }
 
     for _, name in ipairs(modules) do
@@ -221,6 +221,17 @@ describe("Core Init and Enable flow", function()
     addon:OnEnable()
     assert.spy(automation.Init).was.called(1)
     assert.spy(automation.Enable).was.called(1)
+  end)
+
+  -- BetterBags Next's tracked currencies (currency.md) read what changes from their OnEnable.
+  it("starts and enables the tracked currencies", function()
+    local c = addon:GetModule("Currencies")
+    c.Init = spy.new(function() end)
+    c.Enable = spy.new(function() end)
+    addon:OnInitialize()
+    addon:OnEnable()
+    assert.spy(c.Init).was.called(1)
+    assert.spy(c.Enable).was.called(1)
   end)
 
   -- Every sale goes through the seller (automation.md §3), which listens to merchants and their errors.

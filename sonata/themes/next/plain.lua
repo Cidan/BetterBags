@@ -181,6 +181,15 @@ sonataNext:RegisterTheme({
     Price = { Copy = "GameFontHighlightSmall" },
     PriceUnaffordable = { Copy = "GameFontRedSmall" },
     VendorName = { Copy = "GameFontHighlightSmall" },
+    -- The currencies (currency.md): a count, one at a cap in Blizzard's red, one you have none of grayed; a gain in its
+    -- green; "+N" in its gold.
+    CurrencyCount = { Copy = "GameFontHighlightSmall" },
+    CurrencyCapped = { Copy = "GameFontRedSmall" },
+    CurrencyNone = { Copy = "GameFontDisableSmall" },
+    CurrencyName = { Copy = "GameFontHighlightSmall" },
+    CurrencyGain = { Copy = "GameFontGreenSmall" },
+    CurrencyLoss = { Copy = "GameFontDisableSmall" },
+    CurrencyMore = { Copy = "GameFontNormalSmall" },
     ControlText = { Copy = "GameFontHighlightSmall" },
     ControlMuted = { Copy = "GameFontDisableSmall" },
     ControlHelp = { Copy = "GameFontDisableSmall" },
@@ -312,6 +321,18 @@ sonataNext:RegisterTheme({
     Card = { Atlas = "UI-DialogBox-Background-Dark", Color = "White", Alpha = 1 },
     Glow = { Color = "Gold" },
     Halo = false,
+  },
+
+  -- The currency tracker on the popup's background, as a waiting section's card, edged in its gold; no glow round a
+  -- gain; the strip lit as Blizzard's lists light a row while a tracker would be put away (currency.md).
+  Currency = {
+    Flash = false,
+    -- The settings list's hover art (Options_List_Hover), as its lists light a row.
+    Drop = { Atlas = "Options_List_Hover", Color = "White", Alpha = 1, BlendMode = "BLEND" },
+    Tracker = {
+      Fill = { Atlas = "UI-DialogBox-Background-Dark", Color = "White", Alpha = 1 },
+      Edge = { Color = "Gold", Alpha = 0.45 },
+    },
   },
 
   Vendor = {

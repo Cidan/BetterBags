@@ -3561,6 +3561,119 @@ end
 -- C_CurrencyInfo.GetCurrencyInfo(type) -> CurrencyInfo; specs set _G._currencies[id].
 _G._currencies = {}
 _G.C_CurrencyInfo.GetCurrencyInfo = function(id) return _G._currencies[id] end
+
+-- Blizzard's currency list (CurrencyInfoDocumentation.lua; the Currency tab's): headings and the currencies under
+-- them, a heading's own only while it is expanded. Specs set _G._currencyList, a tree of { name, isHeader,
+-- isHeaderExpanded, currencyID, children } (a currency's other CurrencyInfo fields come from _G._currencies[id]).
+-- GetCurrencyListSize counts what shows, GetCurrencyListInfo(index) is the index-th that shows (with its
+-- currencyListDepth), ExpandCurrencyList(index, expand) opens or closes a heading, GetCurrencyListLink(index) is a
+-- currency's link ("currency:<id>:<amount>" in a hyperlink, as Blizzard_TokenUI links one). Every call is recorded
+-- in _G._currencyListCalls.
+_G._currencyList = {}
+_G._currencyListCalls = {}
+local function shownCurrencies()
+  local out = {}
+  local function walk(nodes, depth)
+    for _, node in ipairs(nodes) do
+      table.insert(out, { node = node, depth = depth })
+      if node.isHeader and node.isHeaderExpanded and node.children then
+        walk(node.children, depth + 1)
+      end
+    end
+  end
+  walk(_G._currencyList, 0)
+  return out
+end
+_G.C_CurrencyInfo.GetCurrencyListSize = function()
+  return #shownCurrencies()
+end
+_G.C_CurrencyInfo.GetCurrencyListInfo = function(index)
+  local shown = shownCurrencies()[index]
+  if shown == nil then
+    return nil
+  end
+  local node = shown.node
+  local info = {}
+  for k, v in pairs(node.currencyID and _G._currencies[node.currencyID] or {}) do
+    info[k] = v
+  end
+  info.name = node.name or info.name or ""
+  info.isHeader = node.isHeader == true
+  info.isHeaderExpanded = node.isHeaderExpanded == true
+  info.currencyID = node.currencyID or 0
+  info.currencyListDepth = shown.depth
+  info.quantity = info.quantity or 0
+  info.maxQuantity = info.maxQuantity or 0
+  return info
+end
+_G.C_CurrencyInfo.ExpandCurrencyList = function(index, expand)
+  table.insert(_G._currencyListCalls, { "ExpandCurrencyList", index, expand })
+  local shown = shownCurrencies()[index]
+  if shown and shown.node.isHeader then
+    shown.node.isHeaderExpanded = expand == true or expand == 1
+  end
+end
+_G.C_CurrencyInfo.GetCurrencyListLink = function(index)
+  local shown = shownCurrencies()[index]
+  if shown == nil or shown.node.currencyID == nil then
+    return nil
+  end
+  return "|cffffffff|Hcurrency:" .. shown.node.currencyID .. ":0|h[" .. (shown.node.name or "") .. "]|h|r"
+end
+_G.C_CurrencyInfo.GetCurrencyIDFromLink = function(link)
+  return tonumber(link and link:match("currency:(%d+)") or nil) or 0
+end
+
+-- The Warband's characters' amounts of a currency (CurrencyInfoDocumentation.lua): RequestCurrencyDataForAccountCharacters
+-- asks the server, ACCOUNT_CHARACTER_CURRENCY_DATA_RECEIVED says it answered, IsAccountCharacterCurrencyDataReady
+-- says whether it has, FetchCurrencyDataFromAccountCharacters(id) returns CharacterCurrencyData (the other
+-- characters'). Specs set _G._accountCurrencyReady and _G._accountCurrencies[id] = { { characterName, quantity } }.
+_G._accountCurrencies = {}
+_G._accountCurrencyReady = false
+_G._accountCurrencyRequests = 0
+_G.C_CurrencyInfo.RequestCurrencyDataForAccountCharacters = function()
+  _G._accountCurrencyRequests = _G._accountCurrencyRequests + 1
+end
+_G.C_CurrencyInfo.IsAccountCharacterCurrencyDataReady = function() return _G._accountCurrencyReady end
+_G.C_CurrencyInfo.FetchCurrencyDataFromAccountCharacters = function(id)
+  return _G._accountCurrencies[id]
+end
+
+-- C_Item.GetItemCount(itemInfo, includeBank, includeUses, includeReagentBank, includeAccountBank) -> count
+-- (ItemDocumentation.lua, the same on every client): how many the character has, in the bags and, when asked, the
+-- bank, the reagent bank and the Warband bank. Specs set _G._itemCounts[itemID] = { bags, bank, reagent, warband }.
+_G._itemCounts = {}
+_G.C_Item.GetItemCount = function(item, includeBank, _, includeReagentBank, includeAccountBank)
+  local c = _G._itemCounts[item] or {}
+  local n = c.bags or 0
+  if includeBank then n = n + (c.bank or 0) end
+  if includeReagentBank then n = n + (c.reagent or 0) end
+  if includeAccountBank then n = n + (c.warband or 0) end
+  return n
+end
+-- C_Item.GetItemMaxStackSizeByID(itemInfo) -> stackCount (ItemDocumentation.lua, Nilable): nothing for an item the
+-- client has not loaded. Specs set _G._itemStackSizes[itemID].
+_G._itemStackSizes = {}
+_G.C_Item.GetItemMaxStackSizeByID = function(item) return _G._itemStackSizes[item] end
+
+-- GameTooltip:SetCurrencyByID(currencyID, amount?) fills the tooltip with a currency's (TooltipDataHandler.lua
+-- GetCurrencyByID on retail, native on Classic) and shows it.
+function _G.GameTooltip:SetCurrencyByID(currencyID)
+  self._currencyByID = currencyID
+  self:Show()
+end
+
+-- ResetMockCurrencies empties every currency and item count mock.
+function _G.ResetMockCurrencies()
+  _G._currencies = {}
+  _G._currencyList = {}
+  _G._currencyListCalls = {}
+  _G._accountCurrencies = {}
+  _G._accountCurrencyReady = false
+  _G._accountCurrencyRequests = 0
+  _G._itemCounts = {}
+  _G._itemStackSizes = {}
+end
 -- Tooltips for merchants: GameTooltip:SetMerchantItem(index), SetBuybackItem(index),
 -- SetInventoryItem(unit, slot) -> hasItem, hasCooldown, repairCost (ItemUtil.lua). C_TooltipInfo
 -- (retail; TooltipInfoDocumentation.lua) returns TooltipData, whose repairCost

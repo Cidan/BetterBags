@@ -130,6 +130,36 @@ _G.UseNextTheme = function(theme)
   return style.Theme
 end
 
+-- UseNextCurrencies readies BetterBags Next's currencies (.claude/rules/currency.md) for a spec that builds the
+-- backpack, whose footer holds them: the spec's Database answers the currency settings (nothing tracked, every option
+-- its default, the tracker put away), installed with the spec's own override so they are put back after each test,
+-- and the Currencies module starts fresh. Call it where the spec sets up each test (before_each), after it loaded
+-- data/currencies.lua.
+---@param database table
+---@param override fun(tbl: table, key: string, value: any)
+_G.UseNextCurrencies = function(database, override)
+  local tracked, tracker = {}, { out = false }
+  local options = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
+    scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" }
+  override(database, "GetNextCurrencies", function()
+    local out = {}
+    for _, e in ipairs(tracked) do table.insert(out, { kind = e.kind, id = e.id }) end
+    return out
+  end)
+  override(database, "SetNextCurrencies", function(_, list)
+    tracked = {}
+    for _, e in ipairs(list) do table.insert(tracked, { kind = e.kind, id = e.id }) end
+  end)
+  override(database, "GetNextCurrencyOption", function(_, name) return options[name] end)
+  override(database, "SetNextCurrencyOption", function(_, name, value) options[name] = value end)
+  override(database, "GetNextCurrencyTracker", function() return tracker.out, tracker.x, tracker.y end)
+  override(database, "SetNextCurrencyTracker", function(_, out, x, y)
+    tracker.out = out
+    if x ~= nil then tracker.x, tracker.y = x, y end
+  end)
+  addon:GetModule("Currencies"):Init()
+end
+
 -- NextIconName names what a BetterBags Next header button draws: its icon's file name without its
 -- folder or extension ("sort" for ...\\icons\\sort.png), or its atlas.
 ---@param button table

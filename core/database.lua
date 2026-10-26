@@ -384,6 +384,97 @@ function DB:SetNextAnimation(name, on)
   DB.data.profile.nextAnimation[name] = on
 end
 
+---@alias NextCurrencyKind "currency"|"item"
+
+-- NextTrackedCurrency is something BetterBags Next tracks as a currency (currency.md): a currency, or an item counted
+-- as one.
+---@class (exact) NextTrackedCurrency
+---@field kind NextCurrencyKind
+---@field id number
+
+-- GetNextCurrencies returns what BetterBags Next tracks, in the order it shows: a copy, so nothing a caller does
+-- changes what is saved.
+---@return NextTrackedCurrency[]
+function DB:GetNextCurrencies()
+  local out = {}
+  for _, entry in ipairs(DB.data.profile.nextCurrencies) do
+    table.insert(out, { kind = entry.kind, id = entry.id })
+  end
+  return out
+end
+
+-- SetNextCurrencies saves what BetterBags Next tracks, in order: a copy of the list, refusing anything that is no
+-- currency or item.
+---@param list NextTrackedCurrency[]
+function DB:SetNextCurrencies(list)
+  local saved = {}
+  for _, entry in ipairs(list) do
+    if (entry.kind ~= "currency" and entry.kind ~= "item") or type(entry.id) ~= "number" then
+      error("not a currency or an item: " .. tostring(entry.kind) .. " " .. tostring(entry.id))
+    end
+    table.insert(saved, { kind = entry.kind, id = entry.id })
+  end
+  DB.data.profile.nextCurrencies = saved
+end
+
+---@alias NextCurrencyOption "capBars"|"gains"|"hideEmpty"|"itemsEverywhere"|"layout"|"scale"|"background"|"hideInCombat"|"growX"|"growY"
+
+-- The values an option is checked against: the tracker's layouts and the ways it grows (currency.md §5).
+local CURRENCY_CHOICES = {
+  layout = { row = true, column = true, list = true },
+  growX = { left = true, right = true },
+  growY = { up = true, down = true },
+}
+
+-- nextCurrencyOption checks a currency option's name: one of the defaults' (const.DATABASE_DEFAULTS), nothing else.
+---@param name string
+local function nextCurrencyOption(name)
+  if const.DATABASE_DEFAULTS.profile.nextCurrency[name] == nil then
+    error("unknown BetterBags Next currency option: " .. tostring(name))
+  end
+end
+
+-- GetNextCurrencyOption returns how BetterBags Next's currencies show (currency.md §6): cap bars, gains, what you
+-- have none of hidden, items counted everywhere, and the tracker's layout, scale (percent), background, whether it
+-- hides in combat, and which way it grows (growX "left" or "right", growY "down" or "up").
+---@param name NextCurrencyOption
+---@return any
+function DB:GetNextCurrencyOption(name)
+  nextCurrencyOption(name)
+  return DB.data.profile.nextCurrency[name]
+end
+
+---@param name NextCurrencyOption
+---@param value any
+function DB:SetNextCurrencyOption(name, value)
+  nextCurrencyOption(name)
+  local choices = CURRENCY_CHOICES[name]
+  if choices ~= nil and not choices[value] then
+    error("not a currency tracker " .. name .. ": " .. tostring(value))
+  end
+  DB.data.profile.nextCurrency[name] = value
+end
+
+-- GetNextCurrencyTracker returns whether the currency tracker is out of the backpack, and where it was left: the corner
+-- it grows from (growX, growY), in UIParent's units from the screen's top left; nothing before it was first placed.
+-- Put away, it remembers where it was.
+---@return boolean out, number? x, number? y
+function DB:GetNextCurrencyTracker()
+  local t = DB.data.profile.nextCurrencyTracker
+  return t.out == true, t.x, t.y
+end
+
+---@param out boolean
+---@param x? number
+---@param y? number
+function DB:SetNextCurrencyTracker(out, x, y)
+  local t = DB.data.profile.nextCurrencyTracker
+  t.out = out
+  if x ~= nil then
+    t.x, t.y = x, y
+  end
+end
+
 ---@alias NextSmallChain "apart"|"backpack"|"companion"
 
 -- GetNextSmallChain returns which small panel anchors a chained pair (docs/next-small-mode.md):

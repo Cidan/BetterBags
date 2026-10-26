@@ -835,6 +835,50 @@ describe("NextSettings", function()
     end)
   end)
 
+  -- Reported: Tracker Grows kept showing "Left" after Tracker Layout was changed to Column (its value follows the
+  -- layout). Every change shows the page's values again, as next-settings.md §3 says.
+  describe("a change", function()
+    local function rowTitled(title)
+      for _, section in ipairs(settings.page.sections) do
+        for _, row in ipairs(section.rows) do
+          if row.label and row.label:GetText() == title then return row end
+        end
+      end
+    end
+
+    it("shows every row's value again: a setting that follows another follows it at once", function()
+      pages:Define({ id = "linked", group = "Bags", title = "Linked", description = "",
+        tabs = { { id = "main", title = "Linked", sections = { { title = "Linked", rows = {
+          toggle("Leader", "free"),
+          { option = { kind = "toggle", title = "Follower", description = "",
+            get = function() return values.free == true end, set = function() end } },
+        } } } } } })
+      open("linked")
+      local leader, follower = rowTitled("Leader"), rowTitled("Follower")
+      assert.is_false(follower.control:GetChecked())
+      leader.control.frame:GetScript("OnClick")(leader.control.frame, "LeftButton")
+      assert.is_true(values.free)
+      assert.is_true(follower.control:GetChecked(), "shown again")
+    end)
+
+    it("shows nothing again for a change the setting refused", function()
+      local reads = 0
+      pages:Define({ id = "refusing", group = "Bags", title = "Refusing", description = "",
+        tabs = { { id = "main", title = "Refusing", sections = { { title = "Refusing", rows = {
+          { option = { kind = "toggle", title = "Refused", description = "",
+            get = function() return false end, set = function() return false end } },
+          { option = { kind = "toggle", title = "Other", description = "",
+            get = function() reads = reads + 1 return false end, set = function() end } },
+        } } } } } })
+      open("refusing")
+      local before = reads
+      local refused = rowTitled("Refused")
+      refused.control.frame:GetScript("OnClick")(refused.control.frame, "LeftButton")
+      assert.is_false(refused.control:GetChecked(), "its own value shown again")
+      assert.are.equal(before, reads, "the others untouched")
+    end)
+  end)
+
   describe("rows and sections hidden while a function says so", function()
     local hide
 
@@ -1158,8 +1202,10 @@ describe("NextSettings", function()
       local sonataNext = addon:GetModule("SonataNext")
       LoadBetterBagsModule("sonata/themes/next/parchment.lua")
       local db = StubBetterBagsModule("Database")
-      local savedGet = db.GetNextTheme
+      local savedGet, savedAnimation = db.GetNextTheme, db.GetNextAnimation
       db.GetNextTheme = function() return "Default" end
+      -- Applying a theme lays the player's Animation switches over it (next-themes.md §20): all on.
+      db.GetNextAnimation = function() return true end
       open()
       sonataNext:ApplyTheme(addon:GetModule("Context"):New("spec"), "Parchment", false)
       local paper = "Interface\\AddOns\\BetterBags\\textures\\moonlight\\parchment.png"
@@ -1170,7 +1216,7 @@ describe("NextSettings", function()
       assert.are.equal("Seal", edge.Color)
       assert.are.same({ r = r, g = g, b = b, a = edge.Alpha }, settings.done.edge.Top._colorTexture, "its Done button sealed")
       sonataNext:ApplyTheme(addon:GetModule("Context"):New("spec"), "Default", false)
-      db.GetNextTheme = savedGet
+      db.GetNextTheme, db.GetNextAnimation = savedGet, savedAnimation
       assert.is_true(settings.wash:IsShown())
     end)
 

@@ -229,7 +229,9 @@ section dragged out of a panel returns to the panel's strata (§7).
   Coverage: `spec/next/style_spec.lua` ("NextStyle Icon Scale"), `spec/next/small_spec.lua` ("the Size
   tab's scales" → "Icon Scale"), `spec/next/content_spec.lua`, `spec/next/vendorbutton_spec.lua`,
   `spec/sonata/next_engine_spec.lua`.
-- **Footer:** free slots on the left, money on the right (`MoneyFrame`).
+- **Footer:** free slots on the left, money on the right (`MoneyFrame`). The backpack's footer shows its tracked
+  currencies in the free slots' place (asked: "replace our 'xx slots free' text"; Free Space's header counts them):
+  currency.md §4.
 - **Tabs** (`next/tabs.lua`): the backpack's groups as tabs stacked down the body's left edge,
   sticking out over the feather like bookmarks. The selected one is brighter, with a gold bar that
   glides to it; a hovered one slides out a little. Left click switches group (the same data, drawn

@@ -462,6 +462,7 @@ local FONT_KEYS = {
   PriceFont = true, UnaffordableFont = true, StackFont = true, NameFont = true, HoverFont = true,
   DescriptionFont = true, NoteFont = true, LabelFont = true, LinkFont = true, GroupFont = true,
   ActiveFont = true, PreviewFont = true, UnavailableFont = true, DisabledFont = true,
+  CappedFont = true, NoneFont = true, GainFont = true, LossFont = true, MoreFont = true,
 }
 -- Keys whose value names one of the theme's Textures, or is a file (a path or a file ID).
 local TEXTURE_KEYS = { Texture = true, QualityBorder = true, QuestMark = true, Icon = true, HoverIcon = true }

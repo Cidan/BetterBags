@@ -759,6 +759,143 @@ for _, effect in ipairs({
   })
 end
 
+-- BetterBags Next's currencies (currency.md §6, the Currencies page's Display tab): how the strip at the bottom of the
+-- backpack and the tracker dragged out of it show what is tracked. Each saves the player's choice (one of the
+-- currency options, unless it says how to read and write its own) and tells them (currencies/OptionsChanged), which
+-- read it again.
+---@param id string
+---@param def table
+local function currencyOption(id, def)
+  local name = def.option
+  def.option = nil
+  def.get = def.get or function() return db:GetNextCurrencyOption(name) end
+  local write = def.write or function(value) db:SetNextCurrencyOption(name, value) end
+  def.write = nil
+  def.set = function(ctx, value)
+    write(value)
+    events:SendMessage(ctx, 'currencies/OptionsChanged')
+  end
+  define(id, def)
+end
+
+currencyOption('nextCurrencyCapBars', {
+  option = 'capBars',
+  kind = "toggle",
+  title = 'Cap Bars',
+  description = 'A thin bar under each currency with a cap, filling toward it, in a warning color once it is reached: '
+    .. 'what you earn past a cap is wasted.',
+  keywords = { 'currency', 'currencies', 'cap', 'bar', 'weekly', 'season' },
+})
+
+currencyOption('nextCurrencyGains', {
+  option = 'gains',
+  kind = "toggle",
+  title = 'Show Gains',
+  description = 'A number floating off a currency or an item as you gain some, or spend it.',
+  keywords = { 'currency', 'currencies', 'gain', 'earn', 'loot', 'float' },
+})
+
+currencyOption('nextCurrencyHideEmpty', {
+  option = 'hideEmpty',
+  kind = "toggle",
+  title = 'Hide What You Have None Of',
+  description = 'Currencies and items you have none of wait behind +N in your backpack, and are left out of the '
+    .. 'tracker. Off, they show faded.',
+  keywords = { 'currency', 'currencies', 'empty', 'none', 'zero', 'hide' },
+})
+
+currencyOption('nextCurrencyItemsEverywhere', {
+  option = 'itemsEverywhere',
+  kind = "toggle",
+  title = 'Count Items Everywhere',
+  description = 'Count a tracked item in your bank and Warband bank too, not only in your bags.',
+  keywords = { 'currency', 'item', 'count', 'bank', 'warband', 'reagent' },
+})
+
+local currencyLayouts = { ["Row"] = "row", ["Column"] = "column", ["List"] = "list" }
+
+currencyOption('nextCurrencyLayout', {
+  kind = "dropdown",
+  title = 'Tracker Layout',
+  description = 'How the tracker you drag out of your backpack lays out what it tracks: in a row, in a column, or a '
+    .. 'list with their names.',
+  keywords = { 'currency', 'tracker', 'layout', 'row', 'column', 'list', 'names' },
+  items = { 'Row', 'Column', 'List' },
+  get = function() return choiceOf(currencyLayouts, db:GetNextCurrencyOption('layout')) end,
+  write = function(value) db:SetNextCurrencyOption('layout', currencyLayouts[value]) end,
+})
+
+-- Asked: "a grow direction for the tracker ... grow direction should probably be left (anchor point is right, frame
+-- grows out left) ... for list view we need up and down as options". One choice for the layout shown: Left or Right in
+-- a row, Up or Down in a column or a list (the tracker keeps both).
+local currencyGrowth = { ["Left"] = { "growX", "left" }, ["Right"] = { "growX", "right" },
+  ["Up"] = { "growY", "up" }, ["Down"] = { "growY", "down" } }
+
+currencyOption('nextCurrencyGrow', {
+  kind = "dropdown",
+  title = 'Tracker Grows',
+  description = 'Which way the tracker grows as what it tracks gets longer: left from its right edge or right from its '
+    .. 'left edge in a row; down from its top or up from its bottom in a column or a list.',
+  keywords = { 'currency', 'tracker', 'grow', 'direction', 'anchor', 'left', 'right', 'up', 'down' },
+  itemsFunction = function()
+    if db:GetNextCurrencyOption('layout') == 'row' then
+      return { 'Left', 'Right' }
+    end
+    return { 'Up', 'Down' }
+  end,
+  get = function()
+    if db:GetNextCurrencyOption('layout') == 'row' then
+      return db:GetNextCurrencyOption('growX') == 'right' and 'Right' or 'Left'
+    end
+    return db:GetNextCurrencyOption('growY') == 'up' and 'Up' or 'Down'
+  end,
+  write = function(value)
+    local growth = currencyGrowth[value]
+    db:SetNextCurrencyOption(growth[1], growth[2])
+  end,
+})
+
+currencyOption('nextCurrencyScale', {
+  option = 'scale',
+  kind = "slider",
+  title = 'Tracker Scale',
+  description = 'The scale of the tracker you drag out of your backpack, in percent.',
+  keywords = { 'currency', 'tracker', 'size', 'scale', 'zoom' },
+  min = 50,
+  max = 200,
+  step = 5,
+})
+
+currencyOption('nextCurrencyBackground', {
+  option = 'background',
+  kind = "toggle",
+  title = 'Tracker Background',
+  description = "The tracker's card behind what it tracks. Off, the card shows faintly only while the pointer is "
+    .. 'over it, to grab it by.',
+  keywords = { 'currency', 'tracker', 'background', 'card', 'border', 'transparent' },
+})
+
+currencyOption('nextCurrencyHideInCombat', {
+  option = 'hideInCombat',
+  kind = "toggle",
+  title = 'Hide Tracker in Combat',
+  description = 'Fade the tracker out while you are in combat, and back in after.',
+  keywords = { 'currency', 'tracker', 'combat', 'hide', 'fade' },
+})
+
+currencyOption('nextCurrencyTracker', {
+  kind = "toggle",
+  title = 'Show Tracker',
+  description = 'The tracker you drag out of the bottom of your backpack, kept on screen with your bags closed. On, '
+    .. 'it shows where you left it; dropping it back on your backpack puts it away.',
+  keywords = { 'currency', 'tracker', 'show', 'detach', 'float' },
+  get = function()
+    local out = db:GetNextCurrencyTracker()
+    return out
+  end,
+  write = function(value) db:SetNextCurrencyTracker(value) end,
+})
+
 define('scale', {
   kind = "slider",
   bag = true,

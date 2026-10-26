@@ -45,9 +45,6 @@ local nextDropdown = addon:GetModule('NextDropdown')
 ---@class NextSwatch: AceModule
 local nextSwatch = addon:GetModule('NextSwatch')
 
----@class NextMenu: AceModule
-local nextMenu = addon:GetModule('NextMenu')
-
 ---@class NextDialog: AceModule
 local nextDialog = addon:GetModule('NextDialog')
 
@@ -68,6 +65,9 @@ local context = addon:GetModule('Context')
 
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
+
+---@class NextSettingsItemsTab: AceModule
+local itemsTab = addon:GetModule('NextSettingsItemsTab')
 
 -- NextSettingsCategories is the Categories page (next-settings.md §5, category-lifecycle.md §6), where
 -- every category is defined once: one kind of category, a rule, items added by hand, or both. The page
@@ -138,13 +138,7 @@ local function rederive(ctx)
   events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
----@param n number
----@param one string
----@param many string
----@return string
-local function count(n, one, many)
-  return format(n == 1 and one or many, n)
-end
+local count = itemsTab.Count
 
 -- isPlugins says whether a category is a plugin's: not saved by the player.
 ---@param filter? CustomCategoryFilter
@@ -446,19 +440,7 @@ local function matchingCounts(bags)
   return counts
 end
 
--- byName orders grid entries by name (those not known yet after, by item ID).
----@param a table
----@param b table
----@return boolean
-local function byName(a, b)
-  if (a.name == nil) ~= (b.name == nil) then
-    return a.name ~= nil
-  end
-  if a.name ~= nil and a.name ~= b.name then
-    return a.name:lower() < b.name:lower()
-  end
-  return a.itemID < b.itemID
-end
+local byName = itemsTab.ByName
 
 ---------------------------------------------------------------------------------------------------
 -- The list, in the window's sidebar.
@@ -894,13 +876,10 @@ end
 ---------------------------------------------------------------------------------------------------
 -- The tabs: each a wide row filling the page's content (no scrolling).
 
--- tabHeight returns the height a tab's row fills: the content's, less the page's own room above and
--- below its section (the section's title is hidden).
----@param frame Frame The tab's, on the window's grid.
+---@param frame Frame
 ---@return number
 local function tabHeight(frame)
-  local C = style.Theme.Settings.Content
-  return math.max(1, settings:ContentHeight() - pixel:Snap(frame, C.Top) - pixel:Snap(frame, C.Bottom))
+  return itemsTab:TabHeight(frame)
 end
 
 -- makeTab makes a tab's frame and registers it, and has it shown again when the bags are read.
@@ -936,14 +915,10 @@ local function label(tab, key, text, font)
   tab.labels[key] = l
 end
 
--- metricsOf returns a tab's lengths in whole pixels on its grid (docs/next-pixel-perfect.md): its padding,
--- the gap between fields, a field row's height (a button's), a label's width.
 ---@param frame Frame
 ---@return {pad: number, gap: number, row: number, labelWidth: number}
 local function metricsOf(frame)
-  local K = style.Theme.Settings.Categories
-  return { pad = pixel:Snap(frame, K.Pad), gap = pixel:Snap(frame, K.FieldGap),
-    row = pixel:Length(frame, controls:Theme("Button").Height), labelWidth = pixel:Snap(frame, K.LabelWidth) }
+  return itemsTab:Metrics(frame)
 end
 
 -- boxRows returns where the Settings and Search Rule tabs put their item box's name row and the box,
@@ -957,19 +932,13 @@ local function boxRows(frame)
   return row, row + m.row + m.gap
 end
 
--- placeTab anchors a tab's frame where the page put it.
 ---@param tab table
 ---@param x number
 ---@param y number
 ---@param width number
 ---@param height number
 local function placeTab(tab, x, y, width, height)
-  local frame = tab.frame
-  frame:ClearAllPoints()
-  pixel:Point(frame, "TOPLEFT", frame:GetParent(), "TOPLEFT", x, -y)
-  pixel:Size(frame, width, height)
-  tab.x, tab.y, tab.width, tab.height = x, y, frame:GetWidth(), frame:GetHeight()
-  frame:Show()
+  itemsTab:PlaceTab(tab, x, y, width, height)
 end
 
 -- The Settings tab.
@@ -1397,323 +1366,98 @@ function ruleTabProto:layout()
   self.grid:Place(width, math.max(pixel:Unit(frame), self.height - box - pad))
 end
 
--- The Added Items tab.
+-- The Added Items and Ignored Items tabs: the shared items tab (NextSettingsItemsTab) over the chosen category's lists.
 
----@class NextCategoryItemsTab
----@field frame Frame
----@field wide boolean
----@field owner Frame
----@field bags fun(): SettingBag[]
----@field labels table<string, FontString>
----@field loading table<string, boolean> The categories whose item names are loading.
----@field mode "added"|"ignored" Its list: the items added to the category by hand (Added Items), or those it ignores (Ignored Items).
-local itemsTabProto = {}
-addon:GetModule('Perf'):RegisterPrototype(itemsTabProto, 'NextCategoryItemsTab')
-
--- CreateItemsTab makes a tab of a category's items: those added by hand (Added Items), or with mode
--- "ignored" those it ignores (Ignored Items, docs/next-batch-2.md §2; asked: "same interface/layout as
--- Added Items"). One tab, two lists: the count, the filter, Remove All, the help and the item grid,
--- taking drops and removing on a right click.
+-- CreateItemsTab makes a tab of a category's items: those added by hand (Added Items), or with mode "ignored" those
+-- it ignores (Ignored Items, docs/next-batch-2.md §2; asked: "same interface/layout as Added Items"). A plugin's added
+-- items show read-only; what a category ignores is always the player's. An added item that lands elsewhere (ignored
+-- here, or in another category) is faded with a note; an ignored item in your bags says where it shows.
 ---@param parent Frame
 ---@param owner Frame The window its dialogs and menus show over.
 ---@param bags fun(): SettingBag[] The bags the settings show.
 ---@param mode? "added"|"ignored"
----@return NextCategoryItemsTab
+---@return NextItemsTab
 function editor:CreateItemsTab(parent, owner, bags, mode)
-  local tab = makeTab(parent, itemsTabProto,
-    { owner = owner, bags = bags, labels = {}, loading = {}, mode = mode or "added" })
-  local K = style.Theme.Settings.Categories
-  local frame = tab.frame
-  tab.count = style:CreateText(frame, K.SectionFont)
-  tab.count:SetJustifyH("LEFT")
-  tab.filter = nextInput:Create(frame, {
-    width = K.FilterWidth, help = L:G("Find an item"),
-    onChange = function() tab:ShowItems() end,
-    icon = function()
-      local SR = style.Theme.Settings.Search
-      return { Texture = SR.Icon, Size = SR.IconSize, Color = SR.IconColor }
+  local ignored = mode == "ignored"
+  ---@type NextItemsSource
+  local source = {
+    key = function()
+      return editor:Chosen() ~= nil and editor.selected or nil
     end,
-  })
-  tab.removeAll = nextButton:Create(frame, {
-    text = L:G("Remove All"), style = "Danger", onClick = function() tab:AskRemoveAll() end,
-  })
-  tab.help = style:CreateText(frame, K.HintFont)
-  tab.help:SetJustifyH("LEFT")
-  tab.help:SetWordWrap(true)
-  tab.grid = nextItemGrid:Create(frame, {
-    onDrop = function(ctx) tab:Drop(ctx) end,
-    onRightClick = function(ctx, entry, cell) tab:OfferRemove(ctx, entry, cell) end,
-    hint = L:G("Right-click to remove it."),
-    empty = tab.mode == "ignored" and L:G("No items ignored.") or L:G("No items added yet."),
-  })
-  tab.readOnly = nextItemGrid:Create(frame, { empty = L:G("The plugin added no items.") })
-  tab:Style()
-  return tab
-end
-
-function itemsTabProto:Style()
-  local K = style.Theme.Settings.Categories
-  style:SetFont(self.count, K.SectionFont)
-  style:SetFont(self.help, K.HintFont)
-  if self.width then
-    self:layout()
-  end
-end
-
----@param width number
----@return number
-function itemsTabProto:Measure(width)
-  local _ = width
-  return tabHeight(self.frame)
-end
-
----@param x number
----@param y number
----@param width number
----@param height number
-function itemsTabProto:Place(x, y, width, height)
-  placeTab(self, x, y, width, height)
-  self:layout()
-end
-
--- readOnlyFor says whether the tab only shows a category's list: the items a plugin added to its
--- category are the plugin's; what a category ignores is always the player's.
----@private
----@param filter CustomCategoryFilter
----@return boolean
-function itemsTabProto:readOnlyFor(filter)
-  return self.mode == "added" and isPlugins(filter)
-end
-
--- words returns how the tab counts its items ("%d added item", "%d added items").
----@private
----@return string one, string many
-function itemsTabProto:words()
-  if self.mode == "ignored" then
-    return L:G("%d ignored item"), L:G("%d ignored items")
-  end
-  return L:G("%d added item"), L:G("%d added items")
-end
-
--- listOf returns the chosen category's list for this tab: its items added by hand, or those it ignores.
----@private
----@param name string
----@return table<number, boolean>
-function itemsTabProto:listOf(name)
-  if self.mode == "ignored" then
-    return categories:GetIgnoredItems(name)
-  end
-  return categories:GetMergedCategory(name).itemList
-end
-
--- Refresh shows the chosen category's list: yours to add to and remove from; a plugin's added items
--- read-only.
----@param ctx? Context
-function itemsTabProto:Refresh(ctx)
-  local _ = ctx
-  local filter = editor:Chosen()
-  if filter == nil then
-    return
-  end
-  local readOnly = self:readOnlyFor(filter)
-  self.grid.frame:SetShown(not readOnly)
-  self.readOnly.frame:SetShown(readOnly)
-  self.removeAll.frame:SetShown(not readOnly)
-  if self.mode == "ignored" then
-    self.help:SetText(L:G("Drag an item here so it never shows in this category."))
-  else
-    self.help:SetText(readOnly and L:G("The plugin that made this category adds these items.")
-      or L:G("Drag an item here to manually add it to this category."))
-  end
-  self:ShowItems()
-  if self.width then
-    self:layout()
-  end
-end
-
--- note returns how an item of the list shows: faded with a note for an added item that lands elsewhere
--- (ignored here, or in another category), a note saying where an ignored item in your bags shows.
----@private
----@param name string
----@param itemID number
----@param where? string The category it shows in, for an item in your bags outside this one.
----@return boolean dim, string? note
-function itemsTabProto:note(name, itemID, where)
-  if self.mode == "ignored" then
-    return false, where and format(L:G("Shows in %s."), where) or nil
-  end
-  if categories:IgnoresItem(name, itemID) then
-    return true, L:G("Ignored in this category.")
-  end
-  return where ~= nil, where and format(L:G("Shows in %s instead."), where) or nil
-end
-
--- ShowItems lists the tab's items, by name, those whose name has the filter's text, each with its
--- note (note). Names not loaded yet are asked for, and the list is shown again once they arrive.
-function itemsTabProto:ShowItems()
-  local filter = editor:Chosen()
-  if filter == nil then
-    return
-  end
-  local name = filter.name
-  local list = self:listOf(name)
-  local elsewhere = {}
-  bagItemsOf(self.bags(), function(_, _, data)
-    local info = data.itemInfo
-    local category = info.category or ""
-    if list[info.itemID] and not isShownIn(name, category) and elsewhere[info.itemID] == nil then
-      elsewhere[info.itemID] = category
-    end
-  end)
-  local needle = strtrim(self.filter:GetText() or ""):lower()
-  local all, shown, cold = 0, {}, {}
-  for itemID in pairs(list) do
-    all = all + 1
-    local itemName = C_Item.GetItemNameByID(itemID)
-    if itemName == nil then
-      table.insert(cold, itemID)
-    end
-    if needle == "" or (itemName ~= nil and itemName:lower():find(needle, 1, true)) then
-      local _, _, _, _, icon = C_Item.GetItemInfoInstant(itemID)
-      local dim, note = self:note(name, itemID, elsewhere[itemID])
-      table.insert(shown, {
-        id = itemID, itemID = itemID, icon = icon, quality = C_Item.GetItemQualityByID(itemID), name = itemName,
-        dim = dim, note = note,
-      })
-    end
-  end
-  table.sort(shown, byName)
-  local one, many = self:words()
-  if needle == "" then
-    self.count:SetText(count(all, one, many))
-  else
-    self.count:SetText(format(L:G("%d of %s"), #shown, count(all, one, many)))
-  end
-  self.removeAll:SetEnabled(all > 0)
-  local grid = self:readOnlyFor(filter) and self.readOnly or self.grid
-  grid:SetEntries(shown)
-  self:loadNames(name, cold)
-end
-
--- loadNames asks for the item data of items whose names are not known yet, once per category, and
--- shows the list again when it has arrived (if the category still shows).
----@private
----@param name string
----@param ids number[]
-function itemsTabProto:loadNames(name, ids)
-  if #ids == 0 or self.loading[name] then
-    return
-  end
-  self.loading[name] = true
-  local container = ContinuableContainer:Create()
-  for _, itemID in ipairs(ids) do
-    container:AddContinuable(Item:CreateFromItemID(itemID))
-  end
-  container:ContinueOnLoad(function()
-    self.loading[name] = nil
-    if editor.selected == name and self.frame:IsVisible() then
-      self:ShowItems()
-    end
-  end)
-end
-
--- Drop adds the item on the cursor to the chosen category's list: added to it, or ignored by it.
----@param ctx Context
-function itemsTabProto:Drop(ctx)
-  local filter = editor:Chosen()
-  if filter == nil or self:readOnlyFor(filter) or not CursorHasItem() then
-    return
-  end
-  local kind, itemID = GetCursorInfo()
-  if kind ~= "item" then
-    return
-  end
-  if self.mode == "ignored" then
-    categories:IgnoreItem(ctx, itemID, editor.selected)
-  else
-    categories:AddPermanentItemToCategory(ctx, itemID, editor.selected)
-  end
-  ClearCursor()
-  rederive(ctx)
-  self:ShowItems()
-end
-
--- OfferRemove offers to remove an item, from a right click on it.
----@param ctx Context
----@param entry NextItemGridEntry
----@param cell Button
-function itemsTabProto:OfferRemove(ctx, entry, cell)
-  local _ = ctx
-  nextMenu:Open(cell, {
-    items = { { text = L:G("Remove") } },
-    onPick = function(pctx)
-      if self.mode == "ignored" then
-        categories:UnignoreItem(pctx, entry.itemID, editor.selected)
-      else
-        categories:RemoveItemFromCategory(entry.itemID, editor.selected)
+    list = function(name)
+      if ignored then
+        return categories:GetIgnoredItems(name)
       end
-      rederive(pctx)
-      self:ShowItems()
+      return categories:GetMergedCategory(name).itemList
     end,
-  })
-end
-
--- AskRemoveAll empties the chosen category's list, after asking.
-function itemsTabProto:AskRemoveAll()
-  local name = editor.selected
-  local filter = editor:Chosen()
-  if filter == nil then
-    return
-  end
-  local n = 0
-  for _ in pairs(self:listOf(name)) do
-    n = n + 1
-  end
-  local one, many = self:words()
-  nextDialog:Show(self.owner, {
-    title = L:G("Remove All"),
-    text = format(L:G("Remove all %s from '%s'? This cannot be undone."), count(n, one, many), name),
-    buttons = {
-      { text = L:G("Cancel"), onClick = function() end },
-      { text = L:G("Remove All"), style = "Danger", onClick = function(ctx)
-        if self.mode == "ignored" then
-          categories:ClearIgnoredItems(ctx, name)
-        else
-          categories:WipeCategory(ctx, name)
+    readOnly = function(name)
+      return not ignored and isPlugins(categories:GetCategoryByName(name))
+    end,
+    help = function(_, readOnly)
+      if ignored then
+        return L:G("Drag an item here so it never shows in this category.")
+      end
+      return readOnly and L:G("The plugin that made this category adds these items.")
+        or L:G("Drag an item here to manually add it to this category.")
+    end,
+    words = function()
+      if ignored then
+        return L:G("%d ignored item"), L:G("%d ignored items")
+      end
+      return L:G("%d added item"), L:G("%d added items")
+    end,
+    empty = ignored and L:G("No items ignored.") or L:G("No items added yet."),
+    readOnlyEmpty = L:G("The plugin added no items."),
+    notes = function(name, list)
+      local elsewhere = {}
+      bagItemsOf(bags(), function(_, _, data)
+        local info = data.itemInfo
+        local category = info.category or ""
+        if list[info.itemID] and not isShownIn(name, category) and elsewhere[info.itemID] == nil then
+          elsewhere[info.itemID] = category
         end
-        rederive(ctx)
-        self:ShowItems()
-      end },
-    },
-  })
-end
-
--- layout puts the count, the filter and Remove All on top, the help under them, and the items taking
--- the room left.
----@private
--- In whole pixels (docs/next-pixel-perfect.md): the top row's parts centered on it by their tops, from
--- the tab's corners; the help's height rounded up.
-function itemsTabProto:layout()
-  local frame = self.frame
-  local m = metricsOf(frame)
-  local pad, gap = m.pad, m.gap
-  local width = self.width - 2 * pad
-  local y = pad
-  self.removeAll.frame:ClearAllPoints()
-  pixel:Row(self.removeAll.frame, "TOPRIGHT", frame, pad, m.row, nil, y)
-  local filterRight = self.removeAll.frame:IsShown() and (pad + self.removeAll.frame:GetWidth() + gap) or pad
-  self.filter.frame:ClearAllPoints()
-  pixel:Row(self.filter.frame, "TOPRIGHT", frame, filterRight, m.row, nil, y)
-  self.count:ClearAllPoints()
-  pixel:Row(self.count, "TOPLEFT", frame, pad, m.row, nil, y)
-  y = y + m.row + gap
-  self.help:ClearAllPoints()
-  pixel:Point(self.help, "TOPLEFT", frame, "TOPLEFT", pad, -y)
-  self.help:SetWidth(width)
-  y = y + pixel:Ceil(frame, self.help:GetStringHeight()) + gap
-  for _, grid in ipairs({ self.grid, self.readOnly }) do
-    grid.frame:ClearAllPoints()
-    grid.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -y)
-    grid:Place(width, math.max(pixel:Unit(frame), self.height - y - pad))
-  end
+      end)
+      local notes = {}
+      for itemID in pairs(list) do
+        local where = elsewhere[itemID]
+        if ignored then
+          notes[itemID] = { dim = false, note = where and format(L:G("Shows in %s."), where) or nil }
+        elseif categories:IgnoresItem(name, itemID) then
+          notes[itemID] = { dim = true, note = L:G("Ignored in this category.") }
+        else
+          notes[itemID] = { dim = where ~= nil, note = where and format(L:G("Shows in %s instead."), where) or nil }
+        end
+      end
+      return notes
+    end,
+    add = function(ctx, name, itemID)
+      if ignored then
+        categories:IgnoreItem(ctx, itemID, name)
+      else
+        categories:AddPermanentItemToCategory(ctx, itemID, name)
+      end
+      rederive(ctx)
+      return true
+    end,
+    remove = function(ctx, name, itemID)
+      if ignored then
+        categories:UnignoreItem(ctx, itemID, name)
+      else
+        categories:RemoveItemFromCategory(itemID, name)
+      end
+      rederive(ctx)
+    end,
+    clear = function(ctx, name)
+      if ignored then
+        categories:ClearIgnoredItems(ctx, name)
+      else
+        categories:WipeCategory(ctx, name)
+      end
+      rederive(ctx)
+    end,
+    clearText = function(name, counted)
+      return format(L:G("Remove all %s from '%s'? This cannot be undone."), counted, name)
+    end,
+  }
+  return itemsTab:Create(parent, owner, source)
 end

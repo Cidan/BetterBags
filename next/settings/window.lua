@@ -1264,8 +1264,10 @@ function settings:makeRow(page, def, parent, section)
       return nil
     end
     row = rows:Create(parent, catalog:Get(def.setting, page.bag), self.frame)
+    row.onChanged = function(ctx) self:Refresh(ctx) end
   elseif def.option ~= nil then
     row = rows:Create(parent, def.option, self.frame)
+    row.onChanged = function(ctx) self:Refresh(ctx) end
   elseif def.text ~= nil then
     row = rows:CreateText(parent, def.text)
   elseif def.buttons ~= nil then

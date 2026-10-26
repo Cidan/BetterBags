@@ -73,10 +73,11 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.are.same({ "general > main", "appearance > theme", "appearance > size", "appearance > animation",
       "itemcolors > main",
       "categories > settings",
-      "categories > rule", "categories > items", "categories > ignored", "categories > automation", "backpack > layout",
-      "backpack > items", "backpack > categories", "bank > layout", "bank > items", "bank > categories",
-      "guild > layout", "guild > items", "guild > categories", "profiles > profiles", "profiles > transfer",
-      "quickfind > main" }, builtEveryTab(addon))
+      "categories > rule", "categories > items", "categories > ignored", "categories > automation",
+      "currencies > tracked", "currencies > currencies", "currencies > items", "currencies > display",
+      "backpack > layout", "backpack > items", "backpack > categories", "bank > layout", "bank > items",
+      "bank > categories", "guild > layout", "guild > items", "guild > categories", "profiles > profiles",
+      "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
     settings:Close()
     assert.are.same({}, handle.errors, "closing")
   end)
@@ -114,6 +115,25 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.are.equal(db:GetStackingOptions(0).mergeStacks == true, row.control:GetChecked())
     settings:Open("general")
     assert.is_true(rowOf(settings, "nextEnabled").control:GetChecked())
+  end)
+
+  -- Reported: after Tracker Layout went from Row to Column, Tracker Grows still said "Left" (its menu offered Up and
+  -- Down, the tracker grew down). Its value follows the layout, so the page shows every value again after a change.
+  it("shows Tracker Grows by the layout chosen as soon as Tracker Layout changes", function()
+    local addon = start({ next = true })
+    local settings = addon:GetModule("NextSettings")
+    settings:Open("currencies", "display")
+    local layout, grows = rowOf(settings, "nextCurrencyLayout"), rowOf(settings, "nextCurrencyGrow")
+    assert.are.equal("Row", layout.control.text:GetText())
+    assert.are.equal("Left", grows.control.text:GetText())
+    layout.control:Pick(ctx(addon), "Column")
+    assert.are.same({}, handle.errors)
+    assert.are.equal("Down", grows.control.text:GetText())
+    grows.control:Pick(ctx(addon), "Up")
+    layout.control:Pick(ctx(addon), "List")
+    assert.are.equal("Up", grows.control.text:GetText(), "a list grows the way a column does")
+    layout.control:Pick(ctx(addon), "Row")
+    assert.are.equal("Left", grows.control.text:GetText())
   end)
 
   it("finds settings by what they do", function()
