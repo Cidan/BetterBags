@@ -1,16 +1,16 @@
 {
-  "id": 1793068725,
+  "id": 1793068731,
   "version": "v0.8.9",
-  "channel": "alpha",
+  "channel": "release",
   "date": "2026-10-27",
-  "from": "a4f134f99c07e63024912c4c6c9b99a4b65044a2",
-  "to": "98caf2002e57cb5de44cb2c0bde4ce08b7b20246",
-  "headline": "Fixed a Lua error that could occur when logging out or reloading the game.",
+  "from": "v0.8.8",
+  "to": "v0.8.9",
+  "headline": "Fixed a Lua error that could trigger when logging out or reloading the interface.",
   "entries": [
     {
       "category": "Fixed",
-      "title": "Lua error when logging out or reloading",
-      "details": "Fixed an error referencing bag views that could occur when logging out, reloading, or quitting if bag windows resized while the settings were shutting down.",
+      "title": "Lua error on logout or UI reload",
+      "details": "Fixed an issue where bag frame scripts running during logout or interface reloads could trigger an error referencing views.",
       "clients": []
     }
   ]
