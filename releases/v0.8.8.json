@@ -1,0 +1,17 @@
+{
+  "id": 1793067843,
+  "version": "v0.8.8",
+  "channel": "alpha",
+  "date": "2026-10-27",
+  "from": "ff5db093ebd7a1d8a07444bbaac19ad9e8111930",
+  "to": "a4f134f99c07e63024912c4c6c9b99a4b65044a2",
+  "headline": "This build fixes errors that could occur when entering instances or zoning.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Errors when entering instances or teleporting",
+      "details": "BetterBags now pauses bag processing the moment a loading screen begins. This prevents errors caused by background tasks trying to inspect items while the game client temporarily clears your bags during zone transitions.",
+      "clients": []
+    }
+  ]
+}
