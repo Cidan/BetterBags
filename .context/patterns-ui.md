@@ -447,6 +447,17 @@ pixel the glyphs landed in. Texts whose edges were not on a boundary never moved
 textures on whole pixels. Never hang anything from a text: the offset carries, and a text hung from a text sits half a
 pixel off. When a text moves by exactly one pixel with no layout change, look for an anchor exactly on a boundary.
 
+## Never Give a Text the Size It Reports
+**Problem**: an item level showed as a dot under the icon, only in BetterBags Next. Its item fitter recorded every
+part's size the first time it fitted a button and set it again in whole pixels, texts included. A text with no size of
+its own reports its text's size, so the item level was frozen at the width of the level it first showed, rounded to the
+nearest pixel, and a text narrower than its text is cut short: a fraction of a pixel short, or a longer level later.
+
+**Rule**: place a text by a corner and let the client size it; save and restore only its points. Size a text only to
+the room it may take (a title in a header), never to what it measures now. When a text reads "..." or less, check for
+a width set on it. The frame mock reports an unsized text's size as its text's, as the client does; a test that wants
+"no width set" compares `GetWidth()` with `GetStringWidth()`, not with 0.
+
 ## A Player's Choice Over a Declarative Theme Removes Parts After Resolution
 **Problem**: players wanted BetterBags Next's sparkles and other effects off on any theme, not only on themes that
 leave them out. Checking a setting in every widget that draws an effect would spread one choice across the panels,

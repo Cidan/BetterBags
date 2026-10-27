@@ -162,6 +162,50 @@ describe("NextItemFit", function()
     assert.are.equal(decoration, decoration.IconQuestTexture._allPoints, "the quest art too")
   end)
 
+  -- Reported in game: an item level cut short, a dot under the icon ("only happens in betterbags next"). A text
+  -- given no size reports its text's (Blizzard measures text that way, Blizzard_CustomizationOptionTemplates.lua),
+  -- and one given a width narrower than its text is cut short. The fitter gave each text it placed the size it
+  -- reported the first time the button was fitted, rounded to the nearest pixel: a fraction under its text, or
+  -- frozen at the width of the item level the button showed then.
+  describe("texts", function()
+    local function wholeText(text)
+      assert.are.equal(text:GetStringWidth(), text:GetWidth(), text:GetText())
+      assert.are.equal(text:GetStringHeight(), text:GetHeight(), text:GetText())
+      assert.is_false(text:IsTruncated(), text:GetText())
+    end
+
+    it("gives a text no size of its own, so a wider one drawn later is not cut short", function()
+      ilvl:SetText("98")
+      decoration.Stock:SetText("5")
+      itemFit:Fit({}, decoration, { ilvl })
+      ilvl:SetText("684")
+      decoration.Stock:SetText("100")
+      wholeText(ilvl)
+      wholeText(decoration.Stock)
+    end)
+
+    it("cuts no text short where its width falls between two pixels", function()
+      -- 1920 x 1080 at 64%: a unit is 0.9 pixel, so "684" (18 units) is 16.2 pixels, 16 rounded to the nearest.
+      undo()
+      undo = layout.UseScreen(1920, 1080, 0.64)
+      ilvl:SetText("684")
+      itemFit:Fit({}, decoration, { ilvl })
+      wholeText(ilvl)
+    end)
+
+    it("gives the classic bags back their texts with no size of their own", function()
+      local countdown = decoration.Cooldown:GetCountdownFontString()
+      itemFit:Fit({}, decoration, { ilvl })
+      itemFit:RestoreAll()
+      ilvl:SetText("1000")
+      countdown:SetText("59")
+      decoration.Stock:SetText("100")
+      wholeText(ilvl)
+      wholeText(countdown)
+      wholeText(decoration.Stock)
+    end)
+  end)
+
   -- Found by the pixel check in game (next-pixel-perfect.md §4): the client draws a cooldown's countdown in a font
   -- string hung by its middle from the cooldown's middle, and the cooldown fills the button (CooldownFrameTemplate,
   -- setAllPoints): on a button an odd number of pixels across, between two pixels. Its numbers change every

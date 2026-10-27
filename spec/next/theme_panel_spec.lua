@@ -848,7 +848,8 @@ describe("BetterBags Next's panels and themes", function()
       end
       backToDefault()
       assert.are.equal("LEFT", bag.title:GetJustifyH())
-      assert.are.equal(0, bag.title:GetWidth(), "as long as it is again")
+      assert.are.equal(bag.title:GetStringWidth(), bag.title:GetWidth(), "as long as it is again")
+      assert.is_false(bag.title:IsTruncated())
     end)
   end)
 
