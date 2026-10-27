@@ -4663,6 +4663,416 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       end)
     end)
 
+    -- A simulated client: the real events, queue and pipeline, a client whose bags change at random, and
+    -- what BetterBags is asked for in game (tooltips finishing, windows opening and closing, the bank,
+    -- settings, gear sets, sorts, loading screens). The client reports each change to a bag (BAG_UPDATE)
+    -- as it makes it, and a loading screen behaves as a capture of a trip into an instance and back out
+    -- showed: the items there at LOADING_SCREEN_ENABLED, taken away with no BAG_UPDATE while frames run,
+    -- gone at PLAYER_LEAVING_WORLD, and given back with BAG_UPDATE once the loading screen ends. Reported
+    -- in game, from a tooltip finishing, a window closing and the queue's step: items.lua: bad argument #1
+    -- to 'GetItemGUID' (Usage: local itemGUID = C_Item.GetItemGUID(itemLocation)), a recalculation asking
+    -- the client about a slot it had emptied. BetterBags must never ask about one, and once the client is
+    -- quiet what it committed must be what the client holds.
+    describe("a simulated client", function()
+      local now, timers, errors, loaderCallback, loaderPending, frameChanged, bankStore, clientBankOpen
+      local seed, log, guidCounter, sweeps
+
+      local BACKPACK, BANK_BAGS = { 0, 1 }, { 6, 7, 13 }
+      local SLOTS = 6
+
+      local function random(n)
+        seed = (seed * 1103515245 + 12345) % 2147483648
+        return (math.floor(seed / 65536) % n) + 1
+      end
+
+      local function after(delay, fn)
+        table.insert(timers, { at = now + math.max(delay or 0, 0.001), fn = fn })
+      end
+
+      -- A WoW event reaches every listener: the events module's handlers and the world frame
+      -- (refresh-scheduler.md §8).
+      local function fire(name, ...)
+        table.insert(log, string.format("%.3f %s %s", now, name, tostring((...))))
+        local entry = events._eventMap[name]
+        if entry then entry.fn(name, ...) end
+        local f = refresh._worldFrame
+        if f and f._events and f._events[name] and f:GetScript("OnEvent") then
+          f:GetScript("OnEvent")(f, name, ...)
+        end
+      end
+
+      local function send(message, options)
+        table.insert(log, string.format("%.3f [msg] %s", now, message))
+        events:SendMessage(context:New(message), message, options)
+      end
+
+      -- The client's BAG_UPDATE: BetterBags' handlers, and the loader's (its pending bags, read once the
+      -- frame's batch ends and their item data has loaded, at once or a few frames later).
+      local function bagUpdate(bag)
+        fire("BAG_UPDATE", bag)
+        loaderPending[bag] = true
+        frameChanged = true
+      end
+
+      local function loaderBatch()
+        if next(loaderPending) == nil then return end
+        local bags = loaderPending
+        loaderPending = {}
+        local delay = random(4) - 1
+        if delay == 0 then
+          loaderCallback(bags)
+        else
+          after(delay / 60, function() loaderCallback(bags) end)
+        end
+      end
+
+      local function frame()
+        now = now + 1 / 60
+        local f = refresh._worldFrame
+        local onUpdate = f and f:GetScript("OnUpdate")
+        if onUpdate then onUpdate(f, 1 / 60) end
+        local due, rest = {}, {}
+        for _, t in ipairs(timers) do
+          if t.at <= now + 1e-9 then table.insert(due, t) else table.insert(rest, t) end
+        end
+        timers = rest
+        for _, t in ipairs(due) do t.fn() end
+        if frameChanged then
+          frameChanged = false
+          fire("BAG_UPDATE_DELAYED")
+          loaderBatch()
+        end
+      end
+
+      local function frames(n)
+        for _ = 1, n do frame() end
+      end
+
+      local function newItem()
+        guidCounter = guidCounter + 1
+        return { itemID = 100 + random(5), guid = "g" .. guidCounter, count = random(5) }
+      end
+
+      local function slotsOf(bags, filled)
+        local found = {}
+        for _, bag in ipairs(bags) do
+          local slots = mockContainer[bag]
+          if slots then
+            for slot = 1, #slots do
+              if (slots[slot].itemID ~= nil) == filled then
+                table.insert(found, { bag, slot })
+              end
+            end
+          end
+        end
+        return found
+      end
+
+      local function pick(list)
+        if #list == 0 then return nil end
+        return list[random(#list)]
+      end
+
+      -- What hooks.lua asks for when an interaction window opens (a frame later, from OnUpdate) or closes.
+      local function interactionRecalculation()
+        return {
+          resetLayout = true,
+          backpack = true,
+          bank = items:NeedsInteractionRecalculation(const.BAG_KIND.BANK),
+          categoriesUnchanged = true,
+        }
+      end
+
+      local function closeWindow(interactionType)
+        addon.atInteracting = false
+        fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", interactionType)
+        send("bags/Rederive", interactionRecalculation())
+      end
+
+      -- What a tooltip finishing asks for, from its bucket's timer (TooltipScanner:OnTooltipDataResolved).
+      local function tooltipLoaded()
+        after(0.2, function()
+          send("bags/Rederive", { backpack = true, bank = addon.atBank, categoriesUnchanged = true })
+        end)
+      end
+
+      local OPS = {
+        loot = function()
+          local at = pick(slotsOf(BACKPACK, false))
+          if not at then return end
+          mockContainer[at[1]][at[2]] = newItem()
+          bagUpdate(at[1])
+          tooltipLoaded()
+        end,
+        use = function()
+          local at = pick(slotsOf(BACKPACK, true))
+          if not at then return end
+          mockContainer[at[1]][at[2]] = {}
+          bagUpdate(at[1])
+        end,
+        move = function()
+          local from, to = pick(slotsOf(BACKPACK, true)), pick(slotsOf(BACKPACK, false))
+          if not (from and to) then return end
+          mockContainer[to[1]][to[2]] = mockContainer[from[1]][from[2]]
+          mockContainer[from[1]][from[2]] = {}
+          bagUpdate(from[1])
+          if to[1] ~= from[1] then bagUpdate(to[1]) end
+        end,
+        count = function()
+          local at = pick(slotsOf(BACKPACK, true))
+          if not at then return end
+          local item = mockContainer[at[1]][at[2]]
+          mockContainer[at[1]][at[2]] = { itemID = item.itemID, guid = item.guid, count = random(20) }
+          bagUpdate(at[1])
+        end,
+        tooltip = tooltipLoaded,
+        settings = function()
+          send("bags/Rederive", { resetLayout = true, buttons = true })
+        end,
+        gearSets = function()
+          fire("EQUIPMENT_SETS_CHANGED")
+        end,
+        openWindow = function()
+          if addon.atInteracting then return end
+          addon.atInteracting = true
+          fire("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", 5)
+          after(0, function() send("bags/Rederive", interactionRecalculation()) end)
+        end,
+        closeWindow = function()
+          if not addon.atInteracting or clientBankOpen then return end
+          closeWindow(5)
+        end,
+        openBank = function()
+          if clientBankOpen or addon.atInteracting then return end
+          clientBankOpen = true
+          for _, bag in ipairs(BANK_BAGS) do mockContainer[bag] = bankStore[bag] end
+          addon.atInteracting = true
+          fire("BANKFRAME_OPENED")
+          after(0, function() send("bags/Rederive", interactionRecalculation()) end)
+        end,
+        -- BANKFRAME_CLOSED fires twice; the bank's data is there only at the first (warcraft.wiki.gg
+        -- BANKFRAME_CLOSED). addon.CloseBank forgets the bank's items at each.
+        closeBank = function()
+          if not clientBankOpen then return end
+          fire("BANKFRAME_CLOSED")
+          items:ClearBankCache(context:New("BANKFRAME_CLOSED"))
+          clientBankOpen = false
+          for _, bag in ipairs(BANK_BAGS) do mockContainer[bag] = nil end
+          fire("BANKFRAME_CLOSED")
+          items:ClearBankCache(context:New("BANKFRAME_CLOSED"))
+          closeWindow(8)
+        end,
+        deposit = function()
+          if not clientBankOpen then return end
+          local from, to = pick(slotsOf(BACKPACK, true)), pick(slotsOf(BANK_BAGS, false))
+          if not (from and to) then return end
+          mockContainer[to[1]][to[2]] = mockContainer[from[1]][from[2]]
+          mockContainer[from[1]][from[2]] = {}
+          bagUpdate(from[1])
+          bagUpdate(to[1])
+        end,
+        withdraw = function()
+          if not clientBankOpen then return end
+          local from, to = pick(slotsOf(BANK_BAGS, true)), pick(slotsOf(BACKPACK, false))
+          if not (from and to) then return end
+          mockContainer[to[1]][to[2]] = mockContainer[from[1]][from[2]]
+          mockContainer[from[1]][from[2]] = {}
+          bagUpdate(from[1])
+          bagUpdate(to[1])
+        end,
+        sort = function()
+          send("bags/SortBackpack")
+        end,
+        -- A loading screen, as captured: the items there at LOADING_SCREEN_ENABLED, frames run, the items
+        -- taken with no BAG_UPDATE, more frames (timers firing, a window closing, a tooltip finishing),
+        -- PLAYER_LEAVING_WORLD, the bags' containers and the player back, the loading screen gone, then
+        -- the items given back with BAG_UPDATE.
+        transfer = function()
+          if clientBankOpen then return end
+          fire("LOADING_SCREEN_ENABLED")
+          frames(random(10))
+          local held = {}
+          for _, bag in ipairs(BACKPACK) do
+            held[bag] = mockContainer[bag]
+            mockContainer[bag] = nil
+          end
+          tooltipLoaded()
+          frames(random(10))
+          if addon.atInteracting then closeWindow(5) end
+          frames(random(30))
+          fire("PLAYER_LEAVING_WORLD")
+          frames(random(5))
+          fire("BAG_CONTAINER_UPDATE")
+          fire("PLAYER_ENTERING_WORLD", false, false)
+          fire("LOADING_SCREEN_DISABLED")
+          frames(random(3))
+          for _, bag in ipairs(BACKPACK) do
+            mockContainer[bag] = held[bag]
+            bagUpdate(bag)
+          end
+        end,
+        wait = function()
+          frames(random(12))
+        end,
+      }
+      local OP_NAMES = {}
+      for name in pairs(OPS) do table.insert(OP_NAMES, name) end
+      table.sort(OP_NAMES)
+
+      -- What does not change from one seed to the next: the client's clock, its error handler, the loader,
+      -- the bank's window, the stacking options BetterBags ships with, and a count of the sweeps run.
+      before_each(function()
+        saveGlobal(_G.C_Timer, "After")
+        saveGlobal(_G.C_Timer, "NewTimer")
+        _G.C_Timer.After = function(delay, fn) after(delay, fn) end
+        _G.C_Timer.NewTimer = function(delay, fn)
+          local t = { cancelled = false }
+          function t:Cancel() self.cancelled = true end
+          after(delay, function() if not t.cancelled then fn(t) end end)
+          return t
+        end
+        saveGlobal(_G, "geterrorhandler")
+        _G.geterrorhandler = function()
+          return function(err)
+            table.insert(errors, { err = tostring(err), log = { unpack(log, math.max(1, #log - 30)) } })
+          end
+        end
+        saveGlobal(_G, "GameMenuFrame")
+        _G.GameMenuFrame = { IsShown = function() return false end }
+        saveGlobal(_G.C_Container, "SortBags")
+        _G.C_Container.SortBags = function()
+          -- The server moves the items a few frames later; each bag it changed says so.
+          after(random(3) / 60, function()
+            for _, bag in ipairs(BACKPACK) do
+              local slots = mockContainer[bag]
+              if slots then
+                for i = #slots, 2, -1 do
+                  local j = random(i)
+                  slots[i], slots[j] = slots[j], slots[i]
+                end
+                bagUpdate(bag)
+              end
+            end
+          end)
+        end
+        override(database, "GetStackingOptions", function()
+          return { mergeStacks = true, unmergeAtShop = true, mergeUnstackable = true }
+        end)
+        local loader = addon:GetModule("ItemLoader")
+        override(loader, "TellMeWhenABagIsUpdated", function(_, cb) loaderCallback = cb end)
+        override(loader, "Hold", function() end)
+        override(loader, "Release", function() end)
+        for _, name in ipairs({ "PrimeBank", "PrimeAll" }) do
+          override(loader, name, function(...)
+            local cb = select(select("#", ...), ...)
+            local delay = random(3) - 1
+            if delay == 0 then cb() else after(delay / 60, cb) end
+          end)
+        end
+        local runRefresh = items.RunRefresh
+        override(items, "RunRefresh", function(self, ctx, kind)
+          local key = ctx:Get("derive") and "derive" or "read"
+          sweeps[key] = sweeps[key] + 1
+          if kind == const.BAG_KIND.BANK then sweeps.bank = sweeps.bank + 1 end
+          return runRefresh(self, ctx, kind)
+        end)
+      end)
+
+      after_each(function()
+        if events._eventHandler then
+          events._eventHandler:UnregisterAllEvents()
+          events._eventHandler:UnregisterAllMessages()
+        end
+        events:Init()
+      end)
+
+      local function setup(s)
+        seed = s
+        now, timers, errors, loaderPending, frameChanged, log, guidCounter = 0, {}, {}, {}, false, {}, 0
+        clientBankOpen = false
+        sweeps = { read = 0, derive = 0, bank = 0, transfer = 0 }
+        if events._eventHandler then
+          events._eventHandler:UnregisterAllEvents()
+          events._eventHandler:UnregisterAllMessages()
+        end
+        events:Init()
+        async.Yield = function() coroutine.yield() end
+        search:Init()
+        items:Init()
+        items._firstLoad[const.BAG_KIND.BACKPACK] = false
+        items._firstLoad[const.BAG_KIND.BANK] = false
+        refresh:Init()
+        addon.atBank = false
+        addon.atInteracting = false
+        addon.Bags = { Bank = { bankTab = 6, Show = function(_, _, _, onShown)
+          after(random(30) / 60, onShown)
+        end } }
+        mockContainer, newSlots = {}, {}
+        bankStore = {}
+        for _, bag in ipairs(BANK_BAGS) do
+          bankStore[bag] = {}
+          for slot = 1, SLOTS do bankStore[bag][slot] = random(2) == 1 and newItem() or {} end
+        end
+        for _, bag in ipairs(BACKPACK) do
+          mockContainer[bag] = {}
+          for slot = 1, SLOTS do mockContainer[bag][slot] = random(2) == 1 and newItem() or {} end
+        end
+        refresh:OnEnable()
+        refresh:_WorldRead(refresh._world, "primed")
+        frames(10)
+      end
+
+      -- Runs a seed: its operations, then frames until the client has been quiet long enough for every
+      -- read, wait and timeout to have run. It returns the first error, with the events before it.
+      local function run(steps)
+        for _ = 1, steps do
+          local name = OP_NAMES[random(#OP_NAMES)]
+          table.insert(log, string.format("%.3f op %s", now, name))
+          if name == "transfer" then sweeps.transfer = sweeps.transfer + 1 end
+          local ok, err = pcall(OPS[name])
+          if not ok then
+            table.insert(errors, { err = tostring(err), log = { unpack(log, math.max(1, #log - 30)) } })
+          end
+          if #errors > 0 then
+            return errors[1].err .. "\n--- before it ---\n" .. table.concat(errors[1].log, "\n")
+          end
+        end
+        frames(60 * 70)
+        return nil
+      end
+
+      -- What the client holds in the backpack, and what BetterBags committed of it, by slot and GUID.
+      local function holdings()
+        local client, committed = {}, {}
+        for _, bag in ipairs(BACKPACK) do
+          for slot, contents in ipairs(mockContainer[bag]) do
+            if contents.itemID then client[bag .. "_" .. slot] = contents.guid end
+          end
+        end
+        for slotkey, item in pairs(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
+          if not item.isItemEmpty then committed[slotkey] = item.itemInfo.itemGUID end
+        end
+        return client, committed
+      end
+
+      it("never asks about a slot the client emptied, and commits what the client holds once it is quiet", function()
+        local total = { read = 0, derive = 0, bank = 0, transfer = 0 }
+        for s = 1, 60 do
+          setup(s)
+          local failure = run(300)
+          if failure then
+            error("seed " .. s .. ": " .. failure)
+          end
+          local client, committed = holdings()
+          assert.same(client, committed, "seed " .. s)
+          for k, v in pairs(sweeps) do total[k] = total[k] + v end
+        end
+        assert.is_true(total.read > 1000 and total.derive > 1000 and total.bank > 100 and total.transfer > 500,
+          string.format("reads %d, recalculations %d, bank sweeps %d, loading screens %d",
+            total.read, total.derive, total.bank, total.transfer))
+      end)
+    end)
+
     it("leaves an item read without its data whose slot now holds something else", function()
       local getItemInfo = _G.C_Item.GetItemInfo
       override(_G.C_Item, "GetItemInfo", function(itemID)
@@ -5836,6 +6246,118 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.is_nil(next(items._newItemTimers[const.BAG_KIND.BACKPACK] or {}), "nothing came in as new")
         assert.equal(2, held)
         assert.equal(2, released)
+      end)
+
+      -- Captured in game, a trip into an instance and back out (BetterBags' profiler, both bag counts
+      -- recorded at each event): the client takes the player's items away after LOADING_SCREEN_ENABLED and
+      -- before PLAYER_LEAVING_WORLD, which came 1.9 s (in) and 0.9 s (out) later, with 464 frames run in
+      -- between on the way in. At LOADING_SCREEN_ENABLED the backpack held its 26 items, all existing; at
+      -- PLAYER_LEAVING_WORLD, none, and no slot. Reported three times after the world was held from
+      -- PLAYER_LEAVING_WORLD on: the GetItemGUID error with the queue not held (_held=false), from a tooltip
+      -- that finished loading (its bucket's timer), from a window closing, and from the queue's step.
+      local function tooltipLoaded()
+        events:SendMessage(context:New("TooltipDataResolved"), "bags/Rederive",
+          { backpack = true, bank = false, categoriesUnchanged = true })
+      end
+
+      it("holds from the loading screen's start, before the client takes the items away (captured)", function()
+        login()
+        local before = #sweeps
+        asked = {}
+        fire("LOADING_SCREEN_ENABLED")
+        frame()
+        takeAway()
+        frame()
+        -- Before PLAYER_LEAVING_WORLD: a window closes as the player zones, a tooltip finishes loading.
+        closeWindow()
+        tooltipLoaded()
+        frame()
+        drain()
+        assert.same({}, errors)
+        assert.same({}, asked, "the client is asked about no slot during the loading screen")
+        assert.equal(before, #sweeps, "nothing swept during the loading screen")
+
+        fire("PLAYER_LEAVING_WORLD")
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        giveBack()
+        fire("BAG_UPDATE", 0)
+        fire("BAG_UPDATE", 1)
+        frame() -- the items arriving
+        frame() -- quiet
+        primed()
+        drain()
+        assert.same({}, errors)
+        assert.equal(before + 1, #sweeps, "one read takes in the window's and the tooltip's recalculations")
+        assert.is_true(sweeps[#sweeps].wipe)
+        assert.equal("g101", committed()["0_1"].itemInfo.itemGUID)
+        assert.equal(2, held, "the login's wait and the loading screen's: leaving the world joins it")
+        assert.equal(2, released)
+      end)
+
+      -- The first report's stack: the queue's step (refresh.lua _Step) ran the recalculation.
+      it("goes on with no unit during the loading screen: a recalculation waiting behind a read (captured)", function()
+        login()
+        refresh:RequestUpdate({ backpack = true }) -- a read under way, its harvest done
+        refresh:RequestUpdate({ derive = true, backpack = true }) -- a recalculation waits behind it
+        asked = {}
+        fire("LOADING_SCREEN_ENABLED")
+        frame()
+        takeAway()
+        drain()
+        assert.same({}, errors)
+        assert.same({}, asked)
+
+        fire("PLAYER_LEAVING_WORLD")
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        giveBack()
+        frame()
+        primed()
+        drain()
+        assert.same({}, errors)
+        assert.equal("g101", committed()["0_1"].itemInfo.itemGUID)
+      end)
+
+      it("waits once per loading screen, whichever of its two signals comes first", function()
+        login()
+        fire("PLAYER_LEAVING_WORLD")
+        fire("LOADING_SCREEN_ENABLED")
+        assert.equal(2, held, "the loading screen joins the wait leaving the world started")
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED")
+        giveBack()
+        frame()
+        primed()
+        drain()
+        assert.same({}, errors)
+        -- The next loading screen is a wait of its own.
+        fire("LOADING_SCREEN_ENABLED")
+        assert.equal(3, held)
+      end)
+
+      it("starts a new wait for a loading screen that begins before the world's read", function()
+        login()
+        fire("PLAYER_LEAVING_WORLD")
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("LOADING_SCREEN_DISABLED") -- the first wait settles
+        fire("LOADING_SCREEN_ENABLED") -- another loading screen, before the first wait read
+        frame()
+        frame()
+        assert.is_nil(primed, "waiting for the second loading screen to end")
+        assert.equal(3, held)
+      end)
+
+      it("starts a new wait when the player leaves a second time during a loading screen's wait", function()
+        login()
+        fire("LOADING_SCREEN_ENABLED")
+        fire("PLAYER_LEAVING_WORLD") -- the same loading screen: joins its wait
+        fire("PLAYER_ENTERING_WORLD", false, false) -- arms that wait's loading timeout
+        fire("PLAYER_LEAVING_WORLD") -- another transfer, before the loading screen ended
+        assert.equal(3, held)
+        assert.is_true(fireDelayed(refresh.WORLD_LOADING_TIMEOUT))
+        frame()
+        assert.is_nil(primed, "the second wait still waits for its loading screen")
       end)
 
       it("asks the client about no bag while out of the world", function()
