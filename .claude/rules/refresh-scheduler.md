@@ -240,18 +240,32 @@ whose slot the client said was empty. `BAG_UPDATE` is a `SynchronousEvent`
 (ContainerDocumentation.lua): it fires the moment a bag's contents change, so a real change marks
 its bag before any later event can recalculate. A dungeon is a world transfer, and the client takes
 the player's items away for its loading screen and gives them back after, without a `BAG_UPDATE`
-on the way out. **Inferred**, not captured: no capture covers a world transfer; this rests on the
-stack, the synchronous `BAG_UPDATE`, the captured login above, and Blizzard forum advice that the
-client resets its bag cache between `PLAYER_ENTERING_WORLD` and the first `BAG_UPDATE`. The capture
-tooling now records it (perf-profiler.md §10d), so a capture of a dungeon entry with a window open
-will show when the items leave and come back. Reproduced on the real pipeline: a replay of the
-entry (items read, the player leaves, the slots go empty, two windows close) raises the reported
-error once per window without the fix.
+on the way out.
+
+**Captured** (a profiler capture of a trip into an instance and back out, retail, the bag counts of
+perf-profiler.md §10d recorded at each event): the items leave **before `PLAYER_LEAVING_WORLD`**.
+
+| | In | Out |
+|---|---|---|
+| `LOADING_SCREEN_ENABLED` | 1.48 s: 26 items, all existing | 9.07 s: 26 items, all existing |
+| `PLAYER_LEAVING_WORLD` | 3.41 s: no item, no slot | 9.93 s: no item, no slot |
+| frames run in between | 464 (about 4 ms each) | |
+| items back | 4.27 s, `BAG_UPDATE` bursts after `LOADING_SCREEN_DISABLED` (3.93 s) | 15.42 s, after it (15.19 s) |
+
+No `BAG_UPDATE` fired between the first two rows, and none of BetterBags' code ran (nothing was
+pending), but frames, and so timers, kept running. The wait first started at `PLAYER_LEAVING_WORLD`,
+and the error came back three times after that fix, the queue not held (`_held=false`): from a
+tooltip finishing (`TooltipScanner:OnTooltipDataResolved`, its bucket's timer), from a window
+closing (`CloseInteractionWindow`), and from the queue's step. Each is something that runs in that
+gap. Replayed on the real pipeline in the captured order, each raises the reported error without
+the fix.
 
 **The wait** (`refresh:HoldForWorld(cause)`): at the end of `OnEnable` (cause `login`), and on every
-`PLAYER_LEAVING_WORLD` (cause `transfer`; a `SynchronousEvent` too, SystemDocumentation.lua, so it
-fires before the transfer), which also marks every backpack, bank and Warbank bag unread (§10:
-until a read of them commits, a recalculation asks the client nothing about them). It holds the
+loading screen (cause `transfer`) from whichever of its two signals comes first,
+`LOADING_SCREEN_ENABLED` (documented on every client branch, LoadingScreenDocumentation.lua) or
+`PLAYER_LEAVING_WORLD` (`refresh:_LeaveWorld(signal)`, which returns `"held"` or `"joined"` for
+traces). Each signal also marks every backpack, bank and Warbank bag unread (§10: until a read of
+them commits, a recalculation asks the client nothing about them). It holds the
 queue (`self._held`) and the loader (`itemLoader:Hold()`, so bag batches only mark bags dirty) and
 listens on its own frame (`self._worldFrame`) to `PLAYER_ENTERING_WORLD`,
 `LOADING_SCREEN_DISABLED`, `BAG_UPDATE` and `BAG_CONTAINER_UPDATE`. **While held, no unit starts
@@ -282,8 +296,11 @@ there. Then:
    read of the backpack once per loading screen (the bank and guild bank close with the
    transfer). Not measured after a loading screen yet.
 
-**Each wait is its own** (a table, `self._world`). A new wait (the player leaving the world again)
-replaces the last. The world frame's scripts are the current wait's (set by `HoldForWorld` and
+**Each wait is its own** (a table, `self._world`). The other signal of the same loading screen joins
+the wait under way: a wait still waiting for a loading screen to end (`phase == 'loading'`, the
+login's included) that has not had that signal (`hold.signals`). The same signal again, or either
+signal once the wait is past its loading screen (settling, priming), is another loading screen: a
+new wait replaces the last. The world frame's scripts are the current wait's (set by `HoldForWorld` and
 `_WorldSettle`, cleared by `_WorldPrime` and `_WorldRead`); only the timers and the item data's
 callback outlive their wait, and each checks it: a replaced wait's loading or return timeout
 settles nothing, its prime timeout reads nothing, and its item data asks for a read only if that
@@ -325,18 +342,33 @@ a recalculation before the world's read asking nothing about the bags (the items
 an earlier wait's timers and item data ending nothing (read or not, still loading or not), the
 settle timeout counted from the loading screen's end, the return timeout, no early read for a
 backpack shown after a loading screen and no second hook, a second loading screen before the
-read. `spec/loader_spec.lua` covers the loader's hold and `PrimeAll`; `spec/refresh_spec.lua`
+read. In the captured order: a window closing and a tooltip finishing between `LOADING_SCREEN_ENABLED`
+and `PLAYER_LEAVING_WORLD`, after the items left (no error, nothing asked, nothing swept, one read
+after); a recalculation queued behind a read stepping in that gap; one wait per loading screen
+whichever signal comes first; a new wait for a loading screen that begins before the last one's read,
+and for the player leaving a second time during a loading screen's wait. "a simulated client"
+(the "recalculating without reading" tests): 60 seeds of 300 random steps on the real events, queue
+and pipeline (loot, use, moves, counts, tooltips finishing, settings, gear sets, windows and the bank
+opening and closing, deposits, withdrawals, sorts, loading screens in the captured order), a client
+that reports every change as it makes it: no slot the client emptied is ever asked about, and once
+the client is quiet the committed backpack is what it holds. Without the fix, the first seed raises
+the reported error. `spec/loader_spec.lua` covers the loader's hold and `PrimeAll`; `spec/refresh_spec.lua`
 that `OnEnable` reads nothing. Mutation-tested: 27 mutations of the wait, the marks and the
 capture tooling, each caught; six first survived and led to five tests (a wait replaced while
 still loading, the settle timeout, a never-read wait's late item data, the bag shown mid-prime,
 the Warbank's count) and to removing a check its callers already made (priming twice). Three
 identity checks in the world frame's scripts were removed first: the scripts are set per wait.
+Holding from `LOADING_SCREEN_ENABLED`: 6 mutations (no `LOADING_SCREEN_ENABLED`, joining past the
+loading screen, the same signal joining, a new wait or a join not recording its signal, no marks), each
+caught; the one that first survived (a join not recording its signal) led to the test of the player
+leaving a second time.
 
-**Not verified in game:** that the items leave the client during a world transfer and how they
-come back (the capture tooling is there to show it), and the wipe's cost after a loading screen.
-To check: start a capture (Performance tab of `/bbdb`), stand at a vendor or mailbox with it
-open, enter a dungeon, stop once in; the trace shows `[event] PLAYER_LEAVING_WORLD`, the window
-closing, the loading screen and each `[bags]` count (perf-profiler.md §10d).
+**Measured** (the same capture): the wipe after a loading screen, with the items there, cost 47 to
+57 ms for a 26-item backpack. On the way in the world's read ran at 4.09 s, before the items came back
+(4.27 s): the bags were attached but empty and a frame passed with no bag event, so it read an empty
+backpack, and the read the bags' `BAG_CONTAINER_UPDATE`s asked for (0.76 s later, 17 requests merged)
+read the items. No error comes of it (an empty commit asks nothing), but the first read was for
+nothing. Not changed yet.
 
 ## 9. Redraw-Only Settings
 

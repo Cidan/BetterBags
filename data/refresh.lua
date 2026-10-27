@@ -649,18 +649,45 @@ function refresh:OnEnable()
     items:ClearGuildBankCache(ctx)
   end)
 
-  -- Leaving the world (a loading screen: a dungeon, a portal, a hearthstone) takes the player's items
-  -- out of the client until it delivers them again, with no BAG_UPDATE on the way out: what was read is
-  -- not what the client holds until a read of it commits, so every bag is unread (a recalculation asks
-  -- the client nothing about it), and nothing is read until the world is back (§8).
+  -- A loading screen (a dungeon, a portal, a hearthstone) takes the player's items out of the client
+  -- until it delivers them again, with no BAG_UPDATE on the way out, and before PLAYER_LEAVING_WORLD:
+  -- held from whichever of the two comes first (_LeaveWorld).
+  if isEventValid('LOADING_SCREEN_ENABLED') then
+    events:RegisterEvent('LOADING_SCREEN_ENABLED', function()
+      self:_LeaveWorld('loadingScreen')
+    end)
+  end
   events:RegisterEvent('PLAYER_LEAVING_WORLD', function()
-    markUnread(const.BACKPACK_BAGS)
-    markUnread(const.BANK_BAGS)
-    markUnread(const.ACCOUNT_BANK_BAGS)
-    self:HoldForWorld('transfer')
+    self:_LeaveWorld('leaving')
   end)
 
   self:HoldForWorld('login')
+end
+
+-- _LeaveWorld marks every bag unread (a recalculation asks the client nothing about it) and holds every
+-- sweep until the world is back (§8), on either signal of a loading screen: LOADING_SCREEN_ENABLED
+-- ("loadingScreen") or PLAYER_LEAVING_WORLD ("leaving"). A capture of a trip into an instance and back
+-- out had the backpack's 26 items there at LOADING_SCREEN_ENABLED and gone at PLAYER_LEAVING_WORLD, which
+-- came 1.9 s and 0.9 s later with hundreds of frames run in between: held only from PLAYER_LEAVING_WORLD,
+-- a tooltip finishing, a window closing or the queue's step recalculated the bags in that gap and asked
+-- the client about the items it had taken ("bad argument #1 to 'GetItemGUID'"). The other signal of the
+-- same loading screen joins the wait under way (one still waiting for a loading screen to end that has
+-- not had that signal); the same signal again is another loading screen, a wait of its own. It returns
+-- what it did, for profiler traces: "held" or "joined".
+---@param signal "loadingScreen"|"leaving"
+---@return string
+function refresh:_LeaveWorld(signal)
+  markUnread(const.BACKPACK_BAGS)
+  markUnread(const.BANK_BAGS)
+  markUnread(const.ACCOUNT_BANK_BAGS)
+  local hold = self._world
+  if hold and hold.phase == 'loading' and not hold.signals[signal] then
+    hold.signals[signal] = true
+    return 'joined'
+  end
+  self:HoldForWorld('transfer')
+  self._world.signals[signal] = true
+  return 'held'
 end
 
 -- _OpenGuildBank shows the guild bank's window at once and loads its tabs only once the window has
@@ -772,7 +799,7 @@ end
 function refresh:HoldForWorld(cause)
   self._held = true
   ---@type table
-  local hold = { cause = cause, phase = 'loading', bagActivity = false }
+  local hold = { cause = cause, phase = 'loading', bagActivity = false, signals = {} }
   self._world = hold
   addon:GetModule('ItemLoader'):Hold()
 
