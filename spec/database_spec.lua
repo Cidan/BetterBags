@@ -542,6 +542,46 @@ describe("Database", function()
     end)
   end)
 
+  -- At PLAYER_LOGOUT AceDB strips every setting still at its default from the profile, right after
+  -- it fires OnDatabaseShutdown (initialization.md §7).
+  describe("logging out", function()
+    local savedData, savedVariables
+    before_each(function()
+      savedData, savedVariables = DB.data, _G.BetterBagsDB
+    end)
+    after_each(function()
+      DB.data, _G.BetterBagsDB = savedData, savedVariables
+      addon.loggingOut = false
+    end)
+
+    -- AceDB's handler of PLAYER_LOGOUT, for this database alone.
+    local function logout()
+      local aceDB = LibStub("AceDB-3.0")
+      local registry = aceDB.db_registry
+      aceDB.db_registry = { [DB.data] = true }
+      local ok, err = pcall(aceDB.frame:GetScript("OnEvent"), aceDB.frame, "PLAYER_LOGOUT")
+      aceDB.db_registry = registry
+      if not ok then error(err, 0) end
+    end
+
+    it("says the player is logging out when AceDB shuts the database down, and not before", function()
+      _G.BetterBagsDB = nil
+      DB:Init()
+      assert.is_false(addon.loggingOut)
+      logout()
+      assert.is_true(addon.loggingOut)
+      assert.is_nil(rawget(DB.data.profile, "views"), "the views at their default, stripped")
+    end)
+
+    it("starts a new session not logging out", function()
+      _G.BetterBagsDB = nil
+      DB:Init()
+      logout()
+      DB:Init()
+      assert.is_false(addon.loggingOut)
+    end)
+  end)
+
   -- ─── Bag view ──────────────────────────────────────────────────────────────────
 
   describe("bag views", function()

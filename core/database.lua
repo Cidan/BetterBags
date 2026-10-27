@@ -26,6 +26,13 @@ function DB:Init()
   local newInstall = _G[addonName .. 'DB'] == nil
   -- Create the settings database.
   DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
+  -- At PLAYER_LOGOUT AceDB strips every setting still at its default, and every table left empty,
+  -- from the profile, right after this callback: a setting read after it can be nil
+  -- (initialization.md §7).
+  addon.loggingOut = false
+  DB.data.RegisterCallback(DB, 'OnDatabaseShutdown', function()
+    addon.loggingOut = true
+  end)
   if newInstall then
     -- New installs start with BetterBags Next (next.md §1). Saved in the profile: the default stays
     -- off, so a profile from before that never turned Next on keeps the classic bags.

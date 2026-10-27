@@ -328,4 +328,27 @@ describe("Context", function()
       assert.is_truthy(text:find('"RightButton"$'), text)
     end)
   end)
+
+  -- Once the player is logging out, AceDB strips the settings of their defaults, so no handler may
+  -- run (initialization.md §7).
+  describe("SetScript and HookScript while logging out", function()
+    after_each(function()
+      addon.loggingOut = false
+    end)
+
+    it("runs neither handler while the player is logging out", function()
+      local frame = CreateFrame("Frame")
+      local ran = {}
+      addon.SetScript(frame, "OnSizeChanged", function() table.insert(ran, "set") end)
+      addon.HookScript(frame, "OnSizeChanged", function() table.insert(ran, "hooked") end)
+
+      addon.loggingOut = true
+      frame:GetScript("OnSizeChanged")(frame)
+      assert.are.same({}, ran)
+
+      addon.loggingOut = false
+      frame:GetScript("OnSizeChanged")(frame)
+      assert.are.same({ "set", "hooked" }, ran)
+    end)
+  end)
 end)
