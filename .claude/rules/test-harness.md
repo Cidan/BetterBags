@@ -128,6 +128,9 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
 - **Driving time:** pass `globals = { C_Timer = ... }` with an `After`/`NewTimer` that keep their
   timers for the spec to run (`spec/integration/bank_open_spec.lua`); the startup read runs once
   the spec fires `LOADING_SCREEN_DISABLED` and runs one quiet frame on `refresh._worldFrame`.
+- **Logging out:** `handle:Logout()` runs AceDB's own `PLAYER_LOGOUT` handler for the loaded addon's
+  database alone, stripping its defaults as the client's logout does; the other specs' databases are
+  left as they are (initialization.md §7, `spec/integration/logout_spec.lua`).
 - **Restore** puts back everything changed in place (insulation restores only globals): first
   the loaded addon's events, messages and hooks and Sonata's text-size callback (unhooking reads
   the libraries' registries, put back next), then the table fields of every library (AceHook's

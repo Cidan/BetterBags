@@ -378,6 +378,18 @@ function WholeAddon.Load(opts)
     onEvent(aceAddon.frame, "PLAYER_LOGIN")
   end
 
+  -- Logout runs AceDB's handler of PLAYER_LOGOUT, as the client does when the player logs out or
+  -- reloads: it strips every setting still at its default, and every table left empty, before the
+  -- saved variables are written. Only the loaded addon's database: the other specs' are left alone.
+  function handle:Logout()
+    local aceDB = LibStub("AceDB-3.0")
+    local registry = aceDB.db_registry
+    aceDB.db_registry = { [self.addon:GetModule("Database").data] = true }
+    local ok, err = pcall(aceDB.frame:GetScript("OnEvent"), aceDB.frame, "PLAYER_LOGOUT")
+    aceDB.db_registry = registry
+    if not ok then error(err, 0) end
+  end
+
   -- Restore frees the loaded addon too (a load and start hold about 80 MB of mock frames): a full
   -- collection, so no more than one load is ever in memory.
   function handle:Restore()

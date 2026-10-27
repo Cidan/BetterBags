@@ -148,12 +148,15 @@ end
 ---@class Perf: AceModule
 local perf = addon:GetModule('Perf')
 
+-- Neither runs its handler once the player is logging out (addon.loggingOut): the settings it may
+-- read are being stripped of their defaults (initialization.md §7).
 ---@param obj any
 ---@param script string
 ---@param func fun(ctx: Context, ...)
 function addon.HookScript(obj, script, func)
   local label = '[script] ' .. script
   obj:HookScript(script, function(...)
+    if addon.loggingOut then return end
     local token = perf.active and perf:Enter(label, ...)
     local ctx = context:New(script)
     func(ctx, unpack({...}))
@@ -167,6 +170,7 @@ end
 function addon.SetScript(obj, script, func)
   local label = '[script] ' .. script
   obj:SetScript(script, function(...)
+    if addon.loggingOut then return end
     local token = perf.active and perf:Enter(label, ...)
     local ctx = context:New(script)
     func(ctx, unpack({...}))
