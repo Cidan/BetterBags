@@ -1,16 +1,16 @@
 {
-  "id": 1793064522,
+  "id": 1793064533,
   "version": "v0.8.7",
-  "channel": "alpha",
+  "channel": "release",
   "date": "2026-10-27",
-  "from": "cae20851f18c716470654d7477e0ad6cb9177a5b",
-  "to": "ff5db093ebd7a1d8a07444bbaac19ad9e8111930",
-  "headline": "This build fixes truncated item levels and button texts in BetterBags Next.",
+  "from": "v0.8.6",
+  "to": "v0.8.7",
+  "headline": "This release fixes truncated item level and slot text displays in BetterBags Next.",
   "entries": [
     {
       "category": "Fixed",
-      "title": "Item level and button text cut short in Next",
-      "details": "Fixed an issue in BetterBags Next where an item's level could be cut short, reduced to a dot, or disappear entirely. Stack counts and cooldown numbers are also protected from being truncated.",
+      "title": "Item level and button texts truncating in Next",
+      "details": "Fixed an issue in BetterBags Next where item levels, stock counts, and cooldown timers could be cut short or appear as dots under item icons.",
       "clients": []
     }
   ]
