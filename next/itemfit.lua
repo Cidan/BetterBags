@@ -40,7 +40,10 @@ local MASQUE_PARTS = { IconBorder = true, IconOverlay = true, IconOverlay2 = tru
 itemFit.saved = setmetatable({}, { __mode = "k" }) ---@type table<Frame, table<Region, table>>
 itemFit.keys = setmetatable({}, { __mode = "k" }) ---@type table<Frame, string>
 
--- remember records where a region is, once: its points and its size.
+-- remember records where a region is, once: its points, and a region's size. Not a text's: a text given no size
+-- reports its text's, and one given a size narrower than its text is cut short, so a text is placed, never sized
+-- (an item level sized to its first text, rounded to the nearest pixel, was a fraction too narrow or too narrow
+-- for a later, longer one).
 ---@param saved table<Region, table>
 ---@param region Region
 ---@return table
@@ -51,14 +54,17 @@ local function remember(saved, region)
     for i = 1, region:GetNumPoints() do
       points[i] = { region:GetPoint(i) }
     end
-    was = { points = points, width = region:GetWidth(), height = region:GetHeight() }
+    was = { points = points }
+    if region:GetObjectType() ~= "FontString" then
+      was.width, was.height = region:GetWidth(), region:GetHeight()
+    end
     saved[region] = was
   end
   return was
 end
 
 -- fromCorner anchors a region by its template point, at its template offset rounded to whole pixels (a text a
--- quarter pixel right and up of them, NextPixel:TextOffset), its size (when it has one) in whole pixels.
+-- quarter pixel right and up of them, NextPixel:TextOffset), a region's size (when it has one) in whole pixels.
 ---@param saved table<Region, table>
 ---@param region Region
 local function fromCorner(saved, region)
@@ -70,7 +76,7 @@ local function fromCorner(saved, region)
   region:ClearAllPoints()
   local q = pixel:TextOffset(region)
   region:SetPoint(p[1], p[2], p[3], pixel:Snap(region, p[4] or 0) + q, pixel:Snap(region, p[5] or 0) + q)
-  if was.width > 0 and was.height > 0 then
+  if was.width ~= nil and was.width > 0 and was.height > 0 then
     pixel:Size(region, was.width, was.height)
   end
 end
@@ -230,7 +236,9 @@ function itemFit:Restore(decoration)
     for _, p in ipairs(was.points) do
       region:SetPoint(p[1], p[2], p[3], p[4], p[5])
     end
-    region:SetSize(was.width, was.height)
+    if was.width ~= nil then
+      region:SetSize(was.width, was.height)
+    end
   end
   self.saved[decoration] = nil
   self.keys[decoration] = nil

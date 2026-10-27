@@ -277,7 +277,9 @@ describe("NextTopTabs", function()
       tabs.frame:SetWidth(600)
       tabs:Fit()
       assert.are.equal(60 + 40, tabs.tabs[3].frame:GetWidth(), "whole again with room")
-      assert.are.equal(0, tabs.tabs[3].label:GetWidth(), "its name its whole width again")
+      local label = tabs.tabs[3].label
+      assert.are.equal(label:GetStringWidth(), label:GetWidth(), "its name its whole width again")
+      assert.is_false(label:IsTruncated())
     end)
   end)
 

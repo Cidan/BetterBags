@@ -820,7 +820,8 @@ describe("BetterBags Next's small mode", function()
         assert.is_false(bank.title._wordWrap)
         nextPanel:SetSize(ctx(), "full")
         finishTweens()
-        assert.are.equal(0, bank.title:GetWidth(), "a full panel's title is as long as it is")
+        assert.are.equal(bank.title:GetStringWidth(), bank.title:GetWidth(), "a full panel's title is as long as it is")
+        assert.is_false(bank.title:IsTruncated())
       end)
 
       -- A theme that puts the header buttons down a side rail (Header.Buttons.Rail, docs/next-gw2-theme.md).

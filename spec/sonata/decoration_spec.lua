@@ -688,7 +688,7 @@ describe("SonataDecoration", function()
       local title = deco:GetTitleText()
       assert.are.equal(_G.GameFontNormal, title._fontObject)
       assert.are.same({ r = 1, g = 0.82, b = 0, a = 1 }, title._textColor)
-      assert.are.equal(0, title:GetHeight())
+      assert.are.equal(title:GetStringHeight(), title:GetHeight(), "as tall as its text: the last theme's 30 gone")
       assert.are.same({ "TOP", window.frame, "TOP", 0, -5 }, { title:GetPoint(1) })
     end)
 

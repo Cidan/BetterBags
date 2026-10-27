@@ -374,24 +374,46 @@ function WidgetMethods:GetID()
   return self._id or 0
 end
 -- SetSize, SetWidth, SetHeight and SetPoint take secrets only from untainted callers (SecretArguments =
--- "AllowedWhenUntainted", SimpleScriptRegionResizingAPIDocumentation), and addon code is always tainted.
+-- "AllowedWhenUntainted", SimpleScriptRegionResizingAPIDocumentation), and addon code is always tainted. A size
+-- is never nil (Nilable = false, the same documentation).
+local function requireSize(name, ...)
+  for i = 1, select("#", ...) do
+    if type((select(i, ...))) ~= "number" then
+      error("bad argument #" .. i .. " to '" .. name .. "' (number expected)", 3)
+    end
+  end
+end
 function WidgetMethods:SetSize(w, h)
   rejectSecret("SetSize", w, h)
+  requireSize("SetSize", w, h)
   self._width = w
   self._height = h
 end
 function WidgetMethods:SetWidth(w)
   rejectSecret("SetWidth", w)
+  requireSize("SetWidth", w)
   self._width = w
 end
 function WidgetMethods:SetHeight(h)
   rejectSecret("SetHeight", h)
+  requireSize("SetHeight", h)
   self._height = h
 end
+-- Region:GetWidth() and GetHeight(): a font string given no size, or a size of 0 (how Blizzard resets one),
+-- reports its text's. Blizzard measures text that way: Blizzard_CustomizationOptionTemplates.lua sets a name's
+-- width to 0, sets its text and compares GetWidth() with the room it has, then truncates it by setting a smaller
+-- width; Blizzard_ObjectiveTrackerBlock.lua sets a text's height to 0 "or GetHeight() might return an incorrect
+-- value" and reads its height after SetText.
 function WidgetMethods:GetWidth()
+  if self._type == "FontString" and (self._width == nil or self._width == 0) then
+    return self._text ~= nil and self:GetStringWidth() or 0
+  end
   return self._width or 0
 end
 function WidgetMethods:GetHeight()
+  if self._type == "FontString" and (self._height == nil or self._height == 0) then
+    return self._text ~= nil and self:GetStringHeight() or 0
+  end
   return self._height or 0
 end
 -- ScriptRegion:GetSize(ignoreRect?) -> width, height.
@@ -1289,7 +1311,9 @@ function WidgetMethods:GetStringWidth()
   return #self._text * 6
 end
 -- FontString:GetNumLines() -> numLines, IsTruncated() -> isTruncated, CanWordWrap() -> wrap
--- (SimpleFontStringAPIDocumentation). Lines as GetStringHeight counts them; never truncated.
+-- (SimpleFontStringAPIDocumentation). Lines as GetStringHeight counts them. Truncated: a text given a width
+-- narrower than its text, that cannot wrap or whose height holds fewer lines than it needs (Blizzard truncates a
+-- name by setting a width smaller than its text's, Blizzard_CustomizationOptionTemplates.lua).
 function WidgetMethods:GetNumLines()
   local text = self._text or ""
   if text == "" then return 0 end
@@ -1300,7 +1324,16 @@ function WidgetMethods:GetNumLines()
   return 1
 end
 function WidgetMethods:IsTruncated()
-  return false
+  local width = self._width
+  if self._type ~= "FontString" or self._text == nil or self._text == "" or width == nil or width == 0
+    or self:GetStringWidth() <= width then
+    return false
+  end
+  if self._wordWrap == false then
+    return true
+  end
+  local height = self._height
+  return height ~= nil and height > 0 and self:GetStringHeight() > height
 end
 function WidgetMethods:CanWordWrap()
   return self._wordWrap ~= false

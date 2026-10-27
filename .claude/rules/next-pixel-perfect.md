@@ -154,6 +154,18 @@ bags take over:
   was not styled on, Sonata styles it again (`Sonata:RestyleElement`) and the item says so for Masque:
   `item/Updated`, or the item's own `Restyled(ctx)` (a guild bank button: `guild/Updated`). Once per grid,
   size, Sonata theme generation and whether Masque skins the button.
+- **Texts are placed, never sized.** The fitter moves a text (the item level, the stock, a cooldown's countdown) by
+  its corner and leaves its size to the client, and `Restore` puts back only where it was. A text given no size
+  reports its text's (Blizzard measures text that way: `Blizzard_CustomizationOptionTemplates.lua` sets a name's
+  width to 0, sets its text and reads `GetWidth()`), and one given a width narrower than its text is cut short (the
+  same file truncates the name by setting a smaller width). **Failure mode (fixed, reported: an item level cut short,
+  a dot under the icon, "only happens in betterbags next"):** the fitter recorded each part's size the first time it
+  fitted a button and set it in whole pixels, texts included. The item level then kept the width of the level the
+  button showed first, rounded to the nearest pixel: a fraction under its own text where the width fell between two
+  pixels, and too narrow for a longer level later in the same slot. `Restore` gave the classic bags the same width
+  after a switch, and the countdown too. The specs missed it because the frame mock reported 0 for an unsized
+  text's size; it now reports its text's, and `IsTruncated` is true for a text narrower than its text that cannot
+  show it on more lines.
 - **Masque's parts are Masque's.** On a button in one of BetterBags' Masque groups
   (`Masque:IsSkinned(button)`, integrations/masque.lua; a group turned off in Masque's options still places
   its buttons' parts, with Masque's base skin), the fitter leaves the parts Masque places where Masque put
@@ -279,7 +291,10 @@ In the specs:
   scaled.
 - The mock follows the client for this: Blizzard's item button parts anchored as their XML anchors them,
   `UIPanelButtonTemplate` from Blizzard's XML, `SetPoint(point, x, y)` relative to the parent, the scroll
-  box anchoring its scroll target at the scroll offset.
+  box anchoring its scroll target at the scroll offset, a text with no size of its own reporting its text's
+  (`GetWidth`, `GetHeight`; a size of 0 counts as none, as Blizzard resets one) and cut short when given less
+  (`IsTruncated`), and `SetSize`, `SetWidth` and `SetHeight` refusing nil (Nilable = false,
+  SimpleScriptRegionResizingAPIDocumentation).
 
 ## 6a. The check in game (`/bbdb`, the Pixels tab)
 
@@ -353,6 +368,9 @@ Real screens: the reporter's 3396x1362 at 65% and 70%, 3440x1440 at 65%, 1920x10
   grid, rows that fit their width with even gaps, a section laid out again keeping its rows),
   `spec/render/scrollbox_spec.lua` (the room off the width to lay out for, in units). Undoing the decision or
   the scroll box's part fails the first; removing the gap closing fails the canvas test.
+- Texts placed, never sized (§4): `spec/next/itemfit_spec.lua` ("texts": a longer item level and stock drawn later,
+  a width falling between two pixels, the classic bags given their texts back with no size, the countdown
+  included); each failed before the fix.
 - Masque: `spec/next/itemfit_spec.lua` ("on a button Masque skins": Masque's parts left where a Caith-like
   skin put them, fitted again once Masque lets the button go, not put back over the skin; a button that
   announces its own restyles), `spec/next/content_spec.lua` (the canvas leaves Masque's border as Masque
