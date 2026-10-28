@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-# Makes the Halloween theme's art (next-themes.md, "Halloween"): a pumpkin-orange body with soft ribs, a
-# cartoon puff of smoke, a star spark, a bat flapping (four frames side by side) and one gliding, a black
+# Makes the Halloween theme's art (next-themes.md, "Halloween"): a pumpkin-orange body, a soft, wispy puff
+# of smoke, a star spark, a bat flapping (four frames side by side) and one gliding, a black
 # cat (its eyes and its tail apart, so they blink and sway), a jack-o'-lantern (its candlelit face apart,
 # so it flickers), a cobweb, a spider on its thread, an autumn leaf, a vine and goo dripping along an edge.
 # Flat-shaded and cartoony (asked: "slightly cartoony almost and flat shaded"): hard-edged shapes in a few
-# flat tones, anti-aliased by drawing each at 4 x 4 samples a pixel. The body, the bats, the cat, its eyes,
+# flat tones, anti-aliased by drawing each at 4 x 4 samples a pixel; the smoke alone is soft (asked of a
+# cartoon puff: "can you make it more real-ish?"). The body, the bats, the cat, its eyes,
 # the jack-o'-lantern, its face and the spider are in their own colours (drawn untinted: Color White); the
 # puff, the star, the web, the leaf, the vine and the drips are white, their tones in grey, so the theme
 # tints each. Standard library only, like next_frost.py. Run from the repository root:
@@ -19,8 +20,8 @@ OUT = os.path.join("textures", "next", "halloween")
 SS = 4
 
 
-def write_png(path, width, height, rgba):
-    """rgba: width * height (r, g, b, a) tuples, row by row, each 0..1."""
+def write_png(path, width, height, rgba, level=9):
+    """rgba: width * height (r, g, b, a) tuples, row by row, each 0..1; level 0 stores it uncompressed."""
     raw = bytearray()
     for y in range(height):
         raw.append(0)
@@ -33,7 +34,7 @@ def write_png(path, width, height, rgba):
 
     header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
     with open(path, "wb") as f:
-        f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
+        f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(bytes(raw), level))
                 + chunk(b"IEND", b""))
 
 
@@ -184,45 +185,93 @@ class Image:
         return self
 
 
-# The body, 256 x 512 in its own colours: a pumpkin's orange, not over bright (asked: "a nice good color of
-# orange, like that of a pumpkin, not over the top bright"), in five soft ribs across it, each a touch lighter
-# down its middle and darker in its grooves, a little darker toward the bottom. Flat: three tones, soft only
-# where they meet.
-PUMPKIN = (0.835, 0.455, 0.16)
+# The body, 8 x 512 in its own colours: a pumpkin's orange, not over bright (asked: "a nice good color of
+# orange, like that of a pumpkin, not over the top bright"), then a little deeper and without the soft ribs
+# the first version had across it (asked: "remove the dark streaks on the bag ... make the orange slightly
+# deeper"). One colour from side to side, a touch lighter at the top and darker toward the bottom, so every
+# column is the same and it stretches across a body of any width. Stored uncompressed, so the theme's spec
+# can read its pixels (spec/sonata/next_themes_spec.lua).
+PUMPKIN = (0.8, 0.4, 0.11)
+
+
+def body_shade(v):
+    """How light the body is v of the way down it (0 the top, 1 the bottom)."""
+    return 1.035 - 0.07 * smoothstep(0.0, 1.0, v)
 
 
 def body():
-    w, h = 256, 512
-    ribs = 5
+    w, h = 8, 512
     px = []
+    total = [0.0, 0.0, 0.0]
     for y in range(h):
-        v = (y + 0.5) / h
-        shade = 1.03 - 0.1 * smoothstep(0.35, 1.0, v)
-        for x in range(w):
-            u = (x + 0.5) / w
-            # Where it is across its rib, 0 at a groove to 1 at the middle: the grooves bow a little, as a
-            # pumpkin's do, curving in toward the bottom.
-            bow = 0.012 * math.sin(math.pi * v)
-            t = (u * ribs + bow * math.cos(2 * math.pi * u * ribs)) % 1.0
-            across = 1 - abs(2 * t - 1)
-            tone = 0.9 + 0.06 * smoothstep(0.06, 0.16, across) + 0.04 * smoothstep(0.55, 0.65, across)
-            k = tone * shade
-            px.append((clamp(PUMPKIN[0] * k), clamp(PUMPKIN[1] * k), clamp(PUMPKIN[2] * k), 1.0))
-    write_png(os.path.join(OUT, "body.png"), w, h, px)
+        k = body_shade((y + 0.5) / h)
+        colour = tuple(clamp(PUMPKIN[c] * k) for c in range(3))
+        for c in range(3):
+            total[c] += round(colour[c] * 255) / 255
+        px.extend([colour + (1.0,)] * w)
+    write_png(os.path.join(OUT, "body.png"), w, h, px, level=0)
+    print("body.png average (the theme's Palette.Body):", tuple(round(t / h, 3) for t in total))
 
 
-# A puff of smoke, 128 x 128, white in grey tones: a cartoon ball of smoke, its rim darker, a shaded
-# crescent below and to the right, a highlight above and to the left (the light from the top left).
+# A puff of smoke, 256 x 256, white in grey tones (the theme tints it): soft, wispy and uneven, as real
+# smoke is (asked of a cartoon ball of smoke: "can you make it more real-ish?"). Its density is a soft
+# round falloff broken up by fractal noise whose sampling point is itself pushed about by noise (domain
+# warping, the curls and tendrils), thinning to nothing well inside its edge; lighter toward the top
+# left, where the light comes from, and a little darker where it is densest. Seeded, so it is the same
+# every run.
+def value_noise(seed):
+    rnd = random.Random(seed)
+    size = 64
+    grid = [[rnd.random() for _ in range(size)] for _ in range(size)]
+
+    def at(x, y):
+        x0, y0 = int(math.floor(x)), int(math.floor(y))
+        fx, fy = x - x0, y - y0
+        fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+        a = grid[y0 % size][x0 % size]
+        b = grid[y0 % size][(x0 + 1) % size]
+        c = grid[(y0 + 1) % size][x0 % size]
+        d = grid[(y0 + 1) % size][(x0 + 1) % size]
+        return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fy
+
+    return at
+
+
+def fbm(noise, x, y, octaves=5):
+    total, amp, freq, norm = 0.0, 1.0, 1.0, 0.0
+    for _ in range(octaves):
+        total += amp * noise(x * freq, y * freq)
+        norm += amp
+        amp *= 0.5
+        freq *= 2.03
+    return total / norm
+
+
 def puff():
-    s = 128
-    img = Image(s, s)
-    img.paint(Mask(s, s).circle(64, 64, 61), (0.62, 0.62, 0.62))
-    img.paint(Mask(s, s).circle(64, 64, 57), (0.78, 0.78, 0.78))
-    lit = Mask(s, s).circle(58, 57, 51).keep(Mask(s, s).circle(64, 64, 57))
-    img.paint(lit, (0.94, 0.94, 0.94))
-    img.paint(Mask(s, s).ellipse(44, 40, 15, 10, -0.6), (1.0, 1.0, 1.0))
-    img.paint(Mask(s, s).circle(30, 56, 5), (1.0, 1.0, 1.0))
-    img.save("puff.png")
+    s = 256
+    density_noise, warp_x, warp_y = value_noise(7), value_noise(19), value_noise(43)
+    px = []
+    for y in range(s):
+        for x in range(s):
+            u, v = (x + 0.5) / s * 2 - 1, (y + 0.5) / s * 2 - 1
+            # Warped: where the noise is read from wanders, so the smoke curls rather than blots.
+            wx = u * 3 + 1.6 * (fbm(warp_x, u * 2.2 + 5, v * 2.2 + 5, 4) - 0.5)
+            wy = v * 3 + 1.6 * (fbm(warp_y, u * 2.2 + 9, v * 2.2 + 9, 4) - 0.5)
+            n = fbm(density_noise, wx + 10, wy + 10)
+            # A soft round falloff, its edge pushed far in and out by the noise, nothing past 0.95 of the
+            # radius; inside it the noise makes billows and thin places.
+            dist = math.sqrt(u * u + v * v)
+            r = dist + 0.7 * (n - 0.5)
+            falloff = (1 - smoothstep(0.1, 1.0, r)) * (1 - smoothstep(0.8, 0.95, dist))
+            density = falloff * 2.2 * n ** 1.8
+            alpha = smoothstep(0.06, 1.0, density)
+            light = 0.8 + 0.16 * clamp(0.5 - 0.35 * (u + v)) - 0.12 * smoothstep(0.55, 1.1, density)
+            px.append((light, light, light, alpha))
+    write_png(os.path.join(OUT, "puff.png"), s, s, px)
+    # An outline of it as text, to look at without an image viewer.
+    shades = " .:-=+*#%@"
+    for y in range(0, s, 8):
+        print("".join(shades[min(9, int(px[y * s + x][3] * 10))] for x in range(0, s, 4)))
 
 
 # A star spark, 64 x 64, white: four points, the sides between them drawn in, and a round heart.

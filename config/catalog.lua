@@ -776,10 +776,10 @@ for _, effect in ipairs({
     keywords = { 'snow', 'flakes', 'leaves', 'autumn', 'fall', 'wind', 'breeze', 'gust', 'weather', 'theme' } },
   -- The Halloween theme's (next-themes.md §23): off, its bags slide in and out as any theme's.
   { id = 'nextSmoke', name = 'smoke', title = 'Smoke Puff',
-    description = "A theme's bags appearing out of a puff of smoke as they open. Off, they slide in.",
+    description = "A theme's bags appearing out of rising smoke as they open. Off, they slide in.",
     keywords = { 'smoke', 'puff', 'poof', 'cloud', 'halloween', 'theme' } },
   { id = 'nextBats', name = 'bats', title = 'Bats',
-    description = "A theme's bags turning into bats that fly away as they close, and bats fluttering out of a bag now "
+    description = "A theme's bags breaking up into bats that fly away as they close, and bats fluttering out of a bag now "
       .. 'and then. Off, they slide out.',
     keywords = { 'bats', 'bat', 'fly', 'flutter', 'vampire', 'halloween', 'theme' } },
 }) do

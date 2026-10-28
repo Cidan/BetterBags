@@ -997,11 +997,11 @@ function panelProto:shatterOut(from, to, done)
   })
 end
 
--- smokeIn opens the panel where it rests out of a puff of smoke (the theme's Panel.Smoke.Open, next-themes.md §23), after
--- delay unseen: the smoke rises up its body from the bottom, the panel shows under it as it covers it, and it clears
--- from the bottom up (NextSmoke's Open). A tween of the panel's own, like the slide it stands in for: whatever stops or
--- replaces it (a flight, a placement, Escape) ends the smoke at rest (endShatter). Once the smoke has cleared it says it
--- has finished showing, as the slide does.
+-- smokeIn opens the panel where it rests out of smoke (the theme's Panel.Smoke.Open, next-themes.md §23), after delay
+-- unseen: the smoke rises up its body from the bottom and the panel shows under it (NextSmoke's Open). A tween of the
+-- panel's own, like the slide it stands in for: whatever stops or replaces it (a flight, a placement, Escape) ends the
+-- smoke at rest (endShatter). Once the panel has fully appeared it says it has finished showing, as the slide does, and
+-- its smoke lingers on its own layer until it has cleared (Linger).
 ---@private
 ---@param to number
 ---@param delay number
@@ -1039,7 +1039,10 @@ function panelProto:smokeIn(to, delay)
       self:endShatter(to)
     end,
     onDone = function()
-      rest()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
       self:endShatter(to)
       self.frame:SetFrameLevel(PANEL_LEVEL)
       self:finishShowing()
@@ -1048,39 +1051,47 @@ function panelProto:smokeIn(to, delay)
   })
 end
 
--- batsOut closes the panel where it is by turning it into bats (the theme's Panel.Bats.Close): a puff of smoke covers
--- its body at once (the tween's start value, drawn as it starts) and it vanishes under it over Close.Vanish, then the bats burst out of the smoke on the bats layer,
--- which carries them on after the panel has hidden (NextBats). Then done (Hide's end), as they burst out.
+-- batsOut closes the panel where it is by breaking it up into bats (the theme's Panel.Bats.Close, next-themes.md §23;
+-- asked: "how the frost theme shatters, we want the bag break up *and morph* into bats and fly away"): it trembles where
+-- it stands over Close.Shudder, then it is gone and pieces of its own art take its place on the bats layer, drift apart
+-- from where it breaks (breakPoint) and turn into bats that fly away, carried on after the panel has hidden (NextBats).
+-- Then done (Hide's end), as it breaks.
 ---@private
 ---@param from number
 ---@param to number
 ---@param done fun()
 function panelProto:batsOut(from, to, done)
-  local run = nextBats:Begin(self) ---@type NextBatRun?
-  local vanish = nextBats:Spec().Close.Vanish or 0
+  local run = nextBats:Begin(self, self:breakPoint()) ---@type NextBatRun?
+  local shudder = nextBats:Spec().Close.Shudder or 0
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
   tween:Play(self, {
-    duration = vanish,
+    duration = shudder,
     from = 0,
     to = 1,
     ease = "linear",
     onUpdate = function(p)
       if not nextBats:Closes() then
-        -- Its theme went while it vanished: it closes plainly at the end.
-        run = nil
-        self.frame:SetAlpha(1)
+        -- Its theme went while it trembled: it closes plainly at the end.
+        rest()
+        self:setOffset(from)
         return
       end
       if run ~= nil then
-        self.frame:SetAlpha(run:Vanish(p * vanish))
+        self:setOffset(from + run:Shudder(p * shudder))
       end
     end,
     onStop = function()
-      run = nil
+      rest()
       self:endShatter(from)
     end,
     onDone = function()
       if run ~= nil then
-        run:Fly()
+        run:Break()
         run = nil
       end
       self:endShatter(from)
@@ -4750,7 +4761,7 @@ function panelProto:Hide(ctx)
     return
   end
   if nextBats:Closes() then
-    self.threads:Unravel(nextBats:Spec().Close.Vanish or 0)
+    self.threads:Unravel(nextBats:Spec().Close.Shudder or 0)
     -- Where it is: it turns into bats where it stands.
     self:batsOut(self.offset, to, slidOut)
     return

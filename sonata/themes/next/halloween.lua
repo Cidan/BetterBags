@@ -11,11 +11,11 @@ local sonataNext = addon:GetModule('SonataNext')
 -- for the bag closing, make the bag 'turn into' several bats ... main color should be orange with black accents (so
 -- orange backdrop), with whimsy and fun animations. slightly cartoony almost and flat shaded ... a nice good color of
 -- orange, like that of a pumpkin, not over the top bright".
---   Opening: a puff of cartoon smoke rises up the bag from the bottom, star sparks twinkling in it, and the bag comes
---     out of it from the bottom to the top as it clears (NextSmoke); a bat or two flutters out of its header.
---     Closing: a puff of smoke covers it, it vanishes under it, and a dozen or so bats burst out of the smoke, flapping
---     off the screen every which way (NextBats).
---   At rest: the body a pumpkin's orange in soft ribs, goo dripping along its top; at the bottom of the feather a
+--   Opening: smoke rises up the bag from the bottom, soft and uneven, swelling, curling and thinning away as real smoke
+--     does, embers rising through it, and the bag shows under it (NextSmoke); a bat or two flutters out of its header.
+--     Closing: the bag trembles, breaks up into a dozen or so pieces of itself that drift apart and turn into bats,
+--     flapping off the screen every which way (NextBats).
+--   At rest: the body a deep pumpkin orange, goo dripping along its top; at the bottom of the feather a
 --     jack-o'-lantern, its candle flickering, with a black cat sitting on it, blinking now and then and swishing its
 --     tail (on a small bag, the cat and a little jack-o'-lantern sit on its top edge); a cobweb in the feather's top
 --     corner, a spider swinging from it; a pumpkin vine curling along the footer; autumn leaves falling down the
@@ -38,18 +38,18 @@ end
 -- Light text on the black parts (tabs, the search box, menus) carries a shadow of its own.
 local DARK_SHADOW = { Color = "Black", X = 1, Y = -1 }
 
--- A puff of smoke's look: lavender greys, a few darker.
+-- The smoke's look: greys with a little of a witch's purple in them, a few darker.
 local SMOKE_COLORS = { "Smoke", "Smoke", "SmokeShade", "SmokeDeep" }
 
 sonataNext:RegisterTheme({
   Name = "Halloween",
   DisplayName = "Halloween",
-  Description = "Pumpkin orange and black: it appears out of a puff of smoke, turns into bats when it closes, and a "
+  Description = "Pumpkin orange and black: it appears out of rising smoke, breaks up into bats when it closes, and a "
     .. "black cat keeps watch on a jack-o'-lantern while the leaves fall.",
 
   Palette = {
-    -- A pumpkin's orange (body.png's own), not over bright.
-    Body = { 0.835, 0.455, 0.16, 0.97 },
+    -- A pumpkin's orange, not over bright and a little deep (body.png's average).
+    Body = { 0.8, 0.4, 0.11, 0.97 },
     Wash = { 1, 0.78, 0.35, 0.12 },
     -- Candlelight where Default is gold; a witch's purple where it is lavender.
     Gold = { 1, 0.78, 0.24, 1 },
@@ -66,10 +66,10 @@ sonataNext:RegisterTheme({
     Night = { 0.27, 0.13, 0.33, 1 },
     Blood = { 0.55, 0.04, 0.04, 1 },
     Lime = { 0.66, 0.9, 0.24, 1 },
-    -- The smoke: lavender greys.
-    Smoke = { 0.92, 0.88, 0.96, 1 },
-    SmokeShade = { 0.76, 0.7, 0.86, 1 },
-    SmokeDeep = { 0.57, 0.49, 0.7, 1 },
+    -- The smoke: greys, a little purple.
+    Smoke = { 0.88, 0.86, 0.9, 1 },
+    SmokeShade = { 0.7, 0.67, 0.75, 1 },
+    SmokeDeep = { 0.52, 0.48, 0.57, 1 },
     -- Autumn leaves and the vine.
     Rust = { 0.66, 0.2, 0.07, 1 },
     Ochre = { 0.9, 0.64, 0.14, 1 },
@@ -94,10 +94,10 @@ sonataNext:RegisterTheme({
     Bead = { 1, 0.92, 0.7, 1 },
     -- The settings window's controls (next-settings.md §6): fields a deeper orange than the page, edged in ink, a
     -- darker one pressed and for a switch's or slider's empty track; a deep red for what deletes.
-    ControlFill = { 0.75, 0.39, 0.12, 1 },
-    ControlHover = { 0.8, 0.43, 0.14, 1 },
-    ControlPressed = { 0.67, 0.34, 0.1, 1 },
-    Track = { 0.56, 0.27, 0.08, 1 },
+    ControlFill = { 0.72, 0.36, 0.1, 1 },
+    ControlHover = { 0.77, 0.39, 0.12, 1 },
+    ControlPressed = { 0.64, 0.31, 0.08, 1 },
+    Track = { 0.53, 0.25, 0.07, 1 },
     Danger = { 0.55, 0.04, 0.04, 1 },
     Crimson = { 0.7, 0.06, 0.06, 1 },
     Emerald = { 0.22, 0.62, 0.18, 1 },
@@ -234,25 +234,30 @@ sonataNext:RegisterTheme({
       { Texture = "PumpkinFace", Point = "TOPOUTER", Anchor = "BOTTOMOUTER", Width = 44, Height = 44, X = 84, Y = 4,
         Layer = "ARTWORK", SubLevel = 2, Sizes = "Small", Motion = { Flicker = { Low = 0.45, Speed = 9 } } },
     },
-    -- Out of a puff of smoke (NextSmoke). Appearance > Animation > Smoke Puff turns it off. About 0.85 seconds in
-    -- all: a bank waits for its panel to have shown before it loads, 1 second at most.
+    -- Out of smoke (NextSmoke; asked: "make it more real-ish"): a front rising up the body leaves rows of soft, uneven
+    -- puffs, each at a strength and an angle of its own, swelling, rising faster and faster, curling and thinning away
+    -- from the bottom up; embers rising through it. The bag shows under it by 0.4 seconds (a bank waits for its panel
+    -- to have shown before it loads, 1 second at most), and the smoke clears about a second later.
+    -- Appearance > Animation > Smoke Puff turns it off.
     Smoke = {
-      Puffs = { Texture = "Puff", Colors = SMOKE_COLORS, Size = { 96, 150 }, Alpha = 1, BlendMode = "BLEND", Spin = 40 },
-      Sparks = { Texture = "Star", Count = 14, Size = { 12, 22 }, Life = { 0.18, 0.32 }, Spin = 240,
-        Colors = { "Gold", "Lime", "Bone" }, Alpha = 1, BlendMode = "BLEND" },
-      Open = { Rise = 0.34, Spacing = 58, Grow = 0.15, Hold = 0.14, Shrink = 0.22, Lift = { 30, 70 },
-        Spread = { 20, 60 }, Burst = 3.5, Reveal = { 0.08, 0.34 }, Jitter = 0.3 },
+      Puffs = { Texture = "Puff", Colors = SMOKE_COLORS, Size = { 110, 160 }, Alpha = { 0.35, 0.65 }, BlendMode = "BLEND",
+        Spin = 25 },
+      Sparks = { Texture = "Glow", Count = 12, Size = { 10, 16 }, Life = { 0.3, 0.55 }, Rise = { 40, 90 },
+        Colors = { "Gold", "PumpkinLight" }, Alpha = 1, BlendMode = "ADD" },
+      Open = { Rise = 0.36, Spacing = 52, Jitter = 0.35, Life = { 0.75, 1.25 }, Start = 0.55, Growth = 1.8,
+        FadeIn = 0.12, Lift = { 25, 55 }, Buoyancy = 80, Spread = { 10, 35 }, Burst = 3, Swirl = { 12, 0.7 },
+        Reveal = { 0.1, 0.4 } },
     },
-    -- Turning into bats (NextBats): a puff of smoke, then a dozen or so of them flapping off the screen every which
-    -- way (asked: "like 10-15 bats, and fly away in random directions off screen"); and now and then one to three
-    -- fluttering out of the header, as it opens too. Appearance > Animation > Bats turns them off.
+    -- Turning into bats (NextBats; asked: "no puff of smokes: how the frost theme shatters, we want the bag break up
+    -- *and morph* into bats and fly away. almost a surreal effect"): it trembles a moment, breaks into a dozen or so
+    -- pieces of its own body that drift apart, and each turns into a bat that flaps off the screen every which way
+    -- (asked: "like 10-15 bats, and fly away in random directions off screen"); and now and then one to three fluttering
+    -- out of the header, as it opens too. Appearance > Animation > Bats turns them off.
     Bats = {
       Texture = "Bats", Frames = 4, FrameRate = 14, Color = "White", BlendMode = "BLEND",
-      Close = { Count = { 11, 15 }, Size = { 44, 70 }, Speed = { 170, 260 }, Accel = 1.6, Wobble = { 14, 2.2 },
-        Grow = 0.22, Delay = { 0, 0.14 }, Tilt = 22, Life = 3.5, Vanish = 0.13, Spread = 50,
-        Puff = { Texture = "Puff", Colors = SMOKE_COLORS, Size = { 110, 170 }, Alpha = 1, BlendMode = "BLEND",
-          Spin = 50, Spacing = 72, Grow = 0.1, Hold = 0.1, Shrink = 0.3, Lift = { 20, 50 }, Spread = { 30, 80 },
-          Jitter = 0.35 } },
+      Close = { Count = { 11, 15 }, Pieces = { Texture = "HalloweenBody", Color = "White" }, Jitter = 0.3,
+        Shudder = 0.18, Tremble = 3, Break = 0.12, Gap = 16, Morph = 0.32, Dark = "Ink", Delay = { 0, 0.16 },
+        Size = { 44, 70 }, Speed = { 170, 260 }, Accel = 1.6, Wobble = { 14, 2.2 }, Tilt = 22, Life = 3.5, Spread = 50 },
       Flutter = { Every = { 9, 18 }, Count = { 1, 3 }, Size = { 22, 32 }, Speed = { 90, 140 }, Wobble = { 7, 2.6 },
         Stagger = 0.35, Travel = 420, Band = { 28, 62 }, Rise = { -30, 10 }, Alpha = 1, OnOpen = true,
         Layer = "BORDER", SubLevel = 6 },

@@ -909,6 +909,9 @@ function sonataNext:Check(key)
     if type(K.Puffs) == "table" then
       partsOf(K.Puffs, smokeModule.PUFF_KEYS, where .. "Puffs.")
       ranges(K.Puffs, where .. "Puffs.", { { "Size", "smallest and largest", true } })
+      if type(K.Puffs.Alpha) == "table" then
+        ranges(K.Puffs, where .. "Puffs.", { { "Alpha", "faintest and strongest" } })
+      end
     elseif K.Open ~= nil then
       table.insert(problems, where .. "Puffs: a smoke opening needs them")
     end
@@ -917,7 +920,8 @@ function sonataNext:Check(key)
       if type(K.Sparks.Count) ~= "number" then
         table.insert(problems, where .. "Sparks.Count: a number")
       end
-      ranges(K.Sparks, where .. "Sparks.", { { "Size", "smallest and largest" }, { "Life", "shortest and longest" } })
+      ranges(K.Sparks, where .. "Sparks.", { { "Size", "smallest and largest" }, { "Life", "shortest and longest" },
+        { "Rise", "slowest and fastest" } })
     end
     local O = K.Open
     if type(O) == "table" then
@@ -926,16 +930,28 @@ function sonataNext:Check(key)
         table.insert(problems, where .. "Open.Rise: an opening needs one")
       end
       atLeast(O, "Spacing", where .. "Open.", true, true)
-      for _, part in ipairs({ "Grow", "Hold", "Shrink" }) do
-        atLeast(O, part, where .. "Open.", false)
+      atLeast(O, "Start", where .. "Open.", true)
+      atLeast(O, "Growth", where .. "Open.", true)
+      atLeast(O, "Burst", where .. "Open.", true)
+      atLeast(O, "Jitter", where .. "Open.", false)
+      if O.Buoyancy ~= nil and type(O.Buoyancy) ~= "number" then
+        table.insert(problems, where .. "Open.Buoyancy: a number")
       end
-      ranges(O, where .. "Open.", { { "Lift", "slowest and fastest" }, { "Spread", "slowest and fastest" },
-        { "Reveal", "from and to" } })
+      local swirl = O.Swirl
+      if swirl ~= nil and not (type(swirl) == "table" and type(swirl[1]) == "number" and swirl[1] >= 0
+          and type(swirl[2]) == "number" and swirl[2] >= 0) then
+        table.insert(problems, where .. "Open.Swirl: two numbers, how far and how often")
+      end
+      if O.FadeIn ~= nil and not (type(O.FadeIn) == "number" and O.FadeIn >= 0 and O.FadeIn <= 1) then
+        table.insert(problems, where .. "Open.FadeIn: from 0 to 1")
+      end
+      ranges(O, where .. "Open.", { { "Life", "shortest and longest", true }, { "Lift", "slowest and fastest" },
+        { "Spread", "slowest and fastest" }, { "Reveal", "from and to" } })
     end
   end
   local batsModule = addon:GetModule('NextBats', true)
   local V = theme.Panel and theme.Panel.Bats
-  if batsModule ~= nil and smokeModule ~= nil and type(V) == "table" then
+  if batsModule ~= nil and type(V) == "table" then
     local where = "Panel.Bats."
     partsOf(V, batsModule.KEYS, where)
     atLeast(V, "Frames", where, true)
@@ -943,24 +959,18 @@ function sonataNext:Check(key)
     local C = V.Close
     if type(C) == "table" then
       partsOf(C, batsModule.CLOSE_KEYS, where .. "Close.")
+      if type(C.Pieces) ~= "table" then
+        table.insert(problems, where .. "Close.Pieces: a bats close needs them")
+      end
       ranges(C, where .. "Close.", { { "Count", "fewest and most" }, { "Size", "smallest and largest" },
         { "Speed", "slowest and fastest" }, { "Delay", "soonest and latest" } })
-      for _, part in ipairs({ "Vanish", "Grow", "Accel", "Life" }) do
+      for _, part in ipairs({ "Shudder", "Tremble", "Break", "Gap", "Morph", "Accel", "Life" }) do
         atLeast(C, part, where .. "Close.", false)
       end
-      local P = C.Puff
-      if type(P) == "table" then
-        local keys = {}
-        for k in pairs(smokeModule.PUFF_KEYS) do keys[k] = true end
-        for k in pairs(smokeModule.BURST_KEYS) do keys[k] = true end
-        partsOf(P, keys, where .. "Close.Puff.")
-        atLeast(P, "Spacing", where .. "Close.Puff.", true, true)
-        for _, part in ipairs({ "Grow", "Hold", "Shrink" }) do
-          atLeast(P, part, where .. "Close.Puff.", false)
-        end
-        ranges(P, where .. "Close.Puff.", { { "Size", "smallest and largest", true }, { "Lift", "slowest and fastest" },
-          { "Spread", "slowest and fastest" } })
+      if C.Jitter ~= nil and not (type(C.Jitter) == "number" and C.Jitter >= 0 and C.Jitter < 0.5) then
+        table.insert(problems, where .. "Close.Jitter: from 0 to below half a cell")
       end
+      color(C.Dark, where .. "Close.Dark")
     end
     local F = V.Flutter
     if type(F) == "table" then

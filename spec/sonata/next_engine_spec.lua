@@ -120,7 +120,7 @@ describe("SonataNext", function()
       -- The Frost theme's (next-themes.md §22): freezing together and shattering; the snow.
       shatter = function(t) return t.Panel.Shatter end,
       snow = function(t) return t.Panel.Snow end,
-      -- The Halloween theme's (next-themes.md §23): coming in out of a puff of smoke; turning into bats, and the bats
+      -- The Halloween theme's (next-themes.md §23): coming in out of smoke; breaking up into bats, and the bats
       -- fluttering out of the header.
       smoke = function(t) return t.Panel.Smoke end,
       bats = function(t) return t.Panel.Bats end,
@@ -919,24 +919,28 @@ describe("SonataNext", function()
     sonataNext = addon:GetModule("SonataNext")
     sonataNext:Init()
     sonataNext:RegisterTheme({ Name = "BadSpooky", Panel = {
-      Smoke = { Puffs = { Size = { 9, 3 }, Fog = 1 }, Sparks = { Count = "lots", Life = { 1 }, Glow = 1 },
-        Open = { Spacing = 0, Reveal = { 0.5 }, Lift = { 3 }, Waft = 1 }, Haze = 1 },
+      Smoke = { Puffs = { Size = { 9, 3 }, Alpha = { 0.8, 0.2 }, Fog = 1 },
+        Sparks = { Count = "lots", Life = { 1 }, Rise = { 3 }, Glow = 1 },
+        Open = { Spacing = 0, Reveal = { 0.5 }, Lift = { 3 }, Life = { 1 }, Start = -1, Growth = 0, FadeIn = 2,
+          Swirl = { 4 }, Burst = 0, Jitter = -1, Buoyancy = "up", Waft = 1 }, Haze = 1 },
       Bats = { Frames = 0, FrameRate = -1, Squeak = 1,
-        Close = { Count = { 15, 10 }, Speed = { 1 }, Vanish = -1, Flap = 1,
-          Puff = { Spacing = 0, Size = { 2 }, Grow = -1, Fog = 1 } },
+        Close = { Count = { 15, 10 }, Speed = { 1 }, Shudder = -1, Break = -1, Morph = -1, Gap = -2, Jitter = 0.5,
+          Dark = "Nope", Flap = 1 },
         Flutter = { Every = { 3 }, Travel = 0, Band = { 50, 10 }, Swoop = 1 } },
     } })
     local problems = sonataNext:Check("BadSpooky")
     table.sort(problems)
     assert.are.same({
+      "Panel.Bats.Close.Break: no less than nothing",
       "Panel.Bats.Close.Count: two numbers, fewest and most",
+      "Panel.Bats.Close.Dark: no color named Nope",
       "Panel.Bats.Close.Flap: no part named Flap",
-      "Panel.Bats.Close.Puff.Fog: no part named Fog",
-      "Panel.Bats.Close.Puff.Grow: no less than nothing",
-      "Panel.Bats.Close.Puff.Size: two numbers, smallest and largest",
-      "Panel.Bats.Close.Puff.Spacing: more than nothing",
+      "Panel.Bats.Close.Gap: no less than nothing",
+      "Panel.Bats.Close.Jitter: from 0 to below half a cell",
+      "Panel.Bats.Close.Morph: no less than nothing",
+      "Panel.Bats.Close.Pieces: a bats close needs them",
+      "Panel.Bats.Close.Shudder: no less than nothing",
       "Panel.Bats.Close.Speed: two numbers, slowest and fastest",
-      "Panel.Bats.Close.Vanish: no less than nothing",
       "Panel.Bats.Flutter.Band: two numbers, highest and lowest",
       "Panel.Bats.Flutter.Every: two numbers, soonest and latest",
       "Panel.Bats.Flutter.Swoop: no part named Swoop",
@@ -945,18 +949,29 @@ describe("SonataNext", function()
       "Panel.Bats.Frames: more than nothing",
       "Panel.Bats.Squeak: no part named Squeak",
       "Panel.Smoke.Haze: no part named Haze",
+      "Panel.Smoke.Open.Buoyancy: a number",
+      "Panel.Smoke.Open.Burst: more than nothing",
+      "Panel.Smoke.Open.FadeIn: from 0 to 1",
+      "Panel.Smoke.Open.Growth: more than nothing",
+      "Panel.Smoke.Open.Jitter: no less than nothing",
+      "Panel.Smoke.Open.Life: two numbers, shortest and longest",
       "Panel.Smoke.Open.Lift: two numbers, slowest and fastest",
       "Panel.Smoke.Open.Reveal: two numbers, from and to",
       "Panel.Smoke.Open.Rise: an opening needs one",
       "Panel.Smoke.Open.Spacing: more than nothing",
+      "Panel.Smoke.Open.Start: more than nothing",
+      "Panel.Smoke.Open.Swirl: two numbers, how far and how often",
       "Panel.Smoke.Open.Waft: no part named Waft",
+      "Panel.Smoke.Puffs.Alpha: two numbers, faintest and strongest",
       "Panel.Smoke.Puffs.Fog: no part named Fog",
       "Panel.Smoke.Puffs.Size: two numbers, smallest and largest",
       "Panel.Smoke.Sparks.Count: a number",
       "Panel.Smoke.Sparks.Glow: no part named Glow",
       "Panel.Smoke.Sparks.Life: two numbers, shortest and longest",
+      "Panel.Smoke.Sparks.Rise: two numbers, slowest and fastest",
     }, problems)
-    sonataNext:RegisterTheme({ Name = "NoPuffs", Panel = { Smoke = { Open = { Rise = 0.3, Spacing = 50 } } } })
+    sonataNext:RegisterTheme({ Name = "NoPuffs", Panel = { Smoke = { Open = { Rise = 0.3, Spacing = 50,
+      Life = { 0.5, 0.8 } } } } })
     assert.are.same({ "Panel.Smoke.Puffs: a smoke opening needs them" }, sonataNext:Check("NoPuffs"))
     sonataNext:RegisterTheme({ Name = "NoSizes", Panel = {
       Smoke = { Puffs = { Texture = "Glow" }, Open = { Rise = 0.3, Spacing = 50 } },
@@ -965,14 +980,16 @@ describe("SonataNext", function()
     problems = sonataNext:Check("NoSizes")
     table.sort(problems)
     assert.are.same({ "Panel.Bats.Flutter.Every: two numbers, soonest and latest",
+      "Panel.Smoke.Open.Life: two numbers, shortest and longest",
       "Panel.Smoke.Puffs.Size: two numbers, smallest and largest" }, problems)
     sonataNext:RegisterTheme({ Name = "GoodSpooky", Panel = {
-      Smoke = { Puffs = { Texture = "Glow", Size = { 80, 120 }, Colors = { "White" } },
-        Sparks = { Texture = "Glow", Count = 4, Life = { 0.2, 0.3 } },
-        Open = { Rise = 0.3, Spacing = 50, Grow = 0.1, Hold = 0.1, Shrink = 0.2, Lift = { 10, 20 }, Reveal = { 0.1, 0.3 } } },
+      Smoke = { Puffs = { Texture = "Glow", Size = { 80, 120 }, Alpha = { 0.4, 0.7 }, Colors = { "White" } },
+        Sparks = { Texture = "Glow", Count = 4, Life = { 0.2, 0.3 }, Rise = { 20, 40 } },
+        Open = { Rise = 0.3, Spacing = 50, Life = { 0.6, 0.9 }, Start = 0.5, Growth = 2, FadeIn = 0.1,
+          Lift = { 10, 20 }, Buoyancy = 30, Swirl = { 6, 1 }, Burst = 3, Jitter = 0.3, Reveal = { 0.1, 0.3 } } },
       Bats = { Texture = "Glow", Frames = 4, FrameRate = 10,
-        Close = { Count = { 10, 15 }, Speed = { 100, 200 }, Vanish = 0.1,
-          Puff = { Texture = "Glow", Spacing = 50, Size = { 60, 80 }, Grow = 0.1 } },
+        Close = { Count = { 10, 15 }, Pieces = { Texture = "Glow" }, Speed = { 100, 200 }, Shudder = 0.1, Break = 0.1,
+          Morph = 0.3, Gap = 8, Jitter = 0.25, Dark = "Black" },
         Flutter = { Every = { 5, 9 }, Travel = 200, Band = { 20, 50 } } },
     } })
     assert.are.same({}, sonataNext:Check("GoodSpooky"))

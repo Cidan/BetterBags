@@ -632,7 +632,7 @@ describe("BetterBags Next's shipped themes", function()
   end)
   -- Glitch (next-themes.md §21): asked for "flickers, glitched blinking textures that wobble suddenly and harshly, think
   -- green mesh".
-  -- Halloween (next-themes.md §23): pumpkin orange and black, coming in out of a puff of smoke and turning into bats as it
+  -- Halloween (next-themes.md §23): pumpkin orange and black, coming in out of smoke and breaking up into bats as it
   -- closes, a black cat on a jack-o'-lantern, leaves falling.
   describe("Halloween", function()
     local function readFile(path)
@@ -646,6 +646,50 @@ describe("BetterBags Next's shipped themes", function()
 
     local function lum(c)
       return 0.3 * c[1] + 0.59 * c[2] + 0.11 * c[3]
+    end
+
+    local function u32(data, at)
+      return data:byte(at) * 2 ^ 24 + data:byte(at + 1) * 2 ^ 16 + data:byte(at + 2) * 256 + data:byte(at + 3)
+    end
+
+    -- pixels reads an 8-bit RGBA PNG whose data is stored uncompressed (zlib's stored blocks, unfiltered rows), as the
+    -- generator writes the body: its rows, each a list of { r, g, b, a } from 0 to 1.
+    local function pixels(data)
+      assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8))
+      local at, width, height, stream = 9, nil, nil, {}
+      while at <= #data do
+        local length, kind = u32(data, at), data:sub(at + 4, at + 7)
+        local chunk = data:sub(at + 8, at + 7 + length)
+        if kind == "IHDR" then
+          width, height = u32(chunk, 1), u32(chunk, 5)
+          assert.are.equal(8, chunk:byte(9), "8 bits a channel")
+          assert.are.equal(6, chunk:byte(10), "RGBA")
+        elseif kind == "IDAT" then
+          table.insert(stream, chunk)
+        end
+        at = at + 12 + length
+      end
+      stream = table.concat(stream)
+      local raw, pos = {}, 3
+      repeat
+        local final = stream:byte(pos) % 2
+        assert.are.equal(0, math.floor(stream:byte(pos) / 2) % 4, "stored, not compressed")
+        local len = stream:byte(pos + 1) + stream:byte(pos + 2) * 256
+        table.insert(raw, stream:sub(pos + 5, pos + 4 + len))
+        pos = pos + 5 + len
+      until final == 1
+      raw = table.concat(raw)
+      local rows, stride = {}, 1 + 4 * width
+      for y = 0, height - 1 do
+        assert.are.equal(0, raw:byte(y * stride + 1), "unfiltered")
+        local row = {}
+        for x = 0, width - 1 do
+          local p = y * stride + 2 + 4 * x
+          row[x + 1] = { raw:byte(p) / 255, raw:byte(p + 1) / 255, raw:byte(p + 2) / 255, raw:byte(p + 3) / 255 }
+        end
+        rows[y + 1] = row
+      end
+      return rows, width, height
     end
 
     it("draws its display text in Creepster, which it ships with its license, in the locales it covers", function()
@@ -699,6 +743,32 @@ describe("BetterBags Next's shipped themes", function()
       end
     end)
 
+    -- Asked, of the first version's soft ribs: "remove the dark streaks on the bag ... make the orange slightly deeper".
+    it("is one orange from side to side, no streaks across it, a little deeper than it was", function()
+      local t = sonataNext:Resolve("Halloween")
+      local body = t.Palette.Body
+      assert.is_true(body[1] <= 0.82 and body[2] <= 0.43, "deeper than the first (0.835, 0.455, 0.16)")
+      local rows, width, height = pixels(readFile(t.Textures.HalloweenBody))
+      assert.is_true(width >= 1 and height >= 64)
+      local sum, lightest, darkest = { 0, 0, 0 }, 0, 1
+      for y, row in ipairs(rows) do
+        for x = 2, width do
+          for c = 1, 4 do
+            assert.are.equal(row[1][c], row[x][c], "row " .. y .. ": the same all the way across")
+          end
+        end
+        for c = 1, 3 do
+          sum[c] = sum[c] + row[1][c]
+        end
+        lightest, darkest = math.max(lightest, lum(row[1])), math.min(darkest, lum(row[1]))
+        assert.are.equal(1, row[1][4], "opaque")
+      end
+      for c = 1, 3 do
+        assert.is_true(math.abs(sum[c] / height - body[c]) < 0.01, "the feather its average color (" .. c .. ")")
+      end
+      assert.is_true(darkest > 0.9 * lightest, "shaded only a little, top to bottom")
+    end)
+
     -- Text reads on what it sits on: ink on the orange, light on the black tabs, search box, menus and primary buttons.
     it("writes in ink on the orange and in light on the black", function()
       local t = sonataNext:Resolve("Halloween")
@@ -716,24 +786,36 @@ describe("BetterBags Next's shipped themes", function()
       end
     end)
 
-    -- Asked: "the bags should appear in a puff of smoke from bottom to top".
-    it("appears out of a puff of smoke from the bottom up, shown before a bank's wait ends", function()
+    -- Asked: "the bags should appear in a puff of smoke from bottom to top", then of the cartoon smoke: "can you make it
+    -- more real-ish?".
+    it("appears out of smoke from the bottom up, shown before a bank's wait ends, rising and thinning as smoke does", function()
       local t = sonataNext:Resolve("Halloween")
       local K = t.Panel.Smoke
       local O = K.Open
-      assert.is_true(O.Rise + O.Grow + O.Hold + O.Shrink < 0.9, "shown before a bank's 1 second wait ends")
-      assert.is_true(O.Reveal[2] <= O.Rise, "the bag shown under the smoke by the time it reaches the top")
-      assert.is_true(K.Puffs.Size[1] >= 1.5 * O.Spacing, "puffs overlapping, so the smoke covers the bag")
+      assert.is_true(O.Reveal[2] < 0.9, "shown before a bank's 1 second wait ends")
+      assert.is_true(O.Reveal[2] <= O.Rise + 0.1, "the bag shown under the smoke about as it reaches the top")
+      assert.is_true(K.Puffs.Size[1] * O.Start >= O.Spacing, "puffs overlapping from the start, covering the bag")
       assert.are.equal("Puff", K.Puffs.Texture)
-      assert.is_true(K.Sparks.Count > 0, "sparks in it")
+      assert.is_true(K.Puffs.Alpha[2] < 1, "translucent")
+      assert.is_true(K.Puffs.Alpha[1] < K.Puffs.Alpha[2], "some thinner than others")
+      assert.is_true(O.Start < 1 and O.Growth > 1.4, "swelling as it rises")
+      assert.is_true(O.Buoyancy > 0, "rising faster and faster, as warm smoke does")
+      assert.is_true(O.Swirl[1] > 0 and O.Swirl[2] > 0, "curling")
+      assert.is_true(O.Life[1] < O.Life[2], "each puff thinning away in its own time")
+      assert.is_true(K.Sparks.Count > 0, "embers in it")
     end)
 
-    -- Asked: "make the bag 'turn into' several bats, like 10-15 bats, and fly away in random directions off screen".
-    it("turns into 10 to 15 bats out of a puff of smoke as it closes, and flutters bats out of its header", function()
+    -- Asked: "make the bag 'turn into' several bats, like 10-15 bats, and fly away in random directions off screen", then:
+    -- "no puff of smokes: how the frost theme shatters, we want the bag break up *and morph* into bats".
+    it("breaks up into 10 to 15 pieces of itself that turn into bats as it closes, and flutters bats out of its header",
+      function()
       local t = sonataNext:Resolve("Halloween")
       local B = t.Panel.Bats
       assert.is_true(B.Close.Count[1] >= 10 and B.Close.Count[2] <= 15)
-      assert.is_not_nil(B.Close.Puff)
+      assert.is_nil(B.Close.Puff, "no smoke")
+      assert.are.equal(t.Panel.Fill.Texture, B.Close.Pieces.Texture, "pieces of its own body")
+      assert.is_true(B.Close.Shudder > 0 and B.Close.Break > 0 and B.Close.Morph > 0, "trembles, breaks, morphs")
+      assert.is_true(B.Close.Shudder < 0.3, "breaking up soon after it is closed")
       assert.are.equal(4, B.Frames, "bats.png: four frames side by side")
       local data = readFile(t.Textures.Bats)
       local w, h = data:byte(17) * 2 ^ 24 + data:byte(18) * 2 ^ 16 + data:byte(19) * 256 + data:byte(20),
