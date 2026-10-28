@@ -85,7 +85,7 @@ may also be inset, drawn at its atlas's size or pieced (§16); a **frame** is Bl
 | `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`, `Locales` (the client locales `File` is drawn in; elsewhere the client's own font: a font covers some alphabets, §21); or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font); or `Copy`, a client font copied outright (its file, flags, color and shadow) at the role's `Size` (its own, or the one it inherits from Default; `false`: the client font's own), nothing else the role inherits changing it but its height on whole pixels and its own `Justify` (the Plain theme, at Default's sizes). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
 | `Layout` | Sizes: Icon (an item button's size; the player's Icon Scale, the Size tab, multiplies it: `style.ICON`; the grid's width and the vendor's cards keep the theme's own, `style.CARD_ICON`, docs/next-appearance-size.md), VendorColumns, VendorTextGap, VendorPriceRaise (the vendor's cards, next.md §10b), Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
 | `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize; any of `NextTween.Ease`, `flicker` included, §21), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
-| `Panel` | `Fill` (texture spec; `Inset`: `Left`, `Right`, `Top`, `Bottom` into the body, drawn for the backpack and mirrored on the bank, the screen-edge side still reaching past the edge while docked; `Panel:FillInsets()`), `Frame` (Blizzard's frame round the body, §15, mirrored on the bank; `Above` over the content, `Bands` across its top), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none), `Glitch` (glitching in, out and now and then, §21; Default has none), `Rain` (data rain, §21; Default has none). |
+| `Panel` | `Fill` (texture spec; `Inset`: `Left`, `Right`, `Top`, `Bottom` into the body, drawn for the backpack and mirrored on the bank, the screen-edge side still reaching past the edge while docked; `Panel:FillInsets()`), `Frame` (Blizzard's frame round the body, §15, mirrored on the bank; `Above` over the content, `Bands` across its top), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none), `Glitch` (glitching in, out and now and then, §21; Default has none), `Rain` (data rain, §21; Default has none), `Shatter`, `Snow`, `Threads` (§22), `Smoke`, `Bats` (§23; Default has none). |
 | `Header` | `Title.Font`, `Title.Ghosts` (copies of the title under it, each `{ Font, X, Y, Alpha }`: a colour split, §21), `Title.Justify` (`"CENTER"`: centered in the room the header buttons leave, as Blizzard centers a window's title; its button and glow over the text where it is drawn); `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button; an icon's `Highlight`, art drawn over it under the pointer; an icon's `Pushed` art while pressed and `Disabled` art while disabled, drawn whole (neither dimmed nor grayed), as a button's pushed and disabled textures are; `RowStart`, where the row starts from the outer side when the pinned buttons hold the corner (the title's room counts the row from there or the pins, whichever reaches further); `Rail`, the buttons down a strip along the inner side instead of across the header, inside the body or `Outside` it, its art from `Start`, §13, false in Default; `Pinned`, a button at a corner of the body apart from the row or the rail, §13; `Menu`, the row in a bag button's menu, §19). |
 | `Search` | `Fill`, `FocusFill` (colors, or art: §14), `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`, `ActiveColor`: while it holds a search, under the pointer or not, as Blizzard's magnifier stays white), `HelpFont`, `TextFont`; `Template = true` keeps the bag search box's own border (`BagSearchBoxTemplate`) and draws neither the fill nor the edge. |
 | `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Header` (art behind the title row, across the section, `Layout.SectionHeader` tall; unset in Default), `Line` (`Color`, `From`, `To`, `Size`, or art, or false), `Highlight` (`Color`, `From`, `To`, or art, or false). |
@@ -338,6 +338,53 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     on the body's art.
   - Not seen in game yet. Seen nowhere else either: no image of it was rendered.
 
+- **Halloween** (`sonata/themes/next/halloween.lua`; asked: "think: black cats, pumpkins/jack-o-lanterns, bats, orange
+  and black. the bags should appear in a puff of smoke from bottom to top (get that smoke right! make it feel really
+  good). for the bag closing, make the bag 'turn into' several bats, like 10-15 bats, and fly away in random directions
+  off screen. like old school cartoon vampires turning into bats and flying away ... main color should be orange with
+  black accents (so orange backdrop), with whimsy and fun animations. slightly cartoony almost and flat shaded ... a
+  nice good color of orange, like that of a pumpkin, not over the top bright"): pumpkin orange with black accents, its
+  palette Default's names in candlelight (Gold), a witch's purple (Lavender) and dark ink (Text, Muted), plus Ink, Bone,
+  Night, the smoke's purple-tinged greys and the leaves' autumn colours. Its engine is §23.
+  - **Opening:** smoke rises up the bag from the bottom (NextSmoke). The first version was cartoon smoke (flat,
+    cel-shaded puffs popping past their size, holding, shrinking away); asked: "can you make it more real-ish?". Now rows
+    of soft, uneven puffs (`puff.png`, noise-shaped) are born from the rising front, each at its own strength (0.35 to
+    0.65) and angle, swelling from 0.55 of its size to 1.8, rising faster and faster (buoyancy), curling across its drift,
+    fading in quickly and thinning away over 0.75 to 1.25 s, the bottom row spreading along the floor; embers (soft gold
+    and pumpkin glows) rise through it. The bag shows under it by 0.4 s (under the 1 s a bank waits for its panel to
+    show) and the smoke lingers on its layer, clearing from the bottom up, about 1.6 s in all. A bat or two flutters out
+    of its header as it opens. **Closing:** first a puff of smoke covered it and bats burst out of it; asked: "no puff of
+    smokes: how the frost theme shatters, we want the bag break up *and morph* into bats and fly away. almost a surreal
+    effect". Now it trembles where it stands (0.18 s), breaks into 11 to 15 pieces of its own body that drift apart from
+    where it breaks (the pointer, else its middle), and each in turn, nearer the break first, shrinks, spreads wings and
+    darkens into a bat (0.32 s) that flies away (four frames, 14 a second) faster and faster, wobbling and banking, until
+    it is off the screen.
+  - **At rest:** the body's art (`body.png`: one deep pumpkin orange from side to side, averaging 0.8, 0.4, 0.11, a
+    touch lighter at the top and darker toward the bottom; the first version's five soft ribs were taken out, asked:
+    "remove the dark streaks on the bag ... make the orange slightly deeper"), black goo dripping along its top (16 tall, clear of the title at 24 and the header buttons at
+    27), a black edge; at the bottom of the feather a jack-o'-lantern, its candlelit face and a glow round it flickering
+    (`Flicker`, §12), a black cat sitting on it swishing its tail (`Sway`) and blinking now and then, sometimes twice
+    (`Blink`, §12); on a small bag, the cat and a little jack-o'-lantern sit on its top edge at the outer corner; a cobweb
+    across the feather's top corner, a spider swinging from it; a pumpkin vine curling along the footer out to the
+    jack-o'-lantern (a thread, §22); autumn leaves tumbling down the feather and a few behind the items, on a breeze that
+    gusts now and then (NextSnow, drawn flat); one to three bats fluttering out of the header every 9 to 18 seconds; a
+    candlelit glow round the title, a bat gliding in along a black ribbon into it; little stars for sparkles, drawn flat.
+  - **Text:** Creepster (fonts/halloween, Font Diner, SIL Open Font License, Google Fonts' upstream file) for display
+    text (titles, sections, the empty text, dialog and settings titles), the client's font for the rest; dark ink on the
+    orange, bone and pumpkin on the black (tabs, the search box, menus, a primary button), each with a shadow of its own.
+    Its character map covers Latin-1 and more (checked with a stdlib reader of the font's `cmap`: none of the
+    accented letters of the eight Latin locales missing), so in other locales its roles draw the client's (`Locales`).
+  - **Art:** `tools/textures/next_halloween.py` (standard-library Python; a scanline rasterizer at 4 x 4 samples a pixel
+    for flat, hard-edged, anti-aliased shapes) makes `textures/next/halloween/*.png`: the body (8 x 512, every column the
+    same, stored uncompressed so the theme's spec reads its pixels), a soft puff of smoke (256 x 256, grey tones, tinted:
+    a round falloff broken up by fractal value noise read through a noise-warped point, for curls and thin places), a star, the bat flapping (512 x 128, four square frames) and gliding, the cat with its eyes (on the
+    same canvas, so they lie over it exactly) and its tail apart, the jack-o'-lantern with its lit face apart, a cobweb, a
+    spider on its thread, a maple leaf, a vine, goo drips repeating across. Checked by ASCII previews of each picture's
+    shape in the terminal rather than an image viewer, which hangs.
+  - Item buttons are dark cells on the orange (cropped icons, an ink edge carrying the quality); the settings window, a
+    dock's card, the currency tracker and dialogs are on the body's art in ink; menus are black with bone text.
+  - Not seen in game yet; no image of it was rendered.
+
 Each draws the settings window and its controls in its own look (next-settings.md §6): Ember and Quiet
 their control colors in their own charcoal and grays (Quiet also smaller settings titles and quicker
 switches and tab markers); Parchment the window, its menus and dialogs on the paper art, ink text and
@@ -482,7 +529,13 @@ is a column at a screen edge, feathered on its inner side), so ornaments are art
     average, from 0.3 to 1.7 of it, the piece glitches for `Hold` seconds, rolled anew every `GLITCH_STEP`, 0.06: a jump
     up to `Jump` units either way across and up or down on whole pixels, half the time a blink to `Blink` of its alpha,
     its art slipped up to `Slip` of a tile; then back at rest; `ornaments.Random` its randomness). A panel hiding mid-
-    glitch puts the piece back at rest. The Animation switch Moving Ornaments stills both (§20).
+    glitch puts the piece back at rest. Two more, added for the Halloween theme (§23): `Blink` (after `Every` seconds,
+    `{ soonest, latest }`, the piece is shut, drawn at no alpha, for `Time`, 0.12 when unset, then open again; now and
+    then, `Twice` of its blinks, it blinks again as soon as it has been open as long as it was shut, never a third time:
+    a black cat's eyes) and `Flicker` (its alpha wandering like a candle's, never still, between `Low` of its own and its
+    own, toward somewhere new every half to one and a half of a `Speed`'th of a second). Both set only the piece's alpha
+    (`fade`), never its place. A panel hiding mid-blink opens it again. The Animation switch Moving Ornaments stills
+    them all (§20).
 - **Whole pixels** (docs/next-pixel-perfect.md): offsets snapped and sizes rounded on the frame's grid, so a
   piece at rest is on whole pixels. Moving pieces rest nowhere: `panelProto:MovingParts` names them (only those
   shown at the panel's size), so the pixel checks leave them out.
@@ -879,7 +932,9 @@ use, and back on.
   | Glitch Effects (`nextGlitch`) | `glitch` | `Panel.Glitch` (§21): no flicker, tears or bursts; the bags slide in and out as any theme's. Flicker can be hard on some players' eyes |
   | Data Rain (`nextRain`) | `rain` | `Panel.Rain` (§21): no glyphs falling |
   | Ice Shatter (`nextShatter`) | `shatter` | `Panel.Shatter` (§22): no freezing together or shattering; the bags slide in and out as any theme's |
-  | Snowfall (`nextSnow`) | `snow` | `Panel.Snow` (§22): no snow, gusts, wind streaks or shooting stars |
+  | Snow and Leaves (`nextSnow`) | `snow` | `Panel.Snow` (§22): no snow, falling leaves, gusts, wind streaks or shooting stars. Titled Snowfall until the Halloween theme's leaves fell through the same engine |
+  | Smoke Puff (`nextSmoke`) | `smoke` | `Panel.Smoke` (§23): no smoke; the bags slide in as any theme's |
+  | Bats (`nextBats`) | `bats` | `Panel.Bats` (§23): no breaking up into bats, no fluttering bats; the bags slide out as any theme's |
 
   Moving Ornaments also holds a theme's threads of light still (§22: each thread's `Sway` and `Glint` taken out, its art
   and its draw-in as the panel opens kept).
@@ -1182,6 +1237,114 @@ What the Frost theme (§8) needed of the engine, all of it data a theme gives, n
   this frame moving only from the next). Then 30 of the shooting stars and their Check rules (two first survived and led
   to tests: a star on a panel on the left of the screen starting inside the body, and fading in and out). Every one now
   caught.
+
+## 23. The Halloween theme's engine (`next/smoke.lua`, `next/bats.lua`, ornaments' `Blink` and `Flicker`)
+
+What the Halloween theme (§8) needed of the engine, all of it data a theme gives.
+
+- **Coming in out of smoke** (`Panel.Smoke`, NextSmoke, driven by the panel: `smokeIn`, as `shatterIn` is,
+  `endShatter` ending both; `moveIn` takes it after a glitch and a shatter). The first version was cartoon smoke (each
+  puff popping past its size over `Grow`, holding over `Hold`, shrinking away over `Shrink`); asked: "can you make it
+  more real-ish?". Those keys are gone.
+  - **The smoke.** `NextSmoke:Begin(panel)` lays puffs over the body's rect (`panel:BodyRect`, at the panel's scale) in
+    rows and columns about `Open.Spacing` apart (scaled), a column half a spacing outside each side so the smoke billows
+    past the edges, each moved up to `Jitter` of a spacing either way; each a texture on the smoke layer (a frame over the
+    screen in the DIALOG strata, level 10, above every panel, taking no mouse), in a colour of `Puffs.Colors`, its size
+    between `Puffs.Size`, its strength between `Puffs.Alpha` (a range, or one number), at an angle of its own, turning up
+    to `Spin` degrees a second either way. Rows lower in the body draw below rows above (sublevels -8 to 7).
+  - **The front** rises up the body over `Open.Rise`, quick off the floor and slowing near the top: `1 - (1 - u)^2` of
+    the way up `u` of the way through; a row is born as it passes it, so the top row at `Rise`.
+  - **A puff**, as smoke does: lives between `Open.Life` (seconds); swells from `Start` of its size toward `Growth` of
+    it (an ease out: quickly at first); rises at its `Lift` (units a second, scaled) and faster and faster by `Buoyancy`
+    (units a second a second, scaled: warm smoke); drifts out from the body's middle line at `Spread` times how far from
+    it it is, the bottom row `Burst` times as fast (the smoke spreading along the floor); curls across that drift
+    (`Swirl`: `{ units, swings a second }`, from a phase of its own, growing in over the first two fifths of its life);
+    fades in over `FadeIn` of its life and thins away from three tenths of it on. The bottom rows, born first, go first:
+    the smoke clears from the bottom up.
+  - **The panel** is drawn at no alpha, then shown under the smoke over `Reveal` (`{ from, to }` seconds, smoothstep).
+    Once that ends it has shown (`OpenTime` and `OpenLock`: `Reveal`'s end, else `Rise`): it says so, its threads draw in
+    and its sections cascade. Its smoke lingers on (`Linger`): the run lives on by itself on the smoke layer's driver
+    until its last puff and ember are gone (`ClearTime`: `Rise` plus the longest `Life`), and the driver stops with the
+    last run. `Init` gives back whatever lingers (`core/init.lua` starts it with the shatter's). The theme going mid-open
+    shows it plainly; Escape ends it at rest, its smoke given back.
+  - **Embers** (`Sparks`: `Count`, born at random through the rise somewhere in the smoke below the front, rising at
+    `Rise` over `Life`, sized `sin(pi * age / life)` of its size, turning, on the layer's `OVERLAY`).
+- **Breaking up into bats** (`Panel.Bats`, NextBats, driven by the panel: `batsOut`, taken in `Hide` after a glitch and
+  a shatter). The first version covered the body in a puff of smoke and sent bats out of it; asked: "no puff of smokes:
+  how the frost theme shatters, we want the bag break up *and morph* into bats and fly away. almost a surreal effect".
+  `Close.Puff`, `Grow` and `Vanish` are gone.
+  - **A bat** is a flipbook: `Texture` holds `Frames` pictures side by side (square), shown in turn `FrameRate` a second,
+    each bat from its own phase (`SetTexCoord` over its frame); `Color`, `BlendMode` (BLEND when unset).
+  - **Closing:** `NextBats:Begin(panel, breakPoint)` cuts the body (where its `BodyRect` puts it) into about
+    `Close.Count` pieces (rounded, between its two): a grid of cells as near square as the body allows, its inner corners
+    moved up to `Jitter` of a cell (those on an edge only along it), so the pieces tile the body exactly. Each is a
+    texture of the bats layer painted with `Close.Pieces` (the body's own art) at the texture coordinates where it lies
+    in the panel's fill (`panel:FillRect`), its four corners moved onto its own (`SetVertexOffset`), as the shatter's
+    shards are. The panel trembles where it stands over `Shudder` (across, `Tremble` units either way, dying away; the
+    tween's own offset), then hides (`Hide`'s end) as `Break` shows the pieces where it was. They drift apart straight
+    out from where it breaks (the pointer over the body, else its middle; `Gap` units over `Break` seconds); then each,
+    after its delay (`Delay`, nearer the break first, give or take a fifth), turns into its bat over `Morph`: it shrinks
+    toward its bat's `Size`, its top spreading into wings that flap and its bottom drawn in, banking as its bat will,
+    darkening toward `Dark` and fading as the bat (in from halfway) comes out of it. The bat flies away from the break
+    give or take `Spread` degrees at its `Speed`, growing by `Accel` of itself a second (`speed * (t + accel * t^2 / 2)`,
+    eased in over the morph), wobbling across its way (`Wobble`: `{ units, swings a second }`), banking by `Tilt`
+    degrees toward the side it flies to, growing a little as it goes; it is hidden once off the screen. The run is
+    given back when its last bat is, or after `Life`. All on the bats layer (DIALOG, above the panels), whose driver
+    stops with the last run. The theme going as it trembles closes it plainly.
+  - **Fluttering** (`Flutter`, NextBats' set on each panel: `Create`, `Style`, `Start`, `Stop`, `MovingParts`, the
+    panel calling them with its snow's): every `Every` (`{ soonest, latest }`), none in combat, `Count` bats one after
+    another `Stagger` apart (a negative starting age) fly out of the header band of the body (`Band`: down from its top;
+    from its outer three quarters) toward its inner side, out into the world, at `Speed`, rising or falling at `Rise`,
+    wobbling up and down, flapping, faded in over the first tenth of `Travel` and out over its last quarter, given back
+    once they have flown it; on the panel's frame (`Layer`, `SubLevel`: BORDER 5 when unset), under its content. One
+    flutters out as the panel shows with `OnOpen`. A theme without a flutter applied while they fly lets them go
+    (`Style`).
+- **Ornament motions** `Blink` and `Flicker` (§12).
+- **Check** names each part a smoke or bats does not have, and what their runtimes need: an opening's `Rise`,
+  `Spacing`, `Start`, `Growth` and `Burst` more than nothing, its `Jitter` no less, `FadeIn` from 0 to 1, `Buoyancy` a
+  number, `Swirl` two numbers no less than nothing (how far and how often, in no order); a close's `Pieces`, its
+  `Shudder`, `Tremble`, `Break`, `Gap`, `Morph`, `Accel` and `Life` no less than nothing, its `Jitter` from 0 to below
+  half a cell (corners moved further could cross), its `Dark` a palette color; `FrameRate` and `Stagger` no less,
+  `Frames` and `Travel` more; `Puffs` for a smoke that opens, and their `Size`; a spark's `Count`; every range as two
+  numbers in order (`Size`, `Alpha`, `Lift`, `Spread`, `Reveal`, `Life`, `Count`, `Speed`, `Delay`, `Band`; `Every`
+  required for a flutter); a blink's `Every` and parts, a flicker's `Low` (0 to 1), `Speed` and parts.
+- **The switches** Smoke Puff and Bats (§20); Snowfall became Snow and Leaves.
+- **Not measured in game:** the smoke's cost. A full panel's open draws about 230 puffs (458 x 1000 at a spacing of 52)
+  for up to 1.6 s, each placed, sized, turned and faded every frame; the close 11 to 15 pieces and their bats.
+- **Coverage:** `spec/next/smoke_spec.lua` (opening only with an open, its lock, time and clear time; the layer; rows
+  and columns over the body and past its sides; born as the front rises; swelling from `Start` to `Growth`, fading in
+  and thinning away; clearing from the bottom up; the reveal; rising faster and faster and drifting out, the bottom row
+  along the floor; swirling no more than its `Swirl`, from a phase of its own, growing in over two fifths of its life;
+  turning, colours and alphas; embers; the panel's scale, buoyancy included; pools; lingering on after the panel has
+  shown until its last puff has lived its life, then stopping; given back when it starts again and by `Init`),
+  `spec/next/bats_spec.lua` (closing only with a close; pieces tiling the body, as near square as it allows, jittered,
+  each painted with the fill where it lies at every corner; trembling less and less, at the panel's scale; shown where
+  the body was, drifting apart over `Break`, half way half way; turning in their own time, nearer the break first;
+  shrinking, the top spread into wings and the bottom drawn in exactly as much as it shrank, flapping, darkening and
+  fading into the bat; bats flapping through the frames, straight out give or take `Spread`, eased into their speed,
+  faster and faster, wobbling no more than their wobble, growing as they fly, banking, at the panel's scale; given back
+  off the screen and as the last leaves, hidden as each leaves, within their Life, by `Init`; fluttering: none without,
+  now and then one after another, out of the header inside the body, toward the inner side, flapping, fading, gone after
+  its travel, mirrored, combat, stopping, OnOpen, moving parts), `spec/next/ornaments_spec.lua` (a blink, once and
+  twice, never a third; open again on a hide; a flicker between `Low` and its own, never still, back at its own),
+  `spec/next/theme_panel_spec.lua` ("smoke and bats": on the real backpack: opening out of the smoke over its body,
+  shown under it, its threads waiting, the smoke lingering after; Escape and the theme going mid-open; closing by
+  trembling then breaking into pieces of its body, no smoke; its threads unravelled as it trembles; breaking from the
+  pointer or the middle; the theme going as it trembles; sliding without them; fluttering while it shows and stopping,
+  a theme without bats letting them go), `spec/sonata/next_engine_spec.lua` (Check; the switches),
+  `spec/sonata/next_themes_spec.lua` ("Halloween": the font and its license, its locales, the art, the palette, ink on
+  orange and light on black; the body one orange from side to side, read from its pixels, averaging the feather's color,
+  deeper than the first; the smoke's timing, cover, translucency, swelling, buoyancy, curling and lives; the bats' count,
+  the pieces of its own body, the tremble, break and morph, the frames; the cat and jack-o'-lantern at each size, the
+  drips' clearance, leaves and vine), `spec/core/init_spec.lua` (started), the settings specs (the switches and their
+  rows), and every shipped-theme spec with it (`shipped_themes_spec`, `pixel_perfect_spec`). Mutation-tested: 110
+  mutations of the two modules, the motions, the panel's wiring, Check and the switches. Eleven first survived: nine led
+  to sharper tests, two showed code that did nothing, removed. Then the feedback round (smoke made real-ish, the close
+  made a break into bats, the body): 62 mutations of the smoke, the bats, the panel's wiring and Check; 16 first
+  survived and led to the tests above (the swirl's phase and growing in, a linger lasting its puffs' lives, buoyancy at
+  the panel's scale, threads unravelling over the tremble, the tremble dying away and its scale, the drift over `Break`,
+  the wings' spread, the piece fading into its bat, the corners' jitter and texture coordinates, `Spread`, the grid's
+  shape, the speed's ease in, the bat's growing). Every one now caught.
 
 ## 9. Coverage
 

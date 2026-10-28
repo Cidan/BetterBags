@@ -49,7 +49,8 @@ describe("Core Init and Enable flow", function()
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
-      "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies", "NextShatter"
+      "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies", "NextShatter",
+      "NextSmoke", "NextBats"
     }
 
     for _, name in ipairs(modules) do
@@ -296,6 +297,16 @@ describe("Core Init and Enable flow", function()
     shatter.Init = spy.new(function() end)
     addon:OnInitialize()
     assert.spy(shatter.Init).was.called(1)
+  end)
+
+  -- The smoke and bats layers' pools and what lives out on them (next-themes.md §23).
+  it("starts BetterBags Next's smoke and bats", function()
+    local smoke, bats = addon:GetModule("NextSmoke"), addon:GetModule("NextBats")
+    smoke.Init = spy.new(function() end)
+    bats.Init = spy.new(function() end)
+    addon:OnInitialize()
+    assert.spy(smoke.Init).was.called(1)
+    assert.spy(bats.Init).was.called(1)
   end)
 
   -- Its pages listen for the highest item level seen (next-settings.md §4).

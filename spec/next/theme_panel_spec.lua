@@ -59,7 +59,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
-  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -1839,6 +1839,257 @@ describe("BetterBags Next's panels and themes", function()
       bag.frame:Hide()
       bag.frame:GetScript("OnHide")(bag.frame)
       assert.is_nil(bag.snow.driver:GetScript("OnUpdate"))
+    end)
+  end)
+
+  -- The Halloween theme's engine (next-themes.md §23): its bags come in out of smoke (NextSmoke) and break up into bats as
+  -- they close, a few fluttering out of the header while they show (NextBats).
+  describe("smoke and bats (Panel.Smoke, Panel.Bats)", function()
+    local smokeModule = addon:GetModule("NextSmoke")
+    local batsModule = addon:GetModule("NextBats")
+    local savedSmokeRandom, savedBatsRandom, begun
+
+    local SMOKE = {
+      Puffs = { Texture = "Glow", Colors = { "White" }, Size = { 160, 160 }, Alpha = { 0.6, 0.6 }, BlendMode = "BLEND" },
+      Open = { Rise = 0.3, Spacing = 150, Life = { 0.4, 0.4 }, Start = 0.5, Growth = 2, FadeIn = 0.1, Lift = { 10, 10 },
+        Spread = { 10, 10 }, Reveal = { 0.05, 0.25 } },
+    }
+    local BATS = {
+      Texture = "Glow", Frames = 4, FrameRate = 10,
+      Close = { Count = { 10, 10 }, Pieces = { Texture = "Glow", Color = "White" }, Shudder = 0.1, Tremble = 3,
+        Break = 0.1, Gap = 8, Morph = 0.2, Delay = { 0, 0.1 }, Size = { 30, 30 }, Speed = { 300, 300 }, Accel = 1,
+        Life = 2 },
+      Flutter = { Every = { 4, 4 }, Count = { 1, 1 }, Size = { 20, 20 }, Speed = { 80, 80 }, Travel = 200,
+        Band = { 30, 50 }, OnOpen = true },
+    }
+    local THREADS = { { Anchor = "TOP", Points = { { 0, 20 }, { 1, 40 } }, Segments = 6, Width = 4, Texture = "Glow",
+      Color = "Gold", Alpha = 0.8, BlendMode = "ADD", Draw = 0.4 } }
+
+    local function spooky(without)
+      local panel = { Smoke = SMOKE, Bats = BATS, Threads = THREADS }
+      for _, key in ipairs(without or {}) do
+        panel[key] = nil
+      end
+      apply({ Panel = panel })
+    end
+
+    local function step(dt)
+      tween.driver:GetScript("OnUpdate")(tween.driver, dt)
+    end
+
+    local function lingering()
+      local n = 0
+      for _ in pairs(smokeModule.living) do n = n + 1 end
+      return n
+    end
+
+    -- The runs a close began, and where it broke from.
+    local broken
+
+    before_each(function()
+      savedSmokeRandom, savedBatsRandom = smokeModule.Random, batsModule.Random
+      local seed = 9
+      local function random()
+        seed = (seed * 16807) % 2147483647
+        return seed / 2147483647
+      end
+      smokeModule.Random, batsModule.Random = random, random
+      smokeModule:Init()
+      batsModule:Init()
+      begun = {}
+      local begin = smokeModule.Begin
+      override(smokeModule, "Begin", function(self, panel)
+        local run = begin(self, panel)
+        table.insert(begun, run)
+        return run
+      end)
+      broken = {}
+      local beginBats = batsModule.Begin
+      override(batsModule, "Begin", function(self, panel, focus)
+        local run = beginBats(self, panel, focus)
+        table.insert(broken, { run = run, focus = focus })
+        return run
+      end)
+      spooky()
+    end)
+
+    after_each(function()
+      smokeModule.Random, batsModule.Random = savedSmokeRandom, savedBatsRandom
+      smokeModule:Init()
+      batsModule:Init()
+    end)
+
+    it("opens where it rests out of smoke over its body, shown under it, the smoke clearing on its own after", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      assert.are.equal(0, bag.offset, "in place, not sliding in")
+      assert.are.equal(0, bag.frame:GetAlpha())
+      local run = begun[1]
+      local left, top, height, width = bag:BodyRect()
+      for _, p in ipairs(run.puffs) do
+        assert.is_true(p.x >= left - 150 and p.x <= left + width + 150)
+        assert.is_true(p.y >= top - height - 1e-6 and p.y <= top + 1e-6, "over its body, from its bottom to its top")
+      end
+      step(0.15)
+      local alpha = bag.frame:GetAlpha()
+      assert.is_true(alpha > 0 and alpha < 1, "showing under the smoke: " .. alpha)
+      assert.is_nil(shownAt)
+      finishTweens()
+      assert.is_true(shownAt, "says it has shown once it has fully appeared")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(1, lingering(), "its smoke lingering on its own")
+      local d = smokeModule:Layer().driver
+      for _ = 1, 20 do
+        local u = d:GetScript("OnUpdate")
+        if u == nil then break end
+        u(d, 0.05)
+      end
+      assert.are.equal(0, #run.puffs, "its smoke given back once it has cleared")
+      assert.are.equal(0, lingering())
+    end)
+
+    it("draws its threads in once the smoke covers it", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      local threads = bag.threads
+      local d = threads.driver
+      d:GetScript("OnUpdate")(d, 0.2)
+      assert.are.equal(0, threads.reveal, "waiting for the smoke to cover it")
+      d:GetScript("OnUpdate")(d, 0.2)
+      assert.is_true(threads.reveal > 0)
+    end)
+
+    it("stops at rest when Escape hides it mid-open, its smoke given back", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(0.1)
+      local run = begun[1]
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.are.equal(0, #run.puffs)
+      assert.are.equal(1, bag.frame:GetAlpha())
+    end)
+
+    it("shows plainly when its theme goes mid-open, and still says it has shown", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      step(0.1)
+      local run = begun[1]
+      spooky({ "Smoke" })
+      step(0.05)
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(0, #run.puffs)
+      finishTweens()
+      assert.is_true(shownAt)
+    end)
+
+    -- Asked: "no puff of smokes: how the frost theme shatters, we want the bag break up *and morph* into bats".
+    it("closes by trembling where it stands, then breaking into pieces of its art that fly on as bats, no smoke", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local base = bag.offset
+      local smokes = #begun
+      bag:Hide(ctx())
+      local run = broken[#broken].run
+      local _, _, height, width = bag:BodyRect()
+      local area = 0
+      for _, p in ipairs(run.pieces) do
+        local cs = p.corners
+        for k = 1, 4 do
+          local a, b = cs[k], cs[k % 4 + 1]
+          area = area + (a[1] * b[2] - b[1] * a[2]) / 2
+        end
+        assert.is_false(p.art:IsShown(), "not yet")
+      end
+      assert.is_true(math.abs(math.abs(area) - width * height) < 1e-3, "pieces of its body, tiling it")
+      step(0.02)
+      assert.are_not.equal(base, bag.offset, "trembling")
+      assert.is_true(bag.frame:IsShown())
+      assert.are.equal(1, bag.frame:GetAlpha())
+      finishTweens()
+      assert.is_false(bag.frame:IsShown(), "gone as it breaks")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.is_true(batsModule.flying[run], "its pieces flying on")
+      assert.is_true(run.pieces[1].art:IsShown())
+      assert.are.equal(smokes, #begun, "no smoke")
+    end)
+
+    it("unravels its threads as it trembles, before it breaks", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local over
+      local unravel = bag.threads.Unravel
+      bag.threads.Unravel = function(set, time)
+        over = time
+        return unravel(set, time)
+      end
+      bag:Hide(ctx())
+      assert.are.equal(BATS.Close.Shudder, over)
+    end)
+
+    it("breaks from the pointer when it is over its body, else from its middle", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local left, top, height, width = bag:BodyRect()
+      local savedCursor = _G.GetCursorPosition
+      _G.GetCursorPosition = function() return left + width / 2, top - height / 3 end
+      bag:Hide(ctx())
+      _G.GetCursorPosition = savedCursor
+      assert.are.same({ x = left + width / 2, y = top - height / 3 }, broken[#broken].focus)
+      finishTweens()
+      local again = opened(function(c) return nextBag:Create(c) end)
+      _G.GetCursorPosition = function() return -1000, -1000 end
+      again:Hide(ctx())
+      _G.GetCursorPosition = savedCursor
+      assert.is_nil(broken[#broken].focus)
+    end)
+
+    it("closes plainly when its theme goes as it trembles", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:Hide(ctx())
+      local run = broken[#broken].run
+      step(0.03)
+      spooky({ "Bats" })
+      step(0.02)
+      finishTweens()
+      assert.is_false(bag.frame:IsShown())
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(bag:HiddenOffset(), bag.offset, "out of sight, done trembling")
+      assert.is_nil(next(batsModule.flying), "no bats")
+      assert.are.equal(0, #run.pieces, "its pieces given back")
+    end)
+
+    it("slides in and out as any theme's without them", function()
+      spooky({ "Smoke", "Bats" })
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      assert.are_not.equal(0, bag.offset, "sliding in")
+      assert.are.equal(0, #begun)
+      finishTweens()
+      bag:Hide(ctx())
+      finishTweens()
+      assert.are.equal(0, #broken)
+      assert.is_nil(next(batsModule.flying))
+    end)
+
+    it("flutters bats out of its header while it shows, and stops as it hides, its bats moving parts", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.are.equal(1, #bag.bats.flutters, "one as it opens")
+      assert.is_not_nil(bag.bats.driver:GetScript("OnUpdate"))
+      local skip = bag:MovingParts()
+      assert.is_true(skip[bag.bats.flutters[1].texture])
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.are.equal(0, #bag.bats.flutters)
+      assert.is_nil(bag.bats.driver:GetScript("OnUpdate"))
+    end)
+
+    it("lets its fluttering bats go when a theme without them applies while it shows", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local texture = bag.bats.flutters[1].texture
+      spooky({ "Bats" })
+      assert.are.equal(0, #bag.bats.flutters)
+      assert.is_false(texture:IsShown())
+      assert.is_nil(bag.bats.driver:GetScript("OnUpdate"))
     end)
   end)
 

@@ -58,7 +58,8 @@ describe("Bag-bar backpack button click", function()
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
-      "GuildBank", "NextGuildBank", "Automation", "Seller", "Currencies", "NextShatter"
+      "GuildBank", "NextGuildBank", "Automation", "Seller", "Currencies", "NextShatter",
+      "NextSmoke", "NextBats"
     }
     for _, name in ipairs(modules) do
       local stub = StubBetterBagsModule(name)

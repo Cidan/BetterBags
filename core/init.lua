@@ -205,6 +205,9 @@ function addon:OnInitialize()
   addon:GetModule('NextPixel'):Init()
   -- The shatter layer's pools and the shards flying on it (next-themes.md §22).
   addon:GetModule('NextShatter'):Init()
+  -- The smoke and bats layers' pools and the puffs and bats living out on them (next-themes.md §23).
+  addon:GetModule('NextSmoke'):Init()
+  addon:GetModule('NextBats'):Init()
   -- The client's fonts its roles copy, rewritten by UI addons once the game has loaded (docs/next-gw2-theme.md).
   addon:GetModule('SonataNext'):WatchClientFonts()
   -- The player's Animation switches, laid over the theme in use as they change (next-themes.md §20).

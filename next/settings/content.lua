@@ -414,7 +414,7 @@ function content:Init()
       { title = L:G("Effects"), rows = { { setting = 'nextSparkles' }, { setting = 'nextShimmer' },
         { setting = 'nextTitleCloud' }, { setting = 'nextTitleRibbon' }, { setting = 'nextBraid' },
         { setting = 'nextOrnamentMotion' }, { setting = 'nextGlitch' }, { setting = 'nextRain' },
-        { setting = 'nextShatter' }, { setting = 'nextSnow' } } },
+        { setting = 'nextShatter' }, { setting = 'nextSnow' }, { setting = 'nextSmoke' }, { setting = 'nextBats' } } },
     } } },
   })
   pages:Define({

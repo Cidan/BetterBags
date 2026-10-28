@@ -13,7 +13,7 @@ end
 local constants, createdConstants = StubBetterBagsModule("Constants")
 constants.BAG_KIND = constants.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = 2 }
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextOrnaments", "next/ornaments.lua" },
-  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" } }) do
+  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" } }) do
   if addon:GetModule(m[1], true) == nil then
     ResetModuleStub(m[1], m[2])
     LoadBetterBagsModule(m[2])
@@ -60,7 +60,8 @@ describe("BetterBags Next's shipped themes", function()
   end
 
   it("ships Default and at least three others", function()
-    assert.are.same({ "Default", "Ember", "Frost", "GW2", "Glitch", "Parchment", "Plain", "Quiet" }, shipped())
+    assert.are.same({ "Default", "Ember", "Frost", "GW2", "Glitch", "Halloween", "Parchment", "Plain", "Quiet" },
+      shipped())
   end)
 
   it("resolves every one on every client and finds nothing it does not define", function()
@@ -631,6 +632,244 @@ describe("BetterBags Next's shipped themes", function()
   end)
   -- Glitch (next-themes.md §21): asked for "flickers, glitched blinking textures that wobble suddenly and harshly, think
   -- green mesh".
+  -- Halloween (next-themes.md §23): pumpkin orange and black, coming in out of smoke and breaking up into bats as it
+  -- closes, a black cat on a jack-o'-lantern, leaves falling.
+  describe("Halloween", function()
+    local function readFile(path)
+      local file = path:gsub("^Interface\\AddOns\\BetterBags\\", ""):gsub("\\", "/")
+      local f = io.open(file, "rb")
+      assert.is_not_nil(f, file)
+      local data = f:read("*a")
+      f:close()
+      return data, file
+    end
+
+    local function lum(c)
+      return 0.3 * c[1] + 0.59 * c[2] + 0.11 * c[3]
+    end
+
+    local function u32(data, at)
+      return data:byte(at) * 2 ^ 24 + data:byte(at + 1) * 2 ^ 16 + data:byte(at + 2) * 256 + data:byte(at + 3)
+    end
+
+    -- pixels reads an 8-bit RGBA PNG whose data is stored uncompressed (zlib's stored blocks, unfiltered rows), as the
+    -- generator writes the body: its rows, each a list of { r, g, b, a } from 0 to 1.
+    local function pixels(data)
+      assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8))
+      local at, width, height, stream = 9, nil, nil, {}
+      while at <= #data do
+        local length, kind = u32(data, at), data:sub(at + 4, at + 7)
+        local chunk = data:sub(at + 8, at + 7 + length)
+        if kind == "IHDR" then
+          width, height = u32(chunk, 1), u32(chunk, 5)
+          assert.are.equal(8, chunk:byte(9), "8 bits a channel")
+          assert.are.equal(6, chunk:byte(10), "RGBA")
+        elseif kind == "IDAT" then
+          table.insert(stream, chunk)
+        end
+        at = at + 12 + length
+      end
+      stream = table.concat(stream)
+      local raw, pos = {}, 3
+      repeat
+        local final = stream:byte(pos) % 2
+        assert.are.equal(0, math.floor(stream:byte(pos) / 2) % 4, "stored, not compressed")
+        local len = stream:byte(pos + 1) + stream:byte(pos + 2) * 256
+        table.insert(raw, stream:sub(pos + 5, pos + 4 + len))
+        pos = pos + 5 + len
+      until final == 1
+      raw = table.concat(raw)
+      local rows, stride = {}, 1 + 4 * width
+      for y = 0, height - 1 do
+        assert.are.equal(0, raw:byte(y * stride + 1), "unfiltered")
+        local row = {}
+        for x = 0, width - 1 do
+          local p = y * stride + 2 + 4 * x
+          row[x + 1] = { raw:byte(p) / 255, raw:byte(p + 1) / 255, raw:byte(p + 2) / 255, raw:byte(p + 3) / 255 }
+        end
+        rows[y + 1] = row
+      end
+      return rows, width, height
+    end
+
+    it("draws its display text in Creepster, which it ships with its license, in the locales it covers", function()
+      local t = sonataNext:Resolve("Halloween")
+      local files = {}
+      for role, spec in pairs(t.Fonts) do
+        if spec.File ~= nil and spec.File:find("halloween", 1, true) then
+          files[spec.File] = true
+          assert.are.same({ "enUS", "enGB", "deDE", "frFR", "esES", "esMX", "itIT", "ptBR" }, spec.Locales, role)
+        end
+      end
+      local count = 0
+      for path in pairs(files) do
+        count = count + 1
+        local data, file = readFile(path)
+        assert.are.equal("\0\1\0\0", data:sub(1, 4), file .. " is a TrueType font")
+      end
+      assert.are.equal(1, count)
+      local license = readFile("Interface\\AddOns\\BetterBags\\fonts\\halloween\\Creepster_OFL.txt")
+      assert.is_truthy(license:find("SIL Open Font License", 1, true))
+      assert.is_not_nil(t.Fonts.Title.File, "the title")
+      assert.is_not_nil(t.Fonts.Section.File, "sections")
+      assert.is_nil(t.Fonts.Count.File, "counts in the client's font")
+      assert.is_nil(t.Fonts.Tab.File, "tabs, small, in the client's font")
+    end)
+
+    it("ships every texture it names, as a PNG", function()
+      local t = sonataNext:Resolve("Halloween")
+      local count = 0
+      for name, path in pairs(t.Textures) do
+        if path:find("textures\\next\\halloween\\", 1, true) then
+          count = count + 1
+          local data, file = readFile(path)
+          assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), name .. ": " .. file)
+        end
+      end
+      assert.are.equal(15, count)
+    end)
+
+    -- Asked: "main color should be orange with black accents (so orange backdrop) ... a nice good color of orange,
+    -- like that of a pumpkin, not over the top bright".
+    it("is a pumpkin's orange, not over bright, with black accents", function()
+      local t = sonataNext:Resolve("Halloween")
+      local body = t.Palette.Body
+      assert.is_true(body[1] > body[2] and body[2] > body[3], "orange: red over green over blue")
+      assert.is_true(body[1] < 0.9 and body[1] > 0.75, "not over bright, not dull")
+      assert.is_true(body[3] < 0.3, "saturated")
+      assert.are.equal("HalloweenBody", t.Panel.Fill.Texture)
+      for _, name in ipairs({ "Ink", "Tab", "SearchFill", "Card" }) do
+        assert.is_true(lum(t.Palette[name]) < 0.1, name .. " is black")
+      end
+    end)
+
+    -- Asked, of the first version's soft ribs: "remove the dark streaks on the bag ... make the orange slightly deeper".
+    it("is one orange from side to side, no streaks across it, a little deeper than it was", function()
+      local t = sonataNext:Resolve("Halloween")
+      local body = t.Palette.Body
+      assert.is_true(body[1] <= 0.82 and body[2] <= 0.43, "deeper than the first (0.835, 0.455, 0.16)")
+      local rows, width, height = pixels(readFile(t.Textures.HalloweenBody))
+      assert.is_true(width >= 1 and height >= 64)
+      local sum, lightest, darkest = { 0, 0, 0 }, 0, 1
+      for y, row in ipairs(rows) do
+        for x = 2, width do
+          for c = 1, 4 do
+            assert.are.equal(row[1][c], row[x][c], "row " .. y .. ": the same all the way across")
+          end
+        end
+        for c = 1, 3 do
+          sum[c] = sum[c] + row[1][c]
+        end
+        lightest, darkest = math.max(lightest, lum(row[1])), math.min(darkest, lum(row[1]))
+        assert.are.equal(1, row[1][4], "opaque")
+      end
+      for c = 1, 3 do
+        assert.is_true(math.abs(sum[c] / height - body[c]) < 0.01, "the feather its average color (" .. c .. ")")
+      end
+      assert.is_true(darkest > 0.9 * lightest, "shaded only a little, top to bottom")
+    end)
+
+    -- Text reads on what it sits on: ink on the orange, light on the black tabs, search box, menus and primary buttons.
+    it("writes in ink on the orange and in light on the black", function()
+      local t = sonataNext:Resolve("Halloween")
+      local function color(role)
+        local c = t.Fonts[role].Color
+        return type(c) == "string" and t.Palette[c] or c
+      end
+      for _, role in ipairs({ "Title", "Section", "SectionRecent", "SectionFree", "Count", "Footer", "Empty",
+        "ConfirmTitle", "Price", "VendorName", "ControlText", "Button", "DialogTitle", "DialogText", "SettingsTitle",
+        "SettingsLabel", "SettingsNav", "SettingsText", "TopTabSelected", "CurrencyName" }) do
+        assert.is_true(lum(color(role)) < 0.3, role .. " is dark on the orange")
+      end
+      for _, role in ipairs({ "Tab", "TabSelected", "SearchText", "MenuItem", "MenuItemSelected", "ButtonPrimary" }) do
+        assert.is_true(lum(color(role)) > 0.55, role .. " is light on the black")
+      end
+    end)
+
+    -- Asked: "the bags should appear in a puff of smoke from bottom to top", then of the cartoon smoke: "can you make it
+    -- more real-ish?".
+    it("appears out of smoke from the bottom up, shown before a bank's wait ends, rising and thinning as smoke does", function()
+      local t = sonataNext:Resolve("Halloween")
+      local K = t.Panel.Smoke
+      local O = K.Open
+      assert.is_true(O.Reveal[2] < 0.9, "shown before a bank's 1 second wait ends")
+      assert.is_true(O.Reveal[2] <= O.Rise + 0.1, "the bag shown under the smoke about as it reaches the top")
+      assert.is_true(K.Puffs.Size[1] * O.Start >= O.Spacing, "puffs overlapping from the start, covering the bag")
+      assert.are.equal("Puff", K.Puffs.Texture)
+      assert.is_true(K.Puffs.Alpha[2] < 1, "translucent")
+      assert.is_true(K.Puffs.Alpha[1] < K.Puffs.Alpha[2], "some thinner than others")
+      assert.is_true(O.Start < 1 and O.Growth > 1.4, "swelling as it rises")
+      assert.is_true(O.Buoyancy > 0, "rising faster and faster, as warm smoke does")
+      assert.is_true(O.Swirl[1] > 0 and O.Swirl[2] > 0, "curling")
+      assert.is_true(O.Life[1] < O.Life[2], "each puff thinning away in its own time")
+      assert.is_true(K.Sparks.Count > 0, "embers in it")
+    end)
+
+    -- Asked: "make the bag 'turn into' several bats, like 10-15 bats, and fly away in random directions off screen", then:
+    -- "no puff of smokes: how the frost theme shatters, we want the bag break up *and morph* into bats".
+    it("breaks up into 10 to 15 pieces of itself that turn into bats as it closes, and flutters bats out of its header",
+      function()
+      local t = sonataNext:Resolve("Halloween")
+      local B = t.Panel.Bats
+      assert.is_true(B.Close.Count[1] >= 10 and B.Close.Count[2] <= 15)
+      assert.is_nil(B.Close.Puff, "no smoke")
+      assert.are.equal(t.Panel.Fill.Texture, B.Close.Pieces.Texture, "pieces of its own body")
+      assert.is_true(B.Close.Shudder > 0 and B.Close.Break > 0 and B.Close.Morph > 0, "trembles, breaks, morphs")
+      assert.is_true(B.Close.Shudder < 0.3, "breaking up soon after it is closed")
+      assert.are.equal(4, B.Frames, "bats.png: four frames side by side")
+      local data = readFile(t.Textures.Bats)
+      local w, h = data:byte(17) * 2 ^ 24 + data:byte(18) * 2 ^ 16 + data:byte(19) * 256 + data:byte(20),
+        data:byte(21) * 2 ^ 24 + data:byte(22) * 2 ^ 16 + data:byte(23) * 256 + data:byte(24)
+      assert.are.equal(4 * h, w, "four square frames")
+      assert.is_true(B.Flutter.OnOpen)
+    end)
+
+    it("keeps a black cat on a jack-o'-lantern at each size, the cat blinking and its candle flickering", function()
+      local t = sonataNext:Resolve("Halloween")
+      for _, size in ipairs({ "Full", "Small" }) do
+        local cat, eyes, face
+        for _, piece in ipairs(t.Panel.Ornaments) do
+          if piece.Sizes == size then
+            if piece.Texture == "Cat" then cat = piece end
+            if piece.Texture == "CatEyes" then eyes = piece end
+            if piece.Texture == "PumpkinFace" then face = piece end
+          end
+        end
+        assert.is_not_nil(cat, size)
+        assert.is_not_nil(eyes.Motion.Blink, size .. ": blinking")
+        assert.is_not_nil(face.Motion.Flicker, size .. ": flickering")
+        for _, key in ipairs({ "Point", "Anchor", "Width", "Height", "X", "Y" }) do
+          assert.are.equal(cat[key], eyes[key], size .. ": the eyes over the cat exactly (" .. key .. ")")
+        end
+        assert.is_true(eyes.SubLevel > cat.SubLevel, size .. ": the eyes over the cat")
+      end
+    end)
+
+    it("drips goo along its top, clear of the title and the header buttons", function()
+      local t = sonataNext:Resolve("Halloween")
+      local drips
+      for _, piece in ipairs(t.Panel.Ornaments) do
+        if piece.Texture == "Drips" then drips = piece end
+      end
+      assert.are.equal("TOP", drips.Point)
+      assert.is_true(drips.Height < t.Layout.TitleTop and drips.Height < t.Layout.HeaderButtonTop)
+      assert.are.equal("Ink", drips.Color)
+    end)
+
+    it("lets autumn leaves fall and grows a vine along its footer", function()
+      local t = sonataNext:Resolve("Halloween")
+      local wheres = {}
+      for _, entry in ipairs(t.Panel.Snow.Flakes) do
+        assert.are.equal("Leaf", entry.Texture)
+        assert.are.equal("BLEND", entry.BlendMode, "flat, not light")
+        wheres[entry.Where] = true
+      end
+      assert.are.same({ Body = true, Feather = true }, wheres)
+      assert.are.equal("Vine", t.Panel.Threads[1].Texture)
+      assert.are.equal("BOTTOM", t.Panel.Threads[1].Anchor)
+    end)
+  end)
+
   -- Frost (next-themes.md §22): deep winter blue threaded with gold, freezing together from shards and shattering, snow
   -- on a breeze, threads of gold light.
   describe("Frost", function()

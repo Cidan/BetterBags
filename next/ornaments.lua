@@ -45,12 +45,14 @@ ornaments.SIZES = { Full = true, Small = true }
 -- The panels a piece may be shown on (Panels), by the name of the bag kind each panel shows (const.BAG_KIND).
 ornaments.PANELS = { Backpack = "BACKPACK", Bank = "BANK", Vendor = "UNDEFINED", GuildBank = "GUILD" }
 ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period = true, Delay = true, Origin = true,
-  Scroll = true, Glitch = true }
--- The keys of a Glitch motion.
+  Scroll = true, Glitch = true, Blink = true, Flicker = true }
+-- The keys of a Glitch motion, a Blink and a Flicker.
 ornaments.GLITCH = { Every = true, Hold = true, Jump = true, Blink = true, Slip = true }
+ornaments.BLINK = { Every = true, Time = true, Twice = true }
+ornaments.FLICKER = { Low = true, Speed = true }
 -- Seconds between a glitch's rolls while it lasts: each roll jumps, blinks and slips the piece anew.
 ornaments.GLITCH_STEP = 0.06
--- Where Scroll and Glitch take their randomness (a source of numbers in [0, 1)): replaced by the specs.
+-- Where Scroll, Glitch, Blink and Flicker take their randomness (a source of numbers in [0, 1)): replaced by the specs.
 ornaments.Random = math.random
 
 ---@class (exact) NextOrnamentPiece
@@ -69,6 +71,12 @@ ornaments.Random = math.random
 ---@field jy? number And up.
 ---@field blink? number A glitch's share of its alpha.
 ---@field slip? number A glitch's slip of its art across, in tiles.
+---@field blinking? table Its Blink's state: wait (seconds to its next blink), shut (seconds left of one under way),
+---second (blinking again right after one).
+---@field shut? boolean Shut by a blink: drawn at no alpha.
+---@field flick? table Its Flicker's state: at (its share of its alpha now), to (where it wanders), left (seconds to the
+---next).
+---@field flicker? number A flicker's share of its alpha.
 
 ---@class (exact) NextOrnamentSet
 ---@field panel table The panel: its frame, its body, its side, IsSmall.
@@ -76,7 +84,8 @@ ornaments.Random = math.random
 ---@field count number
 ---@field mirrored boolean Drawn for an inner side on the right.
 ---@field running boolean Moving (the panel shows).
----@field driver? Frame Runs the pieces' Scroll and Glitch motions while they move, made the first time one does.
+---@field driver? Frame Runs the pieces' Scroll, Glitch, Blink and Flicker motions while they move, made the first
+---time one does.
 local setProto = {}
 addon:GetModule('Perf'):RegisterPrototype(setProto, 'NextOrnamentSet')
 
@@ -484,7 +493,7 @@ end
 ---@return boolean
 local function moving(piece)
   local M = piece.spec and piece.spec.Motion
-  if M and (M.Glitch or (M.Scroll and piece.spec.Tile)) then
+  if M and (M.Glitch or M.Blink or M.Flicker or (M.Scroll and piece.spec.Tile)) then
     return true
   end
   if piece.groups == nil then
@@ -526,15 +535,18 @@ function setProto:Start()
   self:drive()
 end
 
--- luaMotion says whether a piece moves on the set's driver: art that scrolls (a tiled piece's Scroll) or glitches.
+-- luaMotion says whether a piece moves on the set's driver: art that scrolls (a tiled piece's Scroll), glitches, blinks
+-- or flickers.
 ---@param piece NextOrnamentPiece
 ---@return boolean
 local function luaMotion(piece)
   local M = piece.spec and piece.spec.Motion
-  return M ~= nil and (M.Glitch ~= nil or (M.Scroll ~= nil and piece.spec.Tile ~= nil))
+  return M ~= nil and (M.Glitch ~= nil or M.Blink ~= nil or M.Flicker ~= nil
+    or (M.Scroll ~= nil and piece.spec.Tile ~= nil))
 end
 
--- drive runs the set's driver while a piece shown moves on it (Scroll, Glitch), and stops it when none does. A child
+-- drive runs the set's driver while a piece shown moves on it (Scroll, Glitch, Blink, Flicker), and stops it when none
+-- does. A child
 -- of the panel's frame: it stops while the panel hides.
 ---@private
 function setProto:drive()
@@ -560,8 +572,9 @@ function setProto:drive()
 end
 
 -- Step moves the pieces on the driver elapsed seconds along: art that scrolls moves on (Motion.Scroll: X units a second
--- toward the outer side, Y down; kept within a tile), and a piece that glitches waits for its next glitch, or rolls a
--- glitch under way anew every GLITCH_STEP until it ends, back at rest (Motion.Glitch).
+-- toward the outer side, Y down; kept within a tile), a piece that glitches waits for its next glitch, or rolls a
+-- glitch under way anew every GLITCH_STEP until it ends, back at rest (Motion.Glitch), one that blinks waits for its
+-- next blink or holds one shut (Motion.Blink), and one that flickers wanders its alpha on (Motion.Flicker).
 ---@param elapsed number
 function setProto:Step(elapsed)
   for i = 1, self.count do
@@ -577,8 +590,81 @@ function setProto:Step(elapsed)
       if M.Glitch ~= nil then
         self:glitchStep(piece, M.Glitch, elapsed)
       end
+      if M.Blink ~= nil then
+        self:blinkStep(piece, M.Blink, elapsed)
+      end
+      if M.Flicker ~= nil then
+        self:flickerStep(piece, M.Flicker, elapsed)
+      end
     end
   end
+end
+
+---@param range number[]
+---@return number
+local function between(range)
+  return range[1] + (range[2] - range[1]) * ornaments.Random()
+end
+
+-- blinkStep blinks a piece now and then (asked, of the Halloween theme's black cat, next-themes.md §23): it waits Every
+-- (soonest, latest), is shut for Time (drawn at no alpha), and now and then (Twice: the share of blinks) blinks again
+-- as soon as it has been open as long as it was shut, never a third time.
+---@private
+---@param piece NextOrnamentPiece
+---@param B table
+---@param elapsed number
+function setProto:blinkStep(piece, B, elapsed)
+  local st = piece.blinking
+  if st == nil then
+    st = { wait = between(B.Every), second = false }
+    piece.blinking = st
+  end
+  local time = B.Time or 0.12
+  if st.shut ~= nil then
+    st.shut = st.shut - elapsed
+    if st.shut <= 0 then
+      st.shut = nil
+      piece.shut = nil
+      if not st.second and ornaments.Random() < (B.Twice or 0) then
+        st.second = true
+        st.wait = time
+      else
+        st.second = false
+        st.wait = between(B.Every)
+      end
+      self:fade(piece)
+    end
+    return
+  end
+  st.wait = st.wait - elapsed
+  if st.wait <= 0 then
+    st.shut = time
+    piece.shut = true
+    self:fade(piece)
+  end
+end
+
+-- flickerStep flickers a piece like a candle (the Halloween theme's jack-o'-lantern): its alpha wanders, never still,
+-- between Low of its own and its own, toward somewhere new every half to one and a half of a Speed'th of a second.
+---@private
+---@param piece NextOrnamentPiece
+---@param F table
+---@param elapsed number
+function setProto:flickerStep(piece, F, elapsed)
+  local st = piece.flick
+  if st == nil then
+    st = { at = 1, to = 1, left = 0 }
+    piece.flick = st
+  end
+  local low, speed = F.Low or 0.6, F.Speed or 8
+  st.left = st.left - elapsed
+  if st.left <= 0 then
+    st.to = low + (1 - low) * ornaments.Random()
+    st.left = (0.5 + ornaments.Random()) / speed
+  end
+  st.at = st.at + (st.to - st.at) * math.min(1, elapsed * speed * 1.5)
+  piece.flicker = st.at
+  self:fade(piece)
 end
 
 -- nextWait is how long a piece waits for its next glitch: Every on average, from 0.3 to 1.7 of it.
@@ -643,14 +729,22 @@ function setProto:rest(piece)
   self:show(piece)
 end
 
--- show draws a piece as its glitch state says: placed, its art's coordinates, its alpha (its own times a blink).
+-- show draws a piece as its glitch state says: placed, its art's coordinates, its alpha (fade).
 ---@private
 ---@param piece NextOrnamentPiece
 function setProto:show(piece)
   self:place(piece)
   self:tilePiece(piece)
+  self:fade(piece)
+end
+
+-- fade draws a piece at its alpha: its own, times a glitch's blink, a flicker's share, and none while a blink has it
+-- shut.
+---@private
+---@param piece NextOrnamentPiece
+function setProto:fade(piece)
   local _, _, _, a = style:RGBA(piece.spec.Color or "White", piece.spec.Alpha)
-  piece.texture:SetAlpha(a * (piece.blink or 1))
+  piece.texture:SetAlpha(piece.shut and 0 or a * (piece.blink or 1) * (piece.flicker or 1))
 end
 
 ---@private
@@ -661,7 +755,7 @@ function setProto:stopPiece(piece)
   end
 end
 
--- Stop ends every piece's motion, back at rest (the panel hid): a glitch under way ends.
+-- Stop ends every piece's motion, back at rest (the panel hid): a glitch, a blink or a flicker under way ends.
 function setProto:Stop()
   self.running = false
   if self.driver ~= nil then
@@ -673,6 +767,12 @@ function setProto:Stop()
       piece.glitch = nil
       if piece.spec ~= nil then
         self:rest(piece)
+      end
+    end
+    if piece.blinking ~= nil or piece.flick ~= nil then
+      piece.blinking, piece.shut, piece.flick, piece.flicker = nil, nil, nil, nil
+      if piece.spec ~= nil then
+        self:fade(piece)
       end
     end
   end
