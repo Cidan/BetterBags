@@ -1,0 +1,17 @@
+{
+  "id": 1793171771,
+  "version": "v0.8.9-1-gadcfe74",
+  "channel": "alpha",
+  "date": "2026-10-28",
+  "from": "98caf2002e57cb5de44cb2c0bde4ce08b7b20246",
+  "to": "adcfe74adf9ca0be00f8d48c1960c42e324f9bf1",
+  "headline": "This build adds an option to choose whether bag windows are restricted to staying within your screen boundaries.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Clamp Bags to Screen setting",
+      "details": "A new toggle under General settings controls whether bags must stay entirely within the display. Off by default, bags can now be moved freely beyond screen edges; turning it on pulls any off-screen bags back into view.",
+      "clients": []
+    }
+  ]
+}
