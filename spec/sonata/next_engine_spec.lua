@@ -96,6 +96,10 @@ describe("SonataNext", function()
       },
         Glitch = { Open = { Time = 0.4 }, Close = { Time = 0.2 }, Bursts = { Every = 10, Time = 0.2 } },
         Rain = { { Where = "Feather", Font = "Title", HeadFont = "Title", Glyphs = "01", Speed = { 4, 8 }, Trail = { 4, 8 } } },
+        Shatter = { Shards = { Size = 100 }, Frost = {}, Seams = {}, Open = { Time = 0.4 }, Close = { Time = 0.5 } },
+        Snow = { Flakes = { { Where = "Body", Count = 4 } } },
+        Threads = { { Points = { { 0, 1 }, { 1, 2 } }, Sway = { Amplitude = 2, Period = 5 },
+          Glint = { Every = 4, Time = 1 }, Draw = 0.5 } },
       }
       return t
     end
@@ -111,6 +115,9 @@ describe("SonataNext", function()
       -- The Glitch theme's (next-themes.md §21): glitching in, out and now and then; the data rain.
       glitch = function(t) return t.Panel.Glitch end,
       rain = function(t) return t.Panel.Rain end,
+      -- The Frost theme's (next-themes.md §22): freezing together and shattering; the snow.
+      shatter = function(t) return t.Panel.Shatter end,
+      snow = function(t) return t.Panel.Snow end,
     }
 
     before_each(function()
@@ -135,6 +142,18 @@ describe("SonataNext", function()
         assert.are.equal("Leaf", theme.Panel.Ornaments[2].Texture)
         assert.are.equal("Roots", theme.Panel.Ornaments[1].Texture, "a still ornament keeps its art")
       end
+    end)
+
+    -- A thread of light's sway and glint are a theme's moving ornaments: Moving Ornaments off holds it still, its art and
+    -- its draw-in as the panel opens kept.
+    it("takes a thread's sway and glint out with Moving Ornaments, keeping the thread", function()
+      animation = { ornaments = false }
+      sonataNext:Init()
+      local thread = used[#used].Panel.Threads[1]
+      assert.is_nil(thread.Sway)
+      assert.is_nil(thread.Glint)
+      assert.are.equal(0.5, thread.Draw)
+      assert.are.equal(2, #thread.Points)
     end)
 
     -- Glitch Effects off is for players flicker is hard on: an ornament's glitch (its blinking twitch) goes with it, its
@@ -680,7 +699,7 @@ describe("SonataNext", function()
   -- ornament's glitch and scroll, and the fonts they name.
   it("names what is wrong with a glitch, a data rain and an ornament's glitch, by where it is", function()
     for _, m in ipairs({ { "NextOrnaments", "next/ornaments.lua" }, { "NextGlitch", "next/glitch.lua" },
-      { "NextRain", "next/rain.lua" } }) do
+      { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" } }) do
       if addon:GetModule(m[1], true) == nil then
         ResetModuleStub(m[1], m[2])
         LoadBetterBagsModule(m[2])
@@ -754,6 +773,85 @@ describe("SonataNext", function()
       "Panel.Rain.1.Speed: two numbers, slowest and fastest",
       "Panel.Rain.1.Trail: two numbers, shortest and longest",
     }, problems)
+  end)
+
+  -- The Frost theme's engine (next-themes.md §22): data Check must not take that the runtime cannot run (a shard size of
+  -- nothing cuts the body into cells without end; jitter of half a cell or more folds triangles over; a gust, a glint or
+  -- a sway without its time divides by nothing).
+  it("names what is wrong with a shatter, snow and threads, by where it is", function()
+    for _, m in ipairs({ { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" },
+      { "NextThreads", "next/threads.lua" } }) do
+      if addon:GetModule(m[1], true) == nil then
+        ResetModuleStub(m[1], m[2])
+        LoadBetterBagsModule(m[2])
+      end
+    end
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadFrost", Panel = {
+      Shatter = { Shards = { Size = 0, Jitter = 0.5, Texture = "Nope" }, Close = {}, Thaw = 1,
+        Open = { Spread = { 3 }, Storm = { From = "MIDDLE", Gale = 1, Flakes = { Count = "lots", Life = { 2 }, Puff = 1 },
+          Mist = { Size = { 5, 1 }, Fog = 1 } } } },
+      Snow = { Flakes = { { Where = "Sky", Count = "lots", Fall = { 2 }, Sleet = true } },
+        Gusts = { Every = 0, Strength = 4, Streaks = { Length = { 9, 3 }, Gale = 1 } }, Hail = 1 },
+      Threads = {
+        { Anchor = "MIDDLE", Points = { { 0, 1 } }, Segments = 0, Sway = { Amplitude = 2 },
+          Glint = { Every = 0, Shine = 1 }, Sizes = "Huge", Knot = 1 },
+      },
+    } })
+    local problems = sonataNext:Check("BadFrost")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Shatter.Close.Time: a shatter closing needs one",
+      "Panel.Shatter.Frost: a shatter needs one",
+      "Panel.Shatter.Open.Spread: two numbers, nearest and farthest",
+      "Panel.Shatter.Open.Storm.Flakes.Count: a number",
+      "Panel.Shatter.Open.Storm.Flakes.Life: two numbers, shortest and longest",
+      "Panel.Shatter.Open.Storm.Flakes.Puff: no part named Puff",
+      "Panel.Shatter.Open.Storm.From: no corner named MIDDLE",
+      "Panel.Shatter.Open.Storm.Gale: no part named Gale",
+      "Panel.Shatter.Open.Storm.Mist.Count: a number",
+      "Panel.Shatter.Open.Storm.Mist.Fog: no part named Fog",
+      "Panel.Shatter.Open.Storm.Mist.Size: two numbers, smallest and largest",
+      "Panel.Shatter.Open.Time: a shatter opening needs one",
+      "Panel.Shatter.Seams: a shatter needs one",
+      "Panel.Shatter.Shards.Jitter: from 0 to below half a cell",
+      "Panel.Shatter.Shards.Size: more than nothing",
+      "Panel.Shatter.Shards.Texture: no texture named Nope",
+      "Panel.Shatter.Thaw: no part named Thaw",
+      "Panel.Snow.Flakes.1.Count: a number",
+      "Panel.Snow.Flakes.1.Fall: two numbers, slowest and fastest",
+      "Panel.Snow.Flakes.1.Sleet: no part named Sleet",
+      "Panel.Snow.Flakes.1.Where: no place named Sky",
+      "Panel.Snow.Gusts.Every: gusts need one",
+      "Panel.Snow.Gusts.Streaks.Gale: no part named Gale",
+      "Panel.Snow.Gusts.Streaks.Length: two numbers, shortest and longest",
+      "Panel.Snow.Gusts.Time: gusts need one",
+      "Panel.Snow.Hail: no part named Hail",
+      "Panel.Threads.1.Anchor: no anchor named MIDDLE",
+      "Panel.Threads.1.Glint.Every: a glint needs one",
+      "Panel.Threads.1.Glint.Shine: no part named Shine",
+      "Panel.Threads.1.Glint.Time: a glint needs one",
+      "Panel.Threads.1.Knot: no part named Knot",
+      "Panel.Threads.1.Points: two points or more, each two numbers",
+      "Panel.Threads.1.Segments: more than nothing",
+      "Panel.Threads.1.Sizes: Full or Small",
+      "Panel.Threads.1.Sway.Period: a sway needs one",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "GoodFrost", Panel = {
+      Shatter = { Shards = { Size = 100, Jitter = 0.3, Texture = "Glow" }, Frost = { Texture = "Glow" },
+        Seams = { Color = "White" }, Close = { Time = 0.5, Speed = { 1, 2 } },
+        Open = { Time = 0.4, Spread = { 10, 20 }, Storm = { From = "TOPOUTER", Appear = 0.1,
+          Flakes = { Texture = "Glow", Count = 40, Size = { 4, 8 }, Life = { 0.3, 0.6 }, Colors = { "White" } },
+          Mist = { Texture = "Glow", Count = 6, Size = { 80, 120 }, Color = "White", Alpha = 0.2 } } } },
+      Snow = { Flakes = { { Where = "Body", Count = 4, Texture = "Glow", Fall = { 2, 4 }, Wobble = { 3, 1 } } },
+        Gusts = { Every = 8, Time = 2, Strength = 40, Streaks = { Count = 2, Texture = "Glow", Length = { 3, 9 } } } },
+      Threads = { { Anchor = "BOTTOM", Points = { { 0, 1 }, { 1, 2 } }, Segments = 8, Texture = "Glow",
+        Sway = { Amplitude = 2, Period = 5 }, Glint = { Every = 4, Time = 1, Color = "White" }, Sizes = "Full" } },
+    } })
+    assert.are.same({}, sonataNext:Check("GoodFrost"))
   end)
 
   -- The header buttons down a side rail (Header.Buttons.Rail, next-themes.md §13).

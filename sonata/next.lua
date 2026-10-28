@@ -274,9 +274,15 @@ local ANIMATION_OFF = {
   titleCloud = function(theme) theme.Header.Cloud = nil end,
   ribbon = function(theme) theme.Header.Ribbon = nil end,
   braid = function(theme) theme.Chain.Braid = false end,
+  -- A thread of light's sway and glint (Panel.Threads, next-themes.md §22) are a theme's moving ornaments too: it stands
+  -- still, its art and its draw-in as the panel opens kept.
   ornaments = function(theme)
     for _, piece in ipairs(theme.Panel.Ornaments or {}) do
       piece.Motion = nil
+    end
+    for _, thread in ipairs(theme.Panel.Threads or {}) do
+      thread.Sway = nil
+      thread.Glint = nil
     end
   end,
   -- The Glitch theme's (next-themes.md §21): its bags glitch in and out and now and then while they show; off, they
@@ -291,6 +297,10 @@ local ANIMATION_OFF = {
     end
   end,
   rain = function(theme) theme.Panel.Rain = nil end,
+  -- The Frost theme's (next-themes.md §22): its bags freeze together and shatter; off, they slide in and out as any
+  -- theme's. And its snow.
+  shatter = function(theme) theme.Panel.Shatter = nil end,
+  snow = function(theme) theme.Panel.Snow = nil end,
 }
 
 -- effective returns a theme as the player sees it: resolved (a new table), the Animation switches they turned off laid
@@ -706,6 +716,152 @@ function sonataNext:Check(key)
       end
       if not range(entry.Trail) then
         problem("Trail", "two numbers, shortest and longest")
+      end
+    end
+  end
+  -- A shatter, snow and threads (Panel.Shatter, Panel.Snow, Panel.Threads, next-themes.md §22): their parts are the
+  -- modules', and what their runtimes divide by or cut with. A shard size of nothing would cut the body into cells
+  -- without end; jitter of half a cell or more folds triangles over.
+  local function partsOf(spec, keys, where, word)
+    for k in pairs(spec) do
+      if not keys[k] then
+        table.insert(problems, where .. tostring(k) .. ": no " .. (word or "part") .. " named " .. tostring(k))
+      end
+    end
+  end
+  local function positive(v)
+    return type(v) == "number" and v > 0
+  end
+  local shatter = addon:GetModule('NextShatter', true)
+  local S = theme.Panel and theme.Panel.Shatter
+  if shatter ~= nil and type(S) == "table" then
+    local where = "Panel.Shatter."
+    partsOf(S, shatter.KEYS, where)
+    for _, part in ipairs({ "Shards", "Frost", "Seams" }) do
+      if type(S[part]) ~= "table" then
+        table.insert(problems, where .. part .. ": a shatter needs one")
+      end
+    end
+    local shards = type(S.Shards) == "table" and S.Shards or nil
+    if shards ~= nil and not positive(shards.Size) then
+      table.insert(problems, where .. "Shards.Size: more than nothing")
+    end
+    if shards ~= nil and shards.Jitter ~= nil and not (type(shards.Jitter) == "number" and shards.Jitter >= 0
+      and shards.Jitter < 0.5) then
+      table.insert(problems, where .. "Shards.Jitter: from 0 to below half a cell")
+    end
+    for _, part in ipairs({ { "Open", "a shatter opening needs one" }, { "Close", "a shatter closing needs one" } }) do
+      local spec = S[part[1]]
+      if spec ~= nil and (type(spec) ~= "table" or type(spec.Time) ~= "number") then
+        table.insert(problems, where .. part[1] .. ".Time: " .. part[2])
+      end
+    end
+    if type(S.Open) == "table" and S.Open.Spread ~= nil and not range(S.Open.Spread) then
+      table.insert(problems, where .. "Open.Spread: two numbers, nearest and farthest")
+    end
+    -- Its storm (Open.Storm): the corner it grows from, its flakes and its mist, each a number of them and its ranges.
+    local storm = type(S.Open) == "table" and S.Open.Storm or nil
+    if type(storm) == "table" then
+      local at = where .. "Open.Storm."
+      partsOf(storm, shatter.STORM_KEYS, at)
+      if storm.From ~= nil and not shatter.CORNERS[storm.From] then
+        table.insert(problems, at .. "From: no corner named " .. tostring(storm.From))
+      end
+      for _, kind in ipairs({ { "Flakes", shatter.FLAKE_KEYS }, { "Mist", shatter.MIST_KEYS } }) do
+        local spec = storm[kind[1]]
+        if type(spec) == "table" then
+          local sub = at .. kind[1] .. "."
+          partsOf(spec, kind[2], sub)
+          if type(spec.Count) ~= "number" then
+            table.insert(problems, sub .. "Count: a number")
+          end
+          for _, field in ipairs({ { "Size", "smallest and largest" }, { "Life", "shortest and longest" },
+            { "Speed", "slowest and fastest" } }) do
+            if spec[field[1]] ~= nil and not range(spec[field[1]]) then
+              table.insert(problems, sub .. field[1] .. ": two numbers, " .. field[2])
+            end
+          end
+        end
+      end
+    end
+    if type(S.Close) == "table" and S.Close.Speed ~= nil and not range(S.Close.Speed) then
+      table.insert(problems, where .. "Close.Speed: two numbers, slowest and fastest")
+    end
+  end
+  local snow = addon:GetModule('NextSnow', true)
+  local W = theme.Panel and theme.Panel.Snow
+  if snow ~= nil and type(W) == "table" then
+    partsOf(W, snow.KEYS, "Panel.Snow.")
+    for i, entry in ipairs(type(W.Flakes) == "table" and W.Flakes or {}) do
+      local where = "Panel.Snow.Flakes." .. i .. "."
+      partsOf(entry, snow.FLAKE_KEYS, where)
+      if not snow.WHERE[entry.Where] then
+        table.insert(problems, where .. "Where: no place named " .. tostring(entry.Where))
+      end
+      if type(entry.Count) ~= "number" then
+        table.insert(problems, where .. "Count: a number")
+      end
+      for _, field in ipairs({ { "Size", "smallest and largest" }, { "Fall", "slowest and fastest" },
+        { "Alpha", "faintest and brightest" } }) do
+        if entry[field[1]] ~= nil and not range(entry[field[1]]) then
+          table.insert(problems, where .. field[1] .. ": two numbers, " .. field[2])
+        end
+      end
+    end
+    local gusts = W.Gusts
+    if type(gusts) == "table" then
+      local where = "Panel.Snow.Gusts."
+      partsOf(gusts, snow.GUST_KEYS, where)
+      for _, field in ipairs({ "Every", "Time" }) do
+        if not positive(gusts[field]) then
+          table.insert(problems, where .. field .. ": gusts need one")
+        end
+      end
+      if type(gusts.Streaks) == "table" then
+        partsOf(gusts.Streaks, snow.STREAK_KEYS, where .. "Streaks.")
+        for _, field in ipairs({ { "Length", "shortest and longest" }, { "Thickness", "thinnest and thickest" } }) do
+          if gusts.Streaks[field[1]] ~= nil and not range(gusts.Streaks[field[1]]) then
+            table.insert(problems, where .. "Streaks." .. field[1] .. ": two numbers, " .. field[2])
+          end
+        end
+      end
+    end
+  end
+  local threads = addon:GetModule('NextThreads', true)
+  local T = theme.Panel and theme.Panel.Threads
+  if threads ~= nil and type(T) == "table" then
+    for i, entry in ipairs(T) do
+      local where = "Panel.Threads." .. i .. "."
+      partsOf(entry, threads.KEYS, where)
+      if entry.Anchor ~= nil and not threads.ANCHORS[entry.Anchor] then
+        table.insert(problems, where .. "Anchor: no anchor named " .. tostring(entry.Anchor))
+      end
+      local points = type(entry.Points) == "table" and #entry.Points >= 2
+      for _, p in ipairs(type(entry.Points) == "table" and entry.Points or {}) do
+        points = points and type(p) == "table" and type(p[1]) == "number" and type(p[2]) == "number"
+      end
+      if not points then
+        table.insert(problems, where .. "Points: two points or more, each two numbers")
+      end
+      if entry.Segments ~= nil and not positive(entry.Segments) then
+        table.insert(problems, where .. "Segments: more than nothing")
+      end
+      if entry.Sizes ~= nil and entry.Sizes ~= "Full" and entry.Sizes ~= "Small" then
+        table.insert(problems, where .. "Sizes: Full or Small")
+      end
+      if type(entry.Sway) == "table" then
+        partsOf(entry.Sway, threads.SWAY_KEYS, where .. "Sway.")
+        if not positive(entry.Sway.Period) then
+          table.insert(problems, where .. "Sway.Period: a sway needs one")
+        end
+      end
+      if type(entry.Glint) == "table" then
+        partsOf(entry.Glint, threads.GLINT_KEYS, where .. "Glint.")
+        for _, field in ipairs({ "Every", "Time" }) do
+          if not positive(entry.Glint[field]) then
+            table.insert(problems, where .. "Glint." .. field .. ": a glint needs one")
+          end
+        end
       end
     end
   end

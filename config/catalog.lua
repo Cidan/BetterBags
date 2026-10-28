@@ -750,6 +750,15 @@ for _, effect in ipairs({
   { id = 'nextRain', name = 'rain', title = 'Data Rain',
     description = "A theme's columns of glyphs falling down a bag's feathered edge and behind its items.",
     keywords = { 'rain', 'data', 'glyphs', 'matrix', 'theme' } },
+  -- The Frost theme's (next-themes.md §22): off, its bags slide in and out as any theme's.
+  { id = 'nextShatter', name = 'shatter', title = 'Ice Shatter',
+    description = "A theme's bags freezing together from shards of ice as they open, and shattering as they close. "
+      .. 'Off, they slide in and out.',
+    keywords = { 'shatter', 'ice', 'shards', 'frost', 'freeze', 'crack', 'theme' } },
+  { id = 'nextSnow', name = 'snow', title = 'Snowfall',
+    description = "A theme's snow drifting across a bag and down its feathered edge on a breeze, and the gusts that "
+      .. 'sweep it along.',
+    keywords = { 'snow', 'flakes', 'wind', 'breeze', 'gust', 'weather', 'theme' } },
 }) do
   local keywords = { 'animation', 'effects', 'motion' }
   for _, word in ipairs(effect.keywords) do

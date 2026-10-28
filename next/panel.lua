@@ -72,6 +72,15 @@ local nextOrnaments = addon:GetModule('NextOrnaments')
 ---@class NextRain: AceModule
 local nextRain = addon:GetModule('NextRain')
 
+---@class NextShatter: AceModule
+local shatter = addon:GetModule('NextShatter')
+
+---@class NextSnow: AceModule
+local nextSnow = addon:GetModule('NextSnow')
+
+---@class NextThreads: AceModule
+local nextThreads = addon:GetModule('NextThreads')
+
 ---@class NextMenuButtonModule: AceModule
 local nextMenuButton = addon:GetModule('NextMenuButton')
 
@@ -420,6 +429,8 @@ function panelProto:MovingParts()
   skip[self.braid.layer] = true
   self.ornaments:MovingParts(skip)
   self.rain:MovingParts(skip)
+  self.snow:MovingParts(skip)
+  self.threads:MovingParts(skip)
   return skip
 end
 
@@ -695,6 +706,15 @@ function panelProto:moveIn(from, to, duration, ease, delay)
     self.content:Cascade(true, delay + style.Time.OpenCascadeDelay)
     return
   end
+  if shatter:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once its shards have all formed.
+    local lock = shatter:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:shatterIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
+  self.threads:DrawIn(delay + style.Time.OpenCascadeDelay)
   self:setOffset(from)
   tween:Play(self, {
     duration = duration,
@@ -828,6 +848,144 @@ end
 ---@param base number
 function panelProto:endGlitch(base)
   glitch:Rest(self)
+  self.frame:SetAlpha(1)
+  if not tween:IsPlaying(self) then
+    self:setOffset(base)
+  end
+end
+
+-- FillRect is where the body's fill is on the screen, in UIParent's units: its left and top, width and height (it
+-- reaches past the body on a full panel's screen-edge side, past its inset), or nil before the client placed it. A
+-- shatter maps the fill's art onto its shards from it.
+---@return number? left, number? top, number? width, number? height
+function panelProto:FillRect()
+  local f = self.fill
+  local left, top, right, bottom = f:GetLeft(), f:GetTop(), f:GetRight(), f:GetBottom()
+  if left == nil or top == nil or right == nil or bottom == nil then
+    return nil
+  end
+  local s = lift:ScaleOf(self.frame)
+  return left * s, top * s, (right - left) * s, (top - bottom) * s
+end
+
+-- breakPoint is where a closing panel breaks from (NextShatter): the pointer when it is over the body (the close button
+-- clicked, a key pressed with the pointer there), else nothing (its middle).
+---@private
+---@return {x: number, y: number}?
+function panelProto:breakPoint()
+  local x, y = lift:Cursor()
+  local left, top, height, width = self:BodyRect()
+  if x >= left and x <= left + width and y <= top and y >= top - height then
+    return { x = x, y = y }
+  end
+  return nil
+end
+
+-- shatterIn opens the panel where it rests by freezing it together from shards of ice (the theme's Panel.Shatter.Open,
+-- next-themes.md §22), after delay unseen: the shards form out of a frost storm growing across its body (Open.Storm), or
+-- fly in from around it, then the seams flash and the panel shows under them as they thaw away (NextShatter's
+-- Assemble). A tween of the panel's own, like the
+-- slide it stands in for: whatever stops or replaces it (a flight, a placement, Escape) ends the shatter at rest
+-- (endShatter). Once in place it says it has finished showing, as the slide does.
+---@private
+---@param to number
+---@param delay number
+function panelProto:shatterIn(to, delay)
+  local total = shatter:OpenTime()
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  local run ---@type NextShatterRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not shatter:Opens() then
+        -- Its theme went while it froze together (another theme, Ice Shatter off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      -- Its shards are cut where its body is once its delay is up (a chained bag waiting unseen is in place by then).
+      run = run or shatter:Begin(self)
+      self.frame:SetAlpha(run:Assemble(p * total))
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      rest()
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- shatterOut closes the panel where it is by shattering it (the theme's Panel.Shatter.Close): frost spreads over it,
+-- cracks run along its seams out from where it breaks (breakPoint), then it is gone and its shards fly apart on the
+-- shatter layer, which carries them on after the panel has hidden. Then done (Hide's end), at once as it shatters.
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:shatterOut(from, to, done)
+  local C = shatter:Spec().Close
+  local total = (C.Frost or 0) + (C.Crack or 0)
+  local run = shatter:Begin(self, self:breakPoint()) ---@type NextShatterRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not shatter:Closes() then
+        -- Its theme went while it froze: it closes plainly at the end.
+        rest()
+        return
+      end
+      if run ~= nil then
+        run:Freeze(p * total)
+      end
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Shatter()
+        run = nil
+      end
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- endShatter puts the panel back as it is without a shatter, at full strength, and where its shatter had it (base):
+-- unless another tween has taken the panel over (a flight), which places it.
+---@private
+---@param base number
+function panelProto:endShatter(base)
   self.frame:SetAlpha(1)
   if not tween:IsPlaying(self) then
     self:setOffset(base)
@@ -1049,6 +1207,9 @@ function panelProto:BuildPanel(name)
   self.ornaments = nextOrnaments:Create(self)
   -- The theme's data rain (Panel.Rain, next-themes.md §21), down the feather or behind the content.
   self.rain = nextRain:Create(self)
+  -- The theme's snow and its threads of light (Panel.Snow, Panel.Threads, next-themes.md §22).
+  self.snow = nextSnow:Create(self)
+  self.threads = nextThreads:Create(self)
   -- The theme's frame round the body (Panel.Frame, next-themes.md §15): Blizzard's nine-slice art.
   self.frameArt = nextFrameArt:Create(frame, self.body, self.overlay)
   self:styleBody()
@@ -1097,6 +1258,8 @@ function panelProto:styleBody()
   end
   self.ornaments:Style()
   self.rain:Style()
+  self.snow:Style()
+  self.threads:Style()
   -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
   self.frameArt:Apply(P.Frame, self.side == "LEFT")
 end
@@ -1673,6 +1836,8 @@ function panelProto:ApplyGeometry()
   self:setOffset(self.offset or 0)
   -- Once anchored: its rows are the frame's height.
   self.rain:Layout()
+  self.snow:Layout()
+  self.threads:Layout()
 end
 
 -- FitSmall sizes a small panel for the screen as it is now and puts it at its place, kept on the
@@ -4261,7 +4426,7 @@ end
 function panelProto:WatchKind()
 end
 
--- startEffects starts what moves while the panel shows: its sparkles, ornaments, rain and shimmer.
+-- startEffects starts what moves while the panel shows: its sparkles, ornaments, rain, snow, threads and shimmer.
 ---@private
 function panelProto:startEffects()
   self.sparkles:Start()
@@ -4269,6 +4434,8 @@ function panelProto:startEffects()
   self.cloudSparkles:Start()
   self.ornaments:Start()
   self.rain:Start()
+  self.snow:Start()
+  self.threads:Start()
   self:playShimmer()
 end
 
@@ -4453,6 +4620,14 @@ function panelProto:Hide(ctx)
     self:glitchOut(self.offset, to, slidOut)
     return
   end
+  if shatter:Closes() then
+    local C = shatter:Spec().Close
+    self.threads:Unravel((C.Frost or 0) + (C.Crack or 0))
+    -- Where it is: it breaks where it stands, from the pointer when it is over the body.
+    self:shatterOut(self.offset, to, slidOut)
+    return
+  end
+  self.threads:Unravel(style.Time.Close)
   tween:Play(self, {
     duration = style.Time.Close,
     from = from,
@@ -4535,6 +4710,8 @@ function panelProto:OnHidden(ctx)
   self.knotSparkles:Stop()
   self.ornaments:Stop()
   self.rain:Stop()
+  self.snow:Stop()
+  self.threads:Stop()
   self.waiting = false
   self.frame:SetFrameLevel(PANEL_LEVEL)
   chain:Update(ctx)

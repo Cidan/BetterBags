@@ -59,7 +59,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
-  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -1612,6 +1612,234 @@ describe("BetterBags Next's panels and themes", function()
   end)
 
   -- Panel.Rain (next-themes.md §21): the data rain on real panels.
+  -- The Frost theme's engine (next-themes.md §22): its bags freeze together from shards of ice as they open and shatter
+  -- as they close (NextShatter), snow drifts across them (NextSnow) and threads of light run round them (NextThreads).
+  describe("shattering, snow and threads (Panel.Shatter, Panel.Snow, Panel.Threads)", function()
+    local shatter = addon:GetModule("NextShatter")
+    local savedRandom, savedCursor, cursor, begun
+
+    local SHATTER = {
+      Shards = { Size = 150, Jitter = 0.3, Texture = "Glow", Color = "White", Alpha = 1 },
+      Frost = { Texture = "Glow", Color = "White", Alpha = 0.6, BlendMode = "ADD" },
+      Seams = { Color = "White", Alpha = 0.9, Thickness = 2, BlendMode = "ADD" },
+      Open = { Time = 0.3, Stagger = 0.1, Clear = 0.2, Spread = { 100, 200 }, Spin = 90 },
+      Close = { Frost = 0.2, Crack = 0.1, Time = 0.5, Speed = { 200, 400 }, Spin = 360, Gravity = 900, Lift = 100 },
+    }
+    local THREADS = { { Anchor = "TOP", Points = { { 0, 20 }, { 1, 40 } }, Segments = 6, Width = 4, Texture = "Glow",
+      Color = "Gold", Alpha = 0.8, BlendMode = "ADD", Draw = 0.4 } }
+    local SNOW = { Flakes = { { Where = "Body", Texture = "Glow", Count = 5, Size = { 3, 6 }, Fall = { 10, 20 },
+      Drift = 5, Alpha = { 0.3, 0.5 } } } }
+
+    local function frosty(without)
+      local panel = { Shatter = SHATTER, Snow = SNOW, Threads = THREADS }
+      for _, key in ipairs(without or {}) do
+        panel[key] = nil
+      end
+      apply({ Panel = panel })
+    end
+
+    local function step(dt)
+      tween.driver:GetScript("OnUpdate")(tween.driver, dt)
+    end
+
+    -- The shards a run has drawn on the layer that show.
+    local function showing(run)
+      local n = 0
+      for _, sh in ipairs(run.shards) do
+        if sh.art:IsShown() then n = n + 1 end
+      end
+      return n
+    end
+
+    before_each(function()
+      savedRandom = shatter.Random
+      local seed = 5
+      shatter.Random = function()
+        seed = (seed * 16807) % 2147483647
+        return seed / 2147483647
+      end
+      shatter:Init()
+      savedCursor = _G.GetCursorPosition
+      cursor = { -1000, -1000 }
+      _G.GetCursorPosition = function() return cursor[1], cursor[2] end
+      begun = {}
+      local begin = shatter.Begin
+      override(shatter, "Begin", function(self, panel, focus)
+        local run = begin(self, panel, focus)
+        table.insert(begun, { run = run, focus = focus })
+        return run
+      end)
+      frosty()
+    end)
+
+    after_each(function()
+      shatter.Random = savedRandom
+      _G.GetCursorPosition = savedCursor
+      shatter:Init()
+    end)
+
+    it("opens where it rests, freezing together from shards cut where its body is, unseen until they thaw", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      assert.are.equal(0, bag.offset, "in place, not sliding in")
+      assert.are.equal(0, bag.frame:GetAlpha())
+      local run = begun[1].run
+      assert.is_nil(begun[1].focus)
+      local left, top, height, width = bag:BodyRect()
+      local corners = 0
+      for _, v in ipairs(run.mesh.verts) do
+        for _, c in ipairs({ { left, top }, { left + width, top }, { left, top - height }, { left + width, top - height } }) do
+          if math.abs(v.x - c[1]) < 1e-6 and math.abs(v.y - c[2]) < 1e-6 then corners = corners + 1 end
+        end
+      end
+      assert.are.equal(4, corners, "the shards tile its body")
+      assert.is_true(showing(run) > 0)
+      step(0.35)
+      assert.are.equal(0, bag.frame:GetAlpha(), "unseen while its shards fly in")
+      step(0.15)
+      local alpha = bag.frame:GetAlpha()
+      assert.is_true(alpha > 0 and alpha < 1, "showing under them as they thaw: " .. alpha)
+      assert.is_nil(shownAt)
+      finishTweens()
+      assert.is_true(shownAt, "says it has shown once in place")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(0, #run.shards, "its shards given back")
+    end)
+
+    -- The Frost theme's own open (asked: "a sort of... frost storm that grows from the bottom left to the top right and
+    -- the bag appears"): the panel unseen while the storm crosses it and its shards form, its threads and sections from
+    -- when they all have.
+    it("opens out of a frost storm growing from its bottom inner corner", function()
+      local storm = {}
+      for k, v in pairs(SHATTER) do storm[k] = v end
+      storm.Open = { Time = 0.4, Clear = 0.2, Storm = { From = "BOTTOMINNER", Appear = 0.1,
+        Flakes = { Texture = "Glow", Count = 40, Size = { 4, 8 }, Life = { 0.2, 0.4 }, Speed = { 100, 200 }, Swirl = 3 },
+        Mist = { Texture = "Glow", Count = 6, Size = { 60, 90 }, Growth = 1.5, Life = { 0.2, 0.4 }, Speed = { 30, 60 },
+          Alpha = 0.3 } } }
+      apply({ Panel = { Shatter = storm, Threads = THREADS } })
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      local run = begun[1].run
+      assert.is_not_nil(run.storm)
+      local left, top, height = bag:BodyRect()
+      assert.are.same({ left, top - height }, { run.storm.x, run.storm.y }, "from the backpack's bottom left")
+      step(0.2)
+      local d = bag.threads.driver
+      d:GetScript("OnUpdate")(d, 0.2)
+      assert.are.equal(0, bag.frame:GetAlpha())
+      assert.is_true(#run.storm.particles > 0, "storming")
+      assert.are.equal(0, bag.threads.reveal, "its threads wait for every shard to form")
+      finishTweens()
+      assert.is_true(shownAt)
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(0, #run.storm.particles, "the storm given back")
+    end)
+
+    it("closes where it stands: frost, then cracks from the pointer, then it shatters and hides at once", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local left, top, height, width = bag:BodyRect()
+      cursor = { left + width / 2, top - height / 3 }
+      bag:Hide(ctx())
+      local entry = begun[#begun]
+      assert.are.same({ x = left + width / 2, y = top - height / 3 }, entry.focus, "it breaks from the pointer")
+      local run = entry.run
+      step(0.1)
+      assert.are.equal(1, bag.frame:GetAlpha(), "still showing under its frost")
+      assert.is_true(run.shards[1].frost:GetAlpha() > 0)
+      assert.is_true(bag.frame:IsShown())
+      step(0.15)
+      local cracked = 0
+      for _, line in ipairs(run.seams) do
+        if line:IsShown() then cracked = cracked + 1 end
+      end
+      assert.is_true(cracked > 0, "cracking")
+      finishTweens()
+      assert.is_false(bag.frame:IsShown(), "gone as it shatters")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.is_true(showing(run) > 0, "its shards fly on")
+      assert.is_true(shatter.flying[run])
+    end)
+
+    it("breaks from its middle when the pointer is elsewhere", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:Hide(ctx())
+      assert.is_nil(begun[#begun].focus)
+    end)
+
+    it("stops at rest when Escape hides it mid-open, its shards given back", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(0.1)
+      local run = begun[1].run
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.are.equal(0, #run.shards)
+      assert.are.equal(1, bag.frame:GetAlpha())
+    end)
+
+    it("shows plainly when its theme goes mid-open, and still says it has shown", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      step(0.1)
+      local run = begun[1].run
+      frosty({ "Shatter" })
+      step(0.05)
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(0, #run.shards)
+      finishTweens()
+      assert.is_true(shownAt)
+    end)
+
+    it("slides in and out as any theme's without its shatter", function()
+      frosty({ "Shatter" })
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      assert.are_not.equal(0, bag.offset, "sliding in")
+      assert.are.equal(0, #begun)
+      finishTweens()
+      bag:Hide(ctx())
+      finishTweens()
+      assert.are.equal(0, #begun)
+    end)
+
+    it("draws its threads in once its shards have locked, and unravels them as it closes", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      local threads = bag.threads
+      assert.are.equal(0, threads.reveal)
+      step(0.3)
+      assert.are.equal(0, threads.reveal, "waiting for the shards to lock")
+      local d = threads.driver
+      d:GetScript("OnUpdate")(d, 0.45)
+      assert.is_true(threads.reveal > 0)
+      finishTweens()
+      for _ = 1, 20 do
+        local u = d:GetScript("OnUpdate")
+        if u == nil then break end
+        u(d, 0.05)
+      end
+      assert.are.equal(1, threads.reveal)
+      bag:Hide(ctx())
+      d:GetScript("OnUpdate")(d, 0.15)
+      assert.is_true(threads.reveal < 1, "unravelling")
+    end)
+
+    it("lets its snow fall while it shows and stops it as it hides, flakes and lines moving parts", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.are.equal(5, #bag.snow.flakes)
+      assert.is_not_nil(bag.snow.driver:GetScript("OnUpdate"))
+      local skip = bag:MovingParts()
+      assert.is_true(skip[bag.snow.flakes[1].texture])
+      assert.is_true(skip[bag.threads.threads[1].lines[1]])
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.is_nil(bag.snow.driver:GetScript("OnUpdate"))
+    end)
+  end)
+
   describe("data rain (Panel.Rain)", function()
     local rainModule = addon:GetModule("NextRain")
     local layout = dofile("spec/helpers/layout.lua")
