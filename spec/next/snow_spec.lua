@@ -281,6 +281,172 @@ describe("NextSnow", function()
     end)
   end)
 
+  -- Asked, of streaks blown across the whole body: "slightly too noisy ... the wrong color -- more golden, and A LOT less
+  -- of them, more like... slower, shooting star, then don't even go the full length of the bag, more like... flyby
+  -- twinkles". A few gold shooting stars now and then, each flying a short way.
+  describe("flybys", function()
+    local FLYBYS = { Every = { 1, 1 }, Max = 2, Travel = { 60, 60 }, Speed = { 40, 40 }, Length = { 50, 50 },
+      Thickness = { 3, 3 }, Tilt = 10, Texture = "Streak", Color = "Gold", Alpha = 0.8, BlendMode = "ADD",
+      Head = { Texture = "Flake", Size = { 10, 10 }, Color = "White", Twinkle = 6 } }
+
+    local function flying(flybys, side)
+      UseNextTheme({
+        Textures = { Flake = "flake.png", Streak = "streak.png" },
+        Panel = { Snow = { Flakes = {}, Flybys = flybys or FLYBYS } },
+      })
+      local panel = panelOn(side or "RIGHT")
+      panel.snow:Style()
+      panel.snow:Start()
+      return panel
+    end
+
+    local function shownFlybys(panel)
+      local out = {}
+      for _, f in ipairs(panel.snow.flybys) do
+        if f.tail:IsShown() then table.insert(out, f) end
+      end
+      return out
+    end
+
+    it("sends one now and then, Every apart", function()
+      local panel = flying()
+      assert.are.equal(0, #shownFlybys(panel))
+      step(panel, 0.9)
+      assert.are.equal(0, #shownFlybys(panel), "not before its first is due")
+      step(panel, 0.2)
+      assert.are.equal(1, #shownFlybys(panel))
+      step(panel, 0.9)
+      assert.are.equal(1, #shownFlybys(panel), "not before the next is due")
+      step(panel, 0.15)
+      assert.are.equal(2, #shownFlybys(panel))
+    end)
+
+    it("never has more than Max flying at once", function()
+      local fast = {}
+      for k, v in pairs(FLYBYS) do fast[k] = v end
+      fast.Every = { 0.2, 0.2 }
+      local panel = flying(fast)
+      local most = 0
+      for _ = 1, 40 do
+        step(panel, 0.1)
+        most = math.max(most, #shownFlybys(panel))
+      end
+      assert.are.equal(2, most)
+    end)
+
+    it("starts inside the body and flies a short way toward its inner side, falling a little, in its gold", function()
+      local panel = flying()
+      step(panel, 1.05)
+      local f = shownFlybys(panel)[1]
+      local x0, y0 = at(f.head)
+      assert.is_true(x0 >= 96 and x0 <= 496 and y0 >= 0 and y0 <= 600, "inside the body: " .. x0 .. ", " .. y0)
+      step(panel, 0.5)
+      local x1, y1 = at(f.head)
+      assert.is_true(math.abs((x0 - x1) - 20 * math.cos(math.rad(10))) < 1e-6, "40 a second, leftward")
+      assert.is_true(y1 > y0, "falling")
+      local r, g, b = f.tail:GetVertexColor()
+      local gr, gg, gb = style:RGBA("Gold")
+      assert.are.same({ gr, gg, gb }, { r, g, b })
+      -- Its head leads: the art's right end, mirrored going left; tilted down along its way.
+      assert.are.same({ 1, 0, 0, 1 }, f.tail._texCoords)
+      assert.is_true(f.tail:GetRotation() > 0)
+      assert.are.equal("streak.png", f.tail:GetTexture())
+      assert.are.equal("flake.png", f.head:GetTexture())
+      -- Gone once it has flown its Travel (60 at 40 a second), the next one (due a second after it) flying meanwhile.
+      step(panel, 0.5)
+      assert.are.equal(2, #shownFlybys(panel))
+      step(panel, 0.55)
+      for _, other in ipairs(panel.snow.flybys) do
+        assert.are_not.equal(f, other)
+      end
+      assert.is_false(f.tail:IsShown())
+      assert.is_false(f.head:IsShown())
+    end)
+
+    it("grows its tail behind its head as it sets off, and twinkles its head", function()
+      local panel = flying()
+      step(panel, 1.05)
+      local f = shownFlybys(panel)[1]
+      local w0 = f.tail:GetWidth()
+      step(panel, 0.3)
+      assert.is_true(f.tail:GetWidth() > w0, "growing")
+      local alphas = {}
+      for _ = 1, 6 do
+        step(panel, 0.04)
+        alphas[math.floor(f.head:GetAlpha() * 100)] = true
+      end
+      local n = 0
+      for _ in pairs(alphas) do n = n + 1 end
+      assert.is_true(n > 3, "twinkling")
+    end)
+
+    it("flies toward the inner side on a panel on the left of the screen", function()
+      local panel = flying(nil, "LEFT")
+      step(panel, 1.05)
+      local f = shownFlybys(panel)[1]
+      local x0 = at(f.head)
+      step(panel, 0.5)
+      assert.is_true((at(f.head)) > x0)
+      assert.are.same({ 0, 1, 0, 1 }, f.tail._texCoords)
+    end)
+
+    it("keeps every star inside the body all the way, on either side of the screen", function()
+      for _, side in ipairs({ "RIGHT", "LEFT" }) do
+        local fast = {}
+        for k, v in pairs(FLYBYS) do fast[k] = v end
+        fast.Every = { 0.2, 0.2 }
+        local panel = flying(fast, side)
+        local left = panel:BodyLeft()
+        local seen = 0
+        for _ = 1, 200 do
+          step(panel, 0.05)
+          for _, f in ipairs(shownFlybys(panel)) do
+            seen = seen + 1
+            local x, y = at(f.head)
+            assert.is_true(x >= left and x <= left + 400, side .. ": across " .. x)
+            assert.is_true(y >= 0 and y <= 600, side .. ": down " .. y)
+          end
+        end
+        assert.is_true(seen > 100)
+      end
+    end)
+
+    it("fades in as it sets off and out before it ends, both its head and tail", function()
+      local panel = flying()
+      step(panel, 1.05)
+      local f = shownFlybys(panel)[1]
+      assert.are.equal(0, f.tail:GetAlpha())
+      assert.are.equal(0, f.head:GetAlpha())
+      step(panel, 0.5)
+      assert.is_true(math.abs(f.tail:GetAlpha() - 0.8) < 1e-9, "full strength on its way")
+      step(panel, 0.85)
+      assert.is_true(f.tail:GetAlpha() < 0.8 * 0.3, "fading as it ends")
+      assert.is_true(f.head:GetAlpha() < 0.3)
+    end)
+
+    it("sends none in combat, and none once the panel hid", function()
+      local panel = flying()
+      combat = true
+      step(panel, 2)
+      assert.are.equal(0, #shownFlybys(panel))
+      combat = false
+      step(panel, 1.05)
+      assert.are.equal(1, #shownFlybys(panel))
+      panel.snow:Stop()
+      assert.are.equal(0, #shownFlybys(panel))
+    end)
+
+    it("names its flybys moving parts", function()
+      local panel = flying()
+      step(panel, 1.05)
+      local skip = {}
+      panel.snow:MovingParts(skip)
+      local f = shownFlybys(panel)[1]
+      assert.is_true(skip[f.tail])
+      assert.is_true(skip[f.head])
+    end)
+  end)
+
   it("falls only while the panel shows, its streaks gone when it stops", function()
     local panel = started({ BODY }, GUSTS)
     panel.snow:Gust()

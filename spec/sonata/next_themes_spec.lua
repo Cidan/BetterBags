@@ -676,7 +676,7 @@ describe("BetterBags Next's shipped themes", function()
           assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), name .. ": " .. file)
         end
       end
-      assert.are.equal(11, count)
+      assert.are.equal(10, count)
     end)
 
     it("freezes together from shards of its own fill and shatters, with snow on a breeze and threads of gold", function()
@@ -704,20 +704,26 @@ describe("BetterBags Next's shipped themes", function()
       end
     end)
 
-    -- Asked: "the streaks i see, make those animated and not static? also get rid of that big rune in the background".
-    it("blows its streaks across the body rather than painting them in, and has no rune", function()
+    -- Asked: "the streaks i see, make those animated and not static? also get rid of that big rune in the background";
+    -- then, of the streaks blown across the whole body: "slightly too noisy ... the wrong color -- more golden, and A LOT
+    -- less of them, more like... slower, shooting star, then don't even go the full length of the bag, more like...
+    -- flyby twinkles".
+    it("sends a few slow gold shooting stars across its body, and has no streaks or rune", function()
       local t = sonataNext:Resolve("Frost")
       assert.is_nil(t.Textures.Rune)
-      local streaks
+      assert.is_nil(t.Textures.Streaks)
       for _, piece in ipairs(t.Panel.Ornaments) do
         assert.are_not.equal("Rune", piece.Texture)
-        if piece.Texture == "Streaks" then streaks = piece end
+        assert.are_not.equal("Streaks", piece.Texture)
       end
-      assert.is_not_nil(streaks)
-      assert.are.equal("BODY", streaks.Point)
-      assert.is_not_nil(streaks.Tile)
-      local scroll = streaks.Motion.Scroll
-      assert.is_true(scroll.X < 0 and scroll.Y > 0, "toward the inner side, falling")
+      local F = t.Panel.Snow.Flybys
+      assert.are.equal("Gold", F.Color)
+      assert.is_true(F.Max <= 2, "a lot less of them")
+      assert.is_true(F.Every[1] >= 3, "now and then")
+      assert.is_true(F.Speed[2] <= 120, "slow")
+      assert.is_true(F.Travel[2] <= 200, "never the length of the bag (400 across)")
+      assert.is_not_nil(F.Head.Twinkle)
+      assert.are.equal("Gold", F.Head.Color)
     end)
 
     it("is in the screenshot's blues and gold", function()

@@ -826,6 +826,29 @@ function sonataNext:Check(key)
         end
       end
     end
+    -- Its shooting stars: how often, how many at once, how far and how fast each flies, and its head.
+    local flybys = W.Flybys
+    if type(flybys) == "table" then
+      local where = "Panel.Snow.Flybys."
+      partsOf(flybys, snow.FLYBY_KEYS, where)
+      if not positive(flybys.Max) then
+        table.insert(problems, where .. "Max: flybys need one")
+      end
+      for _, field in ipairs({ { "Every", "soonest and latest", true }, { "Travel", "shortest and longest", true },
+        { "Speed", "slowest and fastest", true }, { "Length", "shortest and longest" },
+        { "Thickness", "thinnest and thickest" } }) do
+        local v = flybys[field[1]]
+        if (field[3] or v ~= nil) and not range(v) then
+          table.insert(problems, where .. field[1] .. ": two numbers, " .. field[2])
+        end
+      end
+      if type(flybys.Head) == "table" then
+        partsOf(flybys.Head, snow.HEAD_KEYS, where .. "Head.")
+        if flybys.Head.Size ~= nil and not range(flybys.Head.Size) then
+          table.insert(problems, where .. "Head.Size: two numbers, smallest and largest")
+        end
+      end
+    end
   end
   local threads = addon:GetModule('NextThreads', true)
   local T = theme.Panel and theme.Panel.Threads

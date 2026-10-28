@@ -15,11 +15,11 @@ local sonataNext = addon:GetModule('SonataNext')
 --     blows snow in, and its gold threads draw themselves in (NextShatter, NextSnow, NextThreads).
 --     Closing: frost spreads over it, cracks run along its seams out from where it was clicked, and it shatters, the
 --     shards tumbling away as they fall, catching the light as they turn.
---   At rest: the body's teal-blue depths, streaks of wind blowing across it, an aurora drifting across the top, a
---     frosted rim, an interlace border down its inner side and along its top and bottom, ice crystals growing out
---     of its inner corners; snow drifting across the body and down the feather on a breeze that gusts now and then, its
---     streaks of wind sweeping across; threads of gold light swaying round the header, the footer and the feather, a
---     glint running along them; snowflakes for sparkles, a frosty mist round the title.
+--   At rest: the body's teal-blue depths, an aurora drifting across the top, a frosted rim, an interlace border down
+--     its inner side and along its top and bottom, ice crystals growing out of its inner corners; snow drifting across
+--     the body and down the feather on a breeze that gusts now and then, its streaks of wind sweeping across; now and
+--     then a gold shooting star flying a short way across the body; threads of gold light swaying round the header,
+--     the footer and the feather, a glint running along them; snowflakes for sparkles, a frosty mist round the title.
 --   Display text in Cinzel (fonts/frost, SIL Open Font License; its Latin alphabets only, so other locales draw the
 --     client's font), the rest in the client's own.
 -- The palette redefines Default's names (Gold, Lavender, Text, Muted...) in its gold and ice blues, so everything this
@@ -83,7 +83,6 @@ sonataNext:RegisterTheme({
     Crystal = TEXTURES .. "crystal.png",
     KnotEdge = TEXTURES .. "knot_edge.png",
     KnotSide = TEXTURES .. "knot_side.png",
-    Streaks = TEXTURES .. "streaks.png",
     Aurora = TEXTURES .. "aurora.png",
     Rim = TEXTURES .. "rim.png",
     Flake = TEXTURES .. "flake.png",
@@ -125,10 +124,6 @@ sonataNext:RegisterTheme({
     DropGlow = { Color = "Ice", Alpha = 0.15, BlendMode = "ADD" },
     -- Each piece drawn for the backpack (its inner side on the left) and mirrored on the panels across the screen.
     Ornaments = {
-      -- Streaks of wind blown across the body toward its inner side, falling as they go, along their own slant (asked:
-      -- "the streaks i see, make those animated and not static").
-      { Texture = "Streaks", Point = "BODY", Tile = 256, Color = "Frost", Alpha = 0.55, BlendMode = "ADD",
-        Layer = "BACKGROUND", SubLevel = 3, Motion = { Scroll = { X = -90, Y = 20 } } },
       -- Frost along every edge.
       { Texture = "Rim", Point = "BODY", Color = "Frost", Alpha = 0.18, BlendMode = "ADD", Layer = "BACKGROUND",
         SubLevel = 4 },
@@ -183,6 +178,13 @@ sonataNext:RegisterTheme({
       Gusts = { Every = 11, Time = 2.6, Strength = 110, OnOpen = true,
         Streaks = { Texture = "Streak", Count = 6, Length = { 140, 300 }, Thickness = { 3, 7 }, Alpha = 0.22,
           Color = "Frost", BlendMode = "ADD", Tilt = 8 } },
+      -- Now and then a gold shooting star flies a short way across the body, its head twinkling (asked, of the streaks
+      -- first blown across the whole body: "more golden, and A LOT less of them, more like... slower, shooting star,
+      -- then don't even go the full length of the bag, more like... flyby twinkles").
+      Flybys = { Every = { 4, 9 }, Max = 2, Travel = { 110, 170 }, Speed = { 55, 85 }, Length = { 50, 90 },
+        Thickness = { 2, 3 }, Tilt = 12, Texture = "Streak", Color = "Gold", Alpha = 0.7, BlendMode = "ADD",
+        Layer = "BORDER", SubLevel = 4,
+        Head = { Texture = "Flake", Size = { 9, 13 }, Color = "Gold", Alpha = 0.95, BlendMode = "ADD", Twinkle = 3 } },
     },
     -- Threads of gold light (NextThreads): round the header behind the title, along the footer and out into the
     -- feather, and a long one down the feather; swaying, a glint running along each now and then.

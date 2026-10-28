@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Makes the Frost theme's art (next-themes.md, "Frost"): the body's deep winter blue, hoarfrost, an ice
-# crystal cluster, an interlace border (along a side and along an edge), streaks of wind (tiling, blown
-# across the body), aurora curtains, a frost rim, a snowflake, a wind streak and a thread of light. White unless a piece is the body (its own
-# blues), the shape in the alpha, so the theme tints each. Standard library only, like next_glitch.py. Run
-# from the repository root:
+# crystal cluster, an interlace border (along a side and along an edge), aurora curtains, a frost rim, a
+# snowflake, a wind streak (a gust's, and a shooting star's tail) and a thread of light. White unless a
+# piece is the body (its own blues), the shape in the alpha, so the theme tints each. Standard library
+# only, like next_glitch.py. Run from the repository root:
 #   python3 tools/textures/next_frost.py
 import math
 import os
@@ -156,9 +156,9 @@ def fbm(width, height, cells, seed, wrap=True):
 
 
 # The body, 256 x 512 in its own blues (drawn white-tinted: Color White): deep at the top and bottom, a
-# lighter teal through the middle, cloudy with drifting frost. Its streaks of wind are their own art, blown
-# across it (streaks, asked: "the streaks i see, make those animated and not static"). Shards of a panel's
-# body carry the same art.
+# lighter teal through the middle, cloudy with drifting frost (no streaks painted in: asked, "the streaks i
+# see, make those animated and not static"; shooting stars fly across it instead, Panel.Snow.Flybys).
+# Shards of a panel's body carry the same art.
 def body():
     w, h = 256, 512
     clouds = fbm(w, h, [128, 64, 32, 16], 11, wrap=False)
@@ -298,27 +298,6 @@ def knot():
     write_alpha(os.path.join(OUT, "knot_side.png"), across, length, turned)
 
 
-# Streaks of wind, 256 x 256, tiling both ways: short thin lines slanting down toward the left (the way the
-# theme blows them across a backpack, toward its inner side), each brightest at its leading end (left, lower)
-# and fading back along its tail, as the screenshot's snow drives through the wind.
-def streaks():
-    size = 256
-    c = Canvas(size, size, wrap=True)
-    rnd = random.Random(5)
-    for _ in range(60):
-        x, y = rnd.uniform(0, size), rnd.uniform(0, size)
-        length = rnd.uniform(12, 36)
-        strength = rnd.uniform(0.35, 0.9)
-        steps = 6
-        for k in range(steps):
-            # From its head, back up and to the right, fading.
-            t0, t1 = k / steps, (k + 1) / steps
-            x0, y0 = x + length * t0, y - length * 0.22 * t0
-            x1, y1 = x + length * t1, y - length * 0.22 * t1
-            c.line(x0, y0, x1, y1, rnd.uniform(0.9, 1.3), strength * (1 - t0) ** 1.4, 1.1)
-    write_alpha(os.path.join(OUT, "streaks.png"), size, size, c.a)
-
-
 # Aurora curtains, 512 x 128, tiling across: vertical rays whose brightness wanders along the band, a
 # brighter fold along a wave through it, fading out at the top and the bottom.
 def aurora():
@@ -411,7 +390,7 @@ def thread():
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    for make in (body, frost, crystal, knot, streaks, aurora, rim, flake, streak, thread):
+    for make in (body, frost, crystal, knot, aurora, rim, flake, streak, thread):
         make()
         print("made", make.__name__)
 

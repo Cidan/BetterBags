@@ -313,10 +313,14 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     still the engine's open without a `Storm`.) **Closing:** frost spreads over it, cracks run along its
     seams out from where the pointer is (the close button clicked), and it shatters, the shards tumbling away under
     gravity, turning and catching the light, on a layer that carries them on after the bag has hidden.
-  - **At rest:** the body's art (`body.png`: teal-blue depths, drifting frost), streaks of wind blowing across it toward
-    the inner side and falling along their slant (a tiled ornament scrolling, `streaks.png`; asked, after the first
-    version painted them into the body: "the streaks i see, make those animated and not static"; the rune circle it had
-    behind the items was removed, asked: "get rid of that big rune"), an aurora drifting across the top, a frosted rim, an interlace
+  - **At rest:** the body's art (`body.png`: teal-blue depths, drifting frost), and now and then a gold shooting star
+    flying a short way across it toward the inner side, its snowflake head twinkling (`Panel.Snow.Flybys`, §22; at most
+    two at once, every 4 to 9 seconds, 110 to 170 units at 55 to 85 a second, the body 458 across). The first version
+    painted streaks of wind into the body; asked, "make those animated and not static", they became a tiled ornament
+    blown across the whole body, and then, asked: "slightly too noisy ... the wrong color -- more golden, and A LOT less
+    of them, more like... slower, shooting star, then don't even go the full length of the bag, more like... flyby
+    twinkles", these stars. The rune circle it had behind the items was removed, asked: "get rid of that big rune". An
+    aurora drifting across the top, a frosted rim, an interlace
     border down the inner side and along the top and bottom (and the outer side of a small panel), ice crystals growing
     out of the inner corners into the feather and glinting; snow behind the items and down the feather on a breeze that
     gusts now and then, streaks of wind sweeping across; three threads of gold light (round the header behind the title,
@@ -327,9 +331,9 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     font for the rest; Cinzel covers Latin alphabets only, so in other locales its roles draw the client's (`Locales`).
   - **Art:** `tools/textures/next_frost.py` (standard-library Python) makes `textures/next/frost/*.png`: the body, hoarfrost
     (dendrites grown in from the edges), an ice crystal cluster, an interlace band (along an edge and turned down a
-    side), streaks of wind (tiling both ways, each brightest at its leading end), aurora curtains, a frost rim, a
-    snowflake, a wind streak, a thread of light. Checked by its numbers rather than by eye (the body averages 0.05, 0.19,
-    0.29; the frost covers 9% of its file; the streaks tile's opposite edges match).
+    side), aurora curtains, a frost rim, a snowflake, a wind streak (a gust's, and a shooting star's tail), a thread of
+    light. Checked by its numbers rather than by eye (the body averages 0.05, 0.19, 0.29; the frost covers 9% of its
+    file).
   - Item buttons are frosted cells (cropped icons, a thin ice edge carrying the quality); the settings window is drawn
     on the body's art.
   - Not seen in game yet. Seen nowhere else either: no image of it was rendered.
@@ -875,7 +879,7 @@ use, and back on.
   | Glitch Effects (`nextGlitch`) | `glitch` | `Panel.Glitch` (§21): no flicker, tears or bursts; the bags slide in and out as any theme's. Flicker can be hard on some players' eyes |
   | Data Rain (`nextRain`) | `rain` | `Panel.Rain` (§21): no glyphs falling |
   | Ice Shatter (`nextShatter`) | `shatter` | `Panel.Shatter` (§22): no freezing together or shattering; the bags slide in and out as any theme's |
-  | Snowfall (`nextSnow`) | `snow` | `Panel.Snow` (§22): no snow, gusts or wind streaks |
+  | Snowfall (`nextSnow`) | `snow` | `Panel.Snow` (§22): no snow, gusts, wind streaks or shooting stars |
 
   Moving Ornaments also holds a theme's threads of light still (§22: each thread's `Sway` and `Glint` taken out, its art
   and its draw-in as the panel opens kept).
@@ -1111,6 +1115,14 @@ What the Frost theme (§8) needed of the engine, all of it data a theme gives, n
   average (0.4 to 1.6 of it) the breeze rises by up to `Strength` and falls over `Time`, and `Streaks` (`Count`, `Length`,
   `Thickness`, `Alpha`, `Color`, `Texture`, `BlendMode`, `Tilt`) sweep across the panel ahead of it, tilted down along the
   wind, their head first (the art's right end, mirrored to lead going left); one blows as the panel shows with `OnOpen`.
+  `Flybys` (`Every`, `Max`, `Travel`, `Speed`, `Length`, `Thickness`, `Tilt`, `Texture`, `Color`, `Alpha`, `BlendMode`,
+  `Layer`, `SubLevel`, `Head`): shooting stars. One sets off every `Every` (`{ soonest, latest }`) while fewer than `Max`
+  fly, none in combat (it is due again `Every` later); from somewhere in the body far enough from its inner edge to fly
+  its `Travel` inside it (and from its top and bottom: 8% to 85% down, less its fall), toward the inner side at `Speed`,
+  falling along its `Tilt` (degrees). Its tail (`Texture`, the art's right end its head, mirrored going left, tilted down
+  along its way) is as long as it has flown, up to `Length`, `Thickness` thick, behind its head; `Head` (`Texture`,
+  `Size`, `Color`, `Alpha`, `BlendMode`, `Twinkle`: twinkles a second) at its front. Both fade in over its first 15% and
+  out over its last 45%. Given back when it has flown its way, or the panel hides (`Stop`).
   Laid out again on the panel's geometry and frame size changes, keeping flakes still inside where they are; a feather
   flake hides while the panel is small and falls again once it is full (a size switch lays the snow out, it does not
   make it again: found in review, it errored every frame). Falls only while the panel shows; a flake that does not spin is
@@ -1149,7 +1161,9 @@ What the Frost theme (§8) needed of the engine, all of it data a theme gives, n
   away, curling, turning and growing, flakes given back as they die, mirrored, another corner, given back with the run,
   the lock and total times), `spec/next/snow_spec.lua` (none without, the look, places on either side, a
   small panel, falling and drifting, starting again at the top and upwind, combat, gusts and streaks both ways, OnOpen,
-  stopping, a new theme, resizing, a size switch, moving parts), `spec/next/threads_spec.lua` (lines, the curve through
+  stopping, a new theme, resizing, a size switch, moving parts; "flybys": Every apart, never more than Max, inside the
+  body all the way on either side, flying a short way toward the inner side and falling in its color, its tail growing
+  and its head twinkling, fading in and out, mirrored, none in combat or once hidden, moving parts), `spec/next/threads_spec.lua` (lines, the curve through
   its points, mirroring, anchors, sizes, sway, glint, draw-in and its tip, a part-drawn segment, unravelling, a draw-in
   before Start, a new theme, resizing, moving parts), `spec/next/theme_panel_spec.lua` ("shattering, snow and threads":
   on the real backpack: opening, opening out of a storm from its bottom left, closing from the pointer and its middle,
@@ -1165,7 +1179,9 @@ What the Frost theme (§8) needed of the engine, all of it data a theme gives, n
   that changed nothing, removed (the crack phase's own time check, a per-frame hide Layout already does), and one did
   not apply. Then 25 of the storm (four first survived and led to tests: flakes born on the front inside the body,
   curling, given back as they die, the threads waiting for the lock on the panel; the first also led to a flake born
-  this frame moving only from the next). Every one now caught.
+  this frame moving only from the next). Then 30 of the shooting stars and their Check rules (two first survived and led
+  to tests: a star on a panel on the left of the screen starting inside the body, and fading in and out). Every one now
+  caught.
 
 ## 9. Coverage
 
