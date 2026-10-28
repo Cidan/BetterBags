@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Makes the Frost theme's art (next-themes.md, "Frost"): the body's deep winter blue, hoarfrost, an ice
-# crystal cluster, an interlace border (along a side and along an edge), a rune circle, aurora curtains,
-# a frost rim, a snowflake, a wind streak and a thread of light. White unless a piece is the body (its own
+# crystal cluster, an interlace border (along a side and along an edge), streaks of wind (tiling, blown
+# across the body), aurora curtains, a frost rim, a snowflake, a wind streak and a thread of light. White unless a piece is the body (its own
 # blues), the shape in the alpha, so the theme tints each. Standard library only, like next_glitch.py. Run
 # from the repository root:
 #   python3 tools/textures/next_frost.py
@@ -156,17 +156,12 @@ def fbm(width, height, cells, seed, wrap=True):
 
 
 # The body, 256 x 512 in its own blues (drawn white-tinted: Color White): deep at the top and bottom, a
-# lighter teal through the middle, cloudy with drifting frost, and faint streaks of wind across it, falling
-# toward the inner side (the screenshot's snow-in-the-wind). Shards of a panel's body carry the same art.
+# lighter teal through the middle, cloudy with drifting frost. Its streaks of wind are their own art, blown
+# across it (streaks, asked: "the streaks i see, make those animated and not static"). Shards of a panel's
+# body carry the same art.
 def body():
     w, h = 256, 512
     clouds = fbm(w, h, [128, 64, 32, 16], 11, wrap=False)
-    streaks = Canvas(w, h)
-    rnd = random.Random(5)
-    for _ in range(70):
-        x, y = rnd.uniform(-40, w), rnd.uniform(0, h)
-        length = rnd.uniform(10, 34)
-        streaks.line(x, y, x + length, y + length * 0.18, rnd.uniform(0.6, 1.2), rnd.uniform(0.15, 0.4), 1.2)
     deep = (0.028, 0.110, 0.180)
     teal = (0.085, 0.320, 0.450)
     glow = (0.180, 0.520, 0.660)
@@ -184,8 +179,6 @@ def body():
             col = [deep[i] + (teal[i] - deep[i]) * t for i in range(3)]
             g = clamp((c - 0.55) * 2.2) * mid * 0.35
             col = [col[i] + (glow[i] - col[i]) * g for i in range(3)]
-            s = streaks.a[y * w + x] * 0.45
-            col = [col[i] + (0.75 - col[i]) * s for i in range(3)]
             row.append((col[0], col[1], col[2], 1))
         rows.append(row)
     write_png(os.path.join(OUT, "body.png"), w, h, rows)
@@ -305,63 +298,25 @@ def knot():
     write_alpha(os.path.join(OUT, "knot_side.png"), across, length, turned)
 
 
-# A rune circle, 512 x 512: an outer double ring, a ring of interlace between rings, twelve rune marks, a
-# compass star in the middle with rings inside it; thin lines, a soft glow round them.
-def rune():
-    size = 512
-    c = Canvas(size, size)
-    cx = cy = size / 2
-
-    def ring(r, width, strength=0.9):
-        n = int(2 * math.pi * r / 3)
-        for i in range(n):
-            a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
-            c.line(cx + r * math.cos(a0), cy + r * math.sin(a0), cx + r * math.cos(a1), cy + r * math.sin(a1),
-                   width, strength, 1.0)
-
-    ring(246, 2.0)
-    ring(236, 1.0, 0.7)
-    ring(196, 1.0, 0.7)
-    ring(186, 2.0)
-    # Interlace between 196 and 236: two strands crossing 24 times round the ring.
-    for phase in (0.0, math.pi):
-        n = 720
-        for i in range(n):
-            a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
-            r0 = 216 + 13 * math.sin(12 * a0 + phase)
-            r1 = 216 + 13 * math.sin(12 * a1 + phase)
-            c.line(cx + r0 * math.cos(a0), cy + r0 * math.sin(a0), cx + r1 * math.cos(a1), cy + r1 * math.sin(a1),
-                   1.8, 0.85, 1.0)
-    rnd = random.Random(12)
-    for k in range(12):
-        a = 2 * math.pi * k / 12
-        # A rune: a stave toward the middle with two or three strokes off it.
-        bx, by = cx + 170 * math.cos(a), cy + 170 * math.sin(a)
-        ex, ey = cx + 140 * math.cos(a), cy + 140 * math.sin(a)
-        c.line(bx, by, ex, ey, 2.0, 0.85, 1.0)
-        nx, ny = -math.sin(a), math.cos(a)
-        for _ in range(rnd.randint(2, 3)):
-            t = rnd.uniform(0.15, 0.85)
-            px, py = bx + (ex - bx) * t, by + (ey - by) * t
-            s = rnd.choice((-1, 1)) * rnd.uniform(6, 10)
-            back = rnd.uniform(-6, 6)
-            c.line(px, py, px + nx * s + math.cos(a) * back, py + ny * s + math.sin(a) * back, 1.6, 0.8, 1.0)
-    ring(120, 1.5)
-    ring(60, 1.2, 0.7)
-    # A compass star: eight points, the four cardinal ones longer.
-    for k in range(8):
-        a = 2 * math.pi * k / 8
-        r = 118 if k % 2 == 0 else 78
-        tip = (cx + r * math.cos(a), cy + r * math.sin(a))
-        for side in (-1, 1):
-            b = a + side * math.pi / 8
-            base = (cx + 26 * math.cos(b), cy + 26 * math.sin(b))
-            c.line(base[0], base[1], tip[0], tip[1], 1.4, 0.85, 1.0)
-    glow = Canvas(size, size)
-    glow.a = list(c.a)
-    glow.blur(4)
-    alpha = [clamp(c.a[i] * 0.85 + glow.a[i] * 0.9) for i in range(size * size)]
-    write_alpha(os.path.join(OUT, "rune.png"), size, size, alpha)
+# Streaks of wind, 256 x 256, tiling both ways: short thin lines slanting down toward the left (the way the
+# theme blows them across a backpack, toward its inner side), each brightest at its leading end (left, lower)
+# and fading back along its tail, as the screenshot's snow drives through the wind.
+def streaks():
+    size = 256
+    c = Canvas(size, size, wrap=True)
+    rnd = random.Random(5)
+    for _ in range(60):
+        x, y = rnd.uniform(0, size), rnd.uniform(0, size)
+        length = rnd.uniform(12, 36)
+        strength = rnd.uniform(0.35, 0.9)
+        steps = 6
+        for k in range(steps):
+            # From its head, back up and to the right, fading.
+            t0, t1 = k / steps, (k + 1) / steps
+            x0, y0 = x + length * t0, y - length * 0.22 * t0
+            x1, y1 = x + length * t1, y - length * 0.22 * t1
+            c.line(x0, y0, x1, y1, rnd.uniform(0.9, 1.3), strength * (1 - t0) ** 1.4, 1.1)
+    write_alpha(os.path.join(OUT, "streaks.png"), size, size, c.a)
 
 
 # Aurora curtains, 512 x 128, tiling across: vertical rays whose brightness wanders along the band, a
@@ -456,7 +411,7 @@ def thread():
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    for make in (body, frost, crystal, knot, rune, aurora, rim, flake, streak, thread):
+    for make in (body, frost, crystal, knot, streaks, aurora, rim, flake, streak, thread):
         make()
         print("made", make.__name__)
 

@@ -15,8 +15,8 @@ local sonataNext = addon:GetModule('SonataNext')
 --     blows snow in, and its gold threads draw themselves in (NextShatter, NextSnow, NextThreads).
 --     Closing: frost spreads over it, cracks run along its seams out from where it was clicked, and it shatters, the
 --     shards tumbling away as they fall, catching the light as they turn.
---   At rest: the body's teal-blue depths, a rune circle turning slowly behind the items, an aurora drifting across the
---     top, a frosted rim, an interlace border down its inner side and along its top and bottom, ice crystals growing out
+--   At rest: the body's teal-blue depths, streaks of wind blowing across it, an aurora drifting across the top, a
+--     frosted rim, an interlace border down its inner side and along its top and bottom, ice crystals growing out
 --     of its inner corners; snow drifting across the body and down the feather on a breeze that gusts now and then, its
 --     streaks of wind sweeping across; threads of gold light swaying round the header, the footer and the feather, a
 --     glint running along them; snowflakes for sparkles, a frosty mist round the title.
@@ -83,7 +83,7 @@ sonataNext:RegisterTheme({
     Crystal = TEXTURES .. "crystal.png",
     KnotEdge = TEXTURES .. "knot_edge.png",
     KnotSide = TEXTURES .. "knot_side.png",
-    Rune = TEXTURES .. "rune.png",
+    Streaks = TEXTURES .. "streaks.png",
     Aurora = TEXTURES .. "aurora.png",
     Rim = TEXTURES .. "rim.png",
     Flake = TEXTURES .. "flake.png",
@@ -125,11 +125,10 @@ sonataNext:RegisterTheme({
     DropGlow = { Color = "Ice", Alpha = 0.15, BlendMode = "ADD" },
     -- Each piece drawn for the backpack (its inner side on the left) and mirrored on the panels across the screen.
     Ornaments = {
-      -- A rune circle behind the items, turning once every four minutes: across a full body, smaller on a small one.
-      { Texture = "Rune", Point = "TOPINNER", Width = 380, Height = 380, X = 39, Y = 150, Color = "Ice", Alpha = 0.08,
-        BlendMode = "ADD", Layer = "BACKGROUND", SubLevel = 3, Sizes = "Full", Motion = { Spin = 1, Period = 240 } },
-      { Texture = "Rune", Point = "TOPINNER", Width = 300, Height = 300, X = 79, Y = 110, Color = "Ice", Alpha = 0.07,
-        BlendMode = "ADD", Layer = "BACKGROUND", SubLevel = 3, Sizes = "Small", Motion = { Spin = 1, Period = 240 } },
+      -- Streaks of wind blown across the body toward its inner side, falling as they go, along their own slant (asked:
+      -- "the streaks i see, make those animated and not static").
+      { Texture = "Streaks", Point = "BODY", Tile = 256, Color = "Frost", Alpha = 0.55, BlendMode = "ADD",
+        Layer = "BACKGROUND", SubLevel = 3, Motion = { Scroll = { X = -90, Y = 20 } } },
       -- Frost along every edge.
       { Texture = "Rim", Point = "BODY", Color = "Frost", Alpha = 0.18, BlendMode = "ADD", Layer = "BACKGROUND",
         SubLevel = 4 },

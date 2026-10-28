@@ -306,14 +306,17 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     storm"): the storm grows out of the body's bottom inner corner (bottom left on the backpack, mirrored to bottom right
     on the panels across the screen, as all of the theme is) across it, flakes curling and turning and mist rolling and
     growing in it, shards of its own body forming behind its front; once it has crossed, the seams flash, the frost on
-    the shards thaws and the bag shows under them as the storm blows away; a gust of wind blows snow in, and its gold
+    the shards thaws and the bag shows under them as the storm blows away, the seams never showing (asked, of the first
+    storm, which flashed them: "these lines, don't need to show"); a gust of wind blows snow in, and its gold
     threads draw themselves in once every shard has formed. About 0.9 s, under the 1 s a bank waits for its panel to show
     (refresh-scheduler.md §11). (Its first opening was the close in reverse: the shards flying in from around the body;
     still the engine's open without a `Storm`.) **Closing:** frost spreads over it, cracks run along its
     seams out from where the pointer is (the close button clicked), and it shatters, the shards tumbling away under
     gravity, turning and catching the light, on a layer that carries them on after the bag has hidden.
-  - **At rest:** the body's art (`body.png`: teal-blue depths, drifting frost, faint streaks of wind), a rune circle
-    turning once every four minutes behind the items, an aurora drifting across the top, a frosted rim, an interlace
+  - **At rest:** the body's art (`body.png`: teal-blue depths, drifting frost), streaks of wind blowing across it toward
+    the inner side and falling along their slant (a tiled ornament scrolling, `streaks.png`; asked, after the first
+    version painted them into the body: "the streaks i see, make those animated and not static"; the rune circle it had
+    behind the items was removed, asked: "get rid of that big rune"), an aurora drifting across the top, a frosted rim, an interlace
     border down the inner side and along the top and bottom (and the outer side of a small panel), ice crystals growing
     out of the inner corners into the feather and glinting; snow behind the items and down the feather on a breeze that
     gusts now and then, streaks of wind sweeping across; three threads of gold light (round the header behind the title,
@@ -324,8 +327,9 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     font for the rest; Cinzel covers Latin alphabets only, so in other locales its roles draw the client's (`Locales`).
   - **Art:** `tools/textures/next_frost.py` (standard-library Python) makes `textures/next/frost/*.png`: the body, hoarfrost
     (dendrites grown in from the edges), an ice crystal cluster, an interlace band (along an edge and turned down a
-    side), a rune circle, aurora curtains, a frost rim, a snowflake, a wind streak, a thread of light. Checked by its
-    numbers rather than by eye (the body averages 0.05, 0.19, 0.29; the frost covers 9% of its file, the rune 9%).
+    side), streaks of wind (tiling both ways, each brightest at its leading end), aurora curtains, a frost rim, a
+    snowflake, a wind streak, a thread of light. Checked by its numbers rather than by eye (the body averages 0.05, 0.19,
+    0.29; the frost covers 9% of its file; the streaks tile's opposite edges match).
   - Item buttons are frosted cells (cropped icons, a thin ice edge carrying the quality); the settings window is drawn
     on the body's art.
   - Not seen in game yet. Seen nowhere else either: no image of it was rendered.
@@ -1068,7 +1072,8 @@ What the Frost theme (§8) needed of the engine, all of it data a theme gives, n
     each shard flies in from `Spread` units away from the body's middle, turned up to `Spin` degrees, half its size,
     starting up to `Stagger` later the farther from the middle (the ice forms outward), eased out, catching the light as it
     turns (its frost brighter across a turn); once all have locked (the open's lock, tolerant of float error), over
-    `Clear` the seams flash and fade, the frost thaws, the shards go and the panel shows under them. The threads draw
+    `Clear` the seams flash and fade (only with `Open.Flash`: none otherwise), the frost thaws, the shards go and the
+    panel shows under them. The threads draw
     themselves in from the lock, and the sections cascade in from it. Then it says it has shown, as the slide does.
     `NextShatter:OpenLock()` and `OpenTime()` say how long it takes to lock and in all, for the panel.
   - **Opening out of a frost storm** (`Open.Storm`: `From`, `Appear`, `Flakes`, `Mist`; Frost's open): the storm grows out
@@ -1080,7 +1085,8 @@ What the Frost theme (§8) needed of the engine, all of it data a theme gives, n
     (the same, one `Color` and `Alpha`, and `Growth`, how much a puff grows over its life) are born on the front, inside
     the body (a few tries, none where the front has left it), heading out from the corner; one born this frame moves from
     the next. Each shard forms where it lies over `Appear` once the front reaches its middle (from frost to its art,
-    turning to rest, growing to its size); the lock is `Time + Appear`. Over `Clear` the storm fades as the panel shows.
+    turning to rest, growing to its size); the lock is `Time + Appear`. Over `Clear` the storm fades as the panel shows
+    (its seams flash only with `Open.Flash`, as the fly-in's).
     Its flakes and mist are pooled textures on the shatter layer, given back as they die and with the run.
   - **Closing** (`Close`: `Frost`, `Crack`, `Time`, `Speed`, `Spin`, `Gravity`, `Lift`): where it stands, frost spreads
     over the body over `Frost` (the shards' frost, their art unseen: the panel still shows under it), then cracks run

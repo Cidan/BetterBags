@@ -688,6 +688,8 @@ describe("BetterBags Next's shipped themes", function()
       assert.is_true(S.Shards.Jitter < 0.5)
       -- It appears out of a frost storm growing from its bottom inner corner.
       assert.are.equal("BOTTOMINNER", S.Open.Storm.From)
+      -- Asked: the shatter's lines "don't need to show" as it opens.
+      assert.is_nil(S.Open.Flash)
       assert.is_not_nil(S.Open.Storm.Flakes)
       assert.is_not_nil(S.Open.Storm.Mist)
       assert.is_true(S.Open.Time + S.Open.Storm.Appear + S.Open.Clear < 0.9, "shown before a bank's 1 second wait ends")
@@ -700,6 +702,22 @@ describe("BetterBags Next's shipped themes", function()
         assert.are.equal("Gold", thread.Color)
         assert.is_not_nil(thread.Draw)
       end
+    end)
+
+    -- Asked: "the streaks i see, make those animated and not static? also get rid of that big rune in the background".
+    it("blows its streaks across the body rather than painting them in, and has no rune", function()
+      local t = sonataNext:Resolve("Frost")
+      assert.is_nil(t.Textures.Rune)
+      local streaks
+      for _, piece in ipairs(t.Panel.Ornaments) do
+        assert.are_not.equal("Rune", piece.Texture)
+        if piece.Texture == "Streaks" then streaks = piece end
+      end
+      assert.is_not_nil(streaks)
+      assert.are.equal("BODY", streaks.Point)
+      assert.is_not_nil(streaks.Tile)
+      local scroll = streaks.Motion.Scroll
+      assert.is_true(scroll.X < 0 and scroll.Y > 0, "toward the inner side, falling")
     end)
 
     it("is in the screenshot's blues and gold", function()

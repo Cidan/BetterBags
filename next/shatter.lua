@@ -94,7 +94,7 @@ function shatter:Spec()
   return style.Theme.Panel.Shatter or nil
 end
 
--- OpenLock is how long the theme's open takes until its shards have all formed (the seams flash then, its threads draw
+-- OpenLock is how long the theme's open takes until its shards have all formed (its seams flash then with Flash, its threads draw
 -- in and its sections cascade from then): a storm's crossing and a shard's forming, else the stagger and a shard's
 -- flight. OpenTime is the whole open: that and its Clear.
 ---@return number
@@ -448,12 +448,18 @@ local function alphaOf(spec)
   return spec.Alpha or 1
 end
 
----@param seams Line[]
----@param alpha number
-local function showSeams(seams, alpha)
-  for _, line in ipairs(seams) do
-    line:SetAlpha(alpha)
-    line:Show()
+-- flash shows the seams fading over the open's Clear (f, 0 to 1) when the open says Flash; without, they never show as it
+-- opens (asked, of the Frost theme: "these lines, don't need to show").
+---@param f number
+function runProto:flash(f)
+  local S = self.spec
+  for _, line in ipairs(self.seams) do
+    if S.Open.Flash then
+      line:SetAlpha(alphaOf(S.Seams) * (1 - f))
+      line:Show()
+    else
+      line:Hide()
+    end
   end
 end
 
@@ -461,7 +467,7 @@ end
 -- else each shard flies in from around the body over
 -- Open.Time, starting up to Stagger later the farther from the middle it is (easing out, turning to rest, growing to
 -- its size, catching the light as it turns), the panel unseen; once all have locked, over Clear, the seams flash and
--- fade, the frost thaws and the shards go as the panel shows under them.
+-- fade (with Open.Flash), the frost thaws and the shards go as the panel shows under them.
 ---@param t number
 ---@return number alpha The panel's.
 function runProto:Assemble(t)
@@ -491,7 +497,7 @@ function runProto:Assemble(t)
   for _, s in ipairs(self.shards) do
     draw(s, s.cx, s.cy, 0, 1, artA * (1 - smoothstep(0.4, 1, f)), frostA * (1 - f))
   end
-  showSeams(self.seams, alphaOf(S.Seams) * (1 - f))
+  self:flash(f)
   return smoothstep(0, 0.6, f)
 end
 
@@ -652,7 +658,7 @@ end
 -- stormAt draws the open's frost storm t seconds in, and returns the panel's alpha: its front grows across the body over
 -- Open.Time, flakes curling and turning in it and mist rolling and growing with it; each shard forms where it lies over
 -- Appear once the storm has reached it (from frost to its art, turning to rest); once all have formed, over Clear, the
--- seams flash and fade, the frost thaws and the shards go as the panel shows under them, and the storm blows away.
+-- seams flash and fade (with Open.Flash), the frost thaws and the shards go as the panel shows under them, and the storm blows away.
 ---@param t number
 ---@return number alpha The panel's.
 function runProto:stormAt(t)
@@ -729,7 +735,7 @@ function runProto:stormAt(t)
   for _, s in ipairs(self.shards) do
     draw(s, s.cx, s.cy, 0, 1, artA * (1 - smoothstep(0.4, 1, f)), frostA * (1 - f))
   end
-  showSeams(self.seams, alphaOf(S.Seams) * (1 - f))
+  self:flash(f)
   return smoothstep(0, 0.6, f)
 end
 

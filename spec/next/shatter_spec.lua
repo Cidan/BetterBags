@@ -19,7 +19,7 @@ local SHATTER = {
   Shards = { Size = 100, Jitter = 0.3, Texture = "Body", Color = "White", Alpha = 1 },
   Frost = { Texture = "Frost", Color = "White", Alpha = 0.6, BlendMode = "ADD" },
   Seams = { Texture = "Thread", Color = "White", Alpha = 0.9, Thickness = 2, BlendMode = "ADD" },
-  Open = { Time = 0.4, Stagger = 0.2, Clear = 0.3, Spread = { 100, 200 }, Spin = 90 },
+  Open = { Time = 0.4, Stagger = 0.2, Clear = 0.3, Spread = { 100, 200 }, Spin = 90, Flash = true },
   Close = { Frost = 0.2, Crack = 0.1, Time = 0.6, Speed = { 200, 400 }, Spin = 360, Gravity = 900, Lift = 100 },
 }
 
@@ -348,6 +348,20 @@ describe("NextShatter", function()
         end
       end)
 
+      -- Asked, of the seams flashing at the end of the open: "these lines, don't need to show". Only with Flash.
+      it("shows no seams as its shards lock without Flash", function()
+        local spec = copy(SHATTER)
+        spec.Open.Flash = nil
+        theme(spec)
+        local run = shatter:Begin(panelOn(false))
+        for _, t in ipairs({ 0.3, 0.6, 0.75, 0.9 }) do
+          run:Assemble(t)
+          for _, line in ipairs(run.seams) do
+            assert.is_false(line:IsShown(), "at " .. t)
+          end
+        end
+      end)
+
       it("catches the light as a shard turns: its frost brightest across a turn", function()
         local run = shatter:Begin(panelOn(false))
         -- Every shard seen by now (a third of its flight in), none locked yet.
@@ -515,6 +529,23 @@ describe("NextShatter", function()
           local x, y = middle(p.texture)
           assert.is_true(x > 1400 - 250 and y > 900 - 350, "near the top right: " .. x .. ", " .. y)
         end
+      end)
+
+      it("never shows its seams without Flash, and flashes them with it", function()
+        local run = shatter:Begin(panelOn(false))
+        for t = 0, 0.9, 0.05 do
+          run:Assemble(t)
+          for _, line in ipairs(run.seams) do
+            assert.is_false(line:IsShown())
+          end
+        end
+        local spec = copy(SHATTER)
+        spec.Open = { Time = 0.5, Clear = 0.3, Flash = true, Storm = copy(STORM) }
+        theme(spec)
+        local flashed = shatter:Begin(panelOn(false))
+        flashed:Assemble(0)
+        flashed:Assemble(0.6)
+        assert.is_true(flashed.seams[1]:IsShown())
       end)
 
       it("gives its storm back when released, and reuses it", function()
