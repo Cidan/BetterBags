@@ -100,6 +100,8 @@ describe("SonataNext", function()
         Snow = { Flakes = { { Where = "Body", Count = 4 } } },
         Threads = { { Points = { { 0, 1 }, { 1, 2 } }, Sway = { Amplitude = 2, Period = 5 },
           Glint = { Every = 4, Time = 1 }, Draw = 0.5 } },
+        Smoke = { Puffs = { Size = { 80, 120 } }, Open = { Rise = 0.3 } },
+        Bats = { Frames = 4, Close = { Vanish = 0.1 }, Flutter = { Every = { 5, 9 } } },
       }
       return t
     end
@@ -118,6 +120,10 @@ describe("SonataNext", function()
       -- The Frost theme's (next-themes.md §22): freezing together and shattering; the snow.
       shatter = function(t) return t.Panel.Shatter end,
       snow = function(t) return t.Panel.Snow end,
+      -- The Halloween theme's (next-themes.md §23): coming in out of a puff of smoke; turning into bats, and the bats
+      -- fluttering out of the header.
+      smoke = function(t) return t.Panel.Smoke end,
+      bats = function(t) return t.Panel.Bats end,
     }
 
     before_each(function()
@@ -651,6 +657,41 @@ describe("SonataNext", function()
 
   -- Ornaments (Panel.Ornaments, next-themes.md §12): a place, an anchor, a size or a motion no ornament has, a
   -- missing size, an origin no motion turns about.
+  -- An ornament's blink and flicker (next-themes.md §23).
+  it("names what is wrong with an ornament's blink or flicker", function()
+    if addon:GetModule("NextOrnaments", true) == nil then
+      ResetModuleStub("NextOrnaments", "next/ornaments.lua")
+      LoadBetterBagsModule("next/ornaments.lua")
+    end
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadBlinks", Panel = { Ornaments = {
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4,
+        Motion = { Blink = { Every = { 3 }, Wink = 1 }, Flicker = { Low = 2, Glow = 1 } } },
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Motion = { Blink = 3, Flicker = true } },
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Motion = { Blink = {}, Flicker = { Speed = 0 } } },
+    } } })
+    local problems = sonataNext:Check("BadBlinks")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Ornaments.1.Motion.Blink.Every: two numbers, soonest and latest",
+      "Panel.Ornaments.1.Motion.Blink.Wink: no blink part named Wink",
+      "Panel.Ornaments.1.Motion.Flicker.Glow: no flicker part named Glow",
+      "Panel.Ornaments.1.Motion.Flicker.Low: from 0 to 1",
+      "Panel.Ornaments.2.Motion.Blink: a table",
+      "Panel.Ornaments.2.Motion.Flicker: a table",
+      "Panel.Ornaments.3.Motion.Blink.Every: two numbers, soonest and latest",
+      "Panel.Ornaments.3.Motion.Flicker.Speed: more than nothing",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "GoodBlinks", Panel = { Ornaments = {
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4,
+        Motion = { Blink = { Every = { 2, 5 }, Time = 0.1, Twice = 0.3 }, Flicker = { Low = 0.6, Speed = 8 } } },
+    } } })
+    assert.are.same({}, sonataNext:Check("GoodBlinks"))
+  end)
+
   it("names what is wrong with an ornament, by where it is", function()
     if addon:GetModule("NextOrnaments", true) == nil then
       ResetModuleStub("NextOrnaments", "next/ornaments.lua")
@@ -699,7 +740,7 @@ describe("SonataNext", function()
   -- ornament's glitch and scroll, and the fonts they name.
   it("names what is wrong with a glitch, a data rain and an ornament's glitch, by where it is", function()
     for _, m in ipairs({ { "NextOrnaments", "next/ornaments.lua" }, { "NextGlitch", "next/glitch.lua" },
-      { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" } }) do
+      { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" } }) do
       if addon:GetModule(m[1], true) == nil then
         ResetModuleStub(m[1], m[2])
         LoadBetterBagsModule(m[2])
@@ -780,7 +821,7 @@ describe("SonataNext", function()
   -- a sway without its time divides by nothing).
   it("names what is wrong with a shatter, snow and threads, by where it is", function()
     for _, m in ipairs({ { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" },
-      { "NextThreads", "next/threads.lua" } }) do
+      { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" } }) do
       if addon:GetModule(m[1], true) == nil then
         ResetModuleStub(m[1], m[2])
         LoadBetterBagsModule(m[2])
@@ -862,6 +903,79 @@ describe("SonataNext", function()
         Sway = { Amplitude = 2, Period = 5 }, Glint = { Every = 4, Time = 1, Color = "White" }, Sizes = "Full" } },
     } })
     assert.are.same({}, sonataNext:Check("GoodFrost"))
+  end)
+
+  -- The Halloween theme's smoke and bats (next-themes.md §23): their parts are the modules', and what their runtimes
+  -- divide by or count.
+  it("names what is wrong with a smoke and bats, by where it is", function()
+    for _, m in ipairs({ { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" } }) do
+      if addon:GetModule(m[1], true) == nil then
+        ResetModuleStub(m[1], m[2])
+        LoadBetterBagsModule(m[2])
+      end
+    end
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadSpooky", Panel = {
+      Smoke = { Puffs = { Size = { 9, 3 }, Fog = 1 }, Sparks = { Count = "lots", Life = { 1 }, Glow = 1 },
+        Open = { Spacing = 0, Reveal = { 0.5 }, Lift = { 3 }, Waft = 1 }, Haze = 1 },
+      Bats = { Frames = 0, FrameRate = -1, Squeak = 1,
+        Close = { Count = { 15, 10 }, Speed = { 1 }, Vanish = -1, Flap = 1,
+          Puff = { Spacing = 0, Size = { 2 }, Grow = -1, Fog = 1 } },
+        Flutter = { Every = { 3 }, Travel = 0, Band = { 50, 10 }, Swoop = 1 } },
+    } })
+    local problems = sonataNext:Check("BadSpooky")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Bats.Close.Count: two numbers, fewest and most",
+      "Panel.Bats.Close.Flap: no part named Flap",
+      "Panel.Bats.Close.Puff.Fog: no part named Fog",
+      "Panel.Bats.Close.Puff.Grow: no less than nothing",
+      "Panel.Bats.Close.Puff.Size: two numbers, smallest and largest",
+      "Panel.Bats.Close.Puff.Spacing: more than nothing",
+      "Panel.Bats.Close.Speed: two numbers, slowest and fastest",
+      "Panel.Bats.Close.Vanish: no less than nothing",
+      "Panel.Bats.Flutter.Band: two numbers, highest and lowest",
+      "Panel.Bats.Flutter.Every: two numbers, soonest and latest",
+      "Panel.Bats.Flutter.Swoop: no part named Swoop",
+      "Panel.Bats.Flutter.Travel: more than nothing",
+      "Panel.Bats.FrameRate: no less than nothing",
+      "Panel.Bats.Frames: more than nothing",
+      "Panel.Bats.Squeak: no part named Squeak",
+      "Panel.Smoke.Haze: no part named Haze",
+      "Panel.Smoke.Open.Lift: two numbers, slowest and fastest",
+      "Panel.Smoke.Open.Reveal: two numbers, from and to",
+      "Panel.Smoke.Open.Rise: an opening needs one",
+      "Panel.Smoke.Open.Spacing: more than nothing",
+      "Panel.Smoke.Open.Waft: no part named Waft",
+      "Panel.Smoke.Puffs.Fog: no part named Fog",
+      "Panel.Smoke.Puffs.Size: two numbers, smallest and largest",
+      "Panel.Smoke.Sparks.Count: a number",
+      "Panel.Smoke.Sparks.Glow: no part named Glow",
+      "Panel.Smoke.Sparks.Life: two numbers, shortest and longest",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "NoPuffs", Panel = { Smoke = { Open = { Rise = 0.3, Spacing = 50 } } } })
+    assert.are.same({ "Panel.Smoke.Puffs: a smoke opening needs them" }, sonataNext:Check("NoPuffs"))
+    sonataNext:RegisterTheme({ Name = "NoSizes", Panel = {
+      Smoke = { Puffs = { Texture = "Glow" }, Open = { Rise = 0.3, Spacing = 50 } },
+      Bats = { Flutter = { Travel = 100 } },
+    } })
+    problems = sonataNext:Check("NoSizes")
+    table.sort(problems)
+    assert.are.same({ "Panel.Bats.Flutter.Every: two numbers, soonest and latest",
+      "Panel.Smoke.Puffs.Size: two numbers, smallest and largest" }, problems)
+    sonataNext:RegisterTheme({ Name = "GoodSpooky", Panel = {
+      Smoke = { Puffs = { Texture = "Glow", Size = { 80, 120 }, Colors = { "White" } },
+        Sparks = { Texture = "Glow", Count = 4, Life = { 0.2, 0.3 } },
+        Open = { Rise = 0.3, Spacing = 50, Grow = 0.1, Hold = 0.1, Shrink = 0.2, Lift = { 10, 20 }, Reveal = { 0.1, 0.3 } } },
+      Bats = { Texture = "Glow", Frames = 4, FrameRate = 10,
+        Close = { Count = { 10, 15 }, Speed = { 100, 200 }, Vanish = 0.1,
+          Puff = { Texture = "Glow", Spacing = 50, Size = { 60, 80 }, Grow = 0.1 } },
+        Flutter = { Every = { 5, 9 }, Travel = 200, Band = { 20, 50 } } },
+    } })
+    assert.are.same({}, sonataNext:Check("GoodSpooky"))
   end)
 
   -- The header buttons down a side rail (Header.Buttons.Rail, next-themes.md §13).

@@ -301,6 +301,10 @@ local ANIMATION_OFF = {
   -- theme's. And its snow.
   shatter = function(theme) theme.Panel.Shatter = nil end,
   snow = function(theme) theme.Panel.Snow = nil end,
+  -- The Halloween theme's (next-themes.md §23): its bags come in out of a puff of smoke; off, they slide in. Its bats
+  -- (turning into them as it closes, and fluttering out of the header); off, they slide out.
+  smoke = function(theme) theme.Panel.Smoke = nil end,
+  bats = function(theme) theme.Panel.Bats = nil end,
 }
 
 -- effective returns a theme as the player sees it: resolved (a new table), the Animation switches they turned off laid
@@ -622,7 +626,7 @@ function sonataNext:Check(key)
         if o.Motion.Origin ~= nil and not ornaments.ORIGINS[o.Motion.Origin] then
           problem("Motion.Origin", "no point named " .. tostring(o.Motion.Origin))
         end
-        for _, motion in ipairs({ "Glitch", "Scroll" }) do
+        for _, motion in ipairs({ "Glitch", "Scroll", "Blink", "Flicker" }) do
           local spec = o.Motion[motion]
           if spec ~= nil and type(spec) ~= "table" then
             problem("Motion." .. motion, "a table")
@@ -636,6 +640,34 @@ function sonataNext:Check(key)
         for k in pairs(type(o.Motion.Scroll) == "table" and o.Motion.Scroll or {}) do
           if k ~= "X" and k ~= "Y" then
             problem("Motion.Scroll." .. tostring(k), "X or Y")
+          end
+        end
+        -- A blink (Every its soonest and latest) and a flicker (Low a share of the alpha, Speed what it divides by).
+        local B = o.Motion.Blink
+        if type(B) == "table" then
+          for k in pairs(B) do
+            if not ornaments.BLINK[k] then
+              problem("Motion.Blink." .. tostring(k), "no blink part named " .. tostring(k))
+            end
+          end
+          local E = B.Every
+          if not (type(E) == "table" and type(E[1]) == "number" and type(E[2]) == "number" and E[1] >= 0
+            and E[1] <= E[2]) then
+            problem("Motion.Blink.Every", "two numbers, soonest and latest")
+          end
+        end
+        local F = o.Motion.Flicker
+        if type(F) == "table" then
+          for k in pairs(F) do
+            if not ornaments.FLICKER[k] then
+              problem("Motion.Flicker." .. tostring(k), "no flicker part named " .. tostring(k))
+            end
+          end
+          if F.Low ~= nil and not (type(F.Low) == "number" and F.Low >= 0 and F.Low <= 1) then
+            problem("Motion.Flicker.Low", "from 0 to 1")
+          end
+          if F.Speed ~= nil and not (type(F.Speed) == "number" and F.Speed > 0) then
+            problem("Motion.Flicker.Speed", "more than nothing")
           end
         end
       end
@@ -848,6 +880,95 @@ function sonataNext:Check(key)
           table.insert(problems, where .. "Head.Size: two numbers, smallest and largest")
         end
       end
+    end
+  end
+  -- A smoke and bats (Panel.Smoke, Panel.Bats, next-themes.md §23): their parts are the modules', and what their
+  -- runtimes divide by or count.
+  local function atLeast(spec, part, where, above, required)
+    local v = spec[part]
+    if v == nil and not required then
+      return
+    end
+    if not (type(v) == "number" and (above and v > 0 or not above and v >= 0)) then
+      table.insert(problems, where .. part .. (above and ": more than nothing" or ": no less than nothing"))
+    end
+  end
+  local function ranges(spec, where, fields)
+    for _, field in ipairs(fields) do
+      local v = spec[field[1]]
+      if (field[3] or v ~= nil) and not range(v) then
+        table.insert(problems, where .. field[1] .. ": two numbers, " .. field[2])
+      end
+    end
+  end
+  local smokeModule = addon:GetModule('NextSmoke', true)
+  local K = theme.Panel and theme.Panel.Smoke
+  if smokeModule ~= nil and type(K) == "table" then
+    local where = "Panel.Smoke."
+    partsOf(K, smokeModule.KEYS, where)
+    if type(K.Puffs) == "table" then
+      partsOf(K.Puffs, smokeModule.PUFF_KEYS, where .. "Puffs.")
+      ranges(K.Puffs, where .. "Puffs.", { { "Size", "smallest and largest", true } })
+    elseif K.Open ~= nil then
+      table.insert(problems, where .. "Puffs: a smoke opening needs them")
+    end
+    if type(K.Sparks) == "table" then
+      partsOf(K.Sparks, smokeModule.SPARK_KEYS, where .. "Sparks.")
+      if type(K.Sparks.Count) ~= "number" then
+        table.insert(problems, where .. "Sparks.Count: a number")
+      end
+      ranges(K.Sparks, where .. "Sparks.", { { "Size", "smallest and largest" }, { "Life", "shortest and longest" } })
+    end
+    local O = K.Open
+    if type(O) == "table" then
+      partsOf(O, smokeModule.OPEN_KEYS, where .. "Open.")
+      if type(O.Rise) ~= "number" or O.Rise <= 0 then
+        table.insert(problems, where .. "Open.Rise: an opening needs one")
+      end
+      atLeast(O, "Spacing", where .. "Open.", true, true)
+      for _, part in ipairs({ "Grow", "Hold", "Shrink" }) do
+        atLeast(O, part, where .. "Open.", false)
+      end
+      ranges(O, where .. "Open.", { { "Lift", "slowest and fastest" }, { "Spread", "slowest and fastest" },
+        { "Reveal", "from and to" } })
+    end
+  end
+  local batsModule = addon:GetModule('NextBats', true)
+  local V = theme.Panel and theme.Panel.Bats
+  if batsModule ~= nil and smokeModule ~= nil and type(V) == "table" then
+    local where = "Panel.Bats."
+    partsOf(V, batsModule.KEYS, where)
+    atLeast(V, "Frames", where, true)
+    atLeast(V, "FrameRate", where, false)
+    local C = V.Close
+    if type(C) == "table" then
+      partsOf(C, batsModule.CLOSE_KEYS, where .. "Close.")
+      ranges(C, where .. "Close.", { { "Count", "fewest and most" }, { "Size", "smallest and largest" },
+        { "Speed", "slowest and fastest" }, { "Delay", "soonest and latest" } })
+      for _, part in ipairs({ "Vanish", "Grow", "Accel", "Life" }) do
+        atLeast(C, part, where .. "Close.", false)
+      end
+      local P = C.Puff
+      if type(P) == "table" then
+        local keys = {}
+        for k in pairs(smokeModule.PUFF_KEYS) do keys[k] = true end
+        for k in pairs(smokeModule.BURST_KEYS) do keys[k] = true end
+        partsOf(P, keys, where .. "Close.Puff.")
+        atLeast(P, "Spacing", where .. "Close.Puff.", true, true)
+        for _, part in ipairs({ "Grow", "Hold", "Shrink" }) do
+          atLeast(P, part, where .. "Close.Puff.", false)
+        end
+        ranges(P, where .. "Close.Puff.", { { "Size", "smallest and largest", true }, { "Lift", "slowest and fastest" },
+          { "Spread", "slowest and fastest" } })
+      end
+    end
+    local F = V.Flutter
+    if type(F) == "table" then
+      partsOf(F, batsModule.FLUTTER_KEYS, where .. "Flutter.")
+      ranges(F, where .. "Flutter.", { { "Every", "soonest and latest", true }, { "Count", "fewest and most" },
+        { "Size", "smallest and largest" }, { "Speed", "slowest and fastest" }, { "Band", "highest and lowest" } })
+      atLeast(F, "Travel", where .. "Flutter.", true)
+      atLeast(F, "Stagger", where .. "Flutter.", false)
     end
   end
   local threads = addon:GetModule('NextThreads', true)

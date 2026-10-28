@@ -769,10 +769,19 @@ for _, effect in ipairs({
     description = "A theme's bags freezing together from shards of ice as they open, and shattering as they close. "
       .. 'Off, they slide in and out.',
     keywords = { 'shatter', 'ice', 'shards', 'frost', 'freeze', 'crack', 'theme' } },
-  { id = 'nextSnow', name = 'snow', title = 'Snowfall',
-    description = "A theme's snow drifting across a bag and down its feathered edge on a breeze, and the gusts that "
-      .. 'sweep it along.',
-    keywords = { 'snow', 'flakes', 'wind', 'breeze', 'gust', 'weather', 'theme' } },
+  -- The Frost theme's snow and the Halloween theme's falling leaves (one engine: next-themes.md §22).
+  { id = 'nextSnow', name = 'snow', title = 'Snow and Leaves',
+    description = "A theme's snow or autumn leaves drifting across a bag and down its feathered edge on a breeze, and "
+      .. 'the gusts that sweep them along.',
+    keywords = { 'snow', 'flakes', 'leaves', 'autumn', 'fall', 'wind', 'breeze', 'gust', 'weather', 'theme' } },
+  -- The Halloween theme's (next-themes.md §23): off, its bags slide in and out as any theme's.
+  { id = 'nextSmoke', name = 'smoke', title = 'Smoke Puff',
+    description = "A theme's bags appearing out of a puff of smoke as they open. Off, they slide in.",
+    keywords = { 'smoke', 'puff', 'poof', 'cloud', 'halloween', 'theme' } },
+  { id = 'nextBats', name = 'bats', title = 'Bats',
+    description = "A theme's bags turning into bats that fly away as they close, and bats fluttering out of a bag now "
+      .. 'and then. Off, they slide out.',
+    keywords = { 'bats', 'bat', 'fly', 'flutter', 'vampire', 'halloween', 'theme' } },
 }) do
   local keywords = { 'animation', 'effects', 'motion' }
   for _, word in ipairs(effect.keywords) do

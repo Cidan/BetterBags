@@ -381,7 +381,7 @@ describe("NextSettingsContent", function()
         resizableWindow = true, snapToContent = true, itemsPerRow = true, columns = true, opacity = true, scale = true }
       local nextOnly = { nextIconScale = true, nextBagScale = true, nextSparkles = true, nextShimmer = true,
         nextTitleCloud = true, nextTitleRibbon = true, nextBraid = true, nextOrnamentMotion = true, nextGlitch = true,
-        nextRain = true, nextShatter = true, nextSnow = true,
+        nextRain = true, nextShatter = true, nextSnow = true, nextSmoke = true, nextBats = true,
         nextCurrencyCapBars = true, nextCurrencyGains = true, nextCurrencyHideEmpty = true,
         nextCurrencyItemsEverywhere = true, nextCurrencyTracker = true, nextCurrencyLayout = true,
         nextCurrencyScale = true, nextCurrencyBackground = true, nextCurrencyHideInCombat = true,
@@ -411,8 +411,8 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 24, the Currencies page's 10 (currency.md §6), and each bag's 29.
-      assert.are.equal(24 + 10 + 3 * 29, named)
+      -- The general pages' 26, the Currencies page's 10 (currency.md §6), and each bag's 29.
+      assert.are.equal(26 + 10 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -515,7 +515,7 @@ describe("NextSettingsContent", function()
     -- then: "title it 'Animation'". A switch per effect, each on until turned off (next-themes.md §20).
     it("has an Animation tab with BetterBags Next, a switch per effect showing whether it is on", function()
       local on = { sparkles = true, shimmer = false, titleCloud = true, ribbon = false, braid = true, ornaments = false,
-        glitch = true, rain = false, shatter = true, snow = false }
+        glitch = true, rain = false, shatter = true, snow = false, smoke = true, bats = false }
       override(db, "GetNextAnimation", function(_, name) return on[name] end)
       settings:Open("appearance", "animation")
       assert.are.equal("animation", settings.tabId)
@@ -523,7 +523,7 @@ describe("NextSettingsContent", function()
       local titles = {}
       for _, row in ipairs(rowsShown()) do table.insert(titles, row.label:GetText()) end
       assert.are.same({ "Sparkles", "Title Shimmer", "Title Cloud", "Title Ribbon", "Braid", "Moving Ornaments",
-        "Glitch Effects", "Data Rain", "Ice Shatter", "Snowfall" }, titles)
+        "Glitch Effects", "Data Rain", "Ice Shatter", "Snow and Leaves", "Smoke Puff", "Bats" }, titles)
       assert.is_true(rowTitled("Sparkles").control:GetChecked())
       assert.is_false(rowTitled("Title Shimmer").control:GetChecked())
       assert.is_false(rowTitled("Title Ribbon").control:GetChecked())
@@ -531,7 +531,9 @@ describe("NextSettingsContent", function()
       assert.is_true(rowTitled("Glitch Effects").control:GetChecked())
       assert.is_false(rowTitled("Data Rain").control:GetChecked())
       assert.is_true(rowTitled("Ice Shatter").control:GetChecked())
-      assert.is_false(rowTitled("Snowfall").control:GetChecked())
+      assert.is_false(rowTitled("Snow and Leaves").control:GetChecked())
+      assert.is_true(rowTitled("Smoke Puff").control:GetChecked())
+      assert.is_false(rowTitled("Bats").control:GetChecked())
     end)
 
     it("has no Animation tab with the classic bags, and finds the switches with BetterBags Next", function()

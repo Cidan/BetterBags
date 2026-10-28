@@ -92,6 +92,7 @@ sonata\themes\next\default.lua
 sonata\themes\next\ember.lua
 sonata\themes\next\glitch.lua
 sonata\themes\next\frost.lua
+sonata\themes\next\halloween.lua
 sonata\themes\next\gw2.lua
 sonata\themes\next\parchment.lua
 sonata\themes\next\plain.lua
@@ -207,6 +208,8 @@ next\rain.lua
 next\shatter.lua
 next\snow.lua
 next\threads.lua
+next\smoke.lua
+next\bats.lua
 next\panel.lua
 next\currencydrag.lua
 next\currencyentry.lua

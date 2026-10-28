@@ -81,6 +81,12 @@ local nextSnow = addon:GetModule('NextSnow')
 ---@class NextThreads: AceModule
 local nextThreads = addon:GetModule('NextThreads')
 
+---@class NextSmoke: AceModule
+local nextSmoke = addon:GetModule('NextSmoke')
+
+---@class NextBats: AceModule
+local nextBats = addon:GetModule('NextBats')
+
 ---@class NextMenuButtonModule: AceModule
 local nextMenuButton = addon:GetModule('NextMenuButton')
 
@@ -412,7 +418,8 @@ end
 
 -- MovingParts are the parts of a panel that move by nature, on the screen's pixels only by chance (next-pixel-
 -- perfect.md): its sparkles and the spark fly, the cloud's puffs breathe every frame, the braid's lights run
--- along it, its ornaments that sway, spin, pulse or bob (NextOrnaments), its data rain's glyphs (NextRain). The pixel checks
+-- along it, its ornaments that sway, spin, pulse or bob (NextOrnaments), its data rain's glyphs (NextRain), its snow, its
+-- threads and its fluttering bats (NextSnow, NextThreads, NextBats). The pixel checks
 -- leave them out (PixelAudit, the specs).
 ---@return table<table, boolean>
 function panelProto:MovingParts()
@@ -431,6 +438,7 @@ function panelProto:MovingParts()
   self.rain:MovingParts(skip)
   self.snow:MovingParts(skip)
   self.threads:MovingParts(skip)
+  self.bats:MovingParts(skip)
   return skip
 end
 
@@ -714,6 +722,14 @@ function panelProto:moveIn(from, to, duration, ease, delay)
     self.content:Cascade(true, delay + lock)
     return
   end
+  if nextSmoke:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once it shows under the smoke.
+    local lock = nextSmoke:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:smokeIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
   self.threads:DrawIn(delay + style.Time.OpenCascadeDelay)
   self:setOffset(from)
   tween:Play(self, {
@@ -981,8 +997,101 @@ function panelProto:shatterOut(from, to, done)
   })
 end
 
--- endShatter puts the panel back as it is without a shatter, at full strength, and where its shatter had it (base):
--- unless another tween has taken the panel over (a flight), which places it.
+-- smokeIn opens the panel where it rests out of a puff of smoke (the theme's Panel.Smoke.Open, next-themes.md §23), after
+-- delay unseen: the smoke rises up its body from the bottom, the panel shows under it as it covers it, and it clears
+-- from the bottom up (NextSmoke's Open). A tween of the panel's own, like the slide it stands in for: whatever stops or
+-- replaces it (a flight, a placement, Escape) ends the smoke at rest (endShatter). Once the smoke has cleared it says it
+-- has finished showing, as the slide does.
+---@private
+---@param to number
+---@param delay number
+function panelProto:smokeIn(to, delay)
+  local total = nextSmoke:OpenTime()
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  local run ---@type NextSmokeRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextSmoke:Opens() then
+        -- Its theme went while it came in (another theme, Smoke Puff off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      -- Its smoke is laid over where its body is once its delay is up (a chained bag waiting unseen is in place by then).
+      run = run or nextSmoke:Begin(self)
+      self.frame:SetAlpha(run:Open(p * total))
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      rest()
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- batsOut closes the panel where it is by turning it into bats (the theme's Panel.Bats.Close): a puff of smoke covers
+-- its body at once (the tween's start value, drawn as it starts) and it vanishes under it over Close.Vanish, then the bats burst out of the smoke on the bats layer,
+-- which carries them on after the panel has hidden (NextBats). Then done (Hide's end), as they burst out.
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:batsOut(from, to, done)
+  local run = nextBats:Begin(self) ---@type NextBatRun?
+  local vanish = nextBats:Spec().Close.Vanish or 0
+  tween:Play(self, {
+    duration = vanish,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextBats:Closes() then
+        -- Its theme went while it vanished: it closes plainly at the end.
+        run = nil
+        self.frame:SetAlpha(1)
+        return
+      end
+      if run ~= nil then
+        self.frame:SetAlpha(run:Vanish(p * vanish))
+      end
+    end,
+    onStop = function()
+      run = nil
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Fly()
+        run = nil
+      end
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- endShatter puts the panel back as it is without a shatter (or its smoke, or its bats), at full strength, and where it
+-- had it (base): unless another tween has taken the panel over (a flight), which places it.
 ---@private
 ---@param base number
 function panelProto:endShatter(base)
@@ -1210,6 +1319,8 @@ function panelProto:BuildPanel(name)
   -- The theme's snow and its threads of light (Panel.Snow, Panel.Threads, next-themes.md §22).
   self.snow = nextSnow:Create(self)
   self.threads = nextThreads:Create(self)
+  -- Its bats fluttering out of the header now and then (Panel.Bats.Flutter, next-themes.md §23).
+  self.bats = nextBats:Create(self)
   -- The theme's frame round the body (Panel.Frame, next-themes.md §15): Blizzard's nine-slice art.
   self.frameArt = nextFrameArt:Create(frame, self.body, self.overlay)
   self:styleBody()
@@ -1260,6 +1371,7 @@ function panelProto:styleBody()
   self.rain:Style()
   self.snow:Style()
   self.threads:Style()
+  self.bats:Style()
   -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
   self.frameArt:Apply(P.Frame, self.side == "LEFT")
 end
@@ -4435,7 +4547,7 @@ end
 function panelProto:WatchKind()
 end
 
--- startEffects starts what moves while the panel shows: its sparkles, ornaments, rain, snow, threads and shimmer.
+-- startEffects starts what moves while the panel shows: its sparkles, ornaments, rain, snow, threads, bats and shimmer.
 ---@private
 function panelProto:startEffects()
   self.sparkles:Start()
@@ -4445,6 +4557,7 @@ function panelProto:startEffects()
   self.rain:Start()
   self.snow:Start()
   self.threads:Start()
+  self.bats:Start()
   self:playShimmer()
 end
 
@@ -4636,6 +4749,12 @@ function panelProto:Hide(ctx)
     self:shatterOut(self.offset, to, slidOut)
     return
   end
+  if nextBats:Closes() then
+    self.threads:Unravel(nextBats:Spec().Close.Vanish or 0)
+    -- Where it is: it turns into bats where it stands.
+    self:batsOut(self.offset, to, slidOut)
+    return
+  end
   self.threads:Unravel(style.Time.Close)
   tween:Play(self, {
     duration = style.Time.Close,
@@ -4721,6 +4840,7 @@ function panelProto:OnHidden(ctx)
   self.rain:Stop()
   self.snow:Stop()
   self.threads:Stop()
+  self.bats:Stop()
   self.waiting = false
   self.frame:SetFrameLevel(PANEL_LEVEL)
   chain:Update(ctx)

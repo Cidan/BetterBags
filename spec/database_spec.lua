@@ -104,7 +104,7 @@ const.DATABASE_DEFAULTS = {
     nextSmallChain = "apart",
     nextTheme = "Default",
     nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, ribbon = true, braid = true, ornaments = true,
-      glitch = true, rain = true, shatter = true, snow = true },
+      glitch = true, rain = true, shatter = true, snow = true, smoke = true, bats = true },
     nextCurrencies = {},
     nextCurrency = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
       scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" },
@@ -424,7 +424,7 @@ describe("Database", function()
     -- player turns it off, on any theme; nothing but an effect.
     it("GetNextAnimation / SetNextAnimation, every effect on until turned off, and nothing but an effect", function()
       for _, name in ipairs({ "sparkles", "shimmer", "titleCloud", "ribbon", "braid", "ornaments", "glitch", "rain",
-        "shatter", "snow" }) do
+        "shatter", "snow", "smoke", "bats" }) do
         assert.is_true(DB:GetNextAnimation(name), name)
         DB:SetNextAnimation(name, false)
         assert.is_false(DB:GetNextAnimation(name), name)

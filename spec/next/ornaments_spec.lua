@@ -641,6 +641,80 @@ describe("NextOrnaments", function()
       assert.are.same({ 0, 1, 0, 1 }, { coords(t) })
     end)
 
+    -- The Halloween theme's black cat blinking now and then (next-themes.md §23): its eyes out for Time and back, now and
+    -- then twice in a row.
+    it("blinks now and then: out for its Time, back at its alpha, sometimes twice in a row", function()
+      ornaments.Random = function() return 0.1 end
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, Alpha = 0.8,
+        Motion = { Blink = { Every = { 2, 4 }, Time = 0.1, Twice = 0.5 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      panel.ornaments:Start()
+      -- Its first blink after 2 + (4 - 2) * 0.1 = 2.2 seconds.
+      step(panel, 2.1)
+      assert.is_true(near(0.8, t:GetAlpha()))
+      local skip = {}
+      panel.ornaments:MovingParts(skip)
+      assert.is_true(skip[t], "it rests nowhere")
+      step(panel, 0.15)
+      assert.are.equal(0, t:GetAlpha(), "shut")
+      step(panel, 0.1)
+      assert.is_true(near(0.8, t:GetAlpha()), "open again")
+      step(panel, 0.1)
+      assert.are.equal(0, t:GetAlpha(), "and shut again (0.1 is below Twice)")
+      step(panel, 0.1)
+      assert.is_true(near(0.8, t:GetAlpha()), "then open")
+      step(panel, 1)
+      assert.is_true(near(0.8, t:GetAlpha()), "not a third time")
+      panel.ornaments:Stop()
+      assert.is_true(near(0.8, t:GetAlpha()))
+    end)
+
+    it("is open again when the panel hides mid-blink", function()
+      ornaments.Random = function() return 0.9 end
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, Alpha = 0.8,
+        Motion = { Blink = { Every = { 1, 1 }, Time = 0.3 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      panel.ornaments:Start()
+      step(panel, 1.1)
+      assert.are.equal(0, t:GetAlpha())
+      panel.ornaments:Stop()
+      assert.is_true(near(0.8, t:GetAlpha()))
+    end)
+
+    -- And its jack-o'-lantern's candle flickering.
+    it("flickers like a candle: its alpha wandering between Low and its own, never still", function()
+      local seq, i = { 0, 1, 0.5, 0.2, 0.9, 0.35, 0.75 }, 0
+      ornaments.Random = function()
+        i = i % #seq + 1
+        return seq[i]
+      end
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, Alpha = 0.8,
+        Motion = { Flicker = { Low = 0.5, Speed = 10 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      panel.ornaments:Start()
+      local seen = {}
+      for _ = 1, 30 do
+        step(panel, 0.03)
+        local a = t:GetAlpha()
+        assert.is_true(a >= 0.8 * 0.5 - 1e-9 and a <= 0.8 + 1e-9, "between Low and its own: " .. a)
+        seen[math.floor(a * 1000)] = true
+      end
+      local n = 0
+      for _ in pairs(seen) do n = n + 1 end
+      assert.is_true(n > 10, "never still")
+      local skip = {}
+      panel.ornaments:MovingParts(skip)
+      assert.is_true(skip[t])
+      panel.ornaments:Stop()
+      assert.is_true(near(0.8, t:GetAlpha()), "back at its own once still")
+    end)
+
     it("runs no driver for pieces that only move on the client's animations", function()
       theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Motion = { Sway = 4 } } })
       local panel = panelOn("RIGHT")

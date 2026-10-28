@@ -271,7 +271,8 @@ describe("What each setting asks the bags for", function()
   -- Next, which lays the switches over the theme in use again; the bags' items are neither read nor recalculated.
   for _, case in ipairs({ { "Sparkles", "sparkles" }, { "Title Shimmer", "shimmer" }, { "Title Cloud", "titleCloud" },
     { "Title Ribbon", "ribbon" }, { "Braid", "braid" }, { "Moving Ornaments", "ornaments" },
-    { "Glitch Effects", "glitch" }, { "Data Rain", "rain" }, { "Ice Shatter", "shatter" }, { "Snowfall", "snow" } }) do
+    { "Glitch Effects", "glitch" }, { "Data Rain", "rain" }, { "Ice Shatter", "shatter" }, { "Snow and Leaves", "snow" },
+    { "Smoke Puff", "smoke" }, { "Bats", "bats" } }) do
     it("saves " .. case[1] .. " on or off and tells BetterBags Next, reading nothing", function()
       local on = { [case[2]] = true }
       override(db, "GetNextAnimation", function(_, name) return on[name] end)
