@@ -1,0 +1,29 @@
+{
+  "id": 1793229444,
+  "version": "v0.8.10",
+  "channel": "release",
+  "date": "2026-10-28",
+  "from": "v0.8.9",
+  "to": "v0.8.10",
+  "headline": "This release introduces the Frost and Halloween themes for BetterBags Next alongside a new setting to toggle screen clamping for your bags.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Clamp Bags to Screen setting",
+      "details": "Added an option under General settings to choose whether bags are strictly kept on screen or allowed to be moved off the edges. This setting defaults to off, restoring the ability to position bags past the borders of your screen.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Frost theme for BetterBags Next",
+      "details": "Added an icy blue and gold theme featuring drifting snow, swaying golden threads, and twinkling shooting stars. Bags materialize out of a frost storm when opened and shatter into flying icy shards when closed.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Halloween theme for BetterBags Next",
+      "details": "Added a pumpkin-orange and black theme featuring animated cats, flickering jack-o-lanterns, and falling autumn leaves. Bags reveal themselves through rising smoke when opened and break apart into swarms of bats that fly away when closed.",
+      "clients": []
+    }
+  ]
+}
