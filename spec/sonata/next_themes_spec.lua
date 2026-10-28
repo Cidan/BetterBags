@@ -13,7 +13,7 @@ end
 local constants, createdConstants = StubBetterBagsModule("Constants")
 constants.BAG_KIND = constants.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = 2 }
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextOrnaments", "next/ornaments.lua" },
-  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" } }) do
+  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" } }) do
   if addon:GetModule(m[1], true) == nil then
     ResetModuleStub(m[1], m[2])
     LoadBetterBagsModule(m[2])
@@ -60,7 +60,7 @@ describe("BetterBags Next's shipped themes", function()
   end
 
   it("ships Default and at least three others", function()
-    assert.are.same({ "Default", "Ember", "GW2", "Glitch", "Parchment", "Plain", "Quiet" }, shipped())
+    assert.are.same({ "Default", "Ember", "Frost", "GW2", "Glitch", "Parchment", "Plain", "Quiet" }, shipped())
   end)
 
   it("resolves every one on every client and finds nothing it does not define", function()
@@ -83,11 +83,18 @@ describe("BetterBags Next's shipped themes", function()
   -- (Default's Primary and Danger fills), dark and unreadable. Art a theme sets resolves with the alpha it set.
   it("draws the art each theme sets at the alpha it sets, never one inherited from Default", function()
     local found = {}
+    -- An alpha may be a range (a snow entry's, NextSnow): resolution copies it, so it is compared by value.
+    local function same(a, b)
+      if type(a) == "table" and type(b) == "table" then
+        return a[1] == b[1] and a[2] == b[2]
+      end
+      return a == b
+    end
     local function walk(raw, resolved, path)
       for k, v in pairs(raw) do
         local r = type(resolved) == "table" and resolved[k] or nil
         if type(v) == "table" and type(r) == "table" then
-          if (v.Texture ~= nil or v.Atlas ~= nil) and r.Alpha ~= v.Alpha then
+          if (v.Texture ~= nil or v.Atlas ~= nil) and not same(r.Alpha, v.Alpha) then
             table.insert(found, path .. "." .. tostring(k) .. " " .. tostring(r.Alpha))
           end
           walk(v, r, path .. "." .. tostring(k))
@@ -624,6 +631,110 @@ describe("BetterBags Next's shipped themes", function()
   end)
   -- Glitch (next-themes.md §21): asked for "flickers, glitched blinking textures that wobble suddenly and harshly, think
   -- green mesh".
+  -- Frost (next-themes.md §22): deep winter blue threaded with gold, freezing together from shards and shattering, snow
+  -- on a breeze, threads of gold light.
+  describe("Frost", function()
+    local function readFile(path)
+      local file = path:gsub("^Interface\\AddOns\\BetterBags\\", ""):gsub("\\", "/")
+      local f = io.open(file, "rb")
+      assert.is_not_nil(f, file)
+      local data = f:read("*a")
+      f:close()
+      return data, file
+    end
+
+    it("draws its display text in Cinzel, which it ships with its license, in the locales it covers", function()
+      local t = sonataNext:Resolve("Frost")
+      local files = {}
+      for role, spec in pairs(t.Fonts) do
+        if spec.File ~= nil then
+          files[spec.File] = true
+          assert.are.same({ "enUS", "enGB", "deDE", "frFR", "esES", "esMX", "itIT", "ptBR" }, spec.Locales, role)
+        end
+      end
+      local count = 0
+      for path in pairs(files) do
+        count = count + 1
+        local data, file = readFile(path)
+        assert.are.equal("\0\1\0\0", data:sub(1, 4), file .. " is a TrueType font")
+      end
+      assert.are.equal(2, count, "regular and bold")
+      local license = readFile("Interface\\AddOns\\BetterBags\\fonts\\frost\\Cinzel_OFL.txt")
+      assert.is_truthy(license:find("SIL Open Font License", 1, true))
+      assert.is_not_nil(t.Fonts.Title.File, "the title")
+      assert.is_not_nil(t.Fonts.Section.File, "sections")
+      assert.is_nil(t.Fonts.Count.File, "counts in the client's font")
+    end)
+
+    it("ships every texture it names, as a PNG", function()
+      local t = sonataNext:Resolve("Frost")
+      local count = 0
+      for name, path in pairs(t.Textures) do
+        if path:find("textures\\next\\frost\\", 1, true) then
+          count = count + 1
+          local data, file = readFile(path)
+          assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), name .. ": " .. file)
+        end
+      end
+      assert.are.equal(10, count)
+    end)
+
+    it("freezes together from shards of its own fill and shatters, with snow on a breeze and threads of gold", function()
+      local t = sonataNext:Resolve("Frost")
+      local S = t.Panel.Shatter
+      assert.are.equal(t.Panel.Fill.Texture, S.Shards.Texture, "its shards carry the body's own art")
+      assert.is_not_nil(S.Open)
+      assert.is_not_nil(S.Close)
+      assert.is_true(S.Shards.Jitter < 0.5)
+      -- It appears out of a frost storm growing from its bottom inner corner.
+      assert.are.equal("BOTTOMINNER", S.Open.Storm.From)
+      -- Asked: the shatter's lines "don't need to show" as it opens.
+      assert.is_nil(S.Open.Flash)
+      assert.is_not_nil(S.Open.Storm.Flakes)
+      assert.is_not_nil(S.Open.Storm.Mist)
+      assert.is_true(S.Open.Time + S.Open.Storm.Appear + S.Open.Clear < 0.9, "shown before a bank's 1 second wait ends")
+      assert.is_true(t.Panel.Snow.Gusts.OnOpen)
+      local wheres = {}
+      for _, entry in ipairs(t.Panel.Snow.Flakes) do wheres[entry.Where] = true end
+      assert.are.same({ Body = true, Feather = true }, wheres)
+      assert.are.equal(3, #t.Panel.Threads)
+      for _, thread in ipairs(t.Panel.Threads) do
+        assert.are.equal("Gold", thread.Color)
+        assert.is_not_nil(thread.Draw)
+      end
+    end)
+
+    -- Asked: "the streaks i see, make those animated and not static? also get rid of that big rune in the background";
+    -- then, of the streaks blown across the whole body: "slightly too noisy ... the wrong color -- more golden, and A LOT
+    -- less of them, more like... slower, shooting star, then don't even go the full length of the bag, more like...
+    -- flyby twinkles".
+    it("sends a few slow gold shooting stars across its body, and has no streaks or rune", function()
+      local t = sonataNext:Resolve("Frost")
+      assert.is_nil(t.Textures.Rune)
+      assert.is_nil(t.Textures.Streaks)
+      for _, piece in ipairs(t.Panel.Ornaments) do
+        assert.are_not.equal("Rune", piece.Texture)
+        assert.are_not.equal("Streaks", piece.Texture)
+      end
+      local F = t.Panel.Snow.Flybys
+      assert.are.equal("Gold", F.Color)
+      assert.is_true(F.Max <= 2, "a lot less of them")
+      assert.is_true(F.Every[1] >= 3, "now and then")
+      assert.is_true(F.Speed[2] <= 120, "slow")
+      assert.is_true(F.Travel[2] <= 200, "never the length of the bag (400 across)")
+      assert.is_not_nil(F.Head.Twinkle)
+      assert.are.equal("Gold", F.Head.Color)
+    end)
+
+    it("is in the screenshot's blues and gold", function()
+      local t = sonataNext:Resolve("Frost")
+      local gold, body = t.Palette.Gold, t.Palette.Body
+      assert.is_true(gold[1] > gold[3] + 0.3, "gold: warm")
+      assert.is_true(body[3] > body[2] and body[2] > body[1], "the body: blue over teal over red")
+      assert.is_true(t.Palette.Ice[3] > 0.9 and t.Palette.Ice[1] < 0.6, "ice: a cold light blue")
+    end)
+  end)
+
   describe("Glitch", function()
     -- readFile returns a file shipped with BetterBags, by its game path.
     local function readFile(path)

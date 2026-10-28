@@ -49,7 +49,7 @@ describe("Core Init and Enable flow", function()
       "QuickFind", "Refresh", "ItemLoader", "Views",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
-      "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies"
+      "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies", "NextShatter"
     }
 
     for _, name in ipairs(modules) do
@@ -288,6 +288,14 @@ describe("Core Init and Enable flow", function()
     sonataNext.WatchClientFonts, sonataNext.WatchAnimation = savedWatch, savedAnimation
     assert.are.same({ "SonataNext", "NextPixel", "WatchClientFonts", "WatchAnimation", "NextSettings",
       "NextSettingsContent" }, order)
+  end)
+
+  -- The shatter layer's pools and the shards flying on it (next-themes.md §22) start with BetterBags Next's look.
+  it("starts BetterBags Next's shatter", function()
+    local shatter = addon:GetModule("NextShatter")
+    shatter.Init = spy.new(function() end)
+    addon:OnInitialize()
+    assert.spy(shatter.Init).was.called(1)
   end)
 
   -- Its pages listen for the highest item level seen (next-settings.md §4).

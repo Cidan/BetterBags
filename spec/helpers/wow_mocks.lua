@@ -1015,6 +1015,27 @@ end
 function WidgetMethods:SetTexCoord(...)
   self._texCoords = {...}
 end
+-- TextureBase:SetVertexOffset(vertexIndex, offsetX, offsetY) and GetVertexOffset(vertexIndex) -> offsetX, offsetY
+-- (SimpleTextureBaseAPIDocumentation, every client): a corner moved from where the texture's rect puts it, in its own
+-- units, y up; vertexIndex is UPPER_LEFT_VERTEX 1, LOWER_LEFT_VERTEX 2, UPPER_RIGHT_VERTEX 3, LOWER_RIGHT_VERTEX 4
+-- (Blizzard_FrameXMLBase/Constants.lua). Neither offset is nilable.
+function WidgetMethods:SetVertexOffset(vertexIndex, offsetX, offsetY)
+  if vertexIndex ~= 1 and vertexIndex ~= 2 and vertexIndex ~= 3 and vertexIndex ~= 4 then
+    error("Usage: SetVertexOffset(vertexIndex, offsetX, offsetY): no vertex " .. tostring(vertexIndex), 2)
+  end
+  if type(offsetX) ~= "number" or type(offsetY) ~= "number" then
+    error("Usage: SetVertexOffset(vertexIndex, offsetX, offsetY)", 2)
+  end
+  self._vertexOffsets = self._vertexOffsets or {}
+  self._vertexOffsets[vertexIndex] = { offsetX, offsetY }
+end
+function WidgetMethods:GetVertexOffset(vertexIndex)
+  local o = self._vertexOffsets and self._vertexOffsets[vertexIndex]
+  if o == nil then
+    return 0, 0
+  end
+  return o[1], o[2]
+end
 -- TextureBase:SetRotation(radians, normalizedRotationPoint?) and GetRotation() -> radians
 -- (SimpleTextureBaseAPIDocumentation, every client).
 function WidgetMethods:SetRotation(radians)

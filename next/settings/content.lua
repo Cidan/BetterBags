@@ -413,7 +413,8 @@ function content:Init()
       -- Each effect on or off on any theme (next-themes.md §20); the classic bags have none of them.
       { title = L:G("Effects"), rows = { { setting = 'nextSparkles' }, { setting = 'nextShimmer' },
         { setting = 'nextTitleCloud' }, { setting = 'nextTitleRibbon' }, { setting = 'nextBraid' },
-        { setting = 'nextOrnamentMotion' }, { setting = 'nextGlitch' }, { setting = 'nextRain' } } },
+        { setting = 'nextOrnamentMotion' }, { setting = 'nextGlitch' }, { setting = 'nextRain' },
+        { setting = 'nextShatter' }, { setting = 'nextSnow' } } },
     } } },
   })
   pages:Define({

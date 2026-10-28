@@ -203,6 +203,8 @@ function addon:OnInitialize()
   addon:GetModule('SonataNext'):Init()
   -- Its pixel grid (docs/next-pixel-perfect.md): the theme is applied again when the grid changes.
   addon:GetModule('NextPixel'):Init()
+  -- The shatter layer's pools and the shards flying on it (next-themes.md §22).
+  addon:GetModule('NextShatter'):Init()
   -- The client's fonts its roles copy, rewritten by UI addons once the game has loaded (docs/next-gw2-theme.md).
   addon:GetModule('SonataNext'):WatchClientFonts()
   -- The player's Animation switches, laid over the theme in use as they change (next-themes.md §20).
