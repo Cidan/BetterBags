@@ -218,6 +218,23 @@ describe("What each setting asks the bags for", function()
     end
   end)
 
+  -- One setting for every bag (window.md §3a): the bags put themselves on the screen when it is turned
+  -- on, and may be moved off it when it is off.
+  it("turns Clamp Bags to Screen on and off, and tells the bags", function()
+    local on = false
+    override(db, "GetClampBagsToScreen", function() return on end)
+    override(db, "SetClampBagsToScreen", function(_, value) on = value end)
+    local found = settings("Clamp Bags to Screen")
+    assert.are.equal(1, #found)
+    assert.is_false(found[1].get(ctx()))
+    found[1].set(ctx(), true)
+    assert.is_true(on)
+    assert.are.same({ "bags/ClampChanged" }, messages())
+    found[1].set(ctx(), false)
+    assert.is_false(on)
+    assert.are.same({ "bags/ClampChanged", "bags/ClampChanged" }, messages())
+  end)
+
   -- The bag's canvas reads it on every render (render-pipeline.md §4c). One setting for both bags.
   it("turns Animate Item Movement on and off, with no refresh", function()
     local on = false

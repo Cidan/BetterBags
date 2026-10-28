@@ -176,6 +176,10 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
     Parent = bagFrame,
     Movable = false,
     Points = { { Point = "TOPLEFT", RelativeTo = bagFrame, RelativePoint = "BOTTOMLEFT", X = 0, Y = -2 } },
+    -- Clamped as its bag is (Clamp Bags to Screen, window.md §3a), or it would part from a bag moved off the screen.
+    Clamp = function()
+      return database:GetClampBagsToScreen()
+    end,
     OnRendered = function()
       b:OnRendered()
     end,

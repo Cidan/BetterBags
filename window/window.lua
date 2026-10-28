@@ -95,6 +95,7 @@ local DEFAULT_GRIP = {
 ---@field MinContentWidth? number|fun(): number The content box's minimum width.
 ---@field MinContentHeight? number|fun(): number The content box's minimum height.
 ---@field Fade? fun(): boolean false: show and hide at once. Fades when unset.
+---@field Clamp? fun(): boolean false: the window may be moved, or grow, off the screen (the bags' Clamp Bags to Screen). Kept on the screen when unset.
 ---@field OnClose? fun(ctx: Context, button: string?) Called when its close button is clicked, instead of hiding.
 ---@field CloseClicks? string[] The clicks its close button takes (RegisterForClicks); LeftButtonUp when unset.
 ---@field OnRendered? fun(ctx: Context?, width: number, height: number) Called after every render, with the size the window took.
@@ -144,7 +145,10 @@ local function numberOf(value)
   return nil
 end
 
--- Init fits every window to the screen again whenever the screen's size in UI units changes.
+-- Init fits every window to the screen again whenever the screen's size in UI units changes, and
+-- clamps the windows whose Clamp follows the bags' Clamp Bags to Screen when it changes
+-- (bags/ClampChanged): turned on, a shown one is put back on the screen and its place saved there, so
+-- turning it off again moves nothing, now or after a reload; a hidden one is put back as it shows.
 function window:Init()
   self.windows = self.windows or setmetatable({}, { __mode = "k" })
   ---@class Events: AceModule
@@ -158,6 +162,14 @@ function window:Init()
       end
     end)
   end
+  events:RegisterMessage('bags/ClampChanged', function()
+    for w in pairs(self.windows) do
+      w:KeepOnScreen()
+      if w.opts.Clamp ~= nil and w:Clamped() and w.frame:IsShown() then
+        w:SavePosition()
+      end
+    end
+  end)
 end
 
 -- recording returns the render recorder (debug/renderrecorder.lua) while it records.
@@ -215,8 +227,8 @@ function window:Create(opts)
   if opts.Toplevel then
     frame:SetToplevel(true)
   end
-  -- No part of a window may be off the screen (KeepOnScreen, FitToScreen).
-  frame:SetClampedToScreen(true)
+  -- No part of a window may be off the screen (KeepOnScreen, FitToScreen), unless its Clamp says so.
+  frame:SetClampedToScreen(w:Clamped())
   frame:SetClampRectInsets(0, 0, 0, 0)
   frame:EnableMouse(true)
   w.frame = frame
@@ -707,9 +719,16 @@ function windowProto:FitToScreen()
   end
 end
 
+-- Clamped says whether the window is kept on the screen: always, unless its Clamp says no.
+---@return boolean
+function windowProto:Clamped()
+  return self.opts.Clamp == nil or self.opts.Clamp() == true
+end
+
 -- KeepOnScreen pulls the window back inside the screen. A clamped frame stays on the screen as
 -- it is moved; turning the clamp off and on applies it after the window changed size too. It
--- waits while the player is sizing the window.
+-- waits while the player is sizing the window. A window that is not clamped is left where it is,
+-- its clamp off.
 function windowProto:KeepOnScreen()
   if self.sizing then
     return
@@ -717,7 +736,9 @@ function windowProto:KeepOnScreen()
   local frame = self.frame
   frame:SetClampRectInsets(0, 0, 0, 0)
   frame:SetClampedToScreen(false)
-  frame:SetClampedToScreen(true)
+  if self:Clamped() then
+    frame:SetClampedToScreen(true)
+  end
 end
 
 -- Geometry describes the window's anchors, rect, scale, clamp and the cursor, for the

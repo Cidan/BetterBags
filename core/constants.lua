@@ -720,6 +720,8 @@ const.DATABASE_DEFAULTS = {
     enabled = true,
     enableBagFading = false,
     animateItemMovement = false,
+    -- Whether every bag is kept on the screen (window.md §3a): off, bags may be moved off it.
+    clampBagsToScreen = false,
     nextEnabled = false,
     -- How BetterBags Next's backpack and its companion (the bank or a vendor) sit: "apart" on
     -- opposite edges, chained "left" (the companion at the left edge, the backpack beside it) or

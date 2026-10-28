@@ -1421,8 +1421,8 @@ end of a switch. `BuildPanel` only makes the parts.
 - **Small:** the frame is the body, its size `SmallSize`: the size the player gave it (§14g), else
   `BODY_WIDTH` wide (the full body's) and a share of the screen tall (whole units), never below its
   minimum nor past the screen. It is anchored by its top left at its place (`SmallPlace`: where it was
-  left, else a margin in from its own screen edge, centered; always kept on the screen, `clampPlace`,
-  for its own width). No feather, clicks everywhere, a 1-pixel lavender edge all round (`edges`), the
+  left, else a margin in from its own screen edge, centered; kept on the screen while Clamp Bags to
+  Screen is on, `clampPlace`, for its own width, and on whole pixels either way). No feather, clicks everywhere, a 1-pixel lavender edge all round (`edges`), the
   shorter beam, a grip on each bottom corner (§14g). `SetDocked` does nothing to a small panel (it is
   never at its screen edge). The render root hands the content the body's width less its padding
   (`BodyWidth`: the full body's at full size, a small panel's own) and the panel's height less its
@@ -1442,8 +1442,21 @@ end of a switch. `BuildPanel` only makes the parts.
   full mode, and would otherwise fly a small bag across the screen.
 - **Moving:** dragging the title row (`mover`: the body's top down to the search box, under the
   header buttons, which stay clickable above it) or the title (`titleButton`) calls `StartMove`
-  (`frame:StartMoving()`) and `StopMove`: the place, kept on the screen, is saved for the kind and the
-  frame anchored there again (the client anchors a moved frame to the nearest screen corner).
+  (`frame:StartMoving()`) and `StopMove`: the place, kept on the screen while the bags are clamped to it,
+  is saved for the kind and the frame anchored there again (the client anchors a moved frame to the
+  nearest screen corner).
+  - **Clamp Bags to Screen** (window.md §3a, one setting for every bag, off by default): a small panel's
+    frame is clamped (`ApplyClamp`, from `ApplyGeometry`) and its place kept on the screen (`clampPlace`:
+    a move, a resize, a snap, a reset glide, a chained spot, the screen changing, opening) only while it is
+    on. Off, the place is only put on whole pixels, so a panel goes where the player puts it, off the
+    screen too. A full panel is never clamped. `bags/ClampChanged` (registered by the chain with its screen
+    events, in BetterBags Next's scope): `chain:ClampChanged` applies every panel's clamp; turned on, each
+    open small panel is fitted again (`FitSmall`: a chained one beside where its anchor is put back, which
+    `LivePlace` reads already clamped) and its place saved, so turning it off again moves nothing. A closed
+    one is put back as it opens. Coverage: `spec/next/small_spec.lua` ("with Clamp Bags to Screen": moved off
+    the screen on whole pixels, opening off it, a screen change, turning it on (saved; a closed one as it
+    opens), turning it off (nothing moves, also a panel the screen's edge put back), a chained bag beside its
+    anchor, a full panel untouched).
   - `StartMoving` flags a frame user-placed, and the client then restores a named frame's place from
     its layout cache at login (warcraft.wiki.gg Frame:StartMoving): `StartMove` clears the flag
     (`SetUserPlaced(false)`), as the wiki says to.

@@ -79,6 +79,7 @@ function chain:Register(panel, role)
     events:RegisterEvent("UI_SCALE_CHANGED", function(ctx) self:Update(ctx, true) end)
     events:RegisterEvent("DISPLAY_SIZE_CHANGED", function(ctx) self:Update(ctx, true) end)
     events:RegisterMessage("next/ScalesChanged", function(ctx) self:ScalesChanged(ctx) end)
+    events:RegisterMessage("bags/ClampChanged", function(ctx) self:ClampChanged(ctx) end)
   end
 end
 
@@ -111,6 +112,23 @@ end
 ---@return boolean
 local function isSmall(panel)
   return panel ~= nil and panel.size == "small"
+end
+
+-- ClampChanged follows Clamp Bags to Screen (bags/ClampChanged, window.md §3a): every panel takes the clamp;
+-- turned on, each open small panel is put back on the screen (FitSmall; a chained one beside where its anchor
+-- is put back, LivePlace) and its place saved there, so turning it off again moves nothing, now or when it
+-- opens next. A closed one is put back as it opens.
+---@param ctx Context
+function chain:ClampChanged(ctx)
+  local _ = ctx
+  local on = database:GetClampBagsToScreen()
+  for _, panel in ipairs(self:Panels()) do
+    panel:ApplyClamp()
+    if on and isOpen(panel) and isSmall(panel) then
+      panel:FitSmall()
+      database:SetNextSmallPlace(panel.kind, panel.placeX, panel.placeY)
+    end
+  end
 end
 
 -- Companion returns the companion that is open, if any.

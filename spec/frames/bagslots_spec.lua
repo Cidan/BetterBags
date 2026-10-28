@@ -24,7 +24,8 @@ L.G = function(_, key) return key end
 
 local database = stubModule("Database")
 local savedTheme = "Default"
-local originals = { GetGroupsEnabled = database.GetGroupsEnabled, GetTheme = database.GetTheme, SetTheme = database.SetTheme }
+local originals = { GetGroupsEnabled = database.GetGroupsEnabled, GetTheme = database.GetTheme, SetTheme = database.SetTheme,
+  GetClampBagsToScreen = database.GetClampBagsToScreen }
 
 local const = stubModule("Constants")
 const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0, BANK = 1 }
@@ -81,6 +82,7 @@ describe("BagSlots panel", function()
     database.SetTheme = function(_, key) savedTheme = key end
     groupsEnabled = false
     database.GetGroupsEnabled = function() return groupsEnabled end
+    database.GetClampBagsToScreen = function() return false end
     originalSend = events.SendMessage
     events.SendMessage = function() end
     originalPlaySound = _G.PlaySound
@@ -163,6 +165,21 @@ describe("BagSlots panel", function()
       assert.is_false(t:IsSnappingToPixelGrid(), "part " .. i)
       assert.are.equal(0, t:GetTexelSnappingBias(), "part " .. i)
     end
+  end)
+
+  -- It hangs below its bag: clamped as its bag is (Clamp Bags to Screen, window.md §3a), or it would part
+  -- from a bag moved off the screen.
+  it("is clamped to the screen as its bag is", function()
+    local panel = newPanel()
+    local clamp = false
+    local saved = database.GetClampBagsToScreen
+    database.GetClampBagsToScreen = function() return clamp end
+    local off = panel.window.opts.Clamp()
+    clamp = true
+    local on = panel.window.opts.Clamp()
+    database.GetClampBagsToScreen = saved
+    assert.is_false(off)
+    assert.is_true(on)
   end)
 
   it("is a Slots window hanging below its bag, hidden until shown", function()

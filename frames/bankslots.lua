@@ -490,6 +490,10 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     Parent = bagFrame,
     Movable = false,
     Points = { { Point = "TOPLEFT", RelativeTo = bagFrame, RelativePoint = "BOTTOMLEFT", X = 0, Y = -2 } },
+    -- Clamped as the bank is (Clamp Bags to Screen, window.md §3a), or it would part from a bank moved off the screen.
+    Clamp = function()
+      return database:GetClampBagsToScreen()
+    end,
     OnRendered = function()
       b:OnRendered()
     end,

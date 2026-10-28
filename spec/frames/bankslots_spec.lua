@@ -33,6 +33,7 @@ database.SetBagView = function() end
 database.GetPreviousView = function() return 1 end
 database.SetPreviousView = function() end
 database.GetEnableBagFading = function() return false end
+database.GetClampBagsToScreen = function() return false end
 database.GetGroupsEnabled = function() return true end
 
 local const = StubBetterBagsModule("Constants")
@@ -519,6 +520,20 @@ describe("Bank Bag/Slot Window Pane Tests", function()
         assert.is_false(t:IsSnappingToPixelGrid(), "part " .. i)
         assert.are.equal(0, t:GetTexelSnappingBias(), "part " .. i)
       end
+    end)
+
+    -- It hangs below the bank: clamped as the bank is (Clamp Bags to Screen, window.md §3a).
+    it("is clamped to the screen as the bank is", function()
+      local panel = newPanel({ retail = true, forever = false })
+      local clamp = false
+      local saved = database.GetClampBagsToScreen
+      database.GetClampBagsToScreen = function() return clamp end
+      local off = panel.window.opts.Clamp()
+      clamp = true
+      local on = panel.window.opts.Clamp()
+      database.GetClampBagsToScreen = saved
+      assert.is_false(off)
+      assert.is_true(on)
     end)
 
     it("is a Slots window hanging below the bank, sized to its tab buttons plus the theme's room", function()
