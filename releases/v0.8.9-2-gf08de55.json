@@ -1,0 +1,17 @@
+{
+  "id": 1793172219,
+  "version": "v0.8.9-2-gf08de55",
+  "channel": "alpha",
+  "date": "2026-10-28",
+  "from": "adcfe74adf9ca0be00f8d48c1960c42e324f9bf1",
+  "to": "f08de5506279aae43a7dfe3bc19effa431340ca5",
+  "headline": "Introduces the new Frost theme for BetterBags Next with custom frost storm and shatter animations.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Frost theme for BetterBags Next",
+      "details": "Bags styled with the new Frost theme materialize from a frost storm when opened and shatter into ice shards when closed. The theme features a winter blue and gold palette with drifting snow, swaying threads of light, and gentle gold shooting stars. New options in the Animation settings allow you to toggle the ice shatter and snowfall effects.",
+      "clients": []
+    }
+  ]
+}
