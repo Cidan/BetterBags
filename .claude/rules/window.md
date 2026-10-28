@@ -28,6 +28,7 @@ close code, and themes built each window's search box and buttons.
 | `MinWidth`, `MinHeight` | the frame's minimum (number, function, or `false`) |
 | `MinContentWidth`, `MinContentHeight` | the content box's minimum (number or function) |
 | `Fade()` | `false` shows and hides at once (default: fade) |
+| `Clamp()` | `false`: the window may be moved, or grow, off the screen (the bags' Clamp Bags to Screen, §3a); kept on the screen when unset |
 | `OnClose(ctx, button)` | the close button's action, with the mouse button that clicked (default `Hide`) |
 | `CloseClicks` | the clicks the close button takes (`RegisterForClicks`), default `{ "LeftButtonUp" }`; the debug window takes right clicks too |
 | `OnRendered(ctx, w, h)` | after every render, with the size it took (growth anchoring) |
@@ -90,6 +91,25 @@ touch the clamp.
   insets. (The bag used to set its own insets, `KeepBagInBounds`: `0, -w + 50, 0, h - 50`, which
   let all but 50 pixels of it leave the screen; a user's bank grew past the screen and its grip
   became unreachable, even at 50% scale. It is gone.)
+- **The bags clamp only when the player says so: Clamp Bags to Screen.** Asked (2026-10-27): "a
+  toggle of 'clamp bags to screen', and it should default to off ... an all bags setting"; a bag
+  may then go fully off the screen, as WoW lets any frame, and turning the setting on is how to
+  bring it back (asked: "yeah that's fine"; the bags were unclamped until the window manager
+  above). One profile setting, `clampBagsToScreen` (`DB:Get/SetClampBagsToScreen`, off in
+  `const.DATABASE_DEFAULTS`), on the settings window's General page in both designs
+  (next-settings.md §4).
+  - A window whose `Clamp()` returns false (`windowProto:Clamped()`) is created unclamped, and
+    `KeepOnScreen` leaves it where it is, its clamp off. The classic backpack and bank windows
+    (§7) and both slots panels (§8: they hang below their bag, so they clamp as it does) read
+    the setting. Every other window has no `Clamp` and stays on the screen, and the size cap below
+    holds for the bags too: a bag never grows bigger than the screen, only past its edge.
+  - Turning it on or off sends `bags/ClampChanged` (the catalog's setter). `window:Init` listens:
+    every window applies its clamp again (`KeepOnScreen`); a shown window with a `Clamp` that is now
+    on is put back on the screen and its position saved there (`SavePosition`), so turning it off
+    again moves nothing, now or after a reload. A hidden one is put back when it next renders.
+    Turned off, nothing moves.
+  - BetterBags Next's small panels follow the same setting (next.md §14c); its full panels rest at
+    their screen edges and are never clamped.
 - **Never bigger than the screen.** `screenSize()` is the screen measured in the window's own
   scale (`UIParent` size x its effective scale / the frame's), at least the minimums. In window
   mode it is the resize bounds' maximum, a saved size is cut down to it, and `FitToScreen()`
@@ -109,8 +129,16 @@ touch the clamp.
   `windowProto:Geometry(step)`, whose return value (anchors, rect, effective scale, clamp, the
   cursor in the window's scale) the call trace records (data-driven.md).
 
-Coverage: `spec/window/window_spec.lua` ("kept on the screen"), `spec/frames/bag_draw_ownership_spec.lua`
-("leaves keeping the window on the screen to the window").
+Coverage: `spec/window/window_spec.lua` ("kept on the screen"; "with a Clamp option": unclamped
+after a render, a move and a resize, clamped when it says so, following the setting both ways, saving
+only a shown window it put back), `spec/frames/bag_draw_ownership_spec.lua` ("leaves keeping the
+window on the screen to the window", "is clamped to the screen while the bags' setting says so"),
+`spec/frames/bagslots_spec.lua` and `spec/frames/bankslots_spec.lua` ("is clamped to the screen as its
+bag is"), `spec/config/settings_effects_spec.lua` ("turns Clamp Bags to Screen on and off, and tells
+the bags"), `spec/core/constants_spec.lua`, `spec/database_spec.lua`, `spec/config/catalog_spec.lua`.
+Every guard was mutation-tested (with Next's, next.md §14c: 32 mutations; four first survived: one
+led to a test (a full panel left alone), three showed code that changed nothing, removed (fitting
+anchors before chained bags, a guard for a grip held while the setting changes, a coupling update)).
 
 ### 3b. Centering, the scroll bar, and snapping to the content
 
@@ -285,7 +313,7 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   bag's settings for the view it shows: `Opacity` and `Scale` from `GetBagSizeInfo`, `SizeMode`
   from `database:GetBagSizeMode` (per view, default `"content"`), `Size`/`OnResized` from
   `Get/SetBagViewFrameSize`, `SnapToContent` from `GetBagSnapToContent` (per view, on unless
-  turned off, §3b), `Fade` from `GetEnableBagFading`. `CanMove` is false while an
+  turned off, §3b), `Fade` from `GetEnableBagFading`, `Clamp` from `GetClampBagsToScreen` (§3a). `CanMove` is false while an
   item is on the cursor (pressing on the window is a drop then). `OnClose` is `bag:Hide`.
   `OnRendered` runs `bag:OnResize`. Its content is a `Scrollbox` (with the bar's room on both
   sides and a bar that hides itself, §3b) whose child is the bag's canvas

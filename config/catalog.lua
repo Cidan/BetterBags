@@ -256,6 +256,20 @@ define('animateItemMovement', {
   set = function(_, value) db:SetAnimateItemMovement(value) end,
 })
 
+-- One setting for every bag: the bags follow it at once (bags/ClampChanged, window.md §3a).
+define('clampBagsToScreen', {
+  kind = "toggle",
+  title = 'Clamp Bags to Screen',
+  description = 'If enabled, bags are kept on the screen: they cannot be moved or grow past its edges. '
+    .. 'In BetterBags Next this applies to small bags; full-size bags rest at the edges of the screen.',
+  keywords = { 'clamp', 'screen', 'edge', 'off screen', 'move', 'position' },
+  get = function() return db:GetClampBagsToScreen() end,
+  set = function(ctx, value)
+    db:SetClampBagsToScreen(value)
+    events:SendMessage(ctx, 'bags/ClampChanged')
+  end,
+})
+
 define('nextEnabled', {
   kind = "toggle",
   title = 'BetterBags Next (experimental)',

@@ -169,6 +169,9 @@ describe("BetterBags Next's small mode", function()
     override(stubs.database, "GetNextSmallChain", function() return db.smallChain end)
     override(stubs.database, "SetNextSmallChain", function(_, layout) db.smallChain = layout end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
+    -- Clamp Bags to Screen (window.md §3a): on here, so a small panel stays on the screen; off by default.
+    db.clamp = true
+    override(stubs.database, "GetClampBagsToScreen", function() return db.clamp end)
     -- The Size tab's scales (docs/next-appearance-size.md), in percent.
     db.iconScale, db.bagScale = 100, 100
     override(stubs.database, "GetNextIconScale", function() return db.iconScale end)
@@ -523,6 +526,128 @@ describe("BetterBags Next's small mode", function()
       assert.is_false(bag.frame:IsClampedToScreen())
       bag.titleButton:GetScript("OnDragStart")(bag.titleButton, "LeftButton")
       assert.is_nil(bag.frame._moving)
+    end)
+  end)
+
+  -- Clamp Bags to Screen (asked: "a toggle of 'clamp bags to screen', and it should default to off ... an all
+  -- bags setting"; window.md §3a). Off, a small panel goes where the player puts it, off the screen too, as WoW
+  -- lets any frame, still on whole pixels; turned on, an open one is pulled back on the screen at once.
+  describe("with Clamp Bags to Screen", function()
+    local handlers
+
+    local function opened(create)
+      local panel = create(ctx())
+      panel:Show(ctx())
+      finishTweens()
+      return panel
+    end
+
+    local function drag(panel, left, top)
+      panel.mover:GetScript("OnDragStart")(panel.mover, "LeftButton")
+      panel.frame:_SetRect(left, top - panel.frame:GetHeight(), panel.frame:GetWidth(), panel.frame:GetHeight())
+      panel.mover:GetScript("OnDragStop")(panel.mover)
+    end
+
+    local function turned(on)
+      db.clamp = on
+      handlers["bags/ClampChanged"](ctx())
+    end
+
+    before_each(function()
+      db.clamp = false
+      handlers = {}
+      override(stubs.events, "RegisterMessage", function(_, name, fn) handlers[name] = fn end)
+    end)
+
+    it("is not clamped while it is off, and goes where it is moved, off the screen too, on whole pixels", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.is_false(bag.frame:IsClampedToScreen())
+      drag(bag, 1900.4, 1500.3)
+      assert.are.same({ 1900, 1500 }, db.places[BACKPACK])
+      assert.are.same({ 1900, 1500 }, { topLeft(bag) })
+    end)
+
+    it("opens where it was left, off the screen too", function()
+      db.places[BANK] = { -500, 5000 }
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      assert.are.same({ -500, 5000 }, { topLeft(bank) })
+    end)
+
+    it("stays where it is when the screen changes, its height the new screen's share", function()
+      db.places[BACKPACK] = { 1400, 1100 }
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      UIParent:_SetRect(0, 0, 1280, 720)
+      chain:Update(ctx(), true)
+      assert.are.equal(math.floor(720 * style.Small.Height), bag.frame:GetHeight())
+      assert.are.same({ 1400, 1100 }, { topLeft(bag) })
+    end)
+
+    it("pulls an open panel back on the screen once turned on, and saves it there; a closed one as it opens", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      drag(bag, 1900, 1500)
+      db.places[BANK] = { -500, 5000 }
+      local bank = nextBank:Create(ctx())
+      turned(true)
+      local onScreen = { UIParent:GetWidth() - style.BODY_WIDTH, UIParent:GetHeight() }
+      assert.is_true(bag.frame:IsClampedToScreen())
+      assert.are.same(onScreen, { topLeft(bag) })
+      assert.are.same(onScreen, db.places[BACKPACK], "where it was put back is where it stays")
+      assert.is_true(bank.frame:IsClampedToScreen())
+      assert.are.same({ -500, 5000 }, db.places[BANK], "a closed panel is not moved")
+      bank:Show(ctx())
+      finishTweens()
+      assert.are.same({ 0, UIParent:GetHeight() }, { topLeft(bank) })
+    end)
+
+    it("moves nothing once turned off, and lets the panel go", function()
+      db.clamp = true
+      db.places[BACKPACK] = { 300, 900 }
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.is_true(bag.frame:IsClampedToScreen())
+      turned(false)
+      assert.is_false(bag.frame:IsClampedToScreen())
+      assert.are.same({ 300, 900 }, { topLeft(bag) })
+      assert.are.same({ 300, 900 }, db.places[BACKPACK])
+    end)
+
+    -- A smaller screen put it back on the screen without saving where (the player's place is kept for a
+    -- bigger screen); turning the clamp off does not send it back there.
+    it("leaves a panel the screen's edge put back where it is once turned off", function()
+      db.clamp = true
+      db.places[BACKPACK] = { 1400, 1100 }
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      UIParent:_SetRect(0, 0, 1280, 720)
+      chain:Update(ctx(), true)
+      local onScreen = { 1280 - style.BODY_WIDTH, 720 }
+      assert.are.same(onScreen, { topLeft(bag) })
+      turned(false)
+      assert.are.same(onScreen, { topLeft(bag) })
+      assert.are.same({ 1400, 1100 }, db.places[BACKPACK])
+    end)
+
+    it("puts a chained bag back beside its anchor, where the anchor was put back", function()
+      db.smallChain = "companion"
+      db.places[BANK] = { -500, 900 }
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.are.equal(bank, chain:SmallAnchorOf(bag), "chained beside the bank")
+      turned(true)
+      assert.are.same({ 0, 900 }, { topLeft(bank) })
+      local x, y = chain:ChainedPlace(bag, bank, 0, 900)
+      local beside = { pixel:Snap(UIParent, x), pixel:Snap(UIParent, y) }
+      assert.are.same(beside, { topLeft(bag) })
+      assert.are.same(beside, db.places[BACKPACK])
+      assert.are.same({ 0, 900 }, db.places[BANK])
+    end)
+
+    it("never clamps a full panel, which rests at its screen edge, nor moves it", function()
+      db.size = "full"
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local width, height = bag.frame:GetWidth(), bag.frame:GetHeight()
+      turned(true)
+      assert.is_false(bag.frame:IsClampedToScreen())
+      assert.are.same({ width, height }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+      assert.is_nil(db.places[BACKPACK], "no small place saved")
     end)
   end)
 

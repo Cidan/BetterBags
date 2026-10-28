@@ -996,6 +996,78 @@ describe("Window", function()
         assert.is_true(render:IsDirty(w))
       end)
 
+      -- Clamp Bags to Screen (asked: "a toggle of 'clamp bags to screen', and it should default to off ... an
+      -- all bags setting"): a window whose Clamp says no may go off the screen, as WoW lets any frame.
+      describe("with a Clamp option", function()
+        local clamp
+
+        local function clamped(extra)
+          local opts = { Clamp = function() return clamp end }
+          for k, v in pairs(extra or {}) do opts[k] = v end
+          return resizable(content(1, 1), opts)
+        end
+
+        before_each(function()
+          clamp = false
+        end)
+
+        it("is not clamped while its Clamp says no, after a render, a move or a resize", function()
+          local w = clamped()
+          assert.is_false(w.frame:IsClampedToScreen())
+          apply()
+          w:UpdateSizeMode()
+          w:Show(ctx())
+          advance()
+          local calls = clampCalls(w)
+          render:NewRenderChain(w, {})
+          w.frame:GetScript("OnDragStart")(w.frame)
+          w.frame:GetScript("OnDragStop")(w.frame)
+          w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
+          w.resizeGrip:GetScript("OnMouseUp")(w.resizeGrip, "LeftButton")
+          for _, on in ipairs(calls) do
+            assert.is_false(on)
+          end
+          assert.is_false(w.frame:IsClampedToScreen())
+        end)
+
+        it("is clamped while its Clamp says yes", function()
+          clamp = true
+          local w = clamped()
+          assert.is_true(w.frame:IsClampedToScreen())
+          local calls = clampCalls(w)
+          render:NewRenderChain(w, {})
+          assert.are.same({ false, true }, calls)
+        end)
+
+        it("follows the setting when it changes: back on the screen once on, free once off", function()
+          local current = addon:GetModule("Events")
+          current:Init()
+          window:Init()
+          local w = clamped()
+          local closed = clamped()
+          local always = resizable(content(1, 1))
+          w.frame:Show()
+          always.frame:Show()
+          local calls = clampCalls(w)
+          local alwaysCalls = clampCalls(always)
+          clamp = true
+          current._messageMap["bags/ClampChanged"].fn("bags/ClampChanged", ctx())
+          assert.are.same({ false, true }, calls, "pulled back on the screen")
+          assert.is_true(w.frame:IsClampedToScreen())
+          assert.is_true(closed.frame:IsClampedToScreen())
+          -- Where it was put back is where it stays: turned off again, nothing moves, now or after a reload.
+          assert.are.equal(1, saved[w.frame], "an open bag's place is saved where it was put back")
+          assert.is_nil(saved[closed.frame], "a closed one is put back as it shows")
+          assert.is_nil(saved[always.frame], "a window always on the screen saves nothing")
+          clamp = false
+          current._messageMap["bags/ClampChanged"].fn("bags/ClampChanged", ctx())
+          assert.is_false(w.frame:IsClampedToScreen())
+          assert.are.equal(1, saved[w.frame], "turned off, nothing is saved")
+          assert.is_true(always.frame:IsClampedToScreen(), "a window with no Clamp option is always clamped")
+          assert.are.same({ false, true, false, true }, alwaysCalls)
+        end)
+      end)
+
       -- Diagnostics: while a profiler capture runs, each step of a resize or a move records the
       -- window's anchors and rect as Geometry's return value in the call trace.
       it("describes itself to a running profiler at each step of a resize and a move", function()

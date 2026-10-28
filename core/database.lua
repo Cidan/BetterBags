@@ -211,6 +211,18 @@ function DB:SetAnimateItemMovement(enabled)
   DB.data.profile.animateItemMovement = enabled
 end
 
+-- GetClampBagsToScreen returns whether every bag is kept on the screen (window.md §3a): the classic
+-- bags and their slots panels, and BetterBags Next's small panels. Off unless turned on.
+---@return boolean
+function DB:GetClampBagsToScreen()
+  return DB.data.profile.clampBagsToScreen
+end
+
+---@param enabled boolean
+function DB:SetClampBagsToScreen(enabled)
+  DB.data.profile.clampBagsToScreen = enabled
+end
+
 -- GetNextEnabled returns whether the backpack is BetterBags Next's panel (next.md); it takes
 -- effect after a reload. Off unless turned on.
 ---@return boolean

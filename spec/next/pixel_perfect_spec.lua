@@ -155,6 +155,8 @@ describe("BetterBags Next, pixel perfect", function()
       if p then return p[1], p[2] end
     end)
     override(stubs.database, "SetNextSmallPlace", function(_, kind, x, y) db.places[kind] = { x, y } end)
+    -- Clamp Bags to Screen (window.md §3a): small panels kept on the screen.
+    override(stubs.database, "GetClampBagsToScreen", function() return true end)
     override(stubs.database, "GetNextSmallSize", function(_, kind)
       local size = db.sizes[kind]
       if size then return size[1], size[2] end
