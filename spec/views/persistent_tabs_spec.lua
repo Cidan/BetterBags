@@ -278,6 +278,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
       GetBagSizeMode = function() return "content" end,
       GetBagViewFrameSize = function() return 700, 500 end,
       GetEnableBagFading = function() return false end,
+      GetClampBagsToScreen = function() return false end,
       GetAnimateItemMovement = function() return false end,
       GetTheme = function() return "Default" end,
     }) do

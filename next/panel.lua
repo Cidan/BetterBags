@@ -1511,14 +1511,17 @@ function panelProto:SparkSpreadBase()
   return self:IsSmall() and style.Small.SparkSpread or (R and R.Spread or 0)
 end
 
--- clampPlace keeps a small panel's place (its top left) on the screen, its size there its own times its
--- scale, on whole pixels of the screen (docs/next-pixel-perfect.md: its size is whole pixels at its
--- scale, so its far edges are too).
+-- clampPlace keeps a small panel's place (its top left) on the screen while the bags are clamped to it
+-- (Clamp Bags to Screen, window.md §3a), its size there its own times its scale; always on whole pixels of
+-- the screen (docs/next-pixel-perfect.md: its size is whole pixels at its scale, so its far edges are too).
 ---@private
 ---@param x number
 ---@param y number
 ---@return number x, number y
 function panelProto:clampPlace(x, y)
+  if not database:GetClampBagsToScreen() then
+    return pixel:Snap(UIParent, x), pixel:Snap(UIParent, y)
+  end
   local s = self:Scale()
   -- A side rail outside the body (Header.Buttons.Rail.Outside) stays on the screen too, on the inner side.
   local strip = style.RAIL_OUT * s
@@ -1656,7 +1659,7 @@ function panelProto:ApplyGeometry()
   self.sparkSpread = self:SparkSpreadBase()
   frame:SetMovable(small)
   frame:SetResizable(small)
-  frame:SetClampedToScreen(small)
+  self:ApplyClamp()
   self.mover:SetShown(small)
   self:UpdateGrips()
   self:FitTitle()
@@ -1673,6 +1676,12 @@ function panelProto:ApplyGeometry()
   self:setOffset(self.offset or 0)
   -- Once anchored: its rows are the frame's height.
   self.rain:Layout()
+end
+
+-- ApplyClamp clamps a small panel to the screen while the bags are clamped to it (Clamp Bags to Screen,
+-- window.md §3a); a full panel rests at its screen edge and is never clamped.
+function panelProto:ApplyClamp()
+  self.frame:SetClampedToScreen(self:IsSmall() and database:GetClampBagsToScreen())
 end
 
 -- FitSmall sizes a small panel for the screen as it is now and puts it at its place, kept on the

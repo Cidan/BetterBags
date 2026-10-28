@@ -837,6 +837,10 @@ function bagFrame.bagProto:BuildWindow(name)
 		Fade = function()
 			return database:GetEnableBagFading()
 		end,
+		-- One setting for every bag (Clamp Bags to Screen, window.md §3a).
+		Clamp = function()
+			return database:GetClampBagsToScreen()
+		end,
 		OnClose = function(ctx)
 			self:Hide(ctx)
 		end,

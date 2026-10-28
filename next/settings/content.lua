@@ -379,7 +379,7 @@ function content:Init()
     tabs = { { id = "main", title = L:G("General"), sections = {
       { title = L:G("Bags"), rows = {
         { setting = 'nextEnabled' }, { setting = 'enableBankBags' }, { setting = 'showBagButton' },
-        { setting = 'bagFading', design = "classic" }, { setting = 'animateItemMovement', design = "classic" },
+        { setting = 'clampBagsToScreen' }, { setting = 'bagFading', design = "classic" }, { setting = 'animateItemMovement', design = "classic" },
       } },
       -- Only the classic bags' search box makes a category on Enter (frames/search.lua).
       { title = L:G("Search"), rows = { { setting = 'inBagSearch' }, { setting = 'enterToMakeCategory', design = "classic" } } },

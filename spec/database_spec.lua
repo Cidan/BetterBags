@@ -92,6 +92,7 @@ const.DATABASE_DEFAULTS = {
     enabled = true,
     enableBagFading = false,
     animateItemMovement = false,
+    clampBagsToScreen = false,
     nextEnabled = false,
     nextChain = "apart",
     nextTabOrder = {},
@@ -501,6 +502,14 @@ describe("Database", function()
         assert.are.equal(120, x, "put away, it remembers where it was")
         assert.are.equal(340, y)
       end)
+    end)
+
+    it("GetClampBagsToScreen / SetClampBagsToScreen, off until turned on", function()
+      assert.is_false(DB:GetClampBagsToScreen())
+      DB:SetClampBagsToScreen(true)
+      assert.is_true(DB:GetClampBagsToScreen())
+      DB:SetClampBagsToScreen(false)
+      assert.is_false(DB:GetClampBagsToScreen())
     end)
 
     it("GetAnimateItemMovement / SetAnimateItemMovement, off until turned on", function()

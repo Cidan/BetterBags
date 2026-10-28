@@ -180,7 +180,7 @@ describe("The settings catalog", function()
       seen[id] = true
     end
     for _, id in ipairs({ "inBagSearch", "enterToMakeCategory", "categorySell", "showBagButton", "enableBankBags",
-      "bagFading", "animateItemMovement", "nextEnabled", "upgradeProvider", "newItemDuration", "sectionOrder",
+      "bagFading", "animateItemMovement", "clampBagsToScreen", "nextEnabled", "upgradeProvider", "newItemDuration", "sectionOrder",
       "itemOrder", "enableGroups", "filterEquipmentLocation", "filterExpansion", "filterGearSet", "filterRecentItems",
       "filterTradeSkill", "filterType", "filterSubtype", "markRecentItems", "newItemFlash", "mergeStacks",
       "mergeUnstackable", "dontMergePartial", "dontMergeTransmog", "unmergeAtShop", "itemLevel", "itemLevelColor",

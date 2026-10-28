@@ -184,6 +184,13 @@ describe("Constants Module Offsets", function()
     assert.are.equal("down", options.growY)
   end)
 
+  -- Asked: "a toggle of 'clamp bags to screen', and it should default to off" (window.md §3a).
+  it("leaves clamping the bags to the screen off by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    assert.is_false(const.DATABASE_DEFAULTS.profile.clampBagsToScreen)
+  end)
+
   it("leaves animating item movement off by default", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")

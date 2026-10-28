@@ -249,6 +249,7 @@ local function stubModules()
   override(database, "GetBagViewFrameSize", function() return 700, 500 end)
   override(database, "SetBagViewFrameSize", function() end)
   override(database, "GetEnableBagFading", function() return false end)
+  override(database, "GetClampBagsToScreen", function() return false end)
   override(database, "GetAnimateItemMovement", function() return false end)
   override(database, "GetTheme", function() return "Default" end)
   override(database, "SetTheme", function() end)
@@ -1734,6 +1735,16 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.is_true(bag.window.opts.SnapToContent())
       snap = false
       assert.is_false(bag.window.opts.SnapToContent())
+    end)
+
+    -- One setting for every bag (Clamp Bags to Screen, window.md §3a).
+    it("is clamped to the screen while the bags' setting says so", function()
+      local bag = newBag()
+      local clamp = false
+      override(addon:GetModule("Database"), "GetClampBagsToScreen", function() return clamp end)
+      assert.is_false(bag.window.opts.Clamp())
+      clamp = true
+      assert.is_true(bag.window.opts.Clamp())
     end)
 
     it("is at least as wide as its slots panel while that shows", function()

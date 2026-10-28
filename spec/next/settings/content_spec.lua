@@ -333,8 +333,8 @@ describe("NextSettingsContent", function()
 
     it("puts the bags' general settings on General, the classic bags' own only for them", function()
       assert.are.same({
-        { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton", "bagFading [classic]",
-          "animateItemMovement [classic]" } },
+        { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton", "clampBagsToScreen",
+          "bagFading [classic]", "animateItemMovement [classic]" } },
         { "General", "Search", { "inBagSearch", "enterToMakeCategory [classic]" } },
         { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell" } },
         { "General", "What's New", { "changelogOnLogin" } },
@@ -411,8 +411,8 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 21, the Currencies page's 10 (currency.md §6), and each bag's 29.
-      assert.are.equal(21 + 10 + 3 * 29, named)
+      -- The general pages' 22, the Currencies page's 10 (currency.md §6), and each bag's 29.
+      assert.are.equal(22 + 10 + 3 * 29, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -1060,7 +1060,7 @@ describe("NextSettingsContent", function()
         high = { red = 0, green = 0.55, blue = 0.87, alpha = 1 }, max = { red = 1, green = 0.5, blue = 0, alpha = 1 } }
       local profile = { newItemTime = 300 }
       for name, value in pairs({
-        GetAnimateItemMovement = per(false), GetBagSizeInfo = per(size), GetBagSizeMode = per("content"),
+        GetAnimateItemMovement = per(false), GetClampBagsToScreen = per(false), GetBagSizeInfo = per(size), GetBagSizeMode = per("content"),
         GetBagSnapToContent = per(true), GetBagView = per(2), GetCategoryFilters = per(filters),
         GetCategorySell = per(false), GetChangelogAutoOpen = per(true), GetCustomSectionSort = per({}),
         GetData = per({ profile = profile }), GetEnableBagFading = per(false), GetEnableBankBag = per(true),
