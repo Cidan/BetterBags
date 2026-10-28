@@ -1,0 +1,17 @@
+{
+  "id": 1793200335,
+  "version": "v0.8.9-3-g19ba1f9",
+  "channel": "alpha",
+  "date": "2026-10-28",
+  "from": "f08de5506279aae43a7dfe3bc19effa431340ca5",
+  "to": "19ba1f94bb729f4ecd2374959b9a13bc67fcd63d",
+  "headline": "Introduces the animated Halloween theme featuring smoke reveals and bat morphing effects.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Halloween theme for BetterBags Next",
+      "details": "A pumpkin-orange theme complete with a flickering jack-o'-lantern, a blinking black cat, cobwebs, and falling leaves. Bags materialize through rising smoke when opened, and break apart into a swarm of flying bats when closed. Includes settings toggles to control the smoke and bat animations.",
+      "clients": []
+    }
+  ]
+}
