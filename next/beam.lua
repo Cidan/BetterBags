@@ -38,8 +38,12 @@ beam.OPEN_KEYS = { Reveal = true, Sparkles = true, Column = true, Glow = true }
 beam.CLOSE_KEYS = { Fade = true, Sparkles = true, Column = true, Glow = true }
 -- The parts with an envelope.
 beam.ENVELOPES = { "Sparkles", "Column", "Glow" }
--- The mask that fades the column's ends (tools/textures/next_masks.py): nothing at its top, all at its bottom.
-beam.END_MASK = "Interface\\AddOns\\BetterBags\\textures\\next\\beam_end.png"
+-- The masks that fade the column's ends (tools/textures/next_masks.py), one image for each: nothing at the end it is for,
+-- all at the other. Two images, as the client ignores a mask's texture coordinates (so one could not be turned over).
+beam.END_MASKS = {
+  TOP = "Interface\\AddOns\\BetterBags\\textures\\next\\beam_end_top.png",
+  BOTTOM = "Interface\\AddOns\\BetterBags\\textures\\next\\beam_end_bottom.png",
+}
 
 ---@class (exact) NextBeamSparkle
 ---@field texture Texture
@@ -205,14 +209,15 @@ local function over(t, left, top, width, height)
   t:SetSize(width, height)
 end
 
--- endMask takes a mask from the pool, or makes one on the layer, drawn with the end's art.
+-- endMask takes a mask from the pool, or makes one on the layer, drawn with an end's art ("TOP" or "BOTTOM").
+---@param edge string
 ---@return MaskTexture
-local function endMask()
+local function endMask(edge)
   local m = table.remove(beam.maskPool)
   if m == nil then
     m = beam:Layer():CreateMaskTexture()
-    m:SetTexture(beam.END_MASK, "CLAMPTOWHITE", "CLAMPTOWHITE")
   end
+  m:SetTexture(beam.END_MASKS[edge], "CLAMPTOWHITE", "CLAMPTOWHITE")
   m:ClearAllPoints()
   m:Show()
   return m
@@ -257,12 +262,11 @@ function beam:Begin(panel, phase)
     run.column = t
     -- Its ends fade to nothing: a mask over each, the art's own coordinates left to scroll.
     if ends > 0 then
-      for i, edge in ipairs({ "TOP", "BOTTOM" }) do
-        local m = endMask()
+      for _, edge in ipairs({ "TOP", "BOTTOM" }) do
+        local m = endMask(edge)
         m:SetPoint(edge .. "LEFT", t, edge .. "LEFT", 0, 0)
         m:SetPoint(edge .. "RIGHT", t, edge .. "RIGHT", 0, 0)
         m:SetHeight(ends)
-        m:SetTexCoord(0, 1, i == 1 and 0 or 1, i == 1 and 1 or 0)
         t:AddMaskTexture(m)
         table.insert(run.masks, m)
       end

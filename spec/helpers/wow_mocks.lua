@@ -666,11 +666,16 @@ function WidgetMethods:GetCountdownFontString()
 end
 -- Frame:CreateMaskTexture(name, drawLayer, templateName, subLevel) (SimpleFrameAPIDocumentation) makes a
 -- MaskTexture, one of the frame's regions (Masque masks icons with them, Core/Regions/Mask.lua).
+-- A mask's art is never cut by texture coordinates: SetTexCoord has no effect on a MaskTexture (tested by lightspark
+-- when MaskTexture came in, 7.2, WoWInterface "MaskTexture : new widget for 7.2"; seen in game again on 2026-10-29: a
+-- corner mask flipped by its coordinates cut nothing but the top left, where none were needed). Each mask is an image
+-- of its own. Blizzard never sets coordinates on one.
 function WidgetMethods:CreateMaskTexture(textureName, drawLayer, inherits, subLevel)
   local mask = CreateMockWidget("MaskTexture", textureName, self)
   mask._drawLayer = drawLayer
   mask._sublevel = subLevel
   mask._inherits = inherits
+  mask.SetTexCoord = function() end
   table.insert(self._textures, mask)
   return mask
 end
@@ -1081,7 +1086,9 @@ function WidgetMethods:SetAtlas(atlas, useAtlasSize, filterMode, _, wrapH, wrapV
   self._sliceMode = nil
 end
 -- Texture:AddMaskTexture(mask), RemoveMaskTexture(mask), GetNumMaskTextures(), GetMaskTexture(index)
--- (SimpleTextureAPIDocumentation, every client): the masks that cut the texture's art.
+-- (SimpleTextureAPIDocumentation, every client): the masks that cut the texture's art. A texture takes at most 3: "a
+-- texture can be masked by up to 3 mask textures" (TheDanW, Blizzard, #wowuidev, 2017-01-18), and a fourth raises the
+-- client's error (quoted in EllesmereUI's pull request 2594, rounded raid frame corners).
 function WidgetMethods:AddMaskTexture(mask)
   local masks = rawget(self, "_masks") or {}
   rawset(self, "_masks", masks)
@@ -1089,6 +1096,9 @@ function WidgetMethods:AddMaskTexture(mask)
     if m == mask then
       return
     end
+  end
+  if #masks >= 3 then
+    error("Texture:AddMaskTexture(): Texture already has the maximum number of mask textures (3)", 2)
   end
   table.insert(masks, mask)
 end

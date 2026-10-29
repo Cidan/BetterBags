@@ -485,3 +485,19 @@ and stepping the tween: the Glitch theme's code errored every frame of the rest 
 Flicker across a whole window is a flash in WCAG 2.3.1's sense (more than three a second over a large area can trigger
 seizures). An effect that flickers a window's alpha or flashes large textures needs an Animation switch that takes it
 out on any theme (next-themes.md §20), and its rate written down where it is defined.
+
+## Mask Textures: One Image per Orientation, Three per Texture
+
+Two client rules for `MaskTexture` that the API documentation does not state (next-themes.md §24, both in the spec
+mock):
+
+- **`SetTexCoord` does nothing on a mask.** A mask's art cannot be flipped, rotated or cut out of an atlas by its
+  coordinates: draw every orientation as its own image (BetterBags Next's `corner_topleft.png` ... `corner_bottomright.png`,
+  `beam_end_top.png` and `beam_end_bottom.png`). The textures a mask cuts keep their own coordinates (a scrolling
+  texture can be masked).
+- **A texture takes at most three masks**; a fourth raises "Texture already has the maximum number of mask textures
+  (3)". Something that spans four masked regions (a body with four rounded corners) needs fewer masks or more
+  textures. Take old masks off before adding new ones, and never add one twice.
+
+Failure mode (fixed): one corner image flipped per corner rounded only the top left (the only corner needing no flip),
+and a theme rounding four corners errored on the body's fill.

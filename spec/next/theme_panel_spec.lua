@@ -2097,8 +2097,13 @@ describe("BetterBags Next's panels and themes", function()
   -- square corners "peak out around the LCARS ... we need a way to shape the window itself"): on a small panel, each
   -- corner a theme rounds cuts everything drawn across the body (its fill, its wash, its edge, its side rail's strip, the
   -- glow a drop lights) with a mask its radius twice across at that corner, white outside it.
+  -- A mask's own coordinates are ignored by the client, and a texture takes at most 3 (spec/helpers/wow_mocks.lua): each
+  -- corner is an image of its own, and no texture is given a fourth. Reported: "lower left corner not masked. top left is
+  -- perfect though", the lower left's mask flipped by its coordinates, and the body's fill refusing a fourth corner.
   describe("a body with rounded corners (Panel.Corners)", function()
-    local CORNER = "Interface\\AddOns\\BetterBags\\textures\\next\\corner_mask.png"
+    local function cornerArt(corner)
+      return "Interface\\AddOns\\BetterBags\\textures\\next\\corner_" .. corner:lower() .. ".png"
+    end
 
     local function shaped(corners)
       apply({ Panel = { Corners = corners, Edge = { Color = "Gold", Size = 1 } },
@@ -2138,14 +2143,46 @@ describe("BetterBags Next's panels and themes", function()
         assert.are.same({ [top] = true, [bottom] = true }, masksOf(t))
       end
       assert.is_true(top:IsShown())
-      assert.are.equal(CORNER, top:GetTexture())
+      assert.are.equal(cornerArt("TOPLEFT"), top:GetTexture())
       assert.are.same({ "CLAMPTOWHITE", "CLAMPTOWHITE" }, { top._wrapH, top._wrapV }, "nothing cut past it")
       assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 0, 0 }, { top:GetPoint(1) })
       assert.are.same({ 40, 40 }, { top:GetWidth(), top:GetHeight() })
-      assert.are.same({ 0, 0, 0, 1, 1, 0, 1, 1 }, { top:GetTexCoord() }, "its art's cut corner at the top left")
+      assert.are.equal(cornerArt("BOTTOMRIGHT"), bottom:GetTexture(), "an image cut at its own corner")
       assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", 0, 0 }, { bottom:GetPoint(1) })
       assert.are.same({ 24, 24 }, { bottom:GetWidth(), bottom:GetHeight() })
-      assert.are.same({ 1, 1, 1, 0, 0, 1, 0, 0 }, { bottom:GetTexCoord() }, "flipped both ways")
+    end)
+
+    it("cuts every corner with an image of its own: the lower left with the lower left's", function()
+      shaped({ TOPINNER = 20, BOTTOMINNER = 16, BOTTOMOUTER = 12 })
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      small(bag)
+      for side, corner in pairs({ TOPINNER = "TOPLEFT", BOTTOMINNER = "BOTTOMLEFT", BOTTOMOUTER = "BOTTOMRIGHT" }) do
+        local mask = bag.cornerMasks[side]
+        assert.are.equal(cornerArt(corner), mask:GetTexture(), side)
+        assert.are.same({ corner, bag.body, corner, 0, 0 }, { mask:GetPoint(1) }, side)
+      end
+    end)
+
+    it("rounds at most three corners, the client's most masks on a texture, in order", function()
+      shaped({ TOPINNER = 20, BOTTOMINNER = 16, TOPOUTER = 12, BOTTOMOUTER = 12 })
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      small(bag)
+      local masks = bag.cornerMasks
+      for _, t in ipairs(parts(bag)) do
+        assert.are.same({ [masks.TOPINNER] = true, [masks.BOTTOMINNER] = true, [masks.TOPOUTER] = true }, masksOf(t))
+      end
+      assert.is_true(masks.BOTTOMOUTER == nil or not masks.BOTTOMOUTER:IsShown(), "the fourth left square")
+    end)
+
+    it("takes a theme's corners off before rounding the next theme's, never four on a texture at once", function()
+      shaped({ BOTTOMINNER = 16, TOPOUTER = 12, BOTTOMOUTER = 12 })
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      small(bag)
+      shaped({ TOPINNER = 20, BOTTOMINNER = 16, TOPOUTER = 12 })
+      local masks = bag.cornerMasks
+      assert.are.same({ [masks.TOPINNER] = true, [masks.BOTTOMINNER] = true, [masks.TOPOUTER] = true },
+        masksOf(bag.fill))
+      assert.is_false(masks.BOTTOMOUTER:IsShown())
     end)
 
     it("rounds them mirrored on a panel whose inner side is on the right", function()
@@ -2154,7 +2191,7 @@ describe("BetterBags Next's panels and themes", function()
       small(bank)
       local top = bank.cornerMasks.TOPINNER
       assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", 0, 0 }, { top:GetPoint(1) })
-      assert.are.same({ 1, 0, 1, 1, 0, 0, 0, 1 }, { top:GetTexCoord() }, "flipped across")
+      assert.are.equal(cornerArt("TOPRIGHT"), top:GetTexture(), "the top right's own")
       assert.is_true(masksOf(bank.fill)[top])
     end)
 

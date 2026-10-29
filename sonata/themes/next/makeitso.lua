@@ -177,11 +177,11 @@ sonataNext:RegisterTheme({
     -- its edges.
     Edge = false,
     DropGlow = { Color = "LcarsOrange", Alpha = 0.16, BlendMode = "ADD" },
-    -- A small bag's corners rounded (asked: "corner at the top left and bottom left peak out around the LCARS, i think we
-    -- need a way to shape the window itself"): its inner ones as round as the elbows' outer corners
-    -- (tools/textures/next_makeitso.py: TOP_ROUND, BOTTOM_ROUND), so nothing of the body shows past them; its outer ones
-    -- a little.
-    Corners = { TOPINNER = 30, BOTTOMINNER = 24, TOPOUTER = 12, BOTTOMOUTER = 12 },
+    -- A small bag's inner corners rounded (asked: "corner at the top left and bottom left peak out around the LCARS, i
+    -- think we need a way to shape the window itself"), as round as the elbows' outer corners
+    -- (tools/textures/next_makeitso.py: TOP_ROUND, BOTTOM_ROUND), so nothing of the body shows past them. Its outer ones
+    -- square: the client masks the body's fill at most three times.
+    Corners = { TOPINNER = 30, BOTTOMINNER = 24 },
     -- The LCARS frame, drawn for the backpack (its inner side on the left) and mirrored on the panels across the screen:
     -- the side bar (Header.Buttons.Rail, 52 wide) curving into the slim top bar (10 tall) at the top elbow, then a
     -- segment flickering, the bar on to its rounded end short of the comm badge; the bottom elbow into the bottom bar (8

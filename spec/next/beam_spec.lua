@@ -326,7 +326,8 @@ describe("NextBeam", function()
       assert.are.equal(2, c:GetNumMaskTextures())
       local masks = { c:GetMaskTexture(1), c:GetMaskTexture(2) }
       for i, m in ipairs(masks) do
-        assert.are.equal(beam.END_MASK, m:GetTexture())
+        -- Each its own image: a mask's coordinates are ignored by the client (spec/helpers/wow_mocks.lua).
+        assert.are.equal(beam.END_MASKS[i == 1 and "TOP" or "BOTTOM"], m:GetTexture())
         assert.are.equal(50, m:GetHeight())
         local corner = i == 1 and "TOP" or "BOTTOM"
         local seen = {}
@@ -339,10 +340,7 @@ describe("NextBeam", function()
         end
         assert.are.same({ [corner .. "LEFT"] = true, [corner .. "RIGHT"] = true }, seen)
       end
-      -- The art fades in downward (nothing at its top): the top end as it is, the bottom end turned upside down (read
-      -- back as the client gives them: each corner's, upper left, lower left, upper right, lower right).
-      assert.are.same({ 0, 0, 0, 1, 1, 0, 1, 1 }, { masks[1]:GetTexCoord() })
-      assert.are.same({ 0, 1, 0, 0, 1, 1, 1, 0 }, { masks[2]:GetTexCoord() })
+      assert.are_not.equal(beam.END_MASKS.TOP, beam.END_MASKS.BOTTOM)
       run:Draw(0.3)
       local _, top = c:GetTexCoord()
       assert.is_true(near(top, 0.5 * 0.3), "its own art still scrolls")

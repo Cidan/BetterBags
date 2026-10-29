@@ -956,6 +956,14 @@ describe("SonataNext", function()
     assert.are.same({}, sonataNext:Check("GoodCorners"))
     sonataNext:RegisterTheme({ Name = "BadHeader", Sections = { Header = { Texture = "Glow", Height = 0 } } })
     assert.are.same({ "Sections.Header.Height: more than nothing" }, sonataNext:Check("BadHeader"))
+    -- The client masks a texture at most three times (spec/helpers/wow_mocks.lua); a corner left square is none.
+    sonataNext:RegisterTheme({ Name = "FourCorners",
+      Panel = { Corners = { TOPINNER = 4, TOPOUTER = 4, BOTTOMINNER = 4, BOTTOMOUTER = 4 } } })
+    assert.are.same({ "Panel.Corners: at most 3 rounded, the most masks the client puts on a texture" },
+      sonataNext:Check("FourCorners"))
+    sonataNext:RegisterTheme({ Name = "ThreeCorners",
+      Panel = { Corners = { TOPINNER = 4, TOPOUTER = 4, BOTTOMINNER = 4, BOTTOMOUTER = 0 } } })
+    assert.are.same({}, sonataNext:Check("ThreeCorners"))
   end)
 
   -- A transporter's beam (next-themes.md §24).

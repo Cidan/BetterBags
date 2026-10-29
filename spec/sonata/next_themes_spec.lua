@@ -1040,12 +1040,11 @@ describe("BetterBags Next's shipped themes", function()
 
     -- Asked: "corner at the top left and bottom left peak out around the LCARS, i think we need a way to shape the window
     -- itself".
-    it("rounds its corners, the inner ones as round as the elbows round them", function()
+    it("rounds its inner corners as round as the elbows round them, its outer ones square", function()
       local C = theme().Panel.Corners
-      for _, side in ipairs({ "TOPINNER", "BOTTOMINNER", "TOPOUTER", "BOTTOMOUTER" }) do
-        assert.is_true(C[side] > 0, side)
-      end
-      assert.is_true(C.TOPINNER > C.TOPOUTER and C.BOTTOMINNER > C.BOTTOMOUTER, "the elbows rounder")
+      assert.is_true(C.TOPINNER > 0 and C.BOTTOMINNER > 0)
+      assert.is_nil(C.TOPOUTER)
+      assert.is_nil(C.BOTTOMOUTER)
       assert.are.same({}, sonataNext:Check("MakeItSo"))
     end)
 

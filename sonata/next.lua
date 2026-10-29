@@ -1016,6 +1016,16 @@ function sonataNext:Check(key)
   local corners = theme.Panel and theme.Panel.Corners
   if type(corners) == "table" then
     local sides = addon:GetModule('NextOrnaments', true)
+    -- The client masks a texture at most three times, and the body's fill spans every corner (NextPanel:shapeCorners).
+    local rounded = 0
+    for _, radius in pairs(corners) do
+      if type(radius) == "number" and radius > 0 then
+        rounded = rounded + 1
+      end
+    end
+    if rounded > 3 then
+      table.insert(problems, "Panel.Corners: at most 3 rounded, the most masks the client puts on a texture")
+    end
     for side, radius in pairs(corners) do
       if sides ~= nil and not sides.CORNERS[side] then
         table.insert(problems, "Panel.Corners." .. tostring(side)

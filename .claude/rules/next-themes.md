@@ -397,7 +397,7 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     glass. LCARS' colours softened to pastels (apricot, peach, lavender, sky, soft blue, salmon; none more than 0.6
     saturated, where the original orange was 1); the body a translucent navy (the holodeck tile's base navy, its grid
     a faint amber, drawn at 0.9, `HolodeckGlass`); the side bar glass (`LilacGlass`, 0.16) with its blocks floating on it
-    as rounded keys; a slimmer top bar (10) and bottom bar (8); no border (`Edge = false`: the corners are rounded,
+    as rounded keys; a slimmer top bar (10) and bottom bar (8); no border (`Edge = false`: the inner corners are rounded,
     where straight lines would stop short); sections and tabs on glass with their names in peach; the chosen tab solid
     apricot, its name in black; item buttons navy cells with a soft lavender edge.
   - **Beaming down** (NextBeam): a column of pale blue light comes up over where the bag rests, its art flowing up and
@@ -414,8 +414,9 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     top 6 left clear) into the bottom bar (salmon, 8 tall) and its rounded end. A small bag (as narrow as 216) keeps its
     elbows, its bottom bar and the badge: the top bar beyond its elbow would run into them. **Its corners** (asked:
     "corner at the top left and bottom left peak out around the LCARS, i think we need a way to shape the window
-    itself"): a small bag's inner corners are rounded as the elbows round them (30 and 24), its outer ones 12
-    (`Panel.Corners`, §24); a full bag's stay square. The header's buttons are the side bar's blocks: each its soft
+    itself"): a small bag's inner corners are rounded as the elbows round them (30 and 24) (`Panel.Corners`, §24); its
+    outer corners and a full bag's stay square. (The restyle first rounded the outer ones too, 12: the body's fill then
+    needed a fourth mask, which the client refuses, §24.) The header's buttons are the side bar's blocks: each its soft
     LCARS colour (settings peach, sort and filter lavender, Show Blizzard Bags and repair sky, the size button apricot,
     bank tabs and Sell Junk salmon, deposits blue, gold gold), a key rounded 8, 3 in from the bar's sides, its glyph cut
     in dark navy at its right end, the bar's glass round it, so the blocks stack 4 apart under the elbow
@@ -1458,25 +1459,43 @@ What the Make It So theme (§8) needed of the engine, all of it data a theme giv
     right": the tabs are left out, the margin is even.
   - **Its ends** (`Ends`; asked: "the top and bottom beam are cut off extremely clean on the horizontal plane, almost
     like it's clipped at the top and bottom"): it runs `Ends` past the top and bottom of what it covers. The column and
-    the glow reach that far; the column fades out to nothing over each end through two masks (`beam.END_MASK`,
-    `textures/next/beam_end.png`: nothing at its top, all at its bottom, smoothstep between; one at the column's top,
-    one upside down at its bottom, `Ends` tall, the column's own art left to scroll), given back to their pool off the
-    column when the run is (a texture used again for a fleck is never cut). The flecks are scattered over the ends too,
+    the glow reach that far; the column fades out to nothing over each end through two masks (`beam.END_MASKS`,
+    `textures/next/beam_end_top.png` and `beam_end_bottom.png`: nothing at the end each is for, all at the other,
+    smoothstep between; each over its end of the column, `Ends` tall, the column's own art left to scroll; two images,
+    since a mask cannot be turned over by its coordinates, below), given back to their pool off the column when the run
+    is (a texture used again for a fleck is never cut). The flecks are scattered over the ends too,
     as dense, drift round the whole length, and fade over the ends as the column does
     (`smoothstep(bottom, bottom + ends, y) * (1 - smoothstep(top - ends, top, y))`). The glow's art softens over its
     outer fifth. Without `Ends` nothing changes.
 - **A body's rounded corners** (`Panel.Corners`; reported with a screenshot: "corner at the top left and bottom left
   peak out around the LCARS, i think we need a way to shape the window itself"): by side (`TOPINNER`, `TOPOUTER`,
   `BOTTOMINNER`, `BOTTOMOUTER`, as ornaments name corners, §12), each a radius. On a small panel (`shapeCorners`, from
-  `ApplyGeometry`, which every styling of the body is followed by), a mask (`textures/next/corner_mask.png`: its top left quarter cut round, the rest
-  opaque) at each rounded corner of the body, the radius twice across, flipped for the corner and mirrored on a panel
-  whose inner side is on the right, cuts what is drawn across the body: its fill, its wash, its edges, the side rail's
-  strip and the glow a drop lights. It is wrapped white outside its rect (`CLAMPTOWHITE`); its right and bottom halves
-  are opaque, so a wrap that clamps to its edge would cut nothing more either. A full panel's corners stay square (it
-  stands against the screen's top and bottom beside its feathered edge), and a corner the theme leaves square has its
-  mask taken off. Ornaments are not cut: a theme draws them to fit (the elbows' outer corners are rounded as much).
+  `ApplyGeometry`, which every styling of the body is followed by), a mask at each rounded corner of the body, the
+  radius twice across, that corner's own image (`textures/next/corner_topleft.png`, `corner_topright.png`,
+  `corner_bottomleft.png`, `corner_bottomright.png`: cut round at that corner, opaque elsewhere; the inner and outer
+  corners swap sides on a panel whose inner side is on the right), cuts what is drawn across the body: its fill, its
+  wash, its edges, the side rail's strip and the glow a drop lights. It is wrapped white outside its rect
+  (`CLAMPTOWHITE`); its halves away from its corner are opaque, so a wrap that clamps to its edge would cut nothing more
+  either. A full panel's corners stay square (it stands against the screen's top and bottom beside its feathered edge).
+  Ornaments are not cut: a theme draws them to fit (the elbows' outer corners are rounded as much).
+  - **Two rules of the client's masks**, both found the hard way (reported in game: "lower left corner not masked. top
+    left is perfect though"), and both now in the spec mock (`spec/helpers/wow_mocks.lua`):
+    - **A mask's texture coordinates are ignored.** The first version drew one image and flipped it for each corner
+      with `SetTexCoord`: only the top left, which needs no flip, was cut. lightspark tested it when masks came in (7.2,
+      WoWInterface, "MaskTexture : new widget for 7.2": "SetTexCoord had no effect on mask texture"), and Blizzard's UI
+      never sets coordinates on one. Every orientation is an image of its own; the masked texture's own coordinates are
+      not affected (TheDanW, Blizzard, #wowuidev 2017-01-18: masks "won't wreak havoc on texcoords you set"), so the
+      beam's column still scrolls.
+    - **A texture takes at most 3 masks**; a fourth is an error ("Texture:AddMaskTexture(): Texture already has the
+      maximum number of mask textures (3)", quoted in EllesmereUI's pull request 2594; "a texture can be masked by up
+      to 3 mask textures", TheDanW, the same day). The body's fill spans every corner, so at most `MAX_CORNERS` (3) are
+      rounded, in the order `TOPINNER`, `BOTTOMINNER`, `TOPOUTER`, `BOTTOMOUTER`, the rest left square; Check names a
+      theme that rounds four. The masks a theme no longer rounds come off every part before any new one goes on, and a
+      mask already on its parts is not added again (`applied`), so no part is ever asked for a fourth. The restyle had
+      rounded all four corners of Make It So; its fill refused the fourth.
   **Not verified in game:** `CLAMPTOWHITE` on a mask texture (the client's UI schema lists it, `UI.xsd` `WRAPMODE`;
-  Blizzard's own masks use `CLAMPTOBLACKADDITIVE`, never it), which the art makes not matter.
+  Blizzard's own masks use `CLAMPTOBLACKADDITIVE`, never it), which the art makes not matter; and whether the client
+  counts the same mask added twice to a texture toward its three (`applied` makes sure it is never asked).
 - **A section's row art shorter than its row** (`Sections.Header.Height`, from the row's top; reported: the section's
   title "is overlaping with the first icon row"): the art no longer fills the header to the first row of icons.
 - **Ornament motion** `Flash` (§12), the comm badge's chirp.
@@ -1502,7 +1521,8 @@ What the Make It So theme (§8) needed of the engine, all of it data a theme giv
   left out, on either side and at a scale; "its ends": the column and glow past them, the two masks, given back with
   the column, flecks over the ends as dense and faded there, at a scale), `spec/next/content_spec.lua` (a section's row
   art its own height), `spec/next/theme_panel_spec.lua` ("a body with rounded corners": masks on a small backpack and
-  the mirrored bank, none on a full panel, taken off when a theme leaves a corner square), `spec/next/ornaments_spec.lua` (a flash:
+  the mirrored bank, none on a full panel, taken off when a theme leaves a corner square; each corner its own image, the
+  lower left the lower left's; at most three, in order; one theme's corners off before the next one's go on), `spec/next/ornaments_spec.lua` (a flash:
   unseen at rest, its first after `First`, up to its alpha and out over `Time`, the next after `Every`, out once still
   and `First` again; without `First`, a whole `Every`), `spec/next/theme_panel_spec.lua` ("a transporter's beam": on the
   real backpack, beaming down in place, materializing under the shimmer and saying it has shown, the shimmer going out
@@ -1516,7 +1536,7 @@ What the Make It So theme (§8) needed of the engine, all of it data a theme giv
   a flashing piece out), `spec/sonata/next_themes_spec.lua` ("Make It So": the font, its license and locales, the art,
   the beam's timing and colour, the side bar's blocks, the comm badge centered on the pin and its chirp after the beam,
   the holodeck and the warp stars; the restyle: soft colours, section names in peach on glass above the icons, glass
-  tabs and a solid chosen one, the body and side bar translucent, rounded corners and a clean Check, the beam's margin
+  tabs and a solid chosen one, the body and side bar translucent, its inner corners rounded and a clean Check, the beam's margin
   and ends), `spec/core/init_spec.lua` (started), the settings specs (the
   switch, its row, its title; Snow, Leaves and Stars), `spec/core/constants_spec.lua` (every switch on by default), and
   every shipped-theme spec with it (`shipped_themes_spec`, `pixel_perfect_spec`). Mutation-tested: 65 mutations of the
@@ -1526,7 +1546,9 @@ What the Make It So theme (§8) needed of the engine, all of it data a theme giv
   run's clear time starting from the panel's part), simplified. Every one now caught. The feedback round (the beam's
   reach and ends and their masks, the rounded corners, a section's art height, their Check): 30 mutations, 29 caught at
   once; the survivor showed code that changed nothing (shaping the corners from `styleBody`, which `ApplyGeometry`
-  always follows), removed.
+  always follows), removed. The masks' two client rules (an image per corner and per beam end, at most three masks):
+  9 mutations, 8 caught; the survivor (adding a mask already on a part again) cannot be told apart in the mock, which
+  ignores a repeated add, as the client may; it is kept so the client is never asked.
 
 ## 9. Coverage
 
