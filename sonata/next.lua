@@ -276,9 +276,16 @@ local ANIMATION_OFF = {
   braid = function(theme) theme.Chain.Braid = false end,
   -- A thread of light's sway and glint (Panel.Threads, next-themes.md §22) are a theme's moving ornaments too: it stands
   -- still, its art and its draw-in as the panel opens kept.
+  -- A piece that only flashes (the Make It So theme's glint on its comm badge, next-themes.md §24) is light, not art at
+  -- rest: held still it would shine for good, so it goes.
   ornaments = function(theme)
-    for _, piece in ipairs(theme.Panel.Ornaments or {}) do
-      piece.Motion = nil
+    local pieces = theme.Panel.Ornaments or {}
+    for i = #pieces, 1, -1 do
+      if pieces[i].Motion and pieces[i].Motion.Flash then
+        table.remove(pieces, i)
+      else
+        pieces[i].Motion = nil
+      end
     end
     for _, thread in ipairs(theme.Panel.Threads or {}) do
       thread.Sway = nil
@@ -305,6 +312,8 @@ local ANIMATION_OFF = {
   -- (turning into them as it closes, and fluttering out of the header); off, they slide out.
   smoke = function(theme) theme.Panel.Smoke = nil end,
   bats = function(theme) theme.Panel.Bats = nil end,
+  -- The Make It So theme's (next-themes.md §24): its bags beam in and out; off, they slide in and out.
+  beam = function(theme) theme.Panel.Beam = nil end,
 }
 
 -- effective returns a theme as the player sees it: resolved (a new table), the Animation switches they turned off laid
@@ -626,7 +635,7 @@ function sonataNext:Check(key)
         if o.Motion.Origin ~= nil and not ornaments.ORIGINS[o.Motion.Origin] then
           problem("Motion.Origin", "no point named " .. tostring(o.Motion.Origin))
         end
-        for _, motion in ipairs({ "Glitch", "Scroll", "Blink", "Flicker" }) do
+        for _, motion in ipairs({ "Glitch", "Scroll", "Blink", "Flicker", "Flash" }) do
           local spec = o.Motion[motion]
           if spec ~= nil and type(spec) ~= "table" then
             problem("Motion." .. motion, "a table")
@@ -668,6 +677,26 @@ function sonataNext:Check(key)
           end
           if F.Speed ~= nil and not (type(F.Speed) == "number" and F.Speed > 0) then
             problem("Motion.Flicker.Speed", "more than nothing")
+          end
+        end
+        -- A flash (Every its soonest and latest, Time how long, First how long after the panel shows).
+        local L = o.Motion.Flash
+        if type(L) == "table" then
+          for k in pairs(L) do
+            if not ornaments.FLASH[k] then
+              problem("Motion.Flash." .. tostring(k), "no flash part named " .. tostring(k))
+            end
+          end
+          local E = L.Every
+          if not (type(E) == "table" and type(E[1]) == "number" and type(E[2]) == "number" and E[1] >= 0
+            and E[1] <= E[2]) then
+            problem("Motion.Flash.Every", "two numbers, soonest and latest")
+          end
+          if L.Time ~= nil and not (type(L.Time) == "number" and L.Time > 0) then
+            problem("Motion.Flash.Time", "more than nothing")
+          end
+          if L.First ~= nil and not (type(L.First) == "number" and L.First >= 0) then
+            problem("Motion.Flash.First", "no less than nothing")
           end
         end
       end
@@ -979,6 +1008,68 @@ function sonataNext:Check(key)
         { "Size", "smallest and largest" }, { "Speed", "slowest and fastest" }, { "Band", "highest and lowest" } })
       atLeast(F, "Travel", where .. "Flutter.", true)
       atLeast(F, "Stagger", where .. "Flutter.", false)
+    end
+  end
+  -- A transporter's beam (Panel.Beam, next-themes.md §24): its parts NextBeam's; its sparkles needed, its envelopes four
+  -- numbers in order, the panel's part (an open's Reveal, a close's Fade) two.
+  local beamModule = addon:GetModule('NextBeam', true)
+  local M = theme.Panel and theme.Panel.Beam
+  if beamModule ~= nil and type(M) == "table" then
+    local where = "Panel.Beam."
+    partsOf(M, beamModule.KEYS, where)
+    local P = M.Sparkles
+    if type(P) == "table" then
+      partsOf(P, beamModule.SPARKLE_KEYS, where .. "Sparkles.")
+      atLeast(P, "Density", where .. "Sparkles.", true, true)
+      atLeast(P, "Stretch", where .. "Sparkles.", true)
+      atLeast(P, "Sharpness", where .. "Sparkles.", true)
+      atLeast(P, "Spread", where .. "Sparkles.", false)
+      ranges(P, where .. "Sparkles.", { { "Size", "smallest and largest", true }, { "Twinkle", "slowest and fastest" },
+        { "Drift", "slowest and fastest" } })
+      if type(P.Alpha) == "table" then
+        ranges(P, where .. "Sparkles.", { { "Alpha", "faintest and strongest" } })
+      end
+    else
+      table.insert(problems, where .. "Sparkles: a beam needs them")
+    end
+    local C = M.Column
+    if type(C) == "table" then
+      partsOf(C, beamModule.COLUMN_KEYS, where .. "Column.")
+      atLeast(C, "Spread", where .. "Column.", false)
+      local shimmer = C.Shimmer
+      if shimmer ~= nil and not (type(shimmer) == "table" and type(shimmer[1]) == "number" and shimmer[1] >= 0
+          and shimmer[1] <= 1 and type(shimmer[2]) == "number" and shimmer[2] >= 0) then
+        table.insert(problems, where .. "Column.Shimmer: two numbers, how deep (0 to 1) and how fast")
+      end
+      if C.Scroll ~= nil and type(C.Scroll) ~= "number" then
+        table.insert(problems, where .. "Column.Scroll: a number")
+      end
+    end
+    if type(M.Glow) == "table" then
+      partsOf(M.Glow, beamModule.GLOW_KEYS, where .. "Glow.")
+    end
+    local function envelopes(O, phaseWhere)
+      for _, part in ipairs(beamModule.ENVELOPES) do
+        local e = O[part]
+        if e ~= nil then
+          local ok = type(e) == "table" and #e == 4
+          for i = 1, 4 do
+            ok = ok and type(e[i]) == "number" and e[i] >= 0 and (i == 1 or e[i] >= e[i - 1])
+          end
+          if not ok then
+            table.insert(problems, phaseWhere .. part .. ": four numbers in order, in, full, out and gone")
+          end
+        end
+      end
+    end
+    for phase, keys in pairs({ Open = beamModule.OPEN_KEYS, Close = beamModule.CLOSE_KEYS }) do
+      local O = M[phase]
+      if type(O) == "table" then
+        local phaseWhere = where .. phase .. "."
+        partsOf(O, keys, phaseWhere)
+        ranges(O, phaseWhere, { { phase == "Open" and "Reveal" or "Fade", "from and to", true } })
+        envelopes(O, phaseWhere)
+      end
     end
   end
   local threads = addon:GetModule('NextThreads', true)

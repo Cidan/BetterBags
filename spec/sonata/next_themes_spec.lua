@@ -13,7 +13,7 @@ end
 local constants, createdConstants = StubBetterBagsModule("Constants")
 constants.BAG_KIND = constants.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = 2 }
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextOrnaments", "next/ornaments.lua" },
-  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" } }) do
+  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" } }) do
   if addon:GetModule(m[1], true) == nil then
     ResetModuleStub(m[1], m[2])
     LoadBetterBagsModule(m[2])
@@ -60,7 +60,8 @@ describe("BetterBags Next's shipped themes", function()
   end
 
   it("ships Default and at least three others", function()
-    assert.are.same({ "Default", "Ember", "Frost", "GW2", "Glitch", "Halloween", "Parchment", "Plain", "Quiet" },
+    assert.are.same({ "Default", "Ember", "Frost", "GW2", "Glitch", "Halloween", "MakeItSo", "Parchment", "Plain",
+      "Quiet" },
       shipped())
   end)
 
@@ -867,6 +868,138 @@ describe("BetterBags Next's shipped themes", function()
       assert.are.same({ Body = true, Feather = true }, wheres)
       assert.are.equal("Vine", t.Panel.Threads[1].Texture)
       assert.are.equal("BOTTOM", t.Panel.Threads[1].Anchor)
+    end)
+  end)
+
+  -- Make It So (next-themes.md §24): a starship's computer, beaming in and out, an LCARS frame, a comm badge, the
+  -- holodeck's grid and stars at warp. Asked: "star trek TNG themed, the bags obviously need the star trek beam down, and
+  -- beam up animation for appearing and closing. star trek comm badge is a part of the theme as well ... LCARS is an
+  -- option, but maybe also holodeck too".
+  describe("Make It So", function()
+    local function readFile(path)
+      local file = path:gsub("^Interface\\AddOns\\BetterBags\\", ""):gsub("\\", "/")
+      local f = io.open(file, "rb")
+      assert.is_not_nil(f, file)
+      local data = f:read("*a")
+      f:close()
+      return data, file
+    end
+
+    local function theme()
+      return sonataNext:Resolve("MakeItSo")
+    end
+
+    it("draws its display text in Antonio, which it ships with its license, in the locales it covers", function()
+      local t = theme()
+      local files = {}
+      for role, spec in pairs(t.Fonts) do
+        if spec.File ~= nil and spec.File:find("makeitso", 1, true) then
+          files[spec.File] = true
+          assert.are.same({ "enUS", "enGB", "deDE", "frFR", "esES", "esMX", "itIT", "ptBR" }, spec.Locales, role)
+        end
+      end
+      local count = 0
+      for path in pairs(files) do
+        count = count + 1
+        local data, file = readFile(path)
+        assert.are.equal("\0\1\0\0", data:sub(1, 4), file .. " is a TrueType font")
+      end
+      assert.are.equal(2, count, "bold and semibold")
+      local license = readFile("Interface\\AddOns\\BetterBags\\fonts\\makeitso\\Antonio_OFL.txt")
+      assert.is_truthy(license:find("SIL Open Font License", 1, true))
+      assert.is_not_nil(t.Fonts.Title.File, "the title")
+      assert.is_not_nil(t.Fonts.Section.File, "sections")
+      assert.is_not_nil(t.Fonts.Tab.File, "tabs")
+    end)
+
+    it("ships every texture it names, as a PNG", function()
+      local t = theme()
+      local count = 0
+      for name, path in pairs(t.Textures) do
+        if path:find("textures\\next\\makeitso\\", 1, true) then
+          count = count + 1
+          local data, file = readFile(path)
+          assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), name .. ": " .. file)
+        end
+      end
+      assert.are.equal(28, count)
+    end)
+
+    -- Asked: "the bags obviously need the star trek beam down, and beam up animation for appearing and closing".
+    it("beams down, shown before a bank's wait ends, and beams up, in the transporter's pale blue", function()
+      local B = theme().Panel.Beam
+      assert.is_true(B.Open.Reveal[2] < 0.9, "materialized before a bank's 1 second wait ends")
+      assert.is_true(B.Open.Sparkles[4] > B.Open.Reveal[2], "its shimmer going out after")
+      assert.is_true(B.Close.Fade[2] < B.Close.Sparkles[4], "gone before its shimmer is")
+      assert.is_true(B.Open.Glow[2] < B.Open.Reveal[2], "glowing before it is solid")
+      assert.are.equal("Transporter", B.Column.Color)
+      local blue = theme().Palette.Transporter
+      assert.is_true(blue[3] > blue[1], "blue")
+      assert.is_true(B.Sparkles.Drift[2] > 0 and B.Sparkles.Twinkle[1] > 0, "rippling and twinkling")
+    end)
+
+    -- An LCARS frame: the header's buttons are the side bar's blocks, each in its own colour and its glyph, the bar's
+    -- width across.
+    it("puts its header buttons down an LCARS side bar, each a block the bar's width across", function()
+      local t = theme()
+      local B = t.Header.Buttons
+      assert.is_false(B.Rail.Outside == true, "inside the body")
+      for key, icon in pairs(B.Icons) do
+        if key ~= "closeButton" then
+          assert.is_false(icon.Glyph, key)
+          assert.is_true(math.abs(t.Layout.HeaderButton * icon.Scale - B.Rail.Width) < 1e-9, key .. " the bar's width")
+          assert.are.equal("BlockLight", icon.Highlight.Texture, key)
+        end
+      end
+      for key in pairs(sonataNext:Resolve("Default").Header.Buttons.Icons) do
+        assert.is_not_nil(B.Icons[key], key .. " has a block")
+      end
+      assert.are.equal(B.Rail.Start + 4, B.Rail.Top, "a black band between the elbow and the first block")
+      local elbow = t.Panel.Ornaments[1]
+      assert.are.equal("ElbowTop", elbow.Texture)
+      assert.are.equal(B.Rail.Start, elbow.Height, "the elbow ends where the side bar starts")
+    end)
+
+    -- Tap your comm badge: the close button stands under it, its own icon blank.
+    it("closes from its comm badge, which chirps once it has beamed in", function()
+      local t = theme()
+      local pin = t.Header.Buttons.Pinned.closeButton
+      assert.are.equal("Blank", t.Header.Buttons.Icons.closeButton.Texture)
+      local badge, glint
+      for _, piece in ipairs(t.Panel.Ornaments) do
+        if piece.Texture == "CommBadge" then badge = piece end
+        if piece.Motion and piece.Motion.Flash then glint = piece end
+      end
+      assert.are.equal(pin.Point, badge.Point)
+      assert.are.same({ -pin.X, -pin.Y }, { badge.X, badge.Y }, "where the pin puts the button (Y down, X inward)")
+      assert.are.same({ t.Layout.HeaderButton, t.Layout.HeaderButton }, { badge.Width, badge.Height })
+      assert.is_true(badge.Above, "over the content")
+      assert.is_true(glint.Above and glint.SubLevel > badge.SubLevel, "the glint over the badge")
+      assert.is_true(glint.Motion.Flash.First > t.Panel.Beam.Open.Reveal[2], "once it has beamed in")
+    end)
+
+    it("lays the holodeck's grid behind the items, stars streaking past at warp in its edge", function()
+      local t = theme()
+      assert.are.equal("Holodeck", t.Panel.Fill.Texture)
+      assert.is_true(t.Panel.Fill.HorizTile and t.Panel.Fill.VertTile, "repeating")
+      for _, entry in ipairs(t.Panel.Snow.Flakes) do
+        assert.are.equal("Feather", entry.Where)
+        assert.are.same({ 0, 0 }, entry.Fall, "across, not falling")
+        assert.is_true(entry.Drift > 0)
+        assert.are.equal(0, entry.Spin, "never turned: a streak stays a streak")
+      end
+      assert.is_true(t.Panel.Snow.Gusts.Strength > 300, "a jump to warp")
+    end)
+
+    it("writes in black on its LCARS bars and in LCARS orange and peach on black", function()
+      local t = theme()
+      for _, role in ipairs({ "Section", "SectionRecent", "SectionFree", "Count", "Tab", "TabSelected" }) do
+        assert.are.equal("Black", t.Fonts[role].Color, role)
+        assert.is_false(t.Fonts[role].Shadow, role)
+      end
+      assert.are.equal("LcarsOrange", t.Fonts.Title.Color)
+      assert.are.equal("SectionBar", t.Sections.Header.Texture)
+      assert.are.equal("LcarsTab", t.Tabs.Fill.Texture)
     end)
   end)
 

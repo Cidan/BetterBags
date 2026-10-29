@@ -59,7 +59,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
-  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -2090,6 +2090,340 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal(0, #bag.bats.flutters)
       assert.is_false(texture:IsShown())
       assert.is_nil(bag.bats.driver:GetScript("OnUpdate"))
+    end)
+  end)
+
+  -- The Make It So theme's transporter (next-themes.md §24; asked: "the bags obviously need the star trek beam down, and
+  -- beam up animation for appearing and closing").
+  describe("a transporter's beam (Panel.Beam)", function()
+    local beamModule = addon:GetModule("NextBeam")
+    local savedRandom, begun
+
+    local BEAM = {
+      Sparkles = { Texture = "Glow", Colors = { "White" }, Density = 1, Size = { 8, 8 }, Alpha = { 0.8, 0.8 },
+        Twinkle = { 4, 4 }, Drift = { 20, 20 } },
+      Column = { Texture = "Glow", Color = "White", Alpha = 0.5, Spread = 20 },
+      Glow = { Texture = "Glow", Color = "White", Alpha = 0.6 },
+      Open = { Reveal = { 0.2, 0.5 }, Sparkles = { 0, 0.1, 0.4, 0.8 }, Column = { 0, 0.1, 0.5, 0.9 },
+        Glow = { 0.1, 0.3, 0.4, 0.6 } },
+      Close = { Fade = { 0.15, 0.4 }, Sparkles = { 0, 0.1, 0.4, 0.7 }, Column = { 0, 0.1, 0.4, 0.8 },
+        Glow = { 0, 0.15, 0.3, 0.5 } },
+    }
+    local THREADS = { { Anchor = "TOP", Points = { { 0, 20 }, { 1, 40 } }, Segments = 6, Width = 4, Texture = "Glow",
+      Color = "Gold", Alpha = 0.8, BlendMode = "ADD", Draw = 0.4 } }
+
+    local function beaming(without)
+      local panel = { Beam = BEAM, Threads = THREADS }
+      if without then panel.Beam = nil end
+      apply({ Panel = panel })
+    end
+
+    local function step(dt)
+      tween.driver:GetScript("OnUpdate")(tween.driver, dt)
+    end
+
+    local function lingering()
+      local n = 0
+      for _ in pairs(beamModule.living) do n = n + 1 end
+      return n
+    end
+
+    local function clear()
+      local d = beamModule:Layer().driver
+      for _ = 1, 40 do
+        local u = d:GetScript("OnUpdate")
+        if u == nil then return end
+        u(d, 0.05)
+      end
+    end
+
+    before_each(function()
+      savedRandom = beamModule.Random
+      local seed = 3
+      beamModule.Random = function()
+        seed = (seed * 16807) % 2147483647
+        return seed / 2147483647
+      end
+      beamModule:Init()
+      begun = {}
+      local begin = beamModule.Begin
+      override(beamModule, "Begin", function(self, panel, phase)
+        local run = begin(self, panel, phase)
+        table.insert(begun, { run = run, phase = phase })
+        return run
+      end)
+      beaming()
+    end)
+
+    after_each(function()
+      beamModule.Random = savedRandom
+      beamModule:Init()
+    end)
+
+    it("beams down where it rests, shown under the shimmer over its body, the shimmer going out on its own after", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      assert.are.equal(0, bag.offset, "in place, not sliding in")
+      assert.are.equal(0, bag.frame:GetAlpha())
+      assert.are.equal("Open", begun[1].phase)
+      local run = begun[1].run
+      local left, top, height, width = bag:BodyRect()
+      for _, s in ipairs(run.sparkles) do
+        assert.is_true(s.x >= left - 1e-6 and s.x <= left + width + 1e-6, "across its body")
+        assert.is_true(s.y >= top - height - 1e-6 and s.y <= top + 1e-6, "down it")
+      end
+      step(0.3)
+      local alpha = bag.frame:GetAlpha()
+      assert.is_true(alpha > 0 and alpha < 1, "materializing: " .. alpha)
+      assert.is_true(run.glow:IsShown(), "glowing as it does")
+      assert.is_nil(shownAt)
+      finishTweens()
+      assert.is_true(shownAt, "says it has shown once it has fully materialized")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(1, lingering(), "its shimmer lingering on its own")
+      local column = run.column
+      clear()
+      assert.are.equal(0, lingering())
+      assert.is_false(column:IsShown(), "given back once it has gone out")
+    end)
+
+    it("draws its threads in and cascades its sections once it has materialized", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      local threads = bag.threads
+      local d = threads.driver
+      d:GetScript("OnUpdate")(d, 0.45)
+      assert.are.equal(0, threads.reveal, "waiting for it to materialize")
+      d:GetScript("OnUpdate")(d, 0.1)
+      assert.is_true(threads.reveal > 0)
+    end)
+
+    it("stops at rest when Escape hides it mid-beam, its shimmer given back", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(0.1)
+      local run = begun[1].run
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.are.equal(0, #run.sparkles)
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(0, lingering())
+    end)
+
+    it("shows plainly when its theme goes mid-beam, and still says it has shown", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      step(0.1)
+      local run = begun[1].run
+      beaming(true)
+      step(0.05)
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(0, #run.sparkles)
+      finishTweens()
+      assert.is_true(shownAt)
+    end)
+
+    it("beams up where it stands: fading out under the shimmer, gone at its Fade's end, the shimmer lingering", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local base = bag.offset
+      clear()
+      bag:Hide(ctx())
+      assert.are.equal("Close", begun[#begun].phase)
+      local run = begun[#begun].run
+      step(0.1)
+      assert.are.equal(base, bag.offset, "where it stands")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.is_true(run.glow:IsShown(), "lighting up")
+      step(0.15)
+      local alpha = bag.frame:GetAlpha()
+      assert.is_true(alpha > 0 and alpha < 1, "dematerializing: " .. alpha)
+      assert.is_true(bag.frame:IsShown())
+      finishTweens()
+      assert.is_false(bag.frame:IsShown(), "gone")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(1, lingering(), "its shimmer going out on its own")
+      clear()
+      assert.are.equal(0, #run.sparkles)
+    end)
+
+    it("unravels its threads as it beams up", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local over
+      local unravel = bag.threads.Unravel
+      bag.threads.Unravel = function(set, time)
+        over = time
+        return unravel(set, time)
+      end
+      bag:Hide(ctx())
+      assert.are.equal(0.4, over)
+    end)
+
+    it("closes plainly when its theme goes as it beams up", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      clear()
+      bag:Hide(ctx())
+      local run = begun[#begun].run
+      step(0.2)
+      beaming(true)
+      step(0.05)
+      assert.are.equal(1, bag.frame:GetAlpha(), "shown plainly")
+      assert.are.equal(0, #run.sparkles, "its shimmer given back")
+      finishTweens()
+      assert.is_false(bag.frame:IsShown())
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(0, lingering())
+    end)
+
+    it("slides in and out as any theme's without a beam", function()
+      beaming(true)
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      assert.are_not.equal(0, bag.offset, "sliding in")
+      finishTweens()
+      bag:Hide(ctx())
+      finishTweens()
+      assert.are.equal(0, #begun)
+    end)
+  end)
+
+  -- The Make It So theme's LCARS frame (next-themes.md §24): the side bar's blocks (its header buttons) and its elbows
+  -- fit together, the comm badge stands where the close button is, and nothing else runs into them.
+  describe("the Make It So theme's LCARS frame", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local beamModule = addon:GetModule("NextBeam")
+    local undoScreen
+
+    before_each(function()
+      -- 768 pixels high at a UI scale of 1: a unit is a pixel, so its sizes are exact.
+      undoScreen = layout.UseScreen(1366, 768, 1)
+      beamModule:Init()
+      sonataNext:ApplyTheme(ctx(), "MakeItSo", false)
+    end)
+
+    after_each(function()
+      undoScreen()
+      beamModule:Init()
+      backToDefault()
+    end)
+
+    local function piece(panel, texture)
+      for _, p in ipairs(panel.ornaments.pieces) do
+        if p.spec and p.spec.Texture == texture then return p end
+      end
+    end
+
+    local function near(a, b) return math.abs(a - b) < 1e-6 end
+
+    -- How far a rect is in from the body's inner side (the backpack's left, the bank's right), and down from its top.
+    local function inner(panel, r, body)
+      if panel.side == "LEFT" then return body.right - r.right end
+      return r.left - body.left
+    end
+
+    it("stands the comm badge exactly where the close button is pinned, on the backpack and the mirrored bank", function()
+      for _, panel in ipairs({ opened(function(c) return nextBag:Create(c) end),
+        opened(function(c) return nextBank:Create(c) end) }) do
+        local badge = layout.Rect(piece(panel, "CommBadge").texture)
+        local close = layout.Rect(panel.closeButton)
+        for _, side in ipairs({ "left", "right", "top", "bottom" }) do
+          assert.is_true(near(badge[side], close[side]), panel.side .. " " .. side)
+        end
+        local body = layout.Rect(panel.body)
+        assert.is_true(badge.top <= body.top and badge.bottom >= body.top - 40, "at the top")
+      end
+    end)
+
+    it("stacks its header buttons down the side bar below the top elbow, block under block", function()
+      for _, panel in ipairs({ opened(function(c) return nextBag:Create(c) end),
+        opened(function(c) return nextBank:Create(c) end) }) do
+        local body = layout.Rect(panel.body)
+        local elbow = layout.Rect(piece(panel, "ElbowTop").texture)
+        assert.is_true(near(body.top - elbow.bottom, 66), "the elbow 66 tall")
+        assert.is_true(near(inner(panel, elbow, body), 0), "from the inner corner")
+        local tops = {}
+        for _, button in ipairs(panel.headerButtons) do
+          if button:IsShown() and button ~= panel.closeButton then
+            local r = layout.Rect(button)
+            local icon = layout.Rect(button.icon)
+            assert.is_true(near(inner(panel, icon, body), 0), "its block the side bar's width, from its inner side")
+            assert.is_true(near(icon.right - icon.left, 52))
+            table.insert(tops, body.top - r.top)
+          end
+        end
+        table.sort(tops)
+        assert.is_true(#tops >= 3)
+        assert.is_true(near(tops[1], 70), "the first 4 under the elbow, its black band between")
+        for i = 2, #tops do
+          assert.is_true(near(tops[i] - tops[i - 1], 40), "each 4 under the one above")
+        end
+      end
+    end)
+
+    it("keeps its title and search box clear of the side bar, the top bar and the comm badge", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      bag:SetTitle("Backpack")
+      local body = layout.Rect(bag.body)
+      -- The title, by where it hangs from the body (a text has no rect of its own in the specs' frames).
+      local point, rel, relPoint, x, y = bag.title:GetPoint(1)
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT" }, { point, rel, relPoint })
+      local badge = layout.Rect(piece(bag, "CommBadge").texture)
+      local search = layout.Rect(bag.searchBox.frame)
+      assert.is_true(x >= 52, "right of the side bar")
+      assert.is_true(-y >= 18, "under the top bar")
+      assert.is_true(body.left + x + bag.title:GetStringWidth() <= badge.left, "short of the badge")
+      assert.is_true(search.left >= body.left + 52)
+      assert.is_true(body.top - search.top >= -y + 32, "under the title")
+    end)
+
+    -- A small bag goes as narrow as 216 (its title's room, its footer, a column of items beside the side bar): the
+    -- pieces along its top and bottom, the comm badge among them, never run into each other, at that width or at a
+    -- full bag's.
+    it("never runs the pieces along its top or bottom into each other, as narrow as a small bag goes", function()
+      override(stubs.database, "GetNextSmallSize", function() return 1, 400 end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      local function check(label)
+        local body = layout.Rect(bag.body)
+        for _, edge in ipairs({ "top", "bottom" }) do
+          local spans = {}
+          for _, p in ipairs(bag.ornaments.pieces) do
+            local o = p.spec
+            -- The glint over the badge is light, not a piece of the frame.
+            if o ~= nil and p.texture:IsShown() and o.Texture ~= "Glint" then
+              local r = layout.Rect(p.texture)
+              local at = edge == "top" and body.top - r.top or r.bottom - body.bottom
+              if at < 4 then
+                assert.is_true(r.right - r.left >= 0, label .. ": " .. o.Texture .. " a length")
+                table.insert(spans, { r.left, r.right, o.Texture })
+              end
+            end
+          end
+          table.sort(spans, function(a, b) return a[1] < b[1] end)
+          for i = 2, #spans do
+            assert.is_true(spans[i][1] >= spans[i - 1][2] - 1e-6,
+              label .. ": " .. spans[i - 1][3] .. " runs into " .. spans[i][3] .. " along the " .. edge)
+          end
+          assert.is_true(#spans >= 2, label .. ": its " .. edge)
+        end
+      end
+      check("full")
+      addon:GetModule("NextPanel"):SetSize(ctx(), "small")
+      finishTweens()
+      assert.are.equal(216, layout.Rect(bag.body).right - layout.Rect(bag.body).left, "as narrow as it goes")
+      check("small")
+      addon:GetModule("NextPanel"):SetSize(ctx(), "full")
+      finishTweens()
+    end)
+
+    it("keeps its footer's text above the bottom bar", function()
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local body = layout.Rect(bank.body)
+      local free = layout.Rect(bank.freeText)
+      local bar = layout.Rect(piece(bank, "ElbowBottom").texture)
+      assert.is_true(near(bar.bottom, body.bottom))
+      assert.is_true(free.bottom >= body.bottom + 12, "above the bar")
+      assert.is_true(free.right <= bar.left or free.left >= body.left, "beside the elbow")
     end)
   end)
 

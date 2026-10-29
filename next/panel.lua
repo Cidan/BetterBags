@@ -87,6 +87,9 @@ local nextSmoke = addon:GetModule('NextSmoke')
 ---@class NextBats: AceModule
 local nextBats = addon:GetModule('NextBats')
 
+---@class NextBeam: AceModule
+local nextBeam = addon:GetModule('NextBeam')
+
 ---@class NextMenuButtonModule: AceModule
 local nextMenuButton = addon:GetModule('NextMenuButton')
 
@@ -730,6 +733,14 @@ function panelProto:moveIn(from, to, duration, ease, delay)
     self.content:Cascade(true, delay + lock)
     return
   end
+  if nextBeam:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once it has materialized.
+    local lock = nextBeam:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:beamIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
   self.threads:DrawIn(delay + style.Time.OpenCascadeDelay)
   self:setOffset(from)
   tween:Play(self, {
@@ -1092,6 +1103,108 @@ function panelProto:batsOut(from, to, done)
     onDone = function()
       if run ~= nil then
         run:Break()
+        run = nil
+      end
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- beamIn opens the panel where it rests by beaming it down (the theme's Panel.Beam.Open, next-themes.md §24), after
+-- delay unseen: the transporter's shimmer, its column of light and a glow over its body, and the panel materializing
+-- under them (NextBeam's Draw). A tween of the panel's own, like the slide it stands in for: whatever stops or replaces
+-- it (a flight, a placement, Escape) ends the beam at rest (endShatter). Once the panel has materialized it says it has
+-- finished showing, as the slide does, and its beam lingers on its own layer until it has gone out (Linger).
+---@private
+---@param to number
+---@param delay number
+function panelProto:beamIn(to, delay)
+  local total = nextBeam:OpenTime()
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  local run ---@type NextBeamRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextBeam:Opens() then
+        -- Its theme went while it beamed down (another theme, Transporter off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      -- Its beam is laid over where its body is once its delay is up (a chained bag waiting unseen is in place by then).
+      run = run or nextBeam:Begin(self, "Open")
+      self.frame:SetAlpha(run:Draw(p * total))
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- beamOut closes the panel where it is by beaming it up (the theme's Panel.Beam.Close, next-themes.md §24): the
+-- transporter's shimmer, its column and a glow over its body, and the panel fading out under them; then it is gone (done,
+-- Hide's end) and its beam lingers on its own layer until it has gone out.
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:beamOut(from, to, done)
+  local total = nextBeam:CloseTime()
+  local run = nextBeam:Begin(self, "Close") ---@type NextBeamRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextBeam:Closes() then
+        -- Its theme went while it beamed up: shown plainly, it closes at the end.
+        rest()
+        self.frame:SetAlpha(1)
+        return
+      end
+      if run ~= nil then
+        self.frame:SetAlpha(run:Draw(p * total))
+      end
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
         run = nil
       end
       self:endShatter(from)
@@ -4764,6 +4877,12 @@ function panelProto:Hide(ctx)
     self.threads:Unravel(nextBats:Spec().Close.Shudder or 0)
     -- Where it is: it turns into bats where it stands.
     self:batsOut(self.offset, to, slidOut)
+    return
+  end
+  if nextBeam:Closes() then
+    self.threads:Unravel(nextBeam:CloseTime())
+    -- Where it is: it beams up where it stands.
+    self:beamOut(self.offset, to, slidOut)
     return
   end
   self.threads:Unravel(style.Time.Close)

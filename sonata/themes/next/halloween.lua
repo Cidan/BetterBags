@@ -263,7 +263,7 @@ sonataNext:RegisterTheme({
         Layer = "BORDER", SubLevel = 6 },
     },
     -- Autumn leaves (NextSnow): down the feather, out into the world, and a few behind the items, tumbling as they
-    -- fall, a gust now and then. Appearance > Animation > Snow and Leaves turns them off.
+    -- fall, a gust now and then. Appearance > Animation > Snow, Leaves and Stars turns them off.
     Snow = {
       Flakes = {
         { Where = "Feather", Texture = "Leaf", Count = 10, Size = { 12, 20 }, Fall = { 18, 34 }, Drift = 10,

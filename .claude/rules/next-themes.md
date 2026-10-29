@@ -385,6 +385,57 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     dock's card, the currency tracker and dialogs are on the body's art in ink; menus are black with bone text.
   - Not seen in game yet; no image of it was rendered.
 
+- **Make It So** (`sonata/themes/next/makeitso.lua`; asked, to honor Patrick Stewart: "star trek TNG themed, the bags
+  obviously need the star trek beam down, and beam up animation for appearing and closing. star trek comm badge is a
+  part of the theme as well ... LCARS is an option, but maybe also holodeck too -- up to you, go nuts ... most important
+  part is beam down/beam up", with the glam of the Halloween, Glitch and Frost themes): a starship's computer. Its
+  palette redefines Default's names in LCARS' colours (Gold its orange, Lavender its lilac, Text and Muted peach) and
+  adds them (`LcarsOrange`, `LcarsPeach`, `LcarsLilac`, `LcarsBlue`, `LcarsSalmon`, `LcarsRed`, `Sky`) and the
+  transporter's pale blue (`Transporter`). Its engine is §24.
+  - **Beaming down** (NextBeam): a column of pale blue light comes up over where the bag rests, its art flowing up and
+    its strength shimmering; the transporter's shimmer (flecks of white, blue and a little peach, about 2.6 to every
+    100 x 100 units of the body, some a little past its sides) twinkles in brief flashes and ripples up and down
+    through it; the body glows as the bag materializes under them, solid by 0.72 s (under the 1 s a bank waits for its
+    panel to show); the light goes out after, by 1.15 s. A moment later the comm badge chirps: a glint flashes across
+    it (`Flash`, first 0.85 s after it shows, then every 7 to 13 s). **Beaming up:** where it stands, the column and the
+    shimmer come up and the body glows as the bag fades out of the light, gone by 0.65 s; the light goes out after it.
+  - **The LCARS frame** (ornaments, §12, and the side rail, §13): the side bar (52 wide, lilac, inside the body on its
+    inner side) curves into the top bar (18 tall, orange) at the top elbow (150 x 66, its outer corner rounded, the
+    corner inside filled round); then a lilac segment, its light flickering as the computer works, the bar on to its
+    rounded end short of the comm badge. At the bottom another elbow (peach, 150 x 40) into the bottom bar (salmon, 12
+    tall) and its rounded end. A small bag (as narrow as 216) keeps its elbows, its bottom bar and the badge: the top
+    bar beyond its elbow would run into them. The header's buttons are the side bar's blocks: each its LCARS colour
+    (settings peach, sort and filter lilac, Show Blizzard Bags and repair sky, the size button orange, bank tabs and
+    Sell Junk salmon, deposits blue, gold gold), its glyph cut in black at its right end, drawn the bar's width across
+    with a black band above and below, so the blocks stack 4 apart under the elbow (`Layout.HeaderButton` 36, each
+    icon's `Scale` 52 / 36, `Rail.Top` 70, `Gap` 4, its art from 66 where the elbow ends), a light over one under the
+    pointer.
+  - **The comm badge:** the close button, pinned at the top outer corner (12 in, 2 down), its own icon blank; the badge
+    (the gold delta over its silver oval) an ornament drawn over the content exactly where the pin puts the button
+    (`Above`), a glint over it, and a soft light round it under the pointer (the button's `Highlight`). Tap your comm
+    badge to beam up.
+  - **At rest:** the holodeck's golden grid behind the items (the body's fill, a 64 x 64 tile repeating); in the
+    feathered edge, stars at warp (NextSnow, §22): streaks and specks drifting out into the world at three speeds,
+    never falling, never turned, and every 30 s or so a jump to warp (a gust 600 strong, streaks of light sweeping
+    across). Tabs are LCARS bars, rounded where they stick out (lilac, the chosen one orange), section headers lilac
+    bars, their names and counts in black; the title in LCARS orange with a soft glow, an orange line out of the window
+    and a fleck of the transporter's light gliding in along it; no cloud (LCARS' text stands on black); sparkles are the
+    transporter's flecks; item buttons dark cells, a thin orange edge carrying an item's quality.
+  - **Text:** Antonio (fonts/makeitso, Vernon Adams, SIL Open Font License; Google Fonts' upstream,
+    googlefonts/antonioFont at `0856299`, its static Bold and SemiBold, checked against the upstream's file hashes), a
+    free face in the spirit of LCARS' lettering, for display text (titles, sections, tabs, counts, the empty text,
+    dialog and settings titles); the client's font for the rest. Its character map covers Latin-1 (checked with a stdlib
+    reader of its `cmap`), none of Cyrillic, Korean or Chinese, so in other locales its roles draw the client's
+    (`Locales`).
+  - **Art:** `tools/textures/next_makeitso.py` (standard-library Python; shapes at 4 x 4 samples a pixel, lights as
+    smooth fields; the frame's pieces drawn for the size the theme gives them in its units, so circles stay circles)
+    makes `textures/next/makeitso/*.png`: the elbows, a bar's rounded end, a white square the bars and segments are
+    tinted from, a blank, the tab, the section bar, a block for each header button (its glyph read from
+    `textures/next/icons` with a stdlib PNG reader and resampled) and the light over one, the comm badge and the light
+    round it, the glint, the transporter's column (soft across, streaked, banded so it tiles as it flows), the body's
+    glow, a warp streak and the holodeck tile. Checked by ASCII previews, colour classes for the badge and a block.
+  - Not seen in game yet; no image of it was rendered.
+
 Each draws the settings window and its controls in its own look (next-settings.md §6): Ember and Quiet
 their control colors in their own charcoal and grays (Quiet also smaller settings titles and quicker
 switches and tab markers); Parchment the window, its menus and dialogs on the paper art, ink text and
@@ -534,8 +585,12 @@ is a column at a screen edge, feathered on its inner side), so ornaments are art
     then, `Twice` of its blinks, it blinks again as soon as it has been open as long as it was shut, never a third time:
     a black cat's eyes) and `Flicker` (its alpha wandering like a candle's, never still, between `Low` of its own and its
     own, toward somewhere new every half to one and a half of a `Speed`'th of a second). Both set only the piece's alpha
-    (`fade`), never its place. A panel hiding mid-blink opens it again. The Animation switch Moving Ornaments stills
-    them all (§20).
+    (`fade`), never its place. A panel hiding mid-blink opens it again. One more for the Make It So theme (§24): `Flash`
+    (a piece that is light, not art at rest: unseen, it waits `First` seconds after the panel shows, else `Every`, `{
+    soonest, latest }`, then over `Time`, 0.3 when unset, comes up to its alpha and goes out again, half a sine, and
+    waits `Every` for the next; what a step waited past is how far into its flash it is; a panel hiding mid-flash puts it
+    out, and it waits its `First` again next time: the comm badge's glint). The Animation switch Moving Ornaments stills
+    them all (§20), and takes a piece that only flashes out altogether: held still it would shine for good.
 - **Whole pixels** (docs/next-pixel-perfect.md): offsets snapped and sizes rounded on the frame's grid, so a
   piece at rest is on whole pixels. Moving pieces rest nowhere: `panelProto:MovingParts` names them (only those
   shown at the panel's size), so the pixel checks leave them out.
@@ -932,9 +987,10 @@ use, and back on.
   | Glitch Effects (`nextGlitch`) | `glitch` | `Panel.Glitch` (§21): no flicker, tears or bursts; the bags slide in and out as any theme's. Flicker can be hard on some players' eyes |
   | Data Rain (`nextRain`) | `rain` | `Panel.Rain` (§21): no glyphs falling |
   | Ice Shatter (`nextShatter`) | `shatter` | `Panel.Shatter` (§22): no freezing together or shattering; the bags slide in and out as any theme's |
-  | Snow and Leaves (`nextSnow`) | `snow` | `Panel.Snow` (§22): no snow, falling leaves, gusts, wind streaks or shooting stars. Titled Snowfall until the Halloween theme's leaves fell through the same engine |
+  | Snow, Leaves and Stars (`nextSnow`) | `snow` | `Panel.Snow` (§22): no snow, falling leaves, stars at warp, gusts, wind streaks or shooting stars. Titled Snowfall until the Halloween theme's leaves fell through the same engine, then Snow and Leaves until the Make It So theme's stars did |
   | Smoke Puff (`nextSmoke`) | `smoke` | `Panel.Smoke` (§23): no smoke; the bags slide in as any theme's |
   | Bats (`nextBats`) | `bats` | `Panel.Bats` (§23): no breaking up into bats, no fluttering bats; the bags slide out as any theme's |
+  | Transporter (`nextBeam`) | `beam` | `Panel.Beam` (§24): no beaming in or out; the bags slide in and out as any theme's |
 
   Moving Ornaments also holds a theme's threads of light still (§22: each thread's `Sway` and `Glint` taken out, its art
   and its draw-in as the panel opens kept).
@@ -1345,6 +1401,77 @@ What the Halloween theme (§8) needed of the engine, all of it data a theme give
   the panel's scale, threads unravelling over the tremble, the tremble dying away and its scale, the drift over `Break`,
   the wings' spread, the piece fading into its bat, the corners' jitter and texture coordinates, `Spread`, the grid's
   shape, the speed's ease in, the bat's growing). Every one now caught.
+
+## 24. The Make It So theme's engine (`next/beam.lua`, ornaments' `Flash`)
+
+What the Make It So theme (§8) needed of the engine, all of it data a theme gives.
+
+- **Beaming in and out** (`Panel.Beam`, NextBeam, driven by the panel: `beamIn` from `moveIn` after a glitch, a shatter
+  and smoke; `beamOut` from `Hide` after a glitch, a shatter and bats; `endShatter` ending both, as it ends theirs).
+  - **A run** (`NextBeam:Begin(panel, phase)`, `"Open"` a beam down, `"Close"` a beam up) lays its parts on the beam
+    layer (a frame over the screen in the DIALOG strata, level 15, above every panel, taking no mouse) over the body's
+    rect (`panel:BodyRect`, at the panel's scale), unseen until it draws:
+    - **Sparkles** (required): `Density` of them to every 100 x 100 units of the body (counted in the body's own units,
+      so a scaled panel shows as many, smaller), across it and `Spread` past its sides, down it; each a texture
+      (`OVERLAY`) in a colour of `Colors`, its size between `Size`, its strength between `Alpha` (a range, or one
+      number), drifting up or down (half each way) at between `Drift` round the body (wrapping from top to bottom), and
+      twinkling `Twinkle` times a second from a phase of its own: `((1 + sin(2 pi f t + phase)) / 2) ^ Sharpness` of its
+      strength, `Sharpness` making the flashes brief; swelling from half its size to its size as it flashes, drawn out
+      `Stretch` times as tall as wide. All scaled by the panel's scale.
+    - **Column** (optional): a texture (`ARTWORK` 0) over the body and `Spread` past its sides, in `Color`, at `Alpha`,
+      shimmering (`Shimmer`: `{ how deep, 0 to 1; how fast, swings a second }`: `1 - depth + depth * (0.5 + 0.5 sin)`
+      of its strength) and its art flowing up `Scroll` of its height a second (its texture coordinates; the art loaded
+      with the REPEAT wrap mode down its length, not tiled by the client).
+    - **Glow** (optional): a texture (`ARTWORK` 1) over the body, in `Color`, at `Alpha`: the bag lit as it
+      materializes.
+  - **Envelopes:** each part grows in and out over an envelope of its phase, `{ in, full, out, gone }` seconds:
+    `smoothstep(in, full, t) * (1 - smoothstep(out, gone, t))`; a part its phase gives no envelope stays dark.
+  - **The panel's part:** a beam down (`Open`) shows the panel under it over `Reveal` (`{ from, to }`, smoothstep): it
+    has materialized at `Reveal`'s end (`OpenTime`, `OpenLock`), says it has shown, and its threads draw in and its
+    sections cascade from then. A beam up (`Close`) fades it over `Fade` (`CloseTime`, its end): then it hides (`Hide`'s
+    end), and its threads unravel over that time. Either way the run lingers on its own (`Linger`, on the beam layer's
+    driver) until its last part has gone out (`ClearTime(phase)`: the latest envelope's end; none without one), then
+    gives its textures back; the driver stops with the last. `Init` gives back whatever lingers (`core/init.lua` starts
+    it with the smoke's and the bats'). The theme going mid-beam shows the panel plainly (and a beam up closes it
+    plainly at its end), its run given back; Escape mid-beam ends it at rest.
+- **Ornament motion** `Flash` (§12), the comm badge's chirp.
+- **Check** names each part a beam does not have (and each of its phase's parts: `Reveal` only in an `Open`, `Fade`
+  only in a `Close`, each required there, two numbers in order), what its runtime needs (`Sparkles`, and their
+  `Density`, more than nothing; `Stretch` and `Sharpness` more than nothing; `Spread` no less; `Size` required, and
+  `Twinkle`, `Drift` and `Alpha` (when a range) as two numbers in order; a column's `Spread` no less, `Shimmer` its
+  depth from 0 to 1 and its speed no less than nothing, `Scroll` a number), every envelope four numbers in order, none
+  below 0; its colours through the usual walk. And a flash's `Every` (required, in order), `Time` more than nothing,
+  `First` no less, and its parts.
+- **The switch** Transporter (§20); Snow and Leaves became Snow, Leaves and Stars (the warp stars fall through the snow
+  engine).
+- **Not measured in game:** the beam's cost. A full panel's beam lays about 130 flecks (510 x 1000 units at a density of
+  2.6), each placed, sized and faded every frame for about 1.15 s, and two large textures over the body.
+- **Coverage:** `spec/next/beam_spec.lua` (opening only with an Open and closing only with a Close, the times; the
+  layer; flecks by their density across the body and past its sides, unseen until drawn, their colours, rippling both
+  ways; each twinkling, swelling, drawn out, drifting round the body, in and out over its envelope, nothing before or
+  after it; the column over the body and past its sides, loaded repeating, shimmering and flowing; the glow over the
+  body, dark before its envelope; the panel shown over its Reveal, faded over its Fade by the Close's own envelopes;
+  only sparkles without a column or glow; the panel's scale; lingering where the panel left it until the last part has
+  gone out, the driver stopped; pools, and `Init` letting go of what lingers), `spec/next/ornaments_spec.lua` (a flash:
+  unseen at rest, its first after `First`, up to its alpha and out over `Time`, the next after `Every`, out once still
+  and `First` again; without `First`, a whole `Every`), `spec/next/theme_panel_spec.lua` ("a transporter's beam": on the
+  real backpack, beaming down in place, materializing under the shimmer and saying it has shown, the shimmer going out
+  on its own after; its threads and sections waiting; Escape and the theme going mid-beam; beaming up where it stands,
+  gone at its Fade's end, the shimmer lingering; its threads unravelling over it; the theme going as it beams up;
+  sliding without a beam. "the Make It So theme's LCARS frame", on a screen where a unit is a pixel: the badge exactly
+  where the close button is pinned on the backpack and the mirrored bank; the buttons down the side bar under the elbow,
+  each block the bar's width, 4 apart; the title and search box clear of the side bar, the top bar and the badge; the
+  footer's text above the bottom bar; no piece along the top or bottom running into another, full and as narrow as a
+  small bag goes), `spec/sonata/next_engine_spec.lua` (Check of a beam and of a flash; the switch; Moving Ornaments taking
+  a flashing piece out), `spec/sonata/next_themes_spec.lua` ("Make It So": the font, its license and locales, the art,
+  the beam's timing and colour, the side bar's blocks, the comm badge where the pin is and its chirp after the beam,
+  the holodeck and the warp stars, black on the bars), `spec/core/init_spec.lua` (started), the settings specs (the
+  switch, its row, its title; Snow, Leaves and Stars), `spec/core/constants_spec.lua` (every switch on by default), and
+  every shipped-theme spec with it (`shipped_themes_spec`, `pixel_perfect_spec`). Mutation-tested: 65 mutations of the
+  beam, the flash, the panel's wiring, Check, the switch, its default and its start. Six first survived: four led to
+  sharper tests (a fleck's Spread at the panel's scale, each fleck's own twinkle phase, drifting round the body, the
+  switch on by default), one to a test of an envelope of five numbers, and one showed code that changed nothing (a
+  run's clear time starting from the panel's part), simplified. Every one now caught.
 
 ## 9. Coverage
 

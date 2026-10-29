@@ -45,11 +45,12 @@ ornaments.SIZES = { Full = true, Small = true }
 -- The panels a piece may be shown on (Panels), by the name of the bag kind each panel shows (const.BAG_KIND).
 ornaments.PANELS = { Backpack = "BACKPACK", Bank = "BANK", Vendor = "UNDEFINED", GuildBank = "GUILD" }
 ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period = true, Delay = true, Origin = true,
-  Scroll = true, Glitch = true, Blink = true, Flicker = true }
--- The keys of a Glitch motion, a Blink and a Flicker.
+  Scroll = true, Glitch = true, Blink = true, Flicker = true, Flash = true }
+-- The keys of a Glitch motion, a Blink, a Flicker and a Flash.
 ornaments.GLITCH = { Every = true, Hold = true, Jump = true, Blink = true, Slip = true }
 ornaments.BLINK = { Every = true, Time = true, Twice = true }
 ornaments.FLICKER = { Low = true, Speed = true }
+ornaments.FLASH = { Every = true, Time = true, First = true }
 -- Seconds between a glitch's rolls while it lasts: each roll jumps, blinks and slips the piece anew.
 ornaments.GLITCH_STEP = 0.06
 -- Where Scroll, Glitch, Blink and Flicker take their randomness (a source of numbers in [0, 1)): replaced by the specs.
@@ -77,6 +78,8 @@ ornaments.Random = math.random
 ---@field flick? table Its Flicker's state: at (its share of its alpha now), to (where it wanders), left (seconds to the
 ---next).
 ---@field flicker? number A flicker's share of its alpha.
+---@field flashing? table Its Flash's state: wait (seconds to its next flash), left (seconds left of one under way).
+---@field flash? number A flash's share of its alpha: none at rest.
 
 ---@class (exact) NextOrnamentSet
 ---@field panel table The panel: its frame, its body, its side, IsSmall.
@@ -186,6 +189,10 @@ function setProto:paint(piece)
   t:SetDesaturated(o.Desaturated == true)
   t:SetDrawLayer(o.Layer or "ARTWORK", o.SubLevel or 0)
   self:cut(piece)
+  -- A piece that flashes is light, unseen at rest (its color's alpha is its texture's, next-themes.md §10).
+  if o.Motion ~= nil and o.Motion.Flash ~= nil then
+    self:fade(piece)
+  end
 end
 
 -- DrawArt draws a piece's picture on a texture: the portrait of its Unit while the client has that unit
@@ -493,7 +500,7 @@ end
 ---@return boolean
 local function moving(piece)
   local M = piece.spec and piece.spec.Motion
-  if M and (M.Glitch or M.Blink or M.Flicker or (M.Scroll and piece.spec.Tile)) then
+  if M and (M.Glitch or M.Blink or M.Flicker or M.Flash or (M.Scroll and piece.spec.Tile)) then
     return true
   end
   if piece.groups == nil then
@@ -541,7 +548,7 @@ end
 ---@return boolean
 local function luaMotion(piece)
   local M = piece.spec and piece.spec.Motion
-  return M ~= nil and (M.Glitch ~= nil or M.Blink ~= nil or M.Flicker ~= nil
+  return M ~= nil and (M.Glitch ~= nil or M.Blink ~= nil or M.Flicker ~= nil or M.Flash ~= nil
     or (M.Scroll ~= nil and piece.spec.Tile ~= nil))
 end
 
@@ -595,6 +602,9 @@ function setProto:Step(elapsed)
       end
       if M.Flicker ~= nil then
         self:flickerStep(piece, M.Flicker, elapsed)
+      end
+      if M.Flash ~= nil then
+        self:flashStep(piece, M.Flash, elapsed)
       end
     end
   end
@@ -664,6 +674,40 @@ function setProto:flickerStep(piece, F, elapsed)
   end
   st.at = st.at + (st.to - st.at) * math.min(1, elapsed * speed * 1.5)
   piece.flicker = st.at
+  self:fade(piece)
+end
+
+-- flashStep flashes a piece now and then (asked: the Make It So theme's comm badge, next-themes.md §24): unseen at rest,
+-- it waits First after the panel shows (else Every: soonest, latest), then over Time it comes up to its alpha and goes
+-- out again (half a sine), and waits Every for the next.
+---@private
+---@param piece NextOrnamentPiece
+---@param F table
+---@param elapsed number
+function setProto:flashStep(piece, F, elapsed)
+  local st = piece.flashing
+  if st == nil then
+    st = { wait = F.First or between(F.Every) }
+    piece.flashing = st
+  end
+  local time = F.Time or 0.3
+  if st.left == nil then
+    st.wait = st.wait - elapsed
+    if st.wait > 0 then
+      return
+    end
+    -- What it waited past is how far into its flash it is.
+    st.left = time + st.wait
+  else
+    st.left = st.left - elapsed
+  end
+  if st.left <= 0 then
+    st.left = nil
+    st.wait = between(F.Every)
+    piece.flash = 0
+  else
+    piece.flash = math.sin(math.pi * (1 - st.left / time))
+  end
   self:fade(piece)
 end
 
@@ -744,7 +788,12 @@ end
 ---@param piece NextOrnamentPiece
 function setProto:fade(piece)
   local _, _, _, a = style:RGBA(piece.spec.Color or "White", piece.spec.Alpha)
-  piece.texture:SetAlpha(piece.shut and 0 or a * (piece.blink or 1) * (piece.flicker or 1))
+  local M = piece.spec.Motion
+  local flash = 1
+  if M ~= nil and M.Flash ~= nil then
+    flash = piece.flash or 0
+  end
+  piece.texture:SetAlpha(piece.shut and 0 or a * (piece.blink or 1) * (piece.flicker or 1) * flash)
 end
 
 ---@private
@@ -769,8 +818,9 @@ function setProto:Stop()
         self:rest(piece)
       end
     end
-    if piece.blinking ~= nil or piece.flick ~= nil then
+    if piece.blinking ~= nil or piece.flick ~= nil or piece.flashing ~= nil then
       piece.blinking, piece.shut, piece.flick, piece.flicker = nil, nil, nil, nil
+      piece.flashing, piece.flash = nil, nil
       if piece.spec ~= nil then
         self:fade(piece)
       end

@@ -715,6 +715,57 @@ describe("NextOrnaments", function()
       assert.is_true(near(0.8, t:GetAlpha()), "back at its own once still")
     end)
 
+    -- The Make It So theme's comm badge chirping (next-themes.md §24): a glint over it, unseen, that flashes a moment
+    -- after the bag has beamed in and now and then after.
+    it("flashes now and then: unseen at rest, up to its alpha and out again over its Time, first after First", function()
+      ornaments.Random = function() return 0.25 end
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, Alpha = 0.8,
+        Motion = { Flash = { Every = { 4, 8 }, Time = 0.4, First = 0.7 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      assert.are.equal(0, t:GetAlpha(), "unseen at rest")
+      panel.ornaments:Start()
+      local skip = {}
+      panel.ornaments:MovingParts(skip)
+      assert.is_true(skip[t], "it rests nowhere")
+      step(panel, 0.65)
+      assert.are.equal(0, t:GetAlpha(), "not yet")
+      step(panel, 0.15)
+      -- 0.1 into its 0.4: sin(pi / 4) of its alpha.
+      assert.is_true(near(0.8 * math.sin(math.pi / 4), t:GetAlpha()))
+      step(panel, 0.1)
+      assert.is_true(near(0.8, t:GetAlpha()), "at its alpha half way")
+      step(panel, 0.25)
+      assert.are.equal(0, t:GetAlpha(), "out again")
+      -- The next after 4 + (8 - 4) * 0.25 = 5 seconds.
+      step(panel, 4.9)
+      assert.are.equal(0, t:GetAlpha())
+      step(panel, 0.2)
+      assert.is_true(t:GetAlpha() > 0, "again")
+      panel.ornaments:Stop()
+      assert.are.equal(0, t:GetAlpha(), "unseen once still")
+      panel.ornaments:Start()
+      step(panel, 0.65)
+      assert.are.equal(0, t:GetAlpha(), "its First again each time the panel shows")
+      step(panel, 0.25)
+      assert.is_true(t:GetAlpha() > 0)
+    end)
+
+    it("waits a whole Every for its first flash without a First", function()
+      ornaments.Random = function() return 0.5 end
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16,
+        Motion = { Flash = { Every = { 2, 4 }, Time = 0.2 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local t = texture(panel, 1)
+      panel.ornaments:Start()
+      step(panel, 2.95)
+      assert.are.equal(0, t:GetAlpha())
+      step(panel, 0.1)
+      assert.is_true(t:GetAlpha() > 0)
+    end)
+
     it("runs no driver for pieces that only move on the client's animations", function()
       theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Motion = { Sway = 4 } } })
       local panel = panelOn("RIGHT")
