@@ -87,6 +87,9 @@ local nextSmoke = addon:GetModule('NextSmoke')
 ---@class NextBats: AceModule
 local nextBats = addon:GetModule('NextBats')
 
+---@class NextBeam: AceModule
+local nextBeam = addon:GetModule('NextBeam')
+
 ---@class NextMenuButtonModule: AceModule
 local nextMenuButton = addon:GetModule('NextMenuButton')
 
@@ -730,6 +733,14 @@ function panelProto:moveIn(from, to, duration, ease, delay)
     self.content:Cascade(true, delay + lock)
     return
   end
+  if nextBeam:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once it has materialized.
+    local lock = nextBeam:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:beamIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
   self.threads:DrawIn(delay + style.Time.OpenCascadeDelay)
   self:setOffset(from)
   tween:Play(self, {
@@ -1101,6 +1112,108 @@ function panelProto:batsOut(from, to, done)
   })
 end
 
+-- beamIn opens the panel where it rests by beaming it down (the theme's Panel.Beam.Open, next-themes.md §24), after
+-- delay unseen: the transporter's shimmer, its column of light and a glow over its body, and the panel materializing
+-- under them (NextBeam's Draw). A tween of the panel's own, like the slide it stands in for: whatever stops or replaces
+-- it (a flight, a placement, Escape) ends the beam at rest (endShatter). Once the panel has materialized it says it has
+-- finished showing, as the slide does, and its beam lingers on its own layer until it has gone out (Linger).
+---@private
+---@param to number
+---@param delay number
+function panelProto:beamIn(to, delay)
+  local total = nextBeam:OpenTime()
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  local run ---@type NextBeamRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextBeam:Opens() then
+        -- Its theme went while it beamed down (another theme, Transporter off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      -- Its beam is laid over where its body is once its delay is up (a chained bag waiting unseen is in place by then).
+      run = run or nextBeam:Begin(self, "Open")
+      self.frame:SetAlpha(run:Draw(p * total))
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- beamOut closes the panel where it is by beaming it up (the theme's Panel.Beam.Close, next-themes.md §24): the
+-- transporter's shimmer, its column and a glow over its body, and the panel fading out under them; then it is gone (done,
+-- Hide's end) and its beam lingers on its own layer until it has gone out.
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:beamOut(from, to, done)
+  local total = nextBeam:CloseTime()
+  local run = nextBeam:Begin(self, "Close") ---@type NextBeamRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextBeam:Closes() then
+        -- Its theme went while it beamed up: shown plainly, it closes at the end.
+        rest()
+        self.frame:SetAlpha(1)
+        return
+      end
+      if run ~= nil then
+        self.frame:SetAlpha(run:Draw(p * total))
+      end
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
 -- endShatter puts the panel back as it is without a shatter (or its smoke, or its bats), at full strength, and where it
 -- had it (base): unless another tween has taken the panel over (a flight), which places it.
 ---@private
@@ -1385,6 +1498,81 @@ function panelProto:styleBody()
   self.bats:Style()
   -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
   self.frameArt:Apply(P.Frame, self.side == "LEFT")
+end
+
+-- The masks that round a corner (tools/textures/next_masks.py), one image for each corner, cut round at it and opaque
+-- elsewhere: the client ignores a mask's texture coordinates, so one image cannot be flipped for the others (reported:
+-- "lower left corner not masked. top left is perfect though", the one corner its unflipped image fitted).
+local CORNER_MASKS = {}
+for _, corner in ipairs({ "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" }) do
+  CORNER_MASKS[corner] = "Interface\\AddOns\\BetterBags\\textures\\next\\corner_" .. corner:lower() .. ".png"
+end
+-- The corners in the order they are rounded, and how many: the client masks a texture at most 3 times (a fourth is an
+-- error: "Texture already has the maximum number of mask textures (3)"), and the body's fill spans every corner.
+local CORNER_ORDER = { "TOPINNER", "BOTTOMINNER", "TOPOUTER", "BOTTOMOUTER" }
+panelProto.MAX_CORNERS = 3
+
+-- shapeCorners rounds a small panel's corners (the theme's Panel.Corners, next-themes.md §24; reported with the Make It So
+-- theme: the window's square corners "peak out around the LCARS ... we need a way to shape the window itself"): for each
+-- corner the theme rounds (by its side, a radius), up to MAX_CORNERS of them in CORNER_ORDER, a mask at that corner
+-- (that corner's own image, the radius twice across) cuts everything drawn across the body (its fill, its wash, its
+-- edge, its side rail's strip, the glow a drop lights). The mask is wrapped white outside its rect (CLAMPTOWHITE), so it
+-- cuts nothing but its corner. Mirrored on a panel whose inner side is on the right. A full panel stands against the
+-- screen's top and bottom, beside its feathered edge: its corners stay square. The masks a theme no longer rounds come
+-- off every part before any new one goes on, so no part is ever given a fourth. From ApplyGeometry, which every styling
+-- of the body is followed by (a theme's ApplyStyle, a new grid's takeScale, the panel being made).
+---@private
+function panelProto:shapeCorners()
+  local C = style.Theme.Panel.Corners
+  local small = self:IsSmall()
+  local mirrored = self.side == "LEFT"
+  self.cornerMasks = self.cornerMasks or {}
+  local parts = { self.fill, self.wash, self.dropGlow, self.rail }
+  for _, edge in ipairs(self.edges) do
+    table.insert(parts, edge)
+  end
+  local rounded, count = {}, 0
+  for _, side in ipairs(CORNER_ORDER) do
+    local radius = small and C and C[side] or 0
+    if radius > 0 and count < self.MAX_CORNERS then
+      rounded[side] = radius
+      count = count + 1
+    end
+  end
+  for side, mask in pairs(self.cornerMasks) do
+    if rounded[side] == nil and mask.applied then
+      for _, t in ipairs(parts) do
+        t:RemoveMaskTexture(mask)
+      end
+      mask.applied = false
+      mask:Hide()
+    end
+  end
+  for _, side in ipairs(CORNER_ORDER) do
+    local radius = rounded[side]
+    if radius ~= nil then
+      local mask = self.cornerMasks[side]
+      if mask == nil then
+        mask = self.frame:CreateMaskTexture()
+        self.cornerMasks[side] = mask
+      end
+      local corner = nextOrnaments.CORNERS[side]
+      if mirrored then
+        corner = nextOrnaments.MIRRORED[corner]
+      end
+      mask:SetTexture(CORNER_MASKS[corner], "CLAMPTOWHITE", "CLAMPTOWHITE")
+      mask:ClearAllPoints()
+      mask:SetPoint(corner, self.body, corner, 0, 0)
+      pixel:Size(mask, 2 * radius, 2 * radius)
+      mask:Show()
+      if not mask.applied then
+        for _, t in ipairs(parts) do
+          t:AddMaskTexture(mask)
+        end
+        mask.applied = true
+      end
+    end
+  end
 end
 
 -- paintEdges draws the border at a strength, 0 to 1, of the theme's alpha. A texture's alpha is its
@@ -1964,6 +2152,8 @@ function panelProto:ApplyGeometry()
   self.rain:Layout()
   self.snow:Layout()
   self.threads:Layout()
+  -- Its corners rounded at the size it has now.
+  self:shapeCorners()
 end
 
 -- ApplyClamp clamps a small panel to the screen while the bags are clamped to it (Clamp Bags to Screen,
@@ -4764,6 +4954,12 @@ function panelProto:Hide(ctx)
     self.threads:Unravel(nextBats:Spec().Close.Shudder or 0)
     -- Where it is: it turns into bats where it stands.
     self:batsOut(self.offset, to, slidOut)
+    return
+  end
+  if nextBeam:Closes() then
+    self.threads:Unravel(nextBeam:CloseTime())
+    -- Where it is: it beams up where it stands.
+    self:beamOut(self.offset, to, slidOut)
     return
   end
   self.threads:Unravel(style.Time.Close)

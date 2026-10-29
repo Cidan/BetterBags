@@ -1108,6 +1108,23 @@ describe("NextContent", function()
       assert.is_false(s.row:IsShown())
     end)
 
+    -- Reported with the Make It So theme: a bar as tall as its row sat right on the first row of icons. Its art may be
+    -- shorter than the row (Height), from its top, the cells still under the whole row.
+    it("draws its row's art Height tall from the row's top, its cells still under the whole row", function()
+      sections()
+      UseNextTheme({ Layout = { SectionHeader = 28 },
+        Sections = { Header = { Texture = "Interface\\Spec\\sep.png", Color = "White", Height = 20 } } })
+      canvas:ApplyStyle(context:New("spec"))
+      draw()
+      local s = canvas.byName.A
+      assert.are.equal(20, s.row:GetHeight())
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 0, 0 }, { s.row:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 0, -28 }, { s.cells:GetPoint(1) })
+      assert.are.equal(28, s.header:GetHeight())
+      UseNextTheme(nil)
+      canvas:ApplyStyle(context:New("spec"))
+    end)
+
     it("draws the line and the highlight in art when they name some, and colors after", function()
       sections()
       UseNextTheme({ Sections = {

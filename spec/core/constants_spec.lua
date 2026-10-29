@@ -191,6 +191,22 @@ describe("Constants Module Offsets", function()
     assert.is_false(const.DATABASE_DEFAULTS.profile.clampBagsToScreen)
   end)
 
+  -- BetterBags Next's Animation switches (next-themes.md §20): every effect on until the player turns it off; these are
+  -- the only names there are (DB:GetNextAnimation refuses any other).
+  it("turns every BetterBags Next effect on by default, the Transporter's too", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    local on = const.DATABASE_DEFAULTS.profile.nextAnimation
+    local names = { "sparkles", "shimmer", "titleCloud", "ribbon", "braid", "ornaments", "glitch", "rain", "shatter",
+      "snow", "smoke", "bats", "beam" }
+    local count = 0
+    for _ in pairs(on) do count = count + 1 end
+    assert.are.equal(#names, count)
+    for _, name in ipairs(names) do
+      assert.is_true(on[name], name)
+    end
+  end)
+
   it("leaves animating item movement off by default", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")

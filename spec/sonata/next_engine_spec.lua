@@ -101,7 +101,8 @@ describe("SonataNext", function()
         Threads = { { Points = { { 0, 1 }, { 1, 2 } }, Sway = { Amplitude = 2, Period = 5 },
           Glint = { Every = 4, Time = 1 }, Draw = 0.5 } },
         Smoke = { Puffs = { Size = { 80, 120 } }, Open = { Rise = 0.3 } },
-        Bats = { Frames = 4, Close = { Vanish = 0.1 }, Flutter = { Every = { 5, 9 } } },
+        Bats = { Frames = 4, Close = { Shudder = 0.1 }, Flutter = { Every = { 5, 9 } } },
+        Beam = { Sparkles = { Density = 2 }, Open = { Reveal = { 0.2, 0.6 } }, Close = { Fade = { 0.2, 0.5 } } },
       }
       return t
     end
@@ -124,6 +125,8 @@ describe("SonataNext", function()
       -- fluttering out of the header.
       smoke = function(t) return t.Panel.Smoke end,
       bats = function(t) return t.Panel.Bats end,
+      -- The Make It So theme's (next-themes.md §24): beaming in and out.
+      beam = function(t) return t.Panel.Beam end,
     }
 
     before_each(function()
@@ -160,6 +163,23 @@ describe("SonataNext", function()
       assert.is_nil(thread.Glint)
       assert.are.equal(0.5, thread.Draw)
       assert.are.equal(2, #thread.Points)
+    end)
+
+    -- A glint that flashes now and then (the Make It So theme's comm badge) is light, not art at rest: held still it would
+    -- shine for good, so Moving Ornaments off takes the piece out; a piece that only moves stays, still.
+    it("takes a piece that only flashes out with Moving Ornaments", function()
+      local t = full()
+      table.insert(t.Panel.Ornaments, 1, { Texture = "Glint", Point = "TOPOUTER", Width = 8, Height = 8,
+        Motion = { Flash = { Every = { 4, 8 }, Time = 0.3 } } })
+      sonataNext.themes = {}
+      sonataNext:RegisterTheme(t)
+      animation = { ornaments = false }
+      sonataNext:Init()
+      local pieces = used[#used].Panel.Ornaments
+      assert.are.equal(2, #pieces)
+      assert.are.equal("Roots", pieces[1].Texture)
+      assert.is_nil(pieces[1].Motion)
+      assert.are.equal("Leaf", pieces[2].Texture)
     end)
 
     -- Glitch Effects off is for players flicker is hard on: an ornament's glitch (its blinking twitch) goes with it, its
@@ -672,6 +692,9 @@ describe("SonataNext", function()
         Motion = { Blink = { Every = { 3 }, Wink = 1 }, Flicker = { Low = 2, Glow = 1 } } },
       { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Motion = { Blink = 3, Flicker = true } },
       { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Motion = { Blink = {}, Flicker = { Speed = 0 } } },
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4,
+        Motion = { Flash = { Every = { 5, 1 }, Time = 0, First = -1, Spark = 1 } } },
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Motion = { Flash = 2 } },
     } } })
     local problems = sonataNext:Check("BadBlinks")
     table.sort(problems)
@@ -684,10 +707,17 @@ describe("SonataNext", function()
       "Panel.Ornaments.2.Motion.Flicker: a table",
       "Panel.Ornaments.3.Motion.Blink.Every: two numbers, soonest and latest",
       "Panel.Ornaments.3.Motion.Flicker.Speed: more than nothing",
+      "Panel.Ornaments.4.Motion.Flash.Every: two numbers, soonest and latest",
+      "Panel.Ornaments.4.Motion.Flash.First: no less than nothing",
+      "Panel.Ornaments.4.Motion.Flash.Spark: no flash part named Spark",
+      "Panel.Ornaments.4.Motion.Flash.Time: more than nothing",
+      "Panel.Ornaments.5.Motion.Flash: a table",
     }, problems)
     sonataNext:RegisterTheme({ Name = "GoodBlinks", Panel = { Ornaments = {
       { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4,
         Motion = { Blink = { Every = { 2, 5 }, Time = 0.1, Twice = 0.3 }, Flicker = { Low = 0.6, Speed = 8 } } },
+      { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4,
+        Motion = { Flash = { Every = { 5, 9 }, Time = 0.4, First = 0.8 } } },
     } } })
     assert.are.same({}, sonataNext:Check("GoodBlinks"))
   end)
@@ -907,6 +937,100 @@ describe("SonataNext", function()
 
   -- The Halloween theme's smoke and bats (next-themes.md §23): their parts are the modules', and what their runtimes
   -- divide by or count.
+  -- A body's rounded corners (Panel.Corners, next-themes.md §24): by the corner's side, each a radius.
+  it("names what is wrong with a body's corners", function()
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadCorners", Panel = { Corners = { TOPLEFT = 4, TOPINNER = -1, BOTTOMOUTER = "round" } } })
+    local problems = sonataNext:Check("BadCorners")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Corners.BOTTOMOUTER: a radius, no less than nothing",
+      "Panel.Corners.TOPINNER: a radius, no less than nothing",
+      "Panel.Corners.TOPLEFT: no corner named TOPLEFT (TOPINNER, TOPOUTER, BOTTOMINNER, BOTTOMOUTER)",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "GoodCorners", Panel = { Corners = { TOPINNER = 20, BOTTOMOUTER = 0 } },
+      Sections = { Header = { Texture = "Glow", Height = 20 } } })
+    assert.are.same({}, sonataNext:Check("GoodCorners"))
+    sonataNext:RegisterTheme({ Name = "BadHeader", Sections = { Header = { Texture = "Glow", Height = 0 } } })
+    assert.are.same({ "Sections.Header.Height: more than nothing" }, sonataNext:Check("BadHeader"))
+    -- The client masks a texture at most three times (spec/helpers/wow_mocks.lua); a corner left square is none.
+    sonataNext:RegisterTheme({ Name = "FourCorners",
+      Panel = { Corners = { TOPINNER = 4, TOPOUTER = 4, BOTTOMINNER = 4, BOTTOMOUTER = 4 } } })
+    assert.are.same({ "Panel.Corners: at most 3 rounded, the most masks the client puts on a texture" },
+      sonataNext:Check("FourCorners"))
+    sonataNext:RegisterTheme({ Name = "ThreeCorners",
+      Panel = { Corners = { TOPINNER = 4, TOPOUTER = 4, BOTTOMINNER = 4, BOTTOMOUTER = 0 } } })
+    assert.are.same({}, sonataNext:Check("ThreeCorners"))
+  end)
+
+  -- A transporter's beam (next-themes.md §24).
+  it("names what is wrong with a beam, by where it is", function()
+    if addon:GetModule("NextBeam", true) == nil then
+      ResetModuleStub("NextBeam", "next/beam.lua")
+      LoadBetterBagsModule("next/beam.lua")
+    end
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadBeam", Panel = { Beam = {
+      Sparkles = { Density = 0, Size = { 9, 3 }, Stretch = 0, Alpha = { 1 }, Twinkle = { 2 }, Sharpness = 0,
+        Drift = { 5 }, Spread = -1, Colors = { "Nope" }, Fizz = 1 },
+      Column = { Spread = -2, Shimmer = { 2, 1 }, Scroll = "up", Color = "Nope", Hum = 1 },
+      Glow = { Color = "Nope", Halo = 1 },
+      Open = { Reveal = { 0.5, 0.2 }, Sparkles = { 0, 0.5, 0.2, 0.8 }, Column = { 1 }, Fade = { 0, 1 } },
+      Close = { Sparkles = { 0, 0.1, 0.2, 0.3 }, Glow = { 0.1, 0.2, 0.3 }, Column = { 0, 0.1, 0.2, 0.3, 0.4 } },
+      Phaser = 1, Margin = -1, Ends = "far",
+    } } })
+    local problems = sonataNext:Check("BadBeam")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Beam.Close.Column: four numbers in order, in, full, out and gone",
+      "Panel.Beam.Close.Fade: two numbers, from and to",
+      "Panel.Beam.Close.Glow: four numbers in order, in, full, out and gone",
+      "Panel.Beam.Column.Color: no color named Nope",
+      "Panel.Beam.Column.Hum: no part named Hum",
+      "Panel.Beam.Column.Scroll: a number",
+      "Panel.Beam.Column.Shimmer: two numbers, how deep (0 to 1) and how fast",
+      "Panel.Beam.Column.Spread: no less than nothing",
+      "Panel.Beam.Ends: no less than nothing",
+      "Panel.Beam.Glow.Color: no color named Nope",
+      "Panel.Beam.Glow.Halo: no part named Halo",
+      "Panel.Beam.Margin: no less than nothing",
+      "Panel.Beam.Open.Column: four numbers in order, in, full, out and gone",
+      "Panel.Beam.Open.Fade: no part named Fade",
+      "Panel.Beam.Open.Reveal: two numbers, from and to",
+      "Panel.Beam.Open.Sparkles: four numbers in order, in, full, out and gone",
+      "Panel.Beam.Phaser: no part named Phaser",
+      "Panel.Beam.Sparkles.Alpha: two numbers, faintest and strongest",
+      "Panel.Beam.Sparkles.Colors.1: no color named Nope",
+      "Panel.Beam.Sparkles.Density: more than nothing",
+      "Panel.Beam.Sparkles.Drift: two numbers, slowest and fastest",
+      "Panel.Beam.Sparkles.Fizz: no part named Fizz",
+      "Panel.Beam.Sparkles.Sharpness: more than nothing",
+      "Panel.Beam.Sparkles.Size: two numbers, smallest and largest",
+      "Panel.Beam.Sparkles.Spread: no less than nothing",
+      "Panel.Beam.Sparkles.Stretch: more than nothing",
+      "Panel.Beam.Sparkles.Twinkle: two numbers, slowest and fastest",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "NoSparkles", Panel = { Beam = { Open = { Reveal = { 0.2, 0.6 } } } } })
+    assert.are.same({ "Panel.Beam.Sparkles: a beam needs them" }, sonataNext:Check("NoSparkles"))
+    sonataNext:RegisterTheme({ Name = "GoodBeam", Panel = { Beam = { Margin = 12, Ends = 40,
+      Sparkles = { Texture = "Glow", Colors = { "White", "Gold" }, Density = 2, Size = { 6, 12 }, Stretch = 2,
+        Alpha = { 0.6, 1 }, BlendMode = "ADD", Twinkle = { 3, 8 }, Sharpness = 3, Drift = { 20, 50 }, Spread = 10 },
+      Column = { Texture = "Glow", Color = "White", Alpha = 0.5, BlendMode = "ADD", Spread = 20, Shimmer = { 0.3, 4 },
+        Scroll = 0.6 },
+      Glow = { Texture = "Glow", Color = "Gold", Alpha = 0.6, BlendMode = "ADD" },
+      Open = { Reveal = { 0.3, 0.6 }, Sparkles = { 0, 0.2, 0.5, 0.8 }, Column = { 0, 0.15, 0.55, 0.9 },
+        Glow = { 0.1, 0.35, 0.45, 0.7 } },
+      Close = { Fade = { 0.2, 0.5 }, Sparkles = { 0, 0.15, 0.5, 0.8 } },
+    } } })
+    assert.are.same({}, sonataNext:Check("GoodBeam"))
+  end)
+
   it("names what is wrong with a smoke and bats, by where it is", function()
     for _, m in ipairs({ { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" } }) do
       if addon:GetModule(m[1], true) == nil then
