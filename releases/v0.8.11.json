@@ -1,16 +1,16 @@
 {
-  "id": 1793316157,
+  "id": 1793316169,
   "version": "v0.8.11",
-  "channel": "alpha",
+  "channel": "release",
   "date": "2026-10-29",
-  "from": "19ba1f94bb729f4ecd2374959b9a13bc67fcd63d",
-  "to": "ccbe88e83bdcaecc344d063728ef56758a779e7f",
-  "headline": "Introduces the Star Trek-inspired Make It So theme featuring LCARS styling and transporter animations.",
+  "from": "v0.8.10",
+  "to": "v0.8.11",
+  "headline": "Adds the Star Trek-inspired Make It So theme with animated transporter effects.",
   "entries": [
     {
       "category": "New",
-      "title": "Make It So theme",
-      "details": "Adds a Star Trek-inspired theme featuring an LCARS frame, pastel accents, a holodeck grid background, and a comm badge close button. Windows beam in and out with animated transporter effects that can be toggled in the animation settings. The background particle setting has also been renamed to Snow, Leaves and Stars to reflect the new warp star streaks.",
+      "title": "Make It So theme and transporter animation",
+      "details": "A Star Trek-inspired theme featuring an LCARS frame, a communicator badge close button, a holodeck grid with warp stars, and pastel glass styling. Bags beam in and out with an animated transporter effect, which can be toggled under the Animation settings.",
       "clients": []
     }
   ]
