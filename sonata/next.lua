@@ -1012,11 +1012,31 @@ function sonataNext:Check(key)
   end
   -- A transporter's beam (Panel.Beam, next-themes.md §24): its parts NextBeam's; its sparkles needed, its envelopes four
   -- numbers in order, the panel's part (an open's Reveal, a close's Fade) two.
+  -- A body's rounded corners (Panel.Corners, next-themes.md §24): by the corner's side, each a radius.
+  local corners = theme.Panel and theme.Panel.Corners
+  if type(corners) == "table" then
+    local sides = addon:GetModule('NextOrnaments', true)
+    for side, radius in pairs(corners) do
+      if sides ~= nil and not sides.CORNERS[side] then
+        table.insert(problems, "Panel.Corners." .. tostring(side)
+          .. ": no corner named " .. tostring(side) .. " (TOPINNER, TOPOUTER, BOTTOMINNER, BOTTOMOUTER)")
+      elseif not (type(radius) == "number" and radius >= 0) then
+        table.insert(problems, "Panel.Corners." .. tostring(side) .. ": a radius, no less than nothing")
+      end
+    end
+  end
+  -- A section's row art may be shorter than its row (Sections.Header.Height).
+  local header = theme.Sections and theme.Sections.Header
+  if type(header) == "table" and header.Height ~= nil and not (type(header.Height) == "number" and header.Height > 0) then
+    table.insert(problems, "Sections.Header.Height: more than nothing")
+  end
   local beamModule = addon:GetModule('NextBeam', true)
   local M = theme.Panel and theme.Panel.Beam
   if beamModule ~= nil and type(M) == "table" then
     local where = "Panel.Beam."
     partsOf(M, beamModule.KEYS, where)
+    atLeast(M, "Margin", where, false)
+    atLeast(M, "Ends", where, false)
     local P = M.Sparkles
     if type(P) == "table" then
       partsOf(P, beamModule.SPARKLE_KEYS, where .. "Sparkles.")

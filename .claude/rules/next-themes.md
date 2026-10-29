@@ -85,10 +85,10 @@ may also be inset, drawn at its atlas's size or pieced (§16); a **frame** is Bl
 | `Fonts` | Text roles: `Size`, `Color`, `Shadow` (true, a table, or none), `Flags`, `File` (unset: the client's own font, for the locale), `Justify`, `Locales` (the client locales `File` is drawn in; elsewhere the client's own font: a font covers some alphabets, §21); or `Object`, one of the client's font objects by name, copied (its file, size and flags in every locale, its color and shadow) and changed only by what the role also sets (`Stack` copies `NumberFontNormal`, the bags' item count font); or `Copy`, a client font copied outright (its file, flags, color and shadow) at the role's `Size` (its own, or the one it inherits from Default; `false`: the client font's own), nothing else the role inherits changing it but its height on whole pixels and its own `Justify` (the Plain theme, at Default's sizes). Default's roles: Title, Section, SectionRecent, SectionFree, Count, Tab, TabSelected, Footer, Empty, DragHint, ConfirmTitle, ConfirmWarning, ConfirmHint, Search, SearchText, Price, PriceUnaffordable, VendorName, Stack; the controls' ControlText, ControlMuted, ControlHelp, Button, ButtonPrimary, ButtonDanger, Link, LinkHover, MenuItem, MenuItemSelected, DialogTitle, DialogText, TopTab, TopTabHover, TopTabSelected; the settings window's SettingsBrand, SettingsNavGroup, SettingsNav, SettingsNavHover, SettingsNavSelected, SettingsVersion, SettingsTitle, SettingsDescription, SettingsSection, SettingsSectionNote, SettingsLabel, SettingsText, SettingsLink. |
 | `Layout` | Sizes: Icon (an item button's size; the player's Icon Scale, the Size tab, multiplies it: `style.ICON`; the grid's width and the vendor's cards keep the theme's own, `style.CARD_ICON`, docs/next-appearance-size.md), VendorColumns, VendorTextGap, VendorPriceRaise (the vendor's cards, next.md §10b), Gap, PerRow, Gutter, Pad, Feather, TitleTop, TitleInset, SearchTop, SearchHeight, SearchIcon, SearchGap, SearchRight, ContentTop, EmptyTop, Footer, FooterText, FooterMoney, SectionHeader, SectionSpacing, TabHeight, TabSpacing, TabMinWidth, TabMaxWidth, TabPadding, TabHover, TabIcon, TabIconGap, TabGroupGap, HeaderButton, HeaderButtonGap, HeaderButtonTop. |
 | `Motion` | `Time` (every animation's seconds), `Ease` (Open, Close, SmallOpen, SmallClose, Enter, Fly, Glide, Hover, Wash, Cascade, Lift, Land, FlyAway, Pulse, Couple, Uncouple, Morph, MorphFade, Resize; any of `NextTween.Ease`, `flicker` included, §21), `Rise` (the cascade). `NextStyle.OVERREACH` follows the Open ease's overshoot (outBack a tenth, outBackSoft a fiftieth, others none). |
-| `Panel` | `Fill` (texture spec; `Inset`: `Left`, `Right`, `Top`, `Bottom` into the body, drawn for the backpack and mirrored on the bank, the screen-edge side still reaching past the edge while docked; `Panel:FillInsets()`), `Frame` (Blizzard's frame round the body, §15, mirrored on the bank; `Above` over the content, `Bands` across its top), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none), `Glitch` (glitching in, out and now and then, §21; Default has none), `Rain` (data rain, §21; Default has none), `Shatter`, `Snow`, `Threads` (§22), `Smoke`, `Bats` (§23; Default has none). |
+| `Panel` | `Fill` (texture spec; `Inset`: `Left`, `Right`, `Top`, `Bottom` into the body, drawn for the backpack and mirrored on the bank, the screen-edge side still reaching past the edge while docked; `Panel:FillInsets()`), `Frame` (Blizzard's frame round the body, §15, mirrored on the bank; `Above` over the content, `Bands` across its top), `Feather` (`Color`, or false), `Wash` (`Height`, `BlendMode`, or false), `Washes` (Default, Warbank, Guild: palette names), `Edge` (`Color`, `Alpha`, `Size`, `Full`: on full panels too, kept through a size switch; or false), `DropGlow` (or false), `Ornaments` (§12; Default has none), `Glitch` (glitching in, out and now and then, §21; Default has none), `Rain` (data rain, §21; Default has none), `Shatter`, `Snow`, `Threads` (§22), `Smoke`, `Bats` (§23; Default has none), `Beam` (§24), `Corners` (a small body's rounded corners, by side, §24; Default has none). |
 | `Header` | `Title.Font`, `Title.Ghosts` (copies of the title under it, each `{ Font, X, Y, Alpha }`: a colour split, §21), `Title.Justify` (`"CENTER"`: centered in the room the header buttons leave, as Blizzard centers a window's title; its button and glow over the text where it is drawn); `TitleGlow` (`Texture`, `Color`, `Alpha`, `X`, `Y`, `BlendMode`, or false); `Ribbon` (`Length`, `Thickness`, `Color`, `BlendMode`, `Glow`: `{ offset, alpha }` lines, as many as listed; or false); `Spark` (`Texture`, `Size`, `Growth`, `Color`, `BlendMode`; false: no shimmer); `Cloud` (puffs as many as listed, `Join`, swell and breath; or false); `Buttons` (§11: `Icons`, every header button's icon by its key; `Color` and `HoverColor` for glyphs, `ArtColor` and `ArtHoverColor` for full-color art; `DisabledAlpha`; `Scale`, an icon's size as a share of its button; an icon's `Highlight`, art drawn over it under the pointer; an icon's `Pushed` art while pressed and `Disabled` art while disabled, drawn whole (neither dimmed nor grayed), as a button's pushed and disabled textures are; `RowStart`, where the row starts from the outer side when the pinned buttons hold the corner (the title's room counts the row from there or the pins, whichever reaches further); `Rail`, the buttons down a strip along the inner side instead of across the header, inside the body or `Outside` it, its art from `Start`, §13, false in Default; `Pinned`, a button at a corner of the body apart from the row or the rail, §13; `Menu`, the row in a bag button's menu, §19). |
 | `Search` | `Fill`, `FocusFill` (colors, or art: §14), `Edge` (`Color`, `Size`, `Idle`, `Hover`, `Focus`, or false), `Icon` (`Color`, `Idle`, `Active`, `FocusColor`, `ActiveColor`: while it holds a search, under the pointer or not, as Blizzard's magnifier stays white), `HelpFont`, `TextFont`; `Template = true` keeps the bag search box's own border (`BagSearchBoxTemplate`) and draws neither the fill nor the edge. |
-| `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Header` (art behind the title row, across the section, `Layout.SectionHeader` tall; unset in Default), `Line` (`Color`, `From`, `To`, `Size`, or art, or false), `Highlight` (`Color`, `From`, `To`, or art, or false). |
+| `Sections` | `Title` (`X`, `Y`), `CountGap`, `LineGap`, `TitleFont`, `RecentFont`, `FreeFont`, `CountFont`, `Header` (art behind the title row, across the section, `Layout.SectionHeader` tall or its own `Height` from the row's top, §24; unset in Default), `Line` (`Color`, `From`, `To`, `Size`, or art, or false), `Highlight` (`Color`, `From`, `To`, or art, or false). |
 | `Tabs` | `Fill`, `SelectedFill` (colors fading by `Fade`, or art: drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels, no fade), `Font`, `SelectedFont`, `Glow` (`Color`, `BlendMode`, `Drop`, `Pulse`, or false), `Indicator` (`Color`, `Width`, or art tinted by the accent, or false), `Highlight` and `SelectedHighlight` (art over the tab's fill under the pointer and when selected: Blizzard's list rows; mirrored with the panel), `Edge` and `SelectedEdge` (an edge round each tab, NextControls' edge: `Color`, `Alpha`, `Size`; the selected tab's and a drop target's in `SelectedEdge`, else `Edge`; §21), `Accents` (Warbank, Guild). A tab entry's `accent` is an accent name, a palette name or a color. |
 | `Footer` | `Line` (`Color`, `Inner`, `Outer`, `Size`, or art mirrored with the panel, or false), `Font`, `EmptyFont`, `MoneyFont` (the guild's gold). |
 | `Sparkles` | `Texture`, `BlendMode`, `Colors`, `FadeIn`, `FadeOut`, `TwinkleSpeed`, `TwinkleDepth`, `Shrink`, `WobbleSpeed`, `Upright` (never turned: square pixels, §21); emitters `Cloud`, `Ribbon` (+`Spread`), `Edge` (+`Reach`), `Knot` (+`Burst`), each `Rate`, `Max`, `Life`, `Size`, `Speed`, `Rise`, `Wobble`, `Spin`, `Alpha`, or false; `Sparkles = false` turns them all off. A coupled bag keeps its shorter ribbon and edge sparkle lives (next.md §12, §14e). |
@@ -392,6 +392,14 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
   palette redefines Default's names in LCARS' colours (Gold its orange, Lavender its lilac, Text and Muted peach) and
   adds them (`LcarsOrange`, `LcarsPeach`, `LcarsLilac`, `LcarsBlue`, `LcarsSalmon`, `LcarsRed`, `Sky`) and the
   transporter's pale blue (`Transporter`). Its engine is §24.
+  - **Softer and more modern** (asked after the first look, with a screenshot: "softer colors, maybe a bit more
+    translucent in the title of each section, more.. modern a bit. i'll let you decide what this means"): a pane of
+    glass. LCARS' colours softened to pastels (apricot, peach, lavender, sky, soft blue, salmon; none more than 0.6
+    saturated, where the original orange was 1); the body a translucent navy (the holodeck tile's base navy, its grid
+    a faint amber, drawn at 0.9, `HolodeckGlass`); the side bar glass (`LilacGlass`, 0.16) with its blocks floating on it
+    as rounded keys; a slimmer top bar (10) and bottom bar (8); no border (`Edge = false`: the corners are rounded,
+    where straight lines would stop short); sections and tabs on glass with their names in peach; the chosen tab solid
+    apricot, its name in black; item buttons navy cells with a soft lavender edge.
   - **Beaming down** (NextBeam): a column of pale blue light comes up over where the bag rests, its art flowing up and
     its strength shimmering; the transporter's shimmer (flecks of white, blue and a little peach, about 2.6 to every
     100 x 100 units of the body, some a little past its sides) twinkles in brief flashes and ripples up and down
@@ -399,28 +407,35 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     panel to show); the light goes out after, by 1.15 s. A moment later the comm badge chirps: a glint flashes across
     it (`Flash`, first 0.85 s after it shows, then every 7 to 13 s). **Beaming up:** where it stands, the column and the
     shimmer come up and the body glows as the bag fades out of the light, gone by 0.65 s; the light goes out after it.
-  - **The LCARS frame** (ornaments, §12, and the side rail, §13): the side bar (52 wide, lilac, inside the body on its
-    inner side) curves into the top bar (18 tall, orange) at the top elbow (150 x 66, its outer corner rounded, the
-    corner inside filled round); then a lilac segment, its light flickering as the computer works, the bar on to its
-    rounded end short of the comm badge. At the bottom another elbow (peach, 150 x 40) into the bottom bar (salmon, 12
-    tall) and its rounded end. A small bag (as narrow as 216) keeps its elbows, its bottom bar and the badge: the top
-    bar beyond its elbow would run into them. The header's buttons are the side bar's blocks: each its LCARS colour
-    (settings peach, sort and filter lilac, Show Blizzard Bags and repair sky, the size button orange, bank tabs and
-    Sell Junk salmon, deposits blue, gold gold), its glyph cut in black at its right end, drawn the bar's width across
-    with a black band above and below, so the blocks stack 4 apart under the elbow (`Layout.HeaderButton` 36, each
-    icon's `Scale` 52 / 36, `Rail.Top` 70, `Gap` 4, its art from 66 where the elbow ends), a light over one under the
-    pointer.
-  - **The comm badge:** the close button, pinned at the top outer corner (12 in, 2 down), its own icon blank; the badge
-    (the gold delta over its silver oval) an ornament drawn over the content exactly where the pin puts the button
-    (`Above`), a glint over it, and a soft light round it under the pointer (the button's `Highlight`). Tap your comm
-    badge to beam up.
+  - **The LCARS frame** (ornaments, §12, and the side rail, §13): the side bar (52 wide, inside the body on its inner
+    side) curves into the slim top bar (10 tall, apricot) at the top elbow (150 x 66, its outer corner rounded 30, the
+    corner inside filled round); then a lavender segment, its light flickering as the computer works, the bar on to its
+    rounded end short of the comm badge. At the bottom another elbow (peach, 150 x 40, its outer corner rounded 24, its
+    top 6 left clear) into the bottom bar (salmon, 8 tall) and its rounded end. A small bag (as narrow as 216) keeps its
+    elbows, its bottom bar and the badge: the top bar beyond its elbow would run into them. **Its corners** (asked:
+    "corner at the top left and bottom left peak out around the LCARS, i think we need a way to shape the window
+    itself"): a small bag's inner corners are rounded as the elbows round them (30 and 24), its outer ones 12
+    (`Panel.Corners`, §24); a full bag's stay square. The header's buttons are the side bar's blocks: each its soft
+    LCARS colour (settings peach, sort and filter lavender, Show Blizzard Bags and repair sky, the size button apricot,
+    bank tabs and Sell Junk salmon, deposits blue, gold gold), a key rounded 8, 3 in from the bar's sides, its glyph cut
+    in dark navy at its right end, the bar's glass round it, so the blocks stack 4 apart under the elbow
+    (`Layout.HeaderButton` 36, each icon's `Scale` 52 / 36, `Rail.Top` 70, `Gap` 4, the glass from 66 where the elbow
+    ends), a light over one under the pointer.
+  - **The comm badge:** the close button, pinned at the top outer corner (12 in, 6 down), its own icon blank; the badge
+    (the gold delta over its silver oval) an ornament drawn over the content, 44 across, centered on the button (36),
+    so 4 past it on every side, inside the rounded corner (`Above`), a glint over it, and a soft light round it under
+    the pointer (the button's `Highlight`). Tap your comm badge to beam up.
   - **At rest:** the holodeck's golden grid behind the items (the body's fill, a 64 x 64 tile repeating); in the
     feathered edge, stars at warp (NextSnow, §22): streaks and specks drifting out into the world at three speeds,
     never falling, never turned, and every 30 s or so a jump to warp (a gust 600 strong, streaks of light sweeping
-    across). Tabs are LCARS bars, rounded where they stick out (lilac, the chosen one orange), section headers lilac
-    bars, their names and counts in black; the title in LCARS orange with a soft glow, an orange line out of the window
-    and a fleck of the transporter's light gliding in along it; no cloud (LCARS' text stands on black); sparkles are the
-    transporter's flecks; item buttons dark cells, a thin orange edge carrying an item's quality.
+    across). Tabs are LCARS bars of glass, rounded where they stick out (lavender at 0.42, `TabGlass`, their names in
+    peach; the chosen one solid apricot, its name in black). Section headers are bars of glass (the section bar art: a
+    solid rounded tip, a gap, then glass a third as strong fading along the section to a twentieth), 20 tall in a header
+    28 tall (`Sections.Header.Height`, `Layout.SectionHeader`), so 8 clear the first row of icons (reported: the title
+    "is overlaping with the first icon row"), their names in peach after the tip, counts in lavender; the title in
+    LCARS orange with a soft glow, an orange line out of the window and a fleck of the transporter's light gliding in
+    along it; no cloud; sparkles are the transporter's flecks; item buttons navy cells, a soft lavender edge carrying an
+    item's quality.
   - **Text:** Antonio (fonts/makeitso, Vernon Adams, SIL Open Font License; Google Fonts' upstream,
     googlefonts/antonioFont at `0856299`, its static Bold and SemiBold, checked against the upstream's file hashes), a
     free face in the spirit of LCARS' lettering, for display text (titles, sections, tabs, counts, the empty text,
@@ -433,8 +448,11 @@ alone. The setting is `nextTheme` (`DB:Get/SetNextTheme`, default `"Default"`).
     tinted from, a blank, the tab, the section bar, a block for each header button (its glyph read from
     `textures/next/icons` with a stdlib PNG reader and resampled) and the light over one, the comm badge and the light
     round it, the glint, the transporter's column (soft across, streaked, banded so it tiles as it flows), the body's
-    glow, a warp streak and the holodeck tile. Checked by ASCII previews, colour classes for the badge and a block.
-  - Not seen in game yet; no image of it was rendered.
+    glow (softening over its outer fifth, where the beam's margin and ends are), a warp streak and the holodeck tile.
+    Checked by ASCII previews, colour classes for the badge and a block. The masks the engine cuts with (a corner, a
+    beam's end) are `tools/textures/next_masks.py`'s.
+  - Seen in game once, before the restyle (a screenshot: the corners, the section titles and the look above came from
+    it); the beam's reach and ends were reported from it too. The restyle is not seen in game yet.
 
 Each draws the settings window and its controls in its own look (next-settings.md §6): Ember and Quiet
 their control colors in their own charcoal and grays (Quiet also smaller settings titles and quicker
@@ -1434,13 +1452,41 @@ What the Make It So theme (§8) needed of the engine, all of it data a theme giv
     gives its textures back; the driver stops with the last. `Init` gives back whatever lingers (`core/init.lua` starts
     it with the smoke's and the bats'). The theme going mid-beam shows the panel plainly (and a beam up closes it
     plainly at its end), its run given back; Escape mid-beam ends it at rest.
+  - **What it covers** (`NextBeam:Reach`): the body and `Margin` past it evenly all round, at the panel's scale. Asked:
+    "make sure it covers the window + it's decoration fully, it's a bit too small on all sides", then, of a version that
+    also reached past the tabs on the inner side, "it's too far to the left (leave tabs out) and not enough on the
+    right": the tabs are left out, the margin is even.
+  - **Its ends** (`Ends`; asked: "the top and bottom beam are cut off extremely clean on the horizontal plane, almost
+    like it's clipped at the top and bottom"): it runs `Ends` past the top and bottom of what it covers. The column and
+    the glow reach that far; the column fades out to nothing over each end through two masks (`beam.END_MASK`,
+    `textures/next/beam_end.png`: nothing at its top, all at its bottom, smoothstep between; one at the column's top,
+    one upside down at its bottom, `Ends` tall, the column's own art left to scroll), given back to their pool off the
+    column when the run is (a texture used again for a fleck is never cut). The flecks are scattered over the ends too,
+    as dense, drift round the whole length, and fade over the ends as the column does
+    (`smoothstep(bottom, bottom + ends, y) * (1 - smoothstep(top - ends, top, y))`). The glow's art softens over its
+    outer fifth. Without `Ends` nothing changes.
+- **A body's rounded corners** (`Panel.Corners`; reported with a screenshot: "corner at the top left and bottom left
+  peak out around the LCARS, i think we need a way to shape the window itself"): by side (`TOPINNER`, `TOPOUTER`,
+  `BOTTOMINNER`, `BOTTOMOUTER`, as ornaments name corners, §12), each a radius. On a small panel (`shapeCorners`, from
+  `ApplyGeometry`, which every styling of the body is followed by), a mask (`textures/next/corner_mask.png`: its top left quarter cut round, the rest
+  opaque) at each rounded corner of the body, the radius twice across, flipped for the corner and mirrored on a panel
+  whose inner side is on the right, cuts what is drawn across the body: its fill, its wash, its edges, the side rail's
+  strip and the glow a drop lights. It is wrapped white outside its rect (`CLAMPTOWHITE`); its right and bottom halves
+  are opaque, so a wrap that clamps to its edge would cut nothing more either. A full panel's corners stay square (it
+  stands against the screen's top and bottom beside its feathered edge), and a corner the theme leaves square has its
+  mask taken off. Ornaments are not cut: a theme draws them to fit (the elbows' outer corners are rounded as much).
+  **Not verified in game:** `CLAMPTOWHITE` on a mask texture (the client's UI schema lists it, `UI.xsd` `WRAPMODE`;
+  Blizzard's own masks use `CLAMPTOBLACKADDITIVE`, never it), which the art makes not matter.
+- **A section's row art shorter than its row** (`Sections.Header.Height`, from the row's top; reported: the section's
+  title "is overlaping with the first icon row"): the art no longer fills the header to the first row of icons.
 - **Ornament motion** `Flash` (§12), the comm badge's chirp.
 - **Check** names each part a beam does not have (and each of its phase's parts: `Reveal` only in an `Open`, `Fade`
   only in a `Close`, each required there, two numbers in order), what its runtime needs (`Sparkles`, and their
   `Density`, more than nothing; `Stretch` and `Sharpness` more than nothing; `Spread` no less; `Size` required, and
   `Twinkle`, `Drift` and `Alpha` (when a range) as two numbers in order; a column's `Spread` no less, `Shimmer` its
   depth from 0 to 1 and its speed no less than nothing, `Scroll` a number), every envelope four numbers in order, none
-  below 0; its colours through the usual walk. And a flash's `Every` (required, in order), `Time` more than nothing,
+  below 0; `Margin` and `Ends` no less than nothing; its colours through the usual walk. A corner that is no side
+  (`TOPLEFT` is not one) or a radius below nothing; a section's art `Height` not more than nothing. And a flash's `Every` (required, in order), `Time` more than nothing,
   `First` no less, and its parts.
 - **The switch** Transporter (§20); Snow and Leaves became Snow, Leaves and Stars (the warp stars fall through the snow
   engine).
@@ -1452,26 +1498,35 @@ What the Make It So theme (§8) needed of the engine, all of it data a theme giv
   after it; the column over the body and past its sides, loaded repeating, shimmering and flowing; the glow over the
   body, dark before its envelope; the panel shown over its Reveal, faded over its Fade by the Close's own envelopes;
   only sparkles without a column or glow; the panel's scale; lingering where the panel left it until the last part has
-  gone out, the driver stopped; pools, and `Init` letting go of what lingers), `spec/next/ornaments_spec.lua` (a flash:
+  gone out, the driver stopped; pools, and `Init` letting go of what lingers; a margin evenly all round with its tabs
+  left out, on either side and at a scale; "its ends": the column and glow past them, the two masks, given back with
+  the column, flecks over the ends as dense and faded there, at a scale), `spec/next/content_spec.lua` (a section's row
+  art its own height), `spec/next/theme_panel_spec.lua` ("a body with rounded corners": masks on a small backpack and
+  the mirrored bank, none on a full panel, taken off when a theme leaves a corner square), `spec/next/ornaments_spec.lua` (a flash:
   unseen at rest, its first after `First`, up to its alpha and out over `Time`, the next after `Every`, out once still
   and `First` again; without `First`, a whole `Every`), `spec/next/theme_panel_spec.lua` ("a transporter's beam": on the
   real backpack, beaming down in place, materializing under the shimmer and saying it has shown, the shimmer going out
   on its own after; its threads and sections waiting; Escape and the theme going mid-beam; beaming up where it stands,
   gone at its Fade's end, the shimmer lingering; its threads unravelling over it; the theme going as it beams up;
-  sliding without a beam. "the Make It So theme's LCARS frame", on a screen where a unit is a pixel: the badge exactly
-  where the close button is pinned on the backpack and the mirrored bank; the buttons down the side bar under the elbow,
+  sliding without a beam. "the Make It So theme's LCARS frame", on a screen where a unit is a pixel: the badge over the
+  close button, centered on it, 4 past it on every side, inside the body, on the backpack and the mirrored bank; the buttons down the side bar under the elbow,
   each block the bar's width, 4 apart; the title and search box clear of the side bar, the top bar and the badge; the
   footer's text above the bottom bar; no piece along the top or bottom running into another, full and as narrow as a
   small bag goes), `spec/sonata/next_engine_spec.lua` (Check of a beam and of a flash; the switch; Moving Ornaments taking
   a flashing piece out), `spec/sonata/next_themes_spec.lua` ("Make It So": the font, its license and locales, the art,
-  the beam's timing and colour, the side bar's blocks, the comm badge where the pin is and its chirp after the beam,
-  the holodeck and the warp stars, black on the bars), `spec/core/init_spec.lua` (started), the settings specs (the
+  the beam's timing and colour, the side bar's blocks, the comm badge centered on the pin and its chirp after the beam,
+  the holodeck and the warp stars; the restyle: soft colours, section names in peach on glass above the icons, glass
+  tabs and a solid chosen one, the body and side bar translucent, rounded corners and a clean Check, the beam's margin
+  and ends), `spec/core/init_spec.lua` (started), the settings specs (the
   switch, its row, its title; Snow, Leaves and Stars), `spec/core/constants_spec.lua` (every switch on by default), and
   every shipped-theme spec with it (`shipped_themes_spec`, `pixel_perfect_spec`). Mutation-tested: 65 mutations of the
   beam, the flash, the panel's wiring, Check, the switch, its default and its start. Six first survived: four led to
   sharper tests (a fleck's Spread at the panel's scale, each fleck's own twinkle phase, drifting round the body, the
   switch on by default), one to a test of an envelope of five numbers, and one showed code that changed nothing (a
-  run's clear time starting from the panel's part), simplified. Every one now caught.
+  run's clear time starting from the panel's part), simplified. Every one now caught. The feedback round (the beam's
+  reach and ends and their masks, the rounded corners, a section's art height, their Check): 30 mutations, 29 caught at
+  once; the survivor showed code that changed nothing (shaping the corners from `styleBody`, which `ApplyGeometry`
+  always follows), removed.
 
 ## 9. Coverage
 

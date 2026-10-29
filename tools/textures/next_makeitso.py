@@ -3,12 +3,16 @@
 # holodeck's grid, its transporter's light, and a comm badge. Asked: "star trek TNG themed, the bags obviously need the
 # star trek beam down, and beam up animation for appearing and closing. star trek comm badge is a part of the theme as
 # well ... LCARS is an option, but maybe also holodeck too".
-#   The LCARS frame: an elbow at the body's top inner corner (the side bar curving into the top bar) and one at its
-#     bottom (into the bottom bar), a rounded cap for each bar's end, a plain white square the theme tints for the bars
-#     and their segments, a tab with a rounded end, a section's bar with a rounded end.
-#   The side bar's buttons: one block for each header button, in its own LCARS colour, its glyph (textures/next/icons,
-#     tools/textures/next_icons.py) cut in black at its right end, a black band above and below it; the light over one
-#     under the pointer; a blank for the close button, which the comm badge stands under.
+# Then, asked after the first look: "softer colors, maybe a bit more translucent in the title of each section, more..
+# modern a bit. i'll let you decide what this means". So the frame is slimmer and rounder, its colours softer, and what
+# was a solid bar is glass the theme draws translucent.
+#   The LCARS frame: an elbow at the body's top inner corner (the side bar curving into a slim top bar) and one at its
+#     bottom (into a slimmer bottom bar), their outer corners as round as the theme rounds the body's (Panel.Corners), a
+#     rounded cap for each bar's end, a plain white square the theme tints for the bars and their segments, a tab with a
+#     rounded end; a section's bar: a solid rounded tip, then glass fading out along the section, its name over it.
+#   The side bar's buttons: one rounded block for each header button, in its own soft LCARS colour, its glyph
+#     (textures/next/icons, tools/textures/next_icons.py) cut in dark navy at its right end, floating on the side bar's
+#     glass; the light over one under the pointer; a blank for the close button, which the comm badge stands under.
 #   The comm badge: the delta in gold over its silver oval; a glint; a glow under the pointer.
 #   The holodeck's grid: a tile of it, golden lines on black, repeating across the body.
 #   The transporter: a column of light (soft across, streaked up and down, banded so it flows up seamlessly), a fleck of
@@ -29,21 +33,31 @@ OUT = os.path.join("textures", "next", "makeitso")
 ICONS = os.path.join("textures", "next", "icons")
 SS = 4
 
-# LCARS colours (the theme's palette names the same): orange, peach, lilac, sky, blue, salmon, gold.
-ORANGE = (1.0, 0.6, 0.0)
-PEACH = (1.0, 0.8, 0.6)
-LILAC = (0.8, 0.6, 0.8)
-SKY = (0.6, 0.8, 1.0)
-BLUE = (0.6, 0.6, 1.0)
-SALMON = (1.0, 0.6, 0.4)
-GOLD = (1.0, 0.7, 0.0)
-BLACK = (0.0, 0.0, 0.0)
+# Soft LCARS colours (the theme's palette names the same): apricot, peach, lavender, sky, blue, salmon, gold; and the
+# dark navy glyphs are cut in.
+ORANGE = (0.98, 0.7, 0.42)
+PEACH = (1.0, 0.86, 0.72)
+LILAC = (0.78, 0.68, 0.9)
+SKY = (0.66, 0.84, 1.0)
+BLUE = (0.62, 0.7, 1.0)
+SALMON = (0.96, 0.66, 0.56)
+GOLD = (1.0, 0.8, 0.45)
+NAVY = (0.04, 0.05, 0.1)
 
 # The side bar (Header.Buttons.Rail): 52 wide; its buttons 36 (Layout.HeaderButton), each drawn 52 across (the bar's
-# width) and as tall, the block 36 tall in its middle with a 4 unit black band above and below it.
+# width) and as tall, the block 36 tall in its middle, inset INSET from the bar's sides, its corners rounded (ROUND).
 RAIL = 52
 BUTTON = 36
-BAND = 4
+INSET = 3
+ROUND = 8
+# The frame's bars, slim: the top bar TOP tall, the bottom bar BOTTOM; the elbows' outer corners rounded TOP_ROUND and
+# BOTTOM_ROUND (the theme's Panel.Corners.TOPINNER and BOTTOMINNER, so the body is cut where they curve); a GAP of glass
+# at the bottom elbow's top, between the side bar's blocks and it.
+TOP = 10
+BOTTOM = 8
+TOP_ROUND = 30
+BOTTOM_ROUND = 24
+GAP = 6
 
 
 def write_png(path, width, height, rgba, level=9):
@@ -126,6 +140,12 @@ def arc(cx, cy, r, a0, a1, n=24):
     """Points along a circle from angle a0 to a1 (degrees, y down: 90 is down), both included."""
     return [(cx + r * math.cos(math.radians(a0 + (a1 - a0) * i / n)),
              cy + r * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
+
+
+def rounded(x0, y0, x1, y1, r, n=12):
+    """A rectangle's outline, its corners rounded r."""
+    return (arc(x1 - r, y0 + r, r, 270, 360, n) + arc(x1 - r, y1 - r, r, 0, 90, n) + arc(x0 + r, y1 - r, r, 90, 180, n)
+            + arc(x0 + r, y0 + r, r, 180, 270, n))
 
 
 def bezier(p0, p1, p2, n=16):
@@ -228,31 +248,32 @@ class Image:
         return self
 
 
-# The top elbow, 150 x 66 units drawn into 256 x 128, white: the side bar (0 to 52 across, all the way down) curving
-# into the top bar (18 down, all the way across), its outer corner rounded (26), the corner inside filled round (14).
+# The top elbow, 150 x 66 units drawn into 256 x 128, white: the side bar (0 to RAIL across, all the way down) curving
+# into the slim top bar (TOP down, all the way across), its outer corner rounded TOP_ROUND, the corner inside filled
+# round (12).
 def elbow_top():
     w, h, uw, uh = 256, 128, 150, 66
-    pts = [(26, 0), (uw, 0), (uw, 18), (66, 18)]
-    pts += arc(66, 32, 14, 270, 180)[1:]
-    pts += [(52, uh), (0, uh), (0, 26)]
-    pts += arc(26, 26, 26, 180, 270)[1:-1]
+    r, f = TOP_ROUND, 12
+    pts = [(r, 0), (uw, 0), (uw, TOP), (RAIL + f, TOP)]
+    pts += arc(RAIL + f, TOP + f, f, 270, 180)[1:]
+    pts += [(RAIL, uh), (0, uh), (0, r)]
+    pts += arc(r, r, r, 180, 270)[1:-1]
     m = Mask(w, h, w / uw, h / uh).poly(pts)
     Image(w, h).paint(m, (1, 1, 1)).save("elbow_top.png").preview()
 
 
-# The bottom elbow, 150 x 40 units drawn into 256 x 64, white: a black band (4) across the side bar's top, so the bar
-# above ends apart from it; the side bar (52 across) curving into the bottom bar (12 up from the bottom, all the way
-# across), its outer corner rounded (22), the corner inside filled round (10). Black stays black however it is tinted.
+# The bottom elbow, 150 x 40 units drawn into 256 x 64, white: nothing for its top GAP (the side bar's glass shows there,
+# between its last block and the elbow); the side bar (RAIL across) curving into the slim bottom bar (BOTTOM up from the
+# bottom, all the way across), its outer corner rounded BOTTOM_ROUND, the corner inside filled round (10).
 def elbow_bottom():
     w, h, uw, uh = 256, 64, 150, 40
-    pts = [(0, BAND), (52, BAND), (52, 18)]
-    pts += arc(62, 18, 10, 180, 90)[1:]
-    pts += [(uw, 28), (uw, uh), (22, uh)]
-    pts += arc(22, 18, 22, 90, 180)[1:]
-    img = Image(w, h)
-    img.paint(Mask(w, h, w / uw, h / uh).poly(pts), (1, 1, 1))
-    img.paint(Mask(w, h, w / uw, h / uh).rect(0, 0, 52, BAND), BLACK)
-    img.save("elbow_bottom.png").preview()
+    r, f = BOTTOM_ROUND, 10
+    pts = [(0, GAP), (RAIL, GAP), (RAIL, uh - BOTTOM - f)]
+    pts += arc(RAIL + f, uh - BOTTOM - f, f, 180, 90)[1:]
+    pts += [(uw, uh - BOTTOM), (uw, uh), (r, uh)]
+    pts += arc(r, uh - r, r, 90, 180)[1:]
+    m = Mask(w, h, w / uw, h / uh).poly(pts)
+    Image(w, h).paint(m, (1, 1, 1)).save("elbow_bottom.png").preview()
 
 
 # A bar's rounded end, 64 x 64, white: square on the inner side, a half round on the outer (the right: the backpack's).
@@ -280,16 +301,31 @@ def tab():
     Image(w, h).paint(Mask(w, h).poly(pts), (1, 1, 1)).save("tab.png").preview(2, 2)
 
 
-# A section's bar, 512 x 32, white: rounded at its left end, as LCARS headers are, its title written over it in black.
+# A section's bar, 512 x 32, white: a solid tip rounded at its left end, as LCARS headers are (to 20 across), a gap (to
+# 28), then glass, a third as strong, fading out along the section to a twentieth at its right end, a line along its top
+# a little stronger; the section's name is written over the glass.
 def section_bar():
     w, h = 512, 32
-    pts = [(16, 0), (w, 0), (w, h), (16, h)] + arc(16, 16, 16, 90, 270)[1:-1]
-    Image(w, h).paint(Mask(w, h).poly(pts), (1, 1, 1)).save("section_bar.png").preview(8, 2)
+    tip, glass = 20, 28
+    img = Image(w, h)
+    img.paint(Mask(w, h).poly([(16, 0), (tip, 0), (tip, h), (16, h)] + arc(16, 16, 16, 90, 270)[1:-1]), (1, 1, 1))
+    cov = []
+    for y in range(h):
+        for x in range(w):
+            if x < glass:
+                cov.append(0.0)
+                continue
+            u = (x + 0.5 - glass) / (w - glass)
+            a = 0.34 * (1 - 0.85 * smoothstep(0, 1, u))
+            cov.append(a * (1.45 if y < 2 else 1.0))
+    img.paint(cov, (1, 1, 1))
+    img.save("section_bar.png").preview(8, 2)
 
 
-# The side bar's buttons: each 64 x 64, its 52 units across the bar's width: a black band (4) above and below the block
-# (rows 4 to 8 and 44 to 48 of its 52), the block (8 to 44) in its colour, its glyph cut in black at its right end
-# (20 across, its middle 14 in from the right). Its glyph is the header icon's own (textures/next/icons), resampled.
+# The side bar's buttons: each 64 x 64, its 52 units across the bar's width: the block (rows 8 to 44 of its 52, INSET in
+# from its sides, its corners rounded ROUND) in its colour, nothing round it (the side bar's glass shows there), its
+# glyph cut in dark navy at its right end (20 across, its middle 14 in from the right). Its glyph is the header icon's
+# own (textures/next/icons), resampled.
 BLOCKS = {
     "settings": PEACH, "sort": LILAC, "bags": SKY, "small": ORANGE, "full": ORANGE, "banktabs": SALMON,
     "deposit": BLUE, "depositgold": GOLD, "withdrawgold": GOLD, "filter": LILAC, "selljunk": SALMON, "repair": SKY,
@@ -319,9 +355,7 @@ def blocks():
     for name, color in BLOCKS.items():
         gw, gh, glyph = read_png(os.path.join(ICONS, name + ".png"))
         img = Image(s, s)
-        img.paint(Mask(s, s, k, k).rect(0, top - BAND, RAIL, top), BLACK)
-        img.paint(Mask(s, s, k, k).rect(0, bottom, RAIL, bottom + BAND), BLACK)
-        img.paint(Mask(s, s, k, k).rect(0, top, RAIL, bottom), color)
+        img.paint(Mask(s, s, k, k).poly(rounded(INSET, top, RAIL - INSET, bottom, ROUND)), color)
         size, cx, cy = 20, RAIL - 14, RAIL / 2
         cov = [0.0] * (s * s)
         for y in range(s):
@@ -330,10 +364,10 @@ def blocks():
                 v = ((y + 0.5) / k - (cy - size / 2)) / size
                 if 0 <= u <= 1 and 0 <= v <= 1:
                     cov[y * s + x] = sample(glyph, gw, gh, u, v)
-        img.paint(cov, BLACK)
+        img.paint(cov, NAVY)
         img.save("block_" + name + ".png")
     # The light over a block under the pointer: its shape, white.
-    img = Image(s, s).paint(Mask(s, s, k, k).rect(0, top, RAIL, bottom), (1, 1, 1))
+    img = Image(s, s).paint(Mask(s, s, k, k).poly(rounded(INSET, top, RAIL - INSET, bottom, ROUND)), (1, 1, 1))
     img.save("block_light.png").preview()
 
 
@@ -415,14 +449,16 @@ def column():
     Image(w, h).paint(cov, (1, 1, 1)).save("column.png").preview(2, 11)
 
 
-# The glow over a body as it beams in or out, 128 x 128, white: strong all over but its edges, which soften to nothing.
+# The glow over a body as it beams in or out, 128 x 128, white: strong all over but its edges, which soften to nothing
+# over the outer fifth across and up and down (the beam's margin and its ends, Panel.Beam.Margin and Ends: the body
+# itself lit, the light past it fading, nothing cut clean).
 def body_glow():
     s = 128
     cov = []
     for y in range(s):
         for x in range(s):
             u, v = abs((x + 0.5) / s * 2 - 1), abs((y + 0.5) / s * 2 - 1)
-            cov.append((1 - smoothstep(0.82, 1.0, u)) * (1 - smoothstep(0.88, 1.0, v)))
+            cov.append((1 - smoothstep(0.78, 1.0, u)) * (1 - smoothstep(0.8, 1.0, v)))
     Image(s, s).paint(cov, (1, 1, 1)).save("body_glow.png")
 
 
@@ -439,17 +475,17 @@ def streak():
     Image(s, s).paint(cov, (1, 1, 1)).save("streak.png").preview(1, 4)
 
 
-# The holodeck's grid, a 64 x 64 tile in its own colours: black, a golden line along its top and left edges (repeated,
-# the grid), a soft glow either side of it. Opaque.
+# The holodeck's grid, a 64 x 64 tile in its own colours: deep navy, a faint amber line along its top and left edges
+# (repeated, the grid), a soft glow either side of it. Opaque: the theme draws it translucent.
 def holodeck():
     s = 64
-    line = (0.95, 0.72, 0.15)
-    base = (0.012, 0.012, 0.02)
+    line = (0.95, 0.78, 0.45)
+    base = (0.02, 0.025, 0.05)
     px = []
     for y in range(s):
         for x in range(s):
             dx, dy = min(x, s - x), min(y, s - y)
-            a = max(0.3 if dx == 0 else 0.07 * math.exp(-dx / 1.2), 0.3 if dy == 0 else 0.07 * math.exp(-dy / 1.2))
+            a = max(0.16 if dx == 0 else 0.045 * math.exp(-dx / 1.4), 0.16 if dy == 0 else 0.045 * math.exp(-dy / 1.4))
             px.append(tuple(base[c] * (1 - a) + line[c] * a for c in range(3)) + (1.0,))
     write_png(os.path.join(OUT, "holodeck.png"), s, s, px)
 

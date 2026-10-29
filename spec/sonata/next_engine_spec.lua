@@ -937,6 +937,27 @@ describe("SonataNext", function()
 
   -- The Halloween theme's smoke and bats (next-themes.md §23): their parts are the modules', and what their runtimes
   -- divide by or count.
+  -- A body's rounded corners (Panel.Corners, next-themes.md §24): by the corner's side, each a radius.
+  it("names what is wrong with a body's corners", function()
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadCorners", Panel = { Corners = { TOPLEFT = 4, TOPINNER = -1, BOTTOMOUTER = "round" } } })
+    local problems = sonataNext:Check("BadCorners")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Corners.BOTTOMOUTER: a radius, no less than nothing",
+      "Panel.Corners.TOPINNER: a radius, no less than nothing",
+      "Panel.Corners.TOPLEFT: no corner named TOPLEFT (TOPINNER, TOPOUTER, BOTTOMINNER, BOTTOMOUTER)",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "GoodCorners", Panel = { Corners = { TOPINNER = 20, BOTTOMOUTER = 0 } },
+      Sections = { Header = { Texture = "Glow", Height = 20 } } })
+    assert.are.same({}, sonataNext:Check("GoodCorners"))
+    sonataNext:RegisterTheme({ Name = "BadHeader", Sections = { Header = { Texture = "Glow", Height = 0 } } })
+    assert.are.same({ "Sections.Header.Height: more than nothing" }, sonataNext:Check("BadHeader"))
+  end)
+
   -- A transporter's beam (next-themes.md §24).
   it("names what is wrong with a beam, by where it is", function()
     if addon:GetModule("NextBeam", true) == nil then
@@ -954,7 +975,7 @@ describe("SonataNext", function()
       Glow = { Color = "Nope", Halo = 1 },
       Open = { Reveal = { 0.5, 0.2 }, Sparkles = { 0, 0.5, 0.2, 0.8 }, Column = { 1 }, Fade = { 0, 1 } },
       Close = { Sparkles = { 0, 0.1, 0.2, 0.3 }, Glow = { 0.1, 0.2, 0.3 }, Column = { 0, 0.1, 0.2, 0.3, 0.4 } },
-      Phaser = 1,
+      Phaser = 1, Margin = -1, Ends = "far",
     } } })
     local problems = sonataNext:Check("BadBeam")
     table.sort(problems)
@@ -967,8 +988,10 @@ describe("SonataNext", function()
       "Panel.Beam.Column.Scroll: a number",
       "Panel.Beam.Column.Shimmer: two numbers, how deep (0 to 1) and how fast",
       "Panel.Beam.Column.Spread: no less than nothing",
+      "Panel.Beam.Ends: no less than nothing",
       "Panel.Beam.Glow.Color: no color named Nope",
       "Panel.Beam.Glow.Halo: no part named Halo",
+      "Panel.Beam.Margin: no less than nothing",
       "Panel.Beam.Open.Column: four numbers in order, in, full, out and gone",
       "Panel.Beam.Open.Fade: no part named Fade",
       "Panel.Beam.Open.Reveal: two numbers, from and to",
@@ -987,7 +1010,7 @@ describe("SonataNext", function()
     }, problems)
     sonataNext:RegisterTheme({ Name = "NoSparkles", Panel = { Beam = { Open = { Reveal = { 0.2, 0.6 } } } } })
     assert.are.same({ "Panel.Beam.Sparkles: a beam needs them" }, sonataNext:Check("NoSparkles"))
-    sonataNext:RegisterTheme({ Name = "GoodBeam", Panel = { Beam = {
+    sonataNext:RegisterTheme({ Name = "GoodBeam", Panel = { Beam = { Margin = 12, Ends = 40,
       Sparkles = { Texture = "Glow", Colors = { "White", "Gold" }, Density = 2, Size = { 6, 12 }, Stretch = 2,
         Alpha = { 0.6, 1 }, BlendMode = "ADD", Twinkle = { 3, 8 }, Sharpness = 3, Drift = { 20, 50 }, Spread = 10 },
       Column = { Texture = "Glow", Color = "White", Alpha = 0.5, BlendMode = "ADD", Spread = 20, Shimmer = { 0.3, 4 },

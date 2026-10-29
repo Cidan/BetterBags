@@ -16,6 +16,8 @@ local style = addon:GetModule('NextStyle')
 --   Column: a column of light over the body and Spread past its sides, shimmering (Shimmer: how deep, how fast) and its
 --     art flowing up (Scroll, of its height a second).
 --   Glow: the body lit as it materializes or dematerializes.
+-- It covers the body and Margin past it all round, and runs Ends past that above and below, where its column and its
+-- sparkles fade out to nothing and its glow's art softens, so it has no hard top or bottom.
 -- Each part grows in and out over an envelope of its own ({ in, full, out, gone } seconds): a beam down's (Open), the
 -- panel shown under it over its Reveal; a beam up's (Close), the panel fading out of it over its Fade. The run lingers
 -- on its own layer after the panel's part, until its last part has gone out (Linger). A theme without Panel.Beam has none.
@@ -26,7 +28,7 @@ local beam = addon:NewModule('NextBeam')
 beam.Random = math.random
 
 -- The keys of Panel.Beam, of its Sparkles, its Column, its Glow, its Open and its Close, for SonataNext:Check.
-beam.KEYS = { Sparkles = true, Column = true, Glow = true, Open = true, Close = true }
+beam.KEYS = { Sparkles = true, Column = true, Glow = true, Open = true, Close = true, Margin = true, Ends = true }
 beam.SPARKLE_KEYS = { Texture = true, Colors = true, Density = true, Size = true, Stretch = true, Alpha = true,
   BlendMode = true, Twinkle = true, Sharpness = true, Drift = true, Spread = true }
 beam.COLUMN_KEYS = { Texture = true, Color = true, Alpha = true, BlendMode = true, Spread = true, Shimmer = true,
@@ -36,6 +38,8 @@ beam.OPEN_KEYS = { Reveal = true, Sparkles = true, Column = true, Glow = true }
 beam.CLOSE_KEYS = { Fade = true, Sparkles = true, Column = true, Glow = true }
 -- The parts with an envelope.
 beam.ENVELOPES = { "Sparkles", "Column", "Glow" }
+-- The mask that fades the column's ends (tools/textures/next_masks.py): nothing at its top, all at its bottom.
+beam.END_MASK = "Interface\\AddOns\\BetterBags\\textures\\next\\beam_end.png"
 
 ---@class (exact) NextBeamSparkle
 ---@field texture Texture
@@ -54,8 +58,10 @@ beam.ENVELOPES = { "Sparkles", "Column", "Glow" }
 ---@field sparkles NextBeamSparkle[]
 ---@field column? Texture
 ---@field glow? Texture
----@field bottom number The body's bottom on the layer.
----@field height number
+---@field masks MaskTexture[] The column's, fading its ends.
+---@field bottom number The bottom of where it runs on the layer, its ends included.
+---@field height number Of where it runs, its ends included.
+---@field ends number How far it runs past what it covers, above and below, on the layer.
 ---@field clear number When its last part has gone out.
 ---@field elapsed number How long it has lived, while it lingers.
 local runProto = {}
@@ -67,6 +73,7 @@ function beam:Init()
   end
   self.living = {}
   self.pool = self.pool or {}
+  self.maskPool = self.maskPool or {}
   if self.layer ~= nil then
     self.layer.driver:SetScript("OnUpdate", nil)
   end
@@ -198,18 +205,47 @@ local function over(t, left, top, width, height)
   t:SetSize(width, height)
 end
 
+-- endMask takes a mask from the pool, or makes one on the layer, drawn with the end's art.
+---@return MaskTexture
+local function endMask()
+  local m = table.remove(beam.maskPool)
+  if m == nil then
+    m = beam:Layer():CreateMaskTexture()
+    m:SetTexture(beam.END_MASK, "CLAMPTOWHITE", "CLAMPTOWHITE")
+  end
+  m:ClearAllPoints()
+  m:Show()
+  return m
+end
+
+-- Reach is the rect a panel's beam covers, on the screen: its body where its BodyRect puts it and Margin past it evenly
+-- all round, at its scale (asked: "make sure it covers the window + it's decoration fully", then "too far to the left
+-- (leave tabs out) and not enough on the right": its tabs, sticking out of its inner side, are left out). Its left and
+-- top, its height and width, its scale.
+---@param panel table
+---@return number left, number top, number height, number width, number scale
+function beam:Reach(panel)
+  local left, top, height, width, scale = panel:BodyRect()
+  scale = scale or 1
+  local margin = (self:Spec().Margin or 0) * scale
+  return left - margin, top + margin, height + 2 * margin, width + 2 * margin, scale
+end
+
 -- Begin readies a panel's beam on the beam layer, unseen until it draws: its phase ("Open", a beam down; "Close", a
--- beam up), its sparkles over its body where its BodyRect puts it on the screen (at its scale), its column and glow.
+-- beam up), its sparkles over what it covers (Reach) and its ends, its column and glow. Asked of the ends: "the top and
+-- bottom beam are cut off extremely clean on the horizontal plane, almost like it's clipped at the top and bottom".
 ---@param panel table
 ---@param phase string
 ---@return NextBeamRun
 function beam:Begin(panel, phase)
   local S = self:Spec()
-  local left, top, height, width, scale = panel:BodyRect()
-  scale = scale or 1
+  local left, top, height, width, scale = self:Reach(panel)
+  local ends = (S.Ends or 0) * scale
+  top, height = top + ends, height + 2 * ends
   ---@type NextBeamRun
-  local run = setmetatable({ spec = S, timing = S[phase], phase = phase, sparkles = {}, bottom = top - height,
-    height = height, clear = self:ClearTime(phase), elapsed = 0 }, { __index = runProto })
+  local run = setmetatable({ spec = S, timing = S[phase], phase = phase, sparkles = {}, masks = {},
+    bottom = top - height, height = height, ends = ends, clear = self:ClearTime(phase), elapsed = 0 },
+    { __index = runProto })
   local C = S.Column
   if C ~= nil then
     local t = texture("ARTWORK", 0)
@@ -219,6 +255,18 @@ function beam:Begin(panel, phase)
     local spread = (C.Spread or 0) * scale
     over(t, left - spread, top, width + 2 * spread, height)
     run.column = t
+    -- Its ends fade to nothing: a mask over each, the art's own coordinates left to scroll.
+    if ends > 0 then
+      for i, edge in ipairs({ "TOP", "BOTTOM" }) do
+        local m = endMask()
+        m:SetPoint(edge .. "LEFT", t, edge .. "LEFT", 0, 0)
+        m:SetPoint(edge .. "RIGHT", t, edge .. "RIGHT", 0, 0)
+        m:SetHeight(ends)
+        m:SetTexCoord(0, 1, i == 1 and 0 or 1, i == 1 and 1 or 0)
+        t:AddMaskTexture(m)
+        table.insert(run.masks, m)
+      end
+    end
   end
   local G = S.Glow
   if G ~= nil then
@@ -254,18 +302,20 @@ function runProto:Draw(t)
   local P = S.Sparkles
   local stretch, sharpness = P.Stretch or 1, P.Sharpness or 1
   local env = O.Sparkles and envelope(O.Sparkles, t) or 0
+  local bottom, top, ends = self.bottom, self.bottom + self.height, self.ends
   for _, s in ipairs(self.sparkles) do
     local tex = s.texture
     local tw = ((1 + math.sin(2 * math.pi * s.twinkle * t + s.phase)) / 2) ^ sharpness
-    local alpha = env * tw * s.alpha
     if env <= 0 then
       tex:Hide()
     else
       local size = s.size * (0.5 + 0.5 * tw)
-      tex:SetPoint("CENTER", beam:Layer(), "BOTTOMLEFT", s.x,
-        self.bottom + (s.y - self.bottom + s.drift * t) % self.height)
+      local y = bottom + (s.y - bottom + s.drift * t) % self.height
+      -- Fading out over its ends, as the column does.
+      local fade = ends > 0 and smoothstep(bottom, bottom + ends, y) * (1 - smoothstep(top - ends, top, y)) or 1
+      tex:SetPoint("CENTER", beam:Layer(), "BOTTOMLEFT", s.x, y)
       tex:SetSize(size, size * stretch)
-      tex:SetAlpha(alpha)
+      tex:SetAlpha(env * tw * s.alpha * fade)
       tex:Show()
     end
   end
@@ -330,9 +380,16 @@ function beam:Step(elapsed)
   end
 end
 
--- Release gives the run's textures back, hidden, at once; a run released again does nothing.
+-- Release gives the run's textures and masks back, hidden, at once (the masks off its column first, so a texture used
+-- again is not cut); a run released again does nothing.
 function runProto:Release()
   beam.living[self] = nil
+  for _, m in ipairs(self.masks) do
+    self.column:RemoveMaskTexture(m)
+    m:Hide()
+    table.insert(beam.maskPool, m)
+  end
+  self.masks = {}
   for _, s in ipairs(self.sparkles) do
     s.texture:Hide()
     table.insert(beam.pool, s.texture)

@@ -2093,6 +2093,93 @@ describe("BetterBags Next's panels and themes", function()
     end)
   end)
 
+  -- A body with rounded corners (Panel.Corners, next-themes.md §24; reported with the Make It So theme: the window's
+  -- square corners "peak out around the LCARS ... we need a way to shape the window itself"): on a small panel, each
+  -- corner a theme rounds cuts everything drawn across the body (its fill, its wash, its edge, its side rail's strip, the
+  -- glow a drop lights) with a mask its radius twice across at that corner, white outside it.
+  describe("a body with rounded corners (Panel.Corners)", function()
+    local CORNER = "Interface\\AddOns\\BetterBags\\textures\\next\\corner_mask.png"
+
+    local function shaped(corners)
+      apply({ Panel = { Corners = corners, Edge = { Color = "Gold", Size = 1 } },
+        Header = { Buttons = { Rail = { Width = 40, Top = 60, Fill = { Color = "Gold" } } } } })
+    end
+
+    local function parts(bag)
+      local list = { bag.fill, bag.wash, bag.dropGlow, bag.rail }
+      for _, e in ipairs(bag.edges) do table.insert(list, e) end
+      return list
+    end
+
+    local function masksOf(t)
+      local out = {}
+      for i = 1, t:GetNumMaskTextures() do out[t:GetMaskTexture(i)] = true end
+      return out
+    end
+
+    local function small(bag)
+      addon:GetModule("NextPanel"):SetSize(ctx(), "small")
+      finishTweens()
+      assert.is_true(bag:IsSmall())
+    end
+
+    after_each(function()
+      addon:GetModule("NextPanel"):SetSize(ctx(), "full")
+      finishTweens()
+      backToDefault()
+    end)
+
+    it("rounds a small panel's corners, each a mask over every part across its body", function()
+      shaped({ TOPINNER = 20, BOTTOMOUTER = 12 })
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      small(bag)
+      local top, bottom = bag.cornerMasks.TOPINNER, bag.cornerMasks.BOTTOMOUTER
+      for _, t in ipairs(parts(bag)) do
+        assert.are.same({ [top] = true, [bottom] = true }, masksOf(t))
+      end
+      assert.is_true(top:IsShown())
+      assert.are.equal(CORNER, top:GetTexture())
+      assert.are.same({ "CLAMPTOWHITE", "CLAMPTOWHITE" }, { top._wrapH, top._wrapV }, "nothing cut past it")
+      assert.are.same({ "TOPLEFT", bag.body, "TOPLEFT", 0, 0 }, { top:GetPoint(1) })
+      assert.are.same({ 40, 40 }, { top:GetWidth(), top:GetHeight() })
+      assert.are.same({ 0, 0, 0, 1, 1, 0, 1, 1 }, { top:GetTexCoord() }, "its art's cut corner at the top left")
+      assert.are.same({ "BOTTOMRIGHT", bag.body, "BOTTOMRIGHT", 0, 0 }, { bottom:GetPoint(1) })
+      assert.are.same({ 24, 24 }, { bottom:GetWidth(), bottom:GetHeight() })
+      assert.are.same({ 1, 1, 1, 0, 0, 1, 0, 0 }, { bottom:GetTexCoord() }, "flipped both ways")
+    end)
+
+    it("rounds them mirrored on a panel whose inner side is on the right", function()
+      shaped({ TOPINNER = 20 })
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      small(bank)
+      local top = bank.cornerMasks.TOPINNER
+      assert.are.same({ "TOPRIGHT", bank.body, "TOPRIGHT", 0, 0 }, { top:GetPoint(1) })
+      assert.are.same({ 1, 0, 1, 1, 0, 0, 0, 1 }, { top:GetTexCoord() }, "flipped across")
+      assert.is_true(masksOf(bank.fill)[top])
+    end)
+
+    -- A full panel stands against the screen's top and bottom, beside its feathered edge: its corners stay square.
+    it("leaves a full panel square, and takes its masks off for a full size or a theme without corners", function()
+      shaped({ TOPINNER = 20 })
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      assert.are.equal(0, bag.fill:GetNumMaskTextures(), "full")
+      small(bag)
+      local top = bag.cornerMasks.TOPINNER
+      assert.are.equal(1, bag.fill:GetNumMaskTextures())
+      addon:GetModule("NextPanel"):SetSize(ctx(), "full")
+      finishTweens()
+      assert.are.equal(0, bag.fill:GetNumMaskTextures(), "full again")
+      assert.is_false(top:IsShown())
+      small(bag)
+      assert.are.equal(1, bag.fill:GetNumMaskTextures())
+      backToDefault()
+      for _, t in ipairs(parts(bag)) do
+        assert.are.equal(0, t:GetNumMaskTextures())
+      end
+      assert.is_false(top:IsShown())
+    end)
+  end)
+
   -- The Make It So theme's transporter (next-themes.md §24; asked: "the bags obviously need the star trek beam down, and
   -- beam up animation for appearing and closing").
   describe("a transporter's beam (Panel.Beam)", function()
@@ -2322,16 +2409,20 @@ describe("BetterBags Next's panels and themes", function()
       return r.left - body.left
     end
 
-    it("stands the comm badge exactly where the close button is pinned, on the backpack and the mirrored bank", function()
+    it("stands the comm badge over the close button where it is pinned, centered on it, on the backpack and the mirrored bank", function()
       for _, panel in ipairs({ opened(function(c) return nextBag:Create(c) end),
         opened(function(c) return nextBank:Create(c) end) }) do
         local badge = layout.Rect(piece(panel, "CommBadge").texture)
         local close = layout.Rect(panel.closeButton)
-        for _, side in ipairs({ "left", "right", "top", "bottom" }) do
-          assert.is_true(near(badge[side], close[side]), panel.side .. " " .. side)
+        -- 44 across over a button 36 across: 4 past it on every side.
+        for _, side in ipairs({ "left", "bottom" }) do
+          assert.is_true(near(badge[side], close[side] - 4), panel.side .. " " .. side)
+        end
+        for _, side in ipairs({ "right", "top" }) do
+          assert.is_true(near(badge[side], close[side] + 4), panel.side .. " " .. side)
         end
         local body = layout.Rect(panel.body)
-        assert.is_true(badge.top <= body.top and badge.bottom >= body.top - 40, "at the top")
+        assert.is_true(badge.top <= body.top and badge.bottom >= body.top - 50, "at the top, inside the body")
       end
     end)
 

@@ -22,6 +22,11 @@ local sonataNext = addon:GetModule('SonataNext')
 --     names in black; sparkles are the transporter's flecks.
 --   Display text in Antonio (fonts/makeitso, Vernon Adams, SIL Open Font License; a free face in the spirit of LCARS'
 --     lettering; its Latin alphabets only, so other locales draw the client's font), the rest in the client's own.
+-- Then, asked after the first look: "softer colors, maybe a bit more translucent in the title of each section, more..
+-- modern a bit. i'll let you decide what this means". A pane of glass: LCARS' colours softened to pastels, the body a
+-- translucent navy, the side bar glass with its blocks floating on it as rounded keys, a slimmer top and bottom bar, the
+-- body's corners rounded (the inner ones as the elbows curve), sections and tabs on glass with their names in peach, the
+-- chosen tab solid.
 -- The palette redefines Default's names (Gold, Lavender, Text, Muted...) in LCARS orange, lilac and peach, so everything
 -- this theme leaves to Default follows. Its art is tools/textures/next_makeitso.py's. Data only.
 local FONTS = "Interface\\AddOns\\BetterBags\\fonts\\makeitso\\"
@@ -43,6 +48,10 @@ end
 -- across (tools/textures/next_makeitso.py: the block 36 tall in the middle of its 52, a black band above and below).
 local RAIL, BUTTON = 52, 36
 
+-- The comm badge: larger than the close button it stands over (Layout.HeaderButton), centered on it.
+local BADGE = 44
+local OVER = (BADGE - BUTTON) / 2
+
 -- A side bar button: its block, the light over it under the pointer.
 local function block(name)
   return { Texture = "Block" .. name, Glyph = false, Scale = RAIL / BUTTON,
@@ -56,40 +65,44 @@ sonataNext:RegisterTheme({
     .. "badge closes it, the holodeck's grid lies behind your items and stars streak past at warp.",
 
   Palette = {
-    -- The holodeck's black (holodeck.png's).
-    Body = { 0.012, 0.012, 0.02, 0.97 },
+    -- The holodeck's navy (holodeck.png's), as glass.
+    Body = { 0.02, 0.025, 0.05, 0.9 },
     -- LCARS orange where Default is gold; lilac where it is lavender; peach for text.
-    Gold = { 1, 0.6, 0, 1 },
-    Lavender = { 0.8, 0.6, 0.8, 1 },
-    Text = { 1, 0.86, 0.72, 1 },
-    Muted = { 0.72, 0.6, 0.5, 1 },
-    -- LCARS' colours.
-    LcarsOrange = { 1, 0.6, 0, 1 },
-    LcarsPeach = { 1, 0.8, 0.6, 1 },
-    LcarsLilac = { 0.8, 0.6, 0.8, 1 },
-    LcarsBlue = { 0.6, 0.6, 1, 1 },
-    LcarsSalmon = { 1, 0.6, 0.4, 1 },
-    LcarsRed = { 0.8, 0.4, 0.4, 1 },
-    Sky = { 0.6, 0.8, 1, 1 },
+    Gold = { 0.98, 0.7, 0.42, 1 },
+    Lavender = { 0.78, 0.68, 0.9, 1 },
+    Text = { 1, 0.9, 0.8, 1 },
+    Muted = { 0.7, 0.66, 0.76, 1 },
+    -- LCARS' colours, softened (tools/textures/next_makeitso.py draws its blocks in the same).
+    LcarsOrange = { 0.98, 0.7, 0.42, 1 },
+    LcarsPeach = { 1, 0.86, 0.72, 1 },
+    LcarsLilac = { 0.78, 0.68, 0.9, 1 },
+    LcarsBlue = { 0.62, 0.7, 1, 1 },
+    LcarsSalmon = { 0.96, 0.66, 0.56, 1 },
+    LcarsRed = { 0.88, 0.5, 0.52, 1 },
+    Sky = { 0.66, 0.84, 1, 1 },
+    -- Glass: the holodeck, the side bar behind its blocks, the tabs not chosen.
+    HolodeckGlass = { 1, 1, 1, 0.9 },
+    LilacGlass = { 0.78, 0.68, 0.9, 0.16 },
+    TabGlass = { 0.78, 0.68, 0.9, 0.42 },
     -- The transporter's light.
     Transporter = { 0.62, 0.82, 1, 1 },
     Warbank = { 0.6, 0.8, 1, 1 },
     WarbankWash = { 0.6, 0.8, 1, 0.12 },
-    Card = { 0.03, 0.03, 0.045, 0.98 },
-    Scrim = { 0, 0, 0, 0.6 },
-    SearchFill = { 0.05, 0.045, 0.06, 1 },
-    SearchFillFocus = { 0.1, 0.075, 0.06, 1 },
-    Shadow = { 0, 0, 0, 0.85 },
-    ButtonIcon = { 1, 0.8, 0.6, 1 },
-    Bead = { 1, 0.8, 0.6, 1 },
-    -- The settings window's controls (next-settings.md §6): dark fields, a warm track; LCARS red for what deletes.
-    ControlFill = { 0.08, 0.07, 0.09, 1 },
-    ControlHover = { 0.12, 0.1, 0.12, 1 },
-    ControlPressed = { 0.05, 0.045, 0.06, 1 },
-    Track = { 0.24, 0.18, 0.15, 1 },
-    Danger = { 0.8, 0.4, 0.4, 1 },
-    Crimson = { 0.8, 0.27, 0.27, 1 },
-    Sidebar = { 0, 0, 0, 0.35 },
+    Card = { 0.03, 0.035, 0.065, 0.95 },
+    Scrim = { 0, 0, 0, 0.55 },
+    SearchFill = { 0.06, 0.065, 0.1, 0.85 },
+    SearchFillFocus = { 0.09, 0.09, 0.14, 0.95 },
+    Shadow = { 0, 0, 0, 0.75 },
+    ButtonIcon = { 1, 0.86, 0.72, 1 },
+    Bead = { 1, 0.86, 0.72, 1 },
+    -- The settings window's controls (next-settings.md §6): navy fields, a lavender track; soft red for what deletes.
+    ControlFill = { 0.07, 0.075, 0.12, 1 },
+    ControlHover = { 0.1, 0.105, 0.16, 1 },
+    ControlPressed = { 0.05, 0.055, 0.09, 1 },
+    Track = { 0.22, 0.2, 0.3, 1 },
+    Danger = { 0.88, 0.5, 0.52, 1 },
+    Crimson = { 0.86, 0.38, 0.4, 1 },
+    Sidebar = { 0, 0, 0.02, 0.3 },
   },
 
   Textures = {
@@ -125,12 +138,13 @@ sonataNext:RegisterTheme({
 
   Fonts = {
     Title = antonio(32, "LcarsOrange"),
-    -- Section names and counts in black on their LCARS bars.
-    Section = antonio(16, "Black"),
-    SectionRecent = antonio(16, "Black"),
-    SectionFree = antonio(16, "Black"),
-    Count = antonio(14, "Black", true),
-    Tab = antonio(15, "Black", true),
+    -- Section names in peach on their bars' glass, counts in lavender; tabs' names in peach on glass, the chosen one's in
+    -- black on its solid bar.
+    Section = antonio(15, "LcarsPeach"),
+    SectionRecent = antonio(15, "LcarsPeach"),
+    SectionFree = antonio(15, "LcarsPeach"),
+    Count = antonio(13, "LcarsLilac", true),
+    Tab = antonio(15, "LcarsPeach", true),
     TabSelected = antonio(15, "Black", true),
     Footer = { Color = "LcarsPeach" },
     Empty = antonio(22, "LcarsPeach"),
@@ -145,46 +159,55 @@ sonataNext:RegisterTheme({
   },
 
   Layout = {
-    -- The side bar's buttons (its blocks), and the footer's text clear of the bottom bar.
+    -- The side bar's buttons (its blocks), and the footer's text clear of the bottom bar; a section's header taller than
+    -- its bar (Sections.Header.Height), room under it before the first row of icons.
     HeaderButton = BUTTON,
     TitleTop = 26,
     FooterText = 20,
     FooterMoney = 18,
+    SectionHeader = 28,
   },
 
   Panel = {
-    -- The holodeck's golden grid behind the items, repeating.
-    Fill = { Texture = "Holodeck", Color = "White", HorizTile = true, VertTile = true },
+    -- The holodeck's grid behind the items, repeating, as glass.
+    Fill = { Texture = "Holodeck", Color = "HolodeckGlass", HorizTile = true, VertTile = true },
     Feather = { Color = "Body" },
     Wash = false,
-    Edge = { Color = "LcarsOrange", Alpha = 0.55, Size = 1 },
-    DropGlow = { Color = "LcarsOrange", Alpha = 0.18, BlendMode = "ADD" },
+    -- No border: its corners are rounded (Corners), where straight lines would stop short; the frame and the glass mark
+    -- its edges.
+    Edge = false,
+    DropGlow = { Color = "LcarsOrange", Alpha = 0.16, BlendMode = "ADD" },
+    -- A small bag's corners rounded (asked: "corner at the top left and bottom left peak out around the LCARS, i think we
+    -- need a way to shape the window itself"): its inner ones as round as the elbows' outer corners
+    -- (tools/textures/next_makeitso.py: TOP_ROUND, BOTTOM_ROUND), so nothing of the body shows past them; its outer ones
+    -- a little.
+    Corners = { TOPINNER = 30, BOTTOMINNER = 24, TOPOUTER = 12, BOTTOMOUTER = 12 },
     -- The LCARS frame, drawn for the backpack (its inner side on the left) and mirrored on the panels across the screen:
-    -- the side bar (Header.Buttons.Rail, 52 wide) curving into the top bar (18 tall) at the top elbow, then a segment
-    -- flickering, the bar on to its rounded end short of the comm badge; the bottom elbow into the bottom bar (12 tall).
-    -- A small bag can be as narrow as 216, where the top bar beyond its elbow would run into the elbow and the badge: it
-    -- keeps its elbows, its bottom bar and the badge.
+    -- the side bar (Header.Buttons.Rail, 52 wide) curving into the slim top bar (10 tall) at the top elbow, then a
+    -- segment flickering, the bar on to its rounded end short of the comm badge; the bottom elbow into the bottom bar (8
+    -- tall). A small bag can be as narrow as 216, where the top bar beyond its elbow would run into the elbow and the
+    -- badge: it keeps its elbows, its bottom bar and the badge.
     Ornaments = {
       { Texture = "ElbowTop", Point = "TOPINNER", Width = 150, Height = 66, Color = "LcarsOrange", Layer = "ARTWORK",
         SubLevel = 2 },
-      { Texture = "Solid", Point = "TOPINNER", Width = 40, Height = 18, X = 154, Color = "LcarsLilac",
+      { Texture = "Solid", Point = "TOPINNER", Width = 40, Height = 10, X = 154, Color = "LcarsLilac",
         Layer = "ARTWORK", SubLevel = 2, Sizes = "Full", Motion = { Flicker = { Low = 0.55, Speed = 2.5 } } },
-      { Texture = "Solid", Point = "TOP", Height = 18, Start = 198, End = 72, Color = "LcarsOrange", Layer = "ARTWORK",
+      { Texture = "Solid", Point = "TOP", Height = 10, Start = 198, End = 70, Color = "LcarsOrange", Layer = "ARTWORK",
         SubLevel = 2, Sizes = "Full" },
-      { Texture = "Cap", Point = "TOPOUTER", Width = 18, Height = 18, X = 54, Color = "LcarsOrange", Layer = "ARTWORK",
+      { Texture = "Cap", Point = "TOPOUTER", Width = 10, Height = 10, X = 60, Color = "LcarsOrange", Layer = "ARTWORK",
         SubLevel = 2, Sizes = "Full" },
       { Texture = "ElbowBottom", Point = "BOTTOMINNER", Width = 150, Height = 40, Color = "LcarsPeach",
         Layer = "ARTWORK", SubLevel = 2 },
-      { Texture = "Solid", Point = "BOTTOM", Height = 12, Start = 154, End = 40, Color = "LcarsSalmon",
+      { Texture = "Solid", Point = "BOTTOM", Height = 8, Start = 154, End = 36, Color = "LcarsSalmon",
         Layer = "ARTWORK", SubLevel = 2 },
-      { Texture = "Cap", Point = "BOTTOMOUTER", Width = 12, Height = 12, X = 28, Color = "LcarsSalmon",
+      { Texture = "Cap", Point = "BOTTOMOUTER", Width = 8, Height = 8, X = 28, Color = "LcarsSalmon",
         Layer = "ARTWORK", SubLevel = 2 },
-      -- The comm badge, where the close button is pinned (its own icon blank, its light the badge's): over the content,
-      -- a glint flashing across it once the bag has beamed in, and now and then after.
-      { Texture = "CommBadge", Point = "TOPOUTER", Width = BUTTON, Height = BUTTON, X = 12, Y = 2, Above = true,
-        Layer = "OVERLAY", SubLevel = 2 },
-      { Texture = "Glint", Point = "TOPOUTER", Width = 30, Height = 30, X = 15, Y = 0, Above = true, Layer = "OVERLAY",
-        SubLevel = 3, BlendMode = "ADD", Alpha = 0.95,
+      -- The comm badge, larger than the close button pinned under it and centered on it (its own icon blank, its light
+      -- the badge's): over the content, a glint flashing across it once the bag has beamed in, and now and then after.
+      { Texture = "CommBadge", Point = "TOPOUTER", Width = BADGE, Height = BADGE, X = 12 - OVER, Y = 6 - OVER,
+        Above = true, Layer = "OVERLAY", SubLevel = 2 },
+      { Texture = "Glint", Point = "TOPOUTER", Width = 36, Height = 36, X = 12 - OVER + (BADGE - 36) / 2,
+        Y = 6 - OVER + (BADGE - 36) / 2, Above = true, Layer = "OVERLAY", SubLevel = 3, BlendMode = "ADD", Alpha = 0.95,
         Motion = { Flash = { Every = { 7, 13 }, Time = 0.5, First = 0.85 } } },
     },
     -- Beaming in and out (NextBeam; asked: "the bags obviously need the star trek beam down, and beam up animation for
@@ -192,8 +215,12 @@ sonataNext:RegisterTheme({
     -- over where it rests, the bag glowing as it materializes under them, there by 0.72 seconds (a bank waits for its
     -- panel to have shown before it loads, 1 second at most); the light goes out after. Up: lit and shimmering, it
     -- fades out of the light by 0.65 seconds, which goes out after it. Appearance > Animation > Transporter turns it
-    -- off.
+    -- off. It covers the window and Margin past it all round, and runs Ends past that above and below, fading out there
+    -- (asked: "make sure it covers the window + it's decoration fully", "leave tabs out", and "the top and bottom beam are
+    -- cut off extremely clean on the horizontal plane, almost like it's clipped at the top and bottom").
     Beam = {
+      Margin = 24,
+      Ends = 64,
       Sparkles = { Texture = "Glint", Colors = { "White", "Transporter", "Transporter", "LcarsPeach" }, Density = 2.6,
         Size = { 6, 13 }, Stretch = 1.8, Alpha = { 0.55, 1 }, BlendMode = "ADD", Twinkle = { 3, 9 }, Sharpness = 3,
         Drift = { 20, 70 }, Spread = 8 },
@@ -224,19 +251,19 @@ sonataNext:RegisterTheme({
   },
 
   Header = {
-    TitleGlow = { Texture = "Glow", Color = "LcarsOrange", Alpha = 0.2, X = 24, Y = 14, BlendMode = "ADD" },
+    TitleGlow = { Texture = "Glow", Color = "LcarsOrange", Alpha = 0.16, X = 24, Y = 14, BlendMode = "ADD" },
     -- An orange line out of the window, a fleck of the transporter's light gliding in along it; no cloud: LCARS' text
     -- stands on black.
     Ribbon = { Length = 300, Thickness = 2, Color = "LcarsOrange", BlendMode = "ADD",
       Glow = { { 0, 0.9 }, { 2, 0.3 }, { -2, 0.3 }, { 4, 0.1 }, { -4, 0.1 } } },
     Spark = { Texture = "Glint", Size = 22, Growth = 8, Color = "Transporter", BlendMode = "ADD" },
     Cloud = false,
-    -- The header's buttons down the side bar, each its LCARS block; the close button pinned at the top outer corner,
-    -- under the comm badge (Panel.Ornaments).
+    -- The header's buttons down the side bar, each its LCARS block floating on the bar's glass; the close button pinned
+    -- at the top outer corner, under the comm badge (Panel.Ornaments).
     Buttons = {
       ArtColor = "White", ArtHoverColor = "White", DisabledAlpha = 0.35,
-      Rail = { Width = RAIL, Top = 70, Gap = 4, Start = 66, Fill = { Color = "LcarsLilac" } },
-      Pinned = { closeButton = { Point = "TOPOUTER", X = -12, Y = -2 } },
+      Rail = { Width = RAIL, Top = 70, Gap = 4, Start = 66, Fill = { Color = "LilacGlass" } },
+      Pinned = { closeButton = { Point = "TOPOUTER", X = -12, Y = -6 } },
       Icons = {
         settingsButton = block("Settings"),
         closeButton = { Texture = "Blank", Glyph = false,
@@ -258,21 +285,23 @@ sonataNext:RegisterTheme({
   },
 
   Search = {
-    Edge = { Color = "LcarsOrange", Size = 1, Idle = 0.5, Hover = 0.8, Focus = 1 },
+    Edge = { Color = "LcarsLilac", Size = 1, Idle = 0.35, Hover = 0.6, Focus = 0.9 },
     Icon = { Color = "LcarsPeach", Idle = 0.8, Active = 1, FocusColor = "LcarsOrange" },
   },
 
-  -- Each section's header an LCARS bar, its name in black after the bar's rounded end.
+  -- Each section's header an LCARS bar of glass (tools/textures/next_makeitso.py: a solid rounded tip, then glass fading
+  -- along the section), its name in peach over the glass; 20 tall, in a header 28 tall (Layout.SectionHeader), room
+  -- between it and the first row of icons (reported: the title "is overlaping with the first icon row").
   Sections = {
-    Title = { X = 16, Y = -3 },
-    Header = { Texture = "SectionBar", Color = "LcarsLilac" },
+    Title = { X = 24, Y = -3 },
+    Header = { Texture = "SectionBar", Color = "LcarsLilac", Height = 20 },
     Line = false,
-    Highlight = { Color = "LcarsPeach", From = 0.15, To = 0 },
+    Highlight = { Color = "LcarsPeach", From = 0.12, To = 0 },
   },
 
-  -- Tabs as LCARS bars, rounded where they stick out; the chosen one orange.
+  -- Tabs as LCARS bars of glass, rounded where they stick out; the chosen one solid apricot.
   Tabs = {
-    Fill = { Texture = "LcarsTab", Color = "LcarsLilac" },
+    Fill = { Texture = "LcarsTab", Color = "TabGlass" },
     SelectedFill = { Texture = "LcarsTab", Color = "LcarsOrange" },
     Indicator = false,
     Glow = { Color = "LcarsPeach", BlendMode = "ADD", Drop = 0.35, Pulse = 0.8 },
@@ -305,21 +334,21 @@ sonataNext:RegisterTheme({
   -- The settings window on the holodeck's black, its marks in LCARS orange.
   Settings = {
     Wash = false,
-    Edge = { Color = "LcarsOrange", Alpha = 0.55 },
+    Edge = { Color = "LcarsLilac", Alpha = 0.35 },
     Brand = { IconColor = "LcarsOrange", Line = { Color = "LcarsOrange" } },
     Nav = { Indicator = { Color = "LcarsOrange" } },
   },
 
   Vendor = {
-    Highlight = { 1, 0.8, 0.6, 0.12 },
+    Highlight = { 1, 0.86, 0.72, 0.12 },
   },
 
-  -- Item buttons as dark cells on the grid, a thin orange edge carrying an item's quality.
+  -- Item buttons as navy cells on the grid, a soft lavender edge carrying an item's quality.
   ItemButton = {
     Icon = { Inset = 1, TexCoords = { 0.08, 0.92, 0.08, 0.92 } },
-    Backdrop = { Color = { 0.04, 0.04, 0.06, 0.95 }, BorderColor = { 1, 0.6, 0, 0.45 }, EdgeSize = 1 },
+    Backdrop = { Color = { 0.04, 0.045, 0.08, 0.9 }, BorderColor = { 0.78, 0.68, 0.9, 0.3 }, EdgeSize = 1 },
     QualityBorder = "Backdrop",
-    Highlight = { Color = { 1, 0.8, 0.6, 0.18 } },
-    Pushed = { Color = { 1, 0.6, 0, 0.25 } },
+    Highlight = { Color = { 1, 0.86, 0.72, 0.16 } },
+    Pushed = { Color = { 0.98, 0.7, 0.42, 0.22 } },
   },
 })

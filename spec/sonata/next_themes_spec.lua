@@ -954,7 +954,7 @@ describe("BetterBags Next's shipped themes", function()
       for key in pairs(sonataNext:Resolve("Default").Header.Buttons.Icons) do
         assert.is_not_nil(B.Icons[key], key .. " has a block")
       end
-      assert.are.equal(B.Rail.Start + 4, B.Rail.Top, "a black band between the elbow and the first block")
+      assert.are.equal(B.Rail.Start + 4, B.Rail.Top, "a gap between the elbow and the first block")
       local elbow = t.Panel.Ornaments[1]
       assert.are.equal("ElbowTop", elbow.Texture)
       assert.are.equal(B.Rail.Start, elbow.Height, "the elbow ends where the side bar starts")
@@ -971,8 +971,13 @@ describe("BetterBags Next's shipped themes", function()
         if piece.Motion and piece.Motion.Flash then glint = piece end
       end
       assert.are.equal(pin.Point, badge.Point)
-      assert.are.same({ -pin.X, -pin.Y }, { badge.X, badge.Y }, "where the pin puts the button (Y down, X inward)")
-      assert.are.same({ t.Layout.HeaderButton, t.Layout.HeaderButton }, { badge.Width, badge.Height })
+      -- Larger than the button, centered on where the pin puts it (Y down, X inward).
+      local over = (badge.Width - t.Layout.HeaderButton) / 2
+      assert.is_true(over > 0, "larger than the button")
+      assert.are.equal(badge.Width, badge.Height)
+      assert.are.same({ -pin.X - over, -pin.Y - over }, { badge.X, badge.Y }, "centered on the button")
+      assert.are.same({ badge.X + badge.Width / 2, badge.Y + badge.Height / 2 },
+        { glint.X + glint.Width / 2, glint.Y + glint.Height / 2 }, "the glint centered on the badge")
       assert.is_true(badge.Above, "over the content")
       assert.is_true(glint.Above and glint.SubLevel > badge.SubLevel, "the glint over the badge")
       assert.is_true(glint.Motion.Flash.First > t.Panel.Beam.Open.Reveal[2], "once it has beamed in")
@@ -991,15 +996,65 @@ describe("BetterBags Next's shipped themes", function()
       assert.is_true(t.Panel.Snow.Gusts.Strength > 300, "a jump to warp")
     end)
 
-    it("writes in black on its LCARS bars and in LCARS orange and peach on black", function()
-      local t = theme()
-      for _, role in ipairs({ "Section", "SectionRecent", "SectionFree", "Count", "Tab", "TabSelected" }) do
-        assert.are.equal("Black", t.Fonts[role].Color, role)
-        assert.is_false(t.Fonts[role].Shadow, role)
+    -- Asked, after the first look: "softer colors, maybe a bit more translucent in the title of each section, more..
+    -- modern a bit. i'll let you decide what this means".
+    it("draws in soft LCARS colours: none as saturated as the original's", function()
+      local P = theme().Palette
+      for _, name in ipairs({ "LcarsOrange", "LcarsPeach", "LcarsLilac", "LcarsBlue", "LcarsSalmon", "LcarsRed", "Sky" }) do
+        local c = P[name]
+        local hi, lo = math.max(c[1], c[2], c[3]), math.min(c[1], c[2], c[3])
+        assert.is_true((hi - lo) / hi <= 0.6, name .. " soft")
       end
-      assert.are.equal("LcarsOrange", t.Fonts.Title.Color)
-      assert.are.equal("SectionBar", t.Sections.Header.Texture)
+    end)
+
+    it("writes its section names in peach on glass, a solid tip before them, the bar above the icons", function()
+      local t = theme()
+      for _, role in ipairs({ "Section", "SectionRecent", "SectionFree" }) do
+        assert.are.equal("LcarsPeach", t.Fonts[role].Color, role)
+      end
+      local H = t.Sections.Header
+      assert.are.equal("SectionBar", H.Texture)
+      assert.is_true(H.Height < t.Layout.SectionHeader, "room between the bar and the first row of icons")
+      assert.is_true(t.Sections.Title.X > 0)
+    end)
+
+    it("draws its tabs as glass, the chosen one solid with its name in black", function()
+      local t = theme()
+      local glass = t.Palette[t.Tabs.Fill.Color][4]
+      assert.is_true(glass < 0.6, "the others translucent")
+      assert.are.equal("LcarsOrange", t.Tabs.SelectedFill.Color)
+      assert.are.equal("Black", t.Fonts.TabSelected.Color)
+      assert.is_false(t.Fonts.TabSelected.Shadow)
+      assert.are.equal("LcarsPeach", t.Fonts.Tab.Color)
       assert.are.equal("LcarsTab", t.Tabs.Fill.Texture)
+    end)
+
+    it("is a pane of glass: its holodeck and side bar translucent, its title in LCARS orange", function()
+      local t = theme()
+      -- Drawn in its colour's alpha (NextStyle:Paint).
+      assert.is_true(t.Palette[t.Panel.Fill.Color][4] < 1, "the body")
+      local rail = t.Palette[t.Header.Buttons.Rail.Fill.Color]
+      assert.is_true(rail[4] < 0.5, "the side bar behind its blocks")
+      assert.are.equal("LcarsOrange", t.Fonts.Title.Color)
+    end)
+
+    -- Asked: "corner at the top left and bottom left peak out around the LCARS, i think we need a way to shape the window
+    -- itself".
+    it("rounds its corners, the inner ones as round as the elbows round them", function()
+      local C = theme().Panel.Corners
+      for _, side in ipairs({ "TOPINNER", "BOTTOMINNER", "TOPOUTER", "BOTTOMOUTER" }) do
+        assert.is_true(C[side] > 0, side)
+      end
+      assert.is_true(C.TOPINNER > C.TOPOUTER and C.BOTTOMINNER > C.BOTTOMOUTER, "the elbows rounder")
+      assert.are.same({}, sonataNext:Check("MakeItSo"))
+    end)
+
+    -- Asked: "make sure it covers the window + it's decoration fully", "leave tabs out", and "the top and bottom beam are
+    -- cut off extremely clean on the horizontal plane".
+    it("beams past the window all round, fading out above and below it", function()
+      local B = theme().Panel.Beam
+      assert.is_true(B.Margin > 0)
+      assert.is_true(B.Ends >= 40, "long, soft ends")
     end)
   end)
 

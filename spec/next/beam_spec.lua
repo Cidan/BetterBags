@@ -269,6 +269,133 @@ describe("NextBeam", function()
     assert.is_true(run.column:IsShown(), "its column out by its own envelope")
   end)
 
+  -- Asked: "make sure it covers the window + it's decoration fully, it's a bit too small on all sides"; then "it's too
+  -- far to the left (leave tabs out) and not enough on the right".
+  it("covers the window and its decoration: a Margin past the body evenly all round, its tabs left out", function()
+    local s = copy(BEAM)
+    s.Margin = 12
+    theme(s)
+    for _, side in ipairs({ "RIGHT", "LEFT" }) do
+      local panel = panelOn()
+      panel.side = side
+      panel.tabs = { Width = function() return 60 end }
+      local run = beam:Begin(panel, "Open")
+      -- 424 x 624 is 26.5 squares of 100: 2 to a square.
+      assert.are.equal(53, #run.sparkles)
+      for _, sp in ipairs(run.sparkles) do
+        assert.is_true(sp.x >= 988 - 10 and sp.x <= 1412 + 10, side .. " across")
+        assert.is_true(sp.y >= 288 and sp.y <= 912, side .. " down")
+      end
+      run:Draw(0.3)
+      local x, y = at(run.glow)
+      assert.are.same({ 988, 912, 424, 624 }, { x, y, run.glow:GetWidth(), run.glow:GetHeight() })
+      x, y = at(run.column)
+      assert.are.same({ 968, 912, 464, 624 }, { x, y, run.column:GetWidth(), run.column:GetHeight() })
+      run:Release()
+    end
+    -- At the panel's scale: its margin a half.
+    local run = beam:Begin(panelOn(0.5), "Open")
+    run:Draw(0.3)
+    local x, y = at(run.glow)
+    assert.are.same({ 994, 906, 212, 312 }, { x, y, run.glow:GetWidth(), run.glow:GetHeight() })
+  end)
+
+  -- Asked: "the top and bottom beam are cut off extremely clean on the horizontal plane, almost like it's clipped at the
+  -- top and bottom".
+  describe("its ends (Ends)", function()
+    local function withEnds(ends)
+      local s = copy(BEAM)
+      s.Ends = ends
+      theme(s)
+    end
+
+    it("runs its column and glow Ends past the top and bottom of what it covers", function()
+      withEnds(50)
+      local run = beam:Begin(panelOn(), "Open")
+      run:Draw(0.3)
+      local x, y = at(run.column)
+      assert.are.same({ 980, 950, 440, 700 }, { x, y, run.column:GetWidth(), run.column:GetHeight() })
+      x, y = at(run.glow)
+      assert.are.same({ 1000, 950, 400, 700 }, { x, y, run.glow:GetWidth(), run.glow:GetHeight() })
+    end)
+
+    it("fades its column out to nothing over each end: a mask at its top and one at its bottom, the column's own", function()
+      withEnds(50)
+      local run = beam:Begin(panelOn(), "Open")
+      local c = run.column
+      assert.are.equal(2, c:GetNumMaskTextures())
+      local masks = { c:GetMaskTexture(1), c:GetMaskTexture(2) }
+      for i, m in ipairs(masks) do
+        assert.are.equal(beam.END_MASK, m:GetTexture())
+        assert.are.equal(50, m:GetHeight())
+        local corner = i == 1 and "TOP" or "BOTTOM"
+        local seen = {}
+        for p = 1, m:GetNumPoints() do
+          local point, rel, relPoint, px, py = m:GetPoint(p)
+          assert.are.equal(c, rel)
+          assert.are.equal(point, relPoint)
+          assert.are.same({ 0, 0 }, { px, py })
+          seen[point] = true
+        end
+        assert.are.same({ [corner .. "LEFT"] = true, [corner .. "RIGHT"] = true }, seen)
+      end
+      -- The art fades in downward (nothing at its top): the top end as it is, the bottom end turned upside down (read
+      -- back as the client gives them: each corner's, upper left, lower left, upper right, lower right).
+      assert.are.same({ 0, 0, 0, 1, 1, 0, 1, 1 }, { masks[1]:GetTexCoord() })
+      assert.are.same({ 0, 1, 0, 0, 1, 1, 1, 0 }, { masks[2]:GetTexCoord() })
+      run:Draw(0.3)
+      local _, top = c:GetTexCoord()
+      assert.is_true(near(top, 0.5 * 0.3), "its own art still scrolls")
+    end)
+
+    it("gives its masks back with its column, so a texture reused for a sparkle is not cut", function()
+      withEnds(50)
+      local run = beam:Begin(panelOn(), "Open")
+      local c = run.column
+      run:Release()
+      assert.are.equal(0, c:GetNumMaskTextures())
+      theme(copy(BEAM))
+      local next = beam:Begin(panelOn(), "Open")
+      for _, sp in ipairs(next.sparkles) do
+        assert.are.equal(0, sp.texture:GetNumMaskTextures())
+      end
+      assert.are.equal(0, next.column:GetNumMaskTextures(), "no ends, no masks")
+    end)
+
+    it("scatters its sparkles over the ends too, as dense, fading out over them as the column does", function()
+      withEnds(50)
+      local run = beam:Begin(panelOn(), "Open")
+      -- 400 x 700 is 28 squares of 100: 2 to a square.
+      assert.are.equal(56, #run.sparkles)
+      local over = 0
+      for _, sp in ipairs(run.sparkles) do
+        assert.is_true(sp.y >= 250 and sp.y <= 950)
+        if sp.y > 900 or sp.y < 300 then over = over + 1 end
+      end
+      assert.is_true(over > 0, "some over the ends")
+      for _, t in ipairs({ 0.25, 0.3, 0.35, 0.4 }) do
+        run:Draw(t)
+        local env = envelope(BEAM.Open.Sparkles, t)
+        for _, sp in ipairs(run.sparkles) do
+          local _, y = at(sp.texture)
+          assert.is_true(y >= 250 and y < 950, "drifting round the beam, ends and all")
+          local fade = smoothstep(250, 300, y) * (1 - smoothstep(900, 950, y))
+          local tw = ((1 + math.sin(2 * math.pi * sp.twinkle * t + sp.phase)) / 2) ^ 2
+          assert.is_true(near(sp.texture:GetAlpha(), env * tw * 0.8 * fade, 1e-6), "faded by where it is: " .. y)
+        end
+      end
+    end)
+
+    it("runs past its ends at the panel's scale", function()
+      withEnds(50)
+      local run = beam:Begin(panelOn(0.5), "Open")
+      run:Draw(0.3)
+      local _, y = at(run.column)
+      assert.are.same({ 925, 350 }, { y, run.column:GetHeight() })
+      assert.are.equal(25, run.column:GetMaskTexture(1):GetHeight())
+    end)
+  end)
+
   it("draws only its sparkles when it has no column or glow", function()
     local s = copy(BEAM)
     s.Column, s.Glow = nil, nil

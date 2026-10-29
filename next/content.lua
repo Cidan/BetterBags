@@ -258,7 +258,10 @@ function canvasProto:placeHeader(section)
   section.cells:ClearAllPoints()
   pixel:Point(section.cells, "TOPLEFT", section.inner, "TOPLEFT", 0, -style.SECTION_HEADER)
   pixel:Height(section.header, style.SECTION_HEADER)
-  pixel:Height(section.row, style.SECTION_HEADER)
+  -- Its art may be shorter than its row (Sections.Header.Height, from the row's top), so a bar leaves room above the
+  -- cells (reported with the Make It So theme: a bar as tall as its row sat right on the first row of icons).
+  local art = style.Theme.Sections.Header
+  pixel:Height(section.row, art and art.Height or style.SECTION_HEADER)
 end
 
 -- ApplyStyle restyles every section it holds (drawn, kept from the last pass, pooled) for the

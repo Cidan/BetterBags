@@ -1500,6 +1500,60 @@ function panelProto:styleBody()
   self.frameArt:Apply(P.Frame, self.side == "LEFT")
 end
 
+-- The mask that rounds a corner (tools/textures/next_corner_mask.py): its top left quarter cut round, the rest opaque.
+local CORNER_MASK = "Interface\\AddOns\\BetterBags\\textures\\next\\corner_mask.png"
+-- Its art flipped for each corner (left, right, top, bottom), its cut corner at the top left.
+local CORNER_COORDS = {
+  TOPLEFT = { 0, 1, 0, 1 }, TOPRIGHT = { 1, 0, 0, 1 }, BOTTOMLEFT = { 0, 1, 1, 0 }, BOTTOMRIGHT = { 1, 0, 1, 0 },
+}
+
+-- shapeCorners rounds a small panel's corners (the theme's Panel.Corners, next-themes.md §24; reported with the Make It So
+-- theme: the window's square corners "peak out around the LCARS ... we need a way to shape the window itself"): for each
+-- corner the theme rounds (by its side, a radius), a mask at that corner, the radius twice across, cuts everything drawn
+-- across the body (its fill, its wash, its edge, its side rail's strip, the glow a drop lights). The mask is wrapped
+-- white outside its rect (CLAMPTOWHITE), so it cuts nothing but its corner. Mirrored on a panel whose inner side is on
+-- the right. A full panel stands against the screen's top and bottom, beside its feathered edge: its corners stay
+-- square, and a corner the theme leaves square has its mask taken off. From ApplyGeometry, which every styling of the
+-- body is followed by (a theme's ApplyStyle, a new grid's takeScale, the panel being made).
+---@private
+function panelProto:shapeCorners()
+  local C = style.Theme.Panel.Corners
+  local small = self:IsSmall()
+  local mirrored = self.side == "LEFT"
+  self.cornerMasks = self.cornerMasks or {}
+  local parts = { self.fill, self.wash, self.dropGlow, self.rail }
+  for _, edge in ipairs(self.edges) do
+    table.insert(parts, edge)
+  end
+  for side, corner in pairs(nextOrnaments.CORNERS) do
+    local radius = small and C and C[side] or 0
+    local mask = self.cornerMasks[side]
+    if radius > 0 then
+      if mask == nil then
+        mask = self.frame:CreateMaskTexture()
+        self.cornerMasks[side] = mask
+      end
+      if mirrored then
+        corner = nextOrnaments.MIRRORED[corner]
+      end
+      mask:SetTexture(CORNER_MASK, "CLAMPTOWHITE", "CLAMPTOWHITE")
+      mask:SetTexCoord(unpack(CORNER_COORDS[corner]))
+      mask:ClearAllPoints()
+      mask:SetPoint(corner, self.body, corner, 0, 0)
+      pixel:Size(mask, 2 * radius, 2 * radius)
+      mask:Show()
+      for _, t in ipairs(parts) do
+        t:AddMaskTexture(mask)
+      end
+    elseif mask ~= nil then
+      for _, t in ipairs(parts) do
+        t:RemoveMaskTexture(mask)
+      end
+      mask:Hide()
+    end
+  end
+end
+
 -- paintEdges draws the border at a strength, 0 to 1, of the theme's alpha. A texture's alpha is its
 -- vertex color's alpha: SetAlpha replaces the alpha SetVertexColor gave it and the other way round
 -- (Blizzard sets a chat window's alpha with SetAlpha and reads it back from GetVertexColor,
@@ -2077,6 +2131,8 @@ function panelProto:ApplyGeometry()
   self.rain:Layout()
   self.snow:Layout()
   self.threads:Layout()
+  -- Its corners rounded at the size it has now.
+  self:shapeCorners()
 end
 
 -- ApplyClamp clamps a small panel to the screen while the bags are clamped to it (Clamp Bags to Screen,
