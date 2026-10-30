@@ -124,7 +124,9 @@ local MIN_CONTENT_HEIGHT = 100
 ---@field toReleaseSections Section[]
 ---@field views table<BagView, View>
 ---@field loaded boolean
----@field previousSize number
+---@field keptLeft? number Where a bag sized to its content is kept, its bottom left in its own units (OnResize): nil until it has drawn what it holds.
+---@field keptBottom? number
+---@field bankOpening? boolean The bank's tabs are still reading in on this visit: its saved position decides where it is (OnBankOpening).
 ---@field searchFrame SearchFrame
 ---@field tabs Tab
 ---@field bankTab BankTab
@@ -734,9 +736,11 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 	callback()
 end
 
--- OnResize runs after every render of the bag's window. A bag sized to its content keeps
--- its bottom edge where it was (it grows upwards), or follows its anchor; a bag the player
--- sized stays where the player put it. The window keeps it on the screen afterwards.
+-- OnResize runs after every render of the bag's window (window.md §3c). A bag the player sized
+-- stays where the player put it, and a bag with its anchor on follows it. Any other bag is sized to
+-- its content: until it has drawn what it holds, its saved position decides where it is, so it
+-- opens where it was dropped; from then on it keeps that bottom left (it grows upward), and its own
+-- growth never takes it off the screen. Only a player's drag can (Window:Fit).
 function bagFrame.bagProto:OnResize()
 	if self.window:GetSizeMode() == "window" then
 		return
@@ -750,13 +754,37 @@ function bagFrame.bagProto:OnResize()
 		self.frame:GetBottom()
 		return
 	end
-	--Window.RestorePosition(self.frame)
-	if self.previousSize and self.loaded then
-		local left = self.frame:GetLeft()
-		self.frame:ClearAllPoints()
-		self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, self.previousSize) --, left, self.previousSize * self.frame:GetScale())
+	if self.loading or self.bankOpening then
+		return
 	end
-	self.previousSize = self.frame:GetBottom()
+	if self.keptLeft == nil then
+		self:KeepPlace()
+	end
+	local left, bottom = self.window:Fit(self.keptLeft, self.keptBottom)
+	self.frame:ClearAllPoints()
+	self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, bottom)
+end
+
+-- KeepPlace makes where the bag is now the place it keeps as it changes size.
+function bagFrame.bagProto:KeepPlace()
+	self.keptLeft, self.keptBottom = self.frame:GetLeft(), self.frame:GetBottom()
+end
+
+-- OnBankOpening starts a bank visit: back at its saved position, which decides where it is while its
+-- tabs read in one at a time (refresh-scheduler.md §11a). Each makes it taller, and keeping the first
+-- one's bottom edge would push its top up by all the others.
+function bagFrame.bagProto:OnBankOpening()
+	self.bankOpening = true
+	self.keptLeft, self.keptBottom = nil, nil
+	if not (self.anchor and self.anchor:IsActive()) then
+		self.window:RestorePosition()
+	end
+end
+
+-- OnBankLoaded ends that: the bank has drawn what it holds.
+function bagFrame.bagProto:OnBankLoaded()
+	self.bankOpening = false
+	self:OnResize()
 end
 
 function bagFrame.bagProto:SetTitle(text)
@@ -777,6 +805,10 @@ function bagFrame.bagProto:ApplySizeSettings()
 	local view = database:GetBagView(self.kind)
 	local mode = database:GetBagSizeMode(self.kind)
 	if view ~= self.appliedView or mode ~= self.appliedSizeMode then
+		if mode ~= self.appliedSizeMode then
+			-- The grip may have moved its edges meanwhile: what it kept is out of date.
+			self.keptLeft, self.keptBottom = nil, nil
+		end
 		self.appliedView = view
 		self.appliedSizeMode = mode
 		self.window:UpdateSizeMode()
@@ -800,7 +832,7 @@ function bagFrame.bagProto:BuildWindow(name)
 			return not CursorHasItem()
 		end,
 		OnMoved = function()
-			self.previousSize = self.frame:GetBottom()
+			self:KeepPlace()
 			self:OnResize()
 		end,
 		Opacity = function()
@@ -1156,7 +1188,6 @@ function bagFrame:Create(ctx, kind)
 	b:WatchMouse()
 
 	b.anchor = anchor:New(kind, b.frame, name)
-	b.previousSize = b.frame:GetBottom()
 
 	-- Register behavior-specific events
 	b.behavior:RegisterEvents()
@@ -1165,6 +1196,15 @@ function bagFrame:Create(ctx, kind)
 	events:RegisterMessage("search/SetInFrame", function(ectx)
 		b:SetSearchShown(ectx)
 	end)
+
+	if kind == const.BAG_KIND.BANK then
+		events:RegisterMessage("bags/BankOpening", function()
+			b:OnBankOpening()
+		end)
+		events:RegisterMessage("bags/BankLoaded", function()
+			b:OnBankLoaded()
+		end)
+	end
 
 	events:RegisterMessage("bag/RedrawIcons", function(ectx)
 		if not b.currentView then

@@ -881,6 +881,8 @@ function refresh:_OpenBank(ctx)
   local open = { showing = true }
   self._bankOpen = open
   C_Timer.After(self.BANK_SHOW_TIMEOUT, function() self:_BankShown(open, 'timeout') end)
+  -- The classic bank goes by its saved position until bags/BankLoaded (window.md §3c).
+  events:SendMessage(ctx, 'bags/BankOpening')
   if addon.Bags and addon.Bags.Bank then
     addon.Bags.Bank:Show(ctx, nil, function() self:_BankShown(open, 'finished') end)
   else
@@ -953,12 +955,14 @@ end
 ---@param open table The open being loaded (refresh._bankOpen).
 function refresh:_LoadBank(open)
   local tabs = self:BankTabs()
+  open.order, open.tabs, open.waiting, open.loaded, open.first = tabs, {}, {}, {}, true
   if #tabs == 0 then
     items:SetLoadedBankBags(nil)
-    self:RequestUpdate({ bank = true, resetLayout = true, bankOpen = 'empty' })
+    self._bankWaves = (self._bankWaves or 0) + 1
+    open.reading = self._bankWaves
+    self:RequestUpdate({ bank = true, resetLayout = true, bankOpen = 'empty', bankWave = open.reading })
     return
   end
-  open.order, open.tabs, open.waiting, open.loaded, open.first = tabs, {}, {}, {}, true
   for _, bag in ipairs(tabs) do
     open.tabs[bag] = { ready = false, read = false }
     open.waiting[bag] = true
@@ -1045,6 +1049,7 @@ function refresh:_LoadNextBankTab(open)
   local bag = self:_NextBankTab(open)
   if bag == nil then
     items:SetLoadedBankBags(nil)
+    events:SendMessage(context:New('BankLoaded'), 'bags/BankLoaded')
     return 'done'
   end
   local tab = open.tabs[bag]

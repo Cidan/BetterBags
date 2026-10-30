@@ -28,7 +28,7 @@ close code, and themes built each window's search box and buttons.
 | `MinWidth`, `MinHeight` | the frame's minimum (number, function, or `false`) |
 | `MinContentWidth`, `MinContentHeight` | the content box's minimum (number or function) |
 | `Fade()` | `false` shows and hides at once (default: fade) |
-| `Clamp()` | `false`: the window may be moved, or grow, off the screen (the bags' Clamp Bags to Screen, §3a); kept on the screen when unset |
+| `Clamp()` | `false`: the player may move the window off the screen (the bags' Clamp Bags to Screen, §3a); kept on the screen when unset. Its own growth is §3c's |
 | `OnClose(ctx, button)` | the close button's action, with the mouse button that clicked (default `Hide`) |
 | `CloseClicks` | the clicks the close button takes (`RegisterForClicks`), default `{ "LeftButtonUp" }`; the debug window takes right clicks too |
 | `OnRendered(ctx, w, h)` | after every render, with the size it took (growth anchoring) |
@@ -94,15 +94,18 @@ touch the clamp.
 - **The bags clamp only when the player says so: Clamp Bags to Screen.** Asked (2026-10-27): "a
   toggle of 'clamp bags to screen', and it should default to off ... an all bags setting"; a bag
   may then go fully off the screen, as WoW lets any frame, and turning the setting on is how to
-  bring it back (asked: "yeah that's fine"; the bags were unclamped until the window manager
-  above). One profile setting, `clampBagsToScreen` (`DB:Get/SetClampBagsToScreen`, off in
+  bring it back (asked: "yeah that's fine"). (The change said the bags were unclamped until the window
+  manager above. They were not: until #1142 they were clamped with the insets `0, -w + 50, 0, h - 50`, so
+  they could hang off the right and the bottom, but their top and left could not leave the screen. That
+  clamp had hidden the bug of §3c.) One profile setting, `clampBagsToScreen` (`DB:Get/SetClampBagsToScreen`, off in
   `const.DATABASE_DEFAULTS`), on the settings window's General page in both designs
   (next-settings.md §4).
   - A window whose `Clamp()` returns false (`windowProto:Clamped()`) is created unclamped, and
     `KeepOnScreen` leaves it where it is, its clamp off. The classic backpack and bank windows
     (§7) and both slots panels (§8: they hang below their bag, so they clamp as it does) read
     the setting. Every other window has no `Clamp` and stays on the screen, and the size cap below
-    holds for the bags too: a bag never grows bigger than the screen, only past its edge.
+    holds for the bags too: a bag never grows bigger than the screen. It does not grow past its edge
+    either (§3c).
   - Turning it on or off sends `bags/ClampChanged` (the catalog's setter). `window:Init` listens:
     every window applies its clamp again (`KeepOnScreen`); a shown window with a `Clamp` that is now
     on is put back on the screen and its position saved there (`SavePosition`), so turning it off
@@ -250,6 +253,60 @@ where the plan puts it"),
 mutation-tested. To check a theme in game, record rendering (render-recorder.md): each bag
 snapshot has a `padding` line with both sides.
 
+### 3c. Where a bag sized to its content is
+
+Reported by several players on v0.8.10: "frames no longer remember their last position and open partially
+off screen". Reproduced with the real bag, window and LibWindow-1.1 on a screen
+(`spec/integration/bag_position_spec.lua`); not seen in a client, whose only capture from such a player
+never opened or moved a bag.
+
+**What was wrong.** A bag sized to its content keeps its bottom edge as it changes size, and the first bottom
+it kept was not its own:
+- **The backpack** recorded it as it was made, a 200 x 200 placeholder at its saved position. A draw on a hidden
+  bag sets `loaded` without sizing anything, so the first real open pinned the real bag to the placeholder's
+  bottom. A save by the bag's bottom edge came back right; a save by its top or its middle did not, and
+  LibWindow-1.1 picks those for most bags (a tall bag near the bottom of the screen is saved by its middle). A
+  bag dropped with its top at 750 opened with its top at 1241 on a screen 768 tall. A real player's save
+  (`RIGHT`, at a scale of 0.92) put its middle 226 above where it was saved.
+- **The bank** recorded it after its first tab read in (refresh-scheduler.md §11a); each later tab then pushed
+  its top up. Saved at the top left, its top went 747, 917, 1097, on every visit.
+- **Any bag** near the top of the screen went past it as it grew.
+
+The wrong place is old (v0.8.9 gives the same anchors, and a bag mid-screen opened 95 too high, which no clamp
+could hide). Going off the screen is new with v0.8.10, when the clamp came off by default (§3a).
+
+**The rules now** (`bagProto:OnResize`, `KeepPlace`, `OnBankOpening`, `OnBankLoaded`; `windowProto:Fit`,
+`IsOnScreen`, `RestorePosition`, `SavePosition`):
+- **Until a bag has drawn what it holds, its saved position decides where it is.** Nothing is kept while it says
+  Loading... (`bag.loading`), or while a bank's tabs read in (`bankOpening`). `bags/BankOpening`, sent by
+  `refresh:_OpenBank` before the window shows, puts the bank back at its saved position and forgets what it kept,
+  every visit, unless its anchor is on; `bags/BankLoaded`, sent by `_LoadNextBankTab` when no tab is left, ends it.
+  A bank with no tab with slots reads once as a wave, so it says so too.
+- **Then it keeps that bottom left** (`keptLeft`, `keptBottom`, own units): it grows upward, as it always has. A
+  drop keeps the new place (`OnMoved`). A change of size mode forgets it (`ApplySizeSettings`): the grip may have
+  moved its edges, and going back to its size by content jumped to the bottom it had before.
+- **Its own growth never takes it off the screen; only a player's drag can.** `Fit` moves the place it wants as
+  little as it takes to be on the screen, and it goes back as the bag shrinks, since what is kept is the place it
+  wants, not where it was fitted to. `SavePosition` saves whether the window is wholly on the screen, within half a
+  unit (`Position.offScreen`, nil when it is), and `Fit` leaves a window the player left off it alone, across a
+  reload. A drop back on the screen ends that. Saves from before this have no mark, and fit: until v0.8.10 no bag
+  could be off the top or the left.
+- **After a reload it goes back to where it was dropped**, not to where it had grown to since: the save is the drop.
+
+Bags the player sizes, and bags with their anchor on, are placed as before. BetterBags Next keeps its own places
+(next.md §14c): measured, its small panels come back where they were dropped at any Bag Scale.
+
+Coverage: `spec/integration/bag_position_spec.lua` (on the whole addon, on a screen: after a reload, by each
+point LibWindow-1.1 saves, at a scale, a real player's save, nothing saved, opened before the first read, holding
+more than when dropped; while open: closed and opened again, growing upward, stopping at the top and coming back,
+stopping at the right, a smaller screen; dropped off the screen: staying there, across a reload, until dropped back;
+the setting turned on and off again; the bank: its top as its tabs read in on every visit, the next visit holding
+something else, the backpack left alone, back where it was dropped, its bottom kept once loaded, fitted once loaded,
+dropped while loading, the real event; an anchor from the start of an open, a bag the player sized, Drag to Resize going
+off), `spec/window/window_spec.lua` ("its place on the screen"), `spec/refresh_spec.lua` ("telling the bags when an
+open starts and when its reads are done"). 29 mutations, each caught; three first survived and led to tests (what
+was kept forgotten on the next visit, an anchor while the bank opens, the backpack as the bank opens).
+
 ## 4. Showing and hiding
 
 `Show(ctx, callback?)` and `Hide(ctx, callback?)` play the theme's `Animations` (sonata.md;
@@ -373,7 +430,8 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   `Sonata:UpdateOpacity()` (every window follows an opacity: the bags their own, the other
   windows the backpack's) and the Scale slider `window:UpdateScale()`; neither sends anything to
   the bags.
-- **OnResize**: a bag sized to its content keeps its bottom edge (it grows upwards) or follows
+- **OnResize**: a bag sized to its content goes by its saved position until it has drawn what it
+  holds, then keeps that bottom left (it grows upwards) without leaving the screen (§3c), or follows
   its anchor (`frames/anchor.lua`); a bag the player sized stays where it was put.
 - **Showing and hiding** go through the behaviors (`OnShow`/`OnHide` call `window:Show`/
   `window:Hide`). The bank's open setup (`SuppressBlizzardBankPanel`, the active group, money,

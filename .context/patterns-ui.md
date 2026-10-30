@@ -501,3 +501,12 @@ mock):
 
 Failure mode (fixed): one corner image flipped per corner rounded only the top left (the only corner needing no flip),
 and a theme rounding four corners errored on the body's fill.
+
+## A Clamp Can Hide a Placement Bug
+
+Before loosening a clamp, check where the frame goes without it. A classic bag's first open pinned it to a placeholder's
+bottom edge for months, and a clamp pulled it back on the screen, so only a bag saved mid-screen showed anything wrong
+(a little too high, and easy to miss). Taking the clamp off by default (#1210) turned that into bags opening off the top
+of the screen (window.md §3c). Anything recorded from a frame's size or place must come from a render with its real
+content, not from the frame as it was made or part way through loading. And a clamp setting says what the player may do:
+a frame's own growth should still not take it off the screen.
