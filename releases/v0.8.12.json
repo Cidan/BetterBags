@@ -1,0 +1,17 @@
+{
+  "id": 1793402901,
+  "version": "v0.8.12",
+  "channel": "alpha",
+  "date": "2026-10-30",
+  "from": "ccbe88e83bdcaecc344d063728ef56758a779e7f",
+  "to": "4d571daf5c76961b6c3bb1bd1d65339a8002408b",
+  "headline": "This update fixes an issue where bag and bank windows could drift off-screen or open in the wrong position.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Fix bags opening in the wrong place or off-screen",
+      "details": "Bag and bank windows now consistently open where you left them and will no longer drift upward or off the screen as their contents load. Toggling drag-to-resize off also no longer causes windows to jump position.",
+      "clients": []
+    }
+  ]
+}
