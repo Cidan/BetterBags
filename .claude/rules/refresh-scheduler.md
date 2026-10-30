@@ -633,7 +633,10 @@ when asked again a second later) and drawing about 180 ms.
   guild bank read reads only the tabs received (`LoadedContainers`): any read of the bank during the
   load (a `BAG_UPDATE`, a wipe, a sort's sweep) shows only the tabs loaded so far, and nothing pops in
   before its turn. Once every tab is read, and when the bank closes, the limit goes (nil: every bank
-  bag), so a tab that gains slots later is read like any change.
+  bag), so a tab that gains slots later is read like any change. An open also says when it starts and when
+  its reads are done (`bags/BankOpening`, `bags/BankLoaded`): the classic bank goes by its saved position
+  between them, or each tab would push its top up (window.md §3c). A bank with no tab with slots reads once as
+  a wave, so its one read ends the same way.
 - **Item data loads at once, each tab on its own.** The guild bank's tabs arrive from the server; the
   bank's are all on the client, so `_LoadBank` starts every tab's load at once
   (`itemLoader:PrimeBank({ bag }, ...)`, one `ContinuableContainer` each), so the server sends them

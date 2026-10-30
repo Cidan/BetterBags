@@ -416,6 +416,57 @@ describe("Refresh Module", function()
       assert.equal(1, #timeouts())
     end)
 
+    -- window.md §3c: the classic bank goes by its saved position while its tabs read in.
+    describe("telling the bags when an open starts and when its reads are done", function()
+      local said, savedSend
+
+      before_each(function()
+        said = {}
+        savedSend = events.SendMessage
+        events.SendMessage = function(self, ctx, message, ...)
+          if message == "bags/BankOpening" or message == "bags/BankLoaded" then
+            table.insert(said, { message = message, shown = shown, waves = #waves() })
+          end
+          return savedSend(self, ctx, message, ...)
+        end
+      end)
+
+      after_each(function()
+        events.SendMessage = savedSend
+      end)
+
+      it("says it is opening before the window shows, and loaded once, after the last tab's read", function()
+        fire("BANKFRAME_OPENED")
+        assert.are.same({ { message = "bags/BankOpening", shown = 0, waves = 0 } }, said)
+        onShown()
+        prime(6)
+        prime(7)
+        assert.equal(1, #said, "tabs still to read")
+        prime(13)
+        assert.are.same({ 6, 7, 13 }, waves())
+        assert.are.same({ message = "bags/BankLoaded", shown = 1, waves = 3 }, said[2])
+        assert.equal(2, #said, "once")
+      end)
+
+      it("says it is loaded after the one read of a bank with no tab with slots", function()
+        slotsOf = {}
+        fire("BANKFRAME_OPENED")
+        onShown()
+        assert.equal("bags/BankLoaded", said[2].message)
+        assert.equal(2, #said)
+      end)
+
+      it("says nothing more for an open that ended", function()
+        fire("BANKFRAME_OPENED")
+        onShown()
+        prime(6)
+        fire("BANKFRAME_CLOSED")
+        prime(7)
+        prime(13)
+        assert.equal(1, #said)
+      end)
+    end)
+
     it("reads each tab once its item data has loaded, the shown one first, the first read afresh", function()
       fire("BANKFRAME_OPENED")
       onShown()
@@ -542,6 +593,8 @@ describe("Refresh Module", function()
       onShown()
       assert.equal(0, #primes)
       assert.equal(1, #requests)
+      assert.is_number(requests[1].bankWave)
+      requests[1].bankWave = nil
       assert.are.same({ bank = true, resetLayout = true, bankOpen = "empty" }, requests[1])
       assert.is_nil(loaded)
     end)

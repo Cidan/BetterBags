@@ -1499,6 +1499,7 @@ describe("Bag Draw: shared item button ownership across global sections and view
 
     it("still moves the window, and saves where it was left, with nothing on the cursor", function()
       local bag = watchedBag()
+      bag.frame:_SetRect(100, 100, 300, 300)
       bag.frame:GetScript("OnDragStart")(bag.frame)
       assert.is_true(bag.frame._moving)
       bag.frame:GetScript("OnDragStop")(bag.frame)

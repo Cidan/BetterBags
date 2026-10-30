@@ -111,7 +111,11 @@ describe("Window", function()
       SavePosition = libWindow.SavePosition,
     }
     libWindow.RegisterConfig = function(frame, config) registered[frame] = config end
-    libWindow.RestorePosition = function(frame) restored[frame] = true end
+    -- Where a saved position puts it: a rect, as LibWindow-1.1's SetPoint gives it (SavePosition reads it).
+    libWindow.RestorePosition = function(frame)
+      restored[frame] = true
+      frame._rect = frame._rect or { left = 0, bottom = 0 }
+    end
     libWindow.SavePosition = function(frame) saved[frame] = (saved[frame] or 0) + 1 end
   end)
 
@@ -350,6 +354,94 @@ describe("Window", function()
       assert.is_false(w.frame._moving)
       assert.are.equal(1, saved[w.frame])
       assert.are.equal(1, moved)
+    end)
+
+    -- window.md §3c: only a player can leave a window off the screen.
+    describe("its place on the screen", function()
+      local savedSize
+
+      before_each(function()
+        savedSize = { UIParent._width, UIParent._height, UIParent._rect }
+        UIParent:_SetRect(0, 0, 1000, 800)
+      end)
+
+      after_each(function()
+        UIParent._width, UIParent._height, UIParent._rect = savedSize[1], savedSize[2], savedSize[3]
+      end)
+
+      local function placed(left, bottom, width, height, opts)
+        opts = opts or {}
+        local w = window:Create({ Name = name(), Kind = "Bag", Position = opts.position or {}, Scale = opts.scale })
+        w.frame:_SetRect(left, bottom, width, height)
+        return w
+      end
+
+      it("saves that it is wholly on the screen, or that it is not, each side", function()
+        local position = {}
+        local w = placed(0, 0, 1000, 800, { position = position })
+        w:SavePosition()
+        assert.is_nil(position.offScreen, "exactly on it")
+        for _, off in ipairs({ { -5, 100 }, { 900, 100 }, { 100, -5 }, { 100, 700 } }) do
+          w.frame:_SetRect(off[1], off[2], 200, 200)
+          w:SavePosition()
+          assert.is_true(position.offScreen, off[1] .. " " .. off[2])
+        end
+        w.frame:_SetRect(100, 100, 200, 200)
+        w:SavePosition()
+        assert.is_nil(position.offScreen, "back on it")
+      end)
+
+      it("says it is on the screen within half a unit, as a frame's edges read back with float error", function()
+        local w = placed(-0.4, -0.4, 1000.8, 800.8)
+        assert.is_true(w:IsOnScreen())
+        w.frame:_SetRect(-0.6, 0, 200, 200)
+        assert.is_false(w:IsOnScreen())
+        w.frame:_SetRect(0, 0, 1000.6, 200)
+        assert.is_false(w:IsOnScreen())
+      end)
+
+      it("fits a place on the screen, moving it as little as it takes", function()
+        local w = placed(0, 0, 200, 300)
+        assert.are.same({ 100, 100 }, { w:Fit(100, 100) }, "room for it")
+        assert.are.same({ 800, 100 }, { w:Fit(900, 100) }, "past the right")
+        assert.are.same({ 0, 100 }, { w:Fit(-50, 100) }, "past the left")
+        assert.are.same({ 100, 500 }, { w:Fit(100, 700) }, "past the top")
+        assert.are.same({ 100, 0 }, { w:Fit(100, -50) }, "past the bottom")
+      end)
+
+      it("keeps its left and bottom on the screen when it is bigger than the screen", function()
+        local w = placed(0, 0, 1200, 900)
+        assert.are.same({ 0, 0 }, { w:Fit(100, 100) })
+      end)
+
+      it("fits in its own units, at its own scale", function()
+        local w = placed(0, 0, 200, 300)
+        w.frame:SetScale(0.5)
+        -- The screen is 2000 x 1600 of a window drawn at half the size.
+        assert.are.same({ 1800, 1300 }, { w:Fit(1900, 1500) })
+      end)
+
+      it("leaves a place alone when the player left it off the screen", function()
+        local w = placed(0, 0, 200, 300, { position = { offScreen = true } })
+        assert.are.same({ 900, 700 }, { w:Fit(900, 700) })
+      end)
+
+      it("goes back to its saved position at the scale its owner draws it at", function()
+        local w = placed(0, 0, 200, 300, { scale = function() return 0.8 end })
+        restored[w.frame] = nil
+        -- LibWindow-1.1 gives it the scale it was saved at.
+        local restore = libWindow.RestorePosition
+        libWindow.RestorePosition = function(frame) restore(frame) frame:SetScale(1) end
+        w:RestorePosition()
+        assert.is_true(restored[w.frame])
+        assert.are.equal(0.8, w.frame:GetScale())
+      end)
+
+      it("has no saved position to go back to without one", function()
+        local w = window:Create({ Name = name(), Kind = "Flat" })
+        w:RestorePosition()
+        assert.is_nil(restored[w.frame])
+      end)
     end)
 
     it("moves when its owner says it can, and not when it says it cannot", function()

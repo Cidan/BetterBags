@@ -336,11 +336,49 @@ function windowProto:WatchDrag()
   end)
 end
 
--- SavePosition saves where the window is, when it has a saved position.
+-- SavePosition saves where the window is, when it has a saved position, and whether any of it is off
+-- the screen: only a player can leave it there (Fit).
 function windowProto:SavePosition()
   if self.opts.Position ~= nil then
     LibWindow.SavePosition(self.frame)
+    self.opts.Position.offScreen = not self:IsOnScreen() or nil
   end
+end
+
+-- RestorePosition puts the window back at its saved position, at the scale its owner draws it at (LibWindow-1.1 also
+-- gives it the scale it was saved at).
+function windowProto:RestorePosition()
+  if self.opts.Position == nil then
+    return
+  end
+  LibWindow.RestorePosition(self.frame)
+  if self.opts.Scale ~= nil then
+    self.frame:SetScale(self.opts.Scale())
+  end
+end
+
+-- IsOnScreen says the whole window is on the screen, within half a unit.
+---@return boolean
+function windowProto:IsOnScreen()
+  local frame = self.frame
+  local width, height = self:screenSize()
+  return frame:GetLeft() >= -0.5 and frame:GetBottom() >= -0.5 and frame:GetRight() <= width + 0.5
+    and frame:GetTop() <= height + 0.5
+end
+
+-- Fit returns where the window's bottom left goes, in its own units, for a place it wants at its size now: moved as
+-- little as it takes to be wholly on the screen, so a window that changes size never leaves the screen by itself. The
+-- same place when the player left it off the screen (SavePosition): Clamp Bags to Screen off lets them (window.md §3a).
+---@param left number
+---@param bottom number
+---@return number left, number bottom
+function windowProto:Fit(left, bottom)
+  if self.opts.Position ~= nil and self.opts.Position.offScreen then
+    return left, bottom
+  end
+  local frame = self.frame
+  local width, height = self:screenSize()
+  return math.max(0, math.min(left, width - frame:GetWidth())), math.max(0, math.min(bottom, height - frame:GetHeight()))
 end
 
 -- SetContent makes content the drawable the window lays out. The content it replaces is
