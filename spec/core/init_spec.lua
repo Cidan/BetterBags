@@ -50,7 +50,7 @@ describe("Core Init and Enable flow", function()
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
       "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies", "NextShatter",
-      "NextSmoke", "NextBats", "NextBeam"
+      "NextSmoke", "NextBats", "NextBeam", "NextPaper"
     }
 
     for _, name in ipairs(modules) do
@@ -307,6 +307,14 @@ describe("Core Init and Enable flow", function()
     addon:OnInitialize()
     assert.spy(smoke.Init).was.called(1)
     assert.spy(bats.Init).was.called(1)
+  end)
+
+  -- The paper layer's pool and the sheets going on it (next-themes.md §25).
+  it("starts BetterBags Next's paper", function()
+    local paper = addon:GetModule("NextPaper")
+    paper.Init = spy.new(function() end)
+    addon:OnInitialize()
+    assert.spy(paper.Init).was.called(1)
   end)
 
   -- The beam layer's pool and the beams going out on it (next-themes.md §24).

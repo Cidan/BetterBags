@@ -59,7 +59,7 @@ describe("Bag-bar backpack button click", function()
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
       "GuildBank", "NextGuildBank", "Automation", "Seller", "Currencies", "NextShatter",
-      "NextSmoke", "NextBats", "NextBeam"
+      "NextSmoke", "NextBats", "NextBeam", "NextPaper"
     }
     for _, name in ipairs(modules) do
       local stub = StubBetterBagsModule(name)

@@ -67,7 +67,9 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
   what it clips stretched across the fraction.
 - **Not snapped, by nature**: what moves (glides, slides, drags, lifts, flights, sparkles, the cloud's
   breathing, the braid, the tab marker's glide, a toggle's knob sliding, a theme's swaying, spinning,
-  pulsing or bobbing ornaments, next-themes.md §12). Each lands on whole pixels when it comes to rest.
+  pulsing or bobbing ornaments, next-themes.md §12; a stop motion's poses, each off its place on purpose,
+  §25). Each lands on whole pixels when it comes to rest. A doodle's boil jiggles on whole pixels: it never rests, and
+  is listed with what moves (`MovingParts`) because its drawing changes.
 
 ## 3. A new grid
 

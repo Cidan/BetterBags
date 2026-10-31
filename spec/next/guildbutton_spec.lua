@@ -197,6 +197,11 @@ describe("NextGuildButton", function()
       assert.are.same({ { kind = "ItemButton", element = b.button } }, calls.registered)
     end)
 
+    it("tells the theme's style where its item level text is", function()
+      local b = guildButton:GetButton(ctx, "1001_1")
+      assert.are.equal(b.itemLevel, b.button.ItemLevelText)
+    end)
+
     it("is hidden and unparented once released", function()
       local b = guildButton:GetButton(ctx, "1002_7")
       b.frame:SetParent(UIParent)

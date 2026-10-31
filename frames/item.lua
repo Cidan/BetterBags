@@ -946,7 +946,8 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	if addon.isRetail then
 		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
 	else
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]]) else SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]]) end
+		local emptySlot = addon:GetModule('SonataElements'):EmptySlotArt(decoration) or [[Interface\PaperDoll\UI-Backpack-EmptySlot]]
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(emptySlot) else SetItemButtonTexture(decoration, emptySlot) end
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
@@ -1081,7 +1082,8 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 	if addon.isRetail then
 		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
 	else
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]]) else SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]]) end
+		local emptySlot = addon:GetModule('SonataElements'):EmptySlotArt(decoration) or [[Interface\PaperDoll\UI-Backpack-EmptySlot]]
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(emptySlot) else SetItemButtonTexture(decoration, emptySlot) end
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
@@ -1161,6 +1163,7 @@ function itemFrame:CreateDecoration(item)
 	end
 	if button.BattlepayItemTexture then button.BattlepayItemTexture:Hide() end
 	if button.NewItemTexture then button.NewItemTexture:Hide() end
+	button.ItemLevelText = item.ilvlText
 	button:Show()
 	return button
 end

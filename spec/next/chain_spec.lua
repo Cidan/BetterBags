@@ -58,7 +58,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -854,6 +854,38 @@ describe("NextChain", function()
       end
       return pts
     end
+
+    it("turns the braid a pose at a time under a theme's stop motion, with all the time it held", function()
+      click(backpack)
+      settle()
+      local driver = chain.driver:GetScript("OnUpdate")
+      assert.is_function(driver)
+      local saved = style.StopMotion
+      style.StopMotion = { FPS = 10 }
+      local turns = {}
+      local turn = chain.Turn
+      chain.Turn = function(self, elapsed)
+        table.insert(turns, elapsed)
+        turn(self, elapsed)
+      end
+      local ok, err = pcall(function()
+        driver(chain.driver, 0.04)
+        driver(chain.driver, 0.04)
+        assert.are.same({}, turns, "it holds its pose")
+        driver(chain.driver, 0.04)
+        assert.are.equal(1, #turns)
+        assert.is_true(math.abs(turns[1] - 0.12) < 1e-9, "with the time it held")
+        driver(chain.driver, 0.04)
+        assert.are.equal(1, #turns, "and holds the next")
+        style.StopMotion = nil
+        driver(chain.driver, 0.04)
+        assert.are.equal(2, #turns, "without one, every frame")
+        assert.is_true(math.abs(turns[2] - 0.04) < 1e-9)
+      end)
+      chain.Turn = turn
+      style.StopMotion = saved
+      assert(ok, err)
+    end)
 
     it("twists the two ribbons together once the bag has flown in", function()
       click(backpack)

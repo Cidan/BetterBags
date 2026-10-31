@@ -383,10 +383,10 @@ function stripProto:Layout(animate)
 
   local shown = {}
   if animate then
-    motion:BeginPass(frame, style.Time.Interaction)
+    motion:BeginPass(frame, style.Time.Interaction, style.StopMotion)
   else
     motion:Forget(frame)
-    motion:BeginPass(frame, style.Time.Interaction)
+    motion:BeginPass(frame, style.Time.Interaction, style.StopMotion)
   end
   local x = 0
   local centers, roomX = {}, nil

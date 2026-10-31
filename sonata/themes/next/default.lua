@@ -462,7 +462,8 @@ sonataNext:RegisterTheme({
     Line = { Color = "Lavender", Inner = 0.05, Outer = 0.35, Size = 1 },
     Font = "Footer",
     EmptyFont = "Empty",
-    -- Gold written as text (the guild bank's; the bags' money frame is Blizzard's).
+    -- Gold written as text (the guild bank's; the bags' money frame is Blizzard's). CoinFont, a role for the amounts in
+    -- that money frame, is unset here: they keep the frame's own font.
     MoneyFont = "Footer",
   },
 

@@ -90,6 +90,7 @@ describe("SonataNext", function()
       t.Header = { Ribbon = { Length = 300 }, Spark = { Size = 26 }, Cloud = { Join = 4 }, TitleGlow = { Alpha = 0.6 } }
       t.Sparkles = { Ribbon = { Rate = 8 } }
       t.Chain = { Braid = true, Color = "Gold" }
+      t.Motion = { StopMotion = { FPS = 12 } }
       t.Panel = { Ornaments = {
         { Texture = "Roots", Point = "INNER", Width = 20, Motion = { Sway = 4, Period = 6 } },
         { Texture = "Leaf", Point = "TOPINNER", Width = 8, Height = 8 },
@@ -97,6 +98,7 @@ describe("SonataNext", function()
         Glitch = { Open = { Time = 0.4 }, Close = { Time = 0.2 }, Bursts = { Every = 10, Time = 0.2 } },
         Rain = { { Where = "Feather", Font = "Title", HeadFont = "Title", Glyphs = "01", Speed = { 4, 8 }, Trail = { 4, 8 } } },
         Shatter = { Shards = { Size = 100 }, Frost = {}, Seams = {}, Open = { Time = 0.4 }, Close = { Time = 0.5 } },
+        Paper = { Rate = 12 },
         Snow = { Flakes = { { Where = "Body", Count = 4 } } },
         Threads = { { Points = { { 0, 1 }, { 1, 2 } }, Sway = { Amplitude = 2, Period = 5 },
           Glint = { Every = 4, Time = 1 }, Draw = 0.5 } },
@@ -123,6 +125,8 @@ describe("SonataNext", function()
       snow = function(t) return t.Panel.Snow end,
       -- The Halloween theme's (next-themes.md §23): coming in out of smoke; breaking up into bats, and the bats
       -- fluttering out of the header.
+      paper = function(t) return t.Panel.Paper end,
+      stopMotion = function(t) return t.Motion.StopMotion end,
       smoke = function(t) return t.Panel.Smoke end,
       bats = function(t) return t.Panel.Bats end,
       -- The Make It So theme's (next-themes.md §24): beaming in and out.
@@ -636,6 +640,7 @@ describe("SonataNext", function()
         Motion = { Ease = { Open = "wobbly" } },
         Fonts = { Title = { Color = "AlsoNope" } },
         Dock = { DestroyColor = "Blood", BuyColor = "Moss" },
+        Footer = { CoinFont = "NoHand" },
         Settings = { Header = { Close = { HoverIcon = "NoHover" } } },
         Controls = { Button = { Plain = { DisabledFont = "NoGray" } } },
         Palette = { Client = { Global = "NO_SUCH_COLOR" }, Fine = { Global = "PANEL_BACKGROUND_COLOR" } },
@@ -647,6 +652,7 @@ describe("SonataNext", function()
         "Dock.BuyColor: no color named Moss",
         "Dock.DestroyColor: no color named Blood",
         "Fonts.Title.Color: no color named AlsoNope",
+        "Footer.CoinFont: no font named NoHand",
         "Header.Buttons.ArtColor: no color named Pale",
         "Header.Cloud.Texture: no texture named NoArt",
         "Motion.Ease.Open: no ease named wobbly",
@@ -967,6 +973,106 @@ describe("SonataNext", function()
   end)
 
   -- A transporter's beam (next-themes.md §24).
+  it("names what is wrong with a stop motion, a boil and a sheet of paper, by where it is", function()
+    for _, m in ipairs({ { "NextShatter", "next/shatter.lua" }, { "NextStopMotion", "next/stopmotion.lua" },
+      { "NextPaper", "next/paper.lua" }, { "NextOrnaments", "next/ornaments.lua" } }) do
+      if addon:GetModule(m[1], true) == nil then
+        ResetModuleStub(m[1], m[2])
+        LoadBetterBagsModule(m[2])
+      end
+    end
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadStop", Motion = { StopMotion = { FPS = 0, Spacing = 0.7, Wobble = -1, Hop = 1 } },
+      Panel = { Ornaments = {
+        { Texture = "Glow", Point = "TOPINNER", Width = 4, Height = 4, Frames = 0, Locales = "enUS",
+          Motion = { Boil = { FPS = 0, Jiggle = -1, Hum = 1 } } },
+      } } })
+    local problems = sonataNext:Check("BadStop")
+    for _, expected in ipairs({
+      "Motion.StopMotion.Hop: no stop motion part named Hop",
+      "Motion.StopMotion.FPS: more than nothing",
+      "Motion.StopMotion.Spacing: from 0 to under a half",
+      "Motion.StopMotion.Wobble: no less than nothing",
+      "Panel.Ornaments.1.Frames: a whole number, at least one",
+      "Panel.Ornaments.1.Locales: a list of locales",
+      "Panel.Ornaments.1.Motion.Boil.Hum: no boil part named Hum",
+      "Panel.Ornaments.1.Motion.Boil.FPS: more than nothing",
+      "Panel.Ornaments.1.Motion.Boil.Jiggle: no less than nothing",
+    }) do
+      local found = false
+      for _, p in ipairs(problems) do found = found or p == expected end
+      assert.is_true(found, "not named: " .. expected .. " in " .. table.concat(problems, "; "))
+    end
+    sonataNext:RegisterTheme({ Name = "NoPaperArt", Panel = { Paper = { Rate = 12 } } })
+    problems = sonataNext:Check("NoPaperArt")
+    assert.are.same({ "Panel.Paper.Front: a sheet needs it", "Panel.Paper.Back: a sheet needs it" }, problems)
+    sonataNext:RegisterTheme({ Name = "BadPaper", Panel = { Paper = {
+      Hum = 1,
+      Front = { Texture = "Glow" }, Back = { Texture = "Glow" },
+      Rate = 0,
+      Edge = { Width = -1, Tile = 0, Hum = 1 },
+      Shadow = { Spread = -1, Hum = 1 },
+      Wobble = { Move = -1, Hum = 1 },
+      Open = { From = "MIDDLE", Cells = 0, Curl = -1, Depth = -1, Lit = 2, Reveal = -1, Hum = 1, Half = {}, Full = { "up" },
+        Note = { { Hum = 1, Width = 0 } } },
+      Close = { Grab = -1, Tremble = -1, Cell = 0, Jitter = 0.6, Ball = 0, Lump = -1, Wrinkle = -1, Jag = -1, Wrap = 2, Lag = 1,
+        Lit = 2, Facet = -1, Crop = 0.6, Hum = 1, Poses = {},
+        Toss = { Up = "high", Gravity = -1, Drift = { 2, 1 }, Tumble = { 1 }, Life = 0, Hum = 1 } },
+    } } })
+    problems = sonataNext:Check("BadPaper")
+    for _, expected in ipairs({
+      "Panel.Paper.Hum: no sheet part named Hum",
+      "Panel.Paper.Rate: more than nothing",
+      "Panel.Paper.Edge.Hum: no edge part named Hum",
+      "Panel.Paper.Edge.Width: no less than nothing",
+      "Panel.Paper.Edge.Tile: more than nothing",
+      "Panel.Paper.Shadow.Hum: no shadow part named Hum",
+      "Panel.Paper.Shadow.Spread: no less than nothing",
+      "Panel.Paper.Wobble.Hum: no wobble part named Hum",
+      "Panel.Paper.Wobble.Move: no less than nothing",
+      "Panel.Paper.Open.Hum: no open part named Hum",
+      "Panel.Paper.Open.From: no corner named MIDDLE",
+      "Panel.Paper.Open.Cells: a whole number, at least one",
+      "Panel.Paper.Open.Curl: no less than nothing",
+      "Panel.Paper.Open.Depth: no less than nothing",
+      "Panel.Paper.Open.Lit: from 0 to 1",
+      "Panel.Paper.Open.Reveal: no less than nothing",
+      "Panel.Paper.Open.Half: a pose or more, each an angle",
+      "Panel.Paper.Open.Full: a pose or more, each an angle",
+      "Panel.Paper.Open.Note.1.Hum: no note part named Hum",
+      "Panel.Paper.Open.Note.1.Width: more than nothing",
+      "Panel.Paper.Open.Note.1.Height: more than nothing",
+      "Panel.Paper.Close.Hum: no close part named Hum",
+      "Panel.Paper.Close.Grab: no less than nothing",
+      "Panel.Paper.Close.Tremble: no less than nothing",
+      "Panel.Paper.Close.Cell: more than nothing",
+      "Panel.Paper.Close.Jitter: from 0 to under a half",
+      "Panel.Paper.Close.Ball: more than nothing",
+      "Panel.Paper.Close.Lump: no less than nothing",
+      "Panel.Paper.Close.Wrinkle: no less than nothing",
+      "Panel.Paper.Close.Jag: no less than nothing",
+      "Panel.Paper.Close.Wrap: from 0 to 1",
+      "Panel.Paper.Close.Lag: from 0 to under 1",
+      "Panel.Paper.Close.Lit: from 0 to 1",
+      "Panel.Paper.Close.Facet: no less than nothing",
+      "Panel.Paper.Close.Crop: from 0 to under a half",
+      "Panel.Paper.Close.Poses: a pose or more, each from 0 to 1, the last 1",
+      "Panel.Paper.Close.Toss.Hum: no toss part named Hum",
+      "Panel.Paper.Close.Toss.Up: no less than nothing",
+      "Panel.Paper.Close.Toss.Gravity: no less than nothing",
+      "Panel.Paper.Close.Toss.Drift: two numbers, the least first",
+      "Panel.Paper.Close.Toss.Tumble: two numbers",
+      "Panel.Paper.Close.Toss.Life: more than nothing",
+    }) do
+      local found = false
+      for _, p in ipairs(problems) do found = found or p == expected end
+      assert.is_true(found, "not named: " .. expected .. " in " .. table.concat(problems, "; "))
+    end
+  end)
+
   it("names what is wrong with a beam, by where it is", function()
     if addon:GetModule("NextBeam", true) == nil then
       ResetModuleStub("NextBeam", "next/beam.lua")

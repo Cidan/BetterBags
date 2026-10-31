@@ -71,6 +71,8 @@ end
 ---@param keepFonts? boolean
 function style:Use(theme, keepFonts)
   self.Theme = theme
+  -- A theme's animations as stop motion (Motion.StopMotion, next-themes.md §25): what steps itself reads it here.
+  self.StopMotion = theme.Motion.StopMotion or nil
   local L, M = theme.Layout, theme.Motion
   self.Color = palette(theme)
 

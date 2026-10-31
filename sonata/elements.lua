@@ -31,6 +31,7 @@ local ITEM_HIGHLIGHT = { Texture = "Interface\\Buttons\\ButtonHilight-Square", B
 local ITEM_PUSHED = { Texture = "", BlendMode = "BLEND" }
 local ITEM_UPGRADE = { Atlas = "bags-greenarrow", Scale = 1 }
 local ITEM_COUNT = { Font = { Object = "NumberFontNormal" }, Points = { { Point = "BOTTOMRIGHT", X = -5, Y = 2 } } }
+local ITEM_LEVEL = { Font = { Object = "NumberFontNormal" } }
 local QUEST_BORDER = "Interface\\Common\\WhiteIconFrame"
 
 -- PanelTabButtonTemplate's and BetterBags' Classic tab template's art, fonts and height, and
@@ -402,6 +403,38 @@ local function snapAnchors(region)
   end
 end
 
+-- styleCountdown draws a cooldown's countdown (the client's numbers, with its Cooldown Numbers setting on) in a style's
+-- font, in the locales it lists: minutes and hours are words in some. The client's own font is recorded by value the
+-- first time and put back when a style has none (font objects read back: .context/patterns-ui.md).
+---@param decoration ItemButton
+---@param spec? table
+local function styleCountdown(decoration, spec)
+  local cooldown = decoration.Cooldown
+  if cooldown == nil or cooldown.GetCountdownFontString == nil then
+    return
+  end
+  local text = cooldown:GetCountdownFontString()
+  local own = decoration.sonataCountdownFont
+  if spec ~= nil and spec.Locales ~= nil then
+    local covered = false
+    for _, locale in ipairs(spec.Locales) do
+      covered = covered or locale == GetLocale()
+    end
+    if not covered then
+      spec = nil
+    end
+  end
+  if spec ~= nil then
+    if own == nil then
+      decoration.sonataCountdownFont = { text:GetFont() }
+    end
+    apply:Font(text, spec.Font)
+  elseif own ~= nil then
+    text:SetFont(own[1], own[2], own[3])
+    decoration.sonataCountdownFont = nil
+  end
+end
+
 ---@param decoration ItemButton
 ---@param style table
 function elements:StyleItemButton(decoration, style)
@@ -456,6 +489,9 @@ function elements:StyleItemButton(decoration, style)
     end
   end
 
+  -- An empty slot's own art (retail's: Classic's is drawn as its icon, EmptySlotArt); Blizzard's when the style has none.
+  styleRegion(decoration, "EmptySlot", decoration.ItemSlotBackground, style.EmptySlot, decoration)
+
   local upgrade = decoration.UpgradeIcon
   if upgrade ~= nil then
     local spec = withDefaults(style.UpgradeIcon, ITEM_UPGRADE)
@@ -480,6 +516,25 @@ function elements:StyleItemButton(decoration, style)
       snapAnchors(count)
     end
   end
+
+  -- Its color is its draw's (the item level colors), and a style applied without a draw must leave it.
+  local level = decoration.ItemLevelText
+  if level ~= nil then
+    local r, g, b, a = level:GetTextColor()
+    apply:Font(level, withDefaults(style.ItemLevel, ITEM_LEVEL).Font)
+    level:SetTextColor(r, g, b, a)
+  end
+
+  styleCountdown(decoration, style.Countdown)
+end
+
+-- EmptySlotArt is what a decoration's style draws an empty slot with on Classic, whose empty slot is its icon, or nil
+-- for Blizzard's.
+---@param decoration ItemButton
+---@return string?
+function elements:EmptySlotArt(decoration)
+  local style = decoration.sonataItemStyle
+  return style ~= nil and style.EmptySlot ~= nil and style.EmptySlot.Texture or nil
 end
 
 -- artBorder draws the icon's border in a style's border art (QualityBorder given as art), in a color at the

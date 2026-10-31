@@ -637,7 +637,7 @@ function canvasProto:Render(parentResult)
   local spacing = pixel:Length(frame, style.SECTION_SPACING)
   local animated = self.frame:IsVisible() and not self.instant
   if animated then
-    motion:BeginPass(self, style.Time.Interaction)
+    motion:BeginPass(self, style.Time.Interaction, style.StopMotion)
   else
     motion:Forget(self)
   end

@@ -487,6 +487,149 @@ describe("NextOrnaments", function()
   -- The Glitch theme (next-themes.md §21): art over the whole body (a grid, scanlines, a CRT's vignette), art that
   -- scrolls (scanlines rolling, a grid drifting) and art that glitches now and then (a HUD bracket jumping, blinking,
   -- its art slipping). Scroll and Glitch run on a driver of the set's own, only while the panel shows.
+  describe("a strip of drawings (Frames) that boils", function()
+    local function coords(t)
+      local ulx, _, _, _, urx = t:GetTexCoord()
+      return ulx, urx
+    end
+
+    it("shows its first drawing at rest, whether it moves or not", function()
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Frames = 3 } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local left, right = coords(texture(panel, 1))
+      assert.is_true(math.abs(left) < 1e-6)
+      assert.is_true(math.abs(right - 1 / 3) < 1e-6)
+    end)
+
+    it("is mirrored with the panel", function()
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Frames = 3 } })
+      local panel = panelOn("LEFT")
+      panel.ornaments:Style()
+      local left, right = coords(texture(panel, 1))
+      assert.is_true(math.abs(left - 1 / 3) < 1e-6)
+      assert.is_true(math.abs(right) < 1e-6)
+    end)
+
+    local function boiling(fps, jiggle)
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, X = 20, Y = 20, Frames = 3,
+        Motion = { Boil = { FPS = fps, Jiggle = jiggle } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      panel.ornaments:Start()
+      return panel, panel.ornaments
+    end
+
+    it("draws itself again every pose, never the same drawing twice running", function()
+      local _, set = boiling(10)
+      local t = set.pieces[1].texture
+      local last = coords(t)
+      for _ = 1, 20 do
+        set:Step(0.1)
+        local now = coords(t)
+        assert.is_true(math.abs(now - last) > 1e-6, "another drawing")
+        assert.is_true(math.abs(now * 3 - math.floor(now * 3 + 0.5)) < 1e-6, "one of its three")
+        last = now
+      end
+    end)
+
+    it("holds a drawing for its whole pose", function()
+      local _, set = boiling(10)
+      local t = set.pieces[1].texture
+      local last = coords(t)
+      set:Step(0.04)
+      set:Step(0.04)
+      assert.are.equal(last, (coords(t)))
+      set:Step(0.04)
+      assert.are_not.equal(last, (coords(t)))
+    end)
+
+    it("draws FPS poses a second, keeping the time a slow frame ran over", function()
+      local _, set = boiling(10)
+      local t = set.pieces[1].texture
+      local poses, last = 0, coords(t)
+      for _ = 1, 25 do
+        set:Step(0.04)
+        local now = coords(t)
+        if now ~= last then
+          poses, last = poses + 1, now
+        end
+      end
+      assert.are.equal(10, poses, "ten poses in a second")
+    end)
+
+    it("jiggles on whole pixels, and only by its Jiggle", function()
+      local _, set = boiling(10, 2)
+      local t = set.pieces[1].texture
+      local _, _, _, rest = t:GetPoint(1)
+      local unit = addon:GetModule("NextPixel"):Unit(t)
+      local moved = false
+      for _ = 1, 30 do
+        set:Step(0.1)
+        local _, _, _, x = t:GetPoint(1)
+        assert.is_true(math.abs(x - rest) <= 2 + unit, "by at most its Jiggle")
+        local pixels = (x - rest) / unit
+        assert.is_true(math.abs(pixels - math.floor(pixels + 0.5)) < 1e-6, "on whole pixels")
+        moved = moved or x ~= rest
+      end
+      assert.is_true(moved)
+    end)
+
+    it("goes back to its first drawing, where it rests, as the panel hides", function()
+      local _, set = boiling(10, 2)
+      local t = set.pieces[1].texture
+      local _, _, _, rest = t:GetPoint(1)
+      for _ = 1, 7 do set:Step(0.1) end
+      set:Stop()
+      local left = coords(t)
+      assert.is_true(math.abs(left) < 1e-6)
+      local _, _, _, x = t:GetPoint(1)
+      assert.are.equal(rest, x)
+    end)
+
+    it("moves only while the panel shows, and counts as a moving part", function()
+      local panel, set = boiling(10)
+      assert.is_not_nil(set.driver:GetScript("OnUpdate"))
+      local skip = {}
+      set:MovingParts(skip)
+      assert.is_true(skip[set.pieces[1].texture])
+      set:Stop()
+      assert.is_nil(set.driver:GetScript("OnUpdate"))
+      local _ = panel
+    end)
+  end)
+
+  describe("a piece for some locales (Locales)", function()
+    local saved
+
+    before_each(function()
+      saved = _G.GetLocale
+    end)
+
+    after_each(function()
+      _G.GetLocale = saved
+    end)
+
+    it("shows in the locales it names, and only those", function()
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10, Locales = { "enUS", "enGB" } } })
+      _G.GetLocale = function() return "enGB" end
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      assert.is_true(texture(panel, 1):IsShown())
+      _G.GetLocale = function() return "deDE" end
+      panel.ornaments:Layout()
+      assert.is_false(texture(panel, 1):IsShown())
+    end)
+
+    it("shows everywhere without any", function()
+      theme({ { Texture = "Leaf", Point = "TOPINNER", Width = 10, Height = 10 } })
+      _G.GetLocale = function() return "koKR" end
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      assert.is_true(texture(panel, 1):IsShown())
+    end)
+  end)
+
   describe("glitch art", function()
     local savedRandom
 

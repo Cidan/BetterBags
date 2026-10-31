@@ -314,6 +314,10 @@ local ANIMATION_OFF = {
   bats = function(theme) theme.Panel.Bats = nil end,
   -- The Make It So theme's (next-themes.md §24): its bags beam in and out; off, they slide in and out.
   beam = function(theme) theme.Panel.Beam = nil end,
+  -- The Papercraft theme's (next-themes.md §25): its bags unfold and crumple; off, they slide in and out. Its animations
+  -- run a pose at a time; off, they run smoothly.
+  paper = function(theme) theme.Panel.Paper = nil end,
+  stopMotion = function(theme) theme.Motion.StopMotion = nil end,
 }
 
 -- effective returns a theme as the player sees it: resolved (a new table), the Animation switches they turned off laid
@@ -493,7 +497,8 @@ local COLOR_MAPS = { Washes = true, Accents = true, Colors = true }
 -- Keys whose value names a text role (Fonts).
 local FONT_KEYS = {
   Font = true, SelectedFont = true, TitleFont = true, RecentFont = true, FreeFont = true, CountFont = true,
-  HelpFont = true, TextFont = true, EmptyFont = true, MoneyFont = true, HintFont = true, WarningFont = true,
+  HelpFont = true, TextFont = true, EmptyFont = true, MoneyFont = true, CoinFont = true, HintFont = true,
+  WarningFont = true,
   PriceFont = true, UnaffordableFont = true, StackFont = true, NameFont = true, HoverFont = true,
   DescriptionFont = true, NoteFont = true, LabelFont = true, LinkFont = true, GroupFont = true,
   ActiveFont = true, PreviewFont = true, UnavailableFont = true, DisabledFont = true,
@@ -597,6 +602,26 @@ function sonataNext:Check(key)
       end
       if o.Anchor ~= nil and not ornaments.ANCHORS[o.Anchor] then
         problem("Anchor", "no corner named " .. tostring(o.Anchor))
+      end
+      if o.Frames ~= nil and not (type(o.Frames) == "number" and o.Frames >= 1 and o.Frames % 1 == 0) then
+        problem("Frames", "a whole number, at least one")
+      end
+      if o.Locales ~= nil and type(o.Locales) ~= "table" then
+        problem("Locales", "a list of locales")
+      end
+      local boil = type(o.Motion) == "table" and o.Motion.Boil or nil
+      if type(boil) == "table" then
+        for k in pairs(boil) do
+          if not ornaments.BOIL[k] then
+            problem("Motion.Boil." .. tostring(k), "no boil part named " .. tostring(k))
+          end
+        end
+        if not (type(boil.FPS) == "number" and boil.FPS > 0) then
+          problem("Motion.Boil.FPS", "more than nothing")
+        end
+        if boil.Jiggle ~= nil and not (type(boil.Jiggle) == "number" and boil.Jiggle >= 0) then
+          problem("Motion.Boil.Jiggle", "no less than nothing")
+        end
       end
       if o.Sizes ~= nil and not ornaments.SIZES[o.Sizes] then
         problem("Sizes", "no size named " .. tostring(o.Sizes))
@@ -1008,6 +1033,156 @@ function sonataNext:Check(key)
         { "Size", "smallest and largest" }, { "Speed", "slowest and fastest" }, { "Band", "highest and lowest" } })
       atLeast(F, "Travel", where .. "Flutter.", true)
       atLeast(F, "Stagger", where .. "Flutter.", false)
+    end
+  end
+  -- A stop motion and a sheet of paper (Motion.StopMotion, Panel.Paper, next-themes.md §25): their parts, and what their
+  -- runtimes need: a frame takes time, a spacing past a half goes back on itself, a sheet is cut into cells at least one
+  -- to a half, a lag of all of it never moves.
+  local function checkNumber(where, value, rule)
+    if value == nil then
+      return
+    end
+    local ok = type(value) == "number"
+    if ok then
+      if rule == "more than nothing" then
+        ok = value > 0
+      elseif rule == "no less than nothing" then
+        ok = value >= 0
+      elseif rule == "from 0 to 1" then
+        ok = value >= 0 and value <= 1
+      elseif rule == "from 0 to under a half" then
+        ok = value >= 0 and value < 0.5
+      elseif rule == "from 0 to under 1" then
+        ok = value >= 0 and value < 1
+      else
+        ok = value >= 1 and value % 1 == 0
+      end
+    end
+    if not ok then
+      table.insert(problems, where .. ": " .. rule)
+    end
+  end
+  local function checkKeys(where, spec, keys, name)
+    for k in pairs(spec) do
+      if not keys[k] then
+        table.insert(problems, where .. "." .. tostring(k) .. ": no " .. name .. " part named " .. tostring(k))
+      end
+    end
+  end
+  local stepping = theme.Motion and theme.Motion.StopMotion
+  if type(stepping) == "table" then
+    checkKeys("Motion.StopMotion", stepping, { FPS = true, Spacing = true, Wobble = true }, "stop motion")
+    if not (type(stepping.FPS) == "number" and stepping.FPS > 0) then
+      table.insert(problems, "Motion.StopMotion.FPS: more than nothing")
+    end
+    checkNumber("Motion.StopMotion.Spacing", stepping.Spacing, "from 0 to under a half")
+    checkNumber("Motion.StopMotion.Wobble", stepping.Wobble, "no less than nothing")
+  end
+  local paperModule = addon:GetModule('NextPaper', true)
+  local sheet = theme.Panel and theme.Panel.Paper
+  if paperModule ~= nil and type(sheet) == "table" then
+    local here = "Panel.Paper"
+    checkKeys(here, sheet, paperModule.KEYS, "sheet")
+    if type(sheet.Front) ~= "table" then
+      table.insert(problems, here .. ".Front: a sheet needs it")
+    end
+    if type(sheet.Back) ~= "table" then
+      table.insert(problems, here .. ".Back: a sheet needs it")
+    end
+    if not (type(sheet.Rate) == "number" and sheet.Rate > 0) then
+      table.insert(problems, here .. ".Rate: more than nothing")
+    end
+    local E = sheet.Edge
+    if type(E) == "table" then
+      checkKeys(here .. ".Edge", E, paperModule.EDGE_KEYS, "edge")
+      checkNumber(here .. ".Edge.Width", E.Width, "no less than nothing")
+      checkNumber(here .. ".Edge.Inside", E.Inside, "no less than nothing")
+      checkNumber(here .. ".Edge.Tile", E.Tile, "more than nothing")
+    end
+    local H = sheet.Shadow
+    if type(H) == "table" then
+      checkKeys(here .. ".Shadow", H, paperModule.SHADOW_KEYS, "shadow")
+      checkNumber(here .. ".Shadow.Spread", H.Spread, "no less than nothing")
+    end
+    local wobble = sheet.Wobble
+    if type(wobble) == "table" then
+      checkKeys(here .. ".Wobble", wobble, paperModule.WOBBLE_KEYS, "wobble")
+      for _, part in ipairs({ "Move", "Turn", "Vertex", "Pose" }) do
+        checkNumber(here .. ".Wobble." .. part, wobble[part], "no less than nothing")
+      end
+    end
+    local function angles(where, poses)
+      local ok = type(poses) == "table" and #poses > 0
+      for _, angle in ipairs(ok and poses or {}) do
+        ok = ok and type(angle) == "number"
+      end
+      if not ok then
+        table.insert(problems, where .. ": a pose or more, each an angle")
+      end
+    end
+    local O = sheet.Open
+    if type(O) == "table" then
+      local at = here .. ".Open"
+      checkKeys(at, O, paperModule.OPEN_KEYS, "open")
+      if O.From ~= nil and not paperModule.CORNERS[O.From] then
+        table.insert(problems, at .. ".From: no corner named " .. tostring(O.From))
+      end
+      checkNumber(at .. ".Cells", O.Cells, "a whole number, at least one")
+      checkNumber(at .. ".Curl", O.Curl, "no less than nothing")
+      checkNumber(at .. ".Depth", O.Depth, "no less than nothing")
+      checkNumber(at .. ".Lit", O.Lit, "from 0 to 1")
+      checkNumber(at .. ".Reveal", O.Reveal, "no less than nothing")
+      angles(at .. ".Half", O.Half)
+      angles(at .. ".Full", O.Full)
+      for i, note in ipairs(O.Note or {}) do
+        local where = at .. ".Note." .. i
+        checkKeys(where, note, paperModule.NOTE_KEYS, "note")
+        if not (type(note.Width) == "number" and note.Width > 0) then
+          table.insert(problems, where .. ".Width: more than nothing")
+        end
+        if not (type(note.Height) == "number" and note.Height > 0) then
+          table.insert(problems, where .. ".Height: more than nothing")
+        end
+      end
+    end
+    local C = sheet.Close
+    if type(C) == "table" then
+      local at = here .. ".Close"
+      checkKeys(at, C, paperModule.CLOSE_KEYS, "close")
+      for _, part in ipairs({ "Grab", "Tremble", "Lump", "Wrinkle", "Jag", "Facet", "Twist" }) do
+        checkNumber(at .. "." .. part, C[part], "no less than nothing")
+      end
+      checkNumber(at .. ".Cell", C.Cell, "more than nothing")
+      checkNumber(at .. ".Ball", C.Ball, "more than nothing")
+      checkNumber(at .. ".Jitter", C.Jitter, "from 0 to under a half")
+      checkNumber(at .. ".Crop", C.Crop, "from 0 to under a half")
+      checkNumber(at .. ".Wrap", C.Wrap, "from 0 to 1")
+      checkNumber(at .. ".Lit", C.Lit, "from 0 to 1")
+      checkNumber(at .. ".Lag", C.Lag, "from 0 to under 1")
+      local poses = C.Poses
+      local ok = type(poses) == "table" and #poses > 0 and poses[#poses] == 1
+      for _, pose in ipairs(ok and poses or {}) do
+        ok = ok and type(pose) == "number" and pose >= 0 and pose <= 1
+      end
+      if not ok then
+        table.insert(problems, at .. ".Poses: a pose or more, each from 0 to 1, the last 1")
+      end
+      local T = C.Toss
+      if type(T) == "table" then
+        local where = at .. ".Toss"
+        checkKeys(where, T, paperModule.TOSS_KEYS, "toss")
+        checkNumber(where .. ".Up", T.Up, "no less than nothing")
+        checkNumber(where .. ".Gravity", T.Gravity, "no less than nothing")
+        checkNumber(where .. ".Life", T.Life, "more than nothing")
+        local D = T.Drift
+        if D ~= nil and not (type(D) == "table" and type(D[1]) == "number" and type(D[2]) == "number" and D[1] <= D[2]) then
+          table.insert(problems, where .. ".Drift: two numbers, the least first")
+        end
+        local U = T.Tumble
+        if U ~= nil and not (type(U) == "table" and type(U[1]) == "number" and type(U[2]) == "number") then
+          table.insert(problems, where .. ".Tumble: two numbers")
+        end
+      end
     end
   end
   -- A transporter's beam (Panel.Beam, next-themes.md §24): its parts NextBeam's; its sparkles needed, its envelopes four

@@ -180,4 +180,38 @@ describe("NextSparkles", function()
     assert.is_true(seen.red or seen.blue)
     assert.is_nil(seen.other)
   end)
+  describe("under a stop motion", function()
+    local style = addon:GetModule("NextStyle")
+    local saved
+
+    before_each(function()
+      saved = style.StopMotion
+      style.StopMotion = { FPS = 10 }
+    end)
+
+    after_each(function()
+      style.StopMotion = saved
+    end)
+
+    it("moves its sparkles a pose at a time, with all the time the pose held", function()
+      local e = emitter()
+      local steps = {}
+      local real = e.Step
+      e.Step = function(self, dt)
+        table.insert(steps, dt)
+        return real(self, dt)
+      end
+      e:Start()
+      local update = e.frame:GetScript("OnUpdate")
+      update(e.frame, 0.04)
+      update(e.frame, 0.04)
+      assert.are.equal(0, #steps, "held")
+      update(e.frame, 0.04)
+      assert.are.equal(1, #steps)
+      assert.is_true(math.abs(steps[1] - 0.12) < 1e-6)
+      update(e.frame, 0.04)
+      assert.are.equal(1, #steps, "and held again")
+      e:Stop()
+    end)
+  end)
 end)

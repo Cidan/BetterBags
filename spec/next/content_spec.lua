@@ -438,6 +438,19 @@ describe("NextContent", function()
     assert.is_nil(motion:GetMove(frame))
   end)
 
+  it("moves an item a pose at a time under a theme's stop motion", function()
+    local saved = style.StopMotion
+    local stepping = { FPS = 10 }
+    style.StopMotion = stepping
+    bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A"), item("0_2", "A") } }))
+    draw()
+    bind(data({ categories = { { name = "A" } }, items = { item("0_2", "A") } }))
+    draw()
+    style.StopMotion = saved
+    assert.are.equal(stepping, motion.moves[buttons["0_2"].frame].stepping)
+    motion:Step(1)
+  end)
+
   -- BetterBags Next's vendor (next.md §10) binds sections of its own buttons, taller than an icon
   -- (the price is under it).
   -- A tab shown in slot order draws its empty slots in place and carries no Free Space (the data

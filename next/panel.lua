@@ -90,6 +90,9 @@ local nextBats = addon:GetModule('NextBats')
 ---@class NextBeam: AceModule
 local nextBeam = addon:GetModule('NextBeam')
 
+---@class NextPaper: AceModule
+local nextPaper = addon:GetModule('NextPaper')
+
 ---@class NextMenuButtonModule: AceModule
 local nextMenuButton = addon:GetModule('NextMenuButton')
 
@@ -741,6 +744,14 @@ function panelProto:moveIn(from, to, duration, ease, delay)
     self.content:Cascade(true, delay + lock)
     return
   end
+  if nextPaper:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once the sheet lies flat.
+    local lock = nextPaper:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:paperIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
   self.threads:DrawIn(delay + style.Time.OpenCascadeDelay)
   self:setOffset(from)
   tween:Play(self, {
@@ -1212,6 +1223,135 @@ function panelProto:beamOut(from, to, done)
       done()
     end,
   })
+end
+
+-- paperIn opens the panel where it rests by unfolding it (the theme's Panel.Paper.Open, next-themes.md §25), after delay
+-- unseen: a sheet folded in four unfolds over it, a fold at a time (NextPaper's Unfold), and once it lies flat the panel
+-- shows. A tween of the panel's own, like the slide it stands in for: whatever stops or replaces it (a flight, a placement,
+-- Escape) ends the fold at rest (endShatter). Once flat it says it has finished showing, as the slide does, and the
+-- sheet goes by itself over it on its own layer (Linger). It steps itself as stop motion: its tween is smooth.
+---@private
+---@param to number
+---@param delay number
+function panelProto:paperIn(to, delay)
+  local total = nextPaper:OpenTime()
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  local run ---@type NextPaperRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    smooth = true,
+    onUpdate = function(p)
+      if not nextPaper:Opens() then
+        -- Its theme went while it unfolded (another theme, Paper Folding off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      -- Its sheet is laid over where its body is once its delay is up (a chained bag waiting unseen is in place by then).
+      run = run or nextPaper:Begin(self, "Open")
+      self.frame:SetAlpha(run:Unfold(p * total))
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger()
+        run = nil
+      end
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- paperOut closes the panel where it is by crumpling it up (the theme's Panel.Paper.Close, next-themes.md §25): it trembles
+-- as it is grabbed, then it is gone (done, Hide's end) and its sheet, its items printed on it, crumples on the paper
+-- layer into a ball that is tossed up a little and falls off the screen, on its own.
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:paperOut(from, to, done)
+  local total = nextPaper:GrabTime()
+  local run = nextPaper:Begin(self, "Close") ---@type NextPaperRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    smooth = true,
+    onUpdate = function(p)
+      if not nextPaper:Closes() then
+        -- Its theme went as it was grabbed: it closes plainly at the end.
+        rest()
+        self:setOffset(from)
+        return
+      end
+      if run ~= nil then
+        self:setOffset(from + run:Grab(p * total))
+      end
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Crumple()
+        run = nil
+      end
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- PaperDecals lists what is printed on the panel's sheet as it crumples (NextPaper): each item shown in its scroll area,
+-- with its icon, where it is on the screen in UIParent's units.
+---@return {left: number, top: number, width: number, height: number, texture: string|number}[]
+function panelProto:PaperDecals()
+  local out = {}
+  local box = self.scroll.scrollBox
+  local boxTop, boxBottom = box:GetTop(), box:GetBottom()
+  local s = lift:ScaleOf(self.frame)
+  for _, button in pairs(self.content.buttons or {}) do
+    local frame = button.frame
+    -- The decoration an item button draws on (none yet: never drawn), or a guild bank button itself.
+    local holder = button._decoration or button.button
+    local icon = holder and (holder.icon or holder.IconTexture)
+    local file = icon and icon:GetTexture()
+    if file ~= nil and frame:IsVisible() then
+      local left, top, right, bottom = frame:GetLeft(), frame:GetTop(), frame:GetRight(), frame:GetBottom()
+      if left ~= nil and top <= boxTop and bottom >= boxBottom then
+        table.insert(out, { left = left * s, top = top * s, width = (right - left) * s, height = (top - bottom) * s,
+          texture = file })
+      end
+    end
+  end
+  return out
 end
 
 -- endShatter puts the panel back as it is without a shatter (or its smoke, or its bats), at full strength, and where it
@@ -4457,6 +4597,7 @@ function panelProto:styleFooter()
       style:SetFont(m.text, F.MoneyFont)
     end
     if m.Place ~= nil then
+      coins:Style(m, F.CoinFont and style:Font(F.CoinFont) or nil)
       m.Place()
     end
     m.frame:ClearAllPoints()
@@ -4960,6 +5101,12 @@ function panelProto:Hide(ctx)
     self.threads:Unravel(nextBeam:CloseTime())
     -- Where it is: it beams up where it stands.
     self:beamOut(self.offset, to, slidOut)
+    return
+  end
+  if nextPaper:Closes() then
+    self.threads:Unravel(nextPaper:GrabTime())
+    -- Where it is: it is crumpled up where it stands.
+    self:paperOut(self.offset, to, slidOut)
     return
   end
   self.threads:Unravel(style.Time.Close)

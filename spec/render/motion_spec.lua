@@ -29,6 +29,102 @@ describe("Motion", function()
     end
   end
 
+  describe("under a stop motion", function()
+    local STOP = { FPS = 10, Wobble = 2 }
+    local saved
+
+    before_each(function()
+      saved = motion.Random
+      local seed = 5
+      motion.Random = function()
+        seed = (seed * 16807) % 2147483647
+        return seed / 2147483647
+      end
+    end)
+
+    after_each(function()
+      motion.Random = saved
+    end)
+
+    local function moving(f)
+      motion:BeginPass(key, 0.5, STOP)
+      motion:Place(f, root, 0, 0)
+      motion:EndPass()
+      motion:BeginPass(key, 0.5, STOP)
+      motion:Place(f, root, 100, 40)
+      motion:EndPass()
+    end
+
+    it("holds each pose for a whole frame", function()
+      local f = CreateFrame("Frame", nil, root)
+      f:Show()
+      moving(f)
+      local _, _, _, x0, y0 = f:GetPoint(1)
+      tick(0.04)
+      tick(0.04)
+      local _, _, _, x1, y1 = f:GetPoint(1)
+      assert.are.equal(x0, x1)
+      assert.are.equal(y0, y1)
+      tick(0.04)
+      local _, _, _, x2 = f:GetPoint(1)
+      assert.are_not.equal(x0, x2)
+      tick(0.04)
+      assert.are.equal(x2, (select(4, f:GetPoint(1))), "the next pose held too")
+    end)
+
+    it("lands a little off its line, by no more than its Wobble", function()
+      local f = CreateFrame("Frame", nil, root)
+      f:Show()
+      moving(f)
+      local off = 0
+      for i = 1, 4 do
+        tick(0.1)
+        local _, _, _, x, y = f:GetPoint(1)
+        -- On the line, y is 0.4 of x.
+        local line = x * 0.4
+        off = math.max(off, math.abs(y - line))
+        assert.is_true(math.abs(y - line) <= 2 * (1 + 0.4) + 1e-6, "pose " .. i)
+      end
+      assert.is_true(off > 0.01, "not on its line")
+    end)
+
+    it("ends exactly where it goes", function()
+      local f = CreateFrame("Frame", nil, root)
+      f:Show()
+      moving(f)
+      for _ = 1, 8 do tick(0.1) end
+      local _, _, _, x, y = f:GetPoint(1)
+      assert.are.equal(100, x)
+      assert.are.equal(40, y)
+      assert.is_nil(motion:GetMove(f))
+    end)
+
+    it("keeps a move that a wobble put off its place from being dropped as moved by something else", function()
+      local f = CreateFrame("Frame", nil, root)
+      f:Show()
+      moving(f)
+      tick(0.1)
+      assert.is_not_nil(motion:GetMove(f))
+      tick(0.1)
+      assert.is_not_nil(motion:GetMove(f))
+    end)
+
+    it("runs every frame without one", function()
+      local f = CreateFrame("Frame", nil, root)
+      f:Show()
+      motion:BeginPass(key, 0.5)
+      motion:Place(f, root, 0, 0)
+      motion:EndPass()
+      motion:BeginPass(key, 0.5)
+      motion:Place(f, root, 100, 40)
+      motion:EndPass()
+      local _, _, _, x0 = f:GetPoint(1)
+      tick(0.02)
+      local _, _, _, x1 = f:GetPoint(1)
+      assert.are_not.equal(x0, x1)
+    end)
+  end)
+
   -- A window snapping to its content (window.md §3b) and a BetterBags Next panel snapping to its columns (next.md §14g)
   -- bounce the same way.
   describe("a size snapping", function()

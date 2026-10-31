@@ -92,6 +92,7 @@ local function newButton()
   local itemLevel = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   itemLevel:SetPoint("BOTTOMLEFT", 2, 2)
   itemLevel:Hide()
+  button.ItemLevelText = itemLevel
   local upgrade = button:CreateTexture(nil, "OVERLAY", nil, 1)
   upgrade:SetAtlas("bags-greenarrow", true)
   upgrade:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)

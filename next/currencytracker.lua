@@ -377,7 +377,7 @@ function trackerProto:LayOut()
   end
   local visible = frame:IsVisible()
   if visible then
-    motion:BeginPass(frame, style.Time.Interaction)
+    motion:BeginPass(frame, style.Time.Interaction, style.StopMotion)
   end
   local x, y, width, height = pad, pad, 0, 0
   local centers, roomX, roomY = {}, nil, nil

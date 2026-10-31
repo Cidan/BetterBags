@@ -45,12 +45,13 @@ ornaments.SIZES = { Full = true, Small = true }
 -- The panels a piece may be shown on (Panels), by the name of the bag kind each panel shows (const.BAG_KIND).
 ornaments.PANELS = { Backpack = "BACKPACK", Bank = "BANK", Vendor = "UNDEFINED", GuildBank = "GUILD" }
 ornaments.MOTIONS = { Sway = true, Spin = true, Pulse = true, Bob = true, Period = true, Delay = true, Origin = true,
-  Scroll = true, Glitch = true, Blink = true, Flicker = true, Flash = true }
--- The keys of a Glitch motion, a Blink, a Flicker and a Flash.
+  Scroll = true, Glitch = true, Blink = true, Flicker = true, Flash = true, Boil = true }
+-- The keys of a Glitch motion, a Blink, a Flicker, a Flash and a Boil.
 ornaments.GLITCH = { Every = true, Hold = true, Jump = true, Blink = true, Slip = true }
 ornaments.BLINK = { Every = true, Time = true, Twice = true }
 ornaments.FLICKER = { Low = true, Speed = true }
 ornaments.FLASH = { Every = true, Time = true, First = true }
+ornaments.BOIL = { FPS = true, Jiggle = true }
 -- Seconds between a glitch's rolls while it lasts: each roll jumps, blinks and slips the piece anew.
 ornaments.GLITCH_STEP = 0.06
 -- Where Scroll, Glitch, Blink and Flicker take their randomness (a source of numbers in [0, 1)): replaced by the specs.
@@ -80,6 +81,8 @@ ornaments.Random = math.random
 ---@field flicker? number A flicker's share of its alpha.
 ---@field flashing? table Its Flash's state: wait (seconds to its next flash), left (seconds left of one under way).
 ---@field flash? number A flash's share of its alpha: none at rest.
+---@field drawing? integer Which of its Frames it shows: the first when unset.
+---@field boiling? table Its Boil's state: left (seconds left of this pose).
 
 ---@class (exact) NextOrnamentSet
 ---@field panel table The panel: its frame, its body, its side, IsSmall.
@@ -265,11 +268,21 @@ function setProto:cut(piece)
   piece.mask = ornaments:Cut(piece.texture, piece.spec.Mask, piece.host, piece.mask, self:Mirrored())
 end
 
--- OnPanel says whether a piece is for this panel: every panel, or those its Panels names.
+-- OnPanel says whether a piece is for this panel and this client: every panel, or those its Panels names; every locale,
+-- or those its Locales names (a note written in one language).
 ---@private
 ---@param o table
 ---@return boolean
 function setProto:OnPanel(o)
+  if o.Locales ~= nil then
+    local here = false
+    for _, locale in ipairs(o.Locales) do
+      here = here or locale == GetLocale()
+    end
+    if not here then
+      return false
+    end
+  end
   if o.Panels == nil then
     return true
   end
@@ -380,6 +393,11 @@ function setProto:tilePiece(piece)
   local o, t = piece.spec, piece.texture
   -- A tiled span's TexCoords crop it across (its strip of the file: Classic's title band, _UI-Frame-TitleTileBg).
   local c = o.TexCoords or { 0, 1, 0, 1 }
+  -- A strip of Frames drawings side by side shows one (Motion.Boil draws it again a pose at a time).
+  if o.Frames ~= nil then
+    local n, f = o.Frames, piece.drawing or 1
+    c = { (f - 1) / n, f / n, c[3], c[4] }
+  end
   local u0, u1, v0, v1
   if o.Tile ~= nil and o.Point == "BODY" then
     local w, h = t:GetWidth() / o.Tile, t:GetHeight() / o.Tile
@@ -500,7 +518,7 @@ end
 ---@return boolean
 local function moving(piece)
   local M = piece.spec and piece.spec.Motion
-  if M and (M.Glitch or M.Blink or M.Flicker or M.Flash or (M.Scroll and piece.spec.Tile)) then
+  if M and (M.Glitch or M.Blink or M.Flicker or M.Flash or M.Boil or (M.Scroll and piece.spec.Tile)) then
     return true
   end
   if piece.groups == nil then
@@ -548,7 +566,7 @@ end
 ---@return boolean
 local function luaMotion(piece)
   local M = piece.spec and piece.spec.Motion
-  return M ~= nil and (M.Glitch ~= nil or M.Blink ~= nil or M.Flicker ~= nil or M.Flash ~= nil
+  return M ~= nil and (M.Glitch ~= nil or M.Blink ~= nil or M.Flicker ~= nil or M.Flash ~= nil or M.Boil ~= nil
     or (M.Scroll ~= nil and piece.spec.Tile ~= nil))
 end
 
@@ -581,7 +599,8 @@ end
 -- Step moves the pieces on the driver elapsed seconds along: art that scrolls moves on (Motion.Scroll: X units a second
 -- toward the outer side, Y down; kept within a tile), a piece that glitches waits for its next glitch, or rolls a
 -- glitch under way anew every GLITCH_STEP until it ends, back at rest (Motion.Glitch), one that blinks waits for its
--- next blink or holds one shut (Motion.Blink), and one that flickers wanders its alpha on (Motion.Flicker).
+-- next blink or holds one shut (Motion.Blink), one that flickers wanders its alpha on (Motion.Flicker), and one that
+-- boils is drawn again a pose at a time (Motion.Boil).
 ---@param elapsed number
 function setProto:Step(elapsed)
   for i = 1, self.count do
@@ -606,6 +625,9 @@ function setProto:Step(elapsed)
       if M.Flash ~= nil then
         self:flashStep(piece, M.Flash, elapsed)
       end
+      if M.Boil ~= nil then
+        self:boilStep(piece, M.Boil, elapsed)
+      end
     end
   end
 end
@@ -614,6 +636,38 @@ end
 ---@return number
 local function between(range)
   return range[1] + (range[2] - range[1]) * ornaments.Random()
+end
+
+-- boilStep draws a piece again FPS times a second (asked, of the Papercraft theme's doodles: stop motion, "imperfect in
+-- their placement from frame to frame"): another of its Frames, never the same one twice running, as a hand-drawn
+-- animation's lines shimmer, and up to Jiggle units off its place, on whole pixels.
+---@private
+---@param piece NextOrnamentPiece
+---@param B table
+---@param elapsed number
+function setProto:boilStep(piece, B, elapsed)
+  local st = piece.boiling
+  if st == nil then
+    st = { left = 1 / B.FPS }
+    piece.boiling = st
+  end
+  st.left = st.left - elapsed
+  if st.left > 1e-9 then
+    return
+  end
+  st.left = math.max(st.left + 1 / B.FPS, 0)
+  local frames = piece.spec.Frames or 1
+  if frames > 1 then
+    local shift = 1 + math.floor(ornaments.Random() * (frames - 1))
+    piece.drawing = ((piece.drawing or 1) - 1 + shift) % frames + 1
+  end
+  local jiggle = B.Jiggle or 0
+  if jiggle ~= 0 then
+    piece.jx = pixel:Snap(piece.texture, (2 * ornaments.Random() - 1) * jiggle)
+    piece.jy = pixel:Snap(piece.texture, (2 * ornaments.Random() - 1) * jiggle)
+    self:place(piece)
+  end
+  self:tilePiece(piece)
 end
 
 -- blinkStep blinks a piece now and then (asked, of the Halloween theme's black cat, next-themes.md §23): it waits Every
@@ -816,6 +870,13 @@ function setProto:Stop()
       piece.glitch = nil
       if piece.spec ~= nil then
         self:rest(piece)
+      end
+    end
+    if piece.boiling ~= nil then
+      piece.boiling, piece.drawing, piece.jx, piece.jy = nil, nil, nil, nil
+      if piece.spec ~= nil then
+        self:place(piece)
+        self:tilePiece(piece)
       end
     end
     if piece.blinking ~= nil or piece.flick ~= nil or piece.flashing ~= nil then

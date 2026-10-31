@@ -6,7 +6,8 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 -- NextTween runs BetterBagsNext's animations (next.md §5): one tween per key, all on a single
 -- OnUpdate that exists only while something tweens. A tween reports its value through onUpdate:
 -- at once with its start value (so a delayed tween holds it), then every frame, and its end
--- value last.
+-- value last. Under a theme whose animations run as stop motion (NextStopMotion, next-themes.md §25), a tween holds each
+-- pose for a whole frame and lands a little off its even spacing; its end is still exact.
 ---@class NextTween: AceModule
 local tween = addon:NewModule('NextTween')
 
@@ -69,10 +70,21 @@ tween.Ease = {
 ---@field onUpdate fun(value: number)
 ---@field onDone? fun()
 ---@field onStop? fun() When it ends without reaching its end: stopped without finishing, or replaced by another of its key.
+---@field smooth? boolean Runs every frame under a stop motion too: what steps itself (NextPaper's runs).
 
 ---@class (exact) NextTweenState
 ---@field options NextTweenOptions
 ---@field elapsed number
+---@field seed number Its own spacing under a stop motion.
+---@field frame? integer The pose it holds under a stop motion.
+
+-- Noise is a number from -1 to 1 for a frame and a key, always the same for the same two (NextStopMotion).
+---@param frame number
+---@param key number
+---@return number
+function tween.Noise(frame, key)
+  return 2 * ((math.sin(frame * 12.9898 + key * 78.233 + 1.7) * 43758.5453) % 1) - 1
+end
 
 function tween:Init()
   self.tweens = {} ---@type table<any, NextTweenState>
@@ -88,7 +100,8 @@ tween:Init()
 ---@param options NextTweenOptions
 function tween:Play(key, options)
   local replaced = self.tweens[key]
-  self.tweens[key] = { options = options, elapsed = 0 }
+  self.seeds = (self.seeds or 0) + 1
+  self.tweens[key] = { options = options, elapsed = 0, seed = self.seeds }
   if replaced ~= nil and replaced.options.onStop then
     replaced.options.onStop()
   end
@@ -136,10 +149,29 @@ function tween:stopIfIdle()
   end
 end
 
+-- pose moves a tween under a stop motion to the frame it has reached, when it has reached a new one: a little off that
+-- frame's even place (Spacing), never back past the one before.
+---@private
+---@param state NextTweenState
+---@param ease fun(t: number): number
+---@param stepping table
+function tween:pose(state, ease, stepping)
+  local options = state.options
+  local frame = math.floor((state.elapsed - (options.delay or 0)) * stepping.FPS + 1e-6)
+  if frame <= (state.frame or 0) then
+    return
+  end
+  state.frame = frame
+  local off = (stepping.Spacing or 0) * tween.Noise(frame, state.seed)
+  local u = math.min(1, (frame + off) / stepping.FPS / options.duration)
+  options.onUpdate(options.from + (options.to - options.from) * ease(u))
+end
+
 -- Step moves every tween elapsed seconds along. A finished tween is removed before it is called
 -- back, so its callback can start the next tween of the same key.
 ---@param elapsed number
 function tween:Step(elapsed)
+  local stepping = self.Stepping and self.Stepping() or nil
   local due = {}
   for key, state in pairs(self.tweens) do
     due[key] = state
@@ -157,7 +189,11 @@ function tween:Step(elapsed)
         end
       elseif t > 0 then
         local ease = tween.Ease[options.ease or "outCubic"]
-        options.onUpdate(options.from + (options.to - options.from) * ease(t))
+        if stepping ~= nil and not options.smooth then
+          self:pose(state, ease, stepping)
+        else
+          options.onUpdate(options.from + (options.to - options.from) * ease(t))
+        end
       end
     end
   end
