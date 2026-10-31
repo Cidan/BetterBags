@@ -205,6 +205,28 @@ describe("every shipped Next theme", function()
     assert.is_not_nil(sonataNext:GetThemes().Plain)
   end)
 
+  -- Reported in game on the Papercraft theme: every pencilled field and button smeared past its edges.
+  for _, key in ipairs(keys) do
+    it("sizes all its art in the settings window with " .. key, function()
+      local layout = dofile("spec/helpers/layout.lua")
+      local undo = layout.UseScreen(1920, 1080, 1)
+      useClient(CLIENTS.Retail)
+      style:Use(sonataNext:Resolve(key))
+      sonataNext:RestyleWidgets(ctx())
+      settings:Open("general")
+      local found = layout.ArtWithNoSize(settings.frame)
+      nextDialog:Show(settings.frame, { title = "Rename", text = "A new name.", input = "Raid",
+        buttons = { { text = "Rename", style = "Primary", onClick = function() end } } })
+      local dialog = layout.ArtWithNoSize(settings.frame)
+      nextDialog:Hide()
+      settings:Close()
+      tween:Step(1)
+      undo()
+      assert.are.same({}, found)
+      assert.are.same({}, dialog)
+    end)
+  end
+
   local clientNames = {}
   for name in pairs(CLIENTS) do table.insert(clientNames, name) end
   table.sort(clientNames)

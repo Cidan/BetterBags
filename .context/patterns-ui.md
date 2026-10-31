@@ -519,3 +519,11 @@ time: a pose held across several client frames then stays exactly where it lande
 skips poses lands where those poses would have, and the specs can name exact places. Anything that adds its time up
 (`held`, a boil's `left`) keeps what a slow frame ran over, or the animation drifts slower than its FPS. And test that a held
 pose draws once with a spy on the draw: since the noise repeats, redrawing it every frame looks identical and only costs time.
+
+## A Texture With No Size Draws at Its File's Size
+
+`SetWidth(0)` on a texture does not make it nothing: it means no width, and a texture with art and no width appears to draw at
+its file's own width (seen in game: pencil art 128 units wide over a 48-unit box). So anything computing a length that can be
+nil must not fall back to 0 for art (`pixel:Width(cap, size or 0)`), and a spec key read from the wrong level silently becomes
+this. The frame mock reports 0 and shows nothing wrong: `layout.ArtWithNoSize` is the check, and a render only proves what it
+was pointed at, so point it at every window a theme draws, not only the one the work was about.

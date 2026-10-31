@@ -878,7 +878,8 @@ and an end cap, and many of its fills reach past their frame (a dropdown's backg
 - **One piece**: a texture spec filling the region, `Inset` into it (`Left`, `Right`, `Top`, `Bottom`; negative reaches
   past), or at its atlas's own size (`AtlasSize = true`) by its `Point` (CENTER when unset, `X`, `Y`).
 - **Pieced**: `Pieces = "Horizontal"` or `"Vertical"`; `Begin`, `Middle`, `End`, each its own `Atlas` or `Texture` with
-  `TexCoords` (else the fill's); the caps `Size` long (else their atlas's); `Thickness` thick and centered (else the
+  `TexCoords` (else the fill's); each cap `Size` long, its own and not the fill's (else its atlas's; a cap drawn from a file
+  with none gets no width, and a texture with no width draws at its file's: `Check` names it); `Thickness` thick and centered (else the
   region's), or `"Atlas"`: each piece its atlas's own thickness, the caps by their middles (or by their bottom corners
   with `Align = "BOTTOM"`), the middle hung from the caps' tops (MinimalSliderTemplate, MinimalTabTemplate); tinted by
   the fill's `Color` and alpha.
@@ -1678,7 +1679,17 @@ What the Papercraft theme (§8) needed of the engine, all of it data a theme giv
   on a turned face, each of Warp's parts, a shake fading, poses drawn once), and led to tests; two were code that could not
   matter, removed (a tween's lower clamp, a second Release's guard: its lists are empty by then). On the rerun every one of
   the 95 left was caught.
-- **Not seen in game yet: any of it.** To check: a bag opening and closing at full size and small, chained both ways, a bank
+- **Failure mode (fixed, reported in game, with screenshots):** every pencilled field and button in the settings window (the
+  search box, dropdowns, a slider's number box, Done) smeared past its edges and crossed over itself, an X on a narrow box. The
+  theme's `outlined` gave the fill a `Size`; `NextFill` reads each cap's own, so the caps got a width of 0, and a texture with
+  no width appears to draw at its file's: a 12-pixel sliver of `button.png` stretched 128 units, the two caps overlapping when
+  the box was narrower than both (measured from the screenshot: the art about 217 pixels across a box about 48 wide; inferred
+  for the client, which no API documents). The mock reports no width as 0 and draws nothing, so nothing failed, and the renders
+  reviewed before shipping showed the bags and not the settings window. Now `Check` names a cap drawn from a file with no length
+  on every theme, and `layout.ArtWithNoSize` (spec/helpers/layout.lua) fails on shown art with no size: in the settings window
+  under every shipped theme (`spec/next/shipped_themes_spec.lua`) and on every page and tab and the bags under Papercraft
+  (`spec/integration/papercraft_spec.lua`).
+- **Seen in game once (the settings window, the report above); the rest not yet.** To check: a bag opening and closing at full size and small, chained both ways, a bank
   open (a capture: does its panel say it has shown under the 1 second?), the paper layer over other windows, `SetVertexOffset`
   on Classic, the fonts at the UI scales the pixel rules cover, cooldown numbers (whether the client keeps a countdown's font),
   the cost of a crumple (a profiler capture: `NextPaperRun.DrawCrumple`), and `/console taintLog 1`.

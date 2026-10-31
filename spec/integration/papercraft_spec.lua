@@ -121,6 +121,67 @@ describe("the Papercraft theme on the whole addon", function()
     assert.same({}, handle.errors)
   end)
 
+  -- Reported in game: every pencilled field and button in the settings window smeared past its edges, its caps with no
+  -- width of their own. The whole addon pins each frame at the screen's origin, so the anchors are let decide here.
+  describe("sizing all its art", function()
+    local layout = dofile("spec/helpers/layout.lua")
+    local undo
+
+    before_each(function()
+      undo = layout.UseScreen(1920, 1080, 1)
+    end)
+
+    after_each(function()
+      undo()
+    end)
+
+    local function unpin(frame)
+      frame._rect = nil
+      for _, region in ipairs({ frame:GetRegions() }) do region._rect = nil end
+      for _, child in ipairs({ frame:GetChildren() }) do unpin(child) end
+    end
+
+    local function missing(frame)
+      unpin(frame)
+      return layout.ArtWithNoSize(frame)
+    end
+
+    it("on every page and tab of the settings window", function()
+      start()
+      -- A category of the player's, so the Categories page shows all its tabs.
+      module("Categories"):CreateCategory(ctx(), { name = "Spec Mats", itemList = { [2589] = true }, save = true,
+        searchCategory = { query = "type = trade goods" } })
+      local settings, pages = module("NextSettings"), module("NextSettingsPages")
+      local seen = 0
+      for _, page in ipairs(pages:List()) do
+        for _, tab in ipairs(page.tabs) do
+          if pages:InDesign(tab) then
+            settings:Open(page.id, tab.id)
+            run(1)
+            seen = seen + 1
+            assert.are.same({}, missing(settings.frame), page.id .. " > " .. tab.id)
+          end
+        end
+      end
+      assert.is_true(seen > 10, "every page's tabs: " .. seen)
+      assert.same({}, handle.errors)
+    end)
+
+    it("on its bags, at full size and small", function()
+      local addon = start()
+      local bag = addon.Bags.Backpack
+      bag:Show(ctx())
+      run(2)
+      assert.are.same({}, missing(bag.frame), "full")
+      module("Database"):SetNextSize("small")
+      module("NextPanel"):SetSize(ctx(), "full")
+      module("NextPanel"):SetSize(ctx(), "small")
+      run(2)
+      assert.are.same({}, missing(bag.frame), "small")
+      assert.same({}, handle.errors)
+    end)
+  end)
+
   it("slides a bag in and out with Paper Folding off, on no sheet", function()
     local addon = start()
     local bag = addon.Bags.Backpack

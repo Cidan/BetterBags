@@ -551,7 +551,21 @@ function sonataNext:Check(key)
       end
     end
   end
+  -- A pieced fill's caps each need a length of their own (NextFill): an atlas has one, and a file with none gets no
+  -- width, and a texture with no width draws at its file's.
+  local function caps(v, here)
+    for _, name in ipairs({ "Begin", "End" }) do
+      local cap = type(v[name]) == "table" and v[name] or {}
+      local atlas = cap.Atlas ~= nil or (cap.Texture == nil and v.Atlas ~= nil)
+      if not atlas and cap.Size == nil then
+        table.insert(problems, here .. "." .. name .. ".Size: a cap drawn from a file needs its length")
+      end
+    end
+  end
   local function check(k, v, here)
+    if type(v) == "table" and (v.Pieces == "Horizontal" or v.Pieces == "Vertical") then
+      caps(v, here)
+    end
     if k == "Frame" and type(v) == "table" then
       frame(v, here)
       walk(v, here)

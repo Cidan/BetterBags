@@ -79,10 +79,10 @@ end
 
 -- A control in its art: its pencil outline in three pieces, whatever its width.
 local function outlined(file, color, alpha)
-  return { Pieces = "Horizontal", Size = 12, Color = color, Alpha = alpha,
-    Begin = { Texture = file, TexCoords = { 0, 12 / 128, 0, 1 } },
+  return { Pieces = "Horizontal", Color = color, Alpha = alpha,
+    Begin = { Texture = file, TexCoords = { 0, 12 / 128, 0, 1 }, Size = 12 },
     Middle = { Texture = file, TexCoords = { 12 / 128, 116 / 128, 0, 1 } },
-    End = { Texture = file, TexCoords = { 116 / 128, 1, 0, 1 } } }
+    End = { Texture = file, TexCoords = { 116 / 128, 1, 0, 1 }, Size = 12 } }
 end
 
 sonataNext:RegisterTheme({

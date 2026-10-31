@@ -629,6 +629,29 @@ describe("SonataNext", function()
       assert.are.same({}, sonataNext:Check("Default"))
     end)
 
+    -- Reported in game on the Papercraft theme: its caps took their Size from the fill, which reads each cap's own, so they
+    -- had no width, and a texture with none draws at its file's: a sliver of art stretched 128 units across, over the
+    -- control and past it.
+    it("names a fill's cap drawn from a file with no length of its own, and an atlas's, which has one, not at all", function()
+      sonataNext:RegisterTheme({ Name = "NoCaps",
+        Textures = { Art = "a.png" },
+        Controls = {
+          Input = { Fill = { Pieces = "Horizontal", Size = 12, Color = "White",
+            Begin = { Texture = "Art" }, Middle = { Texture = "Art" }, End = { Texture = "Art", Size = 12 } } },
+          Dropdown = { Fill = { Pieces = "Vertical", Texture = "Art", Color = "White", Begin = { Size = 4 } } },
+          Slider = { Track = { Pieces = "Horizontal", Thickness = "Atlas", Color = "White",
+            Begin = { Atlas = "cap" }, Middle = { Atlas = "middle" }, End = { Atlas = "cap" } } },
+          Button = { Plain = { Fill = { Pieces = "Horizontal", Atlas = "cap", Color = "White" } } },
+        },
+      })
+      local problems = sonataNext:Check("NoCaps")
+      table.sort(problems)
+      assert.are.same({
+        "Controls.Dropdown.Fill.End.Size: a cap drawn from a file needs its length",
+        "Controls.Input.Fill.Begin.Size: a cap drawn from a file needs its length",
+      }, problems)
+    end)
+
     it("names every color, role, texture and ease it cannot find, by where it is", function()
       sonataNext:RegisterTheme({ Name = "Broken",
         Panel = { Fill = { Color = "Nope" }, DropGlow = { Color = { 1, 0, 0, 1 } } },
