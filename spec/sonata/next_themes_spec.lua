@@ -810,6 +810,14 @@ describe("BetterBags Next's shipped themes", function()
       assert.is_true(math.sqrt(2 * full / C.Toss.Gravity) + 0.5 < C.Toss.Life, "falls off a tall screen within its Life")
     end)
 
+    it("throws the ball away quickly: off the screen in under nine tenths of a second, from the screen's middle", function()
+      local C = t().Panel.Paper.Close
+      local T = C.Toss
+      local drop = 384 + C.Ball * 1.4
+      local time = (T.Up + math.sqrt(T.Up * T.Up + 2 * T.Gravity * drop)) / T.Gravity
+      assert.is_true(time < 0.9, "off the screen after " .. time)
+    end)
+
     it("mounts each item on lighter paper, its quality in coloured pencil, its count by hand", function()
       local B = t().ItemButton
       assert.is_true(B.Icon.Inset > 0)

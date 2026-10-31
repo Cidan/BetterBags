@@ -366,7 +366,7 @@ sonataNext:RegisterTheme({
         Grab = 2, Tremble = 2.5, Cell = 56, Jitter = 0.34, Ball = 56, Lump = 0.2, Wrinkle = 24, Jag = 13, Wrap = 0.94,
         Lag = 0.35, Lit = 0.42, Twist = 0.9, Facet = 0.34, Crop = 0.08, Mount = { Texture = "ItemMount", Color = "White" },
         Poses = { 0.1, 0.27, 0.48, 0.7, 0.88, 1 },
-        Toss = { Up = 470, Gravity = 1500, Drift = { 60, 130 }, Tumble = { 5, 6.5 }, Life = 3.5 },
+        Toss = { Up = 635, Gravity = 2730, Drift = { 80, 175 }, Tumble = { 6.75, 8.75 }, Life = 3.5 },
       },
     },
   },
