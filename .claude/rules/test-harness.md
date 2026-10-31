@@ -182,6 +182,11 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   every item button of every slot at login. Keep whole-addon specs few and pointed: a test needs
   its own load only when it needs a fresh start (what it checks happens the first time something
   is made).
+- **Every order of a client's steps** (`spec/integration/empty_slot_spec.lua`, refresh-scheduler.md §10): a small client
+  model answers the APIs through `globals`, and `eachOrder` runs every distinct order of its steps on one load, each from
+  a `reset()`. To reach everything a client event reaches, it wraps the mock's `RegisterEvent` and `SetScript` for the
+  load (frames listening themselves, OnUpdate drivers) and sends events through `events._eventMap`, never AceEvent's
+  shared frame, which holds other specs' listeners. Draws are stubbed on the bags, so the bags can hold items.
 - Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e; and §1: a new
   install starts with Next, an existing one keeps the classic bags),
   `spec/integration/bank_open_spec.lua` (refresh-scheduler.md §11).
