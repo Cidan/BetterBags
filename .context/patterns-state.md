@@ -213,6 +213,13 @@ To keep heavy work out of an animation (the bank's read during its window's show
 ## The Bags Are Not Readable While the Player Is Out of the World
 A loading screen (login, a dungeon, a portal) takes the player's items out of the client and gives them back after, with no `BAG_UPDATE` on the way out; `BAG_UPDATE` itself is synchronous, so outside a transfer a changed bag is always marked before anything later can ask about it. So "the bag was not reported changed" means "it holds what was read" only while the player is in the world. Model the world, not the error: from the loading screen's first signal (`LOADING_SCREEN_ENABLED`, or `PLAYER_LEAVING_WORLD` when it comes first) every bag is unread and nothing starts or goes on (a parked unit included) until the world is back (the loading screen over, a quiet frame, the item data loaded), then one read; give each wait its own token so an earlier wait's timers and callbacks end nothing. Checking `DoesItemExist` before each location read (Baganator's way) hides the error but still reads, commits and compares a half-delivered inventory (refresh-scheduler.md §8, the reported `GetItemGUID` error on entering a dungeon). Pick the start from a capture, not the event's name: one showed the items gone up to 1.9 s before `PLAYER_LEAVING_WORLD`, with hundreds of frames run in between, so holding from that event left a gap that timers, windows closing and the queue fell into.
 
+## Enumerate the Orders Before Blaming One
+When an error depends on the order of events the client does not document, run every distinct order of the steps on the
+real code (`spec/integration/empty_slot_spec.lua`) and classify each result by the state that mattered at the moment
+(held or not, marked or not), not by the steps' positions. It splits "our logic is wrong" from "the client did something
+we assumed it does not", which no single replay can, and says exactly what a capture needs to show. Then break each check
+the result rests on, to see the enumeration can fail.
+
 ## Settings Are Not Readable Once the Player Logs Out
 AceDB strips every setting still at its default from the profile at `PLAYER_LOGOUT`, right after it fires `OnDatabaseShutdown`, so a setting read after that can be nil and a table of settings can be gone. Frames still get scripts then (a classic bag window was resized after it, `.claude/rules/initialization.md` §7). Gate at the entry point rather than in every getter: the shutdown callback sets `addon.loggingOut`, and the script wrappers (`addon.SetScript`, `addon.HookScript`) run nothing while it is set. Never put the defaults back after the strip: they would be written into the saved variables, which the strip exists to prevent.
 

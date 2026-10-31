@@ -554,6 +554,48 @@ read"; "upgrade verdict cache": which events read and which recalculate; "mergin
 `spec/bags/bank_context_refresh_spec.lua`, `spec/bags/backpack_spec.lua`, `spec/items_spec.lua`
 (late Pawn registration).
 
+**What it takes to ask about an empty slot (`spec/integration/empty_slot_spec.lua`).** Reported again from a Labyrinth
+(12.1.5, v0.8.8 or later by the world frame's line in the locals, `_held=false`, from a tooltip finishing): the same
+`GetItemGUID` error. The player's stack could not say which item, because the error passes through `coroutine.resume`, whose
+stack and locals are lost. This spec drives the whole addon (test-harness.md §5), every real listener, loader, bucket and
+queue, on a client whose every call taking an `ItemLocation` that must hold an item (not an `EmptiableItemLocation`,
+`ItemDocumentation.lua`) raises for an empty slot. Item buttons are not drawn (the frame mock has no template). By
+default it runs a spread of its cases in about 5 seconds; `BB_SIM_FULL=1` runs them all (about 12 minutes),
+`BB_SIM_REPORT=1` prints the counts below.
+
+| Simulated | Cases | Asked about an empty slot |
+|---|---|---|
+| Each change reported as it is made: 23 changes x 17 triggers x 10 moments, both designs | 3,910 each | never |
+| The same 23 changes x 4 reads x 10 moments, both designs | 920 each | never |
+| Every order of a reported change, its frame's end, its item data, 2 recalculations, a read, a wipe, 2 frames | 90,720 | never |
+| Random sessions of 200 steps, bank and loading screens included: classic, Next, WoW: Forever | 900 | never |
+| At the bank: 4 changes x 18 triggers x 10 moments | 720 | never |
+| Every order of a slot emptying, its report, its frame's end, its item data, a recalculation, a read and frames: reported as it is made | 18,480 | never |
+| The same: reported later | 70,560 | 20,170, until the report; none once the client is quiet |
+| The same: reported before the slot empties | 89,040 | 12,040; 1,051 keep failing once the client is quiet |
+| The same: never reported | 2,520 | 1,260; 840 keep failing until a read of the bag |
+| A loading screen's 8 steps in every order: items leaving while the bags are held | 46,620 | never |
+| The same: items leaving while they are not held | 28,980 | 3,600 |
+| A bank closing in every order: its slots going once `BANKFRAME_CLOSED` fired | 240 | never |
+| The same: its slots going before it fired (the wiki says its data is there at the first) | 120 | 36 |
+
+So every sender of `bags/Rederive` is safe against any change the client reports as it makes it, in any order: the reported
+error needs the client to hold a slot empty, unmarked, with no `BAG_UPDATE` since that bag's last read. Every trigger then
+raises it (so the tooltip is the trigger and not the cause), and a recalculation fails each time until a read of that bag
+ends it, so one such slot can make any number of errors.
+
+**Measured:** in-world, in a player's capture (v0.8.10), a looted item was there at its own `BAG_UPDATE` (bag 4, 6 then 7
+items); no capture has a slot emptying in the world. No capture of 1,232 `[bags]` records has `items` differ from `exist`: a
+slot whose item object is gone while its ID still reads would also raise on a read (`ReuseHarvestedSlot`), which no player
+has reported. warcraft.wiki.gg's `BAG_UPDATE` says "the APIs can provide unreliable information during this event".
+**Not known:** which of those three client behaviours a Labyrinth shows. A profiler capture of the error tells them apart:
+the next `BAG_UPDATE` after the failure, a signal just after it, or failures repeating with none.
+
+Mutation-checked: 12 breaks of the real checks (the mark ignored, cleared too early or not made, by `BAG_UPDATE`,
+`BAG_CONTAINER_UPDATE` and leaving the world; a recalculation clearing marks; the hold not holding; `atBank` left on): 10 are
+caught in the default run. The other 2 (`bank = atBank` in the tooltip's request, the bank's `atBank` gate in `_RunUnit`)
+change nothing, since `_RunUnit` gates the first and closing clears the bank's items for the second.
+
 ## 12. The Guild Bank
 
 The guild bank is a third kind of bag, read only while it is open and BetterBags Next's guild bank
