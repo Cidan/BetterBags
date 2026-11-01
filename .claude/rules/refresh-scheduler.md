@@ -213,22 +213,34 @@ longer refreshed by a sort that moved nothing and has nothing to show, as the re
 accident; the next read of the slot refreshes it, as for a bag not sorted. Chosen, and said to the
 player: the read was all but the whole of BetterBags' cost of such a sort.
 
-**Measured, what a sort costs** (a retail capture, game build 70688, of three sorts that moved nothing,
-the character pane open under GW2_UI, 30 items, Pawn): three stalls each sort, the first two on nobody's
-code that BetterBags can see. Blizzard's readings (perf-profiler.md §3) say whose:
-- At the click, about 56 ms inside `C_Container.SortBags`, in the frame's 58.5 ms of BetterBags time: no
-  BetterBags function runs in it (the one thing measured in it, `Pawn.OnArrowsReset`, 0.4 ms, comes before),
-  and Blizzard charges it to BetterBags for making the call (60.2 of 60.3 ms for all addons).
-- About 0.17 s later, a tick of 69 ms for the whole client with 1.4 ms for all addons: the client's own.
-- At 0.5 s, the fallback's read: 5.5 ms reading every slot, then 15.2 ms committing and drawing in the
-  next frame. This is what `SortLeaves` removes, for a sort that moved nothing and has nothing to show.
-  Not yet captured since. (The 59 ms Blizzard read for that tick is mostly the capture itself: the
-  profiler spent 648 ms over the capture describing arguments, left out of its own clock.)
-The player reports the hitch only with the character pane open; no capture compares it closed. The likely
-cause of the first two, not shown: the client re-dressing the player's model, `UNIT_MODEL_CHANGED` being a
-synchronous event GW2_UI and Blizzard's pane both rebuild on. A capture now says (perf-profiler.md §3a):
-each sort's call is `Refresh._CallSorter`, what the client fired inside and after it is recorded, with
-the pane showing, and each slow tick names what each addon took.
+**Measured, what a sort costs** (retail captures, game build 70688, of sorts that moved nothing, GW2_UI 12.1.2, Pawn). `Refresh._CallSorter`'s
+wall time and the `[client]` calls give the first two rows (perf-profiler.md §3a); the last column is GW2_UI's hook skipping
+`ITEM_LOCK_CHANGED`, patched locally:
+
+| | Pane closed | Pane open | Pane open, hook patched |
+|---|---|---|---|
+| Inside `SortBags` | 11 ms | 64 ms | 19 ms |
+| Unlock burst, 0.11 to 0.25 s later | 10 ms | 63 ms | 18 ms |
+| Slowest client ticks | none of 33 ms | about 80 ms, two a sort | about 33 ms |
+
+- **A sort locks everything it could move, whether or not it moves it.** 575 `ITEM_LOCKED` inside the call and, when the server answers,
+  575 `ITEM_UNLOCKED`, each with an `ITEM_LOCK_CHANGED`: 30 backpack items, 30 equipped and inventory slots, and 515 in the bank, even
+  away from it. So what reacts per event costs twice per sort, and more the more a character owns. These figures include the capture
+  recording each event.
+- **The pane's cost is per event, not a stall:** no gap over 1 ms inside the call, and the same 52.5 ms on both bursts, whose only event in
+  common is `ITEM_LOCK_CHANGED`. Blizzard's 18 equipment slot buttons register it only while shown (`PaperDollItemSlotButton_OnShow`), and
+  GW2_UI's pane uses those buttons and hooks them with no filter (`slot:HookScript("OnEvent", CorruptionIcon)`,
+  `Games/Mainline/Character/paperdoll_equipment.lua`), reading each slot's item link on every event: 10,350 runs a burst. The hook is most of
+  it, by the table above. The 8 ms left against the pane closed is probably Blizzard's own handlers, not measured apart. Sent upstream:
+  Mortalknight/GW2_UI#288.
+- **Not the model.** A first guess blamed the client re-dressing the player's model; none of the sorts fired `UNIT_MODEL_CHANGED`.
+- **The stall at the click is charged to BetterBags only because BetterBags makes the call:** the handlers run inside it. The same handlers
+  on the unlock burst are charged to no addon.
+- **BetterBags leaves those buttons alone.** Silencing them around a sort was considered and not done: no event says a sort has finished, the
+  12.x API marks `UnregisterEvent` as adding a forbidden aspect to a frame with no documented trigger, and the upstream fix removes most of it.
+- **BetterBags' own share:** after a sort that moved nothing, the fallback's read (5.5 ms reading every slot, then 15.2 ms committing and drawing) is gone. `SortLeaves` answered
+  "nothing" in about 0.6 ms on each of four sorts. What is left is Pawn's rechecks after the reset it sends on `ITEM_LOCKED`: 15 to 24 ms a sort,
+  in chunks of 8 to 10 ms a frame.
 
 ## 7. Merging Waiting Requests
 

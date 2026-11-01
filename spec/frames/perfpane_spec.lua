@@ -34,6 +34,9 @@ LoadFreshBetterBagsModule("PerfSessions", "debug/perf/sessions.lua")
 local recorder = LoadFreshBetterBagsModule("RenderRecorder", "debug/renderrecorder.lua")
 LoadBetterBagsModule("frames/flamegraph.lua")
 LoadBetterBagsModule("frames/tracechart.lua")
+LoadBetterBagsModule("render/render.lua")
+LoadBetterBagsModule("render/drawable.lua")
+LoadBetterBagsModule("render/scrollbox.lua")
 LoadFreshBetterBagsModule("PerfPane", "frames/perfpane.lua")
 
 local perf = addon:GetModule("Perf")
@@ -104,21 +107,60 @@ local function makeSession(id, overrides)
 end
 
 describe("PerfPane slow ticks", function()
-  it("lists the slowest ticks of a capture, the pane and who took them", function()
+  local function linesOf(session)
     local pane = setmetatable({}, { __index = addon:GetModule("PerfPane").proto })
     local lines = {}
-    local function add(fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
-    pane:AddSlowTicks(add, { timeline = { slow = {
-      { frame = 3, ms = 40, detail = { pane = "no character pane", addons = {} } },
-      { frame = 9, ms = 70, detail = { pane = "GW2_UI's character pane", addons = { { name = "Pawn", ms = 2 } } } },
+    pane:AddSlowTicks(function(fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end, session)
+    return lines
+  end
+
+  it("lists the slowest ticks of a capture, the pane and who took them in which frame", function()
+    local lines = linesOf({ timeline = { slow = {
+      { frame = 3, ms = 40, detail = { pane = "no character pane", readings = {} } },
+      { frame = 9, ms = 70, detail = { pane = "GW2_UI's character pane", readings = {
+        { frame = 8, allMs = 69, addons = { { name = "Pawn", ms = 2 } } },
+      } } },
     } } })
     assert.equal(1, #lines)
-    assert.is_truthy(lines[1]:find("frame 9", 1, true))
-    assert.is_truthy(lines[1]:find("GW2_UI's character pane", 1, true))
-    assert.is_truthy(lines[1]:find("Pawn", 1, true))
-    assert.is_truthy(lines[1]:find("frame 3", 1, true))
+    assert.is_truthy(lines[1]:find("frame 9 70.0 ms (GW2_UI's character pane; frame 8, all addons 69.0 ms: Pawn 2.00 ms)", 1, true))
+    assert.is_truthy(lines[1]:find("frame 3 40.0 ms (no character pane; addons not busy)", 1, true))
     assert.is_truthy(lines[1]:find("frame 9", 1, true) < lines[1]:find("frame 3", 1, true))
-    assert.is_truthy(lines[1]:find("no addon", 1, true))
+  end)
+
+  it("lists both frames a tick has readings for", function()
+    local lines = linesOf({ timeline = { slow = {
+      { frame = 9, ms = 100, detail = { pane = "no character pane", readings = {
+        { frame = 8, allMs = 40, addons = { { name = "Pawn", ms = 38 } } },
+        { frame = 9, allMs = 20, addons = { { name = "GW2_UI", ms = 19 } } },
+      } } },
+    } } })
+    assert.is_truthy(lines[1]:find("frame 8, all addons 40.0 ms: Pawn 38.0 ms; frame 9, all addons 20.0 ms: GW2_UI 19.0 ms", 1, true))
+  end)
+
+  it("says when addons were busy with none named, and when a frame could not be read", function()
+    local lines = linesOf({ timeline = { slow = {
+      { frame = 9, ms = 100, detail = { pane = "no character pane", readings = {
+        { frame = 8, allMs = 6, addons = {} },
+        { frame = 9, allMs = 41, error = "x" },
+      } } },
+    } } })
+    assert.is_truthy(lines[1]:find("frame 8, all addons 6.00 ms: none named; frame 9, all addons 41.0 ms: not read", 1, true))
+  end)
+
+  it("reads a capture saved before readings", function()
+    local lines = linesOf({ timeline = { slow = {
+      { frame = 3, ms = 40, detail = { pane = "no character pane", addons = {} } },
+      { frame = 9, ms = 70, detail = { pane = "no character pane", addons = { { name = "Pawn", ms = 2 } } } },
+    } } })
+    assert.is_truthy(lines[1]:find("frame 9 70.0 ms (no character pane; Pawn 2.00 ms)", 1, true))
+    assert.is_truthy(lines[1]:find("frame 3 40.0 ms (no character pane; no addon)", 1, true))
+  end)
+
+  it("does not say the addons were idle before a capture's first frame, which it did not read", function()
+    local lines = linesOf({ timeline = { slow = {
+      { frame = 1, ms = 80, detail = { pane = "no character pane", readings = {} } },
+    } } })
+    assert.is_truthy(lines[1]:find("frame 1 80.0 ms (no character pane; addons not busy in this first frame)", 1, true))
   end)
 
   it("says what it can of a tick it could not describe", function()
@@ -185,6 +227,7 @@ describe("PerfPane", function()
       yesNo = { title = title, text = text, yes = yes, no = no }
     end)
     _G.UISpecialFrames = {}
+    addon:GetModule("Render"):Init()
     pane = perfPane:Create(UIParent)
     pane.flame.canvas:SetSize(500, 300)
     pane.frameFlame.canvas:SetSize(500, 200)
@@ -655,6 +698,53 @@ describe("PerfPane", function()
       assert.are.equal(150, pane.timelineChart.to)
     end)
 
+    -- The Summary can run longer than its view: 8 slow ticks with two readings each take about 15 rows of it.
+    describe("the Summary", function()
+      local function select()
+        table.insert(perfSessions.db.sessions, makeSession(99))
+        pane:Update()
+        pane:SelectSession(99)
+      end
+
+      it("scrolls, as long as its text", function()
+        pane.views.summary:SetSize(600, 400)
+        pane.summaryText.GetStringHeight = function() return 900 end
+        select()
+        local scroll = pane.summaryScroll
+        assert.equal(scroll.scrollChild, pane.summaryText:GetParent():GetParent())
+        assert.equal(600 - scroll:GetGutterWidth() - 8, pane.summaryText:GetWidth())
+        assert.equal(908, scroll.scrollChild:GetHeight())
+        assert.is_true(pane.summaryText:GetParent():IsShown())
+        assert.is_false(scroll.scrollBar:GetAttribute("nodeignore"), "taller than its view, so it scrolls")
+      end)
+
+      it("lays its text out again at the view's size when it shows", function()
+        pane.views.summary:SetSize(600, 400)
+        select()
+        pane.views.summary:SetSize(500, 400)
+        pane:ShowView("summary")
+        assert.equal(500 - pane.summaryScroll:GetGutterWidth() - 8, pane.summaryText:GetWidth())
+      end)
+
+      it("lays out the text it says with no session selected", function()
+        pane.views.summary:SetSize(600, 400)
+        pane.summaryText.GetStringHeight = function() return 30 end
+        select()
+        pane.summaryText.GetStringHeight = function() return 12 end
+        pane:SelectSession(nil)
+        assert.is_truthy(pane.summaryText:GetText():find("Select a saved session", 1, true))
+        assert.equal(20, pane.summaryScroll.scrollChild:GetHeight())
+      end)
+
+      it("starts at the top of each session", function()
+        pane.views.summary:SetSize(600, 400)
+        select()
+        pane.summaryScroll.scrollBox:SetScrollPercentage(1)
+        pane:SelectSession(99)
+        assert.equal(0, pane.summaryScroll.scrollBox:GetScrollPercentage())
+      end)
+    end)
+
     it("says when the selected session has no call trace", function()
       table.insert(perfSessions.db.sessions, makeSession(99))
       pane:Update()
@@ -719,6 +809,18 @@ describe("PerfPane", function()
         },
       }
     end
+
+    it("says what the profiler spent on itself, and what asking about the addons took, with or without a slow tick", function()
+      local s = session()
+      s.timeline.slow = nil
+      s.stats.excludedMs, s.stats.busyAsks, s.stats.busyAskMs = 100, 25, 88
+      local text = pane:BuildSummary(s)
+      assert.is_truthy(text:find("The profiler spent 100 ms of its own time: describing arguments, packing the trace, "
+        .. "asking about slow frames. That time is left out of every number here.", 1, true))
+      assert.is_truthy(text:find("Of it, 88.0 ms went on asking what each addon took, in 25 busy frames.", 1, true))
+      s.stats.busyAsks, s.stats.busyAskMs = nil, nil
+      assert.is_nil(pane:BuildSummary(s):find("Of it,", 1, true))
+    end)
 
     it("says whose the client's slowest ticks were", function()
       local s = session()

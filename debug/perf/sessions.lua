@@ -126,11 +126,14 @@ end
 local SLOW_TICK_MS = 33
 -- SLOW_TICKS_KEPT is how many of them a capture says that of.
 local SLOW_TICKS_KEPT = 64
--- ADDON_SHARE_MS is the least an addon has to have taken in such a tick to be named.
+-- ADDONS_BUSY_MS is how much all addons have to have taken in a frame for a capture to ask what each took: a slow tick with less
+-- than this names no addon.
+local ADDONS_BUSY_MS = 5
+-- ADDON_SHARE_MS is the least an addon has to have taken in such a frame to be named.
 local ADDON_SHARE_MS = 0.5
 
--- addonsTaking lists what each loaded addon took in the last tick (Blizzard's reading), most first. Asked of
--- slow ticks only: it asks about every addon.
+-- addonsTaking lists what each loaded addon took in the last tick (Blizzard's reading), most first. It asks about every addon, so
+-- only of a frame that took a while.
 ---@return {name: string, ms: number}[]
 local function addonsTaking()
   local out = {}
@@ -538,8 +541,16 @@ function perfSessions:BuildOptions()
       series = 'app',
       ms = SLOW_TICK_MS,
       max = SLOW_TICKS_KEPT,
-      describe = function()
-        return { pane = self:CharacterPane(), addons = addonsTaking() }
+      busySeries = 'all',
+      busyMs = ADDONS_BUSY_MS,
+      busy = addonsTaking,
+      describe = function(busy)
+        local readings = {}
+        for i, reading in ipairs(busy) do
+          local failed = reading.answer.error
+          readings[i] = { frame = reading.frame, allMs = reading.ms, addons = not failed and reading.answer or nil, error = failed }
+        end
+        return { pane = self:CharacterPane(), readings = readings }
       end,
     },
     -- The engine asks once, on a frame, when the maximum duration passed or the call

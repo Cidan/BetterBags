@@ -559,7 +559,7 @@ describe("Perf engine", function()
       assert.are.same({}, perfFormat:DecodeTimeline(plain).series)
     end)
 
-    -- A frame the client took long over says whose it was: asked only of those, and at most so many.
+    -- A frame the client took long over says whose it was: described only for those, and at most so many.
     describe("slow frames", function()
       local app, asked
 
@@ -603,6 +603,217 @@ describe("Perf engine", function()
         local session = perf:Stop()
         assert.is_truthy(session.timeline.slow[1].detail.error:find("describing failed", 1, true))
         assert.equal(2, session.stats.frames)
+      end)
+
+      -- Blizzard's reading for the whole client comes a frame after the addons' for work from a click or an event, and in the same
+      -- frame for a timer's, so a slow frame looks at what was busy in both.
+      describe("what was busy around one", function()
+        local all, busyAsked, seen
+
+        local function startBusy(extra)
+          busyAsked, seen = 0, {}
+          local opts = options({ frameSeries = {
+            all = function() return table.remove(all, 1) end,
+            app = function() return table.remove(app, 1) end,
+          } })
+          opts.slowFrame = { series = "app", ms = 33, max = 4, busySeries = "all", busyMs = 5,
+            busy = function()
+              busyAsked = busyAsked + 1
+              return { n = busyAsked }
+            end,
+            describe = function(busy)
+              table.insert(seen, busy)
+              return {}
+            end }
+          for k, v in pairs(extra or {}) do opts.slowFrame[k] = v end
+          perf:Start(opts)
+        end
+
+        it("hands over what was busy the frame before", function()
+          all, app = { 40, 1 }, { 10, 80 }
+          startBusy()
+          perf:_OnFrame()
+          perf:_OnFrame()
+          perf:Stop()
+          assert.are.same({ { { frame = 1, ms = 40, answer = { n = 1 } } } }, seen)
+        end)
+
+        it("hands over what is busy in the frame itself", function()
+          all, app = { 1, 40 }, { 10, 80 }
+          startBusy()
+          perf:_OnFrame()
+          perf:_OnFrame()
+          perf:Stop()
+          assert.are.same({ { { frame = 2, ms = 40, answer = { n = 1 } } } }, seen)
+        end)
+
+        it("hands over both when both were busy, oldest first, whichever was busier", function()
+          all, app = { 20, 40 }, { 10, 80 }
+          startBusy()
+          perf:_OnFrame()
+          perf:_OnFrame()
+          perf:Stop()
+          assert.are.same({ { { frame = 1, ms = 20, answer = { n = 1 } }, { frame = 2, ms = 40, answer = { n = 2 } } } }, seen)
+          all, app = { 40, 20 }, { 10, 80 }
+          startBusy()
+          perf:_OnFrame()
+          perf:_OnFrame()
+          perf:Stop()
+          assert.are.same({ { { frame = 1, ms = 40, answer = { n = 1 } }, { frame = 2, ms = 20, answer = { n = 2 } } } }, seen)
+        end)
+
+        it("does not look further back than the frame before", function()
+          all, app = { 40, 1, 1 }, { 10, 10, 80 }
+          startBusy()
+          for _ = 1, 3 do perf:_OnFrame() end
+          perf:Stop()
+          assert.are.same({ {} }, seen)
+        end)
+
+        it("does not look further back when reading a frame fails", function()
+          local reads = 0
+          app = { 10, 80 }
+          local opts = options({ frameSeries = {
+            all = function()
+              reads = reads + 1
+              if reads == 2 then error("no reading") end
+              return reads == 1 and 40 or 1
+            end,
+            app = function() return table.remove(app, 1) end,
+          } })
+          seen = {}
+          opts.slowFrame = { series = "app", ms = 33, max = 4, busySeries = "all", busyMs = 5,
+            busy = function() return {} end,
+            describe = function(busy)
+              table.insert(seen, busy)
+              return {}
+            end }
+          perf:Start(opts)
+          perf:_OnFrame()
+          assert.is_false(pcall(perf._OnFrame, perf))
+          perf:_OnFrame()
+          perf:Stop()
+          assert.are.same({ {} }, seen)
+        end)
+
+        it("reads one series for both, when told to", function()
+          app = { 40 }
+          local opts = options({ frameSeries = { app = function() return table.remove(app, 1) end } })
+          seen = {}
+          opts.slowFrame = { series = "app", ms = 33, max = 4, busySeries = "app", busyMs = 5,
+            busy = function() return { n = 1 } end,
+            describe = function(busy)
+              table.insert(seen, busy)
+              return {}
+            end }
+          perf:Start(opts)
+          perf:_OnFrame()
+          perf:Stop()
+          assert.are.same({ { { frame = 1, ms = 40, answer = { n = 1 } } } }, seen)
+        end)
+
+        it("asks only of a frame at its reading or over", function()
+          all, app = { 4.9, 5, 1 }, { 10, 10, 10 }
+          startBusy()
+          for _ = 1, 3 do perf:_OnFrame() end
+          perf:Stop()
+          assert.equal(1, busyAsked)
+          assert.are.same({}, seen)
+        end)
+
+        it("asks of no frame past the timeline's limit", function()
+          all, app = { 40, 40, 40 }, { 10, 10, 10 }
+          busyAsked, seen = 0, {}
+          local opts = options({ timelineFrames = 1, frameSeries = {
+            all = function() return table.remove(all, 1) end,
+            app = function() return table.remove(app, 1) end,
+          } })
+          opts.slowFrame = { series = "app", ms = 33, max = 4, busySeries = "all", busyMs = 5,
+            busy = function()
+              busyAsked = busyAsked + 1
+              return {}
+            end,
+            describe = function() return {} end }
+          perf:Start(opts)
+          for _ = 1, 3 do perf:_OnFrame() end
+          perf:Stop()
+          assert.equal(1, busyAsked)
+        end)
+
+        it("says so when asking fails, and the frame still closes", function()
+          all, app = { 40, 1 }, { 10, 80 }
+          startBusy({ busy = function() error("asking failed") end })
+          perf:_OnFrame()
+          perf:_OnFrame()
+          local session = perf:Stop()
+          assert.is_truthy(seen[1][1].answer.error:find("asking failed", 1, true))
+          assert.equal(2, session.stats.frames)
+        end)
+
+        it("charges asking to nothing, and says what asking took apart from describing", function()
+          all, app = { 40, 1, 40 }, { 80, 10, 10 }
+          startBusy({ busy = function()
+            now = now + 25
+            return {}
+          end, describe = function()
+            now = now + 14
+            return {}
+          end })
+          for _ = 1, 3 do perf:_OnFrame() end
+          local stats = perf:Stop().stats
+          assert.equal(64, stats.excludedMs)
+          assert.equal(2, stats.busyAsks)
+          assert.equal(50, stats.busyAskMs)
+        end)
+
+        it("says nothing of asking when it asked nothing", function()
+          all, app = { 1 }, { 10 }
+          startBusy()
+          perf:_OnFrame()
+          local stats = perf:Stop().stats
+          assert.is_nil(stats.busyAsks)
+          assert.is_nil(stats.busyAskMs)
+        end)
+
+        it("forgets the last capture's", function()
+          all, app = { 40 }, { 10 }
+          startBusy({ busy = function()
+            now = now + 25
+            return {}
+          end })
+          perf:_OnFrame()
+          perf:Stop()
+          all, app = { 1, 40 }, { 80, 10 }
+          startBusy({ busy = function()
+            now = now + 7
+            return {}
+          end })
+          perf:_OnFrame()
+          perf:_OnFrame()
+          local stats = perf:Stop().stats
+          assert.are.same({ {} }, seen)
+          assert.equal(1, stats.busyAsks)
+          assert.equal(7, stats.busyAskMs)
+        end)
+
+        it("lets go of the last two frames' answers once it has stopped", function()
+          local weak, n = setmetatable({}, { __mode = "v" }), 0
+          all, app = { 40, 40 }, { 10, 10 }
+          startBusy({ busy = function()
+            local answer = {}
+            n = n + 1
+            weak[n] = answer
+            return answer
+          end })
+          perf:_OnFrame()
+          perf:_OnFrame()
+          perf:Stop()
+          collectgarbage()
+          collectgarbage()
+          assert.equal(2, n)
+          assert.is_nil(weak[1])
+          assert.is_nil(weak[2])
+        end)
       end)
 
       it("keeps nothing without a slow frame", function()

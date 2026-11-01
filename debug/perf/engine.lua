@@ -109,6 +109,10 @@ local frameSeries = {}
 -- What to keep of a frame one of those says was slow (options.slowFrame), and what was kept.
 local slowFrame
 local slowFrames = {}
+-- What options.slowFrame.busy answered of the frame closing and the one before: { frame, ms, answer }.
+local busyBefore, busyNow
+-- How many times options.slowFrame.busy was asked, and what that took (left out of every measurement).
+local busyAsks, busyAskMs = 0, 0
 local wrapped, overheadParent, overheadChild
 local captureOptions
 local frozen, frozenAt, stopReason
@@ -1075,6 +1079,8 @@ local function finalize(now)
       allocatedKB = bytes(allocTotal) / 1024,
       gcFreedKB = bytes(gcFreed) / 1024,
       excludedMs = us(excluded) / 1000,
+      busyAsks = busyAsks > 0 and busyAsks or nil,
+      busyAskMs = busyAsks > 0 and us(busyAskMs) / 1000 or nil,
       traceCalls = tracing and traceCount or nil,
       stopReason = stopReason,
     },
@@ -1294,7 +1300,7 @@ end
 ---@field traceMaxCalls? number Recording stops (the capture freezes) after this many calls.
 ---@field traceChunkSize? number Calls per packed chunk.
 ---@field frameMetric? fun(): number|nil Per-frame external metric in ms (Blizzard's addon profiler).
----@field slowFrame? {series: string, ms: number, max: number, describe: fun(): table} Of the slowest max frames the named series reads ms or more for, keep describe()'s answer, in timeline.slow (its time is left out).
+---@field slowFrame? {series: string, ms: number, max: number, describe: fun(busy: {frame: number, ms: number, answer: table}[]): table, busySeries?: string, busyMs?: number, busy?: fun(): table} Of the slowest max frames the named series reads ms or more for, keep describe()'s answer, in timeline.slow. Of a frame busySeries reads busyMs or more for, ask busy(), and hand a slow frame what it and the frame before answered, oldest first. Series go by name, so busySeries has to sort before series or be the same, or a frame does not see its own answer. Their time is left out.
 ---@field frameSeries? table<string, fun(): number|nil> More named per-frame readings in ms, recorded as timeline.series[name].
 ---@field onAutoStop? fun(reason: "maxDuration"|"traceFull") Called once when the capture should stop on its own.
 
@@ -1311,6 +1317,7 @@ function perf:Start(options)
   timelineCap = options.timelineFrames or 18000
   frameMetric = options.frameMetric
   slowFrame, slowFrames = options.slowFrame, {}
+  busyAsks, busyAskMs = 0, 0
   frameSeries = {}
   for name, fn in pairs(options.frameSeries or {}) do
     frameSeries[#frameSeries + 1] = { name = name, fn = fn, data = {} }
@@ -1360,6 +1367,7 @@ function perf:Stop()
   self.active = false
   self.frame:SetScript('OnUpdate', nil)
   uninstall()
+  busyBefore, busyNow = nil, nil
   if captureOptions.pauseGC then
     collectgarbage("restart")
   end
@@ -1375,8 +1383,31 @@ function perf:Stop()
   return session
 end
 
--- keepSlowFrame keeps what options.slowFrame says of the frame closing: the slowest so many, each described only when it is kept,
--- since describing one can ask the client a lot. A description that fails says so, and the frame still closes.
+-- outsideClock asks what options.slowFrame needs of the client, which can be a lot. Its time is left out of the profiler's clock, and
+-- one that fails says so, so the frame still closes.
+---@param ask function
+---@param ... any
+---@return table
+local function outsideClock(ask, ...)
+  local x0 = clock()
+  local ok, answer = pcall(ask, ...)
+  excluded = excluded + (clock() - x0)
+  return ok and answer or { error = tostring(answer) }
+end
+
+-- noteBusy asks what options.slowFrame.busy says of the frame closing, when it was busy.
+---@param value number
+local function noteBusy(value)
+  if value >= slowFrame.busyMs then
+    local before = excluded
+    busyNow = { frame = frames, ms = value, answer = outsideClock(slowFrame.busy) }
+    busyAsks, busyAskMs = busyAsks + 1, busyAskMs + (excluded - before)
+  end
+end
+
+-- keepSlowFrame keeps what options.slowFrame says of the frame closing: the slowest so many, each described only when it is kept.
+-- Blizzard's reading for the whole client comes a frame after the addons' for work from a click or an event, and in the same frame
+-- for a timer's, and its readings cannot tell which, so it hands over what was busy in both, for the reader to judge.
 ---@param ms number
 local function keepSlowFrame(ms)
   local at = #slowFrames + 1
@@ -1391,10 +1422,10 @@ local function keepSlowFrame(ms)
       return
     end
   end
-  local x0 = clock()
-  local ok, detail = pcall(slowFrame.describe)
-  slowFrames[at] = { frame = frames, ms = ms, detail = ok and detail or { error = tostring(detail) } }
-  excluded = excluded + (clock() - x0)
+  local busy = {}
+  busy[#busy + 1] = busyBefore
+  busy[#busy + 1] = busyNow
+  slowFrames[at] = { frame = frames, ms = ms, detail = outsideClock(slowFrame.describe, busy) }
 end
 
 -- _OnFrame closes one frame of measurements. It runs from the profiler's own OnUpdate,
@@ -1453,12 +1484,18 @@ function perf:_OnFrame()
     if frameMetric then
       timelineBlizzard[#timelineBlizzard + 1] = blizzardMs or 0
     end
+    busyBefore, busyNow = busyNow, nil
     for i = 1, #frameSeries do
       local series = frameSeries[i]
       local value = series.fn() or 0
       series.data[#series.data + 1] = value
-      if slowFrame ~= nil and series.name == slowFrame.series and value >= slowFrame.ms then
-        keepSlowFrame(value)
+      if slowFrame ~= nil then
+        if series.name == slowFrame.busySeries then
+          noteBusy(value)
+        end
+        if series.name == slowFrame.series and value >= slowFrame.ms then
+          keepSlowFrame(value)
+        end
       end
     end
   end
