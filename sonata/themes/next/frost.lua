@@ -276,11 +276,11 @@ sonataNext:RegisterTheme({
     CardHover = { 0.5, 0.85, 1, 0.12 },
   },
 
-  -- Item buttons as frosted cells: the icon cropped in a dark cell, a thin ice edge, an item's quality on it.
+  -- Item buttons as frosted cells: the icon cropped in a dark cell, a thin ice edge, an item's quality on its icon's
+  -- border.
   ItemButton = {
     Icon = { Inset = 1, TexCoords = { 0.08, 0.92, 0.08, 0.92 } },
     Backdrop = { Color = { 0.02, 0.08, 0.13, 0.85 }, BorderColor = { 0.5, 0.85, 1, 0.45 }, EdgeSize = 1 },
-    QualityBorder = "Backdrop",
     Highlight = { Color = { 0.6, 0.9, 1, 0.18 } },
     Pushed = { Color = { 0.6, 0.9, 1, 0.28 } },
   },

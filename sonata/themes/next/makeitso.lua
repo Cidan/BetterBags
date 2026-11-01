@@ -343,11 +343,10 @@ sonataNext:RegisterTheme({
     Highlight = { 1, 0.86, 0.72, 0.12 },
   },
 
-  -- Item buttons as navy cells on the grid, a soft lavender edge carrying an item's quality.
+  -- Item buttons as navy cells on the grid, a soft lavender edge, an item's quality on its icon's border.
   ItemButton = {
     Icon = { Inset = 1, TexCoords = { 0.08, 0.92, 0.08, 0.92 } },
     Backdrop = { Color = { 0.04, 0.045, 0.08, 0.9 }, BorderColor = { 0.78, 0.68, 0.9, 0.3 }, EdgeSize = 1 },
-    QualityBorder = "Backdrop",
     Highlight = { Color = { 1, 0.86, 0.72, 0.16 } },
     Pushed = { Color = { 0.98, 0.7, 0.42, 0.22 } },
   },

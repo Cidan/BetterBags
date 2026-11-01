@@ -174,6 +174,15 @@ called by `BagSystem:Use`; while Next is in use and its theme sets `ItemButton`,
 override, and `ItemFrame:RestyleButtons()` makes every button draw in full again. Default sets none,
 so item buttons look as before. Masque is still decided by the bags' theme.
 
+**A Next theme leaves quality on the icon's border** (`spec/sonata/next_themes_spec.lua`): none sets
+`QualityBorder = "Backdrop"` (the ElvUI classic theme does, with `Masque = false`). **Failure mode (fixed, reported):**
+Frost, Glitch, Halloween and Make It So drew quality on the button's own 1-pixel edge, which hid `IconBorder`, the texture
+Masque skins, and Masque's Normal frame covers the edge (Caith: 42 of 36, `ARTWORK` over `BORDER`), so under Masque no
+quality showed; Default showed it. A check for a skinned button could not have fixed it: a bag button joins its group on
+its first `item/Updated`, after its first draw, and the draw record then skips later draws. Reported as missing without
+Masque too. **Not known:** why the edge did not show there; the code sets its color and the mock shows it, and no capture
+of it exists. Default's route works in both, so the themes use it, following Quality Glow Intensity as Default does.
+
 **Sizes and Masque.** Masque sizes a skin to the button when it skins it (Masque 12.1.0 `Core.lua`
 `UpdateScale`, from `Button:GetSize()`, in `SkinButton`, which both `AddButton` and `ReSkin` run).
 Bag item buttons are re-skinned on `item/Updated`, which only a full draw sends, and a redraw whose
@@ -651,6 +660,13 @@ is a column at a screen edge, feathered on its inner side), so ornaments are art
   mode (fixed, reported in game: "very jerky"):** every step was eased `IN_OUT`, so the last stopped dead at rest
   and the loop began again from a standstill, a halt mid-swing once a cycle (concluded from the animation's
   definition; confirm in game). A pulse or a bob (one animation, `BOUNCE`) eases at its two turns, which is right.
+- **The next theme's piece starts at rest.** Pieces are reused by their place in the list, so a theme's ornaments would
+  otherwise take what the last theme's motions did to that piece. `Style` clears it (`scrollU`, `scrollV`, `slip`, `jx`, `jy`,
+  `blink`). **Failure mode (fixed, reported on Make It So: "this weird texture in the lower left"):** Glitch's scanlines
+  scroll, and they are the same piece as Make It So's bottom elbow. How far they had scrolled stayed on the piece through every
+  theme after, until a reload: the elbow drew V 0.33 to 1.33, and its art's last row, opaque all the way across, clamped to
+  fill what was left, a solid block. `spec/integration/theme_switch_spec.lua` compares Make It So's pieces fresh and after
+  every other theme, with their motions run.
 - **Motion runs on the client's animation groups** (`Rotation`, `Alpha`, `Translation`, every client): no Lua
   runs while they loop, unlike the sparkles and the cloud. They play while the panel shows (`Show`, and a piece a
   size switch shows while it does) and stop when it hides (`OnHidden`); each motion has one group per piece, made

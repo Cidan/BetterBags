@@ -65,6 +65,18 @@ describe("BetterBags Next's shipped themes", function()
       shipped())
   end)
 
+  -- Reported: Make It So, Frost, Halloween and Glitch showed no quality at all, and Default did. Masque skins the icon's
+  -- border and its Normal frame covers the button's edge (Caith: 42 of 36), so quality must reach the icon's border.
+  it("leaves quality on the icon's border in every theme, where Masque can skin it", function()
+    for client, flags in pairs(CLIENTS) do
+      for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+      for _, key in ipairs(shipped()) do
+        local style = sonataNext:Resolve(key).ItemButton
+        assert.are_not.equal("Backdrop", style and style.QualityBorder, key .. " on " .. client)
+      end
+    end
+  end)
+
   it("writes the bag's gold and currency counts in every theme's footer font, as the vendor's footer is", function()
     for client, flags in pairs(CLIENTS) do
       for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
