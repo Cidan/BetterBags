@@ -151,7 +151,7 @@ category only the bags, color and priority change, and they are saved
 (`DB:UpdateEphemeralItemCategory`; `CreateOrUpdateCategory` keeps them, `CreateCategory` applies
 them over the plugin's values). `GetCustomCategory` also returns the category it found.
 `HideCategory`, `ShowCategory` and `ToggleCategoryShown` do nothing, and `IsCategoryShown` is always
-true; the partition no longer drops "hidden" categories.
+true: what a plugin hides this way stays shown. Hiding came back as a player's per-bag setting (§10).
 
 **Resolution** (`items:GetCategory`, and the vendor's copy in `next/merchant.lua`): an item added by
 hand to a category of yours stays there, whatever the order (§7); a plugin's item lists compete with
@@ -282,3 +282,33 @@ it should." docs/next-batch-2.md §8.
 - Coverage: `spec/categories_spec.lua` ("filing an item dropped on a category's header", "GetCustomCategory
   without the item's Added Items"), `spec/refresh_pipeline_spec.lua` ("an item's natural category"),
   `spec/next/drag_spec.lua` ("the header").
+
+## 10. Hide In: a category kept out of a bag
+
+Asked (issue #1222, 2026-11-01): hiding was retired (§6) because players hid a category and then wondered where its
+items went, and tabs do it better; but players who turn tabs off asked for it back. Agreed: a per-bag switch beside Used
+In, asking first, and the bag's footer saying how many items are hidden.
+
+- **Stored on the category** as `hidden = { [kind] = true }` (shown everywhere: no field). Yours in its saved filter, a
+  plugin's in its saved state (`saveState`, restored by `CreateCategory` and `DB:CreateOrUpdateCategory`), as its color is.
+- **API:** `categories:UpdateCategory(ctx, name, { hidden = { [kind] = true|false } })` (the bags named are set, the others
+  kept; recalculates the bags, with `categories/Changed`) and `categories:HiddenIn(name, kind)` (a group by's sections as
+  their category; a built-in category is never hidden).
+- **Different from Used In:** off, a category does not apply in that bag and its items fall through to what they would be
+  otherwise; hidden, they are its items and nothing shows them. A category not used in a bag has nothing to hide there, so
+  its switch is off (`SetEnabled`).
+- **Where it applies** (`Phase10_PartitionIntoTabs`): an item whose shown category is hidden in the kind leaves its tab's
+  `items`, so it has no cell and its category no section, for either design. Its gap goes too. Its tab counts it
+  (`tabData.hiddenItems`, by the tab it belongs to, gaps and free slots not counted). Nothing else changes: it keeps its
+  data, its search entry and its slot.
+- **What still shows it:** Recent Items while it is new (its shown category is Recent Items, so a player sees what they
+  looted), and the Show Bags view, whose sections are bags.
+- **What still acts on it:** Auto Sell that does not confirm reads categories, not sections (automation.md §2). A confirming
+  sale is offered only with a section in the backpack's view (automation.md §4a), so a hidden category is not offered.
+- **The footer:** BetterBags Next's free slots line ends " · N hidden" (`panelProto:Draw`, for the tab shown); the classic
+  bags write "N hidden" on the footer bar, left of the money (`bagProto:ShowHiddenCount`). **Known limit:** on the classic
+  backpack in a narrow window, with many currency icons, it can run over them: the bar has no room rule.
+- **The switch:** a row of the Settings tab, "Hide In", next-settings.md §5.
+- **Coverage:** `spec/categories_spec.lua`, `spec/database_spec.lua`, `spec/refresh_pipeline_spec.lua` ("hiding a category in
+  a bag"), `spec/next/bag_spec.lua`, `spec/frames/bag_draw_ownership_spec.lua`, `spec/next/settings/categories_spec.lua`
+  ("hiding it in a bag").

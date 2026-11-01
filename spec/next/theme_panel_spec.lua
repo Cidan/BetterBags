@@ -1446,6 +1446,18 @@ describe("BetterBags Next's panels and themes", function()
   end)
 
   describe("the footer and content", function()
+    it("writes the gold in the theme's footer font, following the theme", function()
+      local fonts = {}
+      override(addon:GetModule("NextCoins"), "Style", function(_, _, font) table.insert(fonts, font) end)
+      override(stubs.money, "Create", function()
+        return { frame = CreateFrame("Frame"), Update = function() end, Place = function() end }
+      end)
+      nextBag:Create(ctx())
+      assert.are.equal(style:Font("Footer"), fonts[#fonts])
+      apply({ Fonts = { Footer = { Size = 9 } } })
+      assert.are.equal(style:Font("Footer"), fonts[#fonts])
+    end)
+
     it("draws its line in its colors and size, or none, and its text in its roles", function()
       local bag = nextBag:Create(ctx())
       apply({ Fonts = { Small = { Size = 9 } }, Footer = { Line = { Color = "Gold", Inner = 0.1, Outer = 0.9, Size = 2 },

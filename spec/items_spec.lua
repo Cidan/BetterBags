@@ -44,6 +44,7 @@ if not ok then
 else
   categories = addon:GetModule("Categories")
 end
+categories.HiddenIn = categories.HiddenIn or function() return false end
 categories.GetSortedSearchCategories = categories.GetSortedSearchCategories or function() return {} end
 categories.GetCustomCategory = categories.GetCustomCategory or function() return nil, nil end
 categories.DoesCategoryExist = categories.DoesCategoryExist or function() return false end
@@ -686,6 +687,27 @@ describe("Items (New Data Farming Engine)", function()
       assert.are.equal(68, props.traits.minLevel)
       assert.are.equal(41000, props.traits.sellPrice)
       assert.are.equal(1, props.bindType)
+    end)
+
+    -- Every caged pet's item is the same Pet Cage, which teaches no pet of its own: its species is the first
+    -- value of its link (Blizzard's BattlePetToolTip_UnpackBattlePetLink).
+    it("knows a caged pet's species from its link, whatever the Pet Cage's item says", function()
+      local pet = "|cff0070dd|Hbattlepet:635:1:3:152:13:12:0000000000000000|h[Adder]|h|r"
+      _G.C_PetJournal = { GetPetInfoByItemID = function() return nil end }
+      local props = items:ReadItemProperties(42, pet)
+      assert.is_true(props.traits.isPet)
+      assert.are.equal(635, props.traits.petSpeciesID)
+    end)
+
+    it("asks the pet journal about an item that teaches a pet, by its item ID", function()
+      _G.C_PetJournal = {
+        GetPetInfoByItemID = function(id)
+          if id == 42 then return "Adder", 1, 1, 1, "", "", false, true, true, false, true, 1, 635 end
+        end,
+      }
+      local props = items:ReadItemProperties(42, "|cffffffff|Hitem:42::::::::|h[Adder]|h|r")
+      assert.is_true(props.traits.isPet)
+      assert.are.equal(635, props.traits.petSpeciesID)
     end)
   end)
 

@@ -534,6 +534,20 @@ describe("NextVendor", function()
         assert.is_truthy(guild.tooltipText:find("The guild pays up to ", 1, true))
       end)
 
+      it("separates the thousands of what repairing costs and of what the guild pays", function()
+        _G._merchant.canRepair, _G._merchant.canGuildRepair, _G._merchant.repairCost = true, true, 12340000
+        override(_G, "GetGuildBankWithdrawMoney", function() return -1 end)
+        override(_G, "GetGuildBankMoney", function() return 56780000 end)
+        local list
+        override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+        local v = open()
+        menuTheme()
+        v:ApplyStyle(ctx())
+        v.menuButton:Open(ctx())
+        assert.is_truthy(list[4].tooltipText:find("Repair all: 1,234g", 1, true))
+        assert.is_truthy(list[5].tooltipText:find("The guild pays up to 5,678g", 1, true))
+      end)
+
       it("opens Blizzard's filter from the bag button while the filter is in its menu", function()
         local v = open()
         menuTheme()
@@ -749,6 +763,9 @@ describe("NextVendor", function()
       click(v.tabs.tabs[3].button)
       assert.are.same({ "Equipped", "In your bags" }, sectionNames(v))
       assert.are.equal("Repair all: 25s", v.freeText:GetText())
+      data.repair = { equipped = { { slot = 5, texture = 6, durability = 1, maxDurability = 2, cost = 12340000 } }, bags = {} }
+      eventsRegistered["UPDATE_INVENTORY_DURABILITY"](ctx())
+      assert.are.equal("Repair all: 1,234g", v.freeText:GetText())
       data.repair = { equipped = {}, bags = {} }
       eventsRegistered["UPDATE_INVENTORY_DURABILITY"](ctx())
       assert.are.equal("Nothing needs repair", v.emptyText:GetText())
@@ -759,7 +776,33 @@ describe("NextVendor", function()
       _G._merchant.currencies = { 42 }
       _G._currencies[42] = { name = "Valor", iconFileID = 77, quantity = 1200 }
       local v = open()
-      assert.are.equal("1g 23s 45c   |T77:0|t 1200", v.freeText:GetText())
+      assert.are.equal("1g 23s 45c   |T77:0|t 1,200", v.freeText:GetText())
+    end)
+
+    it("separates the thousands of the gold in its footer", function()
+      override(_G, "GetMoney", function() return 123456780000 end)
+      local v = open()
+      assert.is_truthy(v.freeText:GetText():find("12,345,678g", 1, true))
+    end)
+  end)
+
+  describe("Icon Scale", function()
+    -- Reported (issue #1221): the Bag Scale slider reached the vendor, the Icon Scale slider did not.
+    it("draws an open vendor's icons at the scale at once, a row of cards as tall as they are", function()
+      data.items = { forSale(5, "Gems"), forSale(6, "Gems"), forSale(7, "Gems") }
+      local v = open()
+      local section = v.content.byName.Gems
+      local cell = section.entries[1].item
+      assert.are.equal(style.ICON, cell.icon:GetWidth())
+      local top = select(5, section.entries[3].item.frame:GetPoint(1))
+      style:SetIconScale(150)
+      v:ApplyScales(ctx())
+      local after = section.entries[1].item
+      local raised = select(5, section.entries[3].item.frame:GetPoint(1))
+      style:SetIconScale(100)
+      assert.are.equal(66, after.icon:GetWidth())
+      assert.are.equal(66, after.frame:GetHeight())
+      assert.are.equal(top - 22, raised, "a row taller by what the icon grew")
     end)
   end)
 
@@ -1799,6 +1842,25 @@ describe("NextVendor", function()
     for _, size in ipairs({ "full", "small" }) do
       for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 1920, 1080, 1 } }) do
         local name = string.format("%s, on %dx%d at %d%%", size, screen[1], screen[2], screen[3] * 100)
+        for _, scale in ipairs({ 50, 150 }) do
+          it("draws its cards on whole pixels at an Icon Scale of " .. scale .. "%, " .. name, function()
+            override(stubs.database, "GetNextSize", function() return size end)
+            override(stubs.database, "GetNextBagScale", function() return 100 end)
+            override(stubs.database, "GetNextSmallChain", function() return "apart" end)
+            override(stubs.database, "GetNextSmallPlace", function() return nil end)
+            override(stubs.database, "GetNextSmallSize", function() return nil end)
+            override(stubs.database, "GetClampBagsToScreen", function() return true end)
+            undo = layout.UseScreen(screen[1], screen[2], screen[3])
+            local v = open()
+            style:SetIconScale(scale)
+            v:ApplyScales(ctx())
+            local ok, offs = pcall(offGrid, v)
+            style:SetIconScale(100)
+            assert.is_true(ok, tostring(offs))
+            assert.are.same({}, offs)
+          end)
+        end
+
         it("draws its buy, buyback and repair views on whole pixels, " .. name, function()
           override(stubs.database, "GetNextSize", function() return size end)
           -- A small vendor's place, size and chain (docs/next-small-mode.md): the defaults.

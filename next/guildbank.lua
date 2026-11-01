@@ -207,7 +207,7 @@ function guildProto:WithdrawLines()
   else
     amount = math.min(amount, funds)
   end
-  return { { L:G("You may withdraw up to ") .. C_CurrencyInfo.GetCoinTextureString(amount), 0.8, 0.8, 0.8 } }
+  return { { L:G("You may withdraw up to ") .. GetMoneyString(amount, true), 0.8, 0.8, 0.8 } }
 end
 
 -- WithdrawTooltip is the withdraw gold button's tooltip: its name, then WithdrawLines.
@@ -233,7 +233,7 @@ function guildProto:CreateMoney()
     frame = frame,
     text = text,
     Update = function()
-      text:SetText(C_CurrencyInfo.GetCoinTextureString(GetGuildBankMoney() or 0))
+      text:SetText(GetMoneyString(GetGuildBankMoney() or 0, true))
     end,
   }
   -- Placed by its owner (styleFooter, on the panel's grid): by its top left, in whole pixels.

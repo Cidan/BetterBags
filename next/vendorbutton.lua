@@ -108,7 +108,7 @@ function vendorButton:PriceText(price, costs)
   local size = style.Theme.Vendor.CoinSize
   local parts = {}
   local function add(n, texture)
-    table.insert(parts, n .. "|T" .. texture .. ":" .. size .. ":" .. size .. ":2:0|t")
+    table.insert(parts, BreakUpLargeNumbers(n) .. "|T" .. texture .. ":" .. size .. ":" .. size .. ":2:0|t")
   end
   if price and price > 0 then
     local coins = { math.floor(price / 10000), math.floor(price / 100) % 100, price % 100 }
@@ -195,20 +195,23 @@ function buttonProto:Style()
   -- that changes (a card is made before the canvas it goes in).
   local frame = self.frame
   self.unit = pixel:Unit(frame)
-  -- A card keeps the theme's icon size (CARD_ICON): Icon Scale is the bags' item buttons'
-  -- (docs/next-appearance-size.md), and a smaller icon would not fit two lines of name beside it.
-  local icon, width = pixel:Lengths(frame, style.CARD_ICON, style.VENDOR_CARD_WIDTH)
-  frame:SetSize(width, icon)
+  -- Its icon follows Icon Scale. A small one sits in the card's middle, the card as tall as its text needs
+  -- (CARD_HEIGHT); a large one leaves its name and price less room.
+  self.iconSize = style.ICON
+  local icon, height, width = pixel:Lengths(frame, style.ICON, style.CARD_HEIGHT, style.VENDOR_CARD_WIDTH)
+  frame:SetSize(width, height)
   self.button:SetSize(icon, icon)
   self.icon:SetSize(icon, icon)
+  self.button:ClearAllPoints()
+  pixel:Point(self.button, "TOPLEFT", frame, "TOPLEFT", 0, -pixel:Middle(frame, height, icon))
   local gap = pixel:Snap(frame, style.VENDOR_TEXT_GAP)
   local textWidth = width - icon - 2 * gap
   local name, price = self.name, self.price
   name:ClearAllPoints()
-  pixel:Point(name, "TOPLEFT", self.button, "TOPRIGHT", gap, 0)
+  pixel:Point(name, "TOPLEFT", frame, "TOPLEFT", icon + gap, 0)
   name:SetWidth(textWidth)
   price:ClearAllPoints()
-  pixel:Point(price, "BOTTOMLEFT", self.button, "BOTTOMRIGHT", gap, pixel:Snap(frame, style.VENDOR_PRICE_RAISE))
+  pixel:Point(price, "BOTTOMLEFT", frame, "BOTTOMLEFT", icon + gap, pixel:Snap(frame, style.VENDOR_PRICE_RAISE))
   price:SetWidth(textWidth)
   local inset = pixel:Snap(frame, COUNT_INSET)
   self.count:ClearAllPoints()
@@ -245,10 +248,10 @@ function buttonProto:sizeDurability()
   pixel:Width(self.durability, math.max(1, self.icon:GetWidth() * (self.durabilityFraction or 1)))
 end
 
--- Fit styles the card again when the grid it is drawn on is not the one it was styled for: the canvas calls
--- it as it places the card (docs/next-pixel-perfect.md).
+-- Fit styles the card again when the grid it is drawn on, or the Icon Scale, is not the one it was styled for:
+-- the canvas calls it as it places the card (docs/next-pixel-perfect.md).
 function buttonProto:Fit()
-  if self.unit == nil or math.abs(self.unit - pixel:Unit(self.frame)) > 1e-9 then
+  if self.unit == nil or math.abs(self.unit - pixel:Unit(self.frame)) > 1e-9 or self.iconSize ~= style.ICON then
     self:Style()
     -- Styling drew its icon, count and highlight again, over Masque's skin: Masque's integration skins it
     -- again on this, so its skin goes last, as after a theme.
@@ -455,10 +458,10 @@ end
 ---@param costs NextVendorCost[]
 local function addCosts(price, costs)
   if price and price > 0 then
-    GameTooltip:AddLine(L:G("Price: ") .. C_CurrencyInfo.GetCoinTextureString(price), 1, 1, 1)
+    GameTooltip:AddLine(L:G("Price: ") .. GetMoneyString(price, true), 1, 1, 1)
   end
   for _, cost in ipairs(costs) do
-    GameTooltip:AddLine("|T" .. cost.texture .. ":0|t " .. cost.value .. " " .. (cost.currencyName or cost.link or ""), 1, 1, 1)
+    GameTooltip:AddLine("|T" .. cost.texture .. ":0|t " .. BreakUpLargeNumbers(cost.value) .. " " .. (cost.currencyName or cost.link or ""), 1, 1, 1)
   end
 end
 
@@ -499,7 +502,7 @@ function buttonProto:OnEnter()
     end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine(format(L:G("Durability: %d / %d"), entry.durability, entry.maxDurability), 1, 1, 1)
-    GameTooltip:AddLine(L:G("Repair: ") .. C_CurrencyInfo.GetCoinTextureString(entry.cost), 1, 1, 1)
+    GameTooltip:AddLine(L:G("Repair: ") .. GetMoneyString(entry.cost, true), 1, 1, 1)
     GameTooltip:AddLine(L:G("Click to repair"), 0.8, 0.8, 0.8)
   end
   GameTooltip:Show()

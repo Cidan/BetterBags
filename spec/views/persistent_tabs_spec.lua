@@ -316,6 +316,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     bagCount = bagCount + 1
     bag:BuildWindow("PersistentTabsSpec" .. bagCount)
     bag.OnResize = function() end
+    bag.hiddenText = bag.frame:CreateFontString()
     bag.frame:Show()
     return bag
   end

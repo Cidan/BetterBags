@@ -374,7 +374,7 @@ Supported windows include bags, all bank tabs, the mailbox, the trade window, an
 ## Search
 BetterBags offers a comprehensive Search option that can be toggled with a keybinding (`BetterBags > Search Bags`).
 
-When searching for bare words (eg. "Signet"), the search will match any item that has the word in the entire text of the default indices, which includes `name`, `type`, `subtype`, `category`, `equipmentLocation`, `binding`, and `tooltip`. When searching in an index (eg. "name = Signet"), using the `=` operator will search in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator. The exception is `tooltip`: there, `=` and `!=` match the text anywhere in the tooltip, the same as `%=`.  
+When searching for bare words (eg. "Signet"), the search will match any item that has the word in the entire text of the default indices, which includes `name`, `type`, `subtype`, `category`, `equipmentLocation`, `binding`, and `tooltip`. A bare word that names a true or false field (eg. `collectable`, `toy`, `pet`) also matches the items where that field is true, so `not collectable` leaves out every pet you can still learn. Quote the word to search for its text alone. When searching in an index (eg. "name = Signet"), using the `=` operator will search in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator. The exception is `tooltip`: there, `=` and `!=` match the text anywhere in the tooltip, the same as `%=`.  
 If you would like to exclude items in gear sets from your searches, the easiest way to do so is add `and not category = "gear:"` to the end of your search. (eg. `slot = finger or slot = neck and not (category = 'gear:')` will highlight all rings and necklaces that are NOT part of a gear set)
 Search allows you to find items by the following indices (based on the item below):
 
@@ -437,7 +437,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `usable` (usable = false) Can your character use the item? (Weapon and armor skills, level, professions, reputation: the red text in its tooltip.)
 - `equippable` (equippable = true) Is the item gear your character can wear?
 - `transmoggable` (transmoggable = true) Does the item have an appearance (Retail)?
-- `collectable` (collectable = true) Is the item a battle pet you can still learn one more of (Retail)?
+- `collectable` (collectable = true) Is the item a battle pet you can still learn one more of (Retail)? Caged pets count.
 - `appearance` (appearance = unknown) Is the item's look in your collection? `known` when any item that gives the same appearance has been collected, `unknown` when none has (Retail).
 - `source` (source = unknown) Is this very item's appearance source in your collection? `known` or `unknown` (Retail).
 - `toy` (toy = true) Is the item a toy? (Its tooltip says "Toy".)

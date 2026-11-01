@@ -160,7 +160,6 @@ sonataNext:RegisterTheme({
     SettingsLabel = mono(13, "Text"),
     SettingsText = mono(12, "Muted"),
     SettingsLink = mono(12, "Gold"),
-    CurrencyCount = mono(12, "Text", true),
     CurrencyCapped = mono(12, "Capped", true),
     CurrencyNone = mono(12, "Muted"),
     CurrencyName = mono(12, "Text"),
@@ -321,11 +320,11 @@ sonataNext:RegisterTheme({
     Tracker = { Edge = { Color = "Lavender", Alpha = 0.6, Size = 1 } },
   },
 
-  -- Item buttons as terminal cells: the icon cropped in a dark cell, a thin phosphor edge, an item's quality on it.
+  -- Item buttons as terminal cells: the icon cropped in a dark cell, a thin phosphor edge, an item's quality on its
+  -- icon's border.
   ItemButton = {
     Icon = { Inset = 1, TexCoords = { 0.08, 0.92, 0.08, 0.92 } },
     Backdrop = { Color = { 0, 0.04, 0.02, 0.9 }, BorderColor = { 0.22, 0.72, 0.4, 0.55 }, EdgeSize = 1 },
-    QualityBorder = "Backdrop",
     Highlight = { Color = { 0.3, 1, 0.5, 0.2 } },
     Pushed = { Color = { 0.3, 1, 0.5, 0.3 } },
   },

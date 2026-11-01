@@ -303,7 +303,7 @@ function QueryParser:Parser(tokens)
       return { type = "compare", left = left, operator = op, right = right }
     end
     if left.type == "word" then
-      return { type = "term", value = left.value }
+      return { type = "term", value = left.value, quoted = left.quoted }
     end
     return left
   end

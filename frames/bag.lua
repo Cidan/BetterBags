@@ -673,6 +673,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		assert(view, "No view found for bag view: " .. database:GetBagView(self.kind))
 		return
 	end
+	self:ShowHiddenCount(slotInfo, tabID)
 
 	if self.currentView and self.currentView ~= view then
 		self.currentView:GetContent():Hide()
@@ -927,6 +928,22 @@ function bagFrame.bagProto:BuildParts()
 	bottomBar:SetHeight(20)
 	bottomBar:Show()
 	self.bottomBar = bottomBar
+
+	self.hiddenText = sonata:CreateText(bottomBar, "Count")
+	self.hiddenText:Hide()
+end
+
+-- ShowHiddenCount says in the footer how many items a hidden category keeps out of the tab shown (Hide In,
+-- category-lifecycle.md §10), so a player can tell where they went.
+---@param slotInfo SlotInfo
+---@param tabID number
+function bagFrame.bagProto:ShowHiddenCount(slotInfo, tabID)
+	local tab = slotInfo.tabs and slotInfo.tabs[tabID]
+	local hidden = tab and tab.hiddenItems or 0
+	self.hiddenText:SetShown(hidden > 0)
+	if hidden > 0 then
+		self.hiddenText:SetText(format(L:G("%d hidden"), hidden))
+	end
 end
 
 -- PlaceParts puts the bag's own parts where the theme's layout says, and reserves the room
@@ -963,6 +980,12 @@ function bagFrame.bagProto:PlaceParts(ctx, decoration)
 		self.bottomBar:Show()
 	else
 		self.bottomBar:Hide()
+	end
+	self.hiddenText:ClearAllPoints()
+	if self.moneyFrame then
+		self.hiddenText:SetPoint("BOTTOMRIGHT", self.moneyFrame.frame, "BOTTOMLEFT", -4, 3)
+	else
+		self.hiddenText:SetPoint("BOTTOMRIGHT", self.bottomBar, "BOTTOMRIGHT", -4, 3)
 	end
 
 	menuButton:Place(self.menuButton, layout.MenuButton, self.frame, overlay)

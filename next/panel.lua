@@ -5278,7 +5278,10 @@ function panelProto:Draw(ctx, slotInfo, callback)
   -- After the render, which styles what it lays out (the item fitter, vendor cards) and Masque skins
   -- (texture-sharpening.md).
   texels:Unsharpen(self.frame)
-  self.freeText:SetText(format(L:G("%d free slots"), self.content.freeTotal))
+  local free = format(L:G("%d free slots"), self.content.freeTotal)
+  local tab = slotInfo.tabs and slotInfo.tabs[self:GetCurrentTabID()]
+  local hidden = tab and tab.hiddenItems or 0
+  self.freeText:SetText(hidden > 0 and (free .. " · " .. format(L:G("%d hidden"), hidden)) or free)
   -- Data that was never read (the bank before its first read after it opens) has no tabs.
   self.emptyText:SetText(slotInfo.tabs == nil and L:G("Loading...") or L:G("Nothing here yet"))
   self.emptyText:SetShown(#self.content.order == 0)

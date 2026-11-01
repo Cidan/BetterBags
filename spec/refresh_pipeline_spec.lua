@@ -106,6 +106,7 @@ local function stubModules()
   override(categories, "GetSortedSearchCategories", function() return {} end)
   override(categories, "GetCustomCategory", function() return nil, nil end)
   override(categories, "SkipsRecentOf", function() return false end)
+  override(categories, "HiddenIn", function() return false end)
   override(categories, "DoesCategoryExist", function() return false end)
   override(categories, "IsCategoryShown", function() return true end)
   override(categories, "CreateCategory", function() end)
@@ -1999,6 +2000,23 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         items._petJournalLoaded = false
       end)
 
+      -- Reported (issue #1219): a battle pet at 1 of 3 was not excluded by NOT collectable.
+      it("counts a caged pet by its species, so a query finds it collectable or not", function()
+        mockContainer[0] = { { itemID = 82800, guid = "guid-cage", count = 1,
+          link = "|cff0070dd|Hbattlepet:635:1:3:152:13:12:0000000000000000|h[Adder]|h|r" },
+          { itemID = 202, guid = "guid-202", count = 1 } }
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        local slotInfo = refreshBackpack()
+        assert.are.same({ 1, 3 }, { slotInfo.itemsBySlotKey["0_1"].petOwned, slotInfo.itemsBySlotKey["0_1"].petLimit })
+        assert.is_true(search:Search("collectable")["0_1"])
+        assert.is_nil(search:Search("NOT collectable")["0_1"])
+        assert.is_true(search:Search("NOT collectable")["0_2"])
+        owned[635] = 3
+        refreshBackpack({ derive = true })
+        assert.is_nil(search:Search("collectable")["0_1"], "not once the account has as many as it may")
+        assert.is_true(search:Search("NOT collectable")["0_1"])
+      end)
+
       it("listens to the pet journal's events", function()
         for _, name in ipairs({ "PET_JOURNAL_LIST_UPDATE", "NEW_PET_ADDED", "PET_JOURNAL_PET_DELETED",
           "PET_JOURNAL_PET_RESTORED" }) do
@@ -3335,6 +3353,104 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
   -- Asked: "'Skip Recent Items', which makes items that get assigned that category skip the recent
   -- items list (it gets unmarked as a new item, goes right to the category) -- this is 100% independent
   -- of autosell". docs/next-batch-2.md §1.
+  -- Asked (issue #1222): a per-bag switch hides a category's items from that bag, and its footer says how many.
+  describe("hiding a category in a bag", function()
+    local hidden
+
+    before_each(function()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      override(database, "GetNewItemTime", function() return 300 end)
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        local name = ({ [101] = "Ore", [202] = "Mats" })[data.itemInfo.itemID]
+        if name then return name, 10 end
+        return nil, nil
+      end)
+      hidden = { Ore = { [const.BAG_KIND.BACKPACK] = true } }
+      override(categories, "HiddenIn", function(_, name, kind) return hidden[name] ~= nil and hidden[name][kind] == true end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, { itemID = 101, guid = "g101b", count = 1 },
+        { itemID = 202, guid = "g202", count = 1 } }
+      override(database, "GetStackingOptions", function() return { mergeStacks = false } end)
+    end)
+
+    local function shown(tab)
+      local names = {}
+      for _, item in ipairs(tab.items) do table.insert(names, item.itemInfo.itemID) end
+      return names
+    end
+
+    it("leaves its items out of the tab, with no section, and counts them", function()
+      local slotInfo = refreshBackpack({ wipe = true })
+      local tab = slotInfo.tabs[1]
+      assert.are.same({ 202 }, shown(tab))
+      assert.are.equal(1, tab.totalItems)
+      assert.are.equal(2, tab.hiddenItems)
+      for _, category in ipairs(tab.categories) do
+        assert.are_not.equal("Ore", category.name)
+      end
+    end)
+
+    it("keeps the items themselves: their data, and the search", function()
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.equal("Ore", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+      assert.is_true(addon:GetModule("Search"):Search("category = Ore")["0_1"])
+    end)
+
+    it("hides them only in the bag named", function()
+      hidden.Ore = { [const.BAG_KIND.BANK] = true }
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.same({ 101, 101, 202 }, shown(slotInfo.tabs[1]))
+      assert.are.equal(0, slotInfo.tabs[1].hiddenItems)
+    end)
+
+    it("leaves another bag's items alone", function()
+      mockContainer[6] = { { itemID = 101, guid = "g101c", count = 1 } }
+      addon.atBank = true
+      items:RefreshBank(context:New("bank"))
+      addon.atBank = false
+      local listed, hiddenThere = 0, 0
+      for _, tab in pairs(items.slotInfo[const.BAG_KIND.BANK].tabs) do
+        listed = listed + #tab.items
+        hiddenThere = hiddenThere + tab.hiddenItems
+      end
+      assert.is_true(listed > 0)
+      assert.are.equal(0, hiddenThere)
+    end)
+
+    it("shows them again as soon as it is turned off", function()
+      refreshBackpack({ wipe = true })
+      hidden.Ore = nil
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.are.same({ 101, 101, 202 }, shown(slotInfo.tabs[1]))
+      assert.are.equal(0, slotInfo.tabs[1].hiddenItems)
+    end)
+
+    it("still shows a new item in Recent Items, until it goes to its category", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, { itemID = 202, guid = "g202", count = 1 } }
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+      assert.are.equal(0, slotInfo.tabs[1].hiddenItems)
+    end)
+
+    it("shows everything in the Show Bags view, where sections are bags", function()
+      override(database, "GetBagView", function() return const.BAG_VIEW.SECTION_ALL_BAGS end)
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.equal(0, slotInfo.tabs[1].hiddenItems)
+      local ids = {}
+      for _, id in ipairs(shown(slotInfo.tabs[1])) do ids[id] = true end
+      assert.is_true(ids[101])
+    end)
+
+    it("does not count the gap a hidden item leaves", function()
+      override(database, "GetPreserveItemGaps", function() return true end)
+      override(items, "IsBagOpen", function() return true end)
+      refreshBackpack({ wipe = true })
+      mockContainer[0][1] = {}
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.equal(1, slotInfo.tabs[1].hiddenItems)
+    end)
+  end)
+
   describe("Skip Recent Items (a category setting)", function()
     local skips
 

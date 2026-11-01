@@ -219,8 +219,10 @@ section dragged out of a panel returns to the panel's strata (§7).
   is the theme's icon size (`Layout.Icon`) times the scale, in whole pixels (`style.ICON`,
   `NextStyle:SetIconScale`). The grid keeps the theme's width (`GRID_WIDTH` from `Layout.Icon`), so the
   panels keep theirs and a row fits as many buttons as its width allows (`canvas:Render` already packs
-  by width). The vendor's cards keep the theme's icon size (`style.CARD_ICON`): they are not item
-  buttons, and a smaller icon would not fit two lines of name beside it. SonataNext's `Init` gives the
+  by width). A vendor's card draws its icon at that size too (reported, issue #1221: the scale did
+  nothing there), the card as tall as its icon and never shorter than the theme's icon size, which two lines of
+  name and a price need (`style.CARD_HEIGHT`): a small icon sits in the card's middle, a large one squeezes the
+  name and price. A card styles itself again when the scale changes (`Fit`). SonataNext's `Init` gives the
   style the saved scale before the theme; a theme change keeps it. The slider sends
   `next/ScalesChanged`; the chain (`chain:ScalesChanged`, registered once with the first panel, in
   BetterBags Next's event scope) sets the style's scale, has every panel draw again (`ApplyScales`:

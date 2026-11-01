@@ -251,6 +251,60 @@ describe("SonataElements", function()
       assert.are.same({ r = 0, g = 0, b = 0, a = 1 }, b.sonataSkin.edges[1]._colorTexture)
     end)
 
+    -- Reported: on a fresh load quality borders were missing, a sort brought back some and a full redraw all. BetterBags
+    -- Next's layout styles a button again on a pixel grid it was not styled on (NextItemFit), right after its first draw,
+    -- and that repainted the edge in the style's border color with no draw to put the quality back.
+    describe("drawn on the backdrop's edge, through a restyle with no draw", function()
+      local BORDER = { r = 0, g = 0, b = 0, a = 1 }
+      local function styled()
+        local b = itemDecoration()
+        local spec = { Backdrop = { BorderColor = { 0, 0, 0, 1 } }, QualityBorder = "Backdrop",
+          QuestBorderColor = { 1, 1, 0, 1 } }
+        elements:StyleItemButton(b, spec)
+        return b, spec
+      end
+
+      it("keeps the quality's color", function()
+        local b, spec = styled()
+        elements:DrawItemQuality(b, { 0.1, 1, 0.1, 1 })
+        elements:StyleItemButton(b, spec)
+        assert.are.same({ r = 0.1, g = 1, b = 0.1, a = 1 }, b.sonataSkin.edges[1]._colorTexture)
+      end)
+
+      it("keeps the plain border of an item with no quality color", function()
+        local b, spec = styled()
+        elements:DrawItemQuality(b, { 0.1, 1, 0.1, 1 })
+        elements:DrawItemQuality(b, nil)
+        elements:StyleItemButton(b, spec)
+        assert.are.same(BORDER, b.sonataSkin.edges[1]._colorTexture)
+      end)
+
+      it("keeps a quest item's color", function()
+        local b, spec = styled()
+        elements:DrawItemQuality(b, { 0.1, 1, 0.1, 1 })
+        elements:DrawItemQuest(b, { isQuestItem = true })
+        elements:StyleItemButton(b, spec)
+        assert.are.same({ r = 1, g = 1, b = 0, a = 1 }, b.sonataSkin.edges[1]._colorTexture)
+      end)
+
+      it("keeps it on every edge", function()
+        local b, spec = styled()
+        elements:DrawItemQuality(b, { 0.1, 1, 0.1, 1 })
+        elements:StyleItemButton(b, spec)
+        for _, edge in ipairs(b.sonataSkin.edges) do
+          assert.are.same({ r = 0.1, g = 1, b = 0.1, a = 1 }, edge._colorTexture)
+        end
+      end)
+
+      it("does not paint a style's edge with a color another style's draw left", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { QualityBorder = { Texture = "x.png" } })
+        elements:DrawItemQuality(b, { 0.1, 1, 0.1, 1 })
+        elements:StyleItemButton(b, { Backdrop = { BorderColor = { 0, 0, 0, 1 } } })
+        assert.are.same(BORDER, b.sonataSkin.edges[1]._colorTexture)
+      end)
+    end)
+
     it("leaves quality to BetterBags' glow when the style does not take it", function()
       local b = itemDecoration()
       elements:StyleItemButton(b, {})

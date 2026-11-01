@@ -922,13 +922,13 @@ local function metricsOf(frame)
 end
 
 -- boxRows returns where the Settings and Search Rule tabs put their item box's name row and the box,
--- down from the tab's top: under three rows of settings, the same in both, so the box stays put as the
+-- down from the tab's top: under four rows of settings, the same in both, so the box stays put as the
 -- tabs change (asked).
 ---@param frame Frame
 ---@return number nameRow, number box
 local function boxRows(frame)
   local m = metricsOf(frame)
-  local row = m.pad + 3 * (m.row + m.gap) + m.gap
+  local row = m.pad + 4 * (m.row + m.gap) + m.gap
   return row, row + m.row + m.gap
 end
 
@@ -950,6 +950,9 @@ end
 ---@field labels table<string, FontString>
 ---@field toggles table<BagKind, NextToggleFrame>
 ---@field toggleLabels table<BagKind, FontString>
+---@field hideToggles table<BagKind, NextToggleFrame>
+---@field hideLabels table<BagKind, FontString>
+---@field owner Frame
 local settingsTabProto = {}
 addon:GetModule('Perf'):RegisterPrototype(settingsTabProto, 'NextCategorySettingsTab')
 
@@ -958,13 +961,14 @@ addon:GetModule('Perf'):RegisterPrototype(settingsTabProto, 'NextCategorySetting
 ---@param bags fun(): SettingBag[] The bags the settings show.
 ---@return NextCategorySettingsTab
 function editor:CreateSettingsTab(parent, owner, bags)
-  local _ = owner
-  local tab = makeTab(parent, settingsTabProto, { bags = bags, labels = {}, toggles = {}, toggleLabels = {} })
+  local tab = makeTab(parent, settingsTabProto, { bags = bags, owner = owner, labels = {}, toggles = {},
+    toggleLabels = {}, hideToggles = {}, hideLabels = {} })
   local K = style.Theme.Settings.Categories
   local frame = tab.frame
   tab.none = style:CreateText(frame, K.TextFont)
   tab.none:SetText(L:G("You have no categories yet. Make one with New Category, under the list."))
   label(tab, "bags", L:G("Used In"))
+  label(tab, "hide", L:G("Hide In"))
   label(tab, "groupBy", L:G("Group By"))
   tab.groupBy = nextDropdown:Create(frame, {
     items = GROUP_BY_NAMES, width = 140,
@@ -1004,6 +1008,9 @@ function settingsTabProto:Style()
     style:SetFont(l, key == "inBags" and K.SectionFont or K.LabelFont)
   end
   for _, l in pairs(self.toggleLabels) do
+    style:SetFont(l, K.TextFont)
+  end
+  for _, l in pairs(self.hideLabels) do
     style:SetFont(l, K.TextFont)
   end
   style:SetFont(self.none, K.TextFont)
@@ -1048,6 +1055,48 @@ function settingsTabProto:toggleFor(bag)
   return toggle
 end
 
+-- hideToggleFor returns a bag's Hide In switch, made the first time it is needed.
+---@private
+---@param bag SettingBag
+---@return NextToggleFrame
+function settingsTabProto:hideToggleFor(bag)
+  local toggle = self.hideToggles[bag.kind]
+  if toggle == nil then
+    toggle = nextToggle:Create(self.frame, {
+      onChange = function(ctx, on)
+        if on then
+          self:askHide(bag)
+        else
+          self:update(ctx, { hidden = { [bag.kind] = false } })
+        end
+      end,
+    })
+    self.hideToggles[bag.kind] = toggle
+    self.hideLabels[bag.kind] = style:CreateText(self.frame, style.Theme.Settings.Categories.TextFont)
+  end
+  self.hideLabels[bag.kind]:SetText(L:G(bag.name))
+  return toggle
+end
+
+-- askHide asks before hiding: hiding a category used to leave players wondering where their items went.
+-- Closing the question any other way answers Cancel (NextDialog).
+---@private
+---@param bag SettingBag
+function settingsTabProto:askHide(bag)
+  local name = editor.selected
+  nextDialog:Show(self.owner, {
+    title = format(L:G("Hide %s?"), name),
+    text = format(L:G("Its items will not show in your %s. They stay in your bags, and the bag's footer says how "
+      .. "many are hidden. Turn this off to see them again."), L:G(bag.name)),
+    buttons = {
+      { text = L:G("Cancel"), onClick = function() self.hideToggles[bag.kind]:SetChecked(false) end },
+      { text = L:G("Hide"), style = "Primary", onClick = function(ctx)
+        self:update(ctx, { hidden = { [bag.kind] = true } })
+      end },
+    },
+  })
+end
+
 -- update changes the chosen category (categories:UpdateCategory recalculates the bags).
 ---@private
 ---@param ctx Context
@@ -1068,14 +1117,20 @@ function settingsTabProto:Refresh(ctx)
   local shown = {}
   for _, bag in ipairs(self.bags()) do
     local toggle = self:toggleFor(bag)
-    toggle:SetChecked(filter ~= nil and filter.enabled ~= nil and filter.enabled[bag.kind] ~= false)
+    local used = filter ~= nil and filter.enabled ~= nil and filter.enabled[bag.kind] ~= false
+    toggle:SetChecked(used)
+    local hide = self:hideToggleFor(bag)
+    hide:SetChecked(filter ~= nil and filter.hidden ~= nil and filter.hidden[bag.kind] == true)
+    hide:SetEnabled(used)
     shown[bag.kind] = filter ~= nil
   end
   for kind, toggle in pairs(self.toggles) do
     toggle.frame:SetShown(shown[kind] == true)
     self.toggleLabels[kind]:SetShown(shown[kind] == true)
+    self.hideToggles[kind].frame:SetShown(shown[kind] == true)
+    self.hideLabels[kind]:SetShown(shown[kind] == true)
   end
-  for _, part in ipairs({ self.labels.bags, self.labels.color, self.swatch.frame, self.resetColor.frame, self.labels.inBags, self.inBags, self.grid.frame }) do
+  for _, part in ipairs({ self.labels.bags, self.labels.hide, self.labels.color, self.swatch.frame, self.resetColor.frame, self.labels.inBags, self.inBags, self.grid.frame }) do
     part:SetShown(filter ~= nil)
   end
   for _, part in ipairs({ self.labels.groupBy, self.groupBy.frame, self.groupByHint }) do
@@ -1133,8 +1188,9 @@ function settingsTabProto:showInBags(name)
   self.grid:SetEntries(list)
 end
 
--- layout puts the settings in three rows (the bags it is used in, group by, color; group by's row left
--- empty for a plugin's), then the current items in their box, where the Search Rule tab puts its own.
+-- layout puts the settings in four rows (the bags it is used in, the bags it is hidden in, group by, color;
+-- group by's row left empty for a plugin's), then the current items in their box, where the Search Rule tab
+-- puts its own.
 ---@private
 -- Each field by its top left in whole pixels (docs/next-pixel-perfect.md), centered on its row's height;
 -- what follows a text starts past its width rounded up.
@@ -1149,7 +1205,7 @@ function settingsTabProto:layout()
   local noneTop = pixel:Middle(frame, self.height, pixel:Ceil(frame, self.none:GetStringHeight()))
   pixel:Point(self.none, "TOPLEFT", frame, "TOPLEFT", 0, -noneTop)
   pixel:Point(self.none, "TOPRIGHT", frame, "TOPRIGHT", 0, -noneTop)
-  -- rowTop is how far down a row (1 to 3) of settings starts.
+  -- rowTop is how far down a row (1 to 4) of settings starts.
   local function rowTop(i)
     return pad + (i - 1) * (m.row + gap)
   end
@@ -1158,23 +1214,29 @@ function settingsTabProto:layout()
     region:ClearAllPoints()
     pixel:Row(region, "TOPLEFT", frame, x, m.row, nil, top)
   end
-  at(self.labels.bags, pad, rowTop(1))
-  local x = pad + m.labelWidth
-  for _, bag in ipairs(self.bags()) do
-    local toggle, text = self.toggles[bag.kind], self.toggleLabels[bag.kind]
-    if toggle and toggle.frame:IsShown() then
-      at(toggle.frame, x, rowTop(1))
-      local textX = x + toggle.frame:GetWidth() + pixel:Snap(frame, 6)
-      at(text, textX, rowTop(1))
-      x = textX + pixel:Ceil(frame, text:GetStringWidth()) + 2 * gap
+  -- switches puts a switch per bag along a row, each with its bag's name.
+  local function switches(row, toggles, labels)
+    local x = pad + m.labelWidth
+    for _, bag in ipairs(self.bags()) do
+      local toggle, text = toggles[bag.kind], labels[bag.kind]
+      if toggle and toggle.frame:IsShown() then
+        at(toggle.frame, x, rowTop(row))
+        local textX = x + toggle.frame:GetWidth() + pixel:Snap(frame, 6)
+        at(text, textX, rowTop(row))
+        x = textX + pixel:Ceil(frame, text:GetStringWidth()) + 2 * gap
+      end
     end
   end
-  at(self.labels.groupBy, pad, rowTop(2))
-  at(self.groupBy.frame, pad + m.labelWidth, rowTop(2))
-  at(self.groupByHint, pad + m.labelWidth + self.groupBy.frame:GetWidth() + gap, rowTop(2))
-  at(self.labels.color, pad, rowTop(3))
-  at(self.swatch.frame, pad + m.labelWidth, rowTop(3))
-  at(self.resetColor.frame, pad + m.labelWidth + self.swatch.frame:GetWidth() + gap, rowTop(3))
+  at(self.labels.bags, pad, rowTop(1))
+  switches(1, self.toggles, self.toggleLabels)
+  at(self.labels.hide, pad, rowTop(2))
+  switches(2, self.hideToggles, self.hideLabels)
+  at(self.labels.groupBy, pad, rowTop(3))
+  at(self.groupBy.frame, pad + m.labelWidth, rowTop(3))
+  at(self.groupByHint, pad + m.labelWidth + self.groupBy.frame:GetWidth() + gap, rowTop(3))
+  at(self.labels.color, pad, rowTop(4))
+  at(self.swatch.frame, pad + m.labelWidth, rowTop(4))
+  at(self.resetColor.frame, pad + m.labelWidth + self.swatch.frame:GetWidth() + gap, rowTop(4))
   local nameRow, box = boxRows(frame)
   at(self.labels.inBags, pad, nameRow)
   at(self.inBags, pad + pixel:Ceil(frame, self.labels.inBags:GetStringWidth()) + gap, nameRow)

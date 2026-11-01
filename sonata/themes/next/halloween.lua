@@ -143,7 +143,6 @@ sonataNext:RegisterTheme({
     Price = { Color = "Ink" },
     PriceUnaffordable = { Color = "Blood" },
     VendorName = { Color = "Ink", Shadow = false },
-    CurrencyCount = { Color = "Ink" },
     CurrencyCapped = { Color = "Blood" },
     CurrencyNone = { Color = "InkMuted" },
     CurrencyName = { Color = "Ink" },
@@ -443,11 +442,10 @@ sonataNext:RegisterTheme({
     CardHover = { 0.09, 0.055, 0.04, 0.12 },
   },
 
-  -- Item buttons as dark cells on the orange: the icon cropped, a thin ink edge carrying an item's quality.
+  -- Item buttons as dark cells on the orange: the icon cropped, a thin ink edge, an item's quality on its icon's border.
   ItemButton = {
     Icon = { Inset = 1, TexCoords = { 0.08, 0.92, 0.08, 0.92 } },
     Backdrop = { Color = { 0.12, 0.07, 0.09, 0.92 }, BorderColor = { 0.09, 0.055, 0.04, 1 }, EdgeSize = 1 },
-    QualityBorder = "Backdrop",
     Highlight = { Color = { 1, 0.8, 0.3, 0.18 } },
     Pushed = { Color = { 1, 0.8, 0.3, 0.28 } },
   },

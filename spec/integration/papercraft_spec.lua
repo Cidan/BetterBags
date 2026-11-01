@@ -80,19 +80,19 @@ describe("the Papercraft theme on the whole addon", function()
     end
     module("SonataNext"):ApplyTheme(ctx(), "Default", false)
     for _, button in ipairs(buttons(bag)) do
-      assert.are.equal(module("Sonata"):GetTextFont("Money"), button:GetNormalFontObject())
+      assert.are.equal(module("NextStyle"):Font("Footer"), button:GetNormalFontObject())
     end
     module("Sonata"):ApplyTheme(ctx(), "Default", false)
     for _, button in ipairs(buttons(bag)) do
-      assert.are.equal(module("Sonata"):GetTextFont("Money"), button:GetNormalFontObject(), "a theme moves it again")
+      assert.are.equal(module("NextStyle"):Font("Footer"), button:GetNormalFontObject(), "the bags' theme leaves it")
     end
     assert.same({}, handle.errors)
   end)
 
-  it("leaves the money in the frame's own font under a Next theme that names none", function()
+  it("writes the money in the footer's font under a Next theme that names no other", function()
     local addon = start("Default")
     for _, button in ipairs(buttons(addon.Bags.Backpack)) do
-      assert.are.equal(module("Sonata"):GetTextFont("Money"), button:GetNormalFontObject())
+      assert.are.equal(module("NextStyle"):Font("Footer"), button:GetNormalFontObject())
     end
   end)
 

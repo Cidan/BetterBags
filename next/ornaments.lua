@@ -113,6 +113,13 @@ end
 -- longer has hide and stop. Moving while the panel showed, they move again (Start).
 function setProto:Style()
   local running = self.running
+  -- Their old theme's specs name colors this theme's palette does not have: nothing is put back with them (Stop), each
+  -- piece is drawn anew below. Nor does anything its old motions did stay: how far its art had scrolled or slipped would
+  -- shift the next theme's art for good, the art's last row clamping across what is left.
+  for _, piece in ipairs(self.pieces) do
+    piece.spec = nil
+    piece.scrollU, piece.scrollV, piece.slip, piece.jx, piece.jy, piece.blink = nil, nil, nil, nil, nil, nil
+  end
   self:Stop()
   local list = style.Theme.Panel.Ornaments or {}
   self.mirrored = self:Mirrored()

@@ -706,6 +706,24 @@ describe("NextOrnaments", function()
       assert.is_nil(driver(panel):GetScript("OnUpdate"))
     end)
 
+    -- Reported on Make It So: a block of solid color over its bottom elbow, after Glitch's scanlines had used the same
+    -- piece. How far its art had scrolled stayed with the piece, into every theme after, until a reload.
+    it("starts the next theme's piece at rest, whatever the last theme did to it", function()
+      theme({ { Texture = "Roots", Point = "BODY", Tile = 50, Motion = { Scroll = { X = 10, Y = 10 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local piece = panel.ornaments.pieces[1]
+      piece.scrollU, piece.scrollV, piece.slip, piece.jx, piece.jy, piece.blink = 0.25, 0.33, 0.4, 3, 5, 0.5
+      theme({ { Texture = "Roots", Point = "TOPINNER", Width = 10, Height = 10 } })
+      panel.ornaments:Style()
+      assert.are.same({ 0, 0, 0, 1, 1, 0, 1, 1 }, { piece.texture:GetTexCoord() })
+      assert.is_nil(piece.scrollU)
+      assert.is_nil(piece.scrollV)
+      assert.is_nil(piece.slip)
+      assert.is_nil(piece.blink)
+      assert.are.same({ "TOPLEFT", panel.body, "TOPLEFT", 0, 0 }, { piece.texture:GetPoint(1) }, "no jump left on it")
+    end)
+
     it("scrolls a span along its length", function()
       theme({ { Texture = "Roots", Point = "INNER", Width = 20, Tile = 100, Motion = { Scroll = { Y = 25 } } } })
       local panel = panelOn("RIGHT")
@@ -857,6 +875,31 @@ describe("NextOrnaments", function()
       panel.ornaments:Stop()
       assert.is_true(near(0.8, t:GetAlpha()), "back at its own once still")
     end)
+
+    -- Reported: "the Next theme has no color named LcarsLilac", switching away from Make It So. Restyling stopped the
+    -- moving pieces with their old theme's spec, in the new theme's palette.
+    for name, motion in pairs({
+      Flicker = { Flicker = { Low = 0.5, Speed = 10 } },
+      Blink = { Blink = { Every = { 1, 2 }, Time = 0.1 } },
+      Glitch = { Glitch = { Every = 1, Hold = 1, Jump = 5, Blink = 0.25, Slip = 0.5 } },
+      Flash = { Flash = { Every = { 1, 2 }, Time = 0.1, First = 0.01 } },
+      Boil = { Boil = { FPS = 8, Jiggle = 1 } },
+    }) do
+      it("restyles for another theme a piece caught in its " .. name .. ", in a color only its old theme has", function()
+        ornaments.Random = function() return 0.25 end
+        UseNextTheme({ Palette = { OnlyHere = { 1, 0, 0, 1 } }, Textures = { Roots = ROOTS, Leaf = LEAF },
+          Panel = { Ornaments = { { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, Color = "OnlyHere",
+            Motion = motion } } } })
+        local panel = panelOn("RIGHT")
+        panel.ornaments:Style()
+        panel.ornaments:Start()
+        for _ = 1, 40 do step(panel, 0.05) end
+        UseNextTheme({ Textures = { Roots = ROOTS, Leaf = LEAF }, Panel = { Ornaments = {
+          { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, Alpha = 0.7 } } } })
+        panel.ornaments:Style()
+        assert.is_true(near(0.7, texture(panel, 1):GetAlpha()), "at the new theme's alpha")
+      end)
+    end
 
     -- The Make It So theme's comm badge chirping (next-themes.md §24): a glint over it, unseen, that flashes a moment
     -- after the bag has beamed in and now and then after.

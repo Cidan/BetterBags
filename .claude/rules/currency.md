@@ -217,7 +217,7 @@ used (`TabHeight`, `Metrics`, `PlaceTab`, `Count`, `ByName`).
 
 ## 7. Theme (`Currency`, every shipped Next theme)
 
-`Currency`: `Icon`, `Crop`, `CountGap`, `Gap`, `NameGap`, `MoneyGap`; fonts `Font` (`CurrencyCount`), `CappedFont`,
+`Currency`: `Icon`, `Crop`, `CountGap`, `Gap`, `NameGap`, `MoneyGap`; fonts `Font` (`Footer`: a count reads as the vendor's footer does, issue #1226), `CappedFont`,
 `NoneFont`, `NameFont`, `GainFont`, `LossFont`, `MoreFont`, `HintFont`; `Bar` (`Gap`, `Height`, `Track`, `Fill`,
 `Capped`); `Flash` (`Size` times the icon), `Bump`, `Rise`; `Drop`; `Slot` (`Icon`); `Tracker`
 (`Pad`, `RowGap`, `ListWidth`, `Fill`, `Edge`, `Frame`). Palette `Gain`, `Capped`. `Motion.Time`: `CurrencyCount`,

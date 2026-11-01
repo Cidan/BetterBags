@@ -1381,7 +1381,15 @@ function search:EvaluateAST(node, within)
   elseif node.type == "compare" then
       return compare(node)
   elseif node.type == "term" then
-      return self:DefaultSearch(node.value)
+      local found = self:DefaultSearch(node.value)
+      -- A word naming a true or false field also finds the items where it is true: "NOT collectable".
+      local field = not node.quoted and fieldKey(string.lower(node.value))
+      if field and BOOLEAN[field] then
+        for slotkey in pairs(self:isInIndex(field, "true")) do
+          found[slotkey] = true
+        end
+      end
+      return found
   else
       error("Unknown node type: " .. node.type)
   end

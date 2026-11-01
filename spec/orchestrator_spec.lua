@@ -85,6 +85,7 @@ LoadBetterBagsModule("data/binding.lua")
 
 local categories = StubBetterBagsModule("Categories")
 categories.GetSortedSearchCategories = function() return {} end
+categories.HiddenIn = function() return false end
 -- No item here is in a custom category (categories:GetCustomCategory returns nil for those).
 categories.GetCustomCategory = function() return nil end
 

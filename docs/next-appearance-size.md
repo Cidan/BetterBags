@@ -33,9 +33,9 @@ Then, on the plan:
   takes as many buttons as fit (`content.lua` already packs a row by its width): big buttons, fewer per
   row; small buttons, more. A small panel the player sized fits as many as its width allows, as it does
   today.
-- Every bag with item buttons: the backpack, the bank and the guild bank. The vendor's cards are not
-  item buttons (name and price beside the icon, two to a row) and keep the theme's size: a smaller icon
-  would not fit two lines of name.
+- Every bag with item buttons: the backpack, the bank and the guild bank, and the icon on a vendor's card
+  (name and price beside it, two to a row; changed for issue #1221, it first kept the theme's size). The
+  card stays at least the theme's icon size tall, so two lines of name still fit beside a small icon.
 - A change applies at once: the icon size is recomputed and every panel lays out again. It does not
   re-apply the theme (a theme application makes new font objects, which can never be freed: a slider
   drag would leave one set per step).

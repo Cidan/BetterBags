@@ -338,6 +338,13 @@ describe("BetterBags Next's currencies", function()
       assert.are.equal(pixel:Length(e.frame, style.Theme.Currency.Icon), e.height)
     end)
 
+    it("writes a count in the theme's footer font, as the vendor's footer is", function()
+      currency(1, { quantity = 5 })
+      currencies:Track(ctx(), "currency", 1)
+      local s = strip(backpack())
+      assert.are.equal(style:Font("Footer"), s.entries["currency:1"].count:GetFontObject())
+    end)
+
     it("writes a count at a cap in the capped role, and one you have none of faded", function()
       currency(1, { quantity = 1200, maxQuantity = 1200 })
       currency(2, { quantity = 0 })

@@ -140,6 +140,7 @@ globals = {
 	"BetterBagsPerfDB",
 	"ButtonInventorySlot",
 	"BreakUpLargeNumbers",
+	"GetMoneyString",
 	"C_ActionBar",
 	"C_AddOns",
 	"C_AddOnProfiler",

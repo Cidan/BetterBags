@@ -117,17 +117,52 @@ describe("NextVendorButton", function()
       assert.are_not.equal(b, vendorButton:Acquire())
     end)
 
-    -- Icon Scale is the bags' item buttons' (docs/next-appearance-size.md): a card keeps the theme's
-    -- size, its name's two lines beside the icon.
-    it("keeps the theme's icon size whatever the player's Icon Scale", function()
-      style:SetIconScale(150)
+    -- Reported (issue #1221): Icon Scale did nothing to the vendor's icons.
+    it("draws its icon at the theme's size times the player's Icon Scale, its name squeezed beside it", function()
+      local theme = style.Theme.Layout.Icon
       local b = vendorButton:Acquire()
       b:Style()
-      assert.are.same({ style.VENDOR_CARD_WIDTH, style.CARD_ICON }, { b.frame:GetSize() })
-      assert.are.same({ style.CARD_ICON, style.CARD_ICON }, { b.button:GetSize() })
-      assert.are.equal(style.Theme.Layout.Icon, style.CARD_ICON)
-      assert.are_not.equal(style.ICON, style.CARD_ICON)
+      local textWidth = b.name:GetWidth()
+      style:SetIconScale(150)
+      b:Fit()
+      assert.are.same({ style.VENDOR_CARD_WIDTH, style.ICON }, { b.frame:GetSize() })
+      assert.are.same({ style.ICON, style.ICON }, { b.button:GetSize() })
+      assert.are.same({ style.ICON, style.ICON }, { b.icon:GetSize() })
+      assert.are.equal(textWidth - (style.ICON - theme), b.name:GetWidth())
+      assert.are.equal(textWidth - (style.ICON - theme), b.price:GetWidth())
       style:SetIconScale(100)
+      b:Fit()
+      b:Release()
+    end)
+
+    it("stays tall enough for its name and price under a small icon, the icon in the card's middle", function()
+      local theme = style.Theme.Layout.Icon
+      local b = vendorButton:Acquire()
+      style:SetIconScale(50)
+      b:Fit()
+      assert.are.same({ style.VENDOR_CARD_WIDTH, theme }, { b.frame:GetSize() })
+      assert.are.same({ style.ICON, style.ICON }, { b.button:GetSize() })
+      assert.are.same({ "TOPLEFT", b.frame, "TOPLEFT", 0, -math.floor((theme - style.ICON) / 2) }, { b.button:GetPoint(1) })
+      local left = style.ICON + style.VENDOR_TEXT_GAP + TEXT
+      assert.are.same({ "TOPLEFT", b.frame, "TOPLEFT", left, TEXT }, { b.name:GetPoint(1) })
+      assert.are.same({ "BOTTOMLEFT", b.frame, "BOTTOMLEFT", left, style.VENDOR_PRICE_RAISE + TEXT }, { b.price:GetPoint(1) })
+      style:SetIconScale(100)
+      b:Fit()
+      assert.are.same({ "TOPLEFT", b.frame, "TOPLEFT", 0, 0 }, { b.button:GetPoint(1) })
+      b:Release()
+    end)
+
+    it("is skinned again when Icon Scale resizes it, and left alone when nothing changed", function()
+      local b = vendorButton:Acquire()
+      b:Fit()
+      calls.messages = {}
+      b:Fit()
+      assert.are.same({}, calls.messages)
+      style:SetIconScale(150)
+      b:Fit()
+      assert.are.same({ { name = "vendor/Updated", args = { b } } }, { calls.messages[1] })
+      style:SetIconScale(100)
+      b:Fit()
       b:Release()
     end)
 
@@ -147,14 +182,14 @@ describe("NextVendorButton", function()
         b:MasqueRegions())
       assert.are.equal("HIGHLIGHT", b.highlight:GetDrawLayer())
       local textWidth = style.VENDOR_CARD_WIDTH - style.ICON - 2 * style.VENDOR_TEXT_GAP
-      assert.are.same({ "TOPLEFT", b.button, "TOPRIGHT", style.VENDOR_TEXT_GAP + TEXT, TEXT }, { b.name:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", b.frame, "TOPLEFT", style.ICON + style.VENDOR_TEXT_GAP + TEXT, TEXT }, { b.name:GetPoint(1) })
       assert.are.equal(textWidth, b.name:GetWidth())
       assert.are.same({ "LEFT", "TOP" }, { b.name:GetJustifyH(), b.name:GetJustifyV() })
       assert.is_true(b.name:CanWordWrap())
       assert.are.equal(2, b.name:GetMaxLines())
       -- Raised a little off the card's bottom edge (asked: "2-3 pixels up from the border").
       assert.is_true(style.VENDOR_PRICE_RAISE >= 2 and style.VENDOR_PRICE_RAISE <= 3)
-      assert.are.same({ "BOTTOMLEFT", b.button, "BOTTOMRIGHT", style.VENDOR_TEXT_GAP + TEXT, style.VENDOR_PRICE_RAISE + TEXT },
+      assert.are.same({ "BOTTOMLEFT", b.frame, "BOTTOMLEFT", style.ICON + style.VENDOR_TEXT_GAP + TEXT, style.VENDOR_PRICE_RAISE + TEXT },
         { b.price:GetPoint(1) })
       assert.are.equal(textWidth, b.price:GetWidth())
       assert.are.equal("LEFT", b.price:GetJustifyH())
@@ -272,7 +307,8 @@ describe("NextVendorButton", function()
       assert.are.equal(coin(34, SILVER) .. " " .. coin(56, COPPER), vendorButton:PriceText(3456, {}))
       assert.are.equal(coin(7, COPPER), vendorButton:PriceText(7, {}))
       assert.are.equal(coin(2, GOLD) .. " " .. coin(5, COPPER), vendorButton:PriceText(20005, {}))
-      assert.are.equal(coin(123456, GOLD), vendorButton:PriceText(1234560000, {}))
+      assert.are.equal(coin("123,456", GOLD), vendorButton:PriceText(1234560000, {}))
+      assert.are.equal(coin("1,200", "77"), vendorButton:PriceText(0, { { texture = 77, value = 1200 } }))
       assert.are.equal(coin(30, 77), vendorButton:PriceText(0, { { texture = 77, value = 30 } }))
       assert.are.equal(coin(5, SILVER) .. " " .. coin(30, 77) .. " " .. coin(1, 78),
         vendorButton:PriceText(500, { { texture = 77, value = 30 }, { texture = 78, value = 1 } }))
@@ -377,7 +413,7 @@ describe("NextVendorButton", function()
         local width = math.floor((style.GRID_WIDTH - 2 * style.GAP) / 3)
         for _, b in ipairs({ live, pooled }) do
           assert.are.same({ width, 32 }, { b.frame:GetSize() })
-          assert.are.same({ "BOTTOMLEFT", b.button, "BOTTOMRIGHT", 5 + TEXT, 4 + TEXT }, { b.price:GetPoint(1) })
+          assert.are.same({ "BOTTOMLEFT", b.frame, "BOTTOMLEFT", 32 + 5 + TEXT, 4 + TEXT }, { b.price:GetPoint(1) })
           assert.are.equal(width - 32 - 10, b.name:GetWidth())
           assert.are.equal(style:Font("Tiny"), b.name:GetFontObject())
           assert.are.same({ 0.5, 0.5, 0.5, 0.2 }, { b.cardFill:GetVertexColor() })
@@ -462,6 +498,11 @@ describe("NextVendorButton", function()
       local text = {}
       for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
       assert.are.same({ " ", "Price: 15s", "|T77:0|t 2 Valor", "Right-click to buy", "Shift-click to buy a quantity" }, text)
+      b:SetBuy(item({ price = 1234560000, costs = { { texture = 77, value = 1200, currencyName = "Valor" } } }))
+      enter(b)
+      text = {}
+      for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
+      assert.are.same({ " ", "Price: 123,456g", "|T77:0|t 1,200 Valor", "Right-click to buy", "Shift-click to buy a quantity" }, text)
       assert.are.equal("BUY_CURSOR", _G._cursor)
       b.button:GetScript("OnLeave")(b.button)
       assert.is_nil(_G._cursor)
@@ -497,6 +538,11 @@ describe("NextVendorButton", function()
       local text = {}
       for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
       assert.are.same({ " ", "Durability: 25 / 100", "Repair: 30s", "Click to repair" }, text)
+      b:SetRepair({ slot = 5, texture = 6, durability = 25, maxDurability = 100, cost = 12340000 })
+      enter(b)
+      text = {}
+      for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
+      assert.are.same({ " ", "Durability: 25 / 100", "Repair: 1,234g", "Click to repair" }, text)
       b:SetRepair({ bag = 0, slot = 2, texture = 6, durability = 1, maxDurability = 2, cost = 5 })
       enter(b)
       assert.are.same({ bag = 0, slot = 2 }, GameTooltip._bagItem)

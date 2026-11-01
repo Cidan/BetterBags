@@ -3636,6 +3636,17 @@ _G.C_CurrencyInfo.GetCoinTextureString = function(amount)
   if copper > 0 or #parts == 0 then table.insert(parts, copper .. "c") end
   return table.concat(parts, " ")
 end
+-- GetMoneyString(money, separateThousands) (Blizzard_SharedXML/FormattingUtil.lua, every client): the
+-- amount in gold, silver and copper with their icons, the gold's thousands separated when asked; the
+-- mock writes "1,234g 2s 3c", leaving out zeros.
+_G.GetMoneyString = function(money, separateThousands)
+  local gold, silver, copper = math.floor(money / 10000), math.floor(money / 100) % 100, money % 100
+  local parts = {}
+  if gold > 0 then table.insert(parts, (separateThousands and _G.BreakUpLargeNumbers(gold) or gold) .. "g") end
+  if silver > 0 then table.insert(parts, silver .. "s") end
+  if copper > 0 or #parts == 0 then table.insert(parts, copper .. "c") end
+  return table.concat(parts, " ")
+end
 -- C_CurrencyInfo.GetCurrencyInfo(type) -> CurrencyInfo; specs set _G._currencies[id].
 _G._currencies = {}
 _G.C_CurrencyInfo.GetCurrencyInfo = function(id) return _G._currencies[id] end

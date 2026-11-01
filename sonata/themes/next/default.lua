@@ -168,7 +168,6 @@ sonataNext:RegisterTheme({
     -- The currencies at the bottom of the backpack and on the tracker dragged out of it (currency.md): a count, one at a
     -- cap, one you have none of; a name (the tracker's list); a gain rising off it and a loss sinking; "+N" (what does
     -- not fit).
-    CurrencyCount = { Size = 12, Color = "Text", Shadow = true },
     CurrencyCapped = { Size = 12, Color = "Capped", Shadow = true },
     CurrencyNone = { Size = 12, Color = "Muted" },
     CurrencyName = { Size = 12, Color = "Text" },
@@ -462,9 +461,9 @@ sonataNext:RegisterTheme({
     Line = { Color = "Lavender", Inner = 0.05, Outer = 0.35, Size = 1 },
     Font = "Footer",
     EmptyFont = "Empty",
-    -- Gold written as text (the guild bank's; the bags' money frame is Blizzard's). CoinFont, a role for the amounts in
-    -- that money frame, is unset here: they keep the frame's own font.
+    -- Gold written as text (the guild bank's), and the amounts in the bags' money frame.
     MoneyFont = "Footer",
+    CoinFont = "Footer",
   },
 
   -- Sparkles: Texture and Colors (palette names) for every emitter; how a sparkle fades in and out
@@ -594,7 +593,7 @@ sonataNext:RegisterTheme({
     Gap = 14,
     NameGap = 8,
     MoneyGap = 16,
-    Font = "CurrencyCount",
+    Font = "Footer",
     CappedFont = "CurrencyCapped",
     NoneFont = "CurrencyNone",
     NameFont = "CurrencyName",

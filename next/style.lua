@@ -37,10 +37,13 @@ function style:SetIconScale(percent)
 end
 
 -- sizeIcons sizes the item buttons: the theme's icon size (Layout.Icon) times the Icon Scale, in whole
--- pixels, as every other size is.
+-- pixels, as every other size is. A vendor's card is as tall as its icon, and never shorter than the theme's
+-- icon size, which two lines of name and a price beside the icon need.
 ---@private
 function style:sizeIcons()
-  self.ICON = math.max(1, math.floor(self.Theme.Layout.Icon * self.iconScale / 100 + 0.5))
+  local theme = self.Theme.Layout.Icon
+  self.ICON = math.max(1, math.floor(theme * self.iconScale / 100 + 0.5))
+  self.CARD_HEIGHT = math.max(self.ICON, theme)
 end
 
 -- palette returns a theme's palette as colors: each { r, g, b, a } as given, and each entry naming one of the
@@ -76,9 +79,8 @@ function style:Use(theme, keepFonts)
   local L, M = theme.Layout, theme.Motion
   self.Color = palette(theme)
 
-  -- Item buttons are the theme's icon size times the player's Icon Scale (sizeIcons); the grid and the
-  -- vendor's cards keep the theme's own (CARD_ICON), so a row fits as many buttons as its width allows.
-  self.CARD_ICON = L.Icon
+  -- Item buttons are the theme's icon size times the player's Icon Scale (sizeIcons); the grid keeps the
+  -- theme's own, so a row fits as many buttons as its width allows.
   self:sizeIcons()
   self.GAP = L.Gap
   self.PER_ROW = L.PerRow
