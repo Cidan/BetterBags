@@ -26,6 +26,8 @@ To prevent test side-effects and preserve local user configurations:
   DB:OnInitialize()
   ```
 
+- **Everything a spec reads is in the repository.** A saved profile or a capture a spec needs goes in `spec/fixtures/`, holding only what it needs (who the player is never goes in one, §5 below). **Failure mode (fixed):** three tests in `spec/bank_tab_category_routing_spec.lua` read `~/Downloads/BetterBags.lua`. In CI, without the file, they were `pending`, so they never ran there, and locally one failed on a clean tree once another profile replaced that file (2026-10-29). The original profile was gone, so `spec/fixtures/bank_categories_flat.lua` rebuilds what they read, from the tabs and assignments the spec's own first test describes: a profile saved before bank categories were scoped by bank type, which goes through `DB:Migrate`. A fixture is loaded with no `pending` fallback, so a missing one fails.
+
 ### 3. High-Fidelity End-to-End Simulation (Phases 2 - 4.5)
 To test the pipeline with maximum fidelity, we do not mock high-level pipeline functions like `items:Harvest`. Instead, we mock the World of Warcraft client's low-level container and item C-APIs using our serialized dump as the game state seed. This forces the real physical scanning, data-farming, stacking, and indexing systems to execute on top of our dataset.
 - **Rule:** Mock the underlying WoW client C-level APIs (`C_Container` and `C_Item`) using raw dump fields, leaving `items:Harvest` completely unmocked.
