@@ -64,6 +64,11 @@ reasoning about it can suggest a cause; it does not establish one.
   items that exist at their location). Added for a `GetItemGUID` error on entering a dungeon, which
   no capture could explain: none showed when a world transfer takes the items away and gives them
   back (refresh-scheduler.md §8).
+- **What the client did around a stall** (perf-profiler.md §3a, refresh-scheduler.md §6): `Refresh._CallSorter` measures each sort
+  call by name; a capture records events the client fired that BetterBags does not listen to (`[client] UNIT_MODEL_CHANGED` and
+  others), with the character pane showing, and names what each addon took in each tick of 33 ms or more. Added for a game-wide
+  hitch sorting with the character pane open: a capture showed 56 ms inside `SortBags` and 58 ms in a tick no addon took, and could
+  say neither what the client was doing nor whether the pane mattered.
 - **What the client answered about an item** (`debug/itemprobe.lua`, `ItemProbe`): the Dump tab of
   `/bbdb` stores, beside each dumped backpack item (`apiProbe`), every value each Blizzard API
   returned about it: `GetItemInfo` by item ID and by link (`n` is how many values, so "returned

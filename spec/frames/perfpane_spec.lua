@@ -103,6 +103,41 @@ local function makeSession(id, overrides)
   return s
 end
 
+describe("PerfPane slow ticks", function()
+  it("lists the slowest ticks of a capture, the pane and who took them", function()
+    local pane = setmetatable({}, { __index = addon:GetModule("PerfPane").proto })
+    local lines = {}
+    local function add(fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
+    pane:AddSlowTicks(add, { timeline = { slow = {
+      { frame = 3, ms = 40, detail = { pane = "no character pane", addons = {} } },
+      { frame = 9, ms = 70, detail = { pane = "GW2_UI's character pane", addons = { { name = "Pawn", ms = 2 } } } },
+    } } })
+    assert.equal(1, #lines)
+    assert.is_truthy(lines[1]:find("frame 9", 1, true))
+    assert.is_truthy(lines[1]:find("GW2_UI's character pane", 1, true))
+    assert.is_truthy(lines[1]:find("Pawn", 1, true))
+    assert.is_truthy(lines[1]:find("frame 3", 1, true))
+    assert.is_truthy(lines[1]:find("frame 9", 1, true) < lines[1]:find("frame 3", 1, true))
+    assert.is_truthy(lines[1]:find("no addon", 1, true))
+  end)
+
+  it("says what it can of a tick it could not describe", function()
+    local pane = setmetatable({}, { __index = addon:GetModule("PerfPane").proto })
+    local lines = {}
+    local function add(fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
+    pane:AddSlowTicks(add, { timeline = { slow = { { frame = 3, ms = 40, detail = { error = "x" } } } } })
+    assert.is_truthy(lines[1]:find("frame 3", 1, true))
+    assert.is_truthy(lines[1]:find("not described", 1, true))
+  end)
+
+  it("says nothing of a capture without any", function()
+    local pane = setmetatable({}, { __index = addon:GetModule("PerfPane").proto })
+    local lines = {}
+    pane:AddSlowTicks(function(fmt) lines[#lines + 1] = fmt end, { timeline = {} })
+    assert.are.same({}, lines)
+  end)
+end)
+
 describe("PerfPane", function()
   local pane
   local saved
@@ -684,6 +719,14 @@ describe("PerfPane", function()
         },
       }
     end
+
+    it("says whose the client's slowest ticks were", function()
+      local s = session()
+      s.timeline.slow = { { frame = 2, ms = 180, detail = { pane = "no character pane", addons = {} } } }
+      local text = pane:BuildSummary(s)
+      assert.is_truthy(text:find("frame 2", 1, true))
+      assert.is_truthy(text:find("no character pane; no addon", 1, true))
+    end)
 
     it("says what was simulated, where, and under which restrictions", function()
       local text = pane:BuildSummary(session())

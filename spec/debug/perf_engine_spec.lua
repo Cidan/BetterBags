@@ -559,6 +559,82 @@ describe("Perf engine", function()
       assert.are.same({}, perfFormat:DecodeTimeline(plain).series)
     end)
 
+    -- A frame the client took long over says whose it was: asked only of those, and at most so many.
+    describe("slow frames", function()
+      local app, asked
+
+      local function start(extra)
+        asked = 0
+        local opts = options({ frameSeries = { app = function() return table.remove(app, 1) end } })
+        opts.slowFrame = { series = "app", ms = 33, max = 2, describe = function()
+          asked = asked + 1
+          return { n = asked }
+        end }
+        for k, v in pairs(extra or {}) do opts.slowFrame[k] = v end
+        perf:Start(opts)
+      end
+
+      it("describes a frame at or over its reading, and only those", function()
+        app = { 10, 33, 12, 70 }
+        start()
+        for _ = 1, 4 do perf:_OnFrame() end
+        local session = perf:Stop()
+        assert.equal(2, asked)
+        assert.are.same({ { frame = 2, ms = 33, detail = { n = 1 } }, { frame = 4, ms = 70, detail = { n = 2 } } },
+          session.timeline.slow)
+      end)
+
+      it("keeps the slowest once it has kept its most, asking only about what it keeps", function()
+        app = { 50, 40, 45, 35, 60 }
+        start()
+        for _ = 1, 5 do perf:_OnFrame() end
+        assert.equal(4, asked, "35 is below both it has by then")
+        local kept = perf:Stop().timeline.slow
+        table.sort(kept, function(a, b) return a.frame < b.frame end)
+        assert.are.same({ 1, 5 }, { kept[1].frame, kept[2].frame })
+        assert.are.same({ 50, 60 }, { kept[1].ms, kept[2].ms })
+      end)
+
+      it("keeps the frame and goes on when describing it fails", function()
+        app = { 40, 10 }
+        start({ describe = function() error("describing failed") end })
+        perf:_OnFrame()
+        perf:_OnFrame()
+        local session = perf:Stop()
+        assert.is_truthy(session.timeline.slow[1].detail.error:find("describing failed", 1, true))
+        assert.equal(2, session.stats.frames)
+      end)
+
+      it("keeps nothing without a slow frame", function()
+        app = { 10 }
+        start()
+        perf:_OnFrame()
+        assert.is_nil(perf:Stop().timeline.slow)
+      end)
+
+      it("forgets the last capture's", function()
+        app = { 40 }
+        start()
+        perf:_OnFrame()
+        perf:Stop()
+        app = { 10 }
+        start()
+        perf:_OnFrame()
+        assert.is_nil(perf:Stop().timeline.slow)
+      end)
+
+      it("charges describing one to nothing", function()
+        app = { 40 }
+        start({ describe = function()
+          now = now + 25
+          return {}
+        end })
+        perf:_OnFrame()
+        local session = perf:Stop()
+        assert.is_true(session.stats.excludedMs >= 25)
+      end)
+    end)
+
     -- Blizzard's reading taken at the end of a frame covers the game tick that just
     -- finished, which overlaps that frame and the one before it. Work run before our
     -- OnUpdate in a tick (events, timers) shows up in the next frame's reading.

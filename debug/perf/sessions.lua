@@ -122,6 +122,35 @@ local function frameSeries()
   return next(series) and series or nil
 end
 
+-- SLOW_TICK_MS is how long a tick of the whole client has to take for a capture to say whose it was.
+local SLOW_TICK_MS = 33
+-- SLOW_TICKS_KEPT is how many of them a capture says that of.
+local SLOW_TICKS_KEPT = 64
+-- ADDON_SHARE_MS is the least an addon has to have taken in such a tick to be named.
+local ADDON_SHARE_MS = 0.5
+
+-- addonsTaking lists what each loaded addon took in the last tick (Blizzard's reading), most first. Asked of
+-- slow ticks only: it asks about every addon.
+---@return {name: string, ms: number}[]
+local function addonsTaking()
+  local out = {}
+  if not (C_AddOns and C_AddOns.GetNumAddOns) then
+    return out
+  end
+  local metric = Enum.AddOnProfilerMetric.LastTime
+  for i = 1, C_AddOns.GetNumAddOns() do
+    local name = C_AddOns.GetAddOnInfo(i)
+    if name and C_AddOns.IsAddOnLoaded(name) then
+      local ms = C_AddOnProfiler.GetAddOnMetric(name, metric) or 0
+      if ms >= ADDON_SHARE_MS then
+        table.insert(out, { name = name, ms = ms })
+      end
+    end
+  end
+  table.sort(out, function(a, b) return a.ms > b.ms end)
+  return out
+end
+
 -- topAddons lists the addons with the slowest single tick since the client started
 -- (PeakTime), slowest first.
 local function topAddons()
@@ -154,6 +183,17 @@ function perfSessions:RestrictionStates()
   end
   return out
 end
+
+-- CLIENT_EVENTS are events BetterBags does not listen to, that tell what the client did around a stall it
+-- cannot see into (a sort, with the character pane open: data-driven.md). A capture records each as a
+-- "[client]" call, with the character pane showing: inside the call that caused it when it fires
+-- synchronously. Registered only while a capture runs. CLIENT_UNIT_EVENTS are the player's alone.
+perfSessions.CLIENT_EVENTS = {
+  'ITEM_LOCKED', 'ITEM_UNLOCKED', 'ITEM_LOCK_CHANGED', 'COMBAT_RATING_UPDATE',
+}
+perfSessions.CLIENT_UNIT_EVENTS = {
+  'UNIT_MODEL_CHANGED', 'UNIT_INVENTORY_CHANGED', 'UNIT_PORTRAIT_UPDATE', 'UNIT_STATS',
+}
 
 -- COLLECTION_EVENTS are the pet journal's, the appearance collection's and the toy box's: recorded
 -- during a capture with the collections' counts at that moment, so a capture shows when each has
@@ -335,6 +375,12 @@ function perfSessions:Init()
   BetterBagsPerfDB = db
   self.db = db
   self.pendingMeta = nil
+  if self.clientEventFrame == nil then
+    self.clientEventFrame = CreateFrame('Frame')
+    self.clientEventFrame:SetScript('OnEvent', function(_, event, ...)
+      perf:Exit(perf:Enter('[client] ' .. event, self:CharacterPane(), ...))
+    end)
+  end
 
   if not self._eventsHooked then
     self._eventsHooked = true
@@ -433,6 +479,39 @@ local function parseNames(text)
   return names
 end
 
+-- CharacterPane says which character pane shows: GW2_UI's window stands in for Blizzard's when it is on.
+---@return string
+function perfSessions:CharacterPane()
+  if _G.GwCharacterWindow and _G.GwCharacterWindow:IsShown() then
+    return "GW2_UI's character pane"
+  end
+  if _G.CharacterFrame and _G.CharacterFrame:IsShown() then
+    return "Blizzard's character pane"
+  end
+  return 'no character pane'
+end
+
+-- WatchClient starts or stops recording the client's events (CLIENT_EVENTS).
+---@param on boolean
+function perfSessions:WatchClient(on)
+  local frame = self.clientEventFrame
+  frame:UnregisterAllEvents()
+  local valid = _G.C_EventUtils and _G.C_EventUtils.IsEventValid
+  if not on or valid == nil then
+    return
+  end
+  for _, name in ipairs(self.CLIENT_EVENTS) do
+    if valid(name) then
+      frame:RegisterEvent(name)
+    end
+  end
+  for _, name in ipairs(self.CLIENT_UNIT_EVENTS) do
+    if valid(name) then
+      frame:RegisterUnitEvent(name, 'player')
+    end
+  end
+end
+
 ---@return PerfOptions
 function perfSessions:BuildOptions()
   local s = self.db.settings
@@ -455,6 +534,14 @@ function perfSessions:BuildOptions()
     traceMaxCalls = s.traceMaxCalls,
     frameMetric = blizzardFrameMetric(),
     frameSeries = frameSeries(),
+    slowFrame = {
+      series = 'app',
+      ms = SLOW_TICK_MS,
+      max = SLOW_TICKS_KEPT,
+      describe = function()
+        return { pane = self:CharacterPane(), addons = addonsTaking() }
+      end,
+    },
     -- The engine asks once, on a frame, when the maximum duration passed or the call
     -- trace filled; the session records which.
     onAutoStop = function()
@@ -500,6 +587,7 @@ function perfSessions:StartCapture(reason, extra)
     return false
   end
   self.pendingMeta = meta
+  self:WatchClient(true)
   local token = {}
   self.captureToken = token
   if meta.diagnostics then
@@ -547,6 +635,7 @@ end
 
 ---@return table|nil session
 function perfSessions:StopCapture()
+  self:WatchClient(false)
   local samples = self.samples
   if samples then
     self:TakeSample('stop', true)
