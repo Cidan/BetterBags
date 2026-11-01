@@ -581,16 +581,10 @@ function ConsolePort:AddInterfaceCursorFrame(frame) end
 
 --- Pawn Globals
 
--- PawnIsContainerItemAnUpgrade returns whether the item in the given bag and slot is an upgrade.
----@param bag number
----@param slot number
-function PawnIsContainerItemAnUpgrade(bag, slot) end
-
 PawnVersion = _G['PawnVersion'] --[[@as number]]
-PawnGetItemData = _G['PawnGetItemData'] --[[@as fun(itemLink: string): table]]
-PawnIsItemAnUpgrade = _G['PawnIsItemAnUpgrade'] --[[@as fun(itemData: table): boolean]]
-PawnShouldItemLinkHaveUpgradeArrow = _G['PawnShouldItemLinkHaveUpgradeArrow'] --[[@as fun(itemLink: string): boolean]]
-PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = _G['PawnShouldItemLinkHaveUpgradeArrowUnbudgeted'] --[[@as fun(itemLink: string, level?: boolean): boolean]]
+PawnIsReady = _G['PawnIsReady'] --[[@as fun(): boolean?]]
+PawnShouldItemLinkHaveUpgradeArrow = _G['PawnShouldItemLinkHaveUpgradeArrow'] --[[@as fun(itemLink: string, checkLevel?: boolean): boolean?]]
+PawnRegisterThirdPartyBag = _G['PawnRegisterThirdPartyBag'] --[[@as fun(addonName: string, overrides?: {RefreshAll?: fun()})]]
 
 --- SimpleItemLevel API Globals
 ---@class SimpleItemLevel

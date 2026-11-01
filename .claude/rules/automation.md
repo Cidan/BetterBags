@@ -41,7 +41,8 @@ Vendor rule.
   `ignoreRecent` argument): a newly looted item is acted on by the category it will have, as a Vendor rule
   matches by the item. Search categories count; `GetCategory` already honors each category's bags.
 - **Left alone, with why** (`BlockedReason`): an item read before its data loaded (its category may be
-  wrong), an item in an equipment set, a purchase that can still be refunded (`itemInfo.refundable`;
+  wrong), an item whose upgrade state its provider cannot tell yet (`upgradeUnknown`: a rule on the `upgrade`
+  field could take it either way, caches.md §2a), an item in an equipment set, a purchase that can still be refunded (`itemInfo.refundable`;
   Blizzard asks before refunding, `ContainerFrame_GetExtendedPriceString`, and selling it directly would
   skip that), and, to sell, one merchants do not buy (`hasNoValue`).
 - **Decided from the bags' last read alone; the client is asked only when acting.** Everything above
@@ -80,6 +81,10 @@ Vendor rule.
   in the vendor (§4), the same box a dragged section's sale waits in; the classic design has no such box,
   so it is left to the player's usual Move Categories right click on its title (never a dialog of its
   own: one interface for one action, CLAUDE.md "UI Consistency" 5).
+- **Waiting for answers.** With an item in the backpack whose upgrade state its provider cannot tell yet (`upgradeUnknown`, caches.md §2a) a
+  sale waits, at most 10 s, looking 4 times a second, then lists what it sells again, and sells what it knows when the time is up (a sale is one
+  list: what it left out would wait for the next visit). Any such item, in a selling category or not: an answer is what puts an item in a rule
+  on the `upgrade` field. Only with Pawn, on a session's first seconds or a read of more new items than its budget covers.
 - **Through the Seller** (seller.md): one item at a time, the next one an interval later (the larger
   of the home and world latency, at least 0.2 s; Dejunk's pace, asked: "dejunk's works fine"), from the
   frame after the merchant opens (`C_Timer.After(0)`), each still there when its turn comes

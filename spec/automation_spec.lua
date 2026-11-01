@@ -46,6 +46,7 @@ describe("Automation", function()
     local data = {
       bagid = bag, slotid = slot, slotkey = key, kind = BACKPACK, isItemEmpty = false,
       harvestIncomplete = extra.cold,
+      upgradeUnknown = extra.upgradeUnknown,
       itemInfo = { itemID = id, itemGUID = "guid-" .. key, itemLink = "[Item " .. id .. "]", sellPrice = 5,
         traits = { sellPrice = extra.price or 100 }, equipmentSets = extra.sets, refundable = extra.refundable == true },
       containerInfo = { hasNoValue = extra.noValue == true, stackCount = extra.count or 1 },
@@ -226,6 +227,24 @@ describe("Automation", function()
       local list = automation:Entries(ctx())
       assert.are.equal(1, #list)
       assert.are.equal("0_1", list[1].data.slotkey)
+    end)
+
+    -- Found by an adversarial review: while Pawn's budget was spent an item read as "not an upgrade", so a rule on the upgrade field
+    -- took real upgrades, and Auto Sell sold them. A rule can take one by NOT upgrade = true too, so the field alone is not enough.
+    it("leaves alone an item whose upgrade state is not known yet, to sell and to destroy", function()
+      local a = put(0, 1, 11, "Junk", { upgradeUnknown = true })
+      local b = put(0, 2, 12, "Trash", { upgradeUnknown = true, noValue = true })
+      local c = put(0, 3, 13, "Junk")
+      local function keysOf(list)
+        local keys = {}
+        for i, e in ipairs(list) do keys[i] = e.data.slotkey end
+        return keys
+      end
+      assert.is_string(automation:BlockedReason(a, automation.SELL))
+      assert.is_string(automation:BlockedReason(b, automation.DESTROY))
+      assert.are.same({ "0_3" }, keysOf(automation:SellList(ctx())))
+      assert.are.same({}, keysOf(automation:DestroyQueue(ctx())))
+      assert.are.same({ "0_3" }, keysOf(automation:SellList(ctx(), { a, c })))
     end)
 
     it("says why it leaves an item alone", function()
@@ -494,6 +513,133 @@ describe("Automation", function()
 
   -- What BetterBags Next's vendor shows on its destroy card (automation.md §4), and what a click
   -- destroys: what destroy categories hold that cannot be sold.
+  -- Found by an adversarial review: a sale is one list, made as the merchant opens. What a provider had no answer for was left out of
+  -- it for the whole visit, whatever the rule, with nothing said. It waits for them instead (caches.md §2a).
+  describe("a sale with items whose upgrade state is not known yet", function()
+    local now
+
+    local function runAll()
+      for _ = 1, 100 do
+        if run() == 0 then break end
+      end
+    end
+
+    before_each(function()
+      now = 100
+      override(_G, "GetTime", function() return now end)
+    end)
+
+    it("sells at once with none", function()
+      put(0, 1, 11, "Junk")
+      assert.are.equal("selling", automation:OnMerchantShow(ctx()))
+      assert.are.equal(0, timers[1].delay)
+    end)
+
+    it("waits for them, then sells them with the rest", function()
+      local unknown = put(0, 1, 11, "Junk", { upgradeUnknown = true })
+      put(0, 2, 12, "Junk")
+      assert.are.equal("waiting", automation:OnMerchantShow(ctx()))
+      run()
+      run()
+      assert.are.same({}, used, "nothing yet")
+      unknown.upgradeUnknown = nil
+      runAll()
+      assert.are.same({ "0_1", "0_2" }, used)
+    end)
+
+    it("waits with nothing else to sell", function()
+      local unknown = put(0, 1, 11, "Junk", { upgradeUnknown = true })
+      assert.are.equal("waiting", automation:OnMerchantShow(ctx()))
+      unknown.upgradeUnknown = nil
+      runAll()
+      assert.are.same({ "0_1" }, used)
+    end)
+
+    it("reads the list again: what the answer took out of the category is not sold", function()
+      local unknown = put(0, 1, 11, "Junk", { upgradeUnknown = true })
+      put(0, 2, 12, "Junk")
+      automation:OnMerchantShow(ctx())
+      unknown.upgradeUnknown = nil
+      ofCategory["0_1"] = "Mats"
+      runAll()
+      assert.are.same({ "0_2" }, used)
+    end)
+
+    it("sells what it knows when the wait is over, and leaves the rest", function()
+      put(0, 1, 11, "Junk", { upgradeUnknown = true })
+      put(0, 2, 12, "Junk")
+      automation:OnMerchantShow(ctx())
+      run()
+      now = now + 60
+      runAll()
+      assert.are.same({ "0_2" }, used)
+      assert.is_not_nil(slots["0_1"])
+    end)
+
+    it("ends with nothing to sell when the wait is over", function()
+      put(0, 1, 11, "Junk", { upgradeUnknown = true })
+      automation:OnMerchantShow(ctx())
+      now = now + 60
+      runAll()
+      assert.are.same({}, used)
+      assert.are.equal(0, #timers)
+      assert.is_nil(automation.sale)
+    end)
+
+    -- A rule on the upgrade field does not hold it until it has an answer: Pawn's answer is what puts it in the category.
+    it("waits for an item in no category that sells yet, and sells it when the answer puts it in one", function()
+      local unknown = put(0, 1, 11, "Mats", { upgradeUnknown = true })
+      assert.are.equal("waiting", automation:OnMerchantShow(ctx()))
+      unknown.upgradeUnknown = nil
+      ofCategory["0_1"] = "Junk"
+      for _ = 1, 100 do
+        if run() == 0 then break end
+      end
+      assert.are.same({ "0_1" }, used)
+    end)
+
+    it("sells nothing of a category that confirms: it waits in the vendor's dock for the player", function()
+      local unknown = put(0, 1, 11, "Junk", { upgradeUnknown = true })
+      confirms.Junk = true
+      automation:OnMerchantShow(ctx())
+      unknown.upgradeUnknown = nil
+      for _ = 1, 100 do
+        if run() == 0 then break end
+      end
+      assert.are.same({}, used)
+      assert.is_nil(automation.sale)
+    end)
+
+    it("does not wait for an item outside the backpack's bags", function()
+      put(6, 1, 11, "Junk", { upgradeUnknown = true })
+      assert.are.equal("nothing", automation:OnMerchantShow(ctx()))
+    end)
+
+    it("does not wait for an item no merchant buys", function()
+      put(0, 1, 11, "Junk", { upgradeUnknown = true, noValue = true })
+      assert.are.equal("nothing", automation:OnMerchantShow(ctx()))
+    end)
+
+    it("stops looking when the merchant closes, with the answers still to come", function()
+      put(0, 1, 11, "Junk", { upgradeUnknown = true })
+      automation:OnMerchantShow(ctx())
+      automation:OnMerchantClosed(ctx())
+      runAll()
+      assert.are.same({}, used)
+      assert.are.equal(0, #timers)
+      assert.is_nil(automation.sale)
+    end)
+
+    it("is replaced when the merchant opens again, selling once", function()
+      local unknown = put(0, 1, 11, "Junk", { upgradeUnknown = true })
+      automation:OnMerchantShow(ctx())
+      automation:OnMerchantShow(ctx())
+      unknown.upgradeUnknown = nil
+      runAll()
+      assert.are.same({ "0_1" }, used)
+    end)
+  end)
+
   describe("the destroy queue", function()
     local function keysOf(list)
       local keys = {}
