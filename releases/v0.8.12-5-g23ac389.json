@@ -1,0 +1,17 @@
+{
+  "id": 1793523386,
+  "version": "v0.8.12-5-g23ac389",
+  "channel": "alpha",
+  "date": "2026-11-01",
+  "from": "6c9b9dad9038fbccb3eba8034da0d7fbe78f3c2e",
+  "to": "23ac389b63f27605b0aeae0b0653d714d7c5047c",
+  "headline": "Item movement animations have been reworked to only trigger when an item visibly changes position.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Item movement animations",
+      "details": "Icons now only fly across the screen when an item actually changes its visible location, preventing items from flying around needlessly when sorting your bags. Switching tabs or views no longer causes items to animate, and icon positioning with custom bag scaling and scrolling is now properly aligned.",
+      "clients": []
+    }
+  ]
+}
