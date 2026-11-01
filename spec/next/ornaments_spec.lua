@@ -858,6 +858,31 @@ describe("NextOrnaments", function()
       assert.is_true(near(0.8, t:GetAlpha()), "back at its own once still")
     end)
 
+    -- Reported: "the Next theme has no color named LcarsLilac", switching away from Make It So. Restyling stopped the
+    -- moving pieces with their old theme's spec, in the new theme's palette.
+    for name, motion in pairs({
+      Flicker = { Flicker = { Low = 0.5, Speed = 10 } },
+      Blink = { Blink = { Every = { 1, 2 }, Time = 0.1 } },
+      Glitch = { Glitch = { Every = 1, Hold = 1, Jump = 5, Blink = 0.25, Slip = 0.5 } },
+      Flash = { Flash = { Every = { 1, 2 }, Time = 0.1, First = 0.01 } },
+      Boil = { Boil = { FPS = 8, Jiggle = 1 } },
+    }) do
+      it("restyles for another theme a piece caught in its " .. name .. ", in a color only its old theme has", function()
+        ornaments.Random = function() return 0.25 end
+        UseNextTheme({ Palette = { OnlyHere = { 1, 0, 0, 1 } }, Textures = { Roots = ROOTS, Leaf = LEAF },
+          Panel = { Ornaments = { { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, Color = "OnlyHere",
+            Motion = motion } } } })
+        local panel = panelOn("RIGHT")
+        panel.ornaments:Style()
+        panel.ornaments:Start()
+        for _ = 1, 40 do step(panel, 0.05) end
+        UseNextTheme({ Textures = { Roots = ROOTS, Leaf = LEAF }, Panel = { Ornaments = {
+          { Texture = "Leaf", Point = "TOPINNER", Width = 16, Height = 16, Alpha = 0.7 } } } })
+        panel.ornaments:Style()
+        assert.is_true(near(0.7, texture(panel, 1):GetAlpha()), "at the new theme's alpha")
+      end)
+    end
+
     -- The Make It So theme's comm badge chirping (next-themes.md §24): a glint over it, unseen, that flashes a moment
     -- after the bag has beamed in and now and then after.
     it("flashes now and then: unseen at rest, up to its alpha and out again over its Time, first after First", function()

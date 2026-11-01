@@ -113,6 +113,11 @@ end
 -- longer has hide and stop. Moving while the panel showed, they move again (Start).
 function setProto:Style()
   local running = self.running
+  -- Their old theme's specs name colors this theme's palette does not have: nothing is put back with them (Stop), each
+  -- piece is drawn anew below.
+  for _, piece in ipairs(self.pieces) do
+    piece.spec = nil
+  end
   self:Stop()
   local list = style.Theme.Panel.Ornaments or {}
   self.mirrored = self:Mirrored()

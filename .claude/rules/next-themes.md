@@ -660,6 +660,13 @@ is a column at a screen edge, feathered on its inner side), so ornaments are art
   in the body's padding and outside it (over the feather), never over items.
 - **Restyled live** with the body (`styleBody`): pieces reused across themes, the ones a theme no longer has
   hidden and stopped; laid out again with the geometry (`ApplyGeometry`).
+- **A piece's old spec goes before anything stops it** (`setProto:Style`). A theme's palette names exist only in that
+  theme, and stopping a Flicker, Blink, Glitch or Flash puts the piece back at rest by reading its color. **Failure mode
+  (fixed, reported in game):** switching away from Make It So with its panel shown raised "the Next theme has no color
+  named LcarsLilac", from its flickering top bar, with the new theme's palette already in place. Nothing caught it because
+  no spec let a piece's motion run before the switch. Coverage: `spec/next/ornaments_spec.lua` ("restyles for another
+  theme a piece caught in its ..."), `spec/integration/theme_switch_spec.lua` (every shipped theme with its effects running,
+  on the whole addon).
 - **Checked** (`SonataNext:Check`): a `Point` that is no place, an `Anchor` that is no corner, a span or a piece
   without its size, `Sizes` that is no size, a `Motion` key that is no motion, an `Origin` that is no point; the
   art's texture and color through the usual walk.
