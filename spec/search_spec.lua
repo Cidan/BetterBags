@@ -511,6 +511,54 @@ describe("Search", function()
       assert.are.same({}, search:Search("petcount = 0"), "no count before the journal loaded")
     end)
 
+    -- Reported (issue #1219): "NOT collectable" kept a pet at 1 of 3. A bare word was only a text search, so
+    -- "collectable" alone matched nothing and its NOT matched everything.
+    describe("a bare word naming a true or false field", function()
+      local snake, full, ore, carrier
+
+      before_each(function()
+        snake = MockSearchItem({ slotkey = "snake", name = "Adder", traits = { isPet = true, petSpeciesID = 635, stats = {} } })
+        snake.petOwned, snake.petLimit = 1, 3
+        full = MockSearchItem({ slotkey = "full", name = "Sprite", traits = { isPet = true, petSpeciesID = 243, stats = {} } })
+        full.petOwned, full.petLimit = 1, 1
+        ore = MockSearchItem({ slotkey = "ore", name = "Copper Ore", traits = { isPet = false, stats = {} } })
+        carrier = MockSearchItem({ slotkey = "carrier", name = "Pet Carrier", traits = { isPet = false, stats = {} } })
+        for _, item in ipairs({ snake, full, ore, carrier }) do search:Add(item) end
+      end)
+
+      it("matches the items where it is true", function()
+        assert.are.same(keys("snake"), search:Search("collectable"))
+      end)
+
+      it("leaves them out under a NOT", function()
+        local found = search:Search("NOT collectable")
+        assert.is_nil(found.snake)
+        assert.is_true(found.full)
+        assert.is_true(found.ore)
+        assert.is_true(found.carrier)
+      end)
+
+      it("still matches its word in the text too", function()
+        assert.are.same(keys("snake", "full", "carrier"), search:Search("pet"))
+      end)
+
+      it("reads it whatever its case", function()
+        assert.are.same(keys("snake"), search:Search("Collectable"))
+      end)
+
+      it("works inside a larger query", function()
+        assert.are.same(keys("full"), search:Search("pet AND NOT collectable AND name %= sprite"))
+      end)
+
+      it("leaves a quoted word as text", function()
+        assert.are.same(keys("carrier"), search:Search('"pet"'))
+      end)
+
+      it("leaves a word naming another kind of field as text", function()
+        assert.are.same({}, search:Search("petcount"))
+      end)
+    end)
+
     it("finds items whose appearance is collected, through any source or this one", function()
       local cloak = MockSearchItem({ slotkey = "c", traits = { transmoggable = true, stats = {} } })
       cloak.appearanceKnown, cloak.sourceKnown = true, false

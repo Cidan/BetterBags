@@ -1999,6 +1999,23 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         items._petJournalLoaded = false
       end)
 
+      -- Reported (issue #1219): a battle pet at 1 of 3 was not excluded by NOT collectable.
+      it("counts a caged pet by its species, so a query finds it collectable or not", function()
+        mockContainer[0] = { { itemID = 82800, guid = "guid-cage", count = 1,
+          link = "|cff0070dd|Hbattlepet:635:1:3:152:13:12:0000000000000000|h[Adder]|h|r" },
+          { itemID = 202, guid = "guid-202", count = 1 } }
+        registered.PET_JOURNAL_LIST_UPDATE(context:New("evt"), "PET_JOURNAL_LIST_UPDATE")
+        local slotInfo = refreshBackpack()
+        assert.are.same({ 1, 3 }, { slotInfo.itemsBySlotKey["0_1"].petOwned, slotInfo.itemsBySlotKey["0_1"].petLimit })
+        assert.is_true(search:Search("collectable")["0_1"])
+        assert.is_nil(search:Search("NOT collectable")["0_1"])
+        assert.is_true(search:Search("NOT collectable")["0_2"])
+        owned[635] = 3
+        refreshBackpack({ derive = true })
+        assert.is_nil(search:Search("collectable")["0_1"], "not once the account has as many as it may")
+        assert.is_true(search:Search("NOT collectable")["0_1"])
+      end)
+
       it("listens to the pet journal's events", function()
         for _, name in ipairs({ "PET_JOURNAL_LIST_UPDATE", "NEW_PET_ADDED", "PET_JOURNAL_PET_DELETED",
           "PET_JOURNAL_PET_RESTORED" }) do

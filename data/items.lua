@@ -3330,8 +3330,14 @@ function items:ReadItemTraits(itemID, itemLink, minLevel, stackSize, sellPrice)
       traits.appearanceID, traits.sourceID = appearanceID, sourceID
     end
   end
-  -- Takes an item ID only: a link raises an error (warcraft.wiki.gg).
-  if C_PetJournal and C_PetJournal.GetPetInfoByItemID then
+  -- Every caged pet's item is the same Pet Cage: its species is the first value of its link
+  -- (BattlePetToolTip_UnpackBattlePetLink). GetPetInfoByItemID takes an item ID only: a link raises an error
+  -- (warcraft.wiki.gg).
+  local caged = itemLink and string.match(itemLink, "battlepet:(%d+)")
+  if caged then
+    traits.isPet = true
+    traits.petSpeciesID = tonumber(caged)
+  elseif C_PetJournal and C_PetJournal.GetPetInfoByItemID then
     local name, _, _, _, _, _, _, _, _, _, _, _, speciesID = C_PetJournal.GetPetInfoByItemID(itemID)
     traits.isPet = name ~= nil
     traits.petSpeciesID = speciesID

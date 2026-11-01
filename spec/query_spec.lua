@@ -664,6 +664,7 @@ describe("QueryParser", function()
       assert.same({
         type = "term",
         value = "Thunderfury, Blessed Blade of the Windseeker",
+        quoted = true,
       }, ast)
     end)
 
