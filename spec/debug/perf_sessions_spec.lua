@@ -413,14 +413,14 @@ describe("PerfSessions", function()
         if perf:IsActive() then perf:Stop() end
       end)
 
-      local function installProfiler(appMs)
+      local function installProfiler(appMs, allMs)
         _G.Enum = _G.Enum or {}
         _G.Enum.AddOnProfilerMetric = _G.Enum.AddOnProfilerMetric or { LastTime = 1, PeakTime = 2 }
         _G.C_AddOnProfiler = {
           IsEnabled = function() return true end,
           GetAddOnMetric = function(name) return metrics[name] or 0 end,
-          GetOverallMetric = function() return 41 end,
-          GetApplicationMetric = function() return appMs end,
+          GetOverallMetric = function() return type(allMs) == "function" and allMs() or allMs or 41 end,
+          GetApplicationMetric = function() return type(appMs) == "function" and appMs() or appMs end,
         }
         local names = { "BetterBags", "GW2_UI", "Pawn", "NotLoaded" }
         _G.C_AddOns = setmetatable({
@@ -494,11 +494,124 @@ describe("PerfSessions", function()
         assert.equal(1, slow.frame)
         assert.equal(70, slow.ms)
         assert.equal("Blizzard's character pane", slow.detail.pane)
-        assert.are.same({ { name = "GW2_UI", ms = 40 }, { name = "BetterBags", ms = 1 } }, slow.detail.addons)
+        assert.are.same({ { frame = 1, allMs = 41, addons = { { name = "GW2_UI", ms = 40 }, { name = "BetterBags", ms = 1 } } } },
+          slow.detail.readings)
+      end)
+
+      -- A capture of a sort: the frame the client read 80 ms for came a frame after the addons' readings for it.
+      it("names what each addon took a frame before the client's reading, and says which frame", function()
+        local frame = 0
+        installProfiler(function() return frame == 2 and 80 or 13 end, function() return frame == 1 and 69 or 1.3 end)
+        perfSessions:StartCapture()
+        frame = 1
+        metrics = { BetterBags = 65, GW2_UI = 3 }
+        perf:_OnFrame()
+        frame = 2
+        metrics = { BetterBags = 1.2 }
+        perf:_OnFrame()
+        local slow = perfSessions:StopCapture().timeline.slow[1]
+        assert.equal(2, slow.frame)
+        assert.are.same({ { frame = 1, allMs = 69, addons = { { name = "BetterBags", ms = 65 }, { name = "GW2_UI", ms = 3 } } } },
+          slow.detail.readings)
+      end)
+
+      it("names both frames when both were busy, so neither's work is dropped", function()
+        local frame = 0
+        installProfiler(function() return frame == 2 and 100 or 13 end, function() return frame == 1 and 40 or 20 end)
+        perfSessions:StartCapture()
+        frame = 1
+        metrics = { Pawn = 38 }
+        perf:_OnFrame()
+        frame = 2
+        metrics = { GW2_UI = 19 }
+        perf:_OnFrame()
+        assert.are.same({
+          { frame = 1, allMs = 40, addons = { { name = "Pawn", ms = 38 } } },
+          { frame = 2, allMs = 20, addons = { { name = "GW2_UI", ms = 19 } } },
+        }, perfSessions:StopCapture().timeline.slow[1].detail.readings)
+      end)
+
+      it("keeps a frame that names somebody beside a busier one that names nobody", function()
+        local frame = 0
+        installProfiler(function() return frame == 2 and 80 or 13 end, function() return frame == 1 and 6 or 7 end)
+        perfSessions:StartCapture()
+        frame = 1
+        metrics = { Pawn = 5.5 }
+        perf:_OnFrame()
+        frame = 2
+        metrics = { GW2_UI = 0.4 }
+        perf:_OnFrame()
+        assert.are.same({
+          { frame = 1, allMs = 6, addons = { { name = "Pawn", ms = 5.5 } } },
+          { frame = 2, allMs = 7, addons = {} },
+        }, perfSessions:StopCapture().timeline.slow[1].detail.readings)
+      end)
+
+      it("names an addon of 0.5 ms or more, and not one under", function()
+        installProfiler(80, 41)
+        metrics = { Pawn = 0.5, GW2_UI = 0.49 }
+        perfSessions:StartCapture()
+        perf:_OnFrame()
+        assert.are.same({ { frame = 1, allMs = 41, addons = { { name = "Pawn", ms = 0.5 } } } },
+          perfSessions:StopCapture().timeline.slow[1].detail.readings)
+      end)
+
+      it("reads no frame when the addons took little in that tick", function()
+        installProfiler(80, 2)
+        perfSessions:StartCapture()
+        perf:_OnFrame()
+        local slow = perfSessions:StopCapture().timeline.slow[1]
+        assert.are.same({}, slow.detail.readings)
+        assert.is_nil(slow.detail.error)
+      end)
+
+      it("reads a frame all addons took 5 ms or more in, and not one under", function()
+        installProfiler(80, 5)
+        perfSessions:StartCapture()
+        perf:_OnFrame()
+        assert.equal(1, #perfSessions:StopCapture().timeline.slow[1].detail.readings)
+        installProfiler(80, 4.9)
+        perfSessions:StartCapture()
+        perf:_OnFrame()
+        assert.equal(0, #perfSessions:StopCapture().timeline.slow[1].detail.readings)
+      end)
+
+      it("keeps a tick of 33 ms or more, and not one under", function()
+        installProfiler(32.9, 41)
+        perfSessions:StartCapture()
+        perf:_OnFrame()
+        assert.is_nil(perfSessions:StopCapture().timeline.slow)
+        installProfiler(33, 41)
+        perfSessions:StartCapture()
+        perf:_OnFrame()
+        assert.equal(1, #perfSessions:StopCapture().timeline.slow)
+      end)
+
+      it("keeps the slowest 64", function()
+        local ms = 40
+        installProfiler(function() ms = ms + 1 return ms end, 1)
+        perfSessions:StartCapture()
+        for _ = 1, 65 do perf:_OnFrame() end
+        assert.equal(64, #perfSessions:StopCapture().timeline.slow)
+      end)
+
+      it("says so when it could not read what the addons took in a frame", function()
+        installProfiler(80, 41)
+        _G.C_AddOnProfiler.GetAddOnMetric = function(name)
+          if name == "GW2_UI" then error("no reading") end
+          return 1
+        end
+        perfSessions:StartCapture()
+        perf:_OnFrame()
+        local reading = perfSessions:StopCapture().timeline.slow[1].detail.readings[1]
+        assert.equal(1, reading.frame)
+        assert.equal(41, reading.allMs)
+        assert.is_truthy(reading.error:find("no reading", 1, true))
+        assert.is_nil(reading.addons)
       end)
 
       it("asks about no addon in an ordinary tick", function()
-        installProfiler(12)
+        installProfiler(12, 2)
         spy.on(_G.C_AddOnProfiler, "GetAddOnMetric")
         perfSessions:StartCapture()
         local before = #_G.C_AddOnProfiler.GetAddOnMetric.calls
@@ -512,7 +625,7 @@ describe("PerfSessions", function()
         _G.C_AddOns = setmetatable({ GetNumAddOns = false }, { __index = savedAddOns })
         perfSessions:StartCapture()
         perf:_OnFrame()
-        assert.are.same({}, perfSessions:StopCapture().timeline.slow[1].detail.addons)
+        assert.are.same({ { frame = 1, allMs = 41, addons = {} } }, perfSessions:StopCapture().timeline.slow[1].detail.readings)
       end)
     end)
 

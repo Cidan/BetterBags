@@ -196,17 +196,35 @@ A stall BetterBags cannot see into (the sort's, refresh-scheduler.md §6) needs 
   `CLIENT_UNIT_EVENTS`: events BetterBags does not listen to, each recorded as a `[client] NAME` call whose first argument is
   the character pane showing (`perfSessions:CharacterPane()`: GW2_UI's, Blizzard's or none) and then its payload. Each exists in
   the client's API documentation, and is checked with `C_EventUtils.IsEventValid`. The frame registers them when a capture starts
-  and lets go of them when it stops, so they cost nothing otherwise. One the client fires synchronously shows inside the call
-  that caused it, in the trace.
+  and lets go of them when it stops, so they cost nothing otherwise. Seen in a client: one fired inside `SortBags` runs on the main Lua
+  state, not the refresh queue's coroutine, so it shows beside `Refresh._CallSorter`, not inside it, and the call's time counts as the
+  coroutine's pause: read a sort's `wall`, not `incl` (64.1 and 0.36 ms for one sort).
 - **Slow ticks** (`timeline.slow`, the engine's `slowFrame` option). Of the ticks Blizzard's reading for the whole client (`app`) says
-  took 33 ms or more, the capture keeps the slowest 64, each `{ frame, ms, detail = { pane, addons } }`: `addons` is what each loaded
-  addon took in that tick (`LastTime`, 0.5 ms or more, most first). A tick with no addon named is the client's own. It asks about every
-  addon, so only about a tick it keeps; a failure says so (`detail.error`) and the frame still closes. Its time is left out of the
-  profiler's clock, not the game's, so it can add to the next tick's reading. Only frames the timeline holds (`timelineFrames`) count.
-  The Summary lists the slowest eight (`AddSlowTicks`).
-- **Not seen in a client yet:** whether a `[client]` call fired inside `SortBags` shows inside `Refresh._CallSorter`. If the client runs
-  that handler on the main Lua state rather than the refresh queue's coroutine, the call shows beside it instead, with the sort's
-  time counted as the coroutine's pause.
+  took 33 ms or more, the capture keeps the slowest 64, each `{ frame, ms, detail = { pane, readings } }`. The whole client's reading of
+  a tick comes a frame after the addons' for work from a click or an event, and in the same frame for a timer's (captures: all addons
+  69 ms at frame 153, the client 80 ms at 154; a timer's work in both at 171), and the readings cannot tell which. So each frame all
+  addons took 5 ms or more in, the capture asks what each took (`busySeries`, `busy`), and a slow tick lists a reading for its frame and
+  for the one before, those that were busy, oldest first: `{ frame, allMs, addons }` (`LastTime`, 0.5 ms or more, most first) or
+  `{ frame, allMs, error }` for one it could not read.
+  - **Read the frame numbers.** A reading of the frame before can be this tick's work or the last tick's: the client stalling right after
+    a timer's tick lists the timer's addons, under the frame they ran in, and one job can show under two ticks. Neither is a claim that
+    the addon took this tick's time.
+  - **What no name means:** no reading has all addons under 5 ms in both frames (the client's own, or, for a Blizzard frame's handlers
+    outside any addon's call, Blizzard's, which no addon is charged for), or a capture's first frame, with nothing read before it. A
+    reading with no addon has no addon at 0.5 ms or more to name: its `allMs` spread among small addons, no addon list to ask, or, not
+    settled, time Blizzard counts for all addons and charges to none (a capture's frame 1 read 174 ms for all addons with BetterBags at
+    0.2 ms; §3 says it sometimes does not charge a click's work to BetterBags, cause unknown).
+  - **Left as it is, found by review:** a saved `detail` with neither `readings` nor `addons` raises in the Summary, since nothing writes
+    one; a series reader that raises leaves its series a frame short, as it did before (Blizzard documents no failure for them).
+  - A failure says so and the frame still closes (`detail.error` for describing a tick, a reading's `error` for asking). Asking's time is
+    left out of the profiler's clock, not the game's, so it can add to the next tick's reading, itself past 5 ms if the rest is close:
+    `stats.busyAsks` and `busyAskMs` say how often it asked and what that took, and the Summary says so (not measured in a client yet;
+    on mocks with 100 addons loaded an ask is 0.1 KB of garbage naming none, 1.2 KB naming 7). Only frames the timeline holds (`timelineFrames`) count, and a capture with no `all` series names no addons.
+    `busySeries` has to sort before `series` or be the same, or a frame does not see its own answer (`all` and `app` do). The Summary
+    lists the slowest eight (`AddSlowTicks`), and scrolls (the shared `Scrollbox`): eight ticks of two readings each run about 15 rows,
+    past what the view shows (a row count from Friz Quadrata's metrics, not seen in game). A session saved before readings (`detail.addons`) still shows. (It first read the addons in
+    the frame of the client's slow reading, a frame late for a click's work; then it took the busier of the two frames, which dropped a
+    frame's own work and let a frame naming nobody beat one naming somebody.)
 - `Refresh._CallSorter` makes each sort call its own measured call, by name.
 
 ### Overhead and allocations
@@ -390,7 +408,7 @@ session = {
   options = { the engine options used, including trace, traceArgs, traceMaxCalls },
   stats = { durationMs, instrumentedMs, calls, frames, activeFrames, worstFrameMs, aborted,
             nodeCount, droppedNodes, wrappedFunctions, overheadPerCallMs, overheadParentMs|nil,
-            overheadChildMs|nil, allocatedKB, gcFreedKB, excludedMs,
+            overheadChildMs|nil, allocatedKB, gcFreedKB, excludedMs, busyAsks|nil, busyAskMs|nil,
             traceCalls|nil, stopReason|nil ("traceFull"|"maxDuration"), traceRemoved|nil },
   names = { "[all]", "[event] BAG_UPDATE", ... },
   nodes = { "parentId,nameId,selfUs,calls,maxUs,allocBytes", ... },  -- node 1 is [all]; ids are creation order, parents first
@@ -402,7 +420,7 @@ session = {
   timeline = { ours = "us,us,...", blizzard = "us,..."|nil,
                calls = "n,n,...", nested = "n,n,...",  -- per-frame measured calls, and those with a measured caller
                series = { all = "us,...", app = "us,..." }|nil,  -- §3: Blizzard's time for all addons and the whole client
-               slow = { { frame, ms, detail = { pane, addons = { { name, ms }, ... } } }, ... }|nil },  -- §3a
+               slow = { { frame, ms, detail = { pane, readings = { { frame, allMs, addons = { { name, ms }, ... } }, ... } } }, ... }|nil },  -- §3a
   trace = nil | {                -- §4; absent when tracing was off or the trace was removed
     chunkSize = 4096, calls = n, full = true|nil, args = true|nil,
     chunks = { "startDeltaUs,nodeId,argSet,durUs,retSet,flags,...", ... },  -- chunkSize records each

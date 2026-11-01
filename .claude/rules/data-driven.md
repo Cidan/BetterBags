@@ -68,7 +68,8 @@ reasoning about it can suggest a cause; it does not establish one.
   call by name; a capture records events the client fired that BetterBags does not listen to (`[client] UNIT_MODEL_CHANGED` and
   others), with the character pane showing, and names what each addon took in each tick of 33 ms or more. Added for a game-wide
   hitch sorting with the character pane open: a capture showed 56 ms inside `SortBags` and 58 ms in a tick no addon took, and could
-  say neither what the client was doing nor whether the pane mattered.
+  say neither what the client was doing nor whether the pane mattered. The next capture named it: 575 lock and 575 unlock events, each
+  burst 52.5 ms slower with the pane open, which disproved the guess it was made to test (refresh-scheduler.md §6).
 - **What the client answered about an item** (`debug/itemprobe.lua`, `ItemProbe`): the Dump tab of
   `/bbdb` stores, beside each dumped backpack item (`apiProbe`), every value each Blizzard API
   returned about it: `GetItemInfo` by item ID and by link (`n` is how many values, so "returned

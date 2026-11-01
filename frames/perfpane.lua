@@ -36,6 +36,15 @@ local perfFormat = addon:GetModule('PerfFormat')
 ---@class FlameGraph: AceModule
 local flameGraph = addon:GetModule('FlameGraph')
 
+---@class Render: AceModule
+local render = addon:GetModule('Render')
+
+---@class DrawableModule: AceModule
+local drawable = addon:GetModule('Drawable')
+
+---@class Scrollbox: AceModule
+local scrollbox = addon:GetModule('Scrollbox')
+
 ---@class TraceChart: AceModule
 local traceChart = addon:GetModule('TraceChart')
 
@@ -57,6 +66,8 @@ local VIEW_LABELS = {
 }
 local VIEW_WIDTHS = { flame = 74 }
 local VIEW_WIDTH = 64
+-- SUMMARY_PAD is the room round the Summary's text.
+local SUMMARY_PAD = 4
 
 local CALL_COLUMNS = {
   { key = 'Time', label = 'Started', width = 64, justify = 'RIGHT' },
@@ -159,6 +170,7 @@ end
 ---@field timelineBars Texture[]
 ---@field timelineBlizzardBars Texture[]
 ---@field summaryText FontString
+---@field summaryScroll ScrollboxDrawable
 ---@field settingsForm FormFrame|nil
 ---@field selectedId number|nil
 ---@field selectedFrame number|nil
@@ -1009,12 +1021,35 @@ end
 
 ---@param view Frame
 function paneProto:CreateSummaryView(view)
-  self.summaryText = sonata:CreateText(view, "Body")
-  self.summaryText:SetPoint('TOPLEFT', view, 'TOPLEFT', 4, -4)
-  self.summaryText:SetPoint('BOTTOMRIGHT', view, 'BOTTOMRIGHT', -4, 4)
+  local scroll = scrollbox:Create(view)
+  scroll.frame:SetAllPoints(view)
+  local holder = CreateFrame('Frame', nil, scroll.scrollChild)
+  self.summaryText = sonata:CreateText(holder, "Body")
+  self.summaryText:SetPoint('TOPLEFT', holder, 'TOPLEFT', SUMMARY_PAD, -SUMMARY_PAD)
   self.summaryText:SetJustifyH('LEFT')
   self.summaryText:SetJustifyV('TOP')
   self.summaryText:SetWordWrap(true)
+  scroll:SetChild(drawable:FromFrame(holder, function(parentResult)
+    local width = parentResult and parentResult.Width or 0
+    self.summaryText:SetWidth(math.max(1, width - SUMMARY_PAD * 2))
+    local height = self.summaryText:GetStringHeight() + SUMMARY_PAD * 2
+    holder:SetSize(width, height)
+    return width, height
+  end))
+  self.summaryScroll = scroll
+end
+
+-- LayoutSummary lays the Summary out at its view's size, scrolling what does not fit.
+function paneProto:LayoutSummary()
+  local view = self.views.summary
+  render:NewRenderChain(self.summaryScroll, nil, { Width = view:GetWidth(), Height = view:GetHeight() })
+end
+
+---@param text string
+function paneProto:SetSummary(text)
+  self.summaryText:SetText(text)
+  self:LayoutSummary()
+  self.summaryScroll.scrollBox:SetScrollPercentage(0, true)
 end
 
 ---@param name string
@@ -1033,6 +1068,8 @@ function paneProto:ShowView(name)
     self:DrawTimeline()
   elseif name == 'timeline' then
     self:DrawTraceStrip()
+  elseif name == 'summary' then
+    self:LayoutSummary()
   end
 end
 
@@ -1139,7 +1176,7 @@ function paneProto:ClearSelection()
   self.frameFlame:SetTree(nil)
   self.functionList:Wipe()
   self.frameList:Wipe()
-  self.summaryText:SetText('Select a saved session on the left, or start a capture.')
+  self:SetSummary('Select a saved session on the left, or start a capture.')
   self:UpdateMetricButton()
   self:UpdateAdjustCheck()
   self:DrawTimeline()
@@ -1176,7 +1213,7 @@ function paneProto:SelectSession(id)
   else
     self.frameFlame:SetTree(nil)
   end
-  self.summaryText:SetText(self:BuildSummary(session))
+  self:SetSummary(self:BuildSummary(session))
   self:DrawTimeline()
   self:LoadTrace(session)
   self:FillSessions()
@@ -1386,8 +1423,41 @@ function paneProto:AddContextLines(add, session)
   end
 end
 
+---@param addons {name: string, ms: number}[]
+---@param none string What to say when it names nobody
+---@return string
+local function takersText(addons, none)
+  local takers = {}
+  for _, entry in ipairs(addons) do
+    table.insert(takers, string.format('%s %s', entry.name, perfFormat:Ms(entry.ms)))
+  end
+  return #takers > 0 and table.concat(takers, ', ') or none
+end
+
+-- whoTookIt says what the addons took around a slow tick, by the frame each reading is of: the whole client's reading comes a frame
+-- after the addons' for a click's work and in the same frame for a timer's, so a reading can be of the tick before, or of other work.
+-- With none, the addons were not busy in either frame, so the tick is the client's own or Blizzard's; before a capture's first frame
+-- nothing was read.
+---@param tick table
+---@return string
+local function whoTookIt(tick)
+  local detail = tick.detail
+  if detail.readings == nil then
+    return takersText(detail.addons, 'no addon')
+  end
+  if #detail.readings == 0 then
+    return tick.frame == 1 and 'addons not busy in this first frame' or 'addons not busy'
+  end
+  local parts = {}
+  for _, reading in ipairs(detail.readings) do
+    table.insert(parts, string.format('frame %d, all addons %s: %s', reading.frame, perfFormat:Ms(reading.allMs),
+      reading.error and 'not read' or takersText(reading.addons, 'none named')))
+  end
+  return table.concat(parts, '; ')
+end
+
 -- AddSlowTicks says whose the client's slowest ticks of a capture were: how long each took, the character pane
--- showing, and what Blizzard charged each addon. A tick no addon took the time of is the client's own.
+-- showing, and what Blizzard charged each addon around it.
 ---@param add fun(fmt: string, ...)
 ---@param session table
 function paneProto:AddSlowTicks(add, session)
@@ -1403,14 +1473,9 @@ function paneProto:AddSlowTicks(add, session)
   local parts = {}
   for i = 1, math.min(8, #sorted) do
     local tick = sorted[i]
-    local takers = {}
-    for _, entry in ipairs(tick.detail.addons or {}) do
-      table.insert(takers, string.format('%s %s', entry.name, perfFormat:Ms(entry.ms)))
-    end
     table.insert(parts, tick.detail.error
       and string.format('frame %d %s (not described)', tick.frame, perfFormat:Ms(tick.ms))
-      or string.format('frame %d %s (%s; %s)', tick.frame, perfFormat:Ms(tick.ms), tick.detail.pane,
-        #takers > 0 and table.concat(takers, ', ') or 'no addon'))
+      or string.format('frame %d %s (%s; %s)', tick.frame, perfFormat:Ms(tick.ms), tick.detail.pane, whoTookIt(tick)))
   end
   add('Slowest ticks of the whole client (Blizzard), %d kept: %s.', #slow, table.concat(parts, ', '))
 end
@@ -1542,8 +1607,11 @@ function paneProto:BuildSummary(session)
     add('The capture stopped on its own after its maximum duration.')
   end
   if (stats.excludedMs or 0) > 0 then
-    add('The profiler spent %s describing arguments and packing the trace; that time is left out of every number here.',
-      perfFormat:Ms(stats.excludedMs))
+    add('The profiler spent %s of its own time: describing arguments, packing the trace, asking about slow frames. '
+      .. 'That time is left out of every number here.', perfFormat:Ms(stats.excludedMs))
+  end
+  if stats.busyAsks then
+    add('Of it, %s went on asking what each addon took, in %d busy frames.', perfFormat:Ms(stats.busyAskMs), stats.busyAsks)
   end
   return table.concat(lines, '\n')
 end
