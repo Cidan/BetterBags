@@ -12,7 +12,7 @@ local context = addon:GetModule('Context')
 -- ProfessionShoppingList is the Profession Shopping List integration (Slackluster's addon,
 -- .claude/rules/profession-shopping-list.md): what its list still needs, and buying it from the open
 -- merchant, for BetterBags Next's vendor. It is there only while Profession Shopping List has both
--- functions BetterBags calls, ProfessionShoppingList:GetShoppingList() and :BuyFromMerchant() (asked:
+-- functions BetterBags calls, ProfessionShoppingList:GetMerchantShoppingList() and :BuyFromMerchant() (asked:
 -- "if PSL (and this function, because it's new) isn't available, don't show this integration/don't
 -- try to call this"); without them nothing of it shows and nothing is called.
 ---@class ProfessionShoppingListIntegration: AceModule
@@ -24,10 +24,10 @@ local shoppingList = addon:NewModule('ProfessionShoppingList')
 ---@field owned number How many the player has, as Profession Shopping List counts them.
 
 -- api returns Profession Shopping List's API when it has both functions BetterBags calls, else nil.
----@return {GetShoppingList: fun(self): table<number, ProfessionShoppingListReagent>, BuyFromMerchant: fun(self)}?
+---@return {GetMerchantShoppingList: fun(self): table<number, ProfessionShoppingListReagent>, BuyFromMerchant: fun(self)}?
 local function api()
   local psl = _G.ProfessionShoppingList
-  if type(psl) == "table" and type(psl.GetShoppingList) == "function" and type(psl.BuyFromMerchant) == "function" then
+  if type(psl) == "table" and type(psl.GetMerchantShoppingList) == "function" and type(psl.BuyFromMerchant) == "function" then
     return psl
   end
   return nil
@@ -48,7 +48,7 @@ function shoppingList:Needs()
   if psl == nil then
     return needs
   end
-  for itemID, reagent in pairs(psl:GetShoppingList()) do
+  for itemID, reagent in pairs(psl:GetMerchantShoppingList()) do
     local missing = reagent.required - reagent.owned
     if missing >= 1 then
       needs[itemID] = missing

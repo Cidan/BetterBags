@@ -11,34 +11,33 @@ integration/don't try to call this".
 
 ## 1. What PSL provides
 
-Read from PSL's `main` (`API.lua`, `modules-old/Merchant.lua`, `modules-old/TrackingWindow.lua`):
+Read from PSL v12.1.5-02, the first release with what BetterBags calls (`API.lua`, `modules-old/Merchant.lua`,
+`modules-old/TrackingWindow.lua`):
 
-- `ProfessionShoppingList:BuyFromMerchant()` (PSL `a550419`, 2026-10-24): for each reagent the list
-  needs, the open merchant's first item of that ID (`GetMerchantItemID`), bought when
-  `C_MerchantFrame.GetItemInfo(index).isPurchasable` and at least one is missing, in stacks of
-  `GetMerchantItemMaxStack` (`BuyMerchantItem(index, n)`). It calls `app:ShowWindow()`, which opens PSL's
-  tracking window. It runs only while `app.Flag.MerchantOpen` (`ad84d0f`: it checked
-  `MerchantFrame:IsVisible()` before, false under BetterBags Next, which keeps Blizzard's merchant frame
-  shown under a hidden parent, next.md §10a).
-- `ProfessionShoppingList:GetShoppingList()` **does not exist upstream yet.** PSL had no API to read the
-  list: the reagent quantities live in its private `app.ReagentQuantities`, rebuilt by
-  `app:UpdateRecipes()`. It was written locally, in the PSL checkout at `~/git/ProfessionShoppingList`,
-  branch `betterbags-shopping-list` (`e516d9b`, not pushed), for PSL's author to adopt or rename:
+- `ProfessionShoppingList:BuyFromMerchant()`: for each reagent the list needs, the open merchant's first item of
+  that ID (`GetMerchantItemID`), bought when `C_MerchantFrame.GetItemInfo(index).isPurchasable` and at least one is
+  missing, in stacks of `GetMerchantItemMaxStack` (`BuyMerchantItem(index, n)`). It calls `app:ShowWindow()`, which
+  opens PSL's tracking window. It runs only while `app.Flag.MerchantOpen` (`ad84d0f`: it checked
+  `MerchantFrame:IsVisible()` before, false under BetterBags Next, which keeps Blizzard's merchant frame shown under
+  a hidden parent, next.md §10a).
+- `ProfessionShoppingList:GetMerchantShoppingList()`: written for this integration, as there was no API to read the
+  list (the reagent quantities live in PSL's private `app.ReagentQuantities`, rebuilt by `app:UpdateRecipes()`).
+  Contributed as `GetShoppingList` (PSL #414, `2bc99ce`) and renamed by PSL's author (`5a88d7a`) before either
+  was released, so no release has the old name and BetterBags does not look for it.
   - Returns `itemID = { required = number, owned = number }` for every reagent the tracked recipes
     need (numeric item IDs only: no gold, no currencies); `required - owned` is what is missing.
-  - Computed as the tracking window computes it, without showing the window: the quantity loop moved
-    out of `UpdateRecipes` into `app:UpdateReagentQuantities()`, unchanged; `owned` is
-    `app:GetReagentCount` (its quality tiers and settings).
-  - `BuyFromMerchant` now buys from `GetShoppingList()`, so what BetterBags shows is what it buys.
+  - Computed as the tracking window computes it, without showing the window: the quantity loop is
+    `app:UpdateReagentQuantities()`; `owned` is `app:GetReagentCount` (its quality tiers and settings).
+  - `BuyFromMerchant` buys from it, so what BetterBags shows is what it buys.
 - `EventRegistry` `ProfessionShoppingList.OnTrackedRecipesChanged`: tracked recipes changed.
 
-The local install (retail, `_retail_/Interface/AddOns/ProfessionShoppingList`) is a symlink to that
-checkout; the packaged v12.1.5-01 it replaced is in `_retail_/Interface/AddOns-backup/`.
+**A renamed function reads as PSL not being there** (§2), with no error: the rename left the integration off, with nothing
+showing at the vendor, until this file followed it. When PSL's section stops showing, read its `API.lua` first.
 
 ## 2. The integration (`integrations/professionshoppinglist.lua`, module `ProfessionShoppingList`)
 
 - **There only with both functions.** `Available()` is true while the global `ProfessionShoppingList`
-  has `GetShoppingList` and `BuyFromMerchant`. Without them `Needs()` is empty, `Buy()` calls nothing
+  has `GetMerchantShoppingList` and `BuyFromMerchant`. Without them `Needs()` is empty, `Buy()` calls nothing
   (returns false) and nothing of the integration shows.
 - `Needs()`: item ID -> how many are missing (`required - owned`), only for at least one.
 - `Buy()`: `ProfessionShoppingList:BuyFromMerchant()` (colon calls: PSL asserts `self == api`).
@@ -165,7 +164,7 @@ checked before).
   `OnHide`, so work done there (the panel's `PanelHidden`, the canvas's `Settle`) must be fired by hand. To check: track a recipe whose reagents a vendor sells, open that vendor with Next on, double-
   click the card, check the purchases and PSL's window, right-click instead, switch tabs while it waits,
   close the vendor with the card waiting.
-- **Not measured:** `GetShoppingList` recomputes PSL's quantities on every Buy draw (several per sale or
+- **Not measured:** `GetMerchantShoppingList` recomputes PSL's quantities on every Buy draw (several per sale or
   purchase). Capture a vendor visit with the profiler (`NextVendorPanel.Draw`) before changing it.
 - **Behaviors that are PSL's:** `BuyFromMerchant` opens PSL's tracking window, and buys with
   `BuyMerchantItem` directly, without Blizzard's confirmations for extended costs and non-refundable
