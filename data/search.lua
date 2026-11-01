@@ -165,8 +165,8 @@ local function fillSnapshot(s, item)
   end
   -- Follows the sets above, which are compared.
   s.inset = info.equipmentSets ~= nil and info.equipmentSets[1] ~= nil
-  -- The arrow BetterBags draws, for an item read with its data (rule #1).
-  if item.harvestIncomplete then
+  -- The arrow BetterBags draws, for an item read with its data (rule #1) that its provider can tell about.
+  if item.harvestIncomplete or item.upgradeUnknown then
     s.upgrade = nil
   else
     s.upgrade = item.isUpgrade == true

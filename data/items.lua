@@ -292,12 +292,15 @@ end
 -- else a verdict depends on starts a new generation (InvalidateUpgrades; see
 -- .claude/rules/caches.md §2). Nothing is kept for an item read while the client had no item
 -- info for it, before the equipped gear has been read, or while any equipped item reads cold.
+-- A provider that cannot tell yet leaves the item marked upgradeUnknown: it shows no arrow, but it
+-- is no "not an upgrade", which a rule could take and Auto Sell could sell.
 ---@param data ItemData
 ---@return boolean
 function items:ResolveUpgrade(data)
   if not data or data.isItemEmpty then
     return false
   end
+  data.upgradeUnknown = nil
   local provider = self:GetActiveUpgradeProvider()
   if provider == "None" then
     return false
@@ -317,6 +320,7 @@ function items:ResolveUpgrade(data)
   -- asked again next time.
   local answer = func(data)
   local verdict = answer and true or false
+  data.upgradeUnknown = answer == nil or nil
   if cacheable and answer ~= nil then
     data.upgradeVerdict = verdict
     data.upgradeProvider = provider
@@ -371,6 +375,12 @@ function items:InvalidateUpgrades(refresh, reread)
   if refresh then
     self:RequestUpgradeRefresh(true, addon.atBank == true, reread)
   end
+end
+
+-- GetUpgradeGeneration is the current upgrade generation, for a provider keeping answers of its own (Pawn).
+---@return number
+function items:GetUpgradeGeneration()
+  return self._upgradeGeneration
 end
 
 -- RequestUpgradeRefresh asks, on the next frame, for refreshes of the given bag kinds:
@@ -1330,11 +1340,12 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
     end
     -- Kept verdicts are reused inside (caches.md §2). The search indexes the arrow: a kept item
     -- whose arrow changed is compared with its search entry again (search-indexing.md §11).
+    local wasUnknown = currentItem.upgradeUnknown
     local upgrade = self:ResolveUpgrade(currentItem)
     -- The slot values follow the worn gear, as the arrow does (search-indexing.md §16).
     local slotEquipped, slotBest = self:SlotLevelsOf(currentItem)
-    if currentItem.derived and (currentItem.isUpgrade ~= upgrade or currentItem.slotEquipped ~= slotEquipped
-      or currentItem.slotBest ~= slotBest) then
+    if currentItem.derived and (currentItem.isUpgrade ~= upgrade or currentItem.upgradeUnknown ~= wasUnknown
+      or currentItem.slotEquipped ~= slotEquipped or currentItem.slotBest ~= slotBest) then
       currentItem.derived.indexPending = true
     end
     currentItem.isUpgrade = upgrade
@@ -1568,7 +1579,9 @@ end
 ---@param category string
 ---@return boolean
 function items:SkipRecent(ctx, item, category)
-  if not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category) then
+  -- Not on a guess: a rule can take an item with no upgrade state yet (NOT upgrade = true), and what this
+  -- ends cannot be given back when the answer says otherwise.
+  if item.upgradeUnknown or not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category) then
     return false
   end
   item.stackRecent = nil

@@ -47,7 +47,13 @@ automation.DESTROY = "destroy"
 ---@class AutomationSale
 ---@field list AutomationEntry[]
 ---@field job? SellerJob Its sale, once started (Seller).
+---@field waitUntil? number Until when it waits for items whose upgrade state is not known yet.
 ---@field finished? boolean
+
+-- How long a sale waits for items whose upgrade state its provider cannot tell yet, and how often it looks: a sale is one list, so what
+-- it left out would wait for the next visit. Only a session's first read, or a read of more new items than Pawn's budget covers.
+local WAIT_FOR_ANSWERS = 10
+local LOOK_FOR_ANSWERS = 0.25
 
 function automation:Init()
   self.atMerchant = false
@@ -86,6 +92,9 @@ end
 function automation:BlockedReason(data, action)
   if data.harvestIncomplete then
     return L:G("Its item data has not loaded yet.")
+  end
+  if data.upgradeUnknown then
+    return L:G("Whether it is an upgrade is not known yet.")
   end
   if data.itemInfo.equipmentSets and data.itemInfo.equipmentSets[1] ~= nil then
     return L:G("It is in an equipment set.")
@@ -229,11 +238,39 @@ function automation:StillThere(entry, forSale)
   return seller:StillThere(entry.data, forSale)
 end
 
+-- saleNow lists what a merchant opening sells of its own: SellList, of the categories that do not confirm
+-- their sale (Confirm Auto Sell off).
+---@param ctx Context
+---@return AutomationEntry[]
+function automation:saleNow(ctx)
+  local list = {}
+  for _, entry in ipairs(self:SellList(ctx)) do
+    if not categories:ConfirmsSaleOf(entry.category) then
+      table.insert(list, entry)
+    end
+  end
+  return list
+end
+
+-- waitsForAnswers says whether the backpack holds an item a merchant would buy that a provider cannot tell
+-- about yet. Any such item: it may not be in a category that sells until the answer puts it there.
+---@return boolean
+function automation:waitsForAnswers()
+  local slotInfo = items.slotInfo and items.slotInfo[const.BAG_KIND.BACKPACK]
+  for _, data in pairs(slotInfo and slotInfo.itemsBySlotKey or {}) do
+    if data.upgradeUnknown and const.BACKPACK_BAGS[data.bagid] ~= nil
+      and not (data.containerInfo and data.containerInfo.hasNoValue) then
+      return true
+    end
+  end
+  return false
+end
+
 -- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy in the
 -- categories that do not confirm their sale (Confirm Auto Sell off), from the frame after it opens
--- (StartSale). A category that confirms waits in BetterBags Next's vendor dock for the player (§4); the
--- classic design has no dock and leaves it to the player. Holding Shift as it opens sells nothing. It
--- returns what it did, for profiler traces.
+-- (StartSale), or once a provider can tell about the items it cannot yet. A category that confirms waits
+-- in BetterBags Next's vendor dock for the player (§4); the classic design has no dock and leaves it to
+-- the player. Holding Shift as it opens sells nothing. It returns what it did, for profiler traces.
 ---@param ctx Context
 ---@return string
 function automation:OnMerchantShow(ctx)
@@ -247,20 +284,16 @@ function automation:OnMerchantShow(ctx)
   if not self:MerchantBuys() then
     return "not buying"
   end
-  local list = {}
-  for _, entry in ipairs(self:SellList(ctx)) do
-    if not categories:ConfirmsSaleOf(entry.category) then
-      table.insert(list, entry)
-    end
-  end
-  if #list == 0 then
+  local list = self:saleNow(ctx)
+  local waiting = self:waitsForAnswers()
+  if #list == 0 and not waiting then
     return "nothing"
   end
   ---@type AutomationSale
-  local sale = { list = list }
+  local sale = { list = list, waitUntil = waiting and GetTime() + WAIT_FOR_ANSWERS or nil }
   self.sale = sale
   C_Timer.After(0, function() self:StartSale(sale) end)
-  return "selling"
+  return waiting and "waiting" or "selling"
 end
 
 ---@param ctx Context
@@ -277,6 +310,16 @@ end
 function automation:StartSale(sale)
   if self.sale ~= sale then
     return "replaced"
+  end
+  if sale.waitUntil then
+    if not self.atMerchant then
+      return self:FinishSale(sale, "closed")
+    end
+    if GetTime() < sale.waitUntil and self:waitsForAnswers() then
+      C_Timer.After(LOOK_FOR_ANSWERS, function() self:StartSale(sale) end)
+      return "waiting"
+    end
+    sale.list = self:saleNow(context:New('AutomationSale'))
   end
   local list = {}
   for _, entry in ipairs(sale.list) do

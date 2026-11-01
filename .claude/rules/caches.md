@@ -55,9 +55,9 @@ quality); it has no GUID or item location to compare. Never kept when read cold.
 
 ### 2. Upgrade verdicts (`items:ResolveUpgrade`, data-loader.md §15)
 Kept value: `data.upgradeVerdict`, only for providers registered `{ cacheable = true }`: the
-built-in `BetterBags` provider and Pawn. SimpleItemLevel is asked on every sweep, as before. A
-`nil` answer (Pawn's "we're not sure yet": no item data or stats yet) draws no arrow and is not
-kept. Reused only while `data.upgradeProvider` is the active provider and
+built-in `BetterBags` provider. SimpleItemLevel is asked on every sweep, as before; so is Pawn's
+provider, which answers from what it keeps by link (§2a). A provider's `nil` answer draws no arrow
+and is not kept. Reused only while `data.upgradeProvider` is the active provider and
 `data.upgradeGeneration` equals `items._upgradeGeneration`. `InvalidateUpgrades(refresh)` bumps the
 generation and, with `refresh`, refreshes the backpack and the open bank on the next frame
 (`RequestUpgradeRefresh` coalesces a frame's requests into one refresh per kind and never drops a
@@ -77,26 +77,107 @@ kind requested later in the frame).
 | The item's stats (primary stats) | Part of the item: a changed slot is a new ItemData; scaling items change with level (above) |
 | Settings | No setting but the provider is an input; every wipe invalidates anyway |
 | Cold item | Verdicts of `harvestIncomplete` items are not kept |
-| Pawn's own state (its scales and settings, its best items per scale, the spec) | `PawnResetBags`, hooked once (`hooksecurefunc`) when the Pawn integration registers: Pawn calls it after every change of what its verdicts read (scale and setting edits, spec changes, its throttled check of the equipped gear after inventory changes, out of combat; Pawn 2.13 `Pawn.lua`). It invalidates without a refresh, as Pawn expects of bag addons that are not registered with it |
+| An answer the provider cannot give yet | Not kept, and the item is marked `upgradeUnknown` until it can (§2a) |
 Optional events are registered only when `C_EventUtils.IsEventValid` says the client has them
 (Blizzard's own pattern); every event above exists on retail, WoW: Forever and every Classic
 branch. `RegisterCacheEvents` runs once, from `items:OnEnable`.
 
-**Pawn is cached, without the costs of the first attempt.** An earlier attempt (registering as a
-Pawn third-party bag for `RefreshAll`, hooking every Pawn function that changes its state, and
-checking Pawn had the data each answer needed) made sorting visibly hitch and was reverted: a sort
-moves every item, so every verdict was re-asked anyway, the readiness checks roughly doubled the
-cost of each ask, and refreshing on Pawn's signal (it signals on every item pickup) added a second
-full sweep. Now: no readiness check (Pawn's own `nil` answer is not kept), one hook on
-`PawnResetBags` that invalidates without a refresh, and nothing registered with Pawn. A sort still
-asks about every item (each moved item is a new ItemData), once, as before. Pawn's check after
-inventory changes always ends in `PawnResetBags`; it runs 0.25 s after `UNIT_INVENTORY_CHANGED`
-(equipping, and an item taking a new bag slot, not loot onto a stack) or `ITEM_LOCKED` (an item
-picked up), out of combat (warcraft.wiki.gg, Pawn 2.13 `PawnOnInventoryChanged`). So the refresh
-after such a loot or move out of combat asks again about every item, as before; loot onto stacks,
-a bank open, recalculations (a vendor, a tooltip that loaded, a bank tab switch) and refreshes in
-combat ask only about new items. Pawn is called through `PawnShouldItemLinkHaveUpgradeArrowUnbudgeted`; the public time-budgeted check
-answers nil once its budget is spent, which is why the internal one is used.
+### 2a. Pawn's answers (`integrations/pawn.lua`)
+Kept value: what Pawn last said about each item (`pawn.answers`), with the upgrade generation it was asked in
+(`pawn.answeredAt`), under the item's link without the player's level and spec (`pawn:keyOf`). No verdict is kept on an item, so a
+read asks the integration about every item, which is a table lookup or two.
+
+**Why (issue #1209, measured).** A captured loot: `UNIT_INVENTORY_CHANGED`, Pawn's `PawnResetBags` 0.25 s later, our hook on it
+starting a new generation, and the refresh that followed asking Pawn about all 163 items through the unbudgeted question: about
+141 ms of a 150 ms frame, 0.87 ms a question, with the bags closed and no answer changed. Two loots a third of a second apart cost
+it twice.
+
+**Pawn's contract** (Pawn 2.14 `PawnBags.lua`, "If you're the author of a bag addon"): ask `PawnShouldItemLinkHaveUpgradeArrow(link,
+true)`, which answers nil past its budget (2/60 of a quarter second, 8.3 ms, `BudgetThrottle`) or without an item's data, so check
+back on a timer; register with `PawnRegisterThirdPartyBag(name, { RefreshAll })` to hear when arrows may have changed.
+`PawnShouldItemLinkHaveUpgradeArrowUnbudgeted` is marked "Internal only. Don't use this", and we hook nothing of Pawn's now.
+
+| Input | What happens |
+|---|---|
+| The item | The link is the key: a new stack, a sort or a full re-read asks nothing. A link never seen is asked about in the read, so a looted item has its arrow on the read that found it, unless the budget is spent |
+| The player's level and spec | Every bag item's link carries both (`\|Hitem:6948::::::::90:66:...`, every link of a retail dump), so they are left out of the key, or a level-up or respec would change every link and take every arrow away until its turn. What starts the new generation has it checked again, asking with the link a read last saw (`pawn.links`) |
+| Pawn's own state (scales, settings, best items per scale, spec) | `RefreshAll`, called by `PawnResetBags`: scale and setting edits, spec changes, and its check after inventory changes, at most once per 0.25 s (`VgerCore.Throttle`: the first at once, a later one when the 0.25 s is up) on `UNIT_INVENTORY_CHANGED` or `ITEM_LOCKED`, skipped in combat (most loots, few of which change an answer). Starts a new generation and queues every item the bags hold |
+| Gear, level, skills, spec, spells, reputation | The upgrade generation (§2). The next read or recalculation queues what it finds out of date |
+| The provider in use | A signal or a turn that finds Pawn is not the provider forgets everything: it misses Pawn's signals while it is not |
+
+**The queue.** One timer, a quarter second a turn (Pawn's budget comes back then), and each link in the queue once. A turn asks
+until Pawn says nil, which may mean the budget is gone, and sends that link to the back. **What waits keeps its turn**: another
+signal does not clear the queue (asked: "do we clear the queue if there is one"), so a burst costs one round; what was answered
+before the signal goes behind what still waits, so nothing starves however often Pawn signals; what shows no answer yet goes to
+the front. An item keeps its old answer while it waits, and a read never asks about it: that was the freeze. A link Pawn has said
+nil about 20 times since it last answered waits for the next read, so one Pawn can never answer about does not keep the timer
+going; a read that answers it later still tells any other bag holding it (`pawn.gaveUp`). In combat turns ask nothing, and go on
+after it (Pawn skips its own check there too); a link never seen is still asked in a read. An answer is kept under the generation
+read before asking, so a signal from inside the question makes it wait again.
+
+**Not known yet is not "not an upgrade".** Found by an adversarial review, and reproduced on the real Automation and Seller: an item
+Pawn has no answer for showed as no upgrade, so while the budget was spent a rule `upgrade = false` with Auto Sell on sold 3 of 5
+real upgrades (`docs/vendor-compat.md` maps Vendor's `Pawn_IsUpgrade()` to this field, and buyback keeps only 12 items). A provider's
+nil now leaves the item marked `upgradeUnknown` (`items:ResolveUpgrade`): it draws no arrow, the `upgrade` search field is absent
+(search-indexing.md §11, as for an item read cold), and Automation leaves it alone (automation.md §2; the field alone is not enough,
+since `NOT upgrade = true` also matches an absent value). Skip Recent Items leaves it alone too (recent-items.md §4): what that ends
+cannot be given back when the answer says otherwise. It lasts as long as Pawn has no answer: seconds, on a session's first read or a
+bank's first open, and when a read holds more new links than the budget covers. A sale is one list, so with Confirm Auto Sell off it
+waits for those items as a merchant opens, at most 10 s, or a merchant beside a login would leave them out for the whole visit
+(automation.md §3). An old answer is not "not known": an item
+waiting to be checked again is sold by what Pawn last said, since Pawn signals on every item picked up and blocking on that would
+stop Auto Sell for seconds after any loot. That leaves one case: an item that became an upgrade by a level-up, sold by a rule
+`upgrade = false` at a merchant within the seconds it takes to check it.
+
+**Showing a change** (asked: "let's take care not to trigger full redraws"). A signal asks for no refresh. Only an answer that
+changed the arrow recalculates, and only the open bags holding that link (`bags/Rederive` with `categoriesUnchanged`, no
+`resetLayout`, no `buttons`), at most once a second while others wait and once more when the queue is done; a button draws only if
+what it shows changed (item-drawing.md §7b). A first answer that is no upgrade moves no arrow, but the item shows as not known until
+it arrives, so it goes along with a recalculation for an arrow, or when the queue is done, or 5 s after it came: a first open of a big
+bank would otherwise recalculate every second for no change on screen, and moving things at the bank, with a signal each time, keeps
+the queue from emptying for minutes. A loot with every answer the same recalculates nothing.
+
+**The first attempt, and why this is not it.** Registering as a third-party bag was tried and reverted: it made sorting visibly
+hitch. A sort moved every item, so every verdict on an item was asked again; readiness checks doubled each question; and it
+refreshed on Pawn's signal, a second full sweep per item picked up. Here the link is the key, there is no readiness check, and the
+signal refreshes nothing.
+
+**Accepted:**
+- Registering turns off Pawn's arrows on Blizzard's own bag frames (`PawnIsAThirdPartyBagRegistered`, `PawnBags.lua`). That only shows
+  on Blizzard's bank with Enable Bank Bags off, which loses them.
+- Answers for links no bag holds any more stay until Pawn stops being the provider; they cost a table entry each.
+- A bank closed mid-round leaves its links in the queue: up to about 18 s more at Pawn's budget for a 740-link bank (measured by the
+  review on mocks). The answers are not wasted: the next open shows them at once.
+- `PawnRegisterThirdPartyBag` came with Pawn 2.13.1 (its `Version history.md`). An older Pawn gets no arrows, and a line in chat says
+  to update it once (`PawnVersion`).
+- A link that gave up keeps what it shows until the next read, if its data arrives after 20 tries: as before, nothing retried until
+  a refresh.
+- With Pawn not ready (`PawnIsReady`, its API: a start-up that failed, where each question would print a failure and every item stay not
+  known, stopping Auto Sell for good) an item gets no arrow and counts as answered, and nothing is asked. Pawn is ready from
+  `PLAYER_LOGIN`, before the bags' first read.
+- A provider that means "no" by returning nil would stop Auto Sell, as "not known" for good. `RegisterUpgradeProvider` takes a function
+  returning a boolean; the built-in one and SimpleItemLevel do.
+- A recalculation reads no links, so an item checked again right after a respec is asked about with the link last read, and a read of the
+  new link in that generation asks nothing. It matters only if the client changes bag links with no `BAG_UPDATE` and Pawn's answer reads the
+  link's spec; the next signal corrects it. Asking again per link would loop between two bags holding one item under different links, each
+  answer recalculating, so it is left. Check in game: respec with a two-primary item in the bags.
+
+**Cost, simulated with the capture's 0.87 ms** (`spec/integrations/pawn_spec.lua`, "the reported loot"; not captured in game yet): the
+loot's frame asks one question; the other 163 items take about 4 s, at most Pawn's 8.3 ms a turn. Capture a loot with the profiler
+to confirm: `Pawn.Turn` returns how many it asked and how many wait, `Pawn.OnArrowsReset` how many wait.
+
+**Coverage:** `spec/integrations/pawn_spec.lua` (registering and an old Pawn; answering a read; the signal, several signals and what waits
+keeping its turn; links that follow the level and spec; links Pawn is not sure about and giving up; when a change is shown; combat; the
+provider switched; an error from Pawn; the reported loot at the capture's cost), `spec/refresh_pipeline_spec.lua` ("Pawn's answers" on the
+real pipeline, the upgrade field while not known, a respec; "a simulated client" > "with Pawn": Pawn's real budget and everything the client
+does with enough items and a dear enough question that the budget runs out, every arrow and search entry Pawn's answer once quiet, and
+the real Automation and Seller, by both `upgrade = false` and `NOT upgrade = true`, selling no upgrade and everything else in one visit after
+a level-up or while Pawn has no answer), `spec/items_spec.lua` ("Pawn provider"), `spec/automation_spec.lua` (left alone while not known, a sale
+waiting for answers), `spec/integration/pawn_spec.lua` (the whole addon, both designs). Mutation-tested over three rounds, 119 mutations on the final code; those
+that survived led to tests, or to removing what they showed did nothing (a reset of the queue's indices, clearing `gaveUp` on an answer, a
+check for an empty sale). One is equivalent: `|Hitem:` in the key's pattern differs only for a caged pet, which is never asked about.
+Two adversarial reviews found what the tests first missed: selling upgrades, arrows lost on a respec, a sale leaving items out for a visit,
+Skip Recent Items acting on a guess, a broken Pawn stopping Auto Sell.
 
 ### 3. Equipped gear (`items:HarvestEquipment`)
 Kept value: each equipment slot's ItemData (`items._equipped[slot]`), read on backpack sweeps.
@@ -176,7 +257,7 @@ record that claims more: `indexPending` stays on an item until it is indexed.
 verdict cache" — one test per invalidating event, provider scoping, coalescing, cold gear and its
 warming, failed sweeps and failed gear reads, same-sweep gear — "draw generation", "incremental
 search index", "deriving only what changed", "looks up a bag's name once per sweep", "looks a bag's
-name up again on the next sweep"), `spec/items_spec.lua` ("kept verdicts": Pawn),
+name up again on the next sweep"), `spec/integrations/pawn_spec.lua` and `spec/refresh_pipeline_spec.lua` ("Pawn's answers"),
 `spec/categories_spec.lua` ("generation"), `spec/frames/item_spec.lua`
 ("cooldown refresh", "skipping a redraw whose inputs are unchanged"),
 `spec/frames/bag_draw_ownership_spec.lua` ("cooldown refresh (OnCooldown)"),

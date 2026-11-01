@@ -91,7 +91,9 @@ leaves on the following close once it is old enough.
   item's own category without Recent Items (data-loader.md §8), so a category whose rule takes items by
   their category (`category = "junk"`) skips them while they are new too; it did not at first
   (reported on WoW: Forever). A virtual stack whose category skips them is no longer recent (`stackRecent`: every pile of a
-  stack is the same item). Turned on, the bags are recalculated, so items already in Recent Items leave
+  stack is the same item). Not while its upgrade state is not known (`upgradeUnknown`, caches.md §2a): a rule
+  `NOT upgrade = true` takes such an item, and ending its timer and the client's mark cannot be undone when the
+  answer says it is an upgrade. Turned on, the bags are recalculated, so items already in Recent Items leave
   it at once; turned off, it marks nothing new again (the items were unmarked). Coverage:
   `spec/refresh_pipeline_spec.lua` ("Skip Recent Items"), `spec/categories_spec.lua`,
   `spec/database_spec.lua`, `spec/next/settings/categories_spec.lua` ("the Skip Recent Items setting"),

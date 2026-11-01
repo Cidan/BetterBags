@@ -2228,7 +2228,7 @@ describe("Upgrade Icon Providers", function()
   -- INVSLOT globals the built-in BetterBags provider references. wow_mocks only
   -- defines FIRST/LAST_EQUIPPED, not MAINHAND/OFFHAND.
   local savedMainhand, savedOffhand, savedIsEquippable
-  local savedPawnUnbudgeted, savedPawnIsUpgrade, savedPawnGetItemData
+  local savedPawnAsk, savedPawnRegisterBag
   local savedSimpleItemLevel
 
   local savedUserSet, savedGetProvider
@@ -2243,9 +2243,8 @@ describe("Upgrade Icon Providers", function()
     savedMainhand = _G.INVSLOT_MAINHAND
     savedOffhand = _G.INVSLOT_OFFHAND
     savedIsEquippable = _G.C_Item.IsEquippableItem
-    savedPawnUnbudgeted = _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted
-    savedPawnIsUpgrade = _G.PawnIsContainerItemAnUpgrade
-    savedPawnGetItemData = _G.PawnGetItemData
+    savedPawnAsk = _G.PawnShouldItemLinkHaveUpgradeArrow
+    savedPawnRegisterBag = _G.PawnRegisterThirdPartyBag
     savedSimpleItemLevel = _G.SimpleItemLevel
     savedUserSet = database.GetUpgradeIconProviderUserSet
     savedGetProvider = database.GetUpgradeIconProvider
@@ -2262,9 +2261,8 @@ describe("Upgrade Icon Providers", function()
     _G.INVSLOT_MAINHAND = savedMainhand
     _G.INVSLOT_OFFHAND = savedOffhand
     _G.C_Item.IsEquippableItem = savedIsEquippable
-    _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = savedPawnUnbudgeted
-    _G.PawnIsContainerItemAnUpgrade = savedPawnIsUpgrade
-    _G.PawnGetItemData = savedPawnGetItemData
+    _G.PawnShouldItemLinkHaveUpgradeArrow = savedPawnAsk
+    _G.PawnRegisterThirdPartyBag = savedPawnRegisterBag
     _G.SimpleItemLevel = savedSimpleItemLevel
     database.GetUpgradeIconProviderUserSet = savedUserSet
     database.GetUpgradeIconProvider = savedGetProvider
@@ -2272,9 +2270,10 @@ describe("Upgrade Icon Providers", function()
 
   -- Register the Pawn provider with a controllable verdict.
   local function enablePawn(verdict)
-    _G.PawnGetItemData = function() return {} end
-    _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return verdict end
+    _G.PawnShouldItemLinkHaveUpgradeArrow = function() return verdict end
+    _G.PawnRegisterThirdPartyBag = function() end
     pawn._registered = nil
+    pawn:Forget()
     pawn:OnEnable()
   end
 
@@ -2669,94 +2668,95 @@ describe("Upgrade Icon Providers", function()
     end)
   end)
 
+  -- The integration itself, its queue and Pawn's signal are in spec/integrations/pawn_spec.lua; this is how it meets the real
+  -- ResolveUpgrade and the real upgrade generation.
   describe("Pawn provider", function()
+    local verdict
+
+    before_each(function()
+      verdict = true
+      enablePawn(nil)
+      _G.PawnShouldItemLinkHaveUpgradeArrow = function() return verdict end
+      database.GetUpgradeIconProvider = function() return "Pawn" end
+    end)
+
     it("registers a 'Pawn' provider when Pawn is loaded at OnEnable time", function()
-      _G.PawnGetItemData = function() return {} end
-      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return true end
-      pawn:OnEnable()
       assert.is_function(items.upgradeProviders["Pawn"])
     end)
 
-    it("delegates to Pawn's verdict when selected as the provider", function()
-      _G.PawnGetItemData = function() return {} end
-      local pawnVerdict = true
-      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return pawnVerdict end
-      pawn:OnEnable()
-      database.GetUpgradeIconProvider = function() return "Pawn" end
-
-      local data = equippableItem({ currentItemLevel = 1 })
-      assert.is_true(items:ResolveUpgrade(data))
-
-      pawnVerdict = false
-      assert.is_false(items:ResolveUpgrade(data))
+    it("shows Pawn's answer", function()
+      assert.is_true(items:ResolveUpgrade(equippableItem({ currentItemLevel = 1 })))
+      pawn:Forget()
+      verdict = false
+      assert.is_false(items:ResolveUpgrade(equippableItem({ currentItemLevel = 1 })))
     end)
 
-    -- Pawn tells bag addons when their arrows may have changed (PawnResetBags: scale and setting
-    -- edits, spec changes, and its own throttled check after inventory changes; Pawn 2.13
-    -- Pawn.lua). Its verdicts are kept on each item until then, and until an upgrade input BetterBags
-    -- watches changes (caches.md §2), so an item is asked about once, not on every refresh.
-    describe("kept verdicts", function()
-      local verdict, asked, savedReset
+    it("keeps no verdict on the item: a read asks the integration, which keeps answers by link", function()
+      local data = equippableItem({})
+      items.equipmentCache = {}
+      items:ResolveUpgrade(data)
+      assert.is_nil(data.upgradeVerdict)
+      assert.is_nil(data.upgradeGeneration)
+      items.equipmentCache = nil
+    end)
 
-      before_each(function()
-        verdict, asked = true, 0
-        savedReset = _G.PawnResetBags
-        _G.PawnResetBags = function() end
-        _G.PawnGetItemData = function() return {} end
-        _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function()
-          asked = asked + 1
-          return verdict
-        end
-        pawn._registered = nil
-        pawn._hooked = nil
-        pawn:OnEnable()
-        database.GetUpgradeIconProvider = function() return "Pawn" end
-        items.equipmentCache = {}
-      end)
+    it("draws no arrow while Pawn is not sure, and shows its answer once it is", function()
+      local data = equippableItem({})
+      verdict = nil
+      assert.is_false(items:ResolveUpgrade(data))
+      verdict = true
+      assert.is_true(items:ResolveUpgrade(data))
+    end)
 
-      after_each(function()
-        _G.PawnResetBags = savedReset
-        items.equipmentCache = nil
-      end)
+    -- An item Pawn has no answer for yet is not "not an upgrade": no rule may take it as one, and Auto Sell leaves it alone.
+    it("marks an item with no answer as not known, until it has one", function()
+      local data = equippableItem({})
+      verdict = nil
+      assert.is_false(items:ResolveUpgrade(data))
+      assert.is_true(data.upgradeUnknown)
+      verdict = false
+      assert.is_false(items:ResolveUpgrade(data))
+      assert.is_nil(data.upgradeUnknown)
+    end)
 
-      it("keeps Pawn's verdict until Pawn says the arrows may have changed", function()
-        local data = equippableItem({})
-        assert.is_true(items:ResolveUpgrade(data))
-        verdict = false
-        assert.is_true(items:ResolveUpgrade(data), "kept")
-        assert.equal(1, asked)
-        _G.PawnResetBags()
-        assert.is_false(items:ResolveUpgrade(data), "asked again")
-        assert.equal(2, asked)
-      end)
+    it("does not mark an item as not known when no provider is in use, or none is registered", function()
+      local data = equippableItem({})
+      verdict = nil
+      items:ResolveUpgrade(data)
+      assert.is_true(data.upgradeUnknown)
+      database.GetUpgradeIconProvider = function() return "None" end
+      items:ResolveUpgrade(data)
+      assert.is_nil(data.upgradeUnknown)
+      data.upgradeUnknown = true
+      database.GetUpgradeIconProvider = function() return "NotRegistered" end
+      items:ResolveUpgrade(data)
+      assert.is_nil(data.upgradeUnknown)
+    end)
 
-      -- PawnShouldItemLinkHaveUpgradeArrowUnbudgeted returns nil for "we're not sure yet" (no item
-      -- data or stats, or Pawn not initialized).
-      it("draws no arrow while Pawn is not sure, and asks again until it is", function()
-        local data = equippableItem({})
-        verdict = nil
-        assert.is_false(items:ResolveUpgrade(data))
-        verdict = true
-        assert.is_true(items:ResolveUpgrade(data))
-        assert.equal(2, asked)
-      end)
+    it("does not mark an item as not known for a provider that has answered", function()
+      local data = equippableItem({})
+      assert.is_true(items:ResolveUpgrade(data))
+      assert.is_nil(data.upgradeUnknown)
+    end)
 
-      it("hooks Pawn's reset once, however often it registers", function()
-        pawn._registered = nil
-        pawn:OnEnable()
-        local generation = items._upgradeGeneration
-        _G.PawnResetBags()
-        assert.equal(generation + 1, items._upgradeGeneration)
-      end)
+    it("gives the provider the upgrade generation an invalidation starts", function()
+      local before = items:GetUpgradeGeneration()
+      items:InvalidateUpgrades(false)
+      assert.are.equal(before + 1, items:GetUpgradeGeneration())
+    end)
+
+    -- A generation only makes an answer wait to be checked again: the old arrow stays until then.
+    it("keeps showing Pawn's answer when a new generation starts", function()
+      local data = equippableItem({})
+      assert.is_true(items:ResolveUpgrade(data))
+      verdict = false
+      items:InvalidateUpgrades(false)
+      assert.is_true(items:ResolveUpgrade(data))
     end)
 
     it("returns false for empty items without calling Pawn", function()
-      _G.PawnGetItemData = function() return {} end
       local called = false
-      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() called = true; return true end
-      pawn:OnEnable()
-      database.GetUpgradeIconProvider = function() return "Pawn" end
-
+      _G.PawnShouldItemLinkHaveUpgradeArrow = function() called = true; return true end
       -- ResolveUpgrade short-circuits empty items before hitting the provider.
       assert.is_false(items:ResolveUpgrade({ isItemEmpty = true }))
       assert.is_false(called)
@@ -2767,9 +2767,10 @@ describe("Upgrade Icon Providers", function()
     -- its modules (load-order race), OnEnable must not give up permanently. It
     -- registers an ADDON_LOADED retry so the provider appears once Pawn loads.
     it("registers late via ADDON_LOADED when Pawn loads after BetterBags enables", function()
-      _G.PawnGetItemData = nil
-      _G.PawnIsContainerItemAnUpgrade = nil
-      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = nil
+      items.upgradeProviders["Pawn"] = nil
+      pawn._registered = nil
+      _G.PawnShouldItemLinkHaveUpgradeArrow = nil
+      _G.PawnRegisterThirdPartyBag = nil
       pawn:OnEnable()
       -- Not registered yet: Pawn's globals do not exist.
       assert.is_nil(items.upgradeProviders["Pawn"])
@@ -2777,8 +2778,8 @@ describe("Upgrade Icon Providers", function()
       -- Pawn finishes loading; its globals appear and ADDON_LOADED fires. The
       -- retry registers the provider and requests one refresh so drawn arrows
       -- re-resolve against Pawn.
-      _G.PawnGetItemData = function() return {} end
-      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return true end
+      _G.PawnShouldItemLinkHaveUpgradeArrow = function() return true end
+      _G.PawnRegisterThirdPartyBag = function() end
       local refreshed = 0
       events:RegisterMessage('bags/Rederive', function() refreshed = refreshed + 1 end)
       local handler = events._eventMap["ADDON_LOADED"]

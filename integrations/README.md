@@ -97,28 +97,24 @@ Integrates with Masque for custom button skinning.
 
 ### Pawn (`pawn.lua`)
 
-Shows item upgrade indicators using Pawn's upgrade detection.
-
-**Features:**
-- Upgrade arrow indicators on items
-- Equipment slot preloading for comparison
-- Support for both Retail and Classic
-- Combat lockdown handling
-- Deferred updates after combat
+Shows item upgrade indicators using Pawn's upgrade detection, the way Pawn asks a bag addon to work with it (`PawnBags.lua`).
 
 **Key Components:**
 ```lua
--- Uses Pawn's upgrade detection
-PawnShouldItemLinkHaveUpgradeArrowUnbudgeted(itemLink, true)
+-- Asked about each item link; nil means past Pawn's budget, or no item data yet: check back on a timer
+PawnShouldItemLinkHaveUpgradeArrow(itemLink, true)
+-- RefreshAll is called when arrows may have changed. Registering also turns off Pawn's arrows on Blizzard's bag frames
+PawnRegisterThirdPartyBag("BetterBags", { RefreshAll = ... })
 ```
 
-**Event Handlers:**
-- `bag/Rendered` - Update all items after bag render
-
 **Behavior:**
-- Shows upgrade arrows on items that are upgrades according to Pawn
-- Preloads all equipment slots for accurate comparison
-- Defers updates during combat to avoid taint
+- Answers are kept by item link, without the player's level and spec: a sort, a re-read or a respec asks Pawn nothing in the read, and a read only asks about an item it has not seen
+- An item Pawn has no answer for yet is not treated as "not an upgrade": no `upgrade` search field, and Automation leaves it alone
+- Pawn's signal asks for no refresh: every item held is checked again a few at a time, showing its old arrow meanwhile
+- Only an arrow that changed recalculates the bags holding it, and no category or button is redone for it
+- Nothing is checked again during combat
+
+Details: `.claude/rules/caches.md` §2a.
 
 ### SimpleItemLevel (`simpleitemlevel.lua`)
 

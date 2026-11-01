@@ -103,8 +103,10 @@ it changes.
   It follows the sets, which `fillSnapshot` compares, and which `RefreshKeptItem` refreshes,
   dropping the item's `derived` (so Phase 6 marks it) when they change.
 - **`upgrade`** (boolean): the arrow BetterBags draws (`item.isUpgrade`, Phase 6, from the active
-  provider, data-loader.md §15). Phase 6 marks the item when its arrow changed. Absent for an item
-  read before its data loaded (rule #1, data-loader.md §19), whose arrow is a guess.
+  provider, data-loader.md §15). Phase 6 marks the item when its arrow changed, or when it became known
+  or not known. Absent for an item read before its data loaded (rule #1, data-loader.md §19), whose arrow
+  is a guess, and for one its provider cannot tell about yet (`upgradeUnknown`, caches.md §2a): no arrow
+  there is no answer, so `upgrade = false` must not take it.
 - **`total`** (number): how many of the item the kind's bags hold, by item ID, every stack counted
   (Vendor's `TotalItemCount`). `items:CountItemTotals`, between Phase 7 and Phase 8, every sweep,
   marks an item whose total changed. Per kind: the backpack's bags for the backpack, the bank's for

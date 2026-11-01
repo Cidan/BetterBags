@@ -1509,6 +1509,263 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
+  -- The real integration on the real pipeline. Reported (issue #1209): every loot froze the game for about 150 ms, because Pawn's
+  -- signal made the read that followed ask Pawn about the whole bag again.
+  describe("Pawn's answers", function()
+    local pawn, asked, verdicts, timers, sent, bag, budget
+
+    local function link(id)
+      return "|cffffffff|Hitem:" .. id .. "|h[" .. (itemNames[id] or ("TestItem " .. id)) .. "]|h|r"
+    end
+
+    -- turn runs the timers waiting, as a quarter second passing does, with Pawn's budget back.
+    local function turn()
+      if budget then
+        budget.left = budget.size
+      end
+      local pending = timers
+      timers = {}
+      for _, fn in ipairs(pending) do fn() end
+    end
+
+    local function settle()
+      local guard = 0
+      while #timers > 0 do
+        turn()
+        guard = guard + 1
+        assert(guard < 100, "the queue never settled")
+      end
+    end
+
+    -- signal is Pawn calling BetterBags back (PawnResetBags).
+    local function signal()
+      bag.RefreshAll()
+    end
+
+    before_each(function()
+      asked, verdicts, timers, sent, budget = {}, {}, {}, {}, nil
+      saveGlobal(_G, "PawnShouldItemLinkHaveUpgradeArrow")
+      saveGlobal(_G, "PawnRegisterThirdPartyBag")
+      _G.PawnShouldItemLinkHaveUpgradeArrow = function(askedLink, checkLevel)
+        assert(checkLevel == true)
+        if budget then
+          if budget.left <= 0 then return nil end
+          budget.left = budget.left - 1
+        end
+        table.insert(asked, askedLink)
+        return verdicts[tonumber(askedLink:match("item:(%d+)"))] == true
+      end
+      _G.PawnRegisterThirdPartyBag = function(_, callbacks) bag = callbacks end
+      override(database, "GetUpgradeIconProvider", function() return "Pawn" end)
+      override(database, "GetUpgradeIconProviderUserSet", function() return true end)
+      override(_G.C_Timer, "After", function(_, fn) table.insert(timers, fn) end)
+      local send = events.SendMessage
+      override(events, "SendMessage", function(self, ctx, event, ...)
+        if event == "bags/Rederive" then
+          table.insert(sent, { event = event, options = (...) })
+        end
+        return send(self, ctx, event, ...)
+      end)
+      override(_G, "print", function() end)
+      pawn = LoadFreshBetterBagsModule("Pawn", "integrations/pawn.lua")
+      assert.is_true(pawn:Register())
+      mockContainer[0] = {
+        { itemID = 101, guid = "g1", count = 1 },
+        { itemID = 102, guid = "g2", count = 5 },
+        { itemID = 303, guid = "g3", count = 2 },
+        {},
+      }
+      verdicts[101] = true
+      refreshBackpack({ wipe = true })
+      table.sort(asked)
+      assert.are.same({ link(101), link(102), link(303) }, asked)
+      asked, sent = {}, {}
+    end)
+
+    after_each(function()
+      ResetModuleStub("Pawn", "integrations/pawn.lua")
+    end)
+
+    it("keeps no verdict on the items, so a read always shows what Pawn last said", function()
+      local item = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"]
+      assert.is_true(item.isUpgrade)
+      assert.is_nil(item.upgradeVerdict)
+    end)
+
+    -- The report: a loot, and Pawn's signal, with every answer the same as it was.
+    it("asks about the looted item alone in the read after Pawn's signal, and recalculates nothing", function()
+      mockContainer[0][4] = { itemID = 201, guid = "g4", count = 1 }
+      verdicts[201] = true
+      signal()
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ link(201) }, asked, "the read asks only about what it has not seen")
+      assert.is_true(slotInfo.itemsBySlotKey["0_4"].isUpgrade, "the loot has its arrow on the read that found it")
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+      settle()
+      table.sort(asked)
+      assert.are.same({ link(101), link(102), link(201), link(303) }, asked, "the rest a turn later")
+      assert.are.same({}, sent, "nothing changed, so nothing is recalculated")
+    end)
+
+    it("shows an arrow Pawn changed its mind about through one recalculation that keeps categories", function()
+      local kept = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_2"]
+      verdicts[102] = true
+      signal()
+      assert.is_false(kept.isUpgrade)
+      settle()
+      assert.are.same({ { event = "bags/Rederive",
+        options = { backpack = true, bank = false, guild = false, categoriesUnchanged = true } } }, sent)
+      asked = {}
+      local slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({}, asked, "the recalculation asks nothing")
+      assert.are.equal(kept, slotInfo.itemsBySlotKey["0_2"], "the same item, kept")
+      assert.is_true(kept.isUpgrade)
+      assert.is_true(search:Search("upgrade = true")["0_2"], "the upgrade field follows")
+    end)
+
+    it("takes an arrow away the same way", function()
+      verdicts[101] = false
+      signal()
+      local slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isUpgrade, "the old arrow, until its turn")
+      settle()
+      slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.is_false(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+      assert.is_nil(search:Search("upgrade = true")["0_1"])
+    end)
+
+    -- Found by an adversarial review: "not known yet" read as "not an upgrade", which a rule on the field could take.
+    it("leaves an item with no answer out of the upgrade field, until it has one", function()
+      pawn:Forget()
+      budget = { size = 0, left = 0 }
+      local item = refreshBackpack({ wipe = true }).itemsBySlotKey["0_2"]
+      assert.is_true(item.upgradeUnknown)
+      assert.is_false(item.isUpgrade)
+      assert.is_nil(search:Search("upgrade = false")["0_2"])
+      assert.is_nil(search:Search("upgrade = true")["0_2"])
+      budget.size = 10
+      settle()
+      assert.are.equal(1, #sent, "its answer changes no arrow, and must still reach it")
+      item = refreshBackpack({ derive = true, categoriesUnchanged = true }).itemsBySlotKey["0_2"]
+      assert.is_nil(item.upgradeUnknown)
+      assert.is_true(search:Search("upgrade = false")["0_2"])
+    end)
+
+    -- Found by an adversarial review: a rule on the absent field took it, Skip Recent Items ended its timer and the client's new-item flag,
+    -- and neither came back when Pawn said it was an upgrade.
+    describe("Skip Recent Items on a rule that a first answer decides", function()
+      before_each(function()
+        override(categories, "GetSortedSearchCategories", function()
+          return { { name = "NotUpgrades", priority = 1, enabled = { [const.BAG_KIND.BACKPACK] = true },
+            searchCategory = { query = "NOT upgrade = true", groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } } }
+        end)
+        override(categories, "SkipsRecentOf", function(_, name) return name == "NotUpgrades" end)
+        budget = { size = 0, left = 0 }
+        mockContainer[0][4] = { itemID = 201, guid = "g4", count = 1 }
+        newSlots["0_4"] = true
+      end)
+
+      it("leaves a new item in Recent Items until Pawn says, and there when it is an upgrade", function()
+        verdicts[201] = true
+        local item = refreshBackpack({ bags = { [0] = true } }).itemsBySlotKey["0_4"]
+        assert.is_true(item.upgradeUnknown)
+        assert.is_true(items:IsNewItem(item), "not skipped on a guess")
+        assert.is_true(newSlots["0_4"])
+        budget.size = 10
+        settle()
+        item = refreshBackpack({ derive = true, categoriesUnchanged = true }).itemsBySlotKey["0_4"]
+        assert.is_nil(item.upgradeUnknown)
+        assert.is_true(items:IsNewItem(item))
+        assert.is_true(newSlots["0_4"])
+      end)
+
+      it("skips it once Pawn says it is no upgrade", function()
+        verdicts[201] = false
+        refreshBackpack({ bags = { [0] = true } })
+        budget.size = 10
+        settle()
+        local item = refreshBackpack({ derive = true, categoriesUnchanged = true }).itemsBySlotKey["0_4"]
+        assert.is_false(items:IsNewItem(item))
+        assert.is_nil(newSlots["0_4"])
+      end)
+    end)
+
+    it("keeps its arrows through a level-up or respec that changes every link, asking nothing in the read", function()
+      for _, slot in ipairs({ 1, 2, 3 }) do
+        local contents = mockContainer[0][slot]
+        contents.link = "|cnIQ1:|Hitem:" .. contents.itemID .. "::::::::90:66:::::::::|h[Item]|h|r"
+      end
+      pawn:Forget()
+      refreshBackpack({ wipe = true })
+      asked = {}
+      for _, slot in ipairs({ 1, 2, 3 }) do
+        local contents = mockContainer[0][slot]
+        contents.link = "|cnIQ1:|Hitem:" .. contents.itemID .. "::::::::90:65:::::::::|h[Item]|h|r"
+      end
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({}, asked)
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+      assert.is_false(slotInfo.itemsBySlotKey["0_2"].isUpgrade)
+    end)
+
+    it("asks nothing when a sort moves everything: an answer is kept by link", function()
+      mockContainer[0][1], mockContainer[0][3] = mockContainer[0][3], mockContainer[0][1]
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({}, asked)
+      assert.are.same({}, timers)
+      assert.is_true(slotInfo.itemsBySlotKey["0_3"].isUpgrade, "the arrow goes with the item")
+      assert.is_false(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+    end)
+
+    it("asks nothing on a full re-read", function()
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.same({}, asked)
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+    end)
+
+    it("asks once about two stacks of one item", function()
+      mockContainer[0][4] = { itemID = 201, guid = "g4", count = 1 }
+      mockContainer[1] = { { itemID = 201, guid = "g5", count = 1 } }
+      refreshBackpack({ bags = { [0] = true, [1] = true } })
+      assert.are.same({ link(201) }, asked)
+    end)
+
+    -- Gear, level, skills and spec start a generation too, and ask for a refresh of their own.
+    it("checks every item again after a new generation, a turn after the refresh, keeping its arrow until then", function()
+      verdicts[101] = false
+      items:InvalidateUpgrades(false)
+      local slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.are.same({}, asked, "not in the refresh")
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+      settle()
+      assert.are.equal(3, #asked)
+      assert.are.equal("bags/Rederive", sent[1].event)
+    end)
+
+    -- A session's first read, or the bank's: Pawn's budget stops it part of the way.
+    it("draws what the budget let it ask about, then the rest as Pawn answers", function()
+      pawn:Forget()
+      asked = {}
+      budget = { size = 2, left = 2 }
+      verdicts[101], verdicts[102], verdicts[303] = true, true, true
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.are.equal(2, #asked)
+      local arrows = 0
+      for _, item in pairs(slotInfo.itemsBySlotKey) do
+        arrows = arrows + (item.isUpgrade and 1 or 0)
+      end
+      assert.are.equal(2, arrows, "no arrow for the one Pawn could not answer about yet")
+      settle()
+      assert.are.equal(3, #asked)
+      assert.are.equal(1, #sent)
+      slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
+      for _, slotkey in ipairs({ "0_1", "0_2", "0_3" }) do
+        assert.is_true(slotInfo.itemsBySlotKey[slotkey].isUpgrade, slotkey)
+      end
+      assert.are.equal(3, #asked, "asked nothing more")
+    end)
+  end)
+
   -- Item buttons skip a redraw whose inputs are unchanged (frames/item.lua). Settings that
   -- change how a button looks without changing its data (glow intensity, item level
   -- display, theme) all send bags/FullRefreshAll, a wipe sweep; the draw generation every
@@ -4795,6 +5052,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
       local BACKPACK, BANK_BAGS = { 0, 1 }, { 6, 7, 13 }
       local SLOTS = 6
+      local itemKinds = 5
 
       local function random(n)
         seed = (seed * 1103515245 + 12345) % 2147483648
@@ -4866,7 +5124,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
       local function newItem()
         guidCounter = guidCounter + 1
-        return { itemID = 100 + random(5), guid = "g" .. guidCounter, count = random(5) }
+        return { itemID = 100 + random(itemKinds), guid = "g" .. guidCounter, count = random(5) }
       end
 
       local function slotsOf(bags, filled)
@@ -5170,6 +5428,268 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         end
         return client, committed
       end
+
+      -- Pawn in a whole client (caches.md §2a): Pawn's real budget, links that carry the player's level and spec, and everything the
+      -- client does. Found by an adversarial review of the integration, which ran this over many more seeds.
+      describe("with Pawn", function()
+        local pawn, truth, pawnBag, inCombat, spent, level
+        local ask = 0.00087
+
+        -- Pawn's BudgetThrottle (Pawn 2.14 Pawn.lua), line for line.
+        local function budgetThrottle(func, budget, period)
+          local periodEndsAt, remaining = 0, 0
+          return function(...)
+            local at = _G.GetTimePreciseSec()
+            if at >= periodEndsAt then
+              periodEndsAt = at + period
+              remaining = budget
+            elseif remaining <= 0 then
+              return nil
+            end
+            local returns = { func(...) }
+            remaining = remaining - (_G.GetTimePreciseSec() - at)
+            return unpack(returns)
+          end
+        end
+
+        local function idOf(itemLink)
+          return tonumber(itemLink:match("item:(%d+)"))
+        end
+
+        local function signal()
+          pawnBag.RefreshAll()
+        end
+
+        before_each(function()
+          saveGlobal(_G, "PawnShouldItemLinkHaveUpgradeArrow")
+          saveGlobal(_G, "PawnRegisterThirdPartyBag")
+          override(database, "GetUpgradeIconProvider", function() return "Pawn" end)
+          override(database, "GetUpgradeIconProviderUserSet", function() return true end)
+          override(_G, "GetTime", function() return now end)
+          override(_G, "GetTimePreciseSec", function() return now + spent end)
+          override(_G, "InCombatLockdown", function() return inCombat end)
+          override(_G, "print", function() end)
+          local baseLink = _G.C_Container.GetContainerItemLink
+          override(_G.C_Container, "GetContainerItemLink", function(bag, slot)
+            local plain = baseLink(bag, slot)
+            return plain and (plain:gsub("item:(%d+)", "item:%1::::::::" .. level .. ":66"))
+          end)
+          _G.PawnRegisterThirdPartyBag = function(_, callbacks) pawnBag = callbacks end
+          _G.PawnShouldItemLinkHaveUpgradeArrow = function() return nil end
+          pawn = LoadFreshBetterBagsModule("Pawn", "integrations/pawn.lua")
+        end)
+
+        after_each(function()
+          itemKinds, ask = 5, 0.00087
+          ResetModuleStub("Pawn", "integrations/pawn.lua")
+        end)
+
+        local function setupPawn(s)
+          truth, spent, level, inCombat = {}, 0, 90, false
+          for id = 101, 100 + itemKinds do truth[id] = id % 2 == 0 end
+          _G.PawnShouldItemLinkHaveUpgradeArrow = budgetThrottle(function(itemLink, checkLevel)
+            assert(checkLevel == true)
+            spent = spent + ask
+            return truth[idOf(itemLink)] == true
+          end, 2 / 60 / 4, 1 / 4)
+          setup(s)
+          items:RegisterCacheEvents()
+          pawn:Forget()
+          pawn._registered = nil
+          pawn.turnWaiting = false
+          pawn.recalculatedAt = nil
+          assert(pawn:Register())
+          send("bags/Rederive", { categoriesUnchanged = true })
+        end
+
+        local function settled()
+          local guard = 0
+          repeat
+            frames(15)
+            guard = guard + 1
+          until (pawn:Waiting() == 0 and next(timers) == nil) or guard > 4000
+        end
+
+        -- Enough items and a dear enough question that Pawn's budget runs out, or no item is ever "not known" here.
+        it("shows Pawn's answer on every arrow and search entry once the client is quiet", function()
+          itemKinds, ask = 40, 0.004
+          local marked = { [const.BAG_KIND.BACKPACK] = 0, [const.BAG_KIND.BANK] = 0 }
+          local ops = {}
+          for name, op in pairs(OPS) do ops[name] = op end
+          ops.pawnChange = function()
+            truth[100 + random(itemKinds)] = random(2) == 1
+            signal()
+          end
+          ops.pawnSignal = signal
+          ops.gear = function()
+            -- Pawn's own check is skipped in combat, so its answers do not change then.
+            fire("PLAYER_EQUIPMENT_CHANGED", 1)
+            if not inCombat then
+              truth[100 + random(itemKinds)] = random(2) == 1
+              signal()
+            end
+          end
+          ops.faction = function() fire("UPDATE_FACTION") end
+          ops.combat = function() inCombat = not inCombat end
+          ops.respec = function()
+            level = level + 1
+            fire("PLAYER_SPECIALIZATION_CHANGED", "player")
+            signal()
+          end
+          local names = {}
+          for name in pairs(ops) do table.insert(names, name) end
+          table.sort(names)
+          for s = 1, 15 do
+            setupPawn(s)
+            for _ = 1, 150 do
+              local name = names[random(#names)]
+              table.insert(log, string.format("%.3f op %s", now, name))
+              local ok, err = pcall(ops[name])
+              if not ok then
+                table.insert(errors, { err = tostring(err), log = { unpack(log, math.max(1, #log - 30)) } })
+              end
+              if #errors > 0 then
+                error("seed " .. s .. ": " .. errors[1].err .. "\n--- before it ---\n" .. table.concat(errors[1].log, "\n"))
+              end
+              for kind, count in pairs(marked) do
+                for _, item in pairs(items.slotInfo[kind].itemsBySlotKey) do
+                  if item.upgradeUnknown then
+                    marked[kind] = count + 1
+                    break
+                  end
+                end
+              end
+            end
+            inCombat = false
+            frames(60 * 70)
+            assert.are.equal(0, #errors)
+            local kinds = { const.BAG_KIND.BACKPACK }
+            if addon.atBank then table.insert(kinds, const.BAG_KIND.BANK) end
+            for _, kind in ipairs(kinds) do
+              for slotkey, item in pairs(items.slotInfo[kind].itemsBySlotKey) do
+                if not item.isItemEmpty then
+                  local want = truth[idOf(item.itemInfo.itemLink)] == true
+                  assert.are.equal(want, item.isUpgrade, "seed " .. s .. " " .. slotkey)
+                  assert.is_nil(item.upgradeUnknown, "seed " .. s .. " " .. slotkey)
+                  assert.are.equal(want, search:Search("upgrade = true")[slotkey] == true, "seed " .. s .. " " .. slotkey)
+                  assert.are.equal(not want, search:Search("upgrade = false")[slotkey] == true, "seed " .. s .. " " .. slotkey)
+                end
+              end
+            end
+            assert.are.equal(0, pawn:Waiting(), "seed " .. s)
+            assert.is_nil(next(timers), "seed " .. s .. ": a timer left")
+          end
+          assert.is_true(marked[const.BAG_KIND.BACKPACK] > 50, "backpack: " .. marked[const.BAG_KIND.BACKPACK])
+          assert.is_true(marked[const.BAG_KIND.BANK] > 5, "bank: " .. marked[const.BAG_KIND.BANK])
+        end)
+
+        -- A rule that sells what is no upgrade, the way docs/vendor-compat.md maps Vendor's Pawn_IsUpgrade(). 3 of 5 upgrades were sold
+        -- with Pawn's budget spent; buyback keeps 12 items, so they can be lost for good. The real Automation and Seller. `NOT upgrade = true`
+        -- also takes an item with no upgrade field, so only Automation leaving it alone stands between it and the merchant.
+        for _, query in ipairs({ "upgrade = false", "NOT upgrade = true" }) do
+          describe("selling by the rule " .. query, function()
+            local automation, seller, sold, upgrades
+            local TOTAL, UPGRADES = 60, 5
+
+            local function sellListHolds()
+              local held = 0
+              for _, entry in ipairs(automation:SellList(context:New("spec"))) do
+                if upgrades[entry.data.itemInfo.itemID] then held = held + 1 end
+              end
+              return held
+            end
+
+            local function soldUpgrades()
+              local count = 0
+              for _, id in ipairs(sold) do
+                if upgrades[id] then count = count + 1 end
+              end
+              return count
+            end
+
+            before_each(function()
+              seller = LoadFreshBetterBagsModule("Seller", "data/seller.lua")
+              automation = LoadFreshBetterBagsModule("Automation", "data/automation.lua")
+              sold = {}
+              override(_G.C_Container, "UseContainerItem", function(bag, slot)
+                local contents = mockContainer[bag] and mockContainer[bag][slot]
+                if contents and contents.itemID then
+                  table.insert(sold, contents.itemID)
+                  mockContainer[bag][slot] = {}
+                  bagUpdate(bag)
+                end
+              end)
+              setupPawn(7)
+              seller:Init()
+              automation:Init()
+              seller:OnEnable()
+              automation:OnEnable()
+              override(categories, "GetSortedSearchCategories", function()
+                return { { name = "NotUpgrades", priority = 1,
+                  enabled = { [const.BAG_KIND.BACKPACK] = true, [const.BAG_KIND.BANK] = true },
+                  searchCategory = { query = query, groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE } } }
+              end)
+              override(categories, "AutomationOf", function(_, name) return name == "NotUpgrades" and "sell" or nil end)
+              override(categories, "ConfirmsSaleOf", function() return false end)
+              override(_G, "IsShiftKeyDown", function() return false end)
+              override(_G, "GetNetStats", function() return 0, 0, 20, 20 end)
+              override(_G, "UnitGUID", function() return "merchant" end)
+              override(_G.C_Item, "CanBeRefunded", function() return false end)
+              override(_G, "C_MerchantFrame", { IsSellAllJunkEnabled = function() return true end })
+              upgrades = {}
+              for _, bag in ipairs(BACKPACK) do
+                mockContainer[bag] = {}
+                for slot = 1, TOTAL / 2 do
+                  guidCounter = guidCounter + 1
+                  local id = 4000 + bag * 100 + slot
+                  mockContainer[bag][slot] = { itemID = id, guid = "s" .. guidCounter, count = 1, info = { hasNoValue = false } }
+                  if bag == 0 and slot % 6 == 1 then
+                    truth[id] = true
+                    upgrades[id] = true
+                  end
+                end
+                bagUpdate(bag)
+              end
+              settled()
+              assert.are.equal(0, sellListHolds(), "settled")
+            end)
+
+            after_each(function()
+              ResetModuleStub("Automation", "data/automation.lua")
+              ResetModuleStub("Seller", "data/seller.lua")
+            end)
+
+            it("sells none of them right after a level-up that changes every link, and the rest", function()
+              level = level + 1
+              fire("PLAYER_LEVEL_UP", level)
+              frames(5)
+              assert.are.equal(0, sellListHolds())
+              fire("MERCHANT_SHOW")
+              frames(60 * 60)
+              assert.are.equal(0, soldUpgrades())
+              assert.are.equal(TOTAL - UPGRADES, #sold)
+            end)
+
+            -- A session's first read, with a merchant right beside it: the sale waits for Pawn, rather than leaving out for the
+            -- whole visit what it had no answer for yet.
+            it("sells none of them while Pawn has no answer for them, then the rest, in that one visit", function()
+              pawn:Forget()
+              send("bags/FullRefreshAll")
+              frames(5)
+              local unknown = 0
+              for _, item in pairs(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
+                if item.upgradeUnknown then unknown = unknown + 1 end
+              end
+              assert.is_true(unknown > 0, "the budget left some with no answer")
+              assert.are.equal(0, sellListHolds())
+              fire("MERCHANT_SHOW")
+              frames(60 * 60)
+              assert.are.equal(0, soldUpgrades())
+              assert.are.equal(TOTAL - UPGRADES, #sold)
+            end)
+          end)
+        end
+      end)
 
       it("never asks about a slot the client emptied, and commits what the client holds once it is quiet", function()
         local total = { read = 0, derive = 0, bank = 0, transfer = 0 }
