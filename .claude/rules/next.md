@@ -2,7 +2,7 @@
 
 An experiment in a new bag design: full-height panels that slide in from the edges of the screen,
 the backpack from the right and the bank from the left, each with its tabs down its inner side, the
-categories in one column of big icons, and a title with a light ribbon and sparkles drifting out of
+categories in columns of big icons (§7a), and a title with a light ribbon and sparkles drifting out of
 the window. Asked for: "magical, with whimsy and animations; nice to use, but functional", then
 "bank next, but, on the opposite side! remember we have warbank, etc." It replaces only how the bags
 are drawn: the data pipeline, the item buttons and every setting that feeds the data are the same.
@@ -99,7 +99,7 @@ drew that nobody claimed are released afterwards. A draw on a hidden panel is de
 
 Sections are kept by name across passes and reused; one not drawn again is hidden and pooled.
 
-**Layout** (`NextContent:Render`): one column. A section is a header (its name, its count, a fading
+**Layout** (`NextContent:Render`): one column here, or several (§7a). A section is a header (its name, its count, a fading
 line) and its cells in rows of as many 44-pixel icons as fit the width given, 6 apart; sections 16
 apart. Item buttons are sized to 44 (`item:SetSize`) when they are not already. Every placement goes
 through Motion (render-pipeline.md §4c) in a pass of the canvas while the panel is shown, so a
@@ -665,10 +665,16 @@ orders. Columns stacking on their own heights are never an option, though they w
 
 - **Settings**, per bag, in its Layout tab's Sections, BetterBags Next only (`config/catalog.lua`; saved apart from the classic
   bags' `columnCount`, whose saved values would otherwise change Next's layouts): **Section Columns** (`sectionColumns`, 1 to 4,
-  default 1: nothing changes until someone opts in), **Fill Order** (`sectionFill`, Side to Side by default, or Top to Bottom),
-  **Wide Sections Span Columns** (`sectionSpan`, on) and **Wide Column Limit** (`sectionWideRows`, 2 to 10, default 2). The last
+  default 2, `const.NEXT_SECTION_COLUMNS_DEFAULT`), **Fill Order** (`sectionFill`, Side to Side by default, or Top to Bottom),
+  **Wide Sections Span Columns** (`sectionSpan`, on) and **Wide Column Limit** (`sectionWideRows`, 2 to 10, default 2). Section
+  Order, which both designs read, defaults to Size Descending (`sectionSort`). Asked: "2 columns, side to side, wide sections on,
+  wide column limit of 2, and sort order is descending for sections by default. do this for all bags." AceDB saves only what
+  differs from a default, so a player on the old default, who chose Alphabetically or not, takes the new one: a saved value
+  cannot tell them apart. The last
   three are disabled at one column, the limit also with wide sections off. Each sends `next/SectionColumnsChanged` (the bag's
   kind), and that bag's panel lays out again: no read of the bags. The settings window shows the rows' state again on it.
+- **Sizes change the order:** with Size Descending a section's place follows how much it holds, so a read that changes a count can
+  move sections, in rows too. A read that changes no count moves none, and a section's own width stays held through it.
 - **What decides it:** the panel names a source (`canvas:SetColumnSource`, `panel:SectionColumns`), read at each layout. Only
   bags have one: the vendor's cards stay one column. The Show Bags view (a bag's slots in order, a guild tab by itself) is one
   column. One column takes the code path it always did, unchanged.
@@ -709,11 +715,15 @@ orders. Columns stacking on their own heights are never an option, though they w
   name is on its header's tooltip. The line after a title hides when no room is left (`LINE_MIN`), where it would draw backwards;
   that holds at one column in a narrow window too.
 - **Nothing between columns.** A divider was built and removed, asked: "remove that divider for columns, looks terrible".
-- **Dragging, for now:** `canvas:CanReorder()` is false in columns, so its own bag is no target and a section lands back where it
+- **Dragging, for now (and so by default):** `canvas:CanReorder()` is false in columns, so its own bag is no target and a section lands back where it
   was, in its column (`GetDragSlotX`, `section.x`), saving nothing. Tabs, the other bag, sellers and docks work as ever, and the
   tooltip stops offering to reorder. Held-out and leaving sections close up as in one column.
-- **Small panels** (§14g): `Widest(layoutWidth)` counts columns, each as wide as the largest section, at least `MIN_COLUMN_CELLS`
-  so a snap never takes a column away, or what Recent Items or Free Space hold. Letting go of a grip lays out once more where it
+- **Small panels** (§14g): `Widest(layoutWidth)` is what keeps the columns as they stand at the width let go at (`columnRows`, so what
+  stood side by side still does): each column as wide as the largest section beside another, at least `MIN_COLUMN_CELLS` so a snap
+  never takes a column away; one spanning some of its columns sharing what it needs among them; one alone in its row only what it
+  needs, since it can take the row (not filling down, where the sections above it hold its column); or what Recent Items or Free Space
+  hold. Every column as wide as the largest section, spanning or not, left a bag of 14, 4 and 7 let go at 25 cells 25 wide, and a
+  lone section of 6 at 12: asked of one column, "it should shrink back down". Letting go of a grip lays out once more where it
   was let go (in columns only), so what the snap moves glides from there: sizing places everything at once, and the second column
   jumped hundreds of pixels with the window still wide behind it. A frame within half a pixel of the width the panel lays out
   for stands for that width (`FrameLayoutWidth`): frames stand on whole pixels, and a frame a fraction under what its columns take
@@ -1749,7 +1759,7 @@ window to be too big like in that screenshot, it should shrink back down to wher
     does both, as Blizzard's does: it kept the percentage on a full update and had no `OnSizeChanged`.
   - **Recorded** while the render recorder records (`recordSizing`, render-recorder.md §2): each step of the sizing and
     of its glide, with where the client put the panel and a few icons in screen pixels with their fractions.
-  - **Let go, it shrinks to its widest row of icons** (`StopSizing`, `SnapWidth`): its widest row as laid out
+  - **Let go, it shrinks to its widest row of icons** (`StopSizing`, `SnapWidth`; in columns what they need, §7a): its widest row as laid out
     where it was let go, in units: as many cells as a row holds there (`NextCanvas:PerRow`, the canvas's own row
     rule, icons or the vendor's cards), or as its largest section in the column holds when that is fewer
     (`NextCanvas:Widest`: a gap takes a cell; a section waiting in a dock or leaving is not in the column, one flying

@@ -364,6 +364,137 @@ describe("BetterBags Next's small mode", function()
       return bag
     end
 
+    -- Found reviewing the defaults: every column as wide as the largest section left a bag of 14, 4 and 7 let go at 25 cells
+    -- 25 wide, 11 empty beside its 14. Asked of one column: "if i drag the [bag too wide] it should shrink back down".
+    describe("on the defaults, wide sections spanning columns", function()
+      -- holding puts sections of as many items as each says in a bag, nothing held from what it showed before.
+      local function holding(bag, list)
+        local categories, items, n = {}, {}, 0
+        for _, s in ipairs(list) do
+          table.insert(categories, { name = s[1] })
+          for _ = 1, s[2] do
+            n = n + 1
+            table.insert(items, item("0_" .. n, s[1]))
+          end
+        end
+        bag.content:Settle()
+        bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = { categories = categories, items = items } } }, function() end)
+        render:Flush()
+      end
+
+      local function bagIn(list, wideRows, fill)
+        override(stubs.database, "GetNextSectionColumns", function() return 2 end)
+        override(stubs.database, "GetNextSectionSpan", function() return true end)
+        override(stubs.database, "GetNextSectionWideRows", function() return wideRows or 2 end)
+        override(stubs.database, "GetNextSectionFill", function() return fill or "across" end)
+        local bag = nextBag:Create(ctx())
+        bag:Show(ctx())
+        finishTweens()
+        holding(bag, list)
+        return bag, bag:ContentRoom()
+      end
+
+      for _, fill in ipairs({ "across", "down" }) do
+        it("shrinks to what a section spanning them and the rest need, filling " .. fill, function()
+          local bag, room = bagIn({ { "A", 14 }, { "B", 4 }, { "C", 7 } }, 2, fill)
+          local at = bag.content:RowWidth(14) + room
+          assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(25) + room))
+          assert.are.equal(at, bag:SnapWidth(at), "and stays there")
+          assert.are.equal(2, bag.content:ColumnSplit(at - room).count, "its columns kept")
+        end)
+      end
+
+      it("keeps side by side what stood side by side where it was let go", function()
+        local bag, room = bagIn({ { "A", 3 }, { "B", 1 } })
+        assert.are.equal(bag.content:RowWidth(6) + room, bag:SnapWidth(bag.content:RowWidth(20) + room))
+      end)
+
+      it("leaves a section as wide as a column where it is, by its own cells", function()
+        local bag, room = bagIn({ { "A", 10 }, { "B", 9 }, { "C", 9 } })
+        local at = bag.content:RowWidth(20) + room
+        assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(25) + room))
+        assert.are.equal(at, bag:SnapWidth(at))
+      end)
+
+      it("shares among the columns it spans what keeps a section beside another under the limit", function()
+        override(stubs.database, "GetNextSectionColumns", function() return 3 end)
+        local bag, room = bagIn({ { "A", 14 }, { "B", 3 } })
+        override(stubs.database, "GetNextSectionColumns", function() return 3 end)
+        bag.content:Invalidate()
+        render:Flush()
+        local at = bag.content:RowWidth(21) + room
+        assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(30) + room))
+        assert.are.equal(at, bag:SnapWidth(at))
+      end)
+
+      -- Alone in its row it can take the row, so nothing beside it asks for a column as wide as it.
+      it("hugs a section alone in its row, an odd number of cells too", function()
+        local bag, room = bagIn({ { "A", 5 }, { "B", 2 } })
+        local at = bag.content:RowWidth(5) + room
+        assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(8) + room))
+        assert.are.equal(at, bag:SnapWidth(at))
+        local lone, loneRoom = bagIn({ { "A", 11 } })
+        local width = lone.content:RowWidth(11) + loneRoom
+        assert.are.equal(width, lone:SnapWidth(lone.content:RowWidth(20) + loneRoom))
+      end)
+
+      it("hugs what keeps a lone section under a higher limit", function()
+        local bag, room = bagIn({ { "A", 30 } }, 3)
+        local at = bag.content:RowWidth(15) + room
+        assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(20) + room))
+        assert.are.equal(at, bag:SnapWidth(at))
+      end)
+
+      it("keeps a section alone in its row a column wide with wide sections off", function()
+        local bag, room = bagIn({ { "A", 6 } })
+        override(stubs.database, "GetNextSectionSpan", function() return false end)
+        bag.content:Settle()
+        assert.are.equal(bag.content:RowWidth(12) + room, bag:SnapWidth(bag.content:RowWidth(20) + room))
+      end)
+
+      it("keeps a section in its column filling down, though it stands alone in its row", function()
+        local bag, room = bagIn({ { "A", 3 }, { "B", 10 }, { "C", 3 } }, 2, "down")
+        local at = bag.content:RowWidth(20) + room
+        assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(25) + room))
+        assert.are.equal(at, bag:SnapWidth(at))
+      end)
+
+      -- A width let go at snaps to one the snap leaves alone, the same number of columns, never wider, for any bag.
+      it("snaps to a width it stays at, its columns kept, across random bags", function()
+        local count, wideRows, fill = 2, 2, "across"
+        local bag, room = bagIn({ { "S1", 1 } })
+        override(stubs.database, "GetNextSectionColumns", function() return count end)
+        override(stubs.database, "GetNextSectionWideRows", function() return wideRows end)
+        override(stubs.database, "GetNextSectionFill", function() return fill end)
+        for seed = 1, 200 do
+          math.randomseed(seed)
+          count, wideRows, fill = math.random(2, 4), math.random(2, 4), seed % 2 == 0 and "across" or "down"
+          local list = {}
+          for i = 1, math.random(1, 8) do
+            list[i] = { "S" .. i, math.random() < 0.2 and math.random(10, 40) or math.random(1, 6) }
+          end
+          holding(bag, list)
+          local width = math.max(bag:MinWidth(), bag.content:RowWidth(math.random(count * 2, 30)) + room + math.random() * 40)
+          local to = bag:SnapWidth(width)
+          local before, after = bag.content:ColumnSplit(width - room), bag.content:ColumnSplit(to - room)
+          assert.are.equal(before and before.count or 1, after and after.count or 1, "columns, seed " .. seed)
+          assert.is_true(math.abs(to - bag:SnapWidth(to)) < 1e-6, "stays there, seed " .. seed)
+          assert.is_true(to <= width + 1e-6, "never wider, seed " .. seed)
+        end
+      end)
+
+      it("never adds cells a section spanning them would like", function()
+        local bag, room = bagIn({ { "A", 30 } })
+        local width = bag.content:RowWidth(20) + room
+        assert.are.equal(width, bag:SnapWidth(width))
+      end)
+
+      it("keeps two cells a column for what needs fewer", function()
+        local bag, room = bagIn({ { "A", 1 }, { "B", 1 } })
+        assert.are.equal(4, bag.content:PerRow(bag:SnapWidth(bag.content:RowWidth(20) + room) - room))
+      end)
+    end)
+
     it("snaps to what its columns need: two columns of its largest section", function()
       local bag = bagOf({ A = 3, B = 1 })
       local room = bag:ContentRoom()

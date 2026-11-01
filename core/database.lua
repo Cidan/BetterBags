@@ -1305,7 +1305,7 @@ end
 function DB:GetNextSectionColumns(kind)
   local count = DB.data.profile.nextSectionColumns[kind]
   if type(count) ~= "number" then
-    return 1
+    return const.NEXT_SECTION_COLUMNS_DEFAULT
   end
   return math.max(1, math.min(const.NEXT_SECTION_COLUMNS_MAX, math.floor(count)))
 end

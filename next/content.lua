@@ -578,27 +578,45 @@ function canvasProto:RowWidth(perRow)
 end
 
 -- Widest is how many cells the largest section the column lays out holds; given a width to lay out for that holds
--- columns of sections, how many cells they need, each as wide as the largest section (at least what keeps them
--- columns), or as Recent Items or Free Space, at the full width, when that is more (its gaps included: each takes a cell): not
--- one waiting in a dock (one flying back is laid out again), nor one leaving; 0 while it lays out none. A small panel
--- let go snaps to its widest row of icons (next.md §14g).
+-- columns of sections, how many cells they need to stay as they stand there: each column as wide as the largest section
+-- beside another (at least what keeps them columns), one spanning columns sharing what it needs among them, one alone in
+-- its row what it needs, as it can take the row, or as Recent Items or Free Space, at the full width, when that is more
+-- (its gaps included: each takes a cell). Not one waiting
+-- in a dock (one flying back is laid out again), nor one leaving; 0 while it lays out none. A small panel let go snaps to
+-- its widest row of icons (next.md §14g).
 ---@param layoutWidth? number
 ---@return number
 function canvasProto:Widest(layoutWidth)
   local grid = layoutWidth and self:ColumnSplit(layoutWidth)
-  local widest, whole = 0, 0
+  local widest, whole, columned = 0, 0, {}
   for _, section in ipairs(self.order) do
     local away = self.away[section]
     if (away == nil or away.returning) and not self:IsLeaving(section) then
       if grid and section.kind ~= "category" then
         whole = math.max(whole, #section.entries)
+      elseif grid then
+        table.insert(columned, section)
       else
         widest = math.max(widest, #section.entries)
       end
     end
   end
-  if grid and widest > 0 then
-    widest = grid.count * math.max(widest, nextContent.MIN_COLUMN_CELLS)
+  if grid and #columned > 0 then
+    local column, row = nextContent.MIN_COLUMN_CELLS, 0
+    for _, cells in ipairs(self:columnRows(grid, columned)) do
+      -- Filling down, one alone in its row still has a column: the sections above it are in that column too.
+      local alone = grid.wide and #cells == 1 and (not grid.down or cells[1].span > 1)
+      for _, cell in ipairs(cells) do
+        if alone then
+          row = math.max(row, self:neededCells(grid, cell.section))
+        elseif cell.span > 1 then
+          column = math.max(column, math.ceil(self:neededCells(grid, cell.section) / cell.span))
+        else
+          column = math.max(column, #cell.section.entries)
+        end
+      end
+    end
+    widest = math.max(grid.count * column, row)
   end
   return math.max(widest, whole)
 end

@@ -355,6 +355,7 @@ const.GRID_COMPACT_STYLE = {
 ---@enum SectionSortType
 -- The most columns of sections a bag of BetterBags Next can be set to (next.md §7a).
 const.NEXT_SECTION_COLUMNS_MAX = 4
+const.NEXT_SECTION_COLUMNS_DEFAULT = 2
 
 const.SECTION_SORT_TYPE = {
   ALPHABETICALLY = 1,
@@ -788,9 +789,9 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.GUILD] = false,
     },
     nextSectionColumns = {
-      [const.BAG_KIND.BACKPACK] = 1,
-      [const.BAG_KIND.BANK] = 1,
-      [const.BAG_KIND.GUILD] = 1,
+      [const.BAG_KIND.BACKPACK] = const.NEXT_SECTION_COLUMNS_DEFAULT,
+      [const.BAG_KIND.BANK] = const.NEXT_SECTION_COLUMNS_DEFAULT,
+      [const.BAG_KIND.GUILD] = const.NEXT_SECTION_COLUMNS_DEFAULT,
     },
     nextSectionFill = {
       [const.BAG_KIND.BACKPACK] = "across",
@@ -904,16 +905,16 @@ const.DATABASE_DEFAULTS = {
     },
     sectionSort = {
       [const.BAG_KIND.BACKPACK] = {
-        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
-        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
       },
       [const.BAG_KIND.BANK] = {
-        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
-        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
       },
       [const.BAG_KIND.GUILD] = {
-        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
-        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
       },
     },
     itemSort = {

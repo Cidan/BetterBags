@@ -74,6 +74,7 @@ function L:G(key) return key end
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { BACKPACK = 0, BANK = 1, UNDEFINED = -1 }
 const.NEXT_SECTION_COLUMNS_MAX = 4
+const.NEXT_SECTION_COLUMNS_DEFAULT = 2
 const.GLOW_INTENSITY_HALO_THRESHOLD = 60
 const.GLOW_INTENSITY_MAX = 100
 const.GLOW_INTENSITY_DEFAULT = 60
@@ -123,7 +124,7 @@ const.DATABASE_DEFAULTS = {
     theme = 'Default',
     showFullSectionNames = { [0] = false, [1] = false },
     showAllFreeSpace = { [0] = false, [1] = false },
-    nextSectionColumns = { [0] = 1, [1] = 1 },
+    nextSectionColumns = { [0] = const.NEXT_SECTION_COLUMNS_DEFAULT, [1] = const.NEXT_SECTION_COLUMNS_DEFAULT },
     nextSectionFill = { [0] = "across", [1] = "across" },
     nextSectionSpan = { [0] = true, [1] = true },
     nextSectionWideRows = { [0] = 2, [1] = 2 },
@@ -860,11 +861,11 @@ describe("Database", function()
       assert.is_true(DB:GetShowAllFreeSpace(const.BAG_KIND.BACKPACK))
     end)
 
-    it("keeps each bag's section columns, one until set, within what a window can show", function()
-      assert.are.equal(1, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK))
-      assert.are.equal(1, DB:GetNextSectionColumns(const.BAG_KIND.BANK))
+    it("keeps each bag's section columns, two until set, within what a window can show", function()
+      assert.are.equal(2, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK))
+      assert.are.equal(2, DB:GetNextSectionColumns(const.BAG_KIND.BANK))
       -- What a saved profile holds is not always what a setter wrote.
-      for saved, expected in pairs({ [99] = const.NEXT_SECTION_COLUMNS_MAX, [2.5] = 2, [0] = 1, [-3] = 1, abc = 1 }) do
+      for saved, expected in pairs({ [99] = const.NEXT_SECTION_COLUMNS_MAX, [2.5] = 2, [0] = 1, [-3] = 1, [1.5] = 1, abc = 2 }) do
         DB.data.profile.nextSectionColumns[const.BAG_KIND.BACKPACK] = saved
         assert.are.equal(expected, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK), tostring(saved))
       end
@@ -876,7 +877,7 @@ describe("Database", function()
       DB.data.profile.nextSectionWideRows[const.BAG_KIND.BACKPACK] = nil
       DB:SetNextSectionColumns(const.BAG_KIND.BACKPACK, 3)
       assert.are.equal(3, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK))
-      assert.are.equal(1, DB:GetNextSectionColumns(const.BAG_KIND.BANK))
+      assert.are.equal(2, DB:GetNextSectionColumns(const.BAG_KIND.BANK))
       DB:SetNextSectionColumns(const.BAG_KIND.BACKPACK, 9)
       assert.are.equal(const.NEXT_SECTION_COLUMNS_MAX, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK))
       DB:SetNextSectionColumns(const.BAG_KIND.BACKPACK, 0)

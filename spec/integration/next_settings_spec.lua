@@ -63,6 +63,18 @@ describe("BetterBags Next's settings window on the whole addon", function()
       save = true, searchCategory = { query = "type = trade goods" } })
   end
 
+  -- On the real database: a bag nobody has set anything on.
+  it("starts every bag in two columns, side to side, wide sections spanning them, its largest section first", function()
+    local addon = start({ next = true })
+    local database, const = addon:GetModule("Database"), addon:GetModule("Constants")
+    for _, panel in ipairs({ addon.Bags.Backpack, addon.Bags.Bank, addon.Bags.GuildBank }) do
+      assert.are.same({ 2, "across", true, 2 }, { panel:SectionColumns() }, "bag " .. panel.kind)
+      assert.are.equal(const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+        database:GetSectionSortType(panel.kind, const.BAG_VIEW.SECTION_GRID), "bag " .. panel.kind)
+    end
+    assert.are.same({}, handle.errors)
+  end)
+
   it("opens for BetterBags Next and builds every page and tab", function()
     local addon = start({ next = true })
     makeCategory(addon)
@@ -119,17 +131,17 @@ describe("BetterBags Next's settings window on the whole addon", function()
 
   it("lays out a bag's section columns through its real settings, and shows them on one line", function()
     local addon = start({ next = true })
+    local db = addon:GetModule("Database")
+    db:SetNextSectionColumns(1, 1)
     local settings = addon:GetModule("NextSettings")
     settings:Open("backpack", "layout")
     local c = ctx(addon)
-    rowOf(settings, "sectionColumns").option.set(c, 2)
+    rowOf(settings, "sectionColumns").option.set(c, 3)
     rowOf(settings, "sectionFill").option.set(c, "Top to Bottom")
     rowOf(settings, "sectionWideRows").option.set(c, 3)
-    local db = addon:GetModule("Database")
-    assert.are.equal(2, db:GetNextSectionColumns(0))
+    assert.are.equal(3, db:GetNextSectionColumns(0))
     assert.are.equal("down", db:GetNextSectionFill(0))
     assert.are.equal(3, db:GetNextSectionWideRows(0))
-    assert.are.equal(2, db:GetNextSectionColumns(0))
     assert.are.equal(1, db:GetNextSectionColumns(1), "another bag keeps its own")
     addon:GetModule("Render"):Flush()
     assert.is_false(addon.Bags.Backpack.content:CanReorder())
