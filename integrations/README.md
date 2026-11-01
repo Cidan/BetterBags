@@ -153,13 +153,14 @@ Buys what Profession Shopping List's list needs from a BetterBags Next vendor
 **Key Components:**
 ```lua
 -- Profession Shopping List's API
-ProfessionShoppingList:GetShoppingList() -- itemID = { required, owned }
+ProfessionShoppingList:GetMerchantShoppingList() -- itemID = { required, owned }
 ProfessionShoppingList:BuyFromMerchant()
 EventRegistry "ProfessionShoppingList.OnTrackedRecipesChanged"
 ```
 
 **Behavior:**
-- Only activates when Profession Shopping List has both `GetShoppingList` and `BuyFromMerchant`
+- Only activates when Profession Shopping List has both `GetMerchantShoppingList` and `BuyFromMerchant`
+  (v12.1.5-02 or later)
 - Retries on `ADDON_LOADED` when Profession Shopping List loads after BetterBags
 - Sends `shoppingList/Changed` when the tracked recipes change
 

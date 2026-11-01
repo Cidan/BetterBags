@@ -35,8 +35,8 @@ describe("Profession Shopping List integration", function()
     opts = opts or {}
     local api = {}
     if opts.list ~= false then
-      function api.GetShoppingList(self)
-        assert(self == api, "Call ProfessionShoppingList:GetShoppingList(), not ProfessionShoppingList.GetShoppingList()")
+      function api.GetMerchantShoppingList(self)
+        assert(self == api, "Call ProfessionShoppingList:GetMerchantShoppingList(), not ProfessionShoppingList.GetMerchantShoppingList()")
         return list
       end
     end
@@ -79,7 +79,7 @@ describe("Profession Shopping List integration", function()
 
     -- Asked: "if PSL (and this function, because it's new) isn't available, don't show this
     -- integration/don't try to call this."
-    it("is not there with a Profession Shopping List that has no GetShoppingList", function()
+    it("is not there with a Profession Shopping List that has no GetMerchantShoppingList", function()
       psl({ list = false })
       assert.is_false(shoppingList:Available())
       assert.are.same({}, shoppingList:Needs())
