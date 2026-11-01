@@ -351,23 +351,18 @@ describe("Bank tab category routing bug reproduction", function()
     assert.are.same({ 1 }, tabsOf(), "dropped on the default group: back there")
   end)
 
-  it("reproduces the bug using the user's actual SavedVariables file from ~/Downloads/BetterBags.lua", function()
-    local dumpPath = "/home/antonio/Downloads/BetterBags.lua"
-    local f = io.open(dumpPath, "r")
-    if not f then
-      pending("SavedVariables file not found at " .. dumpPath)
-      return
-    end
-    f:close()
-
-    _G.BetterBagsDB = nil
-    dofile(dumpPath)
-
+  -- A profile saved before bank categories were scoped by bank type: its flat mapping reaches the right tabs only through DB:Migrate.
+  local function loadFlatProfile()
+    _G.BetterBagsDB = dofile("spec/fixtures/bank_categories_flat.lua")
     database:Init()
-    database.data:SetProfile("Default")
     groups:Init()
     categories:Init()
+    search:Init()
     items:Init()
+  end
+
+  it("sends each item to its own bank type's tabs, from a profile saved before categories were scoped by bank type", function()
+    loadFlatProfile()
 
     local ctx = context:New("UserDumpRepro")
     local BANK = const.BAG_KIND.BANK
@@ -423,10 +418,21 @@ describe("Bank tab category routing bug reproduction", function()
       category = "Mining - The War Within",
     })
 
-    local sortedItems = { charHelm, charMidnightOre, warHelm, warMidnightOre, warTWWOre }
+    -- 6. "Mining - The War Within" in Character Bank, the bank type it was assigned in
+    local charTWWOre = mockData.ItemData({
+      bagid = 6,
+      slotid = 3,
+      slotkey = "6_3",
+      kind = BANK,
+      name = "User Character Bank TWW Ore",
+      category = "Mining - The War Within",
+    })
+
+    local sortedItems = { charHelm, charMidnightOre, charTWWOre, warHelm, warMidnightOre, warTWWOre }
     local itemData = {
       ["6_1"] = charHelm,
       ["6_2"] = charMidnightOre,
+      ["6_3"] = charTWWOre,
       ["13_1"] = warHelm,
       ["13_2"] = warMidnightOre,
       ["13_3"] = warTWWOre,
@@ -455,6 +461,7 @@ describe("Bank tab category routing bug reproduction", function()
     -- Verify warbank items are in tab 4 (ARMOR WEAPONS) and tab 6 (CRAFTING)
     assert.are.same({ 4 }, warHelmTabs)
     assert.are.same({ 6 }, warMidnightOreTabs)
+    assert.are.same({ 10 }, findTabsForItem("6_3"), "the Character Bank TWW ore, in the Bank's CRAFTING")
 
     -- Under the migrated configuration:
     -- 1. Character bank armor piece safely falls back to default Bank tab 1 instead of vanishing:
@@ -467,26 +474,8 @@ describe("Bank tab category routing bug reproduction", function()
     assert.are.same({ 2 }, warTWWOreTabs, "User's Warbank TWW Ore is safely visible in Warbank default tab (2)!")
   end)
 
-  it("fails the expected invariant: all physical bank items must belong to at least one bank tab", function()
-    -- This test asserts what SHOULD happen (expected behavior):
-    -- Every item in the character bank and warbank MUST appear in at least one tab of that container.
-    -- This test FAILS under the current codebase, reproducing the bug as a TDD failure.
-    local dumpPath = "/home/antonio/Downloads/BetterBags.lua"
-    local f = io.open(dumpPath, "r")
-    if not f then
-      pending("SavedVariables file not found at " .. dumpPath)
-      return
-    end
-    f:close()
-
-    _G.BetterBagsDB = nil
-    dofile(dumpPath)
-
-    database:Init()
-    database.data:SetProfile("Default")
-    groups:Init()
-    categories:Init()
-    items:Init()
+  it("shows every physical bank item in a bank tab, from that profile", function()
+    loadFlatProfile()
 
     local ctx = context:New("InvariantTest")
     local BANK = const.BAG_KIND.BANK
@@ -525,30 +514,13 @@ describe("Bank tab category routing bug reproduction", function()
       return false
     end
 
-    -- Expected invariant: Character bank items must NOT vanish into thin air
-    -- Under the current codebase, both of these fail because the items are in 0 tabs!
+    -- Character bank items must not vanish into thin air.
     assert.is_true(isItemInAnyTab("6_1"), "Character bank helm should be visible in at least one bank tab")
     assert.is_true(isItemInAnyTab("6_2"), "Character bank Midnight ore should be visible in at least one bank tab")
   end)
 
-  it("reproduces through the end-to-end items:ProcessRefresh pipeline", function()
-    local dumpPath = "/home/antonio/Downloads/BetterBags.lua"
-    local f = io.open(dumpPath, "r")
-    if not f then
-      pending("SavedVariables file not found at " .. dumpPath)
-      return
-    end
-    f:close()
-
-    _G.BetterBagsDB = nil
-    dofile(dumpPath)
-
-    database:Init()
-    database.data:SetProfile("Default")
-    groups:Init()
-    categories:Init()
-    search:Init()
-    items:Init()
+  it("does the same through the whole of items:ProcessRefresh, from that profile", function()
+    loadFlatProfile()
 
     local BANK = const.BAG_KIND.BANK
     items._firstLoad[BANK] = false
@@ -608,21 +580,19 @@ describe("Bank tab category routing bug reproduction", function()
     assert.is_not_nil(slotInfo.itemsBySlotKey["6_2"], "Item 6_2 was harvested into itemsBySlotKey")
     assert.is_not_nil(slotInfo.itemsBySlotKey["13_1"], "Item 13_1 was harvested into itemsBySlotKey")
 
-    local function inAnyTab(slotkey)
-      for _, tab in pairs(slotInfo.tabs) do
+    local function tabsOf(slotkey)
+      local tabList = {}
+      for tabID, tab in pairs(slotInfo.tabs) do
         for _, item in ipairs(tab.items) do
-          if item.slotkey == slotkey then return true end
+          if item.slotkey == slotkey then table.insert(tabList, tabID) end
         end
       end
-      return false
+      return tabList
     end
 
-    -- Warbank helm is in tab 4 (Warbank Armor):
-    assert.is_true(inAnyTab("13_1"), "Warbank helm is present in a bank tab")
-
-    -- Character bank items are safely preserved in bank tabs (default tab 1):
-    assert.is_true(inAnyTab("6_1"), "Character bank helm is visible in bank tabs!")
-    assert.is_true(inAnyTab("6_2"), "Character bank Midnight ore is visible in bank tabs!")
+    assert.are.same({ 4 }, tabsOf("13_1"), "the Warbank helm, in the Warbank's ARMOR WEAPONS")
+    assert.are.same({ 1 }, tabsOf("6_1"), "the Character Bank helm, in the Bank's default tab")
+    assert.are.same({ 1 }, tabsOf("6_2"), "the Character Bank ore, in the Bank's default tab")
   end)
 end)
 
