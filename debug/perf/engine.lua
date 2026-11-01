@@ -106,6 +106,9 @@ local timelineOurs, timelineBlizzard, timelineCalls, timelineNested, timelineCap
 local frameMetric, maxDurationMs, onAutoStop, autoStopSent
 -- Named per-frame readings recorded beside ours (options.frameSeries): { name, fn, data }.
 local frameSeries = {}
+-- What to keep of a frame one of those says was slow (options.slowFrame), and what was kept.
+local slowFrame
+local slowFrames = {}
 local wrapped, overheadParent, overheadChild
 local captureOptions
 local frozen, frozenAt, stopReason
@@ -1091,6 +1094,7 @@ local function finalize(now)
       nested = table.concat(timelineNested, ','),
       blizzard = frameMetric and packTimeline(timelineBlizzard) or nil,
       series = packedSeries,
+      slow = #slowFrames > 0 and slowFrames or nil,
     },
     trace = trace,
   }
@@ -1290,6 +1294,7 @@ end
 ---@field traceMaxCalls? number Recording stops (the capture freezes) after this many calls.
 ---@field traceChunkSize? number Calls per packed chunk.
 ---@field frameMetric? fun(): number|nil Per-frame external metric in ms (Blizzard's addon profiler).
+---@field slowFrame? {series: string, ms: number, max: number, describe: fun(): table} Of the slowest max frames the named series reads ms or more for, keep describe()'s answer, in timeline.slow (its time is left out).
 ---@field frameSeries? table<string, fun(): number|nil> More named per-frame readings in ms, recorded as timeline.series[name].
 ---@field onAutoStop? fun(reason: "maxDuration"|"traceFull") Called once when the capture should stop on its own.
 
@@ -1305,6 +1310,7 @@ function perf:Start(options)
   spikeThreshold = options.spikeThresholdMs or 16
   timelineCap = options.timelineFrames or 18000
   frameMetric = options.frameMetric
+  slowFrame, slowFrames = options.slowFrame, {}
   frameSeries = {}
   for name, fn in pairs(options.frameSeries or {}) do
     frameSeries[#frameSeries + 1] = { name = name, fn = fn, data = {} }
@@ -1369,6 +1375,28 @@ function perf:Stop()
   return session
 end
 
+-- keepSlowFrame keeps what options.slowFrame says of the frame closing: the slowest so many, each described only when it is kept,
+-- since describing one can ask the client a lot. A description that fails says so, and the frame still closes.
+---@param ms number
+local function keepSlowFrame(ms)
+  local at = #slowFrames + 1
+  if at > slowFrame.max then
+    at = 1
+    for i = 2, #slowFrames do
+      if slowFrames[i].ms < slowFrames[at].ms then
+        at = i
+      end
+    end
+    if slowFrames[at].ms >= ms then
+      return
+    end
+  end
+  local x0 = clock()
+  local ok, detail = pcall(slowFrame.describe)
+  slowFrames[at] = { frame = frames, ms = ms, detail = ok and detail or { error = tostring(detail) } }
+  excluded = excluded + (clock() - x0)
+end
+
 -- _OnFrame closes one frame of measurements. It runs from the profiler's own OnUpdate,
 -- where no measured call can legitimately be open on the main thread, so anything still
 -- open there was left behind by an uncaught error.
@@ -1427,7 +1455,11 @@ function perf:_OnFrame()
     end
     for i = 1, #frameSeries do
       local series = frameSeries[i]
-      series.data[#series.data + 1] = series.fn() or 0
+      local value = series.fn() or 0
+      series.data[#series.data + 1] = value
+      if slowFrame ~= nil and series.name == slowFrame.series and value >= slowFrame.ms then
+        keepSlowFrame(value)
+      end
     end
   end
   if tracing then

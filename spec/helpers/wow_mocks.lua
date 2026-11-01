@@ -307,6 +307,16 @@ end
 function WidgetMethods:RegisterEvent(event)
   self._events[event] = true
 end
+-- SimpleFrameAPIDocumentation: RegisterUnitEvent, IsEventRegistered, UnregisterAllEvents.
+function WidgetMethods:RegisterUnitEvent(event)
+  self._events[event] = true
+end
+function WidgetMethods:UnregisterAllEvents()
+  self._events = {}
+end
+function WidgetMethods:IsEventRegistered(event)
+  return self._events[event] == true
+end
 function WidgetMethods:UnregisterEvent(event)
   self._events[event] = nil
 end

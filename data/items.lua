@@ -2235,9 +2235,10 @@ function items:RunRefresh(ectx, kind)
   -- The first sweep after a sort shows the sort. It re-reads every bag of the kind, even
   -- when a BAG_UPDATE named only some: the sort may have moved items anywhere, and the
   -- new-item flags it cleared live on every bag (an untouched bag would keep its stale
-  -- glow). It also rebuilds the layout from scratch, collapsing held gaps. Only a read can
-  -- show it, so a derive leaves it pending.
-  local sortSweep = not derive and self._sortSweepPending[kind] == true
+  -- glow). It also rebuilds the layout from scratch, collapsing held gaps. A derive leaves it
+  -- pending, unless it is what the sort's fallback found a sort that moved nothing needs
+  -- (showsSort, SortLeaves).
+  local sortSweep = (not derive or ectx:Get("showsSort") == true) and self._sortSweepPending[kind] == true
   if sortSweep then
     ectx:Delete("targetedBags")
     ectx:Set("resetLayout", true)
@@ -2375,6 +2376,62 @@ end
 ---@return boolean
 function items:IsSortSweepPending(kind)
   return self._sortSweepPending[kind] == true
+end
+
+-- SortSweepShown says a sort has nothing left to show.
+---@param kind BagKind
+function items:SortSweepShown(kind)
+  self._sortSweepPending[kind] = false
+end
+
+-- SortLeaves says what a sort no sweep has shown yet still needs, once its fallback fires. "read": a
+-- bag of the kind changed since it was read, or a slot holds other than it was read holding (the client
+-- does not always say, refresh-scheduler.md §10), so the sort may have moved something; or nothing has
+-- been read yet. Otherwise the sort moved nothing, and what it did do is clear Recent Items and the
+-- new-item flags, and ask for a fresh layout: "recalculate" when anything on screen shows otherwise, or
+-- an item was read before its data had loaded, which needs no other slot read; "nothing" when what the
+-- bags committed already looks like that.
+---@param kind BagKind
+---@return "read"|"recalculate"|"nothing"
+function items:SortLeaves(kind)
+  local slotInfo = self.slotInfo[kind]
+  local committed = slotInfo and slotInfo.itemsBySlotKey
+  if committed == nil or next(committed) == nil or slotInfo.sortedItems == nil then
+    return "read"
+  end
+  local tables = kind == const.BAG_KIND.BACKPACK and { const.BACKPACK_BAGS } or { const.BANK_BAGS, const.ACCOUNT_BANK_BAGS }
+  for _, bags in pairs(tables) do
+    for bagID in pairs(bags) do
+      if self._unreadBags[bagID] ~= nil then
+        return "read"
+      end
+    end
+  end
+  local recentName = L:G("Recent Items")
+  local recalculate = false
+  for _, item in pairs(committed) do
+    local info = item.itemInfo
+    if C_Container.GetContainerItemID(item.bagid, item.slotid) ~= info.itemID then
+      return "read"
+    end
+    if item.harvestIncomplete or info.isNewItem or info.category == recentName then
+      recalculate = true
+    end
+  end
+  if recalculate then
+    return "recalculate"
+  end
+  local fresh = self:Phase9_Sort(kind, slotInfo.visibleItemsBySlotKey, slotInfo.emptySlotByBagAndSlot)
+  local shown = slotInfo.sortedItems
+  if #fresh ~= #shown then
+    return "recalculate"
+  end
+  for i = 1, #fresh do
+    if fresh[i].slotkey ~= shown[i].slotkey then
+      return "recalculate"
+    end
+  end
+  return "nothing"
 end
 
 function items:ProcessRefresh(ctx, kind)

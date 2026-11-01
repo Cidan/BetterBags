@@ -4452,6 +4452,408 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assertSortShown()
     end)
 
+    -- A capture of three sorts that moved nothing: 5.5 ms reading every slot of the backpack in one
+    -- frame and 15.2 ms committing and drawing in the next, each time, to show what was there already.
+    describe("a sort that moved nothing", function()
+      local reads
+
+      local function sortAndFallback()
+        refresh:RequestUpdate({ sort = true })
+        drain()
+        fireFallbacks()
+        drain()
+      end
+
+      local function readBag()
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        drain()
+      end
+
+      -- Shows the sort held in before_each with the moves' read, leaving nothing recent, no gap and
+      -- the layout a fresh sort makes.
+      local function settled()
+        installClocks()
+        sortAndFallback()
+        assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+        assert.equal(0, gapCount(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems))
+        sweeps[const.BAG_KIND.BACKPACK] = 0
+        reads = 0
+      end
+
+      before_each(function()
+        local origHarvest = items.Phase2_Harvest
+        override(items, "Phase2_Harvest", function(...)
+          reads = reads + 1
+          return origHarvest(...)
+        end)
+        reads = 0
+      end)
+
+      it("recalculates from what it read when something still has to change, reading no slot", function()
+        installClocks()
+        sortAndFallback()
+        assert.equal(0, reads)
+        assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+        assertSortShown()
+      end)
+
+      -- The client can change a slot with no BAG_UPDATE (refresh-scheduler.md §10). The read this replaces cured that, as a side
+      -- effect; a recalculation would ask about an emptied slot, and raise.
+      describe("a slot the client changed without saying so", function()
+        local errors
+
+        before_each(function()
+          errors = {}
+          saveGlobal(_G, "geterrorhandler")
+          _G.geterrorhandler = function() return function(e) table.insert(errors, tostring(e)) end end
+        end)
+
+        local function shownInSlot(slotkey)
+          return items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey[slotkey]
+        end
+
+        it("reads when it has been emptied, with something else to show, and raises nothing", function()
+          installClocks()
+          mockContainer[0][3] = {}
+          sortAndFallback()
+          assert.are.same({}, errors)
+          assert.equal(1, reads)
+          assert.is_true(shownInSlot("0_3").isItemEmpty)
+          assertSortShown()
+        end)
+
+        it("reads when it has been emptied, with nothing else to show", function()
+          settled()
+          mockContainer[0][3] = {}
+          sortAndFallback()
+          assert.equal(1, reads)
+          assert.is_true(shownInSlot("0_3").isItemEmpty)
+        end)
+
+        it("reads when it holds another item now", function()
+          settled()
+          mockContainer[0][3] = { itemID = 505, guid = "g505", count = 1 }
+          sortAndFallback()
+          assert.equal(1, reads)
+          assert.equal(505, shownInSlot("0_3").itemInfo.itemID)
+        end)
+
+        it("reads when it was empty, and holds an item now", function()
+          settled()
+          mockContainer[0][2] = { itemID = 505, guid = "g505", count = 1 }
+          sortAndFallback()
+          assert.equal(1, reads)
+          assert.equal(505, shownInSlot("0_2").itemInfo.itemID)
+        end)
+      end)
+
+      it("reads again what it read before the item's data had loaded, reading no slot it need not", function()
+        settled()
+        local warm = false
+        local originalInfo = _G.C_Item.GetItemInfo
+        saveGlobal(_G.C_Item, "GetItemInfo")
+        _G.C_Item.GetItemInfo = function(id)
+          local n = tonumber(id) or tonumber(tostring(id):match("item:(%d+)"))
+          if n == 202 and not warm then return nil end
+          return originalInfo(id)
+        end
+        refresh:RequestUpdate({ wipe = true, backpack = true })
+        drain()
+        assert.is_true(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_3"].harvestIncomplete == true)
+        warm = true
+        sweeps[const.BAG_KIND.BACKPACK] = 0
+        reads = 0
+
+        sortAndFallback()
+
+        assert.equal(0, reads)
+        assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+        assert.is_falsy(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_3"].harvestIncomplete)
+      end)
+
+      it("does nothing at all when nothing would change", function()
+        settled()
+        local committed = items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems
+
+        sortAndFallback()
+
+        assert.equal(0, sweeps[const.BAG_KIND.BACKPACK], "nothing to show, so no sweep")
+        assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+        assert.are.equal(committed, items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems)
+      end)
+
+      it("still reads when a bag changed before the fallback, its read on the way", function()
+        settled()
+        refresh:RequestUpdate({ sort = true })
+        drain()
+        items:MarkBagUnread(0)
+        fireFallbacks()
+        drain()
+        assert.equal(1, reads)
+        assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+      end)
+
+      it("leaves a bag of the other kind out of it", function()
+        settled()
+        for bag in pairs(const.BANK_BAGS or {}) do
+          items:MarkBagUnread(bag)
+        end
+        items:MarkBagUnread(const.BANK_TAB and const.BANK_TAB.BANK or -1)
+        sortAndFallback()
+        assert.equal(0, reads)
+        assert.equal(0, sweeps[const.BAG_KIND.BACKPACK])
+      end)
+
+      it("recalculates when the layout is not what a fresh sort makes, and it becomes so", function()
+        settled()
+        -- A loot with the bag open is appended after what was there: out of a fresh sort's order.
+        mockContainer[0][2] = { itemID = 150, guid = "g150", count = 1 }
+        readBag()
+        local order = {}
+        for _, e in ipairs(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems) do
+          table.insert(order, e.slotkey)
+        end
+        table.sort(order)
+        sweeps[const.BAG_KIND.BACKPACK] = 0
+        reads = 0
+
+        sortAndFallback()
+
+        assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+        assert.equal(0, reads)
+        local after = {}
+        for _, e in ipairs(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems) do
+          table.insert(after, e.slotkey)
+        end
+        assert.are.same(order, after)
+      end)
+
+      it("collapses a gap, reading no slot", function()
+        settled()
+        mockContainer[0][3] = {}
+        readBag()
+        assert.equal(1, gapCount(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems))
+        sweeps[const.BAG_KIND.BACKPACK] = 0
+        reads = 0
+
+        sortAndFallback()
+
+        assert.equal(0, reads)
+        assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+        assert.equal(0, gapCount(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems))
+      end)
+
+      it("collapses a gap at the very end of the layout", function()
+        settled()
+        mockContainer[1][1] = {}
+        refresh:RequestUpdate({ backpack = true, bags = { [1] = true } })
+        drain()
+        local sorted = items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems
+        assert.is_true(sorted[#sorted].isItemGap == true, "the gap comes last, so every entry before it matches")
+        sweeps[const.BAG_KIND.BACKPACK] = 0
+
+        sortAndFallback()
+
+        assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+        assert.equal(0, gapCount(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems))
+      end)
+
+      it("takes an item out of Recent Items after the player hovered it, when only its timer kept it there", function()
+        settled()
+        newSlots["0_1"] = true
+        mockContainer[0][1] = { itemID = 101, guid = "g101b", count = 1 }
+        readBag()
+        newSlots["0_1"] = nil
+        readBag()
+        local item = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"]
+        assert.equal("Recent Items", item.itemInfo.category)
+        assert.is_false(item.itemInfo.isNewItem)
+        sweeps[const.BAG_KIND.BACKPACK] = 0
+
+        sortAndFallback()
+
+        assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+        assert.are_not.equal("Recent Items", items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"].itemInfo.category)
+      end)
+
+      it("takes a glowing item out of its glow with Recent Items turned off", function()
+        settled()
+        override(database, "GetCategoryFilter", function() return false end)
+        newSlots["0_1"] = true
+        mockContainer[0][1] = { itemID = 101, guid = "g101b", count = 1 }
+        readBag()
+        local item = items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"]
+        assert.is_true(item.itemInfo.isNewItem)
+        assert.are_not.equal("Recent Items", item.itemInfo.category)
+        sweeps[const.BAG_KIND.BACKPACK] = 0
+
+        sortAndFallback()
+
+        assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+        assert.is_false(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"].itemInfo.isNewItem)
+      end)
+
+      it("does not take the next read for the sort's once it has settled", function()
+        settled()
+        sortAndFallback()
+        mockContainer[0][3] = {}
+        readBag()
+        assert.equal(1, gapCount(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems),
+          "an ordinary read keeps its gap: only the sort's sweep rebuilds the layout")
+      end)
+
+      it("leaves the sort to show when its recalculation fails, and the next read shows it", function()
+        installClocks()
+        local failures = 1
+        local origPartition = items.Phase10_PartitionIntoTabs
+        override(items, "Phase10_PartitionIntoTabs", function(...)
+          if failures > 0 then
+            failures = failures - 1
+            error("simulated sweep failure")
+          end
+          return origPartition(...)
+        end)
+        saveGlobal(_G, "geterrorhandler")
+        _G.geterrorhandler = function() return function() end end
+
+        sortAndFallback()
+
+        assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        drain()
+        assertSortShown()
+      end)
+
+      it("reads a kind with nothing read yet", function()
+        installClocks()
+        items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey = {}
+        refresh:RequestUpdate({ sort = true })
+        drain()
+        fireFallbacks()
+        drain()
+        assert.equal(1, reads)
+      end)
+
+      describe("at the bank", function()
+        before_each(function()
+          addon.atBank = true
+          addon.Bags = addon.Bags or {}
+          saveGlobal(addon.Bags, "Bank")
+          addon.Bags.Bank = addon.Bags.Bank or {}
+          mockContainer[const.BANK_TAB and const.BANK_TAB.BANK or -1] = { { itemID = 404, guid = "g404", count = 1 } }
+          installClocks()
+          refresh:RequestUpdate({ bank = true })
+          drain()
+          sweeps[const.BAG_KIND.BANK] = 0
+          reads = 0
+        end)
+
+        after_each(function()
+          addon.atBank = false
+        end)
+
+        it("does not sweep a bank whose sort moved nothing", function()
+          installClocks()
+          refresh:RequestUpdate({ sortBank = true })
+          drain()
+          fireFallbacks()
+          drain()
+          assert.equal(0, sweeps[const.BAG_KIND.BANK])
+          assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BANK))
+        end)
+
+        it("recalculates a bank whose sort moved nothing and left a gap, reading no slot", function()
+          local bank = const.BANK_TAB and const.BANK_TAB.BANK or -1
+          mockContainer[bank] = { { itemID = 404, guid = "g404", count = 1 }, { itemID = 405, guid = "g405", count = 1 } }
+          refresh:RequestUpdate({ bank = true })
+          drain()
+          mockContainer[bank][1] = {}
+          refresh:RequestUpdate({ bank = true })
+          drain()
+          assert.equal(1, gapCount(items.slotInfo[const.BAG_KIND.BANK].sortedItems))
+          sweeps[const.BAG_KIND.BANK] = 0
+          reads = 0
+
+          refresh:RequestUpdate({ sortBank = true })
+          drain()
+          fireFallbacks()
+          drain()
+
+          assert.equal(1, sweeps[const.BAG_KIND.BANK])
+          assert.equal(0, reads)
+          assert.equal(0, gapCount(items.slotInfo[const.BAG_KIND.BANK].sortedItems))
+          assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BANK))
+        end)
+
+        it("reads when a Warbank tab changed before the fallback", function()
+          saveGlobal(const, "ACCOUNT_BANK_BAGS")
+          const.ACCOUNT_BANK_BAGS = { [50] = 50 }
+          refresh:RequestUpdate({ sortBank = true })
+          drain()
+          items:MarkBagUnread(50)
+          fireFallbacks()
+          drain()
+          assert.equal(1, reads)
+        end)
+
+        it("leaves it pending for the next open when the bank has closed", function()
+          installClocks()
+          refresh:RequestUpdate({ sortBank = true })
+          drain()
+          addon.atBank = false
+          fireFallbacks()
+          drain()
+          assert.equal(0, sweeps[const.BAG_KIND.BANK])
+          assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BANK))
+        end)
+
+        it("leaves it to the open's read while the bank window is still showing", function()
+          installClocks()
+          refresh:RequestUpdate({ sortBank = true })
+          drain()
+          override(refresh, "BankShowing", function() return true end)
+          fireFallbacks()
+          drain()
+          assert.equal(0, sweeps[const.BAG_KIND.BANK])
+          assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BANK))
+        end)
+
+        -- The bank's sweep yields, so a frame passes before the backpack's turn: what the backpack still needs is worked out then.
+        it("settles the backpack after the bank's sweep, seeing a slot emptied in that frame", function()
+          local bank = const.BANK_TAB and const.BANK_TAB.BANK or -1
+          newSlots[bank .. "_1"] = true
+          refresh:RequestUpdate({ bank = true })
+          drain()
+          local errors = {}
+          saveGlobal(_G, "geterrorhandler")
+          _G.geterrorhandler = function() return function(e) table.insert(errors, tostring(e)) end end
+          refresh:RequestUpdate({ sort = true, sortBank = true })
+          drain()
+          reads = 0
+          fireFallbacks()
+          mockContainer[0][1] = {}
+          drain()
+          assert.are.same({}, errors)
+          assert.is_true(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"].isItemEmpty)
+          assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+        end)
+
+        it("settles each kind on its own", function()
+          installClocks()
+          refresh:RequestUpdate({ sort = true, sortBank = true })
+          drain()
+          fireFallbacks()
+          drain()
+          -- The backpack still holds its gap and its recent item; the bank has nothing to show.
+          assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+          assert.equal(0, sweeps[const.BAG_KIND.BANK])
+          assert.equal(0, reads)
+          assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+          assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BANK))
+        end)
+      end)
+    end)
+
     it("does not sweep twice when the fallback fires while the moves' refresh is still queued", function()
       installClocks()
       refresh:RequestUpdate({ sort = true })

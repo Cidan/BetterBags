@@ -189,6 +189,26 @@ which BetterBags did nothing was listed as a worst frame for the previous frame'
 timeline with the same rule and drops frames that no longer qualify; entries the timeline
 does not cover are shown as captured. `DecodeFrame` returns the credited reading.
 
+### 3a. What the client did: client events and slow ticks
+
+A stall BetterBags cannot see into (the sort's, refresh-scheduler.md §6) needs more than its own calls.
+- **Client events.** While a capture runs, `perfSessions.clientEventFrame` listens to `CLIENT_EVENTS` and, for the player,
+  `CLIENT_UNIT_EVENTS`: events BetterBags does not listen to, each recorded as a `[client] NAME` call whose first argument is
+  the character pane showing (`perfSessions:CharacterPane()`: GW2_UI's, Blizzard's or none) and then its payload. Each exists in
+  the client's API documentation, and is checked with `C_EventUtils.IsEventValid`. The frame registers them when a capture starts
+  and lets go of them when it stops, so they cost nothing otherwise. One the client fires synchronously shows inside the call
+  that caused it, in the trace.
+- **Slow ticks** (`timeline.slow`, the engine's `slowFrame` option). Of the ticks Blizzard's reading for the whole client (`app`) says
+  took 33 ms or more, the capture keeps the slowest 64, each `{ frame, ms, detail = { pane, addons } }`: `addons` is what each loaded
+  addon took in that tick (`LastTime`, 0.5 ms or more, most first). A tick with no addon named is the client's own. It asks about every
+  addon, so only about a tick it keeps; a failure says so (`detail.error`) and the frame still closes. Its time is left out of the
+  profiler's clock, not the game's, so it can add to the next tick's reading. Only frames the timeline holds (`timelineFrames`) count.
+  The Summary lists the slowest eight (`AddSlowTicks`).
+- **Not seen in a client yet:** whether a `[client]` call fired inside `SortBags` shows inside `Refresh._CallSorter`. If the client runs
+  that handler on the main Lua state rather than the refresh queue's coroutine, the call shows beside it instead, with the sort's
+  time counted as the coroutine's pause.
+- `Refresh._CallSorter` makes each sort call its own measured call, by name.
+
 ### Overhead and allocations
 
 - **Overhead model.** Every wrapped call spends time in the profiler, and the cursor charges
@@ -381,7 +401,8 @@ session = {
            -- blizzardUs: the readings credited to this frame (version 1: the same-frame reading)
   timeline = { ours = "us,us,...", blizzard = "us,..."|nil,
                calls = "n,n,...", nested = "n,n,...",  -- per-frame measured calls, and those with a measured caller
-               series = { all = "us,...", app = "us,..." }|nil },  -- §3: Blizzard's time for all addons and the whole client
+               series = { all = "us,...", app = "us,..." }|nil,  -- §3: Blizzard's time for all addons and the whole client
+               slow = { { frame, ms, detail = { pane, addons = { { name, ms }, ... } } }, ... }|nil },  -- §3a
   trace = nil | {                -- §4; absent when tracing was off or the trace was removed
     chunkSize = 4096, calls = n, full = true|nil, args = true|nil,
     chunks = { "startDeltaUs,nodeId,argSet,durUs,retSet,flags,...", ... },  -- chunkSize records each
@@ -401,7 +422,7 @@ updates `format.lua`, the tool, and their specs together. Version 2 changed only
 of `worst[].blizzardUs` (see "Pairing Blizzard's reading"); version 1 sessions are re-paired
 when decoded. Version 3 made node ids creation order and added `trace`; older sessions
 decode as before (their children keep id order, which was name order). The overhead fields
-(`overheadParentMs`, `overheadChildMs`, `timeline.calls`, `timeline.nested`) are optional
+(`overheadParentMs`, `overheadChildMs`, `timeline.calls`, `timeline.nested`) and `timeline.slow` are optional
 additions read only when present.
 
 `perfSessions:RemoveTrace(id)` and `RemoveAllTraces()` delete `session.trace` (the bulk of a

@@ -193,6 +193,7 @@ end
 ---@field removeTraceButton Button
 ---@field removeAllTracesButton Button
 local paneProto = {}
+perfPane.proto = paneProto
 
 ---@param parent Frame
 ---@return PerfPaneFrame
@@ -1385,6 +1386,35 @@ function paneProto:AddContextLines(add, session)
   end
 end
 
+-- AddSlowTicks says whose the client's slowest ticks of a capture were: how long each took, the character pane
+-- showing, and what Blizzard charged each addon. A tick no addon took the time of is the client's own.
+---@param add fun(fmt: string, ...)
+---@param session table
+function paneProto:AddSlowTicks(add, session)
+  local slow = session.timeline and session.timeline.slow
+  if slow == nil then
+    return
+  end
+  local sorted = {}
+  for _, tick in ipairs(slow) do
+    table.insert(sorted, tick)
+  end
+  table.sort(sorted, function(a, b) return a.ms > b.ms end)
+  local parts = {}
+  for i = 1, math.min(8, #sorted) do
+    local tick = sorted[i]
+    local takers = {}
+    for _, entry in ipairs(tick.detail.addons or {}) do
+      table.insert(takers, string.format('%s %s', entry.name, perfFormat:Ms(entry.ms)))
+    end
+    table.insert(parts, tick.detail.error
+      and string.format('frame %d %s (not described)', tick.frame, perfFormat:Ms(tick.ms))
+      or string.format('frame %d %s (%s; %s)', tick.frame, perfFormat:Ms(tick.ms), tick.detail.pane,
+        #takers > 0 and table.concat(takers, ', ') or 'no addon'))
+  end
+  add('Slowest ticks of the whole client (Blizzard), %d kept: %s.', #slow, table.concat(parts, ', '))
+end
+
 function paneProto:BuildSummary(session)
   local meta, stats = session.meta or {}, session.stats or {}
   local lines = {}
@@ -1398,6 +1428,7 @@ function paneProto:BuildSummary(session)
     meta.flavor or '?', meta.gameVersion or '?', meta.gameBuild or '?', meta.addonVersion or '?')
   add('What was measured: %s.', (perfSessions.PRESETS[meta.preset or 'full'] or perfSessions.PRESETS.full).label)
   self:AddContextLines(add, session)
+  self:AddSlowTicks(add, session)
   add('')
   local duration = stats.durationMs or 0
   local measured = stats.instrumentedMs or 0

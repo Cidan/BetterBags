@@ -113,8 +113,9 @@ handed to the next frame by `_Arm`.
   `Refresh._RunUnit`'s argument.
 - `RefreshRequest.onlyIfSortPending` — set only by the sort fallback (§6). The unit drops each
   requested kind whose sort sweep is no longer pending (`items:IsSortSweepPending`) before
-  doing anything else. This is not coalescing: the request literally means "sweep this kind
-  if its sort has not been shown yet".
+  doing anything else, and asks what each other kind's sort still needs (`refresh:_SettleSort`).
+  This is not coalescing: the request literally means "show this kind's sort if it has not been
+  shown yet".
 
 ## 5. Testing Contract
 
@@ -152,7 +153,7 @@ spent about 31 ms of real time in the first, wasted sweep.
 Now, in `_RunUnit`, for each sorted kind (`sort` -> backpack; `sortBank`/`sortWarbank` ->
 bank):
 
-1. `items:MarkSortSweepPending(kind)`. The next committed sweep of that kind shows the sort:
+1. `items:MarkSortSweepPending(kind)`. The next committed read of that kind shows the sort:
    `items:RunRefresh` re-reads **every** bag of the kind (it deletes `targetedBags`, because
    the sort may have moved items anywhere and the new-item glow is a harvest-time field on
    every bag, so a sweep of only the bags a `BAG_UPDATE` named would leave stale glows) and
@@ -165,7 +166,27 @@ bank):
    (0.5 s). When it fires it requests `{ onlyIfSortPending = true }` for the kinds still
    pending. This covers a sort that moves nothing (already sorted, or refused), which fires
    no `BAG_UPDATE` at all; WoW has no "sort finished" event (`ContainerDocumentation.lua`,
-   and Blizzard's own sort button just calls `SortBags()`).
+   and Blizzard's own sort button just calls `SortBags()`). Its unit asks what the sort still
+   needs (`items:SortLeaves`, through `refresh:_SettleSort`), because no slot has to be read for a
+   sort that moved nothing:
+   - `"read"`: a bag of the kind has changed since it was read (`_unreadBags`, so the sort may have
+     moved something and that bag's read is on its way; a bag with no slots an open read skipped stays
+     marked, so the first no-move bank sort after a loading screen can read, once); or a slot holds other than it was read
+     holding (`C_Container.GetContainerItemID`, which takes an empty slot), which the client does
+     not always say (§10), and a recalculation would ask about an emptied slot and raise; or nothing has
+     been read yet. The sweep reads, as a sort's sweep always did.
+   - `"recalculate"`: the sort moved nothing, but something committed still shows what it took away
+     (an item in Recent Items, a new-item glow), an item was read before its data had loaded
+     (`harvestIncomplete`, which a recalculation reads again), or the committed order is not what a
+     fresh sort makes (a held gap, a loot appended at a section's end; `Phase9_Sort` compared slot key
+     by slot key). A recalculation (§10) shows it, marked `showsSort` so that it counts as the sort's
+     sweep and clears the mark once it has committed, with `categoriesUnchanged` (recency picks
+     between what is kept).
+   - `"nothing"`: what the bags committed already looks like that. The mark is cleared, and nothing
+     is swept, committed or drawn.
+   A kind that cannot be swept now (a closed bank, a bank window still showing) is not asked, and
+   stays pending for its next read. The backpack is asked at its turn, after the bank's sweep has
+   yielded, so what it answers is true when its sweep runs.
 4. The mark and the fallback are set **before** `ClearNewItems` and the sort calls, so an
    error in either still leaves a refresh guaranteed.
 5. A request that also names the sorted kind explicitly (`backpack`, `bank`, or `wipe`) still
@@ -177,14 +198,37 @@ bank):
 
 Why no refresh can be missed: every real item change still produces its own `BAG_UPDATE`
 refresh, exactly as before; the change only removes the sort unit's own sweep, and the
-effects that sweep had (recent items cleared, layout reset, all bags re-read) are delivered
-by the first later sweep of that kind, which the fallback guarantees within 0.5 s. A bank
+effects that sweep had (recent items cleared, layout reset) are delivered by the first later
+read of that kind, or within 0.5 s by the fallback, which reads, recalculates or finds nothing to
+show (point 3). A bank
 sort whose bank closes first stays pending until the next bank sweep (bank open), the same
 gating the old in-unit bank sweep had.
 
 Trade-off: a sort that moves nothing now shows its cleared Recent Items 0.5 s after the
 click instead of at once. A sort whose moves arrive later than 0.5 s (high latency) gets the
-fallback sweep and then the moves' sweep, which is the old cost.
+fallback's recalculation, if it has anything to show, and then the moves' read, an ordinary one, as
+the fallback's read and the moves' read before it were: the mark is gone by then. And what a kept
+slot goes stale on with no bag event (a quest's state, an expired refund's binding, caches.md §1) is no
+longer refreshed by a sort that moved nothing and has nothing to show, as the read it replaces did by
+accident; the next read of the slot refreshes it, as for a bag not sorted. Chosen, and said to the
+player: the read was all but the whole of BetterBags' cost of such a sort.
+
+**Measured, what a sort costs** (a retail capture, game build 70688, of three sorts that moved nothing,
+the character pane open under GW2_UI, 30 items, Pawn): three stalls each sort, the first two on nobody's
+code that BetterBags can see. Blizzard's readings (perf-profiler.md §3) say whose:
+- At the click, about 56 ms inside `C_Container.SortBags`, in the frame's 58.5 ms of BetterBags time: no
+  BetterBags function runs in it (the one thing measured in it, `Pawn.OnArrowsReset`, 0.4 ms, comes before),
+  and Blizzard charges it to BetterBags for making the call (60.2 of 60.3 ms for all addons).
+- About 0.17 s later, a tick of 69 ms for the whole client with 1.4 ms for all addons: the client's own.
+- At 0.5 s, the fallback's read: 5.5 ms reading every slot, then 15.2 ms committing and drawing in the
+  next frame. This is what `SortLeaves` removes, for a sort that moved nothing and has nothing to show.
+  Not yet captured since. (The 59 ms Blizzard read for that tick is mostly the capture itself: the
+  profiler spent 648 ms over the capture describing arguments, left out of its own clock.)
+The player reports the hitch only with the character pane open; no capture compares it closed. The likely
+cause of the first two, not shown: the client re-dressing the player's model, `UNIT_MODEL_CHANGED` being a
+synchronous event GW2_UI and Blizzard's pane both rebuild on. A capture now says (perf-profiler.md §3a):
+each sort's call is `Refresh._CallSorter`, what the client fired inside and after it is recorded, with
+the pane showing, and each slow tick names what each addon took.
 
 ## 7. Merging Waiting Requests
 
@@ -479,8 +523,8 @@ the last read committed.
   `_firstLoad` makes a wipe that marks nothing new, must be a read, or that read would put the
   whole bag in Recent Items) or emptied (`ClearBankCache` on bank close; deriving would draw
   an empty bank).
-- A derive never shows a sort: it leaves the kind's sort sweep pending (§6), only a read
-  re-reads every bag.
+- A derive shows a sort only when it is what the sort's fallback asked for (`showsSort`, §6): any
+  other leaves the kind's sort sweep pending.
 - `resetLayout` works as for a read.
 
 **What asks for what.** `bags/Rederive` (`ctx`, `{ backpack?, bank?, resetLayout?, buttons? }?`;

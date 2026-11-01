@@ -373,6 +373,31 @@ function refresh:_ArmSortFallback(backpack, bank)
   end)
 end
 
+-- _CallSorter calls one of the client's sorts. Its own function so the profiler measures it by name,
+-- apart from the unit that asked (data-driven.md): a capture showed 56 ms inside the call, every sort.
+---@param _ string Its name, for the call trace.
+---@param sorter function
+function refresh:_CallSorter(_, sorter)
+  sorter()
+end
+
+-- _SettleSort decides, when a sort's fallback's unit runs, whether kind is swept: not if the sort has
+-- been shown, or left nothing to show. It returns whether to sweep, and whether that recalculates
+-- rather than reads (items:SortLeaves).
+---@param kind BagKind
+---@return boolean sweep, boolean recalculate
+function refresh:_SettleSort(kind)
+  if not items:IsSortSweepPending(kind) then
+    return false, false
+  end
+  local leaves = items:SortLeaves(kind)
+  if leaves == "nothing" then
+    items:SortSweepShown(kind)
+    return false, false
+  end
+  return true, leaves == "recalculate"
+end
+
 -- _RunUnit executes a single request end-to-end inside the pump's coroutine: request-time
 -- mutations and sort calls first, then the bank sweep, then the backpack sweep (each an
 -- inline items:RunRefresh that yields once). Because this is the only sweep in flight,
@@ -381,13 +406,13 @@ end
 function refresh:_RunUnit(request)
   local ctx = context:New('BagUpdate')
 
-  if request.onlyIfSortPending then
-    if request.backpack and not items:IsSortSweepPending(const.BAG_KIND.BACKPACK) then
-      request.backpack = nil
-    end
-    if request.bank and not items:IsSortSweepPending(const.BAG_KIND.BANK) then
-      request.bank = nil
-    end
+  -- The backpack's is worked out at its turn, below: the bank's sweep yields before it.
+  local recalculateBank = false
+  -- A bank closed or still showing is not swept below, and its sort stays to be shown by its next read.
+  if request.onlyIfSortPending and request.bank and addon.atBank and addon.Bags.Bank and not self:BankShowing() then
+    local sweep, recalculate = self:_SettleSort(const.BAG_KIND.BANK)
+    request.bank = sweep or nil
+    recalculateBank = recalculate
   end
 
   if request.bags then
@@ -422,7 +447,7 @@ function refresh:_RunUnit(request)
     request.guild = true
   end
 
-  -- Sorting. Every sorted kind is marked "sort sweep pending": the next committed sweep of
+  -- Sorting. Every sorted kind is marked "sort sweep pending": the next committed read of
   -- that kind re-reads all of its bags with a fresh layout and clears the mark. When the
   -- client can sort now, the sort is issued here and this unit does not sweep that kind,
   -- since the sweep would only redraw the pre-sort contents the moves replace a moment
@@ -438,7 +463,7 @@ function refresh:_RunUnit(request)
     items:MarkSortSweepPending(const.BAG_KIND.BACKPACK)
     local sorter = canSort and backpackSorter() or nil
     if sorter then
-      table.insert(sorters, sorter)
+      table.insert(sorters, { "backpack", sorter })
       deferBackpack = true
     else
       request.backpack = true
@@ -449,8 +474,8 @@ function refresh:_RunUnit(request)
     items:MarkSortSweepPending(const.BAG_KIND.BANK)
     local bank = request.sortBank and canSort and bankSorter() or nil
     local warbank = request.sortWarbank and canSort and warbankSorter() or nil
-    if bank then table.insert(sorters, bank) end
-    if warbank then table.insert(sorters, warbank) end
+    if bank then table.insert(sorters, { "bank", bank }) end
+    if warbank then table.insert(sorters, { "warbank", warbank }) end
     if bank or warbank then
       deferBank = true
     else
@@ -470,7 +495,15 @@ function refresh:_RunUnit(request)
   end
 
   for _, sorter in ipairs(sorters) do
-    sorter()
+    self:_CallSorter(sorter[1], sorter[2])
+  end
+
+  -- showsSort: a recalculation that shows the sort, and clears its mark once it has committed.
+  local function recalculating(sweepCtx)
+    sweepCtx:Set('derive', true)
+    sweepCtx:Set('showsSort', true)
+    sweepCtx:Set('categoriesUnchanged', true)
+    return sweepCtx
   end
 
   -- While the bank window shows after an open, the bank is not swept: the open's reads, which
@@ -481,7 +514,8 @@ function refresh:_RunUnit(request)
       addon.Bags.Bank.bankTab = accountBankStart
     end
 
-    items:RunRefresh(ctx:Copy(), const.BAG_KIND.BANK)
+    local bankCtx = ctx:Copy()
+    items:RunRefresh(recalculateBank and recalculating(bankCtx) or bankCtx, const.BAG_KIND.BANK)
   end
 
   -- While the guild bank window shows after an open, the guild bank is not swept: its tabs load
@@ -490,8 +524,14 @@ function refresh:_RunUnit(request)
     items:RunRefresh(ctx:Copy(), const.BAG_KIND.GUILD)
   end
 
+  local recalculateBackpack = false
+  if request.onlyIfSortPending and request.backpack then
+    local sweep, recalculate = self:_SettleSort(const.BAG_KIND.BACKPACK)
+    request.backpack = sweep or nil
+    recalculateBackpack = recalculate
+  end
   if request.backpack then
-    items:RunRefresh(ctx, const.BAG_KIND.BACKPACK)
+    items:RunRefresh(recalculateBackpack and recalculating(ctx) or ctx, const.BAG_KIND.BACKPACK)
   end
 end
 

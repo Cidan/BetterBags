@@ -39,6 +39,10 @@ items.ClearNewItems = function() end
 local sortSweepPending = {}
 items.MarkSortSweepPending = function(_, kind) sortSweepPending[kind] = true end
 items.IsSortSweepPending = function(_, kind) return sortSweepPending[kind] == true end
+items.SortSweepShown = function(_, kind) sortSweepPending[kind] = nil end
+-- What a sort no read has shown still needs (the real Items works it out from what it read).
+local sortLeaves = "read"
+items.SortLeaves = function() return sortLeaves end
 -- The bags marked changed since their read (the real Items records them, data/items.lua).
 local unreadBags = {}
 items.MarkBagUnread = function(_, bagID) unreadBags[bagID] = true end
@@ -68,6 +72,7 @@ describe("Refresh Module", function()
     addon.atBank = false
     addon.Bags = {}
     for k in pairs(sortSweepPending) do sortSweepPending[k] = nil end
+    sortLeaves = "read"
     for k in pairs(unreadBags) do unreadBags[k] = nil end
     -- Drive the scheduler's frame clock synchronously so a RequestUpdate drains its unit
     -- within the call, preserving these tests' "processed synchronously" expectations.
@@ -1096,6 +1101,65 @@ describe("Refresh Module", function()
 
       assert.spy(refresh.RequestUpdate).was.called(1)
       assert.spy(items.RunRefresh).was_not.called()
+    end)
+
+    it("sweeps nothing from the fallback when the sort left nothing to show", function()
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortBags = function() end
+      spy.on(items, "RunRefresh")
+
+      refresh:RequestUpdate({ sort = true })
+      sortLeaves = "nothing"
+      delayed[1].fn()
+
+      assert.spy(items.RunRefresh).was_not.called()
+      assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("recalculates from the fallback, showing the sort, when that is all it left", function()
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortBags = function() end
+      local seen
+      items.RunRefresh = function(_, ectx, kind)
+        seen = { kind = kind, derive = ectx:Get("derive"), showsSort = ectx:Get("showsSort"),
+          categoriesUnchanged = ectx:Get("categoriesUnchanged") }
+      end
+
+      refresh:RequestUpdate({ sort = true })
+      sortLeaves = "recalculate"
+      delayed[1].fn()
+      items.RunRefresh = function() end
+
+      assert.are.same({ kind = const.BAG_KIND.BACKPACK, derive = true, showsSort = true, categoriesUnchanged = true }, seen)
+      assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BACKPACK), "the sweep (stubbed here) is what clears it")
+    end)
+
+    it("reads from the fallback when that is what the sort left", function()
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortBags = function() end
+      local seen
+      items.RunRefresh = function(_, ectx) seen = ectx:Get("derive") == true end
+
+      refresh:RequestUpdate({ sort = true })
+      delayed[1].fn()
+      items.RunRefresh = function() end
+
+      assert.is_false(seen)
+    end)
+
+    it("calls each sort through a function the profiler measures, by name", function()
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortBags = function() end
+      local original, seen = refresh._CallSorter, {}
+      refresh._CallSorter = function(self, name, sorter)
+        table.insert(seen, { name, sorter })
+        return original(self, name, sorter)
+      end
+
+      refresh:RequestUpdate({ sort = true })
+      refresh._CallSorter = original
+
+      assert.are.same({ { "backpack", _G.C_Container.SortBags } }, seen)
     end)
 
     it("re-checks a fallback request when its unit runs, and skips a kind already swept", function()

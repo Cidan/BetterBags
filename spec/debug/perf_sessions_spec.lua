@@ -394,6 +394,128 @@ describe("PerfSessions", function()
     -- Appearances collected: GetCategoryCollectedCount summed over every category (TransmogCollectionType,
     -- TransmogSharedDocumentation.lua) but None. (GetNumTransmogSources, used at first, is the number of
     -- source filters, Blizzard_Wardrobe.lua:67: 7 in a login capture whatever was collected.)
+    describe("what the client does", function()
+      local savedUtils, savedProfiler, savedAddOns, savedEnum, savedCharacter, savedGw
+      local metrics
+
+      before_each(function()
+        savedUtils, savedProfiler, savedAddOns = _G.C_EventUtils, _G.C_AddOnProfiler, _G.C_AddOns
+        savedEnum = _G.Enum and _G.Enum.AddOnProfilerMetric
+        savedCharacter, savedGw = _G.CharacterFrame, _G.GwCharacterWindow
+        _G.C_EventUtils = { IsEventValid = function() return true end }
+        metrics = { BetterBags = 1, GW2_UI = 40, Pawn = 0.2, NotLoaded = 99 }
+      end)
+
+      after_each(function()
+        _G.C_EventUtils, _G.C_AddOnProfiler, _G.C_AddOns = savedUtils, savedProfiler, savedAddOns
+        _G.CharacterFrame, _G.GwCharacterWindow = savedCharacter, savedGw
+        if _G.Enum then _G.Enum.AddOnProfilerMetric = savedEnum end
+        if perf:IsActive() then perf:Stop() end
+      end)
+
+      local function installProfiler(appMs)
+        _G.Enum = _G.Enum or {}
+        _G.Enum.AddOnProfilerMetric = _G.Enum.AddOnProfilerMetric or { LastTime = 1, PeakTime = 2 }
+        _G.C_AddOnProfiler = {
+          IsEnabled = function() return true end,
+          GetAddOnMetric = function(name) return metrics[name] or 0 end,
+          GetOverallMetric = function() return 41 end,
+          GetApplicationMetric = function() return appMs end,
+        }
+        local names = { "BetterBags", "GW2_UI", "Pawn", "NotLoaded" }
+        _G.C_AddOns = setmetatable({
+          GetNumAddOns = function() return #names end,
+          GetAddOnInfo = function(i) return names[i] end,
+          IsAddOnLoaded = function(name) return name ~= "NotLoaded" end,
+        }, { __index = savedAddOns })
+      end
+
+      it("listens to the client's events only while a capture runs", function()
+        local frame = perfSessions.clientEventFrame
+        assert.is_false(frame:IsEventRegistered("ITEM_LOCKED"))
+        perfSessions:StartCapture()
+        assert.is_truthy(frame:IsEventRegistered("ITEM_LOCKED"))
+        assert.is_truthy(frame:IsEventRegistered("UNIT_MODEL_CHANGED"))
+        perfSessions:StopCapture()
+        assert.is_false(frame:IsEventRegistered("ITEM_LOCKED"))
+        assert.is_false(frame:IsEventRegistered("UNIT_MODEL_CHANGED"))
+      end)
+
+      it("leaves out an event the client does not have", function()
+        _G.C_EventUtils = { IsEventValid = function(name) return name ~= "UNIT_MODEL_CHANGED" and name ~= "ITEM_UNLOCKED" end }
+        local frame = perfSessions.clientEventFrame
+        perfSessions:StartCapture()
+        assert.is_false(frame:IsEventRegistered("UNIT_MODEL_CHANGED"))
+        assert.is_false(frame:IsEventRegistered("ITEM_UNLOCKED"))
+        assert.is_truthy(frame:IsEventRegistered("ITEM_LOCKED"))
+        perfSessions:StopCapture()
+      end)
+
+      it("names each in the trace, with what shows and its payload", function()
+        _G.CharacterFrame = CreateFrame("Frame")
+        _G.CharacterFrame:Show()
+        perfSessions:StartCapture()
+        perfSessions.clientEventFrame:GetScript("OnEvent")(perfSessions.clientEventFrame, "UNIT_MODEL_CHANGED", "player")
+        local session = perfSessions:StopCapture()
+        local trace = addon:GetModule("PerfFormat"):OpenTrace(session)
+        local found
+        for i = 1, trace:Count() do
+          if trace:Get(i).name == "[client] UNIT_MODEL_CHANGED" then found = trace:Get(i) end
+        end
+        assert.is_truthy(found)
+        local text = trace:Text(found.args)
+        assert.is_truthy(text:find("Blizzard's character pane", 1, true))
+        assert.is_truthy(text:find("player", 1, true))
+      end)
+
+      it("says which character pane shows", function()
+        _G.CharacterFrame, _G.GwCharacterWindow = nil, nil
+        assert.equal("no character pane", perfSessions:CharacterPane())
+        _G.CharacterFrame = CreateFrame("Frame")
+        _G.CharacterFrame:Hide()
+        assert.equal("no character pane", perfSessions:CharacterPane())
+        _G.CharacterFrame:Show()
+        assert.equal("Blizzard's character pane", perfSessions:CharacterPane())
+        _G.GwCharacterWindow = CreateFrame("Frame")
+        _G.GwCharacterWindow:Hide()
+        assert.equal("Blizzard's character pane", perfSessions:CharacterPane())
+        _G.GwCharacterWindow:Show()
+        assert.equal("GW2_UI's character pane", perfSessions:CharacterPane())
+      end)
+
+      it("names what each addon took in a slow tick, slowest first, and the pane", function()
+        installProfiler(70)
+        _G.CharacterFrame = CreateFrame("Frame")
+        _G.CharacterFrame:Show()
+        perfSessions:StartCapture()
+        perf:_OnFrame()
+        local session = perfSessions:StopCapture()
+        local slow = session.timeline.slow[1]
+        assert.equal(1, slow.frame)
+        assert.equal(70, slow.ms)
+        assert.equal("Blizzard's character pane", slow.detail.pane)
+        assert.are.same({ { name = "GW2_UI", ms = 40 }, { name = "BetterBags", ms = 1 } }, slow.detail.addons)
+      end)
+
+      it("asks about no addon in an ordinary tick", function()
+        installProfiler(12)
+        spy.on(_G.C_AddOnProfiler, "GetAddOnMetric")
+        perfSessions:StartCapture()
+        local before = #_G.C_AddOnProfiler.GetAddOnMetric.calls
+        perf:_OnFrame()
+        assert.equal(before + 1, #_G.C_AddOnProfiler.GetAddOnMetric.calls, "only BetterBags' own reading")
+        assert.is_nil(perfSessions:StopCapture().timeline.slow)
+      end)
+
+      it("works without Blizzard's addon list", function()
+        installProfiler(70)
+        _G.C_AddOns = setmetatable({ GetNumAddOns = false }, { __index = savedAddOns })
+        perfSessions:StartCapture()
+        perf:_OnFrame()
+        assert.are.same({}, perfSessions:StopCapture().timeline.slow[1].detail.addons)
+      end)
+    end)
+
     local function collections()
       local saved = { _G.C_PetJournal, _G.C_ToyBox, _G.C_TransmogCollection, _G.Enum.TransmogCollectionType }
       _G.C_PetJournal = { GetNumPets = function() return 1200, 850 end }
