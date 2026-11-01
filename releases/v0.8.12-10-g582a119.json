@@ -1,0 +1,23 @@
+{
+  "id": 1793572741,
+  "version": "v0.8.12-10-g582a119",
+  "channel": "alpha",
+  "date": "2026-11-01",
+  "from": "032e062fa5bc06428a98c98897caca8e0cd626f3",
+  "to": "582a119deace792e505ad81eafbd6b881aee0c3a",
+  "headline": "Introduces section columns in BetterBags Next and fixes bank layout positioning when opening bank tabs.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Section columns in BetterBags Next",
+      "details": "Sections can now sit side by side in up to four columns, defaulting to two columns with sections ordered from largest to smallest. Wide sections can automatically span across multiple columns, and bags smoothly resize and snap to fit their contents.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Bank layout positioning on open",
+      "details": "Fixed an issue where opening the bank or guild bank displayed items in the wrong layout positions until settings were changed. All tabs now properly recalculate and arrange the layout as their items finish loading.",
+      "clients": []
+    }
+  ]
+}
