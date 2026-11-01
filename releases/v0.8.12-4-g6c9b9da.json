@@ -1,0 +1,17 @@
+{
+  "id": 1793515870,
+  "version": "v0.8.12-4-g6c9b9da",
+  "channel": "alpha",
+  "date": "2026-11-01",
+  "from": "768edce24fc7cfb10a8a8e803009b89dec041ada",
+  "to": "6c9b9dad9038fbccb3eba8034da0d7fbe78f3c2e",
+  "headline": "Resolved game freezes when looting items with the Pawn addon installed.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Game freezes when looting with Pawn installed",
+      "details": "Looting an item no longer freezes the game while Pawn calculates upgrades. Upgrade arrows are now processed smoothly in the background, and items pending evaluation are safely protected from Auto Sell so upgrades are never sold by mistake.",
+      "clients": []
+    }
+  ]
+}
