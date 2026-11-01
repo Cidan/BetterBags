@@ -1,0 +1,17 @@
+{
+  "id": 1793551469,
+  "version": "v0.8.12-9-g032e062",
+  "channel": "alpha",
+  "date": "2026-11-01",
+  "from": "7a74e9608e0d4341baf12c21e89f12dd04856e04",
+  "to": "032e062fa5bc06428a98c98897caca8e0cd626f3",
+  "headline": "Restored compatibility with the latest version of Profession Shopping List.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Profession Shopping List integration",
+      "details": "Restored compatibility with the latest updates to Profession Shopping List so your shopping list section and vendor cards appear correctly again.",
+      "clients": []
+    }
+  ]
+}
