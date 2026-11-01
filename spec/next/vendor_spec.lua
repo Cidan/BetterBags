@@ -534,6 +534,20 @@ describe("NextVendor", function()
         assert.is_truthy(guild.tooltipText:find("The guild pays up to ", 1, true))
       end)
 
+      it("separates the thousands of what repairing costs and of what the guild pays", function()
+        _G._merchant.canRepair, _G._merchant.canGuildRepair, _G._merchant.repairCost = true, true, 12340000
+        override(_G, "GetGuildBankWithdrawMoney", function() return -1 end)
+        override(_G, "GetGuildBankMoney", function() return 56780000 end)
+        local list
+        override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+        local v = open()
+        menuTheme()
+        v:ApplyStyle(ctx())
+        v.menuButton:Open(ctx())
+        assert.is_truthy(list[4].tooltipText:find("Repair all: 1,234g", 1, true))
+        assert.is_truthy(list[5].tooltipText:find("The guild pays up to 5,678g", 1, true))
+      end)
+
       it("opens Blizzard's filter from the bag button while the filter is in its menu", function()
         local v = open()
         menuTheme()
@@ -749,6 +763,9 @@ describe("NextVendor", function()
       click(v.tabs.tabs[3].button)
       assert.are.same({ "Equipped", "In your bags" }, sectionNames(v))
       assert.are.equal("Repair all: 25s", v.freeText:GetText())
+      data.repair = { equipped = { { slot = 5, texture = 6, durability = 1, maxDurability = 2, cost = 12340000 } }, bags = {} }
+      eventsRegistered["UPDATE_INVENTORY_DURABILITY"](ctx())
+      assert.are.equal("Repair all: 1,234g", v.freeText:GetText())
       data.repair = { equipped = {}, bags = {} }
       eventsRegistered["UPDATE_INVENTORY_DURABILITY"](ctx())
       assert.are.equal("Nothing needs repair", v.emptyText:GetText())
@@ -759,7 +776,13 @@ describe("NextVendor", function()
       _G._merchant.currencies = { 42 }
       _G._currencies[42] = { name = "Valor", iconFileID = 77, quantity = 1200 }
       local v = open()
-      assert.are.equal("1g 23s 45c   |T77:0|t 1200", v.freeText:GetText())
+      assert.are.equal("1g 23s 45c   |T77:0|t 1,200", v.freeText:GetText())
+    end)
+
+    it("separates the thousands of the gold in its footer", function()
+      override(_G, "GetMoney", function() return 123456780000 end)
+      local v = open()
+      assert.is_truthy(v.freeText:GetText():find("12,345,678g", 1, true))
     end)
   end)
 

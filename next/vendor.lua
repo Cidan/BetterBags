@@ -456,13 +456,13 @@ function vendorProto:buildBuy(ctx, previous)
     end
     table.insert(sections, { name = s.name, buttons = buttons })
   end
-  local footer = C_CurrencyInfo.GetCoinTextureString(GetMoney())
+  local footer = GetMoneyString(GetMoney(), true)
   if C_MerchantFrame and C_MerchantFrame.GetMerchantCurrencies then
     local parts = {}
     for _, id in ipairs(C_MerchantFrame.GetMerchantCurrencies() or {}) do
       local info = C_CurrencyInfo.GetCurrencyInfo(id)
       if info then
-        table.insert(parts, "|T" .. info.iconFileID .. ":0|t " .. info.quantity)
+        table.insert(parts, "|T" .. info.iconFileID .. ":0|t " .. BreakUpLargeNumbers(info.quantity))
       end
     end
     if #parts > 0 then
@@ -511,7 +511,7 @@ function vendorProto:buildRepair(previous)
       table.insert(sections, { name = part[1], buttons = buttons })
     end
   end
-  local footer = total > 0 and (L:G("Repair all: ") .. C_CurrencyInfo.GetCoinTextureString(total)) or ""
+  local footer = total > 0 and (L:G("Repair all: ") .. GetMoneyString(total, true)) or ""
   return sections, footer, L:G("Nothing needs repair")
 end
 
@@ -940,7 +940,7 @@ function vendorProto:RepairLines(guild)
   if not canRepair or cost <= 0 then
     return { { L:G("Nothing needs repair"), 1, 1, 1 } }
   end
-  local lines = { { L:G("Repair all: ") .. C_CurrencyInfo.GetCoinTextureString(cost), 1, 1, 1 } }
+  local lines = { { L:G("Repair all: ") .. GetMoneyString(cost, true), 1, 1, 1 } }
   if guild then
     local amount = GetGuildBankWithdrawMoney()
     local funds = GetGuildBankMoney()
@@ -949,7 +949,7 @@ function vendorProto:RepairLines(guild)
     else
       amount = math.min(amount, funds)
     end
-    table.insert(lines, { L:G("The guild pays up to ") .. C_CurrencyInfo.GetCoinTextureString(amount), 0.8, 0.8, 0.8 })
+    table.insert(lines, { L:G("The guild pays up to ") .. GetMoneyString(amount, true), 0.8, 0.8, 0.8 })
   elseif cost > GetMoney() then
     table.insert(lines, { L:G("You do not have enough money"), 1, 0.25, 0.25 })
   end

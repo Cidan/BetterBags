@@ -393,6 +393,11 @@ describe("NextGuildBank", function()
       g.menuButton:Open(ctx())
       assert.are.same({ "Deposit Gold", "Withdraw Gold", "Open Options Screen" }, { list[2].text, list[3].text, list[4].text })
       assert.is_truthy(list[3].tooltipText:find("You may withdraw up to ", 1, true))
+      data.withdrawMoney = 12340000
+      data.money = 56780000
+      handlers["guildbank/MoneyChanged"](ctx())
+      g.menuButton:Open(ctx())
+      assert.is_truthy(list[3].tooltipText:find("You may withdraw up to 1,234g", 1, true))
       data.canWithdraw = false
       handlers["guildbank/MoneyChanged"](ctx())
       g.menuButton:Open(ctx())
@@ -400,6 +405,13 @@ describe("NextGuildBank", function()
       assert.is_truthy(list[3].tooltipText:find("You may not withdraw gold", 1, true))
       UseNextTheme(nil)
       g:ApplyStyle(ctx())
+    end)
+
+    it("separates the thousands of the guild's gold", function()
+      local g = open()
+      data.money = 123456780000
+      handlers["guildbank/MoneyChanged"](ctx())
+      assert.are.equal("12,345,678g", g.moneyFrame.text:GetText())
     end)
 
     it("updates the gold when the guild bank's money changes", function()

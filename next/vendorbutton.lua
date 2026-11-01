@@ -108,7 +108,7 @@ function vendorButton:PriceText(price, costs)
   local size = style.Theme.Vendor.CoinSize
   local parts = {}
   local function add(n, texture)
-    table.insert(parts, n .. "|T" .. texture .. ":" .. size .. ":" .. size .. ":2:0|t")
+    table.insert(parts, BreakUpLargeNumbers(n) .. "|T" .. texture .. ":" .. size .. ":" .. size .. ":2:0|t")
   end
   if price and price > 0 then
     local coins = { math.floor(price / 10000), math.floor(price / 100) % 100, price % 100 }
@@ -455,10 +455,10 @@ end
 ---@param costs NextVendorCost[]
 local function addCosts(price, costs)
   if price and price > 0 then
-    GameTooltip:AddLine(L:G("Price: ") .. C_CurrencyInfo.GetCoinTextureString(price), 1, 1, 1)
+    GameTooltip:AddLine(L:G("Price: ") .. GetMoneyString(price, true), 1, 1, 1)
   end
   for _, cost in ipairs(costs) do
-    GameTooltip:AddLine("|T" .. cost.texture .. ":0|t " .. cost.value .. " " .. (cost.currencyName or cost.link or ""), 1, 1, 1)
+    GameTooltip:AddLine("|T" .. cost.texture .. ":0|t " .. BreakUpLargeNumbers(cost.value) .. " " .. (cost.currencyName or cost.link or ""), 1, 1, 1)
   end
 end
 
@@ -499,7 +499,7 @@ function buttonProto:OnEnter()
     end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine(format(L:G("Durability: %d / %d"), entry.durability, entry.maxDurability), 1, 1, 1)
-    GameTooltip:AddLine(L:G("Repair: ") .. C_CurrencyInfo.GetCoinTextureString(entry.cost), 1, 1, 1)
+    GameTooltip:AddLine(L:G("Repair: ") .. GetMoneyString(entry.cost, true), 1, 1, 1)
     GameTooltip:AddLine(L:G("Click to repair"), 0.8, 0.8, 0.8)
   end
   GameTooltip:Show()

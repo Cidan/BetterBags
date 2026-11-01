@@ -272,7 +272,8 @@ describe("NextVendorButton", function()
       assert.are.equal(coin(34, SILVER) .. " " .. coin(56, COPPER), vendorButton:PriceText(3456, {}))
       assert.are.equal(coin(7, COPPER), vendorButton:PriceText(7, {}))
       assert.are.equal(coin(2, GOLD) .. " " .. coin(5, COPPER), vendorButton:PriceText(20005, {}))
-      assert.are.equal(coin(123456, GOLD), vendorButton:PriceText(1234560000, {}))
+      assert.are.equal(coin("123,456", GOLD), vendorButton:PriceText(1234560000, {}))
+      assert.are.equal(coin("1,200", "77"), vendorButton:PriceText(0, { { texture = 77, value = 1200 } }))
       assert.are.equal(coin(30, 77), vendorButton:PriceText(0, { { texture = 77, value = 30 } }))
       assert.are.equal(coin(5, SILVER) .. " " .. coin(30, 77) .. " " .. coin(1, 78),
         vendorButton:PriceText(500, { { texture = 77, value = 30 }, { texture = 78, value = 1 } }))
@@ -462,6 +463,11 @@ describe("NextVendorButton", function()
       local text = {}
       for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
       assert.are.same({ " ", "Price: 15s", "|T77:0|t 2 Valor", "Right-click to buy", "Shift-click to buy a quantity" }, text)
+      b:SetBuy(item({ price = 1234560000, costs = { { texture = 77, value = 1200, currencyName = "Valor" } } }))
+      enter(b)
+      text = {}
+      for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
+      assert.are.same({ " ", "Price: 123,456g", "|T77:0|t 1,200 Valor", "Right-click to buy", "Shift-click to buy a quantity" }, text)
       assert.are.equal("BUY_CURSOR", _G._cursor)
       b.button:GetScript("OnLeave")(b.button)
       assert.is_nil(_G._cursor)
@@ -497,6 +503,11 @@ describe("NextVendorButton", function()
       local text = {}
       for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
       assert.are.same({ " ", "Durability: 25 / 100", "Repair: 30s", "Click to repair" }, text)
+      b:SetRepair({ slot = 5, texture = 6, durability = 25, maxDurability = 100, cost = 12340000 })
+      enter(b)
+      text = {}
+      for _, line in ipairs(GameTooltip.lines) do table.insert(text, line.text) end
+      assert.are.same({ " ", "Durability: 25 / 100", "Repair: 1,234g", "Click to repair" }, text)
       b:SetRepair({ bag = 0, slot = 2, texture = 6, durability = 1, maxDurability = 2, cost = 5 })
       enter(b)
       assert.are.same({ bag = 0, slot = 2 }, GameTooltip._bagItem)
