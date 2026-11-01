@@ -4321,6 +4321,13 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
   -- the item moves' BAG_UPDATE), forced to re-read every bag and rebuild the layout, and a
   -- fallback timer guarantees that sweep when nothing moves. The disaster to rule out is a
   -- sort after which no sweep ever shows the cleared Recent Items / collapsed gaps.
+  it("says which view it built what it commits for", function()
+    override(database, "GetBagView", function() return const.BAG_VIEW.SECTION_ALL_BAGS end)
+    assert.equal(const.BAG_VIEW.SECTION_ALL_BAGS, refreshBackpack().builtForView)
+    override(database, "GetBagView", function() return const.BAG_VIEW.SECTION_GRID end)
+    assert.equal(const.BAG_VIEW.SECTION_GRID, refreshBackpack().builtForView)
+  end)
+
   describe("sorting (one sweep per sort)", function()
     local frames, timers, sweeps, sortCalls
 

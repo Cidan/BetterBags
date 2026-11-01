@@ -212,6 +212,45 @@ slow. It is an option, off by default (asked).
   nothing). Pass ids are unique across roots, so a frame placed by one bag never animates in the
   other's. A frame already at its place (within 0.01) is left alone, so a render that changes
   nothing (most resize renders) re-anchors nothing.
+- **What moves is what shows, not the button.** Asked, after icons flew about on a sort that left the bag looking as it did: "we
+  animate the icon *if the underlying bag slot changes*, and not *if the icon would shift it's visible position in a section or across
+  sections*". Every item button belongs to a bag slot, and a sort moves items between slots, so a section's cells can show the same
+  items in the same order on different buttons. A cell says what it shows (`Place`'s `shows`, from `motion.ShownBy(cell)`: its item's
+  `itemHash`, so two stacks of one item look alike; `motion.NOTHING` for an empty slot; none for a section, a container or a vendor
+  card, which move as frames, as above). Each root keeps what its last pass showed and where (`state.shown`), and where each frame
+  those hang from stands (`state.origins`). Its pass's `BeginPass` reads those again from the anchors, so a flight starts where the player
+  saw the icon whatever moved since: a section still on its way, a canvas re-centering, a section let go of mid-glide (its move stays until
+  the next `Step`). Only a frame let go of at rest keeps what its last pass kept. Places in different frames are measured from the root's own frame (`root.frame`), not from what it hangs
+  from, so a scroll or a dragged window cannot put a flight off by that much. A pass then decides by the icon:
+  - Shown where it showed, on this button or another: it stays. A button that kept its item and place costs a table lookup and allocates
+    nothing for itself (each pass allocates a table per section for `state.origins`), and is done in `Place`; the rest wait for `EndPass`,
+    since a place can only be told free once every frame has said where it goes. A place a fraction off (a Bag Scale step, whose grid
+    moves every cell) is where it goes now: a flight there lands on it, and the record follows, or the icon rests off its pixel.
+  - Shown somewhere else: it travels from where it showed, in this order, each old place used once: its own place, for a button that kept
+    its item; else the nearest left. An icon in flight goes on from where it has got to, at its speed, even on another button.
+  - `motion.NOTHING` never takes another frame's place as its start: empty slots look alike, and one flying into the place an item left
+    looks like a bug. It moves from its own place when the rows change.
+  - Not shown in the last pass (or a look that changed where it stands: a cold read warming, an enchant): put there at once.
+  - Another tab or view is another set of places: `motion:ForgetShown(root)` when a canvas shows one, so an item looking like one shown
+    before is put there at once, as Show Blizzard Bags and tabs were before Motion went by what shows. Next's `Bind` compares its tab ID and
+    the view its data was read for (`slotInfo.builtForView`, set at commit: Show Blizzard Bags keeps its tab ID, and a redraw of the last
+    view's data can come between the toggle and the read); the classic canvas compares `bag.currentView` and the same. Sections, which say
+    nothing of what they show, keep moving as frames.
+  So a sort that changes nothing on screen starts no move, in either design, and one that does moves each icon from where the player saw
+  it, Recent Items into a section included, which used to be put at once whenever the section went away in the same draw.
+- **A pass can be left open** by a render that fails between `BeginPass` and `EndPass`, and what it deferred would wait for an end that
+  never comes. A failed render chain ends it (`render:NewRenderChain`; an error doing so goes to the error handler, the render's own to the
+  caller), `BeginPass` and `Forget` of its root settle one left open, and a canvas rendering with no pass of its own ends whatever is open
+  first, so what it places goes at once. No pass begins inside another in production (a run of the whole suite, instrumented).
+- **Left, found by a review:** on the classic bags, with Animate Item Movement on, a section at rest let go of under a container still gliding
+  (Recent Items appeared under 0.3 s before) keeps the place its last pass kept, which assumed the container had arrived, so a flight out of
+  it can start that far off (59 px measured). Its anchors are gone, and keeping each frame's whole chain for this one case is not worth it: on
+  `main` that icon jumped to its place, so a jump it stays. Next's sections hang straight from the canvas, so they cannot hit it.
+- **Not seen in game:** classic section grids clip (`WowScrollBox`, `clipChildren="true"`), so an icon flying into a classic section probably
+  shows only once inside it. An icon flying into a brand-new Next section fades in with the section's cascade.
+- **Measured** (offline, PUC Lua 5.1, the spec's frame mock, median of 21 runs): a redraw of 1358 distinct buttons in which nothing changes
+  takes 1.3 ms, and a sort leaving the same picture 3.7-4 ms, identical items and free slots included (places are indexed by frame and
+  whole x and y, `findSources`; before the index, 21 ms). Real client API calls cost more than this; capture one in game.
 - **The curve.** A cubic Hermite from the frame's position and speed to its place at rest, over
   0.3 s; from rest it is 3u^2 - 2u^3, slow, fast, slow. A frame given a new place mid-move starts a
   new move from where it is, keeping its speed (no stop before turning). A frame re-placed with the
@@ -261,11 +300,13 @@ slow. It is an option, off by default (asked).
   (render-recorder.md); a snapshot is taken as the render that starts the moves ends, so its
   positions are the moves' starts.
 
-Coverage: `spec/render/motion_spec.lua` (at once outside a pass, in a first pass, for a frame the
+Coverage: `spec/render/motion_spec.lua` ("by what a frame shows": a sort that changes only buttons, identical items, a real change of place,
+a new button, the same item still shown, nearest and own places, other frames and released ones, empty slots, in flight, roots, `ShownBy`;
+at once outside a pass, in a first pass, for a frame the
 previous pass skipped, a fraction off its place put exactly; moving from where it is; the curve
 and duration; still frames untouched; same target kept; new target keeps speed; carried to another
 parent; links; unreachable old place placed at once; moves dropped when released, hidden or moved
-by something else; `Forget`; roots apart; moves counted), `spec/render/motion_layout_spec.lua`
+by something else; `Forget`; roots apart; moves counted), `spec/next/content_spec.lua` ("moving what shows, not the slot behind it": the real canvas, Recent Items going away, gaps), `spec/render/motion_layout_spec.lua`
 (real sections in a real grid: a section moves with its items still, items move in a section that
 stays, an item carried to another section and into a section that just appeared, each from where
 it was), `spec/frames/grid_spec.lua` ("Grid cells in motion"), `spec/frames/section_spec.lua`

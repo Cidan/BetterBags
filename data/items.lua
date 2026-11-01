@@ -2158,6 +2158,7 @@ function items:Phase11_CommitAndDispatch(ctx, kind, itemData, equipmentData, pre
   realSlotInfo.stacks = stackData
 
   -- Set final computed fields on realSlotInfo
+  realSlotInfo.builtForView = database.GetBagView and database:GetBagView(kind) or nil
   realSlotInfo.visibleItemsBySlotKey = visibleItemsBySlotKey
   realSlotInfo.sectionLayouts = sectionLayouts
   realSlotInfo.sortedItems = sortedItems

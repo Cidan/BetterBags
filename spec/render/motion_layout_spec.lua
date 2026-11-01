@@ -68,10 +68,10 @@ local context = addon:GetModule("Context")
 describe("Motion through sections in a grid", function()
   local root, view, weapons, armor, items, key
 
-  local function item()
+  local function item(hash)
     local f = CreateFrame("Frame")
     f:SetSize(37, 37)
-    return { frame = f }
+    return { frame = f, GetItemData = function() return hash and { itemHash = hash } or nil end }
   end
 
   -- arrange lays the sections out like a view: every section measured at perRow items per row,
@@ -154,6 +154,56 @@ describe("Motion through sections in a grid", function()
     assert.are.same({ "TOPLEFT", armor.content.inner, "TOPLEFT", -53, 0 }, { items.c.frame:GetPoint(1) })
     assert.are.same({ 135, 0, 94, 0 }, { motion:GetMove(armor.frame) })
     assert.is_nil(motion:GetMove(items.d.frame))
+  end)
+
+  -- Reported, in the classic bags too with Animate Item Movement on: a button belongs to a bag slot, so a sort reshuffles buttons across
+  -- cells that end up showing what they showed.
+  it("moves nothing when a sort leaves every item showing where it was", function()
+    weapons:RemoveCell("a")
+    weapons:RemoveCell("b")
+    weapons:RemoveCell("c")
+    local one, two, three, four = item("sword"), item("axe"), item("bow"), item()
+    weapons:AddCell("first", one)
+    weapons:AddCell("second", two)
+    weapons:AddCell("third", three)
+    arrange({}, 1000)
+    local function x(cell)
+      local _, _, _, at = cell.frame:GetPoint(1)
+      return at
+    end
+    local places = { x(one), x(two), x(three) }
+    weapons:RemoveCell("first")
+    weapons:RemoveCell("second")
+    weapons:RemoveCell("third")
+    two.GetItemData = function() return { itemHash = "sword" } end
+    three.GetItemData = function() return { itemHash = "axe" } end
+    four.GetItemData = function() return { itemHash = "bow" } end
+    weapons:AddCell("first", two)
+    weapons:AddCell("second", three)
+    weapons:AddCell("third", four)
+    assert.are.equal(0, arrange({}, 1000))
+    assert.are.same(places, { x(two), x(three), x(four) })
+    assert.is_nil(motion:GetMove(two.frame))
+    assert.is_nil(motion:GetMove(three.frame))
+    assert.is_nil(motion:GetMove(four.frame))
+  end)
+
+  it("moves an item a sort puts somewhere else, from where it showed, on the button that shows it now", function()
+    weapons:RemoveCell("a")
+    weapons:RemoveCell("b")
+    weapons:RemoveCell("c")
+    local one, two = item("sword"), item("axe")
+    weapons:AddCell("first", one)
+    weapons:AddCell("second", two)
+    arrange({}, 1000)
+    local _, _, _, swordAt = one.frame:GetPoint(1)
+    local _, _, _, axeAt = two.frame:GetPoint(1)
+    one.GetItemData = function() return { itemHash = "axe" } end
+    two.GetItemData = function() return { itemHash = "sword" } end
+    arrange({}, 1000)
+    assert.are.same({ swordAt, select(2, motion:GetMove(two.frame)), axeAt, select(4, motion:GetMove(two.frame)) },
+      { motion:GetMove(two.frame) })
+    assert.are.equal(axeAt, (motion:GetMove(one.frame)))
   end)
 
   -- Tools appears at 147 (after Weapons, now 90 wide, and Armor) and is put there at once; c, 88 in

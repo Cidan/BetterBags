@@ -28,8 +28,15 @@ itemFrame.GetButton = function(_, _, slotkey)
   if buttons[slotkey] == nil then
     local b = { slotkey = slotkey, frame = CreateFrame("Frame"), drawn = {}, sized = 0 }
     b.frame:SetSize(37, 37)
-    function b:SetItemFromData(_, data) table.insert(self.drawn, { "item", data }) end
-    function b:SetFreeSlots(_, data, count, nocount) table.insert(self.drawn, { "free", data, count, nocount }) end
+    function b:SetItemFromData(_, data)
+      self.data, self.isFreeSlot = data, nil
+      table.insert(self.drawn, { "item", data })
+    end
+    function b:SetFreeSlots(_, data, count, nocount)
+      self.data, self.isFreeSlot = data, true
+      table.insert(self.drawn, { "free", data, count, nocount })
+    end
+    function b:GetItemData() return self.data end
     function b:SetSize(_, w, h)
       self.sized = self.sized + 1
       self.frame:SetSize(w, h)
@@ -456,6 +463,192 @@ describe("NextContent", function()
   -- A tab shown in slot order draws its empty slots in place and carries no Free Space (the data
   -- phase leaves it out: the section took a slot's only button out of its place). The panel's
   -- footer still says how many slots are free.
+  -- Reported: put an item in the backpack, sort, take it out, sort, and icons flew about though every item showed where it was. Each
+  -- button belongs to a bag slot, and a sort moves items between slots. A move follows the icon, not the button.
+  describe("moving what shows, not the slot behind it", function()
+    local function shown(slotkey, category, hash)
+      local d = item(slotkey, category)
+      d.itemHash = hash
+      return d
+    end
+
+    local function moving()
+      local count = 0
+      for _, button in pairs(buttons) do
+        if motion:GetMove(button.frame) then count = count + 1 end
+      end
+      return count
+    end
+
+    local function place(slotkey)
+      local _, _, _, x, y = buttons[slotkey].frame:GetPoint(1)
+      return x, y
+    end
+
+    -- onScreen adds a frame's anchors up to the canvas.
+    local function onScreen(frame)
+      local x, y, f = 0, 0, frame
+      while f ~= canvas.frame do
+        local _, relativeTo, _, ox, oy = f:GetPoint(1)
+        assert.is_not_nil(relativeTo, "anchored all the way up")
+        x, y, f = x + ox, y + oy, relativeTo
+      end
+      return x, y
+    end
+
+    local function layout(list)
+      local items = {}
+      for _, entry in ipairs(list) do table.insert(items, shown(entry[1], entry[2], entry[3])) end
+      return data({ categories = { { name = "A" }, { name = "B" } }, items = items })
+    end
+
+    it("moves nothing when a sort leaves every item showing where it was", function()
+      bind(layout({ { "0_1", "A", "sword" }, { "0_2", "A", "axe" }, { "0_3", "A", "bow" }, { "0_4", "B", "ring" } }))
+      draw()
+      local x2, y2 = place("0_2")
+      bind(layout({ { "1_1", "A", "sword" }, { "0_1", "A", "axe" }, { "0_2", "A", "bow" }, { "0_3", "B", "ring" } }))
+      draw()
+      assert.are.equal(0, moving())
+      local x, y = place("0_1")
+      assert.are.same({ x2, y2 }, { x, y }, "the button of slot 0_1 now stands where the axe stood")
+    end)
+
+    it("moves nothing when identical stacks change slots", function()
+      bind(layout({ { "0_1", "A", "potion" }, { "0_2", "A", "potion" } }))
+      draw()
+      bind(layout({ { "0_2", "A", "potion" }, { "0_1", "A", "potion" } }))
+      draw()
+      assert.are.equal(0, moving())
+    end)
+
+    it("moves an item a sort does put somewhere else, on the button that shows it now", function()
+      bind(layout({ { "0_1", "A", "sword" }, { "0_2", "A", "axe" } }))
+      draw()
+      local swordX, swordY = place("0_1")
+      local axeX = place("0_2")
+      bind(layout({ { "0_1", "A", "axe" }, { "0_2", "A", "sword" } }))
+      draw()
+      assert.are.same({ swordX, swordY, axeX, swordY }, { motion:GetMove(buttons["0_2"].frame) })
+      assert.are.same({ axeX, swordY, swordX, swordY }, { motion:GetMove(buttons["0_1"].frame) })
+    end)
+
+    it("moves an item from its old section to its new one, on a different button", function()
+      bind(layout({ { "0_1", "A", "sword" }, { "0_2", "B", "ring" } }))
+      draw()
+      bind(layout({ { "0_2", "A", "ring" }, { "0_1", "B", "sword" } }))
+      draw()
+      assert.are.equal(2, moving())
+    end)
+
+    -- The Recent Items section is released in the same draw that moves its last item out.
+    it("moves an item out of Recent Items to its section when Recent Items goes away", function()
+      local new = shown("0_3", L:G("Recent Items"), "gem")
+      local old = shown("0_1", "A", "sword")
+      bind(data({ recent = { new }, categories = { { name = "A" } }, items = { old } }))
+      draw()
+      assert.are.equal(L:G("Recent Items"), canvas.order[1].name)
+      local wasX, wasY = onScreen(buttons["0_3"].frame)
+      bind(data({ categories = { { name = "A" } }, items = { shown("0_1", "A", "sword"), shown("0_2", "A", "gem") } }))
+      draw()
+      assert.is_not_nil(motion:GetMove(buttons["0_2"].frame), "it flies")
+      local nowX, nowY = onScreen(buttons["0_2"].frame)
+      assert.are.same({ wasX, wasY }, { nowX, nowY }, "from where it showed")
+      assert.is_nil(motion:GetMove(buttons["0_1"].frame), "the sword stays in its section")
+    end)
+
+    it("shows a looted stack's new count where it stands, on its own button", function()
+      local before, after = shown("0_1", "A", "potion"), shown("0_1", "A", "potion")
+      before.stackedCount, after.stackedCount = 5, 12
+      bind(data({ categories = { { name = "A" } }, items = { before } }))
+      draw()
+      local x, y = place("0_1")
+      bind(data({ categories = { { name = "A" } }, items = { after } }))
+      draw()
+      assert.are.equal(0, moving())
+      assert.are.equal(12, buttons["0_1"].data.stackedCount)
+      assert.are.same({ x, y }, { place("0_1") })
+    end)
+
+    -- Bank and guild bank tabs share a canvas and its sections, and hold items that look alike.
+    it("flies nothing when another tab shows an item the last tab showed", function()
+      local tabs = {
+        [1] = { categories = { { name = "A" } }, items = { shown("6_1", "A", "herb"), shown("6_2", "A", "ore") } },
+        [2] = { categories = { { name = "A" } }, items = {
+          shown("7_1", "A", "cloth"), shown("7_2", "A", "leather"), shown("7_3", "A", "herb") } },
+      }
+      local info = { sortedItems = {}, tabs = tabs }
+      bind(info, 1)
+      draw()
+      bind(info, 2)
+      draw()
+      assert.are.equal(0, moving())
+    end)
+
+    it("still flies what changed place when the same tab is drawn again", function()
+      local function onTab(category)
+        return { sortedItems = {}, tabs = { [2] = { categories = { { name = "A" }, { name = "B" } }, items = {
+          shown("0_1", "A", "ore"), shown("0_2", category, "herb") } } } }
+      end
+      bind(onTab("A"), 2)
+      draw()
+      bind(onTab("B"), 2)
+      draw()
+      assert.are.equal(1, moving())
+    end)
+
+    it("places what it left of a pass another render left open, when it renders with none of its own", function()
+      bind(layout({ { "0_1", "A", "sword" } }))
+      draw()
+      motion:BeginPass({})
+      canvas:SetInstant(true)
+      bind(layout({ { "0_1", "A", "sword" }, { "0_2", "A", "axe" } }))
+      draw()
+      canvas:SetInstant(false)
+      assert.is_nil(motion.pass)
+      assert.are.equal(1, buttons["0_2"].frame:GetNumPoints())
+    end)
+
+    it("still moves the items that close a gap when a sort takes it away", function()
+      local sword, ax = shown("0_1", "A", "sword"), shown("0_3", "A", "axe")
+      bind(data({ categories = { { name = "A" } }, items = { sword, gap("0_2", "A"), ax } }))
+      draw()
+      bind(layout({ { "0_1", "A", "sword" }, { "0_2", "A", "axe" } }))
+      draw()
+      assert.are.equal(1, moving())
+      assert.is_not_nil(motion:GetMove(buttons["0_2"].frame))
+    end)
+
+    it("does not fly a free slot from where another one stood", function()
+      local free = { buttons = { { slotkey = "0_9", count = 3 } } }
+      bind(data({ categories = {}, items = {}, free = free }))
+      draw()
+      bind(data({ categories = {}, items = {}, free = { buttons = { { slotkey = "0_8", count = 2 } } } }))
+      draw()
+      assert.are.equal(0, moving())
+    end)
+
+    it("places everything at once on the first draw after it hid", function()
+      bind(layout({ { "0_1", "A", "sword" }, { "0_2", "A", "axe" } }))
+      draw()
+      parent:Hide()
+      draw()
+      parent:Show()
+      bind(layout({ { "0_1", "A", "axe" }, { "0_2", "A", "sword" } }))
+      draw()
+      assert.are.equal(0, moving())
+    end)
+
+    it("places everything at once while it is sized", function()
+      bind(layout({ { "0_1", "A", "sword" }, { "0_2", "A", "axe" } }))
+      draw()
+      canvas:SetInstant(true)
+      bind(layout({ { "0_1", "A", "axe" }, { "0_2", "A", "sword" } }))
+      draw()
+      assert.are.equal(0, moving())
+      canvas:SetInstant(false)
+    end)
+  end)
+
   describe("free slots drawn in place", function()
     local function emptySlot(slotkey, category)
       return { slotkey = slotkey, isFreeSlot = true, itemInfo = { category = category } }

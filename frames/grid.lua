@@ -329,7 +329,7 @@ function gridProto:PlaceCell(cell, x, y)
   if cell.frame:GetParent() ~= self.inner then
     cell.frame:SetParent(self.inner)
   end
-  motion:Place(cell.frame, self.inner, x, y)
+  motion:Place(cell.frame, self.inner, x, y, motion.ShownBy(cell))
   cell.frame:Show()
 end
 
