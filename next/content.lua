@@ -540,6 +540,11 @@ end
 ---@param claims table<Item, boolean>
 function canvasProto:Bind(ctx, slotInfo, tabID, claims)
   self:beginBind()
+  -- Another tab or view is other places (Show Blizzard Bags keeps its tab ID): nothing travels from what showed.
+  if tabID ~= self.boundTab or slotInfo.builtForView ~= self.boundView then
+    self.boundTab, self.boundView = tabID, slotInfo.builtForView
+    motion:ForgetShown(self)
+  end
 
   local recentName = L:G("Recent Items")
   local recent = {}
@@ -639,6 +644,8 @@ function canvasProto:Render(parentResult)
   if animated then
     motion:BeginPass(self, style.Time.Interaction, style.StopMotion)
   else
+    -- What it places here goes at once, not into a pass some other failed render left open.
+    motion:EndPass()
     motion:Forget(self)
   end
   local drag = self.drag
@@ -758,7 +765,7 @@ function canvasProto:LayoutSection(section, width, layoutWidth)
         itemFit:Fit(ctx, decoration, extras, item)
       end
       local column, row = (j - 1) % perRow, math.floor((j - 1) / perRow)
-      motion:Place(item.frame, section.cells, column * step, -row * rowStep)
+      motion:Place(item.frame, section.cells, column * step, -row * rowStep, motion.ShownBy(item))
       item.frame:Show()
     end
   end

@@ -255,6 +255,118 @@ describe("BagCanvas", function()
   -- The view and Free Space slide to their new places when what is above them changes height
   -- (Recent Items appearing, a row more or less), through Motion (render/motion.lua): only while
   -- the bag is shown, and never into a bag that just opened (render-pipeline.md, motion).
+  describe("in motion, by what a frame shows", function()
+    local real, button, cells, parent, width, canvas
+
+    before_each(function()
+      real = addon:GetModule("Motion")
+      real:Init()
+      animate = true
+      parent = CreateFrame("Frame")
+      parent:Show()
+      button = CreateFrame("Frame")
+      button:Show()
+      cells, width = {}, 300
+      local where = "A"
+      local b = bag({})
+      b.currentView = { tabID = 1, Measure = function() return { width = width, height = 100, sections = {} } end,
+        Arrange = function() real:Place(button, cells[where], 0, 0, "sword") end }
+      b.moveTo = function(_, to) where = to end
+      canvas = bagCanvas:Create(b, parent)
+      canvas.frame:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+      cells.A = CreateFrame("Frame", nil, canvas.tabContainer)
+      cells.A:SetPoint("TOPLEFT", canvas.tabContainer, "TOPLEFT", 0, 0)
+      cells.B = CreateFrame("Frame", nil, canvas.tabContainer)
+      cells.B:SetPoint("TOPLEFT", canvas.tabContainer, "TOPLEFT", 200, 0)
+      canvas.Plan = function()
+        return { itemsPerRow = 7, columns = 1, global = {}, view = { width = width, height = 100 }, width = width, height = 100 }
+      end
+    end)
+
+    after_each(function()
+      real:Init()
+      animate = true
+    end)
+
+    local function renderIt()
+      return render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = 500 })
+    end
+
+    local function screenX(frame)
+      local x, f = 0, frame
+      while f ~= parent do
+        local _, rel, _, ox = f:GetPoint(1)
+        x, f = x + ox, rel
+      end
+      return x
+    end
+
+    it("starts a flight where the icon showed, when the layout's centering changed the pass before", function()
+      renderIt()
+      renderIt()
+      width = 500
+      renderIt()
+      local shownAt = screenX(button)
+      canvas.bag:moveTo("B")
+      renderIt()
+      assert.are.equal(shownAt, screenX(button))
+      assert.is_not_nil(real:GetMove(button))
+    end)
+
+    it("starts a flight where the icon showed, when the layout's centering changes in the same pass", function()
+      renderIt()
+      renderIt()
+      local shownAt = screenX(button)
+      width = 500
+      canvas.bag:moveTo("B")
+      renderIt()
+      assert.are.equal(shownAt, screenX(button))
+      assert.is_not_nil(real:GetMove(button))
+    end)
+
+    it("flies nothing into the view a read was built for, drawn in that view before it came", function()
+      canvas.bag.lastSlotInfo = { builtForView = 2 }
+      renderIt()
+      local other = {}
+      for k, v in pairs(canvas.bag.currentView) do other[k] = v end
+      canvas.bag.currentView = other
+      renderIt()
+      canvas.bag.lastSlotInfo = { builtForView = 4 }
+      canvas.bag:moveTo("B")
+      renderIt()
+      assert.is_nil(real:GetMove(button))
+    end)
+
+    -- A view for each layout and tab: another tab, or Show Bags, is another view (frames/bag.lua GetViewForTab).
+    it("flies nothing into another view", function()
+      renderIt()
+      local other = {}
+      for k, v in pairs(canvas.bag.currentView) do other[k] = v end
+      canvas.bag.currentView = other
+      canvas.bag:moveTo("B")
+      renderIt()
+      assert.is_nil(real:GetMove(button))
+      assert.are.equal(cells.B, select(2, button:GetPoint(1)))
+    end)
+
+    it("still flies within a tab", function()
+      renderIt()
+      canvas.bag:moveTo("B")
+      renderIt()
+      assert.is_not_nil(real:GetMove(button))
+    end)
+
+    it("places at once what it renders with no pass of its own, with another's left open", function()
+      renderIt()
+      animate = false
+      real:BeginPass({})
+      canvas.bag:moveTo("B")
+      renderIt()
+      assert.is_nil(real.pass)
+      assert.are.equal(cells.B, select(2, button:GetPoint(1)))
+    end)
+  end)
+
   describe("in motion", function()
     local function recentAppears(parent)
       local b = bag({ section(9) }, nil, section(4, "free"))

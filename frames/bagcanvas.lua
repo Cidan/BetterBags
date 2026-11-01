@@ -258,9 +258,18 @@ function canvasProto:Render(parentResult)
   self.plan = plan
   self.plannedFor = plannedFor
   local animated = self.frame:IsVisible() and database:GetAnimateItemMovement()
+  -- A view for each layout and tab (bag:GetViewForTab), and data read for one, which can come a draw later: nothing travels from
+  -- one to another.
+  local builtFor = self.bag.lastSlotInfo and self.bag.lastSlotInfo.builtForView
+  if self.bag.currentView ~= self.shownView or builtFor ~= self.shownBuiltFor then
+    self.shownView, self.shownBuiltFor = self.bag.currentView, builtFor
+    motion:ForgetShown(self)
+  end
   if animated then
     motion:BeginPass(self)
   else
+    -- What it places here goes at once, not into a pass some other failed render left open.
+    motion:EndPass()
     motion:Forget(self)
   end
   -- The containers first, then what is in them: an item that changes container moves from where
@@ -276,15 +285,16 @@ function canvasProto:Render(parentResult)
   if view ~= nil then
     bag.currentView:Arrange(view)
   end
-  if animated then
-    motion:EndPass()
-  end
 
   local totalW = width or plan.width
   local offset = (totalW - plan.width) / 2
   self.headerContainer:ClearAllPoints()
   self.headerContainer:SetPoint("TOPLEFT", self.frame, "TOPLEFT", offset, 0)
   self.headerContainer:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -offset, 0)
+  -- After the centering: the pass's end works out where things stand with it.
+  if animated then
+    motion:EndPass()
+  end
   self.frame:SetSize(math.max(1, totalW), math.max(1, plan.height))
   return { Width = totalW, Height = plan.height, FitWidth = plan.width }
 end

@@ -144,6 +144,12 @@ function render:NewRenderChain(d, options, constraints)
         self.active[node] = nil
       end
     end
+    -- A render that failed in a pass of Motion left what it placed waiting for the pass's end.
+    local motion = addon:GetModule('Motion')
+    local settled, settleError = pcall(motion.EndPass, motion)
+    if not settled then
+      geterrorhandler()(settleError)
+    end
     error(err, 0)
   end
   return results.Results[d], results

@@ -55,6 +55,59 @@ local function node(name, log, opts)
   return d
 end
 
+describe("Render, with a pass of Motion open", function()
+  it("settles the pass of a chain that failed, and raises its error", function()
+    local motion = addon:GetModule("Motion")
+    render:Init()
+    motion:Init()
+    local parent, button = CreateFrame("Frame"), CreateFrame("Frame")
+    local proto = drawable:Extend({}, "FailingInAPass")
+    function proto:GetRenderPlan()
+      return { Plan = { { step = render.SELF } } }
+    end
+    function proto:Render()
+      motion:BeginPass(self)
+      motion:Place(button, parent, 10, 0, "X")
+      error("a render that fails")
+    end
+    local d = drawable:Create(proto, { frame = CreateFrame("Frame") })
+    local ok, err = pcall(function() render:NewRenderChain(d, {}) end)
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find("a render that fails", 1, true))
+    assert.is_nil(motion.pass)
+    assert.are.same({ "TOPLEFT", parent, "TOPLEFT", 10, 0 }, { button:GetPoint(1) })
+  end)
+end)
+
+describe("Render, when a pass of Motion cannot settle either", function()
+  it("raises the render's own error, and hands the other to the error handler", function()
+    local motion = addon:GetModule("Motion")
+    render:Init()
+    motion:Init()
+    local proto = drawable:Extend({}, "FailingInAPassTwice")
+    function proto:GetRenderPlan()
+      return { Plan = { { step = render.SELF } } }
+    end
+    function proto:Render()
+      motion:BeginPass(self)
+      motion:Place(CreateFrame("Frame"), CreateFrame("Frame"), 10, 0, "X")
+      error("the render's own error")
+    end
+    local d = drawable:Create(proto, { frame = CreateFrame("Frame") })
+    local settle, handler = motion.settleShown, _G.geterrorhandler
+    local reported = {}
+    motion.settleShown = function() error("settling failed") end
+    _G.geterrorhandler = function() return function(e) table.insert(reported, tostring(e)) end end
+    local ok, err = pcall(function() render:NewRenderChain(d, {}) end)
+    motion.settleShown, _G.geterrorhandler = settle, handler
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find("the render's own error", 1, true))
+    assert.equal(1, #reported)
+    assert.is_truthy(reported[1]:find("settling failed", 1, true))
+    assert.is_nil(motion.pass)
+  end)
+end)
+
 describe("Render", function()
   local originalAfter
 

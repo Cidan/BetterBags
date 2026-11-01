@@ -957,4 +957,102 @@ describe("BetterBags Next, pixel perfect", function()
       end
     end)
   end)
+
+  -- Show Blizzard Bags shows the same items on the same tab, in sections of its own, fading in.
+  describe("another view of the same tab", function()
+    -- Twelve items, in as many sections as named: the same items stand elsewhere in one section than in two.
+    local function shown(first, second, view)
+      local tabData = { categories = { { name = first } }, items = {} }
+      if second then table.insert(tabData.categories, { name = second }) end
+      for i = 1, 12 do
+        table.insert(tabData.items, { slotkey = "0_" .. i, itemHash = "h" .. i,
+          itemInfo = { category = (second and i > 6) and second or first } })
+      end
+      return { sortedItems = {}, tabs = { [1] = tabData }, builtForView = view or SECTION_GRID }
+    end
+
+    local function flying()
+      local n = 0
+      for _, b in pairs(buttons) do
+        if motion:GetMove(b.frame) then n = n + 1 end
+      end
+      return n
+    end
+
+    it("flies nothing when the panel shows another view", function()
+      useScreen(1920, 1080, 1)
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      bag:Draw(ctx(), shown("Herbs", "Ore"))
+      settle()
+      bag:Draw(ctx(), shown("#1: Backpack", nil, 4))
+      assert.are.equal(0, flying())
+      bag:Hide(ctx())
+      finishTweens()
+      chain:Init()
+    end)
+
+    -- The toggle asks for a recalculation, which can wait behind another unit; a redraw of what was read before lands first.
+    it("flies nothing when a redraw of the last view comes before the new view's read", function()
+      useScreen(1920, 1080, 1)
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      local before = shown("Herbs", "Ore")
+      bag:Draw(ctx(), before)
+      settle()
+      bag.tabChanged = true
+      bag:Draw(ctx(), before)
+      bag:Draw(ctx(), shown("#1: Backpack", nil, 4))
+      assert.are.equal(0, flying())
+      bag:Hide(ctx())
+      finishTweens()
+      chain:Init()
+    end)
+
+    it("flies what changed place in the same view", function()
+      useScreen(1920, 1080, 1)
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      bag:Draw(ctx(), shown("Herbs", "Ore"))
+      settle()
+      bag:Draw(ctx(), shown("Herbs"))
+      assert.is_true(flying() > 0)
+      bag:Hide(ctx())
+      finishTweens()
+      chain:Init()
+    end)
+  end)
+
+  -- Items that say what they show, as the real pipeline's do: dragging the slider moves their places a fraction of a pixel
+  -- on each step, while they fly.
+  describe("dragging the Bag Scale slider", function()
+    local function grid()
+      local info = { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" } }, items = {} } } }
+      for i = 1, 24 do
+        table.insert(info.tabs[1].items, { slotkey = "0_" .. i, itemHash = "h" .. i,
+          itemInfo = { category = i <= 16 and "A" or "B" } })
+      end
+      return info
+    end
+
+    for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 1920, 1080, 0.64 } }) do
+      for _, dt in ipairs({ 0, 0.016, 0.05 }) do
+        it("leaves its icons on whole pixels, " .. screenName(screen) .. ", " .. dt .. " s a step", function()
+          useScreen(screen[1], screen[2], screen[3])
+          db.size, db.bagScale = "small", 100
+          chain:ScalesChanged(ctx())
+          local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+          bag:Draw(ctx(), grid())
+          settle()
+          for _, scale in ipairs({ 95, 90, 85, 80 }) do
+            db.bagScale = scale
+            chain:ScalesChanged(ctx())
+            if dt > 0 then motion:Step(dt) end
+          end
+          settle()
+          assert.are.same({}, offGrid(bag))
+          bag:Hide(ctx())
+          finishTweens()
+          chain:Init()
+        end)
+      end
+    end
+  end)
 end)
