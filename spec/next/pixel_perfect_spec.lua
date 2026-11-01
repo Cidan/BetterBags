@@ -149,6 +149,10 @@ describe("BetterBags Next, pixel perfect", function()
     override(stubs.items, "ExpireRecentItems", function() return false end)
     override(stubs.items, "ClearBankCache", function() end)
     override(stubs.database, "GetNextSize", function() return db.size end)
+    override(stubs.database, "GetNextSectionColumns", function() return 1 end)
+    override(stubs.database, "GetNextSectionFill", function() return "across" end)
+    override(stubs.database, "GetNextSectionSpan", function() return false end)
+    override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "SetNextSize", function(_, size) db.size = size end)
     override(stubs.database, "GetNextSmallPlace", function(_, kind)
       local p = db.places[kind]
@@ -442,6 +446,171 @@ describe("BetterBags Next, pixel perfect", function()
     end
     _G.geterrorhandler = savedHandler
     _G._loadedAddOns = nil
+  end)
+
+  -- Found by the adversarial review: a pieced bar's caps were rounded on the grid they were painted on, and a dock card
+  -- draws its section on another; a theme applied while it waited there left them off in the bag too.
+  it("keeps a pieced section bar on whole pixels seated in a dock card, and back in its bag", function()
+    for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 1920, 1080, 0.64 }, { 2560, 1440, 1.15 } }) do
+      useScreen(screen[1], screen[2], screen[3])
+      db.size, db.theme = "full", "MakeItSo"
+      startSonataNext()
+      -- What the theme draws in the world: started once a session.
+      for _, name in ipairs({ "NextBeam", "NextPaper", "NextShatter", "NextSmoke", "NextBats" }) do
+        local module = addon:GetModule(name, true)
+        if module and module.Init then module:Init() end
+      end
+      local dock = addon:GetModule("NextDock")
+      dock:Init()
+      local bag, bank = bags()
+      settle()
+      local section = bag.content.order[1]
+      assert.is_not_nil(section)
+      local entry = dock:Add(bank, { section = section, source = bag,
+        offer = { text = function() return "title", "warning", "hint" end } })
+      settle()
+      assert.are.same({}, offGrid(bank), screenName(screen) .. " seated")
+      sonataNext:ApplyTheme(ctx(), "Default", false)
+      settle()
+      sonataNext:ApplyTheme(ctx(), "MakeItSo", false)
+      settle()
+      assert.are.same({}, offGrid(bank), screenName(screen) .. " a theme applied while seated")
+      entry.list:SendBack(entry)
+      settle()
+      assert.are.same({}, offGrid(bag), screenName(screen) .. " sent back")
+      sonataNext:ApplyTheme(ctx(), "Default", false)
+      bag:Hide(ctx())
+      bank:Hide(ctx())
+      finishTweens()
+      chain:Init()
+    end
+    db.theme = "Default"
+  end)
+
+  describe("in section columns", function()
+    local function columns(count, fill, span)
+      override(stubs.database, "GetNextSectionColumns", function() return count end)
+      override(stubs.database, "GetNextSectionFill", function() return fill end)
+      override(stubs.database, "GetNextSectionSpan", function() return span == true end)
+    end
+
+    -- Found by the second adversarial review, as a test failing in about 4 runs of 10: a read of its bag sized the buttons of
+    -- a section waiting in a dock card for the column's grid, with nothing laying them out on the card's again.
+    for _, count in ipairs({ 1, 3 }) do
+      it("leaves a section waiting in a dock card on whole pixels when its bag is read, at " .. count .. " columns", function()
+        useScreen(3396, 1362, 0.65)
+        db.size = "full"
+        startSonataNext()
+        local dock = addon:GetModule("NextDock")
+        dock:Init()
+        columns(count, "across", true)
+        local bag, bank = bags()
+        local function read()
+          local list = { { "Consumable", 16 }, { "Back", 1 } }
+          local categories, items, n = {}, {}, 0
+          for _, s in ipairs(list) do
+            table.insert(categories, { name = s[1] })
+            for _ = 1, s[2] do
+              n = n + 1
+              table.insert(items, item("0_" .. n, s[1]))
+            end
+          end
+          bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = { categories = categories, items = items } } })
+          settle()
+        end
+        read()
+        local section = bag.content.byName.Consumable
+        dock:Add(bank, { section = section, source = bag,
+          offer = { text = function() return "A title", "A warning", "A hint" end } })
+        settle()
+        assert.are.same({}, offGrid(bank), "seated")
+        local button = section.entries[1].item
+        local width = button.frame:GetWidth()
+        read()
+        assert.are.equal(width, button.frame:GetWidth())
+        assert.are.same({}, offGrid(bank), "after a read of its bag")
+        bag:Hide(ctx())
+        bank:Hide(ctx())
+        finishTweens()
+        chain:Init()
+      end)
+    end
+
+    local function mixed()
+      local list = { { "Consumable", 16 }, { "Back", 1 }, { "A Category With A Very Very Long Name Indeed", 3 },
+        { "Tradeskill", 6 }, { "Quest", 1 } }
+      local categories, items, n = {}, {}, 0
+      for _, s in ipairs(list) do
+        table.insert(categories, { name = s[1] })
+        for _ = 1, s[2] do
+          n = n + 1
+          table.insert(items, item("0_" .. n, s[1]))
+        end
+      end
+      return { sortedItems = {}, tabs = { [1] = { categories = categories, items = items } } }
+    end
+
+    it("puts every part on whole pixels in every shipped theme, in both fill orders", function()
+      useScreen(3396, 1362, 0.65)
+      _G._loadedAddOns = { GW2_UI = true }
+      local errors = {}
+      local savedHandler = _G.geterrorhandler
+      _G.geterrorhandler = function() return function(err) table.insert(errors, tostring(err)) end end
+      local keys = {}
+      for key in pairs(sonataNext:GetThemes()) do table.insert(keys, key) end
+      table.sort(keys)
+      db.size = "small"
+      startSonataNext()
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      bag:Draw(ctx(), mixed(), function() end)
+      for _, key in ipairs(keys) do
+        for _, case in ipairs({ { 2, "across", false }, { 3, "down", false }, { 3, "across", true }, { 2, "down", true } }) do
+          columns(case[1], case[2], case[3])
+          sonataNext:ApplyTheme(ctx(), key, false)
+          bag.content:Invalidate()
+          local where = table.concat({ key, case[1], case[2], tostring(case[3]) }, " ")
+          assert.are.same({}, offGrid(bag), where)
+          assert.are.same({}, errors, where)
+        end
+      end
+      sonataNext:ApplyTheme(ctx(), "Default", false)
+      _G.geterrorhandler = savedHandler
+      _G._loadedAddOns = nil
+    end)
+
+    for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 3396, 1362, 0.7 }, { 1920, 1080, 0.64 }, { 2560, 1440, 1.15 } }) do
+      it("stands every icon of a row on one grid across its columns, on " .. screenName(screen), function()
+        useScreen(screen[1], screen[2], screen[3])
+        db.size = "small"
+        columns(2, "across")
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        local items = {}
+        for i = 1, 8 do items[i] = item("0_" .. i, i <= 4 and "A" or "B") end
+        bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" } },
+          items = items } } }, function() end)
+        settle()
+        assert.are.same({}, offGrid(bag))
+        local lefts = {}
+        for i = 1, 8 do
+          lefts[i] = layout.Rect(buttons["0_" .. i].frame).left
+        end
+        local step = lefts[2] - lefts[1]
+        assert.is_true(step > 0)
+        for i = 2, 8 do
+          assert.is_true(math.abs(lefts[i] - lefts[i - 1] - step) < 0.01,
+            "icon " .. i .. " is a step from the one before, across the columns too")
+        end
+      end)
+    end
+
+    it("stays on whole pixels at a Bag Scale", function()
+      useScreen(3396, 1362, 0.65)
+      db.size, db.bagScale = "small", 85
+      columns(2, "across")
+      local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+      bag:Draw(ctx(), mixed(), function() end)
+      assert.are.same({}, offGrid(bag))
+    end)
   end)
 
   -- Everything it can show besides its resting look, each on whole pixels.

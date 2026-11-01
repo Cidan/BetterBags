@@ -1299,6 +1299,67 @@ function DB:GetPreserveItemGaps(kind)
   return t[kind]
 end
 
+-- GetNextSectionColumns is how many columns of sections a bag of BetterBags Next is set to (next.md §7a).
+---@param kind BagKind
+---@return number
+function DB:GetNextSectionColumns(kind)
+  local count = DB.data.profile.nextSectionColumns[kind]
+  if type(count) ~= "number" then
+    return const.NEXT_SECTION_COLUMNS_DEFAULT
+  end
+  return math.max(1, math.min(const.NEXT_SECTION_COLUMNS_MAX, math.floor(count)))
+end
+
+---@param kind BagKind
+---@param count number
+function DB:SetNextSectionColumns(kind, count)
+  DB.data.profile.nextSectionColumns[kind] = math.max(1, math.min(const.NEXT_SECTION_COLUMNS_MAX, math.floor(count)))
+end
+
+-- GetNextSectionFill is how a bag's sections fill its columns: "across" a row and then the next, or "down" a
+-- column and then the next.
+---@param kind BagKind
+---@return "across"|"down"
+function DB:GetNextSectionFill(kind)
+  return DB.data.profile.nextSectionFill[kind] or "across"
+end
+
+---@param kind BagKind
+---@param fill "across"|"down"
+function DB:SetNextSectionFill(kind, fill)
+  DB.data.profile.nextSectionFill[kind] = fill
+end
+
+-- GetNextSectionSpan is whether a bag's wide sections take more than one of its columns.
+---@param kind BagKind
+---@return boolean
+function DB:GetNextSectionSpan(kind)
+  return DB.data.profile.nextSectionSpan[kind] ~= false
+end
+
+---@param kind BagKind
+---@param on boolean
+function DB:SetNextSectionSpan(kind, on)
+  DB.data.profile.nextSectionSpan[kind] = on
+end
+
+-- GetNextSectionWideRows is how many rows a section takes in one of a bag's columns before it counts as wide.
+---@param kind BagKind
+---@return number
+function DB:GetNextSectionWideRows(kind)
+  local rows = DB.data.profile.nextSectionWideRows[kind]
+  if type(rows) ~= "number" then
+    return 2
+  end
+  return math.max(2, math.floor(rows))
+end
+
+---@param kind BagKind
+---@param rows number
+function DB:SetNextSectionWideRows(kind, rows)
+  DB.data.profile.nextSectionWideRows[kind] = math.max(2, math.floor(rows))
+end
+
 ---@param kind BagKind
 ---@param value boolean
 function DB:SetPreserveItemGaps(kind, value)

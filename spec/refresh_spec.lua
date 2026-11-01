@@ -9,6 +9,7 @@ local events = addon:GetModule("Events")
 events:Init()
 
 -- Default the flavor flags to retail-with-warbank; individual tests override.
+local savedIsRetail, savedHasWarbank = addon.isRetail, addon.hasWarbank
 addon.isRetail = true
 addon.hasWarbank = true
 
@@ -64,6 +65,14 @@ LoadBetterBagsModule("data/refresh.lua")
 local refresh = addon:GetModule("Refresh")
 
 describe("Refresh Module", function()
+  local savedSortBank, savedSortAccount = _G.C_Container.SortBankBags, _G.C_Container.SortAccountBankBags
+
+  -- These outlive the file: a spec file after it would read the bags as if it had a Warbank and could sort the bank.
+  teardown(function()
+    addon.isRetail, addon.hasWarbank = savedIsRetail, savedHasWarbank
+    _G.C_Container.SortBankBags, _G.C_Container.SortAccountBankBags = savedSortBank, savedSortAccount
+  end)
+
   local savedAfter
   local delayed
   before_each(function()
@@ -472,7 +481,7 @@ describe("Refresh Module", function()
       end)
     end)
 
-    it("reads each tab once its item data has loaded, the shown one first, the first read afresh", function()
+    it("reads each tab once its item data has loaded, the shown one first, every read afresh", function()
       fire("BANKFRAME_OPENED")
       onShown()
       prime(7)
@@ -482,7 +491,8 @@ describe("Refresh Module", function()
       assert.is_true(requests[1].resetLayout)
       assert.equal("primed", requests[1].bankOpen)
       assert.is_true(requests[1].bank)
-      assert.is_nil(requests[2].resetLayout, "later reads keep the layout, as the guild bank's do")
+      assert.is_true(requests[2].resetLayout, "a layout kept from the tabs read so far would be wrong for the whole bank")
+      assert.is_true(requests[1].tabArrived and requests[2].tabArrived, "and nothing travels: each read re-sorts everything")
       assert.are.same({ [6] = true, [7] = true }, loaded)
       prime(13)
       assert.are.same({ 6, 7, 13 }, waves())
@@ -551,7 +561,8 @@ describe("Refresh Module", function()
       assert.is_true(requests[1].resetLayout)
       prime(7)
       assert.equal(4, #requests)
-      assert.are.same({ bank = true }, requests[4], "read again, warm")
+      assert.are.same({ bank = true, resetLayout = true, tabArrived = true }, requests[4],
+        "read again, warm, afresh: its first read was cold")
       prime(6)
       assert.equal(5, #requests)
     end)
@@ -920,6 +931,15 @@ describe("Refresh Module", function()
       addon.atGuildBank = nil
     end)
 
+    -- What the nth read asked for, and how many it has asked for.
+    local function asked(n)
+      return refresh.RequestUpdate.calls[n].vals[2]
+    end
+
+    local function reads()
+      return #refresh.RequestUpdate.calls
+    end
+
     local function open()
       addon.atGuildBank = true
       send("guildbank/Opened")
@@ -951,18 +971,19 @@ describe("Refresh Module", function()
       assert.equal(0, #primes)
     end)
 
-    it("reads each tab once its items' data has loaded, the first read of a visit afresh", function()
+    -- Whether a read starts the layout afresh is the read's to find: it does when a tab's items first appear in it.
+    it("reads each tab once its items' data has loaded", function()
       open()
       onShown()
       send("guildbank/TabLoaded", 2)
       assert.are.same({ 2 }, primes[1].tabs)
       assert.spy(refresh.RequestUpdate).was_not.called()
       primes[1].cb()
-      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, resetLayout = true, guildLoad = "primed" })
+      assert.are.same({ guild = true, guildLoad = "primed" }, asked(1))
       send("guildbank/TabLoaded", 1)
       primes[2].cb()
-      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, guildLoad = "primed" })
-      assert.spy(refresh.RequestUpdate).was.called(2)
+      assert.are.same({ guild = true, guildLoad = "primed" }, asked(2))
+      assert.equal(2, reads())
     end)
 
     it("reads a tab whose data has not loaded in time, and again when it arrives", function()
@@ -970,10 +991,25 @@ describe("Refresh Module", function()
       onShown()
       send("guildbank/TabLoaded", 2)
       timers(refresh.GUILD_PRIME_TIMEOUT)[1].fn()
-      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, resetLayout = true, guildLoad = "timeout" })
+      assert.are.same({ guild = true, guildLoad = "timeout" }, asked(1))
       primes[1].cb()
-      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true })
-      assert.spy(refresh.RequestUpdate).was.called(2)
+      assert.are.same({ guild = true }, asked(2), "the read that warms it finds that for itself")
+      assert.equal(2, reads())
+    end)
+
+    -- A change is another player moving an item: it keeps the layout, gaps and all, once the visit has read something.
+    it("keeps the layout for a change after a tab has loaded, and for its read again", function()
+      open()
+      onShown()
+      send("guildbank/TabLoaded", 2)
+      primes[1].cb()
+      loadedTabs = { 2 }
+      send("guildbank/Changed")
+      timers(refresh.GUILD_PRIME_TIMEOUT)[2].fn()
+      assert.are.same({ guild = true, guildLoad = "timeout" }, asked(2))
+      primes[2].cb()
+      assert.are.same({ guild = true }, asked(3))
+      assert.equal(3, reads())
     end)
 
     it("reads the loaded tabs when the guild bank changes, not while its window shows", function()
@@ -985,10 +1021,10 @@ describe("Refresh Module", function()
       send("guildbank/Changed")
       assert.are.same({ 1, 3 }, primes[1].tabs)
       primes[1].cb()
-      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, resetLayout = true, guildLoad = "primed" })
+      assert.are.same({ guild = true, guildLoad = "primed" }, asked(1))
       send("guildbank/Changed")
       primes[2].cb()
-      assert.spy(refresh.RequestUpdate).was.called_with(match._, { guild = true, guildLoad = "primed" })
+      assert.are.same({ guild = true, guildLoad = "primed" }, asked(2))
     end)
 
     it("reads when its tabs change (names, permissions)", function()

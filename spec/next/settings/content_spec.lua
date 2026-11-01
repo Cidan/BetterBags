@@ -5,6 +5,7 @@
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 local const = StubBetterBagsModule("Constants")
+const.NEXT_SECTION_COLUMNS_MAX = const.NEXT_SECTION_COLUMNS_MAX or 4
 const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
 const.BAG_VIEW = const.BAG_VIEW or { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
@@ -23,6 +24,10 @@ local events = StubBetterBagsModule("Events")
 local db = StubBetterBagsModule("Database")
 -- The saved BetterBags Next theme (DB:GetNextTheme), which SonataNext reads.
 db.GetNextTheme = db.GetNextTheme or function() return "Default" end
+db.GetNextSectionColumns = db.GetNextSectionColumns or function() return 1 end
+db.GetNextSectionFill = db.GetNextSectionFill or function() return "across" end
+db.GetNextSectionSpan = db.GetNextSectionSpan or function() return true end
+db.GetNextSectionWideRows = db.GetNextSectionWideRows or function() return 2 end
 -- The Animation switches (next-themes.md §20), all on, which SonataNext lays over the theme it uses.
 db.GetNextAnimation = db.GetNextAnimation or function() return true end
 StubBetterBagsModule("Bucket")
@@ -346,6 +351,7 @@ describe("NextSettingsContent", function()
       assert.are.equal(const.BAG_KIND.BANK, page.bag.kind)
       assert.are.same({
         { "Layout", "Order", { "sectionOrder", "itemOrder" } },
+        { "Layout", "Sections [next]", { "sectionColumns", "sectionFill", "sectionSpan", "sectionWideRows" } },
         { "Layout", "Tabs", { "enableGroups" } },
         { "Layout", "Slots", { "showAllFreeSpace", "preserveGaps" } },
         { "Layout", "Window [classic]", { "resizableWindow", "snapToContent", "itemsPerRow", "columns", "opacity",
@@ -359,6 +365,30 @@ describe("NextSettingsContent", function()
           "filterRecentItems", "filterTradeSkill", "filterType", "filterSubtype" } },
         { "Categories", "In This Bag", { "Categories in This Bag" } },
       }, idsOf(page))
+    end)
+
+    it("turns a bag's fill order and wide sections on and off as its columns change", function()
+      local columns = 1
+      override(db, "GetNextSectionColumns", function() return columns end)
+      override(db, "GetNextSectionFill", function() return "across" end)
+      override(db, "GetNextSectionSpan", function() return true end)
+      for _, name in ipairs({ "GetSectionSortType", "GetBagView", "GetItemSortType", "GetGroupsEnabled",
+        "GetShowAllFreeSpace", "GetPreserveItemGaps" }) do
+        override(db, name, function() return 1 end)
+      end
+      design = "next"
+      settings:Open("backpack", "layout")
+      content:OnEnable()
+      local fill, span = rowTitled("Fill Order"), rowTitled("Wide Sections Span Columns")
+      local limit = rowTitled("Wide Column Limit")
+      assert.is_false(limit.control.track:IsEnabled())
+      assert.is_false(fill.control.frame:IsEnabled())
+      assert.is_false(span.control.frame:IsEnabled())
+      columns = 2
+      handlers["next/SectionColumnsChanged"](nil, 0)
+      assert.is_true(fill.control.frame:IsEnabled())
+      assert.is_true(span.control.frame:IsEnabled())
+      assert.is_true(limit.control.track:IsEnabled())
     end)
 
     it("arranges the categories on a bag's Categories tab, bound to it", function()
@@ -412,8 +442,8 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 29, the Currencies page's 10 (currency.md §6), and each bag's 29.
-      assert.are.equal(29 + 10 + 3 * 29, named)
+      -- The general pages' 29, the Currencies page's 10 (currency.md §6), and each bag's 33.
+      assert.are.equal(29 + 10 + 3 * 33, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -424,7 +454,7 @@ describe("NextSettingsContent", function()
       settings:Open("bank", "layout")
       local sections = {}
       for _, section in ipairs(settings.page.sections) do table.insert(sections, section.title) end
-      assert.are.same({ "Order", "Slots" }, sections)
+      assert.are.same({ "Order", "Sections", "Slots" }, sections)
       settings:Open("backpack", "layout")
       assert.is_not_nil(rowTitled("Enable Groups"))
     end)

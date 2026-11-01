@@ -409,6 +409,7 @@ function nextPanel:Create(proto, opts)
   p:Watch()
   p.content:SetHeaderHandler(p)
   if not opts.noDrag then
+    p.content:SetColumnSource(function() return p:SectionColumns() end)
     nextDrag:Register(p)
   end
   chain:Register(p, opts.chainRole)
@@ -1832,7 +1833,7 @@ end
 function panelProto:SnapWidth(width)
   local room = self:ContentRoom()
   local perRow = self.content:PerRow(width - room)
-  local widest = self.content:Widest()
+  local widest = self.content:Widest(width - room)
   if widest > 0 then
     perRow = math.min(perRow, widest)
   end
@@ -2096,10 +2097,31 @@ function panelProto:LayoutWidth()
     return self.snap.layout
   end
   if self.sizing ~= nil or self.sizeGliding then
-    return self.frame:GetWidth()
+    return self:FrameLayoutWidth(self.frame:GetWidth())
   end
+  return self:RestingLayoutWidth()
+end
+
+-- RestingLayoutWidth is the width a small panel lays out for while nothing sizes it, in its own units: never rounded to
+-- its grid (docs/next-pixel-perfect.md).
+---@return number
+function panelProto:RestingLayoutWidth()
   local w = database:GetNextSmallSize(self.kind) or self:DefaultWidth()
   return math.min(UIParent:GetWidth() / self:Scale(), math.max(self:MinWidth(), w))
+end
+
+-- FrameLayoutWidth is the width to lay out for from a width the frame reports while a grip holds it. At rest the frame
+-- stands on the whole pixel nearest the width the panel lays out for, which can be a fraction under what its columns take
+-- and read as a cell fewer: within half a pixel of it, that width is what the frame stands for (asked: "never normalize
+-- such that the column count changes away from the user"). Anywhere else, the frame's width is the width the player sees.
+---@param width number
+---@return number
+function panelProto:FrameLayoutWidth(width)
+  local resting = self:RestingLayoutWidth()
+  if math.abs(width - resting) <= self:PixelUnit() / 2 + 1e-6 then
+    return resting
+  end
+  return width
 end
 
 -- BodyLeft is where the body starts, from the frame's left edge: past the feather on the full
@@ -2844,12 +2866,17 @@ function panelProto:StopSizing()
   local x, y, w, h = frame:GetLeft(), frame:GetTop(), frame:GetWidth(), frame:GetHeight()
   local from, side = self.sizingFrom, self.sizing
   self:recordSizing("let go")
+  self.content:SetInstant(false)
+  -- Sizing placed everything at once, which leaves nothing to glide from: in columns the snap moves them, by hundreds of
+  -- pixels. One column keeps its rows through a snap.
+  if self.content.grid ~= nil then
+    render:RenderNow(self.root, { ctx = context:New("NextPanelSnap") })
+  end
   self.sizing = nil
   -- Let go away from the pointer, it fades now.
   self:fadeGrip(side)
   self.sizingFrom = nil
-  self.content:SetInstant(false)
-  local to = self:SnapWidth(w)
+  local to = self:SnapWidth(self:FrameLayoutWidth(w))
   if x ~= nil and y ~= nil and (math.abs(to - from[1]) >= 0.5 or math.abs(h - from[2]) >= 0.5) then
     database:SetNextSmallSize(self.kind, to, h)
     self.smallWidth, self.smallHeight = self:SmallSize()
@@ -3154,6 +3181,18 @@ function panelProto:OnHeaderReceiveDrag(ctx, section)
   end
 end
 
+-- SectionColumns is how many columns of sections this bag is set to, how they fill and whether wide sections span
+-- them (next.md §7a). Show Bags (a bag's slots, or a guild tab's, in order) is one column.
+---@return number count, string? fill, boolean? span, number? wideRows
+function panelProto:SectionColumns()
+  -- The logout stripped the settings these read (initialization.md).
+  if addon.loggingOut or database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    return 1
+  end
+  return database:GetNextSectionColumns(self.kind), database:GetNextSectionFill(self.kind),
+    database:GetNextSectionSpan(self.kind), database:GetNextSectionWideRows(self.kind)
+end
+
 -- OnHeaderEnter tells what a header does.
 ---@param section NextSection
 function panelProto:OnHeaderEnter(section)
@@ -3163,7 +3202,8 @@ function panelProto:OnHeaderEnter(section)
   GameTooltip:SetOwner(section.header, self.side == "LEFT" and "ANCHOR_RIGHT" or "ANCHOR_LEFT")
   GameTooltip:SetText(section.name, 1, 1, 1, 1, true)
   if section.kind == "category" then
-    GameTooltip:AddLine(L:G("Drag to reorder, or onto a tab or the other bag."), 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(self.content:CanReorder() and L:G("Drag to reorder, or onto a tab or the other bag.")
+      or L:G("Drag onto a tab or the other bag."), 0.8, 0.8, 0.8, true)
   end
   if section.kind ~= "free" then
     GameTooltip:AddLine(L:G("Right-click to move it to the open window."), 0.8, 0.8, 0.8, true)
@@ -4878,6 +4918,16 @@ function panelProto:Watch()
       return self:IsShown()
     end)
   end
+  events:RegisterMessage("next/SectionColumnsChanged", function(_, kind)
+    if kind == self.kind then
+      self.content:Invalidate()
+    end
+  end)
+  events:RegisterMessage("bags/SortSettled", function(_, kind)
+    if kind == self.kind then
+      self.content:ReleaseWidths()
+    end
+  end)
   events:RegisterMessage("search/SetInFrame", function(ctx)
     self:UpdateSearchShown()
     events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true, categoriesUnchanged = true })

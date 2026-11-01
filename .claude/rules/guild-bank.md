@@ -105,7 +105,7 @@ nothing.
   loads the tabs (`GuildBank:Load`) only once the panel has finished showing, or after
   `GUILD_SHOW_TIMEOUT` (1 s). Each tab loaded is read once its items' data has loaded
   (`ItemLoader:PrimeGuildBank`: `Item:CreateFromItemLink` for each item, in one
-  `ContinuableContainer`), the first read of a visit with a fresh layout; after `GUILD_PRIME_TIMEOUT`
+  `ContinuableContainer`), a read holding a tab's first items with a fresh layout (refresh-scheduler.md §11a); after `GUILD_PRIME_TIMEOUT`
   (2 s) it is read anyway and again when the data arrives. `guildbank/Changed` reads the loaded tabs
   again (primed), `guildbank/TabsChanged` reads, `guildbank/Closed` forgets the guild bank. Nothing
   happens for a visit that has ended. `RefreshRequest.guild` sweeps the guild bank after the bank and

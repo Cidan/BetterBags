@@ -206,6 +206,195 @@ describe("a guild bank visit on the whole addon", function()
     assert.are.same({}, handle.errors)
   end)
 
+  -- Each tab's read used to keep the layout, so a section took the width what had loaded when it first showed asked for.
+  it("gives a section spanning columns its width for the whole guild bank, not the first tab read", function()
+    local addon = start("next")
+    guild()
+    local ores = {}
+    for slot = 1, 20 do
+      ores[slot] = { link = linkOf(200), texture = 134600, count = 1, quality = 1 }
+    end
+    _G._guildBank.tabs[1].slots = { [1] = { link = linkOf(200), texture = 134600, count = 1, quality = 1 } }
+    _G._guildBank.tabs[2].slots = ores
+    local database = addon:GetModule("Database")
+    local const = addon:GetModule("Constants")
+    database:SetNextSectionColumns(const.BAG_KIND.GUILD, 2)
+    -- Not stacked, so the section holds every pile.
+    database:SetMergeItems(const.BAG_KIND.GUILD, false)
+    local panel = addon.Bags.GuildBank
+    openGuildBank(addon)
+    slideIn(addon)
+    answer(addon)
+    frames()
+    assert.are.same({}, handle.errors)
+    local section
+    for _, candidate in ipairs(panel.content.order) do
+      if #candidate.entries == 21 then section = candidate end
+    end
+    assert.is_not_nil(section, "one section holds all 21 piles")
+    assert.are.equal(addon:GetModule("NextStyle").GRID_WIDTH, section.frame:GetWidth(), "it spans both columns")
+  end)
+
+  -- Found by the adversarial review: GUILDBANKBAGSLOTS_CHANGED names no tab, so the real answer can come after the query
+  -- timed out, or after another player's move was taken for it. Such a read is a "change", and it kept the layout.
+  describe("a tab's real answer coming late or shifted", function()
+    local ORES = { [201] = "Iron Ore", [202] = "Zinc Ore" }
+
+    local function stock()
+      for id, name in pairs(ORES) do
+        ITEMS[id] = { name = name, type = "Tradeskill", subType = "Metal & Stone", equip = "", class = 7, sub = 7 }
+      end
+      _G._guildBank.tabs[1].slots = {
+        [1] = { link = linkOf(200), texture = 134600, count = 20, quality = 1 },
+        [2] = { link = linkOf(202), texture = 134602, count = 20, quality = 1 },
+      }
+      _G._guildBank.tabs[2].slots = { [1] = { link = linkOf(201), texture = 134601, count = 20, quality = 1 } }
+    end
+
+    after_each(function()
+      for id in pairs(ORES) do ITEMS[id] = nil end
+    end)
+
+    local function order(addon)
+      local const = addon:GetModule("Constants")
+      local out = {}
+      for _, item in ipairs(addon:GetModule("Items").slotInfo[const.BAG_KIND.GUILD].sortedItems) do
+        if item.isItemGap then
+          out[#out + 1] = "GAP"
+        elseif item.itemInfo and item.itemInfo.itemName then
+          out[#out + 1] = item.itemInfo.itemName
+        end
+      end
+      return table.concat(out, " | ")
+    end
+
+    -- freshOrder is the layout a fresh one gives; the sort is the player's, by name.
+    local function freshOrder(addon)
+      addon:GetModule("Refresh"):RequestUpdate({ guild = true, resetLayout = true })
+      frames()
+      return order(addon)
+    end
+
+    local function byName(addon)
+      addon:GetModule("Sort").GetItemDataSortFunction = function()
+        return function(a, b)
+          if a.isFreeSlot or a.isItemGap then return false end
+          if b.isFreeSlot or b.isItemGap then return true end
+          return a.itemInfo.itemName < b.itemInfo.itemName
+        end
+      end
+    end
+
+    local function fireTimeout(seconds)
+      for i = #timers, 1, -1 do
+        if timers[i].delay == seconds then
+          local t = table.remove(timers, i)
+          t.fn()
+          frames()
+          return true
+        end
+      end
+      return false
+    end
+
+    local function arrive(addon, tab)
+      if tab then _G._guildBank.delivered[tab] = true end
+      addon:GetModule("Events")._eventMap["GUILDBANKBAGSLOTS_CHANGED"].fn("GUILDBANKBAGSLOTS_CHANGED")
+      frames()
+    end
+
+    it("ends in a fresh layout when a tab answers after its query timed out", function()
+      local addon = start("next")
+      guild()
+      stock()
+      byName(addon)
+      openGuildBank(addon)
+      slideIn(addon)
+      arrive(addon, 1)
+      assert.is_true(fireTimeout(addon:GetModule("GuildBank").QUERY_TIMEOUT))
+      arrive(addon, 2)
+      local loaded = order(addon)
+      assert.are.equal("Copper Ore | Iron Ore | Zinc Ore", freshOrder(addon))
+      assert.are.equal("Copper Ore | Iron Ore | Zinc Ore", loaded)
+      assert.are.same({}, handle.errors)
+    end)
+
+    it("ends in a fresh layout when another player's move was taken for a tab's answer", function()
+      local addon = start("next")
+      guild()
+      stock()
+      byName(addon)
+      openGuildBank(addon)
+      slideIn(addon)
+      arrive(addon, 1)
+      arrive(addon)
+      assert.is_false(addon:GetModule("GuildBank"):IsLoading())
+      arrive(addon, 2)
+      assert.are.equal("Copper Ore | Iron Ore | Zinc Ore", order(addon))
+    end)
+
+    it("gives a section spanning columns its width when its tab answers late", function()
+      local addon = start("next")
+      guild()
+      local ores = {}
+      for slot = 1, 20 do
+        ores[slot] = { link = linkOf(200), texture = 134600, count = 1, quality = 1 }
+      end
+      _G._guildBank.tabs[1].slots = { [1] = { link = linkOf(200), texture = 134600, count = 1, quality = 1 } }
+      _G._guildBank.tabs[2].slots = ores
+      local database, const = addon:GetModule("Database"), addon:GetModule("Constants")
+      database:SetNextSectionColumns(const.BAG_KIND.GUILD, 2)
+      database:SetMergeItems(const.BAG_KIND.GUILD, false)
+      local panel = addon.Bags.GuildBank
+      openGuildBank(addon)
+      slideIn(addon)
+      arrive(addon, 1)
+      assert.is_true(fireTimeout(addon:GetModule("GuildBank").QUERY_TIMEOUT))
+      arrive(addon, 2)
+      local section
+      for _, candidate in ipairs(panel.content.order) do
+        if #candidate.entries == 21 then section = candidate end
+      end
+      assert.is_not_nil(section)
+      assert.are.equal(addon:GetModule("NextStyle").GRID_WIDTH, section.frame:GetWidth())
+    end)
+
+    it("keeps a gap the player made when a tab they looked at is answered again", function()
+      local addon = start("next")
+      guild()
+      stock()
+      byName(addon)
+      local panel = addon.Bags.GuildBank
+      openGuildBank(addon)
+      slideIn(addon)
+      answer(addon)
+      frames()
+      local context = addon:GetModule("Context")
+      panel:ShowTab(context:New("spec"), addon:GetModule("GuildBank"):ContainerOf(2))
+      frames()
+      panel:ShowAll(context:New("spec"))
+      frames()
+      -- The withdrawal, taken for the answer to the tab queried.
+      _G._guildBank.tabs[1].slots[2] = nil
+      arrive(addon)
+      assert.is_truthy(order(addon):find("GAP"), order(addon))
+    end)
+
+    it("flies nothing as its tabs arrive", function()
+      local addon = start("next")
+      guild()
+      stock()
+      byName(addon)
+      local motion = addon:GetModule("Motion")
+      openGuildBank(addon)
+      slideIn(addon)
+      for _, tab in ipairs({ 1, 2 }) do
+        arrive(addon, tab)
+        assert.are.same({}, motion.moves, "after tab " .. tab)
+      end
+    end)
+  end)
+
   it("puts the guild's tabs in the panel's tabs, and its gold in the footer", function()
     local addon = start("next")
     guild()

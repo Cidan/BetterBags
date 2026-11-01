@@ -207,6 +207,25 @@ describe("Constants Module Offsets", function()
     end
   end)
 
+  -- Asked: "2 columns, side to side, wide sections on, wide column limit of 2, and sort order is descending for sections by
+  -- default. do this for all bags."
+  it("starts every bag in two columns, side to side, wide sections spanning them, its largest section first", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    local profile = const.DATABASE_DEFAULTS.profile
+    local kinds = { const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK, const.BAG_KIND.GUILD }
+    for _, kind in ipairs(kinds) do
+      assert.are.equal(2, profile.nextSectionColumns[kind], "columns of bag " .. kind)
+      assert.are.equal("across", profile.nextSectionFill[kind], "fill of bag " .. kind)
+      assert.is_true(profile.nextSectionSpan[kind], "wide sections of bag " .. kind)
+      assert.are.equal(2, profile.nextSectionWideRows[kind], "wide column limit of bag " .. kind)
+      for _, view in ipairs({ const.BAG_VIEW.SECTION_GRID, const.BAG_VIEW.SECTION_ALL_BAGS }) do
+        assert.are.equal(const.SECTION_SORT_TYPE.SIZE_DESCENDING, profile.sectionSort[kind][view],
+          "section sort of bag " .. kind .. " in view " .. view)
+      end
+    end
+  end)
+
   it("leaves animating item movement off by default", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")

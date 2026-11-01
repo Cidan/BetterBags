@@ -52,6 +52,8 @@ ResetModuleStub("NextStyle", "next/style.lua")
 LoadBetterBagsModule("next/style.lua")
 ResetModuleStub("NextTween", "next/tween.lua")
 LoadBetterBagsModule("next/tween.lua")
+ResetModuleStub("NextFill", "next/fill.lua")
+LoadBetterBagsModule("next/fill.lua")
 ResetModuleStub("NextContent", "next/content.lua")
 LoadBetterBagsModule("next/content.lua")
 
@@ -443,6 +445,54 @@ describe("NextContent", function()
     motion:Step(style.Time.Interaction * 3 / 4)
     assert.are.equal(0, (select(4, frame:GetPoint(1))))
     assert.is_nil(motion:GetMove(frame))
+  end)
+
+  -- Reported by the adversarial review: a bank of 500 items on 6 tabs started 1,057 flights opening, each tab's read
+  -- re-sorting everything while the last tab's flights were under way (refresh-scheduler.md §11a).
+  it("places what a read that adds a tab moved at once, and glides again on the read after", function()
+    bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A"), item("0_2", "A") } }))
+    draw()
+    local arrived = data({ categories = { { name = "A" } }, items = { item("0_2", "A"), item("0_1", "A") } })
+    arrived.tabArrived, arrived.layoutResets = true, 1
+    bind(arrived)
+    draw()
+    assert.is_nil(motion:GetMove(buttons["0_1"].frame))
+    assert.is_nil(motion:GetMove(buttons["0_2"].frame))
+    assert.are.equal(0, (select(4, buttons["0_2"].frame:GetPoint(1))))
+    bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A"), item("0_2", "A") } }))
+    draw()
+    assert.is_not_nil(motion:GetMove(buttons["0_1"].frame))
+    motion:Step(1)
+  end)
+
+  -- It stays on the committed data until the next read: a draw of that read again (a tab switched, a redraw) glides.
+  it("places at once only the draw of the read that added a tab", function()
+    local function read(first, second)
+      local slotInfo = data({ categories = { { name = "A" } }, items = { item(first, "A"), item(second, "A") } })
+      slotInfo.tabArrived, slotInfo.layoutResets = true, 1
+      return slotInfo
+    end
+    bind(read("0_1", "0_2"))
+    draw()
+    bind(read("0_2", "0_1"))
+    draw()
+    assert.is_not_nil(motion:GetMove(buttons["0_1"].frame))
+    motion:Step(1)
+  end)
+
+  -- A font string keeps the width its text took through a font change, and cuts what no longer fits (next-themes.md §14).
+  it("measures a title again in the font a theme gives it", function()
+    bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+    draw()
+    local title = canvas.byName.A.title
+    local widths, texts = {}, {}
+    local setWidth, setText = title.SetWidth, title.SetText
+    title.SetWidth = function(self, w) table.insert(widths, w) return setWidth(self, w) end
+    title.SetText = function(self, t) table.insert(texts, t) return setText(self, t) end
+    canvas:ApplyStyle(context:New("spec"))
+    title.SetWidth, title.SetText = nil, nil
+    assert.are.equal(0, widths[1])
+    assert.are.equal("A", texts[1])
   end)
 
   it("moves an item a pose at a time under a theme's stop motion", function()
@@ -1160,6 +1210,744 @@ describe("NextContent", function()
   end)
 
   -- The cards a panel's dock holds (NextDock) lead its column, above its sections.
+  -- Asked: a layout option for N columns, sections sorted across rows or down columns, the window deciding
+  -- each column's size. Hard rule: never disjoint rows: sections side by side share a title line.
+  describe("section columns", function()
+    local HEADER, SPACING = style.SECTION_HEADER, style.SECTION_SPACING
+
+    before_each(function()
+      canvas:SetInstant(true)
+    end)
+
+    -- sections binds categories of as many items as each says: { { "A", 8 }, { "B", 8 } }.
+    local function sections(list, opts)
+      opts = opts or {}
+      local categories, items, n = {}, {}, 0
+      for _, s in ipairs(list) do
+        table.insert(categories, { name = s[1] })
+        for _ = 1, s[2] do
+          n = n + 1
+          table.insert(items, item("0_" .. n, s[1]))
+        end
+      end
+      bind(data({ categories = categories, items = items, recent = opts.recent, free = opts.free }))
+    end
+
+    local function columns(count, fill)
+      canvas:SetColumnSource(function() return count, fill end)
+    end
+
+    local function place(name)
+      local _, x, y = at(canvas.byName[name].frame)
+      return { x, -y }
+    end
+
+    local function height(rows)
+      return HEADER + rows * STEP - style.GAP
+    end
+
+    it("splits its width into whole cells, with the icon gap between the columns", function()
+      columns(2, "across")
+      sections({ { "A", 8 }, { "B", 8 } })
+      local result = draw()
+      assert.are.same({ 0, 0 }, place("A"))
+      assert.are.same({ 4 * STEP, 0 }, place("B"))
+      assert.are.equal(4 * STEP - style.GAP, canvas.byName.A.frame:GetWidth())
+      assert.are.equal(4 * STEP - style.GAP, canvas.byName.B.frame:GetWidth())
+      local _, x, y = at(buttons["0_13"].frame)
+      assert.are.same({ 0, -STEP }, { x, y }, "B's fifth item starts its second row")
+      assert.are.equal(height(2), result.Height)
+    end)
+
+    it("gives the cells left over to the first columns", function()
+      columns(3, "across")
+      sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+      draw()
+      assert.are.same({ 0, 3 * STEP, 6 * STEP }, { place("A")[1], place("B")[1], place("C")[1] })
+      assert.are.equal(3 * STEP - style.GAP, canvas.byName.B.frame:GetWidth())
+      assert.are.equal(2 * STEP - style.GAP, canvas.byName.C.frame:GetWidth())
+    end)
+
+    it("fills side to side: across a row, then the next", function()
+      columns(2, "across")
+      sections({ { "A", 1 }, { "B", 1 }, { "C", 1 }, { "D", 1 }, { "E", 1 } })
+      draw()
+      local row = height(1) + SPACING
+      assert.are.same({ { 0, 0 }, { 200, 0 }, { 0, row }, { 200, row }, { 0, 2 * row } },
+        { place("A"), place("B"), place("C"), place("D"), place("E") })
+    end)
+
+    it("fills top to bottom: down a column, then the next, its rows still lined up", function()
+      columns(2, "down")
+      sections({ { "A", 1 }, { "B", 1 }, { "C", 1 }, { "D", 1 }, { "E", 1 } })
+      draw()
+      local row = height(1) + SPACING
+      assert.are.same({ { 0, 0 }, { 0, row }, { 0, 2 * row }, { 200, 0 }, { 200, row } },
+        { place("A"), place("B"), place("C"), place("D"), place("E") })
+    end)
+
+    it("makes a row as tall as its tallest section, in either fill", function()
+      for _, fill in ipairs({ "across", "down" }) do
+        columns(2, fill)
+        sections({ { "A", 9 }, { "B", 1 }, { "C", 1 }, { "D", 1 } })
+        draw()
+        local second = fill == "across" and place("C") or place("B")
+        assert.are.equal(height(3) + SPACING, second[2], fill)
+      end
+    end)
+
+    -- The hard rule, whatever the bag holds: every section's title is on its row's line, and each row starts
+    -- below the tallest section of the row above. Nothing ever stands between rows.
+    it("never lets sections side by side sit on different lines, across random bags", function()
+      for seed = 1, 40 do
+        math.randomseed(seed)
+        local count = math.random(2, 4)
+        local fill = seed % 2 == 0 and "across" or "down"
+        local list = {}
+        for i = 1, math.random(1, 16) do list[i] = { "S" .. string.format("%02d", i), math.random(1, 30) } end
+        columns(count, fill)
+        sections(list)
+        local result = draw()
+        local rows = {}
+        local byLine = {}
+        for _, s in ipairs(canvas.order) do
+          local x, y = unpack(place(s.name))
+          assert.are.equal(s.y, y)
+          assert.are.equal(s.x, x)
+          if not byLine[y] then
+            byLine[y] = {}
+            table.insert(rows, y)
+          end
+          assert.is_nil(byLine[y][x], "two sections in one cell, seed " .. seed)
+          byLine[y][x] = s
+        end
+        table.sort(rows)
+        local expect = 0
+        for _, y in ipairs(rows) do
+          assert.are.equal(expect, y, "a row starts below the tallest of the row above, seed " .. seed)
+          local tallest = 0
+          for _, s in pairs(byLine[y]) do tallest = math.max(tallest, s.height) end
+          expect = y + tallest + SPACING
+        end
+        assert.are.equal(expect - SPACING, result.Height, "seed " .. seed)
+        local sorted = { unpack(canvas.order) }
+        table.sort(sorted, function(a, b)
+          if fill == "across" then
+            return a.y < b.y or (a.y == b.y and a.x < b.x)
+          end
+          return a.x < b.x or (a.x == b.x and a.y < b.y)
+        end)
+        for i, s in ipairs(sorted) do
+          assert.are.equal(canvas.order[i].name, s.name, "reading order, seed " .. seed)
+        end
+      end
+    end)
+
+    -- As in one column: held in a drag or flying back from a dock it is drawn on another grid, and its room is its height
+    -- on the column's, so the rows below stay on whole pixels.
+    for _, case in ipairs({ "held in a drag", "flying back from a dock" }) do
+      it("gives a section " .. case .. " its height in its row on the column's grid, drawn on another", function()
+        local layout = dofile("spec/helpers/layout.lua")
+        local undo = layout.UseScreen(3396, 1362, 0.65)
+        parent:SetParent(UIParent)
+        parent:SetScale(0.55)
+        finally(function()
+          parent:SetScale(1)
+          parent:SetParent(nil)
+          undo()
+        end)
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 9 }, { "C", 1 } })
+        draw()
+        local before = place("C")[2]
+        local B = canvas.byName.B
+        local away = CreateFrame("Frame", nil, UIParent)
+        away:SetScale(0.55 * 0.94)
+        if case == "held in a drag" then
+          canvas:BeginDrag(B)
+        else
+          canvas:HoldOut(B)
+          draw()
+          canvas:Returning(B)
+        end
+        B.frame:SetParent(away)
+        B.frame:ClearAllPoints()
+        B.frame:SetPoint("TOPLEFT", away, "TOPLEFT", 0, 0)
+        draw()
+        assert.is_true(math.abs(place("C")[2] - before) < 1e-9, string.format("C at %.4f, %.4f before", place("C")[2], before))
+      end)
+    end
+
+    it("keeps Recent Items above and Free Space below the columns, at the full width", function()
+      columns(2, "across")
+      sections({ { "A", 1 }, { "B", 1 } }, {
+        recent = { item("0_9", "Recent Items") },
+        free = { showAll = false, buttons = { { slotkey = "1_5", count = 3 } } },
+      })
+      draw()
+      local row = height(1) + SPACING
+      local free = canvas.order[#canvas.order]
+      assert.are.equal("free", free.kind)
+      assert.are.same({ 0, 0 }, place(canvas.order[1].name))
+      assert.are.equal(style.GRID_WIDTH, canvas.order[1].frame:GetWidth())
+      assert.are.same({ { 0, row }, { 200, row } }, { place("A"), place("B") })
+      assert.are.same({ 0, 2 * row }, place(free.name))
+      assert.are.equal(style.GRID_WIDTH, free.frame:GetWidth())
+    end)
+
+    it("shows fewer columns when the window cannot give each two cells", function()
+      columns(4, "across")
+      sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+      draw(canvas:RowWidth(5))
+      assert.are.same({ 0, 3 * STEP }, { place("A")[1], place("B")[1] }, "two columns fit five cells")
+      assert.are.equal(0, place("C")[1])
+      draw(canvas:RowWidth(3))
+      assert.are.same({ 0, 0, 0 }, { place("A")[1], place("B")[1], place("C")[1] }, "one column")
+      assert.is_true(canvas:CanReorder())
+    end)
+
+    it("decides its columns on the width to lay out for, not the width it is drawn in", function()
+      columns(2, "across")
+      sections({ { "A", 5 }, { "B", 1 } })
+      render:NewRenderChain(canvas, { ctx = context:New("spec") },
+        { Width = canvas:RowWidth(8) - 1, LayoutWidth = canvas:RowWidth(8) })
+      assert.are.equal(4 * STEP, place("B")[1])
+    end)
+
+    it("stays one column without a source, and at one column", function()
+      sections({ { "A", 9 }, { "B", 1 } })
+      draw()
+      assert.are.equal(0, place("B")[1])
+      assert.are.equal(style.GRID_WIDTH, canvas.byName.B.frame:GetWidth())
+      assert.is_true(canvas:CanReorder())
+      columns(1, "down")
+      draw()
+      assert.are.equal(0, place("B")[1])
+      assert.is_true(canvas:CanReorder())
+    end)
+
+    it("goes back to the full width when the columns go", function()
+      columns(2, "across")
+      sections({ { "A", 8 }, { "B", 8 } })
+      draw()
+      assert.is_false(canvas:CanReorder())
+      columns(1, "across")
+      local result = draw()
+      assert.are.equal(style.GRID_WIDTH, canvas.byName.B.frame:GetWidth())
+      assert.are.equal(0, canvas.byName.B.x)
+      assert.are.equal(2 * height(1) + SPACING, result.Height)
+      local _, x = at(buttons["0_16"].frame)
+      assert.are.equal(7 * STEP, x)
+    end)
+
+    describe("titles", function()
+      local LONG = string.rep("x", 40)
+
+      it("cuts a title too long for its column short, keeping its count in the column", function()
+        columns(2, "across")
+        sections({ { LONG, 1 }, { "B", 1 } })
+        draw()
+        local s = canvas.byName[LONG]
+        local room = s.frame:GetWidth() - style.Theme.Sections.Title.X - style.Theme.Sections.CountGap
+          - s.count:GetStringWidth()
+        assert.are.equal(room, s.title:GetWidth())
+        assert.is_false(s.title:CanWordWrap())
+        local _, cx = at(s.count)
+        assert.is_true(cx + s.count:GetStringWidth() <= s.frame:GetWidth() + 0.5)
+      end)
+
+      it("gives a title back its whole length when there is room again", function()
+        columns(2, "across")
+        sections({ { LONG, 1 }, { "B", 1 } })
+        draw()
+        local s = canvas.byName[LONG]
+        columns(1, "across")
+        local widths, texts = {}, {}
+        local setWidth, setText = s.title.SetWidth, s.title.SetText
+        s.title.SetWidth = function(self, w) table.insert(widths, w) return setWidth(self, w) end
+        s.title.SetText = function(self, t) table.insert(texts, t) return setText(self, t) end
+        draw()
+        assert.are.same({ 0 }, widths)
+        assert.are.same({ LONG }, texts)
+        assert.is_nil(s.titleCut)
+      end)
+
+      it("leaves a title that fits alone", function()
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 1 } })
+        spy.on(canvas.byName.A.title, "SetWidth")
+        draw()
+        assert.spy(canvas.byName.A.title.SetWidth).was_not.called()
+      end)
+
+      it("draws no line after a title that leaves it no room, and draws it again when there is", function()
+        columns(2, "across")
+        sections({ { LONG, 1 }, { "B", 1 } })
+        draw()
+        assert.is_false(canvas.byName[LONG].line:IsShown())
+        assert.is_true(canvas.byName.B.line:IsShown())
+        columns(1, "across")
+        draw()
+        assert.is_true(canvas.byName[LONG].line:IsShown())
+      end)
+
+      it("draws no line in a window too narrow for one, at one column too", function()
+        sections({ { LONG, 1 } })
+        draw(canvas:RowWidth(4))
+        assert.is_false(canvas.byName[LONG].line:IsShown())
+      end)
+
+      it("leaves a theme's missing line missing", function()
+        override(style.Theme.Sections, "Line", false)
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 1 } })
+        canvas:ApplyStyle(context:New("spec"))
+        draw()
+        assert.is_false(canvas.byName.A.line:IsShown())
+      end)
+    end)
+
+    -- Asked: wide rows consume multiple columns, as a toggle. A section past three rows in its column takes as many as
+    -- keep it within three, and order is never given up to do it.
+    describe("wide sections", function()
+      local function spanning(count, fill, limit)
+        canvas:SetColumnSource(function() return count, fill, true, limit or 4 end)
+      end
+
+      local function widthOf(name)
+        return canvas.byName[name].frame:GetWidth()
+      end
+
+      it("takes the columns it needs: both of two", function()
+        spanning(2, "across")
+        sections({ { "A", 16 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+        assert.are.same({ 0, height(2) + SPACING }, place("B"))
+        assert.are.same({ 4 * STEP, height(2) + SPACING }, place("C"))
+      end)
+
+      it("takes only the columns it needs: two of three, the third beside it", function()
+        spanning(3, "across")
+        sections({ { "A", 16 }, { "B", 1 } })
+        draw()
+        assert.are.equal(6 * STEP - style.GAP, widthOf("A"))
+        assert.are.same({ 6 * STEP, 0 }, place("B"))
+        assert.are.equal(2 * STEP - style.GAP, widthOf("B"))
+      end)
+
+      it("starts a new row rather than give up the order, leaving the rest of the row empty", function()
+        spanning(2, "across")
+        sections({ { "A", 1 }, { "B", 16 }, { "C", 1 } })
+        draw()
+        assert.are.same({ 0, 0 }, place("A"))
+        assert.are.same({ 0, height(1) + SPACING }, place("B"))
+        assert.are.equal(style.GRID_WIDTH, widthOf("B"))
+        assert.are.same({ 0, height(1) + SPACING + height(2) + SPACING }, place("C"))
+      end)
+
+      it("takes what is left of a row when that is enough", function()
+        spanning(4, "across")
+        sections({ { "A", 1 }, { "B", 12 } })
+        draw(canvas:RowWidth(16))
+        assert.are.same({ 4 * STEP, 0 }, place("B"))
+        assert.are.equal(4 * STEP - style.GAP, widthOf("B"), "exactly three rows in its column is not wide")
+      end)
+
+      it("is wide just past three rows in its column", function()
+        spanning(2, "across")
+        sections({ { "A", 12 }, { "B", 13 } })
+        draw()
+        assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+        assert.are.equal(style.GRID_WIDTH, widthOf("B"))
+      end)
+
+      it("takes every column when even they run past three rows", function()
+        spanning(2, "across")
+        sections({ { "A", 197 } })
+        local result = draw()
+        assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+        assert.are.equal(height(25), result.Height)
+      end)
+
+      -- Asked, of a limit of 2: "you can see tradeskill not expand out into columns" (6 items, 2 rows in a column of 4).
+      it("counts as wide once it would reach the bag's limit of rows", function()
+        spanning(2, "across", 2)
+        sections({ { "Tradeskill", 6 }, { "Back", 1 }, { "Quest", 4 } })
+        draw()
+        assert.are.equal(style.GRID_WIDTH, widthOf("Tradeskill"), "two rows in its column")
+        assert.are.equal(4 * STEP - style.GAP, widthOf("Back"), "one row")
+        assert.are.equal(4 * STEP - style.GAP, widthOf("Quest"), "one row, its column full")
+      end)
+
+      it("takes only the columns that keep it under the limit", function()
+        spanning(3, "across", 2)
+        sections({ { "A", 6 }, { "B", 1 } })
+        draw()
+        assert.are.equal(6 * STEP - style.GAP, widthOf("A"))
+        assert.are.same({ 6 * STEP, 0 }, place("B"))
+      end)
+
+      it("lets a higher limit keep more in its column", function()
+        spanning(2, "across", 3)
+        sections({ { "A", 8 }, { "B", 9 } })
+        draw()
+        assert.are.equal(4 * STEP - style.GAP, widthOf("A"), "two rows, under three")
+        assert.are.equal(style.GRID_WIDTH, widthOf("B"), "three rows")
+      end)
+
+      it("decides again when the limit changes while it shows", function()
+        spanning(2, "across", 3)
+        sections({ { "A", 8 }, { "B", 1 } })
+        draw()
+        assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+        spanning(2, "across", 2)
+        draw()
+        assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+      end)
+
+      it("stays in its column with the toggle off", function()
+        canvas:SetColumnSource(function() return 2, "across", false end)
+        sections({ { "A", 16 }, { "B", 1 } })
+        draw()
+        assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+        assert.are.same({ 4 * STEP, 0 }, place("B"))
+      end)
+
+      it("takes a row of its own filling top to bottom, the others filling down between", function()
+        spanning(2, "down")
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 16 }, { "D", 1 }, { "E", 1 }, { "F", 1 } })
+        draw()
+        local row = height(1) + SPACING
+        assert.are.same({ { 0, 0 }, { 4 * STEP, 0 } }, { place("A"), place("B") })
+        assert.are.same({ 0, row }, place("C"))
+        assert.are.equal(style.GRID_WIDTH, widthOf("C"))
+        local below = row + height(2) + SPACING
+        assert.are.same({ { 0, below }, { 0, below + row }, { 4 * STEP, below } }, { place("D"), place("E"), place("F") })
+      end)
+
+      -- Asked: "content changes and isn't always stable, so rows above or below it might get gapped out". What a section
+      -- takes is decided once, and held until the layout starts afresh, as gaps are.
+      describe("while its contents change", function()
+        it("stays in its column as it grows past three rows, only growing taller", function()
+          spanning(2, "across")
+          sections({ { "A", 12 }, { "B", 1 }, { "C", 1 } })
+          draw()
+          sections({ { "A", 20 }, { "B", 1 }, { "C", 1 } })
+          draw()
+          assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+          assert.are.same({ 4 * STEP, 0 }, place("B"), "nothing moves sideways")
+          assert.are.same({ 0, height(5) + SPACING }, place("C"), "what is below moves down for it")
+        end)
+
+        it("stays wide as it shrinks, leaving nothing to fill", function()
+          spanning(2, "across")
+          sections({ { "B", 1 }, { "C", 1 }, { "D", 20 }, { "E", 1 } })
+          draw()
+          local before = place("E")
+          sections({ { "B", 1 }, { "C", 1 }, { "D", 13 }, { "E", 1 } })
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("D"))
+          assert.are.equal(before[1], place("E")[1])
+          sections({ { "B", 1 }, { "C", 1 }, { "D", 2 }, { "E", 1 } })
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("D"), "even down to two")
+        end)
+
+        it("gives a section new while it shows its own width, and holds it", function()
+          spanning(2, "across")
+          sections({ { "A", 1 } })
+          draw()
+          sections({ { "A", 1 }, { "B", 20 } })
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("B"))
+          sections({ { "A", 1 }, { "B", 2 } })
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("B"))
+        end)
+
+        -- Reported by the second adversarial review: holding what a section needs on opening, with nothing laid out, held a
+        -- width the bag did not show, and the next read moved everything. A bag opening lays out, so the two agree.
+        it("lays out as it shows in columns: a section that grew while it was open takes its width then", function()
+          spanning(2, "across", 2)
+          sections({ { "A", 4 }, { "B", 1 } })
+          draw()
+          local narrow = widthOf("A")
+          sections({ { "A", 5 }, { "B", 1 } })
+          draw()
+          assert.are.equal(narrow, widthOf("A"), "held while it shows")
+          canvas.frame:GetScript("OnHide")(canvas.frame)
+          assert.are.same({}, canvas.heldCells)
+          canvas.frame:GetScript("OnShow")(canvas.frame)
+          assert.is_true(render:IsDirty(canvas))
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+          sections({ { "A", 2 }, { "B", 1 } })
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("A"), "and holds it again")
+        end)
+
+        it("lays nothing out as it shows in one column", function()
+          sections({ { "A", 4 } })
+          draw()
+          canvas.frame:GetScript("OnShow")(canvas.frame)
+          assert.is_false(render:IsDirty(canvas))
+        end)
+
+        it("lets go of what it holds when told to, and lays out only in columns", function()
+          spanning(2, "across")
+          sections({ { "A", 12 }, { "B", 1 } })
+          draw()
+          sections({ { "A", 20 }, { "B", 1 } })
+          draw()
+          assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+          canvas:ReleaseWidths()
+          assert.is_true(render:IsDirty(canvas))
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+        end)
+
+        -- Found by the third adversarial review: released with what it held, a section coming back took a width it no longer needed.
+        it("decides again for a section that left its bag's data and came back", function()
+          spanning(2, "across", 2)
+          sections({ { "A", 20 }, { "B", 1 }, { "C", 1 } })
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+          sections({ { "B", 1 }, { "C", 1 } })
+          draw()
+          sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+          draw()
+          assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+        end)
+
+        it("decides again once its bag closes", function()
+          spanning(2, "across")
+          sections({ { "A", 12 }, { "B", 1 } })
+          draw()
+          sections({ { "A", 20 }, { "B", 1 } })
+          canvas:Settle()
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+        end)
+
+        it("holds nothing while it does not show: what it holds on opening decides", function()
+          spanning(2, "across")
+          sections({ { "A", 12 }, { "B", 1 } })
+          parent:Hide()
+          draw()
+          sections({ { "A", 20 }, { "B", 1 } })
+          parent:Show()
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+        end)
+
+        it("decides again when the bag's layout starts afresh (a sort)", function()
+          spanning(2, "across")
+          local function info(n, resets)
+            local items = { item("0_90", "B") }
+            for i = 1, n do table.insert(items, item("0_" .. i, "A")) end
+            local slotInfo = data({ categories = { { name = "A" }, { name = "B" } }, items = items })
+            slotInfo.layoutResets = resets
+            return slotInfo
+          end
+          bind(info(12, 1))
+          draw()
+          bind(info(20, 1))
+          draw()
+          assert.are.equal(4 * STEP - style.GAP, widthOf("A"), "a read that keeps the layout keeps it")
+          bind(info(20, 2))
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+        end)
+
+        it("decides again on another tab", function()
+          spanning(2, "across")
+          local items = {}
+          for i = 1, 20 do items[i] = item("0_" .. i, "A") end
+          local slotInfo = data({ categories = { { name = "A" } }, items = { item("0_90", "A") } })
+          slotInfo.tabs[2] = { categories = { { name = "A" } }, items = items }
+          bind(slotInfo, 1)
+          draw()
+          assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+          bind(slotInfo, 2)
+          draw()
+          assert.are.equal(style.GRID_WIDTH, widthOf("A"))
+        end)
+
+        it("fills top to bottom by what it holds too", function()
+          spanning(2, "down")
+          sections({ { "A", 12 }, { "B", 1 } })
+          draw()
+          sections({ { "A", 20 }, { "B", 1 } })
+          draw()
+          assert.are.equal(4 * STEP - style.GAP, widthOf("A"))
+          assert.are.same({ 4 * STEP, 0 }, place("B"))
+        end)
+      end)
+
+      -- Found by the adversarial review: filling down it asked only of the first column, so a section landing in a narrower
+      -- one reached the limit. Asked of the narrowest instead, a split of 5 and 4 gave up all that columns gain.
+      describe("filling down, by the column each section lands in", function()
+        it("makes a section wide that reaches the limit in the narrower column", function()
+          spanning(2, "down", 2)
+          sections({ { "A", 1 }, { "B", 5 } })
+          draw(canvas:RowWidth(9))
+          assert.are.same({ 5, 4 }, canvas.grid.split)
+          assert.are.equal(canvas:RowWidth(9), widthOf("B"), "it takes a row of its own")
+          assert.are.equal(0, place("B")[1])
+        end)
+
+        it("leaves a section where it is that fits the wider column it lands in", function()
+          spanning(2, "down", 2)
+          sections({ { "A", 5 }, { "B", 1 } })
+          draw(canvas:RowWidth(9))
+          assert.are.equal(canvas:RowWidth(5), widthOf("A"))
+          assert.is_true(place("B")[1] > 0, "B beside it")
+        end)
+
+        it("lands the sections either side of a wide one again, each run filling its own columns", function()
+          spanning(2, "down", 2)
+          sections({ { "A", 5 }, { "B", 4 }, { "C", 5 }, { "D", 4 } })
+          draw(canvas:RowWidth(9))
+          assert.are.equal(canvas:RowWidth(9), widthOf("C"), "C lands in the narrower column")
+          assert.are.equal(0, place("A")[1])
+          assert.is_true(place("B")[1] > 0, "A and B fill their own columns above it")
+          assert.are.equal(place("A")[2], place("B")[2])
+          assert.is_true(place("C")[2] > place("A")[2])
+          assert.is_true(place("D")[2] > place("C")[2], "D below it")
+        end)
+      end)
+
+      -- Whatever the bag holds, the hard rule holds: rows line up, nothing overlaps, and no section passes another.
+      it("keeps every row on one line and the order, across random bags", function()
+        for seed = 1, 40 do
+          math.randomseed(seed)
+          local count = math.random(2, 4)
+          local fill = seed % 2 == 0 and "across" or "down"
+          local list = {}
+          for i = 1, math.random(1, 16) do
+            list[i] = { "S" .. string.format("%02d", i), math.random() < 0.3 and math.random(13, 60) or math.random(1, 8) }
+          end
+          spanning(count, fill)
+          sections(list)
+          canvas:Settle()
+          local result = draw()
+          local lines, rows = {}, {}
+          for _, s in ipairs(canvas.order) do
+            if not lines[s.y] then
+              lines[s.y] = {}
+              table.insert(rows, s.y)
+            end
+            table.insert(lines[s.y], s)
+          end
+          table.sort(rows)
+          local expect = 0
+          for _, y in ipairs(rows) do
+            assert.are.equal(expect, y, "seed " .. seed)
+            table.sort(lines[y], function(a, b) return a.x < b.x end)
+            local tallest, right = 0, 0
+            for _, s in ipairs(lines[y]) do
+              assert.is_true(s.x >= right, "no overlap, seed " .. seed)
+              right = s.x + s.frame:GetWidth()
+              assert.is_true(right <= style.GRID_WIDTH + 0.5, "inside the width, seed " .. seed)
+              tallest = math.max(tallest, s.height)
+            end
+            expect = y + tallest + SPACING
+          end
+          assert.are.equal(expect - SPACING, result.Height, "seed " .. seed)
+          if fill == "across" then
+            local read = {}
+            for _, y in ipairs(rows) do
+              for _, s in ipairs(lines[y]) do table.insert(read, s.name) end
+            end
+            assert.are.same(names(), read, "reading order, seed " .. seed)
+          end
+        end
+      end)
+    end)
+
+    describe("what moves", function()
+      it("keeps a dragged section's place in its column, the others staying put", function()
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        assert.is_false(canvas:CanReorder())
+        canvas:BeginDrag(canvas.byName.B)
+        draw()
+        assert.are.same({ 4 * STEP, 0 }, { canvas:GetDragSlotX(), canvas:GetDragSlotY() })
+        assert.are.same({ 0, 0 }, place("A"))
+        assert.are.same({ 0, height(1) + SPACING }, place("C"))
+        canvas:EndDrag(false)
+        draw()
+        assert.are.same({ 4 * STEP, 0 }, place("B"))
+      end)
+
+      it("lands a drag at the left in one column", function()
+        sections({ { "A", 1 }, { "B", 1 } })
+        draw()
+        assert.are.equal(0, canvas.byName.B.x)
+      end)
+
+      it("closes up over a section held out, and keeps its room while it flies back", function()
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        local b = canvas.byName.B
+        canvas:HoldOut(b)
+        draw()
+        assert.are.equal(4 * STEP, canvas.byName.C.x, "C takes B's place")
+        canvas:Returning(b)
+        draw()
+        assert.are.equal(4 * STEP, b.x)
+        assert.are.equal(0, canvas.byName.C.x)
+        canvas:Return(b)
+        assert.are.same({ canvas.frame, 4 * STEP, 0 }, { at(b.frame) })
+      end)
+
+      it("closes up over a section leaving", function()
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+        canvas:MarkLeaving("A", 3)
+        draw()
+        assert.is_false(canvas.byName.A.frame:IsShown())
+        assert.are.same({ 0, 0 }, place("B"))
+        assert.are.same({ 4 * STEP, 0 }, place("C"))
+      end)
+    end)
+
+    describe("how wide it needs to be", function()
+      it("needs its columns' cells, at most its largest section's in each", function()
+        columns(2, "across")
+        sections({ { "A", 3 }, { "B", 1 } })
+        draw()
+        assert.are.equal(6, canvas:Widest(canvas:RowWidth(12)))
+      end)
+
+      it("never needs so little its columns would go", function()
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 1 } })
+        draw()
+        assert.are.equal(4, canvas:Widest(canvas:RowWidth(12)))
+      end)
+
+      it("needs what Recent Items holds, at the full width", function()
+        columns(2, "across")
+        local recent = {}
+        for i = 1, 7 do recent[i] = item("0_9" .. i, "Recent Items") end
+        sections({ { "A", 1 }, { "B", 1 } }, { recent = recent })
+        draw()
+        assert.are.equal(7, canvas:Widest(canvas:RowWidth(12)))
+      end)
+
+      it("needs its largest section's at one column", function()
+        sections({ { "A", 3 }, { "B", 1 } })
+        draw()
+        assert.are.equal(3, canvas:Widest(canvas:RowWidth(12)))
+        assert.are.equal(3, canvas:Widest())
+      end)
+    end)
+  end)
+
   describe("leading frames", function()
     it("lays them out first, centered, as tall as they say, the sections below them", function()
       bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
@@ -1230,6 +2018,34 @@ describe("NextContent", function()
 
   -- A Next theme (next-themes.md): everything the canvas draws comes from it, and a theme applied
   -- while sections are out restyles them.
+  describe("a section's header art", function()
+    it("keeps its end cap's shape in a narrower section: the fill's pieces", function()
+      override(style.Theme.Sections, "Header", { Pieces = "Horizontal", Texture = "Glow", Color = "Gold", Height = 20,
+        Begin = { TexCoords = { 0, 0.0625, 0, 1 }, Size = 20 }, Middle = { TexCoords = { 0.0625, 1, 0, 1 } } })
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+      draw()
+      canvas:ApplyStyle(context:New("spec"))
+      local fill = canvas.byName.A.rowFill
+      assert.are.equal(20, fill.Begin:GetWidth())
+      assert.is_true(fill.Begin:IsShown())
+      assert.is_true(canvas.byName.A.row:IsShown())
+      local _, relative = canvas.byName.A.row:GetPoint(1)
+      assert.are.equal(fill.Begin, relative)
+    end)
+
+    it("draws no art for a theme without any, and hides its cap too", function()
+      override(style.Theme.Sections, "Header", { Pieces = "Horizontal", Texture = "Glow", Color = "Gold", Height = 20,
+        Begin = { Size = 20 } })
+      bind(data({ categories = { { name = "A" } }, items = { item("0_1", "A") } }))
+      draw()
+      canvas:ApplyStyle(context:New("spec"))
+      override(style.Theme.Sections, "Header", false)
+      canvas:ApplyStyle(context:New("spec"))
+      assert.is_false(canvas.byName.A.row:IsShown())
+      assert.is_false(canvas.byName.A.rowFill.Begin:IsShown())
+    end)
+  end)
+
   describe("a theme", function()
     after_each(function()
       UseNextTheme(nil)
@@ -1306,8 +2122,10 @@ describe("NextContent", function()
       local s = canvas.byName.A
       assert.are.equal("Interface\\Spec\\sep.png", s.row:GetTexture())
       assert.are.equal(0.9, s.row:GetAlpha())
-      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 0, 0 }, { s.row:GetPoint(1) })
-      assert.are.same({ "TOPRIGHT", s.inner, "TOPRIGHT", 0, 0 }, { s.row:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", s.rowArea, "TOPLEFT", 0, 0 }, { s.row:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", s.rowArea, "BOTTOMRIGHT", 0, 0 }, { s.row:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 0, 0 }, { s.rowArea:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", s.inner, "TOPRIGHT", 0, 0 }, { s.rowArea:GetPoint(2) })
       assert.are.equal(32, s.row:GetHeight())
       assert.are.equal("BACKGROUND", s.row:GetDrawLayer(), "behind the title, the count and the line")
       assert.is_true(s.row:IsShown())
@@ -1326,7 +2144,8 @@ describe("NextContent", function()
       draw()
       local s = canvas.byName.A
       assert.are.equal(20, s.row:GetHeight())
-      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 0, 0 }, { s.row:GetPoint(1) })
+      assert.are.equal(20, s.rowArea:GetHeight())
+      assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 0, 0 }, { s.rowArea:GetPoint(1) })
       assert.are.same({ "TOPLEFT", s.inner, "TOPLEFT", 0, -28 }, { s.cells:GetPoint(1) })
       assert.are.equal(28, s.header:GetHeight())
       UseNextTheme(nil)

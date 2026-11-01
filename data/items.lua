@@ -561,6 +561,8 @@ function items:Init()
   -- redraw whose inputs are unchanged, so a new generation makes every button of the kind
   -- redraw.
   self._drawGeneration = {}
+  -- How many times each kind's layout started afresh (Phase11_CommitAndDispatch).
+  self._layoutResets = {}
   -- What an item's kept category was worked out under (data-loader.md §18): bumped by every wipe and
   -- every recalculation that does not say its categories are unchanged (settings, categories, gear
   -- sets). With the Categories module's own generation it is each item's category stamp.
@@ -2159,6 +2161,14 @@ function items:Phase11_CommitAndDispatch(ctx, kind, itemData, equipmentData, pre
 
   -- Set final computed fields on realSlotInfo
   realSlotInfo.builtForView = database.GetBagView and database:GetBagView(kind) or nil
+  -- Which layout of this kind this is: it starts afresh where gaps collapse. BetterBags Next's columns hold each
+  -- section's width until then (next.md §7a).
+  if ctx and (ctx:Get("resetLayout") == true or ctx:Get("wipe") == true) then
+    self._layoutResets[kind] = (self._layoutResets[kind] or 0) + 1
+  end
+  realSlotInfo.layoutResets = self._layoutResets[kind]
+  -- A read that adds a tab re-sorts everything, and nothing travels (refresh-scheduler.md §11a).
+  realSlotInfo.tabArrived = ctx and ctx:Get("tabArrived") == true or nil
   realSlotInfo.visibleItemsBySlotKey = visibleItemsBySlotKey
   realSlotInfo.sectionLayouts = sectionLayouts
   realSlotInfo.sortedItems = sortedItems
@@ -2262,6 +2272,10 @@ function items:RunRefresh(ectx, kind)
     itemData, equipmentData = self:Phase2_Rederive(kind, committedItems)
   else
     itemData, equipmentData = self:Phase2_Harvest(kind, bagList, committedItems, wipeRequested)
+  end
+  if kind == const.BAG_KIND.GUILD and self:GuildTabArrived(committedItems, itemData) then
+    ectx:Set("resetLayout", true)
+    ectx:Set("tabArrived", true)
   end
 
   -- The harvest captured this frame's client state. Everything below runs on the
@@ -3920,6 +3934,32 @@ end
 local function sameGuildRead(a, b)
   return a.link == b.link and a.count == b.count and a.locked == b.locked and a.texture == b.texture
     and a.isFiltered == b.isFiltered and a.quality == b.quality
+end
+
+-- GuildTabArrived says whether a guild bank read holds a tab's first items, or warms an item it read cold (what an item is
+-- called and where it goes come with its data). GUILDBANKBAGSLOTS_CHANGED names no tab, so a tab's real answer can come after
+-- its query timed out, or after another player's move was taken for it, and only what the read holds can tell
+-- (refresh-scheduler.md §11a).
+---@param committedItems? table<string, ItemData>
+---@param itemData table<string, ItemData>
+---@return boolean
+function items:GuildTabArrived(committedItems, itemData)
+  local committed = committedItems or {}
+  local had = {}
+  for _, item in pairs(committed) do
+    if not item.isItemEmpty then
+      had[item.bagid] = true
+    end
+  end
+  for slotkey, item in pairs(itemData) do
+    if not item.isItemEmpty then
+      local before = committed[slotkey]
+      if not had[item.bagid] or (before ~= nil and before.harvestIncomplete and not item.harvestIncomplete) then
+        return true
+      end
+    end
+  end
+  return false
 end
 
 -- HarvestGuildBank reads every slot of the guild bank tabs in bagList (their containers), as Harvest
