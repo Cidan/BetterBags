@@ -87,5 +87,28 @@ describe("switching BetterBags Next's theme with its effects running", function(
       end
     end
     assert.is_true(tried > 5, "themes tried: " .. tried)
+
+    -- Reported on Make It So: "this weird texture in the lower left". A piece kept how far its art had scrolled into the
+    -- next theme: after Glitch's scanlines, Make It So's bottom elbow drew 0.33 of the way down its art, the art's last row,
+    -- opaque all the way across, clamped to fill what was left.
+    local function coords()
+      local out = {}
+      for i, piece in ipairs(addon.Bags.Backpack.ornaments.pieces) do
+        if piece.spec ~= nil then
+          out[i] = { piece.texture:GetTexCoord() }
+        end
+      end
+      return out
+    end
+    engine:ApplyTheme(ctx, "MakeItSo", false)
+    local fresh = coords()
+    for key in pairs(engine:GetThemes()) do
+      if key ~= "MakeItSo" and engine:IsSelectable(key) then
+        engine:ApplyTheme(ctx, key, false)
+        play()
+        engine:ApplyTheme(ctx, "MakeItSo", false)
+        assert.same(fresh, coords(), "Make It So after " .. key)
+      end
+    end
   end)
 end)

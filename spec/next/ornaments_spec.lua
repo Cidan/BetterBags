@@ -706,6 +706,24 @@ describe("NextOrnaments", function()
       assert.is_nil(driver(panel):GetScript("OnUpdate"))
     end)
 
+    -- Reported on Make It So: a block of solid color over its bottom elbow, after Glitch's scanlines had used the same
+    -- piece. How far its art had scrolled stayed with the piece, into every theme after, until a reload.
+    it("starts the next theme's piece at rest, whatever the last theme did to it", function()
+      theme({ { Texture = "Roots", Point = "BODY", Tile = 50, Motion = { Scroll = { X = 10, Y = 10 } } } })
+      local panel = panelOn("RIGHT")
+      panel.ornaments:Style()
+      local piece = panel.ornaments.pieces[1]
+      piece.scrollU, piece.scrollV, piece.slip, piece.jx, piece.jy, piece.blink = 0.25, 0.33, 0.4, 3, 5, 0.5
+      theme({ { Texture = "Roots", Point = "TOPINNER", Width = 10, Height = 10 } })
+      panel.ornaments:Style()
+      assert.are.same({ 0, 0, 0, 1, 1, 0, 1, 1 }, { piece.texture:GetTexCoord() })
+      assert.is_nil(piece.scrollU)
+      assert.is_nil(piece.scrollV)
+      assert.is_nil(piece.slip)
+      assert.is_nil(piece.blink)
+      assert.are.same({ "TOPLEFT", panel.body, "TOPLEFT", 0, 0 }, { piece.texture:GetPoint(1) }, "no jump left on it")
+    end)
+
     it("scrolls a span along its length", function()
       theme({ { Texture = "Roots", Point = "INNER", Width = 20, Tile = 100, Motion = { Scroll = { Y = 25 } } } })
       local panel = panelOn("RIGHT")
