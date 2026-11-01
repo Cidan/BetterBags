@@ -510,3 +510,20 @@ bottom edge for months, and a clamp pulled it back on the screen, so only a bag 
 of the screen (window.md §3c). Anything recorded from a frame's size or place must come from a render with its real
 content, not from the frame as it was made or part way through loading. And a clamp setting says what the player may do:
 a frame's own growth should still not take it off the screen.
+
+## Imperfect Stop Motion Needs Noise Keyed by Frame
+
+A stop-motion look (next-themes.md §25) is not a low frame rate alone: each pose lands a little off where it should be. That
+offset must come from noise that is a pure function of the frame and a key (`NextTween.Noise`), not from `math.random` at draw
+time: a pose held across several client frames then stays exactly where it landed even if it is drawn again, a slow frame that
+skips poses lands where those poses would have, and the specs can name exact places. Anything that adds its time up
+(`held`, a boil's `left`) keeps what a slow frame ran over, or the animation drifts slower than its FPS. And test that a held
+pose draws once with a spy on the draw: since the noise repeats, redrawing it every frame looks identical and only costs time.
+
+## A Texture With No Size Draws at Its File's Size
+
+`SetWidth(0)` on a texture does not make it nothing: it means no width, and a texture with art and no width appears to draw at
+its file's own width (seen in game: pencil art 128 units wide over a 48-unit box). So anything computing a length that can be
+nil must not fall back to 0 for art (`pixel:Width(cap, size or 0)`), and a spec key read from the wrong level silently becomes
+this. The frame mock reports 0 and shows nothing wrong: `layout.ArtWithNoSize` is the check, and a render only proves what it
+was pointed at, so point it at every window a theme draws, not only the one the work was about.

@@ -198,7 +198,7 @@ describe("Constants Module Offsets", function()
     local const = addon:GetModule("Constants")
     local on = const.DATABASE_DEFAULTS.profile.nextAnimation
     local names = { "sparkles", "shimmer", "titleCloud", "ribbon", "braid", "ornaments", "glitch", "rain", "shatter",
-      "snow", "smoke", "bats", "beam" }
+      "snow", "smoke", "bats", "beam", "paper", "stopMotion" }
     local count = 0
     for _ in pairs(on) do count = count + 1 end
     assert.are.equal(#names, count)

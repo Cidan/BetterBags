@@ -357,6 +357,13 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       assert.is_false(decoration:IsVisible())
     end)
 
+    it("tells its decoration where its item level text is, for a theme's style to draw it", function()
+      itemFrame:Init()
+      local item = itemFrame:Create(ctx:New("boot"), 0)
+      local decoration = realCreateDecoration(itemFrame, item)
+      assert.are.equal(item.ilvlText, decoration.ItemLevelText)
+    end)
+
     it("keeps 40 slots per bank bag on Classic", function()
       addon.isRetail = false
       const.BANK_ONLY_BAGS = { [6] = 6 }

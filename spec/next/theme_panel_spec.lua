@@ -59,7 +59,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
-  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -2219,6 +2219,296 @@ describe("BetterBags Next's panels and themes", function()
 
   -- The Make It So theme's transporter (next-themes.md §24; asked: "the bags obviously need the star trek beam down, and
   -- beam up animation for appearing and closing").
+  describe("a sheet of paper (Panel.Paper)", function()
+    local paperModule = addon:GetModule("NextPaper")
+    local savedRandom, begun
+
+    local PAPER = {
+      Front = { Texture = "Glow", Color = "White" },
+      Back = { Texture = "Glow", Color = "White" },
+      Rate = 10,
+      Open = { From = "TOPOUTER", Cells = 2, Lit = 0.6, Reveal = 2, Quarter = { {} }, Half = { 90, 0 }, Full = { 90, 0 } },
+      Close = { Grab = 2, Tremble = 3, Cell = 200, Ball = 40, Poses = { 0.5, 1 },
+        Toss = { Up = 100, Gravity = 1000, Drift = { 0, 0 }, Tumble = { 1, 1 }, Life = 2 } },
+    }
+    local LOCK = 5 / 10
+    local THREADS = { { Anchor = "TOP", Points = { { 0, 20 }, { 1, 40 } }, Segments = 6, Width = 4, Texture = "Glow",
+      Color = "Gold", Alpha = 0.8, BlendMode = "ADD", Draw = 0.4 } }
+
+    local function papered(without)
+      local panel = { Paper = PAPER, Threads = THREADS }
+      if without then panel.Paper = nil end
+      apply({ Panel = panel })
+    end
+
+    local function step(dt)
+      tween.driver:GetScript("OnUpdate")(tween.driver, dt)
+    end
+
+    local function living()
+      local n = 0
+      for _ in pairs(paperModule.living) do n = n + 1 end
+      return n
+    end
+
+    local function clear()
+      local d = paperModule:Layer().driver
+      for _ = 1, 80 do
+        local u = d:GetScript("OnUpdate")
+        if u == nil then return end
+        u(d, 0.05)
+      end
+    end
+
+    before_each(function()
+      savedRandom = paperModule.Random
+      local seed = 3
+      paperModule.Random = function()
+        seed = (seed * 16807) % 2147483647
+        return seed / 2147483647
+      end
+      paperModule:Init()
+      begun = {}
+      local begin = paperModule.Begin
+      override(paperModule, "Begin", function(self, panel, phase)
+        local run = begin(self, panel, phase)
+        table.insert(begun, { run = run, phase = phase, panel = panel })
+        return run
+      end)
+      papered()
+    end)
+
+    after_each(function()
+      paperModule.Random = savedRandom
+      paperModule:Init()
+    end)
+
+    it("unfolds where it rests, unseen until the sheet lies flat, which then goes over it on its own", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      assert.are.equal(0, bag.offset, "in place, not sliding in")
+      assert.are.equal(0, bag.frame:GetAlpha())
+      assert.are.equal("Open", begun[1].phase)
+      assert.are.equal(bag, begun[1].panel)
+      step(0.3)
+      assert.are.equal(0, bag.frame:GetAlpha(), "still unfolding")
+      assert.is_nil(shownAt)
+      finishTweens()
+      assert.is_true(shownAt, "says it has shown once it lies flat")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(1, living(), "its sheet going over it")
+      local cell = begun[1].run.cells
+      clear()
+      assert.are.equal(0, living())
+      assert.are.equal(0, #begun[1].run.cells, "given back")
+      local _ = cell
+    end)
+
+    it("steps itself: the panel's tween is not one more thing a stop motion holds", function()
+      apply({ Motion = { StopMotion = { FPS = 10 } }, Panel = { Paper = PAPER } })
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(0.05)
+      local run = begun[1].run
+      assert.are.equal(0, run.frame, "its first pose, on the first frame")
+    end)
+
+    it("stays unseen until it lies flat, whatever shows it meanwhile", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(0.05)
+      bag.frame:SetAlpha(1) -- A small panel placed by its chain: its place shows it.
+      step(0.05)
+      assert.are.equal(0, bag.frame:GetAlpha())
+    end)
+
+    it("is shaken as its sheet says while it is grabbed", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      clear()
+      begun = {}
+      bag:Hide(ctx())
+      begun[1].run.Grab = function() return 2 end
+      step(0.05)
+      assert.are.equal(2, bag.offset)
+      finishTweens()
+      clear()
+    end)
+
+    it("lists the items in its scroll area for the sheet to print, in the screen's units", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      clear()
+      bag.frame:SetScale(0.5)
+      bag.scroll.scrollBox:_SetRect(0, 100, 300, 500)
+      local function button(left, bottom, file)
+        local frame = CreateFrame("Frame", nil, bag.frame)
+        frame:_SetRect(left, bottom, 40, 40)
+        local holder = CreateFrame("Frame")
+        holder.icon = holder:CreateTexture()
+        holder.icon:SetTexture(file)
+        return { frame = frame, _decoration = holder }
+      end
+      local kept = bag.content.buttons
+      bag.content.buttons = { inside = button(50, 200, 111), above = button(50, 580, 222), below = button(50, 90, 333) }
+      local out = bag:PaperDecals()
+      bag.content.buttons = kept
+      bag.frame:SetScale(1)
+      assert.are.same({ { left = 25, top = 120, width = 20, height = 20, texture = 111 } }, out)
+    end)
+
+    it("draws its threads in and cascades its sections once it lies flat", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      local threads = bag.threads
+      local d = threads.driver
+      d:GetScript("OnUpdate")(d, LOCK - 0.05)
+      assert.are.equal(0, threads.reveal, "waiting for it to unfold")
+      d:GetScript("OnUpdate")(d, 0.1)
+      assert.is_true(threads.reveal > 0)
+    end)
+
+    it("stops at rest when Escape hides it mid-fold, its sheet given back", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(0.1)
+      local run = begun[1].run
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.are.equal(0, #run.cells)
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(0, living())
+    end)
+
+    it("shows plainly when its theme goes mid-fold, and still says it has shown", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      step(0.1)
+      local run = begun[1].run
+      papered(true)
+      step(0.05)
+      assert.are.equal(0, #run.cells)
+      assert.are.equal(1, bag.frame:GetAlpha())
+      finishTweens()
+      assert.is_true(shownAt)
+    end)
+
+    it("is grabbed where it stands, trembling, then gone as the sheet crumples on its own and falls off the screen", function()
+      local bag = opened(nextBag.Create and function(c) return nextBag:Create(c) end)
+      clear()
+      begun = {}
+      bag:Hide(ctx())
+      assert.are.equal("Close", begun[1].phase)
+      assert.is_true(bag.frame:IsShown(), "still there as it is grabbed")
+      assert.is_true(bag:IsClosing())
+      assert.are.equal(0, living())
+      local run = begun[1].run
+      step(0.1)
+      assert.is_true(math.abs(bag.offset) <= 3, "trembling where it stands: " .. bag.offset)
+      finishTweens()
+      assert.is_false(bag.frame:IsShown(), "gone as the sheet takes its place")
+      assert.is_false(bag:IsClosing())
+      assert.are.equal(1, living(), "the sheet crumpling on its own")
+      assert.is_true(run.tris[1].texture:IsShown())
+      clear()
+      assert.are.equal(0, living(), "given back once it has fallen")
+    end)
+
+    it("unravels its threads over the grab", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      clear()
+      local threads = bag.threads
+      local seen
+      override(threads, "Unravel", function(_, time) seen = time end)
+      bag:Hide(ctx())
+      assert.is_true(math.abs(seen - 0.2) < 1e-6)
+    end)
+
+    it("closes plainly when its theme goes as it is grabbed", function()
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      clear()
+      begun = {}
+      bag:Hide(ctx())
+      local run = begun[1].run
+      papered(true)
+      step(0.05)
+      assert.are.equal(0, #run.tris)
+      finishTweens()
+      assert.is_false(bag.frame:IsShown())
+      assert.are.equal(0, living())
+    end)
+
+    it("slides without a sheet", function()
+      papered(true)
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      assert.are.equal(0, #begun)
+      assert.is_true(bag.offset ~= 0, "sliding in")
+    end)
+
+    it("slides in, and unfolds only with an Open; slides out, and crumples only with a Close", function()
+      local spec = {}
+      for k, v in pairs(PAPER) do spec[k] = v end
+      spec.Open = nil
+      apply({ Panel = { Paper = spec } })
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      assert.are.equal(0, #begun)
+      finishTweens()
+      bag:Hide(ctx())
+      assert.are.equal(1, #begun)
+      assert.are.equal("Close", begun[1].phase)
+    end)
+
+    describe("what it prints on the sheet", function()
+      it("lists the items shown, with their icons, where they are on the screen", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        clear()
+        local b = CreateFrame("Frame", nil, bag.frame)
+        b:SetSize(44, 44)
+        b:Show()
+        local deco = { icon = CreateFrame("Frame"):CreateTexture() }
+        deco.icon:SetTexture(4242)
+        override(b, "GetLeft", function() return 1000 end)
+        override(b, "GetTop", function() return 800 end)
+        override(b, "GetRight", function() return 1044 end)
+        override(b, "GetBottom", function() return 756 end)
+        override(b, "IsVisible", function() return true end)
+        bag.content.buttons = { ["0_1"] = { frame = b, _decoration = deco } }
+        override(bag.scroll.scrollBox, "GetTop", function() return 900 end)
+        override(bag.scroll.scrollBox, "GetBottom", function() return 100 end)
+        local list = bag:PaperDecals()
+        assert.are.equal(1, #list)
+        assert.are.equal(4242, list[1].texture)
+        assert.are.equal(1000, list[1].left)
+        assert.are.equal(800, list[1].top)
+        assert.are.equal(44, list[1].width)
+        assert.are.equal(44, list[1].height)
+      end)
+
+      it("leaves out what is scrolled out of sight, not shown, or has no icon", function()
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        clear()
+        local function button(top, visible, file)
+          local b = CreateFrame("Frame", nil, bag.frame)
+          override(b, "GetLeft", function() return 1000 end)
+          override(b, "GetTop", function() return top end)
+          override(b, "GetRight", function() return 1044 end)
+          override(b, "GetBottom", function() return top - 44 end)
+          override(b, "IsVisible", function() return visible end)
+          local icon = CreateFrame("Frame"):CreateTexture()
+          icon:SetTexture(file)
+          return { frame = b, _decoration = { icon = icon } }
+        end
+        bag.content.buttons = { a = button(950, true, 1), b = button(600, false, 2), c = button(600, true, nil),
+          d = button(120, true, 3) }
+        override(bag.scroll.scrollBox, "GetTop", function() return 900 end)
+        override(bag.scroll.scrollBox, "GetBottom", function() return 100 end)
+        assert.are.equal(0, #bag:PaperDecals())
+      end)
+    end)
+  end)
+
   describe("a transporter's beam (Panel.Beam)", function()
     local beamModule = addon:GetModule("NextBeam")
     local savedRandom, begun

@@ -210,6 +210,8 @@ function addon:OnInitialize()
   addon:GetModule('NextBats'):Init()
   -- The beam layer's pool and the beams going out on it (next-themes.md §24).
   addon:GetModule('NextBeam'):Init()
+  -- The paper layer's pool and the sheets going on it (next-themes.md §25).
+  addon:GetModule('NextPaper'):Init()
   -- The client's fonts its roles copy, rewritten by UI addons once the game has loaded (docs/next-gw2-theme.md).
   addon:GetModule('SonataNext'):WatchClientFonts()
   -- The player's Animation switches, laid over the theme in use as they change (next-themes.md §20).

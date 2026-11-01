@@ -628,6 +628,16 @@ function chain:UpdateCoupling()
         end
         self.coupling = { anchor = anchor, chained = chained, amount = 0, target = 0, phase = 0, time = 0 }
         self.driver:SetScript("OnUpdate", function(_, elapsed)
+          -- As stop motion (next-themes.md §25), a pose at a time, with all the time it held.
+          local stepping = style.StopMotion
+          local coupling = self.coupling
+          if stepping ~= nil and coupling ~= nil then
+            coupling.held = (coupling.held or 0) + elapsed
+            if coupling.held < 1 / stepping.FPS then
+              return
+            end
+            elapsed, coupling.held = coupling.held, 0
+          end
           self:Turn(elapsed)
         end)
         self:tweenCoupling(1)

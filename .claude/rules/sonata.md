@@ -217,7 +217,7 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 
 | Kind | Element | Style keys (defaults are Blizzard's) |
 |---|---|---|
-| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (a `Color` fill, or art: `Texture` or `Atlas`, tinted by `VertexColor`, with `TexCoords`, `Alpha`, `BlendMode`; `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"` or art (`{ Texture or Atlas, Alpha, BlendMode }`: the icon's border drawn in it, tinted the quality's color at `Alpha`), `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
+| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (a `Color` fill, or art: `Texture` or `Atlas`, tinted by `VertexColor`, with `TexCoords`, `Alpha`, `BlendMode`; `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"` or art (`{ Texture or Atlas, Alpha, BlendMode }`: the icon's border drawn in it, tinted the quality's color at `Alpha`), `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `ItemLevel` (`Font`: the item level text, its color the draw's), `Countdown` (`Font`, `Locales`: a cooldown's numbers; none, the client's own font, recorded by value and put back), `EmptySlot` (a texture spec: an empty slot's art; Classic draws it as its icon), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
 | `Tab` | a bottom tab | `Art = "Flat"` (template art hidden; `Background`, `Border`, `Hover` (HIGHLIGHT layer), `Selected = { Background, Bar, Border }`: `Bar` is a texture spec with `Height` and `Points` (default along the top), `Border = { Color }` recolors the tab's border while it is selected or a drop target), `Height` (default 32), `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | a section title font string | `Font` (default `GameFontNormal`) |
 | `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
@@ -481,7 +481,9 @@ gray, so no theme could change it, and on Parchment's light paper it was white o
   `Sonata:CreateText(parent, role, layer?)` makes a font string drawn with a role,
   `Sonata:SetTextRole(text, role)` switches a font string or edit box to a role, and
   `Sonata:SetButtonTextRole(button, role)` sets a button's normal font object; all three record
-  the role (weak tables `texts`, `buttonTexts`). An unknown role errors.
+  the role (weak tables `texts`, `buttonTexts`). An unknown role errors. `Sonata:ClearButtonTextRole(button)` forgets a
+  button's role, so a theme no longer moves it (BetterBags Next's money under a Next theme's `Footer.CoinFont`,
+  next-themes.md §25).
 - **A theme makes new font objects and moves the text.** `ApplyTheme` (before windows and
   elements) and every rescale of the client's fonts call `newTextFonts`: it starts an empty set
   of role font objects and points every recorded text and button at its role's new one. Text

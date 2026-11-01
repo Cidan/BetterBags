@@ -230,6 +230,32 @@ function layout.UseScreen(width, height, uiScale)
   end
 end
 
+-- ArtWithNoSize lists the shown textures under root that draw a file and have no width or height: a texture with none
+-- draws at its file's own size (seen in game: pencil art 128 units wide over a 48-unit box), which the mock cannot show.
+---@param root Frame
+---@return string[]
+function layout.ArtWithNoSize(root)
+  local out = {}
+  local function visit(frame, path)
+    if not frame:IsShown() then
+      return
+    end
+    for i, region in ipairs({ frame:GetRegions() }) do
+      if region:IsObjectType("Texture") and region:IsShown() and region:GetTexture() ~= nil then
+        local rect = layout.Rect(region)
+        if rect ~= nil and (rect.right - rect.left <= 0 or rect.top - rect.bottom <= 0) then
+          table.insert(out, path .. ">" .. i .. " " .. tostring(region:GetTexture()))
+        end
+      end
+    end
+    for i, child in ipairs({ frame:GetChildren() }) do
+      visit(child, path .. ">" .. i)
+    end
+  end
+  visit(root, "root")
+  return out
+end
+
 -- PixelCheck runs BetterBags' pixel check (PixelAudit:Check, debug/pixelaudit.lua: the same check the game
 -- runs from the /bbdb debug window) on the mock, the client's GetScaledRect answered by the resolver. It lists
 -- every shown region under root that draws and is not on whole screen pixels, one string each; opts.skip and

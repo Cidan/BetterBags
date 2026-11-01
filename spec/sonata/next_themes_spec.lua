@@ -13,7 +13,7 @@ end
 local constants, createdConstants = StubBetterBagsModule("Constants")
 constants.BAG_KIND = constants.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = 2 }
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextOrnaments", "next/ornaments.lua" },
-  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" } }) do
+  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" } }) do
   if addon:GetModule(m[1], true) == nil then
     ResetModuleStub(m[1], m[2])
     LoadBetterBagsModule(m[2])
@@ -60,8 +60,8 @@ describe("BetterBags Next's shipped themes", function()
   end
 
   it("ships Default and at least three others", function()
-    assert.are.same({ "Default", "Ember", "Frost", "GW2", "Glitch", "Halloween", "MakeItSo", "Parchment", "Plain",
-      "Quiet" },
+    assert.are.same({ "Default", "Ember", "Frost", "GW2", "Glitch", "Halloween", "MakeItSo", "Papercraft", "Parchment",
+      "Plain", "Quiet" },
       shipped())
   end)
 
@@ -633,6 +633,222 @@ describe("BetterBags Next's shipped themes", function()
   end)
   -- Glitch (next-themes.md §21): asked for "flickers, glitched blinking textures that wobble suddenly and harshly, think
   -- green mesh".
+  -- Papercraft (next-themes.md §25): a sheet of soft paper taped on, unfolding and crumpling in stop motion, hand-drawn
+  -- lettering and doodles in its margins.
+  describe("Papercraft", function()
+    local function exists(path)
+      local file = path:gsub("^Interface\\AddOns\\BetterBags\\", ""):gsub("\\", "/")
+      local f = io.open(file, "rb")
+      if f == nil then
+        return false
+      end
+      f:close()
+      return true
+    end
+
+    local function t()
+      return sonataNext:Resolve("Papercraft")
+    end
+
+    it("draws all its text by hand: every role of Default's in its fonts, which it ships with their licenses", function()
+      local theme = t()
+      local files = {}
+      local default = sonataNext:Resolve("Default")
+      for role in pairs(default.Fonts) do
+        local spec = theme.Fonts[role]
+        assert.is_not_nil(spec.File, role .. " draws in a hand")
+        assert.is_true(spec.File:find("papercraft", 1, true) ~= nil, role)
+        files[spec.File] = true
+      end
+      local n = 0
+      for file in pairs(files) do
+        n = n + 1
+        assert.is_true(exists(file), file)
+      end
+      assert.are.equal(2, n)
+      assert.is_true(exists("fonts/papercraft/Caveat_OFL.txt"))
+      assert.is_true(exists("fonts/papercraft/PatrickHand_OFL.txt"))
+    end)
+
+    it("draws what is written on the bags' shared parts by hand too: money, item levels and cooldown numbers", function()
+      local theme = t()
+      assert.is_true(theme.Fonts[theme.Footer.CoinFont].File:find("papercraft", 1, true) ~= nil)
+      assert.is_true(theme.ItemButton.Count.Font.Path:find("papercraft", 1, true) ~= nil)
+      assert.is_true(theme.ItemButton.ItemLevel.Font.Path:find("papercraft", 1, true) ~= nil)
+      assert.is_true(theme.ItemButton.Countdown.Font.Path:find("papercraft", 1, true) ~= nil)
+      assert.is_not_nil(theme.ItemButton.Countdown.Locales, "minutes and hours are words in some locales")
+    end)
+
+    it("draws its fonts only in the locales they cover", function()
+      local theme = t()
+      local function has(list, locale)
+        for _, l in ipairs(list) do
+          if l == locale then return true end
+        end
+        return false
+      end
+      for role, spec in pairs(theme.Fonts) do
+        assert.is_true(has(spec.Locales, "enUS"), role)
+        assert.is_false(has(spec.Locales, "koKR"), role)
+        assert.is_false(has(spec.Locales, "zhCN"), role)
+        assert.is_false(has(spec.Locales, "zhTW"), role)
+      end
+      -- Patrick Hand has no Cyrillic; Caveat has.
+      assert.is_false(has(theme.Fonts.Footer.Locales, "ruRU"))
+      assert.is_true(has(theme.Fonts.Title.Locales, "ruRU"))
+    end)
+
+    it("ships every picture it names", function()
+      local theme = t()
+      for name, file in pairs(theme.Textures) do
+        if file:find("papercraft", 1, true) then
+          assert.is_true(exists(file), name .. ": " .. file)
+        end
+      end
+      for _, file in ipairs({ theme.Vendor.QualityBorder, theme.ItemButton.Backdrop.Texture,
+        theme.ItemButton.QualityBorder.Texture, theme.ItemButton.Highlight.Texture, theme.ItemButton.Pushed.Texture,
+        theme.ItemButton.EmptySlot.Texture }) do
+        assert.is_true(exists(file), file)
+      end
+    end)
+
+    it("is paper of a soft colour, with no glow, feather, wash or ribbon on it", function()
+      local theme = t()
+      local p = theme.Palette.Paper
+      assert.is_true(p[1] > 0.85 and p[1] < 0.97, "not stark white")
+      assert.is_true(p[3] < p[1] - 0.05, "warm")
+      assert.are.equal("PaperBody", theme.Panel.Fill.Texture)
+      assert.is_nil(theme.Panel.Feather)
+      assert.is_nil(theme.Panel.Wash)
+      assert.is_nil(theme.Panel.Edge)
+      assert.is_nil(theme.Header.Ribbon)
+      assert.is_nil(theme.Header.Spark)
+      assert.is_nil(theme.Header.Cloud)
+      assert.are.equal("BLEND", theme.Sparkles.BlendMode, "paper does not glow")
+    end)
+
+    it("frames each sheet in a torn edge that reaches past it, for every window it draws", function()
+      local theme = t()
+      for name, frame in pairs({ panel = theme.Panel.Frame, settings = theme.Settings.Frame,
+        dialog = theme.Controls.Dialog.Frame, tracker = theme.Currency.Tracker.Frame }) do
+        assert.are.equal("PaperEdgeSide", frame.Pieces.LeftEdge.Texture, name)
+        assert.is_true(frame.Pieces.TopLeftCorner.X < 0 and frame.Pieces.TopLeftCorner.Y > 0, name .. " out from the corner")
+      end
+    end)
+
+    it("is taped on: over the bag's edge at either size, and on its tabs", function()
+      local theme = t()
+      local full, small = 0, 0
+      for _, piece in ipairs(theme.Panel.Ornaments) do
+        if type(piece.Texture) == "string" and piece.Texture:find("^Tape") then
+          assert.is_true(piece.Above, "over what it holds")
+          if piece.Sizes == nil then
+            full, small = full + 1, small + 1
+          elseif piece.Sizes == "Small" then
+            small = small + 1
+          end
+        end
+      end
+      assert.is_true(full >= 2)
+      assert.is_true(small >= 4)
+      assert.are.equal("TabScrap", theme.Tabs.Fill.Texture)
+      assert.are.equal("TabScrapChosen", theme.Tabs.SelectedFill.Texture)
+    end)
+
+    it("has doodles that boil in its margins, each a strip of drawings, its corners' places inside the body", function()
+      local theme = t()
+      local boiling = 0
+      for _, piece in ipairs(theme.Panel.Ornaments) do
+        if piece.Motion and piece.Motion.Boil then
+          boiling = boiling + 1
+          assert.are.equal(3, piece.Frames, piece.Texture)
+          -- Y is down from its corner: a piece at a bottom corner goes in with a Y up.
+          if piece.Point:find("^BOTTOM") then
+            assert.is_true(piece.Y < 0, piece.Texture .. " up from the bottom")
+          end
+        end
+      end
+      assert.is_true(boiling >= 6)
+    end)
+
+    it("writes its notes to self only for those who read them", function()
+      for _, piece in ipairs(t().Panel.Ornaments) do
+        if type(piece.Texture) == "string" and piece.Texture:find("^Note") then
+          assert.are.same({ "enUS", "enGB" }, piece.Locales)
+        end
+      end
+    end)
+
+    it("runs as stop motion: twelve poses a second, each a little off", function()
+      local S = t().Motion.StopMotion
+      assert.are.equal(12, S.FPS)
+      assert.is_true(S.Spacing > 0 and S.Spacing < 0.5)
+      assert.is_true(S.Wobble > 0)
+      local P = t().Panel.Paper
+      assert.are.equal(S.FPS, P.Rate)
+      assert.is_true(P.Wobble.Move > 0 and P.Wobble.Turn > 0 and P.Wobble.Vertex > 0 and P.Wobble.Pose > 0)
+    end)
+
+    it("unfolds a quarter, then a half, then whole, within the second a bank waits for its panel", function()
+      local O = t().Panel.Paper.Open
+      assert.is_true(#O.Quarter >= 1 and #O.Half >= 3 and #O.Full >= 3)
+      assert.are.equal(0, O.Half[#O.Half], "the first fold ends flat")
+      assert.are.equal(0, O.Full[#O.Full], "the second fold ends flat")
+      local lock = (#O.Quarter + #O.Half + #O.Full) / t().Panel.Paper.Rate
+      assert.is_true(lock < 1, "shown in " .. lock)
+    end)
+
+    it("crumples to a ball that is tossed up slightly and falls", function()
+      local C = t().Panel.Paper.Close
+      assert.are.equal(1, C.Poses[#C.Poses])
+      for i = 2, #C.Poses do
+        assert.is_true(C.Poses[i] > C.Poses[i - 1])
+      end
+      local rise = C.Toss.Up * C.Toss.Up / (2 * C.Toss.Gravity)
+      assert.is_true(rise > 30 and rise < 120, "tossed up slightly: " .. rise)
+      local full = 1100 + rise + C.Ball
+      assert.is_true(math.sqrt(2 * full / C.Toss.Gravity) + 0.5 < C.Toss.Life, "falls off a tall screen within its Life")
+    end)
+
+    it("throws the ball away quickly: off the screen in under nine tenths of a second, from the screen's middle", function()
+      local C = t().Panel.Paper.Close
+      local T = C.Toss
+      local drop = 384 + C.Ball * 1.4
+      local time = (T.Up + math.sqrt(T.Up * T.Up + 2 * T.Gravity * drop)) / T.Gravity
+      assert.is_true(time < 0.9, "off the screen after " .. time)
+    end)
+
+    it("mounts each item on lighter paper, its quality in coloured pencil, its count by hand", function()
+      local B = t().ItemButton
+      assert.is_true(B.Icon.Inset > 0)
+      assert.is_true(B.QualityBorder.Texture:find("item_quality", 1, true) ~= nil)
+      assert.is_true(B.Count.Font.Path:find("PatrickHand", 1, true) ~= nil)
+    end)
+
+    it("draws its controls in pencil: check boxes, outlined buttons and fields", function()
+      local C = t().Controls
+      assert.are.equal("Check", C.Toggle.Style)
+      assert.are.equal("Horizontal", C.Button.Plain.Fill.Pieces)
+      assert.are.equal("Horizontal", C.Input.Fill.Pieces)
+      assert.are.equal("Horizontal", C.Dropdown.Fill.Pieces)
+      assert.are.equal("CheckBox", C.Toggle.Off.Texture)
+      assert.are.equal("CheckMark", C.Toggle.On.Texture)
+    end)
+
+    it("draws every glyph by hand", function()
+      local theme = t()
+      for _, name in ipairs({ "IconSettings", "IconClose", "IconSort", "IconBags", "IconSmall", "IconFull", "IconBankTabs",
+        "IconDeposit", "IconDepositGold", "IconWithdrawGold", "IconFilter", "IconSellJunk", "IconRepair",
+        "IconGuildRepair", "IconChevron", "IconBack", "IconCheck", "IconSearch", "IconPlus" }) do
+        assert.is_true(theme.Textures[name]:find("papercraft", 1, true) ~= nil, name)
+      end
+    end)
+
+    it("names no art it does not ship in its Check", function()
+      assert.are.same({}, sonataNext:Check("Papercraft"))
+    end)
+  end)
+
   -- Halloween (next-themes.md §23): pumpkin orange and black, coming in out of smoke and breaking up into bats as it
   -- closes, a black cat on a jack-o'-lantern, leaves falling.
   describe("Halloween", function()

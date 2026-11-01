@@ -121,6 +121,19 @@ describe("NextListReorder", function()
       assert.is_nil(motion:GetMove(rows.A), "a row that keeps its place stays still")
     end)
 
+    it("slides its rows a pose at a time under a theme's stop motion", function()
+      local saved = style.StopMotion
+      local stepping = { FPS = 10 }
+      style.StopMotion = stepping
+      box:Show()
+      drag:Arrange(280)
+      entries[3], entries[4] = entries[4], entries[3]
+      drag:Arrange(280)
+      style.StopMotion = saved
+      assert.are.equal(stepping, motion.moves[rows.C].stepping)
+      motion:Step(1)
+    end)
+
     it("slides its rows in the interaction time, as the bags' sections do", function()
       box:Show()
       drag:Arrange(280)

@@ -65,6 +65,61 @@ describe("NextCoins", function()
     assert.are.equal(-pixel:Snap(window, 4), x, "4 apart, rounded")
   end)
 
+  describe("in a font of a theme's", function()
+    local sonata = addon:GetModule("Sonata")
+    local hand = CreateFont("SpecHandFont")
+    hand:SetFont("Hand.ttf", 14, "")
+
+    local function buttons(m)
+      return { m.copperButton, m.silverButton, m.goldButton }
+    end
+
+    it("draws its amounts in it, on whole pixels", function()
+      local m = made()
+      coins:Fit(m)
+      coins:Style(m, hand)
+      for _, button in ipairs(buttons(m)) do
+        assert.are.equal(hand, button:GetNormalFontObject())
+      end
+      assert.are.same({}, layout.PixelCheck(window))
+    end)
+
+    it("keeps them in it when the bags' theme makes new fonts", function()
+      local m = made()
+      coins:Fit(m)
+      coins:Style(m, hand)
+      sonata:newTextFonts()
+      for _, button in ipairs(buttons(m)) do
+        assert.are.equal(hand, button:GetNormalFontObject())
+      end
+    end)
+
+    it("gives them back to the shared money frame's own role, which a theme moves again", function()
+      local m = made()
+      coins:Fit(m)
+      coins:Style(m, hand)
+      coins:Style(m, nil)
+      for _, button in ipairs(buttons(m)) do
+        assert.are.equal(sonata:GetTextFont("Money"), button:GetNormalFontObject())
+      end
+      sonata:newTextFonts()
+      for _, button in ipairs(buttons(m)) do
+        assert.are.equal(sonata:GetTextFont("Money"), button:GetNormalFontObject())
+      end
+    end)
+
+    it("lets each amount take its text's width in the new font, and writes it again", function()
+      local m = made()
+      coins:Fit(m)
+      local text = m.goldButton:GetFontString()
+      text:SetWidth(40)
+      m.goldButton:SetText("gone")
+      coins:Style(m, hand)
+      assert.are.equal(0, text._width or 0, "a font string keeps the width it was sized to through a font change")
+      assert.are_not.equal("gone", m.goldButton:GetText())
+    end)
+  end)
+
   it("keeps them there when the amounts change, each button as wide as its amount and coin", function()
     local m = made()
     coins:Fit(m)

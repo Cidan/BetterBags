@@ -345,6 +345,7 @@ ribbon, the braid and moving ornaments (Appearance > Animation, next-themes.md ย
 on a single `OnUpdate` that exists only while something tweens; playing a key again replaces its
 tween, `Stop(key, finish)` stops it (at its end with `finish`). Eases: `linear`, `outCubic`,
 `inCubic`, `inOutSine`, `outBack`.
+A theme's stop motion (next-themes.md ยง25) steps every tween not marked `smooth`: `NextTween.Stepping`.
 
 **0.24 seconds for interactions** (asked: "that'll be our magic number for interactions").
 `NextStyle.Time.Interaction` is how long everything that moves in answer to the player takes:

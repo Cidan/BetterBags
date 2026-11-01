@@ -216,6 +216,9 @@ slow. It is an option, off by default (asked).
   0.3 s; from rest it is 3u^2 - 2u^3, slow, fast, slow. A frame given a new place mid-move starts a
   new move from where it is, keeping its speed (no stop before turning). A frame re-placed with the
   same target keeps its move. A move closer than half a pixel is placed at once.
+- **A stop motion.** `BeginPass(root, duration?, stepping?)`: under `stepping` (`{ FPS, Wobble }`, a Next theme's
+  `Motion.StopMotion`, next-themes.md §25) a pass's moves hold each pose for a whole frame, up to `Wobble` units off their
+  line (`motion.Random`), and still end exactly where they go. The classic bags' canvas passes none.
 - **A pass's own duration.** `BeginPass(root, duration?)`: the moves a pass starts take its duration
   (each move keeps its own), else 0.3 s. BetterBags Next's canvas passes its interaction time,
   0.24 s, to every pass (next.md §5); the classic bags' canvas passes none. A frame turning from a move of one duration into a move of

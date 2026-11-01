@@ -633,6 +633,12 @@ function sonata:SetButtonTextRole(button, role)
   self.buttonTexts[button] = role
 end
 
+-- ClearButtonTextRole stops drawing a button's text with a text role: a theme no longer moves it to its role's font.
+---@param button Button
+function sonata:ClearButtonTextRole(button)
+  self.buttonTexts[button] = nil
+end
+
 -- newTextFonts starts a new set of role font objects for the current theme and moves every
 -- text and button drawn with a role to its role's new font object. Text whose role the theme
 -- does not define keeps its font object.

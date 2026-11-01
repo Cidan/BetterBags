@@ -96,7 +96,7 @@ function listProto:Arrange(width)
   local state = self.state
   local animated = content:IsVisible()
   if animated then
-    motion:BeginPass(self, style.Time.Interaction)
+    motion:BeginPass(self, style.Time.Interaction, style.StopMotion)
   else
     motion:Forget(self)
   end

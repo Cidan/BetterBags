@@ -83,6 +83,15 @@ function emitterProto:Start()
     return
   end
   self.frame:SetScript("OnUpdate", function(_, elapsed)
+    -- As stop motion (next-themes.md §25), a pose at a time, with all the time it held.
+    local stepping = style.StopMotion
+    if stepping ~= nil then
+      self.held = (self.held or 0) + elapsed
+      if self.held < 1 / stepping.FPS then
+        return
+      end
+      elapsed, self.held = self.held, 0
+    end
     self:Step(elapsed)
   end)
 end

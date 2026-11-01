@@ -17,6 +17,26 @@ local coins = addon:NewModule('NextCoins')
 -- The money frame's size, a coin's size and the room between coins, as frames/money.lua makes them.
 local WIDTH, HEIGHT, COIN, GAP = 128, 18, 13, 4
 
+-- Style draws a money frame's amounts in a font of a Next theme's (Footer.CoinFont), out of the bags' theme's hands, or,
+-- given none, in the shared money frame's own role. A font string keeps the width it was sized to through a font change
+-- and cuts its text short past it (Blizzard resets it with a width of 0 and the text again, QuestLogTitleButton_Resize).
+---@param m Money
+---@param font? FontObject
+function coins:Style(m, font)
+  ---@class Sonata: AceModule
+  local sonata = addon:GetModule('Sonata')
+  for _, button in ipairs({ m.copperButton, m.silverButton, m.goldButton }) do
+    if font ~= nil then
+      sonata:ClearButtonTextRole(button)
+      button:SetNormalFontObject(font)
+    else
+      sonata:SetButtonTextRole(button, "Money")
+    end
+    button:GetFontString():SetWidth(0)
+  end
+  m:Update()
+end
+
 -- Fit lays a money frame out on whole pixels now and after each of its updates, and gives it Place, which
 -- lays it out again (its owner places the frame, then calls it: styleFooter).
 ---@param m Money

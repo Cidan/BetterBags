@@ -56,7 +56,7 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextScrollBar", "next/controls/scrollbar.lua" }, { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" },
   { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" }, { "NextDockCard", "next/dockcard.lua" },
   { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
-  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" },
@@ -1203,6 +1203,21 @@ describe("BetterBags Next's currencies", function()
       assert.are.equal(0, xOf(two), "closed up")
     end)
 
+    it("makes room a pose at a time under a theme's stop motion, in the strip", function()
+      three()
+      local s = strip(backpack())
+      local stepping = { FPS = 10 }
+      local saved = style.StopMotion
+      style.StopMotion = stepping
+      local one, three_ = s.entries["currency:1"], s.entries["currency:3"]
+      shiftDrag(one)
+      local x, y = lift:Center(three_.frame)
+      moveTo(x + three_.width, y)
+      style.StopMotion = saved
+      assert.are.equal(stepping, motion.moves[s.entries["currency:2"].frame].stepping)
+      letGo(one)
+    end)
+
     it("moves it where it is let go over the strip, the others making room as it goes", function()
       three()
       local s = strip(backpack())
@@ -1394,6 +1409,21 @@ describe("BetterBags Next's currencies", function()
         t.frame:GetScript("OnDragStart")(t.frame)
         assert.is_nil(t.held)
         assert.is_nil(lift.held)
+      end)
+
+      it("makes room a pose at a time under a theme's stop motion, in a tracker", function()
+        three()
+        local t = out("column")
+        local stepping = { FPS = 10 }
+        local saved = style.StopMotion
+        style.StopMotion = stepping
+        local one, three_ = t.entries["currency:1"], t.entries["currency:3"]
+        shiftDrag(one)
+        local x, y = lift:Center(three_.frame)
+        moveTo(x, y - three_.height)
+        style.StopMotion = saved
+        assert.are.equal(stepping, motion.moves[t.entries["currency:2"].frame].stepping)
+        letGo(one)
       end)
 
       it("moves it down a column where it is let go", function()

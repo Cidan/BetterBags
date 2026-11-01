@@ -17,9 +17,13 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 --
 -- A move eases slow, fast, slow: a cubic that starts and ends at rest, over MOVE_DURATION, or the
 -- duration the pass that started it gives. Turned toward a new place mid-move, a frame keeps its
--- speed rather than stopping first.
+-- speed rather than stopping first. A pass under a stop motion ({ FPS, Wobble }: a theme's, next-themes.md §25) holds each
+-- pose of its moves for a whole frame, a little off its line, and still ends exactly where it goes.
 ---@class Motion: AceModule
 local motion = addon:NewModule('Motion')
+
+-- Where a stop motion's wobble takes its randomness (a source of numbers in [0, 1)): replaced by the specs.
+motion.Random = math.random
 
 -- How long a move takes, in seconds.
 local MOVE_DURATION = 0.3
@@ -84,6 +88,8 @@ end
 ---@field duration number How long it takes, in seconds.
 ---@field x number Where it was put last.
 ---@field y number
+---@field stepping? table The stop motion it runs under: its FPS and Wobble.
+---@field pose? integer The pose it holds under one.
 
 ---@class (exact) MotionLink
 ---@field to Frame
@@ -95,6 +101,7 @@ end
 ---@field previous? number The id of the root's previous pass.
 ---@field started number
 ---@field duration? number How long the moves it starts take, when not MOVE_DURATION.
+---@field stepping? table The stop motion the moves it starts run under.
 
 -- reset empties every table; the driver stops.
 local function reset()
@@ -210,17 +217,19 @@ end
 
 -- BeginPass starts placing root's frames: frames root's previous pass placed move to their new
 -- places, the rest are placed at once. duration is how long the moves it starts take (default
--- MOVE_DURATION).
+-- MOVE_DURATION), and stepping the stop motion they run under (none: every frame).
 ---@param root any
 ---@param duration? number
-function motion:BeginPass(root, duration)
+---@param stepping? table
+function motion:BeginPass(root, duration, stepping)
   self.nextPass = self.nextPass + 1
   local state = self.roots[root]
   if state == nil then
     state = {}
     self.roots[root] = state
   end
-  self.pass = { root = root, id = self.nextPass, previous = state.current, started = 0, duration = duration }
+  self.pass = { root = root, id = self.nextPass, previous = state.current, started = 0, duration = duration,
+    stepping = stepping }
   state.current = self.nextPass
 end
 
@@ -271,7 +280,7 @@ function motion:Place(frame, relativeTo, x, y)
   end
   self.moves[frame] = {
     root = pass.root, relativeTo = relativeTo, x0 = cx, y0 = cy, vx = vx, vy = vy, x1 = x, y1 = y,
-    elapsed = 0, duration = pass.duration or MOVE_DURATION, x = cx, y = cy,
+    elapsed = 0, duration = pass.duration or MOVE_DURATION, x = cx, y = cy, stepping = pass.stepping,
   }
   anchor(frame, relativeTo, cx, cy)
   pass.started = pass.started + 1
@@ -325,6 +334,23 @@ function motion:stopIfIdle()
   end
 end
 
+-- pose is where a move under a stop motion lands when it has reached a new frame (nothing while it holds its last): on
+-- its way at that frame's time, a little off its line.
+---@private
+---@param move Move
+---@return number? x, number? y
+function motion:pose(move)
+  local S = move.stepping
+  local pose = math.floor(move.elapsed * S.FPS + 1e-6)
+  if pose <= (move.pose or 0) then
+    return nil, nil
+  end
+  move.pose = pose
+  local x, y = at(move, pose / S.FPS / move.duration)
+  local wobble = S.Wobble or 0
+  return x + (2 * self.Random() - 1) * wobble, y + (2 * self.Random() - 1) * wobble
+end
+
 -- Step moves every moving frame elapsed seconds along. A move whose frame something else
 -- re-anchored, released or hid is dropped: that frame is not ours to move any more.
 ---@param elapsed number
@@ -340,11 +366,15 @@ function motion:Step(elapsed)
       if move.elapsed >= move.duration then
         x, y = move.x1, move.y1
         self.moves[frame] = nil
+      elseif move.stepping ~= nil then
+        x, y = self:pose(move)
       else
         x, y = at(move, move.elapsed / move.duration)
       end
-      anchor(frame, move.relativeTo, x, y)
-      move.x, move.y = x, y
+      if x ~= nil then
+        anchor(frame, move.relativeTo, x, y)
+        move.x, move.y = x, y
+      end
     end
   end
   self:stopIfIdle()

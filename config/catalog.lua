@@ -789,6 +789,15 @@ for _, effect in ipairs({
     description = "A theme's bags beaming in and out in a shimmer of light, as a starship's transporter does. Off, they "
       .. 'slide in and out.',
     keywords = { 'transporter', 'beam', 'energize', 'shimmer', 'star', 'trek', 'theme' } },
+  -- The Papercraft theme's (next-themes.md §25): off, its bags slide in and out, and its animations run smoothly.
+  { id = 'nextPaper', name = 'paper', title = 'Paper Folding',
+    description = "A theme's bags unfolding from a folded note as they open, and crumpling into a ball that falls off the "
+      .. 'screen as they close. Off, they slide in and out.',
+    keywords = { 'paper', 'fold', 'unfold', 'crumple', 'ball', 'papercraft', 'theme' } },
+  { id = 'nextStopMotion', name = 'stopMotion', title = 'Stop Motion',
+    description = "A theme's animations running a pose at a time, each a little off where it should be. Off, they run "
+      .. 'smoothly.',
+    keywords = { 'stop', 'motion', 'stepped', 'choppy', 'smooth', 'papercraft', 'theme' } },
 }) do
   local keywords = { 'animation', 'effects', 'motion' }
   for _, word in ipairs(effect.keywords) do

@@ -415,7 +415,7 @@ function content:Init()
         { setting = 'nextTitleCloud' }, { setting = 'nextTitleRibbon' }, { setting = 'nextBraid' },
         { setting = 'nextOrnamentMotion' }, { setting = 'nextGlitch' }, { setting = 'nextRain' },
         { setting = 'nextShatter' }, { setting = 'nextSnow' }, { setting = 'nextSmoke' }, { setting = 'nextBats' },
-        { setting = 'nextBeam' } } },
+        { setting = 'nextBeam' }, { setting = 'nextPaper' }, { setting = 'nextStopMotion' } } },
     } } },
   })
   pages:Define({

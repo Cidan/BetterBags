@@ -272,6 +272,57 @@ describe("SonataElements", function()
       assert.are.equal(_G.NumberFontNormal, b.Count._fontObject)
     end)
 
+    it("draws the item level in the style's font, keeping the color its draw gave it, back to Blizzard's", function()
+      local b = itemDecoration()
+      b.ItemLevelText = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+      b.ItemLevelText:SetTextColor(0.1, 0.2, 0.3, 1)
+      elements:StyleItemButton(b, { ItemLevel = { Font = { Object = "UnitFrame12White" } } })
+      assert.are.equal(fonts.UnitFrame12White, b.ItemLevelText._fontObject)
+      assert.are.same({ 0.1, 0.2, 0.3, 1 }, { b.ItemLevelText:GetTextColor() })
+      elements:StyleItemButton(b, {})
+      assert.are.equal(_G.NumberFontNormal, b.ItemLevelText._fontObject)
+      assert.are.same({ 0.1, 0.2, 0.3, 1 }, { b.ItemLevelText:GetTextColor() })
+    end)
+
+    describe("a cooldown's countdown", function()
+      local savedLocale
+      before_each(function() savedLocale = _G.GetLocale end)
+      after_each(function() _G.GetLocale = savedLocale end)
+
+      local function cooled()
+        local b = itemDecoration()
+        b.Cooldown = CreateFrame("Cooldown", nil, b)
+        b.Cooldown:GetCountdownFontString():SetFont("Fonts\\CLIENT.TTF", 18, "OUTLINE")
+        return b, b.Cooldown:GetCountdownFontString()
+      end
+
+      it("is left as the client has it by a style without one", function()
+        local b, text = cooled()
+        elements:StyleItemButton(b, {})
+        assert.are.same({ "Fonts\\CLIENT.TTF", 18, "OUTLINE" }, { text:GetFont() })
+      end)
+
+      it("is drawn in the style's font, and goes back to the client's font after", function()
+        local b, text = cooled()
+        local spec = { Countdown = { Font = { Path = "Hand.ttf", Size = 20, Flags = "OUTLINE" } } }
+        elements:StyleItemButton(b, spec)
+        assert.are.same({ "Hand.ttf", 20, "OUTLINE" }, { text:GetFont() })
+        elements:StyleItemButton(b, spec)
+        elements:StyleItemButton(b, {})
+        assert.are.same({ "Fonts\\CLIENT.TTF", 18, "OUTLINE" }, { text:GetFont() })
+      end)
+
+      it("keeps the client's font in a locale the style's does not cover", function()
+        local b, text = cooled()
+        _G.GetLocale = function() return "koKR" end
+        elements:StyleItemButton(b, { Countdown = { Locales = { "enUS" }, Font = { Path = "Hand.ttf", Size = 20 } } })
+        assert.are.same({ "Fonts\\CLIENT.TTF", 18, "OUTLINE" }, { text:GetFont() })
+        _G.GetLocale = function() return "enUS" end
+        elements:StyleItemButton(b, { Countdown = { Locales = { "enUS" }, Font = { Path = "Hand.ttf", Size = 20 } } })
+        assert.are.equal("Hand.ttf", (text:GetFont()))
+      end)
+    end)
+
     it("swaps a quest item's icon art after Blizzard draws it, and leaves Blizzard's otherwise", function()
       local b = itemDecoration()
       elements:StyleItemButton(b, { QuestIcon = { Texture = "elv-quest.tga" }, QuestBorderColor = { 1, 0.8, 0, 1 } })
@@ -373,6 +424,28 @@ describe("SonataElements", function()
 
     -- GW2_UI's item buttons (Inventory/inventory.lua, reskinItemButton): its backdrop art behind the icon, and its
     -- border art in the quality's color (docs/next-gw2-theme.md).
+    describe("an empty slot's art (EmptySlot)", function()
+      it("draws retail's empty slot in the style's art, and gives Blizzard's back", function()
+        local decoration = CreateFrame("Button")
+        local slot = decoration:CreateTexture()
+        slot:SetAtlas("bags-item-slot64")
+        decoration.ItemSlotBackground = slot
+        elements:StyleItemButton(decoration, { EmptySlot = { Texture = "empty.png" } })
+        assert.are.equal("empty.png", slot:GetTexture())
+        assert.are.equal("empty.png", elements:EmptySlotArt(decoration))
+        elements:StyleItemButton(decoration, {})
+        assert.are.equal("bags-item-slot64", slot:GetAtlas())
+        assert.is_nil(elements:EmptySlotArt(decoration))
+      end)
+
+      it("has no art of its own for a decoration no style drew, or without a slot's texture", function()
+        local decoration = CreateFrame("Button")
+        assert.is_nil(elements:EmptySlotArt(decoration))
+        elements:StyleItemButton(decoration, { EmptySlot = { Texture = "empty.png" } })
+        assert.are.equal("empty.png", elements:EmptySlotArt(decoration))
+      end)
+    end)
+
     describe("in art", function()
       local BACKDROP = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagitembackdrop.png"
       local BORDER = "Interface\\AddOns\\GW2_UI\\Textures\\bag\\bagitemborder.png"

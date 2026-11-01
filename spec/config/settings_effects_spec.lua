@@ -272,7 +272,8 @@ describe("What each setting asks the bags for", function()
   for _, case in ipairs({ { "Sparkles", "sparkles" }, { "Title Shimmer", "shimmer" }, { "Title Cloud", "titleCloud" },
     { "Title Ribbon", "ribbon" }, { "Braid", "braid" }, { "Moving Ornaments", "ornaments" },
     { "Glitch Effects", "glitch" }, { "Data Rain", "rain" }, { "Ice Shatter", "shatter" }, { "Snow, Leaves and Stars", "snow" },
-    { "Smoke Puff", "smoke" }, { "Bats", "bats" }, { "Transporter", "beam" } }) do
+    { "Smoke Puff", "smoke" }, { "Bats", "bats" }, { "Transporter", "beam" }, { "Paper Folding", "paper" },
+    { "Stop Motion", "stopMotion" } }) do
     it("saves " .. case[1] .. " on or off and tells BetterBags Next, reading nothing", function()
       local on = { [case[2]] = true }
       override(db, "GetNextAnimation", function(_, name) return on[name] end)
