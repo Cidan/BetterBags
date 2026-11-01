@@ -1,0 +1,17 @@
+{
+  "id": 1793492140,
+  "version": "v0.8.12-2-g8dda90b",
+  "channel": "alpha",
+  "date": "2026-11-01",
+  "from": "2fdde8995429ca1b27639110793f04864906fb56",
+  "to": "8dda90b58099b49abd4a9e39e318ff650c952f9a",
+  "headline": "Introduces the hand-drawn Papercraft theme with stop-motion folding and crumpling animations.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Papercraft theme",
+      "details": "A new hand-drawn theme featuring soft torn paper, doodles, washi tape, and custom handwritten fonts. Opening the bag unfolds the paper sheet, while closing crumples it into a ball and tosses it away in a stop-motion style. You can toggle the folding and stop-motion effects individually under Appearance \u003e Animation.",
+      "clients": []
+    }
+  ]
+}
