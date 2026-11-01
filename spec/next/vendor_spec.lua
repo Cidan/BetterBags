@@ -786,6 +786,26 @@ describe("NextVendor", function()
     end)
   end)
 
+  describe("Icon Scale", function()
+    -- Reported (issue #1221): the Bag Scale slider reached the vendor, the Icon Scale slider did not.
+    it("draws an open vendor's icons at the scale at once, a row of cards as tall as they are", function()
+      data.items = { forSale(5, "Gems"), forSale(6, "Gems"), forSale(7, "Gems") }
+      local v = open()
+      local section = v.content.byName.Gems
+      local cell = section.entries[1].item
+      assert.are.equal(style.ICON, cell.icon:GetWidth())
+      local top = select(5, section.entries[3].item.frame:GetPoint(1))
+      style:SetIconScale(150)
+      v:ApplyScales(ctx())
+      local after = section.entries[1].item
+      local raised = select(5, section.entries[3].item.frame:GetPoint(1))
+      style:SetIconScale(100)
+      assert.are.equal(66, after.icon:GetWidth())
+      assert.are.equal(66, after.frame:GetHeight())
+      assert.are.equal(top - 22, raised, "a row taller by what the icon grew")
+    end)
+  end)
+
   describe("keeping up", function()
     it("redraws on the merchant's updates and on new item data while shown", function()
       local v = open()
@@ -1822,6 +1842,25 @@ describe("NextVendor", function()
     for _, size in ipairs({ "full", "small" }) do
       for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 1920, 1080, 1 } }) do
         local name = string.format("%s, on %dx%d at %d%%", size, screen[1], screen[2], screen[3] * 100)
+        for _, scale in ipairs({ 50, 150 }) do
+          it("draws its cards on whole pixels at an Icon Scale of " .. scale .. "%, " .. name, function()
+            override(stubs.database, "GetNextSize", function() return size end)
+            override(stubs.database, "GetNextBagScale", function() return 100 end)
+            override(stubs.database, "GetNextSmallChain", function() return "apart" end)
+            override(stubs.database, "GetNextSmallPlace", function() return nil end)
+            override(stubs.database, "GetNextSmallSize", function() return nil end)
+            override(stubs.database, "GetClampBagsToScreen", function() return true end)
+            undo = layout.UseScreen(screen[1], screen[2], screen[3])
+            local v = open()
+            style:SetIconScale(scale)
+            v:ApplyScales(ctx())
+            local ok, offs = pcall(offGrid, v)
+            style:SetIconScale(100)
+            assert.is_true(ok, tostring(offs))
+            assert.are.same({}, offs)
+          end)
+        end
+
         it("draws its buy, buyback and repair views on whole pixels, " .. name, function()
           override(stubs.database, "GetNextSize", function() return size end)
           -- A small vendor's place, size and chain (docs/next-small-mode.md): the defaults.

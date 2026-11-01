@@ -469,10 +469,10 @@ function canvasProto:CellWidth()
 end
 
 -- CellHeight is how tall a row of buttons is, without the gap, for the current theme: an item button
--- (the theme's icon times the player's Icon Scale), or a card (the theme's icon); in whole pixels.
+-- (the theme's icon times the player's Icon Scale), or a card (CARD_HEIGHT); in whole pixels.
 ---@return number
 function canvasProto:CellHeight()
-  return pixel:Length(self.frame, self.cards and style.CARD_ICON or style.ICON)
+  return pixel:Length(self.frame, self.cards and style.CARD_HEIGHT or style.ICON)
 end
 
 -- PerRow is how many cells a row holds in layoutWidth (the width to lay out for, in units: a panel's own, never rounded
@@ -777,7 +777,7 @@ end
 function canvasProto:MeasureSection(section, grid, width, layoutWidth)
   width = pixel:Floor(grid, width)
   local cellWidth, cellHeight = pixel:Lengths(grid, self.cards and style.VENDOR_CARD_WIDTH or style.ICON,
-    self.cards and style.CARD_ICON or style.ICON)
+    self.cards and style.CARD_HEIGHT or style.ICON)
   local gap, header = pixel:Lengths(grid, style.GAP, style.SECTION_HEADER)
   local perRow = self:PerRow(layoutWidth)
   -- The row fits its own width (RowWidth: its cells and gaps in units, the least width that holds them): where the

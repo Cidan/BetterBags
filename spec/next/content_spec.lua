@@ -556,14 +556,16 @@ describe("NextContent", function()
       assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
     end)
 
-    -- Icon Scale sizes the bags' item buttons, not the vendor's cards (docs/next-appearance-size.md).
-    it("steps down by the theme's icon size for cards, by the scaled one for item buttons", function()
+    -- Icon Scale sizes a card's icon too, and its name and price still need the theme's icon size (issue #1221).
+    it("steps down by the scaled icon size, for a card never less than its text needs", function()
+      local theme = style.Theme.Layout.Icon
       style:SetIconScale(150)
       canvas:SetCards(true)
-      assert.are.same({ style.VENDOR_CARD_WIDTH, style.CARD_ICON }, { canvas:CellWidth(), canvas:CellHeight() })
+      assert.are.same({ style.VENDOR_CARD_WIDTH, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
+      style:SetIconScale(50)
+      assert.are.same({ style.VENDOR_CARD_WIDTH, theme }, { canvas:CellWidth(), canvas:CellHeight() })
       canvas:SetCards(false)
       assert.are.same({ style.ICON, style.ICON }, { canvas:CellWidth(), canvas:CellHeight() })
-      assert.are_not.equal(style.ICON, style.CARD_ICON)
       style:SetIconScale(100)
     end)
 
