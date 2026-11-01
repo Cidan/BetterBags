@@ -293,7 +293,9 @@ describe("the guild bank through the data engine", function()
     -- AceEvent keeps every earlier test's handler, so each test's handler fills its own list.
     local mine = {}
     done = mine
-    events:RegisterMessage("items/RefreshGuildBank/Done", function(_, slotInfo) table.insert(mine, slotInfo) end)
+    events:RegisterMessage("items/RefreshGuildBank/Done", function(_, slotInfo)
+      if done == mine then table.insert(mine, slotInfo) end
+    end)
 
     _G._guildBank.tabs = {
       { name = "Gear", icon = 1, isViewable = true, canDeposit = true, slots = {
@@ -305,6 +307,8 @@ describe("the guild bank through the data engine", function()
   end)
 
   after_each(function()
+    -- What it read reaches every item and the addon that made it; a later spec file's sends would keep theirs too.
+    done = nil
     async.Yield = savedYield
     addon.Bags, addon.hasGuildBank = savedBags, savedHasGuildBank
     addon.atGuildBank = nil
@@ -374,6 +378,83 @@ describe("the guild bank through the data engine", function()
       local sword = read().itemsBySlotKey[keyOf(1, 1)]
       assert.are.same({ binding = const.BINDING_SCOPE.BOE, bound = false }, sword.bindingInfo)
       assert.is_false(sword.itemInfo.isBound)
+    end)
+  end)
+
+  -- A guild bank read names no tab, and the server's answers can come late or be taken for another tab's
+  -- (refresh-scheduler.md §11a), so a read finds for itself when a tab's items first appear.
+  describe("a tab's items first appearing", function()
+    it("starts the layout afresh on that read, and says a tab arrived", function()
+      fire("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", Enum.PlayerInteractionType.GuildBanker)
+      _G._guildBank.delivered[1] = true
+      guildBank:LoadTab(1)
+      fire("GUILDBANKBAGSLOTS_CHANGED")
+      local first = read()
+      assert.is_true(first.tabArrived)
+      local resets = first.layoutResets
+      -- The second tab's answer: a read as any other, with its items in it.
+      _G._guildBank.delivered[2] = true
+      guildBank:LoadTab(2)
+      fire("GUILDBANKBAGSLOTS_CHANGED")
+      local second = read()
+      assert.is_true(second.tabArrived)
+      assert.are.equal(resets + 1, second.layoutResets)
+    end)
+
+    it("keeps the layout for a read with nothing new, and for a tab with nothing in it", function()
+      loadTabs()
+      local first = read()
+      local again = read()
+      assert.is_nil(again.tabArrived)
+      assert.are.equal(first.layoutResets, again.layoutResets)
+      _G._guildBank.tabs[1].slots[5] = slot(300)
+      local grown = read()
+      assert.is_nil(grown.tabArrived, "an item more in a tab with items")
+      assert.are.equal(first.layoutResets, grown.layoutResets)
+    end)
+
+    -- Found by the adversarial reviews: a tab's real answer came as a change, read cold after its timeout, and the read that
+    -- warmed it kept the layout: "GAP | Copper Ore | Zinc Ore | Iron Ore". What an item is called and where it goes come with it.
+    it("starts afresh again when an item it read cold reads warm, whatever else its tab holds", function()
+      coldItems[100] = true
+      loadTabs()
+      local first = read()
+      assert.is_true(first.tabArrived)
+      local resets = first.layoutResets
+      coldItems[100] = nil
+      local warm = read()
+      assert.is_true(warm.tabArrived)
+      assert.are.equal(resets + 1, warm.layoutResets)
+      assert.is_nil(read().tabArrived, "and once")
+    end)
+
+    it("starts afresh when a recalculation warms an item it read cold", function()
+      coldItems[100] = true
+      loadTabs()
+      read()
+      coldItems[100] = nil
+      assert.is_true(read({ derive = true }).tabArrived)
+    end)
+
+    -- An item whose data never loads must not make every read of the visit collapse gaps.
+    it("arrives once for a tab of items that stay cold", function()
+      coldItems[100], coldItems[300] = true, true
+      loadTabs()
+      local first = read()
+      assert.is_true(first.tabArrived)
+      local resets = first.layoutResets
+      local again = read()
+      assert.is_nil(again.tabArrived)
+      assert.are.equal(resets, again.layoutResets)
+    end)
+
+    it("keeps the layout for a tab that holds nothing yet", function()
+      _G._guildBank.tabs[2].slots = {}
+      loadTabs()
+      local first = read()
+      assert.is_true(first.tabArrived, "the first tab")
+      local again = read()
+      assert.is_nil(again.tabArrived, "the empty one is no arrival")
     end)
   end)
 

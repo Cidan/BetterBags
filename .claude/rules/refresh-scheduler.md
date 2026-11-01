@@ -657,8 +657,8 @@ change nothing, since `_RunUnit` gates the first and closing clears the bank's i
 The guild bank is a third kind of bag, read only while it is open and BetterBags Next's guild bank
 panel has shown, the way a bank open is (§11): `guildbank/Opened` shows the panel and loads the tabs
 once it has shown (`GUILD_SHOW_TIMEOUT`), each tab loaded is read once its items' data has loaded
-(`ItemLoader:PrimeGuildBank`, `GUILD_PRIME_TIMEOUT`), and the first read of a visit has a fresh
-layout. `RefreshRequest.guild` sweeps it after the bank and before the backpack; a wipe sweeps it,
+(`ItemLoader:PrimeGuildBank`, `GUILD_PRIME_TIMEOUT`), and a read holding a tab's first items has a
+fresh layout (§11a). `RefreshRequest.guild` sweeps it after the bank and before the backpack; a wipe sweeps it,
 and `bags/Rederive` naming no kind recalculates every kind. Details: guild-bank.md §3.
 
 ## 11. Opening the Bank: Show at Once, Load Once Shown, Read Tab by Tab
@@ -754,9 +754,39 @@ when asked again a second later) and drawing about 180 ms.
   the bank type shown (Warbank or character bank, from `bankTab`: both bag designs keep both fields on
   `addon.Bags.Bank`), then the others. It is chosen afresh before each read, so a tab chosen while the
   bank loads is read next, as a guild tab chosen while loading is queried next (`GuildBank:LoadTab`).
-- **Layout:** the first read rebuilds the layout (`resetLayout`); later reads keep it, as the guild
-  bank's do, so with "Preserve Empty Slots as Gaps" (on by default) a later tab's items are added at
-  the end of their sections (data-loader.md §13) until the bank is next opened.
+- **Layout:** every read of an open rebuilds the layout (`resetLayout`), and so does reading a tab again when its late data
+  arrives (its first read was cold). So the bank always ends in the layout a fresh one gives, for no extra read.
+- **The guild bank finds its own arrivals** (`items:GuildTabArrived`, from `RunRefresh`). `GUILDBANKBAGSLOTS_CHANGED` names no
+  tab, so a tab's real answer can come after its query timed out, or after another player's move was taken for it, and it is then
+  an ordinary `guildbank/Changed`. A read or recalculation starts afresh when it holds a tab's first items, or warms an item it read
+  cold (what an item is called and where it goes come with its data), whichever way it was asked for. Any other read keeps the
+  layout, so re-querying a tab the player clicks, or another player moving an item, never collapses a gap, and an item whose data
+  never loads counts once. A deposit into a tab holding nothing also counts: it cannot be told from a late answer, since the event
+  names no tab, and it only collapses gaps.
+- **Nothing travels while tabs arrive** (`tabArrived`: the request, the context of the bank's or guild bank's sweep alone, never
+  the backpack's a unit also runs, and `slotInfo.tabArrived`). Each read re-sorts everything a few frames after the last, so
+  BetterBags Next's canvas (`Bind`) and the classic bag (`Draw`, with Animate Item Movement on) call `motion:Forget` for the first
+  draw of that read (a read that adds a tab always counts a layout reset, which is how a draw tells: drawing it again, a tab switch
+  or a redraw, glides). What moved is placed at once; new sections still fade in. Measured by the adversarial review, 500 items on
+  6 tabs: 1,057 item flights and 406 frames flying at once without it, none with it.
+- **Failure mode (fixed, reported in game):** "not everything is in it's right spot on the layout as expected in the bank when
+  it's opened, but if we change options, it 'fixes' itself". Only the first read rebuilt the layout, so with "Preserve Empty Slots
+  as Gaps" (on by default) every later tab's items stayed at the end of their sections until something next reset the layout, and
+  BetterBags Next's section columns held each section at the width the tabs read when it first showed asked for (next.md §7a): a
+  section of 21 guild bank items, one of them in the first tab, stayed 194 wide where it should span 394.
+- **A sort that moved nothing** (§6) has no read, so `_SettleSort` sends `bags/SortSettled` (the kind): BetterBags Next's columns let
+  go of the widths they held (next.md §7a).
+- **Left as it is, and why** (from the adversarial review; each proven in a spec, none seen in game):
+  - **A gap the player makes while tabs are arriving collapses** when the next tab lands, or a bank tab's late data does (after
+    its 2 s timeout). Everything in the bank moves as tabs arrive anyway, by the choice above, and a gap cannot hold its place in a
+    re-sort. The window is the load itself, normally under a second; a late read can come a little after it, only when an item's
+    data took over 2 s. What was under the cursor can change in that window, and a repeat click would take the item now there. Not
+    proven to happen in play.
+  - **A read waiting when a loading screen ends** is replaced by the world read (`_WorldRead`) and its wave is lost, so the load
+    stops there. Only matters if the bank stays open across a loading screen (not known to happen), and it was so before this.
+  - **A last wave that fails** leaves its tab undrawn until the next read of the bank. It was so before this.
+  - **A render that fails as a grip is let go** (`StopSizing`, in columns) leaves the grip stuck until a reload: proven only with an
+    injected error, and a render failing there would fail on every other render too.
 - **Traces** (data-driven.md): the request names the tab it adds (`bankWaveTab`) and why it ran
   (`bankOpen`: "primed", "timeout", "empty"); `_BankTabReady` returns "ready", "read again",
   "already" or "ended", and `_LoadNextBankTab` the tab it read or "reading", "waiting", "done".
@@ -774,7 +804,7 @@ cost of a loop over every bank slot in its first frame.
 
 Coverage: `spec/refresh_spec.lua` ("opening the bank": shown at once and loaded only once shown;
 every tab's data loaded at once, a load each, only tabs with slots; each tab read once its data has
-loaded, the shown one first, the first read afresh, the limit gone at the end, the timeouts doing
+loaded, the shown one first, every read afresh, the limit gone at the end, the timeouts doing
 nothing after; the Warbank first while it shows; the Blizzard tab shown first; a tab chosen while it
 loads read next; one tab per read with every tab's data loaded; every tab read on the timeout and a
 tab again when its data arrives; a tab whose data arrives before its turn read once, warm; Classic's

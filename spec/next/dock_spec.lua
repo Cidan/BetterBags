@@ -40,7 +40,7 @@ end
 LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
-  { "NextLift", "next/lift.lua" }, { "NextContent", "next/content.lua" }, { "NextDockCard", "next/dockcard.lua" },
+  { "NextLift", "next/lift.lua" }, { "NextFill", "next/fill.lua" }, { "NextContent", "next/content.lua" }, { "NextDockCard", "next/dockcard.lua" },
   { "NextDock", "next/dock.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
@@ -260,6 +260,38 @@ describe("NextDock", function()
       assert.are.equal(entry.box.frame, section("B").frame:GetParent())
     end)
 
+    -- Found by the third adversarial review: only its height and how many it holds said the card should lay out, and a sort at
+    -- a vendor gives a docked section other buttons in the same number: unplaced, unsized for the card.
+    it("lays the column out again when its bag reads it, the same size and number", function()
+      local entry = dock("B")
+      settle()
+      local driver = nextDock:ListOf(target).driver
+      driver:GetScript("OnUpdate")(driver, 0.01)
+      render:Flush()
+      driver:GetScript("OnUpdate")(driver, 0.01)
+      assert.is_false(render:IsDirty(target.content))
+      source.content:Bind(ctx(), { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" } },
+        items = { item("0_1", "A"), item("9_9", "B") } } } }, 1, {})
+      driver:GetScript("OnUpdate")(driver, 0.01)
+      assert.is_true(render:IsDirty(target.content))
+      draw(target.content)
+      assert.is_not_nil(section("B").entries[1].item.frame:GetPoint(1), "the new button is placed")
+      assert.is_true(entry.seated)
+    end)
+
+    -- Found by the third adversarial review: Lead lays a section out only once it is seated, and nothing asked again when it
+    -- landed: its buttons stayed on the column's grid in a card on another, at every scale but 1.
+    it("lays the column out again once a flight has seated its section", function()
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      local entry = dock("B")
+      draw(target.content)
+      assert.is_false(entry.seated == true)
+      render:Flush()
+      finishTweens()
+      assert.is_true(entry.seated)
+      assert.is_true(render:IsDirty(target.content))
+    end)
+
     it("lays the column out again when its section's size changes", function()
       local entry = dock("B")
       settle()
@@ -447,6 +479,41 @@ describe("NextDock", function()
       local _, _, _, ox, oy = frame:GetPoint(1)
       assert.is_true(math.abs(ox * s - 20) < 0.5)
       assert.is_true(math.abs(oy * s - (1000 - section("B").y)) < 0.5, "its place: " .. oy * s)
+    end)
+
+    -- Found by the adversarial review: a card as wide as a section in a column of four was 118 wide, under a warning of 282.
+    it("keeps its card as wide as the column whatever its section's width, so its text fits", function()
+      local D = style.Theme.Dock
+      local spread = (D.Halo and D.Halo.Spread) or (D.Glow and D.Glow.Width) or 0
+      source.content:SetColumnSource(function() return 4, "across" end)
+      bindSource({ "A", "B" })
+      assert.is_true(section("B").frame:GetWidth() < style.GRID_WIDTH / 3)
+      local entry = dock("B")
+      settle()
+      assert.are.equal(style.GRID_WIDTH - 2 * spread, entry.box.frame:GetWidth())
+      assert.are.equal(1, entry.scale, "the section is not stretched to fill it")
+      finishTweens()
+    end)
+
+    it("aims at its own column as it flies back", function()
+      source.content:SetColumnSource(function() return 2, "across" end)
+      bindSource({ "A", "B" })
+      local x = section("B").x
+      assert.is_true(x > 0)
+      section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
+      source.content.frame:_SetRect(20, 0, style.GRID_WIDTH, 1000)
+      local entry = dock("B")
+      settle()
+      finishTweens()
+      click(entry, "RightButton")
+      draw(source.content)
+      source.content.frame:_SetRect(20, 0, style.GRID_WIDTH, 1000)
+      tween:Step(style.Time.Land - 0.001)
+      tween:Step(0.0005)
+      local frame = section("B").frame
+      local s = frame:GetScale()
+      local _, _, _, ox = frame:GetPoint(1)
+      assert.is_true(math.abs(ox * s - (20 + x)) < 0.5, "at " .. ox * s)
     end)
 
     -- BetterBags Next's small panels have a Bag Scale (docs/next-appearance-size.md): a flight back to a

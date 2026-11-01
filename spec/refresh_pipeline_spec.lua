@@ -4328,6 +4328,19 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.equal(const.BAG_VIEW.SECTION_GRID, refreshBackpack().builtForView)
   end)
 
+  -- BetterBags Next's columns hold each section's width until the layout starts afresh (next.md §7a).
+  it("counts each time a kind's layout starts afresh, and no other read", function()
+    local first = refreshBackpack().layoutResets
+    assert.equal(first, refreshBackpack().layoutResets, "a read that keeps the layout")
+    local ctx = context:New("refresh")
+    ctx:Set("resetLayout", true)
+    items:RefreshBackpack(ctx)
+    local afterReset = items.slotInfo[const.BAG_KIND.BACKPACK].layoutResets
+    assert.equal((first or 0) + 1, afterReset)
+    assert.equal((first or 0) + 2, refreshBackpack({ wipe = true }).layoutResets)
+    assert.equal((first or 0) + 2, refreshBackpack().layoutResets, "the next plain read")
+  end)
+
   describe("sorting (one sweep per sort)", function()
     local frames, timers, sweeps, sortCalls
 
@@ -4487,6 +4500,25 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
           return origHarvest(...)
         end)
         reads = 0
+      end)
+
+      it("says so when it leaves nothing to read, and only then", function()
+        settled()
+        local said = {}
+        local listening = true
+        events:RegisterMessage("bags/SortSettled", function(_, kind)
+          if listening then table.insert(said, kind) end
+        end)
+        finally(function() listening = false end)
+        sortAndFallback()
+        assert.are.same({ const.BAG_KIND.BACKPACK }, said)
+        assert.equal(0, reads)
+        said = {}
+        readBag()
+        mockContainer[0][1] = {}
+        readBag()
+        sortAndFallback()
+        assert.are.same({}, said, "the gap it left needs a sweep, which starts the layout afresh")
       end)
 
       it("recalculates from what it read when something still has to change, reading no slot", function()
@@ -6990,10 +7022,197 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
             if sweep.kind == const.BAG_KIND.BANK then bankSweeps[#bankSweeps + 1] = sweep end
           end
           assert.equal(3, #bankSweeps)
-          assert.is_true(bankSweeps[1].reset, "the first read afresh")
-          assert.is_false(bankSweeps[2].reset)
-          assert.is_false(bankSweeps[3].reset)
+          for i, sweep in ipairs(bankSweeps) do
+            assert.is_true(sweep.reset, "read " .. i .. " afresh")
+          end
           assert.is_nil(items:LoadedBankBags(), "every tab read")
+        end)
+
+        -- Reported in game: "not everything is in it's right spot on the layout as expected in the bank when it's opened,
+        -- but if we change options, it 'fixes' itself". Reads that kept the layout left later tabs' items at the end of
+        -- their sections, and every section as wide as the tabs read when it first showed (next.md §7a).
+        describe("ending in the layout a fresh one gives", function()
+          -- The spec's Sort stub sorts nothing: by name, then count, then GUID, as a player's sort settings would.
+          local function sortByName()
+            override(addon:GetModule("Sort"), "GetItemDataSortFunction", function()
+              return function(a, b)
+                if a.isFreeSlot or a.isItemGap then return false end
+                if b.isFreeSlot or b.isItemGap then return true end
+                if a.itemInfo.itemName ~= b.itemInfo.itemName then return a.itemInfo.itemName < b.itemInfo.itemName end
+                if a.itemInfo.currentItemCount ~= b.itemInfo.currentItemCount then
+                  return a.itemInfo.currentItemCount > b.itemInfo.currentItemCount
+                end
+                return a.itemInfo.itemGUID < b.itemInfo.itemGUID
+              end
+            end)
+          end
+
+          local function layout()
+            local out = {}
+            for _, item in ipairs(items.slotInfo[const.BAG_KIND.BANK].sortedItems) do
+              if item.isItemGap then
+                out[#out + 1] = "GAP"
+              elseif not item.isItemEmpty and not item.isFreeSlot then
+                out[#out + 1] = item.slotkey .. ":" .. tostring(item.itemInfo.itemName) .. ":" .. tostring(item.stackedCount)
+              end
+            end
+            return table.concat(out, " ")
+          end
+
+          for seed = 1, 20 do
+            it("with stacks, Recent Items, the Warbank and tabs read cold, whatever order they load in, seed " .. seed, function()
+              local state = seed * 104729
+              local function rnd(n)
+                state = (state * 1103515245 + 12345) % 2147483648
+                return math.floor(state / 65536) % n + 1
+              end
+              sortByName()
+              override(database, "GetPreserveItemGaps", function() return true end)
+              override(items, "IsBagOpen", function() return true end)
+              local partial = rnd(2) == 1
+              override(database, "GetStackingOptions", function()
+                return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false, dontMergePartial = partial }
+              end)
+              override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+              local cold = {}
+              local getInfo = _G.C_Item.GetItemInfo
+              override(_G.C_Item, "GetItemInfo", function(item)
+                local id = tonumber(item) or tonumber(tostring(item):match("item:(%d+)")) or 0
+                if cold[id] then return nil end
+                return getInfo(item)
+              end)
+              local guid = 0
+              for _, bag in ipairs({ 6, 7, 13 }) do
+                mockContainer[bag] = {}
+                for slot = 1, 8 do
+                  if rnd(4) == 1 then
+                    mockContainer[bag][slot] = {}
+                  else
+                    guid = guid + 1
+                    local id = 5000 + rnd(9)
+                    itemNames[id] = "N" .. (id % 7) .. "_" .. id
+                    mockContainer[bag][slot] = { itemID = id, guid = "e" .. guid, count = rnd(5) }
+                    if rnd(6) == 1 then newSlots[bag .. "_" .. slot] = true end
+                  end
+                end
+              end
+              open()
+              local order = { 6, 7, 13 }
+              for i = 3, 2, -1 do
+                local k = rnd(i)
+                order[i], order[k] = order[k], order[i]
+              end
+              local late = {}
+              for _, bag in ipairs(order) do
+                if rnd(3) == 1 then
+                  late[bag] = true
+                  for _, c in pairs(mockContainer[bag]) do
+                    if c.itemID then cold[c.itemID] = true end
+                  end
+                end
+              end
+              local function warm(bag)
+                for _, c in pairs(mockContainer[bag]) do
+                  if c.itemID then cold[c.itemID] = nil end
+                end
+                loads[bag]()
+                frameNo = frameNo + 1
+                advance()
+              end
+              for _, bag in ipairs(order) do
+                if not late[bag] then warm(bag) end
+              end
+              run()
+              while fireDelayed(refresh.BANK_PRIME_TIMEOUT) do end
+              run()
+              for _, bag in ipairs(order) do
+                if late[bag] then warm(bag) end
+              end
+              run()
+              local loaded = layout()
+              refresh:RequestUpdate({ bank = true, resetLayout = true })
+              run()
+              assert.equal(layout(), loaded)
+            end)
+          end
+
+          it("counts a start afresh for every read, so columns decide each section's width again", function()
+            local resets = {}
+            local commit = items.Phase11_CommitAndDispatch
+            override(items, "Phase11_CommitAndDispatch", function(self, ectx, kind, ...)
+              local result = commit(self, ectx, kind, ...)
+              if kind == const.BAG_KIND.BANK then
+                table.insert(resets, self.slotInfo[kind].layoutResets)
+              end
+              return result
+            end)
+            open()
+            loadAll()
+            run()
+            assert.equal(3, #resets)
+            assert.is_true(resets[1] < resets[2] and resets[2] < resets[3])
+          end)
+
+          it("says a tab arrived on each read of the load, and not on a read after it", function()
+            open()
+            loadAll()
+            run()
+            assert.is_true(items.slotInfo[const.BAG_KIND.BANK].tabArrived)
+            refresh:RequestUpdate({ bank = true })
+            run()
+            assert.is_nil(items.slotInfo[const.BAG_KIND.BANK].tabArrived)
+          end)
+
+          it("says a tab arrived through a request it merged into", function()
+            open()
+            loadAll()
+            run()
+            refresh:RequestUpdate({ bank = true })
+            refresh:RequestUpdate({ wipe = true })
+            refresh:RequestUpdate({ bank = true, resetLayout = true, tabArrived = true })
+            run()
+            assert.is_true(items.slotInfo[const.BAG_KIND.BANK].tabArrived)
+            assert.is_nil(items.slotInfo[const.BAG_KIND.BACKPACK].tabArrived, "the wipe read the backpack too: no tab of its")
+          end)
+
+          it("leaves the backpack's gaps and its count of fresh starts alone", function()
+            sortByName()
+            override(database, "GetPreserveItemGaps", function() return true end)
+            override(items, "IsBagOpen", function() return true end)
+            itemNames[611], itemNames[612] = "BA", "BB"
+            mockContainer[0] = { { itemID = 611, guid = "ba", count = 1 }, { itemID = 612, guid = "bb", count = 1 } }
+            refresh:RequestUpdate({ backpack = true, resetLayout = true })
+            drain()
+            mockContainer[0][1] = {}
+            refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+            drain()
+            local function gaps()
+              local n = 0
+              for _, item in ipairs(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems) do
+                if item.isItemGap then n = n + 1 end
+              end
+              return n
+            end
+            assert.equal(1, gaps())
+            local resets = items.slotInfo[const.BAG_KIND.BACKPACK].layoutResets
+            open()
+            loadAll()
+            run()
+            refresh:RequestUpdate({ backpack = true, bank = true, bags = { [0] = true, [6] = true } })
+            run()
+            assert.equal(1, gaps())
+            assert.equal(resets, items.slotInfo[const.BAG_KIND.BACKPACK].layoutResets)
+          end)
+        end)
+
+        it("keeps the layout for a read once it has loaded", function()
+          open()
+          loadAll()
+          run()
+          local resets = items.slotInfo[const.BAG_KIND.BANK].layoutResets
+          refresh:RequestUpdate({ bank = true })
+          run()
+          assert.equal(resets, items.slotInfo[const.BAG_KIND.BANK].layoutResets)
         end)
 
         it("reads the Warbank first while it shows", function()

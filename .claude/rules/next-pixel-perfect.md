@@ -404,6 +404,10 @@ Real screens: the reporter's 3396x1362 at 65% and 70%, 3440x1440 at 65%, 1920x10
   led to the engine test, and two offsets that could only ever apply to textures (`pixel:Center`, the fitter's
   `atItsSize`) were removed as dead code.
 
+**Known and not fixed, older than section columns** (found by the adversarial review of them, the same on the commit before):
+a Bag Scale changed with the bag open leaves the Plain theme's `panel.fill` and Make It So's corner masks off the grid until the next
+theme applies, and `panel.currencyStrip.hintText` was seen off the grid in a fuzz run after one, with no small reproduction yet.
+
 **Not verified in game yet.** To check: in a maximized window at UI scales of 65% and 70%, the selected
 theme card's four edges, a docked section, scrolled settings pages, a small panel after a drag; the render
 recorder (render-recorder.md) snapshots positions.

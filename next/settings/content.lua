@@ -306,6 +306,10 @@ local function bagPage(id, bag, shown, design)
     tabs = {
       { id = "layout", title = L:G("Layout"), sections = {
         { title = L:G("Order"), rows = { { setting = 'sectionOrder' }, { setting = 'itemOrder' } } },
+        { title = L:G("Sections"), design = "next", rows = {
+          { setting = 'sectionColumns' }, { setting = 'sectionFill' }, { setting = 'sectionSpan' },
+          { setting = 'sectionWideRows' },
+        } },
         { title = L:G("Tabs"), rows = { { setting = 'enableGroups' } } },
         { title = L:G("Slots"), rows = { { setting = 'showAllFreeSpace' }, { setting = 'preserveGaps' } } },
         -- Only the classic bags read these (frames/bag.lua, frames/bagcanvas.lua, frames/section.lua).
@@ -597,6 +601,12 @@ end
 function content:OnEnable()
   events:RegisterMessage('itemLevel/MaxChanged', function(ctx)
     if settings:IsShown() and settings.pageId == "itemcolors" and settings.query == nil then
+      settings:Refresh(ctx)
+    end
+  end)
+  -- A bag's Fill Order, Wide Sections Span Columns and Wide Column Limit are off at one column.
+  events:RegisterMessage('next/SectionColumnsChanged', function(ctx)
+    if settings:IsShown() then
       settings:Refresh(ctx)
     end
   end)

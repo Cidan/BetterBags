@@ -52,6 +52,18 @@ describe("logging out on the whole addon", function()
     assert.same({}, handle.errors)
   end)
 
+  -- A render reads its bag's section columns. Whether a timer's flush can run after the logout is not known: nothing
+  -- may read a setting if it does (initialization.md).
+  it("lays a BetterBags Next panel out without reading a setting the logout stripped", function()
+    handle = WholeAddon.Load({ next = true })
+    handle:Start()
+    local bags = handle.addon.Bags
+    handle:Logout()
+    bags.Backpack.content:Invalidate()
+    handle.addon:GetModule("Render"):Flush()
+    assert.same({}, handle.errors)
+  end)
+
   it("still runs the scripts of a session that has not logged out", function()
     handle = WholeAddon.Load()
     handle:Start()

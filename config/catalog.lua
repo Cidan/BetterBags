@@ -166,6 +166,7 @@ function catalog:Get(id, bag)
     title = def.title,
     description = description,
     keywords = def.keywords or {},
+    disabled = def.disabled and function() return def.disabled(bag) end or nil,
     items = def.items,
     itemsFunction = def.itemsFunction,
     min = def.min,
@@ -699,6 +700,87 @@ define('opacity', {
 
 -- BetterBags Next's Size tab (docs/next-appearance-size.md). The panels size themselves on
 -- next/ScalesChanged: nothing is read or recalculated.
+define('sectionColumns', {
+  kind = "slider",
+  bag = true,
+  title = 'Section Columns',
+  description = function(bag)
+    return 'How many columns of sections the ' .. lower(bag) .. ' shows side by side, sharing its width. '
+      .. 'A window too narrow for them shows fewer.'
+  end,
+  keywords = { 'columns', 'compact', 'grid', 'layout', 'side by side', 'sections' },
+  min = 1,
+  max = const.NEXT_SECTION_COLUMNS_MAX,
+  step = 1,
+  get = function(_, bag) return db:GetNextSectionColumns(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetNextSectionColumns(bag.kind, value)
+    events:SendMessage(ctx, 'next/SectionColumnsChanged', bag.kind)
+  end,
+})
+
+local sectionFills = {
+  ["Side to Side"] = "across",
+  ["Top to Bottom"] = "down",
+}
+
+define('sectionFill', {
+  kind = "dropdown",
+  bag = true,
+  title = 'Fill Order',
+  description = function(bag)
+    return 'How sections fill the ' .. lower(bag) .. "'s columns: left to right and then a new row, or down a column "
+      .. 'and then the next. Sections side by side always share a line.'
+  end,
+  keywords = { 'columns', 'sort', 'order', 'top to bottom', 'side to side', 'sections' },
+  items = { 'Side to Side', 'Top to Bottom' },
+  disabled = function(bag) return db:GetNextSectionColumns(bag.kind) <= 1 end,
+  get = function(_, bag) return choiceOf(sectionFills, db:GetNextSectionFill(bag.kind)) end,
+  set = function(ctx, value, bag)
+    db:SetNextSectionFill(bag.kind, sectionFills[value])
+    events:SendMessage(ctx, 'next/SectionColumnsChanged', bag.kind)
+  end,
+})
+
+define('sectionSpan', {
+  kind = "toggle",
+  bag = true,
+  title = 'Wide Sections Span Columns',
+  description = function(bag)
+    return 'A section that would reach the Wide Column Limit in one of the ' .. lower(bag) .. "'s columns takes as "
+      .. 'many columns as keep it under the limit. If it does not fit in what is left of its row, it starts a new one.'
+  end,
+  keywords = { 'columns', 'wide', 'span', 'large', 'full width', 'sections' },
+  disabled = function(bag) return db:GetNextSectionColumns(bag.kind) <= 1 end,
+  get = function(_, bag) return db:GetNextSectionSpan(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetNextSectionSpan(bag.kind, value)
+    events:SendMessage(ctx, 'next/SectionColumnsChanged', bag.kind)
+  end,
+})
+
+define('sectionWideRows', {
+  kind = "slider",
+  bag = true,
+  title = 'Wide Column Limit',
+  description = function(bag)
+    return 'How many rows in one of the ' .. lower(bag) .. "'s columns make a section wide. At 2, any section that "
+      .. 'does not fit one row of its column spans out.'
+  end,
+  keywords = { 'columns', 'wide', 'span', 'rows', 'limit', 'sections' },
+  min = 2,
+  max = 10,
+  step = 1,
+  disabled = function(bag)
+    return db:GetNextSectionColumns(bag.kind) <= 1 or not db:GetNextSectionSpan(bag.kind)
+  end,
+  get = function(_, bag) return db:GetNextSectionWideRows(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetNextSectionWideRows(bag.kind, value)
+    events:SendMessage(ctx, 'next/SectionColumnsChanged', bag.kind)
+  end,
+})
+
 define('nextIconScale', {
   kind = "slider",
   title = 'Icon Scale',

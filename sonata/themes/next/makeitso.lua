@@ -294,7 +294,10 @@ sonataNext:RegisterTheme({
   -- between it and the first row of icons (reported: the title "is overlaping with the first icon row").
   Sections = {
     Title = { X = 24, Y = -3 },
-    Header = { Texture = "SectionBar", Color = "LcarsLilac", Height = 20 },
+    -- Its round end keeps its shape in a narrower section (a column, a narrow window); the fade stretches.
+    Header = { Pieces = "Horizontal", Texture = "SectionBar", Color = "LcarsLilac", Height = 20,
+      Begin = { TexCoords = { 0, 0.0625, 0, 1 }, Size = 20 }, Middle = { TexCoords = { 0.0625, 0.96875, 0, 1 } },
+      End = { TexCoords = { 0.96875, 1, 0, 1 }, Size = 16 } },
     Line = false,
     Highlight = { Color = "LcarsPeach", From = 0.12, To = 0 },
   },

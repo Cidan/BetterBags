@@ -151,6 +151,7 @@ end
 ---@field merged? number How many requests this one carries (set by merging, for profiler traces)
 ---@field world? string Why the world's read ran: "primed", "timeout" or "bagShown" (set on it, for profiler traces)
 ---@field worldCause? string What the world's read follows: "login" or "transfer" (a loading screen)
+---@field tabArrived? boolean A read that adds a bank tab: it re-sorts everything, and nothing travels (Items: slotInfo.tabArrived)
 ---@field bankOpen? string Why a bank open's read ran: "primed", "timeout", or "empty" with no tab (for profiler traces)
 ---@field bankWave? number The bank open read this is (_LoadNextBankTab); the next tab loads once it has run
 ---@field bankWaveTab? number The bank tab that read added (for profiler traces)
@@ -219,6 +220,7 @@ local function mergeInto(waiting, incoming)
     waiting.bags = bags
   end
   waiting.restyle = waiting.restyle or incoming.restyle
+  waiting.tabArrived = waiting.tabArrived or incoming.tabArrived
   -- Kept categories stand only when every request merged says nothing categories read changed. A
   -- read keeps categories; a read that absorbs a recalculation that changed them must not.
   if waiting.derive and incoming.derive then
@@ -393,6 +395,7 @@ function refresh:_SettleSort(kind)
   local leaves = items:SortLeaves(kind)
   if leaves == "nothing" then
     items:SortSweepShown(kind)
+    events:SendMessage(context:New('SortSettled'), 'bags/SortSettled', kind)
     return false, false
   end
   return true, leaves == "recalculate"
@@ -515,6 +518,9 @@ function refresh:_RunUnit(request)
     end
 
     local bankCtx = ctx:Copy()
+    if request.tabArrived then
+      bankCtx:Set('tabArrived', true)
+    end
     items:RunRefresh(recalculateBank and recalculating(bankCtx) or bankCtx, const.BAG_KIND.BANK)
   end
 
@@ -739,7 +745,7 @@ function refresh:_OpenGuildBank(ctx)
   if bag == nil then
     return
   end
-  local open = { showing = true, read = false }
+  local open = { showing = true }
   self._guildBankOpen = open
   C_Timer.After(self.GUILD_SHOW_TIMEOUT, function() self:_GuildBankShown(open, 'timeout') end)
   bag:Show(ctx, nil, function() self:_GuildBankShown(open, 'finished') end)
@@ -770,9 +776,10 @@ function refresh:GuildBankShowing()
   return self._guildBankOpen ~= nil and self._guildBankOpen.showing == true
 end
 
--- _PrimeGuildAndRead loads the item data of the guild bank tabs given, then reads the guild bank;
--- the first read of a visit rebuilds the layout. It reads after GUILD_PRIME_TIMEOUT if the data has
--- not all arrived, and again when it does. Nothing happens for a visit that has ended.
+-- _PrimeGuildAndRead loads the item data of the guild bank tabs given, then reads the guild bank. It
+-- reads after GUILD_PRIME_TIMEOUT if the data has not all arrived, and again when it does. The read
+-- itself finds whether a tab's items first appear in it (refresh-scheduler.md §11a). Nothing happens
+-- for a visit that has ended.
 ---@param tabs number[]
 function refresh:_PrimeGuildAndRead(tabs)
   local open = self._guildBankOpen
@@ -789,9 +796,7 @@ function refresh:_PrimeGuildAndRead(tabs)
       return
     end
     read = true
-    local first = not open.read
-    open.read = true
-    self:RequestUpdate({ guild = true, resetLayout = first or nil, guildLoad = reason })
+    self:RequestUpdate({ guild = true, guildLoad = reason })
   end
   C_Timer.After(self.GUILD_PRIME_TIMEOUT, function() readGuild('timeout') end)
   addon:GetModule('ItemLoader'):PrimeGuildBank(tabs, function() readGuild('primed') end)
@@ -995,7 +1000,7 @@ end
 ---@param open table The open being loaded (refresh._bankOpen).
 function refresh:_LoadBank(open)
   local tabs = self:BankTabs()
-  open.order, open.tabs, open.waiting, open.loaded, open.first = tabs, {}, {}, {}, true
+  open.order, open.tabs, open.waiting, open.loaded = tabs, {}, {}, {}
   if #tabs == 0 then
     items:SetLoadedBankBags(nil)
     self._bankWaves = (self._bankWaves or 0) + 1
@@ -1037,7 +1042,7 @@ function refresh:_BankTabReady(open, bag, reason)
       return 'already'
     end
     if tab.read then
-      self:RequestUpdate({ bank = true })
+      self:RequestUpdate({ bank = true, resetLayout = true, tabArrived = true })
       return 'read again'
     end
     tab.reason = 'primed'
@@ -1076,8 +1081,9 @@ end
 
 -- _LoadNextBankTab reads the next bank tab once the read before it has run and the tab's item data
 -- has loaded: one tab per read, so each read shows one more tab, frames apart, even when every tab's
--- data was already loaded. The first read of an open rebuilds the layout; later ones keep it, as the
--- guild bank's do. Once every tab is read, reads of the bank read every bank bag again. It returns
+-- data was already loaded. Every read of an open rebuilds the layout, or the bank would end in a layout decided
+-- from the tabs read so far (refresh-scheduler.md §11a). Once every tab is read, reads of the bank read every bank
+-- bag again. It returns
 -- the tab it read, or why it read none, for profiler traces: "reading", "waiting" (for the tab's
 -- data) or "done". It is only called with the open under way.
 ---@param open table
@@ -1101,11 +1107,10 @@ function refresh:_LoadNextBankTab(open)
   tab.read = true
   self._bankWaves = (self._bankWaves or 0) + 1
   open.reading = self._bankWaves
-  local first = open.first
-  open.first = false
   self:RequestUpdate({
     bank = true,
-    resetLayout = first or nil,
+    resetLayout = true,
+    tabArrived = true,
     bankOpen = tab.reason,
     bankWave = open.reading,
     bankWaveTab = bag,

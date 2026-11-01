@@ -331,6 +331,8 @@ function listProto:Seat(entry)
   frame:Show()
   entry.catcher:SetFrameLevel(math.min(lift.MAX_LEVEL, lift:MaxLevel(frame) + lift.COVER_ABOVE))
   entry.seated = true
+  -- Lead lays a section out only once it is seated: its buttons are still on the grid of the column it came from.
+  self:Invalidate()
 end
 
 -- Lead lays the cards out for the panel's column (NextContent:SetLead), width wide (its rows decided on
@@ -353,15 +355,19 @@ function listProto:Lead(width, layoutWidth)
     local section = entry.section
     local own = entry.source == self.panel
     local w = own and width or section.frame:GetWidth()
-    entry.scale = math.min(1, (width - 2 * spread - 2 * pad) / w)
+    -- The card is as wide as the column whatever its section's width: its text needs the room, and a section in a column of
+    -- four is a quarter as wide.
+    local room = width - 2 * spread - 2 * pad
+    entry.scale = math.min(1, room / w)
     -- Seated, the section is laid out on the grid it is drawn on at its card's scale (whole pixels there,
     -- docs/next-pixel-perfect.md), and its card is sized from that: its size times its scale is whole.
     local h = section.height or section.frame:GetHeight()
     if entry.seated then
       section.frame:SetScale(entry.scale)
-      w, h = entry.source.content:LayoutSection(section, w, own and (layoutWidth or width) or nil)
+      local _, seatedHeight = entry.source.content:LayoutSection(section, w, own and (layoutWidth or width) or nil)
+      h = seatedHeight
     end
-    local cardHeight = entry.box:Size(w * entry.scale, h * entry.scale)
+    local cardHeight = entry.box:Size(room, h * entry.scale)
     self:Read(entry)
     local cardWidth = entry.box.frame:GetWidth()
     entry.box.frame:ClearAllPoints()
@@ -435,7 +441,7 @@ function listProto:Pulse(elapsed)
   local changed = false
   for _, entry in ipairs(self.entries) do
     entry.box:Pulse(self.elapsed)
-    local seen = (entry.section.height or 0) .. ":" .. #entry.section.entries
+    local seen = (entry.section.height or 0) .. ":" .. #entry.section.entries .. ":" .. (entry.section.boundAt or 0)
     if seen ~= entry.seen then
       entry.seen = seen
       changed = true
@@ -593,7 +599,7 @@ function listProto:SendBack(entry)
     if at == nil then
       return left0, top0
     end
-    return at.left, at.top - (section.y or 0) * at.scale, at.scale
+    return at.left + (section.x or 0) * at.scale, at.top - (section.y or 0) * at.scale, at.scale
   end, home, from)
 end
 

@@ -651,6 +651,108 @@ section to the open window (the classic header's Move Categories, `SectionFrame:
 open), every pile of each item's virtual stack, the vendor's limit of 10 and the category-sell
 setting, then `C_Container.UseContainerItem` for each item.
 
+## 7a. Section columns (`NextCanvas:ColumnSplit`, `columnRows`, `renderColumns`)
+
+Asked: sections side by side, because a bag of many one-item sections is tedious to scroll: "a layout option to ... have N
+columns by default", "top-to-bottom or side-to-side", "window determines the size of columns", and "most players play in
+window detached/non docked mode, so optimize for that". Automatic packing (each section taking the first row with room) and
+dragging a section beside another were considered first; this came instead, and drag-to-reorder in columns is the next stage.
+
+**The hard rule: never disjoint rows.** Asked, in these words: "NO, absolutely no disjoint rows. this is a hard constraint.
+never, ever. at all. this is a design decision for visual clarity." Sections stand side by side only in rows: every section
+of a row starts on the row's line, so their titles share it, and the next row starts below the tallest of them, in both fill
+orders. Columns stacking on their own heights are never an option, though they were measured denser (the classic bags do it).
+
+- **Settings**, per bag, in its Layout tab's Sections, BetterBags Next only (`config/catalog.lua`; saved apart from the classic
+  bags' `columnCount`, whose saved values would otherwise change Next's layouts): **Section Columns** (`sectionColumns`, 1 to 4,
+  default 1: nothing changes until someone opts in), **Fill Order** (`sectionFill`, Side to Side by default, or Top to Bottom),
+  **Wide Sections Span Columns** (`sectionSpan`, on) and **Wide Column Limit** (`sectionWideRows`, 2 to 10, default 2). The last
+  three are disabled at one column, the limit also with wide sections off. Each sends `next/SectionColumnsChanged` (the bag's
+  kind), and that bag's panel lays out again: no read of the bags. The settings window shows the rows' state again on it.
+- **What decides it:** the panel names a source (`canvas:SetColumnSource`, `panel:SectionColumns`), read at each layout. Only
+  bags have one: the vendor's cards stay one column. The Show Bags view (a bag's slots in order, a guild tab by itself) is one
+  column. One column takes the code path it always did, unchanged.
+- **The split** (`ColumnSplit`): the cells a row holds at the width to lay out for, split into whole cells per column, the spare
+  ones in the first columns: 8 cells are 4+4, 3+3+2 or 2+2+2+2; Quiet's 9 are 5+4. Decided in units, never on lengths rounded
+  to the grid (next-pixel-perfect.md §3). A window that cannot give each column `MIN_COLUMN_CELLS` (2) shows fewer. Between columns
+  is the theme's icon gap, so every icon in the bag stands on one grid (`gridLengths`, with `section.gridCells` so every section
+  closes its gap for the whole width): that gap is what makes 8 cells 4+4. A bigger gap makes 3+3, which is taller than not
+  sharing at all (two 8-item sections: stacked 152, 4+4 118, 3+3 168, Default's sizes).
+- **Fill orders** (`columnRows`): Side to Side goes across a row and then the next. Top to Bottom goes down a column and then the
+  next, its rows still lined up: K sections in N columns are `ceil(K / N)` rows.
+- **Wide sections**, asked: "wide rows consume multiple columns", as a toggle; then "the number of rows before something is
+  considered a wide column. default this to 2, not 3. min 2". A section that would **reach** the limit in its column is wide:
+  at 2, any section that does not fit one row of its column (asked of 6 items in a column of 4: "you can see tradeskill not
+  expand out into columns"). It takes as many columns as keep it under the limit (`needed = ceil(n / (limit - 1))` cells),
+  every column when even that is not enough. Side to Side, one that does not fit in what is left of its row starts the next
+  row, leaving the rest empty: order is never given up to fill the hole. Top to Bottom, a wide section takes a row of its own
+  across every column, and the sections between such rows fill down their columns: a section is wide when it reaches the limit in
+  the column it lands in, and the sections either side of it land again as their own runs (a split of 5 and 4 can treat two sections
+  of 5 differently). Asked of the first column alone a section landing in the narrower one reached the limit; asked of the narrowest
+  alone, a split of 5 and 4 gave up all that columns gain.
+- **Held while it shows** (`neededCells`), asked: "content changes and isn't always stable, so rows above or below it might get
+  gapped out". The cells a section needs are decided the first time they are asked for while the canvas shows, and held until the
+  layout starts afresh: its bag closing (`Settle`), a sort or anything else that sets `resetLayout` or wipes
+  (`slotInfo.layoutResets`, counted in `Phase11_CommitAndDispatch`, which a read adding a bank or guild bank tab does too:
+  refresh-scheduler.md §11a), another tab or view, or a new limit. That is when gaps
+  collapse too (data-loader.md §13). So one item coming or going never pushes sections across the bag: a section reaching the limit
+  grows taller where it stands, one shrinking stays as wide, and a hidden canvas holds nothing, so a bag opens with what it holds.
+  A canvas in columns lays out again each time it shows (its `OnShow`), a parent showing it too (Alt+Z): a bag can open on what it
+  drew before it closed, with no read to lay it out, and from its second open the next read, one item more, decided every section's
+  width (found by the adversarial review; holding what sections needed with nothing laid out, its first fix, held a width the bag
+  did not show). A section that grew while the bag was open takes its width as the bag opens.
+  A sort that moved nothing has no read to count a reset, so it says so (`bags/SortSettled`) and the bag lets go (`ReleaseWidths`).
+- **Full width:** Recent Items above the columns and Free Space below them, as the classic bags' global sections do. Dock cards
+  lead the column as ever.
+- **Titles:** one too long for its section is cut short, its count kept (`placeTitleRow`; `section.titleCut`; a font string keeps
+  the width it was cut to, so it is set back with `SetWidth(0)` and its text again before measuring, next-themes.md §14). The full
+  name is on its header's tooltip. The line after a title hides when no room is left (`LINE_MIN`), where it would draw backwards;
+  that holds at one column in a narrow window too.
+- **Nothing between columns.** A divider was built and removed, asked: "remove that divider for columns, looks terrible".
+- **Dragging, for now:** `canvas:CanReorder()` is false in columns, so its own bag is no target and a section lands back where it
+  was, in its column (`GetDragSlotX`, `section.x`), saving nothing. Tabs, the other bag, sellers and docks work as ever, and the
+  tooltip stops offering to reorder. Held-out and leaving sections close up as in one column.
+- **Small panels** (§14g): `Widest(layoutWidth)` counts columns, each as wide as the largest section, at least `MIN_COLUMN_CELLS`
+  so a snap never takes a column away, or what Recent Items or Free Space hold. Letting go of a grip lays out once more where it
+  was let go (in columns only), so what the snap moves glides from there: sizing places everything at once, and the second column
+  jumped hundreds of pixels with the window still wide behind it. A frame within half a pixel of the width the panel lays out
+  for stands for that width (`FrameLayoutWidth`): frames stand on whole pixels, and a frame a fraction under what its columns take
+  read as a cell fewer, so a press on a grip that moved nothing took a column away, each press another. The root was older; at one
+  column it cost a cell, and columns made it a column.
+- **Dock cards:** a card is as wide as the panel's column whatever its section's width (`listProto:Lead`), the section at its own
+  size inside it: as wide as a section in a column of four it was 118 wide under a warning of 282. A read of its bag leaves the
+  buttons of a section waiting in a card to the dock (`claim`), which draws them on the card's grid: sized for the column's, they
+  stood a fraction of a pixel off until the card next laid out, and made a test fail in about 4 runs of 10, as widgets restyle in
+  no fixed order (`pairs(self.widgets)`). So a read of its bag lays the card out (`boundAt`, read by `Pulse`): a sort gives a docked
+  section other buttons in the same number. So does a flight seating its section (`Seat`), which laid nothing out. Both are older
+  than columns.
+- **Top to Bottom reflows:** a section appearing or leaving changes where the sections after it land, so many can move, in spite of
+  held widths: filling down has no other way to keep its columns even. Measured: a neighbour leaving moved 1,060 of 2,708 sections
+  (2 columns, 300 random bags). Side to Side moves only what comes after it in its row.
+- **Known, not fixed:** a small panel left at its minimum width lays out for that minimum live (`RestingLayoutWidth`, `MinWidth`
+  following the footer's text), and its frame only takes it in `FitSmall`: a free-slot count gaining a digit can show one cell, and
+  so a column, more than the frame holds until the panel is next fitted. It needs a panel at exactly its minimum width, and the
+  formula is older than columns.
+- **Not done:** drag-to-reorder in columns; placing a section beside another by hand.
+
+Measured offline on real bags (title widths estimated from a screenshot, Default's sizes, 8 cells, 2 columns, scroll height, before
+the limit was 2): your backpack 538 today, 436 Side to Side, 420 with wide sections; a long-name profile 1428, 1056, 1040; a 33-section
+bank 5106, 6262, 4582: without wide sections its 197-icon section takes 50 rows beside blank space. Not measured in game.
+
+Coverage: `spec/next/content_spec.lua` ("section columns": the split, spare cells, both fills, rows as tall as their tallest, random
+bags keeping every row on one line and the order, Recent Items and Free Space, fewer columns in a narrow window, deciding on the width
+to lay out for, none without a source, back to one column; titles and lines; "wide sections": columns taken, a new row, the limit,
+top to bottom, what it holds while its contents change, random bags; what moves; how wide it needs to be; "a section's header art"),
+`spec/next/bag_spec.lua` ("section columns": its own bag's setting, Show Bags, the message, the tooltip, holding from the second
+open and after Alt+Z, a sort that moved nothing, the logout), `spec/next/drag_spec.lua` ("with section columns"),
+`spec/next/dock_spec.lua` (a card's width, flying back to a column), `spec/next/small_spec.lua` ("with section columns": a press that
+moves nothing on real screens, a real pixel's drag, gliding as it snaps), `spec/next/pixel_perfect_spec.lua` ("in section
+columns": every shipped theme, one grid across columns on four screens, a Bag Scale, a read of a docked section's bag; a pieced bar in
+a dock card), `spec/integration/logout_spec.lua`, `spec/integration/guild_bank_spec.lua` (late and shifted answers), `spec/next/vendor_spec.lua`,
+`spec/config/catalog_spec.lua`, `spec/config/settings_effects_spec.lua`, `spec/database_spec.lua`,
+`spec/next/settings/content_spec.lua`, `spec/refresh_pipeline_spec.lua` ("counts each time a kind's layout starts afresh"),
+`spec/integration/next_settings_spec.lua`.
+
 ## 8. Coverage
 
 `spec/next/tween_spec.lua` (eases, start value at once, delay, replacing, side by side, stopping

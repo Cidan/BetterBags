@@ -280,6 +280,10 @@ describe("NextDrag", function()
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    override(stubs.database, "GetNextSectionColumns", function() return 1 end)
+    override(stubs.database, "GetNextSectionFill", function() return "across" end)
+    override(stubs.database, "GetNextSectionSpan", function() return false end)
+    override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "GetInBagSearch", function() return true end)
     override(stubs.database, "GetShowBankTabs", function() return db.showBankTabs end)
     override(stubs.database, "SetShowBankTabs", function(_, on) db.showBankTabs = on end)
@@ -605,6 +609,70 @@ describe("NextDrag", function()
         nextDrag:SaveOrder(BACKPACK, { "Cloth", "Herbs", "Armor", "Ore" }, 3)
         assert.are.same({ Cloth = 0, Herbs = 1, Armor = 2 }, pins[BACKPACK])
       end)
+    end)
+  end)
+
+  -- Reordering in columns comes later. Until then a section lands back in its place, and every other drop works.
+  describe("with section columns", function()
+    local function twoColumns(panel)
+      override(stubs.database, "GetNextSectionColumns", function() return 2 end)
+      panel.content:Invalidate()
+      flush()
+      layout(panel)
+    end
+
+    it("reorders nothing: its own bag is no target, and nothing is saved", function()
+      local bag = backpack
+      twoColumns(bag)
+      local before = sectionNames(bag)
+      local s = pickUp(bag, "Herbs")
+      local cx, cy = centerOf(section(bag, "Ore").frame)
+      moveTo(cx, cy)
+      assert.is_nil(nextDrag:FindTarget())
+      drop(s)
+      finishTweens()
+      assert.are.same(before, sectionNames(bag))
+      assert.are.same({}, pins[BACKPACK] or {})
+    end)
+
+    it("lands back in its own column", function()
+      local bag = backpack
+      twoColumns(bag)
+      local s = section(bag, "Cloth")
+      assert.is_true(s.x > 0)
+      local picked = pickUp(bag, s.name)
+      local x = s.x
+      moveTo(100, 100)
+      drop(picked)
+      finishTweens()
+      local _, _, _, px = s.frame:GetPoint(1)
+      assert.are.equal(x, px)
+    end)
+
+    it("aims at its own column as it lands", function()
+      local bag = backpack
+      twoColumns(bag)
+      local s = section(bag, "Cloth")
+      local x = s.x
+      assert.is_true(x > 0)
+      local canvas = bag.content
+      drop(pickUp(bag, s.name))
+      tween:Step(style.Time.Land - 0.001)
+      tween:Step(0.0005)
+      local scale = s.frame:GetScale()
+      local _, _, _, ox = s.frame:GetPoint(1)
+      assert.is_true(math.abs(ox * scale - (canvas.frame:GetLeft() + x)) < 0.5, "at " .. ox * scale)
+      finishTweens()
+    end)
+
+    it("still moves it to a tab", function()
+      local bag = backpack
+      twoColumns(bag)
+      local s = pickUp(bag, "Herbs")
+      local cx, cy = centerOf(bag.tabs.tabs[2].button)
+      moveTo(cx, cy)
+      assert.are.equal("tab", nextDrag:FindTarget().type)
+      drop(s)
     end)
   end)
 

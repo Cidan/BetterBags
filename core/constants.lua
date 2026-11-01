@@ -353,6 +353,9 @@ const.GRID_COMPACT_STYLE = {
 }
 
 ---@enum SectionSortType
+-- The most columns of sections a bag of BetterBags Next can be set to (next.md §7a).
+const.NEXT_SECTION_COLUMNS_MAX = 4
+
 const.SECTION_SORT_TYPE = {
   ALPHABETICALLY = 1,
   SIZE_DESCENDING = 2,
@@ -783,6 +786,26 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,
       [const.BAG_KIND.GUILD] = false,
+    },
+    nextSectionColumns = {
+      [const.BAG_KIND.BACKPACK] = 1,
+      [const.BAG_KIND.BANK] = 1,
+      [const.BAG_KIND.GUILD] = 1,
+    },
+    nextSectionFill = {
+      [const.BAG_KIND.BACKPACK] = "across",
+      [const.BAG_KIND.BANK] = "across",
+      [const.BAG_KIND.GUILD] = "across",
+    },
+    nextSectionWideRows = {
+      [const.BAG_KIND.BACKPACK] = 2,
+      [const.BAG_KIND.BANK] = 2,
+      [const.BAG_KIND.GUILD] = 2,
+    },
+    nextSectionSpan = {
+      [const.BAG_KIND.BACKPACK] = true,
+      [const.BAG_KIND.BANK] = true,
+      [const.BAG_KIND.GUILD] = true,
     },
     preserveItemGaps = {
       [const.BAG_KIND.BACKPACK] = true,

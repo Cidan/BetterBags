@@ -19,6 +19,7 @@ end
 local const = stubModule("Constants")
 const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BAG_KIND.GUILD = const.BAG_KIND.GUILD or 2
+const.NEXT_SECTION_COLUMNS_MAX = const.NEXT_SECTION_COLUMNS_MAX or 4
 const.SECTION_SORT_TYPE = const.SECTION_SORT_TYPE or { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
 const.ITEM_SORT_TYPE = const.ITEM_SORT_TYPE
   or { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
@@ -92,6 +93,14 @@ describe("What each setting asks the bags for", function()
       GetCategoryFilters = function() return {} end,
       SetShowAllFreeSpace = function() end,
       SetPreserveItemGaps = function() end,
+      GetNextSectionColumns = function() return 1 end,
+      SetNextSectionColumns = function() end,
+      GetNextSectionFill = function() return "across" end,
+      SetNextSectionFill = function() end,
+      GetNextSectionSpan = function() return true end,
+      SetNextSectionSpan = function() end,
+      GetNextSectionWideRows = function() return 2 end,
+      SetNextSectionWideRows = function() end,
     }) do
       override(db, key, fn)
     end
@@ -119,6 +128,20 @@ describe("What each setting asks the bags for", function()
     { "Show Item Level", false, true },
     { "Show Item Level Color", false, true },
   }
+  -- Laying the sections out again reads nothing, and only that bag's panel does it.
+  it("lays only that bag out again for its section columns and fill order", function()
+    for _, title in ipairs({ "Section Columns", "Fill Order", "Wide Sections Span Columns", "Wide Column Limit" }) do
+      local found = settings(title)
+      assert.are.equal(2, #found, title)
+      for _, option in ipairs(found) do
+        sent = {}
+        option.set(ctx(), title == "Fill Order" and "Top to Bottom" or title == "Section Columns" and 2 or false)
+        assert.same({ "next/SectionColumnsChanged" }, messages(), title)
+        assert.is_number(sent[1].args[1], title)
+      end
+    end
+  end)
+
   for _, case in ipairs(redrawOnly) do
     it("redraws the bags for " .. case[1] .. " and reads nothing", function()
       for _, option in ipairs(settings(case[1])) do

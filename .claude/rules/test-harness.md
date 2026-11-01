@@ -151,8 +151,10 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   something reads them (`LAZY_TEXTURES`; their getters read the field with `rawget`, or the lazy
   lookup would call itself). Behavior is unchanged: every spec passed without a change. Measured: a load holds
   78 MB live (was 1.6 GB); the largest file peaks at 183 MB alone (was 5.3 GB); every file run
-  alone sums to 2.1 GB of peaks (was 23.5 GB); the full suite peaks at 1.25 GB in one process (was
-  19.4 GB) and takes 17 s (was 112 s).
+  alone sums to 2.1 GB of peaks (was 23.5 GB); the full suite peaked at 1.25 GB in one process then (was
+  19.4 GB) and took 17 s (was 112 s). With 6,300 specs (2026-11-01) it peaks at 3.6 GB under CI's 4 GB cap, about 1.5 GB of it
+  live at the end; that holder has not been found (clearing stale modules and `UIParent`'s children after every file only took
+  the peak to 3.5 GB).
   - **A method is shared, so it must not read the constructor's locals**: use the widget's fields
     (`self._type`, `self._name`, `self._parent`). Per-widget state goes in the constructor.
   - **Overriding a method on one widget** (`frame.Method = ...`, a spec's `override`) sets the
@@ -169,6 +171,10 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
     whole run. A fake clock's list of timers that never ran (the 2-second timeouts) held the loaded
     addon of the guild bank and bank open specs' last test until the suite ended. Clear such lists
     in `after_each` after `Restore` (`timers = nil`).
+  - **a listener a spec leaves registered**: the shared AceEvent registry keeps every test's handler for the whole run. One in
+    `spec/guildbank_pipeline_spec.lua` kept every `items/RefreshGuildBank/Done` slotInfo sent after it, whole-addon guild bank
+    loads included (`Events._messageMap > ... > cb > its list > the slotInfo > ... > addon`): 400 MB, enough to reach CI's 4 GB
+    cap once a few more such tests were added. A handler that keeps what it is sent checks its own test is still the current one.
   - `spec/integration/bag_switch_spec.lua` ("lets the loaded addon be collected once restored", and
     "... after one of its frames owned the tooltip") fails if a load is kept.
 - **Measure one file at a time.** A single process holds every spec it ran, so a memory problem is

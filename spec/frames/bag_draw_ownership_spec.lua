@@ -1772,6 +1772,25 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.are.same({ "forget", "render" }, order)
     end)
 
+    -- Each read of a bank loading re-sorts everything, and nothing travels (refresh-scheduler.md §11a).
+    it("has what a draw of a tab arriving moved placed at once", function()
+      local bag = newBag()
+      local motion = addon:GetModule("Motion")
+      local forgot = {}
+      override(motion, "Forget", function(_, root) table.insert(forgot, root) end)
+      local order = {}
+      override(addon:GetModule("Render"), "RenderNow", function() table.insert(order, #forgot) end)
+      local slotInfo = slotInfoWith({}, {})
+      bag:Draw(context:New("spec"), slotInfo, function() end)
+      assert.are.same({ 0 }, order, "an ordinary draw glides")
+      slotInfo.tabArrived, slotInfo.layoutResets = true, 1
+      bag:Draw(context:New("spec"), slotInfo, function() end)
+      assert.are.same({ 0, 1 }, order, "before it lays out")
+      assert.are.equal(bag.canvas, forgot[1])
+      bag:Draw(context:New("spec"), slotInfo, function() end)
+      assert.are.same({ 0, 1, 1 }, order, "that read drawn again glides")
+    end)
+
     -- texture-sharpening.md: the client's sharpening drew each texture of a bag a fraction of a pixel differently from
     -- frame to frame while it was resized, though nothing moved; the classic bags too (asked: "literally all bags").
     it("draws its window's textures without the client's sharpening, after laying it out", function()

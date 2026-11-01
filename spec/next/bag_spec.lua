@@ -131,6 +131,10 @@ describe("NextBag", function()
     override(stubs.database, "SetActiveGroup", function(_, _, id) activeGroup = id end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    override(stubs.database, "GetNextSectionColumns", function() return 1 end)
+    override(stubs.database, "GetNextSectionFill", function() return "across" end)
+    override(stubs.database, "GetNextSectionSpan", function() return false end)
+    override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "GetInBagSearch", function() return inBagSearch end)
     tabOrder = {}
     override(stubs.database, "GetNextTabOrder", function(_, key) return tabOrder[key] or {} end)
@@ -957,6 +961,175 @@ describe("NextBag", function()
 
   -- Asked: "our left tabs replaced with the bag icons for the Blizzard Bags, so users can swap out their
   -- bags -- the view of items switches to the full stack of bags, just like in our Original bags view".
+  describe("section columns", function()
+    local columns, fill
+
+    local function twoSections()
+      return { sortedItems = {}, tabs = { [1] = { categories = { { name = "Weapons" }, { name = "Ore" } },
+        items = { item("0_1", "Weapons"), item("0_2", "Ore") } } } }
+    end
+
+    before_each(function()
+      columns, fill = 2, "across"
+      override(stubs.database, "GetNextSectionColumns", function(_, kind)
+        assert.are.equal(BACKPACK, kind)
+        return columns
+      end)
+      override(stubs.database, "GetNextSectionFill", function() return fill end)
+    end)
+
+    it("lays out the columns its own bag's setting says", function()
+      slotInfo = twoSections()
+      local bag = opened()
+      assert.is_true(bag.content.byName.Ore.x > 0)
+      assert.is_false(bag.content:CanReorder())
+    end)
+
+    it("keeps one column in the Show Bags view, which shows a bag's slots in order", function()
+      override(stubs.database, "GetBagView", function() return const.BAG_VIEW.SECTION_ALL_BAGS end)
+      slotInfo = twoSections()
+      local bag = opened()
+      assert.is_true(bag.content:CanReorder())
+    end)
+
+    -- Found by the adversarial review: only a layout held anything, and a bag opened on what it had drawn lays nothing
+    -- out, so from the second open one item more moved every section (asked: "rows above or below it might get gapped out").
+    it("holds what it shows from the second time it opens, nothing read while it was closed", function()
+      override(stubs.database, "GetNextSectionSpan", function() return true end)
+      local function holding(n)
+        local items = { item("0_90", "B"), item("0_91", "C") }
+        for i = 1, n do table.insert(items, item("0_" .. i, "A")) end
+        return { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" }, { name = "C" } },
+          items = items } } }
+      end
+      slotInfo = holding(4)
+      local bag = opened()
+      render:Flush()
+      local A, B = bag.content.byName.A, bag.content.byName.B
+      local width, x = A.frame:GetWidth(), B.x
+      assert.is_true(x > 0, "A and B share a row")
+      bag:Hide(ctx())
+      finishTweens()
+      bag.content.frame:GetScript("OnHide")(bag.content.frame)
+      assert.are.same({}, bag.content.heldCells, "a closed bag holds nothing")
+      bag:Show(ctx())
+      bag.content.frame:GetScript("OnShow")(bag.content.frame)
+      finishTweens()
+      render:Flush()
+      bag:Draw(ctx(), holding(5), function() end)
+      render:Flush()
+      assert.are.equal(width, A.frame:GetWidth(), "one item more makes it taller where it stands")
+      assert.are.equal(x, B.x)
+    end)
+
+    -- Alt+Z hides UIParent: the canvas's OnHide lets go of what it holds, with the panel's own flag still set.
+    it("holds what it shows again when a parent shows it", function()
+      override(stubs.database, "GetNextSectionSpan", function() return true end)
+      local function holding(n)
+        local items = { item("0_90", "B") }
+        for i = 1, n do table.insert(items, item("0_" .. i, "A")) end
+        return { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" } }, items = items } } }
+      end
+      slotInfo = holding(4)
+      local bag = opened()
+      render:Flush()
+      local A = bag.content.byName.A
+      local width = A.frame:GetWidth()
+      local canvasFrame = bag.content.frame
+      canvasFrame:GetScript("OnHide")(canvasFrame)
+      canvasFrame:GetScript("OnShow")(canvasFrame)
+      render:Flush()
+      bag:Draw(ctx(), holding(5), function() end)
+      render:Flush()
+      assert.are.equal(width, A.frame:GetWidth())
+    end)
+
+    it("decides from what it was read holding when it opens on a read made while it was closed", function()
+      override(stubs.database, "GetNextSectionSpan", function() return true end)
+      local function holding(n)
+        local items = { item("0_90", "B") }
+        for i = 1, n do table.insert(items, item("0_" .. i, "A")) end
+        return { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" } }, items = items } } }
+      end
+      slotInfo = holding(4)
+      local bag = opened()
+      render:Flush()
+      local narrow = bag.content.byName.A.frame:GetWidth()
+      bag:Hide(ctx())
+      finishTweens()
+      bag.content.frame:GetScript("OnHide")(bag.content.frame)
+      bag:Draw(ctx(), holding(20), function() end)
+      bag:Show(ctx())
+      finishTweens()
+      render:Flush()
+      assert.is_true(bag.content.byName.A.frame:GetWidth() > narrow)
+    end)
+
+    -- A sort that moved nothing is no read (refresh-scheduler.md §6), and the player sorted to tidy up.
+    it("lets go of the widths it holds when a sort of its own bag moved nothing", function()
+      override(stubs.database, "GetNextSectionSpan", function() return true end)
+      slotInfo = twoSections()
+      local bag = opened()
+      render:Flush()
+      assert.is_not_nil(next(bag.content.heldCells))
+      messages["bags/SortSettled"](ctx(), const.BAG_KIND.BANK)
+      assert.is_not_nil(next(bag.content.heldCells))
+      assert.is_false(render:IsDirty(bag.content))
+      messages["bags/SortSettled"](ctx(), BACKPACK)
+      assert.is_true(render:IsDirty(bag.content))
+      render:Flush()
+    end)
+
+    it("lays nothing out for a sort that moved nothing in one column", function()
+      columns = 1
+      slotInfo = twoSections()
+      local bag = opened()
+      render:Flush()
+      messages["bags/SortSettled"](ctx(), BACKPACK)
+      assert.is_false(render:IsDirty(bag.content))
+    end)
+
+    it("reads no setting once the player is logging out", function()
+      slotInfo = twoSections()
+      local bag = opened()
+      override(addon, "loggingOut", true)
+      override(stubs.database, "GetBagView", function() error("the logout stripped it") end)
+      override(stubs.database, "GetNextSectionColumns", function() error("the logout stripped it") end)
+      assert.are.equal(1, (bag:SectionColumns()))
+    end)
+
+    it("lays out again when its own columns change, and not another bag's", function()
+      slotInfo = twoSections()
+      local bag = opened()
+      render:Flush()
+      messages["next/SectionColumnsChanged"](ctx(), const.BAG_KIND.BANK)
+      assert.is_false(render:IsDirty(bag.content))
+      messages["next/SectionColumnsChanged"](ctx(), BACKPACK)
+      assert.is_true(render:IsDirty(bag.content))
+      columns = 1
+      render:Flush()
+      assert.are.equal(0, bag.content.byName.Ore.x)
+    end)
+
+    it("does not offer to reorder a section while it cannot", function()
+      slotInfo = twoSections()
+      local bag = opened()
+      local lines = {}
+      local saved = { GameTooltip.SetText, GameTooltip.AddLine }
+      GameTooltip.SetText = function(_, text) table.insert(lines, text) end
+      GameTooltip.AddLine = function(_, text) table.insert(lines, text) end
+      bag:OnHeaderEnter(bag.content.byName.Ore)
+      columns = 1
+      bag.content:Invalidate()
+      render:Flush()
+      bag:OnHeaderEnter(bag.content.byName.Ore)
+      GameTooltip.SetText, GameTooltip.AddLine = saved[1], saved[2]
+      assert.is_truthy(lines[2]:find("onto a tab", 1, true))
+      assert.is_nil(lines[2]:find("reorder", 1, true))
+      assert.is_truthy(lines[5]:find("Drag to reorder", 1, true))
+    end)
+  end)
+
   describe("Show Blizzard Bags", function()
     local function bagsShown()
       local bag = opened()

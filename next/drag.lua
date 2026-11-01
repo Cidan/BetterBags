@@ -285,7 +285,8 @@ function nextDrag:FindTarget()
       end
       if panel.body:IsMouseOver() then
         if panel == src then
-          return { type = "reorder", panel = panel }
+          -- In columns of sections nothing reorders yet: it lands back in its place (next.md §7a).
+          return panel.content:CanReorder() and { type = "reorder", panel = panel } or nil
         end
         if self:CanDropOnBody(panel, src) then
           return { type = "bag", panel = panel }
@@ -470,7 +471,8 @@ function nextDrag:reattach(hidden)
   local canvas = state.panel.content
   local frame = state.section.frame
   lift:Put(state, canvas.frame)
-  frame:SetPoint("TOPLEFT", canvas.frame, "TOPLEFT", 0, -(canvas:GetDragSlotY() or state.section.y or 0))
+  frame:SetPoint("TOPLEFT", canvas.frame, "TOPLEFT", canvas:GetDragSlotX() or state.section.x or 0,
+    -(canvas:GetDragSlotY() or state.section.y or 0))
   if hidden then
     frame:Hide()
   end
@@ -504,7 +506,8 @@ function nextDrag:land(commit, after, from)
     if at == nil then
       return left0, top0
     end
-    return at.left, at.top - (canvas:GetDragSlotY() or 0) * at.scale, at.scale
+    return at.left + (canvas:GetDragSlotX() or state.section.x or 0) * at.scale,
+      at.top - (canvas:GetDragSlotY() or state.section.y or 0) * at.scale, at.scale
   end, function()
     self:reattach(false)
     canvas:EndDrag(commit)

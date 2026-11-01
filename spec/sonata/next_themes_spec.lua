@@ -498,6 +498,17 @@ describe("BetterBags Next's shipped themes", function()
     end)
   end)
 
+  -- A section in a column is narrower than the bag: art across its header has to hold its shape (next.md §7a).
+  describe("section columns", function()
+    it("draws Make It So's section bar with an end cap that keeps its shape", function()
+      local header = sonataNext:Resolve("MakeItSo").Sections.Header
+      assert.are.equal("Horizontal", header.Pieces)
+      assert.are.equal(header.Height, header.Begin.Size)
+      assert.are.same({ 0, 0.0625, 0, 1 }, header.Begin.TexCoords)
+      assert.are.same({ 0.0625, 0.96875, 0, 1 }, header.Middle.TexCoords)
+    end)
+  end)
+
   describe("Quiet's settings and controls", function()
     it("are cool grays, its settings' titles smaller and its controls' motion quicker", function()
       local t = sonataNext:Resolve("Quiet")

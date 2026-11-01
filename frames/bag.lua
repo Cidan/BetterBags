@@ -43,6 +43,9 @@ local itemFrame = addon:GetModule("ItemFrame")
 ---@class Render: AceModule
 local render = addon:GetModule("Render")
 
+---@class Motion: AceModule
+local motion = addon:GetModule("Motion")
+
 ---@class Texels: AceModule
 local texels = addon:GetModule("Texels")
 
@@ -720,6 +723,11 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 	-- itself, now, so the draw is complete when Draw returns. The sections hold new data: the
 	-- canvas measures them again.
 	self.canvas:ForgetMeasures()
+	-- A read that adds a tab re-sorts everything, tab after tab: what moved is placed at once (refresh-scheduler.md §11a).
+	if slotInfo.tabArrived and slotInfo.layoutResets ~= self.arrivedLayout then
+		self.arrivedLayout = slotInfo.layoutResets
+		motion:Forget(self.canvas)
+	end
 	render:RenderNow(self.window, { ctx = ctx })
 	-- Its window, sections and theme art; each item button draws its own (texture-sharpening.md).
 	texels:Unsharpen(self.frame)

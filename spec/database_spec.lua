@@ -73,6 +73,7 @@ function L:G(key) return key end
 -- Set up Constants module
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { BACKPACK = 0, BANK = 1, UNDEFINED = -1 }
+const.NEXT_SECTION_COLUMNS_MAX = 4
 const.GLOW_INTENSITY_HALO_THRESHOLD = 60
 const.GLOW_INTENSITY_MAX = 100
 const.GLOW_INTENSITY_DEFAULT = 60
@@ -122,6 +123,10 @@ const.DATABASE_DEFAULTS = {
     theme = 'Default',
     showFullSectionNames = { [0] = false, [1] = false },
     showAllFreeSpace = { [0] = false, [1] = false },
+    nextSectionColumns = { [0] = 1, [1] = 1 },
+    nextSectionFill = { [0] = "across", [1] = "across" },
+    nextSectionSpan = { [0] = true, [1] = true },
+    nextSectionWideRows = { [0] = 2, [1] = 2 },
     preserveItemGaps = { [0] = true, [1] = true },
     glowIntensity = { [0] = 60, [1] = 60 },
     newItems = {
@@ -853,6 +858,56 @@ describe("Database", function()
     it("GetShowAllFreeSpace / SetShowAllFreeSpace", function()
       DB:SetShowAllFreeSpace(const.BAG_KIND.BACKPACK, true)
       assert.is_true(DB:GetShowAllFreeSpace(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("keeps each bag's section columns, one until set, within what a window can show", function()
+      assert.are.equal(1, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK))
+      assert.are.equal(1, DB:GetNextSectionColumns(const.BAG_KIND.BANK))
+      -- What a saved profile holds is not always what a setter wrote.
+      for saved, expected in pairs({ [99] = const.NEXT_SECTION_COLUMNS_MAX, [2.5] = 2, [0] = 1, [-3] = 1, abc = 1 }) do
+        DB.data.profile.nextSectionColumns[const.BAG_KIND.BACKPACK] = saved
+        assert.are.equal(expected, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK), tostring(saved))
+      end
+      for saved, expected in pairs({ [1] = 2, [3.5] = 3, x = 2 }) do
+        DB.data.profile.nextSectionWideRows[const.BAG_KIND.BACKPACK] = saved
+        assert.are.equal(expected, DB:GetNextSectionWideRows(const.BAG_KIND.BACKPACK), tostring(saved))
+      end
+      DB.data.profile.nextSectionColumns[const.BAG_KIND.BACKPACK] = nil
+      DB.data.profile.nextSectionWideRows[const.BAG_KIND.BACKPACK] = nil
+      DB:SetNextSectionColumns(const.BAG_KIND.BACKPACK, 3)
+      assert.are.equal(3, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK))
+      assert.are.equal(1, DB:GetNextSectionColumns(const.BAG_KIND.BANK))
+      DB:SetNextSectionColumns(const.BAG_KIND.BACKPACK, 9)
+      assert.are.equal(const.NEXT_SECTION_COLUMNS_MAX, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK))
+      DB:SetNextSectionColumns(const.BAG_KIND.BACKPACK, 0)
+      assert.are.equal(1, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK))
+      DB:SetNextSectionColumns(const.BAG_KIND.BACKPACK, 2.4)
+      assert.are.equal(2, DB:GetNextSectionColumns(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("keeps whether each bag's wide sections span its columns, on until turned off", function()
+      assert.is_true(DB:GetNextSectionSpan(const.BAG_KIND.BACKPACK))
+      DB:SetNextSectionSpan(const.BAG_KIND.BACKPACK, false)
+      assert.is_false(DB:GetNextSectionSpan(const.BAG_KIND.BACKPACK))
+      assert.is_true(DB:GetNextSectionSpan(const.BAG_KIND.BANK))
+    end)
+
+    it("keeps each bag's limit of rows before a section is wide, two until set and never below", function()
+      assert.are.equal(2, DB:GetNextSectionWideRows(const.BAG_KIND.BACKPACK))
+      DB:SetNextSectionWideRows(const.BAG_KIND.BACKPACK, 4)
+      assert.are.equal(4, DB:GetNextSectionWideRows(const.BAG_KIND.BACKPACK))
+      assert.are.equal(2, DB:GetNextSectionWideRows(const.BAG_KIND.BANK))
+      DB:SetNextSectionWideRows(const.BAG_KIND.BACKPACK, 1)
+      assert.are.equal(2, DB:GetNextSectionWideRows(const.BAG_KIND.BACKPACK))
+      DB:SetNextSectionWideRows(const.BAG_KIND.BACKPACK, 3.6)
+      assert.are.equal(3, DB:GetNextSectionWideRows(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("keeps each bag's fill order, side to side until set", function()
+      assert.are.equal("across", DB:GetNextSectionFill(const.BAG_KIND.BACKPACK))
+      DB:SetNextSectionFill(const.BAG_KIND.BACKPACK, "down")
+      assert.are.equal("down", DB:GetNextSectionFill(const.BAG_KIND.BACKPACK))
+      assert.are.equal("across", DB:GetNextSectionFill(const.BAG_KIND.BANK))
     end)
 
     it("GetPreserveItemGaps / SetPreserveItemGaps", function()
