@@ -183,7 +183,6 @@ sonataNext:RegisterTheme({
     VendorName = { Copy = "GameFontHighlightSmall" },
     -- The currencies (currency.md): a count, one at a cap in Blizzard's red, one you have none of grayed; a gain in its
     -- green; "+N" in its gold.
-    CurrencyCount = { Copy = "GameFontHighlightSmall" },
     CurrencyCapped = { Copy = "GameFontRedSmall" },
     CurrencyNone = { Copy = "GameFontDisableSmall" },
     CurrencyName = { Copy = "GameFontHighlightSmall" },

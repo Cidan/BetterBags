@@ -65,6 +65,18 @@ describe("BetterBags Next's shipped themes", function()
       shipped())
   end)
 
+  it("writes the bag's gold and currency counts in every theme's footer font, as the vendor's footer is", function()
+    for client, flags in pairs(CLIENTS) do
+      for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end
+      for _, key in ipairs(shipped()) do
+        local theme = sonataNext:Resolve(key)
+        assert.are.equal(theme.Footer.Font, theme.Currency.Font, key .. " on " .. client)
+        assert.is_nil(theme.Fonts.CurrencyCount, key .. " on " .. client .. " has no separate count role")
+        assert.is_not_nil(theme.Footer.CoinFont, key .. " on " .. client)
+      end
+    end
+  end)
+
   it("resolves every one on every client and finds nothing it does not define", function()
     for client, flags in pairs(CLIENTS) do
       for _, flag in ipairs(FLAGS) do addon[flag] = flags[flag] == true end

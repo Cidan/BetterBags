@@ -73,7 +73,6 @@ sonataNext:RegisterTheme({
     Price = { Color = "Ink" },
     PriceUnaffordable = { Color = "Seal" },
     VendorName = { Color = "Ink", Shadow = false },
-    CurrencyCount = { Color = "Ink" },
     CurrencyNone = { Color = "InkMuted" },
     CurrencyName = { Color = "Ink" },
     CurrencyLoss = { Color = "InkMuted" },

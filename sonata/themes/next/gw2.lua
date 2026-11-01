@@ -150,7 +150,6 @@ sonataNext:RegisterTheme({
     Price = { Object = NORMAL, Size = 13, Color = "White", Shadow = true },
     PriceUnaffordable = { Object = NORMAL, Size = 13, Color = "Unaffordable", Shadow = true },
     VendorName = { Object = NORMAL, Size = 13, Color = "Text", Shadow = true },
-    CurrencyCount = { Object = NORMAL, Size = 12, Color = "White", Shadow = true },
     CurrencyCapped = { Object = NORMAL, Size = 12, Color = "Capped", Shadow = true },
     CurrencyNone = { Object = NORMAL, Size = 12, Color = "Muted" },
     CurrencyName = { Object = NORMAL, Size = 12, Color = "Text" },
