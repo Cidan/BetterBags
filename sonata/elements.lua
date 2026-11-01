@@ -472,6 +472,11 @@ function elements:StyleItemButton(decoration, style)
     BlendMode = backdrop.BlendMode, Inset = backdrop.Inset } or nil, "fill", "BACKGROUND", -8)
   local bordered = backdrop ~= nil and (backdrop.BorderColor ~= nil or backdrop.EdgeSize ~= nil)
   edges(decoration, bordered and { Color = backdrop.BorderColor, EdgeSize = backdrop.EdgeSize, Inset = backdrop.BorderInset } or nil)
+  -- What its last draw put on the edge is its draw's: a style applied without a draw must leave it (BetterBags Next styles
+  -- a button again on a new pixel grid, right after its first draw).
+  if style.QualityBorder == "Backdrop" and decoration.sonataEdgeDrawn ~= nil then
+    setEdgeColor(decoration, decoration.sonataEdgeDrawn)
+  end
   local skin = decoration.sonataSkin
   if snap ~= nil and skin ~= nil then
     if skin.fill ~= nil and skin.fill:IsShown() then
@@ -567,6 +572,7 @@ function elements:DrawItemQuality(decoration, color, quality)
   if style == nil then
     return false
   end
+  decoration.sonataEdgeDrawn = nil
   local override = quality ~= nil and style.QualityColors ~= nil and style.QualityColors[quality] or nil
   if type(style.QualityBorder) == "table" then
     local border = decoration.IconBorder
@@ -587,6 +593,7 @@ function elements:DrawItemQuality(decoration, color, quality)
     decoration.IconBorder:Hide()
   end
   local backdrop = type(style.Backdrop) == "table" and style.Backdrop or {}
+  decoration.sonataEdgeDrawn = override or color
   setEdgeColor(decoration, override or color or backdrop.BorderColor)
   return true
 end
@@ -619,6 +626,7 @@ function elements:DrawItemQuest(decoration, questInfo)
     if type(style.QualityBorder) == "table" and decoration.IconBorder ~= nil then
       artBorder(decoration.IconBorder, style.QualityBorder, style.QuestBorderColor)
     elseif style.QualityBorder == "Backdrop" and hasEdges(decoration) then
+      decoration.sonataEdgeDrawn = style.QuestBorderColor
       setEdgeColor(decoration, style.QuestBorderColor)
     elseif decoration.IconBorder ~= nil then
       local border = decoration.IconBorder
