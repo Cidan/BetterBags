@@ -41,6 +41,7 @@ local context = addon:GetModule('Context')
 ---@field automation? string What it does with its items on its own: "sell" or "destroy" (automation.md).
 ---@field confirmSale? boolean false when Auto Sell sells at once; confirmed in the vendor's dock otherwise (automation.md §3).
 ---@field skipRecent? boolean Its items skip Recent Items (Skip Recent Items, docs/next-batch-2.md §1).
+---@field hidden? table<BagKind, boolean> The bags its items are not shown in (Hide In, category-lifecycle.md §10).
 ---@field ignoredItems? table<number, boolean> Items that never land in it, by item ID (Ignored Items, docs/next-batch-2.md §2).
 
 ---@class (exact) Categories: AceModule
@@ -427,6 +428,9 @@ function categories:CreateCategory(ctx, category)
       if savedState.skipRecent ~= nil then
         category.skipRecent = savedState.skipRecent
       end
+      if savedState.hidden ~= nil then
+        category.hidden = savedState.hidden
+      end
       if savedState.ignoredItems ~= nil then
         category.ignoredItems = savedState.ignoredItems
       end
@@ -482,7 +486,7 @@ end
 local function saveState(filter)
   database:UpdateEphemeralItemCategory(filter.name, { enabled = filter.enabled, color = filter.color,
     priority = filter.priority, automation = filter.automation, confirmSale = filter.confirmSale,
-    skipRecent = filter.skipRecent, ignoredItems = filter.ignoredItems })
+    skipRecent = filter.skipRecent, ignoredItems = filter.ignoredItems, hidden = filter.hidden })
 end
 
 -- setPriority sets a category's place, saving a plugin's in its saved state as UpdateCategory does.
@@ -578,8 +582,9 @@ end
 -- UpdateCategory changes a category in place, keeping its items: fields may hold color (a color, or
 -- false for none), priority, enabled (the bags named are set, the others kept), rule (its search;
 -- empty for none), groupBy, automation ("sell", "destroy", or false for none), confirmSale (false:
--- Auto Sell sells at once; true, the default, is not stored) and skipRecent (true: its items skip Recent
--- Items; false, the default, is not stored). A plugin's category keeps its own rule and
+-- Auto Sell sells at once; true, the default, is not stored), skipRecent (true: its items skip Recent
+-- Items; false, the default, is not stored) and hidden (the bags named are set, the others kept; shown, the
+-- default, is not stored). A plugin's category keeps its own rule and
 -- group by; the bags, color, priority and automation set for it are saved, and win when the plugin makes
 -- it again. The bags are recalculated unless only the automation changed, which changes no item's
 -- category. It returns false for a name no category has.
@@ -610,6 +615,13 @@ function categories:UpdateCategory(ctx, name, fields)
   end
   if fields.skipRecent ~= nil then
     filter.skipRecent = fields.skipRecent == true or nil
+  end
+  if fields.hidden ~= nil then
+    local hidden = filter.hidden or {}
+    for kind, on in pairs(fields.hidden) do
+      hidden[kind] = on == true or nil
+    end
+    filter.hidden = next(hidden) ~= nil and hidden or nil
   end
   if fields.enabled ~= nil then
     filter.enabled = filter.enabled or everyBag()
@@ -663,6 +675,19 @@ function categories:SkipsRecentOf(name)
     filter = self:GetCategoryByName(filter.groupByParent)
   end
   return filter ~= nil and filter.skipRecent == true
+end
+
+-- HiddenIn says whether a category's items are kept out of a bag (Hide In; a group by's sections as their
+-- category). A built-in category is not.
+---@param name string
+---@param kind BagKind
+---@return boolean
+function categories:HiddenIn(name, kind)
+  local filter = self:GetCategoryByName(name)
+  if filter and filter.isGroupBySubcategory and filter.groupByParent then
+    filter = self:GetCategoryByName(filter.groupByParent)
+  end
+  return filter ~= nil and filter.hidden ~= nil and filter.hidden[kind] == true
 end
 
 -- ignores says whether a category's own Ignored Items hold an item.

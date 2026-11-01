@@ -889,6 +889,17 @@ describe("NextBag", function()
       assert.are.equal("Nothing here yet", bag.emptyText:GetText())
     end)
 
+    -- Asked (issue #1222): the old hide confused players about where their items went.
+    it("says in the footer how many items a hidden category keeps out of the tab shown", function()
+      slotInfo = data(nil, nil, { showAll = false, buttons = { { slotkey = "1_5", count = 12 } } })
+      slotInfo.tabs[1].hiddenItems = 3
+      local bag = opened()
+      assert.are.equal("12 free slots · 3 hidden", bag.freeText:GetText())
+      slotInfo.tabs[1].hiddenItems = 0
+      bag:Draw(ctx(), slotInfo)
+      assert.are.equal("12 free slots", bag.freeText:GetText())
+    end)
+
     it("shows its free slots in the footer", function()
       slotInfo = data(nil, nil, { showAll = false, buttons = { { slotkey = "1_5", count = 12 } } })
       local bag = opened()

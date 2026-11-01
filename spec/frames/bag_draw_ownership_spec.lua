@@ -344,6 +344,8 @@ local function newBag()
   }, { __index = bagProto })
   bag:BuildWindow("OwnershipSpec" .. bagCount)
   bag.OnResize = function() end
+  bag.hiddenText = bag.frame:CreateFontString()
+  bag.hiddenText:SetFontObject("GameFontNormal")
   bag.frame:Show()
   return bag
 end
@@ -1897,6 +1899,43 @@ describe("Bag Draw: shared item button ownership across global sections and view
       local places = create:find("b:PlacePartsIfDecorated(ctx)", 1, true)
       assert.is_not_nil(places)
       assert.is_true(places > made)
+    end)
+
+    it("updates its hidden count with each draw", function()
+      local bag = newBag()
+      local slotInfo = slotInfoWith({ itemAt(0, 1, "Weapons") }, {})
+      slotInfo.tabs[1].hiddenItems = 2
+      bag:Draw(context:New("draw"), slotInfo, function() end)
+      assert.is_true(bag.hiddenText:IsShown())
+      assert.are.equal("2 hidden", bag.hiddenText:GetText())
+      slotInfo.tabs[1].hiddenItems = 0
+      bag:Draw(context:New("draw"), slotInfo, function() end)
+      assert.is_false(bag.hiddenText:IsShown())
+    end)
+
+    -- Asked (issue #1222): the old hide confused players about where their items went.
+    it("says in the footer how many items a hidden category keeps out of the tab shown", function()
+      local bag = partsBag()
+      assert.is_false(bag.hiddenText:IsShown())
+      bag:ShowHiddenCount({ tabs = { [1] = { hiddenItems = 3 } } }, 1)
+      assert.is_true(bag.hiddenText:IsShown())
+      assert.are.equal("3 hidden", bag.hiddenText:GetText())
+      bag:ShowHiddenCount({ tabs = { [1] = { hiddenItems = 3 }, [2] = { hiddenItems = 0 } } }, 2)
+      assert.is_false(bag.hiddenText:IsShown())
+      bag:ShowHiddenCount({}, 1)
+      assert.is_false(bag.hiddenText:IsShown(), "data that was never read")
+    end)
+
+    it("puts the hidden count on the footer bar beside the money", function()
+      local bag = partsBag()
+      bag.moneyFrame = { frame = CreateFrame("Frame") }
+      bag:PlaceParts(context:New("Test"), bag.window.decoration)
+      local point, relativeTo, relativePoint = bag.hiddenText:GetPoint(1)
+      assert.are.same({ "BOTTOMRIGHT", bag.moneyFrame.frame, "BOTTOMLEFT" }, { point, relativeTo, relativePoint })
+      bag.moneyFrame = nil
+      bag:PlaceParts(context:New("Test"), bag.window.decoration)
+      local _, relative2, relativePoint2 = bag.hiddenText:GetPoint(1)
+      assert.are.same({ bag.bottomBar, "BOTTOMRIGHT" }, { relative2, relativePoint2 }, "a bag with no money")
     end)
 
     it("puts the footer bar along the bottom and the menu button where the theme says", function()

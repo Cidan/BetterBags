@@ -1095,12 +1095,13 @@ function DB:CreateOrUpdateCategory(category)
       confirmSale = saved and saved.confirmSale,
       skipRecent = saved and saved.skipRecent,
       ignoredItems = saved and saved.ignoredItems,
+      hidden = saved and saved.hidden,
     }
   end
 end
 
 -- UpdateEphemeralItemCategory saves what a player set for a plugin's category (its bags, color,
--- priority, automation, confirming, skipping Recent Items, its Ignored Items).
+-- priority, automation, confirming, skipping Recent Items, its Ignored Items, the bags it is hidden in).
 ---@param name string
 ---@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean, skipRecent?: boolean, ignoredItems?: table<number, boolean>}
 function DB:UpdateEphemeralItemCategory(name, fields)
@@ -1116,6 +1117,7 @@ function DB:UpdateEphemeralItemCategory(name, fields)
   saved.confirmSale = fields.confirmSale
   saved.skipRecent = fields.skipRecent
   saved.ignoredItems = fields.ignoredItems
+  saved.hidden = fields.hidden
 end
 
 ---@param category string

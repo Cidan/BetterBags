@@ -312,8 +312,9 @@ page's `Content.Top` and `Bottom`).
 - **The two item boxes stay put** (asked: boxes a few pixels apart made switching tabs messy): the
   Settings and Search Rule tabs put their box's name row and their box at the same place
   (`boxRows`: under three rows of settings, a row for the name, the box down to the tab's bottom).
-- **Settings tab**: three rows, Used In (a switch per bag the settings show, the guild bank like any),
-  Group By (yours only; the row stays empty for a plugin's), Color (and
+- **Settings tab**: four rows, Used In (a switch per bag the settings show, the guild bank like any),
+  Hide In (a switch per bag, off where it is not used, asking in a `NextDialog` before hiding; turning it off asks nothing;
+  category-lifecycle.md §10), Group By (yours only; the row stays empty for a plugin's), Color (and
   Reset Color: none, drawn in gold); then **Current Items in this Group** (the player's wording): how
   many items each bag shows in it (its group by's sections too) and those items in a read-only grid,
   one cell per item with how many there are, by name, or "There are no current items in your

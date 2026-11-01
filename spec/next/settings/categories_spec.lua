@@ -208,6 +208,10 @@ describe("NextSettingsCategories", function()
       end
       if fields.skipRecent ~= nil then f.skipRecent = fields.skipRecent == true or nil end
       for k, v in pairs(fields.enabled or {}) do f.enabled[k] = v end
+      for k, v in pairs(fields.hidden or {}) do
+        f.hidden = f.hidden or {}
+        f.hidden[k] = v == true or nil
+      end
       return true
     end)
     override(categories, "DeleteCategory", function(_, _, name)
@@ -653,7 +657,7 @@ describe("NextSettingsCategories", function()
       assert.is_false(tab.toggles[GUILD].frame:IsShown(), "only the bags the settings show")
     end)
 
-    it("puts its three rows of settings, then the box of what shows in it under them", function()
+    it("puts its four rows of settings, then the box of what shows in it under them", function()
       editor.selected = "Mats"
       place(tab)
       local K = style.Theme.Settings.Categories
@@ -662,11 +666,86 @@ describe("NextSettingsCategories", function()
       local function topOf(i) return K.Pad + (i - 1) * (B.Height + K.FieldGap) end
       local point, _, _, _, colorY = tab.swatch.frame:GetPoint(1)
       assert.are.equal("TOPLEFT", point)
-      assert.are.equal(-(topOf(3) + math.floor((B.Height - tab.swatch.frame:GetHeight()) / 2)), colorY,
-        "color is the third row")
-      local box = K.Pad + 3 * (B.Height + K.FieldGap) + K.FieldGap + B.Height + K.FieldGap
+      assert.are.equal(-(topOf(4) + math.floor((B.Height - tab.swatch.frame:GetHeight()) / 2)), colorY,
+        "color is the fourth row")
+      local _, _, _, _, hideY = tab.hideToggles[BACKPACK].frame:GetPoint(1)
+      assert.are.equal(-(topOf(2) + math.floor((B.Height - tab.hideToggles[BACKPACK].frame:GetHeight()) / 2)), hideY,
+        "hiding is the row under the bags it is used in")
+      local box = K.Pad + 4 * (B.Height + K.FieldGap) + K.FieldGap + B.Height + K.FieldGap
       local _, _, _, _, gridY = tab.grid.frame:GetPoint(1)
       assert.are.equal(-box, gridY)
+    end)
+
+    -- Asked (issue #1222): a switch per bag beside Used In, asking first, since the old hide confused players.
+    describe("hiding it in a bag", function()
+      before_each(function()
+        editor.selected = "Mats"
+        place(tab)
+      end)
+
+      it("has a switch per bag the settings show, showing what is saved", function()
+        filters.Mats.hidden = { [BANK] = true }
+        tab:Refresh(ctx())
+        assert.are.equal("Hide In", tab.labels.hide:GetText())
+        assert.is_false(tab.hideToggles[BACKPACK]:GetChecked())
+        assert.is_true(tab.hideToggles[BANK]:GetChecked())
+        bags = { bags[1], bags[2] }
+        tab:Refresh(ctx())
+        assert.is_false(tab.hideToggles[GUILD].frame:IsShown(), "only the bags the settings show")
+      end)
+
+      it("asks before hiding, naming the category and the bag, and hides on Hide", function()
+        click(tab.hideToggles[BACKPACK])
+        assert.are.same({}, updates(), "nothing yet")
+        assert.is_true(nextDialog:IsShown())
+        assert.are.equal("Hide Mats?", nextDialog.title:GetText())
+        assert.is_truthy(nextDialog.text:GetText():find("Backpack", 1, true))
+        answer("Hide")
+        local list = updates()
+        assert.are.equal(1, #list)
+        assert.are.same({ hidden = { [BACKPACK] = true } }, list[1][3])
+      end)
+
+      it("puts the switch back and hides nothing on Cancel", function()
+        click(tab.hideToggles[BACKPACK])
+        answer("Cancel")
+        assert.are.same({}, updates())
+        assert.is_false(tab.hideToggles[BACKPACK]:GetChecked())
+      end)
+
+      it("puts the switch back when the question is closed another way", function()
+        click(tab.hideToggles[BACKPACK])
+        nextDialog:Hide()
+        assert.are.same({}, updates())
+        assert.is_false(tab.hideToggles[BACKPACK]:GetChecked())
+      end)
+
+      it("shows a hidden category again without asking", function()
+        filters.Mats.hidden = { [BACKPACK] = true }
+        tab:Refresh(ctx())
+        click(tab.hideToggles[BACKPACK])
+        assert.is_false(nextDialog:IsShown())
+        assert.are.same({ hidden = { [BACKPACK] = false } }, updates()[1][3])
+      end)
+
+      it("cannot hide it in a bag it is not used in", function()
+        assert.is_false(tab.toggles[BANK]:GetChecked())
+        assert.is_false(tab.hideToggles[BANK].frame:IsEnabled())
+        assert.is_true(tab.hideToggles[BACKPACK].frame:IsEnabled())
+      end)
+
+      it("hides a plugin's category too", function()
+        editor.selected = "Openable"
+        tab:Refresh(ctx())
+        assert.is_true(tab.hideToggles[BACKPACK].frame:IsShown())
+      end)
+
+      it("hides its row while no category is chosen", function()
+        editor.selected = nil
+        tab:Refresh(ctx())
+        assert.is_false(tab.hideToggles[BACKPACK].frame:IsShown())
+        assert.is_false(tab.labels.hide:IsShown())
+      end)
     end)
 
     it("saves each setting at once: bags, group by, color and its reset", function()

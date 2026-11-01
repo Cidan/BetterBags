@@ -1971,6 +1971,7 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
       emptySlotsByBag = {},
       emptySlots = {},
       totalItems = 0,
+      hiddenItems = 0,
     }
     local freeSpaceButtons = {}
 
@@ -2060,13 +2061,25 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
     end
   end
 
-  -- Assign items to their respective tabs (every category shows: hiding was retired).
+  -- Assign items to their respective tabs, leaving out what a category hides in this bag (a gap it left too)
+  -- and counting it for the bag's footer.
+  local hiddenCategories = {}
   for _, item in ipairs(sortedItems) do
+    local category = item.itemInfo and item.itemInfo.category or ""
+    if hiddenCategories[category] == nil then
+      hiddenCategories[category] = categories:HiddenIn(category, kind)
+    end
+    local hides = hiddenCategories[category]
     for tabID, tabData in pairs(tabs) do
       if ItemBelongsToTab(kind, item, tabID, viewBagView) then
-        table.insert(tabData.items, item)
-        if not item.isFreeSlot and not item.isItemGap then
-          tabData.totalItems = tabData.totalItems + 1
+        local counts = not item.isFreeSlot and not item.isItemGap
+        if not hides then
+          table.insert(tabData.items, item)
+          if counts then
+            tabData.totalItems = tabData.totalItems + 1
+          end
+        elseif counts then
+          tabData.hiddenItems = tabData.hiddenItems + 1
         end
       end
     end

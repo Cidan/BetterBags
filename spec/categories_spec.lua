@@ -49,7 +49,7 @@ database.CreateOrUpdateCategory = function(_, category)
       isGroupBySubcategory = category.isGroupBySubcategory, groupByParent = category.groupByParent, itemList = {},
       color = saved and saved.color, priority = saved and saved.priority, automation = saved and saved.automation,
       confirmSale = saved and saved.confirmSale, skipRecent = saved and saved.skipRecent,
-      ignoredItems = saved and saved.ignoredItems,
+      ignoredItems = saved and saved.ignoredItems, hidden = saved and saved.hidden,
     }
   end
 end
@@ -557,6 +557,43 @@ describe("Categories", function()
       categories:UpdateCategory(context:New("Test"), "Mats", { skipRecent = false })
       assert.is_nil(dbCategories["Mats"].skipRecent, "off is the default")
       assert.are.equal(2, #sent)
+    end)
+
+    -- Asked (issue #1222): hiding a category is back, per bag, for players without tabs.
+    it("hides it in the bags named, keeping only what is on, and recalculates the bags", function()
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      categories:UpdateCategory(context:New("Test"), "Mats", { hidden = { [const.BAG_KIND.BANK] = true } })
+      assert.are.same({ [const.BAG_KIND.BANK] = true }, dbCategories["Mats"].hidden)
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[2])
+      categories:UpdateCategory(context:New("Test"), "Mats", { hidden = { [const.BAG_KIND.BACKPACK] = true } })
+      assert.are.same({ [const.BAG_KIND.BANK] = true, [const.BAG_KIND.BACKPACK] = true }, dbCategories["Mats"].hidden)
+      categories:UpdateCategory(context:New("Test"), "Mats", { hidden = { [const.BAG_KIND.BANK] = false } })
+      assert.are.same({ [const.BAG_KIND.BACKPACK] = true }, dbCategories["Mats"].hidden)
+      categories:UpdateCategory(context:New("Test"), "Mats", { hidden = { [const.BAG_KIND.BACKPACK] = false } })
+      assert.is_nil(dbCategories["Mats"].hidden, "shown everywhere is the default")
+    end)
+
+    it("says whether a category is hidden in a bag, a group by's sections as their category is", function()
+      local ctx = context:New("Test")
+      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, hidden = { [const.BAG_KIND.BANK] = true } }
+      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
+      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
+        isGroupBySubcategory = true, groupByParent = "Ore" })
+      assert.is_true(categories:HiddenIn("Ore", const.BAG_KIND.BANK))
+      assert.is_false(categories:HiddenIn("Ore", const.BAG_KIND.BACKPACK))
+      assert.is_true(categories:HiddenIn("Ore - Copper", const.BAG_KIND.BANK))
+      assert.is_false(categories:HiddenIn("Mats", const.BAG_KIND.BANK))
+      assert.is_false(categories:HiddenIn("Armor", const.BAG_KIND.BANK), "a built-in category has none")
+    end)
+
+    it("keeps a plugin's hidden bags across its next creation", function()
+      local ctx = context:New("Test")
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      categories:UpdateCategory(ctx, "Openable", { hidden = { [const.BAG_KIND.BANK] = true } })
+      assert.are.same({ [const.BAG_KIND.BANK] = true }, dbEphemeralCategories["Openable"].hidden)
+      categories:Init()
+      categories:CreateCategory(ctx, { name = "Openable", itemList = {}, priority = 1 })
+      assert.are.same({ [const.BAG_KIND.BANK] = true }, categories:GetCategoryByName("Openable").hidden)
     end)
 
     it("keeps a plugin's Skip Recent Items across its next creation", function()
