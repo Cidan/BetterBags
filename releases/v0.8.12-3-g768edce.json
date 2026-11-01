@@ -1,0 +1,47 @@
+{
+  "id": 1793507953,
+  "version": "v0.8.12-3-g768edce",
+  "channel": "alpha",
+  "date": "2026-11-01",
+  "from": "8dda90b58099b49abd4a9e39e318ff650c952f9a",
+  "to": "768edce24fc7cfb10a8a8e803009b89dec041ada",
+  "headline": "This update reintroduces category hiding per bag, fixes theme switching and quality border bugs, and improves money formatting, vendor card scaling, and search.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Hide categories per bag",
+      "details": "You can once again hide specific categories per bag from their settings tab, with a confirmation prompt when hiding. The bag footer now shows the count of hidden items, while recent items and the show bags view continue to display them.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Theme switching errors and visual artifacts",
+      "details": "Switching away from themes with animated ornaments no longer causes script errors or carries over visual artifacts to the newly selected theme.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Missing quality borders on certain themes",
+      "details": "Fixed an issue where quality borders disappeared on load or after scaling bags. Themes including Frost, Glitch, Halloween, and Make It So now correctly display quality borders on item icons, including when skinned by Masque.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Money formatting and footer font consistency",
+      "details": "Vendor totals, repair costs, and guild bank money now format with digit separators. Gold and currency counts in the footer also consistently adopt your active theme font.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Vendor card icons follow icon scale",
+      "details": "The Icon Scale slider now scales the icons on vendor cards, adjusting card heights appropriately and updating Masque skinning.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Search queries for boolean filters and caged pets",
+      "details": "Searching bare keywords such as collectable or pet now directly matches items where those conditions are true. Caged battle pets are also now properly recognized by pet search filters.",
+      "clients": []
+    }
+  ]
+}
