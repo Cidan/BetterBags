@@ -724,11 +724,11 @@ sonataNext:RegisterTheme({
       LabelFont = "SettingsText", TextFont = "SettingsText", SectionFont = "SettingsSection",
       HintFont = "SettingsSectionNote",
     },
-    -- A bag's categories, on its Categories tab: Height tall over its Fill, Pad inside; rows RowHeight
-    -- tall (headings GroupHeight), Indent in; the light under the pointer; the fonts. A dragged row is
-    -- lifted as a bag's section is (Drag).
+    -- A bag's categories, on its Order tab: over its Fill, Pad inside; rows RowHeight tall (headings
+    -- GroupHeight), Indent in; the light under the pointer; the fonts. A dragged row is lifted as a bag's
+    -- section is (Drag).
     BagCategories = {
-      Height = 420, Pad = 10, RowHeight = 30, GroupHeight = 24, Indent = 10,
+      Pad = 10, RowHeight = 30, GroupHeight = 24, Indent = 10,
       Fill = { Color = "Lavender", Alpha = 0.035 },
       HoverFill = { Color = "Lavender", Alpha = 0.05 },
       GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",

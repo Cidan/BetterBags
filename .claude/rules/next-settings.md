@@ -212,7 +212,7 @@ same database calls, with the same effects, as the classic window did; every que
 | | Appearance (`appearance`) | Three tabs (asked: "make 'Theme' here a tab, and add a tab for 'Size'", docs/next-appearance-size.md; then an Animation tab). **Theme**: the theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext) while Next is in use; for the classic bags, their Bag Theme (Sonata), then Settings Window (SonataNext: Next's themes draw this window). **Size** (Next only): Icon Scale (`nextIconScale`) and Bag Scale (`nextBagScale`), 50% to 150% in steps of 5, each sending `next/ScalesChanged` (next.md §3, §14h). **Animation** (Next only): an Effects section of fifteen switches, Sparkles, Title Shimmer, Title Cloud, Title Ribbon, Braid, Moving Ornaments, Glitch Effects, Data Rain, Ice Shatter, Snow, Leaves and Stars, Smoke Puff, Bats, Transporter, Paper Folding and Stop Motion (`nextSparkles`, `nextShimmer`, `nextTitleCloud`, `nextTitleRibbon`, `nextBraid`, `nextOrnamentMotion`, `nextGlitch`, `nextRain`, `nextShatter`, `nextSnow`, `nextSmoke`, `nextBats`, `nextBeam`, `nextPaper`, `nextStopMotion`; Glitch Effects and Data Rain the Glitch theme's, next-themes.md §21, Ice Shatter and Snow, Leaves and Stars the Frost theme's, §22, the Halloween theme's leaves and the Make It So theme's stars falling through the same snow, Smoke Puff and Bats the Halloween theme's, §23, Transporter the Make It So theme's, §24, Paper Folding and Stop Motion the Papercraft theme's, §25), each turning its effect off on any theme and sending `next/AnimationChanged` (next-themes.md §20). The classic bags size themselves on each bag's page and have none of those effects, so with them Appearance has the Theme tab alone, and no tab strip. |
 | | Item Colors (`itemcolors`) | The four item level colors as swatches, named with their ranges (61% and 86% of the highest item level seen, as the classic pane); a picked color is saved and sent as `itemLevel/MaxChanged` (Cancel saves the color back too); the highest level seen; Reset Colors, Reset Max Item Level. |
 | | Currencies (`currencies`, Next only) | BetterBags Next's currencies (currency.md §6): *Tracked* (what is tracked, in order, dragged to move, each with Remove), *Currencies* (on clients with currencies: every currency with a switch that tracks it), *Items* (the shared items tab over the items tracked), *Display* (Backpack and Tracker; Tracker). |
-| Bags | Backpack, Bank, Guild Bank (`backpack`, `bank`, `guild`) | Each bound to its bag. *Layout:* Order (Section, Item), Sections (Next only: Section Columns, Fill Order, Wide Sections Span Columns, Wide Column Limit, next.md §7a), Tabs (Enable Groups: the backpack only; the bank's Tabs section is left out), Slots (All Free Space, Gaps). *Items:* Item Level (two), Quality (Glow Intensity), Stacking (seven). *Categories:* Automatic (the seven filters). The guild bank's page shows on a client with one (`addon.hasGuildBank`). |
+| Bags | Backpack, Bank, Guild Bank (`backpack`, `bank`, `guild`) | Each bound to its bag. *Layout:* Order (Section, Item), Sections (Next only: Section Columns, Fill Order, Wide Sections Span Columns, Wide Column Limit, next.md §7a), Tabs (Enable Groups: the backpack only; the bank's Tabs section is left out), Slots (All Free Space, Gaps). *Items:* Item Level (two), Quality (Glow Intensity), Stacking (seven). *Categories:* Automatic (the seven filters). *Order:* the order of its categories (§5). The guild bank's page shows on a client with one (`addon.hasGuildBank`). |
 | Profiles | Profiles (`profiles`) | Tab *Profiles:* the active profile (a pick asks, then switches and reloads), the characters on each, New, Copy, Rename, Delete, Reset to Defaults (the classic flows: Copy creates then copies; Delete switches to Default first; Default cannot be renamed or deleted; a name is asked again while empty). Tab *Import / Export* (`transfer`): Export Categories fills a text area and selects it; Import Categories asks, imports (`DB:ImportSettings`), clears the area and offers a reload, or says what is wrong. |
 | Integrations | QuickFind (`quickfind`) | What the integration does. |
 | | a plugin (`plugin:<title>`) | Below. |
@@ -362,14 +362,21 @@ page's `Content.Top` and `Bottom`).
   its rule (the search box's Enter to Make Category, through `config/NewCategoryFromSearch`, which
   Config handles by opening the page). Both are used once.
 
-**A bag's Categories tab** keeps Automatic (the built-in filters) and, in place of the old manager,
-"In This Bag" (`next/settings/bagcategories.lua`, `NextSettingsBagCategories`, `Create(parent,
-window, bag)`, `Settings.BagCategories` tall): a filter box; "Pinned" in their order
-(`customSectionSort[kind]`), then "Other Categories" by name: the categories defined and the bag's
-sections from its committed items (not empty slots, Recent Items, Free Space, or Show Bags' bags).
-- A defined category has a switch for this bag (`UpdateCategory { enabled = { [kind] = on } }`); its
-  name opens it on the Categories page (`Show`, then `NextSettings:Open("categories")`), and Back
-  returns to the bag's tab.
+**A bag's Categories tab** is Automatic (the built-in filters). **Its Order tab** (asked: "move that to a new tab next to
+categories, called 'Order', and make that the whole tab") is its categories' order and nothing else
+(`next/settings/bagcategories.lua`, `NextSettingsBagCategories`, `Create(parent, window, bag)`): a filter box; "Pinned" in their
+order (`customSectionSort[kind]`), then "Other Categories" by name: the categories defined and the bag's sections from its
+committed items (not empty slots, Recent Items, Free Space, or Show Bags' bags).
+- **No scroll box within a tab** (asked: "no scrollbox within tabs, just make the whole list scroll the tab content itself"). The
+  list is as tall as its filter and every row (`Measure`) and the tab's own content scrolls it, filter included. When a filter, a read
+  or a category changes its height it asks the page to lay out again (`NextSettings:Relayout`, which reads no value: `Refresh` runs
+  from the page's own). Its drag scrolls the window's box, and `NextListReorder` reads where a list is from its `content` on the
+  screen, so a list can stand anywhere in what its box scrolls. Since the window's box resets on every page shown, Back scrolls back
+  to where the page was left (`returnTo.scroll`). Not yet the same: the Categories page's item grids and the Currencies page's list,
+  which fill their tab and scroll inside it (`itemsTab:TabHeight`).
+- **Whether a bag uses a category is set on the Categories page alone** (asked: "no duplicate controls here"; the switch that was
+  here is gone). A defined category not used in this bag says so ("Not used in this bag"), as its order has no effect there; its
+  name opens it on the Categories page (`Show`, then `NextSettings:Open("categories")`), and Back returns to the bag's tab.
 - A group by's sub-category says whose it is ("Grouped by Potions") and opens that one.
 - A built-in section says "Automatic"; a pinned name that is neither (a leftover) has Remove
   (category-lifecycle.md §4).

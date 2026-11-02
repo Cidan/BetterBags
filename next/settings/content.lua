@@ -292,7 +292,20 @@ end
 ---@type {id: string, bag: SettingBag}[]
 local BAG_PAGES = {}
 
--- bagPage defines a bag's page: its layout, items and categories, its settings bound to it.
+-- tabSection is a tab that is one block: its section's title hidden (the tab's name says it), found by its
+-- name and searching words.
+---@param title string
+---@param keywords string[]
+---@param block fun(parent: Frame, owner: Frame): NextSettingsRow
+---@return NextSettingsSectionDef
+local function tabSection(title, keywords, block)
+  return {
+    title = title, titleHidden = function() return true end,
+    rows = { { title = title, keywords = keywords, block = block } },
+  }
+end
+
+-- bagPage defines a bag's page: its layout, items, categories and their order, its settings bound to it.
 ---@param id string
 ---@param bag SettingBag
 ---@param shown? fun(): boolean
@@ -334,13 +347,11 @@ local function bagPage(id, bag, shown, design)
           { setting = 'filterRecentItems' }, { setting = 'filterTradeSkill' }, { setting = 'filterType' },
           { setting = 'filterSubtype' },
         } },
-        -- Categories are defined on the Categories page; a bag arranges them (category-lifecycle.md §6).
-        { title = L:G("In This Bag"), note = L:G("(drag to reorder, Shift-click to pin)"), rows = { {
-          title = L:G("Categories in This Bag"),
-          keywords = { "category", "categories", "pinned", "pin", "order", "used", "custom" },
-          block = function(parent, window) return bagCategories:Create(parent, window, bag) end,
-        } } },
       } },
+      -- Categories are defined on the Categories page; a bag orders them (category-lifecycle.md §6).
+      { id = "order", title = L:G("Order"), sections = { tabSection(L:G("Category Order"),
+        { "category", "categories", "pinned", "pin", "order", "reorder", "custom" },
+        function(parent, window) return bagCategories:Create(parent, window, bag) end) } },
     },
   })
 end
@@ -357,19 +368,6 @@ local function shownBags()
     end
   end
   return list
-end
-
--- tabSection is a tab of the Categories page: one block filling it, its section's title hidden (the
--- tab's name says it), found by its name and searching words.
----@param title string
----@param keywords string[]
----@param block fun(parent: Frame, owner: Frame): NextSettingsRow
----@return NextSettingsSectionDef
-local function tabSection(title, keywords, block)
-  return {
-    title = title, titleHidden = function() return true end,
-    rows = { { title = title, keywords = keywords, block = block } },
-  }
 end
 
 -- Init defines the pages, in the sidebar's order.

@@ -229,7 +229,7 @@ function editor:Choose(ctx, name)
   settings:Reselect(ctx)
 end
 
--- Show chooses a category for the next time the page shows (a bag's Categories tab opens it here).
+-- Show chooses a category for the next time the page shows (a bag's Order tab opens it here).
 ---@param name string
 function editor:Show(name)
   self.selected = name

@@ -1,7 +1,7 @@
 -- bagcategories_spec.lua -- NextSettingsBagCategories (next/settings/bagcategories.lua): a bag's categories
--- on its Categories tab (next-settings.md §5, category-lifecycle.md §6). Categories are defined once on
--- the Categories page; a bag arranges them: which it uses, their order (pinned first, then the rest),
--- and leftovers it can remove. A category's name opens it on the Categories page.
+-- on its Order tab (next-settings.md §5, category-lifecycle.md §6). Categories are defined once on the
+-- Categories page, which says which bags use them; a bag orders them (pinned first, then the rest) and can
+-- remove leftovers. A category's name opens it on the Categories page.
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 local const = StubBetterBagsModule("Constants")
@@ -40,7 +40,7 @@ local motion = addon:GetModule("Motion")
 local BANK = 1
 
 describe("NextSettingsBagCategories", function()
-  local block, owner, filters, sorts, view, committed, sent, handlers, calls, saved
+  local block, owner, filters, sorts, view, committed, sent, handlers, calls, saved, relayouts
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -73,12 +73,12 @@ describe("NextSettingsBagCategories", function()
       local row = block.rows[i]
       if entry.header then
         table.insert(list, "# " .. entry.title)
-      elseif row.toggle and row.toggle.frame:IsShown() then
-        table.insert(list, entry.name .. (row.toggle:GetChecked() and " [on]" or " [off]"))
       elseif row.remove.frame:IsShown() then
         table.insert(list, entry.name .. " [remove]")
-      else
+      elseif row.note:GetText() ~= "" then
         table.insert(list, entry.name .. " | " .. row.note:GetText())
+      else
+        table.insert(list, entry.name)
       end
     end
     return list
@@ -160,12 +160,15 @@ describe("NextSettingsBagCategories", function()
     override(items, "slotInfo", { [BANK] = { itemsBySlotKey = committed } })
     override(editor, "Show", function(_, name) table.insert(calls, { "Show", name }) end)
     override(settings, "Open", function(_, page) table.insert(calls, { "Open", page }) end)
+    relayouts = 0
+    override(settings, "Relayout", function() relayouts = relayouts + 1 end)
+    override(settings, "scroll", { scrollBox = CreateFrame("Frame", nil, UIParent, "WowScrollBox") })
 
     owner = CreateFrame("Frame", "SpecSettingsWindow", UIParent)
     owner:Show()
     block = bagCategories:Create(CreateFrame("Frame"), owner, { name = "Bank", kind = BANK })
     block:Refresh(ctx())
-    block:Place(0, 0, 700, style.Theme.Settings.BagCategories.Height)
+    block:Place(0, 0, 700, 420)
   end)
 
   after_each(function()
@@ -175,36 +178,102 @@ describe("NextSettingsBagCategories", function()
     end
   end)
 
-  it("lists the pinned categories in their order, then the rest by name: a switch for each defined one", function()
+  it("lists the pinned categories in their order, then the rest by name", function()
     assert.are.same({
-      "# Pinned", "Potions [on]", "Mats [off]", "Ghost [remove]",
-      "# Other Categories", "Armor | Automatic", "Potions - Flask | Grouped by Potions", "Tokens [on]",
+      "# Pinned", "Potions", "Mats | Not used in this bag", "Ghost [remove]",
+      "# Other Categories", "Armor | Automatic", "Potions - Flask | Grouped by Potions", "Tokens",
     }, listed(), "the bag's sections from its items too; a leftover can be removed")
   end)
 
   it("lists no bag names in Show Bags", function()
     view = const.BAG_VIEW.SECTION_ALL_BAGS
     block:Refresh(ctx())
-    assert.are.same({ "# Pinned", "Potions [on]", "Mats [off]", "Ghost [remove]", "# Other Categories",
-      "Potions - Flask | Grouped by Potions", "Tokens [on]" }, listed(), "the categories defined, not Armor")
+    assert.are.same({ "# Pinned", "Potions", "Mats | Not used in this bag", "Ghost [remove]", "# Other Categories",
+      "Potions - Flask | Grouped by Potions", "Tokens" }, listed(), "the categories defined, not Armor")
   end)
 
-  it("is a wide row Height tall", function()
+  -- Asked: "no scrollbox within tabs, just make the whole list scroll the tab content itself".
+  it("is a wide row as tall as its filter and every row, scrolling with its tab's content", function()
+    local K, I = style.Theme.Settings.BagCategories, controls:Theme("Input")
     assert.is_true(block.wide)
-    assert.are.equal(style.Theme.Settings.BagCategories.Height, block:Measure(700))
+    assert.are.equal(3 * K.Pad + I.Height + 2 * K.GroupHeight + 6 * K.RowHeight, block:Measure(700))
+    assert.are.equal(2 * K.GroupHeight + 6 * K.RowHeight, block.listContent:GetHeight())
+    assert.is_nil(block.listBox)
+    assert.are.equal(settings.scroll.scrollBox, block.drag.opts.box, "a drag scrolls the tab's content")
+  end)
+
+  it("hangs its rows under its filter", function()
+    local K, I = style.Theme.Settings.BagCategories, controls:Theme("Input")
+    local point, relativeTo, relativePoint, x, y = block.listContent:GetPoint(1)
+    assert.are.same({ "TOPLEFT", block.frame, "TOPLEFT", K.Pad, -(2 * K.Pad + I.Height) },
+      { point, relativeTo, relativePoint, x, y })
+    assert.are.equal(700 - 2 * K.Pad, block.listContent:GetWidth())
+  end)
+
+  -- Typing lays the list out again; restyling the box being typed in could move its caret.
+  it("restyles its filter when it is made wider or a theme applies, not for what is typed", function()
+    local styled = 0
+    local real = block.filter.Style
+    block.filter.Style = function(...)
+      styled = styled + 1
+      return real(...)
+    end
+    block:Place(0, 0, 700, 300)
+    assert.are.equal(0, styled, "only shorter")
+    block:Place(0, 0, 500, 300)
+    assert.are.equal(1, styled, "narrower")
+    block:Style()
+    assert.are.equal(2, styled, "a theme")
+    block.filter.Style = nil
+  end)
+
+  it("asks its tab to lay out again when its height changes, and only then", function()
+    local before = block:Measure(700)
+    relayouts = 0
+    block:Refresh(ctx())
+    assert.are.equal(0, relayouts, "nothing changed")
+    block.filter.frame:SetText("pot")
+    block.filter.frame:GetScript("OnTextChanged")(block.filter.frame, true)
+    assert.are.equal(1, relayouts)
+    assert.is_true(block:Measure(700) < before)
+    block.filter.frame:SetText("")
+    block.filter.frame:GetScript("OnTextChanged")(block.filter.frame, true)
+    assert.are.equal(2, relayouts)
+    assert.are.equal(before, block:Measure(700))
   end)
 
   it("keeps only the categories whose name has what is typed in its filter", function()
     block.filter.frame:SetText("pot")
     block.filter.frame:GetScript("OnTextChanged")(block.filter.frame, true)
-    assert.are.same({ "# Pinned", "Potions [on]", "# Other Categories", "Potions - Flask | Grouped by Potions" },
+    assert.are.same({ "# Pinned", "Potions", "# Other Categories", "Potions - Flask | Grouped by Potions" },
       listed())
   end)
 
-  it("uses a category in this bag or not with its switch", function()
+  -- Asked: "we set that in the categories page already (no duplicate controls here)".
+  it("has no switch for whether the bag uses a category: the Categories page says", function()
     local row = block:RowFor("Mats")
-    click(row.toggle)
-    assert.are.same({ "UpdateCategory", "Mats", { enabled = { [BANK] = true } } }, calls[#calls])
+    assert.is_nil(row.toggle)
+    local shown = {}
+    for _, child in ipairs({ row.frame:GetChildren() }) do
+      if child:IsShown() then
+        table.insert(shown, child)
+      end
+    end
+    assert.are.same({}, shown, "nothing to press in the row")
+    assert.is_false(categories.UpdateCategory ~= nil and #calls > 0)
+  end)
+
+  it("says when a bag does not use a category, and stops saying once it does", function()
+    assert.are.equal("Not used in this bag", block:RowFor("Mats").note:GetText())
+    filters.Mats.enabled[BANK] = true
+    handlers["categories/Changed"](ctx())
+    assert.are.equal("", block:RowFor("Mats").note:GetText())
+    filters.Tokens.enabled = nil
+    block:Refresh(ctx())
+    assert.are.equal("", block:RowFor("Tokens").note:GetText(), "used in every bag when it names none")
+    filters.Tokens.enabled = { [0] = true }
+    block:Refresh(ctx())
+    assert.are.equal("", block:RowFor("Tokens").note:GetText(), "used in a bag it does not name")
   end)
 
   it("opens a defined category on the Categories page when its name is clicked", function()
@@ -256,7 +325,7 @@ describe("NextSettingsBagCategories", function()
   -- Asked: "instead of a line on drag, let's animate the move like we do categories" (NextListReorder).
   it("drags a row as the bags drag a section: lifted, the others making room, landing where let go", function()
     local K = style.Theme.Settings.BagCategories
-    block.listBox:_SetRect(0, 0, 300, 300)
+    block.listContent.GetLeft, block.listContent.GetTop = function() return 0 end, function() return 300 end
     local row = block:RowFor("Tokens")
     row.frame:_SetRect(0, 300 - yOf("Tokens") - K.RowHeight, 300, K.RowHeight)
     -- A quarter of the way down the first pinned row: in its top half, so before it.
@@ -278,7 +347,7 @@ describe("NextSettingsBagCategories", function()
 
   it("never drops a row above the Pinned heading", function()
     local K = style.Theme.Settings.BagCategories
-    block.listBox:_SetRect(0, 0, 300, 300)
+    block.listContent.GetLeft, block.listContent.GetTop = function() return 0 end, function() return 300 end
     local row = block:RowFor("Mats")
     row.frame:_SetRect(0, 300 - yOf("Mats") - K.RowHeight, 300, K.RowHeight)
     _G._cursorX, _G._cursorY = 20, 299

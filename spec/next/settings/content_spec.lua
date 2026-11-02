@@ -363,7 +363,7 @@ describe("NextSettingsContent", function()
           "dontMergePartial", "dontMergeTransmog", "unmergeAtShop" } },
         { "Categories", "Automatic", { "filterEquipmentLocation", "filterExpansion", "filterGearSet",
           "filterRecentItems", "filterTradeSkill", "filterType", "filterSubtype" } },
-        { "Categories", "In This Bag", { "Categories in This Bag" } },
+        { "Order", "Category Order", { "Category Order" } },
       }, idsOf(page))
     end)
 
@@ -391,7 +391,7 @@ describe("NextSettingsContent", function()
       assert.is_true(limit.control.track:IsEnabled())
     end)
 
-    it("arranges the categories on a bag's Categories tab, bound to it", function()
+    it("orders the categories on a bag's Order tab, bound to it, the tab beside Categories", function()
       local made
       local manager = addon:GetModule("NextSettingsBagCategories")
       override(manager, "Create", function(_, parent, windowFrame, bag)
@@ -401,9 +401,33 @@ describe("NextSettingsContent", function()
       for _, name in ipairs({ "GetCategoryFilters" }) do
         override(db, name, function() return {} end)
       end
+      local tabs = {}
+      for _, tab in ipairs(pages:Get("bank").tabs) do
+        table.insert(tabs, tab.id)
+      end
+      assert.are.same({ "layout", "items", "categories", "order" }, tabs)
       settings:Open("bank", "categories")
+      assert.is_nil(made, "not on the Categories tab")
+      settings:Open("bank", "order")
       assert.are.equal(settings.frame, made.owner)
       assert.are.equal(const.BAG_KIND.BANK, made.bag.kind)
+    end)
+
+    it("makes the list the whole of the Order tab, its section's title hidden", function()
+      local sections = pages:Sections(pages:Get("bank").tabs[4])
+      assert.are.equal(1, #sections)
+      assert.is_true(sections[1].titleHidden())
+      assert.are.equal(1, #sections[1].rows)
+    end)
+
+    it("is found by the words a player would look for it by", function()
+      local row = pages:Sections(pages:Get("bank").tabs[4])[1].rows[1]
+      local words = {}
+      for _, word in ipairs(row.keywords) do
+        words[word] = true
+      end
+      assert.is_true(words.order and words.pin and words.pinned and words.categories)
+      assert.is_nil(words.used, "whether a bag uses a category is the Categories page's")
     end)
 
     it("names only settings the catalog has, for the page's bag; the classic bags' own only for them", function()
@@ -1198,6 +1222,27 @@ describe("NextSettingsContent", function()
           assert.are.same({}, problems)
         end)
       end
+
+      -- Every kind of row it has: pinned, a leftover's Remove link, a note, a heading.
+      it("draws a bag's Order tab on whole pixels with every kind of row, " .. screen[1] .. "x" .. screen[2], function()
+        design = "next"
+        undo = layout.UseScreen(screen[1], screen[2], screen[3])
+        local pinned = { Armor = 1, Gone = 2 }
+        override(addon:GetModule("Database"), "GetCustomSectionSort", function() return pinned end)
+        local filters = addon:GetModule("Categories"):GetAllCategories()
+        for i = 1, 20 do
+          local name = "Spec " .. i
+          filters[name] = { name = name, save = true, itemList = {},
+            enabled = i % 2 == 0 and { [const.BAG_KIND.BACKPACK] = false } or nil }
+        end
+        settings:Open("backpack", "order")
+        assert.are.same({}, offGrid())
+        settings.scroll.scrollBox._scrollRange = pixel:Length(settings.frame, 517)
+        settings.scroll.scrollBox:SetScrollPercentage(0.37, true)
+        assert.are.same({}, offGrid(), "scrolled partway")
+        settings.scroll.scrollBox._scrollRange = nil
+        settings.scroll.scrollBox:SetScrollPercentage(0, true)
+      end)
     end
   end)
 end)

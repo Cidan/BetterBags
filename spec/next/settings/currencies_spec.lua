@@ -259,6 +259,7 @@ describe("NextSettingsCurrencies", function()
       make()
       local K = style.Theme.Settings.BagCategories
       list.listBox:_SetRect(0, 0, 300, 300)
+      list.listContent.GetLeft, list.listContent.GetTop = function() return 0 end, function() return 300 end
       local row = list:RowFor("currency:2")
       row.frame:_SetRect(0, 300 - yOf("currency:2") - K.RowHeight, 300, K.RowHeight)
       -- A quarter of the way down the first row: in its top half, so before it.

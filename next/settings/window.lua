@@ -103,7 +103,7 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@field offset number How far right of where it rests it is, as it slides.
 ---@field motion table The slide's tween key.
 ---@field sidebarPage? NextSettingsPageDef The page whose own list the sidebar shows.
----@field returnTo? {pageId: string, tabId: string} Where Back goes.
+---@field returnTo? {pageId: string, tabId: string, scroll: number} Where Back goes, scrolled as it was left.
 ---@field shift number How far the sidebar has slid to a page's own list, from 0 (the pages) to 1.
 ---@field shiftMotion table The sidebar slide's tween key.
 ---@field lists table<NextSettingsPageDef, NextSettingsSidebar>
@@ -931,6 +931,9 @@ end
 function settings:Back(ctx)
   local to = self.returnTo
   self:Select(to and to.pageId or nil, to and to.tabId or nil, ctx)
+  if to ~= nil then
+    self.scroll.scrollBox:ScrollToOffset(to.scroll, true)
+  end
 end
 
 -- Reselect shows the page again: its heading, buttons, tabs, list and rows read again (a page's own
@@ -1366,7 +1369,8 @@ function settings:Select(pageId, tabId, ctx)
   end
   -- Coming into a page's own list from the pages: Back goes to the page left.
   if page.sidebar ~= nil and self.sidebarPage == nil then
-    self.returnTo = self.pageId and { pageId = self.pageId, tabId = self.tabId } or nil
+    self.returnTo = self.pageId and { pageId = self.pageId, tabId = self.tabId,
+      scroll = self.scroll.scrollBox:GetDerivedScrollOffset() } or nil
   end
   if self.query ~= nil then
     self.query = nil
@@ -1432,6 +1436,11 @@ function settings:Refresh(ctx)
     self.page:Refresh(ctx or context:New('NextSettings_Refresh'))
     render:Invalidate(self.root)
   end
+end
+
+-- Relayout lays the page out again for a row whose height changed, reading no value again (a row's Refresh can ask for it).
+function settings:Relayout()
+  render:Invalidate(self.root)
 end
 
 -- matches says whether a row definition of a page matches a search: a setting by its name,

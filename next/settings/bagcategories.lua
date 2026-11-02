@@ -30,14 +30,8 @@ local style = addon:GetModule('NextStyle')
 ---@class NextControls: AceModule
 local controls = addon:GetModule('NextControls')
 
----@class NextScrollBar: AceModule
-local nextScrollBar = addon:GetModule('NextScrollBar')
-
 ---@class NextButton: AceModule
 local nextButton = addon:GetModule('NextButton')
-
----@class NextToggle: AceModule
-local nextToggle = addon:GetModule('NextToggle')
 
 ---@class NextInput: AceModule
 local nextInput = addon:GetModule('NextInput')
@@ -60,13 +54,14 @@ local reorder = addon:GetModule('NextListReorder')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
--- NextSettingsBagCategories is a bag's categories, on its Categories tab (next-settings.md §5,
--- category-lifecycle.md §6): categories are defined once on the Categories page, and a bag arranges
--- them. A wide row listing the pinned categories in their order (customSectionSort), then every other
--- one by name: the categories defined and the bag's sections read from its committed items (not Recent
--- Items, Free Space, empty slots, or the bags of Show Bags). A defined category has a switch for whether
--- this bag uses it, and its name opens it on the Categories page; a group by's sub-category says whose it
--- is and opens that one; a built-in section says it is automatic; a pinned name that is neither (a
+-- NextSettingsBagCategories is a bag's categories, the whole of its Order tab (next-settings.md §5,
+-- category-lifecycle.md §6): categories are defined once on the Categories page, which also says which bags
+-- use them, and a bag orders them. A wide row listing the pinned categories in their order
+-- (customSectionSort), then every other one by name: the categories defined and the bag's sections read from
+-- its committed items (not Recent Items, Free Space, empty slots, or the bags of Show Bags). It is as tall as
+-- its rows and scrolls with the tab's content, with no scroll box of its own. A defined category's name opens
+-- it on the Categories page, and it says so when this bag does not use it; a group by's sub-category says
+-- whose it is and opens that one; a built-in section says it is automatic; a pinned name that is neither (a
 -- leftover) can be removed. Shift-click pins or unpins; dragging a row puts it where it is let go.
 ---@class NextSettingsBagCategories: AceModule
 ---@field all NextBagCategoryList[]
@@ -84,7 +79,6 @@ local DONE = {
 ---@field hover Texture
 ---@field label FontString
 ---@field note FontString
----@field toggle NextToggleFrame
 ---@field remove NextButtonFrame
 ---@field entry? table
 ---@field hovered boolean
@@ -151,20 +145,11 @@ function bagCategories:Create(parent, owner, bag)
       return { Texture = SR.Icon, Size = SR.IconSize, Color = SR.IconColor }
     end,
   })
-  local box = CreateFrame("Frame", nil, frame, "WowScrollBox") --[[@as WowScrollBox]]
-  box:SetInterpolateScroll(true)
-  pixel:SnapScroll(box)
-  local content = CreateFrame("Frame", nil, box)
-  content.scrollable = true
-  local view = CreateScrollBoxLinearView()
-  view:SetPanExtent(30)
-  box:Init(view)
-  block.bar = nextScrollBar:Create(box)
-  block.bar:Bind(box)
-  block.listBox, block.listContent = box, content
+  local content = CreateFrame("Frame", nil, frame)
+  block.listContent = content
   -- A row lands after the Pinned heading, the list's first entry.
   block.drag = reorder:Create({
-    box = box, content = content, first = 2,
+    box = settings.scroll.scrollBox, content = content, first = 2,
     entries = function() return block.entries end,
     rowOf = function(entry) return block.byKey[keyOf(entry)].frame end,
     heightOf = function(entry) return block:heightOf(entry) end,
@@ -196,6 +181,7 @@ end
 function listProto:Style()
   local K = style.Theme.Settings.BagCategories
   controls:Paint(self.fill, K.Fill)
+  self.filter:Style()
   for _, row in ipairs(self.rows) do
     self:paintRow(row)
   end
@@ -322,13 +308,6 @@ function listProto:newRow()
     note = style:CreateText(frame, K.NoteFont),
     hovered = false,
   }
-  row.toggle = nextToggle:Create(frame, {
-    onChange = function(ctx, on)
-      if row.entry and row.entry.name then
-        categories:UpdateCategory(ctx, row.entry.name, { enabled = { [self.bag.kind] = on } })
-      end
-    end,
-  })
   row.remove = nextButton:Create(frame, {
     text = L:G("Remove"), style = "Link",
     onClick = function(ctx)
@@ -366,9 +345,21 @@ function listProto:newRow()
   return row
 end
 
+-- rowsHeight is how tall every row of the list is together.
+---@private
+---@return number
+function listProto:rowsHeight()
+  local height = 0
+  for _, entry in ipairs(self.entries) do
+    height = height + self:heightOf(entry)
+  end
+  return height
+end
+
 -- layoutList shows each entry in its own row, headings GroupHeight tall and categories RowHeight tall,
 -- each with what belongs on its right, and puts the rows of entries no longer listed away; the list's
--- arrangement places them (NextListReorder: a row that moved slides).
+-- arrangement places them (NextListReorder: a row that moved slides). The tab lays out again when that
+-- changes the list's height.
 ---@private
 function listProto:layoutList()
   local listed = {}
@@ -380,7 +371,6 @@ function listProto:layoutList()
     row.entry = entry
     row.frame:SetHeight(self:heightOf(entry))
     row.frame:EnableMouse(entry.header ~= true)
-    row.toggle.frame:Hide()
     row.remove.frame:Hide()
     row.note:SetText("")
     if entry.header then
@@ -389,8 +379,9 @@ function listProto:layoutList()
       row.label:SetText(entry.name)
       local kind, filter = self:kindOf(entry.name)
       if kind == "defined" then
-        row.toggle:SetChecked(filter.enabled == nil or filter.enabled[self.bag.kind] ~= false)
-        row.toggle.frame:Show()
+        if filter.enabled ~= nil and filter.enabled[self.bag.kind] == false then
+          row.note:SetText(L:G("Not used in this bag"))
+        end
       elseif kind == "group" then
         local parent = filter.groupByParent or entry.name:match("^(.-) %- ") or entry.name
         row.note:SetText(format(L:G("Grouped by %s"), parent))
@@ -412,6 +403,11 @@ function listProto:layoutList()
     end
   end
   self.drag:Arrange()
+  local height = self:rowsHeight()
+  if height ~= self.listHeight then
+    self.listHeight = height
+    settings:Relayout()
+  end
 end
 
 -- paintRow draws a row: a heading, or a category, lit under the pointer.
@@ -434,8 +430,6 @@ function listProto:paintRow(row)
   style:SetFont(row.label, K.Font)
   style:SetFont(row.note, K.NoteFont)
   local height = self:heightOf(entry)
-  row.toggle.frame:ClearAllPoints()
-  pixel:Row(row.toggle.frame, "TOPRIGHT", frame, indent, height)
   row.remove.frame:ClearAllPoints()
   pixel:Row(row.remove.frame, "TOPRIGHT", frame, indent, height)
   pixel:Row(row.note, "TOPRIGHT", frame, indent, height)
@@ -570,11 +564,14 @@ function listProto:AskRemove(ctx, name)
   })
 end
 
+-- Measure is how tall it is: its filter and every row, which its tab's content scrolls.
 ---@param width number
 ---@return number
 function listProto:Measure(width)
   local _ = width
-  return pixel:Length(self.frame, style.Theme.Settings.BagCategories.Height)
+  local frame = self.frame
+  local pad = pixel:Snap(frame, style.Theme.Settings.BagCategories.Pad)
+  return 3 * pad + pixel:Length(frame, controls:Theme("Input").Height) + self:rowsHeight()
 end
 
 -- Place lays the list out: its filter at the top, the rows under it.
@@ -583,6 +580,8 @@ end
 ---@param width number
 ---@param height number
 function listProto:Place(x, y, width, height)
+  -- A filter being typed in is laid out for every height the list takes: restyling it could move its caret.
+  local narrowed = width ~= self.width
   self.x, self.y, self.width, self.height = x, y, width, height
   local K = style.Theme.Settings.BagCategories
   local I = controls:Theme("Input")
@@ -596,10 +595,12 @@ function listProto:Place(x, y, width, height)
   self.filter.frame:ClearAllPoints()
   self.filter.frame:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -pad)
   self.filter.frame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -pad, -pad)
-  self.filter:Style()
-  self.listBox:ClearAllPoints()
-  self.listBox:SetPoint("TOPLEFT", frame, "TOPLEFT", pad, -(pad + pixel:Length(frame, I.Height) + pad))
-  self.listBox:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -pad, pad)
+  if narrowed then
+    self.filter:Style()
+  end
+  self.listContent:ClearAllPoints()
+  pixel:Point(self.listContent, "TOPLEFT", frame, "TOPLEFT", pad, -(pad + pixel:Length(frame, I.Height) + pad))
+  pixel:Width(self.listContent, frame:GetWidth() - 2 * pad)
   self.drag:Arrange(frame:GetWidth() - 2 * pad)
   frame:Show()
 end

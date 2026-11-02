@@ -72,7 +72,7 @@ profile across a load, built-in ones included", on the real profile in `test.lua
 
 ## 4. UI escape hatch for any unfindable category
 
-A bag's Categories tab (`next/settings/bagcategories.lua`, next-settings.md §5; before it the
+A bag's Order tab (`next/settings/bagcategories.lua`, next-settings.md §5; before it the
 category manager's and the classic pane's `ShowDynamicCategoryDetail`) marks a pinned name that is
 neither a category (`GetCategoryByName == nil`) nor one of the bag's sections now as a leftover,
 with a **Remove** link that calls `categories:DeleteCategory` on it after asking: the delete scrub
@@ -160,7 +160,7 @@ also only won ties). A category with a group by shows a hand-placed
 item in its sub-category for the item (`items:GroupedCategory`), made as for rule matches
 (`items:ensureSubcategory`: the same bags, color and priority).
 
-**Where it is edited**: the Categories page defines categories; each bag's Categories tab arranges
+**Where it is edited**: the Categories page defines categories and which bags use them; each bag's Order tab orders
 them (next-settings.md §5). The search box's Enter to Make Category opens the Categories page with
 the search as the new category's rule (the old search category dialog, whose Save wrote the
 category whole and dropped its hand-placed items, was removed).
