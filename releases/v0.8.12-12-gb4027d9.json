@@ -1,0 +1,17 @@
+{
+  "id": 1793591692,
+  "version": "v0.8.12-12-gb4027d9",
+  "channel": "alpha",
+  "date": "2026-11-02",
+  "from": "847df23181d5798f1f67b3774563280cc5263c9d",
+  "to": "b4027d903678ecec2fa5aadeebd55620c5a4c73e",
+  "headline": "Category ordering in bag settings has been moved to its own dedicated tab.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Dedicated Order tab in bag settings",
+      "details": "Category ordering for each bag has moved from the Categories tab to its own dedicated Order tab, scrolling with the whole page rather than inside a nested scroll box. Categories not used by the bag now clearly indicate their order has no effect, and returning to the list after viewing a category preserves your scroll position.",
+      "clients": []
+    }
+  ]
+}
