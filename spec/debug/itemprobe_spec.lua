@@ -94,6 +94,21 @@ describe("ItemProbe", function()
     assert.are.same({ n = 1, "Backpack" }, p.bagName)
   end)
 
+  it("records whether the item can be auctioned, and which auction house the client has", function()
+    local asked
+    local api = _G.C_AuctionHouse
+    _G.C_AuctionHouse = { IsSellItemValid = function(_, displayError)
+      asked = displayError
+      return true
+    end }
+    _G.IsUsingLegacyAuctionClient = function() return false end
+    local probe = itemProbe:Probe(0, 1)
+    _G.C_AuctionHouse, _G.IsUsingLegacyAuctionClient = api, nil
+    assert.is_false(asked, "showing no error")
+    assert.is_true(probe.auctionable[1])
+    assert.is_false(probe.legacyAuctionHouse[1])
+  end)
+
   it("records each tooltip line with its type", function()
     local p = itemProbe:Probe(0, 1)
     assert.are.same({
@@ -269,7 +284,15 @@ describe("ItemProbe", function()
     _G.C_PetJournal.GetNumCollectedInfo = function(species) return species == 635 and 2 or 0, 3 end
     override(_G, "UnitLevel", function() return 90 end)
     override(_G, "UnitFullName", function() return "Someone", "Somewhere" end)
+    local auctionHouse = _G.C_AuctionHouse
+    _G.C_AuctionHouse = { IsSellItemValid = function(location, displayError)
+      assert(displayError == false, "showing no error")
+      local _, slot = location:GetBagAndSlot()
+      return slot == 1
+    end }
     local sample = itemProbe:Sample()
+    _G.C_AuctionHouse = auctionHouse
+    assert.are.same({ [42] = true, [43] = false }, sample.auctionable)
     assert.are.same({ [42] = true, [43] = false }, sample.usable)
     assert.are.same({ [2002] = true }, sample.appearances)
     assert.are.same({ [635] = { 2, 3 } }, sample.pets)

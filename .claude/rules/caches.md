@@ -43,7 +43,7 @@ item was read from:
 | Cold read | `harvestIncomplete` items are never kept |
 Refreshed on every kept item, computed exactly as a fresh read (`items:RefreshKeptItem`, also run
 by recalculations on every item still in its slot): new-item flag (`items:ClientNewItemFlag`),
-gear sets, quest state, tooltip text, whether it can still be refunded (`itemInfo.refundable`,
+gear sets, quest state, tooltip text, whether it can be auctioned (`isAuctionable`, search-indexing.md §18; also asked again on `UPDATE_INVENTORY_DURABILITY`, its fires kept only out of combat or at an interaction window), whether it can still be refunded (`itemInfo.refundable`,
 automation.md §2), whether the character can use it, how many of its pet the
 account has and whether its appearance is collected (`items:RefreshCharacterState`,
 search-indexing.md §13, §14 and §17). Known staleness, the same as an unvisited bag: a refundable
@@ -242,7 +242,7 @@ it was worked out from.
 | Recency (`IsNewItem`, and the stack's, virtual-stacks.md §9; the own category and `base` leave it out) | Compared every sweep; it only picks between `base` and Recent Items |
 | Category settings and definitions | The kind's category generation: wipes, recalculations without `categoriesUnchanged`, reads that absorbed one (`recategorize`); and the Categories module's generation (every change made through it) |
 | Search categories matched (name and priority) | Compared every sweep with the search cache, which is rebuilt every sweep |
-| The item context, the bank open, the bank showing a Warbank tab | `contextSignature()` compared every sweep; under an active item context grey-out is worked out every sweep |
+| The item context, the bank open, the bank showing a Warbank tab, the Auction House open | `contextSignature()` compared every sweep; under an active item context grey-out is worked out every sweep |
 | Show Bags | Not kept: section names are set every sweep |
 A sweep that fails partway leaves each item either worked out (with its record) or not, never a
 record that claims more: `indexPending` stays on an item until it is indexed.

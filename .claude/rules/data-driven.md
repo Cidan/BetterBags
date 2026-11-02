@@ -76,7 +76,7 @@ reasoning about it can suggest a cause; it does not establish one.
   nothing" and "returned nil" differ), `GetItemInfoInstant`, item levels (`GetDetailedItemLevelInfo`
   by ID and by link, `GetCurrentItemLevel`), whether its data was loaded (`IsItemDataCached`,
   `IsItemDataCachedByID`), `IsEquippableItem`, `GetItemSpell`, `IsCosmeticItem`,
-  `GetItemUpgradeInfo`, `CanScrapItem`, `GetItemStats`, both crafting tiers, the pet journal (and
+  `GetItemUpgradeInfo`, `CanScrapItem`, `C_AuctionHouse.IsSellItemValid` and `IsUsingLegacyAuctionClient`, `GetItemStats`, both crafting tiers, the pet journal (and
   the species' collected count), the toy box (`C_ToyBox.GetToyInfo`, `PlayerHasToy`),
   `C_PlayerInfo.CanUseItem`, the upgrade watermark, the appearance and whether it is collected, the
   bag's name, and the tooltip's lines with their types (`C_TooltipInfo.GetBagItem`). Each call is

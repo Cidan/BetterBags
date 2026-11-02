@@ -622,7 +622,7 @@ and starts the game (a login capture), then `/reload`s (a reload capture).
   `items/RefreshBackpack/Done` (right after each backpack read, the startup read first).
   `ItemProbe:Sample()` reads, straight from the client, the player values (as `Player()`, without who
   the player is) and, for each item in the backpack once per item ID: whether the character can use
-  it, whether its appearance's source is collected, and its pet's counts. So a capture shows when each
+  it, whether it can be auctioned, whether its appearance's source is collected, and its pet's counts. So a capture shows when each
   of them is known at login against the bag reads.
 - Optional in the session format (no version change).
 

@@ -113,6 +113,8 @@ function addon.OpenInteractionWindow(ctx, _, interactionType)
   debug:Log("Interaction", "OpenInteractionWindow", interactionType)
   if interactionType == Enum.PlayerInteractionType.AccountBanker then
     addon.atWarbank = true
+  elseif interactionType == Enum.PlayerInteractionType.Auctioneer then
+    addon.atAuctionHouse = true
   end
   addon.atInteracting = true
   addon.backpackShouldOpen = true
@@ -126,6 +128,9 @@ function addon.CloseInteractionWindow(ctx, _, interactionType)
   debug:Log("Interaction", "CloseInteractionWindow", interactionType)
   addon.atInteracting = false
   addon.atWarbank = false
+  if interactionType == Enum.PlayerInteractionType.Auctioneer then
+    addon.atAuctionHouse = false
+  end
   addon.backpackShouldClose = true
   events:SendMessage(ctx, 'bags/Rederive', interactionRecalculation())
   events:SendMessageLater(ctx, 'bags/OpenClose')

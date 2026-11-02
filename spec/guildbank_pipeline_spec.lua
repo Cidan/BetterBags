@@ -621,6 +621,26 @@ describe("the guild bank through the data engine", function()
       assert.is_true(search:Search("usable = true")[keyOf(2, 2)], "asked again")
     end)
 
+    -- A guild slot has no item location to ask about, and its read says nothing of loot.
+    it("says nothing of whether a guild bank item can be auctioned or opened", function()
+      local asked = 0
+      saveGlobal(_G, "C_AuctionHouse")
+      _G.C_AuctionHouse = { IsSellItemValid = function()
+        asked = asked + 1
+        return false
+      end }
+      -- However the client answers for a slot that is no bag's.
+      local doesItemExist = _G.C_Item.DoesItemExist
+      _G.C_Item.DoesItemExist = function() return true end
+      loadTabs()
+      read()
+      _G.C_Item.DoesItemExist = doesItemExist
+      assert.are.equal(0, asked)
+      for _, query in ipairs({ "auctionable = true", "auctionable = false", "lootable = true", "lootable = false" }) do
+        assert.is_nil(search:Search(query)[keyOf(1, 1)], query)
+      end
+    end)
+
     it("finds a guild bank item by its tab's name (bagname)", function()
       loadTabs()
       read()

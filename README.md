@@ -434,6 +434,8 @@ Search allows you to find items by the following indices (based on the item belo
 - `scrappable` (scrappable = true) Can the item be scrapped (Retail)?
 - `inset` (inset = true) Is the item in any equipment set? (`equipmentSet` names one.)
 - `upgrade` (upgrade = true) Does BetterBags show the upgrade arrow on the item? It follows the upgrade provider chosen in the settings (BetterBags, Pawn or SimpleItemLevel).
+- `auctionable` or `ah` (auctionable = true) Can the item be posted on the Auction House? It asks the game, so it knows about bound and other items that cannot be listed. Not on Classic Era or The Burning Crusade Classic, and not in the guild bank, where the field matches nothing. `auctionable = false` finds only what the game said no about, while `NOT auctionable` also finds every item the game has no answer for. `ah` on its own searches for those letters: write `ah = true`. Where the game has no answer, Auto Sell and Destroy What Can't Be Sold leave alone every item in a category whose rule says `NOT auctionable` or `auctionable != true`.
+- `lootable` (lootable = true) Can the item be opened, such as a lockbox, clam or cache? Not in the guild bank.
 - `usable` (usable = false) Can your character use the item? (Weapon and armor skills, level, professions, reputation: the red text in its tooltip.)
 - `equippable` (equippable = true) Is the item gear your character can wear?
 - `transmoggable` (transmoggable = true) Does the item have an appearance (Retail)?
@@ -443,7 +445,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `toy` (toy = true) Is the item a toy? (Its tooltip says "Toy".)
 - `known` (known = true) Does the item's tooltip say "Already known" (a toy, recipe, pet or mount you already have)?
 
-The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable`, `scrappable`, `toy`, `known`, `transmoggable`, `usable`, `equippable` and `upgrade` are read once the game has sent the item's data, `petcount`, `petlimit` and `collectable` once your pet journal has loaded, and `appearance` and `source` once your appearance collection has loaded: an item that has just arrived may match none of them for a moment.
+The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable`, `scrappable`, `toy`, `known`, `transmoggable`, `usable`, `equippable`, `auctionable`, `lootable` and `upgrade` are read once the game has sent the item's data, `petcount`, `petlimit` and `collectable` once your pet journal has loaded, and `appearance` and `source` once your appearance collection has loaded: an item that has just arrived may match none of them for a moment.
 
 ### Logical Operators
 - `AND` (slot = Legs AND ilvl > 500 \[This will match leg pieces that are also greater than 500 ilvl.\]) The intersection of two terms. Items must match both sides of the AND.

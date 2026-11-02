@@ -98,6 +98,7 @@ addon.Vendor = nil
 
 addon.atBank = false
 addon.atWarbank = false
+addon.atAuctionHouse = false
 
 -- BetterBags_ToggleBags is a wrapper function for the ToggleAllBags function.
 function BetterBags_ToggleBags()
