@@ -1,0 +1,33 @@
+{
+  "id": 1793601932,
+  "version": "v0.8.12-13-g8dc2473",
+  "channel": "alpha",
+  "date": "2026-11-02",
+  "from": "b4027d903678ecec2fa5aadeebd55620c5a4c73e",
+  "to": "8dc247312aace08eee4da9b9b9b73f22d904f190",
+  "headline": "Adds Auction House item dimming and new search filters for auctionable and lootable items.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Dim unauctionable items at the Auction House",
+      "details": "Items that cannot be posted are now dimmed while the Auction House window is open.",
+      "clients": [
+        "Retail"
+      ]
+    },
+    {
+      "category": "New",
+      "title": "Search keyword for auctionable items",
+      "details": "You can now search and create category rules using the auctionable filter (alias ah) for items that can be posted on the Auction House.",
+      "clients": [
+        "Retail"
+      ]
+    },
+    {
+      "category": "New",
+      "title": "Search keyword for lootable items",
+      "details": "You can now search and create category rules using the lootable filter for containers waiting to be opened.",
+      "clients": []
+    }
+  ]
+}
