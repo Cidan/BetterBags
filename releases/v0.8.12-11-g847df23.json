@@ -1,0 +1,23 @@
+{
+  "id": 1793587525,
+  "version": "v0.8.12-11-g847df23",
+  "channel": "alpha",
+  "date": "2026-11-02",
+  "from": "582a119deace792e505ad81eafbd6b881aee0c3a",
+  "to": "847df23181d5798f1f67b3774563280cc5263c9d",
+  "headline": "Adds drag-and-drop section reordering in BetterBags Next column layouts and separates section sort settings by design.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Drag to reorder sections in column layouts",
+      "details": "You can now drag section headers to reorder them directly within multi-column layouts in BetterBags Next. Dragging preserves a section's shape while held and prevents the layout from shifting or jittering under the cursor.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Independent section sorting per design",
+      "details": "Section sort order is now saved separately for each bag layout design. BetterBags Next defaults to sorting by size descending, while classic bags return to alphabetical sorting.",
+      "clients": []
+    }
+  ]
+}
