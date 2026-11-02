@@ -1,0 +1,33 @@
+{
+  "id": 1793632178,
+  "version": "v0.8.12-14-gd7ce0a0",
+  "channel": "alpha",
+  "date": "2026-11-02",
+  "from": "8dc247312aace08eee4da9b9b9b73f22d904f190",
+  "to": "d7ce0a0ea3f9f7ddb40c6c7189bc4ea0032b5b0f",
+  "headline": "This update fixes item dimming and the auctionable search filter on Classic versions, and resolves an issue with empty slots staying dimmed after a search.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Auctionable search filter on Classic Era and TBC",
+      "details": "The auctionable search keyword now identifies listable items on Classic Era and Burning Crusade by checking for soulbound status, quest items, conjured goods, and other restrictions.",
+      "clients": [
+        "Classic"
+      ]
+    },
+    {
+      "category": "Fixed",
+      "title": "Item dimming on Classic clients",
+      "details": "Fixed an issue where search mismatch and interaction dimming overlays failed to display on Classic versions.",
+      "clients": [
+        "Classic"
+      ]
+    },
+    {
+      "category": "Fixed",
+      "title": "Empty slots remaining dimmed after clearing search",
+      "details": "Slots that became empty while a search was active no longer remain dimmed after clearing the search.",
+      "clients": []
+    }
+  ]
+}
