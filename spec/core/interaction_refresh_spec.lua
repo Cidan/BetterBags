@@ -49,6 +49,7 @@ describe("interaction window refreshes", function()
     savedState = {
       atInteracting = addon.atInteracting,
       atWarbank = addon.atWarbank,
+      atAuctionHouse = addon.atAuctionHouse,
       backpackShouldOpen = addon.backpackShouldOpen,
       backpackShouldClose = addon.backpackShouldClose,
       UpdateButtonHighlight = addon.UpdateButtonHighlight,
@@ -82,6 +83,26 @@ describe("interaction window refreshes", function()
     end
     return out
   end
+
+  it("knows the Auction House is open, and no other window sets it", function()
+    addon.OpenInteractionWindow(nil, nil, Enum.PlayerInteractionType.Merchant)
+    assert.is_not_true(addon.atAuctionHouse)
+    addon.CloseInteractionWindow(nil, nil, Enum.PlayerInteractionType.Merchant)
+    addon.OpenInteractionWindow(nil, nil, Enum.PlayerInteractionType.Auctioneer)
+    assert.is_true(addon.atAuctionHouse)
+    addon.CloseInteractionWindow(nil, nil, Enum.PlayerInteractionType.Auctioneer)
+    assert.is_false(addon.atAuctionHouse)
+  end)
+
+  it("recalculates the backpack when the Auction House opens and closes, so what cannot be posted dims", function()
+    addon.OpenInteractionWindow(nil, nil, Enum.PlayerInteractionType.Auctioneer)
+    sent = {}
+    addon.OnUpdate(nil)
+    assert.equal("bags/Rederive", refreshes()[1].message)
+    sent = {}
+    addon.CloseInteractionWindow(nil, nil, Enum.PlayerInteractionType.Auctioneer)
+    assert.equal("bags/Rederive", refreshes()[1].message)
+  end)
 
   -- The backpack's grey-out depends on the open window, so it is always recalculated. The
   -- bank's only input that depends on it is stack unmerging, so it is recalculated only when

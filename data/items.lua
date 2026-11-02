@@ -333,7 +333,8 @@ end
 
 -- contextSignature is what grey-out (ResolveItemContextMatchResult) reads besides the item, or nil
 -- when kept grey-out cannot stand. With no item context (ItemButtonUtil.GetItemContext, every
--- client) it reads whether the bank is open and whether it shows a Warbank tab. While a context is
+-- client) it reads whether the bank is open, whether it shows a Warbank tab, and whether the Auction
+-- House is open. While a context is
 -- active, Blizzard's answer can depend on more than the context (the spell being cast for Enchanting,
 -- CheckItemCondition, ReplaceBonusTree or JumpUpgradeTrack; the recipe while recrafting:
 -- ItemButtonUtil.GetItemContextMatchResultForItem), so it is worked out on every refresh, as before.
@@ -351,7 +352,7 @@ function items:contextSignature()
       or (const.BANK_TAB and const.BANK_TAB.ACCOUNT_BANK_1)
     warbank = accountBankStart ~= nil and bank.bankTab >= accountBankStart
   end
-  return tostring(addon.atBank == true) .. "|" .. tostring(warbank)
+  return tostring(addon.atBank == true) .. "|" .. tostring(warbank) .. "|" .. tostring(addon.atAuctionHouse == true)
 end
 
 -- categoryStamp is what an item's own category was worked out under, besides the item and its
@@ -514,6 +515,10 @@ function items:ResolveItemContextMatchResult(data)
     end
     if result == match then
       return match
+    end
+    -- What cannot be posted dims while the Auction House is open, as what the Warbank refuses does there.
+    if addon.atAuctionHouse and data.isAuctionable == false then
+      return mismatch
     end
 
     local accountBankStart = addon.isRetail and Enum and Enum.BagIndex and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
@@ -3308,15 +3313,42 @@ function items:AppearanceStateOf(traits, itemLink)
   return known == true, false
 end
 
--- ReadCharacterState reads what follows the character and the account rather than the item:
--- whether the character can use it, how many of its pet the account has, and whether its appearance
--- is collected. Only for an item read with its data (rule #1).
+-- auctionLocation is told each slot in turn: AuctionableOf asks about every item on every read.
+local auctionLocation
+
+-- AuctionableOf says whether an item can be posted on the Auction House: Blizzard's own check, which answers with
+-- the Auction House closed (a /run on retail 12.1.5, not opened that session: bound items no, unbound yes), told not
+-- to show an error. Nil where nothing can say: a client on the legacy auction house (Classic Era, TBC), which Blizzard
+-- never asks (ContainerFrame_Shared.lua); a guild bank slot, which has no item location; a slot emptied since it was
+-- read, which Blizzard's container and Auction House frames check for first.
+---@param item ItemData
+---@return boolean?
+function items:AuctionableOf(item)
+  local api, legacy = _G.C_AuctionHouse, _G.IsUsingLegacyAuctionClient
+  if api == nil or api.IsSellItemValid == nil or (legacy ~= nil and legacy()) or guildTabOf(item.bagid) then
+    return nil
+  end
+  if auctionLocation then
+    auctionLocation:SetBagAndSlot(item.bagid, item.slotid)
+  else
+    auctionLocation = ItemLocation:CreateFromBagAndSlot(item.bagid, item.slotid)
+  end
+  if not auctionLocation:IsValid() then
+    return nil
+  end
+  return api.IsSellItemValid(auctionLocation, false)
+end
+
+-- ReadCharacterState reads what changes without the slot changing, rather than what the item is:
+-- whether the character can use it, how many of its pet the account has, whether its appearance
+-- is collected, and whether it can be auctioned. Only for an item read with its data (rule #1).
 ---@param item ItemData
 function items:ReadCharacterState(item)
   local traits = item.itemInfo.traits
   item.isUsable = self:CanUseItem(item.itemInfo.itemID)
   item.petOwned, item.petLimit = self:PetCountsOf(traits.petSpeciesID)
   item.appearanceKnown, item.sourceKnown = self:AppearanceStateOf(traits, item.itemInfo.itemLink)
+  item.isAuctionable = self:AuctionableOf(item)
 end
 
 -- RefreshCharacterState reads a kept item's character state again (a kept item was read with its
@@ -3325,11 +3357,16 @@ end
 ---@param item ItemData
 function items:RefreshCharacterState(item)
   local usable, owned, limit = item.isUsable, item.petOwned, item.petLimit
-  local appearance, source = item.appearanceKnown, item.sourceKnown
+  local appearance, source, auctionable = item.appearanceKnown, item.sourceKnown, item.isAuctionable
   self:ReadCharacterState(item)
   if (usable ~= item.isUsable or owned ~= item.petOwned or limit ~= item.petLimit
-    or appearance ~= item.appearanceKnown or source ~= item.sourceKnown) and item.derived then
+    or appearance ~= item.appearanceKnown or source ~= item.sourceKnown
+    or auctionable ~= item.isAuctionable) and item.derived then
     item.derived.indexPending = true
+  end
+  -- Grey-out reads it at the Auction House (ResolveItemContextMatchResult).
+  if auctionable ~= item.isAuctionable and item.derived then
+    item.derived.context = nil
   end
 end
 
@@ -3887,7 +3924,6 @@ function items:AttachGuildBankItemInfo(data, read)
     isLocked = read.locked,
     quality = itemQuality,
     isReadable = false,
-    hasLoot = false,
     hyperlink = read.link,
     isFiltered = read.isFiltered,
     hasNoValue = props.sellPrice == 0,

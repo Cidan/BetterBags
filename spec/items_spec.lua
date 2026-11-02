@@ -2588,10 +2588,13 @@ describe("Upgrade Icon Providers", function()
   end)
 
   describe("BetterBags provider — usability gating (retail APIs)", function()
-    local savedCanUse, savedPreferred, savedArmorSub, savedClassArmor, savedClassWeapon
+    local savedCanUse, savedPreferred, savedArmorSub, savedClassArmor, savedClassWeapon, savedDoesItemExist
 
     before_each(function()
       database.GetUpgradeIconProvider = function() return "BetterBags" end
+      -- The preferred-armor check asks about the item where it is, so its slot must hold it (ItemLocation:IsValid).
+      savedDoesItemExist = _G.C_Item.DoesItemExist
+      _G.C_Item.DoesItemExist = function() return true end
       savedCanUse = _G.C_PlayerInfo
       savedPreferred = _G.IsItemPreferredArmorType
       savedArmorSub = _G.Enum.ItemArmorSubclass
@@ -2608,6 +2611,7 @@ describe("Upgrade Icon Providers", function()
     end)
 
     after_each(function()
+      _G.C_Item.DoesItemExist = savedDoesItemExist
       _G.C_PlayerInfo = savedCanUse
       _G.IsItemPreferredArmorType = savedPreferred
       _G.Enum.ItemArmorSubclass = savedArmorSub
@@ -2665,6 +2669,10 @@ describe("Upgrade Icon Providers", function()
       local weapon = armorItem(7, "INVTYPE_WEAPONMAINHAND")
       weapon.itemInfo.classID = 2 -- Weapon
       assert.is_true(items:ResolveUpgrade(weapon))
+      -- A one-handed mace's subclass is the number plate's is.
+      local mace = armorItem(4, "INVTYPE_WEAPONMAINHAND")
+      mace.itemInfo.classID = 2
+      assert.is_true(items:ResolveUpgrade(mace))
     end)
   end)
 

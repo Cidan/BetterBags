@@ -3261,6 +3261,23 @@ _G.C_Item.CanBeRefunded = function(itemLocation)
   local bag, slot = itemLocation:GetBagAndSlot()
   return bag ~= nil and _G._refundableLocations[bag .. ":" .. slot] == true
 end
+-- C_AuctionHouse.IsSellItemValid(item: ItemLocation, displayError = true) -> valid
+-- (AuctionHouseDocumentation.lua). Specs list locations that cannot be posted in
+-- _G._unauctionableLocations["bag:slot"]. Its argument is an ItemLocation, not an empty one, and Blizzard's container
+-- and Auction House frames check itemLocation:IsValid() first (ContainerFrame.lua, Blizzard_AuctionHouseFrame.lua; its
+-- sell frame does not), so an empty one is an error here, as CanBeRefunded's is, by that documented type alone. A
+-- client on the legacy auction house has IsUsingLegacyAuctionClient(), which
+-- specs define; no spec's default client does.
+_G._unauctionableLocations = {}
+_G.C_AuctionHouse = _G.C_AuctionHouse or {}
+_G.C_AuctionHouse.IsSellItemValid = function(itemLocation, displayError)
+  if not _G.C_Item.DoesItemExist(itemLocation) then
+    error("bad argument #1 to '?' (Usage: local valid = C_AuctionHouse.IsSellItemValid(item [, displayError]))", 2)
+  end
+  _G._lastSellDisplayError = displayError
+  local bag, slot = itemLocation:GetBagAndSlot()
+  return bag ~= nil and _G._unauctionableLocations[bag .. ":" .. slot] ~= true
+end
 -- UIErrorsFrame:AddMessage(text, r, g, b, a): the red error text in the middle of the
 -- screen. Messages are recorded for specs.
 _G.UIErrorsFrame = _G.UIErrorsFrame or {}
@@ -3304,12 +3321,15 @@ _G.ItemLocation.CreateFromBagAndSlot = function(_, bagID, slotID)
     _isEquipmentSlot = false,
   }
   function loc:GetBagAndSlot() return self._bagID, self._slotID end
+  -- ItemLocationMixin:SetBagAndSlot (Blizzard_ObjectAPI/Mainline/ItemLocation.lua).
+  function loc:SetBagAndSlot(bag, slot) self._bagID, self._slotID = bag, slot end
   function loc:GetEquipmentSlot() return nil end
   function loc:IsEquipmentSlot() return false end
   function loc:IsBagAndSlot() return true end
   -- ItemLocationMixin:HasAnyLocation (Blizzard_ObjectAPI/Mainline/ItemLocation.lua).
   function loc:HasAnyLocation() return true end
-  function loc:IsValid() return true end
+  -- ItemLocationMixin:IsValid is C_Item.DoesItemExist(self) (Blizzard_ObjectAPI/Mainline/ItemLocation.lua).
+  function loc:IsValid() return _G.C_Item.DoesItemExist(self) end
   return loc
 end
 _G.ItemLocation.CreateFromEquipmentSlot = function(_, slotID)

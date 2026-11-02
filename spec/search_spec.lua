@@ -464,6 +464,59 @@ describe("Search", function()
 
   -- ─── Usability and appearances ──────────────────────────────────────────────
 
+  describe("auctionable and lootable", function()
+    local function keys(...)
+      local set = {}
+      for _, k in ipairs({...}) do set[k] = true end
+      return set
+    end
+
+    before_each(function()
+      local mats = MockSearchItem({ slotkey = "mats", traits = {} })
+      mats.isAuctionable, mats.containerInfo = true, { hasLoot = false }
+      local cloak = MockSearchItem({ slotkey = "cloak", traits = {} })
+      cloak.isAuctionable, cloak.containerInfo = false, { hasLoot = false }
+      local box = MockSearchItem({ slotkey = "box", traits = {} })
+      box.isAuctionable, box.containerInfo = false, { hasLoot = true }
+      local classic = MockSearchItem({ slotkey = "classic", traits = {} })
+      classic.containerInfo = { hasLoot = false }
+      local guild = MockSearchItem({ slotkey = "guild", traits = {} })
+      guild.containerInfo = {}
+      local cold = MockSearchItem({ slotkey = "cold" })
+      cold.isAuctionable, cold.containerInfo = false, { hasLoot = true }
+      for _, item in ipairs({ mats, cloak, box, classic, guild, cold }) do search:Add(item) end
+    end)
+
+    it("finds what can be posted, and what cannot, and nothing where nothing can say", function()
+      assert.are.same(keys("mats"), search:Search("auctionable = true"))
+      assert.are.same(keys("cloak", "box"), search:Search("auctionable = false"), "not a client without the check, nor a cold read")
+      assert.are.same(keys("mats"), search:Search("ah = true"))
+    end)
+
+    it("reads the alias as the field with every operator", function()
+      local others = keys("cloak", "box", "classic", "guild", "cold")
+      assert.are.same(keys("mats"), search:Search("ah == true"))
+      assert.are.same(keys("cloak", "box"), search:Search("ah == false"))
+      assert.are.same(others, search:Search("ah != true"))
+      assert.are.same(others, search:Search("ah ~= true"))
+      assert.are.same(others, search:Search("NOT ah = true"))
+    end)
+
+    -- Found by an adversarial review: a bare word naming a true or false field also finds where it is true, and ah
+    -- starts many a name, so typing "ahn" lit up every item that can be posted on the way.
+    it("reads a bare ah as text, and a bare auctionable as the field", function()
+      search:Add(MockSearchItem({ slotkey = "scarab", name = "Ahn'Qiraj Scarab" }))
+      assert.are.same(keys("scarab"), search:Search("ah"))
+      assert.are.same(keys("mats"), search:Search("auctionable"))
+      assert.are.same(keys("cloak", "box", "classic", "guild", "cold", "scarab"), search:Search("NOT auctionable"))
+    end)
+
+    it("finds what can be opened, and nothing where nothing can say", function()
+      assert.are.same(keys("box"), search:Search("lootable = true"))
+      assert.are.same(keys("mats", "cloak", "classic"), search:Search("lootable = false"), "not a guild slot, nor a cold read")
+    end)
+  end)
+
   describe("usability and appearances", function()
     local function keys(...)
       local set = {}
@@ -1468,6 +1521,8 @@ describe("Search incremental indexing (SyncKind)", function()
       { "toy mark", function(it) it.itemInfo.tooltipMarks = { toy = true } end },
       { "known mark", function(it) it.itemInfo.tooltipMarks = { known = true } end },
       { "usable", function(it) it.isUsable = true end },
+      { "auctionable", function(it) it.isAuctionable = true end },
+      { "lootable", function(it) it.containerInfo = { hasLoot = true } end },
       { "appearance", function(it) it.itemInfo.traits.transmoggable = true end },
       { "slot equipped", function(it) it.slotEquipped = 200 end },
       { "slot best", function(it) it.slotBest = 250 end },

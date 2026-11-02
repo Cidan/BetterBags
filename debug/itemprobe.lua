@@ -101,6 +101,8 @@ local function probeItem(itemID, link, location)
     cosmetic = ask(item.IsCosmeticItem, link),
     upgradeInfo = ask(item.GetItemUpgradeInfo, link),
     scrappable = ask(item.CanScrapItem, location),
+    auctionable = ask(field(_G.C_AuctionHouse, "IsSellItemValid"), location, false),
+    legacyAuctionHouse = ask(_G.IsUsingLegacyAuctionClient),
     stats = ask(item.GetItemStats or _G.GetItemStats, link),
     reagentQuality = ask(field(trade, "GetItemReagentQualityByItemInfo"), link),
     craftedQuality = ask(field(trade, "GetItemCraftedQualityByItemInfo"), link),

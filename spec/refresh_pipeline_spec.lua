@@ -2224,6 +2224,170 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       override(_G.C_Item, "GetItemInfo", getItemInfo)
     end)
 
+    -- Whether an item can be posted is Blizzard's own check, which answers with the Auction House closed (a
+    -- /run on retail 12.1.5, the AH not opened that session: bound items no, unbound yes).
+    describe("auctionable and lootable", function()
+      before_each(function()
+        _G._unauctionableLocations = { ["0:2"] = true }
+        mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, { itemID = 202, guid = "guid-202", count = 1 } }
+      end)
+
+      after_each(function()
+        _G._unauctionableLocations = {}
+      end)
+
+      it("asks about each item without showing an error, and searches the answer", function()
+        local slotInfo = refreshBackpack()
+        assert.is_true(slotInfo.itemsBySlotKey["0_1"].isAuctionable)
+        assert.is_false(slotInfo.itemsBySlotKey["0_2"].isAuctionable)
+        assert.is_false(_G._lastSellDisplayError, "no error shown for what cannot be posted")
+        assert.are.same({ ["0_1"] = true }, search:Search("auctionable = true"))
+        assert.are.same({ ["0_2"] = true }, search:Search("auctionable = false"))
+        assert.are.same({ ["0_2"] = true }, search:Search("ah = false"))
+        assert.are.same({ ["0_2"] = true }, search:Search("NOT auctionable = true"))
+      end)
+
+      it("follows a kept item's answer into the search", function()
+        local slotInfo = refreshBackpack()
+        local kept = slotInfo.itemsBySlotKey["0_2"]
+        _G._unauctionableLocations = {}
+        slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
+        assert.are.equal(kept, slotInfo.itemsBySlotKey["0_2"])
+        assert.are.same({ ["0_1"] = true, ["0_2"] = true }, search:Search("auctionable = true"))
+      end)
+
+      -- A rule of auctionable = false on Auto Sell or Destroy must not take an item nobody has answered for.
+      it("says nothing before the item's data has loaded", function()
+        local getItemInfo = _G.C_Item.GetItemInfo
+        override(_G.C_Item, "GetItemInfo", function() return nil end)
+        local slotInfo = refreshBackpack()
+        override(_G.C_Item, "GetItemInfo", getItemInfo)
+        assert.is_nil(slotInfo.itemsBySlotKey["0_2"].isAuctionable)
+        assert.are.same({}, search:Search("auctionable = false"))
+        assert.are.same({}, search:Search("auctionable = true"))
+      end)
+
+      for _, legacy in ipairs({ true, false }) do
+        it(legacy and "says nothing on the legacy auction house (Classic Era, TBC)" or "asks where the client is not on it", function()
+          override(_G, "IsUsingLegacyAuctionClient", function() return legacy end)
+          local slotInfo = refreshBackpack()
+          if legacy then
+            assert.is_nil(slotInfo.itemsBySlotKey["0_2"].isAuctionable)
+            assert.are.same({}, search:Search("auctionable = false"))
+          else
+            assert.is_false(slotInfo.itemsBySlotKey["0_2"].isAuctionable)
+            assert.are.same({ ["0_2"] = true }, search:Search("auctionable = false"))
+          end
+        end)
+      end
+
+      it("says nothing on a client without the check", function()
+        override(_G, "C_AuctionHouse", nil)
+        local slotInfo = refreshBackpack()
+        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].isAuctionable)
+      end)
+
+      it("says nothing about an emptied slot, whatever the client would say", function()
+        local item = refreshBackpack().itemsBySlotKey["0_2"]
+        override(_G, "C_AuctionHouse", { IsSellItemValid = function() return false end })
+        mockContainer[0][2] = nil
+        assert.is_nil(items:AuctionableOf(item))
+      end)
+
+      -- Found by an adversarial review: every item on every sweep and every check made a location, 0.7 KB each.
+      it("asks about each slot with one location", function()
+        local slotInfo = refreshBackpack()
+        local created, asked = 0, {}
+        local create = _G.ItemLocation.CreateFromBagAndSlot
+        override(_G.ItemLocation, "CreateFromBagAndSlot", function(...)
+          created = created + 1
+          return create(...)
+        end)
+        override(_G, "C_AuctionHouse", { IsSellItemValid = function(location)
+          local bag, slot = location:GetBagAndSlot()
+          table.insert(asked, bag .. ":" .. slot)
+          return true
+        end })
+        items:AuctionableOf(slotInfo.itemsBySlotKey["0_1"])
+        items:AuctionableOf(slotInfo.itemsBySlotKey["0_2"])
+        assert.are.same({ "0:1", "0:2" }, asked)
+        assert.are.equal(0, created)
+      end)
+
+      it("finds what can be opened, and what cannot", function()
+        mockContainer[0][1].info = { hasLoot = true }
+        refreshBackpack()
+        assert.are.same({ ["0_1"] = true }, search:Search("lootable = true"))
+        assert.are.same({ ["0_2"] = true }, search:Search("lootable = false"))
+      end)
+
+      describe("at the Auction House", function()
+        local MISMATCH, DOES_NOT_APPLY = 2, 1
+
+        before_each(function()
+          override(_G, "ItemButtonUtil", {
+            ItemContextMatchResult = { Match = 0, DoesNotApply = DOES_NOT_APPLY, Mismatch = MISMATCH },
+            GetItemContext = function() return nil end,
+            GetItemContextMatchResultForItem = function() return DOES_NOT_APPLY end,
+          })
+          addon.atAuctionHouse = nil
+        end)
+
+        after_each(function()
+          addon.atAuctionHouse = nil
+        end)
+
+        local function dim(slotkey)
+          return items.slotInfo[0].itemsBySlotKey[slotkey].itemContextMatchResult
+        end
+
+        it("dims what cannot be posted while it is open, and nothing once it closes", function()
+          refreshBackpack()
+          assert.are.equal(DOES_NOT_APPLY, dim("0_2"), "closed")
+          addon.atAuctionHouse = true
+          refreshBackpack({ derive = true, categoriesUnchanged = true })
+          assert.are.equal(MISMATCH, dim("0_2"))
+          assert.are.equal(DOES_NOT_APPLY, dim("0_1"), "what can be posted is left alone")
+          addon.atAuctionHouse = false
+          refreshBackpack({ derive = true, categoriesUnchanged = true })
+          assert.are.equal(DOES_NOT_APPLY, dim("0_2"))
+        end)
+
+        it("dims nothing it has no answer for", function()
+          override(_G, "IsUsingLegacyAuctionClient", function() return true end)
+          addon.atAuctionHouse = true
+          refreshBackpack()
+          assert.are.equal(DOES_NOT_APPLY, dim("0_2"))
+        end)
+
+        it("leaves an item another window's context matches alone", function()
+          override(_G.ItemButtonUtil, "GetItemContext", function() return "Scrapping" end)
+          override(_G.ItemButtonUtil, "GetItemContextMatchResultForItem", function() return 0 end)
+          addon.atAuctionHouse = true
+          refreshBackpack()
+          assert.are.equal(0, dim("0_2"))
+        end)
+
+        it("works a kept item's dimming out again when its answer changes", function()
+          addon.atAuctionHouse = true
+          refreshBackpack()
+          assert.are.equal(MISMATCH, dim("0_2"))
+          _G._unauctionableLocations = {}
+          refreshBackpack({ derive = true, categoriesUnchanged = true })
+          assert.are.equal(DOES_NOT_APPLY, dim("0_2"))
+        end)
+
+        it("does not dim the bank's items", function()
+          mockContainer[6] = { { itemID = 303, guid = "guid-303", count = 1 } }
+          _G._unauctionableLocations = { ["6:1"] = true }
+          addon.atAuctionHouse = true
+          local data = { bagid = 6, slotid = 1, isAuctionable = false, itemInfo = {} }
+          assert.are.equal(0, items:ResolveItemContextMatchResult(data))
+        end)
+      end)
+
+    end)
+
     -- Pet counts follow the account. Nothing is asked before the pet journal has loaded (a login
     -- capture: 0 owned until PET_JOURNAL_LIST_UPDATE); the journal's events recalculate the bags
     -- holding a pet item whose counts changed, and nothing else.
@@ -2428,6 +2592,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         buckets.UPDATE_FACTION(context:New("evt"), {})
         assert.are.same({}, sent)
       end)
+
     end)
 
     it("gives every item the plain name of its bag, for the bagname field", function()
@@ -5173,6 +5338,15 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       override(items, "Phase11_CommitAndDispatch", function(...)
         commits = commits + 1
         return commit(...)
+      end)
+      -- ItemLocation:IsValid (C_Item.DoesItemExist), which a kept item's auction answer checks first, reads no
+      -- bag slot's contents in the client, and neither does the mock's lookup behind it.
+      local doesItemExist = _G.C_Item.DoesItemExist
+      override(_G.C_Item, "DoesItemExist", function(...)
+        local before = reads
+        local exists = doesItemExist(...)
+        reads = before
+        return exists
       end)
       -- The CanBeRefunded mock looks the slot up to know whether it holds an item; the client's reads no
       -- bag slot, so that lookup is not counted.

@@ -41,7 +41,7 @@ local SNAPSHOT_FIELDS = {
   'bagid', 'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
   'minlevel', 'stacksize', 'price', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable', 'upgradeable',
   'track', 'upgradelevel', 'upgrademax', 'maxlevel', 'upgrade', 'total', 'toy', 'known', 'transmoggable',
-  'usable', 'petcount', 'petlimit', 'slotequipped', 'slotbest', 'appearance', 'source',
+  'usable', 'petcount', 'petlimit', 'slotequipped', 'slotbest', 'appearance', 'source', 'auctionable', 'lootable',
 }
 -- expansionid is not compared: it follows expansion, which is.
 
@@ -148,6 +148,11 @@ local function fillSnapshot(s, item)
   s.toy = t and (marks ~= nil and marks.toy == true)
   s.known = t and (marks ~= nil and marks.known == true)
   s.transmoggable = t and t.transmoggable
+  -- Whether it can be posted on the Auction House (items:AuctionableOf); absent where nothing can say, so a rule
+  -- of auctionable = false takes only what the client said no about.
+  s.auctionable = t and item.isAuctionable
+  -- Whether it can be opened; absent for a guild bank slot or a vendor's item, whose reads do not say.
+  s.lootable = t and item.containerInfo and item.containerInfo.hasLoot
   -- Whether the character can use it (items:CanUseItem); equippable follows it and equipment.
   s.usable = t and item.isUsable
   s.equippable = t and item.isUsable and t.isEquipment == true
@@ -211,6 +216,7 @@ local NUMBER_FIELDS = {
 local BOOL_FIELDS = {
   'reagent', 'isbound', 'bound', 'quest', 'activequest', 'equipment', 'hasuse', 'cosmetic', 'pet', 'scrappable',
   'upgradeable', 'inset', 'upgrade', 'toy', 'known', 'transmoggable', 'usable', 'equippable', 'collectable',
+  'auctionable', 'lootable',
 }
 
 -- scratch is reused to snapshot each item SyncKind compares, so an unchanged item costs no
@@ -219,7 +225,7 @@ local scratch = {}
 
 -- What a query's words name, for comparisons answered item by item (search:MatchEach) and for
 -- deciding how a word compared with a field is read.
-local ALIASES = { ilvl = 'level', count = 'stackcount', exp = 'expansion', slot = 'equipmentlocation', bag = 'bagname' }
+local ALIASES = { ah = 'auctionable', ilvl = 'level', count = 'stackcount', exp = 'expansion', slot = 'equipmentlocation', bag = 'bagname' }
 local TEXT_FIELDS = {
   name = true, type = true, subtype = true, category = true, guid = true, expansion = true,
   equipmentlocation = true, binding = true, tooltip = true, bagname = true, track = true,
@@ -450,6 +456,8 @@ function search:Init()
   self:CreateIndex('petlimit')
   self:CreateIndex('slotequipped')
   self:CreateIndex('slotbest')
+  self:CreateIndex('auctionable')
+  self:CreateIndex('lootable')
 
   self.defaultIndicies = {
     'name',
@@ -467,6 +475,7 @@ function search:Init()
     ilvl = self.indicies.level,
     count = self.indicies.stackcount,
     bag = self.indicies.bagname,
+    ah = self.indicies.auctionable,
   }
 end
 
@@ -1382,8 +1391,9 @@ function search:EvaluateAST(node, within)
       return compare(node)
   elseif node.type == "term" then
       local found = self:DefaultSearch(node.value)
-      -- A word naming a true or false field also finds the items where it is true: "NOT collectable".
-      local field = not node.quoted and fieldKey(string.lower(node.value))
+      -- A word naming a true or false field also finds the items where it is true: "NOT collectable". By its name, not
+      -- an alias: ah starts many an item's name.
+      local field = not node.quoted and string.lower(node.value)
       if field and BOOLEAN[field] then
         for slotkey in pairs(self:isInIndex(field, "true")) do
           found[slotkey] = true

@@ -144,6 +144,7 @@ globals = {
 	"C_ActionBar",
 	"C_AddOns",
 	"C_AddOnProfiler",
+	"C_AuctionHouse",
 	"C_Bank",
 	"C_Container",
 	"C_Cursor",

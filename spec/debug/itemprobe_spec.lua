@@ -94,6 +94,21 @@ describe("ItemProbe", function()
     assert.are.same({ n = 1, "Backpack" }, p.bagName)
   end)
 
+  it("records whether the item can be auctioned, and which auction house the client has", function()
+    local asked
+    local api = _G.C_AuctionHouse
+    _G.C_AuctionHouse = { IsSellItemValid = function(_, displayError)
+      asked = displayError
+      return true
+    end }
+    _G.IsUsingLegacyAuctionClient = function() return false end
+    local probe = itemProbe:Probe(0, 1)
+    _G.C_AuctionHouse, _G.IsUsingLegacyAuctionClient = api, nil
+    assert.is_false(asked, "showing no error")
+    assert.is_true(probe.auctionable[1])
+    assert.is_false(probe.legacyAuctionHouse[1])
+  end)
+
   it("records each tooltip line with its type", function()
     local p = itemProbe:Probe(0, 1)
     assert.are.same({
