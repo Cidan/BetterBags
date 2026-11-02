@@ -779,6 +779,96 @@ describe("TooltipScanner", function()
       assert.is_nil(next(tooltipScanner.marks))
     end)
 
+    -- What the legacy auction house's answer reads (items:LegacyAuctionableOf), from a Classic scan.
+    describe("what keeps an item off the legacy auction house", function()
+      local strings = { "ITEM_CONJURED", "ITEM_WRAPPED_BY", "ITEM_DURATION_DAYS", "ITEM_DURATION_HOURS",
+        "ITEM_DURATION_MIN", "ITEM_DURATION_SEC" }
+      local kept, lines
+
+      before_each(function()
+        kept = {}
+        for _, name in ipairs(strings) do kept[name] = _G[name] end
+        _G.ITEM_CONJURED = "Conjured Item"
+        _G.ITEM_WRAPPED_BY = "|cff00ff00<Gift from %s>|r"
+        _G.ITEM_DURATION_DAYS = "Duration: %d days"
+        _G.ITEM_DURATION_HOURS = "Duration: %d hrs"
+        _G.ITEM_DURATION_MIN = "Duration: %d min"
+        _G.ITEM_DURATION_SEC = "Duration: %d sec"
+        addon.isRetail = false
+        tooltipScanner:Init()
+        lines = {}
+        tooltipScanner.scanTooltip = {
+          ClearLines = function() end,
+          SetBagItem = function() end,
+          NumLines = function() return #lines end,
+        }
+      end)
+
+      after_each(function()
+        for _, name in ipairs(strings) do _G[name] = kept[name] end
+        for i = 1, #lines do _G["BetterBagsScanTooltipTextLeft" .. i] = nil end
+      end)
+
+      local function marksOf(...)
+        lines = { ... }
+        for i, text in ipairs(lines) do
+          _G["BetterBagsScanTooltipTextLeft" .. i] = { GetText = function() return text end }
+        end
+        local _, marks = tooltipScanner:ExtractClassic(0, 1)
+        return marks
+      end
+
+      it("marks a conjured item", function()
+        assert.are.same({ conjured = true }, marksOf("Conjured Water", "Conjured Item"))
+      end)
+
+      it("marks a limited duration, in every unit", function()
+        for _, line in ipairs({ "Duration: 3 days", "Duration: 2 hrs", "Duration: 14 min", "Duration: 30 sec" }) do
+          assert.are.same({ limited = true }, marksOf("Summoned Thing", line), line)
+        end
+      end)
+
+      it("marks a wrapped gift, with its color or without", function()
+        assert.are.same({ wrapped = true }, marksOf("Wrapped Thing", "|cff00ff00<Gift from Someone>|r"))
+        assert.are.same({ wrapped = true }, marksOf("Wrapped Thing", "<Gift from Someone>"))
+      end)
+
+      it("marks nothing for words inside a line, or a line like one of them", function()
+        assert.is_nil(marksOf("Conjured Item Case", "Use: Increases duration: 5 min of something.",
+          "|cff00ff00<Made by Someone>|r", "Duration", "Lasts. Duration: 14 min", "Duration: 14 min left"))
+      end)
+
+      -- Blizzard's own strings: ruRU changes its wording with the unit and has three plurals, zhCN puts the giver's name
+      -- first, and frFR on TBC Anniversary uses the |2 token ("de" or "d'").
+      it("reads each client's own strings", function()
+        _G.ITEM_DURATION_DAYS = "Исчезнет через %d д."
+        _G.ITEM_DURATION_MIN = "Срок действия: %d |4минута:минуты:минут;"
+        assert.are.same({ limited = true }, marksOf("Исчезнет через 3 д."))
+        assert.are.same({ limited = true }, marksOf("Срок действия: 14 минут"))
+        _G.ITEM_WRAPPED_BY = "|cff00ff00<%s的礼物>|r"
+        assert.are.same({ wrapped = true }, marksOf("|cff00ff00<Someone的礼物>|r"))
+        assert.is_nil(marksOf("|cff00ff00<Made by Someone>|r"), "a crafter's line is not a gift, where a gift's opens with the name")
+        _G.ITEM_WRAPPED_BY = "|cff00ff00<Cadeau |2 %s>|r"
+        assert.are.same({ wrapped = true }, marksOf("|cff00ff00<Cadeau de Someone>|r"))
+        assert.are.same({ wrapped = true }, marksOf("|cff00ff00<Cadeau d'Someone>|r"))
+      end)
+
+      it("reads a string with a positional argument", function()
+        _G.ITEM_WRAPPED_BY = "|cff00ff00<Gift (%1$s)>|r"
+        assert.are.same({ wrapped = true }, marksOf("<Gift (Someone)>"))
+        assert.is_nil(marksOf("<Gift Someone>"), "its own parentheses are text")
+      end)
+
+      it("leaves them out of a retail scan, whose client answers for itself", function()
+        addon.isRetail = true
+        _G.C_TooltipInfo = { GetBagItem = function()
+          return { lines = { { leftText = "Conjured Item" }, { leftText = "Duration: 14 min" } } }
+        end }
+        local _, _, marks = tooltipScanner:ExtractRetail(0, 1)
+        assert.is_nil(marks)
+      end)
+    end)
+
     it("marks the lines of a Classic scan", function()
       addon.isRetail = false
       tooltipScanner:Init()

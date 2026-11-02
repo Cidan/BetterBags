@@ -142,6 +142,7 @@ local function stubModules()
   local elements = stubModule("SonataElements")
   override(elements, "DrawItemQuality", function() return false end)
   override(elements, "DrawItemQuest", function() end)
+  override(elements, "EmptySlotArt", function() return nil end)
 end
 
 -- decorate makes an item's decoration; useItemModule loads a fresh ItemFrame whose
@@ -225,6 +226,108 @@ describe("ItemFrame on Classic clients", function()
     _G.NEW_ITEM_ATLAS_BY_QUALITY = savedGlobals.NEW_ITEM_ATLAS_BY_QUALITY
     addon.isRetail = savedGlobals.isRetail
     resetCreatedStubs()
+  end)
+
+  -- Found by a bug review: Classic's item button has no overlay for an item context, so a mismatch drew nothing.
+  describe("dimming what does not fit an item context", function()
+    local MATCH, MISMATCH, DOES_NOT_APPLY = 1, 2, 3
+
+    before_each(function()
+      override(_G, "ItemButtonUtil", { ItemContextMatchResult = { Match = MATCH, Mismatch = MISMATCH, DoesNotApply = DOES_NOT_APPLY } })
+      decorate = function(item)
+        local d = newClassicDecoration(item)
+        d.SetMatchesSearch = nil
+        itemFrame:AddClassicOverlay(d)
+        return d
+      end
+    end)
+
+    local function overlayOf(item)
+      return item._decoration.searchOverlay:IsShown()
+    end
+
+    local function draw(item, result, search)
+      local data = itemData(0, 1, 2)
+      data.itemContextMatchResult, data.isSearchResult = result, search
+      item:SetItemFromData(context:New("test"), data)
+    end
+
+    it("dims an item that does not fit, and not one that does", function()
+      local item = itemFrame:GetButton(context:New("test"), "0_1")
+      draw(item, MISMATCH)
+      assert.is_true(overlayOf(item))
+      draw(item, DOES_NOT_APPLY)
+      assert.is_false(overlayOf(item), "the Auction House closed")
+      draw(item, MATCH)
+      assert.is_false(overlayOf(item))
+    end)
+
+    it("dims for either a search's miss or a mismatch, and clears only when neither holds", function()
+      local item = itemFrame:GetButton(context:New("test"), "0_1")
+      draw(item, MISMATCH, true)
+      assert.is_true(overlayOf(item), "the search found it, but it does not fit")
+      draw(item, DOES_NOT_APPLY, false)
+      assert.is_true(overlayOf(item), "it fits, but the search missed it")
+      draw(item, MISMATCH, false)
+      assert.is_true(overlayOf(item))
+      draw(item, DOES_NOT_APPLY, true)
+      assert.is_false(overlayOf(item))
+    end)
+
+    it("keeps a mismatch dimmed through a live search, and a search's miss until it clears", function()
+      local ctx = context:New("test")
+      local item = itemFrame:GetButton(ctx, "0_1")
+      draw(item, MISMATCH)
+      item:UpdateSearch(ctx, false)
+      assert.is_true(overlayOf(item))
+      item:UpdateSearch(ctx, true)
+      assert.is_true(overlayOf(item), "the search box cleared, and it still does not fit")
+      draw(item, DOES_NOT_APPLY)
+      item:UpdateSearch(ctx, false)
+      assert.is_true(overlayOf(item), "the search missed it")
+      item:UpdateSearch(ctx, true)
+      assert.is_false(overlayOf(item))
+    end)
+
+    -- Found by a bug review: a search's miss stayed on a slot that became a free slot, and clearing the search walks
+    -- only items, so it stayed dim until the slot held one again.
+    it("undims a button drawn as a free slot, after a mismatch or a search's miss", function()
+      local ctx = context:New("test")
+      for _, setup in ipairs({ { MISMATCH }, { DOES_NOT_APPLY, false } }) do
+        local item = itemFrame:GetButton(ctx, "0_1")
+        draw(item, setup[1], setup[2])
+        assert.is_true(overlayOf(item))
+        item:SetFreeSlots(ctx, { slotkey = "0_1", bagid = 0, slotid = 1,
+          itemInfo = { emptySlotName = "Bag", itemQuality = const.ITEM_QUALITY.Common } }, 4)
+        assert.is_false(overlayOf(item))
+      end
+    end)
+
+    it("undims a released button", function()
+      local ctx = context:New("test")
+      local item = itemFrame:GetButton(ctx, "0_1")
+      draw(item, DOES_NOT_APPLY, false)
+      item:ClearItem(ctx)
+      assert.is_false(overlayOf(item))
+    end)
+
+    it("gives Classic's real button the overlay's dimming, and leaves retail's alone", function()
+      ResetModuleStub("ItemFrame", "frames/item.lua")
+      LoadBetterBagsModule("frames/item.lua")
+      local real = addon:GetModule("ItemFrame")
+      local function decoration(name)
+        local item = { frame = CreateFrame("Frame"), button = CreateFrame("Button", name) }
+        return real:CreateDecoration(item)
+      end
+      local classic = decoration("ClassicOverlayButton")
+      classic.searchOverlay = classic.searchOverlay or classic:CreateTexture()
+      classic.GetItemContextMatchResult = function() return MISMATCH end
+      classic:UpdateItemContextMatching()
+      assert.is_true(classic.searchOverlay:IsShown())
+      addon.isRetail = true
+      assert.is_nil(rawget(decoration("RetailOverlayButton"), "UpdateItemContextMatching"), "retail's mixin has its own")
+      addon.isRetail = false
+    end)
   end)
 
   it("draws no quality border at glow intensity 0", function()

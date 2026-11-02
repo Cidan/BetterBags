@@ -641,6 +641,16 @@ describe("the guild bank through the data engine", function()
       end
     end)
 
+    it("says nothing of a guild bank item on the legacy auction house either", function()
+      saveGlobal(_G, "IsUsingLegacyAuctionClient")
+      _G.IsUsingLegacyAuctionClient = function() return true end
+      loadTabs()
+      read()
+      for _, query in ipairs({ "auctionable = true", "auctionable = false" }) do
+        assert.is_nil(search:Search(query)[keyOf(1, 1)], query)
+      end
+    end)
+
     it("finds a guild bank item by its tab's name (bagname)", function()
       loadTabs()
       read()

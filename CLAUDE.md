@@ -20,17 +20,22 @@ Always write TESTS FIRST to validate the bug or feature before writing any imple
 4. Run tests to confirm they are now passing.
 No implementation code should be modified or added without a corresponding test written and observed failing first.
 
-## PRIME DIRECTIVE #2: Adversarial Review
+## PRIME DIRECTIVE #2: Bug Review
 
-Every code change gets an adversarial review before it is reported as done: a sub-agent whose only job is to break it. Passing tests are not the bar. Skip it only for changes that alter no behaviour (docs, comments, renames).
+Every code change gets a bug review before it is reported as done: a sub-agent that reads the change and looks for logic bugs, race conditions and drawing bugs. Passing tests are not the bar. Skip it only for changes that alter no behaviour (docs, comments, renames), or when the user says to skip it.
 
 1. **When.** After the tests pass and lint is clean, while the work is still uncommitted or at least unmerged, so what it finds can still change the design.
-2. **The brief.** The sub-agent cannot see the conversation, so write it a complete brief: the repository and how to run its tests, the problem, what changed and which files, and the exact behaviour to attack. Tell it to assume there are bugs; not to edit the repository, or run anything that changes the working tree (throwaway specs and scripts go under `/tmp`); and to prove findings by reproducing them against the real modules. Name decisions the user already approved, which it should challenge only with a concrete failure. Have it attack the tests too (a test can assert less than it claims, or pass without exercising what it names), and report ranked findings, with proven bugs apart from speculation, plus what it checked and found sound.
-3. **Acting on it.** Reproduce each finding, then fix it test-first (Prime Directive #1). A finding left unfixed goes in the rules file with why, and in the report to the user. Never drop one silently.
-4. **Again.** When its fixes add state or touch paths other features share, run another review aimed at those fixes. Repeat until a pass finds nothing new that matters.
+2. **The brief.** The sub-agent cannot see the conversation, so write it a complete brief: the repository and how to run its tests, the problem, what changed and which files, and what to look for:
+   - **Logic bugs:** a case the code gets wrong, a state it does not handle, a branch that does something other than what it says.
+   - **Race conditions:** what can happen between a read and its commit, events arriving in another order, something opening or closing part way through.
+   - **Drawing bugs:** what ends up on screen wrong, stale, misplaced or left behind.
+
+   Tell it not to edit the repository, or run anything that changes the working tree (throwaway specs and scripts go under `/tmp`), and to confirm what it finds by reproducing it against the real modules. Name decisions the user already approved, which it should not reopen. Have it check the tests too (a test can assert less than it claims, or pass without exercising what it names), and report ranked findings, with proven bugs apart from speculation, plus what it checked and found sound.
+3. **Acting on it.** Reproduce each finding and weigh it: a bug a player can hit gets fixed test-first (Prime Directive #1). A finding that needs something nobody has seen (an API raising, an order the client has never shown) is reported to the user, not built for. It is not our job to police what players do with the tools we give them. A finding left unfixed goes in the rules file with why, and in the report to the user. Never drop one silently.
+4. **Again.** When its fixes add state or touch paths other features share, run another review aimed at those fixes.
 5. **The report.** Tell the user what the reviews found, what changed because of them, and what was left and why.
 
-Mistake this rule comes from: the Pawn rewrite (#1209) passed 64 tests and a mutation run, and its first adversarial review found that Auto Sell could sell real upgrades, because an item Pawn had not answered about yet read as "not an upgrade". The second, aimed at that fix, found the fix left items unsold for a whole merchant visit, let Skip Recent Items act on a guess, and stopped Auto Sell for good on a broken Pawn. No test had looked there.
+Mistakes this rule comes from: the Pawn rewrite (#1209) passed 64 tests and a mutation run, and its first review found that Auto Sell could sell real upgrades, because an item Pawn had not answered about yet read as "not an upgrade". The second, aimed at that fix, found the fix left items unsold for a whole merchant visit, let Skip Recent Items act on a guess, and stopped Auto Sell for good on a broken Pawn. No test had looked there. And the other way: on the `auctionable` search field (#1243), four rounds of review built guards against a rule the player wrote themselves and an API raising, which nobody had seen, and the user had all of it removed ("our job isn't to police what user's do with the tools we give them, and hidden changes to logic like this are bad").
 
 
 ## Evidence

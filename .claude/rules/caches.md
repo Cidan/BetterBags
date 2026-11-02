@@ -43,7 +43,7 @@ item was read from:
 | Cold read | `harvestIncomplete` items are never kept |
 Refreshed on every kept item, computed exactly as a fresh read (`items:RefreshKeptItem`, also run
 by recalculations on every item still in its slot): new-item flag (`items:ClientNewItemFlag`),
-gear sets, quest state, tooltip text, whether it can be auctioned (`isAuctionable`, search-indexing.md §18), whether it can still be refunded (`itemInfo.refundable`,
+gear sets, quest state, tooltip text, whether it can be auctioned (`isAuctionable`, search-indexing.md §18; on Classic it reads the item's durability, so a repair shows once a recalculation or a read of its bag runs), whether it can still be refunded (`itemInfo.refundable`,
 automation.md §2), whether the character can use it, how many of its pet the
 account has and whether its appearance is collected (`items:RefreshCharacterState`,
 search-indexing.md §13, §14 and §17). Known staleness, the same as an unvisited bag: a refundable
@@ -227,7 +227,7 @@ value either drops the item's kept work (which marks it) or goes through `Update
 Checked against a clean rebuild by a randomized test and a per-field test.
 
 ### 7. Tooltip text (`TooltipScanner`, tooltip-scanning.md)
-Kept value: an item's tooltip text by GUID, and what its whole lines mark (toy, already known;
+Kept value: an item's tooltip text by GUID, and what its whole lines mark (toy, already known, and on Classic what keeps it off the auction house;
 search-indexing.md §12), kept and dropped together. Invalidated by `TOOLTIP_DATA_UPDATE` for the
 item's tooltip instance (bounded re-scans). Kept harvest slots and recalculations re-fetch it, so a
 re-scan lands; a resolution asks for a recalculation, not a read.

@@ -101,6 +101,7 @@ local function stubModules()
 
   local tooltipScanner = stubModule("TooltipScanner")
   override(tooltipScanner, "GetTooltipText", function() return "" end)
+  override(tooltipScanner, "RemoveFromCache", function() end)
 
   categories = stubModule("Categories")
   override(categories, "GetSortedSearchCategories", function() return {} end)
@@ -2267,19 +2268,188 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.are.same({}, search:Search("auctionable = true"))
       end)
 
-      for _, legacy in ipairs({ true, false }) do
-        it(legacy and "says nothing on the legacy auction house (Classic Era, TBC)" or "asks where the client is not on it", function()
-          override(_G, "IsUsingLegacyAuctionClient", function() return legacy end)
-          local slotInfo = refreshBackpack()
-          if legacy then
-            assert.is_nil(slotInfo.itemsBySlotKey["0_2"].isAuctionable)
-            assert.are.same({}, search:Search("auctionable = false"))
-          else
-            assert.is_false(slotInfo.itemsBySlotKey["0_2"].isAuctionable)
-            assert.are.same({ ["0_2"] = true }, search:Search("auctionable = false"))
-          end
+      it("asks the game where the client is not on the legacy auction house", function()
+        override(_G, "IsUsingLegacyAuctionClient", function() return false end)
+        local slotInfo = refreshBackpack()
+        assert.is_false(slotInfo.itemsBySlotKey["0_2"].isAuctionable)
+        assert.are.same({ ["0_2"] = true }, search:Search("auctionable = false"))
+      end)
+
+      it("goes by the game's answer alone there, whatever the item's tooltip says", function()
+        override(_G, "IsUsingLegacyAuctionClient", function() return false end)
+        override(addon:GetModule("TooltipScanner"), "GetTooltipText", function() return "Conjured", { conjured = true } end)
+        assert.is_true(refreshBackpack().itemsBySlotKey["0_1"].isAuctionable)
+      end)
+
+      -- Found by a bug review: only retail can replace a scan (TOOLTIP_DATA_UPDATE), so what was scanned before the item's
+      -- data loaded stood for the session, and a conjured item read as one that can be posted.
+      describe("a tooltip scanned before the item's data loaded", function()
+        local isRetail, scans, getItemInfo
+
+        before_each(function()
+          local scanner, cached = addon:GetModule("TooltipScanner"), {}
+          isRetail = addon.isRetail
+          scans, getItemInfo = 0, _G.C_Item.GetItemInfo
+          -- As the scanner: scanned once by GUID until forgotten.
+          override(scanner, "GetTooltipText", function(_, _, _, guid)
+            if not cached[guid] then
+              scans = scans + 1
+              cached[guid] = "Retrieving item information"
+            end
+            return cached[guid]
+          end)
+          override(scanner, "RemoveFromCache", function(_, guid) cached[guid] = nil end)
         end)
-      end
+
+        after_each(function()
+          addon.isRetail = isRetail
+        end)
+
+        local function readCold()
+          override(_G.C_Item, "GetItemInfo", function() return nil end)
+          refreshBackpack()
+          override(_G.C_Item, "GetItemInfo", getItemInfo)
+        end
+
+        it("is scanned again on Classic once the item is read with its data", function()
+          addon.isRetail = false
+          readCold()
+          local cold = scans
+          assert.is_true(cold > 0)
+          refreshBackpack({ bags = { [0] = true } })
+          assert.is_true(scans > cold, "not kept from the scan before the data loaded")
+        end)
+
+        it("stays cached once read with its data", function()
+          addon.isRetail = false
+          refreshBackpack({ wipe = true })
+          local warm = scans
+          assert.is_true(warm > 0)
+          refreshBackpack({ wipe = true })
+          assert.are.equal(warm, scans)
+        end)
+
+        it("is left to TOOLTIP_DATA_UPDATE on retail", function()
+          addon.isRetail = true
+          readCold()
+          local cold = scans
+          assert.is_true(cold > 0)
+          refreshBackpack({ bags = { [0] = true } })
+          assert.are.equal(cold, scans)
+        end)
+      end)
+
+      -- The client has no check there (a /run on Classic Era and TBC: nothing for a hearthstone, another item or an
+      -- empty bag), so the answer comes from the reasons the game refuses a listing (Enum.AuctionHouseError).
+      describe("on the legacy auction house (Classic Era, TBC)", function()
+        local asked, durability, marks, bound, quests
+
+        before_each(function()
+          asked, durability, marks, bound, quests = 0, {}, {}, {}, {}
+          override(_G, "IsUsingLegacyAuctionClient", function() return true end)
+          override(_G, "C_AuctionHouse", { IsSellItemValid = function()
+            asked = asked + 1
+            return false
+          end })
+          override(_G.C_Item, "IsBound", function(location)
+            local _, slot = location:GetBagAndSlot()
+            return bound[slot] == true
+          end)
+          override(_G.C_Container, "GetContainerItemQuestInfo", function(_, slot)
+            return { isQuestItem = quests[slot] == true, isActive = false }
+          end)
+          -- A bound item's read asks whether it can be refunded (MayReturnNothing, ContainerDocumentation.lua).
+          override(_G.C_Container, "GetContainerItemPurchaseInfo", function() return nil end)
+          override(_G.C_Container, "GetContainerItemDurability", function(_, slot)
+            if durability[slot] then return durability[slot][1], durability[slot][2] end
+          end)
+          override(addon:GetModule("TooltipScanner"), "GetTooltipText", function(_, _, slot)
+            return marks[slot] and "marked" or "", marks[slot]
+          end)
+          local list = {}
+          for slot = 1, 8 do list[slot] = { itemID = 100 + slot, guid = "guid-" .. slot, count = 1 } end
+          mockContainer[0] = list
+        end)
+
+        it("says no for each reason the game refuses a listing, and yes for the rest", function()
+          bound[2], quests[3] = true, true
+          durability[4], durability[8] = { 5, 100 }, { 100, 100 }
+          marks[5], marks[6], marks[7] = { conjured = true }, { limited = true }, { wrapped = true }
+          local got = refreshBackpack().itemsBySlotKey
+          assert.is_true(got["0_1"].isAuctionable, "nothing against it")
+          assert.is_false(got["0_2"].isAuctionable, "bound")
+          assert.is_false(got["0_3"].isAuctionable, "a quest item")
+          assert.is_false(got["0_4"].isAuctionable, "damaged")
+          assert.is_false(got["0_5"].isAuctionable, "conjured")
+          assert.is_false(got["0_6"].isAuctionable, "limited duration")
+          assert.is_false(got["0_7"].isAuctionable, "a wrapped gift")
+          assert.is_true(got["0_8"].isAuctionable, "at full durability")
+          assert.are.equal(0, asked, "the game has nothing to ask")
+          assert.are.same({ ["0_1"] = true, ["0_8"] = true }, search:Search("auctionable = true"))
+          assert.are.same({ ["0_2"] = true, ["0_3"] = true, ["0_4"] = true, ["0_5"] = true, ["0_6"] = true,
+            ["0_7"] = true }, search:Search("auctionable = false"))
+        end)
+
+        it("reads the marks the search index's scan left, asking for no tooltip of its own", function()
+          marks[1] = { conjured = true }
+          local item = refreshBackpack().itemsBySlotKey["0_1"]
+          local scans = 0
+          override(addon:GetModule("TooltipScanner"), "GetTooltipText", function()
+            scans = scans + 1
+          end)
+          assert.is_false(items:AuctionableOf(item))
+          assert.are.equal(0, scans)
+        end)
+
+        it("reads a kept item's new state in the same pass", function()
+          local kept = refreshBackpack().itemsBySlotKey["0_1"]
+          assert.is_true(kept.isAuctionable)
+          quests[1] = true
+          refreshBackpack({ derive = true, categoriesUnchanged = true })
+          assert.is_false(kept.isAuctionable, "a quest item now")
+          quests[1], marks[1] = false, { conjured = true }
+          refreshBackpack({ derive = true, categoriesUnchanged = true })
+          assert.is_false(kept.isAuctionable, "its tooltip's marks now")
+        end)
+
+        it("says yes for what it cannot see: a lockbox or clam", function()
+          mockContainer[0][1].info = { hasLoot = true }
+          assert.is_true(refreshBackpack().itemsBySlotKey["0_1"].isAuctionable)
+        end)
+
+        it("follows a repair on a kept item", function()
+          durability[1] = { 5, 100 }
+          local kept = refreshBackpack().itemsBySlotKey["0_1"]
+          assert.is_false(kept.isAuctionable)
+          durability[1] = { 100, 100 }
+          local got = refreshBackpack({ derive = true, categoriesUnchanged = true }).itemsBySlotKey
+          assert.are.equal(kept, got["0_1"])
+          assert.is_true(kept.isAuctionable)
+          assert.is_true(search:Search("auctionable = true")["0_1"])
+        end)
+
+        it("says nothing before the item's data has loaded", function()
+          local getItemInfo = _G.C_Item.GetItemInfo
+          override(_G.C_Item, "GetItemInfo", function() return nil end)
+          local got = refreshBackpack().itemsBySlotKey
+          override(_G.C_Item, "GetItemInfo", getItemInfo)
+          assert.is_nil(got["0_1"].isAuctionable)
+        end)
+
+        it("dims what it says no about at the Auction House", function()
+          override(_G, "ItemButtonUtil", {
+            ItemContextMatchResult = { Match = 1, Mismatch = 2, DoesNotApply = 3 },
+            GetItemContext = function() return nil end,
+            GetItemContextMatchResultForItem = function() return 3 end,
+          })
+          bound[2] = true
+          addon.atAuctionHouse = true
+          local got = refreshBackpack({ wipe = true }).itemsBySlotKey
+          addon.atAuctionHouse = nil
+          assert.are.equal(2, got["0_2"].itemContextMatchResult)
+          assert.are.equal(3, got["0_1"].itemContextMatchResult, "what it says yes about is left alone")
+        end)
+      end)
 
       it("says nothing on a client without the check", function()
         override(_G, "C_AuctionHouse", nil)
@@ -2354,7 +2524,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         end)
 
         it("dims nothing it has no answer for", function()
-          override(_G, "IsUsingLegacyAuctionClient", function() return true end)
+          override(_G, "C_AuctionHouse", nil)
           addon.atAuctionHouse = true
           refreshBackpack()
           assert.are.equal(DOES_NOT_APPLY, dim("0_2"))

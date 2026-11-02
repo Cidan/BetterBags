@@ -121,4 +121,8 @@ Besides the joined text, each scan notes the whole left lines equal to `TOY` ("T
 (`self.marks`, kept 1:1 with `cache`: `RemoveFromCache` and `ClearCache` drop both) and returned as
 the second value of `GetTooltipText`, `GetGuildBankItemText` and `GetMerchantItemText`. A
 resolution re-scan replaces both. They feed the `toy` and `known` search fields
-(search-indexing.md §12). Coverage: `spec/tooltip_spec.lua` ("line marks").
+(search-indexing.md §12). A bag slot's Classic scan also marks `conjured` (`ITEM_CONJURED`), `limited` (`ITEM_DURATION_*`) and `wrapped` (`ITEM_WRAPPED_BY`), for the legacy auction house's answer (search-indexing.md §18), matched by a pattern made from each client's string, whose wording and word order differ by locale (`linePattern`: colors, `|4` plurals, frFR's `|2` article, positional arguments); retail's scan leaves them out, since its client answers for itself. Coverage: `spec/tooltip_spec.lua` ("line marks").
+
+## 6. A scan made before the item's data loaded
+
+Off retail nothing can replace a cached scan (no `TOOLTIP_DATA_UPDATE`), so `AttachItemInfo` drops one made during a cold read (`props.incomplete`), and the item's next read scans again: its bag read again, or a recalculation, which re-reads a cold item. Nothing off retail asks for that read when the data arrives. Retail keeps its path above. **Left as it is:** the guild bank's scan (`GetGuildBankItemText`) has the same gap on TBC and Mists, for a tab read after its load timeout; it costs that stack's tooltip search for the session, and it predates this. Coverage: `spec/refresh_pipeline_spec.lua` ("a tooltip scanned before the item's data loaded").
