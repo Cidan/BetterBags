@@ -43,7 +43,7 @@ item was read from:
 | Cold read | `harvestIncomplete` items are never kept |
 Refreshed on every kept item, computed exactly as a fresh read (`items:RefreshKeptItem`, also run
 by recalculations on every item still in its slot): new-item flag (`items:ClientNewItemFlag`),
-gear sets, quest state, tooltip text, whether it can be auctioned (`isAuctionable`, search-indexing.md §18; also asked again on `UPDATE_INVENTORY_DURABILITY`, its fires kept only out of combat or at an interaction window), whether it can still be refunded (`itemInfo.refundable`,
+gear sets, quest state, tooltip text, whether it can be auctioned (`isAuctionable`, search-indexing.md §18), whether it can still be refunded (`itemInfo.refundable`,
 automation.md §2), whether the character can use it, how many of its pet the
 account has and whether its appearance is collected (`items:RefreshCharacterState`,
 search-indexing.md §13, §14 and §17). Known staleness, the same as an unvisited bag: a refundable

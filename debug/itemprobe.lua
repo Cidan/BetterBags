@@ -259,15 +259,13 @@ function itemProbe:Sample()
   ---@class Constants: AceModule
   local const = addon:GetModule('Constants')
   local transmog, pets, info = _G.C_TransmogCollection, _G.C_PetJournal, _G.C_PlayerInfo
-  local sample = { player = characterValues(false), usable = {}, auctionable = {}, appearances = {}, pets = {} }
+  local sample = { player = characterValues(false), usable = {}, appearances = {}, pets = {} }
   for bag in pairs(const.BACKPACK_BAGS) do
     for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
       local itemID = C_Container.GetContainerItemID(bag, slot)
       if itemID ~= nil and sample.usable[itemID] == nil then
         local usable = ask(field(info, "CanUseItem"), itemID)
         sample.usable[itemID] = usable and usable[1]
-        local auctionable = ask(field(_G.C_AuctionHouse, "IsSellItemValid"), ItemLocation:CreateFromBagAndSlot(bag, slot), false)
-        sample.auctionable[itemID] = auctionable and auctionable[1]
         local link = C_Container.GetContainerItemLink(bag, slot)
         local appearance = ask(field(transmog, "GetItemInfo"), link)
         local source = appearance and appearance[2]

@@ -2287,40 +2287,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.is_nil(slotInfo.itemsBySlotKey["0_1"].isAuctionable)
       end)
 
-      -- Whether it raises for a bank slot, or on a client not checked yet, is not known, and a raise here would commit
-      -- nothing of the whole read.
-      it("says nothing when the check raises, and the read still commits", function()
-        local api = _G.C_AuctionHouse
-        override(_G, "C_AuctionHouse", { IsSellItemValid = function() error("bad argument") end })
-        local slotInfo = refreshBackpack()
-        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].isAuctionable)
-        assert.is_true(slotInfo.itemsBySlotKey["0_1"].auctionRaised)
-        override(_G, "C_AuctionHouse", api)
-        slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
-        assert.is_true(slotInfo.itemsBySlotKey["0_1"].isAuctionable)
-        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].auctionRaised, "cleared once it answers")
-      end)
-
-      it("marks nothing where the client simply cannot answer", function()
-        override(_G, "IsUsingLegacyAuctionClient", function() return true end)
-        local slotInfo = refreshBackpack()
-        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].isAuctionable)
-        assert.is_nil(slotInfo.itemsBySlotKey["0_1"].auctionRaised)
-      end)
-
-      -- Found by an adversarial review: a higher category can hold an item by its answer (auctionable = true), so
-      -- losing the answer passed it down to one that sells poor items, and Auto Sell sold it.
-      it("keeps a kept item's answer through a check that raises", function()
-        local kept = refreshBackpack().itemsBySlotKey["0_2"]
-        assert.is_false(kept.isAuctionable)
-        override(_G, "C_AuctionHouse", { IsSellItemValid = function() error("bad argument") end })
-        local slotInfo = refreshBackpack({ derive = true, categoriesUnchanged = true })
-        assert.are.equal(kept, slotInfo.itemsBySlotKey["0_2"])
-        assert.is_false(kept.isAuctionable)
-        assert.is_true(kept.auctionRaised)
-        assert.are.same({ ["0_2"] = true }, search:Search("auctionable = false"))
-      end)
-
       it("says nothing about an emptied slot, whatever the client would say", function()
         local item = refreshBackpack().itemsBySlotKey["0_2"]
         override(_G, "C_AuctionHouse", { IsSellItemValid = function() return false end })
@@ -2420,70 +2386,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         end)
       end)
 
-      describe("what it follows", function()
-        local buckets, filters, sent
-
-        before_each(function()
-          buckets, filters, sent = {}, {}, {}
-          override(events, "RegisterEvent", function() end)
-          override(events, "BucketEvent", function(_, name, cb, filter)
-            buckets[name], filters[name] = cb, filter
-          end)
-          local send = events.SendMessage
-          override(events, "SendMessage", function(self, ctx, event, ...)
-            if event == "bags/Rederive" then table.insert(sent, (...)) end
-            return send(self, ctx, event, ...)
-          end)
-          items:RegisterCacheEvents()
-        end)
-
-        it("recalculates the bags when an answer changes, and only then", function()
-          refreshBackpack()
-          buckets.SPELLS_CHANGED(context:New("evt"), {})
-          assert.are.same({}, sent, "nothing changed")
-          _G._unauctionableLocations = {}
-          buckets.SPELLS_CHANGED(context:New("evt"), {})
-          assert.are.equal(1, #sent)
-          assert.is_true(sent[1].backpack)
-        end)
-
-        -- Found by an adversarial review: without it a repaired item stayed in a sale's offer until the window closed.
-        it("recalculates the bags when a repair changes an answer", function()
-          refreshBackpack()
-          _G._unauctionableLocations = {}
-          items._petJournalLoaded = false
-          buckets.UPDATE_INVENTORY_DURABILITY(context:New("evt"), {})
-          assert.are.equal(1, #sent)
-          assert.is_true(sent[1].backpack)
-          assert.is_false(items._petJournalLoaded, "says nothing about the pet journal")
-        end)
-
-        -- Worn gear wears down all through a fight, and each flush asks about every item.
-        it("leaves durability alone in combat", function()
-          local combat = false
-          override(_G, "InCombatLockdown", function() return combat end)
-          assert.is_true(filters.UPDATE_INVENTORY_DURABILITY("UPDATE_INVENTORY_DURABILITY"))
-          combat = true
-          assert.is_false(filters.UPDATE_INVENTORY_DURABILITY("UPDATE_INVENTORY_DURABILITY"))
-          assert.is_nil(filters.SPELLS_CHANGED, "what the character can use follows spells in combat too")
-          -- Found by an adversarial review: nothing asks again when combat ends, and a sale may be waiting.
-          local interacting = addon.atInteracting
-          addon.atInteracting = true
-          local atMerchant = filters.UPDATE_INVENTORY_DURABILITY("UPDATE_INVENTORY_DURABILITY")
-          addon.atInteracting = interacting
-          assert.is_true(atMerchant, "a repair at a merchant")
-        end)
-
-        -- Found by an adversarial review: no answer read as a changed answer, and the recalculation that asked for
-        -- raised in GetItemGUID on the emptied slot (refresh-scheduler.md §10).
-        it("takes a slot emptied with no read on its way as no change", function()
-          local slotInfo = refreshBackpack()
-          assert.is_not_nil(slotInfo.itemsBySlotKey["0_2"])
-          mockContainer[0][2] = nil
-          assert.has_no.errors(function() buckets.SPELLS_CHANGED(context:New("evt"), {}) end)
-          assert.are.same({}, sent)
-        end)
-      end)
     end)
 
     -- Pet counts follow the account. Nothing is asked before the pet journal has loaded (a login
@@ -2691,19 +2593,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.are.same({}, sent)
       end)
 
-      -- Found by an adversarial review: a slot the client has changed answers for what is in it now, which differs
-      -- from the committed item, so every sale asked for a recalculation that changed nothing.
-      it("asks nothing about a bag whose read is on its way, and asks again once it is read", function()
-        refreshBackpack()
-        items:MarkBagUnread(0)
-        can[101] = true
-        buckets.SPELLS_CHANGED(context:New("evt"), {})
-        assert.are.same({}, sent)
-        refreshBackpack({ bags = { [0] = true } })
-        can[101] = false
-        buckets.SPELLS_CHANGED(context:New("evt"), {})
-        assert.are.equal(1, #sent)
-      end)
     end)
 
     it("gives every item the plain name of its bag, for the bagname field", function()
@@ -4014,23 +3903,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal("Recent Items", categoryOf(slotInfo, "0_2"), "another category's item stays recent")
       slotInfo = refreshBackpack()
       assert.equal("Ore", categoryOf(slotInfo, "0_1"), "and on the next read")
-    end)
-
-    -- Found by an adversarial review: a rule can take an item read before its data loaded (NOT auctionable = true,
-    -- which has no answer yet), and what this ends cannot be given back once the read says otherwise.
-    it("leaves an item read before its data loaded in Recent Items, and skips it once read", function()
-      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
-      newSlots["0_1"] = true
-      local getItemInfo = _G.C_Item.GetItemInfo
-      override(_G.C_Item, "GetItemInfo", function() return nil end)
-      local slotInfo = refreshBackpack({ wipe = true })
-      override(_G.C_Item, "GetItemInfo", getItemInfo)
-      assert.is_true(slotInfo.itemsBySlotKey["0_1"].harvestIncomplete)
-      assert.is_true(items:IsNewItem(slotInfo.itemsBySlotKey["0_1"]), "not ended on a guess")
-      assert.is_true(newSlots["0_1"])
-      slotInfo = refreshBackpack({ bags = { [0] = true } })
-      assert.is_false(items:IsNewItem(slotInfo.itemsBySlotKey["0_1"]))
-      assert.is_nil(newSlots["0_1"])
     end)
 
     it("unmarks an item looted later, and follows the setting", function()

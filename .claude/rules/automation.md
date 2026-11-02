@@ -42,8 +42,7 @@ Vendor rule.
   matches by the item. Search categories count; `GetCategory` already honors each category's bags.
 - **Left alone, with why** (`BlockedReason`): an item read before its data loaded (its category may be
   wrong), an item whose upgrade state its provider cannot tell yet (`upgradeUnknown`: a rule on the `upgrade`
-  field could take it either way, caches.md §2a), an item its category's rule takes only for lack of an answer
-  (a rule negating `auctionable` on a client that cannot say, search-indexing.md §18), an item the check for that raised about (`auctionRaised`), an item in an equipment set, a purchase that can still be refunded (`itemInfo.refundable`;
+  field could take it either way, caches.md §2a), an item in an equipment set, a purchase that can still be refunded (`itemInfo.refundable`;
   Blizzard asks before refunding, `ContainerFrame_GetExtendedPriceString`, and selling it directly would
   skip that), and, to sell, one merchants do not buy (`hasNoValue`).
 - **Decided from the bags' last read alone; the client is asked only when acting.** Everything above

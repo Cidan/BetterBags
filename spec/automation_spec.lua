@@ -19,7 +19,6 @@ local events = StubBetterBagsModule("Events")
 ResetModuleStub("Seller", "data/seller.lua")
 LoadBetterBagsModule("data/seller.lua")
 local seller = addon:GetModule("Seller")
-if not addon:GetModule("QueryParser", true) then LoadBetterBagsModule("util/query.lua") end
 ResetModuleStub("Automation", "data/automation.lua")
 LoadBetterBagsModule("data/automation.lua")
 local automation = addon:GetModule("Automation")
@@ -28,7 +27,7 @@ local BACKPACK = 0
 
 describe("Automation", function()
   local saved, slots, actions, ofCategory, timers, printed, used, picked, deleted, cursor, shift, combat
-  local buys, refundable, registered, asked, messages, confirms, rules
+  local buys, refundable, registered, asked, messages, confirms
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, rawget(tbl, key) })
@@ -48,8 +47,6 @@ describe("Automation", function()
       bagid = bag, slotid = slot, slotkey = key, kind = BACKPACK, isItemEmpty = false,
       harvestIncomplete = extra.cold,
       upgradeUnknown = extra.upgradeUnknown,
-      isAuctionable = extra.auctionable,
-      auctionRaised = extra.auctionRaised,
       itemInfo = { itemID = id, itemGUID = "guid-" .. key, itemLink = "[Item " .. id .. "]", sellPrice = 5,
         traits = { sellPrice = extra.price or 100 }, equipmentSets = extra.sets, refundable = extra.refundable == true },
       containerInfo = { hasNoValue = extra.noValue == true, stackCount = extra.count or 1 },
@@ -82,7 +79,6 @@ describe("Automation", function()
     actions = { Junk = "sell", Trash = "destroy", Mats = nil }
     -- Which categories confirm their sale in BetterBags Next's dock: none here, so a sale sells at once.
     confirms = {}
-    rules = {}
     cursor, shift, combat, buys, refundable, registered = false, false, false, true, {}, {}
     messages = {}
     automation:Init()
@@ -99,7 +95,6 @@ describe("Automation", function()
     end)
     override(categories, "AutomationOf", function(_, name) return actions[name] end)
     override(categories, "ConfirmsSaleOf", function(_, name) return confirms[name] == true end)
-    override(categories, "RuleNamed", function(_, name) return rules[name] end)
     -- Both Automation and the seller listen to merchants: registered fires every listener.
     local listeners = {}
     override(events, "RegisterEvent", function(_, name, fn)
@@ -250,56 +245,6 @@ describe("Automation", function()
       assert.are.same({ "0_3" }, keysOf(automation:SellList(ctx())))
       assert.are.same({}, keysOf(automation:DestroyQueue(ctx())))
       assert.are.same({ "0_3" }, keysOf(automation:SellList(ctx(), { a, c })))
-    end)
-
-    -- Found by an adversarial review: a client that cannot say whether an item can be auctioned (Classic Era, TBC)
-    -- answers nothing about any item, so NOT auctionable = true on Auto Sell sold everything in the bags.
-    describe("a rule that negates what the client cannot answer", function()
-      local function keysOf(list)
-        local keys = {}
-        for i, e in ipairs(list) do keys[i] = e.data.slotkey end
-        return keys
-      end
-
-      it("leaves the item alone, to sell and to destroy", function()
-        rules.Junk, rules.Trash = "NOT auctionable = true", "ah != true"
-        local a = put(0, 1, 11, "Junk")
-        local b = put(0, 2, 12, "Trash", { noValue = true })
-        assert.truthy(automation:BlockedReason(a, automation.SELL, "Junk"):find("auction", 1, true))
-        assert.truthy(automation:BlockedReason(b, automation.DESTROY, "Trash"):find("auction", 1, true))
-        assert.are.same({}, keysOf(automation:SellList(ctx())))
-        assert.are.same({}, keysOf(automation:DestroyQueue(ctx())))
-        assert.are.same({}, keysOf(automation:SellList(ctx(), { a })))
-      end)
-
-      -- Found by an adversarial review: a new read has no last answer, so a check that raised passed the item down from
-      -- a category holding it by auctionable = true to one whose rule never reads the field, and Auto Sell sold it.
-      it("leaves alone an item the check raised about, whatever the rule reads", function()
-        local a = put(0, 1, 11, "Junk", { auctionRaised = true })
-        local b = put(0, 2, 12, "Trash", { auctionRaised = true, auctionable = false, noValue = true })
-        assert.truthy(automation:BlockedReason(a, automation.SELL, "Junk"):find("auction", 1, true))
-        assert.truthy(automation:BlockedReason(b, automation.DESTROY, "Trash"):find("auction", 1, true))
-        assert.are.same({}, keysOf(automation:SellList(ctx())))
-        assert.are.same({}, keysOf(automation:DestroyQueue(ctx())))
-      end)
-
-      it("acts on it where the client answers", function()
-        rules.Junk = "NOT auctionable = true"
-        put(0, 1, 11, "Junk", { auctionable = false })
-        put(0, 2, 12, "Junk", { auctionable = true })
-        assert.are.same({ "0_1", "0_2" }, keysOf(automation:SellList(ctx())))
-      end)
-
-      it("still acts on it under a rule no missing answer can decide", function()
-        rules.Junk = "rarity = poor OR auctionable = false"
-        put(0, 1, 11, "Junk")
-        assert.are.same({ "0_1" }, keysOf(automation:SellList(ctx())))
-      end)
-
-      it("still acts on it in a category with no rule", function()
-        put(0, 1, 11, "Junk")
-        assert.are.same({ "0_1" }, keysOf(automation:SellList(ctx())))
-      end)
     end)
 
     it("says why it leaves an item alone", function()

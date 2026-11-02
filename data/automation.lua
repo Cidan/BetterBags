@@ -12,9 +12,6 @@ local context = addon:GetModule('Context')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
----@class QueryParser: AceModule
-local QueryParser = addon:GetModule('QueryParser')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -84,37 +81,20 @@ local function priceOf(data)
   return (traits and traits.sellPrice) or data.itemInfo.sellPrice or 0
 end
 
--- What a rule calls whether an item can be auctioned (data/search.lua).
-local AUCTIONABLE = { auctionable = true, ah = true }
-
 -- BlockedReason says why automation leaves an item alone, or nil: an item whose data has not
 -- loaded (its category may be wrong), one in an equipment set, a purchase that can still be
--- refunded, one its category's rule takes only for lack of an answer, and, to sell, one merchants
--- do not buy. It reads only the item as the bags last read it: the client may have changed the slot
--- since (a sale empties slots before the bags are read again), so what is still there is asked only
--- when acting (StillThere).
+-- refunded, and, to sell, one merchants do not buy. It reads only the item as the bags last read it:
+-- the client may have changed the slot since (a sale empties slots before the bags are read again),
+-- so what is still there is asked only when acting (StillThere).
 ---@param data ItemData
 ---@param action string
----@param category? string
 ---@return string?
-function automation:BlockedReason(data, action, category)
+function automation:BlockedReason(data, action)
   if data.harvestIncomplete then
     return L:G("Its item data has not loaded yet.")
   end
   if data.upgradeUnknown then
     return L:G("Whether it is an upgrade is not known yet.")
-  end
-  -- The check raised: a category may have held the item by its answer, so where it landed is a guess.
-  if data.auctionRaised then
-    return L:G("The game could not say whether it can be auctioned.")
-  end
-  -- A client that cannot say whether an item can be auctioned (Classic Era, TBC) has no answer for any item, so a rule
-  -- negating the field would take everything in the bags.
-  if data.isAuctionable == nil then
-    local rule = categories:RuleNamed(category)
-    if rule and QueryParser:NegatesField(rule, AUCTIONABLE) then
-      return L:G("Whether it can be auctioned is not known here.")
-    end
   end
   if data.itemInfo.equipmentSets and data.itemInfo.equipmentSets[1] ~= nil then
     return L:G("It is in an equipment set.")
@@ -147,7 +127,7 @@ function automation:Entries(ctx, only)
       local action = categories:AutomationOf(category)
       if action then
         table.insert(list, { data = data, category = category, action = action,
-          blocked = self:BlockedReason(data, action, category) })
+          blocked = self:BlockedReason(data, action) })
       end
     end
   end

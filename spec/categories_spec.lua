@@ -625,18 +625,6 @@ describe("Categories", function()
       assert.is_nil(categories:AutomationOf("Armor"), "a built-in category has none")
     end)
 
-    it("names a category's rule, a group by's sections as their category does", function()
-      local ctx = context:New("Test")
-      dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, searchCategory = { query = " type = ore " } }
-      dbCategories["Mats"] = { name = "Mats", itemList = {}, save = true }
-      categories:CreateCategory(ctx, { name = "Ore - Copper", itemList = {}, dynamic = true,
-        isGroupBySubcategory = true, groupByParent = "Ore" })
-      assert.are.equal("type = ore", categories:RuleNamed("Ore"))
-      assert.are.equal("type = ore", categories:RuleNamed("Ore - Copper"))
-      assert.is_nil(categories:RuleNamed("Mats"))
-      assert.is_nil(categories:RuleNamed("Armor"), "a built-in category has none")
-    end)
-
     it("skips Recent Items when turned on, a group by's sections as their category does", function()
       local ctx = context:New("Test")
       dbCategories["Ore"] = { name = "Ore", itemList = {}, save = true, skipRecent = true }

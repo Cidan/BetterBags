@@ -492,15 +492,6 @@ function items:RegisterCacheEvents()
       end)
     end
   end
-  -- What can be auctioned follows a repair. Worn gear wears down all through a fight, and each flush asks about every
-  -- item: not in combat, unless at a window that repairs.
-  if isEventValid('UPDATE_INVENTORY_DURABILITY') then
-    events:BucketEvent('UPDATE_INVENTORY_DURABILITY', function()
-      self:OnCharacterStateChanged(false)
-    end, function()
-      return addon.atInteracting == true or not InCombatLockdown()
-    end)
-  end
 end
 
 ---@param data ItemData
@@ -1595,10 +1586,9 @@ end
 ---@param category string
 ---@return boolean
 function items:SkipRecent(ctx, item, category)
-  -- Not on a guess: a rule can take an item with no upgrade state yet (NOT upgrade = true), or one read before its data
-  -- loaded (NOT auctionable = true), and what this ends cannot be given back when the answer says otherwise.
-  if item.upgradeUnknown or item.harvestIncomplete or not (item.stackRecent or self:IsNewItem(item))
-    or not categories:SkipsRecentOf(category) then
+  -- Not on a guess: a rule can take an item with no upgrade state yet (NOT upgrade = true), and what this
+  -- ends cannot be given back when the answer says otherwise.
+  if item.upgradeUnknown or not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category) then
     return false
   end
   item.stackRecent = nil
@@ -3330,11 +3320,9 @@ local auctionLocation
 -- the Auction House closed (a /run on retail 12.1.5, not opened that session: bound items no, unbound yes), told not
 -- to show an error. Nil where nothing can say: a client on the legacy auction house (Classic Era, TBC), which Blizzard
 -- never asks (ContainerFrame_Shared.lua); a guild bank slot, which has no item location; a slot emptied since it was
--- read, which Blizzard's container and Auction House frames check for first. Protected: whether it raises for a bank
--- slot, or on a client not checked yet, is not known, and a raise would commit nothing of the whole read. Its second
--- return says it raised: an answer was due and did not come.
+-- read, which Blizzard's container and Auction House frames check for first.
 ---@param item ItemData
----@return boolean?, boolean?
+---@return boolean?
 function items:AuctionableOf(item)
   local api, legacy = _G.C_AuctionHouse, _G.IsUsingLegacyAuctionClient
   if api == nil or api.IsSellItemValid == nil or (legacy ~= nil and legacy()) or guildTabOf(item.bagid) then
@@ -3348,11 +3336,7 @@ function items:AuctionableOf(item)
   if not auctionLocation:IsValid() then
     return nil
   end
-  local ok, valid = pcall(api.IsSellItemValid, auctionLocation, false)
-  if ok then
-    return valid
-  end
-  return nil, true
+  return api.IsSellItemValid(auctionLocation, false)
 end
 
 -- ReadCharacterState reads what changes without the slot changing, rather than what the item is:
@@ -3364,13 +3348,7 @@ function items:ReadCharacterState(item)
   item.isUsable = self:CanUseItem(item.itemInfo.itemID)
   item.petOwned, item.petLimit = self:PetCountsOf(traits.petSpeciesID)
   item.appearanceKnown, item.sourceKnown = self:AppearanceStateOf(traits, item.itemInfo.itemLink)
-  -- No answer keeps the last one: a category can hold the item by it (auctionable = true), and losing it would pass the
-  -- item down to the next, which may sell it.
-  local auctionable, raised = self:AuctionableOf(item)
-  if auctionable ~= nil then
-    item.isAuctionable = auctionable
-  end
-  item.auctionRaised = raised
+  item.isAuctionable = self:AuctionableOf(item)
 end
 
 -- RefreshCharacterState reads a kept item's character state again (a kept item was read with its
@@ -3398,12 +3376,6 @@ end
 ---@return boolean
 function items:CharacterStateChanged(item)
   if self:CanUseItem(item.itemInfo.itemID) ~= item.isUsable then
-    return true
-  end
-  -- No answer is no change: a slot emptied with no read on its way says nothing about the item that was there, and the
-  -- recalculation it would ask for raises in GetItemGUID (refresh-scheduler.md §10).
-  local auctionable = self:AuctionableOf(item)
-  if auctionable ~= nil and auctionable ~= item.isAuctionable then
     return true
   end
   local traits = item.itemInfo.traits
@@ -3444,9 +3416,7 @@ function items:OnCharacterStateChanged(petJournal)
     local slotInfo = self.slotInfo[kind]
     if open and not firstLoad and slotInfo then
       for _, item in pairs(slotInfo.itemsBySlotKey) do
-        -- A bag the client changed answers for what is in its slots now; its read is on its way.
-        if not item.isItemEmpty and item.itemInfo.traits and self._unreadBags[item.bagid] == nil
-          and self:CharacterStateChanged(item) then
+        if not item.isItemEmpty and item.itemInfo.traits and self:CharacterStateChanged(item) then
           options[name], changed = true, true
           break
         end

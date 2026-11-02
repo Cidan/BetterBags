@@ -128,9 +128,7 @@ function addon.CloseInteractionWindow(ctx, _, interactionType)
   debug:Log("Interaction", "CloseInteractionWindow", interactionType)
   addon.atInteracting = false
   addon.atWarbank = false
-  if interactionType == Enum.PlayerInteractionType.Auctioneer then
-    addon.atAuctionHouse = false
-  end
+  addon.atAuctionHouse = false
   addon.backpackShouldClose = true
   events:SendMessage(ctx, 'bags/Rederive', interactionRecalculation())
   events:SendMessageLater(ctx, 'bags/OpenClose')

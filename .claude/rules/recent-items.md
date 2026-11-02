@@ -90,7 +90,7 @@ leaves on the following close once it is old enough.
   mark (so the next read does not start a timer again), and its glow goes. Rules are matched against an
   item's own category without Recent Items (data-loader.md §8), so a category whose rule takes items by
   their category (`category = "junk"`) skips them while they are new too; it did not at first
-  (reported on WoW: Forever). An item read before its data loaded is left alone until it is read: its category is a guess, and ending its recency cannot be undone. A virtual stack whose category skips them is no longer recent (`stackRecent`: every pile of a
+  (reported on WoW: Forever). A virtual stack whose category skips them is no longer recent (`stackRecent`: every pile of a
   stack is the same item). Not while its upgrade state is not known (`upgradeUnknown`, caches.md §2a): a rule
   `NOT upgrade = true` takes such an item, and ending its timer and the client's mark cannot be undone when the
   answer says it is an upgrade. Turned on, the bags are recalculated, so items already in Recent Items leave

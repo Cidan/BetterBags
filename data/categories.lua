@@ -665,18 +665,6 @@ function categories:AutomationOf(name)
   return filter and filter.automation or nil
 end
 
--- RuleNamed returns a category's rule by the category's name (a group by's sections as their
--- category), or nil: none, or a built-in category.
----@param name string
----@return string?
-function categories:RuleNamed(name)
-  local filter = self:GetCategoryByName(name)
-  if filter and filter.isGroupBySubcategory and filter.groupByParent then
-    filter = self:GetCategoryByName(filter.groupByParent)
-  end
-  return self:RuleOf(filter)
-end
-
 -- SkipsRecentOf says whether a category's items skip Recent Items (Skip Recent Items; a group by's
 -- sections as their category). A built-in category does not.
 ---@param name string
