@@ -665,8 +665,7 @@ function guildProto:OnHeaderEnter(section)
   GameTooltip:SetOwner(section.header, "ANCHOR_RIGHT")
   GameTooltip:SetText(section.name, 1, 1, 1, 1, true)
   if section.kind == "category" then
-    GameTooltip:AddLine(self.content:CanReorder() and L:G("Drag to reorder, or onto the backpack to take it out.")
-      or L:G("Drag onto the backpack to take it out."), 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(L:G("Drag to reorder, or onto the backpack to take it out."), 0.8, 0.8, 0.8, true)
   end
   if section.kind ~= "free" then
     GameTooltip:AddLine(L:G("Right-click to take it out to your bags."), 0.8, 0.8, 0.8, true)

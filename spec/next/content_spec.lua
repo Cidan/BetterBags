@@ -1403,7 +1403,7 @@ describe("NextContent", function()
       assert.are.equal(0, place("C")[1])
       draw(canvas:RowWidth(3))
       assert.are.same({ 0, 0, 0 }, { place("A")[1], place("B")[1], place("C")[1] }, "one column")
-      assert.is_true(canvas:CanReorder())
+      assert.is_nil(canvas.grid)
     end)
 
     it("decides its columns on the width to lay out for, not the width it is drawn in", function()
@@ -1419,18 +1419,18 @@ describe("NextContent", function()
       draw()
       assert.are.equal(0, place("B")[1])
       assert.are.equal(style.GRID_WIDTH, canvas.byName.B.frame:GetWidth())
-      assert.is_true(canvas:CanReorder())
+      assert.is_nil(canvas.grid)
       columns(1, "down")
       draw()
       assert.are.equal(0, place("B")[1])
-      assert.is_true(canvas:CanReorder())
+      assert.is_nil(canvas.grid)
     end)
 
     it("goes back to the full width when the columns go", function()
       columns(2, "across")
       sections({ { "A", 8 }, { "B", 8 } })
       draw()
-      assert.is_false(canvas:CanReorder())
+      assert.is_not_nil(canvas.grid)
       columns(1, "across")
       local result = draw()
       assert.are.equal(style.GRID_WIDTH, canvas.byName.B.frame:GetWidth())
@@ -1866,12 +1866,728 @@ describe("NextContent", function()
       end)
     end)
 
+    -- Asked: "implement drag to reorder for columns ... we're not storing column positions, just list positions here, so
+    -- what we save is still just an ordered list." The room goes to the place in the list whose slot is under the cursor.
+    describe("reordering by drag", function()
+      local function indexAt(x, y)
+        return canvas:DragIndexAt(y, x)
+      end
+
+      local function moveTo(x, y)
+        canvas:SetDragIndex(indexAt(x, y))
+        draw()
+      end
+
+      local function slot()
+        return { canvas:GetDragSlotX(), canvas:GetDragSlotY() }
+      end
+
+      local ROW = height(1) + SPACING
+      local COLUMN = 4 * STEP
+
+      before_each(function()
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 }, { "D", 1 } })
+        draw()
+      end)
+
+      it("keeps its room where it was until the cursor moves, the others staying put", function()
+        canvas:BeginDrag(canvas.byName.C)
+        draw()
+        assert.are.same({ 0, ROW }, slot())
+        assert.are.same({ COLUMN, 0 }, place("B"))
+        assert.are.same({ COLUMN, ROW }, place("D"))
+      end)
+
+      it("moves its room to the slot under the cursor, in a row and between rows, the others making way", function()
+        canvas:BeginDrag(canvas.byName.C)
+        draw()
+        moveTo(COLUMN + 20, 10)
+        assert.are.same({ COLUMN, 0 }, slot(), "beside A")
+        assert.are.same({ 0, 0 }, place("A"))
+        assert.are.same({ 0, ROW }, place("B"), "B goes to the next row")
+        assert.are.same({ COLUMN, ROW }, place("D"))
+        moveTo(10, 10)
+        assert.are.same({ 0, 0 }, slot(), "first")
+        assert.are.same({ COLUMN, 0 }, place("A"))
+        moveTo(COLUMN + 20, ROW + 10)
+        assert.are.same({ COLUMN, ROW }, slot(), "last")
+        assert.are.same({ 0, ROW }, place("D"))
+      end)
+
+      it("takes its place in the one list when it ends", function()
+        canvas:BeginDrag(canvas.byName.D)
+        draw()
+        moveTo(COLUMN + 20, 10)
+        canvas:EndDrag(true)
+        assert.are.same({ "A", "D", "B", "C" }, names())
+      end)
+
+      it("keeps the place it had when it is cancelled", function()
+        canvas:BeginDrag(canvas.byName.D)
+        draw()
+        moveTo(COLUMN + 20, 10)
+        canvas:EndDrag(false)
+        assert.are.same({ "A", "B", "C", "D" }, names())
+      end)
+
+      it("goes to the slot nearest a cursor outside every slot", function()
+        canvas:BeginDrag(canvas.byName.A)
+        draw()
+        assert.are.equal(1, indexAt(-50, -50))
+        assert.are.equal(4, indexAt(COLUMN + 50, 10000))
+      end)
+
+      it("goes to the slot nearest across as well as down, from under a column's last section", function()
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        canvas:BeginDrag(canvas.byName.C)
+        draw()
+        moveTo(COLUMN + 60, ROW + 5)
+        assert.are.same({ COLUMN, 0 }, slot(), "beside A, not back under it a column away")
+      end)
+
+      it("stands its room and its slots under Recent Items", function()
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 }, { "D", 1 } }, { recent = { item("0_50", "Recent Items") } })
+        draw()
+        local top = place("A")[2]
+        assert.is_true(top > 0)
+        canvas:BeginDrag(canvas.byName.D)
+        draw()
+        assert.are.same({ COLUMN, top + ROW }, slot())
+        moveTo(10, top + 10)
+        assert.are.same({ 0, top }, slot(), "first of the list, under Recent Items")
+        assert.are.same({ COLUMN, top }, place("A"))
+        moveTo(COLUMN + 10, top + 10)
+        assert.are.same({ COLUMN, top }, slot(), "second")
+        assert.are.same({ 0, top }, place("A"))
+      end)
+
+      -- The room moving must not change where the cursor sends it: it would flip between two places every frame.
+      it("gives one answer for a cursor wherever the room stands", function()
+        canvas:BeginDrag(canvas.byName.A)
+        draw()
+        for _, cursor in ipairs({ { 10, 10 }, { COLUMN + 10, 10 }, { 10, ROW + 10 }, { COLUMN + 10, ROW + 10 }, { COLUMN, ROW } }) do
+          local first = indexAt(cursor[1], cursor[2])
+          canvas:SetDragIndex(first)
+          draw()
+          assert.are.equal(first, indexAt(cursor[1], cursor[2]))
+        end
+      end)
+
+      it("fills down when its bag does, the room in the column under the cursor", function()
+        columns(2, "down")
+        draw()
+        canvas:BeginDrag(canvas.byName.D)
+        draw()
+        assert.are.same({ COLUMN, ROW }, slot())
+        moveTo(10, 10)
+        assert.are.same({ 0, 0 }, slot())
+        assert.are.same({ 0, ROW }, place("A"), "down its column")
+        assert.are.same({ COLUMN, 0 }, place("B"))
+        canvas:EndDrag(true)
+        assert.are.same({ "D", "A", "B", "C" }, names())
+      end)
+
+      it("passes a section spanning its columns, either side of it", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "A", 1 }, { "W", 20 }, { "B", 1 } })
+        draw()
+        canvas:BeginDrag(canvas.byName.B)
+        draw()
+        local wide = place("W")
+        assert.are.same({ 0, ROW }, wide, "W starts a row of its own")
+        moveTo(10, 10)
+        assert.are.same({ 0, 0 }, slot(), "above it, first")
+        assert.are.same({ COLUMN, 0 }, place("A"))
+        moveTo(COLUMN + 10, 10)
+        assert.are.same({ COLUMN, 0 }, slot(), "beside A, above it")
+        assert.are.same({ 0, ROW }, place("W"))
+        canvas:EndDrag(true)
+        assert.are.same({ "A", "B", "W" }, names())
+      end)
+
+      -- Reported, with Back, Consumable (spanning) and Quest: "i can't drag a span section under the last single item
+      -- section ... quest doesn't move above consumable". After Back and after Quest it stands in the same place, as Quest
+      -- beside Back leaves the row it starts the same.
+      describe("a section spanning its columns, whose places can stand in one spot", function()
+        local function wide(list)
+          canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+          sections(list)
+          draw()
+        end
+
+        local function index()
+          return canvas.drag.index
+        end
+
+        it("goes under the section after it, which moves up beside the one before", function()
+          wide({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          local where = slot()
+          assert.are.same({ 0, ROW }, where)
+          moveTo(20, where[2] + canvas.byName.W.height + 5)
+          assert.are.same(where, slot(), "it stands where it stood")
+          assert.are.same({ COLUMN, 0 }, place("Quest"), "Quest moves up beside Back")
+          canvas:EndDrag(true)
+          assert.are.same({ "Back", "Quest", "W" }, names())
+        end)
+
+        it("stays there with the cursor held still", function()
+          wide({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          local cursorY = slot()[2] + canvas.byName.W.height + 5
+          for _ = 1, 4 do
+            moveTo(20, cursorY)
+            assert.are.equal(3, index())
+          end
+        end)
+
+        it("does not move when picked up, with or without a hole above it", function()
+          wide({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          local where = slot()
+          assert.are.equal(2, indexAt(where[1] + 20, where[2] + 8), "a hole beside Back: as it was saved")
+          canvas:EndDrag(false)
+          wide({ { "Back", 1 }, { "Quest", 1 }, { "W", 20 } })
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          where = slot()
+          assert.are.equal(3, indexAt(where[1] + 20, where[2] + 8), "no hole")
+        end)
+
+        it("stays in its place while the cursor moves around inside its slot", function()
+          wide({ { "Back", 1 }, { "Quest", 1 }, { "W", 20 } })
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          local where = slot()
+          local tall = canvas.byName.W.height
+          for _, y in ipairs({ 2, tall / 2, tall - 2 }) do
+            assert.are.equal(3, indexAt(COLUMN + 5, where[2] + y))
+          end
+        end)
+
+        it("comes into a spot from elsewhere at its place with no hole", function()
+          wide({ { "A", 1 }, { "B", 1 }, { "C", 1 }, { "D", 1 }, { "W", 20 } })
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          moveTo(20, 10)
+          assert.are.equal(1, index())
+          moveTo(20, ROW + 10)
+          assert.are.equal(3, index(), "A and B above it, not A with a hole beside it")
+          assert.are.same({ COLUMN, 0 }, place("B"))
+        end)
+
+        it("reaches the last place from anywhere below", function()
+          wide({ { "A", 1 }, { "W", 20 }, { "B", 1 }, { "C", 1 }, { "D", 1 } })
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          assert.are.equal(5, indexAt(20, 100000))
+        end)
+
+        it("holds its place among three that share a spot, and leaves it only past the bottom", function()
+          canvas:SetColumnSource(function() return 3, "across", true, 2 end)
+          sections({ { "A", 1 }, { "B", 1 }, { "W", 20 }, { "C", 1 } })
+          draw()
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          local where = slot()
+          assert.are.equal(3, indexAt(where[1] + 20, where[2] + 8))
+          assert.are.equal(4, indexAt(where[1] + 20, where[2] + canvas.byName.W.height + 5))
+        end)
+
+        it("goes by where the section is, the cursor less the point grabbed", function()
+          wide({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          local bottom = slot()[2] + canvas.byName.W.height
+          assert.are.equal(2, canvas:DragIndexAt(bottom + 5, 20, 20, 10), "the cursor is past the bottom, the section's top not")
+          assert.are.equal(3, canvas:DragIndexAt(bottom + 15, 20, 20, 10))
+        end)
+
+        it("does not move for a cursor just above the spot: a nudge reorders nothing", function()
+          canvas:SetColumnSource(function() return 2, "across", true, 3 end)
+          sections({ { "T", 8 }, { "U", 8 }, { "W", 9 } })
+          draw()
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          local where = slot()
+          assert.are.equal(3, indexAt(20, where[2] + 8))
+          assert.are.equal(3, indexAt(20, where[2] - 2))
+          canvas:EndDrag(false)
+          sections({ { "T", 8 }, { "W", 9 }, { "U", 8 } })
+          draw()
+          canvas:BeginDrag(canvas.byName.W)
+          draw()
+          where = slot()
+          assert.are.equal(2, indexAt(20, where[2] - 2), "nor with a hole above it")
+        end)
+
+        -- A spanning section a row tall leaves a gap between its slots, where the first place used to be taken.
+        it("ends in one place however fast the cursor moves", function()
+          for _, frames in ipairs({ 1, 2, 4, 8, 16, 40 }) do
+            wide({ { "Wide", 8 }, { "Alpha", 1 }, { "Beta", 1 } })
+            canvas:BeginDrag(canvas.byName.Wide)
+            draw()
+            for i = 1, frames do
+              moveTo(20, 10 + ROW * i / frames)
+            end
+            assert.are.equal(3, index(), frames .. " frames")
+            canvas:EndDrag(false)
+            draw()
+          end
+        end)
+
+        it("goes by a place's nearest corner, whatever it spans", function()
+          wide({ { "A", 1 }, { "W", 20 }, { "B", 1 } })
+          canvas:BeginDrag(canvas.byName.B)
+          draw()
+          assert.are.equal(1, indexAt(COLUMN / 2 - 1, 10), "nearer the first")
+          assert.are.equal(2, indexAt(COLUMN / 2 + 1, 10), "nearer the second, inside the first's width")
+        end)
+
+        it("is no spot where the next place at that corner is another size", function()
+          canvas:SetColumnSource(function() return 3, "down", true, 2 end)
+          sections({ { "S01", 2 }, { "S02", 1 }, { "S03", 3 }, { "S04", 2 } })
+          local width = canvas:RowWidth(7)
+          draw(width)
+          canvas:BeginDrag(canvas.byName.S03)
+          draw(width)
+          local slots = canvas:dragSlots()
+          assert.are.same({ slots[2].x, slots[2].y }, { slots[3].x, slots[3].y })
+          assert.is_true(slots[2].width ~= slots[3].width)
+          canvas:SetDragIndex(1)
+          draw(width)
+          assert.are.equal(2, indexAt(slots[2].x + 2, slots[2].y + 2))
+        end)
+
+        it("spans only the places side by side in the list and of one size, filling down", function()
+          canvas:SetColumnSource(function() return 3, "down", true, 3 end)
+          sections({ { "A", 41 }, { "B", 5 }, { "C", 9 }, { "D", 8 }, { "E", 9 }, { "F", 1 }, { "G", 8 }, { "H", 1 } })
+          local width = canvas:RowWidth(14)
+          draw(width)
+          canvas:BeginDrag(canvas.byName.C)
+          draw(width)
+          local slots = canvas:dragSlots()
+          local shared = false
+          for i, spot in ipairs(slots) do
+            for j, other in ipairs(slots) do
+              shared = shared or (i ~= j and other.x == spot.x and other.y == spot.y and other.width ~= spot.width)
+            end
+          end
+          assert.is_true(shared, "the bag has a corner two sizes share")
+          for i, spot in ipairs(slots) do
+            local to = indexAt(spot.x + 2, spot.y + 2)
+            local first
+            for _, other in ipairs(slots) do
+              if other.x == spot.x and other.y == spot.y then
+                first = first or other
+              end
+            end
+            for _, between in ipairs(slots) do
+              if between.index >= first.index and between.index <= to then
+                assert.are.same({ first.x, first.y, first.width }, { between.x, between.y, between.width }, "place " .. i)
+              end
+            end
+          end
+        end)
+
+        it("reaches every spot in random bags, and a pick-up never moves it", function()
+          for seed = 1, 60 do
+            math.randomseed(seed)
+            canvas:SetColumnSource(function() return 2 + seed % 2, seed % 3 == 0 and "down" or "across", true, 2 end)
+            local list = {}
+            for i = 1, math.random(3, 9) do
+              list[i] = { "S" .. string.format("%02d", i), ({ 1, 2, 3, 20, 25 })[math.random(1, 5)] }
+            end
+            sections(list)
+            draw()
+            local dragged = canvas.byName[list[math.random(1, #list)][1]]
+            canvas:BeginDrag(dragged)
+            draw()
+            local start = canvas.drag.index
+            local where = slot()
+            assert.are.equal(start, indexAt(where[1] + 20, where[2] + 8), "picked up, seed " .. seed)
+            local spots, reached = {}, 0
+            for k = 1, #list do
+              canvas:SetDragIndex(k)
+              draw()
+              spots[slot()[1] .. ":" .. slot()[2]] = slot()
+            end
+            for _, spot in pairs(spots) do
+              canvas:SetDragIndex(indexAt(spot[1] + 3, spot[2] + 3))
+              draw()
+              assert.are.same(spot, slot(), "spot, seed " .. seed)
+              reached = reached + 1
+            end
+            assert.is_true(reached > 0)
+            canvas:SetDragIndex(indexAt(20, 100000))
+            draw()
+            canvas:EndDrag(false)
+            draw()
+          end
+        end)
+      end)
+
+      -- Reported of the review: a section narrowing over a column of fewer cells hopped sideways, off the cursor.
+      it("keeps the shape it was picked up in while held, taking its place's when it ends", function()
+        canvas:SetColumnSource(function() return 3, "across", false, 2 end)
+        sections({ { "A", 3 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        local a = canvas.byName.A
+        local wide, tall = a.frame:GetWidth(), a.frame:GetHeight()
+        assert.are.equal(3 * STEP - style.GAP, wide)
+        assert.are.equal(height(1), tall)
+        canvas:BeginDrag(a)
+        draw()
+        canvas:SetDragIndex(3)
+        draw()
+        assert.are.equal(6 * STEP, slot()[1], "over the narrow third column")
+        assert.are.same({ wide, tall }, { a.frame:GetWidth(), a.frame:GetHeight() })
+        assert.are.equal(height(2), canvas.drag.height, "its room as tall as it will be there")
+        canvas:EndDrag(true)
+        draw()
+        assert.are.same({ 2 * STEP - style.GAP, height(2) }, { a.frame:GetWidth(), a.frame:GetHeight() })
+      end)
+
+      it("keeps its height through a drag, so the scroll box never pulls it out from under the cursor", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+        local before = draw().Height
+        canvas:BeginDrag(canvas.byName.W)
+        assert.are.equal(before, draw().Height)
+        canvas:SetDragIndex(3)
+        assert.are.equal(before, draw().Height, "Quest moved up, the bag no shorter")
+        assert.are.equal(before, canvas.frame:GetHeight())
+        canvas:EndDrag(true)
+        assert.is_true(draw().Height < before, "shorter once it ends")
+      end)
+
+      it("lets its height go over the time it is told, to where the rows end", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+        local before = draw().Height
+        canvas:BeginDrag(canvas.byName.W)
+        draw()
+        canvas:SetDragIndex(3)
+        draw()
+        assert.are.equal(ROW, canvas:HeldHeightExtra(), "Quest went up a row")
+        canvas:ReleaseHeight(0.2)
+        draw()
+        tween.driver:GetScript("OnUpdate")(tween.driver, 0.1)
+        local partWay = draw().Height
+        assert.is_true(partWay < before)
+        finishTweens()
+        local after = draw().Height
+        assert.is_true(after < partWay)
+        assert.are.equal(0, canvas:HeldHeightExtra())
+        canvas:EndDrag(true)
+        assert.are.equal(after, draw().Height)
+      end)
+
+      -- A drop can move the room and ask for the height in one frame, before any render has seen the room's new place.
+      it("comes down to where the rows end after a room moved just before it was asked", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+        local before = draw().Height
+        canvas:BeginDrag(canvas.byName.W)
+        draw()
+        canvas:SetDragIndex(3)
+        canvas:ReleaseHeight(0.2)
+        assert.are.equal(before, draw().Height, "starts from what it held")
+        tween.driver:GetScript("OnUpdate")(tween.driver, 0.1)
+        local partWay = draw().Height
+        assert.is_true(partWay < before)
+        finishTweens()
+        assert.are.equal(before - ROW, draw().Height)
+      end)
+
+      it("is down in the time it is told, rendered every step of the way", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+        local before = draw().Height
+        canvas:BeginDrag(canvas.byName.W)
+        draw()
+        canvas:SetDragIndex(3)
+        draw()
+        canvas:ReleaseHeight(0.2)
+        draw()
+        for _ = 1, 5 do
+          local update = tween.driver:GetScript("OnUpdate")
+          if update ~= nil then
+            update(tween.driver, 0.05)
+          end
+          draw()
+        end
+        assert.are.equal(before - ROW, draw().Height)
+      end)
+
+      it("asks for no render when the height it holds is where the rows end", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "A", 1 }, { "B", 1 } })
+        draw()
+        canvas:BeginDrag(canvas.byName.A)
+        draw()
+        canvas:ReleaseHeight(0.2)
+        draw()
+        local real, asked = canvas.Invalidate, 0
+        canvas.Invalidate = function(...)
+          asked = asked + 1
+          return real(...)
+        end
+        finishTweens()
+        canvas.Invalidate = nil
+        assert.are.equal(0, asked)
+      end)
+
+      it("lays it out once for a read that lands while it lands", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+        draw()
+        local w = canvas.byName.W
+        canvas:BeginDrag(w)
+        draw()
+        canvas:ReleaseHeight(0.2)
+        draw()
+        local real, laidOut = canvas.LayoutSection, 0
+        canvas.LayoutSection = function(self, section, ...)
+          if section == w then
+            laidOut = laidOut + 1
+          end
+          return real(self, section, ...)
+        end
+        sections({ { "Back", 1 }, { "W", 22 }, { "Quest", 1 } })
+        draw()
+        assert.are.equal(1, laidOut, "its new items placed")
+        draw()
+        canvas.LayoutSection = nil
+        assert.are.equal(1, laidOut, "and left alone again")
+      end)
+
+      it("does not bounce when a read lands while it comes down", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+        draw()
+        canvas:BeginDrag(canvas.byName.W)
+        draw()
+        canvas:SetDragIndex(3)
+        draw()
+        canvas:ReleaseHeight(0.2)
+        draw()
+        tween.driver:GetScript("OnUpdate")(tween.driver, 0.05)
+        draw()
+        sections({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+        local atTheRead = draw().Height
+        if tween.driver and tween.driver:GetScript("OnUpdate") then
+          tween.driver:GetScript("OnUpdate")(tween.driver, 0.05)
+        end
+        assert.is_true(draw().Height <= atTheRead)
+      end)
+
+      -- Its frame changes scale as it lands: laid out on each frame's new grid it would restyle every button, every frame.
+      it("leaves the section alone while it lands", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+        draw()
+        local w = canvas.byName.W
+        canvas:BeginDrag(w)
+        draw()
+        canvas:SetDragIndex(3)
+        draw()
+        canvas:ReleaseHeight(0.2)
+        local real, laidOut = canvas.LayoutSection, 0
+        canvas.LayoutSection = function(self, section, ...)
+          if section == w then
+            laidOut = laidOut + 1
+          end
+          return real(self, section, ...)
+        end
+        draw()
+        tween.driver:GetScript("OnUpdate")(tween.driver, 0.1)
+        draw()
+        assert.are.equal(0, laidOut)
+        canvas:EndDrag(true)
+        draw()
+        canvas.LayoutSection = nil
+        assert.are.equal(1, laidOut, "once it is back")
+      end)
+
+      it("works its slots out again when its fill, wide sections or limit change, with no read", function()
+        for _, source in ipairs({ { 2, "down", true, 2, 1 }, { 2, "across", false, 2, 12 }, { 2, "across", true, 5, 12 } }) do
+          canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+          sections({ { "W", source[5] }, { "V", source[5] == 1 and 1 or 7 }, { "B", 1 }, { "C", 1 } })
+          draw()
+          canvas:BeginDrag(canvas.byName.C)
+          draw()
+          indexAt(10, 10)
+          canvas:SetColumnSource(function() return source[1], source[2], source[3], source[4] end)
+          canvas.heldCells = {}
+          draw()
+          for _, spot in ipairs(canvas:dragSlots()) do
+            canvas:SetDragIndex(spot.index)
+            draw()
+            assert.are.same({ spot.x, spot.y }, slot(), source[2] .. " place " .. spot.index)
+          end
+          canvas:EndDrag(false)
+          draw()
+        end
+      end)
+
+      it("lets its height go when a read changes what its sections hold", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "Back", 1 }, { "W", 20 }, { "Quest", 1 } })
+        local before = draw().Height
+        canvas:BeginDrag(canvas.byName.W)
+        draw()
+        sections({ { "Back", 1 }, { "W", 1 }, { "Quest", 1 } })
+        assert.is_true(draw().Height < before)
+      end)
+
+      it("works its slots out again when it lets go of the widths it holds", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 3 end)
+        sections({ { "A", 9 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        canvas:BeginDrag(canvas.byName.C)
+        draw()
+        indexAt(10, 10)
+        canvas:ReleaseWidths()
+        draw()
+        canvas:SetDragIndex(indexAt(COLUMN + 5, 5))
+        draw()
+        assert.are.same({ COLUMN, 0 }, slot(), "A no longer spans")
+      end)
+
+      it("keeps the room's height for a report", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2 end)
+        sections({ { "A", 4 }, { "B", 1 } })
+        draw()
+        canvas:BeginDrag(canvas.byName.A)
+        canvas.drag.height = 0
+        draw()
+        assert.are.equal(height(1), canvas.drag.height)
+      end)
+
+      it("never passes Recent Items or Free Space", function()
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } }, {
+          recent = { item("0_50", "Recent Items") },
+          free = { showAll = true, buttons = { { slotkey = "0_60", data = item("0_60", "Free Space") } } },
+        })
+        draw()
+        assert.are.equal("Recent Items", names()[1])
+        canvas:BeginDrag(canvas.byName.B)
+        draw()
+        moveTo(10, -100)
+        canvas:EndDrag(true)
+        local after = names()
+        assert.are.same({ "Recent Items", "B", "A", "C" }, { after[1], after[2], after[3], after[4] })
+        canvas:BeginDrag(canvas.byName.B)
+        draw()
+        moveTo(COLUMN + 10, 100000)
+        canvas:EndDrag(true)
+        after = names()
+        assert.are.equal("B", after[#after - 1], "before Free Space")
+      end)
+
+      it("works its slots out again when a read changes what its sections hold", function()
+        canvas:BeginDrag(canvas.byName.D)
+        draw()
+        indexAt(10, ROW + 10)
+        sections({ { "A", 9 }, { "B", 9 }, { "C", 1 }, { "D", 1 } })
+        draw()
+        local tall = canvas.byName.A.height + SPACING
+        assert.is_true(tall > ROW)
+        canvas:SetDragIndex(indexAt(10, tall + 5))
+        draw()
+        assert.are.equal(tall, slot()[2])
+        canvas:SetDragIndex(indexAt(10, ROW + 5))
+        draw()
+        assert.are.same({ 0, 0 }, slot(), "where the second row was is the first row's now")
+      end)
+
+      it("works its slots out again when its columns change, with no read", function()
+        canvas:BeginDrag(canvas.byName.D)
+        draw()
+        indexAt(10, 10)
+        columns(3, "across")
+        draw()
+        canvas:SetDragIndex(indexAt(3 * STEP + 5, 5))
+        draw()
+        assert.are.same({ 3 * STEP, 0 }, slot(), "beside A, in a narrower column")
+      end)
+
+      it("works its slots out once, however often the cursor moves, asked before its first render too", function()
+        canvas:BeginDrag(canvas.byName.D)
+        indexAt(10, 10)
+        draw()
+        local real, measured = canvas.MeasureSection, 0
+        canvas.MeasureSection = function(...)
+          measured = measured + 1
+          return real(...)
+        end
+        indexAt(COLUMN + 10, 10)
+        indexAt(10, ROW + 10)
+        canvas.MeasureSection = nil
+        assert.are.equal(0, measured)
+      end)
+
+      -- The hard rule holds with the room in any place, in both fills: rows line up and nothing overlaps.
+      it("keeps every row on its line with the room anywhere, its slot where it said, across random bags", function()
+        for seed = 1, 40 do
+          math.randomseed(seed)
+          local fill = seed % 2 == 0 and "across" or "down"
+          canvas:SetColumnSource(function() return 2 + seed % 3, fill, seed % 4 ~= 0, 2 end)
+          local list = {}
+          for i = 1, math.random(2, 12) do list[i] = { "S" .. string.format("%02d", i), math.random(1, 30) } end
+          sections(list)
+          draw()
+          local dragged = canvas.byName[list[math.random(1, #list)][1]]
+          canvas:BeginDrag(dragged)
+          draw()
+          for k = 1, #list do
+            canvas:SetDragIndex(k)
+            draw()
+            local rx, ry = canvas:GetDragSlotX(), canvas:GetDragSlotY()
+            local seen = {}
+            seen[rx .. ":" .. ry] = true
+            for _, s in ipairs(canvas.order) do
+              if s ~= dragged then
+                local key = s.x .. ":" .. s.y
+                assert.is_nil(seen[key], "two in one place, seed " .. seed)
+                seen[key] = true
+              end
+            end
+            -- The cursor on the slot sends it to a place with that slot.
+            local to = indexAt(rx + 2, ry + 2)
+            canvas:SetDragIndex(to)
+            draw()
+            assert.are.same({ rx, ry }, { canvas:GetDragSlotX(), canvas:GetDragSlotY() }, "seed " .. seed .. " place " .. k)
+          end
+          canvas:EndDrag(false)
+          draw()
+        end
+      end)
+
+      it("still reads a height in one column", function()
+        columns(1, "across")
+        draw()
+        canvas:BeginDrag(canvas.byName.C)
+        draw()
+        assert.are.equal(1, indexAt(0, 0))
+        canvas:EndDrag(false)
+      end)
+    end)
+
     describe("what moves", function()
       it("keeps a dragged section's place in its column, the others staying put", function()
         columns(2, "across")
         sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
         draw()
-        assert.is_false(canvas:CanReorder())
+        assert.is_not_nil(canvas.grid)
         canvas:BeginDrag(canvas.byName.B)
         draw()
         assert.are.same({ 4 * STEP, 0 }, { canvas:GetDragSlotX(), canvas:GetDragSlotY() })

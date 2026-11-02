@@ -171,8 +171,8 @@ describe("NextDrag", function()
     canvas:_SetRect(bodyLeft + style.PAD + 14, CANVAS_TOP - height, style.GRID_WIDTH, height)
     for _, section in ipairs(panel.content.order) do
       if section.frame:GetParent() == canvas then
-        section.frame:_SetRect(bodyLeft + style.PAD + 14, CANVAS_TOP - section.y - section.height,
-          style.GRID_WIDTH, section.height)
+        section.frame:_SetRect(bodyLeft + style.PAD + 14 + section.x, CANVAS_TOP - section.y - section.height,
+          section.frame:GetWidth(), section.height)
       end
     end
     local tabLeft = panel.side == "LEFT" and (bodyLeft + style.BODY_WIDTH) or (bodyLeft - 100)
@@ -530,7 +530,7 @@ describe("NextDrag", function()
       assert.are.equal(backpack.frame:GetFrameStrata(), herbs.frame:GetFrameStrata())
       assert.is_false(nextDrag.shadow:IsShown())
       assert.are.same({ "Recent Items", "Herbs", "Armor", "Cloth", "Ore" }, sectionNames(backpack))
-      assert.are.same({ { backpack = true, bank = false } }, sentNamed("bags/Rederive"))
+      assert.are.same({ { backpack = true, bank = false, guild = false } }, sentNamed("bags/Rederive"))
       render:Flush()
       assert.is_nil(motion:GetMove(herbs.frame), "lands exactly where the canvas puts it")
     end)
@@ -612,7 +612,7 @@ describe("NextDrag", function()
     end)
   end)
 
-  -- Reordering in columns comes later. Until then a section lands back in its place, and every other drop works.
+  -- Asked: "we're not storing column positions, just list positions here, so what we save is still just an ordered list."
   describe("with section columns", function()
     local function twoColumns(panel)
       override(stubs.database, "GetNextSectionColumns", function() return 2 end)
@@ -621,46 +621,349 @@ describe("NextDrag", function()
       layout(panel)
     end
 
-    it("reorders nothing: its own bag is no target, and nothing is saved", function()
+    -- to moves the cursor onto a section's place on the screen.
+    local function to(panel, s)
+      local c = panel.content
+      local left, top = c.frame:GetLeft(), c.frame:GetTop()
+      moveTo(left + s.x + 10, top - s.y - 10)
+    end
+
+    it("reorders by where the cursor is, saving one ordered list", function()
+      local bag = backpack
+      twoColumns(bag)
+      assert.are.same({ "Recent Items", "Armor", "Cloth", "Herbs", "Ore" }, sectionNames(bag))
+      local cloth = section(bag, "Cloth")
+      local x = cloth.x
+      local ore = pickUp(bag, "Ore")
+      to(bag, cloth)
+      assert.are.equal("reorder", nextDrag:FindTarget().type)
+      flush()
+      assert.are.equal(x, bag.content:GetDragSlotX(), "its room takes the place under the cursor")
+      drop(ore)
+      finishTweens()
+      assert.are.same({ "Recent Items", "Armor", "Ore", "Cloth", "Herbs" }, sectionNames(bag))
+      assert.are.same({ Armor = 0, Ore = 1 }, pins[BACKPACK], "positions in the list, no column")
+      assert.are.same({ { backpack = true, bank = false, guild = false } }, sentNamed("bags/Rederive"))
+    end)
+
+    it("lands in the place it has now when Recent Items goes while it is held", function()
+      local bag = backpack
+      local cloth = pickUp(bag, "Cloth")
+      assert.are.equal(3, bag.content.drag.index)
+      local data = backpackData()
+      data.sortedItems = {}
+      bag:Draw(ctx(), data, function() end)
+      flush()
+      moveTo(-500, -500)
+      drop(cloth)
+      assert.are.equal(2, bag.content.drag.index, "while it lands")
+      finishTweens()
+      assert.are.same({ "Armor", "Cloth", "Herbs", "Ore" }, sectionNames(bag))
+    end)
+
+    it("shows no hint for a reorder, as in one column", function()
+      local bag = backpack
+      twoColumns(bag)
+      local ore = pickUp(bag, "Ore")
+      to(bag, section(bag, "Cloth"))
+      flush()
+      assert.is_false(nextDrag.hint:IsShown())
+      drop(ore)
+      finishTweens()
+    end)
+
+    -- Reported, from a screenshot of Back, Consumable and Quest: "if i drag consumable to try to put it under quest, it
+    -- won't become a drop zone/quest doesn't move above consumable".
+    it("puts a section spanning its columns under the one after it, which moves up", function()
+      local bag = backpack
+      bag.content:SetColumnSource(function() return 2, "across", true, 2 end)
+      local items = { item("0_1", "Back"), item("0_40", "Quest") }
+      for i = 2, 17 do table.insert(items, item("0_" .. i, "Consumable")) end
+      bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = tab({ "Back", "Consumable", "Quest" }, items) } }, function() end)
+      flush()
+      local consumable, quest = section(bag, "Consumable"), section(bag, "Quest")
+      local stood = consumable.y
+      assert.are.equal(0, quest.x)
+      local held = pickUp(bag, "Consumable")
+      flush()
+      local c = bag.content
+      moveTo(c.frame:GetLeft() + quest.x + 10, c.frame:GetTop() - quest.y - 10)
+      assert.are.equal("reorder", nextDrag:FindTarget().type)
+      flush()
+      assert.are.equal(stood, c:GetDragSlotY(), "it stands where it stood")
+      assert.is_true(quest.x > 0, "Quest moves up beside Back")
+      assert.are.equal(0, quest.y)
+      drop(held)
+      finishTweens()
+      assert.are.same({ "Back", "Quest", "Consumable" }, sectionNames(bag))
+      assert.are.same({ Back = 0, Quest = 1, Consumable = 2 }, pins[BACKPACK])
+    end)
+
+    describe("a section spanning some of three columns, picked up at its far end", function()
+      local function threeColumns(bag)
+        bag.content:SetColumnSource(function() return 3, "across", true, 2 end)
+        local items = { item("0_1", "Alpha"), item("0_2", "Beta") }
+        for i = 3, 6 do table.insert(items, item("0_" .. i, "Wide")) end
+        bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = tab({ "Wide", "Alpha", "Beta" }, items) } }, function() end)
+        flush()
+      end
+
+      it("does not move, and saves nothing when dropped", function()
+        local bag = backpack
+        threeColumns(bag)
+        local wide = section(bag, "Wide")
+        local held = pickUp(bag, "Wide", wide.frame:GetWidth() - 10, 5)
+        nextDrag:Update(0.016)
+        flush()
+        nextDrag:Update(0.016)
+        assert.are.equal(1, bag.content.drag.index)
+        drop(held)
+        finishTweens()
+        assert.is_nil(next(pins[BACKPACK] or {}))
+        assert.are.same({}, sentNamed("bags/Rederive"))
+      end)
+
+      it("moves by where the section is, not by where the cursor is on it", function()
+        local bag = backpack
+        threeColumns(bag)
+        local STEP = style.ICON + style.GAP
+        local wide = section(bag, "Wide")
+        local grabbed = wide.frame:GetWidth() / 2
+        local left, top = wide.frame:GetLeft(), wide.frame:GetTop()
+        local held = pickUp(bag, "Wide", grabbed, 5)
+        moveTo(left + grabbed + STEP, top - 5)
+        assert.are.equal(1, bag.content.drag.index, "a cell along, its own place is nearest still")
+        moveTo(left + grabbed + 3 * STEP, top - 5)
+        assert.are.equal(2, bag.content.drag.index, "a column along")
+        moveTo(left + grabbed, top - 5)
+        drop(held)
+        finishTweens()
+      end)
+    end)
+
+    -- A read's glide can still be carrying the section when it is grabbed: a still cursor chooses nothing, and once it
+    -- moves the section goes by where it looks, as what the player sees is what they are dragging.
+    describe("picked up while a read's glide still carries it", function()
+      local function glidingCloth(bag)
+        twoColumns(bag)
+        local armor = section(bag, "Armor")
+        local cloth = section(bag, "Cloth")
+        local width, height = cloth.frame:GetWidth(), cloth.frame:GetHeight()
+        cloth.frame:_SetRect(armor.frame:GetLeft(), armor.frame:GetTop() - height, width, height)
+        return bag.content:IndexOf(cloth), armor
+      end
+
+      it("does not move with the cursor still, and saves nothing", function()
+        local bag = backpack
+        local index = glidingCloth(bag)
+        local held = pickUp(bag, "Cloth")
+        nextDrag:Update(0.016)
+        flush()
+        nextDrag:Update(0.016)
+        assert.are.equal(index, bag.content.drag.index)
+        drop(held)
+        finishTweens()
+        assert.is_nil(next(pins[BACKPACK] or {}))
+      end)
+
+      it("goes by where it looks once the cursor moves", function()
+        local bag = backpack
+        local index = glidingCloth(bag)
+        local held = pickUp(bag, "Cloth")
+        local x, y = lift:Cursor()
+        moveTo(x + 1, y)
+        assert.is_true(bag.content.drag.index < index, "over Armor, as it looks")
+        drop(held)
+        finishTweens()
+      end)
+    end)
+
+    it("goes back to its own place when the cursor comes back to where it picked it up", function()
+      local bag = backpack
+      twoColumns(bag)
+      local cloth = section(bag, "Cloth")
+      local index = bag.content:IndexOf(section(bag, "Ore"))
+      local held = pickUp(bag, "Ore")
+      local x, y = lift:Cursor()
+      local c = bag.content
+      moveTo(c.frame:GetLeft() + cloth.x + 10, c.frame:GetTop() - cloth.y - 10)
+      flush()
+      assert.is_true(c.drag.index < index)
+      moveTo(x, y)
+      assert.are.equal(index, c.drag.index)
+      drop(held)
+      finishTweens()
+      assert.is_nil(next(pins[BACKPACK] or {}))
+    end)
+
+    it("ends cleanly when a read takes the section away as it lands", function()
+      local bag = backpack
+      twoColumns(bag)
+      local cloth = section(bag, "Cloth")
+      local held = pickUp(bag, "Ore")
+      local c = bag.content
+      moveTo(c.frame:GetLeft() + cloth.x + 10, c.frame:GetTop() - cloth.y - 10)
+      flush()
+      drop(held)
+      local data = backpackData()
+      data.tabs[1] = tab({ "Armor", "Cloth", "Herbs" }, {
+        item("0_1", "Armor"), item("0_2", "Cloth"), item("0_3", "Herbs"), item("0_4", "Herbs"),
+      })
+      bag:Draw(ctx(), data, function() end)
+      flush()
+      finishTweens()
+      flush()
+      assert.is_false(nextDrag:IsActive())
+      assert.are.same({ "Recent Items", "Armor", "Cloth", "Herbs" }, sectionNames(bag))
+    end)
+
+    it("shows the order it saved when its bag closes as it lands", function()
+      local bag = backpack
+      bag.content:SetColumnSource(function() return 2, "across", true, 2 end)
+      local items = { item("0_1", "Back"), item("0_40", "Quest") }
+      for i = 2, 17 do table.insert(items, item("0_" .. i, "Consumable")) end
+      bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = tab({ "Back", "Consumable", "Quest" }, items) } }, function() end)
+      flush()
+      local quest = section(bag, "Quest")
+      local held = pickUp(bag, "Consumable")
+      flush()
+      local c = bag.content
+      moveTo(c.frame:GetLeft() + quest.x + 10, c.frame:GetTop() - quest.y - 10)
+      flush()
+      drop(held)
+      nextDrag:Cancel()
+      assert.are.same({ "Back", "Quest", "Consumable" }, sectionNames(bag))
+      assert.are.same({ Back = 0, Quest = 1, Consumable = 2 }, pins[BACKPACK])
+      assert.are.same({ { backpack = true, bank = false, guild = false } }, sentNamed("bags/Rederive"))
+    end)
+
+    it("lets the height it held go as the section lands", function()
+      local bag = backpack
+      bag.content:SetColumnSource(function() return 2, "across", true, 2 end)
+      local items = { item("0_1", "Back"), item("0_40", "Quest") }
+      for i = 2, 17 do table.insert(items, item("0_" .. i, "Consumable")) end
+      bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = tab({ "Back", "Consumable", "Quest" }, items) } }, function() end)
+      flush()
+      local quest = section(bag, "Quest")
+      local held = pickUp(bag, "Consumable")
+      flush()
+      local c = bag.content
+      moveTo(c.frame:GetLeft() + quest.x + 10, c.frame:GetTop() - quest.y - 10)
+      flush()
+      local tall = c.frame:GetHeight()
+      assert.is_true(c:HeldHeightExtra() > 0)
+      drop(held)
+      render:Flush()
+      tween.driver:GetScript("OnUpdate")(tween.driver, style.Time.Land / 2)
+      render:Flush()
+      local partWay = c.frame:GetHeight()
+      assert.is_true(partWay < tall, "coming down with the landing")
+      finishTweens()
+      flush()
+      assert.is_true(c.frame:GetHeight() < partWay)
+    end)
+
+    it("lets the height it held go as the section flies to a tab", function()
+      local bag = backpack
+      bag.content:SetColumnSource(function() return 2, "across", true, 2 end)
+      local items = { item("0_1", "Back"), item("0_40", "Quest") }
+      for i = 2, 17 do table.insert(items, item("0_" .. i, "Consumable")) end
+      bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = tab({ "Back", "Consumable", "Quest" }, items) } }, function() end)
+      flush()
+      local quest = section(bag, "Quest")
+      local held = pickUp(bag, "Consumable")
+      flush()
+      local c = bag.content
+      moveTo(c.frame:GetLeft() + quest.x + 10, c.frame:GetTop() - quest.y - 10)
+      flush()
+      local extra = c:HeldHeightExtra()
+      assert.is_true(extra > 0)
+      moveTo(centerOf(bag.tabs:Tab(2).button))
+      assert.are.equal("tab", nextDrag:FindTarget().type)
+      drop(held)
+      render:Flush()
+      tween.driver:GetScript("OnUpdate")(tween.driver, style.Time.FlyAway / 2)
+      assert.is_true(c:HeldHeightExtra() < extra)
+      finishTweens()
+    end)
+
+    -- Auto-scroll would run on into the height held, past where the rows end, and show nothing.
+    it("does not auto-scroll past where the rows end into the height it holds", function()
+      local bag = backpack
+      bag.content:SetColumnSource(function() return 2, "across", true, 2 end)
+      local items = { item("0_1", "Back"), item("0_40", "Quest") }
+      for i = 2, 17 do table.insert(items, item("0_" .. i, "Consumable")) end
+      bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = tab({ "Back", "Consumable", "Quest" }, items) } }, function() end)
+      flush()
+      local quest = section(bag, "Quest")
+      local held = pickUp(bag, "Consumable")
+      flush()
+      local c, box, area = bag.content, bag.scroll.scrollBox, bag.scroll.frame
+      moveTo(c.frame:GetLeft() + quest.x + 10, c.frame:GetTop() - quest.y - 10)
+      flush()
+      local extra = c:HeldHeightExtra()
+      assert.is_true(extra > 0)
+      box._scrollRange, box._scrollPercentage = 100 + extra, 0
+      for _ = 1, 200 do
+        moveTo(c.frame:GetLeft() + 20, area:GetBottom() + 1)
+      end
+      assert.is_true(box:GetDerivedScrollOffset() <= 100)
+      assert.is_true(box:GetDerivedScrollOffset() > 90)
+      drop(held)
+      finishTweens()
+    end)
+
+    it("saves nothing dropped in the place it was picked up", function()
       local bag = backpack
       twoColumns(bag)
       local before = sectionNames(bag)
-      local s = pickUp(bag, "Herbs")
-      local cx, cy = centerOf(section(bag, "Ore").frame)
-      moveTo(cx, cy)
-      assert.is_nil(nextDrag:FindTarget())
-      drop(s)
+      local cloth = section(bag, "Cloth")
+      local picked = pickUp(bag, "Cloth")
+      to(bag, cloth)
+      flush()
+      drop(picked)
+      finishTweens()
+      assert.are.same(before, sectionNames(bag))
+      assert.is_nil(next(pins[BACKPACK] or {}), "no pins")
+      assert.are.same({}, sentNamed("bags/Rederive"))
+    end)
+
+    it("lands back where it was, saving nothing, dropped outside any panel", function()
+      local bag = backpack
+      twoColumns(bag)
+      local before = sectionNames(bag)
+      local s = section(bag, "Cloth")
+      local x, y = s.x, s.y
+      local picked = pickUp(bag, s.name)
+      to(bag, section(bag, "Armor"))
+      flush()
+      moveTo(-500, -500)
+      drop(picked)
       finishTweens()
       assert.are.same(before, sectionNames(bag))
       assert.are.same({}, pins[BACKPACK] or {})
+      flush()
+      motion:Step(1)
+      local _, _, _, px, py = s.frame:GetPoint(1)
+      assert.are.same({ x, -y }, { px, py })
     end)
 
-    it("lands back in its own column", function()
+    it("aims at its slot in its column as it lands", function()
       local bag = backpack
       twoColumns(bag)
-      local s = section(bag, "Cloth")
-      assert.is_true(s.x > 0)
-      local picked = pickUp(bag, s.name)
-      local x = s.x
-      moveTo(100, 100)
-      drop(picked)
-      finishTweens()
-      local _, _, _, px = s.frame:GetPoint(1)
-      assert.are.equal(x, px)
-    end)
-
-    it("aims at its own column as it lands", function()
-      local bag = backpack
-      twoColumns(bag)
-      local s = section(bag, "Cloth")
-      local x = s.x
+      local cloth = section(bag, "Cloth")
+      local x = cloth.x
       assert.is_true(x > 0)
       local canvas = bag.content
-      drop(pickUp(bag, s.name))
+      local ore = pickUp(bag, "Ore")
+      to(bag, cloth)
+      flush()
+      assert.are.equal(x, canvas:GetDragSlotX())
+      drop(ore)
       tween:Step(style.Time.Land - 0.001)
       tween:Step(0.0005)
-      local scale = s.frame:GetScale()
-      local _, _, _, ox = s.frame:GetPoint(1)
+      local scale = ore.frame:GetScale()
+      local _, _, _, ox = ore.frame:GetPoint(1)
       assert.is_true(math.abs(ox * scale - (canvas.frame:GetLeft() + x)) < 0.5, "at " .. ox * scale)
       finishTweens()
     end)
@@ -995,6 +1298,22 @@ describe("NextDrag", function()
       assert.are.same({}, calls.deposited)
     end)
 
+    it("lands back in its old place when nothing in it can go in, after its room moved", function()
+      local armor = section(backpack, "Armor")
+      local herbs = pickUp(backpack, "Herbs")
+      local oldY = herbs.y
+      moveTo(herbs.frame:GetLeft() + 20, armor.frame:GetTop() - 5)
+      flush()
+      override(guild, "Deposit", function() return "nothing" end)
+      moveTo(300, 600)
+      drop(herbs)
+      flush()
+      finishTweens()
+      local _, rel, _, _, y = herbs.frame:GetPoint(1)
+      assert.are.equal(backpack.content.frame, rel)
+      assert.are.equal(-oldY, y)
+    end)
+
     it("is no target when the player may deposit in no tab the guild bank would use", function()
       guildTabs[2].canDeposit = false
       local herbs = pickUp(backpack, "Herbs")
@@ -1079,6 +1398,14 @@ describe("NextDrag", function()
       finishTweens()
       assert.are.same({ "Ore", "Cloth" }, sectionNames(guild))
       assert.are.equal(0, pins[GUILD].Ore)
+    end)
+
+    it("recalculates the guild bank when its own sections are reordered", function()
+      local ore = pickUp(guild, "Ore")
+      moveTo(300, CANVAS_TOP - 5)
+      drop(ore)
+      finishTweens()
+      assert.are.same({ { backpack = false, bank = false, guild = true } }, sentNamed("bags/Rederive"))
     end)
 
     it("does not drop a guild section on the guild bank's own tabs", function()
@@ -1180,6 +1507,22 @@ describe("NextDrag", function()
       assert.are.equal("Sell 1 item", nextDrag.hint:GetText())
       drop(armor)
       assert.are.same({ { "0_1" } }, seller.sales)
+    end)
+
+    it("lands back in its old place when nothing in it sells, after its room moved", function()
+      seller.sells = {}
+      local armor = section(backpack, "Armor")
+      local herbs = pickUp(backpack, "Herbs")
+      local oldY = herbs.y
+      moveTo(herbs.frame:GetLeft() + 20, armor.frame:GetTop() - 5)
+      flush()
+      moveTo(300, 600)
+      drop(herbs)
+      flush()
+      finishTweens()
+      local _, rel, _, _, y = herbs.frame:GetPoint(1)
+      assert.are.equal(backpack.content.frame, rel)
+      assert.are.equal(-oldY, y)
     end)
 
     it("lands back when nothing in it sells", function()

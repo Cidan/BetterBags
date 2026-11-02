@@ -494,6 +494,50 @@ describe("BetterBags Next, pixel perfect", function()
       override(stubs.database, "GetNextSectionSpan", function() return span == true end)
     end
 
+    -- Asked: drag to reorder in columns. The real drag, tweens each frame, as "keeps the column on whole pixels" in one column.
+    for _, fill in ipairs({ "across", "down" }) do
+      it("keeps its columns on whole pixels while a section is dragged across them, filling " .. fill, function()
+        db.size, db.bagScale = "small", 55
+        useScreen(3396, 1362, 0.65)
+        columns(2, fill, true)
+        local cats, list = {}, {}
+        for i = 1, 8 do
+          table.insert(cats, { name = "S" .. i })
+          for j = 1, 2 + i do table.insert(list, item(i .. "_" .. j, "S" .. i)) end
+        end
+        slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
+        local pins = {}
+        override(stubs.database, "GetCustomSectionSort", function() return pins end)
+        override(stubs.database, "SetCustomSectionSort", function(_, _, name, i) pins[name] = i end)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        local canvas = bag.content
+        local function column()
+          render:Flush()
+          motion:Step(10)
+          return layout.PixelCheck(bag.frame, { owners = { panel = bag }, skip = moving(bag) })
+        end
+        assert.are.same({}, column(), "before")
+        local dragged, over = canvas.byName.S8, canvas.byName.S1
+        local sc = dragged.frame:GetEffectiveScale()
+        _G._cursorX, _G._cursorY = (dragged.frame:GetLeft() + 20) * sc, (dragged.frame:GetTop() - 10) * sc
+        _G._mouseButtonsDown = { LeftButton = true }
+        dragged.header:GetScript("OnDragStart")(dragged.header)
+        for _ = 1, 4 do nextDrag:Update(0.016) end
+        _G._cursorX, _G._cursorY = (over.frame:GetLeft() + 5) * sc, (over.frame:GetTop() - 2) * sc
+        nextDrag:Update(0.016)
+        assert.are.same({}, column(), "while it is held")
+        assert.are.equal(0, canvas:GetDragSlotX())
+        dragged.header:GetScript("OnDragStop")(dragged.header)
+        finishTweens()
+        assert.are.same({}, column(), "after it lands")
+        _G._mouseButtonsDown = nil
+        db.bagScale = 100
+        bag:Hide(ctx())
+        finishTweens()
+        chain:Init()
+      end)
+    end
+
     -- Found by the second adversarial review, as a test failing in about 4 runs of 10: a read of its bag sized the buttons of
     -- a section waiting in a dock card for the column's grid, with nothing laying them out on the card's again.
     for _, count in ipairs({ 1, 3 }) do

@@ -85,8 +85,11 @@ local nextDrag = addon:NewModule('NextDrag')
 ---@class NextDragState: NextLifted
 ---@field panel NextPanelFrame The panel the section came from.
 ---@field section NextSection
+---@field startX number The cursor at pickup.
+---@field startY number
+---@field moved? boolean The cursor has moved since.
+---@field landed? {commit: boolean, after?: fun()} What its landing does when it ends.
 ---@field name string
----@field startIndex number Where its gap was at pickup.
 ---@field target? NextDropTarget
 ---@field released? number Frames in a row the left button was up without a drop.
 
@@ -162,7 +165,8 @@ function nextDrag:Begin(panel, section)
     self:Cancel()
   end)
   ---@type NextDragState
-  self.current = { panel = panel, section = section, name = section.name, startIndex = canvas.drag.index }
+  self.current = { panel = panel, section = section, name = section.name }
+  self.current.startX, self.current.startY = lift:Cursor()
   lift:Pick(self.current, frame, function(elapsed)
     self:Update(elapsed)
   end)
@@ -285,8 +289,7 @@ function nextDrag:FindTarget()
       end
       if panel.body:IsMouseOver() then
         if panel == src then
-          -- In columns of sections nothing reorders yet: it lands back in its place (next.md §7a).
-          return panel.content:CanReorder() and { type = "reorder", panel = panel } or nil
+          return { type = "reorder", panel = panel }
         end
         if self:CanDropOnBody(panel, src) then
           return { type = "bag", panel = panel }
@@ -399,13 +402,15 @@ function nextDrag:Update(elapsed)
   self:showTarget(target)
   if target and target.type == "reorder" then
     local canvas = state.panel.content
+    -- A still cursor chooses nothing: a read's glide can still be carrying the section it picked up, away from its place.
+    state.moved = state.moved or x ~= state.startX or y ~= state.startY
     -- The cursor is on the screen; the canvas lays out in its own units (a small panel's Bag Scale).
     local at = lift:ScreenPoint(canvas.frame)
-    if at then
-      canvas:SetDragIndex(canvas:DragIndexAt((at.top - y) / at.scale))
+    if at and state.moved then
+      canvas:SetDragIndex(canvas:DragIndexAt((at.top - y) / at.scale, (x - at.left) / at.scale, state.grabX, state.grabY))
     end
     local scroll = state.panel.scroll
-    lift:AutoScroll(scroll.frame, scroll.scrollBox, y, elapsed)
+    lift:AutoScroll(scroll.frame, scroll.scrollBox, y, elapsed, canvas:HeldHeightExtra())
   end
 end
 
@@ -501,6 +506,8 @@ end
 function nextDrag:land(commit, after, from)
   local state = self.current
   local canvas = state.panel.content
+  state.landed = { commit = commit, after = after }
+  canvas:ReleaseHeight(style.Time.Land)
   lift:Land(state, function(left0, top0)
     local at = lift:ScreenPoint(canvas.frame)
     if at == nil then
@@ -528,6 +535,7 @@ end
 function nextDrag:flyAway(x, y, after, from)
   local state = self.current
   local canvas = state.panel.content
+  canvas:ReleaseHeight(style.Time.FlyAway)
   lift:FlyAway(state, x, y, function()
     self:reattach(true)
     canvas:EndDrag(false)
@@ -614,7 +622,12 @@ function nextDrag:Drop(ctx, noMoves)
 
   if target == nil or target.type == "reorder" then
     if target == nil then
-      canvas:SetDragIndex(state.startIndex)
+      canvas:SetDragIndex(canvas:IndexOf(state.section))
+      self:land(false)
+      return
+    end
+    -- Back where it was is no choice of the player's: a save would pin it, and it would stop following the section order.
+    if canvas.drag.index == canvas:IndexOf(state.section) then
       self:land(false)
       return
     end
@@ -634,6 +647,7 @@ function nextDrag:Drop(ctx, noMoves)
       events:SendMessage(ctx, 'bags/Rederive', {
         backpack = kind == const.BAG_KIND.BACKPACK,
         bank = kind == const.BAG_KIND.BANK,
+        guild = kind == const.BAG_KIND.GUILD,
       })
     end)
     return
@@ -657,7 +671,7 @@ function nextDrag:Drop(ctx, noMoves)
       return
     end
     if result ~= "deposited" then
-      canvas:SetDragIndex(state.startIndex)
+      canvas:SetDragIndex(canvas:IndexOf(state.section))
       self:land(false)
       return
     end
@@ -671,7 +685,7 @@ function nextDrag:Drop(ctx, noMoves)
     -- Back in its place when nothing sells; else docked in the seller with its sale (the seller's
     -- offer), which sells one item at a time, at once or once confirmed.
     if #target.panel:SaleOf(list) == 0 then
-      canvas:SetDragIndex(state.startIndex)
+      canvas:SetDragIndex(canvas:IndexOf(state.section))
       self:land(false)
       return
     end
@@ -739,11 +753,16 @@ function nextDrag:Cancel()
   end
   local canvas = state.panel.content
   local dragging = canvas.drag ~= nil and canvas.drag.section == state.section
+  -- A landing cut short ends as it would have: the order it saved is the order shown.
+  local landed = state.landed or { commit = false }
   self:reattach(false)
   if dragging then
-    canvas:EndDrag(false)
+    canvas:EndDrag(landed.commit)
   end
   self:finish()
+  if landed.after then
+    landed.after()
+  end
 end
 
 -- PanelHidden cancels a drag from a panel that closed (NextDock sends back what waits in it).

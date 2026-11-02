@@ -208,7 +208,7 @@ describe("Constants Module Offsets", function()
   end)
 
   -- Asked: "2 columns, side to side, wide sections on, wide column limit of 2, and sort order is descending for sections by
-  -- default. do this for all bags."
+  -- default. do this for all bags", then: "i did mean bbn here". The classic bags keep their own, alphabetical.
   it("starts every bag in two columns, side to side, wide sections spanning them, its largest section first", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")
@@ -220,8 +220,10 @@ describe("Constants Module Offsets", function()
       assert.is_true(profile.nextSectionSpan[kind], "wide sections of bag " .. kind)
       assert.are.equal(2, profile.nextSectionWideRows[kind], "wide column limit of bag " .. kind)
       for _, view in ipairs({ const.BAG_VIEW.SECTION_GRID, const.BAG_VIEW.SECTION_ALL_BAGS }) do
-        assert.are.equal(const.SECTION_SORT_TYPE.SIZE_DESCENDING, profile.sectionSort[kind][view],
+        assert.are.equal(const.SECTION_SORT_TYPE.SIZE_DESCENDING, profile.nextSectionSort[kind][view],
           "section sort of bag " .. kind .. " in view " .. view)
+        assert.are.equal(const.SECTION_SORT_TYPE.ALPHABETICALLY, profile.sectionSort[kind][view],
+          "the classic bags' section sort of bag " .. kind .. " in view " .. view)
       end
     end
   end)
