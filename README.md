@@ -434,7 +434,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `scrappable` (scrappable = true) Can the item be scrapped (Retail)?
 - `inset` (inset = true) Is the item in any equipment set? (`equipmentSet` names one.)
 - `upgrade` (upgrade = true) Does BetterBags show the upgrade arrow on the item? It follows the upgrade provider chosen in the settings (BetterBags, Pawn or SimpleItemLevel).
-- `auctionable` or `ah` (auctionable = true) Can the item be posted on the Auction House? It asks the game, so it knows about bound and other items that cannot be listed. On modern clients only: on Classic Era and The Burning Crusade Classic, and in the guild bank, it matches nothing. `ah` on its own searches for those letters: write `ah = true`.
+- `auctionable` or `ah` (auctionable = true) Can the item be posted on the Auction House? It asks the game, so it knows about bound and other items that cannot be listed. Classic Era and The Burning Crusade Classic have no such check, so there BetterBags works it out: no for what is bound, a quest item, damaged, conjured, limited in duration or a wrapped gift, and yes otherwise, so the game may still refuse an item with used charges or a lockbox. In the guild bank it matches nothing. `ah` on its own searches for those letters: write `ah = true`.
 - `lootable` (lootable = true) Can the item be opened, such as a lockbox, clam or cache? Not in the guild bank.
 - `usable` (usable = false) Can your character use the item? (Weapon and armor skills, level, professions, reputation: the red text in its tooltip.)
 - `equippable` (equippable = true) Is the item gear your character can wear?

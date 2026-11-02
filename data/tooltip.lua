@@ -51,6 +51,57 @@ local function markLine(marks, text, nested)
   return marks
 end
 
+-- linePatterns keeps, by global string, the pattern of a whole tooltip line written from it.
+local linePatterns = {}
+
+-- linePattern makes that pattern: colors left out, and anything for its number, its name, its plural
+-- (|4minute:minutes;) and its article (frFR's |2, "de" or "d'"). A string's wording, and where the name goes, differs
+-- by client locale.
+---@param format string
+---@return string
+local function linePattern(format)
+  local pattern = linePatterns[format]
+  if not pattern then
+    local plain = format:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|4[^;]*;", "\1"):gsub("|2%s*", "\1"):gsub("%%%d?%$?[sd]", "\1")
+    pattern = "^" .. plain:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"):gsub("\1", ".*") .. "$"
+    linePatterns[format] = pattern
+  end
+  return pattern
+end
+
+local LIMITED_DURATION = { "ITEM_DURATION_DAYS", "ITEM_DURATION_HOURS", "ITEM_DURATION_MIN", "ITEM_DURATION_SEC" }
+
+-- markClassicLine also notes what keeps an item off the legacy auction house, for items:LegacyAuctionableOf: conjured,
+-- a limited duration, a wrapped gift. Retail's scan leaves these out: its client answers for itself.
+---@param marks? table
+---@param text? string
+---@return table?
+local function markClassicLine(marks, text)
+  marks = markLine(marks, text)
+  if text == nil or text == "" then
+    return marks
+  end
+  local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  local mark
+  if plain == _G.ITEM_CONJURED then
+    mark = "conjured"
+  elseif _G.ITEM_WRAPPED_BY and plain:find(linePattern(_G.ITEM_WRAPPED_BY)) then
+    mark = "wrapped"
+  else
+    for _, name in ipairs(LIMITED_DURATION) do
+      if _G[name] and plain:find(linePattern(_G[name])) then
+        mark = "limited"
+        break
+      end
+    end
+  end
+  if mark then
+    marks = marks or {}
+    marks[mark] = true
+  end
+  return marks
+end
+
 function tooltipScanner:Init()
   -- Cache to store extracted tooltip text, keyed by item GUID
   -- This prevents repeated expensive tooltip extractions
@@ -224,7 +275,7 @@ function tooltipScanner:ExtractClassic(bagid, slotid)
       if text and text ~= "" then
         table.insert(lines, text)
       end
-      marks = markLine(marks, text)
+      marks = markClassicLine(marks, text)
     end
 
     -- Extract text from right-aligned FontString (e.g., stat values)

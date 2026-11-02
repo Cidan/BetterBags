@@ -3316,16 +3316,39 @@ end
 -- auctionLocation is told each slot in turn: AuctionableOf asks about every item on every read.
 local auctionLocation
 
+-- LegacyAuctionableOf works the answer out on the legacy auction house (Classic Era, TBC), whose client has no check
+-- to ask (a /run on both: nothing for a hearthstone, another item or an empty bag). It goes through the reasons the game
+-- refuses a listing (Enum.AuctionHouseError, Blizzard_AuctionHouseUtil.lua), from what the read already holds: the
+-- tooltip's marks come from the scan the search index runs. It can say yes and be refused: used charges do not show,
+-- and whether a lockbox or clam counts as lootable is not known.
+---@param item ItemData
+---@return boolean
+function items:LegacyAuctionableOf(item)
+  local marks = item.itemInfo.tooltipMarks
+  if item.bindingInfo.bound or item.questInfo.isQuestItem
+    or (marks and (marks.conjured or marks.limited or marks.wrapped)) then
+    return false
+  end
+  local durability, maxDurability = C_Container.GetContainerItemDurability(item.bagid, item.slotid)
+  return not (durability and maxDurability and durability < maxDurability)
+end
+
 -- AuctionableOf says whether an item can be posted on the Auction House: Blizzard's own check, which answers with
 -- the Auction House closed (a /run on retail 12.1.5, not opened that session: bound items no, unbound yes), told not
--- to show an error. Nil where nothing can say: a client on the legacy auction house (Classic Era, TBC), which Blizzard
--- never asks (ContainerFrame_Shared.lua); a guild bank slot, which has no item location; a slot emptied since it was
--- read, which Blizzard's container and Auction House frames check for first.
+-- to show an error; worked out on the legacy auction house, where there is none. Nil where nothing can say: a guild
+-- bank slot, which has no item location; a client with neither; a slot emptied since it was read, which Blizzard's
+-- container and Auction House frames check for first.
 ---@param item ItemData
 ---@return boolean?
 function items:AuctionableOf(item)
+  if guildTabOf(item.bagid) then
+    return nil
+  end
   local api, legacy = _G.C_AuctionHouse, _G.IsUsingLegacyAuctionClient
-  if api == nil or api.IsSellItemValid == nil or (legacy ~= nil and legacy()) or guildTabOf(item.bagid) then
+  if legacy ~= nil and legacy() then
+    return self:LegacyAuctionableOf(item)
+  end
+  if api == nil or api.IsSellItemValid == nil then
     return nil
   end
   if auctionLocation then
@@ -3669,6 +3692,10 @@ function items:AttachItemInfo(data, kind, containerInfo)
   local tooltipScanner = addon:GetModule('TooltipScanner')
   local itemGUID = C_Item.GetItemGUID(itemLocation) or ""
   local tooltipText, tooltipMarks = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
+  -- Only retail can replace a scan made before the item's data loaded (TOOLTIP_DATA_UPDATE): the next read scans again.
+  if props.incomplete and not addon.isRetail then
+    tooltipScanner:RemoveFromCache(itemGUID)
+  end
 
   data.inventoryType = invType --[[@as number]]
   data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType]

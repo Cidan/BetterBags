@@ -1079,6 +1079,8 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 	if decoration.SetHasItem then decoration:SetHasItem(false) end
 	if self.button.SetHasItem then self.button:SetHasItem(false) end
 	decoration.GetItemContextMatchResult = nil
+	-- A search's miss was about the item drawn: a full draw sets it again, and clearing a search walks only items.
+	if decoration.SetMatchesSearch then decoration:SetMatchesSearch(true) end
 	if addon.isRetail then
 		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
 	else
@@ -1116,6 +1118,31 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 	self.blank = true
 end
 
+-- AddClassicOverlay gives Classic's item button what its template lacks (it inherits Classic's ItemButtonTemplate, with no
+-- ItemButtonMixin): its search overlay shown for a search's miss, and for what does not fit an item context (the Auction
+-- House), which has no overlay of its own there.
+---@param button ItemButton
+function itemFrame:AddClassicOverlay(button)
+	local function draw(me)
+		if me.missedSearch or me.missedContext then
+			me.searchOverlay:Show()
+		else
+			me.searchOverlay:Hide()
+		end
+	end
+	---@diagnostic disable-next-line: duplicate-set-field
+	button.SetMatchesSearch = function(me, match)
+		me.missedSearch = not match
+		draw(me)
+	end
+	button.UpdateItemContextMatching = function(me)
+		local results = _G.ItemButtonUtil and _G.ItemButtonUtil.ItemContextMatchResult
+		me.missedContext = results ~= nil and me.GetItemContextMatchResult ~= nil
+			and me:GetItemContextMatchResult() == results.Mismatch
+		draw(me)
+	end
+end
+
 -- CreateDecoration makes an item button's decoration, shown, behind the item's interaction
 -- button. The template's normal, pushed, battle pay and new item textures are cleared: with
 -- an empty slot drawn transparent on Classic they bleed through as a blue glow
@@ -1131,14 +1158,7 @@ function itemFrame:CreateDecoration(item)
 		button = CreateFrame("ItemButton", name, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
 	else
 		button = CreateFrame("Button", name, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
-		---@diagnostic disable-next-line: duplicate-set-field
-		button.SetMatchesSearch = function(me, match)
-			if match then
-				me.searchOverlay:Hide()
-			else
-				me.searchOverlay:Show()
-			end
-		end
+		self:AddClassicOverlay(button)
 	end
 	button:SetAllPoints()
 
