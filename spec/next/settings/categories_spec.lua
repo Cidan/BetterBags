@@ -395,6 +395,7 @@ describe("NextSettingsCategories", function()
     it("drags a category as the bags drag a section, moving it after the one above where it lands", function()
       local K = style.Theme.Settings.Categories
       list.box:_SetRect(0, 0, 232, 600)
+      list.content.GetLeft, list.content.GetTop = function() return 0 end, function() return 600 end
       local row = list:RowFor("Potions")
       row.frame:_SetRect(0, 600 - yOf("Potions") - K.RowHeight, 232, K.RowHeight)
       -- A quarter of the way down the second row: in its top half, so after the first.

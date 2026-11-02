@@ -103,11 +103,31 @@ describe("BetterBags Next's settings window on the whole addon", function()
       "categories > settings",
       "categories > rule", "categories > items", "categories > ignored", "categories > automation",
       "currencies > tracked", "currencies > currencies", "currencies > items", "currencies > display",
-      "backpack > layout", "backpack > items", "backpack > categories", "bank > layout", "bank > items",
-      "bank > categories", "guild > layout", "guild > items", "guild > categories", "profiles > profiles",
+      "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > layout", "bank > items",
+      "bank > categories", "bank > order", "guild > layout", "guild > items", "guild > categories", "guild > order",
+      "profiles > profiles",
       "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
     settings:Close()
     assert.are.same({}, handle.errors, "closing")
+  end)
+
+  -- Asked: "no scrollbox within tabs, just make the whole list scroll the tab content itself".
+  it("scrolls a bag's Order tab with the tab's own content", function()
+    local addon = start({ next = true })
+    local categories = addon:GetModule("Categories")
+    for i = 1, 40 do
+      categories:CreateCategory(ctx(addon), { name = "Spec " .. i, itemList = {}, save = true })
+    end
+    local settings = addon:GetModule("NextSettings")
+    settings:Open("backpack", "order")
+    assert.are.same({}, handle.errors)
+    local blocks = addon:GetModule("NextSettingsBagCategories").all
+    local block = blocks[#blocks]
+    assert.is_not_nil(block:RowFor("Spec 40"), "listed")
+    assert.is_nil(block.listBox, "no scroll box of its own")
+    assert.is_true(block:Measure(600) > settings:ContentHeight(), "taller than the tab shows")
+    assert.is_true(settings.scroll.scrollChild:GetHeight() >= block:Measure(600), "and what the tab scrolls holds it")
+    assert.are.same({}, handle.errors)
   end)
 
   -- The Categories page on the real window (next-settings.md §5): its list slides into the sidebar, the
@@ -201,8 +221,8 @@ describe("BetterBags Next's settings window on the whole addon", function()
     assert.is_true(settings:IsShown())
     assert.are.same({ "general > main", "appearance > theme", "itemcolors > main", "categories > settings",
       "categories > rule", "categories > items", "categories > ignored", "categories > automation", "currency > main",
-      "backpack > layout", "backpack > items", "backpack > categories", "bank > layout", "bank > items",
-      "bank > categories", "profiles > profiles", "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
+      "backpack > layout", "backpack > items", "backpack > categories", "backpack > order", "bank > layout", "bank > items",
+      "bank > categories", "bank > order", "profiles > profiles", "profiles > transfer", "quickfind > main" }, builtEveryTab(addon))
     settings:Open("backpack", "layout")
     assert.is_not_nil(rowOf(settings, "itemsPerRow"), "rows and columns, for the classic bags")
     assert.is_not_nil(rowOf(settings, "columns"))
