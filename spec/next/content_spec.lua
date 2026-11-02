@@ -1868,6 +1868,755 @@ describe("NextContent", function()
 
     -- Asked: "implement drag to reorder for columns ... we're not storing column positions, just list positions here, so
     -- what we save is still just an ordered list." The room goes to the place in the list whose slot is under the cursor.
+    -- Asked: "a 'compact' mode to columns, as a single toggle", that "aggressively pulls categories together and ignores
+    -- the concepts of columns", a section's start set by the icons and text before it, "always ... the nearest item grid
+    -- position -- no disjoint item button placement". Test names and sizes are the mock's: 6 pixels a character.
+    describe("compact", function()
+      local GAP, CELLS = style.GAP, 8
+
+      local function compact(opts)
+        opts = opts or {}
+        canvas:SetColumnSource(function()
+          return opts.columns or 2, opts.fill or "across", opts.span ~= false, opts.rows or 2, true
+        end)
+      end
+
+      local function width(name)
+        return canvas.byName[name].frame:GetWidth()
+      end
+
+      local function cellsWide(n)
+        return n * STEP - GAP
+      end
+
+      it("pulls a section as far left as the icons and the text before it allow", function()
+        compact()
+        sections({ { "Back", 1 }, { "Item Enhancement", 1 } })
+        draw()
+        assert.are.same({ 0, 0 }, place("Back"))
+        assert.are.equal(cellsWide(1), width("Back"), "its name and count fit over its icon")
+        assert.are.same({ STEP, 0 }, place("Item Enhancement"))
+        assert.are.equal(cellsWide(3), width("Item Enhancement"), "as wide as its name needs, in whole cells")
+      end)
+
+      it("starts the next section where the text before it ends, on the next grid position", function()
+        compact()
+        sections({ { "Item Enhancement", 1 }, { "Back", 1 } })
+        draw()
+        assert.are.same({ 3 * STEP, 0 }, place("Back"))
+      end)
+
+      it("pulls sections up from the next row: more in a row than it has columns", function()
+        compact()
+        sections({ { "Consumable", 16 }, { "Back", 1 }, { "Item Enhancement", 1 }, { "Miscellaneous", 1 }, { "Quest", 1 } })
+        local result = draw()
+        local row = height(2) + SPACING
+        assert.are.same({ 0, 0 }, place("Consumable"))
+        assert.are.equal(cellsWide(CELLS), width("Consumable"))
+        assert.are.same({ 0, row }, place("Back"))
+        assert.are.same({ STEP, row }, place("Item Enhancement"))
+        assert.are.same({ 4 * STEP, row }, place("Miscellaneous"))
+        assert.are.same({ 6 * STEP, row }, place("Quest"))
+        assert.are.equal(row + height(1), result.Height)
+      end)
+
+      it("holds a name that exactly fills its cells, and one a pixel over takes another", function()
+        compact()
+        -- 2 in, 78 of name, 8 to the count, 6 of count: 94, two cells to the pixel.
+        sections({ { "Miscellaneous", 1 }, { "Miscellaneousx", 1 } })
+        draw()
+        assert.are.equal(cellsWide(2), width("Miscellaneous"))
+        assert.are.equal(cellsWide(3), width("Miscellaneousx"))
+        assert.is_nil(canvas.byName.Miscellaneous.titleCut)
+      end)
+
+      it("keeps a gap of at least the grid's between a section's text and the next", function()
+        compact()
+        sections({ { "Miscellaneous", 1 }, { "Back", 1 } })
+        draw()
+        local A = canvas.byName.Miscellaneous
+        local textEnd = style.Theme.Sections.Title.X + A.title:GetStringWidth() + style.Theme.Sections.CountGap
+          + A.count:GetStringWidth()
+        assert.is_true(place("Back")[1] - textEnd >= GAP)
+      end)
+
+      it("starts a new row when nothing is left of this one, below the tallest", function()
+        compact()
+        sections({ { "A", 4 }, { "B", 6 }, { "C", 1 } })
+        local result = draw()
+        assert.are.same({ 0, 0 }, place("A"))
+        assert.are.same({ 0, height(1) + SPACING }, place("B"), "six do not fit in the four left")
+        assert.are.same({ 6 * STEP, height(1) + SPACING }, place("C"))
+        assert.are.equal(2 * height(1) + SPACING, result.Height)
+      end)
+
+      it("never puts a section ahead of its order to fill a hole", function()
+        compact()
+        sections({ { "A", 4 }, { "B", 6 }, { "C", 1 } })
+        draw()
+        assert.is_true(place("C")[2] > place("A")[2], "C would fit beside A, but B comes first")
+      end)
+
+      it("gives a wide section only the cells its icons take, and what is left to the next", function()
+        compact()
+        sections({ { "A", 6 }, { "B", 1 } })
+        draw()
+        assert.are.equal(cellsWide(6), width("A"))
+        assert.are.same({ 6 * STEP, 0 }, place("B"))
+      end)
+
+      it("takes no more cells than its rows need when it holds more than a row", function()
+        compact()
+        sections({ { "A", 9 }, { "B", 1 } })
+        draw()
+        assert.are.equal(cellsWide(5), width("A"), "two rows either way, five and four")
+        assert.are.same({ 5 * STEP, 0 }, place("B"))
+        local _, x, y = at(buttons["0_6"].frame)
+        assert.are.same({ 0, -STEP }, { x, y }, "its sixth icon starts its second row")
+      end)
+
+      it("keeps a section of its bag's Wide Column Limit within it, in as few cells as that allows", function()
+        compact({ rows = 3 })
+        sections({ { "A", 6 }, { "B", 3 }, { "C", 1 } })
+        draw()
+        assert.are.equal(cellsWide(3), width("A"), "two rows of three: it fits a column in two rows")
+        assert.are.equal(cellsWide(3), width("B"), "one row: it fits one")
+        assert.are.same({ 3 * STEP, 0 }, place("B"))
+        assert.are.same({ 6 * STEP, 0 }, place("C"))
+      end)
+
+      it("keeps a section within one column's width with wide sections off", function()
+        compact({ span = false })
+        sections({ { "A", 16 }, { "B", 1 } })
+        draw()
+        assert.are.equal(cellsWide(4), width("A"), "four rows of four")
+        assert.are.equal(HEADER + 4 * STEP - GAP, canvas.byName.A.height)
+        assert.are.same({ 4 * STEP, 0 }, place("B"))
+      end)
+
+      it("lays icons out across the width its name took", function()
+        compact({ span = false })
+        -- Six icons take three cells over two rows; this name takes four, so they lay out four and two.
+        sections({ { "A Rather Longer Name Here", 6 }, { "B", 1 } })
+        draw()
+        assert.are.equal(cellsWide(4), width("A Rather Longer Name Here"))
+        local _, x, y = at(buttons["0_5"].frame)
+        assert.are.same({ 0, -STEP }, { x, y })
+      end)
+
+      it("cuts a name too long for the whole row, as it always has, keeping its count", function()
+        compact()
+        local long = string.rep("x", 90)
+        sections({ { "A", 1 }, { long, 1 } })
+        draw()
+        assert.are.equal(cellsWide(CELLS), width(long))
+        assert.is_true(canvas.byName[long].titleCut)
+        assert.are.same({ 0, height(1) + SPACING }, place(long))
+      end)
+
+      it("holds a name that exactly fills its cell on a screen whose sums are not exact", function()
+        local layout = dofile("spec/helpers/layout.lua")
+        local undo = layout.UseScreen(3396, 1362, 0.65)
+        parent:SetParent(UIParent)
+        finally(function()
+          parent:SetParent(nil)
+          undo()
+        end)
+        compact()
+        sections({ { "A", 1 }, { "B", 1 } })
+        local pixel = addon:GetModule("NextPixel")
+        local frame, S, s = canvas.frame, style.Theme.Sections, canvas.byName.A
+        local fills = pixel:Length(frame, style.ICON) - pixel:Snap(frame, S.Title.X) - pixel:Snap(frame, S.CountGap)
+          - pixel:Ceil(frame, s.count:GetStringWidth())
+        s.title.GetStringWidth = function() return fills end
+        draw()
+        assert.are.equal(canvas.columnPlaces.step, canvas.byName.B.x)
+      end)
+
+      -- A section waiting in a dock card or held in a drag is drawn at another scale, where each length rounds otherwise.
+      describe("drawn on another grid", function()
+        local function onScreen()
+          local layout = dofile("spec/helpers/layout.lua")
+          local undo = layout.UseScreen(3396, 1362, 0.65)
+          parent:SetParent(UIParent)
+          finally(function()
+            parent:SetParent(nil)
+            undo()
+          end)
+        end
+
+        it("keeps whole a name that fits on its column's grid", function()
+          onScreen()
+          compact()
+          sections({ { "Miscellaneous", 1 }, { "Back", 1 } })
+          draw()
+          local s = canvas.byName.Miscellaneous
+          assert.is_nil(s.titleCut)
+          s.frame:SetScale(0.94)
+          canvas:LayoutSection(s, s.width, canvas:RowWidth(2))
+          assert.is_nil(s.titleCut)
+        end)
+
+        it("cuts a name a pixel over at rest, on its column's grid", function()
+          onScreen()
+          columns(2, "across")
+          sections({ { "A", 1 }, { "B", 1 } })
+          draw()
+          local pixel, S, s = addon:GetModule("NextPixel"), style.Theme.Sections, canvas.byName.A
+          local frame = canvas.frame
+          local over = s.width + pixel:Unit(frame) - pixel:Snap(frame, S.Title.X) - pixel:Snap(frame, S.CountGap)
+            - pixel:Ceil(frame, s.count:GetStringWidth())
+          s.title.GetStringWidth = function() return over end
+          canvas:LayoutSection(s, s.width)
+          assert.is_true(s.titleCut)
+        end)
+
+        it("keeps a name cut at rest cut, however little it was over", function()
+          onScreen()
+          columns(2, "across")
+          sections({ { "A", 1 }, { "B", 1 } })
+          draw()
+          local pixel, S, s = addon:GetModule("NextPixel"), style.Theme.Sections, canvas.byName.A
+          local frame, given = canvas.frame, s.width
+          local over = given + pixel:Unit(frame) - pixel:Snap(frame, S.Title.X) - pixel:Snap(frame, S.CountGap)
+            - pixel:Ceil(frame, s.count:GetStringWidth())
+          s.title.GetStringWidth = function() return over end
+          for _, scale in ipairs({ 0.94, 0.7, 0.5 }) do
+            s.frame:SetScale(scale)
+            canvas:LayoutSection(s, given)
+            assert.is_true(s.titleCut, "at " .. scale)
+          end
+        end)
+
+        it("keeps whole a name that exactly fills any number of cells", function()
+          onScreen()
+          columns(2, "across")
+          sections({ { "A", 1 } })
+          draw()
+          local pixel, S, s = addon:GetModule("NextPixel"), style.Theme.Sections, canvas.byName.A
+          local frame = canvas.frame
+          local cell, between = pixel:Length(frame, style.ICON), pixel:Length(frame, style.GAP)
+          local taken = pixel:Snap(frame, S.Title.X) + pixel:Snap(frame, S.CountGap) + pixel:Ceil(frame, s.count:GetStringWidth())
+          s.frame:SetScale(0.94)
+          for cells = 1, 8 do
+            local given = cells * (cell + between) - between
+            s.title.GetStringWidth = function() return given - taken end
+            canvas:LayoutSection(s, given)
+            assert.is_nil(s.titleCut, cells .. " cells")
+          end
+        end)
+
+        it("still cuts a name that does not fit on its column's grid", function()
+          onScreen()
+          compact()
+          local long = string.rep("x", 200)
+          sections({ { long, 1 } })
+          draw()
+          local s = canvas.byName[long]
+          assert.is_true(s.titleCut)
+          s.frame:SetScale(0.94)
+          canvas:LayoutSection(s, s.width, canvas:RowWidth(2))
+          assert.is_true(s.titleCut)
+        end)
+      end)
+
+      it("closes up around a section waiting in a dock, and gives it its place back", function()
+        compact()
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        local B = canvas.byName.B
+        canvas:HoldOut(B)
+        draw()
+        assert.are.same({ STEP, 0 }, place("C"), "the next pulled into its place")
+        canvas:Returning(B)
+        draw()
+        assert.are.same({ 2 * STEP, 0 }, place("C"), "room made for it")
+        assert.are.equal(STEP, B.x)
+        canvas:Return(B)
+        draw()
+        assert.are.same({ STEP, 0 }, place("B"))
+        assert.is_false(canvas:IsAway(B))
+      end)
+
+      it("has nothing to put side by side in a window of one cell", function()
+        compact()
+        sections({ { "A", 1 }, { "B", 1 } })
+        draw(canvas:RowWidth(1))
+        assert.is_nil(canvas.grid)
+      end)
+
+      it("rounds its name and its count up on their own, as they are drawn", function()
+        compact()
+        sections({ { "Back", 1 }, { "B", 1 } })
+        -- 2 in, 8 between: 43.8 as measured, in a cell of 44, but 45 once each is whole, where one cell would cut the name.
+        local s = canvas.byName.Back
+        s.title.GetStringWidth = function() return 20.4 end
+        s.count.GetStringWidth = function() return 13.4 end
+        draw()
+        assert.are.equal(cellsWide(2), width("Back"))
+        assert.is_nil(s.titleCut)
+      end)
+
+      it("measures a name cut short in columns whole, once it is compact", function()
+        columns(2, "across")
+        local long = string.rep("x", 40)
+        sections({ { long, 1 }, { "B", 1 } })
+        draw()
+        local s = canvas.byName[long]
+        assert.is_true(s.titleCut)
+        -- The client measures a font string cut to a width at that width.
+        local measure = s.title.GetStringWidth
+        s.title.GetStringWidth = function(self)
+          local whole = measure(self)
+          return (self._width or 0) > 0 and math.min(self._width, whole) or whole
+        end
+        compact()
+        draw()
+        assert.are.equal(cellsWide(6), width(long))
+        assert.is_nil(s.titleCut)
+      end)
+
+      it("has no columns to fill down, so a Fill Order changes nothing", function()
+        compact({ fill = "down" })
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+        draw()
+        assert.are.same({ 0, 0 }, place("A"))
+        assert.are.same({ STEP, 0 }, place("B"))
+        assert.are.same({ 2 * STEP, 0 }, place("C"))
+      end)
+
+      it("still pulls sections together in a window too narrow for two columns", function()
+        compact()
+        sections({ { "A", 1 }, { "B", 1 }, { "C", 1 } })
+        draw(canvas:RowWidth(3))
+        assert.are.same({ 2 * STEP, 0 }, place("C"))
+      end)
+
+      it("does nothing at one column", function()
+        compact({ columns = 1 })
+        sections({ { "A", 1 }, { "B", 1 } })
+        draw()
+        assert.are.same({ 0, height(1) + SPACING }, place("B"))
+        assert.is_nil(canvas.grid)
+      end)
+
+      it("leaves Recent Items and Free Space at the full width", function()
+        compact()
+        sections({ { "A", 1 } }, { recent = { item("9_1", "Recent Items") } })
+        draw()
+        assert.are.equal(cellsWide(1), width("A"))
+      end)
+
+      it("lays out as it did with it off", function()
+        canvas:SetColumnSource(function() return 2, "across", true, 2, false end)
+        sections({ { "Back", 1 }, { "Item Enhancement", 1 } })
+        draw()
+        assert.are.same({ 4 * STEP, 0 }, place("Item Enhancement"))
+      end)
+
+      describe("with a theme", function()
+        it("counts its title's place and the gap to its count", function()
+          compact()
+          override(style.Theme.Sections, "Title", { X = 10, Y = -4 })
+          sections({ { "Back", 1 }, { "B", 1 } })
+          draw()
+          assert.are.equal(cellsWide(2), width("Back"), "48 past a cell")
+        end)
+
+        it("keeps the room it asks for after a section's text", function()
+          compact()
+          override(style.Theme.Sections, "Compact", { TextEnd = 5 })
+          sections({ { "Back", 1 }, { "B", 1 } })
+          draw()
+          assert.are.equal(cellsWide(2), width("Back"), "45 past a cell")
+          assert.is_nil(canvas.byName.Back.titleCut)
+        end)
+
+        it("does without any such room when it asks for none", function()
+          compact()
+          override(style.Theme.Sections, "Compact", false)
+          sections({ { "Back", 1 }, { "B", 1 } })
+          draw()
+          assert.are.equal(cellsWide(1), width("Back"))
+        end)
+
+        it("stands every section on its own grid when its icons and gaps differ", function()
+          compact()
+          override(style, "ICON", 38)
+          override(style, "GAP", 12)
+          sections({ { "A", 1 }, { "Item Enhancement", 1 }, { "B", 1 } })
+          draw()
+          assert.are.same({ 50, 0 }, place("Item Enhancement"), "one cell of 38 and 12")
+          assert.are.same({ 200, 0 }, place("B"), "its name takes three cells of 50: 138")
+        end)
+
+        it("measures its text again for a theme applied while it shows: its fonts are the theme's", function()
+          compact()
+          sections({ { "Back", 1 }, { "B", 1 } })
+          draw()
+          assert.are.equal(cellsWide(1), width("Back"))
+          canvas.byName.Back.title.GetStringWidth = function() return 60 end
+          canvas:ApplyStyle(context:New("spec"))
+          draw()
+          assert.are.equal(cellsWide(2), width("Back"))
+        end)
+      end)
+
+      -- As in columns: "content changes and isn't always stable, so rows above or below it might get gapped out".
+      describe("held while it shows", function()
+        it("grows a section taller where it stands, one more item pushing nothing across the bag", function()
+          compact()
+          sections({ { "A", 1 }, { "B", 1 } })
+          draw()
+          sections({ { "A", 2 }, { "B", 1 } })
+          draw()
+          assert.are.equal(cellsWide(1), width("A"))
+          assert.are.same({ STEP, 0 }, place("B"))
+          assert.are.equal(height(2), canvas.byName.A.height)
+        end)
+
+        it("cuts a name its count has grown into, rather than move what follows", function()
+          compact()
+          sections({ { "Back", 1 }, { "B", 1 } })
+          draw()
+          -- "Back 10": 46 in a cell of 44.
+          sections({ { "Back", 10 }, { "B", 1 } })
+          draw()
+          assert.are.same({ STEP, 0 }, place("B"))
+          assert.is_true(canvas.byName.Back.titleCut)
+        end)
+
+        it("lays out afresh once it hides, and when told to", function()
+          compact()
+          sections({ { "A", 1 }, { "B", 1 } })
+          draw()
+          sections({ { "A", 2 }, { "B", 1 } })
+          canvas:ReleaseWidths()
+          draw()
+          assert.are.equal(cellsWide(2), width("A"))
+          sections({ { "A", 3 }, { "B", 1 } })
+          canvas:Settle()
+          draw()
+          assert.are.equal(cellsWide(3), width("A"))
+        end)
+
+        local function info(a, opts)
+          local items = { item("0_90", "B") }
+          for i = 1, a do table.insert(items, item("0_" .. i, "A")) end
+          local slotInfo = data({ categories = { { name = "A" }, { name = "B" } }, items = items })
+          slotInfo.layoutResets, slotInfo.builtForView = opts.resets, opts.view
+          return slotInfo
+        end
+
+        it("lays out afresh when a read starts its bag's layout over", function()
+          compact()
+          bind(info(1, { resets = 1 }))
+          draw()
+          bind(info(2, { resets = 1 }))
+          draw()
+          assert.are.equal(cellsWide(1), width("A"), "a read that keeps the layout keeps it")
+          bind(info(2, { resets = 2 }))
+          draw()
+          assert.are.equal(cellsWide(2), width("A"))
+        end)
+
+        it("lays out afresh for another view", function()
+          compact()
+          bind(info(1, { resets = 1, view = 1 }))
+          draw()
+          bind(info(2, { resets = 1, view = 2 }))
+          draw()
+          assert.are.equal(cellsWide(2), width("A"))
+        end)
+
+        it("forgets what it held when it stops being compact", function()
+          compact()
+          sections({ { "A", 1 }, { "B", 1 } })
+          draw()
+          assert.is_not_nil(next(canvas.heldCompact))
+          canvas:SetColumnSource(function() return 2, "across", true, 2, false end)
+          draw()
+          assert.are.same({}, canvas.heldCompact)
+        end)
+
+        it("holds nothing while it does not show", function()
+          compact()
+          canvas.frame:Hide()
+          sections({ { "A", 1 }, { "B", 1 } })
+          draw()
+          assert.are.same({}, canvas.heldCompact)
+          canvas.frame:Show()
+          sections({ { "A", 2 }, { "B", 1 } })
+          draw()
+          assert.are.equal(cellsWide(2), width("A"))
+        end)
+
+        it("forgets a section gone from the bag, which comes back measured afresh", function()
+          compact()
+          sections({ { "A", 1 }, { "B", 1 } })
+          draw()
+          sections({ { "B", 1 } })
+          draw()
+          sections({ { "A", 3 }, { "B", 1 } })
+          draw()
+          assert.are.equal(cellsWide(3), width("A"))
+        end)
+
+        it("still follows the window: a section holding more than a row takes the wider row", function()
+          compact()
+          sections({ { "A", 16 } })
+          draw()
+          assert.are.equal(cellsWide(8), width("A"))
+          draw(canvas:RowWidth(12))
+          assert.are.equal(cellsWide(8), width("A"), "two rows of eight at twelve as well: it needs no more")
+          draw(canvas:RowWidth(16))
+          assert.are.equal(cellsWide(16), width("A"), "one row")
+        end)
+
+      end)
+
+      -- What a small panel snaps to: every row stays as it is (next.md §14g).
+      describe("how wide it needs to be", function()
+        it("says its widest row, in cells", function()
+          compact()
+          sections({ { "Back", 1 }, { "Item Enhancement", 1 } })
+          draw(canvas:RowWidth(12))
+          assert.are.equal(4, canvas:Widest(canvas:RowWidth(12)))
+        end)
+
+        it("says none while it lays out none", function()
+          compact()
+          sections({ { "A", 1 } })
+          draw(canvas:RowWidth(12))
+          canvas:HoldOut(canvas.byName.A)
+          assert.are.equal(0, canvas:Widest(canvas:RowWidth(12)))
+        end)
+
+        it("needs two cells for a section of one: a window of one has no grid", function()
+          compact()
+          sections({ { "A", 1 } })
+          draw(canvas:RowWidth(12))
+          assert.are.equal(2, canvas:Widest(canvas:RowWidth(12)))
+        end)
+
+        it("says a window a section's rows fill needs all of it", function()
+          compact()
+          sections({ { "A", 16 } })
+          draw()
+          assert.are.equal(8, canvas:Widest(canvas:RowWidth(8)))
+        end)
+
+        it("keeps what a narrower window would change: a column's width, with wide sections off", function()
+          compact({ span = false })
+          sections({ { "A", 16 } })
+          draw(canvas:RowWidth(16))
+          assert.are.equal(15, canvas:Widest(canvas:RowWidth(16)), "two rows of eight need a first column of eight")
+          compact({ span = false, columns = 4 })
+          canvas:ReleaseWidths()
+          draw(canvas:RowWidth(16))
+          assert.are.equal(13, canvas:Widest(canvas:RowWidth(16)), "four rows of four need a first column of four")
+        end)
+
+        it("leaves out a section waiting in a dock or leaving", function()
+          compact()
+          sections({ { "A", 3 }, { "B", 3 } })
+          draw(canvas:RowWidth(12))
+          canvas:HoldOut(canvas.byName.A)
+          draw(canvas:RowWidth(12))
+          assert.are.equal(3, canvas:Widest(canvas:RowWidth(12)))
+        end)
+
+        it("counts Recent Items and Free Space, at the full width", function()
+          compact()
+          sections({ { "A", 1 } }, { free = { showAll = true, buttons = { { slotkey = "5_1" }, { slotkey = "5_2" },
+            { slotkey = "5_3" } } } })
+          draw(canvas:RowWidth(12))
+          assert.are.equal(3, canvas:Widest(canvas:RowWidth(12)))
+        end)
+      end)
+
+      -- Whatever the bag holds, what was asked: every icon on one grid, no text run into the next section, rows on one
+      -- line, the order kept, each section as far left as it can go, and a snap changing none of it.
+      describe("whatever the bag holds", function()
+        local function randomBag(rand)
+          local list = {}
+          for i = 1, rand(1, 12) do
+            table.insert(list, { "S" .. i .. string.rep("n", rand(0, 40)), rand(1, 22) })
+          end
+          return list
+        end
+
+        local function rowsOf(list)
+          local rows, current = {}, nil
+          for _, s in ipairs(list) do
+            local at_ = place(s[1])
+            if current == nil or current.y ~= at_[2] then
+              current = { y = at_[2], names = {} }
+              table.insert(rows, current)
+            end
+            table.insert(current.names, s[1])
+          end
+          return rows
+        end
+
+        it("keeps what was asked, in 400 random bags", function()
+          math.randomseed(1244)
+          local rand = math.random
+          for _ = 1, 400 do
+            local opts = { columns = rand(2, 4), span = rand(1, 3) > 1, rows = rand(2, 4) }
+            compact(opts)
+            local cells = rand(2, 14)
+            local list = randomBag(rand)
+            canvas:ReleaseWidths()
+            sections(list)
+            draw(canvas:RowWidth(cells))
+            local rows = rowsOf(list)
+            local previousBottom
+            for r, row in ipairs(rows) do
+              local x, tallest = 0, 0
+              for _, name in ipairs(row.names) do
+                local s = canvas.byName[name]
+                local where = place(name)
+                assert.are.equal(x, where[1], name .. " stands as far left as it can")
+                assert.are.equal(0, where[1] % STEP, "on a grid position")
+                local wide = s.frame:GetWidth()
+                assert.are.equal(0, (wide + GAP) % STEP, "a whole number of cells")
+                x = x + wide + GAP
+                assert.is_true(x - GAP <= cells * STEP - GAP, "not past the row")
+                local T = style.Theme.Sections
+                local text = T.Title.X + #name * 6 + T.CountGap + s.count:GetStringWidth()
+                if wide < cells * STEP - GAP then
+                  assert.is_true(text <= wide, "its text fits it, so nothing overlaps the next")
+                  assert.is_nil(s.titleCut)
+                end
+                for _, entry in ipairs(s.entries) do
+                  local _, ix = at(entry.item.frame)
+                  assert.are.equal(0, (where[1] + ix) % STEP, "every icon on one grid")
+                end
+                tallest = math.max(tallest, s.height)
+              end
+              if previousBottom then
+                assert.are.equal(previousBottom + SPACING, row.y, "the next row starts below the tallest")
+              end
+              previousBottom = row.y + tallest
+              -- Pulled up as far as it can be: the next row's first would not have fit.
+              if rows[r + 1] then
+                local nextWide = canvas.byName[rows[r + 1].names[1]].frame:GetWidth() + GAP
+                assert.is_true(x + nextWide > cells * STEP, "it would have fit in the row above")
+              end
+            end
+          end
+        end)
+
+        it("keeps every row as it stands when a window snaps to what it says it needs", function()
+          math.randomseed(1245)
+          local rand = math.random
+          for _ = 1, 300 do
+            compact({ columns = rand(2, 4), span = rand(1, 3) > 1, rows = rand(2, 4) })
+            local cells = rand(4, 20)
+            local list = randomBag(rand)
+            canvas:ReleaseWidths()
+            sections(list)
+            draw(canvas:RowWidth(cells))
+            local before = {}
+            for _, s in ipairs(list) do
+              before[s[1]] = { place(s[1])[1], place(s[1])[2], width(s[1]) }
+            end
+            local snapped = math.min(cells, canvas:Widest(canvas:RowWidth(cells)))
+            canvas:ReleaseWidths()
+            draw(canvas:RowWidth(snapped))
+            for _, s in ipairs(list) do
+              assert.are.same(before[s[1]], { place(s[1])[1], place(s[1])[2], width(s[1]) }, s[1] .. " at " .. cells
+                .. " snapped to " .. snapped)
+            end
+            assert.are.equal(snapped, math.min(snapped, canvas:Widest(canvas:RowWidth(snapped))), "and it stays there")
+          end
+        end)
+      end)
+
+      describe("reordering by drag", function()
+        local function slot()
+          return { canvas:GetDragSlotX(), canvas:GetDragSlotY() }
+        end
+
+        local function moveTo(x, y)
+          canvas:SetDragIndex(canvas:DragIndexAt(y, x))
+          draw()
+        end
+
+        before_each(function()
+          compact()
+          sections({ { "A", 1 }, { "B", 1 }, { "C", 1 }, { "D", 1 } })
+          draw()
+        end)
+
+        it("keeps its room where it was until the cursor moves", function()
+          canvas:BeginDrag(canvas.byName.C)
+          draw()
+          assert.are.same({ 2 * STEP, 0 }, slot())
+          assert.are.same({ STEP, 0 }, place("B"))
+          assert.are.same({ 3 * STEP, 0 }, place("D"))
+        end)
+
+        it("moves its room along the grid, the others making way", function()
+          canvas:BeginDrag(canvas.byName.C)
+          draw()
+          moveTo(5, 5)
+          assert.are.same({ 0, 0 }, slot())
+          assert.are.same({ STEP, 0 }, place("A"))
+          assert.are.same({ 2 * STEP, 0 }, place("B"))
+          moveTo(3 * STEP + 5, 5)
+          assert.are.same({ 3 * STEP, 0 }, slot())
+          assert.are.same({ 2 * STEP, 0 }, place("D"))
+        end)
+
+        it("takes its place in the order when it lands", function()
+          canvas:BeginDrag(canvas.byName.C)
+          draw()
+          moveTo(5, 5)
+          canvas:EndDrag(true)
+          draw()
+          assert.are.same({ "C", "A", "B", "D" }, names())
+          assert.are.same({ 0, 0 }, place("C"))
+        end)
+
+        it("gives its room the shape it will have there", function()
+          sections({ { "A", 1 }, { "Item Enhancement", 1 }, { "B", 1 } })
+          draw()
+          canvas:BeginDrag(canvas.byName["Item Enhancement"])
+          draw()
+          local slots = canvas:dragSlots()
+          assert.are.equal(3, #slots)
+          for i, x in ipairs({ 0, STEP, 2 * STEP }) do
+            assert.are.equal(x, slots[i].x)
+            assert.are.equal(cellsWide(3), slots[i].width)
+          end
+        end)
+
+        it("works each section's width out once to find its slots, not once per place", function()
+          canvas:BeginDrag(canvas.byName.C)
+          draw()
+          local asked = 0
+          local cells = canvas.compactCells
+          override(canvas, "compactCells", function(...)
+            asked = asked + 1
+            return cells(...)
+          end)
+          canvas:dragSlots()
+          assert.are.equal(4, asked)
+        end)
+
+        it("starts over when it no longer holds the same slots", function()
+          canvas:BeginDrag(canvas.byName.C)
+          draw()
+          local slots = canvas:dragSlots()
+          canvas:SetColumnSource(function() return 2, "across", true, 2, false end)
+          draw()
+          assert.are_not.equal(slots, canvas:dragSlots())
+        end)
+      end)
+    end)
+
     describe("reordering by drag", function()
       local function indexAt(x, y)
         return canvas:DragIndexAt(y, x)

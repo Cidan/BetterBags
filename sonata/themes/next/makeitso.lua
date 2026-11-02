@@ -298,6 +298,8 @@ sonataNext:RegisterTheme({
     Header = { Pieces = "Horizontal", Texture = "SectionBar", Color = "LcarsLilac", Height = 20,
       Begin = { TexCoords = { 0, 0.0625, 0, 1 }, Size = 20 }, Middle = { TexCoords = { 0.0625, 0.96875, 0, 1 } },
       End = { TexCoords = { 0.96875, 1, 0, 1 }, Size = 16 } },
+    -- A compact section as wide as its text keeps it off the bar's end cap.
+    Compact = { TextEnd = 16 },
     Line = false,
     Highlight = { Color = "LcarsPeach", From = 0.12, To = 0 },
   },

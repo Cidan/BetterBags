@@ -297,6 +297,8 @@ sonataNext:RegisterTheme({
   Sections = {
     Title = { X = 8, Y = -8 },
     Header = { Texture = "SectionRow", Color = "White" },
+    -- Its bar insets its title: as much at its other end when a compact section is only as wide as its text.
+    Compact = { TextEnd = 8 },
     Line = false,
     Highlight = { Texture = "RowHover", Color = "White", Alpha = 0.6 },
   },

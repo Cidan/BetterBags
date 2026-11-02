@@ -178,6 +178,7 @@ describe("NextBank", function()
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
+    override(stubs.database, "GetNextSectionCompact", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "GetInBagSearch", function() return db.inBagSearch end)
     db.tabOrder = {}
@@ -290,6 +291,11 @@ describe("NextBank", function()
     finishTweens()
     return bank
   end
+
+  it("reads its own bag's Compact Sections", function()
+    override(stubs.database, "GetNextSectionCompact", function(_, kind) return kind == const.BAG_KIND.BANK end)
+    assert.is_true(select(5, opened():SectionColumns()))
+  end)
 
   local function tabIDs(bank)
     local ids = {}

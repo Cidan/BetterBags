@@ -68,6 +68,7 @@ nextContent.MIN_COLUMN_CELLS = 2
 ---@field y number Where the last render put it, from the canvas's top.
 ---@field x? number Where the last render put it, from the canvas's left (its column).
 ---@field width? number The width it was last laid out, what its title has to fit.
+---@field givenWidth? number The width it was last given to lay out, before the grid it is drawn on rounded it.
 ---@field gridCells? number The cells of the whole width, in section columns: its gap is the same as every column's.
 ---@field titleCut? boolean Its title is cut short to fit.
 ---@field rowFillUnit? number The grid its row's art was painted on.
@@ -94,12 +95,21 @@ nextContent.MIN_COLUMN_CELLS = 2
 ---@field down boolean Sections fill down a column and then the next, not across a row and then the next.
 ---@field wide boolean A wide section takes more than one column.
 ---@field wideRows? number The rows a section reaches to be wide, at least 2.
+---@field compact boolean Sections stand on the next free grid position, not in columns (compactRows).
 
--- NextColumnCell is where a section stands in a row of columns.
+-- NextColumnCell is where a section stands in a row: in columns, or, compact, by the grid's cells.
 ---@class (exact) NextColumnCell
 ---@field section NextSection
----@field column number
----@field span number How many columns it takes.
+---@field column? number
+---@field span? number How many columns it takes.
+---@field start? number Compact: how many cells stand before it in its row.
+---@field cells? number Compact: how many cells it takes.
+
+-- NextCompactSize is what a compact section's width is worked out from, held while it shows (compactSize).
+---@class (exact) NextCompactSize
+---@field entries number
+---@field title number Its name's width, whole.
+---@field count number Its count's width.
 
 ---@class NextHeaderHandler
 ---@field OnHeaderDragStart? fun(self: any, section: NextSection)
@@ -120,10 +130,11 @@ nextContent.MIN_COLUMN_CELLS = 2
 ---@field drag? NextCanvasDrag The section being dragged.
 ---@field dragSlotY? number Where the last render put the dragged section's gap.
 ---@field dragSlotX? number The same, from its left, in section columns.
----@field columnSource? fun(): number, string?, boolean?, number? How many columns its bag is set to, how they fill, whether wide sections span them, and how many rows make a section wide (SetColumnSource).
+---@field columnSource? fun(): number, string?, boolean?, number?, boolean? How many columns its bag is set to, how they fill, whether wide sections span them, how many rows make a section wide, and whether they are compact (SetColumnSource).
 ---@field grid? NextColumnSplit The columns its last render laid out, none for one column.
 ---@field heldCells table<string, number> The cells each section takes to stay within its bag's Wide Column Limit, held while it shows (neededCells).
 ---@field heldRows? number The limit it holds them for.
+---@field heldCompact table<string, NextCompactSize> What each section's compact width is worked out from, held while it shows.
 ---@field layoutResets? number Which layout of its bag it holds them for (slotInfo.layoutResets).
 ---@field leaving table<string, number> Sections moved away, left out until this time (GetTime).
 ---@field away table<NextSection, NextCanvasAway> Sections held out of the column: waiting in a dock (NextDock), or flying back to their place (returning).
@@ -150,6 +161,7 @@ function nextContent:Create(parent)
   canvas.leaving = {}
   canvas.away = {}
   canvas.heldCells = {}
+  canvas.heldCompact = {}
   canvas.cards = false
   canvas.instant = false
   canvas.buttonSource = itemFrame
@@ -270,6 +282,18 @@ local function fontHeight(text)
   return height or 0
 end
 
+-- titleFits is whether a section's name and count fit the width it was given, on the grid that width was worked out on, its
+-- canvas's. Drawn shrunk (held in a drag, in a dock card) each length rounds otherwise and its width comes up short, which
+-- would cut a name that fits.
+---@private
+---@param section NextSection
+---@return boolean
+function canvasProto:titleFits(section)
+  local frame, S = self.frame, style.Theme.Sections
+  return pixel:Snap(frame, S.Title.X) + pixel:Ceil(frame, section.title:GetStringWidth()) + pixel:Snap(frame, S.CountGap)
+    + pixel:Ceil(frame, section.count:GetStringWidth()) <= pixel:Floor(frame, section.givenWidth) + 1e-6
+end
+
 -- placeTitleRow puts a section's title row on whole pixels (docs/next-pixel-perfect.md): the title at the
 -- theme's place, the count after the title's text and the line after the count's, each by its top left,
 -- the count and the line centered on the title by the fonts' heights. Anchored to a text's middle or its
@@ -296,7 +320,7 @@ function canvasProto:placeTitleRow(section)
   -- on its header's tooltip.
   if section.width ~= nil then
     local room = math.max(1, pixel:Floor(inner, section.width - x - countGap - countWidth))
-    if titleWidth > room then
+    if titleWidth > room and not self:titleFits(section) then
       titleWidth = room
       title:SetWidth(room)
       section.titleCut = true
@@ -357,6 +381,7 @@ function canvasProto:ApplyStyle(ctx)
   for _, section in pairs(self.stale) do
     self:styleSection(section)
   end
+  self.heldCompact = {}
   self:Invalidate()
 end
 
@@ -537,6 +562,7 @@ function canvasProto:finishBind()
     self.stale[name] = nil
     self.leaving[name] = nil
     self.heldCells[name] = nil
+    self.heldCompact[name] = nil
     self:release(section)
   end
 end
@@ -591,7 +617,7 @@ end
 -- columns of sections, how many cells they need to stay as they stand there: each column as wide as the largest section
 -- beside another (at least what keeps them columns), one spanning columns sharing what it needs among them, one alone in
 -- its row what it needs, as it can take the row, or as Recent Items or Free Space, at the full width, when that is more
--- (its gaps included: each takes a cell). Not one waiting
+-- (its gaps included: each takes a cell); compact, compactWidest. Not one waiting
 -- in a dock (one flying back is laid out again), nor one leaving; 0 while it lays out none. A small panel let go snaps to
 -- its widest row of icons (next.md §14g).
 ---@param layoutWidth? number
@@ -611,7 +637,9 @@ function canvasProto:Widest(layoutWidth)
       end
     end
   end
-  if grid and #columned > 0 then
+  if grid and grid.compact then
+    widest = #columned > 0 and self:compactWidest(grid, columned) or 0
+  elseif grid and #columned > 0 then
     local column, row = nextContent.MIN_COLUMN_CELLS, 0
     for _, cells in ipairs(self:columnRows(grid, columned)) do
       -- Filling down, one alone in its row still has a column: the sections above it are in that column too.
@@ -668,11 +696,11 @@ function canvasProto:Bind(ctx, slotInfo, tabID, claims)
   if tabID ~= self.boundTab or slotInfo.builtForView ~= self.boundView then
     self.boundTab, self.boundView = tabID, slotInfo.builtForView
     motion:ForgetShown(self)
-    self.heldCells = {}
+    self.heldCells, self.heldCompact = {}, {}
   end
   if slotInfo.layoutResets ~= self.layoutResets then
     self.layoutResets = slotInfo.layoutResets
-    self.heldCells = {}
+    self.heldCells, self.heldCompact = {}, {}
     -- A read that adds a tab re-sorts everything, tab after tab: what moved is placed at once (refresh-scheduler.md §11a).
     if slotInfo.tabArrived then
       motion:Forget(self)
@@ -803,6 +831,9 @@ function canvasProto:Render(parentResult)
   end
   local grid = self:ColumnSplit(layoutWidth)
   self.grid = grid
+  if (grid == nil or not grid.compact) and next(self.heldCompact) ~= nil then
+    self.heldCompact = {}
+  end
   if grid then
     y, placed = self:renderColumns(grid, width, layoutWidth, spacing, y, placed)
   end
@@ -861,33 +892,36 @@ function canvasProto:Render(parentResult)
 end
 
 -- SetColumnSource names what says how many columns of sections it lays out, how they fill, whether wide sections
--- span them and how many rows make a section wide: read each time it lays out. Without one (the vendor's cards) it
--- lays out one column.
----@param source fun(): number, string?, boolean?, number?
+-- span them, how many rows make a section wide and whether they are compact: read each time it lays out. Without one
+-- (the vendor's cards) it lays out one column.
+---@param source fun(): number, string?, boolean?, number?, boolean?
 function canvasProto:SetColumnSource(source)
   self.columnSource = source
 end
 
 -- ColumnSplit splits the cells a row holds at layoutWidth into the columns its bag is set to, each a whole number of
 -- cells, the spare ones in the first columns, so the window decides each column's size: nil for one column. Decided
--- in units on the width to lay out for, never on lengths rounded to the grid (next-pixel-perfect.md §3).
+-- in units on the width to lay out for, never on lengths rounded to the grid (next-pixel-perfect.md §3). Compact, a
+-- window too narrow for its columns can still hold sections side by side, so only a bag of one column has none.
 ---@param layoutWidth number
 ---@return NextColumnSplit?
 function canvasProto:ColumnSplit(layoutWidth)
   if self.columnSource == nil then
     return nil
   end
-  local wanted, fill, wide, wideRows = self.columnSource()
+  local wanted, fill, wide, wideRows, compact = self.columnSource()
   local cells = self:PerRow(layoutWidth)
   local count = math.min(wanted, math.floor(cells / nextContent.MIN_COLUMN_CELLS))
-  if count <= 1 then
+  compact = compact == true and wanted > 1 and cells > 1
+  if count <= 1 and not compact then
     return nil
   end
   local split, base, spare = {}, math.floor(cells / count), cells % count
   for i = 1, count do
     split[i] = base + (i <= spare and 1 or 0)
   end
-  return { cells = cells, count = count, split = split, down = fill == "down", wide = wide == true, wideRows = wideRows }
+  return { cells = cells, count = count, split = split, down = fill == "down", wide = wide == true,
+    wideRows = wideRows, compact = compact }
 end
 
 -- neededCells is how many cells keep a section under its bag's Wide Column Limit: reaching that many rows, it is wide
@@ -917,10 +951,124 @@ function canvasProto:neededCells(grid, section)
   return needed
 end
 
+-- compactSize is what a compact section's width is worked out from: how many icons it holds and how wide its name and
+-- count are, in units. Held from the first time it is asked while the canvas shows, as neededCells holds, so one item or
+-- a count gaining a digit moves nothing across the bag; what is worked out from it still follows the window.
+---@private
+---@param section NextSection
+---@return NextCompactSize
+function canvasProto:compactSize(section)
+  local held = self.heldCompact[section.name]
+  if held ~= nil then
+    return held
+  end
+  -- A font string keeps the width it was cut to: set back to none, its text set again, it measures its whole text.
+  if section.titleCut then
+    section.title:SetWidth(0)
+    section.title:SetText(section.name)
+    section.titleCut = nil
+  end
+  local size = { entries = #section.entries, title = section.title:GetStringWidth(), count = section.count:GetStringWidth() }
+  if self.frame:IsVisible() then
+    self.heldCompact[section.name] = size
+  end
+  return size
+end
+
+-- compactCells is how many cells a compact section takes: what its icons take or what its text takes, whichever is more,
+-- so it can never run into the next section, which starts a whole grid step after its last cell. Its icons take what
+-- keeps them within a column, or with wide sections on within its bag's Wide Column Limit, and of that as few cells as
+-- hold the same rows. Its text is on the grid it is drawn on (placeTitleRow), with the room its theme keeps after it
+-- (Sections.Compact.TextEnd): art with an end cap keeps its text off the cap. Never more than the row.
+---@private
+---@param grid NextColumnSplit
+---@param section NextSection
+---@param step number
+---@param gap number
+---@return number
+function canvasProto:compactCells(grid, section, step, gap)
+  local size, frame = self:compactSize(section), self.frame
+  local S = style.Theme.Sections
+  local text = pixel:Snap(frame, S.Title.X) + pixel:Ceil(frame, size.title) + pixel:Snap(frame, S.CountGap)
+    + pixel:Ceil(frame, size.count) + pixel:Snap(frame, S.Compact and S.Compact.TextEnd or 0)
+  local entries = size.entries
+  local most = grid.split[1]
+  if grid.wide then
+    most = math.max(most, math.min(math.ceil(entries / (grid.wideRows - 1)), grid.cells))
+  end
+  local icons = math.ceil(entries / math.ceil(entries / most))
+  return math.min(grid.cells, math.max(icons, math.ceil((text + gap) / step - 1e-6)))
+end
+
+-- compactRows arranges compact sections in rows, in their order: each on the grid position after the last cell of the one
+-- before, as many to a row as fit, whatever columns its bag is set to. Rows are still the only way sections stand side by
+-- side, and order is still never given up to fill a hole.
+---@private
+---@param grid NextColumnSplit
+---@param sections NextSection[]
+---@param known? table<NextSection, number> Each section's cells, kept between calls for one grid (dragSlots).
+---@return NextColumnCell[][]
+function canvasProto:compactRows(grid, sections, known)
+  local cellWidth, gap = self:gridLengths(self.frame, grid.cells)
+  local rows, row, used = {}, {}, 0
+  for _, section in ipairs(sections) do
+    local cells = known and known[section] or self:compactCells(grid, section, cellWidth + gap, gap)
+    if known then
+      known[section] = cells
+    end
+    if used + cells > grid.cells then
+      table.insert(rows, row)
+      row, used = {}, 0
+    end
+    table.insert(row, { section = section, start = used, cells = cells })
+    used = used + cells
+  end
+  if #row > 0 then
+    table.insert(rows, row)
+  end
+  return rows
+end
+
+-- compactCellsOf lists the cells each section of compact rows takes. A window holding the widest of those rows, with the
+-- same cells for each section, has the same rows.
+---@param rows NextColumnCell[][]
+---@return string
+local function compactCellsOf(rows)
+  local cells = {}
+  for _, row in ipairs(rows) do
+    for _, cell in ipairs(row) do
+      table.insert(cells, cell.cells)
+    end
+  end
+  return table.concat(cells, ",")
+end
+
+-- compactWidest is how many cells keep compact sections' rows as they stand at grid: its widest row, at least, and more
+-- where a narrower window would give a section other cells (a column's width, its Wide Column Limit's).
+---@private
+---@param grid NextColumnSplit
+---@param sections NextSection[]
+---@return number
+function canvasProto:compactWidest(grid, sections)
+  local rows = self:compactRows(grid, sections)
+  local widest = 0
+  for _, row in ipairs(rows) do
+    widest = math.max(widest, row[#row].start + row[#row].cells)
+  end
+  local wanted = compactCellsOf(rows)
+  for cells = widest, grid.cells - 1 do
+    local narrower = self:ColumnSplit(self:RowWidth(cells))
+    if narrower ~= nil and compactCellsOf(self:compactRows(narrower, sections)) == wanted then
+      return cells
+    end
+  end
+  return grid.cells
+end
+
 -- ReleaseWidths lets go of the widths it holds, and lays out again in columns: a sort that moved nothing has no read to
 -- start the layout afresh, and the player sorted to tidy up.
 function canvasProto:ReleaseWidths()
-  self.heldCells = {}
+  self.heldCells, self.heldCompact = {}, {}
   self:forgetDragLayout()
   if self.grid ~= nil then
     self:Invalidate()
@@ -936,8 +1084,12 @@ end
 ---@private
 ---@param grid NextColumnSplit
 ---@param sections NextSection[]
+---@param known? table<NextSection, number> Compact: each section's cells, kept between calls (compactRows).
 ---@return NextColumnCell[][]
-function canvasProto:columnRows(grid, sections)
+function canvasProto:columnRows(grid, sections, known)
+  if grid.compact then
+    return self:compactRows(grid, sections, known)
+  end
   local split, count = grid.split, grid.count
   local rows = {}
   if grid.down then
@@ -999,16 +1151,30 @@ function canvasProto:columnRows(grid, sections)
   return rows
 end
 
--- cellsOf is how many cells a place in a row takes: the columns it spans.
+-- cellsOf is how many cells a place in a row takes: the columns it spans, or what it was given, compact.
 ---@param grid NextColumnSplit
 ---@param cell NextColumnCell
 ---@return number
 local function cellsOf(grid, cell)
+  if cell.cells ~= nil then
+    return cell.cells
+  end
   local cells = 0
   for c = cell.column, cell.column + cell.span - 1 do
     cells = cells + grid.split[c]
   end
   return cells
+end
+
+-- xOf is where a place in a row starts, on the one grid: its column's first cell, or, compact, its own.
+---@param places table
+---@param cell NextColumnCell
+---@return number
+local function xOf(places, cell)
+  if cell.start ~= nil then
+    return cell.start * places.step
+  end
+  return places.xs[cell.column]
 end
 
 -- renderColumns lays its sections out in columns, from height y: Recent Items above them and Free Space below, at the
@@ -1068,8 +1234,9 @@ function canvasProto:renderColumns(grid, width, layoutWidth, spacing, y, placed)
   end
   local rowsTop = placed > 0 and y + spacing or y
   local shape = table.concat({ grid.cells, grid.count, #middle, step, rowsTop, tostring(grid.down), tostring(grid.wide),
-    tostring(grid.wideRows) }, ":")
-  self.columnPlaces = { xs = xs, step = step, gap = gap, spacing = spacing, top = rowsTop, shape = shape }
+    tostring(grid.wideRows), tostring(grid.compact) }, ":")
+  local places = { xs = xs, step = step, gap = gap, spacing = spacing, top = rowsTop, shape = shape }
+  self.columnPlaces = places
   if drag ~= nil and drag.slotsShape ~= shape then
     drag.slots = nil
   end
@@ -1107,7 +1274,7 @@ function canvasProto:renderColumns(grid, width, layoutWidth, spacing, y, placed)
       y = y + spacing
     end
     for _, cell in ipairs(row) do
-      place(cell.section, xs[cell.column], y)
+      place(cell.section, xOf(places, cell), y)
     end
     y = y + tallest
     placed = placed + 1
@@ -1154,6 +1321,7 @@ function canvasProto:LayoutSection(section, width, layoutWidth)
   local ctx
   layoutWidth = layoutWidth or section.layoutWidth or pixel:Floor(f, width)
   section.layoutWidth = layoutWidth
+  section.givenWidth = width
   local m = self:MeasureSection(section, f, width, layoutWidth)
   width = m.width
   section.width = width
@@ -1382,7 +1550,7 @@ function canvasProto:dragSlots()
     end
     return known[cells]
   end
-  local slots = {}
+  local slots, known = {}, {}
   for index = first, last do
     local list = {}
     for i = first, last - 1 do
@@ -1395,14 +1563,14 @@ function canvasProto:dragSlots()
       table.insert(list, drag.section)
     end
     local y = places.top
-    for _, row in ipairs(self:columnRows(grid, list)) do
+    for _, row in ipairs(self:columnRows(grid, list, known)) do
       local tallest, slot = 0, nil
       for _, cell in ipairs(row) do
         local cells = cellsOf(grid, cell)
         local height = heightOf(cell.section, cells)
         tallest = math.max(tallest, height)
         if cell.section == drag.section then
-          slot = { index = index, x = places.xs[cell.column], y = y, width = cells * places.step - places.gap, height = height }
+          slot = { index = index, x = xOf(places, cell), y = y, width = cells * places.step - places.gap, height = height }
         end
       end
       if slot ~= nil then
@@ -1632,7 +1800,7 @@ end
 -- Settle ends every move and cascade at its end: the canvas hid.
 function canvasProto:Settle()
   motion:Forget(self)
-  self.heldCells = {}
+  self.heldCells, self.heldCompact = {}, {}
   for _, section in ipairs(self.order) do
     tween:Stop(section, true)
   end

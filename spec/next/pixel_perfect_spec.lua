@@ -152,6 +152,7 @@ describe("BetterBags Next, pixel perfect", function()
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
+    override(stubs.database, "GetNextSectionCompact", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "SetNextSize", function(_, size) db.size = size end)
     override(stubs.database, "GetNextSmallPlace", function(_, kind)
@@ -495,11 +496,13 @@ describe("BetterBags Next, pixel perfect", function()
     end
 
     -- Asked: drag to reorder in columns. The real drag, tweens each frame, as "keeps the column on whole pixels" in one column.
-    for _, fill in ipairs({ "across", "down" }) do
-      it("keeps its columns on whole pixels while a section is dragged across them, filling " .. fill, function()
+    for _, case in ipairs({ { "across" }, { "down" }, { "across", true } }) do
+      local fill, packed = case[1], case[2] == true
+      it("keeps its columns on whole pixels while a section is dragged across them, filling " .. fill .. (packed and ", compact" or ""), function()
         db.size, db.bagScale = "small", 55
         useScreen(3396, 1362, 0.65)
         columns(2, fill, true)
+        override(stubs.database, "GetNextSectionCompact", function() return packed end)
         local cats, list = {}, {}
         for i = 1, 8 do
           table.insert(cats, { name = "S" .. i })
@@ -646,6 +649,201 @@ describe("BetterBags Next, pixel perfect", function()
         end
       end)
     end
+
+    -- Asked of compact sections: "always make sure we round to the nearest item grid position -- no disjoint item button
+    -- placement ... compact mode must never violate this constraint."
+    describe("compact", function()
+      local function compactBag()
+        columns(2, "across", true)
+        override(stubs.database, "GetNextSectionCompact", function() return true end)
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        local list, n = {}, 0
+        local cats = {}
+        for _, s in ipairs({ { "Consumable", 16 }, { "Back", 1 }, { "Item Enhancement", 1 }, { "Miscellaneous", 1 }, { "Quest", 1 } }) do
+          table.insert(cats, { name = s[1] })
+          for _ = 1, s[2] do
+            n = n + 1
+            table.insert(list, item("0_" .. n, s[1]))
+          end
+        end
+        bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }, function() end)
+        settle()
+        return bag, n
+      end
+
+      local function assertOneGrid(bag, n)
+        assert.are.same({}, offGrid(bag))
+        local first = layout.Rect(buttons["0_1"].frame).left
+        local step = layout.Rect(buttons["0_2"].frame).left - first
+        assert.is_true(step > 0)
+        for i = 1, n do
+          local cells = (layout.Rect(buttons["0_" .. i].frame).left - first) / step
+          assert.is_true(math.abs(cells - math.floor(cells + 0.5)) < 0.001, "icon " .. i .. " stands " .. cells .. " cells along")
+        end
+      end
+
+      -- How many fit depends on the theme's fonts; on the default's, more than it has columns.
+      local function assertPulledTogether(bag)
+        local content = bag.content
+        assert.is_true(content.byName["Item Enhancement"].x < content.byName.Miscellaneous.x)
+        assert.are.equal(content.byName.Back.y, content.byName.Miscellaneous.y, "three in a row of two columns")
+      end
+
+      for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 3396, 1362, 0.7 }, { 1920, 1080, 0.64 }, { 2560, 1440, 1.15 } }) do
+        it("stands every icon on one grid across its sections, on " .. screenName(screen), function()
+          useScreen(screen[1], screen[2], screen[3])
+          db.size = "small"
+          local bag, n = compactBag()
+          assertOneGrid(bag, n)
+          assertPulledTogether(bag)
+        end)
+      end
+
+      it("stands every icon on one grid at a Bag Scale", function()
+        useScreen(3396, 1362, 0.65)
+        db.size, db.bagScale = "small", 85
+        local bag, n = compactBag()
+        assertOneGrid(bag, n)
+        assertPulledTogether(bag)
+        db.bagScale = 100
+      end)
+
+      -- Its name's room on the grid it is drawn on can only move a section by a cell for a name within a pixel or two
+      -- of a cell's end: these are not.
+      it("puts every section in the same cells at every Bag Scale", function()
+        for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 1920, 1080, 0.64 }, { 2560, 1440, 1 } }) do
+          useScreen(screen[1], screen[2], screen[3])
+          db.size = "small"
+          local shape
+          for scale = 50, 150, 5 do
+            db.bagScale = scale
+            columns(2, "across", true)
+            override(stubs.database, "GetNextSectionCompact", function() return true end)
+            local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+            local list, cats, n = {}, {}, 0
+            for _, s in ipairs({ { "Consumable", 16 }, { "Back", 1 }, { "Item Enhancement", 1 }, { "Quest", 1 } }) do
+              table.insert(cats, { name = s[1] })
+              for _ = 1, s[2] do
+                n = n + 1
+                table.insert(list, item("0_" .. n, s[1]))
+              end
+            end
+            bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }, function() end)
+            settle()
+            local content, now = bag.content, {}
+            local step = layout.Rect(buttons["0_2"].frame).left - layout.Rect(buttons["0_1"].frame).left
+            for _, s in ipairs({ "Consumable", "Back", "Item Enhancement", "Quest" }) do
+              local r, origin = layout.Rect(content.byName[s].frame), layout.Rect(content.frame)
+              table.insert(now, math.floor((r.left - origin.left) / step + 0.5))
+              table.insert(now, content.byName[s].y > 0 and math.floor(content.byName[s].y / content.byName.Back.y + 0.5) or 0)
+            end
+            shape = shape or now
+            assert.are.same(shape, now, string.format("%s at Bag Scale %d%%", screenName(screen), scale))
+            bag:Hide(ctx())
+            finishTweens()
+          end
+          db.bagScale = 100
+        end
+      end)
+
+      it("moves no icon while a grip sizes it, but where a row holds another cell", function()
+        useScreen(3396, 1362, 0.65)
+        db.size, db.bagScale = "small", 100
+        columns(2, "across", true)
+        override(stubs.database, "GetNextSectionCompact", function() return true end)
+        local cats, list = {}, {}
+        for s, n in ipairs({ 1, 14, 4, 7, 20 }) do
+          table.insert(cats, { name = "S" .. s })
+          for i = 1, n do table.insert(list, item(s .. "_" .. i, "S" .. s)) end
+        end
+        slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        settle()
+        local ppu, s = layout.PixelsPerUnit(), bag.frame:GetEffectiveScale()
+        local h = bag.frame:GetHeight()
+        local r0 = layout.Rect(bag.frame)
+        local start = math.floor((r0.right - r0.left) * ppu + 0.5)
+        bag:StartSizing("RIGHT")
+        local previous
+        for px = start, start + 130 do
+          bag.frame:SetSize(px / ppu / s, h)
+          bag.frame:GetScript("OnSizeChanged")(bag.frame, px / ppu / s, h)
+          render:Flush()
+          local frame = layout.Rect(bag.frame)
+          local now = { perRow = bag.content:PerRow(bag:LayoutWidth() - bag:ContentRoom()), places = {} }
+          for key, b in pairs(buttons) do
+            local r = layout.Rect(b.frame)
+            if r ~= nil and b.frame:IsVisible() then
+              now.places[key] = math.floor((r.left - frame.left) * ppu + 0.5) .. "," .. math.floor((frame.top - r.top) * ppu + 0.5)
+            end
+          end
+          if previous ~= nil and previous.perRow == now.perRow then
+            assert.are.same(previous.places, now.places, (px - 1) .. " to " .. px .. " pixels wide")
+          end
+          previous = now
+        end
+        bag:StopSizing()
+        bag:Hide(ctx())
+        finishTweens()
+      end)
+
+      -- Found by the bug review: held in a drag a section is drawn shrunk, on another grid, where each length rounds otherwise,
+      -- and a compact section has no room to spare.
+      it("keeps a name that fits whole while its section is held in a drag", function()
+        useScreen(3396, 1362, 0.65)
+        db.size, db.bagScale = "small", 100
+        columns(2, "across", true)
+        override(stubs.database, "GetNextSectionCompact", function() return true end)
+        slots[BACKPACK] = { sortedItems = {}, layoutResets = 1, tabs = { [1] = {
+          categories = { { name = "Miscellaneous" }, { name = "Back" } },
+          items = { item("0_1", "Miscellaneous"), item("0_2", "Back") } } } }
+        local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
+        settle()
+        local s = bag.content.byName.Miscellaneous
+        assert.is_nil(s.titleCut)
+        local sc = s.frame:GetEffectiveScale()
+        _G._cursorX, _G._cursorY = (s.frame:GetLeft() + 20) * sc, (s.frame:GetTop() - 10) * sc
+        _G._mouseButtonsDown = { LeftButton = true }
+        s.header:GetScript("OnDragStart")(s.header)
+        for i = 1, 30 do
+          tween.driver:GetScript("OnUpdate")(tween.driver, 0.016)
+          nextDrag:Update(0.016)
+          if i % 10 == 0 then bag.content:Invalidate() end
+          render:Flush()
+        end
+        assert.is_true(s.frame:GetEffectiveScale() < sc, "drawn shrunk")
+        assert.is_nil(s.titleCut)
+        s.header:GetScript("OnDragStop")(s.header)
+        finishTweens()
+        _G._mouseButtonsDown = nil
+        bag:Hide(ctx())
+        finishTweens()
+      end)
+
+      it("stands every icon on one grid in every shipped theme", function()
+        _G._loadedAddOns = { GW2_UI = true }
+        useScreen(3396, 1362, 0.65)
+        db.size = "small"
+        local errors = {}
+        local savedHandler = _G.geterrorhandler
+        _G.geterrorhandler = function() return function(err) table.insert(errors, tostring(err)) end end
+        startSonataNext()
+        local bag, n = compactBag()
+        local keys = {}
+        for key in pairs(sonataNext:GetThemes()) do table.insert(keys, key) end
+        table.sort(keys)
+        assert.is_true(#keys >= 4)
+        for _, key in ipairs(keys) do
+          sonataNext:ApplyTheme(ctx(), key, false)
+          settle()
+          assertOneGrid(bag, n)
+          assert.are.same({}, errors, key)
+        end
+        sonataNext:ApplyTheme(ctx(), "Default", false)
+        _G.geterrorhandler = savedHandler
+        _G._loadedAddOns = nil
+      end)
+    end)
 
     it("stays on whole pixels at a Bag Scale", function()
       useScreen(3396, 1362, 0.65)

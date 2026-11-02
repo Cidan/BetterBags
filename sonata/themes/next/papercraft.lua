@@ -392,6 +392,8 @@ sonataNext:RegisterTheme({
     CountGap = 8,
     LineGap = 10,
     Header = { Texture = "Swash", Color = "Highlighter", Alpha = 0.55, Height = 26 },
+    -- The stroke runs past its title on both sides, even when a compact section is only as wide as its text.
+    Compact = { TextEnd = 4 },
     Line = { Texture = "PencilLine", Color = "Ink", Alpha = 0.42, Size = 8 },
     Highlight = { Texture = "Swash", Color = "PencilBlue", Alpha = 0.22 },
   },

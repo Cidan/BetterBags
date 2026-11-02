@@ -438,6 +438,10 @@ sonataNext:RegisterTheme({
     Line = { Color = "Lavender", From = 0.35, To = 0, Size = 1 },
     -- Lit under a section's title row while the pointer is over it; or art.
     Highlight = { Color = "Lavender", From = 0.12, To = 0 },
+    -- A compact section (a bag's Compact Sections) is as wide as its icons or its text need, in whole cells of the icon
+    -- grid. TextEnd is room it keeps after its text for the theme's art: an end cap, a bar's inset. The next section
+    -- is always at least the icon gap further on.
+    Compact = { TextEnd = 0 },
   },
 
   Tabs = {

@@ -238,6 +238,43 @@ describe("NextDock", function()
       assert.are.same({}, layout.PixelCheck(target.frame, { owners = { card = entry.box, section = section("B"), entry = entry } }))
     end)
 
+    -- Found by the bug review of Compact Sections: held in a drag a section's width comes up short on the grid it is shrunk to,
+    -- and a card read that width and took it short again, cutting a name that fit its column.
+    it("seats a section dragged here at the width its column gave it, its name whole", function()
+      local layout = dofile("spec/helpers/layout.lua")
+      local pixel = addon:GetModule("NextPixel")
+      finally(layout.UseScreen(3396, 1362, 0.65))
+      UseNextTheme(nil)
+      for i, p in ipairs({ source, target }) do
+        p.frame:ClearAllPoints()
+        pixel:Point(p.frame, "TOPLEFT", UIParent, "TOPLEFT", 37 + (i - 1) * 600, -40)
+        pixel:Size(p.frame, 400, 600)
+        p.content.frame:ClearAllPoints()
+        p.content.frame:SetPoint("TOPLEFT", p.frame, "TOPLEFT", 0, 0)
+        p.scroll.frame._rect = nil
+        p.scroll.frame:SetAllPoints(p.frame)
+      end
+      bindSource({ "B" })
+      local s, content = section("B"), source.content
+      local frame, S = content.frame, style.Theme.Sections
+      local column = pixel:Length(frame, 2 * style.ICON + style.GAP)
+      local fills = column - pixel:Snap(frame, S.Title.X) - pixel:Snap(frame, S.CountGap) - pixel:Ceil(frame, s.count:GetStringWidth())
+      s.title.GetStringWidth = function() return fills end
+      content:LayoutSection(s, column, content:RowWidth(2))
+      assert.is_nil(s.titleCut)
+      -- Held in a drag, at the column's width on the grid it is shrunk to, which comes up short.
+      s.frame:SetScale(0.94)
+      content:LayoutSection(s, column)
+      assert.is_true(s.frame:GetWidth() < column)
+      s.frame:SetScale(1)
+      local entry = dock("B")
+      settle()
+      finishTweens()
+      settle()
+      assert.is_true(entry.seated)
+      assert.is_nil(s.titleCut)
+    end)
+
     it("flies the section from where it was into its card", function()
       section("B").frame:_SetRect(100, 300, style.GRID_WIDTH, 60)
       local entry = dock("B")

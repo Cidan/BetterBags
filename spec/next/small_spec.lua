@@ -156,6 +156,7 @@ describe("BetterBags Next's small mode", function()
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
+    override(stubs.database, "GetNextSectionCompact", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "SetNextSize", function(_, size) db.size = size end)
     override(stubs.database, "GetNextSmallPlace", function(_, kind)
@@ -457,6 +458,49 @@ describe("BetterBags Next's small mode", function()
         local at = bag.content:RowWidth(20) + room
         assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(25) + room))
         assert.are.equal(at, bag:SnapWidth(at))
+      end)
+
+      -- Asked of compact sections: a bag let go too wide comes back to its widest row, every row as it stands.
+      it("snaps compact sections to their widest row, and stays there", function()
+        local bag, room = bagIn({ { "A", 1 }, { "B", 1 }, { "C", 3 } })
+        override(stubs.database, "GetNextSectionCompact", function() return true end)
+        bag.content:Settle()
+        local at = bag.content:RowWidth(5) + room
+        assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(20) + room))
+        assert.are.equal(at, bag:SnapWidth(at))
+      end)
+
+      it("keeps every compact row through a grip let go too wide, and a press that moves nothing", function()
+        finally(dofile("spec/helpers/layout.lua").UseScreen(3396, 1362, 0.65))
+        local bag = bagIn({ { "A", 1 }, { "B", 1 }, { "C", 3 } })
+        override(stubs.database, "GetNextSectionCompact", function() return true end)
+        bag.content:Invalidate()
+        render:Flush()
+        local room = bag:ContentRoom()
+        local function rows()
+          local c = bag.content.byName
+          return { c.A.x, c.A.y, c.B.x, c.B.y, c.C.x, c.C.y }
+        end
+        local before = rows()
+        local snapped = bag.content:RowWidth(5) + room
+        bag:StartSizing("RIGHT")
+        bag.frame:SetSize(bag.content:RowWidth(20) + room, bag.frame:GetHeight())
+        bag:Resized()
+        render:Flush()
+        bag:StopSizing()
+        finishTweens()
+        render:Flush()
+        assert.are.same(before, rows())
+        assert.is_true(math.abs(snapped - bag:SmallWidth()) < 1)
+        local width = bag:SmallWidth()
+        bag:StartSizing("RIGHT")
+        bag:Resized()
+        render:Flush()
+        bag:StopSizing()
+        finishTweens()
+        render:Flush()
+        assert.are.same(before, rows())
+        assert.are.equal(width, bag:SmallWidth())
       end)
 
       -- A width let go at snaps to one the snap leaves alone, the same number of columns, never wider, for any bag.

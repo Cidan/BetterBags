@@ -27,6 +27,7 @@ db.GetNextTheme = db.GetNextTheme or function() return "Default" end
 db.GetNextSectionColumns = db.GetNextSectionColumns or function() return 1 end
 db.GetNextSectionFill = db.GetNextSectionFill or function() return "across" end
 db.GetNextSectionSpan = db.GetNextSectionSpan or function() return true end
+db.GetNextSectionCompact = db.GetNextSectionCompact or function() return false end
 db.GetNextSectionWideRows = db.GetNextSectionWideRows or function() return 2 end
 -- The Animation switches (next-themes.md §20), all on, which SonataNext lays over the theme it uses.
 db.GetNextAnimation = db.GetNextAnimation or function() return true end
@@ -351,7 +352,7 @@ describe("NextSettingsContent", function()
       assert.are.equal(const.BAG_KIND.BANK, page.bag.kind)
       assert.are.same({
         { "Layout", "Order", { "sectionOrder", "itemOrder" } },
-        { "Layout", "Sections [next]", { "sectionColumns", "sectionFill", "sectionSpan", "sectionWideRows" } },
+        { "Layout", "Sections [next]", { "sectionColumns", "sectionCompact", "sectionFill", "sectionSpan", "sectionWideRows" } },
         { "Layout", "Tabs", { "enableGroups" } },
         { "Layout", "Slots", { "showAllFreeSpace", "preserveGaps" } },
         { "Layout", "Window [classic]", { "resizableWindow", "snapToContent", "itemsPerRow", "columns", "opacity",
@@ -466,8 +467,8 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 29, the Currencies page's 10 (currency.md §6), and each bag's 33.
-      assert.are.equal(29 + 10 + 3 * 33, named)
+      -- The general pages' 29, the Currencies page's 10 (currency.md §6), and each bag's 34.
+      assert.are.equal(29 + 10 + 3 * 34, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()

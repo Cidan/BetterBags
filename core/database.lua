@@ -1351,6 +1351,19 @@ function DB:SetNextSectionSpan(kind, on)
   DB.data.profile.nextSectionSpan[kind] = on
 end
 
+-- GetNextSectionCompact is whether a bag's sections stand on the next free grid position rather than in its columns.
+---@param kind BagKind
+---@return boolean
+function DB:GetNextSectionCompact(kind)
+  return DB.data.profile.nextSectionCompact[kind] == true
+end
+
+---@param kind BagKind
+---@param on boolean
+function DB:SetNextSectionCompact(kind, on)
+  DB.data.profile.nextSectionCompact[kind] = on
+end
+
 -- GetNextSectionWideRows is how many rows a section takes in one of a bag's columns before it counts as wide.
 ---@param kind BagKind
 ---@return number

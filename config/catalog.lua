@@ -719,6 +719,23 @@ define('sectionColumns', {
   end,
 })
 
+define('sectionCompact', {
+  kind = "toggle",
+  bag = true,
+  title = 'Compact Sections',
+  description = function(bag)
+    return 'Packs the ' .. lower(bag) .. "'s sections as close together as their icons and names allow, each starting "
+      .. 'on the next free spot of the icon grid, so a row holds as many as fit rather than one per column.'
+  end,
+  keywords = { 'columns', 'compact', 'dense', 'tight', 'grid', 'side by side', 'sections' },
+  disabled = function(bag) return db:GetNextSectionColumns(bag.kind) <= 1 end,
+  get = function(_, bag) return db:GetNextSectionCompact(bag.kind) end,
+  set = function(ctx, value, bag)
+    db:SetNextSectionCompact(bag.kind, value)
+    events:SendMessage(ctx, 'next/SectionColumnsChanged', bag.kind)
+  end,
+})
+
 local sectionFills = {
   ["Side to Side"] = "across",
   ["Top to Bottom"] = "down",
@@ -734,7 +751,7 @@ define('sectionFill', {
   end,
   keywords = { 'columns', 'sort', 'order', 'top to bottom', 'side to side', 'sections' },
   items = { 'Side to Side', 'Top to Bottom' },
-  disabled = function(bag) return db:GetNextSectionColumns(bag.kind) <= 1 end,
+  disabled = function(bag) return db:GetNextSectionColumns(bag.kind) <= 1 or db:GetNextSectionCompact(bag.kind) end,
   get = function(_, bag) return choiceOf(sectionFills, db:GetNextSectionFill(bag.kind)) end,
   set = function(ctx, value, bag)
     db:SetNextSectionFill(bag.kind, sectionFills[value])
