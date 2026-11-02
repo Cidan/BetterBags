@@ -3202,8 +3202,7 @@ function panelProto:OnHeaderEnter(section)
   GameTooltip:SetOwner(section.header, self.side == "LEFT" and "ANCHOR_RIGHT" or "ANCHOR_LEFT")
   GameTooltip:SetText(section.name, 1, 1, 1, 1, true)
   if section.kind == "category" then
-    GameTooltip:AddLine(self.content:CanReorder() and L:G("Drag to reorder, or onto a tab or the other bag.")
-      or L:G("Drag onto a tab or the other bag."), 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(L:G("Drag to reorder, or onto a tab or the other bag."), 0.8, 0.8, 0.8, true)
   end
   if section.kind ~= "free" then
     GameTooltip:AddLine(L:G("Right-click to move it to the open window."), 0.8, 0.8, 0.8, true)

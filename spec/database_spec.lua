@@ -125,6 +125,10 @@ const.DATABASE_DEFAULTS = {
     showFullSectionNames = { [0] = false, [1] = false },
     showAllFreeSpace = { [0] = false, [1] = false },
     nextSectionColumns = { [0] = const.NEXT_SECTION_COLUMNS_DEFAULT, [1] = const.NEXT_SECTION_COLUMNS_DEFAULT },
+    nextSectionSort = {
+      [0] = { [2] = const.SECTION_SORT_TYPE.SIZE_DESCENDING, [4] = const.SECTION_SORT_TYPE.SIZE_DESCENDING },
+      [1] = { [2] = const.SECTION_SORT_TYPE.SIZE_DESCENDING, [4] = const.SECTION_SORT_TYPE.SIZE_DESCENDING },
+    },
     nextSectionFill = { [0] = "across", [1] = "across" },
     nextSectionSpan = { [0] = true, [1] = true },
     nextSectionWideRows = { [0] = 2, [1] = 2 },
@@ -859,6 +863,26 @@ describe("Database", function()
     it("GetShowAllFreeSpace / SetShowAllFreeSpace", function()
       DB:SetShowAllFreeSpace(const.BAG_KIND.BACKPACK, true)
       assert.is_true(DB:GetShowAllFreeSpace(const.BAG_KIND.BACKPACK))
+    end)
+
+    -- Asked: the default of largest section first is BetterBags Next's: "i did mean bbn here".
+    it("keeps each design's section order apart", function()
+      local kind, view = const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID
+      DB:SetNextEnabled(false)
+      local classic = DB:GetSectionSortType(kind, view)
+      DB:SetNextEnabled(true)
+      assert.are.equal(const.SECTION_SORT_TYPE.SIZE_DESCENDING, DB:GetSectionSortType(kind, view))
+      DB:SetSectionSortType(kind, view, const.SECTION_SORT_TYPE.SIZE_ASCENDING)
+      assert.are.equal(const.SECTION_SORT_TYPE.SIZE_ASCENDING, DB:GetSectionSortType(kind, view))
+      DB:SetNextEnabled(false)
+      assert.are.equal(classic, DB:GetSectionSortType(kind, view), "setting Next's leaves the classic bags' alone")
+      DB:SetSectionSortType(kind, view, const.SECTION_SORT_TYPE.ALPHABETICALLY)
+      DB:SetNextEnabled(true)
+      assert.are.equal(const.SECTION_SORT_TYPE.SIZE_ASCENDING, DB:GetSectionSortType(kind, view),
+        "setting the classic bags' leaves Next's alone")
+      DB:SetSectionSortType(kind, view, const.SECTION_SORT_TYPE.SIZE_DESCENDING)
+      DB:SetNextEnabled(false)
+      DB:SetSectionSortType(kind, view, classic)
     end)
 
     it("keeps each bag's section columns, two until set, within what a window can show", function()

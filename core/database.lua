@@ -694,18 +694,26 @@ function DB:SetBagViewSizeOpacity(kind, view, opacity)
   DB.data.profile.size[view][kind].opacity = opacity
 end
 
+-- sectionSortOf is the Section Order of the bags in use: each design keeps its own, as BetterBags Next's section columns
+-- are apart from the classic bags' columns (next.md §7a).
+---@param profile table
+---@return table
+local function sectionSortOf(profile)
+  return profile.nextEnabled and profile.nextSectionSort or profile.sectionSort
+end
+
 ---@param kind BagKind
 ---@param view BagView
 ---@return SectionSortType
 function DB:GetSectionSortType(kind, view)
-  return DB.data.profile.sectionSort[kind][view]
+  return sectionSortOf(DB.data.profile)[kind][view]
 end
 
 ---@param kind BagKind
 ---@param view BagView
 ---@param sort SectionSortType
 function DB:SetSectionSortType(kind, view, sort)
-  DB.data.profile.sectionSort[kind][view] = sort
+  sectionSortOf(DB.data.profile)[kind][view] = sort
 end
 
 ---@param kind BagKind
@@ -1785,7 +1793,30 @@ function DB:ImportSettings(dataString)
   return true, "Category configuration imported successfully"
 end
 
+-- SplitSectionOrder gives BetterBags Next, once, a Section Order a player chose when both designs shared one.
+function DB:SplitSectionOrder()
+  local profile = DB.data.profile
+  if profile.nextSectionSortSplit then
+    return
+  end
+  profile.nextSectionSortSplit = true
+  for kind, views in pairs(profile.nextSectionSort) do
+    for view in pairs(views) do
+      local chosen = profile.sectionSort[kind] and profile.sectionSort[kind][view]
+      if chosen ~= nil and chosen ~= const.SECTION_SORT_TYPE.ALPHABETICALLY then
+        views[view] = chosen
+      end
+    end
+  end
+end
+
 function DB:Migrate()
+
+  --[[
+    BetterBags Next's Section Order was the classic bags' until it took a default of its own. What a player
+    chose carries over once; the old default cannot be told from a choice, and takes the new one.
+  ]]--
+  DB:SplitSectionOrder()
 
   --[[
     Deletion of the old lockedItems table.
@@ -2231,8 +2262,9 @@ function DB:CreateProfile(name)
 
   -- SetProfile creates new profile if doesn't exist
   DB.data:SetProfile(name)
-  -- No old rules in it; rules written before the next load are current ones.
+  -- No old rules in it; rules written before the next load are current ones. No order to carry over either.
   DB:MigrateSearchRules(addon:GetModule('QueryParser').VERSION)
+  DB.data.profile.nextSectionSortSplit = true
   return true, "Profile created successfully"
 end
 
@@ -2262,8 +2294,9 @@ function DB:CopyFromProfile(sourceName)
 
   -- Copy from source to current profile
   DB.data:CopyProfile(sourceName)
-  -- The copy has the source's rules, in the version the source has.
+  -- The copy has the source's rules, in the version the source has, and its order, split or not.
   DB:MigrateSearchRules()
+  DB:SplitSectionOrder()
   return true, "Profile copied successfully"
 end
 
@@ -2325,6 +2358,7 @@ end
 function DB:ResetCurrentProfile()
   DB.data:ResetProfile(false, true)
   DB:MigrateSearchRules(addon:GetModule('QueryParser').VERSION)
+  DB.data.profile.nextSectionSortSplit = true
   return true, "Profile reset to defaults"
 end
 

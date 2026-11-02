@@ -116,6 +116,8 @@ describe("BagSystem", function()
     override(stubs.database, "GetNextEnabled", function() return nextOn end)
     override(stubs.database, "SetNextEnabled", function(_, on) nextOn = on end)
     override(stubs.database, "GetEnableBankBag", function() return bankOn end)
+    override(stubs.database, "GetBagView", function() return 2 end)
+    override(stubs.database, "GetSectionSortType", function() return nextOn and 2 or 1 end)
     override(stubs.items, "GetAllSlotInfo", function() return slotInfo end)
     override(stubs.bagFrame, "Create", spy.new(function(_, _, kind) return fakeBag("classic", kind) end))
     override(stubs.nextBag, "Create", spy.new(function() return fakeBag("next", BACKPACK) end))
@@ -224,6 +226,24 @@ describe("BagSystem", function()
       assert.are.same({ "deactivate" }, made[2].log)
       assert.are.same({ "next 0", "next 1", "next guild", "next message 0", "next message 1", "next message guild",
         "next message vendor", "next vendor" }, fire())
+    end)
+
+    -- Each design has its own Section Order, and what the bags last read was sorted by the other's.
+    it("recalculates the backpack when the design in use sorts its sections another way", function()
+      start()
+      local asked = {}
+      events:RegisterMessage("bags/Rederive", function(_, opts) table.insert(asked, opts) end)
+      bagSystem:Switch(ctx(), "next")
+      assert.are.same({ { backpack = true, bank = false, categoriesUnchanged = true } }, asked)
+    end)
+
+    it("recalculates nothing when both designs sort their sections the same way", function()
+      override(stubs.database, "GetSectionSortType", function() return 2 end)
+      start()
+      local asked = {}
+      events:RegisterMessage("bags/Rederive", function(_, opts) table.insert(asked, opts) end)
+      bagSystem:Switch(ctx(), "next")
+      assert.are.same({}, asked)
     end)
 
     it("makes the other design once, uses it, saves the setting and says so", function()

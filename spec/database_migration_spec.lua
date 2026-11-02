@@ -118,6 +118,7 @@ const.DATABASE_DEFAULTS = {
     positions = { [0] = {}, [1] = {} },
     anchorPositions = { [0] = {}, [1] = {} },
     anchorState = { [0] = { enabled = false, shown = false }, [1] = { enabled = false, shown = false } },
+    nextSectionSort = { [0] = { [2] = 2, [4] = 2 }, [1] = { [2] = 2, [4] = 2 } },
     sectionSort = { [0] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 }, [1] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 } },
     itemSort = { [0] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 }, [1] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 } },
     customSectionSort = { [0] = {}, [1] = {} },
@@ -169,6 +170,60 @@ DB:Init()
 describe("Database Migration", function()
 
   -- ─── Bug: nil itemsPerRow crashes Migrate() ────────────────────────────────────
+
+  -- BetterBags Next's Section Order was the classic bags' until it took a default of its own.
+  describe("BetterBags Next's own section order", function()
+    local GRID, ALL = const.BAG_VIEW.SECTION_GRID, const.BAG_VIEW.SECTION_ALL_BAGS
+
+    it("carries over what a player chose, and takes the new default for what they did not", function()
+      local profile = DB.data.profile
+      profile.nextSectionSortSplit = nil
+      profile.sectionSort[0][GRID] = const.SECTION_SORT_TYPE.SIZE_ASCENDING
+      profile.sectionSort[1][GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY
+      profile.nextSectionSort[0][GRID] = const.SECTION_SORT_TYPE.SIZE_DESCENDING
+      profile.nextSectionSort[1][GRID] = const.SECTION_SORT_TYPE.SIZE_DESCENDING
+      DB:Migrate()
+      assert.are.equal(const.SECTION_SORT_TYPE.SIZE_ASCENDING, profile.nextSectionSort[0][GRID])
+      assert.are.equal(const.SECTION_SORT_TYPE.SIZE_DESCENDING, profile.nextSectionSort[0][ALL])
+      assert.are.equal(const.SECTION_SORT_TYPE.SIZE_DESCENDING, profile.nextSectionSort[1][GRID])
+      assert.are.equal(const.SECTION_SORT_TYPE.SIZE_ASCENDING, profile.sectionSort[0][GRID], "the classic bags keep theirs")
+    end)
+
+    -- A new or reset profile has nothing to carry over; the player may choose before the next load.
+    it("marks a new profile and a reset one as split, so a choice made before the next load stands", function()
+      local start = DB:GetCurrentProfileName()
+      DB:CreateProfile("Fresh Order")
+      assert.is_true(DB.data.profile.nextSectionSortSplit)
+      DB.data.profile.nextSectionSortSplit = nil
+      DB:ResetCurrentProfile()
+      assert.is_true(DB.data.profile.nextSectionSortSplit)
+      DB:SwitchToProfile(start)
+      DB.data:DeleteProfile("Fresh Order", true)
+    end)
+
+    it("carries over what a profile copied here chose, before it was ever loaded", function()
+      local start = DB:GetCurrentProfileName()
+      DB:CreateProfile("Copy Target")
+      DB.data.sv.profiles["Old Order"] = { sectionSort = { [0] = { [GRID] = const.SECTION_SORT_TYPE.SIZE_ASCENDING } } }
+      DB:CopyFromProfile("Old Order")
+      assert.are.equal(const.SECTION_SORT_TYPE.SIZE_ASCENDING, DB.data.profile.nextSectionSort[0][GRID])
+      assert.is_true(DB.data.profile.nextSectionSortSplit)
+      DB:SwitchToProfile(start)
+      DB.data:DeleteProfile("Copy Target", true)
+      DB.data:DeleteProfile("Old Order", true)
+    end)
+
+    it("carries it over once, so what the player sets afterwards stands", function()
+      local profile = DB.data.profile
+      profile.nextSectionSortSplit = nil
+      profile.sectionSort[0][GRID] = const.SECTION_SORT_TYPE.SIZE_ASCENDING
+      DB:Migrate()
+      profile.nextSectionSort[0][GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY
+      DB:Migrate()
+      assert.are.equal(const.SECTION_SORT_TYPE.ALPHABETICALLY, profile.nextSectionSort[0][GRID])
+      profile.sectionSort[0][GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY
+    end)
+  end)
 
   describe("size fix migration (line 1021)", function()
 

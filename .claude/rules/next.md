@@ -666,13 +666,16 @@ orders. Columns stacking on their own heights are never an option, though they w
 - **Settings**, per bag, in its Layout tab's Sections, BetterBags Next only (`config/catalog.lua`; saved apart from the classic
   bags' `columnCount`, whose saved values would otherwise change Next's layouts): **Section Columns** (`sectionColumns`, 1 to 4,
   default 2, `const.NEXT_SECTION_COLUMNS_DEFAULT`), **Fill Order** (`sectionFill`, Side to Side by default, or Top to Bottom),
-  **Wide Sections Span Columns** (`sectionSpan`, on) and **Wide Column Limit** (`sectionWideRows`, 2 to 10, default 2). Section
-  Order, which both designs read, defaults to Size Descending (`sectionSort`). Asked: "2 columns, side to side, wide sections on,
-  wide column limit of 2, and sort order is descending for sections by default. do this for all bags." AceDB saves only what
-  differs from a default, so a player on the old default, who chose Alphabetically or not, takes the new one: a saved value
-  cannot tell them apart. The last
-  three are disabled at one column, the limit also with wide sections off. Each sends `next/SectionColumnsChanged` (the bag's
+  **Wide Sections Span Columns** (`sectionSpan`, on) and **Wide Column Limit** (`sectionWideRows`, 2 to 10, default 2). The last
+three are disabled at one column, the limit also with wide sections off. Each sends `next/SectionColumnsChanged` (the bag's
   kind), and that bag's panel lays out again: no read of the bags. The settings window shows the rows' state again on it.
+- **Section Order is each design's own** (`nextSectionSort`, Size Descending by default; the classic bags' `sectionSort`, Alphabetically).
+  Asked: "2 columns, side to side, wide sections on, wide column limit of 2, and sort order is descending for sections by default. do
+  this for all bags", then of that default: "i did mean bbn here". `DB:GetSectionSortType` and `SetSectionSortType` read and write the
+  design in use, so the setting's row and the data phase need no other change. A design switch recalculates the backpack when the two
+  sort it differently (`BagSystem:Switch`): what the bags last read was sorted by the other. `DB:SplitSectionOrder` carries over, once,
+  an order a player chose when both designs shared one. AceDB saves only what differs from a default, so a BetterBags Next player on
+  Alphabetically before, chosen or not, takes the new default: a saved value cannot tell them apart.
 - **Sizes change the order:** with Size Descending a section's place follows how much it holds, so a read that changes a count can
   move sections, in rows too. A read that changes no count moves none, and a section's own width stays held through it.
 - **What decides it:** the panel names a source (`canvas:SetColumnSource`, `panel:SectionColumns`), read at each layout. Only
@@ -715,9 +718,49 @@ orders. Columns stacking on their own heights are never an option, though they w
   name is on its header's tooltip. The line after a title hides when no room is left (`LINE_MIN`), where it would draw backwards;
   that holds at one column in a narrow window too.
 - **Nothing between columns.** A divider was built and removed, asked: "remove that divider for columns, looks terrible".
-- **Dragging, for now (and so by default):** `canvas:CanReorder()` is false in columns, so its own bag is no target and a section lands back where it
-  was, in its column (`GetDragSlotX`, `section.x`), saving nothing. Tabs, the other bag, sellers and docks work as ever, and the
-  tooltip stops offering to reorder. Held-out and leaving sections close up as in one column.
+- **Dragging reorders, as in one column:** asked, "we're not storing column positions, just list positions here, so what we save is
+  still just an ordered list". The room is a place in the list (`drag.index`, as ever): `renderColumns` stands the dragged section there
+  among the others, the rows follow, and whatever moved slides there. A drop saves the list as one column does (`SaveOrder`), and tabs,
+  the other bag, sellers and docks work as ever. Section Order applies after a drop as in one column: a place saved is a pin. A drop back
+  in the place it had saves nothing and recalculates nothing (`IndexOf`, one column too), or it would pin the section and stop it
+  following the order; a reorder recalculates its own bag, the guild bank too (it was left out, and its order stayed old until its next read).
+  - **Where it goes** (`columnIndexAt`): the place whose slot's top left is nearest the held section's top left (the cursor less the
+    point grabbed, `DragIndexAt`), so where along its header it was grabbed does not matter, and a pick-up finds its own place at no
+    distance. A still cursor chooses nothing (`state.moved`): a read's glide can still be carrying the section it picked up, and once the
+    cursor moves it goes by where it looks. `dragSlots` works out, for every place, where the section would stand with the rows laid out that way, once a drag (again
+    when a read, a held width, the columns, the fill, the wide settings or the grid change them; a pass of the rows per place, 2 to 12 ms at
+    60 sections, measured offline with mocks). Both fills and spanning sections take no special case, as `columnRows` lays each place out.
+  - **Places sharing a spot.** Reported, Back then Consumable (spanning) then Quest: "i can't drag a span section under the last single
+    item section ... quest doesn't move above consumable". A section spanning its columns starts the row after the one before it, whether
+    or not another fits beside that one, so after Back and after Quest it stands in one spot, and only the others differ. Choosing the
+    first made 1,865 of 10,964 places unreachable in 300 random bags, and 187 of 1,109 pick-ups moved the room with the cursor still.
+    Now, past the spot's bottom the section takes the last of its places, which leaves no hole. Otherwise the place the room holds stays,
+    above the spot's top too (taking the first there made the result depend on the cursor's speed, and a 5-pixel nudge reorder the bag),
+    and arriving from another spot it takes the last. A spot is places side by side in the list and of one size (`slots[at + 1]`): filling
+    down with unequal columns, places far apart can start at one corner, and comparing corners alone sent a section four places on and
+    made it 450 pixels wider.
+  - **What a wide section cannot do by itself:** take a place that leaves a hole (Back, Consumable, Quest with Consumable already moved).
+    Drag the neighbor past it to get that order. Filling down, when two spots of different sizes start at one corner, the later is only
+    reached the same way (24 of 4,005 random drags in a limit-3 bag of unequal columns, none filling across).
+  - **Left as it is:** filling down, a section dragged far below a short column goes by the nearest corner, which can be in a longer
+    column beside it (the last place is taken on its own slot; only blank space below the rows shows this). A section dropped onto a tall
+    section's exact corner can need a few more pixels, as leaving makes that section rise. Dropping on a seller or a dock ends the drag at once,
+    and the height with it, as it always did: the section leaves the column anyway. A read or a section leaving mid-drag can shift the room under a
+    still cursor, and a drop then saves what the screen shows.
+  - **Staying put.** Where a slot stands depends only on the held section's place, and among places sharing a spot the room does not
+    move, so the room moving cannot send it back. But the room's place changes the bag's height, and a shorter bag shortens what its box
+    scrolls: at the end of a scrolled bag the box pulled the canvas down from under a cursor held still, which then asked for another place,
+    and the room flipped every few frames (11 of 1,800 runs; heights swinging 2388 to 2687). So through a drag the canvas never shrinks
+    (`drag.heldHeight`; a read or a released width starts it over), auto-scroll stops at where the rows end (`AutoScroll`'s `beyond`:
+    `HeldHeightExtra`; it had run on into the height held, showing nothing, 450 to 600 pixels of it with wide sections off), and when the
+    section lands the height comes down with the landing (`ReleaseHeight`, started by the next render, which knows where the rows end after the
+    room's last move), not all at once after it (84 pixels at once on a scrolled bag, 450 after a drop off the panel). A read during it ends it.
+  - **Held, a section keeps its shape** (`drag.heldWidth`, `drag.heldLayout`): drawn for a column of other cells it hopped off the cursor (245
+    pixels at Bag Scale 85), and a release there could click another section's item. It takes its place's shape once it lands. Its room is
+    still measured for the place (`drag.height`, `MeasureSection`). Landing, it is not laid out at all (`drag.landingFor`): its frame changes
+    scale every frame, and laid out on each new grid it restyled every button every frame (2,955 restyles for a 197-icon section's landing, 197 without);
+    only once more for a read that changed what it holds (`drag.layoutOwed`). A landing cut short (the bag closing) ends as it would have, so the order it
+    saved is the order shown and the bag recalculates (`state.landed`).
 - **Small panels** (§14g): `Widest(layoutWidth)` is what keeps the columns as they stand at the width let go at (`columnRows`, so what
   stood side by side still does): each column as wide as the largest section beside another, at least `MIN_COLUMN_CELLS` so a snap
   never takes a column away; one spanning some of its columns sharing what it needs among them; one alone in its row only what it
@@ -743,7 +786,7 @@ orders. Columns stacking on their own heights are never an option, though they w
   following the footer's text), and its frame only takes it in `FitSmall`: a free-slot count gaining a digit can show one cell, and
   so a column, more than the frame holds until the panel is next fitted. It needs a panel at exactly its minimum width, and the
   formula is older than columns.
-- **Not done:** drag-to-reorder in columns; placing a section beside another by hand.
+- **Not done:** saving a section in a column: order is one list, and a section stands where the list and the window put it.
 
 Measured offline on real bags (title widths estimated from a screenshot, Default's sizes, 8 cells, 2 columns, scroll height, before
 the limit was 2): your backpack 538 today, 436 Side to Side, 420 with wide sections; a long-name profile 1428, 1056, 1040; a 33-section
@@ -755,7 +798,11 @@ to lay out for, none without a source, back to one column; titles and lines; "wi
 top to bottom, what it holds while its contents change, random bags; what moves; how wide it needs to be; "a section's header art"),
 `spec/next/bag_spec.lua` ("section columns": its own bag's setting, Show Bags, the message, the tooltip, holding from the second
 open and after Alt+Z, a sort that moved nothing, the logout), `spec/next/drag_spec.lua` ("with section columns"),
-`spec/next/dock_spec.lua` (a card's width, flying back to a column), `spec/next/small_spec.lua` ("with section columns": a press that
+`spec/next/dock_spec.lua` (a card's width, flying back to a column), `spec/next/content_spec.lua` ("reordering by drag": the room under
+the cursor in a row and between rows, committing and cancelling, nearest slot, one answer wherever the room stands, filling down, a
+section spanning columns, places sharing a spot, the height kept through a drag, Recent Items and Free Space, a read during a drag, a released
+width, random bags with the room anywhere), `spec/next/drag_spec.lua` ("with section columns": the reported Consumable under Quest, a drop in
+its own place, landing back; a guild reorder recalculating), `spec/next/lift_spec.lua` (the cursor on a frame that narrows), `spec/next/small_spec.lua` ("with section columns": a press that
 moves nothing on real screens, a real pixel's drag, gliding as it snaps), `spec/next/pixel_perfect_spec.lua` ("in section
 columns": every shipped theme, one grid across columns on four screens, a Bag Scale, a read of a docked section's bag; a pieced bar in
 a dock card), `spec/integration/logout_spec.lua`, `spec/integration/guild_bank_spec.lua` (late and shifted answers), `spec/next/vendor_spec.lua`,

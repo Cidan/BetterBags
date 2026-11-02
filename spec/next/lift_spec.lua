@@ -319,6 +319,25 @@ describe("NextLift", function()
 
   -- BetterBags Next's small panels have a Bag Scale (docs/next-appearance-size.md): a frame in one is
   -- drawn at that scale, and everything on screen is read in UIParent's units.
+  it("scrolls no further than the end it is told, never pulling back from past it", function()
+    local box = CreateFrame("Frame", nil, parent)
+    local offset = 0
+    box.GetDerivedScrollOffset = function() return offset end
+    box.GetDerivedScrollRange = function() return 500 end
+    box.ScrollToOffset = function(_, to) offset = to end
+    local area = CreateFrame("Frame", nil, parent)
+    area:_SetRect(0, 100, 100, 400)
+    for _ = 1, 400 do
+      lift:AutoScroll(area, box, 101, 0.1, 80)
+    end
+    assert.are.equal(420, offset)
+    offset = 450
+    lift:AutoScroll(area, box, 101, 0.1, 80)
+    assert.are.equal(450, offset, "past it already, it stays")
+    lift:AutoScroll(area, box, 499, 0.1, 80)
+    assert.is_true(offset < 450, "and scrolls back up when asked")
+  end)
+
   describe("a frame in a scaled panel", function()
     before_each(function()
       parent:SetScale(0.5)

@@ -982,14 +982,14 @@ describe("NextBag", function()
       slotInfo = twoSections()
       local bag = opened()
       assert.is_true(bag.content.byName.Ore.x > 0)
-      assert.is_false(bag.content:CanReorder())
+      assert.is_not_nil(bag.content.grid)
     end)
 
     it("keeps one column in the Show Bags view, which shows a bag's slots in order", function()
       override(stubs.database, "GetBagView", function() return const.BAG_VIEW.SECTION_ALL_BAGS end)
       slotInfo = twoSections()
       local bag = opened()
-      assert.is_true(bag.content:CanReorder())
+      assert.is_nil(bag.content.grid)
     end)
 
     -- Found by the adversarial review: only a layout held anything, and a bag opened on what it had drawn lays nothing
@@ -1111,7 +1111,7 @@ describe("NextBag", function()
       assert.are.equal(0, bag.content.byName.Ore.x)
     end)
 
-    it("does not offer to reorder a section while it cannot", function()
+    it("offers to reorder a section in columns", function()
       slotInfo = twoSections()
       local bag = opened()
       local lines = {}
@@ -1119,14 +1119,8 @@ describe("NextBag", function()
       GameTooltip.SetText = function(_, text) table.insert(lines, text) end
       GameTooltip.AddLine = function(_, text) table.insert(lines, text) end
       bag:OnHeaderEnter(bag.content.byName.Ore)
-      columns = 1
-      bag.content:Invalidate()
-      render:Flush()
-      bag:OnHeaderEnter(bag.content.byName.Ore)
       GameTooltip.SetText, GameTooltip.AddLine = saved[1], saved[2]
-      assert.is_truthy(lines[2]:find("onto a tab", 1, true))
-      assert.is_nil(lines[2]:find("reorder", 1, true))
-      assert.is_truthy(lines[5]:find("Drag to reorder", 1, true))
+      assert.are.equal("Drag to reorder, or onto a tab or the other bag.", lines[2])
     end)
   end)
 

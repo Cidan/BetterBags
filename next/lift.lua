@@ -371,12 +371,14 @@ function lift:ShadowAlpha()
 end
 
 -- AutoScroll scrolls box while y (UIParent's coordinates) is near the top or bottom of area, faster the
--- closer, never above its top.
+-- closer, never above its top. beyond is how far what box scrolls reaches past its content: it scrolls down no
+-- further than the content's end, and stays where it is when already past it.
 ---@param area Frame
 ---@param box WowScrollBox
 ---@param y number
 ---@param elapsed number
-function lift:AutoScroll(area, box, y, elapsed)
+---@param beyond? number
+function lift:AutoScroll(area, box, y, elapsed, beyond)
   local top, bottom = area:GetTop(), area:GetBottom()
   if top == nil or bottom == nil then
     return
@@ -391,7 +393,12 @@ function lift:AutoScroll(area, box, y, elapsed)
     closeness = math.min(1, ((bottom + edge) - y) / edge)
   end
   if closeness ~= 0 then
-    box:ScrollToOffset(math.max(0, box:GetDerivedScrollOffset() + closeness * self.SCROLL_SPEED * elapsed), true)
+    local offset = box:GetDerivedScrollOffset()
+    local to = offset + closeness * self.SCROLL_SPEED * elapsed
+    if beyond ~= nil and closeness > 0 then
+      to = math.max(offset, math.min(to, box:GetDerivedScrollRange() - beyond))
+    end
+    box:ScrollToOffset(math.max(0, to), true)
   end
 end
 

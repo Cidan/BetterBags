@@ -507,9 +507,19 @@ function canvasProto:addItem(ctx, section, data, claims)
   end
 end
 
+-- forgetDragLayout drops what a drag worked out from the sections as they were: a read changes them, or their widths.
+---@private
+function canvasProto:forgetDragLayout()
+  if self.drag ~= nil then
+    tween:Stop(self.drag)
+    self.drag.slots, self.drag.heldHeight, self.drag.layoutOwed = nil, nil, true
+  end
+end
+
 -- beginBind sets last pass's sections aside for reuse and starts an empty pass.
 ---@private
 function canvasProto:beginBind()
+  self:forgetDragLayout()
   for name, section in pairs(self.byName) do
     self.stale[name] = section
   end
@@ -837,6 +847,15 @@ function canvasProto:Render(parentResult)
     motion:EndPass()
   end
   local height = math.max(1, y)
+  -- In columns the room's place changes the bag's height. A bag getting shorter shortens what its box scrolls, and at the
+  -- end of it the box pulls the canvas down from under a cursor held still, which then asks for another place, and the
+  -- bag grows again: the room flipped every few frames at the bottom of a scrolled bag. So through a drag it never shrinks.
+  if drag ~= nil then
+    drag.rowsHeight = height
+    drag.heldHeight = math.max(drag.heldHeight or 0, height)
+    height = drag.heldHeight
+    self:comeDown(drag)
+  end
   self.frame:SetSize(width, height)
   return { Width = width, Height = height }
 end
@@ -847,12 +866,6 @@ end
 ---@param source fun(): number, string?, boolean?, number?
 function canvasProto:SetColumnSource(source)
   self.columnSource = source
-end
-
--- CanReorder says whether a section dragged in its own bag can take another place: not in columns yet.
----@return boolean
-function canvasProto:CanReorder()
-  return self.grid == nil
 end
 
 -- ColumnSplit splits the cells a row holds at layoutWidth into the columns its bag is set to, each a whole number of
@@ -908,6 +921,7 @@ end
 -- start the layout afresh, and the player sorted to tidy up.
 function canvasProto:ReleaseWidths()
   self.heldCells = {}
+  self:forgetDragLayout()
   if self.grid ~= nil then
     self:Invalidate()
   end
@@ -985,9 +999,21 @@ function canvasProto:columnRows(grid, sections)
   return rows
 end
 
+-- cellsOf is how many cells a place in a row takes: the columns it spans.
+---@param grid NextColumnSplit
+---@param cell NextColumnCell
+---@return number
+local function cellsOf(grid, cell)
+  local cells = 0
+  for c = cell.column, cell.column + cell.span - 1 do
+    cells = cells + grid.split[c]
+  end
+  return cells
+end
+
 -- renderColumns lays its sections out in columns, from height y: Recent Items above them and Free Space below, at the
 -- full width, and the rest in rows (columnRows), every icon on one grid, a column's first cell a step from the last
--- cell of the one before. A dragged section keeps its place, as nothing reorders in columns yet.
+-- cell of the one before. A dragged section stands at its room in the list, and keeps it open (GetDragSlotX, GetDragSlotY).
 ---@private
 ---@param grid NextColumnSplit
 ---@param width number
@@ -1004,9 +1030,13 @@ function canvasProto:renderColumns(grid, width, layoutWidth, spacing, y, placed)
     local dragged = drag ~= nil and section == drag.section
     if not dragged and self:IsLeaving(section) then
       section.frame:Hide()
-    elseif dragged or away == nil or away.returning then
+    elseif not dragged and (away == nil or away.returning) then
       table.insert(section.kind == "recent" and top or section.kind == "free" and bottom or middle, section)
     end
+  end
+  -- The dragged section stands at its room among the others: the room is a place in the one list, and the rows follow.
+  if drag ~= nil then
+    table.insert(middle, math.max(1, math.min(#middle + 1, drag.index - #top)), drag.section)
   end
   local function place(section, x, at)
     section.x, section.y = x, at
@@ -1036,23 +1066,40 @@ function canvasProto:renderColumns(grid, width, layoutWidth, spacing, y, placed)
   for i = 1, grid.count do
     xs[i + 1] = xs[i] + grid.split[i] * step
   end
+  local rowsTop = placed > 0 and y + spacing or y
+  local shape = table.concat({ grid.cells, grid.count, #middle, step, rowsTop, tostring(grid.down), tostring(grid.wide),
+    tostring(grid.wideRows) }, ":")
+  self.columnPlaces = { xs = xs, step = step, gap = gap, spacing = spacing, top = rowsTop, shape = shape }
+  if drag ~= nil and drag.slotsShape ~= shape then
+    drag.slots = nil
+  end
   for _, row in ipairs(self:columnRows(grid, middle)) do
     local tallest = 0
     for _, cell in ipairs(row) do
       local section = cell.section
-      local cells = 0
-      for c = cell.column, cell.column + cell.span - 1 do
-        cells = cells + grid.split[c]
-      end
+      local cells = cellsOf(grid, cell)
       local columnWidth, columnLayout = cells * step - gap, self:RowWidth(cells)
       section.gridCells = grid.cells
-      self:LayoutSection(section, columnWidth, columnLayout)
-      local height = section.height
       local away = self.away[section]
       local dragged = drag ~= nil and section == drag.section
+      -- Held, it keeps the shape it was picked up in: drawn for a column of other cells it would hop off the cursor. Landing, its
+      -- frame changes scale every frame, and laid out on each new grid it would restyle every button every frame: only once more,
+      -- for a read that changed what it holds.
+      if dragged then
+        if drag.landingFor == nil or drag.layoutOwed then
+          drag.layoutOwed = false
+          self:LayoutSection(section, drag.heldWidth, drag.heldLayout)
+        end
+      else
+        self:LayoutSection(section, columnWidth, columnLayout)
+      end
+      local height = section.height
       -- Drawn on another grid than the column's, its room is its height on the column's (MeasureSection).
       if dragged or (away ~= nil and away.returning) then
         height = self:MeasureSection(section, frame, columnWidth, columnLayout).height
+      end
+      if dragged then
+        drag.height = height
       end
       tallest = math.max(tallest, height)
     end
@@ -1228,6 +1275,59 @@ end
 ---@param section NextSection
 ---@param onLost? fun()
 function canvasProto:BeginDrag(section, onLost)
+  self.drag = { section = section, index = self:IndexOf(section), height = section.height, onLost = onLost,
+    heldWidth = section.frame:GetWidth(), heldLayout = section.layoutWidth }
+  tween:Stop(section, true)
+end
+
+-- HeldHeightExtra is how far the height a drag holds reaches past where the rows end.
+---@return number
+function canvasProto:HeldHeightExtra()
+  local drag = self.drag
+  if drag == nil or drag.heldHeight == nil then
+    return 0
+  end
+  return math.max(0, drag.heldHeight - drag.rowsHeight)
+end
+
+-- ReleaseHeight says the section is landing over seconds: the height a drag holds comes down to where the rows end with it, and
+-- not all at once after it. It starts at the next render: the room may have just moved, and only a render knows where the rows
+-- end then.
+---@param seconds number
+function canvasProto:ReleaseHeight(seconds)
+  local drag = self.drag
+  if drag ~= nil then
+    drag.landingFor, drag.comingDown = seconds, true
+    self:Invalidate()
+  end
+end
+
+-- comeDown starts the height's way down, once the render asked for has worked out where the rows end.
+---@private
+---@param drag table
+function canvasProto:comeDown(drag)
+  if not drag.comingDown then
+    return
+  end
+  drag.comingDown = false
+  if self:HeldHeightExtra() > 0 then
+    tween:Play(drag, {
+      duration = drag.landingFor,
+      from = drag.heldHeight,
+      to = drag.rowsHeight,
+      ease = style:Ease("Land"),
+      onUpdate = function(height)
+        drag.heldHeight = height
+        self:Invalidate()
+      end,
+    })
+  end
+end
+
+-- IndexOf is the place a section has among the others now: what its room is when it has not moved.
+---@param section NextSection
+---@return number
+function canvasProto:IndexOf(section)
   local index = 1
   for _, other in ipairs(self.order) do
     if other == section then
@@ -1237,8 +1337,7 @@ function canvasProto:BeginDrag(section, onLost)
       index = index + 1
     end
   end
-  self.drag = { section = section, index = index, height = section.height, onLost = onLost }
-  tween:Stop(section, true)
+  return index
 end
 
 -- SetDragIndex moves the dragged section's gap to index among the others (kept among the
@@ -1257,11 +1356,112 @@ function canvasProto:SetDragIndex(index)
   end
 end
 
--- DragIndexAt returns the insertion point among the others for a height from the canvas's top:
--- before the first other section whose middle is below it, laid out without the gap.
----@param localY number
+-- dragSlots is where the dragged section would stand at each place it can take in the list, each slot's index that place:
+-- the rows laid out with it there, nothing moved. Worked out once a drag, and again when a read or the width changes them,
+-- as it takes a pass of the rows per place.
+---@private
+---@return {index: number, x: number, y: number, width: number, height: number}[]
+function canvasProto:dragSlots()
+  local drag, grid, places = self.drag, self.grid, self.columnPlaces
+  if drag.slots ~= nil then
+    return drag.slots
+  end
+  local others = self:others()
+  local first, last = self:dragRange()
+  local heights = {}
+  -- The height of a section this many cells wide, on the column's grid: the sections keep few widths between them.
+  local function heightOf(section, cells)
+    local known = heights[section]
+    if known == nil then
+      known = {}
+      heights[section] = known
+    end
+    if known[cells] == nil then
+      section.gridCells = grid.cells
+      known[cells] = self:MeasureSection(section, self.frame, cells * places.step - places.gap, self:RowWidth(cells)).height
+    end
+    return known[cells]
+  end
+  local slots = {}
+  for index = first, last do
+    local list = {}
+    for i = first, last - 1 do
+      if i == index then
+        table.insert(list, drag.section)
+      end
+      table.insert(list, others[i])
+    end
+    if index == last then
+      table.insert(list, drag.section)
+    end
+    local y = places.top
+    for _, row in ipairs(self:columnRows(grid, list)) do
+      local tallest, slot = 0, nil
+      for _, cell in ipairs(row) do
+        local cells = cellsOf(grid, cell)
+        local height = heightOf(cell.section, cells)
+        tallest = math.max(tallest, height)
+        if cell.section == drag.section then
+          slot = { index = index, x = places.xs[cell.column], y = y, width = cells * places.step - places.gap, height = height }
+        end
+      end
+      if slot ~= nil then
+        table.insert(slots, slot)
+        break
+      end
+      y = y + tallest + places.spacing
+    end
+  end
+  drag.slots, drag.slotsShape = slots, places.shape
+  return slots
+end
+
+-- columnIndexAt is the place in the list for a held section whose top left is at x, y: the one whose slot's top left is
+-- nearest. Where a slot stands depends only on x, y, never on where the room stands now, so the room moving cannot send it back.
+--
+-- Places can share a spot: a section spanning its columns starts the row after the one before it, whether or not another
+-- fits beside that one. Reported: "i can't drag a span section under the last single item section ... quest doesn't move
+-- above consumable". Only the others differ between them, so the room never moves among them. Past the spot's bottom it takes
+-- the last of them, which leaves no hole. Otherwise the place the room holds stays, so a pick-up or a nudge moves nothing,
+-- and one arriving from another spot takes the last. A spot is places side by side in the list, of one size: filling down,
+-- places far apart in the list can start at one corner.
+---@private
+---@param x number
+---@param y number
 ---@return number
-function canvasProto:DragIndexAt(localY)
+function canvasProto:columnIndexAt(x, y)
+  local slots, index = self:dragSlots(), self.drag.index
+  local at, nearest
+  for i, slot in ipairs(slots) do
+    local dx, dy = x - slot.x, y - slot.y
+    local distance = dx * dx + dy * dy
+    if nearest == nil or distance < nearest or (distance == nearest and slot.index == index) then
+      at, nearest = i, distance
+    end
+  end
+  local spot = slots[at]
+  if spot.index == index and y <= spot.y + spot.height then
+    return index
+  end
+  while slots[at + 1] ~= nil and slots[at + 1].x == spot.x and slots[at + 1].y == spot.y
+    and slots[at + 1].width == spot.width do
+    at = at + 1
+  end
+  return slots[at].index
+end
+
+-- DragIndexAt returns the insertion point among the others for a cursor in the canvas, from its top and its left. In columns
+-- it goes by where the held section is, the cursor less the point grabbed (columnIndexAt), so where it was grabbed does not
+-- matter; in one column, before the first other section whose middle is below the cursor, laid out without the gap.
+---@param localY number
+---@param localX? number
+---@param grabX? number
+---@param grabY? number
+---@return number
+function canvasProto:DragIndexAt(localY, localX, grabX, grabY)
+  if self.grid ~= nil and self.drag ~= nil then
+    return self:columnIndexAt((localX or 0) - (grabX or 0), localY - (grabY or 0))
+  end
   local y = 0
   for i, section in ipairs(self:others()) do
     if i > 1 then

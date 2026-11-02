@@ -262,6 +262,8 @@ function bagSystem:Switch(ctx, design)
   end
 
   self:Use(design)
+  local view = database:GetBagView(const.BAG_KIND.BACKPACK)
+  local sectionOrder = database:GetSectionSortType(const.BAG_KIND.BACKPACK, view)
   database:SetNextEnabled(design == "next")
   new.backpack.loaded = old.backpack.loaded
   if new.bank and old.bank then
@@ -278,6 +280,11 @@ function bagSystem:Switch(ctx, design)
     new.bank.searchBox.textBox:SetText(bankSearch)
   end
   addon:UpdateButtonHighlight()
+  -- Each design has its own Section Order, and what the bags last read was sorted by the other's. Only the backpack:
+  -- the bags cannot switch at the bank or the guild bank, and each is read when it opens.
+  if database:GetSectionSortType(const.BAG_KIND.BACKPACK, view) ~= sectionOrder then
+    events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false, categoriesUnchanged = true })
+  end
   events:SendMessage(ctx, 'bags/DesignChanged', design)
   return true
 end

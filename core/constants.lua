@@ -905,6 +905,20 @@ const.DATABASE_DEFAULTS = {
     },
     sectionSort = {
       [const.BAG_KIND.BACKPACK] = {
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+      [const.BAG_KIND.BANK] = {
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+      [const.BAG_KIND.GUILD] = {
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+    },
+    nextSectionSort = {
+      [const.BAG_KIND.BACKPACK] = {
         [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
       },
