@@ -21,15 +21,15 @@ local motion = addon:GetModule('Motion')
 -- the cursor), the list keeps a room its height where it would land, under the cursor, and the other rows
 -- slide out of its way through Motion in the interaction time, as a bag's sections do (Time.Interaction).
 -- Let go, the row lands into its room and the list's owner is told where it went. One for every list that
--- reorders (CLAUDE.md, "UI Consistency"): a bag's Categories tab (its pins) and the Categories page's list
+-- reorders (CLAUDE.md, "UI Consistency"): a bag's Order tab (its pins) and the Categories page's list
 -- (the order of the categories, category-lifecycle.md §7). Each row belongs to its entry (rowOf), so a
 -- row moved in the order slides to its new place.
 ---@class NextListReorder: AceModule
 local reorder = addon:NewModule('NextListReorder')
 
 ---@class (exact) NextListReorderOptions
----@field box WowScrollBox The list's scroll box.
----@field content Frame What the rows hang from, top down (the box's scroll child).
+---@field box WowScrollBox The scroll box the list scrolls in.
+---@field content Frame What the rows hang from, top down, anywhere in what the box scrolls.
 ---@field entries fun(): table[] The list's entries, in order; { name } can be dragged, others (headings) not.
 ---@field rowOf fun(entry: table): Frame The row frame that shows an entry, its own.
 ---@field heightOf fun(entry: table): number How tall an entry's row is.
@@ -57,7 +57,7 @@ addon:GetModule('Perf'):RegisterPrototype(listProto, 'NextListReorderList')
 ---@return NextListReorderList
 function reorder:Create(opts)
   local list = setmetatable({ opts = opts }, { __index = listProto })
-  addon.HookScript(opts.box, "OnHide", function()
+  addon.HookScript(opts.content, "OnHide", function()
     if list.state ~= nil then
       list:Cancel()
     end
@@ -164,15 +164,14 @@ end
 -- no place on screen.
 ---@return number?
 function listProto:IndexAt()
-  local box = self.opts.box
   -- The cursor is on the screen; the list in its own units (the settings window scales down to fit a
   -- small screen).
-  local at = lift:ScreenPoint(box)
+  local at = lift:ScreenPoint(self.opts.content)
   if at == nil then
     return nil
   end
   local _, cursorY = lift:Cursor()
-  local down = (at.top - cursorY) / at.scale + box:GetDerivedScrollOffset()
+  local down = (at.top - cursorY) / at.scale
   local y, index, others = 0, nil, 0
   for _, entry in ipairs(self.opts.entries()) do
     if entry.name ~= self.state.name then
@@ -219,13 +218,12 @@ function listProto:Drop()
     return
   end
   state.landing = true
-  local box = self.opts.box
   lift:Land(state, function(left0, top0)
-    local at = lift:ScreenPoint(box)
+    local at = lift:ScreenPoint(self.opts.content)
     if at == nil then
       return left0, top0
     end
-    return at.left, at.top + (box:GetDerivedScrollOffset() - (self.roomY or 0)) * at.scale, at.scale
+    return at.left, at.top - (self.roomY or 0) * at.scale, at.scale
   end, function()
     self:land()
   end)

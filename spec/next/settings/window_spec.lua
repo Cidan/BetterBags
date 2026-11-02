@@ -657,6 +657,20 @@ describe("NextSettings", function()
       tween:Step(10)
     end
 
+    -- The page's list scrolls in the window's box, so a category opened from a long list must not lose the place.
+    it("goes back to where the page left was scrolled", function()
+      open("backpack", "items")
+      local box = settings.scroll.scrollBox
+      box._scrollRange = 500
+      box:ScrollToOffset(200, true)
+      settings:Select("cats")
+      assert.are.equal(0, box:GetDerivedScrollOffset(), "its list starts at the top")
+      settings:Back()
+      assert.are.equal(200, box:GetDerivedScrollOffset())
+      box._scrollRange = nil
+      box:SetScrollPercentage(0, true)
+    end)
+
     it("slides the pages out and its list in when chosen, and back with Back", function()
       open()
       settle()
@@ -966,6 +980,21 @@ describe("NextSettings", function()
       settings:Search(addon:GetModule("Context"):New("spec"), "in maybe")
       assert.are.same({}, shownRows(), "nor a row of a hidden section")
     end)
+  end)
+
+  it("lays the page out again when a row's height changes, reading no value again", function()
+    settings:Open("page1")
+    local read = 0
+    local refresh = settings.page.Refresh
+    settings.page.Refresh = function(...)
+      read = read + 1
+      return refresh(...)
+    end
+    settings:Relayout()
+    assert.is_true(render:IsDirty(settings.root))
+    render:Flush()
+    settings.page.Refresh = nil
+    assert.are.equal(0, read)
   end)
 
   describe("by design", function()

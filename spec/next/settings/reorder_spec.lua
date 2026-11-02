@@ -2,7 +2,7 @@
 -- under another and dragged to a new place the way BetterBags Next's sections are (next.md §7): the row
 -- is lifted (NextLift) and follows the cursor, the list keeps a room its height under the cursor, the
 -- other rows slide out of its way (Motion), and the row lands into its room when let go. Shared by the
--- bag's Categories tab and the Categories page's list (CLAUDE.md, "UI Consistency"). Asked: "instead of a
+-- bag's Order tab and the Categories page's list (CLAUDE.md, "UI Consistency"). Asked: "instead of a
 -- line on drag, let's animate the move like we do categories".
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
@@ -33,6 +33,11 @@ describe("NextListReorder", function()
     return entry.name or ("# " .. entry.title)
   end
 
+  -- placeContent puts the list's top where the client would, whatever its rows make its height.
+  local function placeContent(top, left)
+    content.GetLeft, content.GetTop = function() return left or 0 end, function() return top end
+  end
+
   local function make()
     drag = reorder:Create({
       box = box, content = content, first = first,
@@ -51,6 +56,7 @@ describe("NextListReorder", function()
     box:_SetRect(0, 0, 300, 300)
     box:Hide()
     content = CreateFrame("Frame", nil, box)
+    placeContent(300)
     entries = { { header = true, title = "Pinned" }, { name = "A" }, { name = "B" }, { name = "C" } }
     rows = {}
     for _, entry in ipairs(entries) do
@@ -184,8 +190,9 @@ describe("NextListReorder", function()
       assert.are.same({ 0, 60, 100 }, { yOf("# Pinned"), yOf("A"), yOf("C") }, "after the heading")
     end)
 
-    it("counts what the list is scrolled", function()
+    it("goes by where the list is on screen, as it scrolls", function()
       start("A")
+      placeContent(350)
       box._scrollRange, box._scrollPercentage = 100, 0.5
       at(20)
       step()
@@ -193,9 +200,18 @@ describe("NextListReorder", function()
       assert.are.equal(100, yOf("C"))
     end)
 
+    -- A list partway down what its box scrolls: the tab's own content, with a filter above it (a bag's Order tab).
+    it("goes by where the list is, wherever that is in its box", function()
+      start("A")
+      placeContent(200)
+      at(150)
+      step()
+      assert.are.same({ 20, 100 }, { yOf("B"), yOf("C") }, "150 down the box is 50 into the list: past B's middle, before C")
+    end)
+
     it("keeps its room while the list has no place on screen", function()
       start("B")
-      box._rect = nil
+      placeContent(nil)
       at(130)
       step()
       assert.are.equal(100, yOf("C"))
@@ -266,6 +282,7 @@ describe("NextListReorder", function()
       local window = CreateFrame("Frame", nil, UIParent)
       window:SetScale(0.5)
       box:SetParent(window)
+      content:SetParent(box)
       drag:Arrange(280)
       rows.B:_SetRect(0, 300 - yOf("B") - 40, 280, 40)
       _G._cursorX, _G._cursorY = 10, (300 - yOf("B") - 10) * 0.5
@@ -287,15 +304,17 @@ describe("NextListReorder", function()
 
     it("aims at its room on screen as the list is scrolled", function()
       start("B")
+      placeContent(350, 30)
       box._scrollRange, box._scrollPercentage = 100, 0.5
       at(80)
       step()
       release()
       tween:Step(style.Time.Land - 0.001)
       tween:Step(0.0005)
-      local _, _, _, _, y = rows.B:GetPoint(1)
+      local _, _, _, x, y = rows.B:GetPoint(1)
       local s = rows.B:GetScale()
       assert.is_true(math.abs(y * s - (300 + 50 - 100)) < 0.5, "50 scrolled: " .. y * s)
+      assert.is_true(math.abs(x * s - 30) < 0.5, "at the list's left: " .. x * s)
     end)
 
     it("ignores the cursor while it lands", function()
@@ -368,8 +387,8 @@ describe("NextListReorder", function()
       start("B")
       at(130)
       step()
-      box:Hide()
-      box:GetScript("OnHide")(box)
+      content:Hide()
+      content:GetScript("OnHide")(content)
       assert.is_false(drag:IsDragging())
       assert.is_false(lift:IsHolding())
       assert.are.equal(content, rows.B:GetParent())
