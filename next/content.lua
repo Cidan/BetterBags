@@ -458,6 +458,11 @@ function canvasProto:section(name, kind)
     section = table.remove(self.pool) or self:newSection()
     section.isNew = true
     section.frame:Show()
+    -- Its title keeps the width it was last cut to, maybe cut again in the pool by a theme: its new name takes its own.
+    if section.titleCut then
+      section.title:SetWidth(0)
+      section.titleCut = nil
+    end
   end
   section.name = name
   section.kind = kind
@@ -492,11 +497,6 @@ function canvasProto:release(section)
   section.frame:Hide()
   section.frame:ClearAllPoints()
   section.entries = {}
-  -- Reused for another name, it takes that one's width.
-  if section.titleCut then
-    section.title:SetWidth(0)
-    section.titleCut = nil
-  end
   table.insert(self.pool, section)
 end
 

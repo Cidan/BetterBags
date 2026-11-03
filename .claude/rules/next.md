@@ -861,7 +861,8 @@ compute what the most compact layout is possible, but making sure section names 
   width let go at snaps to one the snap leaves alone. A lone section of one cell needs two: a window of one has no grid. At the window it shows them in, it goes by where they
   stand now, so a press on a grip that moves nothing moves nothing (found by the bug review: a section that had lost items since came in a cell).
 - **A name cut for the whole row** (`section.titleWhole`): measuring it never touches the title, which keeps the width it was cut to and measures that. Setting it back to measure it left it
-  whole with no layout after it to cut it again, running over its count through a drag (found by the bug review).
+  whole with no layout after it to cut it again, running over its count through a drag (found by the bug review). A section taken from the pool for a new name has its title's width set back
+  first: a theme restyles the pool too, which cut the old name again, and the new name took the old one's width (found by the next review: "Back" across a whole row).
 - **Themes:** `Sections.Compact.TextEnd` (next-themes.md §3): Default 0; Guild Wars 2 8 and Papercraft 4, the insets of their title bars at the other
   end; Make It So 16, its bar's end cap. Everything else comes from what a theme already sets: its icon and gap (the grid), its title's place,
   fonts and count gap (the text), its section header and spacing (how far apart sections stand).
