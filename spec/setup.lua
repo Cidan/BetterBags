@@ -62,3 +62,10 @@ FreshNextThemes()
 
 -- Step 4: Load shared mock data factories
 dofile("spec/helpers/mock_data.lua")
+
+-- The frame mock lists a frame on its parent (GetChildren), and every panel's parent is UIParent, which lives for the whole
+-- run: without this, everything each spec file parents to it stays alive to the end (test-harness.md, Memory).
+require("busted").subscribe({ "file", "end" }, function()
+  UIParent._children = {}
+  return nil, true
+end)

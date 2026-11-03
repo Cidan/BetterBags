@@ -154,7 +154,9 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   alone sums to 2.1 GB of peaks (was 23.5 GB); the full suite peaked at 1.25 GB in one process then (was
   19.4 GB) and took 17 s (was 112 s). With 6,300 specs (2026-11-01) it peaks at 3.6 GB under CI's 4 GB cap, about 1.5 GB of it
   live at the end; that holder has not been found (clearing stale modules and `UIParent`'s children after every file only took
-  the peak to 3.5 GB).
+  the peak to 3.5 GB). At 6,560 specs (2026-11-02) it peaked at 4.06 GB and died under the cap with no summary and no failure listed: exit 1 and a line
+  of progress marks, a crash to read as memory. `spec/setup.lua` now clears `UIParent`'s children after every file, which leaves 3.64 GB, and the margin is thin. The most live memory
+  is added by `frames/item_spec` (233 MB), `refresh_pipeline_spec` (173), `next/drag_spec` (150), `next/pixel_perfect_spec` (148), `next/settings/content_spec` and `next/theme_panel_spec` (128 each).
   - **A method is shared, so it must not read the constructor's locals**: use the widget's fields
     (`self._type`, `self._name`, `self._parent`). Per-widget state goes in the constructor.
   - **Overriding a method on one widget** (`frame.Method = ...`, a spec's `override`) sets the

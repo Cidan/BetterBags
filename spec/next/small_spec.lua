@@ -503,6 +503,30 @@ describe("BetterBags Next's small mode", function()
         assert.are.equal(width, bag:SmallWidth())
       end)
 
+      -- Found by the bug review: the snap packed afresh, and a section that had lost items since would come in a cell.
+      it("moves nothing on a press of a grip, when compact sections no longer stand as a fresh layout would", function()
+        finally(dofile("spec/helpers/layout.lua").UseScreen(3396, 1362, 0.65))
+        local bag = bagIn({ { "A", 8 }, { "B", 4 } })
+        override(stubs.database, "GetNextSectionCompact", function() return true end)
+        override(stubs.database, "GetNextSectionSpan", function() return false end)
+        bag.content:Invalidate()
+        render:Flush()
+        local slotInfo = { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" } },
+          items = { item("0_1", "A"), item("0_2", "A"), item("0_9", "B"), item("0_10", "B"), item("0_11", "B"), item("0_12", "B") } } } }
+        local width = bag:SmallWidth()
+        bag:Draw(ctx(), slotInfo, function() end)
+        render:Flush()
+        local xB = bag.content.byName.B.x
+        bag:StartSizing("RIGHT")
+        bag:Resized()
+        render:Flush()
+        bag:StopSizing()
+        finishTweens()
+        render:Flush()
+        assert.are.equal(width, bag:SmallWidth())
+        assert.are.equal(xB, bag.content.byName.B.x)
+      end)
+
       -- A width let go at snaps to one the snap leaves alone, the same number of columns, never wider, for any bag.
       it("snaps to a width it stays at, its columns kept, across random bags", function()
         local count, wideRows, fill = 2, 2, "across"

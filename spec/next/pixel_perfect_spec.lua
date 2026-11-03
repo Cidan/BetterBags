@@ -653,8 +653,8 @@ describe("BetterBags Next, pixel perfect", function()
     -- Asked of compact sections: "always make sure we round to the nearest item grid position -- no disjoint item button
     -- placement ... compact mode must never violate this constraint."
     describe("compact", function()
-      local function compactBag()
-        columns(2, "across", true)
+      local function compactBag(span)
+        columns(2, "across", span ~= false)
         override(stubs.database, "GetNextSectionCompact", function() return true end)
         local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
         local list, n = {}, 0
@@ -680,6 +680,22 @@ describe("BetterBags Next, pixel perfect", function()
           local cells = (layout.Rect(buttons["0_" .. i].frame).left - first) / step
           assert.is_true(math.abs(cells - math.floor(cells + 0.5)) < 0.001, "icon " .. i .. " stands " .. cells .. " cells along")
         end
+      end
+
+      -- Reported with a screenshot: wide sections off, Miscellaneous and Quest under Consumable with room beside it.
+      for _, screen in ipairs({ { 3396, 1362, 0.65 }, { 3396, 1362, 0.7 }, { 1920, 1080, 0.64 }, { 2560, 1440, 1.15 } }) do
+        it("tucks sections in beside a taller one, on one grid, on " .. screenName(screen), function()
+          useScreen(screen[1], screen[2], screen[3])
+          db.size = "small"
+          local bag, n = compactBag(false)
+          assertOneGrid(bag, n)
+          local content = bag.content.byName
+          assert.is_true(content.Miscellaneous.x >= content.Back.x, "beside Consumable")
+          assert.is_true(content.Miscellaneous.y < content.Consumable.height, "not under it")
+          for _, name in ipairs({ "Consumable", "Back", "Item Enhancement", "Miscellaneous", "Quest" }) do
+            assert.is_nil(content[name].titleCut, name)
+          end
+        end)
       end
 
       -- How many fit depends on the theme's fonts; on the default's, more than it has columns.

@@ -724,8 +724,8 @@ define('sectionCompact', {
   bag = true,
   title = 'Compact Sections',
   description = function(bag)
-    return 'Packs the ' .. lower(bag) .. "'s sections as close together as their icons and names allow, each starting "
-      .. 'on the next free spot of the icon grid, so a row holds as many as fit rather than one per column.'
+    return 'Packs the ' .. lower(bag) .. "'s sections as tightly as their icons and names allow, on the one icon grid: "
+      .. 'side by side as many as fit, and into any room beside a taller section.'
   end,
   keywords = { 'columns', 'compact', 'dense', 'tight', 'grid', 'side by side', 'sections' },
   disabled = function(bag) return db:GetNextSectionColumns(bag.kind) <= 1 end,
