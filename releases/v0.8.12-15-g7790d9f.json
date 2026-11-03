@@ -1,0 +1,23 @@
+{
+  "id": 1793674196,
+  "version": "v0.8.12-15-g7790d9f",
+  "channel": "alpha",
+  "date": "2026-11-03",
+  "from": "d7ce0a0ea3f9f7ddb40c6c7189bc4ea0032b5b0f",
+  "to": "7790d9fc53e56da79edca83744b913ca4b2ca4db",
+  "headline": "Adds a Compact Sections layout setting to pack categories tightly and fixes section title clipping.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Compact Sections layout option",
+      "details": "Adds an optional Compact Sections toggle under bag layout settings, packing categories tightly into open space and beside taller sections while keeping items aligned to the grid. Sections hold their positions while the bag remains open so looted items move downward rather than sideways.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Section names no longer cut off when dragged or docked",
+      "details": "Titles that cleanly fit their section width are no longer truncated when dragged or displayed in a dock card.",
+      "clients": []
+    }
+  ]
+}
