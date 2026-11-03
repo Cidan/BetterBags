@@ -810,6 +810,82 @@ a dock card), `spec/integration/logout_spec.lua`, `spec/integration/guild_bank_s
 `spec/next/settings/content_spec.lua`, `spec/refresh_pipeline_spec.lua` ("counts each time a kind's layout starts afresh"),
 `spec/integration/next_settings_spec.lua`.
 
+## 7b. Compact sections (`NextCanvas:compactPlaces`, `compactFit`, `compactShapes`, `compactLayout`, `compactWidest`)
+
+Asked: "a 'compact' mode to columns, as a single toggle", that "aggressively pulls categories together and ignores the concepts
+of columns", each section pushed "as far left as it can, with a minimum of the icon grid's normal gap", "take into account header text as
+well so it doesn't overlap". And the constraint: "always make sure we round to the nearest item grid position -- no disjoint item button
+placement ... compact mode must never violate this constraint." Then, of a bag with wide sections off, Consumable 16 with Miscellaneous and
+Quest below it beside nothing: "in this one very, very narrow case, i'm okay violating our 'no disjoint rows' constraint ... generally, try to
+compute what the most compact layout is possible, but making sure section names are always visible."
+
+- **The setting:** **Compact Sections** (`sectionCompact`, per bag, off by default, BetterBags Next only, `DB:GetNextSectionCompact`), in
+  a bag's Layout tab's Sections, right after Section Columns. Off at one column (`disabled`). Sends `next/SectionColumnsChanged`, as the
+  others do: no read of the bags. **Fill Order** is off while it is on: with no columns there is nothing to fill down.
+- **Every icon in the columns of one grid:** a section starts `start` whole cells along (`step`, from `gridLengths`), and every icon a whole number of steps further on. Nothing is
+  ever placed across by a measured pixel length. So a section's left edge and every icon line up with every other section's, wherever it stands down the bag.
+- **Down the bag, the usual spacing, nothing more:** a section under another stands `SectionSpacing` below it, the same as outside compact, in whole pixels. Asked, of a first version
+  that kept icons on a grid of rows too, each title taking a whole row of it (about 14 pixels more between sections): "why when we have compact sections, do we have a wider gap on the
+  Y axis between sections? feels... like that defeats the purpose". So a section tucked beside a taller one does not line up with that section's rows (the "no disjoint rows" the player
+  gave up for this, below). Compact is never looser than the layout it replaces.
+- **Packing** (`compactPlaces`): in the bag's order, each section takes the place where it ends highest, whichever its bag's columns, beside a
+  taller section or in a hole an earlier one left; for one height, its usual shape, then the leftmost place. Only here does §7a's "no disjoint
+  rows" not hold (asked, above); section columns keep it.
+- **Judgment call:** a later section can stand ahead of an earlier one to fill a hole: the first section of a list never moves, each after takes the
+  best of what is left. So a bag's order is a priority, not a reading order. Asked for the most compact layout, and order given up only where a hole
+  would otherwise stay empty.
+- **A section's shapes** (`compactShapes`), widest first: what keeps its icons within a column, or with wide sections on within its Wide Column
+  Limit (`ceil(n / (limit - 1))`, up to the row), in as few cells as hold the same rows (`ceil(n / rows)`). So 6 at a limit of 2 is 6 cells, 9 in a row of
+  8 is 5 and 4 rather than 8 and 1, and 16 with wide sections off in columns of 4 is 4 and 4 and 4 and 4. Then each narrower one, more rows
+  for fewer cells, taken only when that ends strictly higher (6 icons beside a section leaving two cells: 2 cells, 3 rows). With wide sections on, never as
+  many rows as its limit: that is the player's setting.
+- **A name is always whole** (`compactTextCells`): no shape is narrower than the section's title's place (`Sections.Title.X`), its whole name, the gap to the
+  count (`CountGap`), the count, and what the theme keeps after them (`Sections.Compact.TextEnd`), in whole pixels on the grid it is drawn on, as `placeTitleRow`
+  works its room out: `ceil((text + gap) / step)`. A name too long for the whole row is cut, its count kept, as it always was. A count gaining a digit past its cells
+  packs the bag afresh rather than cut the name.
+- **Held while it shows** (`compactLayout`, `heldPlaces`), as §7a's widths are held and for the same reason: each section keeps the cell it starts on and its
+  cells until the layout starts afresh, and only finds its row. One more item grows it taller where it stands, and what is under it moves down, never across the bag.
+  Packed afresh for: a read that starts the layout over, a sort, another tab or view, its bag closing; a window of other cells or other settings; a section coming or
+  going (waiting in a dock, leaving, gone); a drag; a count outgrowing its cells; a theme.
+- **Recent Items and Free Space** stay at the full width, above and below, as in §7a. Dock cards lead the column as ever.
+- **A window too narrow for its columns** (`ColumnSplit`): compact keeps a grid down to two cells, where columns fall back to one: sections of one
+  cell can still stand side by side.
+- **Drawn on another grid** (`titleFits`, `section.givenWidth`): held in a drag or in a dock card a section is drawn shrunk, where each length rounds otherwise and its width
+  comes up short, and a compact section has no room to spare: a name that exactly fit its cells was cut while held, and in the card after a drag, whose card read the short
+  width (both found by the bug reviews, 3396x1362 at 65%). Whether a name fits is decided on the canvas's grid, against the width the section was given, so at rest nothing
+  changes, and a dock card lays out a section from another panel at that width too, never at its frame's.
+- **Dragging:** the room is a place in the list (§7a). Where the dragged section stands at a place depends only on the sections before it, so `dragSlots` finds every place in
+  one pass of them, not a pass per place. A drag packs afresh, so the others make way by the same rule.
+- **Small panels** (`compactWidest`): what the sections reach, in cells, and from there the fewest cells that leave every section where it stands, as a narrower
+  window can narrow a column and so a section's shape: 16 icons with wide sections off, two rows of eight at 16 cells, need 15, where the first column is still eight. A
+  width let go at snaps to one the snap leaves alone. A lone section of one cell needs two: a window of one has no grid. At the window it shows them in, it goes by where they
+  stand now, so a press on a grip that moves nothing moves nothing (found by the bug review: a section that had lost items since came in a cell).
+- **A name cut for the whole row** (`section.titleWhole`): measuring it never touches the title, which keeps the width it was cut to and measures that. Setting it back to measure it left it
+  whole with no layout after it to cut it again, running over its count through a drag (found by the bug review). A section taken from the pool for a new name has its title's width set back
+  first: a theme restyles the pool too, which cut the old name again, and the new name took the old one's width (found by the next review: "Back" across a whole row).
+- **Themes:** `Sections.Compact.TextEnd` (next-themes.md §3): Default 0; Guild Wars 2 8 and Papercraft 4, the insets of their title bars at the other
+  end; Make It So 16, its bar's end cap. Everything else comes from what a theme already sets: its icon and gap (the grid), its title's place,
+  fonts and count gap (the text), its section header and spacing (how far apart sections stand).
+- **Measured offline** (PUC Lua 5.1, mock widgets, wide sections off, 2 columns), compact on against off: 15 sections, a render 1.26 / 1.11 ms; 60 sections at 30 cells, a render 5.16 / 4.45 ms,
+  packed afresh 10.69 / 4.39 ms, every room of a drag (`dragSlots`) 8.76 / 1.61 ms (measured with whole rows; the packing's work is the same). Not measured in game.
+- **Known:** a name's room is worked out on the grid it is drawn on, as it must be not to be cut, so a name within a pixel or two of a cell's end can take a
+  different number of cells at another Bag Scale, and so the packing can differ. A layout otherwise does not depend on the grid (next-pixel-perfect.md §3; tested at Bag Scales 50% to 150% on three
+  screens). A section of few cells looted into while the bag shows grows tall where it stands (25 items in one cell's width), until the next sort or close: the same hold as §7a's.
+
+Coverage: `spec/next/content_spec.lua` ("compact"; "packing": the reported bag, the usual spacing down, one grid across, names whole, a hole filled ahead of its order, a narrower shape, its usual shape, a name's width, the
+limit; held: moved down never across, afresh when told, a section going or coming, a count outgrowing its cells, a window of other cells; the exact fit, the gap, wide sections, wide sections off,
+icons across a name's width, a name too long, Fill Order, a narrow window, one column, off; themes: title, count gap, `TextEnd`, none, another grid, a theme applied; `Widest`; 400 random bags keeping every
+icon in the grid's columns, nothing overlapping or closer than the spacing, every name whole and each section as high as it can stand; 300 random snaps leaving every section where it stands; reordering by drag; a drag working each section's width out once; drawn on another grid; a dock and back), `spec/next/pixel_perfect_spec.lua` ("compact": one grid measured on four screens, at a Bag Scale, in every shipped
+theme; the same cells at every Bag Scale; a grip; "in section columns": a real drag), `spec/next/small_spec.lua`, `spec/next/bag_spec.lua`, `spec/config/catalog_spec.lua`,
+`spec/config/settings_effects_spec.lua`, `spec/database_spec.lua`, `spec/core/constants_spec.lua`, `spec/next/settings/content_spec.lua`, `spec/sonata/next_themes_spec.lua`,
+`spec/integration/next_settings_spec.lua`.
+
+Mutation-tested: 110 mutations of the first version, which kept rows, and 72 of the packing, every one caught but what cannot be told apart. Of the packing's, seven first survived: five led to tests (a
+drag's slots under Recent Items, their height, how far down they stand; a snap for another window, and for other sections); and two cover for each other (`compactKey`'s start and `compactWidest` counting a
+section's start: either alone finds a layout that fits). Rounding a name or a count up alone cannot be told apart either, as any fraction left in the sum still goes past a whole pixel, while both together are caught.
+
+**Not seen in game** since the packing. To check: a bag with wide sections off and a tall section (the reported Consumable 16 with Back, Item Enhancement, Miscellaneous and Quest), on a few themes; drag a section; resize a small panel; loot into a small section with the bag open.
+
 ## 8. Coverage
 
 `spec/next/tween_spec.lua` (eases, start value at once, delay, replacing, side by side, stopping

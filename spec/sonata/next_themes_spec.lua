@@ -1522,4 +1522,20 @@ describe("BetterBags Next's shipped themes", function()
       end
     end)
   end)
+  -- What a compact section keeps after its text, in the theme's own art: an end cap, a bar's inset (next.md §7b).
+  describe("compact sections", function()
+    it("keeps no room after a section's text unless a theme asks", function()
+      assert.are.equal(0, sonataNext:Resolve("Default").Sections.Compact.TextEnd)
+      assert.are.equal(0, sonataNext:Resolve("Quiet").Sections.Compact.TextEnd)
+    end)
+
+    it("keeps a section's text off the end of its art", function()
+      local makeItSo = sonataNext:Resolve("MakeItSo").Sections
+      assert.are.equal(makeItSo.Header.End.Size, makeItSo.Compact.TextEnd, "off the bar's end cap")
+      local gw2 = sonataNext:Resolve("GW2").Sections
+      assert.are.equal(gw2.Title.X, gw2.Compact.TextEnd, "the bar's inset on both sides")
+      local papercraft = sonataNext:Resolve("Papercraft").Sections
+      assert.are.equal(papercraft.Title.X, papercraft.Compact.TextEnd, "the stroke's inset on both sides")
+    end)
+  end)
 end)

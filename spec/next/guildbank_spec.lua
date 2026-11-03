@@ -171,6 +171,7 @@ describe("NextGuildBank", function()
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
+    override(stubs.database, "GetNextSectionCompact", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "GetInBagSearch", function() return true end)
     data.tabOrder = {}
@@ -688,6 +689,11 @@ describe("NextGuildBank", function()
 
   -- Sections dragged in and out (next.md §7, guild-bank.md §5): the guild bank says what it takes and
   -- moves it, as the vendor sells what is dragged onto it.
+  it("reads its own bag's Compact Sections", function()
+    override(stubs.database, "GetNextSectionCompact", function(_, kind) return kind == const.BAG_KIND.GUILD end)
+    assert.is_true(select(5, open():SectionColumns()))
+  end)
+
   describe("sections moved in and out", function()
     local function bagItem(bag, slot, opts)
       opts = opts or {}

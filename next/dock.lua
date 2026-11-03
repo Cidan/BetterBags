@@ -354,7 +354,8 @@ function listProto:Lead(width, layoutWidth)
   for i, entry in ipairs(self.entries) do
     local section = entry.section
     local own = entry.source == self.panel
-    local w = own and width or section.frame:GetWidth()
+    -- A section from another panel keeps the width its column gave it: its frame's has been rounded on other grids since.
+    local w = own and width or section.givenWidth
     -- The card is as wide as the column whatever its section's width: its text needs the room, and a section in a column of
     -- four is a quarter as wide.
     local room = width - 2 * spread - 2 * pad

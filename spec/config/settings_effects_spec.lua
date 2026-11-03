@@ -99,6 +99,8 @@ describe("What each setting asks the bags for", function()
       SetNextSectionFill = function() end,
       GetNextSectionSpan = function() return true end,
       SetNextSectionSpan = function() end,
+      GetNextSectionCompact = function() return false end,
+      SetNextSectionCompact = function() end,
       GetNextSectionWideRows = function() return 2 end,
       SetNextSectionWideRows = function() end,
     }) do
@@ -130,7 +132,7 @@ describe("What each setting asks the bags for", function()
   }
   -- Laying the sections out again reads nothing, and only that bag's panel does it.
   it("lays only that bag out again for its section columns and fill order", function()
-    for _, title in ipairs({ "Section Columns", "Fill Order", "Wide Sections Span Columns", "Wide Column Limit" }) do
+    for _, title in ipairs({ "Section Columns", "Compact Sections", "Fill Order", "Wide Sections Span Columns", "Wide Column Limit" }) do
       local found = settings(title)
       assert.are.equal(2, #found, title)
       for _, option in ipairs(found) do

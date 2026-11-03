@@ -156,6 +156,7 @@ describe("BetterBags Next's small mode", function()
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
+    override(stubs.database, "GetNextSectionCompact", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "SetNextSize", function(_, size) db.size = size end)
     override(stubs.database, "GetNextSmallPlace", function(_, kind)
@@ -457,6 +458,73 @@ describe("BetterBags Next's small mode", function()
         local at = bag.content:RowWidth(20) + room
         assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(25) + room))
         assert.are.equal(at, bag:SnapWidth(at))
+      end)
+
+      -- Asked of compact sections: a bag let go too wide comes back to its widest row, every row as it stands.
+      it("snaps compact sections to their widest row, and stays there", function()
+        local bag, room = bagIn({ { "A", 1 }, { "B", 1 }, { "C", 3 } })
+        override(stubs.database, "GetNextSectionCompact", function() return true end)
+        bag.content:Settle()
+        local at = bag.content:RowWidth(5) + room
+        assert.are.equal(at, bag:SnapWidth(bag.content:RowWidth(20) + room))
+        assert.are.equal(at, bag:SnapWidth(at))
+      end)
+
+      it("keeps every compact row through a grip let go too wide, and a press that moves nothing", function()
+        finally(dofile("spec/helpers/layout.lua").UseScreen(3396, 1362, 0.65))
+        local bag = bagIn({ { "A", 1 }, { "B", 1 }, { "C", 3 } })
+        override(stubs.database, "GetNextSectionCompact", function() return true end)
+        bag.content:Invalidate()
+        render:Flush()
+        local room = bag:ContentRoom()
+        local function rows()
+          local c = bag.content.byName
+          return { c.A.x, c.A.y, c.B.x, c.B.y, c.C.x, c.C.y }
+        end
+        local before = rows()
+        local snapped = bag.content:RowWidth(5) + room
+        bag:StartSizing("RIGHT")
+        bag.frame:SetSize(bag.content:RowWidth(20) + room, bag.frame:GetHeight())
+        bag:Resized()
+        render:Flush()
+        bag:StopSizing()
+        finishTweens()
+        render:Flush()
+        assert.are.same(before, rows())
+        assert.is_true(math.abs(snapped - bag:SmallWidth()) < 1)
+        local width = bag:SmallWidth()
+        bag:StartSizing("RIGHT")
+        bag:Resized()
+        render:Flush()
+        bag:StopSizing()
+        finishTweens()
+        render:Flush()
+        assert.are.same(before, rows())
+        assert.are.equal(width, bag:SmallWidth())
+      end)
+
+      -- Found by the bug review: the snap packed afresh, and a section that had lost items since would come in a cell.
+      it("moves nothing on a press of a grip, when compact sections no longer stand as a fresh layout would", function()
+        finally(dofile("spec/helpers/layout.lua").UseScreen(3396, 1362, 0.65))
+        local bag = bagIn({ { "A", 8 }, { "B", 4 } })
+        override(stubs.database, "GetNextSectionCompact", function() return true end)
+        override(stubs.database, "GetNextSectionSpan", function() return false end)
+        bag.content:Invalidate()
+        render:Flush()
+        local slotInfo = { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" } },
+          items = { item("0_1", "A"), item("0_2", "A"), item("0_9", "B"), item("0_10", "B"), item("0_11", "B"), item("0_12", "B") } } } }
+        local width = bag:SmallWidth()
+        bag:Draw(ctx(), slotInfo, function() end)
+        render:Flush()
+        local xB = bag.content.byName.B.x
+        bag:StartSizing("RIGHT")
+        bag:Resized()
+        render:Flush()
+        bag:StopSizing()
+        finishTweens()
+        render:Flush()
+        assert.are.equal(width, bag:SmallWidth())
+        assert.are.equal(xB, bag.content.byName.B.x)
       end)
 
       -- A width let go at snaps to one the snap leaves alone, the same number of columns, never wider, for any bag.
