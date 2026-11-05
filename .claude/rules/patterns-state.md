@@ -173,10 +173,16 @@ recalculation that ran first asked `GetItemGUID` about a slot the player had jus
 **Rule**: The data layer records which bags the client changed after their last committed read
 (`items:MarkBagUnread`, set from the same events that lead to reads; cleared by a committed read for the
 changes before its harvest). A recalculation leaves such a bag's items exactly as committed and asks
-the client nothing about them; their read is on its way. Never answer this with a check in front of the
-client call: the committed items of that bag are known to be stale, and nothing else about them should
-be refreshed either. Never read the bag in the recalculation instead: its item data may not have loaded
-(data-loader.md §19).
+the client nothing about them; their read is on its way. Never answer a reported change with a check in
+front of the client call: the committed items of that bag are known to be stale, and nothing else about
+them should be refreshed either. Never read the bag in the recalculation instead: its item data may not
+have loaded (data-loader.md §19).
+
+**Seen since** (refresh-scheduler.md §10): the client can empty a slot and report it late, early or never
+(a craft using up its reagents, reported with the bags closed). For that, and only that, the recalculation
+asks `C_Item.DoesItemExist` (an `EmptiableItemLocation`) before `GetItemGUID`, and an item it finds gone
+turns into what a report would have made: its bag marked unread and a read of it asked for (a separate unit,
+after the recalculation). The marks stay the rule for every change the client does report.
 
 ## Dual-Bank Tab Routing (Retail Character Bank vs Warbank)
 **Problem**: In Retail, Character Bank (`bankType = Character`) and Account Bank (`bankType = Account`) share `const.BAG_KIND.BANK`. If `categoryToGroup[BANK]` is stored as a flat dictionary, assigning a category to a Warbank tab overwrites the Character Bank assignment. `ItemBelongsToTab` strictly filters items by `itemIsAccountBank == tabIsAccountBank`, so Character Bank items of that category cannot show in the Warbank tab, cannot show in any Character Bank tab (since `assignedGroup` points to the Warbank tab), and are rejected by default Tab 1 (which only accepts unassigned categories). The items completely vanish from all bank tabs.

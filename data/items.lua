@@ -1196,6 +1196,9 @@ end
 -- the new-item flag; one read while the client had no data for it (harvestIncomplete) is
 -- read again, as every read does with such a slot. An item whose slot now holds something else keeps its values: what the
 -- client reports for the slot belongs to the other item, and the slot's read is on its way.
+-- An item whose slot holds nothing now (C_Item.DoesItemExist, which takes an empty location; GetItemGUID raises for one)
+-- keeps its values too, and its bag is marked unread and read: the client emptied it without a BAG_UPDATE, so no read
+-- of it is on its way (refresh-scheduler.md §10).
 -- A backpack derive reads the equipped gear, as a backpack read does, so upgrade arrows
 -- compare with the gear worn now.
 ---@param kind BagKind
@@ -1207,12 +1210,17 @@ function items:Phase2_Rederive(kind, committedItems)
     return self:RederiveGuildBank(committedItems), {}
   end
   local itemData = {}
+  local gone = false
   local itemLoader = addon:GetModule("ItemLoader", true)
   for slotkey, item in pairs(committedItems) do
     if not item.isItemEmpty and self._unreadBags[item.bagid] == nil then
       local itemMixin = itemLoader and itemLoader:GetItemMixinFromSlotKey(slotkey) or Item:CreateFromBagAndSlot(item.bagid, item.slotid) --[[@as ItemMixin]]
-      local itemGUID = C_Item.GetItemGUID(itemMixin:GetItemLocation()) or ""
-      if itemGUID == item.itemInfo.itemGUID then
+      local location = itemMixin:GetItemLocation()
+      local itemGUID = C_Item.DoesItemExist(location) and (C_Item.GetItemGUID(location) or "") or nil
+      if itemGUID == nil then
+        self:MarkBagUnread(item.bagid)
+        gone = true
+      elseif itemGUID == item.itemInfo.itemGUID then
         if item.harvestIncomplete then
           local data = {}
           ---@cast data +ItemData
@@ -1225,6 +1233,9 @@ function items:Phase2_Rederive(kind, committedItems)
       end
     end
     itemData[slotkey] = item
+  end
+  if gone then
+    events:SendMessage(context:New('ItemGone'), kind == const.BAG_KIND.BANK and 'bags/RefreshBank' or 'bags/RefreshBackpack')
   end
   local equipmentData = {}
   if kind == const.BAG_KIND.BACKPACK then

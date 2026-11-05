@@ -1,6 +1,7 @@
 ---
 paths:
   - "data/refresh.lua"
+  - "data/items.lua"
   - "spec/refresh_spec.lua"
   - "spec/refresh_pipeline_spec.lua"
   - "spec/targeted_sweep_spec.lua"
@@ -508,7 +509,12 @@ the last read committed.
   information" tooltips until the next open. An item whose slot now holds something else
   keeps its values: what the client reports for the slot belongs to the other item (writing its
   new-item flag would put the moved item in Recent Items), and the slot's `BAG_UPDATE` read
-  is on its way.
+  is on its way. **An item whose slot holds nothing** (`C_Item.DoesItemExist`, which takes an
+  `EmptiableItemLocation`, asked before `GetItemGUID`, which raises for an empty one) keeps its values
+  too, and its bag is marked unread (`MarkBagUnread`) and read (`bags/RefreshBackpack`, or
+  `bags/RefreshBank` for the bank): the client emptied it with no `BAG_UPDATE`, so no read was on its way.
+  The read waits behind the derive (one unit at a time) and clears the mark as it commits; later derives
+  leave the marked bag alone meanwhile.
 - **A bag the client changed after its read keeps its committed items, and the client is asked
   nothing about them.** `items:MarkBagUnread(bagID)` records each change the client reports:
   `BAG_UPDATE` (its bag), `BAG_CONTAINER_UPDATE` (every backpack, bank and Warbank bag),
@@ -516,8 +522,9 @@ the last read committed.
   the reads they lead to (`refresh:OnEnable`). A committed read clears, for each bag it harvested,
   the changes made before its harvest (`items:MarkBagsRead`; changes are numbered, so one made
   while the read was parked at its yield still marks the bag after it commits, and a read that
-  fails before committing clears nothing). A derive never clears a mark. `Phase2_Rederive` asks
-  `GetItemGUID` only about items of unmarked bags, which hold what they committed.
+  fails before committing clears nothing). A derive never clears a mark; it only makes one, for an item it
+  finds gone (above). `Phase2_Rederive` asks `GetItemGUID` only about items of unmarked bags whose slot holds an
+  item.
   **Failure mode (fixed, reported twice in game):** `data/items.lua:1190: bad argument #1 to
   'GetItemGUID' (Usage: local itemGUID = C_Item.GetItemGUID(itemLocation))`, from a unit the queue
   stepped (`refresh.lua:250`). `GetItemGUID` takes an `ItemLocation` that holds an item, not an
@@ -533,6 +540,13 @@ the last read committed.
   came from a stepped unit (its stack starts at `_Arm`'s timer). A second report came from a
   synchronous one during a world transfer, which takes the items away with no `BAG_UPDATE`: leaving
   the world marks every bag unread and holds the queue (§8).
+  **Reported again, and guarded (v0.9.0, `items.lua:1214`, issue #1217's line):** with the bags closed at a
+  trainer, crafting (Runed Copper Pants, its reagent stacks used up), "When they popped into the bags, I got
+  the error", from a unit `_Arm` stepped (`refresh.lua` 267, 336, 281), not held. A replay on the real modules
+  gives that stack only when the client reports the reagent bag three or more frames late, before its slot
+  empties, or never; which one the client does was not captured. The asked-for fix, without a capture: the
+  derive asks `C_Item.DoesItemExist` first, and an item it finds gone is kept, its bag marked and read (above).
+  It covers every such client order (the simulation below), and the read clears what is left on screen.
 - A backpack derive reads the equipped gear (`HarvestEquipment`), as a backpack read does,
   so upgrade arrows compare with the gear worn now.
 - Phases 3-11 then run exactly as for a read, against a copy of the committed table (so the
@@ -629,33 +643,40 @@ queue, on a client whose every call taking an `ItemLocation` that must hold an i
 default it runs a spread of its cases in about 5 seconds; `BB_SIM_FULL=1` runs them all (about 12 minutes),
 `BB_SIM_REPORT=1` prints the counts below.
 
-| Simulated | Cases | Asked about an empty slot |
-|---|---|---|
-| Each change reported as it is made: 23 changes x 17 triggers x 10 moments, both designs | 3,910 each | never |
-| The same 23 changes x 4 reads x 10 moments, both designs | 920 each | never |
-| Every order of a reported change, its frame's end, its item data, 2 recalculations, a read, a wipe, 2 frames | 90,720 | never |
-| Random sessions of 200 steps, bank and loading screens included: classic, Next, WoW: Forever | 900 | never |
-| At the bank: 4 changes x 18 triggers x 10 moments | 720 | never |
-| Every order of a slot emptying, its report, its frame's end, its item data, a recalculation, a read and frames: reported as it is made | 18,480 | never |
-| The same: reported later | 70,560 | 20,170, until the report; none once the client is quiet |
-| The same: reported before the slot empties | 89,040 | 12,040; 1,051 keep failing once the client is quiet |
-| The same: never reported | 2,520 | 1,260; 840 keep failing until a read of the bag |
-| A loading screen's 8 steps in every order: items leaving while the bags are held | 46,620 | never |
-| The same: items leaving while they are not held | 28,980 | 3,600 |
-| A bank closing in every order: its slots going once `BANKFRAME_CLOSED` fired | 240 | never |
-| The same: its slots going before it fired (the wiki says its data is there at the first) | 120 | 36 |
+| Simulated | Cases | Asked about an empty slot, before the guard | With it |
+|---|---|---|---|
+| Each change reported as it is made: 23 changes x 17 triggers x 10 moments, both designs | 3,910 each | never | never |
+| The same 23 changes x 4 reads x 10 moments, both designs | 920 each | never | never |
+| Every order of a reported change, its frame's end, its item data, 2 recalculations, a read, a wipe, 2 frames | 90,720 | never | never |
+| Random sessions of 200 steps, bank and loading screens included: classic, Next, WoW: Forever | 900 | never | never |
+| At the bank: 4 changes x 18 triggers x 10 moments | 720 | never | never |
+| Every order of a slot emptying, its report, its frame's end, its item data, a recalculation, a read and frames: reported as it is made | 18,480 | never | never |
+| The same: reported later | 70,560 | 20,170, until the report; none once the client is quiet | never |
+| The same: reported before the slot empties | 89,040 | 12,040; 1,051 keep failing once the client is quiet | never |
+| The same: never reported | 2,520 | 1,260; 840 keep failing until a read of the bag | never |
+| A loading screen's 8 steps in every order: items leaving while the bags are held | 46,620 | never | never |
+| The same: items leaving while they are not held | 28,980 | 3,600 | never |
+| A bank closing in every order: its slots going once `BANKFRAME_CLOSED` fired | 240 | never | never |
+| The same: its slots going before it fired (the wiki says its data is there at the first) | 120 | 36 | never |
 
-So every sender of `bags/Rederive` is safe against any change the client reports as it makes it, in any order: the reported
-error needs the client to hold a slot empty, unmarked, with no `BAG_UPDATE` since that bag's last read. Every trigger then
-raises it (so the tooltip is the trigger and not the cause), and a recalculation fails each time until a read of that bag
-ends it, so one such slot can make any number of errors.
+Before the guard, every sender of `bags/Rederive` was safe against any change the client reports as it makes it, in any
+order: the reported error needed the client to hold a slot empty, unmarked, with no `BAG_UPDATE` since that bag's last read.
+Every trigger then raised it (so the tooltip is the trigger and not the cause), and a recalculation failed each time until a
+read of that bag ended it, so one such slot could make any number of errors. With the guard, the first recalculation over
+such a slot asks nothing, marks its bag and reads it, and every case above ends with the committed bags what the client holds
+and no bag marked. A slot whose item object is gone while its ID still reads (`objectGone`) is still asked about by the read
+it leads to (`ReuseHarvestedSlot`, another line), as by any read: no player has reported that line.
 
 **Measured:** in-world, in a player's capture (v0.8.10), a looted item was there at its own `BAG_UPDATE` (bag 4, 6 then 7
 items); no capture has a slot emptying in the world. No capture of 1,232 `[bags]` records has `items` differ from `exist`: a
 slot whose item object is gone while its ID still reads would also raise on a read (`ReuseHarvestedSlot`), which no player
 has reported. warcraft.wiki.gg's `BAG_UPDATE` says "the APIs can provide unreliable information during this event".
-**Not known:** which of those three client behaviours a Labyrinth shows. A profiler capture of the error tells them apart:
-the next `BAG_UPDATE` after the failure, a signal just after it, or failures repeating with none.
+**Not known:** which of those three client behaviours a Labyrinth, or a craft, shows. With the guard nothing fails to capture;
+a profiler capture of the read it asks for (`[msg] bags/RefreshBackpack` from `ItemGone`, the `[bags]` record of the next
+`BAG_UPDATE`, if any) would still tell them apart.
+
+The guard's own mutations (`spec/integration/empty_slot_spec.lua`, default run): no `DoesItemExist` check (8 failing), no mark
+(1), no read (6), the bank reading the backpack (1), the backpack reading the bank (5): each caught.
 
 Mutation-checked: 12 breaks of the real checks (the mark ignored, cleared too early or not made, by `BAG_UPDATE`,
 `BAG_CONTAINER_UPDATE` and leaving the world; a recalculation clearing marks; the hold not holding; `atBank` left on): 10 are

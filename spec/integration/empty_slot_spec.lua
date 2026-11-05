@@ -18,17 +18,17 @@ local FULL = os.getenv("BB_SIM_FULL") ~= nil
 local TAKES_AN_ITEM = { "CanBeRefunded", "CanScrapItem", "GetCurrentItemLevel", "GetCurrentItemTransmogInfo",
   "GetItemGUID", "GetItemIcon", "GetItemQuality", "GetStackCount", "IsBound", "IsBoundToAccountUntilEquip" }
 
--- The line players report: where a recalculation asks a stored item's GUID (Phase2_Rederive).
-local function lineOf(path, text)
-  local number = 0
-  for line in io.lines(path) do
+-- The line players reported: where a recalculation asks a stored item's GUID (Phase2_Rederive).
+local function rederiveLine()
+  local number, inside = 0, false
+  for line in io.lines("data/items.lua") do
     number = number + 1
-    if line:find(text, 1, true) then return number end
+    inside = inside or line:find("function items:Phase2_Rederive", 1, true) ~= nil
+    if inside and line:find("C_Item.GetItemGUID(", 1, true) then return number end
   end
-  error(text .. " is not in " .. path)
+  error("Phase2_Rederive asks no GUID in data/items.lua")
 end
-local RECALCULATION_LINE = "data/items.lua:" .. lineOf("data/items.lua", "C_Item.GetItemGUID(itemMixin:GetItemLocation())")
-local THE_REPORTED_ERROR = RECALCULATION_LINE .. ": bad argument #1 to 'GetItemGUID'"
+local RECALCULATION_LINE = "data/items.lua:" .. rederiveLine()
 
 local BAG_SIZES = { [0] = 6, [1] = 6, [5] = 3 }
 local BANK_SIZES = { [6] = 6, [12] = 6 }
@@ -862,11 +862,13 @@ describe("a bag slot the client has emptied", function()
     if REPORT then print("orders of a change reported as it is made: " .. count) end
   end)
 
-  it("reproduces the reported error, and only when the change is not reported as it is made", function()
+  -- Reported in game, the slot emptying unreported, or reported late or early (a craft using up its reagents): the
+  -- recalculation that finds a committed item gone from its slot asks nothing about it, and reads its bag.
+  it("asks nothing in any order of a slot emptying, reported as it is made, later, earlier or never", function()
     start()
     local s = steps()
     -- By what the order says of the slot emptying (E) and its report (U).
-    local stats = {}
+    local orders = {}
     local function classOf(order)
       local e, u
       for i, token in ipairs(order) do
@@ -877,29 +879,17 @@ describe("a bag slot the client has emptied", function()
       if u > e then return "reported later" end
       return "reported before it is made"
     end
-    local tally = function(class, during, after)
-      local stat = stats[class] or { orders = 0, during = 0, after = 0 }
-      stats[class] = stat
-      stat.orders = stat.orders + 1
-      if during then stat.during = stat.during + 1 end
-      if after then stat.after = stat.after + 1 end
-    end
     local count = 0
     local function each(order)
       count = count + 1
       if sampled(count, 43) then
-        local during, after, first = runOrder(order, s)
-        tally(classOf(order), during, after)
-        if during and first then
-          -- The same error the player sent, in the same state: not held, the failed unit just ended.
-          assert.equal("GetItemGUID", first.api, table.concat(order, " "))
-          assert.is_false(first.marked, table.concat(order, " "))
-        end
-        local stale
-        for _, err in ipairs(handle.errors) do
-          if not err:find(THE_REPORTED_ERROR, 1, true) then stale = err end
-        end
-        assert.is_nil(stale, table.concat(order, " "))
+        local what = table.concat(order, " ")
+        local during, after = runOrder(order, s)
+        local class = classOf(order)
+        orders[class] = (orders[class] or 0) + 1
+        assert.is_false(during, failure(what))
+        assert.is_false(after, failure(what))
+        check(what)
       end
     end
     eachOrder({ E = 1, U = 1, D = 1, L = 1, T = 1, R = 1, F = 2 }, each)
@@ -909,29 +899,21 @@ describe("a bag slot the client has emptied", function()
       eachOrder({ E = 1, U = 1, D = 1, L = 1, T = 1, R = 1, F = 4 }, each)
     end
     if REPORT then
-      for class, stat in pairs(stats) do
-        print(string.format("%-28s %6d orders, asked during %6d, asked once quiet %6d", class, stat.orders, stat.during,
-          stat.after))
-      end
+      for class, n in pairs(orders) do print(string.format("%-28s %6d orders, never asked", class, n)) end
     end
-    assert.equal(0, stats["reported as it is made"].during)
-    assert.equal(0, stats["reported as it is made"].after)
-    assert.is_true(stats["reported later"].during > 0, "a recalculation between the change and its report")
-    assert.equal(0, stats["reported later"].after, "the report ends it")
-    assert.is_true(stats["reported before it is made"].after > 0, "a read commits before the slot empties")
-    assert.is_true(stats["never reported"].after > 0, "nothing ever ends it")
+    for _, class in ipairs({ "reported as it is made", "reported later", "reported before it is made", "never reported" }) do
+      assert.is_true((orders[class] or 0) > 0, class)
+    end
   end)
 
-  it("shows the player's stack and state when a tooltip finishes over an unreported empty slot", function()
+  it("asks nothing when a tooltip finishes over an unreported empty slot, and reads its bag", function()
     start()
     assert.is_truthy(aTooltipInstance())
     c.bags[0][1] = nil
     fire("TOOLTIP_DATA_UPDATE", aTooltipInstance())
     frames(13)
-    assert.equal(1, #handle.errors, failure("one error"))
-    assert.is_truthy(handle.errors[1]:find(THE_REPORTED_ERROR, 1, true), handle.errors[1])
-    assert.is_false(refresh._held)
-    assert.is_nil(refresh._world)
+    assert.same({}, handle.errors)
+    finish("a tooltip finishing over an unreported empty slot")
   end)
 
   ---------------------------------------------------------------------------------------------------------------------
@@ -939,7 +921,7 @@ describe("a bag slot the client has emptied", function()
   -- ending, the items given back; with a recalculation among them.
   ---------------------------------------------------------------------------------------------------------------------
 
-  it("loading screens: asks only when the items leave while the bags are not held", function()
+  it("loading screens: asks nothing, the items leaving while the bags are held or not", function()
     start()
     local held, takenWhile
     local actions = {
@@ -978,11 +960,7 @@ describe("a bag slot the client has emptied", function()
           local stat = stats[takenWhile]
           stat.orders = stat.orders + 1
           if #c.asked > 0 then stat.asked = stat.asked + 1 end
-          local other
-          for _, err in ipairs(handle.errors) do
-            if not err:find(THE_REPORTED_ERROR, 1, true) then other = err end
-          end
-          assert.is_nil(other, table.concat(order, " "))
+          check(table.concat(order, " "))
         end
       end
     end)
@@ -991,8 +969,9 @@ describe("a bag slot the client has emptied", function()
         "(asked %d)", count, stats.held.orders, stats.held.asked, stats["not held"].orders, stats["not held"].asked))
     end
     assert.is_true(stats.held.orders > 0)
+    assert.is_true(stats["not held"].orders > 0)
     assert.equal(0, stats.held.asked)
-    assert.is_true(stats["not held"].asked > 0)
+    assert.equal(0, stats["not held"].asked)
   end)
 
   ---------------------------------------------------------------------------------------------------------------------
@@ -1035,7 +1014,7 @@ describe("a bag slot the client has emptied", function()
     if toBag ~= fromBag then report(toBag) end
   end
 
-  it("the bank closing: asks only when its slots go while the bank is still open", function()
+  it("the bank closing: asks nothing, its slots going before it closed or once it did", function()
     start()
     local stats = { ["before it closed"] = { orders = 0, asked = 0 }, ["once it closed"] = { orders = 0, asked = 0 } }
     local goneWhen
@@ -1069,8 +1048,10 @@ describe("a bag slot the client has emptied", function()
         stats["once it closed"].orders, stats["once it closed"].asked))
     end
     assert.is_true(stats["once it closed"].orders > 0)
+    assert.is_true(stats["before it closed"].orders > 0)
     assert.equal(0, stats["once it closed"].asked)
-    assert.is_true(stats["before it closed"].asked > 0)
+    assert.equal(0, stats["before it closed"].asked)
+    assert.same({}, handle.errors)
   end)
 
   it("never asks while at the bank: every change there, every trigger, every moment", function()
@@ -1184,57 +1165,67 @@ describe("a bag slot the client has emptied", function()
   end)
 
   ---------------------------------------------------------------------------------------------------------------------
-  -- What it takes: a slot empty on the client, unmarked, reaches the same error from every trigger.
+  -- A slot empty on the client, unmarked: what the client never reported. Every trigger's recalculation finds the
+  -- committed item gone (C_Item.DoesItemExist, which takes an empty location), keeps it, and reads its bag.
   ---------------------------------------------------------------------------------------------------------------------
 
-  it("raises the reported error from every trigger once a slot empties unreported", function()
+  it("asks nothing from every trigger once a slot empties unreported, and reads its bag", function()
     start()
     for _, trigger in ipairs(TRIGGERS) do
       reset()
       c.bags[0][1] = nil
       trigger[2]()
       drain()
-      assert.is_true(#c.asked > 0, trigger[1])
-      assert.equal("GetItemGUID", c.asked[1].api, trigger[1])
-      assert.is_truthy(handle.errors[1]:find(THE_REPORTED_ERROR, 1, true), trigger[1] .. ": " .. tostring(handle.errors[1]))
+      check(trigger[1])
     end
   end)
 
-  it("keeps raising it, once per recalculation, until a read of that bag", function()
+  it("marks the bag unread and reads it once, however many recalculations come before the read", function()
     start()
-    c.bags[0][1] = nil
-    for _ = 1, 8 do
-      send("bags/Rederive", { backpack = true })
-      drain()
+    local harvests = 0
+    local harvest = items.Phase2_Harvest
+    items.Phase2_Harvest = function(...)
+      harvests = harvests + 1
+      return harvest(...)
     end
-    assert.equal(8, #handle.errors)
-    -- A change reported in another bag reads only that bag: the same error next time.
+    finally(function() items.Phase2_Harvest = harvest end)
+    c.bags[0][1] = nil
+    send("bags/Rederive", { backpack = true })
+    assert.is_not_nil(items._unreadBags[0], "marked as the recalculation finds it gone")
+    for _ = 1, 8 do send("bags/Rederive", { backpack = true }) end
+    drain()
+    check("eight recalculations behind the first")
+    assert.equal(1, harvests)
+    -- Another bag's item gone: that bag is read, and the first stays read.
     c.bags[1][1] = nil
-    report(1)
-    drain()
     send("bags/Rederive", { backpack = true })
     drain()
-    assert.equal(9, #handle.errors)
-    -- A report of this bag, of anything in it, ends it.
-    report(0)
-    drain()
-    send("bags/Rederive", { backpack = true })
-    drain()
-    assert.equal(9, #handle.errors)
-    assert.same(backpackHeld(), backpackCommitted())
+    check("another bag's item gone")
+    assert.equal(2, harvests)
   end)
 
-  it("names another line when the item object is gone and the slot still reads as filled", function()
+  it("at the bank, asks nothing about a bank slot emptied unreported, and reads the bank", function()
+    start()
+    openBank()
+    c.bags[6][1] = nil
+    send("bags/Rederive", { bank = true })
+    drain()
+    assert.same({}, c.asked)
+    assert.same({}, handle.errors)
+    local committed = items.slotInfo[const.BAG_KIND.BANK].itemsBySlotKey["6_1"]
+    assert.is_true(committed == nil or committed.isItemEmpty == true, "the bank was read")
+    assert.is_nil(items._unreadBags[6])
+    closeBank()
+    drain()
+    check("the bank closed")
+  end)
+
+  it("asks nothing when the item object is gone and the slot still reads as filled; the read it asks for does", function()
     start()
     c.bags[0][1].objectGone = true
     send("bags/Rederive", { backpack = true })
     drain()
-    assert.equal(1, #handle.errors)
-    assert.is_truthy(handle.errors[1]:find(THE_REPORTED_ERROR, 1, true), handle.errors[1])
-    -- A read of the bag asks too, where a truly empty slot asks nothing: no player has reported these lines.
-    for i = #handle.errors, 1, -1 do handle.errors[i] = nil end
-    send("bags/RefreshBackpack")
-    drain()
+    -- The read asks, as any read of such a slot does: no player has reported its line.
     assert.equal(1, #handle.errors)
     assert.is_nil(handle.errors[1]:find(RECALCULATION_LINE, 1, true), handle.errors[1])
     assert.is_truthy(handle.errors[1]:find("data/items.lua", 1, true), handle.errors[1])
