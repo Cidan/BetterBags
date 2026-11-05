@@ -100,7 +100,7 @@ const.DATABASE_DEFAULTS = {
     nextTabOrder = {},
     nextIconScale = 100,
     nextBagScale = 100,
-    nextSize = "full",
+    nextSize = "small",
     nextSmallPlaces = {},
     nextSmallSizes = {},
     nextSmallChain = "apart",
@@ -379,14 +379,14 @@ describe("Database", function()
       end)
     end
 
-    it("GetNextSize / SetNextSize, full until switched, and nothing but a size", function()
-      assert.are.equal("full", DB:GetNextSize())
-      DB:SetNextSize("small")
-      assert.are.equal("small", DB:GetNextSize())
-      assert.has_error(function() DB:SetNextSize("tiny") end)
+    it("GetNextSize / SetNextSize, small until switched, and nothing but a size", function()
       assert.are.equal("small", DB:GetNextSize())
       DB:SetNextSize("full")
       assert.are.equal("full", DB:GetNextSize())
+      assert.has_error(function() DB:SetNextSize("tiny") end)
+      assert.are.equal("full", DB:GetNextSize())
+      DB:SetNextSize("small")
+      assert.are.equal("small", DB:GetNextSize())
     end)
 
     -- Each kind of bag keeps where its small panel was left: its top left, in UIParent's units.

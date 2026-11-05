@@ -1635,8 +1635,18 @@ small panels by dragging them together (§14e); then resizing them with grips (�
 
 ### 14a. The setting and the size
 
-- `nextSize` (profile, `"full"` by default; `DB:Get/SetNextSize`, nothing else accepted) is every
-  Next panel's size; `nextSmallPlaces[kind]` (`DB:Get/SetNextSmallPlace`) where each kind's small
+- `nextSize` (profile, `"small"` by default; `DB:Get/SetNextSize`, nothing else accepted) is every
+  Next panel's size. Asked (2026-11-04): "by default, bags in next start in minimized mode"; it was `"full"`.
+  AceDB saves only what differs from a default, so a profile on full before this, chosen or not, saved
+  nothing and starts small too; one already on small is unchanged.
+  - **Left as it is, for the player to decide (found by the bug review, computed with the real modules):** with no
+    saved place, the small backpack sits 40 in from the right edge and every companion 40 in from the left
+    (`SmallPlace`), each regardless of the other, so on a screen under 996 units wide (1280x1024 at UI scale 1: 960)
+    the two overlap by default (36 units there; 106 at 1024x768 and 1.15). It was so before for players who chose
+    small; small being the default makes it every unsaved profile's at the bank, a vendor or the guild bank.
+  - **Coverage:** the whole-addon specs that start BetterBags Next now run small panels; Papercraft's "full size and
+    small" starts full (it had started on the default).
+  `nextSmallPlaces[kind]` (`DB:Get/SetNextSmallPlace`) where each kind's small
   panel was left (its top left in UIParent's units), nothing until first moved;
   `nextSmallSizes[kind]` (`DB:Get/SetNextSmallSize`, `{ width, height }`) the size the player gave it
   with its grips (§14g), nothing while it is the default size (a reset clears it).
