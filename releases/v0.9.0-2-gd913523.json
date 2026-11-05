@@ -1,0 +1,23 @@
+{
+  "id": 1793892664,
+  "version": "v0.9.0-2-gd913523",
+  "channel": "alpha",
+  "date": "2026-11-05",
+  "from": "139b69f4717f8a8e76672539d803b9106e2d0558",
+  "to": "d91352378ee293a8f757a9353feb801c088fa56b",
+  "headline": "Small panels now expand as needed to prevent titles and section names from being cut off, with an optional setting to adjust width while open.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Small bags preserve full titles and section names",
+      "details": "Small panels now automatically expand to the nearest grid step required to display the bag title and all section names in full instead of truncating them.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Fit Names While Open setting for small bags",
+      "details": "A new option under Appearance \u003e Size lets open small bags smoothly expand when longer names appear and shrink back down once they fit.",
+      "clients": []
+    }
+  ]
+}
