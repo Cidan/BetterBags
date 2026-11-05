@@ -145,6 +145,7 @@ describe("BetterBags Next's panels and themes", function()
     override(stubs.database, "GetNextAnimation", function(_, name) return db.animation[name] ~= false end)
     override(stubs.database, "GetNextIconScale", function() return 100 end)
     override(stubs.database, "GetNextBagScale", function() return 100 end)
+    override(stubs.database, "GetNextFitNamesWhileOpen", function() return false end)
     override(stubs.database, "SetNextTheme", function(_, key) db.theme = key end)
     override(stubs.database, "GetNextSize", function() return db.size end)
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
@@ -2812,8 +2813,9 @@ describe("BetterBags Next's panels and themes", function()
       assert.is_true(body.top - search.top >= -y + 32, "under the title")
     end)
 
-    -- A small bag goes as narrow as 216 (its title's room, its footer, a column of items beside the side bar): the
-    -- pieces along its top and bottom, the comm badge among them, never run into each other, at that width or at a
+    -- A small bag goes as narrow as 216 (its title's room, its footer, a column of items beside the side bar), on a grid
+    -- step (next.md §14g): three cells and the room beside them (2 * 18, the side bar's 52 and the scroll bar's 28), 260.
+    -- The pieces along its top and bottom, the comm badge among them, never run into each other, at that width or at a
     -- full bag's.
     it("never runs the pieces along its top or bottom into each other, as narrow as a small bag goes", function()
       override(stubs.database, "GetNextSmallSize", function() return 1, 400 end)
@@ -2845,7 +2847,8 @@ describe("BetterBags Next's panels and themes", function()
       check("full")
       addon:GetModule("NextPanel"):SetSize(ctx(), "small")
       finishTweens()
-      assert.are.equal(216, layout.Rect(bag.body).right - layout.Rect(bag.body).left, "as narrow as it goes")
+      assert.are.equal(260, layout.Rect(bag.body).right - layout.Rect(bag.body).left, "as narrow as it goes")
+      assert.are.equal(bag.content:RowWidth(3) + bag:ContentRoom(), 260)
       check("small")
       addon:GetModule("NextPanel"):SetSize(ctx(), "full")
       finishTweens()

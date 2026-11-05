@@ -73,6 +73,29 @@ Then, on the plan:
   small screen, and its rows had the same mismatch.
 - Commits: the tabs and Icon Scale (21 mutations, one led to a test), then Bag Scale (58 mutations, 11
   first survived: 10 led to tests, one showed a refit the chain already does, removed). Rules: next.md
-  §3 (Icon Scale) and §14h (Bag Scale), next-settings.md, next-themes.md, `.claude/rules/patterns-ui-next.md`.
+  §3 (Icon Scale) and next-small-mode.md §14h (Bag Scale), next-settings.md, next-themes.md, `.claude/rules/patterns-ui-next.md`.
 - Not seen in game: how a scaled small panel looks (art, text, sparkles), dragging sections and tabs in
   one, and the switch's scale glide.
+
+## Fit Names While Open (2026-11-04)
+
+Reported with a screenshot: a small backpack four cells wide in two columns, its title "Backp..." and a section
+"Miscellaneo... 2". Asked:
+
+> we need to make sure this never happens by always have the bag width sit at the minimum step ... such that no
+> text is truncated in bag title or section title
+
+> with an option to enable/disable this behavior in settings, default disable. with it disabled, behavior is as it
+> is now
+
+- A small bag's width always sits at the first grid step (whole cells of icons and the room beside them) at or above
+  the width the player chose at which neither its title nor any section's name is cut: as it opens and where a resize
+  grip is let go (next-small-names.md §14g).
+- **Fit Names While Open**, after Bag Scale on the Size tab (`nextFitNamesWhileOpen`, a switch, off by default): on, a
+  small bag open on the screen also follows what it shows, gliding wider when a section's name or its title would be
+  cut and back to its size once it fits, saving nothing. Off, nothing changes its width while it is open.
+- Found by the bug review and fixed: two chained bags follow their names one at a time (at once they overlapped); a bank
+  tab switch fits its new name and sections in one glide; a Bag Scale change takes the scale before the bag follows its
+  names; the glide keeps where the bag is scrolled; the title's glow is laid out for the title as it shows.
+- Full-height bags are unchanged.
+- Not seen in game: a bag fitting its names as it opens and as a grip is let go, and the switch's glide.

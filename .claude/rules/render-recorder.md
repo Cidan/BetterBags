@@ -86,7 +86,7 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
 - **A BetterBags Next panel sized** (`recorder:PanelSizing(panel, step)`, from `panelProto:recordSizing`): every step
   of a grip sizing a small panel and of its size gliding adds a `sizing` entry, `panel` its label and `step` one of
   `start` (the grip pressed), `resized` (each size change the client makes), `rendered` (each layout while sized or
-  gliding), `scroll kept` (`KeepScroll` put the scroll back, next-small-mode.md §14g), `let go`, `placed` (let go with nothing to
+  gliding), `scroll kept` (`KeepScroll` put the scroll back, next-small-resize.md §14g), `let go`, `placed` (let go with nothing to
   snap), `snap` and `snapped` (each frame of the snap and its end), `reset` and `reset done` (Shift-click's glide).
   Its lines (`SizingSnapshot`): `screen WxH uiScale scale effective cursor x,y`; `frame <every anchor: point, relative
   frame, relative point, x,y to four decimals> | l t r b`; `scroll offset <offset> of <range> (<percentage>) | target

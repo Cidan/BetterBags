@@ -100,6 +100,7 @@ const.DATABASE_DEFAULTS = {
     nextTabOrder = {},
     nextIconScale = 100,
     nextBagScale = 100,
+    nextFitNamesWhileOpen = false,
     nextSize = "small",
     nextSmallPlaces = {},
     nextSmallSizes = {},
@@ -378,6 +379,16 @@ describe("Database", function()
         assert.are.equal(100, DB[case[1]](DB))
       end)
     end
+
+    -- Fit Names While Open (next.md §14g): off until turned on.
+    it("GetNextFitNamesWhileOpen / SetNextFitNamesWhileOpen, off until turned on", function()
+      assert.is_false(DB:GetNextFitNamesWhileOpen())
+      DB:SetNextFitNamesWhileOpen(true)
+      assert.is_true(DB:GetNextFitNamesWhileOpen())
+      assert.is_true(DB.data.profile.nextFitNamesWhileOpen)
+      DB:SetNextFitNamesWhileOpen(false)
+      assert.is_false(DB:GetNextFitNamesWhileOpen())
+    end)
 
     it("GetNextSize / SetNextSize, small until switched, and nothing but a size", function()
       assert.are.equal("small", DB:GetNextSize())

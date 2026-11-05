@@ -124,6 +124,14 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
       text across and 6 above and below (`placeTitleRow`), no longer anchored to the title.
     - What still hangs from the title (the cloud's puffs, the braid) is only ever placed, never read.
     - The pixel check (`/bbdb`, `debug/pixelaudit.lua`) skips a region whose anchoring is secret.
+    - **A small vendor's minimum** holds a title's whole width (next-small-resize.md §14g; asked of vendors: "careful with
+      secret value please"): `measureTitle` keeps nil while the measure is secret (`isSecret`, before anything is done with
+      it), and `MinWidth` then keeps `Small.MinTitle`, the title cut short as before. Nothing compares, adds up, concatenates
+      or sizes with the secret; `FollowNames` (Fit Names While Open) reads only that nil. Its section names and counts are
+      category names and button counts, never secret. Coverage: `spec/next/vendor_spec.lua` ("keeps the least room for its
+      title a small vendor always kept while the name is secret, its whole name else").
+    - **Its draw** sets its footer's text before it fits and lays out (`vendorProto:Draw`: the footer is part of a small
+      vendor's minimum), then follows its names while Fit Names While Open is on (`FollowNames`), as the bags' draw does.
   - **What else can be secret** (checked against `Blizzard_APIDocumentationGenerated`, every function and event
     BetterBags calls or registers): the unit APIs only for a unit that is not player-controlled or in the group
     (`SecretWhenUnitIdentityRestricted`), so only `UnitName("npc")` and `UnitGUID("npc")` (the Seller, seller.md

@@ -130,6 +130,14 @@ drag drops once it finds the left button up two frames in a row (`IsMouseButtonD
 frame leaves the release's own `OnDragStop` its chance), but without moving items: an `OnUpdate`
 is no hardware event, so a drop on the other bag or its tabs lands back.
 
+**However a drag ends** (`finish`: a landing, a flight away, a dock, a cancel, the section released mid-drag),
+the panel it was dragged on follows what its names asked for while the drag held it, the frame after: a small
+panel with Fit Names While Open on waits for a drag on its canvas (`Settled`) and tries again each frame
+(next-small-names.md §14g, `followLater`). A drag cancelled draws nothing after it, and the follow waited for the
+next draw (found by the bug review); `finish` called back for it, which the tries each frame made needless
+(found by the second bug review). Covered by `spec/next/small_spec.lua` ("waits while a section is dragged on it,
+and follows once the drag ends").
+
 **Confirming in the target** (`NextDrag:Pend`). A move the target confirms first (a sale past what
 buyback keeps, next-vendor.md §10; a deposit into a guild tab the player cannot withdraw from, guild-bank.md §5)
 used to open the question dialog while the section landed back in its source. Asked: the dialog

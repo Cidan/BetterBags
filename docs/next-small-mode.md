@@ -51,7 +51,7 @@ From `next/panel.lua`, `next/chain.lua` and `next/style.lua`:
 
 - One setting for every Next panel: `nextSize`, `"full"` or `"small"`, in the profile next to `nextChain`.
   Full was the default until 2026-11-04, when small became the default (asked: "by default, bags in next start in
-  minimized mode"; next.md §14a).
+  minimized mode"; `.claude/rules/next-small-mode.md` §14a).
 - **The toggle** is a header button on the backpack: arrows in while full, arrows out while small
   (BetterBags' own glyphs, `.claude/rules/next-themes.md` §11; first Blizzard's red expand and
   condense art). It switches every Next panel, open or not, and every open one morphs to its new
@@ -136,14 +136,14 @@ through `style.ICON` and `style.GAP`). Resizing a small panel with a grip is don
 
 ## Phases
 
-1. **Small panels** (done; `.claude/rules/next.md` §14): the setting, the small geometry (no
+1. **Small panels** (done; `.claude/rules/next-small-mode.md` §14): the setting, the small geometry (no
    feather, a shorter beam, the height, the edge), sparkles that follow the geometry, opening and
    closing in place, moving and saved places, the toggle with the morph. Small panels are not
    chained yet.
-2. **Chaining by dragging** (done; `.claude/rules/next.md` §14e): the snap, moving a chained pair
+2. **Chaining by dragging** (done; `.claude/rules/next-small-mode.md` §14e): the snap, moving a chained pair
    together, letting go, the braid and its sparkles between two free panels, a companion opening
    beside its anchor.
-3. **Resizing with grips** (done; `.claude/rules/next.md` §14g): a grip on each bottom corner, seen
+3. **Resizing with grips** (done; `.claude/rules/next-small-resize.md` §14g): a grip on each bottom corner, seen
    under the pointer, none on the chained side, live reflow, the size kept and saved per bag, and
    Shift-click to glide back to the default size.
 4. **Tuning** with the player, in game.

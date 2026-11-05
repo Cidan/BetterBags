@@ -44,6 +44,21 @@ local function override(tbl, key, value)
   table.insert(replaced, { tbl, key, rawget(tbl, key) })
   tbl[key] = value
 end
+
+-- countCalls counts the calls to obj's method, put back after the test (override), and returns a reader of the count.
+-- Never spy.on a panel's method: luassert's spy deep-copies every call's arguments, and a panel's first is the panel, the
+-- whole mocked UI behind it (over 100 MB a call; the suite outgrew CI's 4 GB limit on two such calls).
+---@param obj table
+---@param method string
+---@return fun(): number
+local function countCalls(obj, method)
+  local calls, original = 0, obj[method]
+  override(obj, method, function(...)
+    calls = calls + 1
+    return original(...)
+  end)
+  return function() return calls end
+end
 local function restore()
   for i = #replaced, 1, -1 do
     replaced[i][1][replaced[i][2]] = replaced[i][3]
@@ -181,6 +196,9 @@ describe("BetterBags Next's small mode", function()
     db.iconScale, db.bagScale = 100, 100
     override(stubs.database, "GetNextIconScale", function() return db.iconScale end)
     override(stubs.database, "GetNextBagScale", function() return db.bagScale end)
+    -- Fit Names While Open (next.md §14g): off by default.
+    db.fitNames = false
+    override(stubs.database, "GetNextFitNamesWhileOpen", function() return db.fitNames end)
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
@@ -1019,6 +1037,20 @@ describe("BetterBags Next's small mode", function()
       release(panel.grips[side])
     end
 
+    -- gripTo drags panel's grip on side until the panel is w wide, the corner across from it still, as the client does on a
+    -- screen that lays the frames out from their anchors (spec/helpers/layout.lua's UseScreen), and lets go.
+    local function gripTo(panel, side, w)
+      local f = panel.frame
+      local left, top = f:GetLeft(), f:GetTop()
+      local right = left + f:GetWidth()
+      press(panel.grips[side])
+      f:ClearAllPoints()
+      f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", side == "LEFT" and right - w or left, top)
+      f:SetSize(w, f:GetHeight())
+      f:GetScript("OnSizeChanged")(f, w, f:GetHeight())
+      release(panel.grips[side])
+    end
+
     local function perRow(panel)
       local width = panel.root:PreRender().Width - panel.scroll:GetGutterWidth()
       local STEP = style.ICON + style.GAP
@@ -1029,6 +1061,14 @@ describe("BetterBags Next's small mode", function()
     -- sides, and the icons with the gaps between them.
     local function columnsWidth(n)
       return 2 * style.PAD + scrollbox:GutterWidthFor({ Symmetric = true }) + n * (style.ICON + style.GAP) - style.GAP
+    end
+
+    -- The narrowest grid step at least width wide (next.md §14g): whole cells of icons and the room beside them, a side
+    -- rail's too.
+    local function gridStep(width)
+      local n = 1
+      while columnsWidth(n) + style.RAIL < width - 1e-6 do n = n + 1 end
+      return columnsWidth(n) + style.RAIL
     end
 
     describe("the grips", function()
@@ -1195,9 +1235,10 @@ describe("BetterBags Next's small mode", function()
           if button:IsShown() then row = row + style.HEADER_BUTTON + style.HEADER_BUTTON_GAP end
         end
         row = row - style.HEADER_BUTTON_GAP
-        local header = 2 * style.PAD + style.TITLE_INSET + row + 12 + style.Small.MinTitle
+        -- Its whole title and a pixel (next.md §14g), on a grid step.
+        local header = 2 * style.PAD + style.TITLE_INSET + row + 12 + bag.title:GetStringWidth() + bag:PixelUnit()
         local column = 2 * style.PAD + style.GUTTER + style.ICON
-        assert.are.equal(math.ceil(math.max(header, column)), bag:MinWidth())
+        assert.are.equal(gridStep(math.max(header, column)), bag:MinWidth())
         assert.are.equal(style.CONTENT_TOP + style.FOOTER + style.SECTION_HEADER + style.ICON, bag:MinHeight())
       end)
 
@@ -1207,7 +1248,7 @@ describe("BetterBags Next's small mode", function()
         bag.moneyFrame.frame:SetWidth(400)
         local footer = 2 * style.PAD + style.TITLE_INSET + bag.currencyStrip:MinWidth() + 12 + 400
         assert.is_true(bag.currencyStrip:MinWidth() > 0)
-        assert.are.equal(math.ceil(footer), bag:MinWidth())
+        assert.are.equal(gridStep(footer), bag:MinWidth())
       end)
 
       it("reflows its content at once as it is dragged", function()
@@ -1255,7 +1296,8 @@ describe("BetterBags Next's small mode", function()
         assert.are.equal(w, bag.frame:GetWidth())
       end)
 
-      it("cuts its title short in the room its header buttons leave", function()
+      -- Cut short only where even the screen cannot hold it, or it is a secret ("keeping its names whole").
+      it("fits its title in the room its header buttons leave, on one line, whole at its minimum", function()
         local bank = opened(function(c) return nextBank:Create(c) end)
         resize(bank, "LEFT", bank:MinWidth(), 500)
         local row = 0
@@ -1265,6 +1307,7 @@ describe("BetterBags Next's small mode", function()
         row = row - style.HEADER_BUTTON_GAP
         assert.are.equal(bank:MinWidth() - (style.PAD + style.TITLE_INSET) - (style.PAD + row) - 12, bank.title:GetWidth())
         assert.is_false(bank.title._wordWrap)
+        assert.is_false(bank.title:IsTruncated(), "whole at its minimum")
         nextPanel:SetSize(ctx(), "full")
         finishTweens()
         assert.are.equal(bank.title:GetStringWidth(), bank.title:GetWidth(), "a full panel's title is as long as it is")
@@ -1292,14 +1335,15 @@ describe("BetterBags Next's small mode", function()
         it("goes no narrower than the strip and its header, footer and column need", function()
           railed()
           local bag = opened(function(c) return nextBag:Create(c) end)
-          local header = 2 * style.PAD + 40 + style.TITLE_INSET + 12 + style.Small.MinTitle
+          local header = 2 * style.PAD + 40 + style.TITLE_INSET + 12 + bag.title:GetStringWidth() + bag:PixelUnit()
           local cells = 2 * style.PAD + 40 + style.GUTTER + style.ICON
           local currencies = 2 * style.PAD + 40 + style.TITLE_INSET + bag.currencyStrip:MinWidth() + 12
             + bag.moneyFrame.frame:GetWidth()
-          assert.are.equal(math.ceil(math.max(header, cells, currencies)), bag:MinWidth())
+          assert.are.equal(40, style.RAIL)
+          assert.are.equal(gridStep(math.max(header, cells, currencies)), bag:MinWidth())
           bag.moneyFrame.frame:SetWidth(400)
           local footer = 2 * style.PAD + 40 + style.TITLE_INSET + bag.currencyStrip:MinWidth() + 12 + 400
-          assert.are.equal(math.ceil(footer), bag:MinWidth())
+          assert.are.equal(gridStep(footer), bag:MinWidth())
         end)
 
         it("goes no shorter than its buttons down the strip need", function()
@@ -1720,6 +1764,1726 @@ describe("BetterBags Next's small mode", function()
       end)
     end)
 
+    -- Asked: "we need to make sure this never happens by always have the bag width sit at the minimum step ... such that no
+    -- text is truncated in bag title or section title". Reported with a screenshot: a backpack four cells wide in two
+    -- columns, its title "Backp..." and "Miscellaneo... 2" cut short beside "Consumable 1". A small panel sits at the first
+    -- grid step from the width the player chose at which neither its title nor any section's name is cut: as it opens, and
+    -- where a grip let go snaps. With Fit Names While Open on it follows what it shows while open; off, the default, nothing
+    -- changes its width while it is open ("with it disabled, behavior is as it is now").
+    describe("keeping its names whole", function()
+      local REPORTED = { { "Consumable", 1 }, { "Miscellaneous", 2 }, { "Trade Goods", 2 }, { "Quest", 1 } }
+      -- 2 + 240 + 8 + 6 = 256 with its count: more than a column of four cells (194) or five (244), a column of six.
+      local LONG = string.rep("n", 40)
+
+      local function slotsOf(list)
+        local categories, items, n = {}, {}, 0
+        for _, s in ipairs(list) do
+          table.insert(categories, { name = s[1] })
+          for _ = 1, s[2] do
+            n = n + 1
+            table.insert(items, item("0_" .. n, s[1]))
+          end
+        end
+        return { sortedItems = {}, tabs = { [1] = { categories = categories, items = items,
+          freeSpace = { showAll = false, buttons = { { slotkey = "9_1", count = 30 } } } } } }
+      end
+
+      -- tabOf is a tab holding list's sections, each item's slot key starting with prefix: each bag its own buttons.
+      local function tabOf(prefix, list)
+        local categories, items, n = {}, {}, 0
+        for _, s in ipairs(list) do
+          table.insert(categories, { name = s[1] })
+          for _ = 1, s[2] do
+            n = n + 1
+            table.insert(items, item(prefix .. n, s[1]))
+          end
+        end
+        return { categories = categories, items = items }
+      end
+
+      -- The defaults: two columns side to side, wide sections on, a Wide Column Limit of two.
+      local function inColumns()
+        override(stubs.database, "GetNextSectionColumns", function() return 2 end)
+        override(stubs.database, "GetNextSectionSpan", function() return true end)
+      end
+
+      local function holding(panel, list)
+        panel:Draw(ctx(), slotsOf(list), function() end)
+        render:Flush()
+      end
+
+      -- cut lists what is cut short: its title, and each section's name.
+      local function cut(panel)
+        local out = {}
+        if panel.title:IsTruncated() then table.insert(out, "title") end
+        for _, s in ipairs(panel.content.order) do
+          if s.titleCut then table.insert(out, s.name) end
+        end
+        return out
+      end
+
+      -- measured gives a section's name a width of its own, as the client measures its font.
+      local function measured(panel, name, width)
+        panel.content.byName[name].title.GetStringWidth = function() return width end
+      end
+
+      local function backpack()
+        return opened(function(c) return nextBag:Create(c) end)
+      end
+
+      local function reopen(panel)
+        panel:Hide(ctx())
+        finishTweens()
+        panel:Show(ctx())
+        finishTweens()
+        render:Flush()
+      end
+
+      describe("as it opens and as a grip is let go", function()
+        -- Three cells hold it in one column; four (two columns of two) and five (three and two) cut it; six (three and three)
+        -- hold it. The snap searches up from where it snaps, the player's columns kept, never down to the fewest.
+        it("snaps the reported bag let go wide to six cells, every name whole, and saves that", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, REPORTED)
+          measured(bag, "Miscellaneous", 100)
+          resize(bag, "RIGHT", columnsWidth(12), 600)
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(6), bag.frame:GetWidth())
+          assert.are.same({ columnsWidth(6), 600 }, db.sizes[BACKPACK])
+          assert.are.equal(2, bag.content.grid.count, "its columns kept")
+          assert.are.same({}, cut(bag))
+          resize(bag, "RIGHT", columnsWidth(5), 600)
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(6), bag.frame:GetWidth(), "let go at five")
+        end)
+
+        -- Clamp Bags to Screen is on here. Let go a grip's width from the screen's edge, a name takes it wider than the
+        -- screen leaves room for: its place is put back on the screen, and both its edges glide there.
+        it("glides both its edges where a grip let go snaps it wider than the screen's edge leaves room for", function()
+          inColumns()
+          db.places[BACKPACK] = { UIParent:GetWidth() - columnsWidth(8) - 30, 900 }
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          resize(bag, "RIGHT", columnsWidth(8) + 10, 600)
+          local x1 = UIParent:GetWidth() - columnsWidth(12)
+          assert.are.equal(x1, bag.placeX)
+          step(style.Time.Snap * 0.7)
+          assert.is_true(bag.sizeGliding)
+          local x = topLeft(bag)
+          assert.is_true(math.abs(x + bag.frame:GetWidth() - UIParent:GetWidth()) < 0.01, "its right edge at the screen's")
+          finishTweens()
+          assert.are.same({ x1, 900 }, { topLeft(bag) })
+          assert.are.same({ columnsWidth(12), 600 }, db.sizes[BACKPACK])
+        end)
+
+        -- Found by the fourth bug review (as for a glide for its names, "with Fit Names While Open on" below): a grip let go
+        -- wider than the screen's edge leaves room for, at the backpack's default place, glided its left edge between two
+        -- pixels on a frame or two.
+        for _, screen in ipairs({ { 2560, 1440, 0.71, 125 }, { 1920, 1080, 0.64, 100 }, { 1920, 1080, 1, 85 } }) do
+          it(string.format("glides both its edges on whole screen pixels where a grip let go puts it back, %dx%d at %s, Bag Scale %d%%",
+            screen[1], screen[2], screen[3], screen[4]), function()
+            local layoutHelper = dofile("spec/helpers/layout.lua")
+            finally(layoutHelper.UseScreen(screen[1], screen[2], screen[3]))
+            db.bagScale = screen[4]
+            local bag = backpack()
+            local x0 = bag.placeX
+            gripTo(bag, "RIGHT", bag.frame:GetWidth() + 101)
+            assert.is_true(bag.placeX < x0 - 10, "its place put back on the screen: " .. x0 .. " to " .. bag.placeX)
+            local ppu = layoutHelper.PixelsPerUnit()
+            local frames = 0
+            while bag.sizeGliding do
+              step(1 / 60)
+              frames = frames + 1
+              local rect = layoutHelper.Rect(bag.frame)
+              for _, edge in ipairs({ "left", "right" }) do
+                local px = rect[edge] * ppu
+                assert.is_true(math.abs(px - math.floor(px + 0.5)) < 1e-3, "its " .. edge .. " edge, frame " .. frames .. ": " .. px)
+              end
+            end
+            assert.is_true(frames > 5)
+          end)
+        end
+
+        it("stays where its names put it through a press on a grip that moves nothing", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, REPORTED)
+          measured(bag, "Miscellaneous", 100)
+          resize(bag, "RIGHT", columnsWidth(12), 600)
+          finishTweens()
+          render:Flush()
+          db.sizes[BACKPACK] = nil
+          press(bag.grips.RIGHT)
+          release(bag.grips.RIGHT)
+          assert.is_false(bag.sizeGliding)
+          assert.is_nil(db.sizes[BACKPACK], "nothing saved")
+          assert.are.equal(columnsWidth(6), bag.frame:GetWidth())
+        end)
+
+        it("snaps one column to the cells its section's name needs", function()
+          local bag = backpack()
+          holding(bag, { { "Item Enhancement", 2 } })
+          measured(bag, "Item Enhancement", 250)
+          resize(bag, "RIGHT", columnsWidth(10), 600)
+          finishTweens()
+          render:Flush()
+          -- 2 + 250 + 8 + 6 = 266: a whole row of six (294), less the pixel and a half its frame may lose, holds it.
+          assert.are.equal(columnsWidth(6), bag.frame:GetWidth())
+          assert.are.same({}, cut(bag))
+        end)
+
+        it("opens a saved width too narrow for its names at the width they need, keeping what was saved", function()
+          inColumns()
+          db.sizes[BACKPACK] = { columnsWidth(4), 600 }
+          local bag = backpack()
+          holding(bag, REPORTED)
+          measured(bag, "Miscellaneous", 100)
+          assert.are.equal(columnsWidth(4), bag.frame:GetWidth())
+          reopen(bag)
+          assert.are.equal(columnsWidth(6), bag.frame:GetWidth())
+          assert.are.equal(columnsWidth(6) - 2 * style.PAD, bag.root:PreRender().LayoutWidth)
+          assert.are.same({ columnsWidth(4), 600 }, db.sizes[BACKPACK], "what was saved is kept")
+          assert.are.same({}, cut(bag))
+        end)
+
+        it("goes no narrower than its whole title, at the first grid step that holds it", function()
+          local bag = backpack()
+          bag:SetTitle(string.rep("t", 26))
+          local room, slack = bag:titleEnd()
+          local need = bag:TitleStart() + room + slack + 26 * 6
+          local min, cr = bag:MinWidth(), bag:ContentRoom()
+          assert.is_true(min >= need, "its title whole")
+          assert.are.equal(min, cr + bag.content:RowWidth(bag.content:PerRow(min - cr)), "on a step")
+          assert.is_true(min - (style.ICON + style.GAP) < need + bag:PixelUnit(), "the first that holds it")
+          db.sizes[BACKPACK] = { 1, 500 }
+          reopen(bag)
+          assert.are.equal(min, bag.frame:GetWidth())
+          assert.is_false(bag.title:IsTruncated())
+        end)
+
+        -- The frame stands on the whole pixel nearest its width, and the title's room is rounded to a whole pixel too: a
+        -- minimum that left exactly the title's width cut it by a fraction of a pixel at some Bag Scales.
+        it("never cuts its title at its minimum, at any Bag Scale, a title's need landing on a grid step too", function()
+          for _, screen in ipairs({ false, { 3396, 1362, 0.65 } }) do
+            local undo = screen and dofile("spec/helpers/layout.lua").UseScreen(screen[1], screen[2], screen[3])
+            for _, scale in ipairs({ 85, 100, 115, 135 }) do
+              db.bagScale = scale
+              db.sizes[BANK] = { 1, 500 }
+              local bank = nextBank:Create(ctx())
+              local room, slack = bank:titleEnd()
+              local start = bank:TitleStart() + room + slack
+              for cells = 5, 8 do
+                for _, off in ipairs({ -0.6, -0.3, -0.01, 0, 0.01, 0.3, 0.6 }) do
+                  local width = columnsWidth(cells) - start + off
+                  bank.title.GetStringWidth = function() return width end
+                  bank:SetTitle("Bank")
+                  bank:FitSmall()
+                  assert.is_false(bank.title:IsTruncated(),
+                    string.format("%s at %d%%, a title %.2f wide", screen and "a 3396x1362 screen" or "1920x1200", scale, width))
+                end
+              end
+            end
+            if undo then undo() end
+          end
+        end)
+
+        -- A whole row is drawn in whole pixels: its frame on the nearest pixel, the scroll bar's room on each side too, so it
+        -- can be up to two pixels short of its cells' width (RowWidth). A name that row was found to hold is never cut.
+        it("never cuts a name its whole row was found to hold, at any Bag Scale", function()
+          for _, screen in ipairs({ false, { 3396, 1362, 0.65 }, { 1920, 1080, 0.64 } }) do
+            local undo = screen and dofile("spec/helpers/layout.lua").UseScreen(screen[1], screen[2], screen[3])
+            for _, scale in ipairs({ 85, 100, 115, 135 }) do
+              db.bagScale = scale
+              local bag = backpack()
+              holding(bag, { { "A", 1 } })
+              for cells = 6, 8 do
+                db.sizes[BACKPACK] = { columnsWidth(cells - 1), 600 }
+                for off = -3, 1, 0.25 do
+                  -- The title's place, the gap and the count (2 + 8 + 6) take the rest of the row's width. A new
+                  -- measure is a new name: the canvas lays it out again.
+                  measured(bag, "A", bag.content:RowWidth(cells) - 16 + off)
+                  bag.content:Invalidate()
+                  reopen(bag)
+                  assert.are.same({}, cut(bag), string.format("%s at %d%%, %d cells %+.2f",
+                    screen and (screen[1] .. "x" .. screen[2]) or "1920x1200", scale, cells, off))
+                end
+              end
+              bag:Hide(ctx())
+              finishTweens()
+            end
+            if undo then undo() end
+          end
+        end)
+
+        -- The client measures a font string at the width it was cut to (next-themes-art.md §14): a title cut short is measured
+        -- whole as it is set again, so the panel still knows how wide it needs to be.
+        it("measures its whole title, though the client measures a title at the width it was cut to", function()
+          local bag = backpack()
+          local whole = 400
+          bag.title.GetStringWidth = function(self)
+            local width = self._width
+            if width ~= nil and width > 0 and width < whole then return width end
+            return whole
+          end
+          bag:SetTitle("Backpack")
+          assert.are.equal(whole, bag.titleWhole)
+          assert.is_true(bag.title:GetStringWidth() < whole, "cut at its default width")
+          bag:StyleParts()
+          assert.are.equal(whole, bag.titleWhole, "and through a restyle")
+          reopen(bag)
+          assert.is_true(bag.frame:GetWidth() >= bag:TitleStart() + select(1, bag:titleEnd()) + 12 + whole)
+        end)
+
+        it("measures its title again as a theme restyles it", function()
+          local bag = backpack()
+          local width = 100
+          bag.title.GetStringWidth = function() return width end
+          bag:SetTitle("Backpack")
+          assert.are.equal(100, bag.titleWhole)
+          -- The theme's font is wider.
+          width = 300
+          bag:StyleParts()
+          assert.are.equal(300, bag.titleWhole)
+        end)
+
+        -- Found by the bug review: the title's cloud is laid out for the title as the client measures it, cut short, as it is
+        -- set; the bank sets its tab's name as it opens (OnShowing), before the open makes room for it (FitSmall), and nothing
+        -- laid the cloud out again for the title shown whole.
+        it("lays its title's cloud out again once it opens wide enough to show its title whole", function()
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          local whole = 70 * 6
+          bank.title.GetStringWidth = function(self)
+            local width = self._width
+            if width ~= nil and width > 0 and width < whole then return width end
+            return whole
+          end
+          bank:Hide(ctx())
+          finishTweens()
+          bank:SetTitle(string.rep("b", 70))
+          local span = bank:CloudSpan()
+          assert.is_true(span < whole, "cut short where it is set")
+          bank:Show(ctx())
+          finishTweens()
+          render:Flush()
+          assert.is_true(bank:CloudSpan() > span, "shown whole")
+          local drawn = {}
+          for i, puff in ipairs(bank.cloud.puffs) do
+            drawn[i] = { puff.base.x, puff.base.w }
+          end
+          assert.is_true(#drawn > 0, "the theme has a cloud")
+          bank:LayoutCloud()
+          for i, puff in ipairs(bank.cloud.puffs) do
+            assert.are.same({ puff.base.x, puff.base.w }, drawn[i], "puff " .. i .. " laid out for the title it shows")
+          end
+        end)
+
+        -- At 85% a pixel is 1/0.85 units: the screen a fraction of a pixel wider moves no frame edge, but what it lays out for
+        -- (held at the screen's width, unrounded) is wider.
+        it("lays its content out again when the width it lays out for changes, though its frame does not", function()
+          db.bagScale = 85
+          db.sizes[BACKPACK] = { 5000, 600 }
+          local bag = backpack()
+          local renders = 0
+          local invalidate = render.Invalidate
+          override(render, "Invalidate", function(r, d)
+            if d == bag.root then renders = renders + 1 end
+            return invalidate(r, d)
+          end)
+          local width = bag.frame:GetWidth()
+          UIParent:_SetRect(0, 0, UIParent:GetWidth() + 0.3, UIParent:GetHeight())
+          chain:Update(ctx(), true)
+          assert.are.equal(width, bag.frame:GetWidth(), "on the same whole pixel")
+          assert.are.equal(1, renders)
+          assert.is_true(math.abs(bag:RestingLayoutWidth() - UIParent:GetWidth() / 0.85) < 1e-9)
+        end)
+
+        it("cuts its title only where even the screen's width cannot hold it", function()
+          local bag = backpack()
+          bag:SetTitle(string.rep("t", 400))
+          reopen(bag)
+          assert.are.equal(UIParent:GetWidth(), bag.frame:GetWidth())
+          assert.is_true(bag.root:PreRender().LayoutWidth <= UIParent:GetWidth() - 2 * style.PAD, "laid out for the screen")
+          assert.is_true(bag.title:IsTruncated())
+          bag:SetTitle("Backpack")
+          reopen(bag)
+          assert.is_false(bag.title:IsTruncated())
+        end)
+      end)
+
+      describe("with Fit Names While Open off", function()
+        it("changes neither its width nor the width it lays out for while it is open, and fits as it next opens", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          local width, layout = bag.frame:GetWidth(), bag.root:PreRender().LayoutWidth
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.are.equal(width, bag.frame:GetWidth())
+          assert.are.equal(layout, bag.root:PreRender().LayoutWidth)
+          assert.is_false(bag.sizeGliding)
+          assert.are.same({ LONG }, cut(bag), "cut until it next opens")
+          reopen(bag)
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth(), "a column of six beside a column of six")
+          assert.are.same({}, cut(bag))
+          assert.is_nil(db.sizes[BACKPACK])
+        end)
+
+        -- It was "Known, not fixed" (next-columns.md): a panel at its minimum laid out for a minimum that followed its footer's
+        -- text, while its frame took it only when fitted, so a free-slot count gaining a digit could lay out a cell more than
+        -- the frame held.
+        it("lays out for the width it took while its footer's minimum grows, until it is fitted again", function()
+          db.sizes[BANK] = { 1, 500 }
+          local bank = nextBank:Create(ctx())
+          -- What the bank draws as it opens (OnShowing), and after: its free slots in the tab it shows.
+          local function bankSlots(free)
+            slots[BANK] = { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = { categories = { { name = "Ore" } },
+              items = { item("6_1", "Ore") }, freeSpace = { showAll = false, buttons = { { slotkey = "6_9", count = free } } } } } }
+            return slots[BANK]
+          end
+          -- 36 + 4 + 12 and the money: "1 free slots" (72) leaves it at nine cells, "100000 free slots" (102) needs ten.
+          bank.moneyFrame.frame:SetWidth(380)
+          bankSlots(1)
+          bank:Show(ctx())
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(9), bank.frame:GetWidth())
+          local layout = bank.root:PreRender().LayoutWidth
+          bank:Draw(ctx(), bankSlots(100000), function() end)
+          render:Flush()
+          assert.are.equal(columnsWidth(9), bank.frame:GetWidth())
+          assert.are.equal(layout, bank.root:PreRender().LayoutWidth, "it lays out for the width it took")
+          reopen(bank)
+          assert.are.equal(columnsWidth(10), bank.frame:GetWidth())
+          assert.are.equal(columnsWidth(10) - 2 * style.PAD, bank.root:PreRender().LayoutWidth)
+        end)
+      end)
+
+      describe("with Fit Names While Open on", function()
+        before_each(function()
+          db.fitNames = true
+        end)
+
+        it("glides wider as a long name comes in, every name whole on the way, and back as it goes, saving nothing", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          local width = bag.frame:GetWidth()
+          local right = select(1, topLeft(bag)) + width
+          assert.are.equal(columnsWidth(8), width)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_true(bag.sizeGliding, "it glides")
+          local frames = 0
+          while bag.sizeGliding do
+            step(1 / 60)
+            render:Flush()
+            frames = frames + 1
+            assert.are.same({}, cut(bag), "frame " .. frames)
+            local w = bag.frame:GetWidth()
+            assert.is_true(w >= width and w <= columnsWidth(12), "frame " .. frames .. ": " .. w)
+            assert.is_true(math.abs(select(1, topLeft(bag)) + w - right) < 0.01, "its right edge still, at its default place")
+          end
+          assert.is_true(frames > 5)
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.same({}, cut(bag))
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          assert.is_true(bag.sizeGliding, "it glides back")
+          finishTweens()
+          render:Flush()
+          assert.are.equal(width, bag.frame:GetWidth())
+          assert.are.same({ right - width }, { (topLeft(bag)) })
+          assert.is_nil(db.sizes[BACKPACK])
+          assert.is_nil(db.places[BACKPACK])
+        end)
+
+        it("narrows back to the width the player saved, its place kept", function()
+          inColumns()
+          db.sizes[BACKPACK] = { columnsWidth(9), 600 }
+          db.places[BACKPACK] = { 300, 900 }
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          finishTweens()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.same({ 300, 900 }, { topLeft(bag) }, "its left edge still")
+          holding(bag, { { "A", 1 } })
+          finishTweens()
+          assert.are.equal(columnsWidth(9), bag.frame:GetWidth())
+          assert.are.same({ 300, 900 }, { topLeft(bag) })
+          assert.are.same({ columnsWidth(9), 600 }, db.sizes[BACKPACK])
+          assert.are.same({ 300, 900 }, db.places[BACKPACK])
+        end)
+
+        -- A frame on: what sets a new title draws what it shows next in the same frame, and that draw fits both at once.
+        it("widens for its title a frame after it is given a longer one, drawn or not", function()
+          local bag = backpack()
+          bag:SetTitle(string.rep("t", 60))
+          assert.is_false(bag.sizeGliding, "a frame on")
+          step(1 / 60)
+          assert.is_true(bag.sizeGliding)
+          finishTweens()
+          assert.is_false(bag.title:IsTruncated())
+          assert.are.equal(bag:MinWidth(), bag.frame:GetWidth())
+          bag:SetTitle("Backpack")
+          finishTweens()
+          assert.are.equal(columnsWidth(8), bag.frame:GetWidth())
+          assert.is_nil(db.sizes[BACKPACK])
+        end)
+
+        -- The footer's text is set before the panel fits and lays out: a count gaining a digit is fitted in the same draw.
+        it("fits its footer's minimum in the draw that grows it", function()
+          db.sizes[BANK] = { 1, 500 }
+          local bank = nextBank:Create(ctx())
+          local function bankSlots(free)
+            slots[BANK] = { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = { categories = { { name = "Ore" } },
+              items = { item("6_1", "Ore") }, freeSpace = { showAll = false, buttons = { { slotkey = "6_9", count = free } } } } } }
+            return slots[BANK]
+          end
+          bank.moneyFrame.frame:SetWidth(380)
+          bankSlots(1)
+          bank:Show(ctx())
+          finishTweens()
+          assert.are.equal(columnsWidth(9), bank.frame:GetWidth())
+          bank:Draw(ctx(), bankSlots(100000), function() end)
+          assert.is_true(bank.sizeGliding)
+          assert.are.equal(columnsWidth(10), bank.snap.body, "laid out at once for the width it glides to")
+          finishTweens()
+          assert.are.equal(columnsWidth(10), bank.frame:GetWidth())
+        end)
+
+        it("waits while a grip holds it, and fits as the grip is let go", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          press(bag.grips.RIGHT)
+          sizeTo(bag, "RIGHT", bag.frame:GetWidth(), bag.frame:GetHeight())
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_false(bag.sizeGliding)
+          assert.are.equal(columnsWidth(8), bag.frame:GetWidth())
+          release(bag.grips.RIGHT)
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.same({}, cut(bag))
+        end)
+
+        it("waits while it is moved, and follows once it is dropped", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_false(bag.sizeGliding)
+          assert.are.equal(columnsWidth(8), bag.frame:GetWidth())
+          bag.mover:GetScript("OnDragStop")(bag.mover)
+          assert.is_false(bag.sizeGliding, "a frame on: what ended may have been cut short by something placing it")
+          step(1 / 60)
+          assert.is_true(bag.sizeGliding)
+          finishTweens()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.is_nil(db.sizes[BACKPACK])
+        end)
+
+        -- Cut short by a move, a glide ends as it is going (endSizeGlide); what the names asked for waits for the move, never
+        -- gliding under the mouse.
+        it("never glides while it is moved, though the glide a move cut short owed one", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          resize(bag, "RIGHT", columnsWidth(20), 600)
+          step(0.05)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+          assert.is_true(bag.moving)
+          assert.is_false(bag.sizeGliding)
+          step(1 / 60)
+          step(1 / 60)
+          assert.is_false(bag.sizeGliding, "not while it is moved")
+          bag.mover:GetScript("OnDragStop")(bag.mover)
+          finishTweens()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+        end)
+
+        it("waits while its size glides, and follows once it ends", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          resize(bag, "RIGHT", columnsWidth(20), 600)
+          step(0.05)
+          assert.is_true(bag.sizeGliding)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.are.equal(columnsWidth(4), bag.snap.body, "its snap goes on where it was going")
+          step(style.Time.Snap)
+          step(1 / 60)
+          assert.is_true(bag.sizeGliding, "following once the snap has ended")
+          assert.are.equal(columnsWidth(12), bag.snap.body)
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.same({ columnsWidth(4), 600 }, db.sizes[BACKPACK], "what the grip saved")
+          assert.are.same({}, cut(bag))
+        end)
+
+        -- Opening fits it (FitSmall): the draw it opens with does not glide it too.
+        it("opens at the width its names need at once, without a glide", function()
+          inColumns()
+          local bag = nextBag:Create(ctx())
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          local glides = countCalls(bag, "snapTo")
+          bag:Show(ctx())
+          assert.are.equal(0, glides())
+          assert.is_false(bag.sizeGliding)
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+        end)
+
+        -- Clamp Bags to Screen is on here: wider, its place is put back on the screen, so both its edges move.
+        it("glides both its edges where the screen's edge puts it back", function()
+          inColumns()
+          db.places[BACKPACK] = { UIParent:GetWidth() - columnsWidth(8) - 20, 900 }
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          local x1 = UIParent:GetWidth() - columnsWidth(12)
+          assert.are.equal(x1, bag.placeX)
+          -- Past the snap's turn a size that grows is at its width.
+          step(style.Time.Snap * 0.7)
+          assert.is_true(bag.sizeGliding)
+          local x = topLeft(bag)
+          assert.is_true(math.abs(x + bag.frame:GetWidth() - UIParent:GetWidth()) < 0.01, "its right edge at the screen's")
+          assert.is_true(math.abs(x - x1) < 0.01)
+          finishTweens()
+          assert.are.same({ x1, 900 }, { topLeft(bag) })
+          assert.are.same({ UIParent:GetWidth() - columnsWidth(8) - 20, 900 }, db.places[BACKPACK], "its place kept")
+        end)
+
+        -- Found by the fourth bug review: gliding to its new place with its width, its left edge was never put on a whole
+        -- pixel, and stood between two on 11 or 12 of the glide's 21 frames: the scroll box it holds, clipped there, drew its
+        -- icons stretched across the fraction (texture-sharpening.md §5).
+        for _, screen in ipairs({ { 2560, 1440, 0.71, 125 }, { 1920, 1080, 0.64, 100 }, { 1920, 1080, 1, 85 } }) do
+          it(string.format("glides both its edges on whole screen pixels where the screen's edge puts it back, %dx%d at %s, Bag Scale %d%%",
+            screen[1], screen[2], screen[3], screen[4]), function()
+            local layoutHelper = dofile("spec/helpers/layout.lua")
+            finally(layoutHelper.UseScreen(screen[1], screen[2], screen[3]))
+            db.bagScale = screen[4]
+            inColumns()
+            db.places[BACKPACK] = { UIParent:GetWidth() - columnsWidth(8) * screen[4] / 100 - 6, UIParent:GetHeight() - 30 }
+            local bag = backpack()
+            holding(bag, { { "A", 1 }, { "B", 1 } })
+            finishTweens()
+            local x0 = bag.placeX
+            holding(bag, { { "A", 1 }, { LONG, 1 } })
+            assert.is_true(bag.placeX < x0 - 10, "its place put back on the screen: " .. x0 .. " to " .. bag.placeX)
+            local ppu = layoutHelper.PixelsPerUnit()
+            local frames = 0
+            while bag.sizeGliding do
+              step(1 / 60)
+              frames = frames + 1
+              local rect = layoutHelper.Rect(bag.frame)
+              for _, edge in ipairs({ "left", "right" }) do
+                local px = rect[edge] * ppu
+                assert.is_true(math.abs(px - math.floor(px + 0.5)) < 1e-3, "its " .. edge .. " edge, frame " .. frames .. ": " .. px)
+              end
+            end
+            assert.is_true(frames > 5)
+          end)
+        end
+
+        it("settles a chained partner that was busy itself as it glided", function()
+          inColumns()
+          local bag = backpack()
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          db.smallChain = "backpack"
+          chain:Update(ctx())
+          finishTweens()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_true(bag.sizeGliding)
+          step(0.05)
+          -- The bank's own snap (it shows nothing: to the cells it was let go at), on through the backpack's glide.
+          resize(bank, "LEFT", columnsWidth(11) + 20, 480)
+          assert.is_true(bank.sizeGliding)
+          finishTweens()
+          local cx, cy = chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY)
+          local bx, by = topLeft(bank)
+          assert.is_true(math.abs(cx - bx) < 1 and math.abs(cy - by) < 1, bx .. " beside " .. cx)
+        end)
+
+        -- What the anchor's glide owed the bag beside it is paid once it is settled (chain:Settle): its own grip let go after,
+        -- its spot still, glides it nowhere, though the place a grip saves stands a fraction of a pixel from its spot.
+        it("owes a busy partner it settled nothing more as that partner's own grip is let go after", function()
+          local layoutHelper = dofile("spec/helpers/layout.lua")
+          finally(layoutHelper.UseScreen(2560, 1440, 0.71))
+          db.bagScale = 125
+          inColumns()
+          local bag = backpack()
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          db.smallChain = "backpack"
+          chain:Update(ctx())
+          finishTweens()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          finishTweens()
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_true(bag.sizeGliding)
+          step(0.05)
+          gripTo(bank, "LEFT", bank.frame:GetWidth() + 40)
+          assert.is_true(bank.sizeGliding)
+          finishTweens()
+          local cx = chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY)
+          assert.is_true(math.abs(cx - bank.placeX) < 1, "settled beside it")
+          for _ = 1, 60 do chain:Turn(1 / 60) end
+          for _, wider in ipairs({ 37, 101, 213, 333 }) do
+            gripTo(bank, "LEFT", bank.frame:GetWidth() + wider)
+            for frame = 1, 45 do
+              step(1 / 60)
+              chain:Turn(1 / 60)
+              local why = "let go " .. wider .. " wider, frame " .. frame
+              assert.is_false(tween:IsPlaying(bank), "it glides into no spot: " .. why)
+              assert.is_true(chain.coupling ~= nil and chain.coupling.target == 1, "braided: " .. why)
+            end
+            finishTweens()
+          end
+        end)
+
+        -- holdAt presses panel's grip on side and sizes it w wide, the corner across from it still, as the client does on a
+        -- screen that lays the frames out from their anchors, and holds it there.
+        local function holdAt(panel, side, w)
+          local f = panel.frame
+          local left, top = f:GetLeft(), f:GetTop()
+          local right = left + f:GetWidth()
+          press(panel.grips[side])
+          f:ClearAllPoints()
+          f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", side == "LEFT" and right - w or left, top)
+          f:SetSize(w, f:GetHeight())
+          f:GetScript("OnSizeChanged")(f, w, f:GetHeight())
+        end
+
+        -- dragBy drags panel dx along by its title row and drops it, the mover's frame (its OnUpdate) run between unless
+        -- dropped in the frame it was picked up.
+        local function dragBy(panel, dx, aFrame)
+          local s = panel.frame:GetScale()
+          panel.mover:GetScript("OnDragStart")(panel.mover, "LeftButton")
+          panel.frame:ClearAllPoints()
+          panel.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (panel.placeX + dx) / s, panel.placeY / s)
+          if aFrame then
+            panel.mover:GetScript("OnUpdate")(panel.mover, 1 / 60)
+          end
+          panel.mover:GetScript("OnDragStop")(panel.mover)
+          finishTweens()
+        end
+
+        -- Found by the fourth bug review: what the anchor's glide owed the bag beside it was paid only by settling it
+        -- (chain:Settle), so a bag put back on its spot some other way kept owing it, and its own left grip let go after ran
+        -- the chain's update, which glided it over the fraction of a pixel its let-go place stands from its spot (the older
+        -- rounding, next-small-resize.md §14g), and the braid let go for 15 frames. Each way of putting it on its spot pays
+        -- what it owed. Each starts as the test above does: the backpack glides for a long name while the bank's left grip
+        -- holds it at its width, so the glide owes it, and a grip let go at that width snaps nothing.
+        local OWED = {
+          { "a refit puts it on its spot", function(_, bank)
+            for _ = 1, 40 do step(1 / 60) end
+            release(bank.grips.LEFT)
+            finishTweens()
+            chain:Update(ctx(), true)
+            finishTweens()
+          end },
+          { "its anchor is dragged and dropped", function(bag, bank)
+            for _ = 1, 40 do step(1 / 60) end
+            release(bank.grips.LEFT)
+            finishTweens()
+            dragBy(bag, -200, true)
+            assert.are.equal("backpack", db.smallChain)
+          end },
+          { "its anchor is dropped in the frame it was picked up", function(bag, bank)
+            for _ = 1, 40 do step(1 / 60) end
+            release(bank.grips.LEFT)
+            finishTweens()
+            dragBy(bag, -200, false)
+            assert.are.equal("backpack", db.smallChain)
+          end },
+          -- Dropped within the reach of its old spot beside the bank, the backpack chains to the bank (chain:Dropped reads the
+          -- old saved place, next-small-names.md §14g: reported, not fixed): the drop places nothing beside it, its frame of the drag did.
+          { "its anchor is dragged a little and chains to it", function(bag, bank)
+            for _ = 1, 40 do step(1 / 60) end
+            release(bank.grips.LEFT)
+            finishTweens()
+            dragBy(bag, -30, true)
+            assert.are.equal("companion", db.smallChain)
+          end },
+          -- Let go while the backpack still glides, the bank is placed by the glide's next frame; a press on the backpack's grip
+          -- then ends the glide (endSizeGlide), which settles no chain.
+          { "its anchor's glide places it and is cut short", function(bag, bank)
+            for _ = 1, 3 do step(1 / 60) end
+            release(bank.grips.LEFT)
+            step(1 / 60)
+            assert.is_true(bag.sizeGliding)
+            press(bag.grips.RIGHT)
+            release(bag.grips.RIGHT)
+            finishTweens()
+          end },
+        }
+        for _, way in ipairs(OWED) do
+          for _, wider in ipairs({ 37, 53, 101, 157 }) do
+            it(string.format("owes a busy partner nothing once %s, its own left grip let go %d wider after", way[1], wider), function()
+              local layoutHelper = dofile("spec/helpers/layout.lua")
+              finally(layoutHelper.UseScreen(2560, 1440, 0.71))
+              db.bagScale = 125
+              inColumns()
+              local bag = backpack()
+              local bank = opened(function(c) return nextBank:Create(c) end)
+              db.smallChain = "backpack"
+              chain:Update(ctx())
+              finishTweens()
+              holding(bag, { { "A", 1 }, { "B", 1 } })
+              finishTweens()
+              holding(bag, { { "A", 1 }, { LONG, 1 } })
+              assert.is_true(bag.sizeGliding)
+              step(0.05)
+              holdAt(bank, "LEFT", bank.frame:GetWidth())
+              way[2](bag, bank)
+              for _ = 1, 60 do chain:Turn(1 / 60) end
+              assert.is_true(chain.coupling ~= nil and chain.coupling.amount == 1, "braided")
+              gripTo(bank, "LEFT", bank.frame:GetWidth() + wider)
+              for frame = 1, 45 do
+                step(1 / 60)
+                chain:Turn(1 / 60)
+                local why = "frame " .. frame
+                assert.is_false(tween:IsPlaying(bag) or tween:IsPlaying(bank), "nothing glides into a spot: " .. why)
+                assert.is_true(chain.coupling ~= nil and chain.coupling.target == 1, "braided: " .. why)
+              end
+            end)
+          end
+        end
+
+        -- The bank busy with its own snap is left to it (busy): placed by the backpack's glide on each frame, its snap would
+        -- end at once (setOffset ends a size glide), a jump to its width.
+        it("leaves a chained partner's own snap gliding frame by frame as it glides", function()
+          inColumns()
+          local bag = backpack()
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          db.smallChain = "backpack"
+          chain:Update(ctx())
+          finishTweens()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          step(0.05)
+          resize(bank, "LEFT", columnsWidth(11) + 20, 480)
+          local was, frames = bank.frame:GetWidth(), 0
+          local distance = was - columnsWidth(11)
+          while bag.sizeGliding do
+            step(1 / 60)
+            frames = frames + 1
+            local w = bank.frame:GetWidth()
+            assert.is_true(bank.sizeGliding, "its own snap goes on, frame " .. frames)
+            assert.is_true(math.abs(w - was) < distance / 2, "frame " .. frames .. ": " .. was .. " to " .. w)
+            was = w
+          end
+          assert.is_true(frames > 5)
+          finishTweens()
+          assert.are.equal(columnsWidth(11), bank.frame:GetWidth())
+        end)
+
+        it("waits for a Shift-click's glide back, and follows once it ends", function()
+          inColumns()
+          db.sizes[BACKPACK] = { columnsWidth(10), 600 }
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          finally(function() _G._isShiftKeyDown = false end)
+          _G._isShiftKeyDown = true
+          press(bag.grips.RIGHT)
+          release(bag.grips.RIGHT)
+          _G._isShiftKeyDown = false
+          assert.is_true(bag.sizeGliding)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.is_nil(db.sizes[BACKPACK], "the reset cleared it, and the follow saves nothing")
+        end)
+
+        it("waits while it switches size, and is fitted as it arrives", function()
+          inColumns()
+          db.size = "full"
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          nextPanel:SetSize(ctx(), "small")
+          step(style.Time.Morph / 2)
+          assert.is_not_nil(bag.morph)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_false(bag.sizeGliding, "not while it switches")
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.same({}, cut(bag))
+        end)
+
+        -- A drag cancelled draws nothing after it: the follow it waited for comes as the drag ends (nextDrag's finish).
+        it("waits while a section is dragged on it, and follows once the drag ends", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          local a = bag.content.byName.A
+          -- Where the client drew it: a section is picked up from its place on the screen.
+          a.frame:_SetRect(100, 500, 100, 40)
+          assert.is_true(nextDrag:Begin(bag, a))
+          holding(bag, { { "A", 1 }, { "B", 1 }, { LONG, 1 } })
+          assert.is_false(bag.sizeGliding, "not under a section dragged")
+          assert.is_true(bag.namesOwed)
+          nextDrag:Cancel()
+          assert.is_false(bag.sizeGliding, "a frame on")
+          step(1 / 60)
+          assert.is_true(bag.sizeGliding, "with no draw after the drag")
+          finishTweens()
+          -- Under A, a first column of six: six and five.
+          assert.are.equal(columnsWidth(11), bag.frame:GetWidth())
+        end)
+
+        it("waits for its opening slide, and follows once it is open", function()
+          inColumns()
+          local bag = nextBag:Create(ctx())
+          bag:Show(ctx())
+          assert.is_true(tween:IsPlaying(bag))
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_false(bag.sizeGliding)
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.same({}, cut(bag))
+        end)
+
+        it("keeps a chained partner beside it, and the braid between them, as it widens", function()
+          finally(dofile("spec/helpers/layout.lua").UseScreen(1920, 1080, 0.64))
+          inColumns()
+          local bag = backpack()
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          db.smallChain = "backpack"
+          chain:Update(ctx())
+          finishTweens()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          assert.is_not_nil(chain.coupling, "braided")
+          local gap = chain:SmallGap(bank, bag)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_true(bag.sizeGliding)
+          local frames = 0
+          while bag.sizeGliding do
+            step(1 / 60)
+            chain:Turn(1 / 60)
+            frames = frames + 1
+            local between = bag.frame:GetLeft() - (bank.frame:GetLeft() + bank.frame:GetWidth())
+            assert.is_true(math.abs(between - gap) < 1, "frame " .. frames .. ": " .. between .. " apart")
+            assert.is_true(math.abs(2 * bag.braid.half - between) < 1, "the braid across the gap, frame " .. frames)
+          end
+          finishTweens()
+          assert.is_true(frames > 5)
+          assert.are.equal(pixel:LengthIn(bag:PixelUnit(), columnsWidth(12)), bag.frame:GetWidth())
+          -- Its spot, on the screen's whole pixels.
+          local cx, cy = chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY)
+          local bx, by = topLeft(bank)
+          assert.is_true(math.abs(cx - bx) < 1 and math.abs(cy - by) < 1, bx .. ", " .. by)
+          assert.are.same({ bank.placeX, bank.placeY }, { bx, by })
+          assert.is_not_nil(chain.coupling, "still braided")
+        end)
+
+        -- Found by the bug review: drawn in the same update (items moved between them), both glided at once, and the anchor
+        -- moves its partner only while the partner is settled: the partner glided from where the anchor's edge was as it
+        -- started, and they overlapped by up to 136 pixels. A chained pair glides for its names one at a time.
+        for _, order in ipairs({ "backpack first", "bank first" }) do
+          it("glides a chained pair for their names one at a time, never overlapping, drawn " .. order, function()
+            finally(dofile("spec/helpers/layout.lua").UseScreen(1920, 1080, 0.64))
+            inColumns()
+            local bag = backpack()
+            local bank = opened(function(c) return nextBank:Create(c) end)
+            db.smallChain = "backpack"
+            chain:Update(ctx())
+            finishTweens()
+            local function drawn(panel, prefix, list)
+              panel:Draw(ctx(), { sortedItems = {}, tabs = { [panel:GetCurrentTabID()] = tabOf(prefix, list) } }, function() end)
+            end
+            drawn(bag, "0_", { { "A", 1 }, { "B", 1 } })
+            drawn(bank, "6_", { { "C", 1 }, { "D", 1 } })
+            render:Flush()
+            finishTweens()
+            assert.is_not_nil(chain.coupling, "braided")
+            local gap = chain:SmallGap(bank, bag)
+            local function between()
+              return bag.frame:GetLeft() - (bank.frame:GetLeft() + bank.frame:GetWidth())
+            end
+            if order == "backpack first" then
+              drawn(bag, "0_", { { "A", 1 }, { LONG, 1 } })
+              drawn(bank, "6_", { { "C", 1 }, { LONG .. "x", 1 } })
+            else
+              drawn(bank, "6_", { { "C", 1 }, { LONG .. "x", 1 } })
+              drawn(bag, "0_", { { "A", 1 }, { LONG, 1 } })
+            end
+            local glided = { [bag] = false, [bank] = false }
+            for frame = 1, 120 do
+              step(1 / 60)
+              chain:Turn(1 / 60)
+              glided[bag] = glided[bag] or bag.sizeGliding
+              glided[bank] = glided[bank] or bank.sizeGliding
+              assert.is_false(bag.sizeGliding and bank.sizeGliding, "one at a time, frame " .. frame)
+              assert.is_true(math.abs(between() - gap) < 1, "frame " .. frame .. ": " .. between() .. " apart")
+            end
+            assert.is_true(glided[bag] and glided[bank], "each glided")
+            assert.is_false(bag.sizeGliding or bank.sizeGliding)
+            render:Flush()
+            assert.are.same({}, cut(bag))
+            assert.are.same({}, cut(bank))
+            assert.are.equal(pixel:LengthIn(bag:PixelUnit(), columnsWidth(12)), bag.frame:GetWidth())
+            assert.are.equal(pixel:LengthIn(bank:PixelUnit(), columnsWidth(12)), bank.frame:GetWidth())
+            assert.is_not_nil(chain.coupling, "still braided")
+          end)
+        end
+
+        -- Found by the bug review: the glide kept the scroll offset read at the last grip press (keptScroll), scrolling the
+        -- bag back there. It keeps where the player has it scrolled as it starts.
+        it("keeps where it is scrolled as it glides for a name", function()
+          finally(dofile("spec/helpers/layout.lua").UseScreen(1920, 1080, 0.64))
+          inColumns()
+          db.sizes[BACKPACK] = { 700, 260 }
+          local list = {}
+          for s, n in ipairs({ 40, 60, 80, 30, 50 }) do
+            table.insert(list, { "S" .. s, n })
+          end
+          local bag = backpack()
+          holding(bag, list)
+          finishTweens()
+          local box = bag.scroll.scrollBox
+          -- It holds more than it shows: a range to scroll (the mock works out no extent without rects).
+          box._scrollRange = 1000
+          box:ScrollToOffset(73, true)
+          press(bag.grips.RIGHT)
+          release(bag.grips.RIGHT)
+          finishTweens()
+          box:ScrollToOffset(40, true)
+          -- Longer than its twelve cells' columns hold.
+          table.insert(list, { string.rep("n", 70), 1 })
+          holding(bag, list)
+          assert.is_true(bag.sizeGliding)
+          local frames = 0
+          while bag.sizeGliding do
+            step(1 / 60)
+            render:Flush()
+            -- The client fires the scroll box's OnSizeChanged as the frame's size changes (Blizzard's handler, then KeepScroll).
+            box:GetScript("OnSizeChanged")(box, box:GetWidth(), box:GetHeight())
+            frames = frames + 1
+            assert.is_true(math.abs(box:GetDerivedScrollOffset() - 40) < 0.001,
+              "frame " .. frames .. ": " .. box:GetDerivedScrollOffset())
+          end
+          assert.is_true(frames > 5)
+        end)
+
+        -- Found by the bug review: a bank tab switch sets the new tab's title before it draws the tab; the title glided the bank
+        -- for the old tab's sections, then the draw glided it again, the new tab's long name cut through the first glide. A new
+        -- title is fitted a frame on, so the draw after it in the same frame fits both in one glide.
+        it("glides once as a bank tab is switched, its title and sections together, no name cut on the way", function()
+          inColumns()
+          override(stubs.database, "GetGroupsEnabled", function() return true end)
+          local groupsById = {
+            [10] = { id = 10, name = string.rep("b", 70), bankType = 1, isDefault = true },
+            [11] = { id = 11, name = "Ore", bankType = 1 },
+          }
+          override(stubs.groups, "GetGroup", function(_, kind, id) if kind == BANK then return groupsById[id] end end)
+          override(stubs.groups, "GetDefaultBankGroup", function() return groupsById[10] end)
+          slots[BANK].tabs[10] = tabOf("6_", { { "A", 1 }, { "B", 1 } })
+          slots[BANK].tabs[11] = tabOf("6_", { { "A", 1 }, { LONG, 1 } })
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          render:Flush()
+          assert.are.same({}, cut(bank))
+          local width = bank.frame:GetWidth()
+          assert.is_true(width > columnsWidth(8), "its title holds it wider than its sections")
+          local glides = countCalls(bank, "snapTo")
+          bank:SwitchToGroup(ctx(), 11)
+          render:Flush()
+          assert.are.same({}, cut(bank), "as it switches")
+          for frame = 1, 90 do
+            step(1 / 60)
+            render:Flush()
+            assert.are.same({}, cut(bank), "frame " .. frame)
+          end
+          assert.are.equal(1, glides())
+          assert.is_false(bank.sizeGliding)
+          assert.are.equal(columnsWidth(12), bank.frame:GetWidth())
+        end)
+
+        -- A backpack and the bank chained beside it, each drawn with two short names, braided.
+        local function chainedPair()
+          local bag = backpack()
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          db.smallChain = "backpack"
+          chain:Update(ctx())
+          finishTweens()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = tabOf("6_", { { "C", 1 }, { "D", 1 } }) } },
+            function() end)
+          render:Flush()
+          finishTweens()
+          return bag, bank
+        end
+
+        -- Found by the second bug review: a bag waiting for its chained partner's glide followed only when what ended that glide
+        -- called back for it. Dragged away, the partner's glide was cut short (StartMove) and the pair unchained (chain:Detach),
+        -- so the partner's let-go called back for nobody; closing, the slide cut it short. The backpack stayed cut until its
+        -- next draw. What a panel owes is tried again each frame while it waits.
+        it("follows once the chained partner it waited for is dragged away mid-glide", function()
+          inColumns()
+          local bag, bank = chainedPair()
+          resize(bank, "LEFT", bank.frame:GetWidth() + 300, bank.frame:GetHeight())
+          step(0.05)
+          assert.is_true(bank.sizeGliding)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_true(bag.namesOwed, "it waits for its partner's glide")
+          bank.mover:GetScript("OnDragStart")(bank.mover, "LeftButton")
+          assert.are.equal("apart", db.smallChain)
+          bank.frame:_SetRect(100, 300, bank.frame:GetWidth(), bank.frame:GetHeight())
+          bank.mover:GetScript("OnDragStop")(bank.mover)
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.same({}, cut(bag))
+          assert.is_false(tween:IsPlaying(bag.namesKey), "nothing left trying")
+        end)
+
+        it("follows once the chained partner it waited for closes mid-glide", function()
+          inColumns()
+          local bag, bank = chainedPair()
+          resize(bank, "LEFT", bank.frame:GetWidth() + 300, bank.frame:GetHeight())
+          step(0.05)
+          assert.is_true(bank.sizeGliding)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_true(bag.namesOwed)
+          bank:Hide(ctx())
+          finishTweens()
+          render:Flush()
+          assert.is_false(bank:IsShown())
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.same({}, cut(bag))
+        end)
+
+        -- Found by the second bug review: a bag waited only for its partner's grip or size glide, so once the anchor was
+        -- dragged (which cuts its glide short) the bag beside it glided under the move, and the anchor, placing it every frame
+        -- as it moves (StartMove), ended that glide at once: it jumped to its width. It waits while its partner is moved.
+        it("waits while its chained anchor is dragged, and glides for its names once the anchor is dropped", function()
+          inColumns()
+          local bag, bank = chainedPair()
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          step(0.05)
+          assert.is_true(bag.sizeGliding)
+          bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = tabOf("6_", { { "C", 1 }, { LONG .. "x", 1 } }) } },
+            function() end)
+          assert.is_true(bank.namesOwed, "it waits for its anchor's glide")
+          local width = bank.frame:GetWidth()
+          bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+          assert.is_false(bag.sizeGliding, "the move ends the anchor's glide")
+          for frame = 1, 30 do
+            step(1 / 60)
+            bag.mover:GetScript("OnUpdate")(bag.mover, 1 / 60)
+            assert.is_false(bank.sizeGliding, "not under the move, frame " .. frame)
+            assert.are.equal(width, bank.frame:GetWidth(), "frame " .. frame)
+          end
+          bag.mover:GetScript("OnDragStop")(bag.mover)
+          local glided = false
+          for _ = 1, 60 do
+            step(1 / 60)
+            glided = glided or bank.sizeGliding
+          end
+          assert.is_true(glided, "it glides once its anchor is dropped")
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(12), bank.frame:GetWidth())
+          assert.are.same({}, cut(bank))
+        end)
+
+        -- Only an open partner makes it wait: one closing slides off its place, and, closed, stays off it (its slide's end).
+        it("waits for no chained anchor that closes", function()
+          inColumns()
+          local bag, bank = chainedPair()
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          step(0.05)
+          assert.is_true(bag.sizeGliding)
+          bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = tabOf("6_", { { "C", 1 }, { LONG .. "x", 1 } }) } },
+            function() end)
+          assert.is_true(bank.namesOwed)
+          bag:Hide(ctx())
+          local glided = false
+          for _ = 1, 3 do
+            step(1 / 60)
+            glided = glided or bank.sizeGliding
+          end
+          assert.is_true(bag:IsClosing())
+          assert.is_true(glided, "as its anchor slides out")
+          finishTweens()
+          render:Flush()
+          assert.is_false(bag:IsShown())
+          assert.are.equal(columnsWidth(12), bank.frame:GetWidth())
+          assert.are.same({}, cut(bank))
+          assert.is_false(tween:IsPlaying(bank.namesKey))
+        end)
+
+        -- A closed anchor rests off its place (its slide's end), so it is never settled: waiting for it, the bank beside it waited
+        -- for good, its name cut.
+        it("waits for no chained anchor that is closed", function()
+          inColumns()
+          local bag, bank = chainedPair()
+          bag:Hide(ctx())
+          finishTweens()
+          assert.is_false(bag:IsShown())
+          bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = tabOf("6_", { { "C", 1 }, { LONG .. "x", 1 } }) } },
+            function() end)
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(12), bank.frame:GetWidth())
+          assert.are.same({}, cut(bank))
+          assert.is_false(tween:IsPlaying(bank.namesKey), "nothing left trying")
+        end)
+
+        -- A glide into its spot (GlideTo) puts the panel on its place as it starts (its offset 0), as the Ice Shatter, Smoke, Beam
+        -- and Paper opens do: only the tween playing on it says it is busy. It follows once it is there, beside its anchor.
+        it("waits while it glides into its spot, and follows once it is there", function()
+          inColumns()
+          local bag, bank = chainedPair()
+          override(bag.tabs, "Width", function() return 140 end)
+          chain:Update(ctx())
+          assert.is_true(tween:IsPlaying(bank), "gliding into its new spot")
+          assert.are.equal(0, bank.offset)
+          bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = tabOf("6_", { { "C", 1 }, { LONG .. "x", 1 } }) } },
+            function() end)
+          assert.is_true(bank.namesOwed, "it waits")
+          local glided = false
+          for frame = 1, 90 do
+            step(1 / 60)
+            assert.is_false(bank.sizeGliding and tween:IsPlaying(bank), "not while it glides into its spot, frame " .. frame)
+            glided = glided or bank.sizeGliding
+          end
+          assert.is_true(glided, "it follows once there")
+          finishTweens()
+          render:Flush()
+          assert.are.equal(columnsWidth(12), bank.frame:GetWidth())
+          assert.are.same({}, cut(bank))
+          assert.are.same({ chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY) }, { topLeft(bank) })
+        end)
+
+        -- Found by the third bug review (as for a grip let go, "chained" below): a glide for its names that leaves the side the bag
+        -- beside it hangs from still (the backpack where the player left it, its right edge gliding; the bank beside it, its
+        -- left) leaves that bag and the braid as they are.
+        for _, screen in ipairs({ { 2560, 1440, 0.71, 125 }, { 1920, 1080, 0.64, 125 }, { 1920, 1080, 1, 85 } }) do
+          it(string.format("never moves the bag beside it as it glides for its names with that side still, %dx%d at %s, Bag Scale %d%%",
+            screen[1], screen[2], screen[3], screen[4]), function()
+            local layoutHelper = dofile("spec/helpers/layout.lua")
+            finally(layoutHelper.UseScreen(screen[1], screen[2], screen[3]))
+            db.bagScale = screen[4]
+            inColumns()
+            -- Where the player left it, with room on both sides for both bags at the width their names take.
+            db.places[BACKPACK] = { UIParent:GetWidth() / 2, UIParent:GetHeight() - 20 }
+            local bag, bank = chainedPair()
+            for _ = 1, 60 do chain:Turn(1 / 60) end
+            assert.is_true(chain.coupling ~= nil and chain.coupling.amount == 1, "braided")
+            local ppu = layoutHelper.PixelsPerUnit()
+            local function left(panel)
+              return layoutHelper.Rect(panel.frame).left * ppu
+            end
+            for _, case in ipairs({ { bag, bank, "0_", "backpack" }, { bank, bag, "6_", "bank" } }) do
+              local sized, other = case[1], case[2]
+              local at = left(other)
+              sized:Draw(ctx(), { sortedItems = {}, tabs = { [sized:GetCurrentTabID()] = tabOf(case[3], { { "A", 1 }, { LONG, 1 } }) } },
+                function() end)
+              local glided = false
+              for frame = 1, 60 do
+                step(1 / 60)
+                chain:Turn(1 / 60)
+                glided = glided or sized.sizeGliding
+                local why = "the " .. case[4] .. "'s glide, frame " .. frame
+                assert.are.equal(at, left(other), "the bag beside it still: " .. why)
+                assert.is_false(tween:IsPlaying(bag) or tween:IsPlaying(bank), "nothing glides into a spot: " .. why)
+                assert.is_true(chain.coupling ~= nil and chain.coupling.target == 1, "braided: " .. why)
+              end
+              assert.is_true(glided, "the " .. case[4] .. " glided")
+              finishTweens()
+              render:Flush()
+              assert.are.same({}, cut(sized))
+            end
+          end)
+        end
+
+        it("tries again each frame while it waits, and stops once it follows, once it closes and once the setting is off", function()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          local function waiting(why)
+            for frame = 1, 3 do
+              step(1 / 60)
+              assert.is_true(tween:IsPlaying(bag.namesKey), why .. ", frame " .. frame)
+            end
+          end
+          -- A grip holds it: tried each frame until the grip lets it go and it follows.
+          press(bag.grips.RIGHT)
+          sizeTo(bag, "RIGHT", bag.frame:GetWidth(), bag.frame:GetHeight())
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          waiting("held")
+          release(bag.grips.RIGHT)
+          finishTweens()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.is_false(tween:IsPlaying(bag.namesKey), "followed")
+          -- Turned off while a grip holds it.
+          press(bag.grips.RIGHT)
+          sizeTo(bag, "RIGHT", bag.frame:GetWidth(), bag.frame:GetHeight())
+          holding(bag, { { "A", 1 }, { LONG, 1 }, { "B", 1 } })
+          waiting("held again")
+          db.fitNames = false
+          step(1 / 60)
+          assert.is_false(tween:IsPlaying(bag.namesKey), "off")
+          release(bag.grips.RIGHT)
+          finishTweens()
+          -- Closed while it slides in.
+          db.fitNames = true
+          bag:Hide(ctx())
+          finishTweens()
+          bag:Show(ctx())
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          waiting("sliding in")
+          bag:Hide(ctx())
+          step(1 / 60)
+          assert.is_false(tween:IsPlaying(bag.namesKey), "closing")
+          finishTweens()
+        end)
+
+        -- Found by the second bug review: the backpack glided for its names while the bank dropped beside it glided into its
+        -- spot (a glide of the panel's own, GlideTo, keyed on the panel): it waited only for a partner's grip or size glide, and
+        -- the anchor moves its partner only while the partner is settled, so the bank glided to the spot of the backpack's old
+        -- width and they overlapped by 136 pixels. A panel waits while its open chained partner is busy in any way.
+        -- A backpack and the bank apart, each with short names, on a screen the client lays out from the frames' anchors.
+        local function pairApart()
+          finally(dofile("spec/helpers/layout.lua").UseScreen(1920, 1080, 0.64))
+          local bag = backpack()
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = tabOf("6_", { { "C", 1 } }) } }, function() end)
+          render:Flush()
+          finishTweens()
+          return bag, bank
+        end
+
+        -- dropBeside drops the bank a little short of its spot beside the backpack, where the backpack is now: it chains, and
+        -- glides into its spot.
+        local function dropBeside(bag, bank)
+          local x, y = chain:ChainedPlace(bank, bag, bag:LivePlace())
+          bank.mover:GetScript("OnDragStart")(bank.mover, "LeftButton")
+          bank.frame:ClearAllPoints()
+          bank.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x - 10, y - 10)
+          bank.mover:GetScript("OnDragStop")(bank.mover)
+          assert.are.equal("backpack", db.smallChain, "chained")
+          assert.is_true(tween:IsPlaying(bank), "gliding into its spot")
+        end
+
+        local function apart(bag, bank)
+          return bag.frame:GetLeft() - (bank.frame:GetLeft() + bank.frame:GetWidth())
+        end
+
+        for _, first in ipairs({ "the drop", "its names" }) do
+          it("keeps a chained pair apart as one glides into its spot and the other for its names, " .. first .. " first", function()
+            inColumns()
+            local bag, bank = pairApart()
+            local gap = chain:SmallGap(bank, bag)
+            local function between()
+              return apart(bag, bank)
+            end
+            if first == "the drop" then
+              dropBeside(bag, bank)
+              holding(bag, { { "A", 1 }, { LONG, 1 } })
+              assert.is_true(bag.namesOwed, "it waits for the bag gliding into its spot")
+            else
+              holding(bag, { { "A", 1 }, { LONG, 1 } })
+              assert.is_true(bag.sizeGliding)
+              dropBeside(bag, bank)
+            end
+            local closest = math.huge
+            for frame = 1, 120 do
+              step(1 / 60)
+              chain:Turn(1 / 60)
+              closest = math.min(closest, between())
+              if first == "the drop" then
+                assert.is_false(bag.sizeGliding and tween:IsPlaying(bank), "one at a time, frame " .. frame)
+              end
+            end
+            assert.is_true(closest > gap - 1, "never closer than their gap (" .. gap .. "): " .. closest)
+            assert.is_true(math.abs(between() - gap) < 1, between() .. " apart")
+            assert.is_not_nil(chain.coupling, "braided")
+            render:Flush()
+            assert.are.same({}, cut(bag))
+            assert.are.equal(pixel:LengthIn(bag:PixelUnit(), columnsWidth(12)), bag.frame:GetWidth())
+          end)
+        end
+
+        -- A bag gliding into its spot is placed by the glide of the bag beside it too (spotGlide), to wherever that glide ends,
+        -- cut short or not: on its own it would be a frame behind whenever it goes first in a frame.
+        it("keeps a bag gliding into its spot beside its anchor as the anchor's glide is cut short", function()
+          inColumns()
+          local bag, bank = pairApart()
+          local gap = chain:SmallGap(bank, bag)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          step(1 / 60)
+          dropBeside(bag, bank)
+          step(1 / 60)
+          assert.is_true(bag.sizeGliding)
+          bag:endSizeGlide()
+          assert.is_true(tween:IsPlaying(bank), "still gliding into its spot")
+          assert.is_true(apart(bag, bank) > gap - 1, apart(bag, bank) .. " apart")
+          finishTweens()
+          assert.is_true(math.abs(apart(bag, bank) - gap) < 1)
+        end)
+
+        it("lets go of its glide into its spot as that glide ends or stops short", function()
+          inColumns()
+          local bag, bank = pairApart()
+          dropBeside(bag, bank)
+          assert.is_not_nil(bank.spotGlide)
+          bank:Hide(ctx())
+          assert.is_nil(bank.spotGlide, "stopped by its slide out")
+          finishTweens()
+          bank:Show(ctx())
+          finishTweens()
+          dropBeside(bag, bank)
+          finishTweens()
+          assert.is_nil(bank.spotGlide, "ended")
+        end)
+
+        -- The Glitch theme's bursts: one every 14 seconds (none scheduled here), shoving the panel up to 14 pixels.
+        local function glitchBursts()
+          local glitch = addon:GetModule("NextGlitch")
+          override(glitch, "Spec", function() return { Bursts = { Every = 14, Time = 0.3 }, Step = 0.06, Jitter = 14 } end)
+          override(glitch, "Random", function() return 0.99 end)
+          override(C_Timer, "After", function() end)
+        end
+
+        -- Found by the second bug review: a burst shoves the panel off its place (setOffset) while nothing else moves it, and a
+        -- glide for its names started then set out from the shoved place, and jumped 14 pixels as it ended. A panel off its
+        -- place is not settled: it follows once the burst has put it back.
+        it("waits for a Glitch burst to put it back on its place, and glides from there", function()
+          glitchBursts()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          finishTweens()
+          local right = (topLeft(bag)) + bag.frame:GetWidth()
+          bag:burst()
+          step(0.15)
+          assert.are_not.equal(0, bag.offset, "shoved")
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_false(bag.sizeGliding, "not while shoved")
+          local glided = false
+          for frame = 1, 90 do
+            step(1 / 60)
+            if bag.sizeGliding then
+              glided = true
+              assert.is_true(math.abs((topLeft(bag)) + bag.frame:GetWidth() - right) < 0.01, "its right edge still, frame " .. frame)
+            end
+          end
+          assert.is_true(glided)
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.equal(right, (topLeft(bag)) + bag.frame:GetWidth())
+        end)
+
+        -- A burst stopped part-way (a parent hiding the panel, Alt+Z) left it shoved off its place for good, and so waiting for
+        -- its names for good. It goes back to where the burst found it.
+        it("goes back to its place when a burst is stopped part-way, and follows its names from there", function()
+          glitchBursts()
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          finishTweens()
+          local x = topLeft(bag)
+          bag:burst()
+          step(0.15)
+          assert.are_not.equal(0, bag.offset, "shoved")
+          -- UIParent hidden: the panel's OnHide runs with its own shown flag still set.
+          bag.frame:GetScript("OnHide")(bag.frame)
+          assert.are.equal(0, bag.offset)
+          assert.are.equal(x, (topLeft(bag)))
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          finishTweens()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.is_false(tween:IsPlaying(bag.namesKey))
+        end)
+
+        -- A parent hiding the panel (Alt+Z) stops what moves it (OnHidden): its opening slide stopped part-way left it off its
+        -- place, faded, once shown again, and so waiting for its names until something placed it. It comes back on its place.
+        it("comes back on its place when a parent shows it again after stopping its slide in, and follows its names", function()
+          inColumns()
+          local bag = nextBag:Create(ctx())
+          bag:Show(ctx())
+          step(style.Time.Open / 4)
+          assert.are_not.equal(0, bag.offset, "sliding in")
+          bag.frame:GetScript("OnHide")(bag.frame)
+          bag.frame:GetScript("OnShow")(bag.frame)
+          assert.are.equal(0, bag.offset)
+          assert.are.equal(1, bag.frame:GetAlpha())
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          finishTweens()
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.is_false(tween:IsPlaying(bag.namesKey))
+        end)
+
+        it("leaves where it is a panel its parent shows again as it slides out, and a full bag beside its anchor", function()
+          local bag = backpack()
+          bag.frame:GetScript("OnHide")(bag.frame)
+          bag:Hide(ctx())
+          step(style.Time.Close / 2)
+          local offset = bag.offset
+          assert.are_not.equal(0, offset, "sliding out")
+          bag.frame:GetScript("OnShow")(bag.frame)
+          assert.are.equal(offset, bag.offset, "its slide out goes on")
+          finishTweens()
+          db.size = "full"
+          override(stubs.database, "GetNextChain", function() return "right" end)
+          opened(function(c) return nextBag:Create(c) end)
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          local rest = chain:RestOffset(bank)
+          assert.are_not.equal(0, rest)
+          bank.frame:GetScript("OnHide")(bank.frame)
+          bank.frame:GetScript("OnShow")(bank.frame)
+          assert.are.equal(rest, bank.offset, "beside its anchor")
+        end)
+
+        it("leaves the panel to a move that stops a burst", function()
+          glitchBursts()
+          local bag = backpack()
+          bag:burst()
+          step(0.15)
+          bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+          local offsets = countCalls(bag, "setOffset")
+          step(1 / 60)
+          assert.are.equal(0, offsets())
+          bag.mover:GetScript("OnDragStop")(bag.mover)
+        end)
+
+        -- A burst shoves the panel 14 pixels at most; the glide of the bag it sits beside places it all the same, which ends the
+        -- burst, rather than leave it where it was as that bag grows into it.
+        it("keeps a chained partner beside it through a burst on the partner as it glides", function()
+          glitchBursts()
+          finally(dofile("spec/helpers/layout.lua").UseScreen(1920, 1080, 0.64))
+          inColumns()
+          local bag, bank = chainedPair()
+          local gap = chain:SmallGap(bank, bag)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          assert.is_true(bag.sizeGliding)
+          step(1 / 60)
+          bank:burst()
+          for frame = 1, 40 do
+            step(1 / 60)
+            local between = bag.frame:GetLeft() - (bank.frame:GetLeft() + bank.frame:GetWidth())
+            assert.is_true(between > gap - 15, "frame " .. frame .. ": " .. between .. " apart")
+          end
+          finishTweens()
+          assert.is_true(math.abs(bag.frame:GetLeft() - (bank.frame:GetLeft() + bank.frame:GetWidth()) - gap) < 1)
+        end)
+
+        -- A full bag chained beside its anchor rests away from its screen edge (next-chain.md §12), and a new screen places it
+        -- at once (PlaceAt), which ends a burst under way: the burst leaves it there, not where the burst found it.
+        it("leaves a full panel where a new screen puts it, ending a burst", function()
+          glitchBursts()
+          db.size = "full"
+          override(stubs.database, "GetNextChain", function() return "right" end)
+          opened(function(c) return nextBag:Create(c) end)
+          local bank = opened(function(c) return nextBank:Create(c) end)
+          local before = chain:RestOffset(bank)
+          assert.are.equal(before, bank.offset, "beside the backpack")
+          bank:burst()
+          step(0.15)
+          assert.are_not.equal(before, bank.offset, "shoved")
+          UIParent:_SetRect(0, 0, 2000, 1200)
+          chain:Update(ctx(), true)
+          local after = chain:RestOffset(bank)
+          assert.are_not.equal(before, after)
+          step(1 / 60)
+          assert.are.equal(after, bank.offset)
+        end)
+      end)
+
+      -- Found by the bug review: a glide something else ended (endSizeGlide: here a size switch, which lets go of the braid
+      -- first) settled the chain as it ended, braiding the pair again while they switched.
+      for _, how in ipairs({ "its names", "a grip let go" }) do
+        it("leaves a chained pair unbraided as it switches size while its size glides for " .. how, function()
+          db.fitNames = how == "its names"
+          inColumns()
+          local bag = backpack()
+          opened(function(c) return nextBank:Create(c) end)
+          db.smallChain = "backpack"
+          chain:Update(ctx())
+          finishTweens()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          finishTweens()
+          assert.is_not_nil(chain.coupling, "braided")
+          if how == "its names" then
+            holding(bag, { { "A", 1 }, { LONG, 1 } })
+          else
+            press(bag.grips.RIGHT)
+            sizeTo(bag, "RIGHT", bag.frame:GetWidth() + 300, bag.frame:GetHeight())
+            release(bag.grips.RIGHT)
+          end
+          step(0.03)
+          assert.is_true(bag.sizeGliding)
+          nextPanel:SetSize(ctx(), "full")
+          assert.is_nil(chain.coupling, "let go as it switches")
+          step(0.05)
+          assert.is_nil(chain.coupling, "not braided again while it switches")
+          finishTweens()
+        end)
+      end
+
+      it("fits every open small panel as Fit Names While Open is turned on (next/FitNamesChanged)", function()
+        local handlers = {}
+        override(stubs.events, "RegisterMessage", function(_, name, fn) handlers[name] = fn end)
+        inColumns()
+        local bag = backpack()
+        holding(bag, { { "A", 1 }, { "B", 1 } })
+        holding(bag, { { "A", 1 }, { LONG, 1 } })
+        assert.are.equal(columnsWidth(8), bag.frame:GetWidth(), "off")
+        db.fitNames = true
+        handlers["next/FitNamesChanged"](ctx())
+        render:Flush()
+        assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+        assert.is_nil(db.sizes[BACKPACK])
+        assert.are.same({}, cut(bag))
+      end)
+
+      -- glidingFor starts the panel's size gliding: for its names (the setting on), a grip let go 300 wider, or a Shift-click
+      -- back to its default from a saved width. It returns the section whose name the panel shows second.
+      local function glidingFor(how)
+        db.fitNames = how == "its names"
+        if how == "a Shift-click" then
+          db.sizes[BACKPACK] = { columnsWidth(10), 600 }
+        end
+        local bag = backpack()
+        holding(bag, { { "A", 1 }, { "B", 1 } })
+        finishTweens()
+        local second = "B"
+        if how == "its names" then
+          second = LONG
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+        elseif how == "a grip let go" then
+          resize(bag, "RIGHT", bag.frame:GetWidth() + 300, bag.frame:GetHeight())
+        else
+          _G._isShiftKeyDown = true
+          press(bag.grips.RIGHT)
+          release(bag.grips.RIGHT)
+          _G._isShiftKeyDown = false
+        end
+        step(0.05)
+        assert.is_true(bag.sizeGliding)
+        return bag, second
+      end
+
+      -- Its frame, the size it took and the width it lays out for are one size: the one it takes now.
+      local function sizedAsItTakes(bag)
+        local w, h, fitted = bag:SmallSize()
+        assert.are.same({ w, h }, { bag.frame:GetSize() })
+        assert.are.same({ w, h, fitted }, { bag.smallWidth, bag.smallHeight, bag.restingWidth })
+        assert.is_true(math.abs(bag:LayoutWidth() - bag.frame:GetWidth()) < bag:PixelUnit(), "laid out for its frame")
+      end
+
+      -- Found by the second bug review: a restyle (ApplyGeometry: a theme, an Animation switch) or a refit (FitSmall: here Clamp
+      -- Bags to Screen turned on) sized the frame, then ended the size glide running (setOffset, endSizeGlide), whose end sized it
+      -- again to what the glide set out for: the frame kept that, while the size it took and the width it laid out for were the
+      -- new ones, until it next opened. What sizes the frame ends the glide first.
+      for _, how in ipairs({ "its names", "a grip let go", "a Shift-click" }) do
+        for _, by in ipairs({ "a restyle", "a refit" }) do
+          it("takes the size " .. by .. " gives it while its size glides for " .. how, function()
+            finally(function() _G._isShiftKeyDown = false end)
+            inColumns()
+            local bag, second = glidingFor(how)
+            -- The new look: a taller share of the screen, and a wider font for the second section's name.
+            override(style.Small, "Height", style.Small.Height + 0.1)
+            measured(bag, second, 420)
+            if by == "a restyle" then
+              bag:ApplyStyle(ctx())
+            else
+              chain:ClampChanged(ctx())
+            end
+            finishTweens()
+            render:Flush()
+            sizedAsItTakes(bag)
+            assert.are.same({}, cut(bag))
+          end)
+        end
+      end
+
+      -- Found by the second bug review: opened again as it slid out, a panel was not fitted (Show fitted only one that had
+      -- finished closing), so a name it was given to show as it closed stayed cut until it next opened, setting on or off. It
+      -- is fitted as any opening is, its slide going on from where it is, the edge its place holds still.
+      for _, on in ipairs({ false, true }) do
+        it("fits a panel opened again as it slides out, from where it is, Fit Names While Open " .. (on and "on" or "off"), function()
+          db.fitNames = on
+          inColumns()
+          local bag = backpack()
+          holding(bag, { { "A", 1 }, { "B", 1 } })
+          finishTweens()
+          bag:Hide(ctx())
+          step(style.Time.Close / 2)
+          holding(bag, { { "A", 1 }, { LONG, 1 } })
+          local partway = (topLeft(bag)) - bag.placeX
+          local right = (topLeft(bag)) + bag.frame:GetWidth()
+          assert.is_true(partway > 0 and partway < style.Small.Slide, "part way out")
+          bag:Show(ctx())
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.equal(partway, (topLeft(bag)) - bag.placeX, "its slide goes on from where it is")
+          assert.are.equal(right, (topLeft(bag)) + bag.frame:GetWidth(), "its right edge, which its default place holds, still")
+          finishTweens()
+          render:Flush()
+          assert.are.equal(0, (topLeft(bag)) - bag.placeX)
+          assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+          assert.are.same({}, cut(bag))
+          assert.is_nil(db.sizes[BACKPACK])
+        end)
+      end
+
+      -- Found by the second bug review: a new Bag Scale (or screen) refits every open small panel (chain:Update, snapping), and
+      -- that left alone one whose size glided: it kept its old scale and size until it next opened. A glide is refitted (its end
+      -- first); only a panel a grip holds is left alone.
+      for _, how in ipairs({ "its names", "a grip let go" }) do
+        it("takes a new Bag Scale while its size glides for " .. how, function()
+          inColumns()
+          local bag = glidingFor(how)
+          db.bagScale = 125
+          chain:ScalesChanged(ctx())
+          assert.are.equal(1.25, bag.frame:GetScale())
+          assert.is_false(bag.sizeGliding)
+          finishTweens()
+          render:Flush()
+          assert.are.equal(1.25, bag.frame:GetScale())
+          sizedAsItTakes(bag)
+          assert.are.same({}, cut(bag))
+        end)
+      end
+
+      -- The backpack chained beside the bank: the bank anchors, and its names glide moves its facing side. Refitted mid-glide,
+      -- the anchor is refitted first (its glide ended), so the backpack's spot is measured from where the anchor ends.
+      it("keeps a bag beside its anchor as a new Bag Scale refits the anchor mid-glide", function()
+        finally(dofile("spec/helpers/layout.lua").UseScreen(1920, 1080, 0.64))
+        db.fitNames = true
+        inColumns()
+        local bag = backpack()
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        db.smallChain = "companion"
+        chain:Update(ctx())
+        finishTweens()
+        holding(bag, { { "A", 1 } })
+        bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = tabOf("6_", { { "C", 1 } }) } }, function() end)
+        render:Flush()
+        finishTweens()
+        assert.are.equal(bank, chain:SmallAnchorOf(bag))
+        bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = tabOf("6_", { { "C", 1 }, { LONG, 1 } }) } },
+          function() end)
+        step(0.1)
+        assert.is_true(bank.sizeGliding)
+        db.bagScale = 125
+        chain:ScalesChanged(ctx())
+        local gap = chain:SmallGap(bank, bag)
+        for frame = 0, 30 do
+          local between = (bag.frame:GetLeft() - (bank.frame:GetLeft() + bank.frame:GetWidth())) * 1.25
+          assert.is_true(math.abs(between - gap) < 1, "frame " .. frame .. ": " .. between .. " apart, not " .. gap)
+          step(1 / 60)
+        end
+      end)
+    end)
+
     describe("its size", function()
       it("opens at its saved size, where it was left", function()
         db.sizes[BACKPACK] = { 640, 500 }
@@ -2104,6 +3868,93 @@ describe("BetterBags Next's small mode", function()
         finishTweens()
         assert.are.equal(bagLeft, select(1, topLeft(bag)))
         assert.are.equal(bankRight, select(1, topLeft(bank)) + wide)
+      end)
+
+      -- Found by the third bug review: a grip let go on a chained pair glided the bag beside it a pixel and back, or untwisted
+      -- the braid and twisted it again: the snap placed the bag beside an anchor every frame, from the grip's edge, which stands
+      -- a fraction of a pixel from where the place it saves puts it, and settled the chain as it ended (chain:Update), which
+      -- glided a bag over that pixel. A grip never moves the side a bag is chained on (it has none there): the bag beside it and
+      -- the braid are left as they are. Clamp Bags to Screen is off (its default): a snap wider than the screen leaves room for
+      -- would move both edges.
+      for _, screen in ipairs({ { 2560, 1440, 0.71, 125 }, { 1920, 1080, 1, 125 }, { 1920, 1080, 1, 85 } }) do
+        for _, layout in ipairs({ "backpack", "companion" }) do
+          it(string.format("never moves the bag beside it as a grip on either bag is let go, %dx%d at %s, Bag Scale %d%%, %s anchoring",
+            screen[1], screen[2], screen[3], screen[4], layout), function()
+            local layoutHelper = dofile("spec/helpers/layout.lua")
+            finally(layoutHelper.UseScreen(screen[1], screen[2], screen[3]))
+            db.bagScale = screen[4]
+            db.clamp = false
+            local bag = opened(function(c) return nextBag:Create(c) end)
+            local bank = opened(function(c) return nextBank:Create(c) end)
+            db.smallChain = layout
+            chain:Update(ctx())
+            finishTweens()
+            bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = "B" } },
+              items = { item("0_1", "A"), item("0_2", "B") },
+              freeSpace = { showAll = false, buttons = { { slotkey = "9_1", count = 30 } } } } } }, function() end)
+            bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = { categories = { { name = "C" } },
+              items = { item("6_1", "C") } } } }, function() end)
+            render:Flush()
+            finishTweens()
+            -- The braid twisted all the way.
+            for _ = 1, 60 do chain:Turn(1 / 60) end
+            assert.is_true(chain.coupling ~= nil and chain.coupling.amount == 1, "braided")
+            local ppu = layoutHelper.PixelsPerUnit()
+            local function left(panel)
+              return layoutHelper.Rect(panel.frame).left * ppu
+            end
+            -- Each bag's grip away from the other: the backpack's right, the bank's left.
+            for _, sized in ipairs({ bag, bank }) do
+              local other = sized == bag and bank or bag
+              local side = sized == bag and "RIGHT" or "LEFT"
+              for _, wider in ipairs({ 37, 101, 213, 333 }) do
+                local at = left(other)
+                gripTo(sized, side, sized.frame:GetWidth() + wider)
+                for frame = 1, 45 do
+                  step(1 / 60)
+                  chain:Turn(1 / 60)
+                  local why = string.format("the %s's grip let go %d wider, frame %d", sized == bag and "backpack" or "bank", wider,
+                    frame)
+                  assert.are.equal(at, left(other), "the bag beside it still: " .. why)
+                  assert.is_false(tween:IsPlaying(bag) or tween:IsPlaying(bank), "nothing glides into a spot: " .. why)
+                  assert.is_true(chain.coupling ~= nil and chain.coupling.target == 1, "braided: " .. why)
+                end
+                finishTweens()
+              end
+            end
+          end)
+        end
+      end
+
+      -- With Clamp Bags to Screen on, a grip let go a little wider than the screen's edge leaves room for at the width it snaps
+      -- to puts its place back on the screen: both its edges glide (snapTo's toX), the chained side too, and the bag beside it
+      -- moves with it, settled as it ends.
+      it("takes the bag beside it along where a grip let go moves both its edges", function()
+        local layoutHelper = dofile("spec/helpers/layout.lua")
+        finally(layoutHelper.UseScreen(2560, 1440, 0.71))
+        db.bagScale = 125
+        local bag = opened(function(c) return nextBag:Create(c) end)
+        local bank = opened(function(c) return nextBank:Create(c) end)
+        chainBank(bag, bank)
+        local function between()
+          return (bag.frame:GetLeft() - (bank.frame:GetLeft() + bank.frame:GetWidth())) * 1.25
+        end
+        local gap = chain:SmallGap(bank, bag)
+        assert.is_true(math.abs(between() - gap) < 1)
+        local left = bag.placeX
+        gripTo(bag, "RIGHT", bag.frame:GetWidth() + 101)
+        assert.is_true(bag.placeX < left - 10, "its place put back on the screen: " .. left .. " to " .. bag.placeX)
+        local frames = 0
+        while bag.sizeGliding do
+          step(1 / 60)
+          frames = frames + 1
+          assert.is_true(math.abs(between() - gap) < 1, "frame " .. frames .. ": " .. between() .. " apart, not " .. gap)
+        end
+        finishTweens()
+        assert.is_true(frames > 5)
+        assert.is_true(math.abs(between() - gap) < 1)
+        assert.are.same({ bank:SmallPlace() }, { bank.placeX, bank.placeY })
+        assert.is_not_nil(chain.coupling)
       end)
 
       it("keeps the grip it is dragged by while a chain forms, until it is let go", function()
@@ -2825,6 +4676,31 @@ describe("BetterBags Next's small mode", function()
       assert.is_not_nil(chain.coupling)
     end)
 
+    -- Found by the third bug review: a glide into a spot reads the spot each frame (its anchor's size may glide meanwhile), and a
+    -- bank closing is no longer the backpack's anchor (the chain's companion is an open one), so the spot became the
+    -- backpack's saved place and it jumped back 10 units. Let go by its anchor, it goes on to the spot it read last.
+    it("glides on to its spot as the anchor it glides beside closes", function()
+      db.smallChain = "companion"
+      local bank = opened(function(c) return nextBank:Create(c) end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      -- Where it was dropped: its place saved at its spot.
+      db.places[BACKPACK] = { bag.placeX, bag.placeY }
+      override(bank.tabs, "Width", function() return 140 end)
+      chain:Update(ctx())
+      assert.is_true(tween:IsPlaying(bag), "it glides to its new spot")
+      local spot = { bag:SmallPlace() }
+      assert.is_true(spot[1] > db.places[BACKPACK][1], "the spot moved right")
+      step(0.05)
+      local before = topLeft(bag)
+      bank:Hide(ctx())
+      step(1 / 60)
+      local after = topLeft(bag)
+      assert.is_true(after >= before, "on toward its spot, not back: " .. before .. " to " .. after)
+      finishTweens()
+      assert.are.same(spot, { topLeft(bag) })
+      assert.are.same(spot, { bag.placeX, bag.placeY })
+    end)
+
     -- A slide or a switch is never cut short: the slide's end says the bag has shown (a bank open
     -- waits for it to read the bank).
     it("glides a chained bag to a spot that moved while it slid in only once it is in", function()
@@ -3133,6 +5009,34 @@ describe("BetterBags Next's small mode", function()
         scalesChanged()
         assert.are.same({ UIParent:GetWidth() - bodyWidth() * 1.5, 1188 }, { onScreen(bag) }, "kept on the screen")
       end)
+
+      -- Found by the bug review: with Fit Names While Open on, the redraw a new scale asks for (ApplyScales) glided the panel
+      -- toward the width its names take at the new scale before it was refitted, and the refit leaves a gliding panel alone
+      -- (chain:Update), so it kept its old scale. It is refitted first, then drawn.
+      for _, case in ipairs({ { 105, "saved" }, { 150, "saved" }, { 150, "a name no step holds" } }) do
+        it("takes a new scale at once while open with Fit Names While Open on, " .. case[1] .. "%, " .. case[2], function()
+          db.fitNames = true
+          if case[2] == "saved" then
+            db.sizes[BACKPACK] = { 5000, 600 }
+          else
+            local name = string.rep("n", 300)
+            slots[BACKPACK].tabs[1] = { categories = { { name = name } }, items = { item("0_1", name) } }
+          end
+          local bag = opened(function(c) return nextBag:Create(c) end)
+          bag:Draw(ctx(), slots[BACKPACK], function() end)
+          render:Flush()
+          finishTweens()
+          db.bagScale = case[1]
+          scalesChanged()
+          local scale = case[1] / 100
+          assert.are.equal(scale, bag.frame:GetScale())
+          assert.is_false(bag.sizeGliding)
+          finishTweens()
+          render:Flush()
+          assert.are.equal(scale, bag.frame:GetScale())
+          assert.is_true(bag.frame:GetWidth() * scale <= UIParent:GetWidth() + 1e-6, "on the screen")
+        end)
+      end
 
       it("chains small bags side by side on the screen, the gap and the braid at their scale", function()
         db.bagScale = 50

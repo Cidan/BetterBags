@@ -79,6 +79,7 @@ function chain:Register(panel, role)
     events:RegisterEvent("UI_SCALE_CHANGED", function(ctx) self:Update(ctx, true) end)
     events:RegisterEvent("DISPLAY_SIZE_CHANGED", function(ctx) self:Update(ctx, true) end)
     events:RegisterMessage("next/ScalesChanged", function(ctx) self:ScalesChanged(ctx) end)
+    events:RegisterMessage("next/FitNamesChanged", function(ctx) self:FitNamesChanged(ctx) end)
     events:RegisterMessage("bags/ClampChanged", function(ctx) self:ClampChanged(ctx) end)
   end
 end
@@ -92,6 +93,13 @@ function chain:ScalesChanged(ctx)
   for _, panel in ipairs(self:Panels()) do
     panel:ApplyScales(ctx)
   end
+  self:Update(ctx, true)
+end
+
+-- FitNamesChanged follows Fit Names While Open (next/FitNamesChanged from its switch, next.md §14g): every open small panel
+-- is fitted again to what it shows now (Update, snapping: FitSmall); a closed one is fitted as it opens.
+---@param ctx Context
+function chain:FitNamesChanged(ctx)
   self:Update(ctx, true)
 end
 
@@ -313,10 +321,12 @@ function chain:SmallPlaced(anchor, chained)
 end
 
 -- Settle glides a small bag chained to an open anchor to its spot when the spot moved (the gap
--- changed). It returns whether it glides.
+-- changed, its anchor's size glided while it was busy: spotMoved, which this pays, as whatever else
+-- puts it on its spot does). It returns whether it glides.
 ---@param panel NextPanelFrame
 ---@return boolean
 function chain:Settle(panel)
+  panel.spotMoved = nil
   local anchor = self:SmallAnchorOf(panel)
   if anchor == nil or not isOpen(anchor) then
     return false
@@ -325,7 +335,7 @@ function chain:Settle(panel)
   if math.abs(x - panel.placeX) < PLACED and math.abs(y - panel.placeY) < PLACED then
     return false
   end
-  panel:GlideTo(x, y)
+  panel:GlideTo()
   return true
 end
 
@@ -539,16 +549,31 @@ end
 ---@param snap? boolean
 function chain:Update(ctx, snap)
   local _ = ctx
-  for _, panel in ipairs(self:Panels()) do
+  local panels = self:Panels()
+  -- A small pair's anchor first: the bag beside it is placed from where the anchor is now, which a refit can move (a
+  -- glide of its size ended, a new scale).
+  local anchor = self:SmallPair()
+  if anchor ~= nil and anchor ~= panels[1] then
+    for i, panel in ipairs(panels) do
+      if panel == anchor then
+        table.remove(panels, i)
+        break
+      end
+    end
+    table.insert(panels, 1, anchor)
+  end
+  for _, panel in ipairs(panels) do
     if isOpen(panel) and isSmall(panel) then
-      -- Where the player put it; the screen changed: still on it, its height the screen's share. A
-      -- chained bag whose spot beside its open anchor moved (the gap changed) glides there. One the
-      -- player sizes, or whose size glides (back to its default, or onto its columns' width), is left alone: it
-      -- places itself after.
+      -- Where the player put it; the screen changed: still on it, its height the screen's share, at its
+      -- scale; one whose size glides is refitted too (FitSmall ends the glide first). A chained bag whose
+      -- spot beside its open anchor moved (the gap changed) glides there. One a grip sizes is left alone,
+      -- and one whose size glides is not settled: each places itself after (StopSizing takes its scale).
       local sizing = panel.sizing ~= nil or panel.sizeGliding
-      if snap and not sizing then
-        panel:FitSmall()
-      elseif not snap and not sizing and panel.morph == nil and not tween:IsPlaying(panel) then
+      if snap then
+        if panel.sizing == nil then
+          panel:FitSmall()
+        end
+      elseif not sizing and panel.morph == nil and not tween:IsPlaying(panel) then
         -- Never cutting a slide or a switch short (a slide's end says the bag has shown): Arrived
         -- settles it once there.
         self:Settle(panel)

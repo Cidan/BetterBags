@@ -34,7 +34,7 @@ paths:
 
 ## A Font String Given a Width Centers Its Text
 **Problem**: a font string anchored by one corner and sized to its text looks left- or right-aligned whatever its justification. Give it a width (to cut it short, `SetWidth` with `SetWordWrap(false)`) and its text centers in that width, because `justifyH` defaults to `CENTER` (`Blizzard_SharedXML/UI.xsd`, for `Font` and `FontString`). BetterBags Next's small backpack title moved about 100 units right once small panels cut titles short; the bank's, already right-justified, did not move.
-**Solution**: justify a font string toward the side it is anchored on whenever it may get a width, and set it again after anything that gives it a new font object. The spec mock answers `CENTER` for a font string never justified, as the client does. next-small-mode.md §14g.
+**Solution**: justify a font string toward the side it is anchored on whenever it may get a width, and set it again after anything that gives it a new font object. The spec mock answers `CENTER` for a font string never justified, as the client does. next-small-names.md §14g.
 
 ## Copies of the Client's Fonts Go Stale When UI Addons Rewrite Them
 **Problem**: A Next role that copies a client font (`Object`) copies it when the theme applies, at BetterBags'

@@ -68,7 +68,20 @@ three are disabled at one column, the limit also with wide sections off. Each se
 - **Titles:** one too long for its section is cut short, its count kept (`placeTitleRow`; `section.titleCut`; a font string keeps
   the width it was cut to, so it is set back with `SetWidth(0)` and its text again before measuring, next-themes-art.md §14). The full
   name is on its header's tooltip. The line after a title hides when no room is left (`LINE_MIN`), where it would draw backwards;
-  that holds at one column in a narrow window too.
+  that holds at one column in a narrow window too. A small panel widens until no name is cut (`NameCells`, below, and
+  next-small-names.md §14g), so a name is cut short there only past the screen's width.
+- **The cells every name needs** (`NameCells(layoutWidth, most, short)`): the fewest cells, from as many as `layoutWidth` holds up
+  to `most`, at which no section's name and count is cut, each against the room the canvas would lay it out in there (`ColumnSplit`
+  of that width): the whole row for Recent Items and Free Space, and for every section at one column (a bag of one, Show Bags, the
+  vendor's cards, a window too narrow for two); in columns, the cells its place takes (`columnRows`, `cellsOf`, as `renderColumns`'s
+  `layOut` gives them); compact, its name's cells within the row (§7b's `compactTextCells` sum, `Sections.Compact.TextEnd`
+  included, uncapped). The sections `Widest` counts: not one waiting in a dock (one flying back is), nor one leaving. Nil when none
+  does. A whole row is drawn in whole pixels and can come up to `short` short of its cells' width (a panel's frame on whole pixels);
+  a column is whole cells, drawn exactly. At `layoutWidth` itself a whole row is that width, so a width that is not on a grid step
+  and holds every name is kept. It lays nothing out, and changes nothing a layout holds but what `Widest` holds too (`neededCells`);
+  each name is measured once (`titleRowWidth`, the sum `titleFits` and `compactTextCells` take, a name cut short by its
+  `titleWhole`). Whole names are not monotonic in cells (more cells, more columns, each narrower: the reported bag is whole at three
+  cells, cut at four and five, whole from six), so it goes up a cell at a time.
 - **Nothing between columns.** A divider was built and removed, asked: "remove that divider for columns, looks terrible".
 - **Dragging reorders, as in one column:** asked, "we're not storing column positions, just list positions here, so what we save is
   still just an ordered list". The room is a place in the list (`drag.index`, as ever): `renderColumns` stands the dragged section there
@@ -113,7 +126,7 @@ three are disabled at one column, the limit also with wide sections off. Each se
     scale every frame, and laid out on each new grid it restyled every button every frame (2,955 restyles for a 197-icon section's landing, 197 without);
     only once more for a read that changed what it holds (`drag.layoutOwed`). A landing cut short (the bag closing) ends as it would have, so the order it
     saved is the order shown and the bag recalculates (`state.landed`).
-- **Small panels** (next-small-mode.md §14g): `Widest(layoutWidth)` is what keeps the columns as they stand at the width let go at (`columnRows`, so what
+- **Small panels** (next-small-resize.md §14g): `Widest(layoutWidth)` is what keeps the columns as they stand at the width let go at (`columnRows`, so what
   stood side by side still does): each column as wide as the largest section beside another, at least `MIN_COLUMN_CELLS` so a snap
   never takes a column away; one spanning some of its columns sharing what it needs among them; one alone in its row only what it
   needs, since it can take the row (not filling down, where the sections above it hold its column); or what Recent Items or Free Space
@@ -123,7 +136,8 @@ three are disabled at one column, the limit also with wide sections off. Each se
   jumped hundreds of pixels with the window still wide behind it. A frame within half a pixel of the width the panel lays out
   for stands for that width (`FrameLayoutWidth`): frames stand on whole pixels, and a frame a fraction under what its columns take
   read as a cell fewer, so a press on a grip that moved nothing took a column away, each press another. The root was older; at one
-  column it cost a cell, and columns made it a column.
+  column it cost a cell, and columns made it a column. From the width `Widest` gives, the snap goes up to the first grid step at
+  which `NameCells` cuts no name (next-small-names.md §14g), so a snap keeps the columns and can be wider than its icons for a name.
 - **Dock cards:** a card is as wide as the panel's column whatever its section's width (`listProto:Lead`), the section at its own
   size inside it: as wide as a section in a column of four it was 118 wide under a warning of 282. A read of its bag leaves the
   buttons of a section waiting in a card to the dock (`claim`), which draws them on the card's grid: sized for the column's, they
@@ -134,10 +148,9 @@ three are disabled at one column, the limit also with wide sections off. Each se
 - **Top to Bottom reflows:** a section appearing or leaving changes where the sections after it land, so many can move, in spite of
   held widths: filling down has no other way to keep its columns even. Measured: a neighbour leaving moved 1,060 of 2,708 sections
   (2 columns, 300 random bags). Side to Side moves only what comes after it in its row.
-- **Known, not fixed:** a small panel left at its minimum width lays out for that minimum live (`RestingLayoutWidth`, `MinWidth`
-  following the footer's text), and its frame only takes it in `FitSmall`: a free-slot count gaining a digit can show one cell, and
-  so a column, more than the frame holds until the panel is next fitted. It needs a panel at exactly its minimum width, and the
-  formula is older than columns.
+- **Fixed (2026-11-04):** a small panel left at its minimum width laid out for that minimum live (`RestingLayoutWidth`, `MinWidth`
+  following the footer's text) while its frame took it only in `FitSmall`, so a free-slot count gaining a digit could show a cell,
+  and so a column, more than the frame held. It lays out now for the width it last took (`restingWidth`, next-small-resize.md §14g).
 - **Not done:** saving a section in a column: order is one list, and a section stands where the list and the window put it.
 
 Measured offline on real bags (title widths estimated from a screenshot, Default's sizes, 8 cells, 2 columns, scroll height, before
@@ -147,7 +160,11 @@ bank 5106, 6262, 4582: without wide sections its 197-icon section takes 50 rows 
 Coverage: `spec/next/content_spec.lua` ("section columns": the split, spare cells, both fills, rows as tall as their tallest, random
 bags keeping every row on one line and the order, Recent Items and Free Space, fewer columns in a narrow window, deciding on the width
 to lay out for, none without a source, back to one column; titles and lines; "wide sections": columns taken, a new row, the limit,
-top to bottom, what it holds while its contents change, random bags; what moves; how wide it needs to be; "a section's header art"),
+top to bottom, what it holds while its contents change, random bags; what moves; how wide it needs to be; "the cells every name needs":
+one column, the reported bag (three cells, then six from four or five), a section spanning columns, filling down, compact and its
+`TextEnd`, Recent Items at the whole row, a name cut short measured whole, a dock and leaving, none up to the screen, a row drawn short,
+each name measured once, nothing a layout holds changed, 150 random bags against what the layout cuts, the shared sum unchanged on
+another grid; "a section's header art"),
 `spec/next/bag_spec.lua` ("section columns": its own bag's setting, Show Bags, the message, the tooltip, holding from the second
 open and after Alt+Z, a sort that moved nothing, the logout), `spec/next/drag_spec.lua` ("with section columns"),
 `spec/next/dock_spec.lua` (a card's width, flying back to a column), `spec/next/content_spec.lua` ("reordering by drag": the room under

@@ -14,6 +14,10 @@ end
 -- setup.lua -- Busted test helper. Loaded before all spec files via .busted config.
 -- Delegates to modular helpers in spec/helpers/ for maintainability.
 
+-- The whole suite runs in one process under CI's 4 GB cap (test-harness.md, Memory). Lua starts a collection once memory
+-- doubles what the last one left (a pause of 200); at 120 the garbage between collections stays a fifth of what is live.
+collectgarbage("setpause", 120)
+
 -- Step 1: Mock WoW globals (must come before any library loading)
 dofile("spec/helpers/wow_mocks.lua")
 

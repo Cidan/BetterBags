@@ -297,7 +297,7 @@ slow. It is an option, off by default (asked).
   once (a sort of a large bank); capture one.
 - **A size snapping** (`motion.SnapSizeAt(from, to, overshoot, p)`, `motion.SnapOvershoot(from, to, floor)`): the
   bounce a window snapping to its content (window.md §3b) and a BetterBags Next small panel snapping to its columns
-  (next-small-mode.md §14g) both size with. It eases out (cubic) to `overshoot` past `to` in 65% of the way, then settles back
+  (next-small-resize.md §14g) both size with. It eases out (cubic) to `overshoot` past `to` in 65% of the way, then settles back
   (smoothstep); the overshoot is a tenth of the distance, at most 10, never below `floor`, none for a size that grows.
   Each caller drives its own time (the window 0.35 s, Next its theme's `Time.Snap`). It was the window's own
   (`window.SnapSizeAt`); it moved here when Next's panels took the same snap. Coverage: `spec/render/motion_spec.lua`

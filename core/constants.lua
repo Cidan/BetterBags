@@ -738,6 +738,9 @@ const.DATABASE_DEFAULTS = {
     -- icon size times nextIconScale; small panels at nextBagScale (full panels are always at 100).
     nextIconScale = 100,
     nextBagScale = 100,
+    -- Whether a small panel follows what it shows while it is open, widening when a section's name or its title would be
+    -- cut short and narrowing back once it fits (next.md §14g); off, it fits as it opens and as a grip is let go.
+    nextFitNamesWhileOpen = false,
     -- BetterBags Next's panels: "small" movable ones, the default, or "full" height on the screen's
     -- edges (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
     -- size the player gave it with its grips (next.md §14g).

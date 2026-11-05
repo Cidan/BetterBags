@@ -170,6 +170,19 @@ passed (next-bagsystem.md §11f). The whole-addon helper loads and starts all of
   the peak to 3.5 GB). At 6,560 specs (2026-11-02) it peaked at 4.06 GB and died under the cap with no summary and no failure listed: exit 1 and a line
   of progress marks, a crash to read as memory. `spec/setup.lua` now clears `UIParent`'s children after every file, which leaves 3.64 GB, and the margin is thin. The most live memory
   is added by `frames/item_spec` (233 MB), `refresh_pipeline_spec` (173), `next/drag_spec` (150), `next/pixel_perfect_spec` (148), `next/settings/content_spec` and `next/theme_panel_spec` (128 each).
+  At 6,718 specs (2026-11-05, small panels keeping their names whole) it peaked at 4.0 GB and died under the cap again. Two
+  of those tests had `spy.on` a panel's method (patterns-specs.md: a spy deep-copies its arguments, the panel, 100 MB a
+  call); without them it still peaked at 4.0 GB, 1.67 GB live at the end. **`spec/setup.lua` now sets the collector's pause
+  to 120** (Lua's default, 200, lets garbage grow to what is live before a collection starts): measured on the whole suite,
+  uncapped, 4.19 GB and 162 s at the default, 3.42 GB and 170 s at 150, 2.96 GB and 188 s at 120. A full collection after
+  every file gave 3.43 GB and doubled the run.
+  - **Holders found, not cleared** (reference searches from the globals and the registry, a panel made in
+    `next/small_spec` and still live in the next file): each Next control module's `all` (every control made, for a theme
+    to restyle: the scroll bar's holds every panel's scroll box, whose `OnSizeChanged` holds the panel); the vendor buttons'
+    pool; `NextCurrencyDrag.containers` (every backpack's currency strip, holding its panel); the old copies a module
+    loaded fresh leaves in `addon.orderedModules`, holding as much; and the fills' `wrapped` regions, through their
+    parents' scripts. Clearing the first four after every file left the peak where it was (4.19 GB uncapped), as each
+    cleared holder exposed the next.
   - **A method is shared, so it must not read the constructor's locals**: use the widget's fields
     (`self._type`, `self._name`, `self._parent`). Per-widget state goes in the constructor.
   - **Overriding a method on one widget** (`frame.Method = ...`, a spec's `override`) sets the

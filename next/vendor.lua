@@ -555,10 +555,13 @@ function vendorProto:Draw(ctx, _, callback)
   for _, b in pairs(previous) do
     b:Release()
   end
+  -- Before it is laid out: how narrow a small vendor goes keeps room for its footer (MinWidth), and it follows what it
+  -- shows first (FollowNames).
+  self.freeText:SetText(footer)
+  self:FollowNames()
   render:RenderNow(self.root, { ctx = ctx })
   -- Its cards too, styled and skinned as they are laid out (texture-sharpening.md).
   texels:Unsharpen(self.frame)
-  self.freeText:SetText(footer)
   self.emptyText:SetText(empty)
   self.emptyText:SetShown(shown == 0)
   if not self.opening then
