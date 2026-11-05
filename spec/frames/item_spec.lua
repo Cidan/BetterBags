@@ -287,6 +287,88 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     assert.equal(item.slotkey, "Container")
   end)
 
+  -- Blizzard's Initialize sets up a slot's button and its decoration: Initialize(bag, slot) on live retail 12.1.5,
+  -- Initialize(containerFrame, bag, slot) on WoW: Forever 1.60.1.70790 (Mainline/ContainerFrame.lua), which keeps the
+  -- container and asks it whether it is combined (Camelot/ContainerFrame.lua: an empty slot's background follows it).
+  describe("setting up a slot's buttons (Blizzard's Initialize)", function()
+    after_each(function()
+      _G.__mockContainerItemButtons("live")
+      addon.isForever = false
+      itemFrame.CreateDecoration = function(_, item) return newDecoration(item) end
+    end)
+
+    local function buttonsOf(item)
+      return { item.button, item:GetDecoration(ctx:New("buttons")) }
+    end
+
+    it("gives both their bag and slot, and no container, on live retail", function()
+      itemFrame.CreateDecoration = realCreateDecoration
+      local item = itemFrame:GetButton(ctx:New("live"), "1_7")
+      for _, button in ipairs(buttonsOf(item)) do
+        assert.equal(7, button:GetID())
+        assert.equal(1, button:GetBagID())
+        assert.is_nil(button.containerFrame)
+      end
+    end)
+
+    it("draws the decoration's empty slot background from Blizzard's template on live retail", function()
+      itemFrame.CreateDecoration = realCreateDecoration
+      local background = itemFrame:GetButton(ctx:New("live"), "1_7"):GetDecoration(ctx:New("live")).ItemSlotBackground
+      assert.equal("ItemSlotBackgroundCombinedBagsTemplate", background._inherits)
+      assert.equal("BACKGROUND", background._drawLayer)
+      assert.equal(-6, background._sublevel)
+      assert.is_false(background:IsShown())
+    end)
+
+    describe("on WoW: Forever", function()
+      before_each(function()
+        addon.isForever = true
+        _G.__mockContainerItemButtons("forever")
+        itemFrame:Init()
+      end)
+
+      -- Reported on 1.60.1.70790: "ContainerFrame.lua:1861: bad argument #1 to 'SetID'", from OnEnable at login.
+      it("makes every slot's buttons at login", function()
+        itemFrame.CreateDecoration = realCreateDecoration
+        itemFrame:OnEnable()
+        for _, slotkey in ipairs({ "0_1", "1_40", "5_40" }) do
+          local item = itemFrame.buttonsBySlotkey[slotkey]
+          assert.is_not_nil(item, slotkey)
+          local slot = tonumber(slotkey:match("_(%d+)$"))
+          for _, button in ipairs(buttonsOf(item)) do
+            assert.equal(slot, button:GetID(), slotkey)
+          end
+        end
+      end)
+
+      it("gives both their bag and slot, and the slot's holder as their container, which is not combined", function()
+        itemFrame.CreateDecoration = realCreateDecoration
+        local item = itemFrame:GetButton(ctx:New("forever"), "1_7")
+        for _, button in ipairs(buttonsOf(item)) do
+          assert.equal(7, button:GetID())
+          assert.equal(1, button:GetBagID())
+          assert.equal(item.frame, button.containerFrame)
+          assert.is_false(button:IsCombined())
+          assert.same({ "bags-item-slot64", true }, { button:GetItemButtonBackgroundTexture() })
+        end
+      end)
+
+      -- Reported on 1.60.1.70790: "BetterBagsItemButton50Decoration:CreateTexture(): Couldn't find inherited node
+      -- "ItemSlotBackgroundCombinedBagsTemplate"": the build removed the template from Mainline/ContainerFrame.xml and
+      -- draws an empty container slot in the bags-item-slot64 atlas (ContainerFrameItemButtonMixin:GetItemButtonBackgroundTexture).
+      it("draws the decoration's empty slot background in Forever's empty slot atlas", function()
+        itemFrame.CreateDecoration = realCreateDecoration
+        local background = itemFrame:GetButton(ctx:New("forever"), "1_7"):GetDecoration(ctx:New("forever"))
+          .ItemSlotBackground
+        assert.is_nil(background._inherits)
+        assert.equal("bags-item-slot64", background:GetAtlas())
+        assert.equal("BACKGROUND", background._drawLayer)
+        assert.equal(-6, background._sublevel)
+        assert.is_false(background:IsShown())
+      end)
+    end)
+  end)
+
   -- Every item button must exist from boot: creating one later can taint. A capture of
   -- opening the bank on retail created 265 buttons at runtime, all character bank tab slots
   -- 41-98 (tabs hold 98 slots; boot made 40 for them and 98 for Warbank tabs).

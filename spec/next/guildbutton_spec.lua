@@ -559,6 +559,18 @@ describe("NextGuildButton", function()
       assert.is_false(b.slotBackground:IsShown())
     end)
 
+    -- WoW: Forever 1.60.1.70790 removed that art from its UI (Mainline/ContainerFrame.xml's
+    -- ItemSlotBackgroundCombinedBagsTemplate) and draws an empty container slot in the bags-item-slot64 atlas.
+    it("draws the bags' empty slot art: Forever's empty slot atlas on WoW: Forever", function()
+      override(addon, "isForever", true)
+      local b = guildButton:GetButton(ctx, "1002_9")
+      b:SetFreeSlots(ctx, free({ individual = true }), 1, true)
+      assert.is_true(b.slotBackground:IsShown())
+      assert.are.equal("bags-item-slot64", b.slotBackground:GetAtlas())
+      assert.is_nil(b.slotBackground:GetTexture())
+      assert.are.same({ 0, 0, 0, 1, 1, 0, 1, 1 }, { b.slotBackground:GetTexCoord() })
+    end)
+
     it("draws the bags' empty slot art: the backpack's empty slot on Classic", function()
       addon.isRetail = false
       local b = guildButton:GetButton(ctx, "1002_9")

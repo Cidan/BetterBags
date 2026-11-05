@@ -240,6 +240,11 @@ function WholeAddon.Load(opts)
   setGlobal("WOW_PROJECT_CAMELOT", forever and 18 or nil)
   setGlobal("WOW_PROJECT_ID", forever and 18 or 1)
   setField(Enum, "BagIndex", forever and FOREVER_BAG_INDEX or RETAIL_BAG_INDEX)
+  -- WoW: Forever's item buttons take their container in Initialize (1.60.1.70790); live retail's do not.
+  if forever then
+    _G.__mockContainerItemButtons("forever")
+    table.insert(restorers, function() _G.__mockContainerItemButtons("live") end)
+  end
   setField(Enum, "PlayerInteractionType", PLAYER_INTERACTION_TYPE)
   setField(Enum, "ItemQuality", ITEM_QUALITY)
   setField(Enum, "InventoryType", INVENTORY_TYPE)

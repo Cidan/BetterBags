@@ -129,6 +129,11 @@ local FAMILY_ICON_SIZE = 24
 -- The glyph is drawn at reduced opacity so it hints at the bag type without dominating the slot.
 local FAMILY_ICON_ALPHA = 0.4
 
+-- An empty container slot's art on WoW: Forever 1.60.1.70790, which removed ItemSlotBackgroundCombinedBagsTemplate
+-- (Mainline/ContainerFrame.xml) and draws its own empty slots in this atlas
+-- (ContainerFrameItemButtonMixin:GetItemButtonBackgroundTexture).
+local FOREVER_EMPTY_SLOT_ATLAS = "bags-item-slot64"
+
 -- getFamilyIconTexture lazily creates (and returns) the centered family-bag glyph on a themed
 -- item-button decoration. It lives in the OVERLAY layer so it sits above the empty-slot art,
 -- and is stored on the decoration itself so it survives across draws and theme swaps.
@@ -1162,8 +1167,13 @@ function itemFrame:CreateDecoration(item)
 	end
 	button:SetAllPoints()
 
-	if addon.isRetail then
+	if addon.isForever then
+		button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", nil, -6)
+		button.ItemSlotBackground:SetAtlas(FOREVER_EMPTY_SLOT_ATLAS)
+	elseif addon.isRetail then
 		button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
+	end
+	if button.ItemSlotBackground then
 		button.ItemSlotBackground:SetAllPoints(button)
 		button.ItemSlotBackground:Hide()
 	end
@@ -1368,6 +1378,25 @@ function itemFrame:_DoCreate(_, bagID)
 	return i
 end
 
+-- Blizzard's Initialize sets up a container item button: Initialize(bag, slot) on retail, Initialize(containerFrame,
+-- bag, slot) on WoW: Forever (1.60.1.70790), which keeps the container and asks it IsCombinedBagContainer whenever an
+-- empty slot's background is drawn. The slot's holder stands in as the container (it is the buttons' parent, which
+-- retail's Initialize asks). Classic's buttons have no Initialize.
+---@param button ItemButton
+---@param holder Frame
+---@param bagID number
+---@param slotID number
+local function initializeSlotButton(button, holder, bagID, slotID)
+	if not button.Initialize then
+		button:SetID(slotID)
+		button.bagID = bagID
+	elseif addon.isForever then
+		button:Initialize(holder, bagID, slotID)
+	else
+		button:Initialize(bagID, slotID)
+	end
+end
+
 ---@param ctx Context
 ---@param slotkey string
 ---@return Item
@@ -1383,19 +1412,8 @@ function itemFrame:GetButton(ctx, slotkey)
 		slotID = tonumber(slotID)
 		local item = self:Create(ctx, bagID)
 		-- Assign physical slot ID and bag ID exactly once on creation
-		if item.button.Initialize then
-			item.button:Initialize(bagID, slotID)
-		else
-			item.button:SetID(slotID)
-			item.button.bagID = bagID
-		end
-		local decoration = item:GetDecoration(ctx)
-		if decoration.Initialize then
-			decoration:Initialize(bagID, slotID)
-		else
-			decoration:SetID(slotID)
-			decoration.bagID = bagID
-		end
+		initializeSlotButton(item.button, item.frame, bagID, slotID)
+		initializeSlotButton(item:GetDecoration(ctx), item.frame, bagID, slotID)
 		item.slotkey = slotkey
 
 		self.buttonsBySlotkey[slotkey] = item
