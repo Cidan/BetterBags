@@ -224,6 +224,25 @@ describe("NextGuildButton", function()
   -- Blizzard's guild bank draws a slot with SetItemButtonTexture, SetItemButtonCount,
   -- SetItemButtonDesaturated (locked) and SetItemButtonQuality (GuildBankFrameMixin:Update).
   describe("drawing a guild item", function()
+    -- WoW: Forever 1.60.1.70790's SetItemButtonTexture resets the icon's texture coordinates (Mainline/
+    -- ItemButtonTemplate.lua, SetItemButtonTexture_Base), so the theme's icon crop is put back after it there.
+    for _, forever in ipairs({ true, false }) do
+      it(forever and "puts the style's icon crop back after drawing its icon on WoW: Forever"
+          or "leaves its icon's crop to its style on live retail", function()
+        override(addon, "isForever", forever)
+        local order = {}
+        override(_G, "SetItemButtonTexture", function(button, texture) table.insert(order, { "texture", button, texture }) end)
+        override(stubs.elements, "DrawItemIcon", function(_, button) table.insert(order, { "crop", button }) end)
+        local b = guildButton:GetButton(ctx, "1002_7")
+        b:SetItemFromData(ctx, item())
+        if forever then
+          assert.are.same({ { "texture", b.button, 135232 }, { "crop", b.button } }, order)
+        else
+          assert.are.same({ { "texture", b.button, 135232 } }, order)
+        end
+      end)
+    end
+
     it("shows its icon, count and quality as Blizzard's guild bank does, and is shown", function()
       local b = guildButton:GetButton(ctx, "1002_7")
       local data = item({ quality = 3 })
@@ -557,6 +576,18 @@ describe("NextGuildButton", function()
       assert.are.equal("Interface\\ContainerFrame\\UI-Bag-Components", b.slotBackground:GetTexture())
       b:SetItemFromData(ctx, item())
       assert.is_false(b.slotBackground:IsShown())
+    end)
+
+    -- WoW: Forever 1.60.1.70790 removed that art from its UI (Mainline/ContainerFrame.xml's
+    -- ItemSlotBackgroundCombinedBagsTemplate) and draws an empty container slot in the bags-item-slot64 atlas.
+    it("draws the bags' empty slot art: Forever's empty slot atlas on WoW: Forever", function()
+      override(addon, "isForever", true)
+      local b = guildButton:GetButton(ctx, "1002_9")
+      b:SetFreeSlots(ctx, free({ individual = true }), 1, true)
+      assert.is_true(b.slotBackground:IsShown())
+      assert.are.equal("bags-item-slot64", b.slotBackground:GetAtlas())
+      assert.is_nil(b.slotBackground:GetTexture())
+      assert.are.same({ 0, 0, 0, 1, 1, 0, 1, 1 }, { b.slotBackground:GetTexCoord() })
     end)
 
     it("draws the bags' empty slot art: the backpack's empty slot on Classic", function()

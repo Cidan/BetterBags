@@ -146,11 +146,12 @@ describe("Constants Module Offsets", function()
     assert.are.equal("apart", const.DATABASE_DEFAULTS.profile.nextChain)
   end)
 
-  -- BetterBags Next's panels are full height until switched to small (docs/next-small-mode.md).
-  it("keeps BetterBags Next's panels full size, with no small places saved, by default", function()
+  -- BetterBags Next's panels start small until switched to full (asked: "by default, bags in next start in minimized
+  -- mode"; docs/next-small-mode.md).
+  it("starts BetterBags Next's panels small, with no small places saved, by default", function()
     loadfile("core/constants.lua")("BetterBags")
     local const = addon:GetModule("Constants")
-    assert.are.equal("full", const.DATABASE_DEFAULTS.profile.nextSize)
+    assert.are.equal("small", const.DATABASE_DEFAULTS.profile.nextSize)
     assert.are.same({}, const.DATABASE_DEFAULTS.profile.nextSmallPlaces)
     assert.are.same({}, const.DATABASE_DEFAULTS.profile.nextSmallSizes)
     assert.are.equal("apart", const.DATABASE_DEFAULTS.profile.nextSmallChain)

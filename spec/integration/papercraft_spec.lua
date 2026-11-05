@@ -15,10 +15,13 @@ describe("the Papercraft theme on the whole addon", function()
     handle = nil
   end)
 
-  local function start(theme)
+  local function start(theme, size)
     handle = WholeAddon.Load({
       next = true,
-      profile = function(defaults) defaults.nextTheme = theme or "Papercraft" end,
+      profile = function(defaults)
+        defaults.nextTheme = theme or "Papercraft"
+        defaults.nextSize = size or defaults.nextSize
+      end,
     })
     handle:Start()
     return handle.addon
@@ -168,8 +171,9 @@ describe("the Papercraft theme on the whole addon", function()
     end)
 
     it("on its bags, at full size and small", function()
-      local addon = start()
+      local addon = start(nil, "full")
       local bag = addon.Bags.Backpack
+      assert.is_false(bag:IsSmall())
       bag:Show(ctx())
       run(2)
       assert.are.same({}, missing(bag.frame), "full")

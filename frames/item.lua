@@ -129,6 +129,23 @@ local FAMILY_ICON_SIZE = 24
 -- The glyph is drawn at reduced opacity so it hints at the bag type without dominating the slot.
 local FAMILY_ICON_ALPHA = 0.4
 
+-- An empty container slot's art on WoW: Forever 1.60.1.70790, which removed ItemSlotBackgroundCombinedBagsTemplate
+-- (Mainline/ContainerFrame.xml) and draws its own empty slots in this atlas
+-- (ContainerFrameItemButtonMixin:GetItemButtonBackgroundTexture).
+local FOREVER_EMPTY_SLOT_ATLAS = "bags-item-slot64"
+
+-- setIcon draws a decoration's icon with Blizzard's SetItemButtonTexture. On WoW: Forever 1.60.1.70790 that resets the
+-- icon's texture coordinates (Mainline/ItemButtonTemplate.lua, SetItemButtonTexture_Base), so the theme's crop is put
+-- back after it there.
+---@param decoration ItemButton
+---@param texture number|string
+local function setIcon(decoration, texture)
+	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(texture) else SetItemButtonTexture(decoration, texture) end
+	if addon.isForever then
+		elements:DrawItemIcon(decoration)
+	end
+end
+
 -- getFamilyIconTexture lazily creates (and returns) the centered family-bag glyph on a themed
 -- item-button decoration. It lives in the OVERLAY layer so it sits above the empty-slot art,
 -- and is stored on the decoration itself so it survives across draws and theme swaps.
@@ -628,7 +645,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 
 	--override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
 	decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
-	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(data.itemInfo.itemIcon) else SetItemButtonTexture(decoration, data.itemInfo.itemIcon) end
+	setIcon(decoration, data.itemInfo.itemIcon)
 	SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
 	local quality = data.itemInfo.itemQuality
 	if not elements:DrawItemQuality(decoration, qualityColorOf(quality), quality) then
@@ -944,10 +961,10 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	end
 	decoration.GetItemContextMatchResult = nil
 	if addon.isRetail then
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+		setIcon(decoration, 0)
 	else
 		local emptySlot = addon:GetModule('SonataElements'):EmptySlotArt(decoration) or [[Interface\PaperDoll\UI-Backpack-EmptySlot]]
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(emptySlot) else SetItemButtonTexture(decoration, emptySlot) end
+		setIcon(decoration, emptySlot)
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
@@ -1082,10 +1099,10 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 	-- A search's miss was about the item drawn: a full draw sets it again, and clearing a search walks only items.
 	if decoration.SetMatchesSearch then decoration:SetMatchesSearch(true) end
 	if addon.isRetail then
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+		setIcon(decoration, 0)
 	else
 		local emptySlot = addon:GetModule('SonataElements'):EmptySlotArt(decoration) or [[Interface\PaperDoll\UI-Backpack-EmptySlot]]
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(emptySlot) else SetItemButtonTexture(decoration, emptySlot) end
+		setIcon(decoration, emptySlot)
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
@@ -1162,8 +1179,13 @@ function itemFrame:CreateDecoration(item)
 	end
 	button:SetAllPoints()
 
-	if addon.isRetail then
+	if addon.isForever then
+		button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", nil, -6)
+		button.ItemSlotBackground:SetAtlas(FOREVER_EMPTY_SLOT_ATLAS)
+	elseif addon.isRetail then
 		button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
+	end
+	if button.ItemSlotBackground then
 		button.ItemSlotBackground:SetAllPoints(button)
 		button.ItemSlotBackground:Hide()
 	end
@@ -1368,6 +1390,25 @@ function itemFrame:_DoCreate(_, bagID)
 	return i
 end
 
+-- Blizzard's Initialize sets up a container item button: Initialize(bag, slot) on retail, Initialize(containerFrame,
+-- bag, slot) on WoW: Forever (1.60.1.70790), which keeps the container and asks it IsCombinedBagContainer whenever an
+-- empty slot's background is drawn. The slot's holder stands in as the container (it is the buttons' parent, which
+-- retail's Initialize asks). Classic's buttons have no Initialize.
+---@param button ItemButton
+---@param holder Frame
+---@param bagID number
+---@param slotID number
+local function initializeSlotButton(button, holder, bagID, slotID)
+	if not button.Initialize then
+		button:SetID(slotID)
+		button.bagID = bagID
+	elseif addon.isForever then
+		button:Initialize(holder, bagID, slotID)
+	else
+		button:Initialize(bagID, slotID)
+	end
+end
+
 ---@param ctx Context
 ---@param slotkey string
 ---@return Item
@@ -1383,19 +1424,8 @@ function itemFrame:GetButton(ctx, slotkey)
 		slotID = tonumber(slotID)
 		local item = self:Create(ctx, bagID)
 		-- Assign physical slot ID and bag ID exactly once on creation
-		if item.button.Initialize then
-			item.button:Initialize(bagID, slotID)
-		else
-			item.button:SetID(slotID)
-			item.button.bagID = bagID
-		end
-		local decoration = item:GetDecoration(ctx)
-		if decoration.Initialize then
-			decoration:Initialize(bagID, slotID)
-		else
-			decoration:SetID(slotID)
-			decoration.bagID = bagID
-		end
+		initializeSlotButton(item.button, item.frame, bagID, slotID)
+		initializeSlotButton(item:GetDecoration(ctx), item.frame, bagID, slotID)
 		item.slotkey = slotkey
 
 		self.buttonsBySlotkey[slotkey] = item

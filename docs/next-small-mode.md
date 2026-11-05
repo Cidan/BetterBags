@@ -49,8 +49,9 @@ From `next/panel.lua`, `next/chain.lua` and `next/style.lua`:
 
 ### The setting and the toggle
 
-- One setting for every Next panel: `nextSize`, `"full"` (the default: nothing changes for anyone
-  who does not switch) or `"small"`, in the profile next to `nextChain`.
+- One setting for every Next panel: `nextSize`, `"full"` or `"small"`, in the profile next to `nextChain`.
+  Full was the default until 2026-11-04, when small became the default (asked: "by default, bags in next start in
+  minimized mode"; next.md §14a).
 - **The toggle** is a header button on the backpack: arrows in while full, arrows out while small
   (BetterBags' own glyphs, `.claude/rules/next-themes.md` §11; first Blizzard's red expand and
   condense art). It switches every Next panel, open or not, and every open one morphs to its new

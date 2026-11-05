@@ -49,10 +49,13 @@ local elements = addon:GetModule('SonataElements')
 local guildButton = addon:NewModule('NextGuildButton')
 
 -- Blizzard's art for an empty slot: the combined bags' slot background on retail
--- (ItemSlotBackgroundCombinedBagsTemplate, Mainline ContainerFrame.xml), the backpack's empty slot on
--- Classic (what item buttons draw, item-drawing.md §6).
+-- (ItemSlotBackgroundCombinedBagsTemplate, Mainline ContainerFrame.xml), the empty container slot's atlas
+-- on WoW: Forever 1.60.1.70790, which removed that template (ContainerFrameItemButtonMixin:
+-- GetItemButtonBackgroundTexture), the backpack's empty slot on Classic (what item buttons draw,
+-- item-drawing.md §6).
 local SLOT_BACKGROUND = "Interface\\ContainerFrame\\UI-Bag-Components"
 local SLOT_BACKGROUND_COORDS = { 0.64453125, 0.7890625, 0.42578125, 0.498046875 }
+local FOREVER_EMPTY_SLOT_ATLAS = "bags-item-slot64"
 local CLASSIC_EMPTY_SLOT = "Interface\\PaperDoll\\UI-Backpack-EmptySlot"
 
 ---@class NextGuildButtonFrame
@@ -98,9 +101,13 @@ local function newButton()
   upgrade:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
   upgrade:Hide()
   local slotBackground = button:CreateTexture(nil, "BACKGROUND", nil, -6)
-  slotBackground:SetTexture(SLOT_BACKGROUND)
-  slotBackground:SetTexCoord(SLOT_BACKGROUND_COORDS[1], SLOT_BACKGROUND_COORDS[2], SLOT_BACKGROUND_COORDS[3],
-    SLOT_BACKGROUND_COORDS[4])
+  if addon.isForever then
+    slotBackground:SetAtlas(FOREVER_EMPTY_SLOT_ATLAS)
+  else
+    slotBackground:SetTexture(SLOT_BACKGROUND)
+    slotBackground:SetTexCoord(SLOT_BACKGROUND_COORDS[1], SLOT_BACKGROUND_COORDS[2], SLOT_BACKGROUND_COORDS[3],
+      SLOT_BACKGROUND_COORDS[4])
+  end
   slotBackground:SetAllPoints(button)
   slotBackground:Hide()
   ---@type NextGuildButtonFrame
@@ -202,6 +209,11 @@ function buttonProto:SetItemFromData(ctx, data)
   self:reset()
   self.slotBackground:Hide()
   SetItemButtonTexture(self.button, info.itemIcon)
+  -- WoW: Forever 1.60.1.70790's SetItemButtonTexture resets the icon's texture coordinates (Mainline/
+  -- ItemButtonTemplate.lua, SetItemButtonTexture_Base): the theme's crop is put back.
+  if addon.isForever then
+    elements:DrawItemIcon(self.button)
+  end
   SetItemButtonCount(self.button, data.stackedCount or info.currentItemCount)
   SetItemButtonDesaturated(self.button, info.isLocked)
   local quality = info.itemQuality

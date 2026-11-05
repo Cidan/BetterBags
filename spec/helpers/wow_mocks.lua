@@ -377,7 +377,11 @@ end
 function WidgetMethods:GetParent()
   return self._parent
 end
+-- SetID(id): id is a number, not nilable (SimpleFrameAPIDocumentation); the client raises this for anything else.
 function WidgetMethods:SetID(id)
+  if tonumber(id) == nil then
+    error("bad argument #1 to 'SetID' (Usage: self:SetID(id))", 2)
+  end
   self._id = id
 end
 function WidgetMethods:GetID()
@@ -652,7 +656,12 @@ end
 
 -- Textures and FontStrings
 -- Frame:CreateTexture(name, drawLayer, templateName, subLevel) (SimpleFrameAPIDocumentation).
+-- Texture templates the mocked client does not have (__mockContainerItemButtons): the client raises this.
+local missingTextureTemplates = {}
 function WidgetMethods:CreateTexture(textureName, drawLayer, inherits, subLevel)
+  if inherits ~= nil and missingTextureTemplates[inherits] then
+    error(string.format("%s:CreateTexture(): Couldn't find inherited node \"%s\"", tostring(self:GetName()), inherits), 2)
+  end
   local tex = CreateMockWidget("Texture", textureName, self)
   tex._drawLayer = drawLayer
   tex._sublevel = subLevel
@@ -1613,6 +1622,42 @@ function ItemButtonMethods:Initialize(bag, slot)
     self.ItemSlotBackground:SetShown(isCombined)
   end
   self:Show()
+end
+local liveInitialize = ItemButtonMethods.Initialize
+
+-- WoW: Forever 1.60.1.70790 (and PTR 12.1.7.70740), Mainline/ContainerFrame.lua: Initialize takes the container
+-- frame first and keeps it, and IsCombined asks it. Camelot/ContainerFrame.lua makes the empty slot's background
+-- follow it (ShouldUseBagIconForEmptySlot returns IsCombined), so setting a texture without one asks the container.
+local function containerInitialize(self, containerFrame, bag, slot)
+  self.containerFrame = containerFrame
+  self:SetBagID(bag)
+  self:SetID(slot)
+  self:UpdateExtended()
+  self:Show()
+end
+local function isCombined(self)
+  return self.containerFrame and self.containerFrame:IsCombinedBagContainer()
+end
+local function shouldUseBagIconForEmptySlot(self)
+  return self:IsCombined()
+end
+local function getItemButtonBackgroundTexture(self)
+  if self:ShouldUseBagIconForEmptySlot() then
+    return "bags-item-slot-blank", true
+  end
+  return "bags-item-slot64", true
+end
+
+-- Which client's container item buttons the mock makes: "live" (12.1.5, the default) or "forever" (1.60.1.70790),
+-- whose Mainline/ContainerFrame.xml no longer has ItemSlotBackgroundCombinedBagsTemplate.
+---@param client "live"|"forever"
+function _G.__mockContainerItemButtons(client)
+  local forever = client == "forever"
+  missingTextureTemplates.ItemSlotBackgroundCombinedBagsTemplate = forever or nil
+  ItemButtonMethods.Initialize = forever and containerInitialize or liveInitialize
+  ItemButtonMethods.IsCombined = forever and isCombined or nil
+  ItemButtonMethods.ShouldUseBagIconForEmptySlot = forever and shouldUseBagIconForEmptySlot or nil
+  ItemButtonMethods.GetItemButtonBackgroundTexture = forever and getItemButtonBackgroundTexture or nil
 end
 function ItemButtonMethods:GetSlotAndBagID()
   return self:GetID(), self:GetBagID()

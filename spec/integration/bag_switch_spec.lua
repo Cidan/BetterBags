@@ -108,6 +108,20 @@ describe("switching bag designs on the whole addon", function()
     assert.is_not_nil(addon.Vendor)
   end)
 
+  -- Asked: "by default, bags in next start in minimized mode".
+  for _, install in ipairs({ "new", "existing" }) do
+    it("starts BetterBags Next's panels small on an " .. install .. " install", function()
+      local addon = start({ install = install, next = install == "existing" or nil })
+      assert.are.equal("next", addon:GetModule("BagSystem"):ActiveDesign())
+      for name, panel in pairs({ backpack = addon.Bags.Backpack, bank = addon.Bags.Bank, vendor = addon.Vendor }) do
+        assert.is_true(panel:IsSmall(), name)
+      end
+      if addon.Bags.GuildBank then
+        assert.is_true(addon.Bags.GuildBank:IsSmall(), "guild bank")
+      end
+    end)
+  end
+
   it("keeps the classic bags on an install that never turned BetterBags Next on", function()
     local addon = start({ install = "existing" })
     assert.are.equal("classic", addon:GetModule("BagSystem"):ActiveDesign())

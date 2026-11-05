@@ -1,7 +1,9 @@
 # WoW: Forever (Camelot) Support
 
-WoW: Forever (internal codename **Camelot**, build `1.60.1.69893`, install flavor
-`wow_classic_beta`, TOC Interface `16001`) is a **mainline retail fork**: the engine and
+WoW: Forever (internal codename **Camelot**; launched 2026-11-04 as build `1.60.1.70790`, product
+`wowf`, installed in `_forever_`; the beta was `wow_classic_beta`; TOC Interface `16001`, which
+warcraft.wiki.gg's Patch 1.60.1 API changes page gives for 1.60.1; a `_Forever.toc` suffix is accepted as
+an alias of `_Camelot.toc` since 70291) is a **mainline retail fork**: the engine and
 UI are retail, so `addon.isRetail == true`, exactly like live retail (see §1 for how the
 project ID changed in build 70170). Camelot therefore runs BetterBags'
 **retail** code paths. Its bank is still the numbered-container model (BetterBags renders
@@ -431,7 +433,104 @@ placement; shown with no tab, hidden with a tab, with nothing purchasable, after
 `BANK_TABS_CHANGED`, over the Warbank by group and by Show Bags tab; shown on Forever). Each guard
 was mutation-tested.
 
-## 11. Still pending (not yet done)
+## 11. What the launch build changed in Blizzard's container item buttons (1.60.1.70790)
+
+Two changes broke BetterBags at login on launch day, one after the other (§11a, §11b), and a third threw a theme's icon
+crop away on every draw (§11c); all are fixed for Forever only (asked: "make sure this only runs on forever"). Checked for
+more: every template BetterBags names exists on 70790 except the one in §11b, and no Blizzard function BetterBags calls
+was removed between 70532 and 70790. §11d lists what the review found from source and nobody has seen.
+
+### 11a. `Initialize` takes the container
+
+The launch build changed Blizzard's item button setup. Forever 70532 (2026-10-22) and live retail 12.1.5 have
+`ContainerFrameItemButtonMixin:Initialize(bag, slot)`; Forever 70790 has `Initialize(containerFrame, bag, slot)`
+(`Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua`), which keeps `self.containerFrame`, and Blizzard's own callers
+became `AcquireNewItemButton():Initialize(self, bagID, slotID)`. With it came `IsCombined()`, which asks
+`self.containerFrame:IsCombinedBagContainer()`, and Forever's empty slots follow it: `Camelot/ContainerFrame.lua`
+overrides `ShouldUseBagIconForEmptySlot` to return `IsCombined()`, which `GetItemButtonBackgroundTexture` asks whenever
+a button's texture is set to none. The old `Initialize`'s combined-bags background is gone.
+
+- **Failure mode (fixed, reported on launch day):** `ContainerFrame.lua:1861: bad argument #1 to 'SetID' (Usage:
+  self:SetID(id))`, from `itemFrame:GetButton` in `itemFrame:OnEnable` at login. BetterBags called
+  `Initialize(bagID, slotID)`: the bag went into `containerFrame`, the slot into `bag`, and `SetID` got nil, on the first
+  backpack slot, so no item button was made.
+- **The fix** (`initializeSlotButton`, `frames/item.lua`): Blizzard's `Initialize` still runs, for the clickable
+  button and the decoration (asked: letting Blizzard's code run, which is sensitive to taint, rather than doing its work
+  ourselves). On Forever (`addon.isForever`) it is handed the slot's holder (`item.frame`), the buttons' parent, as the
+  container: the holder already answers `IsCombinedBagContainer` false and `GetID` with the bag, the two things live
+  retail's `Initialize` asked its parent. Everywhere else it gets `(bag, slot)`, and Classic's buttons, which have no
+  `Initialize`, get `SetID` and `bagID`.
+- **Forever only, as asked.** PTR 12.1.7 (70740) already has the same `Initialize(containerFrame, bag, slot)`, so live
+  retail will need the same call once 12.1.7 ships; that client is not handled yet.
+- **The mock** (`spec/helpers/wow_mocks.lua`): `__mockContainerItemButtons("forever")` gives item buttons 70790's
+  `Initialize`, `IsCombined`, Forever's `ShouldUseBagIconForEmptySlot` and `GetItemButtonBackgroundTexture`;
+  `"live"` (the default) puts 12.1.5's back. The whole-addon helper's Forever client uses it
+  (`spec/helpers/whole_addon.lua`). The mock's `SetID` now raises the client's error for a missing id
+  (`SimpleFrameAPIDocumentation`: `id` is a number, not nilable), which it took silently before.
+
+Coverage: `spec/frames/item_spec.lua` ("setting up a slot's buttons (Blizzard's Initialize)": every slot's buttons at
+login on Forever, the holder as both buttons' container and not combined, no container on live retail), and on the whole
+addon every Forever start (`spec/integration/bag_switch_spec.lua`, `spec/integration/empty_slot_spec.lua`), which failed
+with the reported error before the fix. Mutation-tested (3 mutations: no container on Forever, the holder on retail, the
+Forever check dropped; each caught).
+
+### 11b. No `ItemSlotBackgroundCombinedBagsTemplate`
+
+70790 removed the texture template `ItemSlotBackgroundCombinedBagsTemplate` (`Interface\ContainerFrame\UI-Bag-Components`
+cropped to 0.64453125, 0.7890625, 0.42578125, 0.498046875) from `Mainline/ContainerFrame.xml`, and the template's
+`emptyBackgroundAtlas` key from `ContainerFrameItemButtonTemplate`. Its own empty container slots now draw the
+`bags-item-slot64` atlas (`ContainerFrameItemButtonMixin:GetItemButtonBackgroundTexture`; its bank slots too,
+`BankFrameTemplates.xml`), and nothing in its UI names `UI-Bag-Components` any more.
+
+- **Failure mode (fixed, reported on launch day, right after §11a's fix):**
+  `BetterBagsItemButton50Decoration:CreateTexture(): Couldn't find inherited node "ItemSlotBackgroundCombinedBagsTemplate"`,
+  from `itemFrame:CreateDecoration` at login. The Show Bags panel's bag buttons (`BagButtonFrame:_DoCreate`) made the same
+  texture.
+- **The fix:** on Forever the decoration's and the bag button's `ItemSlotBackground` is a plain texture (BACKGROUND, -6,
+  hidden, as the template made it) drawing `bags-item-slot64`; retail keeps the template. BetterBags Next's guild bank
+  slots (`next/guildbutton.lua`), which draw the old file themselves and so raised nothing, draw the atlas on Forever
+  too, so an empty slot looks the same in the bags and the guild bank (CLAUDE.md, "UI Consistency"). A theme's
+  `EmptySlot` style (sonata.md §3a) restyles the texture and puts the atlas back when it leaves.
+- **The mock:** `__mockContainerItemButtons("forever")` also makes `CreateTexture` raise the client's error for that
+  template (`missingTextureTemplates`).
+- **Not seen in game:** how `bags-item-slot64` looks behind BetterBags' empty slots and under a theme's empty slot art.
+
+Coverage: `spec/frames/item_spec.lua` (the decoration's background on live and on Forever), `spec/frames/bagbutton_spec.lua`
+("its empty slot background"), `spec/next/guildbutton_spec.lua` ("Forever's empty slot atlas on WoW: Forever"), and the
+whole-addon Forever starts. Mutation-tested (3 mutations, one per file: each caught, the decoration's and the bag
+button's by the whole-addon starts too).
+
+### 11c. `SetItemButtonTexture` resets the icon's crop
+
+Found by the bug review of §11a-b, from source. 70790's `SetItemButtonTexture_Base` (`Blizzard_ItemButton/Mainline/
+ItemButtonTemplate.lua`, which `ItemButtonMixin:SetItemButtonTexture` calls) now ends every draw with
+`icon:SetTexCoord(0, 1, 0, 1)` (or `SetAtlas` with `resetTexCoords`); live 12.1.5 and Forever 70532 leave the
+coordinates as they were. Sonata sets a theme's icon crop (`Icon.TexCoords`, sonata.md §3a) only when it styles a button,
+so on Forever the first full draw threw it away: the classic ElvUI theme (no Masque, nothing put it back) and the Next
+themes that crop their icons, wherever Masque does not skin the buttons; guild bank buttons the same.
+
+- **The fix:** `SonataElements:DrawItemIcon(decoration)` puts back the crop the decoration's style gave its icon (nothing
+  for a decoration no style drew). On Forever it runs right after every icon draw: the item buttons' five
+  (`setIcon`, `frames/item.lua`: an item's icon, a free slot's on both clients, a reset's) and the guild bank buttons'
+  item icon (`next/guildbutton.lua`). Masque still re-skins after it (`item/Updated`, `guild/Updated`), so its crop wins
+  where it skins.
+- **Not on live retail** (asked: Forever only), though PTR 12.1.7 has the same reset.
+
+Coverage: `spec/sonata/elements_spec.lua` ("an icon's crop after a draw (DrawItemIcon)"), `spec/frames/item_spec.lua`
+("drawing an icon (Blizzard's SetItemButtonTexture)": every draw followed by the crop on Forever, none on live),
+`spec/next/guildbutton_spec.lua` (the guild icon both ways). Mutation-tested (3 mutations, each caught).
+
+### 11d. Reported by the review, not built for (from source only, not seen in a client)
+
+- **Gamepad interface style:** with `InputUtil.IsGamepadUIEnabled()`, 70790's `ContainerFrameItemButtonMixin:OnLoad`
+  gives every container button normal, pushed, disabled and highlight atlases (`ItemSlotFrame_*`). BetterBags clears the
+  normal and pushed art only, so the disabled art may show on a free-space button with no count and the highlight over
+  BetterBags' own.
+- **An icon mask:** 70790 masks every `ItemButton`'s icon, normal and pushed textures with `common-iconmask`
+  (`Shared/ItemButtonTemplate.xml`, `PostOnLoad`); its shape is not in the source. It may clip an inset or cropped icon's
+  corners, or a Masque skin's.
+
+## 12. Still pending (not yet done)
 
 - `C_Bank.ShouldUsePlayerBagsInBank`, `FetchMaxNumBankTabs` and `BankBagTypeAndIDToInvSlot`
   (Camelot-only) are still unused; the socket feature (§9) works from the

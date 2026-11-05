@@ -533,6 +533,20 @@ function elements:StyleItemButton(decoration, style)
   styleCountdown(decoration, style.Countdown)
 end
 
+-- DrawItemIcon puts back the crop a decoration's style gave its icon (Icon.TexCoords): WoW: Forever 1.60.1.70790's
+-- SetItemButtonTexture resets the icon's texture coordinates every time it draws one (Mainline/ItemButtonTemplate.lua,
+-- SetItemButtonTexture_Base). A decoration no style drew is left alone.
+---@param decoration ItemButton
+function elements:DrawItemIcon(decoration)
+  local style = decoration.sonataItemStyle
+  local icon = decoration.icon or decoration.IconTexture
+  if style == nil or icon == nil then
+    return
+  end
+  local coords = withDefaults(style.Icon, ITEM_ICON).TexCoords
+  icon:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+end
+
 -- EmptySlotArt is what a decoration's style draws an empty slot with on Classic, whose empty slot is its icon, or nil
 -- for Blizzard's.
 ---@param decoration ItemButton

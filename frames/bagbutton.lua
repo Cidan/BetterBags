@@ -21,6 +21,11 @@ local BagButtonFrame = addon:NewModule('BagButton')
 
 local buttonCount = 0
 
+-- An empty container slot's art on WoW: Forever 1.60.1.70790, which removed ItemSlotBackgroundCombinedBagsTemplate
+-- (Mainline/ContainerFrame.xml) and draws its own empty slots in this atlas
+-- (ContainerFrameItemButtonMixin:GetItemButtonBackgroundTexture).
+local FOREVER_EMPTY_SLOT_ATLAS = "bags-item-slot64"
+
 ---@class BagButton
 ---@field frame ItemButton|Button
 ---@field masqueGroup string
@@ -234,7 +239,10 @@ function BagButtonFrame:_DoCreate()
   f:SetScript("OnDragStart", function() b:OnDragStart() end)
   f:SetScript("OnReceiveDrag", function() b:OnReceiveDrag() end)
   b.frame = f
-  if addon.isRetail then
+  if addon.isForever then
+    f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND", nil, -6)
+    f.ItemSlotBackground:SetAtlas(FOREVER_EMPTY_SLOT_ATLAS)
+  elseif addon.isRetail then
     f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
   else
     f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND")

@@ -68,4 +68,37 @@ describe("BagButtonFrame's bag slot actions", function()
     b:OnDragStart()
     assert.are.equal(4, #calls)
   end)
+
+  -- The art behind an empty bag slot: Blizzard's ItemSlotBackgroundCombinedBagsTemplate on retail, which WoW:
+  -- Forever 1.60.1.70790 removed from Mainline/ContainerFrame.xml (creating a texture from it raises there); Forever
+  -- draws an empty container slot in the bags-item-slot64 atlas.
+  describe("its empty slot background", function()
+    before_each(function()
+      override(addon, "isRetail", true)
+      override(addon, "isForever", false)
+    end)
+
+    after_each(function()
+      _G.__mockContainerItemButtons("live")
+    end)
+
+    it("is Blizzard's template on live retail", function()
+      local background = bagButton:_DoCreate().frame.ItemSlotBackground
+      assert.are.equal("ItemSlotBackgroundCombinedBagsTemplate", background._inherits)
+      assert.are.equal("BACKGROUND", background._drawLayer)
+      assert.are.equal(-6, background._sublevel)
+      assert.is_false(background:IsShown())
+    end)
+
+    it("is Forever's empty slot atlas on WoW: Forever", function()
+      addon.isForever = true
+      _G.__mockContainerItemButtons("forever")
+      local background = bagButton:_DoCreate().frame.ItemSlotBackground
+      assert.is_nil(background._inherits)
+      assert.are.equal("bags-item-slot64", background:GetAtlas())
+      assert.are.equal("BACKGROUND", background._drawLayer)
+      assert.are.equal(-6, background._sublevel)
+      assert.is_false(background:IsShown())
+    end)
+  end)
 end)

@@ -738,10 +738,10 @@ const.DATABASE_DEFAULTS = {
     -- icon size times nextIconScale; small panels at nextBagScale (full panels are always at 100).
     nextIconScale = 100,
     nextBagScale = 100,
-    -- BetterBags Next's panels: "full" height on the screen's edges, or "small" movable ones
-    -- (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
+    -- BetterBags Next's panels: "small" movable ones, the default, or "full" height on the screen's
+    -- edges (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
     -- size the player gave it with its grips (next.md §14g).
-    nextSize = "full",
+    nextSize = "small",
     nextSmallPlaces = {},
     nextSmallSizes = {},
     -- Which small panel anchors a chained pair: "apart", "backpack" or "companion" (the one the
