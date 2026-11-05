@@ -1,3 +1,8 @@
+---
+paths:
+  - "core/events.lua"
+  - "spec/events_spec.lua"
+---
 # Event Buckets (`events:BucketEvent`) and Bag Cooldown Refresh
 
 This documents the contract of `events:BucketEvent` (`core/events.lua`), the bugs its
@@ -16,7 +21,7 @@ windows:
   **Each call makes a bucket of its own**, with its own window, filter and callback; the
   underlying event handler is registered only once. (It used to replace the event's callback and
   filter: the classic backpack and BetterBags Next's backpack both bucket `BAG_UPDATE_COOLDOWN`,
-  and with both designs made, next.md §11, one silently took the other's place.)
+  and with both designs made, next-bagsystem.md §11, one silently took the other's place.)
 - **Filter first.** The optional `filter(eventName, ...)` runs on every fire before anything
   else. Returning false drops the fire: nothing is recorded and no window opens. Use it to
   keep uninteresting fires down to a function call (e.g. only our tooltip instance ids,
@@ -109,6 +114,6 @@ started), an event or message no callback is left for is unregistered from AceEv
 buckets' open windows are cancelled and forgotten. `scope:Enable()` hooks them all again,
 registering with AceEvent what needs it. A callback registered while its scope is off is hooked
 when the scope is switched on. BetterBags makes each bag design in a scope of its own and
-switches the one not in use off (next.md §11).
+switches the one not in use off (next-bagsystem.md §11).
 
 Coverage: `spec/events_spec.lua` ("scopes"; "BucketEvent": one bucket per registration).

@@ -1,3 +1,11 @@
+---
+paths:
+  - "window/window.lua"
+  - "frames/bag.lua"
+  - "frames/anchor.lua"
+  - "spec/window/window_spec.lua"
+  - "spec/integration/bag_position_spec.lua"
+---
 # Windows (`window/window.lua`)
 
 Every BetterBags window (the bags, forms, dialogs, slots panels, theme config, debug window) is
@@ -111,7 +119,7 @@ touch the clamp.
     on is put back on the screen and its position saved there (`SavePosition`), so turning it off
     again moves nothing, now or after a reload. A hidden one is put back when it next renders.
     Turned off, nothing moves.
-  - BetterBags Next's small panels follow the same setting (next.md §14c); its full panels rest at
+  - BetterBags Next's small panels follow the same setting (next-small-mode.md §14c); its full panels rest at
     their screen edges and are never clamped.
 - **Never bigger than the screen.** `screenSize()` is the screen measured in the window's own
   scale (`UIParent` size x its effective scale / the frame's), at least the minimums. In window
@@ -139,7 +147,7 @@ window on the screen to the window", "is clamped to the screen while the bags' s
 `spec/frames/bagslots_spec.lua` and `spec/frames/bankslots_spec.lua` ("is clamped to the screen as its
 bag is"), `spec/config/settings_effects_spec.lua` ("turns Clamp Bags to Screen on and off, and tells
 the bags"), `spec/core/constants_spec.lua`, `spec/database_spec.lua`, `spec/config/catalog_spec.lua`.
-Every guard was mutation-tested (with Next's, next.md §14c: 32 mutations; four first survived: one
+Every guard was mutation-tested (with Next's, next-small-mode.md §14c: 32 mutations; four first survived: one
 led to a test (a full panel left alone), three showed code that changed nothing, removed (fitting
 anchors before chained bags, a guard for a grip held while the setting changes, a coupling update)).
 
@@ -205,7 +213,7 @@ canvas pinned the content to its left edge whatever width it was given.
   edge the player dragged moves. The width eases out (cubic) to 10 % of the distance past the
   target (at most 10 px, never below the minimum) in 65 % of 0.35 s, then settles back
   (smoothstep): the bounce (Motion's `SnapSizeAt` and `SnapOvershoot`, render-pipeline.md §4c, which
-  BetterBags Next's small panels snap with too, next.md §14g). While it runs the window hands the content a `LayoutWidth` (the
+  BetterBags Next's small panels snap with too, next-small-mode.md §14g). While it runs the window hands the content a `LayoutWidth` (the
   target) with its real `Width`, so the layout never changes mid-bounce and the content stays
   centered in the moving width; the bounce stays inside the 14 px room. Each step lays the window
   out (`Invalidate`). At the end it saves the position and size (`OnResized`). Grabbing the grip,
@@ -294,7 +302,7 @@ could hide). Going off the screen is new with v0.8.10, when the clamp came off b
 - **After a reload it goes back to where it was dropped**, not to where it had grown to since: the save is the drop.
 
 Bags the player sizes, and bags with their anchor on, are placed as before. BetterBags Next keeps its own places
-(next.md §14c): measured, its small panels come back where they were dropped at any Bag Scale.
+(next-small-mode.md §14c): measured, its small panels come back where they were dropped at any Bag Scale.
 
 Coverage: `spec/integration/bag_position_spec.lua` (on the whole addon, on a screen: after a reload, by each
 point LibWindow-1.1 saves, at a scale, a real player's save, nothing saved, opened before the first read, holding
@@ -380,7 +388,7 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   both sides, and 100 high; the window at least as wide as the slots panel while it shows. The
   bar's room comes from the options the scroll box is made with (`scrollbox:GutterWidthFor`), not
   the box: a bag made after a theme was applied reads its minimums as its window is styled, inside
-  `window:Create`, before the box exists (next.md §11f).
+  `window:Create`, before the box exists (next-bagsystem.md §11f).
 - **BuildParts** creates the in-bag search box (`searchBox:CreateBox`, kept as
   `bag.searchBox`; `searchBox:GetSearchText` and QuickFind read it there), the menu button
   (`BagMenuButton`, bag-menu-button.md), the action buttons a theme may give the window
@@ -393,7 +401,7 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   theme places them), `MenuButton` (`Points`; `false` hides it), `Actions` (below), `Tabs`
   (`Offset = { X, Y }`: where the tab bar's top left sits from the bag's bottom left, default
   0, 2; `PlaceTabs`). A bag made after a theme was applied (the classic bags made the first time
-  the bags switch from BetterBags Next, next.md §11f) is decorated as its window registers, inside
+  the bags switch from BetterBags Next, next-bagsystem.md §11f) is decorated as its window registers, inside
   `BuildWindow`, before `BuildParts` made anything: `PlaceParts` then does nothing, and
   `bagFrame:Create` places every part once the behavior made the last of them
   (`PlacePartsIfDecorated`; only the tab bar for a window not decorated yet, whose first theme
@@ -494,7 +502,7 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   scrolls a canvas laying the releases out at its width.
   `OnHide` marks the notes seen. Details: changelog.md. Coverage: `spec/frames/changelog_spec.lua`.
 - **The search category editor** (`frames/searchcategory.lua`) was removed: the search box's Enter
-  to Make Category opens the settings window's Categories page instead (next-settings.md §5).
+  to Make Category opens the settings window's Categories page instead (next-settings-categories.md §5).
 - **The debug window** (`frames/debug.lua`, `/bbdb`): a Flat window named
   `BetterBagsDebugWindow`, 800 x 600 in the window mode with `Resizable = false`, movable, no
   fade, in the `DIALOG` strata (above BetterBags Next's `HIGH` panels, next.md §3, which it is

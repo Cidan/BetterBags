@@ -1,9 +1,19 @@
+---
+paths:
+  - "data/guildbank.lua"
+  - "next/guildbank.lua"
+  - "next/guildbutton.lua"
+  - "spec/guildbank*_spec.lua"
+  - "spec/next/guildbank_spec.lua"
+  - "spec/next/guildbutton_spec.lua"
+  - "spec/integration/guild_bank_spec.lua"
+---
 # The Guild Bank (`data/guildbank.lua`, `next/guildbank.lua`, `next/guildbutton.lua`)
 
 BetterBags reads the guild bank with the same data engine as the bags (categories, search, virtual
 stacks, sort, item level, upgrade arrows) and, with BetterBags Next on, shows it in a panel that
 stands in for Blizzard's guild bank frame: a third companion of the backpack on the left, beside
-the bank and the vendor (next.md §12). With the classic bags nothing changes: Blizzard's frame shows
+the bank and the vendor (next-chain.md §12). With the classic bags nothing changes: Blizzard's frame shows
 the guild bank and BetterBags reads none of it.
 
 ## 1. A third kind of bag (`core/constants.lua`)
@@ -130,7 +140,7 @@ nothing.
 (retail and Forever; the Classic UIParent's `GUILDBANKFRAME_OPENED` handler is the same) calls
 `ShowUIPanel(GuildBankFrame)`, then `CloseGuildBankFrame()` at once when the frame is not visible,
 and the frame's `OnHide` (`GuildBankFrameMixin:OnHide`) ends the visit too. So the vendor's way (the
-frame under the hidden frame, next.md §10a) would end every visit. `TakeOver` instead hooks
+frame under the hidden frame, next-vendor.md §10a) would end every visit. `TakeOver` instead hooks
 `ShowUIPanel` securely (once); when it shows `GuildBankFrame` while Next is in use, the frame goes
 under a tiny shown frame (`SetScale(0.001)`: visible to Blizzard's check, never seen), its `OnHide`
 is taken off, and a frame later it goes under the hidden frame. Bagnon does the same
@@ -203,7 +213,7 @@ element (its styler guards the parts a plain item button lacks).
 - The canvas takes these buttons through `NextContent:SetButtonSource`, so `Bind`'s sections, order,
   gaps and free space are the bags'.
 
-**Sections in and out** (next.md §7; `NextDrag:CanMoveBetween`, `CanDropOnBody`, the guild panel's
+**Sections in and out** (next-drag.md §7; `NextDrag:CanMoveBetween`, `CanDropOnBody`, the guild panel's
 `DepositTab`, `CanDepositIn`, `Deposit`, `Withdraw`):
 - At the guild bank, a backpack section dropped on the guild bank's body goes into its deposit tab
   (the tab shown by itself, else the current tab), one dropped on a guild tab into that tab; only
@@ -212,7 +222,7 @@ element (its styler guards the parts a plain item button lacks).
 - **Into a tab the player cannot withdraw from, it is confirmed first**: those items cannot be taken
   back. `Deposit` deposits nothing unless `confirmed` and returns `"confirm"` ("Deposit 15 items?",
   "You cannot take them back out of Donations.", "Double-click to deposit · Right-click to
-  cancel"), and the section docks in the guild bank until a double click (next.md §7, "Confirming in
+  cancel"), and the section docks in the guild bank until a double click (next-drag.md §7, "Confirming in
   the target"); the backpack keeps its gap meanwhile.
 - A guild section dropped on the backpack is withdrawn; on a backpack group tab it is also assigned
   to that group. A guild section header's right click withdraws it (the bank's moves it to the open
@@ -257,7 +267,7 @@ documentation or a restriction on its warcraft.wiki.gg page (checked: `AutoStore
 `CloseGuildBankFrame`), unlike the bank's tab purchase (`C_Bank.PurchaseBankTab`,
 camelot-forever.md §10). Deposits by drag call
 `C_Container.UseContainerItem` from the drop's release, a hardware event, as the bank's section moves
-do (next.md §7).
+do (next-drag.md §7).
 
 ## 7. Not verified in game
 

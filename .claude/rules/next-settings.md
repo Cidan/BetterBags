@@ -1,3 +1,11 @@
+---
+paths:
+  - "config/catalog.lua"
+  - "next/settings/*.lua"
+  - "spec/next/settings/*_spec.lua"
+  - "spec/config/catalog_spec.lua"
+  - "spec/integration/next_settings_spec.lua"
+---
 # BetterBags Next's Settings
 
 BetterBags has one settings window, built from nothing for BetterBags Next (asked; the plan and its
@@ -5,6 +13,9 @@ status are in `docs/next-settings.md`): pages grouped down a sidebar, tabs acros
 rows, and every control BetterBags' own, styled by the Next theme. It is the classic bags' settings
 window too, showing what the bags in use read (§7); the classic settings window was removed. It builds
 its settings from one catalog.
+
+Sections with their own rule files keep their numbers there: next-controls.md §2 and
+next-settings-categories.md §5.
 
 ## 1. The settings catalog (`config/catalog.lua`, `SettingsCatalog`)
 
@@ -40,70 +51,6 @@ design switch and its refusal, opacity and scale). Mutation-tested (a setting re
 moved, the slider range, the dropdown shape, Enable Groups on every bag, a bag's name in a
 description: each caught).
 
-## 2. Controls (`next/controls/`)
-
-Every control is BetterBags' own, made of plain frames and textures (no Blizzard template), drawn
-from the Next theme's `Controls` (next-themes.md), restyled on every theme (each module registers
-with SonataNext and restyles every instance it made in `ApplyStyle`), and usable anywhere in Next.
-Asked: "this also means redoing all our controls (including scrollbars ...) so that they are themable".
-
-| Module | File | What it is |
-|---|---|---|
-| `NextControls` | `base.lua` | `Paint(texture, fill, alpha?)`: a fill is a texture spec (`Color`, `Alpha`; or a `Texture`/`Atlas` tinted by `Color`), a palette color, a color, or `false` (hidden). `CreateEdge`/`PaintEdge(edge, spec, alpha?)`: four lines inside a frame's border, `Size` thick; a strength replaces the alpha (`Idle`/`Hover`/`Focus`). `Theme(name)`. The Escape stack (below). |
-| `NextScrollBar` | `scrollbar.lua` | A track and thumb in a scroll box's right edge (`Width`, `Inset`; `Size`, `HoverSize` under the pointer), the thumb the share shown (at least `MinThumb`), hidden while nothing scrolls. |
-| `NextButton` | `button.lua` | `Plain`, `Primary`, `Danger`, `Link`: fills and edges idle, under the pointer, pressed; a link is its text alone. As wide as its label and `Padding` (at least `MinWidth`) unless given a width; disabled at `DisabledAlpha`, calling nothing. A tooltip when given. |
-| `NextToggle` | `toggle.lua` | A switch: the knob slides (`Motion.Time.Toggle`), the on color fades in with it. A click flips it and calls back; `SetChecked` calls nothing back, and told the state it is already sliding to it keeps sliding (asked: "animate our toggle switches"; a row showing its value again right after a click saved it stopped the slide, so no switch ever looked animated). A settings row slides a switch whose value changed while it shows (one setting turning another off). Two styles (`Controls.Toggle.Style`; asked: "switch between two styles, the current square toggle, or the 'round peg that sits over a smaller track'"): `"Square"` (Default), the track filling the switch with an edge round it and a square knob `KnobInset` in; `"Round"`, a track `TrackHeight` tall with round ends, centered, in from each end by half of what the knob is taller (the knob's middle over the middle of either end at rest), a round knob `KnobSize` across over it, a soft `KnobShadow` under the knob (or false) and, under the pointer, the `Hover` color in a halo `HoverSpread` round it; no edge. The knob, the ends and the halo are the `Circle` texture unless their spec names art; each end is half the circle, cut on a whole pixel (an odd pixel left to the middle), so the round switch is on whole pixels too (`spec/next/controls/pixel_spec.lua`). |
-| `NextInput` | `input.lua` | A text field (an `EditBox`: its text `Padding` in, after an optional `icon` it draws and makes room for itself, help while empty and unfocused) and `CreateArea`, a text area (a multi-line edit box in a Blizzard scroll box with the scroll bar, the wheel taken only while focused, the cursor kept in sight; its box in `Controls.TextArea`'s `Fill`, `FocusFill`, `Edge` and `Frame`, each the input's when unset: the input's fill in pieces at its own thickness covered a strip of the box, not what takes its clicks). Only typed text is reported (`OnTextChanged`'s `userInput`); Enter reports and lets go of focus; Escape puts back the text it had when focused. |
-| `NextSlider` | `slider.lua` | A track filled up to a thumb, pressed or dragged with the left button, and a number box (`NextInput`); every value snapped to the step and kept in range; a change calls back once per value; the wheel is left to the page. |
-| `NextMenu` | `menu.lua` | One menu at a time, `FULLSCREEN_DIALOG`, below what opened it (`Gap`), a row per choice, the chosen one checked, scrolling past `MaxRows`; as wide as its widest choice needs, the list's `Padding` on both sides included (it was left out, and a menu opened from a 36-wide item cell read "Rem..."), at least its anchor. Closes on a pick, a click or the wheel outside it (a screen-sized catcher), Escape, a second open for the same frame, or that frame hiding. |
-| `NextDropdown` | `dropdown.lua` | The choice made and a chevron; a click opens a `NextMenu`, its choices read each time (`itemsFunction`, form-dropdowns.md); the choice already made calls nothing back. |
-| `NextSwatch` | `swatch.lua` | A square of its color. A click opens Blizzard's color picker (`ColorPickerFrame:SetupColorPickerAndShow`, loaded at login on every client); each color picked (`swatchFunc`, `opacityFunc`) calls back, and Cancel puts the color back and calls that back too, so what was saved follows (the classic item color pane left the saved color changed on Cancel). |
-| `NextTopTabs` | `toptabs.lua` | A page's tabs, left to right `Gap` apart, the chosen one in its font and underlined by a marker that glides (`Motion.Time.TabMarker`), over a line under them all that may reach past them (`Line.Outset`) and stop under the chosen tab (`Line.Open`: a tab sitting on a pane, the gap gliding with it). Tabs too wide for their row give up half their padding, then half their gaps, then cut their names short, the longest first (asked: they "run off if too long"), fitted again when the row's width changes. The chosen tab calls nothing back. |
-| `NextItemGrid` | `itemgrid.lua` | A scrolling grid of item icons (`Controls.ItemGrid`, in its own `Fill`, `Edge` and `Frame`, an input's fill and edge when it has none: Plain draws Blizzard's multi-line edit box's frame; drawing a fill in pieces on its plain texture painted it white, round three): as many columns as fit, only the cells of the rows in view made and placed (reused as it scrolls: thousands of items cost a screenful), each with the icon, a count above one, the quality on its edge (Uncommon and up; the plain edge for Common and Poor), faded (`DimAlpha`) for an item showing in another category; the item's tooltip (its link, else `SetItemByID`) with the entry's note and the grid's hint. With `onDrop`, an item dropped anywhere on it (a cell, the box, the frame) or clicked onto it goes there; a right click goes to `onRightClick`, a modified click to `HandleModifiedItemClick`. |
-| `NextDialog` | `dialog.lua` | In place of `StaticPopup`: a scrim over a window (taking its clicks) and a card with a title, wrapped text, an optional field, and buttons laid out from the right in the order given. A button gets the field's text and closes it unless it returns true; Enter is the last button, Escape or the window hiding the first. |
-
-**Escape, innermost first.** `PushEscape(frame)` names a frame in `UISpecialFrames` in place of the
-one under it (a menu over a dialog over the window); `ReleaseEscape(frame)`, from the frame's
-`OnHide`, gives Escape back to the frame under it on the next frame, if that one still shows.
-Blizzard's `CloseSpecialWindows` walks `UISpecialFrames` with `pairs` and hides frames as it goes
-(every client, `UIParentPanelManager.lua`), so the list must not change during a hide: changing a
-table `pairs` is walking is undefined. `SetPropagateKeyboardInput`, which would let a frame take
-Escape itself, is protected (`HasRestrictions`, SimpleFrameAPIDocumentation).
-
-**The bags' scroll bar.** `render/scrollbox.lua` takes `CreateBar(box, { AutoHide })`: a caller's
-bar, made once the box has its view and bound to it (`bar:Bind(box)`), in place of Blizzard's
-`MinimalScrollBar`; `sb.scrollBar` is the bar's frame (ConsolePort's `nodeignore` is set on it as
-before). Every Next panel's scroll box uses `NextScrollBar` with `AutoHide` (seen while the box
-scrolls or the pointer is over it, `Linger` seconds, `FadeIn`/`FadeOut`). The bar drives the box as
-`ScrollUtil` binds one (`OnScroll`, `OnSizeChanged`, `OnAllowScrollChanged`; dragging without
-interpolating, the track paging by the box's height, the wheel by its pan extent). The classic bags
-keep Blizzard's bar.
-
-**The bar sits above its box's content.** `NextScrollBar` is a child of its box, in the box's right edge
-over the content, so the content reaches under it (a list's rows, an item grid's buttons). The client gives
-the mouse to, and draws on top, the highest frame under the pointer, and the content hangs deeper (the box's
-scroll target, a list's content frame, the rows, what is in them) than the bar, one level above the box.
-**Failure mode (fixed, reported):** in a long category list, pressing on the thumb grabbed the row under it
-and dragged the row. `barProto:Raise` puts the bar one level above the deepest frame in its box, its own
-frames left out (or it would climb each time): when it is bound and each time it shows, never as it scrolls
-(a bag holds hundreds of buttons). Rows made while it shows sit as deep as the rows before them. A level
-that high only matters within the box's strata, next to the box's own frames, unlike a fixed jump, which
-could draw the bar over another window in that strata. Coverage: `spec/next/controls/scrollbar_spec.lua`
-("above its box's content": above every frame, again when it shows over rows made while hidden, no climbing)
-and `spec/next/settings/categories_spec.lua` ("keeps its scroll bar above its rows"); each part
-mutation-checked.
-
-**Mocks added from Blizzard's source** (`spec/helpers/wow_mocks.lua`): the scroll box's callback
-registry, extents, percentages, scrolling allowed and `OnScroll` (`ScrollBox.lua`,
-`ScrollController.lua`, `CallbackRegistry.lua`; `BaseScrollBoxEvents`,
-`ScrollControllerMixin.Directions`), `ColorPickerFrame` (`ColorPickerFrameMixin`; `_Pick`, `_Cancel`
-for specs), `SetMotionScriptsWhileDisabled`, `IsMouseWheelEnabled`, `IsAutoFocus`, `HighlightText`.
-
-Coverage: `spec/next/controls/*_spec.lua` (each control's look, states, callbacks and restyle;
-the Escape stack both ways round), `spec/render/scrollbox_spec.lua` ("with a bar of its own"),
-`spec/next/bag_spec.lua` (a panel's bar). Mutation-tested (42 mutations; the three that first
-survived led to two tests and to removing a redundant guard).
-
 ## 3. The window (`next/settings/`)
 
 | Module | File | What it is |
@@ -138,7 +85,7 @@ for the Categories page, as asked).
 - **Escape**: the window takes its place in the controls' Escape stack when it opens and gives it
   back when it hides; a menu or a dialog over it closes first, and both close with it.
 - **A page's own list** (asked: "animate away our main nav bar, and replace it with our category list
-  [...] with a back button on the top left"; the Categories page, §5). Choosing a page with a `sidebar`
+  [...] with a back button on the top left"; the Categories page, next-settings-categories.md §5). Choosing a page with a `sidebar`
   slides the pages (the brand, search box, page list and version, on `navPanel`) out to the left and
   the page's list in from the right (on `listPanel`), each fading as it leaves, over
   `Settings.Back.Slide` with the `Glide` ease, inside the sidebar, which clips them
@@ -209,10 +156,10 @@ same database calls, with the same effects, as the classic window did; every que
 | Group | Page (id) | What it shows |
 |---|---|---|
 | BetterBags | General (`general`) | *Bags:* BetterBags Next, Enable Bank Bags, Show Blizzard Bag Button, Clamp Bags to Screen (window.md §3a), Enable Bag Fading (classic), Animate Item Movement (classic). *Search:* In-Bag Search, Enter to Make Category. *Items:* Upgrade Icon Provider, New Item Duration, Category Sell and Deposit. *What's New:* Show What's New on Login. |
-| | Appearance (`appearance`) | Three tabs (asked: "make 'Theme' here a tab, and add a tab for 'Size'", docs/next-appearance-size.md; then an Animation tab). **Theme**: the theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext) while Next is in use; for the classic bags, their Bag Theme (Sonata), then Settings Window (SonataNext: Next's themes draw this window). **Size** (Next only): Icon Scale (`nextIconScale`) and Bag Scale (`nextBagScale`), 50% to 150% in steps of 5, each sending `next/ScalesChanged` (next.md §3, §14h). **Animation** (Next only): an Effects section of fifteen switches, Sparkles, Title Shimmer, Title Cloud, Title Ribbon, Braid, Moving Ornaments, Glitch Effects, Data Rain, Ice Shatter, Snow, Leaves and Stars, Smoke Puff, Bats, Transporter, Paper Folding and Stop Motion (`nextSparkles`, `nextShimmer`, `nextTitleCloud`, `nextTitleRibbon`, `nextBraid`, `nextOrnamentMotion`, `nextGlitch`, `nextRain`, `nextShatter`, `nextSnow`, `nextSmoke`, `nextBats`, `nextBeam`, `nextPaper`, `nextStopMotion`; Glitch Effects and Data Rain the Glitch theme's, next-themes.md §21, Ice Shatter and Snow, Leaves and Stars the Frost theme's, §22, the Halloween theme's leaves and the Make It So theme's stars falling through the same snow, Smoke Puff and Bats the Halloween theme's, §23, Transporter the Make It So theme's, §24, Paper Folding and Stop Motion the Papercraft theme's, §25), each turning its effect off on any theme and sending `next/AnimationChanged` (next-themes.md §20). The classic bags size themselves on each bag's page and have none of those effects, so with them Appearance has the Theme tab alone, and no tab strip. |
+| | Appearance (`appearance`) | Three tabs (asked: "make 'Theme' here a tab, and add a tab for 'Size'", docs/next-appearance-size.md; then an Animation tab). **Theme**: the theme pickers (`next/settings/themes.lua`, below): BetterBags Next's themes (SonataNext) while Next is in use; for the classic bags, their Bag Theme (Sonata), then Settings Window (SonataNext: Next's themes draw this window). **Size** (Next only): Icon Scale (`nextIconScale`) and Bag Scale (`nextBagScale`), 50% to 150% in steps of 5, each sending `next/ScalesChanged` (next.md §3, next-small-mode.md §14h). **Animation** (Next only): an Effects section of fifteen switches, Sparkles, Title Shimmer, Title Cloud, Title Ribbon, Braid, Moving Ornaments, Glitch Effects, Data Rain, Ice Shatter, Snow, Leaves and Stars, Smoke Puff, Bats, Transporter, Paper Folding and Stop Motion (`nextSparkles`, `nextShimmer`, `nextTitleCloud`, `nextTitleRibbon`, `nextBraid`, `nextOrnamentMotion`, `nextGlitch`, `nextRain`, `nextShatter`, `nextSnow`, `nextSmoke`, `nextBats`, `nextBeam`, `nextPaper`, `nextStopMotion`; Glitch Effects and Data Rain the Glitch theme's, next-themes-glitch.md §21, Ice Shatter and Snow, Leaves and Stars the Frost theme's, next-themes-frost.md §22, the Halloween theme's leaves and the Make It So theme's stars falling through the same snow, Smoke Puff and Bats the Halloween theme's, next-themes-halloween.md §23, Transporter the Make It So theme's, next-themes-makeitso.md §24, Paper Folding and Stop Motion the Papercraft theme's, next-themes-papercraft.md §25), each turning its effect off on any theme and sending `next/AnimationChanged` (next-themes-animation.md §20). The classic bags size themselves on each bag's page and have none of those effects, so with them Appearance has the Theme tab alone, and no tab strip. |
 | | Item Colors (`itemcolors`) | The four item level colors as swatches, named with their ranges (61% and 86% of the highest item level seen, as the classic pane); a picked color is saved and sent as `itemLevel/MaxChanged` (Cancel saves the color back too); the highest level seen; Reset Colors, Reset Max Item Level. |
 | | Currencies (`currencies`, Next only) | BetterBags Next's currencies (currency.md §6): *Tracked* (what is tracked, in order, dragged to move, each with Remove), *Currencies* (on clients with currencies: every currency with a switch that tracks it), *Items* (the shared items tab over the items tracked), *Display* (Backpack and Tracker; Tracker). |
-| Bags | Backpack, Bank, Guild Bank (`backpack`, `bank`, `guild`) | Each bound to its bag. *Layout:* Order (Section, Item), Sections (Next only: Section Columns, Compact Sections (next.md §7b), Fill Order, Wide Sections Span Columns, Wide Column Limit, next.md §7a), Tabs (Enable Groups: the backpack only; the bank's Tabs section is left out), Slots (All Free Space, Gaps). *Items:* Item Level (two), Quality (Glow Intensity), Stacking (seven). *Categories:* Automatic (the seven filters). *Order:* the order of its categories (§5). The guild bank's page shows on a client with one (`addon.hasGuildBank`). |
+| Bags | Backpack, Bank, Guild Bank (`backpack`, `bank`, `guild`) | Each bound to its bag. *Layout:* Order (Section, Item), Sections (Next only: Section Columns, Compact Sections (next-columns.md §7b), Fill Order, Wide Sections Span Columns, Wide Column Limit, next-columns.md §7a), Tabs (Enable Groups: the backpack only; the bank's Tabs section is left out), Slots (All Free Space, Gaps). *Items:* Item Level (two), Quality (Glow Intensity), Stacking (seven). *Categories:* Automatic (the seven filters). *Order:* the order of its categories (next-settings-categories.md §5). The guild bank's page shows on a client with one (`addon.hasGuildBank`). |
 | Profiles | Profiles (`profiles`) | Tab *Profiles:* the active profile (a pick asks, then switches and reloads), the characters on each, New, Copy, Rename, Delete, Reset to Defaults (the classic flows: Copy creates then copies; Delete switches to Default first; Default cannot be renamed or deleted; a name is asked again while empty). Tab *Import / Export* (`transfer`): Export Categories fills a text area and selects it; Import Categories asks, imports (`DB:ImportSettings`), clears the area and offers a reload, or says what is wrong. |
 | Integrations | QuickFind (`quickfind`) | What the integration does. |
 | | a plugin (`plugin:<title>`) | Below. |
@@ -275,191 +222,6 @@ left it again when showing the first page (seen as the theme pickers restoring a
 long gone; `spec/next/settings/window_spec.lua`, "forgets the page of a window from an earlier
 session").
 
-## 5. Categories: the Categories page and each bag's arrangement
-
-Asked (2026-10-20): categories get a dedicated space, as currency did; defined once, applied to bags;
-item and search categories combined, each able to hold both. Then (2026-10-21), after the first version
-crowded a list and an editor into one box (a cut-off button, a scrolling page, unclear "Placed Here",
-icons over text, no room to drop onto a long list): the list moves to the sidebar, the category gets
-the whole content area in three tabs, and the window grew to 720. A fourth, Automation, came with
-category automation (2026-10-22, automation.md). The data model is
-category-lifecycle.md §6. Every question is a `NextDialog` over the window.
-
-**The Categories page** (`next/settings/categories.lua`, `NextSettingsCategories`; page `categories`,
-BetterBags group after Item Colors, both designs). It is a page with its own list (§3): its sidebar is
-`CreateList`, its heading `Heading()`, its buttons `CreateActions`, and its tabs one wide block each,
-their section titles hidden, each filling the content without scrolling (`ContentHeight` less the
-page's `Content.Top` and `Bottom`).
-- **The list** (in the sidebar): a filter box where the settings search box is; every category, yours
-  and the plugins', in their order, which is their priority (category-lifecycle.md §7), a group by's
-  sub-categories left out; each row a color dot, the name and how many of the shown bags' items it
-  holds, "N items matching" ("1 item matching"; asked: "just have the subtext to categories say 'x
-  items matching'"). The count is the Settings tab's Current Items in this Group: each item once, its
-  group by's sections with it, in the bags the settings show (`matchingCounts`, one pass over the
-  items, each counted for its category and every name its category is a section of: `isShownIn`'s
-  rule). It is counted again on `items/Refresh<Kind>/Done` (every bag) while the list shows. New
-  Category at the bottom where the version is (`{ name, itemList = {}, save = true }`, chosen, on top).
-  Dragging a row moves its category (`listProto:Drop` → `categories:MoveCategory`): after the row above
-  where it is let go, or right before the first row shown when let go above them; the categories a
-  filter hides keep their places. The rows are arranged and dragged by `NextListReorder` (below). No
-  tooltip (asked: no help text yet). The first category is chosen when
-  none is (`EnsureChosen`); clicking one chooses it (`Choose`, then `Reselect`). On `categories/Changed` while
-  it shows, the page shows again, the first chosen for one that is gone.
-- **The header**: the chosen category's name, and its line (a plugin's starts "Made by a plugin");
-  "Categories" and "Make a category to sort your items your way." for none. Rename and Delete for your
-  categories; for a plugin's or none they hide and the buttons' frame shrinks so the title takes the
-  room.
-- **The two item boxes stay put** (asked: boxes a few pixels apart made switching tabs messy): the
-  Settings and Search Rule tabs put their box's name row and their box at the same place
-  (`boxRows`: under three rows of settings, a row for the name, the box down to the tab's bottom).
-- **Settings tab**: four rows, Used In (a switch per bag the settings show, the guild bank like any),
-  Hide In (a switch per bag, off where it is not used, asking in a `NextDialog` before hiding; turning it off asks nothing;
-  category-lifecycle.md §10), Group By (yours only; the row stays empty for a plugin's), Color (and
-  Reset Color: none, drawn in gold); then **Current Items in this Group** (the player's wording): how
-  many items each bag shows in it (its group by's sections too) and those items in a read-only grid,
-  one cell per item with how many there are, by name, or "There are no current items in your
-  inventory that match this category". With no category it says to make one.
-- **Search Rule tab** (asked: "Search Rule" everywhere; yours, and a plugin's that has a rule): the
-  search in a field taking the room down to the **Search Results** row, which counts them beside its
-  name as it is typed ("Search Results (3 results)", "(invalid search)" for a mistake, caught from
-  `Search:Search` in a protected call; asked: no line about an empty rule), with Apply Search Rule on
-  its right, on only when the rule changed and has no mistake (it saves it, none for an empty one).
-  The results are a grid in full color (asked), those showing in this category first; the tooltip of
-  one showing elsewhere says "Shows in X." What is typed is kept while the same category shows. A
-  plugin's rule shows read-only (the field disabled, no Apply Search Rule).
-- **Added Items tab** (asked: "Placed Here" made no sense; its line "Drag an item here to manually add
-  it to this category."): how many items were added (or "3 of 12"
-  while filtered), a filter by name, Remove All (asks first; `WipeCategory`, then the bags
-  recalculated), and the items in a `NextItemGrid` that holds thousands: icons at once
-  (`GetItemInfoInstant`), names and qualities from `C_Item.GetItemNameByID` / `GetItemQualityByID`, the
-  names not loaded yet asked for once per category (`ContinuableContainer`) and the list shown again
-  when they arrive; by name, those not known yet last. An item in your bags that shows in another
-  category is faded, "Shows in X instead." An item dropped anywhere on the grid is added
-  (`AddPermanentItemToCategory`, `ClearCursor`, the bags recalculated; asked: the items themselves
-  are drop targets); a right click offers Remove. A plugin's items show read-only (no drop, no remove,
-  no Remove All). An added item the category ignores is faded, "Ignored in this category."
-- **Ignored Items tab** (asked: "a new tab next to 'Added Items' called 'Ignored Items', same
-  interface/layout as Added Items"; category-lifecycle.md §8): the Added Items tab itself
-  (`CreateItemsTab(parent, owner, bags, "ignored")`), the same count ("1 ignored item"), filter, Remove
-  All (`ClearIgnoredItems`), names loading and grid, its line "Drag an item here so it never shows in this
-  category." and "No items ignored."; a drop ignores the item (`IgnoreItem`), a right click stops
-  ignoring it (`UnignoreItem`), the bags recalculated each time. Editable for a plugin's category too:
-  what it ignores is the player's choice. An ignored item in your bags says where it shows ("Shows in
-  X."), not faded.
-- **One items tab** (`NextSettingsItemsTab`, `next/settings/itemstab.lua`): Added Items and Ignored Items are two
-  sources of the shared items tab (`CreateItemsTab` makes it with the chosen category's lists), which the Currencies
-  page's Items tab uses too (currency.md §6). What differs between them is the source's (`NextItemsSource`: the list,
-  read-only, help, words, notes, add, remove, clear, Remove All's question); the tab's look, its filter, names loading,
-  drops, right click and Remove All are one. The page's tabs share its frame helpers (`TabHeight`, `Metrics`,
-  `PlaceTab`).
-- **Automation tab** (automation.md §5): a section ("Merchants") of three settings rows, drawn as every
-  page's settings (not controls of its own): Auto Sell, Confirm Auto Sell (on by default) and Destroy
-  What Can't Be Sold, the last two disabled while Auto Sell is off, saved at once
-  (`NextSettingsCategories:AutomationOptions`). Shown while a category is chosen, a plugin's too. The
-  heading's line ends "Sells at merchants" or "Sells, destroys the rest".
-- `NextSettingsCategories:Show(name)` chooses a category for the next time the page shows (a bag's tab
-  links here); `NewFromSearch(query)` makes the list ask for a new category's name with the search as
-  its rule (the search box's Enter to Make Category, through `config/NewCategoryFromSearch`, which
-  Config handles by opening the page). Both are used once.
-
-**A bag's Categories tab** is Automatic (the built-in filters). **Its Order tab** (asked: "move that to a new tab next to
-categories, called 'Order', and make that the whole tab") is its categories' order and nothing else
-(`next/settings/bagcategories.lua`, `NextSettingsBagCategories`, `Create(parent, window, bag)`): a filter box; "Pinned" in their
-order (`customSectionSort[kind]`), then "Other Categories" by name: the categories defined and the bag's sections from its
-committed items (not empty slots, Recent Items, Free Space, or Show Bags' bags).
-- **No scroll box within a tab** (asked: "no scrollbox within tabs, just make the whole list scroll the tab content itself"). The
-  list is as tall as its filter and every row (`Measure`) and the tab's own content scrolls it, filter included. When a filter, a read
-  or a category changes its height it asks the page to lay out again (`NextSettings:Relayout`, which reads no value: `Refresh` runs
-  from the page's own). Its drag scrolls the window's box, and `NextListReorder` reads where a list is from its `content` on the
-  screen, so a list can stand anywhere in what its box scrolls. Since the window's box resets on every page shown, Back scrolls back
-  to where the page was left (`returnTo.scroll`). Not yet the same: the Categories page's item grids and the Currencies page's list,
-  which fill their tab and scroll inside it (`itemsTab:TabHeight`).
-- **Whether a bag uses a category is set on the Categories page alone** (asked: "no duplicate controls here"; the switch that was
-  here is gone). A defined category not used in this bag says so ("Not used in this bag"), as its order has no effect there; its
-  name opens it on the Categories page (`Show`, then `NextSettings:Open("categories")`), and Back returns to the bag's tab.
-- A group by's sub-category says whose it is ("Grouped by Potions") and opens that one.
-- A built-in section says "Automatic"; a pinned name that is neither (a leftover) has Remove
-  (category-lifecycle.md §4).
-- Shift-click pins at the top or unpins; dragging a row drops it after the entry above the pointer's
-  half of a row (above the "Other Categories" heading pinned there, below it unpinned; never above the
-  "Pinned" heading, `first = 2`). The order is saved from 1 (the pins a filter hides keep their order
-  after the ones it shows) and the bags recalculated (`bags/Rederive { resetLayout, buttons }`). Read
-  again on the bag's `items/Refresh<Kind>/Done` and on `categories/Changed` while it shows.
-
-**Dragging a row** (`NextListReorder`, `next/settings/reorder.lua`), shared by both lists (and the Currencies page's
-Tracked list, currency.md §6). Asked:
-"instead of a line on drag, let's animate the move like we do categories (again, re-inventing drag
-handling, we do this amazingly in the bags today, look how it's done, be careful)". The first version
-drew a gold line where the row would land, a drag of its own; now a row moves exactly as a bag's
-section does (next.md §7), through the same code:
-- **Each entry has its own row** (`rowOf`: the Categories page keys them by name, the bag's tab by name
-  and a heading by a key of its own, so a category named like a heading still has its own). Rows of
-  entries no longer listed (a filter, a delete) hide and wait to be reused. So when a category moves in
-  the order, its own row slides there.
-- **Arranging** (`Arrange(width)`): the rows one under another, each as wide as the list (Motion anchors
-  only a frame's top left), placed through Motion in a pass of the list (`BeginPass(list,
-  Time.Interaction)`), as the canvas places sections: while the list shows, a row whose place changed
-  slides there (0.24 s, the bags' interaction time); a row newly shown, and everything while the list is
-  hidden, is put there at once. The content is as tall as the rows. Both lists call it after every
-  layout, and when they are placed (a new width).
-- **Picking up** (the row's `OnDragStart`): the row is lifted with `NextLift` (`next/lift.lua`, moved out
-  of NextDrag so both drags are one): onto the drag layer where it was on screen, a cover over it, the
-  theme's shadow under it, shrinking to `Drag.LiftScale` around the point grabbed over `Time.Lift`,
-  following the cursor. The list keeps a room the row's height where it was. One drag at a time, and
-  none while NextLift holds another frame (a section waiting in the vendor's dock).
-- **Making room**: every frame the room goes before the first other row whose middle is below the cursor
-  (counting what the list is scrolled), never before `first`, and the rows slide out of its way. Near the
-  list's top or bottom (40 pixels) the list scrolls toward the edge, faster closer (`NextLift:AutoScroll`,
-  the bags' auto-scroll).
-- **Letting go** (the left button found up): the row lands into its room over `Time.Land`, back to full
-  size, aiming at the room every frame (`NextLift:Land`), then goes back in the list there. Its owner is
-  told what it lands after, counted with the row itself (`onDrop(name, after)`, 0 before the first:
-  the owners' `Drop` contract), unless it landed where it was. An owner that draws the list again (the
-  bag's tab, and the Categories page through `categories/Changed`) shows the new order; otherwise the
-  list reorders its entries itself, so nothing slides back.
-- **Ending early**: the list hiding mid-drag, or the dragged entry leaving the list, puts the row
-  straight back in its place.
-- No hardware event is needed (nothing protected runs), so letting go is read from the mouse button
-  each frame, as the bags read a missed release.
-- Mutation-tested with the shared lift and NextDrag on it: 74 mutations. Twelve first survived: ten led
-  to tests (a frame with its own strata, the level it is put back at, a second drag, the half-row rule,
-  following the cursor, ignoring the cursor while landing, a scrolled landing, reusing rows put away,
-  the Pinned heading staying on top, NextDrag's landing aiming at its gap), one was a redundant tween stop
-  in NextDrag's Cancel (removed: putting the frame back stops it), and one cannot be told apart with the
-  mocks (NextDrag finishing a section's flight into the dock before it leaves the dock: the mock frames'
-  screen rectangles do not follow their anchors). That last one is NextDrag's behavior from before,
-  unchanged.
-
-Coverage: `spec/next/settings/categories_spec.lua` (the list: order, place, filter, choosing,
-a category chosen elsewhere, New Category, a search waiting, changes; "N items matching" as the Settings
-tab counts, in the bags shown, counted again when a bag is read while it shows; a drag lifting a row,
-the others making room, landing it and moving its category; each category's own row, its width, rows put
-away; the heading and which tabs show;
-Rename and Delete; the Settings tab: its height, none, fields, saving, a plugin's, what the bags show
-and reading them again; the Search Rule tab: its names, the count as typed, the results in full color,
-the box where the Settings tab's is, Apply Search Rule, typed text kept, a plugin's; the Added Items
-tab: order, icons, faded items, the filter, names loading once, drops, removing, Remove All, a plugin's,
-its line, an ignored item; the Ignored Items tab: its count, line, filter, drops (a plugin's too),
-removing, Remove All), `spec/next/controls/itemgrid_spec.lua` (columns, only the rows in view, scrolling to the
-end, empty text, cells, tooltips, clicks, drops, the theme), `spec/next/settings/window_spec.lua` ("a
-page with its own list": sliding, Back, opening on it, the first Escape, closing and reopening on it, a
-fade-out, heading and buttons, tabs shown, tabs read after the list, Reselect, a search, nothing while
-closed), `spec/next/settings/bagcategories_spec.lua` (and its drag: lifted, room made, pinned where
-it lands, never above the Pinned heading; its own rows, a category named like a heading),
-`spec/next/settings/reorder_spec.lua` (arranging: places, widths, height, at once while hidden, sliding
-while shown in the interaction time; dragging: the lift, the room under the cursor, `first`, scrolled,
-no place on screen, auto-scroll, one drag at a time; letting go: landing aimed at the room, what it lands
-after, before every other, the order shown by the list or its owner, nothing for no move; ending when the
-list hides or the entry goes), `spec/next/lift_spec.lua` (the shared lift), `spec/next/settings/content_spec.lua` (the page's
-list, heading, buttons and three tabs, the bags shown), `spec/integration/next_settings_spec.lua`
-(every tab built on the whole addon; the list in the sidebar and the first Escape on the real window),
-`spec/next/controls/input_spec.lua` (`commitOnBlur`, a disabled text area),
-`spec/next/controls/dropdown_spec.lua` (a menu's whole text from a narrow anchor), `spec/frames/search_spec.lua`
-and `spec/config/config_spec.lua` (Enter to Make Category). Mutation-tested: the window's list mode and
-the grid (37 mutations; the three survivors led to two tests and dead code removed), the tabs (50; the
-survivors led to three tests and two dead guards removed), the controls and the recorder (10; one
-equivalent).
-
 ## 6. The themes
 
 Default carries every `Settings` and `Controls` value (next-themes.md §3), from palette colors, so a
@@ -515,7 +277,7 @@ gone), it shows only what the bags in use read, and nothing the classic window h
     Appearance: Bag Theme (Sonata) and Settings Window (SonataNext: Next's themes draw this window);
     Currency (§8).
   - **Next only:** the Guild Bank page (the classic bags have no guild bank); Appearance: Theme
-    (SonataNext), the Size tab (Icon Scale, Bag Scale) and the Animation tab (next-themes.md §20); the Currencies page
+    (SonataNext), the Size tab (Icon Scale, Bag Scale) and the Animation tab (next-themes-animation.md §20); the Currencies page
     (currency.md §6: the classic bags keep their Currency page). The classic themes' picker (item buttons) is not shown
     in Next (asked).
   - Everything else, both.

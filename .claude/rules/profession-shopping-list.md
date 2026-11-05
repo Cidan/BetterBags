@@ -1,3 +1,8 @@
+---
+paths:
+  - "integrations/professionshoppinglist.lua"
+  - "spec/integrations/professionshoppinglist_spec.lua"
+---
 # Profession Shopping List at the BetterBags Next Vendor
 
 Profession Shopping List (PSL, Slackluster's addon, github.com/Slackluster/ProfessionShoppingList)
@@ -19,7 +24,7 @@ Read from PSL v12.1.5-02, the first release with what BetterBags calls (`API.lua
   missing, in stacks of `GetMerchantItemMaxStack` (`BuyMerchantItem(index, n)`). It calls `app:ShowWindow()`, which
   opens PSL's tracking window. It runs only while `app.Flag.MerchantOpen` (`ad84d0f`: it checked
   `MerchantFrame:IsVisible()` before, false under BetterBags Next, which keeps Blizzard's merchant frame shown under
-  a hidden parent, next.md §10a).
+  a hidden parent, next-vendor.md §10a).
 - `ProfessionShoppingList:GetMerchantShoppingList()`: written for this integration, as there was no API to read the
   list (the reagent quantities live in PSL's private `app.ReagentQuantities`, rebuilt by `app:UpdateRecipes()`).
   Contributed as `GetShoppingList` (PSL #414, `2bc99ce`) and renamed by PSL's author (`5a88d7a`) before either
@@ -70,7 +75,7 @@ showing at the vendor, until this file followed it. When PSL's section stops sho
   column, it reads as one more category of the shop (after a right click, or what a purchase left; asked
   to keep: "that's SLICK").
 - **The card** (`OfferShoppingList`, `ShoppingListOffer`): the section docks in the vendor's own dock
-  (`NextDock`, next.md §7, the dock sales and destroys wait in; source: the vendor) once a visit
+  (`NextDock`, next-drag.md §7, the dock sales and destroys wait in; source: the vendor) once a visit
   (`listOffered`, cleared on `MERCHANT_SHOW`), from the draw that first binds it, **between binding and
   the layout**: a section never placed has no place on screen (`NextLift:ScreenPoint` is nil), so the
   dock seats it in its card at once, and the vendor opens with the card already there. **Failure mode
@@ -168,4 +173,4 @@ checked before).
   purchase). Capture a vendor visit with the profiler (`NextVendorPanel.Draw`) before changing it.
 - **Behaviors that are PSL's:** `BuyFromMerchant` opens PSL's tracking window, and buys with
   `BuyMerchantItem` directly, without Blizzard's confirmations for extended costs and non-refundable
-  items (next.md §10d); BetterBags' own purchases go through them.
+  items (next-vendor.md §10d); BetterBags' own purchases go through them.

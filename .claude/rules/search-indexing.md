@@ -1,3 +1,10 @@
+---
+paths:
+  - "data/search.lua"
+  - "util/query.lua"
+  - "spec/search_spec.lua"
+  - "spec/query_spec.lua"
+---
 # Search Indexing Rules
 
 This document defines the architecture, design guidelines, and API contracts for search indexing within BetterBags.

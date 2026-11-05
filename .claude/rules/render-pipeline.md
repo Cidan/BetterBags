@@ -1,3 +1,10 @@
+---
+paths:
+  - "render/{drawable,flow,motion,render,scrollbox}.lua"
+  - "frames/grid.lua"
+  - "frames/section.lua"
+  - "spec/render/{render,flow,motion,motion_layout,scrollbox}_spec.lua"
+---
 # The Render Pipeline (`render/`)
 
 Every BetterBags window lays itself out through one staged render pipeline, ported from the
@@ -195,7 +202,7 @@ slow. It is an option, off by default (asked).
   targets) and places at once; on, the first render after places at once and the ones after move.
   Specs that render a canvas with a stubbed database stub it off.
 
-- **The settings lists use it too.** `NextListReorder` (next-settings.md §5) places a settings list's rows
+- **The settings lists use it too.** `NextListReorder` (next-settings-categories.md §5) places a settings list's rows
   through Motion in passes of the list, in the interaction time, so a category moved in the order (or a
   dragged row's room moving) slides its rows as a bag's sections slide.
 - **One function places the bag's frames.** `Motion:Place(frame, relativeTo, x, y)` anchors a
@@ -256,7 +263,7 @@ slow. It is an option, off by default (asked).
   new move from where it is, keeping its speed (no stop before turning). A frame re-placed with the
   same target keeps its move. A move closer than half a pixel is placed at once.
 - **A stop motion.** `BeginPass(root, duration?, stepping?)`: under `stepping` (`{ FPS, Wobble }`, a Next theme's
-  `Motion.StopMotion`, next-themes.md §25) a pass's moves hold each pose for a whole frame, up to `Wobble` units off their
+  `Motion.StopMotion`, next-themes-papercraft.md §25) a pass's moves hold each pose for a whole frame, up to `Wobble` units off their
   line (`motion.Random`), and still end exactly where they go. The classic bags' canvas passes none.
 - **A pass's own duration.** `BeginPass(root, duration?)`: the moves a pass starts take its duration
   (each move keeps its own), else 0.3 s. BetterBags Next's canvas passes its interaction time,
@@ -290,7 +297,7 @@ slow. It is an option, off by default (asked).
   once (a sort of a large bank); capture one.
 - **A size snapping** (`motion.SnapSizeAt(from, to, overshoot, p)`, `motion.SnapOvershoot(from, to, floor)`): the
   bounce a window snapping to its content (window.md §3b) and a BetterBags Next small panel snapping to its columns
-  (next.md §14g) both size with. It eases out (cubic) to `overshoot` past `to` in 65% of the way, then settles back
+  (next-small-mode.md §14g) both size with. It eases out (cubic) to `overshoot` past `to` in 65% of the way, then settles back
   (smoothstep); the overshoot is a tenth of the distance, at most 10, never below `floor`, none for a size that grows.
   Each caller drives its own time (the window 0.35 s, Next its theme's `Time.Snap`). It was the window's own
   (`window.SnapSizeAt`); it moved here when Next's panels took the same snap. Coverage: `spec/render/motion_spec.lua`

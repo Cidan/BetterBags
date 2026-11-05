@@ -1,3 +1,11 @@
+---
+paths:
+  - "frames/item.lua"
+  - "frames/itemrow.lua"
+  - "spec/frames/item_spec.lua"
+  - "spec/frames/item_classic_spec.lua"
+  - "spec/itemrow_spec.lua"
+---
 # Pure Presentation Item Button Drawing Rules
 
 This document defines the architectural guidelines, design decisions, and API contracts for item button drawing in BetterBags.

@@ -1,3 +1,14 @@
+---
+paths:
+  - "data/changelog.lua"
+  - "data/changelogdata.lua"
+  - "frames/changelog.lua"
+  - "tools/changelog/**"
+  - ".github/workflows/release*"
+  - "spec/changelog_spec.lua"
+  - "spec/frames/changelog_spec.lua"
+  - "spec/tools/changelog_data_spec.lua"
+---
 # The In-Game Changelog
 
 On login, BetterBags shows players what changed: a window listing the notes of every build they

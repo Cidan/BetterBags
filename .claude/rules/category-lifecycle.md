@@ -1,3 +1,14 @@
+---
+paths:
+  - "data/categories.lua"
+  - "core/database.lua"
+  - "next/settings/categories.lua"
+  - "next/settings/bagcategories.lua"
+  - "spec/categories_spec.lua"
+  - "spec/database_migration_spec.lua"
+  - "spec/next/settings/categories_spec.lua"
+  - "spec/next/settings/bagcategories_spec.lua"
+---
 # Custom Category Lifecycle & Orphan Prevention
 
 This document defines the invariants for creating, renaming, and **deleting** BetterBags
@@ -37,7 +48,7 @@ and `customCategoryIndex`, leaving `customSectionSort`, `categoryOptions` and `c
 behind (and `collapsedSections`, from section collapsing, since removed; `DB:Migrate` drops it).
 
 **Failure mode (the "undeletable dynamic category" bug):** the classic settings window's Categories
-pane (since replaced by the category manager, next-settings.md §5, which lists what is pinned the same
+pane (since replaced by the category manager, next-settings-categories.md §5, which lists what is pinned the same
 way and keeps the Remove Category escape hatch of §4) — its
 `categoryPaneProto:LoadPinnedItems` (`config/categorypane.lua`, removed) — inserted **every**
 `customSectionSort[kind]` entry into the list with no existence check. A deleted-but-still-pinned
@@ -72,7 +83,7 @@ profile across a load, built-in ones included", on the real profile in `test.lua
 
 ## 4. UI escape hatch for any unfindable category
 
-A bag's Order tab (`next/settings/bagcategories.lua`, next-settings.md §5; before it the
+A bag's Order tab (`next/settings/bagcategories.lua`, next-settings-categories.md §5; before it the
 category manager's and the classic pane's `ShowDynamicCategoryDetail`) marks a pinned name that is
 neither a category (`GetCategoryByName == nil`) nor one of the bag's sections now as a leftover,
 with a **Remove** link that calls `categories:DeleteCategory` on it after asking: the delete scrub
@@ -161,7 +172,7 @@ item in its sub-category for the item (`items:GroupedCategory`), made as for rul
 (`items:ensureSubcategory`: the same bags, color and priority).
 
 **Where it is edited**: the Categories page defines categories and which bags use them; each bag's Order tab orders
-them (next-settings.md §5). The search box's Enter to Make Category opens the Categories page with
+them (next-settings-categories.md §5). The search box's Enter to Make Category opens the Categories page with
 the search as the new category's rule (the old search category dialog, whose Save wrote the
 category whole and dropped its hand-placed items, was removed).
 
@@ -183,7 +194,7 @@ stays where it was put. No help text yet (a help system is planned).
 
 - **The order** (`categories:GetOrder()`): every category but a group by's sections, by `priority`
   (10 when unset), then by name ignoring case. Higher in the list wins an item that fits more than one
-  category. The Categories page's list shows it (next-settings.md §5) and the rules are tried in it
+  category. The Categories page's list shows it (next-settings-categories.md §5) and the rules are tried in it
   (`GetSortedSearchCategories`, same comparison), so the bags, the vendor and the list agree. Ties used
   to be decided by an unstable sort over a hash table.
 - **The number stays underneath, never shown.** Rule matching, the vendor, an item's home among your
@@ -242,7 +253,7 @@ circumstance, no matter if it's added in Added Items, or in a Search Filter." do
   - a rule: `items:RefreshSearchCache` skips a rule for an item its category ignores, so the next rule
     by priority takes it, else its own category; a group by's sections included (they are their
     category's rule).
-- The tab: next-settings.md §5. Coverage: `spec/categories_spec.lua` ("Ignored Items"),
+- The tab: next-settings-categories.md §5. Coverage: `spec/categories_spec.lua` ("Ignored Items"),
   `spec/database_spec.lua`, `spec/refresh_pipeline_spec.lua` ("Ignored Items (search rules)"),
   `spec/next/settings/categories_spec.lua` ("the Ignored Items tab"), `spec/next/settings/content_spec.lua`,
   `spec/integration/next_settings_spec.lua`.
@@ -308,7 +319,7 @@ In, asking first, and the bag's footer saying how many items are hidden.
 - **The footer:** BetterBags Next's free slots line ends " · N hidden" (`panelProto:Draw`, for the tab shown); the classic
   bags write "N hidden" on the footer bar, left of the money (`bagProto:ShowHiddenCount`). **Known limit:** on the classic
   backpack in a narrow window, with many currency icons, it can run over them: the bar has no room rule.
-- **The switch:** a row of the Settings tab, "Hide In", next-settings.md §5.
+- **The switch:** a row of the Settings tab, "Hide In", next-settings-categories.md §5.
 - **Coverage:** `spec/categories_spec.lua`, `spec/database_spec.lua`, `spec/refresh_pipeline_spec.lua` ("hiding a category in
   a bag"), `spec/next/bag_spec.lua`, `spec/frames/bag_draw_ownership_spec.lua`, `spec/next/settings/categories_spec.lua`
   ("hiding it in a bag").

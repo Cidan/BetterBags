@@ -1,3 +1,13 @@
+---
+paths:
+  - "data/refresh.lua"
+  - "spec/refresh_spec.lua"
+  - "spec/refresh_pipeline_spec.lua"
+  - "spec/targeted_sweep_spec.lua"
+  - "spec/core/interaction_refresh_spec.lua"
+  - "spec/integration/bank_open_spec.lua"
+  - "spec/integration/empty_slot_spec.lua"
+---
 # Serialized Refresh Scheduler
 
 This document defines the architecture, rationale, and API contracts for how BetterBags
@@ -772,10 +782,10 @@ when asked again a second later) and drawing about 180 ms.
 - **Failure mode (fixed, reported in game):** "not everything is in it's right spot on the layout as expected in the bank when
   it's opened, but if we change options, it 'fixes' itself". Only the first read rebuilt the layout, so with "Preserve Empty Slots
   as Gaps" (on by default) every later tab's items stayed at the end of their sections until something next reset the layout, and
-  BetterBags Next's section columns held each section at the width the tabs read when it first showed asked for (next.md §7a): a
+  BetterBags Next's section columns held each section at the width the tabs read when it first showed asked for (next-columns.md §7a): a
   section of 21 guild bank items, one of them in the first tab, stayed 194 wide where it should span 394.
 - **A sort that moved nothing** (§6) has no read, so `_SettleSort` sends `bags/SortSettled` (the kind): BetterBags Next's columns let
-  go of the widths they held (next.md §7a).
+  go of the widths they held (next-columns.md §7a).
 - **Left as it is, and why** (from the adversarial review; each proven in a spec, none seen in game):
   - **A gap the player makes while tabs are arriving collapses** when the next tab lands, or a bank tab's late data does (after
     its 2 s timeout). Everything in the bank moves as tabs arrive anyway, by the choice above, and a gap cannot hold its place in a

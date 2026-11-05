@@ -1,3 +1,14 @@
+---
+paths:
+  - "frames/bag.lua"
+  - "frames/bagcanvas.lua"
+  - "frames/grid.lua"
+  - "views/*.lua"
+  - "spec/frames/bag_draw_ownership_spec.lua"
+  - "spec/frames/bagcanvas_spec.lua"
+  - "spec/frames/grid_spec.lua"
+  - "spec/views/*_spec.lua"
+---
 # Layout Rendering and the Bag's Scroll Box
 
 This document defines the architecture, design guidelines, and API contracts for layout rendering, tab containers, and global scrolling components within BetterBags.

@@ -1,3 +1,12 @@
+---
+paths:
+  - "data/currencies.lua"
+  - "next/currency*.lua"
+  - "next/settings/currencies.lua"
+  - "spec/currencies_spec.lua"
+  - "spec/next/currency_spec.lua"
+  - "spec/next/settings/currencies_spec.lua"
+---
 # BetterBags Next's Currencies (`data/currencies.lua`, `next/currency*.lua`, the Currencies page)
 
 BetterBags Next's backpack shows the currencies and items the player keeps an eye on at the bottom of its footer, where
@@ -108,7 +117,7 @@ tracker's list its name. Drawn from the theme's `Currency` (§7), on whole pixel
 ## 5. The tracker (`NextCurrencyTracker`, `next/currencytracker.lua`)
 
 - **A copy of the whole strip**: one at a time; dragging the strip again picks the one out up (it flies from where it is
-  to the cursor). It is made with the backpack, in BetterBags Next's event scope (next.md §11).
+  to the cursor). It is made with the backpack, in BetterBags Next's event scope (next-bagsystem.md §11).
 - **Popping out**: it shows what is tracked now (drawn as it pops: it may have been made after the currencies were
   read), laid out where the strip is and as big, and pops out of it under the cursor, a little past its size held
   (`tracker.POP`) and back over `Time.CurrencyPop`, sparkles bursting (`Sparkles.Pop`), lifted with the shared lift
@@ -131,7 +140,7 @@ tracker's list its name. Drawn from the theme's `Currency` (§7), on whole pixel
 - **Shown** while it is out, BetterBags Next is in use (`SetActive`, from the backpack's `Deactivate`/`Activate`),
   something shows in it, no pet battle, and not in combat with Hide Tracker in Combat; it fades in and out.
 - **Its layout** (§6): a row, a column, or a list with names (`ListWidth` wide); entries `RowGap` apart in a column or
-  list, the card `Pad` round them, its `Fill`, `Edge` and `Frame` (Blizzard's nine-slice art, next-themes.md §15); with
+  list, the card `Pad` round them, its `Fill`, `Edge` and `Frame` (Blizzard's nine-slice art, next-themes-art.md §15); with
   the background off, the card shows faintly only under the pointer, to grab it by (the pointer coming onto the card or
   straight onto one of its entries, `EntryHovered`), and while it does, the pointer is watched every frame and the card
   fades once the pointer is off the tracker. At its scale. Gains play on it as on the strip.
@@ -190,7 +199,7 @@ classic bags keep their Currency page, next-settings.md §7, §8). Four tabs:
   items together, in the order the strip and tracker show them. Drawn as a bag's categories list is (its
   `Settings.BagCategories` theme keys; the icon at `Settings.Currency.IconSize`): each row its icon (desaturated with
   none), its name (`Item N` until the client has the item), how many (of a currency's most) and Remove (stops tracking
-  it). Dragging a row moves it (`NextListReorder`, the drag every settings list shares, next-settings.md §5; landing calls
+  it). Dragging a row moves it (`NextListReorder`, the drag every settings list shares, next-settings-categories.md §5; landing calls
   `Currencies:Move`). It follows `currencies/Changed` and `currencies/Updated` while it shows. "Nothing tracked yet."
 - **Currencies** (on clients with currencies): every currency under its headings with a switch that tracks it, the
   classic Currency page's block (`NextSettingsCurrency`) made with `track` (§2's `List`, by currency ID, nothing written

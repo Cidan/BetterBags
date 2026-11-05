@@ -1,3 +1,8 @@
+---
+paths:
+  - "data/seller.lua"
+  - "spec/seller_spec.lua"
+---
 # The Seller (`data/seller.lua`): every sale, one item at a time
 
 Every item BetterBags sells to a merchant goes through one module, `Seller`, at one pace. Callers:

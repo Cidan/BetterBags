@@ -1,3 +1,16 @@
+---
+paths:
+  - "spec/setup.lua"
+  - "spec/helpers/*.lua"
+  - "spec/fixtures/*.lua"
+  - "spec/integration/*_spec.lua"
+  - "spec/debug_dump_harness_spec.lua"
+  - "test.lua"
+  - ".busted"
+  - ".github/workflows/test.yml"
+  - "debug/itemprobe.lua"
+  - "spec/debug/itemprobe_spec.lua"
+---
 # Live SavedVariables & Item Dump Test Harness Rules
 
 This document defines the architecture, design guidelines, and API contracts for utilizing live WoW SavedVariables and `/bbdb` backpack item dumps as high-fidelity integration test harnesses in BetterBags.
@@ -81,7 +94,7 @@ Once C-level APIs are mocked, triggering `items:ProcessRefresh(ctx, const.BAG_KI
 Most specs load the modules they test next to stubs of the rest. That cannot catch an error that
 only shows when the real modules meet in an order startup never produces: a switch between bag
 designs made the classic bags after the theme was applied, and crashed in game while every spec
-passed (next.md §11f). The whole-addon helper loads and starts all of BetterBags:
+passed (next-bagsystem.md §11f). The whole-addon helper loads and starts all of BetterBags:
 - **Use:** `local WholeAddon = dofile("spec/helpers/whole_addon.lua")`; `local handle =
   WholeAddon.Load(opts)`; `handle:Start()`; `handle.addon` is the addon, `handle.errors` every
   error that reached the error handler; `handle:Restore()` in `after_each`. Options: `client`
@@ -197,7 +210,7 @@ passed (next.md §11f). The whole-addon helper loads and starts all of BetterBag
   a `reset()`. To reach everything a client event reaches, it wraps the mock's `RegisterEvent` and `SetScript` for the
   load (frames listening themselves, OnUpdate drivers) and sends events through `events._eventMap`, never AceEvent's
   shared frame, which holds other specs' listeners. Draws are stubbed on the bags, so the bags can hold items.
-- Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next.md §11e; and §1: a new
+- Coverage that uses it: `spec/integration/bag_switch_spec.lua` (next-bagsystem.md §11e; and next.md §1: a new
   install starts with Next, an existing one keeps the classic bags),
   `spec/integration/bank_open_spec.lua` (refresh-scheduler.md §11).
 
