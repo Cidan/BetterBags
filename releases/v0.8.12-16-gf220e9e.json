@@ -1,0 +1,25 @@
+{
+  "id": 1793842859,
+  "version": "v0.8.12-16-gf220e9e",
+  "channel": "alpha",
+  "date": "2026-11-05",
+  "from": "7790d9fc53e56da79edca83744b913ca4b2ca4db",
+  "to": "f220e9e207e85b0ff815dbac2d430dbbf2dde469",
+  "headline": "Fixes launch issues on WoW: Forever and defaults BetterBags Next panels to minimized size.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Compatibility with the WoW: Forever launch build",
+      "details": "Fixed Lua errors on login caused by Blizzard changes to container buttons and slot textures. Restored custom theme icon cropping, which was being reset whenever items were drawn.",
+      "clients": [
+        "Forever"
+      ]
+    },
+    {
+      "category": "Improved",
+      "title": "BetterBags Next panels start minimized by default",
+      "details": "BetterBags Next panels now open in small mode by default instead of full size. You can switch back to full size at any time using the size button in the bag header.",
+      "clients": []
+    }
+  ]
+}
