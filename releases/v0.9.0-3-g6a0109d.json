@@ -1,0 +1,17 @@
+{
+  "id": 1793895278,
+  "version": "v0.9.0-3-g6a0109d",
+  "channel": "alpha",
+  "date": "2026-11-05",
+  "from": "d91352378ee293a8f757a9353feb801c088fa56b",
+  "to": "6a0109d08242d545fdc0279399c5cf6e3f5dcd1b",
+  "headline": "This build fixes a Lua error that could occur when crafting or consuming items while bags are closed.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Error when crafting or emptying bag slots",
+      "details": "Fixed an issue where crafting or consuming items while bags were closed could trigger a Lua error when updating your inventory.",
+      "clients": []
+    }
+  ]
+}
