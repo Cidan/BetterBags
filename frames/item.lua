@@ -134,6 +134,18 @@ local FAMILY_ICON_ALPHA = 0.4
 -- (ContainerFrameItemButtonMixin:GetItemButtonBackgroundTexture).
 local FOREVER_EMPTY_SLOT_ATLAS = "bags-item-slot64"
 
+-- setIcon draws a decoration's icon with Blizzard's SetItemButtonTexture. On WoW: Forever 1.60.1.70790 that resets the
+-- icon's texture coordinates (Mainline/ItemButtonTemplate.lua, SetItemButtonTexture_Base), so the theme's crop is put
+-- back after it there.
+---@param decoration ItemButton
+---@param texture number|string
+local function setIcon(decoration, texture)
+	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(texture) else SetItemButtonTexture(decoration, texture) end
+	if addon.isForever then
+		elements:DrawItemIcon(decoration)
+	end
+end
+
 -- getFamilyIconTexture lazily creates (and returns) the centered family-bag glyph on a themed
 -- item-button decoration. It lives in the OVERLAY layer so it sits above the empty-slot art,
 -- and is stored on the decoration itself so it survives across draws and theme swaps.
@@ -633,7 +645,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 
 	--override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
 	decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
-	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(data.itemInfo.itemIcon) else SetItemButtonTexture(decoration, data.itemInfo.itemIcon) end
+	setIcon(decoration, data.itemInfo.itemIcon)
 	SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
 	local quality = data.itemInfo.itemQuality
 	if not elements:DrawItemQuality(decoration, qualityColorOf(quality), quality) then
@@ -949,10 +961,10 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	end
 	decoration.GetItemContextMatchResult = nil
 	if addon.isRetail then
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+		setIcon(decoration, 0)
 	else
 		local emptySlot = addon:GetModule('SonataElements'):EmptySlotArt(decoration) or [[Interface\PaperDoll\UI-Backpack-EmptySlot]]
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(emptySlot) else SetItemButtonTexture(decoration, emptySlot) end
+		setIcon(decoration, emptySlot)
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
@@ -1087,10 +1099,10 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 	-- A search's miss was about the item drawn: a full draw sets it again, and clearing a search walks only items.
 	if decoration.SetMatchesSearch then decoration:SetMatchesSearch(true) end
 	if addon.isRetail then
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+		setIcon(decoration, 0)
 	else
 		local emptySlot = addon:GetModule('SonataElements'):EmptySlotArt(decoration) or [[Interface\PaperDoll\UI-Backpack-EmptySlot]]
-		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(emptySlot) else SetItemButtonTexture(decoration, emptySlot) end
+		setIcon(decoration, emptySlot)
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end

@@ -476,6 +476,35 @@ describe("SonataElements", function()
       assert.are.equal("ADD", b:GetHighlightTexture():GetBlendMode())
     end)
 
+    -- WoW: Forever 1.60.1.70790's SetItemButtonTexture resets the icon's texture coordinates on every draw
+    -- (Mainline/ItemButtonTemplate.lua, SetItemButtonTexture_Base); the draw puts the style's crop back.
+    describe("an icon's crop after a draw (DrawItemIcon)", function()
+      local function coordsOf(texture) return { texture:GetTexCoord() } end
+
+      it("puts back the crop its style gave the icon", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, { Icon = { TexCoords = { 0.08, 0.92, 0.08, 0.92 } } })
+        b.icon:SetTexCoord(0, 1, 0, 1)
+        elements:DrawItemIcon(b)
+        assert.are.same({ 0.08, 0.08, 0.08, 0.92, 0.92, 0.08, 0.92, 0.92 }, coordsOf(b.icon))
+      end)
+
+      it("puts back the whole icon for a style without a crop", function()
+        local b = itemDecoration()
+        elements:StyleItemButton(b, {})
+        b.icon:SetTexCoord(0.2, 0.8, 0.2, 0.8)
+        elements:DrawItemIcon(b)
+        assert.are.same({ 0, 0, 0, 1, 1, 0, 1, 1 }, coordsOf(b.icon))
+      end)
+
+      it("leaves the icon of a decoration no style drew alone", function()
+        local b = itemDecoration()
+        b.icon:SetTexCoord(0.2, 0.8, 0.2, 0.8)
+        elements:DrawItemIcon(b)
+        assert.are.same({ 0.2, 0.2, 0.2, 0.8, 0.8, 0.2, 0.8, 0.8 }, coordsOf(b.icon))
+      end)
+    end)
+
     -- GW2_UI's item buttons (Inventory/inventory.lua, reskinItemButton): its backdrop art behind the icon, and its
     -- border art in the quality's color (docs/next-gw2-theme.md).
     describe("an empty slot's art (EmptySlot)", function()

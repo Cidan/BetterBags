@@ -369,6 +369,65 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     end)
   end)
 
+  -- Found by the review of the 70790 fix: Forever 1.60.1.70790's SetItemButtonTexture resets the icon's texture
+  -- coordinates on every call (Mainline/ItemButtonTemplate.lua, SetItemButtonTexture_Base), live 12.1.5's does not, so
+  -- a theme's icon crop (Sonata's Icon.TexCoords) was lost on the first full draw.
+  describe("drawing an icon (Blizzard's SetItemButtonTexture)", function()
+    local order, savedDrawItemIcon
+
+    before_each(function()
+      order = {}
+      savedDrawItemIcon = rawget(elements, "DrawItemIcon")
+      elements.DrawItemIcon = function(_, decoration) table.insert(order, { "crop", decoration }) end
+    end)
+
+    after_each(function()
+      elements.DrawItemIcon = savedDrawItemIcon
+      addon.isForever = false
+    end)
+
+    local function draws(btnCtx)
+      local item = itemFrame:GetButton(btnCtx, "0_9")
+      local decoration = item:GetDecoration(btnCtx)
+      decoration.SetItemButtonTexture = function(d, texture) table.insert(order, { "texture", d, texture }) end
+      item:SetItemFromData(btnCtx, {
+        slotkey = "0_9", bagid = 0, slotid = 9, isItemEmpty = false,
+        questInfo = { isQuestItem = false, isActive = false }, containerInfo = {},
+        itemInfo = { itemID = 1, itemIcon = 7, itemQuality = 3, itemLink = "item:1", currentItemCount = 1, classID = 0,
+          currentItemLevel = 1 },
+      })
+      item:SetFreeSlots(btnCtx, { bagid = 0, slotid = 9, slotkey = "0_9", itemInfo = { emptySlotName = "Bag" } }, 1)
+      item:ResetVisuals(btnCtx)
+      return decoration
+    end
+
+    it("puts the style's crop back right after every icon draw on WoW: Forever", function()
+      addon.isForever = true
+      local decoration = draws(ctx:New("forever"))
+      local textures, crops, itemIcon = 0, 0, false
+      for i, entry in ipairs(order) do
+        if entry[1] == "texture" then
+          textures = textures + 1
+          itemIcon = itemIcon or entry[3] == 7
+          assert.are.same({ "crop", decoration }, order[i + 1], "draw " .. textures)
+        else
+          crops = crops + 1
+        end
+      end
+      assert.is_true(textures >= 3, "the item's icon, the free slot and the reset")
+      assert.are.equal(textures, crops)
+      assert.is_true(itemIcon, "the item's own icon is one of them")
+    end)
+
+    it("leaves the icon's crop to its style on live retail", function()
+      draws(ctx:New("live"))
+      assert.is_true(#order >= 3)
+      for _, entry in ipairs(order) do
+        assert.are.equal("texture", entry[1])
+      end
+    end)
+  end)
+
   -- Every item button must exist from boot: creating one later can taint. A capture of
   -- opening the bank on retail created 265 buttons at runtime, all character bank tab slots
   -- 41-98 (tabs hold 98 slots; boot made 40 for them and 98 for Warbank tabs).

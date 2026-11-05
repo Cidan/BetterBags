@@ -234,6 +234,9 @@ Details:
   its own art, blend, coordinates and color on every draw, so a theme switch away from an art border
   needs no reset. `DrawItemQuest` frames a quest item in the same art, in `QuestBorderColor`. Added for
   GW2_UI's item buttons (docs/next-gw2-theme.md); coverage `spec/sonata/elements_spec.lua` ("in art").
+- `DrawItemIcon(decoration)` puts back the icon crop the decoration's style gave it (`Icon.TexCoords`): WoW: Forever's
+  launch build resets the icon's texture coordinates in every `SetItemButtonTexture`, so its icon draws call this right
+  after (camelot-forever.md §11c). Coverage `spec/sonata/elements_spec.lua` ("an icon's crop after a draw").
 - `DrawItemQuest(decoration, questInfo)` goes by the item's quest data (`isQuestItem`,
   `questID`, `isActive`, Blizzard's `UpdateQuestItem` arguments), never by whether the quest
   texture is shown: Classic's `IconQuestTexture` has no hidden attribute and is shown on every

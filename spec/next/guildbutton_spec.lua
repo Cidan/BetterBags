@@ -224,6 +224,25 @@ describe("NextGuildButton", function()
   -- Blizzard's guild bank draws a slot with SetItemButtonTexture, SetItemButtonCount,
   -- SetItemButtonDesaturated (locked) and SetItemButtonQuality (GuildBankFrameMixin:Update).
   describe("drawing a guild item", function()
+    -- WoW: Forever 1.60.1.70790's SetItemButtonTexture resets the icon's texture coordinates (Mainline/
+    -- ItemButtonTemplate.lua, SetItemButtonTexture_Base), so the theme's icon crop is put back after it there.
+    for _, forever in ipairs({ true, false }) do
+      it(forever and "puts the style's icon crop back after drawing its icon on WoW: Forever"
+          or "leaves its icon's crop to its style on live retail", function()
+        override(addon, "isForever", forever)
+        local order = {}
+        override(_G, "SetItemButtonTexture", function(button, texture) table.insert(order, { "texture", button, texture }) end)
+        override(stubs.elements, "DrawItemIcon", function(_, button) table.insert(order, { "crop", button }) end)
+        local b = guildButton:GetButton(ctx, "1002_7")
+        b:SetItemFromData(ctx, item())
+        if forever then
+          assert.are.same({ { "texture", b.button, 135232 }, { "crop", b.button } }, order)
+        else
+          assert.are.same({ { "texture", b.button, 135232 } }, order)
+        end
+      end)
+    end
+
     it("shows its icon, count and quality as Blizzard's guild bank does, and is shown", function()
       local b = guildButton:GetButton(ctx, "1002_7")
       local data = item({ quality = 3 })

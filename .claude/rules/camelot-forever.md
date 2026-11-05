@@ -435,9 +435,10 @@ was mutation-tested.
 
 ## 11. What the launch build changed in Blizzard's container item buttons (1.60.1.70790)
 
-Two changes broke BetterBags at login on launch day, one after the other; both are fixed for Forever only (asked:
-"make sure this only runs on forever"). Checked for more: every template BetterBags names exists on 70790 except the
-one in §11b, and no Blizzard function BetterBags calls was removed between 70532 and 70790.
+Two changes broke BetterBags at login on launch day, one after the other (§11a, §11b), and a third threw a theme's icon
+crop away on every draw (§11c); all are fixed for Forever only (asked: "make sure this only runs on forever"). Checked for
+more: every template BetterBags names exists on 70790 except the one in §11b, and no Blizzard function BetterBags calls
+was removed between 70532 and 70790. §11d lists what the review found from source and nobody has seen.
 
 ### 11a. `Initialize` takes the container
 
@@ -498,6 +499,36 @@ Coverage: `spec/frames/item_spec.lua` (the decoration's background on live and o
 ("its empty slot background"), `spec/next/guildbutton_spec.lua` ("Forever's empty slot atlas on WoW: Forever"), and the
 whole-addon Forever starts. Mutation-tested (3 mutations, one per file: each caught, the decoration's and the bag
 button's by the whole-addon starts too).
+
+### 11c. `SetItemButtonTexture` resets the icon's crop
+
+Found by the bug review of §11a-b, from source. 70790's `SetItemButtonTexture_Base` (`Blizzard_ItemButton/Mainline/
+ItemButtonTemplate.lua`, which `ItemButtonMixin:SetItemButtonTexture` calls) now ends every draw with
+`icon:SetTexCoord(0, 1, 0, 1)` (or `SetAtlas` with `resetTexCoords`); live 12.1.5 and Forever 70532 leave the
+coordinates as they were. Sonata sets a theme's icon crop (`Icon.TexCoords`, sonata.md §3a) only when it styles a button,
+so on Forever the first full draw threw it away: the classic ElvUI theme (no Masque, nothing put it back) and the Next
+themes that crop their icons, wherever Masque does not skin the buttons; guild bank buttons the same.
+
+- **The fix:** `SonataElements:DrawItemIcon(decoration)` puts back the crop the decoration's style gave its icon (nothing
+  for a decoration no style drew). On Forever it runs right after every icon draw: the item buttons' five
+  (`setIcon`, `frames/item.lua`: an item's icon, a free slot's on both clients, a reset's) and the guild bank buttons'
+  item icon (`next/guildbutton.lua`). Masque still re-skins after it (`item/Updated`, `guild/Updated`), so its crop wins
+  where it skins.
+- **Not on live retail** (asked: Forever only), though PTR 12.1.7 has the same reset.
+
+Coverage: `spec/sonata/elements_spec.lua` ("an icon's crop after a draw (DrawItemIcon)"), `spec/frames/item_spec.lua`
+("drawing an icon (Blizzard's SetItemButtonTexture)": every draw followed by the crop on Forever, none on live),
+`spec/next/guildbutton_spec.lua` (the guild icon both ways). Mutation-tested (3 mutations, each caught).
+
+### 11d. Reported by the review, not built for (from source only, not seen in a client)
+
+- **Gamepad interface style:** with `InputUtil.IsGamepadUIEnabled()`, 70790's `ContainerFrameItemButtonMixin:OnLoad`
+  gives every container button normal, pushed, disabled and highlight atlases (`ItemSlotFrame_*`). BetterBags clears the
+  normal and pushed art only, so the disabled art may show on a free-space button with no count and the highlight over
+  BetterBags' own.
+- **An icon mask:** 70790 masks every `ItemButton`'s icon, normal and pushed textures with `common-iconmask`
+  (`Shared/ItemButtonTemplate.xml`, `PostOnLoad`); its shape is not in the source. It may clip an inset or cropped icon's
+  corners, or a Masque skin's.
 
 ## 12. Still pending (not yet done)
 

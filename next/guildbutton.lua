@@ -209,6 +209,11 @@ function buttonProto:SetItemFromData(ctx, data)
   self:reset()
   self.slotBackground:Hide()
   SetItemButtonTexture(self.button, info.itemIcon)
+  -- WoW: Forever 1.60.1.70790's SetItemButtonTexture resets the icon's texture coordinates (Mainline/
+  -- ItemButtonTemplate.lua, SetItemButtonTexture_Base): the theme's crop is put back.
+  if addon.isForever then
+    elements:DrawItemIcon(self.button)
+  end
   SetItemButtonCount(self.button, data.stackedCount or info.currentItemCount)
   SetItemButtonDesaturated(self.button, info.isLocked)
   local quality = info.itemQuality
