@@ -44,6 +44,21 @@ local function override(tbl, key, value)
   table.insert(replaced, { tbl, key, rawget(tbl, key) })
   tbl[key] = value
 end
+
+-- countCalls counts the calls to obj's method, put back after the test (override), and returns a reader of the count.
+-- Never spy.on a panel's method: luassert's spy deep-copies every call's arguments, and a panel's first is the panel, the
+-- whole mocked UI behind it (over 100 MB a call; the suite outgrew CI's 4 GB limit on two such calls).
+---@param obj table
+---@param method string
+---@return fun(): number
+local function countCalls(obj, method)
+  local calls, original = 0, obj[method]
+  override(obj, method, function(...)
+    calls = calls + 1
+    return original(...)
+  end)
+  return function() return calls end
+end
 local function restore()
   for i = #replaced, 1, -1 do
     replaced[i][1][replaced[i][2]] = replaced[i][3]
@@ -2314,9 +2329,9 @@ describe("BetterBags Next's small mode", function()
           inColumns()
           local bag = nextBag:Create(ctx())
           holding(bag, { { "A", 1 }, { LONG, 1 } })
-          spy.on(bag, "snapTo")
+          local glides = countCalls(bag, "snapTo")
           bag:Show(ctx())
-          assert.spy(bag.snapTo).was_not.called()
+          assert.are.equal(0, glides())
           assert.is_false(bag.sizeGliding)
           assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
         end)
@@ -2775,7 +2790,7 @@ describe("BetterBags Next's small mode", function()
           assert.are.same({}, cut(bank))
           local width = bank.frame:GetWidth()
           assert.is_true(width > columnsWidth(8), "its title holds it wider than its sections")
-          spy.on(bank, "snapTo")
+          local glides = countCalls(bank, "snapTo")
           bank:SwitchToGroup(ctx(), 11)
           render:Flush()
           assert.are.same({}, cut(bank), "as it switches")
@@ -2784,7 +2799,7 @@ describe("BetterBags Next's small mode", function()
             render:Flush()
             assert.are.same({}, cut(bank), "frame " .. frame)
           end
-          assert.spy(bank.snapTo).was.called(1)
+          assert.are.equal(1, glides())
           assert.is_false(bank.sizeGliding)
           assert.are.equal(columnsWidth(12), bank.frame:GetWidth())
         end)
@@ -3233,9 +3248,9 @@ describe("BetterBags Next's small mode", function()
           bag:burst()
           step(0.15)
           bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
-          spy.on(bag, "setOffset")
+          local offsets = countCalls(bag, "setOffset")
           step(1 / 60)
-          assert.spy(bag.setOffset).was_not.called()
+          assert.are.equal(0, offsets())
           bag.mover:GetScript("OnDragStop")(bag.mover)
         end)
 
