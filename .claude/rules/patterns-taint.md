@@ -1,3 +1,12 @@
+---
+paths:
+  - "bags/**/*.lua"
+  - "core/hooks.lua"
+  - "frames/{bag,item,bankslots}.lua"
+  - "util/{cursorplacement,movementflow}.lua"
+  - "next/{bank,vendor,merchant,guildbank,panel,chain}.lua"
+  - "data/seller.lua"
+---
 # Taint and Protected Code Patterns
 
 ## Never Assign to Global `_` Variable
@@ -88,7 +97,7 @@ Use `C_Timer.After(0, ...)` to clear the Retail guard after event processing com
 
 **Purchases**: buy through Blizzard's own confirmation functions (`MerchantFrame_ConfirmExtendedItemCost`, `MerchantFrame_ConfirmHighCostItem`), called the way its item button calls them, never instead of them. They run from our click, so they write `MerchantFrame.itemIndex`/`count`/`price` and show the popup tainted (see the section above); their accept calls `BuyMerchantItem`, which is not protected. Not verified in game; CompactVendor ships the same calls.
 
-**Related Files**: `next/vendor.lua` (`TakeOver`, `EndVisitLater`), `next/merchant.lua` (`Purchase`), `util/movementflow.lua`, `.claude/rules/next.md` §10
+**Related Files**: `next/vendor.lua` (`TakeOver`, `EndVisitLater`), `next/merchant.lua` (`Purchase`), `util/movementflow.lua`, `.claude/rules/next-vendor.md` §10
 
 ## Keep a Blizzard Frame Shown When Its Own Show Checks It Is Visible
 
@@ -108,4 +117,4 @@ Use `C_Timer.After(0, ...)` to clear the Retail guard after event processing com
 
 **Secret anchoring spreads to everything hung from it**: a region showing a secret has secret anchoring, so all its size and position queries are secret, the width addon code set included; and every region anchored to it, directly or through others, has secret anchoring too (warcraft.wiki.gg Secret Values, "Secret anchors"), a tooltip anchored to one of those as well. Check every measure read, not only the one that first failed (the vendor's title: `GetStringWidth`, then `GetWidth`), keep the numbers the addon set itself (`panel.titleCut`), and hang anything that is read or that owns a tooltip from a region that never shows a secret (the title's button hangs from the body). The mock models this (`IsAnchoringSecret`).
 
-**Related Files**: `next/panel.lua` (`CloudSpan`, `titleWidth`, the title button), `next/chain.lua` (`Tooltip`), `data/seller.lua` (`merchant`), `spec/helpers/wow_mocks.lua` (`MockSecret`, `SecretKeyGuard`), `.claude/rules/next.md` §10b, `.claude/rules/seller.md` §3
+**Related Files**: `next/panel.lua` (`CloudSpan`, `titleWidth`, the title button), `next/chain.lua` (`Tooltip`), `data/seller.lua` (`merchant`), `spec/helpers/wow_mocks.lua` (`MockSecret`, `SecretKeyGuard`), `.claude/rules/next-vendor.md` §10b, `.claude/rules/seller.md` §3

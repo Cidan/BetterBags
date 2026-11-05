@@ -3,13 +3,28 @@
 @.context/api.md
 @.context/documentation.md
 @.context/patterns.md
-@.context/patterns-taint.md
-@.context/patterns-ui.md
-@.context/patterns-state.md
 @.context/project.md
 
 ## PRIME DIRECTIVE: Document Changes in Rules Files
 All system refactors, major additions, structural changes, or new patterns must be documented inside a dedicated rules markdown file under `.claude/rules/` (and/or existing rules files must be updated). This document must explain what we're doing, why we're doing it, how the architecture works, and any relevant API contracts.
+
+Every rules file starts with a `paths:` block naming the files it documents, so it loads only when an agent reads one of them:
+
+```
+---
+paths:
+  - "data/automation.lua"
+  - "spec/automation_spec.lua"
+---
+```
+
+1. **Name what it documents.** The code the file explains and the specs that test it, as globs from the repository root (`**` spans folders, `{a,b}` picks either). Every glob must match a file in the repository.
+2. **Keep it narrow.** A file whose globs reach every Lua file (`**/*.lua`) is loaded into every session again.
+3. **Keep it current.** When a change documents files a rules file's `paths:` does not name, add them in the same change.
+4. **Only a rule for every change goes without.** A rules file with no `paths:` is read before every session's first message; only one that applies to every change may leave it out (`data-driven.md`).
+5. **Split a file that outgrows one area.** A rules file past about 40 KB that covers more than one area is split into one file per area, each with its own `paths:`, its sections keeping their numbers, and every reference to a moved section updated.
+
+Mistakes this rule comes from: every rules file and pattern file was once loaded into every session, 1.3 MB before the first message, and `next.md` and `next-themes.md` were cut off at the harness's 128 KB limit for one document, so their last sections never reached the agent at all.
 
 ## PRIME DIRECTIVE #1: Test-First TDD
 
@@ -64,10 +79,10 @@ To ensure the reliability of the addon and prevent regressions, adhere to the fo
 
 ## Pattern Learning
 
-As you work through problems and discover new abstract patterns (especially debugging techniques, API workarounds, or architectural decisions), update the appropriate pattern file in `.context/`:
+As you work through problems and discover new abstract patterns (especially debugging techniques, API workarounds, or architectural decisions), update the appropriate pattern file in `.claude/rules/` (each one a rules file with its own `paths:`):
 - Taint/protected code → `patterns-taint.md`
-- UI patterns → `patterns-ui.md`
-- State/architecture → `patterns-state.md`
+- UI patterns → `patterns-ui.md` (frames, forms, views, windows), `patterns-ui-text.md` (text and fonts), `patterns-ui-themes.md` (themes and textures), `patterns-ui-next.md` (BetterBags Next panels)
+- State/architecture → `patterns-state.md`; spec isolation → `patterns-specs.md`
 
 This helps future contexts understand the codebase's design decisions.
 

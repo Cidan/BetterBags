@@ -1,3 +1,11 @@
+---
+paths:
+  - "frames/bagslots.lua"
+  - "frames/bankslots.lua"
+  - "bags/classic/bank.lua"
+  - "bags/era/bank.lua"
+  - "spec/frames/bagslots_spec.lua"
+---
 # "Show Bags" Slots Panel: Classic Flat Panel & Centering
 
 This documents how the bag-slots panel (the "Show Bags" slide-out created by

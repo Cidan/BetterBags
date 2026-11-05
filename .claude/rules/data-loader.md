@@ -1,3 +1,14 @@
+---
+paths:
+  - "data/loader.lua"
+  - "data/items.lua"
+  - "data/equipmentsets.lua"
+  - "spec/items_spec.lua"
+  - "spec/loader_spec.lua"
+  - "spec/refresh_pipeline_spec.lua"
+  - "spec/gap_reconciliation_spec.lua"
+  - "spec/equipmentsets_spec.lua"
+---
 # Item Loading and Static Cache Rules
 
 This document defines the architecture, design guidelines, and API contracts for item loading, caching, and database sweep operations within BetterBags.

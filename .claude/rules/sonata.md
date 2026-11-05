@@ -1,3 +1,9 @@
+---
+paths:
+  - "sonata/{engine,apply,decoration,elements,resolve}.lua"
+  - "sonata/themes/*.lua"
+  - "spec/sonata/{engine,apply,decoration,elements,text,text_usage,theme_ports,themes}_spec.lua"
+---
 # Sonata: the Declarative Theme Engine (`sonata/`)
 
 Sonata replaces BetterBags' old theme API (`themes/themes.lua`, where a theme was a table of
@@ -486,7 +492,7 @@ gray, so no theme could change it, and on Parchment's light paper it was white o
   `Sonata:SetButtonTextRole(button, role)` sets a button's normal font object; all three record
   the role (weak tables `texts`, `buttonTexts`). An unknown role errors. `Sonata:ClearButtonTextRole(button)` forgets a
   button's role, so a theme no longer moves it (BetterBags Next's money under a Next theme's `Footer.CoinFont`,
-  next-themes.md §25).
+  next-themes-papercraft.md §25).
 - **A theme makes new font objects and moves the text.** `ApplyTheme` (before windows and
   elements) and every rescale of the client's fonts call `newTextFonts`: it starts an empty set
   of role font objects and points every recorded text and button at its role's new one. Text

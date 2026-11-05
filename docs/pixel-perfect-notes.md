@@ -1632,7 +1632,7 @@ toolkit that scales a virtual coordinate space onto real pixels.
 The rules, with full detail and coverage: `.claude/rules/next-pixel-perfect.md`, `texture-sharpening.md`,
 `render-recorder.md`, `render-pipeline.md` (§4b the layout engine, §4c Motion), `window.md` (§3a, §3b),
 `layout-rendering.md` (§4), `next-themes.md` (§4 text, §10 alphas), `sonata.md` (§3c text roles), and
-`.context/patterns-ui.md` for the general patterns.
+`.claude/rules/patterns-ui-next.md` and `patterns-ui-text.md` for the general patterns.
 
 ### 11.4 The scripts
 

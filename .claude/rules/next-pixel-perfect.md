@@ -1,3 +1,17 @@
+---
+paths:
+  - "next/pixel.lua"
+  - "next/itemfit.lua"
+  - "debug/pixelaudit.lua"
+  - "frames/pixelpane.lua"
+  - "spec/helpers/layout.lua"
+  - "spec/helpers_layout_spec.lua"
+  - "spec/next/pixel*_spec.lua"
+  - "spec/next/itemfit_spec.lua"
+  - "spec/next/controls/pixel_spec.lua"
+  - "spec/debug/pixelaudit_spec.lua"
+  - "spec/frames/pixelpane_spec.lua"
+---
 # BetterBags Next, Pixel Perfect (`next/pixel.lua` and every Next window)
 
 Every part of every BetterBags Next window rests on whole screen pixels, at any screen size, UI scale,
@@ -67,8 +81,8 @@ screen") fails on the old code with exactly those numbers (1.153 and 1.241 pixel
   what it clips stretched across the fraction.
 - **Not snapped, by nature**: what moves (glides, slides, drags, lifts, flights, sparkles, the cloud's
   breathing, the braid, the tab marker's glide, a toggle's knob sliding, a theme's swaying, spinning,
-  pulsing or bobbing ornaments, next-themes.md §12; a stop motion's poses, each off its place on purpose,
-  §25). Each lands on whole pixels when it comes to rest. A doodle's boil jiggles on whole pixels: it never rests, and
+  pulsing or bobbing ornaments, next-themes-ornaments.md §12; a stop motion's poses, each off its place on purpose,
+  next-themes-papercraft.md §25). Each lands on whole pixels when it comes to rest. A doodle's boil jiggles on whole pixels: it never rests, and
   is listed with what moves (`MovingParts`) because its drawing changes.
 
 ## 3. A new grid

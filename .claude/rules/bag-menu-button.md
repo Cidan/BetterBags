@@ -1,3 +1,10 @@
+---
+paths:
+  - "frames/menubutton.lua"
+  - "frames/contextmenu.lua"
+  - "spec/frames/menubutton_spec.lua"
+  - "spec/frames/contextmenu_spec.lua"
+---
 # Top-Left Bag Menu Button: Click Semantics & Sort Coupling
 
 This documents the click behavior of the round top-left menu button on the bag/bank
@@ -85,7 +92,7 @@ The toggles come first, then Bag Anchor, then the bank's sorts, then the common 
 Button above Bag Anchor). The bank's Show Bags used to come after its sorts; it moved up so both
 menus start alike and the two sorts stay together. Show Bags is only listed when the bag has a
 slots panel. **Switch to Next** (asked) switches the bags to BetterBags Next without a reload
-(next.md §11); only the backpack's menu has it, since the bank's is shown at the bank, where the
+(next-bagsystem.md §11); only the backpack's menu has it, since the bank's is shown at the bank, where the
 bags cannot switch.
 
 - **Drag to Resize** is the Resizable Window option (`config/catalog.lua`, a bag's Layout tab in the

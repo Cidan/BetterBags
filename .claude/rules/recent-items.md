@@ -1,3 +1,8 @@
+---
+paths:
+  - "data/items.lua"
+  - "spec/items_spec.lua"
+---
 # Recent Items: Timer-Only Membership, Expiry When the Bag Closes
 
 This defines when an item is in the Recent Items section, when it leaves, and why nothing

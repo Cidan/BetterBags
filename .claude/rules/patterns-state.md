@@ -1,3 +1,12 @@
+---
+paths:
+  - "data/{items,refresh,loader,search,categories}.lua"
+  - "views/*.lua"
+  - "bags/**/*.lua"
+  - "frames/{bag,item,tabs}.lua"
+  - "core/{events,async,database}.lua"
+  - "integrations/quickfind.lua"
+---
 # State Management and Architecture Patterns
 
 ## Context Filter Propagation
@@ -223,38 +232,8 @@ the result rests on, to see the enumeration can fail.
 ## Settings Are Not Readable Once the Player Logs Out
 AceDB strips every setting still at its default from the profile at `PLAYER_LOGOUT`, right after it fires `OnDatabaseShutdown`, so a setting read after that can be nil and a table of settings can be gone. Frames still get scripts then (a classic bag window was resized after it, `.claude/rules/initialization.md` §7). Gate at the entry point rather than in every getter: the shutdown callback sets `addon.loggingOut`, and the script wrappers (`addon.SetScript`, `addon.HookScript`) run nothing while it is set. Never put the defaults back after the strip: they would be written into the saved variables, which the strip exists to prevent.
 
-## Spec Files Must Pass Alone and Shuffled
-The suite runs every spec file in one Lua state, so a file can pass only because an earlier one left something behind: a stub module with the methods it needs, a real module the earlier file loaded, or a copy of a module loaded with the earlier file's stubs captured in its file-scope locals (`LoadBetterBagsModule` loads a path once per state). Check a new or changed spec file with `~/.local/lua51/bin/busted <file>` and `busted --shuffle --seed=N <file>`, not only in the suite's order. The rules that keep a file independent:
-- Create stubs with `StubBetterBagsModule` and remove the ones the file created (the `created` flag) when it ends; never `x.Method = x.Method or default` on a module another file may have loaded for real (its method then runs against data this file never set up): replace it and put the original back.
-- Load the module under test fresh (`LoadFreshBetterBagsModule`) when it captures other modules at file scope, and remove it after (`spec/frames/item_spec.lua`).
-- Put file-wide restores in a file-level `teardown`, not in one `describe` block's: `--shuffle` reorders blocks, so that block's teardown can run first and undo the stubs every other block needs.
-- Revert a `stub(obj, "Method")` with `finally(function() obj.Method:revert() end)`; it otherwise stays for the rest of the file.
-- Reset shared engines before re-registering into them: the specs call `Sonata:Init()` before loading the theme files, as the addon's own load order does (`.claude/rules/sonata.md` §2: a theme registering after one was applied reads the saved theme).
-- A test that only checks scheduling should stub the scheduled work rather than run it, so it does not depend on what that work touches.
-Measured state and the remaining known failures: `docs/roadmap.md`, "Spec isolation".
-
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point
 2. **Check Blizzard source first**: `.libraries/wow-ui-source/` for actual Blizzard implementation before writing hooks or workarounds
 3. **Profile, don't guess**: in game, capture with the `/bbdb` Performance tab (or arm "Capture next reload" for login) and read the flame graph, the worst frames, and how far Blizzard's addon-profiler number sits above ours. Offline, run the real pipeline under `perf:Start` over the `test.lua` dump the way the "profiles the real refresh pipeline" test of `spec/debug_dump_harness_spec.lua` does (fill empty slots and inject realistic `tooltipText` to approximate a full bag) and export it with `tools/flamegraph`. Hand-wrapping `items:Phase*` with `os.clock()` timers is how the tooltip n-gram cost was found; the profiler does that wrapping for every module. A "no events fired on that frame" hitch report points at the timer-resumed second half of a refresh (`data/refresh.lua` `_Arm`), which the flame graph shows under `Refresh._Step` -> `Refresh._Resume`. Contract: `.claude/rules/perf-profiler.md`.
 4. **Order bugs need the call trace, not the call tree**: when a symptom depends on which of two things ran first (a single-bag refresh committing before the all-bags one at login, a wipe landing under a parked sweep), the flame graph cannot show it, because it sums every call of a path into one node. Capture with the call trace on (the default) and read the Calls view in order: Find the entry point (`RequestUpdate`, `[event] BAG_UPDATE`) to see each request and its arguments, Find the phase that decides scope (`Phase1_DetermineBags`, whose return value is the bag list) and the effect (`MarkItemAsNew`). Arguments are copied when the call is made, so a mutated request or ItemData shows what it held then. For a user's machine, have them arm "Capture next reload", relaunch, and send `SavedVariables/BetterBags.lua`; `tools/flamegraph --trace --find <text>` turns it into a Perfetto file.
-
-## A Spec That Replaces a Shared Module's Method Must Put It Back
-**Problem**: `StubBetterBagsModule` returns the real module when one is loaded. A spec block that set
-`events.RegisterEvent` to a capture and never restored it left every later spec's event registrations going
-nowhere: `spec/targeted_sweep_spec.lua` and `spec/window/window_spec.lua` failed only in the full run.
-
-**Rule**: Save what a spec replaces (`rawget`) and restore it in `after_each`, or use the spec's `override`
-helper where it has one. When a spec passes alone and fails in the full run, look for a method replaced on a
-shared module by an earlier file.
-
-## A Theme's Spec Inherits the Keys It Leaves Out
-**Problem**: Sonata and SonataNext resolve a theme by merging it with its parent key by key (only lists replace).
-A theme that draws art where its parent draws a faint color (`{ Texture = "Button", Color = "White" }` over Default's
-`{ Color = "Gold", Alpha = 0.14 }`) also gets the parent's `Alpha`: Guild Wars 2's cream buttons drew at 14%.
-
-**Rule**: A spec that replaces the look of a parent's spec sets every key the parent sets that would change it
-(`Alpha` above all), and a spec over every shipped theme compares what a theme sets with what it resolves to
-(`spec/sonata/next_themes_spec.lua`, "draws the art each theme sets at the alpha it sets"). `false` removes an
-inherited table entirely (it resolves to nil).
-

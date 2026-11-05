@@ -1,3 +1,9 @@
+---
+paths:
+  - "util/cursorplacement.lua"
+  - "frames/bag.lua"
+  - "spec/cursorplacement_spec.lua"
+---
 # The Bag Window as a Drop Target (issue #408)
 
 An item dropped anywhere on a bag window, or the window left-clicked while holding one, goes
@@ -24,7 +30,7 @@ bag slots. A section title with Shift adds the item to that category; without Sh
 passes the drop to its window (`sectionFrame:OnTitleClickOrDrop`, through
 `addon:GetBagFromKind(section:GetKind())`).
 
-BetterBags Next's sections have a header button over their title row (next.md §7). It takes the
+BetterBags Next's sections have a header button over their title row (next-drag.md §7). It takes the
 item drops the classic section title takes: an item dropped or left-clicked onto it goes to its
 panel (`PlaceCursorItem`), or with Shift into its category, through the same
 `sectionFrame:OnTitleClickOrDrop`.

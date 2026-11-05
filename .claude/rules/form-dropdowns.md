@@ -1,3 +1,8 @@
+---
+paths:
+  - "forms/layouts/*.lua"
+  - "spec/forms/dropdown_spec.lua"
+---
 # Form Dropdowns Resolve Their Item List Lazily
 
 This document defines how the stacked form layout (`forms/layouts/stacked.lua`) builds

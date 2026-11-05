@@ -1,3 +1,10 @@
+---
+paths:
+  - "core/init.lua"
+  - "core/boot.lua"
+  - "spec/core/init_spec.lua"
+  - "spec/integration/logout_spec.lua"
+---
 # Deterministic Manual Initialization Architecture
 
 This document defines the architecture, rationale, and API contracts for the manual initialization sequence inside BetterBags.
@@ -84,7 +91,7 @@ the session. See `.claude/rules/perf-profiler.md`.
 
 The bags themselves are then made through `BagSystem` (core/bagsystem.lua), which makes the design
 the setting names, the classic bags or BetterBags Next, each in an event scope of its own so the
-bags can switch design without a reload (next.md §11): `CreateBackpack` first (the bag-bar setup
+bags can switch design without a reload (next-bagsystem.md §11): `CreateBackpack` first (the bag-bar setup
 of §5 follows it, with `addon:WatchBackpackFrame` for §6), then `CreateRest` and `Use`, then Sonata,
 then `Finish` (the backpack's title and `UISpecialFrames`).
 
@@ -115,7 +122,7 @@ Both leave the bag-bar buttons lit after the bag is gone.
 
 ### 7. No Frame Script Runs Once the Settings Shut Down (logout and reload)
 At `PLAYER_LOGOUT` (a logout, a reload or quitting) AceDB's own handler (`logoutHandler`, `libs/AceDB-3.0/AceDB-3.0.lua`) fires `OnDatabaseShutdown`, then calls `RegisterDefaults(nil)`, which strips the profile in place (`removeDefaults`): every value still at its default is removed, every table left empty is removed, and the wildcard metatables are dropped. That keeps the saved variables small. From then on a setting at its default reads nil, and a getter that indexes a table of settings fails. Checked with the real AceDB from `libs/` and the shape of BetterBags' defaults: before the handler `profile.views` is a table, after it `views`, `newItemTime` and `size` are nil.
-- **Failure mode (reported, fixed):** `core/database.lua:86: attempt to index field 'views' (a nil value)` in `GetBagView`, twice, with `kind = 0`, from the classic backpack window's `OnSizeChanged` hook (`window/window.lua`, which asks the window's size mode; the bag's `SizeMode` option, `frames/bag.lua`, asks `GetBagSizeMode`, which reads the view). Nothing but that strip removes `views` from the profile in use: BetterBags only reads and sets entries in it, and AceDB's `SetProfile`, `ResetProfile` and `CopyProfile` copy the defaults back before returning. So the client resized the window after `PLAYER_LOGOUT`. Why it does is not known, and the rule below does not depend on it. The classic windows exist whenever the bags switched design in the session, BetterBags Next in use or not (next.md §11).
+- **Failure mode (reported, fixed):** `core/database.lua:86: attempt to index field 'views' (a nil value)` in `GetBagView`, twice, with `kind = 0`, from the classic backpack window's `OnSizeChanged` hook (`window/window.lua`, which asks the window's size mode; the bag's `SizeMode` option, `frames/bag.lua`, asks `GetBagSizeMode`, which reads the view). Nothing but that strip removes `views` from the profile in use: BetterBags only reads and sets entries in it, and AceDB's `SetProfile`, `ResetProfile` and `CopyProfile` copy the defaults back before returning. So the client resized the window after `PLAYER_LOGOUT`. Why it does is not known, and the rule below does not depend on it. The classic windows exist whenever the bags switched design in the session, BetterBags Next in use or not (next-bagsystem.md §11).
 - **Rule:** `DB:Init` sets `addon.loggingOut = false` and registers AceDB's `OnDatabaseShutdown` callback, which sets it to true. `addon.SetScript` and `addon.HookScript` (`core/context.lua`) run no handler while it is set, so no frame script BetterBags installs through them reads a setting once the strip is under way.
 - **Not gated:** game events and messages (the profiler's and the render recorder's own `PLAYER_LOGOUT` handlers must still save; they read `BetterBagsPerfDB`, which AceDB does not strip, and the client sends `PLAYER_LOGOUT` to AceDB's frame and to BetterBags' in an order it does not document), timers, and handlers set with a frame's own `SetScript`/`HookScript` (animation drivers, a few layout hooks). Code of those kinds that can run after a logout and reads a setting must check `addon.loggingOut`, or be installed through the wrappers.
 - **Coverage:** `spec/integration/logout_spec.lua` (on the whole addon, through AceDB's real handler: the classic bags' windows resized and hidden after it, which reproduced the reported error before the fix; BetterBags Next's panels; a handler that runs before it and not after), `spec/context_spec.lua` ("SetScript and HookScript while logging out"), `spec/database_spec.lua` ("logging out").

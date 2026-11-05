@@ -1,3 +1,9 @@
+---
+paths:
+  - "data/stacks.lua"
+  - "data/items.lua"
+  - "spec/stacks_spec.lua"
+---
 # Virtual Stacking and Clean-Sweep Optimization Rules
 
 This document defines the architecture, design guidelines, and API contracts for virtual stacking within BetterBags.

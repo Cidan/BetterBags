@@ -1,3 +1,14 @@
+---
+paths:
+  - "debug/perf/*.lua"
+  - "debug/simulator.lua"
+  - "frames/{perfpane,tracechart,flamegraph,simulatepane}.lua"
+  - "tools/flamegraph/*"
+  - "spec/debug/{perf_*,simulator}_spec.lua"
+  - "spec/frames/{perfpane,tracechart,flamegraph,simulatepane}_spec.lua"
+  - "spec/tools/flamegraph_spec.lua"
+  - "spec/core/measured_blizzard_calls_spec.lua"
+---
 # Performance Profiler (`debug/perf/`, Performance tab, `tools/flamegraph`)
 
 BetterBags has a built-in instrumenting profiler. It is off by default and costs nothing

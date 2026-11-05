@@ -1,3 +1,11 @@
+---
+paths:
+  - "data/automation.lua"
+  - "next/settings/categories.lua"
+  - "next/vendor.lua"
+  - "Bindings.xml"
+  - "spec/automation_spec.lua"
+---
 # Category Automation (`data/automation.lua`, the Automation tab)
 
 A category can act on its items on its own, set with three switches in its Automation tab on the
@@ -125,7 +133,7 @@ double click to sell, and selling (or cancelling) animates the next section to t
 (can autosell a section in the middle, for example)"; "our destroy section should function just like
 the above, but with a red outline like we have now, when it's destroying. as far as placement, let's
 stop treating it specially." The destroy card at the bottom of the vendor (its own icon row, its own
-room under the scroll area) is gone: a category's items wait in the vendor's dock (`NextDock`, next.md
+room under the scroll area) is gone: a category's items wait in the vendor's dock (`NextDock`, next-drag.md
 §7) exactly as a section dragged onto the vendor waits there.
 
 - **What is offered**, while a merchant is open and the vendor and the backpack both show, on
@@ -168,7 +176,7 @@ room under the scroll area) is gone: a category's items wait in the vendor's doc
 
 ## 5. The Automation tab (`next/settings/content.lua`, `NextSettingsCategories:AutomationOptions`)
 
-Fourth tab of the Categories page (next-settings.md §5), shown while a category is chosen, a plugin's
+Fourth tab of the Categories page (next-settings-categories.md §5), shown while a category is chosen, a plugin's
 too (what it does is the player's choice). It is drawn as every page draws its settings: a section
 ("Merchants") of settings rows (`next/settings/rows.lua`), three switches, each its name on
 the left and its switch on the right, with its description as its tooltip. Asked: switches, not a
@@ -210,7 +218,7 @@ The category's heading line ends "Sells at merchants" or "Sells, destroys the re
   single click of a sale; the tooltip and the next item; once a visit, every one back when the merchant
   closes, offered again next visit; offered later when automation changes; nothing away from a merchant,
   with the backpack hidden or closing, nor twice; everything back when Next is switched off; no room kept
-  under the vendor's content); `spec/next/dock_spec.lua` (the dock itself, next.md §7);
+  under the vendor's content); `spec/next/dock_spec.lua` (the dock itself, next-drag.md §7);
   `spec/next/bag_spec.lua` (`next/PanelShown` once a panel has slid in).
 - `spec/automation_spec.lua` also: only the categories that do not confirm sell at once; the items given
   to `Entries`, `SellList`, `DestroyQueue` and `DestroyNext`; `SaleOffer` and `DestroyLeft`.
@@ -235,7 +243,7 @@ The category's heading line ends "Sells at merchants" or "Sells, destroys the re
   merchant closing mid-round, a merchant reopened mid-sale saying each sale once) and one was a
   redundant check, removed (`StartSale` returning for a replaced sale, which the open check already
   stops at its first round). Confirm Auto Sell and the dock at the vendor: part of the 97 mutations in
-  next.md §7 ("Docked sections"), every one caught after the tests and removals listed there.
+  next-drag.md §7 ("Docked sections"), every one caught after the tests and removals listed there.
 
 **Not verified in game:** a sale at a real merchant (retail, Classic, WoW: Forever), the Seller's pace
 against the server (seller.md), the trade-timer question during a sale, `IsSellAllJunkEnabled` at a

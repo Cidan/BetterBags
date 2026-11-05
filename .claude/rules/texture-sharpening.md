@@ -1,3 +1,8 @@
+---
+paths:
+  - "render/texels.lua"
+  - "spec/render/texels_spec.lua"
+---
 # Textures Drawn Without the Client's Sharpening (`render/texels.lua`, every bag)
 
 Every texture BetterBags draws in a bag window, in both designs, is drawn without the client's texture sharpening:

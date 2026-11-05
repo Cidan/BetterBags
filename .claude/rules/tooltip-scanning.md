@@ -1,3 +1,8 @@
+---
+paths:
+  - "data/tooltip.lua"
+  - "spec/tooltip_spec.lua"
+---
 # Tooltip Text Scanning & Sparse-Tooltip Resolution
 
 BetterBags scans each item's tooltip body into `itemInfo.tooltipText` (Phase 2 harvest,

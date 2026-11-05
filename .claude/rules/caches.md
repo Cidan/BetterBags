@@ -1,3 +1,13 @@
+---
+paths:
+  - "data/items.lua"
+  - "data/search.lua"
+  - "data/tooltip.lua"
+  - "integrations/pawn.lua"
+  - "frames/item.lua"
+  - "spec/integrations/pawn_spec.lua"
+  - "spec/integration/pawn_spec.lua"
+---
 # Caches and Their Invalidation
 
 BetterBags keeps several values across sweeps so a one-slot change costs one slot of work.
@@ -10,7 +20,7 @@ reads must add the matching invalidation here and a test that fails without it.*
 
 - **Record what was applied, compare against the record, undo with the record.** Never compare
   or remove using the current ItemData's values: ItemData objects are reused and mutated in place
-  (targeted merges, kept harvest slots, Phase 6/8 writes). See `.context/patterns-state.md`
+  (targeted merges, kept harvest slots, Phase 6/8 writes). See `patterns-state.md`
   ("Incremental Work Without Drift").
 - **Unknown is never kept.** A value read while the client had no data for it (cold item cache:
   `harvestIncomplete`), or an answer a provider could not give yet (`nil`), is not cached.

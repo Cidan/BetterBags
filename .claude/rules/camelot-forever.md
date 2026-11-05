@@ -1,3 +1,18 @@
+---
+paths:
+  - "core/forever.lua"
+  - "core/constants.lua"
+  - "BetterBags_Camelot.toc"
+  - "bags/bank.lua"
+  - "frames/bankslots.lua"
+  - "frames/item.lua"
+  - "data/equipmentsets.lua"
+  - "spec/core/forever_spec.lua"
+  - "spec/core/constants_spec.lua"
+  - "spec/frames/bankslots_spec.lua"
+  - "spec/bags/bank_panel_suppress_spec.lua"
+  - "spec/bags/bank_purchase_button_spec.lua"
+---
 # WoW: Forever (Camelot) Support
 
 WoW: Forever (internal codename **Camelot**; launched 2026-11-04 as build `1.60.1.70790`, product
