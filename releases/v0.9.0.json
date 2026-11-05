@@ -1,0 +1,79 @@
+{
+  "id": 1793842876,
+  "version": "v0.9.0",
+  "channel": "release",
+  "date": "2026-11-05",
+  "from": "v0.8.12",
+  "to": "v0.9.0",
+  "headline": "Introduces the Papercraft theme and compact multi-column layouts for BetterBags Next, eliminates loot hitches with Pawn, and adds Auction House dimming and search filters.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Papercraft theme for BetterBags Next",
+      "details": "Introduces the hand-drawn Papercraft theme featuring creased paper backgrounds, margin doodles, custom fonts, and stop-motion style folding and crumpling animations. Includes new animation settings to toggle paper folding and stop motion effects.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Compact Sections for BetterBags Next",
+      "details": "A new per-bag layout option that packs sections tightly together across columns on the icon grid, eliminating unused space while keeping items aligned.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Auction House dimming and search filters",
+      "details": "Unauctionable items are now automatically dimmed while the Auction House window is open. Adds the auctionable and lootable search filters, allows bare words to match boolean fields, and ensures caged battle pets are recognized by pet filters.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Pawn integration overhaul",
+      "details": "Switched to Pawn's official bag API, eliminating game freezes whenever loot is received. Upgrade status checks are now budgeted in the background, and pending items are protected from accidental auto-selling.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Smooth item animations and smarter sorting",
+      "details": "Bag animations now track the item rather than the button slot, preventing unnecessary flying animations when items do not visibly change positions. Sorting that moves no items skips redundant refreshes to reduce hitching.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Column reordering and layout improvements in Next",
+      "details": "Sections can now be dragged to reorder within multi-column layouts, and Next panels default to a two-column layout in small panel mode. Banks and guild banks also settle into their correct layout immediately when opened.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Dedicated category Order tab in bag settings",
+      "details": "Category ordering in bag settings has been moved to its own dedicated Order tab that scrolls cleanly with the window instead of inside a nested scroll box.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Reintroduced per-bag category hiding",
+      "details": "Added the option to hide specific categories per bag from their settings, complete with a confirmation prompt and a count of hidden items displayed in the bag footer.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "WoW: Forever compatibility fixes",
+      "details": "Fixed startup errors on WoW: Forever caused by interface template changes, and restored proper icon cropping on styled themes.",
+      "clients": [
+        "Forever"
+      ]
+    },
+    {
+      "category": "Fixed",
+      "title": "Profession Shopping List compatibility",
+      "details": "Updated integration with Profession Shopping List to recognize its updated merchant API so shopping lists and vendor cards display correctly.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Quality borders and theme styling fixes",
+      "details": "Fixed missing or overwritten item quality borders on themes with backdrop borders, resolved errors when switching away from animated themes, and added thousands separators to vendor and guild bank currency totals.",
+      "clients": []
+    }
+  ]
+}
