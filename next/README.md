@@ -56,6 +56,25 @@ tab's categories in their order, Free Space) and draws the static per-slot item 
 44 pixels; `NextContent:Render` lays them out in one column inside the panel's scroll box, through
 Motion so what changed place glides there. A draw while the panel is hidden waits for it to open.
 
+## A small panel's width
+
+A small panel's width sits on a grid step, whole cells of icons and the room beside them, at the first step from
+the width the player chose (saved, its default, or where a resize grip was let go) at which neither its title nor
+any section's name is cut short: `NextPanel:FitWidth`, which asks the canvas `NextContent:NameCells` how many cells
+its names need there, going up a step at a time (more cells can mean more columns, each narrower), never past the
+screen. Its minimum holds its whole title (`MinWidth`, `measureTitle`; a vendor's name that is a secret keeps the
+least room it always kept). It is fitted as it opens (opened again as it slides out too) and as a grip is let go;
+while it is open, only with Fit Names While Open on (`FollowNames`, which glides it as a grip's snap does and saves
+nothing; it waits while the panel or the open bag chained to it is not settled, trying again each frame until it
+follows, so a chained pair glides one at a time, and fits a new title a frame on, so a bank tab's name and sections
+are fitted in one glide). A refit (a theme, the screen, a scale) ends a size glide first, and refits a panel whose size
+glides. The bag chained to a panel moves with its size glide only where the glide moves the side it hangs from (a
+grip's snap never does), and a bag gliding into its spot beside its anchor follows the spot as the anchor glides,
+while that bag is still its anchor. It lays out at rest for the
+width it last took (`RestingLayoutWidth`). The rules are in `.claude/rules/next-small-resize.md` §14g (the snap, the bag chained beside
+it, `RestingLayoutWidth`), its continuation in `.claude/rules/next-small-names.md` (the names) and
+`.claude/rules/next-columns.md` §7a.
+
 ## Moving sections
 
 Every section has a header button. Dragging a category's header picks the section up: its frame,

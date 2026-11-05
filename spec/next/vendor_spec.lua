@@ -172,6 +172,11 @@ describe("NextVendor", function()
     override(stubs.items, "ExpireRecentItems", function() return false end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    override(stubs.database, "GetNextFitNamesWhileOpen", function() return false end)
+    -- What a small panel reads, whichever test runs first (patterns-specs.md: shuffled, a test had found them missing).
+    override(stubs.database, "GetNextSmallChain", function() return "apart" end)
+    override(stubs.database, "GetNextSmallPlace", function() return nil end)
+    override(stubs.database, "GetNextSmallSize", function() return nil end)
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
@@ -676,6 +681,37 @@ describe("NextVendor", function()
       assert.are.equal(v.titleCut + 2 * G.X, v.titleGlow._width)
     end)
 
+    -- A small panel goes no narrower than its whole title (next.md §14g); a name it may not measure keeps the least room
+    -- it always kept (Small.MinTitle), cut short as before, with nothing compared or added up on the way. Asked of
+    -- vendors: "careful with secret value please".
+    it("keeps the least room for its title a small vendor always kept while the name is secret, its whole name else", function()
+      override(stubs.database, "GetNextSize", function() return "small" end)
+      override(stubs.database, "GetNextSectionColumns", function() return 1 end)
+      override(stubs.database, "GetNextSectionFill", function() return "across" end)
+      override(stubs.database, "GetNextSectionSpan", function() return false end)
+      override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
+      override(stubs.database, "GetNextBagScale", function() return 100 end)
+      override(stubs.database, "GetNextSmallChain", function() return "apart" end)
+      override(stubs.database, "GetNextSmallPlace", function() return nil end)
+      override(stubs.database, "GetNextSmallSize", function() return 1, 500 end)
+      override(stubs.database, "GetClampBagsToScreen", function() return true end)
+      override(stubs.database, "GetNextFitNamesWhileOpen", function() return true end)
+      local v = open()
+      assert.is_true(v:IsSmall())
+      assert.is_nil(v.titleWhole, "never measured")
+      local room, slack = v:titleEnd()
+      local start = v:TitleStart() + room + slack
+      assert.is_true(v:MinWidth() >= start + style.Small.MinTitle)
+      v:SetTitle(name)
+      v:Draw(ctx())
+      finishTweens()
+      local long = string.rep("Mira the Smith ", 4)
+      v:SetTitle(long)
+      assert.are.equal(#long * 6, v.titleWhole)
+      assert.is_true(v:MinWidth() >= start + #long * 6)
+      addon:GetModule("NextChain"):Init()
+    end)
+
     it("calls itself Vendor in its title's tooltip, never by the secret name", function()
       local v = open()
       v.titleButton:GetScript("OnEnter")(v.titleButton)
@@ -703,6 +739,33 @@ describe("NextVendor", function()
     local G = style.Theme.Header.TitleGlow
     assert.are.equal(v.titleCut + 2 * G.X, v.titleGlow._width)
     assert.are.equal(v.titleCut + 16, v.titleButton:GetWidth())
+  end)
+
+  -- A theme's restyle measures the title whole in its font (MinWidth) before it lays the cloud out: the title takes back the
+  -- width it was cut to first.
+  it("lays what is drawn about a long name out to its cut through a theme's restyle", function()
+    local long = string.rep("Mira the Smith ", 6)
+    override(_G, "UnitName", function(unit) if unit == "npc" then return long end end)
+    local v = open()
+    -- The client measures a font string at the width it was cut to (next-themes-art.md §14), as the cloud reads it.
+    v.title.GetStringWidth = function(self)
+      local width = self._width
+      if width ~= nil and width > 0 and width < #long * 6 then return width end
+      return #long * 6
+    end
+    v:SetTitle(long)
+    local function puffs()
+      local out = {}
+      for i, puff in ipairs(v.cloud.puffs) do out[i] = { puff.base.x, puff.base.w } end
+      return out
+    end
+    local laid = puffs()
+    assert.is_true(#laid > 0, "the theme has a cloud")
+    v:ApplyStyle(ctx())
+    assert.are.same(laid, puffs(), "the cloud across the title as cut")
+    local G = style.Theme.Header.TitleGlow
+    assert.are.equal(v.titleCut + 2 * G.X, v.titleGlow._width)
+    assert.are.equal(#string.rep("Mira the Smith ", 6) * 6, v.titleWhole)
   end)
 
   describe("opening", function()

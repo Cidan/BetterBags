@@ -306,6 +306,18 @@ function DB:SetNextBagScale(value)
   DB.data.profile.nextBagScale = nextScale(value)
 end
 
+-- GetNextFitNamesWhileOpen returns whether BetterBags Next's small panels follow what they show while open: wider when a
+-- section's name or the title would be cut short, back once it fits (next.md §14g).
+---@return boolean
+function DB:GetNextFitNamesWhileOpen()
+  return DB.data.profile.nextFitNamesWhileOpen
+end
+
+---@param on boolean
+function DB:SetNextFitNamesWhileOpen(on)
+  DB.data.profile.nextFitNamesWhileOpen = on
+end
+
 ---@alias NextSize "full"|"small"
 
 -- GetNextSize returns BetterBags Next's panel size: "full" height on the screen's edges, or "small"

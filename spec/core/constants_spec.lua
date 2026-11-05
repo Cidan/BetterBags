@@ -166,6 +166,13 @@ describe("Constants Module Offsets", function()
     assert.are.equal(100, const.DATABASE_DEFAULTS.profile.nextBagScale)
   end)
 
+  -- Fit Names While Open (next.md §14g). Asked: "with an option to enable/disable this behavior in settings, default disable".
+  it("keeps BetterBags Next's small bags at their width while they are open by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    assert.is_false(const.DATABASE_DEFAULTS.profile.nextFitNamesWhileOpen)
+  end)
+
   -- BetterBags Next's currencies (currency.md §6). Asked: cap bars off by default.
   it("shows BetterBags Next's currencies without cap bars, with gains, until told", function()
     loadfile("core/constants.lua")("BetterBags")

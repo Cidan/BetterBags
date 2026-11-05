@@ -22,7 +22,7 @@ paths:
 
 ## Reflow a Panel Live While the Player Sizes It, With Its Layout Animations Off
 **Problem**: BetterBags Next lays its content out through Motion, so every layout change glides. A small panel resized with a grip (`Frame:StartSizing`) changes size every frame; laying out again each frame with the glides on starts a new glide toward a target that moves again next frame, so the icons trail the edge instead of flowing with it, and a size change the panel makes itself (a size switch's glide) would lay out every frame for nothing.
-**Solution**: lay out from the frame's own `OnSizeChanged` only while a grip sizes it (or an animated reset of its size runs), and turn the canvas's glides off for that time (`canvas:SetInstant`), on again once let go; save the size only when it changed by half a unit or more, so a click on the grip keeps a default size that follows the screen. next-small-mode.md §14g.
+**Solution**: lay out from the frame's own `OnSizeChanged` only while a grip sizes it (or an animated reset of its size runs), and turn the canvas's glides off for that time (`canvas:SetInstant`), on again once let go; save the size only when it changed by half a unit or more, so a click on the grip keeps a default size that follows the screen. next-small-resize.md §14g.
 
 ## A Scaled Frame's Edges and Offsets Are in Its Own Units
 **Problem**: `GetLeft`, `GetTop`, `GetCenter` and `GetWidth` report a frame in its own units, and `SetPoint` offsets are in the units of the frame being anchored, so a frame under a scaled parent (BetterBags Next's small panels at their Bag Scale; the settings window scaled down to fit a small screen) reads and places at the wrong spot when its edges are compared with the cursor or with another frame's. BetterBags Next assumed every frame was at scale 1: a section drag's gap, its landing, a tab moved in its rail and the dock's flights all used raw edges.
@@ -30,7 +30,7 @@ paths:
 
 ## Whole UI Units Are Not Whole Screen Pixels
 **Problem**: a UI unit is a whole screen pixel only when the screen is 768 pixels high at a UI scale of 1. At 65% in a 3396x1362 window it is 1.153 pixels, so frames and lines placed in whole units land between pixels, and the client snaps each texture to the grid on its own: a 1-unit edge drew one pixel thick, two, or not at all (the theme card that lost its top edge at 65% and its bottom edge at 70%). Anchoring by a middle point (`CENTER`, `LEFT`, `RIGHT`) puts a region between two pixels whenever the region it is anchored to is an odd number of pixels across, and anchoring after a text's far edge follows the client's fractional measure of the text.
-**Solution**: round every length and offset to whole screen pixels on the grid of the region it is used in (`NextPixel`: one pixel is `PixelUtil.GetPixelToUIUnitFactor()` over the region's effective scale), anchor by corners from aligned regions, center by a corner offset with the odd pixel after (`pixel:Middle`, `pixel:Row`, `pixel:Center`), place what follows a text by the text's width or height rounded up, and lay everything out again when the grid changes (UI scale, window size, a frame's own scale). Check it with the spec layout resolver (`spec/helpers/layout.lua`, `PixelCheck`) on real screen sizes. next-pixel-perfect.md.
+**Solution**: round every length and offset to whole screen pixels on the grid of the region it is used in (`NextPixel`: one pixel is `PixelUtil.GetPixelToUIUnitFactor()` over the region's effective scale), anchor by corners from aligned regions, center by a corner offset with the odd pixel after (`pixel:Middle`, `pixel:Row`, `pixel:Center`), place what follows a text by the text's width or height rounded up, and lay everything out again when the grid changes (UI scale, window size, a frame's own scale). A value worked out between two whole-pixel ends (an edge gliding from one place to another with a width) is not on whole pixels because its ends are: round it on every frame too (a small panel's snap gliding both its edges stood its left edge between pixels on 12 of 21 frames, next-small-resize.md §14g). Check it with the spec layout resolver (`spec/helpers/layout.lua`, `PixelCheck`) on real screen sizes, on every frame of a glide. next-pixel-perfect.md.
 
 ## A Docked Section Flies to Where Its Items Went
 **Problem**: Every move waiting for the player waits in `NextDock`, and a "moved" answer flew the section
@@ -81,3 +81,14 @@ screen, diffed frame by frame, did.
 **Rule**: draw a window's textures with `SetSnapToPixelGrid(false)` and `SetTexelSnappingBias(0)`, as Blizzard does
 on textures that resize and ElvUI on every texture (`Texels:Unsharpen`, texture-sharpening.md). When something drawn
 changes with no rect changing, compare video frames before reading more of the layout.
+
+## Clear a Mark of Something Owed Wherever It Is Paid
+**Problem**: a small bag busy while its anchor's glide moved its spot is marked (`spotMoved`), so its own snap settles
+the chain as it ends. Only the call named for settling it (`chain:Settle`) cleared the mark, but a refit and the
+anchor's drag also put the bag on its spot. The mark outlived what it was for, and a later, unrelated snap of the bag
+read it, ran the chain's update and glided the bag over a fraction of a pixel, the braid letting go.
+
+**Rule**: a mark that says something is owed says a fact about the state ("its spot moved and it was left there");
+clear it in every place that makes that fact false, not only in the one that pays it on purpose. Find them by what
+they do (here: each place that sets the bag's place from `SmallPlace()` and places it), and test each one alone,
+since a later path often clears it for the common case and hides a missing clear. next-small-resize.md §14g.

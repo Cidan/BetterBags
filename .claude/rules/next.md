@@ -190,7 +190,8 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
     billows. Their places, sizes, colors and alphas are data (`NextStyle.Cloud`): each sits a share
     of the way across the cloud, which reaches from the window's hard edge to 16 pixels past the
     title's far side (`CloudSpan`), so the cloud spreads across any title (`LayoutCloud`, on every `SetTitle`: the bank's group and tab names,
-    the vendor's merchant). The puffs are at most 0.24 alpha, below the title (ARTWORK; the title is
+    the vendor's merchant; and whenever `FitTitle` cuts the title to another width, as the client measures a cut title
+    at its cut, next-small-names.md §14g). The puffs are at most 0.24 alpha, below the title (ARTWORK; the title is
     OVERLAY), so it stays crisp. No texture of the cloud has an edge.
   - The ribbon and every line of its glow end flush with the window's hard edge (`TitleJoin`: where
     the body and its wash start, 22 pixels before the title), where the cloud begins; a warm puff
@@ -246,7 +247,9 @@ section dragged out of a panel returns to the panel's strata (next-drag.md §7).
   style the saved scale before the theme; a theme change keeps it. The slider sends
   `next/ScalesChanged`; the chain (`chain:ScalesChanged`, registered once with the first panel, in
   BetterBags Next's event scope) sets the style's scale, has every panel draw again (`ApplyScales`:
-  at once while shown, else when it opens), then places the panels (`Update`, snapping). It never
+  at once while shown, else when it opens), then places the panels (`Update`, snapping: an open small one
+  refitted at its Bag Scale, its size gliding or not, so one its draw set gliding for its names is refitted at
+  its new scale; one a grip holds is left alone, next-small-mode.md §14h). It never
   re-applies the theme: that makes new font objects, which cannot be freed, one set per slider step.
   Coverage: `spec/next/style_spec.lua` ("NextStyle Icon Scale"), `spec/next/small_spec.lua` ("the Size
   tab's scales" → "Icon Scale"), `spec/next/content_spec.lua`, `spec/next/vendorbutton_spec.lua`,

@@ -179,6 +179,7 @@ describe("BetterBags Next, pixel perfect", function()
     override(stubs.database, "SetNextTheme", function(_, key) db.theme = key end)
     override(stubs.database, "GetNextIconScale", function() return db.iconScale end)
     override(stubs.database, "GetNextBagScale", function() return db.bagScale end)
+    override(stubs.database, "GetNextFitNamesWhileOpen", function() return false end)
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)

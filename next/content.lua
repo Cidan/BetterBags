@@ -291,6 +291,20 @@ local function fontHeight(text)
   return height or 0
 end
 
+-- titleRowWidth is how much of a section's width its name and count take on the canvas's grid, as placeTitleRow lays them out:
+-- the title's place (Sections.Title.X), its whole name, the gap to the count (CountGap) and the count, each in whole pixels. A
+-- font string keeps the width it was cut to, and measures that: a name cut short is as wide as it was before it was cut, never
+-- measured by setting it back (what reads this may lay nothing out after it to cut it again).
+---@private
+---@param section NextSection
+---@return number
+function canvasProto:titleRowWidth(section)
+  local frame, S = self.frame, style.Theme.Sections
+  local title = section.titleCut and section.titleWhole or section.title:GetStringWidth()
+  return pixel:Snap(frame, S.Title.X) + pixel:Ceil(frame, title) + pixel:Snap(frame, S.CountGap)
+    + pixel:Ceil(frame, section.count:GetStringWidth())
+end
+
 -- titleFits is whether a section's name and count fit the width it was given, on the grid that width was worked out on, its
 -- canvas's. Drawn shrunk (held in a drag, in a dock card) each length rounds otherwise and its width comes up short, which
 -- would cut a name that fits.
@@ -298,9 +312,7 @@ end
 ---@param section NextSection
 ---@return boolean
 function canvasProto:titleFits(section)
-  local frame, S = self.frame, style.Theme.Sections
-  return pixel:Snap(frame, S.Title.X) + pixel:Ceil(frame, section.title:GetStringWidth()) + pixel:Snap(frame, S.CountGap)
-    + pixel:Ceil(frame, section.count:GetStringWidth()) <= pixel:Floor(frame, section.givenWidth) + 1e-6
+  return self:titleRowWidth(section) <= pixel:Floor(self.frame, section.givenWidth) + 1e-6
 end
 
 -- placeTitleRow puts a section's title row on whole pixels (docs/next-pixel-perfect.md): the title at the
@@ -627,6 +639,18 @@ function canvasProto:RowWidth(perRow)
   return perRow * ((self.cards and style.VENDOR_CARD_WIDTH or style.ICON) + style.GAP) - style.GAP
 end
 
+-- cellsOf is how many cells a place in a row takes: the columns it spans.
+---@param grid NextColumnSplit
+---@param cell NextColumnCell
+---@return number
+local function cellsOf(grid, cell)
+  local cells = 0
+  for c = cell.column, cell.column + cell.span - 1 do
+    cells = cells + grid.split[c]
+  end
+  return cells
+end
+
 -- Widest is how many cells the largest section the column lays out holds; given a width to lay out for that holds
 -- columns of sections, how many cells they need to stay as they stand there: each column as wide as the largest section
 -- beside another (at least what keeps them columns), one spanning columns sharing what it needs among them, one alone in
@@ -671,6 +695,64 @@ function canvasProto:Widest(layoutWidth)
     widest = math.max(grid.count * column, row)
   end
   return math.max(widest, whole)
+end
+
+-- NameCells is the fewest cells, from as many as layoutWidth holds up to most, at which every section's name and count fit the
+-- room the canvas lays it out in there, so placeTitleRow cuts none: the whole row for Recent Items and Free Space, and for every
+-- section at one column (a bag set to one, Show Bags, the vendor's cards, a window too narrow for two); in columns, the cells its
+-- place in its row takes (columnRows), as renderColumns gives them; compact, the cells its name needs within the row. Not one
+-- waiting in a dock (one flying back is laid out again), nor one leaving, as Widest. Nil when none does. A whole row is drawn in
+-- whole pixels, which can take up to short off the row's own width (a panel's frame on whole pixels: the panel says how much);
+-- at layoutWidth it is that width, less short. It lays nothing out and changes nothing a layout holds but what Widest holds too
+-- (neededCells). A small panel widens to it (next.md §14g): asked, "such that no text is truncated in bag title or section title".
+---@param layoutWidth number
+---@param most number
+---@param short? number
+---@return number?
+function canvasProto:NameCells(layoutWidth, most, short)
+  local frame = self.frame
+  local sections, widths = {}, {}
+  for _, section in ipairs(self.order) do
+    local away = self.away[section]
+    if (away == nil or away.returning) and not self:IsLeaving(section) then
+      table.insert(sections, section)
+      widths[section] = self:titleRowWidth(section)
+    end
+  end
+  local textEnd = self:compactTextEnd()
+  local first = self:PerRow(layoutWidth)
+  for cells = first, most do
+    local width = cells == first and layoutWidth or self:RowWidth(cells)
+    local grid = self:ColumnSplit(width)
+    local row = pixel:Floor(frame, width - (short or 0)) + 1e-6
+    local fits, columned = true, {}
+    for _, section in ipairs(sections) do
+      if grid ~= nil and section.kind == "category" then
+        table.insert(columned, section)
+      elseif widths[section] > row then
+        fits = false
+      end
+    end
+    if fits and #columned > 0 then
+      local cellWidth, gap = self:gridLengths(frame, grid.cells)
+      local step = cellWidth + gap
+      if grid.compact then
+        for _, section in ipairs(columned) do
+          fits = fits and math.ceil((widths[section] + textEnd + gap) / step - 1e-6) <= grid.cells
+        end
+      else
+        for _, placed in ipairs(self:columnRows(grid, columned)) do
+          for _, cell in ipairs(placed) do
+            fits = fits and widths[cell.section] <= pixel:Floor(frame, cellsOf(grid, cell) * step - gap) + 1e-6
+          end
+        end
+      end
+    end
+    if fits then
+      return cells
+    end
+  end
+  return nil
 end
 
 ---@class (exact) NextCanvasSection
@@ -985,12 +1067,16 @@ end
 ---@param gap number
 ---@return number
 function canvasProto:compactTextCells(grid, section, step, gap)
-  local frame, S = self.frame, style.Theme.Sections
-  -- A font string keeps the width it was cut to, and measures that: this runs with no layout after it to cut it again.
-  local title = section.titleCut and section.titleWhole or section.title:GetStringWidth()
-  local text = pixel:Snap(frame, S.Title.X) + pixel:Ceil(frame, title) + pixel:Snap(frame, S.CountGap)
-    + pixel:Ceil(frame, section.count:GetStringWidth()) + pixel:Snap(frame, S.Compact and S.Compact.TextEnd or 0)
-  return math.min(grid.cells, math.ceil((text + gap) / step - 1e-6))
+  return math.min(grid.cells, math.ceil((self:titleRowWidth(section) + self:compactTextEnd() + gap) / step - 1e-6))
+end
+
+-- compactTextEnd is the room a compact section's theme keeps after its name and count (Sections.Compact.TextEnd), in whole
+-- pixels on the canvas's grid.
+---@private
+---@return number
+function canvasProto:compactTextEnd()
+  local S = style.Theme.Sections
+  return pixel:Snap(self.frame, S.Compact and S.Compact.TextEnd or 0)
 end
 
 -- compactShapes lists the cells a compact section can take, its usual shape first. That is what keeps its icons within a
@@ -1294,18 +1380,6 @@ function canvasProto:columnRows(grid, sections)
     table.insert(rows, row)
   end
   return rows
-end
-
--- cellsOf is how many cells a place in a row takes: the columns it spans.
----@param grid NextColumnSplit
----@param cell NextColumnCell
----@return number
-local function cellsOf(grid, cell)
-  local cells = 0
-  for c = cell.column, cell.column + cell.span - 1 do
-    cells = cells + grid.split[c]
-  end
-  return cells
 end
 
 -- renderColumns lays its sections out in columns, from height y: Recent Items above them and Free Space below, at the

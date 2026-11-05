@@ -3734,6 +3734,271 @@ describe("NextContent", function()
         assert.are.equal(3, canvas:Widest())
       end)
     end)
+
+    -- A small panel sits at the first grid step from the width the player chose where no name is cut (next.md §14g).
+    -- Asked: "always have the bag width sit at the minimum step ... such that no text is truncated in bag title or
+    -- section title". A name with its count takes the title's place, its text, the gap and the count: here
+    -- 2 + 6 a letter + 8 + 6 a digit. A column of k cells has k * 50 - 6 for it.
+    describe("the cells every name needs", function()
+      local LONG17 = string.rep("n", 17)
+
+      local function spanning(count, fill, wide)
+        canvas:SetColumnSource(function() return count, fill, wide, 2 end)
+      end
+
+      local function compactSource()
+        canvas:SetColumnSource(function() return 2, "across", true, 2, true end)
+      end
+
+      -- measured gives a section's title a width of its own, as the client measures its font.
+      local function measured(name, width)
+        canvas.byName[name].title.GetStringWidth = function() return width end
+      end
+
+      local function cutAt(cells)
+        draw(canvas:RowWidth(cells))
+        local cut = {}
+        for _, section in ipairs(canvas.order) do
+          if section.titleCut then table.insert(cut, section.name) end
+        end
+        return cut
+      end
+
+      it("gives every section the whole row at one column", function()
+        sections({ { "Item Enhancement", 2 } })
+        draw()
+        -- 2 + 96 + 8 + 6: more than two cells' 94, within three cells' 144.
+        assert.are.equal(3, canvas:NameCells(canvas:RowWidth(1), 20))
+        assert.are.equal(4, canvas:NameCells(canvas:RowWidth(4), 20), "from the cells it starts at")
+        assert.are.equal(2, canvas:NameCells(canvas:RowWidth(2) + 30, 20), "the width it starts at holds it")
+      end)
+
+      it("finds the reported bag's: three cells in one column, six in two from four or five", function()
+        columns(2, "across")
+        sections({ { "Consumable", 1 }, { "Miscellaneous", 2 }, { "Trade Goods", 2 }, { "Quest", 1 } },
+          { free = { showAll = false, buttons = { { slotkey = "5_1", count = 30 } } } })
+        draw()
+        measured("Miscellaneous", 100)
+        assert.are.equal(3, canvas:NameCells(canvas:RowWidth(2), 20))
+        assert.are.equal(3, canvas:NameCells(canvas:RowWidth(3), 20))
+        assert.are.equal(6, canvas:NameCells(canvas:RowWidth(4), 20), "not two columns of two")
+        assert.are.equal(6, canvas:NameCells(canvas:RowWidth(5), 20), "nor three and two")
+        assert.are.same({ "Miscellaneous" }, cutAt(4))
+        assert.are.same({ "Miscellaneous" }, cutAt(5))
+        assert.are.same({}, cutAt(6))
+        assert.are.same({}, cutAt(3))
+      end)
+
+      it("gives a section spanning its columns the cells it spans", function()
+        local A = string.rep("a", 30)
+        spanning(2, "across", true)
+        sections({ { A, 6 }, { "B", 1 } })
+        draw()
+        -- 2 + 180 + 8 + 6 = 196: more than a column of four.
+        assert.are.equal(8, canvas:NameCells(canvas:RowWidth(8), 20), "spanning both columns of four")
+        spanning(2, "across", false)
+        assert.are.equal(9, canvas:NameCells(canvas:RowWidth(8), 20), "with wide sections off, a column of five")
+      end)
+
+      it("gives each section the column it lands in, filling down", function()
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 1 }, { LONG17, 1 } })
+        draw()
+        assert.are.equal(5, canvas:NameCells(canvas:RowWidth(5), 20), "across: under A, in the column of three")
+        columns(2, "down")
+        assert.are.equal(6, canvas:NameCells(canvas:RowWidth(5), 20), "down: beside A and B, in the column of two")
+        assert.are.same({ LONG17 }, cutAt(5))
+        assert.are.same({}, cutAt(6))
+      end)
+
+      it("gives a compact section the cells its name needs within the row, with what its theme keeps after it", function()
+        compactSource()
+        sections({ { LONG17, 1 }, { "B", 1 } })
+        draw()
+        -- 118 and the gap: three steps of 50.
+        assert.are.equal(3, canvas:NameCells(canvas:RowWidth(2), 20))
+        measured(LONG17, 124)
+        assert.are.equal(3, canvas:NameCells(canvas:RowWidth(2), 20), "140 and the gap")
+        assert.are.same({ LONG17 }, cutAt(2))
+        assert.are.same({}, cutAt(3))
+        -- What the theme keeps after a name (an end cap) is kept clear of it too, as compactTextCells keeps it.
+        override(style.Theme.Sections, "Compact", { TextEnd = 10 })
+        assert.are.equal(4, canvas:NameCells(canvas:RowWidth(2), 20), "and ten more")
+      end)
+
+      it("gives Recent Items and Free Space the whole row in columns", function()
+        columns(2, "across")
+        sections({ { "A", 1 }, { "B", 1 } }, { recent = { item("0_91", "Recent Items") } })
+        draw()
+        measured("Recent Items", 150)
+        assert.are.equal(4, canvas:NameCells(canvas:RowWidth(3), 20), "the whole row of four")
+        measured("Recent Items", 6)
+        measured("A", 150)
+        assert.are.equal(7, canvas:NameCells(canvas:RowWidth(3), 20), "a category: a column of four")
+      end)
+
+      -- A font string keeps the width it was cut to, and measures that (next-themes-art.md §14).
+      it("measures a name cut short by the whole width it had", function()
+        local LONG = string.rep("x", 40)
+        columns(2, "across")
+        sections({ { LONG, 1 }, { "B", 1 } })
+        local s = canvas.byName[LONG]
+        s.title.GetStringWidth = function(self)
+          local cut = self._width
+          if cut ~= nil and cut > 0 and cut < 240 then return cut end
+          return 240
+        end
+        draw(canvas:RowWidth(8))
+        assert.is_true(s.titleCut)
+        assert.is_true(s.title:GetStringWidth() < 240, "it measures its cut")
+        -- 2 + 240 + 8 + 6 = 256: a first column of six.
+        assert.are.equal(11, canvas:NameCells(canvas:RowWidth(8), 20))
+        assert.is_true(s.titleCut, "and stays cut")
+      end)
+
+      it("leaves out a section waiting in a dock or leaving, not one flying back", function()
+        columns(2, "across")
+        sections({ { LONG17, 1 }, { "B", 1 } })
+        draw()
+        local s = canvas.byName[LONG17]
+        assert.are.equal(5, canvas:NameCells(canvas:RowWidth(4), 20))
+        canvas:HoldOut(s)
+        assert.are.equal(4, canvas:NameCells(canvas:RowWidth(4), 20), "in a dock")
+        canvas:Returning(s)
+        assert.are.equal(5, canvas:NameCells(canvas:RowWidth(4), 20), "flying back")
+        canvas:Return(s)
+        canvas:MarkLeaving(LONG17)
+        assert.are.equal(4, canvas:NameCells(canvas:RowWidth(4), 20), "leaving")
+      end)
+
+      it("says none when no row up to the most it may take holds a name", function()
+        sections({ { "A", 1 } })
+        draw()
+        measured("A", 2000)
+        assert.is_nil(canvas:NameCells(canvas:RowWidth(2), 10))
+      end)
+
+      -- A panel's frame stands on whole pixels, and can draw a whole row short of the row's own width (RowWidth).
+      it("takes what a whole row may be drawn short of, not a column, which is whole cells", function()
+        sections({ { "A", 1 } })
+        draw()
+        measured("A", 128)
+        assert.are.equal(3, canvas:NameCells(canvas:RowWidth(2), 20), "exactly three cells' 144")
+        assert.are.equal(4, canvas:NameCells(canvas:RowWidth(2), 20, 1.5), "a pixel and a half short of it")
+        columns(2, "across")
+        assert.are.equal(5, canvas:NameCells(canvas:RowWidth(2), 20, 1.5), "a first column of three, whole")
+      end)
+
+      it("measures each name and count once, however many rows it tries", function()
+        sections({ { "A", 1 }, { "B", 1 } })
+        draw()
+        local calls = 0
+        for _, name in ipairs({ "A", "B" }) do
+          local s = canvas.byName[name]
+          for _, text in ipairs({ s.title, s.count }) do
+            local measure = text.GetStringWidth
+            text.GetStringWidth = function(self)
+              calls = calls + 1
+              return name == "A" and text == s.title and 2000 or measure(self)
+            end
+          end
+        end
+        assert.is_nil(canvas:NameCells(canvas:RowWidth(1), 12))
+        assert.are.equal(4, calls)
+      end)
+
+      it("changes nothing it lays out with", function()
+        compactSource()
+        sections({ { LONG17, 3 }, { "B", 1 }, { "C", 5 } }, { recent = { item("0_91", "Recent Items") } })
+        draw(canvas:RowWidth(8))
+        local function state()
+          local out = { grid = canvas.grid, places = canvas.columnPlaces, heldFor = canvas.heldPlacesFor, held = {} }
+          for name, kept in pairs(canvas.heldPlaces) do out.held[name] = { kept.start, kept.cells } end
+          for _, s in ipairs(canvas.order) do
+            out[s.name] = { s.width, s.givenWidth, s.layoutWidth, s.gridCells, s.titleCut, s.titleWhole, s.x, s.y,
+              s.height, s.title:GetWidth(), s.title:GetText() }
+          end
+          return out
+        end
+        local before = state()
+        for _, name in ipairs({ "LayoutSection", "renderColumns", "compactLayout", "placeTitleRow", "compactPlaces" }) do
+          spy.on(canvas, name)
+        end
+        for _, source in ipairs({ compactSource, function() columns(2, "down") end }) do
+          source()
+          for cells = 1, 12 do canvas:NameCells(canvas:RowWidth(cells), 20) end
+        end
+        compactSource()
+        assert.are.same(before, state())
+        for _, name in ipairs({ "LayoutSection", "renderColumns", "compactLayout", "placeTitleRow", "compactPlaces" }) do
+          assert.spy(canvas[name]).was_not.called()
+        end
+        assert.is_nil(canvas.drag)
+      end)
+
+      -- What it says is what a layout at that width cuts: the first width with no name cut.
+      it("agrees with what the layout cuts, across random bags", function()
+        for seed = 1, 150 do
+          math.randomseed(seed)
+          local list = {}
+          for i = 1, math.random(1, 6) do
+            list[i] = { "S" .. i .. string.rep("w", math.random(0, 30)), math.random(1, 12) }
+          end
+          local count, fill = math.random(1, 4), math.random() < 0.5 and "across" or "down"
+          local wide, compact, rows = math.random() < 0.5, math.random() < 0.3, math.random(2, 3)
+          canvas:SetColumnSource(function() return count, fill, wide, rows, compact end)
+          canvas:Settle()
+          sections(list, { recent = math.random() < 0.3 and { item("0_99", "Recent Items") } or nil })
+          local from = math.random(1, 6)
+          local said = canvas:NameCells(canvas:RowWidth(from), 16)
+          local first
+          for cells = from, 16 do
+            if #cutAt(cells) == 0 then
+              first = cells
+              break
+            end
+          end
+          assert.are.equal(first, said, "seed " .. seed)
+        end
+      end)
+
+      -- The sum both titleFits and compactTextCells take: the title's place, its whole name, the gap, the count, in whole
+      -- pixels on the canvas's grid.
+      it("works a name's room out on the grid it is drawn on, as it always did", function()
+        local layout = dofile("spec/helpers/layout.lua")
+        local undo = layout.UseScreen(3396, 1362, 0.65)
+        parent:SetParent(UIParent)
+        finally(function()
+          parent:SetParent(nil)
+          undo()
+        end)
+        local pixel, S = addon:GetModule("NextPixel"), style.Theme.Sections
+        compactSource()
+        sections({ { "A", 1 }, { "B", 1 } })
+        draw(canvas:RowWidth(8))
+        local frame, s = canvas.frame, canvas.byName.A
+        local grid = canvas:ColumnSplit(canvas:RowWidth(8))
+        local cellWidth, cellGap = canvas:gridLengths(frame, grid.cells)
+        local step = cellWidth + cellGap
+        for _, textEnd in ipairs({ 0, 4, 16 }) do
+          override(S, "Compact", { TextEnd = textEnd })
+          for _, width in ipairs({ 0, 1, 37.4, 88, 94, 100.5, 300 }) do
+            for _, n in ipairs({ "1", "12", "123" }) do
+              s.title.GetStringWidth = function() return width end
+              s.count:SetText(n)
+              local text = pixel:Snap(frame, S.Title.X) + pixel:Ceil(frame, width) + pixel:Snap(frame, S.CountGap)
+                + pixel:Ceil(frame, s.count:GetStringWidth())
+              assert.are.equal(math.min(grid.cells, math.ceil((text + pixel:Snap(frame, textEnd) + cellGap) / step - 1e-6)),
+                canvas:compactTextCells(grid, s, step, cellGap))
+              for _, given in ipairs({ 90.3, 140, 200.9 }) do
+                s.givenWidth = given
+                assert.are.equal(text <= pixel:Floor(frame, given) + 1e-6, canvas:titleFits(s))
+              end
+            end
+          end
+        end
+      end)
+    end)
   end)
 
   describe("leading frames", function()

@@ -173,6 +173,25 @@ describe("The settings catalog", function()
     assert.is_true(toggle.disabled())
   end)
 
+  -- Asked of a small bag fitting its names: "with an option to enable/disable this behavior in settings, default disable".
+  it("turns BetterBags Next's Fit Names While Open on and off, one setting for every bag", function()
+    local on = false
+    override(db, "GetNextFitNamesWhileOpen", function() return on end)
+    override(db, "SetNextFitNamesWhileOpen", function(_, value) on = value end)
+    local toggle = catalog:Get("nextFitNamesWhileOpen")
+    assert.are.equal("toggle", toggle.kind)
+    assert.are.equal("Fit Names While Open", toggle.title)
+    assert.is_truthy(toggle.description:find("cut short", 1, true))
+    local words = {}
+    for _, word in ipairs(toggle.keywords) do words[word] = true end
+    assert.is_true(words.width and words.names and words.title)
+    assert.is_false(toggle.get(ctx()))
+    toggle.set(ctx(), true)
+    assert.is_true(on)
+    assert.is_true(toggle.get(ctx()))
+    assert.are.same({ { message = "next/FitNamesChanged", args = {} } }, sent)
+  end)
+
   it("saves a bag's section columns and fill order, the fill off at one column", function()
     local columns, fill = {}, {}
     override(db, "GetNextSectionColumns", function(_, kind) return columns[kind] or 1 end)

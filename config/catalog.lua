@@ -830,6 +830,22 @@ define('nextBagScale', {
   end,
 })
 
+-- Asked: "with an option to enable/disable this behavior in settings, default disable. with it disabled, behavior is as it is
+-- now" (next.md §14g). The panels fit themselves again on next/FitNamesChanged: nothing is read or recalculated.
+define('nextFitNamesWhileOpen', {
+  kind = "toggle",
+  title = 'Fit Names While Open',
+  description = "Small bags widen while they are open whenever a section's name or the bag's title would otherwise be cut "
+    .. 'short, and narrow back to their size once it fits again. Off, a small bag fits its names as it opens and when you '
+    .. 'let go of its resize grip.',
+  keywords = { 'width', 'names', 'title', 'section', 'cut', 'truncated', 'fit', 'small', 'window', 'resize' },
+  get = function() return db:GetNextFitNamesWhileOpen() end,
+  set = function(ctx, value)
+    db:SetNextFitNamesWhileOpen(value)
+    events:SendMessage(ctx, 'next/FitNamesChanged')
+  end,
+})
+
 -- BetterBags Next's Animation tab (Appearance > Animation, next-themes.md §20): each effect on or off, on any theme.
 -- Asked: "we need a way to disable sparkles etc on any theme, not just switching to a theme without them". Each one
 -- saves its choice and tells BetterBags Next, which lays the switches over the theme in use again (SonataNext).
