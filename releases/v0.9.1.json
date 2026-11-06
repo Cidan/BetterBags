@@ -1,0 +1,23 @@
+{
+  "id": 1793931336,
+  "version": "v0.9.1",
+  "channel": "release",
+  "date": "2026-11-06",
+  "from": "v0.9.0",
+  "to": "v0.9.1",
+  "headline": "This update prevents text truncation in small Next panels and fixes an error when consuming items while bags are closed.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Text fitting for small panels",
+      "details": "Small BetterBags Next panels now widen just enough to keep bag titles and section headers from being cut off. A new Fit Names While Open setting under Appearance \u003e Size allows open panels to dynamically adjust their width as longer names appear.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Error when items are consumed with bags closed",
+      "details": "Fixed an issue where item recalculations caused an error if an item was consumed or cleared while bags were closed, such as when crafting at a trainer.",
+      "clients": []
+    }
+  ]
+}
