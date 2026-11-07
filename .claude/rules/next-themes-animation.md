@@ -30,6 +30,9 @@ use, and back on.
   | Transporter (`nextBeam`) | `beam` | `Panel.Beam` (next-themes-makeitso.md §24): no beaming in or out; the bags slide in and out as any theme's |
   | Paper Folding (`nextPaper`) | `paper` | `Panel.Paper` (next-themes-papercraft.md §25): no unfolding or crumpling; the bags slide in and out as any theme's |
   | Stop Motion (`nextStopMotion`) | `stopMotion` | `Motion.StopMotion` (next-themes-papercraft.md §25): the theme's animations run smoothly, every frame |
+  | Rain on Glass (`nextGlassRain`) | `glassRain` | `Panel.Glass.Rain` (next-themes-glass.md §26): no drops, runners or beads; the glass stays |
+  | Lightning (`nextLightning`) | `lightning` | `Panel.Glass.Lightning` (next-themes-glass.md §26): no flashes. Flashes can be hard on some players' eyes |
+  | Glass Sheen (`nextSheen`) | `sheen` | `Panel.Sheen` (next-themes-glass.md §26): no band of light sweeping across as the bags fade in and out; they slide in and out as any theme's |
 
   Moving Ornaments also holds a theme's threads of light still (next-themes-frost.md §22: each thread's `Sway` and `Glint` taken out, its art
   and its draw-in as the panel opens kept).

@@ -930,6 +930,18 @@ for _, effect in ipairs({
     description = "A theme's animations running a pose at a time, each a little off where it should be. Off, they run "
       .. 'smoothly.',
     keywords = { 'stop', 'motion', 'stepped', 'choppy', 'smooth', 'papercraft', 'theme' } },
+  -- The Rainy Window theme's (next-themes-glass.md §26). Lightning flashes can be hard on some players' eyes.
+  { id = 'nextGlassRain', name = 'glassRain', title = 'Rain on Glass',
+    description = "Raindrops on a glass theme's bags, a few running down now and then and leaving beads behind.",
+    keywords = { 'rain', 'drops', 'raindrops', 'water', 'glass', 'window', 'theme' } },
+  { id = 'nextLightning', name = 'lightning', title = 'Lightning',
+    description = "A flash of lightning lighting up a glass theme's bags now and then. Flashes can be hard on some "
+      .. "players' eyes.",
+    keywords = { 'lightning', 'flash', 'storm', 'thunder', 'glass', 'theme' } },
+  { id = 'nextSheen', name = 'sheen', title = 'Glass Sheen',
+    description = "A theme's bags fading in and out as a band of light sweeps across their glass. Off, they slide in "
+      .. 'and out.',
+    keywords = { 'sheen', 'shine', 'light', 'glint', 'fade', 'glass', 'window', 'theme' } },
 }) do
   local keywords = { 'animation', 'effects', 'motion' }
   for _, word in ipairs(effect.keywords) do
@@ -947,6 +959,26 @@ for _, effect in ipairs({
     end,
   })
 end
+
+-- A glass theme's tint (Appearance > Theme, next-themes-glass.md §26; asked: "let's let people adjust the tint
+-- strength"): how dark its smoked glass is. It tells BetterBags Next, which draws only the glass again: a dragged slider
+-- sends it on every step.
+define('nextGlassTint', {
+  kind = "slider",
+  title = 'Glass Tint',
+  description = "How dark a glass theme's bags are, in percent: 0 is clear glass, 100 is smoked nearly black. "
+    .. 'Darker reads more easily over a bright world.',
+  keywords = { 'glass', 'tint', 'smoke', 'smoked', 'dark', 'transparency', 'opacity', 'clarity', 'rain', 'window',
+    'theme' },
+  min = 0,
+  max = 100,
+  step = 1,
+  get = function() return db:GetNextGlassTint() end,
+  set = function(ctx, value)
+    db:SetNextGlassTint(value)
+    events:SendMessage(ctx, 'next/GlassTintChanged')
+  end,
+})
 
 -- BetterBags Next's currencies (currency.md §6, the Currencies page's Display tab): how the strip at the bottom of the
 -- backpack and the tracker dragged out of it show what is tracked. Each saves the player's choice (one of the

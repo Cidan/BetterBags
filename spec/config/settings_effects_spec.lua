@@ -334,7 +334,8 @@ describe("What each setting asks the bags for", function()
     { "Title Ribbon", "ribbon" }, { "Braid", "braid" }, { "Moving Ornaments", "ornaments" },
     { "Glitch Effects", "glitch" }, { "Data Rain", "rain" }, { "Ice Shatter", "shatter" }, { "Snow, Leaves and Stars", "snow" },
     { "Smoke Puff", "smoke" }, { "Bats", "bats" }, { "Transporter", "beam" }, { "Paper Folding", "paper" },
-    { "Stop Motion", "stopMotion" } }) do
+    { "Stop Motion", "stopMotion" }, { "Rain on Glass", "glassRain" }, { "Lightning", "lightning" },
+    { "Glass Sheen", "sheen" } }) do
     it("saves " .. case[1] .. " on or off and tells BetterBags Next, reading nothing", function()
       local on = { [case[2]] = true }
       override(db, "GetNextAnimation", function(_, name) return on[name] end)
@@ -350,6 +351,22 @@ describe("What each setting asks the bags for", function()
       assert.is_true(on[case[2]])
     end)
   end
+
+  -- A glass theme's tint (Appearance > Theme, next-themes-glass.md §26): saved in percent, and BetterBags Next draws
+  -- only its glass again (next/GlassTintChanged), every step of a drag; the bags' items are neither read nor recalculated.
+  it("saves Glass Tint, 0 to 100 a step at a time, and tells BetterBags Next's glass, reading nothing", function()
+    local tint = 60
+    override(db, "GetNextGlassTint", function() return tint end)
+    override(db, "SetNextGlassTint", function(_, v) tint = v end)
+    local found = settings("Glass Tint")
+    assert.are.equal(1, #found)
+    assert.are.equal("slider", found[1].kind)
+    assert.are.same({ 0, 100, 1 }, { found[1].min, found[1].max, found[1].step })
+    assert.are.equal(60, found[1].get(ctx()))
+    found[1].set(ctx(), 25)
+    assert.are.equal(25, tint)
+    assert.are.same({ "next/GlassTintChanged" }, messages())
+  end)
 
   -- BetterBags Next's currencies (currency.md §6, the Currencies page's Display tab): each saves its choice and tells
   -- the strip and the tracker (currencies/OptionsChanged); the bags' items are neither read nor recalculated.

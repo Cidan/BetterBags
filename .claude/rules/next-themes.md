@@ -27,7 +27,8 @@ Before this, Next's whole look was constants in `next/style.lua` and literals ac
 Sections with their own rule files keep their numbers there: next-themes-shipped.md §8,
 next-themes-ornaments.md §12 and §13, next-themes-art.md §14, §15 and §16, next-themes-plain.md §17 and §18,
 next-themes-menubutton.md §19, next-themes-animation.md §20, and the theme engines: next-themes-glitch.md §21,
-next-themes-frost.md §22, next-themes-halloween.md §23, next-themes-makeitso.md §24 and next-themes-papercraft.md §25.
+next-themes-frost.md §22, next-themes-halloween.md §23, next-themes-makeitso.md §24, next-themes-papercraft.md §25 and
+next-themes-glass.md §26.
 
 ## 1. The pieces
 

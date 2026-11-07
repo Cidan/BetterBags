@@ -108,7 +108,9 @@ const.DATABASE_DEFAULTS = {
     nextSmallChain = "apart",
     nextTheme = "Default",
     nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, ribbon = true, braid = true, ornaments = true,
-      glitch = true, rain = true, shatter = true, snow = true, smoke = true, bats = true, beam = true },
+      glitch = true, rain = true, shatter = true, snow = true, smoke = true, bats = true, beam = true, glassRain = true,
+      lightning = true, sheen = true },
+    nextGlassTint = 60,
     nextCurrencies = {},
     nextCurrency = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
       scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" },
@@ -457,7 +459,7 @@ describe("Database", function()
     -- player turns it off, on any theme; nothing but an effect.
     it("GetNextAnimation / SetNextAnimation, every effect on until turned off, and nothing but an effect", function()
       for _, name in ipairs({ "sparkles", "shimmer", "titleCloud", "ribbon", "braid", "ornaments", "glitch", "rain",
-        "shatter", "snow", "smoke", "bats", "beam" }) do
+        "shatter", "snow", "smoke", "bats", "beam", "glassRain", "lightning", "sheen" }) do
         assert.is_true(DB:GetNextAnimation(name), name)
         DB:SetNextAnimation(name, false)
         assert.is_false(DB:GetNextAnimation(name), name)
@@ -466,6 +468,20 @@ describe("Database", function()
       end
       assert.has_error(function() DB:GetNextAnimation("cascade") end)
       assert.has_error(function() DB:SetNextAnimation("cascade", false) end)
+    end)
+
+    -- A glass theme's tint (Appearance > Theme > Glass Tint, next-themes-glass.md §26), in percent: 60 until the player
+    -- sets it, a whole number from 0 (clear) to 100 (the smoke itself).
+    it("GetNextGlassTint / SetNextGlassTint, 60 until set, whole and from 0 to 100", function()
+      assert.are.equal(60, DB:GetNextGlassTint())
+      DB:SetNextGlassTint(35)
+      assert.are.equal(35, DB:GetNextGlassTint())
+      DB:SetNextGlassTint(72.6)
+      assert.are.equal(73, DB:GetNextGlassTint())
+      DB:SetNextGlassTint(140)
+      assert.are.equal(100, DB:GetNextGlassTint())
+      DB:SetNextGlassTint(-5)
+      assert.are.equal(0, DB:GetNextGlassTint())
     end)
 
     -- BetterBags Next's currencies (currency.md): what is tracked, in order, per profile; how they show;

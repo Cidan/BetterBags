@@ -213,13 +213,15 @@ describe("Constants Module Offsets", function()
     local const = addon:GetModule("Constants")
     local on = const.DATABASE_DEFAULTS.profile.nextAnimation
     local names = { "sparkles", "shimmer", "titleCloud", "ribbon", "braid", "ornaments", "glitch", "rain", "shatter",
-      "snow", "smoke", "bats", "beam", "paper", "stopMotion" }
+      "snow", "smoke", "bats", "beam", "paper", "stopMotion", "glassRain", "lightning", "sheen" }
     local count = 0
     for _ in pairs(on) do count = count + 1 end
     assert.are.equal(#names, count)
     for _, name in ipairs(names) do
       assert.is_true(on[name], name)
     end
+    -- A glass theme's tint (next-themes-glass.md §26): 60% until the player sets it.
+    assert.are.equal(60, const.DATABASE_DEFAULTS.profile.nextGlassTint)
   end)
 
   -- Asked: "2 columns, side to side, wide sections on, wide column limit of 2, and sort order is descending for sections by

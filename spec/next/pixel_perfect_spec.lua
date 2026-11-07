@@ -56,7 +56,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -176,6 +176,7 @@ describe("BetterBags Next, pixel perfect", function()
     db.iconScale, db.bagScale, db.theme = 100, 100, "Default"
     override(stubs.database, "GetNextTheme", function() return db.theme end)
     override(stubs.database, "GetNextAnimation", function() return true end)
+    override(stubs.database, "GetNextGlassTint", function() return 60 end)
     override(stubs.database, "SetNextTheme", function(_, key) db.theme = key end)
     override(stubs.database, "GetNextIconScale", function() return db.iconScale end)
     override(stubs.database, "GetNextBagScale", function() return db.bagScale end)
@@ -462,7 +463,7 @@ describe("BetterBags Next, pixel perfect", function()
       db.size, db.theme = "full", "MakeItSo"
       startSonataNext()
       -- What the theme draws in the world: started once a session.
-      for _, name in ipairs({ "NextBeam", "NextPaper", "NextShatter", "NextSmoke", "NextBats" }) do
+      for _, name in ipairs({ "NextBeam", "NextPaper", "NextShatter", "NextSmoke", "NextBats", "NextSheen" }) do
         local module = addon:GetModule(name, true)
         if module and module.Init then module:Init() end
       end

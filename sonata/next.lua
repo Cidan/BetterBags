@@ -318,10 +318,34 @@ local ANIMATION_OFF = {
   -- run a pose at a time; off, they run smoothly.
   paper = function(theme) theme.Panel.Paper = nil end,
   stopMotion = function(theme) theme.Motion.StopMotion = nil end,
+  -- The Rainy Window theme's (next-themes-glass.md §26): the rain on its glass, its lightning (flashes can be hard on some
+  -- players' eyes), and its bags catching the light as they open and close; off, they slide in and out. The glass itself
+  -- is its look, not an animation, and stays.
+  glassRain = function(theme)
+    if theme.Panel.Glass then
+      theme.Panel.Glass.Rain = nil
+    end
+  end,
+  lightning = function(theme)
+    if theme.Panel.Glass then
+      theme.Panel.Glass.Lightning = nil
+    end
+  end,
+  sheen = function(theme) theme.Panel.Sheen = nil end,
 }
 
--- effective returns a theme as the player sees it: resolved (a new table), the Animation switches they turned off laid
--- over it. Resolve and Check keep a theme as it is written.
+-- glassTint lays the player's Glass Tint (Appearance > Theme, next-themes-glass.md §26) over a glass theme's strength;
+-- a theme without glass is left as it is, and nothing is read for it.
+---@param theme NextTheme
+local function glassTint(theme)
+  local G = theme.Panel and theme.Panel.Glass
+  if G and G.Tint then
+    G.Tint.Strength = db():GetNextGlassTint() / 100
+  end
+end
+
+-- effective returns a theme as the player sees it: resolved (a new table), the Animation switches they turned off and
+-- their Glass Tint laid over it. Resolve and Check keep a theme as it is written.
 ---@private
 ---@param key string
 ---@return NextTheme
@@ -333,6 +357,7 @@ function sonataNext:effective(key)
       off(theme)
     end
   end
+  glassTint(theme)
   return theme
 end
 
@@ -459,8 +484,27 @@ function sonataNext:ApplyAnimation(ctx)
   return true
 end
 
--- WatchAnimation follows the player's Animation switches (core/init.lua, after WatchClientFonts): each one sends
--- next/AnimationChanged (config/catalog.lua). Registered once however often it starts.
+-- ApplyGlassTint lays the player's Glass Tint over the theme in use again (next/GlassTintChanged) and draws only the
+-- glass again (NextGlass:Retint): a slider dragged sends it on every step, and nothing else changed. It returns whether
+-- it did, for profiler traces.
+---@param ctx Context
+---@return boolean
+function sonataNext:ApplyGlassTint(ctx)
+  local _ = ctx
+  if not self.started then
+    return false
+  end
+  glassTint(self:GetCurrentTheme())
+  local glass = addon:GetModule('NextGlass', true)
+  if glass ~= nil then
+    glass:Retint()
+  end
+  return true
+end
+
+-- WatchAnimation follows the player's Animation switches and Glass Tint (core/init.lua, after WatchClientFonts): each
+-- switch sends next/AnimationChanged, the tint next/GlassTintChanged (config/catalog.lua). Registered once however often
+-- it starts.
 function sonataNext:WatchAnimation()
   if self.watchingAnimation then
     return
@@ -468,6 +512,9 @@ function sonataNext:WatchAnimation()
   self.watchingAnimation = true
   events():RegisterMessage('next/AnimationChanged', function(ctx)
     self:ApplyAnimation(ctx)
+  end)
+  events():RegisterMessage('next/GlassTintChanged', function(ctx)
+    self:ApplyGlassTint(ctx)
   end)
 end
 
@@ -1288,6 +1335,138 @@ function sonataNext:Check(key)
         partsOf(O, keys, phaseWhere)
         ranges(O, phaseWhere, { { phase == "Open" and "Reveal" or "Fade", "from and to", true } })
         envelopes(O, phaseWhere)
+      end
+    end
+  end
+  -- Glass and its sheen (Panel.Glass, Panel.Sheen, next-themes-glass.md §26): their parts are NextGlass's and NextSheen's,
+  -- and what their runtimes divide by or count: a period, a reach, a piece, a band's width or a time of nothing divides
+  -- by it, and lightning due at once flashes every frame.
+  local function needs(spec, part, where)
+    if spec[part] == nil then
+      table.insert(problems, where .. part .. ": needs one")
+    end
+  end
+  local function above(spec, part, where, words)
+    local v = spec[part]
+    if not (range(v) and v[1] > 0) then
+      table.insert(problems, where .. part .. ": two numbers above nothing, " .. words)
+    end
+  end
+  local glassModule = addon:GetModule('NextGlass', true)
+  local GL = theme.Panel and theme.Panel.Glass
+  if glassModule ~= nil and glassModule.KEYS ~= nil and type(GL) == "table" then
+    local where = "Panel.Glass."
+    partsOf(GL, glassModule.KEYS, where)
+    local T = GL.Tint
+    if type(T) == "table" then
+      partsOf(T, glassModule.TINT_KEYS, where .. "Tint.")
+      checkNumber(where .. "Tint.Strength", T.Strength, "from 0 to 1")
+      if type(T.Veil) == "table" then
+        partsOf(T.Veil, glassModule.VEIL_KEYS, where .. "Tint.Veil.")
+        checkNumber(where .. "Tint.Veil.Alpha", T.Veil.Alpha, "from 0 to 1")
+      end
+    end
+    local Gr = GL.Grain
+    if type(Gr) == "table" then
+      partsOf(Gr, glassModule.GRAIN_KEYS, where .. "Grain.")
+      needs(Gr, "Texture", where .. "Grain.")
+      atLeast(Gr, "Size", where .. "Grain.", true)
+    end
+    local F = GL.Reflections
+    if type(F) == "table" then
+      partsOf(F, glassModule.REFLECTION_KEYS, where .. "Reflections.")
+      needs(F, "Texture", where .. "Reflections.")
+      atLeast(F, "Period", where .. "Reflections.", true, true)
+      checkNumber(where .. "Reflections.Parallax", F.Parallax, "from 0 to 1")
+      if F.Angle ~= nil and type(F.Angle) ~= "number" then
+        table.insert(problems, where .. "Reflections.Angle: a number")
+      end
+    end
+    local L = GL.Lamp
+    if type(L) == "table" then
+      partsOf(L, glassModule.LAMP_KEYS, where .. "Lamp.")
+      needs(L, "Texture", where .. "Lamp.")
+      atLeast(L, "Size", where .. "Lamp.", true, true)
+      atLeast(L, "Reach", where .. "Lamp.", true, true)
+    end
+    local R = GL.Rim
+    if type(R) == "table" then
+      partsOf(R, glassModule.RIM_KEYS, where .. "Rim.")
+      ranges(R, where .. "Rim.", { { "Alpha", "faintest and strongest", true } })
+      atLeast(R, "Piece", where .. "Rim.", true, true)
+      atLeast(R, "Size", where .. "Rim.", true)
+    end
+    local N = GL.Rain
+    if type(N) == "table" then
+      local at = where .. "Rain."
+      partsOf(N, glassModule.RAIN_KEYS, at)
+      needs(N, "Texture", at)
+      atLeast(N, "Density", at, false, true)
+      ranges(N, at, { { "Size", "smallest and largest", true }, { "Appear", "soonest and latest" } })
+      for _, part in ipairs({ "Highlight", "Caustic" }) do
+        if type(N[part]) == "table" then
+          partsOf(N[part], glassModule.SHINE_KEYS, at .. part .. ".")
+          needs(N[part], "Texture", at .. part .. ".")
+        end
+      end
+      local U = N.Runners
+      if type(U) == "table" then
+        partsOf(U, glassModule.RUNNER_KEYS, at .. "Runners.")
+        atLeast(U, "Count", at .. "Runners.", false, true)
+        atLeast(U, "Beads", at .. "Runners.", false)
+        atLeast(U, "Every", at .. "Runners.", true)
+        -- With beads, each needs a size and a life above nothing (found in review: none raised every frame, a life of
+        -- nothing never dried).
+        local beads = type(U.Beads) == "number" and U.Beads > 0
+        ranges(U, at .. "Runners.", { { "Size", "smallest and largest", true }, { "Speed", "slowest and fastest", true },
+          { "Wait", "shortest and longest", true }, { "Slide", "shortest and longest", true },
+          { "Catch", "shortest and longest", true }, { "BeadSize", "smallest and largest", beads } })
+        if beads then
+          above(U, "BeadLife", at .. "Runners.", "shortest and longest")
+        else
+          ranges(U, at .. "Runners.", { { "BeadLife", "shortest and longest" } })
+        end
+      end
+    end
+    local flash = GL.Lightning
+    if type(flash) == "table" then
+      partsOf(flash, glassModule.LIGHTNING_KEYS, where .. "Lightning.")
+      above(flash, "Every", where .. "Lightning.", "soonest and latest")
+      atLeast(flash, "Time", where .. "Lightning.", true, true)
+    end
+  end
+  local sheenModule = addon:GetModule('NextSheen', true)
+  local SH = theme.Panel and theme.Panel.Sheen
+  if sheenModule ~= nil and sheenModule.KEYS ~= nil and type(SH) == "table" then
+    local where = "Panel.Sheen."
+    partsOf(SH, sheenModule.KEYS, where)
+    local B = SH.Band
+    if type(B) == "table" then
+      partsOf(B, sheenModule.BAND_KEYS, where .. "Band.")
+      needs(B, "Texture", where .. "Band.")
+      atLeast(B, "Width", where .. "Band.", true, true)
+      checkNumber(where .. "Band.Alpha", B.Alpha, "from 0 to 1")
+      if B.Angle ~= nil and type(B.Angle) ~= "number" then
+        table.insert(problems, where .. "Band.Angle: a number")
+      end
+    else
+      table.insert(problems, where .. "Band: a sheen needs one")
+    end
+    if type(SH.Glow) == "table" then
+      partsOf(SH.Glow, sheenModule.GLOW_KEYS, where .. "Glow.")
+      checkNumber(where .. "Glow.Alpha", SH.Glow.Alpha, "from 0 to 1")
+    end
+    -- The panel's part (an open's Reveal, a close's Fade) within the band's Time.
+    for phase, part in pairs({ Open = "Reveal", Close = "Fade" }) do
+      local O = SH[phase]
+      if type(O) == "table" then
+        local at = where .. phase .. "."
+        partsOf(O, phase == "Open" and sheenModule.OPEN_KEYS or sheenModule.CLOSE_KEYS, at)
+        atLeast(O, "Time", at, true, true)
+        atLeast(O, part, at, false, true)
+        if type(O.Time) == "number" and type(O[part]) == "number" and O[part] > O.Time then
+          table.insert(problems, at .. part .. ": no more than its Time")
+        end
       end
     end
   end

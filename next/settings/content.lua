@@ -400,6 +400,12 @@ function content:Init()
         title = L:G("Theme"), keywords = { "theme", "look", "skin", "appearance", "style" },
         block = function(parent) return themes:Create(parent, sonataNext) end,
       } } },
+      -- A glass theme's tint (next-themes-glass.md §26), shown only while one is in use or previewed: on any other
+      -- theme it would do nothing.
+      { title = L:G("Glass"), design = "next", hidden = function()
+        local panel = sonataNext:GetCurrentTheme().Panel
+        return not (panel and panel.Glass and panel.Glass.Tint)
+      end, rows = { { setting = 'nextGlassTint' } } },
       { title = L:G("Bag Theme"), design = "classic", rows = { {
         title = L:G("Bag Theme"), keywords = { "theme", "look", "skin", "appearance", "style", "bags" },
         block = function(parent) return themes:Create(parent, sonata) end,
@@ -418,7 +424,8 @@ function content:Init()
         { setting = 'nextTitleCloud' }, { setting = 'nextTitleRibbon' }, { setting = 'nextBraid' },
         { setting = 'nextOrnamentMotion' }, { setting = 'nextGlitch' }, { setting = 'nextRain' },
         { setting = 'nextShatter' }, { setting = 'nextSnow' }, { setting = 'nextSmoke' }, { setting = 'nextBats' },
-        { setting = 'nextBeam' }, { setting = 'nextPaper' }, { setting = 'nextStopMotion' } } },
+        { setting = 'nextBeam' }, { setting = 'nextPaper' }, { setting = 'nextStopMotion' },
+        { setting = 'nextGlassRain' }, { setting = 'nextLightning' }, { setting = 'nextSheen' } } },
     } } },
   })
   pages:Define({

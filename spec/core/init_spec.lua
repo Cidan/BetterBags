@@ -50,7 +50,7 @@ describe("Core Init and Enable flow", function()
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "NextSettings", "NextSettingsContent", "Tabs", "ChangelogWindow", "NextBag", "NextBank", "NextVendor",
       "GuildBank", "NextGuildBank", "Automation", "Seller", "ProfessionShoppingList", "Currencies", "NextShatter",
-      "NextSmoke", "NextBats", "NextBeam", "NextPaper"
+      "NextSmoke", "NextBats", "NextBeam", "NextPaper", "NextSheen"
     }
 
     for _, name in ipairs(modules) do
@@ -315,6 +315,14 @@ describe("Core Init and Enable flow", function()
     paper.Init = spy.new(function() end)
     addon:OnInitialize()
     assert.spy(paper.Init).was.called(1)
+  end)
+
+  -- The sheen layer's pool and the bands of light crossing on it (next-themes-glass.md §26).
+  it("starts BetterBags Next's glass sheen", function()
+    local sheen = addon:GetModule("NextSheen")
+    sheen.Init = spy.new(function() end)
+    addon:OnInitialize()
+    assert.spy(sheen.Init).was.called(1)
   end)
 
   -- The beam layer's pool and the beams going out on it (next-themes.md §24).

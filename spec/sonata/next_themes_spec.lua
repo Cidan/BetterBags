@@ -13,7 +13,7 @@ end
 local constants, createdConstants = StubBetterBagsModule("Constants")
 constants.BAG_KIND = constants.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1, GUILD = 2 }
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextOrnaments", "next/ornaments.lua" },
-  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" } }) do
+  { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" } }) do
   if addon:GetModule(m[1], true) == nil then
     ResetModuleStub(m[1], m[2])
     LoadBetterBagsModule(m[2])
@@ -61,7 +61,7 @@ describe("BetterBags Next's shipped themes", function()
 
   it("ships Default and at least three others", function()
     assert.are.same({ "Default", "Ember", "Frost", "GW2", "Glitch", "Halloween", "MakeItSo", "Papercraft", "Parchment",
-      "Plain", "Quiet" },
+      "Plain", "Quiet", "RainyWindow" },
       shipped())
   end)
 
@@ -1409,6 +1409,83 @@ describe("BetterBags Next's shipped themes", function()
       assert.is_true(gold[1] > gold[3] + 0.3, "gold: warm")
       assert.is_true(body[3] > body[2] and body[2] > body[1], "the body: blue over teal over red")
       assert.is_true(t.Palette.Ice[3] > 0.9 and t.Palette.Ice[1] < 0.6, "ice: a cold light blue")
+    end)
+  end)
+
+  -- Asked: "that rainy glass pane was... chefs kiss. clarity might be a problem though (transparent bag)", then smoked
+  -- glass whose tint the player sets, and "no idea what to do for open and close though, so, let's have fun with that".
+  describe("Rainy Window", function()
+    local function readFile(path)
+      local file = path:gsub("^Interface\\AddOns\\BetterBags\\", ""):gsub("\\", "/")
+      local f = io.open(file, "rb")
+      assert.is_not_nil(f, file)
+      local data = f:read("*a")
+      f:close()
+      return data, file
+    end
+
+    local function luminance(c)
+      return 0.2126 * c[1] + 0.7152 * c[2] + 0.0722 * c[3]
+    end
+
+    it("ships every texture it names, as a PNG", function()
+      local t = sonataNext:Resolve("RainyWindow")
+      local count = 0
+      for name, path in pairs(t.Textures) do
+        if path:find("textures\\next\\rain\\", 1, true) then
+          count = count + 1
+          local data, file = readFile(path)
+          assert.are.equal("\137PNG\r\n\26\n", data:sub(1, 8), name .. ": " .. file)
+        end
+      end
+      assert.are.equal(4, count, "a drop, condensation, reflections and the sheen")
+    end)
+
+    it("is smoked glass: a dark tint the player sets and a veil, over no fill or feather of its own", function()
+      local t = sonataNext:Resolve("RainyWindow")
+      local G = t.Panel.Glass
+      assert.is_true(luminance(t.Palette[G.Tint.Color]) < 0.3, "smoke, not a colour")
+      assert.are.equal(0.6, G.Tint.Strength, "the player's default, 60")
+      assert.is_not_nil(G.Tint.Veil)
+      assert.are.equal(0, t.Panel.Fill.Color[4], "nothing over the world but the glass")
+      assert.is_nil(t.Panel.Feather)
+      assert.is_not_nil(G.Reflections)
+      assert.is_not_nil(G.Lamp)
+      assert.is_not_nil(G.Rim)
+      assert.is_not_nil(G.Rain.Runners)
+      assert.is_not_nil(G.Lightning)
+      assert.is_true(G.Lightning.Every[1] >= 20, "lightning now and then, never often")
+      assert.is_nil(t.Sparkles)
+      assert.is_nil(t.Header.Ribbon)
+    end)
+
+    -- Asked, of a fog and a wash first tried: "kind of lame -- something more... elegant?"; agreed: light catching the
+    -- glass as it turns toward you.
+    it("catches the light as it opens and closes, its drops beading up after", function()
+      local t = sonataNext:Resolve("RainyWindow")
+      local S = t.Panel.Sheen
+      assert.are.equal("Sheen", S.Band.Texture)
+      assert.is_true(S.Open.Reveal < 0.9, "shown before a bank's 1 second wait ends")
+      assert.is_true(S.Open.Time <= 0.6 and S.Close.Time <= 0.6, "quick and quiet")
+      assert.is_not_nil(t.Panel.Glass.Rain.Appear)
+    end)
+
+    -- Asked, of the reflections: "very nice, but... also repeating a bit too much".
+    it("reflects bands that never repeat across a screen", function()
+      local F = sonataNext:Resolve("RainyWindow").Panel.Glass.Reflections
+      assert.is_true(F.Period >= 1400, "a period wider than most screens: " .. F.Period)
+    end)
+
+    it("keeps its items readable over a bright world: dark beds under its icons and light text with shadows", function()
+      local t = sonataNext:Resolve("RainyWindow")
+      local bed = t.ItemButton.Backdrop.Color
+      assert.is_true(bed[4] >= 0.5 and luminance(bed) < 0.1, "a dark bed under each icon")
+      assert.is_true(luminance(t.Palette.Text) > 0.85)
+      assert.are.equal(true, t.Fonts.Section.Shadow)
+      assert.are.equal(true, t.Fonts.Title.Shadow)
+      local settings = t.Palette[t.Settings.Fill.Color]
+      assert.is_true(settings[4] >= 0.9, "its settings window on solid smoke")
+      assert.is_nil(t.Settings.Fill.BlendMode)
     end)
   end)
 
