@@ -395,3 +395,15 @@ function bagProto:Sort(ctx)
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
   events:SendMessage(ctx, "bags/SortBackpack")
 end
+
+-- OnTitleRightClick sorts the backpack, as its sort button does (asked: "right click the title of the backpack to
+-- sort it").
+---@param ctx Context
+function bagProto:OnTitleRightClick(ctx)
+  self:Sort(ctx)
+end
+
+---@return string
+function bagProto:TitleRightClickHint()
+  return L:G("Right-click to sort your bags.")
+end

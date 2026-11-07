@@ -1393,6 +1393,29 @@ describe("NextBag", function()
       assert.are.equal(1, #sentNamed("config/Open"))
     end)
 
+    -- Asked: "right click the title of the backpack to sort it. same function we call on 'sort bags' button in the
+    -- menu", with its tooltip saying so.
+    it("sorts the backpack from a right click on its title, as its sort button does, and says so", function()
+      local bag = opened()
+      local chained, sounds = 0, {}
+      override(addon:GetModule("NextChain"), "Click", function() chained = chained + 1 return "alone" end)
+      override(_G, "PlaySound", function(sound) table.insert(sounds, sound) end)
+      local title = bag.titleButton
+      assert.are.same({ "LeftButtonUp", "RightButtonUp" }, title._registeredClicks)
+      title:GetScript("OnClick")(title, "RightButton")
+      assert.are.equal(1, #sentNamed("bags/SortBackpack"))
+      assert.are.same({ SOUNDKIT.UI_BAG_SORTING_01 }, sounds, "the sort button's sound")
+      assert.are.equal(0, chained, "a right click does not chain")
+      title:GetScript("OnClick")(title, "LeftButton")
+      assert.are.equal(1, #sentNamed("bags/SortBackpack"), "a left click does not sort")
+      assert.are.equal(1, chained, "a left click still chains")
+      title:GetScript("OnEnter")(title)
+      local lines = GameTooltip.lines
+      assert.are.equal("Right-click to sort your bags.", lines[#lines].text)
+      assert.are.same({ 0.8, 0.8, 0.8 }, { lines[#lines].r, lines[#lines].g, lines[#lines].b })
+      title:GetScript("OnLeave")(title)
+    end)
+
     it("opens and focuses its search box from the search keybinding", function()
       local bag = nextBag:Create(ctx())
       bag:ToggleSearch(ctx())

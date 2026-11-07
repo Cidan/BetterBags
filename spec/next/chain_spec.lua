@@ -1163,6 +1163,26 @@ describe("NextChain", function()
       backpack.titleButton:GetScript("OnLeave")(backpack.titleButton)
     end)
 
+    -- Only the backpack's title sorts on a right click (next.md §3): the bank's neither sorts, chains nor says it does.
+    it("neither chains nor sorts on a right click on a companion's title", function()
+      open(bank)
+      open(backpack)
+      settle()
+      local sorted = 0
+      override(bank, "Sort", function() sorted = sorted + 1 end)
+      local b = bank.titleButton
+      b:GetScript("OnClick")(b, "RightButton")
+      settle()
+      assert.are.equal(0, sorted)
+      assert.are.equal("apart", layout)
+      b:GetScript("OnEnter")(b)
+      assert.are.equal(1, #GameTooltip.lines, "only what a click does")
+      b:GetScript("OnLeave")(b)
+      backpack.titleButton:GetScript("OnClick")(backpack.titleButton, "RightButton")
+      settle()
+      assert.are.equal("apart", layout, "the backpack's right click never chains either")
+    end)
+
     -- A vendor's title is the vendor's name, secret in an instance (UnitName is
     -- SecretWhenUnitNameIdentityRestricted), and GameTooltip's methods are not marked up to take
     -- secrets: tooltips name a bag by its label, never by its title.

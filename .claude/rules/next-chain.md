@@ -37,6 +37,8 @@ The anchor is the bag at the screen edge; the chained bag faces it, so their rib
   (`"no room"`).
 - **The pointer over the title** lights a soft glow behind it and the tooltip says what a click
   does.
+- **A right click never chains.** It runs the panel's `OnTitleRightClick` instead: the backpack sorts, the
+  companions do nothing (next.md §3).
 - **Alone, a bag sits at its own edge.** A chained bag sits beside its anchor only while the anchor
   is open (`chain:Pair`, `chain:RestOffset`): when the anchor opens it flies over; when the anchor
   closes (or Escape hides it) it flies home.
