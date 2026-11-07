@@ -34,7 +34,9 @@ everything mirrors with it: the edge it is anchored to and slides from, the feat
 tabs, the title and its ribbon, the sparkles, the header buttons and the footer. A kind makes its
 prototype with `NextPanel:Extend(proto, name)` and overrides what differs: `GetHeaderButtons`,
 `CreateMoney`, `RefreshTabs`, `OnTabClicked`, `OnTabDragged`, `GetCurrentTabID`, `OnShowing`,
-`OnSlidOut`, `WatchKind`, `Refresh` and `Sort` (and `watchesCooldowns`).
+`OnSlidOut`, `WatchKind`, `Refresh` and `Sort` (and `watchesCooldowns`), and what a right click on
+its title does with `OnTitleRightClick` and `TitleRightClickHint` (the backpack sorts; the others do
+nothing).
 
 ## How it takes over
 

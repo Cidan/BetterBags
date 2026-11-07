@@ -4300,8 +4300,8 @@ function panelProto:placeTitleRow()
 end
 
 -- BuildTitleButton makes the title a button (next.md §12): a click chains the bag to its partner,
--- puts it back, or moves both across; the pointer over it lights a soft glow behind the title and
--- says what a click does.
+-- puts it back, or moves both across, and a right click does what its kind says (OnTitleRightClick);
+-- the pointer over it lights a soft glow behind the title and says what a click does.
 function panelProto:BuildTitleButton()
   local frame = self.frame
   local glow = frame:CreateTexture(nil, "ARTWORK", nil, -3)
@@ -4311,8 +4311,12 @@ function panelProto:BuildTitleButton()
   -- Placed with the title (placeTitleRow).
   local button = CreateFrame("Button", nil, frame)
   button:SetFrameLevel(frame:GetFrameLevel() + 55)
-  button:RegisterForClicks("LeftButtonUp")
-  addon.SetScript(button, "OnClick", function(ctx)
+  button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  addon.SetScript(button, "OnClick", function(ctx, _, mouse)
+    if mouse == "RightButton" then
+      self:OnTitleRightClick(ctx)
+      return
+    end
     chain:Click(ctx, self)
   end)
   -- Dragging the title moves a small panel, as its title row does.
@@ -4328,6 +4332,10 @@ function panelProto:BuildTitleButton()
     GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
     GameTooltip:SetText(self.label)
     GameTooltip:AddLine(chain:Tooltip(self), 1, 1, 1, true)
+    local hint = self:TitleRightClickHint()
+    if hint ~= nil then
+      GameTooltip:AddLine(hint, 0.8, 0.8, 0.8, true)
+    end
     GameTooltip:Show()
   end)
   addon.SetScript(button, "OnLeave", function()
@@ -4335,6 +4343,18 @@ function panelProto:BuildTitleButton()
     GameTooltip:Hide()
   end)
   self.titleButton = button
+end
+
+-- OnTitleRightClick runs a right click on the title: nothing, unless its kind says otherwise (the backpack sorts).
+---@param ctx Context
+function panelProto:OnTitleRightClick(ctx)
+  local _ = ctx
+end
+
+-- TitleRightClickHint says what a right click on the title does, for its tooltip: nil when it does nothing.
+---@return string?
+function panelProto:TitleRightClickHint()
+  return nil
 end
 
 ---@private

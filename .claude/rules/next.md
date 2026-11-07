@@ -151,6 +151,15 @@ description below is the backpack's (the right side); the bank is its mirror ima
 vendor's own button and icon, hiding the backpack), settings, sort, Show Blizzard Bags (below), size
 (next-small-mode.md §14).
 
+**A right click on the backpack's title sorts it** (asked: "right click the title of the backpack to sort it. same
+function we call on 'sort bags' button in the menu", "along with tooltip update for it"). The title's button
+(`titleButton`, next-chain.md §12) takes left and right clicks: a left click chains (`chain:Click`), a right click
+runs the panel's `OnTitleRightClick(ctx)`, and its tooltip adds the panel's `TitleRightClickHint()` under what a
+click does, in the grey of every other "Right-click to" hint (0.8). The panel's own do nothing and say nothing; the
+backpack's call `Sort`, the sort button's own `onClick` (the sort sound and `bags/SortBackpack`), and say
+"Right-click to sort your bags.". The bank, guild bank and vendor keep the default: a right click on their titles
+does nothing, as before (the button took no right clicks then).
+
 **A theme can hold the header's buttons in a bag button's menu** (next-themes-menubutton.md §19; the Plain theme): every button
 not pinned leaves the header for the original bags' drop-down on a button at a corner of the body (the vendor's
 portrait on the vendor), and the title is centered between that button and the close.
@@ -475,7 +484,8 @@ and new only, motion while shown and not while hidden, settling on hide), `spec/
 in with its overshoot and out, toggling, a second open or close, cascades on open and on a tab
 change, sparkles, closing (expiry, held gaps, a parent's hide), the sweep, the empty hint, free
 slots, search, cooldowns, the drop target, tabs: listing, groups off, switching, menus, "+",
-regenerating; sort, settings and their atlases, the keybinding), `spec/next/bank_spec.lua` (the
+regenerating; sort, settings and their atlases, the title's right click sorting and its hint, the keybinding;
+`spec/next/chain_spec.lua` "the title": a companion's right click neither chains nor sorts), `spec/next/bank_spec.lua` (the
 mirrored panel: edge, feather, title and ribbon, tabs, sparkles, slides; its own search box, no
 cooldowns, drops into the bank type shown; the header per client; the money per client; opening:
 Blizzard's panel suppressed, the group or tab set up, Warbank wash, "Loading..."; groups: order,

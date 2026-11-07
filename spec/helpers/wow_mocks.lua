@@ -2842,6 +2842,8 @@ _G.PlaySound = function() end
 _G.SOUNDKIT = {
   IG_BACKPACK_OPEN = 1,
   IG_BACKPACK_CLOSE = 2,
+  -- Blizzard_SharedXML/Mainline/SoundKitConstants.lua.
+  UI_BAG_SORTING_01 = 43937,
 }
 
 -- xpcall(f, msgh, ...) passes ... on to f in WoW (warcraft.wiki.gg API_xpcall); PUC Lua 5.1's
