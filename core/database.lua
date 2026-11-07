@@ -401,7 +401,7 @@ function DB:SetNextTheme(key)
   DB.data.profile.nextTheme = key
 end
 
----@alias NextAnimation "sparkles"|"shimmer"|"titleCloud"|"ribbon"|"braid"|"ornaments"|"glitch"|"rain"|"shatter"|"snow"
+---@alias NextAnimation "sparkles"|"shimmer"|"titleCloud"|"ribbon"|"braid"|"ornaments"|"glitch"|"rain"|"shatter"|"snow"|"smoke"|"bats"|"beam"|"paper"|"stopMotion"|"glassRain"|"lightning"|"sheen"
 
 -- nextAnimationName checks an Animation switch's name: one of the defaults' (const.DATABASE_DEFAULTS), nothing else.
 ---@param name string
@@ -425,6 +425,19 @@ end
 function DB:SetNextAnimation(name, on)
   nextAnimationName(name)
   DB.data.profile.nextAnimation[name] = on
+end
+
+-- GetNextGlassTint returns how dark a glass theme's bags are (Appearance > Theme > Glass Tint, next-themes-glass.md
+-- §26): in percent of the way from clear glass to the theme's smoke.
+---@return number
+function DB:GetNextGlassTint()
+  return DB.data.profile.nextGlassTint
+end
+
+-- SetNextGlassTint saves it, a whole number from 0 to 100.
+---@param value number
+function DB:SetNextGlassTint(value)
+  DB.data.profile.nextGlassTint = math.max(0, math.min(100, math.floor(value + 0.5)))
 end
 
 ---@alias NextCurrencyKind "currency"|"item"

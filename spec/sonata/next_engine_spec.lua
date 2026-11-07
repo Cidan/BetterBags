@@ -25,7 +25,7 @@ local context = addon:GetModule("Context")
 local FLAGS = { "isRetail", "isForever", "isClassic", "isBCC", "isMists", "isAnniversary", "isCata" }
 
 describe("SonataNext", function()
-  local saved, sent, used, savedFlags, iconScale, scales, animation, keeps
+  local saved, sent, used, savedFlags, iconScale, scales, animation, keeps, glassTint
 
   local function default()
     return {
@@ -42,8 +42,9 @@ describe("SonataNext", function()
   before_each(function()
     sonataNext.themes = {}
     saved, sent, used, iconScale = "Default", {}, {}, 120
-    animation, keeps = {}, {}
+    animation, keeps, glassTint = {}, {}, 60
     db.GetNextAnimation = function(_, name) return animation[name] ~= false end
+    db.GetNextGlassTint = function() return glassTint end
     db.GetNextTheme = function() return saved end
     db.SetNextTheme = function(_, key) saved = key end
     db.GetNextIconScale = function() return iconScale end
@@ -105,6 +106,9 @@ describe("SonataNext", function()
         Smoke = { Puffs = { Size = { 80, 120 } }, Open = { Rise = 0.3 } },
         Bats = { Frames = 4, Close = { Shudder = 0.1 }, Flutter = { Every = { 5, 9 } } },
         Beam = { Sparkles = { Density = 2 }, Open = { Reveal = { 0.2, 0.6 } }, Close = { Fade = { 0.2, 0.5 } } },
+        Glass = { Tint = { Color = "Gold", Strength = 0.9 }, Rain = { Density = 1 },
+          Lightning = { Every = { 5, 9 }, Time = 0.4 } },
+        Sheen = { Band = { Width = 200 }, Open = { Time = 0.5, Reveal = 0.3 }, Close = { Time = 0.4, Fade = 0.25 } },
       }
       return t
     end
@@ -131,6 +135,11 @@ describe("SonataNext", function()
       bats = function(t) return t.Panel.Bats end,
       -- The Make It So theme's (next-themes.md §24): beaming in and out.
       beam = function(t) return t.Panel.Beam end,
+      -- The Rainy Window theme's (next-themes-glass.md §26): its rain, its lightning (flashes can be hard on some
+      -- players' eyes), its sheen as it opens and closes; the glass itself is its look, no animation.
+      glassRain = function(t) return t.Panel.Glass.Rain end,
+      lightning = function(t) return t.Panel.Glass.Lightning end,
+      sheen = function(t) return t.Panel.Sheen end,
     }
 
     before_each(function()
@@ -270,12 +279,57 @@ describe("SonataNext", function()
       sonataNext:WatchAnimation()
       sonataNext:WatchAnimation()
       events.RegisterMessage = savedRegister
-      assert.are.equal(1, #handlers)
+      assert.are.equal(2, #handlers)
       assert.are.equal("next/AnimationChanged", handlers[1][1])
+      assert.are.equal("next/GlassTintChanged", handlers[2][1])
       sonataNext:Init()
       animation = { titleCloud = false }
       handlers[1][2](ctx())
       assert.is_nil(used[#used].Header.Cloud)
+    end)
+  end)
+
+  -- Asked, of a glass theme's clarity: "let's let people adjust the tint strength". Appearance > Theme's Glass Tint is
+  -- the player's, laid over whatever glass theme is in use as the switches are; a theme keeps its own as written.
+  describe("the player's Glass Tint", function()
+    local function glassy(strength)
+      local t = default()
+      t.Name = "Glassy"
+      t.Panel = { Glass = { Tint = { Color = "Gold", Strength = strength } } }
+      return t
+    end
+
+    it("lays the player's tint over a glass theme's strength, and asks nothing of a theme without glass", function()
+      sonataNext:RegisterTheme(glassy(0.9))
+      saved, glassTint = "Glassy", 25
+      sonataNext:Init()
+      assert.are.equal(0.25, used[#used].Panel.Glass.Tint.Strength)
+      assert.are.equal(0.9, sonataNext:Resolve("Glassy").Panel.Glass.Tint.Strength, "the theme as written")
+      db.GetNextGlassTint = function() error("a theme without glass has no tint to read") end
+      sonataNext:ApplyTheme(ctx(), "Default", false)
+      assert.is_nil(used[#used].Panel)
+    end)
+
+    it("takes a new tint at once, drawing only the glass again, and nothing before Next starts", function()
+      local glassModule, created = StubBetterBagsModule("NextGlass")
+      local savedRetint = glassModule.Retint
+      local retinted = 0
+      glassModule.Retint = function() retinted = retinted + 1 end
+      sonataNext:RegisterTheme(glassy(0.9))
+      saved = "Glassy"
+      sonataNext:Init()
+      local before = #used
+      glassTint = 80
+      assert.is_true(sonataNext:ApplyGlassTint(ctx()))
+      assert.are.equal(0.8, sonataNext:GetCurrentTheme().Panel.Glass.Tint.Strength)
+      assert.are.equal(before, #used, "no theme handed over again: nothing else restyles")
+      assert.are.equal(1, retinted)
+      sonataNext.started = false
+      assert.is_false(sonataNext:ApplyGlassTint(ctx()))
+      glassModule.Retint = savedRetint
+      if created then
+        ResetModuleStub("NextGlass")
+      end
     end)
   end)
 
@@ -1094,6 +1148,137 @@ describe("SonataNext", function()
       for _, p in ipairs(problems) do found = found or p == expected end
       assert.is_true(found, "not named: " .. expected .. " in " .. table.concat(problems, "; "))
     end
+  end)
+
+  it("names what is wrong with glass and its sheen, by where it is", function()
+    for _, m in ipairs({ { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" } }) do
+      if addon:GetModule(m[1], true) == nil or addon:GetModule(m[1]).KEYS == nil then
+        ResetModuleStub(m[1], m[2])
+        LoadBetterBagsModule(m[2])
+      end
+    end
+    sonataNext.themes = {}
+    FreshNextThemes()
+    sonataNext = addon:GetModule("SonataNext")
+    sonataNext:Init()
+    sonataNext:RegisterTheme({ Name = "BadGlass", Panel = {
+      Glass = {
+        Tint = { Color = "Nope", Strength = 2, Veil = { Alpha = -1, Shine = 1 }, Hue = 1 },
+        Grain = { Size = 0, Glitter = 1 },
+        Reflections = { Period = 0, Parallax = 2, Angle = "up" },
+        Lamp = { Size = 0 },
+        Rim = { Alpha = { 0.5 }, Piece = 0, Size = 0 },
+        Rain = { Density = -1, Size = { 9, 3 }, Appear = { 0.9, 0.2 }, Highlight = { Sparkle = 1 },
+          Runners = { Count = -1, Size = { 8 }, Speed = { 9, 3 }, Wait = { 1 }, Slide = { 1 }, Catch = { 1 }, Every = 0,
+            Beads = -1, BeadSize = { 2 }, BeadLife = { 4 }, Hop = 1 } },
+        Lightning = { Every = { 0, 9 }, Time = 0, Thunder = 1 },
+        Fog = 1,
+      },
+      Sheen = {
+        Band = { Width = 0, Alpha = 2, Angle = "down", Shimmer = 1 },
+        Glow = { Alpha = -1, Hue = 1 },
+        Open = { Time = 0, Reveal = 0.5, Swirl = 1 },
+        Close = { Time = 0.3, Fade = 0.5 },
+        Spray = 1,
+      } } })
+    local problems = sonataNext:Check("BadGlass")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Glass.Fog: no part named Fog",
+      "Panel.Glass.Grain.Glitter: no part named Glitter",
+      "Panel.Glass.Grain.Size: more than nothing",
+      "Panel.Glass.Grain.Texture: needs one",
+      "Panel.Glass.Lamp.Reach: more than nothing",
+      "Panel.Glass.Lamp.Size: more than nothing",
+      "Panel.Glass.Lamp.Texture: needs one",
+      "Panel.Glass.Lightning.Every: two numbers above nothing, soonest and latest",
+      "Panel.Glass.Lightning.Thunder: no part named Thunder",
+      "Panel.Glass.Lightning.Time: more than nothing",
+      "Panel.Glass.Rain.Appear: two numbers, soonest and latest",
+      "Panel.Glass.Rain.Density: no less than nothing",
+      "Panel.Glass.Rain.Highlight.Sparkle: no part named Sparkle",
+      "Panel.Glass.Rain.Highlight.Texture: needs one",
+      "Panel.Glass.Rain.Runners.BeadLife: two numbers, shortest and longest",
+      "Panel.Glass.Rain.Runners.BeadSize: two numbers, smallest and largest",
+      "Panel.Glass.Rain.Runners.Beads: no less than nothing",
+      "Panel.Glass.Rain.Runners.Catch: two numbers, shortest and longest",
+      "Panel.Glass.Rain.Runners.Count: no less than nothing",
+      "Panel.Glass.Rain.Runners.Every: more than nothing",
+      "Panel.Glass.Rain.Runners.Hop: no part named Hop",
+      "Panel.Glass.Rain.Runners.Size: two numbers, smallest and largest",
+      "Panel.Glass.Rain.Runners.Slide: two numbers, shortest and longest",
+      "Panel.Glass.Rain.Runners.Speed: two numbers, slowest and fastest",
+      "Panel.Glass.Rain.Runners.Wait: two numbers, shortest and longest",
+      "Panel.Glass.Rain.Size: two numbers, smallest and largest",
+      "Panel.Glass.Rain.Texture: needs one",
+      "Panel.Glass.Reflections.Angle: a number",
+      "Panel.Glass.Reflections.Parallax: from 0 to 1",
+      "Panel.Glass.Reflections.Period: more than nothing",
+      "Panel.Glass.Reflections.Texture: needs one",
+      "Panel.Glass.Rim.Alpha: two numbers, faintest and strongest",
+      "Panel.Glass.Rim.Piece: more than nothing",
+      "Panel.Glass.Rim.Size: more than nothing",
+      "Panel.Glass.Tint.Color: no color named Nope",
+      "Panel.Glass.Tint.Hue: no part named Hue",
+      "Panel.Glass.Tint.Strength: from 0 to 1",
+      "Panel.Glass.Tint.Veil.Alpha: from 0 to 1",
+      "Panel.Glass.Tint.Veil.Shine: no part named Shine",
+      "Panel.Sheen.Band.Alpha: from 0 to 1",
+      "Panel.Sheen.Band.Angle: a number",
+      "Panel.Sheen.Band.Shimmer: no part named Shimmer",
+      "Panel.Sheen.Band.Texture: needs one",
+      "Panel.Sheen.Band.Width: more than nothing",
+      "Panel.Sheen.Close.Fade: no more than its Time",
+      "Panel.Sheen.Glow.Alpha: from 0 to 1",
+      "Panel.Sheen.Glow.Hue: no part named Hue",
+      "Panel.Sheen.Open.Reveal: no more than its Time",
+      "Panel.Sheen.Open.Swirl: no part named Swirl",
+      "Panel.Sheen.Open.Time: more than nothing",
+      "Panel.Sheen.Spray: no part named Spray",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "BandlessSheen", Panel = { Sheen = { Open = { Time = 0.5, Reveal = 0.3 } } } })
+    assert.are.same({ "Panel.Sheen.Band: a sheen needs one" }, sonataNext:Check("BandlessSheen"))
+    -- Found in review: beads without a size or a life raised every frame; beads with a life of nothing never dried.
+    local function runners(changes)
+      local U = { Count = 1, Size = { 8, 8 }, Speed = { 50, 50 }, Wait = { 1, 1 }, Slide = { 0.5, 0.5 },
+        Catch = { 0.2, 0.2 }, Every = 10, Beads = 4 }
+      for k, v in pairs(changes) do U[k] = v end
+      return { Glass = { Rain = { Texture = "Glow", Density = 1, Size = { 4, 8 }, Runners = U } } }
+    end
+    sonataNext:RegisterTheme({ Name = "BeadsUnmade", Panel = runners({}) })
+    problems = sonataNext:Check("BeadsUnmade")
+    table.sort(problems)
+    assert.are.same({
+      "Panel.Glass.Rain.Runners.BeadLife: two numbers above nothing, shortest and longest",
+      "Panel.Glass.Rain.Runners.BeadSize: two numbers, smallest and largest",
+    }, problems)
+    sonataNext:RegisterTheme({ Name = "BeadsForever", Panel = runners({ BeadSize = { 2, 2 }, BeadLife = { 0, 0 } }) })
+    assert.are.same({ "Panel.Glass.Rain.Runners.BeadLife: two numbers above nothing, shortest and longest" },
+      sonataNext:Check("BeadsForever"))
+    sonataNext:RegisterTheme({ Name = "NoBeads", Panel = runners({ Beads = 0 }) })
+    assert.are.same({}, sonataNext:Check("NoBeads"), "no beads, nothing of theirs needed")
+    sonataNext:RegisterTheme({ Name = "GoodGlass", Panel = {
+      Glass = {
+        Tint = { Color = "White", Strength = 0.6, Veil = { Color = "White", Alpha = 0.2 } },
+        Grain = { Texture = "Glow", Color = "White", Alpha = 0.05, BlendMode = "ADD", Size = 256 },
+        Reflections = { Texture = "Glow", Color = "White", Alpha = 0.4, BlendMode = "ADD", Angle = 62, Period = 360,
+          Parallax = 0.8 },
+        Lamp = { Texture = "Glow", Color = "White", Alpha = 0.12, BlendMode = "ADD", Size = 220, Reach = 160 },
+        Rim = { Color = "White", Alpha = { 0.04, 0.7 }, Size = 1, Piece = 24 },
+        Rain = { Texture = "Glow", Color = "White", Alpha = 0.9, Density = 0.8, Size = { 3, 9 },
+          Highlight = { Texture = "Glow", Color = "White", Alpha = 0.85, BlendMode = "ADD" },
+          Caustic = { Texture = "Glow", Color = "White", Alpha = 0.35 },
+          Runners = { Count = 3, Size = { 7, 10 }, Speed = { 25, 70 }, Wait = { 1, 4 }, Slide = { 0.3, 1.2 },
+            Catch = { 0.15, 0.85 }, Every = 7, Beads = 40, BeadSize = { 2, 3.5 }, BeadLife = { 7, 11 } } },
+        Lightning = { Every = { 25, 60 }, Time = 0.45, Color = "White", Alpha = 0.3 },
+      },
+      Sheen = {
+        Band = { Texture = "Glow", Color = "White", Alpha = 0.5, BlendMode = "ADD", Width = 320, Angle = 28 },
+        Glow = { Color = "White", Alpha = 0.06, BlendMode = "ADD" },
+        Open = { Time = 0.55, Reveal = 0.32 },
+        Close = { Time = 0.45, Fade = 0.3 },
+      } } })
+    assert.are.same({}, sonataNext:Check("GoodGlass"))
   end)
 
   it("names what is wrong with a beam, by where it is", function()

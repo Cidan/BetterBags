@@ -295,6 +295,22 @@ paths:
   - The settings window, menus, dialogs, dock cards and the currency tracker are sheets of the same paper; buttons and
     fields a pencilled outline in three pieces, check boxes drawn by hand.
   - Not seen in game yet.
+- **Rainy Window** (`RainyWindow`, `sonata/themes/next/rainywindow.lua`; the engine and what was asked: next-themes-glass.md
+  §26): smoked glass with rain on it and lamplight inside.
+  - **The glass:** no fill or feather of its own (`Panel.Fill` a clear color); a smoke (`Smoke`) the world behind is
+    multiplied by, at the player's Glass Tint (60 until set), a veil (`Mist`), a condensation grain, reflected bands at
+    64 degrees repeating only every 1600 units, the pointer a warm lamp (`Gold`), the edges glinting, the sky reflected
+    at the top (`Panel.Wash`).
+  - **Rain:** about 0.7 drops to every 100 x 100 units, beading up over 0.15 to 0.9 s as a bag opens, three runners, beads
+    that dry; lightning every 35 to 90 seconds, faint (0.22).
+  - **Opening and closing:** it catches the light: a band 340 across sweeps 24 degrees downhill from its inner side out as
+    it fades in (0.32 s; the band 0.55 s), and back as it fades out (0.28 s; the band 0.45 s).
+  - **Readable over anything:** a dark bed under every icon (`ItemButton.Backdrop` at 0.62), every text role over the
+    glass with a shadow, no sparkles, ribbon, spark or cloud; the settings window on solid smoke (`SettingsGlass`, no
+    MOD), its controls derived from its search fill as Default's are.
+  - **Art:** `tools/textures/next_rain.py` (standard-library Python) makes `textures/next/rain/*.png`: a drop in its own
+    darks and lights, condensation, the reflections' band profile and the sheen's, white with the shape in the alpha.
+  - Seen in game: the glass, the rain and the reflections' parallax. Not yet: the sheen and the reflections' new art.
 
 Each draws the settings window and its controls in its own look (next-settings.md §6): Ember and Quiet
 their control colors in their own charcoal and grays (Quiet also smaller settings titles and quicker

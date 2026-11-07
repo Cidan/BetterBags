@@ -759,7 +759,10 @@ const.DATABASE_DEFAULTS = {
     -- turns it off, on any theme. These are the only names there are.
     nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, ribbon = true, braid = true, ornaments = true,
       glitch = true, rain = true, shatter = true, snow = true, smoke = true, bats = true, beam = true, paper = true,
-      stopMotion = true },
+      stopMotion = true, glassRain = true, lightning = true, sheen = true },
+    -- How dark a glass theme's bags are (Appearance > Theme > Glass Tint, next-themes-glass.md §26), in percent of the way
+    -- from clear glass to its smoke.
+    nextGlassTint = 60,
     -- BetterBags Next's currencies (.claude/rules/currency.md): what is tracked, in order ({ kind, id }, a currency
     -- or an item); how the strip at the bottom of the backpack and the tracker dragged out of it show (these are the
     -- only names there are); whether the tracker is out, and where it was left (its top left in UIParent's units).

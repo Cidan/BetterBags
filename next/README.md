@@ -19,6 +19,8 @@ next/
 ├── tabs.lua      # NextTabs: the tab rail down a panel's inner edge
 ├── content.lua   # NextContent: the canvas: sections in one column, laid out through Motion
 ├── drag.lua      # NextDrag: moving sections by their headers: reorder, to a tab, to the other bag
+├── glass.lua     # NextGlass: a theme's body as smoked glass: tint, light, rain, lightning (Panel.Glass)
+├── sheen.lua     # NextSheen: a theme's panels catching the light as they fade in and out (Panel.Sheen)
 ├── panel.lua     # NextPanel: the panel both bags are made of, for either side of the screen
 ├── bag.lua       # NextBag: the backpack's panel, on the right (addon.Bags.Backpack)
 └── bank.lua      # NextBank: the bank's panel, on the left (addon.Bags.Bank)

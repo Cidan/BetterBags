@@ -31,6 +31,8 @@ db.GetNextSectionCompact = db.GetNextSectionCompact or function() return false e
 db.GetNextSectionWideRows = db.GetNextSectionWideRows or function() return 2 end
 -- The Animation switches (next-themes.md §20), all on, which SonataNext lays over the theme it uses.
 db.GetNextAnimation = db.GetNextAnimation or function() return true end
+-- A glass theme's tint (next-themes-glass.md §26), read by its row on the Theme tab.
+db.GetNextGlassTint = db.GetNextGlassTint or function() return 60 end
 StubBetterBagsModule("Bucket")
 local bagSystem = StubBetterBagsModule("BagSystem")
 StubBetterBagsModule("Items")
@@ -439,7 +441,8 @@ describe("NextSettingsContent", function()
         nextShimmer = true,
         nextTitleCloud = true, nextTitleRibbon = true, nextBraid = true, nextOrnamentMotion = true, nextGlitch = true,
         nextRain = true, nextShatter = true, nextSnow = true, nextSmoke = true, nextBats = true, nextBeam = true,
-        nextPaper = true, nextStopMotion = true,
+        nextPaper = true, nextStopMotion = true, nextGlassRain = true, nextLightning = true, nextSheen = true,
+        nextGlassTint = true,
         nextCurrencyCapBars = true, nextCurrencyGains = true, nextCurrencyHideEmpty = true,
         nextCurrencyItemsEverywhere = true, nextCurrencyTracker = true, nextCurrencyLayout = true,
         nextCurrencyScale = true, nextCurrencyBackground = true, nextCurrencyHideInCombat = true,
@@ -469,9 +472,9 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 31 (Autosize Bags the latest, next-small-autosize.md), the Currencies page's 10 (currency.md §6),
-      -- and each bag's 34.
-      assert.are.equal(31 + 10 + 3 * 34, named)
+      -- The general pages' 35 (Glass Tint and the glass theme's three switches the latest, next-themes-glass.md §26), the
+      -- Currencies page's 10 (currency.md §6), and each bag's 34.
+      assert.are.equal(35 + 10 + 3 * 34, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -530,7 +533,12 @@ describe("NextSettingsContent", function()
     it("picks BetterBags Next's theme alone while Next is in use", function()
       settings:Open("appearance")
       assert.are.equal("theme", settings.tabId)
-      local rows = rowsShown()
+      render:Flush()
+      -- A glass theme's tint is left out with Default in use.
+      local rows = {}
+      for _, row in ipairs(rowsShown()) do
+        if row.frame:IsShown() then table.insert(rows, row) end
+      end
       assert.are.equal(1, #rows)
       assert.are.equal(sonataNext, rows[1].engine)
       assert.are.equal("Theme", settings.page.sections[1].title)
@@ -584,7 +592,7 @@ describe("NextSettingsContent", function()
     it("has an Animation tab with BetterBags Next, a switch per effect showing whether it is on", function()
       local on = { sparkles = true, shimmer = false, titleCloud = true, ribbon = false, braid = true, ornaments = false,
         glitch = true, rain = false, shatter = true, snow = false, smoke = true, bats = false, beam = true,
-        paper = true, stopMotion = false }
+        paper = true, stopMotion = false, glassRain = true, lightning = false, sheen = true }
       override(db, "GetNextAnimation", function(_, name) return on[name] end)
       settings:Open("appearance", "animation")
       assert.are.equal("animation", settings.tabId)
@@ -593,8 +601,11 @@ describe("NextSettingsContent", function()
       for _, row in ipairs(rowsShown()) do table.insert(titles, row.label:GetText()) end
       assert.are.same({ "Sparkles", "Title Shimmer", "Title Cloud", "Title Ribbon", "Braid", "Moving Ornaments",
         "Glitch Effects", "Data Rain", "Ice Shatter", "Snow, Leaves and Stars", "Smoke Puff", "Bats", "Transporter",
-        "Paper Folding", "Stop Motion" },
+        "Paper Folding", "Stop Motion", "Rain on Glass", "Lightning", "Glass Sheen" },
         titles)
+      assert.is_true(rowTitled("Rain on Glass").control:GetChecked())
+      assert.is_false(rowTitled("Lightning").control:GetChecked())
+      assert.is_true(rowTitled("Glass Sheen").control:GetChecked())
       assert.is_true(rowTitled("Sparkles").control:GetChecked())
       assert.is_false(rowTitled("Title Shimmer").control:GetChecked())
       assert.is_false(rowTitled("Title Ribbon").control:GetChecked())
@@ -608,6 +619,29 @@ describe("NextSettingsContent", function()
       assert.is_true(rowTitled("Transporter").control:GetChecked())
       assert.is_true(rowTitled("Paper Folding").control:GetChecked())
       assert.is_false(rowTitled("Stop Motion").control:GetChecked())
+    end)
+
+    -- Asked, of a glass theme: "let's let people adjust the tint strength". A section of the Theme tab, shown only while
+    -- the theme in use (or previewed) is glass: on any other theme the slider would do nothing.
+    it("shows Glass Tint on the Theme tab only while a glass theme is in use", function()
+      override(db, "GetNextGlassTint", function() return 60 end)
+      local glassy = false
+      override(sonataNext, "GetCurrentTheme", function()
+        return { Panel = glassy and { Glass = { Tint = { Color = "White", Strength = 0.6 } } } or {} }
+      end)
+      local function shown()
+        render:Flush()
+        local row = rowTitled("Glass Tint")
+        return row ~= nil and row.frame:IsShown()
+      end
+      settings:Open("appearance", "theme")
+      assert.is_false(shown(), "left out with no glass theme in use")
+      glassy = true
+      settings:Open("appearance", "theme")
+      assert.is_true(shown(), "shown with a glass theme in use")
+      glassy = false
+      settings:Open("appearance", "theme")
+      assert.is_false(shown())
     end)
 
     it("has no Animation tab with the classic bags, and finds the switches with BetterBags Next", function()

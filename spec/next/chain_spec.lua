@@ -58,7 +58,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -561,6 +561,31 @@ describe("NextChain", function()
       assert.are.equal(distance(), offset(bank))
       assert.are.equal(0, offset(backpack))
       assert.is_not_nil(chain.coupling)
+    end)
+
+    -- The Rainy Window theme's sheen (next-themes-glass.md §26). Found in review: a companion held for the backpack came
+    -- in at full, the band part way across, before the backpack had faded in at all.
+    it("fades a companion held for the backpack in under its sheen once its turn comes", function()
+      UseNextTheme({ Panel = { Sheen = { Band = { Texture = "Glow", Width = 200, Angle = 30 },
+        Open = { Time = 0.5, Reveal = 0.3 }, Close = { Time = 0.4, Fade = 0.25 } } } })
+      -- Started once a session (core/init.lua).
+      addon:GetModule("NextSheen"):Init()
+      finally(function()
+        UseNextTheme(nil)
+        addon:GetModule("NextSheen"):Init()
+      end)
+      layout = "right"
+      open(bank)
+      step(1 / 60)
+      open(backpack)
+      assert.are.equal(0, bank.frame:GetAlpha(), "unseen as the backpack starts in")
+      step(style.Chain.Stagger * 0.5)
+      assert.are.equal(0, bank.frame:GetAlpha(), "unseen until its turn")
+      step(style.Chain.Stagger * 0.5 + 0.1)
+      local alpha = bank.frame:GetAlpha()
+      assert.is_true(alpha > 0 and alpha < 1, "fading in: " .. alpha)
+      settle()
+      assert.are.equal(1, bank.frame:GetAlpha())
     end)
 
     it("says the waiting companion has finished showing only once it is in place", function()

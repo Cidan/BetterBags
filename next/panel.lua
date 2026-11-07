@@ -93,6 +93,12 @@ local nextBeam = addon:GetModule('NextBeam')
 ---@class NextPaper: AceModule
 local nextPaper = addon:GetModule('NextPaper')
 
+---@class NextGlass: AceModule
+local nextGlass = addon:GetModule('NextGlass')
+
+---@class NextSheen: AceModule
+local nextSheen = addon:GetModule('NextSheen')
+
 ---@class NextMenuButtonModule: AceModule
 local nextMenuButton = addon:GetModule('NextMenuButton')
 
@@ -449,7 +455,7 @@ end
 -- MovingParts are the parts of a panel that move by nature, on the screen's pixels only by chance (next-pixel-
 -- perfect.md): its sparkles and the spark fly, the cloud's puffs breathe every frame, the braid's lights run
 -- along it, its ornaments that sway, spin, pulse or bob (NextOrnaments), its data rain's glyphs (NextRain), its snow, its
--- threads and its fluttering bats (NextSnow, NextThreads, NextBats). The pixel checks
+-- threads, its fluttering bats and its raindrops (NextSnow, NextThreads, NextBats, NextGlass). The pixel checks
 -- leave them out (PixelAudit, the specs).
 ---@return table<table, boolean>
 function panelProto:MovingParts()
@@ -469,6 +475,7 @@ function panelProto:MovingParts()
   self.snow:MovingParts(skip)
   self.threads:MovingParts(skip)
   self.bats:MovingParts(skip)
+  self.glass:MovingParts(skip)
   return skip
 end
 
@@ -781,6 +788,14 @@ function panelProto:moveIn(from, to, duration, ease, delay)
     local lock = nextPaper:OpenLock()
     self.threads:DrawIn(delay + lock)
     self:paperIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
+  if nextSheen:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once it has faded in.
+    local lock = nextSheen:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:sheenIn(to, delay)
     self.content:Cascade(true, delay + lock)
     return
   end
@@ -1257,6 +1272,136 @@ function panelProto:beamOut(from, to, done)
   })
 end
 
+-- sheenIn opens the panel where it rests catching the light (the theme's Panel.Sheen.Open, next-themes-glass.md §26),
+-- after delay unseen: a band of light sweeps across its body from its inner side out as the panel and its glass fade in
+-- under it (NextSheen's Draw; NextGlass:SetPresence). A tween of the panel's own, like the slide it stands in for:
+-- whatever stops or replaces it (a flight, a placement, Escape) ends it at rest (endShatter). Opened again as it closed,
+-- it goes on from as far in as its sheen had faded it (sheenShown; NextSheen:OpenAt), not from nothing; any other open
+-- starts from nothing, whatever the frame's alpha (a companion held for its anchor is at full, out of sight; a small panel
+-- is given its slide's alpha as it is fitted; found in review: both came in at full). Once revealed it says it has
+-- finished showing, as the slide does, and its band crosses on by itself on its own layer (Linger).
+---@private
+---@param to number
+---@param delay number
+function panelProto:sheenIn(to, delay)
+  local total = nextSheen:OpenTime()
+  local alpha = self.sheenShown or 0
+  local start = nextSheen:OpenAt(alpha)
+  self:setOffset(to)
+  self.frame:SetAlpha(alpha)
+  self.glass:SetPresence(alpha)
+  local run ---@type NextSheenRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+    self.sheenShown = nil
+  end
+  tween:Play(self, {
+    duration = math.max(0.01, total - start),
+    delay = delay,
+    from = start,
+    to = total,
+    ease = "linear",
+    onUpdate = function(t)
+      if not nextSheen:Opens() then
+        -- Its theme went while it came in (another theme, Glass Sheen off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        self.glass:SetPresence(1)
+        return
+      end
+      -- Its band is laid over its body as it begins: setOffset has put it where it rests.
+      run = run or nextSheen:Begin(self, "Open")
+      local shown = run:Draw(t)
+      self.frame:SetAlpha(shown)
+      self.glass:SetPresence(shown)
+      self.sheenShown = shown
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self.sheenShown = nil
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- sheenOut closes the panel where it is catching the light (the theme's Panel.Sheen.Close): a band of light sweeps back
+-- across its body as the panel and its glass fade out under it; then it is gone (done, Hide's end) and its band crosses on
+-- by itself on the sheen layer. Closed as it opened, it goes on from as far in as its sheen had shown it (sheenShown;
+-- NextSheen:CloseAt), its band as strong as the bag then was (found in the third review: a close two frames into its open
+-- played its band at full over a bag about to vanish). Closed before any of it showed (the moment it opened, a chained bag
+-- in its stagger), it goes at once with no band: the band's second half over nothing (found in review).
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:sheenOut(from, to, done)
+  local total = nextSheen:CloseTime()
+  local alpha = self.sheenShown or self.frame:GetAlpha()
+  local start = nextSheen:CloseAt(alpha)
+  local seen = alpha > 0.01
+  local run ---@type NextSheenRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+    self.sheenShown = nil
+  end
+  tween:Play(self, {
+    duration = math.max(0.01, total - start),
+    from = start,
+    to = total,
+    ease = "linear",
+    onUpdate = function(t)
+      if not nextSheen:Closes() then
+        -- Its theme went while it faded: shown plainly, it closes at the end.
+        rest()
+        self.frame:SetAlpha(1)
+        self.glass:SetPresence(1)
+        return
+      end
+      -- Its band laid over its body as it begins, and again if its theme comes back as it fades (found in the third
+      -- review: held still at its starting alpha without one). Unseen without a band: kept unseen (the open it replaced
+      -- has put it back at full) until it hides.
+      if seen then
+        run = run or nextSheen:Begin(self, "Close", alpha)
+      end
+      local shown = run ~= nil and run:Draw(t) or alpha
+      self.frame:SetAlpha(shown)
+      self.glass:SetPresence(shown)
+      self.sheenShown = shown
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self.sheenShown = nil
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
 -- paperIn opens the panel where it rests by unfolding it (the theme's Panel.Paper.Open, next-themes.md §25), after delay
 -- unseen: a sheet folded in four unfolds over it, a fold at a time (NextPaper's Unfold), and once it lies flat the panel
 -- shows. A tween of the panel's own, like the slide it stands in for: whatever stops or replaces it (a flight, a placement,
@@ -1386,12 +1531,13 @@ function panelProto:PaperDecals()
   return out
 end
 
--- endShatter puts the panel back as it is without a shatter (or its smoke, or its bats), at full strength, and where it
--- had it (base): unless another tween has taken the panel over (a flight), which places it.
+-- endShatter puts the panel back as it is without a shatter (or its smoke, its bats, its sheen), at full strength, its
+-- glass too, and where it had it (base): unless another tween has taken the panel over (a flight), which places it.
 ---@private
 ---@param base number
 function panelProto:endShatter(base)
   self.frame:SetAlpha(1)
+  self.glass:SetPresence(1)
   if not tween:IsPlaying(self) then
     self:setOffset(base)
   end
@@ -1622,6 +1768,8 @@ function panelProto:BuildPanel(name)
   self.threads = nextThreads:Create(self)
   -- Its bats fluttering out of the header now and then (Panel.Bats.Flutter, next-themes.md §23).
   self.bats = nextBats:Create(self)
+  -- The theme's body as a pane of glass, its rain and its lightning (Panel.Glass, next-themes-glass.md §26).
+  self.glass = nextGlass:Create(self)
   -- The theme's frame round the body (Panel.Frame, next-themes.md §15): Blizzard's nine-slice art.
   self.frameArt = nextFrameArt:Create(frame, self.body, self.overlay)
   self:styleBody()
@@ -1673,6 +1821,7 @@ function panelProto:styleBody()
   self.snow:Style()
   self.threads:Style()
   self.bats:Style()
+  self.glass:Style()
   -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
   self.frameArt:Apply(P.Frame, self.side == "LEFT")
 end
@@ -2480,6 +2629,7 @@ function panelProto:ApplyGeometry()
   self.rain:Layout()
   self.snow:Layout()
   self.threads:Layout()
+  self.glass:Layout()
   -- Its corners rounded at the size it has now.
   self:shapeCorners()
 end
@@ -5426,7 +5576,8 @@ end
 function panelProto:WatchKind()
 end
 
--- startEffects starts what moves while the panel shows: its sparkles, ornaments, rain, snow, threads, bats and shimmer.
+-- startEffects starts what moves while the panel shows: its sparkles, ornaments, rain, snow, threads, bats, glass and
+-- shimmer.
 ---@private
 function panelProto:startEffects()
   self.sparkles:Start()
@@ -5437,6 +5588,7 @@ function panelProto:startEffects()
   self.snow:Start()
   self.threads:Start()
   self.bats:Start()
+  self.glass:Start()
   self:playShimmer()
 end
 
@@ -5649,6 +5801,12 @@ function panelProto:Hide(ctx)
     self:paperOut(self.offset, to, slidOut)
     return
   end
+  if nextSheen:Closes() then
+    self.threads:Unravel(nextSheen:CloseTime())
+    -- Where it is: it fades out where it stands.
+    self:sheenOut(self.offset, to, slidOut)
+    return
+  end
   self.threads:Unravel(style.Time.Close)
   tween:Play(self, {
     duration = style.Time.Close,
@@ -5747,6 +5905,7 @@ function panelProto:OnHidden(ctx)
   self.snow:Stop()
   self.threads:Stop()
   self.bats:Stop()
+  self.glass:Stop()
   self.waiting = false
   self.frame:SetFrameLevel(PANEL_LEVEL)
   chain:Update(ctx)

@@ -59,7 +59,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" },
-  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -143,6 +143,7 @@ describe("BetterBags Next's panels and themes", function()
     override(stubs.items, "ClearBankCache", function() end)
     override(stubs.database, "GetNextTheme", function() return db.theme end)
     override(stubs.database, "GetNextAnimation", function(_, name) return db.animation[name] ~= false end)
+    override(stubs.database, "GetNextGlassTint", function() return db.glassTint or 60 end)
     override(stubs.database, "GetNextIconScale", function() return 100 end)
     override(stubs.database, "GetNextBagScale", function() return 100 end)
     override(stubs.database, "GetNextFitNamesWhileOpen", function() return false end)
@@ -2968,6 +2969,321 @@ describe("BetterBags Next's panels and themes", function()
       local bag = opened(function(c) return nextBag:Create(c) end)
       local skip = bag:MovingParts()
       assert.is_true(skip[bag.rain.columns[1].glyphs[1]])
+    end)
+  end)
+
+  -- The Rainy Window theme's glass and its sheen (next-themes-glass.md §26; asked: "that rainy glass pane was... chefs
+  -- kiss", then of a fog and a wash first tried for its open and close: "something more... elegant?").
+  describe("glass (Panel.Glass) and its sheen (Panel.Sheen)", function()
+    local sheenModule = addon:GetModule("NextSheen")
+    local layout = dofile("spec/helpers/layout.lua")
+    local begun, undoScreen
+
+    local GLASS = {
+      Tint = { Color = "Smoke", Strength = 0.5, Veil = { Color = "White", Alpha = 0.2 } },
+      Lamp = { Texture = "Glow", Color = "White", Alpha = 0.2, Size = 200, Reach = 150 },
+      Rain = { Texture = "Glow", Color = "White", Alpha = 0.9, Density = 0.2, Size = { 4, 8 },
+        Runners = { Count = 1, Size = { 8, 8 }, Speed = { 50, 50 }, Wait = { 1, 1 }, Slide = { 0.5, 0.5 },
+          Catch = { 0.2, 0.2 }, Every = 10, Beads = 4, BeadSize = { 2, 2 }, BeadLife = { 4, 4 } } },
+      Lightning = { Every = { 10, 10 }, Time = 0.4, Color = "White", Alpha = 0.4 },
+    }
+    local SHEEN = {
+      Band = { Texture = "Glow", Color = "White", Alpha = 0.5, BlendMode = "ADD", Width = 200, Angle = 30 },
+      Glow = { Color = "White", Alpha = 0.08, BlendMode = "ADD" },
+      Open = { Time = 0.5, Reveal = 0.3 },
+      Close = { Time = 0.4, Fade = 0.25 },
+    }
+    local THREADS = { { Anchor = "TOP", Points = { { 0, 20 }, { 1, 40 } }, Segments = 6, Width = 4, Texture = "Glow",
+      Color = "Gold", Alpha = 0.8, BlendMode = "ADD", Draw = 0.4 } }
+
+    local function glazed(withoutSheen)
+      apply({ Palette = { Smoke = { 0.2, 0.3, 0.4, 1 } },
+        Panel = { Glass = GLASS, Sheen = not withoutSheen and SHEEN or nil, Threads = THREADS } })
+    end
+
+    local function step(dt)
+      tween.driver:GetScript("OnUpdate")(tween.driver, dt)
+    end
+
+    local function lingering()
+      local n = 0
+      for _ in pairs(sheenModule.living) do n = n + 1 end
+      return n
+    end
+
+    before_each(function()
+      sheenModule:Init()
+      begun = {}
+      local begin = sheenModule.Begin
+      override(sheenModule, "Begin", function(self, panel, phase, strength)
+        local run = begin(self, panel, phase, strength)
+        table.insert(begun, { run = run, phase = phase, strength = strength })
+        return run
+      end)
+      -- Frames sized by their anchors report the size the anchors give them, as in the client: a full panel's height.
+      undoScreen = layout.UseScreen(1920, 1200, 1)
+      glazed()
+    end)
+
+    after_each(function()
+      undoScreen()
+      sheenModule:Init()
+    end)
+
+    it("draws its glass over the bag's own fill and its rain behind its content, moving only while it shows", function()
+      local bag = nextBag:Create(ctx())
+      local G = bag.glass
+      assert.is_true(G.tint:IsShown())
+      assert.are.equal(bag.fill, select(2, G.tint:GetPoint(1)), "over the fill, past the screen edge with it")
+      assert.are.equal("MOD", G.tint:GetBlendMode())
+      assert.are.equal(bag.body, select(2, G.lamp:GetPoint(1)))
+      assert.is_true(#G.drops > 0)
+      for _, d in ipairs(G.drops) do
+        assert.are.equal(bag.frame, d.body:GetParent(), "the panel's own frame: under its tabs and content")
+        assert.are.same({ "BORDER", 3 }, { d.body:GetDrawLayer() })
+      end
+      assert.is_nil(G.driver:GetScript("OnUpdate"))
+      bag:Show(ctx())
+      finishTweens()
+      assert.is_not_nil(G.driver:GetScript("OnUpdate"), "moving while it shows")
+      local skip = bag:MovingParts()
+      assert.is_true(skip[G.drops[1].body], "its drops left out of the pixel checks")
+      bag:Hide(ctx())
+      finishTweens()
+      -- The client runs a frame's OnHide as it hides; the mock leaves it to the spec.
+      bag.frame:GetScript("OnHide")(bag.frame)
+      assert.is_nil(G.driver:GetScript("OnUpdate"), "still once it has gone")
+    end)
+
+    it("takes the player's tint at once, and its glass goes with another theme", function()
+      local bag = nextBag:Create(ctx())
+      local r = bag.glass.tint:GetVertexColor()
+      assert.is_true(math.abs(r - (1 - 0.6 * 0.8)) < 1e-6, "the saved 60%, not the theme's own 50%: " .. r)
+      db.glassTint = 100
+      assert.is_true(sonataNext:ApplyGlassTint(ctx()))
+      r = bag.glass.tint:GetVertexColor()
+      assert.is_true(math.abs(r - 0.2) < 1e-6, "the smoke itself at 100%: " .. r)
+      backToDefault()
+      assert.is_false(bag.glass.tint:IsShown())
+      assert.are.equal(0, #bag.glass.drops)
+    end)
+
+    -- Found in review: with the bag open, a theme without glass previewed in the theme pane, then this one again, left the
+    -- glass still until the bag was closed and opened.
+    it("keeps its glass moving on an open bag through a theme without glass and back", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      finishTweens()
+      backToDefault()
+      glazed()
+      assert.is_not_nil(bag.glass.driver:GetScript("OnUpdate"), "moving again")
+    end)
+
+    -- Found in review: the bag key pressed twice quickly jumped the bag to full, or to nothing, and faded from there.
+    -- turnBack closes a bag as it opens and opens it again as it closes, each from where it was. A small bag is fitted
+    -- as its items are drawn while it opens, which gives it its slide's alpha until the sheen draws again.
+    local function turnBack(bag, what)
+      bag:Show(ctx())
+      step(0.15)
+      local opening = bag.frame:GetAlpha()
+      assert.is_true(opening > 0 and opening < 1, what)
+      if bag:IsSmall() then
+        bag:FitSmall()
+      end
+      bag:Hide(ctx())
+      assert.is_true(math.abs(bag.frame:GetAlpha() - opening) < 1e-9, what .. ": closing from where it was: "
+        .. bag.frame:GetAlpha() .. " for " .. opening)
+      assert.is_true(math.abs(bag.glass.presence - opening) < 1e-9, what)
+      step(0.05)
+      assert.is_true(bag.frame:GetAlpha() < opening, what .. ": and fading out")
+      finishTweens()
+      bag.frame:GetScript("OnHide")(bag.frame)
+      bag:Show(ctx())
+      finishTweens()
+      bag:Hide(ctx())
+      step(0.1)
+      local closing = bag.frame:GetAlpha()
+      assert.is_true(closing > 0 and closing < 1, what)
+      bag:Show(ctx())
+      assert.is_true(math.abs(bag.frame:GetAlpha() - closing) < 1e-9, what .. ": opening from where it was: "
+        .. bag.frame:GetAlpha() .. " for " .. closing)
+      step(0.05)
+      assert.is_true(bag.frame:GetAlpha() > closing, what .. ": and fading in")
+      finishTweens()
+      assert.are.equal(1, bag.frame:GetAlpha(), what)
+    end
+
+    -- Found in review: the bag key pressed twice quickly jumped the bag to full, or to nothing, and faded from there; and
+    -- a small bag opened again as it closed jumped to full (its fitting as it opens sets its alpha for its slide).
+    it("turns back part way from where it is: closed as it opens, opened again as it closes", function()
+      turnBack(nextBag:Create(ctx()), "full")
+    end)
+
+    it("turns back part way from where it is on a small bag too", function()
+      local bag = nextBag:Create(ctx())
+      addon:GetModule("NextPanel"):SetSize(ctx(), "small")
+      finishTweens()
+      assert.is_true(bag:IsSmall())
+      turnBack(bag, "small")
+    end)
+
+    -- Found in review: a bag closed before any of it showed (closed the moment it opened, a chained bag in its stagger)
+    -- played the second half of its band over nothing.
+    it("closes a bag not yet seen at once, with no band", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      bag:Hide(ctx())
+      assert.are.equal(0, bag.frame:GetAlpha(), "kept unseen until it hides, not put back at full")
+      finishTweens()
+      assert.is_false(bag.frame:IsShown())
+      assert.are.equal(0, lingering())
+      for _, b in ipairs(begun) do
+        assert.is_false(b.run.band ~= nil and b.run.band:IsShown(), b.phase)
+      end
+    end)
+
+    local function escape(bag)
+      bag.frame:Hide()
+      bag.frame:GetScript("OnHide")(bag.frame)
+    end
+
+    -- Found in the third review: nothing showed that an open or a close ended or stopped forgets what its sheen drew, so
+    -- a bag hidden by Escape (at rest, opening or closing) would open again from where it was, not from nothing.
+    it("opens again from nothing after Escape, at rest, opening or closing", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      finishTweens()
+      escape(bag)
+      bag:Show(ctx())
+      assert.are.equal(0, bag.frame:GetAlpha(), "after Escape at rest")
+      step(0.15)
+      escape(bag)
+      bag:Show(ctx())
+      assert.are.equal(0, bag.frame:GetAlpha(), "after Escape as it opened")
+      finishTweens()
+      bag:Hide(ctx())
+      step(0.1)
+      escape(bag)
+      bag:Show(ctx())
+      assert.are.equal(0, bag.frame:GetAlpha(), "after Escape as it closed")
+    end)
+
+    it("closes from full with its band when its open was stopped part way", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(0.15)
+      tween:Stop(bag)
+      bag:Hide(ctx())
+      assert.are.equal(1, bag.frame:GetAlpha(), "from full")
+      assert.are.equal("Close", begun[#begun].phase)
+      step(0.05)
+      local band = begun[#begun].run.band
+      assert.is_true(band:IsShown(), "with its band")
+      assert.is_true(math.abs(band:GetAlpha() - 0.5) < 1e-9, "at full strength: " .. band:GetAlpha())
+    end)
+
+    -- Found in the third review: a close a frame or two into its open (two presses 33 ms apart) played its band at full
+    -- over a bag about to vanish; its band is as strong as the bag was.
+    it("draws a close's band only as strongly as the bag showed", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(2 / 60)
+      local shown = bag.frame:GetAlpha()
+      assert.is_true(shown > 0.01 and shown < 0.1, "barely there: " .. shown)
+      bag:Hide(ctx())
+      local close = begun[#begun]
+      assert.are.equal("Close", close.phase)
+      step(1 / 60)
+      local band = close.run.band
+      assert.is_true(math.abs(band:GetAlpha() - 0.5 * shown) < 1e-9, "as faint as the bag: " .. band:GetAlpha())
+    end)
+
+    -- Found in the third review: a close whose theme went and came back held the bag at its starting alpha, bandless.
+    it("goes on fading out with its band when its theme comes back as it closes", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      finishTweens()
+      bag:Hide(ctx())
+      step(0.05)
+      glazed(true)
+      step(1 / 60)
+      glazed()
+      step(1 / 60)
+      local after = bag.frame:GetAlpha()
+      step(2 / 60)
+      assert.is_true(bag.frame:GetAlpha() < after, "fading on: " .. bag.frame:GetAlpha() .. " from " .. after)
+      local close = begun[#begun]
+      assert.are.equal("Close", close.phase)
+      assert.is_true(close.run.band ~= nil and close.run.band:IsShown(), "its band again")
+    end)
+
+    it("catches the light as it opens, where it rests, fading in with its glass under the band", function()
+      local bag = nextBag:Create(ctx())
+      local shownAt
+      bag:Show(ctx(), nil, function() shownAt = true end)
+      assert.are.equal(0, bag.offset, "in place, not sliding in")
+      assert.are.equal(0, bag.frame:GetAlpha())
+      assert.are.equal("Open", begun[1].phase)
+      step(0.15)
+      local alpha = bag.frame:GetAlpha()
+      assert.is_true(alpha > 0 and alpha < 1, "fading in: " .. alpha)
+      assert.are.equal(alpha, bag.glass.presence, "its smoke with it")
+      assert.is_true(begun[1].run.band:IsShown())
+      assert.is_nil(shownAt)
+      finishTweens()
+      assert.is_true(shownAt, "says it has shown once revealed")
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(1, bag.glass.presence)
+      assert.are.equal(1, lingering(), "its band crossing on by itself")
+    end)
+
+    it("draws its threads in once revealed", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      local threads = bag.threads
+      local d = threads.driver
+      d:GetScript("OnUpdate")(d, 0.25)
+      assert.are.equal(0, threads.reveal, "waiting for the reveal")
+      d:GetScript("OnUpdate")(d, 0.1)
+      assert.is_true(threads.reveal > 0)
+    end)
+
+    it("catches the light as it closes: gone once faded, the band crossing on after", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      finishTweens()
+      sheenModule:Init()
+      bag:Hide(ctx())
+      assert.are.equal("Close", begun[#begun].phase)
+      step(0.1)
+      local alpha = bag.frame:GetAlpha()
+      assert.is_true(alpha > 0 and alpha < 1, "fading out: " .. alpha)
+      assert.are.equal(alpha, bag.glass.presence)
+      finishTweens()
+      assert.is_false(bag.frame:IsShown())
+      assert.are.equal(1, lingering())
+      assert.are.equal(1, bag.glass.presence, "at full strength for when it opens again")
+    end)
+
+    it("is back at full strength, its glass too, when its sheen is cut short", function()
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      step(0.15)
+      tween:Stop(bag)
+      assert.are.equal(1, bag.frame:GetAlpha())
+      assert.are.equal(1, bag.glass.presence)
+    end)
+
+    it("slides in and out as any theme's without a sheen", function()
+      glazed(true)
+      local bag = nextBag:Create(ctx())
+      bag:Show(ctx())
+      assert.are.equal(0, #begun)
+      assert.are_not.equal(0, bag.offset, "sliding in")
+      finishTweens()
+      bag:Hide(ctx())
+      finishTweens()
+      assert.are.equal(0, #begun)
     end)
   end)
 
