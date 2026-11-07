@@ -180,6 +180,10 @@ describe("BetterBags Next, pixel perfect", function()
     override(stubs.database, "GetNextIconScale", function() return db.iconScale end)
     override(stubs.database, "GetNextBagScale", function() return db.bagScale end)
     override(stubs.database, "GetNextFitNamesWhileOpen", function() return false end)
+    -- Autosize Bags (next-small-autosize.md) on, its default: a small panel as tall as what it shows is on whole pixels too.
+    -- Off where a spec scrolls a panel the player gave a height.
+    db.autosize = true
+    override(stubs.database, "GetNextAutosize", function() return db.autosize end)
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
@@ -1177,6 +1181,7 @@ describe("BetterBags Next, pixel perfect", function()
         for i = 1, n do table.insert(list, item(s .. "_" .. i, "S" .. s)) end
       end
       slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
+      db.autosize = false
       for _, case in ipairs({ { 3396, 1362, 0.65, 100, 1 }, { 1920, 1080, 1, 85, -1 }, { 1920, 1080, 1, 100, 1 } }) do
         useScreen(case[1], case[2], case[3])
         db.size, db.bagScale, db.sizes[BACKPACK] = "small", case[4], { 700, 420 }
@@ -1225,7 +1230,7 @@ describe("BetterBags Next, pixel perfect", function()
       end
       slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
       useScreen(3396, 1362, 0.65)
-      db.size, db.sizes[BACKPACK] = "small", { 700, 420 }
+      db.size, db.sizes[BACKPACK], db.autosize = "small", { 700, 420 }, false
       local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
       settle()
       local box = bag.scroll.scrollBox
@@ -1248,7 +1253,7 @@ describe("BetterBags Next, pixel perfect", function()
       end
       slots[BACKPACK] = { sortedItems = {}, tabs = { [1] = { categories = cats, items = list } } }
       useScreen(3396, 1362, 0.65)
-      db.size, db.sizes[BACKPACK] = "small", { 700, 420 }
+      db.size, db.sizes[BACKPACK], db.autosize = "small", { 700, 420 }, false
       local bag = open(function(c) return nextBag:Create(c) end, BACKPACK)
       settle()
       local box = bag.scroll.scrollBox

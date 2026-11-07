@@ -38,7 +38,7 @@ up (`RenderResult`):
 | `LayoutWidth` | the width to lay out for, when it differs from the width shown (a window animating to its snapped width) | |
 | `Scrollable` | | the content is taller than its viewport |
 | `FitWidth` | | the width its layout takes: a window snapped to it shows the same layout (window.md 3b) |
-| `FitHeight` | | the height that shows all of it without scrolling: a window snaps its height to it (window.md 3b) |
+| `FitHeight` | | the height that shows all of it without scrolling: a window snaps its height to it (window.md 3b); BetterBags Next's render root keeps it, and an autosized small bag takes it (next-small-autosize.md) |
 
 `RenderChainOptions` (`OnlyRedraw`, `Invalidated`, `ctx`) is passed to every step. (It is not
 `RenderOptions`, which is `frames/grid.lua`'s grid layout options.)

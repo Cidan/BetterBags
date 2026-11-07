@@ -146,6 +146,8 @@ local PANEL_LEVEL = 500
 -- The overlay's place over the panel's frame: above the content and its sections and item buttons (about 10 levels
 -- deep), below the braid and the sparkles.
 local OVERLAY_LEVEL = 20
+-- How far the footer's line sits below the bottom of the scroll area (styleFooter).
+local FOOTER_LINE = 4
 
 -- The scroll box every panel holds its content in (BuildContent), with BetterBags Next's own bar (next-settings.md §2),
 -- hidden until it is used. A small panel's columns' width counts the room it keeps for its bar (ContentRoom).
@@ -325,6 +327,9 @@ end
 ---@field restingWidth? number A small panel's width as it last took it, before its frame stood it on whole pixels: what it lays out for at rest (RestingLayoutWidth).
 ---@field namesOwed? boolean Its names asked for another width while it was busy (FollowNames): it tries again each frame until it follows (followLater).
 ---@field namesKey table The tween key that tries, a frame on, what its names asked for while it was busy (followLater).
+---@field heightKey table The tween key that fits its height a frame after it was laid out, and each frame it waits (heightLater).
+---@field released? boolean Its close (Hide) has saved the place of the backpack beside it (chain:Released): its slide's end does not again. Cleared as it hides and as it opens.
+---@field contentHeight? number How tall what it shows was laid out last, in its own units: its scroll box's FitHeight (Autosize Bags, FittedHeight).
 ---@field glideCut? boolean Its size glide is being ended early (endSizeGlide): its end settles no chain.
 ---@field spotGlide? fun() While it glides into its spot (GlideTo): puts it where that glide has it now, toward the spot as it is now.
 ---@field spotMoved? boolean Its anchor's size glide moved its spot while it was busy, and left it there (snapTo): its own snap settles the chain as it ends; settling it (chain:Settle) clears it, and so does anything else that puts it on its spot (FitSmall, the anchor's glide placing it, the anchor dragged and dropped).
@@ -356,16 +361,25 @@ function rootProto:PreRender()
   }
 end
 
+-- Render keeps how tall what the panel shows was laid out (its scroll box's FitHeight), which an autosized small panel takes
+-- a frame on (FollowHeight).
+---@param results? RenderResults
 ---@return RenderResult
-function rootProto:Render()
+function rootProto:Render(_, _, results)
+  local bag = self.bag
   -- The pixel check run in game from /bbdb (debug/pixelaudit.lua) checks the panel once it stays the same.
   if pixelAudit.watching then
-    pixelAudit:Changed(self.bag.frame)
+    pixelAudit:Changed(bag.frame)
   end
-  if self.bag.sizing ~= nil or self.bag.sizeGliding then
-    self.bag:recordSizing("rendered")
+  if bag.sizing ~= nil or bag.sizeGliding then
+    bag:recordSizing("rendered")
   end
-  return { Width = self.bag:Width(), Height = self.bag:Height() }
+  local scrolled = results ~= nil and results.Results[bag.scroll] or nil
+  if scrolled ~= nil then
+    bag.contentHeight = scrolled.FitHeight
+  end
+  bag:FollowHeight(true)
+  return { Width = bag:Width(), Height = bag:Height() }
 end
 
 -- Extend makes proto a kind's prototype: its instances fall back to the panel's methods, and the
@@ -402,6 +416,7 @@ function nextPanel:Create(proto, opts)
   p.sizeGliding = false
   p.sizeGlideKey = {}
   p.namesKey = {}
+  p.heightKey = {}
   p.size = database:GetNextSize()
   p:BuildPanel(opts.name)
   p:BuildMover()
@@ -532,6 +547,14 @@ function nextPanel:SetSize(ctx, size)
   for _, panel in ipairs(chain:Panels()) do
     if panel:PrepareResize(size) then
       table.insert(morphing, panel)
+    end
+  end
+  -- Autosized (next-small-autosize.md), every panel switching to small takes the height of what it shows there before any works
+  -- out where it glides to: a bag chained beside another is placed from that one's top, centered for its height where it was
+  -- never moved.
+  if size == "small" and database:GetNextAutosize() then
+    for _, panel in ipairs(morphing) do
+      panel:PrepareHeight()
     end
   end
   for _, panel in ipairs(morphing) do
@@ -1907,18 +1930,54 @@ function panelProto:DefaultWidth()
 end
 
 -- SmallSize is the size a small panel takes on this screen while nothing sizes it (next.md §14g), in its
--- own units: the size the player gave it with its grips (saved for its kind), else its default width
--- and a share of the screen's height in whole units; its width fitted to its title and names (FittedWidth), its
--- height never below its minimum; neither past the screen at its scale. It says its width unrounded too.
+-- own units: the width the player gave it with its grips (saved for its kind), else its default width, fitted to its
+-- title and names (FittedWidth), never past the screen at its scale; and its height (RestingHeight). It says its width
+-- unrounded too.
 ---@return number width, number height, number fitted
 function panelProto:SmallSize()
-  local _, h = database:GetNextSmallSize(self.kind)
   local s, unit = self:Scale(), self:PixelUnit()
   local w = self:FittedWidth()
-  h = h or math.floor(UIParent:GetHeight() * style.Small.Height)
   -- In whole pixels at its scale, never past the screen.
-  return math.min(pixel:FloorIn(unit, UIParent:GetWidth() / s), pixel:LengthIn(unit, w)),
-    math.min(pixel:FloorIn(unit, UIParent:GetHeight() / s), pixel:LengthIn(unit, math.max(self:MinHeight(), h))), w
+  return math.min(pixel:FloorIn(unit, UIParent:GetWidth() / s), pixel:LengthIn(unit, w)), self:RestingHeight(), w
+end
+
+-- RestingHeight is the height a small panel takes while nothing sizes it, in its own units, in whole pixels at its scale: with
+-- Autosize Bags on, what it shows (FittedHeight); off, the height the player gave it with its grips (saved for its kind), else
+-- a share of the screen's height in whole units. Never below its minimum nor past the screen at its scale.
+---@return number
+function panelProto:RestingHeight()
+  local s, unit = self:Scale(), self:PixelUnit()
+  local h
+  if database:GetNextAutosize() then
+    h = self:FittedHeight()
+  else
+    local _, saved = database:GetNextSmallSize(self.kind)
+    h = saved or math.floor(UIParent:GetHeight() * style.Small.Height)
+  end
+  return math.min(pixel:FloorIn(unit, UIParent:GetHeight() / s), pixel:LengthIn(unit, math.max(self:MinHeight(), h)))
+end
+
+-- FittedHeight is how tall a small panel is with Autosize Bags on (next-small-autosize.md; asked: "grows on the vertical (Y
+-- axis) to hold all items + free space the user currently has"), in its own units: its header, what it shows as last laid out
+-- (contentHeight, every section and Free Space), as much room as between its sections down to its footer's line (asked: the
+-- room from the last section's item buttons "to the border to the currency/money section, is too small, make this a bit
+-- wider"; the line sits FOOTER_LINE under the scroll area) and what is under its scroll area (ContentBottom), so nothing
+-- scrolls; never shorter than its tab rail, which hangs beside it from under its header (asked: "always at least as tall as
+-- tab rail"). Neither the room the render root hands its scroll box nor the scroll box as its snapped anchors place it may be a
+-- fraction short of what it holds: its header is taken at the larger of its height and that height in whole pixels (the top
+-- anchor), and the sum rounded up to whole pixels, which covers the bottom anchor's rounding (what it holds is whole pixels, and
+-- a length rounded up is never less than one rounded).
+---@return number
+function panelProto:FittedHeight()
+  local unit = self:PixelUnit()
+  local top = math.max(style.CONTENT_TOP, pixel:SnapIn(unit, style.CONTENT_TOP))
+  local below = math.max(0, style.SECTION_SPACING - FOOTER_LINE)
+  local height = top + (self.contentHeight or 0) + below + self:ContentBottom()
+  local rail = self.tabs.frame
+  if rail:IsShown() then
+    height = math.max(height, top + rail:GetHeight())
+  end
+  return pixel:CeilIn(unit, height)
 end
 
 -- SmallWidth and SmallHeight are a small panel's size now: the frame's while a grip sizes it or its size
@@ -2212,16 +2271,21 @@ end
 
 -- clampPlace keeps a small panel's place (its top left) on the screen while the bags are clamped to it
 -- (Clamp Bags to Screen, window.md §3a), its size there its own times its scale; always on whole pixels of
--- the screen (docs/next-pixel-perfect.md: its size is whole pixels at its scale, so its far edges are too).
+-- the screen (docs/next-pixel-perfect.md: its size is whole pixels at its scale, so its far edges are too). With
+-- Autosize Bags on, its bottom stays on the screen either way: its top at least its height up (asked: "move the bag up just
+-- enough"), so it grows up from the screen's bottom, and goes back down to where it was left as it shrinks.
 ---@private
 ---@param x number
 ---@param y number
 ---@return number x, number y
 function panelProto:clampPlace(x, y)
+  local s = self:Scale()
   if not database:GetClampBagsToScreen() then
+    if database:GetNextAutosize() then
+      y = math.max(y, math.min(UIParent:GetHeight(), self:SmallHeight() * s))
+    end
     return pixel:Snap(UIParent, x), pixel:Snap(UIParent, y)
   end
-  local s = self:Scale()
   -- A side rail outside the body (Header.Buttons.Rail.Outside) stays on the screen too, on the inner side.
   local strip = style.RAIL_OUT * s
   local left, right = strip, 0
@@ -2230,6 +2294,24 @@ function panelProto:clampPlace(x, y)
   end
   x = pixel:Snap(UIParent, math.max(left, math.min(UIParent:GetWidth() - self:SmallWidth() * s - right, x)))
   y = pixel:Snap(UIParent, math.max(self:SmallHeight() * s, math.min(UIParent:GetHeight(), y)))
+  return x, y
+end
+
+-- leftPlace is the place a grip let go or a Shift-click saves for a small panel at x, y on the screen: there, but with Autosize
+-- Bags on, for a top raised above the one saved to keep its bottom on the screen (clampPlace), which keeps the one saved (neither
+-- moves its top), so it goes back down to it as it shrinks. A top Clamp Bags to Screen keeps under the one saved is where it is,
+-- as it always was.
+---@private
+---@param x number
+---@param y number
+---@return number x, number y
+function panelProto:leftPlace(x, y)
+  if database:GetNextAutosize() and chain:SmallAnchorOf(self) == nil then
+    local _, saved = database:GetNextSmallPlace(self.kind)
+    if saved ~= nil and saved < y then
+      return x, saved
+    end
+  end
   return x, y
 end
 
@@ -2410,12 +2492,18 @@ end
 
 -- FitSmall sizes a small panel for the screen as it is now and puts it at its place, kept on the
 -- screen: on opening (the screen may have changed while it was closed, and what it shows), when the screen
--- changes, and as Fit Names While Open is turned on. Its content is laid out again when its size, or the
--- width it lays out for, changed. A size glide running ends first (ApplyGeometry).
+-- changes, and as Fit Names While Open or Autosize Bags is turned on or off. Its content is laid out again when its size,
+-- or the width it lays out for, changed; autosized, at once for a new width first, so it takes the height of what it shows
+-- there. A size glide running ends first (ApplyGeometry).
 function panelProto:FitSmall()
   self:endSizeGlide()
   self:takeScale()
   local width, height, fitted = self:SmallSize()
+  if self.restingWidth ~= fitted and database:GetNextAutosize() then
+    self.smallWidth, self.restingWidth = width, fitted
+    render:RenderNow(self.root, { ctx = context:New("NextPanelFit") })
+    height = self:RestingHeight()
+  end
   local changed = self.frame:GetWidth() ~= width or self.frame:GetHeight() ~= height or self.restingWidth ~= fitted
   self.smallWidth, self.smallHeight, self.restingWidth = width, height, fitted
   self.frame:SetSize(width, height)
@@ -2482,6 +2570,17 @@ function panelProto:PrepareResize(size)
   end
   self.size = size
   return true
+end
+
+-- PrepareHeight lays an autosized panel switching to small out at its small width and takes the height that shows what it holds
+-- there (RestingHeight), so the switch glides once, to that height, and every panel's place is worked out from the heights
+-- they end at (nextPanel:SetSize, before any Morph; ApplyGeometry then takes the same height).
+function panelProto:PrepareHeight()
+  -- The width it takes there first, as FitSmall does: what it shows can ask for another since it was last small (a name).
+  local width, _, fitted = self:SmallSize()
+  self.smallWidth, self.restingWidth = width, fitted
+  render:RenderNow(self.root, { ctx = context:New("NextPanelMorph") })
+  self.smallHeight = self:RestingHeight()
 end
 
 -- Morph switches the panel to its new size in two steps (asked: a "2 step" animation, so the feather
@@ -2877,8 +2976,10 @@ end
 -- StartSizing starts sizing a small panel from a grip's corner (next.md §14g), from where it was
 -- pressed (alwaysStartFromMouse, as the classic bags do), within its minimum and the screen. The
 -- corner across from it stays still. Its opening slide or a glide is finished first, and its content
--- reflows at once as it goes. A full panel, one closing, moving or already sizing, or a press with
--- something on the cursor (a drop) does not size. It returns whether it did.
+-- reflows at once as it goes. With Autosize Bags on it sizes both ways too, and its height bounces back to what it shows as it
+-- is let go (StopSizing; asked: "don't lock dragging on the Y axis ... let it drag larger, but then "bounce" it back"). A full
+-- panel, one closing, moving or already sizing, or a press with something on the cursor (a drop) does not size. It returns
+-- whether it did.
 ---@param side "LEFT"|"RIGHT"
 ---@return boolean
 function panelProto:StartSizing(side)
@@ -2946,7 +3047,9 @@ end
 -- columns it shows there, its names whole (SnapWidth; asked: "never normalize such that the column count changes away
 -- from the user"), saved for its kind with its place, on the screen. A press let go at the size it had, or that snaps
 -- back to it, saves nothing, so the default size still follows the screen. What its names asked for while the grip held
--- it is in the snap.
+-- it is in the snap. With Autosize Bags on its height bounces back with its width's snap to what it shows at the width it
+-- snaps to, from wherever the grip took it; only its width is saved (a press that moved only its height saves nothing), and the
+-- height saved stays the one the player gave it, for when Autosize Bags is off.
 function panelProto:StopSizing()
   if self.sizing == nil then
     return
@@ -2955,6 +3058,7 @@ function panelProto:StopSizing()
   frame:StopMovingOrSizing()
   local x, y, w, h = frame:GetLeft(), frame:GetTop(), frame:GetWidth(), frame:GetHeight()
   local from, side = self.sizingFrom, self.sizing
+  local autosize = database:GetNextAutosize()
   self:recordSizing("let go")
   self.content:SetInstant(false)
   -- Sizing placed everything at once, which leaves nothing to glide from: in columns the snap moves them, by hundreds of
@@ -2967,23 +3071,40 @@ function panelProto:StopSizing()
   self:fadeGrip(side)
   self.sizingFrom = nil
   local to = self:SnapWidth(self:FrameLayoutWidth(w))
-  if x ~= nil and y ~= nil and (math.abs(to - from[1]) >= 0.5 or math.abs(h - from[2]) >= 0.5) then
-    database:SetNextSmallSize(self.kind, to, h)
+  local heightMoved = not autosize and math.abs(h - from[2]) >= 0.5
+  if x ~= nil and y ~= nil and (math.abs(to - from[1]) >= 0.5 or heightMoved) then
+    local height = h
+    if autosize then
+      height = select(2, database:GetNextSmallSize(self.kind))
+    end
+    database:SetNextSmallSize(self.kind, to, height)
     self.smallWidth, self.smallHeight, self.restingWidth = self:SmallSize()
+    if autosize then
+      -- What it shows laid out at the width it snaps to (a name can take it wider than where it was let go), so the height
+      -- it bounces to is that width's and it glides once.
+      render:RenderNow(self.root, { ctx = context:New("NextPanelSnap") })
+      self.smallHeight = self:RestingHeight()
+    end
     -- A chained bag's grip on its chained side is off (UpdateGrips), so its chained side stayed beside
     -- its partner: the side across from the grip stays where it is, on the screen, and is its spot.
     local s = lift:ScaleOf(frame)
     local left = side == "LEFT" and x + w - self.smallWidth or x
-    self.placeX, self.placeY = self:clampPlace(left * s, y * s)
-    database:SetNextSmallPlace(self.kind, self.placeX, self.placeY)
+    -- From the top it was left at, so a raised bag the grip made shorter goes back down (leftPlace).
+    self.placeX, self.placeY = self:clampPlace(self:leftPlace(left * s, y * s))
+    database:SetNextSmallPlace(self.kind, self:leftPlace(self.placeX, self.placeY))
   end
   self:UpdateGrips()
-  if x ~= nil and y ~= nil and math.abs(w - self:SmallWidth()) >= 0.5 then
+  -- Autosized, its height can change where its width does not, and its top with it (its bottom kept on the screen,
+  -- clampPlace).
+  local unit = self:PixelUnit()
+  local toY = y ~= nil and pixel:SnapIn(unit, self.placeY / self:Scale()) or nil
+  local rises = autosize and toY ~= nil and math.abs(toY - y) > unit / 2
+  local refits = autosize and math.abs(h - self:SmallHeight()) >= 0.5
+  if x ~= nil and y ~= nil and (math.abs(w - self:SmallWidth()) >= 0.5 or refits or rises) then
     -- Snapped wider for a name, the screen's edge can put its place back (Clamp Bags to Screen): both its edges move.
-    local unit = self:PixelUnit()
     local toX = pixel:SnapIn(unit, self.placeX / self:Scale())
     local ends = side == "LEFT" and x + w - self:SmallWidth() or x
-    self:snapTo(side, x, y, w, to, math.abs(toX - ends) > unit / 2 and toX or nil)
+    self:snapTo(side, x, y, w, to, math.abs(toX - ends) > unit / 2 and toX or nil, h, rises and toY or nil)
     return
   end
   frame:SetSize(self:SmallWidth(), self:SmallHeight())
@@ -3001,8 +3122,10 @@ end
 -- unrounded) and the width it ends at all the way, so the bounce, inside the scroll box's room, moves no item. Where it
 -- moves the side a bag chained to it hangs from, that bag moves with it, as it does beside an anchor dragged (StartMove), and
 -- settles once it ends (chain:Update); where that side stays (a grip's snap, a glide its place holds that side for), the bag
--- and the braid are left as they are. Anything that places, sizes, switches or hides it ends the snap at its width
--- (endSizeGlide).
+-- and the braid are left as they are. Its height glides from h to its SmallHeight with the same bounce, as the original bags'
+-- does (Autosize Bags: what it shows, FollowHeight and a grip let go), its top to toY where that height moves it (centered
+-- where it was never moved, or its bottom kept on the screen), which moves the bag chained to it too. Anything that places,
+-- sizes, switches or hides it ends the snap at its size (endSizeGlide).
 ---@private
 ---@param side "LEFT"|"RIGHT"
 ---@param x number
@@ -3010,14 +3133,27 @@ end
 ---@param w number
 ---@param layout number
 ---@param toX? number
-function panelProto:snapTo(side, x, y, w, layout, toX)
+---@param h? number Its height as it starts, in its own units: its SmallHeight (no height glide) when nil.
+---@param toY? number Where its top ends, in its own units: it stays at y when nil.
+function panelProto:snapTo(side, x, y, w, layout, toX, h, toY)
   local frame = self.frame
   local width, height = self:SmallWidth(), self:SmallHeight()
+  h = h or height
   local overshoot = motion.SnapOvershoot(w, width, self:MinWidth())
-  -- Whether it moves the side a bag chained to it hangs from (chain:ChainedSide): its edge on that side, or both edges. A
-  -- grip's never does (it has none there), nor a glide its place holds that side for: the bag beside it is left where it is.
+  local overshootH = motion.SnapOvershoot(h, height, self:MinHeight())
+  -- How far along a size is from its start to its end, by the size it has now (so the edge it moves keeps the side across
+  -- still through the bounce); by the glide's progress for a size that does not change.
+  local function along(from, to, now, p)
+    if math.abs(to - from) < 1e-6 then
+      return p
+    end
+    return (now - from) / (to - from)
+  end
+  -- Whether it moves the side a bag chained to it hangs from (chain:ChainedSide): its edge on that side, both edges, or its top.
+  -- A grip's never does (it has none there, and keeps the top), nor a glide its place holds that side for: the bag beside it is
+  -- left where it is.
   local function carries()
-    return toX ~= nil or chain:ChainedSide(self) == side
+    return toX ~= nil or toY ~= nil or chain:ChainedSide(self) == side
   end
   self.snap = { layout = layout, body = width }
   self.sizeGliding = true
@@ -3031,13 +3167,18 @@ function panelProto:snapTo(side, x, y, w, layout, toX)
       -- clipping frame's edge between two pixels drew what it holds stretched across the fraction (texture-sharpening.md §5).
       local unit = self:PixelUnit()
       local current = pixel:LengthIn(unit, motion.SnapSizeAt(w, width, overshoot, p))
+      local tall = pixel:LengthIn(unit, motion.SnapSizeAt(h, height, overshootH, p))
       local left = side == "LEFT" and x + w - current or x
       if toX ~= nil then
-        left = pixel:SnapIn(unit, x + (toX - x) * (current - w) / (width - w))
+        left = pixel:SnapIn(unit, x + (toX - x) * along(w, width, current, p))
+      end
+      local top = y
+      if toY ~= nil then
+        top = pixel:SnapIn(unit, y + (toY - y) * along(h, height, tall, p))
       end
       frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, y)
-      frame:SetSize(current, height)
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+      frame:SetSize(current, tall)
       self:FitTitle()
       render:Invalidate(self.root)
       self:recordSizing("snap")
@@ -3140,7 +3281,9 @@ function panelProto:FollowNames(later)
   local x, y = pixel:SnapIn(unit, (self.placeX + self.offset) / s), pixel:SnapIn(unit, self.placeY / s)
   local w, left = frame:GetWidth(), self.placeX
   local right = left + w * s
-  self.smallWidth, self.smallHeight, self.restingWidth = self:SmallSize()
+  -- Its width alone: its height, and the place that puts it, follow what it shows on their own (FollowHeight).
+  local width, _, resting = self:SmallSize()
+  self.smallWidth, self.restingWidth = width, resting
   self.placeX, self.placeY = self:SmallPlace()
   self.offset = 0
   if math.abs(w - self.smallWidth) < 0.5 then
@@ -3179,6 +3322,65 @@ function panelProto:followLater()
   })
 end
 
+-- FollowHeight fits an open small panel's height to what it shows while Autosize Bags is on (nextAutosize,
+-- next-small-autosize.md; asked: "follow live"): a frame after it is laid out (the render root asks with later, Render), and
+-- after its tab rail changes, it glides to its height (RestingHeight: everything it shows and its Free Space, never shorter
+-- than its tab rail nor past the screen) with the bounce a grip let go glides with (snapTo), its width as it is; its top where
+-- it was left, or where that height puts it (centered at its default place, its bottom kept on the screen: clampPlace), the bag
+-- chained to it moving with that top. Nothing is saved. Not settled (Settled), or while the open bag chained to it is not, it
+-- waits, and tries again a frame on, each frame, until it follows (heightLater), as FollowNames does: a chained pair glides one
+-- at a time. It returns what it did, for profiler traces: "closed" (not an open small panel), "off", "owed" (it waits), "fits"
+-- (it is that tall) or "following".
+---@param later? boolean
+---@return string
+function panelProto:FollowHeight(later)
+  if not self:IsSmall() or not self.frame:IsShown() or self.closing then
+    return "closed"
+  end
+  if not database:GetNextAutosize() then
+    return "off"
+  end
+  local partner = chainedPartner(self)
+  if later or not self:Settled() or (partner ~= nil and partner:IsShown() and not partner.closing and not partner:Settled()) then
+    self:heightLater()
+    return "owed"
+  end
+  local unit = self:PixelUnit()
+  local height = self:RestingHeight()
+  if math.abs(height - self:SmallHeight()) < unit / 2 then
+    return "fits"
+  end
+  local frame, s = self.frame, self:Scale()
+  -- Where it is now, as setOffset anchored it, in its own units.
+  local x, y = pixel:SnapIn(unit, self.placeX / s), pixel:SnapIn(unit, self.placeY / s)
+  local w, h = frame:GetWidth(), frame:GetHeight()
+  self.smallHeight = height
+  self.placeX, self.placeY = self:SmallPlace()
+  -- Where it stands apart from its place across (carried by an anchor that has since closed), its left edge glides there with its
+  -- height, never jumping as the glide ends.
+  local toX, toY = pixel:SnapIn(unit, self.placeX / s), pixel:SnapIn(unit, self.placeY / s)
+  self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
+  self:snapTo("RIGHT", x, y, w, self:RestingLayoutWidth(), math.abs(toX - x) > unit / 2 and toX or nil, h,
+    math.abs(toY - y) > unit / 2 and toY or nil)
+  return "following"
+end
+
+-- heightLater tries FollowHeight again a frame on (a zero-length tween, heightKey), never at once, as followLater does for
+-- FollowNames: it stops once it follows, fits, closes, or the setting is turned off. A try while it waits is FollowHeight's
+-- checks alone: no layout.
+---@private
+function panelProto:heightLater()
+  tween:Play(self.heightKey, {
+    duration = 0,
+    from = 0,
+    to = 1,
+    onUpdate = function() end,
+    onDone = function()
+      self:FollowHeight()
+    end,
+  })
+end
+
 -- ResetSize glides a small panel back to its default size (asked: "shift + left click the grip to
 -- reset to default size (animated, of course)"): the corner across from the grip stays still, the
 -- right grip keeping its top left and the left grip its top right, and the default size follows the
@@ -3208,7 +3410,7 @@ function panelProto:ResetSize(side)
   local x1, y1 = self:clampPlace(side == "LEFT" and x0 + (w0 - w1) * s or x0, y0)
   self.placeX, self.placeY = x1, y1
   self.offset = 0
-  database:SetNextSmallPlace(self.kind, x1, y1)
+  database:SetNextSmallPlace(self.kind, self:leftPlace(x1, y1))
   self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
   self.sizeGliding = true
   self.content:SetInstant(true)
@@ -4853,8 +5055,8 @@ function panelProto:styleFooter()
   local left = self.side == "LEFT"
   local leftPad, rightPad = self:SidePads()
   line:ClearAllPoints()
-  pixel:Point(line, "BOTTOMLEFT", body, "BOTTOMLEFT", leftPad, style.FOOTER - 4)
-  pixel:Point(line, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -rightPad, style.FOOTER - 4)
+  pixel:Point(line, "BOTTOMLEFT", body, "BOTTOMLEFT", leftPad, style.FOOTER - FOOTER_LINE)
+  pixel:Point(line, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -rightPad, style.FOOTER - FOOTER_LINE)
   local spec = F.Line
   if spec and style:IsArt(spec) then
     -- Art, drawn for the backpack and mirrored on the panels on the other side of the screen.
@@ -5077,9 +5279,11 @@ function panelProto:BuildTabs()
   self.tabs:SetReorderHandler(function(ctx, ids)
     self:OnTabsReordered(ctx, ids)
   end)
-  -- Chained, the gap between the bags follows their tabs' widths (next.md §12).
+  -- Chained, the gap between the bags follows their tabs' widths (next.md §12); autosized, its height follows the rail's
+  -- (FollowHeight, a frame on: the rail is shown after its tabs are set).
   self.tabs:SetResizeHandler(function(ctx)
     chain:Update(ctx)
+    self:FollowHeight(true)
   end)
   self:RefreshTabs()
 end
@@ -5300,6 +5504,7 @@ function panelProto:Show(ctx, slotInfo, onShown)
   self.onShown = { onShown }
   local sliding = self.frame:IsShown()
   self.closing = false
+  self.released = nil
   self.waiting = false
   PlaySound(self.openSound)
   self:OnShowing(ctx)
@@ -5365,6 +5570,9 @@ function panelProto:Hide(ctx)
   addon.ForceHideBlizzardBags()
   PlaySound(self.closeSound)
   self.closing = true
+  -- A bag that hangs from it only while it is open stays where it stands, saved once for this close.
+  chain:Released(self)
+  self.released = true
   -- Beside its anchor, it leaves through the anchor's edge, beneath the anchor (next.md §12); else
   -- through its own. Out of sight beyond the far edge, it leaves through its own without crossing
   -- the screen.
@@ -5493,6 +5701,16 @@ function panelProto:OnHidden(ctx)
   self:StopMove()
   self:StopSizing()
   self:endSizeGlide()
+  -- Hidden at once (Escape), a bag that hangs from it only while it is open stays where it stands, as Hide has it. Not again at
+  -- the end of Hide's slide, which hides it too: in the slide's 0.24 s its top can move (a glide the close cut short ends where it
+  -- was going), another companion open and the backpack go beside it, or the backpack be dropped, and the place the close saved
+  -- stands. Nor for a parent hiding it (Alt+Z), which closes nothing.
+  if not self.released and not self.hiddenByParent then
+    chain:Released(self)
+  end
+  -- Every close reaches here once: its slide's end, Escape part way through it, or a parent's hide cutting it short, which
+  -- leaves it open with no Show to clear the mark.
+  self.released = nil
   self.closing = false
   self:stopBursts()
   tween:Stop(self)

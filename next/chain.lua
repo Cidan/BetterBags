@@ -80,6 +80,7 @@ function chain:Register(panel, role)
     events:RegisterEvent("DISPLAY_SIZE_CHANGED", function(ctx) self:Update(ctx, true) end)
     events:RegisterMessage("next/ScalesChanged", function(ctx) self:ScalesChanged(ctx) end)
     events:RegisterMessage("next/FitNamesChanged", function(ctx) self:FitNamesChanged(ctx) end)
+    events:RegisterMessage("next/AutosizeChanged", function(ctx) self:AutosizeChanged(ctx) end)
     events:RegisterMessage("bags/ClampChanged", function(ctx) self:ClampChanged(ctx) end)
   end
 end
@@ -100,6 +101,14 @@ end
 -- is fitted again to what it shows now (Update, snapping: FitSmall); a closed one is fitted as it opens.
 ---@param ctx Context
 function chain:FitNamesChanged(ctx)
+  self:Update(ctx, true)
+end
+
+-- AutosizeChanged follows Autosize Bags (next/AutosizeChanged from its switch, next-small-autosize.md): every open small panel
+-- takes the height it has now at once, what it shows or the height the player gave it (Update, snapping: FitSmall); a closed
+-- one takes it as it opens.
+---@param ctx Context
+function chain:AutosizeChanged(ctx)
   self:Update(ctx, true)
 end
 
@@ -363,6 +372,24 @@ function chain:Dropped(panel, x, y)
   database:SetNextSmallChain(partner.chainRole)
   self:UpdateGrips()
   return wx, wy
+end
+
+-- Released runs once as a small panel closes (Hide; OnHidden for a hide Escape makes at once): the open small backpack chained
+-- beside it, a companion (layout "companion"), keeps where it stands, its place saved there. In that layout the backpack hangs
+-- from a companion only while one is open, and then reads its own place: its anchor's glides and refits, and its own glide into
+-- its spot, moved it without saving, so its next height glide took it back to where it was dropped (next-small-autosize.md). Its
+-- top saved is its spot's, beside the companion's top, not one Autosize Bags raised it to keep its bottom on the screen
+-- (clampPlace), so it still goes back down to it as it shrinks. The backpack closing is never open itself; beside another
+-- companion still open it reads its spot from that one, and saving it changes nothing. A close that ends part way through a
+-- switch to small (PrepareResize finishes it) is a full panel's: nothing is saved (a backpack never small has no place yet).
+---@param panel NextPanelFrame
+function chain:Released(panel)
+  local backpack = self.backpack
+  if not isSmall(panel) or self:SmallLayout() ~= "companion" or not isOpen(backpack) then
+    return
+  end
+  local _, spot = self:ChainedPlace(backpack, panel, panel:LivePlace())
+  database:SetNextSmallPlace(backpack.kind, backpack.placeX, math.min(backpack.placeY, spot))
 end
 
 -- Detach lets a small bag go of its anchor as the player starts to drag it away; its partner braids

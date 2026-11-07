@@ -173,6 +173,8 @@ describe("NextVendor", function()
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
     override(stubs.database, "GetNextFitNamesWhileOpen", function() return false end)
+    -- Autosize Bags (next-small-autosize.md), off but where a test turns it on.
+    override(stubs.database, "GetNextAutosize", function() return false end)
     -- What a small panel reads, whichever test runs first (patterns-specs.md: shuffled, a test had found them missing).
     override(stubs.database, "GetNextSmallChain", function() return "apart" end)
     override(stubs.database, "GetNextSmallPlace", function() return nil end)
@@ -709,6 +711,42 @@ describe("NextVendor", function()
       v:SetTitle(long)
       assert.are.equal(#long * 6, v.titleWhole)
       assert.is_true(v:MinWidth() >= start + #long * 6)
+      addon:GetModule("NextChain"):Init()
+    end)
+
+    -- Autosize Bags (next-small-autosize.md). Asked: "yes vendor bag too".
+    it("autosizes a small vendor's height to the cards it shows, and follows them", function()
+      override(stubs.database, "GetNextSize", function() return "small" end)
+      override(stubs.database, "GetNextBagScale", function() return 100 end)
+      override(stubs.database, "GetClampBagsToScreen", function() return true end)
+      override(stubs.database, "GetNextAutosize", function() return true end)
+      -- Two seconds of frames, each rendering what waits for it: its effects play for as long as it is open.
+      local function settle()
+        for _ = 1, 120 do
+          render:Flush()
+          local update = tween.driver and tween.driver:GetScript("OnUpdate")
+          if update ~= nil then
+            update(tween.driver, 1 / 60)
+          end
+        end
+        render:Flush()
+      end
+      -- Its header, its cards, as much room as between its sections down to its footer's line, and the footer below it.
+      local function fitted(v)
+        return style.CONTENT_TOP + v.content.frame:GetHeight() + style.SECTION_SPACING + select(5, v.footerLine:GetPoint(1))
+      end
+      data.items = {}
+      for i = 1, 16 do table.insert(data.items, forSale(i, i % 2 == 0 and "Food" or "Armor")) end
+      local v = open()
+      settle()
+      local tall = v.frame:GetHeight()
+      assert.are.equal(fitted(v), tall)
+      assert.is_true(v.root:PreRender().Height >= v.content.frame:GetHeight(), "nothing to scroll")
+      data.items = { forSale(1, "Food"), forSale(2, "Food"), forSale(3, "Food"), forSale(4, "Food") }
+      v:Draw(ctx())
+      settle()
+      assert.is_true(v.frame:GetHeight() < tall)
+      assert.are.equal(fitted(v), v.frame:GetHeight())
       addon:GetModule("NextChain"):Init()
     end)
 

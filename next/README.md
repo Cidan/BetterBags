@@ -75,6 +75,19 @@ width it last took (`RestingLayoutWidth`). The rules are in `.claude/rules/next-
 it, `RestingLayoutWidth`), its continuation in `.claude/rules/next-small-names.md` (the names) and
 `.claude/rules/next-columns.md` §7a.
 
+## A small panel's height
+
+With **Autosize Bags** on (the default) a small panel is as tall as what it shows: its header, every section and Free
+Space as last laid out (the scroll box's `FitHeight`, kept by the render root) and its footer, so nothing scrolls; never
+shorter than its tab rail nor past the screen (`NextPanel:RestingHeight`, `FittedHeight`). It takes that height as it opens
+and glides to it a frame after anything it shows changes (`FollowHeight`, which waits as `FollowNames` does, and glides with
+the grips' snap, `snapTo`, its width as it is). Its top stays where it was left, or centered at its default place, and its
+bottom stays on the screen (`clampPlace`, saving nothing). Its grips size it both ways, and as they let go its height bounces
+back to what it shows, its width saved alone. It keeps as much room below its last section, down to its footer's line, as
+between its sections.
+Off, it is the height the player gave it with its grips, or a share of the screen. The rules are in
+`.claude/rules/next-small-autosize.md` §14i.
+
 ## Moving sections
 
 Every section has a header button. Dragging a category's header picks the section up: its frame,

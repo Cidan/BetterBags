@@ -310,6 +310,24 @@ describe("What each setting asks the bags for", function()
     assert.are.same({ "next/FitNamesChanged", "next/FitNamesChanged" }, messages())
   end)
 
+  -- Autosize Bags (next-small-autosize.md): it saves its choice and tells BetterBags Next's panels, which fit every open
+  -- small one again; the bags' items are neither read nor recalculated.
+  it("saves Autosize Bags on or off and tells BetterBags Next's panels, reading nothing", function()
+    local on = true
+    override(db, "GetNextAutosize", function() return on end)
+    override(db, "SetNextAutosize", function(_, value) on = value end)
+    local found = settings("Autosize Bags")
+    assert.are.equal(1, #found)
+    assert.are.equal("toggle", found[1].kind)
+    assert.is_true(found[1].get(ctx()))
+    found[1].set(ctx(), false)
+    assert.is_false(on)
+    assert.are.same({ "next/AutosizeChanged" }, messages())
+    found[1].set(ctx(), true)
+    assert.is_true(on)
+    assert.are.same({ "next/AutosizeChanged", "next/AutosizeChanged" }, messages())
+  end)
+
   -- BetterBags Next's Animation tab (next-themes.md §20): each switch saves its effect on or off and tells BetterBags
   -- Next, which lays the switches over the theme in use again; the bags' items are neither read nor recalculated.
   for _, case in ipairs({ { "Sparkles", "sparkles" }, { "Title Shimmer", "shimmer" }, { "Title Cloud", "titleCloud" },

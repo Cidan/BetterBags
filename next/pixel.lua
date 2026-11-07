@@ -77,6 +77,14 @@ function pixel:FloorIn(unit, units)
   return math.floor(units / unit + 1e-6) * unit
 end
 
+-- CeilIn is units rounded up to whole pixels of a unit.
+---@param unit number
+---@param units number
+---@return number
+function pixel:CeilIn(unit, units)
+  return math.ceil(units / unit - 1e-6) * unit
+end
+
 -- Pixels is how many whole screen pixels units are on region's grid, rounded: an offset, which may be
 -- none.
 ---@param region ScriptRegion

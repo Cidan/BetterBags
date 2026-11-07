@@ -99,3 +99,49 @@ Reported with a screenshot: a small backpack four cells wide in two columns, its
   names; the glide keeps where the bag is scrolled; the title's glow is laid out for the title as it shows.
 - Full-height bags are unchanged.
 - Not seen in game: a bag fitting its names as it opens and as a grip is let go, and the switch's glide.
+
+## Autosize Bags (2026-11-06)
+
+Asked:
+
+> we need to add a new feature to betterbags: autosize bags. this feature should go in appearance next to size, and it
+> should make it so the bag grows on the vertical (Y axis) to hold all items + free space the user currently has, keeping
+> the X size as is.
+>
+> it should be a toggle option, and it should default on i think
+
+Then, of the plan: "follow live", "yes always at least as tall as tab rail", "yes move the bag up just enough", "yes vendor
+bag too".
+
+- **Autosize Bags**, after Bag Scale on the Size tab (`nextAutosize`, a switch, **on** by default): a small bag is as tall as
+  its header, everything it holds and its Free Space, and its footer, so nothing scrolls, as far as the screen allows (past
+  that it scrolls); its width stays the player's. Every small bag: the backpack, the bank, the guild bank and the vendor.
+- **Live:** it fits as it opens, and glides to its new height a frame after anything it shows changes (an item looted or
+  sold, a tab switched, a section moved, Free Space), with the bounce a resize grip's snap has; it waits while the bag is
+  moved, sized, dragged in or sliding, and a chained pair glides one at a time.
+- **Never shorter than its tab rail**, which hangs beside it from under its header.
+- **Where it sits:** its top stays where the player left it and its bottom moves; never moved, it stays centered. Its bottom
+  stays on the screen: where growing would take it past the screen's bottom it moves up as far as that, saving nothing, and
+  goes back down to where it was left as it shrinks.
+- **The grips** size it both ways; let go, its height bounces back to what that width shows, with the width's snap (asked,
+  trying it: "don't lock dragging on the Y axis when resizing the window. let it drag larger, but then "bounce" it back to the
+  size it should be on the Y axis"; a first version held the height while a grip dragged). Only the width is saved; the height a
+  player gave a bag with its grips stays saved, and is its height again once the switch is off.
+- **Room above the footer:** as much room below the last section, down to the footer's line, as between sections (asked,
+  trying it: the room from the last section's item buttons "to the border to the currency/money section, is too small, make
+  this a bit wider"; it was 4 units on Default).
+- Full-height bags and the classic bags are unchanged.
+
+**Status:** done. Rules: `.claude/rules/next-small-autosize.md` (§14i), next-settings.md. Found on the way, by the specs: a
+let-go saved its height where none was saved (`autosize and saved or h`); by a mutation run: a let-go or Shift-click that
+raised the bag saved the raise, so it never went back down (it saves the top it was left at now, `leftPlace`). Found by the bug
+review and fixed: a let-go snapping wider for a name glided the height twice; switching a pair to small with the backpack beside
+a companion jumped at the end; the backpack, carried by its companion, went back to where it was dropped once the companion
+closed (its place is now saved where it stands as its companion closes); a let-go kept a saved top past the screen. Found by the second bug review and fixed: the backpack's place when a companion chained by a drop or a size switch
+closes, or after it is dragged off one; a raised bag a grip made shorter stayed up; a bag small before glided twice switching
+back; a chained bag's let-go saved a mixed place. Found by the third bug review and fixed: the companion's slide end saved the backpack's own raise; Alt+Z
+saved the backpack's place; a backpack raised beside its companion kept the raise once the companion closed. Found by the fourth
+bug review and fixed: the companion's slide end saved over what its close saved (a glide the close cut short, another
+companion opening meanwhile, a drop). Found by the fifth bug review and fixed: a close Alt+Z cut short kept the companion's next close from saving.
+- Not seen in game: the glide as items come and go, a bag growing up from the screen's bottom, a chained pair, a grip dragged
+  taller and bouncing back, the room above the footer on each theme, and how a short bag beside a long tab rail looks.
