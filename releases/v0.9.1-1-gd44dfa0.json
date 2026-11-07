@@ -1,0 +1,17 @@
+{
+  "id": 1794025900,
+  "version": "v0.9.1-1-gd44dfa0",
+  "channel": "alpha",
+  "date": "2026-11-07",
+  "from": "6a0109d08242d545fdc0279399c5cf6e3f5dcd1b",
+  "to": "d44dfa0f93d89283363725bd466524d1dcf490aa",
+  "headline": "Added an option in Next mode to automatically adjust small bag heights to fit their contents.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Autosize Bags setting for small bags",
+      "details": "Small bags in Next mode can now automatically adjust their height to fit all contents and free space without scrolling. The new option is enabled by default under Appearance \u003e Size, and bags will gently shift upward if needed to stay fully on screen.",
+      "clients": []
+    }
+  ]
+}
