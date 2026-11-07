@@ -1,0 +1,29 @@
+{
+  "id": 1794073051,
+  "version": "v0.9.2",
+  "channel": "release",
+  "date": "2026-11-07",
+  "from": "v0.9.1",
+  "to": "v0.9.2",
+  "headline": "Introduces dynamic bag autosizing, right-click backpack sorting, and the new Rainy Window glass theme for BetterBags Next.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Autosize Bags setting for small bags",
+      "details": "A new Autosize Bags setting under Appearance \u003e Size automatically adjusts the height of small bags to fit their contents without scrolling while preserving your custom width. Bags smoothly expand and shrink as items are added or removed.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Right-click backpack title to sort",
+      "details": "Right-clicking the backpack title now sorts your bags, complete with sound effects and an updated tooltip hint. Left-clicking continues to chain panels together as before.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Rainy Window theme",
+      "details": "Adds the Rainy Window theme to BetterBags Next, turning bag frames into smoked glass with interactive lighting, condensation, and animated raindrops. New options in Appearance allow adjusting the glass tint and toggling rain, lightning, and opening sheen effects.",
+      "clients": []
+    }
+  ]
+}
