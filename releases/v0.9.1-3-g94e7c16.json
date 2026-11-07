@@ -1,0 +1,17 @@
+{
+  "id": 1794073030,
+  "version": "v0.9.1-3-g94e7c16",
+  "channel": "alpha",
+  "date": "2026-11-07",
+  "from": "d7b05adba1745eda7e2a3e249e4dd3378fed587f",
+  "to": "94e7c1660041dcc73cdd8933ca4a56eebcb2cf39",
+  "headline": "Introduces the Rainy Window theme featuring smoked glass, animated rain, dynamic lighting, and customizable tint settings.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Rainy Window theme",
+      "details": "Adds the Rainy Window theme for BetterBags Next, turning bag frames into smoked glass panels with interactive lamplight reflections, raindrops, and opening sheens. Players can adjust the glass tint under Theme settings or toggle rain, lightning, and sheen effects under Animation settings.",
+      "clients": []
+    }
+  ]
+}
