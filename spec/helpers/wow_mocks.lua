@@ -1,5 +1,5 @@
 -- wow_mocks.lua -- Mock basic World of Warcraft globals required by Ace3 and addon modules.
--- This file is loaded by spec/setup.lua before any libraries or addon code.
+-- spec/helpers/world.lua loads it for every spec file, before any libraries or addon code.
 
 -- Core game functions
 _G.GetTime = function() return os.clock() end

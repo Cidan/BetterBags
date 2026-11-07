@@ -12,64 +12,56 @@ if _VERSION ~= "Lua 5.1" then
 end
 
 -- setup.lua -- Busted test helper. Loaded before all spec files via .busted config.
--- Delegates to modular helpers in spec/helpers/ for maintainability.
+-- Builds the world each spec file runs in (spec/helpers/world.lua): a new one for every file, let go when the file
+-- ends, so a file runs as it would alone and the suite holds one file's memory at a time
+-- (.claude/rules/test-harness.md §6).
 
--- The whole suite runs in one process under CI's 4 GB cap (test-harness.md, Memory). Lua starts a collection once memory
--- doubles what the last one left (a pause of 200); at 120 the garbage between collections stays a fifth of what is live.
+-- Lua starts a collection once memory doubles what the last one left (a pause of 200); at 120 the garbage between
+-- collections stays a fifth of what is live.
 collectgarbage("setpause", 120)
 
--- Step 1: Mock WoW globals (must come before any library loading)
-dofile("spec/helpers/wow_mocks.lua")
+local buildWorld = dofile("spec/helpers/world.lua")
 
--- Step 2: Load Ace3 libraries (order matters -- dependencies first)
-dofile("libs/LibStub/LibStub.lua")
-dofile("libs/CallbackHandler-1.0/CallbackHandler-1.0.lua")
-dofile("libs/AceAddon-3.0/AceAddon-3.0.lua")
-dofile("libs/AceEvent-3.0/AceEvent-3.0.lua")
-dofile("libs/AceDB-3.0/AceDB-3.0.lua")
-dofile("libs/AceHook-3.0/AceHook-3.0.lua")
-dofile("libs/AceConsole-3.0/AceConsole-3.0.lua")
-dofile("libs/AceDBOptions-3.0/AceDBOptions-3.0.lua")
-dofile("libs/AceConfig-3.0/AceConfigRegistry-3.0/AceConfigRegistry-3.0.lua")
-dofile("libs/AceConfig-3.0/AceConfigCmd-3.0/AceConfigCmd-3.0.lua")
-dofile("libs/AceConfig-3.0/AceConfig-3.0.lua")
+local pristine = {}
+for key, value in pairs(_G) do
+  pristine[key] = value
+end
 
--- Step 3: Create the BetterBags addon and provide module loading helpers
-dofile("spec/helpers/addon_loader.lua")
+-- One world for busted -l, which runs the spec files without their file events.
+buildWorld()
 
--- The profiler engine loads right after core/boot.lua in every TOC, and files across the
--- addon register their prototypes with it at load time, so every spec needs it present.
-LoadBetterBagsModule("debug/perf/engine.lua")
--- The pixel check (debug/pixelaudit.lua): spec/helpers/layout.lua runs it, and BetterBags Next's windows
--- register with it as they are made.
-LoadBetterBagsModule("debug/pixelaudit.lua")
--- Flow is the pure packing every grid lays out with (render/flow.lua); the grid looks it up when
--- it loads, so every spec that loads a grid needs it present.
-LoadBetterBagsModule("render/flow.lua")
--- Motion positions the cells and sections of every grid (render/motion.lua); grids and sections
--- look it up when they load.
-LoadBetterBagsModule("render/motion.lua")
--- Texels draws the bags' textures without the client's sharpening (render/texels.lua); item buttons and windows
--- look it up when they load.
-LoadBetterBagsModule("render/texels.lua")
--- BetterBags Next's pixel grid (next/pixel.lua, docs/next-pixel-perfect.md): every Next file that places
--- anything looks it up when it loads.
-LoadBetterBagsModule("next/pixel.lua")
-LoadBetterBagsModule("next/itemfit.lua")
-LoadBetterBagsModule("next/coins.lua")
--- Sonata resolves its themes and BetterBags Next's with SonataResolve (sonata/resolve.lua), which
--- the engine looks up when it loads.
-LoadBetterBagsModule("sonata/resolve.lua")
--- BetterBags Next's theme engine and its themes (sonata/next.lua, sonata/themes/next): next/style.lua
--- reads the Default theme when it loads.
-FreshNextThemes()
+local busted = require("busted")
 
--- Step 4: Load shared mock data factories
-dofile("spec/helpers/mock_data.lua")
+-- Every world is built on the globals Lua and busted start with: the libraries keep a copy they find (LibStub), and the
+-- mocks wrap the xpcall they find.
+busted.subscribe({ "file", "start" }, function()
+  for key, value in pairs(_G) do
+    if pristine[key] ~= value then
+      rawset(_G, key, pristine[key])
+    end
+  end
+  for key, value in pairs(pristine) do
+    if rawget(_G, key) == nil then
+      rawset(_G, key, value)
+    end
+  end
+  buildWorld()
+  return nil, true
+end)
 
--- The frame mock lists a frame on its parent (GetChildren), and every panel's parent is UIParent, which lives for the whole
--- run: without this, everything each spec file parents to it stays alive to the end (test-harness.md, Memory).
-require("busted").subscribe({ "file", "end" }, function()
-  UIParent._children = {}
+-- busted keeps every describe, it and hook for the whole run, and their functions hold their file's locals, and through
+-- them its world. A finished file's let go of theirs; the file's own function, which --repeat runs again, holds none.
+local function release(element)
+  for _, child in ipairs(busted.children(element)) do
+    release(child)
+  end
+  element.run = nil
+  element.env = nil
+end
+busted.subscribe({ "file", "end" }, function(file)
+  for _, child in ipairs(busted.children(file)) do
+    release(child)
+  end
+  file.env = nil
   return nil, true
 end)
