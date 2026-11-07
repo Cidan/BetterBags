@@ -252,3 +252,4 @@ integrations\quickfind.lua
 
 core\bagsystem.lua
 core\init.lua
+debug\glassdemo.lua
