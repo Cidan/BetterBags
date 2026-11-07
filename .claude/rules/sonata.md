@@ -223,7 +223,7 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 
 | Kind | Element | Style keys (defaults are Blizzard's) |
 |---|---|---|
-| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (a `Color` fill, or art: `Texture` or `Atlas`, tinted by `VertexColor`, with `TexCoords`, `Alpha`, `BlendMode`; `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"` or art (`{ Texture or Atlas, Alpha, BlendMode }`: the icon's border drawn in it, tinted the quality's color at `Alpha`), `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `ItemLevel` (`Font`: the item level text, its color the draw's), `Countdown` (`Font`, `Locales`: a cooldown's numbers; none, the client's own font, recorded by value and put back), `EmptySlot` (a texture spec: an empty slot's art; Classic draws it as its icon), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
+| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (a `Color` fill, or art: `Texture` or `Atlas`, tinted by `VertexColor`, with `TexCoords`, `Alpha`, `BlendMode`; `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"` or art (`{ Texture or Atlas, Alpha, BlendMode }`: the icon's border drawn in it, tinted the quality's color at `Alpha`), `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `ItemLevel` (`Font`: the item level text, its color the draw's; both fonts through a font object, below), `Countdown` (`Font`, `Locales`: a cooldown's numbers; none, the client's own font, recorded by value and put back), `EmptySlot` (a texture spec: an empty slot's art; Classic draws it as its icon), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
 | `Tab` | a bottom tab | `Art = "Flat"` (template art hidden; `Background`, `Border`, `Hover` (HIGHLIGHT layer), `Selected = { Background, Bar, Border }`: `Bar` is a texture spec with `Height` and `Points` (default along the top), `Border = { Color }` recolors the tab's border while it is selected or a drop target), `Height` (default 32), `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | a section title font string | `Font` (default `GameFontNormal`) |
 | `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
@@ -279,6 +279,28 @@ Details:
   state's font object when hovered, which would undo `SetFont`/`SetTextColor` on its label. A
   font spec with a `Path`, `Color`, `Shadow` or `Justify` becomes a font object made for it
   (`CreateFont`, one per distinct spec, copied from its `Object` first).
+- **An item button's count and item level take their fonts through a font object too** (`itemText`,
+  `fontObjectFor`), never `SetFont` on the text: a file `SetFont` gives a font string stays on it through
+  every font object it is given after (patterns-ui-text.md). Issue #1263 (reported in Discord): after
+  previewing the Papercraft theme on the Appearance page and leaving it, its hand stayed on every
+  button's count and item level, under every other theme and the classic bags, until a reload.
+  Papercraft is the only theme whose `Count.Font` and `ItemLevel.Font` name a file
+  (`{ Object = "NumberFontNormal", Path, Size, Flags }`); `apply:Font` had set it on the text, and the
+  next theme's `{ Object = "NumberFontNormal" }` only gave the text a font object. A spec naming no
+  `Object` starts from `NumberFontNormal` (the template's), so a `{ Color }` alone keeps Blizzard's file
+  and `{}` draws Blizzard's font, as before (found by the bug review: a made font object with no `Object`
+  had no file, and `{}` raised `unknown font object`). The countdown keeps its own font by value and puts
+  it back (`styleCountdown`): the client's font for it is not one of Blizzard's font objects.
+  Left as they are, found by the review and not seen in game: a made font copies `NumberFontNormal` once,
+  so a client or addon changing `NumberFontNormal`'s color or shadow during a session leaves Papercraft's
+  count in the copy's (the tab and button state fonts made here already behave so); and copying a
+  font family into a new font object before setting the file is assumed to draw as setting the file on
+  the text did (counts are digits). Coverage: `spec/sonata/elements_spec.lua` ("gives the count and the
+  item level back their own font after a style that drew them in a file", "draws a count and an item
+  level in a file through a font object, the same one for the same spec", "draws a count and an item
+  level whose font names no font object on Blizzard's"), `spec/integration/papercraft_spec.lua` ("takes
+  its hand off the item buttons when a preview of it ends, and when another theme is applied", "... when
+  the bags switch to the classic design").
 - Flat tab fills: background at BACKGROUND -8, selected fill at -7 (always above it), bar at
   OVERLAY 6.
 - **Masque.** Restyling rewrites regions Masque skins (icon, highlight, pushed, count). A theme
@@ -603,7 +625,7 @@ the window's level; a clean switch from a templated theme to a flat one).
 `spec/sonata/elements_spec.lua` (every styler and its reset to Blizzard's look: icons,
 highlight and pushed art with blend modes, backdrops with and without edges, per-side edge
 insets, quality on the edge and per-quality colors, upgrade arrows styled in part, count font
-and position, quest art by quest data (items, starters, Classic's always-shown texture) and the
+and position, count and item level fonts back to Blizzard's after a file (issue #1263), quest art by quest data (items, starters, Classic's always-shown texture) and the
 quest border's texture; tabs: Blizzard art by state, template offsets, drop on a normal and on
 the selected tab, flat art with fills, bar and hover, the selected fill above the normal one,
 fonts and height reset, selected-only fonts, made font objects (shared per spec), highlight

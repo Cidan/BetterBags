@@ -92,6 +92,58 @@ describe("the Papercraft theme on the whole addon", function()
     assert.same({}, handle.errors)
   end)
 
+  -- Issue #1263 (reported in Discord): previewing Papercraft on the Appearance page and leaving it, its hand stayed on the
+  -- item buttons. What every item button's count and item level are drawn in, by file: { [file] = buttons }.
+  local function itemFonts()
+    local seen = {}
+    local function note(text)
+      local file = text and text:GetFont()
+      if file ~= nil then
+        seen[file] = (seen[file] or 0) + 1
+      end
+    end
+    for decoration in pairs(module("Sonata").elements.ItemButton or {}) do
+      note(decoration.Count)
+      note(decoration.ItemLevelText)
+    end
+    return seen
+  end
+
+  local function papercraft(seen)
+    for file in pairs(seen) do
+      if file:find("papercraft", 1, true) then
+        return true
+      end
+    end
+    return false
+  end
+
+  it("takes its hand off the item buttons when a preview of it ends, and when another theme is applied", function()
+    local addon = start("Default")
+    addon.Bags.Backpack:Show(ctx())
+    local before = itemFonts()
+    assert.is_false(papercraft(before))
+    assert.is_true(next(before) ~= nil, "item buttons drawn")
+    local engine = module("SonataNext")
+    engine:ApplyTheme(ctx(), "Papercraft", false)
+    assert.is_true(papercraft(itemFonts()), "previewed")
+    engine:RestoreSavedTheme(ctx())
+    assert.are.same(before, itemFonts(), "the preview over")
+    engine:ApplyTheme(ctx(), "Papercraft", true)
+    engine:ApplyTheme(ctx(), "Frost", true)
+    assert.are.same(before, itemFonts(), "another theme applied")
+    assert.same({}, handle.errors)
+  end)
+
+  it("takes its hand off the item buttons when the bags switch to the classic design", function()
+    local addon = start()
+    addon.Bags.Backpack:Show(ctx())
+    assert.is_true(papercraft(itemFonts()))
+    module("BagSystem"):Switch(ctx(), "classic")
+    assert.is_false(papercraft(itemFonts()))
+    assert.same({}, handle.errors)
+  end)
+
   it("writes the money in the footer's font under a Next theme that names no other", function()
     local addon = start("Default")
     for _, button in ipairs(buttons(addon.Bags.Backpack)) do

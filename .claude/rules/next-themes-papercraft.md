@@ -73,6 +73,9 @@ What the Papercraft theme (next-themes-shipped.md §8) needed of the engine, all
     (a font string keeps the width it was sized to, sonata.md 3c). Default sets it to `Footer` (issue #1226: the bags' gold reads as the vendor's footer does); `false`, the frame's own role.
   - `ItemButton.ItemLevel` and `ItemButton.Countdown` (sonata.md §3a): an item level keeps the color its draw gave it, since a
     style applied for a new pixel grid draws nothing; a countdown's own font is recorded by value and put back.
+  - `ItemButton.Count` and `ItemButton.ItemLevel` name Patrick Hand's file, drawn through a font object made for it, never
+    set on the text: set on the text, it stayed on every button under every other theme and the classic bags (issue #1263,
+    after a preview of this theme; sonata.md §3a).
 - **Item buttons' empty slots:** `ItemButton.EmptySlot` draws an empty slot's art (retail's `ItemSlotBackground`; on Classic
   its icon, `SonataElements:EmptySlotArt`), Blizzard's when the style has none.
 - **Check** (`SonataNext:Check`): a stop motion's parts, an `FPS` above nothing, a `Spacing` from 0 to under a half; a sheet's
@@ -89,7 +92,8 @@ What the Papercraft theme (next-themes-shipped.md §8) needed of the engine, all
   `spec/next/coins_spec.lua`, `spec/sonata/elements_spec.lua`, `spec/frames/item_spec.lua`, `spec/next/guildbutton_spec.lua`
   (the text), `spec/sonata/next_engine_spec.lua` (Check, the switches), `spec/sonata/next_themes_spec.lua` ("Papercraft": its
   fonts, licenses and art on disk), and `spec/integration/papercraft_spec.lua` on the whole addon (the money through classic
-  themes, a real bag unfolding and crumpling twice, Paper Folding off, the design switching under a sheet).
+  themes, the item buttons' counts and item levels after a preview, another theme and the classic bags, a real bag unfolding
+  and crumpling twice, Paper Folding off, the design switching under a sheet).
 - Mutation-tested: 96 mutations of the stop motion, the sheet, the panel's hooks, the switches and the text. 32 first
   survived: most showed the first tests proved the animation ran rather than what it drew (the toss's side, the paper's back
   on a turned face, each of Warp's parts, a shake fading, poses drawn once), and led to tests; two were code that could not
