@@ -427,3 +427,8 @@ files["spec/**/*.lua"] = {
 		"212", -- unused argument (common in mock functions)
 	},
 }
+
+-- The spec files spec/world_spec.lua runs in a busted of their own, named *_world.lua so the suite never runs them.
+files["spec/fixtures/world/*.lua"] = {
+	std = "+busted",
+}

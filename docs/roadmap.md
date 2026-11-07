@@ -133,22 +133,21 @@ question needs the arguments (redraw reasons, layouts).
 
 ### Spec isolation
 
-**Status:** known debt. The suite's own order passes (and is what CI runs). Measured on
-2026-10-16, after the windowing and Sonata overhaul:
+**Status:** known debt, within files only. Every spec file starts from a world of its own
+(`.claude/rules/test-harness.md` §6), so no file can fail for what another left behind, and the
+order of the files does not matter. Measured on 2026-11-07, 194 spec files:
 
-- Run directly before `refresh_pipeline_spec`, `spec/frames/bankslots_spec.lua` and
-  `spec/quickfind_spec.lua` fail 12 of its bank tests (3 failures, 9 errors); this predates the
-  2026-10-12 work. `spec/frames/tabs_spec.lua` no longer does (rewritten in the overhaul).
-- Every spec file passes run alone except `orchestrator_spec` and `targeted_sweep_spec`, whose
-  `Database` and `Constants` stubs miss methods `data/items.lua` calls (they fail alone on the
-  pre-overhaul commit too).
-- `busted --shuffle` (seeds 1-5) fails 18 to 90 tests, all in specs the overhaul did not touch
-  (`categories_spec`, `items_spec`, `equipmentsets_spec`, `loader_spec`, `async_spec`,
-  `orchestrator_spec`, `targeted_sweep_spec`) plus `bags/backpack_spec`, which loads the real
-  `core/database.lua` and fails when any earlier file registered a `Database` stub. The
-  pre-overhaul commit fails 58 to 80 with the same seeds (different orders, as it has fewer
-  files). The specs the overhaul added remove the stubs they create, restore what they replace
-  in file-level teardowns (busted shuffles blocks too, so a restore in one block's teardown can
-  run first), and pass alone and with their blocks shuffled.
+- Every spec file passes run alone.
+- `busted --shuffle` (seeds 1-3) fails 1, 3 and 5 tests (and 1 more errors at seed 3), all in three
+  files whose tests depend on the order they run in. Each fails the same way run alone with the
+  same seed, and did before every file had a world of its own: `spec/sonata/next_engine_spec.lua`
+  (seeds 1-3), `spec/next/controls/panel_controls_spec.lua` (seeds 2 and 3) and
+  `spec/tooltip_spec.lua` (seed 3).
+
+Measured on 2026-10-16, when the files still shared one world, `--shuffle` failed 18 to 90 tests
+(seeds 1-5) across `categories_spec`, `items_spec`, `equipmentsets_spec`, `loader_spec`,
+`async_spec`, `orchestrator_spec`, `targeted_sweep_spec` and `bags/backpack_spec` (which failed
+when any earlier file registered a `Database` stub), and `spec/frames/bankslots_spec.lua` and
+`spec/quickfind_spec.lua` failed 12 of `refresh_pipeline_spec`'s bank tests when run before it.
 
 `events:Init` no longer leaves duplicate handlers behind, which removed one source.

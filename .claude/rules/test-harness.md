@@ -3,6 +3,8 @@ paths:
   - "spec/setup.lua"
   - "spec/helpers/*.lua"
   - "spec/fixtures/*.lua"
+  - "spec/fixtures/world/*.lua"
+  - "spec/world_spec.lua"
   - "spec/integration/*_spec.lua"
   - "spec/debug_dump_harness_spec.lua"
   - "test.lua"
@@ -165,55 +167,41 @@ passed (next-bagsystem.md §11f). The whole-addon helper loads and starts all of
   lookup would call itself). Behavior is unchanged: every spec passed without a change. Measured: a load holds
   78 MB live (was 1.6 GB); the largest file peaks at 183 MB alone (was 5.3 GB); every file run
   alone sums to 2.1 GB of peaks (was 23.5 GB); the full suite peaked at 1.25 GB in one process then (was
-  19.4 GB) and took 17 s (was 112 s). With 6,300 specs (2026-11-01) it peaks at 3.6 GB under CI's 4 GB cap, about 1.5 GB of it
-  live at the end; that holder has not been found (clearing stale modules and `UIParent`'s children after every file only took
-  the peak to 3.5 GB). At 6,560 specs (2026-11-02) it peaked at 4.06 GB and died under the cap with no summary and no failure listed: exit 1 and a line
-  of progress marks, a crash to read as memory. `spec/setup.lua` now clears `UIParent`'s children after every file, which leaves 3.64 GB, and the margin is thin. The most live memory
-  is added by `frames/item_spec` (233 MB), `refresh_pipeline_spec` (173), `next/drag_spec` (150), `next/pixel_perfect_spec` (148), `next/settings/content_spec` and `next/theme_panel_spec` (128 each).
-  At 6,718 specs (2026-11-05, small panels keeping their names whole) it peaked at 4.0 GB and died under the cap again. Two
-  of those tests had `spy.on` a panel's method (patterns-specs.md: a spy deep-copies its arguments, the panel, 100 MB a
-  call); without them it still peaked at 4.0 GB, 1.67 GB live at the end. **`spec/setup.lua` now sets the collector's pause
-  to 120** (Lua's default, 200, lets garbage grow to what is live before a collection starts): measured on the whole suite,
-  uncapped, 4.19 GB and 162 s at the default, 3.42 GB and 170 s at 150, 2.96 GB and 188 s at 120. A full collection after
-  every file gave 3.43 GB and doubled the run.
-  - **Holders found, not cleared** (reference searches from the globals and the registry, a panel made in
-    `next/small_spec` and still live in the next file): each Next control module's `all` (every control made, for a theme
-    to restyle: the scroll bar's holds every panel's scroll box, whose `OnSizeChanged` holds the panel); the vendor buttons'
-    pool; `NextCurrencyDrag.containers` (every backpack's currency strip, holding its panel); the old copies a module
-    loaded fresh leaves in `addon.orderedModules`, holding as much; and the fills' `wrapped` regions, through their
-    parents' scripts. Clearing the first four after every file left the peak where it was (4.19 GB uncapped), as each
-    cleared holder exposed the next.
+  19.4 GB) and took 17 s (was 112 s). What the suite holds as a whole since: §6.
   - **A method is shared, so it must not read the constructor's locals**: use the widget's fields
     (`self._type`, `self._name`, `self._parent`). Per-widget state goes in the constructor.
   - **Overriding a method on one widget** (`frame.Method = ...`, a spec's `override`) sets the
     widget's own field, which shadows the shared one; restoring it to `rawget`'s nil brings the
     shared one back.
 - **Memory: nothing may keep a loaded addon after `Restore`.** Anything left reachable keeps the
-  whole load. Holders found so far, each with a reference search from the globals, the registry
+  whole load until its spec file ends (§6), and a file that loads the addon in many tests holds every
+  load. Holders found so far, each with a reference search from the globals, the registry
   and the stacks (Lua 5.1 rules: a weak-keyed table's values are strong):
   - shared tables the loaded addon adds to: library registries, `SlashCmdList`, frames' children
     lists, LibStub's libraries (loaded fresh; LibWindow's `windowData` outlived a load), and the
     shared `GameTooltip`, whose owner a hovered button of the loaded addon became (the mock keeps an
     owner after `Hide`); `Restore` puts each back as it was;
-  - **a spec's own locals**: busted keeps every spec's closures, and so their upvalues, for the
-    whole run. A fake clock's list of timers that never ran (the 2-second timeouts) held the loaded
-    addon of the guild bank and bank open specs' last test until the suite ended. Clear such lists
-    in `after_each` after `Restore` (`timers = nil`).
-  - **a listener a spec leaves registered**: the shared AceEvent registry keeps every test's handler for the whole run. One in
+  - **a spec's own locals**: busted keeps every spec's closures, and so their upvalues, until its
+    file ends. A fake clock's list of timers that never ran (the 2-second timeouts) held the loaded
+    addon of the guild bank and bank open specs' last test (before §6, until the suite ended). Clear
+    such lists in `after_each` after `Restore` (`timers = nil`).
+  - **a listener a spec leaves registered**: AceEvent's registry keeps every test's handler for the rest of the file. One in
     `spec/guildbank_pipeline_spec.lua` kept every `items/RefreshGuildBank/Done` slotInfo sent after it, whole-addon guild bank
     loads included (`Events._messageMap > ... > cb > its list > the slotInfo > ... > addon`): 400 MB, enough to reach CI's 4 GB
-    cap once a few more such tests were added. A handler that keeps what it is sent checks its own test is still the current one.
+    cap once a few more such tests were added (before §6, the registry was the whole suite's). A handler that keeps what it is
+    sent checks its own test is still the current one.
   - `spec/integration/bag_switch_spec.lua` ("lets the loaded addon be collected once restored", and
     "... after one of its frames owned the tooltip") fails if a load is kept.
-- **Measure one file at a time.** A single process holds every spec it ran, so a memory problem is
-  found file by file: `/usr/bin/time -f "%M" ~/.local/lua51/bin/busted spec/<file>` gives a file's
-  peak resident memory in KB. To see what is live, a busted helper outside the repository
-  (`--helper=/tmp/x.lua` that `dofile`s `spec/setup.lua` and subscribes to `{ "test", "end" }` /
-  `{ "file", "end" }`) can print `collectgarbage("count")` after a full collection; a load that
-  stays live after `Restore` is a leak. Run the whole suite in one process only under a cap
-  (`(ulimit -v 4000000; ~/.local/lua51/bin/busted)`), as CI does (`.github/workflows/test.yml`
-  caps its test step at 4 GB, so a regression fails with "not enough memory" rather than shutting
-  the runner down).
+- **Measure one file at a time.** The suite holds one spec file's memory at a time (§6), so its peak
+  is its heaviest file's, and a memory problem is found file by file:
+  `/usr/bin/time -f "%M" ~/.local/lua51/bin/busted spec/<file>` gives a file's peak resident memory
+  in KB. To see what is live, a busted helper outside the repository (`--helper=/tmp/x.lua` that
+  `dofile`s `spec/setup.lua` and subscribes to `{ "test", "end" }` / `{ "file", "start" }`) can print
+  `collectgarbage("count")` after a full collection; a load that stays live after `Restore` is a
+  leak, and so is memory still live when the next file starts. Run the whole suite in one process
+  only under a cap (`(ulimit -v 4000000; ~/.local/lua51/bin/busted)`), as CI does
+  (`.github/workflows/test.yml` caps its test step at 4 GB, so a regression fails with "not enough
+  memory" rather than shutting the runner down).
 - **Cost:** a load and start take about 0.2 s, most of it the real `ItemFrame:OnEnable` making
   every item button of every slot at login. Keep whole-addon specs few and pointed: a test needs
   its own load only when it needs a fresh start (what it checks happens the first time something
@@ -250,3 +238,64 @@ values, or `{ error = ... }`). Older dumps have no `apiProbe`.
 - **Who the player is never goes in a fixture.** Dumps record the player's name and realm
   (`debugDumpExtras.player.fullName`) and sessions record them in `meta`; an extracted fixture leaves
   them out.
+
+### 6. A World of Its Own for Every Spec File (`spec/setup.lua`, `spec/helpers/world.lua`)
+The suite runs every spec file in one Lua process, and gives each file a world of its own, the one it would get run
+alone, let go when the file ends: the suite holds one file's memory at a time.
+- **The world** (`spec/helpers/world.lua` returns the function that builds it): the WoW mocks (`wow_mocks.lua`), the
+  Ace3 libraries, the BetterBags addon (`addon_loader.lua`) with the modules every spec needs (the profiler engine, the
+  pixel check, Flow, Motion, Texels, Next's pixel grid, item fit and coins, SonataResolve, SonataNext with its themes),
+  and the mock data (`MockData`). Every global it sets is part of it.
+- **A new one for every file:** `spec/setup.lua` records the globals Lua and busted start with, builds one world when
+  busted loads it, and on every `{ "file", "start" }` puts those globals back as they were (removing the ones the last
+  world added, and restoring the one it replaced: the mocks wrap the `xpcall` they find) and builds a new world. Built on
+  the old one's globals, the new world would be the old one: LibStub keeps the copy of itself it finds, and the libraries
+  then find themselves loaded. A world takes about 14 ms to build (2.6 s over the suite). Busted's auto-insulation puts
+  the globals back as they were at the file's start when it ends, which drops the file's world from them.
+- **The world `busted -l` lists with:** list mode (busted's filter loader) swallows the file events, so no file gets a
+  world of its own: all of them run their describe bodies on the one `spec/setup.lua` builds when it loads.
+- **Letting a finished file go:** busted keeps every element (each describe, it and hook) for the whole run, in its
+  context's `parents` and `children` tables, and with each its function (`run`) and environment (`env`), so a file's
+  locals, and through them its whole world, stay live. On `{ "file", "end" }`, `spec/setup.lua` clears `run` and `env`
+  on every element under the file (busted's exported `children`) and the file's own `env`. The file's own `run`, which
+  `--repeat` runs again, is its chunk, which has no upvalues. Without this, a world per file peaked at 3.58 GB, more than
+  one world for the whole run.
+- **What still carries over from file to file:** Lua's own libraries (`string`, `table`, `math`, `os`, `io`, `debug`: a
+  spec that replaces one of their functions puts it back), the Lua registry, and busted's own record of each test: what
+  is live between files grows with the tests run, about 3 KB a test (`refresh_pipeline_spec`'s 371 leave 1.07 MB), from
+  14 MB to 35 MB over the suite. `spec/fixtures/world/first_world.lua` hands what it left to the next file through the
+  registry, in a weak table.
+- **What a file still holds while it runs:** everything every one of its tests made, until it ends. In
+  `spec/next/small_spec.lua`, frames made by each of the first 59 tests were all still live at test 60, held through
+  `UIParent._children` and `NextCurrencyDrag.containers` (reached from the addon's modules, its `orderedModules`,
+  AceAddon's `initializequeue` and the pixel check's records); searches before this found each Next control module's
+  `all` (every control made, for a theme to restyle: the scroll bar's holds every panel's scroll box, whose
+  `OnSizeChanged` holds the panel), the vendor buttons' pool and the fills' `wrapped` regions. All of it is the file's
+  world, so it goes with the file. The suite's peak is its heaviest file's: alone, `next/small_spec` peaks at 507 MB
+  (365 tests, 300 MB live by the last), then `next/pixel_perfect_spec` (287), `next/theme_panel_spec` (272),
+  `integration/theme_switch_spec` (268), `integration/bag_switch_spec` (259), `refresh_pipeline_spec` and
+  `next/drag_spec` (252 each) (2026-11-07).
+- **Measured** (2026-11-07, 6,865 specs in 194 files, all passing, and every file passing alone): with one world for the
+  whole run the suite peaked at 3.17 GB, 1.78 GB of it live by the last file, grown file by file (`next/small_spec` left
+  296 MB behind it, `refresh_pipeline_spec` 174, `next/drag_spec` 154, `next/pixel_perfect_spec` 151,
+  `next/theme_panel_spec` and `next/settings/content_spec` 132 each). With a world per file it peaks at 613 MB and runs
+  in 191 s. Letting finished files' elements go with one world changed nothing (2.90 GB against 2.91 GB, both with a full
+  collection before every file).
+- **The collector's pause stays 120** (Lua starts a collection once memory reaches the pause, in percent, of what the
+  last one left; the default, 200, lets garbage grow as large as what is live): with a world per file, 586 MB and 185 s
+  at 120 against 829 MB and 161 s at 200. With one world it was 2.96 GB and 188 s at 120, 3.42 GB and 170 s at 150,
+  4.19 GB and 162 s at 200.
+- **CI's cap stays 4 GB** (`ulimit -v 4000000` in `.github/workflows/test.yml`, by decision). `ulimit -v` also caps the
+  processes a spec starts: at 1 GB, `git` fails under `spec/helpers/ui_source.lua`, and `spec/sonata/plain_art_spec.lua`
+  with it, whatever the suite holds.
+- **Mistakes this comes from:** one world for the whole run, and its memory hunted holder by holder. From 6,300 specs
+  (2026-11-01) the suite peaked at 3.6 GB under CI's 4 GB cap; at 6,560 (2026-11-02) and 6,718 (2026-11-05) it reached
+  the cap and died with no summary and no failure listed (exit 1 and a line of progress marks, a crash to read as
+  memory). Clearing `UIParent`'s children after every file, and then four of the holders above, each left the peak where
+  it was, as each cleared holder exposed the next.
+- **Coverage:** `spec/world_spec.lua` runs `spec/fixtures/world/first_world.lua` and `second_world.lua` in a busted of
+  their own, started as the running one was (the interpreter, its options and the busted script: `arg[-n]` to
+  `arg[0]`). It checks the second file gets an addon and mocks of its own, without the stub module and the mark on
+  `C_Container` the first left, that the first file's addon and frame are collected, and that `busted -l` still lists
+  both files' tests. The fixtures are named `*_world.lua`, so the suite never runs them (busted's pattern is `_spec`);
+  `.luacheckrc` gives them busted's globals.

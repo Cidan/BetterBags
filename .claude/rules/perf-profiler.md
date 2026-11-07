@@ -671,8 +671,9 @@ world event traced with them, each bag event, nothing read while idle, no event 
   exact; tests pass `modules = {...}, prototypes = {}, includeRoot = false, calibrate = false`
   so only test modules are wrapped.
 - Sessions, Performance tab, and debug window specs load fresh `Context` and `Events`
-  modules with `LoadFreshBetterBagsModule` (`spec/helpers/addon_loader.lua`), because
-  earlier spec files stub or patch those shared modules without restoring them.
+  modules with `LoadFreshBetterBagsModule` (`spec/helpers/addon_loader.lua`), written when
+  earlier spec files stubbed or patched those shared modules without restoring them; every
+  file now starts from a world of its own (test-harness.md §6).
 - `spec/setup.lua` loads `debug/perf/engine.lua` for every spec, since files register
   prototypes with it at load.
 - `spec/debug_dump_harness_spec.lua` profiles the real refresh pipeline over the `test.lua`
