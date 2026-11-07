@@ -82,7 +82,9 @@ to its width, Fit Names While Open, and the bug reviews of them.
   where its new place's left is its old, the right edge ("RIGHT"); where its right is (the backpack's default place, a
   companion chained left of its anchor), the left ("LEFT"); where neither is (the screen's edge, Clamp Bags to Screen),
   both, its left edge gliding to its new place with its width. It returns what it did for profiler traces: `"closed"`,
-  `"off"`, `"owed"`, `"fits"`, `"placed"` (its frame was that wide already) or `"following"`.
+  `"off"`, `"owed"`, `"fits"`, `"placed"` (its frame was that wide already) or `"following"`. It takes the width alone
+  (`smallWidth`, `restingWidth`), its height kept: with Autosize Bags on the height and the place it puts it follow what it
+  shows on their own (`FollowHeight`, next-small-autosize.md §14i), a names glide never jumping the frame to a newer height.
   - **Not settled, it waits** (`Settled`: nothing moves, sizes or places it, `busy`: a grip sizing it, its size gliding,
     moved, switching size, a slide or a glide playing on it, a section dragged on its canvas; and it is on its place, its
     offset 0, which a Glitch burst's shove is not), **and while the open bag chained to it is not settled** (`chainedPartner`:

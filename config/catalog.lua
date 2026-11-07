@@ -830,6 +830,23 @@ define('nextBagScale', {
   end,
 })
 
+-- Asked: "it should make it so the bag grows on the vertical (Y axis) to hold all items + free space the user currently has,
+-- keeping the X size as is. it should be a toggle option, and it should default on" (next-small-autosize.md). The panels fit
+-- themselves again on next/AutosizeChanged: nothing is read or recalculated.
+define('nextAutosize', {
+  kind = "toggle",
+  title = 'Autosize Bags',
+  description = "Small bags are as tall as everything they hold and their Free Space, growing and shrinking as items come "
+    .. 'and go, as far as the screen allows; their width stays as you set it. Off, a small bag keeps the height you give it '
+    .. 'with its resize grips.',
+  keywords = { 'height', 'autosize', 'auto', 'fit', 'grow', 'shrink', 'tall', 'small', 'window', 'resize', 'size' },
+  get = function() return db:GetNextAutosize() end,
+  set = function(ctx, value)
+    db:SetNextAutosize(value)
+    events:SendMessage(ctx, 'next/AutosizeChanged')
+  end,
+})
+
 -- Asked: "with an option to enable/disable this behavior in settings, default disable. with it disabled, behavior is as it is
 -- now" (next.md §14g). The panels fit themselves again on next/FitNamesChanged: nothing is read or recalculated.
 define('nextFitNamesWhileOpen', {

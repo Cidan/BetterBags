@@ -127,7 +127,8 @@ reviews of them are §14g (continued), in next-small-names.md.
 - **Its size** (`SmallSize`): the saved size, else its default width (`DefaultWidth`: the columns the full
   body's width holds, `ColumnsWidth(BODY_WIDTH)`, whatever it shows, so it leaves no room past its last column at
   any Icon Scale and does not change as items come and go;
-  exactly `BODY_WIDTH` at 100%) and `Small.Height` of the screen tall; its width fitted to its title and names
+  exactly `BODY_WIDTH` at 100%) and `Small.Height` of the screen tall (`RestingHeight`; with Autosize Bags on, what it
+  shows, its height bouncing back there as a grip is let go and only its width saved: next-small-autosize.md §14i); its width fitted to its title and names
   (`FittedWidth`: `FitWidth` of the saved or default width, never past the screen at its scale), its height never
   below its minimum nor past the screen, without changing what was saved. An open panel at its default size takes
   its new default when Icon Scale changes (`FitSmall`); a saved size keeps its width. While it is built (its header

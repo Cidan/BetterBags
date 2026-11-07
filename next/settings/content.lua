@@ -411,7 +411,7 @@ function content:Init()
         } } },
     } }, { id = "size", title = L:G("Size"), design = "next", sections = {
       { title = L:G("Size"), rows = { { setting = 'nextIconScale' }, { setting = 'nextBagScale' },
-        { setting = 'nextFitNamesWhileOpen' } } },
+        { setting = 'nextAutosize' }, { setting = 'nextFitNamesWhileOpen' } } },
     } }, { id = "animation", title = L:G("Animation"), design = "next", sections = {
       -- Each effect on or off on any theme (next-themes.md §20); the classic bags have none of them.
       { title = L:G("Effects"), rows = { { setting = 'nextSparkles' }, { setting = 'nextShimmer' },

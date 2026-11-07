@@ -101,6 +101,7 @@ const.DATABASE_DEFAULTS = {
     nextIconScale = 100,
     nextBagScale = 100,
     nextFitNamesWhileOpen = false,
+    nextAutosize = true,
     nextSize = "small",
     nextSmallPlaces = {},
     nextSmallSizes = {},
@@ -388,6 +389,16 @@ describe("Database", function()
       assert.is_true(DB.data.profile.nextFitNamesWhileOpen)
       DB:SetNextFitNamesWhileOpen(false)
       assert.is_false(DB:GetNextFitNamesWhileOpen())
+    end)
+
+    -- Autosize Bags (next-small-autosize.md): on until turned off.
+    it("GetNextAutosize / SetNextAutosize, on until turned off", function()
+      assert.is_true(DB:GetNextAutosize())
+      DB:SetNextAutosize(false)
+      assert.is_false(DB:GetNextAutosize())
+      assert.is_false(DB.data.profile.nextAutosize)
+      DB:SetNextAutosize(true)
+      assert.is_true(DB:GetNextAutosize())
     end)
 
     it("GetNextSize / SetNextSize, small until switched, and nothing but a size", function()

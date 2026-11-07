@@ -741,6 +741,9 @@ const.DATABASE_DEFAULTS = {
     -- Whether a small panel follows what it shows while it is open, widening when a section's name or its title would be
     -- cut short and narrowing back once it fits (next.md §14g); off, it fits as it opens and as a grip is let go.
     nextFitNamesWhileOpen = false,
+    -- Whether a small panel is as tall as what it shows (Autosize Bags, next-small-autosize.md), growing and shrinking with it
+    -- while open; off, it is the height the player gave it, or a share of the screen.
+    nextAutosize = true,
     -- BetterBags Next's panels: "small" movable ones, the default, or "full" height on the screen's
     -- edges (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
     -- size the player gave it with its grips (next.md §14g).

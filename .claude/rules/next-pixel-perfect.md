@@ -234,7 +234,7 @@ bags take over:
 | `Unit(region)`, `UnitAt(effectiveScale)` | one screen pixel in a region's units |
 | `Snap(region, units)`, `SnapIn(unit, units)` | an offset rounded (half away from zero; may be none) |
 | `Length(region, units)`, `LengthIn(unit, units)`, `Lengths(region, ...)` | a length rounded, at least a pixel when not none |
-| `Floor`, `Ceil`, `FloorIn` | rounded down (room it may take) or up (room it needs) |
+| `Floor`, `Ceil`, `FloorIn`, `CeilIn` | rounded down (room it may take) or up (room it needs: an autosized small bag's height, next-small-autosize.md) |
 | `Pixels(region, units)` | how many whole pixels |
 | `Point(region, point, relativeTo, relativePoint, x, y)` | anchor with rounded offsets (a text a quarter pixel right and up of them) |
 | `Inset(region, relativeTo, l, r, t, b)` | inside another, rounded insets (a text a quarter pixel right and up) |

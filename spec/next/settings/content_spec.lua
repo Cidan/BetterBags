@@ -434,7 +434,8 @@ describe("NextSettingsContent", function()
     it("names only settings the catalog has, for the page's bag; the classic bags' own only for them", function()
       local classicOnly = { bagFading = true, animateItemMovement = true, fullSectionNames = true,
         resizableWindow = true, snapToContent = true, itemsPerRow = true, columns = true, opacity = true, scale = true }
-      local nextOnly = { nextIconScale = true, nextBagScale = true, nextFitNamesWhileOpen = true, nextSparkles = true,
+      local nextOnly = { nextIconScale = true, nextBagScale = true, nextAutosize = true, nextFitNamesWhileOpen = true,
+        nextSparkles = true,
         nextShimmer = true,
         nextTitleCloud = true, nextTitleRibbon = true, nextBraid = true, nextOrnamentMotion = true, nextGlitch = true,
         nextRain = true, nextShatter = true, nextSnow = true, nextSmoke = true, nextBats = true, nextBeam = true,
@@ -468,9 +469,9 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 30 (Fit Names While Open the latest, next.md §14g), the Currencies page's 10 (currency.md §6), and
-      -- each bag's 34.
-      assert.are.equal(30 + 10 + 3 * 34, named)
+      -- The general pages' 31 (Autosize Bags the latest, next-small-autosize.md), the Currencies page's 10 (currency.md §6),
+      -- and each bag's 34.
+      assert.are.equal(31 + 10 + 3 * 34, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -548,9 +549,11 @@ describe("NextSettingsContent", function()
     -- Asked: "make 'Theme' here a tab, and add a tab for 'Size'; here we have a slider for 'icon scale' in
     -- the bag, and another slider for 'bag scale'" (docs/next-appearance-size.md).
     -- Then Fit Names While Open after them (next.md §14g): "with an option to enable/disable this behavior in settings".
-    it("has a Theme tab and, with BetterBags Next, a Size tab with Icon Scale, Bag Scale and Fit Names While Open", function()
+    -- And Autosize Bags beside the scales (next-small-autosize.md): "this feature should go in appearance next to size".
+    it("has a Theme tab and, with BetterBags Next, a Size tab with Icon Scale, Bag Scale, Autosize Bags and Fit Names While Open", function()
       override(db, "GetNextIconScale", function() return 120 end)
       override(db, "GetNextBagScale", function() return 85 end)
+      override(db, "GetNextAutosize", function() return false end)
       override(db, "GetNextFitNamesWhileOpen", function() return true end)
       assert.are.same({ "theme", "size", "animation" }, shownTabIds())
       settings:Open("appearance", "size")
@@ -558,9 +561,10 @@ describe("NextSettingsContent", function()
       assert.is_true(settings.tabs.frame:IsShown())
       local titles = {}
       for _, row in ipairs(rowsShown()) do table.insert(titles, row.label:GetText()) end
-      assert.are.same({ "Icon Scale", "Bag Scale", "Fit Names While Open" }, titles)
+      assert.are.same({ "Icon Scale", "Bag Scale", "Autosize Bags", "Fit Names While Open" }, titles)
       assert.are.equal(120, rowTitled("Icon Scale").control:GetValue())
       assert.are.equal(85, rowTitled("Bag Scale").control:GetValue())
+      assert.is_false(rowTitled("Autosize Bags").control:GetChecked())
       assert.is_true(rowTitled("Fit Names While Open").control:GetChecked())
     end)
 
@@ -1142,6 +1146,7 @@ describe("NextSettingsContent", function()
         GetInBagSearch = per(true), GetItemLevelColors = per(colors), GetItemLevelOptions = per({ enabled = true, color = true }),
         GetItemSortType = per(1), GetMarkRecentItems = per(false), GetMaxItemLevel = per(1), GetNextBagScale = per(100),
         GetNextEnabled = per(design == "next"), GetNextIconScale = per(100), GetNextFitNamesWhileOpen = per(false),
+        GetNextAutosize = per(true),
         GetPreserveItemGaps = per(true),
         GetSectionSortType = per(1), GetShowAllFreeSpace = per(false), GetShowBagButton = per(true),
         GetShowFullSectionNames = per(false), GetShowNewItemFlash = per(false), GetStackingOptions = per(stacking),

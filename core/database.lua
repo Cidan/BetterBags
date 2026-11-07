@@ -318,6 +318,18 @@ function DB:SetNextFitNamesWhileOpen(on)
   DB.data.profile.nextFitNamesWhileOpen = on
 end
 
+-- GetNextAutosize returns whether BetterBags Next's small panels are as tall as what they show (Autosize Bags,
+-- next-small-autosize.md): growing and shrinking with it while open, never past the screen.
+---@return boolean
+function DB:GetNextAutosize()
+  return DB.data.profile.nextAutosize
+end
+
+---@param on boolean
+function DB:SetNextAutosize(on)
+  DB.data.profile.nextAutosize = on
+end
+
 ---@alias NextSize "full"|"small"
 
 -- GetNextSize returns BetterBags Next's panel size: "full" height on the screen's edges, or "small"

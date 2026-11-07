@@ -199,6 +199,10 @@ describe("BetterBags Next's small mode", function()
     -- Fit Names While Open (next.md §14g): off by default.
     db.fitNames = false
     override(stubs.database, "GetNextFitNamesWhileOpen", function() return db.fitNames end)
+    -- Autosize Bags (next-small-autosize.md): on by default, off here, so the specs of sizes the player gives see them;
+    -- "autosizing its height" turns it on.
+    db.autosize = false
+    override(stubs.database, "GetNextAutosize", function() return db.autosize end)
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetGroupsEnabled", function() return false end)
@@ -4028,6 +4032,1109 @@ describe("BetterBags Next's small mode", function()
         local gap = bag:SmallLeft() - (bank:SmallLeft() + 620)
         assert.are.equal(gap / 2, bank.braid.half)
       end)
+    end)
+
+    -- Autosize Bags (Appearance → Size, next-small-autosize.md). Asked: "it should make it so the bag grows on the vertical
+    -- (Y axis) to hold all items + free space the user currently has, keeping the X size as is"; then, of the plan: "follow
+    -- live", "yes always at least as tall as tab rail", "yes move the bag up just enough", "yes vendor bag too".
+    describe("autosizing its height", function()
+      local layoutHelper = dofile("spec/helpers/layout.lua")
+
+      before_each(function()
+        db.autosize = true
+      end)
+
+      -- contents is a tab of n items in one category, and Free Space.
+      local function contents(n)
+        local items = {}
+        for i = 1, n do table.insert(items, item("0_" .. i, "Herbs")) end
+        return { sortedItems = {}, tabs = { [1] = { categories = { { name = "Herbs" } }, items = items,
+          freeSpace = { showAll = false, buttons = { { slotkey = "9_1", count = 30 } } } } } }
+      end
+
+      -- settle runs two seconds of frames, each rendering what waits for it: an opening, a glide and what follows it end in
+      -- less. A panel's effects (its sparkles, its spark) play for as long as it is open.
+      local function settle()
+        for _ = 1, 120 do
+          render:Flush()
+          local update = tween.driver and tween.driver:GetScript("OnUpdate")
+          if update ~= nil then
+            update(tween.driver, 1 / 60)
+          end
+        end
+        render:Flush()
+      end
+
+      local function holding(panel, n)
+        panel:Draw(ctx(), contents(n), function() end)
+        render:Flush()
+      end
+
+      -- holds opens a backpack holding n items.
+      local function holds(n)
+        local bag = nextBag:Create(ctx())
+        bag:Draw(ctx(), contents(n), function() end)
+        bag:Show(ctx())
+        settle()
+        return bag
+      end
+
+      -- fitted is the height that shows everything panel holds: its header, what it holds as laid out, then as much room as
+      -- between its sections down to its footer's line (asked: the room from the last section's item buttons "to the border to
+      -- the currency/money section, is too small, make this a bit wider"), and the footer below the line.
+      local function fitted(panel)
+        local line = select(5, panel.footerLine:GetPoint(1))
+        return style.CONTENT_TOP + panel.content.frame:GetHeight() + style.SECTION_SPACING + line
+      end
+
+      -- showsAll says its scroll area is as tall as what it holds: nothing to scroll.
+      local function showsAll(panel)
+        return panel.root:PreRender().Height >= panel.content.frame:GetHeight()
+      end
+
+      local function top(panel)
+        return select(2, topLeft(panel))
+      end
+
+      local LONG = string.rep("n", 40)
+
+      -- The defaults: two columns side to side, wide sections on (so its width decides its rows, and a long name its width).
+      local function inColumns()
+        override(stubs.database, "GetNextSectionColumns", function() return 2 end)
+        override(stubs.database, "GetNextSectionSpan", function() return true end)
+      end
+
+      -- twoSections is a backpack tab of n items in "A" and one in a section named name.
+      local function twoSections(n, name)
+        local items = { item("0_0", name) }
+        for i = 1, n do table.insert(items, item("0_" .. i, "A")) end
+        return { sortedItems = {}, tabs = { [1] = { categories = { { name = "A" }, { name = name } }, items = items } } }
+      end
+
+      -- dragTo drags panel by its title row and drops it with its top left at x, y on the screen.
+      local function dragTo(panel, x, y)
+        panel.mover:GetScript("OnDragStart")(panel.mover, "LeftButton")
+        local f, s = panel.frame, panel:Scale()
+        f:_SetRect(x / s, y / s - f:GetHeight(), f:GetWidth(), f:GetHeight())
+        panel.mover:GetScript("OnDragStop")(panel.mover)
+      end
+
+      -- bankTab is the bank's tab of n items.
+      local function bankTab(bank, n)
+        local items = {}
+        for i = 1, n do table.insert(items, item("6_" .. i, "Ore")) end
+        return { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = { categories = { { name = "Ore" } }, items = items } } }
+      end
+
+      it("opens as tall as its header, what it holds and its footer, as wide as it was, centered where it was never moved", function()
+        local bag = holds(20)
+        local h = bag.frame:GetHeight()
+        assert.are.equal(style.BODY_WIDTH, bag.frame:GetWidth())
+        assert.are.equal(fitted(bag), h)
+        assert.is_true(h < smallHeight(), "shorter than the share of the screen it takes otherwise")
+        assert.is_true(showsAll(bag))
+        assert.are.equal(math.floor((UIParent:GetHeight() + h) / 2 + 0.5), top(bag))
+        assert.is_nil(db.sizes[BACKPACK])
+      end)
+
+      it("is never shorter than its minimum", function()
+        local bag = nextBag:Create(ctx())
+        bag:Draw(ctx(), { sortedItems = {}, tabs = { [1] = { categories = {}, items = {} } } }, function() end)
+        bag:Show(ctx())
+        settle()
+        assert.is_true(fitted(bag) < bag:MinHeight())
+        assert.are.equal(bag:MinHeight(), bag.frame:GetHeight())
+      end)
+
+      it("glides taller as items come in and shorter as they go, a frame on, its top where it was left, saving nothing", function()
+        db.places[BACKPACK] = { 300, 1100 }
+        local bag = holds(8)
+        local short = bag.frame:GetHeight()
+        assert.are.equal(fitted(bag), short)
+        holding(bag, 64)
+        assert.is_false(bag.sizeGliding, "a frame on")
+        step(1 / 60)
+        assert.is_true(bag.sizeGliding)
+        local tall = fitted(bag)
+        assert.is_true(tall > short)
+        local frames = 0
+        while bag.sizeGliding do
+          step(1 / 60)
+          render:Flush()
+          frames = frames + 1
+          local h = bag.frame:GetHeight()
+          assert.is_true(h >= short and h <= tall, "frame " .. frames .. ": " .. h)
+          assert.are.equal(1100, top(bag), "its top still")
+          assert.are.equal(style.BODY_WIDTH, bag.frame:GetWidth(), "its width as it was")
+        end
+        assert.is_true(frames > 5)
+        settle()
+        assert.are.equal(tall, bag.frame:GetHeight())
+        assert.is_true(showsAll(bag))
+        holding(bag, 8)
+        settle()
+        assert.are.equal(short, bag.frame:GetHeight())
+        assert.are.same({ 300, 1100 }, { topLeft(bag) })
+        assert.is_nil(db.sizes[BACKPACK])
+        assert.are.same({ 300, 1100 }, db.places[BACKPACK])
+      end)
+
+      it("stays centered where it was never moved, on the way too", function()
+        local bag = holds(8)
+        holding(bag, 64)
+        step(1 / 60)
+        assert.is_true(bag.sizeGliding)
+        while bag.sizeGliding do
+          step(1 / 60)
+          render:Flush()
+          local h = bag.frame:GetHeight()
+          assert.is_true(math.abs(top(bag) - (UIParent:GetHeight() + h) / 2) <= 1, "centered: " .. top(bag) .. ", " .. h)
+        end
+        settle()
+        local h = bag.frame:GetHeight()
+        assert.are.equal(fitted(bag), h)
+        assert.are.equal(math.floor((UIParent:GetHeight() + h) / 2 + 0.5), top(bag))
+      end)
+
+      it("grows no taller than the screen, and what it holds past that scrolls", function()
+        local bag = holds(8)
+        holding(bag, 800)
+        settle()
+        assert.are.equal(UIParent:GetHeight(), bag.frame:GetHeight())
+        assert.are.equal(UIParent:GetHeight(), top(bag))
+        assert.is_false(showsAll(bag))
+      end)
+
+      -- Clamp Bags to Screen off (its default): only its growth moves it, never past where it was left.
+      for _, scale in ipairs({ 100, 150 }) do
+        it("moves up no further than keeps its bottom on the screen as it grows, and back down as it shrinks, Bag Scale "
+          .. scale .. "%", function()
+          db.clamp = false
+          db.bagScale = scale
+          db.places[BACKPACK] = { 300, 600 }
+          local bag = holds(8)
+          assert.are.same({ 300, 600 }, { bag.placeX, bag.placeY })
+          holding(bag, 80)
+          step(1 / 60)
+          assert.is_true(bag.sizeGliding)
+          while bag.sizeGliding do
+            step(1 / 60)
+            render:Flush()
+            assert.is_true(top(bag) - bag.frame:GetHeight() >= -1e-6, "its bottom on the screen")
+          end
+          settle()
+          local h = bag.frame:GetHeight() * scale / 100
+          assert.is_true(h > 600)
+          assert.are.equal(fitted(bag), bag.frame:GetHeight())
+          assert.are.equal(300, bag.placeX)
+          assert.is_true(math.abs(bag.placeY - h) <= 0.5, "its bottom at the screen's: " .. bag.placeY .. ", " .. h)
+          assert.are.same({ 300, 600 }, db.places[BACKPACK], "where it was left, saved")
+          holding(bag, 8)
+          settle()
+          assert.are.same({ 300, 600 }, { bag.placeX, bag.placeY })
+        end)
+      end
+
+      it("is never shorter than its tab rail, as tabs come and go too", function()
+        override(stubs.database, "GetGroupsEnabled", function() return true end)
+        local all = {}
+        for i = 1, 16 do all[i] = { id = i, name = "Group " .. i } end
+        override(stubs.groups, "GetAllGroups", function() return all end)
+        local bag = holds(1)
+        local rail = bag.tabs.frame
+        assert.is_true(rail:IsShown())
+        assert.is_true(style.CONTENT_TOP + rail:GetHeight() > fitted(bag), "its tabs reach past what it holds")
+        assert.are.equal(math.ceil(style.CONTENT_TOP + rail:GetHeight() - 1e-6), bag.frame:GetHeight())
+        local h = bag.frame:GetHeight()
+        for i = 17, 20 do all[i] = { id = i, name = "Group " .. i } end
+        bag:RefreshTabs()
+        settle()
+        assert.is_true(bag.frame:GetHeight() > h)
+        assert.are.equal(math.ceil(style.CONTENT_TOP + rail:GetHeight() - 1e-6), bag.frame:GetHeight())
+      end)
+
+      it("waits while it is moved, and fits once it is dropped", function()
+        db.places[BACKPACK] = { 300, 1100 }
+        local bag = holds(8)
+        local short = bag.frame:GetHeight()
+        bag.mover:GetScript("OnDragStart")(bag.mover, "LeftButton")
+        holding(bag, 64)
+        step(1 / 60)
+        step(1 / 60)
+        assert.is_false(bag.sizeGliding, "not while it is moved")
+        assert.are.equal(short, bag.frame:GetHeight())
+        bag.mover:GetScript("OnDragStop")(bag.mover)
+        settle()
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+      end)
+
+      -- Asked: "don't lock dragging on the Y axis when resizing the window. let it drag larger, but then "bounce" it back to the
+      -- size it should be on the Y axis."
+      it("lets a grip size it either way, then bounces its height back to what the width it is let go at shows", function()
+        db.places[BACKPACK] = { 300, 1100 }
+        local bag = holds(40)
+        local h0 = bag.frame:GetHeight()
+        press(bag.grips.RIGHT)
+        local b = bag.frame._resizeBounds
+        assert.are.same({ bag:MinWidth(), bag:MinHeight(), UIParent:GetWidth(), UIParent:GetHeight() },
+          { b.minWidth, b.minHeight, b.maxWidth, b.maxHeight }, "its height free, as with the setting off")
+        sizeTo(bag, "RIGHT", columnsWidth(4), h0 + 300)
+        render:Flush()
+        assert.are.equal(h0 + 300 - style.CONTENT_TOP - style.FOOTER, bag.root:PreRender().Height, "as tall as it is dragged")
+        release(bag.grips.RIGHT)
+        assert.is_true(bag.sizeGliding)
+        local lowest = math.huge
+        while bag.sizeGliding do
+          step(1 / 60)
+          render:Flush()
+          lowest = math.min(lowest, bag.frame:GetHeight())
+          assert.are.same({ 300, 1100 }, { topLeft(bag) }, "its top still")
+        end
+        settle()
+        local h = bag.frame:GetHeight()
+        assert.are.equal(columnsWidth(4), bag.frame:GetWidth())
+        assert.are.equal(fitted(bag), h)
+        assert.is_true(h > h0 and h < h0 + 300, "back from where it was dragged, taller for its narrower rows")
+        assert.is_true(lowest < h, "bouncing past it: " .. lowest .. ", " .. h)
+        assert.are.same({ 300, 1100 }, { topLeft(bag) })
+        assert.are.same({ columnsWidth(4) }, db.sizes[BACKPACK], "its width saved, and no height")
+      end)
+
+      it("bounces back to what it shows where a grip only dragged it taller or shorter, saving nothing", function()
+        db.places[BACKPACK] = { 300, 1100 }
+        local bag = holds(40)
+        local w0, h0 = bag.frame:GetWidth(), bag.frame:GetHeight()
+        for _, dh in ipairs({ 250, -150 }) do
+          resize(bag, "RIGHT", w0, h0 + dh)
+          assert.is_true(bag.sizeGliding, "bouncing back from " .. dh)
+          step(1 / 60)
+          local first = bag.frame:GetHeight()
+          assert.is_true(math.abs(first - h0) > 1 and math.abs(first - (h0 + dh)) < math.abs(dh),
+            "gliding from where it was let go, not jumping: " .. first)
+          settle()
+          assert.are.same({ w0, h0 }, { bag.frame:GetWidth(), bag.frame:GetHeight() }, "back from " .. dh)
+        end
+        assert.is_nil(db.sizes[BACKPACK])
+        assert.are.same({ 300, 1100 }, db.places[BACKPACK])
+      end)
+
+      it("leaves as much room below what it shows, down to its footer's line, as between its sections", function()
+        local bag = holds(20)
+        local line = select(5, bag.footerLine:GetPoint(1))
+        local below = bag.frame:GetHeight() - style.CONTENT_TOP - bag.content.frame:GetHeight() - line
+        assert.are.equal(style.SECTION_SPACING, below)
+      end)
+
+      -- Found by the bug review: the let-go laid out at the width it was let go at, took that height, and then glided again to
+      -- the height of the width it snapped to (wider for a name), up to the screen's height first.
+      it("glides its height once where a grip let go snaps wider for a section's name, never past where it ends", function()
+        db.places[BACKPACK] = { 300, 1100 }
+        local bag = nextBag:Create(ctx())
+        bag:Draw(ctx(), twoSections(60, LONG), function() end)
+        bag:Show(ctx())
+        settle()
+        local snaps = countCalls(bag, "snapTo")
+        resize(bag, "RIGHT", columnsWidth(3), bag.frame:GetHeight())
+        local highest = 0
+        for _ = 1, 120 do
+          step(1 / 60)
+          render:Flush()
+          highest = math.max(highest, bag.frame:GetHeight())
+        end
+        assert.are.equal(1, snaps(), "one glide")
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+        assert.is_true(highest <= bag.frame:GetHeight() + 1e-6, "never taller than it ends: " .. highest)
+      end)
+
+      it("glides its height and width together where a grip let go fits it", function()
+        db.places[BACKPACK] = { 300, 1100 }
+        local bag = holds(40)
+        local h0 = bag.frame:GetHeight()
+        local snaps = countCalls(bag, "snapTo")
+        resize(bag, "RIGHT", columnsWidth(4) + 20, h0)
+        assert.is_true(bag.sizeGliding)
+        settle()
+        assert.are.equal(1, snaps(), "one glide")
+        assert.are.same({ columnsWidth(4), fitted(bag) }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+      end)
+
+      -- Clamp Bags to Screen off: a grip let go that makes it taller than the room below it moves it up as it glides, and saves
+      -- the top it was left at, so it goes back down there as it shrinks.
+      it("glides up where a grip let go makes it taller than the room below it, and back down as it shrinks", function()
+        db.clamp = false
+        db.places[BACKPACK] = { 300, 600 }
+        local bag = holds(40)
+        local h0 = bag.frame:GetHeight()
+        assert.is_true(h0 < 600)
+        assert.are.equal(600, top(bag))
+        resize(bag, "RIGHT", columnsWidth(3), h0)
+        assert.is_true(bag.sizeGliding)
+        while bag.sizeGliding do
+          step(1 / 60)
+          render:Flush()
+          assert.is_true(top(bag) - bag.frame:GetHeight() >= -1e-6, "its bottom on the screen")
+        end
+        settle()
+        local h = bag.frame:GetHeight()
+        assert.is_true(h > 600)
+        assert.are.equal(fitted(bag), h)
+        assert.are.equal(h, top(bag))
+        assert.are.same({ 300, 600 }, db.places[BACKPACK], "where it was left, saved")
+        holding(bag, 8)
+        settle()
+        assert.are.equal(600, top(bag))
+      end)
+
+      it("goes back down to where it was left once the width Shift-click glides it to shows it all", function()
+        db.clamp = false
+        db.sizes[BACKPACK] = { columnsWidth(3), 300 }
+        db.places[BACKPACK] = { 300, 600 }
+        local bag = holds(40)
+        local h = bag.frame:GetHeight()
+        assert.is_true(h > 600)
+        assert.are.equal(h, top(bag), "moved up as it opened")
+        assert.are.equal("resetting", bag:ResetSize("RIGHT"))
+        settle()
+        assert.are.equal(columnsWidth(8), bag.frame:GetWidth())
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+        assert.are.equal(600, top(bag))
+        assert.are.same({ 300, 600 }, db.places[BACKPACK])
+      end)
+
+      -- Clamp Bags to Screen keeps a top saved past the screen's on it as it opens; a grip let go saves where it is then, as
+      -- before (the setting on: found by the bug review, it kept the saved top past the screen's).
+      for _, on in ipairs({ false, true }) do
+        it("saves where Clamp Bags to Screen keeps its top as a grip is let go, the setting " .. (on and "on" or "off"), function()
+          db.autosize = on
+          db.places[BACKPACK] = { 300, UIParent:GetHeight() + 200 }
+          local bag = holds(8)
+          assert.are.equal(UIParent:GetHeight(), top(bag))
+          resize(bag, "RIGHT", columnsWidth(6) + 5, bag.frame:GetHeight())
+          settle()
+          assert.are.same({ 300, UIParent:GetHeight() }, db.places[BACKPACK])
+        end)
+      end
+
+      it("opens at the height what it holds needs at the width it opens at, with nothing to glide after", function()
+        inColumns()
+        local bag = nextBag:Create(ctx())
+        bag:Draw(ctx(), twoSections(30, "B"), function() end)
+        bag:Show(ctx())
+        settle()
+        local narrow = bag.frame:GetWidth()
+        bag:Hide(ctx())
+        settle()
+        bag:Draw(ctx(), twoSections(30, LONG), function() end)
+        local snaps = countCalls(bag, "snapTo")
+        bag:Show(ctx())
+        settle()
+        assert.is_true(bag.frame:GetWidth() > narrow, "wider for its names")
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+        assert.are.equal(0, snaps(), "taken as it opened")
+      end)
+
+      it("keeps the height the player gave it for when Autosize is off", function()
+        db.sizes[BACKPACK] = { columnsWidth(8), 300 }
+        local bag = holds(64)
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+        assert.is_true(bag.frame:GetHeight() > 300)
+        resize(bag, "RIGHT", columnsWidth(6) + 5, bag.frame:GetHeight())
+        settle()
+        assert.are.same({ columnsWidth(6), 300 }, db.sizes[BACKPACK])
+      end)
+
+      it("takes the height the player gave it once turned off, and fits again once turned on (next/AutosizeChanged)", function()
+        local handlers = {}
+        override(stubs.events, "RegisterMessage", function(_, name, fn) handlers[name] = fn end)
+        db.sizes[BACKPACK] = { columnsWidth(8), 300 }
+        local bag = holds(64)
+        local h = fitted(bag)
+        assert.are.equal(h, bag.frame:GetHeight())
+        assert.is_true(h > 300)
+        db.autosize = false
+        handlers["next/AutosizeChanged"](ctx())
+        settle()
+        assert.are.equal(300, bag.frame:GetHeight())
+        db.autosize = true
+        handlers["next/AutosizeChanged"](ctx())
+        settle()
+        assert.are.equal(h, bag.frame:GetHeight())
+      end)
+
+      it("glides back to its default width with Shift-click, then fits what that width holds", function()
+        db.sizes[BACKPACK] = { columnsWidth(4), 300 }
+        db.places[BACKPACK] = { 300, 1100 }
+        local bag = holds(40)
+        assert.are.equal(columnsWidth(4), bag.frame:GetWidth())
+        local narrow = bag.frame:GetHeight()
+        assert.are.equal(fitted(bag), narrow)
+        assert.are.equal("resetting", bag:ResetSize("RIGHT"))
+        settle()
+        assert.are.equal(columnsWidth(8), bag.frame:GetWidth())
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+        assert.is_true(bag.frame:GetHeight() < narrow)
+        assert.is_nil(db.sizes[BACKPACK])
+      end)
+
+      it("keeps the bag chained beside it level with it as its top moves", function()
+        finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+        local bag = holds(8)
+        local bank = nextBank:Create(ctx())
+        bank:Show(ctx())
+        db.smallChain = "backpack"
+        chain:Update(ctx())
+        settle()
+        local function level()
+          local a, b = layoutHelper.Rect(bag.frame).top, layoutHelper.Rect(bank.frame).top
+          return math.abs(a - b) < 0.01, a .. ", " .. b
+        end
+        assert.is_true(level())
+        holding(bag, 80)
+        step(1 / 60)
+        assert.is_true(bag.sizeGliding)
+        local y0 = layoutHelper.Rect(bag.frame).top
+        while bag.sizeGliding do
+          step(1 / 60)
+          render:Flush()
+          local ok, why = level()
+          assert.is_true(ok, "level on the way: " .. why)
+        end
+        settle()
+        assert.is_true(layoutHelper.Rect(bag.frame).top > y0, "its top moved, centered")
+        assert.is_true(level())
+        assert.are.same({ chain:ChainedPlace(bank, bag, bag.placeX, bag.placeY) }, { bank.placeX, bank.placeY })
+      end)
+
+      it("glides a chained pair's heights one at a time, level all the way", function()
+        finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+        local bag = holds(8)
+        local bank = nextBank:Create(ctx())
+        bank:Show(ctx())
+        db.smallChain = "backpack"
+        chain:Update(ctx())
+        settle()
+        local function level()
+          return math.abs(layoutHelper.Rect(bag.frame).top - layoutHelper.Rect(bank.frame).top) < 0.01
+        end
+        holding(bag, 80)
+        bank:Draw(ctx(), bankTab(bank, 60), function() end)
+        render:Flush()
+        local both = false
+        for frame = 1, 120 do
+          step(1 / 60)
+          render:Flush()
+          both = both or (bag.sizeGliding and bank.sizeGliding)
+          assert.is_true(level(), "level, frame " .. frame)
+        end
+        assert.is_false(both, "one at a time")
+        settle()
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+        assert.are.equal(fitted(bank), bank.frame:GetHeight())
+        assert.is_true(level())
+      end)
+
+      -- Found by the bug review: switching to small, the backpack beside a companion took its spot from the companion's top for
+      -- the companion's old height, glided there, and jumped 184 pixels as the switch ended.
+      it("switches a chained pair to small level all the way there, the backpack beside a companion", function()
+        finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+        db.size = "full"
+        db.smallChain = "companion"
+        local bag = holds(64)
+        local bank = nextBank:Create(ctx())
+        bank:Draw(ctx(), bankTab(bank, 8), function() end)
+        bank:Show(ctx())
+        settle()
+        nextPanel:SetSize(ctx(), "small")
+        local last
+        for _ = 1, 200 do
+          if bag.morph == nil then break end
+          step(1 / 60)
+          render:Flush()
+          if bag.morph ~= nil then last = layoutHelper.Rect(bag.frame).top end
+        end
+        settle()
+        local a, b = layoutHelper.Rect(bag.frame).top, layoutHelper.Rect(bank.frame).top
+        assert.is_true(math.abs(a - b) < 0.01, "level: " .. a .. ", " .. b)
+        assert.is_true(math.abs(last - a) < 0.01, "the switch glided it there: " .. last .. ", " .. a)
+      end)
+
+      -- Found by the bug review: a companion whose size glide moved the backpack beside it (its centered top following its
+      -- height, or its edge for a name) saved nowhere where the backpack went, so once the companion closed the backpack's next
+      -- height glide took it back to where it was saved, its left edge jumping as the glide ended.
+      for _, how in ipairs({ "its height", "a name", "a Bag Scale", "height, closed by Escape" }) do
+        it("keeps the backpack where a companion's " .. how .. " left it, once the companion closes", function()
+          finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+          db.fitNames = how == "a name"
+          local bank = nextBank:Create(ctx())
+          bank:Draw(ctx(), bankTab(bank, 4), function() end)
+          bank:Show(ctx())
+          settle()
+          local bag = holds(8)
+          db.smallChain = "companion"
+          chain:Update(ctx())
+          settle()
+          -- As a drop beside the bank saves it (StopMove).
+          db.places[BACKPACK] = { bag.placeX, bag.placeY }
+          local x0, y0 = bag.placeX, bag.placeY
+          if how == "a name" then
+            local long = string.rep("W", 70)
+            bank:Draw(ctx(), { sortedItems = {}, tabs = { [bank:GetCurrentTabID()] = { categories = { { name = "Ore" },
+              { name = long } }, items = { item("6_1", "Ore"), item("6_2", long) } } } }, function() end)
+          elseif how == "a Bag Scale" then
+            db.bagScale = 85
+            chain:ScalesChanged(ctx())
+          else
+            bank:Draw(ctx(), bankTab(bank, 60), function() end)
+          end
+          render:Flush()
+          settle()
+          local x1, y1 = bag.placeX, bag.placeY
+          assert.is_true(x1 ~= x0 or y1 ~= y0, "moved with the bank")
+          if how == "height, closed by Escape" then
+            -- Escape hides it at once, with no slide; the client fires its OnHide (OnHidden), the mock does not.
+            bank.frame:Hide()
+            bank.frame:GetScript("OnHide")(bank.frame)
+          else
+            bank:Hide(ctx())
+          end
+          settle()
+          holding(bag, 40)
+          local left = layoutHelper.Rect(bag.frame).left
+          for frame = 1, 60 do
+            step(1 / 60)
+            render:Flush()
+            assert.is_true(math.abs(layoutHelper.Rect(bag.frame).left - left) < 0.01, "its left edge still, frame " .. frame)
+          end
+          settle()
+          assert.are.same({ x1, y1 }, { bag.placeX, bag.placeY })
+        end)
+      end
+
+      -- Found by the second bug review: the chain kept which bag was chained only where it updated, which a pair chained by a
+      -- size switch or a drop never did, so closing the companion saved nothing; the backpack's next height glide slid it 550
+      -- units to its default place, or back to where it was dropped.
+      for _, how in ipairs({ "switching to small", "a drop, the companion's glide cut short by its close" }) do
+        it("keeps the backpack where it stands as its companion closes, chained by " .. how, function()
+          finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+          local bag, bank
+          if how == "switching to small" then
+            db.size = "full"
+            db.smallChain = "companion"
+            bag = holds(8)
+            bank = nextBank:Create(ctx())
+            bank:Draw(ctx(), bankTab(bank, 8), function() end)
+            bank:Show(ctx())
+            settle()
+            nextPanel:SetSize(ctx(), "small")
+            settle()
+          else
+            bank = nextBank:Create(ctx())
+            bank:Draw(ctx(), bankTab(bank, 4), function() end)
+            bank:Show(ctx())
+            settle()
+            bag = holds(8)
+            local wx, wy = chain:ChainedPlace(bag, bank, bank:SmallPlace())
+            dragTo(bag, wx + 3, wy - 3)
+            settle()
+            assert.are.equal("companion", db.smallChain)
+            bank:Draw(ctx(), bankTab(bank, 80), function() end)
+            render:Flush()
+            for _ = 1, 4 do
+              step(1 / 60)
+              render:Flush()
+            end
+            assert.is_true(bank.sizeGliding, "the bank's height glides, carrying the backpack")
+          end
+          bank:Hide(ctx())
+          settle()
+          local x1, y1 = bag.placeX, bag.placeY
+          holding(bag, 40)
+          local left = layoutHelper.Rect(bag.frame).left
+          for frame = 1, 60 do
+            step(1 / 60)
+            render:Flush()
+            assert.is_true(math.abs(layoutHelper.Rect(bag.frame).left - left) < 0.01, "its left edge still, frame " .. frame)
+          end
+          settle()
+          assert.are.same({ x1, y1 }, { bag.placeX, bag.placeY })
+        end)
+      end
+
+      -- A backpack closed beside its companion keeps the place it had (where it was dropped) as the companion closes after it.
+      it("leaves a closed backpack's place as it was as its companion closes after it", function()
+        finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+        local bank = nextBank:Create(ctx())
+        bank:Draw(ctx(), bankTab(bank, 4), function() end)
+        bank:Show(ctx())
+        settle()
+        local bag = holds(8)
+        db.smallChain = "companion"
+        chain:Update(ctx())
+        settle()
+        db.places[BACKPACK] = { bag.placeX, bag.placeY }
+        local x0, y0 = bag.placeX, bag.placeY
+        bank:Draw(ctx(), bankTab(bank, 60), function() end)
+        render:Flush()
+        settle()
+        assert.is_true(bag.placeY ~= y0, "carried with the bank's top")
+        bag:Hide(ctx())
+        settle()
+        bank:Hide(ctx())
+        settle()
+        assert.are.same({ x0, y0 }, db.places[BACKPACK])
+      end)
+
+      -- Found by the third bug review: the client fires OnHide as the slide's end hides the companion, and that saved the backpack
+      -- again, with the top its own growth had raised it to meanwhile; and a backpack raised beside its companion kept that raise.
+      for _, clamp in ipairs({ false, true }) do
+        for _, how in ipairs({ "as it closes", "as its slide ends" }) do
+          it("goes back down to its spot beside a companion once that closes, raised " .. how .. ", Clamp Bags to Screen "
+            .. (clamp and "on" or "off"), function()
+            db.clamp = clamp
+            db.places[BANK] = { 100, 500 }
+            local bank = nextBank:Create(ctx())
+            bank:Draw(ctx(), bankTab(bank, 4), function() end)
+            bank:Show(ctx())
+            settle()
+            -- The client fires OnHide as a shown frame hides; the mock does not.
+            local hide = bank.frame.Hide
+            override(bank.frame, "Hide", function(f)
+              local was = f:IsShown()
+              hide(f)
+              if was then f:GetScript("OnHide")(f) end
+            end)
+            local bag = holds(how == "as it closes" and 80 or 8)
+            db.smallChain = "companion"
+            chain:Update(ctx())
+            settle()
+            assert.are.equal(500, top(bank))
+            bank:Hide(ctx())
+            if how == "as its slide ends" then
+              holding(bag, 80)
+            end
+            settle()
+            assert.is_true(top(bag) > 500, "raised")
+            holding(bag, 8)
+            settle()
+            assert.are.equal(500, top(bag), "back down to its spot beside the bank")
+          end)
+        end
+      end
+
+      -- Found by the fourth bug review: the slide's end saved the backpack's place a second time, after its close had, and what
+      -- had changed in the slide's 0.24 s was saved over it: the companion's top where a shrinking glide the close cut short was
+      -- going, a second companion opened meanwhile, a drop.
+      describe("as a companion's close slide ends (the client fires its OnHide)", function()
+        local function firesOnHide(panel)
+          local hide = panel.frame.Hide
+          override(panel.frame, "Hide", function(f)
+            local was = f:IsShown()
+            hide(f)
+            if was then f:GetScript("OnHide")(f) end
+          end)
+        end
+
+        -- chained opens a bank that comes to hold n items and a backpack beside it, its place saved where it is, as a drop does.
+        local function chained(n)
+          local bank = nextBank:Create(ctx())
+          bank:Draw(ctx(), bankTab(bank, 4), function() end)
+          bank:Show(ctx())
+          settle()
+          bank:Draw(ctx(), bankTab(bank, n), function() end)
+          render:Flush()
+          settle()
+          firesOnHide(bank)
+          local bag = holds(8)
+          db.smallChain = "companion"
+          chain:Update(ctx())
+          settle()
+          db.places[BACKPACK] = { bag.placeX, bag.placeY }
+          return bank, bag
+        end
+
+        it("keeps the place its close saved where it cut a glide lowering the companion's top short", function()
+          finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+          local bank, bag = chained(50)
+          bank:Draw(ctx(), bankTab(bank, 4), function() end)
+          render:Flush()
+          for _ = 1, 2 do
+            step(1 / 60)
+            render:Flush()
+          end
+          bank:Hide(ctx())
+          local saved = { db.places[BACKPACK][1], db.places[BACKPACK][2] }
+          settle()
+          assert.are.same(saved, db.places[BACKPACK])
+          local stood = top(bag)
+          holding(bag, 9)
+          settle()
+          assert.are.equal(stood, top(bag), "its top where it stood")
+        end)
+
+        it("keeps the place its close saved as another companion opens while it slides out", function()
+          finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+          local OTHER = 77
+          db.places[OTHER] = { 300, 1000 }
+          local bank, bag = chained(4)
+          local other = nextBank:Create(ctx())
+          other.kind = OTHER
+          firesOnHide(other)
+          other:Draw(ctx(), bankTab(other, 4), function() end)
+          bank:Hide(ctx())
+          local saved = { db.places[BACKPACK][1], db.places[BACKPACK][2] }
+          other:Show(ctx())
+          settle()
+          assert.is_true(bag.placeX ~= saved[1], "beside the other companion now")
+          assert.are.same(saved, db.places[BACKPACK])
+        end)
+
+        -- Found by the fifth bug review: a parent hiding it mid-slide (Alt+Z) cuts the close short, and it comes back open with
+        -- no Show; its next close, Escape's, saved nothing, and the backpack's next height glide took it back down 175 units.
+        it("saves where the backpack stands as Escape closes a companion whose close a parent's hide cut short", function()
+          finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+          local bank, bag = chained(4)
+          bank:Hide(ctx())
+          step(1 / 60)
+          render:Flush()
+          for _, panel in ipairs({ bank, bag }) do panel.frame:GetScript("OnHide")(panel.frame) end
+          for _, panel in ipairs({ bank, bag }) do panel.frame:GetScript("OnShow")(panel.frame) end
+          settle()
+          assert.is_true(bank.frame:IsShown() and not bank.closing, "open again")
+          bank:Draw(ctx(), bankTab(bank, 60), function() end)
+          render:Flush()
+          settle()
+          local x1, y1 = bag.placeX, bag.placeY
+          bank.frame:Hide()
+          settle()
+          assert.are.same({ x1, y1 }, db.places[BACKPACK])
+        end)
+
+        -- Opened again as it slides out, it is open: its next close saves again, Escape's too.
+        it("saves where the backpack stands as Escape closes a companion opened again as it slid out", function()
+          finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+          local bank, bag = chained(4)
+          bank:Hide(ctx())
+          step(1 / 60)
+          bank:Show(ctx())
+          settle()
+          bank:Draw(ctx(), bankTab(bank, 60), function() end)
+          render:Flush()
+          settle()
+          local x1, y1 = bag.placeX, bag.placeY
+          bank.frame:Hide()
+          settle()
+          assert.are.same({ x1, y1 }, db.places[BACKPACK])
+        end)
+
+        for _, clamp in ipairs({ false, true }) do
+          it("keeps a drop made while it slides out, Clamp Bags to Screen " .. (clamp and "on" or "off"), function()
+            finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+            db.clamp = clamp
+            local bank, bag = chained(4)
+            bank:Hide(ctx())
+            step(1 / 60)
+            render:Flush()
+            dragTo(bag, 1100, 1000)
+            local saved = { db.places[BACKPACK][1], db.places[BACKPACK][2] }
+            settle()
+            assert.are.same(saved, db.places[BACKPACK])
+          end)
+        end
+      end)
+
+      -- A companion's close finishes part way through a size switch (PrepareResize ends it), its OnHidden before it or the backpack
+      -- has the size the switch gives it: nothing is saved for the backpack then, but what the close saved as it started (a
+      -- small one's; one never small has no place yet).
+      for _, to in ipairs({ "small", "full" }) do
+        it("saves nothing more for the backpack as a companion's close ends in a switch to " .. to, function()
+          finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+          db.size = to == "small" and "full" or "small"
+          db.smallChain = "companion"
+          holds(8)
+          local bank = nextBank:Create(ctx())
+          bank:Draw(ctx(), bankTab(bank, 8), function() end)
+          bank:Show(ctx())
+          settle()
+          local hide = bank.frame.Hide
+          override(bank.frame, "Hide", function(f)
+            local was = f:IsShown()
+            hide(f)
+            if was then f:GetScript("OnHide")(f) end
+          end)
+          bank:Hide(ctx())
+          local saved = db.places[BACKPACK]
+          saved = saved and { saved[1], saved[2] }
+          assert.has_no.errors(function() nextPanel:SetSize(ctx(), to) end)
+          settle()
+          assert.are.same(saved, db.places[BACKPACK])
+        end)
+      end
+
+      -- Found by the third bug review: a parent hiding the companion (Alt+Z) is no close, and saved the backpack's place.
+      it("saves nothing as a parent hides a companion and shows it again", function()
+        finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+        local bank = nextBank:Create(ctx())
+        bank:Draw(ctx(), bankTab(bank, 4), function() end)
+        bank:Show(ctx())
+        settle()
+        local bag = holds(8)
+        db.smallChain = "companion"
+        chain:Update(ctx())
+        settle()
+        db.places[BACKPACK] = { bag.placeX, bag.placeY }
+        local x0, y0 = bag.placeX, bag.placeY
+        bank:Draw(ctx(), bankTab(bank, 60), function() end)
+        render:Flush()
+        settle()
+        -- Alt+Z: UIParent hides; each frame's own flag stays set; the client fires each OnHide, then each OnShow.
+        bank.frame:GetScript("OnHide")(bank.frame)
+        bag.frame:GetScript("OnHide")(bag.frame)
+        bank.frame:GetScript("OnShow")(bank.frame)
+        bag.frame:GetScript("OnShow")(bag.frame)
+        settle()
+        bag:Hide(ctx())
+        settle()
+        bank:Hide(ctx())
+        settle()
+        assert.are.same({ x0, y0 }, db.places[BACKPACK])
+      end)
+
+      -- Found by the second bug review: dragged off its companion, the backpack stayed the chain's bag beside it, and its own
+      -- height glide's end saved the top it rose to, so it never went back down to where it was dropped.
+      for _, how in ipairs({ "the bank closes", "the bank's height glides" }) do
+        it("goes back down to where it was dropped after it is dragged off its companion and " .. how, function()
+          db.clamp = false
+          local bank = nextBank:Create(ctx())
+          bank:Draw(ctx(), bankTab(bank, 4), function() end)
+          bank:Show(ctx())
+          settle()
+          local bag = holds(8)
+          db.smallChain = "companion"
+          chain:Update(ctx())
+          settle()
+          dragTo(bag, 1200, 400)
+          settle()
+          assert.are.equal("apart", db.smallChain)
+          assert.are.same({ 1200, 400 }, db.places[BACKPACK])
+          holding(bag, 80)
+          settle()
+          assert.is_true(top(bag) > 400, "it rose as it grew")
+          if how == "the bank closes" then
+            bank:Hide(ctx())
+          else
+            bank:Draw(ctx(), bankTab(bank, 60), function() end)
+          end
+          settle()
+          holding(bag, 8)
+          settle()
+          assert.are.same({ 1200, 400 }, db.places[BACKPACK], "where it was dropped, saved")
+          assert.are.equal(400, top(bag), "back down where it was dropped")
+        end)
+      end
+
+      -- Found by the second bug review: a grip let go took its place from the top it had been raised to, so a raised bag a grip
+      -- made shorter stayed up until its height next changed.
+      for _, clamp in ipairs({ false, true }) do
+        it("goes back down where a grip let go makes a raised bag shorter, Clamp Bags to Screen " .. (clamp and "on" or "off"), function()
+          db.clamp = clamp
+          db.sizes[BACKPACK] = { columnsWidth(3) }
+          db.places[BACKPACK] = { 300, 600 }
+          local bag = holds(40)
+          local h = bag.frame:GetHeight()
+          assert.is_true(h > 600)
+          assert.are.equal(h, top(bag), "raised as it opened")
+          resize(bag, "RIGHT", columnsWidth(8) + 5, h)
+          settle()
+          assert.is_true(bag.frame:GetHeight() < 600)
+          assert.are.same({ 300, 600 }, db.places[BACKPACK], "saved where it was left")
+          assert.are.equal(600, top(bag), "back down to where it was left")
+        end)
+      end
+
+      -- Found by the second bug review: a chained bag's grip let go saved its left edge with a top it had once been dropped at.
+      it("saves a chained bag's place where it stands as its grip is let go", function()
+        finally(layoutHelper.UseScreen(1920, 1200, 0.64))
+        local bank = nextBank:Create(ctx())
+        bank:Draw(ctx(), bankTab(bank, 4), function() end)
+        bank:Show(ctx())
+        settle()
+        db.places[BACKPACK] = { 100, 300 }
+        local bag = holds(8)
+        db.smallChain = "companion"
+        chain:Update(ctx())
+        settle()
+        assert.is_true(bag.placeY > 300)
+        local f = bag.frame
+        local px, py = topLeft(bag)
+        press(bag.grips.RIGHT)
+        f:ClearAllPoints()
+        f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", px, py)
+        f:SetSize(columnsWidth(5) + 5, f:GetHeight())
+        f:GetScript("OnSizeChanged")(f, columnsWidth(5) + 5, f:GetHeight())
+        release(bag.grips.RIGHT)
+        settle()
+        assert.are.same({ bag.placeX, bag.placeY }, db.places[BACKPACK], "saved where it stands")
+      end)
+
+      -- Found by the second bug review: a bag that was small before took the height of the width it had then, and glided again.
+      it("switches back to small in one glide after its names asked for another width while it was full", function()
+        inColumns()
+        local bag = nextBag:Create(ctx())
+        bag:Draw(ctx(), twoSections(60, "B"), function() end)
+        bag:Show(ctx())
+        settle()
+        local narrow = bag.frame:GetWidth()
+        nextPanel:SetSize(ctx(), "full")
+        settle()
+        bag:Draw(ctx(), twoSections(60, LONG), function() end)
+        settle()
+        local snaps = countCalls(bag, "snapTo")
+        nextPanel:SetSize(ctx(), "small")
+        settle()
+        assert.is_true(bag.frame:GetWidth() > narrow, "wider for its names")
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+        assert.are.equal(0, snaps(), "nothing more to glide once it has switched")
+      end)
+
+      -- As a grip's snap leaves the bag chained beside it alone (next-small-resize.md §14g, from the third bug review): a glide of
+      -- its height alone, its top where it was left, moves nothing beside it, and the braid stays twisted.
+      for _, screen in ipairs({ { 2560, 1440, 0.71, 125 }, { 1920, 1080, 1, 85 } }) do
+        it(string.format("never moves the bag chained beside it as its height glides with its top still, %dx%d at %s, Bag Scale %d%%",
+          screen[1], screen[2], screen[3], screen[4]), function()
+          finally(layoutHelper.UseScreen(screen[1], screen[2], screen[3]))
+          db.bagScale = screen[4]
+          db.clamp = false
+          db.places[BANK] = { 200, UIParent:GetHeight() - 60 }
+          local bank = nextBank:Create(ctx())
+          bank:Draw(ctx(), bankTab(bank, 4), function() end)
+          bank:Show(ctx())
+          settle()
+          local bag = holds(8)
+          db.smallChain = "companion"
+          chain:Update(ctx())
+          settle()
+          for _ = 1, 60 do chain:Turn(1 / 60) end
+          assert.is_true(chain.coupling ~= nil and chain.coupling.amount == 1, "braided")
+          local ppu = layoutHelper.PixelsPerUnit()
+          local at = layoutHelper.Rect(bag.frame).left * ppu
+          local top0 = layoutHelper.Rect(bank.frame).top
+          bank:Draw(ctx(), bankTab(bank, 30), function() end)
+          render:Flush()
+          step(1 / 60)
+          assert.is_true(bank.sizeGliding, "its height glides")
+          for frame = 1, 45 do
+            step(1 / 60)
+            render:Flush()
+            chain:Turn(1 / 60)
+            assert.are.equal(at, layoutHelper.Rect(bag.frame).left * ppu, "the bag beside it still, frame " .. frame)
+            assert.is_false(tween:IsPlaying(bag), "nothing glides into a spot, frame " .. frame)
+            assert.is_true(chain.coupling ~= nil and chain.coupling.target == 1, "braided, frame " .. frame)
+          end
+          settle()
+          local h, unit = bank.frame:GetHeight(), bank:PixelUnit()
+          assert.is_true(h >= fitted(bank) - 1e-6 and h < fitted(bank) + 2 * unit, "as tall as what it shows, in whole pixels")
+          assert.is_true(math.abs(layoutHelper.Rect(bank.frame).top - top0) < 0.01, "its top still")
+        end)
+      end
+
+      it("leaves a full panel the screen's height", function()
+        db.size = "full"
+        local bag = holds(8)
+        assert.are.equal(UIParent:GetHeight(), bag:Height())
+        assert.are.equal("closed", bag:FollowHeight())
+      end)
+
+      -- Narrower small than full, it shows more rows small: the switch glides to that height, not the full width's.
+      it("switches to small in one glide, to the height that shows what it holds there", function()
+        db.size = "full"
+        db.sizes[BACKPACK] = { columnsWidth(4), 300 }
+        local bag = holds(64)
+        local snaps = countCalls(bag, "snapTo")
+        nextPanel:SetSize(ctx(), "small")
+        local last
+        for _ = 1, 200 do
+          if bag.morph == nil then break end
+          step(1 / 60)
+          render:Flush()
+          if bag.morph ~= nil then last = bag.frame:GetHeight() end
+        end
+        assert.is_nil(bag.morph)
+        settle()
+        assert.are.equal(0, snaps(), "nothing more to glide once it has switched")
+        assert.are.equal(columnsWidth(4), bag.frame:GetWidth())
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+        assert.is_true(math.abs(last - bag.frame:GetHeight()) < 0.01, "the switch glided all the way: " .. last)
+      end)
+
+      it("says what it did, for profiler traces", function()
+        local bag = nextBag:Create(ctx())
+        assert.are.equal("closed", bag:FollowHeight())
+        bag:Show(ctx())
+        settle()
+        assert.are.equal("fits", bag:FollowHeight())
+        db.autosize = false
+        assert.are.equal("off", bag:FollowHeight())
+        db.autosize = true
+        assert.are.equal("owed", bag:FollowHeight(true))
+        holding(bag, 64)
+        assert.are.equal("following", bag:FollowHeight())
+        assert.are.equal("owed", bag:FollowHeight(), "while it glides")
+        settle()
+      end)
+
+      -- With Fit Names While Open on, what its names ask for glides its width alone: its height, owed by the draw before, glides
+      -- after, never jumping there as the width starts to glide.
+      it("glides its width for its names and its height for what it shows, neither jumping", function()
+        db.fitNames = true
+        inColumns()
+        db.places[BACKPACK] = { 300, 1100 }
+        local bag = nextBag:Create(ctx())
+        bag:Draw(ctx(), twoSections(4, "B"), function() end)
+        bag:Show(ctx())
+        settle()
+        local short, narrow = bag.frame:GetHeight(), bag.frame:GetWidth()
+        bag:Draw(ctx(), twoSections(60, "B"), function() end)
+        render:Flush()
+        assert.is_true(fitted(bag) > short, "what it shows asks for more height, a frame on")
+        bag:Draw(ctx(), twoSections(60, LONG), function() end)
+        assert.is_true(bag.sizeGliding, "its names glide it as it draws (FollowNames)")
+        step(1 / 60)
+        assert.is_true(bag.frame:GetWidth() > narrow, "its width glides")
+        assert.are.equal(short, bag.frame:GetHeight(), "its height as it was")
+        settle()
+        assert.are.equal(columnsWidth(12), bag.frame:GetWidth())
+        assert.are.equal(fitted(bag), bag.frame:GetHeight())
+        assert.are.same({ 300, 1100 }, { topLeft(bag) })
+      end)
+
+      -- Each Bag Scale puts its pixels' edges elsewhere in its header's and footer's fixed units: the height is rounded up past
+      -- both the room the root hands its scroll box and the scroll box as its snapped anchors place it.
+      for _, screen in ipairs({ { 2560, 1440, 0.71 }, { 1920, 1080, 0.64 }, { 3396, 1362, 0.65 } }) do
+        it(string.format("takes whole screen pixels and shows all it holds at every Bag Scale, %dx%d at %s",
+          screen[1], screen[2], screen[3]), function()
+          finally(layoutHelper.UseScreen(screen[1], screen[2], screen[3]))
+          local bag = holds(8)
+          for scale = 50, 150, 5 do
+            db.bagScale = scale
+            chain:ScalesChanged(ctx())
+            for _, n in ipairs({ 13, 40 }) do
+              holding(bag, n)
+              settle()
+              local why = string.format("Bag Scale %d%%, %d items", scale, n)
+              local unit = bag:PixelUnit()
+              local h = bag.frame:GetHeight()
+              assert.is_true(math.abs(h / unit - math.floor(h / unit + 0.5)) < 1e-6, "whole pixels: " .. h / unit .. ", " .. why)
+              -- The room down to its footer's line within a pixel: the line stands on a whole pixel (pixel:Point).
+              assert.is_true(h > fitted(bag) - unit and h < fitted(bag) + 2 * unit,
+                "no taller than whole pixels need: " .. h .. ", " .. fitted(bag) .. ", " .. why)
+              assert.is_true(showsAll(bag), why)
+              local rect = layoutHelper.Rect(bag.scroll.frame)
+              local box = (rect.top - rect.bottom) / bag.scroll.frame:GetEffectiveScale()
+              assert.is_true(box >= bag.content.frame:GetHeight() - 1e-6, "its scroll box, as anchored: " .. box .. ", " .. why)
+            end
+          end
+        end)
+      end
     end)
   end)
 

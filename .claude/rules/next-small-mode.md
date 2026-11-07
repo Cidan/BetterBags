@@ -11,7 +11,8 @@ smaller screens. The plan, the reasoning and what was asked are in `docs/next-sm
 (asked: "the biggest pain is two panels open for people with smaller screens ... a smaller panel,
 like ESO ... a panel we can move ... a button toggle to swap between small and full mode (animated
 of course)"). Phase 1 is small panels, moving them and switching sizes (§14a-d); phase 2 is chaining
-small panels by dragging them together (§14e); then resizing them with grips (§14g: next-small-resize.md, and fitting their names, next-small-names.md).
+small panels by dragging them together (§14e); then resizing them with grips (§14g: next-small-resize.md, and fitting their names, next-small-names.md); then as tall as what
+they show (§14i, Autosize Bags: next-small-autosize.md).
 
 ### 14a. The setting and the size
 
@@ -29,7 +30,8 @@ small panels by dragging them together (§14e); then resizing them with grips (�
   `nextSmallPlaces[kind]` (`DB:Get/SetNextSmallPlace`) where each kind's small
   panel was left (its top left in UIParent's units), nothing until first moved;
   `nextSmallSizes[kind]` (`DB:Get/SetNextSmallSize`, `{ width, height }`) the size the player gave it
-  with its grips (next-small-resize.md §14g), nothing while it is the default size (a reset clears it).
+  with its grips (next-small-resize.md §14g), nothing while it is the default size (a reset clears it); with Autosize Bags on
+  (next-small-autosize.md §14i) its height is kept for when the setting is off, and a grip saves only the width.
 - Each panel keeps its own `size`, read from the setting when it is made, so a panel can be part way
   through a switch (§14d). `IsSmall`, `Height`, `Width`, `BodyLeft`, `RibbonBase` and
   `SparkSpreadBase` answer for it.
@@ -48,7 +50,7 @@ end of a switch. `BuildPanel` only makes the parts.
   screen edge while docked (`SetDocked`).
 - **Small:** the frame is the body, its size `SmallSize`: the size the player gave it (next-small-resize.md §14g), else
   `BODY_WIDTH` wide (the full body's) and a share of the screen tall (whole units), never below its
-  minimum nor past the screen. It is anchored by its top left at its place (`SmallPlace`: where it was
+  minimum nor past the screen; with Autosize Bags on, as tall as what it shows (`RestingHeight`, next-small-autosize.md §14i). It is anchored by its top left at its place (`SmallPlace`: where it was
   left, else a margin in from its own screen edge, centered; kept on the screen while Clamp Bags to
   Screen is on, `clampPlace`, for its own width, and on whole pixels either way). No feather, clicks everywhere, a 1-pixel lavender edge all round (`edges`), the
   shorter beam, a grip on each bottom corner (next-small-resize.md §14g). `SetDocked` does nothing to a small panel (it is
@@ -199,6 +201,12 @@ them/coming out the side though!"
   (`chain:Settle`, from `Update` and `Arrived`; `GlideTo`, above), but never while it slides in or switches size: a
   slide's end says the bag has shown (a bank open waits for it), so it settles once it arrives. A bag
   chained to a closed backpack stays where it is.
+- **A companion closing leaves the backpack beside it where it stands** (`chain:Released`, from the companion's `Hide` and
+  `OnHidden`): the backpack beside a companion (layout "companion") has an anchor only while a companion is open, then reads its
+  own saved place. As a small companion closes (not a parent hiding it), the open backpack's place is saved where it stands,
+  its top its spot's beside the companion (never a raise), so whatever moved it beside the companion (the companion's glides
+  and refits, its glide into its spot) is where it is placed from. Found with Autosize Bags (next-small-autosize.md §14i): its
+  next height glide took it back to where it was dropped.
 
 ### 14f. Coverage
 

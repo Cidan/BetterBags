@@ -173,6 +173,13 @@ describe("Constants Module Offsets", function()
     assert.is_false(const.DATABASE_DEFAULTS.profile.nextFitNamesWhileOpen)
   end)
 
+  -- Autosize Bags (next-small-autosize.md). Asked: "it should be a toggle option, and it should default on i think".
+  it("autosizes BetterBags Next's small bags' height by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    assert.is_true(const.DATABASE_DEFAULTS.profile.nextAutosize)
+  end)
+
   -- BetterBags Next's currencies (currency.md §6). Asked: cap bars off by default.
   it("shows BetterBags Next's currencies without cap bars, with gains, until told", function()
     loadfile("core/constants.lua")("BetterBags")
