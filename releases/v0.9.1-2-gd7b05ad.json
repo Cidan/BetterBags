@@ -1,0 +1,17 @@
+{
+  "id": 1794027482,
+  "version": "v0.9.1-2-gd7b05ad",
+  "channel": "alpha",
+  "date": "2026-11-07",
+  "from": "d44dfa0f93d89283363725bd466524d1dcf490aa",
+  "to": "d7b05adba1745eda7e2a3e249e4dd3378fed587f",
+  "headline": "You can now right-click the backpack title to quickly sort your bags.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Right-click the backpack title to sort",
+      "details": "You can now right-click the backpack title to sort your bags. The title tooltip also includes a hint explaining the shortcut.",
+      "clients": []
+    }
+  ]
+}
