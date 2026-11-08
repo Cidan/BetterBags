@@ -123,9 +123,14 @@ describe("NextVendor", function()
     return out
   end
 
-  -- finishSale ends a sale as the seller does, unsold of its items left in the bags.
+  -- finishSale ends a sale as the seller does, unsold of its items left in the bags: the last ones, the
+  -- others sold (job.sold, as the seller keeps them).
   local function finishSale(job, reason, unsold)
     job.unsold, job.left = unsold or 0, 0
+    for i = 1, #job.list - job.unsold do
+      local d = job.list[i]
+      table.insert(job.sold, { bag = d.bagid or d.bag, slot = d.slotid or d.slot, data = d })
+    end
     if job.opts.onDone then job.opts.onDone(job, reason or "done") end
   end
 
@@ -244,6 +249,13 @@ describe("NextVendor", function()
     override(stubs.merchant, "SellAllJunk", function() calls.sellAll = calls.sellAll + 1 end)
     -- The seller, stood in for: each sale is recorded, and a test ends it (finishSale).
     data.refused = {}
+    -- What the backpack shows on a button of its own (SlotInfo:GetVisibleItems): a pile not in it is one a
+    -- virtual stack hides, under its stack's root (stacks, by item hash).
+    data.visible, data.stacks = {}, {}
+    override(stubs.items, "GetAllSlotInfo", function()
+      return { [const.BAG_KIND.BACKPACK] = { GetVisibleItems = function() return data.visible end,
+        stacks = { GetStackInfo = function(_, hash) return data.stacks[hash] end } } }
+    end)
     override(stubs.seller, "Sell", function(_, list, opts)
       local job = { list = list, opts = opts or {}, sold = {}, unsold = 0, left = #list }
       table.insert(calls.sales, job)
@@ -1175,6 +1187,49 @@ describe("NextVendor", function()
         assert.are.same({ entry, "back" }, calls.answers[3])
       end)
 
+      -- Reported (#1257): a section holding an item no merchant buys flew into the vendor as if all of it
+      -- sold, hid for LEAVING_SECONDS, and came back with the item.
+      it("goes back with what it left out of the sale, still in the bags", function()
+        sectionItems = { slotData(0, 1), slotData(0, 2) }
+        data.visible = { ["0_1"] = sectionItems[1], ["0_2"] = sectionItems[2] }
+        infos["0_2"] = { hasNoValue = true }
+        local o = v:SaleOffer(section)
+        o.docked(entry)
+        assert.are.same({ "0_1" }, slotsOfSale(calls.sales[1]))
+        finishSale(calls.sales[1], "done", 0)
+        assert.are.same({ { entry, "back" } }, calls.answers)
+      end)
+
+      it("goes back with a pile its stack hides that it left out of the sale", function()
+        local stacked = slotData(0, 3)
+        stacked.itemHash = "food"
+        stacked.hides = { slotData(0, 4) }
+        stacked.hides[1].itemHash = "food"
+        sectionItems = { stacked }
+        data.visible = { ["0_3"] = stacked }
+        data.stacks = { food = { rootItem = "0_3", slotkeys = { ["0_4"] = true } } }
+        _G._refundableLocations["0:4"] = true
+        local o = v:SaleOffer(section)
+        o.docked(entry)
+        assert.are.same({ "0_3" }, slotsOfSale(calls.sales[1]))
+        finishSale(calls.sales[1], "done", 0)
+        assert.are.same({ { entry, "back" } }, calls.answers)
+      end)
+
+      it("flies into the vendor when what it left out is no longer in the bags once it ends", function()
+        sectionItems = { slotData(0, 1), slotData(0, 2) }
+        data.visible = { ["0_1"] = sectionItems[1], ["0_2"] = sectionItems[2] }
+        infos["0_2"] = { hasNoValue = true }
+        local o = v:SaleOffer(section)
+        o.docked(entry)
+        override(C_Container, "GetContainerItemInfo", function(bag, slot)
+          if bag == 0 and slot == 2 then return nil end
+          return infos[bag .. "_" .. slot] or { hasNoValue = false }
+        end)
+        finishSale(calls.sales[1], "done", 0)
+        assert.are.same({ { entry, "moved" } }, calls.answers)
+      end)
+
       -- Past 12 the sale is confirmed in the vendor itself: the dialog it asked with blended in.
       it("past 12, the last 12 sold being all buyback keeps, sells only once double-clicked", function()
         local o = sellOf(13)
@@ -1230,10 +1285,12 @@ describe("NextVendor", function()
       for _, fn in ipairs(messages[name] or {}) do fn(ctx(), ...) end
     end
 
+    -- item makes a backpack item on a button of its own, as every item a section shows is.
     local function item(slot, category, noValue)
       local slotkey = "0_" .. slot
       items[slotkey] = { slotkey = slotkey, bagid = 0, slotid = slot, noValue = noValue,
         itemInfo = { category = category } }
+      data.visible[slotkey] = items[slotkey]
       return items[slotkey]
     end
 
@@ -1293,6 +1350,7 @@ describe("NextVendor", function()
         return buttonsByKey[slotkey]
       end })
       override(addon, "Bags", { Backpack = backpack })
+      override(stubs.sectionFrame, "WithStacks", function(_, list) return list end)
       bind({ { "Junk", { item(1, "Junk"), item(2, "Junk") } }, { "Mats", { item(3, "Mats") } },
         { "Trash", { item(4, "Trash", true) } }, { "Ore", { item(5, "Ore") } } })
       data.sell = { Junk = true, Ore = true }
@@ -1365,6 +1423,81 @@ describe("NextVendor", function()
       assert.are.same({ "Trash", "Ore" }, docked(v))
       assert.is_false(backpack.content:IsAway(backpack.content.byName.Junk))
       assert.is_false(backpack.content:IsLeaving(backpack.content.byName.Junk))
+    end)
+
+    -- Reported (#1257): a category that only sells, holding an item no merchant buys, flew into the vendor
+    -- as if all of it sold, and the item came back to the backpack seconds later.
+    it("goes back to the backpack with what no merchant buys, when it does not destroy it", function()
+      bind({ { "Junk", { item(1, "Junk"), item(2, "Junk", true) } } })
+      local v = open()
+      send("next/PanelShown", v)
+      assert.are.equal("Sell 1 item?", entry(v, "Junk").box.title:GetText())
+      doubleClick(entry(v, "Junk"))
+      assert.are.same({ "0_1" }, slotsOfSale(calls.sales[1]))
+      data.gone["0_1"] = true
+      finishSale(calls.sales[1], "done", 0)
+      finishTweens()
+      assert.is_nil(entry(v, "Junk"))
+      assert.is_false(backpack.content:IsAway(backpack.content.byName.Junk))
+      assert.is_false(backpack.content:IsLeaving(backpack.content.byName.Junk), "back, not moved")
+    end)
+
+    it("flies into the vendor once all of it sold", function()
+      local v = open()
+      send("next/PanelShown", v)
+      doubleClick(entry(v, "Junk"))
+      data.gone["0_1"], data.gone["0_2"] = true, true
+      finishSale(calls.sales[1], "done", 0)
+      finishTweens()
+      assert.is_nil(entry(v, "Junk"))
+      assert.is_true(backpack.content:IsLeaving(backpack.content.byName.Junk))
+    end)
+
+    -- Found by review: at a merchant every pile shows on its own (unmergeAtShop), and WithStacks also names
+    -- a pile of the same item with a button of its own in another section (Recent Items, a fresh loot).
+    it("flies into the vendor once all of it sold, a pile of the same item in another section aside", function()
+      bind({ { "Junk", { item(1, "Junk") } } })
+      local twin = { slotkey = "0_9", bagid = 0, slotid = 9, itemInfo = { category = "Recent Items" } }
+      data.visible = { ["0_1"] = items["0_1"], ["0_9"] = twin }
+      override(stubs.sectionFrame, "WithStacks", function(_, list)
+        local all = {}
+        for _, d in ipairs(list) do table.insert(all, d) end
+        table.insert(all, twin)
+        return all
+      end)
+      local v = open()
+      send("next/PanelShown", v)
+      doubleClick(entry(v, "Junk"))
+      assert.are.same({ "0_1" }, slotsOfSale(calls.sales[1]))
+      data.gone["0_1"] = true
+      finishSale(calls.sales[1], "done", 0)
+      finishTweens()
+      assert.is_true(backpack.content:IsLeaving(backpack.content.byName.Junk), "moved, not back")
+    end)
+
+    -- Found by the second review: with Unmerge at Shop off and Don't Merge Partial on, a partial pile shows
+    -- on its own while the full piles merge under a root in another section; a pile that root hides is
+    -- that section's.
+    it("flies into the vendor once all of it sold, a pile hidden under another section's root aside", function()
+      bind({ { "Junk", { item(3, "Junk") } } })
+      local hidden = { slotkey = "0_1", bagid = 0, slotid = 1, itemHash = "food", itemInfo = { category = "Recent Items" } }
+      items["0_3"].itemHash = "food"
+      data.visible = { ["0_2"] = { slotkey = "0_2" }, ["0_3"] = items["0_3"] }
+      data.stacks = { food = { rootItem = "0_2", slotkeys = { ["0_1"] = true, ["0_3"] = true } } }
+      override(stubs.sectionFrame, "WithStacks", function(_, list)
+        local all = {}
+        for _, d in ipairs(list) do table.insert(all, d) end
+        table.insert(all, hidden)
+        return all
+      end)
+      local v = open()
+      send("next/PanelShown", v)
+      doubleClick(entry(v, "Junk"))
+      assert.are.same({ "0_3" }, slotsOfSale(calls.sales[1]))
+      data.gone["0_3"] = true
+      finishSale(calls.sales[1], "done", 0)
+      finishTweens()
+      assert.is_true(backpack.content:IsLeaving(backpack.content.byName.Junk), "moved, not back")
     end)
 
     it("offers no sale where the merchant buys nothing, only what to destroy", function()

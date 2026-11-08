@@ -53,6 +53,11 @@ Vendor rule.
   field could take it either way, caches.md §2a), an item in an equipment set, a purchase that can still be refunded (`itemInfo.refundable`;
   Blizzard asks before refunding, `ContainerFrame_GetExtendedPriceString`, and selling it directly would
   skip that), and, to sell, one merchants do not buy (`hasNoValue`).
+  - **`hasNoValue`, not the sell price.** The slot's flag (`C_Container.GetContainerItemInfo`, on every
+    client) is the stricter test: in the retail 12.1.5 capture (`spec/fixtures/dump_retail_12_1_5.lua`)
+    it agrees with a sell price of 0 for 87 of 88 items, and Mark of Honor (137642) sells for 1 copper
+    yet is flagged. #1257 asked Auto Sell to leave out items with no sell price; it always had, by this
+    flag (what it saw was the dock's, §4a).
 - **Decided from the bags' last read alone; the client is asked only when acting.** Everything above
   reads the committed items. The client can have changed a slot since that read: a sale empties slots,
   and BetterBags reads the bags again only after `BAG_UPDATE_DELAYED` (the loader, then the refresh
@@ -159,11 +164,37 @@ room under the scroll area) is gone: a category's items wait in the vendor's doc
 - **A double click on a sale** sells what it offers then through the Seller (seller.md), one item at a
   time, as a dragged section's sale is (both are `NextVendor:SectionOffer`). The card waits while it
   sells: "Selling N of M...", "One item at a time, as the merchant takes them.", "Right-click to stop"
-  (a right click cancels what is left and sends the section back). Once the sale ends: if the section
-  holds items no merchant buys, the card stays and turns into their destroy, red; else, with anything
-  the merchant did not take (refused, never sent), it goes back to the backpack, where those items stay
-  until a merchant buys them (asked); else it flies into the vendor. A double click that found nothing to
-  sell sends it back.
+  (a right click cancels what is left and sends the section back). Once the sale ends: if its category
+  destroys what can't be sold and the section holds such items, the card stays and turns into their
+  destroy, red; else, with anything the sale left in the bags, it goes back to the backpack, where those
+  items stay until a merchant buys them (asked); else it flies into the vendor. What the sale left is
+  every item of the section, and every pile its virtual stacks hide, that the sale did not sell
+  (`job.sold`) and whose slot still holds an item (`C_Container.GetContainerItemInfo`, nil for an empty
+  slot): what the merchant did not take (refused, never sent) and what the sale left out (no merchant
+  buys it, an equipment set, a refundable purchase). A pile its stacks hide is one `sectionFrame:WithStacks`
+  names that has no button of its own (not in the backpack's `SlotInfo:GetVisibleItems()`) under a stack
+  root that is one of the section's items (`stacks:GetStackInfo(itemHash).rootItem`). `WithStacks` names
+  every pile of the same item: at a merchant the backpack shows each pile on its own (`unmergeAtShop`,
+  on by default), so a pile of it can be another section's (Recent Items, a fresh loot); and with
+  Unmerge at Shop off and Don't Merge Partial on, a partial pile shows on its own while the full piles
+  merge under a root in another section, whose hidden piles are that section's. A dragged section's
+  sale ends the same way. A double click that found nothing to sell sends it back.
+  - **Failure mode (fixed, #1257):** the end of a sale counted only what the Seller did not sell
+    (`job.unsold`), never what was left out of the sale before it began. A sell-only category holding an
+    item no merchant buys, and a dragged section holding one, flew into the vendor as if all of it sold,
+    hid for `LEAVING_SECONDS` (3 s, next-drag.md §7) and came back with the item, which looked like Auto
+    Sell trying to sell it. Reproduced first with the real vendor, dock and canvas; not yet seen in game.
+    The review of the fix found its first version counted every pile `WithStacks` names, so a category
+    sold out at a merchant went back to the backpack, its sold button still drawn, when a pile of the
+    same item sat in Recent Items; only piles with no button of their own counted then. The second review
+    found those counted under another section's root too (the partial pile above); a hidden pile counts
+    now only under a root the section holds. Both reproduced with the real `Stacks`, `SlotInfo`,
+    `Phase7_ApplyVirtualStacks` and `WithStacks` before they were fixed; 9 mutations of `leftBehind`, all
+    caught by `spec/next/vendor_spec.lua`.
+  - **Not built for:** the Seller takes an error raised during an item's interval as that item's answer
+    (seller.md §3). One arriving later would be taken for the next item's, and a refused item then reads
+    as sold; the end of the sale no longer also checks `job.unsold`, so its section would fly in and come
+    back. Nobody has seen an answer arrive that late.
 - **No sale where the merchant buys nothing** (`Automation:MerchantBuys`: a repair-only merchant, or one
   that refused to buy anything): only destroys are offered there.
 - **A click on a destroy** destroys the next item (`DestroyNext` with the section's items), one each
@@ -211,11 +242,14 @@ The category's heading line ends "Sells at merchants" or "Sells, destroys the re
   item, the cursor, combat, nothing left, an item that moved, one not picked up, the key binding).
 - `spec/seller_spec.lua` (seller.md §4); `spec/next/vendor_spec.lua` (Classic Sell Junk through the
   Seller; a dragged section's offer: selling as it docks and its progress, flying in or going back with
-  what was not taken, past 12 only once double-clicked, nothing to sell or closing, stopping its sale,
-  only while open; refused items left out of `SaleOf`); `spec/next/vendor_spec.lua` ("offering categories at a merchant":
+  what was not taken, going back with what it left out (an item no merchant buys, a pile its stack
+  hides), flying in when what it left out is gone by the end, past 12 only once double-clicked, nothing
+  to sell or closing, stopping its sale, only while open; refused items left out of `SaleOf`); `spec/next/vendor_spec.lua` ("offering categories at a merchant":
   docked once both show, in the backpack's order; a sale's text and glow, the buyback warning; a destroy's
   text and red glow; a double click selling through the Seller, waiting while it sells, the next coming up
-  once sold; back to the backpack with what was not taken; no sale where nothing is bought; a sale turning
+  once sold; back to the backpack with what was not taken, and with what no merchant buys when the category
+  does not destroy it; flying in once all of it sold, a pile of the same item in another section aside, and
+  a pile hidden under another section's root aside; no sale where nothing is bought; a sale turning
   into a destroy; one item per click, double clicks included, gone when none is left; nothing on a
   single click of a sale; the tooltip and the next item; once a visit, every one back when the merchant
   closes, offered again next visit; offered later when automation changes; nothing away from a merchant,
