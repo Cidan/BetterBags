@@ -1,0 +1,17 @@
+{
+  "id": 1794099019,
+  "version": "v0.9.2-2-ge450ae6",
+  "channel": "alpha",
+  "date": "2026-11-08",
+  "from": "69f9c7570a6a321bc526a2b81e660a36a0c2cb0c",
+  "to": "e450ae6c204e61a99ee73567f7a67c96bfb37fa2",
+  "headline": "This build fixes an issue where the Papercraft theme's font lingered on item buttons after switching themes.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Papercraft font sticking after switching themes",
+      "details": "Stack counts and item levels no longer keep the Papercraft theme's hand-drawn font after previewing or switching to another theme.",
+      "clients": []
+    }
+  ]
+}
