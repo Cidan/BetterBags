@@ -271,6 +271,70 @@ describe("switching bag designs on the whole addon", function()
     assert.are.same(fresh, listening(addon))
   end)
 
+  -- Enable Vendor Window (#1262, next-bagsystem.md §11g): BetterBags Next's vendor switched off and on at once, Blizzard's
+  -- merchant frame (made here as the client has it, under UIParent) given back and taken again.
+  describe("the vendor window", function()
+    -- merchantFrame is Blizzard's merchant frame, and what the Seller reads as a merchant opens in either design (the
+    -- merchant's GUID, the latency it paces sales by; as spec/seller_spec.lua stands them in).
+    local function merchantFrame()
+      local frame = CreateFrame("Frame", "MerchantFrame", UIParent)
+      frame:Hide()
+      return {
+        MerchantFrame = frame,
+        UnitGUID = function(unit) return unit == "npc" and "Creature-0-1-2-3-4-5" or nil end,
+        GetNetStats = function() return 0, 0, 20, 20 end,
+      }
+    end
+
+    local function fire(addon, name)
+      addon:GetModule("Events")._eventMap[name].fn(name)
+    end
+
+    before_each(function()
+      ResetMockMerchant()
+    end)
+
+    it("is switched off and on at once, Blizzard's merchant frame showing the vendor while it is off", function()
+      local addon = start({ next = true, globals = merchantFrame() })
+      local bagSystem, vendor = addon:GetModule("BagSystem"), addon.Vendor
+      assert.are.equal(_G.BetterBagsSneakyFrame, MerchantFrame:GetParent())
+      assert.is_true(bagSystem:SetVendorEnabled(ctx(addon), false))
+      assert.is_false(addon:GetModule("Database"):GetNextVendorEnabled())
+      assert.is_nil(addon.Vendor)
+      assert.are.equal(UIParent, MerchantFrame:GetParent())
+      MerchantFrame:Show()
+      fire(addon, "MERCHANT_SHOW")
+      assert.is_false(vendor:IsShown(), "Blizzard's frame shows the vendor")
+      assert.is_true(MerchantFrame:IsVisible())
+      assert.is_false(bagSystem:SetVendorEnabled(ctx(addon), true), "refused at a vendor")
+      MerchantFrame:Hide()
+      fire(addon, "MERCHANT_CLOSED")
+      assert.is_true(bagSystem:SetVendorEnabled(ctx(addon), true))
+      assert.are.equal(vendor, addon.Vendor)
+      assert.are.equal(_G.BetterBagsSneakyFrame, MerchantFrame:GetParent())
+      MerchantFrame:Show()
+      fire(addon, "MERCHANT_SHOW")
+      assert.is_true(vendor:IsShown(), "BetterBags Next's vendor shows the vendor again")
+      assert.is_false(MerchantFrame:IsVisible())
+      assert.are.same({}, handle.errors)
+    end)
+
+    it("is not made while off, and when switched on listens to what a fresh start with it listens to", function()
+      local fresh = freshStart({ next = true, globals = merchantFrame() })
+      local addon = start({ next = true, globals = merchantFrame(),
+        profile = function(defaults) defaults.nextVendorEnabled = false end })
+      assert.is_nil(addon.Vendor)
+      assert.are.equal(UIParent, MerchantFrame:GetParent())
+      assert.is_true(addon:GetModule("BagSystem"):SetVendorEnabled(ctx(addon), true))
+      assert.is_not_nil(addon.Vendor)
+      assert.are.equal(_G.BetterBagsSneakyFrame, MerchantFrame:GetParent())
+      assert.are.same(fresh, listening(addon))
+      switch(addon, "classic")
+      switch(addon, "next")
+      assert.are.same({}, handle.errors)
+    end)
+  end)
+
   -- Switching back to a design made earlier hooks its registrations again, and only those.
   it("listens to what a fresh start in each design listens to, switching back to one made earlier", function()
     local freshClassic = freshStart()

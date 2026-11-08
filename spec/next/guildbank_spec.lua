@@ -678,6 +678,52 @@ describe("NextGuildBank", function()
     end)
   end)
 
+  -- Enable Guild Bank Window off (#1262, next-bagsystem.md §11g): the bag system switches the guild bank off (Deactivate) and
+  -- gives Blizzard's guild bank frame back, which shows the guild bank, its tabs and its dialogs.
+  describe("switched off", function()
+    -- switchedOff opens a tab by itself, ends the visit, and switches the panel off.
+    local function switchedOff()
+      data.showTabs = true
+      local g = open()
+      assert.are.equal(1002, g.shownTab)
+      addon.atGuildBank = false
+      handlers["guildbank/Closed"](ctx())
+      finishTweens()
+      g.frame:GetScript("OnHide")(g.frame)
+      g:Deactivate(ctx())
+      messages, _G._hiddenPopups = {}, {}
+      return g
+    end
+
+    it("switches no tab when the guild's tabs change while Blizzard's frame shows the guild bank", function()
+      local g = switchedOff()
+      addon.atGuildBank = true
+      data.tabs[2].viewable = false
+      handlers["guildbank/TabsChanged"](ctx())
+      assert.is_true(data.showTabs, "the tab shown by itself stays the player's choice")
+      assert.are.same({}, sent("bags/Rederive"))
+      assert.is_false(g:IsShown())
+    end)
+
+    it("closes none of Blizzard's guild bank dialogs as the visit ends: Blizzard's frame closes its own", function()
+      switchedOff()
+      handlers["guildbank/Closed"](ctx())
+      assert.are.same({}, _G._hiddenPopups)
+    end)
+
+    it("follows visits again once switched back on", function()
+      local g = switchedOff()
+      g:Activate(ctx())
+      open(g)
+      data.tabs[2].viewable = false
+      handlers["guildbank/TabsChanged"](ctx())
+      assert.is_false(data.showTabs, "every tab shows once the one shown by itself is closed to the player")
+      addon.atGuildBank = false
+      handlers["guildbank/Closed"](ctx())
+      assert.are.same({ "GUILDBANK_DEPOSIT", "GUILDBANK_WITHDRAW", "CONFIRM_BUY_GUILDBANK_TAB" }, _G._hiddenPopups)
+    end)
+  end)
+
   describe("drops", function()
     it("puts the item held into the guild bank's current tab while every tab shows", function()
       local g = open()

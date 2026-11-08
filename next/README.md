@@ -52,6 +52,12 @@ object is there; the panels provide the members they use (`Show`, `Hide`, `Toggl
 `behavior.SwitchToGroup`; the bank also `SwitchToBankAndWipe`, `bankTab`, `blizzardBankTab` and
 `behavior.SwitchToBlizzardTab`).
 
+The vendor (`vendor.lua`, `addon.Vendor`) and the guild bank (`guildbank.lua`, `addon.Bags.GuildBank`) stand in for
+Blizzard's merchant and guild bank frames, each while its own switch is on (Enable Vendor Window, Enable Guild Bank
+Window): `core/bagsystem.lua` switches either off and on at once (`.claude/rules/next-bagsystem.md` §11g). Switched off
+(`Deactivate`), a panel is marked `off` and answers no visit, its Blizzard frame is given back and shows the vendor or
+the guild bank, and `Activate` switches it on again.
+
 ## Drawing
 
 `NextPanel:Draw` is the classic draw pass: claim the buttons drawn, then release the ones the last

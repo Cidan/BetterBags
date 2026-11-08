@@ -88,9 +88,13 @@ describe("Core Init and Enable flow", function()
     -- Database, whose Init would open AceDB on whatever BetterBagsDB it left (none is a new install,
     -- which starts with BetterBags Next, next.md §1) and whose GetNextEnabled would read that
     -- profile (.context/patterns-state.md, "Spec Files Must Pass Alone and Shuffled").
-    savedDatabase = { Init = rawget(db, "Init"), GetNextEnabled = rawget(db, "GetNextEnabled") }
+    savedDatabase = { Init = rawget(db, "Init"), GetNextEnabled = rawget(db, "GetNextEnabled"),
+      GetNextVendorEnabled = rawget(db, "GetNextVendorEnabled"), GetNextGuildBankEnabled = rawget(db, "GetNextGuildBankEnabled") }
     db.Init = spy.new(function() end)
     db.GetNextEnabled = function() return false end
+    -- Enable Vendor Window and Enable Guild Bank Window, on as in a fresh profile (next-bagsystem.md §11g).
+    db.GetNextVendorEnabled = function() return true end
+    db.GetNextGuildBankEnabled = function() return true end
     db.GetShowBagButton = db.GetShowBagButton or function() return true end
 
     local eventsMod = addon:GetModule("Events")
@@ -149,6 +153,8 @@ describe("Core Init and Enable flow", function()
     addon:GetModule("SonataNext").Init = savedNextInit
     local db = addon:GetModule("Database")
     db.Init, db.GetNextEnabled = savedDatabase.Init, savedDatabase.GetNextEnabled
+    db.GetNextVendorEnabled, db.GetNextGuildBankEnabled = savedDatabase.GetNextVendorEnabled,
+      savedDatabase.GetNextGuildBankEnabled
     addon.OnInitialize = oldOnInitialize
     addon.OnEnable = oldOnEnable
     addon.Bags = oldBags

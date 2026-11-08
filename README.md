@@ -561,10 +561,10 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 ### Automation
 A category can act on its items on its own. Pick it on the Categories page (`/bb`), then its **Automation** tab:
 - **Auto Sell**: when you open a merchant, the category's items in your backpack are sold.
-- **Confirm Auto Sell** (on by default): with BetterBags Next, the category's section flies over to the vendor and waits there, glowing, as a category you drag onto the vendor does: double-click it to sell, right-click to put it back. Turned off, its items are sold as soon as you open the merchant. Hold Shift as you open the merchant to keep them. The classic bags have no such box: with it on, sell the category yourself by right-clicking its title.
+- **Confirm Auto Sell** (on by default): with BetterBags Next's vendor window, the category's section flies over to the vendor and waits there, glowing, as a category you drag onto the vendor does: double-click it to sell, right-click to put it back. Turned off, its items are sold as soon as you open the merchant. Hold Shift as you open the merchant to keep them. The classic bags have no such box, nor has BetterBags Next with **Enable Vendor Window** off: with it on, sell the category yourself by right-clicking its title.
 
 Every sale, automatic or not, sells one item at a time, as fast as your connection allows (at least 0.2 seconds apart): selling everything at once makes the game answer "That object is busy." Anything a merchant won't buy stays in your bags, and isn't offered to that merchant again; the next merchant that buys it gets it. A merchant that buys nothing at all is sold nothing.
-- **Destroy What Can't Be Sold** (needs Auto Sell on): the category's items no merchant buys are destroyed. With BetterBags Next, its section waits at the vendor like a sale, glowing red: each click destroys the next item, a whole stack. Anywhere, **Destroy Next Item** (Key Bindings > BetterBags) does the same. The game only lets an addon destroy one item per key press or click.
+- **Destroy What Can't Be Sold** (needs Auto Sell on): the category's items no merchant buys are destroyed. With BetterBags Next's vendor window, its section waits at the vendor like a sale, glowing red: each click destroys the next item, a whole stack. Anywhere, **Destroy Next Item** (Key Bindings > BetterBags) does the same. The game only lets an addon destroy one item per key press or click.
 - **Skip Recent Items** (under Recent Items, for any category, apart from the merchant settings): items that land in the category skip Recent Items. They show in the category right away and are no longer marked new.
 
 Automation never sells or destroys an item in an equipment set or a purchase you can still refund. Selling at once acts on a newly looted item by its category even while it shows under Recent Items; a section waiting at the vendor holds only the items it shows, and a category that isn't on the backpack's current tab doesn't fly over. A rule like `rarity = poor`, `ilvl < player.ilvl - 50 AND binding = soulbound` or `toy = true AND known = true` makes a category worth automating.
@@ -640,10 +640,14 @@ An early look at a new design for your bags. Turn it on with **BetterBags Next (
 - Press a tab and drag it up or down to put your tabs in the order you like, in the backpack, the bank, the guild bank and at a vendor. The order is kept.
 - **Show Blizzard Bags** (the bag button at the top of the backpack) shows your bags themselves: each bag in a tab, to swap it (drop a bag on a tab, or drag a bag off it), and your items bag by bag in slot order. Click it again to see your categories. The **X** at the top right closes the backpack.
 - Searching, sorting, the settings button, dropping items onto the panel, cooldowns and tooltips work as they do in the regular bags.
+- Vendors and the guild bank open in panels of their own, on the left like the bank, with their items in your categories. Turn off **Enable Vendor Window** or **Enable Guild Bank Window** (General, on by default) to use Blizzard's window for them instead; each switches at once, away from a vendor or the guild bank. Without the vendor window, categories waiting to be sold are sold by right-clicking their title, as in the regular bags.
 - In the bank, your Warbank groups are listed after your bank groups, in teal, and the top of the panel turns teal while one shows. The buttons at the top close the bank, deposit your Warbound items, sort the bank (or the Warbank, while it shows) and switch between your groups and the bank's own tabs, where you can see each tab on its own, buy tabs, and right-click a tab to change its name, icon and deposit settings. In WoW: Forever, drop a bag on a bank tab to use it.
 - **Appearance > Size** sets **Icon Scale**, how big item buttons are (each row fits as many as it can), on top of the theme's own size, and **Bag Scale**, the size of the small, movable bags (the full-height bags on the screen's edges keep theirs). A small bag is always wide enough that its title and its sections' names are not cut short when it opens and when you let go of its resize grip; turn on **Fit Names While Open** for it to widen as soon as a longer name comes in while it is open, and narrow back once it fits. **Autosize Bags** (on by default) makes each small bag as tall as everything it holds and its Free Space, growing and shrinking as items come and go, as far as the screen allows; its width stays as you set it, and it moves up rather than past the bottom of the screen. Drag its resize grips to set its width; let go and its height bounces back to fit. Turn it off to set the height yourself.
 
 Not there yet: currencies, the bag anchor, the bag menu, and an opacity setting. To go back to the regular bags, use the setting or `/bb next`. It is an experiment and may change or go away; please report what you think.
+
+## QuickFind
+With the [QuickFind](https://www.curseforge.com/wow/addons/quickfind) addon installed, the items in your backpack and bank can be found from it, tagged with their type, category and where they are. Press Enter on one and BetterBags opens the bag it is in, on the tab that holds it, and searches for its name (In-Bag Search must be on). Turn it off with **Enable QuickFind Integration** on the QuickFind page under Integrations in the settings; it switches at once.
 
 ## Reporting Performance Problems
 If BetterBags makes your game stutter, you can record exactly what it was doing and send that along with your report.
@@ -676,7 +680,6 @@ Github hosts both our [Progress Board](https://github.com/users/Cidan/projects/2
 
 The following features are under active development:
 - Virtual Bank Groups, just like Category Groups in Bags!
-- Integration with [QuickFind](https://www.curseforge.com/wow/addons/quickfind).
 
 These features are planned for the long term:
 - Feature parity between search categories and manual categories.

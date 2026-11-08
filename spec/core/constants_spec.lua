@@ -259,6 +259,16 @@ describe("Constants Module Offsets", function()
     assert.is_false(const.DATABASE_DEFAULTS.profile.nextEnabled)
   end)
 
+  -- BetterBags Next's vendor and guild bank stand in for Blizzard's frames unless switched off (#1262), and the
+  -- QuickFind integration is on while QuickFind is loaded, as before these switches.
+  it("leaves BetterBags Next's vendor and guild bank windows and the QuickFind integration on by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    assert.is_true(const.DATABASE_DEFAULTS.profile.nextVendorEnabled)
+    assert.is_true(const.DATABASE_DEFAULTS.profile.nextGuildBankEnabled)
+    assert.is_true(const.DATABASE_DEFAULTS.profile.quickFindEnabled)
+  end)
+
   it("should have SCROLLBAR_WIDTH defined in the era constants offsets", function()
     loadfile("core/constants.lua")("BetterBags")
     loadfile("core/era/constants.lua")("BetterBags")

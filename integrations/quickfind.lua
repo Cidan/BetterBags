@@ -26,16 +26,22 @@ function quickfind:OnEnable()
   if not _G.QuickFind then return end
   if not QuickFind.RegisterSource then return end
 
-  -- Register our source
+  -- Registered while Enable QuickFind Integration is off too: QuickFind cannot take a source back
+  -- (RegisterSource only), so the source is empty while it is off, and follows the switch at once.
   self:RegisterBetterBagsSource()
 
-  print("BetterBags: QuickFind integration enabled.")
+  if database:GetQuickFindEnabled() then
+    print("BetterBags: QuickFind integration enabled.")
+  end
 end
 
----Builds the item results list for QuickFind
+---Builds the item results list for QuickFind: none while Enable QuickFind Integration is off
 ---@return table
 function quickfind:GetItemResults()
   local results = {}
+  if not database:GetQuickFindEnabled() then
+    return results
+  end
   local allSlotInfo = items:GetAllSlotInfo()
 
   -- Process backpack items

@@ -305,7 +305,7 @@ function editor:AutomationOptions()
     {
       kind = "toggle",
       title = L:G("Confirm Auto Sell"),
-      description = L:G("At a vendor, this category's section waits there to be sold with a double click (BetterBags Next). Turned off, it is sold as soon as the vendor opens."),
+      description = L:G("At a vendor, this category's section waits there to be sold with a double click (BetterBags Next's vendor window; without it, sell it by right-clicking its title). Turned off, it is sold as soon as the vendor opens."),
       keywords = { "automation", "sell", "confirm", "vendor", "merchant" },
       disabled = function() return not sells() end,
       get = function()

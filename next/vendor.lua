@@ -89,6 +89,7 @@ local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED"
 ---@field offered table<string, boolean> The backpack categories docked in it this visit (OfferAutomation).
 ---@field toBuy NextVendorPurchase[] What the shopping list buys here, as last drawn (profession-shopping-list.md).
 ---@field listOffered boolean Its Shopping List was docked in it this visit (OfferShoppingList).
+---@field off? boolean Switched off (Deactivate): it answers no merchant, Blizzard's merchant frame shows the vendor.
 local vendorProto = nextPanel:Extend({}, 'NextVendorPanel')
 -- A vendor's name can be any length: it is cut short to the room its header buttons leave at either
 -- size (FitTitle).
@@ -308,9 +309,12 @@ function vendorProto:OnShowing(ctx)
 end
 
 -- OnMerchantShow opens the vendor (MERCHANT_SHOW), resetting the filter as Blizzard's merchant
--- frame does on every open.
+-- frame does on every open. Switched off, it opens nothing: Blizzard's merchant frame shows the vendor.
 ---@param ctx Context
 function vendorProto:OnMerchantShow(ctx)
+  if self.off then
+    return
+  end
   self.atMerchant = true
   self.closeRequested = false
   self.offered = {}
@@ -322,9 +326,13 @@ function vendorProto:OnMerchantShow(ctx)
 end
 
 -- OnMerchantClosed hides the vendor (MERCHANT_CLOSED), puts the cursor back and closes Blizzard's
--- purchase prompts, as Blizzard's merchant frame does when it hides.
+-- purchase prompts, as Blizzard's merchant frame does when it hides. Switched off, it leaves them to
+-- Blizzard's frame, whose own OnHide does it.
 ---@param ctx Context
 function vendorProto:OnMerchantClosed(ctx)
+  if self.off then
+    return
+  end
   self.atMerchant = false
   self.closeRequested = false
   nextDock:SendBackBorrowed(self)
@@ -367,11 +375,20 @@ function vendorProto:OnHidden(ctx)
   self:EndVisitLater()
 end
 
--- Activate has nothing to catch up on: BetterBags Next is switched only away from a vendor, and
+-- Deactivate switches the vendor off, with BetterBags Next or by itself (Enable Vendor Window, next-bagsystem.md §11g): it hides
+-- at once and lets go of its buttons, and answers no merchant until Activate.
+---@param ctx Context
+function vendorProto:Deactivate(ctx)
+  self.off = true
+  nextPanel.proto.Deactivate(self, ctx)
+end
+
+-- Activate switches the vendor on again. It has nothing to catch up on: it is switched only away from a vendor, and
 -- the next vendor that opens draws everything (OnShowing).
 ---@param ctx Context
 function vendorProto:Activate(ctx)
   local _ = ctx
+  self.off = false
 end
 
 -- OnClosed does nothing: the vendor has no Recent Items.

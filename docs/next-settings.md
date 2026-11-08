@@ -115,7 +115,8 @@ bags'), and Currency (Blizzard's backpack currency list, which Next's footer doe
 **BetterBags**
 
 1. **General** (one tab)
-   - *Bags:* BetterBags Next (experimental), Enable Bank Bags, Show Blizzard Bag Button.
+   - *Bags:* BetterBags Next (experimental), Enable Bank Bags, Enable Vendor Window and Enable Guild Bank Window
+     (Next only, #1262), Show Blizzard Bag Button.
    - *Search:* Enable In-Bag Search, Enable Enter to Make Category.
    - *Items:* Upgrade Icon Provider, New Item Duration, Enable Category Sell and Deposit.
 2. **Appearance**
@@ -146,7 +147,7 @@ bags'), and Currency (Blizzard's backpack currency list, which Next's footer doe
 
 **Integrations**
 
-8. **QuickFind:** what the integration does.
+8. **QuickFind:** Enable QuickFind Integration (#1262), then what the integration does.
 9. **Plugins:** one page per plugin that registered (`Config:AddPluginConfig`), made from its
    AceConfig options: toggle, select, range (a slider: newly supported), input, multi-line input,
    color, execute, description and header; a group's options become a section titled with its

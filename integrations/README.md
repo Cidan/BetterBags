@@ -11,6 +11,7 @@ The integrations module provides seamless compatibility with popular World of Wa
   - [Pawn](#pawn-pawnlua)
   - [SimpleItemLevel](#simpleitemlevel-simpleitemlevellua)
   - [Profession Shopping List](#profession-shopping-list-professionshoppinglistlua)
+  - [QuickFind](#quickfind-quickfindlua)
 - [Integration Architecture](#integration-architecture)
 - [Usage](#usage)
 - [Adding New Integrations](#adding-new-integrations)
@@ -164,6 +165,26 @@ EventRegistry "ProfessionShoppingList.OnTrackedRecipesChanged"
 - Retries on `ADDON_LOADED` when Profession Shopping List loads after BetterBags
 - Sends `shoppingList/Changed` when the tracked recipes change
 
+### QuickFind (`quickfind.lua`)
+
+Makes the items in the backpack and bank findable from the QuickFind addon (`.claude/rules/quickfind.md`).
+
+**Features:**
+- Every item of both bags is a QuickFind entry, tagged with its type, subtype, category, equipment slot and
+  location ("Backpack", "Bank")
+- Enter on one opens its bag, switches to the tab that holds it and searches for its name (In-Bag Search on)
+
+**Key Components:**
+```lua
+-- QuickFind's API (QuickFind/API.lua): register only; a source cannot be taken back
+QuickFind:RegisterSource({ name = 'BetterBags Items', get = function() return quickfind:GetItemResults() end })
+```
+
+**Behavior:**
+- Registers its source whenever QuickFind is loaded, so **Enable QuickFind Integration** (the QuickFind
+  settings page, on by default) switches at once: while it is off the source is empty (`GetItemResults`) and
+  no login message is printed
+
 ## Integration Architecture
 
 ### Automatic Detection
@@ -200,16 +221,17 @@ end)
 
 Integrations are automatic and require no configuration:
 
-1. **Install the third-party addon** (ConsolePort, Masque, Pawn, or SimpleItemLevel)
+1. **Install the third-party addon** (ConsolePort, Masque, Pawn, SimpleItemLevel, Profession Shopping List, or QuickFind)
 2. **Load BetterBags** - Integration automatically detects and activates
 3. **Check chat** - Confirmation message appears when integration loads
 
 ### Disabling Integrations
 
-While there's no built-in disable option, integrations can be prevented by:
+Integrations can be prevented by:
 - Not installing the third-party addon
 - Disabling the third-party addon
 - For Masque: Using a theme with `Masque = false`
+- For QuickFind: **Enable QuickFind Integration** off, on its settings page (at once)
 
 ## Adding New Integrations
 

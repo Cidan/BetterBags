@@ -379,9 +379,13 @@ function content:Init()
     id = "general", group = L:G("BetterBags"), title = L:G("General"),
     description = L:G("How BetterBags works in every bag."),
     tabs = { { id = "main", title = L:G("General"), sections = {
+      -- BetterBags Next's vendor and guild bank stand in for Blizzard's frames (next-bagsystem.md §11g); the classic bags leave
+      -- both to Blizzard. The guild bank's only on a client with one, as its page.
       { title = L:G("Bags"), rows = {
-        { setting = 'nextEnabled' }, { setting = 'enableBankBags' }, { setting = 'showBagButton' },
-        { setting = 'clampBagsToScreen' }, { setting = 'bagFading', design = "classic" }, { setting = 'animateItemMovement', design = "classic" },
+        { setting = 'nextEnabled' }, { setting = 'enableBankBags' }, { setting = 'nextVendor', design = "next" },
+        { setting = 'nextGuildBank', design = "next", hidden = function() return not addon.hasGuildBank end },
+        { setting = 'showBagButton' }, { setting = 'clampBagsToScreen' }, { setting = 'bagFading', design = "classic" },
+        { setting = 'animateItemMovement', design = "classic" },
       } },
       -- Only the classic bags' search box makes a category on Enter (frames/search.lua).
       { title = L:G("Search"), rows = { { setting = 'inBagSearch' }, { setting = 'enterToMakeCategory', design = "classic" } } },
@@ -593,6 +597,7 @@ function content:Init()
     id = "quickfind", group = L:G("Integrations"), title = L:G("QuickFind"),
     description = L:G("Your items, searchable from the QuickFind addon."),
     tabs = { { id = "main", title = L:G("QuickFind"), sections = {
+      { title = L:G("QuickFind"), rows = { { setting = 'quickFind' } } },
       { title = L:G("How it works"), rows = {
         { text = L:G("BetterBags integrates with the QuickFind addon to make your items searchable.") },
         { text = L:G("All items in your backpack and bank are registered as a QuickFind source, tagged with their type, category and location.") },

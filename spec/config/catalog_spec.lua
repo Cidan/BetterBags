@@ -282,6 +282,56 @@ describe("The settings catalog", function()
     assert.are.equal("classic", db._design)
   end)
 
+  -- Enable Vendor Window and Enable Guild Bank Window (#1262): the bag system switches each at once, and says when
+  -- it refuses (at a vendor, at the guild bank).
+  it("switches BetterBags Next's vendor and guild bank windows at once, saying when it was refused", function()
+    local asked, allow = {}, true
+    override(bagSystem, "SetVendorEnabled", function(_, c, on)
+      table.insert(asked, { "vendor", on, c ~= nil })
+      return allow
+    end)
+    override(bagSystem, "SetGuildBankEnabled", function(_, c, on)
+      table.insert(asked, { "guild", on, c ~= nil })
+      return allow
+    end)
+    override(db, "GetNextVendorEnabled", function() return true end)
+    override(db, "GetNextGuildBankEnabled", function() return false end)
+    local vendor, guild = catalog:Get("nextVendor"), catalog:Get("nextGuildBank")
+    assert.are.equal("toggle", vendor.kind)
+    assert.are.equal("toggle", guild.kind)
+    assert.are.equal("Enable Vendor Window", vendor.title)
+    assert.are.equal("Enable Guild Bank Window", guild.title)
+    assert.is_true(vendor.get(ctx()))
+    assert.is_false(guild.get(ctx()))
+    assert.is_true(vendor.set(ctx(), false) ~= false)
+    assert.is_true(guild.set(ctx(), true) ~= false)
+    allow = false
+    assert.is_false(vendor.set(ctx(), true))
+    assert.is_false(guild.set(ctx(), false))
+    assert.are.same({ { "vendor", false, true }, { "guild", true, true }, { "vendor", true, true }, { "guild", false, true } },
+      asked)
+    assert.is_nil(vendor.reload, "no reload")
+    assert.is_nil(guild.reload, "no reload")
+    assert.are.same({}, sent)
+  end)
+
+  -- The QuickFind integration (integrations/quickfind.lua): BetterBags' items stay a QuickFind source, empty while it
+  -- is off, so it follows the switch at once.
+  it("turns the QuickFind integration on and off, sending nothing", function()
+    local on = true
+    override(db, "GetQuickFindEnabled", function() return on end)
+    override(db, "SetQuickFindEnabled", function(_, value) on = value end)
+    local setting = catalog:Get("quickFind")
+    assert.are.equal("toggle", setting.kind)
+    assert.are.equal("Enable QuickFind Integration", setting.title)
+    assert.is_true(setting.get(ctx()))
+    setting.set(ctx(), false)
+    assert.is_false(on)
+    assert.is_false(setting.get(ctx()))
+    assert.is_nil(setting.reload, "no reload")
+    assert.are.same({}, sent)
+  end)
+
   it("defines every setting the classic window had, once each", function()
     local ids = catalog:Ids()
     local seen = {}

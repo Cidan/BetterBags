@@ -52,7 +52,7 @@ local events = addon:GetModule("Events")
 local context = addon:GetModule("Context")
 
 describe("BagSystem", function()
-  local made, fired, nextOn, bankOn, calls, slotInfo, sent
+  local made, fired, nextOn, bankOn, vendorOn, guildOn, calls, slotInfo, sent
 
   local function ctx() return context:New("spec") end
 
@@ -105,7 +105,7 @@ describe("BagSystem", function()
     bagSystem:Init()
     made, fired, calls, sent = {}, {}, { takeOver = {}, giveBack = 0, consoleport = {}, watched = {},
       guildTakeOver = {}, guildGiveBack = 0 }, {}
-    nextOn, bankOn = false, true
+    nextOn, bankOn, vendorOn, guildOn = false, true, true, true
     slotInfo = { [BACKPACK] = { "backpack data" }, [BANK] = { "bank data" } }
     override(addon, "Bags", {})
     override(addon, "Vendor", nil)
@@ -116,6 +116,10 @@ describe("BagSystem", function()
     override(stubs.database, "GetNextEnabled", function() return nextOn end)
     override(stubs.database, "SetNextEnabled", function(_, on) nextOn = on end)
     override(stubs.database, "GetEnableBankBag", function() return bankOn end)
+    override(stubs.database, "GetNextVendorEnabled", function() return vendorOn end)
+    override(stubs.database, "SetNextVendorEnabled", function(_, on) vendorOn = on end)
+    override(stubs.database, "GetNextGuildBankEnabled", function() return guildOn end)
+    override(stubs.database, "SetNextGuildBankEnabled", function(_, on) guildOn = on end)
     override(stubs.database, "GetBagView", function() return 2 end)
     override(stubs.database, "GetSectionSortType", function() return nextOn and 2 or 1 end)
     override(stubs.items, "GetAllSlotInfo", function() return slotInfo end)
@@ -401,6 +405,187 @@ describe("BagSystem", function()
       addon.Vendor.atMerchant = true
       assert.is_false(bagSystem:Switch(ctx(), "classic"))
       assert.are.equal("next", bagSystem:ActiveDesign())
+    end)
+  end)
+
+  -- Enable Vendor Window and Enable Guild Bank Window (#1262): BetterBags Next's vendor and guild bank, each
+  -- switched off and on at once; while one is off, Blizzard's own frame shows the vendor or the guild bank.
+  describe("the vendor and guild bank windows", function()
+    local function listed(name)
+      local n = 0
+      for _, frame in ipairs(UISpecialFrames) do
+        if frame == name then n = n + 1 end
+      end
+      return n
+    end
+
+    local function lastError()
+      return UIErrorsFrame._messages[#UIErrorsFrame._messages].text
+    end
+
+    it("makes neither while they are off, leaving Blizzard's frames to show them", function()
+      nextOn, vendorOn, guildOn = true, false, false
+      start()
+      assert.is_nil(addon.Vendor)
+      assert.is_nil(addon.Bags.GuildBank)
+      assert.spy(stubs.nextVendor.Create).was_not.called()
+      assert.spy(stubs.nextGuildBank.Create).was_not.called()
+      assert.are.same({}, calls.takeOver)
+      assert.are.same({}, calls.guildTakeOver)
+      assert.are.same({ "next 0", "next 1", "next message 0", "next message 1" }, fire())
+    end)
+
+    it("switches the vendor off at once: hidden, its buttons let go of, Blizzard's merchant frame given back", function()
+      nextOn = true
+      start()
+      local vendor = addon.Vendor
+      assert.is_true(bagSystem:SetVendorEnabled(ctx(), false))
+      assert.is_false(vendorOn)
+      assert.are.same({ "deactivate" }, vendor.log)
+      assert.are.equal(1, calls.giveBack)
+      assert.is_nil(addon.Vendor)
+      assert.are.equal(0, calls.guildGiveBack, "the guild bank keeps Blizzard's guild bank frame")
+      assert.are.same({}, addon.Bags.GuildBank.log)
+      assert.are.equal("next", bagSystem:ActiveDesign())
+    end)
+
+    it("switches the vendor back on: the same one, caught up, taking Blizzard's merchant frame again", function()
+      nextOn = true
+      start()
+      local vendor = addon.Vendor
+      bagSystem:SetVendorEnabled(ctx(), false)
+      assert.is_true(bagSystem:SetVendorEnabled(ctx(), true))
+      assert.is_true(vendorOn)
+      assert.are.equal(vendor, addon.Vendor)
+      assert.are.same({ "deactivate", "activate" }, vendor.log)
+      assert.are.same({ _G.BetterBagsSneakyFrame, _G.BetterBagsSneakyFrame }, calls.takeOver)
+      assert.spy(stubs.nextVendor.Create).was.called(1)
+      assert.are.equal(1, listed("BagSystemSpecnextvendor"), "Escape closes it, listed once")
+    end)
+
+    it("makes the vendor the first time it is switched on, in BetterBags Next's scope, Escape closing it", function()
+      nextOn, vendorOn = true, false
+      start()
+      assert.is_true(bagSystem:SetVendorEnabled(ctx(), true))
+      assert.are.equal("vendor", addon.Vendor.kind)
+      assert.are.same({}, addon.Vendor.log, "nothing to catch up on")
+      assert.are.same({ _G.BetterBagsSneakyFrame }, calls.takeOver)
+      assert.are.equal(1, listed("BagSystemSpecnextvendor"))
+      assert.are.same({ "next 0", "next 1", "next guild", "next message 0", "next message 1", "next message guild",
+        "next message vendor", "next vendor" }, fire())
+      bagSystem:Switch(ctx(), "classic")
+      assert.are.same({ "classic 0", "classic 1", "classic message 0", "classic message 1" }, fire(),
+        "unhooked with BetterBags Next")
+    end)
+
+    it("switches the guild bank off and on at once, made the first time it is on, for the cursor too", function()
+      nextOn, guildOn = true, false
+      start()
+      assert.is_nil(addon.Bags.GuildBank)
+      assert.is_true(bagSystem:SetGuildBankEnabled(ctx(), true))
+      local guild = addon.Bags.GuildBank
+      assert.are.equal("guild", guild.kind)
+      assert.is_true(guildOn)
+      assert.are.same({ _G.BetterBagsSneakyFrame }, calls.guildTakeOver)
+      assert.are.equal(1, listed("BagSystemSpecnextguild"))
+      assert.are.same({ guild.frame }, calls.consoleport)
+      assert.is_true(bagSystem:SetGuildBankEnabled(ctx(), false))
+      assert.is_false(guildOn)
+      assert.is_nil(addon.Bags.GuildBank)
+      assert.are.same({ "deactivate" }, guild.log)
+      assert.are.equal(1, calls.guildGiveBack)
+      assert.are.equal(0, calls.giveBack, "the vendor keeps Blizzard's merchant frame")
+      assert.is_true(bagSystem:SetGuildBankEnabled(ctx(), true))
+      assert.are.equal(guild, addon.Bags.GuildBank)
+      assert.are.same({ "deactivate", "activate" }, guild.log)
+      assert.are.equal(2, #calls.guildTakeOver)
+      assert.spy(stubs.nextGuildBank.Create).was.called(1)
+      assert.are.same({ guild.frame }, calls.consoleport, "added once")
+      assert.are.equal(1, listed("BagSystemSpecnextguild"), "listed once")
+    end)
+
+    it("refuses at a vendor, Blizzard's or BetterBags Next's, saying so", function()
+      nextOn = true
+      start()
+      local vendor = addon.Vendor
+      vendor.atMerchant = true
+      assert.is_false(bagSystem:SetVendorEnabled(ctx(), false))
+      assert.is_true(vendorOn)
+      assert.are.equal(vendor, addon.Vendor)
+      assert.are.same({}, vendor.log)
+      assert.are.equal(0, calls.giveBack)
+      assert.are.equal("Close the vendor to switch vendor windows.", lastError())
+      vendor.atMerchant = false
+      bagSystem:SetVendorEnabled(ctx(), false)
+      MerchantFrame:Show()
+      assert.is_false(bagSystem:SetVendorEnabled(ctx(), true))
+      assert.is_false(vendorOn)
+      assert.is_nil(addon.Vendor)
+      assert.are.equal(1, #calls.takeOver)
+    end)
+
+    it("refuses at the guild bank, saying so", function()
+      nextOn = true
+      start()
+      local guild = addon.Bags.GuildBank
+      override(addon, "atGuildBank", true)
+      assert.is_false(bagSystem:SetGuildBankEnabled(ctx(), false))
+      assert.is_true(guildOn)
+      assert.are.equal(guild, addon.Bags.GuildBank)
+      assert.are.same({}, guild.log)
+      assert.are.equal(0, calls.guildGiveBack)
+      assert.are.equal("Close the guild bank to switch guild bank windows.", lastError())
+    end)
+
+    it("only saves the choice while the classic bags are in use, BetterBags Next following it when switched to", function()
+      start()
+      assert.is_true(bagSystem:SetVendorEnabled(ctx(), false))
+      assert.is_true(bagSystem:SetGuildBankEnabled(ctx(), false))
+      assert.is_false(vendorOn)
+      assert.is_false(guildOn)
+      assert.are.equal(0, calls.giveBack)
+      assert.are.equal(0, calls.guildGiveBack)
+      assert.is_true(bagSystem:Switch(ctx(), "next"))
+      assert.is_nil(addon.Vendor)
+      assert.is_nil(addon.Bags.GuildBank)
+      assert.spy(stubs.nextVendor.Create).was_not.called()
+      assert.spy(stubs.nextGuildBank.Create).was_not.called()
+      assert.are.same({}, calls.takeOver)
+      assert.are.same({}, calls.guildTakeOver)
+      assert.are.same({ addon.Bags.Backpack.frame, addon.Bags.Bank.frame }, calls.consoleport)
+    end)
+
+    it("leaves a vendor and guild bank switched off as they are when the bags switch", function()
+      nextOn = true
+      start()
+      local vendor, guild = addon.Vendor, addon.Bags.GuildBank
+      bagSystem:SetVendorEnabled(ctx(), false)
+      bagSystem:SetGuildBankEnabled(ctx(), false)
+      assert.is_true(bagSystem:Switch(ctx(), "classic"))
+      assert.are.equal(1, calls.giveBack, "given back once, when switched off")
+      assert.are.equal(1, calls.guildGiveBack)
+      assert.is_true(bagSystem:Switch(ctx(), "next"))
+      assert.is_nil(addon.Vendor)
+      assert.is_nil(addon.Bags.GuildBank)
+      assert.are.same({ "deactivate" }, vendor.log, "not caught up while off")
+      assert.are.same({ "deactivate" }, guild.log)
+      assert.are.equal(1, #calls.takeOver)
+      assert.are.equal(1, #calls.guildTakeOver)
+      assert.is_true(bagSystem:SetVendorEnabled(ctx(), true))
+      assert.are.equal(vendor, addon.Vendor)
+      assert.are.same({ "deactivate", "activate" }, vendor.log)
+    end)
+
+    it("makes a vendor switched on while the classic bags were in use once BetterBags Next is back", function()
+      nextOn, vendorOn = true, false
+      start()
+      bagSystem:Switch(ctx(), "classic")
+      bagSystem:SetVendorEnabled(ctx(), true)
+      bagSystem:Switch(ctx(), "next")
+      assert.are.equal("vendor", addon.Vendor.kind)
+      assert.are.same({}, addon.Vendor.log, "made, nothing to catch up on")
+      assert.are.same({ _G.BetterBagsSneakyFrame }, calls.takeOver)
+      assert.are.equal(1, listed("BagSystemSpecnextvendor"))
     end)
   end)
 end)

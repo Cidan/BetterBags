@@ -73,7 +73,19 @@ Manages all persistent data storage and settings using AceDB-3.0.
 - **Category Management**: Custom category creation, deletion, and item assignment
 - **Filter Settings**: Category filters, stacking options, sorting preferences
 - **Item Settings**: Item level display, new item marking, item locking, and per-character max item level tracking (emits `itemLevel/MaxChanged` for color refresh)
+- **Design and Integration Switches**: `GetNextEnabled`; BetterBags Next's vendor and guild bank windows
+  (`GetNextVendorEnabled`, `GetNextGuildBankEnabled`, `.claude/rules/next-bagsystem.md` §11g); the QuickFind
+  integration (`GetQuickFindEnabled`, `.claude/rules/quickfind.md`); each on by default but BetterBags Next
 - **Migration**: Handles database schema updates between versions (`DB:Migrate`, run at every load). Among them, `RenameRepeatedTypeCategories` moves the hidden state (`categoryOptions`), pinned order (`customSectionSort`) and group assignments (`categoryToGroup`) saved under a built-in category name that repeated its item type ("Quest - Quest") to its current name ("Quest"), skipping custom categories and keeping a setting already saved under the current name. Migrations never drop a pin because its category has no stored filter: built-in categories have none (issue #1107, `.claude/rules/category-lifecycle.md` §3)
+
+### bagsystem.lua
+
+Makes the bags in one of the two designs, the classic bags or BetterBags Next, each in an event scope of its own,
+and switches between them without a reload (`Switch`, `.claude/rules/next-bagsystem.md` §11). With BetterBags Next
+in use, its vendor and guild bank, which stand in for Blizzard's merchant and guild bank frames, are each switched
+off and on at once (`SetVendorEnabled`, `SetGuildBankEnabled`, §11g): off, the panel answers nothing and Blizzard's
+frame shows the vendor or the guild bank. Every switch is refused in the places a frame would change hands open
+(at a vendor, at the guild bank; the design switch also in combat and at the bank).
 
 ### events.lua
 

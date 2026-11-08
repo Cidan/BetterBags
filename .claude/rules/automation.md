@@ -87,8 +87,9 @@ Vendor rule.
 - **Only the categories that do not confirm** (Confirm Auto Sell off) sell on their own when the
   merchant opens. A category that confirms waits for the player: in BetterBags Next its section is docked
   in the vendor (§4), the same box a dragged section's sale waits in; the classic design has no such box,
-  so it is left to the player's usual Move Categories right click on its title (never a dialog of its
-  own: one interface for one action, CLAUDE.md "UI Consistency" 5).
+  and neither has BetterBags Next with Enable Vendor Window off (next-bagsystem.md §11g: Blizzard's merchant frame shows
+  the vendor), so it is left to the player's usual Move Categories right click on its title (never a dialog of its
+  own: one interface for one action, CLAUDE.md "UI Consistency" 5). Both settings' descriptions say so.
 - **Waiting for answers.** With an item in the backpack whose upgrade state its provider cannot tell yet (`upgradeUnknown`, caches.md §2a) a
   sale waits, at most 10 s, looking 4 times a second, then lists what it sells again, and sells what it knows when the time is up (a sale is one
   list: what it left out would wait for the next visit). Any such item, in a selling category or not: an answer is what puts an item in a rule
@@ -124,7 +125,8 @@ Vendor rule.
   one). An item destroyed shows on the card until the bags are read again; a second click skips it.
 - **Where a player destroys:** at a merchant in BetterBags Next, in the vendor's dock (below); anywhere,
   the **Destroy Next Item** key binding (Bindings.xml, `BetterBags_DestroyNextItem`, Key Bindings >
-  BetterBags). The classic design's merchant (Blizzard's frame) has no dock.
+  BetterBags). The classic design's merchant (Blizzard's frame) has no dock, nor has BetterBags Next's with Enable
+  Vendor Window off.
 
 ### 4a. At a BetterBags Next vendor: categories docked in it (`NextVendor:OfferAutomation`)
 

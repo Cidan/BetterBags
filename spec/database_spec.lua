@@ -96,6 +96,9 @@ const.DATABASE_DEFAULTS = {
     animateItemMovement = false,
     clampBagsToScreen = false,
     nextEnabled = false,
+    nextVendorEnabled = true,
+    nextGuildBankEnabled = true,
+    quickFindEnabled = true,
     nextChain = "apart",
     nextTabOrder = {},
     nextIconScale = 100,
@@ -268,6 +271,30 @@ describe("Database", function()
     it("GetShowBankTabs / SetShowBankTabs", function()
       DB:SetShowBankTabs(true)
       assert.is_true(DB:GetShowBankTabs())
+    end)
+
+    it("GetNextVendorEnabled / SetNextVendorEnabled, on until turned off", function()
+      assert.is_true(DB:GetNextVendorEnabled())
+      DB:SetNextVendorEnabled(false)
+      assert.is_false(DB:GetNextVendorEnabled())
+      DB:SetNextVendorEnabled(true)
+      assert.is_true(DB:GetNextVendorEnabled())
+    end)
+
+    it("GetNextGuildBankEnabled / SetNextGuildBankEnabled, on until turned off", function()
+      assert.is_true(DB:GetNextGuildBankEnabled())
+      DB:SetNextGuildBankEnabled(false)
+      assert.is_false(DB:GetNextGuildBankEnabled())
+      DB:SetNextGuildBankEnabled(true)
+      assert.is_true(DB:GetNextGuildBankEnabled())
+    end)
+
+    it("GetQuickFindEnabled / SetQuickFindEnabled, on until turned off", function()
+      assert.is_true(DB:GetQuickFindEnabled())
+      DB:SetQuickFindEnabled(false)
+      assert.is_false(DB:GetQuickFindEnabled())
+      DB:SetQuickFindEnabled(true)
+      assert.is_true(DB:GetQuickFindEnabled())
     end)
 
     it("GetNextEnabled / SetNextEnabled, off until turned on", function()

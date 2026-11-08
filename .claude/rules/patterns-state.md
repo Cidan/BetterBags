@@ -4,7 +4,7 @@ paths:
   - "views/*.lua"
   - "bags/**/*.lua"
   - "frames/{bag,item,tabs}.lua"
-  - "core/{events,async,database}.lua"
+  - "core/{events,async,database,bagsystem}.lua"
   - "integrations/quickfind.lua"
 ---
 # State Management and Architecture Patterns
@@ -237,6 +237,19 @@ the result rests on, to see the enumeration can fail.
 
 ## Settings Are Not Readable Once the Player Logs Out
 AceDB strips every setting still at its default from the profile at `PLAYER_LOGOUT`, right after it fires `OnDatabaseShutdown`, so a setting read after that can be nil and a table of settings can be gone. Frames still get scripts then (a classic bag window was resized after it, `.claude/rules/initialization.md` §7). Gate at the entry point rather than in every getter: the shutdown callback sets `addon.loggingOut`, and the script wrappers (`addon.SetScript`, `addon.HookScript`) run nothing while it is set. Never put the defaults back after the strip: they would be written into the saved variables, which the strip exists to prevent.
+
+## Switch Off One Part of a Live Design at Its Entry Points, Not by Unhooking It
+**Problem:** a part of a design (BetterBags Next's vendor or guild bank, next-bagsystem.md §11g) must be switched off by itself
+while the rest of its design stays in use. Its registrations live in the design's event scope (events:InScope), which stays
+on, so it keeps hearing every event; and a scope of its own would miss the theme, scale and size messages its design keeps
+sending, coming back stale.
+**Pattern:** keep it made and registered, mark it off in its own `Deactivate` (which also hides it and lets go of its
+buttons), clear the mark in `Activate`, and return early only from the handlers that start or end what it stands in for
+(the vendor's `OnMerchantShow` and `OnMerchantClosed`; the guild bank's tab and visit-end messages). Handlers that act only
+while it shows need nothing. Hand the Blizzard frame it stood in for back (`GiveBack`) and point the addon's reference at
+nil, so every reader takes the path it takes when that part does not exist (the classic design's). Make it only when first
+switched on, in the design's scope, so it unhooks with the design. Refuse the switch wherever a frame would change hands
+open, as the design switch does.
 
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point

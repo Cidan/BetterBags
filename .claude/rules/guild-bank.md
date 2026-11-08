@@ -150,6 +150,17 @@ visit (another panel on the left, Escape through `CloseWindows`). `GiveBack` put
 `UIParent` with its `OnHide` when Next is switched off (refused at the guild bank). With the classic
 bags the hooks do nothing.
 
+**Enable Guild Bank Window off** (next-bagsystem.md §11g, #1262): the bag system switches the guild bank off by itself
+while Next stays in use, away from the guild bank only: `guildProto:Deactivate` marks the panel `off` (then hides it and
+lets go of its buttons) and `GiveBack` puts Blizzard's frame back with its `OnHide`, so its `ShowUIPanel` hook leaves the
+next visit to Blizzard's frame (`active` false). `addon.Bags.GuildBank` is nil meanwhile, so the refresh opens and reads
+nothing (`refresh:_OpenGuildBank`, as with the classic bags). The data source still says the visit's messages: while
+`off`, the panel neither follows `guildbank/TabsChanged` (it would put a tab shown by itself back to All Tabs, writing
+`showGuildBankTabs`) nor `guildbank/Closed` (Blizzard's frame closes its own dialogs). `guildProto:Activate` clears `off`
+and catches up as every panel does; `TakeOver` takes the frame at the next visit. Coverage:
+`spec/next/guildbank_spec.lua` ("switched off"), `spec/integration/guild_bank_spec.lua` (a visit in Blizzard's frame while
+off, BetterBags Next's again once on).
+
 **The panel** (`next/guildbank.lua`): a `NextPanel` on the left, `kind = GUILD`, the backpack's
 companion (it chains as the bank does), in the guild's green (`style.Color.GuildWash`, the guild
 tabs' accent `style.Color.Guild`).

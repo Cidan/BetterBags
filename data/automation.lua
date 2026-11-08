@@ -269,8 +269,9 @@ end
 -- OnMerchantShow sells, when a merchant opens, what either action holds that merchants buy in the
 -- categories that do not confirm their sale (Confirm Auto Sell off), from the frame after it opens
 -- (StartSale), or once a provider can tell about the items it cannot yet. A category that confirms waits
--- in BetterBags Next's vendor dock for the player (§4); the classic design has no dock and leaves it to
--- the player. Holding Shift as it opens sells nothing. It returns what it did, for profiler traces.
+-- in BetterBags Next's vendor dock for the player (§4); the classic design, and BetterBags Next with Enable
+-- Vendor Window off, have no dock and leave it to the player. Holding Shift as it opens sells nothing. It
+-- returns what it did, for profiler traces.
 ---@param ctx Context
 ---@return string
 function automation:OnMerchantShow(ctx)
