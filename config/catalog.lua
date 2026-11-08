@@ -285,6 +285,44 @@ define('nextEnabled', {
   end,
 })
 
+-- BetterBags Next's vendor and guild bank (next-bagsystem.md §11g), each switched at once; refused at a vendor or the
+-- guild bank, whose frames would change hands open, leaving the setting as it was.
+define('nextVendor', {
+  kind = "toggle",
+  title = 'Enable Vendor Window',
+  description = 'If enabled, BetterBags Next shows vendors in its own window, their items in your categories. '
+    .. 'If disabled, the default Blizzard vendor window is used, and a category whose Auto Sell confirms is sold by '
+    .. 'right-clicking its title, as with the classic bags. Switches at once, away from vendors.',
+  keywords = { 'vendor', 'merchant', 'shop', 'blizzard vendor' },
+  get = function() return db:GetNextVendorEnabled() end,
+  set = function(ctx, value)
+    return addon:GetModule('BagSystem'):SetVendorEnabled(ctx, value) and true or false
+  end,
+})
+
+define('nextGuildBank', {
+  kind = "toggle",
+  title = 'Enable Guild Bank Window',
+  description = 'If enabled, BetterBags Next shows the guild bank in its own window, its items in your categories. '
+    .. 'If disabled, the default Blizzard guild bank window is used. Switches at once, away from the guild bank.',
+  keywords = { 'guild bank', 'guild', 'blizzard guild bank' },
+  get = function() return db:GetNextGuildBankEnabled() end,
+  set = function(ctx, value)
+    return addon:GetModule('BagSystem'):SetGuildBankEnabled(ctx, value) and true or false
+  end,
+})
+
+-- The QuickFind integration (integrations/quickfind.lua, quickfind.md): its source stays registered and is empty while
+-- off, so it follows the switch at once.
+define('quickFind', {
+  kind = "toggle",
+  title = 'Enable QuickFind Integration',
+  description = 'If enabled, the items in your backpack and bank can be found from the QuickFind addon.',
+  keywords = { 'quickfind', 'quick find', 'integration' },
+  get = function() return db:GetQuickFindEnabled() end,
+  set = function(_, value) db:SetQuickFindEnabled(value) end,
+})
+
 define('upgradeProvider', {
   kind = "dropdown",
   title = 'Upgrade Icon Provider',

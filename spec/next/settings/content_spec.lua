@@ -341,8 +341,8 @@ describe("NextSettingsContent", function()
 
     it("puts the bags' general settings on General, the classic bags' own only for them", function()
       assert.are.same({
-        { "General", "Bags", { "nextEnabled", "enableBankBags", "showBagButton", "clampBagsToScreen",
-          "bagFading [classic]", "animateItemMovement [classic]" } },
+        { "General", "Bags", { "nextEnabled", "enableBankBags", "nextVendor [next]", "nextGuildBank [next]", "showBagButton",
+          "clampBagsToScreen", "bagFading [classic]", "animateItemMovement [classic]" } },
         { "General", "Search", { "inBagSearch", "enterToMakeCategory [classic]" } },
         { "General", "Items", { "upgradeProvider", "newItemDuration", "categorySell" } },
         { "General", "What's New", { "changelogOnLogin" } },
@@ -442,7 +442,7 @@ describe("NextSettingsContent", function()
         nextTitleCloud = true, nextTitleRibbon = true, nextBraid = true, nextOrnamentMotion = true, nextGlitch = true,
         nextRain = true, nextShatter = true, nextSnow = true, nextSmoke = true, nextBats = true, nextBeam = true,
         nextPaper = true, nextStopMotion = true, nextGlassRain = true, nextLightning = true, nextSheen = true,
-        nextGlassTint = true,
+        nextGlassTint = true, nextVendor = true, nextGuildBank = true,
         nextCurrencyCapBars = true, nextCurrencyGains = true, nextCurrencyHideEmpty = true,
         nextCurrencyItemsEverywhere = true, nextCurrencyTracker = true, nextCurrencyLayout = true,
         nextCurrencyScale = true, nextCurrencyBackground = true, nextCurrencyHideInCombat = true,
@@ -472,9 +472,9 @@ describe("NextSettingsContent", function()
           end
         end
       end
-      -- The general pages' 35 (Glass Tint and the glass theme's three switches the latest, next-themes-glass.md §26), the
-      -- Currencies page's 10 (currency.md §6), and each bag's 34.
-      assert.are.equal(35 + 10 + 3 * 34, named)
+      -- The general pages' 38 (Enable Vendor Window, Enable Guild Bank Window and Enable QuickFind Integration the latest,
+      -- #1262), the Currencies page's 10 (currency.md §6), and each bag's 34.
+      assert.are.equal(38 + 10 + 3 * 34, named)
     end)
 
     it("shows the bank's Layout without the backpack's Enable Groups", function()
@@ -877,11 +877,73 @@ describe("NextSettingsContent", function()
     end)
   end)
 
+  -- Enable Vendor Window and Enable Guild Bank Window (#1262): BetterBags Next's, the guild bank's only on a client
+  -- with one, as its page is.
+  describe("the vendor and guild bank windows", function()
+    -- What General's settings read (config/catalog.lua), as a fresh profile has them.
+    before_each(function()
+      local function per(value)
+        return function() return value end
+      end
+      for name, value in pairs({
+        GetNextEnabled = per(true), GetEnableBankBag = per(true), GetNextVendorEnabled = per(true),
+        GetNextGuildBankEnabled = per(true), GetShowBagButton = per(true), GetClampBagsToScreen = per(false),
+        GetEnableBagFading = per(false), GetAnimateItemMovement = per(false), GetInBagSearch = per(true),
+        GetEnterToMakeCategory = per(true), GetCategorySell = per(false), GetChangelogAutoOpen = per(true),
+        GetData = per({ profile = { newItemTime = 300 } }),
+      }) do
+        override(db, name, value)
+      end
+      override(addon:GetModule("Items"), "GetActiveUpgradeProvider", per("None"))
+    end)
+
+    -- shown says whether the page lays out the row titled so (a row its hidden function hides is made, not shown).
+    local function shown(title)
+      local row = rowTitled(title)
+      return row ~= nil and row.frame:IsShown()
+    end
+
+    it("shows Enable Guild Bank Window only on a client with a guild bank", function()
+      settings:Open("general")
+      render:Flush()
+      assert.is_true(shown("Enable Vendor Window"))
+      assert.is_false(shown("Enable Guild Bank Window"))
+      settings:Close()
+      addon.hasGuildBank = true
+      settings:Open("general")
+      render:Flush()
+      assert.is_true(shown("Enable Vendor Window"))
+      assert.is_true(shown("Enable Guild Bank Window"))
+    end)
+
+    it("shows neither while the classic bags are in use", function()
+      design = "classic"
+      addon.hasGuildBank = true
+      settings:Open("general")
+      render:Flush()
+      assert.is_false(shown("Enable Vendor Window"))
+      assert.is_false(shown("Enable Guild Bank Window"))
+    end)
+  end)
+
   describe("QuickFind", function()
-    it("says what the integration does", function()
+    -- Its switch is in its integration's page (asked: "quickfind integration toggle should be in it's integration
+    -- entry"), first, then what the integration does.
+    it("switches the integration first, then says what it does", function()
+      local on = true
+      override(db, "GetQuickFindEnabled", function() return on end)
+      override(db, "SetQuickFindEnabled", function(_, value) on = value end)
       settings:Open("quickfind")
-      assert.is_true(#rowsShown() >= 2)
-      assert.is_true(rowsShown()[1].label:GetText():find("QuickFind") ~= nil)
+      assert.are.same({ "QuickFind", "How it works" }, (function()
+        local titles = {}
+        for _, section in ipairs(settings.page.sections) do table.insert(titles, section.title) end
+        return titles
+      end)())
+      local row = rowsShown()[1]
+      assert.are.equal("Enable QuickFind Integration", row.label:GetText())
+      assert.is_true(row.control:GetChecked())
+      assert.is_true(#rowsShown() >= 4)
+      assert.is_true(rowsShown()[2].label:GetText():find("QuickFind") ~= nil)
     end)
   end)
 
@@ -1180,7 +1242,8 @@ describe("NextSettingsContent", function()
         GetInBagSearch = per(true), GetItemLevelColors = per(colors), GetItemLevelOptions = per({ enabled = true, color = true }),
         GetItemSortType = per(1), GetMarkRecentItems = per(false), GetMaxItemLevel = per(1), GetNextBagScale = per(100),
         GetNextEnabled = per(design == "next"), GetNextIconScale = per(100), GetNextFitNamesWhileOpen = per(false),
-        GetNextAutosize = per(true),
+        GetNextAutosize = per(true), GetNextVendorEnabled = per(true), GetNextGuildBankEnabled = per(true),
+        GetQuickFindEnabled = per(true),
         GetPreserveItemGaps = per(true),
         GetSectionSortType = per(1), GetShowAllFreeSpace = per(false), GetShowBagButton = per(true),
         GetShowFullSectionNames = per(false), GetShowNewItemFlash = per(false), GetStackingOptions = per(stacking),

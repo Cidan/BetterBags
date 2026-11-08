@@ -81,6 +81,7 @@ local DIALOGS = { "GUILDBANK_DEPOSIT", "GUILDBANK_WITHDRAW", "CONFIRM_BUY_GUILDB
 ---@field shownTab? number The container of the tab shown by itself, nil while every tab shows.
 ---@field closeRequested boolean It asked the guild bank to close.
 ---@field wipeWhenHidden boolean The visit ended while the panel slid out: let go of its buttons once hidden.
+---@field off? boolean Switched off (Deactivate): it follows no visit, Blizzard's guild bank frame shows the guild bank.
 local guildProto = nextPanel:Extend({}, 'NextGuildBankPanel')
 
 ---@param ctx Context
@@ -533,18 +534,38 @@ function guildProto:OnGuildBankClosed(ctx)
 end
 
 -- WatchKind follows the guild bank: its tabs (names, permissions, a tab bought), its gold, and the end
--- of the visit.
+-- of the visit. Switched off, it neither switches its tabs nor closes Blizzard's dialogs: Blizzard's
+-- guild bank frame shows the visit.
 function guildProto:WatchKind()
   events:RegisterMessage('guildbank/TabsChanged', function(ctx)
-    self:OnTabsChanged(ctx)
+    if not self.off then
+      self:OnTabsChanged(ctx)
+    end
   end)
   events:RegisterMessage('guildbank/MoneyChanged', function()
     self.moneyFrame:Update()
     self:UpdateHeader()
   end)
   events:RegisterMessage('guildbank/Closed', function(ctx)
-    self:OnGuildBankClosed(ctx)
+    if not self.off then
+      self:OnGuildBankClosed(ctx)
+    end
   end)
+end
+
+-- Deactivate switches the guild bank off, with BetterBags Next or by itself (Enable Guild Bank Window, next-bagsystem.md §11g): it
+-- hides at once and lets go of its buttons, and follows no visit until Activate.
+---@param ctx Context
+function guildProto:Deactivate(ctx)
+  self.off = true
+  nextPanel.proto.Deactivate(self, ctx)
+end
+
+-- Activate switches the guild bank on again, catching up as every panel does.
+---@param ctx Context
+function guildProto:Activate(ctx)
+  self.off = false
+  nextPanel.proto.Activate(self, ctx)
 end
 
 -- OnTabsChanged lists the tabs again, going back to every tab when the one shown is gone or closed to

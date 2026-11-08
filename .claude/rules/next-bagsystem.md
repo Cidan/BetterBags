@@ -30,7 +30,8 @@ inactive design's frames, which are hidden and so never run; Sonata's registrati
 windows (decorated again only when a theme is applied); `NextDrag`'s registry of panels and
 sellers (it skips hidden ones); the hook on Blizzard's merchant frame's `Hide` (it cannot be taken
 off; with Next off it does nothing, next-vendor.md §10a), and the guild bank's hooks on `ShowUIPanel` and its frame's
-`Hide` (the same, guild-bank.md §5).
+`Hide` (the same, guild-bank.md §5). A vendor or guild bank switched off by itself while Next is in use (§11g) stays made
+and registered in Next's scope; it answers nothing (`off`).
 
 ### 11b. The switch (`BagSystem:Switch(ctx, design)`)
 
@@ -48,8 +49,10 @@ off; with Next off it does nothing, next-vendor.md §10a), and the guild bank's 
    bank frame, with its `OnHide` (`NextGuildBank:GiveBack`).
 3. **The other design**: made the first time (`CreateBackpack`, `CreateRest`, `Finish`: title,
    `UISpecialFrames`; the bag-bar highlight hooks, `addon:WatchBackpackFrame`; ConsolePort's
-   cursor frames), else its scope switched back on, Next taking the merchant frame and the guild
-   bank's again (`TakeOver`, hooking each once), and each bag catching up (`Activate`): what its
+   cursor frames), else its scope switched back on, Next making a vendor or guild bank switched on while the classic
+   bags were in use (`makeMissing`, §11g), taking the merchant frame and the guild
+   bank's again (`TakeOver`, hooking each once; only those switched on), and each bag that was made catching up
+   (`Activate`; one switched off stays off, and one just made has nothing to catch up on): what its
    handlers would have done while unhooked. Classic: the search box's setting, its behavior's
    `Resync` (the backpack lists its groups as tabs; the retail bank its tabs and Purchase Bank
    button; the Classic and Era banks nothing, they have no bank events), the money, the
@@ -57,7 +60,8 @@ off; with Next off it does nothing, next-vendor.md §10a), and the guild bank's 
    money; the bank its Purchase Bank button on retail; the vendor nothing (the next vendor that
    opens draws everything).
 4. **Taking over**: `addon.Bags.Backpack`, `addon.Bags.Bank`, `addon.Bags.GuildBank` and `addon.Vendor` become the new
-   design's, the setting is saved (`database:SetNextEnabled`), the backpack's `loaded` flag (and
+   design's (`useBags`: the guild bank and the vendor only while switched on, else nil, §11g), the setting is saved
+   (`database:SetNextEnabled`), the backpack's `loaded` flag (and
    the bank's) carries over, and the backpack draws the data last read
    (`items:GetAllSlotInfo()[BACKPACK]`; no bag is read again) and opens if the old one was open:
    shown and not closing (`IsClosing`: the classic window fading out, Next's panel sliding out; a
@@ -144,3 +148,56 @@ styled (`OnDecorated`, `SizeMode`, `Size`, the minimums, `Opacity`, `Scale`) run
 do nothing until it does. The specs had missed it because `spec/bagsystem_spec.lua` uses stand-in
 bags and no spec ran the real `bagFrame:Create` after a theme was applied; the whole-addon spec
 reproduces the error exactly without the fix.
+
+### 11g. The vendor and guild bank alone (Enable Vendor Window, Enable Guild Bank Window)
+
+Asked (#1262, from Discord): "Allow users to toggle off BetterBags' custom vendor/merchant frames so that the default
+Blizzard vendor/merchant window is used instead", then "live always", and the guild bank too, "and should do this live".
+#1188 had asked the same for the vendor first (Profession Shopping List's button on Blizzard's frame); the Shopping List
+integration came instead and the switch did not. With BetterBags Next in use, each of its two panels that stand in for a
+Blizzard frame can be switched off by itself, at once, Blizzard's frame showing the vendor or the guild bank as it does
+with the classic bags.
+
+- **Settings** (`config/catalog.lua`): `nextVendor` (Enable Vendor Window) and `nextGuildBank` (Enable Guild Bank Window),
+  saved as `nextVendorEnabled` and `nextGuildBankEnabled` (on by default: Next as before), on General > Bags, Next only
+  (`design = "next"`), the guild bank's only on a client with one (`hidden`, as its page). Each `set` calls
+  `BagSystem:SetVendorEnabled` / `SetGuildBankEnabled` and returns false when refused, so the row shows the setting again
+  (next-settings.md §3). No reload.
+- **`SetVendorEnabled(ctx, on)` / `SetGuildBankEnabled(ctx, on)`** refuse at a vendor (`atVendor`: Blizzard's merchant
+  frame shown, or Next's vendor at one; Switch's own check) and at the guild bank (`addon.atGuildBank`), with Blizzard's
+  error text, for the reason Switch refuses (§11b 1: a shown frame reparented to a visible parent runs Blizzard's OnShow
+  from our code). Otherwise they save the setting and `apply` it.
+- **`apply(ctx, key)`**, only while Next is in use (with the classic bags in use there is nothing to change; Next follows
+  the setting when switched to): on, the panel is made the first time (`make`: in Next's event scope, so it unhooks with
+  the design; listed in `UISpecialFrames`; the guild bank added to ConsolePort, as Switch adds it), else caught up
+  (`Activate`), then its module takes Blizzard's frame (`TakeOver`); off, the panel hides at once and lets go of its
+  buttons (`Deactivate`) and its module gives the frame back (`GiveBack`). Then `useBags` points `addon.Vendor` and
+  `addon.Bags.GuildBank` at it, or nil.
+- **Made only while on.** `CreateRest` makes the vendor and the guild bank only while switched on (`vendorInUse`,
+  `guildInUse`, the latter only with `addon.hasGuildBank`); `takeOver`, `giveBack` and `others` (what Switch deactivates
+  and catches up) count only those switched on: one switched off already gave its frame back and was deactivated then.
+  A Next set made without one that was switched on meanwhile makes it as Next comes back (`makeMissing`), after listing
+  what to catch up, so the new panel is not caught up.
+- **A panel switched off stays made and registered** in Next's scope, and answers nothing: `Deactivate` marks it `off`
+  (vendor: `OnMerchantShow` and `OnMerchantClosed` return, next-vendor.md §10a; guild bank: `guildbank/TabsChanged` and
+  `guildbank/Closed`, guild-bank.md §5), `Activate` clears it. So it keeps up with themes, scales and sizes like a closed
+  panel, and comes back as it was. Its other handlers already act only while it shows (the vendor's draws and offers,
+  the guild bank's gold). With it nil, every reader of `addon.Bags.GuildBank` (`refresh:_OpenGuildBank`, Rederive, the
+  guild read's draw, drags) takes the classic path, and `addon.Vendor` is read only by the refusals.
+- **What a player gives up** with the vendor window off is what the classic bags do without (automation.md §3, §4, UI
+  Consistency 5: the edge case is left out of the common interface, not given one of its own): a category whose Auto
+  Sell confirms has no dock to wait in, and is sold by right-clicking its title (Move Categories, with Enable Category
+  Sell and Deposit, `frames/section.lua` `MoveItems`, which sells whenever Blizzard's merchant frame is shown); destroying
+  is the **Destroy Next Item** binding; dragging a section onto the vendor and the Shopping List section go (Profession
+  Shopping List's own button on Blizzard's frame comes back). The setting's description and Confirm Auto Sell's say so.
+- **Not seen in game.** To check: switch each off and on away from a vendor and the guild bank, then visit; switch at a
+  vendor and at the guild bank (refused); `/console taintLog 1` while buying, selling and depositing with each switched
+  off. Coverage: `spec/bagsystem_spec.lua` ("the vendor and guild bank windows": made only while on, off and on at once,
+  made later in Next's scope and listed once, the guild bank for the cursor, refusals, saved only with the classic bags,
+  left as they are across switches, made when Next comes back), `spec/next/vendor_spec.lua` and
+  `spec/next/guildbank_spec.lua` ("switched off"), `spec/config/catalog_spec.lua`, `spec/next/settings/content_spec.lua`,
+  `spec/core/constants_spec.lua`, `spec/database_spec.lua`, and on the whole addon `spec/integration/bag_switch_spec.lua`
+  ("the vendor window": Blizzard's merchant frame changing hands, a vendor made later listening as a fresh start does)
+  and `spec/integration/guild_bank_spec.lua` (a visit in Blizzard's frame while off, BetterBags Next's again once on).
+  27 mutations of the new guards, all caught. The bug review (logic, races, drawing) found no bug; its one finding was
+  the Auto Sell consequence above, now said in the descriptions.

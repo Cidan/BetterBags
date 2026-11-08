@@ -727,6 +727,10 @@ const.DATABASE_DEFAULTS = {
     -- Whether every bag is kept on the screen (window.md §3a): off, bags may be moved off it.
     clampBagsToScreen = false,
     nextEnabled = false,
+    -- Whether BetterBags Next's vendor and guild bank stand in for Blizzard's merchant and guild bank frames (Enable
+    -- Vendor Window, Enable Guild Bank Window; next-bagsystem.md §11g); off, Blizzard's frame shows the vendor or the guild bank.
+    nextVendorEnabled = true,
+    nextGuildBankEnabled = true,
     -- How BetterBags Next's backpack and its companion (the bank or a vendor) sit: "apart" on
     -- opposite edges, chained "left" (the companion at the left edge, the backpack beside it) or
     -- "right" (the backpack at the right edge, the companion beside it). next.md §12.
@@ -778,6 +782,8 @@ const.DATABASE_DEFAULTS = {
     showGuildBankTabs = false,
     debug = false,
     inBagSearch = true,
+    -- Whether the items in the backpack and bank can be found from the QuickFind addon (quickfind.md).
+    quickFindEnabled = true,
     categorySell = false,
     showKeybindWarning = true,
     enterToMakeCategory = true,

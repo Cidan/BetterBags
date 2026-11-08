@@ -86,3 +86,73 @@ describe("QuickFind bank tab classification", function()
     assert.has_no.errors(function() quickfind:ShowInBag("bank:-1_1") end)
   end)
 end)
+
+-- Enable QuickFind Integration (#1262, quickfind.md): BetterBags' items are a QuickFind source whenever QuickFind is
+-- loaded, since QuickFind has no way to take a source back (its API.lua: RegisterSource only), and the source is
+-- empty while the integration is off, so the switch takes effect at once.
+describe("QuickFind integration switch", function()
+  local saved, on, registered, printed
+
+  local function override(tbl, key, value)
+    table.insert(saved, { tbl, key, rawget(tbl, key) })
+    tbl[key] = value
+  end
+
+  before_each(function()
+    saved, on, registered, printed = {}, true, {}, {}
+    override(database, "GetQuickFindEnabled", function() return on end)
+    -- QuickFind's public table (QuickFind/init.lua, API.lua): its lookup types and RegisterSource.
+    override(_G, "QuickFind", {
+      LOOKUP_TYPE = { SPELL = "SPELL", TOY = "TOY", ITEM = "ITEM", MOUNT = "MOUNT", LUA = "LUA" },
+      RegisterSource = function(_, source)
+        table.insert(registered, source)
+        return true
+      end,
+    })
+    override(_G, "print", function(...) table.insert(printed, table.concat({ ... }, " ")) end)
+    override(items, "GetAllSlotInfo", function()
+      return {
+        [const.BAG_KIND.BACKPACK] = { itemsBySlotKey = {
+          ["0_1"] = { slotkey = "0_1", bagid = 0, slotid = 1, itemInfo = { itemName = "Ore", itemIcon = 1 } },
+        } },
+        [const.BAG_KIND.BANK] = { itemsBySlotKey = {
+          ["6_1"] = { slotkey = "6_1", bagid = 6, slotid = 1, itemInfo = { itemName = "Gems", itemIcon = 2 } },
+        } },
+      }
+    end)
+  end)
+
+  after_each(function()
+    for i = #saved, 1, -1 do
+      saved[i][1][saved[i][2]] = saved[i][3]
+    end
+  end)
+
+  it("registers BetterBags' items as a source while the integration is off too, to follow it being turned on", function()
+    on = false
+    quickfind:OnEnable()
+    assert.are.equal(1, #registered)
+    assert.are.equal("BetterBags Items", registered[1].name)
+  end)
+
+  it("gives QuickFind the bags' items while on, and none while off", function()
+    quickfind:OnEnable()
+    local names = {}
+    for _, entry in ipairs(registered[1].get()) do table.insert(names, entry.name) end
+    table.sort(names)
+    assert.are.same({ "Gems", "Ore" }, names)
+    on = false
+    assert.are.same({}, registered[1].get())
+    assert.are.same({}, quickfind:GetItemResults())
+    on = true
+    assert.are.equal(2, #registered[1].get())
+  end)
+
+  it("says at login that the integration is enabled only while it is on", function()
+    quickfind:OnEnable()
+    assert.are.same({ "BetterBags: QuickFind integration enabled." }, printed)
+    on = false
+    quickfind:OnEnable()
+    assert.are.same({ "BetterBags: QuickFind integration enabled." }, printed, "nothing more")
+  end)
+end)

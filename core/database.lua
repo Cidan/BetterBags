@@ -235,6 +235,30 @@ function DB:SetNextEnabled(enabled)
   DB.data.profile.nextEnabled = enabled
 end
 
+-- GetNextVendorEnabled returns whether BetterBags Next's vendor stands in for Blizzard's merchant frame (Enable Vendor
+-- Window, next-bagsystem.md §11g). On unless turned off.
+---@return boolean
+function DB:GetNextVendorEnabled()
+  return DB.data.profile.nextVendorEnabled
+end
+
+---@param enabled boolean
+function DB:SetNextVendorEnabled(enabled)
+  DB.data.profile.nextVendorEnabled = enabled
+end
+
+-- GetNextGuildBankEnabled returns whether BetterBags Next's guild bank stands in for Blizzard's guild bank frame (Enable
+-- Guild Bank Window, next-bagsystem.md §11g). On unless turned off.
+---@return boolean
+function DB:GetNextGuildBankEnabled()
+  return DB.data.profile.nextGuildBankEnabled
+end
+
+---@param enabled boolean
+function DB:SetNextGuildBankEnabled(enabled)
+  DB.data.profile.nextGuildBankEnabled = enabled
+end
+
 ---@alias NextChainLayout "apart"|"left"|"right"
 
 -- GetNextChain returns how BetterBags Next's backpack and its companion (the bank or a vendor) sit:
@@ -1239,6 +1263,18 @@ end
 ---@return boolean
 function DB:GetInBagSearch()
   return DB.data.profile.inBagSearch
+end
+
+-- GetQuickFindEnabled returns whether the items in the backpack and bank can be found from the QuickFind addon
+-- (quickfind.md). On unless turned off.
+---@return boolean
+function DB:GetQuickFindEnabled()
+  return DB.data.profile.quickFindEnabled
+end
+
+---@param enabled boolean
+function DB:SetQuickFindEnabled(enabled)
+  DB.data.profile.quickFindEnabled = enabled
 end
 
 ---@param enabled boolean
