@@ -63,6 +63,7 @@ local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 ---@field wipeWhenHidden boolean The bank closed while the panel slid out: clear it once hidden.
 ---@field endingInteraction boolean It is ending the bank interaction.
 local bankProto = nextPanel:Extend({}, 'NextBankPanel')
+bankProto.categorizes = true
 
 ---@return BankSlots?
 local function bankSlots()

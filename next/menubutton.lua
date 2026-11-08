@@ -66,8 +66,19 @@ function menuButton:Create(panel)
   addon.SetScript(frame, "OnLeave", function()
     b:Light(false)
   end)
+  -- An item dropped or clicked on it goes in a category, where the theme takes it here (Header.ItemDrop: Plain's), as
+  -- the original bags' button made a category of one.
   addon.SetScript(frame, "OnClick", function(ctx)
+    if GetCursorInfo() == "item" and panel:ItemDropTarget() == "Menu" then
+      panel:PickCategory(ctx, frame)
+      return
+    end
     b:Open(ctx)
+  end)
+  addon.SetScript(frame, "OnReceiveDrag", function(ctx)
+    if panel:ItemDropTarget() == "Menu" then
+      panel:PickCategory(ctx, frame)
+    end
   end)
   return b
 end
@@ -219,8 +230,8 @@ function buttonProto:Paint()
   self:Style()
 end
 
--- Light fades the highlight in under the pointer (and says what a click does, as the original bags' button did) and
--- out after.
+-- Light fades the highlight in under the pointer (and says what a click does, as the original bags' button did, or what
+-- dropping the item held does, where the theme takes it here) and out after.
 ---@param on boolean
 function buttonProto:Light(on)
   local glow = self.highlight
@@ -233,7 +244,12 @@ function buttonProto:Light(on)
     end,
   })
   if on then
-    GameTooltip:SetOwner(self.frame, self.panel.side == "LEFT" and "ANCHOR_RIGHT" or "ANCHOR_LEFT")
+    local point = self.panel.side == "LEFT" and "ANCHOR_RIGHT" or "ANCHOR_LEFT"
+    if GetCursorInfo() == "item" and self.panel:ItemDropTarget() == "Menu" then
+      addon:GetModule('NextCategoryPicker'):Hint(self.frame, point)
+      return
+    end
+    GameTooltip:SetOwner(self.frame, point)
     GameTooltip:AddDoubleLine(L:G("Left Click"), L:G("Open Menu"), 1, 0.81, 0, 1, 1, 1)
     GameTooltip:Show()
   else

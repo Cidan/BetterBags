@@ -121,6 +121,27 @@ describe("NextInput", function()
     assert.is_false(f.frame:HasFocus())
   end)
 
+  -- A field that finds a choice (a menu's, NextMenu): Up and Down move through the choices, as Blizzard's group
+  -- finder's search box moves through its suggestions (LFGListSearchPanelSearchBox_OnArrowPressed), and Escape leaves.
+  it("says which arrow key was pressed, and that Escape was, after putting its text back", function()
+    local keys, escaped = {}, {}
+    local f
+    f = make({ onArrow = function(_, key) table.insert(keys, key) end,
+      onEscape = function() table.insert(escaped, f:GetText()) end })
+    f.frame:GetScript("OnArrowPressed")(f.frame, "DOWN")
+    f.frame:GetScript("OnArrowPressed")(f.frame, "UP")
+    assert.are.same({ "DOWN", "UP" }, keys)
+    f:SetText("before")
+    f.frame:SetFocus()
+    f.frame:GetScript("OnEditFocusGained")(f.frame)
+    f.frame:SetText("after")
+    f.frame:GetScript("OnEscapePressed")(f.frame)
+    assert.are.same({ "before" }, escaped)
+    local plain = make()
+    plain.frame:GetScript("OnArrowPressed")(plain.frame, "UP")
+    plain.frame:GetScript("OnEscapePressed")(plain.frame)
+  end)
+
   it("draws an icon inside its left edge, its text and help after it, read from the theme each time", function()
     local spec = { Texture = "IconSearch", Size = 14, Color = "Lavender" }
     local f = make({ icon = function() return spec end, help = "Search" })

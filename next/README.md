@@ -19,6 +19,7 @@ next/
 ├── tabs.lua      # NextTabs: the tab rail down a panel's inner edge
 ├── content.lua   # NextContent: the canvas: sections in one column, laid out through Motion
 ├── drag.lua      # NextDrag: moving sections by their headers: reorder, to a tab, to the other bag
+├── categorypicker.lua # NextCategoryPicker: an item dropped on a bag's title, into a category or a new one
 ├── glass.lua     # NextGlass: a theme's body as smoked glass: tint, light, rain, lightning (Panel.Glass)
 ├── sheen.lua     # NextSheen: a theme's panels catching the light as they fade in and out (Panel.Sheen)
 ├── panel.lua     # NextPanel: the panel both bags are made of, for either side of the screen
@@ -107,6 +108,15 @@ around. Dropping reorders it (`NextDrag:SaveOrder` pins the new order in `custom
 assigns its category to a tab's group, or moves its items to the other bag with
 `SectionFrame:MoveItems`. Targets are found by position every frame. Panels register with
 `NextDrag:Register` and answer `ShownBankType`, `InTabMode` and, for the bank, `BankTypeOfTab`.
+
+## Putting an item in a category from the title
+
+An item dropped on the backpack's or the bank's title (or, in a theme that says so, its bag button: Plain's;
+`Header.ItemDrop`) opens the category picker under it (`NextPanel:PickCategory`, `NextCategoryPicker`): a menu with a
+field, headed by the item, listing every category in its order with a new category named what is typed, and a way back
+to where the item belongs when it was added to a category by hand. The item goes back to its slot while the player
+picks; a category picked files it as dropping it on that category's header does. The rules are in
+`.claude/rules/next-category-picker.md`.
 
 ## The bank
 

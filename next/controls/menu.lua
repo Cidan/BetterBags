@@ -12,6 +12,9 @@ local controls = addon:GetModule('NextControls')
 ---@class NextScrollBar: AceModule
 local nextScrollBar = addon:GetModule('NextScrollBar')
 
+---@class NextInput: AceModule
+local nextInput = addon:GetModule('NextInput')
+
 ---@class SonataNext: AceModule
 local sonataNext = addon:GetModule('SonataNext')
 
@@ -28,7 +31,10 @@ local pixelAudit = addon:GetModule('PixelAudit')
 -- theme (Controls.Menu), below what opened it, over everything (FULLSCREEN_DIALOG), a row per
 -- choice, the chosen one checked, scrolling past MaxRows. A click picks a choice and closes it; a
 -- click or the wheel anywhere else, Escape, opening it again for the same frame, or that frame
--- hiding, closes it.
+-- hiding, closes it. A menu to find a choice in (opts.filter: the category picker, issue #1270) has a
+-- field over its choices, focused, that reads them again as the player types; the choice Enter takes
+-- is lit (Up and Down move the light, the pointer leaves it where it last was), and Escape in the field
+-- closes it. Over both, a head may say what the menu is for (an item's icon, its name and a note).
 ---@class NextMenu: AceModule
 ---@field frame Frame
 ---@field fill Texture
@@ -40,6 +46,13 @@ local pixelAudit = addon:GetModule('PixelAudit')
 ---@field catcher Button Takes clicks outside the menu, closing it.
 ---@field rows NextMenuRow[] Every row made; the first #items are shown.
 ---@field items NextMenuItem[]
+---@field lit? number The row Enter takes, lit as under the pointer.
+---@field headFrame Frame The head's icon, with its edge.
+---@field headIcon Texture
+---@field headEdge NextEdge
+---@field headText FontString
+---@field headNote FontString
+---@field field NextInputFrame Finds a choice, in a menu with a filter.
 ---@field anchor? Frame
 ---@field opts? NextMenuOptions
 ---@field open boolean
@@ -51,12 +64,28 @@ local nextMenu = addon:NewModule('NextMenu')
 ---@field value? any
 ---@field selected? boolean
 ---@field disabled? boolean
+---@field note? string A word at its right (how many items a category holds; whose it is).
+---@field color? number[] A dot of this color before its text ({ r, g, b }).
+---@field glyph? table Drawn where the check goes, for a choice that does something other than choose (Texture or Atlas, Color).
+
+---@class (exact) NextMenuHead
+---@field icon number|string
+---@field edge? number[] Its icon's edge in this color ({ r, g, b }: an item's quality), else Controls.ItemGrid.CommonEdge.
+---@field text string
+---@field note? string
+
+---@class (exact) NextMenuFilter
+---@field help string The field's help.
+---@field items fun(text: string): NextMenuItem[], number? The choices for what is typed, and the one Enter takes (none: Enter closes).
 
 ---@class (exact) NextMenuOptions
----@field items NextMenuItem[]
+---@field items? NextMenuItem[] Its choices, unless it has a filter.
 ---@field onPick fun(ctx: Context, item: NextMenuItem)
 ---@field onClose? fun()
 ---@field width? number At least this wide.
+---@field style? table Over the theme's Menu.
+---@field head? NextMenuHead
+---@field filter? NextMenuFilter
 
 ---@class NextMenuRow
 ---@field frame Button
@@ -64,6 +93,8 @@ local nextMenu = addon:NewModule('NextMenu')
 ---@field label FontString
 ---@field check Texture
 ---@field ring Texture Under the check: the empty radio ring (Check.Off, Check.Under), Blizzard's radio menus.
+---@field dot Texture
+---@field note FontString
 ---@field item? NextMenuItem
 local rowProto = {}
 addon:GetModule('Perf'):RegisterPrototype(rowProto, 'NextMenuRow')
@@ -111,6 +142,29 @@ function nextMenu:build()
   addon.SetScript(catcher, "OnMouseDown", function() self:Close() end)
   addon.SetScript(catcher, "OnMouseWheel", function() self:Close() end)
   addon.SetScript(frame, "OnHide", function() self:hidden() end)
+  local headFrame = CreateFrame("Frame", nil, frame)
+  self.headIcon = headFrame:CreateTexture(nil, "ARTWORK")
+  self.headIcon:SetAllPoints(headFrame)
+  self.headEdge = controls:CreateEdge(headFrame)
+  self.headText = frame:CreateFontString(nil, "OVERLAY")
+  self.headText:SetJustifyH("LEFT")
+  self.headText:SetWordWrap(false)
+  self.headNote = frame:CreateFontString(nil, "OVERLAY")
+  self.headNote:SetJustifyH("LEFT")
+  self.headNote:SetWordWrap(false)
+  headFrame:Hide()
+  self.headFrame = headFrame
+  self.field = nextInput:Create(frame, {
+    onChange = function(_, text) self:Filter(text) end,
+    onEnter = function(ctx) self:Take(ctx) end,
+    onArrow = function(_, key) self:Arrow(key) end,
+    onEscape = function() self:Close() end,
+    icon = function()
+      local SR = style.Theme.Settings.Search
+      return { Texture = SR.Icon, Atlas = SR.Atlas, Size = SR.IconSize, Color = SR.IconColor }
+    end,
+  })
+  self.field.frame:Hide()
   self.frame, self.box, self.list, self.catcher = frame, box, list, catcher
   sonataNext:RegisterWidget(self)
   pixelAudit:Register(frame, { title = "Menu", owners = { menu = self } })
@@ -136,11 +190,32 @@ function nextMenu:row(i)
   local check = frame:CreateTexture(nil, "ARTWORK", nil, 1)
   local ring = frame:CreateTexture(nil, "ARTWORK")
   ring:Hide()
-  row = setmetatable({ frame = frame, hover = hover, label = label, check = check, ring = ring }, { __index = rowProto })
+  local dot = frame:CreateTexture(nil, "ARTWORK")
+  dot:Hide()
+  local note = frame:CreateFontString(nil, "OVERLAY")
+  note:SetJustifyH("RIGHT")
+  note:SetWordWrap(false)
+  note:Hide()
+  row = setmetatable({ frame = frame, hover = hover, label = label, check = check, ring = ring, dot = dot, note = note },
+    { __index = rowProto })
   style:SetFont(label, controls:Theme("Menu").Font)
   addon.SetScript(frame, "OnClick", function(ctx) self:Pick(ctx, row) end)
-  addon.SetScript(frame, "OnEnter", function() row:SetHovered(true) end)
-  addon.SetScript(frame, "OnLeave", function() row:SetHovered(false) end)
+  -- A choice that cannot be taken is never lit: in a menu with a field the light stays where it was.
+  addon.SetScript(frame, "OnEnter", function()
+    if row.item ~= nil and row.item.disabled then
+      if not (self.opts and self.opts.filter) then
+        self:Light(nil)
+      end
+      return
+    end
+    self:Light(i)
+  end)
+  -- In a menu with a field the light stays where the pointer left it: Enter takes what was last pointed at.
+  addon.SetScript(frame, "OnLeave", function()
+    if not (self.opts and self.opts.filter) then
+      self:Light(nil)
+    end
+  end)
   self.rows[i] = row
   return row
 end
@@ -174,7 +249,14 @@ function nextMenu:Open(anchor, opts)
   if self.open then
     self:Close()
   end
-  self.anchor, self.opts, self.items = anchor, opts, opts.items
+  self.anchor, self.opts, self.lit = anchor, opts, nil
+  if opts.filter then
+    self.field:SetText("")
+    self.field.help:SetText(opts.filter.help or "")
+    self.items, self.lit = opts.filter.items("")
+  else
+    self.items = opts.items
+  end
   if not self.hooked[anchor] then
     self.hooked[anchor] = true
     addon.HookScript(anchor, "OnHide", function()
@@ -188,6 +270,9 @@ function nextMenu:Open(anchor, opts)
   self.catcher:Show()
   self.frame:Show()
   controls:PushEscape(self.frame)
+  if opts.filter then
+    self.field:SetFocus()
+  end
 end
 
 -- Toggle closes the menu when it is open for anchor, and opens it otherwise.
@@ -217,11 +302,84 @@ function nextMenu:hidden()
   end
   self.open = false
   self.catcher:Hide()
+  self.field.frame:ClearFocus()
   controls:ReleaseEscape(self.frame)
   local opts = self.opts
-  self.anchor, self.opts = nil, nil
+  self.anchor, self.opts, self.lit = nil, nil, nil
   if opts and opts.onClose then
     opts.onClose()
+  end
+end
+
+-- Light lights the i-th row as under the pointer (none: no row), the one Enter takes in a menu with a field.
+---@param i? number
+function nextMenu:Light(i)
+  self.lit = i
+  for j = 1, #self.items do
+    self.rows[j]:SetHovered(j == i)
+  end
+end
+
+-- Filter reads a filter's choices again for what the player typed, the one Enter takes lit.
+---@param text string
+function nextMenu:Filter(text)
+  local filter = self.opts and self.opts.filter
+  if filter == nil then
+    return
+  end
+  self.items, self.lit = filter.items(text)
+  self:Style()
+end
+
+-- Arrow moves the light down or up a row past choices that cannot be taken, no further than the first or the last
+-- (from none: the first, or the last), keeping it in sight. Left and Right are the field's.
+---@param key string
+function nextMenu:Arrow(key)
+  local by = (key == "DOWN" and 1) or (key == "UP" and -1) or nil
+  if by == nil or not self.open then
+    return
+  end
+  local n = #self.items
+  local i = self.lit or (by > 0 and 0 or n + 1)
+  repeat
+    i = i + by
+  until i < 1 or i > n or not self.items[i].disabled
+  if i < 1 or i > n then
+    return
+  end
+  self:Light(i)
+  self:showRow(i)
+end
+
+-- showRow scrolls the list so the i-th row is in sight, as little as it takes, gliding unless at once. A menu whose rows
+-- all show never scrolls: on a screen where its rows are a fraction of a unit tall, the box rounds what it shows
+-- (ScrollBoxBaseMixin:GetVisibleExtent) and has a range of less than a pixel.
+---@private
+---@param i number
+---@param instant? boolean
+function nextMenu:showRow(i, instant)
+  local box = self.box
+  if box:GetDerivedScrollRange() < pixel:Unit(box) then
+    return
+  end
+  local height = pixel:Length(self.frame, self:look().ItemHeight)
+  local top, bottom = (i - 1) * height, i * height
+  local offset, visible = box:GetDerivedScrollOffset(), box:GetVisibleExtent()
+  if top < offset then
+    box:ScrollToOffset(top, instant)
+  elseif bottom > offset + visible then
+    box:ScrollToOffset(bottom - visible, instant)
+  end
+end
+
+-- Take takes the lit choice (Enter in the field); with none lit it closes, taking nothing.
+---@param ctx Context
+function nextMenu:Take(ctx)
+  local row = self.lit and self.rows[self.lit]
+  if row ~= nil and row.item ~= nil and not row.item.disabled then
+    self:Pick(ctx, row)
+  else
+    self:Close()
   end
 end
 
@@ -249,11 +407,6 @@ function nextMenu:ApplyStyle(ctx)
   end
 end
 
--- Style lays the rows out and draws the menu: as wide as the widest choice (at least its anchor and
--- opts.width), MaxRows tall at most.
--- All in whole pixels on its own grid (UIParent's: docs/next-pixel-perfect.md), its anchor's width in its
--- units (the anchor may be in a window drawn smaller): its rows one ItemHeight apart, a check and a label
--- on each centered by its top.
 -- look returns the menu's look: the theme's Menu, with what the open menu's style changes (NextMenuOptions.style: a
 -- dropdown's own menu, Blizzard's MenuStyle2 for its settings dropdowns).
 ---@private
@@ -270,8 +423,16 @@ function nextMenu:look()
   return merged
 end
 
+
+-- Style lays the rows out and draws the menu: as wide as the widest choice (at least its anchor and
+-- opts.width, and Picker.Width with a field), MaxRows tall at most, its head and its field above the rows.
+-- All in whole pixels on its own grid (UIParent's: docs/next-pixel-perfect.md), its anchor's width in its
+-- units (the anchor may be in a window drawn smaller): its rows one ItemHeight apart, a check, a dot, a label
+-- and a note on each centered by its top.
 function nextMenu:Style()
   local M = self:look()
+  local P = M.Picker
+  local opts = self.opts
   local frame, items = self.frame, self.items
   frame:ClearAllPoints()
   pixel:Point(frame, "TOPLEFT", self.anchor, "BOTTOMLEFT", 0, -M.Gap)
@@ -287,7 +448,25 @@ function nextMenu:Style()
     ringWidth, ringHeight = style:SizeOf(check, check.Off or check.Under, checkWidth)
   end
   local pad, itemHeight = pixel:Lengths(frame, M.Padding, M.ItemHeight)
-  local textLeft = pad + pixel:Length(frame, math.max(checkWidth, ringWidth)) + pad
+  -- A dot before each name when any choice has a color, the names after the dots.
+  local dotted = false
+  for _, item in ipairs(items) do
+    if item.color ~= nil then
+      dotted = true
+      break
+    end
+  end
+  local dotLeft = pad + pixel:Length(frame, math.max(checkWidth, ringWidth)) + pad
+  local textLeft = dotLeft
+  if dotted then
+    textLeft = dotLeft + pixel:Length(frame, P.Dot) + pad
+  end
+  local shown = math.min(#items, M.MaxRows)
+  local scrolls = #items > M.MaxRows
+  local S = controls:Theme("ScrollBar")
+  -- The scroll bar sits over the rows' right edge (NextScrollBar, a child of the box): what is at a row's right stays
+  -- clear of it.
+  local bar = scrolls and (pixel:Length(frame, S.Width) + pixel:Length(frame, S.Inset)) or 0
   local widest = 0
   for i, item in ipairs(items) do
     local row = self:row(i)
@@ -300,13 +479,26 @@ function nextMenu:Style()
     end
     style:SetFont(row.label, font)
     row.label:SetText(item.text)
-    widest = math.max(widest, row.label:GetStringWidth())
+    -- Its note at its right, the name stopping short of it.
+    local noteRoom = 0
+    if item.note ~= nil then
+      style:SetFont(row.note, P.NoteFont)
+      row.note:SetText(item.note)
+      row.note:ClearAllPoints()
+      pixel:Row(row.note, "TOPRIGHT", row.frame, pad + bar, itemHeight)
+      row.note:Show()
+      noteRoom = pad + pixel:Ceil(frame, row.note:GetStringWidth())
+    else
+      row.note:Hide()
+    end
+    widest = math.max(widest, pixel:Ceil(frame, row.label:GetStringWidth()) + noteRoom)
     controls:Paint(row.hover, M.HoverFill)
     row.hover:Hide()
     -- A glyph, or an atlas (Blizzard's radio tick); the empty ring under it (Off on rows not chosen, Under on the
     -- chosen one), the tick at the ring's top left as Blizzard's retail radios draw it.
     local chosen = item.selected == true
-    local ring = chosen and check.Under or (not chosen and check.Off) or nil
+    local glyph = item.glyph
+    local ring = (glyph == nil) and (chosen and check.Under or (not chosen and check.Off)) or nil
     if ring then
       controls:Paint(row.ring, { Texture = ring.Texture, Atlas = ring.Atlas, Color = ring.Color or check.Color })
       pixel:Size(row.ring, ringWidth, ringHeight)
@@ -315,7 +507,8 @@ function nextMenu:Style()
     else
       row.ring:Hide()
     end
-    controls:Paint(row.check, { Texture = check.Texture, Atlas = check.Atlas, Color = check.Color })
+    local mark = glyph or check
+    controls:Paint(row.check, { Texture = mark.Texture, Atlas = mark.Atlas, Color = mark.Color or check.Color })
     pixel:Size(row.check, checkWidth, checkHeight)
     row.check:ClearAllPoints()
     if ring then
@@ -323,10 +516,21 @@ function nextMenu:Style()
     else
       pixel:Row(row.check, "TOPLEFT", row.frame, pad, itemHeight)
     end
-    row.check:SetShown(chosen)
+    row.check:SetShown(chosen or glyph ~= nil)
+    local color = item.color
+    if color ~= nil then
+      row.dot:SetColorTexture(color[1], color[2], color[3], 1)
+      pixel:Size(row.dot, P.Dot, P.Dot)
+      row.dot:ClearAllPoints()
+      pixel:Row(row.dot, "TOPLEFT", row.frame, dotLeft, itemHeight)
+      row.dot:SetAlpha(item.disabled and controls:Theme("Button").DisabledAlpha or 1)
+      row.dot:Show()
+    else
+      row.dot:Hide()
+    end
     row.label:ClearAllPoints()
     pixel:Row(row.label, "TOPLEFT", row.frame, textLeft, itemHeight)
-    pixel:Row(row.label, "TOPRIGHT", row.frame, pad, itemHeight)
+    pixel:Row(row.label, "TOPRIGHT", row.frame, pad + bar + noteRoom, itemHeight)
     row.frame:ClearAllPoints()
     row.frame:SetPoint("TOPLEFT", self.list, "TOPLEFT", 0, -(i - 1) * itemHeight)
     row.frame:SetPoint("TOPRIGHT", self.list, "TOPRIGHT", 0, -(i - 1) * itemHeight)
@@ -337,23 +541,113 @@ function nextMenu:Style()
     self.rows[i].item = nil
     self.rows[i].frame:Hide()
   end
-  local shown = math.min(#items, M.MaxRows)
-  local scrolls = #items > M.MaxRows
-  local S = controls:Theme("ScrollBar")
   -- The rows sit in a list inset Padding on both sides: the menu holds that, the text's left, the
   -- widest text and the room right of it.
-  local bar = scrolls and (pixel:Length(frame, S.Width) + pixel:Length(frame, S.Inset)) or 0
   -- The list's inset: Inset on each side when the theme gives one (Blizzard's menus: MenuStyle1Mixin:GetInset), else
   -- Padding all round.
   local inset = M.Inset or {}
   local left, right = pixel:Snap(frame, inset.Left or M.Padding), pixel:Snap(frame, inset.Right or M.Padding)
   local top, bottom = pixel:Snap(frame, inset.Top or M.Padding), pixel:Snap(frame, inset.Bottom or M.Padding)
-  local width = left + right + textLeft + pixel:Ceil(frame, widest) + pad + bar
+  local width = left + right + textLeft + widest + pad + bar
   local anchorWidth = self.anchor:GetWidth() * self.anchor:GetEffectiveScale() / frame:GetEffectiveScale()
-  width = math.max(width, pixel:Ceil(frame, anchorWidth), pixel:Ceil(frame, self.opts.width or 0))
-  frame:SetSize(width, shown * itemHeight + top + bottom)
-  pixel:Inset(self.box, frame, left, right, top, bottom)
+  width = math.max(width, pixel:Ceil(frame, anchorWidth), pixel:Ceil(frame, opts.width or 0))
+  -- Above the rows, its head (an icon IconSize square, its text and note beside it) and its field, each Gap above
+  -- what follows.
+  local gap = pixel:Length(frame, P.Gap)
+  local head, filter = opts.head, opts.filter
+  local iconSize = pixel:Length(frame, P.IconSize)
+  local above = 0
+  if head ~= nil then
+    style:SetFont(self.headText, P.HeadFont)
+    style:SetFont(self.headNote, P.NoteFont)
+    self.headText:SetText(head.text or "")
+    self.headNote:SetText(head.note or "")
+    local textWidth = math.max(self.headText:GetStringWidth(), head.note and self.headNote:GetStringWidth() or 0)
+    width = math.max(width, left + iconSize + gap + pixel:Ceil(frame, textWidth) + right)
+    above = iconSize + gap
+  end
+  if filter ~= nil then
+    width = math.max(width, pixel:Ceil(frame, pixel:Length(frame, P.Width)))
+    above = above + pixel:Length(frame, controls:Theme("Input").Height) + gap
+  end
+  frame:SetSize(width, above + shown * itemHeight + top + bottom)
+  self:styleHead(head, left, right, top, iconSize, gap)
+  if filter ~= nil then
+    local field = self.field.frame
+    local fieldTop = top + (head ~= nil and iconSize + gap or 0)
+    field:ClearAllPoints()
+    field:SetPoint("TOPLEFT", frame, "TOPLEFT", left, -fieldTop)
+    field:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -right, -fieldTop)
+    field:SetWidth(width - left - right)
+    self.field:Style()
+    field:Show()
+  else
+    self.field.frame:Hide()
+  end
+  pixel:Inset(self.box, frame, left, right, top + above, bottom)
+  self.box:SetSize(width - left - right, shown * itemHeight)
   self.list:SetHeight(#items * itemHeight)
   self.box:FullUpdate(true)
   self.box:SetScrollPercentage(0, true)
+  local lit = self.lit
+  if lit ~= nil and (items[lit] == nil or items[lit].disabled) then
+    lit = nil
+  end
+  self:Light(lit)
+  -- What Enter takes stays in sight however it was lit (read for what is typed, or restyled while open), at once: the
+  -- list was just put back at its top.
+  if lit ~= nil then
+    self:showRow(lit, true)
+  end
+end
+
+-- styleHead draws the head (an icon in its edge: the item's quality, as an item grid's cell draws it; its text, and a
+-- note under it, centered beside the icon by their top), or puts it away for a menu without one.
+---@private
+---@param head? NextMenuHead
+---@param left number
+---@param right number
+---@param top number
+---@param iconSize number
+---@param gap number
+function nextMenu:styleHead(head, left, right, top, iconSize, gap)
+  local frame = self.frame
+  if head == nil then
+    self.headFrame:Hide()
+    self.headText:Hide()
+    self.headNote:Hide()
+    return
+  end
+  local headFrame = self.headFrame
+  headFrame:ClearAllPoints()
+  headFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", left, -top)
+  headFrame:SetSize(iconSize, iconSize)
+  self.headIcon:SetTexture(head.icon)
+  local K = controls:Theme("ItemGrid")
+  if head.edge ~= nil then
+    controls:PaintEdge(self.headEdge, { Color = { head.edge[1], head.edge[2], head.edge[3] }, Size = K.CommonEdge.Size }, 1)
+  else
+    controls:PaintEdge(self.headEdge, K.CommonEdge)
+  end
+  headFrame:Show()
+  local textHeight = pixel:Ceil(frame, pixel:TextHeight(self.headText))
+  local noteHeight, between = 0, 0
+  if head.note ~= nil then
+    noteHeight, between = pixel:Ceil(frame, pixel:TextHeight(self.headNote)), pixel:Snap(frame, 2)
+  end
+  local textTop = top + pixel:Middle(frame, iconSize, textHeight + between + noteHeight)
+  local textLeft = left + iconSize + gap
+  self.headText:ClearAllPoints()
+  pixel:Point(self.headText, "TOPLEFT", frame, "TOPLEFT", textLeft, -textTop)
+  pixel:Point(self.headText, "TOPRIGHT", frame, "TOPRIGHT", -right, -textTop)
+  self.headText:Show()
+  if head.note ~= nil then
+    local noteTop = textTop + textHeight + between
+    self.headNote:ClearAllPoints()
+    pixel:Point(self.headNote, "TOPLEFT", frame, "TOPLEFT", textLeft, -noteTop)
+    pixel:Point(self.headNote, "TOPRIGHT", frame, "TOPRIGHT", -right, -noteTop)
+    self.headNote:Show()
+  else
+    self.headNote:Hide()
+  end
 end
