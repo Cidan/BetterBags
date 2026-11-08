@@ -1,0 +1,17 @@
+{
+  "id": 1794117454,
+  "version": "v0.9.2-4-g9fb6f3f",
+  "channel": "alpha",
+  "date": "2026-11-08",
+  "from": "0c2f0aa2abb708d59ca70b6fe98f27b9c17959b2",
+  "to": "9fb6f3f24950b518597930cf77c4572afc0ee0fa",
+  "headline": "Docked vendor sections containing unsellable items now return directly to your bags instead of appearing to sell.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Docked section returns to bags when items cannot be sold",
+      "details": "When selling a section from the vendor dock that contains unsellable items or leftovers, the section now returns straight to your bags instead of flying into the vendor and disappearing as if fully sold.",
+      "clients": []
+    }
+  ]
+}
