@@ -435,6 +435,27 @@ local function styleCountdown(decoration, spec)
   end
 end
 
+-- itemText draws an item button's own text (its count, its item level) in a font spec, through a font object
+-- (fontObjectFor) and never a file set on the text itself: a file SetFont gives a font string stays on it through every
+-- font object it is given after, so a later style naming only a font object drew in the last one's file (issue #1263,
+-- the Papercraft theme's hand on every other theme's buttons). A spec naming no font object starts from Blizzard's
+-- (NumberFontNormal, the template's), as the text did.
+---@param text FontString
+---@param spec? SonataFont
+local function itemText(text, spec)
+  if type(spec) ~= "table" then
+    return
+  end
+  if spec.Object == nil then
+    local own = { Object = "NumberFontNormal" }
+    for key, value in pairs(spec) do
+      own[key] = value
+    end
+    spec = own
+  end
+  apply:Font(text, { Object = fontObjectFor(spec) })
+end
+
 ---@param decoration ItemButton
 ---@param style table
 function elements:StyleItemButton(decoration, style)
@@ -515,7 +536,7 @@ function elements:StyleItemButton(decoration, style)
   local count = decoration.Count
   if count ~= nil then
     local spec = withDefaults(style.Count, ITEM_COUNT)
-    apply:Font(count, spec.Font)
+    itemText(count, spec.Font)
     apply:Points(count, spec.Points, decoration)
     if snap ~= nil then
       snapAnchors(count)
@@ -526,7 +547,7 @@ function elements:StyleItemButton(decoration, style)
   local level = decoration.ItemLevelText
   if level ~= nil then
     local r, g, b, a = level:GetTextColor()
-    apply:Font(level, withDefaults(style.ItemLevel, ITEM_LEVEL).Font)
+    itemText(level, withDefaults(style.ItemLevel, ITEM_LEVEL).Font)
     level:SetTextColor(r, g, b, a)
   end
 

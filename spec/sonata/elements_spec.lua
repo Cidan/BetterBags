@@ -338,6 +338,51 @@ describe("SonataElements", function()
       assert.are.same({ 0.1, 0.2, 0.3, 1 }, { b.ItemLevelText:GetTextColor() })
     end)
 
+    -- Issue #1263: after the Papercraft theme (its count and item level in a font file of its own), every other theme's
+    -- buttons kept that file, since a style naming only a font object never takes a file off the text.
+    it("gives the count and the item level back their own font after a style that drew them in a file", function()
+      local b = itemDecoration()
+      b.ItemLevelText = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+      local file = { Object = "NumberFontNormal", Path = "Hand.ttf", Size = 15, Flags = "OUTLINE" }
+      elements:StyleItemButton(b, { Count = { Font = file }, ItemLevel = { Font = file } })
+      assert.are.same({ "Hand.ttf", 15, "OUTLINE" }, { b.Count:GetFont() })
+      assert.are.same({ "Hand.ttf", 15, "OUTLINE" }, { b.ItemLevelText:GetFont() })
+      elements:StyleItemButton(b, {})
+      assert.are.same({ NumberFontNormal:GetFont() }, { b.Count:GetFont() })
+      assert.are.same({ NumberFontNormal:GetFont() }, { b.ItemLevelText:GetFont() })
+      assert.are.equal(_G.NumberFontNormal, b.Count:GetFontObject())
+      assert.are.equal(_G.NumberFontNormal, b.ItemLevelText:GetFontObject())
+    end)
+
+    it("draws a count and an item level in a file through a font object, the same one for the same spec", function()
+      local a, b = itemDecoration(), itemDecoration()
+      a.ItemLevelText = a:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+      local style = { Count = { Font = { Object = "NumberFontNormal", Path = "Hand.ttf", Size = 15, Flags = "OUTLINE" } },
+        ItemLevel = { Font = { Object = "NumberFontNormal", Path = "Hand.ttf", Size = 15, Flags = "OUTLINE" } } }
+      elements:StyleItemButton(a, style)
+      elements:StyleItemButton(b, style)
+      local font = a.Count:GetFontObject()
+      assert.are_not.equal(_G.NumberFontNormal, font)
+      assert.are.same({ "Hand.ttf", 15, "OUTLINE" }, { font:GetFont() })
+      assert.are.equal(font, b.Count:GetFontObject())
+      assert.are.equal(font, a.ItemLevelText:GetFontObject())
+    end)
+
+    -- A font spec naming no font object draws on Blizzard's (NumberFontNormal), as the text did before it was styled.
+    it("draws a count and an item level whose font names no font object on Blizzard's", function()
+      local b = itemDecoration()
+      b.ItemLevelText = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+      local own = { NumberFontNormal:GetFont() }
+      elements:StyleItemButton(b, { Count = { Font = { Color = { 1, 0, 0, 1 } } }, ItemLevel = { Font = {} } })
+      assert.are.same(own, { b.Count:GetFont() })
+      assert.are.same({ 1, 0, 0, 1 }, { b.Count:GetTextColor() })
+      assert.are.same(own, { b.ItemLevelText:GetFont() })
+      elements:StyleItemButton(b, { Count = { Font = { Size = 15 } }, ItemLevel = { Font = { Path = "Hand.ttf", Size = 15 } } })
+      assert.are.same(own, { b.Count:GetFont() })
+      assert.are.same({ "Hand.ttf", 15, "" }, { b.ItemLevelText:GetFont() })
+      assert.are.same({ NumberFontNormal:GetShadowOffset() }, { b.ItemLevelText:GetShadowOffset() })
+    end)
+
     describe("a cooldown's countdown", function()
       local savedLocale
       before_each(function() savedLocale = _G.GetLocale end)
