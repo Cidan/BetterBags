@@ -42,6 +42,9 @@ local nextDock = addon:GetModule('NextDock')
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
@@ -624,11 +627,11 @@ function vendorProto:OfferAutomation(ctx)
   for _, section in ipairs(canvas.order) do
     if section.kind == "category" and not self.offered[section.name] and not canvas:IsAway(section)
       and not canvas:IsLeaving(section) then
-      local items = nextDrag:SectionItems(section)
+      local list = nextDrag:SectionItems(section)
       local phase
-      if buys and #automation:SaleOffer(ctx, items) > 0 then
+      if buys and #automation:SaleOffer(ctx, list) > 0 then
         phase = "confirm"
-      elseif #automation:DestroyLeft(ctx, items) > 0 then
+      elseif #automation:DestroyLeft(ctx, list) > 0 then
         phase = "destroy"
       end
       if phase then
@@ -713,16 +716,17 @@ end
 -- (SaleOf), sold as it docks when buyback keeps all of it, else once double-clicked; of a category Auto
 -- Sell offers (automation), what it sells (Automation:SaleOffer), once double-clicked. The seller sells
 -- it one item at a time while the card says how far it is; once it ends the section flies into the
--- vendor, or goes back to the backpack with what the merchant did not take (refused items stay in the
--- bags until a merchant buys them; asked). Then, for a category, what is left to destroy, glowing in the
--- theme's destroy color, one item per click (Automation:DestroyNext; a double click is two clicks,
--- OnDoubleClick blocking the second OnClick, warcraft.wiki.gg). A right click stops what is left of a
--- sale (cancel).
+-- vendor, or goes back to the backpack with what the sale left in the bags: what the merchant did not
+-- take (refused items stay in the bags until a merchant buys them; asked), and what it left out (no
+-- merchant buys it, an equipment set, a refundable purchase). Then, for a category, what is left to
+-- destroy, glowing in the theme's destroy color, one item per click (Automation:DestroyNext; a double
+-- click is two clicks, OnDoubleClick blocking the second OnClick, warcraft.wiki.gg). A right click stops
+-- what is left of a sale (cancel).
 ---@param section NextSection
 ---@param opts {automation?: boolean, phase?: "confirm"|"destroy"}
 ---@return NextDockOffer
 function vendorProto:SectionOffer(section, opts)
-  local function items()
+  local function sectionItems()
     return nextDrag:SectionItems(section)
   end
   local function ctxOf()
@@ -730,10 +734,10 @@ function vendorProto:SectionOffer(section, opts)
   end
   local function saleOf(ctx)
     if not opts.automation then
-      return self:SaleOf(items())
+      return self:SaleOf(sectionItems())
     end
     local sale = {}
-    for _, entry in ipairs(automation:SaleOffer(ctx, items())) do
+    for _, entry in ipairs(automation:SaleOffer(ctx, sectionItems())) do
       table.insert(sale, entry.data)
     end
     return sale
@@ -744,15 +748,40 @@ function vendorProto:SectionOffer(section, opts)
   end
   local offer, job, total, entry = {}, nil, 0, nil
   local function destroyLeft(ctx)
-    return opts.automation and #automation:DestroyLeft(ctx, items()) > 0
+    return opts.automation and #automation:DestroyLeft(ctx, sectionItems()) > 0
   end
-  -- after says what follows a sale: what is left to destroy, else the section goes.
+  -- leftBehind says whether a sale left any of the section's items in the bags: one of them, or a pile
+  -- its virtual stack hides, that it did not sell (refused, never sent, or left out of it: no merchant
+  -- buys it, an equipment set, a refundable purchase) and whose slot still holds an item. WithStacks
+  -- names every pile of the same item: one on a button of its own (at a merchant each one, unmergeAtShop)
+  -- can be another section's, and one hidden is the section's only under a root that is.
+  local function leftBehind(sold)
+    local list, own, soldSlots = sectionItems(), {}, {}
+    for _, data in ipairs(list) do
+      own[data.bagid .. "_" .. data.slotid] = true
+    end
+    for _, item in ipairs(sold.sold) do
+      soldSlots[item.bag .. "_" .. item.slot] = true
+    end
+    local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK]
+    local visible = slotInfo:GetVisibleItems()
+    for _, data in ipairs(sectionFrame:WithStacks(list)) do
+      local key = data.bagid .. "_" .. data.slotid
+      local ours = own[key] or (visible[key] == nil and own[slotInfo.stacks:GetStackInfo(data.itemHash).rootItem])
+      if ours and not soldSlots[key] and C_Container.GetContainerItemInfo(data.bagid, data.slotid) ~= nil then
+        return true
+      end
+    end
+    return false
+  end
+  -- after says what follows a sale: what is left to destroy, else the section goes back to the backpack
+  -- with what the sale left in the bags, else it flies into the vendor.
   local function after(sold)
     if destroyLeft(ctxOf()) then
       phase = "destroy"
       return "stay"
     end
-    if sold == nil or sold.unsold > 0 then
+    if sold == nil or leftBehind(sold) then
       return "back"
     end
     return "moved"
@@ -779,8 +808,8 @@ function vendorProto:SectionOffer(section, opts)
     return true
   end
   local function destroyOne(ctx)
-    automation:DestroyNext(ctx, items())
-    if #automation:DestroyLeft(ctx, items()) > 0 then
+    automation:DestroyNext(ctx, sectionItems())
+    if #automation:DestroyLeft(ctx, sectionItems()) > 0 then
       return "stay"
     end
     return "moved"
@@ -805,7 +834,7 @@ function vendorProto:SectionOffer(section, opts)
           or L:G("You can buy them back."),
         L:G("Double-click to sell · Right-click to cancel")
     end
-    local n = #automation:DestroyLeft(ctx, items())
+    local n = #automation:DestroyLeft(ctx, sectionItems())
     return format(n == 1 and L:G("Destroy %d item") or L:G("Destroy %d items"), n), L:G("No merchant buys these."),
       L:G("Click to destroy next · Right-click to cancel")
   end
@@ -842,7 +871,7 @@ function vendorProto:SectionOffer(section, opts)
     if phase ~= "destroy" then
       return
     end
-    local next = automation:DestroyLeft(ctxOf(), items())[1]
+    local next = automation:DestroyLeft(ctxOf(), sectionItems())[1]
     if next == nil then
       return
     end

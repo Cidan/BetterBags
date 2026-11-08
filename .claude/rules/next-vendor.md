@@ -187,7 +187,8 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   items?", "Only the last 12 items sold can be bought back.", "Double-click to sell · Right-click to
   cancel"). The Seller (seller.md) sells it one item at a time while the card says how far it is
   ("Selling N of M..."); then the section flies into the vendor, or goes back to its place with what
-  the merchant did not take. It lands back in its place at once when nothing sells. Until this change a
+  the sale left in the bags: what the merchant did not take, and what `SaleOf` left out, a pile its
+  stacks hide included (automation.md §4a, #1257). It lands back in its place at once when nothing sells. Until this change a
   sale of up to 12 sold everything at once and flew straight into the vendor, which hit "That object
   is busy." and could hide unsold items (reported). Selling needs a mouse click, as moves do: the drop's
   release, or the double click; a drag ended without a release sells nothing. Unlike a right click on the
