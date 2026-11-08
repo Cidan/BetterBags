@@ -1,0 +1,23 @@
+{
+  "id": 1794104811,
+  "version": "v0.9.2-3-g0c2f0aa",
+  "channel": "alpha",
+  "date": "2026-11-08",
+  "from": "e450ae6c204e61a99ee73567f7a67c96bfb37fa2",
+  "to": "0c2f0aa2abb708d59ca70b6fe98f27b9c17959b2",
+  "headline": "Added settings to toggle off the QuickFind integration and BetterBags Next's vendor and guild bank windows.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Toggles for Next vendor and guild bank windows",
+      "details": "New options under General \u003e Bags allow you to disable BetterBags Next's custom merchant and guild bank interfaces to use Blizzard's default windows instead. The change takes effect immediately without a reload. When the custom vendor is turned off, categories configured to confirm Auto Sell can be sold by right-clicking their title.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Toggle for QuickFind integration",
+      "details": "A new setting under Integrations \u003e QuickFind allows you to turn off the integration immediately without needing to uninstall the QuickFind addon.",
+      "clients": []
+    }
+  ]
+}
