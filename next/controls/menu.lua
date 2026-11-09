@@ -29,7 +29,7 @@ local pixelAudit = addon:GetModule('PixelAudit')
 
 -- NextMenu is BetterBags Next's menu of choices (next-settings.md §2): one at a time, drawn from the
 -- theme (Controls.Menu), below what opened it, over everything (FULLSCREEN_DIALOG), a row per
--- choice, the chosen one checked, scrolling past MaxRows. A click picks a choice and closes it; a
+-- choice, the chosen one checked, scrolling past MaxRows (Picker.MaxRows with a field). A click picks a choice and closes it; a
 -- click or the wheel anywhere else, Escape, opening it again for the same frame, or that frame
 -- hiding, closes it. A menu to find a choice in (opts.filter: the category picker, issue #1270) has a
 -- field over its choices, focused, that reads them again as the player types; the choice Enter takes
@@ -353,13 +353,14 @@ end
 
 -- showRow scrolls the list so the i-th row is in sight, as little as it takes, gliding unless at once. A menu whose rows
 -- all show never scrolls: on a screen where its rows are a fraction of a unit tall, the box rounds what it shows
--- (ScrollBoxBaseMixin:GetVisibleExtent) and has a range of less than a pixel.
+-- (ScrollBoxBaseMixin:GetVisibleExtent), and the half unit it loses is a range that is no content (as its bar reads it,
+-- NextScrollBar:OnScroll).
 ---@private
 ---@param i number
 ---@param instant? boolean
 function nextMenu:showRow(i, instant)
   local box = self.box
-  if box:GetDerivedScrollRange() < pixel:Unit(box) then
+  if box:GetDerivedScrollRange() <= 0.5 then
     return
   end
   local height = pixel:Length(self.frame, self:look().ItemHeight)
@@ -425,7 +426,8 @@ end
 
 
 -- Style lays the rows out and draws the menu: as wide as the widest choice (at least its anchor and
--- opts.width, and Picker.Width with a field), MaxRows tall at most, its head and its field above the rows.
+-- opts.width, and Picker.Width with a field), MaxRows tall at most (Picker.MaxRows with a field), its head and its field
+-- above the rows.
 -- All in whole pixels on its own grid (UIParent's: docs/next-pixel-perfect.md), its anchor's width in its
 -- units (the anchor may be in a window drawn smaller): its rows one ItemHeight apart, a check, a dot, a label
 -- and a note on each centered by its top.
@@ -461,8 +463,10 @@ function nextMenu:Style()
   if dotted then
     textLeft = dotLeft + pixel:Length(frame, P.Dot) + pad
   end
-  local shown = math.min(#items, M.MaxRows)
-  local scrolls = #items > M.MaxRows
+  -- A menu with a field shows more rows before it scrolls (Picker.MaxRows): a long list read at a glance.
+  local maxRows = opts.filter ~= nil and P.MaxRows or M.MaxRows
+  local shown = math.min(#items, maxRows)
+  local scrolls = #items > maxRows
   local S = controls:Theme("ScrollBar")
   -- The scroll bar sits over the rows' right edge (NextScrollBar, a child of the box): what is at a row's right stays
   -- clear of it.

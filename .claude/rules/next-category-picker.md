@@ -56,7 +56,9 @@ Category" / "Drop the item here to put it in a category, or in a new one.") in p
 ## 3. The picker (`NextCategoryPicker`, next/categorypicker.lua)
 
 A `NextMenu` with a field (next-controls.md §2), below the anchor, closing with it (the menu closes when its anchor
-hides: the bag closing):
+hides: the bag closing), up to `Picker.MaxRows` (18) rows before it scrolls, more than a dropdown's 12 (asked, after
+trying it: "make sure the window is reasonably long as well in general (when there are enough categories) -- generally
+speaking, micro windows with tiny interactions for lots of elements is bad"):
 - **Its head**: the item's icon (the bags' `itemInfo.itemIcon`, else `C_Item.GetItemInfoInstant`'s, the only read that
   needs no load) in its quality's edge from Uncommon up (`const.ITEM_QUALITY_COLOR`, as an item grid cell draws it), its
   link without its brackets (in its quality's color), and "In <section>" (`itemInfo.category`), none for an item the
@@ -94,6 +96,9 @@ hides: the bag closing):
   row out of sight.
 - **Click and drop both firing** on one release (never seen): the section headers and the original bags' button have the
   same pair of scripts.
+- **Pushed over its anchor** (speculative): the menu opens below the title, clamped to the screen; at 18 rows (514 units
+  with its head and field in Default) a picker opened from a small panel low on the screen is pushed up over the title
+  more often than a 12-row one would be.
 
 ## 5. Coverage
 
@@ -106,10 +111,20 @@ a menu whose rows all show on a 4K screen, jump versus glide, dots, notes, glyph
 bags do not hold, a merchant's item, the glow and hint, the glow's place, a Menu theme, no drop; "the guild bank": none),
 `spec/next/menubutton_spec.lua` ("an item dropped on it"), `spec/sonata/next_engine_spec.lua` (the declaration's check).
 
-Two bug reviews: the first found notes under the scroll bar, the lit row out of sight after typing or a restyle, the
+**Seen in game**: a picker of three categories, all shown, drew its scroll bar over their notes. Wherever rows are not a
+whole number of units tall, Blizzard's box rounds its height (`ScrollBoxBaseMixin:GetVisibleExtent`), so rows that all
+show read up to half a unit taller than it and the bar showed, where the menu had left no room for one (it leaves room
+only when there are more rows than it shows). `NextScrollBar` now shows only for a range of more than that half unit
+(next-controls.md §2), and `NextMenu:showRow` ignores the same range; with that the bar shows exactly when the menu left
+room for it, so it never sits over text.
+
+Three bug reviews: the first found notes under the scroll bar, the lit row out of sight after typing or a restyle, the
 pointer taking the light away over a plugin's row, a taken section name offered as new, and the targets answering a
 merchant's item; the second found a one-pixel scroll of a menu whose rows all show on a 4K screen and the list snapping
-to its top then gliding back on each keystroke. Each was fixed test-first.
+to its top then gliding back on each keystroke. Each was fixed test-first. The third, aimed at the scroll bar's half-unit
+rule and `Picker.MaxRows`, found no bug a player can hit (a sweep of 10 screen heights, 5 UI scales and 1 to 22 rows: the
+bar shows exactly when there are more rows than shown, its room always matches, a menu whose rows all show never
+scrolls); it found tests that did not pin the rule, now tightened (each fails with its fix reverted).
 
 **Not seen in game.** To check: drop a bag item and an equipped item on the backpack's title and the bank's, type, use
 the arrow keys and Enter, make a new category, take an item back; the same on Plain's bag button; a merchant's item held

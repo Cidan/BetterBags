@@ -130,6 +130,19 @@ describe("NextScrollBar", function()
       assert.is_true(bar.frame:IsShown())
     end)
 
+    -- Found in game (the category picker, issue #1270): wherever a row is not a whole number of units tall, a box showing
+    -- all its rows reads up to half a unit "taller" than them once it rounds its height (ScrollBoxBaseMixin:GetVisibleExtent
+    -- rounds), and the bar showed over the rows with nothing to scroll.
+    it("hides while what is left to scroll is the half unit the box rounds away", function()
+      make()
+      box._extent = 250.45
+      box:FullUpdate(true)
+      assert.is_false(bar.frame:IsShown(), "under half a unit")
+      box._extent = 250.6
+      box:FullUpdate(true)
+      assert.is_true(bar.frame:IsShown(), "more than the rounding")
+    end)
+
     it("lays its thumb out again when it changes size", function()
       make()
       box:FullUpdate(true)

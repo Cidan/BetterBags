@@ -181,7 +181,9 @@ function barProto:Bind(box)
 end
 
 -- OnScroll follows the box: how far it is scrolled and how much of its content it shows. The bar
--- shows only while there is something to scroll.
+-- shows only while there is something to scroll: more than the half unit the box loses rounding its height
+-- (ScrollBoxBaseMixin:GetVisibleExtent), which left content that all shows up to half a unit "taller" than the box
+-- wherever its rows are not a whole number of units tall, and showed the bar over it.
 ---@param percentage number
 ---@param visible number
 function barProto:OnScroll(percentage, visible)
@@ -189,6 +191,7 @@ function barProto:OnScroll(percentage, visible)
   self.percentage = percentage or 0
   self.visible = visible or 0
   local scrollable = self.visible > 0.0001 and self.visible < 0.9999
+    and (self.box == nil or self.box:GetDerivedScrollRange() > 0.5)
   local shown = self.frame:IsShown()
   self.frame:SetShown(scrollable)
   if scrollable and not shown then

@@ -875,12 +875,12 @@ sonataNext:RegisterTheme({
       HoverFill = { Color = "Lavender", Alpha = 0.14 },
       Font = "MenuItem", SelectedFont = "MenuItemSelected",
       Check = { Texture = "IconCheck", Color = "Gold", Size = 12 },
-      -- A menu to find a choice in by typing (the category picker): at least Width wide; its head (an icon IconSize
-      -- square in an item grid cell's edge, its text in HeadFont and a note under it in NoteFont) and its field, each
-      -- Gap above what follows; a choice's dot Dot square before its name, and its note at its right in NoteFont; the
-      -- glyphs where the check goes on the choice that makes a new category (NewIcon) and the one that takes the item
-      -- back to where it belongs (BackIcon).
-      Picker = { Width = 280, Gap = 8, IconSize = 32, Dot = 8, HeadFont = "DialogTitle", NoteFont = "ControlMuted",
+      -- A menu to find a choice in by typing (the category picker): at least Width wide, MaxRows rows before it scrolls
+      -- (a long list read at a glance); its head (an icon IconSize square in an item grid cell's edge, its text in
+      -- HeadFont and a note under it in NoteFont) and its field, each Gap above what follows; a choice's dot Dot square
+      -- before its name, and its note at its right in NoteFont; the glyphs where the check goes on the choice that makes
+      -- a new category (NewIcon) and the one that takes the item back to where it belongs (BackIcon).
+      Picker = { Width = 280, MaxRows = 18, Gap = 8, IconSize = 32, Dot = 8, HeadFont = "DialogTitle", NoteFont = "ControlMuted",
         NewIcon = { Texture = "IconPlus", Color = "Gold" }, BackIcon = { Texture = "IconBack", Color = "Lavender" } },
     },
     -- A color swatch: Size square, its edge idle and under the pointer.

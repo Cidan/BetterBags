@@ -315,18 +315,18 @@ describe("NextMenu, with a field to find a choice", function()
   it("keeps the lit choice in sight as the light moves past the rows shown", function()
     local many = function(text)
       local list = {}
-      for i = 1, M().MaxRows + 6 do
+      for i = 1, P().MaxRows + 6 do
         list[i] = { text = "Choice " .. i, value = i }
       end
       return list, text ~= "" and 1 or nil
     end
     open(nil, many)
     local box = nextMenu.box
-    for _ = 1, M().MaxRows + 3 do
+    for _ = 1, P().MaxRows + 3 do
       press("DOWN")
     end
     local offset = box:GetDerivedScrollOffset()
-    local row = (M().MaxRows + 3 - 1) * M().ItemHeight
+    local row = (P().MaxRows + 3 - 1) * M().ItemHeight
     assert.is_true(offset > 0, "scrolled")
     assert.is_true(row >= offset and row + M().ItemHeight <= offset + box:GetVisibleExtent() + 0.5, "the lit row is seen")
   end)
@@ -406,7 +406,7 @@ describe("NextMenu, with a field to find a choice", function()
     end
     open(nil, function()
       local list = {}
-      for i = 1, M().MaxRows + 6 do
+      for i = 1, P().MaxRows + 6 do
         list[i] = { text = "Choice " .. i, value = i, note = i .. " items" }
       end
       return list, nil
@@ -421,7 +421,7 @@ describe("NextMenu, with a field to find a choice", function()
   -- Found in review: typing lit a row below the rows shown, and a theme applied while it was open scrolled back to the
   -- top, leaving the lit row out of sight: Enter took a choice the player could not see.
   it("keeps the lit choice in sight as the choices are read again, and as a theme restyles it", function()
-    local n = M().MaxRows + 8
+    local n = P().MaxRows + 8
     local function inSight(i)
       local box, height = nextMenu.box, M().ItemHeight
       local offset = box:GetDerivedScrollOffset()
@@ -432,45 +432,101 @@ describe("NextMenu, with a field to find a choice", function()
       for i = 1, n do
         list[i] = { text = "Choice " .. i, value = i }
       end
-      return list, text ~= "" and (M().MaxRows + 4) or nil
+      return list, text ~= "" and (P().MaxRows + 4) or nil
     end)
     typeText("c")
-    assert.are.same({ M().MaxRows + 4 }, lit())
-    assert.is_true(inSight(M().MaxRows + 4), "after typing")
+    assert.are.same({ P().MaxRows + 4 }, lit())
+    assert.is_true(inSight(P().MaxRows + 4), "after typing")
     press("DOWN")
     press("DOWN")
     nextMenu:ApplyStyle()
-    assert.are.same({ M().MaxRows + 6 }, lit())
-    assert.is_true(inSight(M().MaxRows + 6), "after a restyle")
+    assert.are.same({ P().MaxRows + 6 }, lit())
+    assert.is_true(inSight(P().MaxRows + 6), "after a restyle")
   end)
 
-  -- Found in the second review: rows a whole number of pixels tall are a fraction of a unit tall on a 4K screen, and the
-  -- box rounds what it shows (ScrollBox.lua GetVisibleExtent), so a menu that does not scroll had a range of a third of a
-  -- pixel, and lighting its last row scrolled it a pixel up.
+  -- Found in the second review: rows a whole number of pixels are a fraction of a unit tall wherever a row is not a whole
+  -- number of units, and the box rounds what it shows (ScrollBox.lua GetVisibleExtent), so a menu whose rows all show had
+  -- a range of up to half a unit (on a 4K screen at UI scale 1, 0.42 with 8 rows, more than a pixel's 0.36), and lighting
+  -- its last row scrolled it.
   it("never scrolls a menu whose rows all show, however its rows round on the screen", function()
     local screenSize = _G.GetPhysicalScreenSize
+    finally(function() _G.GetPhysicalScreenSize = screenSize end)
+    _G.GetPhysicalScreenSize = function() return 3840, 2160 end
+    for _, n in ipairs({ 2, 8, 14 }) do
+      open(nil, function(text)
+        local list = {}
+        for i = 1, n do
+          list[i] = { text = "Choice " .. i, value = i }
+        end
+        return list, text ~= "" and n or nil
+      end)
+      typeText("c")
+      assert.are.equal(0, nextMenu.box:GetDerivedScrollOffset(), n .. " rows, typed")
+      press("UP")
+      press("DOWN")
+      assert.are.equal(0, nextMenu.box:GetDerivedScrollOffset(), n .. " rows, arrows")
+      nextMenu:Close()
+    end
+  end)
+
+  -- Seen in game: a picker of three categories, all shown, drew its scroll bar over their notes.
+  it("shows no scroll bar while its rows all show, however they round on the screen", function()
+    local screenSize = _G.GetPhysicalScreenSize
+    finally(function() _G.GetPhysicalScreenSize = screenSize end)
     _G.GetPhysicalScreenSize = function() return 3840, 2160 end
     open(nil, function(text)
-      return { { text = "One", value = 1 }, { text = "Two", value = 2 } }, text ~= "" and 2 or nil
+      return { { text = "Keep", value = 1, note = "7 items" }, { text = "Junk", value = 2, note = "1 item" } },
+        text ~= "" and 2 or nil
     end)
-    typeText("t")
-    local offset = nextMenu.box:GetDerivedScrollOffset()
-    press("UP")
-    press("DOWN")
-    local afterArrows = nextMenu.box:GetDerivedScrollOffset()
-    _G.GetPhysicalScreenSize = screenSize
-    assert.are.equal(0, offset)
-    assert.are.equal(0, afterArrows)
+    assert.is_false(nextMenu.bar.frame:IsShown())
+    typeText("j")
+    assert.is_false(nextMenu.bar.frame:IsShown())
+  end)
+
+  -- Asked: "make sure the window is reasonably long as well in general (when there are enough categories) -- generally
+  -- speaking, micro windows with tiny interactions for lots of elements is bad."
+  it("shows up to Picker.MaxRows choices before it scrolls, more than a menu without a field", function()
+    local n = P().MaxRows + 5
+    local frame = open(nil, function()
+      local list = {}
+      for i = 1, n do
+        list[i] = { text = "Choice " .. i, value = i }
+      end
+      return list, nil
+    end)
+    assert.is_true(P().MaxRows > M().MaxRows)
+    local I = style.Theme.Controls.Input
+    assert.are.equal(I.Height + P().Gap + P().MaxRows * M().ItemHeight + 2 * M().Padding, frame:GetHeight())
+    assert.is_true(nextMenu.bar.frame:IsShown())
+    nextMenu:Close()
+    -- More rows than a dropdown shows, but no more than it does: no bar, and no room left at the right for one.
+    open(nil, function()
+      local list = {}
+      for i = 1, M().MaxRows + 1 do
+        list[i] = { text = "Choice " .. i, value = i, note = "1 item" }
+      end
+      return list, nil
+    end)
+    assert.is_false(nextMenu.bar.frame:IsShown())
+    local _, _, _, noteX = nextMenu:Rows()[1].note:GetPoint(1)
+    assert.are.equal(-M().Padding + 0.25, noteX)
+    nextMenu:Close()
+    local plain = {}
+    for i = 1, n do
+      plain[i] = { text = "Choice " .. i, value = i }
+    end
+    nextMenu:Open(anchor, { items = plain, onPick = function() end })
+    assert.are.equal(M().MaxRows * M().ItemHeight + 2 * M().Padding, nextMenu.frame:GetHeight(), "a dropdown as before")
   end)
 
   -- Found in the second review: each keystroke put the list back at the top, then glided it down to the lit choice.
   it("jumps to the lit choice as the choices are read again, and glides as the arrow keys move the light", function()
     open(nil, function(text)
       local list = {}
-      for i = 1, M().MaxRows + 8 do
+      for i = 1, P().MaxRows + 8 do
         list[i] = { text = "Choice " .. i, value = i }
       end
-      return list, text ~= "" and (M().MaxRows + 4) or nil
+      return list, text ~= "" and (P().MaxRows + 4) or nil
     end)
     typeText("c")
     assert.is_true(nextMenu.box:GetDerivedScrollOffset() > 0)
