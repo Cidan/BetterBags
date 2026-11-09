@@ -274,6 +274,9 @@ sonataNext:RegisterTheme({
       -- The header's actions in the bag button's menu; only the close button (pinned, in Clients) stays in the header.
       Menu = BAG_BUTTON,
     },
+    -- An item dropped on the bag button goes in a category (asked: "in the case of Plain, the bag button"), as the
+    -- original bags' button made a category of one.
+    ItemDrop = { Target = "Menu" },
   },
 
   -- The bag search box as Blizzard draws it (BagSearchBoxTemplate's InputBoxVisualTemplate border), 20 in and 10 from the

@@ -48,6 +48,8 @@ local DEFAULT_WIDTH = 200
 ---@field onChange? fun(ctx: Context, text: string, userInput: boolean)
 ---@field onEnter? fun(ctx: Context, text: string)
 ---@field commitOnBlur? boolean Losing focus with its text changed commits it too (calls onEnter), as Enter does.
+---@field onArrow? fun(ctx: Context, key: string) An arrow key pressed while it is focused ("UP", "DOWN", "LEFT", "RIGHT").
+---@field onEscape? fun(ctx: Context) Escape pressed, after it put its text back and let go of focus.
 ---@field icon? fun(): {Texture: string, Size: number, Color: string} An icon inside its left edge (the settings' magnifier), read from the theme every time it is styled.
 
 ---@class NextInputFrame
@@ -120,8 +122,18 @@ function nextInput:Create(parent, opts)
   addon.SetScript(frame, "OnLeave", function() f:SetHovered(false) end)
   addon.SetScript(frame, "OnEditFocusGained", function() f:OnFocus(true) end)
   addon.SetScript(frame, "OnEditFocusLost", function() f:OnFocus(false) end)
-  addon.SetScript(frame, "OnEscapePressed", function() f:Cancel() end)
+  addon.SetScript(frame, "OnEscapePressed", function(ctx)
+    f:Cancel()
+    if opts.onEscape then
+      opts.onEscape(ctx)
+    end
+  end)
   addon.SetScript(frame, "OnEnterPressed", function(ctx) f:Commit(ctx) end)
+  addon.SetScript(frame, "OnArrowPressed", function(ctx, _, key)
+    if opts.onArrow then
+      opts.onArrow(ctx, key)
+    end
+  end)
   addon.SetScript(frame, "OnTextChanged", function(ctx, _, userInput) f:OnTextChanged(ctx, userInput) end)
   table.insert(self.all, f)
   sonataNext:RegisterWidget(self)

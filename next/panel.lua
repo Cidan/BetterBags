@@ -269,8 +269,9 @@ end
 ---@field ribbonLines Texture[] The ribbon and its glow lines.
 ---@field ribbonLength number How far the ribbon reaches from the body: full length, or the middle of
 --- the gap while coupled.
----@field titleButton Button Over the title: a click chains (next.md §12).
+---@field titleButton Button Over the title: a click chains (next.md §12); an item dropped on it opens the category picker, where the theme takes it there (Header.ItemDrop).
 ---@field titleGlow Texture Behind the title, lit while the pointer is over it.
+---@field itemDropGlow Texture Behind the title, lit while an item it would take is held over it (Header.ItemDrop.Highlight).
 ---@field braid NextBraid This bag's half of the braid while coupled.
 ---@field knotSparkles NextSparkleEmitter Bursts from the knot as the pair couples.
 ---@field sparkSpread number How far out from the body the ribbon's sparkles are born.
@@ -312,6 +313,7 @@ end
 ---@field loaded boolean
 ---@field bankTab? number
 ---@field watchesCooldowns? boolean It refreshes its buttons' cooldowns (the backpack).
+---@field categorizes? boolean An item dropped on its title (or bag button) goes in a category (the backpack, the bank).
 ---@field size NextSize "full" height on its screen edge, or "small" and movable (docs/next-small-mode.md).
 ---@field edges Texture[] A small panel's 1-pixel lavender edge, all round.
 ---@field mover Frame A small panel's title row, dragged to move it.
@@ -3746,6 +3748,39 @@ function panelProto:onHeaderItem(ctx, section)
   sectionFrame:OnTitleClickOrDrop(ctx, self:titleAdapter(section))
 end
 
+-- ItemDropTarget names where this panel takes an item to put it in a category (issue #1270): the theme's
+-- Header.ItemDrop.Target ("Title", or "Menu" for its bag button), on a panel that files items (the backpack, the bank);
+-- nil anywhere else.
+---@return "Title"|"Menu"|nil
+function panelProto:ItemDropTarget()
+  local D = style.Theme.Header.ItemDrop
+  if not self.categorizes or type(D) ~= "table" then
+    return nil
+  end
+  return D.Target
+end
+
+-- PickCategory takes the item on the cursor to the category picker (NextCategoryPicker) under anchor: what the bags
+-- hold of it and where it lands without its category by hand are read first, as a header drop reads them, then the item
+-- goes back to its slot while the player picks. Only an item: a merchant's (buying by drag) or anything else stays on
+-- the cursor. It returns what it did.
+---@param ctx Context
+---@param anchor Frame
+---@return "picking"|"ignored"
+function panelProto:PickCategory(ctx, anchor)
+  local cursorType, itemID, link = GetCursorInfo()
+  if cursorType ~= "item" or not itemID then
+    return "ignored"
+  end
+  local data = cursorItemData(itemID)
+  local natural = data and items:NaturalCategory(ctx, data) or nil
+  ClearCursor()
+  GameTooltip:Hide()
+  self:lightItemDrop(false)
+  addon:GetModule('NextCategoryPicker'):Open(ctx, anchor, { itemID = itemID, link = link, data = data, natural = natural })
+  return "picking"
+end
+
 -- OnHeaderClick takes an item clicked onto a header (onHeaderItem), and moves a section to the open
 -- window on a right click (Move Categories).
 ---@param ctx Context
@@ -4261,17 +4296,19 @@ function panelProto:styleHeader()
     self.cloud.swell = 0
   end
 
-  local glow, G = self.titleGlow, H.TitleGlow
-  glow:ClearAllPoints()
-  if G then
-    local alpha = glow:GetAlpha()
-    style:Paint(glow, { Texture = G.Texture, Color = G.Color, BlendMode = G.BlendMode or "ADD" })
-    glow:SetAlpha(alpha)
-    glow:Show()
-  else
-    tween:Stop(glow)
-    glow:SetAlpha(0)
-    glow:Hide()
+  for _, part in ipairs({ { self.titleGlow, H.TitleGlow }, { self.itemDropGlow, self:itemDropGlowSpec() } }) do
+    local glow, G = part[1], part[2]
+    glow:ClearAllPoints()
+    if G then
+      local alpha = glow:GetAlpha()
+      style:Paint(glow, { Texture = G.Texture, Color = G.Color, BlendMode = G.BlendMode or "ADD" })
+      glow:SetAlpha(alpha)
+      glow:Show()
+    else
+      tween:Stop(glow)
+      glow:SetAlpha(0)
+      glow:Hide()
+    end
   end
 
   self:styleBraid()
@@ -4422,18 +4459,21 @@ function panelProto:placeTitleRow()
   local half = pixel:Floor(body, join:GetWidth() / 2)
   join:ClearAllPoints()
   join:SetPoint("TOPLEFT", body, corner, -half, -(middle - pixel:Floor(body, join:GetHeight() / 2)))
-  local glow, G = self.titleGlow, H.TitleGlow
-  if G then
-    local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
-    local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
-    local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
-    glow:ClearAllPoints()
-    if left then
-      glow:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - gx), -(top - gy))
-    else
-      glow:SetPoint("TOPLEFT", body, "TOPLEFT", inset - gx, -(top - gy))
+  -- The title's glow and the item drop's, each X past the title's text on each side and Y above and below it.
+  for _, part in ipairs({ { self.titleGlow, H.TitleGlow }, { self.itemDropGlow, self:itemDropGlowSpec() } }) do
+    local glow, G = part[1], part[2]
+    if G then
+      local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
+      local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
+      local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
+      glow:ClearAllPoints()
+      if left then
+        glow:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - gx), -(top - gy))
+      else
+        glow:SetPoint("TOPLEFT", body, "TOPLEFT", inset - gx, -(top - gy))
+      end
+      glow:SetSize(math.max(pixel:Unit(body), width), (fontHeight or 0) + 2 * gy)
     end
-    glow:SetSize(math.max(pixel:Unit(body), width), (fontHeight or 0) + 2 * gy)
   end
   -- The title's button covers its text, 8 past it across and 6 above and below, hung from the body by the title's
   -- own numbers, never from the title: a title showing a secret has secret anchoring, and so would every region
@@ -4457,17 +4497,30 @@ function panelProto:BuildTitleButton()
   local glow = frame:CreateTexture(nil, "ARTWORK", nil, -3)
   glow:SetAlpha(0)
   self.titleGlow = glow
+  local dropGlow = frame:CreateTexture(nil, "ARTWORK", nil, -3)
+  dropGlow:SetAlpha(0)
+  self.itemDropGlow = dropGlow
 
   -- Placed with the title (placeTitleRow).
   local button = CreateFrame("Button", nil, frame)
   button:SetFrameLevel(frame:GetFrameLevel() + 55)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   addon.SetScript(button, "OnClick", function(ctx, _, mouse)
+    if mouse == "LeftButton" and GetCursorInfo() == "item" and self:ItemDropTarget() == "Title" then
+      self:PickCategory(ctx, button)
+      return
+    end
     if mouse == "RightButton" then
       self:OnTitleRightClick(ctx)
       return
     end
     chain:Click(ctx, self)
+  end)
+  -- An item dropped on the title goes in a category, where the theme takes it there (Header.ItemDrop).
+  addon.SetScript(button, "OnReceiveDrag", function(ctx)
+    if self:ItemDropTarget() == "Title" then
+      self:PickCategory(ctx, button)
+    end
   end)
   -- Dragging the title moves a small panel, as its title row does.
   button:RegisterForDrag("LeftButton")
@@ -4478,8 +4531,14 @@ function panelProto:BuildTitleButton()
     self:StopMove()
   end)
   addon.SetScript(button, "OnEnter", function()
+    local point = self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT"
+    if GetCursorInfo() == "item" and self:ItemDropTarget() == "Title" then
+      self:lightItemDrop(true)
+      addon:GetModule('NextCategoryPicker'):Hint(button, point)
+      return
+    end
     self:lightTitle(true)
-    GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
+    GameTooltip:SetOwner(button, point)
     GameTooltip:SetText(self.label)
     GameTooltip:AddLine(chain:Tooltip(self), 1, 1, 1, true)
     local hint = self:TitleRightClickHint()
@@ -4490,9 +4549,41 @@ function panelProto:BuildTitleButton()
   end)
   addon.SetScript(button, "OnLeave", function()
     self:lightTitle(false)
+    self:lightItemDrop(false)
     GameTooltip:Hide()
   end)
   self.titleButton = button
+end
+
+-- itemDropGlowSpec is the glow behind the title while an item it would take is held over it (Header.ItemDrop.Highlight),
+-- for a theme that takes the item on the title; none otherwise.
+---@private
+---@return table?
+function panelProto:itemDropGlowSpec()
+  local D = style.Theme.Header.ItemDrop
+  if type(D) ~= "table" or D.Target ~= "Title" then
+    return nil
+  end
+  return D.Highlight or nil
+end
+
+-- lightItemDrop fades the title's item drop glow in while an item it would take is held over it, and out after.
+---@private
+---@param on boolean
+function panelProto:lightItemDrop(on)
+  local glow, D = self.itemDropGlow, self:itemDropGlowSpec()
+  if not D then
+    return
+  end
+  tween:Play(glow, {
+    duration = style.Time.Hover,
+    from = glow:GetAlpha(),
+    to = on and D.Alpha or 0,
+    ease = style:Ease("Hover"),
+    onUpdate = function(v)
+      glow:SetAlpha(v)
+    end,
+  })
 end
 
 -- OnTitleRightClick runs a right click on the title: nothing, unless its kind says otherwise (the backpack sorts).

@@ -206,6 +206,7 @@ next\dock.lua
 next\drag.lua
 next\chain.lua
 next\ornaments.lua
+next\categorypicker.lua
 next\menubutton.lua
 next\glitch.lua
 next\rain.lua

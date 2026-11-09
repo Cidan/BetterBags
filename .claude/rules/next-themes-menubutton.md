@@ -43,6 +43,12 @@ should have their portrait for the bag button, not the bag texture" (docs/next-p
   Repair All and Repair With Guild Funds (their costs: `RepairLines`, shared with the header's tooltips), the guild bank's
   Deposit Gold and Withdraw Gold (`WithdrawLines`), Open Options Screen last on each. The vendor's filter opens from the
   bag button while the filter button is in the menu (`OpenFilter`).
+- **An item dropped on it** (issue #1270, next-category-picker.md): in a theme whose `Header.ItemDrop.Target` is
+  `"Menu"` (Plain), on a panel that files items (the backpack, the bank), an item dropped or left-clicked onto the button
+  opens the category picker under it in place of its menu (asked: "drag an item to the bag name (or in the case of Plain,
+  the bag button ...)"), as the original bags' button made a category of one; while an item is held over it, its
+  highlight lights and its tooltip says what a drop does (`NextCategoryPicker:Hint`). Anything else held (a merchant's
+  item) leaves it the menu button it is.
 - **Drawn again on each show** (`Paint`), so a vendor's portrait is the vendor now.
 - **Checked** (`SonataNext:Check`): a corner by its side, the size, art in every layer (its own and each panel's), the
   panels it names.

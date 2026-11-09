@@ -54,6 +54,7 @@ local nextBag = addon:NewModule('NextBag')
 ---@field currencyStrip NextCurrencyStripFrame The currencies at the bottom, where the free slots were (currency.md).
 local bagProto = nextPanel:Extend({}, 'NextBackpack')
 bagProto.watchesCooldowns = true
+bagProto.categorizes = true
 
 ---@param ctx Context
 ---@return NextBackpack

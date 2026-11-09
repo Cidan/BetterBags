@@ -6,7 +6,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
-  { "NextMenu", "next/controls/menu.lua" }, { "NextDropdown", "next/controls/dropdown.lua" } }) do
+  { "NextInput", "next/controls/input.lua" }, { "NextMenu", "next/controls/menu.lua" }, { "NextDropdown", "next/controls/dropdown.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -174,6 +174,396 @@ describe("NextMenu", function()
     UseNextTheme({ Controls = { Menu = { ItemHeight = 30 } } })
     nextMenu:ApplyStyle()
     assert.are.equal(2 * 30 + 2 * M().Padding, frame:GetHeight())
+  end)
+end)
+
+-- A menu to find a choice in by typing (issue #1270: the category picker an item dropped on a bag's title opens): a
+-- head saying what it is for, a field over the choices that reads them again as the player types, the choice Enter
+-- takes lit, Up and Down moving the light.
+describe("NextMenu, with a field to find a choice", function()
+  local anchor, saved, picked, seen
+
+  local NAMES = { "Travel", "Toys", "Trade Goods", "Junk" }
+
+  local function P()
+    return style.Theme.Controls.Menu.Picker
+  end
+
+  -- choices lists the names with the text in them, Junk disabled (a plugin's), each with a red dot; the first lit
+  -- once something is typed.
+  local function choices(text)
+    table.insert(seen, text)
+    local list = {}
+    for _, name in ipairs(NAMES) do
+      if text == "" or name:lower():find(text:lower(), 1, true) then
+        table.insert(list, { text = name, value = name, color = { 1, 0, 0 }, disabled = name == "Junk",
+          note = name == "Junk" and "Made by a plugin" or nil })
+      end
+    end
+    return list, text ~= "" and 1 or nil
+  end
+
+  local function open(head, items)
+    nextMenu:Open(anchor, { head = head, filter = { help = "Find a category", items = items or choices },
+      onPick = function(_, item) table.insert(picked, item.value) end })
+    return nextMenu.frame
+  end
+
+  local function typeText(text)
+    local field = nextMenu.field.frame
+    field:SetText(text)
+    field:GetScript("OnTextChanged")(field, true)
+  end
+
+  local function press(key)
+    nextMenu.field.frame:GetScript("OnArrowPressed")(nextMenu.field.frame, key)
+  end
+
+  local function lit()
+    local out = {}
+    for i, row in ipairs(nextMenu:Rows()) do
+      if row.hover:IsShown() then table.insert(out, i) end
+    end
+    return out
+  end
+
+  before_each(function()
+    picked, seen = {}, {}
+    saved = { _G.UISpecialFrames, C_Timer.After }
+    _G.UISpecialFrames = {}
+    C_Timer.After = function(_, fn) fn() end
+    controls.escape = {}
+    anchor = CreateFrame("Button", nil, CreateFrame("Frame"))
+    anchor:SetSize(120, 26)
+    anchor:Show()
+  end)
+
+  after_each(function()
+    nextMenu:Close()
+    _G.UISpecialFrames, C_Timer.After = saved[1], saved[2]
+    UseNextTheme(nil)
+    nextMenu:ApplyStyle()
+  end)
+
+  it("shows its head and its field above the choices, the field focused, at least Picker.Width wide", function()
+    local frame = open({ icon = 134400, text = "Hearthstone", note = "In Travel" })
+    local I = style.Theme.Controls.Input
+    assert.are.equal(134400, nextMenu.headIcon:GetTexture())
+    assert.are.same({ P().IconSize, P().IconSize }, { nextMenu.headFrame:GetSize() })
+    assert.are.equal("Hearthstone", nextMenu.headText:GetText())
+    assert.are.equal(style:Font(P().HeadFont), nextMenu.headText:GetFontObject())
+    assert.are.equal("In Travel", nextMenu.headNote:GetText())
+    assert.are.equal(style:Font(P().NoteFont), nextMenu.headNote:GetFontObject())
+    assert.is_true(nextMenu.field.frame:IsShown())
+    assert.is_true(nextMenu.field.frame:HasFocus())
+    assert.are.equal("Find a category", nextMenu.field.help:GetText())
+    assert.are.same({ "" }, seen, "its choices read for an empty field")
+    assert.is_true(frame:GetWidth() >= P().Width)
+    local above = P().IconSize + P().Gap + I.Height + P().Gap
+    assert.are.same({ "TOPLEFT", frame, "TOPLEFT", M().Padding, -(M().Padding + above) }, { nextMenu.box:GetPoint(1) })
+    assert.are.equal(above + 4 * M().ItemHeight + 2 * M().Padding, frame:GetHeight())
+    assert.are.same({}, lit(), "nothing lit until something is typed")
+  end)
+
+  it("leaves out a head it was not given, and both from a menu without a field", function()
+    local frame = open(nil)
+    local I = style.Theme.Controls.Input
+    assert.is_false(nextMenu.headFrame:IsShown() or nextMenu.headText:IsShown() or nextMenu.headNote:IsShown())
+    assert.are.same({ "TOPLEFT", frame, "TOPLEFT", M().Padding, -(M().Padding + I.Height + P().Gap) },
+      { nextMenu.box:GetPoint(1) })
+    nextMenu:Close()
+    nextMenu:Open(anchor, { items = { { text = "One", value = 1 } }, onPick = function() end })
+    assert.is_false(nextMenu.field.frame:IsShown())
+    assert.is_false(nextMenu.headFrame:IsShown())
+    assert.are.same({ "TOPLEFT", nextMenu.frame, "TOPLEFT", M().Padding, -M().Padding }, { nextMenu.box:GetPoint(1) })
+  end)
+
+  it("reads its choices again as the player types, lighting the one Enter takes", function()
+    open(nil)
+    typeText("t")
+    assert.are.same({ "", "t" }, seen)
+    assert.are.same({ "Travel", "Toys", "Trade Goods" }, (function()
+      local out = {}
+      for _, row in ipairs(nextMenu:Rows()) do table.insert(out, row.label:GetText()) end
+      return out
+    end)())
+    assert.are.same({ 1 }, lit())
+    typeText("toy")
+    assert.are.equal(1, #nextMenu:Rows())
+    assert.are.same({ 1 }, lit())
+    assert.is_true(nextMenu.field.frame:HasFocus(), "still typing")
+  end)
+
+  it("moves the light with Up and Down, past choices it cannot take, and no further than the ends", function()
+    open(nil)
+    press("DOWN")
+    assert.are.same({ 1 }, lit())
+    press("DOWN")
+    press("DOWN")
+    assert.are.same({ 3 }, lit())
+    press("DOWN")
+    assert.are.same({ 3 }, lit(), "Junk, a plugin's, is never lit")
+    press("UP")
+    assert.are.same({ 2 }, lit())
+    press("UP")
+    press("UP")
+    assert.are.same({ 1 }, lit())
+    press("LEFT")
+    assert.are.same({ 1 }, lit(), "Left and Right move the text's cursor, not the light")
+  end)
+
+  it("keeps the lit choice in sight as the light moves past the rows shown", function()
+    local many = function(text)
+      local list = {}
+      for i = 1, P().MaxRows + 6 do
+        list[i] = { text = "Choice " .. i, value = i }
+      end
+      return list, text ~= "" and 1 or nil
+    end
+    open(nil, many)
+    local box = nextMenu.box
+    for _ = 1, P().MaxRows + 3 do
+      press("DOWN")
+    end
+    local offset = box:GetDerivedScrollOffset()
+    local row = (P().MaxRows + 3 - 1) * M().ItemHeight
+    assert.is_true(offset > 0, "scrolled")
+    assert.is_true(row >= offset and row + M().ItemHeight <= offset + box:GetVisibleExtent() + 0.5, "the lit row is seen")
+  end)
+
+  it("takes the lit choice on Enter, closing; with none lit, Enter closes, taking nothing", function()
+    open(nil)
+    typeText("toy")
+    nextMenu.field.frame:GetScript("OnEnterPressed")(nextMenu.field.frame)
+    assert.are.same({ "Toys" }, picked)
+    assert.is_false(nextMenu.frame:IsShown())
+    open(nil)
+    nextMenu.field.frame:GetScript("OnEnterPressed")(nextMenu.field.frame)
+    assert.are.same({ "Toys" }, picked)
+    assert.is_false(nextMenu.frame:IsShown())
+  end)
+
+  it("closes on Escape in its field, letting go of focus", function()
+    open(nil)
+    nextMenu.field.frame:GetScript("OnEscapePressed")(nextMenu.field.frame)
+    assert.is_false(nextMenu.frame:IsShown())
+    assert.is_false(nextMenu.field.frame:HasFocus())
+  end)
+
+  it("keeps the light where the pointer leaves it, so Enter takes what was last pointed at", function()
+    open(nil)
+    local row = nextMenu:Rows()[2]
+    row.frame:GetScript("OnEnter")(row.frame)
+    row.frame:GetScript("OnLeave")(row.frame)
+    assert.are.same({ 2 }, lit())
+    nextMenu.field.frame:GetScript("OnEnterPressed")(nextMenu.field.frame)
+    assert.are.same({ "Toys" }, picked)
+  end)
+
+  it("draws each choice's dot in its color before its name, and its note at its right", function()
+    open(nil)
+    local travel, junk = nextMenu:Rows()[1], nextMenu:Rows()[4]
+    assert.is_true(travel.dot:IsShown())
+    local c = travel.dot._colorTexture
+    assert.are.same({ 1, 0, 0, 1 }, { c.r, c.g, c.b, c.a })
+    assert.are.same({ P().Dot, P().Dot }, { travel.dot:GetSize() })
+    local _, _, _, dotX = travel.dot:GetPoint(1)
+    local _, _, _, labelX = travel.label:GetPoint(1)
+    -- A text sits a quarter pixel right of its whole pixel (next-pixel-perfect.md §2).
+    assert.are.equal(dotX + P().Dot + M().Padding + 0.25, labelX, "the name after its dot")
+    assert.is_false(travel.note:IsShown())
+    assert.is_true(junk.note:IsShown())
+    assert.are.equal("Made by a plugin", junk.note:GetText())
+    assert.are.equal(style:Font(P().NoteFont), junk.note:GetFontObject())
+    local point, rel = junk.note:GetPoint(1)
+    assert.are.same({ "TOPRIGHT", junk.frame }, { point, rel })
+    nextMenu:Close()
+    nextMenu:Open(anchor, { items = { { text = "One", value = 1 } }, onPick = function() end })
+    assert.is_false(nextMenu:Rows()[1].dot:IsShown() or nextMenu:Rows()[1].note:IsShown(), "a menu without them")
+  end)
+
+  it("moves the light past a choice it cannot take between two it can", function()
+    open(nil, function(text)
+      local list = {}
+      for _, name in ipairs(NAMES) do
+        table.insert(list, { text = name, value = name, disabled = name == "Toys" })
+      end
+      return list, text ~= "" and 1 or nil
+    end)
+    press("DOWN")
+    press("DOWN")
+    assert.are.same({ 3 }, lit(), "Trade Goods, past Toys")
+    press("UP")
+    assert.are.same({ 1 }, lit(), "Travel, past Toys")
+  end)
+
+  -- Found in review: a note at its row's right edge sat under the scroll bar, which sits over the rows' right edge.
+  it("keeps each choice's note clear of the scroll bar in a menu that scrolls", function()
+    local S = style.Theme.Controls.ScrollBar
+    local function noteX()
+      local _, _, _, x = nextMenu:Rows()[1].note:GetPoint(1)
+      return x
+    end
+    open(nil, function()
+      local list = {}
+      for i = 1, P().MaxRows + 6 do
+        list[i] = { text = "Choice " .. i, value = i, note = i .. " items" }
+      end
+      return list, nil
+    end)
+    assert.are.equal(-(M().Padding + S.Width + S.Inset) + 0.25, noteX())
+    nextMenu:Close()
+    open(nil)
+    local _, _, _, x = nextMenu:Rows()[4].note:GetPoint(1)
+    assert.are.equal(-M().Padding + 0.25, x, "no bar, no room for one")
+  end)
+
+  -- Found in review: typing lit a row below the rows shown, and a theme applied while it was open scrolled back to the
+  -- top, leaving the lit row out of sight: Enter took a choice the player could not see.
+  it("keeps the lit choice in sight as the choices are read again, and as a theme restyles it", function()
+    local n = P().MaxRows + 8
+    local function inSight(i)
+      local box, height = nextMenu.box, M().ItemHeight
+      local offset = box:GetDerivedScrollOffset()
+      return (i - 1) * height >= offset - 0.5 and i * height <= offset + box:GetVisibleExtent() + 0.5
+    end
+    open(nil, function(text)
+      local list = {}
+      for i = 1, n do
+        list[i] = { text = "Choice " .. i, value = i }
+      end
+      return list, text ~= "" and (P().MaxRows + 4) or nil
+    end)
+    typeText("c")
+    assert.are.same({ P().MaxRows + 4 }, lit())
+    assert.is_true(inSight(P().MaxRows + 4), "after typing")
+    press("DOWN")
+    press("DOWN")
+    nextMenu:ApplyStyle()
+    assert.are.same({ P().MaxRows + 6 }, lit())
+    assert.is_true(inSight(P().MaxRows + 6), "after a restyle")
+  end)
+
+  -- Found in the second review: rows a whole number of pixels are a fraction of a unit tall wherever a row is not a whole
+  -- number of units, and the box rounds what it shows (ScrollBox.lua GetVisibleExtent), so a menu whose rows all show had
+  -- a range of up to half a unit (on a 4K screen at UI scale 1, 0.42 with 8 rows, more than a pixel's 0.36), and lighting
+  -- its last row scrolled it.
+  it("never scrolls a menu whose rows all show, however its rows round on the screen", function()
+    local screenSize = _G.GetPhysicalScreenSize
+    finally(function() _G.GetPhysicalScreenSize = screenSize end)
+    _G.GetPhysicalScreenSize = function() return 3840, 2160 end
+    for _, n in ipairs({ 2, 8, 14 }) do
+      open(nil, function(text)
+        local list = {}
+        for i = 1, n do
+          list[i] = { text = "Choice " .. i, value = i }
+        end
+        return list, text ~= "" and n or nil
+      end)
+      typeText("c")
+      assert.are.equal(0, nextMenu.box:GetDerivedScrollOffset(), n .. " rows, typed")
+      press("UP")
+      press("DOWN")
+      assert.are.equal(0, nextMenu.box:GetDerivedScrollOffset(), n .. " rows, arrows")
+      nextMenu:Close()
+    end
+  end)
+
+  -- Seen in game: a picker of three categories, all shown, drew its scroll bar over their notes.
+  it("shows no scroll bar while its rows all show, however they round on the screen", function()
+    local screenSize = _G.GetPhysicalScreenSize
+    finally(function() _G.GetPhysicalScreenSize = screenSize end)
+    _G.GetPhysicalScreenSize = function() return 3840, 2160 end
+    open(nil, function(text)
+      return { { text = "Keep", value = 1, note = "7 items" }, { text = "Junk", value = 2, note = "1 item" } },
+        text ~= "" and 2 or nil
+    end)
+    assert.is_false(nextMenu.bar.frame:IsShown())
+    typeText("j")
+    assert.is_false(nextMenu.bar.frame:IsShown())
+  end)
+
+  -- Asked: "make sure the window is reasonably long as well in general (when there are enough categories) -- generally
+  -- speaking, micro windows with tiny interactions for lots of elements is bad."
+  it("shows up to Picker.MaxRows choices before it scrolls, more than a menu without a field", function()
+    local n = P().MaxRows + 5
+    local frame = open(nil, function()
+      local list = {}
+      for i = 1, n do
+        list[i] = { text = "Choice " .. i, value = i }
+      end
+      return list, nil
+    end)
+    assert.is_true(P().MaxRows > M().MaxRows)
+    local I = style.Theme.Controls.Input
+    assert.are.equal(I.Height + P().Gap + P().MaxRows * M().ItemHeight + 2 * M().Padding, frame:GetHeight())
+    assert.is_true(nextMenu.bar.frame:IsShown())
+    nextMenu:Close()
+    -- More rows than a dropdown shows, but no more than it does: no bar, and no room left at the right for one.
+    open(nil, function()
+      local list = {}
+      for i = 1, M().MaxRows + 1 do
+        list[i] = { text = "Choice " .. i, value = i, note = "1 item" }
+      end
+      return list, nil
+    end)
+    assert.is_false(nextMenu.bar.frame:IsShown())
+    local _, _, _, noteX = nextMenu:Rows()[1].note:GetPoint(1)
+    assert.are.equal(-M().Padding + 0.25, noteX)
+    nextMenu:Close()
+    local plain = {}
+    for i = 1, n do
+      plain[i] = { text = "Choice " .. i, value = i }
+    end
+    nextMenu:Open(anchor, { items = plain, onPick = function() end })
+    assert.are.equal(M().MaxRows * M().ItemHeight + 2 * M().Padding, nextMenu.frame:GetHeight(), "a dropdown as before")
+  end)
+
+  -- Found in the second review: each keystroke put the list back at the top, then glided it down to the lit choice.
+  it("jumps to the lit choice as the choices are read again, and glides as the arrow keys move the light", function()
+    open(nil, function(text)
+      local list = {}
+      for i = 1, P().MaxRows + 8 do
+        list[i] = { text = "Choice " .. i, value = i }
+      end
+      return list, text ~= "" and (P().MaxRows + 4) or nil
+    end)
+    typeText("c")
+    assert.is_true(nextMenu.box:GetDerivedScrollOffset() > 0)
+    assert.is_true(nextMenu.box._noInterpolation, "at once")
+    for _ = 1, 3 do
+      press("DOWN")
+    end
+    assert.is_falsy(nextMenu.box._noInterpolation, "gliding")
+  end)
+
+  -- Found in review: crossing a plugin's row took the light (Enter's choice) away without moving it anywhere.
+  it("keeps the light where it was as the pointer crosses a choice it cannot take", function()
+    open(nil)
+    press("DOWN")
+    local junk = nextMenu:Rows()[4]
+    junk.frame:GetScript("OnEnter")(junk.frame)
+    junk.frame:GetScript("OnLeave")(junk.frame)
+    assert.are.same({ 1 }, lit())
+    nextMenu.field.frame:GetScript("OnEnterPressed")(nextMenu.field.frame)
+    assert.are.same({ "Travel" }, picked)
+  end)
+
+  -- A choice that does something other than choose (making a new category) shows a glyph where the check goes.
+  it("draws a choice's glyph where its check goes, in its color, with no ring", function()
+    UseNextTheme({ Controls = { Menu = { Check = { Texture = "IconCheck", Color = "Gold", Size = 12,
+      Off = { Atlas = "common-dropdown-tickradial" } } } } })
+    nextMenu:Open(anchor, { items = { { text = "New", value = 1, glyph = { Texture = "IconPlus", Color = "Lavender" } },
+      { text = "Two", value = 2 } }, onPick = function() end })
+    local new, two = nextMenu:Rows()[1], nextMenu:Rows()[2]
+    assert.is_true(new.check:IsShown())
+    assert.are.equal(style:TexturePath("IconPlus"), new.check:GetTexture())
+    local r, g, b = style:RGBA("Lavender")
+    local vr, vg, vb = new.check:GetVertexColor()
+    assert.are.same({ r, g, b }, { vr, vg, vb })
+    assert.is_false(new.ring:IsShown(), "no ring under a glyph")
+    assert.is_false(two.check:IsShown())
+    assert.is_true(two.ring:IsShown())
   end)
 end)
 

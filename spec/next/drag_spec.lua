@@ -39,6 +39,7 @@ local stubs = {
   question = trackStub("Question"),
   color = trackStub("Color"),
   elements = trackStub("SonataElements"),
+  picker = trackStub("NextCategoryPicker"),
 }
 
 local replaced = {}
@@ -1431,6 +1432,20 @@ describe("NextDrag", function()
       assert.are.same({}, calls.deposited)
       assert.are.same({}, calls.withdrawn)
     end)
+
+    -- Issue #1270: only the backpack and the bank file an item dropped on their title.
+    it("opens no category picker for an item dropped on its title", function()
+      local opened = 0
+      override(stubs.picker, "Open", function() opened = opened + 1 end)
+      override(stubs.picker, "Hint", function() opened = opened + 1 end)
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "item", 501
+      guild.titleButton:GetScript("OnReceiveDrag")(guild.titleButton)
+      guild.titleButton:GetScript("OnEnter")(guild.titleButton)
+      guild.titleButton:GetScript("OnLeave")(guild.titleButton)
+      assert.are.equal(0, opened)
+      assert.is_nil(guild:ItemDropTarget())
+      _G._cursorType, _G._cursorItemID = nil, nil
+    end)
   end)
 
   -- A panel that buys sections (BetterBags Next's vendor, next.md §10): a backpack section dropped
@@ -1989,6 +2004,154 @@ describe("NextDrag", function()
       local herbs = section(backpack, "Herbs")
       herbs.header:GetScript("OnClick")(herbs.header, "RightButton")
       assert.are.same({ { { "0_3" } } }, calls.moved)
+    end)
+  end)
+
+  -- Issue #1270: an item dropped on a bag's title (or, where the theme says, its bag button: Header.ItemDrop) opens the
+  -- category picker (NextCategoryPicker) under it, to put the item in a category or a new one. Asked: "drag an item to the
+  -- bag name (or in the case of Plain, the bag button -- this has to be themable, so we need a 'item drop' declaration)".
+  describe("the title", function()
+    local opened, hints
+
+    local function hold(itemID, bag, slot)
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "item", itemID
+      _G._cursorItemLink = "item link " .. itemID
+      _G._cursorItemLocation = bag and ItemLocation:CreateFromBagAndSlot(bag, slot) or nil
+    end
+
+    local function menuTheme()
+      UseNextTheme({ Header = { ItemDrop = { Target = "Menu" }, Buttons = { Menu = { Point = "TOPINNER", X = -12, Y = -15,
+        Width = 40, Height = 40, Layers = { { Color = "White" } } } } } })
+      backpack:ApplyStyle(ctx())
+    end
+
+    before_each(function()
+      opened, hints = {}, {}
+      override(stubs.picker, "Open", function(_, c, anchor, held)
+        assert.is_not_nil(c)
+        table.insert(opened, { anchor = anchor, item = held })
+      end)
+      override(stubs.picker, "Hint", function(_, owner, point) table.insert(hints, { owner, point }) end)
+    end)
+
+    after_each(function()
+      _G._cursorType, _G._cursorItemID, _G._cursorItemLink, _G._cursorItemLocation = nil, nil, nil, nil
+      UseNextTheme(nil)
+    end)
+
+    it("opens the category picker under it for an item dropped or clicked on it, the item going back to its slot", function()
+      local title = backpack.titleButton
+      hold(501, 0, 3)
+      title:GetScript("OnReceiveDrag")(title)
+      assert.are.equal(1, #opened)
+      assert.are.equal(title, opened[1].anchor)
+      local held = opened[1].item
+      assert.are.equal(501, held.itemID)
+      assert.are.equal("item link 501", held.link)
+      assert.are.equal("0_3", held.data.slotkey)
+      assert.are.equal("natural of 0_3", held.natural, "where it lands without its category, read before it goes back")
+      assert.is_false(CursorHasItem(), "back in its slot while the player picks")
+      hold(501, 0, 3)
+      title:GetScript("OnClick")(title, "LeftButton")
+      assert.are.equal(2, #opened)
+      assert.are.same({}, calls.filed, "nothing filed until a category is picked")
+    end)
+
+    it("does the same on the bank's title", function()
+      itemIDs["6_1"] = 601
+      hold(601, 6, 1)
+      bank.titleButton:GetScript("OnReceiveDrag")(bank.titleButton)
+      assert.are.equal(1, #opened)
+      assert.are.equal(bank.titleButton, opened[1].anchor)
+      assert.are.equal("natural of 6_1", opened[1].item.natural)
+    end)
+
+    it("opens it for an item the bags do not hold, not knowing where it lands", function()
+      hold(777)
+      backpack.titleButton:GetScript("OnReceiveDrag")(backpack.titleButton)
+      assert.are.equal(777, opened[1].item.itemID)
+      assert.is_nil(opened[1].item.data)
+      assert.is_nil(opened[1].item.natural)
+    end)
+
+    -- bag-drop-zone.md: a merchant's item on the cursor (buying by drag) is no item of yours.
+    it("opens nothing for what is not an item of yours, which stays on the cursor", function()
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "merchant", 3
+      backpack.titleButton:GetScript("OnReceiveDrag")(backpack.titleButton)
+      assert.are.same({}, opened)
+      assert.is_true(CursorHasItem())
+    end)
+
+    -- Found in review: with anything but an item held, the title said a drop would file it, and a click did nothing.
+    it("offers nothing while what is held is not an item of yours, and clicks as before", function()
+      local clicks = 0
+      override(addon:GetModule("NextChain"), "Click", function() clicks = clicks + 1 end)
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "merchant", 3
+      local title = backpack.titleButton
+      title:GetScript("OnEnter")(title)
+      finishTweens()
+      assert.are.same({}, hints)
+      assert.are.equal(0, backpack.itemDropGlow:GetAlpha())
+      title:GetScript("OnLeave")(title)
+      title:GetScript("OnClick")(title, "LeftButton")
+      assert.are.same({}, opened)
+      assert.are.equal(1, clicks, "the title's own click")
+    end)
+
+    it("lights its own glow, not the title's, and says what a drop does while an item is held over it", function()
+      local title = backpack.titleButton
+      local D = style.Theme.Header.ItemDrop.Highlight
+      hold(501, 0, 3)
+      title:GetScript("OnEnter")(title)
+      finishTweens()
+      assert.are.equal(D.Alpha, backpack.itemDropGlow:GetAlpha())
+      assert.are.equal(0, backpack.titleGlow:GetAlpha())
+      assert.are.same({ { title, "ANCHOR_BOTTOMLEFT" } }, hints)
+      title:GetScript("OnLeave")(title)
+      finishTweens()
+      assert.are.equal(0, backpack.itemDropGlow:GetAlpha())
+      ClearCursor()
+      title:GetScript("OnEnter")(title)
+      finishTweens()
+      assert.are.equal(0, backpack.itemDropGlow:GetAlpha(), "nothing held: the title's own glow")
+      assert.are.equal(1, #hints)
+      title:GetScript("OnLeave")(title)
+    end)
+
+    it("draws its glow round the title from its theme", function()
+      local D = style.Theme.Header.ItemDrop.Highlight
+      local glow = backpack.itemDropGlow
+      assert.are.equal(D.BlendMode, glow:GetBlendMode())
+      local _, _, _, x = glow:GetPoint(1)
+      local _, _, _, titleX = backpack.titleGlow:GetPoint(1)
+      local G = style.Theme.Header.TitleGlow
+      assert.are.equal(titleX + G.X - D.X, x, "D.X past the title's text on its side, as the title's glow is G.X past it")
+      UseNextTheme({ Header = { ItemDrop = false } })
+      backpack:ApplyStyle(ctx())
+      assert.is_false(glow:IsShown(), "a theme that takes no drop draws none")
+    end)
+
+    it("takes no item where the theme takes it on the bag button, which opens the picker in its place", function()
+      menuTheme()
+      hold(501, 0, 3)
+      backpack.titleButton:GetScript("OnReceiveDrag")(backpack.titleButton)
+      assert.are.same({}, opened)
+      assert.is_true(CursorHasItem())
+      local button = backpack.menuButton.frame
+      button:GetScript("OnReceiveDrag")(button)
+      assert.are.equal(1, #opened)
+      assert.are.equal(button, opened[1].anchor)
+      assert.are.equal("natural of 0_3", opened[1].item.natural)
+    end)
+
+    it("takes none in a theme that takes no drop", function()
+      UseNextTheme({ Header = { ItemDrop = false } })
+      hold(501, 0, 3)
+      backpack.titleButton:GetScript("OnReceiveDrag")(backpack.titleButton)
+      backpack.titleButton:GetScript("OnEnter")(backpack.titleButton)
+      assert.are.same({}, opened)
+      assert.are.same({}, hints)
+      backpack.titleButton:GetScript("OnLeave")(backpack.titleButton)
     end)
   end)
   -- BetterBags Next's small panels have a Bag Scale (docs/next-appearance-size.md): a drag reads where the

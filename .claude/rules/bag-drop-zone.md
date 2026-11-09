@@ -35,6 +35,10 @@ item drops the classic section title takes: an item dropped or left-clicked onto
 panel (`PlaceCursorItem`), or with Shift into its category, through the same
 `sectionFrame:OnTitleClickOrDrop`.
 
+On BetterBags Next's backpack and bank, the panel's title (or, where the theme says, its bag button:
+`Header.ItemDrop`) keeps an item dropped or left-clicked onto it: it opens the category picker in place of
+placing the item (next-category-picker.md), the item going back to its slot while the player picks.
+
 ## 2. What happens to the item (`util/cursorplacement.lua`)
 
 `CursorPlacement:PlaceCursorItem(kind, bankTab)` returns what it did, so a profiler trace shows

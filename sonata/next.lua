@@ -63,6 +63,9 @@ local CORNERS = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGH
 local MENU_CORNERS = { TOPINNER = true, TOPOUTER = true, BOTTOMINNER = true, BOTTOMOUTER = true }
 -- The styles a switch is drawn in (Controls.Toggle.Style, next/controls/toggle.lua).
 local TOGGLE_STYLES = { Square = true, Round = true, Check = true }
+-- Where an item dropped to put it in a category may go (Header.ItemDrop.Target, next/categorypicker.lua): the title, or
+-- the bag button.
+local ITEM_DROP_TARGETS = { Title = true, Menu = true }
 
 ---@class NextTheme
 ---@field Name string The key the theme is saved and registered under.
@@ -1556,6 +1559,15 @@ function sonataNext:Check(key)
       elseif type(own) == "table" then
         layers(where .. "Panels." .. tostring(name) .. ".", own.Layers)
       end
+    end
+  end
+  -- Where an item dropped to put it in a category goes (Header.ItemDrop): the title, or a bag button the theme has.
+  local drop = theme.Header and theme.Header.ItemDrop
+  if type(drop) == "table" then
+    if not ITEM_DROP_TARGETS[drop.Target] then
+      table.insert(problems, "Header.ItemDrop.Target: no drop target named " .. tostring(drop.Target))
+    elseif drop.Target == "Menu" and type(menu) ~= "table" then
+      table.insert(problems, "Header.ItemDrop.Target: Menu needs a bag button (Header.Buttons.Menu)")
     end
   end
   local tween = addon:GetModule('NextTween', true)

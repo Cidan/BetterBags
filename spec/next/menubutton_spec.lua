@@ -28,12 +28,13 @@ end
 local menuButton = addon:GetModule("NextMenuButton")
 local tween = addon:GetModule("NextTween")
 local contextMenu = StubBetterBagsModule("ContextMenu")
+local picker, createdPicker = StubBetterBagsModule("NextCategoryPicker")
 
 local BAGSLOTS = "Interface\\Containerframe\\Bagslots2x"
 local MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 
 describe("NextMenuButton", function()
-  local shown, clicked, savedShow
+  local shown, clicked, savedShow, picks, hints, savedHint
 
   -- panelOn makes what the button reads of a panel: its frame, its body (filling it), its overlay, the screen side it
   -- belongs to, its kind, its header buttons (each with its spec) and its name.
@@ -61,6 +62,13 @@ describe("NextMenuButton", function()
     add({ key = "sizeButton", label = "Small Bags", tooltipFunc = function() end,
       checked = function() return panel.small == true end, menuTooltip = function() return "Smaller bags." end,
       onClick = function() table.insert(clicked, "size") end })
+    -- Where the theme takes an item dropped to file it (NextPanel:ItemDropTarget), and the picker it opens there.
+    function panel:ItemDropTarget() return panel.dropTarget end
+    function panel:PickCategory(c, anchor)
+      assert.is_not_nil(c)
+      table.insert(picks, anchor)
+      return "picking"
+    end
     panel.menuButton = menuButton:Create(panel)
     return panel
   end
@@ -100,17 +108,21 @@ describe("NextMenuButton", function()
   end
 
   before_each(function()
-    shown, clicked = nil, {}
+    shown, clicked, picks, hints = nil, {}, {}, {}
     savedShow = rawget(contextMenu, "Show")
     contextMenu.Show = function(_, _, list) shown = list end
+    savedHint = rawget(picker, "Hint")
+    picker.Hint = function(_, owner, point) table.insert(hints, { owner, point }) end
     tween:Init()
     MockUnits.npc = nil
   end)
 
   after_each(function()
     contextMenu.Show = savedShow
+    picker.Hint = savedHint
     UseNextTheme(nil)
     MockUnits.npc = nil
+    _G._cursorHasItem, _G._cursorType, _G._cursorItemID = false, nil, nil
   end)
 
   it("is hidden and takes no room for a theme without a menu button", function()
@@ -253,8 +265,87 @@ describe("NextMenuButton", function()
     end)
   end)
 
+  -- Issue #1270: in a theme that takes an item dropped to file it on the bag button (Header.ItemDrop, Plain), the
+  -- button opens the category picker for an item dropped or clicked on it (asked: "drag an item to the bag name (or in the
+  -- case of Plain, the bag button ...)").
+  describe("an item dropped on it", function()
+    local function hold()
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "item", 501
+    end
+
+    it("opens the category picker under it for an item dropped or clicked on it, where the theme takes it there", function()
+      theme()
+      local panel = panelOn("RIGHT")
+      panel.dropTarget = "Menu"
+      panel.menuButton:Style()
+      local frame = panel.menuButton.frame
+      hold()
+      frame:GetScript("OnReceiveDrag")(frame)
+      assert.are.same({ frame }, picks)
+      frame:GetScript("OnClick")(frame, "LeftButton")
+      assert.are.same({ frame, frame }, picks)
+      assert.is_nil(shown, "its menu stays closed")
+    end)
+
+    it("opens its menu as before where the theme takes an item elsewhere, or with nothing held", function()
+      theme()
+      local panel = panelOn("RIGHT")
+      panel.dropTarget = "Title"
+      panel.menuButton:Style()
+      local frame = panel.menuButton.frame
+      hold()
+      frame:GetScript("OnReceiveDrag")(frame)
+      assert.are.same({}, picks)
+      frame:GetScript("OnClick")(frame, "LeftButton")
+      assert.is_not_nil(shown)
+      panel.dropTarget = "Menu"
+      shown = nil
+      ClearCursor()
+      frame:GetScript("OnClick")(frame, "LeftButton")
+      assert.is_not_nil(shown)
+      assert.are.same({}, picks)
+    end)
+
+    it("opens its menu, and says what a click does, while what is held is not an item of yours", function()
+      theme()
+      local panel = panelOn("RIGHT")
+      panel.dropTarget = "Menu"
+      panel.menuButton:Style()
+      local frame = panel.menuButton.frame
+      _G._cursorHasItem, _G._cursorType, _G._cursorItemID = true, "merchant", 3
+      frame:GetScript("OnEnter")(frame)
+      assert.are.same({}, hints)
+      assert.are.equal("Open Menu", GameTooltip.doubleLines[1] and GameTooltip.doubleLines[1].right)
+      frame:GetScript("OnLeave")(frame)
+      frame:GetScript("OnClick")(frame, "LeftButton")
+      assert.are.same({}, picks)
+      assert.is_not_nil(shown)
+    end)
+
+    it("lights and says what a drop does while an item is held over it", function()
+      theme()
+      local panel = panelOn("RIGHT")
+      panel.dropTarget = "Menu"
+      panel.menuButton:Style()
+      local frame = panel.menuButton.frame
+      hold()
+      GameTooltip.doubleLines = {}
+      frame:GetScript("OnEnter")(frame)
+      tween:Step(1)
+      assert.are.equal(1, panel.menuButton.highlight:GetAlpha())
+      assert.are.same({ { frame, "ANCHOR_LEFT" } }, hints)
+      assert.are.same({}, GameTooltip.doubleLines, "not its click's line")
+      frame:GetScript("OnLeave")(frame)
+      ClearCursor()
+      frame:GetScript("OnEnter")(frame)
+      assert.are.equal(1, #hints, "nothing held: what a click does")
+      frame:GetScript("OnLeave")(frame)
+    end)
+  end)
+
   teardown(function()
     for _, name in ipairs(addedKinds) do const.BAG_KIND[name] = nil end
     if createdConstants then ResetModuleStub("Constants") end
+    if createdPicker then ResetModuleStub("NextCategoryPicker") end
   end)
 end)

@@ -1482,6 +1482,28 @@ describe("SonataNext", function()
     assert.are.same({ "Header.Buttons.Menu.Point: no corner named nil" }, sonataNext:Check("NowhereMenu"))
   end)
 
+  -- Where an item dropped to file it in a category goes (Header.ItemDrop, issue #1270): the title, or the bag button,
+  -- which only a theme with one has; its glow is a texture spec as any other.
+  it("names what is wrong with where an item is dropped to file it", function()
+    sonataNext:RegisterTheme({ Name = "BadDrop", Header = { ItemDrop = { Target = "Footer" } } })
+    assert.are.same({ "Header.ItemDrop.Target: no drop target named Footer" }, sonataNext:Check("BadDrop"))
+    sonataNext:RegisterTheme({ Name = "MenulessDrop", Header = { ItemDrop = { Target = "Menu" } } })
+    assert.are.same({ "Header.ItemDrop.Target: Menu needs a bag button (Header.Buttons.Menu)" },
+      sonataNext:Check("MenulessDrop"))
+    sonataNext:RegisterTheme({ Name = "MenuDrop", Header = { ItemDrop = { Target = "Menu" },
+      Buttons = { Menu = { Point = "TOPINNER", Width = 40, Height = 40, Layers = { { Texture = "Interface\\Spec\\bag.png" } } } } } })
+    assert.are.same({}, sonataNext:Check("MenuDrop"))
+    sonataNext:RegisterTheme({ Name = "GlowDrop", Header = { ItemDrop = { Target = "Title",
+      Highlight = { Texture = "Nothing", Color = "Nowhere" } } } })
+    local problems = sonataNext:Check("GlowDrop")
+    table.sort(problems)
+    assert.are.same({ "Header.ItemDrop.Highlight.Color: no color named Nowhere",
+      "Header.ItemDrop.Highlight.Texture: no texture named Nothing" }, problems)
+    sonataNext:RegisterTheme({ Name = "NoDrop", Header = { ItemDrop = false } })
+    assert.are.same({}, sonataNext:Check("NoDrop"), "a theme may take no drop")
+    assert.are.same({}, sonataNext:Check("Default"))
+  end)
+
   -- GW2_UI rewrites the client's fonts at PLAYER_LOGIN (docs/next-gw2-theme.md), after BetterBags copied some of
   -- them for its roles: once the game has started, a theme whose copies are stale is applied again, unsaved.
   describe("watching the client's fonts", function()
