@@ -1,0 +1,17 @@
+{
+  "id": 1794185496,
+  "version": "v0.9.2-5-gc57c941",
+  "channel": "alpha",
+  "date": "2026-11-09",
+  "from": "9fb6f3f24950b518597930cf77c4572afc0ee0fa",
+  "to": "c57c941766a1330cfed93b1766492521617e5347",
+  "headline": "You can now drop items onto bag titles in BetterBags Next to assign them to categories or create new ones.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Drop items on bag titles to categorize them",
+      "details": "In BetterBags Next, dropping an item onto the bag or bank header opens a searchable category picker. You can assign the item to an existing category, type a name to create a new category on the spot, or revert a manual assignment back to its default section.",
+      "clients": []
+    }
+  ]
+}
