@@ -220,7 +220,9 @@ whatever an input every item shares (a setting, the gear, the open window) chang
     item context is active (`ItemButtonUtil.GetItemContext()` not nil) there is no signature and
     grey-out is worked out every sweep: Blizzard's answer then can depend on the spell being cast
     (Enchanting, CheckItemCondition, ReplaceBonusTree, JumpUpgradeTrack) or the recipe being
-    recrafted (`ItemButtonUtil.GetItemContextMatchResultForItem`).
+    recrafted (`ItemButtonUtil.GetItemContextMatchResultForItem`). Grey-out worked out that way is
+    marked (`itemContextResolvedInContext`), since a spell's targeting ends with no refresh: the
+    button asks Blizzard again while it is marked or a context is active (item-drawing.md §8).
   - `indexPending`: the item's own category was worked out again, or its upgrade arrow or its total
     changed (search-indexing.md §11), and it has not been compared with its search entry yet
     (below).

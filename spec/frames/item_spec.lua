@@ -1588,6 +1588,148 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       assert.equal(42, result)
     end)
 
+    -- A spell that targets an item (Feed Pet, an enchant, a sharpening stone) starts and ends with no bag
+    -- refresh: Blizzard fires ItemContextChanged on CURRENT_SPELL_CAST_CHANGED, and each shown button asks
+    -- its GetItemContextMatchResult again (ItemButtonMixin:UpdateItemContextMatching). Issue #1290.
+    describe("while a spell targets an item", function()
+      local MATCH, MISMATCH, DOES_NOT_APPLY = 1, 2, 3
+      -- ItemButtonUtil.ItemContextEnum.FeedPet on WoW: Forever 1.60.1 (Blizzard_FrameXMLUtil/ItemUtil.lua).
+      local FEED_PET = 17
+      local FOOD = 4536
+      local targetCtx, button, itemContext, asked, savedUtil, savedResolve
+
+      local function pile(itemID, fields)
+        local data = {
+          slotkey = "0_11", bagid = 0, slotid = 11, isItemEmpty = false,
+          questInfo = { isQuestItem = false, isActive = false },
+          containerInfo = { isReadable = false, isFiltered = false, hasNoValue = false },
+          itemInfo = { isBound = false, itemID = itemID, itemIcon = 1, itemQuality = 1, itemLink = "item:" .. itemID,
+            currentItemCount = 1, classID = 0, currentItemLevel = 1 },
+        }
+        for k, v in pairs(fields) do data[k] = v end
+        return data
+      end
+
+      before_each(function()
+        targetCtx = ctx:New("spell_target")
+        button = itemFrame:GetButton(targetCtx, "0_11")
+        itemContext, asked = nil, {}
+        savedUtil, savedResolve = _G.ItemButtonUtil, rawget(items, "ResolveItemContextMatchResult")
+        -- Blizzard_FrameXMLUtil/ItemUtil.lua: GenerateCallbackEvents keys each event by its own name.
+        _G.ItemButtonUtil = {
+          Event = { ItemContextChanged = "ItemContextChanged" },
+          TriggerEvent = function() end,
+          ItemContextMatchResult = { Match = MATCH, Mismatch = MISMATCH, DoesNotApply = DOES_NOT_APPLY },
+          GetItemContext = function() return itemContext end,
+        }
+        -- What Blizzard answers for the slot now (ItemButtonUtil.GetItemContextMatchResultForItem): with no
+        -- context nothing applies; while Feed Pet targets, the pet's food matches and the rest does not.
+        items.ResolveItemContextMatchResult = function(_, data)
+          table.insert(asked, data.slotkey)
+          if itemContext == nil then return DOES_NOT_APPLY end
+          return data.itemInfo.itemID == FOOD and MATCH or MISMATCH
+        end
+      end)
+
+      after_each(function()
+        _G.ItemButtonUtil = savedUtil
+        items.ResolveItemContextMatchResult = savedResolve
+      end)
+
+      it("dims what the spell cannot take once it starts, with no refresh", function()
+        button:SetItemFromData(targetCtx, pile(117, { itemContextMatchResult = DOES_NOT_APPLY }))
+        local decoration = button:GetDecoration(targetCtx)
+        assert.equal(DOES_NOT_APPLY, decoration:GetItemContextMatchResult())
+        itemContext = FEED_PET
+        assert.equal(MISMATCH, decoration:GetItemContextMatchResult())
+      end)
+
+      it("leaves what the spell can take alone", function()
+        button:SetItemFromData(targetCtx, pile(FOOD, { itemContextMatchResult = DOES_NOT_APPLY }))
+        itemContext = FEED_PET
+        assert.equal(MATCH, button:GetDecoration(targetCtx):GetItemContextMatchResult())
+      end)
+
+      it("undims once the spell ends, after a refresh worked the dimming out while it was active", function()
+        itemContext = FEED_PET
+        button:SetItemFromData(targetCtx, pile(117, { itemContextMatchResult = MISMATCH, itemContextResolvedInContext = true }))
+        local decoration = button:GetDecoration(targetCtx)
+        assert.equal(MISMATCH, decoration:GetItemContextMatchResult())
+        itemContext = nil
+        assert.equal(DOES_NOT_APPLY, decoration:GetItemContextMatchResult())
+      end)
+
+      it("reads what the refresh worked out, asking nothing, when no spell is involved", function()
+        -- A backpack item the Warbank refuses is dimmed with no item context (ResolveItemContextMatchResult).
+        button:SetItemFromData(targetCtx, pile(117, { itemContextMatchResult = MISMATCH, itemContextResolvedInContext = false }))
+        assert.equal(MISMATCH, button:GetDecoration(targetCtx):GetItemContextMatchResult())
+        assert.are.same({}, asked)
+      end)
+
+      -- Blizzard signs an item button up for ItemContextChanged only as it shows, and only when it has
+      -- GetItemContextMatchResult then (ItemButtonMixin:PostOnShow); a free slot has none. A slot that is
+      -- free when the bag opens and is drawn as an item in place (Show Bags, loot into an empty slot) is
+      -- never shown again, so it never heard a spell start or end.
+      describe("a free slot drawn as an item in place", function()
+        local signedUp, visible
+
+        before_each(function()
+          signedUp, visible = {}, true
+          -- CallbackRegistryMixin:RegisterCallback (Blizzard_SharedXMLBase/CallbackRegistry.lua) raises on these.
+          _G.ItemButtonUtil.RegisterCallback = function(event, func, owner)
+            assert(type(event) == "string", "CallbackRegistryMixin::RegisterCallback 'event' requires string type.")
+            assert(type(func) == "function", "CallbackRegistryMixin::RegisterCallback 'func' requires function type.")
+            table.insert(signedUp, { event = event, func = func, owner = owner })
+          end
+          local decoration = button:GetDecoration(targetCtx)
+          decoration.OnItemContextChanged = function() end
+          decoration.IsVisible = function() return visible end
+        end)
+
+        after_each(function()
+          local decoration = button:GetDecoration(targetCtx)
+          decoration.OnItemContextChanged, decoration.IsVisible = nil, nil
+        end)
+
+        local function freeSlot()
+          return { slotkey = "0_11", bagid = 0, slotid = 11, isItemEmpty = true,
+            itemInfo = { emptySlotName = "Bag", itemQuality = 1 } }
+        end
+
+        it("is signed up for Blizzard's ItemContextChanged while it is shown", function()
+          button:SetFreeSlots(targetCtx, freeSlot(), 1, false)
+          button:SetItemFromData(targetCtx, pile(117, { itemContextMatchResult = DOES_NOT_APPLY }))
+          local decoration = button:GetDecoration(targetCtx)
+          assert.are.equal(1, #signedUp)
+          assert.are.equal(_G.ItemButtonUtil.Event.ItemContextChanged, signedUp[1].event)
+          assert.are.equal(decoration.OnItemContextChanged, signedUp[1].func)
+          assert.are.equal(decoration, signedUp[1].owner)
+        end)
+
+        -- PostOnShow signs it up as the bag opens; signing it up now would leave it called while the bag is closed.
+        it("is not signed up while it is hidden", function()
+          visible = false
+          button:SetFreeSlots(targetCtx, freeSlot(), 1, false)
+          button:SetItemFromData(targetCtx, pile(117, { itemContextMatchResult = DOES_NOT_APPLY }))
+          assert.are.same({}, signedUp)
+        end)
+
+        it("is not signed up on Classic, whose plain Button has no ItemButtonMixin", function()
+          button:GetDecoration(targetCtx).OnItemContextChanged = nil
+          button:SetFreeSlots(targetCtx, freeSlot(), 1, false)
+          button:SetItemFromData(targetCtx, pile(117, { itemContextMatchResult = DOES_NOT_APPLY }))
+          assert.are.same({}, signedUp)
+        end)
+
+        it("is signed up once, not on every redraw of the item", function()
+          button:SetFreeSlots(targetCtx, freeSlot(), 1, false)
+          button:SetItemFromData(targetCtx, pile(117, { itemContextMatchResult = DOES_NOT_APPLY }))
+          button:SetItemFromData(targetCtx, pile(118, { itemContextMatchResult = DOES_NOT_APPLY }))
+          assert.are.equal(1, #signedUp)
+        end)
+      end)
+    end)
+
     it("UpdateUpgrade should assert that data is provided", function()
       assert.has_error(function()
         item:UpdateUpgrade(btnCtx, nil)

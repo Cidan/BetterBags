@@ -85,6 +85,7 @@ Individual item button implementation with full WoW item functionality.
 - Search highlighting
 - Upgrade indicator
 - Junk coin at a vendor (Blizzard's `UpdateJunkItem`), redrawn when a vendor opens or closes through the sweep's junk mark (`data.junkMarked`, one of the inputs a skipped redraw compares; `.claude/rules/item-drawing.md` §7b)
+- Dimming what does not fit Blizzard's item context (`itemFrame.GetItemContextMatchResult`): the answer the sweep worked out (`data.itemContextMatchResult`), except while a spell targets an item (Feed Pet, an enchant, a sharpening stone) or after one the sweep's answer was worked out under, when Blizzard is asked again, since those start and end with no bag refresh (`.claude/rules/item-drawing.md` §8)
 - Stack management
 - Free slot display
 

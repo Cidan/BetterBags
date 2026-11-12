@@ -3436,6 +3436,21 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are.same({ "0_1", "0_2", "0_3", "0_4" }, distinct(contextAsked), "the bank opened")
     end)
 
+    -- A spell targeting an item (Feed Pet, an enchant) ends with no refresh, and the buttons ask again
+    -- (frames/item.lua GetItemContextMatchResult): grey-out worked out while one was active is good only
+    -- while it is. Issue #1290.
+    it("marks the grey-out it worked out while an item context was active", function()
+      threeItems()
+      local function marked() return items.slotInfo[BACKPACK].itemsBySlotKey["0_1"].itemContextResolvedInContext end
+      assert.is_false(marked(), "worked out with no context")
+      itemContext = "Enchanting"
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.is_true(marked())
+      itemContext = nil
+      refreshBackpack({ derive = true, categoriesUnchanged = true })
+      assert.is_false(marked(), "worked out again once the context ended")
+    end)
+
     -- At the bank, the backpack is greyed out by what the shown bank takes: the Warbank takes fewer
     -- items than the character bank (ResolveItemContextMatchResult).
     it("works grey-out out again when the bank shows the Warbank instead of the character bank", function()

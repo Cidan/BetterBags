@@ -577,10 +577,22 @@ function itemFrame.itemProto:SetStaticItemFromData(ctx, data)
 	self:SetItemFromData(ctx, data)
 end
 
+---@return boolean
+local function itemContextActive()
+	local util = _G.ItemButtonUtil
+	return util ~= nil and util.GetItemContext ~= nil and util.GetItemContext() ~= nil
+end
+
 ---@param item ItemButton|Item
 ---@return integer
 function itemFrame.GetItemContextMatchResult(item)
 	local data = item and (item._itemData or (item.GetItemData and item:GetItemData()) or item.currentData)
+	-- A spell targeting an item (Feed Pet, an enchant, a sharpening stone) starts and ends with no bag
+	-- refresh, so what the refresh worked out is stale while one is active, and once one ends if it was
+	-- worked out during it (item-drawing.md §8).
+	if data and (data.itemContextResolvedInContext or itemContextActive()) then
+		return items:ResolveItemContextMatchResult(data)
+	end
 	if data and data.itemContextMatchResult then
 		return data.itemContextMatchResult
 	end
@@ -647,7 +659,14 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	if self.button.SetHasItem then self.button:SetHasItem(data.itemInfo.itemIcon) end
 
 	--override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
+	local hadContextMatch = decoration.GetItemContextMatchResult ~= nil
 	decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
+	-- Blizzard signs an item button up for ItemContextChanged only as it shows with GetItemContextMatchResult
+	-- set (ItemButtonMixin:PostOnShow); a free slot drawn as an item in place does not show again, and would
+	-- never hear a spell's targeting start or end (item-drawing.md §8). One callback per owner: signing up twice is harmless.
+	if not hadContextMatch and decoration.OnItemContextChanged and decoration:IsVisible() then
+		ItemButtonUtil.RegisterCallback(ItemButtonUtil.Event.ItemContextChanged, decoration.OnItemContextChanged, decoration)
+	end
 	setIcon(decoration, data.itemInfo.itemIcon)
 	SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
 	local quality = data.itemInfo.itemQuality

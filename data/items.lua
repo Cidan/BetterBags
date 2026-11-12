@@ -96,6 +96,7 @@ local async = addon:GetModule("Async")
 ---@field itemLinkInfo ItemLinkInfo
 ---@field itemHash string
 ---@field drawGeneration number The kind's draw generation when this sweep ran (see items:Init).
+---@field itemContextResolvedInContext? boolean Its itemContextMatchResult was worked out while an item context was active (Feed Pet, an enchant), so it holds only while one is; set in Phase 6.
 ---@field junkMarked? boolean Blizzard's junk coin shows on it (UpdateJunkItem): poor, sells for something, a vendor open; set in Phase 6.
 ---@field harvestIncomplete boolean True when the client had no item info at harvest; never reused.
 ---@field rawItemName string|nil The client's ContainerItemInfo.itemName, before fallbacks (see ReuseHarvestedSlot).
@@ -1362,6 +1363,7 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
       end
       if contextSig == nil or d.context ~= contextSig then
         currentItem.itemContextMatchResult = self:ResolveItemContextMatchResult(currentItem)
+        currentItem.itemContextResolvedInContext = contextSig == nil
         d.context = contextSig
       end
       -- From the quality and no-value flag the draw hands UpdateJunkItem, so it agrees with the coin drawn.
