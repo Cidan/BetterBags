@@ -76,7 +76,10 @@ sonataNext:RegisterTheme({
     -- alpha, in the style of Blizzard's settings gear.
     IconSettings = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\settings.png",
     IconClose = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\close.png",
-    IconSort = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\sort.png",
+    -- The anchor button's (docs/next-bag-anchor.md): free, its anchor shown, locked.
+    IconAnchor = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\anchor.png",
+    IconAnchorShown = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\anchorshown.png",
+    IconLock = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\lock.png",
     IconBags = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\bags.png",
     IconSmall = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\small.png",
     IconFull = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\full.png",
@@ -402,7 +405,9 @@ sonataNext:RegisterTheme({
       Icons = {
         settingsButton = { Texture = "IconSettings" },
         closeButton = { Texture = "IconClose" },
-        sortButton = { Texture = "IconSort" },
+        anchorButtonFree = { Texture = "IconAnchor" },
+        anchorButtonShown = { Texture = "IconAnchorShown" },
+        anchorButtonLocked = { Texture = "IconLock" },
         bagsButton = { Texture = "IconBags" },
         sizeButtonFull = { Texture = "IconSmall" },
         sizeButtonSmall = { Texture = "IconFull" },

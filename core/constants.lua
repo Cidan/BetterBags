@@ -749,10 +749,13 @@ const.DATABASE_DEFAULTS = {
     -- while open; off, it is the height the player gave it, or a share of the screen.
     nextAutosize = true,
     -- BetterBags Next's panels: "small" movable ones, the default, or "full" height on the screen's
-    -- edges (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
+    -- edges (docs/next-small-mode.md); where each kind's small panel was left before it held its bottom corner (its top
+    -- left, read once), the corner it holds (docs/next-bag-anchor.md), its anchor ("free" saves nothing), and the
     -- size the player gave it with its grips (next.md §14g).
     nextSize = "small",
     nextSmallPlaces = {},
+    nextSmallCorners = {},
+    nextAnchorStates = {},
     nextSmallSizes = {},
     -- Which small panel anchors a chained pair: "apart", "backpack" or "companion" (the one the
     -- other was dropped beside).

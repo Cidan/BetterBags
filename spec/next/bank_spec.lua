@@ -175,6 +175,8 @@ describe("NextBank", function()
     override(stubs.database, "SetActiveGroup", function(_, _, id) db.active = id end)
     override(stubs.database, "GetNextChain", function() return "apart" end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    -- Its anchor (docs/next-bag-anchor.md): free; a full-size bag shows none.
+    override(stubs.database, "GetNextAnchorState", function() return "free" end)
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)
@@ -487,23 +489,23 @@ describe("NextBank", function()
       return out
     end
 
-    it("lines its buttons up from the left edge: close, settings, bank tabs, deposit, sort", function()
+    -- Its anchor button where its sort button was (docs/next-bag-anchor.md): a right click on its title sorts it.
+    it("lines its buttons up from the left edge: close, settings, bank tabs, deposit, anchor", function()
       local bank = nextBank:Create(ctx())
-      assert.are.same({ "close", "settings", "banktabs", "deposit", "sort" }, headerKinds(bank))
+      assert.are.same({ "close", "settings", "banktabs", "deposit", "anchor" }, headerKinds(bank))
+      assert.is_nil(bank.sortButton)
+      assert.is_false(bank.anchorButton:IsShown(), "a full-size bank has nothing to anchor")
       assert.are.same({ "TOPLEFT", bank.body, "TOPLEFT", style.PAD, -(style.TITLE_TOP + 3) }, { bank.closeButton:GetPoint(1) })
       assert.are.same({ "TOPLEFT", bank.closeButton, "TOPRIGHT", 8, 0 }, { bank.settingsButton:GetPoint(1) })
     end)
 
-    it("has no deposit button without a Warbank, and no bank tabs or sort where the client lacks them", function()
+    it("has no deposit button without a Warbank, and no bank tabs where the client lacks them", function()
       client("forever")
       local forever = nextBank:Create(ctx())
-      assert.are.same({ "close", "settings", "banktabs", "sort" }, headerKinds(forever))
+      assert.are.same({ "close", "settings", "banktabs", "anchor" }, headerKinds(forever))
       client("classic")
       local classic = nextBank:Create(ctx())
-      assert.are.same({ "close", "settings" }, headerKinds(classic))
-      override(_G, "SortBankBags", function() end)
-      local sorting = nextBank:Create(ctx())
-      assert.are.same({ "close", "settings", "sort" }, headerKinds(sorting))
+      assert.are.same({ "close", "settings", "anchor" }, headerKinds(classic))
     end)
 
     -- The Plain theme (docs/next-plain-theme.md, round three; asked: "same for vendors and bank, move it all to the
@@ -521,7 +523,8 @@ describe("NextBank", function()
       for i = 2, #list do
         names[i - 1] = list[i].text
       end
-      assert.are.same({ "Show Bank Tabs", "Deposit Warbank Items", "Sort Bank", "Open Options Screen" }, names)
+      -- Its anchor only while small (docs/next-bag-anchor.md); its sort on a right click on its title.
+      assert.are.same({ "Show Bank Tabs", "Deposit Warbank Items", "Open Options Screen" }, names)
       assert.is_true(list[2].checked())
       db.showBankTabs = false
       assert.is_false(list[2].checked())
@@ -542,16 +545,37 @@ describe("NextBank", function()
       assert.is_false(bank:IsShown())
     end)
 
-    it("sorts as the menu button's right click does on retail, and the bank on Classic", function()
+    -- Its sort button gave its place to its anchor button (docs/next-bag-anchor.md: asked, "replace the 'clean up bags'
+    -- button ... since it's duplicate functionality now that you can right click the header"): the bank's title sorts it on a
+    -- right click, as the backpack's does, where the client can sort the bank.
+    it("sorts from a right click on its title, as the menu button's right click does on retail, and the bank on Classic",
+      function()
       local bank = opened()
-      click(bank.sortButton)
+      local title = bank.titleButton
+      title:GetScript("OnClick")(title, "RightButton")
       assert.are.same({ { "menu", bank } }, calls.sorts)
+      title:GetScript("OnEnter")(title)
+      local lines = GameTooltip.lines
+      assert.are.equal("Right-click to sort the bank.", lines[#lines].text)
+      title:GetScript("OnLeave")(title)
       client("classic")
       override(_G, "SortBankBags", function() end)
       override(stubs.events, "SendMessage", function(_, _, name) table.insert(sent, { name }) end)
       local classic = nextBank:Create(ctx())
-      click(classic.sortButton)
+      classic.titleButton:GetScript("OnClick")(classic.titleButton, "RightButton")
       assert.are.equal(1, #sentNamed("bags/SortBank"))
+    end)
+
+    it("neither sorts nor says it does on a client that cannot sort the bank", function()
+      client("classic")
+      override(_G, "SortBankBags", nil)
+      override(C_Container, "SortBankBags", nil)
+      override(stubs.events, "SendMessage", function(_, _, name) table.insert(sent, { name }) end)
+      local bank = nextBank:Create(ctx())
+      bank.titleButton:GetScript("OnClick")(bank.titleButton, "RightButton")
+      assert.are.equal(0, #sentNamed("bags/SortBank"))
+      assert.are.same({}, calls.sorts)
+      assert.is_nil(bank:TitleRightClickHint())
     end)
   end)
 

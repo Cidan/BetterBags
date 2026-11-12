@@ -224,6 +224,8 @@ describe("NextChain", function()
     -- No tab order saved (docs/next-batch-2.md §5).
     override(stubs.database, "GetNextTabOrder", function() return {} end)
     override(stubs.database, "GetNextSize", function() return "full" end)
+    -- Its anchor (docs/next-bag-anchor.md): free; a full-size bag shows none.
+    override(stubs.database, "GetNextAnchorState", function() return "free" end)
     override(stubs.database, "GetNextSectionColumns", function() return 1 end)
     override(stubs.database, "GetNextSectionFill", function() return "across" end)
     override(stubs.database, "GetNextSectionSpan", function() return false end)

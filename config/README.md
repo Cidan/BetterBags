@@ -25,7 +25,8 @@ design the bags switch to (`bags/DesignChanged`).
 Chat commands:
 - `/bb` opens the settings window; `/bb changelog` opens What's New; `/bb next` switches between the
   classic bags and BetterBags Next.
-- `/bbanchor` shows the bags' anchors (the classic bags; BetterBags Next has none).
+- `/bbanchor` shows the classic bags' anchors. BetterBags Next's bags show theirs from their header's anchor button
+  (`.claude/rules/next-bag-anchor.md` §30b).
 - `/bbdb` turns debug mode on and off.
 
 ### plugin.lua

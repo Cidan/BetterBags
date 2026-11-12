@@ -55,7 +55,13 @@ end
 LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("render/scrollbox.lua")
-local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
+-- The classic bags' anchor (frames/anchor.lua), whose square a small bag's anchor shows (docs/next-bag-anchor.md); it saves
+-- the classic anchor's place with LibWindow-1.1.
+local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
+libWindow.RegisterConfig = libWindow.RegisterConfig or function() end
+libWindow.RestorePosition = libWindow.RestorePosition or function() end
+libWindow.SavePosition = libWindow.SavePosition or function() end
+local modules = { { "Anchor", "frames/anchor.lua" }, { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
   { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextUIPanels", "next/uipanels.lua" },
@@ -156,11 +162,21 @@ describe("BetterBags Next's panels and themes", function()
     override(stubs.database, "GetNextSectionCompact", function() return false end)
     override(stubs.database, "GetNextSectionWideRows", function() return 2 end)
     override(stubs.database, "SetNextSize", function(_, size) db.size = size end)
+    -- Where a small panel was left before it held its bottom corner, and the corner it holds (docs/next-bag-anchor.md).
     override(stubs.database, "GetNextSmallPlace", function(_, kind)
       local p = db.places[kind]
       if p then return p[1], p[2] end
     end)
-    override(stubs.database, "SetNextSmallPlace", function(_, kind, x, y) db.places[kind] = { x, y } end)
+    override(stubs.database, "ClearNextSmallPlace", function(_, kind) db.places[kind] = nil end)
+    db.corners = {}
+    override(stubs.database, "GetNextSmallCorner", function(_, kind)
+      local c = db.corners[kind]
+      if c then return c[1], c[2], c[3] end
+    end)
+    override(stubs.database, "SetNextSmallCorner", function(_, kind, x, y, side) db.corners[kind] = { x, y, side } end)
+    db.anchors = {}
+    override(stubs.database, "GetNextAnchorState", function(_, kind) return db.anchors[kind] or "free" end)
+    override(stubs.database, "SetNextAnchorState", function(_, kind, state) db.anchors[kind] = state end)
     -- Clamp Bags to Screen (window.md §3a): small panels kept on the screen.
     override(stubs.database, "GetClampBagsToScreen", function() return true end)
     override(stubs.database, "GetNextSmallSize", function() return nil end)
@@ -441,7 +457,7 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.equal(bag.overlay, bag.title:GetParent(), "the title on it, drawn over its art")
       assert.are.same("OVERLAY", (bag.title:GetDrawLayer()))
       assert.is_true(bag.closeButton:GetFrameLevel() > bag.overlay:GetFrameLevel())
-      assert.is_true(bag.sortButton:GetFrameLevel() > bag.overlay:GetFrameLevel())
+      assert.is_true(bag.bagsButton:GetFrameLevel() > bag.overlay:GetFrameLevel())
       backToDefault()
       assert.is_false(corner:IsShown())
       ResetMockAtlases()
@@ -699,7 +715,7 @@ describe("BetterBags Next's panels and themes", function()
       local bag = nextBag:Create(ctx())
       apply({ Layout = { HeaderButton = 30, HeaderButtonGap = 4, HeaderButtonTop = 20 },
         Header = { Buttons = { Color = "Gold", HoverColor = "Lavender",
-          Icons = { sortButton = { Atlas = "my-sort" }, sizeButtonFull = { Texture = "Interface\\Small" } } } } })
+          Icons = { bagsButton = { Atlas = "my-bags" }, sizeButtonFull = { Texture = "Interface\\Small" } } } } })
       local first, second = bag.headerButtons[1], bag.headerButtons[2]
       assert.are.equal(30, first:GetWidth())
       assert.are.same({ "TOPRIGHT", bag.body, "TOPRIGHT", -style.PAD, -20 }, { first:GetPoint(1) })
@@ -709,11 +725,11 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.same({ 0.78, 0.72, 1.0, 1 }, { first.icon:GetVertexColor() })
       first:GetScript("OnLeave")(first)
       assert.are.same({ 1, 0.84, 0.5, 1 }, { first.icon:GetVertexColor() })
-      assert.are.equal("my-sort", bag.sortButton.icon:GetAtlas())
+      assert.are.equal("my-bags", bag.bagsButton.icon:GetAtlas())
       assert.are.equal("Interface\\Small", bag.sizeButton.icon:GetTexture())
       backToDefault()
-      assert.are.equal("sort", NextIconName(bag.sortButton))
-      assert.is_nil(bag.sortButton.icon:GetAtlas())
+      assert.are.equal("bags", NextIconName(bag.bagsButton))
+      assert.is_nil(bag.bagsButton.icon:GetAtlas())
       assert.are.equal("small", NextIconName(bag.sizeButton))
       assert.are.same({ 0.85, 0.82, 1, 1 }, { first.icon:GetVertexColor() })
     end)
@@ -763,20 +779,20 @@ describe("BetterBags Next's panels and themes", function()
 
     it("takes its row's buttons out of the header, keeping whether the panel shows them, and puts them back after", function()
       local bag = opened(function(c) return nextBag:Create(c) end)
-      local level = bag.sortButton:GetFrameLevel()
+      local level = bag.bagsButton:GetFrameLevel()
       menuTheme()
       assert.is_true(bag.menuButton.frame:IsShown())
-      assert.are.equal(bag.menuHolder, bag.sortButton:GetParent())
-      assert.is_true(bag.sortButton:IsShown(), "still shown by the panel, for the menu")
-      assert.is_false(bag.sortButton:IsVisible())
+      assert.are.equal(bag.menuHolder, bag.bagsButton:GetParent())
+      assert.is_true(bag.bagsButton:IsShown(), "still shown by the panel, for the menu")
+      assert.is_false(bag.bagsButton:IsVisible())
       assert.are.equal(bag.frame, bag.closeButton:GetParent(), "a pinned button stays")
       assert.is_true(bag.closeButton:IsVisible())
       backToDefault()
       assert.is_false(bag.menuButton.frame:IsShown())
-      assert.are.equal(bag.frame, bag.sortButton:GetParent())
-      assert.is_true(bag.sortButton:IsVisible())
-      assert.is_true(bag.sortButton:GetFrameLevel() > bag.overlay:GetFrameLevel(), "over the frame above the content again")
-      assert.are.equal(level, bag.sortButton:GetFrameLevel(), "at the level it was made at")
+      assert.are.equal(bag.frame, bag.bagsButton:GetParent())
+      assert.is_true(bag.bagsButton:IsVisible())
+      assert.is_true(bag.bagsButton:GetFrameLevel() > bag.overlay:GetFrameLevel(), "over the frame above the content again")
+      assert.are.equal(level, bag.bagsButton:GetFrameLevel(), "at the level it was made at")
     end)
 
     -- A new parent changes a frame's level (Blizzard's LFDFrame.lua, FrameUtil.SetParentMaintainRenderLayering), and a
@@ -787,7 +803,7 @@ describe("BetterBags Next's panels and themes", function()
       local bag = opened(function(c) return nextBag:Create(c) end)
       menuTheme()
       backToDefault()
-      for _, key in ipairs({ "settingsButton", "sortButton", "bagsButton", "sizeButton" }) do
+      for _, key in ipairs({ "settingsButton", "anchorButton", "bagsButton", "sizeButton" }) do
         assert.is_true(bag[key]:GetFrameLevel() > bag.mover:GetFrameLevel(), key)
         assert.is_true(bag[key]:GetFrameLevel() > bag.overlay:GetFrameLevel(), key)
       end
@@ -818,9 +834,29 @@ describe("BetterBags Next's panels and themes", function()
       for i = 2, #list do
         names[i - 1] = list[i].text
       end
-      assert.are.same({ "Sort Bags", "Show Blizzard Bags", "Small Bags", "Open Options Screen" }, names)
-      assert.is_false(list[3].checked())
-      assert.are.equal(bag:IsSmall(), list[4].checked())
+      -- Sorted by a right click on its title, its anchor only while small (docs/next-bag-anchor.md).
+      assert.are.same({ "Show Blizzard Bags", "Small Bags", "Open Options Screen" }, names)
+      assert.is_false(list[2].checked())
+      assert.are.equal(bag:IsSmall(), list[3].checked())
+    end)
+
+    -- Its anchor's entry names what a click does next (docs/next-bag-anchor.md), as its button's tooltip does.
+    it("lists a small backpack's anchor in its menu, named for what a click does next", function()
+      db.size = "small"
+      local list
+      override(StubBetterBagsModule("ContextMenu"), "Show", function(_, _, entries) list = entries end)
+      local bag = opened(function(c) return nextBag:Create(c) end)
+      menuTheme()
+      bag.menuButton:Open(ctx())
+      local names = {}
+      for i = 2, #list do
+        names[i - 1] = list[i].text
+      end
+      assert.are.same({ "Show Bag Anchor", "Show Blizzard Bags", "Small Bags", "Open Options Screen" }, names)
+      assert.is_true(list[2].notCheckable)
+      list[2].func()
+      bag.menuButton:Open(ctx())
+      assert.are.equal("Lock Bag", list[2].text)
     end)
 
     it("draws its bag button again each time it shows (a vendor's portrait)", function()
@@ -890,31 +926,31 @@ describe("BetterBags Next's panels and themes", function()
       for _, panel in ipairs({ bag, bank }) do
         every(panel, function(button) assert.are.same({ 0.2, 0.1, 0.05 }, color(button), button.key) end)
       end
-      bag.sortButton:GetScript("OnEnter")(bag.sortButton)
-      assert.are.same({ 0.6, 0.1, 0.1 }, color(bag.sortButton))
-      bag.sortButton:GetScript("OnLeave")(bag.sortButton)
-      assert.are.same({ 0.2, 0.1, 0.05 }, color(bag.sortButton))
+      bag.bagsButton:GetScript("OnEnter")(bag.bagsButton)
+      assert.are.same({ 0.6, 0.1, 0.1 }, color(bag.bagsButton))
+      bag.bagsButton:GetScript("OnLeave")(bag.bagsButton)
+      assert.are.same({ 0.2, 0.1, 0.05 }, color(bag.bagsButton))
     end)
 
     it("draws a theme's own art in its art colors, and its own glyph in the glyph colors", function()
       local bag = nextBag:Create(ctx())
       apply({ Palette = { Ink = { 0.2, 0.1, 0.05, 1 }, Plain = { 0.9, 0.9, 0.9, 1 } },
         Header = { Buttons = { Color = "Ink", ArtColor = "Plain", ArtHoverColor = "Gold",
-          Icons = { sortButton = { Atlas = "my-art", Glyph = false },
+          Icons = { anchorButtonFree = { Atlas = "my-art", Glyph = false },
             settingsButton = { Texture = "Interface\\MyGear" },
             bagsButton = { Texture = "Interface\\Sheet", TexCoords = { 0.5, 1, 0, 0.5 }, Glyph = false } } } } })
-      assert.are.equal("my-art", bag.sortButton.icon:GetAtlas())
-      assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.sortButton))
-      bag.sortButton:GetScript("OnEnter")(bag.sortButton)
-      assert.are.same({ 1, 0.84, 0.5 }, color(bag.sortButton), "art brightens in its own hover color")
-      bag.sortButton:GetScript("OnLeave")(bag.sortButton)
+      assert.are.equal("my-art", bag.anchorButton.icon:GetAtlas())
+      assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.anchorButton))
+      bag.anchorButton:GetScript("OnEnter")(bag.anchorButton)
+      assert.are.same({ 1, 0.84, 0.5 }, color(bag.anchorButton), "art brightens in its own hover color")
+      bag.anchorButton:GetScript("OnLeave")(bag.anchorButton)
       assert.are.equal("Interface\\MyGear", bag.settingsButton.icon:GetTexture())
       assert.are.same({ 0.2, 0.1, 0.05 }, color(bag.settingsButton), "a glyph unless it says otherwise")
       assert.are.equal("Interface\\Sheet", bag.bagsButton.icon:GetTexture())
       assert.are.same({ 0.5, 1, 0, 0.5 }, bag.bagsButton.icon._texCoords)
       assert.are.same({ 0.9, 0.9, 0.9 }, color(bag.bagsButton))
       backToDefault()
-      assert.are.equal("sort", NextIconName(bag.sortButton))
+      assert.are.equal("anchor", NextIconName(bag.anchorButton))
       assert.are.same({ 0, 1, 0, 1 }, bag.bagsButton.icon._texCoords)
     end)
 
@@ -1007,9 +1043,9 @@ describe("BetterBags Next's panels and themes", function()
       apply({ Header = { Buttons = { Icons = {
         closeButton = { Texture = "Interface\\Spec\\close.png", Glyph = false,
           Highlight = { Texture = "Interface\\Spec\\close-hover.png" } },
-        sortButton = { Atlas = "spec-sort", Highlight = { Atlas = "spec-sort", BlendMode = "ADD" } },
+        anchorButtonFree = { Atlas = "spec-anchor", Highlight = { Atlas = "spec-anchor", BlendMode = "ADD" } },
       } } } })
-      local close, sort = bag.closeButton, bag.sortButton
+      local close, anchor = bag.closeButton, bag.anchorButton
       assert.are.equal("Interface\\Spec\\close.png", close.icon:GetTexture())
       assert.is_false(close.highlight:IsShown())
       close:GetScript("OnEnter")(close)
@@ -1021,10 +1057,10 @@ describe("BetterBags Next's panels and themes", function()
       assert.are.same({ close.icon:GetSize() }, { close.highlight:GetSize() })
       close:GetScript("OnLeave")(close)
       assert.is_false(close.highlight:IsShown())
-      sort:GetScript("OnEnter")(sort)
-      assert.are.equal("spec-sort", sort.highlight:GetAtlas())
-      assert.are.equal("ADD", sort.highlight:GetBlendMode())
-      sort:GetScript("OnLeave")(sort)
+      anchor:GetScript("OnEnter")(anchor)
+      assert.are.equal("spec-anchor", anchor.highlight:GetAtlas())
+      assert.are.equal("ADD", anchor.highlight:GetBlendMode())
+      anchor:GetScript("OnLeave")(anchor)
       bag:SetHeaderButtonEnabled(close, false)
       close:GetScript("OnEnter")(close)
       assert.is_false(close.highlight:IsShown(), "disabled")
@@ -1069,7 +1105,7 @@ describe("BetterBags Next's panels and themes", function()
 
     it("names the button whose icon the theme does not give", function()
       local bag = nextBag:Create(ctx())
-      assert.has_error(function() bag:SetHeaderIcon(bag.sortButton, "nopeButton") end,
+      assert.has_error(function() bag:SetHeaderIcon(bag.bagsButton, "nopeButton") end,
         "the Next theme has no icon for nopeButton")
     end)
   end)

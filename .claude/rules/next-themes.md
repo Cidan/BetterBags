@@ -263,15 +263,16 @@ with custom art"; then, shown a draft set, to use BetterBags' own for every butt
 close button included.
 
 - **The art** (`tools/textures/next_icons.py`, standard-library Python like `next_glow.py`; run from
-  the repository root): fourteen glyphs, `textures/next/icons/*.png`, 64 x 64, white, the shape in the
+  the repository root): sixteen glyphs, `textures/next/icons/*.png`, 64 x 64, white, the shape in the
   alpha. Drawn in the style of Blizzard's `uitools-icon` family, measured from its atlas (file 5400310,
   `UiTextureAtlas` 2561 on wago.tools): a 20-unit grid, a 1.5-unit stroke, about 1.5 to 18.5 across,
-  so they fill a 22-unit button as the gear did. Blizzard's family has no sort, bag, bank tab,
-  deposit, gold, filter, junk or repair icon, so BetterBags draws all fourteen, the gear and the close
+  so they fill a 22-unit button as the gear did. Blizzard's family has no anchor, lock, bag, bank tab,
+  deposit, gold, filter, junk or repair icon, so BetterBags draws all sixteen, the gear and the close
   button too, so every button matches in weight and sharpness on every client (Blizzard's are 20
   pixels and blur when scaled up). Each is a set of signed-distance shapes (strokes, fills,
-  knock-outs) sampled once per pixel with a one-pixel edge: settings (a gear), close, sort (a broom
-  with a sparkle, as Blizzard's sort button), classic bags (a backpack), small and full size (arrows
+  knock-outs) sampled once per pixel with a one-pixel edge: settings (a gear), close, the anchor button's three
+  (next-bag-anchor.md §30e: an anchor, the anchor in its square's corners, a padlock; the sort broom went with the sort
+  button), classic bags (a backpack), small and full size (arrows
   in, arrows out), bank tabs (a tabbed panel), Warbank deposit (an arrow into a tray), deposit and
   withdraw gold (a coin stack with an arrow), filter (a funnel), sell junk (a price tag), repair (a
   hammer), guild repair (a hammer with a guild shield).
@@ -279,12 +280,13 @@ close button included.
   `filterMode`), as Blizzard draws its map tiles on every client, so a 64-pixel glyph drawn at 22 units
   (often 14 to 22 pixels) stays smooth, and stays sharp on large screens.
 - **The theme gives every icon** (`Header.Buttons.Icons`, by button key): `settingsButton`,
-  `closeButton`, `sortButton`, `bagsButton` (Show Blizzard Bags; it was `classicButton`, the switch to the
+  `closeButton`, `anchorButtonFree`, `anchorButtonShown` and `anchorButtonLocked` (the anchor button by state,
+  next-bag-anchor.md §30b; it replaced `sortButton`), `bagsButton` (Show Blizzard Bags; it was `classicButton`, the switch to the
   classic bags it replaced), `sizeButtonFull` and `sizeButtonSmall` (the size
   button by state), `bankTabsButton`, `depositButton` (the Warbank), `depositGoldButton`,
   `withdrawGoldButton` (the guild bank's: renamed from `depositButton`/`withdrawButton`, which would
   have shared the Warbank's key), `filterButton`, `sellJunkButton`, `repairAllButton`,
-  `guildRepairButton`. Default names its glyphs in `Textures` (`IconSettings`, `IconSort`, ...), so a
+  `guildRepairButton`. Default names its glyphs in `Textures` (`IconSettings`, `IconAnchor`, ...), so a
   theme can repoint one file for every use. The panels' button lists carry no art; a key the theme
   gives no icon is an error naming it (`SetHeaderIcon`), and every theme inherits Default's.
 - **Replacing one:** `Icons.<key> = { Texture, TexCoords }` or `{ Atlas }`. Theme tables merge key by

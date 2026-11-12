@@ -107,6 +107,8 @@ const.DATABASE_DEFAULTS = {
     nextAutosize = true,
     nextSize = "small",
     nextSmallPlaces = {},
+    nextSmallCorners = {},
+    nextAnchorStates = {},
     nextSmallSizes = {},
     nextSmallChain = "apart",
     nextTheme = "Default",
@@ -440,14 +442,46 @@ describe("Database", function()
       assert.are.equal("small", DB:GetNextSize())
     end)
 
-    -- Each kind of bag keeps where its small panel was left: its top left, in UIParent's units.
-    it("GetNextSmallPlace / SetNextSmallPlace, per kind, nothing until moved", function()
+    -- Where a small panel was left before it held its bottom corner (docs/next-bag-anchor.md): its top left, read once to
+    -- work its corner out, then cleared.
+    it("GetNextSmallPlace / ClearNextSmallPlace, the place saved before corners, per kind", function()
       assert.is_nil(DB:GetNextSmallPlace(0))
-      DB:SetNextSmallPlace(0, 1200.5, 900)
-      DB:SetNextSmallPlace(1, 40, 800)
+      DB.data.profile.nextSmallPlaces[0] = { x = 1200.5, y = 900 }
+      DB.data.profile.nextSmallPlaces[1] = { x = 40, y = 800 }
       assert.are.same({ 1200.5, 900 }, { DB:GetNextSmallPlace(0) })
       assert.are.same({ 40, 800 }, { DB:GetNextSmallPlace(1) })
       assert.is_nil(DB:GetNextSmallPlace(2))
+      DB:ClearNextSmallPlace(0)
+      assert.is_nil(DB:GetNextSmallPlace(0))
+      assert.is_nil(DB.data.profile.nextSmallPlaces[0], "nothing left behind")
+      assert.are.same({ 40, 800 }, { DB:GetNextSmallPlace(1) })
+    end)
+
+    -- Each kind of bag keeps the corner its small panel holds (docs/next-bag-anchor.md): its bottom left or bottom right, in
+    -- UIParent's units, and which.
+    it("GetNextSmallCorner / SetNextSmallCorner, per kind, nothing until placed, and nothing but a side", function()
+      assert.is_nil(DB:GetNextSmallCorner(0))
+      DB:SetNextSmallCorner(0, 1880.5, 120, "RIGHT")
+      DB:SetNextSmallCorner(1, 40, 300, "LEFT")
+      assert.are.same({ 1880.5, 120, "RIGHT" }, { DB:GetNextSmallCorner(0) })
+      assert.are.same({ 40, 300, "LEFT" }, { DB:GetNextSmallCorner(1) })
+      assert.is_nil(DB:GetNextSmallCorner(2))
+      assert.has_error(function() DB:SetNextSmallCorner(0, 1, 2, "TOP") end)
+      assert.are.same({ 1880.5, 120, "RIGHT" }, { DB:GetNextSmallCorner(0) })
+    end)
+
+    -- Each kind of bag's anchor (docs/next-bag-anchor.md): free until shown, then shown or locked.
+    it("GetNextAnchorState / SetNextAnchorState, per kind, free until shown, and nothing but a state", function()
+      assert.are.equal("free", DB:GetNextAnchorState(0))
+      DB:SetNextAnchorState(0, "shown")
+      DB:SetNextAnchorState(1, "locked")
+      assert.are.equal("shown", DB:GetNextAnchorState(0))
+      assert.are.equal("locked", DB:GetNextAnchorState(1))
+      DB:SetNextAnchorState(0, "free")
+      assert.are.equal("free", DB:GetNextAnchorState(0))
+      assert.is_nil(DB.data.profile.nextAnchorStates[0], "free saves nothing")
+      assert.has_error(function() DB:SetNextAnchorState(1, "open") end)
+      assert.are.equal("locked", DB:GetNextAnchorState(1))
     end)
 
     -- And the size the player gave it (next.md §14g): nothing until resized, cleared by a reset.

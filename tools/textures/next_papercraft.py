@@ -751,15 +751,38 @@ def _close(h):
     h.curve([(52, 11), (33, 30), (11, 52)], width=4.6, wobble=1.0)
 
 
-@glyph("sort")
-def _sort(h):
-    h.line([(50, 8), (27, 36)], width=4.0)
-    h.curve([(30, 30), (19, 36), (12, 56)], width=3.0)
-    h.curve([(38, 39), (32, 47), (30, 58)], width=3.0)
-    h.curve([(33, 35), (24, 45), (20, 58)], width=2.6)
-    h.line([(12, 56), (30, 58)], width=2.6)
-    h.line([(13, 11), (13, 23)], width=2.6, wobble=0.3)
-    h.line([(7, 17), (19, 17)], width=2.6, wobble=0.3)
+def anchor_shape(h, cx=32.0, cy=32.0, k=1.0):
+    # A ship's anchor by hand (the anchor button, docs/next-bag-anchor.md): its ring, the shank, the stock, the arms curving
+    # up to their flukes.
+    def p(x, y):
+        return (cx + (x - 32) * k, cy + (y - 32) * k)
+    h.circle(*p(32, 11), 5.2 * k, wobble=0.4, width=3.0)
+    h.line([p(32, 16), p(32, 55)], width=3.8)
+    h.line([p(20, 23), p(44, 23)], width=3.4)
+    h.curve([p(12, 38), p(17, 50), p(32, 56), p(47, 50), p(52, 38)], width=3.6)
+    for side in (-1, 1):
+        tip = p(32 + side * 20, 38)
+        h.line([p(32 + side * 14, 39), tip, p(32 + side * 21, 46)], width=3.0, wobble=0.4)
+
+
+@glyph("anchor")
+def _anchor(h):
+    anchor_shape(h)
+
+
+@glyph("anchorshown")
+def _anchorshown(h):
+    anchor_shape(h, 32, 33, 0.66)
+    for (x, y, dx, dy) in ((7, 7, 1, 1), (57, 7, -1, 1), (7, 57, 1, -1), (57, 57, -1, -1)):
+        h.line([(x, y + dy * 13), (x, y), (x + dx * 13, y)], width=3.2, wobble=0.5)
+
+
+@glyph("lock")
+def _lock(h):
+    h.curve([(20, 31), (19, 18), (32, 11), (45, 18), (44, 31)], width=3.6)
+    h.line([(13, 31), (51, 31), (51, 56), (13, 56), (13, 31)], width=3.6)
+    h.circle(32, 41, 3.4, wobble=0.3, width=2.8)
+    h.line([(32, 44), (32, 50)], width=3.0, wobble=0.3)
 
 
 @glyph("bags")

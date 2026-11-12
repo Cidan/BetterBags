@@ -75,8 +75,10 @@ reviews of them are §14g (continued), in next-small-names.md.
     there, the first grid step that cuts no name short (`FitWidth`, "Names whole", next-small-names.md), which can be wider than where
     it was let go. Every row stays as it was: a section wider than the panel keeps wrapping where it wrapped, and no
     column is added, so it narrows, but for its names (a fraction of a pixel aside). The width saved stays when items come and go (a section that
-    grows past it wraps). The height stays where it was let go (a height snap is on hold). Saved for its kind with its place (its top left, which the left grip moves: the side
-    across from the grip stays still). A press whose snapped width and height are within half a unit of the size
+    grows past it wraps). The height stays where it was let go (a height snap is on hold). Saved for its kind with its place (the
+    corner it holds, next-bag-anchor.md §30a: the bottom it was let go at, its side kept; the side across from the grip stays
+    still). A chained bag glides back level with its partner, and a grip that moved an anchor's bottom glides the bag beside it
+    level once let go. A press whose snapped width and height are within half a unit of the size
     it had saves nothing (a default-sized panel dragged a little wider snaps back to the default and saves
     nothing), so the default size keeps following the screen. Hiding it (Escape) ends the sizing, snapped
     (`OnHidden`).
@@ -163,10 +165,11 @@ reviews of them are §14g (continued), in next-small-names.md.
     (`FitSmall`) it is refitted to it and laid out again if its width or height changed; what was
     saved is kept.
 - **Shift-click** (`ResetSize`): the panel glides (`Time.Resize`, `Ease.Resize`) back to its default
-  size (fitted to its names, `SmallSize`; what they asked for on the way follows the frame after it ends), the corner across from the grip still (the right grip keeps the top left, the left grip the
-  top right), its content reflowing at once on the way as while dragging; the saved size is cleared,
+  size (fitted to its names, `SmallSize`; what they asked for on the way follows the frame after it ends), its bottom and the
+  side across from the grip still (the right grip keeps the bottom left, the left grip the bottom right: next-bag-anchor.md
+  §30a), its content reflowing at once on the way as while dragging; the saved size is cleared,
   so the default follows the screen again, and the place saved. It returns `"resetting"`, `"default"`
-  (nothing was saved) or `"closing"`. Anything that places, moves, sizes, switches or hides the panel
+  (nothing was saved), `"closing"` or `"locked"` (held, next-bag-anchor.md §30d). Anything that places, moves, sizes, switches or hides the panel
   ends the glide where it was going first (`endSizeGlide`, from `setOffset`, `StartMove`, `StartSizing`,
   `PrepareResize`, `OnHidden`).
 - **Everything that read one width reads each panel's own:** `ChainedPlace`, `Dropped` (a bag too wide

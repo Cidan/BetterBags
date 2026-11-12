@@ -371,8 +371,9 @@ function DB:SetNextSize(size)
   DB.data.profile.nextSize = size
 end
 
--- GetNextSmallPlace returns where a kind's small panel was left: its top left in UIParent's units,
--- or nothing before it was first moved.
+-- GetNextSmallPlace returns where a kind's small panel was left before it held its bottom corner
+-- (docs/next-bag-anchor.md): its top left in UIParent's units, or nothing. The panel works its corner out from it the
+-- first time it shows, and clears it.
 ---@param kind BagKind
 ---@return number? x, number? y
 function DB:GetNextSmallPlace(kind)
@@ -384,10 +385,52 @@ function DB:GetNextSmallPlace(kind)
 end
 
 ---@param kind BagKind
+function DB:ClearNextSmallPlace(kind)
+  DB.data.profile.nextSmallPlaces[kind] = nil
+end
+
+---@alias NextSmallSide "LEFT"|"RIGHT"
+
+-- GetNextSmallCorner returns the corner a kind's small panel holds (docs/next-bag-anchor.md): its bottom left (side
+-- "LEFT") or bottom right ("RIGHT") in UIParent's units, and which; nothing before it was first placed.
+---@param kind BagKind
+---@return number? x, number? y, NextSmallSide? side
+function DB:GetNextSmallCorner(kind)
+  local corner = DB.data.profile.nextSmallCorners[kind]
+  if corner == nil then
+    return nil
+  end
+  return corner.x, corner.y, corner.side
+end
+
+---@param kind BagKind
 ---@param x number
 ---@param y number
-function DB:SetNextSmallPlace(kind, x, y)
-  DB.data.profile.nextSmallPlaces[kind] = { x = x, y = y }
+---@param side NextSmallSide
+function DB:SetNextSmallCorner(kind, x, y, side)
+  if side ~= "LEFT" and side ~= "RIGHT" then
+    error("unknown BetterBags Next corner side: " .. tostring(side))
+  end
+  DB.data.profile.nextSmallCorners[kind] = { x = x, y = y, side = side }
+end
+
+---@alias NextAnchorState "free"|"shown"|"locked"
+
+-- GetNextAnchorState returns a kind's anchor (docs/next-bag-anchor.md): "free" (the bag moves and sizes), "shown" (its
+-- anchor shows, and drags it), or "locked" (it neither moves nor sizes).
+---@param kind BagKind
+---@return NextAnchorState
+function DB:GetNextAnchorState(kind)
+  return DB.data.profile.nextAnchorStates[kind] or "free"
+end
+
+---@param kind BagKind
+---@param state NextAnchorState
+function DB:SetNextAnchorState(kind, state)
+  if state ~= "free" and state ~= "shown" and state ~= "locked" then
+    error("unknown BetterBags Next anchor state: " .. tostring(state))
+  end
+  DB.data.profile.nextAnchorStates[kind] = state ~= "free" and state or nil
 end
 
 -- GetNextSmallSize returns the size the player gave a kind's small panel with its grips (next.md

@@ -54,7 +54,7 @@ local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 ---@field settingsButton Button
 ---@field bankTabsButton? Button Retail: switches between groups and Blizzard's bank tabs.
 ---@field depositButton? Button Retail with a Warbank.
----@field sortButton? Button Where the client can sort the bank.
+---@field anchorButton Button Its anchor (docs/next-bag-anchor.md): shown, locked, free.
 ---@field purchaseBankButton? Button Retail: shown while the character owns no character bank tab.
 ---@field bankTab number The bank tab the bank shows: what deposits, drops and the backpack's grey-out go by.
 ---@field blizzardBankTab? number The Blizzard bank tab shown, in tab mode.
@@ -118,10 +118,32 @@ function bankProto:GetHeaderButtons()
     table.insert(buttons, { key = "depositButton", tooltip = L:G("Deposit Warbank Items"),
       onClick = function() C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account) end })
   end
-  if (C_Container and C_Container.SortBankBags) or _G.SortBankBags then
-    table.insert(buttons, { key = "sortButton", tooltip = L:G("Sort Bank"), onClick = function(ctx) self:Sort(ctx) end })
-  end
+  -- The anchor (docs/next-bag-anchor.md), where the sort button was: a right click on the title sorts (OnTitleRightClick).
+  table.insert(buttons, self:AnchorButton())
   return buttons
+end
+
+-- CanSort says the client can sort the bank (SortBankBags).
+---@return boolean
+function bankProto:CanSort()
+  return ((C_Container and C_Container.SortBankBags) or _G.SortBankBags) and true or false
+end
+
+-- OnTitleRightClick sorts the bank, as the backpack's title sorts it (docs/next-bag-anchor.md: the anchor button stands where
+-- its sort button was), on a client that can.
+---@param ctx Context
+function bankProto:OnTitleRightClick(ctx)
+  if self:CanSort() then
+    self:Sort(ctx)
+  end
+end
+
+---@return string?
+function bankProto:TitleRightClickHint()
+  if self:CanSort() then
+    return L:G("Right-click to sort the bank.")
+  end
+  return nil
 end
 
 -- CreateMoney makes the money frame the classic bank shows: the Warbank's gold on retail with a

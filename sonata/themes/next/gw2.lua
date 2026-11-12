@@ -79,7 +79,6 @@ sonataNext:RegisterTheme({
     -- The original's actions (micro buttons) and GW2_UI's own buttons.
     MicroBag = GW .. "icons\\bagmicrobutton-up.png",
     MicroBagDown = GW .. "icons\\bagmicrobutton-down.png",
-    MicroCollections = GW .. "icons\\microicons\\collectionsmicrobutton-up.png",
     MicroQuestLog = GW .. "icons\\microicons\\questlogmicrobutton-up.png",
     -- BetterBags' own size glyphs (asked: GW2_UI's minimize and maximize art, its only, 32 x 32, drew blurry).
     Minimize = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\minimize.png",
@@ -267,8 +266,6 @@ sonataNext:RegisterTheme({
         -- Its X is 16 of its 26 pixels: drawn at 26.
         closeButton = { Texture = "Close", Glyph = false, Scale = 1.1, Highlight = { Texture = "CloseHover" } },
         bagsButton = { Texture = "MicroBag", Glyph = false, Scale = 4 / 3, Highlight = { Texture = "MicroBagDown" } },
-        sortButton = { Texture = "MicroCollections", Glyph = false, Scale = 4 / 3,
-          Highlight = { Texture = "MicroCollections", BlendMode = "ADD" } },
         settingsButton = { Texture = "MicroQuestLog", Glyph = false, Scale = 4 / 3,
           Highlight = { Texture = "MicroQuestLog", BlendMode = "ADD" } },
         -- Glyphs, in the theme's glyph color, white under the pointer.

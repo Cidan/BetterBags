@@ -45,7 +45,7 @@ local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 local nextBag = addon:NewModule('NextBag')
 
 ---@class NextBackpack: NextPanelFrame
----@field sortButton Button
+---@field anchorButton Button Its anchor (docs/next-bag-anchor.md): shown, locked, free.
 ---@field sizeButton Button Switches every panel between full and small (UpdateSizeButton).
 ---@field closeButton Button
 ---@field settingsButton Button
@@ -129,8 +129,8 @@ function bagProto:GetHeaderButtons()
     { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
     { key = "settingsButton", tooltip = L:G("Open Options Screen"), menuLast = true,
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
-    { key = "sortButton", tooltip = L:G("Sort Bags"),
-      onClick = function(ctx) self:Sort(ctx) end },
+    -- The anchor (docs/next-bag-anchor.md), where the sort button was: a right click on the title sorts (OnTitleRightClick).
+    self:AnchorButton(),
     -- Show Blizzard Bags (asked: "the 'Switch to Classic Bags' icon now becomes 'Show Blizzard Bags'";
     -- docs/next-batch-2.md §4). The way back to the classic bags is in the settings and /bb next.
     { key = "bagsButton", tooltipFunc = function() self:BagsTooltip() end, label = L:G("Show Blizzard Bags"),
@@ -397,8 +397,8 @@ function bagProto:Sort(ctx)
   events:SendMessage(ctx, "bags/SortBackpack")
 end
 
--- OnTitleRightClick sorts the backpack, as its sort button does (asked: "right click the title of the backpack to
--- sort it").
+-- OnTitleRightClick sorts the backpack (asked: "right click the title of the backpack to sort it"), the way to sort it now
+-- that its anchor button stands where its sort button was (docs/next-bag-anchor.md).
 ---@param ctx Context
 function bagProto:OnTitleRightClick(ctx)
   self:Sort(ctx)

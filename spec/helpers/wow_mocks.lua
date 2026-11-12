@@ -991,6 +991,10 @@ end
 -- see them unchanged by BetterBags Next's pixel grid (docs/next-pixel-perfect.md). Specs of the pixel
 -- grid set real screens (spec/helpers/layout.lua, UseScreen).
 _G.GetPhysicalScreenSize = function() return 1920, 768 end
+-- GetScreenWidth() -> width, GetScreenHeight() -> height (ScreenDocumentation.lua): the screen in UI units, which UIParent
+-- spans (the classic bags' anchor reads them, frames/anchor.lua).
+_G.GetScreenWidth = function() return UIParent:GetWidth() end
+_G.GetScreenHeight = function() return UIParent:GetHeight() end
 -- Round(value) (Blizzard_SharedXMLBase/MathUtil.lua: Classic's, half away from zero; live is math.round)
 -- and PixelUtil (Blizzard_SharedXML/PixelUtil.lua, every client), as Blizzard writes them.
 _G.Round = _G.Round or function(value)
