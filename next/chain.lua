@@ -149,7 +149,8 @@ function chain:ClampChanged(ctx)
     panel:ApplyClamp()
     if on and isOpen(panel) and isSmall(panel) then
       panel:FitSmall()
-      panel:SetCorner(panel:CornerOf(panel.placeX, panel.placeY, select(3, panel:HeldCorner())))
+      local _, _, side, edge = panel:HeldCorner()
+      panel:SetCorner(panel:CornerOf(panel.placeX, panel.placeY, side, edge))
     end
   end
 end
@@ -271,8 +272,9 @@ function chain:SmallAnchorOf(panel)
 end
 
 -- ChainedPlace is where panel's top left sits beside anchor, whose top left is ax, ay: a companion left of the
--- backpack, the backpack right of a companion, the gap between them, their bottoms aligned (each holds its bottom
--- and grows up, docs/next-bag-anchor.md). Each is as wide and as tall as it is now (next.md §14g).
+-- backpack, the backpack right of a companion, the gap between them, lined up by the edge the anchor holds (its bottom, or
+-- its top where its anchor square gave it a top corner: docs/next-bag-anchor.md), each growing away from it on its own. Each
+-- is as wide and as tall as it is now (next.md §14g).
 ---@param panel NextPanelFrame
 ---@param anchor NextPanelFrame
 ---@param ax number
@@ -280,7 +282,10 @@ end
 ---@return number x, number y
 function chain:ChainedPlace(panel, anchor, ax, ay)
   local gap = self:SmallGap(panel, anchor)
-  local y = ay - anchor:SmallHeight() * anchor:Scale() + panel:SmallHeight() * panel:Scale()
+  local y = ay
+  if anchor:HeldEdge() ~= "TOP" then
+    y = ay - anchor:SmallHeight() * anchor:Scale() + panel:SmallHeight() * panel:Scale()
+  end
   if panel.chainRole == "companion" then
     return ax - gap - panel:BodyWidth() * panel:Scale(), y
   end
@@ -420,8 +425,8 @@ function chain:Released(panel)
   end
   local _, spot = self:ChainedPlace(backpack, panel, panel:LivePlace())
   local spotBottom = spot - backpack:SmallHeight() * backpack:Scale()
-  local x, y, side = backpack:CornerOf(backpack.placeX, backpack.placeY)
-  backpack:SetCorner(x, math.max(y, spotBottom), side)
+  local x, y, side, edge = backpack:CornerOf(backpack.placeX, backpack.placeY)
+  backpack:SetCorner(x, math.max(y, spotBottom), side, edge)
 end
 
 -- Detach lets a small bag go of its anchor as the player starts to drag it away; its partner braids

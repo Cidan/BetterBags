@@ -390,28 +390,34 @@ function DB:ClearNextSmallPlace(kind)
 end
 
 ---@alias NextSmallSide "LEFT"|"RIGHT"
+---@alias NextSmallEdge "TOP"|"BOTTOM"
 
--- GetNextSmallCorner returns the corner a kind's small panel holds (docs/next-bag-anchor.md): its bottom left (side
--- "LEFT") or bottom right ("RIGHT") in UIParent's units, and which; nothing before it was first placed.
+-- GetNextSmallCorner returns the corner a kind's small panel holds (docs/next-bag-anchor.md): one of its four corners in
+-- UIParent's units, and which, its side ("LEFT" or "RIGHT") and its edge ("TOP" or "BOTTOM"); nothing before it was first
+-- placed. A corner saved before corners had an edge (the anchor's first build, run in game) held its bottom.
 ---@param kind BagKind
----@return number? x, number? y, NextSmallSide? side
+---@return number? x, number? y, NextSmallSide? side, NextSmallEdge? edge
 function DB:GetNextSmallCorner(kind)
   local corner = DB.data.profile.nextSmallCorners[kind]
   if corner == nil then
     return nil
   end
-  return corner.x, corner.y, corner.side
+  return corner.x, corner.y, corner.side, corner.edge or "BOTTOM"
 end
 
 ---@param kind BagKind
 ---@param x number
 ---@param y number
 ---@param side NextSmallSide
-function DB:SetNextSmallCorner(kind, x, y, side)
+---@param edge NextSmallEdge
+function DB:SetNextSmallCorner(kind, x, y, side, edge)
   if side ~= "LEFT" and side ~= "RIGHT" then
     error("unknown BetterBags Next corner side: " .. tostring(side))
   end
-  DB.data.profile.nextSmallCorners[kind] = { x = x, y = y, side = side }
+  if edge ~= "TOP" and edge ~= "BOTTOM" then
+    error("unknown BetterBags Next corner edge: " .. tostring(edge))
+  end
+  DB.data.profile.nextSmallCorners[kind] = { x = x, y = y, side = side, edge = edge }
 end
 
 ---@alias NextAnchorState "free"|"shown"|"locked"

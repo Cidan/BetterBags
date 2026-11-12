@@ -100,9 +100,10 @@ content (window.md §3) and are unchanged.
 
 #### Where it sits (`clampPlace`, `SmallPlace`, `saveSized`)
 
-Since #1276 a small bag holds its bottom corner (next-bag-anchor.md §30a): it grows up from its bottom, and everything below
-is that mirror of what it was when bags held their top (each held-top rule, and the review finding behind it, kept its spec,
-rewritten for the bottom).
+Since #1276 a small bag holds a corner (next-bag-anchor.md §30a): a bottom one unless its anchor square gave it a top one. Holding
+its bottom it grows up from it, and everything below is that mirror of what it was when bags held their top (each held-top rule,
+and the review finding behind it, kept its spec, rewritten for the bottom); holding a top corner it grows down, as bags did
+before, pushed up to keep its bottom on the screen (`clampPlace`, `saveSized`'s `math.min`).
 
 - Its bottom stays where the player left it; the top edge moves. Never placed, it holds its own side's bottom corner where a
   bag of the default height centered has it (`HeldCorner`), so it grows up from there.

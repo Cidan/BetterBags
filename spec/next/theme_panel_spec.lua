@@ -171,9 +171,11 @@ describe("BetterBags Next's panels and themes", function()
     db.corners = {}
     override(stubs.database, "GetNextSmallCorner", function(_, kind)
       local c = db.corners[kind]
-      if c then return c[1], c[2], c[3] end
+      if c then return c[1], c[2], c[3], c[4] or "BOTTOM" end
     end)
-    override(stubs.database, "SetNextSmallCorner", function(_, kind, x, y, side) db.corners[kind] = { x, y, side } end)
+    override(stubs.database, "SetNextSmallCorner", function(_, kind, x, y, side, edge)
+      db.corners[kind] = { x, y, side, edge }
+    end)
     db.anchors = {}
     override(stubs.database, "GetNextAnchorState", function(_, kind) return db.anchors[kind] or "free" end)
     override(stubs.database, "SetNextAnchorState", function(_, kind, state) db.anchors[kind] = state end)

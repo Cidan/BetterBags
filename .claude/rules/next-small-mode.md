@@ -27,8 +27,9 @@ they show (§14i, Autosize Bags: next-small-autosize.md).
     small; small being the default makes it every unsaved profile's at the bank, a vendor or the guild bank.
   - **Coverage:** the whole-addon specs that start BetterBags Next now run small panels; Papercraft's "full size and
     small" starts full (it had started on the default).
-  `nextSmallCorners[kind]` (`DB:Get/SetNextSmallCorner`) the corner each kind's small panel holds where it was left (its
-  bottom left or bottom right in UIParent's units, and which: next-bag-anchor.md §30a), nothing until first placed; the
+  `nextSmallCorners[kind]` (`DB:Get/SetNextSmallCorner`) the corner each kind's small panel holds where it was left (one of
+  its four corners in UIParent's units, and which, its side and its edge: next-bag-anchor.md §30a), nothing until first
+  placed; the
   top left it was saved by before (`nextSmallPlaces`) is taken over as it first shows;
   `nextSmallSizes[kind]` (`DB:Get/SetNextSmallSize`, `{ width, height }`) the size the player gave it
   with its grips (next-small-resize.md §14g), nothing while it is the default size (a reset clears it); with Autosize Bags on

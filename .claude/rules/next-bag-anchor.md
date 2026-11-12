@@ -26,40 +26,63 @@ the button and the square; "resize is locked too"; dragging the bag's title whil
 anchoring the bag that sits beside its partner unchains it, and locking a bag holds the bag chained beside it; Next keeps its
 own saved state, apart from the classic anchor's.
 
-### 30a. A small bag holds its bottom corner (`HeldCorner`, `SmallPlace`)
+Then, having used it in game ("the interaction is perfect"):
 
-- **Saved:** `nextSmallCorners[kind] = { x, y, side }` (`DB:Get/SetNextSmallCorner`, side "LEFT" or "RIGHT", nothing else
-  accepted): the bag's bottom left or bottom right on the screen, in UIParent's units. Where it is drawn (`SmallPlace`, its top
-  left) is worked out from the corner and its size now, so it grows up from its bottom and away from its held side: Autosize
-  Bags (next-small-autosize.md §14i), Fit Names While Open, Bag Scale, the screen's height share all keep the corner.
-- **The side** is the half of the screen the bag's middle is on where it is placed (`CornerOf` with no side: `SavePlace`): a
-  drop (`StopMove`), the square dragged (§30c), the backpack saved where it stands as its companion closes (`chain:Released`).
-  Sizing keeps the side it has (`saveSized`: a grip let go, Shift-click), and so does turning Clamp Bags to Screen on
-  (`chain:ClampChanged`), so a bag sized or refitted across the middle never flips.
-- **Never placed** (`HeldCorner`'s default): its own side's corner (the backpack's bottom right, a companion's bottom left) the
-  margin in from its edge, its bottom where a bag of the default height (the screen's share, `Small.Height`) centered on the
-  screen has it: with Autosize Bags off, a bag of the default size sits exactly where it always did.
-- **On the screen** (`clampPlace`): with Autosize Bags on, its top stays on the screen (pushed down no further than the screen's
-  top: the mirror of "move the bag up just enough", asked when bags held their top) and its bottom never goes under the
-  screen's (a drop that leaves it there is put back up and held there). The corner is not changed by a push: the bag goes back
-  up to it as it shrinks. Clamp Bags to Screen on keeps all of it on the screen, as before.
-- **Grips** stay on the bottom corners and size from there (the client's `StartSizing`, the top still): let go, the bottom it
-  was left at is the one it holds, its side kept (`saveSized`); autosized, its height bounces back over the bottom it holds
-  (`StopSizing`'s top is that bottom plus its height), a bottom pushed down kept, one Clamp Bags to Screen raised saved.
-- **Shift-click** (`ResetSize`) keeps its bottom (autosized, the one it holds) and the side across from the grip (the right
-  grip its bottom left, the left grip its bottom right); its top glides.
+> let's do the 4 quadrant anchoring instead of just left and right. for the top half of the screen though... let's make it so
+> we only swap the anchor if the anchor box is the drag handle [...] top anchors only work when you drag via the box, not the
+> title. this is because dragging by the title to the top won't work well given how tall the window is. basically, when
+> dragging by title bar == left/right anchor only. when dragging by anchor box == 4 quadrants.
+
+### 30a. A small bag holds a corner (`HeldCorner`, `SmallPlace`)
+
+- **Saved:** `nextSmallCorners[kind] = { x, y, side, edge }` (`DB:Get/SetNextSmallCorner`: side "LEFT" or "RIGHT", edge
+  "TOP" or "BOTTOM", nothing else accepted; a corner saved without an edge, by the first build of the anchor, reads as
+  "BOTTOM"): one of the bag's four corners on the screen, in UIParent's units. Where it is drawn (`SmallPlace`, its top left)
+  is worked out from the corner and its size now, so it grows away from its held edge and its held side: up from a bottom
+  corner, down from a top one. Autosize Bags (next-small-autosize.md §14i), Fit Names While Open, Bag Scale, the screen's height
+  share all keep the corner.
+- **Which corner:**
+  - **Dragged by its title** (or dropped beside a partner, or saved where it stands as its companion closes): a bottom corner,
+    the side the half of the screen the bag's middle is on (`CornerOf` with no side and no edge: `SavePlace`, `StopMove`,
+    `chain:Released`), wherever it is dropped, the top half too (asked: "when dragging by title bar == left/right anchor
+    only ... dragging by the title to the top won't work well given how tall the window is"). A bag holding a top corner
+    dragged by its title holds a bottom one from then on.
+  - **Dragged by its anchor square** (§30c): any of the four, the quadrant the square's middle is in ("when dragging by anchor
+    box == 4 quadrants").
+  - Sizing keeps the corner it has, side and edge (`saveSized`: a grip let go, Shift-click), and so does turning Clamp Bags
+    to Screen on (`chain:ClampChanged`), so a bag sized or refitted across the middle never flips.
+- **Never placed** (`HeldCorner`'s default): its own side's bottom corner (the backpack's bottom right, a companion's bottom
+  left) the margin in from its edge, its bottom where a bag of the default height (the screen's share, `Small.Height`)
+  centered on the screen has it: with Autosize Bags off, a bag of the default size sits exactly where it always did.
+- **On the screen** (`clampPlace`): with Autosize Bags on, all of its height stays on the screen: a bag holding its bottom is
+  pushed down no further than keeps its top on the screen (the mirror of "move the bag up just enough", asked when bags held
+  their top); one holding its top is pushed up no further than keeps its bottom on it; a drop that leaves its bottom under the
+  screen is put back up and held there. The corner is not changed by a push: the bag goes back to it as it shrinks. Clamp
+  Bags to Screen on keeps all of it on the screen, as before.
+- **Grips** stay on the bottom corners and size from there (the client's `StartSizing`, the top still): let go, the corner is
+  kept, its held edge where it was left (`saveSized`: a bottom corner's bottom where the grip left it, a top corner's top,
+  which the grip never moves); autosized, its height bounces back from the edge it holds (`StopSizing`'s top is a top corner's,
+  or a bottom corner's plus its height), an edge pushed back on the screen kept, one Clamp Bags to Screen moved the other way
+  saved.
+- **Shift-click** (`ResetSize`) keeps its held edge (`HeldEdge`; autosized, the one it holds) and the side across from the grip
+  (the right grip its left, the left grip its right); the other edge glides.
 - **Saved places from before** (`nextSmallPlaces`, a top left, `DB:GetNextSmallPlace`/`ClearNextSmallPlace`): `SmallPlace`
   reads one as a top left until the bag shows; as it first shows (`FitSmall`, `ApplyGeometry` on a shown panel) `adoptPlace`
-  saves the corner it holds where it is then, at the height it shows (kept on the screen as it is drawn), and clears the old
-  place, so it does not move.
-- **Chained bags line up by their bottoms** (`chain:ChainedPlace`; they lined up by their tops): both hold the same bottom
-  line and each grows up on its own, so a companion's height glide no longer carries the bag beside it, while its width (a
-  name, the screen's edge, a Bag Scale) still does. Not asked in so many words; it follows from rule 1, and is reported.
+  saves the bottom corner it holds where it is then, at the height it shows (kept on the screen as it is drawn), and clears the
+  old place, so it does not move.
+- **Chained bags line up by the edge their anchor holds** (`chain:ChainedPlace`, `HeldEdge`; they lined up by their tops):
+  their bottoms beside an anchor holding a bottom corner, their tops beside one holding a top corner, each growing away from
+  that line on its own, so a companion's height glide no longer carries the bag beside it, while its width (a name, the
+  screen's edge, a Bag Scale) still does. A chained bag's `HeldEdge` is its anchor's (its Shift-click keeps that edge).
   - A grip that moves an anchor's bottom (Autosize Bags off) leaves the bag beside it where it is while it is dragged and glides
-    it level once let go (`StopSizing` → `chain:Settle`). A chained bag's own grip let go glides it back level with its
-    partner (`StopSizing`'s top is its spot's; the snap glides the top whenever its place moved, `rises`).
-  - `chain:Released` saves the backpack's bottom level with the companion closing beside it, not one Autosize Bags pushed
-    down (`math.max` of where it stands and its spot's top).
+    it level once let go (`StopSizing` → `SettleSpot`; beside an anchor holding its top, the spot does not move and nothing
+    glides). A chained bag's own grip let go glides it back level with its partner (`StopSizing`'s top is its spot's; the snap
+    glides the top whenever its place moved, `rises`).
+  - `chain:Released` saves the backpack's bottom corner where it stands beside the companion closing, not a bottom Autosize
+    Bags pushed down (`math.max` of where it stands and its spot's bottom).
+  - An anchor holding a top corner dragged by its title carries its partner by their tops; dropped, it holds a bottom corner,
+    and the partner glides to line up by their bottoms (`StopMove`: only where the drop changed the anchor's `HeldEdge`; any
+    other drop moves the partner with the anchor at once, a push off the screen's edge too).
 
 ### 30b. The anchor button (`AnchorButton`, `CycleAnchor`, `SetAnchorState`)
 
@@ -90,15 +113,18 @@ own saved state, apart from the classic anchor's.
   square with it, then adds its own scripts, `CENTER` point and LibWindow config as before; Next's (made the first time it
   shows, the module looked up then, so specs that never show one need not load frames/anchor.lua) sizes it in whole pixels,
   clamps it to the screen and enables the mouse.
-- **Shown** (`SquareShown`: small, open, not closing, state shown) with its bottom left or bottom right on the corner the bag
-  holds (`PlaceSquare`, on whole pixels, its position label `"%dx %dy"` of that corner). `SetCorner` (every save of a corner)
-  places it again. A bag pushed down to keep its top on the screen leaves the square where its corner is.
+- **Shown** (`SquareShown`: small, open, not closing, state shown) with its same corner on the corner the bag holds (its top
+  right on a top right corner, and so on: `PlaceSquare`, on whole pixels, its position label `"%dx %dy"` of that corner). It
+  covers the bag's corner, as the classic one does; on a top corner that is the end of its header, where its buttons are (the
+  backpack's close, settings and anchor buttons), and a right click on the square locks the bag (below). `SetCorner` (every
+  save of a corner) places it again. A bag pushed back on the screen leaves the square where its corner is.
 - **Dragged** (the classic anchor's mechanics: the client moves the square, `StartMoving`): each frame (`OnUpdate`, set for the
-  drag only) the corner is the square's same corner on the half of the screen the square's middle is on, saved, and the bag
-  (and the bag chained beside it) placed over it. Let go, the square is anchored on whole pixels there and the chained bag's
-  place saved. A hide ends the drag (`OnHidden`, `UpdateAnchor`).
-- **Dragging the bag's title** moves the square with it each frame (`StartMove`'s mover `OnUpdate`: the corner the bag would
-  hold where it is now, `CornerOf(LivePlace())`).
+  drag only) the corner is the square's same corner in the quadrant of the screen the square's middle is in (its side the
+  half across, its edge the half up and down), saved, and the bag (and the bag chained beside it) placed from it. Let go, the
+  square is anchored on whole pixels there and the chained bag's place saved. A hide ends the drag (`OnHidden`,
+  `UpdateAnchor`).
+- **Dragging the bag's title** moves the square with it each frame on the bottom corner the bag would hold where it is now
+  (`StartMove`'s mover `OnUpdate`: `CornerOf(LivePlace())`, a bottom corner, as the drop saves).
 - **A right click** on the square hides it, as on the classic one, which keeps the anchor: here that is Locked.
 
 ### 30d. Locked (`Held`)
@@ -120,15 +146,18 @@ glyph color (its sort art, `MicroCollections`, went with the button). `Textures`
 ### 30f. Left as it is
 
 - `/bbanchor` still shows the classic bags' anchors only (config/config.lua); in Next the anchor is the header button.
-- The vendor and the guild bank hold their bottom corner but have no anchor button (asked).
-- Chained bags lining up by their bottoms (§30a) is a consequence of rule 1 rather than something asked in so many words.
+- The vendor and the guild bank hold their corner (a bottom one: they have no square) but have no anchor button (asked).
+- Chained bags lining up by the edge their anchor holds (§30a) follows from holding a corner rather than something asked in so
+  many words.
+- Saved places from before #1276 (a top left) are taken over as a bottom corner, as a title drag would place them: a top corner
+  is the square's alone.
 - **Open, for the player to decide (found by the bug review, reproduced):** the braid between two chained small bags is drawn
   by each bag from its own title (`applyBraid`, `TitleJoin`: each half straight out at its title's height, its ribbon too), so
   with their bottoms level and their heights different (Autosize Bags, on by default) the two halves sit at two heights and do
-  not meet: loose pieces in every theme with a braid (Plain, GW2 and Quiet draw none). Either the braid slopes between the two
-  titles (its strands, beads, knot and both ribbons; not built, its look not seen in game), or chained bags line up by their
-  tops again (the braid as it was; the bag beside the anchor then moves as the anchor grows from its bottom). Asked of the
-  player with the report.
+  not meet: loose pieces in every theme with a braid (Plain, GW2 and Quiet draw none). Beside an anchor holding a top corner
+  their tops are level and the braid meets. Either the braid slopes between the two titles (its strands, beads, knot and both
+  ribbons; not built, its look not seen in game), or chained bags line up by their tops always (the braid as it was; the bag
+  beside an anchor holding a bottom corner then moves as the anchor grows up). Asked of the player with the report.
 
 ### 30h. Bug review
 
@@ -167,14 +196,34 @@ the bag beside an anchor goes through it too. A bag freed during a close slide d
 a Shift-click's glide ends without settling a bag owed one, so a bag shown, reset, then locked and freed within that 0.35 s
 glide waits until the chain next settles it.
 
+The four corners had two reviews (2026-11-12). The first found one bug, fixed test-first: an anchor holding a top corner
+dragged by its title carried its partner by their tops, then the drop saved a bottom corner and the partner jumped to line up
+by their bottoms (446 units at once). `StopMove` glides it there (`SettleSpot`). It also found five of the change's branches
+no spec caught (Clamp Bags to Screen keeping the edge, `saveSized`'s `math.min`, `HeldEdge` through the chain, `StopSizing`'s
+held top with Autosize Bags on, `ResetSize`'s held top with it on); each has a spec now, the last one by what the player sees
+(it changes nothing on screen there: the height a reset starts from is the one it had, and its top comes back as that height
+follows). The second, aimed at the glide, found it glided wherever the partner's spot moved: a drop the screen's edge moved
+(Autosize Bags) slid the partner after the anchor instead of with it, and at some Bag Scales an ordinary drop glided it a
+pixel. It glides only where the drop changed the edge the pair lines up by (`HeldEdge` before and after). Left: grabbing
+either bag in that glide's 0.23 s ends it at once (`StartMove` finishes a partner's glide, as for every glide into a spot),
+so the rest of the distance jumps; less than the whole jump it replaced, and the same as for a glide after a drop beside a
+partner.
+
 ### 30g. Coverage
 
 `spec/next/small_spec.lua`: "holding its bottom corner" (the default corner, the side a drop takes, growing up with each side
 still, never placed, pushed down and back up at Bag Scale 100% and 150%, a drop below the screen put back, a grip's bounce over
 the held bottom, a names glide away from the held side, a grip and Shift-click with Autosize Bags off, chained bags by their
-bottoms, a saved place taken over on either side) and "its anchor" (the button where sort was, small only; the three states,
+bottoms, a saved place taken over on either side; and "holding a top corner": growing down with its side still, pushed up off
+the screen's bottom and back down, a grip and Shift-click keeping its top (Autosize Bags off and on, pushed up too), a title
+drag making it a bottom corner, chained bags by their tops, the partner gliding level by their bottoms once a top-held anchor
+is dropped by its title and moving with it at once on any other drop (Bag Scale 100%, 90%, 115%), a chained bag's Shift-click
+keeping its top level, Clamp Bags to Screen keeping a top corner) and "its anchor" (the button where sort was, small only; the
+three states,
 icons, tooltips and menu labels; the square's look, place, showing with the bag and at full size; dragging it, the side
-following the screen's half; the title drag carrying it; its right click locking; locked: no move, no resize, no reset, grips
+following the screen's half, any of four corners by the square's quadrant (the top ones in the top half, the middle's edge), its
+place on a top corner; the title drag carrying it, on a bottom corner from a top one; its right click locking; locked: no move,
+no resize, no reset, grips
 hidden, the tooltip; unchaining both layouts, keeping the anchor's chain, no chaining a dropped anchored bag; a chained bag held
 by a locked one), plus every older small-mode test rewritten for held bottoms (resizing "chained": a grip that moves an anchor's
 bottom gliding the bag beside it level once let go). `spec/next/bank_spec.lua` (the title's sort and its hint, none where the

@@ -164,9 +164,11 @@ describe("BetterBags Next, pixel perfect", function()
     db.corners = {}
     override(stubs.database, "GetNextSmallCorner", function(_, kind)
       local c = db.corners[kind]
-      if c then return c[1], c[2], c[3] end
+      if c then return c[1], c[2], c[3], c[4] or "BOTTOM" end
     end)
-    override(stubs.database, "SetNextSmallCorner", function(_, kind, x, y, side) db.corners[kind] = { x, y, side } end)
+    override(stubs.database, "SetNextSmallCorner", function(_, kind, x, y, side, edge)
+      db.corners[kind] = { x, y, side, edge }
+    end)
     override(stubs.database, "GetNextAnchorState", function() return "free" end)
     -- Clamp Bags to Screen (window.md §3a): small panels kept on the screen.
     override(stubs.database, "GetClampBagsToScreen", function() return true end)

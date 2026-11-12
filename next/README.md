@@ -45,9 +45,11 @@ nothing).
 
 ## A small panel's place and its anchor
 
-A small panel holds its bottom corner (`HeldCorner`, saved as `nextSmallCorners`): its bottom left or bottom right, by the
-half of the screen it was placed on, so it grows up and away from that side. `SmallPlace` works its top left out from the
-corner and its size; chained bags line up by their bottoms. The backpack's and the bank's anchor button (where their sort
+A small panel holds a corner (`HeldCorner`, saved as `nextSmallCorners`: its side and its edge), so it grows away from it:
+dragged by its title, the bottom left or bottom right, by the half of the screen it was placed on; dragged by its anchor
+square, any of the four, by the square's quadrant (up from a bottom corner, down from a top one). `SmallPlace` works its top
+left out from the corner and its size; chained bags line up by the edge their anchor holds. The backpack's and the bank's
+anchor button (where their sort
 button was; their titles sort on a right click) cycles free, shown (the classic bags' blue square, `Anchor:CreateSquare`, on
 the corner: dragged, the bag follows it) and locked (it neither moves nor resizes, nor does the bag chained beside it,
 `Held`). The rules are in `.claude/rules/next-bag-anchor.md` §30.

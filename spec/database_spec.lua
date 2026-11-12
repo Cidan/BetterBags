@@ -457,17 +457,25 @@ describe("Database", function()
       assert.are.same({ 40, 800 }, { DB:GetNextSmallPlace(1) })
     end)
 
-    -- Each kind of bag keeps the corner its small panel holds (docs/next-bag-anchor.md): its bottom left or bottom right, in
-    -- UIParent's units, and which.
-    it("GetNextSmallCorner / SetNextSmallCorner, per kind, nothing until placed, and nothing but a side", function()
+    -- Each kind of bag keeps the corner its small panel holds (docs/next-bag-anchor.md): one of its four corners, in UIParent's
+    -- units, and which (its side, left or right, and its edge, top or bottom).
+    it("GetNextSmallCorner / SetNextSmallCorner, per kind, nothing until placed, and nothing but a side and an edge", function()
       assert.is_nil(DB:GetNextSmallCorner(0))
-      DB:SetNextSmallCorner(0, 1880.5, 120, "RIGHT")
-      DB:SetNextSmallCorner(1, 40, 300, "LEFT")
-      assert.are.same({ 1880.5, 120, "RIGHT" }, { DB:GetNextSmallCorner(0) })
-      assert.are.same({ 40, 300, "LEFT" }, { DB:GetNextSmallCorner(1) })
+      DB:SetNextSmallCorner(0, 1880.5, 120, "RIGHT", "BOTTOM")
+      DB:SetNextSmallCorner(1, 40, 1100, "LEFT", "TOP")
+      assert.are.same({ 1880.5, 120, "RIGHT", "BOTTOM" }, { DB:GetNextSmallCorner(0) })
+      assert.are.same({ 40, 1100, "LEFT", "TOP" }, { DB:GetNextSmallCorner(1) })
       assert.is_nil(DB:GetNextSmallCorner(2))
-      assert.has_error(function() DB:SetNextSmallCorner(0, 1, 2, "TOP") end)
-      assert.are.same({ 1880.5, 120, "RIGHT" }, { DB:GetNextSmallCorner(0) })
+      assert.has_error(function() DB:SetNextSmallCorner(0, 1, 2, "TOP", "BOTTOM") end)
+      assert.has_error(function() DB:SetNextSmallCorner(0, 1, 2, "LEFT", "LEFT") end)
+      assert.has_error(function() DB:SetNextSmallCorner(0, 1, 2, "LEFT") end)
+      assert.are.same({ 1880.5, 120, "RIGHT", "BOTTOM" }, { DB:GetNextSmallCorner(0) })
+    end)
+
+    -- Corners saved before they had an edge (the first build of the anchor, run in game) held their bottom.
+    it("reads a corner saved without an edge as its bottom", function()
+      DB.data.profile.nextSmallCorners[0] = { x = 300, y = 200, side = "LEFT" }
+      assert.are.same({ 300, 200, "LEFT", "BOTTOM" }, { DB:GetNextSmallCorner(0) })
     end)
 
     -- Each kind of bag's anchor (docs/next-bag-anchor.md): free until shown, then shown or locked.

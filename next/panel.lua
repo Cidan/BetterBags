@@ -2431,9 +2431,10 @@ end
 -- clampPlace keeps a small panel's place (its top left) on the screen while the bags are clamped to it
 -- (Clamp Bags to Screen, window.md §3a), its size there its own times its scale; always on whole pixels of
 -- the screen (docs/next-pixel-perfect.md: its size is whole pixels at its scale, so its far edges are too). With
--- Autosize Bags on, all of its height stays on the screen either way: it holds its bottom (HeldCorner) and grows up, so its
+-- Autosize Bags on, all of its height stays on the screen either way: a bag holding its bottom (HeldCorner) grows up, so its
 -- top is pushed down no further than the screen's top (the mirror of "move the bag up just enough", asked when it held its
--- top), and it goes back up to where it was left as it shrinks; its bottom is never under the screen's.
+-- top); one holding its top (from its anchor square) grows down, and is pushed up no further than keeps its bottom on the
+-- screen; either goes back to where it was left as it shrinks.
 ---@private
 ---@param x number
 ---@param y number
@@ -2459,14 +2460,15 @@ function panelProto:clampPlace(x, y)
 end
 
 -- HeldCorner is the corner a small panel holds (docs/next-bag-anchor.md; asked: "always auto-grow the bag based on it's bottom
--- half quadrant, so lower right, grow from lower right of bag, lower left, grow from lower left"): its bottom left (side
--- "LEFT") or bottom right ("RIGHT") on the screen, where it was placed; never placed, its own side's (the backpack's right, a
--- companion's left) the margin in from its edge, its bottom where a bag of the default height centered on the screen has it.
----@return number x, number y, NextSmallSide side
+-- half quadrant", then "let's do the 4 quadrant anchoring"): one of its four corners on the screen, where it was placed, and
+-- which, its side ("LEFT" or "RIGHT") and its edge ("TOP" only from its anchor square, AnchorDragged; else "BOTTOM"); never
+-- placed, its own side's bottom corner (the backpack's right, a companion's left) the margin in from its edge, its bottom where
+-- a bag of the default height centered on the screen has it.
+---@return number x, number y, NextSmallSide side, NextSmallEdge edge
 function panelProto:HeldCorner()
-  local x, y, side = database:GetNextSmallCorner(self.kind)
+  local x, y, side, edge = database:GetNextSmallCorner(self.kind)
   if x ~= nil then
-    return x, y, side
+    return x, y, side, edge
   end
   local s, unit = self:Scale(), self:PixelUnit()
   local screen = UIParent:GetHeight()
@@ -2474,60 +2476,75 @@ function panelProto:HeldCorner()
     pixel:LengthIn(unit, math.max(self:MinHeight(), math.floor(screen * style.Small.Height)))) * s
   y = (screen - default) / 2
   if self.side == "RIGHT" then
-    return UIParent:GetWidth() - style.Small.Margin, y, "RIGHT"
+    return UIParent:GetWidth() - style.Small.Margin, y, "RIGHT", "BOTTOM"
   end
-  return style.Small.Margin, y, "LEFT"
+  return style.Small.Margin, y, "LEFT", "BOTTOM"
+end
+
+-- HeldEdge is the edge a small panel keeps still as it grows: chained, its anchor's (they line up by it, chain:ChainedPlace);
+-- else its corner's.
+---@return NextSmallEdge
+function panelProto:HeldEdge()
+  local anchor = chain:SmallAnchorOf(self)
+  if anchor ~= nil then
+    return anchor:HeldEdge()
+  end
+  return (select(4, self:HeldCorner()))
 end
 
 -- CornerOf is the corner a small panel whose top left is x, y on the screen holds at its size at rest (the size it takes, not
--- one part way through a glide: its place is where it rests too): its bottom left, or its bottom right, by side; with no side,
--- the half of the screen its middle is on (where it is placed).
+-- one part way through a glide: its place is where it rests too), by side and edge; with no side, the half of the screen its
+-- middle is on (where it is placed); with no edge, its bottom (a bag dragged by its title holds a bottom corner: asked, "when
+-- dragging by title bar == left/right anchor only").
 ---@param x number
 ---@param y number
 ---@param side? NextSmallSide
----@return number x, number y, NextSmallSide side
-function panelProto:CornerOf(x, y, side)
+---@param edge? NextSmallEdge
+---@return number x, number y, NextSmallSide side, NextSmallEdge edge
+function panelProto:CornerOf(x, y, side, edge)
   local s = self:Scale()
   local w = (self.smallWidth or style.BODY_WIDTH) * s
   local h = (self.smallHeight or math.floor(UIParent:GetHeight() * style.Small.Height)) * s
   if side == nil then
     side = x + w / 2 < UIParent:GetWidth() / 2 and "LEFT" or "RIGHT"
   end
-  return side == "RIGHT" and x + w or x, y - h, side
+  edge = edge or "BOTTOM"
+  return side == "RIGHT" and x + w or x, edge == "TOP" and y or y - h, side, edge
 end
 
 -- SetCorner saves the corner a small panel holds, and puts its anchor square there (PlaceSquare).
 ---@param x number
 ---@param y number
 ---@param side NextSmallSide
-function panelProto:SetCorner(x, y, side)
-  database:SetNextSmallCorner(self.kind, x, y, side)
+---@param edge NextSmallEdge
+function panelProto:SetCorner(x, y, side, edge)
+  database:SetNextSmallCorner(self.kind, x, y, side, edge)
   self:PlaceSquare()
 end
 
--- SavePlace saves where a small panel was placed with its top left at x, y on the screen: the corner it holds there, on the
--- half of the screen its middle is on.
+-- SavePlace saves where a small panel was placed with its top left at x, y on the screen: the bottom corner it holds there, on
+-- the half of the screen its middle is on (a drop, by its title: left or right only).
 ---@param x number
 ---@param y number
 function panelProto:SavePlace(x, y)
   self:SetCorner(self:CornerOf(x, y))
 end
 
--- saveSized saves where a grip let go or a Shift-click left a small panel whose top left is x, y on the screen: the side it
--- holds kept (sizing it across the middle of the screen does not flip it), its bottom there; with Autosize Bags on, its
--- height bounces back to what it shows over the bottom it holds, which is kept where clampPlace pushed it down to keep its
--- top on the screen (it goes back up as it shrinks), and saved where Clamp Bags to Screen raised it (a bottom saved past the
--- screen's). A chained bag saves its spot.
+-- saveSized saves where a grip let go or a Shift-click left a small panel whose top left is x, y on the screen: the corner it
+-- holds kept (sizing it across the middle of the screen flips neither its side nor its edge), its held edge there; with Autosize
+-- Bags on, its height bounces back to what it shows from the edge it holds, which is kept where clampPlace pushed it to keep
+-- all of it on the screen (a bottom pushed down, a top pushed up: it goes back as it shrinks), and saved where Clamp Bags to
+-- Screen moved it the other way (an edge saved past the screen's). A chained bag saves its spot.
 ---@private
 ---@param x number
 ---@param y number
 function panelProto:saveSized(x, y)
-  local _, heldY, side = self:HeldCorner()
-  local cx, cy = self:CornerOf(x, y, side)
+  local _, heldY, side, edge = self:HeldCorner()
+  local cx, cy = self:CornerOf(x, y, side, edge)
   if database:GetNextAutosize() and chain:SmallAnchorOf(self) == nil then
-    cy = math.max(cy, heldY)
+    cy = edge == "TOP" and math.min(cy, heldY) or math.max(cy, heldY)
   end
-  self:SetCorner(cx, cy, side)
+  self:SetCorner(cx, cy, side, edge)
 end
 
 -- adoptPlace takes over where a small panel was left before it held its bottom corner (nextSmallPlaces: its top left), once,
@@ -2546,9 +2563,9 @@ function panelProto:adoptPlace()
 end
 
 -- SmallPlace is where a small panel's top left sits: chained (docs/next-small-mode.md), beside its anchor where the anchor is
--- now (LivePlace); else over the corner it holds (HeldCorner) at its size now, so it grows up from its bottom and away from
--- its held side; on the screen either way. A place saved before it held a corner (a top left) stands until it shows
--- (adoptPlace).
+-- now (LivePlace); else from the corner it holds (HeldCorner) at its size now, so it grows away from its held edge and its
+-- held side (up from a bottom corner, down from a top one); on the screen either way. A place saved before it held a corner
+-- (a top left) stands until it shows (adoptPlace).
 ---@return number x, number y
 function panelProto:SmallPlace()
   local anchor = chain:SmallAnchorOf(self)
@@ -2561,12 +2578,15 @@ function panelProto:SmallPlace()
       return self:clampPlace(lx, ly)
     end
   end
-  local x, y, side = self:HeldCorner()
+  local x, y, side, edge = self:HeldCorner()
   local s = self:Scale()
   if side == "RIGHT" then
     x = x - self:SmallWidth() * s
   end
-  return self:clampPlace(x, y + self:SmallHeight() * s)
+  if edge ~= "TOP" then
+    y = y + self:SmallHeight() * s
+  end
+  return self:clampPlace(x, y)
 end
 
 -- LivePlace is where a small panel's top left is now: under the mouse while the player drags it, or
@@ -3072,6 +3092,8 @@ function panelProto:StopMove()
   frame:StopMovingOrSizing()
   local x, y = frame:GetLeft(), frame:GetTop()
   self.moving = false
+  -- The edge it held as it was dragged (its partner was carried by it): the drop saves a bottom corner.
+  local edge = self:HeldEdge()
   if x ~= nil and y ~= nil then
     -- Where the client left it, on the screen (its edges are in its own units).
     local s = lift:ScaleOf(frame)
@@ -3088,13 +3110,21 @@ function panelProto:StopMove()
     self:SavePlace(x, y)
   end
   self:setOffset(0)
-  -- An anchor let go: its partner settles beside where it was dropped, its place saved too.
+  -- An anchor let go: its partner settles beside where it was dropped, its place saved too. Where the drop changed the edge
+  -- the pair lines up by (an anchor that held a top corner holds a bottom one once dropped, and its partner, carried by their
+  -- tops on the way, lines up by their bottoms now), it glides there (SettleSpot), as a bag dropped beside its partner does;
+  -- else it is placed on its spot at once, moving with the anchor (a drop the screen's edge moved, clampPlace).
   local follower = chain:Follower(self)
   if follower ~= nil then
-    follower.placeX, follower.placeY = follower:SmallPlace()
-    follower.spotMoved = nil
-    follower:setOffset(0)
-    follower:SavePlace(follower.placeX, follower.placeY)
+    local fx, fy = follower:SmallPlace()
+    if self:HeldEdge() ~= edge then
+      follower:SettleSpot()
+    else
+      follower.placeX, follower.placeY = fx, fy
+      follower.spotMoved = nil
+      follower:setOffset(0)
+    end
+    follower:SavePlace(fx, fy)
   end
 end
 
@@ -3242,22 +3272,24 @@ function panelProto:anchorSquareFrame()
 end
 
 -- PlaceSquare puts the bag's anchor square's corner on a corner, x, y on the screen (the corner the bag holds, HeldCorner, when
--- none is given), its bottom left or bottom right by side, on whole pixels from the screen's bottom left, and says where.
--- Nothing while the square is not made, or the player drags it (the client moves it).
+-- none is given), its same corner by side and edge, on whole pixels from the screen's bottom left, and says where. Nothing
+-- while the square is not made, or the player drags it (the client moves it).
 ---@param x? number
 ---@param y? number
 ---@param side? NextSmallSide
-function panelProto:PlaceSquare(x, y, side)
+---@param edge? NextSmallEdge
+function panelProto:PlaceSquare(x, y, side, edge)
   local square = self.anchorSquare
   if square == nil or self.anchorDragging then
     return
   end
   if x == nil then
-    x, y, side = self:HeldCorner()
+    x, y, side, edge = self:HeldCorner()
   end
   x, y = pixel:Snap(UIParent, x), pixel:Snap(UIParent, y)
   square:ClearAllPoints()
-  pixel:Point(square, side == "RIGHT" and "BOTTOMRIGHT" or "BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y)
+  local point = (edge == "TOP" and "TOP" or "BOTTOM") .. (side == "RIGHT" and "RIGHT" or "LEFT")
+  pixel:Point(square, point, UIParent, "BOTTOMLEFT", x, y)
   square.positionLabel:SetText(string.format("%dx %dy", x, y))
 end
 
@@ -3285,21 +3317,21 @@ function panelProto:StartAnchorDrag()
   return true
 end
 
--- AnchorDragged follows the square a frame of its drag: the corner the bag holds is the square's same corner (its bottom
--- left, or bottom right), on the half of the screen the square's middle is on (the classic anchor's quadrant, its bottom
--- half: asked, "always auto-grow the bag based on it's bottom half quadrant"), on whole pixels, saved; the bag is placed over
--- it, the bag chained beside it beside it.
+-- AnchorDragged follows the square a frame of its drag: the corner the bag holds is the square's same corner, in the quadrant
+-- of the screen the square's middle is in (the classic anchor's; asked: "let's do the 4 quadrant anchoring ... top anchors only
+-- work when you drag via the box"), on whole pixels, saved; the bag is placed from it, the bag chained beside it beside it.
 function panelProto:AnchorDragged()
   local square = self.anchorSquare
-  local left, bottom = square:GetLeft(), square:GetBottom()
-  if left == nil or bottom == nil then
+  local left, bottom, top = square:GetLeft(), square:GetBottom(), square:GetTop()
+  if left == nil or bottom == nil or top == nil then
     return
   end
   local width = square:GetWidth()
   local side = left + width / 2 < UIParent:GetWidth() / 2 and "LEFT" or "RIGHT"
+  local edge = (bottom + top) / 2 < UIParent:GetHeight() / 2 and "BOTTOM" or "TOP"
   local x = pixel:Snap(UIParent, side == "RIGHT" and left + width or left)
-  local y = pixel:Snap(UIParent, bottom)
-  database:SetNextSmallCorner(self.kind, x, y, side)
+  local y = pixel:Snap(UIParent, edge == "TOP" and top or bottom)
+  database:SetNextSmallCorner(self.kind, x, y, side, edge)
   square.positionLabel:SetText(string.format("%dx %dy", x, y))
   self.placeX, self.placeY = self:SmallPlace()
   self:setOffset(0)
@@ -3572,13 +3604,15 @@ function panelProto:StopSizing()
     -- its partner: the side across from the grip stays where it is, on the screen, and is its spot.
     local s = lift:ScaleOf(frame)
     local left = side == "LEFT" and x + w - self.smallWidth or x
-    -- Its bottom where it was let go; autosized, the bottom it holds (its height bounces back over it), so a bag pushed down
-    -- that the grip made shorter goes back up (saveSized); chained, its spot, its bottom level with its partner's.
+    -- Its top where it was let go (a grip sizes it from its bottom); autosized, from the edge it holds (its height bounces back
+    -- from it), so a bag pushed off that edge that the grip made shorter goes back (saveSized); chained, its spot, level with
+    -- its partner by the edge they line up by.
     local top = y * s
     if chain:SmallAnchorOf(self) ~= nil then
       top = select(2, self:SmallPlace())
     elseif autosize then
-      top = select(2, self:HeldCorner()) + self.smallHeight * self:Scale()
+      local _, heldY, _, edge = self:HeldCorner()
+      top = edge == "TOP" and heldY or heldY + self.smallHeight * self:Scale()
     end
     self.placeX, self.placeY = self:clampPlace(left * s, top)
     self:saveSized(self.placeX, self.placeY)
@@ -3890,8 +3924,8 @@ function panelProto:heightLater()
 end
 
 -- ResetSize glides a small panel back to its default size (asked: "shift + left click the grip to
--- reset to default size (animated, of course)"): its bottom stays, as it holds it (HeldCorner), and so does
--- the side across from the grip, the right grip keeping its bottom left and the left grip its bottom right; the
+-- reset to default size (animated, of course)"): the edge it holds stays (HeldEdge: its bottom, or its top from its anchor
+-- square), and so does the side across from the grip, the right grip keeping its left and the left grip its right; the
 -- default size follows the screen again. Its content reflows on the way, at once, as it does while a grip is
 -- dragged. It returns what it did, for profiler traces: "resetting", "default" (it is the default size already),
 -- "closing" or "locked" (held: it neither moves nor resizes, docs/next-bag-anchor.md).
@@ -3916,13 +3950,18 @@ function panelProto:ResetSize(side)
   database:SetNextSmallSize(self.kind, nil, nil)
   local w1, h1, fitted = self:SmallSize()
   self.smallWidth, self.smallHeight, self.restingWidth = w1, h1, fitted
-  -- Places on the screen, sizes in its own units. Its bottom where it stands; autosized, the bottom it holds.
+  -- Places on the screen, sizes in its own units. The edge it holds where it stands (chained, the one it lines up with its
+  -- partner by); autosized and apart, the one it holds.
   local s = self:Scale()
-  local bottom = y0 - h0 * s
-  if database:GetNextAutosize() and chain:SmallAnchorOf(self) == nil then
-    bottom = select(2, self:HeldCorner())
+  local heldY = select(2, self:HeldCorner())
+  local held = database:GetNextAutosize() and chain:SmallAnchorOf(self) == nil
+  local toTop
+  if self:HeldEdge() == "TOP" then
+    toTop = held and heldY or y0
+  else
+    toTop = (held and heldY or y0 - h0 * s) + h1 * s
   end
-  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + (w0 - w1) * s or x0, bottom + h1 * s)
+  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + (w0 - w1) * s or x0, toTop)
   self.placeX, self.placeY = x1, y1
   self.offset = 0
   self:saveSized(x1, y1)
