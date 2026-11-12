@@ -1,0 +1,17 @@
+{
+  "id": 1794527418,
+  "version": "v0.9.2-13-g28259a5",
+  "channel": "alpha",
+  "date": "2026-11-12",
+  "from": "3ceb4a2a60300c7d8eeaa6bcdf5471aadbb5214d",
+  "to": "28259a5f43674937222860f4c6bb042bed9a723e",
+  "headline": "Adds bag anchors and corner-based positioning to small bags in Next mode.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Bag anchors and corner pinning in Next mode",
+      "details": "Small bags now pin to their corners and expand outward, keeping them in place above action bars as they resize. An anchor button on the backpack and bank replaces the sort button, allowing you to drag an anchor square into any quadrant or lock the window. You can still sort your bags by right-clicking the title bar.",
+      "clients": []
+    }
+  ]
+}
