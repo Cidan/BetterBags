@@ -62,7 +62,10 @@ Window): `core/bagsystem.lua` switches either off and on at once (`.claude/rules
 the guild bank, and `Activate` switches it on again. The vendor's item cards (`vendorbutton.lua`) show Blizzard's
 tooltips as its merchant frame does: the item's over the card, and over each cost besides gold (a crest, a currency, an
 item) that cost's own, from an area that takes the pointer and lets clicks through to the card
-(`.claude/rules/next-vendor.md` §10b).
+(`.claude/rules/next-vendor.md` §10b). A Shift-click asks how many in `NextDialog` over the vendor, its field a
+quantity: one purchase's worth to start, `-` and `+` a purchase's worth at a time, and Max, the most that can be bought
+at once, the currencies held counted too where the client lists the merchant's (`NextMerchant:MaxPurchasable`,
+`.claude/rules/next-vendor.md` §10d).
 
 Each companion names the frame of Blizzard's it stands in for (`opts.standIn`: `MerchantFrame`, `BankFrame`,
 `GuildBankFrame`). Blizzard's UI panel manager still lays that frame out, shown and never seen, so `uipanels.lua`

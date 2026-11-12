@@ -10,7 +10,7 @@ for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/twe
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextButton", "next/controls/button.lua" }, { "NextInput", "next/controls/input.lua" },
   { "NextSwatch", "next/controls/swatch.lua" }, { "NextTopTabs", "next/controls/toptabs.lua" },
-  { "NextDialog", "next/controls/dialog.lua" } }) do
+  { "NextLift", "next/lift.lua" }, { "NextDialog", "next/controls/dialog.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -438,5 +438,203 @@ describe("NextDialog", function()
     assert.is_true(d.buttons[1].frame:IsShown())
     assert.are.equal("OK", d.buttons[1].label:GetText())
     assert.is_false(d.buttons[2].frame:IsShown())
+  end)
+
+  -- Found in review (issue #1281's vendor dialog): a window hiding hides its children without hiding them for
+  -- good, so a dialog its window took with it came back, unanswerable, over the window shown again, and kept
+  -- Escape from the game while it was away (CloseSpecialWindows reads IsShown).
+  it("hides for good with its window, answering no, and gives Escape back", function()
+    controls:PushEscape(owner)
+    local d = show()
+    owner:Hide()
+    -- The client runs a shown child's OnHide as its window hides.
+    d.frame:GetScript("OnHide")(d.frame)
+    assert.are.same({ "cancel" }, log)
+    assert.is_false(d.frame:IsShown(), "not back when its window shows again")
+    for _, fn in ipairs(timers) do fn() end
+    assert.are.same({}, UISpecialFrames)
+  end)
+
+  -- Found in review: the vendor's docked cards (NextDock) take clicks a hundred levels above their section, over a
+  -- dialog a hundred above its window.
+  it("sits above everything in its window, and climbs no higher each time it shows", function()
+    -- As deep as a docked card's catcher: the panel's content, a card's holder, the card, the catcher.
+    local content = CreateFrame("Frame", nil, owner)
+    local holder = CreateFrame("Frame", nil, content)
+    local card = CreateFrame("Frame", nil, holder)
+    local catcher = CreateFrame("Button", nil, card)
+    catcher:SetFrameLevel(owner:GetFrameLevel() + 150)
+    local d = show()
+    local level = d.frame:GetFrameLevel()
+    assert.is_true(level > catcher:GetFrameLevel())
+    show()
+    assert.are.equal(level, d.frame:GetFrameLevel())
+  end)
+
+  -- Found in review: a small vendor (next.md §14g) can be narrower than the theme's dialog.
+  it("is never wider than its window", function()
+    owner:SetSize(300, 660)
+    local d = show()
+    assert.are.equal(300, d.card:GetWidth())
+    assert.are.equal(300 - 2 * C("Dialog").Pad, d.text:GetWidth())
+  end)
+
+  -- Found in review: Escape in its field only put the text back, and the next Escape closed the vendor with it
+  -- (Blizzard closes the merchant as a left panel, CloseAllWindows). The field takes Escape before the game does.
+  it("answers no on Escape in its field, the window under it staying", function()
+    local d = show({ input = { text = "Raid" } })
+    d.input.frame:SetText("Mythic")
+    d.input.frame:GetScript("OnEscapePressed")(d.input.frame)
+    assert.are.same({ "cancel" }, log)
+    assert.is_false(d.frame:IsShown())
+    assert.is_true(owner:IsShown())
+  end)
+
+  -- Found in review: Enter let go of the field's focus, so the keys typed next went to the game.
+  it("keeps its field focused when a button keeps it open", function()
+    local d = show({ input = { text = "Raid" },
+      buttons = { { text = "Cancel", onClick = function() end }, { text = "Create", onClick = function() return true end } } })
+    d.input.frame._highlight = nil
+    d.input.frame:GetScript("OnEnterPressed")(d.input.frame)
+    assert.is_true(d.frame:IsShown())
+    assert.is_true(d.input.frame:HasFocus())
+    assert.are.same({ 0, -1 }, d.input.frame._highlight, "its text chosen, as when it showed")
+  end)
+
+  -- A field holding a quantity (the vendor's Shift-click, issue #1281: "a max button", "pre-filled", "+- buttons"):
+  -- digits only, then -, + and Max on its row, as Blizzard's stack split has its arrows (StackSplitFrame.lua).
+  describe("with a quantity", function()
+    local most
+
+    local function showQuantity(text, step)
+      return show({
+        title = "Buy Ten", text = "How many? (up to 23)",
+        input = { text = text or "5", quantity = { min = 1, step = step or 5, maxText = "Max",
+          max = function() return most end } },
+        buttons = {
+          { text = "Cancel", onClick = function() table.insert(log, "cancel") end },
+          { text = "Buy", style = "Primary", onClick = function(_, t) table.insert(log, { "buy", t }) end },
+        },
+      })
+    end
+
+    local function press(b)
+      b.frame:GetScript("OnClick")(b.frame, "LeftButton")
+    end
+
+    local function typed(d, text)
+      d.input.frame:SetText(text)
+      d.input.frame:GetScript("OnTextChanged")(d.input.frame, true)
+    end
+
+    before_each(function()
+      most = 23
+    end)
+
+    it("puts -, + and Max after its field on one row, the field taking digits only, focused with its text chosen", function()
+      local d = showQuantity("5")
+      local D, B = C("Dialog"), C("Button")
+      assert.is_true(d.input.frame._numeric)
+      assert.are.equal("5", d.input:GetText())
+      assert.is_true(d.input.frame:HasFocus())
+      for _, b in ipairs({ d.minus, d.plus, d.most }) do
+        assert.is_true(b.frame:IsShown())
+        assert.are.equal(style:Font("Button"), b.label:GetFontObject())
+      end
+      assert.are.same({ "-", "+", "Max" }, { d.minus.label:GetText(), d.plus.label:GetText(), d.most.label:GetText() })
+      assert.are.same({ B.Height, B.Height }, { d.minus.frame:GetWidth(), d.plus.frame:GetWidth() }, "- and + are square")
+      local maxWidth = d.most.frame:GetWidth()
+      local top = select(5, d.most.frame:GetPoint(1))
+      assert.is_true(top < 0)
+      assert.are.same({ "TOPRIGHT", d.card, "TOPRIGHT", -D.Pad, top }, { d.most.frame:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", d.card, "TOPRIGHT", -(D.Pad + maxWidth + D.ButtonGap), top }, { d.plus.frame:GetPoint(1) })
+      assert.are.same({ "TOPRIGHT", d.card, "TOPRIGHT", -(D.Pad + maxWidth + B.Height + 2 * D.ButtonGap), top },
+        { d.minus.frame:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", d.card, "TOPLEFT", D.Pad, top }, { d.input.frame:GetPoint(1) }, "on the same row")
+      assert.are.equal(D.Width - 2 * D.Pad - (maxWidth + 2 * B.Height + 3 * D.ButtonGap), d.input.frame:GetWidth())
+      assert.are.equal(-top + math.max(C("Input").Height, B.Height) + D.Gap + B.Height + D.Pad, d.card:GetHeight(),
+        "the answers below the row")
+    end)
+
+    it("shows none of them for a field without one, which takes any text across the card", function()
+      showQuantity()
+      local d = show({ input = { text = "Raid" } })
+      assert.is_false(d.input.frame._numeric)
+      for _, b in ipairs({ d.minus, d.plus, d.most }) do
+        assert.is_false(b.frame:IsShown())
+      end
+      assert.are.equal(C("Dialog").Width - 2 * C("Dialog").Pad, d.input.frame:GetWidth())
+    end)
+
+    it("steps to the multiple of its step below or above, kept between its min and its max", function()
+      local d = showQuantity("5")
+      press(d.plus)
+      assert.are.equal("10", d.input:GetText())
+      press(d.plus)
+      press(d.plus)
+      assert.are.equal("20", d.input:GetText())
+      press(d.plus)
+      assert.are.equal("23", d.input:GetText(), "not past its max")
+      press(d.plus)
+      assert.are.equal("23", d.input:GetText())
+      press(d.minus)
+      assert.are.equal("20", d.input:GetText())
+      typed(d, "7")
+      press(d.minus)
+      assert.are.equal("5", d.input:GetText(), "to the multiple below")
+      press(d.minus)
+      assert.are.equal("1", d.input:GetText(), "not under its min")
+      typed(d, "7")
+      press(d.plus)
+      assert.are.equal("10", d.input:GetText(), "to the multiple above")
+    end)
+
+    it("turns - off where it can go no lower, and steps with the Up and Down keys", function()
+      local d = showQuantity("1", 1)
+      assert.is_false(d.minus.frame:IsEnabled())
+      d.input.frame:GetScript("OnArrowPressed")(d.input.frame, "UP")
+      assert.are.equal("2", d.input:GetText())
+      assert.is_true(d.minus.frame:IsEnabled())
+      d.input.frame:GetScript("OnArrowPressed")(d.input.frame, "DOWN")
+      assert.are.equal("1", d.input:GetText())
+      assert.is_false(d.minus.frame:IsEnabled())
+      typed(d, "")
+      assert.is_false(d.minus.frame:IsEnabled(), "nothing to go lower from")
+      typed(d, "4")
+      assert.is_true(d.minus.frame:IsEnabled())
+    end)
+
+    -- What can be bought changes while it shows (the money): + and Max ask its max at each click, never off.
+    it("fills in its max with Max, asked again at each click", function()
+      local d = showQuantity("5")
+      press(d.most)
+      assert.are.equal("23", d.input:GetText())
+      most = 40
+      assert.is_true(d.most.frame:IsEnabled())
+      assert.is_true(d.plus.frame:IsEnabled())
+      press(d.most)
+      assert.are.equal("40", d.input:GetText())
+    end)
+
+    it("shows its max in place of a larger number typed, and leaves a smaller one to be typed on", function()
+      local d = showQuantity("5")
+      typed(d, "50")
+      assert.are.equal("23", d.input:GetText())
+      typed(d, "0")
+      assert.are.equal("0", d.input:GetText(), "a 0 may become a 0-something")
+    end)
+
+    it("hands the button what it holds, kept between its min and its max, and nothing it cannot read", function()
+      local d = showQuantity("0")
+      press(d.buttons[2])
+      assert.are.same({ { "buy", "1" } }, log)
+      d = showQuantity("20")
+      most = 12
+      d.input.frame:GetScript("OnEnterPressed")(d.input.frame)
+      assert.are.same({ "buy", "12" }, log[2], "Enter buys what can be bought now")
+      d = showQuantity("")
+      press(d.buttons[2])
+      assert.are.same({ "buy", "" }, log[3])
+    end)
   end)
 end)

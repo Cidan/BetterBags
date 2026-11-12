@@ -304,9 +304,43 @@ for extended costs and items not refundable, `MerchantFrame_ConfirmHighCostItem`
 limited currency, quality); BetterBags never asks in their place and never buys past them. CompactVendor
 (Vladinator) calls the same functions from its own buttons. A quantity (Shift-click) goes the way
 Blizzard's stack split does (`SplitStack`): confirmed for extended costs and items not refundable,
-bought at once otherwise, at most what `MerchantItemButton_OnModifiedClick` allows (the stack
-limit, the money, the cost items held). BetterBags asks the number with its own dialog, as Blizzard
-asks it with its stack split frame (not a confirmation).
+bought at once otherwise, at most what `NextMerchant:MaxPurchasable` allows. BetterBags asks the number
+in its own dialog, as Blizzard asks it with its stack split frame (not a confirmation).
+
+**The quantity dialog** (issue #1281: "a 'max' button to pre-fill what you can afford", "the text entry is not
+pre-filled and not well usable", "+- buttons"; the player's BuyEmAll hooks Blizzard's merchant buttons, which never
+show with the vendor on). `NextVendorButton:askQuantity` shows `NextDialog` over the vendor's panel (questions are
+`NextDialog`, CLAUDE.md; it was the classic `Question` window), its field a quantity (next-controls.md §2): digits
+only, focused with its text chosen; `-` and `+` and Max on its row; Cancel and Buy (Primary, so Enter buys) below.
+Decided with the user:
+- **Starts at one purchase's worth** (`item.stackCount`, the vendor's bundle, where Blizzard's stack split starts:
+  `StackSplitMixin:OpenStackSplitFrame`, `split = minSplit`), or what can be bought when that is less.
+- **`-` and `+` move a purchase's worth** (`step = stackCount`) to the multiple below or above, between 1 and what
+  can be bought; Up and Down in the field too. The least stays 1, as before: a typed amount under a bundle buys that
+  many (`BuyMerchantItem` buys the quantity asked since 4.1, warcraft.wiki.gg).
+- **Max fills in `MaxPurchasable`**, asked again at each click (the money changes while it shows: a bag item sold).
+  For every item, gold-priced ones too (the player suggested currency-priced items only; the user chose all).
+- **`MaxPurchasable` counts currencies held**, which Blizzard's own limit leaves out
+  (`MerchantItemButton_OnModifiedClick` counts only `itemLink and not currencyName`): a currency cost names its currency
+  (`GetMerchantItemCostItem`'s `currencyName`, no link for a currency, warcraft.wiki.gg), found by name among the
+  merchant's currencies (`C_MerchantFrame.GetMerchantCurrencies`, retail 12.0.7 and WoW: Forever 1.60.1) with
+  `C_CurrencyInfo.GetCurrencyInfo(id).quantity`. Classic lists no merchant's currencies, so a currency limits
+  nothing there, as in Blizzard's. The money, the cost items and the currencies are each counted in whole numbers
+  first (`have * stackCount / cost`): Blizzard's `have / (cost / stackCount)` is a hair under 15 for 33 / 2.2, and came
+  out one short at an exact multiple when a purchase gives more than one (found in review; the user asked for it fixed).
+- **Nothing is asked when nothing can be bought** (`MaxPurchasable` under 1: Blizzard's stack split hides for that),
+  nor while `NextDialog` shows over another window (the settings window's: the vendor's would replace it unanswered,
+  and its Cancel is what puts a "Hide" switch back, next-settings-categories.md).
+- **Buy** buys what the field holds (the dialog keeps it between 1 and what can be bought now), stays open while it
+  holds no number, and buys nothing for 0 (what can be bought fell to none while it showed).
+
+Left as is, and why: the text's "(up to N)" is what could be bought when it opened, while Max and `+` ask again (it
+changes only with a sale from the bags while it shows); the dialog's level is worked out as it shows, so a card docked
+while the vendor is lowered under a chain's anchor during its slide-in could take clicks over it (seen only with the
+mocks, needing a Shift-click in that fraction of a second: not built for); Escape with the field unfocused (clicked
+away from) still closes the vendor with the dialog, as Blizzard closes the merchant frame as a left panel in
+`CloseAllWindows` (with the field focused, as it opens, the field takes Escape and the dialog alone closes). Papercraft's
+frame reaches 26 px past a dialog as narrow as the narrowest vendor.
 
 - A left click never puts a vendor item on the cursor: Blizzard confirms a picked-up item when it
   is dropped in a bag through `MerchantFrame.extendedCost` / `highPrice`, which its own item button
@@ -338,7 +372,9 @@ Categories; close with the button, Escape and by walking away; then use a consum
 in and out of combat. `Logs/taint.log` should have no BetterBags entries blocking an action.
 Also not verified: Classic's `UseContainerItem` selling (the wiki marks it protected; Move
 Categories already sells with it), a single-item repair through repair mode, and the per-item
-repair costs.
+repair costs. Nor the quantity dialog (§10d): its look beside the vendor in each theme, whether clicking `-`, `+` or
+Max takes the field's focus (then typed keys would go to the game), and Max for a currency-priced item (that the
+cost's `currencyName` matches `C_CurrencyInfo.GetCurrencyInfo`'s `name` for an ID the merchant lists).
 
 ### 10f. Coverage
 
@@ -352,7 +388,12 @@ modified clicks, quantities, buyback, repair; durability; "its costs": an area o
 the price's width, none for one cut off, laid out again when styled, the cost's own tooltip and the card's cursor,
 hover only, none over gold, a buyback, a repair or a released card, a Shopping List's; 11 mutations, all caught, then
 the bug review's 16, two surviving: the price's width set to none before measuring, which no faithful mock can see, §10b),
-`spec/next/merchant_spec.lua` also each cost's place (`costIndex`, past one left out, carried by `PriceOf`),
+`spec/next/merchant_spec.lua` also each cost's place (`costIndex`, past one left out, carried by `PriceOf`), and
+currencies held limiting `MaxPurchasable` (the scarcer of two, one the merchant does not list, none on Classic; the
+money, cost items and currencies counted in whole numbers); `spec/next/vendorbutton_spec.lua` also the quantity dialog (over the vendor, starting at a purchase's worth
+or less, `-`/`+` by a purchase's worth, Max asked again, nothing for none, nothing over another window's dialog,
+Buy staying open with no number); the dialog itself in `spec/next/controls/panel_controls_spec.lua` (next-controls.md §2),
+`spec/next/settings/window_spec.lua` (settings closing leaves the vendor's dialog open),
 `spec/next/vendor_spec.lua` (the panel,
 no drags, its search box; header buttons per client, shown and enabled per vendor, the title's
 room, the game rule; opening, tabs and footers, button reuse, updates; Sell Junk on both clients,

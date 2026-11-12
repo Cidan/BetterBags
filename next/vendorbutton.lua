@@ -12,8 +12,8 @@ local L = addon:GetModule('Localization')
 ---@class NextMerchant: AceModule
 local merchant = addon:GetModule('NextMerchant')
 
----@class Question: AceModule
-local question = addon:GetModule('Question')
+---@class NextDialog: AceModule
+local nextDialog = addon:GetModule('NextDialog')
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
@@ -620,19 +620,49 @@ function buttonProto:OnReceiveDrag()
   merchant:SellCursorItem()
 end
 
--- askQuantity asks how many to buy, within what can be bought at once, then buys that many.
+-- vendorPanel is the vendor's panel (next/vendor.lua, which loads after this file).
+---@return NextVendorPanel
+local function vendorPanel()
+  return addon:GetModule('NextVendor').panel
+end
+
+-- askQuantity asks how many to buy in BetterBags Next's dialog over the vendor, its field a quantity
+-- (NextDialog): one purchase's worth to start, as Blizzard's stack split starts (StackSplitFrame.lua); - and +
+-- a purchase's worth at a time; Max what can be bought at once (NextMerchant:MaxPurchasable, asked again at each
+-- click). Buy buys what the field holds, and stays open while it holds no number. Nothing is asked when nothing
+-- can be bought, as Blizzard's stack split does not open then, nor over a dialog another window shows (the
+-- settings window's): there is one dialog, and showing it again would replace that one unanswered.
 ---@private
 function buttonProto:askQuantity()
-  local item = self.item
+  if nextDialog:IsShown() then
+    return
+  end
+  local item, button = self.item, self.button
   local most = merchant:MaxPurchasable(item)
-  question:AskForInput(format(L:G("Buy %s"), item.name or ""), format(L:G("How many? (up to %d)"), most),
-    function(text)
-      local n = tonumber(text)
-      if n == nil or n < 1 then
-        return
-      end
-      merchant:Purchase(self.button, item, math.min(math.floor(n), most))
-    end)
+  if most < 1 then
+    return
+  end
+  nextDialog:Show(vendorPanel().frame, {
+    title = format(L:G("Buy %s"), item.name or ""),
+    text = format(L:G("How many? (up to %d)"), most),
+    input = {
+      text = tostring(math.min(item.stackCount, most)),
+      quantity = { min = 1, step = item.stackCount, maxText = L:G("Max"),
+        max = function() return merchant:MaxPurchasable(item) end },
+    },
+    buttons = {
+      { text = L:G("Cancel"), onClick = function() end },
+      { text = L:G("Buy"), style = "Primary", onClick = function(_, text)
+        local n = tonumber(text)
+        if n == nil then
+          return true
+        end
+        if n >= 1 then
+          merchant:Purchase(button, item, n)
+        end
+      end },
+    },
+  })
 end
 
 -- OnClick runs a click as Blizzard's merchant buttons do: a left click holding an item sells it, a

@@ -83,7 +83,9 @@ for the Categories page, as asked).
 - **Remembers** the page and tab shown for the session; `Open(pageId, tabId)` goes to one. A page not
   shown now (or unknown) falls back to the first page shown.
 - **Escape**: the window takes its place in the controls' Escape stack when it opens and gives it
-  back when it hides; a menu or a dialog over it closes first, and both close with it.
+  back when it hides; a menu or a dialog over it closes first, and both close with it. Only a dialog over
+  the window itself (`nextDialog.owner == settings.frame`): the vendor asks its quantities in the same
+  `NextDialog` (next-vendor.md §10d), and closing the settings window leaves that one open.
 - **A page's own list** (asked: "animate away our main nav bar, and replace it with our category list
   [...] with a back button on the top left"; the Categories page, next-settings-categories.md §5). Choosing a page with a `sidebar`
   slides the pages (the brand, search box, page list and version, on `navPanel`) out to the left and
@@ -136,7 +138,7 @@ Coverage: `spec/next/settings/page_spec.lua` (rows: each control kind, layout, r
 dialog, the light and tooltip over the control, text, buttons, links; the page: two columns, one
 column, wide rows, sections and notes and cards, lines, refresh, rows of an earlier layout hidden,
 empty text), `spec/next/settings/window_spec.lua` (every value shown again after a change, not after a refused one; built on first open, centered, sized, body, moving,
-fitting a small screen, closing three ways, the menu and dialog closing with it, What's New, the
+fitting a small screen, closing three ways, the menu and dialog closing with it (a dialog over another window left open), What's New, the
 sidebar and its pages, navigation, hover, pages defined later, tabs, content and its scroll bar,
 remembering the page, values read again on open, a page not shown, search: matching, live rows,
 links, nothing found, hidden pages; rows and sections hidden while a function says so, a title hidden

@@ -20,7 +20,8 @@ local const = trackStub("Constants")
 local stubs = {
   events = trackStub("Events"),
   merchant = trackStub("NextMerchant"),
-  question = trackStub("Question"),
+  dialog = trackStub("NextDialog"),
+  vendor = trackStub("NextVendor"),
   L = trackStub("Localization"),
 }
 
@@ -45,7 +46,7 @@ local vendorButton = addon:GetModule("NextVendorButton")
 local style = addon:GetModule("NextStyle")
 
 describe("NextVendorButton", function()
-  local calls, asked
+  local calls, asked, owner
 
   local function item(opts)
     local i = { index = 4, link = "|Hitem:10|h[Ten]|h", itemID = 10, name = "Ten", texture = 1234, price = 0,
@@ -80,9 +81,12 @@ describe("NextVendorButton", function()
     override(stubs.merchant, "MaxPurchasable", function() return 12 end)
     override(stubs.merchant, "Buyback", function(_, index) table.insert(calls.buyback, index) end)
     override(stubs.merchant, "RepairOne", function(_, entry) table.insert(calls.repair, entry) end)
-    override(stubs.question, "AskForInput", function(_, title, text, onInput)
-      asked = { title = title, text = text, onInput = onInput }
+    owner = CreateFrame("Frame", "SpecVendorPanel", UIParent)
+    override(stubs.vendor, "panel", { frame = owner })
+    override(stubs.dialog, "Show", function(_, frame, opts)
+      asked = { owner = frame, opts = opts }
     end)
+    override(stubs.dialog, "IsShown", function() return false end)
     _G._isShiftKeyDown, _G._isControlKeyDown = false, false
     _G._modifiedClickHandled = false
     _G._cursor = nil
@@ -744,20 +748,79 @@ describe("NextVendorButton", function()
       assert.is_nil(asked)
     end)
 
-    it("asks how many on a Shift-click, buying what was asked within what can be bought", function()
+    -- Asked (issue #1281: "a max button", "pre-filled with the default stack size", "+- buttons"): BetterBags Next's
+    -- dialog over the vendor, its field a quantity (NextDialog) starting at one purchase's worth (Blizzard's stack
+    -- split starts there, StackSplitFrame.lua), - and + a purchase's worth at a time, Max what can be bought.
+    it("asks how many on a Shift-click, in a dialog over the vendor starting at one purchase's worth", function()
+      local b = vendorButton:Acquire()
+      local i = item({ maxStack = 20, stackCount = 5 })
+      b:SetBuy(i)
+      _G._isShiftKeyDown = true
+      click(b, "LeftButton")
+      assert.are.equal(owner, asked.owner)
+      local opts = asked.opts
+      assert.are.equal("Buy Ten", opts.title)
+      assert.are.equal("How many? (up to 12)", opts.text)
+      assert.are.equal("5", opts.input.text)
+      local q = opts.input.quantity
+      assert.are.same({ 1, 5, "Max", 12 }, { q.min, q.step, q.maxText, q.max() })
+      assert.are.same({ "Cancel", "Buy" }, { opts.buttons[1].text, opts.buttons[2].text })
+      assert.are.equal("Primary", opts.buttons[2].style)
+      opts.buttons[1].onClick(nil, "5")
+      assert.are.same({}, calls.purchase, "Cancel buys nothing")
+      assert.is_nil(opts.buttons[2].onClick(nil, "7"))
+      assert.are.equal(1, #calls.purchase)
+      assert.are.same({ b.button, i, 7 }, { calls.purchase[1].frame, calls.purchase[1].item, calls.purchase[1].quantity })
+    end)
+
+    it("asks what can be bought again each time Max or + asks", function()
       local b = vendorButton:Acquire()
       local i = item({ maxStack = 20 })
       b:SetBuy(i)
       _G._isShiftKeyDown = true
       click(b, "LeftButton")
-      assert.are.equal("Buy Ten", asked.title)
-      assert.are.equal("How many? (up to 12)", asked.text)
-      asked.onInput("5")
-      asked.onInput("50")
-      asked.onInput("none")
-      asked.onInput("0")
-      assert.are.same({ 5, 12 }, { calls.purchase[1].quantity, calls.purchase[2].quantity })
-      assert.are.equal(2, #calls.purchase)
+      local q = asked.opts.input.quantity
+      local seen
+      override(stubs.merchant, "MaxPurchasable", function(_, it) seen = it return 3 end)
+      assert.are.equal(3, q.max())
+      assert.are.equal(i, seen)
+    end)
+
+    it("starts at what can be bought when less than one purchase's worth, and asks nothing when nothing can be", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ maxStack = 20, stackCount = 5 }))
+      _G._isShiftKeyDown = true
+      override(stubs.merchant, "MaxPurchasable", function() return 3 end)
+      click(b, "LeftButton")
+      assert.are.equal("3", asked.opts.input.text)
+      asked = nil
+      override(stubs.merchant, "MaxPurchasable", function() return 0 end)
+      click(b, "LeftButton")
+      assert.is_nil(asked, "Blizzard's stack split does not open for none (StackSplitFrame.lua)")
+    end)
+
+    -- Found in review: BetterBags Next has one dialog; the settings window's, open beside the vendor, would be
+    -- replaced unanswered (its Cancel is what puts a "Hide" switch back, categories.lua).
+    it("asks nothing while a dialog shows over another window", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ maxStack = 20 }))
+      override(stubs.dialog, "IsShown", function() return true end)
+      _G._isShiftKeyDown = true
+      click(b, "LeftButton")
+      assert.is_nil(asked)
+    end)
+
+    -- The dialog keeps a typed 0 within its min (NextDialog:answer); Buy sees none only when nothing can be bought
+    -- by the time it is pressed.
+    it("stays open while the field holds no number, and buys nothing for none", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ maxStack = 20 }))
+      _G._isShiftKeyDown = true
+      click(b, "LeftButton")
+      local buy = asked.opts.buttons[2]
+      assert.is_true(buy.onClick(nil, ""))
+      assert.is_nil(buy.onClick(nil, "0"))
+      assert.are.same({}, calls.purchase)
     end)
 
     it("asks nothing for an item bought one at a time", function()

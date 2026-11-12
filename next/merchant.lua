@@ -544,22 +544,47 @@ function merchant:TotalOf(purchases)
   return total, costs
 end
 
+-- currencyHeld is how much of a currency the player has, found by its name (GetMerchantItemCostItem gives a
+-- currency's name, no link) among the open merchant's currencies (C_MerchantFrame.GetMerchantCurrencies, retail and
+-- WoW: Forever); nil on a client that lists none (Classic), or for one the merchant does not list.
+---@param name string
+---@return number?
+local function currencyHeld(name)
+  if C_MerchantFrame == nil or C_MerchantFrame.GetMerchantCurrencies == nil then
+    return nil
+  end
+  for _, id in ipairs(C_MerchantFrame.GetMerchantCurrencies() or {}) do
+    local info = C_CurrencyInfo.GetCurrencyInfo(id)
+    if info and info.name == name then
+      return info.quantity
+    end
+  end
+  return nil
+end
+
 -- MaxPurchasable is the most one quantity purchase can buy, as Blizzard's stack split works it out
 -- (MerchantItemButton_OnModifiedClick): the stack limit, what the money pays for, and what the
--- items it costs pay for.
+-- items it costs pay for; and, which Blizzard's leaves out, what the currencies it costs pay for, where
+-- the client says how much of them the player has (currencyHeld). Each counted in whole numbers first:
+-- Blizzard's have / (cost / stackCount) can fall a hair under a whole count (33 / 2.2), one short.
 ---@param item NextVendorItem
 ---@return number
 function merchant:MaxPurchasable(item)
   local maxStack = item.maxStack
   local canAfford = maxStack
   if item.price and item.price > 0 then
-    canAfford = math.floor(GetMoney() / (item.price / item.stackCount))
+    canAfford = math.floor(GetMoney() * item.stackCount / item.price)
   end
   if item.hasExtendedCost then
     for _, cost in ipairs(item.costs) do
-      if cost.link and not cost.currencyName then
-        local have = C_Item.GetItemCount(cost.link, false, false, true)
-        canAfford = math.min(canAfford, math.floor(have / (cost.value / item.stackCount)))
+      local have
+      if cost.currencyName then
+        have = currencyHeld(cost.currencyName)
+      elseif cost.link then
+        have = C_Item.GetItemCount(cost.link, false, false, true)
+      end
+      if have ~= nil then
+        canAfford = math.min(canAfford, math.floor(have * item.stackCount / cost.value))
       end
     end
   end

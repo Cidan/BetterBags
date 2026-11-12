@@ -13,7 +13,7 @@ just want to open the config screen. this is for manual or new category creation
 but also look good." Then: "go with your defaults. let's prototype and figure it out."
 
 The defaults the player approved: the popup is the shared menu (`NextMenu`) with a field, opened where the item was
-dropped, not a dialog over the bag (a `NextDialog` is 380 wide, wider than a small panel, and dims the bag); only the
+dropped, not a dialog over the bag (a `NextDialog` dims the bag, and fills a small panel); only the
 backpack and the bank take the drop (on a vendor, Plain's bag button is the vendor's portrait, and a drop there reads as
 selling); a row taking an item added to a category by hand back to where it belongs; the drop target lights only while
 an item is held over it (no pulse when an item is picked up); a plugin's categories listed but not to be picked.

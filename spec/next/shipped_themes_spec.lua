@@ -20,7 +20,7 @@ local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.
   { "NextToggle", "next/controls/toggle.lua" }, { "NextInput", "next/controls/input.lua" },
   { "NextSlider", "next/controls/slider.lua" }, { "NextMenu", "next/controls/menu.lua" },
   { "NextDropdown", "next/controls/dropdown.lua" }, { "NextSwatch", "next/controls/swatch.lua" },
-  { "NextTopTabs", "next/controls/toptabs.lua" }, { "NextDialog", "next/controls/dialog.lua" },
+  { "NextTopTabs", "next/controls/toptabs.lua" }, { "NextLift", "next/lift.lua" }, { "NextDialog", "next/controls/dialog.lua" },
   { "NextSettingsRows", "next/settings/rows.lua" }, { "NextSettingsPage", "next/settings/page.lua" },
   { "NextSettingsPages", "next/settings/pages.lua" }, { "NextSettings", "next/settings/window.lua" } }
 for _, m in ipairs(modules) do
