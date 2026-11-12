@@ -29,6 +29,7 @@ body:
         - Cataclysm PTR
         - Classic Era (And SoD/Hardcore)
         - Classic PTR
+        - WoW Forever
     validations:
       required: true
   - type: textarea

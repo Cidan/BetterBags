@@ -255,6 +255,7 @@ it was worked out from.
 | Category settings and definitions | The kind's category generation: wipes, recalculations without `categoriesUnchanged`, reads that absorbed one (`recategorize`); and the Categories module's generation (every change made through it) |
 | Search categories matched (name and priority) | Compared every sweep with the search cache, which is rebuilt every sweep |
 | The item context, the bank open, the bank showing a Warbank tab, the Auction House open | `contextSignature()` compared every sweep; under an active item context grey-out is worked out every sweep |
+| A spell's targeting starting or ending (Feed Pet, an enchant), with no sweep | Not kept: the button asks Blizzard again while a context is active or its grey-out is marked `itemContextResolvedInContext` (item-drawing.md §8) |
 | Show Bags | Not kept: section names are set every sweep |
 A sweep that fails partway leaves each item either worked out (with its record) or not, never a
 record that claims more: `indexPending` stays on an item until it is indexed.
