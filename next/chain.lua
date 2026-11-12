@@ -18,6 +18,12 @@ local style = addon:GetModule('NextStyle')
 ---@class NextTween: AceModule
 local tween = addon:GetModule('NextTween')
 
+-- uiPanels is NextUIPanels (next/uipanels.lua, which loads after this file and reads the chain).
+---@return NextUIPanels
+local function uiPanels()
+  return addon:GetModule('NextUIPanels')
+end
+
 -- NextChain keeps BetterBags Next's backpack and its companion (the bank or the vendor, whichever
 -- is open) apart on opposite edges of the screen, or chained together on one (next.md §12). Each
 -- bag keeps its orientation: the backpack faces left, its companion right. Chained "left", the
@@ -571,7 +577,8 @@ function chain:Panels()
 end
 
 -- Update sends every open bag to where it rests now (flying, or at once with snap: the screen
--- changed), then couples or uncouples the pair.
+-- changed), then couples or uncouples the pair, and tells Blizzard's panel manager where they rest
+-- (NextUIPanels).
 ---@param ctx Context
 ---@param snap? boolean
 function chain:Update(ctx, snap)
@@ -622,6 +629,7 @@ function chain:Update(ctx, snap)
     end
   end
   self:UpdateCoupling()
+  uiPanels():Update()
 end
 
 -- Arrived runs when a bag has come to rest after a slide or a flight: a chained bag beside its

@@ -43,6 +43,10 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
 - Move Categories (`util/movementflow.lua` `AtNPCShopWindow`) checked `MerchantFrame:IsVisible()`,
   false under the hidden parent. It now checks `IsShown()`, as Blizzard's bag code does, for the
   classic bags too (the two differ only while `UIParent` is hidden).
+- **Blizzard's panel manager still lays the frame out** (it is shown through `ShowUIPanel`), 336 wide in its left slot,
+  and put the Character pane and the Dressing Room after it, under the vendor (#1247, #1282). The vendor names it
+  (`standIn = "MerchantFrame"`): while the vendor is open at full size, the frame takes no room in the layout and the
+  layout's left edge moves past the vendor and its tabs (next-uipanels.md §27).
 - **Enable Vendor Window off** (next-bagsystem.md §11g, #1262): the bag system switches the vendor off by itself while
   Next stays in use, away from a vendor only. `vendorProto:Deactivate` marks it `off` (then hides it and lets go of its
   buttons, as every panel's), and `GiveBack` puts the frame back under `UIParent`, where Blizzard's own scripts show the

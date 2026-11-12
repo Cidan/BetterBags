@@ -19,6 +19,8 @@ next/
 ├── tabs.lua      # NextTabs: the tab rail down a panel's inner edge
 ├── content.lua   # NextContent: the canvas: sections in one column, laid out through Motion
 ├── drag.lua      # NextDrag: moving sections by their headers: reorder, to a tab, to the other bag
+├── chain.lua     # NextChain: the backpack and its companion apart on opposite edges, or chained on one
+├── uipanels.lua  # NextUIPanels: Blizzard's UI panels (Character pane, Dressing Room...) open beside the panels
 ├── categorypicker.lua # NextCategoryPicker: an item dropped on a bag's title, into a category or a new one
 ├── glass.lua     # NextGlass: a theme's body as smoked glass: tint, light, rain, lightning (Panel.Glass)
 ├── sheen.lua     # NextSheen: a theme's panels catching the light as they fade in and out (Panel.Sheen)
@@ -58,6 +60,13 @@ Blizzard's merchant and guild bank frames, each while its own switch is on (Enab
 Window): `core/bagsystem.lua` switches either off and on at once (`.claude/rules/next-bagsystem.md` §11g). Switched off
 (`Deactivate`), a panel is marked `off` and answers no visit, its Blizzard frame is given back and shows the vendor or
 the guild bank, and `Activate` switches it on again.
+
+Each companion names the frame of Blizzard's it stands in for (`opts.standIn`: `MerchantFrame`, `BankFrame`,
+`GuildBankFrame`). Blizzard's UI panel manager still lays that frame out, shown and never seen, so `uipanels.lua`
+(`NextUIPanels`) tells the manager where BetterBags Next really is: while a full companion is open, its frame takes no
+room in the layout and the layout's left edge (`LEFT_OFFSET`) moves past what BetterBags Next covers there, so the
+Character pane, the Dressing Room and every other Blizzard panel open beside it, not under it. `NextChain:Update` and
+`NextPanel:SetSize` update it (`.claude/rules/next-uipanels.md`).
 
 ## Drawing
 

@@ -84,6 +84,7 @@ function nextBank:Create(ctx)
     openSound = SOUNDKIT.IG_MAINMENU_OPEN,
     closeSound = SOUNDKIT.IG_MAINMENU_CLOSE,
     chainRole = "companion",
+    standIn = "BankFrame",
   })
   b.bankTab = const.BANK_TAB.BANK
   b.wipeWhenHidden = false

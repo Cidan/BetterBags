@@ -72,7 +72,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextUIPanels", "next/uipanels.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" },
   { "Currencies", "data/currencies.lua" }, { "NextCurrencyEntry", "next/currencyentry.lua" },
   { "NextCurrencyDrag", "next/currencydrag.lua" },
   { "NextCurrencyTracker", "next/currencytracker.lua" }, { "NextCurrencyStrip", "next/currencystrip.lua" }, { "NextBag", "next/bag.lua" }, { "NextBank", "next/bank.lua" } }
@@ -5221,6 +5221,22 @@ describe("BetterBags Next's small mode", function()
       assert.are.equal("switched", nextPanel:SetSize(ctx(), "small"))
       assert.are.equal("small", db.size)
       assert.are.equal("small", bag.size)
+    end)
+
+    -- A full companion moves Blizzard's panels past it (next-uipanels.md); a small one is a window the player places.
+    it("gives Blizzard's panel layout its left edge back as a full companion switches to small, and takes it again", function()
+      db.size = "full"
+      opened(function(c) return nextBank:Create(c) end)
+      assert.is_true(GetUIPanelLayoutAttribute("LEFT_OFFSET") > style.BODY_WIDTH, "beside the full bank")
+      nextPanel:SetSize(ctx(), "small")
+      assert.are.equal(16, GetUIPanelLayoutAttribute("LEFT_OFFSET"), "at once")
+      finishTweens()
+      assert.are.equal(16, GetUIPanelLayoutAttribute("LEFT_OFFSET"))
+      nextPanel:SetSize(ctx(), "full")
+      assert.is_true(GetUIPanelLayoutAttribute("LEFT_OFFSET") > style.BODY_WIDTH, "at once")
+      finishTweens()
+      nextPanel:SetSize(ctx(), "small")
+      finishTweens()
     end)
 
     it("switches a closed panel at once, its content laid out for its new height", function()

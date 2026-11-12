@@ -206,6 +206,7 @@ next\dockcard.lua
 next\dock.lua
 next\drag.lua
 next\chain.lua
+next\uipanels.lua
 next\ornaments.lua
 next\categorypicker.lua
 next\menubutton.lua

@@ -4,6 +4,7 @@
 -- the guild's repair, the spec filter, selling what is dropped on it, and every way of closing it
 -- ending the vendor visit.
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
+local blizzard = dofile("spec/helpers/uipanels.lua")
 
 LoadBetterBagsModule("core/context.lua")
 
@@ -54,7 +55,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 local modules = { { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextUIPanels", "next/uipanels.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" }, { "NextVendorButton", "next/vendorbutton.lua" },
   { "NextVendor", "next/vendor.lua" } }
 for _, m in ipairs(modules) do
   ResetModuleStub(m[1], m[2])
@@ -71,6 +72,8 @@ local motion = addon:GetModule("Motion")
 local context = addon:GetModule("Context")
 local nextDock = addon:GetModule("NextDock")
 local nextContent = addon:GetModule("NextContent")
+local chain = addon:GetModule("NextChain")
+local uiPanels = addon:GetModule("NextUIPanels")
 
 describe("NextVendor", function()
   local eventsRegistered, buckets, timers, calls, data, asked, messages
@@ -328,7 +331,6 @@ describe("NextVendor", function()
   describe("chaining", function()
     it("is the backpack's companion, and its name goes to the chain", function()
       local v = nextVendor:Create(ctx())
-      local chain = addon:GetModule("NextChain")
       assert.are.equal("companion", v.chainRole)
       local clicked
       override(chain, "Click", function(_, _, panel) clicked = panel return "alone" end)
@@ -2059,6 +2061,80 @@ describe("NextVendor", function()
       local before = #timers
       MerchantFrame:Hide()
       assert.are.equal(before + 1, #timers, "one hook")
+    end)
+  end)
+
+  -- Blizzard's own panel manager (retail's, from its UI source: spec/helpers/uipanels.lua) lays its panels out beside the
+  -- vendor, not beside the merchant frame it never shows (next-uipanels.md). Reported: the Character pane moved over by
+  -- the merchant frame's width (#1247); the Dressing Room opened behind the vendor (#1282).
+  describe("beside Blizzard's panels", function()
+    local putBack
+
+    local function blizzardFrame(name, w, h)
+      local f = CreateFrame("Frame", name, UIParent)
+      f:SetSize(w, h)
+      f:Hide()
+      override(_G, name, f)
+      return f
+    end
+
+    -- How far the vendor reaches from the left edge: its body, then its tabs with their hover slide, or its feather.
+    local function room(v)
+      return style.BODY_WIDTH + math.max(style.FEATHER, style.RAIL_OUT + v.tabs:Width() + style.TAB_HOVER)
+    end
+
+    -- Opens the vendor as the client does: Blizzard's MerchantFrame_MerchantShow shows its frame through the panel
+    -- manager, then MERCHANT_SHOW.
+    local function openAtMerchant()
+      local v = nextVendor:Create(ctx())
+      ShowUIPanel(MerchantFrame)
+      eventsRegistered["MERCHANT_SHOW"](ctx())
+      finishTweens()
+      return v
+    end
+
+    before_each(function()
+      putBack = blizzard.Load("Retail")
+      -- A manager of its own for each test: the vendors earlier tests left open, and what they told the last one, go.
+      chain:Init()
+      uiPanels:Init()
+      UIParent:_SetRect(0, 0, 1920, 1200)
+      -- The sizes their XML gives them: MerchantFrame.xml; ButtonFrameTemplate at PANEL_DEFAULT_WIDTH (Constants.lua);
+      -- DressUpFrames.xml.
+      MerchantFrame:SetSize(336, 444)
+      blizzardFrame("CharacterFrame", 338, 424)
+      blizzardFrame("DressUpFrame", 450, 545)
+    end)
+
+    after_each(function()
+      putBack()
+    end)
+
+    -- Its tabs (Buy, Buyback, Repair) are narrower than its feather here: spec/next/uipanels_spec.lua takes wider ones.
+    it("opens the Character pane past it, not at the merchant frame's width (#1247)", function()
+      ShowUIPanel(CharacterFrame)
+      assert.are.equal(16, blizzard.Left(CharacterFrame))
+      local v = openAtMerchant()
+      assert.is_true(v.tabs:Width() > 0)
+      assert.are.equal(room(v) + 16, blizzard.Left(CharacterFrame))
+    end)
+
+    it("opens the Dressing Room beside it, not behind it (#1282)", function()
+      local v = openAtMerchant()
+      ShowUIPanel(DressUpFrame)
+      assert.are.equal(room(v) + 16, blizzard.Left(DressUpFrame))
+    end)
+
+    it("gives the left edge back as the merchant closes", function()
+      openAtMerchant()
+      ShowUIPanel(CharacterFrame)
+      eventsRegistered["MERCHANT_CLOSED"](ctx())
+      -- Blizzard's MerchantFrame_MerchantClosed hides its frame through the panel manager.
+      HideUIPanel(MerchantFrame)
+      finishTweens()
+      assert.are.equal(16, GetUIPanelLayoutAttribute("LEFT_OFFSET"))
+      assert.is_nil(MerchantFrame:GetAttribute("UIPanelLayout-width"))
+      assert.are.equal(16, blizzard.Left(CharacterFrame))
     end)
   end)
 

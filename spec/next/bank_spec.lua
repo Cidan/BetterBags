@@ -56,7 +56,7 @@ LoadBetterBagsModule("render/scrollbox.lua")
 for _, m in ipairs({ { "NextStyle", "next/style.lua" }, { "NextTween", "next/tween.lua" },
   { "NextFrameArt", "next/frameart.lua" }, { "NextFill", "next/fill.lua" }, { "NextControls", "next/controls/base.lua" }, { "NextScrollBar", "next/controls/scrollbar.lua" },
   { "NextSparkles", "next/sparkles.lua" }, { "NextLift", "next/lift.lua" }, { "NextTabs", "next/tabs.lua" }, { "NextContent", "next/content.lua" },
-  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBank", "next/bank.lua" } }) do
+  { "NextDockCard", "next/dockcard.lua" }, { "NextDock", "next/dock.lua" }, { "NextDrag", "next/drag.lua" }, { "NextChain", "next/chain.lua" }, { "NextUIPanels", "next/uipanels.lua" }, { "NextOrnaments", "next/ornaments.lua" }, { "NextMenuButton", "next/menubutton.lua" }, { "NextGlitch", "next/glitch.lua" }, { "NextRain", "next/rain.lua" }, { "NextShatter", "next/shatter.lua" }, { "NextSnow", "next/snow.lua" }, { "NextThreads", "next/threads.lua" }, { "NextSmoke", "next/smoke.lua" }, { "NextBats", "next/bats.lua" }, { "NextBeam", "next/beam.lua" }, { "NextStopMotion", "next/stopmotion.lua" }, { "NextPaper", "next/paper.lua" }, { "NextGlass", "next/glass.lua" }, { "NextSheen", "next/sheen.lua" }, { "NextPanel", "next/panel.lua" }, { "NextBank", "next/bank.lua" } }) do
   ResetModuleStub(m[1], m[2])
   LoadBetterBagsModule(m[2])
 end
@@ -337,6 +337,12 @@ describe("NextBank", function()
       assert.are.same({ "BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0 }, { bank.frame:GetPoint(2) })
       assert.are.equal(style.WIDTH, bank.frame:GetWidth())
       assert.are.equal("HIGH", bank.frame:GetFrameStrata())
+    end)
+
+    -- Blizzard's bank frame, shown to Blizzard's panel manager and never seen, takes no room in its layout while the
+    -- bank is open at full size (next-uipanels.md).
+    it("stands in for Blizzard's bank frame", function()
+      assert.are.equal("BankFrame", nextBank:Create(ctx()).standIn)
     end)
 
     it("feathers its right edge out to nothing and takes no clicks there", function()
@@ -1007,7 +1013,10 @@ describe("NextBank", function()
 
     it("resets Classic's selected Blizzard bank tab instead of a bank type", function()
       client("classic")
-      override(_G, "BankFrame", { selectedTab = 3 })
+      -- Blizzard's bank frame, a frame (BankFrame.xml), with the tab it had selected.
+      local frame = CreateFrame("Frame", "BankFrame", UIParent)
+      frame.selectedTab = 3
+      override(_G, "BankFrame", frame)
       local bank = opened()
       bank:SwitchToBankAndWipe(ctx())
       assert.are.equal(1, BankFrame.selectedTab)
