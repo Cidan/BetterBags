@@ -41,6 +41,7 @@ local MAX_ITEM_COST = 3
 ---@field value number
 ---@field link? string An item that is paid.
 ---@field currencyName? string A currency that is paid.
+---@field costIndex? number Its place among the merchant's costs of the item (GetMerchantItemCostItem's), which its tooltip asks for.
 
 ---@class NextVendorItem
 ---@field index number The merchant's index of it.
@@ -97,7 +98,7 @@ function merchant:Init()
   self.search = index
 end
 
--- costsOf reads what an item costs besides gold.
+-- costsOf reads what an item costs besides gold, each with its place among the merchant's costs.
 ---@param index number
 ---@return NextVendorCost[]
 local function costsOf(index)
@@ -106,7 +107,7 @@ local function costsOf(index)
   for i = 1, math.min(count, MAX_ITEM_COST) do
     local texture, value, link, currencyName = GetMerchantItemCostItem(index, i)
     if texture then
-      table.insert(costs, { texture = texture, value = value, link = link, currencyName = currencyName })
+      table.insert(costs, { texture = texture, value = value, link = link, currencyName = currencyName, costIndex = i })
     end
   end
   return costs
@@ -515,7 +516,7 @@ function merchant:PriceOf(item, quantity)
   local costs = {}
   for _, cost in ipairs(item.costs) do
     table.insert(costs, { texture = cost.texture, value = math.ceil(cost.value * per), link = cost.link,
-      currencyName = cost.currencyName })
+      currencyName = cost.currencyName, costIndex = cost.costIndex })
   end
   return math.ceil(item.price * per), costs
 end

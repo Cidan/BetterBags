@@ -81,6 +81,41 @@ the sell cursor). So the frame must stay shown, on tab 1, and never be seen:
   - The card's fill (`Vendor.CardFill`) and a light over it under the pointer (`CardHover`, from the
     icon or anywhere on the card), each a color or false. The whole card takes the clicks and the
     pointer (`card`, a button under the icon's): its tooltip, its buy, buyback and repair.
+  - **A cost's own tooltip** (issue #1283, reported: over Vaskarn's crest cost the card showed the item's
+    tooltip, "as other addons would show it there"; asked: "fix it with hover only areas for costs"). Blizzard's
+    merchant draws each cost besides gold as a button of its own (`SmallAlternateCurrencyFrameTemplate`'s
+    `SmallDenominationTemplate`s), whose `OnEnter` shows that cost's tooltip:
+    `GameTooltip:SetMerchantCostItem(index, costIndex)` (`SmallDenominationTemplate_OnEnter`, retail
+    `MoneyFrame.lua`; Classic's `MoneyFrame.xml` the same), `costIndex` the cost's place among
+    `GetMerchantItemCostItem`'s (`MerchantFrame_UpdateAltCurrency`). The card's price is one font string, so
+    `NextVendorButton:placeCosts` lays an area over each cost it writes (`costAreas`, made as needed, kept per
+    card): from where the price up to the cost before it ends (after the gold, for the first) to where the price
+    up to it ends. It measures as `NextPanel:measureTitle` does (a font string measures at the width it was cut
+    to): the price's width set to none, its text set to each part (`priceParts`, the parts `PriceText` joins),
+    `GetStringWidth`, then its whole text and width back, all in one call, before the client draws. An area ends at
+    the price's width when the price cuts its cost short, and a cost cut off gets none. `Style` lays them out again
+    (a theme, a new grid, Icon Scale change the price's font and width); `Release`, a buyback, a repair and gold
+    alone hide them.
+    - **Hover only.** An area is a `Frame` over the card (frame level + 3), `EnableMouse(true)` then
+      `SetMouseClickEnabled(false)`, as Blizzard's tooltip-only widgets do (`UIWidgetTemplateTooltipFrameMixin:SetMouse`,
+      `Blizzard_UIWidgetTemplateBase.lua`; the API is on every client BetterBags runs on). It takes the pointer and no
+      click, so a right click over a cost still buys from the card and an item dropped there still sells; it has no
+      `OnClick` or `OnReceiveDrag` of its own.
+    - **Its tooltip** (`OnCostEnter`): owned by the area (`ANCHOR_RIGHT`, as Blizzard's), the cost's own and nothing
+      added (Blizzard's adds nothing), the card lit (`CardHover`) and the card's cursor (buy, or buy error), as a
+      click there buys. Leaving it is the card's `OnLeave`. The card's item tooltip still lists every cost as a line.
+    - **The cost's place**: `costsOf` keeps it (`costIndex`, the API's `i`, past a place it leaves out for a
+      missing texture), and `PriceOf` carries it, so a Shopping List card (profession-shopping-list.md) shows the
+      cost's tooltip for its quantity too. `TotalOf`'s total sums costs across items: it is no card, and has no areas.
+    - **Seen in game** (2026-11-12, WoW: Forever, the Darkmoon Faire): the pointer over a card's Darkmoon Prize
+      Ticket cost shows the ticket's tooltip. Not seen yet: that a drop passes through a motion-only frame to the card
+      under it.
+    - **Left as it is (bug review):** no spec sees the price's width set to none before measuring. The client measures a
+      font string cut short at the width it is cut to (next-small-names.md §14g), as the specs model it, and every measure
+      is cut at the price's width anyway, so taking it out changes nothing a faithful mock can show (the mutation
+      survives). It stays so a measure never depends on how the client measures a cut text: were a cut part measured
+      short of the width, a cost hidden past the cut would get an area over the "...". A card with costs writes its price up
+      to five times more as it is set or styled (the gold, each cost's part, then the whole); not measured in a capture.
   - **Drops sell** (`NextMerchant:SellCursorItem`, moved there from the vendor panel): an item dropped
     on a card or its icon, or left-clicked onto one, is sold, as on Blizzard's merchant item buttons
     (`OnReceiveDrag` runs their left click, which picks the merchant item up while holding the
@@ -313,7 +348,12 @@ section order; its own index, negated queries, forgetting the last vendor; buyba
 lists, costs, one item and all; every purchase path and quantity limit; junk on both clients,
 selling while open), `spec/next/vendorbutton_spec.lua` (look, counts, stock, quality, tints, heirlooms
 and reuse, prices, unaffordable, search dimming; tooltips and cursors; clicks: buy, Blizzard's
-modified clicks, quantities, buyback, repair; durability), `spec/next/vendor_spec.lua` (the panel,
+modified clicks, quantities, buyback, repair; durability; "its costs": an area over each, after the gold, cut at
+the price's width, none for one cut off, laid out again when styled, the cost's own tooltip and the card's cursor,
+hover only, none over gold, a buyback, a repair or a released card, a Shopping List's; 11 mutations, all caught, then
+the bug review's 16, two surviving: the price's width set to none before measuring, which no faithful mock can see, §10b),
+`spec/next/merchant_spec.lua` also each cost's place (`costIndex`, past one left out, carried by `PriceOf`),
+`spec/next/vendor_spec.lua` (the panel,
 no drags, its search box; header buttons per client, shown and enabled per vendor, the title's
 room, the game rule; opening, tabs and footers, button reuse, updates; Sell Junk on both clients,
 three rounds, stopping on close; repairs and their tooltips; the filter; selling by dropping and

@@ -569,14 +569,38 @@ function WidgetMethods:GetPoint(index)
   end
   return nil
 end
+-- ScriptRegion:EnableMouse(enable) turns a region's clicks and motion on or off together;
+-- SetMouseClickEnabled(enabled) and SetMouseMotionEnabled(enabled) set one each, and IsMouseClickEnabled()
+-- and IsMouseMotionEnabled() read them (SimpleScriptRegionAPIDocumentation). Blizzard's tooltip-only widgets
+-- turn the mouse on, then clicks off, and still show their tooltips (UIWidgetTemplateTooltipFrameMixin:SetMouse).
 function WidgetMethods:EnableMouse(enable)
   self._mouseEnabled = enable
+  self._mouseClickEnabled = enable and true or false
+  self._mouseMotionEnabled = enable and true or false
 end
 -- ScriptRegion:IsMouseEnabled() -> enabled (SimpleScriptRegionAPIDocumentation). Buttons take
 -- the mouse until told otherwise.
 function WidgetMethods:IsMouseEnabled()
   if self._mouseEnabled ~= nil then
     return self._mouseEnabled == true
+  end
+  return self._type == "Button" or self._type == "CheckButton"
+end
+function WidgetMethods:SetMouseClickEnabled(enabled)
+  self._mouseClickEnabled = enabled and true or false
+end
+function WidgetMethods:SetMouseMotionEnabled(enabled)
+  self._mouseMotionEnabled = enabled and true or false
+end
+function WidgetMethods:IsMouseClickEnabled()
+  if self._mouseClickEnabled ~= nil then
+    return self._mouseClickEnabled
+  end
+  return self._type == "Button" or self._type == "CheckButton"
+end
+function WidgetMethods:IsMouseMotionEnabled()
+  if self._mouseMotionEnabled ~= nil then
+    return self._mouseMotionEnabled
   end
   return self._type == "Button" or self._type == "CheckButton"
 end
@@ -3941,6 +3965,15 @@ end
 -- (retail; TooltipInfoDocumentation.lua) returns TooltipData, whose repairCost
 -- TooltipDataRules.lua reads. Specs set _G._repairCosts["inv:slot"] and ["bag:bag:slot"].
 function _G.GameTooltip:SetMerchantItem(index) self._merchantItem = index self:Show() end
+-- GameTooltip:SetMerchantCostItem(index, costIndex) fills the tooltip with one of a merchant item's costs, the
+-- currency or item paid (TooltipDataHandler.lua's accessor for C_TooltipInfo.GetMerchantCostItem(slot, costIndex),
+-- on retail and Classic alike), and shows it. Blizzard's merchant calls it from each cost's button
+-- (SmallDenominationTemplate_OnEnter, MoneyFrame.lua; Classic MoneyFrame.xml) with the item's index and the
+-- cost's place among GetMerchantItemCostItem's (MerchantFrame_UpdateAltCurrency).
+function _G.GameTooltip:SetMerchantCostItem(index, costIndex)
+  self._merchantCostItem = { index = index, costIndex = costIndex }
+  self:Show()
+end
 function _G.GameTooltip:SetBuybackItem(index) self._buybackItem = index self:Show() end
 function _G.GameTooltip:SetInventoryItem(unit, slot)
   self._inventoryItem = { unit = unit, slot = slot }

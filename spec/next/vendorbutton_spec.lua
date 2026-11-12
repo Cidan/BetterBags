@@ -549,6 +549,176 @@ describe("NextVendorButton", function()
     end)
   end)
 
+  -- Reported (issue #1283): the pointer over a cost other than gold (Vaskarn's crests) showed the item's tooltip, where
+  -- Blizzard's merchant shows the cost's own: each cost is a button of its own there (SmallDenominationTemplate_OnEnter:
+  -- GameTooltip:SetMerchantCostItem(index, costIndex)). Asked: "fix it with hover only areas for costs": each cost the price
+  -- writes has an area over it that takes the pointer and never a click, so the card under it still buys and sells.
+  describe("its costs", function()
+    local valor = { texture = 77, value = 30, currencyName = "Valor", costIndex = 1 }
+    local mark = { texture = 78, value = 2, link = "|Hitem:12|h", costIndex = 2 }
+    local crest = { texture = 79, value = 5, currencyName = "Crest", costIndex = 3 }
+
+    -- shownAreas is the cost areas the button shows, in order.
+    local function shownAreas(b)
+      local shown = {}
+      for _, area in ipairs(b.costAreas) do
+        if area:IsShown() then table.insert(shown, area) end
+      end
+      return shown
+    end
+
+    -- widthOf is how wide the client draws a text in the price's font.
+    local function widthOf(b, text)
+      local measure = b.frame:CreateFontString(nil, "OVERLAY")
+      measure:SetFontObject(b.price:GetFontObject())
+      measure:SetText(text)
+      return measure:GetStringWidth()
+    end
+
+    local function hover(area)
+      area:GetScript("OnEnter")(area)
+    end
+
+    local function unhover(area)
+      area:GetScript("OnLeave")(area)
+    end
+
+    after_each(function()
+      UseNextTheme(nil)
+      vendorButton:ApplyStyle()
+    end)
+
+    it("lays an area over each cost the price writes, from where the one before it ends to where it ends", function()
+      UseNextTheme({ Layout = { VendorColumns = 1 } })
+      vendorButton:ApplyStyle()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ costs = { valor, mark, crest } }))
+      local areas = shownAreas(b)
+      assert.are.equal(3, #areas)
+      local first = widthOf(b, vendorButton:PriceText(0, { valor }))
+      local second = widthOf(b, vendorButton:PriceText(0, { valor, mark }))
+      local third = widthOf(b, vendorButton:PriceText(0, { valor, mark, crest }))
+      local room = b.price:GetWidth()
+      assert.is_true(third <= room, "the three fit")
+      assert.are.same({ "TOPLEFT", b.price, "TOPLEFT", 0, 0 }, { areas[1]:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", b.price, "BOTTOMLEFT", first, 0 }, { areas[1]:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", b.price, "TOPLEFT", first, 0 }, { areas[2]:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", b.price, "BOTTOMLEFT", second, 0 }, { areas[2]:GetPoint(2) })
+      assert.are.same({ "TOPLEFT", b.price, "TOPLEFT", second, 0 }, { areas[3]:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", b.price, "BOTTOMLEFT", third, 0 }, { areas[3]:GetPoint(2) })
+      assert.are.equal(vendorButton:PriceText(0, { valor, mark, crest }), b.price:GetText(), "the whole price written again")
+      assert.are.equal(room, b.price:GetWidth(), "at its width again")
+    end)
+
+    it("starts the first after the gold, cuts one the price cuts short at its width, and gives one cut off none", function()
+      UseNextTheme({ Layout = { VendorColumns = 1 } })
+      vendorButton:ApplyStyle()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ price = 7, costs = { valor, mark } }))
+      local gold = widthOf(b, vendorButton:PriceText(7, {}))
+      local room = b.price:GetWidth()
+      assert.is_true(gold < room and widthOf(b, vendorButton:PriceText(7, { valor })) > room, "the Valor cut short")
+      local areas = shownAreas(b)
+      assert.are.equal(1, #areas, "none for the mark, cut off")
+      assert.are.same({ "TOPLEFT", b.price, "TOPLEFT", gold, 0 }, { areas[1]:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", b.price, "BOTTOMLEFT", room, 0 }, { areas[1]:GetPoint(2) })
+      hover(areas[1])
+      assert.are.same({ index = 4, costIndex = 1 }, GameTooltip._merchantCostItem)
+      unhover(areas[1])
+    end)
+
+    it("lays them out again as it is styled again, at its new width", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ costs = { valor, mark, crest } }))
+      local room = b.price:GetWidth()
+      local first = widthOf(b, vendorButton:PriceText(0, { valor }))
+      local second = widthOf(b, vendorButton:PriceText(0, { valor, mark }))
+      assert.is_true(first < room and second > room, "the mark cut short in two columns")
+      local areas = shownAreas(b)
+      assert.are.equal(2, #areas, "none for the crest, cut off")
+      assert.are.same({ "BOTTOMRIGHT", b.price, "BOTTOMLEFT", room, 0 }, { areas[2]:GetPoint(2) })
+      UseNextTheme({ Layout = { VendorColumns = 1 } })
+      vendorButton:ApplyStyle()
+      areas = shownAreas(b)
+      assert.are.equal(3, #areas, "all three in one column")
+      assert.are.same({ "BOTTOMRIGHT", b.price, "BOTTOMLEFT", second, 0 }, { areas[2]:GetPoint(2) })
+      assert.are.equal(vendorButton:PriceText(0, { valor, mark, crest }), b.price:GetText())
+      assert.are.equal(style.VENDOR_CARD_WIDTH - style.ICON - 2 * style.VENDOR_TEXT_GAP, b.price:GetWidth())
+    end)
+
+    it("shows the cost's own tooltip, as Blizzard's merchant does, lighting the card and keeping the buy cursor", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ costs = { { texture = 77, value = 3, currencyName = "Valor", costIndex = 2 } } }))
+      local area = shownAreas(b)[1]
+      GameTooltip._merchantCostItem, GameTooltip._merchantItem = nil, nil
+      hover(area)
+      assert.are.equal(area, GameTooltip._owner)
+      assert.are.equal("ANCHOR_RIGHT", GameTooltip._anchor)
+      assert.are.same({ index = 4, costIndex = 2 }, GameTooltip._merchantCostItem)
+      assert.is_nil(GameTooltip._merchantItem, "not the item's")
+      assert.is_true(GameTooltip:IsShown())
+      assert.is_true(b.cardHover:IsShown())
+      assert.are.equal("BUY_CURSOR", _G._cursor)
+      unhover(area)
+      assert.is_false(b.cardHover:IsShown())
+      assert.is_false(GameTooltip:IsShown())
+      assert.is_nil(_G._cursor)
+      b:SetBuy(item({ canAfford = false, costs = { valor } }))
+      hover(shownAreas(b)[1])
+      assert.are.equal("BUY_ERROR_CURSOR", _G._cursor)
+      assert.are.same({ index = 4, costIndex = 1 }, GameTooltip._merchantCostItem)
+    end)
+
+    -- As Blizzard's tooltip-only widgets (UIWidgetTemplateTooltipFrameMixin:SetMouse: EnableMouse, then
+    -- SetMouseClickEnabled(false)): a click or a drop over a cost reaches the card under it, which buys and sells.
+    it("takes the pointer and never a click, over its card", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ costs = { valor } }))
+      local area = shownAreas(b)[1]
+      assert.are.equal("Frame", area:GetObjectType())
+      assert.are.equal(b.frame, area:GetParent())
+      assert.is_true(area:IsMouseMotionEnabled())
+      assert.is_false(area:IsMouseClickEnabled())
+      assert.is_true(area:GetFrameLevel() > b.card:GetFrameLevel(), "over the card")
+      assert.is_nil(area:GetScript("OnClick"))
+      assert.is_nil(area:GetScript("OnReceiveDrag"))
+    end)
+
+    it("leaves none over gold alone, a buyback, a repair or a released button, and reuses its areas", function()
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ costs = { valor } }))
+      local area = shownAreas(b)[1]
+      b:SetBuy(item({ price = 500 }))
+      assert.are.same({}, shownAreas(b), "gold alone")
+      b:SetBuy(item({ costs = { valor } }))
+      b:SetBuyback({ index = 1, texture = 1, price = 1, quantity = 1, isUsable = true })
+      assert.are.same({}, shownAreas(b), "a buyback")
+      b:SetBuy(item({ costs = { valor } }))
+      assert.are.equal(area, shownAreas(b)[1], "reused")
+      assert.are.equal(1, #b.costAreas)
+      b:SetRepair({ slot = 1, texture = 1, durability = 1, maxDurability = 2, cost = 1 })
+      assert.are.same({}, shownAreas(b), "a repair")
+      b:SetBuy(item({ costs = { valor } }))
+      b:Release()
+      assert.are.same({}, shownAreas(b), "released")
+    end)
+
+    -- In the vendor's Shopping List (profession-shopping-list.md) its price is what the list's quantity costs
+    -- (NextMerchant:PriceOf), each cost still the item's own.
+    it("shows a cost's tooltip for what a shopping list buys", function()
+      override(stubs.merchant, "PriceOf", function(_, _, quantity)
+        return 0, { { texture = 77, value = 3 * quantity, currencyName = "Valor", costIndex = 2 } }
+      end)
+      local b = vendorButton:Acquire()
+      b:SetBuy(item({ costs = { { texture = 77, value = 3, currencyName = "Valor", costIndex = 2 } } }), 7)
+      assert.are.equal(vendorButton:PriceText(0, { { texture = 77, value = 21 } }), b.price:GetText())
+      local area = shownAreas(b)[1]
+      assert.are.same({ "BOTTOMRIGHT", b.price, "BOTTOMLEFT", widthOf(b, b.price:GetText()), 0 }, { area:GetPoint(2) })
+      hover(area)
+      assert.are.same({ index = 4, costIndex = 2 }, GameTooltip._merchantCostItem)
+    end)
+  end)
+
   describe("its clicks", function()
     it("buys on a right click, through NextMerchant, and does nothing on a left click", function()
       local b = vendorButton:Acquire()
