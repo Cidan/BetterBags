@@ -1,0 +1,20 @@
+{
+  "id": 1794523483,
+  "version": "v0.9.2-11-g352564d",
+  "channel": "alpha",
+  "date": "2026-11-12",
+  "from": "813c48ac1f4f7a8c0cb46cb1e550a06f1cf163e2",
+  "to": "352564d65e0138a5563bdac3c76f79b38936718a",
+  "headline": "Items now dim properly when targeting Feed Pet, enchants, or weapon stones on Retail and WoW: Forever.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Item dimming for Feed Pet, enchants and weapon stones",
+      "details": "When casting Feed Pet, applying an enchant, or using sharpening stones, unusable bag items now correctly dim while targeting. Items also reliably return to normal when targeting ends.",
+      "clients": [
+        "Retail",
+        "Forever"
+      ]
+    }
+  ]
+}
