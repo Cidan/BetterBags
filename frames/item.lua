@@ -177,7 +177,8 @@ end
 -- Each button records in item.drawState the inputs of its last full draw. A redraw whose
 -- inputs all match skips the setters: the decoration still shows what they would set. The
 -- inputs are the item's itemHash (item ID, enchant, gems, bonus IDs, binding, item level
--- and stats), every other ItemData field the setters read, the data phase's draw generation
+-- and stats), every other ItemData field the setters read, the junk mark (Blizzard's
+-- UpdateJunkItem reads whether a vendor is open itself), the data phase's draw generation
 -- (a new one after every wipe sweep and restyling recalculation), the button style generation (RestyleButtons: settings
 -- the setters read, such as glow intensity, changed with no new data), and the decoration
 -- and theme generation the button was drawn with. ResetVisuals (a release or a change
@@ -232,6 +233,7 @@ function itemFrame.itemProto:DrawInputChanged(decoration, data)
 	if s.matches ~= searchMatch(data) then return "matches" end
 	if s.isUpgrade ~= data.isUpgrade then return "isUpgrade" end
 	if s.itemContextMatchResult ~= data.itemContextMatchResult then return "itemContextMatchResult" end
+	if s.junkMarked ~= data.junkMarked then return "junkMarked" end
 	return nil
 end
 
@@ -270,6 +272,7 @@ local function recordItemDraw(item, decoration, data)
 	s.matches = searchMatch(data)
 	s.isUpgrade = data.isUpgrade
 	s.itemContextMatchResult = data.itemContextMatchResult
+	s.junkMarked = data.junkMarked
 	s.valid = true
 end
 

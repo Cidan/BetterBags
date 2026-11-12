@@ -96,6 +96,7 @@ local async = addon:GetModule("Async")
 ---@field itemLinkInfo ItemLinkInfo
 ---@field itemHash string
 ---@field drawGeneration number The kind's draw generation when this sweep ran (see items:Init).
+---@field junkMarked? boolean Blizzard's junk coin shows on it (UpdateJunkItem): poor, sells for something, a vendor open; set in Phase 6.
 ---@field harvestIncomplete boolean True when the client had no item info at harvest; never reused.
 ---@field rawItemName string|nil The client's ContainerItemInfo.itemName, before fallbacks (see ReuseHarvestedSlot).
 ---@field rawIconFileID number|nil The client's ContainerItemInfo.iconFileID, before fallbacks.
@@ -353,6 +354,13 @@ function items:contextSignature()
     warbank = accountBankStart ~= nil and bank.bankTab >= accountBankStart
   end
   return tostring(addon.atBank == true) .. "|" .. tostring(warbank) .. "|" .. tostring(addon.atAuctionHouse == true)
+end
+
+-- vendorOpen says whether a vendor is open as Blizzard's UpdateJunkItem reads it when it shows the junk coin:
+-- MerchantFrame:IsShown() (BetterBags Next's vendor keeps that frame shown, under a hidden parent).
+---@return boolean
+local function vendorOpen()
+  return MerchantFrame ~= nil and MerchantFrame:IsShown() == true
 end
 
 -- categoryStamp is what an item's own category was worked out under, besides the item and its
@@ -1255,6 +1263,7 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
   local totalItems = 0
   local stamp = self:categoryStamp(kind)
   local contextSig = self:contextSignature()
+  local atVendor = vendorOpen()
 
   -- An empty slot is named after its bag and colored by the bag's type. Both are the same
   -- for every slot of a bag, so each bag is looked up once per sweep (never kept across
@@ -1355,6 +1364,9 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
         currentItem.itemContextMatchResult = self:ResolveItemContextMatchResult(currentItem)
         d.context = contextSig
       end
+      -- From the quality and no-value flag the draw hands UpdateJunkItem, so it agrees with the coin drawn.
+      currentItem.junkMarked = atVendor and currentItem.itemInfo.itemQuality == const.ITEM_QUALITY.Poor
+        and not (currentItem.containerInfo and currentItem.containerInfo.hasNoValue)
     end
     -- Kept verdicts are reused inside (caches.md §2). The search indexes the arrow: a kept item
     -- whose arrow changed is compared with its search entry again (search-indexing.md §11).
