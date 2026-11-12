@@ -1,0 +1,17 @@
+{
+  "id": 1794472985,
+  "version": "v0.9.2-9-gaf31b8b",
+  "channel": "alpha",
+  "date": "2026-11-12",
+  "from": "5d6a5d482eaf728596590591c352f1136b1fc5c4",
+  "to": "af31b8b5b6a780a73182aa306b664772e222925e",
+  "headline": "Vendor cards now display dedicated tooltips when hovering over alternate currency costs.",
+  "entries": [
+    {
+      "category": "Improved",
+      "title": "Currency tooltips on vendor cards",
+      "details": "Hovering over alternate currency costs like crests or event tokens on vendor and shopping list cards now shows the currency's own tooltip instead of the item's tooltip. Right-clicking or dragging items over the cost text to buy and sell continues to work as expected.",
+      "clients": []
+    }
+  ]
+}
