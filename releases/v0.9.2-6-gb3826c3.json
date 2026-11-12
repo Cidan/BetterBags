@@ -1,0 +1,17 @@
+{
+  "id": 1794462149,
+  "version": "v0.9.2-6-gb3826c3",
+  "channel": "alpha",
+  "date": "2026-11-12",
+  "from": "c57c941766a1330cfed93b1766492521617e5347",
+  "to": "b3826c3ec04b698e01f2c08b7cfed373fd0de83c",
+  "headline": "This build prevents Blizzard interface panels from opening underneath BetterBags Next windows.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Blizzard panels overlapping bank and vendor windows",
+      "details": "Standard Blizzard frames such as the Character pane and Dressing Room now open beside the vendor, bank, and guild bank windows instead of getting hidden underneath them.",
+      "clients": []
+    }
+  ]
+}
